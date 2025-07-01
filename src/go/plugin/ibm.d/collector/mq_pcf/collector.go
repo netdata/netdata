@@ -42,6 +42,10 @@ type Config struct {
 	CollectChannels *bool `yaml:"collect_channels"`
 	CollectTopics   *bool `yaml:"collect_topics"`
 	
+	// System objects collection
+	CollectSystemQueues   *bool `yaml:"collect_system_queues"`
+	CollectSystemChannels *bool `yaml:"collect_system_channels"`
+	
 	// Filtering
 	QueueSelector   string `yaml:"queue_selector"`
 	ChannelSelector string `yaml:"channel_selector"`
@@ -56,6 +60,7 @@ type Collector struct {
 	
 	// Instance tracking for dynamic chart creation
 	collected map[string]bool
+	seen      map[string]bool // Track what we've seen this collection cycle
 	
 	// MQ connection
 	mqConn *mqConnection
@@ -120,6 +125,18 @@ func (c *Collector) Init(ctx context.Context) error {
 		c.CollectTopics = &defaultValue
 	}
 	
+	if c.CollectSystemQueues == nil {
+		// Auto-detection: Default to true for system queues (provides comprehensive monitoring)
+		defaultValue := true
+		c.CollectSystemQueues = &defaultValue
+	}
+	
+	if c.CollectSystemChannels == nil {
+		// Auto-detection: Default to true for system channels (provides comprehensive monitoring)
+		defaultValue := true
+		c.CollectSystemChannels = &defaultValue
+	}
+	
 	// Compile selector regular expressions if provided
 	if c.QueueSelector != "" {
 		var err error
@@ -137,8 +154,8 @@ func (c *Collector) Init(ctx context.Context) error {
 		}
 	}
 	
-	c.Infof("Collection settings: queues=%v, channels=%v, topics=%v", 
-		*c.CollectQueues, *c.CollectChannels, *c.CollectTopics)
+	c.Infof("Collection settings: queues=%v, channels=%v, topics=%v, system_queues=%v, system_channels=%v", 
+		*c.CollectQueues, *c.CollectChannels, *c.CollectTopics, *c.CollectSystemQueues, *c.CollectSystemChannels)
 	
 	return nil
 }
