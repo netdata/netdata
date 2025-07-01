@@ -5,7 +5,7 @@
 # - "NetApp Release 8.2.5P3 7-Mode: Tue Jul 16 01:37:24 PDT 2019"
 
 extends:
-  - _base.yaml
+  - _system-base.yaml
 
 device:
   vendor: "netapp"

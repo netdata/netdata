@@ -1,8 +1,8 @@
 extends:
-  - _generic-bgp4.yaml
-  - _generic-host-resources.yaml
-  - _generic-if.yaml
-  - _generic-ospf.yaml
+  - _std-bgp4-mib.yaml
+  - _std-host-resources-mib.yaml
+  - _std-if-mib.yaml
+  - _std-ospf-mib.yaml
   - _juniper-cos.yaml
   - _juniper-dcu.yaml
   - _juniper-firewall.yaml

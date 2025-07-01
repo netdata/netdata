@@ -1,7 +1,7 @@
 # Profile for Dell devices
 
 extends:
-  - _base.yaml
+  - _system-base.yaml
 
 metadata:
   device:

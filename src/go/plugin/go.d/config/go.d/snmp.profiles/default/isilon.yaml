@@ -2,10 +2,10 @@
 # - device-name-3 263829375 Isilon OneFS v8.2.0.0
 # - device-name-5 2316163007 Isilon OneFS v8.1.2.0
 extends:
-  - _base.yaml
-  - _generic-ip.yaml
-  - _generic-tcp.yaml
-  - _generic-udp.yaml
+  - _system-base.yaml
+  - _std-ip-mib.yaml
+  - _std-tcp-mib.yaml
+  - _std-udp-mib.yaml
 
 device:
   vendor: "dell"

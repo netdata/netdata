@@ -6,13 +6,13 @@
 #   BIG-IP Virtual Edition : Linux 3.10.0-862.14.4.el7.ve.x86_64 : BIG-IP software release 15.0.1, build 0.0.11
 
 extends:
-  - _base.yaml
-  - _generic-if.yaml # F5-specific variants of the other metrics are provided in this profile.
-  - _generic-bgp4.yaml
-  - _generic-ospf.yaml
-  - _generic-tcp.yaml
-  - _generic-udp.yaml
-  - _generic-ip.yaml
+  - _system-base.yaml
+  - _std-if-mib.yaml # F5-specific variants of the other metrics are provided in this profile.
+  - _std-bgp4-mib.yaml
+  - _std-ospf-mib.yaml
+  - _std-tcp-mib.yaml
+  - _std-udp-mib.yaml
+  - _std-ip-mib.yaml
   - _f5-big-ip-cpu-memory.yaml
 
 device:

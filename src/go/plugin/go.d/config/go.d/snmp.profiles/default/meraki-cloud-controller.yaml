@@ -2,8 +2,8 @@
 #
 # We don't extend from base for now, as sysName is useless for meraki.
 extends:
-  - _base.yaml
-  - _generic-if.yaml
+  - _system-base.yaml
+  - _std-if-mib.yaml
 
 device:
   vendor: "meraki"

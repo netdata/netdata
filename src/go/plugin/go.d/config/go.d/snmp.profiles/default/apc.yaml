@@ -2,7 +2,7 @@
 
 extends:
   - _apc-metadata.yaml
-  - _generic-tcp.yaml
-  - _generic-udp.yaml
+  - _std-tcp-mib.yaml
+  - _std-udp-mib.yaml
 
 sysobjectid: 1.3.6.1.4.1.318.*

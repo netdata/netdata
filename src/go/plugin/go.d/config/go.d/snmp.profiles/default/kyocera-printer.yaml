@@ -1,5 +1,5 @@
 extends:
-  - _base.yaml
+  - _system-base.yaml
   # TODO: Extends _generic-if32.yaml when implemented
   # - _generic-if32.yaml
 sysobjectid: 1.3.6.1.4.1.1347.41

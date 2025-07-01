@@ -1,6 +1,6 @@
 extends:
   - _dell.yaml
-  - _generic-if.yaml
+  - _std-if-mib.yaml
 
 sysobjectid:
   - 1.3.6.1.4.1.6027.1.3.*  # Dell Networking S Family

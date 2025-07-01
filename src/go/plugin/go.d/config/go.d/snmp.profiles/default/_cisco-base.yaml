@@ -1,12 +1,12 @@
 # Metrics mixin for Cisco devices.
 
 extends:
-  - _generic-if.yaml
-  - _generic-tcp.yaml
-  - _generic-udp.yaml
-  - _generic-ospf.yaml
-  - _generic-bgp4.yaml
-  - _generic-ip.yaml
+  - _std-if-mib.yaml
+  - _std-tcp-mib.yaml
+  - _std-udp-mib.yaml
+  - _std-ospf-mib.yaml
+  - _std-bgp4-mib.yaml
+  - _std-ip-mib.yaml
   - _cisco-cpu-memory.yaml
   - _cisco-metadata.yaml
 

@@ -1,6 +1,6 @@
 extends:
-  - _generic-host-resources-base.yaml
-  - _generic-if.yaml
+  - _std-host-resources-mib-feat-base.yaml
+  - _std-if-mib.yaml
   - avaya.yaml
 
 sysobjectid:

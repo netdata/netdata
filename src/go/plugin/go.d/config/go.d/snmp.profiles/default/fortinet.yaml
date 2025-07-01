@@ -2,8 +2,8 @@
 # For Fortinet FortiGate devices, a separate fortinet-fortigate profile is used
 
 extends:
-  - _base.yaml
-  - _generic-if.yaml
+  - _system-base.yaml
+  - _std-if-mib.yaml
 
 metadata:
   device:

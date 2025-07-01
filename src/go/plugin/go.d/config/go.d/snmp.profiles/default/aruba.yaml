@@ -11,7 +11,7 @@ metadata:
         value: Aruba
 
 extends:
-  - _base.yaml
+  - _system-base.yaml
   - _aruba-base.yaml
-  - _generic-if.yaml
-  - _generic-ospf.yaml
+  - _std-if-mib.yaml
+  - _std-ospf-mib.yaml

@@ -1,7 +1,7 @@
 extends:
-  - _base.yaml
-  - _generic-if.yaml
-  - _generic-ucd.yaml
+  - _system-base.yaml
+  - _std-if-mib.yaml
+  - _std-ucd-mib.yaml
 
 metadata:
   device:

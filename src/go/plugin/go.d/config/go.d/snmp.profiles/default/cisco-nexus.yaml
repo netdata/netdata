@@ -1,8 +1,8 @@
 # Profile for Cisco Nexus devices
 
 extends:
-  - _base.yaml
-  - _cisco-generic.yaml
+  - _system-base.yaml
+  - _cisco-base.yaml
 
 metadata:
   device:

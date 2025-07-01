@@ -1,5 +1,5 @@
 extends:
-  - _generic-if.yaml
+  - _std-if-mib.yaml
   - _ubiquiti.yaml
 
 sysobjectid:

@@ -4,13 +4,13 @@
 #   https://www.juniper.net/documentation/en_US/junos/topics/concept/enterprise-specific-mibs-overview.html
 
 extends:
-  - _generic-if.yaml
-  - _generic-ip.yaml
-  - _generic-tcp.yaml
-  - _generic-udp.yaml
-  - _generic-bgp4.yaml
-  - _generic-ospf.yaml
-  - _generic-host-resources.yaml
+  - _std-if-mib.yaml
+  - _std-ip-mib.yaml
+  - _std-tcp-mib.yaml
+  - _std-udp-mib.yaml
+  - _std-bgp4-mib.yaml
+  - _std-ospf-mib.yaml
+  - _std-host-resources-mib.yaml
   - _juniper-virtualchassis.yaml
   - _juniper-firewall.yaml
   - _juniper-junos-generic.yaml

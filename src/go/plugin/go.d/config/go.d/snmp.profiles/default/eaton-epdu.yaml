@@ -1,5 +1,5 @@
 extends:
-  - _base.yaml
+  - _system-base.yaml
 
 sysobjectid: 1.3.6.1.4.1.534.6.6.7 # eatonEpdu
 

@@ -1,4 +1,0 @@
-# This profile is deprecated and kept in place for retrocompatibility purposes, please use `_generic-ospf` instead.
-
-extends:
-  - _generic-ospf.yaml

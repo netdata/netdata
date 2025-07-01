@@ -1,8 +1,8 @@
 extends:
-  - _base.yaml
-  - _generic-entity-sensor.yaml
-  - _generic-if.yaml
-  - _generic-ospf.yaml
+  - _system-base.yaml
+  - _std-entity-sensor-mib.yaml
+  - _std-if-mib.yaml
+  - _std-ospf-mib.yaml
   - avaya.yaml
 
 metadata:

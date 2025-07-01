@@ -1,8 +1,8 @@
 extends:
-  - _base.yaml
-  - _generic-host-resources.yaml
-  - _generic-if.yaml
-  - _generic-ucd.yaml
+  - _system-base.yaml
+  - _std-host-resources-mib.yaml
+  - _std-if-mib.yaml
+  - _std-ucd-mib.yaml
   # This profile does not import cisco.yaml on purpose
 sysobjectid:
   - 1.3.6.1.4.1.9.1.2785

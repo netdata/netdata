@@ -1,7 +1,7 @@
 extends:
   - _dell.yaml
-  - _generic-host-resources-base.yaml
-  - _generic-ucd.yaml
+  - _std-host-resources-mib-feat-base.yaml
+  - _std-ucd-mib.yaml
 #  - if32-mib.yaml  # TODO: later (NDM-1933)
 
 sysobjectid:

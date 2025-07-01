@@ -1,5 +1,5 @@
 extends:
-  - _generic-ucd.yaml
+  - _std-ucd-mib.yaml
   - netgear.yaml
 sysobjectid:
   - 1.3.6.1.4.1.4526.100.16.*

@@ -13,15 +13,15 @@ extends:
   - _arista.yaml
   - _arista-metadata.yaml
   - _arista-queue.yaml
-  - _base.yaml
-  - _generic-if.yaml
-  - _generic-ip.yaml
-  - _generic-host-resources.yaml
-  - _generic-ospf.yaml
-  - _generic-bgp4.yaml
-  - _generic-tcp.yaml
-  - _generic-udp.yaml
-  - _generic-entity-sensor.yaml
+  - _system-base.yaml
+  - _std-if-mib.yaml
+  - _std-ip-mib.yaml
+  - _std-host-resources-mib.yaml
+  - _std-ospf-mib.yaml
+  - _std-bgp4-mib.yaml
+  - _std-tcp-mib.yaml
+  - _std-udp-mib.yaml
+  - _std-entity-sensor-mib.yaml
 
 # The OID `1.3.6.1.4.1.30065.1`/`aristaProducts` is the root object identifier from
 # which sysObjectID values are assigned. Values are defined in ARISTA-PRODUCTS-MIB.
