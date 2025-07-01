@@ -18,10 +18,10 @@
 #define NETDATA_PLUGIN_EXIT_AND_RESTART 0
 #define NETDATA_PLUGIN_EXIT_AND_DISABLE 1
 
-#define NETDATA_PLUGIN_CLABEL_SOURCE_AUTO   1
-#define NETDATA_PLUGIN_CLABEL_SOURCE_MANUAL 2
-#define NETDATA_PLUGIN_CLABEL_SOURCE_K8     4
-#define NETDATA_PLUGIN_CLABEL_SOURCE_AGENT  8
+#define NETDATA_CLABEL_SOURCE_AUTO   1
+#define NETDATA_CLABEL_SOURCE_MANUAL 2
+#define NETDATA_CLABEL_SOURCE_K8     4
+#define NETDATA_CLABEL_SOURCE_AGENT  8
 
 #define NETDATA_CHART_PRIO_UPSD_UPS_LOAD      70000
 #define NETDATA_CHART_PRIO_UPSD_UPS_LOADUSAGE 70001
@@ -593,21 +593,21 @@ int main(int argc, char *argv[]) {
                clean_name(buf, sizeof(buf), ups_name), NETDATA_CHART_PRIO_UPSD_UPS_STATUS, netdata_update_every);
 
         if ((nut_value = nut_get_var(&ups2, ups_name, "battery.type")))
-            printf("CLABEL battery_type '%s' %u\n", nut_value, NETDATA_PLUGIN_CLABEL_SOURCE_AUTO);
+            printf("CLABEL battery_type '%s' %u\n", nut_value, NETDATA_CLABEL_SOURCE_AUTO);
         if ((nut_value = nut_get_var(&ups2, ups_name, "device.model")))
-            printf("CLABEL device_model '%s' %u\n", nut_value, NETDATA_PLUGIN_CLABEL_SOURCE_AUTO);
+            printf("CLABEL device_model '%s' %u\n", nut_value, NETDATA_CLABEL_SOURCE_AUTO);
         if ((nut_value = nut_get_var(&ups2, ups_name, "device.serial")))
-            printf("CLABEL device_serial '%s' %u\n", nut_value, NETDATA_PLUGIN_CLABEL_SOURCE_AUTO);
+            printf("CLABEL device_serial '%s' %u\n", nut_value, NETDATA_CLABEL_SOURCE_AUTO);
         if ((nut_value = nut_get_var(&ups2, ups_name, "device.mfr")))
-            printf("CLABEL device_manufacturer '%s' %u\n", nut_value, NETDATA_PLUGIN_CLABEL_SOURCE_AUTO);
+            printf("CLABEL device_manufacturer '%s' %u\n", nut_value, NETDATA_CLABEL_SOURCE_AUTO);
         if ((nut_value = nut_get_var(&ups2, ups_name, "device.type")))
-            printf("CLABEL device_type '%s' %u\n", nut_value, NETDATA_PLUGIN_CLABEL_SOURCE_AUTO);
+            printf("CLABEL device_type '%s' %u\n", nut_value, NETDATA_CLABEL_SOURCE_AUTO);
 
         // CLABEL name value source
         // CLABEL_COMMIT
         printf("CLABEL ups_name '%s' %u\n"
                "CLABEL_COMMIT\n",
-               ups_name, NETDATA_PLUGIN_CLABEL_SOURCE_AUTO);
+               ups_name, NETDATA_CLABEL_SOURCE_AUTO);
 
         // DIMENSION id [name [algorithm [multiplier [divisor [options]]]]]
         printf("DIMENSION on_line '' '' '' %u\n", NETDATA_PLUGIN_PRECISION);
@@ -652,21 +652,21 @@ int main(int argc, char *argv[]) {
                    netdata_update_every); // update_every
 
             if ((nut_value = nut_get_var(&ups2, ups_name, "battery.type")))
-                printf("CLABEL 'battery_type' '%s' '%u'\n", nut_value, NETDATA_PLUGIN_CLABEL_SOURCE_AUTO);
+                printf("CLABEL 'battery_type' '%s' '%u'\n", nut_value, NETDATA_CLABEL_SOURCE_AUTO);
             if ((nut_value = nut_get_var(&ups2, ups_name, "device.model")))
-                printf("CLABEL 'device_model' '%s' '%u'\n", nut_value, NETDATA_PLUGIN_CLABEL_SOURCE_AUTO);
+                printf("CLABEL 'device_model' '%s' '%u'\n", nut_value, NETDATA_CLABEL_SOURCE_AUTO);
             if ((nut_value = nut_get_var(&ups2, ups_name, "device.serial")))
-                printf("CLABEL 'device_serial' '%s' '%u'\n", nut_value, NETDATA_PLUGIN_CLABEL_SOURCE_AUTO);
+                printf("CLABEL 'device_serial' '%s' '%u'\n", nut_value, NETDATA_CLABEL_SOURCE_AUTO);
             if ((nut_value = nut_get_var(&ups2, ups_name, "device.mfr")))
-                printf("CLABEL 'device_manufacturer' '%s' '%u'\n", nut_value, NETDATA_PLUGIN_CLABEL_SOURCE_AUTO);
+                printf("CLABEL 'device_manufacturer' '%s' '%u'\n", nut_value, NETDATA_CLABEL_SOURCE_AUTO);
             if ((nut_value = nut_get_var(&ups2, ups_name, "device.type")))
-                printf("CLABEL 'device_type' '%s' '%u'\n", nut_value, NETDATA_PLUGIN_CLABEL_SOURCE_AUTO);
+                printf("CLABEL 'device_type' '%s' '%u'\n", nut_value, NETDATA_CLABEL_SOURCE_AUTO);
 
             // CLABEL name value source
             // CLABEL_COMMIT
             printf("CLABEL 'ups_name' '%s' %u\n"
                    "CLABEL_COMMIT\n",
-                   ups_name, NETDATA_PLUGIN_CLABEL_SOURCE_AUTO);
+                   ups_name, NETDATA_CLABEL_SOURCE_AUTO);
  
             // DIMENSION id [name [algorithm [multiplier [divisor [options]]]]]
             printf("DIMENSION '%s' '' '' '' %u\n", chart->chart_dimension, NETDATA_PLUGIN_PRECISION);
