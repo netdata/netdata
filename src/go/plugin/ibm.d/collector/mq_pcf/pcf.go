@@ -313,8 +313,8 @@ func (c *Collector) parsePCFResponse(response []byte) (map[C.MQLONG]interface{},
 				return attrs, nil
 			}
 			// Log parameter details for debugging
-			c.Debugf("MQCFST: StrucLength=%d, StringLength=%d, Parameter=%d", 
-				cfst.StrucLength, cfst.StringLength, cfst.Parameter)
+			// c.Debugf("MQCFST: StrucLength=%d, StringLength=%d, Parameter=%d", 
+			// 	cfst.StrucLength, cfst.StringLength, cfst.Parameter)
 			
 			// Extract string value using a slice for robustness
 			// String data starts at offset 20 within MQCFST (after the fixed header fields)
