@@ -3,24 +3,39 @@ extends:
 
 sysobjectid:
   - 1.3.6.1.4.1.1718.3  # Sentry 3rd Gen PDU
+
 metadata:
   device:
     fields:
       type:
         value: "PDU"
+
+metric_tags:
+  - tag: servertech_sentry3_system_version
+    OID: 1.3.6.1.4.1.1718.3.1.1.0
+    symbol: systemVersion
+  - tag: servertech_sentry3_system_nic_serial_number
+    OID: 1.3.6.1.4.1.1718.3.1.2.0
+    symbol: systemNICSerialNumber
+
 metrics:
   - MIB: SENTRY3-MIB
     symbol:
       name: servertech.sentry3.systemTotalPower
       OID: 1.3.6.1.4.1.1718.3.1.6.0
-      description: Total power consumption of the system
-      unit: "W"
+      chart_meta:
+        description: Total power consumption of the system
+        family: "System/Power/Total"
+        unit: "W"
   - MIB: SENTRY3-MIB
     symbol:
       name: servertech.sentry3.systemConfigModifiedCount
       OID: 1.3.6.1.4.1.1718.3.1.15.0
-      description: Count of system configuration modifications
-      unit: "{modification}"
+      chart_meta:
+        description: Count of system configuration modifications
+        family: "System/Configuration/Modified/Count"
+        unit: "{modification}"
+
   - MIB: SENTRY3-MIB
     table:
       name: towerTable
@@ -28,58 +43,58 @@ metrics:
     symbols:
       - name: servertech.sentry3.towerInfeedCount
         OID: 1.3.6.1.4.1.1718.3.2.1.1.5
-        description: Number of tower infeeds
-        unit: "{infeed}"
+        chart_meta:
+          description: Number of tower infeeds
+          family: "Tower/Infeed/Count"
+          unit: "{infeed}"
       - name: servertech.sentry3.towerVACapacity
         OID: 1.3.6.1.4.1.1718.3.2.1.1.9
-        description: Tower VA capacity
-        unit: "VA"
+        chart_meta:
+          description: Tower VA capacity
+          family: "Tower/Power/Capacity/Apparent"
+          unit: "VA"
       - name: servertech.sentry3.towerVACapacityUsed
         OID: 1.3.6.1.4.1.1718.3.2.1.1.10
-        description: Used tower VA capacity
-        unit: "VA"
+        chart_meta:
+          description: Used tower VA capacity
+          family: "Tower/Power/Used/Apparent"
+          unit: "VA"
       - name: servertech.sentry3.towerActivePower
         OID: 1.3.6.1.4.1.1718.3.2.1.1.11
-        description: Tower active power
-        unit: "W"
+        chart_meta:
+          description: Tower active power
+          family: "Tower/Power/Active"
+          unit: "W"
       - name: servertech.sentry3.towerApparentPower
         OID: 1.3.6.1.4.1.1718.3.2.1.1.12
-        description: Tower apparent power
-        unit: "VA"
+        chart_meta:
+          description: Tower apparent power
+          family: "Tower/Power/Apparent"
+          unit: "VA"
       - name: servertech.sentry3.towerPowerFactor
         OID: 1.3.6.1.4.1.1718.3.2.1.1.13
-        description: Tower power factor
-        unit: "%"
+        chart_meta:
+          description: Tower power factor
+          family: "Tower/Power/Factor"
+          unit: "%"
       - name: servertech.sentry3.towerEnergy
         OID: 1.3.6.1.4.1.1718.3.2.1.1.14
-        description: Tower energy consumption
-        unit: "Wh"
+        chart_meta:
+          description: Tower energy consumption
+          family: "Tower/Energy/Total"
+          unit: "Wh"
       - name: servertech.sentry3.towerLineFrequency
         OID: 1.3.6.1.4.1.1718.3.2.1.1.15
-        description: Tower line frequency
-        unit: "Hz"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          name: servertech.sentry3.towerID
-          OID: 1.3.6.1.4.1.1718.3.2.1.1.2
-        tag: servertech_sentry3_tower_id
-      - symbol:
-          name: servertech.sentry3.towerName
-          OID: 1.3.6.1.4.1.1718.3.2.1.1.3
-        tag: servertech_sentry3_tower_name
-      - symbol:
-          name: servertech.sentry3.towerProductSN
-          OID: 1.3.6.1.4.1.1718.3.2.1.1.6
-        tag: servertech_sentry3_tower_product_sn
-      - symbol:
-          name: servertech.sentry3.towerModelNumber
-          OID: 1.3.6.1.4.1.1718.3.2.1.1.7
-        tag: servertech_sentry3_tower_model_number
-      - symbol:
-          OID: 1.3.6.1.4.1.1718.3.2.1.1.4
-          name: servertech.sentry3.towerStatus
-        tag: servertech_sentry3_tower_status
+        chart_meta:
+          description: Tower line frequency
+          family: "Tower/Frequency/Value"
+          unit: "Hz"
+      - name: servertech.sentry3.towerStatus
+        OID: 1.3.6.1.4.1.1718.3.2.1.1.4
+        chart_meta:
+          description: Tower operational status
+          family: "Tower/Status"
+          unit: "{status}"
         mapping:
           0: normal
           1: no_comm
@@ -87,6 +102,24 @@ metrics:
           3: over_temp
           4: nvm_fail
           5: out_of_balance
+    metric_tags:
+      - tag: servertech_sentry3_tower_id
+        symbol:
+          name: servertech.sentry3.towerID
+          OID: 1.3.6.1.4.1.1718.3.2.1.1.2
+      - tag: servertech_sentry3_tower_name
+        symbol:
+          name: servertech.sentry3.towerName
+          OID: 1.3.6.1.4.1.1718.3.2.1.1.3
+      - tag: _servertech_sentry3_tower_product_sn
+        symbol:
+          name: servertech.sentry3.towerProductSN
+          OID: 1.3.6.1.4.1.1718.3.2.1.1.6
+      - tag: _servertech_sentry3_tower_model_number
+        symbol:
+          name: servertech.sentry3.towerModelNumber
+          OID: 1.3.6.1.4.1.1718.3.2.1.1.7
+
   - MIB: SENTRY3-MIB
     table:
       name: infeedTable
@@ -94,66 +127,64 @@ metrics:
     symbols:
       - name: servertech.sentry3.infeedLoadValue
         OID: 1.3.6.1.4.1.1718.3.2.2.1.7
-        description: Infeed load value
-        unit: "W"
+        chart_meta:
+          description: Infeed load value
+          family: "Infeed/Load/Value"
+          unit: "W"
       - name: servertech.sentry3.infeedOutletCount
         OID: 1.3.6.1.4.1.1718.3.2.2.1.9
-        description: Number of outlets on infeed
-        unit: "{outlet}"
+        chart_meta:
+          description: Number of outlets on infeed
+          family: "Infeed/Outlet/Count"
+          unit: "{outlet}"
       - name: servertech.sentry3.infeedCapacity
         OID: 1.3.6.1.4.1.1718.3.2.2.1.10
-        description: Infeed capacity
-        unit: "VA"
+        chart_meta:
+          description: Infeed capacity
+          family: "Infeed/Power/Capacity"
+          unit: "VA"
       - name: servertech.sentry3.infeedVoltage
         OID: 1.3.6.1.4.1.1718.3.2.2.1.11
-        description: Infeed voltage
-        unit: "V"
+        chart_meta:
+          description: Infeed voltage
+          family: "Infeed/Voltage/Value"
+          unit: "V"
       - name: servertech.sentry3.infeedPower
         OID: 1.3.6.1.4.1.1718.3.2.2.1.12
-        description: Infeed power
-        unit: "W"
+        chart_meta:
+          description: Infeed power
+          family: "Infeed/Power/Active"
+          unit: "W"
       - name: servertech.sentry3.infeedEnergy
         OID: 1.3.6.1.4.1.1718.3.2.2.1.16
-        description: Infeed energy consumption
-        unit: "Wh"
+        chart_meta:
+          description: Infeed energy consumption
+          family: "Infeed/Energy/Total"
+          unit: "Wh"
       - name: servertech.sentry3.infeedPhaseVoltage
         OID: 1.3.6.1.4.1.1718.3.2.2.1.18
-        description: Infeed phase voltage
-        unit: "V"
+        chart_meta:
+          description: Infeed phase voltage
+          family: "Infeed/Phase/Voltage/Value"
+          unit: "V"
       - name: servertech.sentry3.infeedPhaseCurrent
         OID: 1.3.6.1.4.1.1718.3.2.2.1.19
-        description: Infeed phase current
-        unit: "A"
+        chart_meta:
+          description: Infeed phase current
+          family: "Infeed/Phase/Current/Value"
+          unit: "A"
       - name: servertech.sentry3.infeedCapacityUsed
         OID: 1.3.6.1.4.1.1718.3.2.2.1.20
-        description: Used infeed capacity
-        unit: "VA"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          name: servertech.sentry3.infeedID
-          OID: 1.3.6.1.4.1.1718.3.2.2.1.2
-        tag: servertech_sentry3_infeed_id
-      - symbol:
-          name: servertech.sentry3.infeedName
-          OID: 1.3.6.1.4.1.1718.3.2.2.1.3
-        tag: servertech_sentry3_infeed_name
-      - symbol:
-          name: servertech.sentry3.infeedLineID
-          OID: 1.3.6.1.4.1.1718.3.2.2.1.21
-        tag: servertech_sentry3_infeed_line_id
-      - symbol:
-          name: servertech.sentry3.infeedLineToLineID
-          OID: 1.3.6.1.4.1.1718.3.2.2.1.22
-        tag: servertech_sentry3_infeed_line_to_line_id
-      - symbol:
-          name: servertech.sentry3.infeedPhaseID
-          OID: 1.3.6.1.4.1.1718.3.2.2.1.23
-        tag: servertech_sentry3_infeed_phase_id
-      - symbol:
-          OID: 1.3.6.1.4.1.1718.3.2.2.1.5
-          name: servertech.sentry3.infeedStatus
-        tag: servertech_sentry3_infeed_status
+        chart_meta:
+          description: Used infeed capacity
+          family: "Infeed/Power/Used"
+          unit: "VA"
+      - name: servertech.sentry3.infeedStatus
+        OID: 1.3.6.1.4.1.1718.3.2.2.1.5
+        chart_meta:
+          description: Infeed operational status
+          family: "Infeed/Status"
+          unit: "{status}"
         mapping:
           0: off
           1: on
@@ -165,10 +196,12 @@ metrics:
           7: reading
           8: off_fuse
           9: on_fuse
-      - symbol:
-          OID: 1.3.6.1.4.1.1718.3.2.2.1.6
-          name: servertech.sentry3.infeedLoadStatus
-        tag: servertech_sentry3_infeed_load_status
+      - name: servertech.sentry3.infeedLoadStatus
+        OID: 1.3.6.1.4.1.1718.3.2.2.1.6
+        chart_meta:
+          description: Infeed load status
+          family: "Infeed/Load/Status"
+          unit: "{status}"
         mapping:
           0: normal
           1: not_on
@@ -178,36 +211,50 @@ metrics:
           5: over_load
           6: read_error
           7: no_comm
-      - symbol:
-          OID: 1.3.6.1.4.1.1718.3.2.2.1.17
-          name: servertech.sentry3.infeedReactance
-        tag: servertech_sentry3_infeed_reactance
+      - name: servertech.sentry3.infeedReactance
+        OID: 1.3.6.1.4.1.1718.3.2.2.1.17
+        chart_meta:
+          description: Infeed reactance type
+          family: "Infeed/Reactance/Type"
+          unit: "{status}"
         mapping:
           0: unknown
           1: capacitive
           2: inductive
           3: resistive
+    metric_tags:
+      - tag: servertech_sentry3_infeed_id
+        symbol:
+          name: servertech.sentry3.infeedID
+          OID: 1.3.6.1.4.1.1718.3.2.2.1.2
+      - tag: servertech_sentry3_infeed_name
+        symbol:
+          name: servertech.sentry3.infeedName
+          OID: 1.3.6.1.4.1.1718.3.2.2.1.3
+      - tag: servertech_sentry3_infeed_line_id
+        symbol:
+          name: servertech.sentry3.infeedLineID
+          OID: 1.3.6.1.4.1.1718.3.2.2.1.21
+      - tag: servertech_sentry3_infeed_line_to_line_id
+        symbol:
+          name: servertech.sentry3.infeedLineToLineID
+          OID: 1.3.6.1.4.1.1718.3.2.2.1.22
+      - tag: servertech_sentry3_infeed_phase_id
+        symbol:
+          name: servertech.sentry3.infeedPhaseID
+          OID: 1.3.6.1.4.1.1718.3.2.2.1.23
+
   - MIB: SENTRY3-MIB
     table:
       name: outletTable
       OID: 1.3.6.1.4.1.1718.3.2.3
     symbols:
-      - name: servertech.sentry3.outlet
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          name: servertech.sentry3.outletID
-          OID: 1.3.6.1.4.1.1718.3.2.3.1.2
-        tag: servertech_sentry3_outlet_id
-      - symbol:
-          name: servertech.sentry3.outletName
-          OID: 1.3.6.1.4.1.1718.3.2.3.1.3
-        tag: servertech_sentry3_outlet_name
-      - symbol:
-          OID: 1.3.6.1.4.1.1718.3.2.3.1.5
-          name: servertech.sentry3.outletStatus
-        tag: servertech_sentry3_outlet_status
+      - name: servertech.sentry3.outletStatus
+        OID: 1.3.6.1.4.1.1718.3.2.3.1.5
+        chart_meta:
+          description: Outlet operational status
+          family: "Outlet/Status"
+          unit: "{status}"
         mapping:
           0: off
           1: on
@@ -219,10 +266,12 @@ metrics:
           7: reading
           8: off_fuse
           9: on_fuse
-      - symbol:
-          OID: 1.3.6.1.4.1.1718.3.2.3.1.10
-          name: servertech.sentry3.outletControlState
-        tag: servertech_sentry3_outlet_control_state
+      - name: servertech.sentry3.outletControlState
+        OID: 1.3.6.1.4.1.1718.3.2.3.1.10
+        chart_meta:
+          description: Outlet control state
+          family: "Outlet/Control/State"
+          unit: "{status}"
         mapping:
           0: idle_off
           1: idle_on
@@ -242,38 +291,50 @@ metrics:
           15: event_on
           16: event_reboot
           17: event_shutdown
-      - symbol:
-          OID: 1.3.6.1.4.1.1718.3.2.3.1.19
-          name: servertech.sentry3.outletWakeupState
-        tag: servertech_sentry3_outlet_wakeup_state
+      - name: servertech.sentry3.outletWakeupState
+        OID: 1.3.6.1.4.1.1718.3.2.3.1.19
+        chart_meta:
+          description: Outlet wakeup state configuration
+          family: "Outlet/Wakeup/State"
+          unit: "{status}"
         mapping:
           1: last
           2: off
           3: on
+    metric_tags:
+      - tag: servertech_sentry3_outlet_id
+        symbol:
+          name: servertech.sentry3.outletID
+          OID: 1.3.6.1.4.1.1718.3.2.3.1.2
+      - tag: servertech_sentry3_outlet_name
+        symbol:
+          name: servertech.sentry3.outletName
+          OID: 1.3.6.1.4.1.1718.3.2.3.1.3
+
   - MIB: SENTRY3-MIB
     table:
       name: envMonTable
       OID: 1.3.6.1.4.1.1718.3.2.4
     symbols:
-      - name: servertech.sentry3.envMon
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          name: servertech.sentry3.envMonID
-          OID: 1.3.6.1.4.1.1718.3.2.4.1.2
-        tag: servertech_sentry3_env_mon_id
-      - symbol:
-          name: servertech.sentry3.envMonName
-          OID: 1.3.6.1.4.1.1718.3.2.4.1.3
-        tag: servertech_sentry3_env_mon_name
-      - symbol:
-          OID: 1.3.6.1.4.1.1718.3.2.4.1.4
-          name: servertech.sentry3.envMonStatus
-        tag: servertech_sentry3_env_mon_status
+      - name: servertech.sentry3.envMonStatus
+        OID: 1.3.6.1.4.1.1718.3.2.4.1.4
+        chart_meta:
+          description: Environmental monitor status
+          family: "Environment/Monitor/Status"
+          unit: "{status}"
         mapping:
           0: normal
           1: no_comm
+    metric_tags:
+      - tag: servertech_sentry3_env_mon_id
+        symbol:
+          name: servertech.sentry3.envMonID
+          OID: 1.3.6.1.4.1.1718.3.2.4.1.2
+      - tag: servertech_sentry3_env_mon_name
+        symbol:
+          name: servertech.sentry3.envMonName
+          OID: 1.3.6.1.4.1.1718.3.2.4.1.3
+
   - MIB: SENTRY3-MIB
     table:
       name: tempHumidSensorTable
@@ -281,35 +342,33 @@ metrics:
     symbols:
       - name: servertech.sentry3.tempHumidSensorTempValue
         OID: 1.3.6.1.4.1.1718.3.2.5.1.6
-        description: Temperature value from sensor
-        unit: "Cel"
+        chart_meta:
+          description: Temperature value from sensor
+          family: "Sensor/Temperature/Value"
+          unit: "Cel"
       - name: servertech.sentry3.tempHumidSensorHumidValue
         OID: 1.3.6.1.4.1.1718.3.2.5.1.10
-        description: Humidity value from sensor
-        unit: "%"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          name: servertech.sentry3.tempHumidSensorID
-          OID: 1.3.6.1.4.1.1718.3.2.5.1.2
-        tag: servertech_sentry3_temp_humid_sensor_id
-      - symbol:
-          name: servertech.sentry3.tempHumidSensorName
-          OID: 1.3.6.1.4.1.1718.3.2.5.1.3
-        tag: servertech_sentry3_temp_humid_sensor_name
-      - symbol:
-          OID: 1.3.6.1.4.1.1718.3.2.5.1.4
-          name: servertech.sentry3.tempHumidSensorStatus
-        tag: servertech_sentry3_temp_humid_sensor_status
+        chart_meta:
+          description: Humidity value from sensor
+          family: "Sensor/Humidity/Value"
+          unit: "%"
+      - name: servertech.sentry3.tempHumidSensorStatus
+        OID: 1.3.6.1.4.1.1718.3.2.5.1.4
+        chart_meta:
+          description: Temperature/humidity sensor communication status
+          family: "Sensor/Communication/Status"
+          unit: "{status}"
         mapping:
           0: found
           1: not_found
           2: lost
           3: no_comm
-      - symbol:
-          OID: 1.3.6.1.4.1.1718.3.2.5.1.5
-          name: servertech.sentry3.tempHumidSensorTempStatus
-        tag: servertech_sentry3_temp_humid_sensor_temp_status
+      - name: servertech.sentry3.tempHumidSensorTempStatus
+        OID: 1.3.6.1.4.1.1718.3.2.5.1.5
+        chart_meta:
+          description: Temperature sensor status
+          family: "Sensor/Temperature/Status"
+          unit: "{status}"
         mapping:
           0: normal
           1: not_found
@@ -319,10 +378,12 @@ metrics:
           5: read_error
           6: lost
           7: no_comm
-      - symbol:
-          OID: 1.3.6.1.4.1.1718.3.2.5.1.9
-          name: servertech.sentry3.tempHumidSensorHumidStatus
-        tag: servertech_sentry3_temp_humid_sensor_humid_status
+      - name: servertech.sentry3.tempHumidSensorHumidStatus
+        OID: 1.3.6.1.4.1.1718.3.2.5.1.9
+        chart_meta:
+          description: Humidity sensor status
+          family: "Sensor/Humidity/Status"
+          unit: "{status}"
         mapping:
           0: normal
           1: not_found
@@ -332,17 +393,19 @@ metrics:
           5: read_error
           6: lost
           7: no_comm
-      - symbol:
+    metric_tags:
+      - tag: servertech_sentry3_temp_humid_sensor_id
+        symbol:
+          name: servertech.sentry3.tempHumidSensorID
+          OID: 1.3.6.1.4.1.1718.3.2.5.1.2
+      - tag: servertech_sentry3_temp_humid_sensor_name
+        symbol:
+          name: servertech.sentry3.tempHumidSensorName
+          OID: 1.3.6.1.4.1.1718.3.2.5.1.3
+      - tag: servertech_sentry3_temp_humid_sensor_temp_scale
+        symbol:
           OID: 1.3.6.1.4.1.1718.3.2.5.1.13
           name: servertech.sentry3.tempHumidSensorTempScale
-        tag: servertech_sentry3_temp_humid_sensor_temp_scale
         mapping:
           0: celsius
           1: fahrenheit
-metric_tags:
-  - OID: 1.3.6.1.4.1.1718.3.1.1.0
-    symbol: systemVersion
-    tag: servertech_sentry3_system_version
-  - OID: 1.3.6.1.4.1.1718.3.1.2.0
-    symbol: systemNICSerialNumber
-    tag: servertech_sentry3_system_nic_serial_number

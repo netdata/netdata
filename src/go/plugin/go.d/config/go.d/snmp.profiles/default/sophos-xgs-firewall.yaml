@@ -1,6 +1,6 @@
 extends:
   - _system-base.yaml
-  - _std-host-resources-mib-feat-base.yam
+  - _std-host-resources-mib-feat-base.yaml
   - _std-if-mib.yaml
 
 sysobjectid:
