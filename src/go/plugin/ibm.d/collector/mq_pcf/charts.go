@@ -117,8 +117,6 @@ var baseCharts = module.Charts{
 }
 
 // Template charts for queue instances
-// Note: Currently only queue depth is available from INQUIRE_Q_STATUS
-// Enqueue/dequeue counts would require INQUIRE_Q or statistics to be enabled
 var queueChartsTmpl = module.Charts{
 	{
 		ID:       "queue_%s_depth",
@@ -129,6 +127,43 @@ var queueChartsTmpl = module.Charts{
 		Priority: prioQueueDepth,
 		Dims: module.Dims{
 			{ID: "queue_%s_depth", Name: "depth"},
+		},
+	},
+	{
+		ID:       "queue_%s_config",
+		Title:    "Queue Configuration Limits",
+		Units:    "messages",
+		Fam:      "queues", 
+		Ctx:      "mq_pcf.queue_config",
+		Priority: prioQueueDepth + 1,
+		Dims: module.Dims{
+			{ID: "queue_%s_max_depth", Name: "max_depth"},
+			{ID: "queue_%s_backout_threshold", Name: "backout_threshold"},
+			{ID: "queue_%s_trigger_depth", Name: "trigger_depth"},
+		},
+	},
+	{
+		ID:       "queue_%s_inhibit",
+		Title:    "Queue Inhibit Status",
+		Units:    "status",
+		Fam:      "queues",
+		Ctx:      "mq_pcf.queue_inhibit", 
+		Priority: prioQueueDepth + 2,
+		Dims: module.Dims{
+			{ID: "queue_%s_inhibit_get", Name: "inhibit_get"},
+			{ID: "queue_%s_inhibit_put", Name: "inhibit_put"},
+		},
+	},
+	{
+		ID:       "queue_%s_defaults",
+		Title:    "Queue Default Settings",
+		Units:    "value",
+		Fam:      "queues",
+		Ctx:      "mq_pcf.queue_defaults",
+		Priority: prioQueueDepth + 3,
+		Dims: module.Dims{
+			{ID: "queue_%s_def_priority", Name: "priority"},
+			{ID: "queue_%s_def_persistence", Name: "persistence"},
 		},
 	},
 	// TODO: Enable these charts when we implement INQUIRE_Q based collection
