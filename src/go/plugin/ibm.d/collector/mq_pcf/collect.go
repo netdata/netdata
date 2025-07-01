@@ -543,13 +543,21 @@ func (c *Collector) getPCFResponse(requestMd *C.MQMD, hReplyObj C.MQHOBJ) ([]byt
 			break
 		}
 		
+		// Check the PCF header before appending
+		cfh := (*C.MQCFH)(unsafe.Pointer(&buffer[0]))
+		c.Debugf("getPCFResponse: Received message, Control=%d, CompCode=%d, Reason=%d, ParameterCount=%d", 
+			cfh.Control, cfh.CompCode, cfh.Reason, cfh.ParameterCount)
+		
+		// If this is an error response (CompCode != 0), don't collect more messages
+		// Just return this single error response for proper error handling
+		if cfh.CompCode != C.MQCC_OK {
+			return buffer[:bufferLength], nil
+		}
+		
 		// Append this response to our collection
 		allResponses = append(allResponses, buffer[:bufferLength]...)
 		
 		// Check if this is the last message in the sequence
-		cfh := (*C.MQCFH)(unsafe.Pointer(&buffer[0]))
-		c.Debugf("getPCFResponse: Received message %d, Control=%d, CompCode=%d, Reason=%d, ParameterCount=%d", 
-			len(allResponses)/int(bufferLength), cfh.Control, cfh.CompCode, cfh.Reason, cfh.ParameterCount)
 		if cfh.Control == C.MQCFC_LAST {
 			break
 		}
@@ -657,6 +665,11 @@ func (c *Collector) collectChannelMetrics(ctx context.Context, mx map[string]int
 	// Get list of channels
 	channels, err := c.getChannelList(ctx)
 	if err != nil {
+		// Check if this is an authorization error
+		if strings.Contains(err.Error(), "2035") || strings.Contains(err.Error(), "NOT_AUTHORIZED") {
+			c.Warningf("Not authorized to query channels - skipping channel collection: %v", err)
+			return nil // Don't fail entire collection
+		}
 		return fmt.Errorf("failed to get channel list: %w", err)
 	}
 	
