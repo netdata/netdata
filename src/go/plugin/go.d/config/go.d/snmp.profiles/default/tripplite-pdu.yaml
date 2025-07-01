@@ -244,6 +244,6 @@ metrics:
       - tag: tlp_alarm_index
         index: 1  # tlpAlarmId
       - tag: _tlp_alarm_descr
-      - symbol:
+        symbol:
           OID: 1.3.6.1.4.1.850.1.3.2.1.2
           name: tlpAlarmDescr
