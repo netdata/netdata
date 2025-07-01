@@ -33,10 +33,10 @@ func TestContextProliferation(t *testing.T) {
 	// Analyze contexts
 	contextCount := make(map[string]int)
 	categoryContexts := make(map[string][]string)
-	
+
 	for _, chart := range charts {
 		contextCount[chart.Context]++
-		
+
 		// Extract category from context
 		parts := strings.Split(chart.Context, ".")
 		if len(parts) >= 3 {
@@ -60,7 +60,7 @@ func TestContextProliferation(t *testing.T) {
 		contexts := categoryContexts[cat]
 		if len(contexts) > 5 { // Show categories with significant proliferation
 			fmt.Printf("\n%s: %d contexts\n", cat, len(contexts))
-			
+
 			// Show first few examples
 			sort.Strings(contexts)
 			for i, ctx := range contexts {
@@ -75,7 +75,7 @@ func TestContextProliferation(t *testing.T) {
 
 	// Analyze specific array types
 	fmt.Println("\nArray element analysis:")
-	
+
 	// Thread pools
 	threadPools := make(map[string]bool)
 	for _, chart := range charts {

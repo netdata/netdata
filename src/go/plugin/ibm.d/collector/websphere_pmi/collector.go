@@ -54,23 +54,9 @@ func New() *WebSpherePMI {
 			MaxEJBs:            50,
 		},
 
-		charts:             &module.Charts{},
-		collectedApps:      make(map[string]bool),
-		collectedPools:     make(map[string]bool),
-		collectedJDBCPools: make(map[string]bool),
-		collectedJCAPools:  make(map[string]bool),
-		collectedJMS:       make(map[string]bool),
-		collectedServlets:  make(map[string]bool),
-		collectedEJBs:      make(map[string]bool),
-		seenApps:           make(map[string]bool),
-		seenPools:          make(map[string]bool),
-		seenJDBCPools:      make(map[string]bool),
-		seenJCAPools:       make(map[string]bool),
-		seenJMS:            make(map[string]bool),
-		seenServlets:       make(map[string]bool),
-		seenEJBs:           make(map[string]bool),
-		pmiCache:           make(map[string]*pmiCacheEntry),
-		loggedWarnings:     make(map[string]bool),
+		charts:         &module.Charts{},
+		pmiCache:       make(map[string]*pmiCacheEntry),
+		loggedWarnings: make(map[string]bool),
 	}
 }
 
@@ -122,8 +108,6 @@ type Config struct {
 	CollectServletsMatching string `yaml:"collect_servlets_matching,omitempty" json:"collect_servlets_matching"`
 	CollectEJBsMatching     string `yaml:"collect_ejbs_matching,omitempty" json:"collect_ejbs_matching"`
 
-	// Dynamic collection system
-	UseDynamicCollection *bool `yaml:"use_dynamic_collection,omitempty" json:"use_dynamic_collection"`
 
 	// HTTP Client settings
 	web.HTTPConfig `yaml:",inline" json:""`
@@ -137,22 +121,6 @@ type WebSpherePMI struct {
 
 	httpClient *http.Client
 	pmiURL     string
-
-	// For tracking dynamic instances
-	collectedApps      map[string]bool
-	collectedPools     map[string]bool
-	collectedJDBCPools map[string]bool
-	collectedJCAPools  map[string]bool
-	collectedJMS       map[string]bool
-	collectedServlets  map[string]bool
-	collectedEJBs      map[string]bool
-	seenApps           map[string]bool
-	seenPools          map[string]bool
-	seenJDBCPools      map[string]bool
-	seenJCAPools       map[string]bool
-	seenJMS            map[string]bool
-	seenServlets       map[string]bool
-	seenEJBs           map[string]bool
 
 	// Selectors
 	appSelector     matcher.Matcher
@@ -174,8 +142,7 @@ type WebSpherePMI struct {
 	wasEdition string // traditional, liberty
 
 	// Dynamic collection system
-	dynamicCollector     *DynamicCollector
-	useDynamicCollection bool
+	dynamicCollector *DynamicCollector
 }
 
 type pmiCacheEntry struct {
@@ -564,36 +531,10 @@ func (w *WebSpherePMI) collect(ctx context.Context) (map[string]int64, error) {
 	// Detect WebSphere version on first successful collection
 	w.detectWebSphereVersion(stats)
 
-	// Check if dynamic collection should be used
-	if w.shouldUseDynamicCollection() {
-		return w.collectDynamic(ctx, stats), nil
-	}
-
-	// Process and collect metrics using legacy system
-	mx := make(map[string]int64)
-
-	// Mark all current entities as not seen
-	w.markAllNotSeen()
-
-	// Process stats
-	w.processStats(stats, mx)
-
-	// Remove stale entities
-	w.removeNotSeenEntities()
-
-	return mx, nil
+	// Always use dynamic collection for better metric organization
+	return w.collectDynamic(ctx, stats), nil
 }
 
-// shouldUseDynamicCollection determines if dynamic collection should be used
-func (w *WebSpherePMI) shouldUseDynamicCollection() bool {
-	// Check explicit configuration
-	if w.UseDynamicCollection != nil {
-		return *w.UseDynamicCollection
-	}
-
-	// Default: use dynamic collection for better metric coverage
-	return true
-}
 
 func (w *WebSpherePMI) fetchPMIStats(ctx context.Context) (*pmiStatsResponse, error) {
 	// Build request URL with parameters
@@ -655,228 +596,11 @@ func (w *WebSpherePMI) fetchPMIStats(ctx context.Context) (*pmiStatsResponse, er
 	}
 }
 
-func (w *WebSpherePMI) processStats(stats *pmiStatsResponse, mx map[string]int64) {
-	// Process nodes/servers structure (traditional WAS)
-	for _, node := range stats.Nodes {
-		w.Debugf("processing node: %s", node.Name)
-		for _, server := range node.Servers {
-			w.Debugf("processing server: %s", server.Name)
-			for i := range server.Stats {
-				stat := &server.Stats[i]
-				stat.populateBackwardCompatibility()
-				w.Debugf("processing top-level stat: %s (path: %s)", stat.Name, stat.Path)
-				w.processStat(stat, "", mx)
-			}
-		}
-	}
 
-	// Process direct stats (Liberty/other versions)
-	for i := range stats.Stats {
-		stat := &stats.Stats[i]
-		stat.populateBackwardCompatibility()
-		w.Debugf("processing direct stat: %s (path: %s)", stat.Name, stat.Path)
-		w.processStat(stat, "", mx)
-	}
-}
 
-// populateBackwardCompatibility sets the single statistic fields from arrays for backward compatibility
-func (s *pmiStat) populateBackwardCompatibility() {
-	if len(s.CountStatistics) > 0 {
-		s.CountStatistic = &s.CountStatistics[0]
-	}
-	if len(s.TimeStatistics) > 0 {
-		s.TimeStatistic = &s.TimeStatistics[0]
-	}
-	if len(s.RangeStatistics) > 0 {
-		s.RangeStatistic = &s.RangeStatistics[0]
-	}
-	if len(s.BoundedRangeStatistics) > 0 {
-		s.BoundedRangeStatistic = &s.BoundedRangeStatistics[0]
-	}
-	if len(s.DoubleStatistics) > 0 {
-		s.DoubleStatistic = &s.DoubleStatistics[0]
-	}
 
-	// Recursively populate for sub-stats
-	for i := range s.SubStats {
-		s.SubStats[i].populateBackwardCompatibility()
-	}
-}
 
-// statProcessor defines a function that processes a specific type of stat
-type statProcessor struct {
-	module      string
-	enabled     func() bool
-	processFunc func(*pmiStat, map[string]int64)
-}
 
-func (w *WebSpherePMI) getStatProcessors() []statProcessor {
-	return []statProcessor{
-		{
-			module:      "jvmRuntimeModule",
-			enabled:     func() bool { return w.CollectJVMMetrics != nil && *w.CollectJVMMetrics },
-			processFunc: w.processJVMStat,
-		},
-		{
-			module:      "threadPoolModule",
-			enabled:     func() bool { return w.CollectThreadPoolMetrics != nil && *w.CollectThreadPoolMetrics },
-			processFunc: w.processThreadPoolStat,
-		},
-		{
-			module:      "connectionPoolModule",
-			enabled:     func() bool { return w.CollectJDBCMetrics != nil && *w.CollectJDBCMetrics },
-			processFunc: w.processJDBCPoolStat,
-		},
-		{
-			module:      "j2cModule",
-			enabled:     func() bool { return w.CollectJCAMetrics != nil && *w.CollectJCAMetrics },
-			processFunc: w.processJCAPoolStat,
-		},
-		{
-			module:      "webAppModule",
-			enabled:     func() bool { return w.CollectWebAppMetrics != nil && *w.CollectWebAppMetrics },
-			processFunc: w.processWebAppStat,
-		},
-		{
-			module:      "servletModule",
-			enabled:     func() bool { return w.CollectServletMetrics != nil && *w.CollectServletMetrics },
-			processFunc: w.processServletStat,
-		},
-		{
-			module:      "ejbModule",
-			enabled:     func() bool { return w.CollectEJBMetrics != nil && *w.CollectEJBMetrics },
-			processFunc: w.processEJBStat,
-		},
-	}
-}
-
-func (w *WebSpherePMI) processStat(stat *pmiStat, parentPath string, mx map[string]int64) {
-	// Build full path
-	fullPath := stat.Path
-	if fullPath == "" && parentPath != "" {
-		fullPath = parentPath + "/" + stat.Name
-	} else if fullPath == "" {
-		fullPath = stat.Name
-	}
-
-	// Assign the built path back to the stat so extraction functions can use it
-	stat.Path = fullPath
-
-	// Process based on stat type using processors
-	processors := w.getStatProcessors()
-	for _, processor := range processors {
-		// Match both module names and stat names for WebSphere 9.x compatibility
-		if (strings.Contains(fullPath, processor.module) ||
-			(processor.module == "jvmRuntimeModule" && stat.Name == "JVM Runtime") ||
-			(processor.module == "threadPoolModule" && stat.Name == "Thread Pools") ||
-			(processor.module == "connectionPoolModule" && stat.Name == "JDBC Connection Pools") ||
-			(processor.module == "j2cModule" && stat.Name == "JCA Connection Pools") ||
-			(processor.module == "webAppModule" && stat.Name == "Web Applications") ||
-			(processor.module == "servletModule" && stat.Name == "Servlets") ||
-			(processor.module == "ejbModule" && stat.Name == "Enterprise Beans")) &&
-			processor.enabled() {
-			w.Debugf("Processing stat '%s' with %s processor", stat.Name, processor.module)
-			processor.processFunc(stat, mx)
-			break // Only process with the first matching processor
-		}
-	}
-
-	// Process sub-stats recursively
-	for i := range stat.SubStats {
-		subStat := &stat.SubStats[i]
-		subStat.populateBackwardCompatibility()
-		w.processStat(subStat, fullPath, mx)
-	}
-}
-
-func (w *WebSpherePMI) markAllNotSeen() {
-	for k := range w.seenApps {
-		w.seenApps[k] = false
-	}
-	for k := range w.seenPools {
-		w.seenPools[k] = false
-	}
-	for k := range w.seenJDBCPools {
-		w.seenJDBCPools[k] = false
-	}
-	for k := range w.seenJCAPools {
-		w.seenJCAPools[k] = false
-	}
-	for k := range w.seenJMS {
-		w.seenJMS[k] = false
-	}
-	for k := range w.seenServlets {
-		w.seenServlets[k] = false
-	}
-	for k := range w.seenEJBs {
-		w.seenEJBs[k] = false
-	}
-}
-
-func (w *WebSpherePMI) removeNotSeenEntities() {
-	// Remove apps not seen
-	for app, seen := range w.seenApps {
-		if !seen {
-			delete(w.seenApps, app)
-			delete(w.collectedApps, app)
-			w.removeAppCharts(app)
-		}
-	}
-
-	// Remove thread pools not seen
-	for pool, seen := range w.seenPools {
-		if !seen {
-			delete(w.seenPools, pool)
-			delete(w.collectedPools, pool)
-			w.removeThreadPoolCharts(pool)
-		}
-	}
-
-	// Remove JDBC pools not seen
-	for pool, seen := range w.seenJDBCPools {
-		if !seen {
-			delete(w.seenJDBCPools, pool)
-			delete(w.collectedJDBCPools, pool)
-			w.removeJDBCPoolCharts(pool)
-		}
-	}
-
-	// Remove JCA pools not seen
-	for pool, seen := range w.seenJCAPools {
-		if !seen {
-			delete(w.seenJCAPools, pool)
-			delete(w.collectedJCAPools, pool)
-			w.removeJCAPoolCharts(pool)
-		}
-	}
-
-	// Remove JMS destinations not seen
-	for jms, seen := range w.seenJMS {
-		if !seen {
-			delete(w.seenJMS, jms)
-			delete(w.collectedJMS, jms)
-			// TODO: Implement JMS chart removal when JMS support is added
-		}
-	}
-
-	// Remove servlets not seen
-	for servlet, seen := range w.seenServlets {
-		if !seen {
-			delete(w.seenServlets, servlet)
-			delete(w.collectedServlets, servlet)
-			w.removeServletCharts(servlet)
-		}
-	}
-
-	// Remove EJBs not seen
-	for ejb, seen := range w.seenEJBs {
-		if !seen {
-			delete(w.seenEJBs, ejb)
-			delete(w.collectedEJBs, ejb)
-			w.removeEJBCharts(ejb)
-		}
-	}
-}
 
 func (w *WebSpherePMI) logOnce(key, format string, args ...any) {
 	if w.loggedWarnings[key] {

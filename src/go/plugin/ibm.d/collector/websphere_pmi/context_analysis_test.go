@@ -54,7 +54,7 @@ func TestAnalyzeContextProliferation(t *testing.T) {
 		if len(contexts) > 3 {
 			fmt.Printf("\nBase: %s\n", pattern)
 			fmt.Printf("  Has %d different contexts (should be 1!)\n", len(contexts))
-			
+
 			// Show first few
 			sort.Strings(contexts)
 			for i, ctx := range contexts {
@@ -69,12 +69,12 @@ func TestAnalyzeContextProliferation(t *testing.T) {
 
 	// Analyze homogeneous metrics in arrays
 	fmt.Println("\n=== HOMOGENEOUS METRICS IN ARRAYS ===")
-	
+
 	// Look at specific array types
 	for _, array := range flatResult.Arrays {
 		if len(array.Elements) > 0 {
 			fmt.Printf("\nArray: %s (%d elements)\n", array.Path, len(array.Elements))
-			
+
 			// Check what metrics are common across all elements
 			commonMetrics := make(map[string]int)
 			for _, metric := range flatResult.Metrics {
@@ -88,7 +88,7 @@ func TestAnalyzeContextProliferation(t *testing.T) {
 					}
 				}
 			}
-			
+
 			// Show metrics that appear in all elements
 			fmt.Println("  Common metrics across all elements:")
 			for metricName, count := range commonMetrics {
