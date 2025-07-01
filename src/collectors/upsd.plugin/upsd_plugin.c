@@ -550,7 +550,6 @@ int main(int argc, char *argv[]) {
         return NETDATA_PLUGIN_EXIT_AND_DISABLE;
     }
 
-    // TODO: get address/port from configuration file
     if ((-1 == upscli_connect(&ups1, "127.0.0.1", 3493, 0)) ||
         (-1 == upscli_connect(&ups2, "127.0.0.1", 3493, 0))) {
         upscli_cleanup();
