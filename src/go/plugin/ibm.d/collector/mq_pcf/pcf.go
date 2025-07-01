@@ -403,10 +403,16 @@ func mqErrorString(code int32) string {
 	switch code {
 	case 2035:
 		return "MQRC_NOT_AUTHORIZED"
+	case 2067:
+		return "MQRC_OBJECT_OPEN_ERROR"
 	case 2085:
 		return "MQRC_UNKNOWN_OBJECT_NAME"
 	case 3008:
 		return "MQRCCF_COMMAND_FAILED"
+	case 3010:
+		return "MQRCCF_CFH_PARM_ID_ERROR"
+	case 3065:
+		return "MQRCCF_CHANNEL_NOT_ACTIVE"
 	case ErrInternalParsing:
 		return "INTERNAL_PARSE_ERROR"
 	case ErrInternalShort:
