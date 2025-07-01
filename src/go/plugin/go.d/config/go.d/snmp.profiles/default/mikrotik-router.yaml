@@ -186,7 +186,7 @@ metrics:
         transform: |
           {{- $sensorType := index .Metric.Tags "sensor_type" | default "" -}}
           {{- $config := get (dict 
-              "1" (dict "name" "temperature" "unit" "cel" "family" "Sensor/Temperature/Value" 
+              "1" (dict "name" "temperature" "unit" "Cel" "family" "Sensor/Temperature/Value" 
                    "desc" "Temperature reading")
               "2" (dict "name" "fan_speed" "unit" "{revolution}/min" "family" "Sensor/FanSpeed/Value" 
                    "desc" "Fan rotation speed")
