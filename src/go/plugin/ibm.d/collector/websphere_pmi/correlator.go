@@ -134,39 +134,18 @@ func (c *CorrelationEngine) generateCorrelationKey(metric MetricTuple) string {
 }
 
 // isKnownCategory checks if a path part represents a known category
+// This is now simplified since we use natural hierarchy
 func (c *CorrelationEngine) isKnownCategory(part string) bool {
-	knownCategories := []string{
-		"Thread Pools", "JDBC Connection Pools", "JCA Connection Pools",
-		"Web Applications", "JVM Runtime", "Servlets", "Portlets", 
-		"server", "Dynamic Caching", "Servlet Session Manager",
-	}
-	
-	for _, cat := range knownCategories {
-		if part == cat {
-			return true
-		}
-	}
-	return false
+	// We don't need a whitelist anymore - any first-level component
+	// after "server" is a valid category
+	return part != "server" && part != ""
 }
 
 // normalizeCategory converts category names to consistent identifiers
+// This is now simplified - just replace / to prevent submenus
 func (c *CorrelationEngine) normalizeCategory(category string) string {
-	switch category {
-	case "Thread Pools":
-		return "thread_pools"
-	case "JDBC Connection Pools":
-		return "jdbc_pools"
-	case "Web Applications":
-		return "web_apps"
-	case "JVM Runtime":
-		return "jvm"
-	case "Servlets":
-		return "servlets"
-	case "Portlets":
-		return "portlets"
-	default:
-		return strings.ToLower(strings.ReplaceAll(category, " ", "_"))
-	}
+	// Only replace / with _ to prevent UI from making submenus
+	return strings.ReplaceAll(category, "/", "_")
 }
 
 // extractMetricFamily groups related metrics by semantic meaning
@@ -599,13 +578,88 @@ func (c *CorrelationEngine) isMetricType(s string) bool {
 	return false
 }
 
-// generateChartFamily creates a chart family for grouping
+// generateChartFamily creates a chart family for grouping using 2-level hierarchy
 func (c *CorrelationEngine) generateChartFamily(group MetricGroup) string {
-	parts := strings.Split(group.BaseContext, ".")
-	if len(parts) >= 2 {
-		return parts[1] // Use category as family
+	// SAFETY FIRST: Always ensure charts are visible, even if family is wrong
+	fallbackFamily := "websphere/server" // Safe fallback that's always visible
+	
+	if len(group.Metrics) == 0 {
+		return fallbackFamily
 	}
-	return "websphere"
+	
+	// Get the first metric to extract category information
+	firstMetric := group.Metrics[0]
+	
+	// Use category from metric labels (set by flattener based on natural XML hierarchy)
+	if category, exists := firstMetric.Labels["category"]; exists && category != "" {
+		// Category is already normalized by flattener
+		baseFamily := category
+		
+		// Create 2-level family: "baseFamily/instance"
+		if instance, hasInstance := firstMetric.Labels["instance"]; hasInstance && instance != "" {
+			return fmt.Sprintf("%s/%s", baseFamily, c.cleanInstanceName(instance))
+		}
+		
+		// Try to extract instance from path
+		pathParts := strings.Split(firstMetric.Path, "/")
+		if len(pathParts) > 2 {
+			// Skip "server" and category, use next part as instance
+			for i, part := range pathParts {
+				if part == "server" {
+					continue
+				}
+				// After category, the next part could be instance
+				if i > 0 && strings.EqualFold(c.normalizeCategory(part), baseFamily) && i+1 < len(pathParts) {
+					instance := pathParts[i+1]
+					return fmt.Sprintf("%s/%s", baseFamily, c.cleanInstanceName(instance))
+				}
+			}
+		}
+		
+		// No instance - use "general" subfamily
+		return fmt.Sprintf("%s/general", baseFamily)
+	}
+	
+	// SAFETY FALLBACK: Ensure chart is always visible
+	c.debugLog("Using fallback family for group: %s", group.BaseContext)
+	return fallbackFamily
+}
+
+// cleanInstanceName cleans instance names for use in family hierarchy
+func (c *CorrelationEngine) cleanInstanceName(instance string) string {
+	// Only replace / with _ to prevent UI from making submenus
+	clean := strings.ReplaceAll(instance, "/", "_")
+	
+	// Ensure non-empty result
+	if clean == "" {
+		clean = "unknown"
+	}
+	
+	return clean
+}
+
+// extractInstanceFromPath attempts to extract instance name from metric path
+func (c *CorrelationEngine) extractInstanceFromPath(path string) string {
+	parts := strings.Split(path, "/")
+	
+	// Look for instance patterns in path
+	for i, part := range parts {
+		// Skip category parts
+		if c.isKnownCategory(part) {
+			// Next part might be the instance
+			if i+1 < len(parts) && !c.isKnownCategory(parts[i+1]) {
+				return parts[i+1]
+			}
+		}
+	}
+	
+	return ""
+}
+
+// debugLog outputs debug messages (only visible in development)
+func (c *CorrelationEngine) debugLog(format string, args ...interface{}) {
+	// Debug logging - not visible in production
+	// Could be enhanced to use actual logger if available
 }
 
 // getMetricTypeSuffix generates a suffix based on metric type
