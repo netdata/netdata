@@ -266,8 +266,11 @@ func (c *Collector) parsePCFResponse(response []byte) (map[C.MQLONG]interface{},
 	// Parse PCF header
 	cfh := (*C.MQCFH)(unsafe.Pointer(&response[0]))
 	
-	c.Debugf("parsePCFResponse: Type=%d, CompCode=%d, Reason=%d, ParameterCount=%d", 
-		cfh.Type, cfh.CompCode, cfh.Reason, cfh.ParameterCount)
+	// Only log successful responses or responses with parameters to debug
+	if cfh.CompCode == C.MQCC_OK || cfh.ParameterCount > 0 {
+		c.Debugf("parsePCFResponse: Type=%d, CompCode=%d, Reason=%d, ParameterCount=%d", 
+			cfh.Type, cfh.CompCode, cfh.Reason, cfh.ParameterCount)
+	}
 	
 	if cfh.Type != C.MQCFT_RESPONSE {
 		return nil, fmt.Errorf("unexpected PCF message type: %d", cfh.Type)
@@ -284,7 +287,6 @@ func (c *Collector) parsePCFResponse(response []byte) (map[C.MQLONG]interface{},
 	
 	// Parse parameters
 	offset := C.sizeof_MQCFH
-	c.Debugf("Starting parameter parsing, offset=%d, response len=%d", offset, len(response))
 	for i := 0; i < int(cfh.ParameterCount) && offset < len(response); i++ {
 		paramType := *(*C.MQLONG)(unsafe.Pointer(&response[offset]))
 		
@@ -330,9 +332,6 @@ func (c *Collector) parsePCFResponse(response []byte) (map[C.MQLONG]interface{},
 			value := string(response[stringDataStart:stringDataEnd])
 			trimmedValue := strings.TrimSpace(value)
 			attrs[cfst.Parameter] = trimmedValue
-			if cfst.Parameter == C.MQCA_Q_NAME {
-				c.Debugf("Found MQCA_Q_NAME! Value: '%s'", trimmedValue)
-			}
 			offset += int(cfst.StrucLength)
 			
 		case C.MQCFT_INTEGER_LIST:
@@ -368,71 +367,6 @@ func (c *Collector) parsePCFResponse(response []byte) (map[C.MQLONG]interface{},
 	return attrs, nil
 }
 
-// Parse queue list response
-func (c *Collector) parseQueueListResponse(response []byte) ([]string, error) {
-	var queues []string
-	
-	// Parse response in chunks (each queue gets its own response message)
-	offset := 0
-	for offset < len(response) {
-		if offset+int(C.sizeof_MQCFH) > len(response) {
-			break
-		}
-		
-		cfh := (*C.MQCFH)(unsafe.Pointer(&response[offset]))
-		// Calculate the full message size by walking through all parameters
-		messageSize := int(C.sizeof_MQCFH)
-		paramOffset := offset + int(C.sizeof_MQCFH)
-		
-		for i := 0; i < int(cfh.ParameterCount) && paramOffset < len(response); i++ {
-			if paramOffset+8 > len(response) { // Need at least type + length
-				break
-			}
-			paramLength := *(*C.MQLONG)(unsafe.Pointer(&response[paramOffset+4]))
-			if paramLength <= 0 || paramOffset+int(paramLength) > len(response) {
-				break
-			}
-			messageSize += int(paramLength)
-			paramOffset += int(paramLength)
-		}
-		
-		messageEnd := offset + messageSize
-		
-		if messageEnd > len(response) {
-			break
-		}
-		
-		// Parse this message
-		attrs, err := c.parsePCFResponse(response[offset:messageEnd])
-		if err != nil {
-			c.Warningf("failed to parse queue response: %v", err)
-			offset = messageEnd
-			continue
-		}
-		
-		// Debug: log all attributes found
-		c.Debugf("Queue response attributes count: %d", len(attrs))
-		
-		// Extract queue name
-		if queueName, ok := attrs[C.MQCA_Q_NAME]; ok {
-			if name, ok := queueName.(string); ok && name != "" {
-				c.Debugf("Found queue: %s", name)
-				queues = append(queues, strings.TrimSpace(name))
-			}
-		} else {
-			// List all parameter IDs we found
-			var paramIDs []C.MQLONG
-			for k := range attrs {
-				paramIDs = append(paramIDs, k)
-			}
-			c.Debugf("No MQCA_Q_NAME (2016) found. Got %d attributes with parameter IDs: %v", len(attrs), paramIDs)
-		}
-		
-		offset = messageEnd
-	}
-	
-	return queues, nil
-}
 
 // ChannelParseResult contains the results of parsing channel list response
 type ChannelParseResult struct {
@@ -547,6 +481,100 @@ func (c *Collector) parseChannelListResponse(response []byte) *ChannelParseResul
 		} else if channelName != "" {
 			// Successful channel
 			result.Channels = append(result.Channels, channelName)
+		}
+		
+		offset = messageEnd
+	}
+	
+	return result
+}
+
+// QueueParseResult contains the results of parsing queue list response
+type QueueParseResult struct {
+	Queues         []string           // Successfully retrieved queue names
+	ErrorCounts    map[int32]int      // MQ error code -> count
+	ErrorQueues    map[int32][]string // MQ error code -> queue names that failed
+	InternalErrors int                // Count of parsing/internal errors
+}
+
+// Parse queue list response
+func (c *Collector) parseQueueListResponse(response []byte) *QueueParseResult {
+	result := &QueueParseResult{
+		Queues:       make([]string, 0),
+		ErrorCounts:  make(map[int32]int),
+		ErrorQueues:  make(map[int32][]string),
+	}
+	
+	// Parse response in chunks (each queue gets its own response message)
+	offset := 0
+	for offset < len(response) {
+		if offset+int(C.sizeof_MQCFH) > len(response) {
+			result.InternalErrors++
+			result.ErrorCounts[ErrInternalShort]++
+			break
+		}
+		
+		cfh := (*C.MQCFH)(unsafe.Pointer(&response[offset]))
+		// Calculate the full message size by walking through all parameters
+		messageSize := int(C.sizeof_MQCFH)
+		paramOffset := offset + int(C.sizeof_MQCFH)
+		
+		for i := 0; i < int(cfh.ParameterCount) && paramOffset < len(response); i++ {
+			if paramOffset+8 > len(response) { // Need at least type + length
+				break
+			}
+			paramLength := *(*C.MQLONG)(unsafe.Pointer(&response[paramOffset+4]))
+			if paramLength <= 0 || paramOffset+int(paramLength) > len(response) {
+				break
+			}
+			messageSize += int(paramLength)
+			paramOffset += int(paramLength)
+		}
+		
+		messageEnd := offset + messageSize
+		
+		if messageEnd > len(response) {
+			result.InternalErrors++
+			result.ErrorCounts[ErrInternalCorrupt]++
+			break
+		}
+		
+		// Parse this message
+		attrs, err := c.parsePCFResponse(response[offset:messageEnd])
+		if err != nil {
+			// This is a real parsing error
+			result.InternalErrors++
+			result.ErrorCounts[ErrInternalParsing]++
+			offset = messageEnd
+			continue
+		}
+		
+		// Check for MQ errors
+		var mqError int32
+		if reasonCode, ok := attrs[C.MQIACF_REASON_CODE]; ok {
+			if reason, ok := reasonCode.(int32); ok && reason != 0 {
+				mqError = reason
+				result.ErrorCounts[mqError]++
+			}
+		}
+		
+		// Extract queue name
+		queueName := ""
+		if name, ok := attrs[C.MQCA_Q_NAME]; ok {
+			if nameStr, ok := name.(string); ok && nameStr != "" {
+				queueName = strings.TrimSpace(nameStr)
+			}
+		}
+		
+		// Store result based on error status
+		if mqError != 0 {
+			// Queue had an error
+			if queueName != "" {
+				result.ErrorQueues[mqError] = append(result.ErrorQueues[mqError], queueName)
+			}
+		} else if queueName != "" {
+			// Successful queue
+			result.Queues = append(result.Queues, queueName)
 		}
 		
 		offset = messageEnd
