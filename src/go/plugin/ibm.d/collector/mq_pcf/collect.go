@@ -570,10 +570,6 @@ func mqcmdToString(command C.MQLONG) string {
 		return "MQCMD_INQUIRE_TOPIC"
 	case C.MQCMD_INQUIRE_TOPIC_STATUS:
 		return "MQCMD_INQUIRE_TOPIC_STATUS"
-	case MQCMD_INQUIRE_Q_NAMES:
-		return "MQCMD_INQUIRE_Q_NAMES"
-	case MQCMD_INQUIRE_CHANNEL_NAMES:
-		return "MQCMD_INQUIRE_CHANNEL_NAMES"
 	default:
 		return fmt.Sprintf("MQCMD_%d", command)
 	}
@@ -1192,33 +1188,15 @@ func (c *Collector) collectTopicMetrics(ctx context.Context, mx map[string]int64
 }
 
 func (c *Collector) getQueueList(ctx context.Context) (*QueueParseResult, error) {
-	// Primary approach: Use MQCMD_INQUIRE_Q with wildcard queue name
-	// Note: Adding Q_TYPE filter can limit results in some MQ versions
+	// Use MQCMD_INQUIRE_Q with wildcard queue name
+	// This is the standard way to get a list of all queues
 	c.Debugf("Sending MQCMD_INQUIRE_Q with Q_NAME='*'")
 	params := []pcfParameter{
 		newStringParameter(C.MQCA_Q_NAME, "*"),
 	}
 	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_Q, params)
 	if err != nil {
-		c.Debugf("MQCMD_INQUIRE_Q with wildcard and type failed: %v", err)
-		
-		// Fallback: try with just wildcard name
-		c.Debugf("Falling back to MQCMD_INQUIRE_Q with Q_NAME='*' only")
-		params = []pcfParameter{
-			newStringParameter(C.MQCA_Q_NAME, "*"),
-		}
-		response, err = c.sendPCFCommand(C.MQCMD_INQUIRE_Q, params)
-		if err != nil {
-			// Last resort: try INQUIRE_Q_NAMES
-			c.Debugf("Trying MQCMD_INQUIRE_Q_NAMES with Q_NAME='*'")
-			params = []pcfParameter{
-				newStringParameter(C.MQCA_Q_NAME, "*"),
-			}
-			response, err = c.sendPCFCommand(MQCMD_INQUIRE_Q_NAMES, params)
-			if err != nil {
-				return nil, fmt.Errorf("all queue discovery methods failed: %w", err)
-			}
-		}
+		return nil, fmt.Errorf("queue discovery failed: %w", err)
 	}
 	
 	// Parse response and return structured result
@@ -1227,30 +1205,15 @@ func (c *Collector) getQueueList(ctx context.Context) (*QueueParseResult, error)
 }
 
 func (c *Collector) getChannelList(ctx context.Context) (*ChannelParseResult, error) {
-	// Primary approach: Use MQCMD_INQUIRE_CHANNEL with wildcard channel name parameter
-	// Based on IBM documentation, this is the most reliable approach
+	// Use MQCMD_INQUIRE_CHANNEL with wildcard channel name
+	// This is the standard way to get a list of all channels
 	c.Debugf("Sending MQCMD_INQUIRE_CHANNEL with CHANNEL_NAME='*'")
 	params := []pcfParameter{
 		newStringParameter(C.MQCACH_CHANNEL_NAME, "*"),
 	}
 	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_CHANNEL, params)
 	if err != nil {
-		c.Debugf("MQCMD_INQUIRE_CHANNEL with wildcard failed: %v", err)
-		
-		// Fallback: try without parameters (may work in some MQ versions)
-		c.Debugf("Falling back to MQCMD_INQUIRE_CHANNEL with no parameters")
-		response, err = c.sendPCFCommand(C.MQCMD_INQUIRE_CHANNEL, nil)
-		if err != nil {
-			// Last resort: try INQUIRE_CHANNEL_NAMES
-			c.Debugf("Trying MQCMD_INQUIRE_CHANNEL_NAMES with CHANNEL_NAME='*'")
-			params = []pcfParameter{
-				newStringParameter(C.MQCACH_CHANNEL_NAME, "*"),
-			}
-			response, err = c.sendPCFCommand(MQCMD_INQUIRE_CHANNEL_NAMES, params)
-			if err != nil {
-				return nil, fmt.Errorf("all channel discovery methods failed: %w", err)
-			}
-		}
+		return nil, fmt.Errorf("channel discovery failed: %w", err)
 	}
 	
 	// Parse response and return structured result
