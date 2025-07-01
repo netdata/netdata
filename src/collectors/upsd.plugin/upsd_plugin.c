@@ -360,7 +360,7 @@ void parse_command_line(int argc, char *argv[]) {
         }
         netdata_update_every = str2i(argv[optind]);
         if (netdata_update_every <= 0 || netdata_update_every >= 86400) {
-            fputs("COLLECTION_FREQUENCY argument must be between [1,86400)", stderr);
+            netdata_log_error("COLLECTION_FREQUENCY argument must be between [1,86400)\n");
             exit(EXIT_FAILURE);
         }
     }
