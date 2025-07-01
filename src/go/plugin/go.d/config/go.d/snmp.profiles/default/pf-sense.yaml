@@ -1,8 +1,8 @@
 extends:
-  - _base.yaml
-  - _generic-host-resources-base.yaml
-  - _generic-if.yaml
-  - _generic-ucd.yaml
+  - _system-base.yaml
+  - _std-host-resources-mib-feat-base.yaml
+  - _std-if-mib.yaml
+  - _std-ucd-mib.yaml
 
 sysobjectid: 1.3.6.1.4.1.12325.*
 

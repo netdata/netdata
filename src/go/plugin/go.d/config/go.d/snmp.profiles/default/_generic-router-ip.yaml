@@ -1,5 +1,0 @@
-# Generic IP metrics for routers.
-# This profile is deprecated and kept in place for retrocompatibility purposes, please use `_generic-ip` instead.
-
-extends:
-  - _generic-ip.yaml

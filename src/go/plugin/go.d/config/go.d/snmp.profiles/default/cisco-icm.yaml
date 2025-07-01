@@ -1,6 +1,6 @@
 extends:
-  - _base.yaml
-  - _cisco-generic.yaml
+  - _system-base.yaml
+  - _cisco-base.yaml
   - _cisco-voice.yaml
 
 sysobjectid: 1.3.6.1.4.1.9.1.693

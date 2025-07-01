@@ -1,6 +1,6 @@
 extends:
-  - _generic-if.yaml
-  - _generic-ucd.yaml
+  - _std-if-mib.yaml
+  - _std-ucd-mib.yaml
   - _hp.yaml
   - _hp-base.yaml
 sysobjectid:

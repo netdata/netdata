@@ -1,7 +1,7 @@
 extends:
-  - _base.yaml
-  - _generic-bgp4.yaml
-  - _generic-if.yaml
+  - _system-base.yaml
+  - _std-bgp4-mib.yaml
+  - _std-if-mib.yaml
 sysobjectid:
   - 1.3.6.1.4.1.119.1.*        # NEC
   - 1.3.6.1.4.1.119.1.84.18    # NEC IX Series IX2207

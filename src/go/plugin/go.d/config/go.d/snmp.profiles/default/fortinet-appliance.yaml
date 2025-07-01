@@ -1,5 +1,5 @@
 extends:
-  - _base.yaml
+  - _system-base.yaml
   - fortinet.yaml
 
 sysobjectid:

@@ -14,12 +14,12 @@
 
 extends:
   - _palo-alto.yaml
-  - _generic-if.yaml
-  - _generic-host-resources.yaml
-  - _generic-ospf.yaml
-  - _generic-tcp.yaml
-  - _generic-udp.yaml
-  - _generic-ip.yaml
+  - _std-if-mib.yaml
+  - _std-host-resources-mib.yaml
+  - _std-ospf-mib.yaml
+  - _std-tcp-mib.yaml
+  - _std-udp-mib.yaml
+  - _std-ip-mib.yaml
 
 # All Palo Alto Networks sysObjectID start with `1.3.6.1.4.1.25461.2.3` (panMibs)
 sysobjectid: 1.3.6.1.4.1.25461.2.3.*

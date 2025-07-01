@@ -2,8 +2,8 @@
 # This profile is only compatible with the core SNMP integration
 
 extends:
-  - _base.yaml
-  - _cisco-generic.yaml
+  - _system-base.yaml
+  - _cisco-base.yaml
   - _cisco-catalyst.yaml
   - _cisco-wlc.yaml
 

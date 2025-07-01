@@ -6,11 +6,11 @@
 # - 1.3.6.1.4.1.2620.1.6.123.1.56   Linux host3 2.6.18-92cpx86_64 #1 SMP Tue May 16 12:09:46 IDT 2017 x86_64"
 
 extends:
-  - _base.yaml
-  - _generic-if.yaml
-  - _generic-tcp.yaml
-  - _generic-udp.yaml
-  - _generic-ip.yaml
+  - _system-base.yaml
+  - _std-if-mib.yaml
+  - _std-tcp-mib.yaml
+  - _std-udp-mib.yaml
+  - _std-ip-mib.yaml
 
 sysobjectid: 1.3.6.1.4.1.2620.1.*
 

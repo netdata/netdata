@@ -1,5 +1,5 @@
 extends:
-  - _generic-ups.yaml
+  - _std-ups-mib.yaml
   - tripplite.yaml
 
 sysobjectid:

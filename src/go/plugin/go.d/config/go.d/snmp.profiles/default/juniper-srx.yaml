@@ -5,13 +5,13 @@
 
 
 extends:
-  - _generic-if.yaml
-  - _generic-ip.yaml
-  - _generic-tcp.yaml
-  - _generic-udp.yaml
-  - _generic-ospf.yaml
-  - _generic-bgp4.yaml
-  - _generic-host-resources.yaml
+  - _std-if-mib.yaml
+  - _std-ip-mib.yaml
+  - _std-tcp-mib.yaml
+  - _std-udp-mib.yaml
+  - _std-ospf-mib.yaml
+  - _std-bgp4-mib.yaml
+  - _std-host-resources-mib.yaml
   - _juniper-userfirewall.yaml
   - _juniper-scu.yaml
   - _juniper-dcu.yaml

@@ -1,6 +1,6 @@
 extends:
   - _dell.yaml
-  - _generic-if.yaml
+  - _std-if-mib.yaml
 
 metadata:
   device:

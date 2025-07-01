@@ -1,6 +1,6 @@
 extends:
-  - _base.yaml
-  - _generic-if.yaml
+  - _system-base.yaml
+  - _std-if-mib.yaml
   - _cisco-metadata.yaml
   # This profile does not import cisco.yaml on purpose
 

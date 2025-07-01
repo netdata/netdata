@@ -10,9 +10,9 @@
 extends:
   - _dell.yaml
   - _intel-lan-adapters.yaml
-  - _generic-tcp.yaml
-  - _generic-udp.yaml
-  - _generic-ip.yaml
+  - _std-tcp-mib.yaml
+  - _std-udp-mib.yaml
+  - _std-ip-mib.yaml
 
 device:
   vendor: "dell"

@@ -1,5 +1,5 @@
 extends:
-  - _generic-host-resources-base.yaml
+  - _std-host-resources-mib-feat-base.yaml
   - cisco.yaml
 
 metadata:

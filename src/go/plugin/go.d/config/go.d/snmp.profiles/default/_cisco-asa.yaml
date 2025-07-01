@@ -1,7 +1,7 @@
 # Profile for Cisco ASA devices
 extends:
-  - _cisco-generic.yaml
-  - _generic-entity-sensor.yaml
+  - _cisco-base.yaml
+  - _std-entity-sensor-mib.yaml
 
 metrics:
   - MIB: CISCO-FIREWALL-MIB

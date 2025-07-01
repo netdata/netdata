@@ -2,10 +2,10 @@
 # This profile is only compatible with the core SNMP integration
 
 extends:
-  - _base.yaml
-  - _generic-if.yaml
-  - _generic-tcp.yaml
-  - _generic-udp.yaml
+  - _system-base.yaml
+  - _std-if-mib.yaml
+  - _std-tcp-mib.yaml
+  - _std-udp-mib.yaml
   - _cisco-wlc.yaml
   - _cisco-metadata.yaml
 
