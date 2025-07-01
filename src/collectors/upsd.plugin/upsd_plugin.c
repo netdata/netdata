@@ -532,6 +532,44 @@ void print_ups_status_metrics(UPSCONN_t *conn, const char *ups_name, const char 
            status.OTHER);
 }
 
+void print_ups_realpower_metric(UPSCONN_t *conn, const char *ups_name, const char *clean_ups_name) {
+    assert(conn);
+    assert(ups_name);
+    assert(clean_ups_name);
+
+    NETDATA_DOUBLE realpower;
+    const char *ups_load, *ups_realpower, *ups_realpower_nominal;
+
+    if ((ups_load = nut_get_var(conn, ups_name, "ups.load")))
+        ups_load = strdup(ups_load);
+    if ((ups_realpower = nut_get_var(conn, ups_name, "ups.realpower")))
+        ups_realpower = strdup(ups_realpower);
+    if ((ups_realpower_nominal = nut_get_var(conn, ups_name, "ups.realpower.nominal")))
+        ups_realpower_nominal = strdup(ups_realpower_nominal);
+
+    if (ups_realpower) {
+        realpower = str2ndd(ups_realpower, NULL) * NETDATA_PLUGIN_PRECISION;
+    } else {
+        if (!ups_load || !ups_realpower_nominal)
+            return;
+        NETDATA_DOUBLE load = str2ndd(ups_load, NULL);
+        NETDATA_DOUBLE realpower_nominal = str2ndd(ups_realpower_nominal, NULL);
+        realpower = (load / 100) * realpower_nominal * NETDATA_PLUGIN_PRECISION;
+    }
+
+    // BEGIN type.id [microseconds]
+    // SET id = value
+    // END
+    printf("BEGIN 'upsd_%s.load_usage'\n"
+           "SET load_usage = %d\n"
+           "END\n",
+           clean_ups_name, (int)realpower);
+
+    free((char*)ups_load);
+    free((char*)ups_realpower);
+    free((char*)ups_realpower_nominal);
+}
+
 int main(int argc, char *argv[]) {
     int rc;
     size_t numa;
@@ -630,17 +668,15 @@ int main(int argc, char *argv[]) {
 
         for (const struct nd_chart *chart = nd_charts; chart->nut_variable; chart++) {
             nut_value = nut_get_var(&ups2, ups_name, chart->nut_variable);
-
-            // Skip metrics that are not available from the UPS.
-            if (!nut_value && !streq(chart->nut_variable, "ups.realpower"))
-                continue;
-
-            // If the UPS does not support the 'ups.realpower' variable, then
-            // we can still calculate the load_usage if the 'ups.load' and
-            // 'ups.realpower.nominal' variables are available.
-            if (!nut_value && streq(chart->nut_variable, "ups.realpower") &&
-                (!nut_get_var(&ups2, ups_name, "ups.load") || !nut_get_var(&ups2, ups_name, "ups.realpower.nominal")))
-                continue;
+            if (!nut_value) {
+                if (!streq(chart->nut_variable, "ups.realpower"))
+                    continue;
+                // If the UPS does not support the 'ups.realpower' variable, then
+                // we can still calculate the load_usage if the 'ups.load' and
+                // 'ups.realpower.nominal' variables are available.
+                if (!nut_get_var(&ups2, ups_name, "ups.load") || !nut_get_var(&ups2, ups_name, "ups.realpower.nominal"))
+                    continue;
+            }
 
             // CHART type.id name title units [family [context [charttype [priority [update_every [options [plugin [module]]]]]]]]
             printf("CHART 'upsd_%s.%s' '' '%s' '%s' '%s' '%s' '%s' '%u' '%u' '' '" PLUGIN_UPSD_NAME "'\n",
@@ -715,26 +751,17 @@ int main(int argc, char *argv[]) {
             // than one dimension. So, we can't simply print one data point.
             print_ups_status_metrics(&ups2, ups_name, clean_ups_name);
 
-            for (const struct nd_chart *chart = nd_charts; chart->nut_variable; chart++) {
-                NETDATA_DOUBLE nut_value_as_num;
-                const char *nut_value = nut_get_var(&ups2, ups_name, chart->nut_variable);
+            // The 'ups.realpower' variable is another special case, because if it is
+            // not available, then it can be calculated from the ups.load and
+            // ups.realpower.nominal variables.
+            print_ups_realpower_metric(&ups2, ups_name, clean_ups_name);
 
-                // Skip metrics that are not available from the UPS.
-                if (!nut_value && !streq(chart->nut_variable, "ups.realpower"))
+            for (const struct nd_chart *chart = nd_charts; chart->nut_variable; chart++) {
+                const char *nut_value = nut_get_var(&ups2, ups_name, chart->nut_variable);
+                if (!nut_value)
                     continue;
 
-                if (!nut_value && streq(chart->nut_variable, "ups.realpower")) {
-                    const char *ups_load = nut_get_var(&ups2, ups_name, "ups.load");
-                    const char *ups_realpower_nominal = nut_get_var(&ups2, ups_name, "ups.realpower.nominal");
-                    if (ups_load && ups_realpower_nominal) {
-                        NETDATA_DOUBLE load = str2ndd(ups_load, NULL);
-                        NETDATA_DOUBLE nominal = str2ndd(ups_realpower_nominal, NULL);
-                        nut_value_as_num = (load / 100) * nominal * NETDATA_PLUGIN_PRECISION;
-                    }
-                    else continue;
-                }
-
-                nut_value_as_num = str2ndd(nut_value, NULL) * NETDATA_PLUGIN_PRECISION;
+                NETDATA_DOUBLE nut_value_as_num = str2ndd(nut_value, NULL) * NETDATA_PLUGIN_PRECISION;
 
                 // BEGIN type.id [microseconds]
                 // SET id = value
