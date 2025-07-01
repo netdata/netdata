@@ -545,8 +545,11 @@ func (c *Collector) getPCFResponse(requestMd *C.MQMD, hReplyObj C.MQHOBJ) ([]byt
 		
 		// Check the PCF header
 		cfh := (*C.MQCFH)(unsafe.Pointer(&buffer[0]))
-		c.Debugf("getPCFResponse: Received message, Control=%d, CompCode=%d, Reason=%d, ParameterCount=%d", 
-			cfh.Control, cfh.CompCode, cfh.Reason, cfh.ParameterCount)
+		// Only log details for error messages
+		if cfh.CompCode != C.MQCC_OK {
+			c.Debugf("getPCFResponse: Error response - Control=%d, CompCode=%d, Reason=%d, ParameterCount=%d", 
+				cfh.Control, cfh.CompCode, cfh.Reason, cfh.ParameterCount)
+		}
 		
 		// Append this response to our collection
 		allResponses = append(allResponses, buffer[:bufferLength]...)
@@ -653,30 +656,68 @@ func (c *Collector) collectQueueMetrics(ctx context.Context, mx map[string]int64
 		
 		// Collect queue metrics
 		if err := c.collectSingleQueueMetrics(ctx, queueName, cleanName, mx); err != nil {
-			c.Warningf("failed to collect metrics for queue %s: %v", queueName, err)
+			// Check if this is a model queue error (2085 = MQRC_UNKNOWN_OBJECT_NAME)
+			// Model queues don't have status, so this is expected
+			if !strings.Contains(err.Error(), "2085") {
+				c.Warningf("failed to collect metrics for queue %s: %v", queueName, err)
+			} else {
+				c.Debugf("Skipping status collection for model queue %s", queueName)
+			}
 		}
 	}
 	
-	c.Infof("Monitoring %d out of %d queues", collected, len(queues))
+	c.Debugf("Monitoring %d out of %d queues", collected, len(queues))
 	return nil
 }
 
 func (c *Collector) collectChannelMetrics(ctx context.Context, mx map[string]int64) error {
-	// Get list of channels
-	channels, err := c.getChannelList(ctx)
+	// Skip if channel collection has been disabled (by user config or previous auth failure)
+	if c.CollectChannels != nil && !*c.CollectChannels {
+		return nil
+	}
+	
+	// Get channel list with error details
+	result, err := c.getChannelList(ctx)
 	if err != nil {
-		// Check if this is an authorization error
-		if strings.Contains(err.Error(), "2035") || strings.Contains(err.Error(), "NOT_AUTHORIZED") {
-			c.Warningf("Not authorized to query channels - skipping channel collection: %v", err)
-			return nil // Don't fail entire collection
-		}
 		return fmt.Errorf("failed to get channel list: %w", err)
 	}
 	
-	c.Debugf("Found %d channels", len(channels))
+	// Calculate total channels attempted
+	totalChannels := len(result.Channels)
+	for _, channels := range result.ErrorChannels {
+		totalChannels += len(channels)
+	}
 	
+	// Log error summary if there were errors
+	if len(result.ErrorCounts) > 0 {
+		// Build error summary
+		errorSummary := fmt.Sprintf("Channel collection errors: ")
+		first := true
+		for code, count := range result.ErrorCounts {
+			if !first {
+				errorSummary += ", "
+			}
+			errorSummary += fmt.Sprintf("%s (%d channels)", mqErrorString(code), count)
+			first = false
+		}
+		c.Warningf(errorSummary)
+	}
+	
+	// Check if ALL channels failed with authorization errors
+	authErrors := result.ErrorCounts[2035] // MQRC_NOT_AUTHORIZED
+	if authErrors > 0 && authErrors == totalChannels {
+		c.Warningf("All %d channels returned NOT_AUTHORIZED - disabling channel collection", totalChannels)
+		// Disable channel collection for future runs
+		disableChannels := false
+		c.CollectChannels = &disableChannels
+		return nil // Don't fail entire collection
+	}
+	
+	c.Debugf("Found %d successful channels out of %d total", len(result.Channels), totalChannels)
+	
+	// Process successful channels
 	collected := 0
-	for _, channelName := range channels {
+	for _, channelName := range result.Channels {
 		if !c.shouldCollectChannel(channelName) {
 			continue
 		}
@@ -698,11 +739,16 @@ func (c *Collector) collectChannelMetrics(ctx context.Context, mx map[string]int
 		
 		// Collect channel metrics
 		if err := c.collectSingleChannelMetrics(ctx, channelName, cleanName, mx); err != nil {
-			c.Warningf("failed to collect metrics for channel %s: %v", channelName, err)
+			// Check if this is an expected error for certain channel types
+			if !strings.Contains(err.Error(), "2085") {
+				c.Warningf("failed to collect metrics for channel %s: %v", channelName, err)
+			} else {
+				c.Debugf("Skipping metrics for channel %s (expected error)", channelName)
+			}
 		}
 	}
 	
-	c.Infof("Monitoring %d out of %d channels", collected, len(channels))
+	c.Debugf("Monitoring %d out of %d successful channels", collected, len(result.Channels))
 	return nil
 }
 
@@ -742,7 +788,7 @@ func (c *Collector) collectTopicMetrics(ctx context.Context, mx map[string]int64
 		}
 	}
 	
-	c.Infof("Monitoring %d out of %d topics", collected, len(topics))
+	c.Debugf("Monitoring %d out of %d topics", collected, len(topics))
 	return nil
 }
 
@@ -786,7 +832,7 @@ func (c *Collector) getQueueList(ctx context.Context) ([]string, error) {
 	return queues, nil
 }
 
-func (c *Collector) getChannelList(ctx context.Context) ([]string, error) {
+func (c *Collector) getChannelList(ctx context.Context) (*ChannelParseResult, error) {
 	// Primary approach: Use MQCMD_INQUIRE_CHANNEL with wildcard channel name parameter
 	// Based on IBM documentation, this is the most reliable approach
 	c.Debugf("Sending MQCMD_INQUIRE_CHANNEL with CHANNEL_NAME='*'")
@@ -813,14 +859,9 @@ func (c *Collector) getChannelList(ctx context.Context) ([]string, error) {
 		}
 	}
 	
-	// Parse response using the existing parseChannelListResponse function
-	channels, err := c.parseChannelListResponse(response)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse channel list response: %w", err)
-	}
-	
-	c.Debugf("Found %d channels: %v", len(channels), channels)
-	return channels, nil
+	// Parse response and return structured result
+	result := c.parseChannelListResponse(response)
+	return result, nil
 }
 
 func (c *Collector) shouldCollectQueue(queueName string) bool {
@@ -884,6 +925,20 @@ func (c *Collector) collectSingleQueueMetrics(ctx context.Context, queueName, cl
 		return fmt.Errorf("failed to parse queue status response for %s: %w", queueName, err)
 	}
 	
+	// Check for MQ errors in the response
+	if reasonCode, ok := attrs[C.MQIACF_REASON_CODE]; ok {
+		if reason, ok := reasonCode.(int32); ok && reason != 0 {
+			// Map common reason codes to meaningful messages
+			switch reason {
+			case 2085: // MQRC_UNKNOWN_OBJECT_NAME
+				return fmt.Errorf("cannot get status for model queue (MQRC_UNKNOWN_OBJECT_NAME)")
+			case 2035: // MQRC_NOT_AUTHORIZED
+				return fmt.Errorf("not authorized to query queue (MQRC_NOT_AUTHORIZED)")
+			default:
+				return fmt.Errorf("MQ error: reason code %d", reason)
+			}
+		}
+	}
 	
 	// Extract metrics - always set depth as it's critical
 	if depth, ok := attrs[C.MQIA_CURRENT_Q_DEPTH]; ok {
