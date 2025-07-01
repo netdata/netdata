@@ -3,6 +3,9 @@ extends:
   - _std-host-resources-mib-feat-base.yaml
   - _std-if-mib.yaml
 
+sysobjectid:
+  - 1.3.6.1.4.1.5127.1.1.1.8
+
 metadata:
   device:
     fields:
@@ -11,31 +14,31 @@ metadata:
       type:
         value: "storage"
 
-sysobjectid:
-  - 1.3.6.1.4.1.5127.1.1.1.8
+metric_tags:
+  - tag: wdmycloudex2_agent_ver
+    OID: 1.3.6.1.4.1.5127.1.1.1.8.1.1.0
+    symbol: wdmycloudex2AgentVer
+  - tag: wdmycloudex2_software_version
+    OID: 1.3.6.1.4.1.5127.1.1.1.8.1.2.0
+    symbol: wdmycloudex2SoftwareVersion
+  - tag: wdmycloudex2_host_name
+    OID: 1.3.6.1.4.1.5127.1.1.1.8.1.3.0
+    symbol: wdmycloudex2HostName
+  - tag: wdmycloudex2_ftp_server
+    OID: 1.3.6.1.4.1.5127.1.1.1.8.1.5.0
+    symbol: wdmycloudex2FTPServer
+    mapping:
+      0: disable
+      1: enable
+  - tag: wdmycloudex2_net_type
+    OID: 1.3.6.1.4.1.5127.1.1.1.8.1.6.0
+    symbol: wdmycloudex2NetType
+    mapping:
+      0: workgroup
+      1: active_directory
 
+# TODO: add metrics, need snmpwalk sample
 metrics:
-  - MIB: HOST-RESOURCES-MIB
-    symbol:
-      name: memory.total
-      OID: 1.3.6.1.2.1.25.2.3.1.5.1 # hrStorageSize.1
-      description: Size of the storage represented by this entry, in units of hrStorageAllocationUnits
-      unit: "{logical_storage_area}"
-
-  - MIB: HOST-RESOURCES-MIB
-    symbol:
-      name: memory.used
-      OID: 1.3.6.1.2.1.25.2.3.1.6.1 # hrStorageUsed.1
-      description: Amount of the storage represented by this entry that is allocated, in units of hrStorageAllocationUnits
-      unit: "{logical_storage_area}"
-
-  - MIB: HOST-RESOURCES-MIB
-    symbol:
-      name: cpu.usage
-      OID: 1.3.6.1.2.1.25.3.3.1.2.196608 # hrProcessorLoad.196608
-      description: Average over the last minute of the percentage of time that this processor was not idle
-      unit: "%"
-
 #  - MIB: WDMYCLOUDEX2-MIB
 #    symbol:
 #      name: wdmycloudex2Temperature
@@ -46,120 +49,97 @@ metrics:
 #      name: wdmycloudex2FanStatus
 #      OID: 1.3.6.1.4.1.5127.1.1.1.8.1.8.0
 # string metric is not supported yet (keep this metric and this comment in profile until it's fixed)
-  - MIB: WDMYCLOUDEX2-MIB
-    table:
-      name: wdmycloudex2VolumeTable
-      OID: 1.3.6.1.4.1.5127.1.1.1.8.1.9
-    symbols:
-      - name: wdmycloudex2Volume
-        constant_value_one: true
+#  - MIB: WDMYCLOUDEX2-MIB
+#    table:
+#      name: wdmycloudex2VolumeTable
+#      OID: 1.3.6.1.4.1.5127.1.1.1.8.1.9
+#    symbols:
+#      - name: wdmycloudex2Volume
+#        constant_value_one: true
 #      - OID: 1.3.6.1.4.1.5127.1.1.1.8.1.9.1.5
 #        name: wdmycloudex2VolumeSize
 # string metric is not supported yet (keep this metric and this comment in profile until it's fixed)
 #      - OID: 1.3.6.1.4.1.5127.1.1.1.8.1.9.1.6
 #        name: wdmycloudex2VolumeFreeSpace
 # string metric is not supported yet (keep this metric and this comment in profile until it's fixed)
-    metric_tags:
-      - symbol:
-          name: wdmycloudex2VolumeNum
-          OID: 1.3.6.1.4.1.5127.1.1.1.8.1.9.1.1
-        tag: wdmycloudex2_volume_num
-      - symbol:
-          name: wdmycloudex2VolumeName
-          OID: 1.3.6.1.4.1.5127.1.1.1.8.1.9.1.2
-        tag: wdmycloudex2_volume_name
-      - symbol:
-          name: wdmycloudex2VolumeFsType
-          OID: 1.3.6.1.4.1.5127.1.1.1.8.1.9.1.3
-        tag: wdmycloudex2_volume_fs_type
-      - symbol:
-          name: wdmycloudex2VolumeRaidLevel
-          OID: 1.3.6.1.4.1.5127.1.1.1.8.1.9.1.4
-        tag: wdmycloudex2_volume_raid_level
-  - MIB: WDMYCLOUDEX2-MIB
-    table:
-      name: wdmycloudex2DiskTable
-      OID: 1.3.6.1.4.1.5127.1.1.1.8.1.10
-    symbols:
-#      - OID: 1.3.6.1.4.1.5127.1.1.1.8.1.10.1.5
-#        name: wdmycloudex2DiskTemperature
-# string metric is not supported yet (keep this metric and this comment in profile until it's fixed)
-      - name: wdmycloudex2Disk
-        constant_value_one: true
-    metric_tags:
-      - symbol:
-          name: wdmycloudex2DiskNum
-          OID: 1.3.6.1.4.1.5127.1.1.1.8.1.10.1.1
-        tag: wdmycloudex2_disk_num
-      - symbol:
-          name: wdmycloudex2DiskVendor
-          OID: 1.3.6.1.4.1.5127.1.1.1.8.1.10.1.2
-        tag: wdmycloudex2_disk_vendor
-      - symbol:
-          name: wdmycloudex2DiskModel
-          OID: 1.3.6.1.4.1.5127.1.1.1.8.1.10.1.3
-        tag: wdmycloudex2_disk_model
-      - symbol:
-          name: wdmycloudex2DiskSerialNumber
-          OID: 1.3.6.1.4.1.5127.1.1.1.8.1.10.1.4
-        tag: wdmycloudex2_disk_serial_number
-      - symbol:
-          OID: 1.3.6.1.4.1.5127.1.1.1.8.1.10.1.6
-          name: wdmycloudex2DiskCapacity
-        tag: wdmycloudex2_disk_capacity
-  - MIB: WDMYCLOUDEX2-MIB
-    table:
-      name: wdmycloudex2UPSTable
-      OID: 1.3.6.1.4.1.5127.1.1.1.8.1.11
-    symbols:
-      - name: wdmycloudex2UPS
-        constant_value_one: true
-#      - name: wdmycloudex2UPSBatteryCharge
-#        OID: 1.3.6.1.4.1.5127.1.1.1.8.1.11.5
-# string metric is not supported yet (keep this metric and this comment in profile until it's fixed)
-    metric_tags:
-      - symbol:
-          name: wdmycloudex2UPSNum
-          OID: 1.3.6.1.4.1.5127.1.1.1.8.1.11.1.1
-        tag: wdmycloudex2_ups_num
-      - symbol:
-          name: wdmycloudex2UPSMode
-          OID: 1.3.6.1.4.1.5127.1.1.1.8.1.11.1.2
-        tag: wdmycloudex2_ups_mode
-      - symbol:
-          name: wdmycloudex2UPSManufacturer
-          OID: 1.3.6.1.4.1.5127.1.1.1.8.1.11.1.3
-        tag: wdmycloudex2_ups_manufacturer
-      - symbol:
-          name: wdmycloudex2UPSProduct
-          OID: 1.3.6.1.4.1.5127.1.1.1.8.1.11.1.4
-        tag: wdmycloudex2_ups_product
-      - symbol:
-          name: wdmycloudex2UPSStatus
-          OID: 1.3.6.1.4.1.5127.1.1.1.8.1.11.1.6
-        tag: wdmycloudex2_ups_status
+#    metric_tags:
+#      - symbol:
+#          name: wdmycloudex2VolumeNum
+#          OID: 1.3.6.1.4.1.5127.1.1.1.8.1.9.1.1
+#        tag: wdmycloudex2_volume_num
+#      - symbol:
+#          name: wdmycloudex2VolumeName
+#          OID: 1.3.6.1.4.1.5127.1.1.1.8.1.9.1.2
+#        tag: wdmycloudex2_volume_name
+#      - symbol:
+#          name: wdmycloudex2VolumeFsType
+#          OID: 1.3.6.1.4.1.5127.1.1.1.8.1.9.1.3
+#        tag: wdmycloudex2_volume_fs_type
+#      - symbol:
+#          name: wdmycloudex2VolumeRaidLevel
+#          OID: 1.3.6.1.4.1.5127.1.1.1.8.1.9.1.4
+#        tag: wdmycloudex2_volume_raid_level
 
-metric_tags:
-  - OID: 1.3.6.1.4.1.5127.1.1.1.8.1.1.0
-    symbol: wdmycloudex2AgentVer
-    tag: wdmycloudex2_agent_ver
-  - OID: 1.3.6.1.4.1.5127.1.1.1.8.1.2.0
-    symbol: wdmycloudex2SoftwareVersion
-    tag: wdmycloudex2_software_version
-  - OID: 1.3.6.1.4.1.5127.1.1.1.8.1.3.0
-    symbol: wdmycloudex2HostName
-    tag: wdmycloudex2_host_name
-  - OID: 1.3.6.1.4.1.5127.1.1.1.8.1.5.0
-    symbol: wdmycloudex2FTPServer
-    tag: wdmycloudex2_ftp_server
-    mapping:
-      0: disable
-      1: enable
-      # mapping in the metric description
-  - OID: 1.3.6.1.4.1.5127.1.1.1.8.1.6.0
-    symbol: wdmycloudex2NetType
-    tag: wdmycloudex2_net_type
-    mapping:
-      0: workgroup
-      1: active_directory
-      # mapping in the metric description
+#  - MIB: WDMYCLOUDEX2-MIB
+#    table:
+#      name: wdmycloudex2DiskTable
+#      OID: 1.3.6.1.4.1.5127.1.1.1.8.1.10
+#    symbols:
+#      #      - OID: 1.3.6.1.4.1.5127.1.1.1.8.1.10.1.5
+#      #        name: wdmycloudex2DiskTemperature
+#      # string metric is not supported yet (keep this metric and this comment in profile until it's fixed)
+#      - name: wdmycloudex2Disk
+#        constant_value_one: true
+#    metric_tags:
+#      - symbol:
+#          name: wdmycloudex2DiskNum
+#          OID: 1.3.6.1.4.1.5127.1.1.1.8.1.10.1.1
+#        tag: wdmycloudex2_disk_num
+#      - symbol:
+#          name: wdmycloudex2DiskVendor
+#          OID: 1.3.6.1.4.1.5127.1.1.1.8.1.10.1.2
+#        tag: wdmycloudex2_disk_vendor
+#      - symbol:
+#          name: wdmycloudex2DiskModel
+#          OID: 1.3.6.1.4.1.5127.1.1.1.8.1.10.1.3
+#        tag: wdmycloudex2_disk_model
+#      - symbol:
+#          name: wdmycloudex2DiskSerialNumber
+#          OID: 1.3.6.1.4.1.5127.1.1.1.8.1.10.1.4
+#        tag: wdmycloudex2_disk_serial_number
+#      - symbol:
+#          OID: 1.3.6.1.4.1.5127.1.1.1.8.1.10.1.6
+#          name: wdmycloudex2DiskCapacity
+#        tag: wdmycloudex2_disk_capacity
+
+#  - MIB: WDMYCLOUDEX2-MIB
+#    table:
+#      name: wdmycloudex2UPSTable
+#      OID: 1.3.6.1.4.1.5127.1.1.1.8.1.11
+#    symbols:
+#      - name: wdmycloudex2UPS
+#        constant_value_one: true
+#    #      - name: wdmycloudex2UPSBatteryCharge
+#    #        OID: 1.3.6.1.4.1.5127.1.1.1.8.1.11.5
+#    # string metric is not supported yet (keep this metric and this comment in profile until it's fixed)
+#    metric_tags:
+#      - symbol:
+#          name: wdmycloudex2UPSNum
+#          OID: 1.3.6.1.4.1.5127.1.1.1.8.1.11.1.1
+#        tag: wdmycloudex2_ups_num
+#      - symbol:
+#          name: wdmycloudex2UPSMode
+#          OID: 1.3.6.1.4.1.5127.1.1.1.8.1.11.1.2
+#        tag: wdmycloudex2_ups_mode
+#      - symbol:
+#          name: wdmycloudex2UPSManufacturer
+#          OID: 1.3.6.1.4.1.5127.1.1.1.8.1.11.1.3
+#        tag: wdmycloudex2_ups_manufacturer
+#      - symbol:
+#          name: wdmycloudex2UPSProduct
+#          OID: 1.3.6.1.4.1.5127.1.1.1.8.1.11.1.4
+#        tag: wdmycloudex2_ups_product
+#      - symbol:
+#          name: wdmycloudex2UPSStatus
+#          OID: 1.3.6.1.4.1.5127.1.1.1.8.1.11.1.6
+#        tag: wdmycloudex2_ups_status
