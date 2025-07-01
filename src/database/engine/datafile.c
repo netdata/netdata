@@ -73,11 +73,11 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df, bool is_shutdo
     bool can_be_deleted = false;
 
     spinlock_lock(&df->users.spinlock);
-    df->users.available = false;
 
-    if(!df->users.lockers)
+    if(!df->users.lockers) {
         can_be_deleted = true;
-
+        df->users.available = false;
+    }
     else {
         // there are lockers
 
@@ -86,9 +86,10 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df, bool is_shutdo
         pgc_open_evict_clean_pages_of_datafile(open_cache, df);
         spinlock_lock(&df->users.spinlock);
 
-        if(!df->users.lockers)
+        if(!df->users.lockers) {
             can_be_deleted = true;
-
+            df->users.available = false;
+        }
         else {
             // there are lockers still
 
@@ -100,8 +101,10 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df, bool is_shutdo
             time_to_scan_ut = now_monotonic_usec() - time_to_scan_ut;
             spinlock_lock(&df->users.spinlock);
 
-            if(!df->users.lockers)
+            if(!df->users.lockers) {
                 can_be_deleted = true;
+                df->users.available = false;
+            }
 
             else if(!clean_pages_in_open_cache && !hot_pages_in_open_cache) {
                 // no pages in the open cache related to this datafile
@@ -128,6 +131,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df, bool is_shutdo
                 else if(now_s > df->users.time_to_evict) {
                     // time expired, lets remove it
                     can_be_deleted = true;
+                    df->users.available = false;
                     internal_error(true, "DBENGINE: datafile %u of tier %d is not used by any open cache pages, "
                                          "but it has %u lockers (oc:%u, pd:%u), "
                                          "%zu clean and %zu hot open cache pages "

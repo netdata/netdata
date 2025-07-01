@@ -1780,12 +1780,21 @@ static struct rrdengine_datafile *release_and_aquire_next_datafile_for_indexing(
             datafile = datafile->next;
             continue;
         }
-        bool locked = datafile_acquire(datafile, DATAFILE_ACQUIRE_INDEXING);
+
+        int retries = 5;
+        bool locked = false;
+        while (retries-- > 0) {
+            locked = datafile_acquire(datafile, DATAFILE_ACQUIRE_INDEXING);
+            if (locked)
+                break;
+            sleep_usec(200 * USEC_PER_MS);
+        }
         if (locked) {
             uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
             return datafile;
         }
-        nd_log_daemon(NDLP_INFO, "DBENGINE: Datafile %u CANNOT be locked for indexing; skipping", datafile->fileno);
+        nd_log_daemon(NDLP_INFO, "DBENGINE: Datafile %u CANNOT be locked for indexing after retries; skipping", datafile->fileno);
+        datafile = datafile->next;
     }
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
     return NULL;
