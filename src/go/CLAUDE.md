@@ -278,6 +278,140 @@ func (m *MyModule) collectInstances(mx map[string]int64) {
 }
 ```
 
+### Chart Obsolescence Mechanism
+
+The go.d.plugin framework provides a built-in mechanism for marking charts as obsolete when they are no longer needed. This is available for ALL charts - both static (base) charts and dynamic instance charts.
+
+#### How Chart Obsolescence Works
+
+1. **Marking a Chart as Obsolete**:
+   ```go
+   // Method available on any chart
+   func (c *Chart) MarkRemove() {
+       c.Obsolete = true    // Adds "obsolete" to CHART command options
+       c.remove = true      // Flags for removal from charts slice
+   }
+   ```
+
+2. **Framework Behavior**:
+   - When a chart is marked obsolete, the framework appends "obsolete" to the options field in the CHART command
+   - Example output: `CHART 'module.metric' '' 'Title' 'units' 'family' 'context' 'line' '100' '1' 'obsolete' 'plugin' 'module'`
+   - Netdata sees the "obsolete" flag and knows to clean up the chart
+
+3. **No Dimension Values Sent**:
+   - The framework still sends BEGIN/END for obsolete charts
+   - But it sends SETEMPTY for all dimensions (no values)
+   - This creates empty updates that signal the chart should be removed
+
+#### Implementation Examples
+
+**Dynamic Instance Removal**:
+```go
+func (m *MyModule) removeInstanceCharts(instanceName string) {
+    cleanName := cleanName(instanceName)
+    
+    // Mark all charts for this instance as obsolete
+    for _, chart := range *m.charts {
+        if strings.HasPrefix(chart.ID, fmt.Sprintf("instance_%s_", cleanName)) {
+            if !chart.Obsolete {
+                // Set Obsolete flag and reset created flag so framework will send CHART command
+                chart.Obsolete = true
+                chart.MarkNotCreated() // Reset created flag to trigger CHART command
+                m.Debugf("Marked chart %s as obsolete", chart.ID)
+            }
+        }
+    }
+}
+```
+
+**Static Chart Removal** (e.g., feature unavailable):
+```go
+func (m *MyModule) disableFeature() {
+    // Can mark any chart as obsolete, even base charts
+    if chart := m.charts.Get("advanced_metric"); chart != nil {
+        if !chart.Obsolete {
+            chart.Obsolete = true
+            chart.MarkNotCreated() // Ensure CHART command is sent with obsolete flag
+            m.Infof("Advanced metrics not available - chart marked obsolete")
+        }
+    }
+}
+```
+
+**Version-Based Chart Management**:
+```go
+func (m *MyModule) adjustChartsForVersion() {
+    if m.version < "2.0" {
+        // Feature not available in older versions
+        for _, chartID := range []string{"new_metric1", "new_metric2"} {
+            if chart := m.charts.Get(chartID); chart != nil && !chart.Obsolete {
+                chart.Obsolete = true
+                chart.MarkNotCreated() // Trigger CHART command with obsolete flag
+            }
+        }
+    }
+}
+```
+
+#### Complete Lifecycle Example
+
+```go
+func (m *MyModule) handleInstanceLifecycle() {
+    seen := make(map[string]bool)
+    
+    // Collect current instances
+    instances := m.getInstances()
+    for _, inst := range instances {
+        seen[inst.Name] = true
+        
+        if !m.collected[inst.Name] {
+            // New instance - add charts
+            charts := m.newInstanceCharts(inst.Name)
+            m.charts.Add(*charts...)
+            m.collected[inst.Name] = true
+        }
+        
+        // Collect metrics...
+    }
+    
+    // Mark obsolete charts for removed instances
+    for name := range m.collected {
+        if !seen[name] {
+            // Instance no longer exists
+            cleanName := cleanName(name)
+            
+            // Mark all charts for this instance as obsolete
+            for _, chart := range *m.charts {
+                if strings.Contains(chart.ID, cleanName) && !chart.Obsolete {
+                    chart.Obsolete = true
+                    chart.MarkNotCreated() // Trigger CHART command with obsolete flag
+                }
+            }
+            
+            delete(m.collected, name)
+            m.Debugf("Instance %s removed - charts marked obsolete", name)
+        }
+    }
+}
+```
+
+#### Key Points
+
+1. **Universal Feature**: Works for any chart type (static or dynamic)
+2. **Two-Step Process**: Set `Obsolete = true` and call `MarkNotCreated()` 
+3. **Memory Efficiency**: Allows Netdata to free memory buffers for obsolete charts
+4. **Proper Signaling**: Uses Netdata protocol's "obsolete" flag in CHART command
+5. **Framework Integration**: Reset `created` flag ensures CHART command is sent
+6. **Avoid MarkRemove()**: Don't use `MarkRemove()` as it skips CHART command entirely
+
+#### When to Use Chart Obsolescence
+
+- **Instance Deletion**: Queue/channel/database no longer exists
+- **Feature Unavailable**: Version doesn't support certain metrics
+- **Configuration Change**: User disables a feature
+- **Error Conditions**: Permanent failures accessing certain metrics
+- **Resource Cleanup**: Application components are removed
+
 ### Alternative Pattern: Updated Flag
 
 Some collectors use an updated flag pattern:

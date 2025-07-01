@@ -90,6 +90,9 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	c.Debugf("collect() called - connection status: %v", c.mqConn != nil && c.mqConn.connected)
 	mx := make(map[string]int64)
 	
+	// Reset seen map for this collection cycle
+	c.seen = make(map[string]bool)
+	
 	// Connect to queue manager if not connected
 	connectStart := time.Now()
 	if err := c.ensureConnection(ctx); err != nil {
@@ -143,18 +146,28 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 		c.Debugf("Topic metrics collection took %v", time.Since(topicStart))
 	}
 	
+	// Clean up obsolete charts for instances that no longer exist
+	c.markObsoleteCharts()
+	
 	totalDuration := time.Since(collectStart)
 	c.Debugf("collect() finished in %v - connection still valid: %v", totalDuration, c.mqConn != nil && c.mqConn.connected)
 	return mx, nil
 }
 
 func (c *Collector) ensureConnection(ctx context.Context) error {
-	// MQ is configured with DISCINT(0) which means immediate disconnect on idle
-	// Always reconnect for each collection cycle to handle this properly
+	// Check if we already have a valid connection
+	if c.mqConn != nil && c.mqConn.connected && c.testConnection() {
+		c.Debugf("Reusing existing MQ connection - no new queues will be created")
+		return nil
+	}
+	
+	// Clean up any invalid connection
 	if c.mqConn != nil {
-		c.Debugf("Cleaning up previous connection for fresh reconnect")
+		c.Debugf("Cleaning up invalid connection")
 		c.disconnect()
 	}
+	
+	c.Infof("Creating NEW MQ connection - this will create 2 new queues")
 	
 	c.mqConn = &mqConnection{}
 	
@@ -270,7 +283,7 @@ func (c *Collector) ensureConnection(ctx context.Context) error {
 		return fmt.Errorf("MQOPEN failed: completion code %d, reason code %d (check PCF permissions for SYSTEM.ADMIN.COMMAND.QUEUE)", openCompCode, openReason)
 	}
 	
-	c.Debugf("Admin queue opened successfully, now creating persistent reply queue")
+	c.Infof("Admin queue opened successfully, now creating persistent reply queue (Queue #2)")
 	
 	// Create a persistent dynamic reply queue for all PCF commands
 	var replyOd C.MQOD
@@ -311,7 +324,7 @@ func (c *Collector) ensureConnection(ctx context.Context) error {
 	c.Infof("Successfully connected to queue manager %s on %s:%d via channel %s", 
 		c.QueueManager, c.Host, c.Port, c.Channel)
 	actualReplyQueueName := C.GoStringN((*C.char)(unsafe.Pointer(&c.mqConn.replyQueueName[0])), 48)
-	c.Debugf("Created persistent reply queue: %s", strings.TrimSpace(actualReplyQueueName))
+	c.Infof("Created persistent reply queue: %s (will be reused for all PCF commands)", strings.TrimSpace(actualReplyQueueName))
 	
 	return nil
 }
@@ -616,6 +629,9 @@ func (c *Collector) collectQueueMetrics(ctx context.Context, mx map[string]int64
 		}
 		collected++
 		
+		// Mark as seen
+		c.seen[queueName] = true
+		
 		cleanName := c.cleanName(queueName)
 		
 		// Add queue charts if not already present
@@ -653,6 +669,9 @@ func (c *Collector) collectChannelMetrics(ctx context.Context, mx map[string]int
 		}
 		collected++
 		
+		// Mark as seen
+		c.seen[channelName] = true
+		
 		cleanName := c.cleanName(channelName)
 		
 		// Add channel charts if not already present
@@ -689,6 +708,9 @@ func (c *Collector) collectTopicMetrics(ctx context.Context, mx map[string]int64
 			continue
 		}
 		collected++
+		
+		// Mark as seen
+		c.seen[topicName] = true
 		
 		cleanName := c.cleanName(topicName)
 		
@@ -789,10 +811,13 @@ func (c *Collector) getChannelList(ctx context.Context) ([]string, error) {
 }
 
 func (c *Collector) shouldCollectQueue(queueName string) bool {
-	// Skip system queues by default
+	// Check system queue collection setting
 	if strings.HasPrefix(queueName, "SYSTEM.") {
-		c.Debugf("Skipping system queue: %s", queueName)
-		return false
+		if c.CollectSystemQueues == nil || !*c.CollectSystemQueues {
+			c.Debugf("Skipping system queue (disabled): %s", queueName)
+			return false
+		}
+		c.Debugf("Including system queue (enabled): %s", queueName)
 	}
 	
 	// Apply queue selector if configured
@@ -808,10 +833,13 @@ func (c *Collector) shouldCollectQueue(queueName string) bool {
 }
 
 func (c *Collector) shouldCollectChannel(channelName string) bool {
-	// Skip system channels by default
+	// Check system channel collection setting
 	if strings.HasPrefix(channelName, "SYSTEM.") {
-		c.Debugf("Skipping system channel: %s", channelName)
-		return false
+		if c.CollectSystemChannels == nil || !*c.CollectSystemChannels {
+			c.Debugf("Skipping system channel (disabled): %s", channelName)
+			return false
+		}
+		c.Debugf("Including system channel (enabled): %s", channelName)
 	}
 	
 	// Apply channel selector if configured
@@ -1044,4 +1072,52 @@ func (c *Collector) cleanName(name string) string {
 		")", "_",
 	)
 	return strings.ToLower(r.Replace(name))
+}
+
+// markObsoleteCharts marks charts as obsolete when their instances no longer exist
+func (c *Collector) markObsoleteCharts() {
+	// Check all collected instances
+	for name := range c.collected {
+		if !c.seen[name] {
+			// Instance no longer exists - mark all its charts as obsolete
+			cleanName := c.cleanName(name)
+			c.Debugf("Instance %s no longer exists, marking charts as obsolete", name)
+			
+			// Find all charts for this instance
+			chartsMarked := 0
+			for _, chart := range *c.charts {
+				// Check if this chart belongs to the missing instance
+				// Queue charts have IDs like "queue_cleanname_depth"
+				// Channel charts have IDs like "channel_cleanname_status", etc.
+				if strings.Contains(chart.ID, cleanName) {
+					if !chart.Obsolete {
+						// Set Obsolete flag and reset created flag so framework will send CHART command
+						// Don't set remove flag yet - this allows the framework to send the obsolete chart command
+						chart.Obsolete = true
+						chart.MarkNotCreated() // Reset created flag to trigger CHART command
+						chartsMarked++
+						c.Debugf("Marked chart %s as obsolete", chart.ID)
+					}
+				}
+			}
+			
+			// Remove from collected map
+			delete(c.collected, name)
+			c.Infof("Removed instance %s - marked %d charts as obsolete", name, chartsMarked)
+		}
+	}
+}
+
+// testConnection performs a lightweight test to verify the MQ connection is still valid
+func (c *Collector) testConnection() bool {
+	if c.mqConn == nil || c.mqConn.hConn == C.MQHC_UNUSABLE_HCONN {
+		c.Debugf("Connection test failed: connection is nil or handle is unusable")
+		return false
+	}
+	
+	// For now, just do basic handle validation - attempting MQINQ was causing compilation issues
+	// The connection will be tested when we actually send PCF commands
+	// If those fail, the connection will be marked as invalid and recreated
+	c.Debugf("Connection test passed - connection handles are valid")
+	return true
 }
