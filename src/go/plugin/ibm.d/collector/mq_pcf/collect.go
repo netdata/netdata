@@ -1001,7 +1001,7 @@ func (c *Collector) collectQueueConfigMetrics(ctx context.Context, queueName, cl
 			hasDeqCount = true
 		}
 	}
-	c.Debugf("MQCMD_INQUIRE_Q for %s returned %d attributes (has ENQ_COUNT=%v, has DEQ_COUNT=%v)", 
+	c.Debugf("MQCMD_INQUIRE_Q for %s returned %d attributes (has ENQ_COUNT=%v, has DEQ_COUNT=%v)",
 		queueName, attrCount, hasEnqCount, hasDeqCount)
 
 	// Extract configuration metrics
