@@ -1,12 +1,29 @@
 extends:
   - _vertiv.yaml
+
 sysobjectid:
   - 1.3.6.1.4.1.21239.5.1 # watchdog100
+
 metadata:
   device:
     fields:
       type:
         value: "sensor"
+
+metric_tags:
+  - tag: vertiv_product_title
+    OID: 1.3.6.1.4.1.21239.5.1.1.1.0
+    symbol: productTitle
+  - tag: vertiv_product_version
+    OID: 1.3.6.1.4.1.21239.5.1.1.2.0
+    symbol: productVersion
+  - tag: vertiv_product_friendly_name
+    OID: 1.3.6.1.4.1.21239.5.1.1.3.0
+    symbol: productFriendlyName
+  - tag: vertiv_product_mac_address
+    OID: 1.3.6.1.4.1.21239.5.1.1.4.0
+    symbol: productMacAddress
+
 metrics:
   - MIB: VERTIV-BB-MIB
     table:
@@ -15,39 +32,40 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.21239.5.1.2.1.5
         name: vertiv.internalTemp
-        description: Internal temperature measurement
-        unit: "Cel"
+        chart_meta:
+          description: Internal temperature measurement
+          family: Sensor/Temperature/Value
+          unit: "Cel"
       - OID: 1.3.6.1.4.1.21239.5.1.2.1.6
         name: vertiv.internalHumidity
-        description: Internal humidity measurement
-        unit: "%"
+        chart_meta:
+          description: Internal humidity measurement
+          family: Sensor/Humidity/Value
+          unit: "%"
       - OID: 1.3.6.1.4.1.21239.5.1.2.1.7
         name: vertiv.internalDewPoint
-        description: Internal dew point temperature
-        unit: "Cel"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.21239.5.1.2.1.2
-          name: vertiv.internalSerial
-        tag: vertiv_internal_serial
-      #      - symbol:
-      #          OID: 1.3.6.1.4.1.21239.5.1.1.7.0
-      #          name: vertiv.temperatureUnits
-      #        tag: vertiv_temperature_units
-      #        mapping:
-      #          0: fahrenheit
-      #          1: celsius
-      # TODO : Add this tag back when tagging by scalar symbol is implemented NDM-2247
-      - symbol:
-          OID: 1.3.6.1.4.1.21239.5.1.2.1.4
-          name: vertiv.internalAvail
-        tag: vertiv_internal_avail
+        chart_meta:
+          description: Internal dew point temperature
+          family: Sensor/DewPoint/Value
+          unit: "Cel"
+      - OID: 11.3.6.1.4.1.21239.5.1.2.1.4
+        name: vertiv.internalAvail
+        chart_meta:
+          description: Internal availability status
+          family: Sensor/Availability/Status
+          unit: "{status}"
         mapping:
           0: unavailable
           1: available
           2: partially_unavailable
-          # mapping in the metric description
+    metric_tags:
+      - tag: vertiv_internal_index
+        index: 1
+      - tag: vertiv_internal_serial
+        symbol:
+          OID: 1.3.6.1.4.1.21239.5.1.2.1.2
+          name: vertiv.internalSerial
+
   - MIB: VERTIV-BB-MIB
     table:
       name: tempSensorTable
@@ -55,37 +73,28 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.21239.5.1.4.1.5
         name: vertiv.tempSensorTemp
-        description: Temperature measured by the temperature sensor
-        unit: "Cel"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.21239.5.1.4.1.2
-          name: vertiv.tempSensorSerial
-        tag: vertiv_temp_sensor_serial
-      - symbol:
-          OID: 1.3.6.1.4.1.21239.5.1.4.1.3
-          name: vertiv.tempSensorLabel
-        tag: vertiv_temp_sensor_label
-      - symbol:
-          OID: 1.3.6.1.4.1.21239.5.1.4.1.4
-          name: vertiv.tempSensorAvail
-        tag: vertiv_temp_sensor_avail
+        chart_meta:
+          description: Temperature measured by the temperature sensor
+          family: Sensor/Temperature/Value
+          unit: "Cel"
+      - OID: 1.3.6.1.4.1.21239.5.1.4.1.4
+        name: vertiv.tempSensorAvail
+        chart_meta:
+          description: Sensor availability status
+          family: Sensor/Availability/Status
+          unit: "{status}"
         mapping:
           0: unavailable
           1: available
           2: partially_unavailable
-          # mapping in the metric description
-metric_tags:
-  - OID: 1.3.6.1.4.1.21239.5.1.1.1.0
-    symbol: productTitle
-    tag: vertiv_product_title
-  - OID: 1.3.6.1.4.1.21239.5.1.1.2.0
-    symbol: productVersion
-    tag: vertiv_product_version
-  - OID: 1.3.6.1.4.1.21239.5.1.1.3.0
-    symbol: productFriendlyName
-    tag: vertiv_product_friendly_name
-  - OID: 1.3.6.1.4.1.21239.5.1.1.4.0
-    symbol: productMacAddress
-    tag: vertiv_product_mac_address
+    metric_tags:
+      - tag: vertiv_sensor_index
+        index: 1
+      - tag: vertiv_temp_sensor_serial
+        symbol:
+          OID: 1.3.6.1.4.1.21239.5.1.4.1.2
+          name: vertiv.tempSensorSerial
+      - tag: vertiv_temp_sensor_label
+        symbol:
+          OID: 1.3.6.1.4.1.21239.5.1.4.1.3
+          name: vertiv.tempSensorLabel
