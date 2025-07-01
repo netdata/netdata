@@ -273,11 +273,13 @@ func (c *Collector) parsePCFResponse(response []byte) (map[C.MQLONG]interface{},
 		return nil, fmt.Errorf("unexpected PCF message type: %d", cfh.Type)
 	}
 	
-	// Don't fail on warnings (CompCode=1) or failures (CompCode=2) - just process what we can
-	// The individual messages might have useful information even if some failed
-	if cfh.CompCode == C.MQCC_FAILED && cfh.ParameterCount == 0 {
-		// Only return error if it's a complete failure with no parameters
-		return nil, fmt.Errorf("PCF command failed: completion code %d, reason code %d", cfh.CompCode, cfh.Reason)
+	// Store the completion code and reason in the attributes for the caller to check
+	attrs[C.MQIACF_COMP_CODE] = int32(cfh.CompCode)
+	attrs[C.MQIACF_REASON_CODE] = int32(cfh.Reason)
+	
+	// If no parameters, just return the attrs with error codes
+	if cfh.ParameterCount == 0 {
+		return attrs, nil
 	}
 	
 	// Parse parameters
@@ -432,14 +434,55 @@ func (c *Collector) parseQueueListResponse(response []byte) ([]string, error) {
 	return queues, nil
 }
 
+// ChannelParseResult contains the results of parsing channel list response
+type ChannelParseResult struct {
+	Channels       []string           // Successfully retrieved channel names
+	ErrorCounts    map[int32]int      // MQ error code -> count
+	ErrorChannels  map[int32][]string // MQ error code -> channel names that failed
+	InternalErrors int                // Count of parsing/internal errors
+}
+
+// Internal error codes (negative to distinguish from MQ codes)
+const (
+	ErrInternalParsing = -1  // Failed to parse PCF message
+	ErrInternalShort   = -2  // Response too short
+	ErrInternalCorrupt = -3  // Corrupted message structure
+)
+
+// mqErrorString returns a human-readable description for MQ error codes
+func mqErrorString(code int32) string {
+	switch code {
+	case 2035:
+		return "MQRC_NOT_AUTHORIZED"
+	case 2085:
+		return "MQRC_UNKNOWN_OBJECT_NAME"
+	case 3008:
+		return "MQRCCF_COMMAND_FAILED"
+	case ErrInternalParsing:
+		return "INTERNAL_PARSE_ERROR"
+	case ErrInternalShort:
+		return "INTERNAL_RESPONSE_TOO_SHORT"
+	case ErrInternalCorrupt:
+		return "INTERNAL_CORRUPT_MESSAGE"
+	default:
+		return fmt.Sprintf("MQ_ERROR_%d", code)
+	}
+}
+
 // Parse channel list response
-func (c *Collector) parseChannelListResponse(response []byte) ([]string, error) {
-	var channels []string
+func (c *Collector) parseChannelListResponse(response []byte) *ChannelParseResult {
+	result := &ChannelParseResult{
+		Channels:      make([]string, 0),
+		ErrorCounts:   make(map[int32]int),
+		ErrorChannels: make(map[int32][]string),
+	}
 	
 	// Parse response in chunks (each channel gets its own response message)
 	offset := 0
 	for offset < len(response) {
 		if offset+int(C.sizeof_MQCFH) > len(response) {
+			result.InternalErrors++
+			result.ErrorCounts[ErrInternalShort]++
 			break
 		}
 		
@@ -463,28 +506,53 @@ func (c *Collector) parseChannelListResponse(response []byte) ([]string, error) 
 		messageEnd := offset + messageSize
 		
 		if messageEnd > len(response) {
+			result.InternalErrors++
+			result.ErrorCounts[ErrInternalCorrupt]++
 			break
 		}
 		
 		// Parse this message
 		attrs, err := c.parsePCFResponse(response[offset:messageEnd])
 		if err != nil {
-			c.Warningf("failed to parse channel response: %v", err)
+			// This is a real parsing error
+			result.InternalErrors++
+			result.ErrorCounts[ErrInternalParsing]++
 			offset = messageEnd
 			continue
 		}
 		
-		// Extract channel name
-		if channelName, ok := attrs[C.MQCACH_CHANNEL_NAME]; ok {
-			if name, ok := channelName.(string); ok && name != "" {
-				channels = append(channels, strings.TrimSpace(name))
+		// Check for MQ errors
+		var mqError int32
+		if reasonCode, ok := attrs[C.MQIACF_REASON_CODE]; ok {
+			if reason, ok := reasonCode.(int32); ok && reason != 0 {
+				mqError = reason
+				result.ErrorCounts[mqError]++
 			}
+		}
+		
+		// Extract channel name
+		channelName := ""
+		if name, ok := attrs[C.MQCACH_CHANNEL_NAME]; ok {
+			if nameStr, ok := name.(string); ok && nameStr != "" {
+				channelName = strings.TrimSpace(nameStr)
+			}
+		}
+		
+		// Store result based on error status
+		if mqError != 0 {
+			// Channel had an error
+			if channelName != "" {
+				result.ErrorChannels[mqError] = append(result.ErrorChannels[mqError], channelName)
+			}
+		} else if channelName != "" {
+			// Successful channel
+			result.Channels = append(result.Channels, channelName)
 		}
 		
 		offset = messageEnd
 	}
 	
-	return channels, nil
+	return result
 }
 
 // Parse topic list response
