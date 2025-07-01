@@ -401,13 +401,15 @@ const char *nut_get_var(UPSCONN_t *conn, const char *ups_name, const char *var_n
 
 // This function parses the 'ups.status' variable and emits the Netdata metrics
 // for each status, printing 1 for each set status and 0 otherwise.
-static inline void print_ups_status_metrics(const char *ups_name, const char *value) {
+void print_ups_status_metrics(UPSCONN_t *conn, const char *ups_name, const char *clean_ups_name) {
+    assert(conn);
     assert(ups_name);
-    assert(value);
+    assert(clean_ups_name);
 
     struct nut_ups_status status = { 0 };
+    const char *ups_status_string = nut_get_var(conn, ups_name, "ups.status");
 
-    for (const char *c = value; c && *c; c++) {
+    for (const char *c = ups_status_string; c && *c; c++) {
         switch (*c) {
         case ' ':
             continue;
@@ -512,7 +514,7 @@ static inline void print_ups_status_metrics(const char *ups_name, const char *va
            "SET 'forced_shutdown' = %u\n"
            "SET 'other' = %u\n"
            "END\n",
-           ups_name,
+           clean_ups_name,
            status.OL,
            status.OB,
            status.LB,
@@ -711,7 +713,7 @@ int main(int argc, char *argv[]) {
 
             // The 'ups.status' variable is a special case, because its chart has more
             // than one dimension. So, we can't simply print one data point.
-            print_ups_status_metrics(clean_ups_name, nut_get_var(&ups2, ups_name, "ups.status"));
+            print_ups_status_metrics(&ups2, ups_name, clean_ups_name);
 
             for (const struct nd_chart *chart = nd_charts; chart->nut_variable; chart++) {
                 NETDATA_DOUBLE nut_value_as_num;
