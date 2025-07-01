@@ -182,6 +182,7 @@ src/libnetdata/gorilla/fuzz-*.log
 
 # ignore build/ directory (default dir for many IDEs/LSPs)
 build/
+build-*/
 
 # ignore rules for go plugin code
 src/go/plugin/go.d/bin/

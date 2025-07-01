@@ -135,24 +135,24 @@ func TestWebSpherePMI_JVMMetricsExtraction(t *testing.T) {
 			name:    "JVM metrics from 8.5.5.24",
 			xmlFile: "../../samples.d/traditional-8.5.5.24-pmi-full-port-9284.xml",
 			expectedMetrics: map[string]int64{
-				"jvm_heap_used":       54039 * 1024,     // UsedMemory in KB -> bytes
-				"jvm_heap_max":        262144 * 1024,    // HeapSize upperBound in KB -> bytes
-				"jvm_heap_committed":  262144 * 1024,    // Same as max for PMI
-				"jvm_heap_free":       24360 * 1024,     // FreeMemory in KB -> bytes
-				"jvm_uptime":          7982,             // UpTime in seconds
-				"jvm_process_cpu_percent": 0,            // ProcessCpuUsage * precision
+				"jvm_heap_used":           54039 * 1024,  // UsedMemory in KB -> bytes
+				"jvm_heap_max":            262144 * 1024, // HeapSize upperBound in KB -> bytes
+				"jvm_heap_committed":      262144 * 1024, // Same as max for PMI
+				"jvm_heap_free":           24360 * 1024,  // FreeMemory in KB -> bytes
+				"jvm_uptime":              7982,          // UpTime in seconds
+				"jvm_process_cpu_percent": 0,             // ProcessCpuUsage * precision
 			},
 		},
 		{
 			name:    "JVM metrics from 9.0.5.24",
 			xmlFile: "../../samples.d/traditional-9.0.5.x-pmi-full-port-9083.xml",
 			expectedMetrics: map[string]int64{
-				"jvm_heap_used":       49695 * 1024,     // UsedMemory in KB -> bytes
-				"jvm_heap_max":        4092928 * 1024,   // HeapSize upperBound in KB -> bytes
-				"jvm_heap_committed":  4092928 * 1024,   // Same as max for PMI
-				"jvm_heap_free":       30560 * 1024,     // FreeMemory in KB -> bytes
-				"jvm_uptime":          47004,            // UpTime in seconds
-				"jvm_process_cpu_percent": 0,            // ProcessCpuUsage * precision
+				"jvm_heap_used":           49695 * 1024,   // UsedMemory in KB -> bytes
+				"jvm_heap_max":            4092928 * 1024, // HeapSize upperBound in KB -> bytes
+				"jvm_heap_committed":      4092928 * 1024, // Same as max for PMI
+				"jvm_heap_free":           30560 * 1024,   // FreeMemory in KB -> bytes
+				"jvm_uptime":              47004,          // UpTime in seconds
+				"jvm_process_cpu_percent": 0,              // ProcessCpuUsage * precision
 			},
 		},
 	}
@@ -242,7 +242,7 @@ func TestWebSpherePMI_AllElementsParsing(t *testing.T) {
 
 			// Count different statistic types
 			counts := countStatisticTypes(stats)
-			
+
 			// Verify all statistic types are found
 			assert.Greater(t, counts["CountStatistic"], 0, "no CountStatistic elements found")
 			assert.Greater(t, counts["TimeStatistic"], 0, "no TimeStatistic elements found")
@@ -260,17 +260,17 @@ func TestWebSpherePMI_AllElementsParsing(t *testing.T) {
 
 func countStatisticTypes(stats pmiStatsResponse) map[string]int {
 	counts := make(map[string]int)
-	
+
 	for _, node := range stats.Nodes {
 		for _, server := range node.Servers {
 			countStatsRecursive(server.Stats, counts)
 		}
 	}
-	
+
 	for _, stat := range stats.Stats {
 		countStatsRecursive([]pmiStat{stat}, counts)
 	}
-	
+
 	return counts
 }
 
@@ -281,7 +281,7 @@ func countStatsRecursive(stats []pmiStat, counts map[string]int) {
 		counts["RangeStatistic"] += len(stat.RangeStatistics)
 		counts["BoundedRangeStatistic"] += len(stat.BoundedRangeStatistics)
 		counts["DoubleStatistic"] += len(stat.DoubleStatistics)
-		
+
 		// Process sub-stats recursively
 		countStatsRecursive(stat.SubStats, counts)
 	}
@@ -293,19 +293,19 @@ func TestWebSpherePMI_VersionLabels(t *testing.T) {
 	w.wasVersion = "8.5.5.24"
 	w.wasEdition = "traditional"
 	w.HTTPConfig.RequestConfig.URL = "http://localhost:9080/wasPerfTool/servlet/perfservlet"
-	
+
 	// Initialize charts
 	err := w.Init(context.Background())
 	require.NoError(t, err)
-	
+
 	// Add version labels
 	w.addVersionLabelsToCharts()
-	
+
 	// Verify labels were added to all charts
 	for _, chart := range *w.charts {
 		foundVersion := false
 		foundEdition := false
-		
+
 		for _, label := range chart.Labels {
 			if label.Key == "websphere_version" && label.Value == "8.5.5.24" {
 				foundVersion = true
@@ -314,7 +314,7 @@ func TestWebSpherePMI_VersionLabels(t *testing.T) {
 				foundEdition = true
 			}
 		}
-		
+
 		assert.True(t, foundVersion, "websphere_version label not found in chart %s", chart.ID)
 		assert.True(t, foundEdition, "websphere_edition label not found in chart %s", chart.ID)
 	}
@@ -351,7 +351,7 @@ func TestWebSpherePMI_NoDataLoss(t *testing.T) {
 			// Create collector with all collection flags enabled
 			ws := New()
 			ws.HTTPConfig.RequestConfig.URL = ts.URL + "/wasPerfTool/servlet/perfservlet"
-			
+
 			// Enable all collection flags
 			trueVal := true
 			ws.CollectJVMMetrics = &trueVal
@@ -366,7 +366,7 @@ func TestWebSpherePMI_NoDataLoss(t *testing.T) {
 			ws.CollectServletMetrics = &trueVal
 			ws.CollectEJBMetrics = &trueVal
 			ws.CollectJDBCAdvanced = &trueVal
-			
+
 			err = ws.Init(context.Background())
 			require.NoError(t, err)
 
@@ -376,20 +376,20 @@ func TestWebSpherePMI_NoDataLoss(t *testing.T) {
 
 			// Verify we collected some metrics
 			assert.NotEmpty(t, mx, "no metrics collected")
-			
+
 			// Log all collected metrics for manual verification
 			t.Logf("Collected %d metrics:", len(mx))
 			for metric, value := range mx {
 				t.Logf("  %s: %d", metric, value)
 			}
-			
+
 			// Verify critical JVM metrics are present
 			criticalMetrics := []string{
 				"jvm_heap_used",
 				"jvm_heap_max",
 				"jvm_uptime",
 			}
-			
+
 			for _, metric := range criticalMetrics {
 				_, ok := mx[metric]
 				assert.True(t, ok, "critical metric %s not found", metric)
@@ -422,22 +422,22 @@ func TestWebSpherePMI_BackwardCompatibility(t *testing.T) {
 			},
 		},
 	}
-	
+
 	// Populate backward compatibility fields
 	stat.populateBackwardCompatibility()
-	
+
 	// Verify single references are populated with first element
 	require.NotNil(t, stat.CountStatistic)
 	assert.Equal(t, "count1", stat.CountStatistic.Name)
 	assert.Equal(t, "100", stat.CountStatistic.Count)
-	
+
 	require.NotNil(t, stat.TimeStatistic)
 	assert.Equal(t, "time1", stat.TimeStatistic.Name)
-	
+
 	require.NotNil(t, stat.DoubleStatistic)
 	assert.Equal(t, "double1", stat.DoubleStatistic.Name)
 	assert.Equal(t, "3.14159", stat.DoubleStatistic.Double)
-	
+
 	// Verify sub-stats are also populated
 	require.NotNil(t, stat.SubStats[0].CountStatistic)
 	assert.Equal(t, "subcount", stat.SubStats[0].CountStatistic.Name)
@@ -448,7 +448,7 @@ func TestWebSpherePMI_BackwardCompatibility(t *testing.T) {
 func TestWebSpherePMI_ProcessStatSetsPath(t *testing.T) {
 	w := New()
 	w.setConfigurationDefaults()
-	
+
 	// Create a stat tree that simulates the WebSphere PMI structure
 	stat := pmiStat{
 		Name: "server",
@@ -468,7 +468,7 @@ func TestWebSpherePMI_ProcessStatSetsPath(t *testing.T) {
 				},
 			},
 			{
-				Name: "connectionPoolModule", 
+				Name: "connectionPoolModule",
 				Path: "", // Empty path
 				SubStats: []pmiStat{
 					{
@@ -488,12 +488,12 @@ func TestWebSpherePMI_ProcessStatSetsPath(t *testing.T) {
 			},
 		},
 	}
-	
+
 	mx := make(map[string]int64)
-	
+
 	// Process the stat tree
 	w.processStat(&stat, "", mx)
-	
+
 	// Verify paths were set correctly
 	assert.Equal(t, "server", stat.Path, "top level path should be set")
 	assert.Equal(t, "server/threadPoolModule", stat.SubStats[0].Path, "threadPoolModule path should be set")

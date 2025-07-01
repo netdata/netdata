@@ -35,7 +35,7 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 
 		// Check if we can use modern MON_GET_* functions
 		d.detectMonGetSupport(ctx)
-		
+
 		// Check if column-organized table metrics are available
 		d.detectColumnOrganizedSupport(ctx)
 	}
@@ -645,7 +645,7 @@ func (d *DB2) collectBackupStatus(ctx context.Context) error {
 	var lastBackupTime sql.NullString
 	queryCtx, cancel := context.WithTimeout(ctx, time.Duration(d.Timeout))
 	defer cancel()
-	
+
 	// Get the most recent backup attempt
 	err := d.db.QueryRowContext(queryCtx, `
 		SELECT SQLCODE, START_TIME
@@ -655,7 +655,7 @@ func (d *DB2) collectBackupStatus(ctx context.Context) error {
 		ORDER BY START_TIME DESC
 		FETCH FIRST 1 ROW ONLY
 	`).Scan(&lastBackupSQLCode, &lastBackupTime)
-	
+
 	if err == nil && lastBackupSQLCode.Valid {
 		// Check if the last backup was successful (SQLCODE = 0)
 		if lastBackupSQLCode.Int64 == 0 {
@@ -1085,11 +1085,11 @@ func (d *DB2) collectMonGetConnections(ctx context.Context) error {
 			}
 		}
 	})
-	
+
 	if err != nil {
 		return err
 	}
-	
+
 	// Then get max connections from configuration
 	return d.collectSingleMetric(ctx, "max_connections", queryMaxConnections, func(value string) {
 		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
