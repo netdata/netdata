@@ -21,293 +21,293 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.42040.1.6.0
       name: nasuni.filerTotalUnprotectedData
-    description: Total amount of unprotected data on the filer
-    unit: "By"
+      description: Total amount of unprotected data on the filer
+      unit: "By"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.7.0
       name: nasuni.filerPushesCompleted
-    description: Number of completed pushes
-    unit: "{push}"
+      description: Number of completed pushes
+      unit: "{push}"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.8.0
       name: nasuni.filerTotalPushed
-    description: Total amount of data pushed
-    unit: "By"
+      description: Total amount of data pushed
+      unit: "By"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.9.0
       name: nasuni.filerTotalRead
-    description: Total amount of data read
-    unit: "By"
+      description: Total amount of data read
+      unit: "By"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.10.0
       name: nasuni.filerOpensForRead
-    description: Number of opens for read
-    unit: "{open}"
+      description: Number of opens for read
+      unit: "{open}"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.11.0
       name: nasuni.filerOpensForWrite
-    description: Number of opens for write
-    unit: "{open}"
+      description: Number of opens for write
+      unit: "{open}"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.12.0
       name: nasuni.filerMergeConflicts
-    description: Number of merge conflicts
-    unit: "{conflict}"
+      description: Number of merge conflicts
+      unit: "{conflict}"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.13.0
       name: nasuni.filerReadHits
-    description: Number of read hits
-    unit: "{hit}"
+      description: Number of read hits
+      unit: "{hit}"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.14.0
       name: nasuni.filerReadMisses
-    description: Number of read misses
-    unit: "{miss}"
+      description: Number of read misses
+      unit: "{miss}"
   - MIB: NASUNI-FILER-MIB
     metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.42040.1.100.1.0
       name: nasuni.filerCacheTotal
-    description: Total cache size
-    unit: "By"
+      description: Total cache size
+      unit: "By"
   - MIB: NASUNI-FILER-MIB
     metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.42040.1.100.2.0
       name: nasuni.filerCacheUsed
-    description: Used cache size
-    unit: "By"
+      description: Used cache size
+      unit: "By"
   - MIB: NASUNI-FILER-MIB
     metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.42040.1.100.3.0
       name: nasuni.filerCacheFree
-    description: Free cache size
-    unit: "By"
+      description: Free cache size
+      unit: "By"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.103.1.0
       name: nasuni.filerTotalShares
-    description: Total number of shares
-    unit: "{share}"
+      description: Total number of shares
+      unit: "{share}"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.103.2.0
       name: nasuni.filerTotalShareLocks
-    description: Total number of share locks
-    unit: "{lock}"
+      description: Total number of share locks
+      unit: "{lock}"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.103.3.0
       name: nasuni.filerTotalShareClients
-    description: Total number of share clients
-    unit: "{client}"
+      description: Total number of share clients
+      unit: "{client}"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.104.1.0
       name: nasuni.filerTotalExports
-    description: Total number of exports
-    unit: "{export}"
+      description: Total number of exports
+      unit: "{export}"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.105.1.0
       name: nasuni.filerTotalIscsiTargets
-    description: Total number of iSCSI targets
-    unit: "{target}"
+      description: Total number of iSCSI targets
+      unit: "{target}"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.105.2.0
       name: nasuni.filerTotalIscsiClients
-    description: Total number of iSCSI clients
-    unit: "{client}"
+      description: Total number of iSCSI clients
+      unit: "{client}"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.109.1.0
       name: nasuni.filerTotalFtpdirs
-    description: Total number of FTP directories
-    unit: "{directory}"
+      description: Total number of FTP directories
+      unit: "{directory}"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.106.1.0
       name: nasuni.filerTotalMobileLicenses
-    description: Total number of mobile licenses
-    unit: "{license}"
+      description: Total number of mobile licenses
+      unit: "{license}"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.106.2.0
       name: nasuni.filerNumIOSLicenses
-    description: Number of iOS licenses
-    unit: "{license}"
+      description: Number of iOS licenses
+      unit: "{license}"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.106.3.0
       name: nasuni.filerNumAndroidLicenses
-    description: Number of Android licenses
-    unit: "{license}"
+      description: Number of Android licenses
+      unit: "{license}"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.108.1.0
       name: nasuni.filerCloudOut
-    description: Amount of data sent to cloud
-    unit: "By"
+      description: Amount of data sent to cloud
+      unit: "By"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.108.2.0
       name: nasuni.filerCloudIn
-    description: Amount of data received from cloud
-    unit: "By"
+      description: Amount of data received from cloud
+      unit: "By"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.108.3.0
       name: nasuni.filerMobileOut
-    description: Amount of data sent to mobile
-    unit: "By"
+      description: Amount of data sent to mobile
+      unit: "By"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.108.4.0
       name: nasuni.filerMobileIn
-    description: Amount of data received from mobile
-    unit: "By"
+      description: Amount of data received from mobile
+      unit: "By"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.108.5.0
       name: nasuni.filerUIOut
-    description: Amount of data sent to UI
-    unit: "By"
+      description: Amount of data sent to UI
+      unit: "By"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.108.6.0
       name: nasuni.filerUIIn
-    description: Amount of data received from UI
-    unit: "By"
+      description: Amount of data received from UI
+      unit: "By"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.108.7.0
       name: nasuni.filerClientsOut
-    description: Amount of data sent to clients
-    unit: "By"
+      description: Amount of data sent to clients
+      unit: "By"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.108.8.0
       name: nasuni.filerClientsIn
-    description: Amount of data received from clients
-    unit: "By"
+      description: Amount of data received from clients
+      unit: "By"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.108.9.0
       name: nasuni.filerMigrationOut
-    description: Amount of data sent during migration
-    unit: "By"
+      description: Amount of data sent during migration
+      unit: "By"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.108.10.0
       name: nasuni.filerMigrationIn
-    description: Amount of data received during migration
-    unit: "By"
+      description: Amount of data received during migration
+      unit: "By"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.3.1.0
       name: nasuni.accountLicensedCapacity
-    description: Licensed account capacity
-    unit: "By"
+      description: Licensed account capacity
+      unit: "By"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.3.2.0
       name: nasuni.accountUsedCapacity
-    description: Used account capacity
-    unit: "By"
+      description: Used account capacity
+      unit: "By"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.3.3.0
       name: nasuni.accountPercentUsedCapacity
-    description: Percent of used account capacity
-    unit: "%"
+      description: Percent of used account capacity
+      unit: "%"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.102.1.0
       name: nasuni.filerAmbientTemp
-    description: Ambient temperature of the filer
-    unit: "Cel"
+      description: Ambient temperature of the filer
+      unit: "Cel"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.102.2.0
       name: nasuni.filerInletTemp
-    description: Inlet temperature of the filer
-    unit: "Cel"
+      description: Inlet temperature of the filer
+      unit: "Cel"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.102.3.0
       name: nasuni.filerExhaustTemp
-    description: Exhaust temperature of the filer
-    unit: "Cel"
+      description: Exhaust temperature of the filer
+      unit: "Cel"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.102.4.0
       name: nasuni.filerNumPowerSupplies
-    description: Number of power supplies
-    unit: "{power_supply}"
+      description: Number of power supplies
+      unit: "{power_supply}"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.102.5.0
       name: nasuni.filerPowerSupplyErrors
-    description: Number of power supply errors
-    unit: "{error}"
+      description: Number of power supply errors
+      unit: "{error}"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.102.6.0
       name: nasuni.filerNumRaidArrays
-    description: Number of RAID arrays
-    unit: "{raid_array}"
+      description: Number of RAID arrays
+      unit: "{raid_array}"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.102.7.0
       name: nasuni.filerRaidArrayErrors
-    description: Number of RAID array errors
-    unit: "{error}"
+      description: Number of RAID array errors
+      unit: "{error}"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.102.8.0
       name: nasuni.filerNumRaidDisks
-    description: Number of RAID disks
-    unit: "{raid_disk}"
+      description: Number of RAID disks
+      unit: "{raid_disk}"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.102.9.0
       name: nasuni.filerRaidDiskErrors
-    description: Number of RAID disk errors
-    unit: "{error}"
+      description: Number of RAID disk errors
+      unit: "{error}"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.101.10.0
       name: nasuni.filerDiskCount
-    description: Number of disks
-    unit: "{disk}"
+      description: Number of disks
+      unit: "{disk}"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.101.6.0
       name: nasuni.filerPhysCpuCount
-    description: Number of physical CPUs
-    unit: "{cpu}"
+      description: Number of physical CPUs
+      unit: "{cpu}"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.1.101.7.0
       name: nasuni.filerCoreCount
-    description: Number of CPU cores
-    unit: "{core}"
+      description: Number of CPU cores
+      unit: "{core}"
   - MIB: NASUNI-FILER-MIB
     symbol:
       OID: 1.3.6.1.4.1.42040.2.1.0
       name: nasuni.volumeCount
-    description: Number of volumes
-    unit: "{volume}"
+      description: Number of volumes
+      unit: "{volume}"
   - MIB: NASUNI-FILER-MIB
     table:
       OID: 1.3.6.1.4.1.42040.2.2

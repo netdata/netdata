@@ -203,50 +203,34 @@ metrics:
           OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.6
           name: dell.os10bgp4V2PeerLocalPort
         tag: dell_os10bgp4_v2_peer_local_port
-        description: "Local port for the TCP connection between the BGP peers"
-        unit: "{port}"
       - symbol:
           OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.7
           name: dell.os10bgp4V2PeerLocalAs
         tag: dell_os10bgp4_v2_peer_local_as
-        description: "AS that this peering session is representing itself as to the remote peer"
-        unit: "1"
       - symbol:
           OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.8
           name: dell.os10bgp4V2PeerLocalIdentifier
         tag: dell_os10bgp4_v2_peer_local_identifier
-        description: "BGP Identifier of the local system for this peering session"
-        unit: "{identifier}"
       - symbol:
           OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.9
           name: dell.os10bgp4V2PeerRemotePort
         tag: dell_os10bgp4_v2_peer_remote_port
-        description: "Remote port for the TCP connection between the BGP peers"
-        unit: "{port}"
       - symbol:
           OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.10
           name: dell.os10bgp4V2PeerRemoteAs
         tag: dell_os10bgp4_v2_peer_remote_as
-        description: "Remote autonomous system number received in the BGP OPEN message"
-        unit: "1"
       - symbol:
           OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.11
           name: dell.os10bgp4V2PeerRemoteIdentifier
         tag: dell_os10bgp4_v2_peer_remote_identifier
-        description: "BGP Identifier of this entry's remote BGP peer"
-        unit: "{identifier}"
       - symbol:
           OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.14
           name: dell.os10bgp4V2PeerDescription
         tag: dell_os10bgp4_v2_peer_description
-        description: "User configured description identifying this peer"
-        unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.12
           name: dell.os10bgp4V2PeerAdminStatus
         tag: dell_os10bgp4_v2_peer_admin_status
-        description: "Whether the BGP FSM for this remote peer is halted or running"
-        unit: "TBD"
         mapping:
           1: halted
           2: running
@@ -254,8 +238,6 @@ metrics:
           OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.13
           name: dell.os10bgp4V2PeerState
         tag: dell_os10bgp4_v2_peer_state
-        description: "BGP peer connection state"
-        unit: "TBD"
         mapping:
           1: idle
           2: connect

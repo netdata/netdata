@@ -12,8 +12,8 @@ metrics:
       - OID: 1.3.6.1.4.1.9.9.147.1.2.2.2.1.5
         name: cfwConnectionStatValue
         description: Current status of the resource statistic
-        unit: "{connection}"
         family: Firewall/Connection/Count
+        unit: "{connection}"
     metric_tags:
       - tag: service_type
         index: 1

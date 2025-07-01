@@ -61,57 +61,57 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.1.44.0
       name: sysStatMemoryTotal
-    description: The total memory available in bytes for TMM (Traffic Management Module)
-    unit: "By"
+      description: The total memory available in bytes for TMM (Traffic Management Module)
+      unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.1.45.0
       name: sysStatMemoryUsed
-    description: The memory in use in bytes for TMM (Traffic Management Module)
-    unit: "By"
+      description: The memory in use in bytes for TMM (Traffic Management Module)
+      unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.21.28.0
       name: sysGlobalTmmStatMemoryTotal
-    description: The total memory available in bytes for TMM (Traffic Management Module)
-    unit: "By"
+      description: The total memory available in bytes for TMM (Traffic Management Module)
+      unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.21.29.0
       name: sysGlobalTmmStatMemoryUsed
-    description: The memory in use in bytes for TMM (Traffic Management Module)
-    unit: "By"
+      description: The memory in use in bytes for TMM (Traffic Management Module)
+      unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.20.44.0
       name: sysGlobalHostOtherMemoryTotal
-    description: The total other non-TMM memory in bytes for the system
-    unit: "By"
+      description: The total other non-TMM memory in bytes for the system
+      unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.20.45.0
       name: sysGlobalHostOtherMemoryUsed
-    description: The other non-TMM memory in bytes currently in use for the system
-    unit: "By"
+      description: The other non-TMM memory in bytes currently in use for the system
+      unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.20.46.0
       name: sysGlobalHostSwapTotal
-    description: The total swap in bytes for the system
-    unit: "By"
+      description: The total swap in bytes for the system
+      unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.20.47.0
       name: sysGlobalHostSwapUsed
-    description: The swap in bytes currently in use for the system
-    unit: "By"
+      description: The swap in bytes currently in use for the system
+      unit: "By"
   # CPU
   - MIB: F5-BIGIP-SYSTEM-MIB
     table:
@@ -174,130 +174,130 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.12.2.0
       name: sysTcpStatOpen
-    description: The number of current open connections
-    unit: "{connection}"
+      description: The number of current open connections
+      unit: "{connection}"
   - MIB: F5-BIGIP-SYSTEM-MIB
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.12.3.0
       name: sysTcpStatCloseWait
-    description: The number of current connections in CLOSE-WAIT/LAST-ACK
-    unit: "{connection}"
+      description: The number of current connections in CLOSE-WAIT/LAST-ACK
+      unit: "{connection}"
   - MIB: F5-BIGIP-SYSTEM-MIB
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.12.4.0
       name: sysTcpStatFinWait
-    description: The number of current connections in FIN-WAIT/CLOSING
-    unit: "{connection}"
+      description: The number of current connections in FIN-WAIT/CLOSING
+      unit: "{connection}"
   - MIB: F5-BIGIP-SYSTEM-MIB
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.12.5.0
       name: sysTcpStatTimeWait
-    description: The number of current connections in TIME-WAIT
-    unit: "{connection}"
+      description: The number of current connections in TIME-WAIT
+      unit: "{connection}"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.12.6.0
       name: sysTcpStatAccepts
-    description: The number of connections accepted
-    unit: "{connection}"
+      description: The number of connections accepted
+      unit: "{connection}"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.12.7.0
       name: sysTcpStatAcceptfails
-    description: The number of connections not accepted
-    unit: "{connection}"
+      description: The number of connections not accepted
+      unit: "{connection}"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.12.8.0
       name: sysTcpStatConnects
-    description: The number of connections established
-    unit: "{connection}"
+      description: The number of connections established
+      unit: "{connection}"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.12.9.0
       name: sysTcpStatConnfails
-    description: The number of connections failures
-    unit: "{connection}"
+      description: The number of connections failures
+      unit: "{connection}"
   # UDP stats
   - MIB: F5-BIGIP-SYSTEM-MIB
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.13.2.0
       name: sysUdpStatOpen
-    description: The number of current open connections
-    unit: "{connection}"
+      description: The number of current open connections
+      unit: "{connection}"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.13.3.0
       name: sysUdpStatAccepts
-    description: The number of connections accepted
-    unit: "{connection}"
+      description: The number of connections accepted
+      unit: "{connection}"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.13.4.0
       name: sysUdpStatAcceptfails
-    description: The number of connections not accepted
-    unit: "{connection}"
+      description: The number of connections not accepted
+      unit: "{connection}"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.13.5.0
       name: sysUdpStatConnects
-    description: The number of connections established
-    unit: "{connection}"
+      description: The number of connections established
+      unit: "{connection}"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.13.6.0
       name: sysUdpStatConnfails
-    description: The number of connections failures
-    unit: "{connection}"
+      description: The number of connections failures
+      unit: "{connection}"
   - MIB: F5-BIGIP-SYSTEM-MIB
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.9.2.0
       name: sysClientsslStatCurConns
-    description: The current number of concurrent connections with established SSL sessions being maintained by the filter
-    unit: "{connection}"
+      description: The current number of concurrent connections with established SSL sessions being maintained by the filter
+      unit: "{connection}"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.9.10.0
       name: sysClientsslStatEncryptedBytesIn
-    description: The total encrypted bytes received
-    unit: "By"
+      description: The total encrypted bytes received
+      unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.9.11.0
       name: sysClientsslStatEncryptedBytesOut
-    description: The total encrypted bytes sent
-    unit: "By"
+      description: The total encrypted bytes sent
+      unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.9.12.0
       name: sysClientsslStatDecryptedBytesIn
-    description: The total decrypted bytes received
-    unit: "By"
+      description: The total decrypted bytes received
+      unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.9.13.0
       name: sysClientsslStatDecryptedBytesOut
-    description: The total decrypted bytes sent
-    unit: "By"
+      description: The total decrypted bytes sent
+      unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.9.29.0
       name: sysClientsslStatHandshakeFailures
-    description: The total number of handshake failures
-    unit: "{connection}"
+      description: The total number of handshake failures
+      unit: "{connection}"
 
   # Metrics from F5-BIGIP-LOCAL-MIB provide monitoring information about virtual servers, nodes, and pools.
   # These concepts are related to the LTM (Local Traffic Management) features of BIG IP devices.
@@ -312,8 +312,8 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.3375.2.2.10.1.1
       name: ltmVirtualServNumber
-    description: The number of ltmVirtualServ entries in the table
-    unit: "{virtual_server}"
+      description: The number of ltmVirtualServ entries in the table
+      unit: "{virtual_server}"
 
   - MIB: F5-BIGIP-LOCAL-MIB
     table:
@@ -454,8 +454,8 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.3375.2.2.4.1.1
       name: ltmNodeAddrNumber
-    description: The number of ltmNodeAddr entries in the table
-    unit: "{node}"
+      description: The number of ltmNodeAddr entries in the table
+      unit: "{node}"
 
   - MIB: F5-BIGIP-LOCAL-MIB
     table:
@@ -619,8 +619,8 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.3375.2.2.5.1.1
       name: ltmPoolNumber
-    description: The number of ltmPool entries in the table
-    unit: "{pool}"
+      description: The number of ltmPool entries in the table
+      unit: "{pool}"
 
   - MIB: F5-BIGIP-LOCAL-MIB
     table:
@@ -721,8 +721,8 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.3375.2.2.5.3.1
       name: ltmPoolMemberNumber
-    description: The number of ltmPoolMember entries in the table
-    unit: "{member}"
+      description: The number of ltmPoolMember entries in the table
+      unit: "{member}"
 
   - MIB: F5-BIGIP-LOCAL-MIB
     table:

@@ -15,251 +15,251 @@ metrics:
     symbol:
       name: nec.picoCelsius
       OID: 1.3.6.1.4.1.119.2.3.84.2.1.1.0
-    description: Temperature in Celsius
-    unit: "Cel"
+      description: Temperature in Celsius
+      unit: "Cel"
   - MIB: PICO-SMI
     symbol:
       name: nec.picoFahrenheit
       OID: 1.3.6.1.4.1.119.2.3.84.2.1.2.0
-    description: Temperature in Fahrenheit
-    unit: "degF"
+      description: Temperature in Fahrenheit
+      unit: "degF"
   - MIB: PICO-SMI
     symbol:
       name: nec.picoVoltage
       OID: 1.3.6.1.4.1.119.2.3.84.2.2.0
-    description: Voltage level
-    unit: "V"
+      description: Voltage level
+      unit: "V"
   - MIB: PICO-SMI
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.119.2.3.84.2.5.3.0
-    description: CPU usage percentage
-    unit: "%"
+      description: CPU usage percentage
+      unit: "%"
   - MIB: PICO-SMI
     symbol:
       name: memory.usage
       OID: 1.3.6.1.4.1.119.2.3.84.2.6.2.0
-    description: Memory usage percentage
-    unit: "%"
+      description: Memory usage percentage
+      unit: "%"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalActiveTunnels
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.1.0
-    description: Number of active IPsec tunnels
-    unit: "{tunnel}"
+      description: Number of active IPsec tunnels
+      unit: "{tunnel}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalInNotifys
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.6.0
-    description: Number of inbound notifications
-    unit: "{notification}"
+      description: Number of inbound notifications
+      unit: "{notification}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalInP2Exchgs
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.7.0
-    description: Number of inbound phase 2 exchanges
-    unit: "{exchange}"
+      description: Number of inbound phase 2 exchanges
+      unit: "{exchange}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalInP2ExchgInvalids
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.8.0
-    description: Number of invalid inbound phase 2 exchanges
-    unit: "{exchange}"
+      description: Number of invalid inbound phase 2 exchanges
+      unit: "{exchange}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalInP2ExchgRejects
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.9.0
-    description: Number of rejected inbound phase 2 exchanges
-    unit: "{exchange}"
+      description: Number of rejected inbound phase 2 exchanges
+      unit: "{exchange}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalInP2SaDelRequests
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.10.0
-    description: Number of inbound phase 2 SA delete requests
-    unit: "{request}"
+      description: Number of inbound phase 2 SA delete requests
+      unit: "{request}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalOutNotifys
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.14.0
-    description: Number of outbound notifications
-    unit: "{notification}"
+      description: Number of outbound notifications
+      unit: "{notification}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalOutP2Exchgs
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.15.0
-    description: Number of outbound phase 2 exchanges
-    unit: "{exchange}"
+      description: Number of outbound phase 2 exchanges
+      unit: "{exchange}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalOutP2ExchgInvalids
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.16.0
-    description: Number of invalid outbound phase 2 exchanges
-    unit: "{exchange}"
+      description: Number of invalid outbound phase 2 exchanges
+      unit: "{exchange}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalOutP2ExchgRejects
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.17.0
-    description: Number of rejected outbound phase 2 exchanges
-    unit: "{exchange}"
+      description: Number of rejected outbound phase 2 exchanges
+      unit: "{exchange}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalOutP2SaDelRequests
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.18.0
-    description: Number of outbound phase 2 SA delete requests
-    unit: "{request}"
+      description: Number of outbound phase 2 SA delete requests
+      unit: "{request}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalInitTunnels
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.19.0
-    description: Number of initiated IPsec tunnels
-    unit: "{tunnel}"
+      description: Number of initiated IPsec tunnels
+      unit: "{tunnel}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalInitTunnelFails
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.20.0
-    description: Number of failed initiated tunnels
-    unit: "{tunnel}"
+      description: Number of failed initiated tunnels
+      unit: "{tunnel}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalRespTunnelFails
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.21.0
-    description: Number of failed responder tunnels
-    unit: "{tunnel}"
+      description: Number of failed responder tunnels
+      unit: "{tunnel}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalAuthFails
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.23.0
-    description: Number of authentication failures
-    unit: "{failure}"
+      description: Number of authentication failures
+      unit: "{failure}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalDecryptFails
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.24.0
-    description: Number of decryption failures
-    unit: "{failure}"
+      description: Number of decryption failures
+      unit: "{failure}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalHashValidFails
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.25.0
-    description: Number of hash validation failures
-    unit: "{failure}"
+      description: Number of hash validation failures
+      unit: "{failure}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalRespTunnels
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.27.0
-    description: Number of responder IPsec tunnels
-    unit: "{tunnel}"
+      description: Number of responder IPsec tunnels
+      unit: "{tunnel}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalInP1SaDelRequests
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.30.0
-    description: Number of inbound phase 1 SA delete requests
-    unit: "{request}"
+      description: Number of inbound phase 1 SA delete requests
+      unit: "{request}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalOutP1SaDelRequests
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.31.0
-    description: Number of outbound phase 1 SA delete requests
-    unit: "{request}"
+      description: Number of outbound phase 1 SA delete requests
+      unit: "{request}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pipSecGlobalActiveTunnels
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.1.0
-    description: Number of active IPsec tunnels
-    unit: "{tunnel}"
+      description: Number of active IPsec tunnels
+      unit: "{tunnel}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pipSecGlobalInOctets
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.3.0
-    description: Number of inbound octets
-    unit: "By"
+      description: Number of inbound octets
+      unit: "By"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pipSecGlobalInPkts
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.9.0
-    description: Number of inbound packets
-    unit: "{packet}"
+      description: Number of inbound packets
+      unit: "{packet}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pipSecGlobalInDrops
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.10.0
-    description: Number of inbound dropped packets
-    unit: "{packet}"
+      description: Number of inbound dropped packets
+      unit: "{packet}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pipSecGlobalInReplayDrops
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.11.0
-    description: Number of inbound replay dropped packets
-    unit: "{packet}"
+      description: Number of inbound replay dropped packets
+      unit: "{packet}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pipSecGlobalInAuths
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.12.0
-    description: Number of inbound authentications
-    unit: "{authentication}"
+      description: Number of inbound authentications
+      unit: "{authentication}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pipSecGlobalInAuthFails
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.13.0
-    description: Number of inbound authentication failures
-    unit: "{failure}"
+      description: Number of inbound authentication failures
+      unit: "{failure}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pipSecGlobalInDecrypts
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.14.0
-    description: Number of inbound decryptions
-    unit: "{decryption}"
+      description: Number of inbound decryptions
+      unit: "{decryption}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pipSecGlobalInDecryptFails
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.15.0
-    description: Number of inbound decryption failures
-    unit: "{failure}"
+      description: Number of inbound decryption failures
+      unit: "{failure}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pipSecGlobalOutOctets
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.16.0
-    description: Number of outbound octets
-    unit: "By"
+      description: Number of outbound octets
+      unit: "By"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pipSecGlobalOutPkts
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.22.0
-    description: Number of outbound packets
-    unit: "{packet}"
+      description: Number of outbound packets
+      unit: "{packet}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pipSecGlobalOutDrops
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.23.0
-    description: Number of outbound dropped packets
-    unit: "{packet}"
+      description: Number of outbound dropped packets
+      unit: "{packet}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pipSecGlobalOutAuths
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.24.0
-    description: Number of outbound authentications
-    unit: "{authentication}"
+      description: Number of outbound authentications
+      unit: "{authentication}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pipSecGlobalOutAuthFails
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.25.0
-    description: Number of outbound authentication failures
-    unit: "{failure}"
+      description: Number of outbound authentication failures
+      unit: "{failure}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pipSecGlobalOutEncrypts
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.26.0
-    description: Number of outbound encryptions
-    unit: "{encryption}"
+      description: Number of outbound encryptions
+      unit: "{encryption}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pipSecGlobalOutEncryptFails
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.27.0
-    description: Number of outbound encryption failures
-    unit: "{failure}"
+      description: Number of outbound encryption failures
+      unit: "{failure}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pipSecGlobalNoSaFails
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.33.0
-    description: Number of no SA failures
-    unit: "{failure}"
+      description: Number of no SA failures
+      unit: "{failure}"

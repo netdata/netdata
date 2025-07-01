@@ -256,8 +256,8 @@ metrics:
       - OID: 1.3.6.1.4.1.9.9.117.1.4.1.1.1
         name: cefcFanTrayOperStatus
         description: Operational state of the fan or fan tray
-        unit: "{status}"
         family: Environment/FanTray/Status
+        unit: "{status}"
         tag: cefc_fan_tray_oper_status
         mapping:
           1: unknown

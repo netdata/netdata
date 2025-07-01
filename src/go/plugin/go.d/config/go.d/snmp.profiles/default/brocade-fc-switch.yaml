@@ -62,8 +62,8 @@ metrics:
       - OID: 1.3.6.1.2.1.75.1.2.1.1.4
         name: fcFxPortAdminMode
         description: Desired operational mode of the FxPort
-        unit: "{status}"
         family: FibreChannel/FxPort/Admin/Mode
+        unit: "{status}"
         mapping:
           2: f_port
           3: fl_port

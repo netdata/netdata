@@ -14,158 +14,158 @@ metrics:
     symbol:
       name: cumulus.l3HostTableCurrentEntries
       OID: 1.3.6.1.4.1.40310.1.1.1.0
-    description: The number of L3 Host table entries currently in use
-    unit: "{entry}"
+      description: The number of L3 Host table entries currently in use
+      unit: "{entry}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.l3HostTableMaxEntries
       OID: 1.3.6.1.4.1.40310.1.1.2.0
-    description: The maximum possible entries in the L3 Host table
-    unit: "{entry}"
+      description: The maximum possible entries in the L3 Host table
+      unit: "{entry}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.l3RoutingTableCurrentEntries
       OID: 1.3.6.1.4.1.40310.1.1.3.0
-    description: The number of L3 Routing table entries currently in use
-    unit: "{entry}"
+      description: The number of L3 Routing table entries currently in use
+      unit: "{entry}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.l3RoutingTableMaxEntries
       OID: 1.3.6.1.4.1.40310.1.1.4.0
-    description: The maximum possible entries in the L3 Routing table
-    unit: "{entry}"
+      description: The maximum possible entries in the L3 Routing table
+      unit: "{entry}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.l3NextHopTableCurrentEntries
       OID: 1.3.6.1.4.1.40310.1.1.5.0
-    description: The number of L3 Next Hop table entries currently in use
-    unit: "{entry}"
+      description: The number of L3 Next Hop table entries currently in use
+      unit: "{entry}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.l3NextHopTableMaxEntries
       OID: 1.3.6.1.4.1.40310.1.1.6.0
-    description: The maximum possible entries in the L3 Next Hop table
-    unit: "{entry}"
+      description: The maximum possible entries in the L3 Next Hop table
+      unit: "{entry}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.l3EcmpNextHopTableCurrentEntries
       OID: 1.3.6.1.4.1.40310.1.1.9.0
-    description: The number of ECMP Next Hop table entries currently in use
-    unit: "{entry}"
+      description: The number of ECMP Next Hop table entries currently in use
+      unit: "{entry}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.l3EcmpNextHopTableMaxEntries
       OID: 1.3.6.1.4.1.40310.1.1.10.0
-    description: The maximum possible entries in the ECMP Next Hop table
-    unit: "{entry}"
+      description: The maximum possible entries in the ECMP Next Hop table
+      unit: "{entry}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.ingressAclCurrentEntries
       OID: 1.3.6.1.4.1.40310.1.1.11.0
-    description: TBD
-    unit: "TBD"
+      description: TBD
+      unit: "TBD"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.ingressAclMaxEntries
       OID: 1.3.6.1.4.1.40310.1.1.12.0
-    description: TBD
-    unit: "TBD"
+      description: TBD
+      unit: "TBD"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.ingressAclCurrentCounters
       OID: 1.3.6.1.4.1.40310.1.1.13.0
-    description: TBD
-    unit: "TBD"
+      description: TBD
+      unit: "TBD"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.ingressAclMaxCounters
       OID: 1.3.6.1.4.1.40310.1.1.14.0
-    description: TBD
-    unit: "TBD"
+      description: TBD
+      unit: "TBD"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.ingressAclCurrentMeters
       OID: 1.3.6.1.4.1.40310.1.1.15.0
-    description: TBD
-    unit: "TBD"
+      description: TBD
+      unit: "TBD"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.ingressAclMaxMeters
       OID: 1.3.6.1.4.1.40310.1.1.16.0
-    description: TBD
-    unit: "TBD"
+      description: TBD
+      unit: "TBD"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.ingressAclCurrentSlices
       OID: 1.3.6.1.4.1.40310.1.1.17.0
-    description: TBD
-    unit: "TBD"
+      description: TBD
+      unit: "TBD"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.ingressAclMaxSlices
       OID: 1.3.6.1.4.1.40310.1.1.18.0
-    description: TBD
-    unit: "TBD"
+      description: TBD
+      unit: "TBD"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.egressAclCurrentEntries
       OID: 1.3.6.1.4.1.40310.1.1.19.0
-    description: TBD
-    unit: "TBD"
+      description: TBD
+      unit: "TBD"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.egressAclMaxEntries
       OID: 1.3.6.1.4.1.40310.1.1.20.0
-    description: TBD
-    unit: "TBD"
+      description: TBD
+      unit: "TBD"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.egressAclCurrentCounters
       OID: 1.3.6.1.4.1.40310.1.1.21.0
-    description: TBD
-    unit: "TBD"
+      description: TBD
+      unit: "TBD"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.egressAclMaxCounters
       OID: 1.3.6.1.4.1.40310.1.1.22.0
-    description: TBD
-    unit: "TBD"
+      description: TBD
+      unit: "TBD"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.egressAclCurrentMeters
       OID: 1.3.6.1.4.1.40310.1.1.23.0
-    description: TBD
-    unit: "TBD"
+      description: TBD
+      unit: "TBD"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.egressAclMaxMeters
       OID: 1.3.6.1.4.1.40310.1.1.24.0
-    description: TBD
-    unit: "TBD"
+      description: TBD
+      unit: "TBD"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.egressAclCurrentSlices
       OID: 1.3.6.1.4.1.40310.1.1.25.0
-    description: TBD
-    unit: "TBD"
+      description: TBD
+      unit: "TBD"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.egressAclMaxSlices
       OID: 1.3.6.1.4.1.40310.1.1.26.0
-    description: TBD
-    unit: "TBD"
+      description: TBD
+      unit: "TBD"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.l2MacTableCurrentEntries
       OID: 1.3.6.1.4.1.40310.1.2.1.0
-    description: The number of L2 Mac table entries currently in use
-    unit: "{entry}"
+      description: The number of L2 Mac table entries currently in use
+      unit: "{entry}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.l2MacTableMaxEntries
       OID: 1.3.6.1.4.1.40310.1.2.2.0
-    description: The maximum possible entries in the L2 Mac table
-    unit: "{entry}"
+      description: The maximum possible entries in the L2 Mac table
+      unit: "{entry}"
   - MIB: CUMULUS-COUNTERS-MIB
     table:
       name: discardClCountersTable
@@ -324,23 +324,23 @@ metrics:
     symbol:
       name: cumulus.poeTotalSystemPower
       OID: 1.3.6.1.4.1.40310.3.1.1.0
-    description: The total power available to the system, shown with 3 decimal place of precision (milliwatts)
-    unit: "mW"
+      description: The total power available to the system, shown with 3 decimal place of precision (milliwatts)
+      unit: "mW"
   - MIB: CUMULUS-POE-MIB
     symbol:
       name: cumulus.poeTotalUsedPower
       OID: 1.3.6.1.4.1.40310.3.1.2.0
-    description: The total power USED by ports in the system, shown with 3 decimal places of precision (milliwatts)
-    unit: "mW"
+      description: The total power USED by ports in the system, shown with 3 decimal places of precision (milliwatts)
+      unit: "mW"
   - MIB: CUMULUS-POE-MIB
     symbol:
       name: cumulus.poeTotalAvailablePower
       OID: 1.3.6.1.4.1.40310.3.1.3.0
-    description: The total UNUSED and available power for the system in the common pool for new devices, shown with 3 decimal places of precision (milliwatts)
-    unit: "mW"
+      description: The total UNUSED and available power for the system in the common pool for new devices, shown with 3 decimal places of precision (milliwatts)
+      unit: "mW"
   - MIB: CUMULUS-POE-MIB
     symbol:
       name: cumulus.poeLastUpdateTime
       OID: 1.3.6.1.4.1.40310.3.1.4.0
-    description: The system uptime timestamp when the objects in this MIB were last updated
-    unit: "s"
+      description: The system uptime timestamp when the objects in this MIB were last updated
+      unit: "s"

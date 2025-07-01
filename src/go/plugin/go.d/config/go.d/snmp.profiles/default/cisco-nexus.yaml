@@ -30,8 +30,8 @@ metrics:
       - OID: 1.3.6.1.4.1.9.9.91.1.1.1.1.4
         name: entSensorValue # Do not change this name — required by transformEntitySensorValue for matching and renaming logic
         description: Most recent measurement obtained by the agent for this sensor
-        unit: "1"
         family: Sensor/Value
+        unit: "1"
         transform: |
           {{- transformEntitySensorValue .Metric -}}
     metric_tags:

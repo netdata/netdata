@@ -90,5 +90,3 @@ metrics:
         mapping:
           1: up
           2: down
-        description: The status of the stack port
-        unit: "{status}"

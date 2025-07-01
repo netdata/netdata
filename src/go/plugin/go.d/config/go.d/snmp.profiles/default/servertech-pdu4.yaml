@@ -586,14 +586,10 @@ metrics:
           name: servertech.sentry4.st4OcpCurrentCapacity
           OID: 1.3.6.1.4.1.1718.4.1.6.2.1.7
         tag: servertech_sentry4_st4_ocp_current_capacity
-        description: "Current capacity of the ocp"
-        unit: "A"
       - symbol:
           name: servertech.sentry4.st4OcpCurrentCapacityMax
           OID: 1.3.6.1.4.1.1718.4.1.6.2.1.8
         tag: servertech_sentry4_st4_ocp_current_capacity_max
-        description: "Maximum current capacity of the ocp"
-        unit: "A"
       - symbol:
           name: servertech.sentry4.st4OcpBranchCount
           OID: 1.3.6.1.4.1.1718.4.1.6.2.1.20

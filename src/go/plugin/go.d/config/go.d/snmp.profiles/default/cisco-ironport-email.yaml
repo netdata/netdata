@@ -29,30 +29,30 @@ metrics:
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.15497.1.1.1.2.0
-    description: This object provides a general idea of how busy the CPU is according to the appliance software, within the last 5 seconds of utilization
-    family: CPU/Usage
-    unit: "%"
+      description: This object provides a general idea of how busy the CPU is according to the appliance software, within the last 5 seconds of utilization
+      family: CPU/Usage
+      unit: "%"
   - MIB: ASYNCOS-MAIL-MIB
     symbol:
       name: ironport.oldestMessageAge
       OID: 1.3.6.1.4.1.15497.1.1.1.14.0
-    description: The number of seconds the oldest message has been in queue
-    family: Queue/Messages/Age
-    unit: "s"
+      description: The number of seconds the oldest message has been in queue
+      family: Queue/Messages/Age
+      unit: "s"
   - MIB: ASYNCOS-MAIL-MIB
     symbol:
       name: ironport.perCentDiskIOUtilization
       OID: 1.3.6.1.4.1.15497.1.1.1.3.0
-    description: Disk I/O within the last 5-15 seconds
-    family: Disk/IO/Utilization
-    unit: "%"
+      description: Disk I/O within the last 5-15 seconds
+      family: Disk/IO/Utilization
+      unit: "%"
   - MIB: ASYNCOS-MAIL-MIB
     symbol:
       name: ironport.perCentQueueUtilization
       OID: 1.3.6.1.4.1.15497.1.1.1.4.0
-    description: Percent of total queue capacity used
-    family: Queue/Utilization
-    unit: "%"
+      description: Percent of total queue capacity used
+      family: Queue/Utilization
+      unit: "%"
   #  - MIB: ASYNCOS-MAIL-MIB
   #    symbol:
   #      name: ironport.queueAvailabilityStatus
@@ -198,7 +198,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.1.1.15.0
       description: Number of DNS requests that have been sent but for which no reply has been received
       family: DNS/Requests/Outstanding
-    unit: "{request}/s"
+      unit: "{request}/s"
   - MIB: ASYNCOS-MAIL-MIB
     symbol:
       name: ironport.pendingDNSRequests
@@ -240,16 +240,16 @@ metrics:
     symbol:
       name: ironport.openFilesOrSockets
       OID: 1.3.6.1.4.1.15497.1.1.1.19.0
-    description: This object notes how many files or sockets are open on the appliance. In normal operating conditions, the measurement is taken at least once every 5-15 seconds.
-    unit: "{file}"
-    family: System/Resources/Files
+      description: This object notes how many files or sockets are open on the appliance. In normal operating conditions, the measurement is taken at least once every 5-15 seconds.
+      family: System/Resources/Files
+      unit: "{file}"
   - MIB: ASYNCOS-MAIL-MIB
     symbol:
       name: ironport.mailTransferThreads
       OID: 1.3.6.1.4.1.15497.1.1.1.20.0
-    description: Number of threads that perform some task related to transferring mail.
-    unit: "{thread}"
-    family: Mail/Transfer/Threads
+      description: Number of threads that perform some task related to transferring mail.
+      family: Mail/Transfer/Threads
+      unit: "{thread}"
   #  - MIB: ASYNCOS-MAIL-MIB
   #    symbol:
   #      name: ironport.fipsMode
@@ -312,9 +312,9 @@ metrics:
     symbol:
       name: ironport.cacheClientReqDenials
       OID: 1.3.6.1.4.1.15497.1.2.3.2.17.0
-    description: The number of responses blocked by access control
-    family: HTTP/Client/Responses/Denied
-    unit: "{response}/s"
+      description: The number of responses blocked by access control
+      family: HTTP/Client/Responses/Denied
+      unit: "{response}/s"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheServerRequests
@@ -431,9 +431,9 @@ metrics:
     symbol:
       name: ironport.cacheCltReplyErrPct
       OID: 1.3.6.1.4.1.15497.1.2.3.6.9.0
-    description: The percentage of errors in the HTTP replies to clients
-    family: HTTP/Client/Errors/Percentage
-    unit: "%"
+      description: The percentage of errors in the HTTP replies to clients
+      family: HTTP/Client/Errors/Percentage
+      unit: "%"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheThruputNow
@@ -522,9 +522,9 @@ metrics:
     symbol:
       name: ironport.cacheDeniedRespTimeNow
       OID: 1.3.6.1.4.1.15497.1.2.3.7.13.1.0
-    description: Cache denial response time in the last minute
-    family: Cache/Denial/ResponseTime
-    unit: "ms"
+      description: Cache denial response time in the last minute
+      family: Cache/Denial/ResponseTime
+      unit: "ms"
 metric_tags:
   - tag: ironport_cache_admin
     OID: 1.3.6.1.4.1.15497.1.2.2.1.0
