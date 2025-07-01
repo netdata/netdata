@@ -11,6 +11,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"os"
 	"regexp"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -91,6 +92,15 @@ func New() *Collector {
 
 // Init is called once when the collector is created.
 func (c *Collector) Init(ctx context.Context) error {
+	// CRITICAL: IBM MQ PCF fails with LC_ALL=C locale
+	// The MQ client library has issues with string handling in the C locale,
+	// causing MQRCCF_CFH_PARM_ID_ERROR and MQRCCF_COMMAND_FAILED errors.
+	// We must unset LC_ALL to allow MQ to use the default locale handling.
+	if os.Getenv("LC_ALL") == "C" {
+		c.Debugf("Unsetting LC_ALL=C for IBM MQ compatibility")
+		os.Unsetenv("LC_ALL")
+	}
+	
 	// Validate required configuration
 	if c.QueueManager == "" {
 		return errors.New("queue_manager is required")
