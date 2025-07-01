@@ -10,50 +10,18 @@ metadata:
       type:
         value: "PDU"
 
+# https://mibbrowser.online/mibdb_search.php?mib=TRIPPLITE-PRODUCTS
 metrics:
   - MIB: TRIPPLITE-PRODUCTS
     table:
       OID: 1.3.6.1.4.1.850.1.1.1.2
       name: tlpDeviceTable
     symbols:
-      - name: tlpDevice
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.850.1.1.1.2.1.4
-          name: tlpDeviceManufacturer
-        tag: tlp_device_manufacturer
-        description: The name of the manufacturer.
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.850.1.1.1.2.1.5
-          name: tlpDeviceModel
-        tag: tlp_device_model
-        description: The model designation.
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.850.1.1.1.2.1.6
-          name: tlpDeviceName
-        tag: tlp_device_name
-        description: A user-supplied name for the device.
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.850.1.1.1.2.1.8
-          name: tlpDeviceLocation
-        tag: tlp_device_location
-        description: A user-supplied location for the device.
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.850.1.1.1.2.1.9
-          name: tlpDeviceRegion
-        tag: tlp_device_region
-        description: A user-supplied region for the device.
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.850.1.1.1.2.1.10
-          name: tlpDeviceStatus
-        tag: tlp_device_status
+      - OID: 1.3.6.1.4.1.850.1.1.1.2.1.10
+        name: tlpDeviceStatus
+        description: The currently most critical alarm status for the device
+        family: Device/Alarm/Status
+        unit: "{status}"
         mapping:
           0: none
           1: critical
@@ -63,28 +31,30 @@ metrics:
           5: offline
           6: custom
           7: configuration
-        description: The currently most critical alarm status for the device.
-        unit: "TBD"
-  - MIB: TRIPPLITE-PRODUCTS
-    table:
-      OID: 1.3.6.1.4.1.850.1.1.2.1
-      name: tlpDeviceIdentTable
-    symbols:
-      - name: tlpDeviceIdent
-        constant_value_one: true
     metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.850.1.1.2.1.1.5
-          name: tlpDeviceIdentSerialNum
-        tag: tlp_device_ident_serial_num
-        description: The serial number of the device.
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.850.1.1.2.1.1.6
-          name: tlpDeviceIdentDateInstalled
-        tag: tlp_device_ident_date_installed
-        description: The installation date for this device in the format of mm/dd/yyyy.
-        unit: "TBD"
+      - tag: tlp_device_index
+        index: 1
+      - tag: _tlp_device_manufacturer
+        symbol:
+          OID: 1.3.6.1.4.1.850.1.1.1.2.1.4
+          name: tlpDeviceManufacturer
+      - tag: _tlp_device_model
+        symbol:
+          OID: 1.3.6.1.4.1.850.1.1.1.2.1.5
+          name: tlpDeviceModel
+      - tag: _tlp_device_name # A user-supplied name for the device.
+        symbol:
+          OID: 1.3.6.1.4.1.850.1.1.1.2.1.6
+          name: tlpDeviceName
+      - tag: _tlp_device_location # A user-supplied location for the device.
+        symbol:
+          OID: 1.3.6.1.4.1.850.1.1.1.2.1.8
+          name: tlpDeviceLocation
+      - tag: _tlp_device_region # A user-supplied region for the device.
+        symbol:
+          OID: 1.3.6.1.4.1.850.1.1.1.2.1.9
+          name: tlpDeviceRegion
+
   - MIB: TRIPPLITE-PRODUCTS
     table:
       OID: 1.3.6.1.4.1.850.1.1.3.2.2.1
@@ -93,39 +63,44 @@ metrics:
       - OID: 1.3.6.1.4.1.850.1.1.3.2.2.1.1.6
         name: tlpPduDeviceTemperatureC
         description: The ambient temperature at or near the PDU casing.
+        family: Environment/Temperature/Value
         unit: "Cel"
       - OID: 1.3.6.1.4.1.850.1.1.3.2.2.1.1.7
         name: tlpPduDeviceTemperatureF
         description: The ambient temperature at or near the PDU casing.
+        family: Environment/Temperature/Value
         unit: "F"
       - OID: 1.3.6.1.4.1.850.1.1.3.2.2.1.1.8
         name: tlpPduDevicePhaseImbalance
         description: The percentage of imbalance of the three phases.
+        family: Phase/Imbalance/Value
         unit: "%"
       - OID: 1.3.6.1.4.1.850.1.1.3.2.2.1.1.9
         name: tlpPduDeviceOutputPowerTotal
         description: The AC output total power for all circuits.
+        family: Output/Power/Total
         unit: "W"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - index: 1  # tlpDeviceIndex
-        tag: tlp_device_index
-      - symbol:
-          OID: 1.3.6.1.4.1.850.1.1.3.2.2.1.1.11
-          name: tlpPduDeviceOutputCurrentPrecision
-        tag: tlp_pdu_device_output_current_precision
-        mapping:
-          0: whole_number
-          1: tenths
-          2: hundredths
-      - symbol:
-          OID: 1.3.6.1.4.1.850.1.1.3.2.2.1.1.1
-          name: tlpPduDeviceMainLoadState
-        tag: tlp_pdu_device_main_load_state
+      - OID: 1.3.6.1.4.1.850.1.1.3.2.2.1.1.1
+        name: tlpPduDeviceMainLoadState
+        description: The current state of the main output of the device
+        family: Output/Main/Status
+        unit: "{status}"
         mapping:
           0: unknown
           1: off
           2: on
+    metric_tags:
+      - tag: tlp_device_index
+        index: 1
+      - symbol:
+          OID: 1.3.6.1.4.1.850.1.1.3.2.2.1.1.11
+          name: tlpPduDeviceOutputCurrentPrecision
+        tag: _tlp_pdu_device_output_current_precision
+        mapping:
+          0: whole_number
+          1: tenths
+          2: hundredths
+
   - MIB: TRIPPLITE-PRODUCTS
     table:
       OID: 1.3.6.1.4.1.850.1.1.3.2.3.2.1
@@ -134,40 +109,45 @@ metrics:
       - OID: 1.3.6.1.4.1.850.1.1.3.2.3.2.1.1.4
         name: tlpPduOutputVoltage
         description: The magnitude of the present output voltage for a given output line.
+        family: Output/Phase/Voltage/Value
         unit: "V"
       - OID: 1.3.6.1.4.1.850.1.1.3.2.3.2.1.1.5
         name: tlpPduOutputCurrent
         description: The output current, in hundreths of amps, for a given phase.
+        family: Output/Phase/Current/Value
         unit: "mA"
       - OID: 1.3.6.1.4.1.850.1.1.3.2.3.2.1.1.10
         name: tlpPduOutputSource
         description: The present source of output power.
-        unit: "TBD"
+        family: Output/Source/Status
+        unit: "{status}"
       - OID: 1.3.6.1.4.1.850.1.1.3.2.3.2.1.1.11
         name: tlpPduOutputFrequency
         description: The present output frequency.
+        family: Output/Frequency/Value
         unit: "Hz"
     # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
-      - index: 1  # tlpDeviceIndex
-        tag: tlp_device_index
-      - index: 2  # tlpPduOutputIndex
-        tag: tlp_pdu_output_index
-      - symbol:
+      - tag: tlp_device_index
+        index: 1  # tlpDeviceIndex
+      - tag: tlp_pdu_output_index
+        index: 2  # tlpPduOutputIndex
+      - tag: tlp_pdu_output_phase
+        symbol:
           OID: 1.3.6.1.4.1.850.1.1.3.2.3.2.1.1.2
           name: tlpPduOutputPhase
-        tag: tlp_pdu_output_phase
         mapping:
           1: phase1
           2: phase2
           3: phase3
-      - symbol:
+      - tag: tlp_pdu_output_phase_type
+        symbol:
           OID: 1.3.6.1.4.1.850.1.1.3.2.3.2.1.1.3
           name: tlpPduOutputPhaseType
-        tag: tlp_pdu_output_phase_type
         mapping:
           0: phase_to_neutral
           1: phase_to_phase
+
   - MIB: TRIPPLITE-PRODUCTS
     table:
       OID: 1.3.6.1.4.1.850.1.1.3.2.3.3.1
@@ -176,41 +156,52 @@ metrics:
       - OID: 1.3.6.1.4.1.850.1.1.3.2.3.3.1.1.4
         name: tlpPduOutletState
         description: The current state of the outlet.
-        unit: "TBD"
+        family: Outlet/Operational/Status
+        unit: "{status}"
       - OID: 1.3.6.1.4.1.850.1.1.3.2.3.3.1.1.7
         name: tlpPduOutletVoltage
         description: The magnitude of the present output voltage for a given outlet.
+        family: Outlet/Voltage/Value
         unit: "V"
       - OID: 1.3.6.1.4.1.850.1.1.3.2.3.3.1.1.8
         name: tlpPduOutletCurrent
         description: The present output current, in hundreths of amps, of a given outlet.
+        family: Outlet/Current/Value
         unit: "mA"
       - OID: 1.3.6.1.4.1.850.1.1.3.2.3.3.1.1.9
         name: tlpPduOutletPower
         description: The output power of a given outlet.
+        family: Outlet/Power/Active
         unit: "W"
     metric_tags:
-      - symbol:
+      - tag: tlp_pdu_outlet_name
+        symbol:
           OID: 1.3.6.1.4.1.850.1.1.3.2.3.3.1.1.2
           name: tlpPduOutletName
-        tag: tlp_pdu_outlet_name
-      - symbol:
+      - tag: _tlp_pdu_outlet_description
+        symbol:
           OID: 1.3.6.1.4.1.850.1.1.3.2.3.3.1.1.3
           name: tlpPduOutletDescription
-        tag: tlp_pdu_outlet_description
+
   - MIB: TRIPPLITE-PRODUCTS
     table:
       OID: 1.3.6.1.4.1.850.1.1.3.2.3.5.1
       name: tlpPduBreakerTable
     symbols:
-      - name: tlpPduBreaker
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+      - OID: 1.3.6.1.4.1.850.1.1.3.2.3.5.1.1.2
+        name: tlpPduBreakerStatus
+        description: The current state of the bank breaker
+        family: Breaker/Status
+        unit: "{status}"
+        mapping:
+          0: open
+          1: closed
+          2: not_installed
     metric_tags:
-      - index: 1  # tlpDeviceIndex
-        tag: tlp_device_index
-      - index: 2  # tlpPduBreakerIndex
-        tag: tlp_pdu_breaker_index
+      - tag: tlp_device_index
+        index: 1  # tlpDeviceIndex
+      - tag: tlp_pdu_breaker_index
+        index: 2  # tlpPduBreakerIndex
       - symbol:
           OID: 1.3.6.1.4.1.850.1.1.3.2.3.5.1.1.2
           name: tlpPduBreakerStatus
@@ -219,56 +210,40 @@ metrics:
           0: open
           1: closed
           2: not_installed
+
   - MIB: TRIPPLITE-PRODUCTS
     symbol:
       OID: 1.3.6.1.4.1.850.1.3.1.0
       name: tlpAlarmsPresent
       description: The present number of active alarm conditions.
-      unit: "{alarm_condition}"
+      family: Alarm/Active/Count
+      unit: "{alarm}"
+
   - MIB: TRIPPLITE-PRODUCTS
     table:
       OID: 1.3.6.1.4.1.850.1.3.2
       name: tlpAlarmTable
     symbols:
-      - name: tlpAlarm
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - index: 1  # tlpAlarmId
-        tag: tlp_alarm_id
-      - symbol:
-          OID: 1.3.6.1.4.1.850.1.3.2.1.2
-          name: tlpAlarmDescr
-        tag: tlp_alarm_descr
-        description: A reference of the alarm description object.
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.850.1.3.2.1.3
-          name: tlpAlarmTime
-        tag: tlp_alarm_time
-        description: The value of sysUpTime when the alarm condition was detected.
-        unit: "ms"
-      - symbol:
-          OID: 1.3.6.1.4.1.850.1.3.2.1.6
-          name: tlpAlarmDetail
-        tag: tlp_alarm_detail
-        description: A textual description of the alarm condition.
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.850.1.3.2.1.8
-          name: tlpAlarmState
-        tag: tlp_alarm_state
+      - OID: 1.3.6.1.4.1.850.1.3.2.1.8
+        name: tlpAlarmState
+        description: The current state of this alarm condition
+        family: Alarm/Condition/Status
+        unit: "{status}"
         mapping:
           1: active
           2: inactive
-        description: The current state of this alarm condition.
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.850.1.3.2.1.9
-          name: tlpAlarmAcknowledged
-        tag: tlp_alarm_acknowledged
+      - OID: 1.3.6.1.4.1.850.1.3.2.1.9
+        name: tlpAlarmAcknowledged
+        description: Denotes whether the alarm condition has been acknowledged
+        family: Alarm/Condition/Acknowledgment/Status
+        unit: "{status}"
         mapping:
           1: not_acknowledged
           2: acknowledged
-        description: Denotes whether the alarm condition has been acknowledged.
-        unit: "TBD"
+    metric_tags:
+      - tag: tlp_alarm_index
+        index: 1  # tlpAlarmId
+      - tag: _tlp_alarm_descr
+      - symbol:
+          OID: 1.3.6.1.4.1.850.1.3.2.1.2
+          name: tlpAlarmDescr
