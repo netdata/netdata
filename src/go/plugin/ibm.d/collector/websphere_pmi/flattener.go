@@ -19,6 +19,11 @@ type MetricTuple struct {
 	// New fields for fully unique identification
 	UniqueContext  string // Fully unique context including metric name
 	UniqueInstance string // Fully unique instance including metric name
+
+	// Array awareness
+	IsArrayElement bool   // True if this metric is from an array element
+	ArrayPath      string // Path to the array container (e.g., "server/Thread Pools")
+	ElementName    string // Name of the array element (e.g., "WebContainer")
 }
 
 // ArrayInfo represents detected array structures
@@ -82,6 +87,11 @@ func (f *XMLFlattener) FlattenPMIStats(stats *pmiStatsResponse) *FlattenerResult
 
 // flattenStat recursively flattens a stat and its substats
 func (f *XMLFlattener) flattenStat(stat *pmiStat, parentPath string, parentLabels map[string]string, result *FlattenerResult) {
+	f.flattenStatWithArray(stat, parentPath, parentLabels, result, false, "", "")
+}
+
+// flattenStatWithArray recursively flattens a stat with array awareness
+func (f *XMLFlattener) flattenStatWithArray(stat *pmiStat, parentPath string, parentLabels map[string]string, result *FlattenerResult, isArrayElement bool, arrayPath, elementName string) {
 	// Build current path
 	currentPath := stat.Name
 	if parentPath != "" {
@@ -111,17 +121,33 @@ func (f *XMLFlattener) flattenStat(stat *pmiStat, parentPath string, parentLabel
 		for i, subStat := range stat.SubStats {
 			elementLabels := copyLabels(currentLabels)
 			f.addArrayElementLabels(currentPath, subStat.Name, i, elementLabels)
-			f.flattenStat(&subStat, currentPath, elementLabels, result)
+			// Pass array information down
+			f.flattenStatWithArray(&subStat, currentPath, elementLabels, result, true, currentPath, subStat.Name)
 		}
 	} else {
-		// Process direct metrics
-		f.extractMetrics(stat, currentPath, currentLabels, result)
+		// Check if we should skip direct metrics due to Counters substat
+		skipDirectMetrics := f.hasCountersSubstat(stat)
+		
+		// Process direct metrics only if we don't have a Counters substat
+		if !skipDirectMetrics {
+			f.extractMetrics(stat, currentPath, currentLabels, result, isArrayElement, arrayPath, elementName)
+		}
 
 		// Process substats
 		for _, subStat := range stat.SubStats {
-			f.flattenStat(&subStat, currentPath, currentLabels, result)
+			f.flattenStatWithArray(&subStat, currentPath, currentLabels, result, isArrayElement, arrayPath, elementName)
 		}
 	}
+}
+
+// hasCountersSubstat checks if a stat has a "Counters" substat
+func (f *XMLFlattener) hasCountersSubstat(stat *pmiStat) bool {
+	for _, subStat := range stat.SubStats {
+		if subStat.Name == "Counters" {
+			return true
+		}
+	}
+	return false
 }
 
 // isArray determines if a stat represents an array of similar items
@@ -273,20 +299,29 @@ func (f *XMLFlattener) addArrayElementLabels(arrayPath, elementName string, inde
 		labels["servlet"] = elementName
 	} else if strings.Contains(arrayPath, "Portlets") {
 		labels["portlet"] = elementName
+	} else if strings.Contains(arrayPath, "Dynamic Caching") {
+		// For Dynamic Caching, extract a simpler cache name from the object path
+		cacheName := f.extractObjectName(elementName)
+		labels["cache"] = cacheName
+		labels["cache_object"] = elementName // Keep full path in separate label
+		labels["instance"] = cacheName // Override with simplified name
 	}
 }
 
 // extractMetrics extracts all metrics from a stat
-func (f *XMLFlattener) extractMetrics(stat *pmiStat, basePath string, labels map[string]string, result *FlattenerResult) {
+func (f *XMLFlattener) extractMetrics(stat *pmiStat, basePath string, labels map[string]string, result *FlattenerResult, isArrayElement bool, arrayPath, elementName string) {
 	// Extract CountStatistics
 	for _, cs := range stat.CountStatistics {
 		if value, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
 			metric := MetricTuple{
-				Path:   basePath + "/" + cs.Name,
-				Labels: copyLabels(labels),
-				Value:  value,
-				Unit:   "requests", // Default unit for counts
-				Type:   "count",
+				Path:           basePath + "/" + cs.Name,
+				Labels:         copyLabels(labels),
+				Value:          value,
+				Unit:           "requests", // Default unit for counts
+				Type:           "count",
+				IsArrayElement: isArrayElement,
+				ArrayPath:      arrayPath,
+				ElementName:    elementName,
 			}
 			f.refineMetricUnit(&metric)
 
@@ -301,11 +336,14 @@ func (f *XMLFlattener) extractMetrics(stat *pmiStat, basePath string, labels map
 	for _, ts := range stat.TimeStatistics {
 		if value, err := strconv.ParseInt(ts.Count, 10, 64); err == nil {
 			metric := MetricTuple{
-				Path:   basePath + "/" + ts.Name,
-				Labels: copyLabels(labels),
-				Value:  value,
-				Unit:   "milliseconds",
-				Type:   "time",
+				Path:           basePath + "/" + ts.Name,
+				Labels:         copyLabels(labels),
+				Value:          value,
+				Unit:           "milliseconds",
+				Type:           "time",
+				IsArrayElement: isArrayElement,
+				ArrayPath:      arrayPath,
+				ElementName:    elementName,
 			}
 
 			// Generate fully unique context and instance
@@ -319,11 +357,14 @@ func (f *XMLFlattener) extractMetrics(stat *pmiStat, basePath string, labels map
 	for _, brs := range stat.BoundedRangeStatistics {
 		if value, err := strconv.ParseInt(brs.Current, 10, 64); err == nil {
 			metric := MetricTuple{
-				Path:   basePath + "/" + brs.Name,
-				Labels: copyLabels(labels),
-				Value:  value,
-				Unit:   "items", // Default unit for bounded ranges
-				Type:   "bounded_range",
+				Path:           basePath + "/" + brs.Name,
+				Labels:         copyLabels(labels),
+				Value:          value,
+				Unit:           "items", // Default unit for bounded ranges
+				Type:           "bounded_range",
+				IsArrayElement: isArrayElement,
+				ArrayPath:      arrayPath,
+				ElementName:    elementName,
 			}
 			f.refineMetricUnit(&metric)
 
@@ -338,11 +379,14 @@ func (f *XMLFlattener) extractMetrics(stat *pmiStat, basePath string, labels map
 	for _, rs := range stat.RangeStatistics {
 		if value, err := strconv.ParseInt(rs.Current, 10, 64); err == nil {
 			metric := MetricTuple{
-				Path:   basePath + "/" + rs.Name,
-				Labels: copyLabels(labels),
-				Value:  value,
-				Unit:   "items",
-				Type:   "range",
+				Path:           basePath + "/" + rs.Name,
+				Labels:         copyLabels(labels),
+				Value:          value,
+				Unit:           "items",
+				Type:           "range",
+				IsArrayElement: isArrayElement,
+				ArrayPath:      arrayPath,
+				ElementName:    elementName,
 			}
 			f.refineMetricUnit(&metric)
 
@@ -357,11 +401,14 @@ func (f *XMLFlattener) extractMetrics(stat *pmiStat, basePath string, labels map
 	for _, ds := range stat.DoubleStatistics {
 		if value, err := strconv.ParseFloat(ds.Double, 64); err == nil {
 			metric := MetricTuple{
-				Path:   basePath + "/" + ds.Name,
-				Labels: copyLabels(labels),
-				Value:  int64(value), // Convert to int64 for consistency
-				Unit:   "percent",    // Default unit for doubles
-				Type:   "double",
+				Path:           basePath + "/" + ds.Name,
+				Labels:         copyLabels(labels),
+				Value:          int64(value), // Convert to int64 for consistency
+				Unit:           "percent",    // Default unit for doubles
+				Type:           "double",
+				IsArrayElement: isArrayElement,
+				ArrayPath:      arrayPath,
+				ElementName:    elementName,
 			}
 			f.refineMetricUnit(&metric)
 
@@ -424,9 +471,68 @@ func (f *XMLFlattener) generateUniqueContextAndInstance(metric *MetricTuple) (co
 	pathParts := strings.Split(metric.Path, "/")
 	sanitizedParts := make([]string, 0, len(pathParts))
 
-	for _, part := range pathParts {
-		if part != "" { // Skip empty parts
-			sanitizedParts = append(sanitizedParts, sanitizeDimensionID(part))
+	// For array elements, we need to handle the path differently
+	if metric.IsArrayElement && metric.ArrayPath != "" {
+		// Split array path and metric path
+		arrayParts := strings.Split(metric.ArrayPath, "/")
+		
+		// The metric path contains: arrayPath/elementName/metricName
+		// We want: arrayPath/metricName (without the element name)
+		
+		// Find where the array path ends in the full path
+		arrayDepth := len(arrayParts)
+		
+		// Special handling for Dynamic Caching
+		if strings.Contains(metric.ArrayPath, "Dynamic Caching") {
+			// For Dynamic Caching, simplify the complex object paths
+			// Instead of including the full object path in the context
+			for i, part := range pathParts {
+				if part != "" {
+					if i < arrayDepth {
+						// Part of array path
+						sanitizedParts = append(sanitizedParts, sanitizeDimensionID(part))
+					} else if i == arrayDepth {
+						// This is the element name (Object: ws/com.ibm...)
+						// Skip it entirely for context generation
+						continue
+					} else {
+						// Check if this is a sub-component we should include
+						if part == "Object Cache" || part == "Servlet Cache" {
+							// Include these as they represent different metric groups
+							sanitizedParts = append(sanitizedParts, sanitizeDimensionID(part))
+						} else if part == "Counters" || part == "Dependency IDs" {
+							// Skip these intermediate containers
+							continue
+						} else {
+							// This is the actual metric name
+							sanitizedParts = append(sanitizedParts, sanitizeDimensionID(part))
+						}
+					}
+				}
+			}
+		} else {
+			// Normal array handling
+			for i, part := range pathParts {
+				if part != "" {
+					if i < arrayDepth {
+						// Part of array path
+						sanitizedParts = append(sanitizedParts, sanitizeDimensionID(part))
+					} else if i == arrayDepth {
+						// This is the element name - skip it for context generation
+						continue
+					} else {
+						// This is the metric name or sub-metric
+						sanitizedParts = append(sanitizedParts, sanitizeDimensionID(part))
+					}
+				}
+			}
+		}
+	} else {
+		// Non-array metric - use the full path
+		for _, part := range pathParts {
+			if part != "" { // Skip empty parts
+				sanitizedParts = append(sanitizedParts, sanitizeDimensionID(part))
+			}
 		}
 	}
 
@@ -448,6 +554,7 @@ func (f *XMLFlattener) generateUniqueContextAndInstance(metric *MetricTuple) (co
 	uniqueContext := fmt.Sprintf("websphere_pmi.%s", structuredPath)
 	uniqueInstance := fmt.Sprintf("websphere_pmi.%s.%s.%s",
 		structuredPath, sanitizedType, sanitizedUnit)
+
 
 	return uniqueContext, uniqueInstance
 }

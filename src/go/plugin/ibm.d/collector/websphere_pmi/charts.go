@@ -512,7 +512,6 @@ func (w *WebSpherePMI) addThreadPoolCharts(pool string) {
 		w.charts.Add(chart)
 	}
 
-	w.collectedPools[pool] = true
 }
 
 func (w *WebSpherePMI) removeThreadPoolCharts(pool string) {
@@ -553,7 +552,6 @@ func (w *WebSpherePMI) addJDBCPoolCharts(pool string) {
 		w.charts.Add(chart)
 	}
 
-	w.collectedJDBCPools[pool] = true
 }
 
 func (w *WebSpherePMI) removeJDBCPoolCharts(pool string) {
@@ -597,7 +595,6 @@ func (w *WebSpherePMI) addJCAPoolCharts(pool string) {
 		w.charts.Add(chart)
 	}
 
-	w.collectedJCAPools[pool] = true
 }
 
 func (w *WebSpherePMI) removeJCAPoolCharts(pool string) {
@@ -631,7 +628,6 @@ func (w *WebSpherePMI) addAppCharts(app string) {
 		w.charts.Add(chart)
 	}
 
-	w.collectedApps[app] = true
 }
 
 func (w *WebSpherePMI) removeAppCharts(app string) {
@@ -661,7 +657,6 @@ func (w *WebSpherePMI) addServletCharts(servlet string) {
 		w.charts.Add(chart)
 	}
 
-	w.collectedServlets[servlet] = true
 }
 
 func (w *WebSpherePMI) removeServletCharts(servlet string) {
@@ -691,7 +686,6 @@ func (w *WebSpherePMI) addEJBCharts(ejb string) {
 		w.charts.Add(chart)
 	}
 
-	w.collectedEJBs[ejb] = true
 }
 
 func (w *WebSpherePMI) removeEJBCharts(ejb string) {
