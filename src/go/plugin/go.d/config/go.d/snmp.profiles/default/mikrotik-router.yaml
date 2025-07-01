@@ -188,7 +188,7 @@ metrics:
           {{- $config := get (dict 
               "1" (dict "name" "temperature" "unit" "cel" "family" "Sensor/Temperature/Value" 
                    "desc" "Temperature reading")
-              "2" (dict "name" "fan_speed" "unit" "{revolutions}/min" "family" "Sensor/FanSpeed/Value" 
+              "2" (dict "name" "fan_speed" "unit" "{revolution}/min" "family" "Sensor/FanSpeed/Value" 
                    "desc" "Fan rotation speed")
               "3" (dict "name" "voltage" "unit" "V" "family" "Sensor/Voltage/Value" "divisor" 10.0 
                    "desc" "Voltage measurement")
