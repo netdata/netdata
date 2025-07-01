@@ -1,0 +1,63 @@
+Connected to QM1 on localhost:1414 via DEV.APP.SVRCONN
+
+=== MQCMD_INQUIRE_CHANNEL Response for: SYSTEM.DEF.SVRCONN ===
+CompCode=0, Reason=0, Parameters=45
+
+=== Attributes (Raw) ===
+Idx   Type       Param ID   Value
+---   ----       ---------  -----
+[  1] INTEGER        1511 1
+[  2] INTEGER        1555 0
+[  3] INTEGER        1562 50
+[  4] INTEGER        1570 0
+[  5] INTEGER        1552 300
+[  6] INTEGER        1564 0
+[  7] INTEGER        1547 6000
+[  8] INTEGER        1586 10
+[  9] INTEGER        1587 20
+[ 10] INTEGER        1588 10
+[ 11] INTEGER        1589 1200
+[ 12] INTEGER        1563 999999999
+[ 13] INTEGER        1576 1
+[ 14] INTEGER        1545 9999999
+[ 15] INTEGER        1544 1
+[ 16] INTEGER        1559 100
+[ 17] INTEGER        1556 2000
+[ 18] INTEGER        1577 0
+[ 19] INTEGER        1582 0
+[ 20] INTEGER        1578 0
+[ 21] INTEGER        1593 0
+[ 22] INTEGER        1583 3
+[ 23] INTEGER        1520 0
+[ 24] INTEGER        1584 1
+[ 25] INTEGER        1592 0
+[ 26] INTEGER        1594 0
+[ 27] INTEGER        1595 9
+[ 28] INTEGER        1596 9
+[ 29] INTEGER        1597 0
+[ 30] INTEGER        1598 0
+[ 31] INTEGER        1599 1
+[ 32] INTEGER        1600 999999999
+[ 33] INTEGER        1601 5000
+[ 34] INTEGER        1604 0
+[ 35] STRING         3501 'SYSTEM.DEF.SVRCONN'
+[ 36] STRING         3506 ''
+[ 37] STRING         3567 ''
+[ 38] STRING         3559 ''
+[ 39] STRING         3558 ''
+[ 40] STRING         3557 ''
+[ 41] STRING         3560 ''
+[ 42] STRING         3556 ''
+[ 43] STRING         3561 ''
+[ 44] STRING         3564 ''
+[ 45] STRING         3565 ''
+
+=== Summary ===
+Total attributes: 45
+  Integer attributes: 34
+  String attributes: 11
+
+=== Notes ===
+- Parameter IDs starting with 3000s are channel-specific integers (MQIACH_*)
+- Parameter IDs starting with 3500s are channel-specific strings (MQCACH_*)
+- Use cmqcfc.h constants to map parameter IDs to names

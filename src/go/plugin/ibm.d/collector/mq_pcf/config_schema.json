@@ -72,6 +72,12 @@
       "title": "Channel name selector", 
       "description": "Regular expression to filter which channels to monitor.",
       "type": "string"
+    },
+    "collect_reset_queue_stats": {
+      "title": "Collect queue statistics (DESTRUCTIVE)",
+      "description": "WARNING: Enables collection of message counts using MQCMD_RESET_Q_STATS which RESETS counters to zero after reading. This WILL BREAK other monitoring tools. Only enable if Netdata is the ONLY monitoring tool for MQ.",
+      "type": "boolean",
+      "default": false
     }
   },
   "required": [

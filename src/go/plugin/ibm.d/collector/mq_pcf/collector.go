@@ -50,6 +50,10 @@ type Config struct {
 	// Filtering
 	QueueSelector   string `yaml:"queue_selector"`
 	ChannelSelector string `yaml:"channel_selector"`
+
+	// Destructive statistics collection
+	// WARNING: This resets counters and will break other monitoring tools!
+	CollectResetQueueStats *bool `yaml:"collect_reset_queue_stats"`
 }
 
 // Collector is the collector type.
@@ -170,6 +174,14 @@ func (c *Collector) Init(ctx context.Context) error {
 
 	c.Infof("Collection settings: queues=%v, channels=%v, topics=%v, system_queues=%v, system_channels=%v",
 		*c.CollectQueues, *c.CollectChannels, *c.CollectTopics, *c.CollectSystemQueues, *c.CollectSystemChannels)
+
+	// Warn about destructive statistics collection
+	if c.CollectResetQueueStats != nil && *c.CollectResetQueueStats {
+		c.Warningf("DESTRUCTIVE statistics collection is ENABLED!")
+		c.Warningf("Queue message counters will be RESET TO ZERO after each collection!")
+		c.Warningf("This WILL BREAK other monitoring tools using the same statistics!")
+		c.Warningf("Only use this if Netdata is the ONLY monitoring tool for MQ!")
+	}
 
 	return nil
 }
