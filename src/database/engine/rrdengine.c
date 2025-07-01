@@ -617,6 +617,7 @@ static void journalfile_extent_build(struct rrdengine_instance *ctx, struct exte
 
     df_header = xt_io_descr->buf;
     count = df_header->number_of_pages;
+    fatal_assert(count <= MAX_PAGES_PER_EXTENT);
     descr_size = sizeof(*jf_metric_data->descr) * count;
     payload_length = sizeof(*jf_metric_data) + descr_size;
     size_bytes = sizeof(*jf_header) + payload_length + sizeof(*jf_trailer);
