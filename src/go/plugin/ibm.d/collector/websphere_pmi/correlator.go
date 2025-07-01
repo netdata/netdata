@@ -85,9 +85,24 @@ func (c *CorrelationEngine) groupMetricsByCorrelation(metrics []MetricTuple) []M
 		key := c.generateCorrelationKey(metric)
 
 		if group, exists := groupMap[key]; exists {
-			// Add to existing group - no compatibility check needed since
-			// the correlation key ensures proper grouping
-			group.Metrics = append(group.Metrics, metric)
+			// Check if a metric with the same name already exists in the group
+			metricName := c.extractMetricName(metric)
+			hasDuplicate := false
+			for _, existingMetric := range group.Metrics {
+				if c.extractMetricName(existingMetric) == metricName {
+					hasDuplicate = true
+					break
+				}
+			}
+			
+			if hasDuplicate {
+				// Create a new group with a unique key for duplicate metric names
+				uniqueKey := fmt.Sprintf("%s_%s_%d", key, metricName, len(groupMap))
+				groupMap[uniqueKey] = c.createNewGroup(uniqueKey, metric)
+			} else {
+				// Add to existing group
+				group.Metrics = append(group.Metrics, metric)
+			}
 		} else {
 			// Create new group
 			groupMap[key] = c.createNewGroup(key, metric)
@@ -279,6 +294,27 @@ func (c *CorrelationEngine) generateChartContext(metric MetricTuple) string {
 	if len(parts) >= 2 {
 		// Remove last part (metric name)
 		chartContext := strings.Join(parts[:len(parts)-1], ".")
+		
+		// Special handling for Dynamic Caching array metrics
+		// Remove the instance-specific part (com_ibm_ws_...) from the context
+		if metric.IsArrayElement && strings.Contains(metric.ArrayPath, "Dynamic Caching") {
+			// Look for patterns like dynamic_caching.com_ibm_ws_xxx.object_cache
+			contextParts := strings.Split(chartContext, ".")
+			cleanParts := []string{}
+			
+			for _, part := range contextParts {
+				// Skip parts that look like sanitized object names
+				if strings.HasPrefix(part, "com_ibm") || strings.HasPrefix(part, "object__ws") {
+					continue
+				}
+				cleanParts = append(cleanParts, part)
+			}
+			
+			if len(cleanParts) > 0 {
+				chartContext = strings.Join(cleanParts, ".")
+			}
+		}
+		
 		return chartContext
 	}
 
@@ -428,15 +464,26 @@ func (c *CorrelationEngine) createChartFromGroup(group MetricGroup, priority int
 // generateDimensionID creates a unique dimension ID
 func (c *CorrelationEngine) generateDimensionID(metric MetricTuple) string {
 	// For metrics in a chart, we need truly unique IDs
-	// Since each chart should now contain metrics from only one instance,
-	// we can use just the metric name as the dimension ID
+	// Use the full path to ensure uniqueness, especially for array metrics
+	// where multiple metrics might have the same name
 
-	// Extract metric name (last part of path)
-	pathParts := strings.Split(metric.Path, "/")
-	metricName := pathParts[len(pathParts)-1]
+	// Use full path for uniqueness
+	fullPath := metric.Path
+	
+	// For very long paths, use a hash or abbreviation
+	if len(fullPath) > 100 {
+		// Take last 3 path components which usually contain the most specific info
+		pathParts := strings.Split(fullPath, "/")
+		if len(pathParts) > 3 {
+			fullPath = strings.Join(pathParts[len(pathParts)-3:], "_")
+		}
+	} else {
+		// Replace path separators with underscores
+		fullPath = strings.ReplaceAll(fullPath, "/", "_")
+	}
 
 	// Sanitize and return
-	return sanitizeDimensionID(metricName)
+	return sanitizeDimensionID(fullPath)
 }
 
 // sanitizeDimensionID removes or replaces invalid characters for Netdata dimension IDs
@@ -492,16 +539,24 @@ func sanitizeDimensionID(id string) string {
 	return id
 }
 
+// extractMetricName extracts the metric name from the path
+func (c *CorrelationEngine) extractMetricName(metric MetricTuple) string {
+	// Get the last component of the path
+	pathParts := strings.Split(metric.Path, "/")
+	if len(pathParts) > 0 {
+		return pathParts[len(pathParts)-1]
+	}
+	return ""
+}
+
 // generateDimensionName creates a human-readable dimension name
 func (c *CorrelationEngine) generateDimensionName(metric MetricTuple) string {
-	// Use instance name if available
-	if instance := metric.Labels["instance"]; instance != "" {
-		return instance
-	}
-
-	// Use last part of path
+	// For array metrics, use the metric name (last part of path)
+	// Keep the original camelCase format for better readability in dense charts
 	pathParts := strings.Split(metric.Path, "/")
-	return pathParts[len(pathParts)-1]
+	metricName := pathParts[len(pathParts)-1]
+	
+	return metricName
 }
 
 // generateChartTitle creates a descriptive chart title
@@ -685,8 +740,11 @@ func (c *CorrelationEngine) ConvertToNetdataCharts(candidates []ChartCandidate) 
 	charts := &module.Charts{}
 
 	for _, candidate := range candidates {
+		// Sanitize the chart ID to remove invalid characters
+		chartID := sanitizeDimensionID(candidate.Context)
+		
 		chart := &module.Chart{
-			ID:       strings.ReplaceAll(candidate.Context, ".", "_"),
+			ID:       chartID,
 			Title:    candidate.Title,
 			Units:    candidate.Units,
 			Fam:      candidate.Family,
