@@ -428,6 +428,7 @@ func (c *Collector) parseChannelListResponse(response []byte, command string) *C
 	
 	// Parse response in chunks (each channel gets its own response message)
 	offset := 0
+	itemNumber := 0
 	for offset < len(response) {
 		if offset+int(C.sizeof_MQCFH) > len(response) {
 			result.InternalErrors++
@@ -459,6 +460,9 @@ func (c *Collector) parseChannelListResponse(response []byte, command string) *C
 			result.ErrorCounts[ErrInternalCorrupt]++
 			break
 		}
+		
+		// Increment item number for this array element
+		itemNumber++
 		
 		// Parse this message
 		attrs, err := c.parsePCFResponse(response[offset:messageEnd], "")
@@ -500,6 +504,16 @@ func (c *Collector) parseChannelListResponse(response []byte, command string) *C
 			}
 		}
 		
+		// Log individual array item failures
+		if mqError != 0 && command != "" {
+			objectName := "NO_NAME"
+			if channelName != "" {
+				objectName = channelName
+			}
+			c.Debugf("Failed PCF response to %s array item %d, reason %d (%s), on channel %s",
+				command, itemNumber, mqError, mqErrorString(mqError), objectName)
+		}
+		
 		// Store result based on error status
 		if mqError != 0 {
 			// Channel had an error
@@ -535,6 +549,7 @@ func (c *Collector) parseQueueListResponse(response []byte, command string) *Que
 	
 	// Parse response in chunks (each queue gets its own response message)
 	offset := 0
+	itemNumber := 0
 	for offset < len(response) {
 		if offset+int(C.sizeof_MQCFH) > len(response) {
 			result.InternalErrors++
@@ -566,6 +581,9 @@ func (c *Collector) parseQueueListResponse(response []byte, command string) *Que
 			result.ErrorCounts[ErrInternalCorrupt]++
 			break
 		}
+		
+		// Increment item number for this array element
+		itemNumber++
 		
 		// Parse this message
 		attrs, err := c.parsePCFResponse(response[offset:messageEnd], "")
@@ -607,6 +625,16 @@ func (c *Collector) parseQueueListResponse(response []byte, command string) *Que
 			}
 		}
 		
+		// Log individual array item failures
+		if mqError != 0 && command != "" {
+			objectName := "NO_NAME"
+			if queueName != "" {
+				objectName = queueName
+			}
+			c.Debugf("Failed PCF response to %s array item %d, reason %d (%s), on queue %s",
+				command, itemNumber, mqError, mqErrorString(mqError), objectName)
+		}
+		
 		// Store result based on error status
 		if mqError != 0 {
 			// Queue had an error
@@ -630,6 +658,7 @@ func (c *Collector) parseTopicListResponse(response []byte, command string) ([]s
 	
 	// Parse response in chunks (each topic gets its own response message)
 	offset := 0
+	itemNumber := 0
 	for offset < len(response) {
 		if offset+int(C.sizeof_MQCFH) > len(response) {
 			break
@@ -658,6 +687,9 @@ func (c *Collector) parseTopicListResponse(response []byte, command string) ([]s
 			break
 		}
 		
+		// Increment item number for this array element
+		itemNumber++
+		
 		// Parse this message
 		attrs, err := c.parsePCFResponse(response[offset:messageEnd], command)
 		if err != nil {
@@ -667,9 +699,11 @@ func (c *Collector) parseTopicListResponse(response []byte, command string) ([]s
 		}
 		
 		// Track array item
+		var mqError int32
+		var compCode int32
+		var topicNameStr string
+		
 		if command != "" {
-			var mqError int32
-			var compCode int32
 			if reasonCode, ok := attrs[C.MQIACF_REASON_CODE]; ok {
 				if reason, ok := reasonCode.(int32); ok {
 					mqError = reason
@@ -686,8 +720,19 @@ func (c *Collector) parseTopicListResponse(response []byte, command string) ([]s
 		// Extract topic name
 		if topicName, ok := attrs[C.MQCA_TOPIC_NAME]; ok {
 			if name, ok := topicName.(string); ok && name != "" {
-				topics = append(topics, strings.TrimSpace(name))
+				topicNameStr = strings.TrimSpace(name)
+				topics = append(topics, topicNameStr)
 			}
+		}
+		
+		// Log individual array item failures
+		if mqError != 0 && command != "" {
+			objectName := "NO_NAME"
+			if topicNameStr != "" {
+				objectName = topicNameStr
+			}
+			c.Debugf("Failed PCF response to %s array item %d, reason %d (%s), on topic %s",
+				command, itemNumber, mqError, mqErrorString(mqError), objectName)
 		}
 		
 		offset = messageEnd
