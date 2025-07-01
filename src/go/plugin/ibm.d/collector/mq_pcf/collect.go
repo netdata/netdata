@@ -714,7 +714,7 @@ func (c *Collector) collectQueueMetrics(ctx context.Context, mx map[string]int64
 			}
 		}
 		
-		// Collect queue metrics
+		// Collect queue status metrics (depth, runtime info)
 		if err := c.collectSingleQueueMetrics(ctx, queueName, cleanName, mx); err != nil {
 			// Don't warn for expected model queue errors
 			if strings.Contains(err.Error(), "2085") || strings.Contains(err.Error(), "MQRC_UNKNOWN_OBJECT_NAME") {
@@ -723,6 +723,12 @@ func (c *Collector) collectQueueMetrics(ctx context.Context, mx map[string]int64
 				c.Debugf("Failed to collect metrics for queue %s: %v", queueName, err)
 			}
 		}
+		
+		// Collect queue configuration metrics (always available for real queues)
+		if err := c.collectQueueConfigMetrics(ctx, queueName, cleanName, mx); err != nil {
+			// Model queues should still have configuration, so log this as debug
+			c.Debugf("Failed to collect config for queue %s: %v", queueName, err)
+		}
 	}
 	
 	// Update overview metrics
@@ -730,6 +736,73 @@ func (c *Collector) collectQueueMetrics(ctx context.Context, mx map[string]int64
 	mx["queues_excluded"] = int64(excluded)
 	
 	c.Debugf("Monitoring %d queues (filtered from %d successful queues)", collected, len(result.Queues))
+	return nil
+}
+
+// collectQueueConfigMetrics collects queue configuration attributes using MQCMD_INQUIRE_Q
+func (c *Collector) collectQueueConfigMetrics(ctx context.Context, queueName, cleanName string, mx map[string]int64) error {
+	// Send INQUIRE_Q for specific queue to get configuration attributes
+	params := []pcfParameter{
+		newStringParameter(C.MQCA_Q_NAME, queueName),
+		// Request specific attributes we want
+		newIntListParameter(C.MQIACF_Q_ATTRS, []int32{
+			C.MQIA_MAX_Q_DEPTH,        // Maximum queue depth
+			C.MQIA_BACKOUT_THRESHOLD,   // Backout threshold
+			C.MQIA_TRIGGER_DEPTH,       // Trigger depth
+			C.MQIA_INHIBIT_GET,         // Whether get operations are inhibited
+			C.MQIA_INHIBIT_PUT,         // Whether put operations are inhibited
+			C.MQIA_DEF_PRIORITY,        // Default message priority
+			C.MQIA_DEF_PERSISTENCE,     // Default message persistence
+		}),
+	}
+	
+	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_Q, params)
+	if err != nil {
+		return fmt.Errorf("failed to send INQUIRE_Q for %s: %w", queueName, err)
+	}
+	
+	// Parse response
+	attrs, err := c.parsePCFResponse(response)
+	if err != nil {
+		return fmt.Errorf("failed to parse queue config response for %s: %w", queueName, err)
+	}
+	
+	// Check for MQ errors in the response
+	if reasonCode, ok := attrs[C.MQIACF_REASON_CODE]; ok {
+		if reason, ok := reasonCode.(int32); ok && reason != 0 {
+			return fmt.Errorf("MQ error: reason code %d", reason)
+		}
+	}
+	
+	// Extract configuration metrics
+	if maxDepth, ok := attrs[C.MQIA_MAX_Q_DEPTH]; ok {
+		mx[fmt.Sprintf("queue_%s_max_depth", cleanName)] = int64(maxDepth.(int32))
+	}
+	
+	if backoutThreshold, ok := attrs[C.MQIA_BACKOUT_THRESHOLD]; ok {
+		mx[fmt.Sprintf("queue_%s_backout_threshold", cleanName)] = int64(backoutThreshold.(int32))
+	}
+	
+	if triggerDepth, ok := attrs[C.MQIA_TRIGGER_DEPTH]; ok {
+		mx[fmt.Sprintf("queue_%s_trigger_depth", cleanName)] = int64(triggerDepth.(int32))
+	}
+	
+	if inhibitGet, ok := attrs[C.MQIA_INHIBIT_GET]; ok {
+		mx[fmt.Sprintf("queue_%s_inhibit_get", cleanName)] = int64(inhibitGet.(int32))
+	}
+	
+	if inhibitPut, ok := attrs[C.MQIA_INHIBIT_PUT]; ok {
+		mx[fmt.Sprintf("queue_%s_inhibit_put", cleanName)] = int64(inhibitPut.(int32))
+	}
+	
+	if defPriority, ok := attrs[C.MQIA_DEF_PRIORITY]; ok {
+		mx[fmt.Sprintf("queue_%s_def_priority", cleanName)] = int64(defPriority.(int32))
+	}
+	
+	if defPersistence, ok := attrs[C.MQIA_DEF_PERSISTENCE]; ok {
+		mx[fmt.Sprintf("queue_%s_def_persistence", cleanName)] = int64(defPersistence.(int32))
+	}
+	
 	return nil
 }
 
