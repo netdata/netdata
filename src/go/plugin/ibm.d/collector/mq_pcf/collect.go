@@ -411,8 +411,8 @@ func (c *Collector) ensureConnection(ctx context.Context) error {
 	C.MQCONNX(qmName, cno, &c.mqConn.hConn, &compCode, &reason)
 	
 	if compCode != C.MQCC_OK {
-		return fmt.Errorf("MQCONNX failed: completion code %d, reason code %d (check queue manager '%s' is running and accessible on %s:%d)", 
-			compCode, reason, c.QueueManager, c.Host, c.Port)
+		return fmt.Errorf("MQCONNX failed: completion code %d, reason %d (%s) (check queue manager '%s' is running and accessible on %s:%d)", 
+			compCode, reason, mqReasonString(int32(reason)), c.QueueManager, c.Host, c.Port)
 	}
 	
 	c.Debugf("MQCONNX successful - handle: %v", c.mqConn.hConn)
@@ -442,7 +442,7 @@ func (c *Collector) ensureConnection(ctx context.Context) error {
 		
 		var discCompCode, discReason C.MQLONG
 		C.MQDISC(&c.mqConn.hConn, &discCompCode, &discReason)
-		return fmt.Errorf("MQOPEN failed: completion code %d, reason code %d (check PCF permissions for SYSTEM.ADMIN.COMMAND.QUEUE)", openCompCode, openReason)
+		return fmt.Errorf("MQOPEN failed: completion code %d, reason %d (%s) (check PCF permissions for SYSTEM.ADMIN.COMMAND.QUEUE)", openCompCode, openReason, mqReasonString(int32(openReason)))
 	}
 	
 	c.Infof("Admin queue opened successfully, now creating persistent reply queue (Queue #2)")
@@ -476,7 +476,7 @@ func (c *Collector) ensureConnection(ctx context.Context) error {
 		
 		var discCompCode, discReason C.MQLONG
 		C.MQDISC(&c.mqConn.hConn, &discCompCode, &discReason)
-		return fmt.Errorf("MQOPEN reply queue failed: completion code %d, reason code %d", replyOpenCompCode, replyOpenReason)
+		return fmt.Errorf("MQOPEN reply queue failed: completion code %d, reason %d (%s)", replyOpenCompCode, replyOpenReason, mqReasonString(int32(replyOpenReason)))
 	}
 	
 	// Store the actual reply queue name for use in PCF commands
@@ -506,21 +506,21 @@ func (c *Collector) disconnect() {
 	if c.mqConn.hReplyObj != C.MQHO_UNUSABLE_HOBJ {
 		C.MQCLOSE(c.mqConn.hConn, &c.mqConn.hReplyObj, C.MQCO_DELETE_PURGE, &compCode, &reason)
 		if compCode != C.MQCC_OK {
-			c.Warningf("Failed to close reply queue: completion code %d, reason code %d", compCode, reason)
+			c.Warningf("Failed to close reply queue: completion code %d, reason %d (%s)", compCode, reason, mqReasonString(int32(reason)))
 		}
 	}
 	
 	if c.mqConn.hObj != C.MQHO_UNUSABLE_HOBJ {
 		C.MQCLOSE(c.mqConn.hConn, &c.mqConn.hObj, C.MQCO_NONE, &compCode, &reason)
 		if compCode != C.MQCC_OK {
-			c.Warningf("Failed to close admin queue: completion code %d, reason code %d", compCode, reason)
+			c.Warningf("Failed to close admin queue: completion code %d, reason %d (%s)", compCode, reason, mqReasonString(int32(reason)))
 		}
 	}
 	
 	if c.mqConn.hConn != C.MQHC_UNUSABLE_HCONN {
 		C.MQDISC(&c.mqConn.hConn, &compCode, &reason)
 		if compCode != C.MQCC_OK {
-			c.Warningf("Failed to disconnect: completion code %d, reason code %d", compCode, reason)
+			c.Warningf("Failed to disconnect: completion code %d, reason %d (%s)", compCode, reason, mqReasonString(int32(reason)))
 		} else {
 			c.Debugf("Successfully disconnected from queue manager %s", c.QueueManager)
 		}
@@ -576,6 +576,42 @@ func mqcmdToString(command C.MQLONG) string {
 		return "MQCMD_INQUIRE_CHANNEL_NAMES"
 	default:
 		return fmt.Sprintf("MQCMD_%d", command)
+	}
+}
+
+// mqReasonString returns a human-readable name for MQ reason codes
+func mqReasonString(reason int32) string {
+	switch reason {
+	case 0:
+		return "MQRC_NONE"
+	case 2009:
+		return "MQRC_CONNECTION_BROKEN"
+	case 2018:
+		return "MQRC_HCONN_ERROR"
+	case 2033:
+		return "MQRC_NO_MSG_AVAILABLE"
+	case 2035:
+		return "MQRC_NOT_AUTHORIZED"
+	case 2058:
+		return "MQRC_Q_MGR_NAME_ERROR"
+	case 2059:
+		return "MQRC_Q_MGR_NOT_AVAILABLE"
+	case 2067:
+		return "MQRC_OBJECT_OPEN_ERROR"
+	case 2080:
+		return "MQRC_TRUNCATED_MSG_FAILED"
+	case 2085:
+		return "MQRC_UNKNOWN_OBJECT_NAME"
+	case 2538:
+		return "MQRC_HOST_NOT_AVAILABLE"
+	case 2540:
+		return "MQRC_CHANNEL_CONFIG_ERROR"
+	case 3008:
+		return "MQRCCF_COMMAND_FAILED"
+	case 3065:
+		return "MQRCCF_CHANNEL_NOT_ACTIVE"
+	default:
+		return fmt.Sprintf("MQRC_%d", reason)
 	}
 }
 
@@ -653,7 +689,7 @@ func (c *Collector) sendPCFCommand(command C.MQLONG, parameters []pcfParameter) 
 			c.mqConn.connected = false
 			c.Errorf("MQPUT failed with HCONN_ERROR for %s - connection handle is now invalid", mqcmdToString(command))
 		}
-		return nil, fmt.Errorf("MQPUT failed for %s: completion code %d, reason code %d", mqcmdToString(command), compCode, reason)
+		return nil, fmt.Errorf("MQPUT failed for %s: completion code %d, reason %d (%s)", mqcmdToString(command), compCode, reason, mqReasonString(int32(reason)))
 	}
 	
 	// Get response from persistent reply queue
@@ -700,7 +736,7 @@ func (c *Collector) getPCFResponse(requestMd *C.MQMD, hReplyObj C.MQHOBJ) ([]byt
 			}
 			// For the first message, this is an error
 			if len(allResponses) == 0 {
-				return nil, fmt.Errorf("MQGET length check failed: completion code %d, reason code %d", compCode, reason)
+				return nil, fmt.Errorf("MQGET length check failed: completion code %d, reason %d (%s)", compCode, reason, mqReasonString(int32(reason)))
 			}
 			// For subsequent messages, just return what we have
 			break
@@ -723,7 +759,7 @@ func (c *Collector) getPCFResponse(requestMd *C.MQMD, hReplyObj C.MQHOBJ) ([]byt
 			}
 			// For the first message, this is an error
 			if len(allResponses) == 0 {
-				return nil, fmt.Errorf("MQGET failed: completion code %d, reason code %d", compCode, reason)
+				return nil, fmt.Errorf("MQGET failed: completion code %d, reason %d (%s)", compCode, reason, mqReasonString(int32(reason)))
 			}
 			// For subsequent messages, just return what we have
 			break
@@ -955,7 +991,7 @@ func (c *Collector) collectQueueConfigMetrics(ctx context.Context, queueName, cl
 	// Check for MQ errors in the response
 	if reasonCode, ok := attrs[C.MQIACF_REASON_CODE]; ok {
 		if reason, ok := reasonCode.(int32); ok && reason != 0 {
-			return fmt.Errorf("MQ error in MQCMD_INQUIRE_Q: reason code %d", reason)
+			return fmt.Errorf("MQCMD_INQUIRE_Q failed: reason %d (%s)", reason, mqReasonString(reason))
 		}
 	}
 	
@@ -1293,7 +1329,7 @@ func (c *Collector) collectSingleQueueMetrics(ctx context.Context, queueName, cl
 			case 2035: // MQRC_NOT_AUTHORIZED
 				return fmt.Errorf("not authorized to query queue (MQRC_NOT_AUTHORIZED)")
 			default:
-				return fmt.Errorf("MQ error in MQCMD_INQUIRE_Q_STATUS: reason code %d", reason)
+				return fmt.Errorf("MQCMD_INQUIRE_Q_STATUS failed: reason %d (%s)", reason, mqReasonString(reason))
 			}
 		}
 	}
@@ -1409,7 +1445,7 @@ func (c *Collector) collectChannelConfigMetrics(ctx context.Context, channelName
 	// Check for MQ errors in the response
 	if reasonCode, ok := attrs[C.MQIACF_REASON_CODE]; ok {
 		if reason, ok := reasonCode.(int32); ok && reason != 0 {
-			return fmt.Errorf("MQ error in MQCMD_INQUIRE_CHANNEL: reason code %d", reason)
+			return fmt.Errorf("MQCMD_INQUIRE_CHANNEL failed: reason %d (%s)", reason, mqReasonString(reason))
 		}
 	}
 	
