@@ -1572,7 +1572,7 @@ static void *populate_mrg_tp_worker(
                                                     &mlt[thread_index]);
 
         if (!mlt[thread_index].thread) {
-            nd_log_daemon(NDLP_WARNING, "Failed to create thread, rc = %d", rc);
+            nd_log_daemon(NDLP_WARNING, "Failed to create thread for MRG population");
             __atomic_store_n(&mlt[thread_index].busy, false, __ATOMIC_RELEASE);
             spinlock_unlock(&datafile->populate_mrg.spinlock);
         }
