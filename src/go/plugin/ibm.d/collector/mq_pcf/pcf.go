@@ -267,10 +267,11 @@ func (c *Collector) parsePCFResponse(response []byte) (map[C.MQLONG]interface{},
 	cfh := (*C.MQCFH)(unsafe.Pointer(&response[0]))
 	
 	// Only log successful responses or responses with parameters to debug
-	if cfh.CompCode == C.MQCC_OK || cfh.ParameterCount > 0 {
-		c.Debugf("parsePCFResponse: Type=%d, CompCode=%d, Reason=%d, ParameterCount=%d", 
-			cfh.Type, cfh.CompCode, cfh.Reason, cfh.ParameterCount)
-	}
+	// Commented out - too verbose even for successful responses
+	// if cfh.CompCode == C.MQCC_OK || cfh.ParameterCount > 0 {
+	// 	c.Debugf("parsePCFResponse: Type=%d, CompCode=%d, Reason=%d, ParameterCount=%d", 
+	// 		cfh.Type, cfh.CompCode, cfh.Reason, cfh.ParameterCount)
+	// }
 	
 	if cfh.Type != C.MQCFT_RESPONSE {
 		return nil, fmt.Errorf("unexpected PCF message type: %d", cfh.Type)
