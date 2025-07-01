@@ -33,7 +33,7 @@
 
             <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Access Netdata dashboard" />
             <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
-            <Property Id="WIXUI_EXITDIALOGOPTIONALTEXT" Value="The Windows Agent is available for users with paid Netdata subscriptions. Free users will have limited functionality." />
+            <Property Id="WIXUI_EXITDIALOGOPTIONALTEXT" Value="The Windows Agent is available for users with paid Netdata subscriptions.&#x0a;&#x0a;Limitations for Free Users:&#x0a; - Standalone Agent: UI is locked — No local monitoring.&#x0a; - Child Agent: No monitoring data in parent dashboard when streaming to a Linux-based Netdata parent." />
             <Property Id="WixShellExecTarget" Value="http://localhost:19999" />
             <CustomAction Id="LaunchApplication" DllEntry="WixShellExec" Impersonate="yes" BinaryRef="Wix4UtilCA_X86" />
 
