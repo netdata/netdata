@@ -2,15 +2,16 @@ extends:
   - _system-base.yaml
   - _std-if-mib.yaml
 
+sysobjectid:
+  - 1.3.6.1.4.1.11863.1.*  # TP-Link switch
+  - 1.3.6.1.4.1.11863.5.*  # TP-Link products
+
 metadata:
   device:
     fields:
       vendor:
         value: "TP-Link"
 
-sysobjectid:
-  - 1.3.6.1.4.1.11863.1.*  # TP-Link switch
-  - 1.3.6.1.4.1.11863.5.*  # TP-Link products
 metrics:
   - MIB: TPLINK-SYSMONITOR-MIB
     table:
@@ -19,16 +20,14 @@ metrics:
     symbols:
       - name: cpu.usage
         OID: 1.3.6.1.4.1.11863.6.4.1.1.1.1.3
-        description: CPU utilization in 1 minute
-        unit: "%"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+        chart_meta:
+          description: CPU utilization in 1 minute
+          family: CPU/Usage
+          unit: "%"
     metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.11863.6.4.1.1.1.1.4
-          name: tpSysMonitorCpu5Minutes
-        tag: tp_sys_monitor_cpu_5_minutes
-      - index: 1  # tpSysMonitorCpuUnitNumber
-        tag: cpu
+      - tag: cpu_index
+        index: 1  # tpSysMonitorCpuUnitNumber
+
   - MIB: TPLINK-SYSMONITOR-MIB
     table:
       name: tpSysMonitorMemoryTable
@@ -36,8 +35,10 @@ metrics:
     symbols:
       - name: memory.usage
         OID: 1.3.6.1.4.1.11863.6.4.1.2.1.1.2
-        description: Memory utilization
-        unit: "%"
+        chart_meta:
+          description: Memory utilization
+          family: Memory/Usage
+          unit: "%"
     metric_tags:
-      - index: 1  # tpSysMonitorMemoryUnitNumber
-        tag: mem
+      - tag: mem_index
+        index: 1  # tpSysMonitorMemoryUnitNumber

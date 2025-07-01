@@ -10,31 +10,21 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.10002.1.1.1.1.1.0
       name: memory.total
-      description: Total usable physical memory (in KB)
-      unit: "kBy"
+      scale_factor: 1024
+      chart_meta:
+        description: Total usable physical memory (in KB)
+        family: Memory/Total
+        unit: "By"
   - MIB: FROGFOOT-RESOURCES-MIB
     symbol:
       OID: 1.3.6.1.4.1.10002.1.1.1.1.2.0
       name: memory.free
-      description: Available physical memory (in KB)
-      unit: "kBy"
-  # TODO: Update once we support matching on specific tag (`match_attributes`)
-  #  - MIB: FROGFOOT-RESOURCES-MIB
-  #    table:
-  #      OID: 1.3.6.1.4.1.10002.1.1.1.4.2
-  #      name: loadTable
-  #    symbols:
-  #      - OID: 1.3.6.1.4.1.10002.1.1.1.4.2.1.3.1
-  #        name: cpu.usage
-  #    metric_tags:
-  #      - index: 1
-  #        tag: cpu
-  #      - symbol:
-  #          OID: 1.3.6.1.4.1.10002.1.1.1.4.2.1.2.1
-  #          name: loadDescr
-  #          match_attributes:
-  #            - 1 Minute Average
-  #        tag: load_descr
+      scale_factor: 1024
+      chart_meta:
+        description: Available physical memory (in KB)
+        family: Memory/Free
+        unit: "By"
+
   - MIB: UBNT-UniFi-MIB
     table:
       OID: 1.3.6.1.4.1.41112.1.6.1.1
@@ -42,40 +32,50 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.41112.1.6.1.1.1.4
         name: ubiquiti.unifiRadioRxPackets
-        metric_type: monotonic_count
-        description: Number of received packets on the radio
-        unit: "{packet}"
+        chart_meta:
+          description: Number of received packets on the radio
+          family: Wireless/Radio/Packet/In
+          unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.41112.1.6.1.1.1.5
         name: ubiquiti.unifiRadioTxPackets
-        metric_type: monotonic_count
-        description: Number of transmitted packets on the radio
-        unit: "{packet}"
+        chart_meta:
+          description: Number of transmitted packets on the radio
+          family: Wireless/Radio/Packet/Out
+          unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.41112.1.6.1.1.1.6
         name: ubiquiti.unifiRadioCuTotal
-        description: Total cumulative usage on the radio
-        unit: "TBD"
+        chart_meta:
+          description: Total channel utilization on the radio
+          family: Wireless/Radio/ChannelUtilization/Total
+          unit: "%"
       - OID: 1.3.6.1.4.1.41112.1.6.1.1.1.7
         name: ubiquiti.unifiRadioCuSelfRx
-        description: Cumulative self received usage on the radio
-        unit: "TBD"
+        chart_meta:
+          description: Channel utilization for self received traffic on the radio
+          family: Wireless/Radio/ChannelUtilization/SelfReceive
+          unit: "%"
       - OID: 1.3.6.1.4.1.41112.1.6.1.1.1.8
         name: ubiquiti.unifiRadioCuSelfTx
-        description: Cumulative self transmitted usage on the radio
-        unit: "TBD"
+        chart_meta:
+          description: Channel utilization for self transmitted traffic on the radio
+          family: Wireless/Radio/ChannelUtilization/SelfTransmit
+          unit: "%"
       - OID: 1.3.6.1.4.1.41112.1.6.1.1.1.9
         name: ubiquiti.unifiRadioOtherBss
-        description: Other basic service sets on the radio
-        unit: "TBD"
+        chart_meta:
+          description: Number of other basic service sets detected on the radio
+          family: Wireless/Radio/BSS/Other/Count
+          unit: "{bss}"
     metric_tags:
-      - symbol:
+      - tag: ubiquiti_unifi_radio_index
+        symbol:
           OID: 1.3.6.1.4.1.41112.1.6.1.1.1.1
           name: ubiquiti.unifiRadioIndex
-        tag: ubiquiti_unifi_radio_index
-      - symbol:
+      - tag: ubiquiti_unifi_radio_name
+        symbol:
           OID: 1.3.6.1.4.1.41112.1.6.1.1.1.2
           name: ubiquiti.unifiRadioName
-        tag: ubiquiti_unifi_radio_name
-      - symbol:
+      - tag: ubiquiti_unifi_radio_radio
+        symbol:
           OID: 1.3.6.1.4.1.41112.1.6.1.1.1.3
           name: ubiquiti.unifiRadioRadio
-        tag: ubiquiti_unifi_radio_radio

@@ -13,22 +13,3 @@ metadata:
 
 sysobjectid:
   - 1.3.6.1.4.1.45346.1.1  # VeloCloud EDGE
-metrics:
-  - MIB: HOST-RESOURCES-MIB
-    symbol:
-      name: memory.total
-      OID: 1.3.6.1.2.1.25.2.3.1.5.1  # hrStorageSize.1
-      description: Size of the storage represented by this entry, in units of hrStorageAllocationUnits
-      unit: "{storage_unit}"
-  - MIB: HOST-RESOURCES-MIB
-    symbol:
-      name: memory.used
-      OID: 1.3.6.1.2.1.25.2.3.1.6.1  # hrStorageUsed.1
-      description: Amount of the storage represented by this entry that is allocated, in units of hrStorageAllocationUnits
-      unit: "{storage_unit}"
-  - MIB: HOST-RESOURCES-MIB
-    symbol:
-      name: cpu.usage
-      OID: 1.3.6.1.2.1.25.3.3.1.2.196608  # hrProcessorLoad.196608
-      description: Average over the last minute of the percentage of time that this processor was not idle
-      unit: "%"
