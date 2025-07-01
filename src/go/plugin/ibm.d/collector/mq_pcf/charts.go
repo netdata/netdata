@@ -16,6 +16,10 @@ const (
 	prioQueueManagerMemory
 	prioQueueManagerLog
 	
+	// Overview charts priority (higher priority = shown first)
+	prioQueuesOverview
+	prioChannelsOverview
+	
 	prioQueueDepth
 	prioQueueMessages
 	prioQueueAge
@@ -42,6 +46,39 @@ var baseCharts = module.Charts{
 		Priority: prioQueueManagerStatus,
 		Dims: module.Dims{
 			{ID: "qmgr_status", Name: "status"},
+		},
+	},
+	// Overview charts for monitoring status
+	{
+		ID:       "queues_overview",
+		Title:    "Queues Monitoring Status",
+		Units:    "queues",
+		Fam:      "overview",
+		Ctx:      "mq_pcf.queues_overview",
+		Priority: prioQueuesOverview,
+		Type:     module.Stacked,
+		Dims: module.Dims{
+			{ID: "queues_monitored", Name: "monitored"},
+			{ID: "queues_excluded", Name: "excluded"},
+			{ID: "queues_model", Name: "model"},
+			{ID: "queues_unauthorized", Name: "unauthorized"},
+			{ID: "queues_unknown", Name: "unknown"},
+			{ID: "queues_failed", Name: "failed"},
+		},
+	},
+	{
+		ID:       "channels_overview",
+		Title:    "Channels Monitoring Status",
+		Units:    "channels",
+		Fam:      "overview",
+		Ctx:      "mq_pcf.channels_overview",
+		Priority: prioChannelsOverview,
+		Type:     module.Stacked,
+		Dims: module.Dims{
+			{ID: "channels_monitored", Name: "monitored"},
+			{ID: "channels_excluded", Name: "excluded"},
+			{ID: "channels_unauthorized", Name: "unauthorized"},
+			{ID: "channels_failed", Name: "failed"},
 		},
 	},
 	{

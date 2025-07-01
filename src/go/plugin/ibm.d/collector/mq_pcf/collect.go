@@ -618,6 +618,14 @@ func (c *Collector) collectQueueManagerMetrics(ctx context.Context, mx map[strin
 }
 
 func (c *Collector) collectQueueMetrics(ctx context.Context, mx map[string]int64) error {
+	// Initialize overview metrics
+	mx["queues_monitored"] = 0
+	mx["queues_excluded"] = 0
+	mx["queues_model"] = 0
+	mx["queues_unauthorized"] = 0
+	mx["queues_unknown"] = 0
+	mx["queues_failed"] = 0
+	
 	// Skip if queue collection has been disabled (by user config or previous auth failure)
 	if c.CollectQueues != nil && !*c.CollectQueues {
 		return nil
@@ -634,6 +642,20 @@ func (c *Collector) collectQueueMetrics(ctx context.Context, mx map[string]int64
 	// Use error counts instead of queue lists since error responses may not include queue names
 	for _, count := range result.ErrorCounts {
 		totalQueues += count
+	}
+	
+	// Populate error overview metrics
+	if authCount := result.ErrorCounts[2035]; authCount > 0 {
+		mx["queues_unauthorized"] = int64(authCount)
+	}
+	if modelCount := result.ErrorCounts[2085]; modelCount > 0 {
+		mx["queues_model"] = int64(modelCount)
+	}
+	// Sum other errors
+	for code, count := range result.ErrorCounts {
+		if code != 2035 && code != 2085 {
+			mx["queues_failed"] += int64(count)
+		}
 	}
 	
 	// Log error summary if there were errors
@@ -670,8 +692,10 @@ func (c *Collector) collectQueueMetrics(ctx context.Context, mx map[string]int64
 	
 	// Process successful queues
 	collected := 0
+	excluded := 0
 	for _, queueName := range result.Queues {
 		if !c.shouldCollectQueue(queueName) {
+			excluded++
 			continue
 		}
 		collected++
@@ -701,11 +725,21 @@ func (c *Collector) collectQueueMetrics(ctx context.Context, mx map[string]int64
 		}
 	}
 	
-	c.Debugf("Monitoring %d out of %d successful queues", collected, len(result.Queues))
+	// Update overview metrics
+	mx["queues_monitored"] = int64(collected)
+	mx["queues_excluded"] = int64(excluded)
+	
+	c.Debugf("Monitoring %d queues (filtered from %d successful queues)", collected, len(result.Queues))
 	return nil
 }
 
 func (c *Collector) collectChannelMetrics(ctx context.Context, mx map[string]int64) error {
+	// Initialize overview metrics
+	mx["channels_monitored"] = 0
+	mx["channels_excluded"] = 0
+	mx["channels_unauthorized"] = 0
+	mx["channels_failed"] = 0
+	
 	// Skip if channel collection has been disabled (by user config or previous auth failure)
 	if c.CollectChannels != nil && !*c.CollectChannels {
 		return nil
@@ -722,6 +756,17 @@ func (c *Collector) collectChannelMetrics(ctx context.Context, mx map[string]int
 	// Use error counts instead of channel lists since error responses may not include channel names
 	for _, count := range result.ErrorCounts {
 		totalChannels += count
+	}
+	
+	// Populate error overview metrics
+	if authCount := result.ErrorCounts[2035]; authCount > 0 {
+		mx["channels_unauthorized"] = int64(authCount)
+	}
+	// Sum other errors
+	for code, count := range result.ErrorCounts {
+		if code != 2035 {
+			mx["channels_failed"] += int64(count)
+		}
 	}
 	
 	// Log error summary if there were errors
@@ -753,8 +798,10 @@ func (c *Collector) collectChannelMetrics(ctx context.Context, mx map[string]int
 	
 	// Process successful channels
 	collected := 0
+	excluded := 0
 	for _, channelName := range result.Channels {
 		if !c.shouldCollectChannel(channelName) {
+			excluded++
 			continue
 		}
 		collected++
@@ -784,7 +831,11 @@ func (c *Collector) collectChannelMetrics(ctx context.Context, mx map[string]int
 		}
 	}
 	
-	c.Debugf("Monitoring %d out of %d successful channels", collected, len(result.Channels))
+	// Update overview metrics
+	mx["channels_monitored"] = int64(collected)
+	mx["channels_excluded"] = int64(excluded)
+	
+	c.Debugf("Monitoring %d channels (filtered from %d successful channels)", collected, len(result.Channels))
 	return nil
 }
 
@@ -902,7 +953,7 @@ func (c *Collector) shouldCollectQueue(queueName string) bool {
 			c.Debugf("Skipping system queue (disabled): %s", queueName)
 			return false
 		}
-		c.Debugf("Including system queue (enabled): %s", queueName)
+		// c.Debugf("Including system queue (enabled): %s", queueName)
 	}
 	
 	// Apply queue selector if configured
@@ -924,7 +975,7 @@ func (c *Collector) shouldCollectChannel(channelName string) bool {
 			c.Debugf("Skipping system channel (disabled): %s", channelName)
 			return false
 		}
-		c.Debugf("Including system channel (enabled): %s", channelName)
+		// c.Debugf("Including system channel (enabled): %s", channelName)
 	}
 	
 	// Apply channel selector if configured
