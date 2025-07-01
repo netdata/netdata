@@ -879,7 +879,7 @@ func (c *Collector) collectQueueMetrics(ctx context.Context, mx map[string]int64
 	// Log error summary if there were errors
 	if len(result.ErrorCounts) > 0 {
 		// Build error summary
-		errorSummary := fmt.Sprintf("Queue collection errors: ")
+		errorSummary := fmt.Sprintf("Queue discovery (MQCMD_INQUIRE_Q) errors: ")
 		first := true
 		for code, count := range result.ErrorCounts {
 			if !first {
@@ -1079,7 +1079,7 @@ func (c *Collector) collectChannelMetrics(ctx context.Context, mx map[string]int
 	// Log error summary if there were errors
 	if len(result.ErrorCounts) > 0 {
 		// Build error summary
-		errorSummary := fmt.Sprintf("Channel collection errors: ")
+		errorSummary := fmt.Sprintf("Channel discovery (MQCMD_INQUIRE_CHANNEL) errors: ")
 		first := true
 		for code, count := range result.ErrorCounts {
 			if !first {
@@ -1131,7 +1131,7 @@ func (c *Collector) collectChannelMetrics(ctx context.Context, mx map[string]int
 		if err := c.collectSingleChannelMetrics(ctx, channelName, cleanName, mx); err != nil {
 			// Check if this is an expected error for certain channel types
 			if !strings.Contains(err.Error(), "2085") {
-				c.Warningf("failed to collect metrics for channel %s: %v", channelName, err)
+				c.Warningf("failed to collect metrics for channel %s (MQCMD_INQUIRE_CHANNEL_STATUS): %v", channelName, err)
 			} else {
 				c.Debugf("Skipping metrics for channel %s (expected error)", channelName)
 			}
@@ -1183,7 +1183,7 @@ func (c *Collector) collectTopicMetrics(ctx context.Context, mx map[string]int64
 		
 		// Collect topic metrics
 		if err := c.collectSingleTopicMetrics(ctx, topicName, cleanName, mx); err != nil {
-			c.Warningf("failed to collect metrics for topic %s: %v", topicName, err)
+			c.Warningf("failed to collect metrics for topic %s (MQCMD_INQUIRE_TOPIC_STATUS): %v", topicName, err)
 		}
 	}
 	
