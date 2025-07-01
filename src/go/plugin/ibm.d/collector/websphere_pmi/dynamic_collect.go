@@ -5,7 +5,6 @@ package websphere_pmi
 import (
 	"context"
 	"fmt"
-	"strings"
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -168,7 +167,6 @@ type MetricCoverageStats struct {
 // EnableDynamicCollection enables dynamic collection on a WebSphere PMI collector
 func (w *WebSpherePMI) EnableDynamicCollection() {
 	w.dynamicCollector = NewDynamicCollector()
-	w.useDynamicCollection = true
 }
 
 // collectDynamic performs dynamic collection using the new system
@@ -180,69 +178,3 @@ func (w *WebSpherePMI) collectDynamic(ctx context.Context, stats *pmiStatsRespon
 	return w.dynamicCollector.ProcessStats(stats, w.charts)
 }
 
-// Utility function for demonstrating the improvement
-func (w *WebSpherePMI) CompareLegacyVsDynamic(ctx context.Context) (legacyCount, dynamicCount int) {
-	// Fetch PMI stats
-	stats, err := w.fetchPMIStats(ctx)
-	if err != nil {
-		return 0, 0
-	}
-
-	// Count legacy metrics
-	legacyMx := make(map[string]int64)
-	if len(stats.Nodes) > 0 && len(stats.Nodes[0].Servers) > 0 && len(stats.Nodes[0].Servers[0].Stats) > 0 {
-		w.processStat(&stats.Nodes[0].Servers[0].Stats[0], "", legacyMx)
-	}
-	legacyCount = len(legacyMx)
-
-	// Count dynamic metrics
-	if w.dynamicCollector == nil {
-		w.EnableDynamicCollection()
-	}
-	dynamicMx := w.collectDynamic(ctx, stats)
-	dynamicCount = len(dynamicMx)
-
-	return legacyCount, dynamicCount
-}
-
-// Integration helper: Modify processStat to build path correctly (this was our original bug fix)
-func (w *WebSpherePMI) processStatWithPath(stat *pmiStat, parentPath string, mx map[string]int64) {
-	// Build full path
-	fullPath := stat.Path
-	if fullPath == "" && parentPath != "" {
-		fullPath = parentPath + "/" + stat.Name
-	} else if fullPath == "" {
-		fullPath = stat.Name
-	}
-
-	// CRITICAL: Assign the built path back to the stat so extraction functions can use it
-	stat.Path = fullPath
-
-	// Extract metrics from this stat
-	w.extractFromStat(stat, mx)
-
-	// Process substats recursively
-	for _, subStat := range stat.SubStats {
-		w.processStatWithPath(&subStat, fullPath, mx)
-	}
-}
-
-// Mock extraction function (would call the real extraction functions)
-func (w *WebSpherePMI) extractFromStat(stat *pmiStat, mx map[string]int64) {
-	// This would call the existing extraction functions like:
-	// w.extractJVMRuntimeMetrics, w.extractThreadPoolMetrics, etc.
-	// For demonstration, we'll just count the available metrics
-
-	metricCount := len(stat.CountStatistics) + len(stat.TimeStatistics) +
-		len(stat.BoundedRangeStatistics) + len(stat.RangeStatistics) +
-		len(stat.DoubleStatistics)
-
-	if metricCount > 0 {
-		// Generate a synthetic metric name for this stat
-		metricName := strings.ReplaceAll(stat.Path, "/", "_")
-		metricName = strings.ReplaceAll(metricName, " ", "_")
-		metricName = strings.ToLower(metricName)
-
-		mx[metricName+"_metric_count"] = int64(metricCount)
-	}
-}

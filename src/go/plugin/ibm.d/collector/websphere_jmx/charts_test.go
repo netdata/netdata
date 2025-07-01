@@ -36,7 +36,8 @@ func TestInitCharts(t *testing.T) {
 
 func TestNewThreadPoolCharts(t *testing.T) {
 	poolName := "Default ThreadPool"
-	charts := newThreadPoolCharts(poolName)
+	ws := &WebSphereJMX{}
+	charts := ws.newThreadPoolCharts(poolName)
 
 	assert.NotNil(t, charts)
 	assert.Greater(t, len(*charts), 0)
@@ -52,7 +53,8 @@ func TestNewThreadPoolCharts(t *testing.T) {
 
 func TestNewJDBCPoolCharts(t *testing.T) {
 	poolName := "jdbc/OracleDS"
-	charts := newJDBCPoolCharts(poolName)
+	ws := &WebSphereJMX{}
+	charts := ws.newJDBCPoolCharts(poolName)
 
 	assert.NotNil(t, charts)
 	assert.Greater(t, len(*charts), 0)
@@ -69,7 +71,8 @@ func TestNewJDBCPoolCharts(t *testing.T) {
 func TestNewJMSDestinationCharts(t *testing.T) {
 	destName := "Queue.Orders"
 	destType := "queue"
-	charts := newJMSDestinationCharts(destName, destType)
+	ws := &WebSphereJMX{}
+	charts := ws.newJMSDestinationCharts(destName, destType)
 
 	assert.NotNil(t, charts)
 	assert.Greater(t, len(*charts), 0)
@@ -121,7 +124,8 @@ func TestNewApplicationCharts(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			charts := newApplicationCharts(appName, test.includeSessions, test.includeTransactions)
+			ws := &WebSphereJMX{}
+			charts := ws.newApplicationCharts(appName, test.includeSessions, test.includeTransactions)
 
 			assert.NotNil(t, charts)
 			assert.Equal(t, test.expectedChartCount, len(*charts))
