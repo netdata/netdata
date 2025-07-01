@@ -45,6 +45,15 @@ const (
 	
 	// Topic constants that may not be available in all MQ versions
 	MQIA_TOPIC_MSG_COUNT     = C.MQLONG(2164) // Topic message count (MQ 8.0+)
+	
+	// Channel configuration constants - using C header values
+	// Channel batch and timing settings
+	
+	// Channel runtime constants - using C header values
+	// Runtime metrics we can get from MQCMD_INQUIRE_CHANNEL_STATUS
+	
+	// Queue configuration constants - using C header values  
+	// Basic queue configuration available via MQCMD_INQUIRE_Q
 )
 
 // PCF parameter interface
