@@ -658,10 +658,9 @@ metrics:
       name: receptacleEnergyoutlet1s
       metric_type: monotonic_count
       chart_meta:
-        chart_meta:
-          description: Outlet1 receptacle energy accumulated
-          family: PDU/Outlet/1/Energy
-          unit: "da*W"
+        description: Outlet1 receptacle energy accumulated
+        family: PDU/Outlet/1/Energy
+        unit: "da*W"
       scale_factor: 0.1
 
 
@@ -681,10 +680,9 @@ metrics:
       name: receptacleEnergyoutlet3s
       metric_type: monotonic_count
       chart_meta:
-        chart_meta:
-          description: Outlet3 receptacle energy accumulated
-          family: PDU/Outlet/3/Energy
-          unit: "da*W"
+        description: Outlet3 receptacle energy accumulated
+        family: PDU/Outlet/3/Energy
+        unit: "da*W"
       scale_factor: 0.1
 
 
@@ -694,10 +692,9 @@ metrics:
       name: receptacleEnergyoutlet4s
       metric_type: monotonic_count
       chart_meta:
-        chart_meta:
-          description: Outlet4 receptacle energy accumulated
-          family: PDU/Outlet/4/Energy
-          unit: "da*W"
+        description: Outlet4 receptacle energy accumulated
+        family: PDU/Outlet/4/Energy
+        unit: "da*W"
       scale_factor: 0.1
 
 
@@ -707,10 +704,9 @@ metrics:
       name: receptacleEnergyoutlet5s
       metric_type: monotonic_count
       chart_meta:
-        chart_meta:
-          description: Outlet5 receptacle energy accumulated
-          family: PDU/Outlet/5/Energy
-          unit: "da*W"
+        description: Outlet5 receptacle energy accumulated
+        family: PDU/Outlet/5/Energy
+        unit: "da*W"
       scale_factor: 0.1
 
 
@@ -720,10 +716,9 @@ metrics:
       name: receptacleEnergyoutlet6s
       metric_type: monotonic_count
       chart_meta:
-        chart_meta:
-          description: Outlet6 receptacle energy accumulated
-          family: PDU/Outlet/6/Energy
-          unit: "da*W"
+        description: Outlet6 receptacle energy accumulated
+        family: PDU/Outlet/6/Energy
+        unit: "da*W"
       scale_factor: 0.1
 
 
@@ -733,10 +728,9 @@ metrics:
       name: receptacleEnergyoutlet7s
       metric_type: monotonic_count
       chart_meta:
-        chart_meta:
-          description: Outlet7 receptacle energy accumulated
-          family: PDU/Outlet/7/Energy
-          unit: "da*W"
+        description: Outlet7 receptacle energy accumulated
+        family: PDU/Outlet/7/Energy
+        unit: "da*W"
       scale_factor: 0.1
 
 
@@ -746,10 +740,9 @@ metrics:
       name: receptacleEnergyoutlet8s
       metric_type: monotonic_count
       chart_meta:
-        chart_meta:
-          description: Outlet8 receptacle energy accumulated
-          family: PDU/Outlet/8/Energy
-          unit: "da*W"
+        description: Outlet8 receptacle energy accumulated
+        family: PDU/Outlet/8/Energy
+        unit: "da*W"
       scale_factor: 0.1
 
 
@@ -759,10 +752,9 @@ metrics:
       name: receptacleEnergyoutlet9s
       metric_type: monotonic_count
       chart_meta:
-        chart_meta:
-          description: Outlet9 receptacle energy accumulated
-          family: PDU/Outlet/9/Energy
-          unit: "da*W"
+        description: Outlet9 receptacle energy accumulated
+        family: PDU/Outlet/9/Energy
+        unit: "da*W"
       scale_factor: 0.1
 
 
@@ -772,10 +764,9 @@ metrics:
       name: receptacleEnergyoutlet10s
       metric_type: monotonic_count
       chart_meta:
-        chart_meta:
-          description: Outlet10 receptacle energy accumulated
-          family: PDU/Outlet/10/Energy
-          unit: "da*W"
+        description: Outlet10 receptacle energy accumulated
+        family: PDU/Outlet/10/Energy
+        unit: "da*W"
       scale_factor: 0.1
 
 
@@ -785,10 +776,9 @@ metrics:
       name: receptacleEnergyoutlet11s
       metric_type: monotonic_count
       chart_meta:
-        chart_meta:
-          description: Outlet11 receptacle energy accumulated
-          family: PDU/Outlet/11/Energy
-          unit: "da*W"
+        description: Outlet11 receptacle energy accumulated
+        family: PDU/Outlet/11/Energy
+        unit: "da*W"
       scale_factor: 0.1
 
 
@@ -798,10 +788,9 @@ metrics:
       name: receptacleEnergyoutlet12s
       metric_type: monotonic_count
       chart_meta:
-        chart_meta:
-          description: Outlet12 receptacle energy accumulated
-          family: PDU/Outlet/12/Energy
-          unit: "da*W"
+        description: Outlet12 receptacle energy accumulated
+        family: PDU/Outlet/12/Energy
+        unit: "da*W"
       scale_factor: 0.1
 
 
@@ -811,10 +800,9 @@ metrics:
       name: receptacleEnergyoutlet13s
       metric_type: monotonic_count
       chart_meta:
-        chart_meta:
-          description: Outlet13 receptacle energy accumulated
-          family: PDU/Outlet/13/Energy
-          unit: "da*W"
+        description: Outlet13 receptacle energy accumulated
+        family: PDU/Outlet/13/Energy
+        unit: "da*W"
       scale_factor: 0.1
 
 
@@ -824,10 +812,9 @@ metrics:
       name: receptacleEnergyoutlet14s
       metric_type: monotonic_count
       chart_meta:
-        chart_meta:
-          description: Outlet14 receptacle energy accumulated
-          family: PDU/Outlet/14/Energy
-          unit: "da*W"
+        description: Outlet14 receptacle energy accumulated
+        family: PDU/Outlet/14/Energy
+        unit: "da*W"
       scale_factor: 0.1
 
 
@@ -837,10 +824,9 @@ metrics:
       name: receptacleEnergyoutlet15s
       metric_type: monotonic_count
       chart_meta:
-        chart_meta:
-          description: Outlet15 receptacle energy accumulated
-          family: PDU/Outlet/15/Energy
-          unit: "da*W"
+        description: Outlet15 receptacle energy accumulated
+        family: PDU/Outlet/15/Energy
+        unit: "da*W"
       scale_factor: 0.1
 
 
@@ -850,10 +836,9 @@ metrics:
       name: receptacleEnergyoutlet16s
       metric_type: monotonic_count
       chart_meta:
-        chart_meta:
-          description: Outlet16 receptacle energy accumulated
-          family: PDU/Outlet/16/Energy
-          unit: "da*W"
+        description: Outlet16 receptacle energy accumulated
+        family: PDU/Outlet/16/Energy
+        unit: "da*W"
       scale_factor: 0.1
 
 
@@ -863,10 +848,9 @@ metrics:
       name: receptacleEnergyoutlet17s
       metric_type: monotonic_count
       chart_meta:
-        chart_meta:
-          description: Outlet17 receptacle energy accumulated
-          family: PDU/Outlet/17/Energy
-          unit: "da*W"
+        description: Outlet17 receptacle energy accumulated
+        family: PDU/Outlet/17/Energy
+        unit: "da*W"
       scale_factor: 0.1
 
 
@@ -876,10 +860,9 @@ metrics:
       name: receptacleEnergyoutlet18s
       metric_type: monotonic_count
       chart_meta:
-        chart_meta:
-          description: Outlet18 receptacle energy accumulated
-          family: PDU/Outlet/18/Energy
-          unit: "da*W"
+        description: Outlet18 receptacle energy accumulated
+        family: PDU/Outlet/18/Energy
+        unit: "da*W"
       scale_factor: 0.1
 
 
@@ -889,10 +872,9 @@ metrics:
       name: receptacleEnergyoutlet19s
       metric_type: monotonic_count
       chart_meta:
-        chart_meta:
-          description: Outlet19 receptacle energy accumulated
-          family: PDU/Outlet/19/Energy
-          unit: "da*W"
+        description: Outlet19 receptacle energy accumulated
+        family: PDU/Outlet/19/Energy
+        unit: "da*W"
       scale_factor: 0.1
 
 
@@ -902,10 +884,9 @@ metrics:
       name: receptacleEnergyoutlet20s
       metric_type: monotonic_count
       chart_meta:
-        chart_meta:
-          description: Outlet20 receptacle energy accumulated
-          family: PDU/Outlet/20/Energy
-          unit: "da*W"
+        description: Outlet20 receptacle energy accumulated
+        family: PDU/Outlet/20/Energy
+        unit: "da*W"
       scale_factor: 0.1
 
 
@@ -915,10 +896,9 @@ metrics:
       name: receptacleEnergyoutlet21s
       metric_type: monotonic_count
       chart_meta:
-        chart_meta:
-          description: Outlet21 receptacle energy accumulated
-          family: PDU/Outlet/21/Energy
-          unit: "da*W"
+        description: Outlet21 receptacle energy accumulated
+        family: PDU/Outlet/21/Energy
+        unit: "da*W"
       scale_factor: 0.1
 
 
@@ -928,10 +908,9 @@ metrics:
       name: receptacleEnergyoutlet22s
       metric_type: monotonic_count
       chart_meta:
-        chart_meta:
-          description: Outlet22 receptacle energy accumulated
-          family: PDU/Outlet/22/Energy
-          unit: "da*W"
+        description: Outlet22 receptacle energy accumulated
+        family: PDU/Outlet/22/Energy
+        unit: "da*W"
       scale_factor: 0.1
 
 
@@ -941,10 +920,9 @@ metrics:
       name: receptacleEnergyoutlet23s
       metric_type: monotonic_count
       chart_meta:
-        chart_meta:
-          description: Outlet23 receptacle energy accumulated
-          family: PDU/Outlet/23/Energy
-          unit: "da*W"
+        description: Outlet23 receptacle energy accumulated
+        family: PDU/Outlet/23/Energy
+        unit: "da*W"
       scale_factor: 0.1
 
 
@@ -954,10 +932,9 @@ metrics:
       name: receptacleEnergyoutlet24s
       metric_type: monotonic_count
       chart_meta:
-        chart_meta:
-          description: Outlet24 receptacle energy accumulated
-          family: PDU/Outlet/24/Energy
-          unit: "da*W"
+        description: Outlet24 receptacle energy accumulated
+        family: PDU/Outlet/24/Energy
+        unit: "da*W"
       scale_factor: 0.1
 
 
@@ -1228,10 +1205,9 @@ metrics:
       - OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.9
         name: cpiPduBranchEnergy
         chart_meta:
-          chart_meta:
-            description: Branch energy accumulated in decaVA-secs, divide by 360 to obtain VA-hr
-            family: PDU/Branch/Energy
-            unit: "V"
+          description: Branch energy accumulated in decaVA-secs, divide by 360 to obtain VA-hr
+          family: PDU/Branch/Energy
+          unit: "V"
         scale_factor: 0.1
 
     metric_tags:
@@ -1306,10 +1282,9 @@ metrics:
       - OID: 1.3.6.1.4.1.30932.1.10.1.4.10.1.10
         name: cpiPduOutletEnergy
         chart_meta:
-          chart_meta:
-            description: Outlet energy accumulated in decaWatt-secs, divide by 360 to obtain Watt-hr
-            family: PDU/Outlet/Energy
-            unit: "W"
+          description: Outlet energy accumulated in decaWatt-secs, divide by 360 to obtain Watt-hr
+          family: PDU/Outlet/Energy
+          unit: "W"
         scale_factor: 0.1
 
     metric_tags:
