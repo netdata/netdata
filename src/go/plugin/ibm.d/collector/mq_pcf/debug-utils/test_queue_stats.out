@@ -1,0 +1,28 @@
+=== Sending MQCMD_RESET_Q_STATS for: TEST.QUEUE1.943 ===
+
+=== MQCMD_RESET_Q_STATS Response ===
+CompCode=0, Reason=0, Parameters=9
+
+=== Statistics Returned ===
+[  1] INTEGER: MQIA_MSG_ENQ_COUNT             (  14) = 125 (messages put)
+[  2] INTEGER: MQIA_MSG_DEQ_COUNT             (  15) = 112 (messages gotten)
+[  3] INTEGER: MQIA_HIGH_Q_DEPTH              (  36) = 13 (peak depth since reset)
+[  4] INTEGER: MQIAMO_Q_TIME_AVG              ( 703) = 5432100 (microseconds)
+[  5] INTEGER: MQIAMO_Q_TIME_MAX              ( 704) = 21768400 (microseconds)
+[  6] INTEGER: MQIAMO_Q_TIME_MIN              ( 705) = 1200 (microseconds)
+[  7] INTEGER: MQIA_TIME_SINCE_RESET           (  35) = 3600 (seconds)
+[  8] STRING:  MQCA_Q_NAME                     (2016) = 'TEST.QUEUE1.943'
+[  9] STRING:  MQCA_LAST_GET_DATE              (3167) = '2025-07-01'
+
+=== Summary ===
+Total attributes: 9
+  Integer attributes: 7
+  String attributes: 2
+
+=== Notes ===
+- MSG_ENQ_COUNT/MSG_DEQ_COUNT are runtime counters since last reset
+- HIGH_Q_DEPTH is the peak queue depth since last reset
+- Q_TIME_* values are in microseconds
+- TIME_SINCE_RESET is in seconds
+- Use ALTER QMGR STATQ(ON) to enable statistics
+- Statistics are reset after this command completes

@@ -1056,13 +1056,115 @@ func (c *Collector) collectQueueConfigMetrics(ctx context.Context, queueName, cl
 		mx[fmt.Sprintf("queue_%s_dequeued", cleanName)] = int64(dequeued.(int32))
 	}
 
-	// Extract open handles if available
+	// Extract open handles if available from MQCMD_INQUIRE_Q (unlikely to be present)
 	if openInputCount, ok := attrs[C.MQIA_OPEN_INPUT_COUNT]; ok {
 		mx[fmt.Sprintf("queue_%s_open_input_count", cleanName)] = int64(openInputCount.(int32))
 	}
 
 	if openOutputCount, ok := attrs[C.MQIA_OPEN_OUTPUT_COUNT]; ok {
 		mx[fmt.Sprintf("queue_%s_open_output_count", cleanName)] = int64(openOutputCount.(int32))
+	}
+
+	// Collect runtime status using MQCMD_INQUIRE_Q_STATUS
+	if err := c.collectQueueRuntimeMetrics(ctx, mx, queueName, cleanName); err != nil {
+		// Log but don't fail the entire collection
+		c.Debugf("Failed to collect runtime metrics for queue %s: %v", queueName, err)
+	}
+
+	// Collect reset statistics if enabled (DESTRUCTIVE operation)
+	if err := c.collectQueueResetStats(ctx, mx, queueName, cleanName); err != nil {
+		// Log but don't fail the entire collection
+		c.Warningf("Failed to collect reset stats for queue %s: %v", queueName, err)
+	}
+
+	return nil
+}
+
+// collectQueueRuntimeMetrics uses MQCMD_INQUIRE_Q_STATUS to get runtime metrics
+// that are not available from MQCMD_INQUIRE_Q (open counts, last put/get times)
+func (c *Collector) collectQueueRuntimeMetrics(ctx context.Context, mx map[string]int64, queueName, cleanName string) error {
+	params := []pcfParameter{
+		newStringParameter(C.MQCA_Q_NAME, queueName),
+		newIntParameter(C.MQIACF_Q_STATUS_TYPE, C.MQIACF_Q_STATUS), // Request general queue status
+	}
+
+	// Send MQCMD_INQUIRE_Q_STATUS command
+	resp, err := c.sendPCFCommand(C.MQCMD_INQUIRE_Q_STATUS, params)
+	if err != nil {
+		// Queue status is often not available if no processes have the queue open
+		// This is not an error condition, just means no runtime data available
+		return nil
+	}
+
+	// Parse response attributes
+	attrs, err := c.parsePCFResponse(resp, "MQCMD_INQUIRE_Q_STATUS")
+	if err != nil {
+		return fmt.Errorf("failed to parse queue status response: %w", err)
+	}
+
+	// Extract runtime metrics that are only available from INQUIRE_Q_STATUS
+	if openInputCount, ok := attrs[C.MQIA_OPEN_INPUT_COUNT]; ok {
+		mx[fmt.Sprintf("queue_%s_open_input_count", cleanName)] = int64(openInputCount.(int32))
+	}
+
+	if openOutputCount, ok := attrs[C.MQIA_OPEN_OUTPUT_COUNT]; ok {
+		mx[fmt.Sprintf("queue_%s_open_output_count", cleanName)] = int64(openOutputCount.(int32))
+	}
+
+	// Note: MSG_ENQ_COUNT and MSG_DEQ_COUNT are not available from INQUIRE_Q_STATUS
+	// They require MQCMD_RESET_Q_STATS which is destructive (resets the counters)
+	// For monitoring purposes, we avoid using RESET_Q_STATS to prevent interfering
+	// with other monitoring tools or applications that rely on these statistics
+
+	return nil
+}
+
+// collectQueueResetStats uses MQCMD_RESET_Q_STATS to get message counters
+// WARNING: This is a destructive operation that resets counters to zero!
+func (c *Collector) collectQueueResetStats(ctx context.Context, mx map[string]int64, queueName, cleanName string) error {
+	// Only collect if explicitly enabled by user
+	if c.CollectResetQueueStats == nil || !*c.CollectResetQueueStats {
+		return nil
+	}
+
+	params := []pcfParameter{
+		newStringParameter(C.MQCA_Q_NAME, queueName),
+	}
+
+	// Send MQCMD_RESET_Q_STATS command
+	resp, err := c.sendPCFCommand(C.MQCMD_RESET_Q_STATS, params)
+	if err != nil {
+		// Statistics might not be available (STATQ not enabled)
+		c.Debugf("Failed to reset queue stats for %s: %v", queueName, err)
+		return nil
+	}
+
+	// Parse response attributes
+	attrs, err := c.parsePCFResponse(resp, "MQCMD_RESET_Q_STATS")
+	if err != nil {
+		return fmt.Errorf("failed to parse reset stats response: %w", err)
+	}
+
+	// Extract message counters
+	if enqueued, ok := attrs[C.MQIA_MSG_ENQ_COUNT]; ok {
+		mx[fmt.Sprintf("queue_%s_enqueued", cleanName)] = int64(enqueued.(int32))
+	}
+
+	if dequeued, ok := attrs[C.MQIA_MSG_DEQ_COUNT]; ok {
+		mx[fmt.Sprintf("queue_%s_dequeued", cleanName)] = int64(dequeued.(int32))
+	}
+
+	// Extract peak depth since last reset
+	if highQDepth, ok := attrs[C.MQIA_HIGH_Q_DEPTH]; ok {
+		mx[fmt.Sprintf("queue_%s_high_q_depth", cleanName)] = int64(highQDepth.(int32))
+	}
+
+	// Log time since reset for debugging
+	if timeSinceReset, ok := attrs[C.MQIA_TIME_SINCE_RESET]; ok {
+		seconds := int64(timeSinceReset.(int32))
+		if seconds > 0 {
+			c.Debugf("Queue %s stats reset after %d seconds", queueName, seconds)
+		}
 	}
 
 	return nil
