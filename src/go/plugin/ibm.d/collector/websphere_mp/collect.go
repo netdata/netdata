@@ -88,7 +88,7 @@ func (w *WebSphereMicroProfile) collectMicroProfileMetrics(ctx context.Context) 
 		w.serverType = "Liberty MicroProfile"
 		w.mpMetricsVersion = w.detectMpMetricsVersion(w.rawMetrics)
 		w.Infof("detected WebSphere Liberty with MicroProfile Metrics %s", w.mpMetricsVersion)
-		
+
 		// Add version labels to all existing charts
 		w.addVersionLabelsToAllCharts()
 	}
@@ -158,7 +158,7 @@ func (w *WebSphereMicroProfile) cleanMetricName(metricName string) string {
 	// Handle both mpMetrics formats:
 	// 3.0/4.0: base_cpu_systemLoadAverage, vendor_memory_heapUtilization_percent
 	// 5.0+: cpu_systemLoadAverage{mp_scope="base"}, memory_heapUtilization_percent{mp_scope="vendor"}
-	
+
 	// Check for label-based format (5.0+)
 	if idx := strings.Index(metricName, "{"); idx != -1 {
 		baseMetric := metricName[:idx]
@@ -219,27 +219,27 @@ func (w *WebSphereMicroProfile) detectMpMetricsVersion(metrics map[string]float6
 	hasLabelBasedMetrics := false
 	hasPrefixBasedMetrics := false
 	hasVendorMetrics := false
-	
+
 	for metricName := range metrics {
 		// Label-based format (5.0+): cpu_systemLoadAverage{mp_scope="base"}
 		if strings.Contains(metricName, "mp_scope=") {
 			hasLabelBasedMetrics = true
 		}
-		
+
 		// Prefix-based format (3.0/4.0): base_cpu_systemLoadAverage, vendor_memory_heapUtilization_percent
 		if strings.HasPrefix(metricName, "base_") || strings.HasPrefix(metricName, "vendor_") {
 			hasPrefixBasedMetrics = true
 		}
-		
+
 		// Check for vendor metrics that are missing in 4.0
 		if strings.Contains(metricName, "vendor_memory_heapUtilization") ||
-		   strings.Contains(metricName, "vendor_gc_time_per_cycle") ||
-		   strings.Contains(metricName, "vendor_cpu_processCpuUtilization") ||
-		   strings.Contains(metricName, "memory_heapUtilization_percent{mp_scope=\"vendor\"") {
+			strings.Contains(metricName, "vendor_gc_time_per_cycle") ||
+			strings.Contains(metricName, "vendor_cpu_processCpuUtilization") ||
+			strings.Contains(metricName, "memory_heapUtilization_percent{mp_scope=\"vendor\"") {
 			hasVendorMetrics = true
 		}
 	}
-	
+
 	// Determine version based on format and available metrics
 	if hasLabelBasedMetrics {
 		return "5.1" // Default to latest 5.x version
@@ -250,13 +250,13 @@ func (w *WebSphereMicroProfile) detectMpMetricsVersion(metrics map[string]float6
 			return "4.0" // Missing vendor metrics
 		}
 	}
-	
+
 	return "unknown"
 }
 
 func (w *WebSphereMicroProfile) addVersionLabelsToAllCharts() {
 	versionLabels := w.getVersionLabels()
-	
+
 	// Add labels to all existing charts
 	for _, chart := range *w.charts {
 		chart.Labels = append(chart.Labels, versionLabels...)
@@ -317,7 +317,7 @@ func (w *WebSphereMicroProfile) processJVMMetric(mx map[string]int64, metricName
 	if !w.jvmChartsCreated {
 		w.jvmChartsCreated = true
 		charts := newJVMCharts()
-		
+
 		// Add version labels to new charts
 		if w.mpMetricsVersion != "" {
 			versionLabels := w.getVersionLabels()
@@ -325,7 +325,7 @@ func (w *WebSphereMicroProfile) processJVMMetric(mx map[string]int64, metricName
 				chart.Labels = append(chart.Labels, versionLabels...)
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warningf("failed to add JVM charts: %v", err)
 		} else {
@@ -340,7 +340,7 @@ func (w *WebSphereMicroProfile) processJVMMetric(mx map[string]int64, metricName
 	case "base_jvm_uptime_seconds":
 		mx["jvm_uptime_seconds"] = value
 		return
-	
+
 	// Classloader metrics - base scope
 	case "base_classloader_loadedClasses_total", "base_classloader_loadedClasses_count":
 		mx["jvm_classes_loaded"] = value
@@ -348,7 +348,7 @@ func (w *WebSphereMicroProfile) processJVMMetric(mx map[string]int64, metricName
 	case "base_classloader_unloadedClasses_total":
 		mx["jvm_classes_unloaded"] = value
 		return
-	
+
 	// Thread metrics - base scope
 	case "base_thread_count":
 		mx["jvm_thread_count"] = value
@@ -367,7 +367,7 @@ func (w *WebSphereMicroProfile) processJVMMetric(mx map[string]int64, metricName
 	case "base_thread_max_count":
 		mx["jvm_thread_max_count"] = value
 		return
-	
+
 	// Memory metrics - base scope
 	case "base_memory_usedHeap_bytes":
 		mx["jvm_memory_heap_used"] = value
@@ -386,7 +386,7 @@ func (w *WebSphereMicroProfile) processJVMMetric(mx map[string]int64, metricName
 	case "base_memory_maxHeap_bytes":
 		mx["jvm_memory_heap_max"] = value
 		return
-		
+
 	// GC metrics - base scope
 	case "base_gc_total":
 		mx["jvm_gc_collections_total"] = value
@@ -394,7 +394,7 @@ func (w *WebSphereMicroProfile) processJVMMetric(mx map[string]int64, metricName
 	case "base_gc_time_seconds":
 		mx["gc_time_seconds"] = value
 		return
-	
+
 	// CPU metrics - base scope
 	case "base_cpu_availableProcessors":
 		mx["cpu_availableProcessors"] = value
@@ -408,7 +408,7 @@ func (w *WebSphereMicroProfile) processJVMMetric(mx map[string]int64, metricName
 	case "base_cpu_systemLoadAverage":
 		mx["cpu_systemLoadAverage"] = value
 		return
-	
+
 	// Non-heap memory - base scope
 	case "base_memory_usedNonHeap_bytes":
 		mx["memory_usedNonHeap_bytes"] = value
@@ -419,7 +419,7 @@ func (w *WebSphereMicroProfile) processJVMMetric(mx map[string]int64, metricName
 	case "base_memory_maxNonHeap_bytes":
 		mx["memory_maxNonHeap_bytes"] = value
 		return
-	
+
 	// Vendor scope metrics (available in 3.0, 5.x but missing in 4.0)
 	case "vendor_memory_heapUtilization_percent":
 		mx["memory_heapUtilization_percent"] = value

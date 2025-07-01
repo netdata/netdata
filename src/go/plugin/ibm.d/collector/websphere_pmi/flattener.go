@@ -15,16 +15,16 @@ type MetricTuple struct {
 	Value  int64             // Metric value
 	Unit   string            // Metric unit (requests, bytes, milliseconds, etc.)
 	Type   string            // Metric type (count, time, bounded_range, range, double)
-	
+
 	// New fields for fully unique identification
-	UniqueContext  string    // Fully unique context including metric name
-	UniqueInstance string    // Fully unique instance including metric name
+	UniqueContext  string // Fully unique context including metric name
+	UniqueInstance string // Fully unique instance including metric name
 }
 
 // ArrayInfo represents detected array structures
 type ArrayInfo struct {
-	Path     string   // Path to the array container
-	Elements []string // Names of array elements
+	Path     string            // Path to the array container
+	Elements []string          // Names of array elements
 	Labels   map[string]string // Inherited labels
 }
 
@@ -59,12 +59,12 @@ func (f *XMLFlattener) FlattenPMIStats(stats *pmiStatsResponse) *FlattenerResult
 		nodeLabels := map[string]string{
 			"node": node.Name,
 		}
-		
+
 		// Process each server
 		for _, server := range node.Servers {
 			serverLabels := copyLabels(nodeLabels)
 			serverLabels["server"] = server.Name
-			
+
 			// Process server stats
 			for _, stat := range server.Stats {
 				f.flattenStat(&stat, "", serverLabels, result)
@@ -101,7 +101,7 @@ func (f *XMLFlattener) flattenStat(stat *pmiStat, parentPath string, parentLabel
 			Elements: make([]string, len(stat.SubStats)),
 			Labels:   copyLabels(currentLabels),
 		}
-		
+
 		for i, subStat := range stat.SubStats {
 			arrayInfo.Elements[i] = subStat.Name
 		}
@@ -165,7 +165,7 @@ func (f *XMLFlattener) getStatSignature(stat *pmiStat) string {
 // addContextLabels adds labels based on the hierarchical context
 func (f *XMLFlattener) addContextLabels(path, name string, labels map[string]string) {
 	pathParts := strings.Split(path, "/")
-	
+
 	// Skip 'server' from the path to get natural hierarchy
 	cleanParts := []string{}
 	for _, part := range pathParts {
@@ -173,13 +173,13 @@ func (f *XMLFlattener) addContextLabels(path, name string, labels map[string]str
 			cleanParts = append(cleanParts, part)
 		}
 	}
-	
+
 	// The first non-server part becomes the category
 	if len(cleanParts) > 0 {
 		// Use the first level as category (normalized)
 		labels["category"] = f.normalizeForLabel(cleanParts[0])
 	}
-	
+
 	// For specific patterns, add instance labels
 	for i, part := range pathParts {
 		switch part {
@@ -220,8 +220,8 @@ func (f *XMLFlattener) addContextLabels(path, name string, labels map[string]str
 						for j := i + 1; j < len(pathParts); j++ {
 							nextPart := pathParts[j]
 							// Stop at known subcomponents
-							if nextPart == "Object Cache" || nextPart == "Servlet Cache" || 
-							   nextPart == "Counters" || nextPart == "Dependency IDs" {
+							if nextPart == "Object Cache" || nextPart == "Servlet Cache" ||
+								nextPart == "Counters" || nextPart == "Dependency IDs" {
 								break
 							}
 							fullObjectPath += "/" + nextPart
@@ -244,9 +244,9 @@ func (f *XMLFlattener) addContextLabels(path, name string, labels map[string]str
 					}
 				default:
 					// For nested resources like "SIB JMS Resource Adapter/jms/built-in-jms-connectionfactory"
-					if i > 1 && (prevPart == "SIB JMS Resource Adapter" || 
-					            strings.Contains(part, "jms/") || 
-					            strings.Contains(part, "jdbc/")) {
+					if i > 1 && (prevPart == "SIB JMS Resource Adapter" ||
+						strings.Contains(part, "jms/") ||
+						strings.Contains(part, "jdbc/")) {
 						labels["resource"] = part
 						labels["instance"] = part
 					}
@@ -289,10 +289,10 @@ func (f *XMLFlattener) extractMetrics(stat *pmiStat, basePath string, labels map
 				Type:   "count",
 			}
 			f.refineMetricUnit(&metric)
-			
+
 			// Generate fully unique context and instance
 			metric.UniqueContext, metric.UniqueInstance = f.generateUniqueContextAndInstance(&metric)
-			
+
 			result.Metrics = append(result.Metrics, metric)
 		}
 	}
@@ -307,10 +307,10 @@ func (f *XMLFlattener) extractMetrics(stat *pmiStat, basePath string, labels map
 				Unit:   "milliseconds",
 				Type:   "time",
 			}
-			
+
 			// Generate fully unique context and instance
 			metric.UniqueContext, metric.UniqueInstance = f.generateUniqueContextAndInstance(&metric)
-			
+
 			result.Metrics = append(result.Metrics, metric)
 		}
 	}
@@ -326,10 +326,10 @@ func (f *XMLFlattener) extractMetrics(stat *pmiStat, basePath string, labels map
 				Type:   "bounded_range",
 			}
 			f.refineMetricUnit(&metric)
-			
+
 			// Generate fully unique context and instance
 			metric.UniqueContext, metric.UniqueInstance = f.generateUniqueContextAndInstance(&metric)
-			
+
 			result.Metrics = append(result.Metrics, metric)
 		}
 	}
@@ -345,10 +345,10 @@ func (f *XMLFlattener) extractMetrics(stat *pmiStat, basePath string, labels map
 				Type:   "range",
 			}
 			f.refineMetricUnit(&metric)
-			
+
 			// Generate fully unique context and instance
 			metric.UniqueContext, metric.UniqueInstance = f.generateUniqueContextAndInstance(&metric)
-			
+
 			result.Metrics = append(result.Metrics, metric)
 		}
 	}
@@ -360,14 +360,14 @@ func (f *XMLFlattener) extractMetrics(stat *pmiStat, basePath string, labels map
 				Path:   basePath + "/" + ds.Name,
 				Labels: copyLabels(labels),
 				Value:  int64(value), // Convert to int64 for consistency
-				Unit:   "percent", // Default unit for doubles
+				Unit:   "percent",    // Default unit for doubles
 				Type:   "double",
 			}
 			f.refineMetricUnit(&metric)
-			
+
 			// Generate fully unique context and instance
 			metric.UniqueContext, metric.UniqueInstance = f.generateUniqueContextAndInstance(&metric)
-			
+
 			result.Metrics = append(result.Metrics, metric)
 		}
 	}
@@ -376,33 +376,33 @@ func (f *XMLFlattener) extractMetrics(stat *pmiStat, basePath string, labels map
 // refineMetricUnit infers better units based on metric name and type
 func (f *XMLFlattener) refineMetricUnit(metric *MetricTuple) {
 	name := strings.ToLower(metric.Path)
-	
+
 	// Percentage metrics (check first as these override other patterns)
-	if strings.Contains(name, "percent") || strings.Contains(name, "utilization") || 
-	   (strings.Contains(name, "usage") && metric.Type == "double") {
+	if strings.Contains(name, "percent") || strings.Contains(name, "utilization") ||
+		(strings.Contains(name, "usage") && metric.Type == "double") {
 		metric.Unit = "percent"
 		return
 	}
 
 	// Size-related metrics (check before time as "Runtime" contains "time")
-	if strings.Contains(name, "size") || strings.Contains(name, "memory") || 
-	   strings.Contains(name, "heap") || strings.Contains(name, "bytes") {
+	if strings.Contains(name, "size") || strings.Contains(name, "memory") ||
+		strings.Contains(name, "heap") || strings.Contains(name, "bytes") {
 		metric.Unit = "bytes"
 		return
 	}
 
 	// Time-related metrics
-	if metric.Type == "time" || 
-	   (strings.Contains(name, "time") && !strings.Contains(name, "runtime")) || 
-	   strings.Contains(name, "duration") || strings.Contains(name, "response") {
+	if metric.Type == "time" ||
+		(strings.Contains(name, "time") && !strings.Contains(name, "runtime")) ||
+		strings.Contains(name, "duration") || strings.Contains(name, "response") {
 		metric.Unit = "milliseconds"
 		return
 	}
 
 	// Count metrics
-	if metric.Type == "count" || strings.Contains(name, "count") || 
-	   strings.Contains(name, "number") || strings.Contains(name, "active") || 
-	   strings.Contains(name, "pool") || strings.Contains(name, "connection") {
+	if metric.Type == "count" || strings.Contains(name, "count") ||
+		strings.Contains(name, "number") || strings.Contains(name, "active") ||
+		strings.Contains(name, "pool") || strings.Contains(name, "connection") {
 		metric.Unit = "requests"
 		return
 	}
@@ -420,35 +420,35 @@ func (f *XMLFlattener) refineMetricUnit(metric *MetricTuple) {
 func (f *XMLFlattener) generateUniqueContextAndInstance(metric *MetricTuple) (context, instance string) {
 	// Split path into components and sanitize each part separately
 	// This maintains the hierarchical structure for correlation
-	
+
 	pathParts := strings.Split(metric.Path, "/")
 	sanitizedParts := make([]string, 0, len(pathParts))
-	
+
 	for _, part := range pathParts {
 		if part != "" { // Skip empty parts
 			sanitizedParts = append(sanitizedParts, sanitizeDimensionID(part))
 		}
 	}
-	
+
 	// Build the structured path
 	structuredPath := strings.Join(sanitizedParts, ".")
-	
+
 	// Clean type and unit
 	sanitizedType := sanitizeDimensionID(metric.Type)
 	if sanitizedType == "" {
 		sanitizedType = "unknown_type"
 	}
-	
+
 	sanitizedUnit := sanitizeDimensionID(metric.Unit)
 	if sanitizedUnit == "" {
 		sanitizedUnit = "unknown_unit"
 	}
-	
+
 	// Create unique context and instance by including all identifying information
 	uniqueContext := fmt.Sprintf("websphere_pmi.%s", structuredPath)
-	uniqueInstance := fmt.Sprintf("websphere_pmi.%s.%s.%s", 
+	uniqueInstance := fmt.Sprintf("websphere_pmi.%s.%s.%s",
 		structuredPath, sanitizedType, sanitizedUnit)
-		
+
 	return uniqueContext, uniqueInstance
 }
 

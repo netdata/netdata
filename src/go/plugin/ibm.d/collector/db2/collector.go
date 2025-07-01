@@ -155,7 +155,7 @@ type DB2 struct {
 	disabledFeatures map[string]bool // Track disabled features (tables, views, functions)
 
 	// Modern monitoring support
-	useMonGetFunctions           bool // Use MON_GET_* functions instead of SNAP* views when available
+	useMonGetFunctions            bool // Use MON_GET_* functions instead of SNAP* views when available
 	supportsColumnOrganizedTables bool // Whether column-organized table metrics are available
 }
 
@@ -739,38 +739,38 @@ func (d *DB2) detectMonGetSupport(ctx context.Context) {
 func (d *DB2) detectColumnOrganizedSupport(ctx context.Context) {
 	// Column-organized tables (BLU Acceleration) were introduced in DB2 10.5
 	// However, the feature may not be enabled or available in all installations
-	
+
 	// First check version requirements
 	if d.edition == "i" {
 		d.Infof("Column-organized tables not available on DB2 for i")
 		d.supportsColumnOrganizedTables = false
 		return
 	}
-	
+
 	if d.versionMajor > 0 && d.versionMajor < 10 {
 		d.Infof("Column-organized tables require DB2 10.5+, current version %d.%d", d.versionMajor, d.versionMinor)
 		d.supportsColumnOrganizedTables = false
 		return
 	}
-	
+
 	if d.versionMajor == 10 && d.versionMinor < 5 {
 		d.Infof("Column-organized tables require DB2 10.5+, current version %d.%d", d.versionMajor, d.versionMinor)
 		d.supportsColumnOrganizedTables = false
 		return
 	}
-	
+
 	// Test if POOL_COL_L_READS column exists in SYSIBMADM.SNAPBP
 	testQuery := `SELECT POOL_COL_L_READS FROM SYSIBMADM.SNAPBP FETCH FIRST 1 ROW ONLY`
-	
+
 	queryCtx, cancel := context.WithTimeout(ctx, time.Duration(d.Timeout))
 	defer cancel()
-	
+
 	var testValue sql.NullInt64
 	err := d.db.QueryRowContext(queryCtx, testQuery).Scan(&testValue)
 	if err != nil {
-		if strings.Contains(err.Error(), "POOL_COL_L_READS") || 
-		   strings.Contains(err.Error(), "column") ||
-		   strings.Contains(err.Error(), "COLUMN") {
+		if strings.Contains(err.Error(), "POOL_COL_L_READS") ||
+			strings.Contains(err.Error(), "column") ||
+			strings.Contains(err.Error(), "COLUMN") {
 			d.Infof("Column-organized table metrics not available (POOL_COL_L_READS column missing): %v", err)
 			d.supportsColumnOrganizedTables = false
 		} else {
@@ -779,7 +779,7 @@ func (d *DB2) detectColumnOrganizedSupport(ctx context.Context) {
 		}
 		return
 	}
-	
+
 	// Column exists and query succeeded
 	d.supportsColumnOrganizedTables = true
 	d.Infof("Column-organized table metrics detected and available")

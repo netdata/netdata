@@ -111,14 +111,14 @@ type WebSphereMicroProfile struct {
 	restSelector matcher.Matcher
 
 	// Cached server info
-	serverVersion   string
-	serverType      string // "Liberty MicroProfile"
+	serverVersion    string
+	serverType       string // "Liberty MicroProfile"
 	mpMetricsVersion string // "3.0", "4.0", "5.0", "5.1"
 
 	// Metric name patterns
 	jvmPattern  *regexp.Regexp
 	restPattern *regexp.Regexp
-	
+
 	// Raw metrics for version detection
 	rawMetrics map[string]float64
 }

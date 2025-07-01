@@ -172,7 +172,7 @@ type WebSpherePMI struct {
 	// WebSphere version information
 	wasVersion string
 	wasEdition string // traditional, liberty
-	
+
 	// Dynamic collection system
 	dynamicCollector     *DynamicCollector
 	useDynamicCollection bool
@@ -590,7 +590,7 @@ func (w *WebSpherePMI) shouldUseDynamicCollection() bool {
 	if w.UseDynamicCollection != nil {
 		return *w.UseDynamicCollection
 	}
-	
+
 	// Default: use dynamic collection for better metric coverage
 	return true
 }
@@ -758,7 +758,7 @@ func (w *WebSpherePMI) processStat(stat *pmiStat, parentPath string, mx map[stri
 	} else if fullPath == "" {
 		fullPath = stat.Name
 	}
-	
+
 	// Assign the built path back to the stat so extraction functions can use it
 	stat.Path = fullPath
 

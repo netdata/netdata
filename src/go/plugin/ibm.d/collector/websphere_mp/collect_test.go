@@ -21,16 +21,16 @@ func TestWebSphereMicroProfile_parsePrometheusMetrics_AllSamples(t *testing.T) {
 	expectedVersions := map[string]struct {
 		mpMetricsVersion string
 		expectedMetrics  map[string]bool // metric names that should be present
-		minMetricsCount  int            // minimum number of metrics expected
+		minMetricsCount  int             // minimum number of metrics expected
 	}{
 		"liberty-20.0.0.12-mpmetrics-3.0-port-9182.txt": {
 			mpMetricsVersion: "3.0",
 			expectedMetrics: map[string]bool{
-				"base_cpu_systemLoadAverage":           true,
-				"base_classloader_loadedClasses_count": true,
-				"base_thread_count":                    true,
-				"base_gc_total":                        true,
-				"vendor_memory_heapUtilization_percent": true,
+				"base_cpu_systemLoadAverage":               true,
+				"base_classloader_loadedClasses_count":     true,
+				"base_thread_count":                        true,
+				"base_gc_total":                            true,
+				"vendor_memory_heapUtilization_percent":    true,
 				"vendor_cpu_processCpuUtilization_percent": true,
 			},
 			minMetricsCount: 15,
@@ -49,10 +49,10 @@ func TestWebSphereMicroProfile_parsePrometheusMetrics_AllSamples(t *testing.T) {
 		"liberty-23.0.0.12-mpmetrics-5.1-port-9180.txt": {
 			mpMetricsVersion: "5.1",
 			expectedMetrics: map[string]bool{
-				"base_cpu_systemLoadAverage":           true,
-				"base_classloader_loadedClasses_total": true,
-				"base_thread_count":                    true,
-				"base_gc_total":                        true,
+				"base_cpu_systemLoadAverage":            true,
+				"base_classloader_loadedClasses_total":  true,
+				"base_thread_count":                     true,
+				"base_gc_total":                         true,
 				"vendor_memory_heapUtilization_percent": true,
 			},
 			minMetricsCount: 15,
@@ -60,10 +60,10 @@ func TestWebSphereMicroProfile_parsePrometheusMetrics_AllSamples(t *testing.T) {
 		"liberty-24.0.0.12-mpmetrics-5.1-port-9184.txt": {
 			mpMetricsVersion: "5.1",
 			expectedMetrics: map[string]bool{
-				"base_cpu_systemLoadAverage":           true,
-				"base_classloader_loadedClasses_total": true,
-				"base_thread_count":                    true,
-				"base_gc_total":                        true,
+				"base_cpu_systemLoadAverage":            true,
+				"base_classloader_loadedClasses_total":  true,
+				"base_thread_count":                     true,
+				"base_gc_total":                         true,
 				"vendor_memory_heapUtilization_percent": true,
 			},
 			minMetricsCount: 15,
@@ -71,10 +71,10 @@ func TestWebSphereMicroProfile_parsePrometheusMetrics_AllSamples(t *testing.T) {
 		"liberty-collective-mpmetrics-5.0-port-9187.txt": {
 			mpMetricsVersion: "5.1",
 			expectedMetrics: map[string]bool{
-				"base_cpu_systemLoadAverage":           true,
-				"base_classloader_loadedClasses_total": true,
-				"base_thread_count":                    true,
-				"base_gc_total":                        true,
+				"base_cpu_systemLoadAverage":            true,
+				"base_classloader_loadedClasses_total":  true,
+				"base_thread_count":                     true,
+				"base_gc_total":                         true,
 				"vendor_memory_heapUtilization_percent": true,
 			},
 			minMetricsCount: 15,
@@ -82,10 +82,10 @@ func TestWebSphereMicroProfile_parsePrometheusMetrics_AllSamples(t *testing.T) {
 		"liberty-latest-mpmetrics-5.1-port-9080.txt": {
 			mpMetricsVersion: "5.1",
 			expectedMetrics: map[string]bool{
-				"base_cpu_systemLoadAverage":           true,
-				"base_classloader_loadedClasses_total": true,
-				"base_thread_count":                    true,
-				"base_gc_total":                        true,
+				"base_cpu_systemLoadAverage":            true,
+				"base_classloader_loadedClasses_total":  true,
+				"base_thread_count":                     true,
+				"base_gc_total":                         true,
 				"vendor_memory_heapUtilization_percent": true,
 			},
 			minMetricsCount: 15,
@@ -93,10 +93,10 @@ func TestWebSphereMicroProfile_parsePrometheusMetrics_AllSamples(t *testing.T) {
 		"liberty-mp-mpmetrics-5.1-port-9081.txt": {
 			mpMetricsVersion: "5.1",
 			expectedMetrics: map[string]bool{
-				"base_cpu_systemLoadAverage":           true,
-				"base_classloader_loadedClasses_total": true,
-				"base_thread_count":                    true,
-				"base_gc_total":                        true,
+				"base_cpu_systemLoadAverage":            true,
+				"base_classloader_loadedClasses_total":  true,
+				"base_thread_count":                     true,
+				"base_gc_total":                         true,
 				"vendor_memory_heapUtilization_percent": true,
 			},
 			minMetricsCount: 15,
@@ -104,10 +104,10 @@ func TestWebSphereMicroProfile_parsePrometheusMetrics_AllSamples(t *testing.T) {
 		"open-liberty-latest-mpmetrics-5.1-port-9082.txt": {
 			mpMetricsVersion: "5.1",
 			expectedMetrics: map[string]bool{
-				"base_cpu_systemLoadAverage":           true,
-				"base_classloader_loadedClasses_total": true,
-				"base_thread_count":                    true,
-				"base_gc_total":                        true,
+				"base_cpu_systemLoadAverage":            true,
+				"base_classloader_loadedClasses_total":  true,
+				"base_thread_count":                     true,
+				"base_gc_total":                         true,
 				"vendor_memory_heapUtilization_percent": true,
 			},
 			minMetricsCount: 15,
@@ -153,9 +153,9 @@ func TestWebSphereMicroProfile_parsePrometheusMetrics_AllSamples(t *testing.T) {
 			}
 
 			// Log parsed metrics for debugging
-			t.Logf("File: %s, Version: %s, Metrics parsed: %d", 
+			t.Logf("File: %s, Version: %s, Metrics parsed: %d",
 				filename, detectedVersion, len(metrics))
-			
+
 			// Log normalized metric names for verification
 			for normalizedName := range normalizedMetrics {
 				if strings.HasPrefix(normalizedName, "base_") || strings.HasPrefix(normalizedName, "vendor_") {
@@ -180,7 +180,7 @@ func TestWebSphereMicroProfile_cleanMetricName(t *testing.T) {
 			input:    "vendor_memory_heapUtilization_percent",
 			expected: "vendor_memory_heapUtilization_percent",
 		},
-		
+
 		// mpMetrics 5.0+ label-based format (needs normalization)
 		"label_based_base": {
 			input:    `cpu_systemLoadAverage{mp_scope="base"}`,
@@ -194,7 +194,7 @@ func TestWebSphereMicroProfile_cleanMetricName(t *testing.T) {
 			input:    `gc_total{mp_scope="base",name="global"}`,
 			expected: "base_gc_total",
 		},
-		
+
 		// Metrics without labels
 		"no_labels": {
 			input:    "some_metric",
@@ -218,25 +218,25 @@ func TestWebSphereMicroProfile_detectMpMetricsVersion(t *testing.T) {
 	}{
 		"mpMetrics_3.0_with_vendor": {
 			metrics: map[string]float64{
-				"base_cpu_systemLoadAverage":           1.23,
-				"vendor_memory_heapUtilization_percent": 0.45,
+				"base_cpu_systemLoadAverage":               1.23,
+				"vendor_memory_heapUtilization_percent":    0.45,
 				"vendor_cpu_processCpuUtilization_percent": 0.67,
 			},
 			expected: "3.0",
 		},
 		"mpMetrics_4.0_no_vendor": {
 			metrics: map[string]float64{
-				"base_cpu_systemLoadAverage":   1.23,
-				"base_thread_count":            87,
-				"base_gc_total":                14,
+				"base_cpu_systemLoadAverage": 1.23,
+				"base_thread_count":          87,
+				"base_gc_total":              14,
 			},
 			expected: "4.0",
 		},
 		"mpMetrics_5.1_label_based": {
 			metrics: map[string]float64{
-				`cpu_systemLoadAverage{mp_scope="base"}`:           1.23,
+				`cpu_systemLoadAverage{mp_scope="base"}`:            1.23,
 				`memory_heapUtilization_percent{mp_scope="vendor"}`: 0.45,
-				`thread_count{mp_scope="base"}`:                    87,
+				`thread_count{mp_scope="base"}`:                     87,
 			},
 			expected: "5.1",
 		},
@@ -290,7 +290,7 @@ func TestWebSphereMicroProfile_processJVMMetric_AllVersions(t *testing.T) {
 			expectedKey:   "jvm_memory_heap_used",
 			shouldProcess: true,
 		},
-		
+
 		// Vendor scope metrics (missing in 4.0)
 		"heap_utilization": {
 			metricName:    "vendor_memory_heapUtilization_percent",
@@ -310,7 +310,7 @@ func TestWebSphereMicroProfile_processJVMMetric_AllVersions(t *testing.T) {
 			expectedKey:   "gc_time_per_cycle_seconds",
 			shouldProcess: true,
 		},
-		
+
 		// Unknown metric (should be handled gracefully)
 		"unknown_metric": {
 			metricName:    "unknown_jvm_metric",
@@ -343,11 +343,11 @@ func TestWebSphereMicroProfile_processJVMMetric_AllVersions(t *testing.T) {
 func TestWebSphereMicroProfile_DynamicChartCreation(t *testing.T) {
 	// Test using a real sample to verify charts are created only for available metrics
 	samplesDir := filepath.Join("..", "..", "samples.d")
-	
+
 	tests := map[string]struct {
-		filename      string
-		expectJVM     bool
-		expectVendor  bool
+		filename     string
+		expectJVM    bool
+		expectVendor bool
 	}{
 		"mpMetrics_3.0_with_vendor": {
 			filename:     "liberty-20.0.0.12-mpmetrics-3.0-port-9182.txt",
@@ -403,8 +403,8 @@ func TestWebSphereMicroProfile_DynamicChartCreation(t *testing.T) {
 			hasVendorMetrics := false
 			for key := range mx {
 				if strings.Contains(key, "memory_heapUtilization_percent") ||
-				   strings.Contains(key, "cpu_processCpuUtilization_percent") ||
-				   strings.Contains(key, "gc_time_per_cycle_seconds") {
+					strings.Contains(key, "cpu_processCpuUtilization_percent") ||
+					strings.Contains(key, "gc_time_per_cycle_seconds") {
 					hasVendorMetrics = true
 					break
 				}
@@ -432,7 +432,7 @@ func TestWebSphereMicroProfile_DynamicChartCreation(t *testing.T) {
 				assert.True(t, hasVersionLabels, "Charts should have version labels for %s", tt.filename)
 			}
 
-			t.Logf("File: %s, Charts: %d, Metrics: %d, HasVendor: %v", 
+			t.Logf("File: %s, Charts: %d, Metrics: %d, HasVendor: %v",
 				tt.filename, len(*w.charts), len(mx), hasVendorMetrics)
 		})
 	}
@@ -441,17 +441,17 @@ func TestWebSphereMicroProfile_DynamicChartCreation(t *testing.T) {
 func TestWebSphereMicroProfile_GracefulHandlingMissingMetrics(t *testing.T) {
 	// Test that collector handles missing metrics gracefully without errors
 	tests := map[string]struct {
-		metrics map[string]float64
+		metrics     map[string]float64
 		expectError bool
 	}{
 		"empty_metrics": {
-			metrics: map[string]float64{},
+			metrics:     map[string]float64{},
 			expectError: false,
 		},
 		"only_base_metrics": {
 			metrics: map[string]float64{
 				"base_cpu_systemLoadAverage": 1.23,
-				"base_thread_count": 87,
+				"base_thread_count":          87,
 			},
 			expectError: false,
 		},
@@ -477,7 +477,7 @@ func TestWebSphereMicroProfile_GracefulHandlingMissingMetrics(t *testing.T) {
 			w.HTTPConfig.RequestConfig.URL = "https://localhost:9443/metrics"
 			err := w.Init(nil)
 			require.NoError(t, err)
-			
+
 			mx := make(map[string]int64)
 
 			// This should not panic or return errors
@@ -485,9 +485,9 @@ func TestWebSphereMicroProfile_GracefulHandlingMissingMetrics(t *testing.T) {
 
 			// Verify processing completes without errors
 			assert.NotNil(t, mx, "Result map should not be nil")
-			
+
 			// Log results for verification
-			t.Logf("Test: %s, Input metrics: %d, Output metrics: %d", 
+			t.Logf("Test: %s, Input metrics: %d, Output metrics: %d",
 				name, len(tt.metrics), len(mx))
 		})
 	}
@@ -496,18 +496,18 @@ func TestWebSphereMicroProfile_GracefulHandlingMissingMetrics(t *testing.T) {
 func TestWebSphereMicroProfile_CompleteProcessingPipeline(t *testing.T) {
 	// Test complete pipeline: sample file -> parsing -> version detection -> processing -> final mx output
 	// This test ensures NO METRICS ARE LOST and version detection actually works
-	
+
 	expectedResults := map[string]struct {
-		expectedVersion     string
-		mustHaveMetrics     []string // Metrics that MUST be in final mx output
-		mustNotHaveMetrics  []string // Metrics that should NOT be present (version-specific)
-		minOutputMetrics    int      // Minimum metrics in final mx
-		mustHaveVendor      bool     // Whether vendor metrics should be present
+		expectedVersion    string
+		mustHaveMetrics    []string // Metrics that MUST be in final mx output
+		mustNotHaveMetrics []string // Metrics that should NOT be present (version-specific)
+		minOutputMetrics   int      // Minimum metrics in final mx
+		mustHaveVendor     bool     // Whether vendor metrics should be present
 	}{
 		"liberty-20.0.0.12-mpmetrics-3.0-port-9182.txt": {
 			expectedVersion: "3.0",
 			mustHaveMetrics: []string{
-				"jvm_uptime_seconds", "jvm_thread_count", "jvm_memory_heap_used", 
+				"jvm_uptime_seconds", "jvm_thread_count", "jvm_memory_heap_used",
 				"jvm_gc_collections_total", "cpu_systemLoadAverage",
 				"memory_heapUtilization_percent", "cpu_processCpuUtilization_percent", // vendor metrics
 			},
@@ -516,7 +516,7 @@ func TestWebSphereMicroProfile_CompleteProcessingPipeline(t *testing.T) {
 			mustHaveVendor:     true,
 		},
 		"liberty-22.0.0.13-mpmetrics-4.0-port-9181.txt": {
-			expectedVersion: "4.0", 
+			expectedVersion: "4.0",
 			mustHaveMetrics: []string{
 				"jvm_uptime_seconds", "jvm_thread_count", "jvm_memory_heap_used",
 				"jvm_gc_collections_total", "cpu_systemLoadAverage",
@@ -524,14 +524,14 @@ func TestWebSphereMicroProfile_CompleteProcessingPipeline(t *testing.T) {
 			mustNotHaveMetrics: []string{
 				"memory_heapUtilization_percent", "cpu_processCpuUtilization_percent", // vendor missing in 4.0
 			},
-			minOutputMetrics:   12,
-			mustHaveVendor:     false,
+			minOutputMetrics: 12,
+			mustHaveVendor:   false,
 		},
 		"liberty-23.0.0.12-mpmetrics-5.1-port-9180.txt": {
 			expectedVersion: "5.1",
 			mustHaveMetrics: []string{
 				"jvm_uptime_seconds", "jvm_thread_count", "jvm_memory_heap_used",
-				"jvm_gc_collections_total", "cpu_systemLoadAverage", 
+				"jvm_gc_collections_total", "cpu_systemLoadAverage",
 				"memory_heapUtilization_percent", "cpu_processCpuUtilization_percent", // vendor metrics
 			},
 			mustNotHaveMetrics: []string{},
@@ -563,7 +563,7 @@ func TestWebSphereMicroProfile_CompleteProcessingPipeline(t *testing.T) {
 			// STEP 2: Verify version detection works on raw metrics
 			detectedVersion := w.detectMpMetricsVersion(w.rawMetrics)
 			require.Equal(t, expected.expectedVersion, detectedVersion,
-				"Version detection failed for %s. Expected %s, got %s", 
+				"Version detection failed for %s. Expected %s, got %s",
 				filename, expected.expectedVersion, detectedVersion)
 
 			// STEP 3: Manually trigger version detection (simulating collectMicroProfileMetrics)
@@ -577,7 +577,7 @@ func TestWebSphereMicroProfile_CompleteProcessingPipeline(t *testing.T) {
 
 			// STEP 5: Verify output metrics
 			require.GreaterOrEqual(t, len(mx), expected.minOutputMetrics,
-				"Not enough metrics in final output for %s. Expected at least %d, got %d", 
+				"Not enough metrics in final output for %s. Expected at least %d, got %d",
 				filename, expected.minOutputMetrics, len(mx))
 
 			// STEP 6: Verify required metrics are present
@@ -595,14 +595,14 @@ func TestWebSphereMicroProfile_CompleteProcessingPipeline(t *testing.T) {
 			// STEP 8: Verify vendor metrics presence/absence
 			hasVendorInOutput := false
 			for key := range mx {
-				if strings.Contains(key, "heapUtilization") || 
-				   strings.Contains(key, "processCpuUtilization") ||
-				   strings.Contains(key, "gc_time_per_cycle") {
+				if strings.Contains(key, "heapUtilization") ||
+					strings.Contains(key, "processCpuUtilization") ||
+					strings.Contains(key, "gc_time_per_cycle") {
 					hasVendorInOutput = true
 					break
 				}
 			}
-			
+
 			if expected.mustHaveVendor {
 				assert.True(t, hasVendorInOutput, "Vendor metrics should be present in output for %s", filename)
 			} else {
@@ -629,12 +629,12 @@ func TestWebSphereMicroProfile_CompleteProcessingPipeline(t *testing.T) {
 			// Log comprehensive results
 			t.Logf("✅ COMPLETE PIPELINE TEST for %s:", filename)
 			t.Logf("  📥 Raw metrics parsed: %d", len(w.rawMetrics))
-			t.Logf("  📊 Normalized metrics: %d", len(metrics)) 
+			t.Logf("  📊 Normalized metrics: %d", len(metrics))
 			t.Logf("  🏷️  Detected version: %s", detectedVersion)
 			t.Logf("  📈 Final output metrics: %d", len(mx))
 			t.Logf("  📋 Charts created: %d", len(*w.charts))
 			t.Logf("  🏪 Vendor metrics in output: %v", hasVendorInOutput)
-			
+
 			// Log some key output metrics for verification
 			keyMetrics := []string{"jvm_uptime_seconds", "jvm_thread_count", "cpu_systemLoadAverage", "memory_heapUtilization_percent"}
 			for _, key := range keyMetrics {
@@ -649,7 +649,7 @@ func TestWebSphereMicroProfile_CompleteProcessingPipeline(t *testing.T) {
 func TestWebSphereMicroProfile_NoMetricsLost(t *testing.T) {
 	// Test that all metrics from sample files are properly processed and none are lost
 	samplesDir := filepath.Join("..", "..", "samples.d")
-	
+
 	samples := []string{
 		"liberty-20.0.0.12-mpmetrics-3.0-port-9182.txt",
 		"liberty-22.0.0.13-mpmetrics-4.0-port-9181.txt",
@@ -681,14 +681,14 @@ func TestWebSphereMicroProfile_NoMetricsLost(t *testing.T) {
 			for rawName := range w.rawMetrics {
 				if !strings.HasPrefix(rawName, "#") && rawName != "" {
 					rawMetricCount++
-					
+
 					// Count JVM-related metrics (base and vendor scope)
 					if strings.HasPrefix(rawName, "base_") ||
-					   (strings.HasPrefix(rawName, "vendor_") && 
-					    (strings.Contains(rawName, "memory") || strings.Contains(rawName, "cpu") || strings.Contains(rawName, "gc"))) ||
-					   strings.Contains(rawName, "mp_scope=\"base\"") ||
-					   (strings.Contains(rawName, "mp_scope=\"vendor\"") && 
-					    (strings.Contains(rawName, "memory") || strings.Contains(rawName, "cpu") || strings.Contains(rawName, "gc"))) {
+						(strings.HasPrefix(rawName, "vendor_") &&
+							(strings.Contains(rawName, "memory") || strings.Contains(rawName, "cpu") || strings.Contains(rawName, "gc"))) ||
+						strings.Contains(rawName, "mp_scope=\"base\"") ||
+						(strings.Contains(rawName, "mp_scope=\"vendor\"") &&
+							(strings.Contains(rawName, "memory") || strings.Contains(rawName, "cpu") || strings.Contains(rawName, "gc"))) {
 						expectedJVMMetrics++
 					}
 				}
@@ -707,7 +707,7 @@ func TestWebSphereMicroProfile_NoMetricsLost(t *testing.T) {
 			t.Logf("  mpMetrics version: %s", w.mpMetricsVersion)
 
 			// Should process at least the JVM metrics we found
-			assert.GreaterOrEqual(t, len(mx), expectedJVMMetrics/2, 
+			assert.GreaterOrEqual(t, len(mx), expectedJVMMetrics/2,
 				"Too many metrics lost during processing for %s", filename)
 
 			// Should have created charts for JVM metrics
@@ -718,27 +718,27 @@ func TestWebSphereMicroProfile_NoMetricsLost(t *testing.T) {
 
 			// Verify specific essential metrics are not lost (if they exist in raw data)
 			essentialMetrics := map[string]string{
-				"base_cpu_systemLoadAverage":     "cpu_systemLoadAverage",
-				"base_thread_count":              "jvm_thread_count", 
-				"base_memory_usedHeap_bytes":     "jvm_memory_heap_used",
-				"base_gc_total":                  "jvm_gc_collections_total",
+				"base_cpu_systemLoadAverage": "cpu_systemLoadAverage",
+				"base_thread_count":          "jvm_thread_count",
+				"base_memory_usedHeap_bytes": "jvm_memory_heap_used",
+				"base_gc_total":              "jvm_gc_collections_total",
 			}
 
 			for rawPattern, expectedOutput := range essentialMetrics {
 				// Check if this metric exists in raw data (accounting for different formats)
 				hasRawMetric := false
 				for rawName := range w.rawMetrics {
-					if strings.Contains(rawName, rawPattern) || 
-					   (strings.Contains(rawName, strings.TrimPrefix(rawPattern, "base_")) && 
-					    strings.Contains(rawName, "mp_scope=\"base\"")) {
+					if strings.Contains(rawName, rawPattern) ||
+						(strings.Contains(rawName, strings.TrimPrefix(rawPattern, "base_")) &&
+							strings.Contains(rawName, "mp_scope=\"base\"")) {
 						hasRawMetric = true
 						break
 					}
 				}
 
 				if hasRawMetric {
-					assert.Contains(t, mx, expectedOutput, 
-						"Essential metric %s -> %s missing from processed output for %s", 
+					assert.Contains(t, mx, expectedOutput,
+						"Essential metric %s -> %s missing from processed output for %s",
 						rawPattern, expectedOutput, filename)
 				}
 			}
