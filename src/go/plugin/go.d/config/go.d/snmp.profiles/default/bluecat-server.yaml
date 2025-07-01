@@ -23,9 +23,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.13315.3.1.1.2.2.2.1.4
         name: bcnDhcpv4SubnetFreeAddresses
-        description: The number of IPs addresses available in this subnet.
-        family: DHCP/Subnets
-        unit: "{ip_address}"
+        chart_meta:
+          description: The number of IPs addresses available in this subnet.
+          family: DHCP/Subnets
+          unit: "{ip_address}"
         # Transform combines subnet IP and mask into CIDR notation (e.g., 192.168.1.0/24)
         # Converts mask to CIDR if possible, otherwise keeps original mask
         transform: |
@@ -39,9 +40,10 @@ metrics:
           {{- deleteTag .Metric "bcn_dhcpv4_subnet_mask" -}}
       - OID: 1.3.6.1.4.1.13315.3.1.1.2.2.2.1.3
         name: bcnDhcpv4SubnetSize
-        description: Size of the subnet
-        family: DHCP/Subnets
-        unit: "{ip_address}"
+        chart_meta:
+          description: Size of the subnet
+          family: DHCP/Subnets
+          unit: "{ip_address}"
         # Transform combines subnet IP and mask into CIDR notation (e.g., 192.168.1.0/24)
         # Converts mask to CIDR if possible, otherwise keeps original mask
         transform: |
@@ -71,9 +73,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.13315.3.1.1.2.2.3.1.5
         name: bcnDhcpv4PoolFreeAddresses
-        description: The number of IPs addresses available in this pool
-        family: DHCP/Pools
-        unit: "{ip_address}"
+        chart_meta:
+          description: The number of IPs addresses available in this pool
+          family: DHCP/Pools
+          unit: "{ip_address}"
         # Transform combines start and end IPs into a single range tag (e.g., 192.168.1.10-192.168.1.100)
         transform: |
           {{- $startIP := index .Metric.Tags "bcn_dhcpv4_pool_start_ip" | default "" -}}
@@ -85,9 +88,10 @@ metrics:
           {{- deleteTag .Metric "bcn_dhcpv4_pool_end_ip" -}}
       - OID: 1.3.6.1.4.1.13315.3.1.1.2.2.3.1.4
         name: bcnDhcpv4PoolSize
-        description: Pool size
-        family: DHCP/Pools
-        unit: "{ip_address}"
+        chart_meta:
+          description: Pool size
+          family: DHCP/Pools
+          unit: "{ip_address}"
         # Transform combines start and end IPs into a single range tag (e.g., 192.168.1.10-192.168.1.100)
         transform: |
           {{- $startIP := index .Metric.Tags "bcn_dhcpv4_pool_start_ip" | default "" -}}

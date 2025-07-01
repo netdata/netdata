@@ -30,16 +30,18 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.1588.2.1.1.1.26.1.0
       name: cpu.usage
-      description: System's cpu usage
-      family: CPU/Usage
-      unit: "%"
+      chart_meta:
+        description: System's cpu usage
+        family: CPU/Usage
+        unit: "%"
   - MIB: RESOURCE-MIB
     symbol:
       OID: 1.3.6.1.4.1.1588.2.1.1.1.26.6.0
       name: memory.usage
-      description: System's memory usage
-      family: Memory/Usage
-      unit: "%"
+      chart_meta:
+        description: System's memory usage
+        family: Memory/Usage
+        unit: "%"
   - MIB: FIBRE-CHANNEL-FE-MIB
     table:
       OID: 1.3.6.1.2.1.75.1.2.1
@@ -47,23 +49,26 @@ metrics:
     symbols:
       - name: fcFxPortBbCreditAvailable
         OID: 1.3.6.1.2.1.75.1.2.1.1.2
-        description: Buffers currently available for receiving frames from the attached port in the buffer-to-buffer flow control
-        family: FibreChannel/FxPort/Buffer/Available
-        unit: "{buffer}"
+        chart_meta:
+          description: Buffers currently available for receiving frames from the attached port in the buffer-to-buffer flow control
+          family: FibreChannel/FxPort/Buffer/Available
+          unit: "{buffer}"
       - OID: 1.3.6.1.2.1.75.1.2.1.1.3
         name: fcFxPortOperMode
-        description: Operational mode of the FxPort
-        family: FibreChannel/FxPort/Operational/Mode
-        unit: "{status}"
+        chart_meta:
+          description: Operational mode of the FxPort
+          family: FibreChannel/FxPort/Operational/Mode
+          unit: "{status}"
         mapping:
           1: unknown
           2: f_port
           3: fl_port
       - OID: 1.3.6.1.2.1.75.1.2.1.1.4
         name: fcFxPortAdminMode
-        description: Desired operational mode of the FxPort
-        unit: "{status}"
-        family: FibreChannel/FxPort/Admin/Mode
+        chart_meta:
+          description: Desired operational mode of the FxPort
+          family: FibreChannel/FxPort/Admin/Mode
+          unit: "{status}"
         mapping:
           2: f_port
           3: fl_port
@@ -79,18 +84,20 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.75.1.2.2.1.1
         name: fcFxPortPhysAdminStatus
-        description: Desired state of the FxPort
-        family: FibreChannel/FxPort/Physical/Admin/Status
-        unit: "{status}"
+        chart_meta:
+          description: Desired state of the FxPort
+          family: FibreChannel/FxPort/Physical/Admin/Status
+          unit: "{status}"
         mapping:
           1: online
           2: offline
           3: testing
       - OID: 1.3.6.1.2.1.75.1.2.2.1.2
         name: fcFxPortPhysOperStatus
-        description: Current operational status of the FxPort
-        family: FibreChannel/FxPort/Physical/Operational/Status
-        unit: "{status}"
+        chart_meta:
+          description: Current operational status of the FxPort
+          family: FibreChannel/FxPort/Physical/Operational/Status
+          unit: "{status}"
         mapping:
           1: online
           2: offline
@@ -110,93 +117,108 @@ metrics:
       - name: swFCPortTxFrames
         OID: 1.3.6.1.4.1.1588.2.1.1.1.6.2.1.13
         metric_type: monotonic_count
-        description: Number of Fibre Channel frames transmitted by the port
-        family: FibreChannel/Port/Frame/Out
-        unit: "{frame}/s"
+        chart_meta:
+          description: Number of Fibre Channel frames transmitted by the port
+          family: FibreChannel/Port/Frame/Out
+          unit: "{frame}/s"
       - name: swFCPortRxFrames
         OID: 1.3.6.1.4.1.1588.2.1.1.1.6.2.1.14
         metric_type: monotonic_count
-        description: Number of Fibre Channel frames received by the port
-        family: FibreChannel/Port/Frame/In
-        unit: "{frame}/s"
+        chart_meta:
+          description: Number of Fibre Channel frames received by the port
+          family: FibreChannel/Port/Frame/In
+          unit: "{frame}/s"
       - name: swFCPortRxC2Frames
         OID: 1.3.6.1.4.1.1588.2.1.1.1.6.2.1.15
         metric_type: monotonic_count
-        description: Number of Class 2 frames received by the port
-        family: FibreChannel/Port/Frame/Class2/In
-        unit: "{frame}/s"
+        chart_meta:
+          description: Number of Class 2 frames received by the port
+          family: FibreChannel/Port/Frame/Class2/In
+          unit: "{frame}/s"
       - name: swFCPortRxC3Frames
         OID: 1.3.6.1.4.1.1588.2.1.1.1.6.2.1.16
         metric_type: monotonic_count
-        description: Number of Class 3 frames received by the port
-        family: FibreChannel/Port/Frame/Class3/In
-        unit: "{frame}/s"
+        chart_meta:
+          description: Number of Class 3 frames received by the port
+          family: FibreChannel/Port/Frame/Class3/In
+          unit: "{frame}/s"
       - name: swFCPortRxLCs
         OID: 1.3.6.1.4.1.1588.2.1.1.1.6.2.1.17
         metric_type: monotonic_count
-        description: Number of Link Control frames received by the port
-        family: FibreChannel/Port/Frame/LinkControl/In
-        unit: "{frame}/s"
+        chart_meta:
+          description: Number of Link Control frames received by the port
+          family: FibreChannel/Port/Frame/LinkControl/In
+          unit: "{frame}/s"
       - name: swFCPortTooManyRdys
         OID: 1.3.6.1.4.1.1588.2.1.1.1.6.2.1.19
         metric_type: monotonic_count
-        description: Number of times when RDYs exceeds the frames received
-        family: FibreChannel/Port/RDY/Exceeded
-        unit: "{time}/s"
+        chart_meta:
+          description: Number of times when RDYs exceeds the frames received
+          family: FibreChannel/Port/RDY/Exceeded
+          unit: "{time}/s"
       - name: swFCPortNoTxCredits
         OID: 1.3.6.1.4.1.1588.2.1.1.1.6.2.1.20
         metric_type: monotonic_count
-        description: Number of times when the transmit credit has reached zero
-        family: FibreChannel/Port/Credit/Exhausted
-        unit: "{time}/s"
+        chart_meta:
+          description: Number of times when the transmit credit has reached zero
+          family: FibreChannel/Port/Credit/Exhausted
+          unit: "{time}/s"
       - name: swFCPortRxEncInFrs
         OID: 1.3.6.1.4.1.1588.2.1.1.1.6.2.1.21
         metric_type: monotonic_count
-        description: Number of encoding or disparity errors inside frames received.
-        family: FibreChannel/Port/Error/Encoding/InFrame
-        unit: "{error}/s"
+        chart_meta:
+          description: Number of encoding or disparity errors inside frames received.
+          family: FibreChannel/Port/Error/Encoding/InFrame
+          unit: "{error}/s"
       - name: swFCPortRxCrcs
         OID: 1.3.6.1.4.1.1588.2.1.1.1.6.2.1.22
         metric_type: monotonic_count
-        description: Number of CRC errors detected for frames received
-        family: FibreChannel/Port/Error/CRC
-        unit: "{error}/s"
+        chart_meta:
+          description: Number of CRC errors detected for frames received
+          family: FibreChannel/Port/Error/CRC
+          unit: "{error}/s"
       - name: swFCPortRcTruncs
         OID: 1.3.6.1.4.1.1588.2.1.1.1.6.2.1.23
         metric_type: monotonic_count
-        description: Number of truncated frames received by the port
-        family: FibreChannel/Port/Frame/Truncated/In
-        unit: "{frame}/s"
+        chart_meta:
+          description: Number of truncated frames received by the port
+          family: FibreChannel/Port/Frame/Truncated/In
+          unit: "{frame}/s"
       - name: swFCPortRxTooLongs
         OID: 1.3.6.1.4.1.1588.2.1.1.1.6.2.1.24
         metric_type: monotonic_count
-        description: Number of received frames that are too long
-        family: FibreChannel/Port/Frame/TooLong/In
-        unit: "{frame}/s"
+        chart_meta:
+          description: Number of received frames that are too long
+          family: FibreChannel/Port/Frame/TooLong/In
+          unit: "{frame}/s"
       - name: swFCPortRxBadEofs
         OID: 1.3.6.1.4.1.1588.2.1.1.1.6.2.1.25
         metric_type: monotonic_count
-        description: Number of received frames with bad EOF delimiter
-        family: FibreChannel/Port/Error/BadEOF
-        unit: "{frame}/s"
+        chart_meta:
+          description: Number of received frames with bad EOF delimiter
+          family: FibreChannel/Port/Error/BadEOF
+          unit: "{frame}/s"
       - name: swFCPortRxEncOutFrs
         OID: 1.3.6.1.4.1.1588.2.1.1.1.6.2.1.26
         metric_type: monotonic_count
-        description: Number of encoding or disparity errors outside frames received
-        family: FibreChannel/Port/Error/Encoding/OutFrame
-        unit: "{error}/s"
+        chart_meta:
+          description: Number of encoding or disparity errors outside frames received
+          family: FibreChannel/Port/Error/Encoding/OutFrame
+          unit: "{error}/s"
       - name: swFCPortRxBadOs
         OID: 1.3.6.1.4.1.1588.2.1.1.1.6.2.1.27
         metric_type: monotonic_count
-        description: Number of invalid Ordered Sets received
-        family: FibreChannel/Port/Error/InvalidOrderedSet
-        unit: "{error}/s"
+        chart_meta:
+          description: Number of invalid Ordered Sets received
+          family: FibreChannel/Port/Error/InvalidOrderedSet
+          unit: "{error}/s"
       - name: swFCPortC3Discards
         OID: 1.3.6.1.4.1.1588.2.1.1.1.6.2.1.28
         metric_type: monotonic_count
-        description: Number of Class 3 frames discarded by the port.
-        family: FibreChannel/Port/Frame/Class3/Discarded
-        unit: "{frame}/s"
+        chart_meta:
+          description: Number of Class 3 frames discarded by the port.
+          family: FibreChannel/Port/Frame/Class3/Discarded
+          unit: "{frame}/s"
     metric_tags:
       - symbol:
           name: swFCPortName

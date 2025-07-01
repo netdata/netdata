@@ -19,15 +19,17 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.318.1.1.12.2.3.1.1.2
         name: rPDULoadStatusLoad
-        description: Phase/bank load
-        family: PhaseBank/Load/Current
-        unit: "A"
+        chart_meta:
+          description: Phase/bank load
+          family: PhaseBank/Load/Current
+          unit: "A"
         scale_factor: 0.1
       - OID: 1.3.6.1.4.1.318.1.1.12.2.3.1.1.3
         name: rPDULoadStatusLoadState
-        description: Phase/bank load state
-        family: PhaseBank/Load/Status
-        unit: "{status}"
+        chart_meta:
+          description: Phase/bank load state
+          family: PhaseBank/Load/Status
+          unit: "{status}"
         mapping:
           1: phase_load_normal
           2: phase_load_low
@@ -46,15 +48,17 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.318.1.1.12.3.5.1.1.7
         name: rPDUOutletStatusLoad
-        description: Outlet load for an Outlet Monitored Rack PDU
-        family: Outlet/Load/Current
-        unit: "A"
+        chart_meta:
+          description: Outlet load for an Outlet Monitored Rack PDU
+          family: Outlet/Load/Current
+          unit: "A"
         scale_factor: 0.1
       - OID: 1.3.6.1.4.1.318.1.1.12.3.5.1.1.4
         name: rPDUOutletStatusOutletState
-        description: Outlet state
-        family: Outlet/Power/Status
-        unit: "{status}"
+        chart_meta:
+          description: Outlet state
+          family: Outlet/Power/Status
+          unit: "{status}"
         mapping:
           1: outlet_status_on
           2: outlet_status_off
@@ -91,9 +95,10 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.12.4.1.3.0
       name: rPDUPowerSupplyAlarm
-      description: Alarm status of the PDU power supply
-      family: PowerSupply/Alarm/Status
-      unit: "{status}"
+      chart_meta:
+        description: Alarm status of the PDU power supply
+        family: PowerSupply/Alarm/Status
+        unit: "{status}"
       mapping:
         1: allAvailablePowerSuppliesOK
         2: powerSupplyOneFailed
@@ -106,9 +111,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.318.1.1.12.5.2.1.3
         name: rPDUStatusBankState
-        description: Bank load state
-        family: Bank/Load/Status
-        unit: "{status}"
+        chart_meta:
+          description: Bank load state
+          family: Bank/Load/Status
+          unit: "{status}"
         mapping:
           1: bank_load_normal
           2: bank_load_low
@@ -131,9 +137,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.318.1.1.12.5.4.1.3
         name: rPDUStatusPhaseState
-        description: Phase Load state
-        family: Phase/Load/Status
-        unit: "{status}"
+        chart_meta:
+          description: Phase Load state
+          family: Phase/Load/Status
+          unit: "{status}"
         mapping:
           1: phase_load_normal
           2: phase_load_low
@@ -156,9 +163,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.318.1.1.12.5.6.1.3
         name: rPDUStatusOutletState
-        description: Outlet Load state
-        family: Outlet/Load/Status
-        unit: "{status}"
+        chart_meta:
+          description: Outlet Load state
+          family: Outlet/Load/Status
+          unit: "{status}"
         mapping:
           1: outlet_load_normal
           2: outlet_load_low
@@ -180,24 +188,28 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.7
         name: rPDU2SensorTempHumidityStatusTempF
-        description: Temperature in degrees Fahrenheit
-        family: Sensor/Temperature/Value
-        unit: "degF"
+        chart_meta:
+          description: Temperature in degrees Fahrenheit
+          family: Sensor/Temperature/Value
+          unit: "degF"
       - OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.8
         name: rPDU2SensorTempHumidityStatusTempC
-        description: Temperature in degrees Celsius
-        family: Sensor/Temperature/Value
-        unit: "Cel"
+        chart_meta:
+          description: Temperature in degrees Celsius
+          family: Sensor/Temperature/Value
+          unit: "Cel"
       - OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.10
         name: rPDU2SensorTempHumidityStatusRelativeHumidity
-        description: Relative humidity percentage
-        family: Sensor/Humidity/Value
-        unit: "%"
+        chart_meta:
+          description: Relative humidity percentage
+          family: Sensor/Humidity/Value
+          unit: "%"
       - OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.9
         name: rPDU2SensorTempHumidityStatusTempStatus
-        description: Current state of the temperature probe
-        family: Sensor/Temperature/Status
-        unit: "{status}"
+        chart_meta:
+          description: Current state of the temperature probe
+          family: Sensor/Temperature/Status
+          unit: "{status}"
         mapping:
           1: not_present
           2: below_min
@@ -207,9 +219,10 @@ metrics:
           6: above_max
       - OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.11
         name: rPDU2SensorTempHumidityStatusHumidityStatus
-        description: Current state of the humidity probe
-        family: Sensor/Humidity/Status
-        unit: "{status}"
+        chart_meta:
+          description: Current state of the humidity probe
+          family: Sensor/Humidity/Status
+          unit: "{status}"
         mapping:
           1: not_present
           2: below_min

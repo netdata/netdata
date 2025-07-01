@@ -6,16 +6,18 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.99.1.1.1.4
         name: entPhySensorValue # Do not change this name — required by transformEntitySensorValue for matching and renaming logic
-        description: Most recent measurement obtained by the agent for this sensor
-        family: Sensor/Value
-        unit: "1"
+        chart_meta:
+          description: Most recent measurement obtained by the agent for this sensor
+          family: Sensor/Value
+          unit: "1"
         transform: |
           {{- transformEntitySensorValue .Metric -}}
       - OID: 1.3.6.1.2.1.99.1.1.1.5
         name: entPhySensorOperStatus # Do not change this name — required by transformEntitySensorValue for matching and renaming logic
-        description: Operational status of the sensor
-        family: Sensor/Status
-        unit: "{status}"
+        chart_meta:
+          description: Operational status of the sensor
+          family: Sensor/Status
+          unit: "{status}"
         mapping:
           1: ok
           2: unavailable

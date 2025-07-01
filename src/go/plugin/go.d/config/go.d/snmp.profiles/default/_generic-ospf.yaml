@@ -6,9 +6,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.14.10.1.6
         name: ospfNbrState
-        description: The state of the relationship with this neighbor
-        family: Routing/OSPF/Neighbor/State/Status
-        unit: "{status}"
+        chart_meta:
+          description: The state of the relationship with this neighbor
+          family: Routing/OSPF/Neighbor/State/Status
+          unit: "{status}"
         mapping:
           1: down
           2: attempt
@@ -20,14 +21,16 @@ metrics:
           8: full
       - OID: 1.3.6.1.2.1.14.10.1.7
         name: ospfNbrEvents
-        description: The number of times this neighbor relationship has changed state or an error has occurred
-        family: Routing/OSPF/Neighbor/Event/Count
-        unit: "{event}"
+        chart_meta:
+          description: The number of times this neighbor relationship has changed state or an error has occurred
+          family: Routing/OSPF/Neighbor/Event/Count
+          unit: "{event}"
       - OID: 1.3.6.1.2.1.14.10.1.8
         name: ospfNbrLsRetransQLen
-        description: The current length of the retransmission queue
-        family: Routing/OSPF/Neighbor/Queue/RetransmitLength
-        unit: "{message}"
+        chart_meta:
+          description: The current length of the retransmission queue
+          family: Routing/OSPF/Neighbor/Queue/RetransmitLength
+          unit: "{message}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.10.1.3
@@ -45,9 +48,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.14.11.1.5
         name: ospfVirtNbrState
-        description: The state of the virtual neighbor relationship
-        family: Routing/OSPF/VirtualNeighbor/State/Status
-        unit: "{status}"
+        chart_meta:
+          description: The state of the virtual neighbor relationship
+          family: Routing/OSPF/VirtualNeighbor/State/Status
+          unit: "{status}"
         mapping:
           1: down
           2: attempt
@@ -59,14 +63,16 @@ metrics:
           8: full
       - OID: 1.3.6.1.2.1.14.11.1.6
         name: ospfVirtNbrEvents
-        description: The number of times this virtual link has changed its state or an error has occurred
-        family: Routing/OSPF/VirtualNeighbor/Event/Count
-        unit: "{change}"
+        chart_meta:
+          description: The number of times this virtual link has changed its state or an error has occurred
+          family: Routing/OSPF/VirtualNeighbor/Event/Count
+          unit: "{change}"
       - OID: 1.3.6.1.2.1.14.11.1.7
         name: ospfVirtNbrLsRetransQLen
-        description: The current length of the retransmission queue
-        family: Routing/OSPF/VirtualNeighbor/Queue/RetransmitLength
-        unit: "{message}"
+        chart_meta:
+          description: The current length of the retransmission queue
+          family: Routing/OSPF/VirtualNeighbor/Queue/RetransmitLength
+          unit: "{message}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.11.1.3
@@ -84,9 +90,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.14.7.1.12
         name: ospfIfState
-        description: The OSPF Interface State
-        family: Routing/OSPF/Interface/State/Status
-        unit: "{status}"
+        chart_meta:
+          description: The OSPF Interface State
+          family: Routing/OSPF/Interface/State/Status
+          unit: "{status}"
         mapping:
           1: down
           2: loopback
@@ -97,9 +104,10 @@ metrics:
           7: other_designated_router
       - OID: 1.3.6.1.2.1.14.7.1.21
         name: ospfIfLsaCount
-        description: The total number of link-local link state advertisements in this interface's link-local link state database
-        family: Routing/OSPF/Interface/LinkStateAdvertisement/Count
-        unit: "{advertisement}"
+        chart_meta:
+          description: The total number of link-local link state advertisements in this interface's link-local link state database
+          family: Routing/OSPF/Interface/LinkStateAdvertisement/Count
+          unit: "{advertisement}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.7.1.1
@@ -119,17 +127,19 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.14.9.1.7
         name: ospfVirtIfState
-        description: OSPF virtual interface states
-        family: Routing/OSPF/VirtualInterface/State/Status
-        unit: "{status}"
+        chart_meta:
+          description: OSPF virtual interface states
+          family: Routing/OSPF/VirtualInterface/State/Status
+          unit: "{status}"
         mapping:
           1: down
           4: point_to_point
       - OID: 1.3.6.1.2.1.14.9.1.12
         name: ospfVirtIfLsaCount
-        description: The total number of link-local link state advertisements in this virtual interface's link-local link state database
-        family: Routing/OSPF/VirtualInterface/LinkStateAdvertisement/Count
-        unit: "{advertisement}"
+        chart_meta:
+          description: The total number of link-local link state advertisements in this virtual interface's link-local link state database
+          family: Routing/OSPF/VirtualInterface/LinkStateAdvertisement/Count
+          unit: "{advertisement}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.11.1.2

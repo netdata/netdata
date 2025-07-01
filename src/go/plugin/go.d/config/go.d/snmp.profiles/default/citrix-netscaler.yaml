@@ -23,14 +23,14 @@ metrics:
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.5951.4.1.1.41.1.0
-    description: CPU utilization percentage
-    unit: "%"
+      description: CPU utilization percentage
+      unit: "%"
   - MIB: NS-ROOT-MIB
     symbol:
       name: memory.usage
       OID: 1.3.6.1.4.1.5951.4.1.1.41.2.0
-    description: Percentage of memory utilization on NetScaler
-    unit: "%"
+      description: Percentage of memory utilization on NetScaler
+      unit: "%"
   # - MIB: NS-ROOT-MIB
   #   symbol:
   #     name: netscaler.sysHighAvailabilityMode
@@ -57,15 +57,15 @@ metrics:
     symbol:
       name: netscaler.haTotStateTransitions
       OID: 1.3.6.1.4.1.5951.4.1.1.23.4.0
-    metric_type: monotonic_count
-    description: Total number of master state changes of the NetScaler appliance
-    unit: "{state_transition}"
+      description: Total number of master state changes of the NetScaler appliance
+      unit: "{state_transition}"
+      metric_type: monotonic_count
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.haTimeofLastStateTransition
       OID: 1.3.6.1.4.1.5951.4.1.1.23.5.0
-    description: Time since last master state transition
-    unit: "ms"
+      description: Time since last master state transition
+      unit: "ms"
   # - MIB: NS-ROOT-MIB
   #   symbol:
   #     name: netscaler.haCurStatus
@@ -98,246 +98,246 @@ metrics:
     symbol:
       name: netscaler.svcCount
       OID: 1.3.6.1.4.1.5951.4.1.2.6.1.0
-    description: Number of services defined on the NetScaler appliance
-    unit: "{service}"
+      description: Number of services defined on the NetScaler appliance
+      unit: "{service}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.serverCount
       OID: 1.3.6.1.4.1.5951.4.1.2.6.2.0
-    description: Number of servers defined on the NetScaler appliance
-    unit: "{server}"
+      description: Number of servers defined on the NetScaler appliance
+      unit: "{server}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.svcgroupCount
       OID: 1.3.6.1.4.1.5951.4.1.2.6.3.0
-    description: Number of service groups defined on the NetScaler appliance
-    unit: "{service_group}"
+      description: Number of service groups defined on the NetScaler appliance
+      unit: "{service_group}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.svcgroupmemCount
       OID: 1.3.6.1.4.1.5951.4.1.2.6.4.0
-    description: Number of service group members defined on the NetScaler appliance
-    unit: "{service_group_member}"
+      description: Number of service group members defined on the NetScaler appliance
+      unit: "{service_group_member}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.syssvcCount
       OID: 1.3.6.1.4.1.5951.4.1.2.6.5.0
-    description: Number of system services
-    unit: "{service}"
+      description: Number of system services
+      unit: "{service}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.sysupsvcCount
       OID: 1.3.6.1.4.1.5951.4.1.2.6.6.0
-    description: Number of system up services
-    unit: "{service}"
+      description: Number of system up services
+      unit: "{service}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.sysupsvcitmCount
       OID: 1.3.6.1.4.1.5951.4.1.2.6.7.0
-    description: Number of system up service items
-    unit: "{service_item}"
+      description: Number of system up service items
+      unit: "{service_item}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.curConfigVservers
       OID: 1.3.6.1.4.1.5951.4.1.3.5.1.0
-    description: Total number of vservers configured on the NetScaler
-    unit: "{vserver}"
+      description: Total number of vservers configured on the NetScaler
+      unit: "{vserver}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.vsvrBindCount
       OID: 1.3.6.1.4.1.5951.4.1.3.5.2.0
-    description: Number of virtual server bindings on the NetScaler appliance
-    unit: "{binding}"
+      description: Number of virtual server bindings on the NetScaler appliance
+      unit: "{binding}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.vsvrSvcGrpBindCount
       OID: 1.3.6.1.4.1.5951.4.1.3.5.3.0
-    description: Number of virtual server service group bindings on the NetScaler appliance
-    unit: "{binding}"
+      description: Number of virtual server service group bindings on the NetScaler appliance
+      unit: "{binding}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.curConfigLbVservers
       OID: 1.3.6.1.4.1.5951.4.1.3.5.4.0
-    description: Number of load balancing vservers configured on the NetScaler
-    unit: "{vserver}"
+      description: Number of load balancing vservers configured on the NetScaler
+      unit: "{vserver}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.curConfigGslbVservers
       OID: 1.3.6.1.4.1.5951.4.1.3.5.5.0
-    description: Number of GSLB vservers configured on the NetScaler
-    unit: "{vserver}"
+      description: Number of GSLB vservers configured on the NetScaler
+      unit: "{vserver}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.totSpilloverCount
       OID: 1.3.6.1.4.1.5951.4.1.3.5.6.0
-    metric_type: monotonic_count
-    description: Number of times spillover occurred on the NetScaler
-    unit: "{spillover}"
+      description: Number of times spillover occurred on the NetScaler
+      unit: "{spillover}"
+      metric_type: monotonic_count
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.sslCurSessions
       OID: 1.3.6.1.4.1.5951.4.1.1.47.296.0
-    description: Number of active SSL sessions on the NetScaler appliance
-    unit: "{session}"
+      description: Number of active SSL sessions on the NetScaler appliance
+      unit: "{session}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.sslSessionsPerSec
       OID: 1.3.6.1.4.1.5951.4.1.1.47.3.0
-    description: SSL sessions per second between client and NetScaler appliance
-    unit: "1.s"
+      description: SSL sessions per second between client and NetScaler appliance
+      unit: "1.s"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.tcpCurClientConnEstablished
       OID: 1.3.6.1.4.1.5951.4.1.1.46.12.0
-    description: Current client connections in the established state
-    unit: "{connection}"
+      description: Current client connections in the established state
+      unit: "{connection}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.tcpErrAnyPortFail
       OID: 1.3.6.1.4.1.5951.4.1.1.46.69.0
-    metric_type: monotonic_count
-    description: Port allocations failed on mapped IP address
-    unit: "{failure}"
+      description: Port allocations failed on mapped IP address
+      unit: "{failure}"
+      metric_type: monotonic_count
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.tcpErrIpPortFail
       OID: 1.3.6.1.4.1.5951.4.1.1.46.70.0
-    metric_type: monotonic_count
-    description: Port allocations failed on subnet or vserver IP address
-    unit: "{failure}"
+      description: Port allocations failed on subnet or vserver IP address
+      unit: "{failure}"
+      metric_type: monotonic_count
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.tcpErrRetransmit
       OID: 1.3.6.1.4.1.5951.4.1.1.46.59.0
-    metric_type: monotonic_count
-    description: TCP packets retransmitted
-    unit: "{packet}"
+      description: TCP packets retransmitted
+      unit: "{packet}"
+      metric_type: monotonic_count
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.tcpTotRxPkts
       OID: 1.3.6.1.4.1.5951.4.1.1.46.61.0
-    metric_type: monotonic_count
-    description: TCP packets received
-    unit: "{packet}"
+      description: TCP packets received
+      unit: "{packet}"
+      metric_type: monotonic_count
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.tcpTotTxPkts
       OID: 1.3.6.1.4.1.5951.4.1.1.46.63.0
-    metric_type: monotonic_count
-    description: TCP packets transmitted
-    unit: "{packet}"
+      description: TCP packets transmitted
+      unit: "{packet}"
+      metric_type: monotonic_count
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.httpTotGets
       OID: 1.3.6.1.4.1.5951.4.1.1.48.45.0
-    metric_type: monotonic_count
-    description: HTTP requests received using the GET method
-    unit: "{request}"
+      description: HTTP requests received using the GET method
+      unit: "{request}"
+      metric_type: monotonic_count
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.httpTotPosts
       OID: 1.3.6.1.4.1.5951.4.1.1.48.46.0
-    metric_type: monotonic_count
-    description: HTTP requests received using the POST method
-    unit: "{request}"
+      description: HTTP requests received using the POST method
+      unit: "{request}"
+      metric_type: monotonic_count
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.httpTotOthers
       OID: 1.3.6.1.4.1.5951.4.1.1.48.47.0
-    metric_type: monotonic_count
-    description: HTTP requests received using methods other than GET and POST
-    unit: "{request}"
+      description: HTTP requests received using methods other than GET and POST
+      unit: "{request}"
+      metric_type: monotonic_count
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.httpTotRxRequestBytes
       OID: 1.3.6.1.4.1.5951.4.1.1.48.48.0
-    metric_type: monotonic_count
-    description: Bytes of HTTP data received
-    unit: "By"
+      description: Bytes of HTTP data received
+      unit: "By"
+      metric_type: monotonic_count
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.httpTotRxResponseBytes
       OID: 1.3.6.1.4.1.5951.4.1.1.48.49.0
-    metric_type: monotonic_count
-    description: Bytes received as response data
-    unit: "By"
+      description: Bytes received as response data
+      unit: "By"
+      metric_type: monotonic_count
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.httpTotTxRequestBytes
       OID: 1.3.6.1.4.1.5951.4.1.1.48.50.0
-    metric_type: monotonic_count
-    description: Bytes of HTTP data transmitted
-    unit: "By"
+      description: Bytes of HTTP data transmitted
+      unit: "By"
+      metric_type: monotonic_count
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.httpTotTxResponseBytes
       OID: 1.3.6.1.4.1.5951.4.1.1.48.51.0
-    metric_type: monotonic_count
-    description: Bytes transmitted as response data
-    unit: "By"
+      description: Bytes transmitted as response data
+      unit: "By"
+      metric_type: monotonic_count
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.httpTot10Requests
       OID: 1.3.6.1.4.1.5951.4.1.1.48.52.0
-    metric_type: monotonic_count
-    description: HTTP/1.0 requests received
-    unit: "{request}"
+      description: HTTP/1.0 requests received
+      unit: "{request}"
+      metric_type: monotonic_count
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.httpTotResponses
       OID: 1.3.6.1.4.1.5951.4.1.1.48.53.0
-    metric_type: monotonic_count
-    description: HTTP responses sent including HTTP/1.0 and HTTP/1.1 responses
-    unit: "{response}"
+      description: HTTP responses sent including HTTP/1.0 and HTTP/1.1 responses
+      unit: "{response}"
+      metric_type: monotonic_count
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.httpTot10Responses
       OID: 1.3.6.1.4.1.5951.4.1.1.48.54.0
-    metric_type: monotonic_count
-    description: HTTP/1.0 responses sent
-    unit: "{response}"
+      description: HTTP/1.0 responses sent
+      unit: "{response}"
+      metric_type: monotonic_count
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.httpErrIncompleteRequests
       OID: 1.3.6.1.4.1.5951.4.1.1.48.57.0
-    metric_type: monotonic_count
-    description: HTTP requests received with incomplete headers
-    unit: "{request}"
+      description: HTTP requests received with incomplete headers
+      unit: "{request}"
+      metric_type: monotonic_count
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.httpErrIncompleteResponses
       OID: 1.3.6.1.4.1.5951.4.1.1.48.58.0
-    metric_type: monotonic_count
-    description: HTTP responses received with incomplete headers
-    unit: "{response}"
+      description: HTTP responses received with incomplete headers
+      unit: "{response}"
+      metric_type: monotonic_count
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.httpErrIncompleteHeaders
       OID: 1.3.6.1.4.1.5951.4.1.1.48.60.0
-    metric_type: monotonic_count
-    description: HTTP requests and responses with incomplete headers
-    unit: "{header}"
+      description: HTTP requests and responses with incomplete headers
+      unit: "{header}"
+      metric_type: monotonic_count
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.httpErrServerBusy
       OID: 1.3.6.1.4.1.5951.4.1.1.48.61.0
-    metric_type: monotonic_count
-    description: HTTP error responses indicating server busy
-    unit: "{error}"
+      description: HTTP error responses indicating server busy
+      unit: "{error}"
+      metric_type: monotonic_count
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.svcTotalClients
       OID: 1.3.6.1.4.1.5951.4.1.2.1.1.48.0
-    metric_type: monotonic_count
-    description: Total number of established client connections
-    unit: "{connection}"
+      description: Total number of established client connections
+      unit: "{connection}"
+      metric_type: monotonic_count
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.svcTotalServers
       OID: 1.3.6.1.4.1.5951.4.1.2.1.1.49.0
-    metric_type: monotonic_count
-    description: Total number of established server connections
-    unit: "{connection}"
+      description: Total number of established server connections
+      unit: "{connection}"
+      metric_type: monotonic_count
   - MIB: NS-ROOT-MIB
     table:
       name: vserverTable
@@ -554,21 +554,21 @@ metrics:
     symbol:
       name: netscaler.tcpCurClientConn
       OID: 1.3.6.1.4.1.5951.4.1.1.46.2.0
-    description: Client connections including opening, established, and closing states
-    unit: "{connection}"
+      description: Client connections including opening, established, and closing states
+      unit: "{connection}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.tcpCurServerConnEstablished
       OID: 1.3.6.1.4.1.5951.4.1.1.46.10.0
-    description: Current server connections in the established state
-    unit: "{connection}"
+      description: Current server connections in the established state
+      unit: "{connection}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.sslTotSessions
       OID: 1.3.6.1.4.1.5951.4.1.1.47.204.0
-    metric_type: monotonic_count
-    description: Number of SSL sessions on the NetScaler appliance
-    unit: "{session}"
+      description: Number of SSL sessions on the NetScaler appliance
+      unit: "{session}"
+      metric_type: monotonic_count
   - MIB: NS-ROOT-MIB
     table:
       name: lbvserverTable

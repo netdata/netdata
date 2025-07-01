@@ -435,8 +435,6 @@ metrics:
           OID: 1.3.6.1.4.1.232.22.2.5.1.1.1.9
           name: cpqRackPowerSupplyMaxPwrOutput
         tag: cpq_rack_power_supply_max_pwr_output
-        description: The maximum power output of the power supply in watts
-        unit: "W"
       - symbol:
           OID: 1.3.6.1.4.1.232.22.2.5.1.1.1.16
           name: cpqRackPowerSupplyPresent

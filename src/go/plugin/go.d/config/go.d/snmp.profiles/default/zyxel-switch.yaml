@@ -17,14 +17,14 @@ metrics:
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.890.1.15.3.2.4.0
-    description: Device CPU usage (%)
-    unit: "%"
+      description: Device CPU usage (%)
+      unit: "%"
   - MIB: ZYXEL-ES-COMMON
     symbol:
       name: memory.usage
       OID: 1.3.6.1.4.1.890.1.15.3.2.5.0
-    description: Device memory usage (%)
-    unit: "%"
+      description: Device memory usage (%)
+      unit: "%"
 
 # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
 metric_tags:

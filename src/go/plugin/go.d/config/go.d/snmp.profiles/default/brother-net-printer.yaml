@@ -14,9 +14,10 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.2435.2.3.9.1.1.2.9.0
       name: brJamPlace
-      description: Location of jam
-      family: Printer/Jam/Location/Status
-      unit: "{status}"
+      chart_meta:
+        description: Location of jam
+        family: Printer/Jam/Location/Status
+        unit: "{status}"
       mapping:
         0: No Jam
         1: Trays
@@ -27,9 +28,10 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.2435.2.3.9.1.1.2.10.1.0
       name: brToner1Low
-      description: Black toner status
-      family: Printer/Toner/Black/Status
-      unit: "{status}"
+      chart_meta:
+        description: Black toner status
+        family: Printer/Toner/Black/Status
+        unit: "{status}"
       mapping:
         0: Toner Full
         1: Toner Low
@@ -39,9 +41,10 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.2435.2.3.9.1.1.2.10.2.0
       name: brToner2Low
-      description: Cyan toner status
-      family: Printer/Toner/Cyan/Status
-      unit: "{status}"
+      chart_meta:
+        description: Cyan toner status
+        family: Printer/Toner/Cyan/Status
+        unit: "{status}"
       mapping:
         0: Toner Ready
         1: Toner Low
@@ -51,9 +54,10 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.2435.2.3.9.1.1.2.10.3.0
       name: brToner3Low
-      description: Magenta toner status
-      family: Printer/Toner/Magenta/Status
-      unit: "{status}"
+      chart_meta:
+        description: Magenta toner status
+        family: Printer/Toner/Magenta/Status
+        unit: "{status}"
       mapping:
         0: Toner Ready
         1: Toner Low
@@ -63,9 +67,10 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.2435.2.3.9.1.1.2.10.4.0
       name: brToner4Low
-      description: Yellow toner status
-      family: Printer/Toner/Yellow/Status
-      unit: "{status}"
+      chart_meta:
+        description: Yellow toner status
+        family: Printer/Toner/Yellow/Status
+        unit: "{status}"
       mapping:
         0: Toner Ready
         1: Toner Low

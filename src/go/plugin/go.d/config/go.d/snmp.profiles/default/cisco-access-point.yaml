@@ -23,49 +23,58 @@ metrics:
     symbols:
       - name: cDot11ActiveWirelessClients
         OID: 1.3.6.1.4.1.9.9.273.1.1.2.1.1
-        description: Number of wireless clients currently associating with this device on this interface
-        family: Interfaces/Wireless/Client/Active
-        unit: "{client}"
+        chart_meta:
+          description: Number of wireless clients currently associating with this device on this interface
+          family: Interfaces/Wireless/Client/Active
+          unit: "{client}"
       - name: cDot11ActiveBridges
         OID: 1.3.6.1.4.1.9.9.273.1.1.2.1.2
-        description: Number of bridges currently associating with this device on this interface
-        family: Interfaces/Wireless/Bridge/Active
-        unit: "{bridge}"
+        chart_meta:
+          description: Number of bridges currently associating with this device on this interface
+          family: Interfaces/Wireless/Bridge/Active
+          unit: "{bridge}"
       - name: cDot11ActiveRepeaters
         OID: 1.3.6.1.4.1.9.9.273.1.1.2.1.3
-        description: Number of repeaters currently associating with this device on this interface
-        family: Interfaces/Wireless/Repeater/Active
-        unit: "{repeater}"
+        chart_meta:
+          description: Number of repeaters currently associating with this device on this interface
+          family: Interfaces/Wireless/Repeater/Active
+          unit: "{repeater}"
       - name: cDot11AssStatsAssociated
         OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.1
-        description: Number of stations associated with this device on this interface since device re-started
-        family: Interfaces/Wireless/Station/Associated
-        unit: "{station}/s"
+        chart_meta:
+          description: Number of stations associated with this device on this interface since device re-started
+          family: Interfaces/Wireless/Station/Associated
+          unit: "{station}/s"
       - name: cDot11AssStatsAuthenticated
         OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.2
-        description: Number of stations authenticated with this device on this interface since device re-started
-        family: Interfaces/Wireless/Station/Authenticated
-        unit: "{station}/s"
+        chart_meta:
+          description: Number of stations authenticated with this device on this interface since device re-started
+          family: Interfaces/Wireless/Station/Authenticated
+          unit: "{station}/s"
       - name: cDot11AssStatsRoamedIn
         OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.3
-        description: Number of stations roamed from another device to this device on this interface since device re-started
-        family: Interfaces/Wireless/Station/RoamedIn
-        unit: "{station}/s"
+        chart_meta:
+          description: Number of stations roamed from another device to this device on this interface since device re-started
+          family: Interfaces/Wireless/Station/RoamedIn
+          unit: "{station}/s"
       - name: cDot11AssStatsRoamedAway
         OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.4
-        description: Number of stations roamed away from this device on this interface since device re-started
-        family: Interfaces/Wireless/Station/RoamedOut
-        unit: "{station}/s"
+        chart_meta:
+          description: Number of stations roamed away from this device on this interface since device re-started
+          family: Interfaces/Wireless/Station/RoamedOut
+          unit: "{station}/s"
       - name: cDot11AssStatsDeauthenticated
         OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.5
-        description: Number of stations deauthenticated with this device on this interface since device re-started
-        family: Interfaces/Wireless/Station/Deauthenticated
-        unit: "{station}/s"
+        chart_meta:
+          description: Number of stations deauthenticated with this device on this interface since device re-started
+          family: Interfaces/Wireless/Station/Deauthenticated
+          unit: "{station}/s"
       - name: cDot11AssStatsDisassociated
         OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.6
-        description: Number of stations disassociated with this device on this interface since device re-started
-        family: Interfaces/Wireless/Station/Disassociated
-        unit: "{station}/s"
+        chart_meta:
+          description: Number of stations disassociated with this device on this interface since device re-started
+          family: Interfaces/Wireless/Station/Disassociated
+          unit: "{station}/s"
     metric_tags:
       - tag: interface
         table: ifXTable

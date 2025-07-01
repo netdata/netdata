@@ -87,8 +87,6 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
-        description: Chassis status of the system state
-        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.6
           name: systemStatePowerUnitStatusRedundancy
@@ -101,8 +99,6 @@ metrics:
           5: lost
           6: not_redundant
           7: redundancy_offline
-        description: Power unit status redundancy of the system state
-        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.9
           name: systemStatePowerSupplyStatusCombined
@@ -114,8 +110,6 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
-        description: Combined power supply status of the system state
-        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.15
           name: systemStateAmperageStatusCombined
@@ -127,8 +121,6 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
-        description: Combined amperage status of the system state
-        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.18
           name: systemStateCoolingUnitStatusRedundancy
@@ -141,8 +133,6 @@ metrics:
           5: lost
           6: not_redundant
           7: redundancy_offline
-        description: Cooling unit status redundancy of the system state
-        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.21
           name: systemStateCoolingDeviceStatusCombined
@@ -154,8 +144,6 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
-        description: Combined cooling device status of the system state
-        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.24
           name: systemStateTemperatureStatusCombined
@@ -167,8 +155,6 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
-        description: Combined temperature status of the system state
-        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.27
           name: systemStateMemoryDeviceStatusCombined
@@ -180,8 +166,6 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
-        description: Combined memory device status of the system state
-        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.30
           name: systemStateChassisIntrusionStatusCombined
@@ -193,8 +177,6 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
-        description: Combined chassis intrusion status of the system state
-        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.42
           name: systemStatePowerUnitStatusCombined
@@ -206,8 +188,6 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
-        description: Combined power unit status of the system state
-        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.44
           name: systemStateCoolingUnitStatusCombined
@@ -219,8 +199,6 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
-        description: Combined cooling unit status of the system state
-        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.50
           name: systemStateProcessorDeviceStatusCombined
@@ -232,8 +210,6 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
-        description: Combined processor device status of the system state
-        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.63
           name: systemStateTemperatureStatisticsStatusCombined
@@ -245,8 +221,6 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
-        description: Combined temperature statistics status of the system state
-        unit: "{state}"
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4
@@ -297,8 +271,6 @@ metrics:
           8: nonraid
           9: removed
           10: readonly
-        description: State of the physical disk
-        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.2
           name: physicalDiskName
@@ -307,8 +279,6 @@ metrics:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.1
           name: physicalDiskNumber
         tag: disk_number
-        description: Number of the physical disk
-        unit: "{disk}"
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.9
@@ -350,8 +320,6 @@ metrics:
           3: failed
           4: missing
           5: degraded
-        description: State of the enclosure power supply
-        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.9.1.2
           name: enclosurePowerSupplyName
@@ -403,8 +371,6 @@ metrics:
           5: missing
           6: charging
           7: below_threshold
-        description: State of the battery
-        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.15.1.20
           name: batteryFQDD
@@ -427,26 +393,18 @@ metrics:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.1
           name: controllerNumber
         tag: controller_number
-        description: Number of the controller
-        unit: "{controller}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.2
           name: controllerName
         tag: controller_name
-        description: Name of the controller
-        unit: "{controller}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.42
           name: controllerPCISlot
         tag: controller_pci_slot
-        description: PCI slot of the controller
-        unit: "{pci_slot}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.78
           name: controllerFQDD
         tag: controller_fqdd
-        description: Fully qualified device descriptor of the controller
-        unit: "{controller}"
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1
@@ -467,32 +425,22 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
-        description: Roll up status of the controller
-        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.1
           name: controllerNumber
         tag: controller_number
-        description: Number of the controller
-        unit: "{controller}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.2
           name: controllerName
         tag: controller_name
-        description: Name of the controller
-        unit: "{controller}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.42
           name: controllerPCISlot
         tag: controller_pci_slot
-        description: PCI slot of the controller
-        unit: "{pci_slot}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.78
           name: controllerFQDD
         tag: controller_fqdd
-        description: Fully qualified device descriptor of the controller
-        unit: "{controller}"
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.4.1100.80
@@ -531,8 +479,6 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
-        description: Status of the PCI device
-        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.80.1.9
           name: pCIDeviceDescriptionName
@@ -579,8 +525,6 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
-        description: Status of the system slot
-        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1200.10.1.8
           name: systemSlotSlotExternalSlotName
@@ -631,8 +575,6 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
-        description: Status of the network device
-        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.90.1.1
           name: networkDeviceChassisIndex
@@ -695,8 +637,6 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
-        description: Status of the system BIOS
-        unit: "{state}"
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.4.300.70
@@ -857,8 +797,6 @@ metrics:
           8: critical_lower
           9: non_recoverable_lower
           10: failed
-        description: Status of the amperage probe
-        unit: "{state}"
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.4.600.60
@@ -983,8 +921,6 @@ metrics:
           8: critical_lower
           9: non_recoverable_lower
           10: failed
-        description: Status of the voltage probe
-        unit: "{state}"
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.4.600.50

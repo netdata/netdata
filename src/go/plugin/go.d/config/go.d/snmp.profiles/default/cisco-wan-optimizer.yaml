@@ -27,100 +27,114 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.9.9.178.1.6.2.1.0
       name: cceAlarmCriticalCount
-      description: Number of alarms currently raised with a severity of 'critical'
-      family: Alarm/Critical/Raised
-      unit: "{alarm}"
+      chart_meta:
+        description: Number of alarms currently raised with a severity of 'critical'
+        family: Alarm/Critical/Raised
+        unit: "{alarm}"
   - MIB: CISCO-CONTENT-ENGINE-MIB
     symbol:
       OID: 1.3.6.1.4.1.9.9.178.1.6.2.2.0
       name: cceAlarmMajorCount
-      description: Number of alarms currently raised with a severity of 'major'
-      family: Alarm/Major/Raised
-      unit: "{alarm}"
+      chart_meta:
+        description: Number of alarms currently raised with a severity of 'major'
+        family: Alarm/Major/Raised
+        unit: "{alarm}"
   - MIB: CISCO-CONTENT-ENGINE-MIB
     symbol:
       OID: 1.3.6.1.4.1.9.9.178.1.6.2.3.0
       name: cceAlarmMinorCount
-      description: Number of alarms currently raised with a severity of 'minor'
-      family: Alarm/Minor/Raised
-      unit: "{alarm}"
+      chart_meta:
+        description: Number of alarms currently raised with a severity of 'minor'
+        family: Alarm/Minor/Raised
+        unit: "{alarm}"
   - MIB: CISCO-WAN-OPTIMIZATION-MIB
     symbol:
       OID: 1.3.6.1.4.1.9.9.762.1.2.1.1.0
       name: cwoTfoStatsTotalOptConn
-      description: This object contains total number of TCP connections optimized since TFO was started or its statistics were last reset
-      family: TFO/Connection/Optimized/Total
-      unit: "{connection}/s"
+      chart_meta:
+        description: This object contains total number of TCP connections optimized since TFO was started or its statistics were last reset
+        family: TFO/Connection/Optimized/Total
+        unit: "{connection}/s"
   - MIB: CISCO-WAN-OPTIMIZATION-MIB
     symbol:
       OID: 1.3.6.1.4.1.9.9.762.1.2.1.2.0
       name: cwoTfoStatsActiveOptConn
-      description: This object contains number of currently active TCP connections getting optimized
-      family: TFO/Connection/Optimized/Active
-      unit: "{connection}"
+      chart_meta:
+        description: This object contains number of currently active TCP connections getting optimized
+        family: TFO/Connection/Optimized/Active
+        unit: "{connection}"
   - MIB: CISCO-WAN-OPTIMIZATION-MIB
     symbol:
       OID: 1.3.6.1.4.1.9.9.762.1.2.1.4.0
       name: cwoTfoStatsActiveOptTCPPlusConn
-      description: This object contains number of active TCP connections going through TCP plus other optimization
-      family: TFO/Connection/Optimized/TCPPlus
-      unit: "{connection}"
+      chart_meta:
+        description: This object contains number of active TCP connections going through TCP plus other optimization
+        family: TFO/Connection/Optimized/TCPPlus
+        unit: "{connection}"
   - MIB: CISCO-WAN-OPTIMIZATION-MIB
     symbol:
       OID: 1.3.6.1.4.1.9.9.762.1.2.1.5.0
       name: cwoTfoStatsActiveOptTCPOnlyConn
-      description: This object contains number of active connections going through only TCP optimization
-      family: TFO/Connection/Optimized/TCPOnly
-      unit: "{connection}"
+      chart_meta:
+        description: This object contains number of active connections going through only TCP optimization
+        family: TFO/Connection/Optimized/TCPOnly
+        unit: "{connection}"
   - MIB: CISCO-WAN-OPTIMIZATION-MIB
     symbol:
       OID: 1.3.6.1.4.1.9.9.762.1.2.1.6.0
       name: cwoTfoStatsActiveOptTCPPrepConn
-      description: This object contains number of current active TCP connections that were originated by an accelerator to acquire data in anticipation of its future use
-      family: TFO/Connection/Preposition/Active
-      unit: "{connection}"
+      chart_meta:
+        description: This object contains number of current active TCP connections that were originated by an accelerator to acquire data in anticipation of its future use
+        family: TFO/Connection/Preposition/Active
+        unit: "{connection}"
   - MIB: CISCO-WAN-OPTIMIZATION-MIB
     symbol:
       OID: 1.3.6.1.4.1.9.9.762.1.2.1.7.0
       name: cwoTfoStatsActiveADConn
-      description: This object contains number of current active TCP connections in the auto-discovery state
-      family: TFO/Connection/AutoDiscovery/Active
-      unit: "{connection}"
+      chart_meta:
+        description: This object contains number of current active TCP connections in the auto-discovery state
+        family: TFO/Connection/AutoDiscovery/Active
+        unit: "{connection}"
   - MIB: CISCO-WAN-OPTIMIZATION-MIB
     symbol:
       OID: 1.3.6.1.4.1.9.9.762.1.2.1.8.0
       name: cwoTfoStatsReservedConn
-      description: This object contains number of TCP connections reserved for the MAPI accelerator
-      family: TFO/Connection/Reserved/MAPI
-      unit: "{connection}"
+      chart_meta:
+        description: This object contains number of TCP connections reserved for the MAPI accelerator
+        family: TFO/Connection/Reserved/MAPI
+        unit: "{connection}"
   - MIB: CISCO-WAN-OPTIMIZATION-MIB
     symbol:
       OID: 1.3.6.1.4.1.9.9.762.1.2.1.9.0
       name: cwoTfoStatsPendingConn
-      description: This object contains number of TCP connections, which are pending in queue of connections to be optimized
-      family: TFO/Connection/Queue/Pending
-      unit: "{connection}"
+      chart_meta:
+        description: This object contains number of TCP connections, which are pending in queue of connections to be optimized
+        family: TFO/Connection/Queue/Pending
+        unit: "{connection}"
   - MIB: CISCO-WAN-OPTIMIZATION-MIB
     symbol:
       OID: 1.3.6.1.4.1.9.9.762.1.2.1.10.0
       name: cwoTfoStatsActivePTConn
-      description: This object contains number of active Pass Through TCP connections. Connections which are not selected for optimization are called Pass Through.
-      family: TFO/Connection/PassThrough/Active
-      unit: "{connection}"
+      chart_meta:
+        description: This object contains number of active Pass Through TCP connections. Connections which are not selected for optimization are called Pass Through.
+        family: TFO/Connection/PassThrough/Active
+        unit: "{connection}"
   - MIB: CISCO-WAN-OPTIMIZATION-MIB
     symbol:
       OID: 1.3.6.1.4.1.9.9.762.1.2.1.11.0
       name: cwoTfoStatsTotalNormalClosedConn
-      description: This object contains total number of optimized TCP connections which were closed normally since TFO was started or its statistics were last reset.
-      family: TFO/Connection/Closed/Normal
-      unit: "{connection}/s"
+      chart_meta:
+        description: This object contains total number of optimized TCP connections which were closed normally since TFO was started or its statistics were last reset.
+        family: TFO/Connection/Closed/Normal
+        unit: "{connection}/s"
   - MIB: CISCO-WAN-OPTIMIZATION-MIB
     symbol:
       OID: 1.3.6.1.4.1.9.9.762.1.2.1.12.0
       name: cwoTfoStatsResetConn
-      description: This object contains total number of optimized TCP connections, which are reset since TFO was started or its statistics were last reset.
-      family: TFO/Connection/Closed/Reset
-      unit: "{connection}/s"
+      chart_meta:
+        description: This object contains total number of optimized TCP connections, which are reset since TFO was started or its statistics were last reset.
+        family: TFO/Connection/Closed/Reset
+        unit: "{connection}/s"
   # - MIB: CISCO-WAN-OPTIMIZATION-MIB
   #   symbol:
   #     OID: 1.3.6.1.4.1.9.9.762.1.2.1.13.0

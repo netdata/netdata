@@ -9,16 +9,18 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.12383.3.1.1.1.0
       name: hsmOperationRequests
-      description: Number of operations
-      family: HSM/Operation/Request/Total
-      unit: "{operation}"
+      chart_meta:
+        description: Number of operations
+        family: HSM/Operation/Request/Total
+        unit: "{operation}"
   - MIB: CHRYSALIS-UTSP-MIB
     symbol:
       OID: 1.3.6.1.4.1.12383.3.1.1.2.0
       name: hsmOperationErrors
-      description: Number of operation errors
-      family: HSM/Operation/Error/Total
-      unit: "{error}"
+      chart_meta:
+        description: Number of operation errors
+        family: HSM/Operation/Error/Total
+        unit: "{error}"
   # - MIB: CHRYSALIS-UTSP-MIB
   #   symbol:
   #     OID: 1.3.6.1.4.1.12383.3.1.1.3.0
@@ -36,9 +38,10 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.12383.3.1.2.1.0
       name: ntlsOperStatus
-      description: Current operational status of the NTL service
-      family: HSM/NTLS/Operational/Status
-      unit: "{status}"
+      chart_meta:
+        description: Current operational status of the NTL service
+        family: HSM/NTLS/Operational/Status
+        unit: "{status}"
       mapping:
         1: up
         2: down
@@ -47,30 +50,34 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.12383.3.1.2.2.0
       name: ntlsConnectedClients
-      description: The current number of connected clients using NTLS
-      family: HSM/NTLS/Client/Connected
-      unit: "{client}"
+      chart_meta:
+        description: The current number of connected clients using NTLS
+        family: HSM/NTLS/Client/Connected
+        unit: "{client}"
   - MIB: CHRYSALIS-UTSP-MIB
     symbol:
       OID: 1.3.6.1.4.1.12383.3.1.2.3.0
       name: ntlsLinks
-      description: The current number of links in NTLS
-      family: HSM/NTLS/Link/Active
-      unit: "{link}"
+      chart_meta:
+        description: The current number of links in NTLS
+        family: HSM/NTLS/Link/Active
+        unit: "{link}"
   - MIB: CHRYSALIS-UTSP-MIB
     symbol:
       OID: 1.3.6.1.4.1.12383.3.1.2.4.0
       name: ntlsSuccessfulClientConnections
-      description: The total number of successful client connections
-      family: HSM/NTLS/Connection/Successful
-      unit: "{connection}/s"
+      chart_meta:
+        description: The total number of successful client connections
+        family: HSM/NTLS/Connection/Successful
+        unit: "{connection}/s"
   - MIB: CHRYSALIS-UTSP-MIB
     symbol:
       OID: 1.3.6.1.4.1.12383.3.1.2.5.0
       name: ntlsFailedClientConnections
-      description: The total number of unsuccessful client connections
-      family: HSM/NTLS/Connection/Failed
-      unit: "{connection}/s"
+      chart_meta:
+        description: The total number of unsuccessful client connections
+        family: HSM/NTLS/Connection/Failed
+        unit: "{connection}/s"
 # TODO: sending tags for scalar metric is not supported yet (keep this metric and this)
 # - MIB: CHRYSALIS-UTSP-MIB
 #   OID: 1.3.6.1.4.1.12383.3.1.2.6.0

@@ -17,16 +17,18 @@ metrics:
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.6889.2.1.11.1.1.1.1.6.1 # genCpuCurrentUtilization.1
-      description: Current CPU utilization in percentage if the monitoring is enabled
-      family: CPU/Usage
-      unit: "%"
+      chart_meta:
+        description: Current CPU utilization in percentage if the monitoring is enabled
+        family: CPU/Usage
+        unit: "%"
   - MIB: UTILIZATION-MANAGEMENT-MIB
     symbol:
       name: memory.usage
       OID: 1.3.6.1.4.1.6889.2.1.11.1.2.6.1.3.1 # genMemUtilizationPercentUsed.1
-      description: Percentage of memory used
-      family: Memory/Usage
-      unit: "%"
+      chart_meta:
+        description: Percentage of memory used
+        family: Memory/Usage
+        unit: "%"
   - MIB: CONFIG-MIB
     table:
       name: genPortTable

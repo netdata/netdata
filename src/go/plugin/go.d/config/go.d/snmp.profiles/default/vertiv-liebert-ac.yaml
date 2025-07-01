@@ -7,14 +7,14 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.476.1.42.3.4.1.2.1.0
       name: lgpEnvTemperatureSettingDegF
-    description: The temperature setting used to control the well known temperature object 'lgpEnvControlTemperature'
-    unit: "degF"
+      description: The temperature setting used to control the well known temperature object 'lgpEnvControlTemperature'
+      unit: "degF"
   - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
     symbol:
       OID: 1.3.6.1.4.1.476.1.42.3.4.1.2.2.0
       name: lgpEnvTemperatureToleranceDegF
-    description: The acceptable variance from 'lgpEnvTemperatureSettingDegF' without initiating a control action
-    unit: "degF"
+      description: The acceptable variance from 'lgpEnvTemperatureSettingDegF' without initiating a control action
+      unit: "degF"
   - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
     table:
       OID: 1.3.6.1.4.1.476.1.42.3.4.1.2.3
@@ -41,44 +41,44 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.476.1.42.3.4.6.1.0
       name: lgpEnvStatisticsComp1RunHr
-    description: Accumulated run hours of compressor 1
-    unit: "h"
+      description: Accumulated run hours of compressor 1
+      unit: "h"
   - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
     symbol:
       OID: 1.3.6.1.4.1.476.1.42.3.4.6.2.0
       name: lgpEnvStatisticsComp2RunHr
-    description: Accumulated run hours of compressor 2
-    unit: "h"
+      description: Accumulated run hours of compressor 2
+      unit: "h"
   - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
     symbol:
       OID: 1.3.6.1.4.1.476.1.42.3.4.6.3.0
       name: lgpEnvStatisticsFanRunHr
-    description: Accumulated run hours of the main fan
-    unit: "h"
+      description: Accumulated run hours of the main fan
+      unit: "h"
   - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
     symbol:
       OID: 1.3.6.1.4.1.476.1.42.3.4.6.4.0
       name: lgpEnvStatisticsHumRunHr
-    description: Accumulated run hours of the humidifier
-    unit: "h"
+      description: Accumulated run hours of the humidifier
+      unit: "h"
   - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
     symbol:
       OID: 1.3.6.1.4.1.476.1.42.3.4.6.7.0
       name: lgpEnvStatisticsReheat1RunHr
-    description: Accumulated run hours of reheat element 1
-    unit: "h"
+      description: Accumulated run hours of reheat element 1
+      unit: "h"
   - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
     symbol:
       OID: 1.3.6.1.4.1.476.1.42.3.4.6.8.0
       name: lgpEnvStatisticsReheat2RunHr
-    description: Accumulated run hours of reheat element 2
-    unit: "h"
+      description: Accumulated run hours of reheat element 2
+      unit: "h"
   - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
     symbol:
       OID: 1.3.6.1.4.1.476.1.42.3.4.6.9.0
       name: lgpEnvStatisticsReheat3RunHr
-    description: Accumulated run hours of reheat element 3
-    unit: "h"
+      description: Accumulated run hours of reheat element 3
+      unit: "h"
 metric_tags:
   - tag: lgp_agent_ident_model
     OID: 1.3.6.1.4.1.476.1.42.2.1.2.0

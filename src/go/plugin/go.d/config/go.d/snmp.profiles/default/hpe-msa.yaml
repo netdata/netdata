@@ -26,8 +26,6 @@ metrics:
           OID: 1.3.6.1.3.94.1.8.1.3
           name: connUnitSensorName
         tag: hpe_fibrechannel_conn_unit_sensor_name
-        description: Textual identification of the sensor intended primarily for operator use
-        unit: "{sensor}"
       - symbol:
           OID: 1.3.6.1.3.94.1.8.1.8
           name: connUnitSensorCharacteristic
@@ -43,8 +41,6 @@ metrics:
           8: frequency
           9: power
           10: door
-        description: Characteristics being monitored by this sensor
-        unit: "1"
       - symbol:
           OID: 1.3.6.1.3.94.1.8.1.4
           name: connUnitSensorStatus
@@ -55,8 +51,6 @@ metrics:
           3: ok
           4: warning
           5: failed
-        description: Status indicated by the sensor
-        unit: "{status}"
   - MIB: FCMGMT-MIB
     table:
       OID: 1.3.6.1.3.94.1.10
@@ -90,8 +84,6 @@ metrics:
           17: ac
           18: dc
           19: ssa
-        description: Type of the port
-        unit: "{port_type}"
       - symbol:
           OID: 1.3.6.1.3.94.1.10.1.8
           name: connUnitPortTransmitterType
@@ -108,8 +100,6 @@ metrics:
           9: shortwave_no_ofc
           10: longwave_led
           11: ssa
-        description: Technology of the port transceiver
-        unit: "{transmitter_type}"
       - symbol:
           OID: 1.3.6.1.3.94.1.10.1.9
           name: connUnitPortModuleType
@@ -124,26 +114,18 @@ metrics:
           7: gbic_no_serial_id
           8: gbic_not_installed
           9: small_form_factor
-        description: Module type of the port connector
-        unit: "{module_type}"
       - symbol:
           OID: 1.3.6.1.3.94.1.10.1.10
           name: connUnitPortWwn
         tag: hpe_fibrechannel_conn_unit_port_wwn
-        description: World Wide Name of the port if applicable
-        unit: "{wwn}"
       - symbol:
           OID: 1.3.6.1.3.94.1.10.1.15
           name: connUnitPortSpeed
         tag: hpe_fibrechannel_conn_unit_port_speed
-        description: Speed of the port in kilobytes per second
-        unit: "kBy/s"
       - symbol:
           OID: 1.3.6.1.3.94.1.10.1.17
           name: connUnitPortName
         tag: hpe_fibrechannel_conn_unit_port_name
-        description: String describing the addressed port
-        unit: "{port}"
       # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
       - symbol:
           OID: 1.3.6.1.3.94.1.10.1.6
@@ -155,8 +137,6 @@ metrics:
           3: offline
           4: bypassed
           5: diagnostics
-        description: User selected state of the port hardware
-        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.3.94.1.10.1.7
           name: connUnitPortStatus
@@ -171,8 +151,6 @@ metrics:
           7: initializing
           8: bypass
           9: ols
-        description: Overall protocol status for the port
-        unit: "{status}"
 metric_tags:
   - tag: hpe_fibrechannel_cpq_si_sys_serial_num
     OID: 1.3.6.1.4.1.232.2.2.2.1

@@ -27,9 +27,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.91.1.1.1.1.4
         name: entSensorValue # Do not change this name — required by transformEntitySensorValue for matching and renaming logic
-        description: Most recent measurement obtained by the agent for this sensor
-        unit: "1"
-        family: Sensor/Value
+        chart_meta:
+          description: Most recent measurement obtained by the agent for this sensor
+          family: Sensor/Value
+          unit: "1"
         transform: |
           {{- transformEntitySensorValue .Metric -}}
     metric_tags:
@@ -60,24 +61,28 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.276.1.1.1.1.1
         name: cieIfLastInTime
-        description: "Elapsed time in milliseconds since last protocol input packet was received"
-        family: Interfaces/Activity
-        unit: "ms"
+        chart_meta:
+          description: "Elapsed time in milliseconds since last protocol input packet was received"
+          family: Interfaces/Activity
+          unit: "ms"
       - OID: 1.3.6.1.4.1.9.9.276.1.1.1.1.2
         name: cieIfLastOutTime
-        description: "Elapsed time in milliseconds since last protocol output packet was transmitted"
-        family: Interfaces/Activity
-        unit: "ms"
+        chart_meta:
+          description: "Elapsed time in milliseconds since last protocol output packet was transmitted"
+          family: Interfaces/Activity
+          unit: "ms"
       - OID: 1.3.6.1.4.1.9.9.276.1.1.1.1.10
         name: cieIfInputQueueDrops
-        description: "Number of input packets which were dropped"
-        family: Interfaces/Drops
-        unit: "{drop}/s"
+        chart_meta:
+          description: "Number of input packets which were dropped"
+          family: Interfaces/Drops
+          unit: "{drop}/s"
       - OID: 1.3.6.1.4.1.9.9.276.1.1.1.1.11
         name: cieIfOutputQueueDrops
-        description: "Number of output packets dropped by the interface"
-        family: Interfaces/Drops
-        unit: "{drop}/s"
+        chart_meta:
+          description: "Number of output packets dropped by the interface"
+          family: Interfaces/Drops
+          unit: "{drop}/s"
     metric_tags:
       - tag: interface
         MIB: IF-MIB

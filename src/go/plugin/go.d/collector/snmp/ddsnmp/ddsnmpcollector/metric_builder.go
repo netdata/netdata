@@ -47,9 +47,9 @@ func (mb *metricBuilder) asTableMetric() *metricBuilder {
 }
 
 func (mb *metricBuilder) fromSymbol(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU) *metricBuilder {
-	mb.metric.Unit = sym.Unit
-	mb.metric.Description = sym.Description
-	mb.metric.Family = sym.Family
+	mb.metric.Unit = sym.ChartMeta.Unit
+	mb.metric.Description = sym.ChartMeta.Description
+	mb.metric.Family = sym.ChartMeta.Family
 	mb.metric.MetricType = ternary(sym.MetricType != "", sym.MetricType, getMetricTypeFromPDUType(pdu))
 	mb.metric.Mappings = convMappingToNumeric(sym)
 	return mb

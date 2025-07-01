@@ -31,8 +31,8 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.23867.3.1.1.1.4.0
       name: silverpeak.mgmt.spsActiveAlarmCount
-    description: The number of active alarm entries in the alarm table - spsActiveAlarmTable, defined under silverpeakMgmtMIBTables subtree.
-    unit: "{alarm}"
+      description: The number of active alarm entries in the alarm table - spsActiveAlarmTable, defined under silverpeakMgmtMIBTables subtree.
+      unit: "{alarm}"
   - MIB: SILVERPEAK-MGMT-MIB
     table:
       OID: 1.3.6.1.4.1.23867.3.1.1.2.1

@@ -14,251 +14,290 @@ metrics:
     symbol:
       name: axSysMemoryTotal
       OID: 1.3.6.1.4.1.22610.2.4.1.2.1.0
-      description: The total memory
-      family: Memory/Total
+      chart_meta:
+        description: The total memory
+        family: Memory/Total
+        unit: "By"
       scale_factor: 1024
-      unit: "By"
+
   - MIB: A10-AX-MIB
     symbol:
       name: axSysMemoryUsage
       OID: 1.3.6.1.4.1.22610.2.4.1.2.2.0
-      description: The usage memory
-      family: Memory/Used
+      chart_meta:
+        description: The usage memory
+        family: Memory/Used
+        unit: "By"
       scale_factor: 1024
-      unit: "By"
+
   - MIB: A10-AX-MIB
     symbol:
       name: axSysAverageCpuUsage
       OID: 1.3.6.1.4.1.22610.2.4.1.3.3.0
-      description: The average CPU usage in last 5 seconds
-      family: CPU/Usage
-      unit: "%"
+      chart_meta:
+        description: The average CPU usage in last 5 seconds
+        family: CPU/Usage
+        unit: "%"
   - MIB: A10-AX-MIB
     symbol:
       name: axSysDiskTotalSpace
       OID: 1.3.6.1.4.1.22610.2.4.1.4.1.0
-      description: The total space of the disk
-      family: Disk/Total
+      chart_meta:
+        description: The total space of the disk
+        family: Disk/Total
+        unit: "By"
       scale_factor: 1048576
-      unit: "By"
+
   - MIB: A10-AX-MIB
     symbol:
       name: axSysDiskFreeSpace
       OID: 1.3.6.1.4.1.22610.2.4.1.4.2.0
-      description: The free space of the disk
-      family: Disk/Free
+      chart_meta:
+        description: The free space of the disk
+        family: Disk/Free
+        unit: "By"
       scale_factor: 1048576
-      unit: "By"
+
   - MIB: A10-AX-MIB
     symbol:
       name: axSysHwPhySystemTemp
       OID: 1.3.6.1.4.1.22610.2.4.1.5.1.0
-      description: The physical system temperature in Celsius
-      family: Env/Temperature/Value
-      unit: "Cel"
+      chart_meta:
+        description: The physical system temperature in Celsius
+        family: Env/Temperature/Value
+        unit: "Cel"
   - MIB: A10-AX-MIB
     symbol:
       name: axAppGlobalTotalCurrentConnections
       OID: 1.3.6.1.4.1.22610.2.4.3.1.2.1.0
-      description: Total current connections
-      family: Application/Connection/Current/Total
-      unit: "{connection}"
+      chart_meta:
+        description: Total current connections
+        family: Application/Connection/Current/Total
+        unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
       name: axAppGlobalTotalNewConnections
       OID: 1.3.6.1.4.1.22610.2.4.3.1.2.2.0
-      description: Total new connections
-      family: Application/Connection/New/Total
-      unit: "{connection}/s"
+      chart_meta:
+        description: Total new connections
+        family: Application/Connection/New/Total
+        unit: "{connection}/s"
   - MIB: A10-AX-MIB
     symbol:
       name: axAppGlobalTotalNewL4Connections
       OID: 1.3.6.1.4.1.22610.2.4.3.1.2.3.0
-      description: Total new L4 connections
-      family: Application/Connection/New/L4
-      unit: "{connection}/s"
+      chart_meta:
+        description: Total new L4 connections
+        family: Application/Connection/New/L4
+        unit: "{connection}/s"
   - MIB: A10-AX-MIB
     symbol:
       name: axAppGlobalTotalNewL7Connections
       OID: 1.3.6.1.4.1.22610.2.4.3.1.2.4.0
-      description: Total new L7 connections
-      family: Application/Connection/New/L7
-      unit: "{connection}/s"
+      chart_meta:
+        description: Total new L7 connections
+        family: Application/Connection/New/L7
+        unit: "{connection}/s"
   - MIB: A10-AX-MIB
     symbol:
       name: axAppGlobalTotalNewIPNatConnections
       OID: 1.3.6.1.4.1.22610.2.4.3.1.2.5.0
-      description: Total new IP-NAT connections
-      family: Application/Connection/New/IPNAT
-      unit: "{connection}/s"
+      chart_meta:
+        description: Total new IP-NAT connections
+        family: Application/Connection/New/IPNAT
+        unit: "{connection}/s"
   - MIB: A10-AX-MIB
     symbol:
       name: axAppGlobalTotalSSLConnections
       OID: 1.3.6.1.4.1.22610.2.4.3.1.2.6.0
-      description: Total new SSL connections
-      family: Application/Connection/New/SSL
-      unit: "{connection}/s"
+      chart_meta:
+        description: Total new SSL connections
+        family: Application/Connection/New/SSL
+        unit: "{connection}/s"
   - MIB: A10-AX-MIB
     symbol:
       name: axAppGlobalTotalL7Requests
       OID: 1.3.6.1.4.1.22610.2.4.3.1.2.7.0
-      description: Total L7 requests
-      family: Application/Request/L7/Total
-      unit: "{request}/s"
+      chart_meta:
+        description: Total L7 requests
+        family: Application/Request/L7/Total
+        unit: "{request}/s"
   - MIB: A10-AX-MIB
     symbol:
       name: axGlobalAppPacketDrop
       OID: 1.3.6.1.4.1.22610.2.4.3.1.2.8.0
-      description: Total number of buffer drops in the last 10 seconds
-      family: Application/Packet/Dropped/Buffer
-      unit: "{packet}"
+      chart_meta:
+        description: Total number of buffer drops in the last 10 seconds
+        family: Application/Packet/Dropped/Buffer
+        unit: "{packet}"
   - MIB: A10-AX-MIB
     symbol:
       name: axGlobalTotalAppPacketDrop
       OID: 1.3.6.1.4.1.22610.2.4.3.1.2.9.0
-      description: Total number of accumulative buffer drops
-      family: Application/Packet/Dropped/BufferTotal
-      unit: "{packet}/s"
+      chart_meta:
+        description: Total number of accumulative buffer drops
+        family: Application/Packet/Dropped/BufferTotal
+        unit: "{packet}/s"
   - MIB: A10-AX-MIB
     symbol:
       name: axGlobalTotalL4Session
       OID: 1.3.6.1.4.1.22610.2.4.3.1.2.10.0
-      description: Total number of L4 sessions
-      family: Session/L4/Total
-      unit: "{session}"
+      chart_meta:
+        description: Total number of L4 sessions
+        family: Session/L4/Total
+        unit: "{session}"
   - MIB: A10-AX-MIB
     symbol:
       name: axAppGlobalBufferConfigLimit
       OID: 1.3.6.1.4.1.22610.2.4.3.1.3.1.0
-      description: Application buffer configured limit
-      family: Application/Buffer/Limit
-      unit: "1"
+      chart_meta:
+        description: Application buffer configured limit
+        family: Application/Buffer/Limit
+        unit: "1"
   - MIB: A10-AX-MIB
     symbol:
       name: axAppGlobalBufferCurrentUsage
       OID: 1.3.6.1.4.1.22610.2.4.3.1.3.2.0
-      description: Application buffer current usage
-      family: Application/Buffer/Used
-      unit: "1"
+      chart_meta:
+        description: Application buffer current usage
+        family: Application/Buffer/Used
+        unit: "1"
   - MIB: A10-AX-MIB
     symbol:
       name: axConnReuseStatTotalOpenPersist
       OID: 1.3.6.1.4.1.22610.2.4.3.5.1.0
-      description: The total count of open persistent connection-reuse sessions
-      family: Session/ConnectionReuse/Open
-      unit: "{session}"
+      chart_meta:
+        description: The total count of open persistent connection-reuse sessions
+        family: Session/ConnectionReuse/Open
+        unit: "{session}"
   - MIB: A10-AX-MIB
     symbol:
       name: axConnReuseStatTotalActivePersist
       OID: 1.3.6.1.4.1.22610.2.4.3.5.2.0
-      description: The total count of active persistent connection-reuse sessions
-      family: Session/ConnectionReuse/Active
-      unit: "{session}"
+      chart_meta:
+        description: The total count of active persistent connection-reuse sessions
+        family: Session/ConnectionReuse/Active
+        unit: "{session}"
   - MIB: A10-AX-MIB
     symbol:
       name: axConnReuseStatTotalEstablished
       OID: 1.3.6.1.4.1.22610.2.4.3.5.3.0
-      description: The total count of established connection-reuse sessions
-      family: Session/ConnectionReuse/Established
-      unit: "{session}"
+      chart_meta:
+        description: The total count of established connection-reuse sessions
+        family: Session/ConnectionReuse/Established
+        unit: "{session}"
   - MIB: A10-AX-MIB
     symbol:
       name: axConnReuseStatTotalTerminated
       OID: 1.3.6.1.4.1.22610.2.4.3.5.4.0
-      description: The total count of terminated connection-reuse sessions
-      family: Session/ConnectionReuse/Terminated
-      unit: "{session}"
+      chart_meta:
+        description: The total count of terminated connection-reuse sessions
+        family: Session/ConnectionReuse/Terminated
+        unit: "{session}"
   - MIB: A10-AX-MIB
     symbol:
       name: axSessionGlobalStatTCPEstablished
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.1.0
-      description: The count of TCP established
-      family: Connection/TCP/Established
-      unit: "{connection}"
+      chart_meta:
+        description: The count of TCP established
+        family: Connection/TCP/Established
+        unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
       name: axSessionGlobalStatTCPHalfOpen
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.2.0
-      description: The count of TCP half open
-      family: Connection/TCP/HalfOpen
-      unit: "{connection}"
+      chart_meta:
+        description: The count of TCP half open
+        family: Connection/TCP/HalfOpen
+        unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
       name: axSessionGlobalStatUDP
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.3.0
-      description: The count of UDP connections
-      family: Connection/UDP/Active
-      unit: "{connection}"
+      chart_meta:
+        description: The count of UDP connections
+        family: Connection/UDP/Active
+        unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
       name: axSessionGlobalStatNonTcpUdpIPSession
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.4.0
-      description: The count of non TCP/UDP IP sessions
-      family: Session/IP/Other
-      unit: "{session}"
+      chart_meta:
+        description: The count of non TCP/UDP IP sessions
+        family: Session/IP/Other
+        unit: "{session}"
   - MIB: A10-AX-MIB
     symbol:
       name: axSessionGlobalStatOther
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.5.0
-      description: The count of others
-      family: Session/Other/Active
-      unit: "{session}"
+      chart_meta:
+        description: The count of others
+        family: Session/Other/Active
+        unit: "{session}"
   - MIB: A10-AX-MIB
     symbol:
       name: axSessionGlobalStatReverseNATTCP
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.6.0
-      description: The count of reverse NAT TCP
-      family: Connection/ReverseNAT/TCP
-      unit: "{connection}"
+      chart_meta:
+        description: The count of reverse NAT TCP
+        family: Connection/ReverseNAT/TCP
+        unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
       name: axSessionGlobalStatReverseNATUDP
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.7.0
-      description: The count of reverse NAT UDP
-      family: Connection/ReverseNAT/UDP
-      unit: "{connection}"
+      chart_meta:
+        description: The count of reverse NAT UDP
+        family: Connection/ReverseNAT/UDP
+        unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
       name: axSessionGlobalStatFreeCurrentConns
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.9.0
-      description: The count of free current connections
-      family: Connection/Free
-      unit: "{connection}"
+      chart_meta:
+        description: The count of free current connections
+        family: Connection/Free
+        unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
       name: axSessionGlobalStatConnCount
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.10.0
-      description: The count of current connections
-      family: Connection/Current
-      unit: "{connection}"
+      chart_meta:
+        description: The count of current connections
+        family: Connection/Current
+        unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
       name: axSessionGlobalStatConnFree
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.11.0
-      description: The count of freed connections
-      family: Connection/Freed
-      unit: "{connection}/s"
+      chart_meta:
+        description: The count of freed connections
+        family: Connection/Freed
+        unit: "{connection}/s"
   - MIB: A10-AX-MIB
     symbol:
       name: axSessionGlobalStatTCPSynHalfOpen
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.12.0
-      description: The count of TCP SYN half open
-      family: Connection/TCP/SynHalfOpen
-      unit: "{connection}"
+      chart_meta:
+        description: The count of TCP SYN half open
+        family: Connection/TCP/SynHalfOpen
+        unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
       name: axSessionGlobalStatConnSMPAllocated
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.13.0
-      description: The count of allocated SMP connections
-      family: Connection/SMP/Allocated
-      unit: "{connection}"
+      chart_meta:
+        description: The count of allocated SMP connections
+        family: Connection/SMP/Allocated
+        unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
       name: axSessionGlobalStatConnSMPFree
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.14.0
-      description: The count of free SMP connections
-      family: Connection/SMP/Free
-      unit: "{connection}"
+      chart_meta:
+        description: The count of free SMP connections
+        family: Connection/SMP/Free
+        unit: "{connection}"
   - MIB: A10-AX-MIB
     table:
       name: axSysFanStatusTable
@@ -266,14 +305,16 @@ metrics:
     symbols:
       - name: axFanSpeed
         OID: 1.3.6.1.4.1.22610.2.4.1.5.9.1.4
-        description: The fan's speed
-        family: Fan/Speed
-        unit: "{rotation}/min"
+        chart_meta:
+          description: The fan's speed
+          family: Fan/Speed
+          unit: "{rotation}/min"
       - name: axFanStatus
         OID: 1.3.6.1.4.1.22610.2.4.1.5.9.1.3
-        description: Fan status
-        family: Fan/Status
-        unit: "{status}"
+        chart_meta:
+          description: Fan status
+          family: Fan/Status
+          unit: "{status}"
         mapping:
           0: failed
           4: ok_fixed_high
@@ -295,9 +336,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.22610.2.4.1.5.11.1.2
         name: axPowerSupplyVoltageStatus
-        description: Power Supply voltage status
-        family: PowerSupply/Voltage/Status
-        unit: "{status}"
+        chart_meta:
+          description: Power Supply voltage status
+          family: PowerSupply/Voltage/Status
+          unit: "{status}"
         mapping:
           0: invalid
           1: normal
@@ -315,9 +357,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.22610.2.4.1.5.12.1.3
         name: axPowerSupplyStatus
-        description: Power Supply status
-        family: PowerSupply/Status
-        unit: "{status}"
+        chart_meta:
+          description: Power Supply status
+          family: PowerSupply/Status
+          unit: "{status}"
         mapping:
           0: off
           1: on
@@ -336,17 +379,19 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.22610.2.4.3.2.1.2.1.3
         name: axServerEnabledState
-        description: The enabled state for this server
-        family: Server/Admin/Status
-        unit: "{status}"
+        chart_meta:
+          description: The enabled state for this server
+          family: Server/Admin/Status
+          unit: "{status}"
         mapping:
           0: disabled
           1: enabled
       - OID: 1.3.6.1.4.1.22610.2.4.3.2.1.2.1.5
         name: axServerMonitorState
-        description: The server monitor status
-        family: Server/Operational/Status
-        unit: "{status}"
+        chart_meta:
+          description: The server monitor status
+          family: Server/Operational/Status
+          unit: "{status}"
         mapping:
           0: disabled
           1: up
@@ -364,19 +409,22 @@ metrics:
     symbols:
       - name: axServerStatServerCurConns
         OID: 1.3.6.1.4.1.22610.2.4.3.2.2.2.1.8
-        description: The current connections from server side
-        family: Server/Connection/Current
-        unit: "{connection}"
+        chart_meta:
+          description: The current connections from server side
+          family: Server/Connection/Current
+          unit: "{connection}"
       - name: axServerStatServerTotalCurrL7Reqs
         OID: 1.3.6.1.4.1.22610.2.4.3.2.2.2.1.12
-        description: The number of current L7 requests if applicable
-        family: Server/Request/L7/Current
-        unit: "{request}"
+        chart_meta:
+          description: The number of current L7 requests if applicable
+          family: Server/Request/L7/Current
+          unit: "{request}"
       - OID: 1.3.6.1.4.1.22610.2.4.3.2.2.2.1.10
         name: axServerStatServerStatus
-        description: Server status
-        family: Server/Operational/Status
-        unit: "{status}"
+        chart_meta:
+          description: Server status
+          family: Server/Operational/Status
+          unit: "{status}"
         mapping:
           0: disabled
           1: up
@@ -394,9 +442,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.22610.2.4.3.3.1.2.1.4
         name: axServiceGroupDisplayStatus
-        description: Service group status
-        family: ServiceGroup/Status
-        unit: "{status}"
+        chart_meta:
+          description: Service group status
+          family: ServiceGroup/Status
+          unit: "{status}"
         mapping:
           1: all_up
           2: functional_up
@@ -437,9 +486,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.22610.2.4.3.4.1.2.1.5
         name: axVirtualServerDisplayStatus
-        description: Display status of the virtual server
-        family: VirtualServer/Status
-        unit: "{status}"
+        chart_meta:
+          description: Display status of the virtual server
+          family: VirtualServer/Status
+          unit: "{status}"
         mapping:
           0: disabled
           1: all_up
@@ -470,59 +520,70 @@ metrics:
     symbols:
       - name: axVirtualServerStatPktsIn
         OID: 1.3.6.1.4.1.22610.2.4.3.4.2.1.1.3
-        description: The number of packets received from client to server
-        family: VirtualServer/Packet/In
-        unit: "{packet}/s"
+        chart_meta:
+          description: The number of packets received from client to server
+          family: VirtualServer/Packet/In
+          unit: "{packet}/s"
       - name: axVirtualServerStatBytesIn
         OID: 1.3.6.1.4.1.22610.2.4.3.4.2.1.1.4
-        description: The number of bytes received from client to server
-        family: VirtualServer/Traffic/In
-        unit: "By/s"
+        chart_meta:
+          description: The number of bytes received from client to server
+          family: VirtualServer/Traffic/In
+          unit: "By/s"
       - name: axVirtualServerStatPktsOut
         OID: 1.3.6.1.4.1.22610.2.4.3.4.2.1.1.5
-        description: The number of packets sent from server to client
-        family: VirtualServer/Packet/Out
-        unit: "{packet}/s"
+        chart_meta:
+          description: The number of packets sent from server to client
+          family: VirtualServer/Packet/Out
+          unit: "{packet}/s"
       - name: axVirtualServerStatBytesOut
         OID: 1.3.6.1.4.1.22610.2.4.3.4.2.1.1.6
-        description: The number of bytes sent from server to client
-        family: VirtualServer/Traffic/Out
-        unit: "By/s"
+        chart_meta:
+          description: The number of bytes sent from server to client
+          family: VirtualServer/Traffic/Out
+          unit: "By/s"
       - name: axVirtualServerStatPersistConns
         OID: 1.3.6.1.4.1.22610.2.4.3.4.2.1.1.7
-        description: The persistent connections from client side
-        family: VirtualServer/Connection/Persistent
-        unit: "{connection}"
+        chart_meta:
+          description: The persistent connections from client side
+          family: VirtualServer/Connection/Persistent
+          unit: "{connection}"
       - name: axVirtualServerStatTotConns
         OID: 1.3.6.1.4.1.22610.2.4.3.4.2.1.1.8
-        description: The total connections from client side
-        family: VirtualServer/Connection/Total
-        unit: "{connection}/s"
+        chart_meta:
+          description: The total connections from client side
+          family: VirtualServer/Connection/Total
+          unit: "{connection}/s"
       - name: axVirtualServerStatCurConns
         OID: 1.3.6.1.4.1.22610.2.4.3.4.2.1.1.9
-        description: The current connections from client side
-        family: VirtualServer/Connection/Current
-        unit: "{connection}"
+        chart_meta:
+          description: The current connections from client side
+          family: VirtualServer/Connection/Current
+          unit: "{connection}"
       - name: axVirtualServerStatTotalL7Reqs
         OID: 1.3.6.1.4.1.22610.2.4.3.4.2.1.1.12
-        description: The total number of L7 requests if applicable
-        family: VirtualServer/Request/L7/Total
-        unit: "{request}/s"
+        chart_meta:
+          description: The total number of L7 requests if applicable
+          family: VirtualServer/Request/L7/Total
+          unit: "{request}/s"
       - name: axVirtualServerStatTotalCurrL7Reqs
         OID: 1.3.6.1.4.1.22610.2.4.3.4.2.1.1.13
-        description: The number of current L7 requests if applicable
-        family: VirtualServer/Request/L7/Current
-        unit: "{request}"
+        chart_meta:
+          description: The number of current L7 requests if applicable
+          family: VirtualServer/Request/L7/Current
+          unit: "{request}"
       - name: axVirtualServerStatTotalSuccL7Reqs
         OID: 1.3.6.1.4.1.22610.2.4.3.4.2.1.1.14
-        description: The number of successful L7 requests if applicable
-        family: VirtualServer/Request/L7/Successful
-        unit: "{request}/s"
+        chart_meta:
+          description: The number of successful L7 requests if applicable
+          family: VirtualServer/Request/L7/Successful
+          unit: "{request}/s"
       - OID: 1.3.6.1.4.1.22610.2.4.3.4.2.1.1.10
         name: axVirtualServerStatStatus
-        description: Virtual server status
-        family: VirtualServer/Operational/Status
-        unit: "{status}"
+        chart_meta:
+          description: Virtual server status
+          family: VirtualServer/Operational/Status
+          unit: "{status}"
         mapping:
           1: up
           2: down
@@ -544,14 +605,16 @@ metrics:
     symbols:
       - name: axVirtualServerPortStatCurConns
         OID: 1.3.6.1.4.1.22610.2.4.3.4.4.1.1.12
-        description: Current connections from client side
-        family: VirtualServer/ServicePort/Connection/Current
-        unit: "{connection}"
+        chart_meta:
+          description: Current connections from client side
+          family: VirtualServer/ServicePort/Connection/Current
+          unit: "{connection}"
       - OID: 1.3.6.1.4.1.22610.2.4.3.4.4.1.1.13
         name: axVirtualServerStatPortDisplayStatus
-        description: Virtual server port display status
-        family: VirtualServer/ServicePort/Status
-        unit: "{status}"
+        chart_meta:
+          description: Virtual server port display status
+          family: VirtualServer/ServicePort/Status
+          unit: "{status}"
         mapping:
           0: disabled
           1: all_up
@@ -559,9 +622,10 @@ metrics:
           4: stopped
       - OID: 1.3.6.1.4.1.22610.2.4.3.4.4.1.1.5
         name: axVirtualServerStatPortStatus
-        description: Virtual server port status
-        family: VirtualServer/ServicePort/Operational/Status
-        unit: "{status}"
+        chart_meta:
+          description: Virtual server port status
+          family: VirtualServer/ServicePort/Operational/Status
+          unit: "{status}"
         mapping:
           1: up
           2: down
