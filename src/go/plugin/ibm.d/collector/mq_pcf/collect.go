@@ -893,7 +893,7 @@ func (c *Collector) collectChannelMetrics(ctx context.Context, mx map[string]int
 			}
 		}
 		
-		// Collect channel metrics
+		// Collect channel status metrics (runtime info)
 		if err := c.collectSingleChannelMetrics(ctx, channelName, cleanName, mx); err != nil {
 			// Check if this is an expected error for certain channel types
 			if !strings.Contains(err.Error(), "2085") {
@@ -901,6 +901,11 @@ func (c *Collector) collectChannelMetrics(ctx context.Context, mx map[string]int
 			} else {
 				c.Debugf("Skipping metrics for channel %s (expected error)", channelName)
 			}
+		}
+		
+		// Collect channel configuration metrics (always available)
+		if err := c.collectChannelConfigMetrics(ctx, channelName, cleanName, mx); err != nil {
+			c.Debugf("Failed to collect config for channel %s: %v", channelName, err)
 		}
 	}
 	
@@ -1156,6 +1161,98 @@ func (c *Collector) collectSingleChannelMetrics(ctx context.Context, channelName
 	
 	if batches, ok := attrs[C.MQIACH_BATCHES]; ok {
 		mx[fmt.Sprintf("channel_%s_batches", cleanName)] = int64(batches.(int32))
+	}
+	
+	return nil
+}
+
+// collectChannelConfigMetrics collects channel configuration attributes using MQCMD_INQUIRE_CHANNEL
+func (c *Collector) collectChannelConfigMetrics(ctx context.Context, channelName, cleanName string, mx map[string]int64) error {
+	// Send INQUIRE_CHANNEL for specific channel to get configuration attributes
+	params := []pcfParameter{
+		newStringParameter(C.MQCACH_CHANNEL_NAME, channelName),
+		// Request specific attributes we want
+		newIntListParameter(C.MQIACF_CHANNEL_ATTRS, []int32{
+			C.MQIACH_BATCH_SIZE,           // Batch size
+			C.MQIACH_BATCH_INTERVAL,       // Batch interval (seconds)
+			C.MQIACH_DISC_INTERVAL,        // Disconnect interval (seconds)
+			C.MQIACH_HB_INTERVAL,          // Heartbeat interval (seconds)
+			C.MQIACH_KEEP_ALIVE_INTERVAL,  // Keep alive interval (seconds)
+			C.MQIACH_SHORT_RETRY,          // Short retry count
+			C.MQIACH_SHORT_TIMER,          // Short retry timer (seconds)
+			C.MQIACH_LONG_RETRY,           // Long retry count
+			C.MQIACH_LONG_TIMER,           // Long timer (seconds)
+			C.MQIACH_MAX_MSG_LENGTH,       // Maximum message length
+			C.MQIACH_SHARING_CONVERSATIONS, // Sharing conversations
+			C.MQIACH_NETWORK_PRIORITY,     // Network priority
+		}),
+	}
+	
+	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_CHANNEL, params)
+	if err != nil {
+		return fmt.Errorf("failed to send INQUIRE_CHANNEL for %s: %w", channelName, err)
+	}
+	
+	// Parse response
+	attrs, err := c.parsePCFResponse(response)
+	if err != nil {
+		return fmt.Errorf("failed to parse channel config response for %s: %w", channelName, err)
+	}
+	
+	// Check for MQ errors in the response
+	if reasonCode, ok := attrs[C.MQIACF_REASON_CODE]; ok {
+		if reason, ok := reasonCode.(int32); ok && reason != 0 {
+			return fmt.Errorf("MQ error: reason code %d", reason)
+		}
+	}
+	
+	// Extract configuration metrics
+	if batchSize, ok := attrs[C.MQIACH_BATCH_SIZE]; ok {
+		mx[fmt.Sprintf("channel_%s_batch_size", cleanName)] = int64(batchSize.(int32))
+	}
+	
+	if batchInterval, ok := attrs[C.MQIACH_BATCH_INTERVAL]; ok {
+		mx[fmt.Sprintf("channel_%s_batch_interval", cleanName)] = int64(batchInterval.(int32)) * precision
+	}
+	
+	if discInterval, ok := attrs[C.MQIACH_DISC_INTERVAL]; ok {
+		mx[fmt.Sprintf("channel_%s_disc_interval", cleanName)] = int64(discInterval.(int32)) * precision
+	}
+	
+	if hbInterval, ok := attrs[C.MQIACH_HB_INTERVAL]; ok {
+		mx[fmt.Sprintf("channel_%s_hb_interval", cleanName)] = int64(hbInterval.(int32)) * precision
+	}
+	
+	if keepAliveInterval, ok := attrs[C.MQIACH_KEEP_ALIVE_INTERVAL]; ok {
+		mx[fmt.Sprintf("channel_%s_keep_alive_interval", cleanName)] = int64(keepAliveInterval.(int32)) * precision
+	}
+	
+	if shortRetry, ok := attrs[C.MQIACH_SHORT_RETRY]; ok {
+		mx[fmt.Sprintf("channel_%s_short_retry", cleanName)] = int64(shortRetry.(int32))
+	}
+	
+	if shortTimer, ok := attrs[C.MQIACH_SHORT_TIMER]; ok {
+		mx[fmt.Sprintf("channel_%s_short_timer", cleanName)] = int64(shortTimer.(int32)) * precision
+	}
+	
+	if longRetry, ok := attrs[C.MQIACH_LONG_RETRY]; ok {
+		mx[fmt.Sprintf("channel_%s_long_retry", cleanName)] = int64(longRetry.(int32))
+	}
+	
+	if longTimer, ok := attrs[C.MQIACH_LONG_TIMER]; ok {
+		mx[fmt.Sprintf("channel_%s_long_timer", cleanName)] = int64(longTimer.(int32)) * precision
+	}
+	
+	if maxMsgLength, ok := attrs[C.MQIACH_MAX_MSG_LENGTH]; ok {
+		mx[fmt.Sprintf("channel_%s_max_msg_length", cleanName)] = int64(maxMsgLength.(int32))
+	}
+	
+	if sharingConv, ok := attrs[C.MQIACH_SHARING_CONVERSATIONS]; ok {
+		mx[fmt.Sprintf("channel_%s_sharing_conversations", cleanName)] = int64(sharingConv.(int32))
+	}
+	
+	if netPriority, ok := attrs[C.MQIACH_NETWORK_PRIORITY]; ok {
+		mx[fmt.Sprintf("channel_%s_network_priority", cleanName)] = int64(netPriority.(int32))
 	}
 	
 	return nil
