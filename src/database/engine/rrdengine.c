@@ -1880,7 +1880,7 @@ static struct rrdengine_datafile *release_and_aquire_next_datafile_for_indexing(
             return datafile;
         }
         nd_log_daemon(NDLP_INFO, "DBENGINE: Datafile %u CANNOT be locked for indexing after retries; skipping", datafile->fileno);
-        datafile = datafile->next;
+        datafile = get_next_datafile(datafile, NULL, true);
     }
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
     return NULL;
