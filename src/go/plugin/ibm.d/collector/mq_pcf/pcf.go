@@ -11,7 +11,6 @@ package mq_pcf
 // #include <stdlib.h>
 import "C"
 
-
 import (
 	"fmt"
 	"strings"
@@ -21,29 +20,29 @@ import (
 // PCF constants that may not be available in all MQ versions
 // These constants are defined here to avoid CGO compilation errors
 const (
-	
+
 	// PCF attribute selector constants
-	MQIACF_Q_ATTRS              = C.MQLONG(1002) // Queue attributes selector
-	MQIACF_CHANNEL_ATTRS        = C.MQLONG(1015) // Channel attributes selector
-	
+	// Note: These were invalid constants that don't exist in IBM MQ.
+	// Queue and channel inquiries don't use attribute selectors in the way we tried to use them.
+
 	// Queue Manager CPU and Memory constants (MQ 8.0+)
-	MQIACF_Q_MGR_CPU_LOAD    = C.MQLONG(3024) // Queue Manager CPU load percentage
+	MQIACF_Q_MGR_CPU_LOAD     = C.MQLONG(3024) // Queue Manager CPU load percentage
 	MQIACF_Q_MGR_MEMORY_USAGE = C.MQLONG(3025) // Queue Manager memory usage in bytes
-	MQIACF_Q_MGR_LOG_USAGE   = C.MQLONG(3026) // Queue Manager log usage percentage
-	
+	MQIACF_Q_MGR_LOG_USAGE    = C.MQLONG(3026) // Queue Manager log usage percentage
+
 	// Queue constants that may not be available in all MQ versions
-	MQIA_OLDEST_MSG_AGE      = C.MQLONG(2163) // Oldest message age in seconds (MQ 8.0+)
-	
+	MQIA_OLDEST_MSG_AGE = C.MQLONG(2163) // Oldest message age in seconds (MQ 8.0+)
+
 	// Topic constants that may not be available in all MQ versions
-	MQIA_TOPIC_MSG_COUNT     = C.MQLONG(2164) // Topic message count (MQ 8.0+)
-	
+	MQIA_TOPIC_MSG_COUNT = C.MQLONG(2164) // Topic message count (MQ 8.0+)
+
 	// Channel configuration constants - using C header values
 	// Channel batch and timing settings
-	
+
 	// Channel runtime constants - using C header values
 	// Runtime metrics we can get from MQCMD_INQUIRE_CHANNEL_STATUS
-	
-	// Queue configuration constants - using C header values  
+
+	// Queue configuration constants - using C header values
 	// Basic queue configuration available via MQCMD_INQUIRE_Q
 )
 
@@ -70,12 +69,12 @@ func (p *stringParameter) size() C.size_t {
 	// MQCFST structure size calculation matches C: sizeof(MQCFST) - sizeof(MQCHAR) + string length
 	// The MQCFST struct already includes space for one MQCHAR, so we subtract it
 	strLen := len(p.value)
-	
+
 	// Check if this is an MQ object name parameter
 	if p.parameter == C.MQCA_Q_NAME || p.parameter == C.MQCACH_CHANNEL_NAME {
 		strLen = 48
 	}
-	
+
 	paddedLen := (strLen + 3) & ^3 // Round up to multiple of 4
 	return C.sizeof_MQCFST - C.sizeof_MQCHAR + C.size_t(paddedLen)
 }
@@ -86,14 +85,14 @@ func (p *stringParameter) marshal(buffer unsafe.Pointer) {
 	cfst.StrucLength = C.MQLONG(p.size())
 	cfst.Parameter = p.parameter
 	cfst.CodedCharSetId = C.MQCCSI_DEFAULT
-	
+
 	// For MQ object names, we need special handling
 	strLen := len(p.value)
 	isObjectName := p.parameter == C.MQCA_Q_NAME || p.parameter == C.MQCACH_CHANNEL_NAME
-	
+
 	// StringLength is always the actual string length, not the padded length
 	cfst.StringLength = C.MQLONG(len(p.value))
-	
+
 	if isObjectName {
 		// MQ object names are padded to 48 characters
 		strLen = 48
@@ -146,12 +145,12 @@ func (p *stringFilterParameter) size() C.size_t {
 	// MQCFSF structure size calculation matches C: sizeof(MQCFSF) - sizeof(MQCHAR) + string length
 	// The MQCFSF struct already includes space for one MQCHAR, so we subtract it
 	strLen := len(p.value)
-	
+
 	// Check if this is an MQ object name parameter
 	if p.parameter == C.MQCA_Q_NAME || p.parameter == C.MQCACH_CHANNEL_NAME {
 		strLen = 48
 	}
-	
+
 	paddedLen := (strLen + 3) & ^3 // Round up to multiple of 4
 	return C.sizeof_MQCFSF - C.sizeof_MQCHAR + C.size_t(paddedLen)
 }
@@ -163,11 +162,11 @@ func (p *stringFilterParameter) marshal(buffer unsafe.Pointer) {
 	cfsf.Parameter = p.parameter
 	cfsf.CodedCharSetId = C.MQCCSI_DEFAULT
 	cfsf.Operator = p.operator
-	
+
 	// For MQ object names, we need special handling
 	strLen := len(p.value)
 	isObjectName := p.parameter == C.MQCA_Q_NAME || p.parameter == C.MQCACH_CHANNEL_NAME
-	
+
 	// Calculate the actual buffer size for the string data (must match size())
 	paddedLen := (strLen + 3) & ^3
 
@@ -245,7 +244,7 @@ func (p *intListParameter) marshal(buffer unsafe.Pointer) {
 	cfil.StrucLength = C.MQLONG(p.size())
 	cfil.Parameter = p.parameter
 	cfil.Count = C.MQLONG(len(p.values))
-	
+
 	// Copy integer values - start after the fixed 16-byte header
 	if len(p.values) > 0 {
 		valuesPtr := (*C.MQLONG)(unsafe.Pointer(uintptr(buffer) + 16))
@@ -260,42 +259,42 @@ func (c *Collector) parsePCFResponse(response []byte, command string) (map[C.MQL
 	if len(response) < int(C.sizeof_MQCFH) {
 		return nil, fmt.Errorf("response too short for PCF header")
 	}
-	
+
 	attrs := make(map[C.MQLONG]interface{})
-	
+
 	// Parse PCF header
 	cfh := (*C.MQCFH)(unsafe.Pointer(&response[0]))
-	
+
 	// Only log successful responses or responses with parameters to debug
 	// Commented out - too verbose even for successful responses
 	// if cfh.CompCode == C.MQCC_OK || cfh.ParameterCount > 0 {
-	// 	c.Debugf("parsePCFResponse: Type=%d, CompCode=%d, Reason=%d, ParameterCount=%d", 
+	// 	c.Debugf("parsePCFResponse: Type=%d, CompCode=%d, Reason=%d, ParameterCount=%d",
 	// 		cfh.Type, cfh.CompCode, cfh.Reason, cfh.ParameterCount)
 	// }
-	
+
 	if cfh.Type != C.MQCFT_RESPONSE {
 		return nil, fmt.Errorf("unexpected PCF message type: %d", cfh.Type)
 	}
-	
+
 	// Store the completion code and reason in the attributes for the caller to check
 	attrs[C.MQIACF_COMP_CODE] = int32(cfh.CompCode)
 	attrs[C.MQIACF_REASON_CODE] = int32(cfh.Reason)
-	
+
 	// Track PCF command execution
 	if command != "" {
 		c.pcfTracker.trackRequest(command, int32(cfh.CompCode), int32(cfh.Reason))
 	}
-	
+
 	// If no parameters, just return the attrs with error codes
 	if cfh.ParameterCount == 0 {
 		return attrs, nil
 	}
-	
+
 	// Parse parameters
 	offset := C.sizeof_MQCFH
 	for i := 0; i < int(cfh.ParameterCount) && offset < len(response); i++ {
 		paramType := *(*C.MQLONG)(unsafe.Pointer(&response[offset]))
-		
+
 		switch paramType {
 		case C.MQCFT_INTEGER:
 			if offset+int(C.sizeof_MQCFIN) > len(response) {
@@ -310,7 +309,7 @@ func (c *Collector) parsePCFResponse(response []byte, command string) (map[C.MQL
 			}
 			attrs[cfin.Parameter] = int32(cfin.Value)
 			offset += int(cfin.StrucLength)
-			
+
 		case C.MQCFT_STRING:
 			if offset+int(C.sizeof_MQCFST) > len(response) {
 				c.Debugf("Not enough space for MQCFST at offset %d", offset)
@@ -323,9 +322,9 @@ func (c *Collector) parsePCFResponse(response []byte, command string) (map[C.MQL
 				return attrs, nil
 			}
 			// Log parameter details for debugging
-			// c.Debugf("MQCFST: StrucLength=%d, StringLength=%d, Parameter=%d", 
+			// c.Debugf("MQCFST: StrucLength=%d, StringLength=%d, Parameter=%d",
 			// 	cfst.StrucLength, cfst.StringLength, cfst.Parameter)
-			
+
 			// Extract string value using a slice for robustness
 			// String data starts at offset 20 within MQCFST (after the fixed header fields)
 			stringDataStart := offset + 20
@@ -339,7 +338,7 @@ func (c *Collector) parsePCFResponse(response []byte, command string) (map[C.MQL
 			trimmedValue := strings.TrimSpace(value)
 			attrs[cfst.Parameter] = trimmedValue
 			offset += int(cfst.StrucLength)
-			
+
 		case C.MQCFT_INTEGER_LIST:
 			if offset+int(C.sizeof_MQCFIL) > len(response) {
 				c.Debugf("Not enough space for MQCFIL at offset %d", offset)
@@ -353,7 +352,7 @@ func (c *Collector) parsePCFResponse(response []byte, command string) (map[C.MQL
 			}
 			// Handle integer lists if needed
 			offset += int(cfil.StrucLength)
-			
+
 		default:
 			// Skip unknown parameter types
 			if offset+8 > len(response) { // Need at least 8 bytes for type + length
@@ -369,10 +368,9 @@ func (c *Collector) parsePCFResponse(response []byte, command string) (map[C.MQL
 			offset += int(strucLength)
 		}
 	}
-	
+
 	return attrs, nil
 }
-
 
 // ChannelParseResult contains the results of parsing channel list response
 type ChannelParseResult struct {
@@ -384,9 +382,9 @@ type ChannelParseResult struct {
 
 // Internal error codes (negative to distinguish from MQ codes)
 const (
-	ErrInternalParsing = -1  // Failed to parse PCF message
-	ErrInternalShort   = -2  // Response too short
-	ErrInternalCorrupt = -3  // Corrupted message structure
+	ErrInternalParsing = -1 // Failed to parse PCF message
+	ErrInternalShort   = -2 // Response too short
+	ErrInternalCorrupt = -3 // Corrupted message structure
 )
 
 // mqErrorString returns a human-readable description for MQ error codes
@@ -422,7 +420,7 @@ func (c *Collector) parseChannelListResponse(response []byte, command string) *C
 		ErrorCounts:   make(map[int32]int),
 		ErrorChannels: make(map[int32][]string),
 	}
-	
+
 	// Parse response in chunks (each channel gets its own response message)
 	offset := 0
 	itemNumber := 0
@@ -432,12 +430,12 @@ func (c *Collector) parseChannelListResponse(response []byte, command string) *C
 			result.ErrorCounts[ErrInternalShort]++
 			break
 		}
-		
+
 		cfh := (*C.MQCFH)(unsafe.Pointer(&response[offset]))
 		// Calculate the full message size by walking through all parameters
 		messageSize := int(C.sizeof_MQCFH)
 		paramOffset := offset + int(C.sizeof_MQCFH)
-		
+
 		for i := 0; i < int(cfh.ParameterCount) && paramOffset < len(response); i++ {
 			if paramOffset+8 > len(response) { // Need at least type + length
 				break
@@ -449,18 +447,18 @@ func (c *Collector) parseChannelListResponse(response []byte, command string) *C
 			messageSize += int(paramLength)
 			paramOffset += int(paramLength)
 		}
-		
+
 		messageEnd := offset + messageSize
-		
+
 		if messageEnd > len(response) {
 			result.InternalErrors++
 			result.ErrorCounts[ErrInternalCorrupt]++
 			break
 		}
-		
+
 		// Increment item number for this array element
 		itemNumber++
-		
+
 		// Parse this message
 		attrs, err := c.parsePCFResponse(response[offset:messageEnd], "")
 		if err != nil {
@@ -470,7 +468,7 @@ func (c *Collector) parseChannelListResponse(response []byte, command string) *C
 			offset = messageEnd
 			continue
 		}
-		
+
 		// Check for MQ errors and track array item
 		var mqError int32
 		var compCode int32
@@ -487,12 +485,12 @@ func (c *Collector) parseChannelListResponse(response []byte, command string) *C
 				compCode = code
 			}
 		}
-		
+
 		// Track array item
 		if command != "" {
 			c.pcfTracker.trackArrayItem(command, compCode, mqError)
 		}
-		
+
 		// Extract channel name
 		channelName := ""
 		if name, ok := attrs[C.MQCACH_CHANNEL_NAME]; ok {
@@ -500,7 +498,7 @@ func (c *Collector) parseChannelListResponse(response []byte, command string) *C
 				channelName = strings.TrimSpace(nameStr)
 			}
 		}
-		
+
 		// Log individual array item failures
 		if mqError != 0 && command != "" {
 			objectName := "NO_NAME"
@@ -510,7 +508,7 @@ func (c *Collector) parseChannelListResponse(response []byte, command string) *C
 			c.Debugf("Failed PCF response to %s array item %d, reason %d (%s), on channel %s",
 				command, itemNumber, mqError, mqErrorString(mqError), objectName)
 		}
-		
+
 		// Store result based on error status
 		if mqError != 0 {
 			// Channel had an error
@@ -521,10 +519,10 @@ func (c *Collector) parseChannelListResponse(response []byte, command string) *C
 			// Successful channel
 			result.Channels = append(result.Channels, channelName)
 		}
-		
+
 		offset = messageEnd
 	}
-	
+
 	return result
 }
 
@@ -539,11 +537,11 @@ type QueueParseResult struct {
 // Parse queue list response
 func (c *Collector) parseQueueListResponse(response []byte, command string) *QueueParseResult {
 	result := &QueueParseResult{
-		Queues:       make([]string, 0),
-		ErrorCounts:  make(map[int32]int),
-		ErrorQueues:  make(map[int32][]string),
+		Queues:      make([]string, 0),
+		ErrorCounts: make(map[int32]int),
+		ErrorQueues: make(map[int32][]string),
 	}
-	
+
 	// Parse response in chunks (each queue gets its own response message)
 	offset := 0
 	itemNumber := 0
@@ -553,12 +551,12 @@ func (c *Collector) parseQueueListResponse(response []byte, command string) *Que
 			result.ErrorCounts[ErrInternalShort]++
 			break
 		}
-		
+
 		cfh := (*C.MQCFH)(unsafe.Pointer(&response[offset]))
 		// Calculate the full message size by walking through all parameters
 		messageSize := int(C.sizeof_MQCFH)
 		paramOffset := offset + int(C.sizeof_MQCFH)
-		
+
 		for i := 0; i < int(cfh.ParameterCount) && paramOffset < len(response); i++ {
 			if paramOffset+8 > len(response) { // Need at least type + length
 				break
@@ -570,18 +568,18 @@ func (c *Collector) parseQueueListResponse(response []byte, command string) *Que
 			messageSize += int(paramLength)
 			paramOffset += int(paramLength)
 		}
-		
+
 		messageEnd := offset + messageSize
-		
+
 		if messageEnd > len(response) {
 			result.InternalErrors++
 			result.ErrorCounts[ErrInternalCorrupt]++
 			break
 		}
-		
+
 		// Increment item number for this array element
 		itemNumber++
-		
+
 		// Parse this message
 		attrs, err := c.parsePCFResponse(response[offset:messageEnd], "")
 		if err != nil {
@@ -591,7 +589,7 @@ func (c *Collector) parseQueueListResponse(response []byte, command string) *Que
 			offset = messageEnd
 			continue
 		}
-		
+
 		// Check for MQ errors and track array item
 		var mqError int32
 		var compCode int32
@@ -608,12 +606,12 @@ func (c *Collector) parseQueueListResponse(response []byte, command string) *Que
 				compCode = code
 			}
 		}
-		
+
 		// Track array item
 		if command != "" {
 			c.pcfTracker.trackArrayItem(command, compCode, mqError)
 		}
-		
+
 		// Extract queue name
 		queueName := ""
 		if name, ok := attrs[C.MQCA_Q_NAME]; ok {
@@ -621,7 +619,7 @@ func (c *Collector) parseQueueListResponse(response []byte, command string) *Que
 				queueName = strings.TrimSpace(nameStr)
 			}
 		}
-		
+
 		// Log individual array item failures
 		if mqError != 0 && command != "" {
 			objectName := "NO_NAME"
@@ -631,7 +629,7 @@ func (c *Collector) parseQueueListResponse(response []byte, command string) *Que
 			c.Debugf("Failed PCF response to %s array item %d, reason %d (%s), on queue %s",
 				command, itemNumber, mqError, mqErrorString(mqError), objectName)
 		}
-		
+
 		// Store result based on error status
 		if mqError != 0 {
 			// Queue had an error
@@ -642,17 +640,17 @@ func (c *Collector) parseQueueListResponse(response []byte, command string) *Que
 			// Successful queue
 			result.Queues = append(result.Queues, queueName)
 		}
-		
+
 		offset = messageEnd
 	}
-	
+
 	return result
 }
 
 // Parse topic list response
 func (c *Collector) parseTopicListResponse(response []byte, command string) ([]string, error) {
 	var topics []string
-	
+
 	// Parse response in chunks (each topic gets its own response message)
 	offset := 0
 	itemNumber := 0
@@ -660,12 +658,12 @@ func (c *Collector) parseTopicListResponse(response []byte, command string) ([]s
 		if offset+int(C.sizeof_MQCFH) > len(response) {
 			break
 		}
-		
+
 		cfh := (*C.MQCFH)(unsafe.Pointer(&response[offset]))
 		// Calculate the full message size by walking through all parameters
 		messageSize := int(C.sizeof_MQCFH)
 		paramOffset := offset + int(C.sizeof_MQCFH)
-		
+
 		for i := 0; i < int(cfh.ParameterCount) && paramOffset < len(response); i++ {
 			if paramOffset+8 > len(response) { // Need at least type + length
 				break
@@ -677,16 +675,16 @@ func (c *Collector) parseTopicListResponse(response []byte, command string) ([]s
 			messageSize += int(paramLength)
 			paramOffset += int(paramLength)
 		}
-		
+
 		messageEnd := offset + messageSize
-		
+
 		if messageEnd > len(response) {
 			break
 		}
-		
+
 		// Increment item number for this array element
 		itemNumber++
-		
+
 		// Parse this message
 		attrs, err := c.parsePCFResponse(response[offset:messageEnd], command)
 		if err != nil {
@@ -694,12 +692,12 @@ func (c *Collector) parseTopicListResponse(response []byte, command string) ([]s
 			offset = messageEnd
 			continue
 		}
-		
+
 		// Track array item
 		var mqError int32
 		var compCode int32
 		var topicNameStr string
-		
+
 		if command != "" {
 			if reasonCode, ok := attrs[C.MQIACF_REASON_CODE]; ok {
 				if reason, ok := reasonCode.(int32); ok {
@@ -713,7 +711,7 @@ func (c *Collector) parseTopicListResponse(response []byte, command string) ([]s
 			}
 			c.pcfTracker.trackArrayItem(command, compCode, mqError)
 		}
-		
+
 		// Extract topic name
 		if topicName, ok := attrs[C.MQCA_TOPIC_NAME]; ok {
 			if name, ok := topicName.(string); ok && name != "" {
@@ -721,7 +719,7 @@ func (c *Collector) parseTopicListResponse(response []byte, command string) ([]s
 				topics = append(topics, topicNameStr)
 			}
 		}
-		
+
 		// Log individual array item failures
 		if mqError != 0 && command != "" {
 			objectName := "NO_NAME"
@@ -731,9 +729,9 @@ func (c *Collector) parseTopicListResponse(response []byte, command string) ([]s
 			c.Debugf("Failed PCF response to %s array item %d, reason %d (%s), on topic %s",
 				command, itemNumber, mqError, mqErrorString(mqError), objectName)
 		}
-		
+
 		offset = messageEnd
 	}
-	
+
 	return topics, nil
 }
