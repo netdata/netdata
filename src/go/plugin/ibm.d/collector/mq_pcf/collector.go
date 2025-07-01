@@ -75,13 +75,17 @@ type Collector struct {
 	
 	// Debug counters
 	pcfCommandCount int
+	
+	// PCF tracking for detailed command analysis
+	pcfTracker *pcfTracker
 }
 
 // New creates a new collector.
 func New() *Collector {
 	return &Collector{
-		charts:   baseCharts.Copy(),
-		collected: make(map[string]bool),
+		charts:     baseCharts.Copy(),
+		collected:  make(map[string]bool),
+		pcfTracker: newPCFTracker(),
 	}
 }
 

@@ -265,7 +265,7 @@ func (p *intListParameter) marshal(buffer unsafe.Pointer) {
 }
 
 // Parse PCF response into a map of attributes
-func (c *Collector) parsePCFResponse(response []byte) (map[C.MQLONG]interface{}, error) {
+func (c *Collector) parsePCFResponse(response []byte, command string) (map[C.MQLONG]interface{}, error) {
 	if len(response) < int(C.sizeof_MQCFH) {
 		return nil, fmt.Errorf("response too short for PCF header")
 	}
@@ -289,6 +289,11 @@ func (c *Collector) parsePCFResponse(response []byte) (map[C.MQLONG]interface{},
 	// Store the completion code and reason in the attributes for the caller to check
 	attrs[C.MQIACF_COMP_CODE] = int32(cfh.CompCode)
 	attrs[C.MQIACF_REASON_CODE] = int32(cfh.Reason)
+	
+	// Track PCF command execution
+	if command != "" {
+		c.pcfTracker.trackRequest(command, int32(cfh.CompCode), int32(cfh.Reason))
+	}
 	
 	// If no parameters, just return the attrs with error codes
 	if cfh.ParameterCount == 0 {
@@ -414,7 +419,7 @@ func mqErrorString(code int32) string {
 }
 
 // Parse channel list response
-func (c *Collector) parseChannelListResponse(response []byte) *ChannelParseResult {
+func (c *Collector) parseChannelListResponse(response []byte, command string) *ChannelParseResult {
 	result := &ChannelParseResult{
 		Channels:      make([]string, 0),
 		ErrorCounts:   make(map[int32]int),
@@ -456,7 +461,7 @@ func (c *Collector) parseChannelListResponse(response []byte) *ChannelParseResul
 		}
 		
 		// Parse this message
-		attrs, err := c.parsePCFResponse(response[offset:messageEnd])
+		attrs, err := c.parsePCFResponse(response[offset:messageEnd], "")
 		if err != nil {
 			// This is a real parsing error
 			result.InternalErrors++
@@ -465,13 +470,26 @@ func (c *Collector) parseChannelListResponse(response []byte) *ChannelParseResul
 			continue
 		}
 		
-		// Check for MQ errors
+		// Check for MQ errors and track array item
 		var mqError int32
+		var compCode int32
 		if reasonCode, ok := attrs[C.MQIACF_REASON_CODE]; ok {
-			if reason, ok := reasonCode.(int32); ok && reason != 0 {
+			if reason, ok := reasonCode.(int32); ok {
 				mqError = reason
-				result.ErrorCounts[mqError]++
+				if reason != 0 {
+					result.ErrorCounts[mqError]++
+				}
 			}
+		}
+		if compCodeVal, ok := attrs[C.MQIACF_COMP_CODE]; ok {
+			if code, ok := compCodeVal.(int32); ok {
+				compCode = code
+			}
+		}
+		
+		// Track array item
+		if command != "" {
+			c.pcfTracker.trackArrayItem(command, compCode, mqError)
 		}
 		
 		// Extract channel name
@@ -508,7 +526,7 @@ type QueueParseResult struct {
 }
 
 // Parse queue list response
-func (c *Collector) parseQueueListResponse(response []byte) *QueueParseResult {
+func (c *Collector) parseQueueListResponse(response []byte, command string) *QueueParseResult {
 	result := &QueueParseResult{
 		Queues:       make([]string, 0),
 		ErrorCounts:  make(map[int32]int),
@@ -550,7 +568,7 @@ func (c *Collector) parseQueueListResponse(response []byte) *QueueParseResult {
 		}
 		
 		// Parse this message
-		attrs, err := c.parsePCFResponse(response[offset:messageEnd])
+		attrs, err := c.parsePCFResponse(response[offset:messageEnd], "")
 		if err != nil {
 			// This is a real parsing error
 			result.InternalErrors++
@@ -559,13 +577,26 @@ func (c *Collector) parseQueueListResponse(response []byte) *QueueParseResult {
 			continue
 		}
 		
-		// Check for MQ errors
+		// Check for MQ errors and track array item
 		var mqError int32
+		var compCode int32
 		if reasonCode, ok := attrs[C.MQIACF_REASON_CODE]; ok {
-			if reason, ok := reasonCode.(int32); ok && reason != 0 {
+			if reason, ok := reasonCode.(int32); ok {
 				mqError = reason
-				result.ErrorCounts[mqError]++
+				if reason != 0 {
+					result.ErrorCounts[mqError]++
+				}
 			}
+		}
+		if compCodeVal, ok := attrs[C.MQIACF_COMP_CODE]; ok {
+			if code, ok := compCodeVal.(int32); ok {
+				compCode = code
+			}
+		}
+		
+		// Track array item
+		if command != "" {
+			c.pcfTracker.trackArrayItem(command, compCode, mqError)
 		}
 		
 		// Extract queue name
@@ -594,7 +625,7 @@ func (c *Collector) parseQueueListResponse(response []byte) *QueueParseResult {
 }
 
 // Parse topic list response
-func (c *Collector) parseTopicListResponse(response []byte) ([]string, error) {
+func (c *Collector) parseTopicListResponse(response []byte, command string) ([]string, error) {
 	var topics []string
 	
 	// Parse response in chunks (each topic gets its own response message)
@@ -628,11 +659,28 @@ func (c *Collector) parseTopicListResponse(response []byte) ([]string, error) {
 		}
 		
 		// Parse this message
-		attrs, err := c.parsePCFResponse(response[offset:messageEnd])
+		attrs, err := c.parsePCFResponse(response[offset:messageEnd], command)
 		if err != nil {
 			c.Warningf("failed to parse topic response: %v", err)
 			offset = messageEnd
 			continue
+		}
+		
+		// Track array item
+		if command != "" {
+			var mqError int32
+			var compCode int32
+			if reasonCode, ok := attrs[C.MQIACF_REASON_CODE]; ok {
+				if reason, ok := reasonCode.(int32); ok {
+					mqError = reason
+				}
+			}
+			if compCodeVal, ok := attrs[C.MQIACF_COMP_CODE]; ok {
+				if code, ok := compCodeVal.(int32); ok {
+					compCode = code
+				}
+			}
+			c.pcfTracker.trackArrayItem(command, compCode, mqError)
 		}
 		
 		// Extract topic name
