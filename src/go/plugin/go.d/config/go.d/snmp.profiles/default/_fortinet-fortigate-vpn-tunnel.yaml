@@ -22,7 +22,7 @@ metrics:
         name: fgVpnTunEntStatus
         chart_meta:
           description: Current status of tunnel (up or down)
-          family: VPN/Tunnel/Operational/Status
+          family: VPN/Tunnel/Status
           unit: "{status}"
         mapping:
           1: down
