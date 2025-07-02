@@ -40,6 +40,7 @@ type Config struct {
 	RunModule                 string
 	RunJob                    []string
 	MinUpdateEvery            int
+	DumpMode                  time.Duration
 }
 
 // Agent represents orchestrator.
@@ -65,11 +66,16 @@ type Agent struct {
 	api *netdataapi.API
 
 	quitCh chan struct{}
+
+	// Dump mode
+	dumpMode     time.Duration
+	dumpAnalyzer *DumpAnalyzer
+	mgr          *jobmgr.Manager
 }
 
 // New creates a new Agent.
 func New(cfg Config) *Agent {
-	return &Agent{
+	a := &Agent{
 		Logger: logger.New().With(
 			slog.String("component", "agent"),
 		),
@@ -86,7 +92,15 @@ func New(cfg Config) *Agent {
 		Out:                       safewriter.Stdout,
 		api:                       netdataapi.New(safewriter.Stdout),
 		quitCh:                    make(chan struct{}, 1),
+		dumpMode:                  cfg.DumpMode,
 	}
+
+	if a.dumpMode > 0 {
+		a.dumpAnalyzer = NewDumpAnalyzer()
+		a.Infof("dump mode enabled: will run for %v and analyze metric structure", a.dumpMode)
+	}
+
+	return a
 }
 
 // Run starts the Agent.
@@ -103,6 +117,14 @@ func serve(a *Agent) {
 	var wg sync.WaitGroup
 
 	var exit bool
+
+	// Set up dump mode timer if enabled
+	var dumpTimer *time.Timer
+	var dumpTimerCh <-chan time.Time
+	if a.dumpMode > 0 {
+		dumpTimer = time.NewTimer(a.dumpMode)
+		dumpTimerCh = dumpTimer.C
+	}
 
 	for {
 		module.ObsoleteCharts(true)
@@ -123,6 +145,10 @@ func serve(a *Agent) {
 			}
 		case <-a.quitCh:
 			a.Infof("received QUIT command. Terminating...")
+			exit = true
+		case <-dumpTimerCh:
+			a.Infof("dump mode duration expired, collecting analysis...")
+			a.collectDumpAnalysis()
 			exit = true
 		}
 
@@ -206,6 +232,13 @@ func (a *Agent) run(ctx context.Context) {
 	jobMgr.ConfigDefaults = discCfg.Registry
 	jobMgr.FnReg = fnMgr
 
+	// Store reference for dump mode and enable dump mode if configured
+	a.mgr = jobMgr
+	if a.dumpMode > 0 {
+		jobMgr.DumpMode = true
+		jobMgr.DumpAnalyzer = a.dumpAnalyzer
+	}
+
 	if reg := a.setupVnodeRegistry(); len(reg) > 0 {
 		jobMgr.Vnodes = reg
 	}
@@ -246,4 +279,17 @@ func (a *Agent) keepAlive() {
 			os.Exit(0)
 		}
 	}
+}
+
+func (a *Agent) collectDumpAnalysis() {
+	if a.dumpAnalyzer == nil || a.mgr == nil {
+		a.Error("dump analyzer or job manager not initialized")
+		return
+	}
+
+	// Analyze all collected data
+	a.dumpAnalyzer.Analyze()
+
+	// Print the analysis report
+	a.dumpAnalyzer.PrintReport()
 }
