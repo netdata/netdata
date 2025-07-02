@@ -10,7 +10,7 @@ Welcome to Netdata! This guide will help you set up comprehensive infrastructure
 
 ## Quick Start: 4 Essential Steps
 
-### Step 1: Install Netdata
+### 1: Install Netdata
 
 You can install Netdata on all major operating systems. Choose your platform and follow the installation guide:
 
@@ -25,7 +25,7 @@ You can install Netdata on all major operating systems. Choose your platform and
 You can access the Netdata UI at `http://localhost:19999` (or `http://NODE:19999` if remote).
 :::
 
-### Step 2: Connect Your Nodes & See the Magic
+### 2: Connect Your Nodes & See the Magic
 
 Whether it's a **server, container, or virtual machine, Netdata makes it easy to bring your infrastructure under observation**. Once you install the Agent, you'll immediately see your system metrics flowing in.
 
@@ -35,7 +35,7 @@ Whether it's a **server, container, or virtual machine, Netdata makes it easy to
 
 :::
 
-### Step 3: Configure Data Collection & Integrations
+### 3: Configure Data Collection & Integrations
 
 Netdata auto-discovers most metrics, but you can expand monitoring with our extensive integration library:
 
@@ -49,7 +49,7 @@ Netdata auto-discovers most metrics, but you can expand monitoring with our exte
 
 :::
 
-### Step 4: Set Up Alerts & Notifications
+### 4: Set Up Alerts & Notifications
 
 You can use hundreds of built-in alerts and integrate with your preferred notification channels:
 
