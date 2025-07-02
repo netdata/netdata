@@ -77,6 +77,8 @@ type JobConfig struct {
 	Priority        int
 	IsStock         bool
 	Vnode           vnodes.VirtualNode
+	DumpMode        bool
+	DumpAnalyzer    interface{}
 }
 
 const (
@@ -114,6 +116,8 @@ func NewJob(cfg JobConfig) *Job {
 		api:                  netdataapi.New(&buf),
 		vnode:                cfg.Vnode,
 		updVnode:             make(chan *vnodes.VirtualNode, 1),
+		dumpMode:             cfg.DumpMode,
+		dumpAnalyzer:         cfg.DumpAnalyzer,
 	}
 
 	log := logger.New().With(
@@ -167,6 +171,10 @@ type Job struct {
 	prevRun time.Time
 
 	stop chan struct{}
+
+	// Dump mode support
+	dumpMode     bool
+	dumpAnalyzer interface{} // Will be *agent.DumpAnalyzer but avoid circular dependency
 }
 
 // NetdataChartIDMaxLength is the chart ID max length. See RRD_ID_LENGTH_MAX in the netdata source code.
@@ -252,6 +260,15 @@ func (j *Job) AutoDetection() (err error) {
 		j.Errorf("postCheck failed: %v", err)
 		j.disableAutoDetection()
 		return err
+	}
+
+	// Record job structure for dump mode after successful detection
+	if j.dumpMode && j.dumpAnalyzer != nil && j.charts != nil {
+		if analyzer, ok := j.dumpAnalyzer.(interface {
+			RecordJobStructure(string, string, *Charts)
+		}); ok {
+			analyzer.RecordJobStructure(j.name, j.moduleName, j.charts)
+		}
 	}
 
 	return nil
@@ -412,7 +429,18 @@ func (j *Job) collect() (result map[string]int64) {
 			}
 		}
 	}()
-	return j.module.Collect(context.TODO())
+	result = j.module.Collect(context.TODO())
+
+	// Record collected metrics for dump mode
+	if j.dumpMode && j.dumpAnalyzer != nil && result != nil {
+		if analyzer, ok := j.dumpAnalyzer.(interface {
+			RecordCollection(string, map[string]int64)
+		}); ok {
+			analyzer.RecordCollection(j.name, result)
+		}
+	}
+
+	return result
 }
 
 func (j *Job) processMetrics(metrics map[string]int64, startTime time.Time, sinceLastRun int) bool {
