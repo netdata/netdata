@@ -172,7 +172,7 @@ func (da *DumpAnalyzer) RecordLabel(jobName, family, context, chartID, key, valu
 }
 
 // RecordCollection records a data collection
-func (da *DumpAnalyzer) RecordCollection(jobName, family, context, chartID string, values map[string]int64) {
+func (da *DumpAnalyzer) RecordCollection(jobName, family, context, chartID string, values map[string]int64, emptyDims map[string]bool) {
 	da.mu.Lock()
 	defer da.mu.Unlock()
 
@@ -185,15 +185,15 @@ func (da *DumpAnalyzer) RecordCollection(jobName, family, context, chartID strin
 	for dimID, value := range values {
 		if dim, exists := inst.Dimensions[dimID]; exists {
 			dim.Collections++
-			if value != 0 {
-				dim.NonEmptyCollections++
-			} else {
+			// Check if this dimension was explicitly set as empty
+			if empty, isEmptySet := emptyDims[dimID]; isEmptySet && empty {
 				dim.EmptyCollections++
-			}
-
-			// Store up to 100 values for analysis
-			if len(dim.Values) < 100 {
-				dim.Values = append(dim.Values, value)
+			} else {
+				dim.NonEmptyCollections++
+				// Store up to 100 values for analysis
+				if len(dim.Values) < 100 {
+					dim.Values = append(dim.Values, value)
+				}
 			}
 		}
 	}
@@ -494,6 +494,7 @@ type DumpWriter struct {
 	currentContext string
 	inCollection   bool
 	collectionData map[string]int64
+	emptyDims      map[string]bool // Track which dimensions are explicitly set as empty
 }
 
 // NewDumpWriter creates a new dump writer
@@ -503,6 +504,7 @@ func NewDumpWriter(analyzer *DumpAnalyzer, jobName, module string) *DumpWriter {
 		jobName:        jobName,
 		module:         module,
 		collectionData: make(map[string]int64),
+		emptyDims:      make(map[string]bool),
 	}
 }
 
@@ -617,6 +619,7 @@ func (dw *DumpWriter) beginCollection(parts []string) {
 
 	dw.inCollection = true
 	dw.collectionData = make(map[string]int64)
+	dw.emptyDims = make(map[string]bool)
 }
 
 func (dw *DumpWriter) setValue(parts []string) {
@@ -631,10 +634,12 @@ func (dw *DumpWriter) setValue(parts []string) {
 	// Check if value is provided (SET id = value)
 	if len(parts) >= 4 && parts[2] == "=" {
 		fmt.Sscanf(parts[3], "%d", &value)
+		dw.collectionData[dimID] = value
+		dw.emptyDims[dimID] = false
+	} else {
+		// If no value provided (SET id), mark as empty
+		dw.emptyDims[dimID] = true
 	}
-	// If no value provided (SET id), value remains 0 which represents empty/gap
-
-	dw.collectionData[dimID] = value
 }
 
 func (dw *DumpWriter) setEmpty(parts []string) {
@@ -644,7 +649,7 @@ func (dw *DumpWriter) setEmpty(parts []string) {
 	}
 
 	dimID := strings.Trim(parts[1], "'\"")
-	dw.collectionData[dimID] = 0 // Empty value
+	dw.emptyDims[dimID] = true
 }
 
 func (dw *DumpWriter) endCollection() {
@@ -652,6 +657,6 @@ func (dw *DumpWriter) endCollection() {
 		return
 	}
 
-	dw.analyzer.RecordCollection(dw.jobName, dw.currentFamily, dw.currentContext, dw.currentChart, dw.collectionData)
+	dw.analyzer.RecordCollection(dw.jobName, dw.currentFamily, dw.currentContext, dw.currentChart, dw.collectionData, dw.emptyDims)
 	dw.inCollection = false
 }
