@@ -24,7 +24,7 @@ metrics:
         chart_meta:
           description: The number of times this neighbor relationship has changed state or an error has occurred
           family: Routing/OSPF/Neighbor/Event/Count
-          unit: "{event}"
+          unit: "{event}/s"
       - OID: 1.3.6.1.2.1.14.10.1.8
         name: ospfNbrLsRetransQLen
         chart_meta:
@@ -32,14 +32,14 @@ metrics:
           family: Routing/OSPF/Neighbor/Queue/RetransmitLength
           unit: "{message}"
     metric_tags:
-      - symbol:
+      - tag: neighbor_id
+        symbol:
           OID: 1.3.6.1.2.1.14.10.1.3
           name: ospfNbrRtrId
-        tag: neighbor_id
-      - symbol:
+      - tag: neighbor_ip
+        symbol:
           OID: 1.3.6.1.2.1.14.10.1.1
           name: ospfNbrIpAddr
-        tag: neighbor_ip
 
   - MIB: OSPF-MIB
     table:
@@ -66,7 +66,7 @@ metrics:
         chart_meta:
           description: The number of times this virtual link has changed its state or an error has occurred
           family: Routing/OSPF/VirtualNeighbor/Event/Count
-          unit: "{change}"
+          unit: "{change}/s"
       - OID: 1.3.6.1.2.1.14.11.1.7
         name: ospfVirtNbrLsRetransQLen
         chart_meta:
@@ -74,14 +74,14 @@ metrics:
           family: Routing/OSPF/VirtualNeighbor/Queue/RetransmitLength
           unit: "{message}"
     metric_tags:
-      - symbol:
-          OID: 1.3.6.1.2.1.14.11.1.3
-          name: ospfVirtNbrIpAddr
-        tag: neighbor_ip
-      - symbol:
+      - tag: neighbor_id
+        symbol:
           OID: 1.3.6.1.2.1.14.11.1.2
           name: ospfVirtNbrRtrId
-        tag: neighbor_id
+      - tag: neighbor_ip
+        symbol:
+          OID: 1.3.6.1.2.1.14.11.1.3
+          name: ospfVirtNbrIpAddr
 
   - MIB: OSPF-MIB
     table:
@@ -107,7 +107,7 @@ metrics:
         chart_meta:
           description: The total number of link-local link state advertisements in this interface's link-local link state database
           family: Routing/OSPF/Interface/LinkStateAdvertisement/Count
-          unit: "{advertisement}"
+          unit: "{advertisement}/s"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.7.1.1
@@ -139,11 +139,11 @@ metrics:
         chart_meta:
           description: The total number of link-local link state advertisements in this virtual interface's link-local link state database
           family: Routing/OSPF/VirtualInterface/LinkStateAdvertisement/Count
-          unit: "{advertisement}"
+          unit: "{advertisement}/s"
     metric_tags:
-      - symbol:
+      - tag: neighbor_id
+        MIB: OSPF-MIB
+        table: ospfVirtNbrTable
+        symbol:
           OID: 1.3.6.1.2.1.14.11.1.2
           name: ospfVirtNbrRtrId
-        table: ospfVirtNbrTable
-        MIB: OSPF-MIB
-        tag: neighbor_id
