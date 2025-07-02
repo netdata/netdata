@@ -199,7 +199,7 @@ metrics:
         description: Sensor value
         family: Hardware/Sensor
         transform: |
-          {{- $sensorType := index .Metric.Tags "sensor_type" | default "" -}}
+          {{- $sensorType := index .Metric.Tags "rm:sensor_type" | default "" -}}
           {{- $config := get (dict 
               "1" (dict "name" "temperature" "unit" "Cel" "family" "Temperature" 
                    "desc" "Temperature reading")
