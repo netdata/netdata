@@ -126,6 +126,11 @@ func (c *CorrelationEngine) generateCorrelationKey(metric MetricTuple) string {
 
 	// Create a key that groups same metric across different instances
 	// Format: category_path.metric_name.unit
+	// If no category path, use "general" to avoid empty family
+	if categoryPath == "" {
+		categoryPath = "general"
+	}
+
 	return fmt.Sprintf("%s.%s.%s",
 		sanitizeDimensionID(categoryPath),
 		sanitizeDimensionID(metricName),
@@ -134,7 +139,9 @@ func (c *CorrelationEngine) generateCorrelationKey(metric MetricTuple) string {
 
 // extractCategoryAndMetric extracts the category path and metric name from a metric
 func (c *CorrelationEngine) extractCategoryAndMetric(metric MetricTuple) (categoryPath, metricName string) {
-	pathParts := strings.Split(metric.Path, "/")
+	// Remove "server/" prefix if present
+	cleanPath := strings.TrimPrefix(metric.Path, "server/")
+	pathParts := strings.Split(cleanPath, "/")
 
 	if len(pathParts) == 0 {
 		return "", ""
@@ -142,10 +149,7 @@ func (c *CorrelationEngine) extractCategoryAndMetric(metric MetricTuple) (catego
 
 	// The last part is always the metric name
 	metricName = pathParts[len(pathParts)-1]
-
-	// Remove "server/" prefix if present
-	cleanPath := strings.TrimPrefix(metric.Path, "server/")
-	cleanParts := strings.Split(cleanPath, "/")
+	cleanParts := pathParts
 
 	// For NIDL compliance, we need to determine the semantic category
 	// not the full hierarchical path
@@ -205,13 +209,53 @@ func (c *CorrelationEngine) extractCategoryAndMetric(metric MetricTuple) (catego
 		case "ORB":
 			categoryPath = "orb"
 
+		case "System Data":
+			categoryPath = "system_data"
+
+		case "Alarm Manager":
+			categoryPath = "alarm_manager"
+
+		case "HAManager":
+			categoryPath = "hamanager"
+
+		case "Object Pool":
+			categoryPath = "object_pool"
+
+		case "Extension Registry Stats":
+			categoryPath = "extension_registry"
+
+		case "Async Beans":
+			categoryPath = "async_beans"
+
+		case "PMIWebServiceModule":
+			categoryPath = "pmi_webservice"
+
+		case "Data Collection":
+			categoryPath = "data_collection"
+
 		default:
 			// For unknown categories, use a simplified version
-			categoryPath = sanitizeDimensionID(primaryCat)
+			// But ensure it's not empty to avoid "-" family
+			if primaryCat != "" {
+				categoryPath = sanitizeDimensionID(primaryCat)
+			} else {
+				categoryPath = "general"
+			}
 		}
 	} else {
-		// Single-level path
-		categoryPath = ""
+		// Single-level path - try to determine category from metric name
+		if strings.Contains(strings.ToLower(metricName), "jvm") ||
+			strings.Contains(strings.ToLower(metricName), "heap") ||
+			strings.Contains(strings.ToLower(metricName), "gc") ||
+			strings.Contains(strings.ToLower(metricName), "uptime") {
+			categoryPath = "jvm_runtime"
+		} else if strings.Contains(strings.ToLower(metricName), "cpu") ||
+			strings.Contains(strings.ToLower(metricName), "processor") ||
+			strings.Contains(strings.ToLower(metricName), "load") {
+			categoryPath = "system_data"
+		} else {
+			categoryPath = "general"
+		}
 	}
 
 	return categoryPath, metricName
@@ -346,11 +390,18 @@ func (c *CorrelationEngine) generateChartContext(categoryPath, metricName string
 	// Clean up the metric name
 	metricName = strings.ToLower(strings.ReplaceAll(metricName, " ", "_"))
 
+	// Remove common redundant suffixes that don't add meaning
+	metricName = strings.TrimSuffix(metricName, "count")
+	metricName = strings.TrimSuffix(metricName, "time")
+	metricName = strings.TrimSuffix(metricName, "size")
+	metricName = strings.Trim(metricName, "_")
+
 	// Build context: websphere_pmi.category.metric_name
-	if categoryPath != "" {
-		return fmt.Sprintf("websphere_pmi.%s.%s", categoryPath, metricName)
+	// Always ensure we have a category to avoid empty families
+	if categoryPath == "" || categoryPath == "general" {
+		return fmt.Sprintf("websphere_pmi.%s", metricName)
 	}
-	return fmt.Sprintf("websphere_pmi.%s", metricName)
+	return fmt.Sprintf("websphere_pmi.%s.%s", categoryPath, metricName)
 }
 
 // inferChartType determines the appropriate chart type
@@ -479,16 +530,22 @@ func (c *CorrelationEngine) generateDimensionID(metric MetricTuple) string {
 
 	case strings.HasPrefix(categoryPath, "jdbc_connection_pools"):
 		// For JDBC, instance is the datasource name
-		// Handle both:
-		// - "JDBC Connection Pools/Derby JDBC Provider (XA)" -> "Derby JDBC Provider (XA)"
-		// - "JDBC Connection Pools" -> skip, no valid instance
 		if len(pathParts) > 1 && pathParts[0] == "JDBC Connection Pools" {
 			// pathParts[1] should be the datasource name
 			return sanitizeDimensionID(pathParts[1])
-		} else if len(pathParts) == 1 && pathParts[0] == "JDBC Connection Pools" {
-			// This is a category-level metric without a specific datasource
-			// We'll use a generic identifier
-			return "all_pools"
+		}
+		// Check if we have labels that identify the instance
+		if instance := metric.Labels["datasource"]; instance != "" {
+			return sanitizeDimensionID(instance)
+		}
+		return "default"
+
+	case strings.HasPrefix(categoryPath, "jca_connection_pools"):
+		// For JCA, instance is usually after the category
+		if len(pathParts) > 2 {
+			return sanitizeDimensionID(pathParts[2])
+		} else if len(pathParts) > 1 {
+			return sanitizeDimensionID(pathParts[1])
 		}
 
 	case strings.HasPrefix(categoryPath, "web_applications"):
@@ -508,13 +565,19 @@ func (c *CorrelationEngine) generateDimensionID(metric MetricTuple) string {
 		}
 	}
 
-	// Fallback: use a simplified version of the path
-	// Note: pathParts already has the metric name removed
+	// For array elements, always use the element name
+	if metric.IsArrayElement && metric.ElementName != "" {
+		return sanitizeDimensionID(metric.ElementName)
+	}
+
+	// Fallback: use instance from path, but not if it's the metric name
 	if len(pathParts) > 1 {
-		// Use the most specific instance identifier
-		return sanitizeDimensionID(pathParts[len(pathParts)-1])
-	} else if len(pathParts) == 1 {
-		return sanitizeDimensionID(pathParts[0])
+		// Get the second-to-last part (last is metric name)
+		candidate := pathParts[len(pathParts)-2]
+		// Don't use category names as instances
+		if !isCategoryName(candidate) {
+			return sanitizeDimensionID(candidate)
+		}
 	}
 
 	// Last resort - use "default"
@@ -554,9 +617,20 @@ func (c *CorrelationEngine) generateDimensionName(metric MetricTuple) string {
 	case strings.HasPrefix(categoryPath, "jdbc_connection_pools"):
 		if len(pathParts) > 1 && pathParts[0] == "JDBC Connection Pools" {
 			return pathParts[1] // Datasource name
-		} else if len(pathParts) == 1 && pathParts[0] == "JDBC Connection Pools" {
-			return "All Pools" // Category-level metric
 		}
+		// Check labels
+		if instance := metric.Labels["datasource"]; instance != "" {
+			return instance
+		}
+		return "Default"
+
+	case strings.HasPrefix(categoryPath, "jca_connection_pools"):
+		if len(pathParts) > 2 {
+			return pathParts[2]
+		} else if len(pathParts) > 1 {
+			return pathParts[1]
+		}
+		return "Default"
 
 	case strings.HasPrefix(categoryPath, "web_applications"):
 		// For web apps, show app and servlet/portlet
@@ -576,25 +650,26 @@ func (c *CorrelationEngine) generateDimensionName(metric MetricTuple) string {
 		}
 	}
 
-	// Fallback: create a readable name from path components
-	// Note: pathParts already has the metric name removed
-	if len(pathParts) > 1 {
-		return pathParts[len(pathParts)-1]
-	} else if len(pathParts) == 1 {
-		return pathParts[0]
+	// For array elements, always use the element name
+	if metric.IsArrayElement && metric.ElementName != "" {
+		return metric.ElementName
 	}
 
-	return "default"
+	// Fallback: create a readable name from path components
+	if len(pathParts) > 1 {
+		candidate := pathParts[len(pathParts)-2]
+		if !isCategoryName(candidate) {
+			return candidate
+		}
+	}
+
+	return "Default"
 }
 
 // generateChartTitle creates a descriptive chart title
 func (c *CorrelationEngine) generateChartTitle(group MetricGroup) string {
 	// Build a clear title that describes what's being measured
 	// Following NIDL: "What am I monitoring?"
-
-	// Clean up category path for display
-	categoryDisplay := strings.Title(strings.ReplaceAll(group.CategoryPath, "_", " "))
-	categoryDisplay = strings.ReplaceAll(categoryDisplay, ".", " ")
 
 	// Clean up metric name for display
 	metricDisplay := c.formatMetricNameForDisplay(group.MetricName)
@@ -605,12 +680,48 @@ func (c *CorrelationEngine) generateChartTitle(group MetricGroup) string {
 		return fmt.Sprintf("Thread Pools - %s", metricDisplay)
 	case "jdbc_connection_pools":
 		return fmt.Sprintf("JDBC Connection Pools - %s", metricDisplay)
+	case "jca_connection_pools":
+		return fmt.Sprintf("JCA Connection Pools - %s", metricDisplay)
+	case "jca_connection_pools.sib_jms_resource_adapter":
+		return fmt.Sprintf("SIB JMS Resource Adapter - %s", metricDisplay)
+	case "web_applications":
+		return fmt.Sprintf("Web Applications - %s", metricDisplay)
 	case "web_applications.servlets":
 		return fmt.Sprintf("Servlet %s", metricDisplay)
+	case "web_applications.portlets":
+		return fmt.Sprintf("Portlet %s", metricDisplay)
 	case "servlet_session_manager":
 		return fmt.Sprintf("Session Manager %s", metricDisplay)
+	case "dynamic_caching":
+		return fmt.Sprintf("Dynamic Caching %s", metricDisplay)
+	case "transaction_manager":
+		return fmt.Sprintf("Transaction Manager %s", metricDisplay)
+	case "security.authentication":
+		return fmt.Sprintf("Security Authentication - %s", metricDisplay)
+	case "security.authorization":
+		return fmt.Sprintf("Security Authorization - %s", metricDisplay)
+	case "jvm_runtime":
+		return fmt.Sprintf("JVM %s", metricDisplay)
+	case "system_data":
+		return fmt.Sprintf("System %s", metricDisplay)
+	case "hamanager":
+		return fmt.Sprintf("HA Manager %s", metricDisplay)
+	case "object_pool":
+		return fmt.Sprintf("Object Pool %s", metricDisplay)
+	case "extension_registry":
+		return fmt.Sprintf("Extension Registry %s", metricDisplay)
+	case "orb":
+		return fmt.Sprintf("ORB %s", metricDisplay)
+	case "pmi_webservice":
+		return fmt.Sprintf("PMI WebService %s", metricDisplay)
+	case "data_collection":
+		return fmt.Sprintf("Data Collection %s", metricDisplay)
 	default:
-		if categoryDisplay != "" {
+		// Clean up category path for display
+		categoryDisplay := strings.Title(strings.ReplaceAll(group.CategoryPath, "_", " "))
+		categoryDisplay = strings.ReplaceAll(categoryDisplay, ".", " ")
+
+		if categoryDisplay != "" && categoryDisplay != "General" {
 			return fmt.Sprintf("%s - %s", categoryDisplay, metricDisplay)
 		}
 		return metricDisplay
@@ -621,24 +732,142 @@ func (c *CorrelationEngine) generateChartTitle(group MetricGroup) string {
 func (c *CorrelationEngine) formatMetricNameForDisplay(metricName string) string {
 	// Special cases for common patterns
 	replacements := map[string]string{
-		"ActiveCount":        "Active Connections",
-		"CreateCount":        "Created",
-		"DestroyCount":       "Destroyed",
-		"PoolSize":           "Pool Size",
-		"FreePoolSize":       "Free Pool Size",
-		"MaxPoolSize":        "Maximum Pool Size",
-		"UseTime":            "Use Time",
-		"WaitTime":           "Wait Time",
-		"ServiceTime":        "Service Time",
-		"ActiveTime":         "Active Time",
-		"PercentUsed":        "Percent Used",
-		"PercentMaxed":       "Percent at Maximum",
-		"RequestCount":       "Requests",
-		"ErrorCount":         "Errors",
-		"LoadedServletCount": "Loaded Servlets",
-		"CurrentThreads":     "Current Threads",
-		"PeakThreads":        "Peak Threads",
-		"DaemonThreads":      "Daemon Threads",
+		// Thread pool metrics
+		"ActiveCount":             "Active Count",
+		"ActiveTime":              "Active Time",
+		"PoolSize":                "Pool Size",
+		"MaxPoolSize":             "Maximum Pool Size",
+		"CreateCount":             "Create Count",
+		"DestroyCount":            "Destroy Count",
+		"ClearedThreadHangCount":  "Cleared Thread Hang Count",
+		"DeclaredThreadHungCount": "Declared Thread Hung Count",
+		"PercentUsed":             "Percent Used",
+		"PercentMaxed":            "Percent Maxed",
+
+		// Connection pool metrics
+		"FreePoolSize":              "Free Pool Size",
+		"UseTime":                   "Use Time",
+		"WaitTime":                  "Wait Time",
+		"AllocateCount":             "Allocate Count",
+		"ReturnCount":               "Return Count",
+		"FaultCount":                "Fault Count",
+		"ConnectionHandleCount":     "Connection Handle Count",
+		"ManagedConnectionCount":    "Managed Connection Count",
+		"CloseCount":                "Close Count",
+		"PrepStmtCacheDiscardCount": "Prepared Statement Cache Discard Count",
+		"JDBCTime":                  "JDBC Time",
+		"FreedCount":                "Freed Count",
+
+		// JVM metrics
+		"FreeMemory":      "Free Memory",
+		"UsedMemory":      "Used Memory",
+		"HeapSize":        "Heap Size",
+		"Uptime":          "Uptime",
+		"ProcessCPUUsage": "Process CPU Usage",
+		"CurrentThreads":  "Current Threads",
+		"PeakThreads":     "Peak Threads",
+		"DaemonThreads":   "Daemon Threads",
+
+		// Transaction metrics
+		"ActiveCount":                "Active Count",
+		"CommittedCount":             "Committed Count",
+		"RolledbackCount":            "Rolled Back Count",
+		"TimeoutCount":               "Timeout Count",
+		"OptimizationCount":          "Optimization Count",
+		"GlobalBegunCount":           "Global Begun Count",
+		"GlobalInvolvedCount":        "Global Involved Count",
+		"LocalBegunCount":            "Local Begun Count",
+		"GlobalTranTime":             "Global Transaction Time",
+		"GlobalCommitTime":           "Global Commit Time",
+		"GlobalPrepareTime":          "Global Prepare Time",
+		"GlobalBeforeCompletionTime": "Global Before Completion Time",
+		"LocalTranTime":              "Local Transaction Time",
+		"LocalCommitTime":            "Local Commit Time",
+		"LocalBeforeCompletionTime":  "Local Before Completion Time",
+		"LocalActiveCount":           "Local Active Count",
+		"LocalCommittedCount":        "Local Committed Count",
+		"LocalRolledbackCount":       "Local Rolled Back Count",
+		"LocalTimeoutCount":          "Local Timeout Count",
+
+		// Web metrics
+		"RequestCount":               "Request Count",
+		"ServiceTime":                "Service Time",
+		"ErrorCount":                 "Error Count",
+		"LoadedServletCount":         "Loaded Servlet Count",
+		"ReloadCount":                "Reload Count",
+		"AsyncContext_Response_Time": "Async Context Response Time",
+		"URIRequestCount":            "URI Request Count",
+		"URIServiceTime":             "URI Service Time",
+
+		// Session metrics
+		"CreatedCount":                 "Created Count",
+		"InvalidatedCount":             "Invalidated Count",
+		"SessionObjectSize":            "Session Object Size",
+		"ExternalReadTime":             "External Read Time",
+		"ExternalWriteTime":            "External Write Time",
+		"AffinityBreakCount":           "Affinity Break Count",
+		"TimeoutInvalidationCount":     "Timeout Invalidation Count",
+		"ActivateNonExistSessionCount": "Activate Non-Exist Session Count",
+		"CacheDiscardCount":            "Cache Discard Count",
+		"NoRoomForNewSessionCount":     "No Room For New Session Count",
+
+		// Cache metrics
+		"HitCount":                        "Hit Count",
+		"MissCount":                       "Miss Count",
+		"ExplicitInvalidationCount":       "Explicit Invalidation Count",
+		"LruInvalidationCount":            "LRU Invalidation Count",
+		"TimeoutInvalidationCount":        "Timeout Invalidation Count",
+		"InMemoryCacheEntryCount":         "In Memory Cache Entry Count",
+		"MaxInMemoryCacheEntryCount":      "Max In Memory Cache Entry Count",
+		"HitsInMemoryCount":               "Hits In Memory Count",
+		"HitsOnDiskCount":                 "Hits On Disk Count",
+		"RemoteHitCount":                  "Remote Hit Count",
+		"RemoteCreationCount":             "Remote Creation Count",
+		"RemoteExplicitInvalidationCount": "Remote Explicit Invalidation Count",
+		"LocalExplicitInvalidationCount":  "Local Explicit Invalidation Count",
+		"InMemoryAndDiskCacheEntryCount":  "In Memory And Disk Cache Entry Count",
+		"ClientRequestCount":              "Client Request Count",
+		"DistributedRequestCount":         "Distributed Request Count",
+		"ExplicitMemoryInvalidationCount": "Explicit Memory Invalidation Count",
+		"ExplicitDiskInvalidationCount":   "Explicit Disk Invalidation Count",
+
+		// Security metrics
+		"BasicAuthenticationCount":     "Basic Authentication Count",
+		"BasicAuthenticationTime":      "Basic Authentication Time",
+		"TokenAuthenticationCount":     "Token Authentication Count",
+		"TokenAuthenticationTime":      "Token Authentication Time",
+		"IdentityAssertionCount":       "Identity Assertion Count",
+		"IdentityAssertionTime":        "Identity Assertion Time",
+		"WebAuthenticationCount":       "Web Authentication Count",
+		"WebAuthenticationTime":        "Web Authentication Time",
+		"RMIAuthenticationCount":       "RMI Authentication Count",
+		"RMIAuthenticationTime":        "RMI Authentication Time",
+		"TAIRequestCount":              "TAI Request Count",
+		"TAIRequestTime":               "TAI Request Time",
+		"CredentialCreationTime":       "Credential Creation Time",
+		"JAASBasicAuthenticationCount": "JAAS Basic Authentication Count",
+		"JAASBasicAuthenticationTime":  "JAAS Basic Authentication Time",
+		"JAASTokenAuthenticationCount": "JAAS Token Authentication Count",
+		"JAASTokenAuthenticationTime":  "JAAS Token Authentication Time",
+		"JAASIdentityAssertionCount":   "JAAS Identity Assertion Count",
+		"JAASIdentityAssertionTime":    "JAAS Identity Assertion Time",
+		"WebAuthorizationTime":         "Web Authorization Time",
+		"EJBAuthorizationTime":         "EJB Authorization Time",
+		"AdminAuthorizationTime":       "Admin Authorization Time",
+		"JACCAuthorizationTime":        "JACC Authorization Time",
+
+		// System metrics
+		"CPUUsageSinceLastMeasurement": "CPU Usage Since Last Measurement",
+		"FreeMemory":                   "Free Memory",
+
+		// ORB metrics
+		"LookupTime":     "Lookup Time",
+		"ProcessingTime": "Processing Time",
+		"RequestCount":   "Request Count",
+
+		// Other metrics
+		"LoadedCount":   "Loaded Count",
+		"UnloadedCount": "Unloaded Count",
 	}
 
 	if display, exists := replacements[metricName]; exists {
@@ -649,7 +878,7 @@ func (c *CorrelationEngine) formatMetricNameForDisplay(metricName string) string
 	// Insert spaces before uppercase letters
 	result := ""
 	for i, r := range metricName {
-		if i > 0 && 'A' <= r && r <= 'Z' {
+		if i > 0 && 'A' <= r && r <= 'Z' && i > 0 && metricName[i-1] >= 'a' && metricName[i-1] <= 'z' {
 			result += " "
 		}
 		result += string(r)
@@ -661,16 +890,54 @@ func (c *CorrelationEngine) formatMetricNameForDisplay(metricName string) string
 // generateChartFamily creates a chart family for grouping
 func (c *CorrelationEngine) generateChartFamily(group MetricGroup) string {
 	// Use the category as the family
-	if group.CategoryPath != "" {
+	if group.CategoryPath != "" && group.CategoryPath != "general" {
 		// Take the first level of the category path
-		parts := strings.Split(group.CategoryPath, "/")
+		parts := strings.Split(group.CategoryPath, ".")
 		if len(parts) > 0 {
-			return strings.Title(strings.ReplaceAll(parts[0], "_", " "))
+			// Convert to title case and replace underscores
+			family := strings.ReplaceAll(parts[0], "_", " ")
+			// Proper case for known families
+			switch strings.ToLower(family) {
+			case "jvm runtime":
+				return "JVM Runtime"
+			case "thread pools":
+				return "Thread Pools"
+			case "jdbc connection pools":
+				return "JDBC Connection Pools"
+			case "jca connection pools":
+				return "JCA Connection Pools"
+			case "web applications":
+				return "Web Applications"
+			case "servlet session manager":
+				return "Session Manager"
+			case "dynamic caching":
+				return "Dynamic Caching"
+			case "transaction manager":
+				return "Transaction Manager"
+			case "security":
+				return "Security"
+			case "system data":
+				return "System"
+			case "hamanager":
+				return "HA Manager"
+			case "object pool":
+				return "Object Pool"
+			case "extension registry":
+				return "Extension Registry"
+			case "orb":
+				return "ORB"
+			case "pmi webservice":
+				return "PMI WebService"
+			case "data collection":
+				return "Data Collection"
+			default:
+				return strings.Title(family)
+			}
 		}
 	}
 
 	// Fallback to generic family
-	return "WebSphere"
+	return "General"
 }
 
 // isMetricName checks if a string looks like a metric name rather than an instance name
@@ -700,6 +967,21 @@ func isMetricName(name string) bool {
 	}
 
 	return commonMetrics[name]
+}
+
+// isCategoryName checks if a string is a known category name
+func isCategoryName(name string) bool {
+	categories := map[string]bool{
+		"Thread Pools": true, "JDBC Connection Pools": true, "JCA Connection Pools": true,
+		"Web Applications": true, "Servlet Session Manager": true, "Dynamic Caching": true,
+		"Transaction Manager": true, "Security": true, "JVM Runtime": true, "ORB": true,
+		"System Data": true, "HAManager": true, "Object Pool": true, "Servlets": true,
+		"Portlets": true, "Authentication": true, "Authorization": true,
+		"Extension Registry Stats": true, "PMIWebServiceModule": true, "Data Collection": true,
+		"Async Beans": true, "Alarm Manager": true,
+	}
+
+	return categories[name] || categories[strings.Title(name)]
 }
 
 // sanitizeDimensionID removes or replaces invalid characters for Netdata dimension IDs
