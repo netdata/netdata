@@ -204,7 +204,7 @@ metrics:
         name: fgVdEntOpMode
         chart_meta:
           description: Operation mode of the virtual domain
-          family: VirtualDomain/OperationMode
+          family: VirtualDomain/Status/OperationMode
           unit: "{status}"
         mapping:
           1: nat
@@ -214,7 +214,7 @@ metrics:
         name: fgVdEntHaState
         chart_meta:
           description: HA cluster member state of the virtual domain
-          family: VirtualDomain/HighAvailability/Status
+          family: VirtualDomain/Status/HighAvailability
           unit: "{status}"
         mapping:
           1: master
@@ -265,7 +265,7 @@ metrics:
       name: fgVdNumber
       chart_meta:
         description: Number of virtual domains in vdTable
-        family: VirtualDomain/Count/Active
+        family: VirtualDomain/Active
         unit: "{domain}"
   - MIB: FORTINET-FORTIGATE-MIB
     symbol:
@@ -274,7 +274,7 @@ metrics:
       name: fgVdMaxVdoms
       chart_meta:
         description: Maximum number of virtual domains allowed on the device
-        family: VirtualDomain/Count/Maximum
+        family: VirtualDomain/Maximum
         unit: "{domain}"
 
   ### Interfaces

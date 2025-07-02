@@ -1,8 +1,11 @@
 extends:
   - _system-base.yaml
+  - _std-host-resources-mib-feat-base.yaml
   - _std-if-mib.yaml
+
 sysobjectid:
   - 1.3.6.1.4.1.2604.5
+
 metadata:
   device:
     fields:
@@ -10,130 +13,6 @@ metadata:
         value: "sophos"
       type:
         value: "firewall"
-metrics:
-  - MIB: HOST-RESOURCES-MIB
-    symbol:
-      name: cpu.usage
-      OID: 1.3.6.1.2.1.25.3.3.1.2.196608
-      description: "The average, over the last minute, of the percentage of time that this processor was not idle."
-      unit: "%"
-  - MIB: SFOS-FIREWALL-MIB
-    symbol:
-      name: memory.usage
-      OID: 1.3.6.1.4.1.2604.5.1.2.5.2.0
-      description: "Percentage usage of main memory"
-      unit: "%"
-  - MIB: SFOS-FIREWALL-MIB
-    symbol:
-      name: memory.total
-      OID: 1.3.6.1.4.1.2604.5.1.2.5.1.0
-      description: "Memory capacity in MB"
-      unit: "MBy"
-  - MIB: SFOS-FIREWALL-MIB
-    symbol:
-      name: sfosDiskCapacity
-      OID: 1.3.6.1.4.1.2604.5.1.2.4.1.0
-      description: "Disk capacity in MB"
-      unit: "MBy"
-  - MIB: SFOS-FIREWALL-MIB
-    symbol:
-      name: sfosDiskPercentUsage
-      OID: 1.3.6.1.4.1.2604.5.1.2.4.2.0
-      description: "% Disk usage"
-      unit: "%"
-  - MIB: SFOS-FIREWALL-MIB
-    symbol:
-      name: sfosSwapCapacity
-      OID: 1.3.6.1.4.1.2604.5.1.2.5.3.0
-      description: "Swap Capacity in MB"
-      unit: "MBy"
-  - MIB: SFOS-FIREWALL-MIB
-    symbol:
-      name: sfosSwapPercentUsage
-      OID: 1.3.6.1.4.1.2604.5.1.2.5.4.0
-      description: "% usage of swap"
-      unit: "%"
-  - MIB: SFOS-FIREWALL-MIB
-    symbol:
-      name: sfosLiveUsersCount
-      OID: 1.3.6.1.4.1.2604.5.1.2.6.0
-      description: "Display live user count login into captive portal"
-      unit: "{session}"
-  - MIB: SFOS-FIREWALL-MIB
-    symbol:
-      name: sfosHTTPHits
-      OID: 1.3.6.1.4.1.2604.5.1.2.7.0
-      description: "Number of HTTP hits"
-      unit: "{request}"
-      metric_type: monotonic_count
-  - MIB: SFOS-FIREWALL-MIB
-    symbol:
-      name: sfosFTPHits
-      OID: 1.3.6.1.4.1.2604.5.1.2.8.0
-      description: "Number of FTP hits"
-      unit: "{request}"
-      metric_type: monotonic_count
-  - MIB: SFOS-FIREWALL-MIB
-    symbol:
-      name: sfosPOP3Hits
-      OID: 1.3.6.1.4.1.2604.5.1.2.9.1.0
-      description: "Number of POP3 hits"
-      unit: "{request}"
-      metric_type: monotonic_count
-  - MIB: SFOS-FIREWALL-MIB
-    symbol:
-      name: sfosImapHits
-      OID: 1.3.6.1.4.1.2604.5.1.2.9.2.0
-      description: "Number of IMAP hits"
-      unit: "{request}"
-      metric_type: monotonic_count
-  - MIB: SFOS-FIREWALL-MIB
-    symbol:
-      name: sfosSmtpHits
-      OID: 1.3.6.1.4.1.2604.5.1.2.9.3.0
-      description: "Number of SMTP hits"
-      unit: "{request}"
-      metric_type: monotonic_count
-  - MIB: SFOS-FIREWALL-MIB
-    table:
-      name: sfosIPSecVpnTunnelTable
-      OID: 1.3.6.1.4.1.2604.5.1.6.1.1.1
-    symbols:
-      - name: sfosIPSecVpnTunnel
-        constant_value_one: true
-      - name: sfosIPSecVpnActiveTunnel
-        OID: 1.3.6.1.4.1.2604.5.1.6.1.1.1.1.8
-        description: "Count of active tunnel"
-        unit: "{tunnel}"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          name: sfosIPSecVpnConnName
-          OID: 1.3.6.1.4.1.2604.5.1.6.1.1.1.1.2
-        tag: sfos_ip_sec_vpn_conn_name
-      - symbol:
-          name: sfosIPSecVpnConnDes
-          OID: 1.3.6.1.4.1.2604.5.1.6.1.1.1.1.3
-        tag: sfos_ip_sec_vpn_conn_des
-      - symbol:
-          name: sfosIPSecVpnPolicyName
-          OID: 1.3.6.1.4.1.2604.5.1.6.1.1.1.1.4
-        tag: sfos_ip_sec_vpn_policy_name
-      - symbol:
-          name: sfosIPSecVpnConnMode
-          OID: 1.3.6.1.4.1.2604.5.1.6.1.1.1.1.5
-        tag: sfos_ip_sec_vpn_conn_mode
-      - symbol:
-          OID: 1.3.6.1.4.1.2604.5.1.6.1.1.1.1.6
-          name: sfosIPSecVpnConnType
-        tag: sfos_ip_sec_vpn_conn_type
-        mapping:
-          1: host-to-host
-          2: site-to-site
-      - symbol:
-          name: sfosIPSecVpnLocalgwPort
-          OID: 1.3.6.1.4.1.2604.5.1.6.1.1.1.1.7
-        tag: sfos_ip_sec_vpn_localgw_port
 
 metric_tags:
   - OID: 1.3.6.1.4.1.2604.5.1.1.2.0
@@ -145,3 +24,138 @@ metric_tags:
   - OID: 1.3.6.1.4.1.2604.5.1.1.6.0
     symbol: sfosIPSVersion
     tag: sfos_ips_version
+
+metrics:
+  - MIB: SFOS-FIREWALL-MIB
+    symbol:
+      name: memory.usage
+      OID: 1.3.6.1.4.1.2604.5.1.2.5.2.0
+      chart_meta:
+        description: "Percentage usage of main memory"
+        family: "Memory/Usage"
+        unit: "%"
+  - MIB: SFOS-FIREWALL-MIB
+    symbol:
+      name: memory.total
+      OID: 1.3.6.1.4.1.2604.5.1.2.5.1.0
+      scale_factor: 1048576
+      chart_meta:
+        description: "Memory capacity in MB"
+        family: "Memory/Total"
+        unit: "By"
+  - MIB: SFOS-FIREWALL-MIB
+    symbol:
+      name: sfosDiskCapacity
+      OID: 1.3.6.1.4.1.2604.5.1.2.4.1.0
+      scale_factor: 1048576
+      chart_meta:
+        description: "Disk capacity in MB"
+        family: "Disk/Total"
+        unit: "By"
+  - MIB: SFOS-FIREWALL-MIB
+    symbol:
+      name: sfosDiskPercentUsage
+      OID: 1.3.6.1.4.1.2604.5.1.2.4.2.0
+      chart_meta:
+        description: "% Disk usage"
+        family: "Disk/Usage"
+        unit: "%"
+  - MIB: SFOS-FIREWALL-MIB
+    symbol:
+      name: sfosSwapCapacity
+      OID: 1.3.6.1.4.1.2604.5.1.2.5.3.0
+      chart_meta:
+        description: "Swap Capacity in MB"
+        family: "Memory/Swap/Total"
+        unit: "MBy"
+  - MIB: SFOS-FIREWALL-MIB
+    symbol:
+      name: sfosSwapPercentUsage
+      OID: 1.3.6.1.4.1.2604.5.1.2.5.4.0
+      chart_meta:
+        description: "% usage of swap"
+        family: "Memory/Swap/Usage"
+        unit: "%"
+  - MIB: SFOS-FIREWALL-MIB
+    symbol:
+      name: sfosLiveUsersCount
+      OID: 1.3.6.1.4.1.2604.5.1.2.6.0
+      chart_meta:
+        description: "Display live user count login into captive portal"
+        family: "User/Portal/Active"
+        unit: "{session}"
+  - MIB: SFOS-FIREWALL-MIB
+    symbol:
+      name: sfosHTTPHits
+      OID: 1.3.6.1.4.1.2604.5.1.2.7.0
+      chart_meta:
+        description: "Number of HTTP hits"
+        family: "Protocol/HTTP/Request/Total"
+        unit: "{request}/s"
+  - MIB: SFOS-FIREWALL-MIB
+    symbol:
+      name: sfosFTPHits
+      OID: 1.3.6.1.4.1.2604.5.1.2.8.0
+      chart_meta:
+        description: "Number of FTP hits"
+        family: "Protocol/FTP/Request/Total"
+        unit: "{request}/s"
+  - MIB: SFOS-FIREWALL-MIB
+    symbol:
+      name: sfosPOP3Hits
+      OID: 1.3.6.1.4.1.2604.5.1.2.9.1.0
+      chart_meta:
+        description: "Number of POP3 hits"
+        family: "Protocol/POP3/Request/Total"
+        unit: "{request}/s"
+  - MIB: SFOS-FIREWALL-MIB
+    symbol:
+      name: sfosImapHits
+      OID: 1.3.6.1.4.1.2604.5.1.2.9.2.0
+      chart_meta:
+        description: "Number of IMAP hits"
+        family: "Protocol/IMAP/Request/Total"
+        unit: "{request}/s"
+  - MIB: SFOS-FIREWALL-MIB
+    symbol:
+      name: sfosSmtpHits
+      OID: 1.3.6.1.4.1.2604.5.1.2.9.3.0
+      chart_meta:
+        description: "Number of SMTP hits"
+        family: "Protocol/SMTP/Request/Total"
+        unit: "{request}/s"
+  - MIB: SFOS-FIREWALL-MIB
+    table:
+      name: sfosIPSecVpnTunnelTable
+      OID: 1.3.6.1.4.1.2604.5.1.6.1.1.1
+    symbols:
+      - name: sfosIPSecVpnActiveTunnel
+        OID: 1.3.6.1.4.1.2604.5.1.6.1.1.1.1.8
+        chart_meta:
+          description: "Count of active tunnel"
+          family: "IPSec/Tunnel/Active"
+          unit: "{tunnel}"
+    metric_tags:
+      - tag: sfos_ip_sec_vpn_conn_name
+        symbol:
+          name: sfosIPSecVpnConnName
+          OID: 1.3.6.1.4.1.2604.5.1.6.1.1.1.1.2
+      - tag: sfos_ip_sec_vpn_conn_des
+        symbol:
+          name: sfosIPSecVpnConnDes
+          OID: 1.3.6.1.4.1.2604.5.1.6.1.1.1.1.3
+      - tag: sfos_ip_sec_vpn_policy_name
+        symbol:
+          name: sfosIPSecVpnPolicyName
+          OID: 1.3.6.1.4.1.2604.5.1.6.1.1.1.1.4
+      - tag: sfos_ip_sec_vpn_conn_mode
+        symbol:
+          name: sfosIPSecVpnConnMode
+          OID: 1.3.6.1.4.1.2604.5.1.6.1.1.1.1.5
+      - tag: sfos_ip_sec_vpn_conn_type
+        symbol:
+          OID: 1.3.6.1.4.1.2604.5.1.6.1.1.1.1.6
+          name: sfosIPSecVpnConnType
+        mapping:
+          1: host-to-host
+          2: site-to-site

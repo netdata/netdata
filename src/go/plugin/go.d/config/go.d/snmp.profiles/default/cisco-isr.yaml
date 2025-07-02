@@ -12,6 +12,7 @@ metadata:
         value: "Router"
       vendor:
         value: "Cisco"
+
 sysobjectid:
   - 1.3.6.1.4.1.9.1.543  # cisco3825
   - 1.3.6.1.4.1.9.1.544  # cisco3845

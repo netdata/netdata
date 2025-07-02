@@ -8,8 +8,8 @@ metrics:
         name: sipCommonCfgServiceOperStatus
         chart_meta:
           description: Current operational state of the SIP application
-          family: SIP/Status
-          unit: "{state}"
+          family: "Protocol/SIP/Service/Status"
+          unit: "{status}"
         mapping:
           1: unknown
           7: testing
@@ -30,31 +30,31 @@ metrics:
         name: sipCommonSummaryInRequests
         chart_meta:
           description: Total number of SIP request messages received including retransmissions
-          family: SIP/Requests
-          unit: "{request}"
+          family: "Protocol/SIP/Request/Total/In"
+          unit: "{request}/s"
       - OID: 1.3.6.1.2.1.149.1.3.1.1.2
         name: sipCommonSummaryOutRequests
         chart_meta:
           description: Total number of SIP request messages sent including retransmissions
-          family: SIP/Requests
-          unit: "{request}"
+          family: "Protocol/SIP/Request/Total/Out"
+          unit: "{request}/s"
       - OID: 1.3.6.1.2.1.149.1.3.1.1.3
         name: sipCommonSummaryInResponses
         chart_meta:
           description: Total number of SIP response messages received including retransmissions
-          family: SIP/Responses
-          unit: "{response}"
+          family: "Protocol/SIP/Response/Total/In"
+          unit: "{response}/s"
       - OID: 1.3.6.1.2.1.149.1.3.1.1.4
         name: sipCommonSummaryOutResponses
         chart_meta:
           description: Total number of SIP response messages sent including retransmissions
-          family: SIP/Responses
-          unit: "{response}"
+          family: "Protocol/SIP/Response/Total/Out"
+          unit: "{response}/s"
       - OID: 1.3.6.1.2.1.149.1.3.1.1.5
         name: sipCommonSummaryTotalTransactions
         chart_meta:
           description: Count of transactions in progress and terminated transactions
-          family: SIP/Transactions
+          family: "Protocol/SIP/Transaction/Total"
           unit: "{transaction}"
     metric_tags:
       - index: 1
@@ -68,14 +68,14 @@ metrics:
         name: sipCommonStatusCodeIns
         chart_meta:
           description: Total number of response messages received with the specified status code (sipCommonStatusCodeValue)
-          family: SIP/Responses
-          unit: "{response}"
+          family: "Protocol/SIP/Response/StatusCode/In"
+          unit: "{response}/s"
       - OID: 1.3.6.1.2.1.149.1.5.1.1.4
         name: sipCommonStatusCodeOuts
         chart_meta:
           description: Total number of response messages sent with the specified status code (sipCommonStatusCodeValue)
-          family: SIP/Responses
-          unit: "{response}"
+          family: "Protocol/SIP/Response/StatusCode/Out"
+          unit: "{message}/s"
     metric_tags:
       - index: 1
         tag: applIndex
@@ -92,7 +92,7 @@ metrics:
         name: sipCommonTransCurrentactions
         chart_meta:
           description: Number of transactions awaiting definitive response
-          family: SIP/Transactions
+          family: "Protocol/SIP/Transaction/Current"
           unit: "{transaction}"
     metric_tags:
       - index: 1

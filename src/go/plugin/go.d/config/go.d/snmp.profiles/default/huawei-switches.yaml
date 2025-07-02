@@ -1,43 +1,17 @@
 extends:
   - huawei.yaml
+
 sysobjectid:
   - 1.3.6.1.4.1.2011.2.23.343
   - 1.3.6.1.4.1.2011.2.23.606
+
 metadata:
   device:
     fields:
       type:
         value: "switch"
+
 metrics:
-#  - MIB: HUAWEI-STACK-MIB
-#    symbol:
-#      name: huawei.hwStackTopoType
-#      OID: 1.3.6.1.4.1.2011.5.25.183.1.2.0
-#      enum:
-#        ring: 1
-#        link: 2
-#      TODO: enum in scalar metric is not supported yet (keep this metric and this
-#        comment in profile until it's fixed)
-#  - MIB: HUAWEI-STACK-MIB
-#    symbol:
-#      name: huawei.hwStackSystemMac
-#      OID: 1.3.6.1.4.1.2011.5.25.183.1.4.0
-# string metric is not supported yet (keep this metric and this comment in profile until it's fixed)
-#  - MIB: HUAWEI-STACK-MIB
-#    symbol:
-#      name: huawei.hwStackIsStackDevice
-#      OID: 1.3.6.1.4.1.2011.5.25.183.1.5.0
-#      enum:
-#        true: 1
-#        false: 2
-#      TODO: enum in scalar metric is not supported yet (keep this metric and this
-#        comment in profile until it's fixed)
-  - MIB: HUAWEI-STACK-MIB
-    symbol:
-      name: huawei.hwStackReservedVlanId
-      OID: 1.3.6.1.4.1.2011.5.25.183.1.6.0
-      description: Stack reserved-vlanId
-      unit: "{vlan_id}"
   - MIB: HUAWEI-STACK-MIB
     table:
       name: hwStackMemberInfoTable
@@ -45,48 +19,51 @@ metrics:
     symbols:
       - name: huawei.hwMemberStackPriority
         OID: 1.3.6.1.4.1.2011.5.25.183.1.20.1.2
-        description: Stack member's priority
-        unit: "{priority}"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          name: huawei.hwMemberStackMacAddress
-          OID: 1.3.6.1.4.1.2011.5.25.183.1.20.1.4
-          format: mac_address
-        tag: huawei_hw_member_stack_mac_address
-      - symbol:
-          name: huawei.hwMemberStackDeviceType
-          OID: 1.3.6.1.4.1.2011.5.25.183.1.20.1.5
-        tag: huawei_hw_member_stack_device_type
-      - symbol:
-          name: huawei.hwMemberStackObjectId
-          OID: 1.3.6.1.4.1.2011.5.25.183.1.20.1.7
-        tag: huawei_hw_member_stack_object_id
-      - symbol:
-          OID: 1.3.6.1.4.1.2011.5.25.183.1.20.1.3
-          name: huawei.hwMemberStackRole
-        tag: huawei_hw_member_stack_role
+        chart_meta:
+          description: Stack member's priority
+          family: "Stack/Member/Priority/Value"
+          unit: "{priority}"
+      - OID: 1.3.6.1.4.1.2011.5.25.183.1.20.1.3
+        name: huawei.hwMemberStackRole
+        chart_meta:
+          description: Current role of the stack member
+          family: "Stack/Member/Role"
+          unit: "{status}"
         mapping:
           1: master
           2: standby
           3: slave
+    metric_tags:
+      - tag: huawei_hw_member_stack_mac_address
+        symbol:
+          name: huawei.hwMemberStackMacAddress
+          OID: 1.3.6.1.4.1.2011.5.25.183.1.20.1.4
+          format: mac_address
+      - tag: huawei_hw_member_stack_device_type
+        symbol:
+          name: huawei.hwMemberStackDeviceType
+          OID: 1.3.6.1.4.1.2011.5.25.183.1.20.1.5
+      - tag: huawei_hw_member_stack_object_id
+        symbol:
+          name: huawei.hwMemberStackObjectId
+          OID: 1.3.6.1.4.1.2011.5.25.183.1.20.1.7
+
   - MIB: HUAWEI-STACK-MIB
     table:
       name: hwStackPortTable
       OID: 1.3.6.1.4.1.2011.5.25.183.1.21
     symbols:
-      - name: huawei.hwStackPort
-        constant_value_one: true
-    metric_tags:
-      - symbol:
-          name: huawei.hwStackPortName
-          OID: 1.3.6.1.4.1.2011.5.25.183.1.21.1.3
-        tag: huawei_hw_stack_port_name
-      # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-      - symbol:
-          OID: 1.3.6.1.4.1.2011.5.25.183.1.21.1.5
-          name: huawei.hwStackPortStatus
-        tag: huawei_hw_stack_port_status
+      - OID: 1.3.6.1.4.1.2011.5.25.183.1.21.1.5
+        name: huawei.hwStackPortStatus
+        chart_meta:
+          description: Operational status of the stack port
+          family: "Stack/Port/Status"
+          unit: "{status}"
         mapping:
           1: up
           2: down
+    metric_tags:
+      - tag: huawei_hw_stack_port_name
+        symbol:
+          name: huawei.hwStackPortName
+          OID: 1.3.6.1.4.1.2011.5.25.183.1.21.1.3

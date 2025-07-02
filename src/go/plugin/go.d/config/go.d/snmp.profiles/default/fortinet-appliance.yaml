@@ -159,7 +159,7 @@ metrics:
       OID: 1.3.6.1.4.1.12356.103.7.1.2.0
       chart_meta:
         description: RAID Status
-        family: Storage/RAID/Operational/Status
+        family: "Storage/RAID/Status"
         unit: "{status}"
       mapping:
         0: unavailable
@@ -247,7 +247,7 @@ metrics:
         name: fmDeviceEntConnectState
         chart_meta:
           description: Device connection status
-          family: Device/Connection/Status
+          family: "Device/Status/Connection"
           unit: "{status}"
         mapping:
           0: unknown
@@ -257,7 +257,7 @@ metrics:
         name: fmDeviceEntDbState
         chart_meta:
           description: Device database status
-          family: Device/Database/Status
+          family: "Device/Status/Database"
           unit: "{status}"
         mapping:
           0: unknown
@@ -268,7 +268,7 @@ metrics:
         name: fmDeviceEntConfigState
         chart_meta:
           description: Device config status
-          family: Device/Configuration/Status
+          family: "Device/Status/Configuration"
           unit: "{status}"
         mapping:
           0: unknown
@@ -278,7 +278,7 @@ metrics:
         name: fmDeviceEntState
         chart_meta:
           description: Device status
-          family: Device/Operational/Status
+          family: "Device/Status/Operational"
           unit: "{status}"
         mapping:
           0: none
@@ -297,12 +297,12 @@ metrics:
           13: timeout
           14: rev-reverted
           15: auto-updated
-      - symbol:
-        OID: 1.3.6.1.4.1.12356.103.6.2.1.18
+      - OID: 1.3.6.1.4.1.12356.103.6.2.1.18
+        symbol:
         name: fmDeviceEntSupportState
         chart_meta:
           description: The support status of the device
-          family: Device/Support/Status
+          family: "Device/Status/Support"
           unit: "{status}"
         mapping:
           0: expired
@@ -339,10 +339,11 @@ metrics:
     symbols:
       - name: fmRaidDiskEntSize
         OID: 1.3.6.1.4.1.12356.103.7.2.1.3
+        scale_factor: 1073741824 # GB => bytes
         chart_meta:
           description: Raid disk size in GB
           family: Storage/RAID/Disk/Size
-          unit: "GBy"
+          unit: "By"
       - OID: 1.3.6.1.4.1.12356.103.7.2.1.2
         name: fmRaidDiskEntState
         chart_meta:
@@ -371,7 +372,7 @@ metrics:
         name: fmSensorEntState
         chart_meta:
           description: Sensor status
-          family: Sensor/Operational/Status
+          family: Sensor/Status
           unit: "{status}"
         mapping:
           0: ok

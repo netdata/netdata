@@ -5,30 +5,29 @@ metrics:
     table:
       OID: 1.3.6.1.4.1.2636.3.16.1.1
       name: jnxScuStatsTable
-    metric_type: monotonic_count
     symbols:
       - OID: 1.3.6.1.4.1.2636.3.16.1.1.1.4
         name: jnxScuStatsPackets
         chart_meta:
           description: Number of packets sent out of destination interface that match the source class and address family
           family: Interfaces/SCU/Packet/Out
-          unit: "{packet}"
+          unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.2636.3.16.1.1.1.5
         name: jnxScuStatsBytes
         chart_meta:
           description: Number of bytes sent out of destination interface that match the source class and address family
           family: Interfaces/SCU/Traffic/Out
-          unit: "By"
+          unit: "By/s"
     metric_tags:
-      - symbol:
+      - tag: interface
+        table: ifXTable
+        symbol:
           OID: 1.3.6.1.2.1.31.1.1.1.1
           name: ifName
-        table: ifXTable
-        tag: interface
         index_transform:
           - start: 0
             end: 0
-      - symbol:
+      - tag: address_family
+        symbol:
           OID: 1.3.6.1.4.1.2636.3.16.1.1.1.2
           name: jnxScuStatsAddrFamily
-        tag: address_family

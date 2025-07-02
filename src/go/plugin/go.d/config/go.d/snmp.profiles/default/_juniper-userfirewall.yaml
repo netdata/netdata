@@ -3,26 +3,25 @@ metrics:
     table:
       OID: 1.3.6.1.4.1.2636.3.89.1.1.3
       name: jnxUserFwLDAPTable
-    metric_type: monotonic_count
     symbols:
       - OID: 1.3.6.1.4.1.2636.3.89.1.1.3.1.3
         name: jnxUserFwLDAPTotalQuery
         chart_meta:
           description: Total LDAP query number
-          family: Juniper/LDAP/Queries/Total
-          unit: "{query}"
+          family: "LDAP/Query/Total"
+          unit: "{query}/s"
       - OID: 1.3.6.1.4.1.2636.3.89.1.1.3.1.4
         name: jnxUserFwLDAPFailedQuery
         chart_meta:
           description: LDAP failed query number
-          family: Juniper/LDAP/Queries/Failed
-          unit: "{fail}"
+          family: "LDAP/Query/Failed"
+          unit: "{query}/s"
     metric_tags:
-      - symbol:
+      - tag: ldap_domain_name
+        symbol:
           OID: 1.3.6.1.4.1.2636.3.89.1.1.3.1.1
           name: jnxUserFwLDAPDomain
-        tag: ldap_domain_name
-      - symbol:
+      - tag: ldap_host
+        symbol:
           OID: 1.3.6.1.4.1.2636.3.89.1.1.3.1.2
           name: jnxUserFwLDAPHost
-        tag: ldap_host
