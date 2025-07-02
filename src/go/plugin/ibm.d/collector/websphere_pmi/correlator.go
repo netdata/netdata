@@ -478,12 +478,6 @@ func (c *CorrelationEngine) createChartFromGroup(group MetricGroup, priority int
 	// Generate chart properties
 	family := c.generateChartFamily(group)
 
-	// DEBUG: Log what we're generating
-	if group.CategoryPath == "" || group.CategoryPath == "general" {
-		fmt.Printf("DEBUG: Empty category path for metric %s, family=%s, context=%s\n",
-			group.MetricName, family, group.BaseContext)
-	}
-
 	chart := ChartCandidate{
 		Context:    group.BaseContext,
 		Title:      c.generateChartTitle(group),

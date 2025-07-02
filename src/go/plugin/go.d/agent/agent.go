@@ -287,9 +287,6 @@ func (a *Agent) collectDumpAnalysis() {
 		return
 	}
 
-	// Analyze all collected data
-	a.dumpAnalyzer.Analyze()
-
 	// Print the analysis report
 	a.dumpAnalyzer.PrintReport()
 }
