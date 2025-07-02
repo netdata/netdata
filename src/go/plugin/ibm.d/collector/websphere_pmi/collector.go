@@ -108,7 +108,6 @@ type Config struct {
 	CollectServletsMatching string `yaml:"collect_servlets_matching,omitempty" json:"collect_servlets_matching"`
 	CollectEJBsMatching     string `yaml:"collect_ejbs_matching,omitempty" json:"collect_ejbs_matching"`
 
-
 	// HTTP Client settings
 	web.HTTPConfig `yaml:",inline" json:""`
 }
@@ -535,7 +534,6 @@ func (w *WebSpherePMI) collect(ctx context.Context) (map[string]int64, error) {
 	return w.collectDynamic(ctx, stats), nil
 }
 
-
 func (w *WebSpherePMI) fetchPMIStats(ctx context.Context) (*pmiStatsResponse, error) {
 	// Build request URL with parameters
 	reqURL := w.pmiURL + "?stats=" + w.PMIStatsType
@@ -595,12 +593,6 @@ func (w *WebSpherePMI) fetchPMIStats(ctx context.Context) (*pmiStatsResponse, er
 		return nil, fmt.Errorf("parsing cancelled: %w", ctx.Err())
 	}
 }
-
-
-
-
-
-
 
 func (w *WebSpherePMI) logOnce(key, format string, args ...any) {
 	if w.loggedWarnings[key] {

@@ -177,4 +177,3 @@ func (w *WebSpherePMI) collectDynamic(ctx context.Context, stats *pmiStatsRespon
 
 	return w.dynamicCollector.ProcessStats(stats, w.charts)
 }
-
