@@ -19,6 +19,7 @@ type Option struct {
 	WatchPath   []string `short:"w" long:"watch-path" description:"config path to watch"`
 	Debug       bool     `short:"d" long:"debug" description:"debug mode"`
 	Version     bool     `short:"v" long:"version" description:"display the version and exit"`
+	DumpMode    string   `long:"dump" description:"run in dump mode for specified duration (e.g. 30s, 5m) and analyze metric structure"`
 }
 
 // Parse returns parsed command-line flags in Option struct
