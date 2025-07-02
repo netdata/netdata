@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/user"
 	"strings"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
@@ -58,6 +59,17 @@ func main() {
 		logger.Level.Set(slog.LevelDebug)
 	}
 
+	// Parse dump duration if provided
+	var dumpMode time.Duration
+	if opts.DumpMode != "" {
+		var err error
+		dumpMode, err = time.ParseDuration(opts.DumpMode)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: invalid dump duration '%s': %v\n", opts.DumpMode, err)
+			os.Exit(1)
+		}
+	}
+
 	a := agent.New(agent.Config{
 		Name:                      cfg.name,
 		PluginConfigDir:           cfg.pluginDir,
@@ -68,6 +80,7 @@ func main() {
 		RunModule:                 opts.Module,
 		RunJob:                    opts.Job,
 		MinUpdateEvery:            opts.UpdateEvery,
+		DumpMode:                  dumpMode,
 	})
 
 	a.Debugf("plugin: name=%s, version=%s", a.Name, buildinfo.Version)
