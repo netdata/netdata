@@ -8,219 +8,181 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.4
         name: systemStateChassisStatus
-        description: Chassis status of the system state
-        unit: "{state}"
+        chart_meta:
+          family: "Chassis/Status"
+          description: Chassis status of the system state
+          unit: "{status}"
+        mapping:
+          1: other
+          2: unknown
+          3: ok
+          4: non_critical
+          5: critical
+          6: non_recoverable
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.6
         name: systemStatePowerUnitStatusRedundancy
-        description: Power unit status redundancy of the system state
-        unit: "{state}"
+        chart_meta:
+          family: "PowerUnit/Redundancy/Status"
+          description: Power unit status redundancy of the system state
+          unit: "{status}"
+        mapping:
+          1: other
+          2: unknown
+          3: full
+          4: degraded
+          5: lost
+          6: not_redundant
+          7: redundancy_offline
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.9
         name: systemStatePowerSupplyStatusCombined
-        description: Combined power supply status of the system state
-        unit: "{state}"
+        chart_meta:
+          family: "PowerSupply/Status/Combined"
+          description: Combined power supply status of the system state
+          unit: "{state}"
+        mapping:
+          1: other
+          2: unknown
+          3: ok
+          4: non_critical
+          5: critical
+          6: non_recoverable
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.15
         name: systemStateAmperageStatusCombined
-        description: Combined amperage status of the system state
-        unit: "{state}"
+        chart_meta:
+          family: "Amperage/Status/Combined"
+          description: Combined amperage status of the system state
+          unit: "{status}"
+        mapping:
+          1: other
+          2: unknown
+          3: ok
+          4: non_critical
+          5: critical
+          6: non_recoverable
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.18
         name: systemStateCoolingUnitStatusRedundancy
-        description: Cooling unit status redundancy of the system state
-        unit: "{state}"
+        chart_meta:
+          family: "CoolingUnit/Redundancy/Status"
+          description: Cooling unit status redundancy of the system state
+          unit: "{status}"
+        mapping:
+          1: other
+          2: unknown
+          3: full
+          4: degraded
+          5: lost
+          6: not_redundant
+          7: redundancy_offline
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.21
         name: systemStateCoolingDeviceStatusCombined
-        description: Combined cooling device status of the system state
-        unit: "{state}"
+        chart_meta:
+          family: "CoolingDevice/Status/Combined"
+          description: Combined cooling device status of the system state
+          unit: "{status}"
+        mapping:
+          1: other
+          2: unknown
+          3: ok
+          4: non_critical
+          5: critical
+          6: non_recoverable
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.24
         name: systemStateTemperatureStatusCombined
-        description: Combined temperature status of the system state
-        unit: "{state}"
+        chart_meta:
+          family: "Temperature/Status/Combined"
+          description: Combined temperature status of the system state
+          unit: "{status}"
+        mapping:
+          1: other
+          2: unknown
+          3: ok
+          4: non_critical
+          5: critical
+          6: non_recoverable
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.27
         name: systemStateMemoryDeviceStatusCombined
-        description: Combined memory device status of the system state
-        unit: "{state}"
+        chart_meta:
+          family: "MemoryDevice/Status/Combined"
+          description: Combined memory device status of the system state
+          unit: "{status}"
+        mapping:
+          1: other
+          2: unknown
+          3: ok
+          4: non_critical
+          5: critical
+          6: non_recoverable
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.30
         name: systemStateChassisIntrusionStatusCombined
-        description: Combined chassis intrusion status of the system state
-        unit: "{state}"
+        chart_meta:
+          family: "ChassisIntrusion/Status/Combined"
+          description: Combined chassis intrusion status of the system state
+          unit: "{status}"
+        mapping:
+          1: other
+          2: unknown
+          3: ok
+          4: non_critical
+          5: critical
+          6: non_recoverable
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.42
         name: systemStatePowerUnitStatusCombined
-        description: Combined power unit status of the system state
-        unit: "{state}"
+        chart_meta:
+          family: "PowerUnit/Status/Combined"
+          description: Combined power unit status of the system state
+          unit: "{status}"
+        mapping:
+          1: other
+          2: unknown
+          3: ok
+          4: non_critical
+          5: critical
+          6: non_recoverable
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.44
         name: systemStateCoolingUnitStatusCombined
-        description: Combined cooling unit status of the system state
-        unit: "{state}"
+        chart_meta:
+          family: "CoolingUnit/Status/Combined"
+          description: Combined cooling unit status of the system state
+          unit: "{status}"
+        mapping:
+          1: other
+          2: unknown
+          3: ok
+          4: non_critical
+          5: critical
+          6: non_recoverable
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.50
         name: systemStateProcessorDeviceStatusCombined
-        description: Combined processor device status of the system state
-        unit: "{state}"
+        chart_meta:
+          family: "ProcessorDevice/Status/Combined"
+          description: Combined processor device status of the system state
+          unit: "{status}"
+        mapping:
+          1: other
+          2: unknown
+          3: ok
+          4: non_critical
+          5: critical
+          6: non_recoverable
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.63
         name: systemStateTemperatureStatisticsStatusCombined
-        description: Combined temperature statistics status of the system state
-        unit: "{state}"
+        chart_meta:
+          family: "TemperatureStatistics/Status/Combined"
+          description: Combined temperature statistics status of the system state
+          unit: "{status}"
+        mapping:
+          1: other
+          2: unknown
+          3: ok
+          4: non_critical
+          5: critical
+          6: non_recoverable
     metric_tags:
-      - symbol:
+      - tag: chassis_index
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.1
           name: systemStatechassisIndex
-        tag: chassis_index
-  - MIB: IDRAC-MIB-SMIv2
-    table:
-      OID: 1.3.6.1.4.1.674.10892.5.4.200.10
-      name: systemStateTable
-    symbols:
-      - name: dell.systemState
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.1
-          name: systemStatechassisIndex
-        tag: chassis_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.4
-          name: systemStateChassisStatus
-        tag: system_state_chassis_status
-        mapping:
-          1: other
-          2: unknown
-          3: ok
-          4: non_critical
-          5: critical
-          6: non_recoverable
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.6
-          name: systemStatePowerUnitStatusRedundancy
-        tag: system_state_power_unit_status_redundancy
-        mapping:
-          1: other
-          2: unknown
-          3: full
-          4: degraded
-          5: lost
-          6: not_redundant
-          7: redundancy_offline
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.9
-          name: systemStatePowerSupplyStatusCombined
-        tag: system_state_power_supply_status_combined
-        mapping:
-          1: other
-          2: unknown
-          3: ok
-          4: non_critical
-          5: critical
-          6: non_recoverable
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.15
-          name: systemStateAmperageStatusCombined
-        tag: system_state_amperage_status_combined
-        mapping:
-          1: other
-          2: unknown
-          3: ok
-          4: non_critical
-          5: critical
-          6: non_recoverable
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.18
-          name: systemStateCoolingUnitStatusRedundancy
-        tag: system_state_cooling_unit_status_redundancy
-        mapping:
-          1: other
-          2: unknown
-          3: full
-          4: degraded
-          5: lost
-          6: not_redundant
-          7: redundancy_offline
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.21
-          name: systemStateCoolingDeviceStatusCombined
-        tag: system_state_cooling_device_status_combined
-        mapping:
-          1: other
-          2: unknown
-          3: ok
-          4: non_critical
-          5: critical
-          6: non_recoverable
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.24
-          name: systemStateTemperatureStatusCombined
-        tag: system_state_temperature_status_combined
-        mapping:
-          1: other
-          2: unknown
-          3: ok
-          4: non_critical
-          5: critical
-          6: non_recoverable
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.27
-          name: systemStateMemoryDeviceStatusCombined
-        tag: system_state_memory_device_status_combined
-        mapping:
-          1: other
-          2: unknown
-          3: ok
-          4: non_critical
-          5: critical
-          6: non_recoverable
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.30
-          name: systemStateChassisIntrusionStatusCombined
-        tag: system_state_chassis_intrusion_status_combined
-        mapping:
-          1: other
-          2: unknown
-          3: ok
-          4: non_critical
-          5: critical
-          6: non_recoverable
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.42
-          name: systemStatePowerUnitStatusCombined
-        tag: system_state_power_unit_status_combined
-        mapping:
-          1: other
-          2: unknown
-          3: ok
-          4: non_critical
-          5: critical
-          6: non_recoverable
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.44
-          name: systemStateCoolingUnitStatusCombined
-        tag: system_state_cooling_unit_status_combined
-        mapping:
-          1: other
-          2: unknown
-          3: ok
-          4: non_critical
-          5: critical
-          6: non_recoverable
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.50
-          name: systemStateProcessorDeviceStatusCombined
-        tag: system_state_processor_device_status_combined
-        mapping:
-          1: other
-          2: unknown
-          3: ok
-          4: non_critical
-          5: critical
-          6: non_recoverable
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.63
-          name: systemStateTemperatureStatisticsStatusCombined
-        tag: system_state_temperature_statistics_status_combined
-        mapping:
-          1: other
-          2: unknown
-          3: ok
-          4: non_critical
-          5: critical
-          6: non_recoverable
+
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4
@@ -228,38 +190,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.4
         name: physicalDiskState
-        description: State of the physical disk
-        unit: "{state}"
-      - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.11
-        name: physicalDiskCapacityInMB
-        description: Capacity of the physical disk in megabytes
-        unit: "MBy"
-      - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.17
-        name: physicalDiskUsedSpaceInMB
-        description: Used space of the physical disk in megabytes
-        unit: "MBy"
-      - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.19
-        name: physicalDiskFreeSpaceInMB
-        description: Free space of the physical disk in megabytes
-        unit: "MBy"
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.2
-          name: physicalDiskName
-        tag: disk_name
-  - MIB: IDRAC-MIB-SMIv2
-    table:
-      OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4
-      name: physicalDiskTable
-    symbols:
-      - name: dell.physicalDisk
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.4
-          name: physicalDiskState
-        tag: disk_state
+        chart_meta:
+          family: "Disk/Physical/State"
+          description: State of the physical disk
+          unit: "{status}"
         mapping:
           1: unknown
           2: ready
@@ -271,14 +205,37 @@ metrics:
           8: nonraid
           9: removed
           10: readonly
+      - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.11
+        name: physicalDiskCapacityInMB
+        scale_factor: 1048576
+        chart_meta:
+          family: "Disk/Physical/Capacity"
+          description: Capacity of the physical disk in megabytes
+          unit: "By"
+      - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.17
+        name: physicalDiskUsedSpaceInMB
+        scale_factor: 1048576
+        chart_meta:
+          family: "Disk/Physical/Used"
+          description: Used space of the physical disk in megabytes
+          unit: "By"
+      - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.19
+        name: physicalDiskFreeSpaceInMB
+        scale_factor: 1048576
+        chart_meta:
+          family: "Disk/Physical/Free"
+          description: Free space of the physical disk in megabytes
+          unit: "By"
+    metric_tags:
+      - tag: disk_number
+        symbol:
+          OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.1
+          name: physicalDiskNumber
+      - tag: disk_name
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.2
           name: physicalDiskName
-        tag: disk_name
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.1
-          name: physicalDiskNumber
-        tag: disk_number
+
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.9
@@ -286,52 +243,30 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.9.1.4
         name: enclosurePowerSupplyState
-        description: State of the enclosure power supply
-        unit: "{state}"
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.9.1.2
-          name: enclosurePowerSupplyName
-        tag: supply_name
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.9.1.1
-          name: enclosurePowerSupplyNumber
-        tag: enclosure_power_supply_number
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.9.1.15
-          name: enclosurePowerSupplyFQDD
-        tag: enclosure_power_supply_fqdd
-  - MIB: IDRAC-MIB-SMIv2
-    table:
-      OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.9
-      name: enclosurePowerSupplyTable
-    symbols:
-      - name: enclosurePowerSupply
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.9.1.4
-          name: enclosurePowerSupplyState
-        tag: enclosure_power_supply_state
+        chart_meta:
+          family: "Enclosure/PowerSupply/State"
+          description: State of the enclosure power supply
+          unit: "{status}"
         mapping:
           1: unknown
           2: ready
           3: failed
           4: missing
           5: degraded
-      - symbol:
+    metric_tags:
+      - tag: supply_name
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.9.1.2
           name: enclosurePowerSupplyName
-        tag: supply_name
-      - symbol:
+      - tag: enclosure_power_supply_number
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.9.1.1
           name: enclosurePowerSupplyNumber
-        tag: enclosure_power_supply_number
-      - symbol:
+      - tag: enclosure_power_supply_fqdd
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.9.1.15
           name: enclosurePowerSupplyFQDD
-        tag: enclosure_power_supply_fqdd
+
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.15
@@ -339,30 +274,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.15.1.4
         name: batteryState
-        description: State of the battery
-        unit: "{state}"
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.15.1.20
-          name: batteryFQDD
-        tag: battery_fqdd
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.15.1.21
-          name: batteryDisplayName
-        tag: battery_name
-  - MIB: IDRAC-MIB-SMIv2
-    table:
-      OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.15
-      name: batteryTable
-    symbols:
-      - name: dell.battery
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.15.1.4
-          name: batteryState
-        tag: battery_state
+        chart_meta:
+          family: "Battery/State"
+          description: State of the battery
+          unit: "{status}"
         mapping:
           1: unknown
           2: ready
@@ -371,14 +286,16 @@ metrics:
           5: missing
           6: charging
           7: below_threshold
-      - symbol:
+    metric_tags:
+      - tag: battery_fqdd
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.15.1.20
           name: batteryFQDD
-        tag: battery_fqdd
-      - symbol:
+      - tag: battery_name
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.15.1.21
           name: batteryDisplayName
-        tag: battery_name
+
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1
@@ -386,38 +303,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.37
         name: controllerRollUpStatus
-        description: Roll up status of the controller
-        unit: "{state}"
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.1
-          name: controllerNumber
-        tag: controller_number
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.2
-          name: controllerName
-        tag: controller_name
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.42
-          name: controllerPCISlot
-        tag: controller_pci_slot
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.78
-          name: controllerFQDD
-        tag: controller_fqdd
-  - MIB: IDRAC-MIB-SMIv2
-    table:
-      OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1
-      name: controllerTable
-    symbols:
-      - name: dell.controller
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.37
-          name: controllerRollUpStatus
-        tag: controller_roll_up_status
+        chart_meta:
+          family: "Controller/Status/RollUp"
+          description: Roll up status of the controller
+          unit: "{status}"
         mapping:
           1: other
           2: unknown
@@ -425,22 +314,24 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
-      - symbol:
+    metric_tags:
+      - tag: controller_number
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.1
           name: controllerNumber
-        tag: controller_number
-      - symbol:
+      - tag: controller_name
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.2
           name: controllerName
-        tag: controller_name
-      - symbol:
+      - tag: controller_pci_slot
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.42
           name: controllerPCISlot
-        tag: controller_pci_slot
-      - symbol:
+      - tag: controller_fqdd
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.78
           name: controllerFQDD
-        tag: controller_fqdd
+
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.4.1100.80
@@ -448,30 +339,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.80.1.5
         name: pCIDeviceStatus
-        description: Status of the PCI device
-        unit: "{state}"
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.1100.80.1.9
-          name: pCIDeviceDescriptionName
-        tag: device_descr_name
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.1100.80.1.1
-          name: pCIDevicechassisIndex
-        tag: chassis_index
-  - MIB: IDRAC-MIB-SMIv2
-    table:
-      OID: 1.3.6.1.4.1.674.10892.5.4.1100.80
-      name: pCIDeviceTable
-    symbols:
-      - name: dell.pCIDevice
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.1100.80.1.5
-          name: pCIDeviceStatus
-        tag: device_status
+        chart_meta:
+          family: "PCIDevice/Status"
+          description: Status of the PCI device
+          unit: "{status}"
         mapping:
           1: other
           2: unknown
@@ -479,14 +350,16 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
-      - symbol:
+    metric_tags:
+      - tag: device_descr_name
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.80.1.9
           name: pCIDeviceDescriptionName
-        tag: device_descr_name
-      - symbol:
+      - tag: chassis_index
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.80.1.1
           name: pCIDevicechassisIndex
-        tag: chassis_index
+
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.4.1200.10
@@ -494,30 +367,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.1200.10.1.5
         name: systemSlotStatus
-        description: Status of the system slot
-        unit: "{state}"
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.1200.10.1.8
-          name: systemSlotSlotExternalSlotName
-        tag: slot_name
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.1200.10.1.1
-          name: systemSlotchassisIndex
-        tag: chassis_index
-  - MIB: IDRAC-MIB-SMIv2
-    table:
-      OID: 1.3.6.1.4.1.674.10892.5.4.1200.10
-      name: systemSlotTable
-    symbols:
-      - name: dell.systemSlot
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.1200.10.1.5
-          name: systemSlotStatus
-        tag: slot_status
+        chart_meta:
+          family: "Slot/Status"
+          description: Status of the system slot
+          unit: "{status}"
         mapping:
           1: other
           2: unknown
@@ -525,14 +378,16 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
-      - symbol:
+    metric_tags:
+      - tag: slot_name
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1200.10.1.8
           name: systemSlotSlotExternalSlotName
-        tag: slot_name
-      - symbol:
+      - tag: chassis_index
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1200.10.1.1
           name: systemSlotchassisIndex
-        tag: chassis_index
+
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.4.1100.90
@@ -540,34 +395,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.90.1.3
         name: networkDeviceStatus
-        description: Status of the network device
-        unit: "{state}"
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.1100.90.1.1
-          name: networkDeviceChassisIndex
-        tag: chassis_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.1100.90.1.16
-          name: networkDevicePermanentMACAddress
-        tag: mac_addr
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.1100.90.1.30
-          name: networkDeviceFQDD
-        tag: device_fqdd
-  - MIB: IDRAC-MIB-SMIv2
-    table:
-      OID: 1.3.6.1.4.1.674.10892.5.4.1100.90
-      name: networkDeviceTable
-    symbols:
-      - name: dell.networkDevice
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.1100.90.1.3
-          name: networkDeviceStatus
-        tag: network_device_status
+        chart_meta:
+          family: "NetworkDevice/Status"
+          description: Status of the network device
+          unit: "{status}"
         mapping:
           1: other
           2: unknown
@@ -575,22 +406,20 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
-      - symbol:
+    metric_tags:
+      - tag: chassis_index
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.90.1.1
           name: networkDeviceChassisIndex
-        tag: chassis_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.1100.90.1.2
-          name: networkDeviceIndex
-        tag: device_index
-      - symbol:
+      - tag: mac_addr
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.90.1.16
           name: networkDevicePermanentMACAddress
-        tag: mac_addr
-      - symbol:
+      - tag: device_fqdd
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.90.1.30
           name: networkDeviceFQDD
-        tag: device_fqdd
+
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.4.300.50
@@ -598,38 +427,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.300.50.1.5
         name: systemBIOSStatus
-        description: Status of the system BIOS
-        unit: "{state}"
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.300.50.1.1
-          name: systemBIOSchassisIndex
-        tag: chassis_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.300.50.1.2
-          name: systemBIOSIndex
-        tag: system_bios_index
-  - MIB: IDRAC-MIB-SMIv2
-    table:
-      OID: 1.3.6.1.4.1.674.10892.5.4.300.50
-      name: systemBIOSTable
-    symbols:
-      - name: dell.systemBIOS
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.300.50.1.1
-          name: systemBIOSchassisIndex
-        tag: chassis_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.300.50.1.2
-          name: systemBIOSIndex
-        tag: system_bios_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.300.50.1.5
-          name: systemBIOSStatus
-        tag: system_bios_status
+        chart_meta:
+          family: "BIOS/Status"
+          description: Status of the system BIOS
+          unit: "{status}"
         mapping:
           1: other
           2: unknown
@@ -637,6 +438,16 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
+    metric_tags:
+      - tag: chassis_index
+        symbol:
+          OID: 1.3.6.1.4.1.674.10892.5.4.300.50.1.1
+          name: systemBIOSchassisIndex
+      - tag: system_bios_index
+        symbol:
+          OID: 1.3.6.1.4.1.674.10892.5.4.300.50.1.2
+          name: systemBIOSIndex
+
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.4.300.70
@@ -644,25 +455,37 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.300.70.1.5
         name: intrusionStatus
-        description: Status of the intrusion
-        unit: "{state}"
+        chart_meta:
+          family: "Intrusion/Status"
+          description: Status of the intrusion
+          unit: "{status}"
+        mapping:
+          1: other
+          2: unknown
+          3: ok
+          4: non_critical
+          5: critical
+          6: non_recoverable
       - OID: 1.3.6.1.4.1.674.10892.5.4.300.70.1.6
         name: intrusionReading
-        description: Reading of the intrusion
-        unit: "TBD"
+        chart_meta:
+          family: "Intrusion/Reading"
+          description: Reading of the intrusion
+          unit: "{reading}"
     metric_tags:
-      - symbol:
+      - tag: chassis_index
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.300.70.1.1
           name: intrusionchassisIndex
-        tag: chassis_index
-      - symbol:
+      - tag: intrusion_index
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.300.70.1.2
           name: intrusionIndex
-        tag: intrusion_index
-      - symbol:
+      - tag: intrusion_location_name
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.300.70.1.8
           name: intrusionLocationName
-        tag: intrusion_location_name
+
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.4.600.12
@@ -670,29 +493,36 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.12.1.6
         name: powerSupplyOutputWatts
-        description: Output power of the power supply in watts
-        unit: "W"
+        chart_meta:
+          family: "PowerSupply/Output/Power"
+          description: Output power of the power supply in watts
+          unit: "W"
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.12.1.9
         name: powerSupplyMaximumInputVoltage
-        description: Maximum input voltage of the power supply
-        unit: "V"
+        chart_meta:
+          family: "PowerSupply/Input/Voltage/Maximum"
+          description: Maximum input voltage of the power supply
+          unit: "V"
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.12.1.16
         name: powerSupplyCurrentInputVoltage
-        description: Current input voltage of the power supply
-        unit: "V"
+        chart_meta:
+          family: "PowerSupply/Input/Voltage/Current"
+          description: Current input voltage of the power supply
+          unit: "V"
     metric_tags:
-      - symbol:
+      - tag: chassis_index
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.600.12.1.1
           name: powerSupplychassisIndex
-        tag: chassis_index
-      - symbol:
+      - tag: power_supply_index
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.600.12.1.2
           name: powerSupplyIndex
-        tag: power_supply_index
-      - symbol:
+      - tag: power_supply_fqdd
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.600.12.1.15
           name: powerSupplyFQDD
-        tag: power_supply_fqdd
+
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.4.600.30
@@ -700,92 +530,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.5
         name: amperageProbeStatus
-        description: Status of the amperage probe
-        unit: "{state}"
-      - OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.6
-        name: amperageProbeReading
-        description: Reading of the amperage probe in amperes
-        unit: "A"
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.7
-          name: amperageProbeType
-        tag: probe_type
-        mapping:
-          1: amperage_probe_type_is_other
-          2: amperage_probe_type_is_unknown
-          3: amperage_probe_type_is_1point5_volt    # 1.5 volt
-          4: amperage_probe_type_is_3point3_volt    # 3.3 volt
-          5: amperage_probe_type_is_5_volt          # 5 volt
-          6: amperage_probe_type_is_minus5_volt     # -5 volt
-          7: amperage_probe_type_is_12_volt         # 12 volt
-          8: amperage_probe_type_is_minus12_volt    # -12 volt
-          9: amperage_probe_type_is_io
-          10: amperage_probe_type_is_core
-          11: amperage_probe_type_is_flea
-          12: amperage_probe_type_is_battery
-          13: amperage_probe_type_is_terminator
-          14: amperage_probe_type_is_2point5_volt   # 2.5 volt
-          15: amperage_probe_type_is_gtl
-          16: amperage_probe_type_is_discrete
-          23: amperage_probe_type_is_power_supply_amps
-          24: amperage_probe_type_is_power_supply_watts
-          25: amperage_probe_type_is_system_amps
-          26: amperage_probe_type_is_system_watts
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.1
-          name: amperageProbechassisIndex
-        tag: chassis_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.2
-          name: amperageProbeIndex
-        tag: amperage_probe_index
-  - MIB: IDRAC-MIB-SMIv2
-    table:
-      OID: 1.3.6.1.4.1.674.10892.5.4.600.30
-      name: amperageProbeTable
-    symbols:
-      - name: dell.amperageProbe
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.7
-          name: amperageProbeType
-        tag: probe_type
-        mapping:
-          1: amperage_probe_type_is_other
-          2: amperage_probe_type_is_unknown
-          3: amperage_probe_type_is_1point5_volt    # 1.5 volt
-          4: amperage_probe_type_is_3point3_volt    # 3.3 volt
-          5: amperage_probe_type_is_5_volt          # 5 volt
-          6: amperage_probe_type_is_minus5_volt     # -5 volt
-          7: amperage_probe_type_is_12_volt         # 12 volt
-          8: amperage_probe_type_is_minus12_volt    # -12 volt
-          9: amperage_probe_type_is_io
-          10: amperage_probe_type_is_core
-          11: amperage_probe_type_is_flea
-          12: amperage_probe_type_is_battery
-          13: amperage_probe_type_is_terminator
-          14: amperage_probe_type_is_2point5_volt   # 2.5 volt
-          15: amperage_probe_type_is_gtl
-          16: amperage_probe_type_is_discrete
-          23: amperage_probe_type_is_power_supply_amps
-          24: amperage_probe_type_is_power_supply_watts
-          25: amperage_probe_type_is_system_amps
-          26: amperage_probe_type_is_system_watts
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.1
-          name: amperageProbechassisIndex
-        tag: chassis_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.2
-          name: amperageProbeIndex
-        tag: amperage_probe_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.5
-          name: amperageProbeStatus
-        tag: amperage_probe_status
+        chart_meta:
+          family: "Sensor/Amperage/Status"
+          description: Status of the amperage probe
+          unit: "{status}"
         mapping:
           1: other
           2: unknown
@@ -797,6 +545,47 @@ metrics:
           8: critical_lower
           9: non_recoverable_lower
           10: failed
+      - OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.6
+        name: amperageProbeReading
+        chart_meta:
+          family: "Sensor/Amperage/Value"
+          description: Reading of the amperage probe in amperes
+          unit: "A"
+    metric_tags:
+      - tag: probe_type
+        symbol:
+          OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.7
+          name: amperageProbeType
+        mapping:
+          1: amperage_probe_type_is_other
+          2: amperage_probe_type_is_unknown
+          3: amperage_probe_type_is_1point5_volt    # 1.5 volt
+          4: amperage_probe_type_is_3point3_volt    # 3.3 volt
+          5: amperage_probe_type_is_5_volt          # 5 volt
+          6: amperage_probe_type_is_minus5_volt     # -5 volt
+          7: amperage_probe_type_is_12_volt         # 12 volt
+          8: amperage_probe_type_is_minus12_volt    # -12 volt
+          9: amperage_probe_type_is_io
+          10: amperage_probe_type_is_core
+          11: amperage_probe_type_is_flea
+          12: amperage_probe_type_is_battery
+          13: amperage_probe_type_is_terminator
+          14: amperage_probe_type_is_2point5_volt   # 2.5 volt
+          15: amperage_probe_type_is_gtl
+          16: amperage_probe_type_is_discrete
+          23: amperage_probe_type_is_power_supply_amps
+          24: amperage_probe_type_is_power_supply_watts
+          25: amperage_probe_type_is_system_amps
+          26: amperage_probe_type_is_system_watts
+      - tag: chassis_index
+        symbol:
+          OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.1
+          name: amperageProbechassisIndex
+      - tag: amperage_probe_index
+        symbol:
+          OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.2
+          name: amperageProbeIndex
+
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.4.600.60
@@ -804,21 +593,31 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.60.1.5
         name: powerUsageStatus
-        description: Status of the power usage
-        unit: "{state}"
+        chart_meta:
+          family: "PowerUsage/Status"
+          description: Status of the power usage
+          unit: "{status}"
+        mapping:
+          1: other
+          2: unknown
+          3: ok
+          4: non_critical
+          5: critical
+          6: non_recoverable
     metric_tags:
-      - symbol:
+      - tag: chassis_index
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.600.60.1.1
           name: powerUsageChassisIndex
-        tag: chassis_index
-      - symbol:
+      - tag: power_usage_index
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.600.60.1.2
           name: powerUsageIndex
-        tag: power_usage_index
-      - symbol:
+      - tag: power_usage_entity_name
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.600.60.1.6
           name: powerUsageEntityName
-        tag: power_usage_entity_name
+
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.4.600.20
@@ -826,90 +625,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.20.1.5
         name: voltageProbeStatus
-        description: Status of the voltage probe
-        unit: "{state}"
-      - OID: 1.3.6.1.4.1.674.10892.5.4.600.20.1.6
-        name: voltageProbeReading
-        description: Reading of the voltage probe in volts
-        unit: "V"
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.20.1.1
-          name: voltageProbechassisIndex
-        tag: chassis_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.20.1.2
-          name: voltageProbeIndex
-        tag: voltage_probe_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.20.1.7
-          name: voltageProbeType
-        tag: probe_type
-        mapping:
-          1: voltage_probe_type_is_other
-          2: voltage_probe_type_is_unknown
-          3: voltage_probe_type_is_1point5_volt   # 1.5 volt
-          4: voltage_probe_type_is_3point3_volt   # 3.3 volt
-          5: voltage_probe_type_is_5_volt         # 5 volt
-          6: voltage_probe_type_is_minus5_volt    # -5 volt
-          7: voltage_probe_type_is_12_volt        # 12 volt
-          8: voltage_probe_type_is_minus12_volt   # -12 volt
-          9: voltage_probe_type_is_io
-          10: voltage_probe_type_is_core
-          11: voltage_probe_type_is_flea
-          12: voltage_probe_type_is_battery
-          13: voltage_probe_type_is_terminator
-          14: voltage_probe_type_is_2point5_volt  # 2.5 volt
-          15: voltage_probe_type_is_gtl
-          16: voltage_probe_type_is_discrete
-          17: voltage_probe_type_is_generic_discrete
-          18: voltage_probe_type_is_ps_voltage
-          19: voltage_probe_type_is_memory_status
-  - MIB: IDRAC-MIB-SMIv2
-    table:
-      OID: 1.3.6.1.4.1.674.10892.5.4.600.20
-      name: voltageProbeTable
-    symbols:
-      - name: dell.voltageProbe
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.20.1.1
-          name: voltageProbechassisIndex
-        tag: chassis_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.20.1.2
-          name: voltageProbeIndex
-        tag: voltage_probe_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.20.1.7
-          name: voltageProbeType
-        tag: probe_type
-        mapping:
-          1: voltage_probe_type_is_other
-          2: voltage_probe_type_is_unknown
-          3: voltage_probe_type_is_1point5_volt   # 1.5 volt
-          4: voltage_probe_type_is_3point3_volt   # 3.3 volt
-          5: voltage_probe_type_is_5_volt         # 5 volt
-          6: voltage_probe_type_is_minus5_volt    # -5 volt
-          7: voltage_probe_type_is_12_volt        # 12 volt
-          8: voltage_probe_type_is_minus12_volt   # -12 volt
-          9: voltage_probe_type_is_io
-          10: voltage_probe_type_is_core
-          11: voltage_probe_type_is_flea
-          12: voltage_probe_type_is_battery
-          13: voltage_probe_type_is_terminator
-          14: voltage_probe_type_is_2point5_volt  # 2.5 volt
-          15: voltage_probe_type_is_gtl
-          16: voltage_probe_type_is_discrete
-          17: voltage_probe_type_is_generic_discrete
-          18: voltage_probe_type_is_ps_voltage
-          19: voltage_probe_type_is_memory_status
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.20.1.5
-          name: voltageProbeStatus
-        tag: voltage_probe_status
+        chart_meta:
+          family: "Sensor/Voltage/Status"
+          description: Status of the voltage probe
+          unit: "{status}"
         mapping:
           1: other
           2: unknown
@@ -921,6 +640,46 @@ metrics:
           8: critical_lower
           9: non_recoverable_lower
           10: failed
+      - OID: 1.3.6.1.4.1.674.10892.5.4.600.20.1.6
+        name: voltageProbeReading
+        chart_meta:
+          family: "Sensor/Voltage/Value"
+          description: Reading of the voltage probe in volts
+          unit: "V"
+    metric_tags:
+      - tag: chassis_index
+        symbol:
+          OID: 1.3.6.1.4.1.674.10892.5.4.600.20.1.1
+          name: voltageProbechassisIndex
+      - tag: voltage_probe_index
+        symbol:
+          OID: 1.3.6.1.4.1.674.10892.5.4.600.20.1.2
+          name: voltageProbeIndex
+      - tag: probe_type
+        symbol:
+          OID: 1.3.6.1.4.1.674.10892.5.4.600.20.1.7
+          name: voltageProbeType
+        mapping:
+          1: voltage_probe_type_is_other
+          2: voltage_probe_type_is_unknown
+          3: voltage_probe_type_is_1point5_volt   # 1.5 volt
+          4: voltage_probe_type_is_3point3_volt   # 3.3 volt
+          5: voltage_probe_type_is_5_volt         # 5 volt
+          6: voltage_probe_type_is_minus5_volt    # -5 volt
+          7: voltage_probe_type_is_12_volt        # 12 volt
+          8: voltage_probe_type_is_minus12_volt   # -12 volt
+          9: voltage_probe_type_is_io
+          10: voltage_probe_type_is_core
+          11: voltage_probe_type_is_flea
+          12: voltage_probe_type_is_battery
+          13: voltage_probe_type_is_terminator
+          14: voltage_probe_type_is_2point5_volt  # 2.5 volt
+          15: voltage_probe_type_is_gtl
+          16: voltage_probe_type_is_discrete
+          17: voltage_probe_type_is_generic_discrete
+          18: voltage_probe_type_is_ps_voltage
+          19: voltage_probe_type_is_memory_status
+
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.4.600.50
@@ -928,25 +687,37 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.50.1.5
         name: systemBatteryStatus
-        description: Status of the system battery
-        unit: "{state}"
+        chart_meta:
+          family: "SystemBattery/Status"
+          description: Status of the system battery
+          unit: "{status}"
+        mapping:
+          1: other
+          2: unknown
+          3: ok
+          4: non_critical
+          5: critical
+          6: non_recoverable
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.50.1.6
         name: systemBatteryReading
-        description: Reading of the system battery
-        unit: "TBD"
+        chart_meta:
+          family: "SystemBattery/Reading"
+          description: Reading of the system battery
+          unit: "{reading}"
     metric_tags:
-      - symbol:
+      - tag: chassis_index
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.600.50.1.1
           name: systemBatteryChassisIndex
-        tag: chassis_index
-      - symbol:
+      - tag: system_battery_index
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.600.50.1.2
           name: systemBatteryIndex
-        tag: system_battery_index
-      - symbol:
+      - tag: system_battery_location_name
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.600.50.1.7
           name: systemBatteryLocationName
-        tag: system_battery_location_name
+
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.4.700.10
@@ -954,25 +725,46 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.10.1.5
         name: coolingUnitRedundancyStatus
-        description: Redundancy status of the cooling unit
-        unit: "{state}"
+        chart_meta:
+          family: "CoolingUnit/Redundancy/Status"
+          description: Redundancy status of the cooling unit
+          unit: "{status}"
+        mapping:
+          1: other
+          2: unknown
+          3: full
+          4: degraded
+          5: lost
+          6: not_redundant
+          7: redundancy_offline
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.10.1.8
         name: coolingUnitStatus
-        description: Status of the cooling unit
-        unit: "{state}"
+        chart_meta:
+          family: "CoolingUnit/Status"
+          description: Status of the cooling unit
+          unit: "{status}"
+        mapping:
+          1: other
+          2: unknown
+          3: full
+          4: degraded
+          5: lost
+          6: not_redundant
+          7: redundancy_offline
     metric_tags:
-      - symbol:
+      - tag: chassis_index
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.700.10.1.1
           name: coolingUnitchassisIndex
-        tag: chassis_index
-      - symbol:
+      - tag: cooling_unit_index
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.700.10.1.2
           name: coolingUnitIndex
-        tag: cooling_unit_index
-      - symbol:
+      - tag: cooling_unit_name
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.700.10.1.7
           name: coolingUnitName
-        tag: cooling_unit_name
+
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.4.700.12
@@ -980,30 +772,46 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.5
         name: coolingDeviceStatus
-        description: Status of the cooling device
-        unit: "{state}"
+        chart_meta:
+          family: "CoolingDevice/Status"
+          description: Status of the cooling device
+          unit: "{status}"
+        mapping:
+          1: other
+          2: unknown
+          3: ok
+          4: non_critical_upper
+          5: critical_upper
+          6: non_recoverable_upper
+          7: non_critical_lower
+          8: critical_lower
+          9: non_recoverable_lower
+          10: failed
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.6
         name: coolingDeviceReading
-        description: Reading of the cooling device
-        unit: "TBD"
+        chart_meta:
+          family: "CoolingDevice/Speed"
+          description: Reading of the cooling device
+          unit: "rpm"
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.18
         name: coolingDeviceDiscreteReading
-        description: Discrete reading of the cooling device
-        unit: "TBD"
+        chart_meta:
+          family: "CoolingDevice/DiscreteReading"
+          description: Discrete reading of the cooling device
+          unit: "{reading}"
     metric_tags:
-      - symbol:
+      - tag: chassis_index
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.1
           name: coolingDevicechassisIndex
-        tag: chassis_index
-      - symbol:
+      - tag: cooling_device_name
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.2
           name: coolingDeviceIndex
-        tag: cooling_device_name
-      # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-      - symbol:
+      - tag: cooling_device_type
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.7
           name: coolingDeviceType
-        tag: cooling_device_type
         mapping:
           1: cooling_device_type_is_other
           2: cooling_device_type_is_unknown
@@ -1016,14 +824,15 @@ metrics:
           9: cooling_device_type_is_refrigeration
           10: cooling_device_type_is_active_cooling
           11: cooling_device_type_is_passive_cooling
-      - symbol:
+      - tag: cooling_device_location_name
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.8
           name: coolingDeviceLocationName
-        tag: cooling_device_location_name
-      - symbol:
+      - tag: cooling_device_fqdd
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.19
           name: coolingDeviceFQDD
-        tag: cooling_device_fqdd
+
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.4.700.20
@@ -1031,39 +840,56 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.20.1.5
         name: temperatureProbeStatus
-        description: Status of the temperature probe
-        unit: "{state}"
+        chart_meta:
+          family: "Sensor/Temperature/Status"
+          description: Status of the temperature probe
+          unit: "{status}"
+        mapping:
+          1: other
+          2: unknown
+          3: ok
+          4: non_critical_upper
+          5: critical_upper
+          6: non_recoverable_upper
+          7: non_critical_lower
+          8: critical_lower
+          9: non_recoverable_lower
+          10: failed
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.20.1.6
         name: temperatureProbeReading
-        description: Reading of the temperature probe in degrees Celsius
-        unit: "Cel"
+        chart_meta:
+          family: "Sensor/Temperature/Value"
+          description: Reading of the temperature probe in degrees Celsius
+          unit: "Cel"
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.20.1.16
         name: temperatureProbeDiscreteReading
-        description: Discrete reading of the temperature probe
-        unit: "TBD"
+        chart_meta:
+          family: "Sensor/Temperature/DiscreteReading"
+          description: Discrete reading of the temperature probe
+          unit: "{reading}"
     metric_tags:
-      - symbol:
+      - tag: chassis_index
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.700.20.1.1
           name: temperatureProbechassisIndex
-        tag: chassis_index
-      - symbol:
+      - tag: temperature_probe_index
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.700.20.1.2
           name: temperatureProbeIndex
-        tag: temperature_probe_index
-      # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-      - symbol:
+      - tag: temperature_probe_type
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.700.20.1.7
           name: temperatureProbeType
-        tag: temperature_probe_type
         mapping:
           1: temperature_probe_type_is_other
           2: temperature_probe_type_is_unknown
           3: temperature_probe_type_is_ambient_esm
           16: temperature_probe_type_is_discrete
-      - symbol:
+      - tag: temperature_probe_location_name
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.700.20.1.8
           name: temperatureProbeLocationName
-        tag: temperature_probe_location_name
+
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.4.1100.30
@@ -1071,37 +897,53 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.30.1.5
         name: processorDeviceStatus
-        description: Status of the processor device
-        unit: "{state}"
+        chart_meta:
+          family: "Processor/Status"
+          description: Status of the processor device
+          unit: "{status}"
+        mapping:
+          1: other
+          2: unknown
+          3: ok
+          4: non_critical
+          5: critical
+          6: non_recoverable
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.30.1.11
         name: processorDeviceMaximumSpeed
-        description: Maximum speed of the processor device in megahertz
-        unit: "MHz"
+        chart_meta:
+          family: "Processor/Speed/Maximum"
+          description: Maximum speed of the processor device in megahertz
+          unit: "MHz"
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.30.1.12
         name: processorDeviceCurrentSpeed
-        description: Current speed of the processor device in megahertz
-        unit: "MHz"
+        chart_meta:
+          family: "Processor/Speed/Current"
+          description: Current speed of the processor device in megahertz
+          unit: "MHz"
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.30.1.14
         name: processorDeviceVoltage
-        description: Voltage of the processor device in volts
-        unit: "V"
+        chart_meta:
+          family: "Processor/Voltage"
+          description: Voltage of the processor device in volts
+          unit: "V"
     metric_tags:
-      - symbol:
+      - tag: chassis_index
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.30.1.1
           name: processorDevicechassisIndex
-        tag: chassis_index
-      - symbol:
+      - tag: processor_device_index
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.30.1.2
           name: processorDeviceIndex
-        tag: processor_device_index
-      - symbol:
+      - tag: processor_device_brand_name
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.30.1.23
           name: processorDeviceBrandName
-        tag: processor_device_brand_name
-      - symbol:
+      - tag: processor_device_fqdd
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.30.1.26
           name: processorDeviceFQDD
-        tag: processor_device_fqdd
+
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.4.1100.32
@@ -1109,25 +951,37 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.32.1.5
         name: processorDeviceStatusStatus
-        description: Status of the processor device status
-        unit: "{state}"
+        chart_meta:
+          family: "ProcessorDeviceStatus/Status"
+          description: Status of the processor device status
+          unit: "{status}"
+        mapping:
+          1: other
+          2: unknown
+          3: ok
+          4: non_critical
+          5: critical
+          6: non_recoverable
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.32.1.6
         name: processorDeviceStatusReading
-        description: Reading of the processor device status
-        unit: "TBD"
+        chart_meta:
+          family: "ProcessorDeviceStatus/Reading"
+          description: Reading of the processor device status
+          unit: "{reading}"
     metric_tags:
-      - symbol:
+      - tag: chassis_index
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.32.1.1
           name: processorDeviceStatusChassisIndex
-        tag: chassis_index
-      - symbol:
+      - tag: processor_device_status_index
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.32.1.2
           name: processorDeviceStatusIndex
-        tag: processor_device_status_index
-      - symbol:
+      - tag: processor_device_status_location_name
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.32.1.7
           name: processorDeviceStatusLocationName
-        tag: processor_device_status_location_name
+
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.4.1100.50
@@ -1135,34 +989,34 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.50.1.5
         name: memoryDeviceStatus
-        description: Status of the memory device
-        unit: "{state}"
+        chart_meta:
+          family: "Memory/Status"
+          description: Status of the memory device
+          unit: "{status}"
+        mapping:
+          1: other
+          2: unknown
+          3: ok
+          4: non_critical
+          5: critical
+          6: non_recoverable
     metric_tags:
-      - symbol:
+      - tag: device_type
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.50.1.7
           name: memoryDeviceType
-        tag: device_type
-      - symbol:
+      - tag: device_index
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.50.1.2
           name: memoryDeviceIndex
-        tag: device_index
-      - symbol:
+      - tag: chassis_index
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.50.1.1
           name: memoryDevicechassisIndex
-        tag: chassis_index
-  - MIB: IDRAC-MIB-SMIv2
-    table:
-      OID: 1.3.6.1.4.1.674.10892.5.4.1100.50
-      name: memoryDeviceTable
-    symbols:
-      - name: dell.memoryDevice
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
+      - tag: device_type
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.50.1.7
           name: memoryDeviceType
-        tag: device_type
         mapping:
           1: device_type_is_other
           2: device_type_is_unknown
@@ -1187,25 +1041,7 @@ metrics:
           24: device_type_is_ddr3
           25: device_type_is_fbd2
           26: device_type_is_ddr4
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.1100.50.1.2
-          name: memoryDeviceIndex
-        tag: device_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.1100.50.1.1
-          name: memoryDevicechassisIndex
-        tag: chassis_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.1100.50.1.5
-          name: memoryDeviceStatus
-        tag: memory_device_status
-        mapping:
-          1: other
-          2: unknown
-          3: ok
-          4: non_critical
-          5: critical
-          6: non_recoverable
+
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.4.2000.10
@@ -1213,21 +1049,31 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.2000.10.1.3
         name: fruInformationStatus
-        description: Status of the FRU information
-        unit: "{state}"
+        chart_meta:
+          family: "FRU/Status"
+          description: Status of the FRU information
+          unit: "{status}"
+        mapping:
+          1: other
+          2: unknown
+          3: ok
+          4: non_critical
+          5: critical
+          6: non_recoverable
     metric_tags:
-      - symbol:
+      - tag: chassis_index
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.2000.10.1.1
           name: fruChassisIndex
-        tag: chassis_index
-      - symbol:
+      - tag: fru_index
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.2000.10.1.2
           name: fruIndex
-        tag: fru_index
-      - symbol:
+      - tag: fru_fqdd
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.2000.10.1.12
           name: fruFQDD
-        tag: fru_fqdd
+
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1
@@ -1235,63 +1081,135 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1.1.4
         name: virtualDiskState
-        description: State of the virtual disk
-        unit: "{state}"
+        chart_meta:
+          family: "Disk/Virtual/State"
+          description: State of the virtual disk
+          unit: "{status}"
+        mapping:
+          1: unknown
+          2: online
+          3: failed
+          4: degraded
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1.1.6
         name: virtualDiskSizeInMB
-        description: Size of the virtual disk in megabytes
-        unit: "MBy"
+        scale_factor: 1048576
+        chart_meta:
+          family: "Disk/Virtual/Size"
+          description: Size of the virtual disk in megabytes
+          unit: "By"
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1.1.20
         name: virtualDiskComponentStatus
-        description: Component status of the virtual disk
-        unit: "{state}"
+        chart_meta:
+          family: "Disk/Virtual/ComponentStatus"
+          description: Component status of the virtual disk
+          unit: "{status}"
+        mapping:
+          1: other
+          2: unknown
+          3: ok
+          4: non_critical
+          5: critical
+          6: non_recoverable
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1.1.37
         name: virtualDiskT10PIStatus
-        description: T10 PI status of the virtual disk
-        unit: "{state}"
+        chart_meta:
+          family: "Disk/Virtual/T10PIStatus"
+          description: T10 PI status of the virtual disk
+          unit: "{status}"
+        mapping:
+          1: other
+          2: enabled
+          3: disabled
     metric_tags:
-      - symbol:
+      - tag: virtual_disk_number
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1.1.1
           name: virtualDiskNumber
-        tag: virtual_disk_number
-      - symbol:
+      - tag: virtual_disk_name
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1.1.2
           name: virtualDiskName
-        tag: virtual_disk_name
-      - symbol:
+      - tag: virtual_disk_fqdd
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1.1.35
           name: virtualDiskFQDD
-        tag: virtual_disk_fqdd
+
   - MIB: DELL-RAC-MIB
     symbol:
       OID: 1.3.6.1.4.1.674.10892.2.3.1.9.0
       name: drsCMCCurrStatus
-      description: CMC health status being monitored by the chassis management card
-      unit: "{state}"
+      chart_meta:
+        family: "CMC/Status"
+        description: CMC health status being monitored by the chassis management card
+        unit: "{status}"
+      mapping:
+        1: other
+        2: unknown
+        3: ok
+        4: non_critical
+        5: critical
+        6: non_recoverable
+
   - MIB: DELL-RAC-MIB
     symbol:
       OID: 1.3.6.1.4.1.674.10892.2.3.1.1.0
       name: drsGlobalCurrStatus
-      description: Overall chassis status being monitored by the chassis management card
-      unit: "{state}"
+      chart_meta:
+        family: "Global/Status"
+        description: Overall chassis status being monitored by the chassis management card
+        unit: "{status}"
+      mapping:
+        1: other
+        2: unknown
+        3: ok
+        4: non_critical
+        5: critical
+        6: non_recoverable
+
   - MIB: DELL-RAC-MIB
     symbol:
       OID: 1.3.6.1.4.1.674.10892.2.3.1.5.0
       name: drsPowerCurrStatus
-      description: Power subsystem health status being monitored by the chassis management card
-      unit: "{state}"
+      chart_meta:
+        family: "Power/Status"
+        description: Power subsystem health status being monitored by the chassis management card
+        unit: "{status}"
+      mapping:
+        1: other
+        2: unknown
+        3: ok
+        4: non_critical
+        5: critical
+        6: non_recoverable
+
   - MIB: DELL-RAC-MIB
     symbol:
       OID: 1.3.6.1.4.1.674.10892.2.3.1.4.0
       name: drsRedCurrStatus
       description: Redundancy status being monitored by the chassis management card
-      unit: "{state}"
+      unit: "{status}"
+    mapping:
+      1: other
+      2: unknown
+      3: ok
+      4: non_critical
+      5: critical
+      6: non_recoverable
+
   - MIB: DELL-RAC-MIB
     symbol:
       OID: 1.3.6.1.4.1.674.10892.2.2.1.0
       name: drsGlobalSystemStatus
       description: Overall chassis status being monitored by the chassis management card
-      unit: "{state}"
+      unit: "{status}"
+    mapping:
+      1: other
+      2: unknown
+      3: ok
+      4: non_critical
+      5: critical
+      6: non_recoverable
+
   - MIB: DELL-RAC-MIB
     table:
       OID: 1.3.6.1.4.1.674.10892.2.4.1
@@ -1306,14 +1224,15 @@ metrics:
         description: Instantaneous chassis current usage in amperes
         unit: "A"
     metric_tags:
-      - symbol:
+      - tag: chassis_index
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.2.4.1.1.1
           name: drsChassisIndex
-        tag: chassis_index
-      - symbol:
+      - tag: drs_psu_index
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.2.4.2.1.2
           name: drsPSUIndex
-        tag: drs_psu_index
+
   - MIB: DELL-RAC-MIB
     metric_type: monotonic_count
     table:
@@ -1325,11 +1244,11 @@ metrics:
         description: Cumulative chassis power usage in kilowatt hours since last reset
         unit: "kW.h"
     metric_tags:
-      - symbol:
+      - tag: chassis_index
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.2.4.1.1.1
           name: drsChassisIndex
-        tag: chassis_index
-      - symbol:
+      - tag: drs_psu_index
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.2.4.2.1.2
           name: drsPSUIndex
-        tag: drs_psu_index
