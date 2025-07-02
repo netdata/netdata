@@ -1838,8 +1838,14 @@ static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx, void 
         }
         nd_log_daemon(NDLP_INFO, "DBENGINE: journal file \"%s\" is ready to be indexed", path);
 
-        pgc_open_cache_to_journal_v2(open_cache, (Word_t) ctx, (int) datafile->fileno, ctx->config.page_type,
-                                     journalfile_migrate_to_v2_callback, (void *) datafile->journalfile);
+        pgc_open_cache_to_journal_v2(
+            open_cache,
+            (Word_t)ctx,
+            (int)datafile->fileno,
+            ctx->config.page_type,
+            journalfile_migrate_to_v2_callback,
+            (void *)datafile->journalfile,
+            false);
 
         index_once = true;
 
