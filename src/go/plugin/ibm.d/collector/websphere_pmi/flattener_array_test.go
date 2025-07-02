@@ -137,15 +137,15 @@ func TestRealXMLContextReduction(t *testing.T) {
 	// Analyze contexts
 	contextCount := make(map[string]int)
 	contextInstances := make(map[string]map[string]bool)
-	
+
 	for _, chart := range charts {
 		contextCount[chart.Context]++
-		
+
 		// Track unique instances per context
 		if contextInstances[chart.Context] == nil {
 			contextInstances[chart.Context] = make(map[string]bool)
 		}
-		
+
 		// Extract instance from chart ID or labels
 		for _, dim := range chart.Dimensions {
 			if instance := dim.Metric.Labels["instance"]; instance != "" {
@@ -165,7 +165,7 @@ func TestRealXMLContextReduction(t *testing.T) {
 	fmt.Println("Array consolidation:")
 	for _, array := range flatResult.Arrays {
 		fmt.Printf("\nArray: %s (%d elements)\n", array.Path, len(array.Elements))
-		
+
 		// Find contexts for this array
 		arrayContexts := make(map[string]bool)
 		for _, metric := range flatResult.Metrics {
@@ -178,7 +178,7 @@ func TestRealXMLContextReduction(t *testing.T) {
 				}
 			}
 		}
-		
+
 		fmt.Printf("  Consolidated to %d contexts:\n", len(arrayContexts))
 		contexts := make([]string, 0, len(arrayContexts))
 		for ctx := range arrayContexts {
@@ -199,7 +199,7 @@ func TestRealXMLContextReduction(t *testing.T) {
 
 	// Show reduction statistics
 	fmt.Println("\n=== REDUCTION STATISTICS ===")
-	
+
 	// Count contexts by category
 	categoryContexts := make(map[string]int)
 	for ctx := range contextCount {
