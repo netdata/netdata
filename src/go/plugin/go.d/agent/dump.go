@@ -539,6 +539,8 @@ func (dw *DumpWriter) parseCommand(line string) {
 		dw.beginCollection(parts)
 	case "SET":
 		dw.setValue(parts)
+	case "SETEMPTY":
+		dw.setEmpty(parts)
 	case "END":
 		dw.endCollection()
 	}
@@ -618,16 +620,31 @@ func (dw *DumpWriter) beginCollection(parts []string) {
 }
 
 func (dw *DumpWriter) setValue(parts []string) {
-	// SET id = value
-	if len(parts) < 3 || !dw.inCollection {
+	// SET id = value  or  SET id (for empty/gap)
+	if len(parts) < 2 || !dw.inCollection {
 		return
 	}
 
 	dimID := strings.Trim(parts[1], "'\"")
 	var value int64
-	fmt.Sscanf(parts[3], "%d", &value)
+
+	// Check if value is provided (SET id = value)
+	if len(parts) >= 4 && parts[2] == "=" {
+		fmt.Sscanf(parts[3], "%d", &value)
+	}
+	// If no value provided (SET id), value remains 0 which represents empty/gap
 
 	dw.collectionData[dimID] = value
+}
+
+func (dw *DumpWriter) setEmpty(parts []string) {
+	// SETEMPTY id
+	if len(parts) < 2 || !dw.inCollection {
+		return
+	}
+
+	dimID := strings.Trim(parts[1], "'\"")
+	dw.collectionData[dimID] = 0 // Empty value
 }
 
 func (dw *DumpWriter) endCollection() {
