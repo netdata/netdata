@@ -17,43 +17,27 @@ metadata:
       type:
         value: "switch"
 
+# Tagging by column OID is not supported at the moment. Should be a table/columns metric + tags instead.
+# metric_tags:
+#   - OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.1.3.1.6
+#     symbol: dell.os10ChassisHwRev
+#     tag: dell_os10_chassis_hw_rev
+#   - OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.1.3.1.7
+#     symbol: dell.os10ChassisServiceTag
+#     tag: dell_os10_chassis_service_tag
+#   - OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.1.3.1.8
+#     symbol: dell.os10ChassisExpServiceCode
+#     tag: dell_os10_chassis_exp_service_code
+
 metrics:
-  - MIB: HOST-RESOURCES-MIB
-    table:
-      OID: 1.3.6.1.2.1.25.3.3
-      name: hrProcessorTable
-    symbols:
-      - OID: 1.3.6.1.2.1.25.3.3.1.2
-        name: cpu.usage
-        chart_meta:
-          description: "Average over the last minute of the percentage of time that this processor was not idle"
-          unit: "%"
-    metric_tags:
-      - tag: hr_processor_frw_id
-        symbol:
-          OID: 1.3.6.1.2.1.25.3.3.1.1
-          name: hrProcessorFrwID
-  - MIB: HOST-RESOURCES-MIB
-    symbol:
-      name: memory.total
-      OID: 1.3.6.1.2.1.25.2.3.1.5.1
-      chart_meta:
-        description: "Size of the storage represented by this entry in units of hrStorageAllocationUnits"
-        unit: "kBy"
-  - MIB: HOST-RESOURCES-MIB
-    symbol:
-      name: memory.used
-      OID: 1.3.6.1.2.1.25.2.3.1.6.1
-      chart_meta:
-        description: "Amount of the storage represented by this entry that is allocated in units of hrStorageAllocationUnits"
-        unit: "kBy"
   - MIB: DELLEMC-OS10-CHASSIS-MIB
     symbol:
       name: dell.os10ChassisTemp
       OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.1.3.1.11
       chart_meta:
+        family: "Chassis/Temperature/Value"
         description: "Temperature of the chassis"
-        unit: "{temperature}"
+        unit: "Cel"
   - MIB: DELLEMC-OS10-CHASSIS-MIB
     table:
       OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.1.4
@@ -62,22 +46,15 @@ metrics:
       - OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.1.4.1.5
         name: dell.os10CardTemp
         chart_meta:
+          family: "Card/Temperature/Value"
           description: "Temperature of the card"
-          unit: "{temperature}"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.1.4.1.3
-          name: dell.os10CardDescription
-        tag: dell_os10_card_description
-      - symbol:
-          OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.1.4.1.9
-          name: dell.os10CardServiceTag
-        tag: dell_os10_card_service_tag
-      - symbol:
-          OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.1.4.1.4
-          name: dell.os10CardStatus
-        tag: dell_os10_card_status
+          unit: "Cel"
+      - OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.1.4.1.4
+        name: dell.os10CardStatus
+        chart_meta:
+          family: "Card/Status"
+          description: "Status of the card"
+          unit: "{status}"
         mapping:
           1: ready
           2: card_mis_match
@@ -85,19 +62,27 @@ metrics:
           4: diag_mode
           5: card_absent
           6: offline
+    metric_tags:
+      - tag: dell_os10_card_description
+        symbol:
+          OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.1.4.1.3
+          name: dell.os10CardDescription
+      - tag: dell_os10_card_service_tag
+        symbol:
+          OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.1.4.1.9
+          name: dell.os10CardServiceTag
+
   - MIB: DELLEMC-OS10-CHASSIS-MIB
     table:
       OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.2.1
       name: dell.os10PowerSupplyTable
     symbols:
-      - name: dell.os10PowerSupply
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.2.1.1.4
-          name: dell.os10PowerSupplyOperStatus
-        tag: dell_os10_power_supply_oper_status
+      - OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.2.1.1.4
+        name: dell.os10PowerSupplyOperStatus
+        chart_meta:
+          family: "PowerSupply/Operational/Status"
+          description: "Operational status of the power supply"
+          unit: "{status}"
         mapping:
           1: up
           2: down
@@ -107,23 +92,23 @@ metrics:
           6: not_present
           7: lower_layer_down
           8: failed
-      - symbol:
+    metric_tags:
+      - tag: dell_os10_power_supply_index
+        symbol:
           OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.2.1.1.1
           name: dell.os10PowerSupplyIndex
-        tag: dell_os10_power_supply_index
+
   - MIB: DELLEMC-OS10-CHASSIS-MIB
     table:
       OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.2.2
       name: dell.os10FanTrayTable
     symbols:
-      - name: dell.os10FanTray
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.2.2.1.4
-          name: dell.os10FanTrayOperStatus
-        tag: dell_os10_fan_tray_oper_status
+      - OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.2.2.1.4
+        name: dell.os10FanTrayOperStatus
+        chart_meta:
+          family: "FanTray/Operational/Status"
+          description: "Operational status of the fan tray"
+          unit: "{status}"
         mapping:
           1: up
           2: down
@@ -133,23 +118,23 @@ metrics:
           6: not_present
           7: lower_layer_down
           8: failed
-      - symbol:
+    metric_tags:
+      - tag: dell_os10_fan_tray_index
+        symbol:
           OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.2.2.1.1
           name: dell.os10FanTrayIndex
-        tag: dell_os10_fan_tray_index
+
   - MIB: DELLEMC-OS10-CHASSIS-MIB
     table:
       OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.2.3
       name: dell.os10FanTable
     symbols:
-      - name: dell.os10Fan
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.2.3.1.7
-          name: dell.os10FanOperStatus
-        tag: dell_os10_fan_oper_status
+      - OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.2.3.1.7
+        name: dell.os10FanOperStatus
+        chart_meta:
+          family: "Fan/Operational/Status"
+          description: "Operational status of the fan"
+          unit: "{status}"
         mapping:
           1: up
           2: down
@@ -159,18 +144,39 @@ metrics:
           6: not_present
           7: lower_layer_down
           8: failed
-      - symbol:
+    metric_tags:
+      - tag: dell_os10_fan_index
+        symbol:
           OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.2.3.1.1
           name: dell.os10FanIndex
-        tag: dell_os10_fan_index
+
   - MIB: DELLEMC-OS10-BGP4V2-MIB
     table:
       OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2
       name: dell.os10bgp4V2PeerTable
     symbols:
-      - name: dell.os10bgp4V2Peer
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+      - OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.12
+        name: dell.os10bgp4V2PeerAdminStatus
+        chart_meta:
+          family: "Routing/BGP/Peer/Admin/Status"
+          description: "Administrative status of the BGP peer"
+          unit: "{status}"
+        mapping:
+          1: halted
+          2: running
+      - OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.13
+        name: dell.os10bgp4V2PeerState
+        chart_meta:
+          family: "Routing/BGP/Peer/State"
+          description: "Current state of the BGP peer"
+          unit: "{status}"
+        mapping:
+          1: idle
+          2: connect
+          3: active
+          4: opensent
+          5: openconfirm
+          6: established
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.2
@@ -185,10 +191,6 @@ metrics:
           16: dns
           25: l2vpn
       - symbol:
-          OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.3
-          name: dell.os10bgp4V2PeerLocalAddr
-        tag: dell_os10bgp4_v2_peer_local_addr
-      - symbol:
           OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.4
           name: dell.os10bgp4V2PeerRemoteAddrType
         tag: dell_os10bgp4_v2_peer_remote_addr_type
@@ -201,14 +203,6 @@ metrics:
           16: dns
           25: l2vpn
       - symbol:
-          OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.5
-          name: dell.os10bgp4V2PeerRemoteAddr
-        tag: dell_os10bgp4_v2_peer_remote_addr
-      - symbol:
-          OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.6
-          name: dell.os10bgp4V2PeerLocalPort
-        tag: dell_os10bgp4_v2_peer_local_port
-      - symbol:
           OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.7
           name: dell.os10bgp4V2PeerLocalAs
         tag: dell_os10bgp4_v2_peer_local_as
@@ -216,10 +210,6 @@ metrics:
           OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.8
           name: dell.os10bgp4V2PeerLocalIdentifier
         tag: dell_os10bgp4_v2_peer_local_identifier
-      - symbol:
-          OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.9
-          name: dell.os10bgp4V2PeerRemotePort
-        tag: dell_os10bgp4_v2_peer_remote_port
       - symbol:
           OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.10
           name: dell.os10bgp4V2PeerRemoteAs
@@ -232,32 +222,3 @@ metrics:
           OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.14
           name: dell.os10bgp4V2PeerDescription
         tag: dell_os10bgp4_v2_peer_description
-      - symbol:
-          OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.12
-          name: dell.os10bgp4V2PeerAdminStatus
-        tag: dell_os10bgp4_v2_peer_admin_status
-        mapping:
-          1: halted
-          2: running
-      - symbol:
-          OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.13
-          name: dell.os10bgp4V2PeerState
-        tag: dell_os10bgp4_v2_peer_state
-        mapping:
-          1: idle
-          2: connect
-          3: active
-          4: opensent
-          5: openconfirm
-          6: established
-# Tagging by column OID is not supported at the moment. Should be a table/columns metric + tags instead.
-# metric_tags:
-#   - OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.1.3.1.6
-#     symbol: dell.os10ChassisHwRev
-#     tag: dell_os10_chassis_hw_rev
-#   - OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.1.3.1.7
-#     symbol: dell.os10ChassisServiceTag
-#     tag: dell_os10_chassis_service_tag
-#   - OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.1.3.1.8
-#     symbol: dell.os10ChassisExpServiceCode
-#     tag: dell_os10_chassis_exp_service_code

@@ -99,29 +99,38 @@ metrics:
       name: cpu.usage
       OID: 1.3.6.1.4.1.674.10895.5000.2.6132.1.1.1.1.4.9.0
       extract_value: 60 Secs.*?(\d+[.]?\d+)
-      description: "Cpu usage in percent over 60 seconds"
-      unit: "%"
+      chart_meta:
+        family: "CPU/Usage"
+        description: "Cpu usage in percent over 60 seconds"
+        unit: "%"
   - MIB: DNOS-SWITCHING-MIB
     symbol:
       name: memory.free
       OID: 1.3.6.1.4.1.674.10895.5000.2.6132.1.1.1.1.4.1.0
-      description: "Amount of free memory"
-      unit: "By"
+      chart_meta:
+        family: "Memory/Free"
+        description: "Amount of free memory"
+        unit: "By"
   - MIB: DNOS-SWITCHING-MIB
     symbol:
       name: memory.total
       OID: 1.3.6.1.4.1.674.10895.5000.2.6132.1.1.1.1.4.2.0
-      description: "Total amount of memory"
-      unit: "By"
-#  - MIB: Dell-Vendor-MIB
-#    symbol:
-#      name: productStatusGlobalStatus
-#      OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.1.0
-#      enum:
-#        ok: 3
-#        non-critical: 4
-#        critical: 5
-#      TODO: enum in scalar metric is not supported yet (keep this metric and this comment in profile until it's fixed)
+      chart_meta:
+        family: "Memory/Total"
+        description: "Total amount of memory"
+        unit: "By"
+  - MIB: Dell-Vendor-MIB
+    symbol:
+      name: productStatusGlobalStatus
+      OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.1.0
+      chart_meta:
+        family: "Product/Status/Global"
+        description: Global status
+        unit: "{status}"
+      mapping:
+        ok: 3
+        non-critical: 4
+        critical: 5
   - MIB: Dell-Vendor-MIB
     table:
       name: dell.envMonFanStatusTable
@@ -129,18 +138,16 @@ metrics:
     symbols:
       - name: dell.envMonFanSpeed
         OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.1.1.4
-        description: "Fan speed in revolutions per minute"
-        unit: "1.min"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          name: dell.envMonFanStatusDescr
-          OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.1.1.2
-        tag: dell_env_mon_fan_status_descr
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.1.1.3
-          name: dell.envMonFanState
-        tag: dell_env_mon_fan_state
+        chart_meta:
+          family: "Fan/Speed"
+          description: "Fan speed in revolutions per minute"
+          unit: "rpm"
+      - OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.1.1.3
+        name: dell.envMonFanState
+        chart_meta:
+          family: "Fan/Status"
+          description: "Fan operational state"
+          unit: "{status}"
         mapping:
           1: normal
           2: warning
@@ -148,6 +155,14 @@ metrics:
           4: shutdown
           5: not_present
           6: not_functioning
+    metric_tags:
+      - tag: fan_index
+        index: 1
+      - tag: dell_env_mon_fan_status_descr
+        symbol:
+          name: dell.envMonFanStatusDescr
+          OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.1.1.2
+
   - MIB: Dell-Vendor-MIB
     table:
       name: dell.envMonSupplyStatusTable
@@ -155,22 +170,22 @@ metrics:
     symbols:
       - name: dell.envMonSupplyCurrentPower
         OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.2.1.5
-        description: "Current power consumption"
-        unit: "W"
+        chart_meta:
+          family: "PowerSupply/Power/Current"
+          description: "Current power consumption"
+          unit: "W"
       - name: dell.envMonSupplyAveragePower
         OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.2.1.6
-        description: "Average power consumption"
-        unit: "W"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/    statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          name: dell.envMonSupplyStatusDescr
-          OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.2.1.2
-        tag: dell_env_mon_supply_status_descr
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.2.1.3
-          name: dell.envMonSupplyState
-        tag: dell_env_mon_supply_state
+        chart_meta:
+          family: "PowerSupply/Power/Average"
+          description: "Average power consumption"
+          unit: "W"
+      - OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.2.1.3
+        name: dell.envMonSupplyState
+        chart_meta:
+          family: "PowerSupply/Status"
+          description: "Power supply operational state"
+          unit: "{status}"
         mapping:
           1: normal
           2: warning
@@ -178,10 +193,15 @@ metrics:
           4: shutdown
           5: not_present
           6: not_functioning
-      - symbol:
+    metric_tags:
+      - tag: dell_env_mon_supply_status_descr
+        symbol:
+          name: dell.envMonSupplyStatusDescr
+          OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.2.1.2
+      - tag: dell_env_mon_supply_source
+        symbol:
           OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.2.1.4
           name: dell.envMonSupplySource
-        tag: dell_env_mon_supply_source
         mapping:
           1: unknown
           2: ac

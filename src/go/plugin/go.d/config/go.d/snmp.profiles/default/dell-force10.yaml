@@ -16,11 +16,15 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.6027.3.10.1.2.9.1.4
       name: cpu.usage
-      description: Cpu utilization in percentage for last 5 minutes.
-      unit: "%"
+      chart_meta:
+        family: "CPU/Usage"
+        description: Cpu utilization in percentage for last 5 minutes.
+        unit: "%"
   - MIB: F10-S-SERIES-CHASSIS-MIB
     symbol:
       OID: 1.3.6.1.4.1.6027.3.10.1.2.9.1.5
       name: memory.usage
-      description: Total memory usage in percentage.
-      unit: "%"
+      chart_meta:
+        family: "Memory/Usage"
+        description: Total memory usage in percentage.
+        unit: "%"

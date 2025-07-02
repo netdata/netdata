@@ -87,6 +87,7 @@ metrics:
           OID: 1.3.6.1.4.1.674.10892.1.200.10.1.1
           name: systemStatechassisIndex
         tag: chassis_index
+
   - MIB: MIB-Dell-10892
     table:
       OID: 1.3.6.1.4.1.674.10892.1.200.10
@@ -111,6 +112,7 @@ metrics:
           OID: 1.3.6.1.4.1.674.10892.1.200.10.1.1
           name: systemStatechassisIndex
         tag: chassis_index
+
   - MIB: MIB-Dell-10892
     table:
       OID: 1.3.6.1.4.1.674.10892.1.400.20
@@ -154,7 +156,6 @@ metrics:
         name: batteryReading
         description: Reading value of the battery
         unit: "TBD"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.600.50.1.1
@@ -168,6 +169,7 @@ metrics:
           OID: 1.3.6.1.4.1.674.10892.1.600.50.1.7
           name: batteryLocationName
         tag: battery_location_name
+
   - MIB: MIB-Dell-10892
     table:
       OID: 1.3.6.1.4.1.674.10892.1.1100.80
@@ -186,6 +188,7 @@ metrics:
           OID: 1.3.6.1.4.1.674.10892.1.1100.80.1.1
           name: pCIDevicechassisIndex
         tag: chassis_index
+
   - MIB: MIB-Dell-10892
     table:
       OID: 1.3.6.1.4.1.674.10892.1.300.50
@@ -204,6 +207,7 @@ metrics:
           OID: 1.3.6.1.4.1.674.10892.1.300.50.1.2
           name: systemBIOSIndex
         tag: system_bios_index
+
   - MIB: MIB-Dell-10892
     table:
       OID: 1.3.6.1.4.1.674.10892.1.300.70

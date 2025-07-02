@@ -47,74 +47,70 @@ metrics:
     symbol:
       name: memory.total
       OID: 1.3.6.1.2.1.25.2.3.1.5.1
-      description: Size of the storage represented by this entry in units of hrStorageAllocationUnits
-      unit: "By"
+      chart_meta:
+        family: "Memory/Total"
+        description: Size of the storage represented by this entry in units of hrStorageAllocationUnits
+        unit: "By"
   - MIB: HOST-RESOURCES-MIB
     symbol:
       name: memory.used
       OID: 1.3.6.1.2.1.25.2.3.1.6.1
-      description: Amount of the storage represented by this entry that is allocated in units of hrStorageAllocationUnits
-      unit: "By"
+      chart_meta:
+        family: "Memory/Used"
+        description: Amount of the storage represented by this entry that is allocated in units of hrStorageAllocationUnits
+        unit: "By"
   - MIB: HOST-RESOURCES-MIB
     symbol:
       OID: 1.3.6.1.2.1.25.2.3.1.6.6  # hrStorageUsed.6 = Memory buffers
       name: hrMemoryBuffers
-      description: Amount of the storage represented by this entry that is allocated in units of hrStorageAllocationUnits
-      unit: "By"
+      chart_meta:
+        family: "Memory/Buffers"
+        description: Amount of the storage represented by this entry that is allocated in units of hrStorageAllocationUnits
+        unit: "By"
   - MIB: HOST-RESOURCES-MIB
     symbol:
       OID: 1.3.6.1.2.1.25.2.3.1.6.7  # hrStorageUsed.7 = Cached memory
       name: hrCachedMemory
-      description: Amount of the storage represented by this entry that is allocated in units of hrStorageAllocationUnits
-      unit: "By"
-#  - MIB: DATA-DOMAIN-MIB
-#    symbol:
-#      name: fileSystemStatus
-#      OID: 1.3.6.1.4.1.19746.1.3.1.1.0
-#      enum:
-#        enabled: 1
-#        disabled: 2
-#        running: 3
-#        unknown: 4
-#        error: 5
-#        cleaning: 6
-#      TODO: enum in scalar metric is not supported yet (keep this metric and this comment in profile until it's fixed)
+      chart_meta:
+        family: "Memory/Cached"
+        description: Amount of the storage represented by this entry that is allocated in units of hrStorageAllocationUnits
+        unit: "By"
+  - MIB: DATA-DOMAIN-MIB
+    symbol:
+      name: fileSystemStatus
+      OID: 1.3.6.1.4.1.19746.1.3.1.1.0
+      chart_meta:
+        family: "FileSystem/Status"
+        description: Status of the file system
+        unit: "{status}"
+      mapping:
+        enabled: 1
+        disabled: 2
+        running: 3
+        unknown: 4
+        error: 5
+        cleaning: 6
+
   - MIB: DATA-DOMAIN-MIB
     symbol:
       name: datadomain.fileSystemVirtualSpace
       OID: 1.3.6.1.4.1.19746.1.3.1.2.0
-      description: Amount of uncompressed data that has been backed up by the system
-      unit: "By"
-# TODO: octet string cannot be collected
-#  - MIB: DATA-DOMAIN-MIB
-#    symbol:
-#      name: fileSystemUpTime
-#      OID: 1.3.6.1.4.1.19746.1.3.1.3.0
-#      format: TODO_handle_conversion_to_one
-#  - MIB: DATA-DOMAIN-MIB
-#    symbol:
-#      name: fileSystemStatusMessage
-#      OID: 1.3.6.1.4.1.19746.1.3.1.4.0
-#      format: TODO_handle_conversion_to_one
+      chart_meta:
+        family: "FileSystem/VirtualSpace"
+        description: Amount of uncompressed data that has been backed up by the system
+        unit: "By"
+
   - MIB: DATA-DOMAIN-MIB
     table:
       name: powerModuleTable
       OID: 1.3.6.1.4.1.19746.1.1.1.1.1
     symbols:
-      - name: datadomain.powerModule
-        constant_value_one: true
-        description: A table containing entries of PowerModuleEntry
-        unit: "TBD"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          name: powerModuleDescription
-          OID: 1.3.6.1.4.1.19746.1.1.1.1.1.1.3
-        tag: datadomain_power_module_description
-      - symbol:
-          OID: 1.3.6.1.4.1.19746.1.1.1.1.1.1.4
-          name: powerModuleStatus
-        tag: datadomain_power_module_status
+      - OID: 1.3.6.1.4.1.19746.1.1.1.1.1.1.4
+        name: powerModuleStatus
+        chart_meta:
+          family: "PowerModule/Status"
+          description: Status of the power module
+          unit: "{status}"
         mapping:
           0: absent
           1: ok
@@ -122,63 +118,67 @@ metrics:
           3: faulty
           4: acnone
           99: unknown
+    metric_tags:
+      - tag: datadomain_power_module_description
+        symbol:
+          name: powerModuleDescription
+          OID: 1.3.6.1.4.1.19746.1.1.1.1.1.1.3
+
   - MIB: DATA-DOMAIN-MIB
     table:
       name: temperatureSensorTable
       OID: 1.3.6.1.4.1.19746.1.1.2.1.1
     symbols:
-      - name: datadomain.tempSensorCurrentValue
-        OID: 1.3.6.1.4.1.19746.1.1.2.1.1.1.5
-        description: Current temperature value of the sensor
-        unit: "Cel"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          name: tempSensorDescription
-          OID: 1.3.6.1.4.1.19746.1.1.2.1.1.1.4
-        tag: datadomain_temp_sensor_description
-      - symbol:
-          OID: 1.3.6.1.4.1.19746.1.1.2.1.1.1.6
-          name: tempSensorStatus
-        tag: datadomain_temp_sensor_status
+      - OID: 1.3.6.1.4.1.19746.1.1.2.1.1.1.6
+        name: tempSensorStatus
+        chart_meta:
+          family: "Sensor/Temperature/Status"
+          description: Status of the temperature sensor
+          unit: "{status}"
         mapping:
           0: failed
           1: ok
           2: notfound
           3: overheat_warning
           4: overheat_critical
+    metric_tags:
+      - tag: datadomain_temp_sensor_description
+        symbol:
+          name: tempSensorDescription
+          OID: 1.3.6.1.4.1.19746.1.1.2.1.1.1.4
+
   - MIB: DATA-DOMAIN-MIB
     table:
       name: fanPropertiesTable
       OID: 1.3.6.1.4.1.19746.1.1.3.1.1
     symbols:
-      - name: datadomain.fanProperties
-        constant_value_one: true
-        description: A table containing entries of FanPropertiesEntry
-        unit: "TBD"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          name: fanDescription
-          OID: 1.3.6.1.4.1.19746.1.1.3.1.1.1.4
-        tag: datadomain_fan_description
-      - symbol:
-          OID: 1.3.6.1.4.1.19746.1.1.3.1.1.1.5
-          name: fanLevel
-        tag: datadomain_fan_level
+      - OID: 1.3.6.1.4.1.19746.1.1.3.1.1.1.6
+        name: fanStatus
+        chart_meta:
+          family: "Fan/Status"
+          description: Status of the fan
+          unit: "{status}"
+        mapping:
+          0: notfound
+          1: ok
+          2: fail
+      - OID: 1.3.6.1.4.1.19746.1.1.3.1.1.1.5
+        name: fanLevel
+        chart_meta:
+          family: "Fan/Level"
+          description: Speed level of the fan
+          unit: "{status}"
         mapping:
           0: unknown
           1: low
           2: medium
           3: high
-      - symbol:
-          OID: 1.3.6.1.4.1.19746.1.1.3.1.1.1.6
-          name: fanStatus
-        tag: datadomain_fan_status
-        mapping:
-          0: notfound
-          1: ok
-          2: fail
+    metric_tags:
+      - tag: datadomain_fan_description
+        symbol:
+          name: fanDescription
+          OID: 1.3.6.1.4.1.19746.1.1.3.1.1.1.4
+
   - MIB: DATA-DOMAIN-MIB
     table:
       name: fileSystemSpaceTable
@@ -186,33 +186,48 @@ metrics:
     symbols:
       - name: datadomain.fileSystemSpaceSize
         OID: 1.3.6.1.4.1.19746.1.3.2.1.1.4
-        description: Size of the file system resource in gigabytes
-        unit: "GBy"
+        scale_factor: 1073741824 # GB => bytes
+        chart_meta:
+          family: "FileSystem/Space/Total"
+          description: Size of the file system resource in gigabytes
+          unit: "By"
       - name: datadomain.fileSystemSpaceUsed
         OID: 1.3.6.1.4.1.19746.1.3.2.1.1.5
-        description: Amount of used space within the file system resource in gigabytes
-        unit: "GBy"
+        scale_factor: 1073741824 # GB => bytes
+        chart_meta:
+          family: "FileSystem/Space/Used"
+          description: Amount of used space within the file system resource in gigabytes
+          unit: "By"
       - name: datadomain.fileSystemSpaceAvail
         OID: 1.3.6.1.4.1.19746.1.3.2.1.1.6
-        description: Amount of available space within the file system resource in gigabytes
-        unit: "GBy"
+        scale_factor: 1073741824 # GB => bytes
+        chart_meta:
+          family: "FileSystem/Space/Available"
+          description: Amount of available space within the file system resource in gigabytes
+          unit: "By"
       - name: datadomain.fileSystemPercentUsed
         OID: 1.3.6.1.4.1.19746.1.3.2.1.1.7
-        description: Percentage of used space within the file system resource
-        unit: "%"
+        chart_meta:
+          family: "FileSystem/Space/Usage"
+          description: Percentage of used space within the file system resource
+          unit: "%"
       - name: datadomain.fileSystemSpaceCleanable
         OID: 1.3.6.1.4.1.19746.1.3.2.1.1.8
-        description: Amount of file system space that can be cleaned
-        unit: "GBy"
+        scale_factor: 1073741824 # GB => bytes
+        chart_meta:
+          family: "FileSystem/Space/Cleanable"
+          description: Amount of file system space that can be cleaned
+          unit: "By"
     metric_tags:
-      - symbol:
+      - tag: datadomain_file_system_resource_name
+        symbol:
           name: fileSystemResourceName
           OID: 1.3.6.1.4.1.19746.1.3.2.1.1.3
-        tag: datadomain_file_system_resource_name
-      - symbol:
+      - tag: datadomain_file_system_resource_tier
+        symbol:
           name: fileSystemResourceTier
           OID: 1.3.6.1.4.1.19746.1.3.2.1.1.9
-        tag: datadomain_file_system_resource_tier
+
   - MIB: DATA-DOMAIN-MIB
     table:
       name: fileSystemCompressionTable
@@ -220,41 +235,58 @@ metrics:
     symbols:
       - name: datadomain.fileSystemCompressionStartTime
         OID: 1.3.6.1.4.1.19746.1.3.3.1.1.3
-        description: Start time of file system compression
-        unit: "s"
+        chart_meta:
+          family: "FileSystem/Compression/Time/Start"
+          description: Start time of file system compression
+          unit: "s"
       - name: datadomain.fileSystemCompressionEndTime
         OID: 1.3.6.1.4.1.19746.1.3.3.1.1.4
-        description: End time of file system compression
-        unit: "s"
+        chart_meta:
+          family: "FileSystem/Compression/Time/End"
+          description: End time of file system compression
+          unit: "s"
       - name: datadomain.fileSystemPreCompressionSize
         OID: 1.3.6.1.4.1.19746.1.3.3.1.1.5
-        description: Size of file system before compression
-        unit: "By"
+        chart_meta:
+          family: "FileSystem/Compression/Size/Before"
+          description: Size of file system before compression
+          unit: "By"
       - name: datadomain.fileSystemPostCompressionSize
         OID: 1.3.6.1.4.1.19746.1.3.3.1.1.6
-        description: Size of file system after compression
-        unit: "By"
+        chart_meta:
+          family: "FileSystem/Compression/Size/After"
+          description: Size of file system after compression
+          unit: "By"
       - name: datadomain.fileSystemGlobalCompressionFactor
         OID: 1.3.6.1.4.1.19746.1.3.3.1.1.7
-        description: Global compression factor of the file system
-        unit: "1"
+        chart_meta:
+          family: "FileSystem/Compression/Factor/Global"
+          description: Global compression factor of the file system
+          unit: "1"
       - name: datadomain.fileSystemLocalCompressionFactor
         OID: 1.3.6.1.4.1.19746.1.3.3.1.1.8
-        description: Local compression factor of the file system
-        unit: "1"
+        chart_meta:
+          family: "FileSystem/Compression/Factor/Local"
+          description: Local compression factor of the file system
+          unit: "1"
       - name: datadomain.fileSystemTotalCompressionFactor
         OID: 1.3.6.1.4.1.19746.1.3.3.1.1.9
-        description: Total compression factor of the file system
-        unit: "1"
+        chart_meta:
+          family: "FileSystem/Compression/Factor/Total"
+          description: Total compression factor of the file system
+          unit: "1"
       - name: datadomain.fileSystemReductionPercent1
         OID: 1.3.6.1.4.1.19746.1.3.3.1.1.11
-        description: Percentage reduction of the file system size due to compression
-        unit: "%"
+        chart_meta:
+          family: "FileSystem/Compression/Reduction"
+          description: Percentage reduction of the file system size due to compression
+          unit: "%"
     metric_tags:
-      - symbol:
+      - tag: data_domain_file_system_compression_index
+        symbol:
           name: fileSystemCompressionIndex
           OID: 1.3.6.1.4.1.19746.1.3.3.1.1.1
-        tag: data_domain_file_system_compression_index
+
   - MIB: DATA-DOMAIN-MIB
     table:
       name: systemStatsTable
@@ -262,80 +294,124 @@ metrics:
     symbols:
       - name: cpu.usage
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.2
-        description: CPU 0 percentage busy
-        unit: "%"
+        chart_meta:
+          family: "CPU/Usage"
+          description: CPU 0 percentage busy
+          unit: "%"
       - name: datadomain.cpuMaxPercentageBusy
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.3
-        description: CPU 1 percentage busy
-        unit: "%"
+        chart_meta:
+          family: "CPU/Usage/Maximum"
+          description: CPU 1 percentage busy
+          unit: "%"
       - name: datadomain.nfsOpsPerSecond
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.4
-        description: Number of NFS operations performed per second
-        unit: "{operation}/s"
+        chart_meta:
+          family: "NFS/Operation/Rate"
+          description: Number of NFS operations performed per second
+          unit: "{operation}/s"
       - name: datadomain.nfsIdlePercentage
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.5
-        description: Percentage of time NFS was idle
-        unit: "%"
+        chart_meta:
+          family: "NFS/Time/Idle"
+          description: Percentage of time NFS was idle
+          unit: "%"
       - name: datadomain.nfsProcPercentage
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.6
-        description: Percentage of time NFS was processing
-        unit: "%"
+        chart_meta:
+          family: "NFS/Time/Processing"
+          description: Percentage of time NFS was processing
+          unit: "%"
       - name: datadomain.nfsSendPercentage
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.7
-        description: Percentage of time NFS was sending requests
-        unit: "%"
+        chart_meta:
+          family: "NFS/Time/Send"
+          description: Percentage of time NFS was sending requests
+          unit: "%"
       - name: datadomain.nfsReceivePercentage
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.8
-        description: Percentage of time NFS was receiving requests
-        unit: "%"
+        chart_meta:
+          family: "NFS/Time/Receive"
+          description: Percentage of time NFS was receiving requests
+          unit: "%"
       - name: datadomain.cifsOpsPerSecond
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.9
-        description: Number of CIFS operations performed per second
-        unit: "{operation}/s"
+        chart_meta:
+          family: "CIFS/Operation/Rate"
+          description: Number of CIFS operations performed per second
+          unit: "{operation}/s"
       - name: datadomain.diskReadKBytesPerSecond
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.10
-        description: Number of kilobytes per second read from disk
-        unit: "kBy/s"
+        scale_factor: 1024
+        chart_meta:
+          family: "Disk/Throughput/Read"
+          description: Number of kilobytes per second read from disk
+          unit: "By/s"
       - name: datadomain.diskWriteKBytesPerSecond
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.11
-        description: Number of kilobytes per second written to disk
-        unit: "kBy/s"
+        scale_factor: 1024
+        chart_meta:
+          family: "Disk/Throughput/Write"
+          description: Number of kilobytes per second written to disk
+          unit: "By/s"
       - name: datadomain.diskBusyPercentage
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.12
-        description: Percentage of time disks were busy
-        unit: "%"
+        chart_meta:
+          family: "Disk/Usage"
+          description: Percentage of time disks were busy
+          unit: "%"
       - name: datadomain.nvramReadKBytesPerSecond
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.13
-        description: Number of kilobytes read per second from NVRAM
-        unit: "kBy/s"
+        scale_factor: 1024
+        chart_meta:
+          family: "NVRAM/Throughput/Read"
+          description: Number of kilobytes read per second from NVRAM
+          unit: "By/s"
       - name: datadomain.nvramWriteKBytesPerSecond
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.14
-        description: Number of kilobytes written per second to NVRAM
-        unit: "kBy/s"
+        scale_factor: 1024
+        chart_meta:
+          family: "NVRAM/Throughput/Write"
+          description: Number of kilobytes written per second to NVRAM
+          unit: "By/s"
       - name: datadomain.replInKBytesPerSecond
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.15
-        description: Number of kilobytes per second received for replication
-        unit: "kBy/s"
+        scale_factor: 1024
+        chart_meta:
+          family: "Replication/Throughput/In"
+          description: Number of kilobytes per second received for replication
+          unit: "By/s"
       - name: datadomain.replOutKBytesPerSecond
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.16
-        description: Number of kilobytes per second sent for replication
-        unit: "kBy/s"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+        scale_factor: 1024
+        chart_meta:
+          family: "Replication/Throughput/Out"
+          description: Number of kilobytes per second sent for replication
+          unit: "By/s"
     metric_tags:
-      - symbol:
+      - tag: datadomain_system_stats_index
+        symbol:
           OID: 1.3.6.1.4.1.19746.1.5.1.1.1.1
           name: systemStatsIndex
-        tag: datadomain_system_stats_index
+
   - MIB: DATA-DOMAIN-MIB
     table:
       name: diskPropertiesTable
       OID: 1.3.6.1.4.1.19746.1.6.1.1
     symbols:
-      - name: datadomain.diskProperties
-        constant_value_one: true
-        description: A table containing entries of DiskPropertiesEntry
-        unit: "TBD"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+      - OID: 1.3.6.1.4.1.19746.1.6.1.1.1.8
+        name: diskPropState
+        chart_meta:
+          family: "Disk/Status"
+          description: State of the disk
+          unit: "{status}"
+        mapping:
+          1: ok
+          2: unknown
+          3: absent
+          4: failed
+          5: spare
+          6: available
     metric_tags:
       - symbol:
           name: diskPropEnclosureID
@@ -358,21 +434,6 @@ metrics:
           OID: 1.3.6.1.4.1.19746.1.6.1.1.1.6
         tag: datadomain_disk_serial_number
       - symbol:
-          name: diskCapacity
-          OID: 1.3.6.1.4.1.19746.1.6.1.1.1.7
-        tag: datadomain_disk_capacity
-      - symbol:
-          OID: 1.3.6.1.4.1.19746.1.6.1.1.1.8
-          name: diskPropState
-        tag: datadomain_disk_prop_state
-        mapping:
-          1: ok
-          2: unknown
-          3: absent
-          4: failed
-          5: spare
-          6: available
-      - symbol:
           OID: 1.3.6.1.4.1.19746.1.6.1.1.1.9
           name: diskPack
         tag: datadomain_disk_pack
@@ -382,6 +443,7 @@ metrics:
           2: pack2
           3: pack3
           4: pack4
+
   - MIB: DATA-DOMAIN-MIB
     table:
       name: diskPerformanceTable
@@ -389,26 +451,35 @@ metrics:
     symbols:
       - name: datadomain.diskSectorsRead
         OID: 1.3.6.1.4.1.19746.1.6.2.1.1.3
-        description: Number of disk sectors read per second
-        unit: "{disk_sector}"
+        chart_meta:
+          family: "Disk/Sector/Read"
+          description: Number of disk sectors read per second
+          unit: "{disk_sector}/s"
       - name: datadomain.diskSectorsWritten
         OID: 1.3.6.1.4.1.19746.1.6.2.1.1.4
-        description: Number of disk sectors written per second
-        unit: "{disk_sector}"
+        chart_meta:
+          family: "Disk/Sector/Write"
+          description: Number of disk sectors written per second
+          unit: "{disk_sector}/s"
       - name: datadomain.diskTotalKBytes
         OID: 1.3.6.1.4.1.19746.1.6.2.1.1.5
-        description: Total number of kilobytes read or written per second
-        unit: "kBy/s"
+        scale_factor: 1024
+        chart_meta:
+          family: "Disk/Throughput/Total"
+          description: Total number of kilobytes read or written per second
+          unit: "By/s"
       - name: datadomain.diskBusy
         OID: 1.3.6.1.4.1.19746.1.6.2.1.1.6
-        description: Percentage of time disk is busy
-        unit: "%"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.19746.1.6.2.1.1.7
-          name: diskPerfState
-        tag: datadomain_disk_perf_state
+        chart_meta:
+          family: "Disk/Busy"
+          description: Percentage of time disk is busy
+          unit: "%"
+      - OID: 1.3.6.1.4.1.19746.1.6.2.1.1.7
+        name: diskPerfState
+        chart_meta:
+          family: "Disk/Performance/Status"
+          description: Performance state of the disk
+          unit: "{status}"
         mapping:
           1: ok
           2: unknown
@@ -416,7 +487,8 @@ metrics:
           4: failed
           5: spare
           6: available
-      - symbol:
+    metric_tags:
+      - tag: datadomain_disk_perf_index
+        symbol:
           OID: 1.3.6.1.4.1.19746.1.6.2.1.1.2
           name: diskPerfIndex
-        tag: datadomain_disk_perf_index
