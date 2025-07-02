@@ -1,5 +1,3 @@
-![Netdata Logo](https://raw.githubusercontent.com/netdata/website/master/themes/tailwind/static/img/netdata.png)
-
 # Getting Started with Netdata
 
 Welcome to Netdata! This guide will help you set up comprehensive infrastructure monitoring in just a few steps. You'll go from installation to having a fully operational monitoring system that gives you insights into your entire infrastructure.
@@ -16,17 +14,15 @@ Welcome to Netdata! This guide will help you set up comprehensive infrastructure
 
 You can install Netdata on all major operating systems. Choose your platform and follow the installation guide:
 
-- [Linux Installation](https://learn.netdata.cloud/docs/netdata-agent/installation/linux/)
-- [macOS](https://learn.netdata.cloud/docs/netdata-agent/installation/macos)
-- [AWS](https://learn.netdata.cloud/docs/netdata-agent/installation/aws)
-- [Windows](https://learn.netdata.cloud/docs/netdata-agent/installation/windows)
-- [Docker Guide](https://learn.netdata.cloud/docs/netdata-agent/installation/docker)
-- [Kubernetes Setup](https://learn.netdata.cloud/docs/netdata-agent/installation/kubernetes)
+- <span style="color: green;">[Linux Installation](https://learn.netdata.cloud/docs/netdata-agent/installation/linux/)</span>
+- <span style="color: green;">[macOS](https://learn.netdata.cloud/docs/netdata-agent/installation/macos)</span>
+- <span style="color: green;">[AWS](https://learn.netdata.cloud/docs/netdata-agent/installation/aws)</span>
+- <span style="color: green;">[Windows](https://learn.netdata.cloud/docs/netdata-agent/installation/windows)</span>
+- <span style="color: green;">[Docker Guide](https://learn.netdata.cloud/docs/netdata-agent/installation/docker)</span>
+- <span style="color: green;">[Kubernetes Setup](https://learn.netdata.cloud/docs/netdata-agent/installation/kubernetes)</span>
 
 :::note
-
 You can access the Netdata UI at `http://localhost:19999` (or `http://NODE:19999` if remote).
-
 :::
 
 ### Step 2: Connect Your Nodes & See the Magic
@@ -43,9 +39,9 @@ Whether it's a **server, container, or virtual machine, Netdata makes it easy to
 
 Netdata auto-discovers most metrics, but you can expand monitoring with our extensive integration library:
 
-- [All Collectors](https://learn.netdata.cloud/docs/collecting-metrics/) - Browse 1000+ integrations
-- [SNMP Monitoring](https://learn.netdata.cloud/docs/collecting-metrics/generic-collecting-metrics/snmp-devices) - Monitor network devices
-- [Custom Applications](https://learn.netdata.cloud/docs/collecting-metrics/monitor-anything) - Monitor your specific applications
+- <span style="color: green;">[All Collectors](https://learn.netdata.cloud/docs/collecting-metrics/)</span> - Browse 1000+ integrations
+- <span style="color: green;">[SNMP Monitoring](https://learn.netdata.cloud/docs/collecting-metrics/generic-collecting-metrics/snmp-devices)</span> - Monitor network devices
+- <span style="color: green;">[Custom Applications](https://learn.netdata.cloud/docs/collecting-metrics/monitor-anything)</span> - Monitor your specific applications
 
 :::tip
 
@@ -64,7 +60,7 @@ You can use hundreds of built-in alerts and integrate with your preferred notifi
 - `PagerDuty`
 - `Discord`
 - `Microsoft Teams`
-- [And dozens more](https://learn.netdata.cloud/docs/alerts-&-notifications/alert-configuration-reference)
+- <span style="color: green;">[And dozens more](https://learn.netdata.cloud/docs/alerts-&-notifications/alert-configuration-reference)</span>
 
 **Customize Your Alerts**: Explore and customize alerts to ensure you and your team receive the most relevant notifications for your infrastructure.
 
@@ -86,7 +82,7 @@ You can centralize dashboards, alerts, and storage with Netdata Parents for:
 - Centralized alert configuration
 - Reduced resource usage on monitored systems
 
-Check our [Deployment Guides](https://learn.netdata.cloud/docs/deployment-guides/) for more info.
+Check our <span style="color: green;">[Deployment Guides](https://learn.netdata.cloud/docs/deployment-guides/)</span> for more info.
 
 ### Connect to Netdata Cloud
 
@@ -115,13 +111,13 @@ Sign in to Netdata Cloud and connect your nodes for enhanced capabilities:
 
 Once you have Netdata running, you can:
 
-1. **Explore your dashboards** - Navigate through the automatically generated charts and metrics
-2. **Set up custom alerts** - Tailor notifications to your specific infrastructure needs  
-3. **Invite your team** - Share insights and troubleshoot collaboratively
-4. **Optimize performance** - Use insights to improve your system performance
+1. **<span style="color: green;">[Explore your dashboards](https://learn.netdata.cloud/docs/dashboards-and-charts/)</span>** - Navigate through the automatically generated charts and metrics
+2. **<span style="color: green;">[Set up custom alerts](https://learn.netdata.cloud/docs/alerts-&-notifications/alert-configuration-reference)</span>** - Tailor notifications to your specific infrastructure needs  
+3. **<span style="color: green;">[Invite your team](https://www.netdata.cloud/blog/introducing-the-all-new-netdata-cloud/)</span>** - Share insights and troubleshoot collaboratively
+4. **<span style="color: green;">[Optimize performance](https://learn.netdata.cloud/docs/netdata-agent/configuration/performance-optimization)</span>** - Use insights to improve your system performance
 
 :::tip
 
-Check out our [documentation](https://learn.netdata.cloud/docs/deployment-guides) or join our [community forums](https://community.netdata.cloud/) for support and best practices.
+Check out our <span style="color: green;">[documentation](https://learn.netdata.cloud/docs/deployment-guides)</span> or join our <span style="color: green;">[community forums](https://community.netdata.cloud/)</span> for support and best practices.
 
 :::
