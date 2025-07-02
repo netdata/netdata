@@ -1918,7 +1918,6 @@ static void ctx_hosts_load(uv_work_t *req)
             if (hclt[index].db_context_thread)
                 sqlite3_close_v2(hclt[index].db_context_thread);
         }
-        freez(hclt);
     }
 
     usec_t ended_ut = now_monotonic_usec(); (void)ended_ut;
@@ -1940,6 +1939,7 @@ static void ctx_hosts_load(uv_work_t *req)
         db_meta_thread = NULL;
         db_context_thread = NULL;
     }
+    freez(hclt);
     worker_is_idle();
 }
 
@@ -2692,6 +2692,20 @@ static void *metadata_event_loop(void *arg)
         }
         (void)JudyLFreeArray(&pending_ctx_cleanup_list->JudyL, PJE0);
         freez(pending_ctx_cleanup_list);
+    }
+
+    if (pending_uuid_deletion) {
+        Word_t Index = 0;
+        bool first = true;
+        Pvoid_t *Pvalue;
+        while ((Pvalue = JudyLFirstThenNext(pending_uuid_deletion->JudyL, &Index, &first))) {
+            if (!*Pvalue)
+                continue;
+            nd_uuid_t *uuid = *Pvalue;
+            freez(uuid);
+        }
+        (void)JudyLFreeArray(&pending_uuid_deletion->JudyL, PJE0);
+        freez(pending_uuid_deletion);
     }
 
     buffer_free(work_buffer);
