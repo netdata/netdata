@@ -75,9 +75,11 @@ type MetricGroup struct {
 	Metrics        []MetricTuple
 	Unit           string
 	Type           string
+	MetricName     string // The specific metric being measured
+	CategoryPath   string // The hierarchical category path
 }
 
-// groupMetricsByCorrelation groups metrics using the new simple correlation approach
+// groupMetricsByCorrelation groups metrics using NIDL-compliant correlation
 func (c *CorrelationEngine) groupMetricsByCorrelation(metrics []MetricTuple) []MetricGroup {
 	groupMap := make(map[string]*MetricGroup)
 
@@ -85,24 +87,8 @@ func (c *CorrelationEngine) groupMetricsByCorrelation(metrics []MetricTuple) []M
 		key := c.generateCorrelationKey(metric)
 
 		if group, exists := groupMap[key]; exists {
-			// Check if a metric with the same name already exists in the group
-			metricName := c.extractMetricName(metric)
-			hasDuplicate := false
-			for _, existingMetric := range group.Metrics {
-				if c.extractMetricName(existingMetric) == metricName {
-					hasDuplicate = true
-					break
-				}
-			}
-			
-			if hasDuplicate {
-				// Create a new group with a unique key for duplicate metric names
-				uniqueKey := fmt.Sprintf("%s_%s_%d", key, metricName, len(groupMap))
-				groupMap[uniqueKey] = c.createNewGroup(uniqueKey, metric)
-			} else {
-				// Add to existing group
-				group.Metrics = append(group.Metrics, metric)
-			}
+			// Add to existing group
+			group.Metrics = append(group.Metrics, metric)
 		} else {
 			// Create new group
 			groupMap[key] = c.createNewGroup(key, metric)
@@ -126,226 +112,245 @@ func (c *CorrelationEngine) groupMetricsByCorrelation(metrics []MetricTuple) []M
 	return groups
 }
 
-// generateCorrelationKey creates a key for grouping related metrics using the new approach.
-// This function strips the metric name from the unique instance to create intentional collisions,
-// allowing related metrics to be grouped into the same chart.
+// generateCorrelationKey creates a key for grouping related metrics according to NIDL principles
+// The key should group metrics with:
+// 1. Same category (e.g., Thread Pools)
+// 2. Same metric name (e.g., ActiveCount)
+// 3. Different instances (e.g., WebContainer, Default)
 func (c *CorrelationEngine) generateCorrelationKey(metric MetricTuple) string {
-	// Start with the fully unique instance from the flattener
-	uniqueInstance := metric.UniqueInstance
+	// Extract the category path and metric name
+	categoryPath, metricName := c.extractCategoryAndMetric(metric)
+	
+	// Determine the proper unit for this metric
+	properUnit := c.determineProperUnit(metricName, metric)
+	
+	// Create a key that groups same metric across different instances
+	// Format: category_path.metric_name.unit
+	return fmt.Sprintf("%s.%s.%s", 
+		sanitizeDimensionID(categoryPath),
+		sanitizeDimensionID(metricName),
+		sanitizeDimensionID(properUnit))
+}
 
-	// Strip the last 3 components (path.type.unit) to get the chart grouping key
-	// Example: websphere_pmi.server_thread_pools_webcontainer_activecount.count.requests
-	//       -> websphere_pmi.server_thread_pools_webcontainer
-	parts := strings.Split(uniqueInstance, ".")
-
-	if len(parts) >= 3 {
-		// Remove last 3 parts (metric_name, type, unit)
-		chartKey := strings.Join(parts[:len(parts)-3], ".")
-		return chartKey
+// extractCategoryAndMetric extracts the category path and metric name from a metric
+func (c *CorrelationEngine) extractCategoryAndMetric(metric MetricTuple) (categoryPath, metricName string) {
+	pathParts := strings.Split(metric.Path, "/")
+	
+	if len(pathParts) == 0 {
+		return "", ""
 	}
-
-	// Fallback: if structure is unexpected, use the full instance
-	return uniqueInstance
+	
+	// The last part is always the metric name
+	metricName = pathParts[len(pathParts)-1]
+	
+	// Remove "server/" prefix if present
+	cleanPath := strings.TrimPrefix(metric.Path, "server/")
+	cleanParts := strings.Split(cleanPath, "/")
+	
+	// For NIDL compliance, we need to determine the semantic category
+	// not the full hierarchical path
+	if len(cleanParts) > 1 {
+		primaryCat := cleanParts[0]
+		
+		switch primaryCat {
+		case "Thread Pools":
+			// For thread pools, the category is just "Thread Pools"
+			// Instance would be the pool name (e.g., "WebContainer")
+			categoryPath = "thread_pools"
+			
+		case "JDBC Connection Pools":
+			// For JDBC pools, category is "JDBC Connection Pools"
+			// Instance would be the datasource name
+			categoryPath = "jdbc_connection_pools"
+			
+		case "JCA Connection Pools":
+			// For JCA pools, include the adapter type if present
+			if len(cleanParts) > 2 {
+				// e.g., "JCA Connection Pools/SIB JMS Resource Adapter"
+				categoryPath = fmt.Sprintf("jca_connection_pools.%s", sanitizeDimensionID(cleanParts[1]))
+			} else {
+				categoryPath = "jca_connection_pools"
+			}
+			
+		case "Web Applications":
+			// For web apps, we need to look deeper to find the semantic category
+			if c.containsServlets(cleanParts) {
+				categoryPath = "web_applications.servlets"
+			} else if c.containsPortlets(cleanParts) {
+				categoryPath = "web_applications.portlets"
+			} else {
+				categoryPath = "web_applications"
+			}
+			
+		case "Servlet Session Manager":
+			categoryPath = "servlet_session_manager"
+			
+		case "Dynamic Caching":
+			categoryPath = "dynamic_caching"
+			
+		case "Transaction Manager":
+			categoryPath = "transaction_manager"
+			
+		case "Security":
+			// Include the security type (Authentication/Authorization)
+			if len(cleanParts) > 1 {
+				categoryPath = fmt.Sprintf("security.%s", sanitizeDimensionID(cleanParts[1]))
+			} else {
+				categoryPath = "security"
+			}
+			
+		case "JVM Runtime":
+			categoryPath = "jvm_runtime"
+			
+		case "ORB":
+			categoryPath = "orb"
+			
+		default:
+			// For unknown categories, use a simplified version
+			categoryPath = sanitizeDimensionID(primaryCat)
+		}
+	} else {
+		// Single-level path
+		categoryPath = ""
+	}
+	
+	return categoryPath, metricName
 }
 
-// isKnownCategory checks if a path part represents a known category
-// This is now simplified since we use natural hierarchy
-func (c *CorrelationEngine) isKnownCategory(part string) bool {
-	// We don't need a whitelist anymore - any first-level component
-	// after "server" is a valid category
-	return part != "server" && part != ""
+// containsServlets checks if the path contains servlet-related components
+func (c *CorrelationEngine) containsServlets(parts []string) bool {
+	for _, part := range parts {
+		if strings.Contains(strings.ToLower(part), "servlet") {
+			return true
+		}
+	}
+	return false
 }
 
-// normalizeCategory converts category names to consistent identifiers
-// This is now simplified - just replace / to prevent submenus
-func (c *CorrelationEngine) normalizeCategory(category string) string {
-	// Only replace / with _ to prevent UI from making submenus
-	return strings.ReplaceAll(category, "/", "_")
+// containsPortlets checks if the path contains portlet-related components
+func (c *CorrelationEngine) containsPortlets(parts []string) bool {
+	for _, part := range parts {
+		if strings.Contains(strings.ToLower(part), "portlet") {
+			return true
+		}
+	}
+	return false
 }
 
-// extractMetricFamily groups related metrics by semantic meaning
-func (c *CorrelationEngine) extractMetricFamily(metricName string) string {
+// determineProperUnit determines the correct unit for a metric based on its name and type
+func (c *CorrelationEngine) determineProperUnit(metricName string, metric MetricTuple) string {
 	name := strings.ToLower(metricName)
-
-	// Connection/pool metrics
-	if strings.Contains(name, "active") || strings.Contains(name, "pool") {
-		return "active_connections"
+	
+	// Pool/thread/connection counts
+	if strings.Contains(name, "poolsize") || strings.Contains(name, "pool size") ||
+		strings.Contains(name, "activecount") || strings.Contains(name, "active count") ||
+		strings.Contains(name, "currentthreads") || strings.Contains(name, "peakthreads") ||
+		strings.Contains(name, "daemonthreads") || strings.Contains(name, "maxpoolsize") ||
+		strings.Contains(name, "connectioncount") || strings.Contains(name, "handlecount") {
+		return "connections"
 	}
-	if strings.Contains(name, "create") || strings.Contains(name, "destroy") {
-		return "connection_lifecycle"
+	
+	// Thread counts specifically
+	if strings.Contains(name, "thread") && (strings.Contains(name, "count") || 
+		strings.Contains(name, "hung") || strings.Contains(name, "cleared")) {
+		return "threads"
 	}
-	if strings.Contains(name, "wait") || strings.Contains(name, "queue") {
-		return "wait_times"
+	
+	// Session counts and related metrics
+	if strings.Contains(name, "session") && (strings.Contains(name, "count") || 
+		strings.Contains(name, "active") || strings.Contains(name, "invalidate") ||
+		strings.Contains(name, "invalidation")) {
+		return "sessions"
 	}
-
-	// Request metrics
-	if strings.Contains(name, "request") || strings.Contains(name, "served") {
-		return "requests"
+	
+	// Session object size
+	if strings.Contains(name, "sessionobjectsize") || (strings.Contains(name, "session") && strings.Contains(name, "size")) {
+		return "bytes"
 	}
-	if strings.Contains(name, "response") || strings.Contains(name, "time") {
-		return "response_times"
+	
+	// Time metrics (but not invalidation counts or other count metrics ending in "time")
+	if metric.Type == "time" || 
+		(strings.Contains(name, "time") && !strings.Contains(name, "timeoutinvalidation")) || 
+		strings.Contains(name, "duration") || strings.Contains(name, "latency") {
+		return "milliseconds"
 	}
-
-	// Error metrics
-	if strings.Contains(name, "error") || strings.Contains(name, "fault") {
-		return "errors"
+	
+	// Count metrics that should be rates
+	if strings.Contains(name, "createcount") || strings.Contains(name, "destroycount") ||
+		strings.Contains(name, "allocatecount") || strings.Contains(name, "returncount") ||
+		strings.Contains(name, "requestcount") || strings.Contains(name, "errorcount") ||
+		strings.Contains(name, "faultcount") || strings.Contains(name, "discardcount") ||
+		strings.Contains(name, "misscount") || strings.Contains(name, "hitcount") ||
+		strings.Contains(name, "invalidationcount") || strings.Contains(name, "hitsinmemorycount") ||
+		strings.Contains(name, "hitsondiskcount") {
+		return "operations/s"
 	}
-
-	// Memory metrics
-	if strings.Contains(name, "heap") || strings.Contains(name, "memory") {
-		return "memory"
-	}
-	if strings.Contains(name, "gc") || strings.Contains(name, "garbage") {
-		return "garbage_collection"
-	}
-
-	// Utilization metrics
+	
+	// Percentage metrics
 	if strings.Contains(name, "percent") || strings.Contains(name, "utilization") {
-		return "utilization"
+		return "percent"
 	}
-
-	// Default: use the metric name itself (normalized)
-	return strings.ToLower(strings.ReplaceAll(metricName, " ", "_"))
-}
-
-// areMetricsCompatible checks if two metrics can be in the same chart
-func (c *CorrelationEngine) areMetricsCompatible(m1, m2 MetricTuple) bool {
-	// Same unit is required for additive dimensions
-	if m1.Unit != m2.Unit {
-		return false
+	
+	// Size metrics (but not cache entry counts)
+	if strings.Contains(name, "size") && !strings.Contains(name, "pool") && 
+		!strings.Contains(name, "cacheentrycount") {
+		return "bytes"
 	}
-
-	// Same type is preferred
-	if m1.Type != m2.Type {
-		// Some exceptions: count and bounded_range can be mixed if units match
-		if !((m1.Type == "count" && m2.Type == "bounded_range") ||
-			(m1.Type == "bounded_range" && m2.Type == "count")) {
-			return false
-		}
+	
+	// Cache entry counts
+	if strings.Contains(name, "cacheentrycount") || strings.Contains(name, "entrycount") {
+		return "entries"
 	}
-
-	// Check if dimensions would be semantically additive
-	return c.areMetricsAdditive(m1, m2)
-}
-
-// areMetricsAdditive checks if metrics represent additive quantities
-func (c *CorrelationEngine) areMetricsAdditive(m1, m2 MetricTuple) bool {
-	// Metrics from the same instance/pool are typically additive
-	if m1.Labels["instance"] != "" && m1.Labels["instance"] == m2.Labels["instance"] {
-		return true
+	
+	// Memory metrics
+	if strings.Contains(name, "memory") || strings.Contains(name, "heap") {
+		return "bytes"
 	}
-
-	// If metrics have different instances, they should NOT be grouped together
-	// Each instance should have its own chart
-	if m1.Labels["instance"] != "" && m2.Labels["instance"] != "" &&
-		m1.Labels["instance"] != m2.Labels["instance"] {
-		return false
-	}
-
-	// For metrics without instances, only group if they have the same semantic meaning
-	// AND are from the same component
-	family1 := c.extractMetricFamily(strings.Split(m1.Path, "/")[len(strings.Split(m1.Path, "/"))-1])
-	family2 := c.extractMetricFamily(strings.Split(m2.Path, "/")[len(strings.Split(m2.Path, "/"))-1])
-
-	// Check if paths indicate same component (not just same metric family)
-	path1Parts := strings.Split(m1.Path, "/")
-	path2Parts := strings.Split(m2.Path, "/")
-
-	// If paths differ significantly, don't group
-	if len(path1Parts) != len(path2Parts) {
-		return false
-	}
-
-	// Compare paths up to the metric name
-	for i := 0; i < len(path1Parts)-1; i++ {
-		if path1Parts[i] != path2Parts[i] {
-			return false
-		}
-	}
-
-	return family1 == family2
+	
+	// Default to original unit
+	return metric.Unit
 }
 
 // createNewGroup creates a new metric group
 func (c *CorrelationEngine) createNewGroup(key string, metric MetricTuple) *MetricGroup {
-	// Generate chart context by stripping metric name from unique context
-	chartContext := c.generateChartContext(metric)
-
+	categoryPath, metricName := c.extractCategoryAndMetric(metric)
+	properUnit := c.determineProperUnit(metricName, metric)
+	
+	// Extract common labels from the first metric
+	commonLabels := make(map[string]string)
+	for k, v := range metric.Labels {
+		// Skip instance-specific labels
+		if k != "instance" && k != "index" {
+			commonLabels[k] = v
+		}
+	}
+	
 	return &MetricGroup{
 		CorrelationKey: key,
-		BaseContext:    chartContext,
-		CommonLabels:   c.extractCommonLabels([]MetricTuple{metric}),
+		BaseContext:    c.generateChartContext(categoryPath, metricName),
+		CommonLabels:   commonLabels,
 		Metrics:        []MetricTuple{metric},
-		Unit:           metric.Unit,
+		Unit:           properUnit,
 		Type:           c.inferChartType(metric),
+		MetricName:     metricName,
+		CategoryPath:   categoryPath,
 	}
 }
 
-// generateChartContext strips the metric name from the unique context to create chart context
-func (c *CorrelationEngine) generateChartContext(metric MetricTuple) string {
-	// Start with the fully unique context from the flattener
-	uniqueContext := metric.UniqueContext
-
-	// Strip the last component (metric name) to get the chart context
-	// Example: websphere_pmi.server_thread_pools_webcontainer_activecount
-	//       -> websphere_pmi.server_thread_pools_webcontainer
-	parts := strings.Split(uniqueContext, ".")
-
-	if len(parts) >= 2 {
-		// Remove last part (metric name)
-		chartContext := strings.Join(parts[:len(parts)-1], ".")
-		
-		// Special handling for Dynamic Caching array metrics
-		// Remove the instance-specific part (com_ibm_ws_...) from the context
-		if metric.IsArrayElement && strings.Contains(metric.ArrayPath, "Dynamic Caching") {
-			// Look for patterns like dynamic_caching.com_ibm_ws_xxx.object_cache
-			contextParts := strings.Split(chartContext, ".")
-			cleanParts := []string{}
-			
-			for _, part := range contextParts {
-				// Skip parts that look like sanitized object names
-				if strings.HasPrefix(part, "com_ibm") || strings.HasPrefix(part, "object__ws") {
-					continue
-				}
-				cleanParts = append(cleanParts, part)
-			}
-			
-			if len(cleanParts) > 0 {
-				chartContext = strings.Join(cleanParts, ".")
-			}
-		}
-		
-		return chartContext
+// generateChartContext creates the context for a chart based on category and metric
+func (c *CorrelationEngine) generateChartContext(categoryPath, metricName string) string {
+	// Clean up the category path
+	categoryPath = strings.ToLower(strings.ReplaceAll(categoryPath, " ", "_"))
+	categoryPath = strings.ReplaceAll(categoryPath, "/", ".")
+	
+	// Clean up the metric name
+	metricName = strings.ToLower(strings.ReplaceAll(metricName, " ", "_"))
+	
+	// Build context: websphere_pmi.category.metric_name
+	if categoryPath != "" {
+		return fmt.Sprintf("websphere_pmi.%s.%s", categoryPath, metricName)
 	}
-
-	// Fallback: if structure is unexpected, use the full context
-	return uniqueContext
-}
-
-// extractCommonLabels finds labels common to all metrics in a group
-func (c *CorrelationEngine) extractCommonLabels(metrics []MetricTuple) map[string]string {
-	if len(metrics) == 0 {
-		return make(map[string]string)
-	}
-
-	common := make(map[string]string)
-	firstMetric := metrics[0]
-
-	// Check each label in the first metric
-	for key, value := range firstMetric.Labels {
-		isCommon := true
-		for i := 1; i < len(metrics); i++ {
-			if metrics[i].Labels[key] != value {
-				isCommon = false
-				break
-			}
-		}
-		if isCommon {
-			common[key] = value
-		}
-	}
-
-	return common
+	return fmt.Sprintf("websphere_pmi.%s", metricName)
 }
 
 // inferChartType determines the appropriate chart type
@@ -385,36 +390,36 @@ func (c *CorrelationEngine) inferChartType(metric MetricTuple) string {
 
 // splitLargeGroup splits groups with too many dimensions
 func (c *CorrelationEngine) splitLargeGroup(group *MetricGroup) []MetricGroup {
+	// For now, we'll split by creating multiple charts with a suffix
+	// This is a simple implementation - could be enhanced
 	subGroups := make([]MetricGroup, 0)
-
-	// Split by instance if available
-	instanceGroups := make(map[string][]MetricTuple)
-	for _, metric := range group.Metrics {
-		instance := metric.Labels["instance"]
-		if instance == "" {
-			instance = "default"
+	
+	chunkSize := c.maxDimensionsPerChart
+	for i := 0; i < len(group.Metrics); i += chunkSize {
+		end := i + chunkSize
+		if end > len(group.Metrics) {
+			end = len(group.Metrics)
 		}
-		instanceGroups[instance] = append(instanceGroups[instance], metric)
-	}
-
-	for instance, metrics := range instanceGroups {
+		
 		subGroup := MetricGroup{
-			CorrelationKey: group.CorrelationKey + "_" + instance,
-			BaseContext:    group.BaseContext + "_" + instance,
-			CommonLabels:   c.extractCommonLabels(metrics),
-			Metrics:        metrics,
+			CorrelationKey: fmt.Sprintf("%s_%d", group.CorrelationKey, i/chunkSize),
+			BaseContext:    fmt.Sprintf("%s_%d", group.BaseContext, i/chunkSize),
+			CommonLabels:   group.CommonLabels,
+			Metrics:        group.Metrics[i:end],
 			Unit:           group.Unit,
 			Type:           group.Type,
+			MetricName:     group.MetricName,
+			CategoryPath:   group.CategoryPath,
 		}
 		subGroups = append(subGroups, subGroup)
 	}
-
+	
 	return subGroups
 }
 
 // createChartFromGroup converts a metric group to a chart candidate
 func (c *CorrelationEngine) createChartFromGroup(group MetricGroup, priority int) ChartCandidate {
-	// Generate dimensions
+	// Generate dimensions - each instance becomes a dimension
 	dimensions := make([]DimensionCandidate, len(group.Metrics))
 	for i, metric := range group.Metrics {
 		dimensions[i] = DimensionCandidate{
@@ -433,57 +438,268 @@ func (c *CorrelationEngine) createChartFromGroup(group MetricGroup, priority int
 		Family:     c.generateChartFamily(group),
 		Priority:   priority,
 		Dimensions: dimensions,
-		Labels:     make(map[string]string),
-	}
-
-	// Add common labels
-	for k, v := range group.CommonLabels {
-		chart.Labels[k] = v
-	}
-
-	// Add instance label if all metrics share the same instance
-	if len(group.Metrics) > 0 {
-		firstInstance := group.Metrics[0].Labels["instance"]
-		if firstInstance != "" {
-			allSameInstance := true
-			for _, m := range group.Metrics {
-				if m.Labels["instance"] != firstInstance {
-					allSameInstance = false
-					break
-				}
-			}
-			if allSameInstance {
-				chart.Labels["instance"] = firstInstance
-			}
-		}
+		Labels:     group.CommonLabels,
 	}
 
 	return chart
 }
 
-// generateDimensionID creates a unique dimension ID
+// generateDimensionID creates a unique dimension ID for an instance
 func (c *CorrelationEngine) generateDimensionID(metric MetricTuple) string {
-	// For metrics in a chart, we need truly unique IDs
-	// Use the full path to ensure uniqueness, especially for array metrics
-	// where multiple metrics might have the same name
-
-	// Use full path for uniqueness
-	fullPath := metric.Path
+	// For NIDL compliance, the dimension ID should identify the instance
 	
-	// For very long paths, use a hash or abbreviation
-	if len(fullPath) > 100 {
-		// Take last 3 path components which usually contain the most specific info
-		pathParts := strings.Split(fullPath, "/")
-		if len(pathParts) > 3 {
-			fullPath = strings.Join(pathParts[len(pathParts)-3:], "_")
-		}
-	} else {
-		// Replace path separators with underscores
-		fullPath = strings.ReplaceAll(fullPath, "/", "_")
+	// First check explicit instance label
+	if instance := metric.Labels["instance"]; instance != "" {
+		return sanitizeDimensionID(instance)
 	}
+	
+	// For array elements, use the element name
+	if metric.IsArrayElement && metric.ElementName != "" {
+		return sanitizeDimensionID(metric.ElementName)
+	}
+	
+	// Extract instance from path based on category
+	pathParts := strings.Split(strings.TrimPrefix(metric.Path, "server/"), "/")
+	categoryPath, metricName := c.extractCategoryAndMetric(metric)
+	
+	// IMPORTANT: Never use the metric name as a dimension
+	// This prevents issues like having both "PoolSize" and "Derby JDBC Provider (XA)" as dimensions
+	if len(pathParts) > 0 && pathParts[len(pathParts)-1] == metricName {
+		// Remove the metric name from consideration
+		pathParts = pathParts[:len(pathParts)-1]
+	}
+	
+	// Based on category, extract the appropriate instance identifier
+	switch {
+	case strings.HasPrefix(categoryPath, "thread_pools"):
+		// For thread pools, instance is the pool name (e.g., "WebContainer")
+		if len(pathParts) > 1 {
+			return sanitizeDimensionID(pathParts[1])
+		}
+		
+	case strings.HasPrefix(categoryPath, "jdbc_connection_pools"):
+		// For JDBC, instance is the datasource name
+		// Handle both:
+		// - "JDBC Connection Pools/Derby JDBC Provider (XA)" -> "Derby JDBC Provider (XA)"
+		// - "JDBC Connection Pools" -> skip, no valid instance
+		if len(pathParts) > 1 && pathParts[0] == "JDBC Connection Pools" {
+			// pathParts[1] should be the datasource name
+			return sanitizeDimensionID(pathParts[1])
+		} else if len(pathParts) == 1 && pathParts[0] == "JDBC Connection Pools" {
+			// This is a category-level metric without a specific datasource
+			// We'll use a generic identifier
+			return "all_pools"
+		}
+		
+	case strings.HasPrefix(categoryPath, "web_applications"):
+		// For web apps, extract the app#war and servlet/portlet name
+		for i, part := range pathParts {
+			if strings.Contains(part, "#") && strings.Contains(part, ".war") {
+				// Found the app, now look for servlet/portlet
+				for j := i + 1; j < len(pathParts)-1; j++ {
+					if pathParts[j] == "Servlets" && j+1 < len(pathParts)-1 {
+						// Return app#war/servletname
+						return sanitizeDimensionID(fmt.Sprintf("%s_%s", part, pathParts[j+1]))
+					}
+				}
+				// Just the app if no servlet found
+				return sanitizeDimensionID(part)
+			}
+		}
+	}
+	
+	// Fallback: use a simplified version of the path
+	// Note: pathParts already has the metric name removed
+	if len(pathParts) > 1 {
+		// Use the most specific instance identifier
+		return sanitizeDimensionID(pathParts[len(pathParts)-1])
+	} else if len(pathParts) == 1 {
+		return sanitizeDimensionID(pathParts[0])
+	}
+	
+	// Last resort - use "default"
+	return "default"
+}
 
-	// Sanitize and return
-	return sanitizeDimensionID(fullPath)
+// generateDimensionName creates a human-readable dimension name
+func (c *CorrelationEngine) generateDimensionName(metric MetricTuple) string {
+	// For NIDL compliance, the dimension name should be the instance name
+	
+	// First check explicit instance label
+	if instance := metric.Labels["instance"]; instance != "" {
+		return instance
+	}
+	
+	// For array elements, use the element name
+	if metric.IsArrayElement && metric.ElementName != "" {
+		return metric.ElementName
+	}
+	
+	// Extract a human-readable instance name from the path
+	pathParts := strings.Split(strings.TrimPrefix(metric.Path, "server/"), "/")
+	categoryPath, metricName := c.extractCategoryAndMetric(metric)
+	
+	// Remove the metric name from path parts if it's at the end
+	if len(pathParts) > 0 && pathParts[len(pathParts)-1] == metricName {
+		pathParts = pathParts[:len(pathParts)-1]
+	}
+	
+	// Based on category, create appropriate display name
+	switch {
+	case strings.HasPrefix(categoryPath, "thread_pools"):
+		if len(pathParts) > 1 {
+			return pathParts[1] // Pool name
+		}
+		
+	case strings.HasPrefix(categoryPath, "jdbc_connection_pools"):
+		if len(pathParts) > 1 && pathParts[0] == "JDBC Connection Pools" {
+			return pathParts[1] // Datasource name
+		} else if len(pathParts) == 1 && pathParts[0] == "JDBC Connection Pools" {
+			return "All Pools" // Category-level metric
+		}
+		
+	case strings.HasPrefix(categoryPath, "web_applications"):
+		// For web apps, show app and servlet/portlet
+		for i, part := range pathParts {
+			if strings.Contains(part, "#") && strings.Contains(part, ".war") {
+				// Found the app
+				appName := part
+				
+				// Look for servlet/portlet
+				for j := i + 1; j < len(pathParts)-1; j++ {
+					if pathParts[j] == "Servlets" && j+1 < len(pathParts)-1 {
+						return fmt.Sprintf("%s - %s", appName, pathParts[j+1])
+					}
+				}
+				return appName
+			}
+		}
+	}
+	
+	// Fallback: create a readable name from path components
+	// Note: pathParts already has the metric name removed
+	if len(pathParts) > 1 {
+		return pathParts[len(pathParts)-1]
+	} else if len(pathParts) == 1 {
+		return pathParts[0]
+	}
+	
+	return "default"
+}
+
+// generateChartTitle creates a descriptive chart title
+func (c *CorrelationEngine) generateChartTitle(group MetricGroup) string {
+	// Build a clear title that describes what's being measured
+	// Following NIDL: "What am I monitoring?"
+	
+	// Clean up category path for display
+	categoryDisplay := strings.Title(strings.ReplaceAll(group.CategoryPath, "_", " "))
+	categoryDisplay = strings.ReplaceAll(categoryDisplay, ".", " ")
+	
+	// Clean up metric name for display
+	metricDisplay := c.formatMetricNameForDisplay(group.MetricName)
+	
+	// Build title that answers "What instances am I monitoring?"
+	switch group.CategoryPath {
+	case "thread_pools":
+		return fmt.Sprintf("Thread Pools - %s", metricDisplay)
+	case "jdbc_connection_pools":
+		return fmt.Sprintf("JDBC Connection Pools - %s", metricDisplay)
+	case "web_applications.servlets":
+		return fmt.Sprintf("Servlet %s", metricDisplay)
+	case "servlet_session_manager":
+		return fmt.Sprintf("Session Manager %s", metricDisplay)
+	default:
+		if categoryDisplay != "" {
+			return fmt.Sprintf("%s - %s", categoryDisplay, metricDisplay)
+		}
+		return metricDisplay
+	}
+}
+
+// formatMetricNameForDisplay formats a metric name for human-readable display
+func (c *CorrelationEngine) formatMetricNameForDisplay(metricName string) string {
+	// Special cases for common patterns
+	replacements := map[string]string{
+		"ActiveCount": "Active Connections",
+		"CreateCount": "Created",
+		"DestroyCount": "Destroyed",
+		"PoolSize": "Pool Size",
+		"FreePoolSize": "Free Pool Size",
+		"MaxPoolSize": "Maximum Pool Size",
+		"UseTime": "Use Time",
+		"WaitTime": "Wait Time",
+		"ServiceTime": "Service Time",
+		"ActiveTime": "Active Time",
+		"PercentUsed": "Percent Used",
+		"PercentMaxed": "Percent at Maximum",
+		"RequestCount": "Requests",
+		"ErrorCount": "Errors",
+		"LoadedServletCount": "Loaded Servlets",
+		"CurrentThreads": "Current Threads",
+		"PeakThreads": "Peak Threads",
+		"DaemonThreads": "Daemon Threads",
+	}
+	
+	if display, exists := replacements[metricName]; exists {
+		return display
+	}
+	
+	// Generic camelCase to title case conversion
+	// Insert spaces before uppercase letters
+	result := ""
+	for i, r := range metricName {
+		if i > 0 && 'A' <= r && r <= 'Z' {
+			result += " "
+		}
+		result += string(r)
+	}
+	
+	return strings.Title(result)
+}
+
+// generateChartFamily creates a chart family for grouping
+func (c *CorrelationEngine) generateChartFamily(group MetricGroup) string {
+	// Use the category as the family
+	if group.CategoryPath != "" {
+		// Take the first level of the category path
+		parts := strings.Split(group.CategoryPath, "/")
+		if len(parts) > 0 {
+			return strings.Title(strings.ReplaceAll(parts[0], "_", " "))
+		}
+	}
+	
+	// Fallback to generic family
+	return "WebSphere"
+}
+
+// isMetricName checks if a string looks like a metric name rather than an instance name
+func isMetricName(name string) bool {
+	// Common metric name patterns for WebSphere PMI
+	metricPatterns := []string{
+		"Count", "Size", "Time", "Percent", "Rate", "Ratio",
+		"Total", "Average", "Mean", "Max", "Min", "Current",
+		"Threads", "Memory", "Heap", "Sessions", "Requests",
+		"Connections", "Pool", "Active", "Free", "Used",
+	}
+	
+	// Check if the name ends with common metric suffixes
+	nameLower := strings.ToLower(name)
+	for _, pattern := range metricPatterns {
+		if strings.HasSuffix(nameLower, strings.ToLower(pattern)) {
+			return true
+		}
+	}
+	
+	// Check for exact matches of common metric names
+	commonMetrics := map[string]bool{
+		"PoolSize": true, "FreePoolSize": true, "CreateCount": true,
+		"DestroyCount": true, "UseTime": true, "WaitTime": true,
+		"ActiveCount": true, "AllocateCount": true, "ReturnCount": true,
+		"ManagedConnectionCount": true, "ConnectionHandleCount": true,
+	}
+	
+	return commonMetrics[name]
 }
 
 // sanitizeDimensionID removes or replaces invalid characters for Netdata dimension IDs
@@ -539,202 +755,6 @@ func sanitizeDimensionID(id string) string {
 	return id
 }
 
-// extractMetricName extracts the metric name from the path
-func (c *CorrelationEngine) extractMetricName(metric MetricTuple) string {
-	// Get the last component of the path
-	pathParts := strings.Split(metric.Path, "/")
-	if len(pathParts) > 0 {
-		return pathParts[len(pathParts)-1]
-	}
-	return ""
-}
-
-// generateDimensionName creates a human-readable dimension name
-func (c *CorrelationEngine) generateDimensionName(metric MetricTuple) string {
-	// For array metrics, use the metric name (last part of path)
-	// Keep the original camelCase format for better readability in dense charts
-	pathParts := strings.Split(metric.Path, "/")
-	metricName := pathParts[len(pathParts)-1]
-	
-	return metricName
-}
-
-// generateChartTitle creates a descriptive chart title
-func (c *CorrelationEngine) generateChartTitle(group MetricGroup) string {
-	// Start with the category
-	titleParts := []string{}
-
-	if category := group.CommonLabels["category"]; category != "" {
-		titleParts = append(titleParts, strings.Title(strings.ReplaceAll(category, "_", " ")))
-	}
-
-	// Add subcategory if present
-	if subcategory := group.CommonLabels["subcategory"]; subcategory != "" {
-		titleParts = append(titleParts, strings.Title(strings.ReplaceAll(subcategory, "_", " ")))
-	}
-
-	// Add instance information in parentheses
-	instanceParts := []string{}
-	for _, label := range []string{"app", "servlet", "portlet", "pool", "datasource", "provider"} {
-		if value := group.CommonLabels[label]; value != "" {
-			instanceParts = append(instanceParts, value)
-		}
-	}
-
-	// Add primary instance if not already included
-	if instance := group.CommonLabels["instance"]; instance != "" {
-		// Check if instance is not already in the instance parts
-		hasInstance := false
-		for _, part := range instanceParts {
-			if part == instance {
-				hasInstance = true
-				break
-			}
-		}
-		if !hasInstance {
-			instanceParts = append(instanceParts, instance)
-		}
-	}
-
-	if len(instanceParts) > 0 {
-		titleParts = append(titleParts, fmt.Sprintf("(%s)", strings.Join(instanceParts, " - ")))
-	}
-
-	// Add metric type
-	if len(group.Metrics) > 0 {
-		metricName := strings.Split(group.Metrics[0].Path, "/")
-		metricType := c.extractMetricFamily(metricName[len(metricName)-1])
-		if metricType != "" {
-			titleParts = append(titleParts, strings.Title(strings.ReplaceAll(metricType, "_", " ")))
-		}
-	}
-
-	if len(titleParts) > 0 {
-		return strings.Join(titleParts, " ")
-	}
-	return "WebSphere PMI Metrics"
-}
-
-// isMetricType checks if a string represents a known metric type pattern
-func (c *CorrelationEngine) isMetricType(s string) bool {
-	metricTypes := []string{
-		"active_connections", "connection_lifecycle", "wait_times",
-		"requests", "response_times", "errors", "memory",
-		"garbage_collection", "utilization", "metrics",
-		"active_count", "size", "usage", "count", "time",
-	}
-
-	s = strings.ToLower(s)
-	for _, mt := range metricTypes {
-		if s == mt || strings.Contains(s, mt) {
-			return true
-		}
-	}
-	return false
-}
-
-// generateChartFamily creates a chart family for grouping using 2-level hierarchy
-func (c *CorrelationEngine) generateChartFamily(group MetricGroup) string {
-	// SAFETY FIRST: Always ensure charts are visible, even if family is wrong
-	fallbackFamily := "websphere/server" // Safe fallback that's always visible
-
-	if len(group.Metrics) == 0 {
-		return fallbackFamily
-	}
-
-	// Get the first metric to extract category information
-	firstMetric := group.Metrics[0]
-
-	// Use category from metric labels (set by flattener based on natural XML hierarchy)
-	if category, exists := firstMetric.Labels["category"]; exists && category != "" {
-		// Category is already normalized by flattener
-		baseFamily := category
-
-		// Create 2-level family: "baseFamily/instance"
-		if instance, hasInstance := firstMetric.Labels["instance"]; hasInstance && instance != "" {
-			return fmt.Sprintf("%s/%s", baseFamily, c.cleanInstanceName(instance))
-		}
-
-		// Try to extract instance from path
-		pathParts := strings.Split(firstMetric.Path, "/")
-		if len(pathParts) > 2 {
-			// Skip "server" and category, use next part as instance
-			for i, part := range pathParts {
-				if part == "server" {
-					continue
-				}
-				// After category, the next part could be instance
-				if i > 0 && strings.EqualFold(c.normalizeCategory(part), baseFamily) && i+1 < len(pathParts) {
-					instance := pathParts[i+1]
-					return fmt.Sprintf("%s/%s", baseFamily, c.cleanInstanceName(instance))
-				}
-			}
-		}
-
-		// No instance - use "general" subfamily
-		return fmt.Sprintf("%s/general", baseFamily)
-	}
-
-	// SAFETY FALLBACK: Ensure chart is always visible
-	c.debugLog("Using fallback family for group: %s", group.BaseContext)
-	return fallbackFamily
-}
-
-// cleanInstanceName cleans instance names for use in family hierarchy
-func (c *CorrelationEngine) cleanInstanceName(instance string) string {
-	// Only replace / with _ to prevent UI from making submenus
-	clean := strings.ReplaceAll(instance, "/", "_")
-
-	// Ensure non-empty result
-	if clean == "" {
-		clean = "unknown"
-	}
-
-	return clean
-}
-
-// extractInstanceFromPath attempts to extract instance name from metric path
-func (c *CorrelationEngine) extractInstanceFromPath(path string) string {
-	parts := strings.Split(path, "/")
-
-	// Look for instance patterns in path
-	for i, part := range parts {
-		// Skip category parts
-		if c.isKnownCategory(part) {
-			// Next part might be the instance
-			if i+1 < len(parts) && !c.isKnownCategory(parts[i+1]) {
-				return parts[i+1]
-			}
-		}
-	}
-
-	return ""
-}
-
-// debugLog outputs debug messages (only visible in development)
-func (c *CorrelationEngine) debugLog(format string, args ...interface{}) {
-	// Debug logging - not visible in production
-	// Could be enhanced to use actual logger if available
-}
-
-// getMetricTypeSuffix generates a suffix based on metric type
-func (c *CorrelationEngine) getMetricTypeSuffix(metric MetricTuple) string {
-	switch metric.Type {
-	case "count":
-		return "count"
-	case "time":
-		return "time"
-	case "bounded_range":
-		return "current"
-	case "range":
-		return "range"
-	case "double":
-		return "value"
-	default:
-		return "metric"
-	}
-}
-
 // ConvertToNetdataCharts converts chart candidates to Netdata module charts
 func (c *CorrelationEngine) ConvertToNetdataCharts(candidates []ChartCandidate) *module.Charts {
 	charts := &module.Charts{}
@@ -742,7 +762,7 @@ func (c *CorrelationEngine) ConvertToNetdataCharts(candidates []ChartCandidate) 
 	for _, candidate := range candidates {
 		// Sanitize the chart ID to remove invalid characters
 		chartID := sanitizeDimensionID(candidate.Context)
-		
+
 		chart := &module.Chart{
 			ID:       chartID,
 			Title:    candidate.Title,

@@ -1494,10 +1494,14 @@ Netdata is NOT like Prometheus/Grafana. The dashboard provides point-and-click s
 
 #### Key Principles:
 1. **Dimensions must be additive or comparable** - they should make sense when summed
-2. **Use chart families** to group related metrics
-3. **Calculate derived values** (like "other" = total - specific) to maintain additivity
-4. **Separate different measurement types** into different charts
-5. **Historical/peak values** should be in separate charts from current values
+2. **All dimensions must share the same units** - never mix bytes with milliseconds, or gauges with rates
+3. **Context names should describe what's measured** - `thread_pools.threads` clearly indicates thread counts
+4. **Group metrics that tell the same story** - min/current/max belong together when they have same units
+5. **Use chart families** to group related metrics
+6. **Calculate derived values** (like "other" = total - specific) to maintain additivity
+7. **Separate different measurement types** into different charts
+8. **Historical/peak values** should be in separate charts from current values
+9. **Gauges and rates must be in separate contexts** - point-in-time values vs incremental counters
 
 ### RULE #2: Chart Types Based on Data Semantics
 
@@ -1988,6 +1992,68 @@ Application
 
 The goal is logical organization that helps users navigate, not unnecessary nesting that makes charts harder to find.
 
+### RULE #7: Handling Arrays and Homogeneous Metrics
+
+**When dealing with arrays of similar items (thread pools, connections, applications), group homogeneous metrics into shared contexts.**
+
+#### Understanding Netdata's Chart Model:
+
+1. **Developer Charts** (in code): Each instance needs a unique Chart ID for lifecycle management
+2. **User Charts** (dashboard): Multiple developer charts with the same Context appear as ONE chart
+3. **NIDL Framework**: Users can slice/dice by Nodes, Instances, Dimensions, and Labels
+
+#### Homogeneous Metrics Pattern:
+
+When array elements have the same metric names, they should share contexts:
+
+```go
+// BAD: Separate context per instance
+Chart{
+    ID: "thread_pools_webcontainer_activecount",
+    Context: "websphere.thread_pools.webcontainer.activecount", // Unique context
+    Dimensions: [{ID: "active", Name: "active"}]
+}
+
+Chart{
+    ID: "thread_pools_default_activecount", 
+    Context: "websphere.thread_pools.default.activecount", // Different context!
+    Dimensions: [{ID: "active", Name: "active"}]
+}
+```
+
+```go
+// GOOD: Shared context for homogeneous metrics
+Chart{
+    ID: "thread_pools_webcontainer_activecount", // Unique ID
+    Context: "websphere.thread_pools.activecount", // Shared context
+    Labels: {pool: "WebContainer"},
+    Dimensions: [{ID: "active", Name: "active"}]
+}
+
+Chart{
+    ID: "thread_pools_default_activecount", // Unique ID
+    Context: "websphere.thread_pools.activecount", // Same context!
+    Labels: {pool: "Default"},
+    Dimensions: [{ID: "active", Name: "active"}]
+}
+```
+
+#### Benefits:
+
+1. **Reduced Chart Count**: 11 thread pools with 9 metrics each = 9 charts instead of 99
+2. **Better Comparisons**: All thread pool active counts in one chart
+3. **Powerful Filtering**: Users can filter/group by labels and instances
+4. **Meaningful Aggregations**: Sum all active threads across pools
+
+#### Implementation Guidelines:
+
+1. **Identify Arrays**: Look for repeated structures with similar metrics
+2. **Group by Metric Type**: All "activecount" metrics share a context
+3. **Preserve Instance Identity**: Use unique Chart IDs and labels
+4. **Semantic Grouping**: Consider grouping related metrics (created/destroyed as "lifecycle")
+
+Remember: The goal is to create charts that tell a complete story while allowing users to slice the data any way they need.
+
 ## Chart Design Rules Summary
 
 1. **Non-Overlapping Dimensions** - Dimensions within a single chart must be additive or comparable
@@ -1996,6 +2062,7 @@ The goal is logical organization that helps users navigate, not unnecessary nest
 4. **Collect Everything Available** - Default to comprehensive collection unless there's compelling reason not to
 5. **Dynamic Chart Creation and Data Integrity** - Create charts only when metrics exist, never cache old values
 6. **Chart Family Hierarchies** - Use logical grouping with "/" delimiter, limit depth to 2-3 levels
+7. **Handling Arrays and Homogeneous Metrics** - Share contexts for same metrics across array elements
 
 ## Best Practices Summary
 

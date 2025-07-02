@@ -30,7 +30,7 @@ func TestAnalyzeDynamicCaching(t *testing.T) {
 
 	// Look specifically at Dynamic Caching metrics
 	fmt.Println("=== DYNAMIC CACHING ANALYSIS ===")
-	
+
 	// Find all Dynamic Caching metrics
 	dynamicCachingMetrics := make(map[string][]MetricTuple)
 	for _, metric := range flatResult.Metrics {
@@ -42,13 +42,13 @@ func TestAnalyzeDynamicCaching(t *testing.T) {
 	// Show sample paths
 	fmt.Printf("\nTotal Dynamic Caching metrics: %d\n", len(dynamicCachingMetrics))
 	fmt.Println("\nSample Dynamic Caching paths:")
-	
+
 	paths := make([]string, 0, len(dynamicCachingMetrics))
 	for path := range dynamicCachingMetrics {
 		paths = append(paths, path)
 	}
 	sort.Strings(paths)
-	
+
 	for i, path := range paths {
 		if i >= 10 {
 			fmt.Printf("... and %d more\n", len(paths)-10)
@@ -59,7 +59,7 @@ func TestAnalyzeDynamicCaching(t *testing.T) {
 
 	// Analyze structure
 	fmt.Println("\n=== STRUCTURE ANALYSIS ===")
-	
+
 	// Group by pattern
 	patterns := make(map[string]int)
 	for path := range dynamicCachingMetrics {
@@ -113,16 +113,16 @@ func TestAnalyzeDynamicCaching(t *testing.T) {
 			contexts[metric.UniqueContext] = true
 		}
 	}
-	
+
 	fmt.Printf("\nUnique Dynamic Caching contexts: %d\n", len(contexts))
-	
+
 	// Show a few examples
 	contextList := make([]string, 0, len(contexts))
 	for ctx := range contexts {
 		contextList = append(contextList, ctx)
 	}
 	sort.Strings(contextList)
-	
+
 	fmt.Println("\nSample contexts:")
 	for i, ctx := range contextList {
 		if i >= 5 {
@@ -152,7 +152,7 @@ func TestAnalyzeDynamicCaching(t *testing.T) {
 	fmt.Println("\n=== AFTER CORRELATION ===")
 	correlator := NewCorrelationEngine()
 	charts := correlator.CorrelateMetrics(flatResult.Metrics)
-	
+
 	// Count Dynamic Caching contexts after correlation
 	dcContexts := make(map[string]int)
 	for _, chart := range charts {
@@ -160,7 +160,7 @@ func TestAnalyzeDynamicCaching(t *testing.T) {
 			dcContexts[chart.Context]++
 		}
 	}
-	
+
 	fmt.Printf("\nDynamic Caching contexts after correlation: %d\n", len(dcContexts))
 	for ctx, count := range dcContexts {
 		fmt.Printf("  %s (%d charts)\n", ctx, count)

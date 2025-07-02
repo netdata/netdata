@@ -127,7 +127,7 @@ func (f *XMLFlattener) flattenStatWithArray(stat *pmiStat, parentPath string, pa
 	} else {
 		// Check if we should skip direct metrics due to Counters substat
 		skipDirectMetrics := f.hasCountersSubstat(stat)
-		
+
 		// Process direct metrics only if we don't have a Counters substat
 		if !skipDirectMetrics {
 			f.extractMetrics(stat, currentPath, currentLabels, result, isArrayElement, arrayPath, elementName)
@@ -304,7 +304,7 @@ func (f *XMLFlattener) addArrayElementLabels(arrayPath, elementName string, inde
 		cacheName := f.extractObjectName(elementName)
 		labels["cache"] = cacheName
 		labels["cache_object"] = elementName // Keep full path in separate label
-		labels["instance"] = cacheName // Override with simplified name
+		labels["instance"] = cacheName       // Override with simplified name
 	}
 }
 
@@ -475,13 +475,13 @@ func (f *XMLFlattener) generateUniqueContextAndInstance(metric *MetricTuple) (co
 	if metric.IsArrayElement && metric.ArrayPath != "" {
 		// Split array path and metric path
 		arrayParts := strings.Split(metric.ArrayPath, "/")
-		
+
 		// The metric path contains: arrayPath/elementName/metricName
 		// We want: arrayPath/metricName (without the element name)
-		
+
 		// Find where the array path ends in the full path
 		arrayDepth := len(arrayParts)
-		
+
 		// Special handling for Dynamic Caching
 		if strings.Contains(metric.ArrayPath, "Dynamic Caching") {
 			// For Dynamic Caching, simplify the complex object paths
@@ -554,7 +554,6 @@ func (f *XMLFlattener) generateUniqueContextAndInstance(metric *MetricTuple) (co
 	uniqueContext := fmt.Sprintf("websphere_pmi.%s", structuredPath)
 	uniqueInstance := fmt.Sprintf("websphere_pmi.%s.%s.%s",
 		structuredPath, sanitizedType, sanitizedUnit)
-
 
 	return uniqueContext, uniqueInstance
 }

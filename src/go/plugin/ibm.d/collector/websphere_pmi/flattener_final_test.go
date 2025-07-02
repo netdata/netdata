@@ -88,7 +88,7 @@ func TestFinalContextReduction(t *testing.T) {
 		fmt.Printf("\n%s:\n", result.Name)
 		fmt.Printf("  Elements: %d\n", result.Elements)
 		fmt.Printf("  Unique contexts: %d (ideal ratio)\n", result.UniqueContexts)
-		
+
 		// Show first few contexts
 		for i, ctx := range result.Contexts {
 			if i >= 3 {
