@@ -29,7 +29,7 @@ metrics:
       name: cceAlarmCriticalCount
       chart_meta:
         description: Number of alarms currently raised with a severity of 'critical'
-        family: Alarm/Critical/Raised
+        family: Alarm/Raised/Critical
         unit: "{alarm}"
   - MIB: CISCO-CONTENT-ENGINE-MIB
     symbol:
@@ -37,7 +37,7 @@ metrics:
       name: cceAlarmMajorCount
       chart_meta:
         description: Number of alarms currently raised with a severity of 'major'
-        family: Alarm/Major/Raised
+        family: Alarm/Raised/Major
         unit: "{alarm}"
   - MIB: CISCO-CONTENT-ENGINE-MIB
     symbol:
@@ -45,7 +45,7 @@ metrics:
       name: cceAlarmMinorCount
       chart_meta:
         description: Number of alarms currently raised with a severity of 'minor'
-        family: Alarm/Minor/Raised
+        family: Alarm/Raised/Minor
         unit: "{alarm}"
   - MIB: CISCO-WAN-OPTIMIZATION-MIB
     symbol:
@@ -135,11 +135,3 @@ metrics:
         description: This object contains total number of optimized TCP connections, which are reset since TFO was started or its statistics were last reset.
         family: TFO/Connection/Closed/Reset
         unit: "{connection}/s"
-  # - MIB: CISCO-WAN-OPTIMIZATION-MIB
-  #   symbol:
-  #     OID: 1.3.6.1.4.1.9.9.762.1.2.1.13.0
-  #     name: cwoTfoStatsLoadStatus
-  #     description: This object indicates the load status of Traffic Flow Optimizer (TFO).
-  #     family: TFO/Load/Status
-  #     unit: "{status}"
-  # TODO, no mapping for this metric found

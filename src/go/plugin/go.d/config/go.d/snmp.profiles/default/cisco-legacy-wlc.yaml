@@ -44,7 +44,7 @@ metrics:
       name: cpu.usage
       chart_meta:
         description: Current CPU load of the switch
-        family: CPU/Load
+        family: CPU/Usage
         unit: "%"
   - MIB: AIRESPACE-SWITCHING-MIB
     symbol:
