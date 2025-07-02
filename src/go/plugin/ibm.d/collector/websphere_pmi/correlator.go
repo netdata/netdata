@@ -120,13 +120,13 @@ func (c *CorrelationEngine) groupMetricsByCorrelation(metrics []MetricTuple) []M
 func (c *CorrelationEngine) generateCorrelationKey(metric MetricTuple) string {
 	// Extract the category path and metric name
 	categoryPath, metricName := c.extractCategoryAndMetric(metric)
-	
+
 	// Determine the proper unit for this metric
 	properUnit := c.determineProperUnit(metricName, metric)
-	
+
 	// Create a key that groups same metric across different instances
 	// Format: category_path.metric_name.unit
-	return fmt.Sprintf("%s.%s.%s", 
+	return fmt.Sprintf("%s.%s.%s",
 		sanitizeDimensionID(categoryPath),
 		sanitizeDimensionID(metricName),
 		sanitizeDimensionID(properUnit))
@@ -135,34 +135,34 @@ func (c *CorrelationEngine) generateCorrelationKey(metric MetricTuple) string {
 // extractCategoryAndMetric extracts the category path and metric name from a metric
 func (c *CorrelationEngine) extractCategoryAndMetric(metric MetricTuple) (categoryPath, metricName string) {
 	pathParts := strings.Split(metric.Path, "/")
-	
+
 	if len(pathParts) == 0 {
 		return "", ""
 	}
-	
+
 	// The last part is always the metric name
 	metricName = pathParts[len(pathParts)-1]
-	
+
 	// Remove "server/" prefix if present
 	cleanPath := strings.TrimPrefix(metric.Path, "server/")
 	cleanParts := strings.Split(cleanPath, "/")
-	
+
 	// For NIDL compliance, we need to determine the semantic category
 	// not the full hierarchical path
 	if len(cleanParts) > 1 {
 		primaryCat := cleanParts[0]
-		
+
 		switch primaryCat {
 		case "Thread Pools":
 			// For thread pools, the category is just "Thread Pools"
 			// Instance would be the pool name (e.g., "WebContainer")
 			categoryPath = "thread_pools"
-			
+
 		case "JDBC Connection Pools":
 			// For JDBC pools, category is "JDBC Connection Pools"
 			// Instance would be the datasource name
 			categoryPath = "jdbc_connection_pools"
-			
+
 		case "JCA Connection Pools":
 			// For JCA pools, include the adapter type if present
 			if len(cleanParts) > 2 {
@@ -171,7 +171,7 @@ func (c *CorrelationEngine) extractCategoryAndMetric(metric MetricTuple) (catego
 			} else {
 				categoryPath = "jca_connection_pools"
 			}
-			
+
 		case "Web Applications":
 			// For web apps, we need to look deeper to find the semantic category
 			if c.containsServlets(cleanParts) {
@@ -181,16 +181,16 @@ func (c *CorrelationEngine) extractCategoryAndMetric(metric MetricTuple) (catego
 			} else {
 				categoryPath = "web_applications"
 			}
-			
+
 		case "Servlet Session Manager":
 			categoryPath = "servlet_session_manager"
-			
+
 		case "Dynamic Caching":
 			categoryPath = "dynamic_caching"
-			
+
 		case "Transaction Manager":
 			categoryPath = "transaction_manager"
-			
+
 		case "Security":
 			// Include the security type (Authentication/Authorization)
 			if len(cleanParts) > 1 {
@@ -198,13 +198,13 @@ func (c *CorrelationEngine) extractCategoryAndMetric(metric MetricTuple) (catego
 			} else {
 				categoryPath = "security"
 			}
-			
+
 		case "JVM Runtime":
 			categoryPath = "jvm_runtime"
-			
+
 		case "ORB":
 			categoryPath = "orb"
-			
+
 		default:
 			// For unknown categories, use a simplified version
 			categoryPath = sanitizeDimensionID(primaryCat)
@@ -213,7 +213,7 @@ func (c *CorrelationEngine) extractCategoryAndMetric(metric MetricTuple) (catego
 		// Single-level path
 		categoryPath = ""
 	}
-	
+
 	return categoryPath, metricName
 }
 
@@ -240,7 +240,7 @@ func (c *CorrelationEngine) containsPortlets(parts []string) bool {
 // determineProperUnit determines the correct unit for a metric based on its name and type
 func (c *CorrelationEngine) determineProperUnit(metricName string, metric MetricTuple) string {
 	name := strings.ToLower(metricName)
-	
+
 	// Pool/thread/connection counts
 	if strings.Contains(name, "poolsize") || strings.Contains(name, "pool size") ||
 		strings.Contains(name, "activecount") || strings.Contains(name, "active count") ||
@@ -249,32 +249,32 @@ func (c *CorrelationEngine) determineProperUnit(metricName string, metric Metric
 		strings.Contains(name, "connectioncount") || strings.Contains(name, "handlecount") {
 		return "connections"
 	}
-	
+
 	// Thread counts specifically
-	if strings.Contains(name, "thread") && (strings.Contains(name, "count") || 
+	if strings.Contains(name, "thread") && (strings.Contains(name, "count") ||
 		strings.Contains(name, "hung") || strings.Contains(name, "cleared")) {
 		return "threads"
 	}
-	
+
 	// Session counts and related metrics
-	if strings.Contains(name, "session") && (strings.Contains(name, "count") || 
+	if strings.Contains(name, "session") && (strings.Contains(name, "count") ||
 		strings.Contains(name, "active") || strings.Contains(name, "invalidate") ||
 		strings.Contains(name, "invalidation")) {
 		return "sessions"
 	}
-	
+
 	// Session object size
 	if strings.Contains(name, "sessionobjectsize") || (strings.Contains(name, "session") && strings.Contains(name, "size")) {
 		return "bytes"
 	}
-	
+
 	// Time metrics (but not invalidation counts or other count metrics ending in "time")
-	if metric.Type == "time" || 
-		(strings.Contains(name, "time") && !strings.Contains(name, "timeoutinvalidation")) || 
+	if metric.Type == "time" ||
+		(strings.Contains(name, "time") && !strings.Contains(name, "timeoutinvalidation")) ||
 		strings.Contains(name, "duration") || strings.Contains(name, "latency") {
 		return "milliseconds"
 	}
-	
+
 	// Count metrics that should be rates
 	if strings.Contains(name, "createcount") || strings.Contains(name, "destroycount") ||
 		strings.Contains(name, "allocatecount") || strings.Contains(name, "returncount") ||
@@ -285,28 +285,28 @@ func (c *CorrelationEngine) determineProperUnit(metricName string, metric Metric
 		strings.Contains(name, "hitsondiskcount") {
 		return "operations/s"
 	}
-	
+
 	// Percentage metrics
 	if strings.Contains(name, "percent") || strings.Contains(name, "utilization") {
 		return "percent"
 	}
-	
+
 	// Size metrics (but not cache entry counts)
-	if strings.Contains(name, "size") && !strings.Contains(name, "pool") && 
+	if strings.Contains(name, "size") && !strings.Contains(name, "pool") &&
 		!strings.Contains(name, "cacheentrycount") {
 		return "bytes"
 	}
-	
+
 	// Cache entry counts
 	if strings.Contains(name, "cacheentrycount") || strings.Contains(name, "entrycount") {
 		return "entries"
 	}
-	
+
 	// Memory metrics
 	if strings.Contains(name, "memory") || strings.Contains(name, "heap") {
 		return "bytes"
 	}
-	
+
 	// Default to original unit
 	return metric.Unit
 }
@@ -315,7 +315,7 @@ func (c *CorrelationEngine) determineProperUnit(metricName string, metric Metric
 func (c *CorrelationEngine) createNewGroup(key string, metric MetricTuple) *MetricGroup {
 	categoryPath, metricName := c.extractCategoryAndMetric(metric)
 	properUnit := c.determineProperUnit(metricName, metric)
-	
+
 	// Extract common labels from the first metric
 	commonLabels := make(map[string]string)
 	for k, v := range metric.Labels {
@@ -324,7 +324,7 @@ func (c *CorrelationEngine) createNewGroup(key string, metric MetricTuple) *Metr
 			commonLabels[k] = v
 		}
 	}
-	
+
 	return &MetricGroup{
 		CorrelationKey: key,
 		BaseContext:    c.generateChartContext(categoryPath, metricName),
@@ -342,10 +342,10 @@ func (c *CorrelationEngine) generateChartContext(categoryPath, metricName string
 	// Clean up the category path
 	categoryPath = strings.ToLower(strings.ReplaceAll(categoryPath, " ", "_"))
 	categoryPath = strings.ReplaceAll(categoryPath, "/", ".")
-	
+
 	// Clean up the metric name
 	metricName = strings.ToLower(strings.ReplaceAll(metricName, " ", "_"))
-	
+
 	// Build context: websphere_pmi.category.metric_name
 	if categoryPath != "" {
 		return fmt.Sprintf("websphere_pmi.%s.%s", categoryPath, metricName)
@@ -393,14 +393,14 @@ func (c *CorrelationEngine) splitLargeGroup(group *MetricGroup) []MetricGroup {
 	// For now, we'll split by creating multiple charts with a suffix
 	// This is a simple implementation - could be enhanced
 	subGroups := make([]MetricGroup, 0)
-	
+
 	chunkSize := c.maxDimensionsPerChart
 	for i := 0; i < len(group.Metrics); i += chunkSize {
 		end := i + chunkSize
 		if end > len(group.Metrics) {
 			end = len(group.Metrics)
 		}
-		
+
 		subGroup := MetricGroup{
 			CorrelationKey: fmt.Sprintf("%s_%d", group.CorrelationKey, i/chunkSize),
 			BaseContext:    fmt.Sprintf("%s_%d", group.BaseContext, i/chunkSize),
@@ -413,7 +413,7 @@ func (c *CorrelationEngine) splitLargeGroup(group *MetricGroup) []MetricGroup {
 		}
 		subGroups = append(subGroups, subGroup)
 	}
-	
+
 	return subGroups
 }
 
@@ -447,28 +447,28 @@ func (c *CorrelationEngine) createChartFromGroup(group MetricGroup, priority int
 // generateDimensionID creates a unique dimension ID for an instance
 func (c *CorrelationEngine) generateDimensionID(metric MetricTuple) string {
 	// For NIDL compliance, the dimension ID should identify the instance
-	
+
 	// First check explicit instance label
 	if instance := metric.Labels["instance"]; instance != "" {
 		return sanitizeDimensionID(instance)
 	}
-	
+
 	// For array elements, use the element name
 	if metric.IsArrayElement && metric.ElementName != "" {
 		return sanitizeDimensionID(metric.ElementName)
 	}
-	
+
 	// Extract instance from path based on category
 	pathParts := strings.Split(strings.TrimPrefix(metric.Path, "server/"), "/")
 	categoryPath, metricName := c.extractCategoryAndMetric(metric)
-	
+
 	// IMPORTANT: Never use the metric name as a dimension
 	// This prevents issues like having both "PoolSize" and "Derby JDBC Provider (XA)" as dimensions
 	if len(pathParts) > 0 && pathParts[len(pathParts)-1] == metricName {
 		// Remove the metric name from consideration
 		pathParts = pathParts[:len(pathParts)-1]
 	}
-	
+
 	// Based on category, extract the appropriate instance identifier
 	switch {
 	case strings.HasPrefix(categoryPath, "thread_pools"):
@@ -476,7 +476,7 @@ func (c *CorrelationEngine) generateDimensionID(metric MetricTuple) string {
 		if len(pathParts) > 1 {
 			return sanitizeDimensionID(pathParts[1])
 		}
-		
+
 	case strings.HasPrefix(categoryPath, "jdbc_connection_pools"):
 		// For JDBC, instance is the datasource name
 		// Handle both:
@@ -490,7 +490,7 @@ func (c *CorrelationEngine) generateDimensionID(metric MetricTuple) string {
 			// We'll use a generic identifier
 			return "all_pools"
 		}
-		
+
 	case strings.HasPrefix(categoryPath, "web_applications"):
 		// For web apps, extract the app#war and servlet/portlet name
 		for i, part := range pathParts {
@@ -507,7 +507,7 @@ func (c *CorrelationEngine) generateDimensionID(metric MetricTuple) string {
 			}
 		}
 	}
-	
+
 	// Fallback: use a simplified version of the path
 	// Note: pathParts already has the metric name removed
 	if len(pathParts) > 1 {
@@ -516,7 +516,7 @@ func (c *CorrelationEngine) generateDimensionID(metric MetricTuple) string {
 	} else if len(pathParts) == 1 {
 		return sanitizeDimensionID(pathParts[0])
 	}
-	
+
 	// Last resort - use "default"
 	return "default"
 }
@@ -524,47 +524,47 @@ func (c *CorrelationEngine) generateDimensionID(metric MetricTuple) string {
 // generateDimensionName creates a human-readable dimension name
 func (c *CorrelationEngine) generateDimensionName(metric MetricTuple) string {
 	// For NIDL compliance, the dimension name should be the instance name
-	
+
 	// First check explicit instance label
 	if instance := metric.Labels["instance"]; instance != "" {
 		return instance
 	}
-	
+
 	// For array elements, use the element name
 	if metric.IsArrayElement && metric.ElementName != "" {
 		return metric.ElementName
 	}
-	
+
 	// Extract a human-readable instance name from the path
 	pathParts := strings.Split(strings.TrimPrefix(metric.Path, "server/"), "/")
 	categoryPath, metricName := c.extractCategoryAndMetric(metric)
-	
+
 	// Remove the metric name from path parts if it's at the end
 	if len(pathParts) > 0 && pathParts[len(pathParts)-1] == metricName {
 		pathParts = pathParts[:len(pathParts)-1]
 	}
-	
+
 	// Based on category, create appropriate display name
 	switch {
 	case strings.HasPrefix(categoryPath, "thread_pools"):
 		if len(pathParts) > 1 {
 			return pathParts[1] // Pool name
 		}
-		
+
 	case strings.HasPrefix(categoryPath, "jdbc_connection_pools"):
 		if len(pathParts) > 1 && pathParts[0] == "JDBC Connection Pools" {
 			return pathParts[1] // Datasource name
 		} else if len(pathParts) == 1 && pathParts[0] == "JDBC Connection Pools" {
 			return "All Pools" // Category-level metric
 		}
-		
+
 	case strings.HasPrefix(categoryPath, "web_applications"):
 		// For web apps, show app and servlet/portlet
 		for i, part := range pathParts {
 			if strings.Contains(part, "#") && strings.Contains(part, ".war") {
 				// Found the app
 				appName := part
-				
+
 				// Look for servlet/portlet
 				for j := i + 1; j < len(pathParts)-1; j++ {
 					if pathParts[j] == "Servlets" && j+1 < len(pathParts)-1 {
@@ -575,7 +575,7 @@ func (c *CorrelationEngine) generateDimensionName(metric MetricTuple) string {
 			}
 		}
 	}
-	
+
 	// Fallback: create a readable name from path components
 	// Note: pathParts already has the metric name removed
 	if len(pathParts) > 1 {
@@ -583,7 +583,7 @@ func (c *CorrelationEngine) generateDimensionName(metric MetricTuple) string {
 	} else if len(pathParts) == 1 {
 		return pathParts[0]
 	}
-	
+
 	return "default"
 }
 
@@ -591,14 +591,14 @@ func (c *CorrelationEngine) generateDimensionName(metric MetricTuple) string {
 func (c *CorrelationEngine) generateChartTitle(group MetricGroup) string {
 	// Build a clear title that describes what's being measured
 	// Following NIDL: "What am I monitoring?"
-	
+
 	// Clean up category path for display
 	categoryDisplay := strings.Title(strings.ReplaceAll(group.CategoryPath, "_", " "))
 	categoryDisplay = strings.ReplaceAll(categoryDisplay, ".", " ")
-	
+
 	// Clean up metric name for display
 	metricDisplay := c.formatMetricNameForDisplay(group.MetricName)
-	
+
 	// Build title that answers "What instances am I monitoring?"
 	switch group.CategoryPath {
 	case "thread_pools":
@@ -621,30 +621,30 @@ func (c *CorrelationEngine) generateChartTitle(group MetricGroup) string {
 func (c *CorrelationEngine) formatMetricNameForDisplay(metricName string) string {
 	// Special cases for common patterns
 	replacements := map[string]string{
-		"ActiveCount": "Active Connections",
-		"CreateCount": "Created",
-		"DestroyCount": "Destroyed",
-		"PoolSize": "Pool Size",
-		"FreePoolSize": "Free Pool Size",
-		"MaxPoolSize": "Maximum Pool Size",
-		"UseTime": "Use Time",
-		"WaitTime": "Wait Time",
-		"ServiceTime": "Service Time",
-		"ActiveTime": "Active Time",
-		"PercentUsed": "Percent Used",
-		"PercentMaxed": "Percent at Maximum",
-		"RequestCount": "Requests",
-		"ErrorCount": "Errors",
+		"ActiveCount":        "Active Connections",
+		"CreateCount":        "Created",
+		"DestroyCount":       "Destroyed",
+		"PoolSize":           "Pool Size",
+		"FreePoolSize":       "Free Pool Size",
+		"MaxPoolSize":        "Maximum Pool Size",
+		"UseTime":            "Use Time",
+		"WaitTime":           "Wait Time",
+		"ServiceTime":        "Service Time",
+		"ActiveTime":         "Active Time",
+		"PercentUsed":        "Percent Used",
+		"PercentMaxed":       "Percent at Maximum",
+		"RequestCount":       "Requests",
+		"ErrorCount":         "Errors",
 		"LoadedServletCount": "Loaded Servlets",
-		"CurrentThreads": "Current Threads",
-		"PeakThreads": "Peak Threads",
-		"DaemonThreads": "Daemon Threads",
+		"CurrentThreads":     "Current Threads",
+		"PeakThreads":        "Peak Threads",
+		"DaemonThreads":      "Daemon Threads",
 	}
-	
+
 	if display, exists := replacements[metricName]; exists {
 		return display
 	}
-	
+
 	// Generic camelCase to title case conversion
 	// Insert spaces before uppercase letters
 	result := ""
@@ -654,7 +654,7 @@ func (c *CorrelationEngine) formatMetricNameForDisplay(metricName string) string
 		}
 		result += string(r)
 	}
-	
+
 	return strings.Title(result)
 }
 
@@ -668,7 +668,7 @@ func (c *CorrelationEngine) generateChartFamily(group MetricGroup) string {
 			return strings.Title(strings.ReplaceAll(parts[0], "_", " "))
 		}
 	}
-	
+
 	// Fallback to generic family
 	return "WebSphere"
 }
@@ -682,7 +682,7 @@ func isMetricName(name string) bool {
 		"Threads", "Memory", "Heap", "Sessions", "Requests",
 		"Connections", "Pool", "Active", "Free", "Used",
 	}
-	
+
 	// Check if the name ends with common metric suffixes
 	nameLower := strings.ToLower(name)
 	for _, pattern := range metricPatterns {
@@ -690,7 +690,7 @@ func isMetricName(name string) bool {
 			return true
 		}
 	}
-	
+
 	// Check for exact matches of common metric names
 	commonMetrics := map[string]bool{
 		"PoolSize": true, "FreePoolSize": true, "CreateCount": true,
@@ -698,7 +698,7 @@ func isMetricName(name string) bool {
 		"ActiveCount": true, "AllocateCount": true, "ReturnCount": true,
 		"ManagedConnectionCount": true, "ConnectionHandleCount": true,
 	}
-	
+
 	return commonMetrics[name]
 }
 
