@@ -2,9 +2,14 @@ extends:
   - _dell.yaml
   - _std-if-mib.yaml
 
+sysobjectid:
+  - 1.3.6.1.4.1.8741.1  # SonicWALL TZ 400
+
 metadata:
   device:
     fields:
+      type:
+        value: "firewall"
       serial_number:
         symbol:
           MIB: SONICWALL-COMMON-MIB
@@ -20,42 +25,74 @@ metadata:
           MIB: SONICWALL-COMMON-MIB
           OID: 1.3.6.1.4.1.8741.2.1.1.1.0
           name: snwlSysModel
-      type:
-        value: "firewall"
 
-sysobjectid:
-  - 1.3.6.1.4.1.8741.1  # SonicWALL TZ 400
 metrics:
   - MIB: SONICWALL-FIREWALL-IP-STATISTICS-MIB
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.8741.1.3.1.3.0
-      description: Instantaneous CPU Utilization in percent
-      unit: "%"
+      chart_meta:
+        family: "CPU/Usage"
+        description: Instantaneous CPU Utilization in percent
+        unit: "%"
   - MIB: SONICWALL-FIREWALL-IP-STATISTICS-MIB
     symbol:
       name: memory.usage
       OID: 1.3.6.1.4.1.8741.1.3.1.4.0
-      description: Instantaneous RAM Utilization in percent
-      unit: "%"
+      chart_meta:
+        family: "Memory/Usage"
+        description: Instantaneous RAM Utilization in percent
+        unit: "%"
   - MIB: SONICWALL-FIREWALL-IP-STATISTICS-MIB
     symbol:
       name: sonicMaxConnCacheEntries
       OID: 1.3.6.1.4.1.8741.1.3.1.1.0
-      description: Maximum number of connection cache entries allowed through the firewall
-      unit: "{entry}"
+      chart_meta:
+        family: "Connection/Cache/Maximum"
+        description: Maximum number of connection cache entries allowed through the firewall
+        unit: "{entry}"
   - MIB: SONICWALL-FIREWALL-IP-STATISTICS-MIB
     symbol:
       name: sonicCurrentConnCacheEntries
       OID: 1.3.6.1.4.1.8741.1.3.1.2.0
-      description: Number of active connection cache entries through the firewall
-      unit: "{entry}"
+      chart_meta:
+        family: "Connection/Cache/Active"
+        description: Number of active connection cache entries through the firewall
+        unit: "{entry}"
   - MIB: SONICWALL-FIREWALL-IP-STATISTICS-MIB
     symbol:
       name: sonicNatTranslationCount
       OID: 1.3.6.1.4.1.8741.1.3.1.5.0
-      description: Current number of dynamic NAT translations being performed
-      unit: "{translation}"
+      chart_meta:
+        family: "NAT/Translation/Active"
+        description: Current number of dynamic NAT translations being performed
+        unit: "{translation}"
+
+  - MIB: SONICWALL-FIREWALL-IP-STATISTICS-MIB
+    symbol:
+      name: sonicDpiSslConnCountCur
+      OID: 1.3.6.1.4.1.8741.1.3.5.1.0
+      chart_meta:
+        family: "DPI/SSL/Connection/Current"
+        description: Current SSL-inspected connections through the firewall
+        unit: "{connection}"
+  - MIB: SONICWALL-FIREWALL-IP-STATISTICS-MIB
+    symbol:
+      name: sonicDpiSslConnCountHighWater
+      OID: 1.3.6.1.4.1.8741.1.3.5.2.0
+      chart_meta:
+        family: "DPI/SSL/Connection/HighWater"
+        description: Highwater SSL-inspected connections through the firewall
+        unit: "{connection}"
+  - MIB: SONICWALL-FIREWALL-IP-STATISTICS-MIB
+    symbol:
+      name: sonicDpiSslConnCountMax
+      OID: 1.3.6.1.4.1.8741.1.3.5.3.0
+      chart_meta:
+        family: "DPI/SSL/Connection/Maximum"
+        description: Maximum SSL-inspected connections through the firewall
+        unit: "{connection}"
+
   - MIB: SONICWALL-FIREWALL-IP-STATISTICS-MIB
     table:
       name: sonicSAStatTable
@@ -63,72 +100,42 @@ metrics:
     symbols:
       - name: sonicSAStatEncryptPktCount
         OID: 1.3.6.1.4.1.8741.1.3.2.1.1.1.8
-        description: Total encrypted packet count for this phase2 SA
-        unit: "{packet}"
+        chart_meta:
+          family: "IPSec/SA/Packet/Encrypted"
+          description: Total encrypted packet count for this phase2 SA
+          unit: "{packet/s}"
       - name: sonicSAStatEncryptByteCount
         OID: 1.3.6.1.4.1.8741.1.3.2.1.1.1.9
-        description: Total encrypted byte count for this phase2 SA
-        unit: "By"
+        chart_meta:
+          family: "IPSec/SA/Data/Encrypted"
+          description: Total encrypted byte count for this phase2 SA
+          unit: "By/s"
       - name: sonicSAStatDecryptPktCount
         OID: 1.3.6.1.4.1.8741.1.3.2.1.1.1.10
-        description: Total decrypted packet count for this phase2 SA
-        unit: "{packet}"
+        chart_meta:
+          family: "IPSec/SA/Packet/Decrypted"
+          description: Total decrypted packet count for this phase2 SA
+          unit: "{packet}/s"
       - name: sonicSAStatDecryptByteCount
         OID: 1.3.6.1.4.1.8741.1.3.2.1.1.1.11
-        description: Total decrypted byte count for this phase2 SA
-        unit: "By"
+        chart_meta:
+          family: "IPSec/SA/Data/Decrypted"
+          description: Total decrypted byte count for this phase2 SA
+          unit: "By/s"
       - name: sonicSAStatInFragPktCount
         OID: 1.3.6.1.4.1.8741.1.3.2.1.1.1.12
-        description: Incoming Fragmented packet count for this phase2 SA
-        unit: "{packet}"
+        chart_meta:
+          family: "IPSec/SA/Packet/Fragment/In"
+          description: Incoming Fragmented packet count for this phase2 SA
+          unit: "{packet}/s"
       - name: sonicSAStatOutFragPktCount
         OID: 1.3.6.1.4.1.8741.1.3.2.1.1.1.13
-        description: Outgoing Fragmented packet count for this phase2 SA
-        unit: "{packet}"
+        chart_meta:
+          family: "IPSec/SA/Packet/Fragment/Out"
+          description: Outgoing Fragmented packet count for this phase2 SA
+          unit: "{packet}/s"
     metric_tags:
-      - symbol:
-          name: sonicSAStatPeerGateway
-          OID: 1.3.6.1.4.1.8741.1.3.2.1.1.1.2
-        tag: sonic_sa_stat_peer_gateway
-      - symbol:
-          name: sonicSAStatSrcAddrBegin
-          OID: 1.3.6.1.4.1.8741.1.3.2.1.1.1.3
-        tag: sonic_sa_stat_src_addr_begin
-      - symbol:
-          name: sonicSAStatSrcAddrEnd
-          OID: 1.3.6.1.4.1.8741.1.3.2.1.1.1.4
-        tag: sonic_sa_stat_src_addr_end
-      - symbol:
-          name: sonicSAStatDstAddrBegin
-          OID: 1.3.6.1.4.1.8741.1.3.2.1.1.1.5
-        tag: sonic_sa_stat_dst_addr_begin
-      - symbol:
-          name: sonicSAStatDstAddrEnd
-          OID: 1.3.6.1.4.1.8741.1.3.2.1.1.1.6
-        tag: sonic_sa_stat_dst_addr_end
-      - symbol:
-          name: sonicSAStatCreateTime
-          OID: 1.3.6.1.4.1.8741.1.3.2.1.1.1.7
-        tag: sonic_sa_stat_create_time
-      - symbol:
+      - tag: sonic_sa_stat_user_name
+        symbol:
           name: sonicSAStatUserName
           OID: 1.3.6.1.4.1.8741.1.3.2.1.1.1.14
-        tag: sonic_sa_stat_user_name
-  - MIB: SONICWALL-FIREWALL-IP-STATISTICS-MIB
-    symbol:
-      name: sonicDpiSslConnCountCur
-      OID: 1.3.6.1.4.1.8741.1.3.5.1.0
-      description: Current SSL-inspected connections through the firewall
-      unit: "{connection}"
-  - MIB: SONICWALL-FIREWALL-IP-STATISTICS-MIB
-    symbol:
-      name: sonicDpiSslConnCountHighWater
-      OID: 1.3.6.1.4.1.8741.1.3.5.2.0
-      description: Highwater SSL-inspected connections through the firewall
-      unit: "{connection}"
-  - MIB: SONICWALL-FIREWALL-IP-STATISTICS-MIB
-    symbol:
-      name: sonicDpiSslConnCountMax
-      OID: 1.3.6.1.4.1.8741.1.3.5.3.0
-      description: Maximum SSL-inspected connections through the firewall
-      unit: "{connection}"
