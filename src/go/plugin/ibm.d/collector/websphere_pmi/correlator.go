@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
@@ -387,14 +388,8 @@ func (c *CorrelationEngine) generateChartContext(categoryPath, metricName string
 	categoryPath = strings.ToLower(strings.ReplaceAll(categoryPath, " ", "_"))
 	categoryPath = strings.ReplaceAll(categoryPath, "/", ".")
 
-	// Clean up the metric name
-	metricName = strings.ToLower(strings.ReplaceAll(metricName, " ", "_"))
-
-	// Remove common redundant suffixes that don't add meaning
-	metricName = strings.TrimSuffix(metricName, "count")
-	metricName = strings.TrimSuffix(metricName, "time")
-	metricName = strings.TrimSuffix(metricName, "size")
-	metricName = strings.Trim(metricName, "_")
+	// Clean up the metric name - convert to snake_case
+	metricName = convertToSnakeCase(metricName)
 
 	// Build context: websphere_pmi.category.metric_name
 	// Always ensure we have a category to avoid empty families
@@ -481,12 +476,20 @@ func (c *CorrelationEngine) createChartFromGroup(group MetricGroup, priority int
 	}
 
 	// Generate chart properties
+	family := c.generateChartFamily(group)
+
+	// DEBUG: Log what we're generating
+	if group.CategoryPath == "" || group.CategoryPath == "general" {
+		fmt.Printf("DEBUG: Empty category path for metric %s, family=%s, context=%s\n",
+			group.MetricName, family, group.BaseContext)
+	}
+
 	chart := ChartCandidate{
 		Context:    group.BaseContext,
 		Title:      c.generateChartTitle(group),
 		Units:      group.Unit,
 		Type:       group.Type,
-		Family:     c.generateChartFamily(group),
+		Family:     family,
 		Priority:   priority,
 		Dimensions: dimensions,
 		Labels:     group.CommonLabels,
@@ -769,7 +772,6 @@ func (c *CorrelationEngine) formatMetricNameForDisplay(metricName string) string
 		"DaemonThreads":   "Daemon Threads",
 
 		// Transaction metrics
-		"ActiveCount":                "Active Count",
 		"CommittedCount":             "Committed Count",
 		"RolledbackCount":            "Rolled Back Count",
 		"TimeoutCount":               "Timeout Count",
@@ -816,7 +818,6 @@ func (c *CorrelationEngine) formatMetricNameForDisplay(metricName string) string
 		"MissCount":                       "Miss Count",
 		"ExplicitInvalidationCount":       "Explicit Invalidation Count",
 		"LruInvalidationCount":            "LRU Invalidation Count",
-		"TimeoutInvalidationCount":        "Timeout Invalidation Count",
 		"InMemoryCacheEntryCount":         "In Memory Cache Entry Count",
 		"MaxInMemoryCacheEntryCount":      "Max In Memory Cache Entry Count",
 		"HitsInMemoryCount":               "Hits In Memory Count",
@@ -858,12 +859,10 @@ func (c *CorrelationEngine) formatMetricNameForDisplay(metricName string) string
 
 		// System metrics
 		"CPUUsageSinceLastMeasurement": "CPU Usage Since Last Measurement",
-		"FreeMemory":                   "Free Memory",
 
 		// ORB metrics
 		"LookupTime":     "Lookup Time",
 		"ProcessingTime": "Processing Time",
-		"RequestCount":   "Request Count",
 
 		// Other metrics
 		"LoadedCount":   "Loaded Count",
@@ -1035,6 +1034,44 @@ func sanitizeDimensionID(id string) string {
 	}
 
 	return id
+}
+
+// convertToSnakeCase converts camelCase or PascalCase to snake_case
+func convertToSnakeCase(s string) string {
+	// Handle some common patterns first
+	s = strings.ReplaceAll(s, "CPU", "Cpu")
+	s = strings.ReplaceAll(s, "JVM", "Jvm")
+	s = strings.ReplaceAll(s, "JDBC", "Jdbc")
+	s = strings.ReplaceAll(s, "JCA", "Jca")
+	s = strings.ReplaceAll(s, "JMS", "Jms")
+	s = strings.ReplaceAll(s, "EJB", "Ejb")
+	s = strings.ReplaceAll(s, "URI", "Uri")
+	s = strings.ReplaceAll(s, "URL", "Url")
+	s = strings.ReplaceAll(s, "RMI", "Rmi")
+	s = strings.ReplaceAll(s, "TAI", "Tai")
+	s = strings.ReplaceAll(s, "JAAS", "Jaas")
+	s = strings.ReplaceAll(s, "JACC", "Jacc")
+	s = strings.ReplaceAll(s, "LRU", "Lru")
+	s = strings.ReplaceAll(s, "ORB", "Orb")
+
+	var result []rune
+	for i, r := range s {
+		if i > 0 && i < len(s)-1 &&
+			unicode.IsUpper(r) &&
+			(unicode.IsLower(rune(s[i-1])) ||
+				(i+1 < len(s) && unicode.IsLower(rune(s[i+1])))) {
+			result = append(result, '_')
+		}
+		result = append(result, unicode.ToLower(r))
+	}
+
+	// Clean up any double underscores
+	res := string(result)
+	for strings.Contains(res, "__") {
+		res = strings.ReplaceAll(res, "__", "_")
+	}
+
+	return strings.Trim(res, "_")
 }
 
 // ConvertToNetdataCharts converts chart candidates to Netdata module charts
