@@ -4,11 +4,12 @@ package agent
 
 import (
 	"fmt"
-	"io"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
 // DumpAnalyzer collects and analyzes metric structure from dump mode
@@ -20,59 +21,18 @@ type DumpAnalyzer struct {
 
 // JobAnalysis holds analysis for a single job
 type JobAnalysis struct {
-	Name     string
-	Module   string
-	Families map[string]*FamilyAnalysis // key: family name
+	Name            string
+	Module          string
+	Charts          []ChartAnalysis
+	CollectionCount int
+	LastCollection  time.Time
 }
 
-// FamilyAnalysis holds analysis for a chart family
-type FamilyAnalysis struct {
-	Name     string
-	Contexts map[string]*ContextAnalysis // key: context
-}
-
-// ContextAnalysis holds analysis for a single context
-type ContextAnalysis struct {
-	Context   string
-	Title     string
-	Units     string
-	ChartType string
-	Priority  int
-	Instances map[string]*InstanceAnalysis // key: instance ID
-}
-
-// InstanceAnalysis holds analysis for a single instance
-type InstanceAnalysis struct {
-	ID         string
-	Name       string
-	Labels     map[string]string
-	Dimensions map[string]*DimensionAnalysis // key: dimension ID
-
-	// Track redefinitions
-	Definitions []InstanceDefinition
-}
-
-// InstanceDefinition tracks how an instance was defined
-type InstanceDefinition struct {
-	Timestamp time.Time
-	Title     string
-	Units     string
-	Labels    map[string]string
-}
-
-// DimensionAnalysis holds analysis for a single dimension
-type DimensionAnalysis struct {
-	ID         string
-	Name       string
-	Algorithm  string
-	Multiplier int
-	Divisor    int
-
-	// Collection statistics
-	Collections         int
-	EmptyCollections    int
-	NonEmptyCollections int
-	Values              []int64
+// ChartAnalysis holds analysis for a single chart
+type ChartAnalysis struct {
+	Chart           *module.Chart
+	CollectedValues map[string][]int64 // dimension ID -> collected values
+	SeenDimensions  map[string]bool    // track which dimensions received data
 }
 
 // NewDumpAnalyzer creates a new dump analyzer
@@ -83,209 +43,62 @@ func NewDumpAnalyzer() *DumpAnalyzer {
 	}
 }
 
-// NewDumpWriter creates a dump writer for a specific job
-func (da *DumpAnalyzer) NewDumpWriter(jobName, module string) io.Writer {
-	return NewDumpWriter(da, jobName, module)
-}
-
-// RecordChart records a chart definition
-func (da *DumpAnalyzer) RecordChart(jobName, module, family, context, chartID, title, units, chartType string, priority int) {
+// RecordJobStructure records the initial chart structure for a job
+func (da *DumpAnalyzer) RecordJobStructure(jobName, moduleName string, charts *module.Charts) {
 	da.mu.Lock()
 	defer da.mu.Unlock()
 
-	job := da.getOrCreateJob(jobName, module)
-	fam := da.getOrCreateFamily(job, family)
-	ctx := da.getOrCreateContext(fam, context, title, units, chartType, priority)
-
-	// Chart ID becomes the instance ID
-	if _, exists := ctx.Instances[chartID]; !exists {
-		ctx.Instances[chartID] = &InstanceAnalysis{
-			ID:         chartID,
-			Name:       title,
-			Labels:     make(map[string]string),
-			Dimensions: make(map[string]*DimensionAnalysis),
-			Definitions: []InstanceDefinition{
-				{
-					Timestamp: time.Now(),
-					Title:     title,
-					Units:     units,
-					Labels:    make(map[string]string),
-				},
-			},
-		}
-	} else {
-		// Track redefinition
-		inst := ctx.Instances[chartID]
-		def := InstanceDefinition{
-			Timestamp: time.Now(),
-			Title:     title,
-			Units:     units,
-			Labels:    make(map[string]string),
-		}
-
-		// Check if this is a different definition
-		lastDef := inst.Definitions[len(inst.Definitions)-1]
-		if lastDef.Title != title || lastDef.Units != units {
-			inst.Definitions = append(inst.Definitions, def)
-		}
+	job := &JobAnalysis{
+		Name:   jobName,
+		Module: moduleName,
+		Charts: make([]ChartAnalysis, 0),
 	}
-}
 
-// RecordDimension records a dimension definition
-func (da *DumpAnalyzer) RecordDimension(jobName, family, context, chartID, dimID, dimName, algorithm string, multiplier, divisor int) {
-	da.mu.Lock()
-	defer da.mu.Unlock()
-
-	job := da.getOrCreateJob(jobName, "")
-	fam := da.getOrCreateFamily(job, family)
-	ctx := da.getOrCreateContext(fam, context, "", "", "", 0)
-	inst := da.getOrCreateInstance(ctx, chartID)
-
-	if _, exists := inst.Dimensions[dimID]; !exists {
-		inst.Dimensions[dimID] = &DimensionAnalysis{
-			ID:         dimID,
-			Name:       dimName,
-			Algorithm:  algorithm,
-			Multiplier: multiplier,
-			Divisor:    divisor,
-			Values:     make([]int64, 0),
+	// Copy chart structure
+	for _, chart := range *charts {
+		ca := ChartAnalysis{
+			Chart:           chart,
+			CollectedValues: make(map[string][]int64),
+			SeenDimensions:  make(map[string]bool),
 		}
+
+		// Initialize dimension tracking
+		for _, dim := range chart.Dims {
+			ca.CollectedValues[dim.ID] = make([]int64, 0)
+			ca.SeenDimensions[dim.ID] = false
+		}
+
+		job.Charts = append(job.Charts, ca)
 	}
+
+	da.jobs[jobName] = job
 }
 
-// RecordLabel records a chart label
-func (da *DumpAnalyzer) RecordLabel(jobName, family, context, chartID, key, value string) {
+// RecordCollection records collected metrics directly from structured data
+func (da *DumpAnalyzer) RecordCollection(jobName string, mx map[string]int64) {
 	da.mu.Lock()
 	defer da.mu.Unlock()
 
-	job := da.getOrCreateJob(jobName, "")
-	fam := da.getOrCreateFamily(job, family)
-	ctx := da.getOrCreateContext(fam, context, "", "", "", 0)
-	inst := da.getOrCreateInstance(ctx, chartID)
-
-	inst.Labels[key] = value
-
-	// Update latest definition
-	if len(inst.Definitions) > 0 {
-		inst.Definitions[len(inst.Definitions)-1].Labels[key] = value
+	job, exists := da.jobs[jobName]
+	if !exists {
+		return
 	}
-}
 
-// RecordCollection records a data collection
-func (da *DumpAnalyzer) RecordCollection(jobName, family, context, chartID string, values map[string]int64, emptyDims map[string]bool) {
-	da.mu.Lock()
-	defer da.mu.Unlock()
+	job.CollectionCount++
+	job.LastCollection = time.Now()
 
-	job := da.getOrCreateJob(jobName, "")
-	fam := da.getOrCreateFamily(job, family)
-	ctx := da.getOrCreateContext(fam, context, "", "", "", 0)
-	inst := da.getOrCreateInstance(ctx, chartID)
+	// Record values for each chart
+	for i := range job.Charts {
+		ca := &job.Charts[i]
 
-	// Record collection for each dimension
-	for dimID, value := range values {
-		if dim, exists := inst.Dimensions[dimID]; exists {
-			dim.Collections++
-			// Check if this dimension was explicitly set as empty
-			if empty, isEmptySet := emptyDims[dimID]; isEmptySet && empty {
-				dim.EmptyCollections++
-			} else {
-				dim.NonEmptyCollections++
-				// Store up to 100 values for analysis
-				if len(dim.Values) < 100 {
-					dim.Values = append(dim.Values, value)
-				}
+		// Check each dimension in this chart
+		for _, dim := range ca.Chart.Dims {
+			if value, collected := mx[dim.ID]; collected {
+				ca.SeenDimensions[dim.ID] = true
+				ca.CollectedValues[dim.ID] = append(ca.CollectedValues[dim.ID], value)
 			}
 		}
 	}
-
-	// Record dimensions that were not collected (empty)
-	for dimID, dim := range inst.Dimensions {
-		if _, collected := values[dimID]; !collected {
-			dim.Collections++
-			dim.EmptyCollections++
-		}
-	}
-}
-
-// Helper methods
-func (da *DumpAnalyzer) getOrCreateJob(name, module string) *JobAnalysis {
-	if job, exists := da.jobs[name]; exists {
-		if module != "" && job.Module == "" {
-			job.Module = module
-		}
-		return job
-	}
-
-	job := &JobAnalysis{
-		Name:     name,
-		Module:   module,
-		Families: make(map[string]*FamilyAnalysis),
-	}
-	da.jobs[name] = job
-	return job
-}
-
-func (da *DumpAnalyzer) getOrCreateFamily(job *JobAnalysis, family string) *FamilyAnalysis {
-	if fam, exists := job.Families[family]; exists {
-		return fam
-	}
-
-	fam := &FamilyAnalysis{
-		Name:     family,
-		Contexts: make(map[string]*ContextAnalysis),
-	}
-	job.Families[family] = fam
-	return fam
-}
-
-func (da *DumpAnalyzer) getOrCreateContext(fam *FamilyAnalysis, context, title, units, chartType string, priority int) *ContextAnalysis {
-	if ctx, exists := fam.Contexts[context]; exists {
-		// Update fields if provided
-		if title != "" {
-			ctx.Title = title
-		}
-		if units != "" {
-			ctx.Units = units
-		}
-		if chartType != "" {
-			ctx.ChartType = chartType
-		}
-		if priority > 0 {
-			ctx.Priority = priority
-		}
-		return ctx
-	}
-
-	ctx := &ContextAnalysis{
-		Context:   context,
-		Title:     title,
-		Units:     units,
-		ChartType: chartType,
-		Priority:  priority,
-		Instances: make(map[string]*InstanceAnalysis),
-	}
-	fam.Contexts[context] = ctx
-	return ctx
-}
-
-func (da *DumpAnalyzer) getOrCreateInstance(ctx *ContextAnalysis, chartID string) *InstanceAnalysis {
-	if inst, exists := ctx.Instances[chartID]; exists {
-		return inst
-	}
-
-	inst := &InstanceAnalysis{
-		ID:         chartID,
-		Labels:     make(map[string]string),
-		Dimensions: make(map[string]*DimensionAnalysis),
-	}
-	ctx.Instances[chartID] = inst
-	return inst
-}
-
-// Analyze performs final analysis
-func (da *DumpAnalyzer) Analyze() {
-	// Analysis is done incrementally during recording
-	// This method could be used for final computations if needed
 }
 
 // PrintReport prints the analysis report
@@ -311,352 +124,221 @@ func (da *DumpAnalyzer) PrintReport() {
 		da.printJobAnalysis(job)
 	}
 
-	// Print summary of issues
-	da.printIssuesSummary()
+	// Print summary
+	da.printSummary()
 }
 
 func (da *DumpAnalyzer) printJobAnalysis(job *JobAnalysis) {
 	fmt.Printf("\n\nJOB: %s (module: %s)\n", job.Name, job.Module)
 	fmt.Println(strings.Repeat("-", 80))
-
-	// Sort families
-	var families []string
-	for name := range job.Families {
-		families = append(families, name)
+	fmt.Printf("Collections: %d\n", job.CollectionCount)
+	if job.CollectionCount > 0 {
+		fmt.Printf("Last collection: %v ago\n", time.Since(job.LastCollection))
 	}
-	sort.Strings(families)
 
-	// Build hierarchy
+	// Build hierarchy by family
+	families := make(map[string][]*ChartAnalysis)
+	familyPriorities := make(map[string]int)
+
+	for i := range job.Charts {
+		ca := &job.Charts[i]
+		family := ca.Chart.Fam
+		if family == "" {
+			family = "(no family)"
+		}
+
+		families[family] = append(families[family], ca)
+
+		// Track minimum priority for family sorting
+		if minPrio, exists := familyPriorities[family]; !exists || ca.Chart.Priority < minPrio {
+			familyPriorities[family] = ca.Chart.Priority
+		}
+	}
+
+	// Sort families by priority
+	type familyPrio struct {
+		name     string
+		priority int
+	}
+	var sortedFamilies []familyPrio
+	for fam, prio := range familyPriorities {
+		sortedFamilies = append(sortedFamilies, familyPrio{fam, prio})
+	}
+	sort.Slice(sortedFamilies, func(i, j int) bool {
+		return sortedFamilies[i].priority < sortedFamilies[j].priority
+	})
+
 	fmt.Println("\nCHART HIERARCHY:")
-	for _, famName := range families {
-		fam := job.Families[famName]
-		fmt.Printf("├── %s\n", famName)
+	for _, fp := range sortedFamilies {
+		fmt.Printf("├── %s (priority: %d)\n", fp.name, fp.priority)
 
-		// Sort contexts by priority
-		type ctxPrio struct {
-			name     string
-			priority int
-			ctx      *ContextAnalysis
-		}
-		var contexts []ctxPrio
-		for name, ctx := range fam.Contexts {
-			contexts = append(contexts, ctxPrio{name, ctx.Priority, ctx})
-		}
-		sort.Slice(contexts, func(i, j int) bool {
-			return contexts[i].priority < contexts[j].priority
+		// Sort charts within family by priority
+		charts := families[fp.name]
+		sort.Slice(charts, func(i, j int) bool {
+			return charts[i].Chart.Priority < charts[j].Chart.Priority
 		})
 
-		for i, cp := range contexts {
+		for i, ca := range charts {
 			prefix := "│   ├──"
-			if i == len(contexts)-1 {
+			if i == len(charts)-1 {
 				prefix = "│   └──"
 			}
 
-			// Analyze instance type
-			instanceType := da.inferInstanceType(cp.ctx)
-			instanceCount := len(cp.ctx.Instances)
-
-			fmt.Printf("%s %s [%s] %s - %d instances (%s)\n",
-				prefix, cp.name, cp.ctx.Units, cp.ctx.Title, instanceCount, instanceType)
-
-			// Show dimension consistency
-			if !da.checkDimensionConsistency(cp.ctx) {
-				fmt.Printf("│       ⚠️  INCONSISTENT DIMENSIONS across instances\n")
+			// Build instance info
+			instanceInfo := ""
+			if len(ca.Chart.Labels) > 0 {
+				var labels []string
+				for _, label := range ca.Chart.Labels {
+					labels = append(labels, fmt.Sprintf("%s=%s", label.Key, label.Value))
+				}
+				instanceInfo = fmt.Sprintf(" {%s}", strings.Join(labels, ", "))
 			}
 
-			// Show redefinition issues
-			for _, inst := range cp.ctx.Instances {
-				if len(inst.Definitions) > 1 {
-					fmt.Printf("│       ⚠️  Instance '%s' redefined %d times\n", inst.ID, len(inst.Definitions))
+			// Count active dimensions
+			activeDims := 0
+			for dimID, seen := range ca.SeenDimensions {
+				if seen && len(ca.CollectedValues[dimID]) > 0 {
+					activeDims++
 				}
 			}
-		}
-	}
-}
 
-func (da *DumpAnalyzer) inferInstanceType(ctx *ContextAnalysis) string {
-	// Look at instance IDs/labels to infer type
-	var sampleInstances []string
-	for id := range ctx.Instances {
-		sampleInstances = append(sampleInstances, id)
-		if len(sampleInstances) >= 3 {
-			break
-		}
-	}
+			fmt.Printf("%s %s [%s] - %s%s (%d/%d dims active)\n",
+				prefix,
+				ca.Chart.Ctx,
+				ca.Chart.Units,
+				ca.Chart.Title,
+				instanceInfo,
+				activeDims,
+				len(ca.Chart.Dims))
 
-	// Check common patterns
-	lower := strings.ToLower(ctx.Context)
-	if strings.Contains(lower, "thread") && strings.Contains(lower, "pool") {
-		return "thread pools"
-	}
-	if strings.Contains(lower, "jdbc") {
-		return "datasources"
-	}
-	if strings.Contains(lower, "servlet") {
-		return "servlets"
-	}
-	if strings.Contains(lower, "session") {
-		return "sessions"
-	}
-
-	return "instances"
-}
-
-func (da *DumpAnalyzer) checkDimensionConsistency(ctx *ContextAnalysis) bool {
-	var refDims []string
-	first := true
-
-	for _, inst := range ctx.Instances {
-		var dims []string
-		for dimID := range inst.Dimensions {
-			dims = append(dims, dimID)
-		}
-		sort.Strings(dims)
-
-		if first {
-			refDims = dims
-			first = false
-		} else {
-			if !da.slicesEqual(refDims, dims) {
-				return false
+			// Show dimension details if requested
+			if activeDims < len(ca.Chart.Dims) {
+				da.printInactiveDimensions(ca, "│       ")
 			}
 		}
 	}
-
-	return true
 }
 
-func (da *DumpAnalyzer) slicesEqual(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
+func (da *DumpAnalyzer) printInactiveDimensions(ca *ChartAnalysis, indent string) {
+	var inactive []string
+	for _, dim := range ca.Chart.Dims {
+		if !ca.SeenDimensions[dim.ID] {
+			inactive = append(inactive, dim.Name)
 		}
 	}
-	return true
+
+	if len(inactive) > 0 {
+		fmt.Printf("%s⚠️  Inactive dimensions: %s\n", indent, strings.Join(inactive, ", "))
+	}
 }
 
-func (da *DumpAnalyzer) printIssuesSummary() {
-	fmt.Println("\n\nISSUES SUMMARY:")
+func (da *DumpAnalyzer) printSummary() {
+	fmt.Println("\n\nSUMMARY:")
 	fmt.Println(strings.Repeat("-", 80))
 
-	issues := 0
+	totalCharts := 0
+	totalDimensions := 0
+	activeDimensions := 0
+	chartsWithIssues := 0
+
+	for _, job := range da.jobs {
+		totalCharts += len(job.Charts)
+
+		for _, ca := range job.Charts {
+			totalDimensions += len(ca.Chart.Dims)
+			hasIssue := false
+
+			for dimID, seen := range ca.SeenDimensions {
+				if seen && len(ca.CollectedValues[dimID]) > 0 {
+					activeDimensions++
+				} else {
+					hasIssue = true
+				}
+			}
+
+			if hasIssue {
+				chartsWithIssues++
+			}
+		}
+	}
+
+	fmt.Printf("Total charts: %d\n", totalCharts)
+	fmt.Printf("Total dimensions: %d\n", totalDimensions)
+	fmt.Printf("Active dimensions: %d (%.1f%%)\n", activeDimensions,
+		float64(activeDimensions)*100/float64(totalDimensions))
+	fmt.Printf("Charts with inactive dimensions: %d\n", chartsWithIssues)
+
+	// Print chart count by context
+	fmt.Println("\nCHARTS BY CONTEXT:")
+	contextCounts := make(map[string]int)
+	for _, job := range da.jobs {
+		for _, ca := range job.Charts {
+			contextCounts[ca.Chart.Ctx]++
+		}
+	}
+
+	// Sort contexts
+	var contexts []string
+	for ctx := range contextCounts {
+		contexts = append(contexts, ctx)
+	}
+	sort.Strings(contexts)
+
+	for _, ctx := range contexts {
+		fmt.Printf("  %s: %d charts\n", ctx, contextCounts[ctx])
+	}
+}
+
+// PrintDebugInfo prints additional debug information
+func (da *DumpAnalyzer) PrintDebugInfo() {
+	da.mu.RLock()
+	defer da.mu.RUnlock()
+
+	fmt.Println("\n\nDEBUG INFORMATION:")
+	fmt.Println(strings.Repeat("-", 80))
 
 	for jobName, job := range da.jobs {
-		for famName, fam := range job.Families {
-			for ctxName, ctx := range fam.Contexts {
-				// Check dimension consistency
-				if !da.checkDimensionConsistency(ctx) {
-					fmt.Printf("⚠️  [%s/%s/%s] Inconsistent dimensions across instances\n",
-						jobName, famName, ctxName)
-					issues++
+		fmt.Printf("\n[%s] Chart Structure:\n", jobName)
+
+		for _, ca := range job.Charts {
+			fmt.Printf("\nChart ID: %s\n", ca.Chart.ID)
+			fmt.Printf("  Context: %s\n", ca.Chart.Ctx)
+			fmt.Printf("  Title: %s\n", ca.Chart.Title)
+			fmt.Printf("  Units: %s\n", ca.Chart.Units)
+			fmt.Printf("  Family: %s\n", ca.Chart.Fam)
+			fmt.Printf("  Type: %s\n", ca.Chart.Type)
+			fmt.Printf("  Priority: %d\n", ca.Chart.Priority)
+
+			if len(ca.Chart.Labels) > 0 {
+				fmt.Printf("  Labels:\n")
+				for _, label := range ca.Chart.Labels {
+					fmt.Printf("    %s: %s\n", label.Key, label.Value)
+				}
+			}
+
+			fmt.Printf("  Dimensions:\n")
+			for _, dim := range ca.Chart.Dims {
+				status := "INACTIVE"
+				valueCount := 0
+				if ca.SeenDimensions[dim.ID] {
+					status = "ACTIVE"
+					valueCount = len(ca.CollectedValues[dim.ID])
 				}
 
-				// Check redefinitions
-				for instID, inst := range ctx.Instances {
-					if len(inst.Definitions) > 1 {
-						fmt.Printf("⚠️  [%s/%s/%s/%s] Instance redefined %d times\n",
-							jobName, famName, ctxName, instID, len(inst.Definitions))
-						issues++
-					}
+				fmt.Printf("    %s (%s) - %s [%d values collected]\n",
+					dim.ID, dim.Name, status, valueCount)
 
-					// Check empty collections
-					for dimID, dim := range inst.Dimensions {
-						if dim.Collections > 0 && dim.NonEmptyCollections == 0 {
-							fmt.Printf("⚠️  [%s/%s/%s/%s/%s] Dimension always empty (%d collections)\n",
-								jobName, famName, ctxName, instID, dimID, dim.Collections)
-							issues++
-						}
+				// Show sample values if collected
+				if valueCount > 0 {
+					samples := ca.CollectedValues[dim.ID]
+					if valueCount > 5 {
+						fmt.Printf("      Sample values: %v ... %v\n",
+							samples[:3], samples[valueCount-2:])
+					} else {
+						fmt.Printf("      Values: %v\n", samples)
 					}
 				}
 			}
 		}
 	}
-
-	if issues == 0 {
-		fmt.Println("✓ No issues found")
-	} else {
-		fmt.Printf("\nTotal issues: %d\n", issues)
-	}
-}
-
-// DumpWriter intercepts Netdata protocol commands and records them
-type DumpWriter struct {
-	analyzer *DumpAnalyzer
-	jobName  string
-	module   string
-
-	// Current state
-	currentChart   string
-	currentFamily  string
-	currentContext string
-	inCollection   bool
-	collectionData map[string]int64
-	emptyDims      map[string]bool // Track which dimensions are explicitly set as empty
-}
-
-// NewDumpWriter creates a new dump writer
-func NewDumpWriter(analyzer *DumpAnalyzer, jobName, module string) *DumpWriter {
-	return &DumpWriter{
-		analyzer:       analyzer,
-		jobName:        jobName,
-		module:         module,
-		collectionData: make(map[string]int64),
-		emptyDims:      make(map[string]bool),
-	}
-}
-
-// Write implements io.Writer interface
-func (dw *DumpWriter) Write(p []byte) (n int, err error) {
-	// Parse Netdata protocol commands
-	lines := strings.Split(string(p), "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-
-		dw.parseCommand(line)
-	}
-
-	return len(p), nil
-}
-
-func (dw *DumpWriter) parseCommand(line string) {
-	parts := strings.Fields(line)
-	if len(parts) == 0 {
-		return
-	}
-
-	switch parts[0] {
-	case "CHART":
-		dw.parseChart(parts)
-	case "DIMENSION":
-		dw.parseDimension(parts)
-	case "CLABEL":
-		dw.parseLabel(parts)
-	case "BEGIN":
-		dw.beginCollection(parts)
-	case "SET":
-		dw.setValue(parts)
-	case "SETEMPTY":
-		dw.setEmpty(parts)
-	case "END":
-		dw.endCollection()
-	}
-}
-
-func (dw *DumpWriter) parseChart(parts []string) {
-	// CHART type.id name title units family context charttype priority update_every options plugin module
-	if len(parts) < 10 {
-		return
-	}
-
-	typeID := strings.Trim(parts[1], "'\"")
-	idParts := strings.SplitN(typeID, ".", 2)
-	if len(idParts) != 2 {
-		return
-	}
-
-	chartID := idParts[1]
-	title := strings.Trim(parts[3], "'\"")
-	units := strings.Trim(parts[4], "'\"")
-	family := strings.Trim(parts[5], "'\"")
-	context := strings.Trim(parts[6], "'\"")
-	chartType := strings.Trim(parts[7], "'\"")
-	priority := 0
-	fmt.Sscanf(parts[8], "%d", &priority)
-
-	dw.currentChart = chartID
-	dw.currentFamily = family
-	dw.currentContext = context
-
-	dw.analyzer.RecordChart(dw.jobName, dw.module, family, context, chartID, title, units, chartType, priority)
-}
-
-func (dw *DumpWriter) parseDimension(parts []string) {
-	// DIMENSION id name algorithm multiplier divisor options
-	if len(parts) < 6 {
-		return
-	}
-
-	dimID := strings.Trim(parts[1], "'\"")
-	dimName := strings.Trim(parts[2], "'\"")
-	algorithm := strings.Trim(parts[3], "'\"")
-	multiplier := 1
-	divisor := 1
-	fmt.Sscanf(parts[4], "%d", &multiplier)
-	fmt.Sscanf(parts[5], "%d", &divisor)
-
-	dw.analyzer.RecordDimension(dw.jobName, dw.currentFamily, dw.currentContext, dw.currentChart, dimID, dimName, algorithm, multiplier, divisor)
-}
-
-func (dw *DumpWriter) parseLabel(parts []string) {
-	// CLABEL key value source
-	if len(parts) < 3 {
-		return
-	}
-
-	key := strings.Trim(parts[1], "'\"")
-	value := strings.Trim(parts[2], "'\"")
-
-	dw.analyzer.RecordLabel(dw.jobName, dw.currentFamily, dw.currentContext, dw.currentChart, key, value)
-}
-
-func (dw *DumpWriter) beginCollection(parts []string) {
-	// BEGIN type.id microseconds
-	if len(parts) < 2 {
-		return
-	}
-
-	typeID := strings.Trim(parts[1], "'\"")
-	idParts := strings.SplitN(typeID, ".", 2)
-	if len(idParts) == 2 {
-		dw.currentChart = idParts[1]
-	}
-
-	dw.inCollection = true
-	dw.collectionData = make(map[string]int64)
-	dw.emptyDims = make(map[string]bool)
-}
-
-func (dw *DumpWriter) setValue(parts []string) {
-	// SET id = value  or  SET id (for empty/gap)
-	if len(parts) < 2 || !dw.inCollection {
-		return
-	}
-
-	dimID := strings.Trim(parts[1], "'\"")
-	var value int64
-
-	// Check if value is provided (SET id = value)
-	if len(parts) >= 4 && parts[2] == "=" {
-		fmt.Sscanf(parts[3], "%d", &value)
-		dw.collectionData[dimID] = value
-		dw.emptyDims[dimID] = false
-	} else {
-		// If no value provided (SET id), mark as empty
-		dw.emptyDims[dimID] = true
-	}
-}
-
-func (dw *DumpWriter) setEmpty(parts []string) {
-	// SETEMPTY id
-	if len(parts) < 2 || !dw.inCollection {
-		return
-	}
-
-	dimID := strings.Trim(parts[1], "'\"")
-	dw.emptyDims[dimID] = true
-}
-
-func (dw *DumpWriter) endCollection() {
-	if !dw.inCollection {
-		return
-	}
-
-	dw.analyzer.RecordCollection(dw.jobName, dw.currentFamily, dw.currentContext, dw.currentChart, dw.collectionData, dw.emptyDims)
-	dw.inCollection = false
 }
