@@ -74,9 +74,9 @@ type MetricGroup struct {
 	BaseContext    string
 	CommonLabels   map[string]string
 	Metrics        []MetricTuple
-	Unit           string
+	Unit           string // Will be determined by first metric in group
 	Type           string
-	MetricName     string // The specific metric being measured
+	InstanceName   string // The instance being monitored (e.g., "WebContainer")
 	CategoryPath   string // The hierarchical category path
 }
 
@@ -114,28 +114,108 @@ func (c *CorrelationEngine) groupMetricsByCorrelation(metrics []MetricTuple) []M
 }
 
 // generateCorrelationKey creates a key for grouping related metrics according to NIDL principles
-// The key should group metrics with:
-// 1. Same category (e.g., Thread Pools)
-// 2. Same metric name (e.g., ActiveCount)
-// 3. Different instances (e.g., WebContainer, Default)
+// NEW APPROACH: Group by instance, not by metric type
+// This creates one chart per instance (e.g., per thread pool) with metrics as dimensions
 func (c *CorrelationEngine) generateCorrelationKey(metric MetricTuple) string {
 	// Extract the category path and metric name
-	categoryPath, metricName := c.extractCategoryAndMetric(metric)
+	categoryPath, _ := c.extractCategoryAndMetric(metric)
 
-	// Determine the proper unit for this metric
-	properUnit := c.determineProperUnit(metricName, metric)
+	// Extract the instance identifier
+	instanceID := c.extractInstanceIdentifier(metric)
 
-	// Create a key that groups same metric across different instances
-	// Format: category_path.metric_name.unit
 	// If no category path, use "general" to avoid empty family
 	if categoryPath == "" {
 		categoryPath = "general"
 	}
 
-	return fmt.Sprintf("%s.%s.%s",
+	// Create a key that groups metrics by instance
+	// Format: category_path.instance_id
+	return fmt.Sprintf("%s.%s",
 		sanitizeDimensionID(categoryPath),
-		sanitizeDimensionID(metricName),
-		sanitizeDimensionID(properUnit))
+		sanitizeDimensionID(instanceID))
+}
+
+// extractInstanceIdentifier extracts the unique instance ID from a metric path
+func (c *CorrelationEngine) extractInstanceIdentifier(metric MetricTuple) string {
+	// Remove "server/" prefix if present
+	cleanPath := strings.TrimPrefix(metric.Path, "server/")
+	pathParts := strings.Split(cleanPath, "/")
+
+	if len(pathParts) == 0 {
+		return "default"
+	}
+
+	// The last part is the metric name, we need the instance before that
+	metricName := pathParts[len(pathParts)-1]
+
+	// First check explicit instance label
+	if instance := metric.Labels["instance"]; instance != "" {
+		return instance
+	}
+
+	// For array elements, use the element name
+	if metric.IsArrayElement && metric.ElementName != "" {
+		return metric.ElementName
+	}
+
+	// Extract based on the primary category
+	if len(pathParts) > 1 {
+		primaryCat := pathParts[0]
+
+		switch primaryCat {
+		case "Thread Pools":
+			// For thread pools, instance is the pool name (e.g., "WebContainer")
+			if len(pathParts) > 2 {
+				return pathParts[1]
+			}
+
+		case "JDBC Connection Pools":
+			// For JDBC, instance is the datasource name
+			if len(pathParts) > 2 {
+				return pathParts[1]
+			}
+
+		case "JCA Connection Pools":
+			// For JCA, instance is after the category and adapter
+			if len(pathParts) > 3 {
+				return pathParts[2]
+			} else if len(pathParts) > 2 {
+				return pathParts[1]
+			}
+
+		case "ORB":
+			// For ORB, instance is the interceptor name
+			if len(pathParts) > 2 {
+				return pathParts[1]
+			}
+
+		case "Web Applications":
+			// For web apps, look for the app#war pattern
+			for i, part := range pathParts {
+				if strings.Contains(part, "#") && strings.Contains(part, ".war") {
+					// If there's a servlet after, combine them
+					if i+2 < len(pathParts) && pathParts[i+1] == "Servlets" && i+2 < len(pathParts)-1 {
+						return fmt.Sprintf("%s.%s", part, pathParts[i+2])
+					}
+					return part
+				}
+			}
+
+		case "Security Authentication":
+			// For security auth, extract the auth type from metric name
+			return c.ExtractAuthenticationType(metricName)
+		}
+
+		// Default: use the second-to-last part if it's not the metric name
+		if len(pathParts) > 2 {
+			candidate := pathParts[len(pathParts)-2]
+			if !isCategoryName(candidate) {
+				return candidate
+			}
+		}
+	}
+
+	return "default"
 }
 
 // extractCategoryAndMetric extracts the category path and metric name from a metric
@@ -203,6 +283,14 @@ func (c *CorrelationEngine) extractCategoryAndMetric(metric MetricTuple) (catego
 			} else {
 				categoryPath = "security"
 			}
+
+		case "Security Authentication":
+			// Handle "Security Authentication" as a single category
+			categoryPath = "security.authentication"
+
+		case "Security Authorization":
+			// Handle "Security Authorization" as a single category
+			categoryPath = "security.authorization"
 
 		case "JVM Runtime":
 			categoryPath = "jvm_runtime"
@@ -356,10 +444,91 @@ func (c *CorrelationEngine) determineProperUnit(metricName string, metric Metric
 	return metric.Unit
 }
 
+// NormalizeAuthenticationMetric converts specific authentication metric names to general patterns
+// for NIDL-compliant grouping. This groups all count metrics together and all time metrics together.
+func (c *CorrelationEngine) NormalizeAuthenticationMetric(metricName string) string {
+	name := strings.ToLower(metricName)
+
+	// Group all authentication count metrics
+	if strings.Contains(name, "count") {
+		return "count"
+	}
+
+	// Group all authentication time metrics
+	if strings.Contains(name, "time") {
+		return "time"
+	}
+
+	// Keep other metrics as-is (e.g., CredentialCreationTime might be special)
+	return metricName
+}
+
+// ExtractAuthenticationType extracts the authentication type from the metric name
+// to use as the instance identifier (dimension ID)
+func (c *CorrelationEngine) ExtractAuthenticationType(metricName string) string {
+	name := strings.ToLower(metricName)
+
+	// Map specific authentication metrics to their types
+	switch {
+	case strings.Contains(name, "basicauthentication"):
+		return "basic"
+	case strings.Contains(name, "tokenauthentication"):
+		return "token"
+	case strings.Contains(name, "webauthentication"):
+		return "web"
+	case strings.Contains(name, "rmiauthentication"):
+		return "rmi"
+	case strings.Contains(name, "jaasbasicauthentication"):
+		return "jaas_basic"
+	case strings.Contains(name, "jaastokenauthentication"):
+		return "jaas_token"
+	case strings.Contains(name, "jaasidentityassertion"):
+		return "jaas_identity_assertion"
+	case strings.Contains(name, "identityassertion"):
+		return "identity_assertion"
+	case strings.Contains(name, "tairequest"):
+		return "tai_request"
+	case strings.Contains(name, "credentialcreation"):
+		return "credential_creation"
+	default:
+		// Fallback to the original metric name, sanitized
+		return sanitizeDimensionID(metricName)
+	}
+}
+
+// getAuthenticationTypeDisplayName provides human-readable names for authentication types
+func (c *CorrelationEngine) getAuthenticationTypeDisplayName(authType string) string {
+	switch authType {
+	case "basic":
+		return "Basic Authentication"
+	case "token":
+		return "Token Authentication"
+	case "web":
+		return "Web Authentication"
+	case "rmi":
+		return "RMI Authentication"
+	case "jaas_basic":
+		return "JAAS Basic Authentication"
+	case "jaas_token":
+		return "JAAS Token Authentication"
+	case "jaas_identity_assertion":
+		return "JAAS Identity Assertion"
+	case "identity_assertion":
+		return "Identity Assertion"
+	case "tai_request":
+		return "TAI Request"
+	case "credential_creation":
+		return "Credential Creation"
+	default:
+		// Fallback to title case of the auth type
+		return strings.Title(strings.ReplaceAll(authType, "_", " "))
+	}
+}
+
 // createNewGroup creates a new metric group
 func (c *CorrelationEngine) createNewGroup(key string, metric MetricTuple) *MetricGroup {
-	categoryPath, metricName := c.extractCategoryAndMetric(metric)
-	properUnit := c.determineProperUnit(metricName, metric)
+	categoryPath, _ := c.extractCategoryAndMetric(metric)
+	instanceID := c.extractInstanceIdentifier(metric)
 
 	// Extract common labels from the first metric
 	commonLabels := make(map[string]string)
@@ -370,16 +539,42 @@ func (c *CorrelationEngine) createNewGroup(key string, metric MetricTuple) *Metr
 		}
 	}
 
+	// Add the instance identifier as a label
+	commonLabels["websphere_instance"] = instanceID
+
+	// Generate context based on category and instance
+	baseContext := c.generateInstanceContext(categoryPath, instanceID)
+
+	// For the unit, we'll use the unit of the first metric added
+	// Different metrics in the same instance might have different units
+	// This will be handled during chart creation
+
 	return &MetricGroup{
 		CorrelationKey: key,
-		BaseContext:    c.generateChartContext(categoryPath, metricName),
+		BaseContext:    baseContext,
 		CommonLabels:   commonLabels,
 		Metrics:        []MetricTuple{metric},
-		Unit:           properUnit,
-		Type:           c.inferChartType(metric),
-		MetricName:     metricName,
+		Unit:           metric.Unit, // Will be updated as we determine common unit
+		Type:           "line",      // Default, will be refined
+		InstanceName:   instanceID,
 		CategoryPath:   categoryPath,
 	}
+}
+
+// generateInstanceContext creates the context for a chart based on category and instance
+func (c *CorrelationEngine) generateInstanceContext(categoryPath, instanceID string) string {
+	// Clean up the category path
+	categoryPath = strings.ToLower(strings.ReplaceAll(categoryPath, " ", "_"))
+	categoryPath = strings.ReplaceAll(categoryPath, "/", ".")
+
+	// Clean up the instance ID
+	instanceID = sanitizeDimensionID(instanceID)
+
+	// Build context: websphere_pmi.category.instance
+	if categoryPath == "" || categoryPath == "general" {
+		return fmt.Sprintf("websphere_pmi.%s", instanceID)
+	}
+	return fmt.Sprintf("websphere_pmi.%s.%s", categoryPath, instanceID)
 }
 
 // generateChartContext creates the context for a chart based on category and metric
@@ -454,7 +649,7 @@ func (c *CorrelationEngine) splitLargeGroup(group *MetricGroup) []MetricGroup {
 			Metrics:        group.Metrics[i:end],
 			Unit:           group.Unit,
 			Type:           group.Type,
-			MetricName:     group.MetricName,
+			InstanceName:   group.InstanceName,
 			CategoryPath:   group.CategoryPath,
 		}
 		subGroups = append(subGroups, subGroup)
@@ -465,24 +660,49 @@ func (c *CorrelationEngine) splitLargeGroup(group *MetricGroup) []MetricGroup {
 
 // createChartFromGroup converts a metric group to a chart candidate
 func (c *CorrelationEngine) createChartFromGroup(group MetricGroup, priority int) ChartCandidate {
-	// Generate dimensions - each instance becomes a dimension
-	dimensions := make([]DimensionCandidate, len(group.Metrics))
-	for i, metric := range group.Metrics {
-		dimensions[i] = DimensionCandidate{
-			ID:     c.generateDimensionID(metric),
-			Name:   c.generateDimensionName(metric),
-			Metric: metric,
+	// NEW: Each metric in the group becomes a dimension
+	// (e.g., ActiveCount, PoolSize, CreateCount for a thread pool)
+	dimensions := make([]DimensionCandidate, 0, len(group.Metrics))
+
+	// Group metrics with the same unit together
+	// We may need to split this group if metrics have incompatible units
+	unitGroups := make(map[string][]MetricTuple)
+	for _, metric := range group.Metrics {
+		_, metricName := c.extractCategoryAndMetric(metric)
+		unit := c.determineProperUnit(metricName, metric)
+		unitGroups[unit] = append(unitGroups[unit], metric)
+	}
+
+	// For now, use the most common unit
+	// TODO: In the future, we might want to create separate charts for different units
+	maxCount := 0
+	primaryUnit := ""
+	for unit, metrics := range unitGroups {
+		if len(metrics) > maxCount {
+			maxCount = len(metrics)
+			primaryUnit = unit
 		}
+	}
+
+	// Create dimensions from metrics with the primary unit
+	for _, metric := range unitGroups[primaryUnit] {
+		_, metricName := c.extractCategoryAndMetric(metric)
+		dimensions = append(dimensions, DimensionCandidate{
+			ID:     sanitizeDimensionID(metricName),
+			Name:   c.humanizeMetricName(metricName),
+			Metric: metric,
+		})
 	}
 
 	// Generate chart properties
 	family := c.generateChartFamily(group)
+	title := c.generateInstanceTitle(group)
 
 	chart := ChartCandidate{
 		Context:    group.BaseContext,
-		Title:      c.generateChartTitle(group),
-		Units:      group.Unit,
-		Type:       group.Type,
+		Title:      title,
+		Units:      primaryUnit,
+		Type:       c.inferChartTypeForInstance(dimensions),
 		Family:     family,
 		Priority:   priority,
 		Dimensions: dimensions,
@@ -560,6 +780,17 @@ func (c *CorrelationEngine) generateDimensionID(metric MetricTuple) string {
 				return sanitizeDimensionID(part)
 			}
 		}
+
+	case strings.HasPrefix(categoryPath, "security.authentication"):
+		// For Security Authentication, extract the authentication type from the metric name
+		// Convert specific metrics like "BasicAuthenticationCount" to "basic"
+		authType := c.ExtractAuthenticationType(metricName)
+		return sanitizeDimensionID(authType)
+
+	case strings.HasPrefix(categoryPath, "orb"):
+		// For ORB metrics, each interceptor gets its own chart
+		// So the dimension is just the metric name
+		return sanitizeDimensionID(metricName)
 	}
 
 	// For array elements, always use the element name
@@ -645,6 +876,18 @@ func (c *CorrelationEngine) generateDimensionName(metric MetricTuple) string {
 				return appName
 			}
 		}
+
+	case strings.HasPrefix(categoryPath, "security.authentication"):
+		// For Security Authentication, provide human-readable authentication type names
+		authType := c.ExtractAuthenticationType(metricName)
+		return c.getAuthenticationTypeDisplayName(authType)
+
+	case strings.HasPrefix(categoryPath, "orb"):
+		// For ORB metrics, show the interceptor/component name
+		if len(pathParts) > 2 && pathParts[0] == "ORB" {
+			// Return the interceptor name as-is for readability
+			return pathParts[1]
+		}
 	}
 
 	// For array elements, always use the element name
@@ -663,13 +906,106 @@ func (c *CorrelationEngine) generateDimensionName(metric MetricTuple) string {
 	return "Default"
 }
 
+// humanizeMetricName converts a metric name to a human-readable dimension name
+func (c *CorrelationEngine) humanizeMetricName(metricName string) string {
+	// Convert CamelCase to Title Case
+	result := ""
+	for i, r := range metricName {
+		if i > 0 && unicode.IsUpper(r) {
+			result += " "
+		}
+		result += string(r)
+	}
+	return result
+}
+
+// generateInstanceTitle creates a title for an instance-based chart
+func (c *CorrelationEngine) generateInstanceTitle(group MetricGroup) string {
+	// Create a title based on the instance name and category
+	categoryDisplay := c.getCategoryDisplayName(group.CategoryPath)
+
+	// Clean up instance name for display
+	instanceDisplay := group.InstanceName
+	instanceDisplay = strings.ReplaceAll(instanceDisplay, "_", " ")
+	instanceDisplay = strings.ReplaceAll(instanceDisplay, ".", " ")
+
+	return fmt.Sprintf("%s - %s", categoryDisplay, instanceDisplay)
+}
+
+// getCategoryDisplayName returns a human-readable category name
+func (c *CorrelationEngine) getCategoryDisplayName(categoryPath string) string {
+	switch categoryPath {
+	case "thread_pools":
+		return "Thread Pool"
+	case "jdbc_connection_pools":
+		return "JDBC Pool"
+	case "jca_connection_pools":
+		return "JCA Pool"
+	case "web_applications":
+		return "Web Application"
+	case "web_applications.servlets":
+		return "Servlet"
+	case "orb":
+		return "ORB Interceptor"
+	case "servlet_session_manager":
+		return "Session Manager"
+	case "dynamic_caching":
+		return "Dynamic Cache"
+	case "transaction_manager":
+		return "Transaction Manager"
+	case "security.authentication":
+		return "Security Authentication"
+	case "jvm_runtime":
+		return "JVM Runtime"
+	default:
+		// Convert snake_case to Title Case
+		parts := strings.Split(categoryPath, ".")
+		if len(parts) > 0 {
+			return strings.Title(strings.ReplaceAll(parts[0], "_", " "))
+		}
+		return "General"
+	}
+}
+
+// inferChartTypeForInstance determines chart type based on the dimensions
+func (c *CorrelationEngine) inferChartTypeForInstance(dimensions []DimensionCandidate) string {
+	// If we have bidirectional metrics, use area
+	hasIn := false
+	hasOut := false
+	hasRead := false
+	hasWrite := false
+
+	for _, dim := range dimensions {
+		nameLower := strings.ToLower(dim.Name)
+		if strings.Contains(nameLower, "in") || strings.Contains(nameLower, "received") {
+			hasIn = true
+		}
+		if strings.Contains(nameLower, "out") || strings.Contains(nameLower, "sent") {
+			hasOut = true
+		}
+		if strings.Contains(nameLower, "read") {
+			hasRead = true
+		}
+		if strings.Contains(nameLower, "write") {
+			hasWrite = true
+		}
+	}
+
+	if (hasIn && hasOut) || (hasRead && hasWrite) {
+		return "area"
+	}
+
+	// Default to line
+	return "line"
+}
+
 // generateChartTitle creates a descriptive chart title
 func (c *CorrelationEngine) generateChartTitle(group MetricGroup) string {
 	// Build a clear title that describes what's being measured
 	// Following NIDL: "What am I monitoring?"
 
-	// Clean up metric name for display
-	metricDisplay := c.formatMetricNameForDisplay(group.MetricName)
+	// This function is kept for compatibility but not used in instance-based grouping
+	metricDisplay := "Metrics"
 
 	// Build title that answers "What instances am I monitoring?"
 	switch group.CategoryPath {
