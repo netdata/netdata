@@ -231,6 +231,30 @@ type doubleStat struct {
 	Double string `xml:"double,attr"`
 }
 
+// populateBackwardCompatibility populates single references from arrays for backward compatibility
+func (s *pmiStat) populateBackwardCompatibility() {
+	if len(s.CountStatistics) > 0 {
+		s.CountStatistic = &s.CountStatistics[0]
+	}
+	if len(s.TimeStatistics) > 0 {
+		s.TimeStatistic = &s.TimeStatistics[0]
+	}
+	if len(s.RangeStatistics) > 0 {
+		s.RangeStatistic = &s.RangeStatistics[0]
+	}
+	if len(s.BoundedRangeStatistics) > 0 {
+		s.BoundedRangeStatistic = &s.BoundedRangeStatistics[0]
+	}
+	if len(s.DoubleStatistics) > 0 {
+		s.DoubleStatistic = &s.DoubleStatistics[0]
+	}
+
+	// Recursively populate sub-stats
+	for i := range s.SubStats {
+		s.SubStats[i].populateBackwardCompatibility()
+	}
+}
+
 func (w *WebSpherePMI) Configuration() any {
 	return w.Config
 }

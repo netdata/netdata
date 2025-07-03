@@ -26,6 +26,7 @@ type JobAnalysis struct {
 	Charts          []ChartAnalysis
 	CollectionCount int
 	LastCollection  time.Time
+	AllSeenMetrics  map[string]bool // Track ALL metrics seen in mx map
 }
 
 // ChartAnalysis holds analysis for a single chart
@@ -49,9 +50,10 @@ func (da *DumpAnalyzer) RecordJobStructure(jobName, moduleName string, charts *m
 	defer da.mu.Unlock()
 
 	job := &JobAnalysis{
-		Name:   jobName,
-		Module: moduleName,
-		Charts: make([]ChartAnalysis, 0),
+		Name:           jobName,
+		Module:         moduleName,
+		Charts:         make([]ChartAnalysis, 0),
+		AllSeenMetrics: make(map[string]bool),
 	}
 
 	// Copy chart structure
@@ -86,6 +88,11 @@ func (da *DumpAnalyzer) RecordCollection(jobName string, mx map[string]int64) {
 
 	job.CollectionCount++
 	job.LastCollection = time.Now()
+
+	// Track ALL metrics in mx map
+	for metricID := range mx {
+		job.AllSeenMetrics[metricID] = true
+	}
 
 	// Record values for each chart
 	for i := range job.Charts {
@@ -213,6 +220,59 @@ func (da *DumpAnalyzer) printJobAnalysis(job *JobAnalysis) {
 		}
 	}
 
+	// Check for duplicate dimension IDs across ALL charts (SEVERE BUG)
+	allDimIDs := make(map[string][]string) // dimID -> []chartIDs
+	for i := range job.Charts {
+		ca := &job.Charts[i]
+		for _, dim := range ca.Chart.Dims {
+			if _, exists := allDimIDs[dim.ID]; !exists {
+				allDimIDs[dim.ID] = []string{}
+			}
+			allDimIDs[dim.ID] = append(allDimIDs[dim.ID], ca.Chart.ID)
+		}
+	}
+
+	// Report duplicate dimension IDs
+	for dimID, chartIDs := range allDimIDs {
+		if len(chartIDs) > 1 {
+			fmt.Printf("🔴 SEVERE BUG: Dimension ID '%s' is used in %d charts: %s\n",
+				dimID, len(chartIDs), strings.Join(chartIDs, ", "))
+			// Add to issues for each affected context
+			for _, chartID := range chartIDs {
+				// Find the context for this chart
+				for i := range job.Charts {
+					if job.Charts[i].Chart.ID == chartID {
+						ctx := job.Charts[i].Chart.Ctx
+						contextIssues[ctx] = append(contextIssues[ctx],
+							fmt.Sprintf("SEVERE BUG - dimension ID '%s' is shared with charts: %s", dimID, strings.Join(chartIDs, ", ")))
+						break
+					}
+				}
+			}
+		}
+	}
+
+	// Check for excess metrics in mx that have no corresponding dimension
+	if len(job.AllSeenMetrics) > 0 {
+		excessMetrics := []string{}
+		for metricID := range job.AllSeenMetrics {
+			if _, exists := allDimIDs[metricID]; !exists {
+				excessMetrics = append(excessMetrics, metricID)
+			}
+		}
+
+		if len(excessMetrics) > 0 {
+			sort.Strings(excessMetrics)
+			fmt.Printf("🟡 WARNING: Found %d metrics in mx map with no corresponding dimension:\n", len(excessMetrics))
+			for _, metric := range excessMetrics {
+				fmt.Printf("   - %s\n", metric)
+			}
+			// Add to general issues
+			contextIssues["_general"] = append(contextIssues["_general"],
+				fmt.Sprintf("WARNING - %d excess metrics in mx map: %s", len(excessMetrics), strings.Join(excessMetrics, ", ")))
+		}
+	}
+
 	// Sort families by minimum priority
 	var sortedFamilies []string
 	for fam := range families {
@@ -255,7 +315,15 @@ func (da *DumpAnalyzer) printJobAnalysis(job *JobAnalysis) {
 	for ctx, issues := range contextIssues {
 		if len(issues) > 0 {
 			issueCount++
-			fmt.Printf("IDENTIFIED ISSUES ON %s: %s\n", ctx, strings.Join(issues, " | "))
+			for _, issue := range issues {
+				emoji := "❌"
+				if strings.Contains(issue, "WARNING") {
+					emoji = "🟡"
+				} else if strings.Contains(issue, "SEVERE BUG") {
+					emoji = "🔴"
+				}
+				fmt.Printf("%s IDENTIFIED ISSUES ON %s: %s\n", emoji, ctx, issue)
+			}
 		}
 	}
 
@@ -397,74 +465,80 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 		fmt.Printf("\n")
 	}
 
-	// Print dimensions
-	fmt.Printf("%s   ├─ dimensions:\n", treePrefix)
-	var dimIDList []string
-	for dimID := range allDimIDs {
-		dimIDList = append(dimIDList, dimID)
+	// Collect all dimension names across all charts
+	dimNamesByChart := make(map[string]map[string]string) // chartID -> dimName -> dimID
+	allDimNames := make(map[string]bool)
+
+	for _, ca := range charts {
+		dimNamesByChart[ca.Chart.ID] = make(map[string]string)
+		for _, dim := range ca.Chart.Dims {
+			name := dim.Name
+			if name == "" {
+				name = dim.ID
+			}
+			dimNamesByChart[ca.Chart.ID][name] = dim.ID
+			allDimNames[name] = true
+		}
 	}
-	sort.Strings(dimIDList)
 
-	hasInactiveDims := false
+	// Print dimensions (names only at context level)
+	fmt.Printf("%s   ├─ dimensions:\n", treePrefix)
+	var dimNameList []string
+	for dimName := range allDimNames {
+		dimNameList = append(dimNameList, dimName)
+	}
+	sort.Strings(dimNameList)
+
 	hasMissingDims := false
-
-	for _, dimID := range dimIDList {
-		// Check if all charts have this dimension
+	for i, dimName := range dimNameList {
+		// Check if all charts have this dimension name
 		allHaveIt := true
-		var sampleDim *module.Dim
-		activeCount := 0
-
-		for _, ca := range charts {
-			if dim, exists := dimsByChart[ca.Chart.ID][dimID]; exists {
-				if sampleDim == nil {
-					sampleDim = dim
-				}
-				// Check if dimension is active
-				if ca.SeenDimensions[dimID] && len(ca.CollectedValues[dimID]) > 0 {
-					activeCount++
-				}
-			} else {
+		for chartID := range dimNamesByChart {
+			if _, exists := dimNamesByChart[chartID][dimName]; !exists {
 				allHaveIt = false
 				hasMissingDims = true
+				break
 			}
 		}
 
-		if sampleDim != nil {
-			mul := sampleDim.Mul
-			if mul == 0 {
-				mul = 1
-			}
-			div := sampleDim.Div
-			if div == 0 {
-				div = 1
-			}
-
-			emoji := "❌"
-			if activeCount == len(charts) {
-				emoji = "✅"
-			} else if activeCount > 0 {
-				emoji = "🟡"
-				hasInactiveDims = true
-			} else {
-				hasInactiveDims = true
-			}
-
-			dimStatus := ""
-			if !allHaveIt {
-				dimStatus = " ❌ NOT IN ALL CHARTS"
-			}
-
-			fmt.Printf("%s   │     ├─ %s %s (%s) x%d ÷%d%s\n",
-				treePrefix, emoji, dimID, sampleDim.Name, mul, div, dimStatus)
+		prefix := "├─"
+		if i == len(dimNameList)-1 {
+			prefix = "└─"
 		}
+
+		dimStatus := ""
+		if !allHaveIt {
+			dimStatus = " ❌ NOT IN ALL CHARTS"
+		}
+
+		fmt.Printf("%s   │     %s %s%s\n", treePrefix, prefix, dimName, dimStatus)
 	}
 
-	if hasInactiveDims {
-		issues = append(issues, "inactive dimensions")
-	}
 	if hasMissingDims {
 		issues = append(issues, "missing dimensions in some charts")
 	}
+
+	// Check if any dimensions are missing data across all instances
+	missingDataDetails := []string{}
+	for _, ca := range charts {
+		for _, dim := range ca.Chart.Dims {
+			if !ca.SeenDimensions[dim.ID] || len(ca.CollectedValues[dim.ID]) == 0 {
+				dimName := dim.Name
+				if dimName == "" {
+					dimName = dim.ID
+				}
+				// Show both ID and name for clarity
+				dimInfo := fmt.Sprintf("'%s'", dim.ID)
+				if dim.Name != "" && dim.Name != dim.ID {
+					dimInfo = fmt.Sprintf("'%s' ('%s')", dim.ID, dim.Name)
+				}
+				missingDataDetails = append(missingDataDetails, fmt.Sprintf("dimension %s on chart '%s' is not collected", dimInfo, ca.Chart.ID))
+			}
+		}
+	}
+
+	// Add all missing data issues
+	issues = append(issues, missingDataDetails...)
 
 	// Print instances
 	fmt.Printf("%s   └─ instances:\n", treePrefix)
@@ -485,11 +559,29 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 		}
 
 		instPrefix := "├─"
+		instTreePrefix := "│  "
 		if i == len(charts)-1 {
 			instPrefix = "└─"
+			instTreePrefix = "   "
 		}
 
 		fmt.Printf("%s       %s %s (%s)%s\n", treePrefix, instPrefix, ca.Chart.ID, name, labelStr)
+
+		// Print dimension status for this instance
+		for _, dim := range ca.Chart.Dims {
+			dimName := dim.Name
+			if dimName == "" {
+				dimName = dim.ID
+			}
+
+			emoji := "❌"
+			if ca.SeenDimensions[dim.ID] && len(ca.CollectedValues[dim.ID]) > 0 {
+				emoji = "✅"
+			}
+
+			fmt.Printf("%s       %s     %s %s: %s\n", treePrefix, instTreePrefix, emoji, dimName, dim.ID)
+		}
+
 	}
 
 	return issues
