@@ -42,7 +42,7 @@ metrics:
         name: cpu.usage
         chart_meta:
           description: The average, over the last minute, of the percentage of time that this processor was not idle.
-          family: 'CPU/Usage'
+          family: 'System/CPU/Usage'
           unit: "%"
     metric_tags:
       - tag: cpu_index
@@ -66,7 +66,7 @@ metrics:
         name: hrStorageSize
         chart_meta:
           description: Total size of the storage area
-          family: 'Storage/Total'
+          family: 'System/Storage/Total'
           unit: "By"
         transform: |
           {{- $unit := index .Metric.Tags "rm:storage_alloc_unit" | default "1" -}}
@@ -76,7 +76,7 @@ metrics:
         name: hrStorageUsed
         chart_meta:
           description: Amount of storage used
-          family: 'Storage/Used'
+          family: 'System/Storage/Used'
           unit: "By"
         transform: |
           {{- $unit := index .Metric.Tags "rm:storage_alloc_unit" | default "1" -}}
