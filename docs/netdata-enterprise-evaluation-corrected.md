@@ -35,7 +35,7 @@ Typically, organizations use the mixed approach, where they install a number of 
 └────────────────────────────────────────────────────────────────────┘
 ```
 
-For more information see [Deployment Strategies](https://learn.netdata.cloud/docs/deployment-guides/centralized).
+For more information see [Deployment Strategies](https://github.com/netdata/netdata/blob/master/docs/deployment-guides/deployment-with-centralization-points.md).
 
 ## Infrastructure Requirements
 
