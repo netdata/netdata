@@ -106,12 +106,6 @@ func (da *DumpAnalyzer) PrintReport() {
 	da.mu.RLock()
 	defer da.mu.RUnlock()
 
-	fmt.Println("\n" + strings.Repeat("=", 80))
-	fmt.Println("NETDATA METRICS DUMP ANALYSIS")
-	fmt.Println(strings.Repeat("=", 80))
-	fmt.Printf("Duration: %v\n", time.Since(da.startTime))
-	fmt.Printf("Jobs: %d\n", len(da.jobs))
-
 	// Sort jobs for consistent output
 	var jobNames []string
 	for name := range da.jobs {
@@ -123,170 +117,372 @@ func (da *DumpAnalyzer) PrintReport() {
 		job := da.jobs[jobName]
 		da.printJobAnalysis(job)
 	}
+}
 
-	// Print summary
-	da.printSummary()
+// contextInfo holds information about a context within a family
+type contextInfo struct {
+	family      string
+	context     string
+	charts      []*ChartAnalysis
+	minPriority int
 }
 
 func (da *DumpAnalyzer) printJobAnalysis(job *JobAnalysis) {
-	fmt.Printf("\n\nJOB: %s (module: %s)\n", job.Name, job.Module)
-	fmt.Println(strings.Repeat("-", 80))
-	fmt.Printf("Collections: %d\n", job.CollectionCount)
-	if job.CollectionCount > 0 {
-		fmt.Printf("Last collection: %v ago\n", time.Since(job.LastCollection))
-	}
+	// First, check for contexts appearing in multiple families (SEVERE BUG)
+	contextToFamilies := make(map[string][]string)
 
-	// Build hierarchy by family
-	families := make(map[string][]*ChartAnalysis)
-	familyPriorities := make(map[string]int)
+	families := make(map[string]map[string]*contextInfo) // family -> context -> info
+	familyMinPriority := make(map[string]int)
 
+	// Track issues for summary
+	contextIssues := make(map[string][]string)
+
+	// Group charts and check for duplicate contexts
 	for i := range job.Charts {
 		ca := &job.Charts[i]
 		family := ca.Chart.Fam
 		if family == "" {
 			family = "(no family)"
 		}
+		ctx := ca.Chart.Ctx
 
-		families[family] = append(families[family], ca)
+		// Track context to families mapping
+		if _, exists := contextToFamilies[ctx]; !exists {
+			contextToFamilies[ctx] = []string{}
+		}
+		if !contains(contextToFamilies[ctx], family) {
+			contextToFamilies[ctx] = append(contextToFamilies[ctx], family)
+		}
 
-		// Track minimum priority for family sorting
-		if minPrio, exists := familyPriorities[family]; !exists || ca.Chart.Priority < minPrio {
-			familyPriorities[family] = ca.Chart.Priority
+		// Initialize family if needed
+		if _, exists := families[family]; !exists {
+			families[family] = make(map[string]*contextInfo)
+			familyMinPriority[family] = ca.Chart.Priority
+		}
+
+		// Update family minimum priority
+		if ca.Chart.Priority < familyMinPriority[family] {
+			familyMinPriority[family] = ca.Chart.Priority
+		}
+
+		// Initialize context if needed
+		if _, exists := families[family][ctx]; !exists {
+			families[family][ctx] = &contextInfo{
+				family:      family,
+				context:     ctx,
+				charts:      []*ChartAnalysis{},
+				minPriority: ca.Chart.Priority,
+			}
+		}
+
+		// Update context minimum priority
+		if ca.Chart.Priority < families[family][ctx].minPriority {
+			families[family][ctx].minPriority = ca.Chart.Priority
+		}
+
+		families[family][ctx].charts = append(families[family][ctx].charts, ca)
+	}
+
+	// Check for severe bugs - contexts in multiple families
+	fmt.Println("\n" + job.Name)
+	for ctx, fams := range contextToFamilies {
+		if len(fams) > 1 {
+			fmt.Printf("🔴 SEVERE BUG: Context '%s' appears in multiple families: %s\n",
+				ctx, strings.Join(fams, ", "))
+			contextIssues[ctx] = append(contextIssues[ctx],
+				fmt.Sprintf("SEVERE BUG - appears in multiple families: %s", strings.Join(fams, ", ")))
 		}
 	}
 
-	// Sort families by priority
-	type familyPrio struct {
-		name     string
-		priority int
-	}
-	var sortedFamilies []familyPrio
-	for fam, prio := range familyPriorities {
-		sortedFamilies = append(sortedFamilies, familyPrio{fam, prio})
+	// Sort families by minimum priority
+	var sortedFamilies []string
+	for fam := range families {
+		sortedFamilies = append(sortedFamilies, fam)
 	}
 	sort.Slice(sortedFamilies, func(i, j int) bool {
-		return sortedFamilies[i].priority < sortedFamilies[j].priority
+		return familyMinPriority[sortedFamilies[i]] < familyMinPriority[sortedFamilies[j]]
 	})
 
-	fmt.Println("\nCHART HIERARCHY:")
-	for _, fp := range sortedFamilies {
-		fmt.Printf("├── %s (priority: %d)\n", fp.name, fp.priority)
+	// Print analysis for each family
+	for _, family := range sortedFamilies {
+		fmt.Printf("\n├─ family: %s\n", family)
 
-		// Sort charts within family by priority
-		charts := families[fp.name]
-		sort.Slice(charts, func(i, j int) bool {
-			return charts[i].Chart.Priority < charts[j].Chart.Priority
+		// Sort contexts by minimum priority
+		var sortedContexts []string
+		for ctx := range families[family] {
+			sortedContexts = append(sortedContexts, ctx)
+		}
+		sort.Slice(sortedContexts, func(i, j int) bool {
+			return families[family][sortedContexts[i]].minPriority <
+				families[family][sortedContexts[j]].minPriority
 		})
 
-		for i, ca := range charts {
-			prefix := "│   ├──"
-			if i == len(charts)-1 {
-				prefix = "│   └──"
-			}
-
-			// Build instance info
-			instanceInfo := ""
-			if len(ca.Chart.Labels) > 0 {
-				var labels []string
-				for _, label := range ca.Chart.Labels {
-					labels = append(labels, fmt.Sprintf("%s=%s", label.Key, label.Value))
-				}
-				instanceInfo = fmt.Sprintf(" {%s}", strings.Join(labels, ", "))
-			}
-
-			// Count active dimensions
-			activeDims := 0
-			for dimID, seen := range ca.SeenDimensions {
-				if seen && len(ca.CollectedValues[dimID]) > 0 {
-					activeDims++
-				}
-			}
-
-			fmt.Printf("%s %s [%s] - %s%s (%d/%d dims active)\n",
-				prefix,
-				ca.Chart.Ctx,
-				ca.Chart.Units,
-				ca.Chart.Title,
-				instanceInfo,
-				activeDims,
-				len(ca.Chart.Dims))
-
-			// Show dimension details if requested
-			if activeDims < len(ca.Chart.Dims) {
-				da.printInactiveDimensions(ca, "│       ")
+		for i, ctx := range sortedContexts {
+			isLast := i == len(sortedContexts)-1
+			ctxInfo := families[family][ctx]
+			issues := da.printContextAnalysis(ctxInfo, isLast)
+			if len(issues) > 0 {
+				contextIssues[ctx] = append(contextIssues[ctx], issues...)
 			}
 		}
+	}
+
+	// Print greppable summary
+	fmt.Println("\n" + strings.Repeat("═", 80))
+	fmt.Println("ISSUE SUMMARY (greppable)")
+	fmt.Println(strings.Repeat("═", 80))
+
+	issueCount := 0
+	for ctx, issues := range contextIssues {
+		if len(issues) > 0 {
+			issueCount++
+			fmt.Printf("IDENTIFIED ISSUES ON %s: %s\n", ctx, strings.Join(issues, " | "))
+		}
+	}
+
+	if issueCount == 0 {
+		fmt.Println("🟢 NO ISSUES FOUND - All contexts are properly configured!")
+	} else {
+		fmt.Printf("🔴 TOTAL CONTEXTS WITH ISSUES: %d\n", issueCount)
 	}
 }
 
-func (da *DumpAnalyzer) printInactiveDimensions(ca *ChartAnalysis, indent string) {
-	var inactive []string
-	for _, dim := range ca.Chart.Dims {
-		if !ca.SeenDimensions[dim.ID] {
-			inactive = append(inactive, dim.Name)
+func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) []string {
+	charts := ctxInfo.charts
+	var issues []string
+
+	// Analyze titles
+	titles := make(map[string]int)
+	for _, ca := range charts {
+		titles[ca.Chart.Title]++
+	}
+
+	// Analyze units
+	units := make(map[string]int)
+	for _, ca := range charts {
+		units[ca.Chart.Units]++
+	}
+
+	// Analyze priorities
+	priorities := make(map[int]int)
+	for _, ca := range charts {
+		priorities[ca.Chart.Priority]++
+	}
+
+	// Analyze label keys
+	labelKeysByChart := make(map[string]map[string]bool) // chartID -> set of keys
+	allLabelKeys := make(map[string]bool)
+	for _, ca := range charts {
+		labelKeysByChart[ca.Chart.ID] = make(map[string]bool)
+		for _, label := range ca.Chart.Labels {
+			labelKeysByChart[ca.Chart.ID][label.Key] = true
+			allLabelKeys[label.Key] = true
 		}
 	}
 
-	if len(inactive) > 0 {
-		fmt.Printf("%s⚠️  Inactive dimensions: %s\n", indent, strings.Join(inactive, ", "))
+	// Analyze dimensions
+	dimsByChart := make(map[string]map[string]*module.Dim) // chartID -> dimID -> dim
+	allDimIDs := make(map[string]bool)
+	for _, ca := range charts {
+		dimsByChart[ca.Chart.ID] = make(map[string]*module.Dim)
+		for _, dim := range ca.Chart.Dims {
+			dimsByChart[ca.Chart.ID][dim.ID] = dim
+			allDimIDs[dim.ID] = true
+		}
 	}
-}
 
-func (da *DumpAnalyzer) printSummary() {
-	fmt.Println("\n\nSUMMARY:")
-	fmt.Println(strings.Repeat("-", 80))
+	// Tree prefixes
+	ctxPrefix := "├─"
+	treePrefix := "│  "
+	if isLast {
+		ctxPrefix = "└─"
+		treePrefix = "   "
+	}
 
-	totalCharts := 0
-	totalDimensions := 0
-	activeDimensions := 0
-	chartsWithIssues := 0
+	// Print context header
+	fmt.Printf("%s ⚡ context: %s\n", ctxPrefix, ctxInfo.context)
 
-	for _, job := range da.jobs {
-		totalCharts += len(job.Charts)
+	// Print titles
+	if len(titles) == 1 {
+		for title := range titles {
+			fmt.Printf("%s   ├─ title: %s ✅\n", treePrefix, title)
+		}
+	} else {
+		fmt.Printf("%s   ├─ title: ❌ INCONSISTENT (%d different titles)\n", treePrefix, len(titles))
+		for title, count := range titles {
+			fmt.Printf("%s   │     ├─ %s (in %d charts)\n", treePrefix, title, count)
+		}
+		issues = append(issues, fmt.Sprintf("inconsistent titles (%d different)", len(titles)))
+	}
 
-		for _, ca := range job.Charts {
-			totalDimensions += len(ca.Chart.Dims)
-			hasIssue := false
+	// Print units
+	if len(units) == 1 {
+		for unit := range units {
+			fmt.Printf("%s   ├─ units: %s ✅\n", treePrefix, unit)
+		}
+	} else {
+		fmt.Printf("%s   ├─ units: ❌ INCONSISTENT (%d different units)\n", treePrefix, len(units))
+		for unit, count := range units {
+			fmt.Printf("%s   │     ├─ %s (in %d charts)\n", treePrefix, unit, count)
+		}
+		issues = append(issues, fmt.Sprintf("inconsistent units (%d different)", len(units)))
+	}
 
-			for dimID, seen := range ca.SeenDimensions {
-				if seen && len(ca.CollectedValues[dimID]) > 0 {
-					activeDimensions++
-				} else {
-					hasIssue = true
+	// Print priorities
+	if len(priorities) == 1 {
+		for priority := range priorities {
+			fmt.Printf("%s   ├─ priority: %d ✅\n", treePrefix, priority)
+		}
+	} else {
+		fmt.Printf("%s   ├─ priority: %d 🟡 INCONSISTENT (%d different priorities)\n",
+			treePrefix, ctxInfo.minPriority, len(priorities))
+		for priority, count := range priorities {
+			fmt.Printf("%s   │     ├─ %d (in %d charts)\n", treePrefix, priority, count)
+		}
+		issues = append(issues, fmt.Sprintf("inconsistent priorities (%d different)", len(priorities)))
+	}
+
+	// Print label keys
+	fmt.Printf("%s   ├─ label keys: ", treePrefix)
+	if len(allLabelKeys) == 0 {
+		fmt.Printf("(none) ✅\n")
+	} else {
+		var labelKeyList []string
+		for key := range allLabelKeys {
+			labelKeyList = append(labelKeyList, key)
+		}
+		sort.Strings(labelKeyList)
+
+		var labelKeyStatus []string
+		hasInconsistentLabels := false
+		for _, key := range labelKeyList {
+			allHaveIt := true
+			for chartID := range labelKeysByChart {
+				if !labelKeysByChart[chartID][key] {
+					allHaveIt = false
+					hasInconsistentLabels = true
+					break
 				}
 			}
-
-			if hasIssue {
-				chartsWithIssues++
+			if allHaveIt {
+				labelKeyStatus = append(labelKeyStatus, fmt.Sprintf("%s✅", key))
+			} else {
+				labelKeyStatus = append(labelKeyStatus, fmt.Sprintf("%s❌", key))
 			}
 		}
+		fmt.Printf("%s", strings.Join(labelKeyStatus, ", "))
+		if hasInconsistentLabels {
+			fmt.Printf(" 🟡 SOME MISSING")
+			issues = append(issues, "inconsistent label keys")
+		}
+		fmt.Printf("\n")
 	}
 
-	fmt.Printf("Total charts: %d\n", totalCharts)
-	fmt.Printf("Total dimensions: %d\n", totalDimensions)
-	fmt.Printf("Active dimensions: %d (%.1f%%)\n", activeDimensions,
-		float64(activeDimensions)*100/float64(totalDimensions))
-	fmt.Printf("Charts with inactive dimensions: %d\n", chartsWithIssues)
+	// Print dimensions
+	fmt.Printf("%s   ├─ dimensions:\n", treePrefix)
+	var dimIDList []string
+	for dimID := range allDimIDs {
+		dimIDList = append(dimIDList, dimID)
+	}
+	sort.Strings(dimIDList)
 
-	// Print chart count by context
-	fmt.Println("\nCHARTS BY CONTEXT:")
-	contextCounts := make(map[string]int)
-	for _, job := range da.jobs {
-		for _, ca := range job.Charts {
-			contextCounts[ca.Chart.Ctx]++
+	hasInactiveDims := false
+	hasMissingDims := false
+
+	for _, dimID := range dimIDList {
+		// Check if all charts have this dimension
+		allHaveIt := true
+		var sampleDim *module.Dim
+		activeCount := 0
+
+		for _, ca := range charts {
+			if dim, exists := dimsByChart[ca.Chart.ID][dimID]; exists {
+				if sampleDim == nil {
+					sampleDim = dim
+				}
+				// Check if dimension is active
+				if ca.SeenDimensions[dimID] && len(ca.CollectedValues[dimID]) > 0 {
+					activeCount++
+				}
+			} else {
+				allHaveIt = false
+				hasMissingDims = true
+			}
+		}
+
+		if sampleDim != nil {
+			mul := sampleDim.Mul
+			if mul == 0 {
+				mul = 1
+			}
+			div := sampleDim.Div
+			if div == 0 {
+				div = 1
+			}
+
+			emoji := "❌"
+			if activeCount == len(charts) {
+				emoji = "✅"
+			} else if activeCount > 0 {
+				emoji = "🟡"
+				hasInactiveDims = true
+			} else {
+				hasInactiveDims = true
+			}
+
+			dimStatus := ""
+			if !allHaveIt {
+				dimStatus = " ❌ NOT IN ALL CHARTS"
+			}
+
+			fmt.Printf("%s   │     ├─ %s %s (%s) x%d ÷%d%s\n",
+				treePrefix, emoji, dimID, sampleDim.Name, mul, div, dimStatus)
 		}
 	}
 
-	// Sort contexts
-	var contexts []string
-	for ctx := range contextCounts {
-		contexts = append(contexts, ctx)
+	if hasInactiveDims {
+		issues = append(issues, "inactive dimensions")
 	}
-	sort.Strings(contexts)
+	if hasMissingDims {
+		issues = append(issues, "missing dimensions in some charts")
+	}
 
-	for _, ctx := range contexts {
-		fmt.Printf("  %s: %d charts\n", ctx, contextCounts[ctx])
+	// Print instances
+	fmt.Printf("%s   └─ instances:\n", treePrefix)
+	for i, ca := range charts {
+		labelPairs := []string{}
+		for _, label := range ca.Chart.Labels {
+			labelPairs = append(labelPairs, fmt.Sprintf("%s=%s", label.Key, label.Value))
+		}
+		labelStr := ""
+		if len(labelPairs) > 0 {
+			labelStr = fmt.Sprintf(" {%s}", strings.Join(labelPairs, ", "))
+		}
+
+		// Extract name from ID if possible
+		name := ""
+		if ca.Chart.OverID != "" {
+			name = ca.Chart.OverID
+		}
+
+		instPrefix := "├─"
+		if i == len(charts)-1 {
+			instPrefix = "└─"
+		}
+
+		fmt.Printf("%s       %s %s (%s)%s\n", treePrefix, instPrefix, ca.Chart.ID, name, labelStr)
 	}
+
+	return issues
+}
+
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
 }
 
 // PrintDebugInfo prints additional debug information
