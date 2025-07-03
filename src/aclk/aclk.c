@@ -645,9 +645,6 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
             continue;
         }
 
-//        struct mqtt_wss_proxy proxy_conf = { .host = NULL, .port = 0, .username = NULL, .password = NULL, .type = MQTT_WSS_DIRECT };
-//        aclk_set_proxy((char**)&proxy_conf.host, &proxy_conf.port, (char**)&proxy_conf.username, (char**)&proxy_conf.password, &proxy_conf.type);
-
         struct mqtt_connect_params mqtt_conn_params = {
             .clientid   = "anon",
             .username   = "anon",
