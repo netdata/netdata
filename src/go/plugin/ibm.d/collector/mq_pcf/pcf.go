@@ -19,32 +19,9 @@ import (
 
 // PCF constants that may not be available in all MQ versions
 // These constants are defined here to avoid CGO compilation errors
-const (
-
-	// PCF attribute selector constants
-	// Note: These were invalid constants that don't exist in IBM MQ.
-	// Queue and channel inquiries don't use attribute selectors in the way we tried to use them.
-
-	// Queue Manager CPU and Memory constants (MQ 8.0+)
-	MQIACF_Q_MGR_CPU_LOAD     = C.MQLONG(3024) // Queue Manager CPU load percentage
-	MQIACF_Q_MGR_MEMORY_USAGE = C.MQLONG(3025) // Queue Manager memory usage in bytes
-	MQIACF_Q_MGR_LOG_USAGE    = C.MQLONG(3026) // Queue Manager log usage percentage
-
-	// Queue constants that may not be available in all MQ versions
-	MQIA_OLDEST_MSG_AGE = C.MQLONG(2163) // Oldest message age in seconds (MQ 8.0+)
-
-	// Topic constants that may not be available in all MQ versions
-	MQIA_TOPIC_MSG_COUNT = C.MQLONG(2164) // Topic message count (MQ 8.0+)
-
-	// Channel configuration constants - using C header values
-	// Channel batch and timing settings
-
-	// Channel runtime constants - using C header values
-	// Runtime metrics we can get from MQCMD_INQUIRE_CHANNEL_STATUS
-
-	// Queue configuration constants - using C header values
-	// Basic queue configuration available via MQCMD_INQUIRE_Q
-)
+// Note: We should use constants from IBM MQ headers rather than defining our own.
+// If a constant is not available in the headers, we can define it, but we should
+// prefer using the actual IBM constants to ensure compilation fails if we're wrong.
 
 // PCF parameter interface
 type pcfParameter interface {
