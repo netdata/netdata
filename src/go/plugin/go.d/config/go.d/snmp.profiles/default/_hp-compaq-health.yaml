@@ -12,7 +12,7 @@ metrics:
       name: cpqHeSysUtilLifeTime
       scale_factor: 60
       chart_meta:
-        family: 'Uptime'
+        family: 'System/Uptime'
         description: Total time the system has been in full operation in minutes
         unit: "s"
 
@@ -98,7 +98,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.5.1.0
       name: cpqHeAsrStatus
       chart_meta:
-        family: 'System/ASR/Status'
+        family: 'Hardware/ASR/Status'
         description: Overall status of the ASR feature
         unit: "{status}"
       mapping:
@@ -114,7 +114,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.5.6.0
       name: cpqHeAsrPost
       chart_meta:
-        family: 'System/ASR/POST/Status'
+        family: 'Hardware/ASR/POST/Status'
         description: Whether the ASR timer passed the server Power-On Self-Test
         unit: "{status}"
       mapping:
@@ -129,7 +129,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.5.10.0
       name: cpqHeAsrRebootCount
       chart_meta:
-        family: 'System/ASR/Reboot/Count'
+        family: 'Hardware/ASR/Reboot/Count'
         description: Number of ASR reboots that have occurred on the server since last manual reboot
         unit: "{reboot}"
       metric_type: monotonic_count
@@ -141,7 +141,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.5.17.0
       name: cpqHeAsrCondition
       chart_meta:
-        family: 'System/ASR/Condition/Status'
+        family: 'Hardware/ASR/Condition/Status'
         description: Overall condition of the ASR feature
         unit: "{status}"
       mapping:
@@ -157,7 +157,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.5.21.0
       name: cpqHeAsrNetworkAccessStatus
       chart_meta:
-        family: 'System/ASR/NetworkAccess/Status'
+        family: 'Hardware/ASR/NetworkAccess/Status'
         description: Status of the ASR network access feature
         unit: "{status}"
       mapping:
@@ -342,26 +342,26 @@ metrics:
       - name: cpqHeFltTolPowerSupply
         constant_value_one: true
         chart_meta:
-          family: 'Hardware/Power/Supply/Present'
+          family: 'Hardware/PowerSupply/Present'
           description: Indicates the presence of a power supply
           unit: "{present}"
       - OID: 1.3.6.1.4.1.232.6.2.9.3.1.7
         name: cpqHeFltTolPowerSupplyCapacityUsed
         chart_meta:
-          family: 'Hardware/Power/Supply/Used'
+          family: 'Hardware/PowerSupply/Used'
           description: Currently used capacity of the power supply in watts
           unit: "W"
       - OID: 1.3.6.1.4.1.232.6.2.9.3.1.8
         name: cpqHeFltTolPowerSupplyCapacityMaximum
         chart_meta:
-          family: 'Hardware/Power/Supply/Capacity'
+          family: 'Hardware/PowerSupply/Capacity'
           description: Maximum capacity of the power supply in watts
           unit: "W"
       - OID: 1.3.6.1.4.1.232.6.2.9.3.1.5
         name: cpqHeFltTolPowerSupplyStatus
         chart_meta:
           description: Current status of the power supply
-          family: 'Hardware/Power/Supply/Status'
+          family: 'Hardware/PowerSupply/Status'
           unit: "{status}"
         mapping:
           1: no_error

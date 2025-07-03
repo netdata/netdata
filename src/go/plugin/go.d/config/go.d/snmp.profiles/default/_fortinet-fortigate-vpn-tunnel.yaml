@@ -8,21 +8,21 @@ metrics:
         name: fgVpnTunEntInOctets
         chart_meta:
           description: Number of bytes received on tunnel
-          family: 'VPN/Tunnel/Traffic/In'
+          family: 'Network/VPN/Tunnel/Traffic/In'
           unit: "bits/s"
         scale_factor: 8
       - OID: 1.3.6.1.4.1.12356.101.12.2.2.1.19
         name: fgVpnTunEntOutOctets
         chart_meta:
           description: Number of bytes sent out on tunnel
-          family: 'VPN/Tunnel/Traffic/Out'
+          family: 'Network/VPN/Tunnel/Traffic/Out'
           unit: "bits/s"
         scale_factor: 8
       - OID: 1.3.6.1.4.1.12356.101.12.2.2.1.20
         name: fgVpnTunEntStatus
         chart_meta:
           description: Current status of tunnel (up or down)
-          family: 'VPN/Tunnel/Status'
+          family: 'Network/VPN/Tunnel/Status'
           unit: "{status}"
         mapping:
           1: down
