@@ -252,7 +252,7 @@ metrics:
         name: bsnDot11EssRowStatus
         chart_meta:
           description: Row status type for the bsnDot11EssEntry
-          family: WLAN/Row/Status
+          family: WLAN/Config/RowStatus
           unit: "{status}"
         mapping:
           1: active

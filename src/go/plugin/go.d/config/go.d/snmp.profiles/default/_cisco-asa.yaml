@@ -62,7 +62,7 @@ metrics:
           41: protoSnmp
       - tag: stat_type
         index: 2
-        mapping:
+        mapping: # TODO: create a separate metric for each type via transform
           1: other
           2: totalOpen         # Total number of connections opened since system startup
           3: currentOpen       # Current number of open connections

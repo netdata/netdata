@@ -58,37 +58,44 @@ metrics:
         description: Percent of total queue capacity used
         family: Queue/Utilization
         unit: "%"
-  #  - MIB: ASYNCOS-MAIL-MIB
-  #    symbol:
-  #      name: ironport.queueAvailabilityStatus
-  #      OID: 1.3.6.1.4.1.15497.1.1.1.5.0
-  #      enum:
-  #        queueSpaceAvailable: 1
-  #        queueSpaceShortage: 2
-  #        queueFull: 3
-  #      TODO: enum in scalar metric is not supported yet (keep this metric and this
-  #        comment in profile until it's fixed)
-  #  - MIB: ASYNCOS-MAIL-MIB
-  #    symbol:
-  #      name: ironport.resourceConservationReason
-  #      OID: 1.3.6.1.4.1.15497.1.1.1.6.0
-  #      enum:
-  #        noResourceConservation: 1
-  #        memoryShortage: 2
-  #        queueSpaceShortage: 3
-  #        queueFull: 4
-  #      TODO: enum in scalar metric is not supported yet (keep this metric and this
-  #        comment in profile until it's fixed)
-  #  - MIB: ASYNCOS-MAIL-MIB
-  #    symbol:
-  #      name: ironport.memoryAvailabilityStatus
-  #      OID: 1.3.6.1.4.1.15497.1.1.1.7.0
-  #      enum:
-  #        memoryAvailable: 1
-  #        memoryShortage: 2
-  #        memoryFull: 3
-  #      TODO: enum in scalar metric is not supported yet (keep this metric and this
-  #        comment in profile until it's fixed)
+  - MIB: ASYNCOS-MAIL-MIB
+    symbol:
+      name: ironport.queueAvailabilityStatus
+      OID: 1.3.6.1.4.1.15497.1.1.1.5.0
+      chart_meta:
+        description: Status indicating the current availability of the message queue
+        family: Queue/Availability/Status
+        unit: "{status}"
+      mapping:
+        queueSpaceAvailable: 1
+        queueSpaceShortage: 2
+        queueFull: 3
+  - MIB: ASYNCOS-MAIL-MIB
+    symbol:
+      name: ironport.resourceConservationReason
+      OID: 1.3.6.1.4.1.15497.1.1.1.6.0
+      chart_meta:
+        description: Reason the appliance is conserving resources
+        family: System/Resource/Conservation
+        unit: "{status}"
+      mapping:
+        noResourceConservation: 1
+        memoryShortage: 2
+        queueSpaceShortage: 3
+        queueFull: 4
+  - MIB: ASYNCOS-MAIL-MIB
+    symbol:
+      name: ironport.memoryAvailabilityStatus
+      OID: 1.3.6.1.4.1.15497.1.1.1.7.0
+      chart_meta:
+        description: Current status of memory availability
+        family: Memory/Availability/Status
+        unit: "{status}"
+      mapping:
+        memoryAvailable: 1
+        memoryShortage: 2
+        memoryFull: 3
+
   - MIB: ASYNCOS-MAIL-MIB
     table:
       name: powerSupplyTable
@@ -260,7 +267,7 @@ metrics:
       chart_meta:
         description: This object notes how many files or sockets are open on the appliance. In normal operating conditions, the measurement is taken at least once every 5-15 seconds.
         family: System/Resource/File/Open
-        unit: "{file}"
+        unit: "{fd}"
   - MIB: ASYNCOS-MAIL-MIB
     symbol:
       name: ironport.mailTransferThreads
@@ -269,22 +276,24 @@ metrics:
         description: Number of threads that perform some task related to transferring mail.
         family: Mail/Transfer/Threads
         unit: "{thread}"
-  #  - MIB: ASYNCOS-MAIL-MIB
-  #    symbol:
-  #      name: ironport.fipsMode
-  #      OID: 1.3.6.1.4.1.15497.1.1.1.23.0
-  #      enum:
-  #        enabled: 1
-  #        disabled: 2
-  #      TODO: enum in scalar metric is not supported yet (keep this metric and this
-  #        comment in profile until it's fixed)
+  - MIB: ASYNCOS-MAIL-MIB
+    symbol:
+      name: ironport.fipsMode
+      OID: 1.3.6.1.4.1.15497.1.1.1.23.0
+      chart_meta:
+        description: Indicates whether the appliance is operating in FIPS mode
+        family: Security/FIPS/Mode
+        unit: "{status}"
+      mapping:
+        enabled: 1
+        disabled: 2
   - MIB: ASYNCOS-MAIL-MIB
     symbol:
       name: ironport.perCentCPULoad
       OID: 1.3.6.1.4.1.15497.1.1.1.26.0
       chart_meta:
         description: This object provides a general idea of how busy the CPU is according to the appliance software, within the last 5 seconds of ironport
-        family: CPU/Load
+        family: CPU/Usage
         unit: "%"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:

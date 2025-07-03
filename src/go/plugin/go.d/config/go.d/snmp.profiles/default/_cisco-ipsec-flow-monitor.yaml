@@ -108,25 +108,25 @@ metrics:
         name: cipSecTunInAuthFails
         chart_meta:
           description: The total number of inbound authentications which ended in failure by this IPsec Phase-2 Tunnel
-          family: IPSec/Phase2/Tunnel/AuthFailure/In
+          family: IPSec/Phase2/Tunnel/Failure/Auth/In
           unit: "{failure}/s"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.48
         name: cipSecTunOutAuthFails
         chart_meta:
           description: The total number of outbound authentications which ended in failure by this IPsec Phase-2 Tunnel.
-          family: IPSec/Phase2/Tunnel/AuthFailure/Out
+          family: IPSec/Phase2/Tunnel/Failure/Auth/Out
           unit: "{failure}/s"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.38
         name: cipSecTunInDecryptFails
         chart_meta:
           description: The total number of inbound decryptions which ended in failure by this IPsec Phase-2 Tunnel.
-          family: IPSec/Phase2/Tunnel/DecryptFailure/In
+          family: IPSec/Phase2/Tunnel/Failure/Decrypt/In
           unit: "{failure}/s"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.50
         name: cipSecTunOutEncryptFails
         chart_meta:
           description: The total number of outbound encryptions which ended in failure by this IPsec Phase-2 Tunnel.
-          family: IPSec/Phase2/Tunnel/EncryptFailure/Out
+          family: IPSec/Phase2/Tunnel/Failure/Encrypt/Out
           unit: "{failure}/s"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.39
         name: cipSecTunOutOctets
