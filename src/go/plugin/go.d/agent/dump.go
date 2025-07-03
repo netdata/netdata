@@ -252,26 +252,8 @@ func (da *DumpAnalyzer) printJobAnalysis(job *JobAnalysis) {
 		}
 	}
 
-	// Check for excess metrics in mx that have no corresponding dimension
-	if len(job.AllSeenMetrics) > 0 {
-		excessMetrics := []string{}
-		for metricID := range job.AllSeenMetrics {
-			if _, exists := allDimIDs[metricID]; !exists {
-				excessMetrics = append(excessMetrics, metricID)
-			}
-		}
-
-		if len(excessMetrics) > 0 {
-			sort.Strings(excessMetrics)
-			fmt.Printf("🟡 WARNING: Found %d metrics in mx map with no corresponding dimension:\n", len(excessMetrics))
-			for _, metric := range excessMetrics {
-				fmt.Printf("   - %s\n", metric)
-			}
-			// Add to general issues
-			contextIssues["_general"] = append(contextIssues["_general"],
-				fmt.Sprintf("WARNING - %d excess metrics in mx map: %s", len(excessMetrics), strings.Join(excessMetrics, ", ")))
-		}
-	}
+	// Proper excess metrics analysis
+	da.analyzeMetricDimensionMatching(job, allDimIDs, contextIssues)
 
 	// Sort families by minimum priority
 	var sortedFamilies []string
@@ -327,10 +309,46 @@ func (da *DumpAnalyzer) printJobAnalysis(job *JobAnalysis) {
 		}
 	}
 
-	if issueCount == 0 {
-		fmt.Println("🟢 NO ISSUES FOUND - All contexts are properly configured!")
+	// Calculate statistics for the summary independently to avoid interfering with tree logic
+	statsFamilies := make(map[string]bool)
+	statsContexts := make(map[string]bool)
+	statsInstances := 0
+	statsDimensions := 0
+	statsCollectedValues := 0
+
+	for i := range job.Charts {
+		ca := &job.Charts[i]
+		statsInstances++
+
+		// Track unique families and contexts for stats
+		family := ca.Chart.Fam
+		if family == "" {
+			family = "(no family)"
+		}
+		statsFamilies[family] = true
+		statsContexts[ca.Chart.Ctx] = true
+
+		// Count dimensions and their collected values
+		statsDimensions += len(ca.Chart.Dims)
+		for _, dim := range ca.Chart.Dims {
+			statsCollectedValues += len(ca.CollectedValues[dim.ID])
+		}
+	}
+
+	// Count unique metrics in mx map
+	uniqueMetricsInMx := len(job.AllSeenMetrics)
+
+	// Generate summary with detailed stats
+	if issueCount == 0 && statsDimensions == uniqueMetricsInMx {
+		fmt.Printf("🟢 NO ISSUES FOUND, job %s defines: %d families, %d contexts, %d instances, %d dimensions, collects: %d unique metrics\n",
+			job.Name, len(statsFamilies), len(statsContexts), statsInstances, statsDimensions, uniqueMetricsInMx)
+	} else if issueCount == 0 && statsDimensions != uniqueMetricsInMx {
+		// Mismatch between dimensions and unique metrics even though no specific issues found
+		fmt.Printf("🟡 DIMENSION MISMATCH, job %s defines: %d families, %d contexts, %d instances, %d dimensions, collects: %d unique metrics\n",
+			job.Name, len(statsFamilies), len(statsContexts), statsInstances, statsDimensions, uniqueMetricsInMx)
 	} else {
-		fmt.Printf("🔴 TOTAL CONTEXTS WITH ISSUES: %d\n", issueCount)
+		fmt.Printf("🔴 ISSUES FOUND, job %s defines: %d families, %d contexts, %d instances, %d dimensions, collects: %d unique metrics\n",
+			job.Name, len(statsFamilies), len(statsContexts), statsInstances, statsDimensions, uniqueMetricsInMx)
 	}
 }
 
@@ -594,6 +612,106 @@ func contains(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+// analyzeMetricDimensionMatching performs comprehensive analysis of dimension/metric matching
+func (da *DumpAnalyzer) analyzeMetricDimensionMatching(job *JobAnalysis, allDimIDs map[string][]string, contextIssues map[string][]string) {
+	// 1. Find duplicate dimension IDs across charts (already done above but let's be explicit)
+	duplicateDimensions := []string{}
+	for dimID, chartIDs := range allDimIDs {
+		if len(chartIDs) > 1 {
+			duplicateDimensions = append(duplicateDimensions, dimID)
+			// Find affected contexts
+			affectedContexts := make(map[string]bool)
+			for _, chartID := range chartIDs {
+				for i := range job.Charts {
+					if job.Charts[i].Chart.ID == chartID {
+						affectedContexts[job.Charts[i].Chart.Ctx] = true
+						break
+					}
+				}
+			}
+			for ctx := range affectedContexts {
+				contextIssues[ctx] = append(contextIssues[ctx],
+					fmt.Sprintf("SEVERE BUG - dimension '%s' is used in multiple charts: %s", dimID, strings.Join(chartIDs, ", ")))
+			}
+		}
+	}
+
+	// 2. Get unique dimension IDs from charts
+	chartDimensions := make(map[string]bool)
+	for dimID := range allDimIDs {
+		chartDimensions[dimID] = true
+	}
+
+	// 3. Get unique dimension IDs from values map (AllSeenMetrics)
+	valuesDimensions := make(map[string]bool)
+	for metricID := range job.AllSeenMetrics {
+		valuesDimensions[metricID] = true
+	}
+
+	// 4. Find dimensions in charts but not in values (missing data)
+	missingValues := []string{}
+	for dimID := range chartDimensions {
+		if !valuesDimensions[dimID] {
+			missingValues = append(missingValues, dimID)
+		}
+	}
+
+	// 5. Find dimensions in values but not in charts (excess metrics)
+	excessMetrics := []string{}
+	for metricID := range valuesDimensions {
+		if !chartDimensions[metricID] {
+			excessMetrics = append(excessMetrics, metricID)
+		}
+	}
+
+	// Group missing values by context for reporting
+	if len(missingValues) > 0 {
+		contextMissingValues := make(map[string][]string)
+		for _, dimID := range missingValues {
+			// Find which context this dimension belongs to
+			for i := range job.Charts {
+				ca := &job.Charts[i]
+				for _, dim := range ca.Chart.Dims {
+					if dim.ID == dimID {
+						contextMissingValues[ca.Chart.Ctx] = append(contextMissingValues[ca.Chart.Ctx], dimID)
+						break
+					}
+				}
+			}
+		}
+
+		for ctx, dims := range contextMissingValues {
+			sort.Strings(dims)
+			contextIssues[ctx] = append(contextIssues[ctx],
+				fmt.Sprintf("dimensions %s in charts do not have collected values", strings.Join(dims, ", ")))
+		}
+	}
+
+	// Report excess metrics
+	if len(excessMetrics) > 0 {
+		sort.Strings(excessMetrics)
+		contextIssues["_general"] = append(contextIssues["_general"],
+			fmt.Sprintf("dimensions %s in the values map, do not exist in charts", strings.Join(excessMetrics, ", ")))
+	}
+
+	// Print success messages with counts if no issues
+	if len(duplicateDimensions) == 0 {
+		fmt.Printf("✅ DIMENSION UNIQUENESS: All %d dimensions have unique IDs across charts\n", len(chartDimensions))
+	}
+
+	if len(missingValues) == 0 && len(excessMetrics) == 0 {
+		fmt.Printf("✅ DIMENSION/VALUES MATCHING: %d chart dimensions perfectly match %d collected values\n",
+			len(chartDimensions), len(valuesDimensions))
+	} else {
+		if len(missingValues) > 0 {
+			fmt.Printf("❌ MISSING VALUES: %d chart dimensions have no collected values\n", len(missingValues))
+		}
+		if len(excessMetrics) > 0 {
+			fmt.Printf("❌ EXCESS VALUES: %d collected values have no corresponding chart dimensions\n", len(excessMetrics))
+		}
+	}
 }
 
 // PrintDebugInfo prints additional debug information
