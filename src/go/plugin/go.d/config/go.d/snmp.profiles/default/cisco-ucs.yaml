@@ -27,7 +27,7 @@ metrics:
         name: cucsComputeBoardOperPower
         chart_meta:
           description: Operational power state of the board
-          family: Hardware/Board/Status/Power/Operational
+          family: 'Hardware/Board/Status/Power/Operational'
           unit: "{status}"
         mapping:
           0: unknown
@@ -47,7 +47,7 @@ metrics:
         name: cucsComputeBoardOperState
         chart_meta:
           description: Operational state of the board
-          family: Hardware/Board/Status/Operational
+          family: 'Hardware/Board/Status/Operational'
           unit: "{status}"
         mapping:
           0: unknown
@@ -86,7 +86,7 @@ metrics:
         name: cucsComputeBoardOperability
         chart_meta:
           description: "Operability state of the board"
-          family: Hardware/Board/Status/Operability
+          family: 'Hardware/Board/Status/Operability'
           unit: "{status}"
         mapping:
           0: unknown
@@ -125,7 +125,7 @@ metrics:
         name: cucsComputeBoardPerf
         chart_meta:
           description: "Performance state of the board"
-          family: Hardware/Board/Status/Performance
+          family: 'Hardware/Board/Status/Performance'
           unit: "{status}"
         mapping:
           0: unknown
@@ -141,7 +141,7 @@ metrics:
         name: cucsComputeBoardPower
         chart_meta:
           description: "Power state of the board"
-          family: Hardware/Board/Power/Status
+          family: 'Hardware/Board/Power/Status'
           unit: "{status}"
         mapping:
           0: unknown
@@ -161,7 +161,7 @@ metrics:
         name: cucsComputeBoardPresence
         chart_meta:
           description: "Presence state of the board"
-          family: Hardware/Board/Status/Presence
+          family: 'Hardware/Board/Status/Presence'
           unit: "{status}"
         mapping:
           0: unknown
@@ -188,7 +188,7 @@ metrics:
         name: cucsComputeBoardThermal
         chart_meta:
           description: "Thermal state of the board"
-          family: Hardware/Board/Status/Thermal
+          family: 'Hardware/Board/Status/Thermal'
           unit: "{status}"
         mapping:
           0: unknown
@@ -204,7 +204,7 @@ metrics:
         name: cucsComputeBoardVoltage
         chart_meta:
           description: "Voltage state of the board"
-          family: Hardware/Board/Status/Voltage
+          family: 'Hardware/Board/Status/Voltage'
           unit: "{status}"
         mapping:
           0: unknown
@@ -243,19 +243,19 @@ metrics:
         OID: 1.3.6.1.4.1.9.9.719.1.9.14.1.4
         chart_meta:
           description: "Consumed power"
-          family: Hardware/Board/Power/Consumption
+          family: 'Hardware/Board/Power/Consumption'
           unit: "W"
       - name: cucsComputeMbPowerStatsInputCurrent
         OID: 1.3.6.1.4.1.9.9.719.1.9.14.1.8
         chart_meta:
           description: "Input current"
-          family: Hardware/Board/Power/Input/Current
+          family: 'Hardware/Board/Power/Input/Current'
           unit: "A"
       - name: cucsComputeMbPowerStatsInputVoltage
         OID: 1.3.6.1.4.1.9.9.719.1.9.14.1.12
         chart_meta:
           description: "Input voltage"
-          family: Hardware/Board/Power/Input/Voltage
+          family: 'Hardware/Board/Power/Input/Voltage'
           unit: "V"
     metric_tags:
       - tag: cucs_compute_mb_power_stats_dn
@@ -272,19 +272,19 @@ metrics:
         OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.9
         chart_meta:
           description: "Rack unit available memory"
-          family: RackUnit/Memory/Available
+          family: 'RackUnit/Memory/Available'
           unit: "By"
       - name: cucsComputeRackUnitTotalMemory
         OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.49
         chart_meta:
           description: "Rack Unit total memory"
-          family: RackUnit/Memory/Total
+          family: 'RackUnit/Memory/Total'
           unit: "By"
       - OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.4
         name: cucsComputeRackUnitAdminPower
         chart_meta:
           description: "Admin power state of the rack unit"
-          family: RackUnit/Status/Admin/Power
+          family: 'RackUnit/Status/Admin/Power'
           unit: "{status}"
         mapping:
           2: cycle_immediate
@@ -304,7 +304,7 @@ metrics:
         name: cucsComputeRackUnitAdminState
         chart_meta:
           description: "Admin state of the rack unit"
-          family: RackUnit/Status/Admin/State
+          family: 'RackUnit/Status/Admin/State'
           unit: "{status}"
         mapping:
           1: in_service
@@ -314,7 +314,7 @@ metrics:
         name: cucsComputeRackUnitAssociation
         chart_meta:
           description: "Association state of the rack unit"
-          family: RackUnit/Status/Association
+          family: 'RackUnit/Status/Association'
           unit: "{status}"
         mapping:
           0: none
@@ -327,7 +327,7 @@ metrics:
         name: cucsComputeRackUnitAvailability
         chart_meta:
           description: "Availability state of the rack unit"
-          family: RackUnit/Status/Availability
+          family: 'RackUnit/Status/Availability'
           unit: "{status}"
         mapping:
           0: unavailable
@@ -336,7 +336,7 @@ metrics:
         name: cucsComputeRackUnitCheckPoint
         chart_meta:
           description: "Checkpoint state of the rack unit"
-          family: RackUnit/Status/Checkpoint
+          family: 'RackUnit/Status/Checkpoint'
           unit: "{status}"
         mapping:
           0: unknown
@@ -348,7 +348,7 @@ metrics:
         name: cucsComputeRackUnitOperPower
         chart_meta:
           description: "Operational power state of the rack unit"
-          family: RackUnit/Status/Power/Operational
+          family: 'RackUnit/Status/Power/Operational'
           unit: "{status}"
         mapping:
           0: unknown
@@ -368,7 +368,7 @@ metrics:
         name: cucsComputeRackUnitOperState
         chart_meta:
           description: "Operational state of the rack unit"
-          family: RackUnit/Status/Operational
+          family: 'RackUnit/Status/Operational'
           unit: "{status}"
         mapping:
           0: indeterminate
@@ -408,7 +408,7 @@ metrics:
         name: cucsComputeRackUnitOperability
         chart_meta:
           description: "Operability state of the rack unit"
-          family: RackUnit/Status/Operability
+          family: 'RackUnit/Status/Operability'
           unit: "{status}"
         mapping:
           0: unknown
@@ -447,7 +447,7 @@ metrics:
         name: cucsComputeRackUnitPresence
         chart_meta:
           description: "Presence state of the rack unit"
-          family: RackUnit/Status/Presence
+          family: 'RackUnit/Status/Presence'
           unit: "{status}"
         mapping:
           0: unknown
@@ -470,19 +470,19 @@ metrics:
         name: cucsComputeRackUnitNumOfCores
         chart_meta:
           description: "Number of cores"
-          family: RackUnit/CPU/Cores
+          family: 'RackUnit/CPU/Cores'
           unit: "{core}"
       - OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.36
         name: cucsComputeRackUnitNumOfCpus
         chart_meta:
           description: "Number of cpus"
-          family: RackUnit/CPU/Count
+          family: 'RackUnit/CPU/Count'
           unit: "{cpu}"
       - name: cucsComputeRackUnitNumOfThreads
         OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.39
         chart_meta:
           description: "Number of threads"
-          family: RackUnit/CPU/Threads
+          family: 'RackUnit/CPU/Threads'
           unit: "{thread}"
     metric_tags:
       - tag: cucs_compute_rack_unit_dn
@@ -519,25 +519,25 @@ metrics:
         OID: 1.3.6.1.4.1.9.9.719.1.9.44.1.4
         chart_meta:
           description: "Ambient temperature"
-          family: RackUnit/Temperature/Ambient
+          family: 'RackUnit/Temperature/Ambient'
           unit: "Cel"
       - name: cucsComputeRackUnitMbTempStatsFrontTemp
         OID: 1.3.6.1.4.1.9.9.719.1.9.44.1.8
         chart_meta:
           description: "Front temperature"
-          family: RackUnit/Temperature/Front
+          family: 'RackUnit/Temperature/Front'
           unit: "Cel"
       - name: cucsComputeRackUnitMbTempStatsIoh1Temp
         OID: 1.3.6.1.4.1.9.9.719.1.9.44.1.13
         chart_meta:
           description: "Ioh1 temperature"
-          family: RackUnit/Temperature/IOH1
+          family: 'RackUnit/Temperature/IOH1'
           unit: "Cel"
       - name: cucsComputeRackUnitMbTempStatsRearTemp
         OID: 1.3.6.1.4.1.9.9.719.1.9.44.1.21
         chart_meta:
           description: "Rear temperature"
-          family: RackUnit/Temperature/Rear
+          family: 'RackUnit/Temperature/Rear'
           unit: "Cel"
     metric_tags:
       - tag: cucs_compute_rack_unit_mb_temp_stats_dn
@@ -554,7 +554,7 @@ metrics:
         name: cucsEquipmentFanOperState
         chart_meta:
           description: "Operational state of the fan"
-          family: Hardware/Fan/Status/Operational
+          family: 'Hardware/Fan/Status/Operational'
           unit: "{status}"
         mapping:
           0: unknown
@@ -593,7 +593,7 @@ metrics:
         name: cucsEquipmentFanOperability
         chart_meta:
           description: "Operability state of the fan"
-          family: Hardware/Fan/Status/Operability
+          family: 'Hardware/Fan/Status/Operability'
           unit: "{status}"
         mapping:
           0: unknown
@@ -632,7 +632,7 @@ metrics:
         name: cucsEquipmentFanPerf
         chart_meta:
           description: "Performance state of the fan"
-          family: Hardware/Fan/Status/Performance
+          family: 'Hardware/Fan/Status/Performance'
           unit: "{status}"
         mapping:
           0: unknown
@@ -648,7 +648,7 @@ metrics:
         name: cucsEquipmentFanPower
         chart_meta:
           description: "Power state of the fan"
-          family: Hardware/Fan/Status/Power
+          family: 'Hardware/Fan/Status/Power'
           unit: "{status}"
         mapping:
           0: unknown
@@ -668,7 +668,7 @@ metrics:
         name: cucsEquipmentFanPresence
         chart_meta:
           description: "Presence state of the fan"
-          family: Hardware/Fan/Status/Presence
+          family: 'Hardware/Fan/Status/Presence'
           unit: "{status}"
         mapping:
           0: unknown
@@ -714,7 +714,7 @@ metrics:
         name: cucsEquipmentPsuOperState
         chart_meta:
           description: "Operational state of the psu"
-          family: Hardware/PowerSupply/Status/Operational
+          family: 'Hardware/PowerSupply/Status/Operational'
           unit: "{status}"
         mapping:
           0: unknown
@@ -753,7 +753,7 @@ metrics:
         name: cucsEquipmentPsuOperability
         chart_meta:
           description: "Operability state of the psu"
-          family: Hardware/PowerSupply/Status/Operability
+          family: 'Hardware/PowerSupply/Status/Operability'
           unit: "{status}"
         mapping:
           0: unknown
@@ -792,7 +792,7 @@ metrics:
         name: cucsEquipmentPsuPerf
         chart_meta:
           description: "Performance state of the psu"
-          family: Hardware/PowerSupply/Status/Performance
+          family: 'Hardware/PowerSupply/Status/Performance'
           unit: "{status}"
         mapping:
           0: unknown
@@ -808,7 +808,7 @@ metrics:
         name: cucsEquipmentPsuPower
         chart_meta:
           description: "Power state of the psu"
-          family: Hardware/PowerSupply/Status/Power
+          family: 'Hardware/PowerSupply/Status/Power'
           unit: "{status}"
         mapping:
           0: unknown
@@ -828,7 +828,7 @@ metrics:
         name: cucsEquipmentPsuPresence
         chart_meta:
           description: "Presence state of the psu"
-          family: Hardware/PowerSupply/Status/Presence
+          family: 'Hardware/PowerSupply/Status/Presence'
           unit: "{status}"
         mapping:
           0: unknown
@@ -878,13 +878,13 @@ metrics:
         OID: 1.3.6.1.4.1.9.9.719.1.30.11.1.6
         chart_meta:
           description: "Capacity of the memory unit"
-          family: Hardware/Memory/Capacity
+          family: 'Hardware/Memory/Capacity'
           unit: "By"
       - OID: 1.3.6.1.4.1.9.9.719.1.30.11.1.13
         name: cucsMemoryUnitOperState
         chart_meta:
           description: "Operational state of the memory unit"
-          family: Hardware/Memory/Status/Operational
+          family: 'Hardware/Memory/Status/Operational'
           unit: "{status}"
         mapping:
           0: unknown
@@ -923,7 +923,7 @@ metrics:
         name: cucsMemoryUnitOperability
         chart_meta:
           description: "Operability state of the memory unit"
-          family: Hardware/Memory/Status/Operability
+          family: 'Hardware/Memory/Status/Operability'
           unit: "{status}"
         mapping:
           0: unknown
@@ -962,7 +962,7 @@ metrics:
         name: cucsMemoryUnitPerf
         chart_meta:
           description: "Performance state of the memory unit"
-          family: Hardware/Memory/Status/Performance
+          family: 'Hardware/Memory/Status/Performance'
           unit: "{status}"
         mapping:
           0: unknown
@@ -978,7 +978,7 @@ metrics:
         name: cucsMemoryUnitPower
         chart_meta:
           description: "Power state of the memory unit"
-          family: Hardware/Memory/Status/Power
+          family: 'Hardware/Memory/Status/Power'
           unit: "{status}"
         mapping:
           0: unknown
@@ -998,7 +998,7 @@ metrics:
         name: cucsMemoryUnitPresence
         chart_meta:
           description: "Presence state of the memory unit"
-          family: Hardware/Memory/Status/Presence
+          family: 'Hardware/Memory/Status/Presence'
           unit: "{status}"
         mapping:
           0: unknown
@@ -1069,7 +1069,7 @@ metrics:
         OID: 1.3.6.1.4.1.9.9.719.1.30.12.1.6
         chart_meta:
           description: "Temperature"
-          family: Hardware/Memory/Temperature
+          family: 'Hardware/Memory/Temperature'
           unit: "Cel"
     metric_tags:
       - tag: cucs_memory_unit_env_stats_dn
@@ -1086,7 +1086,7 @@ metrics:
         OID: 1.3.6.1.4.1.9.9.719.1.41.2.1.10
         chart_meta:
           description: "Temperature"
-          family: Hardware/CPU/Temperature
+          family: 'Hardware/CPU/Temperature'
           unit: "Cel"
     metric_tags:
       - tag: cucs_processor_env_stats_dn
@@ -1103,25 +1103,25 @@ metrics:
         name: cucsProcessorUnitCores
         chart_meta:
           description: "Number of cores"
-          family: Hardware/CPU/Cores/Total
+          family: 'Hardware/CPU/Cores/Total'
           unit: "{core}"
       - OID: 1.3.6.1.4.1.9.9.719.1.41.9.1.6
         name: cucsProcessorUnitCoresEnabled
         chart_meta:
           description: "Number of cores enabled"
-          family: Hardware/CPU/Cores/Enabled
+          family: 'Hardware/CPU/Cores/Enabled'
           unit: "{core}"
       - OID: 1.3.6.1.4.1.9.9.719.1.41.9.1.20
         name: cucsProcessorUnitThreads
         chart_meta:
           description: "Number of threads"
-          family: Hardware/CPU/Threads
+          family: 'Hardware/CPU/Threads'
           unit: "{thread}"
       - OID: 1.3.6.1.4.1.9.9.719.1.41.9.1.9
         name: cucsProcessorUnitOperState
         chart_meta:
           description: "Operational state of the processor unit"
-          family: Hardware/CPU/Status/Operational
+          family: 'Hardware/CPU/Status/Operational'
           unit: "{status}"
         mapping:
           0: unknown
@@ -1160,7 +1160,7 @@ metrics:
         name: cucsProcessorUnitOperability
         chart_meta:
           description: "Operability state of the processor unit"
-          family: Hardware/CPU/Status/Operability
+          family: 'Hardware/CPU/Status/Operability'
           unit: "{status}"
         mapping:
           0: unknown
@@ -1199,7 +1199,7 @@ metrics:
         name: cucsProcessorUnitPerf
         chart_meta:
           description: "Performance state of the processor unit"
-          family: Hardware/CPU/Status/Performance
+          family: 'Hardware/CPU/Status/Performance'
           unit: "{status}"
         mapping:
           0: unknown
@@ -1215,7 +1215,7 @@ metrics:
         name: cucsProcessorUnitPower
         chart_meta:
           description: "Power state of the processor unit"
-          family: Hardware/CPU/Status/Power
+          family: 'Hardware/CPU/Status/Power'
           unit: "{status}"
         mapping:
           0: unknown
@@ -1235,7 +1235,7 @@ metrics:
         name: cucsProcessorUnitPresence
         chart_meta:
           description: "Presence state of the processor unit"
-          family: Hardware/CPU/Presence/Status
+          family: 'Hardware/CPU/Presence/Status'
           unit: "{status}"
         mapping:
           0: unknown
@@ -1294,25 +1294,25 @@ metrics:
         OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.19
         chart_meta:
           description: "Read io error count"
-          family: Storage/FlexFlash/Error/Read
+          family: 'Storage/FlexFlash/Error/Read'
           unit: "{error}/s"
       - name: cucsStorageFlexFlashCardSize
         OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.22
         chart_meta:
           description: "Size of the flex flash card"
-          family: Storage/FlexFlash/Capacity
+          family: 'Storage/FlexFlash/Capacity'
           unit: "By"
       - name: cucsStorageFlexFlashCardWriteIOErrorCount
         OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.26
         chart_meta:
           description: "Write io error count"
-          family: Storage/FlexFlash/Error/Write
+          family: 'Storage/FlexFlash/Error/Write'
           unit: "{error}/s"
       - OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.6
         name: cucsStorageFlexFlashCardCardMode
         chart_meta:
           description: "Mode of the flex flash card"
-          family: Storage/FlexFlash/Mode
+          family: 'Storage/FlexFlash/Mode'
           unit: "{status}"
         mapping:
           0: ff_phy_drive_unpaired_primary
@@ -1323,13 +1323,13 @@ metrics:
         name: cucsStorageFlexFlashCardDrivesEnabled
         chart_meta:
           description: "Number of drives enabled"
-          family: Storage/FlexFlash/Drive/Enabled
+          family: 'Storage/FlexFlash/Drive/Enabled'
           unit: "{drive}"
       - OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.5
         name: cucsStorageFlexFlashCardCardHealth
         chart_meta:
           description: "Health state of the flex flash card"
-          family: Storage/FlexFlash/Status/Health
+          family: 'Storage/FlexFlash/Status/Health'
           unit: "{status}"
         mapping:
           0: ff_phy_health_na
@@ -1342,7 +1342,7 @@ metrics:
         name: cucsStorageFlexFlashCardOperability
         chart_meta:
           description: "Operability state of the flex flash card"
-          family: Storage/FlexFlash/Status/Operability
+          family: 'Storage/FlexFlash/Status/Operability'
           unit: "{status}"
         mapping:
           0: unknown
@@ -1381,7 +1381,7 @@ metrics:
         name: cucsStorageFlexFlashCardPresence
         chart_meta:
           description: "Presence state of the flex flash card"
-          family: Storage/FlexFlash/Status/Presence
+          family: 'Storage/FlexFlash/Status/Presence'
           unit: "{status}"
         mapping:
           0: unknown
@@ -1408,7 +1408,7 @@ metrics:
         OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.27
         chart_meta:
           description: "State of the flex flash card"
-          family: Storage/FlexFlash/Status/Card
+          family: 'Storage/FlexFlash/Status/Card'
           unit: "{status}"
         mapping:
           0: undefined
@@ -1422,7 +1422,7 @@ metrics:
         name: cucsStorageFlexFlashCardCardSync
         chart_meta:
           description: "Sync state of the flex flash card"
-          family: Storage/FlexFlash/Status/Sync
+          family: 'Storage/FlexFlash/Status/Sync'
           unit: "{status}"
         mapping:
           0: na
@@ -1465,13 +1465,13 @@ metrics:
         OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.18
         chart_meta:
           description: "Size of the flex flash drive"
-          family: Storage/FlexFlash/Drive/Capacity
+          family: 'Storage/FlexFlash/Drive/Capacity'
           unit: "By"
       - OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.14
         name: cucsStorageFlexFlashDriveOperability
         chart_meta:
           description: "Operability state of the flex flash drive"
-          family: Storage/FlexFlash/Drive/Operability
+          family: 'Storage/FlexFlash/Drive/Operability'
           unit: "{status}"
         mapping:
           0: unknown
@@ -1510,7 +1510,7 @@ metrics:
         name: cucsStorageFlexFlashDrivePresence
         chart_meta:
           description: "Presence state of the flex flash drive"
-          family: Storage/FlexFlash/Drive/Presence
+          family: 'Storage/FlexFlash/Drive/Presence'
           unit: "{status}"
         mapping:
           0: unknown
@@ -1537,7 +1537,7 @@ metrics:
         name: cucsStorageFlexFlashDriveOperationState
         chart_meta:
           description: "Operation state of the flex flash drive"
-          family: Storage/FlexFlash/Drive/Operation
+          family: 'Storage/FlexFlash/Drive/Operation'
           unit: "{status}"
         mapping:
           0: partition_non_mirrored

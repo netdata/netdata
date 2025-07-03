@@ -19,7 +19,7 @@ metrics:
       OID: 1.3.6.1.4.1.6889.2.1.11.1.1.1.1.6.1 # genCpuCurrentUtilization.1
       chart_meta:
         description: Current CPU utilization in percentage if the monitoring is enabled
-        family: CPU/Usage
+        family: 'CPU/Usage'
         unit: "%"
   - MIB: UTILIZATION-MANAGEMENT-MIB
     symbol:
@@ -27,7 +27,7 @@ metrics:
       OID: 1.3.6.1.4.1.6889.2.1.11.1.2.6.1.3.1 # genMemUtilizationPercentUsed.1
       chart_meta:
         description: Percentage of memory used
-        family: Memory/Usage
+        family: 'Memory/Usage'
         unit: "%"
   - MIB: CONFIG-MIB
     table:
@@ -37,7 +37,7 @@ metrics:
       - name: avaya.genPortFunctionality
         OID: 1.3.6.1.4.1.81.9.1.1.3
         description: Port functionality
-        family: Port/Functionality
+        family: 'Port/Functionality'
         mapping:
           1: private
           2: repeater_aui

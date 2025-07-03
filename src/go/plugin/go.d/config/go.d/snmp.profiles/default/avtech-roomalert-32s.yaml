@@ -17,7 +17,7 @@ metrics:
       name: roomalert.32s.internal_tempf
       chart_meta:
         description: Internal temperature
-        family: Sensor/Internal/Temperature/Value
+        family: 'Sensor/Internal/Temperature/Value'
         unit: "degF"
   - MIB: ROOMALERT32S-MIB
     symbol:
@@ -25,7 +25,7 @@ metrics:
       name: roomalert.32s.internal_tempc
       chart_meta:
         description: Internal temperature
-        family: Sensor/Internal/Temperature/Value
+        family: 'Sensor/Internal/Temperature/Value'
         unit: "Cel"
   - MIB: ROOMALERT32S-MIB
     symbol:
@@ -33,7 +33,7 @@ metrics:
       name: roomalert.32s.internal_humidity
       chart_meta:
         description: Internal relative humidity percentage
-        family: Sensor/Internal/Humidity/Value
+        family: 'Sensor/Internal/Humidity/Value'
         unit: "%"
   #  - MIB: ROOMALERT32S-MIB
   #    symbol:
@@ -49,7 +49,7 @@ metrics:
       name: roomalert.32s.internal_heat_index
       chart_meta:
         description: Internal heat index
-        family: Sensor/Internal/HeatIndex/Value
+        family: 'Sensor/Internal/HeatIndex/Value'
         unit: "degF"
   - MIB: ROOMALERT32S-MIB
     symbol:
@@ -57,7 +57,7 @@ metrics:
       name: roomalert.32s.internal_heat_indexC
       chart_meta:
         description: Internal heat index
-        family: Sensor/Internal/HeatIndex/Value
+        family: 'Sensor/Internal/HeatIndex/Value'
         unit: "Cel"
   # TODO, can't find MIB, so can't fill in descriptions and know what each metric is
   # - MIB: ROOMALERT32S-MIB

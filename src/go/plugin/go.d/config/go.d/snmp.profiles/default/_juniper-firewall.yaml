@@ -10,13 +10,13 @@ metrics:
         name: jnxFWCounterPacketCount
         chart_meta:
           description: The number of packets being counted pertaining to the specified counter or policer
-          family: "Firewall/Counter/Packet/Total"
+          family: 'Firewall/Counter/Packet/Total'
           unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.2636.3.5.2.1.5
         name: jnxFWCounterByteCount
         chart_meta:
           description: The number of bytes being counted pertaining to the specified counter. For policers, this field is always zero because policers do not count number of bytes
-          family: "Firewall/Counter/Throughput/Total"
+          family: 'Firewall/Counter/Throughput/Total'
           unit: "By/s"
     metric_tags:
       - tag: firewall_filter_name

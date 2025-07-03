@@ -12,7 +12,7 @@ metrics:
       name: cpqHeSysUtilLifeTime
       scale_factor: 60
       chart_meta:
-        family: "Uptime"
+        family: 'Uptime'
         description: Total time the system has been in full operation in minutes
         unit: "s"
 
@@ -22,7 +22,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.8.2.0
       name: cpqHeSysUtilEisaBusMin
       chart_meta:
-        family: "Hardware/Bus/EISA/Usage"
+        family: 'Hardware/Bus/EISA/Usage'
         description: EISA bus utilization as a percentage of the theoretical maximum during the last minute
         unit: "%"
 
@@ -35,7 +35,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.2.2.0
       name: cpqHeCritLogCondition
       chart_meta:
-        family: "System/ErrorLog/Critical/Status"
+        family: 'System/ErrorLog/Critical/Status'
         description: Overall condition of the critical error log feature
         unit: "{status}"
       mapping:
@@ -53,7 +53,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.3.1.0
       name: cpqHeCorrMemLogStatus
       chart_meta:
-        family: "Hardware/Memory/ErrorLog/Status"
+        family: 'Hardware/Memory/ErrorLog/Status'
         description: Overall status of the correctable memory error log feature
         unit: "{status}"
       mapping:
@@ -69,7 +69,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.3.2.0
       name: cpqHeCorrMemLogCondition
       chart_meta:
-        family: "Hardware/Memory/ErrorLog/Condition/Status"
+        family: 'Hardware/Memory/ErrorLog/Condition/Status'
         description: Overall condition of the correctable memory error log feature
         unit: "{status}"
       mapping:
@@ -84,7 +84,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.3.3.0
       name: cpqHeCorrMemTotalErrs
       chart_meta:
-        family: "Hardware/Memory/Error/Correctable/Count"
+        family: 'Hardware/Memory/Error/Correctable/Count'
         description: Number of correctable memory errors that have occurred
         unit: "{error}"
       metric_type: monotonic_count
@@ -98,7 +98,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.5.1.0
       name: cpqHeAsrStatus
       chart_meta:
-        family: "System/ASR/Status"
+        family: 'System/ASR/Status'
         description: Overall status of the ASR feature
         unit: "{status}"
       mapping:
@@ -114,7 +114,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.5.6.0
       name: cpqHeAsrPost
       chart_meta:
-        family: "System/ASR/POST/Status"
+        family: 'System/ASR/POST/Status'
         description: Whether the ASR timer passed the server Power-On Self-Test
         unit: "{status}"
       mapping:
@@ -129,7 +129,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.5.10.0
       name: cpqHeAsrRebootCount
       chart_meta:
-        family: "System/ASR/Reboot/Count"
+        family: 'System/ASR/Reboot/Count'
         description: Number of ASR reboots that have occurred on the server since last manual reboot
         unit: "{reboot}"
       metric_type: monotonic_count
@@ -141,7 +141,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.5.17.0
       name: cpqHeAsrCondition
       chart_meta:
-        family: "System/ASR/Condition/Status"
+        family: 'System/ASR/Condition/Status'
         description: Overall condition of the ASR feature
         unit: "{status}"
       mapping:
@@ -157,7 +157,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.5.21.0
       name: cpqHeAsrNetworkAccessStatus
       chart_meta:
-        family: "System/ASR/NetworkAccess/Status"
+        family: 'System/ASR/NetworkAccess/Status'
         description: Status of the ASR network access feature
         unit: "{status}"
       mapping:
@@ -174,7 +174,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.6.3.0
       name: cpqHeThermalTempStatus
       chart_meta:
-        family: "Hardware/Temperature/Status/Overall"
+        family: 'Hardware/Temperature/Status/Overall'
         description: Status of the system's temperature sensors
         unit: "{status}"
       mapping:
@@ -190,7 +190,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.6.4.0
       name: cpqHeThermalSystemFanStatus
       chart_meta:
-        family: "Hardware/Fan/System/Status"
+        family: 'Hardware/Fan/System/Status'
         description: Status of the fan(s) in the system
         unit: "{status}"
       mapping:
@@ -206,7 +206,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.6.5.0
       name: cpqHeThermalCpuFanStatus
       chart_meta:
-        family: "Hardware/Fan/CPU/Status"
+        family: 'Hardware/Fan/CPU/Status'
         description: Status of the processor fan(s) in the system
         unit: "{status}"
       mapping:
@@ -223,14 +223,14 @@ metrics:
       - OID: 1.3.6.1.4.1.232.6.2.6.8.1.4
         name: cpqHeTemperatureCelsius
         chart_meta:
-          family: "Hardware/Sensor/Temperature/Value"
+          family: 'Hardware/Sensor/Temperature/Value'
           description: Current temperature sensor reading in degrees celsius
           unit: "Cel"
         # NOTE: other(1), ok(2), degraded(3), failed(4)
       - OID: 1.3.6.1.4.1.232.6.2.6.8.1.6
         name: cpqHeTemperatureCondition
         chart_meta:
-          family: "Hardware/Sensor/Temperature/Status"
+          family: 'Hardware/Sensor/Temperature/Status'
           description: Temperature sensor condition
           unit: "{status}"
         mapping:
@@ -252,7 +252,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.15.3.0
       name: cpqHePowerMeterCurrReading
       chart_meta:
-        family: "Hardware/Power/Usage"
+        family: 'Hardware/Power/Usage'
         description: Current power meter reading in watts
         unit: "W"
 
@@ -266,7 +266,7 @@ metrics:
       - OID: 1.3.6.1.4.1.232.6.2.17.2.1.4
         name: cpqHeSysBatteryCondition
         chart_meta:
-          family: "Hardware/Battery/Condition/Status"
+          family: 'Hardware/Battery/Condition/Status'
           description: Overall condition of the battery
           unit: "{status}"
         mapping:
@@ -278,7 +278,7 @@ metrics:
       - OID: 1.3.6.1.4.1.232.6.2.17.2.1.5
         name: cpqHeSysBatteryStatus
         chart_meta:
-          family: "Hardware/Battery/Status"
+          family: 'Hardware/Battery/Status'
           description: Status of the battery
           unit: "{status}"
     metric_tags:
@@ -294,7 +294,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.6.1.0
       name: cpqHeThermalCondition
       chart_meta:
-        family: "Hardware/Temperature/Environment/Status"
+        family: 'Hardware/Temperature/Environment/Status'
         description: Overall condition of the system's thermal environment
         unit: "{status}"
       mapping:
@@ -308,7 +308,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.9.2.0
       name: cpqHeFltTolPwrSupplyStatus
       chart_meta:
-        family: "Hardware/Power/FaultTolerant/Status"
+        family: 'Hardware/Power/FaultTolerant/Status'
         description: Status of the fault tolerant power supply
         unit: "{status}"
       mapping:
@@ -325,7 +325,7 @@ metrics:
       - OID: 1.3.6.1.4.1.232.6.2.14.13.1.20
         name: cpqHeResMem2ModuleCondition
         chart_meta:
-          family: "Hardware/Memory/Module/Status"
+          family: 'Hardware/Memory/Module/Status'
           description: Current status of the correctable memory errors for this memory module
           unit: "{status}"
     metric_tags:
@@ -342,26 +342,26 @@ metrics:
       - name: cpqHeFltTolPowerSupply
         constant_value_one: true
         chart_meta:
-          family: "Hardware/Power/Supply/Present"
+          family: 'Hardware/Power/Supply/Present'
           description: Indicates the presence of a power supply
           unit: "{present}"
       - OID: 1.3.6.1.4.1.232.6.2.9.3.1.7
         name: cpqHeFltTolPowerSupplyCapacityUsed
         chart_meta:
-          family: "Hardware/Power/Supply/Used"
+          family: 'Hardware/Power/Supply/Used'
           description: Currently used capacity of the power supply in watts
           unit: "W"
       - OID: 1.3.6.1.4.1.232.6.2.9.3.1.8
         name: cpqHeFltTolPowerSupplyCapacityMaximum
         chart_meta:
-          family: "Hardware/Power/Supply/Capacity"
+          family: 'Hardware/Power/Supply/Capacity'
           description: Maximum capacity of the power supply in watts
           unit: "W"
       - OID: 1.3.6.1.4.1.232.6.2.9.3.1.5
         name: cpqHeFltTolPowerSupplyStatus
         chart_meta:
           description: Current status of the power supply
-          family: "Hardware/Power/Supply/Status"
+          family: 'Hardware/Power/Supply/Status'
           unit: "{status}"
         mapping:
           1: no_error

@@ -25,7 +25,7 @@ metrics:
         name: bcnDhcpv4SubnetFreeAddresses
         chart_meta:
           description: The number of IPs addresses available in this subnet.
-          family: DHCP/Subnets
+          family: 'DHCP/Subnets'
           unit: "{ip_address}"
         # Transform combines subnet IP and mask into CIDR notation (e.g., 192.168.1.0/24)
         # Converts mask to CIDR if possible, otherwise keeps original mask
@@ -42,7 +42,7 @@ metrics:
         name: bcnDhcpv4SubnetSize
         chart_meta:
           description: Size of the subnet
-          family: DHCP/Subnets
+          family: 'DHCP/Subnets'
           unit: "{ip_address}"
         # Transform combines subnet IP and mask into CIDR notation (e.g., 192.168.1.0/24)
         # Converts mask to CIDR if possible, otherwise keeps original mask
@@ -75,7 +75,7 @@ metrics:
         name: bcnDhcpv4PoolFreeAddresses
         chart_meta:
           description: The number of IPs addresses available in this pool
-          family: DHCP/Pools
+          family: 'DHCP/Pools'
           unit: "{ip_address}"
         # Transform combines start and end IPs into a single range tag (e.g., 192.168.1.10-192.168.1.100)
         transform: |
@@ -90,7 +90,7 @@ metrics:
         name: bcnDhcpv4PoolSize
         chart_meta:
           description: Pool size
-          family: DHCP/Pools
+          family: 'DHCP/Pools'
           unit: "{ip_address}"
         # Transform combines start and end IPs into a single range tag (e.g., 192.168.1.10-192.168.1.100)
         transform: |

@@ -13,7 +13,7 @@ metrics:
       scale_factor: 1024
       chart_meta:
         description: Total usable physical memory (in KB)
-        family: Memory/Total
+        family: 'Memory/Total'
         unit: "By"
   - MIB: FROGFOOT-RESOURCES-MIB
     symbol:
@@ -22,7 +22,7 @@ metrics:
       scale_factor: 1024
       chart_meta:
         description: Available physical memory (in KB)
-        family: Memory/Free
+        family: 'Memory/Free'
         unit: "By"
 
   - MIB: UBNT-UniFi-MIB
@@ -34,37 +34,37 @@ metrics:
         name: ubiquiti.unifiRadioRxPackets
         chart_meta:
           description: Number of received packets on the radio
-          family: Wireless/Radio/Packet/In
+          family: 'Wireless/Radio/Packet/In'
           unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.41112.1.6.1.1.1.5
         name: ubiquiti.unifiRadioTxPackets
         chart_meta:
           description: Number of transmitted packets on the radio
-          family: Wireless/Radio/Packet/Out
+          family: 'Wireless/Radio/Packet/Out'
           unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.41112.1.6.1.1.1.6
         name: ubiquiti.unifiRadioCuTotal
         chart_meta:
           description: Total channel utilization on the radio
-          family: Wireless/Radio/ChannelUtilization/Total
+          family: 'Wireless/Radio/ChannelUtilization/Total'
           unit: "%"
       - OID: 1.3.6.1.4.1.41112.1.6.1.1.1.7
         name: ubiquiti.unifiRadioCuSelfRx
         chart_meta:
           description: Channel utilization for self received traffic on the radio
-          family: Wireless/Radio/ChannelUtilization/SelfReceive
+          family: 'Wireless/Radio/ChannelUtilization/SelfReceive'
           unit: "%"
       - OID: 1.3.6.1.4.1.41112.1.6.1.1.1.8
         name: ubiquiti.unifiRadioCuSelfTx
         chart_meta:
           description: Channel utilization for self transmitted traffic on the radio
-          family: Wireless/Radio/ChannelUtilization/SelfTransmit
+          family: 'Wireless/Radio/ChannelUtilization/SelfTransmit'
           unit: "%"
       - OID: 1.3.6.1.4.1.41112.1.6.1.1.1.9
         name: ubiquiti.unifiRadioOtherBss
         chart_meta:
           description: Number of other basic service sets detected on the radio
-          family: Wireless/Radio/BSS/Other/Count
+          family: 'Wireless/Radio/BSS/Other/Count'
           unit: "{bss}"
     metric_tags:
       - tag: ubiquiti_unifi_radio_index

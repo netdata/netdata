@@ -5,7 +5,7 @@ metrics:
       OID: 1.3.6.1.4.1.2021.10.1.5.1
       chart_meta:
         description: The 1,5 and 15 minute load averages as an integer
-        family: CPU/LoadAverage/1Min
+        family: 'CPU/LoadAverage/1Min'
         unit: "{load_average}"
   - MIB: UCD-SNMP-MIB
     symbol:
@@ -13,7 +13,7 @@ metrics:
       OID: 1.3.6.1.4.1.2021.4.5.0
       chart_meta:
         description: The total amount of real/physical memory installed on this host
-        family: Memory/Physical/Total
+        family: 'Memory/Physical/Total'
         unit: "By"
       scale_factor: 1024
   - MIB: UCD-SNMP-MIB
@@ -22,7 +22,7 @@ metrics:
       OID: 1.3.6.1.4.1.2021.4.6.0
       chart_meta:
         description: The amount of real/physical memory currently unused or available
-        family: Memory/Physical/Free
+        family: 'Memory/Physical/Free'
         unit: "By"
       scale_factor: 1024
   - MIB: UCD-SNMP-MIB
@@ -31,7 +31,7 @@ metrics:
       OID: 1.3.6.1.4.1.2021.4.3.0
       chart_meta:
         description: The total amount of swap space configured for this host
-        family: Memory/Swap/Total
+        family: 'Memory/Swap/Total'
         unit: "By"
       scale_factor: 1024
   - MIB: UCD-SNMP-MIB
@@ -40,7 +40,7 @@ metrics:
       OID: 1.3.6.1.4.1.2021.4.4.0
       chart_meta:
         description: The amount of swap space currently unused or available
-        family: Memory/Swap/Available
+        family: 'Memory/Swap/Available'
         unit: "By"
       scale_factor: 1024
   - MIB: UCD-SNMP-MIB
@@ -49,7 +49,7 @@ metrics:
       OID: 1.3.6.1.4.1.2021.4.11.0
       chart_meta:
         description: The total amount of memory free or available for use on this host
-        family: Memory/Available/Total
+        family: 'Memory/Available/Total'
         unit: "By"
       scale_factor: 1024
   - MIB: UCD-SNMP-MIB
@@ -58,7 +58,7 @@ metrics:
       OID: 1.3.6.1.4.1.2021.4.12.0
       chart_meta:
         description: The minimum amount of swap space expected to be kept free or available during normal operation of this host
-        family: Memory/Swap/Minimum
+        family: 'Memory/Swap/Minimum'
         unit: "By"
       scale_factor: 1024
   - MIB: UCD-SNMP-MIB
@@ -67,7 +67,7 @@ metrics:
       OID: 1.3.6.1.4.1.2021.4.13.0
       chart_meta:
         description: The total amount of real or virtual memory currently allocated for use as shared memory
-        family: Memory/Physical/Shared
+        family: 'Memory/Physical/Shared'
         unit: "By"
       scale_factor: 1024
   - MIB: UCD-SNMP-MIB
@@ -76,7 +76,7 @@ metrics:
       OID: 1.3.6.1.4.1.2021.4.14.0
       chart_meta:
         description: The total amount of real or virtual memory currently allocated for use as memory buffers
-        family: Memory/Physical/Buffer
+        family: 'Memory/Physical/Buffer'
         unit: "By"
       scale_factor: 1024
   - MIB: UCD-SNMP-MIB
@@ -85,7 +85,7 @@ metrics:
       OID: 1.3.6.1.4.1.2021.4.15.0
       chart_meta:
         description: The total amount of real or virtual memory currently allocated for use as cached memory
-        family: Memory/Physical/Cached
+        family: 'Memory/Physical/Cached'
         unit: "By"
       scale_factor: 1024
   - MIB: UCD-SNMP-MIB
@@ -97,40 +97,40 @@ metrics:
         OID: 1.3.6.1.4.1.2021.9.1.6
         chart_meta:
           description: Total size of the disk/partition
-          family: Disk/Space/Total
+          family: 'Disk/Space/Total'
           unit: "By"
         scale_factor: 1024
       - name: ucd.dskAvail
         OID: 1.3.6.1.4.1.2021.9.1.7
         chart_meta:
           description: Available space on the disk
-          family: Disk/Space/Available
+          family: 'Disk/Space/Available'
           unit: "By"
         scale_factor: 1024
       - name: ucd.dskUsed
         OID: 1.3.6.1.4.1.2021.9.1.8
         chart_meta:
           description: Used space on the disk
-          family: Disk/Space/Used
+          family: 'Disk/Space/Used'
           unit: "By"
         scale_factor: 1024
       - name: ucd.dskPercent
         OID: 1.3.6.1.4.1.2021.9.1.9
         chart_meta:
           description: Percentage of space used on disk
-          family: Disk/Usage
+          family: 'Disk/Usage'
           unit: "%"
       - name: ucd.dskPercentNode
         OID: 1.3.6.1.4.1.2021.9.1.10
         chart_meta:
           description: Percentage of inodes used on disk
-          family: Disk/Inode/Usage
+          family: 'Disk/Inode/Usage'
           unit: "%"
       - name: ucd.dskErrorFlag
         OID: 1.3.6.1.4.1.2021.9.1.100
         chart_meta:
           description: Flag signaling that the disk or partition is under the minimum required space configured for it
-          family: Disk/Error/Status
+          family: 'Disk/Error/Status'
           unit: "{status}"
         mapping:
           0: no_error
@@ -155,46 +155,46 @@ metrics:
         metric_type: monotonic_count
         chart_meta:
           description: The number of read accesses from this device since boot
-          family: Disk/IO/Read/Count
+          family: 'Disk/IO/Read/Count'
           unit: "{read}"
       - name: ucd.diskIOWrites
         OID: 1.3.6.1.4.1.2021.13.15.1.1.6
         metric_type: monotonic_count
         chart_meta:
           description: The number of write accesses to this device since boot
-          family: Disk/IO/Write/Count
+          family: 'Disk/IO/Write/Count'
           unit: "{write}"
       - name: ucd.diskIOLA1
         OID: 1.3.6.1.4.1.2021.13.15.1.1.9
         chart_meta:
           description: The 1 minute average load of disk (%)
-          family: Disk/LoadAverage/1Min
+          family: 'Disk/LoadAverage/1Min'
           unit: "%"
       - name: ucd.diskIOLA5
         OID: 1.3.6.1.4.1.2021.13.15.1.1.10
         chart_meta:
           description: The 5 minute average load of disk (%)
-          family: Disk/LoadAverage/5Min
+          family: 'Disk/LoadAverage/5Min'
           unit: "%"
       - name: ucd.diskIOLA15
         OID: 1.3.6.1.4.1.2021.13.15.1.1.11
         chart_meta:
           description: The 15 minute average load of disk (%)
-          family: Disk/LoadAverage/15Min
+          family: 'Disk/LoadAverage/15Min'
           unit: "%"
       - name: ucd.diskIONReadX
         OID: 1.3.6.1.4.1.2021.13.15.1.1.12
         metric_type: monotonic_count
         chart_meta:
           description: The number of bytes read from this device since boot
-          family: Disk/Traffic/Read
+          family: 'Disk/Traffic/Read'
           unit: "By"
       - name: ucd.diskIONWrittenX
         OID: 1.3.6.1.4.1.2021.13.15.1.1.13
         metric_type: monotonic_count
         chart_meta:
           description: The number of bytes written to this device since boot
-          family: Disk/Traffic/Write
+          family: 'Disk/Traffic/Write'
           unit: "By"
     metric_tags:
       - tag: ucd_disk_io_device
@@ -207,7 +207,7 @@ metrics:
       OID: 1.3.6.1.4.1.2021.11.9.0
       chart_meta:
         description: The percentage of CPU time spent processing user-level code, calculated over the last minute
-        family: CPU/Usage/User
+        family: 'CPU/Usage/User'
         unit: "%"
   - MIB: UCD-SNMP-MIB
     symbol:
@@ -215,7 +215,7 @@ metrics:
       OID: 1.3.6.1.4.1.2021.11.10.0
       chart_meta:
         description: The percentage of CPU time spent processing system-level code, calculated over the last minute
-        family: CPU/Usage/System
+        family: 'CPU/Usage/System'
         unit: "%"
   - MIB: UCD-SNMP-MIB
     symbol:
@@ -223,7 +223,7 @@ metrics:
       OID: 1.3.6.1.4.1.2021.11.11.0
       chart_meta:
         description: The percentage of processor time spent idle, calculated over the last minute
-        family: CPU/Usage/Idle
+        family: 'CPU/Usage/Idle'
         unit: "%"
   - MIB: UCD-SNMP-MIB
     symbol:
@@ -232,7 +232,7 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: The number of 'ticks' spent processing user-level code
-        family: CPU/Time/User
+        family: 'CPU/Time/User'
         unit: "{tick}"
   - MIB: UCD-SNMP-MIB
     symbol:
@@ -241,7 +241,7 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: The number of 'ticks' spent processing reduced-priority code
-        family: CPU/Time/Nice
+        family: 'CPU/Time/Nice'
         unit: "{tick}"
   - MIB: UCD-SNMP-MIB
     symbol:
@@ -250,7 +250,7 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: The number of 'ticks' spent processing system-level code
-        family: CPU/Time/System
+        family: 'CPU/Time/System'
         unit: "{tick}"
   - MIB: UCD-SNMP-MIB
     symbol:
@@ -259,7 +259,7 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: The number of 'ticks' spent idle
-        family: CPU/Time/Idle
+        family: 'CPU/Time/Idle'
         unit: "{tick}"
   - MIB: UCD-SNMP-MIB
     symbol:
@@ -268,7 +268,7 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: The number of 'ticks' spent waiting for IO
-        family: CPU/Time/IOWait
+        family: 'CPU/Time/IOWait'
         unit: "{tick}"
   - MIB: UCD-SNMP-MIB
     symbol:
@@ -277,7 +277,7 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: The number of 'ticks' spent processing kernel-level code
-        family: CPU/Time/Kernel
+        family: 'CPU/Time/Kernel'
         unit: "{tick}"
   - MIB: UCD-SNMP-MIB
     symbol:
@@ -286,5 +286,5 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: The number of 'ticks' spent processing hardware interrupts
-        family: CPU/Time/Interrupt
+        family: 'CPU/Time/Interrupt'
         unit: "{tick}"

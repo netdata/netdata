@@ -34,7 +34,7 @@ metrics:
       name: silverpeak.mgmt.spsActiveAlarmCount
       chart_meta:
         description: The number of active alarm entries in the alarm table
-        family: "Alarm/Active/Count"
+        family: 'Alarm/Active/Count'
         unit: "{alarm}"
 
   - MIB: SILVERPEAK-MGMT-MIB
@@ -46,7 +46,7 @@ metrics:
         name: silverpeak.mgmt.spsActiveAlarmSeverity
         chart_meta:
           description: Severity level of the active alarm
-          family: "Alarm/Severity/Level"
+          family: 'Alarm/Severity/Level'
           unit: "{status}"
         mapping:
           0: info
@@ -62,7 +62,7 @@ metrics:
         name: silverpeak.mgmt.spsActiveAlarmAcked
         chart_meta:
           description: Acknowledgement status of the active alarm
-          family: "Alarm/Acknowledgement/Status"
+          family: 'Alarm/Acknowledgement/Status'
           unit: "{status}"
         mapping:
           0: no
@@ -71,7 +71,7 @@ metrics:
         name: silverpeak.mgmt.spsActiveAlarmActive
         chart_meta:
           description: Active status of the alarm
-          family: "Alarm/Active/Status"
+          family: 'Alarm/Active/Status'
           unit: "{status}"
         mapping:
           0: no
@@ -80,7 +80,7 @@ metrics:
         name: silverpeak.mgmt.spsActiveAlarmClearable
         chart_meta:
           description: Whether the alarm can be manually cleared
-          family: "Alarm/Clearable"
+          family: 'Alarm/Clearable'
           unit: "{status}"
         mapping:
           0: no
@@ -89,7 +89,7 @@ metrics:
         name: silverpeak.mgmt.spsActiveAlarmServiceAffect
         chart_meta:
           description: Whether the alarm affects service
-          family: "Alarm/ServiceImpact"
+          family: 'Alarm/ServiceImpact'
           unit: "{status}"
         mapping:
           0: no

@@ -38,7 +38,7 @@ metrics:
       OID: 1.3.6.1.4.1.890.1.15.3.2.4.0
       chart_meta:
         description: Device CPU usage (%)
-        family: CPU/Usage
+        family: 'CPU/Usage'
         unit: "%"
 
   - MIB: ZYXEL-ES-COMMON
@@ -47,5 +47,5 @@ metrics:
       OID: 1.3.6.1.4.1.890.1.15.3.2.5.0
       chart_meta:
         description: Device memory usage (%)
-        family: Memory/Usage
+        family: 'Memory/Usage'
         unit: "%"

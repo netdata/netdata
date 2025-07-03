@@ -17,7 +17,7 @@ metrics:
       name: roomalert.3s.internal_tempf
       chart_meta:
         description: Internal temperature
-        family: Sensor/Internal/Temperature/Value
+        family: 'Sensor/Internal/Temperature/Value'
         unit: "degF"
   - MIB: ROOMALERT3S-MIB
     symbol:
@@ -25,7 +25,7 @@ metrics:
       name: roomalert.3s.internal_tempc
       chart_meta:
         description: Internal temperature
-        family: Sensor/Internal/Temperature/Value
+        family: 'Sensor/Internal/Temperature/Value'
         unit: "Cel"
   - MIB: ROOMALERT3S-MIB
     symbol:
@@ -33,7 +33,7 @@ metrics:
       name: roomalert.3s.digital_sen1_1
       chart_meta:
         description: Current temperature
-        family: Sensor/Digital/Temperature/Value
+        family: 'Sensor/Digital/Temperature/Value'
         unit: "Cel"
   - MIB: ROOMALERT3S-MIB
     symbol:
@@ -41,7 +41,7 @@ metrics:
       name: roomalert.3s.digital_sen1_2
       chart_meta:
         description: Current temperature
-        family: Sensor/Digital/Temperature/Value
+        family: 'Sensor/Digital/Temperature/Value'
         unit: "degF"
   # - MIB: ROOMALERT3S-MIB
   #   symbol:
@@ -68,7 +68,7 @@ metrics:
       name: roomalert.3s.digital_sen1_6
       chart_meta:
         description: Current dew point
-        family: Sensor/Digital/DewPoint/Value
+        family: 'Sensor/Digital/DewPoint/Value'
         unit: "Cel"
   - MIB: ROOMALERT3S-MIB
     symbol:
@@ -76,7 +76,7 @@ metrics:
       name: roomalert.3s.digital_sen1_7
       chart_meta:
         description: Current dew point
-        family: Sensor/Digital/DewPoint/Value
+        family: 'Sensor/Digital/DewPoint/Value'
         unit: "degF"
   - MIB: ROOMALERT3S-MIB
     symbol:
@@ -84,7 +84,7 @@ metrics:
       name: roomalert.3s.switch_sen1
       chart_meta:
         description: The reading for switch sensor 1
-        family: Sensor/Switch/Status
+        family: 'Sensor/Switch/Status'
         unit: "{status}"
       mapping:
         0: open

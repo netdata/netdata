@@ -20,49 +20,49 @@ metrics:
         name: slbStatsCreatedConnections
         chart_meta:
           description: Number of TCP and UDP connections created since SLB was configured
-          family: SLB/Connection/Created
+          family: 'SLB/Connection/Created'
           unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.161.1.1.1.1.7
         name: slbStatsCreatedHCConnections
         chart_meta:
           description: Number of connections created by SLB since it was configured (64-bit)
-          family: SLB/Connection/Created
+          family: 'SLB/Connection/Created'
           unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.161.1.1.1.1.8
         name: slbStatsEstablishedConnections
         chart_meta:
           description: Number of connections established through SLB
-          family: SLB/Connection/Established
+          family: 'SLB/Connection/Established'
           unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.161.1.1.1.1.9
         name: slbStatsEstablishedHCConnections
         chart_meta:
           description: Number of connections established through SLB (64-bit)
-          family: SLB/Connection/Established
+          family: 'SLB/Connection/Established'
           unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.161.1.1.1.1.10
         name: slbStatsDestroyedConnections
         chart_meta:
           description: Number of TCP and UDP connections destroyed by SLB
-          family: SLB/Connection/Destroyed
+          family: 'SLB/Connection/Destroyed'
           unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.161.1.1.1.1.11
         name: slbStatsDestroyedHCConnections
         chart_meta:
           description: Number of TCP and UDP connections destroyed by SLB (64-bit)
-          family: SLB/Connection/Destroyed
+          family: 'SLB/Connection/Destroyed'
           unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.161.1.1.1.1.12
         name: slbStatsReassignedConnections
         chart_meta:
           description: Number of TCP and UDP connections reassigned from one real server to another
-          family: SLB/Connection/Reassigned
+          family: 'SLB/Connection/Reassigned'
           unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.161.1.1.1.1.13
         name: slbStatsReassignedHCConnections
         chart_meta:
           description: Number of TCP and UDP connections reassigned from one real server to another (64-bit)
-          family: SLB/Connection/Reassigned
+          family: 'SLB/Connection/Reassigned'
           unit: "{connection}/s"
     metric_tags:
       - tag: slb_entity_index
@@ -77,175 +77,175 @@ metrics:
         name: cslbxStatsCurrConnections
         chart_meta:
           description: Number of connections currently still open
-          family: SLB/Connection/Current
+          family: 'SLB/Connection/Current'
           unit: "{connection}"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.5
         name: cslbxStatsFailedConns
         chart_meta:
           description: Number of connections that were load balanced to real servers that then failed to respond
-          family: SLB/Connection/Failed
+          family: 'SLB/Connection/Failed'
           unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.7
         name: cslbxStatsL4PolicyConns
         chart_meta:
           description: Number of connections made to the virtual servers with only layer 4 configuration
-          family: SLB/VirtualServer/Layer4/Connection
+          family: 'SLB/VirtualServer/Layer4/Connection'
           unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.26
         name: cslbxStatsL4PolicyHCConns
         chart_meta:
           description: Number of connections made to the virtual servers with only layer 4 configuration (64-bit)
-          family: SLB/VirtualServer/Layer4/Connection
+          family: 'SLB/VirtualServer/Layer4/Connection'
           unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.8
         name: cslbxStatsL7PolicyConns
         chart_meta:
           description: Number of connections made to the virtual servers with some layer 7 configuration
-          family: SLB/VirtualServer/Layer7/Connection
+          family: 'SLB/VirtualServer/Layer7/Connection'
           unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.27
         name: cslbxStatsL7PolicyHCConns
         chart_meta:
           description: Number of connections made to the virtual servers with some layer 7 configuration (64-bit)
-          family: SLB/VirtualServer/Layer7/Connection
+          family: 'SLB/VirtualServer/Layer7/Connection'
           unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.9
         name: cslbxStatsDroppedL4PolicyConns
         chart_meta:
           description: Number of connections dropped by virtual servers with only layer 4 configuration
-          family: SLB/VirtualServer/Layer4/Dropped
+          family: 'SLB/VirtualServer/Layer4/Dropped'
           unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.28
         name: cslbxStatsDroppedL4PolicyHCConns
         chart_meta:
           description: Number of connections dropped by virtual servers with only layer 4 configuration (64-bit)
-          family: SLB/VirtualServer/Layer4/Dropped
+          family: 'SLB/VirtualServer/Layer4/Dropped'
           unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.10
         name: cslbxStatsDroppedL7PolicyConns
         chart_meta:
           description: Number of connections dropped by virtual servers with some layer 7 policy
-          family: SLB/VirtualServer/Layer7/Dropped
+          family: 'SLB/VirtualServer/Layer7/Dropped'
           unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.29
         name: cslbxStatsDroppedL7PolicyHCConns
         chart_meta:
           description: Number of connections dropped by virtual servers with some layer 7 configuration
-          family: SLB/VirtualServer/Layer7/Dropped
+          family: 'SLB/VirtualServer/Layer7/Dropped'
           unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.11
         name: cslbxStatsFtpConns
         chart_meta:
           description: Number of connections made to virtual servers with the FTP service
-          family: SLB/VirtualServer/FTP/Connection
+          family: 'SLB/VirtualServer/FTP/Connection'
           unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.12
         name: cslbxStatsHttpRedirectConns
         chart_meta:
           description: Number of connections made to HTTP redirect servers
-          family: SLB/HTTPRedirect/Connection
+          family: 'SLB/HTTPRedirect/Connection'
           unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.13
         name: cslbxStatsDroppedRedirectConns
         chart_meta:
           description: Number of connections dropped by HTTP redirect servers
-          family: SLB/HTTPRedirect/Dropped
+          family: 'SLB/HTTPRedirect/Dropped'
           unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.14
         name: cslbxStatsNoMatchPolicyRejects
         chart_meta:
           description: Number of connections rejected because they failed to match any configured policy
-          family: SLB/Connection/Rejected/NoPolicy
+          family: 'SLB/Connection/Rejected/NoPolicy'
           unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.30
         name: cslbxStatsNoMatchPolicyHCRejects
         chart_meta:
           description: Number of connections rejected because they failed to match any configured policy (64-bit)
-          family: SLB/Connection/Rejected/NoPolicy
+          family: 'SLB/Connection/Rejected/NoPolicy'
           unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.15
         name: cslbxStatsNoCfgPolicyRejects
         chart_meta:
           description: Number of connections rejected because the matching virtual server was not configured with any policy
-          family: SLB/Connection/Rejected/NoConfig
+          family: 'SLB/Connection/Rejected/NoConfig'
           unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.31
         name: cslbxStatsNoCfgPolicyHCRejects
         chart_meta:
           description: Number of connections rejected because the matching virtual server was not configured with any policy (64-bit)
-          family: SLB/Connection/Rejected/NoConfig
+          family: 'SLB/Connection/Rejected/NoConfig'
           unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.16
         name: cslbxStatsNoActiveServerRejects
         chart_meta:
           description: Number of connections rejected because the chosen server farm did not have any active servers
-          family: SLB/Connection/Rejected/NoServer
+          family: 'SLB/Connection/Rejected/NoServer'
           unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.17
         name: cslbxStatsAclDenyRejects
         chart_meta:
           description: Number of connections rejected because the the matching client access list was configured to deny access
-          family: SLB/Connection/Rejected/ACL
+          family: 'SLB/Connection/Rejected/ACL'
           unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.32
         name: cslbxStatsAclDenyHCRejects
         chart_meta:
           description: Number of connections rejected because the the matching client access list was configured to deny access (64-bit)
-          family: SLB/Connection/Rejected/ACL
+          family: 'SLB/Connection/Rejected/ACL'
           unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.18
         name: cslbxStatsMaxParseLenRejects
         chart_meta:
           description: Number of connections rejected because the length of an HTTP request or response header exceeded the maximum L7 parse length configured for the matching virtual server
-          family: SLB/Connection/Rejected/ParseLength
+          family: 'SLB/Connection/Rejected/ParseLength'
           unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.19
         name: cslbxStatsBadSslFormatRejects
         chart_meta:
           description: Number of connections rejected because some invalid or unrecognized SSL format was detected
-          family: SLB/Connection/Rejected/SSL
+          family: 'SLB/Connection/Rejected/SSL'
           unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.20
         name: cslbxStatsL7ParserErrorRejects
         chart_meta:
           description: Number of connections rejected because an error occurred while parsing the connection data at Layer 7
-          family: SLB/Connection/Rejected/ParseError
+          family: 'SLB/Connection/Rejected/ParseError'
           unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.21
         name: cslbxStatsVerMismatchRejects
         chart_meta:
           description: Number of connections rejected because the Layer 7 configuration was changed while Layer 7 parsing was occurring on the connection
-          family: SLB/Connection/Rejected/VersionMismatch
+          family: 'SLB/Connection/Rejected/VersionMismatch'
           unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.33
         name: cslbxStatsVerMismatchHCRejects
         chart_meta:
           description: Number of connections rejected because the Layer 7 configuration was changed while Layer 7 parsing was occurring on the connection (64-bit)
-          family: SLB/Connection/Rejected/VersionMismatch
+          family: 'SLB/Connection/Rejected/VersionMismatch'
           unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.22
         name: cslbxStatsOutOfMemoryRejects
         chart_meta:
           description: Number of connections rejected because the SLB module could not allocate the required memory
-          family: SLB/Connection/Rejected/Memory
+          family: 'SLB/Connection/Rejected/Memory'
           unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.23
         name: cslbxStatsTimedOutConnections
         chart_meta:
           description: Number of connections that were terminated because they were idle longer than the configured idle timeout value
-          family: SLB/Connection/Timeout
+          family: 'SLB/Connection/Timeout'
           unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.24
         name: cslbxStatsTcpChecksumErrorPkts
         chart_meta:
           description: Accumulated number of TCP packets which have checksum error
-          family: Network/TCP/Error/Checksum
+          family: 'Network/TCP/Error/Checksum'
           unit: "{error}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.25
         name: cslbxStatsIpChecksumErrorPkts
         chart_meta:
           description: Accumulated number of IP packets which have checksum error
-          family: Network/IP/Error/Checksum
+          family: 'Network/IP/Error/Checksum'
           unit: "{packet}/s"
     metric_tags:
       - tag: slb_entity_index

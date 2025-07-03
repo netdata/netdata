@@ -20,7 +20,7 @@ metrics:
       OID: 1.3.6.1.2.1.25.3.3.1.2.1
       chart_meta:
         description: The average, over the last minute, of the percentage of time that the processor was not idle
-        family: CPU/Usage
+        family: 'CPU/Usage'
         unit: "%"
     # TODO:  The allocation unit size is defined in hrStorageAllocationUnits (1.3.6.1.2.1.25.2.3.1.4).
   - MIB: HOST-RESOURCES-MIB
@@ -29,7 +29,7 @@ metrics:
       OID: 1.3.6.1.2.1.25.2.3.1.5.1
       chart_meta:
         description: The size of the storage represented by this entry, in units of hrStorageAllocationUnits.
-        family: Memory/Total
+        family: 'Memory/Total'
         unit: "By"
       scale_factor: 1024
   - MIB: HOST-RESOURCES-MIB
@@ -38,6 +38,6 @@ metrics:
       OID: 1.3.6.1.2.1.25.2.3.1.6.1
       chart_meta:
         description: The amount of the storage represented by this entry that is allocated, in units of hrStorageAllocationUnits.
-        family: Memory/Used
+        family: 'Memory/Used'
         unit: "By"
       scale_factor: 1024

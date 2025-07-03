@@ -30,7 +30,7 @@ metrics:
       OID: 1.3.6.1.4.1.2021.10.1.5.1
       chart_meta:
         description: The 1,5 and 15 minute load averages as an integer
-        family: "CPU/Load"
+        family: 'CPU/Load'
         unit: "{load_average}"
   - MIB: HOST-RESOURCES-MIB
     symbol:
@@ -38,7 +38,7 @@ metrics:
       OID: 1.3.6.1.2.1.25.2.3.1.6.1  # hrStorageUsed.1 = Physical memory
       chart_meta:
         description: The amount of the storage represented by this entry that is allocated, in units of hrStorageAllocationUnits
-        family: "Memory/Used"
+        family: 'Memory/Used'
         unit: "By"
   - MIB: HOST-RESOURCES-MIB
     symbol:
@@ -46,7 +46,7 @@ metrics:
       name: hrMemoryBuffers
       chart_meta:
         description: The amount of the storage represented by this entry that is allocated, in units of hrStorageAllocationUnits
-        family: "Memory/Buffer"
+        family: 'Memory/Buffer'
         unit: "By"
   - MIB: HOST-RESOURCES-MIB
     symbol:
@@ -54,7 +54,7 @@ metrics:
       name: hrCachedMemory
       chart_meta:
         description: The amount of the storage represented by this entry that is allocated, in units of hrStorageAllocationUnits
-        family: "Memory/Cache"
+        family: 'Memory/Cache'
         unit: "By"
   - MIB: SYNOLOGY-SYSTEM-MIB
     symbol:
@@ -62,7 +62,7 @@ metrics:
       OID: 1.3.6.1.4.1.6574.1.1.0
       chart_meta:
         description: System status
-        family: "System/Status"
+        family: 'System/Status'
         unit: "{status}"
       mapping:
         normal: 1
@@ -73,7 +73,7 @@ metrics:
       OID: 1.3.6.1.4.1.6574.1.2.0
       chart_meta:
         description: The temperature of Disk Station uses Celsius degree
-        family: "System/Temperature/Value"
+        family: 'System/Temperature/Value'
         unit: "Cel"
   - MIB: SYNOLOGY-SYSTEM-MIB
     symbol:
@@ -81,7 +81,7 @@ metrics:
       OID: 1.3.6.1.4.1.6574.1.3.0
       chart_meta:
         description: Power status
-        family: "Power/Status"
+        family: 'Power/Status'
         unit: "{status}"
       mapping:
         normal: 1
@@ -93,7 +93,7 @@ metrics:
       OID: 1.3.6.1.4.1.6574.1.4.1.0
       chart_meta:
         description: Fan status
-        family: "Fan/System/Status"
+        family: 'Fan/System/Status'
         unit: "{status}"
       mapping:
         normal: 1
@@ -105,7 +105,7 @@ metrics:
       OID: 1.3.6.1.4.1.6574.1.4.2.0
       chart_meta:
         description: CPU fan status
-        family: "Fan/CPU/Status"
+        family: 'Fan/CPU/Status'
         unit: "{status}"
       mapping:
         normal: 1
@@ -117,7 +117,7 @@ metrics:
       OID: 1.3.6.1.4.1.6574.1.5.4.0
       chart_meta:
         description: System upgrade availability
-        family: "System/Upgrade/Status"
+        family: 'System/Upgrade/Status'
         unit: "{status}"
       mapping:
         available: 1
@@ -135,13 +135,13 @@ metrics:
         OID: 1.3.6.1.4.1.6574.2.1.1.6
         chart_meta:
           description: The temperature of each disk uses Celsius degree
-          family: "Disk/Temperature/Value"
+          family: 'Disk/Temperature/Value'
           unit: "Cel"
       - OID: 1.3.6.1.4.1.6574.2.1.1.5
         name: synology.diskStatus
         chart_meta:
           description: Disk status
-          family: "Disk/Status"
+          family: 'Disk/Status'
           unit: "{status}"
         mapping:
           1: normal
@@ -173,20 +173,20 @@ metrics:
         metric_type: monotonic_count
         chart_meta:
           description: The free size of raid
-          family: "Storage/RAID/Free"
+          family: 'Storage/RAID/Free'
           unit: "By"
       - name: synology.raidTotalSize
         OID: 1.3.6.1.4.1.6574.3.1.1.5
         metric_type: monotonic_count
         chart_meta:
           description: The total size of raid
-          family: "Storage/RAID/Total"
+          family: 'Storage/RAID/Total'
           unit: "By"
       - OID: 1.3.6.1.4.1.6574.3.1.1.3
         name: synology.raid.raidStatus
         chart_meta:
           description: Raid status
-          family: "Storage/RAID/Status"
+          family: 'Storage/RAID/Status'
           unit: "{status}"
         mapping:
           1: normal
@@ -226,13 +226,13 @@ metrics:
         OID: 1.3.6.1.4.1.6574.5.1.1.5
         chart_meta:
           description: SMART attribute current value
-          family: "Disk/SMART/Current"
+          family: 'Disk/SMART/Current'
           unit: "1"
       - name: synology.diskSMARTAttrThreshold
         OID: 1.3.6.1.4.1.6574.5.1.1.7
         chart_meta:
           description: SMART attribute threshold value
-          family: "Disk/SMART/Threshold"
+          family: 'Disk/SMART/Threshold'
           unit: "1"
     metric_tags:
       - tag: synology_disk_smart_info_dev_name
@@ -262,7 +262,7 @@ metrics:
         OID: 1.3.6.1.4.1.6574.6.1.1.3
         chart_meta:
           description: Number of users using this service
-          family: "Service/User/Active"
+          family: 'Service/User/Active'
           unit: "{user}"
     metric_tags:
       - tag: synology_service_name
@@ -279,31 +279,31 @@ metrics:
         OID: 1.3.6.1.4.1.6574.101.1.1.5
         chart_meta:
           description: The number of read accesses from this device since boot
-          family: "Storage/IO/Operations/Read"
+          family: 'Storage/IO/Operations/Read'
           unit: "{access}/s"
       - name: synology.storageIOWrites
         OID: 1.3.6.1.4.1.6574.101.1.1.6
         chart_meta:
           description: The number of write accesses to this device since boot
-          family: "Storage/IO/Operations/Write"
+          family: 'Storage/IO/Operations/Write'
           unit: "{access}/s"
       - name: synology.storageIOLA
         OID: 1.3.6.1.4.1.6574.101.1.1.8
         chart_meta:
           description: The load of disk (%)
-          family: "Storage/IO/Load"
+          family: 'Storage/IO/Load'
           unit: "%"
       - name: synology.storageIONReadX
         OID: 1.3.6.1.4.1.6574.101.1.1.12
         chart_meta:
           description: The number of bytes read from this device since boot
-          family: "Storage/IO/Throughput/Read"
+          family: 'Storage/IO/Throughput/Read'
           unit: "By/s"
       - name: synology.storageIONWrittenX
         OID: 1.3.6.1.4.1.6574.101.1.1.13
         chart_meta:
           description: The number of bytes written to this device since boot
-          family: "Storage/IO/Throughput/Write"
+          family: 'Storage/IO/Throughput/Write'
           unit: "By/s"
     metric_tags:
       - tag: synology_storage_io_device
@@ -320,31 +320,31 @@ metrics:
         OID: 1.3.6.1.4.1.6574.102.1.1.5
         chart_meta:
           description: The number of read accesses from this device since boot
-          family: "Volume/IO/Operations/Read"
+          family: 'Volume/IO/Operations/Read'
           unit: "{access}/s"
       - name: synology.spaceIOWrites
         OID: 1.3.6.1.4.1.6574.102.1.1.6
         chart_meta:
           description: The number of write accesses to this device since boot
-          family: "Volume/IO/Operations/Write"
+          family: 'Volume/IO/Operations/Write'
           unit: "{access}/s"
       - name: synology.spaceIOLA
         OID: 1.3.6.1.4.1.6574.102.1.1.8
         chart_meta:
           description: The load of disk (%)
-          family: "Volume/IO/Load"
+          family: 'Volume/IO/Load'
           unit: "%"
       - name: synology.spaceIONReadX
         OID: 1.3.6.1.4.1.6574.102.1.1.12
         chart_meta:
           description: The number of bytes read from this device since boot
-          family: "Volume/IO/Throughput/Read"
+          family: 'Volume/IO/Throughput/Read'
           unit: "By/s"
       - name: synology.spaceIONWrittenX
         OID: 1.3.6.1.4.1.6574.102.1.1.13
         chart_meta:
           description: The number of bytes written to this device since boot
-          family: "Volume/IO/Throughput/Write"
+          family: 'Volume/IO/Throughput/Write'
           unit: "By/s"
     metric_tags:
       - tag: synology_space_io_device
@@ -358,7 +358,7 @@ metrics:
       OID: 1.3.6.1.4.1.6574.108.1.0
       chart_meta:
         description: GPU info support status
-        family: "GPU/Support/Status"
+        family: 'GPU/Support/Status'
         unit: "{status}"
       mapping:
         supported: 0
@@ -369,7 +369,7 @@ metrics:
       OID: 1.3.6.1.4.1.6574.108.2.0
       chart_meta:
         description: GPU utilization percentage
-        family: "GPU/Usage"
+        family: 'GPU/Usage'
         unit: "%"
   - MIB: SYNOLOGY-GPUINFO-MIB
     symbol:
@@ -377,5 +377,5 @@ metrics:
       OID: 1.3.6.1.4.1.6574.108.3.0
       chart_meta:
         description: GPU memory utilization percentage
-        family: "GPU/Memory/Usage"
+        family: 'GPU/Memory/Usage'
         unit: "%"

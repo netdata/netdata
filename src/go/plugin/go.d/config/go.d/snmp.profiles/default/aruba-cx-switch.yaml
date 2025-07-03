@@ -42,7 +42,7 @@ metrics:
       OID: 1.3.6.1.2.1.25.3.3.1.2.196608 # hrProcessorLoad.196608
       chart_meta:
         description: The average, over the last minute, of the percentage of time that this processor was not idle
-        family: CPU/Usage
+        family: 'CPU/Usage'
         unit: "%"
   - MIB: ARUBAWIRED-TEMPSENSOR-MIB
     table:
@@ -53,7 +53,7 @@ metrics:
         OID: 1.3.6.1.4.1.47196.4.1.1.3.11.3.1.1.7
         chart_meta:
           description: Current temperature value read from the temperature sensor
-          family: Sensor/Temperature/Value
+          family: 'Sensor/Temperature/Value'
           unit: "Cel"
     metric_tags:
       - symbol:
@@ -74,13 +74,13 @@ metrics:
         OID: 1.3.6.1.4.1.47196.4.1.1.3.11.2.1.1.7
         chart_meta:
           description: Total instantaneous power supplied by the power supply in Watts.
-          family: PowerSupply/Power/Output
+          family: 'PowerSupply/Power/Output'
           unit: "W"
       - name: arubaWiredPSUNumberFailures
         OID: 1.3.6.1.4.1.47196.4.1.1.3.11.2.1.1.9
         chart_meta:
           description: Number of failures the power supply has experienced since the most recent insertion of the power supply and boot of the system.
-          family: PowerSupply/Failure/Count
+          family: 'PowerSupply/Failure/Count'
           unit: "{failure}/s"
     metric_tags:
       - symbol:
@@ -141,13 +141,13 @@ metrics:
         OID: 1.3.6.1.4.1.47196.4.1.1.3.11.5.1.1.8
         chart_meta:
           description: Current RPM read for the fan.
-          family: Fan/Speed
+          family: 'Fan/Speed'
           unit: "{revolution}/min"
       - OID: 1.3.6.1.4.1.47196.4.1.1.3.11.5.1.1.5
         name: arubaWiredFanState
         chart_meta:
           description: Current status for the fan
-          family: Fan/Status
+          family: 'Fan/Status'
           unit: "{status}"
         mapping:
           1: unknown

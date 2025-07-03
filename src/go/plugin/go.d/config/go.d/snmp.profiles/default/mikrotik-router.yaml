@@ -31,43 +31,43 @@ metrics:
         name: mtxrOpticalTemperature
         chart_meta:
           description: Temperature at sensor chip
-          family: Hardware/OpticalModule/Temperature/Value
+          family: 'Hardware/OpticalModule/Temperature/Value'
           unit: "Cel"
       - OID: 1.3.6.1.4.1.14988.1.1.19.1.1.10
         name: mtxrOpticalRxPower
         chart_meta:
           description: Received optical power
-          family: Hardware/OpticalModule/Power/In
+          family: 'Hardware/OpticalModule/Power/In'
           unit: "mW"
       - OID: 1.3.6.1.4.1.14988.1.1.19.1.1.7
         name: mtxrOpticalSupplyVoltage
         chart_meta:
           description: Supply voltage
-          family: Hardware/OpticalModule/Voltage/Supply
+          family: 'Hardware/OpticalModule/Voltage/Supply'
           unit: "V"
       - OID: 1.3.6.1.4.1.14988.1.1.19.1.1.8
         name: mtxrOpticalTxBiasCurrent
         chart_meta:
           description: Transmit bias current
-          family: Hardware/OpticalModule/Current/TxBias
+          family: 'Hardware/OpticalModule/Current/TxBias'
           unit: "mA"
       - OID: 1.3.6.1.4.1.14988.1.1.19.1.1.5
         name: mtxrOpticalWavelength
         chart_meta:
           description: Optical wavelength
-          family: Hardware/OpticalModule/Wavelength
+          family: 'Hardware/OpticalModule/Wavelength'
           unit: "nm"
       - OID: 1.3.6.1.4.1.14988.1.1.19.1.1.9
         name: mtxrOpticalTxPower
         chart_meta:
           description: Transmit optical power
-          family: Hardware/OpticalModule/Power/Out
+          family: 'Hardware/OpticalModule/Power/Out'
           unit: "mW"
       - OID: 1.3.6.1.4.1.14988.1.1.19.1.1.4
         name: mtxrOpticalTxFault
         chart_meta:
           description: Indicates whether the optical transceiver is experiencing a transmit fault
-          family: Hardware/OpticalModule/Transmit/Fault/Status
+          family: 'Hardware/OpticalModule/Transmit/Fault/Status'
           unit: "{status}"
         mapping:
           0: 'ok'
@@ -76,7 +76,7 @@ metrics:
         name: mtxrOpticalRxLoss
         chart_meta:
           description: Indicates whether there is a loss of received optical signal (Rx Loss)
-          family: Hardware/OpticalModule/Receive/Loss/Status
+          family: 'Hardware/OpticalModule/Receive/Loss/Status'
           unit: "{status}"
         mapping:
           0: 'ok'
@@ -99,25 +99,25 @@ metrics:
         name: mtxrPOEPower
         chart_meta:
           description: Power over ethernet
-          family: Interface/PoE/Power
+          family: 'Interface/PoE/Power'
           unit: "W"
       - OID: 1.3.6.1.4.1.14988.1.1.15.1.1.4
         name: mtxrPOEVoltage
         chart_meta:
           description: Power over ethernet voltage
-          family: Interface/PoE/Voltage
+          family: 'Interface/PoE/Voltage'
           unit: "V"
       - OID: 1.3.6.1.4.1.14988.1.1.15.1.1.5
         name: mtxrPOECurrent
         chart_meta:
           description: Power over ethernet current
-          family: Interface/PoE/Current
+          family: 'Interface/PoE/Current'
           unit: "mA"
       - OID: 1.3.6.1.4.1.14988.1.1.15.1.1.3
         name: mtxrPOEStatus
         chart_meta:
           description: Power over ethernet status
-          family: Interface/PoE/Status
+          family: 'Interface/PoE/Status'
           unit: "{status}"
         mapping:
           1: disabled
@@ -144,7 +144,7 @@ metrics:
         name: cpu.usage
         chart_meta:
           description: The average, over the last minute, of the percentage of time that this processor was not idle.
-          family: CPU/Usage
+          family: 'CPU/Usage'
           unit: "%"
     metric_tags:
       - tag: cpu_index
@@ -160,7 +160,7 @@ metrics:
         name: memory.total
         chart_meta:
           description: Total size of the storage in bytes
-          family: Memory/Total
+          family: 'Memory/Total'
           unit: "By"
         transform: |
           {{- $unit := index .Metric.Tags "rm:storage_alloc_unit" | default "1" -}}
@@ -170,7 +170,7 @@ metrics:
         name: memory.used
         chart_meta:
           description: Amount of storage currently allocated in bytes
-          family: Memory/Used
+          family: 'Memory/Used'
           unit: "By"
         transform: |
           {{- $unit := index .Metric.Tags "rm:storage_alloc_unit" | default "1" -}}
@@ -197,7 +197,7 @@ metrics:
       - OID: 1.3.6.1.4.1.14988.1.1.3.100.1.3
         name: mtxrHlSensorValue
         description: Sensor value
-        family: Hardware/Sensor
+        family: 'Hardware/Sensor'
         transform: |
           {{- $sensorType := index .Metric.Tags "rm:sensor_type" | default "" -}}
           {{- $config := get (dict 

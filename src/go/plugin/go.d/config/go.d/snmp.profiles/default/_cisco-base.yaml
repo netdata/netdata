@@ -20,7 +20,7 @@ metrics:
         OID: 1.3.6.1.4.1.9.9.117.1.1.2.1.1
         chart_meta:
           description: Administratively desired FRU power state
-          family: Hardware/FRU/Power/Status/Admin
+          family: 'Hardware/FRU/Power/Status/Admin'
           unit: "{status}"
         mapping:
           1: on
@@ -32,7 +32,7 @@ metrics:
         OID: 1.3.6.1.4.1.9.9.117.1.1.2.1.2
         chart_meta:
           description: Operational FRU power state
-          family: Hardware/FRU/Power/Status/Operational
+          family: 'Hardware/FRU/Power/Status/Operational'
           unit: "{status}"
         mapping:
           1: off_env_other
@@ -51,7 +51,7 @@ metrics:
         name: cefcFRUCurrent
         chart_meta:
           description: Current supplied by the FRU or current required to operate the FRU
-          family: Hardware/FRU/Power/Current
+          family: 'Hardware/FRU/Power/Current'
           unit: "A"
     metric_tags:
       - tag: fru_index
@@ -65,25 +65,25 @@ metrics:
         name: cpmCPUTotalMonIntervalValue
         chart_meta:
           description: Overall CPU busy percentage in the last monitoring interval
-          family: System/CPU/Usage
+          family: 'System/CPU/Usage'
           unit: "%"
       - OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.7
         name: cpmCPUTotal1minRev
         chart_meta:
           description: Overall CPU busy percentage in the last 1 minute period
-          family: System/CPU/Usage
+          family: 'System/CPU/Usage'
           unit: "%"
       - OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.12
         name: cpmCPUMemoryUsed
         chart_meta:
           description: Overall CPU wide system memory which is currently under use
-          family: System/CPU/Memory/Used
+          family: 'System/CPU/Memory/Used'
           unit: "By"
       - OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.13
         name: cpmCPUMemoryFree
         chart_meta:
           description: Overall CPU wide system memory which is currently free
-          family: System/CPU/Memory/Free
+          family: 'System/CPU/Memory/Free'
           unit: "By"
     metric_tags:
       - tag: cpu_index
@@ -98,7 +98,7 @@ metrics:
         name: cieIfResetCount
         chart_meta:
           description: Number of times the interface was internally reset and brought up
-          family: Network/Interface/Reset/Count
+          family: 'Network/Interface/Reset/Count'
           unit: "{reset}/s"
     metric_tags:
       - tag: interface
@@ -117,13 +117,13 @@ metrics:
         name: ciscoEnvMonTemperatureStatusValue
         chart_meta:
           description: Current measurement of the testpoint
-          family: Hardware/Sensor/Temperature/Value
+          family: 'Hardware/Sensor/Temperature/Value'
           unit: "Cel"
       - OID: 1.3.6.1.4.1.9.9.13.1.3.1.6
         name: ciscoEnvMonTemperatureState
         chart_meta:
           description: Current state of the testpoint
-          family: Hardware/Sensor/Temperature/Status
+          family: 'Hardware/Sensor/Temperature/Status'
           unit: "{status}"
         mapping:
           1: normal
@@ -149,7 +149,7 @@ metrics:
         name: ciscoEnvMonSupplyState
         chart_meta:
           description: Current state of the power supply
-          family: Hardware/PowerSupply/Status
+          family: 'Hardware/PowerSupply/Status'
           unit: "{status}"
         mapping:
           1: normal
@@ -185,7 +185,7 @@ metrics:
         name: ciscoEnvMonFanState
         chart_meta:
           description: Current state of the fan
-          family: Hardware/Fan/Status
+          family: 'Hardware/Fan/Status'
           unit: "{status}"
         mapping:
           1: normal
@@ -212,7 +212,7 @@ metrics:
         name: cswStackPortOperStatus
         chart_meta:
           description: State of the stackport
-          family: Hardware/StackWise/Port/Status
+          family: 'Hardware/StackWise/Port/Status'
           unit: "{status}"
         mapping:
           1: up
@@ -238,7 +238,7 @@ metrics:
         name: cswSwitchState
         chart_meta:
           description: Current state of a switch
-          family: Hardware/StackWise/Switch/Status
+          family: 'Hardware/StackWise/Switch/Status'
           unit: "{status}"
         mapping:
           1: waiting
@@ -274,7 +274,7 @@ metrics:
         name: cefcFanTrayOperStatus
         chart_meta:
           description: Operational state of the fan or fan tray
-          family: Hardware/FanTray/Status
+          family: 'Hardware/FanTray/Status'
           unit: "{status}"
         tag: cefc_fan_tray_oper_status
         mapping:
@@ -303,19 +303,19 @@ metrics:
         name: ciscoMemoryPoolUsed
         chart_meta:
           description: Number of bytes from the memory pool currently in use
-          family: System/Memory/Pool/Used
+          family: 'System/Memory/Pool/Used'
           unit: "By"
       - OID: 1.3.6.1.4.1.9.9.48.1.1.1.6
         name: ciscoMemoryPoolFree
         chart_meta:
           description: Number of bytes from the memory pool currently unused
-          family: System/Memory/Pool/Free
+          family: 'System/Memory/Pool/Free'
           unit: "By"
       - OID: 1.3.6.1.4.1.9.9.48.1.1.1.7
         name: ciscoMemoryPoolLargestFree
         chart_meta:
           description: Largest number of contiguous bytes from the memory pool currently unused
-          family: System/Memory/Pool/LargestFree
+          family: 'System/Memory/Pool/LargestFree'
           unit: "By"
     metric_tags:
       - tag: mem_pool_index
@@ -334,7 +334,7 @@ metrics:
         name: cfwConnectionStatCount
         chart_meta:
           description: Integer that contains the value of the resource statistic.
-          family: Network/Firewall/Connection/Count
+          family: 'Network/Firewall/Connection/Count'
           unit: "1"
     metric_tags:
       - tag: conn_stat_id
@@ -393,7 +393,7 @@ metrics:
         name: cfwHardwareStatusValue
         chart_meta:
           description: Current status of the resource
-          family: Hardware/Firewall/Status
+          family: 'Hardware/Firewall/Status'
           unit: "{status}"
         mapping:
           1: other
@@ -423,7 +423,7 @@ metrics:
         name: cvsChassisUpTime
         chart_meta:
           description: Up time for the chassis since last re-initialization
-          family: System/VirtualSwitch/Chassis/Uptime
+          family: 'System/VirtualSwitch/Chassis/Uptime'
           unit: "cs"
     metric_tags:
       - tag: chassis_switch_id
@@ -446,7 +446,7 @@ metrics:
         name: rttMonLatestRttOperSense
         chart_meta:
           description: Sense code for the completion status of the latest RTT operation
-          family: Network/RTT/Operation/Status
+          family: 'Network/RTT/Operation/Status'
           unit: "{status}"
         mapping:
           0: other
@@ -521,7 +521,7 @@ metrics:
         name: rttMonCtrlOperState
         chart_meta:
           description: Used to manage the state of the probe that is implementing conceptual RTT control row.
-          family: Network/RTT/Control/Status/State
+          family: 'Network/RTT/Control/Status/State'
           unit: "{status}"
         mapping:
           1: reset
@@ -535,7 +535,7 @@ metrics:
         name: rttMonCtrlOperTimeoutOccurred
         chart_meta:
           description: Indicates if a timeout occurred for the RTT operation
-          family: Network/RTT/Control/Status/Timeout
+          family: 'Network/RTT/Control/Status/Timeout'
           unit: "{status}"
         mapping:
           1: timeout_occurred
@@ -544,7 +544,7 @@ metrics:
         name: rttMonCtrlOperConnectionLostOccurred
         chart_meta:
           description: Indicates if a connection lost occurred for the RTT operation
-          family: Network/RTT/Control/Status/ConnectionLost
+          family: 'Network/RTT/Control/Status/ConnectionLost'
           unit: "{status}"
         mapping:
           1: connection_lost_occurred
@@ -553,7 +553,7 @@ metrics:
         name: rttMonCtrlOperOverThresholdOccurred
         chart_meta:
           description: Indicates if the latest RTT operation exceeded its configured threshold value
-          family: Network/RTT/Control/Status/OverThreshold
+          family: 'Network/RTT/Control/Status/OverThreshold'
           unit: "{status}"
         mapping:
           1: over_threshold_occurred

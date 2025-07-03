@@ -16,7 +16,7 @@ metrics:
       name: brJamPlace
       chart_meta:
         description: Location of jam
-        family: Printer/Jam/Location/Status
+        family: 'Printer/Jam/Location/Status'
         unit: "{status}"
       mapping:
         0: No Jam
@@ -30,7 +30,7 @@ metrics:
       name: brToner1Low
       chart_meta:
         description: Black toner status
-        family: Printer/Toner/Black/Status
+        family: 'Printer/Toner/Black/Status'
         unit: "{status}"
       mapping:
         0: Toner Full
@@ -43,7 +43,7 @@ metrics:
       name: brToner2Low
       chart_meta:
         description: Cyan toner status
-        family: Printer/Toner/Cyan/Status
+        family: 'Printer/Toner/Cyan/Status'
         unit: "{status}"
       mapping:
         0: Toner Ready
@@ -56,7 +56,7 @@ metrics:
       name: brToner3Low
       chart_meta:
         description: Magenta toner status
-        family: Printer/Toner/Magenta/Status
+        family: 'Printer/Toner/Magenta/Status'
         unit: "{status}"
       mapping:
         0: Toner Ready
@@ -69,7 +69,7 @@ metrics:
       name: brToner4Low
       chart_meta:
         description: Yellow toner status
-        family: Printer/Toner/Yellow/Status
+        family: 'Printer/Toner/Yellow/Status'
         unit: "{status}"
       mapping:
         0: Toner Ready

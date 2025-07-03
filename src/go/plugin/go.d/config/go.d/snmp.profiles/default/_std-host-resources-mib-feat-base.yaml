@@ -11,7 +11,7 @@ metrics:
       name: hrSystemNumUsers
       chart_meta:
         description: The number of user sessions for which this host is storing state information. A session is a collection of processes requiring a single act of user authentication and possibly subject to collective job control.
-        family: System/User/Session/Active
+        family: 'System/User/Session/Active'
         unit: "{session}"
   - MIB: HOST-RESOURCES-MIB
     symbol:
@@ -19,7 +19,7 @@ metrics:
       name: hrSystemProcesses
       chart_meta:
         description: The number of process contexts currently loaded or running on this system.
-        family: System/Process/Active
+        family: 'System/Process/Active'
         unit: "{process}"
   - MIB: HOST-RESOURCES-MIB
     symbol:
@@ -27,7 +27,7 @@ metrics:
       name: hrSystemMaxProcesses
       chart_meta:
         description: The maximum number of process contexts this system can support. If there is no fixed maximum, the value should be zero. On systems that have a fixed maximum, this object can help diagnose failures that occur when this maximum is reached.
-        family: System/Process/Maximum
+        family: 'System/Process/Maximum'
         unit: "{process}"
 
   # Table Objects
@@ -42,7 +42,7 @@ metrics:
         name: cpu.usage
         chart_meta:
           description: The average, over the last minute, of the percentage of time that this processor was not idle.
-          family: CPU/Usage
+          family: 'CPU/Usage'
           unit: "%"
     metric_tags:
       - tag: cpu_index
@@ -66,7 +66,7 @@ metrics:
         name: hrStorageSize
         chart_meta:
           description: Total size of the storage area
-          family: Storage/Total
+          family: 'Storage/Total'
           unit: "By"
         transform: |
           {{- $unit := index .Metric.Tags "rm:storage_alloc_unit" | default "1" -}}
@@ -76,7 +76,7 @@ metrics:
         name: hrStorageUsed
         chart_meta:
           description: Amount of storage used
-          family: Storage/Used
+          family: 'Storage/Used'
           unit: "By"
         transform: |
           {{- $unit := index .Metric.Tags "rm:storage_alloc_unit" | default "1" -}}

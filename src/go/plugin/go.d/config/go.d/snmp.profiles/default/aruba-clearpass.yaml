@@ -16,7 +16,7 @@ metrics:
       OID: 1.3.6.1.2.1.25.3.3.1.2.196608
       chart_meta:
         description: Average percentage of time that this processor was not idle over the last minute
-        family: CPU/Usage
+        family: 'CPU/Usage'
         unit: "%"
   - MIB: UCD-SNMP-MIB
     symbol:
@@ -24,7 +24,7 @@ metrics:
       OID: 1.3.6.1.4.1.2021.4.5.0
       chart_meta:
         description: Total amount of real physical memory installed on this host
-        family: Memory/Physical/Total
+        family: 'Memory/Physical/Total'
         unit: "By"
       scale_factor: 1024
   - MIB: UCD-SNMP-MIB
@@ -33,7 +33,7 @@ metrics:
       OID: 1.3.6.1.4.1.2021.4.6.0
       chart_meta:
         description: Amount of real physical memory currently unused or available
-        family: Memory/Physical/Free
+        family: 'Memory/Physical/Free'
         unit: "By"
       scale_factor: 1024
   - MIB: CPPM-MIB
@@ -45,25 +45,25 @@ metrics:
         OID: 1.3.6.1.4.1.14823.1.6.1.1.1.1.1.12
         chart_meta:
           description: Total amount of memory available in bytes in the ClearPass server
-          family: Memory/Total
+          family: 'Memory/Total'
           unit: "By"
       - name: cppmSystemMemoryFree
         OID: 1.3.6.1.4.1.14823.1.6.1.1.1.1.1.13
         chart_meta:
           description: Amount of free memory in bytes in the ClearPass server
-          family: Memory/Free
+          family: 'Memory/Free'
           unit: "By"
       - name: cppmSystemDiskSpaceTotal
         OID: 1.3.6.1.4.1.14823.1.6.1.1.1.1.1.14
         chart_meta:
           description: Total amount of disk space available in bytes in the ClearPass server
-          family: Storage/Disk/Total
+          family: 'Storage/Disk/Total'
           unit: "By"
       - name: cppmSystemDiskSpaceFree
         OID: 1.3.6.1.4.1.14823.1.6.1.1.1.1.1.15
         chart_meta:
           description: Amount of free disk space in bytes in the ClearPass server
-          family: Storage/Disk/Free
+          family: 'Storage/Disk/Free'
           unit: "By"
     metric_tags:
       - symbol:
@@ -79,31 +79,31 @@ metrics:
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.1.1.1
         chart_meta:
           description: Total time taken for policy evaluation from RADIUS server perspective in milliseconds
-          family: RADIUS/PolicyEvaluation/Time
+          family: 'RADIUS/PolicyEvaluation/Time'
           unit: "ms"
       - name: radAuthRequestTime
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.1.1.2
         chart_meta:
           description: Total time taken for RADIUS request end-to-end in milliseconds
-          family: RADIUS/Request/Time
+          family: 'RADIUS/Request/Time'
           unit: "ms"
       - name: radServerCounterSuccess
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.1.1.3
         chart_meta:
           description: Successful RADIUS request count
-          family: RADIUS/Request/Success
+          family: 'RADIUS/Request/Success'
           unit: "{request}/s"
       - name: radServerCounterFailure
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.1.1.4
         chart_meta:
           description: Failed RADIUS request count
-          family: RADIUS/Request/Failed
+          family: 'RADIUS/Request/Failed'
           unit: "{request}/s"
       - name: radServerCounterCount
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.1.1.5
         chart_meta:
           description: Total RADIUS request count
-          family: RADIUS/Request/Total
+          family: 'RADIUS/Request/Total'
           unit: "{request}/s"
     metric_tags:
       - table: cppmSystemTable
@@ -120,25 +120,25 @@ metrics:
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.2.1.3
         chart_meta:
           description: Total number of successful RADIUS authentications
-          family: RADIUS/Authentication/Success
+          family: 'RADIUS/Authentication/Success'
           unit: "{authentication}/s"
       - name: radAuthCounterFailure
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.2.1.4
         chart_meta:
           description: Total number of failed RADIUS authentications
-          family: RADIUS/Authentication/Failed
+          family: 'RADIUS/Authentication/Failed'
           unit: "{authentication}/s"
       - name: radAuthCounterCount
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.2.1.5
         chart_meta:
           description: Total number of RADIUS authentications
-          family: RADIUS/Authentication/Total
+          family: 'RADIUS/Authentication/Total'
           unit: "{authentication}/s"
       - name: radAuthCounterTime
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.2.1.6
         chart_meta:
           description: Time taken to authenticate against an authentication source in milliseconds
-          family: RADIUS/Authentication/Time
+          family: 'RADIUS/Authentication/Time'
           unit: "ms"
     metric_tags:
       - symbol:
@@ -154,115 +154,115 @@ metrics:
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.1
         chart_meta:
           description: Total number of service policies evaluated
-          family: Policy/Evaluation/Service/Count
+          family: 'Policy/Evaluation/Service/Count'
           unit: "{policy}/s"
       - name: psRolemappingPolicyEvalCount
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.2
         chart_meta:
           description: Total number of role mapping policies evaluated
-          family: Policy/Evaluation/RoleMapping/Count
+          family: 'Policy/Evaluation/RoleMapping/Count'
           unit: "{policy}/s"
       - name: psPosturePolicyEvalCount
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.3
         chart_meta:
           description: Total number of posture policies evaluated
-          family: Policy/Evaluation/Posture/Count
+          family: 'Policy/Evaluation/Posture/Count'
           unit: "{policy}/s"
       - name: psAuditPolicyEvalCount
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.4
         chart_meta:
           description: Total number of audit policies evaluated
-          family: Policy/Evaluation/Audit/Count
+          family: 'Policy/Evaluation/Audit/Count'
           unit: "{policy}/s"
       - name: psRestrictionPolicyEvalCount
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.5
         chart_meta:
           description: Total number of restriction policies evaluated
-          family: Policy/Evaluation/Restriction/Count
+          family: 'Policy/Evaluation/Restriction/Count'
           unit: "{policy}/s"
       - name: psEnforcementPolicyEvalCount
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.6
         chart_meta:
           description: Total number of enforcement policies evaluated
-          family: Policy/Evaluation/Enforcement/Count
+          family: 'Policy/Evaluation/Enforcement/Count'
           unit: "{policy}/s"
       - name: psAuthCounterSuccess
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.14
         chart_meta:
           description: Total number of successful authentications computed on the Policy Server
-          family: Policy/Authentication/Success
+          family: 'Policy/Authentication/Success'
           unit: "{authentication}/s"
       - name: psAuthCounterFailure
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.15
         chart_meta:
           description: Total number of failed authentications computed on the Policy Server
-          family: Policy/Authentication/Failed
+          family: 'Policy/Authentication/Failed'
           unit: "{authentication}/s"
       - name: psAuthCounterTotal
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.16
         chart_meta:
           description: Total number of authentications computed on the Policy Server
-          family: Policy/Authentication/Total
+          family: 'Policy/Authentication/Total'
           unit: "{authentication}/s"
       - name: dailySuccessAuthCount
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.17
         chart_meta:
           description: Total number of successful authentications computed over 24 hours
-          family: Policy/Authentication/Daily/Success
+          family: 'Policy/Authentication/Daily/Success'
           unit: "{authentication}/s"
       - name: dailyFailedAuthCount
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.18
         chart_meta:
           description: Total number of failed authentications computed over 24 hours
-          family: Policy/Authentication/Daily/Failed
+          family: 'Policy/Authentication/Daily/Failed'
           unit: "{authentication}/s"
       - name: dailyTotalAuthCount
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.19
         chart_meta:
           description: Total number of authentications computed over 24 hours
-          family: Policy/Authentication/Daily/Total
+          family: 'Policy/Authentication/Daily/Total'
           unit: "{authentication}/s"
       - name: psServicePolicyEvalTime
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.7
         chart_meta:
           description: Time taken for the evaluation of service policies in milliseconds
-          family: Policy/Evaluation/Service/Time
+          family: 'Policy/Evaluation/Service/Time'
           unit: "ms"
       - name: psRolemappingPolicyEvalTime
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.8
         chart_meta:
           description: Time taken for the evaluation of role mapping policies in milliseconds
-          family: Policy/Evaluation/RoleMapping/Time
+          family: 'Policy/Evaluation/RoleMapping/Time'
           unit: "ms"
       - name: psPosturePolicyEvalTime
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.9
         chart_meta:
           description: Time taken for the evaluation of posture policies in milliseconds
-          family: Policy/Evaluation/Posture/Time
+          family: 'Policy/Evaluation/Posture/Time'
           unit: "ms"
       - name: psAuditPolicyEvalTime
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.10
         chart_meta:
           description: Time taken for the evaluation of audit policies in milliseconds
-          family: Policy/Evaluation/Audit/Time
+          family: 'Policy/Evaluation/Audit/Time'
           unit: "ms"
       - name: psRestrictionPolicyEvalTime
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.11
         chart_meta:
           description: Time taken for the evaluation of restriction policies in milliseconds
-          family: Policy/Evaluation/Restriction/Time
+          family: 'Policy/Evaluation/Restriction/Time'
           unit: "ms"
       - name: psEnforcementPolicyEvalTime
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.12
         chart_meta:
           description: Time taken for the evaluation of enforcement policies in milliseconds
-          family: Policy/Evaluation/Enforcement/Time
+          family: 'Policy/Evaluation/Enforcement/Time'
           unit: "ms"
       - name: psSessionlogTime
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.13
         chart_meta:
           description: Time taken for session logging in milliseconds
-          family: Policy/SessionLogging/Time
+          family: 'Policy/SessionLogging/Time'
           unit: "ms"
     metric_tags:
       - table: cppmSystemTable
@@ -279,25 +279,25 @@ metrics:
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.5.1.3
         chart_meta:
           description: Total number of successful Policy authorizations
-          family: Policy/Authorization/Success
+          family: 'Policy/Authorization/Success'
           unit: "{authorization}/s"
       - name: psAutzCounterFailure
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.5.1.4
         chart_meta:
           description: Total number of failed Policy authorizations
-          family: Policy/Authorization/Failed
+          family: 'Policy/Authorization/Failed'
           unit: "{authorization}/s"
       - name: psAutzCounterCount
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.5.1.5
         chart_meta:
           description: Total number of Policy authorizations
-          family: Policy/Authorization/Total
+          family: 'Policy/Authorization/Total'
           unit: "{authorization}/s"
       - name: psAutzCounterTime
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.5.1.6
         chart_meta:
           description: Time taken for Policy authorizations in milliseconds
-          family: Policy/Authorization/Time
+          family: 'Policy/Authorization/Time'
           unit: "ms"
     metric_tags:
       - symbol:
@@ -313,43 +313,43 @@ metrics:
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.7.1.1
         chart_meta:
           description: Total number of successful TACACS+ authentications
-          family: TACACS/Authentication/Success
+          family: 'TACACS/Authentication/Success'
           unit: "{authentication}/s"
       - name: tacAuthCounterFailure
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.7.1.2
         chart_meta:
           description: Total number of failed TACACS+ authentications
-          family: TACACS/Authentication/Failed
+          family: 'TACACS/Authentication/Failed'
           unit: "{authentication}/s"
       - name: tacAuthCounterCount
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.7.1.3
         chart_meta:
           description: Total number of TACACS+ authentications
-          family: TACACS/Authentication/Total
+          family: 'TACACS/Authentication/Total'
           unit: "{authentication}/s"
       - name: tacAuthCounterTime
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.7.1.4
         chart_meta:
           description: Total time taken to perform TACACS+ authentications end-to-end in milliseconds
-          family: TACACS/Authentication/Time/Total
+          family: 'TACACS/Authentication/Time/Total'
           unit: "ms"
       - name: tacAuthCounterAuthTime
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.7.1.5
         chart_meta:
           description: Time taken for TACACS+ authentications in milliseconds
-          family: TACACS/Authentication/Time
+          family: 'TACACS/Authentication/Time'
           unit: "ms"
       - name: tacServicePolicyEvalTime
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.7.1.6
         chart_meta:
           description: Time taken for TACACS+ service policy evaluation in milliseconds
-          family: TACACS/PolicyEvaluation/Service/Time
+          family: 'TACACS/PolicyEvaluation/Service/Time'
           unit: "ms"
       - name: tacPolicyEvalTime
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.7.1.7
         chart_meta:
           description: Time taken for TACACS+ policy evaluation in milliseconds
-          family: TACACS/PolicyEvaluation/Time
+          family: 'TACACS/PolicyEvaluation/Time'
           unit: "ms"
     metric_tags:
       - table: cppmSystemTable
@@ -366,25 +366,25 @@ metrics:
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.8.1.1
         chart_meta:
           description: Total number of successful TACACS+ authorizations
-          family: TACACS/Authorization/Success
+          family: 'TACACS/Authorization/Success'
           unit: "{authorization}/s"
       - name: tacAutzCounterFailure
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.8.1.2
         chart_meta:
           description: Total number of failed TACACS+ authorizations
-          family: TACACS/Authorization/Failed
+          family: 'TACACS/Authorization/Failed'
           unit: "{authorization}/s"
       - name: tacAutzCounterCount
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.8.1.3
         chart_meta:
           description: Total number of TACACS+ authorizations
-          family: TACACS/Authorization/Total
+          family: 'TACACS/Authorization/Total'
           unit: "{authorization}/s"
       - name: tacAutzCounterTime
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.8.1.4
         chart_meta:
           description: Total time taken to perform TACACS+ authorization end-to-end in milliseconds
-          family: TACACS/Authorization/Time
+          family: 'TACACS/Authorization/Time'
           unit: "ms"
     metric_tags:
       - table: cppmSystemTable
@@ -401,7 +401,7 @@ metrics:
         OID: 1.3.6.1.4.1.14823.1.6.1.1.3.1.1.4
         chart_meta:
           description: Total network traffic in bytes
-          family: Network/Traffic/Total
+          family: 'Network/Traffic/Total'
           unit: "By/s"
     metric_tags:
       - symbol:

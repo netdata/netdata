@@ -72,7 +72,7 @@ metrics:
       name: fgSysCpuUsage
       chart_meta:
         description: Current CPU usage
-        family: CPU/Usage
+        family: 'CPU/Usage'
         unit: "%"
 
   ### Processors
@@ -85,19 +85,19 @@ metrics:
         name: fgProcessorPktRxCount
         chart_meta:
           description: Number of packets received by this processor
-          family: Processor/Packet/In
+          family: 'Processor/Packet/In'
           unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.12356.101.4.4.2.1.7
         name: fgProcessorPktTxCount
         chart_meta:
           description: Number of packets transmitted by this processor
-          family: Processor/Packet/Out
+          family: 'Processor/Packet/Out'
           unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.12356.101.4.4.2.1.8
         name: fgProcessorPktDroppedCount
         chart_meta:
           description: Number of packets dropped by this processor
-          family: Processor/Packet/Dropped
+          family: 'Processor/Packet/Dropped'
           unit: "{drop}/s"
     metric_tags:
       - tag: processor_index
@@ -114,14 +114,14 @@ metrics:
         name: fgProcessorUsage
         chart_meta:
           description: Processor CPU usage averaged over last minute
-          family: Processor/Usage/Total
+          family: 'Processor/Usage/Total'
           unit: "%"
       # The processor's CPU system space usage, which is an average calculated over the last minute.
       - OID: 1.3.6.1.4.1.12356.101.4.4.2.1.10
         name: fgProcessorSysUsage
         chart_meta:
           description: Processor CPU system space usage averaged over last minute
-          family: Processor/Usage/System
+          family: 'Processor/Usage/System'
           unit: "%"
     metric_tags:
       # A unique identifier within the fgProcessorTable.
@@ -138,7 +138,7 @@ metrics:
       name: fgSysMemUsage
       chart_meta:
         description: Current memory utilization
-        family: Memory/Usage
+        family: 'Memory/Usage'
         unit: "%"
   - MIB: FORTINET-FORTIGATE-MIB
     symbol:
@@ -147,7 +147,7 @@ metrics:
       name: fgSysMemCapacity
       chart_meta:
         description: Total physical memory installed in kilobytes
-        family: Memory/Total
+        family: 'Memory/Total'
         unit: "By"
       scale_factor: 1024
   - MIB: FORTINET-FORTIGATE-MIB
@@ -157,7 +157,7 @@ metrics:
       name: fgSysLowMemUsage
       chart_meta:
         description: Current low memory utilization
-        family: Memory/LowMem/Usage
+        family: 'Memory/LowMem/Usage'
         unit: "%"
   - MIB: FORTINET-FORTIGATE-MIB
     symbol:
@@ -166,7 +166,7 @@ metrics:
       name: fgSysLowMemCapacity
       chart_meta:
         description: Total low memory capacity in kilobytes
-        family: Memory/LowMem/Total
+        family: 'Memory/LowMem/Total'
         unit: "By"
       scale_factor: 1024
 
@@ -178,7 +178,7 @@ metrics:
       name: fgSysDiskUsage
       chart_meta:
         description: Current hard disk usage in megabytes
-        family: Disk/Space/Used
+        family: 'Disk/Space/Used'
         unit: "By"
       scale_factor: 1048576
   - MIB: FORTINET-FORTIGATE-MIB
@@ -188,7 +188,7 @@ metrics:
       name: fgSysDiskCapacity
       chart_meta:
         description: Total hard disk capacity in megabytes
-        family: Disk/Space/Total
+        family: 'Disk/Space/Total'
         unit: "By"
       scale_factor: 1048576
 
@@ -204,7 +204,7 @@ metrics:
         name: fgVdEntOpMode
         chart_meta:
           description: Operation mode of the virtual domain
-          family: VirtualDomain/Status/OperationMode
+          family: 'VirtualDomain/Status/OperationMode'
           unit: "{status}"
         mapping:
           1: nat
@@ -214,7 +214,7 @@ metrics:
         name: fgVdEntHaState
         chart_meta:
           description: HA cluster member state of the virtual domain
-          family: VirtualDomain/Status/HighAvailability
+          family: 'VirtualDomain/Status/HighAvailability'
           unit: "{status}"
         mapping:
           1: master
@@ -225,28 +225,28 @@ metrics:
         name: fgVdEntCpuUsage
         chart_meta:
           description: CPU usage of the virtual domain
-          family: VirtualDomain/CPU/Usage
+          family: 'VirtualDomain/CPU/Usage'
           unit: "%"
       # Memory usage of the virtual domain (percentage).
       - OID: 1.3.6.1.4.1.12356.101.3.2.1.1.6
         name: fgVdEntMemUsage
         chart_meta:
           description: Memory usage of the virtual domain
-          family: VirtualDomain/Memory/Usage
+          family: 'VirtualDomain/Memory/Usage'
           unit: "%"
       # Number of active sessions on the virtual domain.
       - OID: 1.3.6.1.4.1.12356.101.3.2.1.1.7
         name: fgVdEntSesCount
         chart_meta:
           description: Number of active sessions on the virtual domain
-          family: VirtualDomain/Session/Active
+          family: 'VirtualDomain/Session/Active'
           unit: "{session}"
       # The session setup rate on the virtual domain.
       - OID: 1.3.6.1.4.1.12356.101.3.2.1.1.8
         name: fgVdEntSesRate
         chart_meta:
           description: Session setup rate on the virtual domain
-          family: VirtualDomain/Session/Rate
+          family: 'VirtualDomain/Session/Rate'
           unit: "{session}/s"
     metric_tags:
       - tag: virtualdomain_index
@@ -265,7 +265,7 @@ metrics:
       name: fgVdNumber
       chart_meta:
         description: Number of virtual domains in vdTable
-        family: VirtualDomain/Active
+        family: 'VirtualDomain/Active'
         unit: "{domain}"
   - MIB: FORTINET-FORTIGATE-MIB
     symbol:
@@ -274,7 +274,7 @@ metrics:
       name: fgVdMaxVdoms
       chart_meta:
         description: Maximum number of virtual domains allowed on the device
-        family: VirtualDomain/Maximum
+        family: 'VirtualDomain/Maximum'
         unit: "{domain}"
 
   ### Interfaces
@@ -308,7 +308,7 @@ metrics:
       name: fgSysSesCount
       chart_meta:
         description: Number of active sessions on the device
-        family: Session/Active/Count
+        family: 'Session/Active/Count'
         unit: "{session}"
   - MIB: FORTINET-FORTIGATE-MIB
     symbol:
@@ -317,7 +317,7 @@ metrics:
       name: fgSysSesRate1
       chart_meta:
         description: Average session setup rate over the past minute
-        family: Session/Rate/Average
+        family: 'Session/Rate/Average'
         unit: "{session}/s"
   - MIB: FORTINET-FORTIGATE-MIB
     symbol:
@@ -326,7 +326,7 @@ metrics:
       name: fgSysSes6Count
       chart_meta:
         description: Number of active IPv6 sessions on the device
-        family: Session/IPv6/Active/Count
+        family: 'Session/IPv6/Active/Count'
         unit: "{session}"
   - MIB: FORTINET-FORTIGATE-MIB
     symbol:
@@ -335,7 +335,7 @@ metrics:
       name: fgSysSes6Rate1
       chart_meta:
         description: Average IPv6 session setup rate over the past minute
-        family: Session/IPv6/Rate/Average
+        family: 'Session/IPv6/Rate/Average'
         unit: "{session}/s"
   - MIB: FORTINET-FORTIGATE-MIB
     symbol:
@@ -344,7 +344,7 @@ metrics:
       name: fgApHTTPConnections
       chart_meta:
         description: Current number of HTTP proxy connections
-        family: Proxy/HTTP/Connection/Active
+        family: 'Proxy/HTTP/Connection/Active'
         unit: "{connection}"
   - MIB: FORTINET-FORTIGATE-MIB
     symbol:
@@ -353,7 +353,7 @@ metrics:
       name: fgApHTTPMaxConnections
       chart_meta:
         description: Maximum number of connections supported by HTTP proxy
-        family: Proxy/HTTP/Connection/Maximum
+        family: 'Proxy/HTTP/Connection/Maximum'
         unit: "{connection}"
 
   ### Firewall
@@ -368,14 +368,14 @@ metrics:
         name: fgFwPolPktCount
         chart_meta:
           description: Number of packets matched to firewall policy
-          family: Firewall/Policy/Packet/Count
+          family: 'Firewall/Policy/Packet/Count'
           unit: "{packet}/s"
       # Number of bytes in packets matching the policy.
       - OID: 1.3.6.1.4.1.12356.101.5.1.2.1.1.3
         name: fgFwPolByteCount
         chart_meta:
           description: Number of bytes in packets matching firewall policy
-          family: Firewall/Policy/Throughput/Total
+          family: 'Firewall/Policy/Throughput/Total'
           unit: "By/s"
     metric_tags:
       # Internal virtual domain index used to uniquely identify rows in this table. This index is also used by other tables referencing a virtual domain.
@@ -395,14 +395,14 @@ metrics:
         name: fgFwPol6PktCount
         chart_meta:
           description: Number of packets matched to firewall policy6
-          family: Firewall/Policy6/Packet/Count
+          family: 'Firewall/Policy6/Packet/Count'
           unit: "{packet}/s"
       # Number of bytes in packets matching the policy. See fgFwPol6PktCount.
       - OID: 1.3.6.1.4.1.12356.101.5.1.2.2.1.3
         name: fgFwPol6ByteCount
         chart_meta:
           description: Number of bytes in packets matching firewall policy6
-          family: Firewall/Policy6/Throughput/Total
+          family: 'Firewall/Policy6/Throughput/Total'
           unit: "By/s"
     metric_tags:
       # Internal virtual domain index used to uniquely identify rows in this table. This index is also used by other tables referencing a virtual domain.

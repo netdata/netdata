@@ -16,7 +16,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.1.2.1.0
       chart_meta:
         description: The total memory
-        family: Memory/Total
+        family: 'Memory/Total'
         unit: "By"
       scale_factor: 1024
 
@@ -26,7 +26,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.1.2.2.0
       chart_meta:
         description: The usage memory
-        family: Memory/Used
+        family: 'Memory/Used'
         unit: "By"
       scale_factor: 1024
 
@@ -36,7 +36,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.1.3.3.0
       chart_meta:
         description: The average CPU usage in last 5 seconds
-        family: CPU/Usage
+        family: 'CPU/Usage'
         unit: "%"
   - MIB: A10-AX-MIB
     symbol:
@@ -44,7 +44,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.1.4.1.0
       chart_meta:
         description: The total space of the disk
-        family: Disk/Total
+        family: 'Disk/Total'
         unit: "By"
       scale_factor: 1048576
 
@@ -54,7 +54,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.1.4.2.0
       chart_meta:
         description: The free space of the disk
-        family: Disk/Free
+        family: 'Disk/Free'
         unit: "By"
       scale_factor: 1048576
 
@@ -64,7 +64,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.1.5.1.0
       chart_meta:
         description: The physical system temperature in Celsius
-        family: Env/Temperature/Value
+        family: 'Env/Temperature/Value'
         unit: "Cel"
   - MIB: A10-AX-MIB
     symbol:
@@ -72,7 +72,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.3.1.2.1.0
       chart_meta:
         description: Total current connections
-        family: Application/Connection/Current/Total
+        family: 'Application/Connection/Current/Total'
         unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
@@ -80,7 +80,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.3.1.2.2.0
       chart_meta:
         description: Total new connections
-        family: Application/Connection/New/Total
+        family: 'Application/Connection/New/Total'
         unit: "{connection}/s"
   - MIB: A10-AX-MIB
     symbol:
@@ -88,7 +88,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.3.1.2.3.0
       chart_meta:
         description: Total new L4 connections
-        family: Application/Connection/New/L4
+        family: 'Application/Connection/New/L4'
         unit: "{connection}/s"
   - MIB: A10-AX-MIB
     symbol:
@@ -96,7 +96,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.3.1.2.4.0
       chart_meta:
         description: Total new L7 connections
-        family: Application/Connection/New/L7
+        family: 'Application/Connection/New/L7'
         unit: "{connection}/s"
   - MIB: A10-AX-MIB
     symbol:
@@ -104,7 +104,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.3.1.2.5.0
       chart_meta:
         description: Total new IP-NAT connections
-        family: Application/Connection/New/IPNAT
+        family: 'Application/Connection/New/IPNAT'
         unit: "{connection}/s"
   - MIB: A10-AX-MIB
     symbol:
@@ -112,7 +112,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.3.1.2.6.0
       chart_meta:
         description: Total new SSL connections
-        family: Application/Connection/New/SSL
+        family: 'Application/Connection/New/SSL'
         unit: "{connection}/s"
   - MIB: A10-AX-MIB
     symbol:
@@ -120,7 +120,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.3.1.2.7.0
       chart_meta:
         description: Total L7 requests
-        family: Application/Request/L7/Total
+        family: 'Application/Request/L7/Total'
         unit: "{request}/s"
   - MIB: A10-AX-MIB
     symbol:
@@ -128,7 +128,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.3.1.2.8.0
       chart_meta:
         description: Total number of buffer drops in the last 10 seconds
-        family: Application/Packet/Dropped/Buffer
+        family: 'Application/Packet/Dropped/Buffer'
         unit: "{packet}"
   - MIB: A10-AX-MIB
     symbol:
@@ -136,7 +136,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.3.1.2.9.0
       chart_meta:
         description: Total number of accumulative buffer drops
-        family: Application/Packet/Dropped/BufferTotal
+        family: 'Application/Packet/Dropped/BufferTotal'
         unit: "{packet}/s"
   - MIB: A10-AX-MIB
     symbol:
@@ -144,7 +144,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.3.1.2.10.0
       chart_meta:
         description: Total number of L4 sessions
-        family: Session/L4/Total
+        family: 'Session/L4/Total'
         unit: "{session}"
   - MIB: A10-AX-MIB
     symbol:
@@ -152,7 +152,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.3.1.3.1.0
       chart_meta:
         description: Application buffer configured limit
-        family: Application/Buffer/Limit
+        family: 'Application/Buffer/Limit'
         unit: "1"
   - MIB: A10-AX-MIB
     symbol:
@@ -160,7 +160,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.3.1.3.2.0
       chart_meta:
         description: Application buffer current usage
-        family: Application/Buffer/Used
+        family: 'Application/Buffer/Used'
         unit: "1"
   - MIB: A10-AX-MIB
     symbol:
@@ -168,7 +168,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.3.5.1.0
       chart_meta:
         description: The total count of open persistent connection-reuse sessions
-        family: Session/ConnectionReuse/Open
+        family: 'Session/ConnectionReuse/Open'
         unit: "{session}"
   - MIB: A10-AX-MIB
     symbol:
@@ -176,7 +176,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.3.5.2.0
       chart_meta:
         description: The total count of active persistent connection-reuse sessions
-        family: Session/ConnectionReuse/Active
+        family: 'Session/ConnectionReuse/Active'
         unit: "{session}"
   - MIB: A10-AX-MIB
     symbol:
@@ -184,7 +184,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.3.5.3.0
       chart_meta:
         description: The total count of established connection-reuse sessions
-        family: Session/ConnectionReuse/Established
+        family: 'Session/ConnectionReuse/Established'
         unit: "{session}"
   - MIB: A10-AX-MIB
     symbol:
@@ -192,7 +192,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.3.5.4.0
       chart_meta:
         description: The total count of terminated connection-reuse sessions
-        family: Session/ConnectionReuse/Terminated
+        family: 'Session/ConnectionReuse/Terminated'
         unit: "{session}"
   - MIB: A10-AX-MIB
     symbol:
@@ -200,7 +200,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.1.0
       chart_meta:
         description: The count of TCP established
-        family: Connection/TCP/Established
+        family: 'Connection/TCP/Established'
         unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
@@ -208,7 +208,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.2.0
       chart_meta:
         description: The count of TCP half open
-        family: Connection/TCP/HalfOpen
+        family: 'Connection/TCP/HalfOpen'
         unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
@@ -216,7 +216,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.3.0
       chart_meta:
         description: The count of UDP connections
-        family: Connection/UDP/Active
+        family: 'Connection/UDP/Active'
         unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
@@ -224,7 +224,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.4.0
       chart_meta:
         description: The count of non TCP/UDP IP sessions
-        family: Session/IP/Other
+        family: 'Session/IP/Other'
         unit: "{session}"
   - MIB: A10-AX-MIB
     symbol:
@@ -232,7 +232,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.5.0
       chart_meta:
         description: The count of others
-        family: Session/Other/Active
+        family: 'Session/Other/Active'
         unit: "{session}"
   - MIB: A10-AX-MIB
     symbol:
@@ -240,7 +240,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.6.0
       chart_meta:
         description: The count of reverse NAT TCP
-        family: Connection/ReverseNAT/TCP
+        family: 'Connection/ReverseNAT/TCP'
         unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
@@ -248,7 +248,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.7.0
       chart_meta:
         description: The count of reverse NAT UDP
-        family: Connection/ReverseNAT/UDP
+        family: 'Connection/ReverseNAT/UDP'
         unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
@@ -256,7 +256,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.9.0
       chart_meta:
         description: The count of free current connections
-        family: Connection/Free
+        family: 'Connection/Free'
         unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
@@ -264,7 +264,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.10.0
       chart_meta:
         description: The count of current connections
-        family: Connection/Current
+        family: 'Connection/Current'
         unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
@@ -272,7 +272,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.11.0
       chart_meta:
         description: The count of freed connections
-        family: Connection/Freed
+        family: 'Connection/Freed'
         unit: "{connection}/s"
   - MIB: A10-AX-MIB
     symbol:
@@ -280,7 +280,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.12.0
       chart_meta:
         description: The count of TCP SYN half open
-        family: Connection/TCP/SynHalfOpen
+        family: 'Connection/TCP/SynHalfOpen'
         unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
@@ -288,7 +288,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.13.0
       chart_meta:
         description: The count of allocated SMP connections
-        family: Connection/SMP/Allocated
+        family: 'Connection/SMP/Allocated'
         unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
@@ -296,7 +296,7 @@ metrics:
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.14.0
       chart_meta:
         description: The count of free SMP connections
-        family: Connection/SMP/Free
+        family: 'Connection/SMP/Free'
         unit: "{connection}"
   - MIB: A10-AX-MIB
     table:
@@ -307,13 +307,13 @@ metrics:
         OID: 1.3.6.1.4.1.22610.2.4.1.5.9.1.4
         chart_meta:
           description: The fan's speed
-          family: Fan/Speed
+          family: 'Fan/Speed'
           unit: "{rotation}/min"
       - name: axFanStatus
         OID: 1.3.6.1.4.1.22610.2.4.1.5.9.1.3
         chart_meta:
           description: Fan status
-          family: Fan/Status
+          family: 'Fan/Status'
           unit: "{status}"
         mapping:
           0: failed
@@ -338,7 +338,7 @@ metrics:
         name: axPowerSupplyVoltageStatus
         chart_meta:
           description: Power Supply voltage status
-          family: PowerSupply/Voltage/Status
+          family: 'PowerSupply/Voltage/Status'
           unit: "{status}"
         mapping:
           0: invalid
@@ -359,7 +359,7 @@ metrics:
         name: axPowerSupplyStatus
         chart_meta:
           description: Power Supply status
-          family: PowerSupply/Status
+          family: 'PowerSupply/Status'
           unit: "{status}"
         mapping:
           0: off
@@ -381,7 +381,7 @@ metrics:
         name: axServerEnabledState
         chart_meta:
           description: The enabled state for this server
-          family: Server/Admin/Status
+          family: 'Server/Admin/Status'
           unit: "{status}"
         mapping:
           0: disabled
@@ -390,7 +390,7 @@ metrics:
         name: axServerMonitorState
         chart_meta:
           description: The server monitor status
-          family: Server/Operational/Status
+          family: 'Server/Operational/Status'
           unit: "{status}"
         mapping:
           0: disabled
@@ -411,19 +411,19 @@ metrics:
         OID: 1.3.6.1.4.1.22610.2.4.3.2.2.2.1.8
         chart_meta:
           description: The current connections from server side
-          family: Server/Connection/Current
+          family: 'Server/Connection/Current'
           unit: "{connection}"
       - name: axServerStatServerTotalCurrL7Reqs
         OID: 1.3.6.1.4.1.22610.2.4.3.2.2.2.1.12
         chart_meta:
           description: The number of current L7 requests if applicable
-          family: Server/Request/L7/Current
+          family: 'Server/Request/L7/Current'
           unit: "{request}"
       - OID: 1.3.6.1.4.1.22610.2.4.3.2.2.2.1.10
         name: axServerStatServerStatus
         chart_meta:
           description: Server status
-          family: Server/Operational/Status
+          family: 'Server/Operational/Status'
           unit: "{status}"
         mapping:
           0: disabled
@@ -444,7 +444,7 @@ metrics:
         name: axServiceGroupDisplayStatus
         chart_meta:
           description: Service group status
-          family: ServiceGroup/Status
+          family: 'ServiceGroup/Status'
           unit: "{status}"
         mapping:
           1: all_up
@@ -488,7 +488,7 @@ metrics:
         name: axVirtualServerDisplayStatus
         chart_meta:
           description: Display status of the virtual server
-          family: VirtualServer/Status
+          family: 'VirtualServer/Status'
           unit: "{status}"
         mapping:
           0: disabled
@@ -522,67 +522,67 @@ metrics:
         OID: 1.3.6.1.4.1.22610.2.4.3.4.2.1.1.3
         chart_meta:
           description: The number of packets received from client to server
-          family: VirtualServer/Packet/In
+          family: 'VirtualServer/Packet/In'
           unit: "{packet}/s"
       - name: axVirtualServerStatBytesIn
         OID: 1.3.6.1.4.1.22610.2.4.3.4.2.1.1.4
         chart_meta:
           description: The number of bytes received from client to server
-          family: VirtualServer/Traffic/In
+          family: 'VirtualServer/Traffic/In'
           unit: "By/s"
       - name: axVirtualServerStatPktsOut
         OID: 1.3.6.1.4.1.22610.2.4.3.4.2.1.1.5
         chart_meta:
           description: The number of packets sent from server to client
-          family: VirtualServer/Packet/Out
+          family: 'VirtualServer/Packet/Out'
           unit: "{packet}/s"
       - name: axVirtualServerStatBytesOut
         OID: 1.3.6.1.4.1.22610.2.4.3.4.2.1.1.6
         chart_meta:
           description: The number of bytes sent from server to client
-          family: VirtualServer/Traffic/Out
+          family: 'VirtualServer/Traffic/Out'
           unit: "By/s"
       - name: axVirtualServerStatPersistConns
         OID: 1.3.6.1.4.1.22610.2.4.3.4.2.1.1.7
         chart_meta:
           description: The persistent connections from client side
-          family: VirtualServer/Connection/Persistent
+          family: 'VirtualServer/Connection/Persistent'
           unit: "{connection}"
       - name: axVirtualServerStatTotConns
         OID: 1.3.6.1.4.1.22610.2.4.3.4.2.1.1.8
         chart_meta:
           description: The total connections from client side
-          family: VirtualServer/Connection/Total
+          family: 'VirtualServer/Connection/Total'
           unit: "{connection}/s"
       - name: axVirtualServerStatCurConns
         OID: 1.3.6.1.4.1.22610.2.4.3.4.2.1.1.9
         chart_meta:
           description: The current connections from client side
-          family: VirtualServer/Connection/Current
+          family: 'VirtualServer/Connection/Current'
           unit: "{connection}"
       - name: axVirtualServerStatTotalL7Reqs
         OID: 1.3.6.1.4.1.22610.2.4.3.4.2.1.1.12
         chart_meta:
           description: The total number of L7 requests if applicable
-          family: VirtualServer/Request/L7/Total
+          family: 'VirtualServer/Request/L7/Total'
           unit: "{request}/s"
       - name: axVirtualServerStatTotalCurrL7Reqs
         OID: 1.3.6.1.4.1.22610.2.4.3.4.2.1.1.13
         chart_meta:
           description: The number of current L7 requests if applicable
-          family: VirtualServer/Request/L7/Current
+          family: 'VirtualServer/Request/L7/Current'
           unit: "{request}"
       - name: axVirtualServerStatTotalSuccL7Reqs
         OID: 1.3.6.1.4.1.22610.2.4.3.4.2.1.1.14
         chart_meta:
           description: The number of successful L7 requests if applicable
-          family: VirtualServer/Request/L7/Successful
+          family: 'VirtualServer/Request/L7/Successful'
           unit: "{request}/s"
       - OID: 1.3.6.1.4.1.22610.2.4.3.4.2.1.1.10
         name: axVirtualServerStatStatus
         chart_meta:
           description: Virtual server status
-          family: VirtualServer/Operational/Status
+          family: 'VirtualServer/Operational/Status'
           unit: "{status}"
         mapping:
           1: up
@@ -607,13 +607,13 @@ metrics:
         OID: 1.3.6.1.4.1.22610.2.4.3.4.4.1.1.12
         chart_meta:
           description: Current connections from client side
-          family: VirtualServer/ServicePort/Connection/Current
+          family: 'VirtualServer/ServicePort/Connection/Current'
           unit: "{connection}"
       - OID: 1.3.6.1.4.1.22610.2.4.3.4.4.1.1.13
         name: axVirtualServerStatPortDisplayStatus
         chart_meta:
           description: Virtual server port display status
-          family: VirtualServer/ServicePort/Status
+          family: 'VirtualServer/ServicePort/Status'
           unit: "{status}"
         mapping:
           0: disabled
@@ -624,7 +624,7 @@ metrics:
         name: axVirtualServerStatPortStatus
         chart_meta:
           description: Virtual server port status
-          family: VirtualServer/ServicePort/Operational/Status
+          family: 'VirtualServer/ServicePort/Operational/Status'
           unit: "{status}"
         mapping:
           1: up

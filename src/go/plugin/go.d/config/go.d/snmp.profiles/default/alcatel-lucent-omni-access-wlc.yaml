@@ -22,7 +22,7 @@ metrics:
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.9.1.3
         chart_meta:
           description: The average, over the last minute, of the percentage of time that this processor was not idle
-          family: CPU/Usage
+          family: 'CPU/Usage'
           unit: "%"
     metric_tags:
       - tag: cpu_index
@@ -40,14 +40,14 @@ metrics:
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.10.1.3
         chart_meta:
           description: Size of the storage filesystem
-          family: Storage/Filesystem/Size
+          family: 'Storage/Filesystem/Size'
           unit: "By"
         scale_factor: 1048576
       - name: sysXStorageUsed
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.10.1.4
         chart_meta:
           description: Storage filesystem usage
-          family: Storage/Filesystem/Used
+          family: 'Storage/Filesystem/Used'
           unit: "By"
         scale_factor: 1048576
     metric_tags:
@@ -72,21 +72,21 @@ metrics:
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.11.1.2
         chart_meta:
           description: Total memory in KB
-          family: Memory/Total
+          family: 'Memory/Total'
           unit: "By"
         scale_factor: 1024
       - name: sysXMemoryUsed
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.11.1.3
         chart_meta:
           description: Used memory in KB
-          family: Memory/Used
+          family: 'Memory/Used'
           unit: "By"
         scale_factor: 1024
       - name: sysXMemoryFree
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.11.1.4
         chart_meta:
           description: Free memory in KB
-          family: Memory/Free
+          family: 'Memory/Free'
           unit: "By"
         scale_factor: 1024
     metric_tags:
@@ -99,7 +99,7 @@ metrics:
       OID: 1.3.6.1.4.1.14823.2.2.1.1.3.1.0
       chart_meta:
         description: Total number of access points connected to this switch
-        family: Wireless/AccessPoint/Connected
+        family: 'Wireless/AccessPoint/Connected'
         unit: "{ap}"
 
   - MIB: WLSX-SWITCH-MIB
@@ -108,7 +108,7 @@ metrics:
       OID: 1.3.6.1.4.1.14823.2.2.1.1.3.2.0
       chart_meta:
         description: Total number of stations associated to this switch.
-        family: Wireless/Station/Associated
+        family: 'Wireless/Station/Associated'
         unit: "{station}"
 
 metric_tags:

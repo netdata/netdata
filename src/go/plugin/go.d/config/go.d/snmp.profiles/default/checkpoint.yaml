@@ -71,25 +71,25 @@ metrics:
         name: multiProcUserTime
         chart_meta:
           description: "Processor user time"
-          family: CPU/Time/User
+          family: 'CPU/Time/User'
           unit: "%"
       - OID: 1.3.6.1.4.1.2620.1.6.7.5.1.3
         name: multiProcSystemTime
         chart_meta:
           description: "Processor system time"
-          family: CPU/Time/System
+          family: 'CPU/Time/System'
           unit: "%"
       - OID: 1.3.6.1.4.1.2620.1.6.7.5.1.4
         name: multiProcIdleTime
         chart_meta:
           description: "Processor idle time"
-          family: CPU/Time/Idle
+          family: 'CPU/Time/Idle'
           unit: "%"
       - OID: 1.3.6.1.4.1.2620.1.6.7.5.1.5
         name: multiProcUsage
         chart_meta:
           description: "Processor usage"
-          family: CPU/Usage
+          family: 'CPU/Usage'
           unit: "%"
     metric_tags:
       - symbol:
@@ -102,7 +102,7 @@ metrics:
       name: procNum
       chart_meta:
         description: "Number of processors"
-        family: CPU/Count
+        family: 'CPU/Count'
         unit: "{processor}"
     # Memory
   - MIB: CHECKPOINT-MIB
@@ -112,7 +112,7 @@ metrics:
       name: memTotalReal64
       chart_meta:
         description: "Total real memory"
-        family: Memory/Real/Total
+        family: 'Memory/Real/Total'
         unit: "By"
   - MIB: CHECKPOINT-MIB
     metric_type: gauge
@@ -121,7 +121,7 @@ metrics:
       name: memActiveReal64
       chart_meta:
         description: "Active real memory"
-        family: Memory/Real/Active
+        family: 'Memory/Real/Active'
         unit: "By"
   - MIB: CHECKPOINT-MIB
     metric_type: gauge
@@ -130,7 +130,7 @@ metrics:
       name: memFreeReal64
       chart_meta:
         description: "Free real memory"
-        family: Memory/Real/Free
+        family: 'Memory/Real/Free'
         unit: "By"
   - MIB: CHECKPOINT-MIB
     metric_type: gauge
@@ -139,7 +139,7 @@ metrics:
       name: memTotalVirtual64
       chart_meta:
         description: "Total virtual memory"
-        family: Memory/Virtual/Total
+        family: 'Memory/Virtual/Total'
         unit: "By"
   - MIB: CHECKPOINT-MIB
     metric_type: gauge
@@ -148,7 +148,7 @@ metrics:
       name: memActiveVirtual64
       chart_meta:
         description: "Active virtual memory"
-        family: Memory/Virtual/Active
+        family: 'Memory/Virtual/Active'
         unit: "By"
     # Disk
   - MIB: CHECKPOINT-MIB
@@ -161,37 +161,37 @@ metrics:
         name: multiDiskSize
         chart_meta:
           description: "Disk size"
-          family: Disk/Size/Total
+          family: 'Disk/Size/Total'
           unit: "GBy"
       - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.4
         name: multiDiskUsed
         chart_meta:
           description: "Disk used"
-          family: Disk/Size/Used
+          family: 'Disk/Size/Used'
           unit: "GBy"
       - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.5
         name: multiDiskFreeTotalBytes
         chart_meta:
           description: "Disk free total bytes"
-          family: Disk/Size/Free
+          family: 'Disk/Size/Free'
           unit: "By"
       - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.7
         name: multiDiskFreeAvailableBytes
         chart_meta:
           description: "Disk free available bytes"
-          family: Disk/Size/Available
+          family: 'Disk/Size/Available'
           unit: "By"
       - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.6
         name: multiDiskFreeTotalPercent
         chart_meta:
           description: "Disk free total percent"
-          family: Disk/Free/Percentage
+          family: 'Disk/Free/Percentage'
           unit: "%"
       - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.8
         name: multiDiskFreeAvailablePercent
         chart_meta:
           description: "Disk free available percent"
-          family: Disk/Available/Percentage
+          family: 'Disk/Available/Percentage'
           unit: "%"
     metric_tags:
       - symbol:
@@ -212,13 +212,13 @@ metrics:
         name: fanSpeedSensorValue
         chart_meta:
           description: "Sensor value"
-          family: Sensor/FanSpeed/Value
+          family: 'Sensor/FanSpeed/Value'
           unit: "{revolution}/s"
       - OID: 1.3.6.1.4.1.2620.1.6.7.8.2.1.6
         name: fanSpeedSensorStatus
         chart_meta:
           description: "Sensor is out of range true(1), false(0), reading error(2)"
-          family: Sensor/FanSpeed/Status
+          family: 'Sensor/FanSpeed/Status'
           unit: "{status}"
         mapping:
           0: "false"
@@ -242,13 +242,13 @@ metrics:
         name: tempertureSensorValue
         chart_meta:
           description: "Sensor value"
-          family: Sensor/Temperature/Value
+          family: 'Sensor/Temperature/Value'
           unit: "Cel"
       - OID: 1.3.6.1.4.1.2620.1.6.7.8.1.1.6
         name: tempertureSensorStatus
         chart_meta:
           description: "Sensor is out of range true(1), false(0), reading error(2)"
-          family: Sensor/Temperature/Status
+          family: 'Sensor/Temperature/Status'
           unit: "{status}"
         mapping:
           0: "false"
@@ -270,7 +270,7 @@ metrics:
       name: fwAccepted
       chart_meta:
         description: "Number of accepted packets"
-        family: Firewall/Packet/Accepted
+        family: 'Firewall/Packet/Accepted'
         unit: "{packet}/s"
   - MIB: CHECKPOINT-MIB
     symbol:
@@ -278,7 +278,7 @@ metrics:
       name: fwDropped
       chart_meta:
         description: "Number of dropped packets"
-        family: Firewall/Packet/Dropped
+        family: 'Firewall/Packet/Dropped'
         unit: "{packet}/s"
   - MIB: CHECKPOINT-MIB
     symbol:
@@ -286,7 +286,7 @@ metrics:
       name: fwRejected
       chart_meta:
         description: "Number of rejected packets"
-        family: Firewall/Packet/Rejected
+        family: 'Firewall/Packet/Rejected'
         unit: "{packet}/s"
   - MIB: CHECKPOINT-MIB
     symbol:
@@ -294,7 +294,7 @@ metrics:
       name: fwNumConn
       chart_meta:
         description: "Number of connections"
-        family: Firewall/Connection/Active
+        family: 'Firewall/Connection/Active'
         unit: "{connection}"
   - MIB: CHECKPOINT-MIB
     symbol:
@@ -302,5 +302,5 @@ metrics:
       name: fwPeakNumConn
       chart_meta:
         description: "Peak number of connections"
-        family: Firewall/Connection/Peak
+        family: 'Firewall/Connection/Peak'
         unit: "{connection}/s"

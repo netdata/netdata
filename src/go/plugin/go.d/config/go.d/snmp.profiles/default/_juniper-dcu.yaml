@@ -10,13 +10,13 @@ metrics:
         name: jnxDcuStatsPackets
         chart_meta:
           description: The number of packets received on this interface, belonging to this address family that match this Destination Class
-          family: Interfaces/DCU/Packet/In
+          family: 'Interfaces/DCU/Packet/In'
           unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.2636.3.6.2.1.5
         name: jnxDcuStatsBytes
         chart_meta:
           description: The number of bytes received on this interface, belonging to this address family that match this Destination Class
-          family: Interfaces/DCU/Traffic/In
+          family: 'Interfaces/DCU/Traffic/In'
           unit: "By/s"
     metric_tags:
       - tag: interface

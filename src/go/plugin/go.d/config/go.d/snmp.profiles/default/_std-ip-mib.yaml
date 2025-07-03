@@ -10,28 +10,28 @@ metrics:
         name: ipSystemStatsHCInOctets
         chart_meta:
           description: Octets received in input IP datagrams
-          family: Network/IP/Traffic/Total/In
+          family: 'Network/IP/Traffic/Total/In'
           unit: "bit/s"
         scale_factor: 8
       - OID: 1.3.6.1.2.1.4.31.1.1.33
         name: ipSystemStatsHCOutOctets
         chart_meta:
           description: The total number of octets in IP datagrams delivered to the lower layers for transmission
-          family: Network/IP/Traffic/Total/Out
+          family: 'Network/IP/Traffic/Total/Out'
           unit: "bit/s"
         scale_factor: 8
       - OID: 1.3.6.1.2.1.4.31.1.1.37
         name: ipSystemStatsHCInMcastOctets
         chart_meta:
           description: The total number of octets received in IP multicast datagrams
-          family: Network/IP/Traffic/Multicast/In
+          family: 'Network/IP/Traffic/Multicast/In'
           unit: "bit/s"
         scale_factor: 8
       - OID: 1.3.6.1.2.1.4.31.1.1.41
         name: ipSystemStatsHCOutMcastOctets
         chart_meta:
           description: The total number of octets transmitted in IP multicast datagrams
-          family: Network/IP/Traffic/Multicast/Out
+          family: 'Network/IP/Traffic/Multicast/Out'
           unit: "bit/s"
         scale_factor: 8
 
@@ -39,148 +39,148 @@ metrics:
         name: ipSystemStatsHCInReceives
         chart_meta:
           description: Input IP datagrams received
-          family: Network/IP/Datagram/Total/In
+          family: 'Network/IP/Datagram/Total/In'
           unit: "{packet}/s"
       - OID: 1.3.6.1.2.1.4.31.1.1.21
         name: ipSystemStatsHCOutRequests
         chart_meta:
           description: The total number of IP datagrams that local IP user-protocols including ICMP supplied to IP in requests for transmission
-          family: Network/IP/Datagram/Request/Out
+          family: 'Network/IP/Datagram/Request/Out'
           unit: "{packet}/s"
       - OID: 1.3.6.1.2.1.4.31.1.1.31
         name: ipSystemStatsHCOutTransmits
         chart_meta:
           description: The total number of IP datagrams that this entity supplied to the lower layers for transmission
-          family: Network/IP/Datagram/Total/Out
+          family: 'Network/IP/Datagram/Total/Out'
           unit: "{packet}/s"
       - OID: 1.3.6.1.2.1.4.31.1.1.43
         name: ipSystemStatsHCInBcastPkts
         chart_meta:
           description: The number of IP broadcast datagrams received
-          family: Network/IP/Datagram/Broadcast/In
+          family: 'Network/IP/Datagram/Broadcast/In'
           unit: "{packet}/s"
       - OID: 1.3.6.1.2.1.4.31.1.1.45
         name: ipSystemStatsHCOutBcastPkts
         chart_meta:
           description: The number of IP broadcast datagrams transmitted
-          family: Network/IP/Datagram/Broadcast/Out
+          family: 'Network/IP/Datagram/Broadcast/Out'
           unit: "{packet}/s"
       - OID: 1.3.6.1.2.1.4.31.1.1.35
         name: ipSystemStatsHCInMcastPkts
         chart_meta:
           description: The number of IP multicast datagrams received
-          family: Network/IP/Datagram/Multicast/In
+          family: 'Network/IP/Datagram/Multicast/In'
           unit: "{packet}/s"
       - OID: 1.3.6.1.2.1.4.31.1.1.39
         name: ipSystemStatsHCOutMcastPkts
         chart_meta:
           description: The number of IP multicast datagrams transmitted
-          family: Network/IP/Datagram/Multicast/Out
+          family: 'Network/IP/Datagram/Multicast/Out'
           unit: "{packet}/s"
 
       - OID: 1.3.6.1.2.1.4.31.1.1.13
         name: ipSystemStatsHCInForwDatagrams
         chart_meta:
           description: Input datagrams for which this entity was not their final IP destination and for which this entity attempted to find a route to forward them to that final destination
-          family: Network/IP/Forward/In
+          family: 'Network/IP/Forward/In'
           unit: "{forward}/s"
       - OID: 1.3.6.1.2.1.4.31.1.1.24
         name: ipSystemStatsHCOutForwDatagrams
         chart_meta:
           description: The number of datagrams for which this entity was not their final IP destination and for which it was successful in finding a path to their final destination
-          family: Network/IP/Forward/Out
+          family: 'Network/IP/Forward/Out'
           unit: "{packet}/s"
 
       - OID: 1.3.6.1.2.1.4.31.1.1.7
         name: ipSystemStatsInHdrErrors
         chart_meta:
           description: Discarded input IP datagrams due to errors in their IP headers
-          family: Network/IP/Error/Header/In
+          family: 'Network/IP/Error/Header/In'
           unit: "{error}/s"
       - OID: 1.3.6.1.2.1.4.31.1.1.8
         name: ipSystemStatsInNoRoutes
         chart_meta:
           description: Input IP datagrams discarded because no route could be found to transmit them to their destination
-          family: Network/IP/Error/NoRoute/In
+          family: 'Network/IP/Error/NoRoute/In'
           unit: "{errors}/s"
       - OID: 1.3.6.1.2.1.4.31.1.1.9
         name: ipSystemStatsInAddrErrors
         chart_meta:
           description: Input IP datagrams discarded due to invalid IP address in header
-          family: Network/IP/Error/Address/In
+          family: 'Network/IP/Error/Address/In'
           unit: "{error}/s"
       - OID: 1.3.6.1.2.1.4.31.1.1.10
         name: ipSystemStatsInUnknownProtos
         chart_meta:
           description: Locally-addressed IP datagrams received successfully but discarded due to an unknown or unsupported protocol
-          family: Network/IP/Error/UnknownProtocol/In
+          family: 'Network/IP/Error/UnknownProtocol/In'
           unit: "{error}/s"
       - OID: 1.3.6.1.2.1.4.31.1.1.11
         name: ipSystemStatsInTruncatedPkts
         chart_meta:
           description: Input IP datagrams discarded due to datagram frame not carrying enough data
-          family: Network/IP/Error/Truncated/In
+          family: 'Network/IP/Error/Truncated/In'
           unit: "{error}/s"
       - OID: 1.3.6.1.2.1.4.31.1.1.16
         name: ipSystemStatsReasmFails
         chart_meta:
           description: The number of failures detected by the IP re-assembly algorithm
-          family: Network/IP/Error/ReassemblyFailure/Count
+          family: 'Network/IP/Error/ReassemblyFailure/Count'
           unit: "{error}/s"
       - OID: 1.3.6.1.2.1.4.31.1.1.17
         name: ipSystemStatsInDiscards
         chart_meta:
           description: The number of input IP datagrams for which no problems were encountered to prevent their continued processing, but were discarded
-          family: Network/IP/Discard/In
+          family: 'Network/IP/Discard/In'
           unit: "{error}/s"
       - OID: 1.3.6.1.2.1.4.31.1.1.22
         name: ipSystemStatsOutNoRoutes
         chart_meta:
           description: The number of locally generated IP datagrams discarded because no route could be found to transmit them to their destination
-          family: Network/IP/Error/NoRoute/Out
+          family: 'Network/IP/Error/NoRoute/Out'
           unit: "{error}/s"
       - OID: 1.3.6.1.2.1.4.31.1.1.28
         name: ipSystemStatsOutFragFails
         chart_meta:
           description: The number of IP datagrams that have been discarded because they needed to be fragmented but could not be
-          family: Network/IP/Error/FragmentationFailure/Out
+          family: 'Network/IP/Error/FragmentationFailure/Out'
           unit: "{error}/s"
       - OID: 1.3.6.1.2.1.4.31.1.1.25
         name: ipSystemStatsOutDiscards
         chart_meta:
           description: The number of output IP datagrams for which no problem was encountered to prevent their transmission to their destination, but were discarded
-          family: Network/IP/Discard/Out
+          family: 'Network/IP/Discard/Out'
           unit: "{error}/s"
 
       - OID: 1.3.6.1.2.1.4.31.1.1.26
         name: ipSystemStatsOutFragReqds
         chart_meta:
           description: The number of IP datagrams that would require fragmentation in order to be transmitted
-          family: Network/IP/Fragmentation/Required/Out
+          family: 'Network/IP/Fragmentation/Required/Out'
           unit: "{packet}/s"
       - OID: 1.3.6.1.2.1.4.31.1.1.27
         name: ipSystemStatsOutFragOKs
         chart_meta:
           description: The number of IP datagrams that have been successfully fragmented
-          family: Network/IP/Fragmentation/Success/Out
+          family: 'Network/IP/Fragmentation/Success/Out'
           unit: "{packet}/s"
       - OID: 1.3.6.1.2.1.4.31.1.1.29
         name: ipSystemStatsOutFragCreates
         chart_meta:
           description: The number of output datagram fragments that have been generated as a result of IP fragmentation
-          family: Network/IP/Fragmentation/Created/Out
+          family: 'Network/IP/Fragmentation/Created/Out'
           unit: "{fragment}/s"
       - OID: 1.3.6.1.2.1.4.31.1.1.14
         name: ipSystemStatsReasmReqds
         chart_meta:
           description: The number of IP fragments received that needed to be reassembled at this interface
-          family: Network/IP/Fragmentation/ReassemblyRequired/In
+          family: 'Network/IP/Fragmentation/ReassemblyRequired/In'
           unit: "{fragment}/s"
       - OID: 1.3.6.1.2.1.4.31.1.1.15
         name: ipSystemStatsReasmOKs
         chart_meta:
           description: The number of IP datagrams successfully reassembled
-          family: Network/IP/Fragmentation/ReassemblySuccess/Count
+          family: 'Network/IP/Fragmentation/ReassemblySuccess/Count'
           unit: "{packet}/s"
     metric_tags:
       - index: 1
@@ -201,28 +201,28 @@ metrics:
         name: ipIfStatsHCInOctets
         chart_meta:
           description: The total number of octets received in input IP datagrams, including those received in error
-          family: Network/Interface/IP/Traffic/Total/In
+          family: 'Network/Interface/IP/Traffic/Total/In'
           unit: "bit/s"
         scale_factor: 8
       - OID: 1.3.6.1.2.1.4.31.3.1.33
         name: ipIfStatsHCOutOctets
         chart_meta:
           description: The total number of octets in IP datagrams delivered to the lower layers for transmission
-          family: Network/Interface/IP/Traffic/Total/Out
+          family: 'Network/Interface/IP/Traffic/Total/Out'
           unit: "bit/s"
         scale_factor: 8
       - OID: 1.3.6.1.2.1.4.31.3.1.37
         name: ipIfStatsHCInMcastOctets
         chart_meta:
           description: The total number of octets received in IP multicast datagrams
-          family: Network/Interface/IP/Traffic/Multicast/In
+          family: 'Network/Interface/IP/Traffic/Multicast/In'
           unit: "bit/s"
         scale_factor: 8
       - OID: 1.3.6.1.2.1.4.31.3.1.41
         name: ipIfStatsHCOutMcastOctets
         chart_meta:
           description: The total number of octets transmitted in IP multicast datagrams
-          family: Network/Interface/IP/Traffic/Multicast/Out
+          family: 'Network/Interface/IP/Traffic/Multicast/Out'
           unit: "bit/s"
         scale_factor: 8
 
@@ -230,142 +230,142 @@ metrics:
         name: ipIfStatsHCInDelivers
         chart_meta:
           description: The total number of datagrams successfully delivered to IP user-protocols including ICMP
-          family: Network/Interface/IP/Datagram/Delivered/In
+          family: 'Network/Interface/IP/Datagram/Delivered/In'
           unit: "{packet}/s"
       - OID: 1.3.6.1.2.1.4.31.3.1.21
         name: ipIfStatsHCOutRequests
         chart_meta:
           description: The total number of IP datagrams that local IP user-protocols including ICMP supplied to IP in requests for transmission
-          family: Network/Interface/IP/Datagram/Request/Out
+          family: 'Network/Interface/IP/Datagram/Request/Out'
           unit: "{packet}/s"
       - OID: 1.3.6.1.2.1.4.31.3.1.31
         name: ipIfStatsHCOutTransmits
         chart_meta:
           description: The total number of IP datagrams that this entity supplied to the lower layers for transmission
-          family: Network/Interface/IP/Datagram/Total/Out
+          family: 'Network/Interface/IP/Datagram/Total/Out'
           unit: "{packet}/s"
       - OID: 1.3.6.1.2.1.4.31.3.1.35
         name: ipIfStatsHCInMcastPkts
         chart_meta:
           description: The number of IP multicast datagrams received
-          family: Network/Interface/IP/Datagram/Multicast/In
+          family: 'Network/Interface/IP/Datagram/Multicast/In'
           unit: "{packet}/s"
       - OID: 1.3.6.1.2.1.4.31.3.1.39
         name: ipIfStatsHCOutMcastPkts
         chart_meta:
           description: The number of IP multicast datagrams transmitted
-          family: Network/Interface/IP/Datagram/Multicast/Out
+          family: 'Network/Interface/IP/Datagram/Multicast/Out'
           unit: "{packet}/s"
       - OID: 1.3.6.1.2.1.4.31.3.1.43
         name: ipIfStatsHCInBcastPkts
         chart_meta:
           description: The number of IP broadcast datagrams received
-          family: Network/Interface/IP/Datagram/Broadcast/In
+          family: 'Network/Interface/IP/Datagram/Broadcast/In'
           unit: "{packet}/s"
       - OID: 1.3.6.1.2.1.4.31.3.1.45
         name: ipIfStatsHCOutBcastPkts
         chart_meta:
           description: The number of IP broadcast datagrams transmitted
-          family: Network/Interface/IP/Datagram/Broadcast/Out
+          family: 'Network/Interface/IP/Datagram/Broadcast/Out'
           unit: "{packet}/s"
 
       - OID: 1.3.6.1.2.1.4.31.3.1.17
         name: ipIfStatsInDiscards
         chart_meta:
           description: The number of input IP datagrams for which no problems were encountered to prevent their continued processing, but were discarded
-          family: Network/Interface/IP/Discard/In
+          family: 'Network/Interface/IP/Discard/In'
           unit: "{error}/s"
       - OID: 1.3.6.1.2.1.4.31.3.1.25
         name: ipIfStatsOutDiscards
         chart_meta:
           description: The number of output IP datagrams for which no problem was encountered to prevent their transmission to their destination, but were discarded
-          family: Network/Interface/IP/Discard/Out
+          family: 'Network/Interface/IP/Discard/Out'
           unit: "{error}/s"
       - OID: 1.3.6.1.2.1.4.31.3.1.7
         name: ipIfStatsInHdrErrors
         chart_meta:
           description: The number of input IP datagrams discarded due to errors in their IP headers
-          family: Network/Interface/IP/Error/Header/In
+          family: 'Network/Interface/IP/Error/Header/In'
           unit: "{error}/s"
       - OID: 1.3.6.1.2.1.4.31.3.1.8
         name: ipIfStatsInNoRoutes
         chart_meta:
           description: The number of input IP datagrams discarded because no route could be found to transmit them to their destination
-          family: Network/Interface/IP/Error/NoRoute/In
+          family: 'Network/Interface/IP/Error/NoRoute/In'
           unit: "{error}/s"
       - OID: 1.3.6.1.2.1.4.31.3.1.9
         name: ipIfStatsInAddrErrors
         chart_meta:
           description: The number of input IP datagrams discarded because the IP address in their IP header's destination field was not a valid address to be received at this entity
-          family: Network/Interface/IP/Error/Address/In
+          family: 'Network/Interface/IP/Error/Address/In'
           unit: "{error}/s"
       - OID: 1.3.6.1.2.1.4.31.3.1.10
         name: ipIfStatsInUnknownProtos
         chart_meta:
           description: The number of locally-addressed IP datagrams received successfully but discarded because of an unknown or unsupported protocol
-          family: Network/Interface/IP/Error/UnknownProtocol/In
+          family: 'Network/Interface/IP/Error/UnknownProtocol/In'
           unit: "{error}/s"
       - OID: 1.3.6.1.2.1.4.31.3.1.11
         name: ipIfStatsInTruncatedPkts
         chart_meta:
           description: The number of input IP datagrams discarded because the datagram frame didn't carry enough data
-          family: Network/Interface/IP/Error/Truncated/In
+          family: 'Network/Interface/IP/Error/Truncated/In'
           unit: "{error}/s"
       - OID: 1.3.6.1.2.1.4.31.3.1.28
         name: ipIfStatsOutFragFails
         chart_meta:
           description: The number of IP datagrams that have been discarded because they needed to be fragmented but could not be
-          family: Network/Interface/IP/Error/FragmentationFailure/Out
+          family: 'Network/Interface/IP/Error/FragmentationFailure/Out'
           unit: "{packet}/s"
       - OID: 1.3.6.1.2.1.4.31.3.1.16
         name: ipIfStatsReasmFails
         chart_meta:
           description: The number of failures detected by the IP re-assembly algorithm
-          family: Network/Interface/IP/Error/ReassemblyFailure/Count
+          family: 'Network/Interface/IP/Error/ReassemblyFailure/Count'
           unit: "{error}/s"
 
       - OID: 1.3.6.1.2.1.4.31.3.1.27
         name: ipIfStatsOutFragOKs
         chart_meta:
           description: The number of IP datagrams that have been successfully fragmented
-          family: Network/Interface/IP/Fragmentation/Success/Out
+          family: 'Network/Interface/IP/Fragmentation/Success/Out'
           unit: "{packet}/s"
       - OID: 1.3.6.1.2.1.4.31.3.1.26
         name: ipIfStatsOutFragReqds
         chart_meta:
           description: The number of IP datagrams that would require fragmentation in order to be transmitted
-          family: Network/Interface/IP/Fragmentation/Required/Out
+          family: 'Network/Interface/IP/Fragmentation/Required/Out'
           unit: "{packet}/s"
       - OID: 1.3.6.1.2.1.4.31.3.1.29
         name: ipIfStatsOutFragCreates
         chart_meta:
           description: The number of output datagram fragments that have been generated as a result of IP fragmentation
-          family: Network/Interface/IP/Fragmentation/Created/Out
+          family: 'Network/Interface/IP/Fragmentation/Created/Out'
           unit: "{fragment}/s"
       - OID: 1.3.6.1.2.1.4.31.3.1.14
         name: ipIfStatsReasmReqds
         chart_meta:
           description: The number of IP fragments received that needed to be reassembled at this interface
-          family: Network/Interface/IP/Fragmentation/ReassemblyRequired/In
+          family: 'Network/Interface/IP/Fragmentation/ReassemblyRequired/In'
           unit: "{fragment}/s"
       - OID: 1.3.6.1.2.1.4.31.3.1.15
         name: ipIfStatsReasmOKs
         chart_meta:
           description: The number of IP datagrams successfully reassembled
-          family: Network/Interface/IP/Fragmentation/ReassemblySuccess/Count
+          family: 'Network/Interface/IP/Fragmentation/ReassemblySuccess/Count'
           unit: "{packet}/s"
 
       - OID: 1.3.6.1.2.1.4.31.3.1.13
         name: ipIfStatsHCInForwDatagrams
         chart_meta:
           description: The number of input datagrams for which this entity was not their final IP destination and for which this entity attempted to find a route to forward them to that final destination
-          family: Network/Interface/IP/Forward/In
+          family: 'Network/Interface/IP/Forward/In'
           unit: "{forward}/s"
       - OID: 1.3.6.1.2.1.4.31.3.1.24
         name: ipIfStatsHCOutForwDatagrams
         chart_meta:
           description: The number of datagrams for which this entity was not their final IP destination and for which it was successful in finding a path to their final destination
-          family: Network/Interface/IP/Forward/Out
+          family: 'Network/Interface/IP/Forward/Out'
           unit: "{packet}/s"
     metric_tags:
       - tag: interface_index
