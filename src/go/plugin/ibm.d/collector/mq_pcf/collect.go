@@ -796,43 +796,48 @@ func (c *Collector) getPCFResponse(requestMd *C.MQMD, hReplyObj C.MQHOBJ) ([]byt
 }
 
 func (c *Collector) collectQueueManagerMetrics(ctx context.Context, mx map[string]int64) error {
-	// For now, try a simple MQCMD_INQUIRE_Q_MGR to get basic status
-	// Note: CPU, memory, and log usage metrics might not be available through PCF
-	// in all MQ versions - they might require resource statistics monitoring
+	// Use MQCMD_INQUIRE_Q_MGR_STATUS to get actual Queue Manager status metrics
+	// This is the proper PCF command for queue manager status information
 	var attrs map[C.MQLONG]interface{}
 
-	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_Q_MGR, nil)
+	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_Q_MGR_STATUS, nil)
 	if err == nil {
-		attrs, err = c.parsePCFResponse(response, "MQCMD_INQUIRE_Q_MGR")
+		attrs, err = c.parsePCFResponse(response, "MQCMD_INQUIRE_Q_MGR_STATUS")
 	}
 
 	// Command tracking is now handled automatically in parsePCFResponse
 	if err != nil {
-		c.Debugf("Queue manager inquiry failed: %v", err)
-		return nil
+		c.Debugf("Queue manager status inquiry failed: %v", err)
+		// Fallback to basic MQCMD_INQUIRE_Q_MGR for minimal status
+		response, err = c.sendPCFCommand(C.MQCMD_INQUIRE_Q_MGR, nil)
+		if err == nil {
+			attrs, err = c.parsePCFResponse(response, "MQCMD_INQUIRE_Q_MGR")
+		}
+		if err != nil {
+			c.Debugf("Queue manager basic inquiry also failed: %v", err)
+			return nil
+		}
 	}
 
-	// Extract metrics - set basic status (1 = running, 0 = unknown)
+	// Set basic status (1 = running if we got any response)
 	mx["qmgr_status"] = 1
 
-	// Try different attribute IDs that might contain the metrics
-	// Extract CPU usage if available (percentage * precision)
-	if cpuLoad, ok := attrs[C.MQLONG(MQIACF_Q_MGR_CPU_LOAD)]; ok {
-		mx["qmgr_cpu_usage"] = int64(cpuLoad.(int32)) * precision / 100
-	}
+	// Extract actual Queue Manager status metrics using real MQ constants
+	// Note: These metrics depend on what the actual MQ version supports
+	// We should examine the attrs map to see what's actually available
 
-	// Extract memory usage if available (bytes)
-	if memUsage, ok := attrs[C.MQLONG(MQIACF_Q_MGR_MEMORY_USAGE)]; ok {
-		mx["qmgr_memory_usage"] = int64(memUsage.(int32))
+	// For now, just log what attributes we received to understand what's available
+	if len(attrs) > 0 {
+		c.Debugf("Queue manager status response contains %d attributes", len(attrs))
+		// Uncomment for debugging: log first few attributes to see what's available
+		// count := 0
+		// for attr, value := range attrs {
+		//     if count < 5 {
+		//         c.Debugf("  Attribute %d = %v", attr, value)
+		//         count++
+		//     }
+		// }
 	}
-
-	// Extract log usage if available (percentage * precision)
-	if logUsage, ok := attrs[C.MQLONG(MQIACF_Q_MGR_LOG_USAGE)]; ok {
-		mx["qmgr_log_usage"] = int64(logUsage.(int32)) * precision / 100
-	}
-
-	// Log successful collection for debugging (removed expensive attribute loop)
-	c.Debugf("Collected queue manager metrics, response had %d attributes", len(attrs))
 
 	return nil
 }
@@ -1452,10 +1457,8 @@ func (c *Collector) collectSingleQueueMetrics(ctx context.Context, queueName, cl
 	}
 
 	// Extract oldest message age if available (seconds)
-	// This metric might also not be available in INQUIRE_Q_STATUS
-	if oldestAge, ok := attrs[MQIA_OLDEST_MSG_AGE]; ok {
-		mx[fmt.Sprintf("queue_%s_oldest_message_age", cleanName)] = int64(oldestAge.(int32))
-	}
+	// Note: Oldest message age metric is not available through standard PCF inquiries
+	// This would require specific queue statistics or reset commands
 
 	// Extract runtime activity metrics that are available from INQUIRE_Q_STATUS
 	if openInputCount, ok := attrs[C.MQIA_OPEN_INPUT_COUNT]; ok {
@@ -1642,9 +1645,8 @@ func (c *Collector) collectSingleTopicMetrics(ctx context.Context, topicName, cl
 		mx[fmt.Sprintf("topic_%s_subscribers", cleanName)] = int64(subscribers.(int32))
 	}
 
-	if messages, ok := attrs[MQIA_TOPIC_MSG_COUNT]; ok {
-		mx[fmt.Sprintf("topic_%s_messages", cleanName)] = int64(messages.(int32))
-	}
+	// Note: Topic message count is not available through standard topic inquiries
+	// This would require specific topic statistics if available
 
 	return nil
 }

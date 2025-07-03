@@ -185,6 +185,7 @@ type pmiStat struct {
 	RangeStatistics        []rangeStat        `xml:"RangeStatistic"`
 	BoundedRangeStatistics []boundedRangeStat `xml:"BoundedRangeStatistic"`
 	DoubleStatistics       []doubleStat       `xml:"DoubleStatistic"`
+	AverageStatistics      []averageStat      `xml:"AverageStatistic"`
 	SubStats               []pmiStat          `xml:"Stat"`
 
 	// Keep single references for backward compatibility (no XML tags!)
@@ -193,6 +194,7 @@ type pmiStat struct {
 	RangeStatistic        *rangeStat        `xml:"-"`
 	BoundedRangeStatistic *boundedRangeStat `xml:"-"`
 	DoubleStatistic       *doubleStat       `xml:"-"`
+	AverageStatistic      *averageStat      `xml:"-"`
 }
 
 type pmiValue struct {
@@ -235,6 +237,16 @@ type doubleStat struct {
 	Double string `xml:"double,attr"`
 }
 
+type averageStat struct {
+	Name         string `xml:"name,attr"`
+	Count        string `xml:"count,attr"`
+	Total        string `xml:"total,attr"`
+	Mean         string `xml:"mean,attr"`
+	Min          string `xml:"min,attr"`
+	Max          string `xml:"max,attr"`
+	SumOfSquares string `xml:"sumOfSquares,attr"`
+}
+
 // populateBackwardCompatibility populates single references from arrays for backward compatibility
 func (s *pmiStat) populateBackwardCompatibility() {
 	if len(s.CountStatistics) > 0 {
@@ -251,6 +263,9 @@ func (s *pmiStat) populateBackwardCompatibility() {
 	}
 	if len(s.DoubleStatistics) > 0 {
 		s.DoubleStatistic = &s.DoubleStatistics[0]
+	}
+	if len(s.AverageStatistics) > 0 {
+		s.AverageStatistic = &s.AverageStatistics[0]
 	}
 
 	// Recursively populate sub-stats

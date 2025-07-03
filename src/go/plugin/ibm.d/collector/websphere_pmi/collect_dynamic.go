@@ -333,20 +333,61 @@ func (w *WebSpherePMI) collectWebMetrics(mx map[string]int64, nodeName, serverNa
 	if strings.Contains(stat.Name, "#") && strings.Contains(stat.Name, ".war") {
 		appName := stat.Name // Use the full application identifier
 		instanceName := fmt.Sprintf("%s.%s.%s", nodeName, serverName, w.sanitizeForMetricName(appName))
+		instanceLabels := map[string]string{
+			"node":        nodeName,
+			"server":      serverName,
+			"application": appName,
+		}
 
 		w.Debugf("Found web application session metrics: app='%s'", appName)
 
-		// Create session management charts for this application
-		w.ensureChartExists("websphere_pmi.web.sessions", "Web Application Sessions", "sessions", "line", "web/sessions", 70500,
-			[]string{"active", "created", "invalidated", "lifetime"}, instanceName, map[string]string{
-				"node":        nodeName,
-				"server":      serverName,
-				"application": appName,
-			})
+		// Chart 1: Session Lifecycle (creation, invalidation rates)
+		w.ensureChartExists("websphere_pmi.web.sessions_lifecycle", "Web Application Session Lifecycle", "sessions/s", "line", "web/sessions", 70500,
+			[]string{"created", "invalidated", "timeout_invalidated"}, instanceName, instanceLabels)
 
-		chartID := fmt.Sprintf("web.sessions_%s", w.sanitizeForChartID(instanceName))
-		w.extractWebSessionMetrics(mx, chartID, stat)
-		w.Debugf("Web application '%s' - extracted session metrics", appName)
+		// Chart 2: Active Sessions (current counts)
+		w.ensureChartExists("websphere_pmi.web.sessions_active", "Web Application Active Sessions", "sessions", "line", "web/sessions", 70501,
+			[]string{"active", "live"}, instanceName, instanceLabels)
+
+		// Chart 3: Session Times (lifetimes and activation times)
+		w.ensureChartExists("websphere_pmi.web.sessions_time", "Web Application Session Times", "milliseconds", "line", "web/sessions", 70502,
+			[]string{"lifetime", "time_since_activated"}, instanceName, instanceLabels)
+
+		// Chart 4: Cache Management (cache-related issues)
+		w.ensureChartExists("websphere_pmi.web.sessions_cache", "Web Application Session Cache", "events", "line", "web/sessions", 70503,
+			[]string{"cache_discarded", "no_room_for_new"}, instanceName, instanceLabels)
+
+		// Chart 5: External Storage Performance
+		w.ensureChartExists("websphere_pmi.web.sessions_external_time", "Web Application Session External Storage Time", "milliseconds", "line", "web/sessions", 70504,
+			[]string{"external_read_time", "external_write_time"}, instanceName, instanceLabels)
+
+		// Chart 6: External Storage Size
+		w.ensureChartExists("websphere_pmi.web.sessions_external_size", "Web Application Session External Storage Size", "bytes", "line", "web/sessions", 70505,
+			[]string{"external_read_size", "external_write_size"}, instanceName, instanceLabels)
+
+		// Chart 7: Session Health (affinity breaks, non-existent activations, object size)
+		w.ensureChartExists("websphere_pmi.web.sessions_health", "Web Application Session Health", "events", "line", "web/sessions", 70506,
+			[]string{"affinity_breaks", "activate_nonexist"}, instanceName, instanceLabels)
+
+		// Chart 8: Session Object Size
+		w.ensureChartExists("websphere_pmi.web.sessions_object_size", "Web Application Session Object Size", "bytes", "line", "web/sessions", 70507,
+			[]string{"object_size"}, instanceName, instanceLabels)
+
+		// Chart IDs for each chart (without websphere_pmi prefix)
+		lifecycleChartID := fmt.Sprintf("web.sessions_lifecycle_%s", w.sanitizeForChartID(instanceName))
+		activeChartID := fmt.Sprintf("web.sessions_active_%s", w.sanitizeForChartID(instanceName))
+		timeChartID := fmt.Sprintf("web.sessions_time_%s", w.sanitizeForChartID(instanceName))
+		cacheChartID := fmt.Sprintf("web.sessions_cache_%s", w.sanitizeForChartID(instanceName))
+		externalTimeChartID := fmt.Sprintf("web.sessions_external_time_%s", w.sanitizeForChartID(instanceName))
+		externalSizeChartID := fmt.Sprintf("web.sessions_external_size_%s", w.sanitizeForChartID(instanceName))
+		healthChartID := fmt.Sprintf("web.sessions_health_%s", w.sanitizeForChartID(instanceName))
+		objectSizeChartID := fmt.Sprintf("web.sessions_object_size_%s", w.sanitizeForChartID(instanceName))
+
+		// Extract all session metrics into mx with proper dimension IDs
+		w.extractWebSessionMetricsToCharts(mx, lifecycleChartID, activeChartID, timeChartID, cacheChartID,
+			externalTimeChartID, externalSizeChartID, healthChartID, objectSizeChartID, stat)
+
+		w.Debugf("Web application '%s' - extracted session metrics for 8 charts", appName)
 	}
 
 	// Check for servlet-specific metrics (if path indicates servlet)
@@ -427,35 +468,61 @@ func (w *WebSpherePMI) collectThreadPoolMetrics(mx map[string]int64, nodeName, s
 
 	if poolName != "" && w.shouldCollectThreadPool(poolName) {
 		instanceName := fmt.Sprintf("%s.%s.%s", nodeName, serverName, poolName)
+		instanceLabels := map[string]string{
+			"node":   nodeName,
+			"server": serverName,
+			"pool":   poolName,
+		}
 
-		// Create chart with shared dimensions for all thread pool instances
-		w.ensureChartExists("websphere_pmi.threading.pools", "Thread Pool Usage", "threads", "stacked", "threading/pools", 70800,
-			[]string{"active", "pool_size", "maximum_size"}, instanceName, map[string]string{
-				"node":   nodeName,
-				"server": serverName,
-				"pool":   poolName,
-			})
+		// Chart 1: Thread Pool Usage (current active threads vs capacity)
+		w.ensureChartExists("websphere_pmi.threading.pools_usage", "Thread Pool Usage", "threads", "stacked", "threading/pools", 70800,
+			[]string{"active", "pool_size", "maximum_size"}, instanceName, instanceLabels)
 
-		// Chart ID is "threading.pools_{instance}" (without websphere_pmi prefix)
-		chartID := fmt.Sprintf("threading.pools_%s", w.sanitizeForChartID(instanceName))
+		// Chart 2: Thread Pool Lifecycle (creation and destruction rates)
+		w.ensureChartExists("websphere_pmi.threading.pools_lifecycle", "Thread Pool Lifecycle", "threads/s", "line", "threading/pools", 70801,
+			[]string{"created", "destroyed"}, instanceName, instanceLabels)
 
-		// Extract thread pool metrics directly into mx with proper dimension IDs
-		w.extractThreadPoolMetrics(mx, chartID, stat)
-		w.Debugf("Thread pool '%s' - extracted metrics for chart %s", poolName, chartID)
+		// Chart 3: Thread Pool Health (hung thread monitoring)
+		w.ensureChartExists("websphere_pmi.threading.pools_health", "Thread Pool Health", "threads", "line", "threading/pools", 70802,
+			[]string{"declared_hung", "cleared_hung", "concurrent_hung"}, instanceName, instanceLabels)
 
-		// Debug: log what's in mx for this chart
+		// Chart 4: Thread Pool Performance (utilization and efficiency)
+		w.ensureChartExists("websphere_pmi.threading.pools_performance", "Thread Pool Performance", "percent", "line", "threading/pools", 70803,
+			[]string{"percent_used", "percent_maxed"}, instanceName, instanceLabels)
+
+		// Chart 5: Thread Pool Active Time
+		w.ensureChartExists("websphere_pmi.threading.pools_time", "Thread Pool Active Time", "milliseconds", "line", "threading/pools", 70804,
+			[]string{"active_time"}, instanceName, instanceLabels)
+
+		// Chart IDs for each chart (without websphere_pmi prefix)
+		usageChartID := fmt.Sprintf("threading.pools_usage_%s", w.sanitizeForChartID(instanceName))
+		lifecycleChartID := fmt.Sprintf("threading.pools_lifecycle_%s", w.sanitizeForChartID(instanceName))
+		healthChartID := fmt.Sprintf("threading.pools_health_%s", w.sanitizeForChartID(instanceName))
+		performanceChartID := fmt.Sprintf("threading.pools_performance_%s", w.sanitizeForChartID(instanceName))
+		timeChartID := fmt.Sprintf("threading.pools_time_%s", w.sanitizeForChartID(instanceName))
+
+		// Extract all thread pool metrics into mx with proper dimension IDs
+		// Note: extractThreadPoolMetrics now handles all metrics and maps them to the right chartIDs
+		w.extractThreadPoolMetricsToCharts(mx, usageChartID, lifecycleChartID, healthChartID, performanceChartID, timeChartID, stat)
+
+		w.Debugf("Thread pool '%s' - extracted metrics for charts: usage=%s, lifecycle=%s, health=%s, performance=%s, time=%s",
+			poolName, usageChartID, lifecycleChartID, healthChartID, performanceChartID, timeChartID)
+
+		// Debug: log what's in mx for these charts
 		foundMetrics := false
-		for k, v := range mx {
-			if strings.HasPrefix(k, chartID) {
-				w.Debugf("Thread pool mx[%s] = %d", k, v)
-				foundMetrics = true
+		chartPrefixes := []string{usageChartID, lifecycleChartID, healthChartID, performanceChartID, timeChartID}
+		for _, prefix := range chartPrefixes {
+			for k, v := range mx {
+				if strings.HasPrefix(k, prefix) {
+					w.Debugf("Thread pool mx[%s] = %d", k, v)
+					foundMetrics = true
+				}
 			}
 		}
 
 		if !foundMetrics {
-			w.Debugf("Thread pool '%s' - no metrics found in stat (BoundedRangeStatistics=%d, CountStatistics=%d)",
-				poolName, len(stat.BoundedRangeStatistics), len(stat.CountStatistics))
-			// The extractThreadPoolMetrics function will handle setting default values
+			w.Debugf("Thread pool '%s' - no metrics found in stat (BoundedRangeStatistics=%d, CountStatistics=%d, TimeStatistics=%d, RangeStatistics=%d)",
+				poolName, len(stat.BoundedRangeStatistics), len(stat.CountStatistics), len(stat.TimeStatistics), len(stat.RangeStatistics))
 		}
 	} else {
 		w.Debugf("Thread pool '%s' skipped (poolName empty or filtered)", poolName)
@@ -866,50 +933,30 @@ func (w *WebSpherePMI) extractStatValues(mx map[string]int64, chartID string, st
 // extractThreadPoolMetrics extracts thread pool metrics with proper dimension IDs
 func (w *WebSpherePMI) extractThreadPoolMetrics(mx map[string]int64, chartID string, stat pmiStat) {
 	// Debug what we have available
-	w.Debugf("Thread pool extracting from stat with %d BoundedRangeStatistics, %d CountStatistics",
-		len(stat.BoundedRangeStatistics), len(stat.CountStatistics))
+	w.Debugf("Thread pool extracting from stat with %d BoundedRangeStatistics, %d CountStatistics, %d TimeStatistics, %d RangeStatistics",
+		len(stat.BoundedRangeStatistics), len(stat.CountStatistics), len(stat.TimeStatistics), len(stat.RangeStatistics))
 
 	foundMetrics := make(map[string]bool)
 
-	// Map WebSphere PMI statistic names to our standard dimension names
-	for _, brs := range stat.BoundedRangeStatistics {
-		var dimensionName string
-		switch brs.Name {
-		case "ActiveCount":
-			dimensionName = "active"
-		case "PoolSize":
-			dimensionName = "pool_size"
-		case "MaxPoolSize":
-			dimensionName = "maximum_size"
-		default:
-			// Log what we're skipping to help debug
-			w.Debugf("Thread pool: skipping BoundedRangeStatistic '%s' (current: %s, upper: %s)", brs.Name, brs.Current, brs.UpperBound)
-			continue
-		}
-
-		if brs.Current != "" {
-			if val, err := strconv.ParseInt(brs.Current, 10, 64); err == nil {
-				// Metric key must match dimension ID: chartID_dimensionName
-				metricKey := fmt.Sprintf("%s_%s", chartID, dimensionName)
-				mx[metricKey] = val
-				foundMetrics[dimensionName] = true
-				w.Debugf("Thread pool metric: %s = %d (from BoundedRangeStatistic %s)", metricKey, val, brs.Name)
-			}
-		}
-	}
-
-	// Also check CountStatistics for MaxPoolSize
+	// Extract from CountStatistics (CreateCount, DestroyCount, DeclaredThreadHungCount, ClearedThreadHangCount, MaxPoolSize)
 	for _, cs := range stat.CountStatistics {
 		var dimensionName string
 		switch cs.Name {
-		case "ActiveCount":
-			dimensionName = "active"
-		case "PoolSize":
-			dimensionName = "pool_size"
+		case "CreateCount":
+			dimensionName = "created"
+		case "DestroyCount":
+			dimensionName = "destroyed"
+		case "DeclaredThreadHungCount":
+			dimensionName = "declared_hung"
+		case "ClearedThreadHangCount":
+			dimensionName = "cleared_hung"
 		case "MaxPoolSize":
 			dimensionName = "maximum_size"
+		case "ActiveCount":
+			dimensionName = "active" // Fallback if not in BoundedRange
+		case "PoolSize":
+			dimensionName = "pool_size" // Fallback if not in BoundedRange
 		default:
-			// Log what we're skipping to help debug
 			w.Debugf("Thread pool: skipping CountStatistic '%s' (value: %s)", cs.Name, cs.Count)
 			continue
 		}
@@ -924,27 +971,375 @@ func (w *WebSpherePMI) extractThreadPoolMetrics(mx map[string]int64, chartID str
 		}
 	}
 
-	// If we didn't find maximum_size, look for it in BoundedRangeStatistics UpperBound
-	if !foundMetrics["maximum_size"] {
-		// Try to find MaxPoolSize or UpperBound in BoundedRangeStatistics
-		for _, brs := range stat.BoundedRangeStatistics {
-			if brs.Name == "MaxPoolSize" && brs.UpperBound != "" {
-				if val, err := strconv.ParseInt(brs.UpperBound, 10, 64); err == nil {
-					metricKey := fmt.Sprintf("%s_maximum_size", chartID)
-					mx[metricKey] = val
-					foundMetrics["maximum_size"] = true
-					w.Debugf("Thread pool metric: %s = %d (from %s.UpperBound)", metricKey, val, brs.Name)
-					break
-				}
-			} else if brs.Name == "PoolSize" && brs.UpperBound != "" && !foundMetrics["maximum_size"] {
-				// Use PoolSize UpperBound as maximum if available
-				if val, err := strconv.ParseInt(brs.UpperBound, 10, 64); err == nil {
-					metricKey := fmt.Sprintf("%s_maximum_size", chartID)
-					mx[metricKey] = val
-					foundMetrics["maximum_size"] = true
-					w.Debugf("Thread pool metric: %s = %d (from %s.UpperBound)", metricKey, val, brs.Name)
-					break
-				}
+	// Extract from BoundedRangeStatistics (ActiveCount, PoolSize, PercentMaxed, PercentUsed)
+	for _, brs := range stat.BoundedRangeStatistics {
+		var dimensionName string
+		switch brs.Name {
+		case "ActiveCount":
+			dimensionName = "active"
+		case "PoolSize":
+			dimensionName = "pool_size"
+		case "PercentMaxed":
+			dimensionName = "percent_maxed"
+		case "PercentUsed":
+			dimensionName = "percent_used"
+		default:
+			w.Debugf("Thread pool: skipping BoundedRangeStatistic '%s' (current: %s)", brs.Name, brs.Current)
+			continue
+		}
+
+		// Use Current value (current state)
+		if brs.Current != "" {
+			if val, err := strconv.ParseInt(brs.Current, 10, 64); err == nil {
+				metricKey := fmt.Sprintf("%s_%s", chartID, dimensionName)
+				mx[metricKey] = val
+				foundMetrics[dimensionName] = true
+				w.Debugf("Thread pool metric: %s = %d (from BoundedRangeStatistic %s)", metricKey, val, brs.Name)
+			}
+		}
+
+		// For WebSphere 8.5.5: Extract maximum_size from PoolSize UpperBound if MaxPoolSize CountStatistic not found
+		if brs.Name == "PoolSize" && !foundMetrics["maximum_size"] && brs.UpperBound != "" {
+			if val, err := strconv.ParseInt(brs.UpperBound, 10, 64); err == nil {
+				metricKey := fmt.Sprintf("%s_maximum_size", chartID)
+				mx[metricKey] = val
+				foundMetrics["maximum_size"] = true
+				w.Debugf("Thread pool metric: %s = %d (from BoundedRangeStatistic %s.UpperBound)", metricKey, val, brs.Name)
+			}
+		}
+	}
+
+	// Extract from RangeStatistics (ConcurrentHungThreadCount)
+	for _, rs := range stat.RangeStatistics {
+		var dimensionName string
+		switch rs.Name {
+		case "ConcurrentHungThreadCount":
+			dimensionName = "concurrent_hung"
+		default:
+			w.Debugf("Thread pool: skipping RangeStatistic '%s' (value: %s)", rs.Name, rs.Current)
+			continue
+		}
+
+		if rs.Current != "" {
+			if val, err := strconv.ParseInt(rs.Current, 10, 64); err == nil {
+				metricKey := fmt.Sprintf("%s_%s", chartID, dimensionName)
+				mx[metricKey] = val
+				foundMetrics[dimensionName] = true
+				w.Debugf("Thread pool metric: %s = %d (from RangeStatistic %s)", metricKey, val, rs.Name)
+			}
+		}
+	}
+
+	// Extract from TimeStatistics (ActiveTime)
+	for _, ts := range stat.TimeStatistics {
+		var dimensionName string
+		switch ts.Name {
+		case "ActiveTime":
+			dimensionName = "active_time"
+		default:
+			w.Debugf("Thread pool: skipping TimeStatistic '%s'", ts.Name)
+			continue
+		}
+
+		// Use totalTime for lifetime total, or count for number of operations
+		totalTimeStr := ts.TotalTime
+		if totalTimeStr == "" {
+			totalTimeStr = ts.Total // Fallback for other versions
+		}
+
+		if totalTimeStr != "" {
+			if val, err := strconv.ParseInt(totalTimeStr, 10, 64); err == nil {
+				metricKey := fmt.Sprintf("%s_%s", chartID, dimensionName)
+				mx[metricKey] = val
+				foundMetrics[dimensionName] = true
+				w.Debugf("Thread pool metric: %s = %d (from TimeStatistic %s.totalTime)", metricKey, val, ts.Name)
+			}
+		}
+	}
+
+	// Note: Do not provide default zero values - let the framework detect missing metrics
+	// This allows proper identification of data collection issues
+}
+
+// extractThreadPoolMetricsToCharts extracts thread pool metrics and distributes them to appropriate charts
+func (w *WebSpherePMI) extractThreadPoolMetricsToCharts(mx map[string]int64, usageChartID, lifecycleChartID, healthChartID, performanceChartID, timeChartID string, stat pmiStat) {
+	// Debug what we have available
+	w.Debugf("Thread pool extracting to charts from stat with %d BoundedRangeStatistics, %d CountStatistics, %d TimeStatistics, %d RangeStatistics",
+		len(stat.BoundedRangeStatistics), len(stat.CountStatistics), len(stat.TimeStatistics), len(stat.RangeStatistics))
+
+	foundMetrics := make(map[string]bool)
+
+	// Extract from CountStatistics (CreateCount, DestroyCount, DeclaredThreadHungCount, ClearedThreadHangCount, MaxPoolSize)
+	for _, cs := range stat.CountStatistics {
+		var chartID, dimensionName string
+		switch cs.Name {
+		case "CreateCount":
+			chartID = lifecycleChartID
+			dimensionName = "created"
+		case "DestroyCount":
+			chartID = lifecycleChartID
+			dimensionName = "destroyed"
+		case "DeclaredThreadHungCount":
+			chartID = healthChartID
+			dimensionName = "declared_hung"
+		case "ClearedThreadHangCount":
+			chartID = healthChartID
+			dimensionName = "cleared_hung"
+		case "MaxPoolSize":
+			chartID = usageChartID
+			dimensionName = "maximum_size"
+		case "ActiveCount":
+			chartID = usageChartID
+			dimensionName = "active" // Fallback if not in BoundedRange
+		case "PoolSize":
+			chartID = usageChartID
+			dimensionName = "pool_size" // Fallback if not in BoundedRange
+		default:
+			w.Debugf("Thread pool: skipping CountStatistic '%s' (value: %s)", cs.Name, cs.Count)
+			continue
+		}
+
+		if cs.Count != "" {
+			if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
+				metricKey := fmt.Sprintf("%s_%s", chartID, dimensionName)
+				mx[metricKey] = val
+				foundMetrics[dimensionName] = true
+				w.Debugf("Thread pool metric: %s = %d (from CountStatistic %s)", metricKey, val, cs.Name)
+			}
+		}
+	}
+
+	// Extract from BoundedRangeStatistics (ActiveCount, PoolSize, PercentMaxed, PercentUsed)
+	for _, brs := range stat.BoundedRangeStatistics {
+		var chartID, dimensionName string
+		switch brs.Name {
+		case "ActiveCount":
+			chartID = usageChartID
+			dimensionName = "active"
+		case "PoolSize":
+			chartID = usageChartID
+			dimensionName = "pool_size"
+		case "PercentMaxed":
+			chartID = performanceChartID
+			dimensionName = "percent_maxed"
+		case "PercentUsed":
+			chartID = performanceChartID
+			dimensionName = "percent_used"
+		default:
+			w.Debugf("Thread pool: skipping BoundedRangeStatistic '%s' (current: %s)", brs.Name, brs.Current)
+			continue
+		}
+
+		// Use Current value (current state)
+		if brs.Current != "" {
+			if val, err := strconv.ParseInt(brs.Current, 10, 64); err == nil {
+				metricKey := fmt.Sprintf("%s_%s", chartID, dimensionName)
+				mx[metricKey] = val
+				foundMetrics[dimensionName] = true
+				w.Debugf("Thread pool metric: %s = %d (from BoundedRangeStatistic %s)", metricKey, val, brs.Name)
+			}
+		}
+
+		// For WebSphere 8.5.5: Extract maximum_size from PoolSize UpperBound if MaxPoolSize CountStatistic not found
+		if brs.Name == "PoolSize" && !foundMetrics["maximum_size"] && brs.UpperBound != "" {
+			if val, err := strconv.ParseInt(brs.UpperBound, 10, 64); err == nil {
+				metricKey := fmt.Sprintf("%s_maximum_size", usageChartID)
+				mx[metricKey] = val
+				foundMetrics["maximum_size"] = true
+				w.Debugf("Thread pool metric: %s = %d (from BoundedRangeStatistic %s.UpperBound)", metricKey, val, brs.Name)
+			}
+		}
+	}
+
+	// Extract from RangeStatistics (ConcurrentHungThreadCount)
+	for _, rs := range stat.RangeStatistics {
+		var chartID, dimensionName string
+		switch rs.Name {
+		case "ConcurrentHungThreadCount":
+			chartID = healthChartID
+			dimensionName = "concurrent_hung"
+		default:
+			w.Debugf("Thread pool: skipping RangeStatistic '%s' (value: %s)", rs.Name, rs.Current)
+			continue
+		}
+
+		if rs.Current != "" {
+			if val, err := strconv.ParseInt(rs.Current, 10, 64); err == nil {
+				metricKey := fmt.Sprintf("%s_%s", chartID, dimensionName)
+				mx[metricKey] = val
+				foundMetrics[dimensionName] = true
+				w.Debugf("Thread pool metric: %s = %d (from RangeStatistic %s)", metricKey, val, rs.Name)
+			}
+		}
+	}
+
+	// Extract from TimeStatistics (ActiveTime)
+	for _, ts := range stat.TimeStatistics {
+		var chartID, dimensionName string
+		switch ts.Name {
+		case "ActiveTime":
+			chartID = timeChartID
+			dimensionName = "active_time"
+		default:
+			w.Debugf("Thread pool: skipping TimeStatistic '%s'", ts.Name)
+			continue
+		}
+
+		// Use totalTime for lifetime total, or count for number of operations
+		totalTimeStr := ts.TotalTime
+		if totalTimeStr == "" {
+			totalTimeStr = ts.Total // Fallback for other versions
+		}
+
+		if totalTimeStr != "" {
+			if val, err := strconv.ParseInt(totalTimeStr, 10, 64); err == nil {
+				metricKey := fmt.Sprintf("%s_%s", chartID, dimensionName)
+				mx[metricKey] = val
+				foundMetrics[dimensionName] = true
+				w.Debugf("Thread pool metric: %s = %d (from TimeStatistic %s.totalTime)", metricKey, val, ts.Name)
+			}
+		}
+	}
+
+	// Note: Do not provide default zero values - let the framework detect missing metrics
+	// This allows proper identification of data collection issues
+}
+
+// extractWebSessionMetricsToCharts extracts web session metrics and distributes them to appropriate charts
+func (w *WebSpherePMI) extractWebSessionMetricsToCharts(mx map[string]int64, lifecycleChartID, activeChartID, timeChartID, cacheChartID, externalTimeChartID, externalSizeChartID, healthChartID, objectSizeChartID string, stat pmiStat) {
+	// Debug what we have available
+	w.Debugf("Web session extracting to charts from stat with %d CountStatistics, %d TimeStatistics, %d RangeStatistics, %d AverageStatistics",
+		len(stat.CountStatistics), len(stat.TimeStatistics), len(stat.RangeStatistics), len(stat.AverageStatistics))
+
+	foundMetrics := make(map[string]bool)
+
+	// Extract from CountStatistics (CreateCount, InvalidateCount, NoRoomForNewSessionCount, CacheDiscardCount, AffinityBreakCount, TimeoutInvalidationCount, ActivateNonExistSessionCount)
+	for _, cs := range stat.CountStatistics {
+		var chartID, dimensionName string
+		switch cs.Name {
+		case "CreateCount":
+			chartID = lifecycleChartID
+			dimensionName = "created"
+		case "InvalidateCount":
+			chartID = lifecycleChartID
+			dimensionName = "invalidated"
+		case "TimeoutInvalidationCount":
+			chartID = lifecycleChartID
+			dimensionName = "timeout_invalidated"
+		case "NoRoomForNewSessionCount":
+			chartID = cacheChartID
+			dimensionName = "no_room_for_new"
+		case "CacheDiscardCount":
+			chartID = cacheChartID
+			dimensionName = "cache_discarded"
+		case "AffinityBreakCount":
+			chartID = healthChartID
+			dimensionName = "affinity_breaks"
+		case "ActivateNonExistSessionCount":
+			chartID = healthChartID
+			dimensionName = "activate_nonexist"
+		default:
+			w.Debugf("Web session: skipping CountStatistic '%s' (value: %s)", cs.Name, cs.Count)
+			continue
+		}
+
+		if cs.Count != "" {
+			if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
+				metricKey := fmt.Sprintf("%s_%s", chartID, dimensionName)
+				mx[metricKey] = val
+				foundMetrics[dimensionName] = true
+				w.Debugf("Web session metric: %s = %d (from CountStatistic %s)", metricKey, val, cs.Name)
+			}
+		}
+	}
+
+	// Extract from RangeStatistics (ActiveCount, LiveCount)
+	for _, rs := range stat.RangeStatistics {
+		var chartID, dimensionName string
+		switch rs.Name {
+		case "ActiveCount":
+			chartID = activeChartID
+			dimensionName = "active"
+		case "LiveCount":
+			chartID = activeChartID
+			dimensionName = "live"
+		default:
+			w.Debugf("Web session: skipping RangeStatistic '%s' (value: %s)", rs.Name, rs.Current)
+			continue
+		}
+
+		if rs.Current != "" {
+			if val, err := strconv.ParseInt(rs.Current, 10, 64); err == nil {
+				metricKey := fmt.Sprintf("%s_%s", chartID, dimensionName)
+				mx[metricKey] = val
+				foundMetrics[dimensionName] = true
+				w.Debugf("Web session metric: %s = %d (from RangeStatistic %s)", metricKey, val, rs.Name)
+			}
+		}
+	}
+
+	// Extract from TimeStatistics (LifeTime, ExternalReadTime, ExternalWriteTime, TimeSinceLastActivated, SessionObjectSize)
+	for _, ts := range stat.TimeStatistics {
+		var chartID, dimensionName string
+		switch ts.Name {
+		case "LifeTime":
+			chartID = timeChartID
+			dimensionName = "lifetime"
+		case "ExternalReadTime":
+			chartID = externalTimeChartID
+			dimensionName = "external_read_time"
+		case "ExternalWriteTime":
+			chartID = externalTimeChartID
+			dimensionName = "external_write_time"
+		case "TimeSinceLastActivated":
+			chartID = timeChartID
+			dimensionName = "time_since_activated"
+		case "SessionObjectSize":
+			chartID = objectSizeChartID
+			dimensionName = "object_size"
+		default:
+			w.Debugf("Web session: skipping TimeStatistic '%s'", ts.Name)
+			continue
+		}
+
+		// Use totalTime for lifetime total
+		totalTimeStr := ts.TotalTime
+		if totalTimeStr == "" {
+			totalTimeStr = ts.Total // Fallback for other versions
+		}
+
+		if totalTimeStr != "" {
+			if val, err := strconv.ParseInt(totalTimeStr, 10, 64); err == nil {
+				metricKey := fmt.Sprintf("%s_%s", chartID, dimensionName)
+				mx[metricKey] = val
+				foundMetrics[dimensionName] = true
+				w.Debugf("Web session metric: %s = %d (from TimeStatistic %s.totalTime)", metricKey, val, ts.Name)
+			}
+		}
+	}
+
+	// Extract from AverageStatistics (ExternalReadSize, ExternalWriteSize)
+	for _, as := range stat.AverageStatistics {
+		var chartID, dimensionName string
+		switch as.Name {
+		case "ExternalReadSize":
+			chartID = externalSizeChartID
+			dimensionName = "external_read_size"
+		case "ExternalWriteSize":
+			chartID = externalSizeChartID
+			dimensionName = "external_write_size"
+		default:
+			w.Debugf("Web session: skipping AverageStatistic '%s'", as.Name)
+			continue
+		}
+
+		// Use total for cumulative size
+		if as.Total != "" {
+			if val, err := strconv.ParseInt(as.Total, 10, 64); err == nil {
+				metricKey := fmt.Sprintf("%s_%s", chartID, dimensionName)
+				mx[metricKey] = val
+				foundMetrics[dimensionName] = true
+				w.Debugf("Web session metric: %s = %d (from AverageStatistic %s.total)", metricKey, val, as.Name)
 			}
 		}
 	}
