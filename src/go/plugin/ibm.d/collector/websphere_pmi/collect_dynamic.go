@@ -120,6 +120,8 @@ func (w *WebSpherePMI) extractMetricsFromStat(mx map[string]int64, nodeName, ser
 		w.collectMessagingMetrics(mx, nodeName, serverName, path, stat)
 	case "caching":
 		w.collectCacheMetrics(mx, nodeName, serverName, path, stat)
+	case "hamanager":
+		w.collectHAManagerMetrics(mx, nodeName, serverName, path, stat)
 	case "system":
 		w.collectSystemMetrics(mx, nodeName, serverName, path, stat)
 	default:
@@ -201,8 +203,8 @@ func (w *WebSpherePMI) categorizeStatName(statName string) string {
 	}
 
 	// HAManager metrics (not a thread pool)
-	if strings.Contains(nameLower, "hamanager") {
-		return "other"
+	if strings.Contains(nameLower, "hamanager") && !strings.Contains(nameLower, ".thread.pool") {
+		return "hamanager"
 	}
 
 	// Transaction metrics
@@ -891,6 +893,13 @@ func (w *WebSpherePMI) collectSecurityMetrics(mx map[string]int64, nodeName, ser
 // collectMessagingMetrics handles messaging metrics
 func (w *WebSpherePMI) collectMessagingMetrics(mx map[string]int64, nodeName, serverName, path string, stat pmiStat) {
 	pathLower := strings.ToLower(path)
+	statNameLower := strings.ToLower(stat.Name)
+
+	// ORB Interceptor metrics
+	if stat.Name == "ORB" || stat.Name == "Interceptors" || strings.Contains(statNameLower, "interceptor") {
+		w.collectORBInterceptorMetrics(mx, nodeName, serverName, path, stat)
+		return
+	}
 
 	// JMS destination metrics
 	if strings.Contains(pathLower, "jms") {
@@ -922,6 +931,131 @@ func (w *WebSpherePMI) collectMessagingMetrics(mx map[string]int64, nodeName, se
 
 		chartID := fmt.Sprintf("messaging.sib_%s", w.sanitizeForChartID(instanceName))
 		w.extractStatValues(mx, chartID, stat)
+	}
+}
+
+// collectORBInterceptorMetrics handles ORB interceptor processing time metrics
+func (w *WebSpherePMI) collectORBInterceptorMetrics(mx map[string]int64, nodeName, serverName, path string, stat pmiStat) {
+
+	// Check if this is the ORB container
+	if stat.Name == "ORB" {
+		// Look for Interceptors sub-stat
+		for _, subStat := range stat.SubStats {
+			if subStat.Name == "Interceptors" {
+				w.collectORBInterceptorMetrics(mx, nodeName, serverName, path, subStat)
+			}
+		}
+		return
+	}
+
+	// Check if this is the Interceptors container
+	if stat.Name == "Interceptors" {
+		w.Debugf("Found ORB Interceptors container with %d sub-stats", len(stat.SubStats))
+
+		// Process each interceptor individually as separate instances
+		interceptorCount := 0
+		for _, interceptorStat := range stat.SubStats {
+			dimensionID := w.getInterceptorDimensionID(interceptorStat.Name)
+			if dimensionID != "" {
+				// Check if this interceptor has ProcessingTime metrics
+				hasProcessingTime := false
+				for _, ts := range interceptorStat.TimeStatistics {
+					if ts.Name == "ProcessingTime" {
+						hasProcessingTime = true
+						break
+					}
+				}
+				
+				if hasProcessingTime {
+					// Create individual chart/instance for each interceptor
+					interceptorInstanceName := fmt.Sprintf("%s.%s.%s", nodeName, serverName, dimensionID)
+					interceptorLabels := map[string]string{
+						"node":        nodeName,
+						"server":      serverName,
+						"interceptor": interceptorStat.Name,
+					}
+
+					w.ensureChartExists("websphere_pmi.orb.interceptor_processing_time", "ORB Interceptor Processing Time", "milliseconds", "line", "messaging", 71300,
+						[]string{"processing_time"}, interceptorInstanceName, interceptorLabels)
+
+					chartID := fmt.Sprintf("orb.interceptor_processing_time_%s", w.sanitizeForChartID(interceptorInstanceName))
+					w.extractORBInterceptorMetrics(mx, chartID, interceptorStat)
+					interceptorCount++
+				}
+			}
+		}
+
+		w.Debugf("ORB Interceptors - processed %d interceptors with metrics", interceptorCount)
+		return
+	}
+
+	// Check if this is an individual interceptor (contains "interceptor" in name)
+	if strings.Contains(strings.ToLower(stat.Name), "interceptor") {
+		dimensionID := w.getInterceptorDimensionID(stat.Name)
+		if dimensionID != "" {
+			// Check if this interceptor has ProcessingTime metrics
+			hasProcessingTime := false
+			for _, ts := range stat.TimeStatistics {
+				if ts.Name == "ProcessingTime" {
+					hasProcessingTime = true
+					break
+				}
+			}
+			
+			if hasProcessingTime {
+				// Create individual chart/instance for this interceptor
+				interceptorInstanceName := fmt.Sprintf("%s.%s.%s", nodeName, serverName, dimensionID)
+				interceptorLabels := map[string]string{
+					"node":        nodeName,
+					"server":      serverName,
+					"interceptor": stat.Name,
+				}
+
+				w.ensureChartExists("websphere_pmi.orb.interceptor_processing_time", "ORB Interceptor Processing Time", "milliseconds", "line", "messaging", 71300,
+					[]string{"processing_time"}, interceptorInstanceName, interceptorLabels)
+
+				chartID := fmt.Sprintf("orb.interceptor_processing_time_%s", w.sanitizeForChartID(interceptorInstanceName))
+				w.extractORBInterceptorMetrics(mx, chartID, stat)
+			}
+		}
+	}
+}
+
+// getInterceptorDimensionID maps interceptor names to dimension IDs
+func (w *WebSpherePMI) getInterceptorDimensionID(interceptorName string) string {
+	switch interceptorName {
+	case "PMIServerRequestInterceptor":
+		return "pmi_server"
+	case "SecurityIORInterceptor":
+		return "security_ior"
+	case "TxIORInterceptor":
+		return "tx_ior"
+	case "WLMClientRequestInterceptor":
+		return "wlm_client"
+	case "WLMServerRequestInterceptor":
+		return "wlm_server"
+	case "com.ibm.ISecurityLocalObjectBaseL13Impl.CSIClientRI":
+		return "security_csi_client"
+	case "com.ibm.ISecurityLocalObjectBaseL13Impl.CSIServerRI":
+		return "security_csi_server"
+	case "com.ibm.ws.Transaction.JTS.TxClientInterceptor":
+		return "tx_jts_client"
+	case "com.ibm.ws.Transaction.JTS.TxServerInterceptor":
+		return "tx_jts_server"
+	case "com.ibm.ws.activity.remote.cos.ActivityIORInterceptor":
+		return "activity_ior"
+	case "com.ibm.ws.activity.remote.cos.ActivityServiceClientInterceptor":
+		return "activity_client"
+	case "com.ibm.ws.activity.remote.cos.ActivityServiceServerInterceptor":
+		return "activity_server"
+	case "com.ibm.ws.runtime.workloadcontroller.OrbWorkloadRequestInterceptor":
+		return "workload_controller"
+	case "com.ibm.debug.DebugPortableInterceptor":
+		return "debug"
+	case "com.ibm.ejs.ras.RasContextSupport":
+		return "ras_context"
+	default:
+		return ""
 	}
 }
 
@@ -979,6 +1113,46 @@ func (w *WebSpherePMI) collectCacheMetrics(mx map[string]int64, nodeName, server
 		for _, subStat := range stat.SubStats {
 			if strings.HasPrefix(subStat.Name, "Object: ") {
 				w.collectCacheMetrics(mx, nodeName, serverName, path, subStat)
+			}
+		}
+	}
+}
+
+// collectHAManagerMetrics handles HAManager high availability metrics  
+func (w *WebSpherePMI) collectHAManagerMetrics(mx map[string]int64, nodeName, serverName, path string, stat pmiStat) {
+	instanceName := fmt.Sprintf("%s.%s", nodeName, serverName)
+	instanceLabels := map[string]string{
+		"node":   nodeName,
+		"server": serverName,
+	}
+
+	// Check if this is HAManagerMBean (core HA metrics)
+	if stat.Name == "HAManagerMBean" {
+		w.Debugf("Found HAManagerMBean with %d CountStats, %d TimeStats, %d BoundedRangeStats",
+			len(stat.CountStatistics), len(stat.TimeStatistics), len(stat.BoundedRangeStatistics))
+
+		// Chart 1: HA Groups
+		w.ensureChartExists("websphere_pmi.hamanager.groups", "HAManager Groups", "groups", "line", "hamanager", 72100,
+			[]string{"local_groups", "bulletin_board_subjects", "bulletin_board_subscriptions", "local_bulletin_board_subjects", "local_bulletin_board_subscriptions"}, instanceName, instanceLabels)
+
+		// Chart 2: HA Rebuild Times
+		w.ensureChartExists("websphere_pmi.hamanager.rebuild_times", "HAManager Rebuild Times", "milliseconds", "line", "hamanager", 72101,
+			[]string{"group_state_rebuild_time", "bulletin_board_rebuild_time"}, instanceName, instanceLabels)
+
+		// Chart IDs for metrics extraction
+		groupsChartID := fmt.Sprintf("hamanager.groups_%s", w.sanitizeForChartID(instanceName))
+		rebuildTimesChartID := fmt.Sprintf("hamanager.rebuild_times_%s", w.sanitizeForChartID(instanceName))
+
+		// Extract HAManager metrics into mx with proper dimension IDs
+		w.extractHAManagerMetricsToCharts(mx, groupsChartID, rebuildTimesChartID, stat)
+
+		w.Debugf("HAManager core - extracted metrics for 2 charts")
+	} else if stat.Name == "HAManager" {
+		// This is the parent container - process sub-stats for HAManagerMBean
+		w.Debugf("Processing HAManager container with %d sub-stats", len(stat.SubStats))
+		for _, subStat := range stat.SubStats {
+			if subStat.Name == "HAManagerMBean" {
+				w.collectHAManagerMetrics(mx, nodeName, serverName, path, subStat)
 			}
 		}
 	}
@@ -2168,6 +2342,111 @@ func (w *WebSpherePMI) extractGenericMetrics(mx map[string]int64, chartID string
 
 	// Note: Do not set default zero value - let the framework detect missing metrics
 	w.Debugf("Generic metric: %s - no value found in stat", metricKey)
+}
+
+// extractHAManagerMetricsToCharts extracts HAManager metrics and distributes them to appropriate charts
+func (w *WebSpherePMI) extractHAManagerMetricsToCharts(mx map[string]int64, groupsChartID, rebuildTimesChartID string, stat pmiStat) {
+	w.Debugf("HAManager extracting to charts from stat with %d CountStats, %d TimeStats, %d BoundedRangeStats",
+		len(stat.CountStatistics), len(stat.TimeStatistics), len(stat.BoundedRangeStatistics))
+
+	// Extract BoundedRangeStatistics for group counts
+	for _, brs := range stat.BoundedRangeStatistics {
+		var metricKey string
+		
+		switch brs.Name {
+		case "LocalGroupCount":
+			metricKey = fmt.Sprintf("%s_local_groups", groupsChartID)
+		case "BulletinBoardSubjectCount":
+			metricKey = fmt.Sprintf("%s_bulletin_board_subjects", groupsChartID)
+		case "BulletinBoardSubcriptionCount": // Note: spelling in XML is "Subcription" not "Subscription"
+			metricKey = fmt.Sprintf("%s_bulletin_board_subscriptions", groupsChartID)
+		case "LocalBulletinBoardSubjectCount":
+			metricKey = fmt.Sprintf("%s_local_bulletin_board_subjects", groupsChartID)
+		case "LocalBulletinBoardSubcriptionCount": // Note: spelling in XML is "Subcription" not "Subscription"
+			metricKey = fmt.Sprintf("%s_local_bulletin_board_subscriptions", groupsChartID)
+		}
+		
+		if metricKey != "" && brs.Current != "" {
+			if val, err := strconv.ParseInt(brs.Current, 10, 64); err == nil {
+				mx[metricKey] = val
+				w.Debugf("HAManager group metric: %s = %d", metricKey, val)
+			}
+		}
+	}
+
+	// Extract TimeStatistics for rebuild times
+	for _, ts := range stat.TimeStatistics {
+		var metricKey string
+		
+		switch ts.Name {
+		case "GroupStateRebuildTime":
+			metricKey = fmt.Sprintf("%s_group_state_rebuild_time", rebuildTimesChartID)
+		case "BulletinBoardRebuildTime":
+			metricKey = fmt.Sprintf("%s_bulletin_board_rebuild_time", rebuildTimesChartID)
+		}
+		
+		if metricKey != "" {
+			// Get total time - WebSphere uses "totalTime" attribute
+			totalStr := ts.TotalTime
+			if totalStr == "" {
+				totalStr = ts.Total // Fallback for other versions
+			}
+
+			// Calculate average rebuild time when rebuilds have occurred
+			if ts.Count != "" && totalStr != "" {
+				count, err1 := strconv.ParseInt(ts.Count, 10, 64)
+				total, err2 := strconv.ParseInt(totalStr, 10, 64)
+
+				if err1 == nil && err2 == nil && count > 0 {
+					// Calculate average rebuild time in milliseconds
+					avgRebuildTime := total / count
+					mx[metricKey] = avgRebuildTime
+					w.Debugf("HAManager rebuild time metric: %s = %d ms (total=%d, count=%d)",
+						metricKey, avgRebuildTime, total, count)
+				} else if err1 == nil && count == 0 {
+					// No rebuilds - set time to 0
+					mx[metricKey] = 0
+					w.Debugf("HAManager rebuild time metric: %s = 0 (no rebuilds)", metricKey)
+				}
+			}
+		}
+	}
+}
+
+// extractORBInterceptorMetrics extracts processing time metrics from individual ORB interceptors
+func (w *WebSpherePMI) extractORBInterceptorMetrics(mx map[string]int64, chartID string, stat pmiStat) {
+	// Check if this interceptor has ProcessingTime TimeStatistic
+	for _, ts := range stat.TimeStatistics {
+		if ts.Name == "ProcessingTime" {
+			// Use "processing_time" as the dimension name since each interceptor has its own chart
+			metricKey := fmt.Sprintf("%s_processing_time", chartID)
+
+			// Get total time - WebSphere uses "totalTime" attribute
+			totalStr := ts.TotalTime
+			if totalStr == "" {
+				totalStr = ts.Total // Fallback for other versions
+			}
+
+			// Calculate average processing time when requests have been processed
+			if ts.Count != "" && totalStr != "" {
+				count, err1 := strconv.ParseInt(ts.Count, 10, 64)
+				total, err2 := strconv.ParseInt(totalStr, 10, 64)
+
+				if err1 == nil && err2 == nil && count > 0 {
+					// Calculate average processing time in milliseconds
+					avgProcessingTime := total / count
+					mx[metricKey] = avgProcessingTime
+					w.Debugf("ORB interceptor metric: %s (%s) = %d ms (total=%d, count=%d)",
+						metricKey, stat.Name, avgProcessingTime, total, count)
+				} else if err1 == nil && count == 0 {
+					// No requests processed - set time to 0
+					mx[metricKey] = 0
+					w.Debugf("ORB interceptor metric: %s (%s) = 0 (no requests)", metricKey, stat.Name)
+				}
+			}
+			break // Only one ProcessingTime per interceptor
+		}
+	}
 }
 
 // processStat is a legacy method for test compatibility
