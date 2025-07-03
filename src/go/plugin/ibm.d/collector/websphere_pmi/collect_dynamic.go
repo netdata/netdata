@@ -698,7 +698,7 @@ func (w *WebSpherePMI) collectCacheMetrics(mx map[string]int64, nodeName, server
 
 		// Chart 2: Cache Requests  
 		w.ensureChartExists("websphere_pmi.caching.requests", "Dynamic Cache Requests", "requests/s", "line", "caching", 71301,
-			[]string{"client_requests", "distributed_requests", "remote_hits"}, instanceName, instanceLabels)
+			[]string{"client_requests", "distributed_requests"}, instanceName, instanceLabels)
 
 		// Chart 3: Cache Entries
 		w.ensureChartExists("websphere_pmi.caching.entries", "Dynamic Cache Entries", "entries", "line", "caching", 71302,
@@ -706,7 +706,7 @@ func (w *WebSpherePMI) collectCacheMetrics(mx map[string]int64, nodeName, server
 
 		// Chart 4: Cache Invalidations
 		w.ensureChartExists("websphere_pmi.caching.invalidations", "Dynamic Cache Invalidations", "invalidations/s", "stacked", "caching", 71303,
-			[]string{"explicit", "lru", "timeout", "memory_explicit", "disk_explicit", "local_explicit", "remote_explicit"}, instanceName, instanceLabels)
+			[]string{"explicit", "lru", "timeout", "memory_explicit", "disk_explicit", "local_explicit"}, instanceName, instanceLabels)
 
 		// Chart 5: Cache Remote Operations
 		w.ensureChartExists("websphere_pmi.caching.remote", "Dynamic Cache Remote Operations", "operations/s", "line", "caching", 71304,
@@ -1447,7 +1447,7 @@ func (w *WebSpherePMI) extractCacheCountersToCharts(mx map[string]int64, hitRate
 			chartID = requestsChartID
 			dimensionName = "distributed_requests"
 		case "RemoteHitCount":
-			chartID = requestsChartID
+			chartID = remoteChartID
 			dimensionName = "remote_hits"
 		// Entries Chart
 		case "InMemoryCacheEntryCount":
@@ -1479,8 +1479,8 @@ func (w *WebSpherePMI) extractCacheCountersToCharts(mx map[string]int64, hitRate
 			chartID = invalidationsChartID
 			dimensionName = "local_explicit"
 		case "RemoteExplicitInvalidationCount":
-			chartID = invalidationsChartID
-			dimensionName = "remote_explicit"
+			chartID = remoteChartID
+			dimensionName = "remote_invalidations"
 		// Remote Operations Chart
 		case "RemoteCreationCount":
 			chartID = remoteChartID
