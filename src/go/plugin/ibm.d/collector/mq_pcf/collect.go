@@ -829,14 +829,14 @@ func (c *Collector) collectQueueManagerMetrics(ctx context.Context, mx map[strin
 	// For now, just log what attributes we received to understand what's available
 	if len(attrs) > 0 {
 		c.Debugf("Queue manager status response contains %d attributes", len(attrs))
-		// Uncomment for debugging: log first few attributes to see what's available
-		// count := 0
-		// for attr, value := range attrs {
-		//     if count < 5 {
-		//         c.Debugf("  Attribute %d = %v", attr, value)
-		//         count++
-		//     }
-		// }
+		// Log attributes to see what's actually available for proper metric collection
+		count := 0
+		for attr, value := range attrs {
+			if count < 10 {
+				c.Debugf("  Attribute %d = %v", attr, value)
+				count++
+			}
+		}
 	}
 
 	return nil

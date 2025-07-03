@@ -81,39 +81,13 @@ var baseCharts = module.Charts{
 			{ID: "channels_failed", Name: "failed"},
 		},
 	},
-	{
-		ID:       "qmgr_cpu_usage",
-		Title:    "Queue Manager CPU Usage",
-		Units:    "percentage",
-		Fam:      "queue_manager",
-		Ctx:      "mq_pcf.qmgr_cpu_usage",
-		Priority: prioQueueManagerCPU,
-		Dims: module.Dims{
-			{ID: "qmgr_cpu_usage", Name: "cpu_usage", Div: precision},
-		},
-	},
-	{
-		ID:       "qmgr_memory_usage",
-		Title:    "Queue Manager Memory Usage",
-		Units:    "bytes",
-		Fam:      "queue_manager",
-		Ctx:      "mq_pcf.qmgr_memory_usage",
-		Priority: prioQueueManagerMemory,
-		Dims: module.Dims{
-			{ID: "qmgr_memory_usage", Name: "memory_usage"},
-		},
-	},
-	{
-		ID:       "qmgr_log_usage",
-		Title:    "Queue Manager Log Usage",
-		Units:    "percentage",
-		Fam:      "queue_manager",
-		Ctx:      "mq_pcf.qmgr_log_usage",
-		Priority: prioQueueManagerLog,
-		Dims: module.Dims{
-			{ID: "qmgr_log_usage", Name: "log_usage", Div: precision},
-		},
-	},
+	// Note: Queue Manager CPU usage is not available through standard PCF commands
+	// CPU usage requires MQ resource monitoring which may not be enabled
+	// Note: Queue Manager memory usage is not available through standard PCF commands
+	// Memory usage requires MQ resource monitoring which may not be enabled
+	// See collector_metrics_summary.md for details on available vs missing metrics
+	// Note: Queue Manager log usage is not available through standard PCF commands
+	// Log usage requires MQ resource monitoring which may not be enabled
 }
 
 // Template charts for queue instances
