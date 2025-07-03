@@ -503,6 +503,15 @@ func (j *Job) processMetrics(metrics map[string]int64, startTime time.Time, sinc
 	}
 	*j.charts = (*j.charts)[:i]
 
+	// Update dump analyzer with current chart structure for dynamic collectors
+	if j.dumpMode && j.dumpAnalyzer != nil {
+		if analyzer, ok := j.dumpAnalyzer.(interface {
+			UpdateJobStructure(string, *Charts)
+		}); ok {
+			analyzer.UpdateJobStructure(j.name, j.charts)
+		}
+	}
+
 	j.updateChart(
 		j.collectStatusChart,
 		map[string]int64{"success": metrix.Bool(updated > 0), "failed": metrix.Bool(updated == 0)},

@@ -1233,29 +1233,8 @@ func (c *Collector) collectChannelMetrics(ctx context.Context, mx map[string]int
 
 		cleanName := c.cleanName(channelName)
 
-		// Add channel charts if not already present
-		if !c.collected[channelName] {
-			c.collected[channelName] = true
-			charts := c.newChannelCharts(channelName)
-			if err := c.charts.Add(*charts...); err != nil {
-				c.Warning(err)
-			}
-		}
-
-		// Collect channel status metrics (runtime info)
-		if err := c.collectSingleChannelMetrics(ctx, channelName, cleanName, mx); err != nil {
-			// Check if this is an expected error for certain channel types
-			if !strings.Contains(err.Error(), "2085") {
-				c.Warningf("failed to collect metrics for channel %s (MQCMD_INQUIRE_CHANNEL_STATUS): %v", channelName, err)
-			} else {
-				c.Debugf("Skipping metrics for channel %s (expected error)", channelName)
-			}
-		}
-
-		// Collect channel configuration metrics (always available)
-		if err := c.collectChannelConfigMetrics(ctx, channelName, cleanName, mx); err != nil {
-			c.Debugf("Failed to collect config for channel %s (MQCMD_INQUIRE_CHANNEL): %v", channelName, err)
-		}
+		// NEW PATTERN: Collect data first, then create charts based on what we successfully collected
+		c.collectChannelMetricsWithDynamicCharts(ctx, channelName, cleanName, mx)
 	}
 
 	// Update overview metrics

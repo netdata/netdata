@@ -76,6 +76,62 @@ func (da *DumpAnalyzer) RecordJobStructure(jobName, moduleName string, charts *m
 	da.jobs[jobName] = job
 }
 
+// UpdateJobStructure updates the chart structure for a job with current charts
+// This is needed for collectors that create charts dynamically during collection
+func (da *DumpAnalyzer) UpdateJobStructure(jobName string, charts *module.Charts) {
+	da.mu.Lock()
+	defer da.mu.Unlock()
+
+	job, exists := da.jobs[jobName]
+	if !exists {
+		return // Job not found, cannot update
+	}
+
+	// Create a map of existing chart data to preserve collected values
+	existingCharts := make(map[string]*ChartAnalysis)
+	for i := range job.Charts {
+		existingCharts[job.Charts[i].Chart.ID] = &job.Charts[i]
+	}
+
+	// Rebuild chart list while preserving existing data
+	job.Charts = make([]ChartAnalysis, 0)
+
+	// Copy current chart structure
+	for _, chart := range *charts {
+		var ca ChartAnalysis
+		
+		// Check if we have existing data for this chart
+		if existing, exists := existingCharts[chart.ID]; exists {
+			// Preserve existing chart analysis but update the chart reference
+			ca = *existing
+			ca.Chart = chart
+			
+			// Add any new dimensions that weren't tracked before
+			for _, dim := range chart.Dims {
+				if _, tracked := ca.CollectedValues[dim.ID]; !tracked {
+					ca.CollectedValues[dim.ID] = make([]int64, 0)
+					ca.SeenDimensions[dim.ID] = false
+				}
+			}
+		} else {
+			// New chart - create fresh tracking
+			ca = ChartAnalysis{
+				Chart:           chart,
+				CollectedValues: make(map[string][]int64),
+				SeenDimensions:  make(map[string]bool),
+			}
+			
+			// Initialize dimension tracking
+			for _, dim := range chart.Dims {
+				ca.CollectedValues[dim.ID] = make([]int64, 0)
+				ca.SeenDimensions[dim.ID] = false
+			}
+		}
+
+		job.Charts = append(job.Charts, ca)
+	}
+}
+
 // RecordCollection records collected metrics directly from structured data
 func (da *DumpAnalyzer) RecordCollection(jobName string, mx map[string]int64) {
 	da.mu.Lock()
@@ -293,21 +349,27 @@ func (da *DumpAnalyzer) printJobAnalysis(job *JobAnalysis) {
 	fmt.Println("ISSUE SUMMARY (greppable)")
 	fmt.Println(strings.Repeat("═", 80))
 
-	issueCount := 0
+	errorCount := 0
+	warningCount := 0
 	for ctx, issues := range contextIssues {
 		if len(issues) > 0 {
-			issueCount++
 			for _, issue := range issues {
 				emoji := "❌"
 				if strings.Contains(issue, "WARNING") {
 					emoji = "🟡"
+					warningCount++
 				} else if strings.Contains(issue, "SEVERE BUG") {
 					emoji = "🔴"
+					errorCount++
+				} else {
+					errorCount++
 				}
 				fmt.Printf("%s IDENTIFIED ISSUES ON %s: %s\n", emoji, ctx, issue)
 			}
 		}
 	}
+	
+	issueCount := errorCount // Only count real errors for final status
 
 	// Calculate statistics for the summary independently to avoid interfering with tree logic
 	statsFamilies := make(map[string]bool)
@@ -339,16 +401,26 @@ func (da *DumpAnalyzer) printJobAnalysis(job *JobAnalysis) {
 	uniqueMetricsInMx := len(job.AllSeenMetrics)
 
 	// Generate summary with detailed stats
+	warningText := ""
+	if warningCount > 0 {
+		warningText = fmt.Sprintf(", %d warnings", warningCount)
+	}
+	
 	if issueCount == 0 && statsDimensions == uniqueMetricsInMx {
-		fmt.Printf("🟢 NO ISSUES FOUND, job %s defines: %d families, %d contexts, %d instances, %d dimensions, collects: %d unique metrics\n",
-			job.Name, len(statsFamilies), len(statsContexts), statsInstances, statsDimensions, uniqueMetricsInMx)
+		if warningCount > 0 {
+			fmt.Printf("🟢 NO ISSUES FOUND%s, job %s defines: %d families, %d contexts, %d instances, %d dimensions, collects: %d unique metrics\n",
+				warningText, job.Name, len(statsFamilies), len(statsContexts), statsInstances, statsDimensions, uniqueMetricsInMx)
+		} else {
+			fmt.Printf("🟢 NO ISSUES FOUND, job %s defines: %d families, %d contexts, %d instances, %d dimensions, collects: %d unique metrics\n",
+				job.Name, len(statsFamilies), len(statsContexts), statsInstances, statsDimensions, uniqueMetricsInMx)
+		}
 	} else if issueCount == 0 && statsDimensions != uniqueMetricsInMx {
 		// Mismatch between dimensions and unique metrics even though no specific issues found
-		fmt.Printf("🟡 DIMENSION MISMATCH, job %s defines: %d families, %d contexts, %d instances, %d dimensions, collects: %d unique metrics\n",
-			job.Name, len(statsFamilies), len(statsContexts), statsInstances, statsDimensions, uniqueMetricsInMx)
+		fmt.Printf("🟡 DIMENSION MISMATCH%s, job %s defines: %d families, %d contexts, %d instances, %d dimensions, collects: %d unique metrics\n",
+			warningText, job.Name, len(statsFamilies), len(statsContexts), statsInstances, statsDimensions, uniqueMetricsInMx)
 	} else {
-		fmt.Printf("🔴 ISSUES FOUND, job %s defines: %d families, %d contexts, %d instances, %d dimensions, collects: %d unique metrics\n",
-			job.Name, len(statsFamilies), len(statsContexts), statsInstances, statsDimensions, uniqueMetricsInMx)
+		fmt.Printf("🔴 ISSUES FOUND%s, job %s defines: %d families, %d contexts, %d instances, %d dimensions, collects: %d unique metrics\n",
+			warningText, job.Name, len(statsFamilies), len(statsContexts), statsInstances, statsDimensions, uniqueMetricsInMx)
 	}
 }
 
@@ -478,7 +550,7 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 		fmt.Printf("%s", strings.Join(labelKeyStatus, ", "))
 		if hasInconsistentLabels {
 			fmt.Printf(" 🟡 SOME MISSING")
-			issues = append(issues, "inconsistent label keys")
+			issues = append(issues, "WARNING - inconsistent label keys (natural for heterogeneous instances)")
 		}
 		fmt.Printf("\n")
 	}
@@ -526,14 +598,14 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 
 		dimStatus := ""
 		if !allHaveIt {
-			dimStatus = " ❌ NOT IN ALL CHARTS"
+			dimStatus = " 🟡 NOT IN ALL CHARTS"
 		}
 
 		fmt.Printf("%s   │     %s %s%s\n", treePrefix, prefix, dimName, dimStatus)
 	}
 
 	if hasMissingDims {
-		issues = append(issues, "missing dimensions in some charts")
+		issues = append(issues, "WARNING - missing dimensions in some charts (natural for heterogeneous instances)")
 	}
 
 	// Check if any dimensions are missing data across all instances
