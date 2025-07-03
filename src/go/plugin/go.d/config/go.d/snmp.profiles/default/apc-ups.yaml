@@ -103,7 +103,7 @@ metrics:
       name: upsAdvInputFrequency
       chart_meta:
         description: The current input frequency to the UPS system
-        family: PowerFlowInput/Frequency/Value
+        family: PowerFlow/Input/Frequency/Value
         unit: "Hz"
   - MIB: PowerNet-MIB
     symbol:
