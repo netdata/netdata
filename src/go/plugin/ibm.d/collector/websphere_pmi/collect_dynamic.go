@@ -677,16 +677,61 @@ func (w *WebSpherePMI) collectMessagingMetrics(mx map[string]int64, nodeName, se
 
 // collectCacheMetrics handles cache-related metrics
 func (w *WebSpherePMI) collectCacheMetrics(mx map[string]int64, nodeName, serverName, path string, stat pmiStat) {
-	instanceName := fmt.Sprintf("%s.%s", nodeName, serverName)
-
-	w.ensureChartExists("websphere_pmi.caching.dynacache", "Dynamic Cache", "operations/s", "stacked", "caching", 71300,
-		[]string{"creates", "removes"}, instanceName, map[string]string{
+	// Check if this is a cache object (e.g., "Object: ws/com.ibm.workplace/ExtensionRegistryCache")
+	if strings.HasPrefix(stat.Name, "Object: ") {
+		// Extract cache name from "Object: ws/com.ibm.workplace/ExtensionRegistryCache"
+		cacheName := strings.TrimPrefix(stat.Name, "Object: ")
+		cacheName = strings.ReplaceAll(cacheName, "/", "_") // Clean for metric names
+		
+		instanceName := fmt.Sprintf("%s.%s.%s", nodeName, serverName, w.sanitizeForMetricName(cacheName))
+		instanceLabels := map[string]string{
 			"node":   nodeName,
 			"server": serverName,
-		})
+			"cache":  cacheName,
+		}
 
-	chartID := fmt.Sprintf("caching.dynacache_%s", w.sanitizeForChartID(instanceName))
-	w.extractDynaCacheMetrics(mx, chartID, stat)
+		w.Debugf("Found cache object: cache='%s'", cacheName)
+
+		// Chart 1: Cache Hit Rates
+		w.ensureChartExists("websphere_pmi.caching.hit_rates", "Dynamic Cache Hit Rates", "hits/s", "stacked", "caching", 71300,
+			[]string{"memory_hits", "disk_hits", "misses"}, instanceName, instanceLabels)
+
+		// Chart 2: Cache Requests  
+		w.ensureChartExists("websphere_pmi.caching.requests", "Dynamic Cache Requests", "requests/s", "line", "caching", 71301,
+			[]string{"client_requests", "distributed_requests", "remote_hits"}, instanceName, instanceLabels)
+
+		// Chart 3: Cache Entries
+		w.ensureChartExists("websphere_pmi.caching.entries", "Dynamic Cache Entries", "entries", "line", "caching", 71302,
+			[]string{"memory_entries", "total_entries", "max_memory_entries"}, instanceName, instanceLabels)
+
+		// Chart 4: Cache Invalidations
+		w.ensureChartExists("websphere_pmi.caching.invalidations", "Dynamic Cache Invalidations", "invalidations/s", "stacked", "caching", 71303,
+			[]string{"explicit", "lru", "timeout", "memory_explicit", "disk_explicit", "local_explicit", "remote_explicit"}, instanceName, instanceLabels)
+
+		// Chart 5: Cache Remote Operations
+		w.ensureChartExists("websphere_pmi.caching.remote", "Dynamic Cache Remote Operations", "operations/s", "line", "caching", 71304,
+			[]string{"remote_creations", "remote_hits", "remote_invalidations"}, instanceName, instanceLabels)
+
+		// Chart IDs for each chart (without websphere_pmi prefix)
+		hitRatesChartID := fmt.Sprintf("caching.hit_rates_%s", w.sanitizeForChartID(instanceName))
+		requestsChartID := fmt.Sprintf("caching.requests_%s", w.sanitizeForChartID(instanceName))
+		entriesChartID := fmt.Sprintf("caching.entries_%s", w.sanitizeForChartID(instanceName))
+		invalidationsChartID := fmt.Sprintf("caching.invalidations_%s", w.sanitizeForChartID(instanceName))
+		remoteChartID := fmt.Sprintf("caching.remote_%s", w.sanitizeForChartID(instanceName))
+
+		// Extract all cache metrics into mx with proper dimension IDs
+		w.extractDynaCacheMetricsToCharts(mx, hitRatesChartID, requestsChartID, entriesChartID, invalidationsChartID, remoteChartID, stat)
+		
+		w.Debugf("Cache object '%s' - extracted metrics for 5 charts", cacheName)
+	} else if stat.Name == "Dynamic Caching" {
+		// This is the parent container - process sub-stats for individual cache objects
+		w.Debugf("Processing Dynamic Caching container with %d sub-stats", len(stat.SubStats))
+		for _, subStat := range stat.SubStats {
+			if strings.HasPrefix(subStat.Name, "Object: ") {
+				w.collectCacheMetrics(mx, nodeName, serverName, path, subStat)
+			}
+		}
+	}
 }
 
 // collectSystemMetrics handles system-level metrics
@@ -1346,6 +1391,114 @@ func (w *WebSpherePMI) extractWebSessionMetricsToCharts(mx map[string]int64, lif
 
 	// Note: Do not provide default zero values - let the framework detect missing metrics
 	// This allows proper identification of data collection issues
+}
+
+// extractDynaCacheMetricsToCharts extracts dynamic cache metrics and distributes them to appropriate charts
+func (w *WebSpherePMI) extractDynaCacheMetricsToCharts(mx map[string]int64, hitRatesChartID, requestsChartID, entriesChartID, invalidationsChartID, remoteChartID string, stat pmiStat) {
+	// Debug what we have available
+	w.Debugf("Dynamic cache extracting to charts from stat with %d CountStatistics",
+		len(stat.CountStatistics))
+
+	foundMetrics := make(map[string]bool)
+
+	// The cache metrics are nested: we need to look in SubStats for "Object Cache" → "Counters"
+	// Let's traverse the hierarchy: Object → Object Cache → Counters
+	for _, subStat := range stat.SubStats {
+		if subStat.Name == "Object Cache" {
+			// Found Object Cache level, now look for Counters
+			for _, counterStat := range subStat.SubStats {
+				if counterStat.Name == "Counters" {
+					// Extract all CountStatistics from Counters
+					w.extractCacheCountersToCharts(mx, hitRatesChartID, requestsChartID, entriesChartID, invalidationsChartID, remoteChartID, counterStat, &foundMetrics)
+				}
+			}
+			// Also extract any direct CountStatistics from Object Cache level
+			w.extractCacheCountersToCharts(mx, hitRatesChartID, requestsChartID, entriesChartID, invalidationsChartID, remoteChartID, subStat, &foundMetrics)
+		}
+	}
+
+	// Also extract direct CountStatistics from the Object level (InMemoryCacheEntryCount, MaxInMemoryCacheEntryCount)
+	w.extractCacheCountersToCharts(mx, hitRatesChartID, requestsChartID, entriesChartID, invalidationsChartID, remoteChartID, stat, &foundMetrics)
+
+	// Note: Do not provide default zero values - let the framework detect missing metrics
+	// This allows proper identification of data collection issues
+}
+
+// extractCacheCountersToCharts extracts cache counter metrics to appropriate charts
+func (w *WebSpherePMI) extractCacheCountersToCharts(mx map[string]int64, hitRatesChartID, requestsChartID, entriesChartID, invalidationsChartID, remoteChartID string, stat pmiStat, foundMetrics *map[string]bool) {
+	for _, cs := range stat.CountStatistics {
+		var chartID, dimensionName string
+		switch cs.Name {
+		// Hit Rates Chart
+		case "HitsInMemoryCount":
+			chartID = hitRatesChartID
+			dimensionName = "memory_hits"
+		case "HitsOnDiskCount":
+			chartID = hitRatesChartID
+			dimensionName = "disk_hits"
+		case "MissCount":
+			chartID = hitRatesChartID
+			dimensionName = "misses"
+		// Requests Chart
+		case "ClientRequestCount":
+			chartID = requestsChartID
+			dimensionName = "client_requests"
+		case "DistributedRequestCount":
+			chartID = requestsChartID
+			dimensionName = "distributed_requests"
+		case "RemoteHitCount":
+			chartID = requestsChartID
+			dimensionName = "remote_hits"
+		// Entries Chart
+		case "InMemoryCacheEntryCount":
+			chartID = entriesChartID
+			dimensionName = "memory_entries"
+		case "InMemoryAndDiskCacheEntryCount":
+			chartID = entriesChartID
+			dimensionName = "total_entries"
+		case "MaxInMemoryCacheEntryCount":
+			chartID = entriesChartID
+			dimensionName = "max_memory_entries"
+		// Invalidations Chart
+		case "ExplicitInvalidationCount":
+			chartID = invalidationsChartID
+			dimensionName = "explicit"
+		case "LruInvalidationCount":
+			chartID = invalidationsChartID
+			dimensionName = "lru"
+		case "TimeoutInvalidationCount":
+			chartID = invalidationsChartID
+			dimensionName = "timeout"
+		case "ExplicitMemoryInvalidationCount":
+			chartID = invalidationsChartID
+			dimensionName = "memory_explicit"
+		case "ExplicitDiskInvalidationCount":
+			chartID = invalidationsChartID
+			dimensionName = "disk_explicit"
+		case "LocalExplicitInvalidationCount":
+			chartID = invalidationsChartID
+			dimensionName = "local_explicit"
+		case "RemoteExplicitInvalidationCount":
+			chartID = invalidationsChartID
+			dimensionName = "remote_explicit"
+		// Remote Operations Chart
+		case "RemoteCreationCount":
+			chartID = remoteChartID
+			dimensionName = "remote_creations"
+		default:
+			w.Debugf("Dynamic cache: skipping CountStatistic '%s' (value: %s)", cs.Name, cs.Count)
+			continue
+		}
+
+		if cs.Count != "" {
+			if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
+				metricKey := fmt.Sprintf("%s_%s", chartID, dimensionName)
+				mx[metricKey] = val
+				(*foundMetrics)[dimensionName] = true
+				w.Debugf("Dynamic cache metric: %s = %d (from CountStatistic %s)", metricKey, val, cs.Name)
+			}
+		}
+	}
 }
 
 // extractCacheMetrics extracts cache metrics with proper dimension mapping
