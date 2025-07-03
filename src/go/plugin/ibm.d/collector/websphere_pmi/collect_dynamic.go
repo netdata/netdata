@@ -122,6 +122,8 @@ func (w *WebSpherePMI) extractMetricsFromStat(mx map[string]int64, nodeName, ser
 		w.collectCacheMetrics(mx, nodeName, serverName, path, stat)
 	case "hamanager":
 		w.collectHAManagerMetrics(mx, nodeName, serverName, path, stat)
+	case "webservice":
+		w.collectWebServiceMetrics(mx, nodeName, serverName, path, stat)
 	case "system":
 		w.collectSystemMetrics(mx, nodeName, serverName, path, stat)
 	default:
@@ -221,6 +223,11 @@ func (w *WebSpherePMI) categorizeStatName(statName string) string {
 	if strings.Contains(nameLower, "orb") || strings.Contains(nameLower, "interceptors") ||
 		strings.Contains(nameLower, "sib") || strings.Contains(nameLower, "jms") {
 		return "messaging"
+	}
+
+	// Web service metrics
+	if strings.Contains(nameLower, "pmiwebservicemodule") {
+		return "webservice"
 	}
 
 	// System data
@@ -1156,6 +1163,77 @@ func (w *WebSpherePMI) collectHAManagerMetrics(mx map[string]int64, nodeName, se
 			}
 		}
 	}
+}
+
+// collectWebServiceMetrics handles WebSphere web service PMI metrics
+func (w *WebSpherePMI) collectWebServiceMetrics(mx map[string]int64, nodeName, serverName, path string, stat pmiStat) {
+	// Check if this is the pmiWebServiceModule container
+	if stat.Name == "pmiWebServiceModule" {
+		w.Debugf("Found pmiWebServiceModule container with %d sub-stats", len(stat.SubStats))
+
+		// Process each web service application (*.war)
+		webServiceCount := 0
+		for _, appStat := range stat.SubStats {
+			if strings.HasSuffix(appStat.Name, ".war") {
+				w.collectWebServiceApplication(mx, nodeName, serverName, path, appStat)
+				webServiceCount++
+			}
+		}
+
+		w.Debugf("Web Services - processed %d applications", webServiceCount)
+		return
+	}
+
+	// Check if this is a web service application (*.war)
+	if strings.HasSuffix(stat.Name, ".war") {
+		w.collectWebServiceApplication(mx, nodeName, serverName, path, stat)
+	}
+}
+
+// collectWebServiceApplication handles individual web service application metrics
+func (w *WebSpherePMI) collectWebServiceApplication(mx map[string]int64, nodeName, serverName, path string, stat pmiStat) {
+	// Extract application name from "applicationName.warName.war"
+	appName := stat.Name
+	// Clean app name for instance naming
+	cleanAppName := strings.ReplaceAll(appName, ".war", "")
+	cleanAppName = strings.ReplaceAll(cleanAppName, ".", "_")
+
+	instanceName := fmt.Sprintf("%s.%s.%s", nodeName, serverName, cleanAppName)
+	instanceLabels := map[string]string{
+		"node":        nodeName,
+		"server":      serverName,
+		"application": cleanAppName,
+		"war_file":    appName,
+	}
+
+	w.Debugf("Processing web service application: %s", appName)
+
+	// Chart 1: Request Counts
+	w.ensureChartExists("websphere_pmi.webservice.requests", "Web Service Requests", "requests/s", "stacked", "webservice", 73100,
+		[]string{"received", "dispatched", "successful"}, instanceName, instanceLabels)
+
+	// Chart 2: Response Times
+	w.ensureChartExists("websphere_pmi.webservice.response_times", "Web Service Response Times", "milliseconds", "line", "webservice", 73101,
+		[]string{"response_time", "request_response_time", "dispatch_response_time", "reply_response_time"}, instanceName, instanceLabels)
+
+	// Chart 3: Message Sizes
+	w.ensureChartExists("websphere_pmi.webservice.message_sizes", "Web Service Message Sizes", "bytes", "line", "webservice", 73102,
+		[]string{"request_size", "reply_size", "avg_size"}, instanceName, instanceLabels)
+
+	// Chart 4: Services Loaded
+	w.ensureChartExists("websphere_pmi.webservice.services", "Web Service Services", "services", "line", "webservice", 73103,
+		[]string{"services_loaded"}, instanceName, instanceLabels)
+
+	// Chart IDs for metrics extraction
+	requestsChartID := fmt.Sprintf("webservice.requests_%s", w.sanitizeForChartID(instanceName))
+	responseTimesChartID := fmt.Sprintf("webservice.response_times_%s", w.sanitizeForChartID(instanceName))
+	messageSizesChartID := fmt.Sprintf("webservice.message_sizes_%s", w.sanitizeForChartID(instanceName))
+	servicesChartID := fmt.Sprintf("webservice.services_%s", w.sanitizeForChartID(instanceName))
+
+	// Extract web service metrics into mx with proper dimension IDs
+	w.extractWebServiceMetricsToCharts(mx, requestsChartID, responseTimesChartID, messageSizesChartID, servicesChartID, stat)
+
+	w.Debugf("Web service application '%s' - extracted metrics for 4 charts", appName)
 }
 
 // collectSystemMetrics handles system-level metrics
@@ -2445,6 +2523,120 @@ func (w *WebSpherePMI) extractORBInterceptorMetrics(mx map[string]int64, chartID
 				}
 			}
 			break // Only one ProcessingTime per interceptor
+		}
+	}
+}
+
+// extractWebServiceMetricsToCharts extracts web service metrics and distributes them to appropriate charts
+func (w *WebSpherePMI) extractWebServiceMetricsToCharts(mx map[string]int64, requestsChartID, responseTimesChartID, messageSizesChartID, servicesChartID string, stat pmiStat) {
+	w.Debugf("Web service extracting to charts from stat with %d CountStats, %d TimeStats, %d AverageStats",
+		len(stat.CountStatistics), len(stat.TimeStatistics), len(stat.AverageStatistics))
+
+	// First, extract application-level ServicesLoaded metric
+	for _, cs := range stat.CountStatistics {
+		if cs.Name == "ServicesLoaded" && cs.Count != "" {
+			if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
+				metricKey := fmt.Sprintf("%s_services_loaded", servicesChartID)
+				mx[metricKey] = val
+				w.Debugf("Web service services metric: %s = %d", metricKey, val)
+			}
+		}
+	}
+
+	// Look for pmiWebServiceService sub-stat for detailed metrics
+	for _, subStat := range stat.SubStats {
+		if subStat.Name == "pmiWebServiceService" {
+			w.extractWebServiceServiceMetrics(mx, requestsChartID, responseTimesChartID, messageSizesChartID, subStat)
+			break
+		}
+	}
+}
+
+// extractWebServiceServiceMetrics extracts metrics from pmiWebServiceService block
+func (w *WebSpherePMI) extractWebServiceServiceMetrics(mx map[string]int64, requestsChartID, responseTimesChartID, messageSizesChartID string, stat pmiStat) {
+	// Extract CountStatistics for request counts
+	for _, cs := range stat.CountStatistics {
+		var metricKey string
+		
+		switch cs.Name {
+		case "RequestReceivedService":
+			metricKey = fmt.Sprintf("%s_received", requestsChartID)
+		case "RequestDispatchedService":
+			metricKey = fmt.Sprintf("%s_dispatched", requestsChartID)
+		case "RequestSuccessfulService":
+			metricKey = fmt.Sprintf("%s_successful", requestsChartID)
+		}
+		
+		if metricKey != "" && cs.Count != "" {
+			if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
+				mx[metricKey] = val
+				w.Debugf("Web service request metric: %s = %d", metricKey, val)
+			}
+		}
+	}
+
+	// Extract TimeStatistics for response times
+	for _, ts := range stat.TimeStatistics {
+		var metricKey string
+		
+		switch ts.Name {
+		case "ResponseTimeService":
+			metricKey = fmt.Sprintf("%s_response_time", responseTimesChartID)
+		case "RequestResponseService":
+			metricKey = fmt.Sprintf("%s_request_response_time", responseTimesChartID)
+		case "DispatchResponseService":
+			metricKey = fmt.Sprintf("%s_dispatch_response_time", responseTimesChartID)
+		case "ReplyResponseService":
+			metricKey = fmt.Sprintf("%s_reply_response_time", responseTimesChartID)
+		}
+		
+		if metricKey != "" {
+			// Get total time - WebSphere uses "totalTime" attribute
+			totalStr := ts.TotalTime
+			if totalStr == "" {
+				totalStr = ts.Total // Fallback for other versions
+			}
+
+			// Calculate average response time when requests have been processed
+			if ts.Count != "" && totalStr != "" {
+				count, err1 := strconv.ParseInt(ts.Count, 10, 64)
+				total, err2 := strconv.ParseInt(totalStr, 10, 64)
+
+				if err1 == nil && err2 == nil && count > 0 {
+					// Calculate average response time in milliseconds
+					avgResponseTime := total / count
+					mx[metricKey] = avgResponseTime
+					w.Debugf("Web service response time metric: %s = %d ms (total=%d, count=%d)",
+						metricKey, avgResponseTime, total, count)
+				} else if err1 == nil && count == 0 {
+					// No requests processed - set time to 0
+					mx[metricKey] = 0
+					w.Debugf("Web service response time metric: %s = 0 (no requests)", metricKey)
+				}
+			}
+		}
+	}
+
+	// Extract AverageStatistics for message sizes
+	for _, as := range stat.AverageStatistics {
+		var metricKey string
+		
+		switch as.Name {
+		case "RequestSizeService":
+			metricKey = fmt.Sprintf("%s_request_size", messageSizesChartID)
+		case "ReplySizeService":
+			metricKey = fmt.Sprintf("%s_reply_size", messageSizesChartID)
+		case "SizeService":
+			metricKey = fmt.Sprintf("%s_avg_size", messageSizesChartID)
+		}
+		
+		if metricKey != "" && as.Mean != "" {
+			// Use mean value for average size metrics (already calculated by WebSphere)
+			if val, err := strconv.ParseFloat(as.Mean, 64); err == nil {
+				// Convert to int64 (bytes)
+				mx[metricKey] = int64(val)
+				w.Debugf("Web service size metric: %s = %d bytes", metricKey, int64(val))
+			}
 		}
 	}
 }
