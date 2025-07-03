@@ -670,6 +670,9 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         url_t_destroy(&base_url);
         if (rc != HTTPS_CLIENT_RESP_OK) {
             aclk_status_set((ACLK_STATUS)rc);
+            aclk_env_t_destroy(aclk_env);
+            freez(aclk_env);
+            aclk_env = NULL;
             continue;
         }
 
