@@ -506,6 +506,14 @@ func (j *Job) processMetrics(metrics map[string]int64, startTime time.Time, sinc
 	if !j.collectDurationChart.created || createChart {
 		j.collectDurationChart.ID = fmt.Sprintf("%s_%s_data_collection_duration", cleanPluginName(j.pluginName), j.FullName())
 		j.createChart(j.collectDurationChart)
+
+	// Update dump analyzer with current chart structure for dynamic collectors
+	if j.dumpMode && j.dumpAnalyzer != nil {
+		if analyzer, ok := j.dumpAnalyzer.(interface {
+			UpdateJobStructure(string, *Charts)
+		}); ok {
+			analyzer.UpdateJobStructure(j.name, j.charts)
+		}
 	}
 
 	j.updateChart(
