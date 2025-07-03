@@ -258,8 +258,9 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	// Reset PCF tracking for this collection cycle
 	c.pcfTracker = newPCFTracker()
 
-	// Reset seen map for this collection cycle
+	// Reset seen tracking for this collection cycle (both old and new systems)
 	c.seen = make(map[string]bool)
+	c.resetSeenTracking()
 
 	// Connect to queue manager if not connected
 	connectStart := time.Now()
@@ -314,8 +315,9 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 		c.Debugf("Topic metrics collection took %v", time.Since(topicStart))
 	}
 
-	// Clean up obsolete charts for instances that no longer exist
+	// Clean up obsolete charts for instances that no longer exist (both old and new systems)
 	c.markObsoleteCharts()
+	c.cleanupAbsentInstances()
 
 	// Log comprehensive collection summary including PCF command tracking
 	c.logCollectionSummary(mx, time.Since(collectStart))
@@ -928,35 +930,13 @@ func (c *Collector) collectQueueMetrics(ctx context.Context, mx map[string]int64
 		}
 		collected++
 
-		// Mark as seen
+		// Mark as seen (both old and new tracking systems)
 		c.seen[queueName] = true
 
 		cleanName := c.cleanName(queueName)
 
-		// Add queue charts if not already present
-		if !c.collected[queueName] {
-			c.collected[queueName] = true
-			charts := c.newQueueCharts(queueName)
-			if err := c.charts.Add(*charts...); err != nil {
-				c.Warning(err)
-			}
-		}
-
-		// Collect queue status metrics (depth, runtime info)
-		if err := c.collectSingleQueueMetrics(ctx, queueName, cleanName, mx); err != nil {
-			// Don't warn for expected model queue errors
-			if strings.Contains(err.Error(), "2085") || strings.Contains(err.Error(), "MQRC_UNKNOWN_OBJECT_NAME") {
-				c.Debugf("Skipping status collection for model queue %s", queueName)
-			} else {
-				c.Debugf("Failed to collect metrics for queue %s (MQCMD_INQUIRE_Q_STATUS): %v", queueName, err)
-			}
-		}
-
-		// Collect queue configuration metrics (always available for real queues)
-		if err := c.collectQueueConfigMetrics(ctx, queueName, cleanName, mx); err != nil {
-			// Model queues should still have configuration, so log this as debug
-			c.Debugf("Failed to collect config for queue %s (MQCMD_INQUIRE_Q): %v", queueName, err)
-		}
+		// NEW PATTERN: Collect data first, then create charts based on what we successfully collected
+		c.collectQueueMetricsWithDynamicCharts(ctx, queueName, cleanName, mx)
 	}
 
 	// Update overview metrics

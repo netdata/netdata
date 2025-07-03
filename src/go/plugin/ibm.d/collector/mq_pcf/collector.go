@@ -67,6 +67,9 @@ type Collector struct {
 	collected map[string]bool
 	seen      map[string]bool // Track what we've seen this collection cycle
 
+	// Dynamic collector for synchronized chart creation
+	dynamicCollector *DynamicCollector
+
 	// MQ connection
 	mqConn *mqConnection
 
