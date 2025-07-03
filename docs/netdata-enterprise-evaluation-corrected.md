@@ -254,7 +254,7 @@ These figures include ingestion and query resources.
 
 :::info
 
-For more information see [Agent Resource Utilization](https://learn.netdata.cloud/docs/netdata-agent/resource-utilization).
+For more information see [Agent Resource Utilization](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/sizing-netdata-agents/README.md).
 
 For high availability configurations, see [Clustering and High Availability of Netdata Parents](https://learn.netdata.cloud/docs/observability-centralization-points/metrics-centralization-points/clustering-and-high-availability-of-netdata-parents).
 
