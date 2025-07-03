@@ -516,3 +516,440 @@ func (c *Collector) addQueueResetMetricsWithCharts(queueName string, metrics map
 		}
 	}
 }
+
+// collectChannelMetricsWithDynamicCharts implements the WebSphere PMI pattern for channels:
+// 1. First attempt data collection
+// 2. Only create charts if collection succeeds
+// 3. Create charts specific to the metrics that were actually collected
+func (c *Collector) collectChannelMetricsWithDynamicCharts(ctx context.Context, channelName, cleanName string, mx map[string]int64) {
+	// Temporary map to collect metrics before chart creation
+	tempMx := make(map[string]int64)
+	
+	// Labels for all channel charts
+	channelLabels := map[string]string{
+		"channel": channelName,
+	}
+
+	// Try to collect channel runtime metrics (MQCMD_INQUIRE_CHANNEL_STATUS)
+	runtimeMetrics := c.collectChannelRuntimeData(ctx, channelName)
+	if len(runtimeMetrics) > 0 {
+		// Runtime collection succeeded - create relevant charts and add metrics
+		c.addChannelRuntimeMetricsWithCharts(channelName, runtimeMetrics, channelLabels, tempMx)
+	}
+
+	// Try to collect channel configuration metrics (MQCMD_INQUIRE_CHANNEL)
+	configMetrics := c.collectChannelConfigurationData(ctx, channelName)
+	if len(configMetrics) > 0 {
+		// Configuration collection succeeded - create relevant charts and add metrics
+		c.addChannelConfigMetricsWithCharts(channelName, configMetrics, channelLabels, tempMx)
+	}
+
+	// Add all successfully collected metrics to main map
+	for key, value := range tempMx {
+		mx[key] = value
+	}
+
+	c.Debugf("Collected %d metrics for channel %s", len(tempMx), channelName)
+}
+
+// collectChannelRuntimeData attempts to collect runtime metrics and returns what was found
+func (c *Collector) collectChannelRuntimeData(ctx context.Context, channelName string) map[string]int64 {
+	params := []pcfParameter{
+		newStringParameter(C.MQCACH_CHANNEL_NAME, channelName),
+	}
+
+	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_CHANNEL_STATUS, params)
+	if err != nil {
+		c.Debugf("Failed to send MQCMD_INQUIRE_CHANNEL_STATUS for %s: %v", channelName, err)
+		return nil
+	}
+
+	attrs, err := c.parsePCFResponse(response, "MQCMD_INQUIRE_CHANNEL_STATUS")
+	if err != nil {
+		c.Debugf("Failed to parse channel status response for %s: %v", channelName, err)
+		return nil
+	}
+
+	// Check for MQ errors in the response
+	if reasonCode, ok := attrs[C.MQIACF_REASON_CODE]; ok {
+		if reason, ok := reasonCode.(int32); ok && reason != 0 {
+			c.Debugf("MQCMD_INQUIRE_CHANNEL_STATUS failed for %s: reason %d (%s)", channelName, reason, mqReasonString(reason))
+			return nil
+		}
+	}
+
+	// Extract available runtime metrics
+	metrics := make(map[string]int64)
+
+	// Channel status
+	if val, ok := attrs[C.MQIACH_CHANNEL_STATUS]; ok {
+		if status, ok := val.(int32); ok {
+			metrics["status"] = int64(status)
+		}
+	}
+
+	// Message statistics
+	if val, ok := attrs[C.MQIACH_MSGS]; ok {
+		if msgs, ok := val.(int32); ok {
+			metrics["messages"] = int64(msgs)
+		}
+	}
+
+	// Byte statistics
+	if val, ok := attrs[C.MQIACH_BYTES_SENT]; ok {
+		if bytes, ok := val.(int32); ok {
+			metrics["bytes"] = int64(bytes)
+		}
+	}
+
+	// Batch statistics
+	if val, ok := attrs[C.MQIACH_BATCHES]; ok {
+		if batches, ok := val.(int32); ok {
+			metrics["batches"] = int64(batches)
+		}
+	}
+
+	return metrics
+}
+
+// collectChannelConfigurationData attempts to collect configuration metrics and returns what was found
+func (c *Collector) collectChannelConfigurationData(ctx context.Context, channelName string) map[string]int64 {
+	params := []pcfParameter{
+		newStringParameter(C.MQCACH_CHANNEL_NAME, channelName),
+	}
+
+	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_CHANNEL, params)
+	if err != nil {
+		c.Debugf("Failed to send MQCMD_INQUIRE_CHANNEL for %s: %v", channelName, err)
+		return nil
+	}
+
+	attrs, err := c.parsePCFResponse(response, "MQCMD_INQUIRE_CHANNEL")
+	if err != nil {
+		c.Debugf("Failed to parse channel config response for %s: %v", channelName, err)
+		return nil
+	}
+
+	// Check for MQ errors in the response
+	if reasonCode, ok := attrs[C.MQIACF_REASON_CODE]; ok {
+		if reason, ok := reasonCode.(int32); ok && reason != 0 {
+			c.Debugf("MQCMD_INQUIRE_CHANNEL failed for %s: reason %d (%s)", channelName, reason, mqReasonString(reason))
+			return nil
+		}
+	}
+
+	// Extract available configuration metrics
+	metrics := make(map[string]int64)
+
+	// Batch settings
+	if val, ok := attrs[C.MQIACH_BATCH_SIZE]; ok {
+		if batchSize, ok := val.(int32); ok {
+			metrics["batch_size"] = int64(batchSize)
+		}
+	}
+	if val, ok := attrs[C.MQIACH_BATCH_INTERVAL]; ok {
+		if batchInterval, ok := val.(int32); ok {
+			metrics["batch_interval"] = int64(batchInterval)
+		}
+	}
+
+	// Timeout settings
+	if val, ok := attrs[C.MQIACH_DISC_INTERVAL]; ok {
+		if discInterval, ok := val.(int32); ok {
+			metrics["disc_interval"] = int64(discInterval)
+		}
+	}
+	if val, ok := attrs[C.MQIACH_HB_INTERVAL]; ok {
+		if hbInterval, ok := val.(int32); ok {
+			metrics["hb_interval"] = int64(hbInterval)
+		}
+	}
+	if val, ok := attrs[C.MQIACH_KEEP_ALIVE_INTERVAL]; ok {
+		if keepAlive, ok := val.(int32); ok {
+			metrics["keep_alive_interval"] = int64(keepAlive)
+		}
+	}
+
+	// Retry settings
+	if val, ok := attrs[C.MQIACH_SHORT_RETRY]; ok {
+		if shortRetry, ok := val.(int32); ok {
+			metrics["short_retry"] = int64(shortRetry)
+		}
+	}
+	if val, ok := attrs[C.MQIACH_SHORT_TIMER]; ok {
+		if shortTimer, ok := val.(int32); ok {
+			metrics["short_timer"] = int64(shortTimer)
+		}
+	}
+	if val, ok := attrs[C.MQIACH_LONG_RETRY]; ok {
+		if longRetry, ok := val.(int32); ok {
+			metrics["long_retry"] = int64(longRetry)
+		}
+	}
+	if val, ok := attrs[C.MQIACH_LONG_TIMER]; ok {
+		if longTimer, ok := val.(int32); ok {
+			metrics["long_timer"] = int64(longTimer)
+		}
+	}
+
+	// Limits
+	if val, ok := attrs[C.MQIACH_MAX_MSG_LENGTH]; ok {
+		if maxMsgLength, ok := val.(int32); ok {
+			metrics["max_msg_length"] = int64(maxMsgLength)
+		}
+	}
+	if val, ok := attrs[C.MQIACH_SHARING_CONVERSATIONS]; ok {
+		if sharingConversations, ok := val.(int32); ok {
+			metrics["sharing_conversations"] = int64(sharingConversations)
+		}
+	}
+	if val, ok := attrs[C.MQIACH_NETWORK_PRIORITY]; ok {
+		if networkPriority, ok := val.(int32); ok {
+			metrics["network_priority"] = int64(networkPriority)
+		}
+	}
+
+	return metrics
+}
+
+// addChannelRuntimeMetricsWithCharts creates charts and adds metrics with properly synchronized dimension IDs
+func (c *Collector) addChannelRuntimeMetricsWithCharts(channelName string, metrics map[string]int64, labels map[string]string, mx map[string]int64) {
+	cleanName := c.cleanName(channelName)
+
+	// Channel status
+	statusDims := []string{}
+	if _, hasStatus := metrics["status"]; hasStatus {
+		statusDims = append(statusDims, "status")
+	}
+	if len(statusDims) > 0 {
+		chartID := fmt.Sprintf("channel_status_%s", cleanName)
+		c.ensureChartExists(
+			"mq_pcf.channel_status",
+			"Channel Status",
+			"status",
+			"line",
+			"channels",
+			prioChannelStatus,
+			statusDims,
+			channelName,
+			labels,
+		)
+		// Store metrics with dimension IDs that match chart expectations
+		for _, dim := range statusDims {
+			if value, exists := metrics[dim]; exists {
+				mx[fmt.Sprintf("%s_%s", chartID, dim)] = value
+			}
+		}
+	}
+
+	// Message rate
+	messageDims := []string{}
+	if _, hasMessages := metrics["messages"]; hasMessages {
+		messageDims = append(messageDims, "messages")
+	}
+	if len(messageDims) > 0 {
+		chartID := fmt.Sprintf("channel_messages_%s", cleanName)
+		c.ensureChartExists(
+			"mq_pcf.channel_messages",
+			"Channel Message Rate",
+			"messages/s",
+			"line",
+			"channels",
+			prioChannelMessages,
+			messageDims,
+			channelName,
+			labels,
+		)
+		// Store metrics with dimension IDs that match chart expectations
+		for _, dim := range messageDims {
+			if value, exists := metrics[dim]; exists {
+				mx[fmt.Sprintf("%s_%s", chartID, dim)] = value
+			}
+		}
+	}
+
+	// Byte rate
+	byteDims := []string{}
+	if _, hasBytes := metrics["bytes"]; hasBytes {
+		byteDims = append(byteDims, "bytes")
+	}
+	if len(byteDims) > 0 {
+		chartID := fmt.Sprintf("channel_bytes_%s", cleanName)
+		c.ensureChartExists(
+			"mq_pcf.channel_bytes",
+			"Channel Data Transfer Rate",
+			"bytes/s",
+			"line",
+			"channels",
+			prioChannelBytes,
+			byteDims,
+			channelName,
+			labels,
+		)
+		// Store metrics with dimension IDs that match chart expectations
+		for _, dim := range byteDims {
+			if value, exists := metrics[dim]; exists {
+				mx[fmt.Sprintf("%s_%s", chartID, dim)] = value
+			}
+		}
+	}
+
+	// Batch rate
+	batchDims := []string{}
+	if _, hasBatches := metrics["batches"]; hasBatches {
+		batchDims = append(batchDims, "batches")
+	}
+	if len(batchDims) > 0 {
+		chartID := fmt.Sprintf("channel_batches_%s", cleanName)
+		c.ensureChartExists(
+			"mq_pcf.channel_batches",
+			"Channel Batch Rate",
+			"batches/s",
+			"line",
+			"channels",
+			prioChannelBatches,
+			batchDims,
+			channelName,
+			labels,
+		)
+		// Store metrics with dimension IDs that match chart expectations
+		for _, dim := range batchDims {
+			if value, exists := metrics[dim]; exists {
+				mx[fmt.Sprintf("%s_%s", chartID, dim)] = value
+			}
+		}
+	}
+}
+
+// addChannelConfigMetricsWithCharts creates charts and adds metrics with properly synchronized dimension IDs
+func (c *Collector) addChannelConfigMetricsWithCharts(channelName string, metrics map[string]int64, labels map[string]string, mx map[string]int64) {
+	cleanName := c.cleanName(channelName)
+
+	// Batch configuration
+	batchDims := []string{}
+	if _, hasBatchSize := metrics["batch_size"]; hasBatchSize {
+		batchDims = append(batchDims, "batch_size")
+	}
+	if _, hasBatchInterval := metrics["batch_interval"]; hasBatchInterval {
+		batchDims = append(batchDims, "batch_interval")
+	}
+	if len(batchDims) > 0 {
+		chartID := fmt.Sprintf("channel_batch_config_%s", cleanName)
+		c.ensureChartExists(
+			"mq_pcf.channel_batch_config",
+			"Channel Batch Configuration",
+			"value",
+			"line",
+			"channels",
+			prioChannelStatus+1,
+			batchDims,
+			channelName,
+			labels,
+		)
+		// Store metrics with dimension IDs that match chart expectations
+		for _, dim := range batchDims {
+			if value, exists := metrics[dim]; exists {
+				mx[fmt.Sprintf("%s_%s", chartID, dim)] = value
+			}
+		}
+	}
+
+	// Timeout configuration
+	timeoutDims := []string{}
+	if _, hasDiscInterval := metrics["disc_interval"]; hasDiscInterval {
+		timeoutDims = append(timeoutDims, "disc_interval")
+	}
+	if _, hasHbInterval := metrics["hb_interval"]; hasHbInterval {
+		timeoutDims = append(timeoutDims, "hb_interval")
+	}
+	if _, hasKeepAlive := metrics["keep_alive_interval"]; hasKeepAlive {
+		timeoutDims = append(timeoutDims, "keep_alive_interval")
+	}
+	if len(timeoutDims) > 0 {
+		chartID := fmt.Sprintf("channel_timeouts_config_%s", cleanName)
+		c.ensureChartExists(
+			"mq_pcf.channel_timeouts_config",
+			"Channel Timeout Settings",
+			"seconds",
+			"line",
+			"channels",
+			prioChannelStatus+2,
+			timeoutDims,
+			channelName,
+			labels,
+		)
+		// Store metrics with dimension IDs that match chart expectations
+		for _, dim := range timeoutDims {
+			if value, exists := metrics[dim]; exists {
+				mx[fmt.Sprintf("%s_%s", chartID, dim)] = value
+			}
+		}
+	}
+
+	// Retry configuration
+	retryDims := []string{}
+	if _, hasShortRetry := metrics["short_retry"]; hasShortRetry {
+		retryDims = append(retryDims, "short_retry")
+	}
+	if _, hasShortTimer := metrics["short_timer"]; hasShortTimer {
+		retryDims = append(retryDims, "short_timer")
+	}
+	if _, hasLongRetry := metrics["long_retry"]; hasLongRetry {
+		retryDims = append(retryDims, "long_retry")
+	}
+	if _, hasLongTimer := metrics["long_timer"]; hasLongTimer {
+		retryDims = append(retryDims, "long_timer")
+	}
+	if len(retryDims) > 0 {
+		chartID := fmt.Sprintf("channel_retry_config_%s", cleanName)
+		c.ensureChartExists(
+			"mq_pcf.channel_retry_config",
+			"Channel Retry Configuration",
+			"value",
+			"line",
+			"channels",
+			prioChannelStatus+3,
+			retryDims,
+			channelName,
+			labels,
+		)
+		// Store metrics with dimension IDs that match chart expectations
+		for _, dim := range retryDims {
+			if value, exists := metrics[dim]; exists {
+				mx[fmt.Sprintf("%s_%s", chartID, dim)] = value
+			}
+		}
+	}
+
+	// Limits configuration
+	limitsDims := []string{}
+	if _, hasMaxMsgLength := metrics["max_msg_length"]; hasMaxMsgLength {
+		limitsDims = append(limitsDims, "max_msg_length")
+	}
+	if _, hasSharingConversations := metrics["sharing_conversations"]; hasSharingConversations {
+		limitsDims = append(limitsDims, "sharing_conversations")
+	}
+	if _, hasNetworkPriority := metrics["network_priority"]; hasNetworkPriority {
+		limitsDims = append(limitsDims, "network_priority")
+	}
+	if len(limitsDims) > 0 {
+		chartID := fmt.Sprintf("channel_limits_config_%s", cleanName)
+		c.ensureChartExists(
+			"mq_pcf.channel_limits_config",
+			"Channel Limits",
+			"value",
+			"line",
+			"channels",
+			prioChannelStatus+4,
+			limitsDims,
+			channelName,
+			labels,
+		)
+		// Store metrics with dimension IDs that match chart expectations
+		for _, dim := range limitsDims {
+			if value, exists := metrics[dim]; exists {
+				mx[fmt.Sprintf("%s_%s", chartID, dim)] = value
+			}
+		}
+	}
+}
