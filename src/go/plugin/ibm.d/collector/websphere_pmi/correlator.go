@@ -13,6 +13,7 @@ import (
 
 // ChartCandidate represents a potential Netdata chart
 type ChartCandidate struct {
+	ID         string // Unique chart ID (preserved from original instance-based context)
 	Context    string // Chart context (e.g., websphere_pmi.thread_pools.active_count)
 	Title      string // Human-readable title
 	Units      string // Chart units
@@ -65,7 +66,10 @@ func (c *CorrelationEngine) CorrelateMetrics(metrics []MetricTuple) []ChartCandi
 		return charts[i].Priority < charts[j].Priority
 	})
 
-	return charts
+	// NEW: Secondary consolidation pass - update context and title for similar charts
+	consolidatedCharts := c.consolidateSimilarCharts(charts)
+
+	return consolidatedCharts
 }
 
 // MetricGroup represents a group of correlated metrics
@@ -699,7 +703,8 @@ func (c *CorrelationEngine) createChartFromGroup(group MetricGroup, priority int
 	title := c.generateInstanceTitle(group)
 
 	chart := ChartCandidate{
-		Context:    group.BaseContext,
+		ID:         sanitizeDimensionID(group.BaseContext), // Preserve original instance-specific ID
+		Context:    group.BaseContext,                      // Will be updated by consolidation if needed
 		Title:      title,
 		Units:      primaryUnit,
 		Type:       c.inferChartTypeForInstance(dimensions),
@@ -1404,13 +1409,196 @@ func convertToSnakeCase(s string) string {
 	return strings.Trim(res, "_")
 }
 
+// consolidateSimilarCharts groups charts with identical characteristics (units, dimensions, label keys)
+// within each family and updates their context and title to be consistent
+func (c *CorrelationEngine) consolidateSimilarCharts(charts []ChartCandidate) []ChartCandidate {
+	// Group charts by family first
+	familyGroups := make(map[string][]ChartCandidate)
+	for _, chart := range charts {
+		familyGroups[chart.Family] = append(familyGroups[chart.Family], chart)
+	}
+
+	consolidatedCharts := make([]ChartCandidate, 0, len(charts))
+
+	// Process each family
+	for family, familyCharts := range familyGroups {
+		// Group charts within family by signature (units + dimensions + label keys)
+		signatureGroups := c.groupChartsBySignature(familyCharts)
+
+		// Process each signature group
+		for _, group := range signatureGroups {
+			if len(group) > 1 {
+				// Multiple charts with same signature - consolidate their context and title
+				consolidatedGroup := c.consolidateChartGroup(group, family)
+				consolidatedCharts = append(consolidatedCharts, consolidatedGroup...)
+			} else {
+				// Single chart - no changes needed
+				consolidatedCharts = append(consolidatedCharts, group[0])
+			}
+		}
+	}
+
+	return consolidatedCharts
+}
+
+// groupChartsBySignature groups charts by their structural signature
+func (c *CorrelationEngine) groupChartsBySignature(charts []ChartCandidate) [][]ChartCandidate {
+	signatureMap := make(map[string][]ChartCandidate)
+
+	for _, chart := range charts {
+		signature := c.generateChartSignature(chart)
+		signatureMap[signature] = append(signatureMap[signature], chart)
+	}
+
+	// Convert map to slice
+	groups := make([][]ChartCandidate, 0, len(signatureMap))
+	for _, group := range signatureMap {
+		groups = append(groups, group)
+	}
+
+	return groups
+}
+
+// generateChartSignature creates a signature based on units, dimensions, and label keys
+func (c *CorrelationEngine) generateChartSignature(chart ChartCandidate) string {
+	// Include units
+	signature := chart.Units
+
+	// Add dimension IDs (sorted for consistency)
+	dimIDs := make([]string, 0, len(chart.Dimensions))
+	for _, dim := range chart.Dimensions {
+		dimIDs = append(dimIDs, dim.ID)
+	}
+	sort.Strings(dimIDs)
+	signature += "|dims:" + strings.Join(dimIDs, ",")
+
+	// Add label keys (sorted for consistency)
+	labelKeys := make([]string, 0, len(chart.Labels))
+	for key := range chart.Labels {
+		labelKeys = append(labelKeys, key)
+	}
+	sort.Strings(labelKeys)
+	signature += "|labels:" + strings.Join(labelKeys, ",")
+
+	return signature
+}
+
+// consolidateChartGroup updates context and title for charts with identical signatures
+func (c *CorrelationEngine) consolidateChartGroup(group []ChartCandidate, family string) []ChartCandidate {
+	if len(group) <= 1 {
+		return group
+	}
+
+	// Generate a common context based on the shared characteristics
+	commonContext := c.generateCommonContext(group, family)
+	commonTitle := c.generateCommonTitle(group, family)
+
+	// Update each chart in the group
+	consolidatedCharts := make([]ChartCandidate, 0, len(group))
+	for _, chart := range group {
+		updatedChart := chart // Copy the chart
+		// ONLY update Context and Title - preserve original ID and all other fields
+		updatedChart.Context = commonContext
+		updatedChart.Title = commonTitle
+		// ID remains unchanged (preserves original instance-specific identifier)
+		consolidatedCharts = append(consolidatedCharts, updatedChart)
+	}
+
+	return consolidatedCharts
+}
+
+// generateCommonContext creates a common context for charts with identical signatures
+func (c *CorrelationEngine) generateCommonContext(group []ChartCandidate, family string) string {
+	if len(group) == 0 {
+		return "websphere_pmi.unknown"
+	}
+
+	// Extract the common part from existing contexts
+	// All charts in the group should have similar contexts since they came from the same category
+	firstChart := group[0]
+	contextParts := strings.Split(firstChart.Context, ".")
+
+	if len(contextParts) >= 2 {
+		// Use the category part but make it generic for the group
+		// e.g., "websphere_pmi.thread_pools.webcontainer" -> "websphere_pmi.thread_pools"
+		// This creates a common context for all similar charts in the category
+		return strings.Join(contextParts[:len(contextParts)-1], ".")
+	}
+
+	// Fallback - use family-based context
+	familyContext := strings.ToLower(strings.ReplaceAll(family, " ", "_"))
+	return fmt.Sprintf("websphere_pmi.%s", sanitizeDimensionID(familyContext))
+}
+
+// generateCommonTitle creates a common title for charts with identical signatures
+func (c *CorrelationEngine) generateCommonTitle(group []ChartCandidate, family string) string {
+	if len(group) == 0 {
+		return "Unknown Metrics"
+	}
+
+	// Determine what type of metrics these are based on dimensions
+	firstChart := group[0]
+	if len(firstChart.Dimensions) > 0 {
+		// Analyze the dimension names to create a descriptive title
+		dimensionTypes := c.analyzeDimensionTypes(firstChart.Dimensions)
+
+		if dimensionTypes != "" {
+			return fmt.Sprintf("%s - %s", family, dimensionTypes)
+		}
+	}
+
+	// Fallback to family name
+	return fmt.Sprintf("%s Metrics", family)
+}
+
+// analyzeDimensionTypes analyzes dimension names to determine what type of metrics they represent
+func (c *CorrelationEngine) analyzeDimensionTypes(dimensions []DimensionCandidate) string {
+	if len(dimensions) == 0 {
+		return ""
+	}
+
+	// Count different types of metrics
+	countMetrics := 0
+	timeMetrics := 0
+	sizeMetrics := 0
+	percentMetrics := 0
+
+	for _, dim := range dimensions {
+		nameLower := strings.ToLower(dim.Name)
+		if strings.Contains(nameLower, "count") {
+			countMetrics++
+		} else if strings.Contains(nameLower, "time") || strings.Contains(nameLower, "duration") {
+			timeMetrics++
+		} else if strings.Contains(nameLower, "size") || strings.Contains(nameLower, "memory") {
+			sizeMetrics++
+		} else if strings.Contains(nameLower, "percent") || strings.Contains(nameLower, "utilization") {
+			percentMetrics++
+		}
+	}
+
+	// Determine the primary type
+	total := len(dimensions)
+	if countMetrics > total/2 {
+		return "Counts"
+	} else if timeMetrics > total/2 {
+		return "Response Times"
+	} else if sizeMetrics > total/2 {
+		return "Memory Usage"
+	} else if percentMetrics > total/2 {
+		return "Utilization"
+	}
+
+	// Mixed metrics - use a generic description
+	return "Performance Metrics"
+}
+
 // ConvertToNetdataCharts converts chart candidates to Netdata module charts
 func (c *CorrelationEngine) ConvertToNetdataCharts(candidates []ChartCandidate) *module.Charts {
 	charts := &module.Charts{}
 
 	for _, candidate := range candidates {
-		// Sanitize the chart ID to remove invalid characters
-		chartID := sanitizeDimensionID(candidate.Context)
+		// Use the preserved chart ID (not derived from potentially consolidated context)
+		chartID := candidate.ID
 
 		chart := &module.Chart{
 			ID:       chartID,
