@@ -106,6 +106,8 @@ func (w *WebSpherePMI) extractMetricsFromStat(mx map[string]int64, nodeName, ser
 		w.collectJVMMetrics(mx, nodeName, serverName, path, stat)
 	case "web":
 		w.collectWebMetrics(mx, nodeName, serverName, path, stat)
+	case "portlet":
+		w.collectPortletApplicationMetrics(mx, nodeName, serverName, path, stat)
 	case "connections":
 		w.collectConnectionPoolMetrics(mx, nodeName, serverName, path, stat)
 	case "threading":
@@ -168,6 +170,11 @@ func (w *WebSpherePMI) categorizeStatName(statName string) string {
 	// JVM metrics
 	if strings.Contains(nameLower, "jvm runtime") || strings.Contains(nameLower, "object pool") {
 		return "jvm"
+	}
+
+	// Portlet Application metrics (specific handling)
+	if statName == "Portlet Application" {
+		return "portlet"
 	}
 
 	// Web container metrics - now includes individual applications
@@ -326,7 +333,18 @@ func (w *WebSpherePMI) collectJVMMetrics(mx map[string]int64, nodeName, serverNa
 // collectWebMetrics handles web container metrics
 func (w *WebSpherePMI) collectWebMetrics(mx map[string]int64, nodeName, serverName, path string, stat pmiStat) {
 	// Debug: log what we're processing
-	w.Debugf("Web metrics processing: path='%s', stat.Name='%s'", path, stat.Name)
+	w.Debugf("Web metrics processing: path='%s', stat.Name='%s', subStats=%d", path, stat.Name, len(stat.SubStats))
+	
+	// Special debugging for ISCAdminPortlet
+	if strings.Contains(stat.Name, "ISCAdminPortlet") {
+		w.Debugf("SPECIAL: ISCAdminPortlet entry - %d CountStats, %d SubStats", len(stat.CountStatistics), len(stat.SubStats))
+		if len(stat.SubStats) > 0 {
+			w.Debugf("SPECIAL: ISCAdminPortlet SubStats:")
+			for i, sub := range stat.SubStats {
+				w.Debugf("  [%d] %s", i, sub.Name)
+			}
+		}
+	}
 
 	// Check if this is a session metric for a specific web application
 	// Pattern: isclite#isclite.war, perfServletApp#perfServletApp.war
@@ -388,6 +406,9 @@ func (w *WebSpherePMI) collectWebMetrics(mx map[string]int64, nodeName, serverNa
 			externalTimeChartID, externalSizeChartID, healthChartID, objectSizeChartID, stat)
 
 		w.Debugf("Web application '%s' - extracted session metrics for 8 charts", appName)
+		
+		// Also check for portlet metrics in this web application
+		w.collectPortletMetrics(mx, nodeName, serverName, appName, stat)
 	}
 
 	// Check for servlet-specific metrics (if path indicates servlet)
@@ -409,6 +430,235 @@ func (w *WebSpherePMI) collectWebMetrics(mx map[string]int64, nodeName, serverNa
 			w.Debugf("Servlet '%s' - extracted %d metrics", servletName, extracted)
 		}
 	}
+}
+
+// collectPortletMetrics handles portlet metrics for a web application
+func (w *WebSpherePMI) collectPortletMetrics(mx map[string]int64, nodeName, serverName, appName string, stat pmiStat) {
+	// Use recursive search to find portlet metrics anywhere in the stat hierarchy
+	w.findAndProcessPortlets(mx, nodeName, serverName, appName, stat)
+}
+
+// findAndProcessPortlets recursively searches for portlet metrics in the stat hierarchy
+func (w *WebSpherePMI) findAndProcessPortlets(mx map[string]int64, nodeName, serverName, appName string, stat pmiStat) {
+	// Check if this stat itself is a portlet
+	if w.isIndividualPortletStat(stat) {
+		w.collectIndividualPortletMetrics(mx, nodeName, serverName, appName, stat.Name, stat)
+		return
+	}
+	
+	// Check if this stat contains portlet metrics directly
+	if w.hasPortletMetrics(stat) {
+		w.collectIndividualPortletMetrics(mx, nodeName, serverName, appName, stat.Name, stat)
+	}
+	
+	// Recursively search sub-stats
+	for _, subStat := range stat.SubStats {
+		w.findAndProcessPortlets(mx, nodeName, serverName, appName, subStat)
+	}
+}
+
+// isIndividualPortletStat checks if a stat represents an individual portlet
+func (w *WebSpherePMI) isIndividualPortletStat(stat pmiStat) bool {
+	// A portlet stat should have specific portlet metrics
+	for _, cs := range stat.CountStatistics {
+		if cs.Name == "Number of portlet requests" || cs.Name == "Number of portlet errors" {
+			return true
+		}
+	}
+	
+	for _, rs := range stat.RangeStatistics {
+		if rs.Name == "Number of concurrent portlet requests" {
+			return true
+		}
+	}
+	
+	for _, ts := range stat.TimeStatistics {
+		if strings.Contains(ts.Name, "portlet") {
+			return true
+		}
+	}
+	
+	return false
+}
+
+// hasPortletMetrics checks if a stat contains any portlet-related metrics
+func (w *WebSpherePMI) hasPortletMetrics(stat pmiStat) bool {
+	return w.isIndividualPortletStat(stat)
+}
+
+// collectIndividualPortletMetrics handles metrics for a single portlet
+func (w *WebSpherePMI) collectIndividualPortletMetrics(mx map[string]int64, nodeName, serverName, appName, portletName string, stat pmiStat) {
+	instanceName := fmt.Sprintf("%s.%s.%s.%s", nodeName, serverName, w.sanitizeForMetricName(appName), w.sanitizeForMetricName(portletName))
+	instanceLabels := map[string]string{
+		"node":        nodeName,
+		"server":      serverName,
+		"application": appName,
+		"portlet":     portletName,
+	}
+
+	w.Debugf("Processing portlet '%s' in application '%s'", portletName, appName)
+
+	// Chart 1: Portlet Requests 
+	w.ensureChartExists("websphere_pmi.web.portlet_requests", "Portlet Requests", "requests/s", "line", "web/portlets", 70600,
+		[]string{"requests", "errors"}, instanceName, instanceLabels)
+
+	// Chart 2: Portlet Concurrent Requests
+	w.ensureChartExists("websphere_pmi.web.portlet_concurrent", "Portlet Concurrent Requests", "requests", "line", "web/portlets", 70601,
+		[]string{"concurrent_requests"}, instanceName, instanceLabels)
+
+	// Chart 3: Portlet Response Times
+	w.ensureChartExists("websphere_pmi.web.portlet_response_time", "Portlet Response Times", "milliseconds", "line", "web/portlets", 70602,
+		[]string{"render_time", "action_time", "event_time", "resource_time"}, instanceName, instanceLabels)
+
+	// Chart IDs for each chart (without websphere_pmi prefix)
+	requestsChartID := fmt.Sprintf("web.portlet_requests_%s", w.sanitizeForChartID(instanceName))
+	concurrentChartID := fmt.Sprintf("web.portlet_concurrent_%s", w.sanitizeForChartID(instanceName))
+	responseTimeChartID := fmt.Sprintf("web.portlet_response_time_%s", w.sanitizeForChartID(instanceName))
+
+	// Extract all portlet metrics into mx with proper dimension IDs
+	w.extractPortletMetricsToCharts(mx, requestsChartID, concurrentChartID, responseTimeChartID, stat)
+
+	w.Debugf("Portlet '%s' in application '%s' - extracted metrics for 3 charts", portletName, appName)
+}
+
+// extractPortletMetricsToCharts extracts portlet metrics and distributes them to appropriate charts
+func (w *WebSpherePMI) extractPortletMetricsToCharts(mx map[string]int64, requestsChartID, concurrentChartID, responseTimeChartID string, stat pmiStat) {
+	// Extract from CountStatistics (Number of portlet requests, Number of portlet errors)
+	for _, cs := range stat.CountStatistics {
+		var chartID, dimensionName string
+		switch cs.Name {
+		case "Number of portlet requests":
+			chartID = requestsChartID
+			dimensionName = "requests"
+		case "Number of portlet errors":
+			chartID = requestsChartID
+			dimensionName = "errors"
+		default:
+			w.Debugf("Portlet: skipping CountStatistic '%s' (value: %s)", cs.Name, cs.Count)
+			continue
+		}
+
+		if cs.Count != "" {
+			if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
+				metricKey := fmt.Sprintf("%s_%s", chartID, dimensionName)
+				mx[metricKey] = val
+				w.Debugf("Portlet metric: %s = %d (from CountStatistic %s)", metricKey, val, cs.Name)
+			}
+		}
+	}
+
+	// Extract from RangeStatistics (Number of concurrent portlet requests)
+	for _, rs := range stat.RangeStatistics {
+		var chartID, dimensionName string
+		switch rs.Name {
+		case "Number of concurrent portlet requests":
+			chartID = concurrentChartID
+			dimensionName = "concurrent_requests"
+		default:
+			w.Debugf("Portlet: skipping RangeStatistic '%s' (value: %s)", rs.Name, rs.Current)
+			continue
+		}
+
+		if rs.Current != "" {
+			if val, err := strconv.ParseInt(rs.Current, 10, 64); err == nil {
+				metricKey := fmt.Sprintf("%s_%s", chartID, dimensionName)
+				mx[metricKey] = val
+				w.Debugf("Portlet metric: %s = %d (from RangeStatistic %s)", metricKey, val, rs.Name)
+			}
+		}
+	}
+
+	// Extract from TimeStatistics (Response times for different portlet operations)
+	for _, ts := range stat.TimeStatistics {
+		var chartID, dimensionName string
+		switch ts.Name {
+		case "Response time of portlet render":
+			chartID = responseTimeChartID
+			dimensionName = "render_time"
+		case "Response time of portlet action":
+			chartID = responseTimeChartID
+			dimensionName = "action_time"
+		case "Response time of a portlet processEvent request":
+			chartID = responseTimeChartID
+			dimensionName = "event_time"
+		case "Response time of a portlet serveResource request":
+			chartID = responseTimeChartID
+			dimensionName = "resource_time"
+		default:
+			w.Debugf("Portlet: skipping TimeStatistic '%s'", ts.Name)
+			continue
+		}
+
+		// Use totalTime for lifetime total response time
+		totalTimeStr := ts.TotalTime
+		if totalTimeStr == "" {
+			totalTimeStr = ts.Total // Fallback for other versions
+		}
+
+		if totalTimeStr != "" {
+			if val, err := strconv.ParseInt(totalTimeStr, 10, 64); err == nil {
+				metricKey := fmt.Sprintf("%s_%s", chartID, dimensionName)
+				mx[metricKey] = val
+				w.Debugf("Portlet metric: %s = %d (from TimeStatistic %s.totalTime)", metricKey, val, ts.Name)
+			}
+		}
+	}
+
+	// Note: Do not provide default zero values - let the framework detect missing metrics
+	// This allows proper identification of data collection issues
+}
+
+// collectPortletApplicationMetrics handles direct Portlet Application stats
+func (w *WebSpherePMI) collectPortletApplicationMetrics(mx map[string]int64, nodeName, serverName, path string, stat pmiStat) {
+	w.Debugf("Direct Portlet Application processing: path='%s', SubStats=%d", path, len(stat.SubStats))
+	
+	// Extract the web application name from the path context
+	// The path should contain the parent web application information
+	appName := w.extractPortletAppNameFromPath(path)
+	if appName == "" {
+		w.Debugf("Could not extract application name from path: %s", path)
+		return
+	}
+	
+	w.Debugf("Processing Portlet Application for app: %s", appName)
+	
+	// Look for "Portlets" sub-stat
+	for _, subStat := range stat.SubStats {
+		if subStat.Name == "Portlets" {
+			w.Debugf("Found Portlets container in app '%s' with %d portlets", appName, len(subStat.SubStats))
+			
+			// Process each individual portlet
+			for _, portletStat := range subStat.SubStats {
+				if portletStat.Name != "" {
+					w.collectIndividualPortletMetrics(mx, nodeName, serverName, appName, portletStat.Name, portletStat)
+				}
+			}
+		}
+	}
+}
+
+// extractPortletAppNameFromPath extracts the web application name from the path context
+func (w *WebSpherePMI) extractPortletAppNameFromPath(path string) string {
+	// The path structure should contain the parent application context
+	// We need to look for patterns that indicate the parent web application
+	
+	// Try to extract from various path patterns
+	pathLower := strings.ToLower(path)
+	
+	// Look for common application patterns in the path
+	if strings.Contains(pathLower, "isclite") {
+		if strings.Contains(pathLower, "iscadminportlet") {
+			return "isclite#ISCAdminPortlet.war"
+		} else if strings.Contains(pathLower, "wimportlet") {
+			return "isclite#WIMPortlet.war"
+		} else if strings.Contains(pathLower, "wasportlet") {
+			return "isclite#wasportlet.war"
+		}
+	}
+	
+	// If we can't extract from path, we might need to get it from context
+	// For now, return empty string to indicate we couldn't determine the app
+	return ""
 }
 
 // collectConnectionPoolMetrics handles connection pool metrics
