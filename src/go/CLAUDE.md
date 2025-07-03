@@ -226,6 +226,41 @@ func newInstanceCharts(instance string) *module.Charts {
 }
 ```
 
+### CRITICAL: Understanding Dimension IDs vs Names in go.d Framework
+
+**This is a fundamental concept that differs from other Netdata collectors:**
+
+1. **Inside go.d framework**:
+   - Dimension **IDs must be unique across the entire job** (all charts, all contexts)
+   - The framework uses dimension IDs to look up values in the mx map: `mx[dim.ID]`
+   - This is why dynamic instance collectors format dimension IDs with instance identifiers
+
+2. **What Netdata receives**:
+   - The framework sends the dimension **Name** as BOTH the dimension ID and dimension name
+   - The dimension ID defined in go.d is **internal only** and not exposed to Netdata
+   - This is why NIDL compliance requires shared dimension Names, not IDs
+
+3. **Example**:
+   ```go
+   // In your chart definition:
+   chart.Dims = append(chart.Dims, &module.Dim{
+       ID:   "thread_pool_instance1_active",  // Must be unique across job
+       Name: "active",                         // This is what Netdata sees as both ID and name
+   })
+   
+   // In your mx map:
+   mx["thread_pool_instance1_active"] = 42  // Must match dim.ID exactly
+   
+   // What Netdata receives:
+   // DIMENSION active active ...
+   ```
+
+4. **Key implications**:
+   - For static single-instance collectors: Can use simple dimension IDs (no collision risk)
+   - For dynamic multi-instance collectors: Must use unique dimension IDs to avoid collisions
+   - NIDL compliance is achieved through shared dimension Names, not IDs
+   - The mx map keys must match dimension IDs exactly for the framework to find values
+
 ### Clean Names
 
 Always clean instance names for use in metric IDs:
