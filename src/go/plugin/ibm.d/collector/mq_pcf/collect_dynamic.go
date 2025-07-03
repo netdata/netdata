@@ -31,41 +31,23 @@ func (c *Collector) collectQueueMetricsWithDynamicCharts(ctx context.Context, qu
 	// Try to collect queue configuration metrics (MQCMD_INQUIRE_Q)
 	configMetrics := c.collectQueueConfigurationData(ctx, queueName)
 	if len(configMetrics) > 0 {
-		// Configuration collection succeeded - create relevant charts
-		c.createQueueConfigCharts(queueName, configMetrics, queueLabels)
-		
-		// Add metrics to main collection with proper dimension IDs
-		for metric, value := range configMetrics {
-			dimID := fmt.Sprintf("queue_config_%s_%s", cleanName, metric)
-			tempMx[dimID] = value
-		}
+		// Configuration collection succeeded - create relevant charts and add metrics
+		c.addQueueConfigMetricsWithCharts(queueName, configMetrics, queueLabels, tempMx)
 	}
 
 	// Try to collect queue runtime metrics (MQCMD_INQUIRE_Q_STATUS)
 	runtimeMetrics := c.collectQueueRuntimeData(ctx, queueName)
 	if len(runtimeMetrics) > 0 {
-		// Runtime collection succeeded - create relevant charts
-		c.createQueueRuntimeCharts(queueName, runtimeMetrics, queueLabels)
-		
-		// Add metrics to main collection with proper dimension IDs
-		for metric, value := range runtimeMetrics {
-			dimID := fmt.Sprintf("queue_runtime_%s_%s", cleanName, metric)
-			tempMx[dimID] = value
-		}
+		// Runtime collection succeeded - create relevant charts and add metrics
+		c.addQueueRuntimeMetricsWithCharts(queueName, runtimeMetrics, queueLabels, tempMx)
 	}
 
 	// Try to collect queue reset statistics (if enabled)
 	if c.CollectResetQueueStats != nil && *c.CollectResetQueueStats {
 		resetMetrics := c.collectQueueResetData(ctx, queueName)
 		if len(resetMetrics) > 0 {
-			// Reset stats collection succeeded - create relevant charts
-			c.createQueueResetCharts(queueName, resetMetrics, queueLabels)
-			
-			// Add metrics to main collection with proper dimension IDs
-			for metric, value := range resetMetrics {
-				dimID := fmt.Sprintf("queue_reset_%s_%s", cleanName, metric)
-				tempMx[dimID] = value
-			}
+			// Reset stats collection succeeded - create relevant charts and add metrics
+			c.addQueueResetMetricsWithCharts(queueName, resetMetrics, queueLabels, tempMx)
 		}
 	}
 
@@ -280,10 +262,12 @@ func (c *Collector) collectQueueResetData(ctx context.Context, queueName string)
 	return metrics
 }
 
-// createQueueConfigCharts creates charts for configuration metrics that were successfully collected
-func (c *Collector) createQueueConfigCharts(queueName string, metrics map[string]int64, labels map[string]string) {
+
+// addQueueConfigMetricsWithCharts creates charts and adds metrics with properly synchronized dimension IDs
+func (c *Collector) addQueueConfigMetricsWithCharts(queueName string, metrics map[string]int64, labels map[string]string, mx map[string]int64) {
+	cleanName := c.cleanName(queueName)
 	
-	// Create charts based on what metrics are actually available
+	// Create charts based on what metrics are actually available and store metrics with matching dimension IDs
 	
 	// Queue depth chart (if we have depth-related metrics)
 	depthDims := []string{}
@@ -291,6 +275,7 @@ func (c *Collector) createQueueConfigCharts(queueName string, metrics map[string
 		depthDims = append(depthDims, "depth")
 	}
 	if len(depthDims) > 0 {
+		chartID := fmt.Sprintf("queue_depth_%s", cleanName)
 		c.ensureChartExists(
 			"mq_pcf.queue_depth",
 			"Queue Current Depth",
@@ -302,6 +287,12 @@ func (c *Collector) createQueueConfigCharts(queueName string, metrics map[string
 			queueName,
 			labels,
 		)
+		// Store metrics with dimension IDs that match chart expectations: chartID_dimensionName
+		for _, dim := range depthDims {
+			if value, exists := metrics[dim]; exists {
+				mx[fmt.Sprintf("%s_%s", chartID, dim)] = value
+			}
+		}
 	}
 
 	// Queue configuration chart (limits and thresholds)
@@ -316,6 +307,7 @@ func (c *Collector) createQueueConfigCharts(queueName string, metrics map[string
 		configDims = append(configDims, "trigger_depth")
 	}
 	if len(configDims) > 0 {
+		chartID := fmt.Sprintf("queue_config_%s", cleanName)
 		c.ensureChartExists(
 			"mq_pcf.queue_config",
 			"Queue Configuration Limits",
@@ -327,6 +319,12 @@ func (c *Collector) createQueueConfigCharts(queueName string, metrics map[string
 			queueName,
 			labels,
 		)
+		// Store metrics with dimension IDs that match chart expectations
+		for _, dim := range configDims {
+			if value, exists := metrics[dim]; exists {
+				mx[fmt.Sprintf("%s_%s", chartID, dim)] = value
+			}
+		}
 	}
 
 	// Queue inhibit status
@@ -338,6 +336,7 @@ func (c *Collector) createQueueConfigCharts(queueName string, metrics map[string
 		inhibitDims = append(inhibitDims, "inhibit_put")
 	}
 	if len(inhibitDims) > 0 {
+		chartID := fmt.Sprintf("queue_inhibit_%s", cleanName)
 		c.ensureChartExists(
 			"mq_pcf.queue_inhibit",
 			"Queue Inhibit Status",
@@ -349,6 +348,12 @@ func (c *Collector) createQueueConfigCharts(queueName string, metrics map[string
 			queueName,
 			labels,
 		)
+		// Store metrics with dimension IDs that match chart expectations
+		for _, dim := range inhibitDims {
+			if value, exists := metrics[dim]; exists {
+				mx[fmt.Sprintf("%s_%s", chartID, dim)] = value
+			}
+		}
 	}
 
 	// Queue defaults
@@ -360,6 +365,7 @@ func (c *Collector) createQueueConfigCharts(queueName string, metrics map[string
 		defaultDims = append(defaultDims, "def_persistence")
 	}
 	if len(defaultDims) > 0 {
+		chartID := fmt.Sprintf("queue_defaults_%s", cleanName)
 		c.ensureChartExists(
 			"mq_pcf.queue_defaults",
 			"Queue Default Settings",
@@ -371,6 +377,12 @@ func (c *Collector) createQueueConfigCharts(queueName string, metrics map[string
 			queueName,
 			labels,
 		)
+		// Store metrics with dimension IDs that match chart expectations
+		for _, dim := range defaultDims {
+			if value, exists := metrics[dim]; exists {
+				mx[fmt.Sprintf("%s_%s", chartID, dim)] = value
+			}
+		}
 	}
 
 	// Message counters (if available in config)
@@ -382,6 +394,7 @@ func (c *Collector) createQueueConfigCharts(queueName string, metrics map[string
 		counterDims = append(counterDims, "dequeued")
 	}
 	if len(counterDims) > 0 {
+		chartID := fmt.Sprintf("queue_messages_%s", cleanName)
 		c.ensureChartExists(
 			"mq_pcf.queue_messages",
 			"Queue Message Counters",
@@ -393,6 +406,12 @@ func (c *Collector) createQueueConfigCharts(queueName string, metrics map[string
 			queueName,
 			labels,
 		)
+		// Store metrics with dimension IDs that match chart expectations
+		for _, dim := range counterDims {
+			if value, exists := metrics[dim]; exists {
+				mx[fmt.Sprintf("%s_%s", chartID, dim)] = value
+			}
+		}
 	}
 
 	// Depth events/limits
@@ -404,6 +423,7 @@ func (c *Collector) createQueueConfigCharts(queueName string, metrics map[string
 		eventDims = append(eventDims, "depth_low_limit")
 	}
 	if len(eventDims) > 0 {
+		chartID := fmt.Sprintf("queue_depth_events_%s", cleanName)
 		c.ensureChartExists(
 			"mq_pcf.queue_depth_events",
 			"Queue Depth Event Thresholds",
@@ -415,11 +435,19 @@ func (c *Collector) createQueueConfigCharts(queueName string, metrics map[string
 			queueName,
 			labels,
 		)
+		// Store metrics with dimension IDs that match chart expectations
+		for _, dim := range eventDims {
+			if value, exists := metrics[dim]; exists {
+				mx[fmt.Sprintf("%s_%s", chartID, dim)] = value
+			}
+		}
 	}
 }
 
-// createQueueRuntimeCharts creates charts for runtime metrics that were successfully collected
-func (c *Collector) createQueueRuntimeCharts(queueName string, metrics map[string]int64, labels map[string]string) {
+// addQueueRuntimeMetricsWithCharts creates charts and adds metrics with properly synchronized dimension IDs
+func (c *Collector) addQueueRuntimeMetricsWithCharts(queueName string, metrics map[string]int64, labels map[string]string, mx map[string]int64) {
+	cleanName := c.cleanName(queueName)
+	
 	// Queue activity (open handles)
 	activityDims := []string{}
 	if _, hasInput := metrics["open_input_count"]; hasInput {
@@ -429,6 +457,7 @@ func (c *Collector) createQueueRuntimeCharts(queueName string, metrics map[strin
 		activityDims = append(activityDims, "open_output_count")
 	}
 	if len(activityDims) > 0 {
+		chartID := fmt.Sprintf("queue_activity_%s", cleanName)
 		c.ensureChartExists(
 			"mq_pcf.queue_activity",
 			"Queue Activity Metrics",
@@ -440,11 +469,19 @@ func (c *Collector) createQueueRuntimeCharts(queueName string, metrics map[strin
 			queueName,
 			labels,
 		)
+		// Store metrics with dimension IDs that match chart expectations
+		for _, dim := range activityDims {
+			if value, exists := metrics[dim]; exists {
+				mx[fmt.Sprintf("%s_%s", chartID, dim)] = value
+			}
+		}
 	}
 }
 
-// createQueueResetCharts creates charts for reset statistics that were successfully collected
-func (c *Collector) createQueueResetCharts(queueName string, metrics map[string]int64, labels map[string]string) {
+// addQueueResetMetricsWithCharts creates charts and adds metrics with properly synchronized dimension IDs
+func (c *Collector) addQueueResetMetricsWithCharts(queueName string, metrics map[string]int64, labels map[string]string, mx map[string]int64) {
+	cleanName := c.cleanName(queueName)
+	
 	// Peak depth and other reset statistics
 	resetDims := []string{}
 	if _, hasPeak := metrics["high_q_depth"]; hasPeak {
@@ -459,6 +496,7 @@ func (c *Collector) createQueueResetCharts(queueName string, metrics map[string]
 	}
 
 	if len(resetDims) > 0 {
+		chartID := fmt.Sprintf("queue_reset_stats_%s", cleanName)
 		c.ensureChartExists(
 			"mq_pcf.queue_reset_stats",
 			"Queue Reset Statistics",
@@ -470,5 +508,11 @@ func (c *Collector) createQueueResetCharts(queueName string, metrics map[string]
 			queueName,
 			labels,
 		)
+		// Store metrics with dimension IDs that match chart expectations
+		for _, dim := range resetDims {
+			if value, exists := metrics[dim]; exists {
+				mx[fmt.Sprintf("%s_%s", chartID, dim)] = value
+			}
+		}
 	}
 }
