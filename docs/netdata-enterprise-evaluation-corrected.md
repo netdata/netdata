@@ -236,7 +236,7 @@ When connected to a Netdata Parent (the Agent is in `child` mode), these require
 
 :::info
 
-For more information and ways to further reduce Agent resource utilization, see [Agent Resource Utilization](https://learn.netdata.cloud/docs/netdata-agent/resource-utilization).
+For more information and ways to further reduce Agent resource utilization, see [Agent Resource Utilization](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/sizing-netdata-agents/README.md).
 
 :::
 
