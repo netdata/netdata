@@ -162,6 +162,12 @@ The Definition bar provides powerful filtering and grouping options, helping you
 
 The **NIDL (Nodes, Instances, Dimensions, Labels)** framework helps you filter, group, and understand chart data at a glance.
 
+:::info
+
+For a comprehensive guide to the NIDL framework, including developer guidelines and detailed examples, see the [NIDL Framework documentation](/docs/NIDL-Framework.md).
+
+:::
+
 :::tip
 
 For a detailed explanation, click the image below to open it in a new tab where you can zoom in.
