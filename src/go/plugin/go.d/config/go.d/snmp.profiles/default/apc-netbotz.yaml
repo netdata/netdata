@@ -22,7 +22,7 @@ metrics:
         name: enclosureStatus
         chart_meta:
           description: The status of the enclosure
-          family: 'Enclosure/Connection/Status'
+          family: 'Hardware/Enclosure/Status'
           unit: "{status}"
         mapping:
           0: disconnected
@@ -32,7 +32,7 @@ metrics:
         name: enclosureErrorStatus
         chart_meta:
           description: The error status of the enclosure
-          family: 'Enclosure/Error/Status'
+          family: 'Hardware/Enclosure/Error/Status'
           unit: "{status}"
         mapping:
           0: normal
@@ -64,7 +64,7 @@ metrics:
         name: dinPortStatus
         chart_meta:
           description: The error status of the sensor
-          family: 'Port/DIN/Status'
+          family: 'Hardware/Port/DIN/Status'
           unit: "{status}"
         mapping:
           0: disconnected
@@ -88,7 +88,7 @@ metrics:
         name: otherPortStatus
         chart_meta:
           description: The error status of the sensor
-          family: 'Port/Other/Status'
+          family: 'Hardware/Port/Other/Status'
           unit: "{status}"
         mapping:
           0: disconnected
@@ -120,19 +120,19 @@ metrics:
         name: tempSensorValueInt
         chart_meta:
           description: The temperature measured by the sensor
-          family: 'Sensor/Temperature/Value'
+          family: 'Hardware/Sensor/Temperature/Value'
           unit: "Cel"
       - OID: 1.3.6.1.4.1.5528.100.4.1.1.1.9
         name: tempSensorValueIntF
         chart_meta:
           description: The temperature measured by the sensor
-          family: 'Sensor/Temperature/Value'
+          family: 'Hardware/Sensor/Temperature/Value'
           unit: "degF"
       - OID: 1.3.6.1.4.1.5528.100.4.1.1.1.3
         name: tempSensorErrorStatus
         chart_meta:
           description: The error status of the sensor
-          family: 'Sensor/Temperature/Status'
+          family: 'Hardware/Sensor/Temperature/Status'
           unit: "{status}"
         mapping:
           0: normal
@@ -167,13 +167,13 @@ metrics:
         name: humiSensorValueInt
         chart_meta:
           description: The relative humidity measured by the sensor
-          family: 'Sensor/Humidity/Value'
+          family: 'Hardware/Sensor/Humidity/Value'
           unit: "%"
       - OID: 1.3.6.1.4.1.5528.100.4.1.2.1.3
         name: humiSensorErrorStatus
         chart_meta:
           description: The error status of the sensor
-          family: 'Sensor/Humidity/Status'
+          family: 'Hardware/Sensor/Humidity/Status'
           unit: "{status}"
         mapping:
           0: normal
@@ -208,19 +208,19 @@ metrics:
         name: dewPointSensorValueInt
         chart_meta:
           description: The dew point measured by the sensor
-          family: 'Sensor/DewPoint/Value'
+          family: 'Hardware/Sensor/DewPoint/Value'
           unit: "Cel"
       - OID: 1.3.6.1.4.1.5528.100.4.1.3.1.9
         name: dewPointSensorValueIntF
         chart_meta:
           description: The dew point measured by the sensor
-          family: 'Sensor/DewPoint/Value'
+          family: 'Hardware/Sensor/DewPoint/Value'
           unit: "degF"
       - OID: 1.3.6.1.4.1.5528.100.4.1.3.1.3
         name: dewPointSensorErrorStatus
         chart_meta:
           description: The error status of the sensor
-          family: 'Sensor/DewPoint/Status'
+          family: 'Hardware/Sensor/DewPoint/Status'
           unit: "{status}"
         mapping:
           0: normal
@@ -308,7 +308,7 @@ metrics:
         name: doorSwitchSensorValue
         chart_meta:
           description: Whether the door is open or closed
-          family: 'Sensor/DoorSwitch/Position'
+          family: 'Hardware/Sensor/DoorSwitch/Position'
           unit: "{status}"
         mapping:
           -1: "null"
@@ -318,7 +318,7 @@ metrics:
         name: doorSwitchSensorErrorStatus
         chart_meta:
           description: The error status of the sensor
-          family: 'Sensor/DoorSwitch/Status'
+          family: 'Hardware/Sensor/DoorSwitch/Status'
           unit: "{status}"
         mapping:
           0: normal
@@ -357,7 +357,7 @@ metrics:
         name: otherStateSensorErrorStatus
         chart_meta:
           description: The error status of the sensor
-          family: 'Sensor/OtherState/Status'
+          family: 'Hardware/Sensor/OtherState/Status'
           unit: "{status}"
         mapping:
           0: normal
@@ -392,7 +392,7 @@ metrics:
         name: errorCondSeverity
         chart_meta:
           description: The relative severity of the error condition
-          family: 'Error/Severity'
+          family: 'System/Alert/Severity'
           unit: "{status}"
         mapping:
           0: normal
@@ -405,7 +405,7 @@ metrics:
         name: errorCondResolved
         chart_meta:
           description: Whether the error condition was resolved
-          family: 'Error/Resolution/Status'
+          family: 'System/Alert/Resolution/Status'
           unit: "{status}"
         mapping:
           0: no

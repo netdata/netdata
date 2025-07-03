@@ -1,6 +1,9 @@
 extends:
   - alcatel-lucent.yaml
 
+sysobjectid:
+  - 1.3.6.1.4.1.6486.800.1.1.2.2.2.*
+
 metadata:
   device:
     fields:
@@ -9,8 +12,22 @@ metadata:
       vendor:
         value: Alcatel-Lucent
 
-sysobjectid:
-  - 1.3.6.1.4.1.6486.800.1.1.2.2.2.*
+metric_tags:
+  - tag: wlsx_model_name
+    OID: 1.3.6.1.4.1.14823.2.2.1.1.1.2.0
+    symbol: wlsxModelName
+  - tag: wlsx_switch_role
+    OID: 1.3.6.1.4.1.14823.2.2.1.1.1.4.0
+    symbol: wlsxSwitchRole
+    mapping:
+      1: master
+      2: local
+      3: standbymaster
+      4: branch
+      5: md
+  - tag: wlsx_switch_license_serial_number
+    OID: 1.3.6.1.4.1.14823.2.2.1.1.1.12.0
+    symbol: wlsxSwitchLicenseSerialNumber
 
 metrics:
   - MIB: WLSX-SWITCH-MIB
@@ -21,8 +38,8 @@ metrics:
       - name: sysXProcessorLoad
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.9.1.3
         chart_meta:
+          family: 'System/CPU/Usage'
           description: The average, over the last minute, of the percentage of time that this processor was not idle
-          family: 'CPU/Usage'
           unit: "%"
     metric_tags:
       - tag: cpu_index
@@ -31,6 +48,7 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.14823.2.2.1.1.1.9.1.2
           name: sysXProcessorDescr
+
   - MIB: WLSX-SWITCH-MIB
     table:
       name: wlsxSysXStorageTable
@@ -39,15 +57,15 @@ metrics:
       - name: sysXStorageSize
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.10.1.3
         chart_meta:
+          family: 'System/Storage/Filesystem/Size'
           description: Size of the storage filesystem
-          family: 'Storage/Filesystem/Size'
           unit: "By"
         scale_factor: 1048576
       - name: sysXStorageUsed
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.10.1.4
         chart_meta:
+          family: 'System/Storage/Filesystem/Used'
           description: Storage filesystem usage
-          family: 'Storage/Filesystem/Used'
           unit: "By"
         scale_factor: 1048576
     metric_tags:
@@ -71,22 +89,22 @@ metrics:
       - name: sysXMemorySize
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.11.1.2
         chart_meta:
+          family: 'System/Memory/Total'
           description: Total memory in KB
-          family: 'Memory/Total'
           unit: "By"
         scale_factor: 1024
       - name: sysXMemoryUsed
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.11.1.3
         chart_meta:
+          family: 'System/Memory/Used'
           description: Used memory in KB
-          family: 'Memory/Used'
           unit: "By"
         scale_factor: 1024
       - name: sysXMemoryFree
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.11.1.4
         chart_meta:
+          family: 'System/Memory/Free'
           description: Free memory in KB
-          family: 'Memory/Free'
           unit: "By"
         scale_factor: 1024
     metric_tags:
@@ -98,8 +116,8 @@ metrics:
       name: wlsxSwitchTotalNumAccessPoints
       OID: 1.3.6.1.4.1.14823.2.2.1.1.3.1.0
       chart_meta:
+        family: 'Network/Wireless/AccessPoint/Connected'
         description: Total number of access points connected to this switch
-        family: 'Wireless/AccessPoint/Connected'
         unit: "{ap}"
 
   - MIB: WLSX-SWITCH-MIB
@@ -107,23 +125,6 @@ metrics:
       name: wlsxSwitchTotalNumStationsAssociated
       OID: 1.3.6.1.4.1.14823.2.2.1.1.3.2.0
       chart_meta:
+        family: 'Network/Wireless/Station/Associated'
         description: Total number of stations associated to this switch.
-        family: 'Wireless/Station/Associated'
         unit: "{station}"
-
-metric_tags:
-  - tag: wlsx_model_name
-    OID: 1.3.6.1.4.1.14823.2.2.1.1.1.2.0
-    symbol: wlsxModelName
-  - tag: wlsx_switch_role
-    OID: 1.3.6.1.4.1.14823.2.2.1.1.1.4.0
-    symbol: wlsxSwitchRole
-    mapping:
-      1: master
-      2: local
-      3: standbymaster
-      4: branch
-      5: md
-  - tag: wlsx_switch_license_serial_number
-    OID: 1.3.6.1.4.1.14823.2.2.1.1.1.12.0
-    symbol: wlsxSwitchLicenseSerialNumber

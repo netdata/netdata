@@ -8,7 +8,7 @@ metrics:
         name: entPhySensorValue # Do not change this name — required by transformEntitySensorValue for matching and renaming logic
         chart_meta:
           description: Most recent measurement obtained by the agent for this sensor
-          family: 'Sensor/Value'
+          family: 'Hardware/Sensor/Value'
           unit: "1"
         transform: |
           {{- transformEntitySensorValue .Metric -}}
@@ -16,7 +16,7 @@ metrics:
         name: entPhySensorOperStatus # Do not change this name — required by transformEntitySensorValue for matching and renaming logic
         chart_meta:
           description: Operational status of the sensor
-          family: 'Sensor/Status'
+          family: 'Hardware/Sensor/Status'
           unit: "{status}"
         mapping:
           1: ok

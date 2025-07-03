@@ -164,28 +164,6 @@ sysobjectid:
   - 1.3.6.1.4.1.30065.1.3011.7280.877.48.972
 
 metrics:
-  # - MIB: HOST-RESOURCES-MIB
-  #   symbol:
-  #     name: memory.total
-  #     OID: 1.3.6.1.2.1.25.2.3.1.5.1
-  #   description: "The size of the storage represented by this entry, in units of hrStorageAllocationUnits."
-  #   unit: "By"
-  # - MIB: HOST-RESOURCES-MIB
-  #   symbol:
-  #     name: memory.used
-  #     OID: 1.3.6.1.2.1.25.2.3.1.6.100
-  #   description: "The amount of the storage represented by this entry that is allocated, in units of hrStorageAllocationUnits."
-  #   unit: "By"
-  # TODO, metrics that have dynamic units are not supported
-
-  - MIB: HOST-RESOURCES-MIB
-    symbol:
-      name: cpu.usage
-      OID: 1.3.6.1.2.1.25.3.3.1.2.1
-      chart_meta:
-        description: The average, over the last minute, of the percentage of time that this processor was not idle
-        family: 'CPU/Usage'
-        unit: "%"
   - MIB: ARISTA-BGP4V2-MIB
     table:
       name: aristaBgp4V2PeerTable
@@ -195,7 +173,7 @@ metrics:
         name: aristaBgp4V2PeerAdminStatus
         chart_meta:
           description: BGP FSM Status
-          family: 'BPG/Peer/Admin/Status'
+          family: 'Network/Routing/BGP/Peer/Admin/Status'
           unit: "{status}"
         mapping:
           1: halted
@@ -204,7 +182,7 @@ metrics:
         name: aristaBgp4V2PeerState
         chart_meta:
           description: BGP peer connection state
-          family: 'BGP/Peer/Connection/Status'
+          family: 'Network/Routing/BGP/Peer/Status'
           unit: "{status}"
         mapping:
           1: idle
@@ -214,18 +192,10 @@ metrics:
           5: openconfirm
           6: established
     metric_tags:
-      #      - symbol:
-      #          name: aristaBgp4V2PeerLocalPort
-      #          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.6
-      #        tag: arista_bgp4_v2_peer_local_port
       - tag: arista_bgp4_v2_peer_local_as
         symbol:
           name: aristaBgp4V2PeerLocalAs
           OID: 1.3.6.1.4.1.30065.4.1.1.2.1.7
-      #      - symbol:
-      #          name: aristaBgp4V2PeerRemotePort
-      #          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.9
-      #        tag: arista_bgp4_v2_peer_remote_port
       - tag: arista_bgp4_v2_peer_remote_as
         symbol:
           name: aristaBgp4V2PeerRemoteAs
@@ -251,15 +221,16 @@ metrics:
           3: ipv4z
           4: ipv6z
           16: dns
-      - tag: _arista_bgp4_v2_peer_description
-        symbol:
-          name: aristaBgp4V2PeerDescription
-          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.14
-      - tag: _arista_bgp4_v2_peer_local_addr
-        symbol:
-          name: aristaBgp4V2PeerLocalAddr
-          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.3
-          format: ip_address
+  #      - tag: _arista_bgp4_v2_peer_description
+  #        symbol:
+  #          name: aristaBgp4V2PeerDescription
+  #          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.14
+  #      - tag: _arista_bgp4_v2_peer_local_addr
+  #        symbol:
+  #          name: aristaBgp4V2PeerLocalAddr
+  #          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.3
+  #          format: ip_address
+
   # - MIB: ARISTA-IF-MIB
   #   table:
   #     name: aristaIfTable

@@ -11,7 +11,7 @@ metrics:
       name: hrSystemNumUsers
       chart_meta:
         description: The number of user sessions for which this host is storing state information. A session is a collection of processes requiring a single act of user authentication and possibly subject to collective job control.
-        family: 'System/User/Session/Active'
+        family: 'System/Activity/UserSession/Active'
         unit: "{session}"
   - MIB: HOST-RESOURCES-MIB
     symbol:
@@ -19,15 +19,7 @@ metrics:
       name: hrSystemProcesses
       chart_meta:
         description: The number of process contexts currently loaded or running on this system.
-        family: 'System/Process/Active'
-        unit: "{process}"
-  - MIB: HOST-RESOURCES-MIB
-    symbol:
-      OID: 1.3.6.1.2.1.25.1.7.0
-      name: hrSystemMaxProcesses
-      chart_meta:
-        description: The maximum number of process contexts this system can support. If there is no fixed maximum, the value should be zero. On systems that have a fixed maximum, this object can help diagnose failures that occur when this maximum is reached.
-        family: 'System/Process/Maximum'
+        family: 'System/Activity/Process/Active'
         unit: "{process}"
 
   # Table Objects
