@@ -2168,5 +2168,15 @@ When finishing a new collector or improvements on a collector, follow this check
 7. Once the above work is finished, the code **MUST** compile without errors or warnings. Use `build-claude` for build directory to avoid any interference with other builds and IDEs.
 8. Once all the above work is done and there are no outstanding issues, perform an independent usefulness check of the module being worked and provide a DevOps/SRE expert opinion on how useful, complete, powerful, comprehensive the module is.
 
+## CRITICAL: Data Integrity Rules
+
+**NEVER FAKE DATA COLLECTION VALUES!** YOU ARE NEVER ALLOWED TO SET DATA COLLECTION VALUES TO ZERO, OR ANY VALUE! THIS IS A DATA COLLECTION SYSTEM AND IT SHOULD REFLECT THE ACTUAL DATA COLLECTED VALUES! MISSING DATA = DATA! WHEN A VALUE IS MISSING, NETDATA CREATES GAPS ON THE CHARTS. THIS IS IMPORTANT INFORMATION FOR THE MONITORED APPLICATIONS AND SHOULD NEVER BE FILLED WITH ZEROS OR MOCK DATA!
+
+## CRITICAL: NIDL-Framework
+
+The file /docs/NIDL-Framework.md describes how Netdata metrcis, charts and dashboards work. You **MUST** read it before working with metrics in collectors.
+IMPORTANT: "chart" for go.d modules is "instance" for NIDL and "context" for go.d modules in "chart" for NIDL.
+
 ## Build Notes
 - To compile ibm.d.plugin, use cmake in `build-claude` directory with target `ibm-plugin`
+

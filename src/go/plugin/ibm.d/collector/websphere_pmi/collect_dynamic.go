@@ -185,13 +185,17 @@ func (w *WebSpherePMI) categorizeStatName(statName string) string {
 
 	// Thread pool metrics - now includes individual named pools
 	if strings.Contains(nameLower, "thread pools") || strings.Contains(nameLower, "threadpool") ||
-		strings.Contains(nameLower, "hamanager") ||
 		// Individual thread pool names from WebSphere
 		nameLower == "default" || nameLower == "ariesthreadpool" || nameLower == "hamanager.thread.pool" ||
 		nameLower == "message listener" || nameLower == "object request broker" ||
 		strings.Contains(nameLower, "sibfap") || strings.Contains(nameLower, "soapconnector") ||
 		strings.Contains(nameLower, "tcpchannel") || strings.Contains(nameLower, "wmqjca") {
 		return "threading"
+	}
+
+	// HAManager metrics (not a thread pool)
+	if strings.Contains(nameLower, "hamanager") {
+		return "other"
 	}
 
 	// Transaction metrics
@@ -233,28 +237,20 @@ func (w *WebSpherePMI) collectServerOverviewMetrics(mx map[string]int64, nodeNam
 
 		// Chart ID is "server.extensions_{instance}" (without websphere_pmi prefix)
 		chartID := fmt.Sprintf("server.extensions_%s", w.sanitizeForChartID(instanceName))
-		extracted := w.extractStatValues(mx, chartID, stat)
-		w.Debugf("Server extensions - extracted %d metrics for %s", extracted, instanceName)
+		// Use specialized extraction for server extensions
+		w.extractServerExtensionMetrics(mx, chartID, stat)
+		w.Debugf("Server extensions - extracted metrics for %s", instanceName)
 	}
 
-	// Server root metrics
+	// Server root metrics - only extract actual PMI data if available
 	if stat.Name == "server" {
-		w.ensureChartExists("websphere_pmi.server.status", "Server Status", "status", "line", "server", 70001,
-			[]string{"status"}, instanceName, map[string]string{
-				"node":   nodeName,
-				"server": serverName,
-			})
-
-		// Set server as up (value=1) when we receive data
-		// Chart ID is "server.status_{instance}" (without websphere_pmi prefix)
-		chartID := fmt.Sprintf("server.status_%s", w.sanitizeForChartID(instanceName))
-		mx[fmt.Sprintf("%s_status", chartID)] = 1
-		w.Debugf("Server status - set status=1 for %s", instanceName)
-
-		// Extract any other metrics from server stat if needed
+		// Only extract actual metrics if they exist - don't create synthetic status charts
 		if len(stat.CountStatistics) > 0 || len(stat.BoundedRangeStatistics) > 0 {
-			extracted := w.extractStatValues(mx, chartID, stat)
-			w.Debugf("Server overview - extracted %d metrics for %s", extracted, instanceName)
+			// We could create a chart for actual server metrics here if WebSphere provides them
+			// For now, just log that we found server-level stats but don't extract them
+			// since they would need proper context and dimension mapping
+			w.Debugf("Server root stat found with %d CountStatistics, %d BoundedRangeStatistics - not extracted without proper mapping",
+				len(stat.CountStatistics), len(stat.BoundedRangeStatistics))
 		}
 	}
 }
@@ -349,8 +345,8 @@ func (w *WebSpherePMI) collectWebMetrics(mx map[string]int64, nodeName, serverNa
 			})
 
 		chartID := fmt.Sprintf("web.sessions_%s", w.sanitizeForChartID(instanceName))
-		extracted := w.extractStatValues(mx, chartID, stat)
-		w.Debugf("Web application '%s' - extracted %d session metrics", appName, extracted)
+		w.extractWebSessionMetrics(mx, chartID, stat)
+		w.Debugf("Web application '%s' - extracted session metrics", appName)
 	}
 
 	// Check for servlet-specific metrics (if path indicates servlet)
@@ -459,10 +455,7 @@ func (w *WebSpherePMI) collectThreadPoolMetrics(mx map[string]int64, nodeName, s
 		if !foundMetrics {
 			w.Debugf("Thread pool '%s' - no metrics found in stat (BoundedRangeStatistics=%d, CountStatistics=%d)",
 				poolName, len(stat.BoundedRangeStatistics), len(stat.CountStatistics))
-			// Set zeros for missing metrics so they show up in charts
-			mx[fmt.Sprintf("%s_active", chartID)] = 0
-			mx[fmt.Sprintf("%s_pool_size", chartID)] = 0
-			mx[fmt.Sprintf("%s_maximum_size", chartID)] = 0
+			// The extractThreadPoolMetrics function will handle setting default values
 		}
 	} else {
 		w.Debugf("Thread pool '%s' skipped (poolName empty or filtered)", poolName)
@@ -620,13 +613,13 @@ func (w *WebSpherePMI) collectCacheMetrics(mx map[string]int64, nodeName, server
 	instanceName := fmt.Sprintf("%s.%s", nodeName, serverName)
 
 	w.ensureChartExists("websphere_pmi.caching.dynacache", "Dynamic Cache", "operations/s", "stacked", "caching", 71300,
-		[]string{"hits", "misses", "creates", "removes"}, instanceName, map[string]string{
+		[]string{"creates", "removes"}, instanceName, map[string]string{
 			"node":   nodeName,
 			"server": serverName,
 		})
 
 	chartID := fmt.Sprintf("caching.dynacache_%s", w.sanitizeForChartID(instanceName))
-	w.extractCacheMetrics(mx, chartID, stat)
+	w.extractDynaCacheMetrics(mx, chartID, stat)
 }
 
 // collectSystemMetrics handles system-level metrics
@@ -640,8 +633,8 @@ func (w *WebSpherePMI) collectSystemMetrics(mx map[string]int64, nodeName, serve
 		})
 
 	chartID := fmt.Sprintf("system.data_%s", w.sanitizeForChartID(instanceName))
-	extracted := w.extractStatValues(mx, chartID, stat)
-	w.Debugf("System Data - extracted %d metrics for %s", extracted, instanceName)
+	w.extractSystemDataMetrics(mx, chartID, stat)
+	w.Debugf("System Data - extracted metrics for %s", instanceName)
 }
 
 // collectGenericMetrics handles unrecognized metric categories
@@ -657,8 +650,9 @@ func (w *WebSpherePMI) collectGenericMetrics(mx map[string]int64, nodeName, serv
 		})
 
 	chartID := fmt.Sprintf("monitoring.other_%s", w.sanitizeForChartID(instanceName))
-	extracted := w.extractStatValues(mx, chartID, stat)
-	w.Debugf("Other metrics (%s) - extracted %d metrics for %s", stat.Name, extracted, instanceName)
+	// For generic metrics, we need to ensure we create a "value" dimension
+	w.extractGenericMetrics(mx, chartID, stat)
+	w.Debugf("Other metrics (%s) - extracted metrics for %s", stat.Name, instanceName)
 }
 
 // Helper functions for name extraction and validation
@@ -802,8 +796,13 @@ func (w *WebSpherePMI) extractStatValues(mx map[string]int64, chartID string, st
 				w.Debugf("Extracted time count metric: %s = %d", metricKey, val)
 			}
 		}
-		if ts.Total != "" {
-			if val, err := strconv.ParseInt(ts.Total, 10, 64); err == nil {
+		// Handle total/totalTime (WebSphere uses totalTime)
+		totalStr := ts.TotalTime
+		if totalStr == "" {
+			totalStr = ts.Total
+		}
+		if totalStr != "" {
+			if val, err := strconv.ParseInt(totalStr, 10, 64); err == nil {
 				dimName := baseName + "_total"
 				metricKey := fmt.Sprintf("%s_%s", chartID, dimName)
 				mx[metricKey] = val
@@ -866,6 +865,12 @@ func (w *WebSpherePMI) extractStatValues(mx map[string]int64, chartID string, st
 
 // extractThreadPoolMetrics extracts thread pool metrics with proper dimension IDs
 func (w *WebSpherePMI) extractThreadPoolMetrics(mx map[string]int64, chartID string, stat pmiStat) {
+	// Debug what we have available
+	w.Debugf("Thread pool extracting from stat with %d BoundedRangeStatistics, %d CountStatistics",
+		len(stat.BoundedRangeStatistics), len(stat.CountStatistics))
+
+	foundMetrics := make(map[string]bool)
+
 	// Map WebSphere PMI statistic names to our standard dimension names
 	for _, brs := range stat.BoundedRangeStatistics {
 		var dimensionName string
@@ -877,7 +882,8 @@ func (w *WebSpherePMI) extractThreadPoolMetrics(mx map[string]int64, chartID str
 		case "MaxPoolSize":
 			dimensionName = "maximum_size"
 		default:
-			// Skip unmapped metrics for now to keep dimensions consistent
+			// Log what we're skipping to help debug
+			w.Debugf("Thread pool: skipping BoundedRangeStatistic '%s' (current: %s, upper: %s)", brs.Name, brs.Current, brs.UpperBound)
 			continue
 		}
 
@@ -886,94 +892,65 @@ func (w *WebSpherePMI) extractThreadPoolMetrics(mx map[string]int64, chartID str
 				// Metric key must match dimension ID: chartID_dimensionName
 				metricKey := fmt.Sprintf("%s_%s", chartID, dimensionName)
 				mx[metricKey] = val
-				w.Debugf("Thread pool metric: %s = %d (from %s)", metricKey, val, brs.Name)
+				foundMetrics[dimensionName] = true
+				w.Debugf("Thread pool metric: %s = %d (from BoundedRangeStatistic %s)", metricKey, val, brs.Name)
 			}
 		}
 	}
 
 	// Also check CountStatistics for MaxPoolSize
 	for _, cs := range stat.CountStatistics {
-		if cs.Name == "MaxPoolSize" && cs.Count != "" {
+		var dimensionName string
+		switch cs.Name {
+		case "ActiveCount":
+			dimensionName = "active"
+		case "PoolSize":
+			dimensionName = "pool_size"
+		case "MaxPoolSize":
+			dimensionName = "maximum_size"
+		default:
+			// Log what we're skipping to help debug
+			w.Debugf("Thread pool: skipping CountStatistic '%s' (value: %s)", cs.Name, cs.Count)
+			continue
+		}
+
+		if cs.Count != "" {
 			if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
-				metricKey := fmt.Sprintf("%s_maximum_size", chartID)
+				metricKey := fmt.Sprintf("%s_%s", chartID, dimensionName)
 				mx[metricKey] = val
-				w.Debugf("Thread pool metric: %s = %d (from %s)", metricKey, val, cs.Name)
+				foundMetrics[dimensionName] = true
+				w.Debugf("Thread pool metric: %s = %d (from CountStatistic %s)", metricKey, val, cs.Name)
 			}
 		}
 	}
 
-	// If we didn't find maximum_size, look for it in BoundedRangeStatistics
-	if _, hasMax := mx[fmt.Sprintf("%s_maximum_size", chartID)]; !hasMax {
+	// If we didn't find maximum_size, look for it in BoundedRangeStatistics UpperBound
+	if !foundMetrics["maximum_size"] {
 		// Try to find MaxPoolSize or UpperBound in BoundedRangeStatistics
 		for _, brs := range stat.BoundedRangeStatistics {
 			if brs.Name == "MaxPoolSize" && brs.UpperBound != "" {
 				if val, err := strconv.ParseInt(brs.UpperBound, 10, 64); err == nil {
 					metricKey := fmt.Sprintf("%s_maximum_size", chartID)
 					mx[metricKey] = val
+					foundMetrics["maximum_size"] = true
 					w.Debugf("Thread pool metric: %s = %d (from %s.UpperBound)", metricKey, val, brs.Name)
+					break
 				}
-			} else if brs.Name == "PoolSize" && brs.UpperBound != "" && !hasMax {
+			} else if brs.Name == "PoolSize" && brs.UpperBound != "" && !foundMetrics["maximum_size"] {
 				// Use PoolSize UpperBound as maximum if available
 				if val, err := strconv.ParseInt(brs.UpperBound, 10, 64); err == nil {
 					metricKey := fmt.Sprintf("%s_maximum_size", chartID)
 					mx[metricKey] = val
+					foundMetrics["maximum_size"] = true
 					w.Debugf("Thread pool metric: %s = %d (from %s.UpperBound)", metricKey, val, brs.Name)
+					break
 				}
 			}
 		}
 	}
-}
 
-// extractSecurityAuthMetrics extracts authentication metrics with proper dimension mapping
-func (w *WebSpherePMI) extractSecurityAuthMetrics(mx map[string]int64, chartID string, stat pmiStat) {
-	// Map WebSphere PMI security statistic names to our dimension names
-	for _, cs := range stat.CountStatistics {
-		var dimensionName string
-		nameLower := strings.ToLower(cs.Name)
-
-		if strings.Contains(nameLower, "success") {
-			dimensionName = "successful"
-		} else if strings.Contains(nameLower, "fail") {
-			dimensionName = "failed"
-		} else if strings.Contains(nameLower, "active") || strings.Contains(nameLower, "subject") {
-			dimensionName = "active_subjects"
-		} else {
-			continue
-		}
-
-		if cs.Count != "" {
-			if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
-				metricKey := fmt.Sprintf("%s_%s", chartID, dimensionName)
-				mx[metricKey] = val
-				w.Debugf("Security auth metric: %s = %d (from %s)", metricKey, val, cs.Name)
-			}
-		}
-	}
-}
-
-// extractSecurityAuthzMetrics extracts authorization metrics with proper dimension mapping
-func (w *WebSpherePMI) extractSecurityAuthzMetrics(mx map[string]int64, chartID string, stat pmiStat) {
-	// Map WebSphere PMI security statistic names to our dimension names
-	for _, cs := range stat.CountStatistics {
-		var dimensionName string
-		nameLower := strings.ToLower(cs.Name)
-
-		if strings.Contains(nameLower, "grant") || strings.Contains(nameLower, "permit") {
-			dimensionName = "granted"
-		} else if strings.Contains(nameLower, "deny") || strings.Contains(nameLower, "denied") {
-			dimensionName = "denied"
-		} else {
-			continue
-		}
-
-		if cs.Count != "" {
-			if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
-				metricKey := fmt.Sprintf("%s_%s", chartID, dimensionName)
-				mx[metricKey] = val
-				w.Debugf("Security authz metric: %s = %d (from %s)", metricKey, val, cs.Name)
-			}
-		}
-	}
+	// Note: Do not provide default zero values - let the framework detect missing metrics
+	// This allows proper identification of data collection issues
 }
 
 // extractCacheMetrics extracts cache metrics with proper dimension mapping
@@ -1033,6 +1010,366 @@ func (w *WebSpherePMI) extractTransactionMetrics(mx map[string]int64, chartID st
 			}
 		}
 	}
+}
+
+// extractServerExtensionMetrics extracts server extension metrics with proper dimension mapping
+func (w *WebSpherePMI) extractServerExtensionMetrics(mx map[string]int64, chartID string, stat pmiStat) {
+	// Map WebSphere PMI statistic names to our dimension names
+	for _, cs := range stat.CountStatistics {
+		var dimensionName string
+		switch cs.Name {
+		case "RequestCount":
+			dimensionName = "requests"
+		case "HitCount":
+			dimensionName = "hits"
+		case "HitRate":
+			dimensionName = "hit_rate"
+		case "DisplacementCount":
+			dimensionName = "requests" // If no RequestCount, try DisplacementCount
+		default:
+			continue
+		}
+
+		if cs.Count != "" {
+			if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
+				metricKey := fmt.Sprintf("%s_%s", chartID, dimensionName)
+				mx[metricKey] = val
+				w.Debugf("Server extension metric: %s = %d (from %s)", metricKey, val, cs.Name)
+			}
+		}
+	}
+
+	// Also check BoundedRangeStatistics
+	for _, brs := range stat.BoundedRangeStatistics {
+		var dimensionName string
+		switch brs.Name {
+		case "RequestCount":
+			dimensionName = "requests"
+		case "HitCount":
+			dimensionName = "hits"
+		case "HitRate":
+			dimensionName = "hit_rate"
+		default:
+			continue
+		}
+
+		if brs.Current != "" {
+			if val, err := strconv.ParseInt(brs.Current, 10, 64); err == nil {
+				metricKey := fmt.Sprintf("%s_%s", chartID, dimensionName)
+				mx[metricKey] = val
+				w.Debugf("Server extension metric: %s = %d (from %s)", metricKey, val, brs.Name)
+			}
+		}
+	}
+
+	// Also check DoubleStatistics for HitRate
+	for _, ds := range stat.DoubleStatistics {
+		if ds.Name == "HitRate" && ds.Double != "" {
+			if val, err := strconv.ParseFloat(ds.Double, 64); err == nil {
+				metricKey := fmt.Sprintf("%s_hit_rate", chartID)
+				mx[metricKey] = int64(val * 1000) // Convert to permille for precision
+				w.Debugf("Server extension metric: %s = %d (from %s)", metricKey, int64(val*1000), ds.Name)
+			}
+		}
+	}
+}
+
+// extractSecurityAuthMetrics extracts security authentication metrics with proper dimension mapping
+func (w *WebSpherePMI) extractSecurityAuthMetrics(mx map[string]int64, chartID string, stat pmiStat) {
+	// Extract all authentication-related count statistics
+	// WebSphere provides various authentication counts like WebAuthenticationCount, BasicAuthenticationCount, etc.
+	// We'll sum related counts for our simplified dimensions
+
+	var successfulCount, failedCount int64
+
+	for _, cs := range stat.CountStatistics {
+		if cs.Count == "" {
+			continue
+		}
+
+		val, err := strconv.ParseInt(cs.Count, 10, 64)
+		if err != nil {
+			continue
+		}
+
+		// Aggregate authentication counts
+		// Most authentication counts represent successful attempts
+		// Failed attempts usually have "Failed" in the name
+		if strings.Contains(cs.Name, "Failed") {
+			failedCount += val
+		} else if strings.Contains(cs.Name, "AuthenticationCount") ||
+			strings.Contains(cs.Name, "IdentityAssertionCount") ||
+			strings.Contains(cs.Name, "TAIRequestCount") {
+			successfulCount += val
+		}
+
+		// Don't extract individual metrics - only use aggregated values
+		// to match the chart dimensions
+	}
+
+	// Set aggregated values for chart dimensions
+	mx[fmt.Sprintf("%s_successful", chartID)] = successfulCount
+	mx[fmt.Sprintf("%s_failed", chartID)] = failedCount
+
+	// For active subjects, look for a specific metric or use 0
+	mx[fmt.Sprintf("%s_active_subjects", chartID)] = 0 // Default to 0 if not found
+
+	// Also check BoundedRangeStatistics
+	for _, brs := range stat.BoundedRangeStatistics {
+		var dimensionName string
+		switch brs.Name {
+		case "ActiveSubjects", "ActiveSubjectCount":
+			dimensionName = "active_subjects"
+		default:
+			continue
+		}
+
+		if brs.Current != "" {
+			if val, err := strconv.ParseInt(brs.Current, 10, 64); err == nil {
+				metricKey := fmt.Sprintf("%s_%s", chartID, dimensionName)
+				mx[metricKey] = val
+				w.Debugf("Security auth metric: %s = %d (from %s)", metricKey, val, brs.Name)
+			}
+		}
+	}
+
+	// Note: Do not provide default zero values - let the framework detect missing metrics
+	// This allows proper identification of whether security features are disabled vs. data collection issues
+}
+
+// extractSecurityAuthzMetrics extracts security authorization metrics with proper dimension mapping
+func (w *WebSpherePMI) extractSecurityAuthzMetrics(mx map[string]int64, chartID string, stat pmiStat) {
+	// WebSphere provides TimeStatistics for authorization, not CountStatistics
+	// We'll extract the count from TimeStatistics which represents the number of authorization checks
+
+	var grantedCount, deniedCount int64
+
+	// Process TimeStatistics for authorization metrics
+	for _, ts := range stat.TimeStatistics {
+		if ts.Count == "" {
+			continue
+		}
+
+		count, err := strconv.ParseInt(ts.Count, 10, 64)
+		if err != nil {
+			continue
+		}
+
+		// All authorization time statistics represent granted authorizations
+		// (denied authorizations would typically throw exceptions and not be counted here)
+		if strings.Contains(ts.Name, "AuthorizationTime") {
+			grantedCount += count
+		}
+
+		// Don't extract individual metrics - only use aggregated values
+		// to match the chart dimensions
+	}
+
+	// Set values for chart dimensions
+	mx[fmt.Sprintf("%s_granted", chartID)] = grantedCount
+	mx[fmt.Sprintf("%s_denied", chartID)] = deniedCount // Usually 0 as denials throw exceptions
+}
+
+// extractWebSessionMetrics extracts web session metrics with proper dimension mapping
+func (w *WebSpherePMI) extractWebSessionMetrics(mx map[string]int64, chartID string, stat pmiStat) {
+	// Map WebSphere PMI statistic names to our dimension names
+	// WebSphere uses: CreateCount, InvalidateCount for CountStatistics
+	for _, cs := range stat.CountStatistics {
+		if cs.Count == "" {
+			continue
+		}
+
+		val, err := strconv.ParseInt(cs.Count, 10, 64)
+		if err != nil {
+			continue
+		}
+
+		var dimensionName string
+		switch cs.Name {
+		case "CreateCount":
+			dimensionName = "created"
+		case "InvalidateCount":
+			dimensionName = "invalidated"
+		default:
+			continue
+		}
+
+		metricKey := fmt.Sprintf("%s_%s", chartID, dimensionName)
+		mx[metricKey] = val
+		w.Debugf("Web session metric: %s = %d", metricKey, val)
+	}
+
+	// Check RangeStatistics for active sessions
+	for _, rs := range stat.RangeStatistics {
+		if (rs.Name == "ActiveCount" || rs.Name == "LiveCount") && rs.Current != "" {
+			if val, err := strconv.ParseInt(rs.Current, 10, 64); err == nil {
+				metricKey := fmt.Sprintf("%s_active", chartID)
+				mx[metricKey] = val
+				w.Debugf("Web session active metric: %s = %d", metricKey, val)
+				break // Only use first match (ActiveCount preferred over LiveCount)
+			}
+		}
+	}
+
+	// Check TimeStatistics for lifetime
+	for _, ts := range stat.TimeStatistics {
+		if ts.Name == "LifeTime" {
+			// Get total time - WebSphere uses "totalTime" attribute
+			totalStr := ts.TotalTime
+			if totalStr == "" {
+				totalStr = ts.Total // Fallback for other versions
+			}
+
+			// Calculate average lifetime when sessions exist
+			if ts.Count != "" && totalStr != "" {
+				count, err1 := strconv.ParseInt(ts.Count, 10, 64)
+				total, err2 := strconv.ParseInt(totalStr, 10, 64)
+
+				if err1 == nil && err2 == nil && count > 0 {
+					// Calculate average lifetime in milliseconds
+					avgLifetime := total / count
+					metricKey := fmt.Sprintf("%s_lifetime", chartID)
+					mx[metricKey] = avgLifetime
+					w.Debugf("Web session lifetime metric: %s = %d ms (total=%d, count=%d)",
+						metricKey, avgLifetime, total, count)
+				} else if err1 == nil && count == 0 {
+					// No sessions - set lifetime to 0
+					metricKey := fmt.Sprintf("%s_lifetime", chartID)
+					mx[metricKey] = 0
+					w.Debugf("Web session lifetime metric: %s = 0 (no sessions)", metricKey)
+				}
+			}
+		}
+	}
+
+	// Note: Do not provide default zero values - let the framework detect missing metrics
+	// This allows proper identification of data collection issues
+}
+
+// extractSystemDataMetrics extracts system data metrics with proper dimension mapping
+func (w *WebSpherePMI) extractSystemDataMetrics(mx map[string]int64, chartID string, stat pmiStat) {
+	// System data typically has a single value metric
+	// Try to extract from various statistic types
+	found := false
+
+	// Check CountStatistics
+	for _, cs := range stat.CountStatistics {
+		if cs.Count != "" {
+			if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
+				metricKey := fmt.Sprintf("%s_value", chartID)
+				mx[metricKey] = val
+				w.Debugf("System data metric: %s = %d (from CountStatistic %s)", metricKey, val, cs.Name)
+				found = true
+				break
+			}
+		}
+	}
+
+	// If not found in CountStatistics, check RangeStatistics
+	if !found {
+		for _, rs := range stat.RangeStatistics {
+			if rs.Current != "" {
+				if val, err := strconv.ParseInt(rs.Current, 10, 64); err == nil {
+					metricKey := fmt.Sprintf("%s_value", chartID)
+					mx[metricKey] = val
+					w.Debugf("System data metric: %s = %d (from RangeStatistic %s)", metricKey, val, rs.Name)
+					found = true
+					break
+				}
+			}
+		}
+	}
+
+	// If not found, check Value field directly
+	if !found && stat.Value != nil && stat.Value.Value != "" {
+		if val, err := strconv.ParseInt(stat.Value.Value, 10, 64); err == nil {
+			metricKey := fmt.Sprintf("%s_value", chartID)
+			mx[metricKey] = val
+			w.Debugf("System data metric: %s = %d (from Value field)", metricKey, val)
+		}
+	}
+}
+
+// extractDynaCacheMetrics extracts dynamic cache metrics with proper dimension mapping
+func (w *WebSpherePMI) extractDynaCacheMetrics(mx map[string]int64, chartID string, stat pmiStat) {
+	// Map WebSphere PMI statistic names to our dimension names
+	for _, cs := range stat.CountStatistics {
+		var dimensionName string
+		switch cs.Name {
+		case "RemoteCreationCount", "ObjectsCreatedCount", "CreateCount":
+			dimensionName = "creates"
+		case "RemoteRemovalCount", "LruInvalidationCount", "RemoveCount", "ExplicitInvalidationCount":
+			dimensionName = "removes"
+		default:
+			// Look for patterns in the name
+			nameLower := strings.ToLower(cs.Name)
+			if strings.Contains(nameLower, "creat") {
+				dimensionName = "creates"
+			} else if strings.Contains(nameLower, "remov") || strings.Contains(nameLower, "invalidat") {
+				dimensionName = "removes"
+			} else {
+				continue
+			}
+		}
+
+		if cs.Count != "" {
+			if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
+				metricKey := fmt.Sprintf("%s_%s", chartID, dimensionName)
+				// Add to existing value (multiple remove types)
+				if dimensionName == "removes" {
+					mx[metricKey] += val
+				} else {
+					mx[metricKey] = val
+				}
+				w.Debugf("DynaCache metric: %s = %d (from %s)", metricKey, val, cs.Name)
+			}
+		}
+	}
+}
+
+// extractGenericMetrics extracts metrics for the generic monitoring.other context
+func (w *WebSpherePMI) extractGenericMetrics(mx map[string]int64, chartID string, stat pmiStat) {
+	// For generic metrics, we collect the first available value and map it to "value" dimension
+	metricKey := fmt.Sprintf("%s_value", chartID)
+
+	// Try CountStatistics first
+	if len(stat.CountStatistics) > 0 && stat.CountStatistics[0].Count != "" {
+		if val, err := strconv.ParseInt(stat.CountStatistics[0].Count, 10, 64); err == nil {
+			mx[metricKey] = val
+			w.Debugf("Generic metric: %s = %d (from CountStatistic %s)", metricKey, val, stat.CountStatistics[0].Name)
+			return
+		}
+	}
+
+	// Try RangeStatistics
+	if len(stat.RangeStatistics) > 0 && stat.RangeStatistics[0].Current != "" {
+		if val, err := strconv.ParseInt(stat.RangeStatistics[0].Current, 10, 64); err == nil {
+			mx[metricKey] = val
+			w.Debugf("Generic metric: %s = %d (from RangeStatistic %s)", metricKey, val, stat.RangeStatistics[0].Name)
+			return
+		}
+	}
+
+	// Try BoundedRangeStatistics
+	if len(stat.BoundedRangeStatistics) > 0 && stat.BoundedRangeStatistics[0].Current != "" {
+		if val, err := strconv.ParseInt(stat.BoundedRangeStatistics[0].Current, 10, 64); err == nil {
+			mx[metricKey] = val
+			w.Debugf("Generic metric: %s = %d (from BoundedRangeStatistic %s)", metricKey, val, stat.BoundedRangeStatistics[0].Name)
+			return
+		}
+	}
+
+	// Try Value field
+	if stat.Value != nil && stat.Value.Value != "" {
+		if val, err := strconv.ParseInt(stat.Value.Value, 10, 64); err == nil {
+			mx[metricKey] = val
+			w.Debugf("Generic metric: %s = %d (from Value field)", metricKey, val)
+			return
+		}
+	}
+
+	// Note: Do not set default zero value - let the framework detect missing metrics
+	w.Debugf("Generic metric: %s - no value found in stat", metricKey)
 }
 
 // processStat is a legacy method for test compatibility

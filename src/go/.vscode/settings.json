@@ -1,0 +1,14 @@
+{
+    "go.toolsEnvVars": {
+        "CGO_ENABLED": "1",
+        "CGO_CFLAGS": "-I../../build-claude/ibm-clidriver/include -I../../build-claude/ibm-mqclient/inc -I../../build/ibm-clidriver/include -I../../build/ibm-mqclient/inc",
+        "CGO_LDFLAGS": "-L../../build-claude/ibm-clidriver/lib -L../../build-claude/ibm-mqclient/lib64 -L../../build/ibm-clidriver/lib -L../../build/ibm-mqclient/lib64"
+    },
+    "go.buildTags": "ibm",
+    "C_Cpp.default.includePath": [
+        "${workspaceFolder}/../../build-claude/ibm-clidriver/include",
+        "${workspaceFolder}/../../build-claude/ibm-mqclient/inc",
+        "${workspaceFolder}/../../build/ibm-clidriver/include", 
+        "${workspaceFolder}/../../build/ibm-mqclient/inc"
+    ]
+}

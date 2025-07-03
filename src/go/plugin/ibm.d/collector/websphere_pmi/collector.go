@@ -142,6 +142,9 @@ type WebSpherePMI struct {
 
 	// Dynamic collection system
 	dynamicCollector *DynamicCollector
+
+	// Unified collection system (replaces dynamic collector)
+	unifiedCollector *UnifiedCollector
 }
 
 type pmiCacheEntry struct {
@@ -202,17 +205,18 @@ type countStat struct {
 }
 
 type timeStat struct {
-	Name  string `xml:"name,attr"`
-	Count string `xml:"count,attr"`
-	Total string `xml:"total,attr"`
-	Mean  string `xml:"mean,attr"`
-	Min   string `xml:"min,attr"`
-	Max   string `xml:"max,attr"`
+	Name      string `xml:"name,attr"`
+	Count     string `xml:"count,attr"`
+	Total     string `xml:"total,attr"`     // Some versions use "total"
+	TotalTime string `xml:"totalTime,attr"` // WebSphere uses "totalTime"
+	Mean      string `xml:"mean,attr"`
+	Min       string `xml:"min,attr"`
+	Max       string `xml:"max,attr"`
 }
 
 type rangeStat struct {
 	Name     string `xml:"name,attr"`
-	Current  string `xml:"current,attr"`
+	Current  string `xml:"value,attr"` // WebSphere uses "value" attribute for current value
 	Integral string `xml:"integral,attr"`
 	Mean     string `xml:"mean,attr"`
 }
