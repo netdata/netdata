@@ -8,7 +8,7 @@ metrics:
       name: ifNumber
       chart_meta:
         description: Number of network interfaces regardless of their current state present on this system
-        family: Interfaces/Count/Total
+        family: Network/Interface/Count/Total
         unit: "{interface}"
   - MIB: IF-MIB
     table:
@@ -19,31 +19,31 @@ metrics:
         name: ifInErrors
         chart_meta:
           description: Number of inbound packets that contained errors preventing them from being deliverable to a higher-layer protocol
-          family: Interfaces/Error/Total/In
+          family: Network/Interface/Error/Total/In
           unit: "{error}/s"
       - OID: 1.3.6.1.2.1.2.2.1.20
         name: ifOutErrors
         chart_meta:
           description: Number of outbound packets that could not be transmitted because of errors
-          family: Interfaces/Error/Total/Out
+          family: Network/Interface/Error/Total/Out
           unit: "{error}/s"
       - OID: 1.3.6.1.2.1.2.2.1.13
         name: ifInDiscards
         chart_meta:
           description: Number of inbound packets chosen to be discarded even though no errors had been detected to prevent their being deliverable to a higher-layer protocol
-          family: Interfaces/Discard/In
+          family: Network/Interface/Discard/In
           unit: "{discard}/s"
       - OID: 1.3.6.1.2.1.2.2.1.19
         name: ifOutDiscards
         chart_meta:
           description: Number of outbound packets chosen to be discarded even though no errors had been detected to prevent their being transmitted
-          family: Interfaces/Discard/Out
+          family: Network/Interface/Discard/Out
           unit: "{discard}/s"
       - OID: 1.3.6.1.2.1.2.2.1.7
         name: ifAdminStatus
         chart_meta:
           description: Current administrative state of the interface
-          family: Interfaces/Status/Admin
+          family: Network/Interface/Status/Admin
           unit: "{status}"
         mapping:
           1: up
@@ -53,7 +53,7 @@ metrics:
         name: ifOperStatus
         chart_meta:
           description: Current operational state of the interface
-          family: Interfaces/Status/Operational
+          family: Network/Interface/Status/Operational
           unit: "{status}"
         mapping:
           1: up
@@ -87,57 +87,57 @@ metrics:
         name: ifHCInOctets
         chart_meta:
           description: Total number of octets received on the interface including framing characters
-          family: Interfaces/Traffic/Total/In
+          family: Network/Interface/Traffic/Total/In
           unit: "bit/s"
         scale_factor: 8 # octets => bits
       - OID: 1.3.6.1.2.1.31.1.1.1.10
         name: ifHCOutOctets
         chart_meta:
           description: Total number of octets transmitted out of the interface including framing characters
-          family: Interfaces/Traffic/Total/Out
+          family: Network/Interface/Traffic/Total/Out
           unit: "bit/s"
         scale_factor: 8 # octets => bits
       - OID: 1.3.6.1.2.1.31.1.1.1.7
         name: ifHCInUcastPkts
         chart_meta:
           description: Number of packets delivered by this sub-layer to a higher layer which were not addressed to a multicast or broadcast address
-          family: Interfaces/Packet/Unicast/In
+          family: Network/Interface/Packet/Unicast/In
           unit: "{packet}/s"
       - OID: 1.3.6.1.2.1.31.1.1.1.8
         name: ifHCInMulticastPkts
         chart_meta:
           description: Number of packets delivered by this sub-layer to a higher layer which were addressed to a multicast address
-          family: Interfaces/Packet/Multicast/In
+          family: Network/Interface/Packet/Multicast/In
           unit: "{packet}/s"
       - OID: 1.3.6.1.2.1.31.1.1.1.9
         name: ifHCInBroadcastPkts
         chart_meta:
           description: Number of packets delivered by this sub-layer to a higher layer which were addressed to a broadcast address
-          family: Interfaces/Packet/Broadcast/In
+          family: Network/Interface/Packet/Broadcast/In
           unit: "{packet}/s"
       - OID: 1.3.6.1.2.1.31.1.1.1.11
         name: ifHCOutUcastPkts
         chart_meta:
           description: Total number of packets that higher-level protocols requested be transmitted and which were not addressed to a multicast or broadcast address
-          family: Interfaces/Packet/Unicast/Out
+          family: Network/Interface/Packet/Unicast/Out
           unit: "{packet}/s"
       - OID: 1.3.6.1.2.1.31.1.1.1.12
         name: ifHCOutMulticastPkts
         chart_meta:
           description: Total number of packets that higher-level protocols requested be transmitted and which were addressed to a multicast address
-          family: Interfaces/Packet/Multicast/Out
+          family: Network/Interface/Packet/Multicast/Out
           unit: "{packet}/s"
       - OID: 1.3.6.1.2.1.31.1.1.1.13
         name: ifHCOutBroadcastPkts
         chart_meta:
           description: Total number of packets that higher-level protocols requested be transmitted and which were addressed to a broadcast address
-          family: Interfaces/Packet/Broadcast/Out
+          family: Network/Interface/Packet/Broadcast/Out
           unit: "{packet}/s"
       - OID: 1.3.6.1.2.1.31.1.1.1.15
         name: ifHighSpeed
         chart_meta:
           description: Estimate of the interface's current bandwidth
-          family: Interfaces/Speed
+          family: Network/Interface/Speed
           unit: bit/s
         scale_factor: 1000000 # Megabits => bits
     metric_tags:

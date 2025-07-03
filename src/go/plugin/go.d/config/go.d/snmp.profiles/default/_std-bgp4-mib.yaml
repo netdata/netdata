@@ -10,7 +10,7 @@ metrics:
         name: bgpPeerAdminStatus
         chart_meta:
           description: The desired state of the BGP connection
-          family: Routing/BGP/Peer/Admin/Status
+          family: Network/Routing/BGP/Peer/Admin/Status
           unit: "{status}"
         mapping:
           1: stop
@@ -19,7 +19,7 @@ metrics:
         name: bgpPeerState
         chart_meta:
           description: The BGP peer connection state
-          family: Routing/BGP/Peer/Connection/Status
+          family: Network/Routing/BGP/Peer/Connection/Status
           unit: "{status}"
         mapping:
           1: idle
@@ -32,37 +32,37 @@ metrics:
         name: bgpPeerInTotalMessages
         chart_meta:
           description: The total number of messages received from the remote peer on this connection
-          family: Routing/BGP/Peer/Message/Total/In
+          family: Network/Routing/BGP/Peer/Message/Total/In
           unit: "{message}"
       - OID: 1.3.6.1.2.1.15.3.1.13
         name: bgpPeerOutTotalMessages
         chart_meta:
           description: The total number of messages transmitted to the remote peer on this connection
-          family: Routing/BGP/Peer/Message/Total/Out
+          family: Network/Routing/BGP/Peer/Message/Total/Out
           unit: "{message}"
       - OID: 1.3.6.1.2.1.15.3.1.10
         name: bgpPeerInUpdates
         chart_meta:
           description: The number of BGP UPDATE messages received on this connection
-          family: Routing/BGP/Peer/Message/Update/In
+          family: Network/Routing/BGP/Peer/Message/Update/In
           unit: "{message}"
       - OID: 1.3.6.1.2.1.15.3.1.11
         name: bgpPeerOutUpdates
         chart_meta:
           description: The number of BGP UPDATE messages transmitted on this connection
-          family: Routing/BGP/Peer/Message/Update/Out
+          family: Network/Routing/BGP/Peer/Message/Update/Out
           unit: "{message}"
       - OID: 1.3.6.1.2.1.15.3.1.15
         name: bgpPeerFsmEstablishedTransitions
         chart_meta:
           description: The total number of times the BGP FSM transitioned into the established state
-          family: Routing/BGP/Peer/FSM/Transition/Established/Count
+          family: Network/Routing/BGP/Peer/FSM/Transition/Established/Count
           unit: "{transition}"
       - OID: 1.3.6.1.2.1.15.3.1.16
         name: bgpPeerFsmEstablishedTime
         chart_meta:
           description: Time in seconds this peer has been in the Established state or since last in Established state
-          family: Routing/BGP/Peer/FSM/Duration/Established
+          family: Network/Routing/BGP/Peer/FSM/Duration/Established
           unit: "s"
     metric_tags:
       - tag: remote_as

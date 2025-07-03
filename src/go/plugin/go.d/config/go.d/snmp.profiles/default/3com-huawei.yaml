@@ -48,7 +48,7 @@ metrics:
         name: hwDevMFanStatus
         chart_meta:
           description: Fan status
-          family: Fan/Status
+          family: Hardware/Fan/Status
           unit: "{status}"
         mapping:
           1: active
@@ -67,7 +67,7 @@ metrics:
         name: hwDevMPowerStatus
         chart_meta:
           description: Power status
-          family: PowerSupply/Status
+          family: Hardware/PowerSupply/Status
           unit: "{status}"
         mapping:
           1: active
