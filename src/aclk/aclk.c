@@ -731,9 +731,9 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         }
 
         memset(&mqtt_url, 0, sizeof(url_t));
-        if (url_parse(aclk_env->transports[rc]->endpoint, &mqtt_url)){
+        if (url_parse(aclk_env->transports[trp]->endpoint, &mqtt_url)){
             aclk_status_set(ACLK_STATUS_INVALID_ENV_TRANSPORT_URL);
-            error_report("ACLK: failed to parse target URL for /env trp idx %d \"%s\"", trp, aclk_env->transports[rc]->endpoint);
+            error_report("ACLK: failed to parse target URL for /env trp idx %d \"%s\"", trp, aclk_env->transports[trp]->endpoint);
             url_t_destroy(&mqtt_url);
             continue;
         }
