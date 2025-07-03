@@ -8,49 +8,49 @@ metrics:
         name: cikeTunLifeTime
         chart_meta:
           description: The negotiated lifetime of the IPsec Phase-1 IKE Tunnel in seconds
-          family: IPSec/Phase1/Tunnel/Lifetime
+          family: Network/VPN/IPSec/Phase1/Tunnel/Lifetime
           unit: "s"
       - OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.19
         name: cikeTunInOctets
         chart_meta:
           description: The total number of octets received by this IPsec Phase-1 IKE Tunnel
-          family: IPSec/Phase1/Tunnel/Traffic/In
+          family: Network/VPN/IPSec/Phase1/Tunnel/Traffic/In
           unit: "By"
       - OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.27
         name: cikeTunOutOctets
         chart_meta:
           description: The total number of octets sent by this IPsec Phase-1 IKE Tunnel
-          family: IPSec/Phase1/Tunnel/Traffic/Out
+          family: Network/VPN/IPSec/Phase1/Tunnel/Traffic/Out
           unit: "By/s"
       - OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.20
         name: cikeTunInPkts
         chart_meta:
           description: The total number of packets received by this IPsec Phase-1 IKE Tunnel
-          family: IPSec/Phase1/Tunnel/Packet/In
+          family: Network/VPN/IPSec/Phase1/Tunnel/Packet/In
           unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.21
         name: cikeTunInDropPkts
         chart_meta:
           description: The total number of packets dropped by this IPsec Phase-1 IKE Tunnel during receive processing
-          family: IPSec/Phase1/Tunnel/Drop/In
+          family: Network/VPN/IPSec/Phase1/Tunnel/Drop/In
           unit: "{drop}/s"
       - OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.28
         name: cikeTunOutPkts
         chart_meta:
           description: The total number of packets sent by this IPsec Phase-1 IKE Tunnel
-          family: IPSec/Phase1/Tunnel/Packet/Out
+          family: Network/VPN/IPSec/Phase1/Tunnel/Packet/Out
           unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.29
         name: cikeTunOutDropPkts
         chart_meta:
           description: The total number of packets dropped by this IPsec Phase-1 IKE Tunnel during send processing
-          family: IPSec/Phase1/Tunnel/Drop/Out
+          family: Network/VPN/IPSec/Phase1/Tunnel/Drop/Out
           unit: "{drop}/s"
       - OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.35
         name: cikeTunStatus
         chart_meta:
           description: The status of the IPsec Phase-1 IKE Tunnel
-          family: IPSec/Phase1/Tunnel/Status
+          family: Network/VPN/IPSec/Phase1/Tunnel/Status
           unit: "{status}"
         mapping:
           1: active
@@ -59,7 +59,7 @@ metrics:
         name: cipSecTunIkeTunnelAlive
         chart_meta:
           description: The existence status of the IPsec Phase-1 IKE Tunnel
-          family: IPSec/Phase1/Tunnel/Existence
+          family: Network/VPN/IPSec/Phase1/Tunnel/Existence
           unit: "{status}"
         mapping:
           1: exists
@@ -84,73 +84,73 @@ metrics:
         name: cipSecTunLifeTime
         chart_meta:
           description: The negotiated lifetime of the IPsec Phase-2 Tunnel in seconds.
-          family: IPSec/Phase2/Tunnel/Lifetime
+          family: Network/VPN/IPSec/Phase2/Tunnel/Lifetime
           unit: "s"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.26
         name: cipSecTunInOctets
         chart_meta:
           description: The total number of octets received by this IPsec Phase-2 Tunnel. This value is accumulated BEFORE determining whether or not the packet should be decompressed
-          family: IPSec/Phase2/Tunnel/Traffic/In
+          family: Network/VPN/IPSec/Phase2/Tunnel/Traffic/In
           unit: "By/s"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.27
         name: cipSecTunHcInOctets
         chart_meta:
           description: A high capacity count of the total number of octets received by this IPsec Phase-2 Tunnel. This value is accumulated BEFORE determining whether or not the packet should be decompressed
-          family: IPSec/Phase2/Tunnel/Traffic/In
+          family: Network/VPN/IPSec/Phase2/Tunnel/Traffic/In
           unit: "By/s"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.32
         name: cipSecTunInPkts
         chart_meta:
           description: The total number of packets received by this IPsec Phase-2 Tunnel
-          family: IPSec/Phase2/Tunnel/Packet/In
+          family: Network/VPN/IPSec/Phase2/Tunnel/Packet/In
           unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.36
         name: cipSecTunInAuthFails
         chart_meta:
           description: The total number of inbound authentications which ended in failure by this IPsec Phase-2 Tunnel
-          family: IPSec/Phase2/Tunnel/Failure/Auth/In
+          family: Network/VPN/IPSec/Phase2/Tunnel/Failure/Auth/In
           unit: "{failure}/s"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.48
         name: cipSecTunOutAuthFails
         chart_meta:
           description: The total number of outbound authentications which ended in failure by this IPsec Phase-2 Tunnel.
-          family: IPSec/Phase2/Tunnel/Failure/Auth/Out
+          family: Network/VPN/IPSec/Phase2/Tunnel/Failure/Auth/Out
           unit: "{failure}/s"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.38
         name: cipSecTunInDecryptFails
         chart_meta:
           description: The total number of inbound decryptions which ended in failure by this IPsec Phase-2 Tunnel.
-          family: IPSec/Phase2/Tunnel/Failure/Decrypt/In
+          family: Network/VPN/IPSec/Phase2/Tunnel/Failure/Decrypt/In
           unit: "{failure}/s"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.50
         name: cipSecTunOutEncryptFails
         chart_meta:
           description: The total number of outbound encryptions which ended in failure by this IPsec Phase-2 Tunnel.
-          family: IPSec/Phase2/Tunnel/Failure/Encrypt/Out
+          family: Network/VPN/IPSec/Phase2/Tunnel/Failure/Encrypt/Out
           unit: "{failure}/s"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.39
         name: cipSecTunOutOctets
         chart_meta:
           description: The total number of octets sent by this IPsec Phase-2 Tunnel. This value is accumulated AFTER determining whether or not the packet should be compressed
-          family: IPSec/Phase2/Tunnel/Traffic/Out
+          family: Network/VPN/IPSec/Phase2/Tunnel/Traffic/Out
           unit: "By/s"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.40
         name: cipSecTunHcOutOctets
         chart_meta:
           description: A high capacity count of the total number of octets sent by this IPsec Phase-2 Tunnel. This value is accumulated AFTER determining whether or not the packet should be compressed
-          family: IPSec/Phase2/Tunnel/Traffic/Out
+          family: Network/VPN/IPSec/Phase2/Tunnel/Traffic/Out
           unit: "By/s"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.45
         name: cipSecTunOutPkts
         chart_meta:
           description: The total number of packets sent by this IPsec Phase-2 Tunnel
-          family: IPSec/Phase2/Tunnel/Packet/Out
+          family: Network/VPN/IPSec/Phase2/Tunnel/Packet/Out
           unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.51
         name: cipSecTunStatus
         chart_meta:
           description: The status of the IPsec Phase-2 Tunnel
-          family: IPSec/Phase2/Tunnel/Status
+          family: Network/VPN/IPSec/Phase2/Tunnel/Status
           unit: "{status}"
         mapping:
           1: active
