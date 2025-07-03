@@ -128,7 +128,14 @@ type contextInfo struct {
 }
 
 func (da *DumpAnalyzer) printJobAnalysis(job *JobAnalysis) {
-	// First, check for contexts appearing in multiple families (SEVERE BUG)
+	// First, check for duplicate chart IDs (SEVERE BUG)
+	chartIDCounts := make(map[string]int)
+	for i := range job.Charts {
+		ca := &job.Charts[i]
+		chartIDCounts[ca.Chart.ID]++
+	}
+
+	// Check for contexts appearing in multiple families (SEVERE BUG)
 	contextToFamilies := make(map[string][]string)
 
 	families := make(map[string]map[string]*contextInfo) // family -> context -> info
@@ -183,8 +190,20 @@ func (da *DumpAnalyzer) printJobAnalysis(job *JobAnalysis) {
 		families[family][ctx].charts = append(families[family][ctx].charts, ca)
 	}
 
-	// Check for severe bugs - contexts in multiple families
+	// Check for severe bugs - duplicate chart IDs and contexts in multiple families
 	fmt.Println("\n" + job.Name)
+
+	// Report duplicate chart IDs first (most severe)
+	for chartID, count := range chartIDCounts {
+		if count > 1 {
+			fmt.Printf("🔴 SEVERE BUG: Chart ID '%s' defined %d times - this causes data corruption!\n",
+				chartID, count)
+			contextIssues[chartID] = append(contextIssues[chartID],
+				fmt.Sprintf("SEVERE BUG - chart ID defined %d times (data corruption)", count))
+		}
+	}
+
+	// Report contexts in multiple families
 	for ctx, fams := range contextToFamilies {
 		if len(fams) > 1 {
 			fmt.Printf("🔴 SEVERE BUG: Context '%s' appears in multiple families: %s\n",
