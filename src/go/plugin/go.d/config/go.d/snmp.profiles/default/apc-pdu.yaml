@@ -21,14 +21,14 @@ metrics:
         name: rPDULoadStatusLoad
         chart_meta:
           description: Phase/bank load
-          family: PhaseBank/Load/Current
+          family: Hardware/PhaseBank/Load/Current
           unit: "A"
         scale_factor: 0.1
       - OID: 1.3.6.1.4.1.318.1.1.12.2.3.1.1.3
         name: rPDULoadStatusLoadState
         chart_meta:
           description: Phase/bank load state
-          family: PhaseBank/Load/Status
+          family: Hardware/PhaseBank/Load/Status
           unit: "{status}"
         mapping:
           1: phase_load_normal
@@ -50,14 +50,14 @@ metrics:
         name: rPDUOutletStatusLoad
         chart_meta:
           description: Outlet load for an Outlet Monitored Rack PDU
-          family: Outlet/Load/Current
+          family: Hardware/Outlet/Load/Current
           unit: "A"
         scale_factor: 0.1
       - OID: 1.3.6.1.4.1.318.1.1.12.3.5.1.1.4
         name: rPDUOutletStatusOutletState
         chart_meta:
           description: Outlet state
-          family: Outlet/Power/Status
+          family: Hardware/Outlet/Power/Status
           unit: "{status}"
         mapping:
           1: outlet_status_on
@@ -72,32 +72,37 @@ metrics:
           OID: 1.3.6.1.4.1.318.1.1.12.3.5.1.1.2
           name: rPDUOutletStatusOutletName
 
-  #  - MIB: PowerNet-MIB
-  #    symbol:
-  #      OID: 1.3.6.1.4.1.318.1.1.12.4.1.1.0
-  #      name: rPDUPowerSupply1Status
-  #      mapping:
-  #        1: power_supply_one_ok
-  #        2: power_supply_one_failed
-  #      TODO: enum in scalar metric is not supported yet (keep this metric and this
-  #        comment in profile until it's fixed)
-  #  - MIB: PowerNet-MIB
-  #    symbol:
-  #      OID: 1.3.6.1.4.1.318.1.1.12.4.1.2.0
-  #      name: rPDUPowerSupply2Status
-  #      mapping:
-  #        1: power_supply_two_ok
-  #        2: power_supply_two_failed
-  #        3: power_supply_two_not_present
-  #      TODO: enum in scalar metric is not supported yet (keep this metric and this
-  #        comment in profile until it's fixed)
+  - MIB: PowerNet-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.12.4.1.1.0
+      name: rPDUPowerSupply1Status
+      chart_meta:
+        family: Hardware/PowerSupply/1/Status
+        description: "Status of power supply 1"
+        unit: "{status}"
+      mapping:
+        1: power_supply_one_ok
+        2: power_supply_one_failed
+  - MIB: PowerNet-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.12.4.1.2.0
+      name: rPDUPowerSupply2Status
+      chart_meta:
+        family: Hardware/PowerSupply/2/Status
+        description: "Status of power supply 2"
+        unit: "{status}"
+      mapping:
+        1: power_supply_two_ok
+        2: power_supply_two_failed
+        3: power_supply_two_not_present
+
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.12.4.1.3.0
       name: rPDUPowerSupplyAlarm
       chart_meta:
         description: Alarm status of the PDU power supply
-        family: PowerSupply/Alarm/Status
+        family: Hardware/PowerSupply/Alarm/Status
         unit: "{status}"
       mapping:
         1: allAvailablePowerSuppliesOK
@@ -113,7 +118,7 @@ metrics:
         name: rPDUStatusBankState
         chart_meta:
           description: Bank load state
-          family: Bank/Load/Status
+          family: Hardware/Bank/Load/Status
           unit: "{status}"
         mapping:
           1: bank_load_normal
@@ -139,7 +144,7 @@ metrics:
         name: rPDUStatusPhaseState
         chart_meta:
           description: Phase Load state
-          family: Phase/Load/Status
+          family: Hardware/Phase/Load/Status
           unit: "{status}"
         mapping:
           1: phase_load_normal
@@ -165,7 +170,7 @@ metrics:
         name: rPDUStatusOutletState
         chart_meta:
           description: Outlet Load state
-          family: Outlet/Load/Status
+          family: Hardware/Outlet/Load/Status
           unit: "{status}"
         mapping:
           1: outlet_load_normal
@@ -183,20 +188,20 @@ metrics:
           name: rPDUStatusOutletNumber
   - MIB: PowerNet-MIB
     table:
-      OID: 1.3.6.1.4.1.318.1.1.26.10.2.2
+      OID: 1.3.6.1.4.1.318.1.1.26.10.2.21
       name: rPDU2SensorTempHumidityStatusTable
     symbols:
       - OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.7
         name: rPDU2SensorTempHumidityStatusTempF
         chart_meta:
           description: Temperature in degrees Fahrenheit
-          family: Sensor/Temperature/Value
+          family: Hardware/Sensor/Temperature/Value
           unit: "degF"
       - OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.8
         name: rPDU2SensorTempHumidityStatusTempC
         chart_meta:
           description: Temperature in degrees Celsius
-          family: Sensor/Temperature/Value
+          family: Hardware/Sensor/Temperature/Value
           unit: "Cel"
       - OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.10
         name: rPDU2SensorTempHumidityStatusRelativeHumidity
@@ -208,7 +213,7 @@ metrics:
         name: rPDU2SensorTempHumidityStatusTempStatus
         chart_meta:
           description: Current state of the temperature probe
-          family: Sensor/Temperature/Status
+          family: Hardware/Sensor/Temperature/Status
           unit: "{status}"
         mapping:
           1: not_present

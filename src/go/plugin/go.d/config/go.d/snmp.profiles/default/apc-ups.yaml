@@ -86,7 +86,7 @@ metrics:
       name: upsAdvInputLineVoltage
       chart_meta:
         description: The current utility line voltage
-        family: Input/Voltage/Line
+        family: PowerFlow/Input/Voltage/Line
         unit: "VAC"
   - MIB: PowerNet-MIB
     symbol:
@@ -94,7 +94,7 @@ metrics:
       name: upsHighPrecInputLineVoltage
       chart_meta:
         description: The current utility line voltage
-        family: Input/Voltage/Line
+        family: PowerFlow/Input/Voltage/Line
         unit: "VAC"
       scale_factor: 0.1
   - MIB: PowerNet-MIB
@@ -103,7 +103,7 @@ metrics:
       name: upsAdvInputFrequency
       chart_meta:
         description: The current input frequency to the UPS system
-        family: Input/Frequency/Value
+        family: PowerFlowInput/Frequency/Value
         unit: "Hz"
   - MIB: PowerNet-MIB
     symbol:
@@ -111,7 +111,7 @@ metrics:
       name: upsHighPrecInputFrequency
       chart_meta:
         description: The current input frequency to the UPS system
-        family: Input/Frequency/Value
+        family: PowerFlow/Input/Frequency/Value
         unit: "Hz"
       scale_factor: 0.1
 
@@ -121,7 +121,7 @@ metrics:
       name: upsHighPrecOutputCurrent
       chart_meta:
         description: The current drawn by the load on the UPS
-        family: Output/Current/Total
+        family: PowerFlow/Output/Current/Total
         unit: "A"
       scale_factor: 0.1
 
@@ -131,7 +131,7 @@ metrics:
       name: upsAdvInputLineFailCause
       chart_meta:
         description: The reason for the occurrence of the last transfer to UPS battery power
-        family: Input/Failure/Cause
+        family: PowerFlow/Input/Failure/Cause
         unit: "{status}"
       mapping:
         1: noTransfer
@@ -150,7 +150,7 @@ metrics:
       name: upsAdvOutputVoltage
       chart_meta:
         description: The output voltage of the UPS system
-        family: Output/Voltage/Total
+        family: PowerFlow/Output/Voltage/Total
         unit: "VAC"
   - MIB: PowerNet-MIB
     symbol:
@@ -158,7 +158,7 @@ metrics:
       name: upsAdvOutputFrequency
       chart_meta:
         description: The current output frequency of the UPS system
-        family: Output/Frequency/Value
+        family: PowerFlow/Output/Frequency/Value
         unit: "Hz"
   - MIB: PowerNet-MIB
     symbol:
@@ -166,7 +166,7 @@ metrics:
       name: upsAdvOutputLoad
       chart_meta:
         description: The current UPS load expressed in percent of rated capacity
-        family: Output/Load/Percentage
+        family: PowerFlow/Output/Load/Percentage
         unit: "%"
   - MIB: PowerNet-MIB
     symbol:
@@ -174,7 +174,7 @@ metrics:
       name: upsAdvOutputCurrent
       chart_meta:
         description: The current drawn by the load on the UPS
-        family: Output/Current/Total
+        family: PowerFlow/Output/Current/Total
         unit: "A"
   - MIB: PowerNet-MIB
     symbol:
@@ -182,7 +182,7 @@ metrics:
       name: upsAdvOutputActivePower
       chart_meta:
         description: The total output active power of the UPS system
-        family: Output/Power/Active
+        family: PowerFlow/Output/Power/Active
         unit: "W"
   - MIB: PowerNet-MIB
     symbol:
@@ -190,7 +190,7 @@ metrics:
       name: upsAdvOutputApparentPower
       chart_meta:
         description: The total output apparent power of all phases of the UPS system
-        family: Output/Power/Apparent
+        family: PowerFlow/Output/Power/Apparent
         unit: "VA"
   - MIB: PowerNet-MIB
     symbol:
@@ -198,7 +198,7 @@ metrics:
       name: upsAdvOutputEnergyUsage
       chart_meta:
         description: The output energy usage of the UPS
-        family: Output/Energy/Used
+        family: PowerFlow/Output/Energy/Used
         unit: "kWh"
       scale_factor: 0.01
   - MIB: PowerNet-MIB
@@ -303,7 +303,7 @@ metrics:
         name: upsOutletGroupStatusGroupState
         chart_meta:
           description: Outlet group state
-          family: OutletGroup/Status
+          family: Hardware/OutletGroup/Status
           unit: "{status}"
         mapping:
           1: ups_outlet_group_status_on
@@ -320,7 +320,7 @@ metrics:
       name: uioSensorStatusTemperatureDegC
       chart_meta:
         description: The sensor's current temperature reading
-        family: Sensor/Temperature/Value
+        family: Hardware/Sensor/Temperature/Value
         unit: "Cel"
       scale_factor: 0.1
 metric_tags:
