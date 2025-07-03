@@ -44,7 +44,7 @@ Netdata has been architected to minimize resource consumption while maximizing o
 - **Storage Optimization**: Industry-leading compression achieving ~0.5 bytes per sample on disk for high-resolution data
 - **Edge Computing**: Distributed architecture keeps data processing close to its source, reducing bandwidth and central processing requirements - Netdata distributes the code instead of centralizing the data
 - **Intelligent ML**: Machine learning runs as low-priority background tasks, automatically yielding resources when needed for data collection. See [AI & ML Features](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/machine-learning-and-assisted-troubleshooting.md)
-- **Built-in Scalability**: Native clustering and high-availability features enable organizations to scale horizontally without architectural changes. See [Observability Centralization Points]().
+- **Built-in Scalability**: Native clustering and high-availability features enable organizations to scale horizontally without architectural changes. See [Observability Centralization Points](https://github.com/netdata/netdata/blob/master/docs/observability-centralization-points/README.md).
 - **Stable and Predictable Resource Usage**: Agents are optimized to spread work over time and avoid sudden changes in resource consumption
 
 This design philosophy enables Netdata to monitor infrastructure at unprecedented scale with minimal overhead, making it suitable for everything from IoT devices to high-performance computing clusters.
@@ -58,7 +58,7 @@ When connected to a Netdata Parent (the agent is in `child` mode), these require
 | Type       | Metric/s | CPU | Memory | Network | Storage |
 |------------|---------------|-----------|---------|---------|---------|
 | standalone | 3k - 10k | 4% - 20%<br/>of single core | 150 - 500 MiB | none | varies based on retention |
-| child      | 3k - 10k | 2% - 10%<br/>of single core | 100 - 300 MiB | <1 Mbps | none |
+| child      | 3k - 10k | 2% - 10%<br/>of single core | 100 - 300 MiB | \<1 Mbps | none |
 
 For more information and ways to further reduce Agent resource utilization, see [Agent Resource Utilization](hhttps://github.com/netdata/netdata/blob/master/docs/netdata-agent/sizing-netdata-agents/README.md).
 
