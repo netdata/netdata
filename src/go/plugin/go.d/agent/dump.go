@@ -648,6 +648,33 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 		sort.Strings(algoList)
 		issues = append(issues, fmt.Sprintf("mixed dimension algorithms (%s)", strings.Join(algoList, ", ")))
 	}
+	
+	// Check for rate units with absolute algorithm
+	if len(units) == 1 && len(contextAlgorithms) == 1 {
+		for unit := range units {
+			for algo := range contextAlgorithms {
+				// Check if unit contains rate indicator (per second, per minute, etc.)
+				if strings.Contains(unit, "/") && algo == "absolute" {
+					issues = append(issues, fmt.Sprintf("WARNING - rate unit '%s' with absolute algorithm (should use incremental)", unit))
+				}
+			}
+		}
+	}
+	
+	// Check for generic units that indicate mixed metric types
+	if len(units) == 1 {
+		for unit := range units {
+			lowerUnit := strings.ToLower(unit)
+			// Check for generic counting units
+			if lowerUnit == "value" || lowerUnit == "values" || 
+			   lowerUnit == "count" || lowerUnit == "counts" ||
+			   lowerUnit == "number" || lowerUnit == "numbers" ||
+			   lowerUnit == "amount" || lowerUnit == "amounts" ||
+			   lowerUnit == "quantity" || lowerUnit == "quantities" {
+				issues = append(issues, fmt.Sprintf("WARNING - generic unit '%s' suggests mixed metric types (apples and oranges)", unit))
+			}
+		}
+	}
 
 	hasMissingDims := false
 	hasMultDivInconsistency := false
