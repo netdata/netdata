@@ -492,32 +492,51 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 		issues = append(issues, fmt.Sprintf("inconsistent titles (%d different)", len(titles)))
 	}
 
-	// Print units
+	// Print units, priority, and chart type on one line
+	unitsStr := ""
+	unitsEmoji := " ✅"
 	if len(units) == 1 {
 		for unit := range units {
-			fmt.Printf("%s   ├─ units: %s ✅\n", treePrefix, unit)
+			unitsStr = unit
 		}
 	} else {
-		fmt.Printf("%s   ├─ units: ❌ INCONSISTENT (%d different units)\n", treePrefix, len(units))
-		for unit, count := range units {
-			fmt.Printf("%s   │     ├─ %s (in %d charts)\n", treePrefix, unit, count)
-		}
+		unitsStr = fmt.Sprintf("INCONSISTENT (%d different)", len(units))
+		unitsEmoji = " ❌"
 		issues = append(issues, fmt.Sprintf("inconsistent units (%d different)", len(units)))
 	}
 
-	// Print priorities
+	priorityStr := ""
+	priorityEmoji := " ✅"
 	if len(priorities) == 1 {
 		for priority := range priorities {
-			fmt.Printf("%s   ├─ priority: %d ✅\n", treePrefix, priority)
+			priorityStr = fmt.Sprintf("%d", priority)
 		}
 	} else {
-		fmt.Printf("%s   ├─ priority: %d 🟡 INCONSISTENT (%d different priorities)\n",
-			treePrefix, ctxInfo.minPriority, len(priorities))
-		for priority, count := range priorities {
-			fmt.Printf("%s   │     ├─ %d (in %d charts)\n", treePrefix, priority, count)
-		}
+		priorityStr = fmt.Sprintf("%d (INCONSISTENT: %d different)", ctxInfo.minPriority, len(priorities))
+		priorityEmoji = " 🟡"
 		issues = append(issues, fmt.Sprintf("inconsistent priorities (%d different)", len(priorities)))
 	}
+
+	// Collect chart types
+	chartTypes := make(map[string]int)
+	for _, ca := range charts {
+		chartTypes[ca.Chart.Type.String()]++
+	}
+	
+	typeStr := ""
+	typeEmoji := " ✅"
+	if len(chartTypes) == 1 {
+		for typ := range chartTypes {
+			typeStr = typ
+		}
+	} else {
+		typeStr = fmt.Sprintf("INCONSISTENT (%d different)", len(chartTypes))
+		typeEmoji = " ❌"
+		issues = append(issues, fmt.Sprintf("inconsistent chart types (%d different)", len(chartTypes)))
+	}
+
+	fmt.Printf("%s   ├─ units: %s%s, priority: %s%s, type: %s%s\n",
+		treePrefix, unitsStr, unitsEmoji, priorityStr, priorityEmoji, typeStr, typeEmoji)
 
 	// Print label keys
 	fmt.Printf("%s   ├─ label keys: ", treePrefix)
@@ -579,15 +598,19 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 	}
 	sort.Strings(dimNameList)
 
-	// Check multipliers and dividers consistency across all charts for each dimension
+	// Check multipliers, dividers, and algorithms consistency across all charts for each dimension
 	dimMultDivInfo := make(map[string]map[string][]int) // dimName -> "mul"/"div" -> []values
+	dimAlgoInfo := make(map[string][]string) // dimName -> []algorithms
+	contextAlgorithms := make(map[string]bool) // track all algorithms used in this context
+	
 	for dimName := range allDimNames {
 		dimMultDivInfo[dimName] = map[string][]int{
 			"mul": []int{},
 			"div": []int{},
 		}
+		dimAlgoInfo[dimName] = []string{}
 		
-		// Collect all multipliers and dividers for this dimension name across charts
+		// Collect all multipliers, dividers, and algorithms for this dimension name across charts
 		for _, ca := range charts {
 			for _, dim := range ca.Chart.Dims {
 				name := dim.Name
@@ -606,9 +629,24 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 					}
 					dimMultDivInfo[dimName]["mul"] = append(dimMultDivInfo[dimName]["mul"], mul)
 					dimMultDivInfo[dimName]["div"] = append(dimMultDivInfo[dimName]["div"], div)
+					
+					// Collect algorithm
+					algo := dim.Algo.String()
+					dimAlgoInfo[dimName] = append(dimAlgoInfo[dimName], algo)
+					contextAlgorithms[algo] = true
 				}
 			}
 		}
+	}
+	
+	// Check for mixed algorithms in the context
+	if len(contextAlgorithms) > 1 {
+		algoList := []string{}
+		for algo := range contextAlgorithms {
+			algoList = append(algoList, algo)
+		}
+		sort.Strings(algoList)
+		issues = append(issues, fmt.Sprintf("mixed dimension algorithms (%s)", strings.Join(algoList, ", ")))
 	}
 
 	hasMissingDims := false
@@ -637,55 +675,99 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 		// Check multiplier/divider consistency
 		mulValues := dimMultDivInfo[dimName]["mul"]
 		divValues := dimMultDivInfo[dimName]["div"]
+		algoValues := dimAlgoInfo[dimName]
 		
-		// Get unique multipliers and dividers
+		// Get unique multipliers, dividers, and algorithms
 		uniqueMuls := make(map[int]bool)
 		uniqueDivs := make(map[int]bool)
+		uniqueAlgos := make(map[string]bool)
 		for _, m := range mulValues {
 			uniqueMuls[m] = true
 		}
 		for _, d := range divValues {
 			uniqueDivs[d] = true
 		}
-		
-		// Format multiplier/divider info
-		multDivStr := ""
-		multDivEmoji := " ✅"
-		
-		// Check consistency
-		if len(uniqueMuls) > 1 || len(uniqueDivs) > 1 {
-			hasMultDivInconsistency = true
-			multDivEmoji = " ❌"
+		for _, a := range algoValues {
+			uniqueAlgos[a] = true
 		}
 		
-		// Format the multiplier/divider string - ALWAYS show them
-		if len(uniqueMuls) == 1 && len(uniqueDivs) == 1 {
+		// Format multiplier/divider/algorithm info
+		multDivAlgoStr := ""
+		multDivAlgoEmoji := " ✅"
+		
+		// Check consistency
+		if len(uniqueMuls) > 1 || len(uniqueDivs) > 1 || len(uniqueAlgos) > 1 {
+			hasMultDivInconsistency = true
+			multDivAlgoEmoji = " ❌"
+		}
+		
+		// Format the multiplier/divider/algorithm string - ALWAYS show them
+		if len(uniqueMuls) == 1 && len(uniqueDivs) == 1 && len(uniqueAlgos) == 1 {
 			var mul, div int
+			var algo string
 			for m := range uniqueMuls {
 				mul = m
 			}
 			for d := range uniqueDivs {
 				div = d
 			}
+			for a := range uniqueAlgos {
+				algo = a
+			}
 			
-			// Always show multiplier and divider, even if they're 1
-			multDivStr = fmt.Sprintf(" ×%d ÷%d", mul, div)
+			// Always show multiplier, divider, and algorithm
+			multDivAlgoStr = fmt.Sprintf(" ×%d ÷%d %s", mul, div, algo)
 		} else {
 			// Show all variations if inconsistent
-			mulStrs := []string{}
-			divStrs := []string{}
-			for m := range uniqueMuls {
-				mulStrs = append(mulStrs, fmt.Sprintf("×%d", m))
-			}
-			for d := range uniqueDivs {
-				divStrs = append(divStrs, fmt.Sprintf("÷%d", d))
+			parts := []string{}
+			
+			if len(uniqueMuls) == 1 {
+				var mul int
+				for m := range uniqueMuls {
+					mul = m
+				}
+				parts = append(parts, fmt.Sprintf("×%d", mul))
+			} else {
+				mulStrs := []string{}
+				for m := range uniqueMuls {
+					mulStrs = append(mulStrs, fmt.Sprintf("%d", m))
+				}
+				parts = append(parts, fmt.Sprintf("×(%s)", strings.Join(mulStrs, ",")))
 			}
 			
-			parts := append(mulStrs, divStrs...)
-			multDivStr = fmt.Sprintf(" (%s)", strings.Join(parts, ", "))
+			if len(uniqueDivs) == 1 {
+				var div int
+				for d := range uniqueDivs {
+					div = d
+				}
+				parts = append(parts, fmt.Sprintf("÷%d", div))
+			} else {
+				divStrs := []string{}
+				for d := range uniqueDivs {
+					divStrs = append(divStrs, fmt.Sprintf("%d", d))
+				}
+				parts = append(parts, fmt.Sprintf("÷(%s)", strings.Join(divStrs, ",")))
+			}
+			
+			if len(uniqueAlgos) == 1 {
+				var algo string
+				for a := range uniqueAlgos {
+					algo = a
+				}
+				parts = append(parts, algo)
+			} else {
+				algoStrs := []string{}
+				for a := range uniqueAlgos {
+					algoStrs = append(algoStrs, a)
+				}
+				sort.Strings(algoStrs)
+				parts = append(parts, fmt.Sprintf("(%s)", strings.Join(algoStrs, ",")))
+			}
+			
+			multDivAlgoStr = fmt.Sprintf(" %s", strings.Join(parts, " "))
 		}
 
-		fmt.Printf("%s   │     %s %s%s%s%s\n", treePrefix, prefix, dimName, multDivStr, multDivEmoji, dimStatus)
+		fmt.Printf("%s   │     %s %s%s%s%s\n", treePrefix, prefix, dimName, multDivAlgoStr, multDivAlgoEmoji, dimStatus)
 	}
 
 	if hasMissingDims {
@@ -809,7 +891,7 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 				}
 			}
 
-			// Format multiplier/divider for this specific dimension
+			// Format multiplier/divider and algorithm for this specific dimension
 			mul := dim.Mul
 			div := dim.Div
 			// Treat 0 as 1 (what the framework does)
@@ -820,10 +902,16 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 				div = 1
 			}
 			
-			// Always show multiplier and divider
-			multDivStr := fmt.Sprintf(" ×%d ÷%d", mul, div)
+			// Get algorithm
+			algo := string(dim.Algo)
+			if algo == "" {
+				algo = "absolute"
+			}
+			
+			// Always show multiplier, divider and algorithm
+			multDivAlgoStr := fmt.Sprintf(" ×%d ÷%d %s", mul, div, algo)
 
-			fmt.Printf("%s       %s     %s %s%s%s %s\n", treePrefix, instTreePrefix, emoji, dimName, multDivStr, valueStr, dim.ID)
+			fmt.Printf("%s       %s     %s %s%s%s %s\n", treePrefix, instTreePrefix, emoji, dimName, multDivAlgoStr, valueStr, dim.ID)
 		}
 
 	}
