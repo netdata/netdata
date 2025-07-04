@@ -944,11 +944,16 @@ func (w *WebSpherePMI) collectServletContainerMetrics(mx map[string]int64, nodeN
 
 	w.Debugf("Collecting servlet container metrics for app: %s from web application level", appName)
 
-	// Chart for servlet container metrics
-	w.ensureChartExists("websphere_pmi.web.servlet_container", "Servlet Container", "count", "line", "web/servlets", 70415,
-		[]string{"loaded_servlets", "reload_count"}, instanceName, instanceLabels)
+	// Chart 1: Servlet Container State (gauge - current loaded servlets)
+	w.ensureChartExistsWithDims("websphere_pmi.web.servlet_container_state", "Servlet Container State", "servlets", "line", "web/servlets/state", 70415,
+		[]DimensionConfig{{Name: "loaded_servlets", Algo: module.Absolute}}, instanceName, instanceLabels)
 
-	chartID := fmt.Sprintf("web.servlet_container_%s", w.sanitizeForChartID(instanceName))
+	// Chart 2: Servlet Container Reloads (incremental counter)
+	w.ensureChartExistsWithDims("websphere_pmi.web.servlet_container_reloads", "Servlet Container Reloads", "reloads/s", "line", "web/servlets/reloads", 70416,
+		[]DimensionConfig{{Name: "reload_count", Algo: module.Incremental}}, instanceName, instanceLabels)
+
+	stateChartID := fmt.Sprintf("web.servlet_container_state_%s", w.sanitizeForChartID(instanceName))
+	reloadsChartID := fmt.Sprintf("web.servlet_container_reloads_%s", w.sanitizeForChartID(instanceName))
 
 	// Extract container-level metrics
 	for _, cs := range stat.CountStatistics {
@@ -956,9 +961,9 @@ func (w *WebSpherePMI) collectServletContainerMetrics(mx map[string]int64, nodeN
 		
 		switch cs.Name {
 		case "LoadedServletCount":
-			metricKey = fmt.Sprintf("%s_loaded_servlets", chartID)
+			metricKey = fmt.Sprintf("%s_loaded_servlets", stateChartID)
 		case "ReloadCount":
-			metricKey = fmt.Sprintf("%s_reload_count", chartID)
+			metricKey = fmt.Sprintf("%s_reload_count", reloadsChartID)
 		default:
 			continue
 		}
