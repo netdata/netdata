@@ -91,8 +91,24 @@ func (dc *DynamicCollector) RemoveCollected(instanceKey string) {
 	delete(dc.collected, instanceKey)
 }
 
+// DimensionConfig holds dimension configuration
+type DimensionConfig struct {
+	Name string
+	Algo module.DimAlgo
+}
+
 // ensureChartExists creates a chart if it doesn't exist and adds instance tracking
 func (w *WebSpherePMI) ensureChartExists(context, title, units, chartType, family string, priority int, dimensions []string, instanceName string, labels map[string]string) {
+	// Convert simple dimension names to configs with default algorithm
+	dimConfigs := make([]DimensionConfig, len(dimensions))
+	for i, dim := range dimensions {
+		dimConfigs[i] = DimensionConfig{Name: dim, Algo: module.Absolute}
+	}
+	w.ensureChartExistsWithDims(context, title, units, chartType, family, priority, dimConfigs, instanceName, labels)
+}
+
+// ensureChartExistsWithDims creates a chart with dimension algorithms
+func (w *WebSpherePMI) ensureChartExistsWithDims(context, title, units, chartType, family string, priority int, dimensions []DimensionConfig, instanceName string, labels map[string]string) {
 	if w.dynamicCollector == nil {
 		w.dynamicCollector = NewDynamicCollector()
 		w.dynamicCollector.SetCharts(w.charts)
@@ -128,10 +144,11 @@ func (w *WebSpherePMI) ensureChartExists(context, title, units, chartType, famil
 	// Add dimensions - dimension IDs must match the keys used in mx map
 	// For NIDL compliance, dimension names are shared, but IDs include the chart ID
 	for _, dim := range dimensions {
-		dimID := fmt.Sprintf("%s_%s", chartID, dim)
+		dimID := fmt.Sprintf("%s_%s", chartID, dim.Name)
 		chart.Dims = append(chart.Dims, &module.Dim{
-			ID:   dimID, // Unique dimension ID that matches mx map key
-			Name: dim,   // Shared dimension name for NIDL compliance
+			ID:   dimID,  // Unique dimension ID that matches mx map key
+			Name: dim.Name,   // Shared dimension name for NIDL compliance
+			Algo: dim.Algo,   // Algorithm for this dimension
 		})
 	}
 

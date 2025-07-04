@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
 // precision for floating point metric conversion
@@ -1001,20 +1003,30 @@ func (w *WebSpherePMI) collectServletMetrics(mx map[string]int64, nodeName, serv
 
 	w.Debugf("Collecting metrics for servlet: %s", servletName)
 
-	// Chart 1: Servlet Request Metrics
-	w.ensureChartExists("websphere_pmi.web.servlet_requests", "Servlet Requests", "requests/s", "line", "web/servlets", 70410,
-		[]string{"request_count", "concurrent_requests", "error_count"}, instanceName, instanceLabels)
+	// Chart 1: Servlet Request Rate (incremental counter)
+	w.ensureChartExistsWithDims("websphere_pmi.web.servlet_request_rate", "Servlet Request Rate", "requests/s", "line", "web/servlets/requests", 70410,
+		[]DimensionConfig{{Name: "request_count", Algo: module.Incremental}}, instanceName, instanceLabels)
 
-	// Chart 2: Servlet Response Times
-	w.ensureChartExists("websphere_pmi.web.servlet_response_time", "Servlet Response Time", "milliseconds", "line", "web/servlets", 70411,
+	// Chart 2: Servlet Error Rate (incremental counter)
+	w.ensureChartExistsWithDims("websphere_pmi.web.servlet_error_rate", "Servlet Error Rate", "errors/s", "line", "web/servlets/errors", 70411,
+		[]DimensionConfig{{Name: "error_count", Algo: module.Incremental}}, instanceName, instanceLabels)
+
+	// Chart 3: Servlet Concurrent Requests (gauge)
+	w.ensureChartExistsWithDims("websphere_pmi.web.servlet_concurrent", "Servlet Concurrent Requests", "requests", "line", "web/servlets/concurrent", 70412,
+		[]DimensionConfig{{Name: "concurrent_requests", Algo: module.Absolute}}, instanceName, instanceLabels)
+
+	// Chart 4: Servlet Response Times (keep as is)
+	w.ensureChartExists("websphere_pmi.web.servlet_response_time", "Servlet Response Time", "milliseconds", "line", "web/servlets/response", 70413,
 		[]string{"service_time", "async_response_time"}, instanceName, instanceLabels)
 
 	// Chart IDs for metrics extraction
-	requestsChartID := fmt.Sprintf("web.servlet_requests_%s", w.sanitizeForChartID(instanceName))
+	requestRateChartID := fmt.Sprintf("web.servlet_request_rate_%s", w.sanitizeForChartID(instanceName))
+	errorRateChartID := fmt.Sprintf("web.servlet_error_rate_%s", w.sanitizeForChartID(instanceName))
+	concurrentChartID := fmt.Sprintf("web.servlet_concurrent_%s", w.sanitizeForChartID(instanceName))
 	responseTimeChartID := fmt.Sprintf("web.servlet_response_time_%s", w.sanitizeForChartID(instanceName))
 
 	// Extract servlet metrics
-	w.extractServletMetricsToCharts(mx, requestsChartID, responseTimeChartID, stat)
+	w.extractServletMetricsToCharts(mx, requestRateChartID, errorRateChartID, concurrentChartID, responseTimeChartID, stat)
 }
 
 // collectURLMetrics collects metrics for an individual URL
@@ -1032,20 +1044,25 @@ func (w *WebSpherePMI) collectURLMetrics(mx map[string]int64, nodeName, serverNa
 
 	w.Debugf("Collecting metrics for URL: %s", urlPath)
 
-	// Chart 1: URL Request Metrics
-	w.ensureChartExists("websphere_pmi.web.url_requests", "URL Requests", "requests/s", "line", "web/urls", 70420,
-		[]string{"request_count", "concurrent_requests"}, instanceName, instanceLabels)
+	// Chart 1: URL Request Rate (incremental counter)
+	w.ensureChartExistsWithDims("websphere_pmi.web.url_request_rate", "URL Request Rate", "requests/s", "line", "web/urls/requests", 70420,
+		[]DimensionConfig{{Name: "request_count", Algo: module.Incremental}}, instanceName, instanceLabels)
 
-	// Chart 2: URL Response Time
-	w.ensureChartExists("websphere_pmi.web.url_response_time", "URL Response Time", "milliseconds", "line", "web/urls", 70421,
+	// Chart 2: URL Concurrent Requests (gauge)
+	w.ensureChartExistsWithDims("websphere_pmi.web.url_concurrent", "URL Concurrent Requests", "requests", "line", "web/urls/concurrent", 70421,
+		[]DimensionConfig{{Name: "concurrent_requests", Algo: module.Absolute}}, instanceName, instanceLabels)
+
+	// Chart 3: URL Response Time (keep as is)
+	w.ensureChartExists("websphere_pmi.web.url_response_time", "URL Response Time", "milliseconds", "line", "web/urls/response", 70422,
 		[]string{"service_time", "async_response_time"}, instanceName, instanceLabels)
 
 	// Chart IDs for metrics extraction
-	requestsChartID := fmt.Sprintf("web.url_requests_%s", w.sanitizeForChartID(instanceName))
+	requestRateChartID := fmt.Sprintf("web.url_request_rate_%s", w.sanitizeForChartID(instanceName))
+	concurrentChartID := fmt.Sprintf("web.url_concurrent_%s", w.sanitizeForChartID(instanceName))
 	responseTimeChartID := fmt.Sprintf("web.url_response_time_%s", w.sanitizeForChartID(instanceName))
 
 	// Extract URL metrics
-	w.extractURLMetricsToCharts(mx, requestsChartID, responseTimeChartID, stat)
+	w.extractURLMetricsToCharts(mx, requestRateChartID, concurrentChartID, responseTimeChartID, stat)
 }
 
 // collectTransactionMetrics handles transaction metrics
@@ -3115,7 +3132,7 @@ func (w *WebSpherePMI) extractObjectPoolMetricsToCharts(mx map[string]int64, ope
 }
 
 // extractServletMetricsToCharts extracts servlet metrics and distributes them to appropriate charts
-func (w *WebSpherePMI) extractServletMetricsToCharts(mx map[string]int64, requestsChartID, responseTimeChartID string, stat pmiStat) {
+func (w *WebSpherePMI) extractServletMetricsToCharts(mx map[string]int64, requestRateChartID, errorRateChartID, concurrentChartID, responseTimeChartID string, stat pmiStat) {
 	w.Debugf("Servlet extracting to charts from stat with %d CountStats, %d TimeStats, %d RangeStats",
 		len(stat.CountStatistics), len(stat.TimeStatistics), len(stat.RangeStatistics))
 
@@ -3125,9 +3142,9 @@ func (w *WebSpherePMI) extractServletMetricsToCharts(mx map[string]int64, reques
 		
 		switch cs.Name {
 		case "RequestCount":
-			metricKey = fmt.Sprintf("%s_request_count", requestsChartID)
+			metricKey = fmt.Sprintf("%s_request_count", requestRateChartID)
 		case "ErrorCount":
-			metricKey = fmt.Sprintf("%s_error_count", requestsChartID)
+			metricKey = fmt.Sprintf("%s_error_count", errorRateChartID)
 		default:
 			continue
 		}
@@ -3144,7 +3161,7 @@ func (w *WebSpherePMI) extractServletMetricsToCharts(mx map[string]int64, reques
 	for _, rs := range stat.RangeStatistics {
 		if rs.Name == "ConcurrentRequests" && rs.Current != "" {
 			if val, err := strconv.ParseInt(rs.Current, 10, 64); err == nil {
-				metricKey := fmt.Sprintf("%s_concurrent_requests", requestsChartID)
+				metricKey := fmt.Sprintf("%s_concurrent_requests", concurrentChartID)
 				mx[metricKey] = val
 				w.Debugf("Servlet concurrent requests metric: %s = %d", metricKey, val)
 			}
@@ -3191,7 +3208,7 @@ func (w *WebSpherePMI) extractServletMetricsToCharts(mx map[string]int64, reques
 }
 
 // extractURLMetricsToCharts extracts URL metrics and distributes them to appropriate charts
-func (w *WebSpherePMI) extractURLMetricsToCharts(mx map[string]int64, requestsChartID, responseTimeChartID string, stat pmiStat) {
+func (w *WebSpherePMI) extractURLMetricsToCharts(mx map[string]int64, requestRateChartID, concurrentChartID, responseTimeChartID string, stat pmiStat) {
 	w.Debugf("URL extracting to charts from stat with %d CountStats, %d TimeStats, %d RangeStats",
 		len(stat.CountStatistics), len(stat.TimeStatistics), len(stat.RangeStatistics))
 
@@ -3199,7 +3216,7 @@ func (w *WebSpherePMI) extractURLMetricsToCharts(mx map[string]int64, requestsCh
 	for _, cs := range stat.CountStatistics {
 		if cs.Name == "URIRequestCount" && cs.Count != "" {
 			if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
-				metricKey := fmt.Sprintf("%s_request_count", requestsChartID)
+				metricKey := fmt.Sprintf("%s_request_count", requestRateChartID)
 				mx[metricKey] = val
 				w.Debugf("URL request count metric: %s = %d", metricKey, val)
 			}
@@ -3210,7 +3227,7 @@ func (w *WebSpherePMI) extractURLMetricsToCharts(mx map[string]int64, requestsCh
 	for _, rs := range stat.RangeStatistics {
 		if rs.Name == "URIConcurrentRequests" && rs.Current != "" {
 			if val, err := strconv.ParseInt(rs.Current, 10, 64); err == nil {
-				metricKey := fmt.Sprintf("%s_concurrent_requests", requestsChartID)
+				metricKey := fmt.Sprintf("%s_concurrent_requests", concurrentChartID)
 				mx[metricKey] = val
 				w.Debugf("URL concurrent requests metric: %s = %d", metricKey, val)
 			}
