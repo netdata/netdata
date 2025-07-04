@@ -17,7 +17,7 @@ metrics:
       name: roomalert.3e.digital_sen1_1
       chart_meta:
         description: The current temperature reading of the Internal Temperature Sensor
-        family: 'Sensor/Internal/Temperature/Value'
+        family: 'Hardware/Sensor/Internal/Temperature/Value'
         unit: "Cel"
   - MIB: ROOMALERT3E-MIB
     symbol:
@@ -25,7 +25,7 @@ metrics:
       name: roomalert.3e.digital_sen1_2
       chart_meta:
         description: The current temperature reading of the Internal Temperature Sensor
-        family: 'Sensor/Internal/Temperature/Value'
+        family: 'Hardware/Sensor/Internal/Temperature/Value'
         unit: "degF"
   #  - MIB: ROOMALERT3E-MIB
   #    symbol:
@@ -38,7 +38,7 @@ metrics:
       name: roomalert.3e.digital_sen2_1
       chart_meta:
         description: Current temperature
-        family: 'Sensor/External/Temperature/Value'
+        family: 'Hardware/Sensor/External/Temperature/Value'
         unit: "Cel"
   - MIB: ROOMALERT3E-MIB
     symbol:
@@ -46,7 +46,7 @@ metrics:
       name: roomalert.3e.digital_sen2_2
       chart_meta:
         description: Current temperature
-        family: 'Sensor/External/Temperature/Value'
+        family: 'Hardware/Sensor/External/Temperature/Value'
         unit: "degF"
   - MIB: ROOMALERT3E-MIB
     symbol:
@@ -54,7 +54,7 @@ metrics:
       name: roomalert.3e.digital_sen2_3
       chart_meta:
         description: Current relative humidity
-        family: 'Sensor/External/Humidity/Value'
+        family: 'Hardware/Sensor/External/Humidity/Value'
         unit: "%"
   - MIB: ROOMALERT3E-MIB
     symbol:
@@ -62,7 +62,7 @@ metrics:
       name: roomalert.3e.digital_sen2_5
       chart_meta:
         description: Current heat index
-        family: 'Sensor/External/HeatIndex/Value'
+        family: 'Hardware/Sensor/External/HeatIndex/Value'
         unit: "Cel"
   - MIB: ROOMALERT3E-MIB
     symbol:
@@ -70,7 +70,7 @@ metrics:
       name: roomalert.3e.digital_sen2_4
       chart_meta:
         description: Current heat index
-        family: 'Sensor/External/HeatIndex/Value'
+        family: 'Hardware/Sensor/External/HeatIndex/Value'
         unit: "degF"
   #  - MIB: ROOMALERT3E-MIB
   #    symbol:
@@ -95,7 +95,7 @@ metrics:
       name: roomalert.3e.switch_sen1
       chart_meta:
         description: The reading for the switch sensor
-        family: 'Sensor/Switch/Status'
+        family: 'Hardware/Sensor/Switch/Status'
         unit: "{status}"
       mapping:
         0: open
@@ -111,7 +111,7 @@ metrics:
       name: roomalert.3e.red_led
       chart_meta:
         description: The status of the red Signal Tower LED
-        family: 'SignalTower/LED/Red/Status'
+        family: 'Hardware/SignalTower/LED/Red/Status'
         unit: "{status}"
       mapping:
         0: off
@@ -122,7 +122,7 @@ metrics:
       name: roomalert.3e.amber_led
       chart_meta:
         description: The status of the amber Signal Tower LED
-        family: 'SignalTower/LED/Amber/Status'
+        family: 'Hardware/SignalTower/LED/Amber/Status'
         unit: "{status}"
       mapping:
         0: off
@@ -133,7 +133,7 @@ metrics:
       name: roomalert.3e.green_led
       chart_meta:
         description: The status of the green Signal Tower LED
-        family: 'SignalTower/LED/Green/Status'
+        family: 'Hardware/SignalTower/LED/Green/Status'
         unit: "{status}"
       mapping:
         0: off
@@ -144,7 +144,7 @@ metrics:
       name: roomalert.3e.blue_led
       chart_meta:
         description: The status of the blue Signal Tower LED
-        family: 'SignalTower/LED/Blue/Status'
+        family: 'Hardware/SignalTower/LED/Blue/Status'
         unit: "{status}"
       mapping:
         0: off
@@ -155,7 +155,7 @@ metrics:
       name: roomalert.3e.white_led
       chart_meta:
         description: The status of the white Signal Tower LED
-        family: 'SignalTower/LED/White/Status'
+        family: 'Hardware/SignalTower/LED/White/Status'
         unit: "{status}"
       mapping:
         0: off
@@ -166,7 +166,7 @@ metrics:
       name: roomalert.3e.alarm1
       chart_meta:
         description: The status of the Signal Tower alarm1
-        family: 'SignalTower/Alarm/1/Status'
+        family: 'Hardware/SignalTower/Alarm/1/Status'
         unit: "{status}"
       mapping:
         0: off
@@ -177,7 +177,7 @@ metrics:
       name: roomalert.3e.alarm2
       chart_meta:
         description: The status of the Signal Tower alarm2
-        family: 'SignalTower/Alarm/2/Status'
+        family: 'Hardware/SignalTower/Alarm/2/Status'
         unit: "{status}"
       mapping:
         0: off
