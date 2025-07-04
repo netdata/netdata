@@ -1,6 +1,8 @@
 extends:
   - _system-base.yaml
 
+sysobjectid: 1.3.6.1.4.1.3808.1.1.*
+
 metadata:
   device:
     fields:
@@ -8,8 +10,23 @@ metadata:
         value: Cyberpower
       type:
         value: PDU
-
-sysobjectid: 1.3.6.1.4.1.3808.1.1.*
+  l
+metric_tags:
+  - OID: 1.3.6.1.4.1.3808.1.1.3.1.1.0
+    symbol: ePDUIdentName
+    tag: e_pdu_ident_name
+  - tag: e_pdu_ident_model_number
+    OID: 1.3.6.1.4.1.3808.1.1.3.1.5.0
+    symbol: ePDUIdentModelNumber
+  - tag: e_pdu_ident_serial_number
+    OID: 1.3.6.1.4.1.3808.1.1.3.1.6.0
+    symbol: ePDUIdentSerialNumber
+  - OID: 1.3.6.1.4.1.3808.1.1.4.1.1.0
+    symbol: envirIdentName
+    tag: envir_ident_name
+  - OID: 1.3.6.1.4.1.3808.1.1.4.1.2.0
+    symbol: envirIdentLocation
+    tag: envir_ident_location
 
 metrics:
   - MIB: CPS-MIB
@@ -21,12 +38,14 @@ metrics:
         name: cyberpower.ePDULoadStatusLoad
         chart_meta:
           description: "Phase/bank load"
-          family: 'Load/Current'
+          family: 'PowerFlow/Load/Current'
           unit: "dA"
       - OID: 1.3.6.1.4.1.3808.1.1.3.2.3.1.1.3
         name: ePDULoadStatusLoadState
-        family: 'Load/Status'
-        unit: "{status}"
+        chart_meta:
+          description: "Load state"
+          family: 'PowerFlow/Load/Status'
+          unit: "{status}"
         mapping:
           1: LoadNormal
           2: LoadLow
@@ -36,25 +55,25 @@ metrics:
         name: cyberpower.ePDULoadStatusVoltage
         chart_meta:
           description: "Phase/bank voltage measured"
-          family: 'Voltage/Value'
+          family: 'PowerFlow/Voltage/Value'
           unit: "dV"
       - OID: 1.3.6.1.4.1.3808.1.1.3.2.3.1.1.7
         name: cyberpower.ePDULoadStatusActivePower
         chart_meta:
           description: "Phase/bank active power"
-          family: 'Power/Active'
+          family: 'PowerFlow/Power/Active'
           unit: "W"
       - OID: 1.3.6.1.4.1.3808.1.1.3.2.3.1.1.8
         name: cyberpower.ePDULoadStatusApparentPower
         chart_meta:
           description: "Phase/bank apparent power"
-          family: 'Power/Apparent'
+          family: 'PowerFlow/Power/Apparent'
           unit: "VA"
       - OID: 1.3.6.1.4.1.3808.1.1.3.2.3.1.1.9
         name: cyberpower.ePDULoadStatusPowerFactor
         chart_meta:
           description: "Power factor of the output"
-          family: 'Power/Factor'
+          family: 'PowerFlow/Power/Factor'
           unit: "%"
     metric_tags:
       - symbol:
@@ -70,7 +89,7 @@ metrics:
         name: ePDULoadBankConfigAlarm
         chart_meta:
           description: Bank Alarm
-          family: 'Bank/Alarm/Status'
+          family: 'PowerFlow/Bank/Alarm/Status'
           unit: "{status}"
         mapping:
           1: noLoadAlarm
@@ -91,19 +110,19 @@ metrics:
         name: cyberpower.ePDUOutletStatusLoad
         chart_meta:
           description: "Measured Outlet load for an Outlet Monitored Rack PDU"
-          family: 'Outlet/Load/Current'
+          family: 'PowerFlow/Outlet/Load/Current'
           unit: "dA"
       - OID: 1.3.6.1.4.1.3808.1.1.3.3.5.1.1.8
         name: cyberpower.ePDUOutletStatusActivePower
         chart_meta:
           description: "Measured Outlet load for an Outlet Monitored Rack PDU"
-          family: 'Outlet/Power/Active'
+          family: 'PowerFlow/Outlet/Power/Active'
           unit: "W"
       - OID: 1.3.6.1.4.1.3808.1.1.3.3.5.1.1.4
         name: ePDUOutletStatusOutletState
         chart_meta:
           description: Outlet state
-          family: 'Outlet/Operational/Status'
+          family: 'PowerFlow/Outlet/Status/Operational'
           unit: "{status}"
         mapping:
           1: outletStatusOn
@@ -112,7 +131,7 @@ metrics:
         name: ePDUOutletStatusAlarm
         chart_meta:
           description: Outlet Alarm
-          family: 'Outlet/Alarm/Status'
+          family: 'PowerFlow/Outlet/Alarm/Status'
           unit: "{status}"
         mapping:
           1: noLoadAlarm
@@ -134,7 +153,7 @@ metrics:
       name: ePDUPowerSupply1Status
       chart_meta:
         description: Power Supply 1 Status
-        family: 'PowerSupply/1/Operational/Status'
+        family: 'Hardware/Power/Status/Supply1'
         unit: "{status}"
       mapping:
         1: powerSupplyOneOk
@@ -145,7 +164,7 @@ metrics:
       name: ePDUPowerSupply2Status
       chart_meta:
         description: Power Supply 2 Status
-        family: 'PowerSupply/2/Operational/Status'
+        family: 'Hardware/Power/Status/Supply2'
         unit: "{status}"
       mapping:
         1: powerSupplyTwoOk
@@ -155,8 +174,10 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.3808.1.1.3.4.1.3
       name: ePDUPowerSupplyAlarm
-      description: Power Supply Alarm
-      family: 'PowerSupply/Alarm/Status'
+      chart_meta:
+        description: Power Supply Alarm
+        family: 'Hardware/Power/Alarm/Status'
+        unit: "{status}"
       mapping:
         1: allAvailablePowerSuppliesOK
         2: powerSupplyOneFailed
@@ -175,7 +196,7 @@ metrics:
         name: ePDUStatusBankState
         chart_meta:
           description: Bank load state
-          family: 'Bank/Load/Status'
+          family: 'PowerFlow/Bank/Load/Status'
           unit: "{status}"
         mapping:
           1: bankLoadNormal
@@ -200,7 +221,7 @@ metrics:
         name: ePDUStatusPhaseState
         chart_meta:
           description: Phase load state
-          family: 'Phase/Load/Status'
+          family: 'PowerFlow/Phase/Load/Status'
           unit: "{status}"
         mapping:
           1: phase_load_normal
@@ -225,7 +246,7 @@ metrics:
         name: ePDUStatusOutletState
         chart_meta:
           description: Outlet load state
-          family: 'Outlet/Load/Status'
+          family: 'PowerFlow/Outlet/Load/Status'
           unit: "{status}"
         mapping:
           1: outletLoadNormal
@@ -247,7 +268,7 @@ metrics:
       name: cyberpower.ePDUStatusInputVoltage
       chart_meta:
         description: "Input voltage"
-        family: 'Input/Voltage/Value'
+        family: 'PowerFlow/Input/Voltage/Value'
         unit: "dV"
   - MIB: CPS-MIB
     symbol:
@@ -255,7 +276,7 @@ metrics:
       name: cyberpower.ePDUStatusInputFrequency
       chart_meta:
         description: "Input frequency"
-        family: 'Input/Frequency/Value'
+        family: 'PowerFlow/Input/Frequency/Value'
         unit: "dHz"
   - MIB: CPS-MIB
     table:
@@ -266,31 +287,31 @@ metrics:
         name: cyberpower.ePDU2DeviceStatusCurrentLoad
         chart_meta:
           description: "Power consumption of the Rack PDU load"
-          family: 'Rack/Load/Current'
+          family: 'PowerFlow/Rack/Load/Current'
           unit: "dA"
       - OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.6
         name: cyberpower.ePDU2DeviceStatusCurrentPeakLoad
         chart_meta:
           description: "Peak power consumption of the Rack PDU load"
-          family: 'Rack/Load/Current/Peak'
+          family: 'PowerFlow/Rack/Load/Current/Peak'
           unit: "dA/s"
       - OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.15
         name: cyberpower.ePDU2DeviceStatusApparentPower
         chart_meta:
           description: "Apparent power consumption of the Rack PDU load"
-          family: 'Rack/Power/Apparent'
+          family: 'PowerFlow/Rack/Power/Apparent'
           unit: "VA"
       - OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.16
         name: cyberpower.ePDU2DeviceStatusPowerFactor
         chart_meta:
           description: "Power factor of the Rack PDU load"
-          family: 'Rack/Power/Factor'
+          family: 'PowerFlow/Rack/Power/Factor'
           unit: "%"
       - OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.17
         name: ePDU2DeviceStatusRoleType
         chart_meta:
           description: Rack PDU role on Daisy Chain group
-          family: 'Rack/Role/Status'
+          family: 'System/Rack/Role/Status'
           unit: "{status}"
         mapping:
           1: standalone
@@ -300,7 +321,7 @@ metrics:
         name: ePDU2DeviceStatusLoadState
         chart_meta:
           description: Rack PDU load state
-          family: 'Rack/Load/Status'
+          family: 'PowerFlow/Rack/Load/Status'
           unit: "{status}"
         mapping:
           1: noLoadAlarm
@@ -312,7 +333,7 @@ metrics:
         name: ePDU2DeviceStatusPowerSupplyAlarm
         chart_meta:
           description: Rack PDU Power Supply alarm
-          family: 'Rack/PowerSupply/Alarm/Status'
+          family: 'Hardware/Power/Alarm/Status'
           unit: "{status}"
         mapping:
           1: normal
@@ -321,7 +342,7 @@ metrics:
         name: ePDU2DeviceStatusPowerSupply1Status
         chart_meta:
           description: Rack PDU Power Supply 1 alarm
-          family: 'Rack/PowerSupply/1/Alarm/Status'
+          family: 'Hardware/Power/Status/Supply1'
           unit: "{status}"
         mapping:
           1: normal
@@ -330,7 +351,7 @@ metrics:
         name: ePDU2DeviceStatusPowerSupply2Status
         chart_meta:
           description: Rack PDU Power Supply 2 alarm
-          family: 'Rack/PowerSupply/2/Alarm/Status'
+          family: 'Hardware/Power/Status/Supply2'
           unit: "{status}"
         mapping:
           1: normal
@@ -353,42 +374,44 @@ metrics:
         name: cyberpower.ePDU2PhaseStatusLoad
         chart_meta:
           description: "Current draw of the load on the Rack PDU phase"
-          family: 'Rack/Phase/Load/Current'
+          family: 'PowerFlow/Rack/Phase/Load/Current'
           unit: "dA"
       - OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.6
         name: cyberpower.ePDU2PhaseStatusVoltage
         chart_meta:
           description: "Voltage of the Rack PDU phase"
-          family: 'Rack/Phase/Voltage/Value'
+          family: 'PowerFlow/Rack/Phase/Voltage/Value'
           unit: "V"
       - OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.7
         name: cyberpower.ePDU2PhaseStatusPower
         chart_meta:
           description: "Load power consumed on the Rack PDU phase"
-          family: 'Rack/Phase/Power/Active'
+          family: 'PowerFlow/Rack/Phase/Power/Active'
           unit: "kW"
       - OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.8
         name: cyberpower.ePDU2PhaseStatusApparentPower
         chart_meta:
           description: "Load apparent power consumed on the Rack PDU phase"
-          family: 'Rack/Phase/Power/Apparent'
+          family: 'PowerFlow/Rack/Phase/Power/Apparent'
           unit: "mkVA"
       - OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.9
         name: cyberpower.ePDU2PhaseStatusPowerFactor
         chart_meta:
           description: "Load power factor of the Rack PDU phase"
-          family: 'Rack/Phase/Power/Factor'
+          family: 'PowerFlow/Rack/Phase/Power/Factor'
           unit: "%"
       - OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.10
         name: cyberpower.ePDU2PhaseStatusPeakLoad
         chart_meta:
           description: "Peak current of the Rack PDU phase load in tenths of Amps"
-          family: 'Rack/Phase/Load/Current/Peak'
+          family: 'PowerFlow/Rack/Phase/Load/Current/Peak'
           unit: "dA/s"
       - OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.4
         name: ePDU2PhaseStatusLoadState
-        description:
-        family: 'Rack/Phase/Load/Status'
+        chart_meta:
+          description: "Phase load state"
+          family: 'PowerFlow/Rack/Phase/Load/Status'
+          unit: "{status}"
         mapping:
           # this was wrong by DD
           1: lowLoad
@@ -409,18 +432,20 @@ metrics:
         name: cyberpower.ePDU2BankStatusLoad
         chart_meta:
           description: "Current draw of the load on the Rack PDU bank"
-          family: 'Rack/Bank/Load/Current'
+          family: 'PowerFlow/Rack/Bank/Load/Current'
           unit: "dA"
       - OID: 1.3.6.1.4.1.3808.1.1.6.5.4.1.6
         name: cyberpower.ePDU2BankStatusPeakLoad
         chart_meta:
           description: "Peak current of the Rack PDU bank load in tenths of Amps"
-          family: 'Rack/Bank/Load/Current/Peak'
+          family: 'PowerFlow/Rack/Bank/Load/Current/Peak'
           unit: "dA/s"
       - OID: 1.3.6.1.4.1.3808.1.1.6.5.4.1.4
         name: ePDU2BankStatusLoadState
-        description: Load status of the Rack PDU bank
-        family: 'Rack/Bank/Load/Status'
+        chart_meta:
+          description: Load status of the Rack PDU bank
+          family: 'PowerFlow/Rack/Bank/Load/Status'
+          unit: "{status}"
         # this was wrong by DD
         mapping:
           1: lowLoad
@@ -443,7 +468,7 @@ metrics:
         name: ePDU2OutletSwitchedStatusState
         chart_meta:
           description: Switch state of the Rack PDU switched outlet
-          family: 'Rack/Outlet/Switched/Status'
+          family: 'PowerFlow/Rack/Outlet/Switched/Status'
           unit: "{status}"
         mapping:
           1: outletStatusOn
@@ -481,19 +506,3 @@ metrics:
         description: "Environment relative humidity expressed in percentage"
         family: 'Environment/Humidity/Value'
         unit: "%"
-metric_tags:
-  - OID: 1.3.6.1.4.1.3808.1.1.3.1.1.0
-    symbol: ePDUIdentName
-    tag: e_pdu_ident_name
-  - tag: e_pdu_ident_model_number
-    OID: 1.3.6.1.4.1.3808.1.1.3.1.5.0
-    symbol: ePDUIdentModelNumber
-  - tag: e_pdu_ident_serial_number
-    OID: 1.3.6.1.4.1.3808.1.1.3.1.6.0
-    symbol: ePDUIdentSerialNumber
-  - OID: 1.3.6.1.4.1.3808.1.1.4.1.1.0
-    symbol: envirIdentName
-    tag: envir_ident_name
-  - OID: 1.3.6.1.4.1.3808.1.1.4.1.2.0
-    symbol: envirIdentLocation
-    tag: envir_ident_location
