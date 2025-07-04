@@ -200,11 +200,12 @@ func (w *WebSpherePMI) categorizeStatName(statName string) string {
 		return "portlet"
 	}
 
-	// Web container metrics - now includes individual applications
+	// Web container metrics - now includes individual applications and URL paths
 	if strings.Contains(nameLower, "web applications") || strings.Contains(nameLower, "webcontainer") ||
 		strings.Contains(nameLower, "servlets") || strings.Contains(nameLower, "servlet session manager") ||
 		strings.Contains(nameLower, "urls") || strings.Contains(nameLower, "portlet") ||
-		(strings.Contains(statName, "#") && strings.Contains(statName, ".war")) {
+		(strings.Contains(statName, "#") && strings.Contains(statName, ".war")) ||
+		strings.HasPrefix(statName, "/") {  // URL paths start with /
 		return "web"
 	}
 
@@ -400,6 +401,26 @@ func (w *WebSpherePMI) collectWebMetrics(mx map[string]int64, nodeName, serverNa
 		}
 	}
 
+	// Check if this is a URL path (starts with /)
+	if strings.HasPrefix(stat.Name, "/") {
+		// This is a direct URL stat, not nested under servlet
+		// Create a synthetic context for it
+		urlPath := stat.Name
+		appName := "unknown"
+		servletName := "direct"
+		
+		// Try to extract app name from the URL path
+		// e.g., /wasPerfTool/servlet/perfservlet -> wasPerfTool
+		parts := strings.Split(strings.TrimPrefix(urlPath, "/"), "/")
+		if len(parts) > 0 && parts[0] != "" {
+			appName = parts[0]
+		}
+		
+		w.Debugf("Found direct URL path: %s (app=%s)", urlPath, appName)
+		w.collectURLMetrics(mx, nodeName, serverName, appName, servletName, urlPath, stat)
+		return
+	}
+	
 	// Check if this is a session metric for a specific web application
 	// Pattern: isclite#isclite.war, perfServletApp#perfServletApp.war
 	if strings.Contains(stat.Name, "#") && strings.Contains(stat.Name, ".war") {
