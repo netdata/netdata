@@ -5,23 +5,28 @@ metrics:
 
   # System utilization.
 
-    # Total time the system has been in full operation.
+  # Total time the system has been in full operation.
   - MIB: CPQHLTH-MIB
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.8.1.0
       name: cpqHeSysUtilLifeTime
-      description: Total time the system has been in full operation in minutes
-      unit: "min"
+      scale_factor: 60
+      chart_meta:
+        family: 'System/Uptime'
+        description: Total time the system has been in full operation in minutes
+        unit: "s"
 
     # EISA bus utilization as percentage of theoretical maximum during last minute.
   - MIB: CPQHLTH-MIB
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.8.2.0
       name: cpqHeSysUtilEisaBusMin
-      description: EISA bus utilization as a percentage of the theoretical maximum during the last minute
-      unit: "%"
+      chart_meta:
+        family: 'Hardware/Bus/EISA/Usage'
+        description: EISA bus utilization as a percentage of the theoretical maximum during the last minute
+        unit: "%"
 
-  # Critical errors.
+    # Critical errors.
 
     # Overall condition of the critical error log feature.
     # NOTE: other(1), ok(2), degraded(3), failed(4)
@@ -29,10 +34,17 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.2.2.0
       name: cpqHeCritLogCondition
-      description: Overall condition of the critical error log feature
-      unit: "{instance}"
+      chart_meta:
+        family: 'System/ErrorLog/Critical/Status'
+        description: Overall condition of the critical error log feature
+        unit: "{status}"
+      mapping:
+        1: other
+        2: ok
+        3: degraded
+        4: failed
 
-  # Correctable memory errors tracking.
+    # Correctable memory errors tracking.
 
     # Overall status of the correctable memory error log feature.
     # NOTE: other(1), notSupported(2), disabled(3), enabled(4)
@@ -40,8 +52,15 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.3.1.0
       name: cpqHeCorrMemLogStatus
-      description: Overall status of the correctable memory error log feature
-      unit: "{instance}"
+      chart_meta:
+        family: 'Hardware/Memory/ErrorLog/Status'
+        description: Overall status of the correctable memory error log feature
+        unit: "{status}"
+      mapping:
+        1: other
+        2: not_supported
+        3: disabled
+        4: enabled
 
     # Overall condition of the correctable memory error log feature.
     # NOTE: other(1), ok(2), degraded(3), failed(4)
@@ -49,19 +68,28 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.3.2.0
       name: cpqHeCorrMemLogCondition
-      description: Overall condition of the correctable memory error log feature
-      unit: "{instance}"
+      chart_meta:
+        family: 'Hardware/Memory/ErrorLog/Condition/Status'
+        description: Overall condition of the correctable memory error log feature
+        unit: "{status}"
+      mapping:
+        1: other
+        2: ok
+        3: degraded
+        4: failed
 
     # Number of correctable memory errors that have occurred.
   - MIB: CPQHLTH-MIB
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.3.3.0
       name: cpqHeCorrMemTotalErrs
-      description: Number of correctable memory errors that have occurred
-      unit: "{error}"
+      chart_meta:
+        family: 'Hardware/Memory/Error/Correctable/Count'
+        description: Number of correctable memory errors that have occurred
+        unit: "{error}"
       metric_type: monotonic_count
 
-  # ASR (Automatic Server Recovery)
+    # ASR (Automatic Server Recovery)
 
     # Overall status of the ASR feature.
     # NOTE: other(1), notAvailable(2), disabled(3), enabled(4)
@@ -69,8 +97,15 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.5.1.0
       name: cpqHeAsrStatus
-      description: Overall status of the ASR feature
-      unit: "{instance}"
+      chart_meta:
+        family: 'Hardware/ASR/Status'
+        description: Overall status of the ASR feature
+        unit: "{status}"
+      mapping:
+        1: other
+        2: not_available
+        3: disabled
+        4: enabled
 
     # Whether the ASR timer passed the server Power-On Self-Test (POST).
     # NOTE: other(1), failed(2), ok(3)
@@ -78,8 +113,14 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.5.6.0
       name: cpqHeAsrPost
-      description: Whether the ASR timer passed the server Power-On Self-Test
-      unit: "{instance}"
+      chart_meta:
+        family: 'Hardware/ASR/POST/Status'
+        description: Whether the ASR timer passed the server Power-On Self-Test
+        unit: "{status}"
+      mapping:
+        1: other
+        2: failed
+        3: ok
 
     # Number of ASR reboots that occurred on the server since last manual reboot.
     # NOTE: -1 if not supported.
@@ -87,8 +128,10 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.5.10.0
       name: cpqHeAsrRebootCount
-      description: Number of ASR reboots that have occurred on the server since last manual reboot
-      unit: "{reboot}"
+      chart_meta:
+        family: 'Hardware/ASR/Reboot/Count'
+        description: Number of ASR reboots that have occurred on the server since last manual reboot
+        unit: "{reboot}"
       metric_type: monotonic_count
 
     # Overall condition of the ASR feature.
@@ -97,8 +140,15 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.5.17.0
       name: cpqHeAsrCondition
-      description: Overall condition of the ASR feature
-      unit: "{instance}"
+      chart_meta:
+        family: 'Hardware/ASR/Condition/Status'
+        description: Overall condition of the ASR feature
+        unit: "{status}"
+      mapping:
+        1: other
+        2: not_available
+        3: disabled
+        4: enabled
 
     # Status of the ASR network access feature.
     # NOTE: other(1), disabled(2), enabled(3)
@@ -106,10 +156,16 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.5.21.0
       name: cpqHeAsrNetworkAccessStatus
-      description: Status of the ASR network access feature
-      unit: "{instance}"
+      chart_meta:
+        family: 'Hardware/ASR/NetworkAccess/Status'
+        description: Status of the ASR network access feature
+        unit: "{status}"
+      mapping:
+        1: other
+        2: disabled
+        3: enabled
 
-  # Temperature and fans.
+    # Temperature and fans.
 
     # Status of temperature sensors.
     # NOTE: other(1), ok(2), degraded(3), failed(4)
@@ -117,8 +173,15 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.6.3.0
       name: cpqHeThermalTempStatus
-      description: Status of the system's temperature sensors
-      unit: "{instance}"
+      chart_meta:
+        family: 'Hardware/Temperature/Status/Overall'
+        description: Status of the system's temperature sensors
+        unit: "{status}"
+      mapping:
+        1: other
+        2: ok
+        3: degraded
+        4: failed
 
     # Status of fan(s).
     # NOTE: other(1), ok(2), degraded(3), failed(4)
@@ -126,8 +189,15 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.6.4.0
       name: cpqHeThermalSystemFanStatus
-      description: Status of the fan(s) in the system
-      unit: "{instance}"
+      chart_meta:
+        family: 'Hardware/Fan/System/Status'
+        description: Status of the fan(s) in the system
+        unit: "{status}"
+      mapping:
+        1: other
+        2: ok
+        3: degraded
+        4: failed
 
     # Status of processor fan(s).
     # NOTE: other(1), ok(2), failed(4)
@@ -135,8 +205,14 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.6.5.0
       name: cpqHeThermalCpuFanStatus
-      description: Status of the processor fan(s) in the system
-      unit: "{instance}"
+      chart_meta:
+        family: 'Hardware/Fan/CPU/Status'
+        description: Status of the processor fan(s) in the system
+        unit: "{status}"
+      mapping:
+        1: other
+        2: ok
+        4: failed
 
     # Temperator sensors.
   - MIB: CPQHLTH-MIB
@@ -146,28 +222,39 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.232.6.2.6.8.1.4
         name: cpqHeTemperatureCelsius
-        description: Current temperature sensor reading in degrees celsius
-        unit: "Cel"
+        chart_meta:
+          family: 'Hardware/Sensor/Temperature/Value'
+          description: Current temperature sensor reading in degrees celsius
+          unit: "Cel"
         # NOTE: other(1), ok(2), degraded(3), failed(4)
       - OID: 1.3.6.1.4.1.232.6.2.6.8.1.6
         name: cpqHeTemperatureCondition
-        description: Temperature sensor condition
-        unit: "{instance}"
+        chart_meta:
+          family: 'Hardware/Sensor/Temperature/Status'
+          description: Temperature sensor condition
+          unit: "{status}"
+        mapping:
+          1: other
+          2: ok
+          3: degraded
+          4: failed
     metric_tags:
       - tag: temperature_index
         symbol:
           OID: 1.3.6.1.4.1.232.6.2.6.8.1.3
           name: cpqHeTemperatureIndex
 
-  # Power supplies.
+    # Power supplies.
 
     # Current power meter reading in Watts.
   - MIB: CPQHLTH-MIB
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.15.3.0
       name: cpqHePowerMeterCurrReading
-      description: Current power meter reading in watts
-      unit: "W"
+      chart_meta:
+        family: 'Hardware/Power/Usage'
+        description: Current power meter reading in watts
+        unit: "W"
 
     # A table of battery entries.
   - MIB: CPQHLTH-MIB
@@ -175,16 +262,25 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.17.2
       name: cpqHeSysBatteryTable
     symbols:
-        # NOTE: other(1), ok(2), degraded(3), failed(4)
+      # NOTE: other(1), ok(2), degraded(3), failed(4)
       - OID: 1.3.6.1.4.1.232.6.2.17.2.1.4
         name: cpqHeSysBatteryCondition
-        description: Overall condition of the battery
-        unit: "{instance}"
+        chart_meta:
+          family: 'Hardware/Battery/Condition/Status'
+          description: Overall condition of the battery
+          unit: "{status}"
+        mapping:
+          1: other
+          2: ok
+          3: degraded
+          4: failed
         # NOTE: 15 different statuses are possible -- not listed here, see MIB.
       - OID: 1.3.6.1.4.1.232.6.2.17.2.1.5
         name: cpqHeSysBatteryStatus
-        description: Status of the battery
-        unit: "{instance}"
+        chart_meta:
+          family: 'Hardware/Battery/Status'
+          description: Status of the battery
+          unit: "{status}"
     metric_tags:
       - tag: battery_index
         symbol:
@@ -197,15 +293,29 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.6.1.0
       name: cpqHeThermalCondition
-      description: Overall condition of the system's thermal environment
-      unit: "{instance}"
+      chart_meta:
+        family: 'Hardware/Temperature/Environment/Status'
+        description: Overall condition of the system's thermal environment
+        unit: "{status}"
+      mapping:
+        1: other
+        2: ok
+        3: degraded
+        4: failed
     # NOTE: other(1), notSupported(2), notInstalled(3), installed(4)
   - MIB: CPQHLTH-MIB
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.9.2.0
       name: cpqHeFltTolPwrSupplyStatus
-      description: Status of the fault tolerant power supply
-      unit: "{instance}"
+      chart_meta:
+        family: 'Hardware/Power/FaultTolerant/Status'
+        description: Status of the fault tolerant power supply
+        unit: "{status}"
+      mapping:
+        1: other
+        2: not_supported
+        3: not_installed
+        4: installed
 
   - MIB: CPQHLTH-MIB
     table:
@@ -214,30 +324,15 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.232.6.2.14.13.1.20
         name: cpqHeResMem2ModuleCondition
-        description: Current status of the correctable memory errors for this memory module
-        unit: "{instance}"
+        chart_meta:
+          family: 'Hardware/Memory/Module/Status'
+          description: Current status of the correctable memory errors for this memory module
+          unit: "{status}"
     metric_tags:
-      - symbol:
+      - tag: mem_board_index
+        symbol:
           OID: 1.3.6.1.4.1.232.6.2.14.13.1.15
           name: cpqHeResMem2ModuleCellTablePtr
-        tag: mem_board_index
-
-  # DEPRECATED: use the next table instead
-  - MIB: CPQHLTH-MIB
-    table:
-      OID: 1.3.6.1.4.1.232.6.2.9.3
-      name: cpqHeFltTolPowerSupplyTable
-    symbols:
-      - OID: 1.3.6.1.4.1.232.6.2.9.3.1.5
-        name: cpqHeFltTolPowerSupplyStatus
-        description: Status of the fault tolerant power supply
-        unit: "{instance}"
-      # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.232.6.2.9.3.1.1
-          name: cpqHeFltTolPowerSupplyChassis
-        tag: chassis_num
 
   - MIB: CPQHLTH-MIB
     table:
@@ -246,19 +341,28 @@ metrics:
     symbols:
       - name: cpqHeFltTolPowerSupply
         constant_value_one: true
+        chart_meta:
+          family: 'Hardware/PowerSupply/Present'
+          description: Indicates the presence of a power supply
+          unit: "{present}"
       - OID: 1.3.6.1.4.1.232.6.2.9.3.1.7
         name: cpqHeFltTolPowerSupplyCapacityUsed
-        description: Currently used capacity of the power supply in watts
-        unit: "W"
+        chart_meta:
+          family: 'Hardware/PowerSupply/Used'
+          description: Currently used capacity of the power supply in watts
+          unit: "W"
       - OID: 1.3.6.1.4.1.232.6.2.9.3.1.8
         name: cpqHeFltTolPowerSupplyCapacityMaximum
-        description: Maximum capacity of the power supply in watts
-        unit: "W"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.232.6.2.9.3.1.5
-          name: cpqHeFltTolPowerSupplyStatus
+        chart_meta:
+          family: 'Hardware/PowerSupply/Capacity'
+          description: Maximum capacity of the power supply in watts
+          unit: "W"
+      - OID: 1.3.6.1.4.1.232.6.2.9.3.1.5
+        name: cpqHeFltTolPowerSupplyStatus
+        chart_meta:
+          description: Current status of the power supply
+          family: 'Hardware/PowerSupply/Status'
+          unit: "{status}"
         mapping:
           1: no_error
           2: general_failure
@@ -277,15 +381,10 @@ metrics:
           15: nvram_invalid
           16: calibration_table_invalid
           17: no_power_input
-        tag: power_supply_status
-      - symbol:
+    metric_tags:
+      - tag: power_supply_index
+        index: 1
+      - tag: chassis_num
+        symbol:
           OID: 1.3.6.1.4.1.232.6.2.9.3.1.1
           name: cpqHeFltTolPowerSupplyChassis
-        tag: chassis_num
-
-#  TODO: NDM-1592
-#  - # NOTE: unknown(1), poweredOff(2), poweredOn(3), insufficientPowerOrPowerOnDenied(4)
-#    MIB: CPQSM2-MIB
-#    symbol:
-#      OID: 1.3.6.1.4.1.232.9.2.2.32
-#      name: cpqSm2CntlrServerPowerState

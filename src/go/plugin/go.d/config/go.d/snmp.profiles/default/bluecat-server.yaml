@@ -4,6 +4,20 @@ extends:
   - _std-host-resources-mib-feat-base.yaml
   - _std-ucd-mib.yaml
 
+sysobjectid:
+  - 1.3.6.1.4.1.13315.2.*
+
+metric_tags:
+  - tag: bcn_sys_id_product
+    OID: 1.3.6.1.4.1.13315.3.2.2.1.1.0
+    symbol: bcnSysIdProduct
+  - tag: bcn_sys_id_os_release
+    OID: 1.3.6.1.4.1.13315.3.2.2.1.2.0
+    symbol: bcnSysIdOSRelease
+  - tag: bcn_sys_id_platform
+    OID: 1.3.6.1.4.1.13315.3.2.2.1.5.0
+    symbol: bcnSysIdPlatform
+
 metadata:
   device:
     fields:
@@ -11,9 +25,6 @@ metadata:
         value: Bluecat
       type:
         value: Server
-
-sysobjectid:
-  - 1.3.6.1.4.1.13315.2.*
 
 metrics:
   - MIB: BCN-DHCPV4-MIB
@@ -25,47 +36,42 @@ metrics:
         name: bcnDhcpv4SubnetFreeAddresses
         chart_meta:
           description: The number of IPs addresses available in this subnet.
-          family: DHCP/Subnets
+          family: 'Network/DHCP/Subnet/Address/Free'
           unit: "{ip_address}"
         # Transform combines subnet IP and mask into CIDR notation (e.g., 192.168.1.0/24)
         # Converts mask to CIDR if possible, otherwise keeps original mask
         transform: |
-          {{- $subnetIP := index .Metric.Tags "bcn_dhcpv4_subnet_ip" | default "" -}}
-          {{- $subnetMask := index .Metric.Tags "bcn_dhcpv4_subnet_mask" | default "" -}}
+          {{- $subnetIP := index .Metric.Tags "rm:bcn_dhcpv4_subnet_ip" | default "" -}}
+          {{- $subnetMask := index .Metric.Tags "rm:bcn_dhcpv4_subnet_mask" | default "" -}}
           {{- if and $subnetIP $subnetMask -}}
             {{- $cidr := mask2cidr $subnetMask -}}
             {{- setTag .Metric "bcn_dhcpv4_subnet" (printf "%s/%s" $subnetIP (ternary $cidr $subnetMask $cidr)) -}}
           {{- end -}}
-          {{- deleteTag .Metric "bcn_dhcpv4_subnet_ip" -}}
-          {{- deleteTag .Metric "bcn_dhcpv4_subnet_mask" -}}
       - OID: 1.3.6.1.4.1.13315.3.1.1.2.2.2.1.3
         name: bcnDhcpv4SubnetSize
         chart_meta:
           description: Size of the subnet
-          family: DHCP/Subnets
+          family: 'Network/DHCP/Subnet/Size'
           unit: "{ip_address}"
         # Transform combines subnet IP and mask into CIDR notation (e.g., 192.168.1.0/24)
         # Converts mask to CIDR if possible, otherwise keeps original mask
         transform: |
-          {{- $subnetIP := index .Metric.Tags "bcn_dhcpv4_subnet_ip" | default "" -}}
-          {{- $subnetMask := index .Metric.Tags "bcn_dhcpv4_subnet_mask" | default "" -}}
+          {{- $subnetIP := index .Metric.Tags "rm:bcn_dhcpv4_subnet_ip" | default "" -}}
+          {{- $subnetMask := index .Metric.Tags "rm:bcn_dhcpv4_subnet_mask" | default "" -}}
           {{- if and $subnetIP $subnetMask -}}
             {{- $cidr := mask2cidr $subnetMask -}}
             {{- setTag .Metric "bcn_dhcpv4_subnet" (printf "%s/%s" $subnetIP (ternary $cidr $subnetMask $cidr)) -}}
           {{- end -}}
-          {{- deleteTag .Metric "bcn_dhcpv4_subnet_ip" -}}
-          {{- deleteTag .Metric "bcn_dhcpv4_subnet_mask" -}}
     metric_tags:
-      # Note: This tag will be removed by transform and combined into bcn_dhcpv4_subnet
-      - symbol:
+      - tag: rm:bcn_dhcpv4_subnet_ip
+        symbol:
           OID: 1.3.6.1.4.1.13315.3.1.1.2.2.2.1.1
           name: bcnDhcpv4SubnetIP
-        tag: bcn_dhcpv4_subnet_ip
-      # Note: This tag will be removed by transform and combined into bcn_dhcpv4_subnet
-      - symbol:
+      - tag: rm:bcn_dhcpv4_subnet_mask
+        symbol:
           OID: 1.3.6.1.4.1.13315.3.1.1.2.2.2.1.2
           name: bcnDhcpv4SubnetMask
-        tag: bcn_dhcpv4_subnet_mask
+
   - MIB: BCN-DHCPV4-MIB
     table:
       OID: 1.3.6.1.4.1.13315.3.1.1.2.2.3
@@ -75,55 +81,38 @@ metrics:
         name: bcnDhcpv4PoolFreeAddresses
         chart_meta:
           description: The number of IPs addresses available in this pool
-          family: DHCP/Pools
+          family: 'Network/DHCP/Pool/Address/Free'
           unit: "{ip_address}"
         # Transform combines start and end IPs into a single range tag (e.g., 192.168.1.10-192.168.1.100)
         transform: |
-          {{- $startIP := index .Metric.Tags "bcn_dhcpv4_pool_start_ip" | default "" -}}
-          {{- $endIP := index .Metric.Tags "bcn_dhcpv4_pool_end_ip" | default "" -}}
+          {{- $startIP := index .Metric.Tags "rm:bcn_dhcpv4_pool_start_ip" | default "" -}}
+          {{- $endIP := index .Metric.Tags "rm:bcn_dhcpv4_pool_end_ip" | default "" -}}
           {{- if and $startIP $endIP -}}
           {{- setTag .Metric "bcn_dhcpv4_pool_range" (printf "%s-%s" $startIP $endIP) -}}
           {{- end -}}
-          {{- deleteTag .Metric "bcn_dhcpv4_pool_start_ip" -}}
-          {{- deleteTag .Metric "bcn_dhcpv4_pool_end_ip" -}}
       - OID: 1.3.6.1.4.1.13315.3.1.1.2.2.3.1.4
         name: bcnDhcpv4PoolSize
         chart_meta:
           description: Pool size
-          family: DHCP/Pools
+          family: 'Network/DHCP/Pool/Size'
           unit: "{ip_address}"
         # Transform combines start and end IPs into a single range tag (e.g., 192.168.1.10-192.168.1.100)
         transform: |
-          {{- $startIP := index .Metric.Tags "bcn_dhcpv4_pool_start_ip" | default "" -}}
-          {{- $endIP := index .Metric.Tags "bcn_dhcpv4_pool_end_ip" | default "" -}}
+          {{- $startIP := index .Metric.Tags "rm:bcn_dhcpv4_pool_start_ip" | default "" -}}
+          {{- $endIP := index .Metric.Tags "rm:bcn_dhcpv4_pool_end_ip" | default "" -}}
           {{- if and $startIP $endIP -}}
             {{- setTag .Metric "bcn_dhcpv4_pool_range" (printf "%s-%s" $startIP $endIP) -}}
           {{- end -}}
-          {{- deleteTag .Metric "bcn_dhcpv4_pool_start_ip" -}}
-          {{- deleteTag .Metric "bcn_dhcpv4_pool_end_ip" -}}
     metric_tags:
-      - symbol:
+      - tag: bcn_dhcpv4_pool_subnet_ip
+        symbol:
           OID: 1.3.6.1.4.1.13315.3.1.1.2.2.3.1.3
           name: bcnDhcpv4PoolSubnetIP
-        tag: bcn_dhcpv4_pool_subnet_ip
-      # Note: This tag will be removed by transform and combined into bcn_dhcpv4_pool_range
-      - symbol:
+      - tag: rm:bcn_dhcpv4_pool_start_ip
+        symbol:
           OID: 1.3.6.1.4.1.13315.3.1.1.2.2.3.1.1
           name: bcnDhcpv4PoolStartIP
-        tag: bcn_dhcpv4_pool_start_ip
-      # Note: This tag will be removed by transform and combined into bcn_dhcpv4_pool_range
-      - symbol:
+      - tag: rm:bcn_dhcpv4_pool_end_ip
+        symbol:
           OID: 1.3.6.1.4.1.13315.3.1.1.2.2.3.1.2
           name: bcnDhcpv4PoolEndIP
-        tag: bcn_dhcpv4_pool_end_ip
-
-metric_tags:
-  - OID: 1.3.6.1.4.1.13315.3.2.2.1.1.0
-    symbol: bcnSysIdProduct
-    tag: bcn_sys_id_product
-  - OID: 1.3.6.1.4.1.13315.3.2.2.1.2.0
-    symbol: bcnSysIdOSRelease
-    tag: bcn_sys_id_os_release
-  - OID: 1.3.6.1.4.1.13315.3.2.2.1.5.0
-    symbol: bcnSysIdPlatform
-    tag: bcn_sys_id_platform

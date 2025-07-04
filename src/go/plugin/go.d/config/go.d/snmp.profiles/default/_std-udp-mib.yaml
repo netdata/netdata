@@ -7,7 +7,7 @@ metrics:
       name: udpHCInDatagrams
       chart_meta:
         description: UDP datagrams received
-        family: Network/UDP/Datagram/Total/In
+        family: 'Network/UDP/Datagram/Total/In'
         unit: "{packet}/s"
   - MIB: UDP-MIB
     symbol:
@@ -15,7 +15,7 @@ metrics:
       name: udpInDatagrams
       chart_meta:
         description: UDP datagrams received
-        family: Network/UDP/Datagram/Total/In
+        family: 'Network/UDP/Datagram/Total/In'
         unit: "{packet}/s"
   - MIB: UDP-MIB
     symbol:
@@ -23,7 +23,7 @@ metrics:
       name: udpHCOutDatagrams
       chart_meta:
         description: UDP datagrams sent
-        family: Network/UDP/Datagram/Total/Out
+        family: 'Network/UDP/Datagram/Total/Out'
         unit: "{packet}/s"
   - MIB: UDP-MIB
     symbol:
@@ -31,7 +31,7 @@ metrics:
       name: udpOutDatagrams
       chart_meta:
         description: UDP datagrams sent
-        family: Network/UDP/Datagram/Total/Out
+        family: 'Network/UDP/Datagram/Total/Out'
         unit: "{packet}/s"
   - MIB: UDP-MIB
     symbol:
@@ -39,7 +39,7 @@ metrics:
       name: udpInErrors
       chart_meta:
         description: UDP datagrams received but couldn't be delivered (not due to missing app)
-        family: Network/UDP/Datagram/Error/In
+        family: 'Network/UDP/Datagram/Error/In'
         unit: "{error}/s"
   - MIB: UDP-MIB
     symbol:
@@ -47,5 +47,5 @@ metrics:
       name: udpNoPorts
       chart_meta:
         description: UDP datagrams received with no app on the destination port
-        family: Network/UDP/Datagram/Error/NoPort
+        family: 'Network/UDP/Datagram/Error/NoPort'
         unit: "{error}/s"

@@ -11,7 +11,7 @@ metrics:
       name: hrSystemNumUsers
       chart_meta:
         description: The number of user sessions for which this host is storing state information. A session is a collection of processes requiring a single act of user authentication and possibly subject to collective job control.
-        family: System/User/Session/Active
+        family: 'System/Activity/UserSession/Active'
         unit: "{session}"
   - MIB: HOST-RESOURCES-MIB
     symbol:
@@ -19,15 +19,7 @@ metrics:
       name: hrSystemProcesses
       chart_meta:
         description: The number of process contexts currently loaded or running on this system.
-        family: System/Process/Active
-        unit: "{process}"
-  - MIB: HOST-RESOURCES-MIB
-    symbol:
-      OID: 1.3.6.1.2.1.25.1.7.0
-      name: hrSystemMaxProcesses
-      chart_meta:
-        description: The maximum number of process contexts this system can support. If there is no fixed maximum, the value should be zero. On systems that have a fixed maximum, this object can help diagnose failures that occur when this maximum is reached.
-        family: System/Process/Maximum
+        family: 'System/Activity/Process/Active'
         unit: "{process}"
 
   # Table Objects
@@ -42,7 +34,7 @@ metrics:
         name: cpu.usage
         chart_meta:
           description: The average, over the last minute, of the percentage of time that this processor was not idle.
-          family: CPU/Usage
+          family: 'System/CPU/Usage'
           unit: "%"
     metric_tags:
       - tag: cpu_index
@@ -66,20 +58,20 @@ metrics:
         name: hrStorageSize
         chart_meta:
           description: Total size of the storage area
-          family: Storage/Total
+          family: 'System/Storage/Total'
           unit: "By"
         transform: |
-          {{- $unit := index .Metric.Tags "rm:storage_alloc_unit" | default "1" -}}
+          {{- $unit := index .Metric.Tags "rm:storage_alloc_unit" | default "1024" -}}
           {{- $factor := int64 $unit -}}
           {{- setValue .Metric (mul .Metric.Value $factor) -}}
       - OID: 1.3.6.1.2.1.25.2.3.1.6
         name: hrStorageUsed
         chart_meta:
           description: Amount of storage used
-          family: Storage/Used
+          family: 'System/Storage/Used'
           unit: "By"
         transform: |
-          {{- $unit := index .Metric.Tags "rm:storage_alloc_unit" | default "1" -}}
+          {{- $unit := index .Metric.Tags "rm:storage_alloc_unit" | default "1024" -}}
           {{- $factor := int64 $unit -}}
           {{- setValue .Metric (mul .Metric.Value $factor) -}}
     metric_tags:

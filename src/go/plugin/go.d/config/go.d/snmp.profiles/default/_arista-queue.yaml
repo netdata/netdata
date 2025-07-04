@@ -12,7 +12,7 @@ metrics:
         name: aristaIngressQueuePktsDropped
         chart_meta:
           description: The number of dropped packets due to congestion at the ingress port in an interface
-          family: Interfaces/Queue/Ingress/Packet/Dropped
+          family: 'Network/Interface/Queue/Ingress/Packet/Dropped'
           unit: "{packet}"
     metric_tags:
       - tag: interface_index
@@ -35,7 +35,7 @@ metrics:
         name: aristaEgressQueuePktsDropped
         chart_meta:
           description: The number of packets discarded from this egress queue.
-          family: Interfaces/Queue/Egress/Packet/Dropped
+          family: 'Network/Interface/Queue/Egress/Packet/Dropped'
           unit: "{packet}"
     metric_tags:
       - tag: interface_index

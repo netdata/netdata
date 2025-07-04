@@ -1,24 +1,6 @@
 # CPU and memory metrics for F5 BIG-IP devices
 
 metrics:
-  # Memory stats
-  - MIB: F5-BIGIP-SYSTEM-MIB
-    metric_type: gauge
-    symbol:
-      OID: 1.3.6.1.4.1.3375.2.1.1.2.1.44.0
-        # core check only
-      name: memory.total
-      description: The total memory available in bytes for TMM (Traffic Management Module)
-      unit: "By"
-  - MIB: F5-BIGIP-SYSTEM-MIB
-    metric_type: gauge
-    symbol:
-      OID: 1.3.6.1.4.1.3375.2.1.1.2.1.45.0
-        # core check only
-      name: memory.used
-      description: The memory in use in bytes for TMM (Traffic Management Module)
-      unit: "By"
-  # CPU
   - MIB: F5-BIGIP-SYSTEM-MIB
     table:
       OID: 1.3.6.1.4.1.3375.2.1.7.5.2
@@ -27,10 +9,32 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.27
         name: cpu.usage # sysMultiHostCpuUsageRatio1m
-        description: This is average usage ratio of CPU for the associated host in the last one minute
-        unit: "%"
+        chart_meta:
+          family: 'System/CPU/Usage'
+          description: This is average usage ratio of CPU for the associated host in the last one minute
+          unit: "%"
     metric_tags:
-      - symbol:
+      - tag: cpu
+        symbol:
           OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.3
           name: sysMultiHostCpuId
-        tag: cpu
+
+  - MIB: F5-BIGIP-SYSTEM-MIB
+    metric_type: gauge
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.1.1.2.1.44.0
+      name: memory.total
+      chart_meta:
+        family: 'System/Memory/TMM/Total'
+        description: The total memory available in bytes for TMM (Traffic Management Module)
+        unit: "By"
+
+  - MIB: F5-BIGIP-SYSTEM-MIB
+    metric_type: gauge
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.1.1.2.1.45.0
+      name: memory.used
+      chart_meta:
+        family: 'System/Memory/TMM/Used'
+        description: The memory in use in bytes for TMM (Traffic Management Module)
+        unit: "By"

@@ -8,7 +8,6 @@ import (
 	"math"
 	"net"
 	"strconv"
-	"strings"
 	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
@@ -169,23 +168,24 @@ func newMetricTransformFuncMap() template.FuncMap {
 			sensorScale := m.Tags["rm:sensor_scale"]
 			sensorPrecision := m.Tags["rm:sensor_precision"]
 
+			famPrefix := "Hardware/Sensor/"
 			config := map[string]map[string]interface{}{
-				"1":  {"name": "unspecified", "family": "Sensor/Generic/Value", "desc": "Unspecified or vendor-specific sensor"},
-				"2":  {"name": "unknown", "family": "Sensor/Unknown/Value", "desc": "Unknown sensor type"},
-				"3":  {"name": "voltage_ac", "unit": "V", "family": "Sensor/Voltage/AC", "desc": "AC voltage"},
-				"4":  {"name": "voltage_dc", "unit": "V", "family": "Sensor/Voltage/DC", "desc": "DC voltage"},
-				"5":  {"name": "current", "unit": "A", "family": "Sensor/Current/Value", "desc": "Current draw"},
-				"6":  {"name": "power", "unit": "W", "family": "Sensor/Power/Value", "desc": "Power consumption"},
-				"7":  {"name": "frequency", "unit": "Hz", "family": "Sensor/Frequency/Value", "desc": "Frequency"},
-				"8":  {"name": "temperature", "unit": "Cel", "family": "Sensor/Temperature/Value", "desc": "Temperature reading"},
-				"9":  {"name": "humidity", "unit": "%", "family": "Sensor/Humidity/Value", "desc": "Relative humidity"},
-				"10": {"name": "fan_speed", "unit": "{revolution}/min", "family": "Sensor/FanSpeed/Value", "desc": "Fan rotation speed"},
-				"11": {"name": "airflow", "unit": "m3/min", "family": "Sensor/Airflow/Value", "desc": "Airflow in cubic meters per minute"},
-				"12": {"name": "sensor_state", "family": "Sensor/State/Value", "desc": "Boolean sensor state", "mapping": map[int64]string{
+				"1":  {"name": "unspecified", "family": "Generic", "desc": "Unspecified or vendor-specific sensor"},
+				"2":  {"name": "unknown", "family": "Unknown", "desc": "Unknown sensor type"},
+				"3":  {"name": "voltage_ac", "unit": "V", "family": "Voltage/AC", "desc": "AC voltage"},
+				"4":  {"name": "voltage_dc", "unit": "V", "family": "Voltage/DC", "desc": "DC voltage"},
+				"5":  {"name": "current", "unit": "A", "family": "Current", "desc": "Current draw"},
+				"6":  {"name": "power", "unit": "W", "family": "Power", "desc": "Power consumption"},
+				"7":  {"name": "frequency", "unit": "Hz", "family": "Frequency", "desc": "Frequency"},
+				"8":  {"name": "temperature", "unit": "Cel", "family": "Temperature", "desc": "Temperature reading"},
+				"9":  {"name": "humidity", "unit": "%", "family": "Humidity", "desc": "Relative humidity"},
+				"10": {"name": "fan_speed", "unit": "{revolution}/min", "family": "FanSpeed", "desc": "Fan rotation speed"},
+				"11": {"name": "airflow", "unit": "m3/min", "family": "Airflow", "desc": "Airflow in cubic meters per minute"},
+				"12": {"name": "sensor_state", "family": "State", "desc": "Boolean sensor state", "mapping": map[int64]string{
 					0: "false", 1: "true", 2: "true",
 				}},
-				"13": {"name": "special_enum", "family": "Sensor/Enum/Value", "desc": "Vendor-specific enumerated sensor"},
-				"14": {"name": "power_dbm", "unit": "dBm", "family": "Sensor/Power/Value", "desc": "Power in decibel-milliwatts"},
+				"13": {"name": "special_enum", "family": "Enum", "desc": "Vendor-specific enumerated sensor"},
+				"14": {"name": "power_dbm", "unit": "dBm", "family": "Power", "desc": "Power in decibel-milliwatts"},
 			}
 
 			conf, ok := config[sensorType]
@@ -199,7 +199,7 @@ func newMetricTransformFuncMap() template.FuncMap {
 					m.Name = m.Name + "_" + name
 				}
 				if family, ok := conf["family"].(string); ok {
-					m.Family = strings.TrimSuffix(family, "/Value") + "/Status"
+					m.Family = famPrefix + family + "/Status"
 				}
 				m.Mappings = map[int64]string{
 					1: "ok",
@@ -238,7 +238,7 @@ func newMetricTransformFuncMap() template.FuncMap {
 					m.Name = m.Name + "_" + name
 				}
 				if family, ok := conf["family"].(string); ok {
-					m.Family = family
+					m.Family = famPrefix + family + "/Value"
 				}
 				if desc, ok := conf["desc"].(string); ok {
 					m.Description = desc

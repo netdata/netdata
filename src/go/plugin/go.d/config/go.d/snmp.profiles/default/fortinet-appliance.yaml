@@ -75,7 +75,7 @@ metrics:
       OID: 1.3.6.1.4.1.12356.103.2.1.1.0
       chart_meta:
         description: Current CPU usage
-        family: CPU/Usage
+        family: 'CPU/Usage'
         unit: "%"
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     symbol:
@@ -83,7 +83,7 @@ metrics:
       OID: 1.3.6.1.4.1.12356.103.2.1.2.0
       chart_meta:
         description: Current memory used
-        family: Memory/Used
+        family: 'Memory/Used'
         unit: "By"
       scale_factor: 1024
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
@@ -92,7 +92,7 @@ metrics:
       OID: 1.3.6.1.4.1.12356.103.2.1.3.0
       chart_meta:
         description: Total physical and swap memory installed
-        family: Memory/Total
+        family: 'Memory/Total'
         unit: "By"
       scale_factor: 1024
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
@@ -101,7 +101,7 @@ metrics:
       OID: 1.3.6.1.4.1.12356.103.2.1.4.0
       chart_meta:
         description: Current hard disk usage
-        family: Disk/Space/Used
+        family: 'Disk/Space/Used'
         unit: "By"
       scale_factor: 1048576
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
@@ -110,7 +110,7 @@ metrics:
       OID: 1.3.6.1.4.1.12356.103.2.1.5.0
       chart_meta:
         description: Total hard disk capacity
-        family: Disk/Space/Total
+        family: 'Disk/Space/Total'
         unit: "By"
       scale_factor: 1048576
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
@@ -119,7 +119,7 @@ metrics:
       OID: 1.3.6.1.4.1.12356.103.2.1.6.0
       chart_meta:
         description: Current CPU usage excluded nice processes usage (percentage)
-        family: CPU/Usage/ExcludeNice
+        family: 'CPU/Usage/ExcludeNice'
         unit: "%"
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     symbol:
@@ -127,7 +127,7 @@ metrics:
       OID: 1.3.6.1.4.1.12356.103.2.1.9.0
       chart_meta:
         description: Log receiving rate in number of logs per second
-        family: Log/Rate/In
+        family: 'Log/Rate/In'
         unit: "{log}/s"
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     symbol:
@@ -135,7 +135,7 @@ metrics:
       OID: 1.3.6.1.4.1.12356.103.7.1.1.0
       chart_meta:
         description: RAID Level
-        family: Storage/RAID/Level
+        family: 'Storage/RAID/Level'
         unit: "{status}"
       mapping:
         0: unavailable
@@ -159,7 +159,7 @@ metrics:
       OID: 1.3.6.1.4.1.12356.103.7.1.2.0
       chart_meta:
         description: RAID Status
-        family: "Storage/RAID/Status"
+        family: 'Storage/RAID/Status'
         unit: "{status}"
       mapping:
         0: unavailable
@@ -175,7 +175,7 @@ metrics:
       OID: 1.3.6.1.4.1.12356.103.7.1.3.0
       chart_meta:
         description: Raid size in GB
-        family: Storage/RAID/Space/Total
+        family: 'Storage/RAID/Space/Total'
         unit: "By"
       scale_factor: 1073741824 # GB => bytes
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
@@ -184,7 +184,7 @@ metrics:
       OID: 1.3.6.1.4.1.12356.103.7.1.4.0
       chart_meta:
         description: Disk numbers in the Raid
-        family: Storage/RAID/Disk/Count
+        family: 'Storage/RAID/Disk/Count'
         unit: "{disk}"
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     symbol:
@@ -192,7 +192,7 @@ metrics:
       OID: 1.3.6.1.4.1.12356.103.9.1.1.0
       chart_meta:
         description: High availability mode
-        family: HighAvailability/Mode
+        family: 'HighAvailability/Mode'
         unit: "{status}"
       mapping:
         0: standalone
@@ -204,7 +204,7 @@ metrics:
       OID: 1.3.6.1.4.1.12356.103.9.1.2.0
       chart_meta:
         description: Ha cluster ID
-        family: HighAvailability/Cluster/ID
+        family: 'HighAvailability/Cluster/ID'
         unit: "1"
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     symbol:
@@ -212,7 +212,7 @@ metrics:
       OID: 1.3.6.1.4.1.12356.103.9.1.3.0
       chart_meta:
         description: Peer numbers in the Ha
-        family: HighAvailability/Peer/Count
+        family: 'HighAvailability/Peer/Count'
         unit: "{peer}"
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     table:
@@ -223,7 +223,7 @@ metrics:
         name: fmDeviceEntMode
         chart_meta:
           description: Device management mode
-          family: Device/Mode
+          family: 'Device/Mode'
           unit: "{status}"
         mapping:
           0: unregistered
@@ -234,7 +234,7 @@ metrics:
         name: fmDeviceEntHaMode
         chart_meta:
           description: Device high availability mode
-          family: Device/HighAvailability/Mode
+          family: 'Device/HighAvailability/Mode'
           unit: "{status}"
         mapping:
           0: standalone
@@ -247,7 +247,7 @@ metrics:
         name: fmDeviceEntConnectState
         chart_meta:
           description: Device connection status
-          family: "Device/Status/Connection"
+          family: 'Device/Status/Connection'
           unit: "{status}"
         mapping:
           0: unknown
@@ -257,7 +257,7 @@ metrics:
         name: fmDeviceEntDbState
         chart_meta:
           description: Device database status
-          family: "Device/Status/Database"
+          family: 'Device/Status/Database'
           unit: "{status}"
         mapping:
           0: unknown
@@ -268,7 +268,7 @@ metrics:
         name: fmDeviceEntConfigState
         chart_meta:
           description: Device config status
-          family: "Device/Status/Configuration"
+          family: 'Device/Status/Configuration'
           unit: "{status}"
         mapping:
           0: unknown
@@ -278,7 +278,7 @@ metrics:
         name: fmDeviceEntState
         chart_meta:
           description: Device status
-          family: "Device/Status/Operational"
+          family: 'Device/Status/Operational'
           unit: "{status}"
         mapping:
           0: none
@@ -302,7 +302,7 @@ metrics:
         name: fmDeviceEntSupportState
         chart_meta:
           description: The support status of the device
-          family: "Device/Status/Support"
+          family: 'Device/Status/Support'
           unit: "{status}"
         mapping:
           0: expired
@@ -342,13 +342,13 @@ metrics:
         scale_factor: 1073741824 # GB => bytes
         chart_meta:
           description: Raid disk size in GB
-          family: Storage/RAID/Disk/Size
+          family: 'Storage/RAID/Disk/Size'
           unit: "By"
       - OID: 1.3.6.1.4.1.12356.103.7.2.1.2
         name: fmRaidDiskEntState
         chart_meta:
           description: Raid disk status
-          family: Storage/RAID/Disk/Status
+          family: 'Storage/RAID/Disk/Status'
           unit: "{status}"
         mapping:
           0: unavailable
@@ -372,7 +372,7 @@ metrics:
         name: fmSensorEntState
         chart_meta:
           description: Sensor status
-          family: Sensor/Status
+          family: 'Sensor/Status'
           unit: "{status}"
         mapping:
           0: ok
@@ -405,7 +405,7 @@ metrics:
         name: fmHaPeerEntState
         chart_meta:
           description: Peer status
-          family: HighAvailability/Peer/Status
+          family: 'HighAvailability/Peer/Status'
           unit: "{status}"
         mapping:
           0: down

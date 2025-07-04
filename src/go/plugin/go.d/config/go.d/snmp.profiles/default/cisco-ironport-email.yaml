@@ -24,7 +24,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.1.1.1.0
       chart_meta:
         description: This object provides a general idea of how much memory is being consumed by the appliance software
-        family: Memory/Usage
+        family: 'Memory/Usage'
         unit: "%"
   - MIB: ASYNCOS-MAIL-MIB
     symbol:
@@ -32,7 +32,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.1.1.2.0
       chart_meta:
         description: This object provides a general idea of how busy the CPU is according to the appliance software, within the last 5 seconds of utilization
-        family: CPU/Usage
+        family: 'CPU/Usage'
         unit: "%"
   - MIB: ASYNCOS-MAIL-MIB
     symbol:
@@ -40,7 +40,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.1.1.14.0
       chart_meta:
         description: The number of seconds the oldest message has been in queue
-        family: Queue/Message/Age
+        family: 'Queue/Message/Age'
         unit: "s"
   - MIB: ASYNCOS-MAIL-MIB
     symbol:
@@ -48,7 +48,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.1.1.3.0
       chart_meta:
         description: Disk I/O within the last 5-15 seconds
-        family: Disk/IO/Utilization
+        family: 'Disk/IO/Utilization'
         unit: "%"
   - MIB: ASYNCOS-MAIL-MIB
     symbol:
@@ -56,39 +56,46 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.1.1.4.0
       chart_meta:
         description: Percent of total queue capacity used
-        family: Queue/Utilization
+        family: 'Queue/Utilization'
         unit: "%"
-  #  - MIB: ASYNCOS-MAIL-MIB
-  #    symbol:
-  #      name: ironport.queueAvailabilityStatus
-  #      OID: 1.3.6.1.4.1.15497.1.1.1.5.0
-  #      enum:
-  #        queueSpaceAvailable: 1
-  #        queueSpaceShortage: 2
-  #        queueFull: 3
-  #      TODO: enum in scalar metric is not supported yet (keep this metric and this
-  #        comment in profile until it's fixed)
-  #  - MIB: ASYNCOS-MAIL-MIB
-  #    symbol:
-  #      name: ironport.resourceConservationReason
-  #      OID: 1.3.6.1.4.1.15497.1.1.1.6.0
-  #      enum:
-  #        noResourceConservation: 1
-  #        memoryShortage: 2
-  #        queueSpaceShortage: 3
-  #        queueFull: 4
-  #      TODO: enum in scalar metric is not supported yet (keep this metric and this
-  #        comment in profile until it's fixed)
-  #  - MIB: ASYNCOS-MAIL-MIB
-  #    symbol:
-  #      name: ironport.memoryAvailabilityStatus
-  #      OID: 1.3.6.1.4.1.15497.1.1.1.7.0
-  #      enum:
-  #        memoryAvailable: 1
-  #        memoryShortage: 2
-  #        memoryFull: 3
-  #      TODO: enum in scalar metric is not supported yet (keep this metric and this
-  #        comment in profile until it's fixed)
+  - MIB: ASYNCOS-MAIL-MIB
+    symbol:
+      name: ironport.queueAvailabilityStatus
+      OID: 1.3.6.1.4.1.15497.1.1.1.5.0
+      chart_meta:
+        description: Status indicating the current availability of the message queue
+        family: 'Queue/Availability/Status'
+        unit: "{status}"
+      mapping:
+        queueSpaceAvailable: 1
+        queueSpaceShortage: 2
+        queueFull: 3
+  - MIB: ASYNCOS-MAIL-MIB
+    symbol:
+      name: ironport.resourceConservationReason
+      OID: 1.3.6.1.4.1.15497.1.1.1.6.0
+      chart_meta:
+        description: Reason the appliance is conserving resources
+        family: 'System/Resource/Conservation'
+        unit: "{status}"
+      mapping:
+        noResourceConservation: 1
+        memoryShortage: 2
+        queueSpaceShortage: 3
+        queueFull: 4
+  - MIB: ASYNCOS-MAIL-MIB
+    symbol:
+      name: ironport.memoryAvailabilityStatus
+      OID: 1.3.6.1.4.1.15497.1.1.1.7.0
+      chart_meta:
+        description: Current status of memory availability
+        family: 'Memory/Availability/Status'
+        unit: "{status}"
+      mapping:
+        memoryAvailable: 1
+        memoryShortage: 2
+        memoryFull: 3
+
   - MIB: ASYNCOS-MAIL-MIB
     table:
       name: powerSupplyTable
@@ -98,7 +105,7 @@ metrics:
         name: ironport.powerSupplyStatus
         chart_meta:
           description: Status of the power supply
-          family: PowerSupply/Status/Operational
+          family: 'PowerSupply/Status/Operational'
           unit: "{status}"
         mapping:
           1: power_supply_not_installed
@@ -109,7 +116,7 @@ metrics:
         name: ironport.powerSupplyRedundancy
         chart_meta:
           description: Status of a collection of one or more power supplies
-          family: PowerSupply/Status/Redundancy
+          family: 'PowerSupply/Status/Redundancy'
           unit: "{status}"
         mapping:
           1: power_supply_redundancy_ok
@@ -129,7 +136,7 @@ metrics:
         OID: 1.3.6.1.4.1.15497.1.1.1.9.1.2
         chart_meta:
           description: Temperature reading for the sensor being instrumented
-          family: Sensor/Temperature/Value
+          family: 'Sensor/Temperature/Value'
           unit: "Cel"
     metric_tags:
       - tag: ironport_temperature_name
@@ -145,7 +152,7 @@ metrics:
         OID: 1.3.6.1.4.1.15497.1.1.1.10.1.2
         chart_meta:
           description: Speed in RPMs of the chassis fan
-          family: Fan/Speed/Value
+          family: 'Fan/Speed/Value'
           unit: "{rotation}/m"
     metric_tags:
       - tag: ironport_fan_name
@@ -158,7 +165,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.1.1.11.0
       chart_meta:
         description: Number of messages in the work queue
-        family: Queue/Work/Messages
+        family: 'Queue/Work/Messages'
         unit: "{message}"
   - MIB: ASYNCOS-MAIL-MIB
     table:
@@ -169,7 +176,7 @@ metrics:
         OID: 1.3.6.1.4.1.15497.1.1.1.12.1.4
         chart_meta:
           description: Seconds until the valid Feature Key expires
-          family: License/Key/Expiration
+          family: 'License/Key/Expiration'
           unit: "s"
     metric_tags:
       - tag: ironport_key_description
@@ -192,13 +199,13 @@ metrics:
         OID: 1.3.6.1.4.1.15497.1.1.1.13.1.3
         chart_meta:
           description: The number of successful attempts that have occurred when updating a service
-          family: Service/Update/Successful
+          family: 'Service/Update/Successful'
           unit: "{attempt}/s"
       - name: ironport.updateFailures
         OID: 1.3.6.1.4.1.15497.1.1.1.13.1.4
         chart_meta:
           description: The number of failed attempts that have occurred when updating a service.
-          family: Service/Update/Failed
+          family: 'Service/Update/Failed'
           unit: "{attempt}/s"
     metric_tags:
       - tag: ironport_update_service_name
@@ -211,7 +218,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.1.1.15.0
       chart_meta:
         description: Number of DNS requests that have been sent but for which no reply has been received
-        family: DNS/Request/Outstanding
+        family: 'DNS/Request/Outstanding'
         unit: "{request}/s"
   - MIB: ASYNCOS-MAIL-MIB
     symbol:
@@ -219,7 +226,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.1.1.16.0
       chart_meta:
         description: Number of DNS requests waiting to be sent
-        family: DNS/Request/Pending
+        family: 'DNS/Request/Pending'
         unit: "{request}"
   - MIB: ASYNCOS-MAIL-MIB
     symbol:
@@ -227,7 +234,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.1.1.17.0
       chart_meta:
         description: The total number of RAID events that have occurred since the last appliance power on event
-        family: Disk/RAID/Event/Total
+        family: 'Disk/RAID/Event/Total'
         unit: "{event}/s"
   - MIB: ASYNCOS-MAIL-MIB
     table:
@@ -238,7 +245,7 @@ metrics:
         OID: 1.3.6.1.4.1.15497.1.1.1.18.1.2
         chart_meta:
           description: Represents the status of a drive attached to a RAID controller in the appliance
-          family: Disk/RAID/Status
+          family: 'Disk/RAID/Status'
           unit: "{status}"
         mapping:
           1: drive_healthy
@@ -259,32 +266,34 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.1.1.19.0
       chart_meta:
         description: This object notes how many files or sockets are open on the appliance. In normal operating conditions, the measurement is taken at least once every 5-15 seconds.
-        family: System/Resource/File/Open
-        unit: "{file}"
+        family: 'System/Resource/File/Open'
+        unit: "{fd}"
   - MIB: ASYNCOS-MAIL-MIB
     symbol:
       name: ironport.mailTransferThreads
       OID: 1.3.6.1.4.1.15497.1.1.1.20.0
       chart_meta:
         description: Number of threads that perform some task related to transferring mail.
-        family: Mail/Transfer/Threads
+        family: 'Mail/Transfer/Threads'
         unit: "{thread}"
-  #  - MIB: ASYNCOS-MAIL-MIB
-  #    symbol:
-  #      name: ironport.fipsMode
-  #      OID: 1.3.6.1.4.1.15497.1.1.1.23.0
-  #      enum:
-  #        enabled: 1
-  #        disabled: 2
-  #      TODO: enum in scalar metric is not supported yet (keep this metric and this
-  #        comment in profile until it's fixed)
+  - MIB: ASYNCOS-MAIL-MIB
+    symbol:
+      name: ironport.fipsMode
+      OID: 1.3.6.1.4.1.15497.1.1.1.23.0
+      chart_meta:
+        description: Indicates whether the appliance is operating in FIPS mode
+        family: 'Security/FIPS/Mode'
+        unit: "{status}"
+      mapping:
+        enabled: 1
+        disabled: 2
   - MIB: ASYNCOS-MAIL-MIB
     symbol:
       name: ironport.perCentCPULoad
       OID: 1.3.6.1.4.1.15497.1.1.1.26.0
       chart_meta:
         description: This object provides a general idea of how busy the CPU is according to the appliance software, within the last 5 seconds of ironport
-        family: CPU/Load
+        family: 'CPU/Usage'
         unit: "%"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -292,7 +301,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.2.3.2.2.0
       chart_meta:
         description: The number of HTTP requests received from clients
-        family: HTTP/Client/Request/Total
+        family: 'HTTP/Client/Request/Total'
         unit: "{request}/s"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -300,7 +309,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.2.3.2.4.0
       chart_meta:
         description: The number of HTTP errors caused by client connections.
-        family: HTTP/Client/Error/Total
+        family: 'HTTP/Client/Error/Total'
         unit: "{error}/s"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -308,7 +317,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.2.3.2.7.0
       chart_meta:
         description: The number of connected but idle persistent client connections
-        family: HTTP/Client/Connection/Idle
+        family: 'HTTP/Client/Connection/Idle'
         unit: "{connection}"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -316,7 +325,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.2.3.2.8.0
       chart_meta:
         description: The current number of active + idle client connections
-        family: HTTP/Client/Connection/Total
+        family: 'HTTP/Client/Connection/Total'
         unit: "{connection}"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -324,7 +333,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.2.3.2.9.0
       chart_meta:
         description: The maximum number of simultaneous client connections that will be allowed
-        family: HTTP/Client/Connection/Max
+        family: 'HTTP/Client/Connection/Max'
         unit: "{connection}"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -332,7 +341,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.2.3.2.10.0
       chart_meta:
         description: The total number of sockets accepted from the clients
-        family: HTTP/Client/Socket/Accepted
+        family: 'HTTP/Client/Socket/Accepted'
         unit: "{socket}/s"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -340,7 +349,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.2.3.2.17.0
       chart_meta:
         description: The number of responses blocked by access control
-        family: HTTP/Client/Response/Denied
+        family: 'HTTP/Client/Response/Denied'
         unit: "{response}/s"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -348,7 +357,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.2.3.3.2.0
       chart_meta:
         description: The total number of HTTP requests sent to servers
-        family: HTTP/Server/Request/Total
+        family: 'HTTP/Server/Request/Total'
         unit: "{request}/s"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -356,7 +365,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.2.3.3.3.0
       chart_meta:
         description: The total number of sockets opened from the servers
-        family: HTTP/Server/Socket/Total
+        family: 'HTTP/Server/Socket/Total'
         unit: "{socket}"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -364,7 +373,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.2.3.3.4.0
       chart_meta:
         description: The number of HTTP errors while fetching objects
-        family: HTTP/Server/Error/Total
+        family: 'HTTP/Server/Error/Total'
         unit: "{error}/s"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -372,7 +381,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.2.3.3.7.0
       chart_meta:
         description: The number of connected but idle persistent server connections
-        family: HTTP/Server/Connection/Idle
+        family: 'HTTP/Server/Connection/Idle'
         unit: "{connection}"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -380,7 +389,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.2.3.3.8.0
       chart_meta:
         description: The current number of active + idle server connections
-        family: HTTP/Server/Connection/Total
+        family: 'HTTP/Server/Connection/Total'
         unit: "{connection}"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -388,7 +397,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.2.3.3.9.0
       chart_meta:
         description: The number of server connections closed due to idle time limits
-        family: HTTP/Server/Connection/Closed
+        family: 'HTTP/Server/Connection/Closed'
         unit: "{connection}/s"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -396,7 +405,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.2.3.3.10.0
       chart_meta:
         description: The number of times the number of idle persistent connections hit the count limit and caused a connection to be closed
-        family: HTTP/Server/Connection/Limited
+        family: 'HTTP/Server/Connection/Limited'
         unit: "{connection}/s"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -404,7 +413,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.2.3.3.11.0
       chart_meta:
         description: The limit on the number of server connections
-        family: HTTP/Server/Connection/Threshold
+        family: 'HTTP/Server/Connection/Threshold'
         unit: "{connection}"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -412,7 +421,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.2.3.6.1.0
       chart_meta:
         description: Total number of HTTP requests from clients
-        family: HTTP/Request/Total
+        family: 'HTTP/Request/Total'
         unit: "{request}/s"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -420,7 +429,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.2.3.6.2.0
       chart_meta:
         description: The HTTP mean response time
-        family: HTTP/Response/Time/Mean
+        family: 'HTTP/Response/Time/Mean'
         unit: "ms"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -428,7 +437,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.2.3.6.3.0
       chart_meta:
         description: The HTTP mean response time of Misses
-        family: HTTP/Response/Time/Miss
+        family: 'HTTP/Response/Time/Miss'
         unit: "ms"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -436,7 +445,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.2.3.6.4.0
       chart_meta:
         description: The HTTP mean response time of Hits
-        family: HTTP/Response/Time/Hit
+        family: 'HTTP/Response/Time/Hit'
         unit: "ms"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -444,7 +453,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.2.3.6.5.0
       chart_meta:
         description: The HTTP hit ratio
-        family: Cache/Hit/Ratio
+        family: 'Cache/Hit/Ratio'
         unit: "%"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -452,7 +461,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.2.3.6.6.0
       chart_meta:
         description: The HTTP byte hit ratio
-        family: Cache/Hit/ByteRatio
+        family: 'Cache/Hit/ByteRatio'
         unit: "%"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -461,7 +470,7 @@ metrics:
       scale_factor: 1000000 # MBits => bytes
       chart_meta:
         description: The total bandwidth savings for HTTP
-        family: Bandwidth/Savings/Total
+        family: 'Bandwidth/Savings/Total'
         unit: "bit/s"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -469,7 +478,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.2.3.6.8.0
       chart_meta:
         description: The proxy up time
-        family: System/Uptime
+        family: 'System/Uptime'
         unit: "s"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -477,7 +486,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.2.3.6.9.0
       chart_meta:
         description: The percentage of errors in the HTTP replies to clients
-        family: HTTP/Client/Errors/Percentage
+        family: 'HTTP/Client/Errors/Percentage'
         unit: "%"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -485,7 +494,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.2.3.7.1.1.0
       chart_meta:
         description: Request throughput in the last minute
-        family: Throughput/Request/Total
+        family: 'Throughput/Request/Total'
         unit: "{request}"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -494,7 +503,7 @@ metrics:
       scale_factor: 1000
       chart_meta:
         description: Bandwidth savings in the last minute
-        family: Bandwidth/Savings/Current
+        family: 'Bandwidth/Savings/Current'
         unit: "bit/s"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -503,7 +512,7 @@ metrics:
       scale_factor: 1000
       chart_meta:
         description: Bandwidth spent in the last minute
-        family: Bandwidth/Usage/Current
+        family: 'Bandwidth/Usage/Current'
         unit: "bit/s"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -512,7 +521,7 @@ metrics:
       scale_factor: 1000
       chart_meta:
         description: Bandwidth total in the last minute
-        family: Bandwidth/Total/Current
+        family: 'Bandwidth/Total/Current'
         unit: "bit/s"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -520,7 +529,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.2.3.7.5.1.0
       chart_meta:
         description: Hit throughput in the last minute
-        family: Cache/Hit/Throughput
+        family: 'Cache/Hit/Throughput'
         unit: "{hit}"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -528,7 +537,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.2.3.7.6.1.0
       chart_meta:
         description: Miss throughput in the last minute
-        family: Cache/Miss/Throughput
+        family: 'Cache/Miss/Throughput'
         unit: "{miss}"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -536,7 +545,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.2.3.7.7.1.0
       chart_meta:
         description: Cache hit response time in the last minute
-        family: Cache/Response/Time/Hit
+        family: 'Cache/Response/Time/Hit'
         unit: "ms"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -544,7 +553,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.2.3.7.8.1.0
       chart_meta:
         description: Cache miss response time in the last minute
-        family: Cache/Response/Time/Miss
+        family: 'Cache/Response/Time/Miss'
         unit: "ms"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -552,7 +561,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.2.3.7.9.1.0
       chart_meta:
         description: Cache total response time in the last minute
-        family: Cache/Response/Time/Total
+        family: 'Cache/Response/Time/Total'
         unit: "ms"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -560,7 +569,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.2.3.7.10.1.0
       chart_meta:
         description: Cache error throughput time in the last minute
-        family: Cache/Error/Throughput
+        family: 'Cache/Error/Throughput'
         unit: "{error}"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -568,7 +577,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.2.3.7.11.1.0
       chart_meta:
         description: Cache denial throughput time in the last minute
-        family: Cache/Denial/Throughput
+        family: 'Cache/Denial/Throughput'
         unit: "{denial}"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -576,7 +585,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.2.3.7.12.1.0
       chart_meta:
         description: Cache error response time in the last minute
-        family: Cache/Response/Time/Error
+        family: 'Cache/Response/Time/Error'
         unit: "ms"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
@@ -584,7 +593,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.2.3.7.13.1.0
       chart_meta:
         description: Cache denial response time in the last minute
-        family: Cache/Response/Time/Denial
+        family: 'Cache/Response/Time/Denial'
         unit: "ms"
 metric_tags:
   - tag: ironport_cache_admin

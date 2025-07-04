@@ -10,7 +10,7 @@ metrics:
         name: cpmCPUTotal1minRev
         chart_meta:
           description: The overall CPU busy percentage in the last 1 minute period
-          family: CPU/Usage
+          family: 'System/CPU/Usage'
           unit: "%"
     metric_tags:
       - tag: cpu
@@ -25,24 +25,24 @@ metrics:
         name: ciscoMemoryPoolUsed
         chart_meta:
           description: Number of bytes from the memory pool currently in use
-          family: MemoryPool/Used
+          family: 'System/Memory/Pool/Used'
           unit: "By"
       - OID: 1.3.6.1.4.1.9.9.48.1.1.1.6
         name: ciscoMemoryPoolFree
         chart_meta:
           description: Number of bytes from the memory pool currently unused
-          family: MemoryPool/Free
+          family: 'System/Memory/Pool/Free'
           unit: "By"
       - OID: 1.3.6.1.4.1.9.9.48.1.1.1.7
         name: ciscoMemoryPoolLargestFree
         chart_meta:
           description: Largest number of contiguous bytes from the memory pool currently unused
-          family: MemoryPool/LargestFree
+          family: 'System/Memory/Pool/LargestFree'
           unit: "By"
     metric_tags:
+      - tag: mem_pool_index
+        index: 1
       - tag: mem_pool_name
         symbol:
           OID: 1.3.6.1.4.1.9.9.48.1.1.1.2
           name: ciscoMemoryPoolName
-      - tag: mem_pool_index
-        index: 1

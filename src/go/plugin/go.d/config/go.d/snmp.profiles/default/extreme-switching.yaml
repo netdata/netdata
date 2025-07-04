@@ -4,8 +4,7 @@ extends:
   - _std-entity-sensor-mib.yaml
 
 sysobjectid:
-  - 1.3.6.1.4.1.1916.2.89
-  - 1.3.6.1.4.1.1916.2.343
+  - 1.3.6.1.4.1.1916.2.*
 
 metadata:
   device:
@@ -15,13 +14,23 @@ metadata:
       type:
         value: "switch"
 
+metric_tags:
+  - tag: primary_software_rev
+    OID: 1.3.6.1.4.1.1916.1.1.1.13.0
+    symbol: extremePrimarySoftwareRev
+  - tag: primary_secondary_rev
+    OID: 1.3.6.1.4.1.1916.1.1.1.14.0
+    symbol: extremeSecondarySoftwareRev
+
 metrics:
   - MIB: EXTREME-SOFTWARE-MONITOR-MIB
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.1916.1.32.1.2.0
-      description: Total CPU utlization (percentage) as of last sampling.
-      unit: "%"
+      chart_meta:
+        family: 'CPU/Usage'
+        description: Total CPU utilization
+        unit: "%"
   - MIB: EXTREME-SOFTWARE-MONITOR-MIB
     table:
       name: extremeMemoryMonitorSystemTable
@@ -29,101 +38,134 @@ metrics:
     symbols:
       - name: memory.total
         OID: 1.3.6.1.4.1.1916.1.32.2.2.1.2
-        description: Total amount of DRAM in Kbytes in the system.
-        unit: "kBy"
+        scale_factor: 1024
+        chart_meta:
+          family: 'Memory/Total'
+          description: Total amount of DRAM in Kbytes in the system.
+          unit: "By"
       - name: memory.free
         OID: 1.3.6.1.4.1.1916.1.32.2.2.1.3
-        description: Total amount of free memory in Kbytes in the system.
-        unit: "kBy"
+        scale_factor: 1024
+        chart_meta:
+          family: 'Memory/Free'
+          description: Total amount of free memory in Kbytes in the system.
+          unit: "By"
     metric_tags:
-      - index: 1  # extremeMemoryMonitorSystemSlotId
-        tag: mem
-  # - MIB: EXTREME-SYSTEM-MIB
-  #   symbol:
-  #     name: extremeOverTemperatureAlarm
-  #     OID: 1.3.6.1.4.1.1916.1.1.1.7.0
-  #     enum:
-  #       true: 1
-  #       false: 2
-  #     TODO: enum in scalar metric is not supported yet (keep this metric and this
-  #       comment in profile until it's fixed)
+      - tag: mem_index
+        index: 1  # extremeMemoryMonitorSystemSlotId
+
+  - MIB: EXTREME-SYSTEM-MIB
+    symbol:
+      name: extremeOverTemperatureAlarm
+      OID: 1.3.6.1.4.1.1916.1.1.1.7.0
+      chart_meta:
+        family: 'Hardware/Sensor/Temperature/Alarm/Status'
+        description: Over temperature alarm status
+        unit: "{status}"
+      mapping:
+        1: active
+        2: clear
   - MIB: EXTREME-SYSTEM-MIB
     symbol:
       name: extremeCurrentTemperature
       OID: 1.3.6.1.4.1.1916.1.1.1.8.0
-      description: Current temperature in degrees celcius measured inside device enclosure.
-      unit: "Cel"
-  # - MIB: EXTREME-SYSTEM-MIB
-  #   symbol:
-  #     name: extremePrimaryPowerOperational
-  #     OID: 1.3.6.1.4.1.1916.1.1.1.10.0
-  #     enum:
-  #       true: 1
-  #       false: 2
-  #     TODO: enum in scalar metric is not supported yet (keep this metric and this
-  #       comment in profile until it's fixed)
-  # - MIB: EXTREME-SYSTEM-MIB
-  #   symbol:
-  #     name: extremeRedundantPowerStatus
-  #     OID: 1.3.6.1.4.1.1916.1.1.1.11.0
-  #     enum:
-  #       notPresent: 1
-  #       presentOK: 2
-  #       presentNotOK: 3
-  #     TODO: enum in scalar metric is not supported yet (keep this metric and this
-  #       comment in profile until it's fixed)
-  # - MIB: EXTREME-SYSTEM-MIB
-  #   symbol:
-  #     name: extremeRedundantPowerAlarm
-  #     OID: 1.3.6.1.4.1.1916.1.1.1.12.0
-  #     enum:
-  #       true: 1
-  #       false: 2
-  #     TODO: enum in scalar metric is not supported yet (keep this metric and this
-  #       comment in profile until it's fixed)
-  # - MIB: EXTREME-SYSTEM-MIB
-  #   symbol:
-  #     name: extremePrimarySoftwareRev
-  #     OID: 1.3.6.1.4.1.1916.1.1.1.13.0
-  # scalar string metric is not supported yet (keep this metric and this comment in profile until it's fixed)
-  # - MIB: EXTREME-SYSTEM-MIB
-  #   symbol:
-  #     name: extremeSecondarySoftwareRev
-  #     OID: 1.3.6.1.4.1.1916.1.1.1.14.0
-  # scalar string metric is not supported yet (keep this metric and this comment in profile until it's fixed)
+      chart_meta:
+        family: 'Hardware/Sensor/Temperature/Value'
+        description: Current temperature measured inside device enclosure.
+        unit: "Cel"
+  - MIB: EXTREME-SYSTEM-MIB
+    symbol:
+      name: extremePrimaryPowerOperational
+      OID: 1.3.6.1.4.1.1916.1.1.1.10.0
+      chart_meta:
+        family: 'Hardware/Power/Primary/Status'
+        description: Primary power operational status
+        unit: "{status}"
+      mapping:
+        1: ok
+        2: failed
+  - MIB: EXTREME-SYSTEM-MIB
+    symbol:
+      name: extremeRedundantPowerStatus
+      OID: 1.3.6.1.4.1.1916.1.1.1.11.0
+      chart_meta:
+        family: 'Hardware/Power/Redundant/Status'
+        description: Redundant power supply status
+        unit: "{status}"
+      mapping:
+        1: not_present
+        2: present_ok
+        3: present_not_ok
+  - MIB: EXTREME-SYSTEM-MIB
+    symbol:
+      name: extremeRedundantPowerAlarm
+      OID: 1.3.6.1.4.1.1916.1.1.1.12.0
+      chart_meta:
+        family: 'Hardware/Power/Redundant/Alarm/Status'
+        description: Redundant power alarm status
+        unit: "{status}"
+      mapping:
+        1: clear
+        2: active
   - MIB: EXTREME-SYSTEM-MIB
     symbol:
       name: extremeInputPowerVoltage
       OID: 1.3.6.1.4.1.1916.1.1.1.20.0
-      description: The input power voltage at which the system is currently operating.
-      unit: "V"
-  # - MIB: EXTREME-SYSTEM-MIB
-  #   symbol:
-  #     name: extremePowerStatus
-  #     OID: 1.3.6.1.4.1.1916.1.1.1.21.0
-  #     enum:
-  #       notPresent: 1
-  #       presentOK: 2
-  #       presentNotOK: 3
-  #     TODO: enum in scalar metric is not supported yet (keep this metric and this
-  #       comment in profile until it's fixed)
-  # - MIB: EXTREME-SYSTEM-MIB
-  #   symbol:
-  #     name: extremePowerAlarm
-  #     OID: 1.3.6.1.4.1.1916.1.1.1.22.0
-  #     enum:
-  #       true: 1
-  #       false: 2
-  #     TODO: enum in scalar metric is not supported yet (keep this metric and this
-  #       comment in profile until it's fixed)
-  # - MIB: EXTREME-SYSTEM-MIB
-  #   symbol:
-  #     name: extremeSystemPowerState
-  #     OID: 1.3.6.1.4.1.1916.1.1.1.36.0
-  #     enum:
-  #       computing: 1
-  #       sufficientButNotRedundantPower: 2
-  #       redundantPowerAvailable: 3
-  #       insufficientPower: 4
-  #     TODO: enum in scalar metric is not supported yet (keep this metric and this
-  #       comment in profile until it's fixed)
+      chart_meta:
+        family: 'Hardware/Power/Input/Voltage'
+        description: The input power voltage at which the system is currently operating.
+        unit: "V"
+  - MIB: EXTREME-SYSTEM-MIB
+    symbol:
+      name: extremePowerStatus
+      OID: 1.3.6.1.4.1.1916.1.1.1.21.0
+      chart_meta:
+        family: 'Hardware/Power/Status'
+        description: Power supply status
+        unit: "{status}"
+      mapping:
+        1: not_present
+        2: present_ok
+        3: present_not_ok
+  - MIB: EXTREME-SYSTEM-MIB
+    symbol:
+      name: extremePowerAlarm
+      OID: 1.3.6.1.4.1.1916.1.1.1.22.0
+      chart_meta:
+        family: 'Hardware/Power/Alarm/Status'
+        description: Power alarm status
+        unit: "{status}"
+      mapping:
+        1: clear
+        2: active
+  - MIB: EXTREME-SYSTEM-MIB
+    symbol:
+      name: extremeSystemPowerState
+      OID: 1.3.6.1.4.1.1916.1.1.1.36.0
+      chart_meta:
+        family: 'Hardware/Power/Overall/Status'
+        description: Overall system power state
+        unit: "{status}"
+      mapping:
+        1: computing
+        2: sufficient_but_not_redundant_power
+        3: redundant_power_available
+        4: insufficient_power
+
+  - MIB: EXTREME-SOFTWARE-MONITOR-MIB
+    table:
+      name: extremeFanStatusTable
+      OID: 1.3.6.1.4.1.1916.1.1.1.9
+    symbols:
+      - name: extremeFanOperational
+        OID: 1.3.6.1.4.1.1916.1.1.1.9.1.2
+        chart_meta:
+          description: Operational status of a cooling fan
+          family: 'Hardware/Fan/Status'
+          unit: "{status}"
+        mapping:
+          1: ok
+          2: failed
+    metric_tags:
+      - tag: fan_index
+        index: 1

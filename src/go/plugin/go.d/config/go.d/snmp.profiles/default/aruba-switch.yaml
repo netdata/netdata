@@ -79,7 +79,7 @@ metrics:
         name: sysExtFanStatus
         chart_meta:
           description: Status of the Fan
-          family: Fan/Status
+          family: 'Hardware/Fan/Status'
           unit: "{status}"
         mapping:
           1: active
@@ -102,7 +102,7 @@ metrics:
         name: sysExtPowerSupplyStatus
         chart_meta:
           description: Status of the power supply
-          family: PowerSupply/Status
+          family: 'Hardware/PowerSupply/Status'
           unit: "{status}"
         mapping:
           1: active
@@ -124,7 +124,7 @@ metrics:
         name: sysExtProcessorLoad
         chart_meta:
           description: The average over the last minute of the percentage of time that this processor was not idle
-          family: CPU/Usage
+          family: 'System/CPU/Usage'
           unit: "%"
     metric_tags:
       - tag: cpu_index
@@ -142,21 +142,21 @@ metrics:
         name: sysExtMemorySize
         chart_meta:
           description: Total memory in KB
-          family: Memory/Total
+          family: 'System/Memory/Total'
           unit: "By"
         scale_factor: 1024
       - OID: 1.3.6.1.4.1.14823.2.2.1.2.1.15.1.3
         name: sysExtMemoryUsed
         chart_meta:
           description: Used memory in KB
-          family: Memory/Used
+          family: 'System/Memory/Used'
           unit: "By"
         scale_factor: 1024
       - OID: 1.3.6.1.4.1.14823.2.2.1.2.1.15.1.4
         name: sysExtMemoryFree
         chart_meta:
           description: Free memory in KB
-          family: Memory/Free
+          family: 'System/Memory/Free'
           unit: "By"
         scale_factor: 1024
     metric_tags:
@@ -172,5 +172,5 @@ metrics:
       name: wlsxSysExtPacketLossPercent
       chart_meta:
         description: Packet loss percent of the switch
-        family: Network/Packet/Loss/Percentage
+        family: 'Network/Packet/Loss'
         unit: "%"

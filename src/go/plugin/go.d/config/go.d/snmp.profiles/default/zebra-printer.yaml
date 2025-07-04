@@ -37,7 +37,7 @@ metrics:
         name: zbrTrackedAlertsSeverity
         chart_meta:
           description: The severity level of tracked alerts
-          family: Alert/Severity/Status
+          family: 'Alert/Severity/Status'
           unit: "{status}"
         mapping:
           1: other
@@ -47,7 +47,7 @@ metrics:
         name: zbrTrackedAlertsCode
         chart_meta:
           description: The code associated with tracked alerts
-          family: Alert/Code/Status
+          family: 'Alert/Code/Status'
           unit: "{status}"
         mapping:
           1: paper-out

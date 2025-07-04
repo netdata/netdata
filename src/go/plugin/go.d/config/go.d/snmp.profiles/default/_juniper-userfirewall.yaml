@@ -7,14 +7,14 @@ metrics:
       - OID: 1.3.6.1.4.1.2636.3.89.1.1.3.1.3
         name: jnxUserFwLDAPTotalQuery
         chart_meta:
-          description: Total LDAP query number
-          family: "LDAP/Query/Total"
+          family: 'Network/Firewall/LDAP/Query/Total'
+          description: Total LDAP queries
           unit: "{query}/s"
       - OID: 1.3.6.1.4.1.2636.3.89.1.1.3.1.4
         name: jnxUserFwLDAPFailedQuery
         chart_meta:
-          description: LDAP failed query number
-          family: "LDAP/Query/Failed"
+          family: 'Network/Firewall/LDAP/Query/Failed'
+          description: LDAP failed queries
           unit: "{query}/s"
     metric_tags:
       - tag: ldap_domain_name

@@ -9,47 +9,67 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.1
         name: adapterRxPackets
-        description: Total number of packets received
-        unit: "{packet}"
+        chart_meta:
+          family: "Network/Interface/Packet/Total/In"
+          description: Total number of packets received
+          unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.2
         name: adapterTxPackets
-        description: Total number of packets transmitted
-        unit: "{packet}"
+        chart_meta:
+          family: "Network/Interface/Packet/Total/Out"
+          description: Total number of packets transmitted
+          unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.3
         name: adapterRxBytes
-        description: Total number of bytes received
-        unit: "By"
+        chart_meta:
+          family: "Network/Interface/Traffic/Total/In"
+          description: Total number of bytes received
+          unit: "By/s"
       - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.4
         name: adapterTxBytes
-        description: Total number of bytes transmitted
-        unit: "By"
+        chart_meta:
+          family: "Network/Interface/Traffic/Total/Out"
+          description: Total number of bytes transmitted
+          unit: "By/s"
       - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.5
         name: adapterRxErrors
-        description: Total number of packets received with errors (packets that failed to reach the protocol)
-        unit: "{packet}"
+        chart_meta:
+          family: "Network/Interface/Error/Total/In"
+          description: Total number of packets received with errors (packets that failed to reach the protocol)
+          unit: "{error}/s"
       - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.6
         name: adapterTxErrors
-        description: Total number of packets that failed to transmit
-        unit: "{packet}"
+        chart_meta:
+          family: "Network/Interface/Error/Total/Out"
+          description: Total number of packets that failed to transmit
+          unit: "{error}/s"
       - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.7
         name: adapterRxDropped
-        description: Total number of receive packets dropped due to overrun
-        unit: "{packet}"
+        chart_meta:
+          family: "Network/Interface/Dropped/In"
+          description: Total number of receive packets dropped due to overrun
+          unit: "{drop}/s"
       - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.8
         name: adapterTxDropped
-        description: Total number of transmit packets dropped due to successive collisions
-        unit: "{packet}"
+        chart_meta:
+          family: "Network/Interface/Dropped/Out"
+          description: Total number of transmit packets dropped due to successive collisions
+          unit: "{drop}/s"
       - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.9
         name: adapterRxMulticast
-        description: Total number of Multicast packets received
-        unit: "{packet}"
+        chart_meta:
+          family: "Network/Interface/Multicast/In"
+          description: Total number of Multicast packets received
+          unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.10
         name: adapterCollisions
-        description: Total number of single collisions
-        unit: "{collision}"
+        chart_meta:
+          family: "Network/Interface/Error/Collision/Count"
+          description: Total number of single collisions
+          unit: "{collision}/s"
     metric_tags:
-      - symbol:
+      - tag: adapter
+        symbol:
           OID: 1.3.6.1.4.1.343.2.7.2.2.1.1.1.2
           name: adapterName
         table: genericAdaptersAttrTable
-        tag: adapter

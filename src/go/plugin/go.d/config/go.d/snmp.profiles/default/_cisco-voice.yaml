@@ -10,14 +10,14 @@ metrics:
         OID: 1.3.6.1.2.1.25.5.1.1.2
         chart_meta:
           description: Total amount of real system memory allocated to this process
-          family: Process/Memory/Usage
+          family: 'System/Process/Memory/Usage'
           unit: "By"
         scale_factor: 1024
       - name: hrSWRunPerfCPU
         OID: 1.3.6.1.2.1.25.5.1.1.1
         chart_meta:
           description: The number of centi-seconds of the total system's CPU resources consumed by this process
-          family: Process/CPU/Time
+          family: 'System/Process/CPU/Time'
           unit: "cs"
     metric_tags:
       - tag: run_index
@@ -25,6 +25,7 @@ metrics:
         symbol:
           name: hrSWRunIndex
           OID: 1.3.6.1.2.1.25.4.2.1.1
+
   - MIB: HOST-RESOURCES-MIB
     table:
       name: hrSWRunTable
@@ -34,7 +35,7 @@ metrics:
         OID: 1.3.6.1.2.1.25.4.2.1.7
         chart_meta:
           description: The status of this running piece of software
-          family: Process/Run/Status
+          family: 'System/Process/Run/Status'
           unit: "{status}"
         mapping:
           1: running
@@ -56,37 +57,37 @@ metrics:
         OID: 1.3.6.1.4.1.9.9.590.1.6.1.1.5
         chart_meta:
           description: Average period of time elapsed between the arrival of a CONNECT message from ICM and when the call is actually answered, on the first transfer request for the calls
-          family: Voice/CVP/Connect/Latency
+          family: 'Voice/CVP/Connect/Latency'
           unit: "ms"
       - name: ccvpSipIntAvgLatency2
         OID: 1.3.6.1.4.1.9.9.590.1.6.1.1.6
         chart_meta:
           description: Average period of time between the arrival of a CONNECT message from ICM and when the call is actually answered, on the second and subsequent transfer request for the call
-          family: Voice/CVP/Connect/Latency
+          family: 'Voice/CVP/Connect/Latency'
           unit: "ms"
       - name: ccvpSipIntConnectsRcv
         OID: 1.3.6.1.4.1.9.9.590.1.6.1.1.4
         chart_meta:
           description: Number of CONNECT messages received by the SIP service in order to perform a Customer Voice Portal transfer
-          family: Voice/CVP/Connect/Received
+          family: 'Voice/CVP/Connect/Received'
           unit: "{connect}/s"
       - name: ccvpSipIntNewCalls
         OID: 1.3.6.1.4.1.9.9.590.1.6.1.1.3
         chart_meta:
           description: Number of SIP INVITE messages received by CVP since system start time
-          family: Voice/CVP/Invite/Received
+          family: 'Voice/CVP/Invite/Received'
           unit: "{invite}/s"
       - name: ccvpSipRtActiveCalls
         OID: 1.3.6.1.4.1.9.9.590.1.6.1.1.1
         chart_meta:
           description: Number of active calls being handled by the CVP SIP service
-          family: Voice/CVP/Call/Active
+          family: 'Voice/CVP/Call/Active'
           unit: "{call}"
       - name: ccvpSipRtTotalCallLegs
         OID: 1.3.6.1.4.1.9.9.590.1.6.1.1.2
         chart_meta:
           description: Number of SIP call legs being handled by the SIP service
-          family: Voice/CVP/CallLeg/Active
+          family: 'Voice/CVP/CallLeg/Active'
           unit: "{call_leg}"
     metric_tags:
       - tag: service_index
@@ -102,7 +103,7 @@ metrics:
       OID: 1.3.6.1.4.1.9.9.590.1.2.12.0
       chart_meta:
         description: Peak number of simultaneous port licenses used since the start of the system
-        family: Voice/CVP/License/Port/Maximum
+        family: 'Voice/CVP/License/Port/Maximum'
         unit: "{license}"
   - MIB: CISCO-CVP-MIB
     symbol:
@@ -110,7 +111,7 @@ metrics:
       OID: 1.3.6.1.4.1.9.9.590.1.2.2.0
       chart_meta:
         description: Number of port licenses currently in use on the call server
-        family: Voice/CVP/License/Port/Current
+        family: 'Voice/CVP/License/Port/Current'
         unit: "{license}"
 
   - MIB: CISCO-CCM-MIB
@@ -120,7 +121,7 @@ metrics:
       OID: 1.3.6.1.4.1.9.9.156.1.5.8.0
       chart_meta:
         description: Number of gateways that are registered and actively in communication with the local call manager
-        family: Voice/UCM/Gateway/Registered
+        family: 'Voice/UCM/Gateway/Registered'
         unit: "{gateway}"
   - MIB: CISCO-CCM-MIB
     metric_type: gauge
@@ -129,7 +130,7 @@ metrics:
       OID: 1.3.6.1.4.1.9.9.156.1.5.5.0
       chart_meta:
         description: Number of phones that are registered and actively in communication with the local call manager.
-        family: Voice/UCM/Phone/Registered
+        family: 'Voice/UCM/Phone/Registered'
         unit: "{phone}"
   - MIB: CISCO-CCM-MIB
     metric_type: gauge
@@ -138,7 +139,7 @@ metrics:
       OID: 1.3.6.1.4.1.9.9.156.1.5.7.0
       chart_meta:
         description: Number of phones whose registration requests were rejected by the local call manager.
-        family: Voice/UCM/Phone/Rejected
+        family: 'Voice/UCM/Phone/Rejected'
         unit: "{reject}"
   - MIB: CISCO-CCM-MIB
     metric_type: gauge
@@ -147,7 +148,7 @@ metrics:
       OID: 1.3.6.1.4.1.9.9.156.1.5.6.0
       chart_meta:
         description: Number of phone that are unregistered or have lost contact with the local call manager.
-        family: Voice/UCM/Phone/Unregistered
+        family: 'Voice/UCM/Phone/Unregistered'
         unit: "{phone}"
 
   - MIB: CISCO-VOICE-DIAL-CONTROL-MIB
@@ -159,13 +160,13 @@ metrics:
         OID: 1.3.6.1.4.1.9.9.63.1.3.8.5.1.1
         chart_meta:
           description: Total number of inbound active media calls through this IP interface.
-          family: Interfaces/Voice/Call/Incoming
+          family: '/Voice/Interface/Call/In'
           unit: "{call}/s"
       - name: cvCallVolMediaOutgoingCalls
         OID: 1.3.6.1.4.1.9.9.63.1.3.8.5.1.2
         chart_meta:
           description: Total number of outbound active media calls through the IP interface.
-          family: Interfaces/Voice/Call/Outgoing
+          family: '/Voice/Interface/Call/Out'
           unit: "{call}/s"
     metric_tags:
       - tag: interface
@@ -174,6 +175,7 @@ metrics:
         symbol:
           OID: 1.3.6.1.2.1.31.1.1.1.1
           name: ifName
+
   - MIB: CISCO-VOICE-DIAL-CONTROL-MIB
     table:
       name: cvCallVolPeerTable
@@ -183,13 +185,13 @@ metrics:
         OID: 1.3.6.1.4.1.9.9.63.1.3.8.4.1.1
         chart_meta:
           description: Total number of active calls that has selected the dialpeer as an incoming dialpeer.
-          family: Voice/DialPeer/Call/Incoming
+          family: 'Voice/DialPeer/Call/Incoming'
           unit: "{call}"
       - name: cvCallVolPeerOutgoingCalls
         OID: 1.3.6.1.4.1.9.9.63.1.3.8.4.1.2
         chart_meta:
           description: Total number of active calls that has selected the dialpeer as an outgoing dialpeer.
-          family: Voice/DialPeer/Call/Outgoing
+          family: 'Voice/DialPeer/Call/Outgoing'
           unit: "{call}"
     metric_tags:
       - tag: peer_index
@@ -205,25 +207,25 @@ metrics:
         OID: 1.3.6.1.2.1.10.21.1.2.2.1.5
         chart_meta:
           description: Number of calls from this peer accepted since system startup
-          family: Voice/DialPeer/Call/Accepted
+          family: 'Voice/DialPeer/Call/Accepted'
           unit: "{call}/s"
       - name: dialCtlPeerStatsFailCalls
         OID: 1.3.6.1.2.1.10.21.1.2.2.1.4
         chart_meta:
           description: Number of failed call attempts to this peer since system startup
-          family: Voice/DialPeer/Call/Failed
+          family: 'Voice/DialPeer/Call/Failed'
           unit: "{call}/s"
       - name: dialCtlPeerStatsRefuseCalls
         OID: 1.3.6.1.2.1.10.21.1.2.2.1.6
         chart_meta:
           description: Number of calls from this peer refused since system startup
-          family: Voice/DialPeer/Call/Refused
+          family: 'Voice/DialPeer/Call/Refused'
           unit: "{call}/s"
       - name: dialCtlPeerStatsSuccessCalls
         OID: 1.3.6.1.2.1.10.21.1.2.2.1.3
         chart_meta:
           description: Number of completed calls to this peer
-          family: Voice/DialPeer/Call/Success
+          family: 'Voice/DialPeer/Call/Success'
           unit: "{call}/s"
     metric_tags:
       - tag: peer_index
@@ -237,7 +239,7 @@ metrics:
         OID: 1.3.6.1.4.1.9.9.473.1.3.6.1.4
         chart_meta:
           description: Last known status of the enterprise contact center application peripheral interface manager functional component.
-          family: Voice/CCA/PIM/Status
+          family: 'Voice/CCA/PIM/Status'
           unit: "{status}"
         mapping:
           1: unknown
@@ -272,20 +274,20 @@ metrics:
         OID: 1.3.6.1.4.1.9.9.473.1.3.1.1.3
         chart_meta:
           description: Number of contact center agents currently managed by the enterprise contact center application.
-          family: Voice/CCA/Agent/LoggedOn
+          family: 'Voice/CCA/Agent/LoggedOn'
           unit: "{agent}"
       - name: cccaRouterCallsInProgress
         OID: 1.3.6.1.4.1.9.9.473.1.3.1.1.4
         chart_meta:
           description: Number of active (voice) calls being managed by the enterprise contact center application.
-          family: Voice/CCA/Call/InProgress
-          unit: "{calls}"
+          family: 'Voice/CCA/Call/InProgress'
+          unit: "{call}"
       - name: cccaRouterCallsInQueue
         OID: 1.3.6.1.4.1.9.9.473.1.3.1.1.8
         chart_meta:
           description: Number of calls queued in all network Voice Response Units (VRUs).
-          family: Voice/CCA/Call/InQueue
-          unit: "{calls}"
+          family: 'Voice/CCA/Call/InQueue'
+          unit: "{call}"
     metric_tags:
       - tag: instance_number
         index: 1 # Index of cccaRouterTable is (cccaInstanceNumber, cccaComponentIndex)

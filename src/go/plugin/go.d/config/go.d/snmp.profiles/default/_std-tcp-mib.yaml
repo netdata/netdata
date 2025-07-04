@@ -7,7 +7,7 @@ metrics:
       name: tcpCurrEstab
       chart_meta:
         description: Current TCP connections in ESTABLISHED or CLOSE-WAIT state
-        family: Network/TCP/Connection/Active/Count
+        family: 'Network/TCP/Connection/Active/Count'
         unit: "{connection}"
   - MIB: TCP-MIB
     symbol:
@@ -15,7 +15,7 @@ metrics:
       name: tcpActiveOpens
       chart_meta:
         description: TCP connections transitioning from CLOSED to SYN-SENT
-        family: Network/TCP/Connection/Open/Active/Count
+        family: 'Network/TCP/Connection/Open/Active/Count'
         unit: "{transition}/s"
   - MIB: TCP-MIB
     symbol:
@@ -23,7 +23,7 @@ metrics:
       name: tcpPassiveOpens
       chart_meta:
         description: TCP connections transitioning from LISTEN to SYN-RCVD
-        family: Network/TCP/Connection/Open/Passive/Count
+        family: 'Network/TCP/Connection/Open/Passive/Count'
         unit: "{transition}/s"
   - MIB: TCP-MIB
     symbol:
@@ -31,7 +31,7 @@ metrics:
       name: tcpHCInSegs
       chart_meta:
         description: TCP segments received
-        family: Network/TCP/Segment/Total/In
+        family: 'Network/TCP/Segment/Total/In'
         unit: "{packet}/s"
   - MIB: TCP-MIB
     symbol:
@@ -39,7 +39,7 @@ metrics:
       name: tcpInSegs
       chart_meta:
         description: TCP segments received
-        family: Network/TCP/Segment/Total/In
+        family: 'Network/TCP/Segment/Total/In'
         unit: "{packet}/s"
   - MIB: TCP-MIB
     symbol:
@@ -47,7 +47,7 @@ metrics:
       name: tcpHCOutSegs
       chart_meta:
         description: TCP segments sent
-        family: Network/TCP/Segment/Total/Out
+        family: 'Network/TCP/Segment/Total/Out'
         unit: "{packet}/s"
   - MIB: TCP-MIB
     symbol:
@@ -55,7 +55,7 @@ metrics:
       name: tcpOutSegs
       chart_meta:
         description: TCP segments sent
-        family: Network/TCP/Segment/Total/Out
+        family: 'Network/TCP/Segment/Total/Out'
         unit: "{packet}/s"
   - MIB: TCP-MIB
     symbol:
@@ -63,7 +63,7 @@ metrics:
       name: tcpInErrs
       chart_meta:
         description: TCP segments received with errors
-        family: Network/TCP/Segment/Error/In
+        family: 'Network/TCP/Segment/Error/In'
         unit: "{error}/s"
   - MIB: TCP-MIB
     symbol:
@@ -71,7 +71,7 @@ metrics:
       name: tcpAttemptFails
       chart_meta:
         description: Failed TCP connection attempts
-        family: Network/TCP/Connection/Failure/Count
+        family: 'Network/TCP/Connection/Failure/Count'
         unit: "{failure}/s"
   - MIB: TCP-MIB
     symbol:
@@ -79,7 +79,7 @@ metrics:
       name: tcpEstabResets
       chart_meta:
         description: TCP connections reset from ESTABLISHED/CLOSE-WAIT
-        family: Network/TCP/Connection/Reset/Count
+        family: 'Network/TCP/Connection/Reset/Count'
         unit: "{reset}/s"
   - MIB: TCP-MIB
     symbol:
@@ -87,7 +87,7 @@ metrics:
       name: tcpOutRsts
       chart_meta:
         description: TCP segments sent with RST flag
-        family: Network/TCP/Segment/Reset/Out
+        family: 'Network/TCP/Segment/Reset/Out'
         unit: "{reset}/s"
   - MIB: TCP-MIB
     symbol:
@@ -95,5 +95,5 @@ metrics:
       name: tcpRetransSegs
       chart_meta:
         description: TCP segments retransmitted
-        family: Network/TCP/Segment/Retransmit/Out
+        family: 'Network/TCP/Segment/Retransmit/Out'
         unit: "{retransmit}/s"

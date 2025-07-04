@@ -10,13 +10,13 @@ metrics:
         name: jnxScuStatsPackets
         chart_meta:
           description: Number of packets sent out of destination interface that match the source class and address family
-          family: Interfaces/SCU/Packet/Out
+          family: 'Network/Interface/SCU/Packet/Out'
           unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.2636.3.16.1.1.1.5
         name: jnxScuStatsBytes
         chart_meta:
           description: Number of bytes sent out of destination interface that match the source class and address family
-          family: Interfaces/SCU/Traffic/Out
+          family: 'Network/Interface/SCU/Traffic/Out'
           unit: "By/s"
     metric_tags:
       - tag: interface
