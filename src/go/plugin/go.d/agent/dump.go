@@ -579,7 +579,40 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 	}
 	sort.Strings(dimNameList)
 
+	// Check multipliers and dividers consistency across all charts for each dimension
+	dimMultDivInfo := make(map[string]map[string][]int) // dimName -> "mul"/"div" -> []values
+	for dimName := range allDimNames {
+		dimMultDivInfo[dimName] = map[string][]int{
+			"mul": []int{},
+			"div": []int{},
+		}
+		
+		// Collect all multipliers and dividers for this dimension name across charts
+		for _, ca := range charts {
+			for _, dim := range ca.Chart.Dims {
+				name := dim.Name
+				if name == "" {
+					name = dim.ID
+				}
+				if name == dimName {
+					// Treat 0 as 1 (default value)
+					mul := dim.Mul
+					if mul == 0 {
+						mul = 1
+					}
+					div := dim.Div
+					if div == 0 {
+						div = 1
+					}
+					dimMultDivInfo[dimName]["mul"] = append(dimMultDivInfo[dimName]["mul"], mul)
+					dimMultDivInfo[dimName]["div"] = append(dimMultDivInfo[dimName]["div"], div)
+				}
+			}
+		}
+	}
+
 	hasMissingDims := false
+	hasMultDivInconsistency := false
 	for i, dimName := range dimNameList {
 		// Check if all charts have this dimension name
 		allHaveIt := true
@@ -601,11 +634,95 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 			dimStatus = " 🟡 NOT IN ALL CHARTS"
 		}
 
-		fmt.Printf("%s   │     %s %s%s\n", treePrefix, prefix, dimName, dimStatus)
+		// Check multiplier/divider consistency
+		mulValues := dimMultDivInfo[dimName]["mul"]
+		divValues := dimMultDivInfo[dimName]["div"]
+		
+		// Get unique multipliers and dividers
+		uniqueMuls := make(map[int]bool)
+		uniqueDivs := make(map[int]bool)
+		for _, m := range mulValues {
+			uniqueMuls[m] = true
+		}
+		for _, d := range divValues {
+			uniqueDivs[d] = true
+		}
+		
+		// Format multiplier/divider info
+		multDivStr := ""
+		multDivEmoji := " ✅"
+		
+		// Check consistency
+		if len(uniqueMuls) > 1 || len(uniqueDivs) > 1 {
+			hasMultDivInconsistency = true
+			multDivEmoji = " ❌"
+		}
+		
+		// Format the multiplier/divider string - ALWAYS show them
+		if len(uniqueMuls) == 1 && len(uniqueDivs) == 1 {
+			var mul, div int
+			for m := range uniqueMuls {
+				mul = m
+			}
+			for d := range uniqueDivs {
+				div = d
+			}
+			
+			// Always show multiplier and divider, even if they're 1
+			multDivStr = fmt.Sprintf(" ×%d ÷%d", mul, div)
+		} else {
+			// Show all variations if inconsistent
+			mulStrs := []string{}
+			divStrs := []string{}
+			for m := range uniqueMuls {
+				mulStrs = append(mulStrs, fmt.Sprintf("×%d", m))
+			}
+			for d := range uniqueDivs {
+				divStrs = append(divStrs, fmt.Sprintf("÷%d", d))
+			}
+			
+			parts := append(mulStrs, divStrs...)
+			multDivStr = fmt.Sprintf(" (%s)", strings.Join(parts, ", "))
+		}
+
+		fmt.Printf("%s   │     %s %s%s%s%s\n", treePrefix, prefix, dimName, multDivStr, multDivEmoji, dimStatus)
 	}
 
 	if hasMissingDims {
 		issues = append(issues, "WARNING - missing dimensions in some charts (natural for heterogeneous instances)")
+	}
+	
+	if hasMultDivInconsistency {
+		// Add detailed multiplier/divider inconsistency issues
+		for dimName, info := range dimMultDivInfo {
+			mulValues := info["mul"]
+			divValues := info["div"]
+			
+			uniqueMuls := make(map[int]int)
+			uniqueDivs := make(map[int]int)
+			for _, m := range mulValues {
+				uniqueMuls[m]++
+			}
+			for _, d := range divValues {
+				uniqueDivs[d]++
+			}
+			
+			if len(uniqueMuls) > 1 {
+				mulStrs := []string{}
+				for m, count := range uniqueMuls {
+					mulStrs = append(mulStrs, fmt.Sprintf("%d (in %d charts)", m, count))
+				}
+				issues = append(issues, fmt.Sprintf("dimension '%s' has inconsistent multipliers: %s", dimName, strings.Join(mulStrs, ", ")))
+			}
+			
+			if len(uniqueDivs) > 1 {
+				divStrs := []string{}
+				for d, count := range uniqueDivs {
+					divStrs = append(divStrs, fmt.Sprintf("%d (in %d charts)", d, count))
+				}
+				issues = append(issues, fmt.Sprintf("dimension '%s' has inconsistent dividers: %s", dimName, strings.Join(divStrs, ", ")))
+			}
+		}
 	}
 
 	// Check if any dimensions are missing data across all instances
@@ -665,11 +782,48 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 			}
 
 			emoji := "❌"
+			valueStr := ""
 			if ca.SeenDimensions[dim.ID] && len(ca.CollectedValues[dim.ID]) > 0 {
 				emoji = "✅"
+				
+				// Format sample values
+				values := ca.CollectedValues[dim.ID]
+				if len(values) > 5 {
+					// Show first 3 and last 2 values for long series
+					firstVals := []string{}
+					for i := 0; i < 3; i++ {
+						firstVals = append(firstVals, fmt.Sprintf("%d", values[i]))
+					}
+					lastVals := []string{}
+					for i := len(values) - 2; i < len(values); i++ {
+						lastVals = append(lastVals, fmt.Sprintf("%d", values[i]))
+					}
+					valueStr = fmt.Sprintf(": [%s, ..., %s] ", strings.Join(firstVals, ", "), strings.Join(lastVals, ", "))
+				} else {
+					// Show all values for short series
+					valStrs := []string{}
+					for _, v := range values {
+						valStrs = append(valStrs, fmt.Sprintf("%d", v))
+					}
+					valueStr = fmt.Sprintf(": [%s] ", strings.Join(valStrs, ", "))
+				}
 			}
 
-			fmt.Printf("%s       %s     %s %s: %s\n", treePrefix, instTreePrefix, emoji, dimName, dim.ID)
+			// Format multiplier/divider for this specific dimension
+			mul := dim.Mul
+			div := dim.Div
+			// Treat 0 as 1 (what the framework does)
+			if mul == 0 {
+				mul = 1
+			}
+			if div == 0 {
+				div = 1
+			}
+			
+			// Always show multiplier and divider
+			multDivStr := fmt.Sprintf(" ×%d ÷%d", mul, div)
+
+			fmt.Printf("%s       %s     %s %s%s%s %s\n", treePrefix, instTreePrefix, emoji, dimName, multDivStr, valueStr, dim.ID)
 		}
 
 	}
