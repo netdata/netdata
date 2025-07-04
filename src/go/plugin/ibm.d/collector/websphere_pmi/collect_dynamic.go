@@ -320,7 +320,7 @@ func (w *WebSpherePMI) collectJVMMetrics(mx map[string]int64, nodeName, serverNa
 
 		// CPU usage
 		cpuDimensions := []string{"cpu"}
-		w.ensureChartExists("websphere_pmi.jvm_process_cpu", "JVM Process CPU Usage", "percentage", "line", "jvm", 70101,
+		w.ensureChartExists("websphere_pmi.jvm_process_cpu", "JVM Process CPU Usage", "percentage", "line", "jvm/cpu", 70101,
 			cpuDimensions, instanceName, map[string]string{
 				"node":   nodeName,
 				"server": serverName,
@@ -328,7 +328,7 @@ func (w *WebSpherePMI) collectJVMMetrics(mx map[string]int64, nodeName, serverNa
 
 		// Uptime
 		uptimeDimensions := []string{"uptime"}
-		w.ensureChartExists("websphere_pmi.jvm_uptime", "JVM Uptime", "seconds", "line", "jvm", 70103,
+		w.ensureChartExists("websphere_pmi.jvm_uptime", "JVM Uptime", "seconds", "line", "jvm/uptime", 70103,
 			uptimeDimensions, instanceName, map[string]string{
 				"node":   nodeName,
 				"server": serverName,
