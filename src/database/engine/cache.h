@@ -228,7 +228,14 @@ void pgc_page_hot_set_end_time_s(PGC *cache, PGC_PAGE *page, time_t end_time_s, 
 bool pgc_page_to_clean_evict_or_release(PGC *cache, PGC_PAGE *page);
 
 typedef bool (*migrate_to_v2_callback)(Word_t section, unsigned datafile_fileno, uint8_t type, Pvoid_t JudyL_metrics, Pvoid_t JudyL_extents_pos, size_t count_of_unique_extents, size_t count_of_unique_metrics, size_t count_of_unique_pages, void *data);
-void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_fileno, uint8_t type, migrate_to_v2_callback cb, void *data);
+void pgc_open_cache_to_journal_v2(
+    PGC *cache,
+    Word_t section,
+    unsigned datafile_fileno,
+    uint8_t type,
+    migrate_to_v2_callback cb,
+    void *data,
+    bool startup);
 void pgc_open_evict_clean_pages_of_datafile(PGC *cache, struct rrdengine_datafile *datafile);
 size_t pgc_count_clean_pages_having_data_ptr(PGC *cache, Word_t section, void *ptr);
 size_t pgc_count_hot_pages_having_data_ptr(PGC *cache, Word_t section, void *ptr);

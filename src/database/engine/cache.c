@@ -2418,7 +2418,15 @@ size_t pgc_hot_and_dirty_entries(PGC *cache) {
     return entries;
 }
 
-void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_fileno, uint8_t type, migrate_to_v2_callback cb, void *data) {
+void pgc_open_cache_to_journal_v2(
+    PGC *cache,
+    Word_t section,
+    unsigned datafile_fileno,
+    uint8_t type,
+    migrate_to_v2_callback cb,
+    void *data,
+    bool startup)
+{
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.journal_v2_indexing_started, 1, __ATOMIC_RELAXED);
     p2_add_fetch(&cache->stats.p2_workers_jv2_flush, 1);
 
@@ -2555,7 +2563,8 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
             page_release(cache, page, false);
         }
 
-        yield_the_processor(); // do not lock too aggressively
+        if (likely(false == startup))
+            yield_the_processor(); // do not lock too aggressively
         pgc_queue_lock(cache, &cache->hot, PGC_QUEUE_LOCK_PRIO_LOW);
     }
 
@@ -2578,7 +2587,8 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
             while ((PValue2 = JudyLFirstThenNext(mi->JudyL_pages_by_start_time, &start_time, &start_time_first))) {
                 struct jv2_page_info *pi = *PValue2;
 
-                yield_the_processor(); // do not lock too aggressively
+                if (likely(false == startup))
+                    yield_the_processor(); // do not lock too aggressively
                 if (likely(success))
                     page_set_clean(cache, pi->page, true, false, PGC_QUEUE_LOCK_PRIO_LOW);
                 else

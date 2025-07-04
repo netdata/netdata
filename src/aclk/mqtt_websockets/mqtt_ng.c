@@ -1003,8 +1003,8 @@ int mqtt_ng_connect(struct mqtt_ng_client *client,
 
 uint16_t get_unused_packet_id() {
     static uint16_t packet_id = 0;
-    packet_id++;
-    return packet_id ? packet_id : ++packet_id;
+    uint16_t id = __atomic_fetch_add(&packet_id, 1, __ATOMIC_RELAXED) + 1;
+    return id ? id : 1;
 }
 
 static size_t mqtt_ng_publish_size(
