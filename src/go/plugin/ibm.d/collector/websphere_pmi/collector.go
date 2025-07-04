@@ -54,9 +54,11 @@ func New() *WebSpherePMI {
 			MaxEJBs:            50,
 		},
 
-		charts:         &module.Charts{},
-		pmiCache:       make(map[string]*pmiCacheEntry),
-		loggedWarnings: make(map[string]bool),
+		charts:             &module.Charts{},
+		pmiCache:           make(map[string]*pmiCacheEntry),
+		loggedWarnings:     make(map[string]bool),
+		collectedInstances: make(map[string]bool),
+		seenInstances:      make(map[string]bool),
 	}
 }
 
@@ -142,6 +144,10 @@ type WebSpherePMI struct {
 
 	// Dynamic collection system
 	dynamicCollector *DynamicCollector
+	
+	// Instance tracking for proper collection
+	collectedInstances map[string]bool
+	seenInstances      map[string]bool
 
 	// Unified collection system (replaces dynamic collector)
 	unifiedCollector *UnifiedCollector
@@ -573,8 +579,8 @@ func (w *WebSpherePMI) collect(ctx context.Context) (map[string]int64, error) {
 	// Detect WebSphere version on first successful collection
 	w.detectWebSphereVersion(stats)
 
-	// Always use dynamic collection for better metric organization
-	return w.collectDynamic(ctx, stats), nil
+	// Use proper collection approach based on actual XML structure
+	return w.collectProper(stats), nil
 }
 
 func (w *WebSpherePMI) fetchPMIStats(ctx context.Context) (*pmiStatsResponse, error) {
@@ -629,6 +635,7 @@ func (w *WebSpherePMI) fetchPMIStats(ctx context.Context) (*pmiStatsResponse, er
 	select {
 	case result := <-resultChan:
 		if result.err != nil {
+			w.Errorf("ISSUE: Failed to parse PMI XML response: %v", result.err)
 			return nil, fmt.Errorf("failed to parse PMI XML response: %w", result.err)
 		}
 		return result.stats, nil
