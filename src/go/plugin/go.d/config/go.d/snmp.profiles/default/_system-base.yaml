@@ -16,7 +16,7 @@ metrics:
       scale_factor: 0.01
       chart_meta:
         description: Time since the system was last rebooted or powered on.
-        family: 'Uptime'
+        family: 'System/Uptime'
         unit: s
   - MIB: HOST-RESOURCES-MIB
     symbol:
@@ -25,7 +25,7 @@ metrics:
       scale_factor: 0.01
       chart_meta:
         description: Time since the system was last rebooted or powered on.
-        family: 'Uptime'
+        family: 'System/Uptime'
         unit: s
 
 metadata:
