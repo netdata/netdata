@@ -285,17 +285,20 @@ func (w *WebSpherePMI) collectServerOverviewMetrics(mx map[string]int64, nodeNam
 }
 
 // routeJVMMetrics routes JVM metrics to appropriate charts based on metric names
-func (w *WebSpherePMI) routeJVMMetrics(mx map[string]int64, tempMx map[string]int64, memoryChartID, runtimeChartID string) {
+func (w *WebSpherePMI) routeJVMMetrics(mx map[string]int64, tempMx map[string]int64, memoryChartID, cpuChartID, uptimeChartID string) {
 	for key, value := range tempMx {
 		// Remove the "temp_" prefix to get the metric name
 		metricName := strings.TrimPrefix(key, "temp_")
 
-		// Route to memory chart
+		// Route to appropriate chart
 		if strings.Contains(metricName, "HeapSize") || strings.Contains(metricName, "Memory") {
 			mx[fmt.Sprintf("%s_%s", memoryChartID, metricName)] = value
-		} else if strings.Contains(metricName, "ProcessCpuUsage") || strings.Contains(metricName, "UpTime") {
-			// Route to runtime chart
-			mx[fmt.Sprintf("%s_%s", runtimeChartID, metricName)] = value
+		} else if strings.Contains(metricName, "ProcessCpuUsage") {
+			// Route to CPU chart with correct dimension name
+			mx[fmt.Sprintf("%s_cpu", cpuChartID)] = value
+		} else if strings.Contains(metricName, "UpTime") {
+			// Route to uptime chart with correct dimension name
+			mx[fmt.Sprintf("%s_uptime", uptimeChartID)] = value
 		}
 	}
 }
@@ -315,24 +318,33 @@ func (w *WebSpherePMI) collectJVMMetrics(mx map[string]int64, nodeName, serverNa
 				"server": serverName,
 			})
 
-		// CPU and uptime
-		cpuDimensions := []string{"ProcessCpuUsage", "UpTime"}
-		w.ensureChartExists("websphere_pmi.jvm.runtime", "JVM Runtime", "value", "line", "jvm/runtime", 70101,
+		// CPU usage
+		cpuDimensions := []string{"cpu"}
+		w.ensureChartExists("websphere_pmi.jvm_process_cpu", "JVM Process CPU Usage", "percentage", "line", "jvm", 70101,
 			cpuDimensions, instanceName, map[string]string{
 				"node":   nodeName,
 				"server": serverName,
 			})
 
-		// Extract for both charts
+		// Uptime
+		uptimeDimensions := []string{"uptime"}
+		w.ensureChartExists("websphere_pmi.jvm_uptime", "JVM Uptime", "seconds", "line", "jvm", 70103,
+			uptimeDimensions, instanceName, map[string]string{
+				"node":   nodeName,
+				"server": serverName,
+			})
+
+		// Extract for all charts
 		memoryChartID := fmt.Sprintf("jvm.memory_%s", w.sanitizeForChartID(instanceName))
-		runtimeChartID := fmt.Sprintf("jvm.runtime_%s", w.sanitizeForChartID(instanceName))
+		cpuChartID := fmt.Sprintf("jvm_process_cpu_%s", w.sanitizeForChartID(instanceName))
+		uptimeChartID := fmt.Sprintf("jvm_uptime_%s", w.sanitizeForChartID(instanceName))
 
 		// Extract all metrics first
 		tempMx := make(map[string]int64)
 		extracted := w.extractStatValues(tempMx, "temp", stat)
 
 		// Route metrics to appropriate charts
-		w.routeJVMMetrics(mx, tempMx, memoryChartID, runtimeChartID)
+		w.routeJVMMetrics(mx, tempMx, memoryChartID, cpuChartID, uptimeChartID)
 		w.Debugf("JVM Runtime - extracted %d metrics for %s", extracted, instanceName)
 	}
 
