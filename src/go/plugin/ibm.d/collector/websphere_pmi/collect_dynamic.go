@@ -421,6 +421,17 @@ func (w *WebSpherePMI) collectWebMetrics(mx map[string]int64, nodeName, serverNa
 		return
 	}
 	
+	// Check if this looks like a servlet (has servlet-specific metrics)
+	if w.hasServletMetrics(stat) {
+		// This is a direct servlet stat
+		servletName := stat.Name
+		appName := "unknown"
+		
+		w.Debugf("Found direct servlet: %s", servletName)
+		w.collectServletMetrics(mx, nodeName, serverName, appName, servletName, stat)
+		return
+	}
+	
 	// Check if this is a session metric for a specific web application
 	// Pattern: isclite#isclite.war, perfServletApp#perfServletApp.war
 	if strings.Contains(stat.Name, "#") && strings.Contains(stat.Name, ".war") {
@@ -1724,6 +1735,12 @@ func (w *WebSpherePMI) collectGenericMetrics(mx map[string]int64, nodeName, serv
 	// For metrics that don't fit established categories, create generic monitoring charts
 	instanceName := fmt.Sprintf("%s.%s", nodeName, serverName)
 
+	// Log ALL metrics falling into monitoring.other for debugging
+	w.Warningf("MONITORING.OTHER: path='%s', stat.Name='%s', CountStats=%d, TimeStats=%d, RangeStats=%d, BoundedRangeStats=%d, DoubleStats=%d, hasValue=%v",
+		path, stat.Name, len(stat.CountStatistics), len(stat.TimeStatistics), 
+		len(stat.RangeStatistics), len(stat.BoundedRangeStatistics), 
+		len(stat.DoubleStatistics), stat.Value != nil)
+
 	w.ensureChartExists("websphere_pmi.monitoring.other", "Other Metrics", "value", "line", "monitoring", 79000,
 		[]string{"value"}, instanceName, map[string]string{
 			"node":        nodeName,
@@ -1831,6 +1848,43 @@ func (w *WebSpherePMI) shouldCollectJMSDestination(name string) bool {
 		return true
 	}
 	return w.jmsSelector.MatchString(name)
+}
+
+// hasServletMetrics checks if a stat contains servlet-specific metrics
+func (w *WebSpherePMI) hasServletMetrics(stat pmiStat) bool {
+	// Look for typical servlet metrics: RequestCount, ErrorCount, ConcurrentRequests, ServiceTime
+	servletMetricNames := map[string]bool{
+		"RequestCount":        true,
+		"ErrorCount":          true,
+		"ConcurrentRequests":  true,
+		"ServiceTime":         true,
+		"ResponseTime":        true,
+		"NumErrors":           true,
+		"TotalRequests":       true,
+	}
+	
+	// Check CountStatistics
+	for _, cs := range stat.CountStatistics {
+		if servletMetricNames[cs.Name] {
+			return true
+		}
+	}
+	
+	// Check TimeStatistics
+	for _, ts := range stat.TimeStatistics {
+		if servletMetricNames[ts.Name] {
+			return true
+		}
+	}
+	
+	// Check RangeStatistics
+	for _, rs := range stat.RangeStatistics {
+		if servletMetricNames[rs.Name] {
+			return true
+		}
+	}
+	
+	return false
 }
 
 // extractStatValues extracts numeric values from PMI stat entries
