@@ -409,8 +409,12 @@ func (w *WebSpherePMI) collectWebMetrics(mx map[string]int64, nodeName, serverNa
 		w.collectServletContainerMetrics(mx, nodeName, serverName, appName, stat)
 
 		// Chart 1: Session Lifecycle (creation, invalidation rates)
-		w.ensureChartExists("websphere_pmi.web.sessions_lifecycle", "Web Application Session Lifecycle", "sessions/s", "line", "web/sessions", 70500,
-			[]string{"created", "invalidated", "timeout_invalidated"}, instanceName, instanceLabels)
+		w.ensureChartExistsWithDims("websphere_pmi.web.sessions_lifecycle", "Web Application Session Lifecycle", "sessions/s", "line", "web/sessions", 70500,
+			[]DimensionConfig{
+				{Name: "created", Algo: module.Incremental},
+				{Name: "invalidated", Algo: module.Incremental},
+				{Name: "timeout_invalidated", Algo: module.Incremental},
+			}, instanceName, instanceLabels)
 
 		// Chart 2: Active Sessions (current counts)
 		w.ensureChartExists("websphere_pmi.web.sessions_active", "Web Application Active Sessions", "sessions", "line", "web/sessions", 70501,
@@ -565,8 +569,11 @@ func (w *WebSpherePMI) collectIndividualPortletMetrics(mx map[string]int64, node
 	w.Debugf("Processing portlet '%s' in application '%s'", portletName, appName)
 
 	// Chart 1: Portlet Requests 
-	w.ensureChartExists("websphere_pmi.web.portlet_requests", "Portlet Requests", "requests/s", "line", "web/portlets", 70600,
-		[]string{"requests", "errors"}, instanceName, instanceLabels)
+	w.ensureChartExistsWithDims("websphere_pmi.web.portlet_requests", "Portlet Requests", "requests/s", "line", "web/portlets", 70600,
+		[]DimensionConfig{
+			{Name: "requests", Algo: module.Incremental},
+			{Name: "errors", Algo: module.Incremental},
+		}, instanceName, instanceLabels)
 
 	// Chart 2: Portlet Concurrent Requests
 	w.ensureChartExists("websphere_pmi.web.portlet_concurrent", "Portlet Concurrent Requests", "requests", "line", "web/portlets", 70601,
@@ -795,8 +802,11 @@ func (w *WebSpherePMI) collectThreadPoolMetrics(mx map[string]int64, nodeName, s
 			[]string{"active", "pool_size", "maximum_size"}, instanceName, instanceLabels)
 
 		// Chart 2: Thread Pool Lifecycle (creation and destruction rates)
-		w.ensureChartExists("websphere_pmi.threading.pools_lifecycle", "Thread Pool Lifecycle", "threads/s", "line", "threading/pools", 70801,
-			[]string{"created", "destroyed"}, instanceName, instanceLabels)
+		w.ensureChartExistsWithDims("websphere_pmi.threading.pools_lifecycle", "Thread Pool Lifecycle", "threads/s", "line", "threading/pools", 70801,
+			[]DimensionConfig{
+				{Name: "created", Algo: module.Incremental},
+				{Name: "destroyed", Algo: module.Incremental},
+			}, instanceName, instanceLabels)
 
 		// Chart 3: Thread Pool Health (hung thread monitoring)
 		w.ensureChartExists("websphere_pmi.threading.pools_health", "Thread Pool Health", "threads", "line", "threading/pools", 70802,
@@ -1074,8 +1084,12 @@ func (w *WebSpherePMI) collectURLMetrics(mx map[string]int64, nodeName, serverNa
 func (w *WebSpherePMI) collectTransactionMetrics(mx map[string]int64, nodeName, serverName, path string, stat pmiStat) {
 	instanceName := fmt.Sprintf("%s.%s", nodeName, serverName)
 
-	w.ensureChartExists("websphere_pmi.system.transactions", "Transactions", "transactions/s", "stacked", "system", 70900,
-		[]string{"committed", "rolled_back", "active"}, instanceName, map[string]string{
+	w.ensureChartExistsWithDims("websphere_pmi.system.transactions", "Transactions", "transactions/s", "stacked", "system", 70900,
+		[]DimensionConfig{
+			{Name: "committed", Algo: module.Incremental},
+			{Name: "rolled_back", Algo: module.Incremental},
+			{Name: "active", Algo: module.Incremental},
+		}, instanceName, map[string]string{
 			"node":   nodeName,
 			"server": serverName,
 		})
@@ -1093,8 +1107,12 @@ func (w *WebSpherePMI) collectSecurityMetrics(mx map[string]int64, nodeName, ser
 
 	// Authentication metrics
 	if strings.Contains(pathLower, "auth") {
-		w.ensureChartExists("websphere_pmi.security.authentication", "Authentication Events", "events/s", "stacked", "security", 71000,
-			[]string{"successful", "failed", "active_subjects"}, instanceName, map[string]string{
+		w.ensureChartExistsWithDims("websphere_pmi.security.authentication", "Authentication Events", "events/s", "stacked", "security", 71000,
+			[]DimensionConfig{
+				{Name: "successful", Algo: module.Incremental},
+				{Name: "failed", Algo: module.Incremental},
+				{Name: "active_subjects", Algo: module.Incremental},
+			}, instanceName, map[string]string{
 				"node":   nodeName,
 				"server": serverName,
 			})
@@ -1105,8 +1123,11 @@ func (w *WebSpherePMI) collectSecurityMetrics(mx map[string]int64, nodeName, ser
 
 	// Authorization metrics
 	if strings.Contains(pathLower, "authz") || strings.Contains(pathLower, "authorization") {
-		w.ensureChartExists("websphere_pmi.security.authorization", "Authorization Events", "events/s", "stacked", "security", 71001,
-			[]string{"granted", "denied"}, instanceName, map[string]string{
+		w.ensureChartExistsWithDims("websphere_pmi.security.authorization", "Authorization Events", "events/s", "stacked", "security", 71001,
+			[]DimensionConfig{
+				{Name: "granted", Algo: module.Incremental},
+				{Name: "denied", Algo: module.Incremental},
+			}, instanceName, map[string]string{
 				"node":   nodeName,
 				"server": serverName,
 			})
@@ -1314,24 +1335,42 @@ func (w *WebSpherePMI) collectCacheMetrics(mx map[string]int64, nodeName, server
 		w.Debugf("Found cache object: cache='%s'", cacheName)
 
 		// Chart 1: Cache Hit Rates
-		w.ensureChartExists("websphere_pmi.caching.hit_rates", "Dynamic Cache Hit Rates", "hits/s", "stacked", "caching", 71300,
-			[]string{"memory_hits", "disk_hits", "misses"}, instanceName, instanceLabels)
+		w.ensureChartExistsWithDims("websphere_pmi.caching.hit_rates", "Dynamic Cache Hit Rates", "hits/s", "stacked", "caching", 71300,
+			[]DimensionConfig{
+				{Name: "memory_hits", Algo: module.Incremental},
+				{Name: "disk_hits", Algo: module.Incremental},
+				{Name: "misses", Algo: module.Incremental},
+			}, instanceName, instanceLabels)
 
 		// Chart 2: Cache Requests  
-		w.ensureChartExists("websphere_pmi.caching.requests", "Dynamic Cache Requests", "requests/s", "line", "caching", 71301,
-			[]string{"client_requests", "distributed_requests"}, instanceName, instanceLabels)
+		w.ensureChartExistsWithDims("websphere_pmi.caching.requests", "Dynamic Cache Requests", "requests/s", "line", "caching", 71301,
+			[]DimensionConfig{
+				{Name: "client_requests", Algo: module.Incremental},
+				{Name: "distributed_requests", Algo: module.Incremental},
+			}, instanceName, instanceLabels)
 
 		// Chart 3: Cache Entries
 		w.ensureChartExists("websphere_pmi.caching.entries", "Dynamic Cache Entries", "entries", "line", "caching", 71302,
 			[]string{"memory_entries", "total_entries", "max_memory_entries"}, instanceName, instanceLabels)
 
 		// Chart 4: Cache Invalidations
-		w.ensureChartExists("websphere_pmi.caching.invalidations", "Dynamic Cache Invalidations", "invalidations/s", "stacked", "caching", 71303,
-			[]string{"explicit", "lru", "timeout", "memory_explicit", "disk_explicit", "local_explicit"}, instanceName, instanceLabels)
+		w.ensureChartExistsWithDims("websphere_pmi.caching.invalidations", "Dynamic Cache Invalidations", "invalidations/s", "stacked", "caching", 71303,
+			[]DimensionConfig{
+				{Name: "explicit", Algo: module.Incremental},
+				{Name: "lru", Algo: module.Incremental},
+				{Name: "timeout", Algo: module.Incremental},
+				{Name: "memory_explicit", Algo: module.Incremental},
+				{Name: "disk_explicit", Algo: module.Incremental},
+				{Name: "local_explicit", Algo: module.Incremental},
+			}, instanceName, instanceLabels)
 
 		// Chart 5: Cache Remote Operations
-		w.ensureChartExists("websphere_pmi.caching.remote", "Dynamic Cache Remote Operations", "operations/s", "line", "caching", 71304,
-			[]string{"remote_creations", "remote_hits", "remote_invalidations"}, instanceName, instanceLabels)
+		w.ensureChartExistsWithDims("websphere_pmi.caching.remote", "Dynamic Cache Remote Operations", "operations/s", "line", "caching", 71304,
+			[]DimensionConfig{
+				{Name: "remote_creations", Algo: module.Incremental},
+				{Name: "remote_hits", Algo: module.Incremental},
+				{Name: "remote_invalidations", Algo: module.Incremental},
+			}, instanceName, instanceLabels)
 
 		// Chart IDs for each chart (without websphere_pmi prefix)
 		hitRatesChartID := fmt.Sprintf("caching.hit_rates_%s", w.sanitizeForChartID(instanceName))
@@ -1348,26 +1387,8 @@ func (w *WebSpherePMI) collectCacheMetrics(mx map[string]int64, nodeName, server
 		// This is the parent container
 		w.Debugf("Processing Dynamic Caching container with %d sub-stats", len(stat.SubStats))
 		
-		// First, extract top-level Dynamic Caching metrics
-		if len(stat.CountStatistics) > 0 || len(stat.BoundedRangeStatistics) > 0 || len(stat.DoubleStatistics) > 0 {
-			instanceName := fmt.Sprintf("%s.%s", nodeName, serverName)
-			instanceLabels := map[string]string{
-				"node":   nodeName,
-				"server": serverName,
-			}
-			
-			// Create chart for top-level cache metrics
-			w.ensureChartExists("websphere_pmi.caching.overview", "Dynamic Cache Overview", "value", "line", "caching", 71299,
-				[]string{"hits_in_memory", "hits_on_disk", "explicit_invalidations", "lru_invalidations", 
-					"timeout_invalidations", "memory_and_disk_entries", "remote_hits", 
-					"misses", "client_requests", "distributed_requests", "memory_explicit_invalidations",
-					"disk_explicit_invalidations", "remote_creations", "remote_explicit_invalidations",
-					"local_explicit_invalidations"}, instanceName, instanceLabels)
-			
-			chartID := fmt.Sprintf("caching.overview_%s", w.sanitizeForChartID(instanceName))
-			w.extractTopLevelCacheMetrics(mx, chartID, stat)
-			w.Debugf("Dynamic Caching - extracted top-level metrics")
-		}
+		// Skip top-level Dynamic Caching metrics - they mix different metric types
+		// We collect proper per-cache metrics below instead
 		
 		// Then process sub-stats for individual cache objects
 		for _, subStat := range stat.SubStats {
@@ -1462,8 +1483,12 @@ func (w *WebSpherePMI) collectWebServiceApplication(mx map[string]int64, nodeNam
 	w.Debugf("Processing web service application: %s", appName)
 
 	// Chart 1: Request Counts
-	w.ensureChartExists("websphere_pmi.webservice.requests", "Web Service Requests", "requests/s", "stacked", "webservice", 73100,
-		[]string{"received", "dispatched", "successful"}, instanceName, instanceLabels)
+	w.ensureChartExistsWithDims("websphere_pmi.webservice.requests", "Web Service Requests", "requests/s", "stacked", "webservice", 73100,
+		[]DimensionConfig{
+			{Name: "received", Algo: module.Incremental},
+			{Name: "dispatched", Algo: module.Incremental},
+			{Name: "successful", Algo: module.Incremental},
+		}, instanceName, instanceLabels)
 
 	// Chart 2: Response Times
 	w.ensureChartExists("websphere_pmi.webservice.response_times", "Web Service Response Times", "milliseconds", "line", "webservice", 73101,
@@ -1497,16 +1522,28 @@ func (w *WebSpherePMI) collectObjectPoolMetrics(mx map[string]int64, nodeName, s
 		
 		// Extract any container-level metrics
 		if len(stat.CountStatistics) > 0 || len(stat.BoundedRangeStatistics) > 0 {
-			// Create container-level chart
+			// Create container-level charts
 			instanceName := fmt.Sprintf("%s.%s", nodeName, serverName)
-			w.ensureChartExists("websphere_pmi.objectpool.overview", "Object Pool Overview", "count", "line", "objectpool", 71000,
-				[]string{"objects_created", "objects_allocated", "objects_returned", "idle_objects"}, instanceName, map[string]string{
-					"node":   nodeName,
-					"server": serverName,
-				})
+			instanceLabels := map[string]string{
+				"node":   nodeName,
+				"server": serverName,
+			}
 			
-			chartID := fmt.Sprintf("objectpool.overview_%s", w.sanitizeForChartID(instanceName))
-			w.extractObjectPoolMetrics(mx, chartID, stat)
+			// Chart 1: Object Pool Operations (rates)
+			w.ensureChartExistsWithDims("websphere_pmi.objectpool.operations_rate", "Object Pool Operations", "operations/s", "line", "objectpool", 71000,
+				[]DimensionConfig{
+					{Name: "objects_created", Algo: module.Incremental},
+					{Name: "objects_allocated", Algo: module.Incremental},
+					{Name: "objects_returned", Algo: module.Incremental},
+				}, instanceName, instanceLabels)
+			
+			// Chart 2: Object Pool State (gauge)
+			w.ensureChartExists("websphere_pmi.objectpool.state", "Object Pool State", "objects", "line", "objectpool", 71001,
+				[]string{"idle_objects"}, instanceName, instanceLabels)
+			
+			operationsChartID := fmt.Sprintf("objectpool.operations_rate_%s", w.sanitizeForChartID(instanceName))
+			stateChartID := fmt.Sprintf("objectpool.state_%s", w.sanitizeForChartID(instanceName))
+			w.extractObjectPoolMetricsToCharts(mx, operationsChartID, stateChartID, stat)
 		}
 		
 		// Process each object pool
