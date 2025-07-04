@@ -98,6 +98,12 @@ func (w *WebSpherePMI) extractMetricsFromStat(mx map[string]int64, nodeName, ser
 
 	// Debug: log categorization
 	w.Debugf("Extracting metrics: path='%s', stat.Name='%s', category='%s'", path, stat.Name, category)
+	
+	// Additional debug for missing categories
+	if stat.Name == "pmiWebServiceModule" || stat.Name == "Object Pool" {
+		w.Debugf("IMPORTANT: Found %s with %d sub-stats, categorized as '%s'", 
+			stat.Name, len(stat.SubStats), category)
+	}
 
 	switch category {
 	case "server":
@@ -124,6 +130,8 @@ func (w *WebSpherePMI) extractMetricsFromStat(mx map[string]int64, nodeName, ser
 		w.collectHAManagerMetrics(mx, nodeName, serverName, path, stat)
 	case "webservice":
 		w.collectWebServiceMetrics(mx, nodeName, serverName, path, stat)
+	case "objectpool":
+		w.collectObjectPoolMetrics(mx, nodeName, serverName, path, stat)
 	case "system":
 		w.collectSystemMetrics(mx, nodeName, serverName, path, stat)
 	default:
@@ -172,8 +180,13 @@ func (w *WebSpherePMI) categorizeStatName(statName string) string {
 	}
 
 	// JVM metrics
-	if strings.Contains(nameLower, "jvm runtime") || strings.Contains(nameLower, "object pool") {
+	if strings.Contains(nameLower, "jvm runtime") {
 		return "jvm"
+	}
+	
+	// Object Pool metrics (separate from JVM)
+	if strings.Contains(nameLower, "object pool") {
+		return "objectpool"
 	}
 
 	// Portlet Application metrics (specific handling)
@@ -1108,7 +1121,9 @@ func (w *WebSpherePMI) collectORBInterceptorMetrics(mx map[string]int64, nodeNam
 
 	// Check if this is the ORB container
 	if stat.Name == "ORB" {
-		// Look for Interceptors sub-stat
+		w.Debugf("Found ORB container with %d sub-stats", len(stat.SubStats))
+		
+		// Look for Interceptors sub-stat - ORB itself has no direct metrics
 		for _, subStat := range stat.SubStats {
 			if subStat.Name == "Interceptors" {
 				w.collectORBInterceptorMetrics(mx, nodeName, serverName, path, subStat)
@@ -1223,7 +1238,16 @@ func (w *WebSpherePMI) getInterceptorDimensionID(interceptorName string) string 
 		return "debug"
 	case "com.ibm.ejs.ras.RasContextSupport":
 		return "ras_context"
+	case "WLMTaggedComponentManager":
+		return "wlm_tagged_component"
 	default:
+		// For any unknown interceptor, create a sanitized ID from the name
+		if strings.Contains(interceptorName, "Interceptor") || strings.Contains(interceptorName, "Manager") {
+			// Sanitize the name to create a valid dimension ID
+			sanitized := w.sanitizeForMetricName(interceptorName)
+			w.Debugf("Creating dynamic interceptor ID for: %s -> %s", interceptorName, sanitized)
+			return sanitized
+		}
 		return ""
 	}
 }
@@ -1277,8 +1301,31 @@ func (w *WebSpherePMI) collectCacheMetrics(mx map[string]int64, nodeName, server
 		
 		w.Debugf("Cache object '%s' - extracted metrics for 5 charts", cacheName)
 	} else if stat.Name == "Dynamic Caching" {
-		// This is the parent container - process sub-stats for individual cache objects
+		// This is the parent container
 		w.Debugf("Processing Dynamic Caching container with %d sub-stats", len(stat.SubStats))
+		
+		// First, extract top-level Dynamic Caching metrics
+		if len(stat.CountStatistics) > 0 || len(stat.BoundedRangeStatistics) > 0 || len(stat.DoubleStatistics) > 0 {
+			instanceName := fmt.Sprintf("%s.%s", nodeName, serverName)
+			instanceLabels := map[string]string{
+				"node":   nodeName,
+				"server": serverName,
+			}
+			
+			// Create chart for top-level cache metrics
+			w.ensureChartExists("websphere_pmi.caching.overview", "Dynamic Cache Overview", "value", "line", "caching", 71299,
+				[]string{"hits_in_memory", "hits_on_disk", "explicit_invalidations", "lru_invalidations", 
+					"timeout_invalidations", "memory_and_disk_entries", "remote_hits", 
+					"misses", "client_requests", "distributed_requests", "memory_explicit_invalidations",
+					"disk_explicit_invalidations", "remote_creations", "remote_explicit_invalidations",
+					"local_explicit_invalidations"}, instanceName, instanceLabels)
+			
+			chartID := fmt.Sprintf("caching.overview_%s", w.sanitizeForChartID(instanceName))
+			w.extractTopLevelCacheMetrics(mx, chartID, stat)
+			w.Debugf("Dynamic Caching - extracted top-level metrics")
+		}
+		
+		// Then process sub-stats for individual cache objects
 		for _, subStat := range stat.SubStats {
 			if strings.HasPrefix(subStat.Name, "Object: ") {
 				w.collectCacheMetrics(mx, nodeName, serverName, path, subStat)
@@ -1396,6 +1443,75 @@ func (w *WebSpherePMI) collectWebServiceApplication(mx map[string]int64, nodeNam
 	w.extractWebServiceMetricsToCharts(mx, requestsChartID, responseTimesChartID, messageSizesChartID, servicesChartID, stat)
 
 	w.Debugf("Web service application '%s' - extracted metrics for 4 charts", appName)
+}
+
+// collectObjectPoolMetrics handles Object Pool metrics
+func (w *WebSpherePMI) collectObjectPoolMetrics(mx map[string]int64, nodeName, serverName, path string, stat pmiStat) {
+	// Check if this is the Object Pool container
+	if stat.Name == "Object Pool" {
+		w.Debugf("Found Object Pool container with %d sub-stats", len(stat.SubStats))
+		
+		// Extract any container-level metrics
+		if len(stat.CountStatistics) > 0 || len(stat.BoundedRangeStatistics) > 0 {
+			// Create container-level chart
+			instanceName := fmt.Sprintf("%s.%s", nodeName, serverName)
+			w.ensureChartExists("websphere_pmi.objectpool.overview", "Object Pool Overview", "count", "line", "objectpool", 71000,
+				[]string{"objects_created", "objects_allocated", "objects_returned", "idle_objects"}, instanceName, map[string]string{
+					"node":   nodeName,
+					"server": serverName,
+				})
+			
+			chartID := fmt.Sprintf("objectpool.overview_%s", w.sanitizeForChartID(instanceName))
+			w.extractObjectPoolMetrics(mx, chartID, stat)
+		}
+		
+		// Process each object pool
+		for _, poolStat := range stat.SubStats {
+			if strings.HasPrefix(poolStat.Name, "ObjectPool_") {
+				w.collectIndividualObjectPool(mx, nodeName, serverName, poolStat)
+			}
+		}
+		
+		return
+	}
+	
+	// Handle individual object pool
+	if strings.HasPrefix(stat.Name, "ObjectPool_") {
+		w.collectIndividualObjectPool(mx, nodeName, serverName, stat)
+	}
+}
+
+// collectIndividualObjectPool handles metrics for a specific object pool
+func (w *WebSpherePMI) collectIndividualObjectPool(mx map[string]int64, nodeName, serverName string, stat pmiStat) {
+	// Extract pool name - remove ObjectPool_ prefix
+	poolName := strings.TrimPrefix(stat.Name, "ObjectPool_")
+	cleanPoolName := w.sanitizeForMetricName(poolName)
+	
+	instanceName := fmt.Sprintf("%s.%s.%s", nodeName, serverName, cleanPoolName)
+	instanceLabels := map[string]string{
+		"node":   nodeName,
+		"server": serverName,
+		"pool":   poolName,
+	}
+	
+	w.Debugf("Processing object pool: %s", poolName)
+	
+	// Chart 1: Object Pool Operations
+	w.ensureChartExists("websphere_pmi.objectpool.operations", "Object Pool Operations", "operations", "line", "objectpool", 71001,
+		[]string{"objects_created", "objects_allocated", "objects_returned"}, instanceName, instanceLabels)
+	
+	// Chart 2: Object Pool State
+	w.ensureChartExists("websphere_pmi.objectpool.state", "Object Pool State", "objects", "line", "objectpool", 71002,
+		[]string{"idle_objects"}, instanceName, instanceLabels)
+	
+	// Chart IDs
+	operationsChartID := fmt.Sprintf("objectpool.operations_%s", w.sanitizeForChartID(instanceName))
+	stateChartID := fmt.Sprintf("objectpool.state_%s", w.sanitizeForChartID(instanceName))
+	
+	// Extract metrics
+	w.extractObjectPoolMetricsToCharts(mx, operationsChartID, stateChartID, stat)
+	
+	w.Debugf("Object pool '%s' - extracted metrics", poolName)
 }
 
 // collectSystemMetrics handles system-level metrics
@@ -2798,6 +2914,148 @@ func (w *WebSpherePMI) extractWebServiceServiceMetrics(mx map[string]int64, requ
 				// Convert to int64 (bytes)
 				mx[metricKey] = int64(val)
 				w.Debugf("Web service size metric: %s = %d bytes", metricKey, int64(val))
+			}
+		}
+	}
+}
+
+// extractTopLevelCacheMetrics extracts top-level Dynamic Caching metrics
+func (w *WebSpherePMI) extractTopLevelCacheMetrics(mx map[string]int64, chartID string, stat pmiStat) {
+	// Extract CountStatistics
+	for _, cs := range stat.CountStatistics {
+		var dimensionName string
+		switch cs.Name {
+		case "HitsInMemoryCount":
+			dimensionName = "hits_in_memory"
+		case "HitsOnDiskCount":
+			dimensionName = "hits_on_disk"
+		case "ExplicitInvalidationCount":
+			dimensionName = "explicit_invalidations"
+		case "LruInvalidationCount":
+			dimensionName = "lru_invalidations"
+		case "TimeoutInvalidationCount":
+			dimensionName = "timeout_invalidations"
+		case "InMemoryAndDiskCacheEntryCount":
+			dimensionName = "memory_and_disk_entries"
+		case "RemoteHitCount":
+			dimensionName = "remote_hits"
+		case "MissCount":
+			dimensionName = "misses"
+		case "ClientRequestCount":
+			dimensionName = "client_requests"
+		case "DistributedRequestCount":
+			dimensionName = "distributed_requests"
+		case "ExplicitMemoryInvalidationCount":
+			dimensionName = "memory_explicit_invalidations"
+		case "ExplicitDiskInvalidationCount":
+			dimensionName = "disk_explicit_invalidations"
+		case "RemoteCreationCount":
+			dimensionName = "remote_creations"
+		case "RemoteExplicitInvalidationCount":
+			dimensionName = "remote_explicit_invalidations"
+		case "LocalExplicitInvalidationCount":
+			dimensionName = "local_explicit_invalidations"
+		default:
+			w.Debugf("Unknown cache metric: %s", cs.Name)
+			continue
+		}
+		
+		if cs.Count != "" {
+			if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
+				metricKey := fmt.Sprintf("%s_%s", chartID, dimensionName)
+				mx[metricKey] = val
+				w.Debugf("Top-level cache metric: %s = %d", metricKey, val)
+			}
+		}
+	}
+	
+	// Note: No BoundedRangeStatistics at top-level Dynamic Caching in our test environment
+}
+
+// extractORBOverviewMetrics extracts ORB-level metrics
+
+// extractObjectPoolMetrics extracts object pool metrics from container level
+func (w *WebSpherePMI) extractObjectPoolMetrics(mx map[string]int64, chartID string, stat pmiStat) {
+	// Extract CountStatistics
+	for _, cs := range stat.CountStatistics {
+		var dimensionName string
+		switch cs.Name {
+		case "ObjectsCreatedCount":
+			dimensionName = "objects_created"
+		default:
+			continue
+		}
+		
+		if cs.Count != "" {
+			if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
+				metricKey := fmt.Sprintf("%s_%s", chartID, dimensionName)
+				mx[metricKey] = val
+			}
+		}
+	}
+	
+	// Extract BoundedRangeStatistics
+	for _, rs := range stat.BoundedRangeStatistics {
+		var dimensionName string
+		switch rs.Name {
+		case "ObjectsAllocatedCount":
+			dimensionName = "objects_allocated"
+		case "ObjectsReturnedCount":
+			dimensionName = "objects_returned"
+		case "IdleObjectsSize":
+			dimensionName = "idle_objects"
+		default:
+			continue
+		}
+		
+		if rs.Current != "" {
+			if val, err := strconv.ParseInt(rs.Current, 10, 64); err == nil {
+				metricKey := fmt.Sprintf("%s_%s", chartID, dimensionName)
+				mx[metricKey] = val
+			}
+		}
+	}
+}
+
+// extractObjectPoolMetricsToCharts extracts object pool metrics and distributes them to appropriate charts
+func (w *WebSpherePMI) extractObjectPoolMetricsToCharts(mx map[string]int64, operationsChartID, stateChartID string, stat pmiStat) {
+	// Extract CountStatistics for operations
+	for _, cs := range stat.CountStatistics {
+		var metricKey string
+		switch cs.Name {
+		case "ObjectsCreatedCount":
+			metricKey = fmt.Sprintf("%s_objects_created", operationsChartID)
+		default:
+			continue
+		}
+		
+		if metricKey != "" && cs.Count != "" {
+			if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
+				mx[metricKey] = val
+				w.Debugf("Object pool metric: %s = %d", metricKey, val)
+			}
+		}
+	}
+	
+	// Extract BoundedRangeStatistics
+	for _, rs := range stat.BoundedRangeStatistics {
+		var metricKey string
+		
+		switch rs.Name {
+		case "ObjectsAllocatedCount":
+			metricKey = fmt.Sprintf("%s_objects_allocated", operationsChartID)
+		case "ObjectsReturnedCount":
+			metricKey = fmt.Sprintf("%s_objects_returned", operationsChartID)
+		case "IdleObjectsSize":
+			metricKey = fmt.Sprintf("%s_idle_objects", stateChartID)
+		default:
+			continue
+		}
+		
+		if metricKey != "" && rs.Current != "" {
+			if val, err := strconv.ParseInt(rs.Current, 10, 64); err == nil {
+				mx[metricKey] = val
+				w.Debugf("Object pool metric: %s = %d (from %s)", metricKey, val, rs.Name)
 			}
 		}
 	}
