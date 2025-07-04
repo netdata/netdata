@@ -109,6 +109,7 @@ metric_tags:
     tag: netscaler_sdx_system_bios_version
 
 # https://mibbrowser.online/mibdb_search.php?mib=SDX-ROOT-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/citrix/SDX-ROOT-MIB
 
 metrics:
   - MIB: SDX-ROOT-MIB
@@ -169,7 +170,7 @@ metrics:
           family: 'Storage/Repository/Size'
           unit: "By"
       - OID: 1.3.6.1.4.1.5951.6.2.1000.4.1.7
-        name: netscaler.sdx.softwareResourceStatus
+        name: netscaler.sdx.srStatus
         chart_meta:
           description: Status of the storage repository
           family: 'Storage/Repository/Status'
@@ -298,33 +299,33 @@ metrics:
         OID: 1.3.6.1.4.1.5951.6.3.2.1.33
         chart_meta:
           description: "Cpu usage percentage of netscaler instance"
-          family: 'Virtualization/VM/CPU/Usage'
+          family: 'Virtualization/VirtualInstance/CPU/Usage'
           unit: "%"
       - name: netscaler.sdx.nsNsMemoryUsage
         OID: 1.3.6.1.4.1.5951.6.3.2.1.35
         chart_meta:
           description: "Memory usage percentage"
-          family: 'Virtualization/VM/Memory/Usage'
+          family: 'Virtualization/VirtualInstance/Memory/Usage'
           unit: "%"
       - name: netscaler.sdx.nsNsTx
         OID: 1.3.6.1.4.1.5951.6.3.2.1.36
         scale_factor: 1000000 # MBits => Bits
         chart_meta:
           description: "Out throughput of netscaler instance in megabits per second"
-          family: 'Virtualization/VM/Network/Traffic/Out'
+          family: 'Virtualization/VirtualInstance/Network/Traffic/Out'
           unit: "bit/s"
       - name: netscaler.sdx.nsNsRx
         OID: 1.3.6.1.4.1.5951.6.3.2.1.37
         scale_factor: 1000000 # MBits => Bits
         chart_meta:
           description: "In throughput of netscaler instance in megabits per second"
-          family: 'Virtualization/VM/Network/Traffic/In'
+          family: 'Virtualization/VirtualInstance/Network/Traffic/In'
           unit: "bit/s"
       - name: netscaler.sdx.nsHttpReq
         OID: 1.3.6.1.4.1.5951.6.3.2.1.38
         chart_meta:
           description: "Http requests per second"
-          family: 'Virtualization/VM/Network/HTTP/Request/Total'
+          family: 'Virtualization/VirtualInstance/Network/HTTP/Request/Total'
           unit: "{request}/s"
     metric_tags:
       - tag: netscaler_sdx_ns_uuid
