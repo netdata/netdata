@@ -245,8 +245,9 @@ func (w *WebSpherePMI) categorizeStatName(statName string) string {
 		return "messaging"
 	}
 
-	// Web service metrics
-	if strings.Contains(nameLower, "pmiwebservicemodule") {
+	// Web service metrics - includes both module container and individual applications
+	if strings.Contains(nameLower, "pmiwebservicemodule") || nameLower == "pmiwebserviceservice" ||
+		(strings.Contains(statName, ".") && strings.HasSuffix(statName, ".war") && !strings.Contains(statName, "#")) {
 		return "webservice"
 	}
 
@@ -259,7 +260,14 @@ func (w *WebSpherePMI) categorizeStatName(statName string) string {
 	if nameLower == "counters" || nameLower == "object cache" {
 		return "skip"
 	}
+	
+	// Handle "Details" as portlet-related
+	if nameLower == "details" {
+		return "portlet"
+	}
 
+	// Log what falls into "other" for debugging
+	w.Debugf("Unrecognized metric category for stat: %s", statName)
 	return "other"
 }
 
@@ -1461,6 +1469,48 @@ func (w *WebSpherePMI) collectWebServiceMetrics(mx map[string]int64, nodeName, s
 	// Check if this is a web service application (*.war)
 	if strings.HasSuffix(stat.Name, ".war") {
 		w.collectWebServiceApplication(mx, nodeName, serverName, path, stat)
+		return
+	}
+	
+	// Check if this is a standalone pmiWebServiceService (happens in some configurations)
+	if stat.Name == "pmiWebServiceService" {
+		// Create a generic webservice instance for standalone service metrics
+		instanceName := fmt.Sprintf("%s.%s.standalone", nodeName, serverName)
+		instanceLabels := map[string]string{
+			"node":        nodeName,
+			"server":      serverName,
+			"application": "standalone",
+			"war_file":    "standalone",
+		}
+		
+		w.Debugf("Processing standalone pmiWebServiceService")
+		
+		// Create the same charts as for regular web service applications
+		// Chart 1: Request Counts
+		w.ensureChartExistsWithDims("websphere_pmi.webservice.requests", "Web Service Requests", "requests/s", "stacked", "webservice", 73100,
+			[]DimensionConfig{
+				{Name: "received", Algo: module.Incremental},
+				{Name: "dispatched", Algo: module.Incremental},
+				{Name: "successful", Algo: module.Incremental},
+			}, instanceName, instanceLabels)
+
+		// Chart 2: Response Times
+		w.ensureChartExists("websphere_pmi.webservice.response_times", "Web Service Response Times", "milliseconds", "line", "webservice", 73101,
+			[]string{"response_time", "request_response_time", "dispatch_response_time", "reply_response_time"}, instanceName, instanceLabels)
+
+		// Chart 3: Message Sizes
+		w.ensureChartExists("websphere_pmi.webservice.message_sizes", "Web Service Message Sizes", "bytes", "line", "webservice", 73102,
+			[]string{"request_size", "reply_size", "avg_size"}, instanceName, instanceLabels)
+		
+		// Chart IDs for metrics extraction
+		requestsChartID := fmt.Sprintf("webservice.requests_%s", w.sanitizeForChartID(instanceName))
+		responseTimesChartID := fmt.Sprintf("webservice.response_times_%s", w.sanitizeForChartID(instanceName))
+		messageSizesChartID := fmt.Sprintf("webservice.message_sizes_%s", w.sanitizeForChartID(instanceName))
+		
+		// Extract metrics directly from this stat
+		w.extractWebServiceServiceMetrics(mx, requestsChartID, responseTimesChartID, messageSizesChartID, stat)
+		
+		w.Debugf("Standalone pmiWebServiceService - extracted metrics")
 	}
 }
 
