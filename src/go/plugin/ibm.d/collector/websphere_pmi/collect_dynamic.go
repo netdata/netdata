@@ -106,6 +106,10 @@ func (w *WebSpherePMI) extractMetricsFromStat(mx map[string]int64, nodeName, ser
 	}
 
 	switch category {
+	case "skip":
+		// Skip this stat - it's a container that shouldn't be collected
+		w.Debugf("Skipping container stat '%s'", stat.Name)
+		return
 	case "server":
 		w.collectServerOverviewMetrics(mx, nodeName, serverName, path, stat)
 	case "jvm":
@@ -228,7 +232,8 @@ func (w *WebSpherePMI) categorizeStatName(statName string) string {
 	}
 
 	// Caching metrics
-	if strings.Contains(nameLower, "dynamic caching") {
+	if strings.Contains(nameLower, "dynamic caching") || 
+		strings.HasPrefix(nameLower, "object:") {
 		return "caching"
 	}
 
@@ -246,6 +251,11 @@ func (w *WebSpherePMI) categorizeStatName(statName string) string {
 	// System data
 	if strings.Contains(nameLower, "system data") {
 		return "system"
+	}
+
+	// Skip known container names that shouldn't be collected
+	if nameLower == "counters" || nameLower == "object cache" {
+		return "skip"
 	}
 
 	return "other"
@@ -1543,6 +1553,37 @@ func (w *WebSpherePMI) collectSystemMetrics(mx map[string]int64, nodeName, serve
 
 // collectGenericMetrics handles unrecognized metric categories
 func (w *WebSpherePMI) collectGenericMetrics(mx map[string]int64, nodeName, serverName, path string, stat pmiStat) {
+	// First check if this stat has any actual metrics to collect
+	hasMetrics := false
+	
+	// Check for any statistics with values
+	if len(stat.CountStatistics) > 0 && stat.CountStatistics[0].Count != "" {
+		if _, err := strconv.ParseInt(stat.CountStatistics[0].Count, 10, 64); err == nil {
+			hasMetrics = true
+		}
+	}
+	if !hasMetrics && len(stat.RangeStatistics) > 0 && stat.RangeStatistics[0].Current != "" {
+		if _, err := strconv.ParseInt(stat.RangeStatistics[0].Current, 10, 64); err == nil {
+			hasMetrics = true
+		}
+	}
+	if !hasMetrics && len(stat.BoundedRangeStatistics) > 0 && stat.BoundedRangeStatistics[0].Current != "" {
+		if _, err := strconv.ParseInt(stat.BoundedRangeStatistics[0].Current, 10, 64); err == nil {
+			hasMetrics = true
+		}
+	}
+	if !hasMetrics && stat.Value != nil && stat.Value.Value != "" {
+		if _, err := strconv.ParseInt(stat.Value.Value, 10, 64); err == nil {
+			hasMetrics = true
+		}
+	}
+	
+	// Only create chart and collect metrics if there's actual data
+	if !hasMetrics {
+		w.Debugf("Skipping other metric '%s' - no values found", stat.Name)
+		return
+	}
+	
 	// For metrics that don't fit established categories, create generic monitoring charts
 	instanceName := fmt.Sprintf("%s.%s", nodeName, serverName)
 
