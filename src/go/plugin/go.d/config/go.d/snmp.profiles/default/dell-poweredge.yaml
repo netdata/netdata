@@ -14,19 +14,21 @@ extends:
   - _std-udp-mib.yaml
   - _std-ip-mib.yaml
 
-device:
-  vendor: "dell"
+sysobjectid:
+  - 1.3.6.1.4.1.674.10892.1 # Poweredge R640
+  - 1.3.6.1.4.1.674.10892.1.*
+  - 1.3.6.1.4.1.674.10892.6 # Poweredge MX7000
 
 metadata:
   device:
     fields:
       type:
         value: "server"
+      vendor:
+        value: "dell"
 
-sysobjectid:
-  - 1.3.6.1.4.1.674.10892.1 # Poweredge R640
-  - 1.3.6.1.4.1.674.10892.1.*
-  - 1.3.6.1.4.1.674.10892.6 # Poweredge MX7000
+
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/dell/MIB-Dell-10892
 
 metrics:
   - MIB: MIB-Dell-10892
@@ -93,14 +95,12 @@ metrics:
       OID: 1.3.6.1.4.1.674.10892.1.200.10
       name: systemStateTable
     symbols:
-      - name: systemState
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.1.200.10.1.9
-          name: systemStatePowerSupplyStatusCombined
-        tag: system_state_power_supply_status_combined
+      - OID: 1.3.6.1.4.1.674.10892.1.200.10.1.9
+        name: systemStatePowerSupplyStatusCombined
+        chart_meta:
+          description: Current administrative state of the interface
+          family: ''
+          unit: "{status}"
         mapping:
           1: other
           2: unknown
@@ -108,10 +108,11 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
-      - symbol:
+    metric_tags:
+      - tag: chassis_index
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.1.200.10.1.1
           name: systemStatechassisIndex
-        tag: chassis_index
 
   - MIB: MIB-Dell-10892
     table:
@@ -139,10 +140,11 @@ metrics:
         description: Available virtual memory size
         unit: "By"
     metric_tags:
-      - symbol:
+      - tag: chassis_index
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.1.400.20.1.1
           name: operatingSystemMemorychassisIndex
-        tag: chassis_index
+
   - MIB: MIB-Dell-10892
     table:
       OID: 1.3.6.1.4.1.674.10892.1.600.50
@@ -157,18 +159,18 @@ metrics:
         description: Reading value of the battery
         unit: "TBD"
     metric_tags:
-      - symbol:
+      - tag: chassis_index
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.1.600.50.1.1
           name: batteryChassisIndex
-        tag: chassis_index
-      - symbol:
+      - tag: battery_index
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.1.600.50.1.2
           name: batteryIndex
-        tag: battery_index
-      - symbol:
+      - tag: battery_location_name
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.1.600.50.1.7
           name: batteryLocationName
-        tag: battery_location_name
 
   - MIB: MIB-Dell-10892
     table:
