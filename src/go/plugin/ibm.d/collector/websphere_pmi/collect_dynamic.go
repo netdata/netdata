@@ -1530,7 +1530,7 @@ func (w *WebSpherePMI) collectObjectPoolMetrics(mx map[string]int64, nodeName, s
 			}
 			
 			// Chart 1: Object Pool Operations (rates)
-			w.ensureChartExistsWithDims("websphere_pmi.objectpool.operations_rate", "Object Pool Operations", "operations/s", "line", "objectpool", 71000,
+			w.ensureChartExistsWithDims("websphere_pmi.objectpool.operations_rate", "Object Pool Operations", "operations/s", "line", "objectpool", 71001,
 				[]DimensionConfig{
 					{Name: "objects_created", Algo: module.Incremental},
 					{Name: "objects_allocated", Algo: module.Incremental},
@@ -1582,7 +1582,7 @@ func (w *WebSpherePMI) collectIndividualObjectPool(mx map[string]int64, nodeName
 		[]string{"objects_created", "objects_allocated", "objects_returned"}, instanceName, instanceLabels)
 	
 	// Chart 2: Object Pool State
-	w.ensureChartExists("websphere_pmi.objectpool.state", "Object Pool State", "objects", "line", "objectpool", 71002,
+	w.ensureChartExists("websphere_pmi.objectpool.state", "Object Pool State", "objects", "line", "objectpool", 71001,
 		[]string{"idle_objects"}, instanceName, instanceLabels)
 	
 	// Chart IDs
