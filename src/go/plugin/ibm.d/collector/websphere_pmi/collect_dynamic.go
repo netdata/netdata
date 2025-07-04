@@ -367,6 +367,9 @@ func (w *WebSpherePMI) collectWebMetrics(mx map[string]int64, nodeName, serverNa
 		}
 
 		w.Debugf("Found web application session metrics: app='%s'", appName)
+		
+		// Extract servlet container metrics at the web application level
+		w.collectServletContainerMetrics(mx, nodeName, serverName, appName, stat)
 
 		// Chart 1: Session Lifecycle (creation, invalidation rates)
 		w.ensureChartExists("websphere_pmi.web.sessions_lifecycle", "Web Application Session Lifecycle", "sessions/s", "line", "web/sessions", 70500,
@@ -437,6 +440,23 @@ func (w *WebSpherePMI) collectWebMetrics(mx map[string]int64, nodeName, serverNa
 			chartID := fmt.Sprintf("web.servlet.requests_%s", w.sanitizeForChartID(instanceName))
 			extracted := w.extractStatValues(mx, chartID, stat)
 			w.Debugf("Servlet '%s' - extracted %d metrics", servletName, extracted)
+		}
+	}
+
+	// Process sub-stats to find URLs and Servlets
+	for _, subStat := range stat.SubStats {
+		// Check if this is a "Servlets" container
+		if subStat.Name == "Servlets" {
+			// Extract app name from the stat name if it contains #
+			appName := ""
+			if strings.Contains(stat.Name, "#") && strings.Contains(stat.Name, ".war") {
+				appName = stat.Name
+			}
+			w.processServletsContainer(mx, nodeName, serverName, appName, subStat)
+		} else if subStat.Name == "URLs" {
+			// If we encounter a URLs container directly, process it
+			// This would be unusual - URLs should be under servlets
+			w.Debugf("Found URLs container directly under %s", stat.Name)
 		}
 	}
 }
@@ -849,6 +869,148 @@ func (w *WebSpherePMI) extractConnectionPoolMetrics(mx map[string]int64, chartID
 			}
 		}
 	}
+}
+
+// processServletsContainer processes the "Servlets" container to find individual servlets and their URLs
+func (w *WebSpherePMI) processServletsContainer(mx map[string]int64, nodeName, serverName, appName string, stat pmiStat) {
+	w.Debugf("Processing Servlets container for app '%s' with %d sub-stats", appName, len(stat.SubStats))
+	
+	// Note: LoadedServletCount and ReloadCount are at the web application level,
+	// not inside the Servlets container - they're collected in collectWebMetrics
+	
+	// Each sub-stat should be an individual servlet
+	for _, servletStat := range stat.SubStats {
+		servletName := servletStat.Name
+		w.Debugf("Found servlet '%s' in app '%s'", servletName, appName)
+		
+		// Process this servlet's metrics
+		w.collectServletMetrics(mx, nodeName, serverName, appName, servletName, servletStat)
+		
+		// Look for URLs sub-stat within this servlet
+		for _, subStat := range servletStat.SubStats {
+			if subStat.Name == "URLs" {
+				w.processURLsContainer(mx, nodeName, serverName, appName, servletName, subStat)
+			}
+		}
+	}
+}
+
+// collectServletContainerMetrics collects container-level servlet metrics from web application level
+// These metrics (LoadedServletCount, ReloadCount) are at the web application level, not inside Servlets
+func (w *WebSpherePMI) collectServletContainerMetrics(mx map[string]int64, nodeName, serverName, appName string, stat pmiStat) {
+	instanceName := fmt.Sprintf("%s.%s.%s", nodeName, serverName, w.sanitizeForMetricName(appName))
+	instanceLabels := map[string]string{
+		"node":        nodeName,
+		"server":      serverName,
+		"application": appName,
+	}
+
+	w.Debugf("Collecting servlet container metrics for app: %s from web application level", appName)
+
+	// Chart for servlet container metrics
+	w.ensureChartExists("websphere_pmi.web.servlet_container", "Servlet Container", "count", "line", "web/servlets", 70415,
+		[]string{"loaded_servlets", "reload_count"}, instanceName, instanceLabels)
+
+	chartID := fmt.Sprintf("web.servlet_container_%s", w.sanitizeForChartID(instanceName))
+
+	// Extract container-level metrics
+	for _, cs := range stat.CountStatistics {
+		var metricKey string
+		
+		switch cs.Name {
+		case "LoadedServletCount":
+			metricKey = fmt.Sprintf("%s_loaded_servlets", chartID)
+		case "ReloadCount":
+			metricKey = fmt.Sprintf("%s_reload_count", chartID)
+		default:
+			continue
+		}
+		
+		if cs.Count != "" {
+			if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
+				mx[metricKey] = val
+				w.Debugf("Servlet container metric at web app level: %s = %d (from %s)", metricKey, val, cs.Name)
+			}
+		}
+	}
+}
+
+// processURLsContainer processes the "URLs" container to find individual URL metrics
+func (w *WebSpherePMI) processURLsContainer(mx map[string]int64, nodeName, serverName, appName, servletName string, stat pmiStat) {
+	w.Debugf("Processing URLs container for servlet '%s' with %d URLs", servletName, len(stat.SubStats))
+	
+	// Each sub-stat should be an individual URL
+	for _, urlStat := range stat.SubStats {
+		urlPath := urlStat.Name
+		w.collectURLMetrics(mx, nodeName, serverName, appName, servletName, urlPath, urlStat)
+	}
+}
+
+// collectServletMetrics collects metrics for an individual servlet
+func (w *WebSpherePMI) collectServletMetrics(mx map[string]int64, nodeName, serverName, appName, servletName string, stat pmiStat) {
+	// Create a clean servlet identifier
+	cleanServletName := w.sanitizeForMetricName(servletName)
+	instanceName := fmt.Sprintf("%s.%s.%s.%s", nodeName, serverName, w.sanitizeForMetricName(appName), cleanServletName)
+	instanceLabels := map[string]string{
+		"node":        nodeName,
+		"server":      serverName,
+		"application": appName,
+		"servlet":     servletName,
+	}
+
+	// Check if this servlet has meaningful metrics (not just sub-stats)
+	if !w.hasDirectMetrics(stat) {
+		w.Debugf("Servlet '%s' has no direct metrics, only sub-stats", servletName)
+		return
+	}
+
+	w.Debugf("Collecting metrics for servlet: %s", servletName)
+
+	// Chart 1: Servlet Request Metrics
+	w.ensureChartExists("websphere_pmi.web.servlet_requests", "Servlet Requests", "requests/s", "line", "web/servlets", 70410,
+		[]string{"request_count", "concurrent_requests", "error_count"}, instanceName, instanceLabels)
+
+	// Chart 2: Servlet Response Times
+	w.ensureChartExists("websphere_pmi.web.servlet_response_time", "Servlet Response Time", "milliseconds", "line", "web/servlets", 70411,
+		[]string{"service_time", "async_response_time"}, instanceName, instanceLabels)
+
+	// Chart IDs for metrics extraction
+	requestsChartID := fmt.Sprintf("web.servlet_requests_%s", w.sanitizeForChartID(instanceName))
+	responseTimeChartID := fmt.Sprintf("web.servlet_response_time_%s", w.sanitizeForChartID(instanceName))
+
+	// Extract servlet metrics
+	w.extractServletMetricsToCharts(mx, requestsChartID, responseTimeChartID, stat)
+}
+
+// collectURLMetrics collects metrics for an individual URL
+func (w *WebSpherePMI) collectURLMetrics(mx map[string]int64, nodeName, serverName, appName, servletName, urlPath string, stat pmiStat) {
+	// Create a clean URL identifier
+	cleanURL := w.sanitizeForMetricName(urlPath)
+	instanceName := fmt.Sprintf("%s.%s.%s.%s.%s", nodeName, serverName, w.sanitizeForMetricName(appName), w.sanitizeForMetricName(servletName), cleanURL)
+	instanceLabels := map[string]string{
+		"node":        nodeName,
+		"server":      serverName,
+		"application": appName,
+		"servlet":     servletName,
+		"url":         urlPath,
+	}
+
+	w.Debugf("Collecting metrics for URL: %s", urlPath)
+
+	// Chart 1: URL Request Metrics
+	w.ensureChartExists("websphere_pmi.web.url_requests", "URL Requests", "requests/s", "line", "web/urls", 70420,
+		[]string{"request_count", "concurrent_requests"}, instanceName, instanceLabels)
+
+	// Chart 2: URL Response Time
+	w.ensureChartExists("websphere_pmi.web.url_response_time", "URL Response Time", "milliseconds", "line", "web/urls", 70421,
+		[]string{"service_time", "async_response_time"}, instanceName, instanceLabels)
+
+	// Chart IDs for metrics extraction
+	requestsChartID := fmt.Sprintf("web.url_requests_%s", w.sanitizeForChartID(instanceName))
+	responseTimeChartID := fmt.Sprintf("web.url_response_time_%s", w.sanitizeForChartID(instanceName))
+
+	// Extract URL metrics
+	w.extractURLMetricsToCharts(mx, requestsChartID, responseTimeChartID, stat)
 }
 
 // collectTransactionMetrics handles transaction metrics
@@ -2636,6 +2798,148 @@ func (w *WebSpherePMI) extractWebServiceServiceMetrics(mx map[string]int64, requ
 				// Convert to int64 (bytes)
 				mx[metricKey] = int64(val)
 				w.Debugf("Web service size metric: %s = %d bytes", metricKey, int64(val))
+			}
+		}
+	}
+}
+
+// extractServletMetricsToCharts extracts servlet metrics and distributes them to appropriate charts
+func (w *WebSpherePMI) extractServletMetricsToCharts(mx map[string]int64, requestsChartID, responseTimeChartID string, stat pmiStat) {
+	w.Debugf("Servlet extracting to charts from stat with %d CountStats, %d TimeStats, %d RangeStats",
+		len(stat.CountStatistics), len(stat.TimeStatistics), len(stat.RangeStatistics))
+
+	// Extract CountStatistics for request counts and errors
+	for _, cs := range stat.CountStatistics {
+		var metricKey string
+		
+		switch cs.Name {
+		case "RequestCount":
+			metricKey = fmt.Sprintf("%s_request_count", requestsChartID)
+		case "ErrorCount":
+			metricKey = fmt.Sprintf("%s_error_count", requestsChartID)
+		default:
+			continue
+		}
+		
+		if cs.Count != "" {
+			if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
+				mx[metricKey] = val
+				w.Debugf("Servlet count metric: %s = %d", metricKey, val)
+			}
+		}
+	}
+
+	// Extract RangeStatistics for concurrent requests
+	for _, rs := range stat.RangeStatistics {
+		if rs.Name == "ConcurrentRequests" && rs.Current != "" {
+			if val, err := strconv.ParseInt(rs.Current, 10, 64); err == nil {
+				metricKey := fmt.Sprintf("%s_concurrent_requests", requestsChartID)
+				mx[metricKey] = val
+				w.Debugf("Servlet concurrent requests metric: %s = %d", metricKey, val)
+			}
+		}
+	}
+
+	// Extract TimeStatistics for response times
+	for _, ts := range stat.TimeStatistics {
+		var metricKey string
+		
+		switch ts.Name {
+		case "ServiceTime":
+			metricKey = fmt.Sprintf("%s_service_time", responseTimeChartID)
+		case "AsyncContext Response Time":
+			metricKey = fmt.Sprintf("%s_async_response_time", responseTimeChartID)
+		default:
+			continue
+		}
+
+		// Get total time - WebSphere uses "totalTime" attribute
+		totalStr := ts.TotalTime
+		if totalStr == "" {
+			totalStr = ts.Total // Fallback for other versions
+		}
+
+		// Calculate average response time when requests have been processed
+		if ts.Count != "" && totalStr != "" {
+			count, err1 := strconv.ParseInt(ts.Count, 10, 64)
+			total, err2 := strconv.ParseInt(totalStr, 10, 64)
+
+			if err1 == nil && err2 == nil && count > 0 {
+				// Calculate average response time in milliseconds
+				avgResponseTime := total / count
+				mx[metricKey] = avgResponseTime
+				w.Debugf("Servlet time metric: %s = %d ms (total=%d, count=%d)",
+					metricKey, avgResponseTime, total, count)
+			} else if err1 == nil && count == 0 {
+				// No requests processed - set time to 0
+				mx[metricKey] = 0
+				w.Debugf("Servlet time metric: %s = 0 (no requests)", metricKey)
+			}
+		}
+	}
+}
+
+// extractURLMetricsToCharts extracts URL metrics and distributes them to appropriate charts
+func (w *WebSpherePMI) extractURLMetricsToCharts(mx map[string]int64, requestsChartID, responseTimeChartID string, stat pmiStat) {
+	w.Debugf("URL extracting to charts from stat with %d CountStats, %d TimeStats, %d RangeStats",
+		len(stat.CountStatistics), len(stat.TimeStatistics), len(stat.RangeStatistics))
+
+	// Extract CountStatistics for request counts
+	for _, cs := range stat.CountStatistics {
+		if cs.Name == "URIRequestCount" && cs.Count != "" {
+			if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
+				metricKey := fmt.Sprintf("%s_request_count", requestsChartID)
+				mx[metricKey] = val
+				w.Debugf("URL request count metric: %s = %d", metricKey, val)
+			}
+		}
+	}
+
+	// Extract RangeStatistics for concurrent requests
+	for _, rs := range stat.RangeStatistics {
+		if rs.Name == "URIConcurrentRequests" && rs.Current != "" {
+			if val, err := strconv.ParseInt(rs.Current, 10, 64); err == nil {
+				metricKey := fmt.Sprintf("%s_concurrent_requests", requestsChartID)
+				mx[metricKey] = val
+				w.Debugf("URL concurrent requests metric: %s = %d", metricKey, val)
+			}
+		}
+	}
+
+	// Extract TimeStatistics for response times
+	for _, ts := range stat.TimeStatistics {
+		var metricKey string
+		
+		switch ts.Name {
+		case "URIServiceTime":
+			metricKey = fmt.Sprintf("%s_service_time", responseTimeChartID)
+		case "URL AsyncContext Response Time":
+			metricKey = fmt.Sprintf("%s_async_response_time", responseTimeChartID)
+		default:
+			continue
+		}
+
+		// Get total time - WebSphere uses "totalTime" attribute
+		totalStr := ts.TotalTime
+		if totalStr == "" {
+			totalStr = ts.Total // Fallback for other versions
+		}
+
+		// Calculate average response time when requests have been processed
+		if ts.Count != "" && totalStr != "" {
+			count, err1 := strconv.ParseInt(ts.Count, 10, 64)
+			total, err2 := strconv.ParseInt(totalStr, 10, 64)
+
+			if err1 == nil && err2 == nil && count > 0 {
+				// Calculate average response time in milliseconds
+				avgResponseTime := total / count
+				mx[metricKey] = avgResponseTime
+				w.Debugf("URL response time metric: %s = %d ms (total=%d, count=%d)",
+					metricKey, avgResponseTime, total, count)
+			} else if err1 == nil && count == 0 {
+				// No requests processed - set time to 0
+				mx[metricKey] = 0
+				w.Debugf("URL response time metric: %s = 0 (no requests)", metricKey)
 			}
 		}
 	}
