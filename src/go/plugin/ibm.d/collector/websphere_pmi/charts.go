@@ -60,6 +60,18 @@ const (
 	prioWebServices     = 71201
 	prioORBInterceptors = 71202
 
+	// Object pools
+	prioObjectPoolObjects    = 70801
+	prioObjectPoolLifecycle  = 70802
+	prioObjectCacheObjects   = 70803
+	prioObjectCacheHits      = 70804
+	
+	// Security priorities
+	prioSecurityAuthEvents   = 71003
+	prioSecurityAuthTiming   = 71004
+	prioSecurityAuthzEvents  = 71005
+	prioSecurityAuthzTiming  = 71006
+
 	// Monitoring (catch-all)
 	prioMonitoringOther = 79000
 )

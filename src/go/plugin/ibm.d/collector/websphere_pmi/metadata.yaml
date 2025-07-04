@@ -507,6 +507,60 @@ modules:
               dimensions:
                 - name: active
                 - name: live
+        - name: session_manager
+          description: Metrics for HTTP session management per application.
+          labels:
+            - name: application
+              description: Application name
+            - name: node
+              description: WebSphere node name
+            - name: server
+              description: WebSphere server name
+          metrics:
+            - name: websphere_pmi.sessions_active
+              description: Active Sessions
+              unit: sessions
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: live
+            - name: websphere_pmi.sessions_lifecycle
+              description: Session Lifecycle
+              unit: sessions/s
+              chart_type: line
+              dimensions:
+                - name: created
+                - name: invalidated
+                - name: timeout
+                - name: rejected
+            - name: websphere_pmi.sessions_errors
+              description: Session Errors
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: activate_nonexist
+                - name: affinity_break
+                - name: cache_discard
+            - name: websphere_pmi.sessions_external_time
+              description: Session External Storage Time
+              unit: milliseconds/s
+              chart_type: line
+              dimensions:
+                - name: read_time
+                - name: write_time
+            - name: websphere_pmi.sessions_timing
+              description: Session Timing
+              unit: milliseconds/s
+              chart_type: line
+              dimensions:
+                - name: life_time
+                - name: time_since_activated
+            - name: websphere_pmi.sessions_object_size
+              description: Session Object Size
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: object_size
         - name: servlet
           description: Metrics for a servlet.
           labels:
