@@ -1529,20 +1529,20 @@ func (w *WebSpherePMI) collectObjectPoolMetrics(mx map[string]int64, nodeName, s
 				"server": serverName,
 			}
 			
-			// Chart 1: Object Pool Operations (rates)
-			w.ensureChartExistsWithDims("websphere_pmi.objectpool.operations_rate", "Object Pool Operations", "operations/s", "line", "objectpool", 71001,
+			// Chart 1: Object Pool Total Operations (rates)
+			w.ensureChartExistsWithDims("websphere_pmi.objectpool.total_operations", "Object Pool Total Operations", "operations/s", "line", "objectpool", 71000,
 				[]DimensionConfig{
 					{Name: "objects_created", Algo: module.Incremental},
 					{Name: "objects_allocated", Algo: module.Incremental},
 					{Name: "objects_returned", Algo: module.Incremental},
 				}, instanceName, instanceLabels)
 			
-			// Chart 2: Object Pool State (gauge)
-			w.ensureChartExists("websphere_pmi.objectpool.state", "Object Pool State", "objects", "line", "objectpool", 71001,
+			// Chart 2: Object Pool Total State (gauge)
+			w.ensureChartExists("websphere_pmi.objectpool.total_state", "Object Pool Total State", "objects", "line", "objectpool", 71001,
 				[]string{"idle_objects"}, instanceName, instanceLabels)
 			
-			operationsChartID := fmt.Sprintf("objectpool.operations_rate_%s", w.sanitizeForChartID(instanceName))
-			stateChartID := fmt.Sprintf("objectpool.state_%s", w.sanitizeForChartID(instanceName))
+			operationsChartID := fmt.Sprintf("objectpool.total_operations_%s", w.sanitizeForChartID(instanceName))
+			stateChartID := fmt.Sprintf("objectpool.total_state_%s", w.sanitizeForChartID(instanceName))
 			w.extractObjectPoolMetricsToCharts(mx, operationsChartID, stateChartID, stat)
 		}
 		
