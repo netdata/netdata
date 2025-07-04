@@ -5,33 +5,51 @@ extends:
   - _std-ospf-mib.yaml
   - avaya.yaml
 
+sysobjectid:
+  - 1.3.6.1.4.1.6889.1.45.103.8 # G450 Media Gateway
+  - 1.3.6.1.4.1.6889.1.45.103.41 # G430 Media Gateway
+
 metadata:
   device:
     fields:
       type:
         value: "Media Gateway"
 
-sysobjectid:
-  - 1.3.6.1.4.1.6889.1.45.103.8 # G450 Media Gateway
-  - 1.3.6.1.4.1.6889.1.45.103.41 # G430 Media Gateway
+metric_tags:
+  - tag: avaya_cmg_hw_type
+    OID: 1.3.6.1.4.1.6889.2.9.1.1.1.0
+    symbol: cmgHWType
+    mapping:
+      1: media-gateway
+      2: g350
+      3: avaya_g250
+      4: avaya_g250-bri
+      5: avaya_g250-ds1
+      6: avaya_g250-dcp
+      7: avaya_g450
+      8: avaya_g250-a14
+      10: avaya_tgm550
+      28: avaya_communication_manager_branch_editioni120
+      29: avaya_communication_manager_branch_editioni40-analog
+      30: avaya_communication_manager_branch_editioni40-bri
+      31: avaya_communication_manager_branch_editioni40-ds1
+      32: avaya_communication_manager_branch_editioni40-dcp
+      33: avaya_trm480
+      34: avaya_communication_manager_branch_editioni40-a14
+      35: avaya_communication_manager_branch_edition_g450
+      37: avaya_communication_manager_branch_edition_g430
+      41: avaya_g430
+  - tag: avaya_cmg_model_number
+    OID: 1.3.6.1.4.1.6889.2.9.1.1.2.0
+    symbol: cmgModelNumber
+  - tag: avaya_cmg_serial_number
+    OID: 1.3.6.1.4.1.6889.2.9.1.1.4.0
+    symbol: cmgSerialNumber
+  - tag: avaya_cmg_active_controller_address
+    OID: 1.3.6.1.4.1.6889.2.9.1.3.2.0
+    symbol: cmgActiveControllerAddress
 
 metrics:
-  - MIB: UTILIZATION-MANAGEMENT-MIB
-    symbol:
-      name: cpu.usage
-      OID: 1.3.6.1.4.1.6889.2.1.11.1.1.1.1.5.10 # genCpuAverageUtilization.10
-      chart_meta:
-        description: Current average CPU utilization in percentage
-        family: 'CPU/Usage'
-        unit: "%"
-  - MIB: UTILIZATION-MANAGEMENT-MIB
-    symbol:
-      name: memory.usage
-      OID: 1.3.6.1.4.1.6889.2.1.11.1.2.6.1.3.10 # genMemUtilizationPercentUsed.10
-      chart_meta:
-        description: Percentage of memory used
-        family: 'Memory/Usage'
-        unit: "%"
   - MIB: AVAYA-ENTITY-MIB
     table:
       name: avEntPhyChFruTable
@@ -66,51 +84,32 @@ metrics:
     metric_tags:
       - index: 1
         tag: avaya_ent_physical_index
-  # - MIB: G700-MG-MIB
-  #   symbol:
-  #     name: avaya.cmgRemoteSigDscp
-  #     OID: 1.3.6.1.4.1.6889.2.9.1.2.2.2.0
-  #     description: DiffServ code point for signaling traffic on the H.248 link received from the controller
-  #     unit: "1"
-  # TODO we don't have mapping for this
+
   - MIB: G700-MG-MIB
     symbol:
       name: avaya.cmgRemoteSig802Priority
       OID: 1.3.6.1.4.1.6889.2.9.1.2.2.3.0
       chart_meta:
         description: 802.1 priority for signaling traffic on the H.248 link received from the controller
-        family: 'Network/SignalTraffic/Remote/Priority'
+        family: 'Voice/H248/SignalPriority/Remote'
         unit: "1"
-  # - MIB: G700-MG-MIB
-  #   symbol:
-  #     name: avaya.cmgLocalSigDscp
-  #     OID: 1.3.6.1.4.1.6889.2.9.1.2.2.4.0
-  #     description: DiffServ code point for signaling traffic on the H.248 link locally administered
-  #     unit: "1"
-  # TODO we don't have mapping for this
+
   - MIB: G700-MG-MIB
     symbol:
       name: avaya.cmgLocalSig802Priority
       OID: 1.3.6.1.4.1.6889.2.9.1.2.2.5.0
       chart_meta:
         description: 802.1 priority for signaling traffic on the H.248 link locally administered
-        family: 'Network/SignalTraffic/Local/Priority'
+        family: 'Voice/H248/SignalPriority/Local'
         unit: "1"
-  - MIB: G700-MG-MIB
-    symbol:
-      name: avaya.cmgCurrent802Vlan
-      OID: 1.3.6.1.4.1.6889.2.9.1.2.2.7.0
-      chart_meta:
-        description: Current 802.1 VLAN ID in use for this processor
-        family: 'Network/VLAN/Current'
-        unit: "1"
+
   - MIB: G700-MG-MIB
     symbol:
       name: avaya.cmgH248LinkErrorCode
       OID: 1.3.6.1.4.1.6889.2.9.1.3.4.0
       chart_meta:
         description: Most recently received H.248 error code affecting the link between media gateway and controller
-        family: 'Network/H248Link/Error/Code'
+        family: 'Voice/H248/Link/Error/Status'
         unit: "{status}"
       mapping:
         0: No error
@@ -244,8 +243,10 @@ metrics:
           unit: "{channel}"
       - OID: 1.3.6.1.4.1.6889.2.9.1.4.6.1.4
         name: avaya.cmgDSPCoreAdminState
-        family: 'Voice/VoIPEngine/DSPCore/Admin/Status'
-        unit: "{status}"
+        chart_meta:
+          description: Maintenance busy-out state
+          family: 'Voice/VoIPEngine/DSPCore/Admin/Status'
+          unit: "{status}"
         mapping:
           1: busy-out
           2: release
@@ -253,16 +254,20 @@ metrics:
           255: unknown
       - OID: 1.3.6.1.4.1.6889.2.9.1.4.6.1.5
         name: avaya.cmgDSPCoreStatus
-        family: 'Voice/VoIPEngine/DSPCore/Operational/Status'
-        unit: "{status}"
+        chart_meta:
+          description: Status of the DSP core
+          family: 'Voice/VoIPEngine/DSPCore/Operational/Status'
+          unit: "{status}"
         mapping:
           1: idle
           2: in_use
           3: fault
       - OID: 1.3.6.1.4.1.6889.2.9.1.4.6.1.7
         name: avaya.cmgDSPCoreDemandTestResult
-        family: 'Voice/VoIPEngine/DSPCore/Test/Result'
-        unit: "{status}"
+        chart_meta:
+          description: Result of demand test
+          family: 'Voice/VoIPEngine/DSPCore/Test/Result'
+          unit: "{status}"
         mapping:
           1: error_code1
           2: error_code2
@@ -273,40 +278,7 @@ metrics:
           7: not_responding
           255: pass
     metric_tags:
-      - symbol:
+      - tag: avaya_cmg_dsp_core_id
+        symbol:
           OID: 1.3.6.1.4.1.6889.2.9.1.4.6.1.1
           name: avaya.cmgDSPCoreCoreId
-        tag: avaya_cmg_dsp_core_id
-metric_tags:
-  - OID: 1.3.6.1.4.1.6889.2.9.1.1.1.0
-    symbol: cmgHWType
-    tag: avaya_cmg_hw_type
-    mapping:
-      1: media-gateway
-      2: g350
-      3: avaya_g250
-      4: avaya_g250-bri
-      5: avaya_g250-ds1
-      6: avaya_g250-dcp
-      7: avaya_g450
-      8: avaya_g250-a14
-      10: avaya_tgm550
-      28: avaya_communication_manager_branch_editioni120
-      29: avaya_communication_manager_branch_editioni40-analog
-      30: avaya_communication_manager_branch_editioni40-bri
-      31: avaya_communication_manager_branch_editioni40-ds1
-      32: avaya_communication_manager_branch_editioni40-dcp
-      33: avaya_trm480
-      34: avaya_communication_manager_branch_editioni40-a14
-      35: avaya_communication_manager_branch_edition_g450
-      37: avaya_communication_manager_branch_edition_g430
-      41: avaya_g430
-  - OID: 1.3.6.1.4.1.6889.2.9.1.1.2.0
-    symbol: cmgModelNumber
-    tag: avaya_cmg_model_number
-  - OID: 1.3.6.1.4.1.6889.2.9.1.1.4.0
-    symbol: cmgSerialNumber
-    tag: avaya_cmg_serial_number
-  - OID: 1.3.6.1.4.1.6889.2.9.1.3.2.0
-    symbol: cmgActiveControllerAddress
-    tag: avaya_cmg_active_controller_address
