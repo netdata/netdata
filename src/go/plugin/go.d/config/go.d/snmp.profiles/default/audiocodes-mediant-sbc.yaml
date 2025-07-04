@@ -1,6 +1,7 @@
 extends:
   - _system-base.yaml
   - _std-if-mib.yaml
+  - _std-host-resources-mib-feat-base.yaml
 
 metadata:
   device:
@@ -12,32 +13,3 @@ metadata:
 
 sysobjectid:
   - 1.3.6.1.4.1.5003.8.1.1.71
-
-metrics:
-  - MIB: HOST-RESOURCES-MIB
-    symbol:
-      name: cpu.usage
-      OID: 1.3.6.1.2.1.25.3.3.1.2.1
-      chart_meta:
-        description: The average, over the last minute, of the percentage of time that the processor was not idle
-        family: 'CPU/Usage'
-        unit: "%"
-    # TODO:  The allocation unit size is defined in hrStorageAllocationUnits (1.3.6.1.2.1.25.2.3.1.4).
-  - MIB: HOST-RESOURCES-MIB
-    symbol:
-      name: memory.total
-      OID: 1.3.6.1.2.1.25.2.3.1.5.1
-      chart_meta:
-        description: The size of the storage represented by this entry, in units of hrStorageAllocationUnits.
-        family: 'Memory/Total'
-        unit: "By"
-      scale_factor: 1024
-  - MIB: HOST-RESOURCES-MIB
-    symbol:
-      name: memory.used
-      OID: 1.3.6.1.2.1.25.2.3.1.6.1
-      chart_meta:
-        description: The amount of the storage represented by this entry that is allocated, in units of hrStorageAllocationUnits.
-        family: 'Memory/Used'
-        unit: "By"
-      scale_factor: 1024
