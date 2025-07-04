@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- move NIDL to docs [\#20632](https://github.com/netdata/netdata/pull/20632) ([ktsaou](https://github.com/ktsaou))
+- Move NIDL-Framework.md from repository root to docs/ directory [\#20630](https://github.com/netdata/netdata/pull/20630) ([Copilot](https://github.com/apps/copilot-swe-agent))
+- Nidl Framework Documentation [\#20629](https://github.com/netdata/netdata/pull/20629) ([ktsaou](https://github.com/ktsaou))
+- Fix syntax error on learn doc [\#20628](https://github.com/netdata/netdata/pull/20628) ([Ancairon](https://github.com/Ancairon))
+- At a glance [\#20627](https://github.com/netdata/netdata/pull/20627) ([kanelatechnical](https://github.com/kanelatechnical))
 - Improve packet ID generation [\#20624](https://github.com/netdata/netdata/pull/20624) ([stelfrag](https://github.com/stelfrag))
 - chore\(go.d/snmp-profiles\): charts meta fixes and fam updates p3 [\#20622](https://github.com/netdata/netdata/pull/20622) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d/snmp-profiles\): charts meta fixes and fam updates p2 [\#20621](https://github.com/netdata/netdata/pull/20621) ([ilyam8](https://github.com/ilyam8))
@@ -460,10 +465,6 @@
 - daemon status 27c [\#20088](https://github.com/netdata/netdata/pull/20088) ([ktsaou](https://github.com/ktsaou))
 - Fix inverted logic for skipping non-native CI jobs on PRs. [\#20087](https://github.com/netdata/netdata/pull/20087) ([Ferroin](https://github.com/Ferroin))
 - Properly integrate dlib into our build system. [\#20086](https://github.com/netdata/netdata/pull/20086) ([Ferroin](https://github.com/Ferroin))
-- Alerts and Notifications [\#20085](https://github.com/netdata/netdata/pull/20085) ([kanelatechnical](https://github.com/kanelatechnical))
-- Fix memory allocation for timer callback data when cancelling a timer [\#20084](https://github.com/netdata/netdata/pull/20084) ([stelfrag](https://github.com/stelfrag))
-- Fix crash during shutdown when there are pending messages to cloud [\#20080](https://github.com/netdata/netdata/pull/20080) ([stelfrag](https://github.com/stelfrag))
-- Do not try to index jv2 files during shutdown [\#20079](https://github.com/netdata/netdata/pull/20079) ([stelfrag](https://github.com/stelfrag))
 
 ## [v2.3.2](https://github.com/netdata/netdata/tree/v2.3.2) (2025-04-02)
 
