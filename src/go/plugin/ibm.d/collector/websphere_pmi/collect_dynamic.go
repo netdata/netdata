@@ -1598,16 +1598,23 @@ func (w *WebSpherePMI) collectIndividualObjectPool(mx map[string]int64, nodeName
 // collectSystemMetrics handles system-level metrics
 func (w *WebSpherePMI) collectSystemMetrics(mx map[string]int64, nodeName, serverName, path string, stat pmiStat) {
 	instanceName := fmt.Sprintf("%s.%s", nodeName, serverName)
+	instanceLabels := map[string]string{
+		"node":   nodeName,
+		"server": serverName,
+	}
 
-	w.ensureChartExists("websphere_pmi.system.data", "System Data", "value", "line", "system", 70900,
-		[]string{"value"}, instanceName, map[string]string{
-			"node":   nodeName,
-			"server": serverName,
-		})
+	// Chart 1: CPU Usage (percentage)
+	w.ensureChartExists("websphere_pmi.system.cpu", "System CPU Usage", "percentage", "line", "system", 70900,
+		[]string{"usage"}, instanceName, instanceLabels)
 
-	chartID := fmt.Sprintf("system.data_%s", w.sanitizeForChartID(instanceName))
-	w.extractSystemDataMetrics(mx, chartID, stat)
-	w.Debugf("System Data - extracted metrics for %s", instanceName)
+	// Chart 2: Free Memory (bytes)
+	w.ensureChartExists("websphere_pmi.system.memory", "System Free Memory", "bytes", "area", "system", 70901,
+		[]string{"free"}, instanceName, instanceLabels)
+
+	cpuChartID := fmt.Sprintf("system.cpu_%s", w.sanitizeForChartID(instanceName))
+	memoryChartID := fmt.Sprintf("system.memory_%s", w.sanitizeForChartID(instanceName))
+	w.extractSystemDataMetricsProper(mx, cpuChartID, memoryChartID, stat)
+	w.Debugf("System Data - extracted CPU and memory metrics for %s", instanceName)
 }
 
 // collectGenericMetrics handles unrecognized metric categories
@@ -2687,45 +2694,32 @@ func (w *WebSpherePMI) extractWebSessionMetrics(mx map[string]int64, chartID str
 }
 
 // extractSystemDataMetrics extracts system data metrics with proper dimension mapping
-func (w *WebSpherePMI) extractSystemDataMetrics(mx map[string]int64, chartID string, stat pmiStat) {
-	// System data typically has a single value metric
-	// Try to extract from various statistic types
-	found := false
-
-	// Check CountStatistics
+func (w *WebSpherePMI) extractSystemDataMetricsProper(mx map[string]int64, cpuChartID, memoryChartID string, stat pmiStat) {
+	// Extract specific System Data metrics based on what we found in the PMI output
+	
+	// Process CountStatistics
 	for _, cs := range stat.CountStatistics {
-		if cs.Count != "" {
+		switch cs.Name {
+		case "FreeMemory":
 			if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
-				metricKey := fmt.Sprintf("%s_value", chartID)
+				metricKey := fmt.Sprintf("%s_free", memoryChartID)
 				mx[metricKey] = val
-				w.Debugf("System data metric: %s = %d (from CountStatistic %s)", metricKey, val, cs.Name)
-				found = true
-				break
+				w.Debugf("System memory metric: %s = %d bytes", metricKey, val)
 			}
 		}
 	}
-
-	// If not found in CountStatistics, check RangeStatistics
-	if !found {
-		for _, rs := range stat.RangeStatistics {
-			if rs.Current != "" {
-				if val, err := strconv.ParseInt(rs.Current, 10, 64); err == nil {
-					metricKey := fmt.Sprintf("%s_value", chartID)
-					mx[metricKey] = val
-					w.Debugf("System data metric: %s = %d (from RangeStatistic %s)", metricKey, val, rs.Name)
-					found = true
-					break
-				}
+	
+	// Process AverageStatistics for CPU
+	for _, as := range stat.AverageStatistics {
+		switch as.Name {
+		case "CPUUsageSinceServerStarted":
+			// Use the mean value for average CPU usage
+			if val, err := strconv.ParseFloat(as.Mean, 64); err == nil {
+				// Convert to integer percentage (multiply by precision for decimal preservation)
+				metricKey := fmt.Sprintf("%s_usage", cpuChartID)
+				mx[metricKey] = int64(val * float64(precision))
+				w.Debugf("System CPU metric: %s = %.2f%% (stored as %d)", metricKey, val, mx[metricKey])
 			}
-		}
-	}
-
-	// If not found, check Value field directly
-	if !found && stat.Value != nil && stat.Value.Value != "" {
-		if val, err := strconv.ParseInt(stat.Value.Value, 10, 64); err == nil {
-			metricKey := fmt.Sprintf("%s_value", chartID)
-			mx[metricKey] = val
-			w.Debugf("System data metric: %s = %d (from Value field)", metricKey, val)
 		}
 	}
 }
