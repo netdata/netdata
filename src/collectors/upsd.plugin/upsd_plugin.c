@@ -54,6 +54,7 @@
 
 static bool debug = false;
 static unsigned long netdata_update_every = 1;
+UPSCONN_t ups1, ups2;
 
 // https://networkupstools.org/docs/developer-guide.chunked/new-drivers.html#_status_data
 struct nut_ups_status {
@@ -562,11 +563,97 @@ void print_ups_realpower_metric(UPSCONN_t *conn, const char *ups_name, const cha
            clean_ups_name, (int)realpower);
 }
 
+void print_ups_charts(const char *ups_name) {
+    char buf[BUFLEN];
+    const char *nut_value;
+
+    // CHART type.id name title units [family [context [charttype [priority [update_every [options [plugin [module]]]]]]]]
+    printf("CHART 'upsd_%s.status' '' 'UPS status' 'status' 'ups' 'upsd.ups_status' 'line' %u %u\n",
+           clean_name(buf, sizeof(buf), ups_name), NETDATA_CHART_PRIO_UPSD_UPS_STATUS, netdata_update_every);
+
+    if ((nut_value = nut_get_var(&ups2, ups_name, "battery.type")))
+        printf("CLABEL battery_type '%s' %u\n", nut_value, NETDATA_CLABEL_SOURCE_AUTO);
+    if ((nut_value = nut_get_var(&ups2, ups_name, "device.model")))
+        printf("CLABEL device_model '%s' %u\n", nut_value, NETDATA_CLABEL_SOURCE_AUTO);
+    if ((nut_value = nut_get_var(&ups2, ups_name, "device.serial")))
+        printf("CLABEL device_serial '%s' %u\n", nut_value, NETDATA_CLABEL_SOURCE_AUTO);
+    if ((nut_value = nut_get_var(&ups2, ups_name, "device.mfr")))
+        printf("CLABEL device_manufacturer '%s' %u\n", nut_value, NETDATA_CLABEL_SOURCE_AUTO);
+    if ((nut_value = nut_get_var(&ups2, ups_name, "device.type")))
+        printf("CLABEL device_type '%s' %u\n", nut_value, NETDATA_CLABEL_SOURCE_AUTO);
+
+    // CLABEL name value source
+    // CLABEL_COMMIT
+    printf("CLABEL ups_name '%s' %u\n"
+           "CLABEL_COMMIT\n",
+           ups_name, NETDATA_CLABEL_SOURCE_AUTO);
+
+    // DIMENSION id [name [algorithm [multiplier [divisor [options]]]]]
+    printf("DIMENSION on_line '' '' '' %u\n", NETDATA_PLUGIN_PRECISION);
+    printf("DIMENSION on_battery '' '' '' %u\n", NETDATA_PLUGIN_PRECISION);
+    printf("DIMENSION low_battery '' '' '' %u\n", NETDATA_PLUGIN_PRECISION);
+    printf("DIMENSION high_battery '' '' '' %u\n", NETDATA_PLUGIN_PRECISION);
+    printf("DIMENSION replace_battery '' '' '' %u\n", NETDATA_PLUGIN_PRECISION);
+    printf("DIMENSION charging '' '' '' %u\n", NETDATA_PLUGIN_PRECISION);
+    printf("DIMENSION discharging '' '' '' %u\n", NETDATA_PLUGIN_PRECISION);
+    printf("DIMENSION bypass '' '' '' %u\n", NETDATA_PLUGIN_PRECISION);
+    printf("DIMENSION calibration '' '' '' %u\n", NETDATA_PLUGIN_PRECISION);
+    printf("DIMENSION offline '' '' '' %u\n", NETDATA_PLUGIN_PRECISION);
+    printf("DIMENSION overloaded '' '' '' %u\n", NETDATA_PLUGIN_PRECISION);
+    printf("DIMENSION trim_input_voltage '' '' '' %u\n", NETDATA_PLUGIN_PRECISION);
+    printf("DIMENSION boost_input_voltage '' '' '' %u\n", NETDATA_PLUGIN_PRECISION);
+    printf("DIMENSION forced_shutdown '' '' '' %u\n", NETDATA_PLUGIN_PRECISION);
+    printf("DIMENSION other '' '' '' %u\n", NETDATA_PLUGIN_PRECISION);
+
+    for (const struct nd_chart *chart = nd_charts; chart->nut_variable; chart++) {
+        nut_value = nut_get_var(&ups2, ups_name, chart->nut_variable);
+        if (!nut_value) {
+            if (!streq(chart->nut_variable, "ups.realpower"))
+                continue;
+            // If the UPS does not support the 'ups.realpower' variable, then
+            // we can still calculate the load_usage if the 'ups.load' and
+            // 'ups.realpower.nominal' variables are available.
+            if (!nut_get_var(&ups2, ups_name, "ups.load") || !nut_get_var(&ups2, ups_name, "ups.realpower.nominal"))
+                continue;
+        }
+
+        // CHART type.id name title units [family [context [charttype [priority [update_every [options [plugin [module]]]]]]]]
+        printf("CHART 'upsd_%s.%s' '' '%s' '%s' '%s' '%s' '%s' '%u' '%u' '' '" PLUGIN_UPSD_NAME "'\n",
+               clean_name(buf, sizeof(buf), ups_name), chart->chart_id, // type.id
+               chart->chart_title,    // title
+               chart->chart_units,    // units
+               chart->chart_family,   // family
+               chart->chart_context,  // context
+               chart->chart_type,     // charttype
+               chart->chart_priority, // priority
+               netdata_update_every); // update_every
+
+        if ((nut_value = nut_get_var(&ups2, ups_name, "battery.type")))
+            printf("CLABEL 'battery_type' '%s' '%u'\n", nut_value, NETDATA_CLABEL_SOURCE_AUTO);
+        if ((nut_value = nut_get_var(&ups2, ups_name, "device.model")))
+            printf("CLABEL 'device_model' '%s' '%u'\n", nut_value, NETDATA_CLABEL_SOURCE_AUTO);
+        if ((nut_value = nut_get_var(&ups2, ups_name, "device.serial")))
+            printf("CLABEL 'device_serial' '%s' '%u'\n", nut_value, NETDATA_CLABEL_SOURCE_AUTO);
+        if ((nut_value = nut_get_var(&ups2, ups_name, "device.mfr")))
+            printf("CLABEL 'device_manufacturer' '%s' '%u'\n", nut_value, NETDATA_CLABEL_SOURCE_AUTO);
+        if ((nut_value = nut_get_var(&ups2, ups_name, "device.type")))
+            printf("CLABEL 'device_type' '%s' '%u'\n", nut_value, NETDATA_CLABEL_SOURCE_AUTO);
+
+        // CLABEL name value source
+        // CLABEL_COMMIT
+        printf("CLABEL 'ups_name' '%s' %u\n"
+               "CLABEL_COMMIT\n",
+               ups_name, NETDATA_CLABEL_SOURCE_AUTO);
+
+        // DIMENSION id [name [algorithm [multiplier [divisor [options]]]]]
+        printf("DIMENSION '%s' '' '' '' %u\n", chart->chart_dimension, NETDATA_PLUGIN_PRECISION);
+    }
+}
+
 int main(int argc, char *argv[]) {
     int rc;
     size_t numa;
     char **answer[1];
-    UPSCONN_t ups1, ups2;
     char buf[BUFLEN];
     unsigned int first_ups_count = 0;
     const char *query[] = { "UPS" };
@@ -618,89 +705,7 @@ int main(int argc, char *argv[]) {
 
         // The output of nut_list_ups() will be something like:
         //  { { [0] = "UPS", [1] = <UPS name>, [2] = <UPS description> } }
-        const char *ups_name = answer[0][1];
-
-        // CHART type.id name title units [family [context [charttype [priority [update_every [options [plugin [module]]]]]]]]
-        printf("CHART 'upsd_%s.status' '' 'UPS status' 'status' 'ups' 'upsd.ups_status' 'line' %u %u\n",
-               clean_name(buf, sizeof(buf), ups_name), NETDATA_CHART_PRIO_UPSD_UPS_STATUS, netdata_update_every);
-
-        if ((nut_value = nut_get_var(&ups2, ups_name, "battery.type")))
-            printf("CLABEL battery_type '%s' %u\n", nut_value, NETDATA_CLABEL_SOURCE_AUTO);
-        if ((nut_value = nut_get_var(&ups2, ups_name, "device.model")))
-            printf("CLABEL device_model '%s' %u\n", nut_value, NETDATA_CLABEL_SOURCE_AUTO);
-        if ((nut_value = nut_get_var(&ups2, ups_name, "device.serial")))
-            printf("CLABEL device_serial '%s' %u\n", nut_value, NETDATA_CLABEL_SOURCE_AUTO);
-        if ((nut_value = nut_get_var(&ups2, ups_name, "device.mfr")))
-            printf("CLABEL device_manufacturer '%s' %u\n", nut_value, NETDATA_CLABEL_SOURCE_AUTO);
-        if ((nut_value = nut_get_var(&ups2, ups_name, "device.type")))
-            printf("CLABEL device_type '%s' %u\n", nut_value, NETDATA_CLABEL_SOURCE_AUTO);
-
-        // CLABEL name value source
-        // CLABEL_COMMIT
-        printf("CLABEL ups_name '%s' %u\n"
-               "CLABEL_COMMIT\n",
-               ups_name, NETDATA_CLABEL_SOURCE_AUTO);
-
-        // DIMENSION id [name [algorithm [multiplier [divisor [options]]]]]
-        printf("DIMENSION on_line '' '' '' %u\n", NETDATA_PLUGIN_PRECISION);
-        printf("DIMENSION on_battery '' '' '' %u\n", NETDATA_PLUGIN_PRECISION);
-        printf("DIMENSION low_battery '' '' '' %u\n", NETDATA_PLUGIN_PRECISION);
-        printf("DIMENSION high_battery '' '' '' %u\n", NETDATA_PLUGIN_PRECISION);
-        printf("DIMENSION replace_battery '' '' '' %u\n", NETDATA_PLUGIN_PRECISION);
-        printf("DIMENSION charging '' '' '' %u\n", NETDATA_PLUGIN_PRECISION);
-        printf("DIMENSION discharging '' '' '' %u\n", NETDATA_PLUGIN_PRECISION);
-        printf("DIMENSION bypass '' '' '' %u\n", NETDATA_PLUGIN_PRECISION);
-        printf("DIMENSION calibration '' '' '' %u\n", NETDATA_PLUGIN_PRECISION);
-        printf("DIMENSION offline '' '' '' %u\n", NETDATA_PLUGIN_PRECISION);
-        printf("DIMENSION overloaded '' '' '' %u\n", NETDATA_PLUGIN_PRECISION);
-        printf("DIMENSION trim_input_voltage '' '' '' %u\n", NETDATA_PLUGIN_PRECISION);
-        printf("DIMENSION boost_input_voltage '' '' '' %u\n", NETDATA_PLUGIN_PRECISION);
-        printf("DIMENSION forced_shutdown '' '' '' %u\n", NETDATA_PLUGIN_PRECISION);
-        printf("DIMENSION other '' '' '' %u\n", NETDATA_PLUGIN_PRECISION);
-
-        for (const struct nd_chart *chart = nd_charts; chart->nut_variable; chart++) {
-            nut_value = nut_get_var(&ups2, ups_name, chart->nut_variable);
-            if (!nut_value) {
-                if (!streq(chart->nut_variable, "ups.realpower"))
-                    continue;
-                // If the UPS does not support the 'ups.realpower' variable, then
-                // we can still calculate the load_usage if the 'ups.load' and
-                // 'ups.realpower.nominal' variables are available.
-                if (!nut_get_var(&ups2, ups_name, "ups.load") || !nut_get_var(&ups2, ups_name, "ups.realpower.nominal"))
-                    continue;
-            }
-
-            // CHART type.id name title units [family [context [charttype [priority [update_every [options [plugin [module]]]]]]]]
-            printf("CHART 'upsd_%s.%s' '' '%s' '%s' '%s' '%s' '%s' '%u' '%u' '' '" PLUGIN_UPSD_NAME "'\n",
-                   clean_name(buf, sizeof(buf), ups_name), chart->chart_id, // type.id
-                   chart->chart_title,    // title
-                   chart->chart_units,    // units
-                   chart->chart_family,   // family
-                   chart->chart_context,  // context
-                   chart->chart_type,     // charttype
-                   chart->chart_priority, // priority
-                   netdata_update_every); // update_every
-
-            if ((nut_value = nut_get_var(&ups2, ups_name, "battery.type")))
-                printf("CLABEL 'battery_type' '%s' '%u'\n", nut_value, NETDATA_CLABEL_SOURCE_AUTO);
-            if ((nut_value = nut_get_var(&ups2, ups_name, "device.model")))
-                printf("CLABEL 'device_model' '%s' '%u'\n", nut_value, NETDATA_CLABEL_SOURCE_AUTO);
-            if ((nut_value = nut_get_var(&ups2, ups_name, "device.serial")))
-                printf("CLABEL 'device_serial' '%s' '%u'\n", nut_value, NETDATA_CLABEL_SOURCE_AUTO);
-            if ((nut_value = nut_get_var(&ups2, ups_name, "device.mfr")))
-                printf("CLABEL 'device_manufacturer' '%s' '%u'\n", nut_value, NETDATA_CLABEL_SOURCE_AUTO);
-            if ((nut_value = nut_get_var(&ups2, ups_name, "device.type")))
-                printf("CLABEL 'device_type' '%s' '%u'\n", nut_value, NETDATA_CLABEL_SOURCE_AUTO);
-
-            // CLABEL name value source
-            // CLABEL_COMMIT
-            printf("CLABEL 'ups_name' '%s' %u\n"
-                   "CLABEL_COMMIT\n",
-                   ups_name, NETDATA_CLABEL_SOURCE_AUTO);
- 
-            // DIMENSION id [name [algorithm [multiplier [divisor [options]]]]]
-            printf("DIMENSION '%s' '' '' '' %u\n", chart->chart_dimension, NETDATA_PLUGIN_PRECISION);
-        }
+        print_ups_charts(answer[0][1]);
     }
 
     time_t started_t = now_monotonic_sec();
