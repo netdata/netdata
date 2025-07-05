@@ -538,23 +538,19 @@ void print_ups_realpower_metric(UPSCONN_t *conn, const char *ups_name, const cha
     assert(clean_ups_name);
 
     NETDATA_DOUBLE realpower;
-    const char *ups_load, *ups_realpower, *ups_realpower_nominal;
+    const char *value = nut_get_var(conn, ups_name, "ups.realpower");
 
-    if ((ups_load = nut_get_var(conn, ups_name, "ups.load")))
-        ups_load = strdup(ups_load);
-    if ((ups_realpower = nut_get_var(conn, ups_name, "ups.realpower")))
-        ups_realpower = strdup(ups_realpower);
-    if ((ups_realpower_nominal = nut_get_var(conn, ups_name, "ups.realpower.nominal")))
-        ups_realpower_nominal = strdup(ups_realpower_nominal);
-
-    if (ups_realpower) {
-        realpower = str2ndd(ups_realpower, NULL) * NETDATA_PLUGIN_PRECISION;
+    if (value) {
+        realpower = str2ndd(value, NULL) * NETDATA_PLUGIN_PRECISION;
     } else {
-        if (!ups_load || !ups_realpower_nominal)
+        value = nut_get_var(conn, ups_name, "ups.load");
+        if (!value)
             return;
-        NETDATA_DOUBLE load = str2ndd(ups_load, NULL);
-        NETDATA_DOUBLE realpower_nominal = str2ndd(ups_realpower_nominal, NULL);
-        realpower = (load / 100) * realpower_nominal * NETDATA_PLUGIN_PRECISION;
+        realpower = str2ndd(value, NULL) / 100;
+        value = nut_get_var(conn, ups_name, "ups.realpower.nominal");
+        if (!value)
+            return;
+        realpower *= str2ndd(value, NULL) * NETDATA_PLUGIN_PRECISION;
     }
 
     // BEGIN type.id [microseconds]
@@ -564,10 +560,6 @@ void print_ups_realpower_metric(UPSCONN_t *conn, const char *ups_name, const cha
            "SET load_usage = %d\n"
            "END\n",
            clean_ups_name, (int)realpower);
-
-    free((char*)ups_load);
-    free((char*)ups_realpower);
-    free((char*)ups_realpower_nominal);
 }
 
 int main(int argc, char *argv[]) {
