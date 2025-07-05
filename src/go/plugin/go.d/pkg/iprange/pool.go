@@ -3,7 +3,6 @@
 package iprange
 
 import (
-	"fmt"
 	"iter"
 	"math/big"
 	"net/netip"
@@ -106,24 +105,108 @@ func (p *Pool) Contains(ip netip.Addr) bool {
 
 // ContainsRange reports whether the pool fully contains the given range.
 // This is true if every IP in the given range is contained in at least one range in the pool.
+// Note: For large ranges, this method may be expensive as it needs to verify coverage
+// of all addresses in the range.
 func (p *Pool) ContainsRange(r Range) bool {
 	if p == nil || r == nil {
 		return false
 	}
 
-	// For efficiency, we check if the range is fully contained within
-	// any single range in the pool first
+	// Quick check: if start or end is not in pool, range can't be contained
+	if !p.Contains(r.Start()) || !p.Contains(r.End()) {
+		return false
+	}
+
+	// For efficiency, check if the range is fully contained within
+	// any single range in the pool
 	for _, poolRange := range p.ranges {
-		if poolRange.Contains(r.Start()) && poolRange.Contains(r.End()) {
+		if rangeFullyContains(poolRange, r) {
 			return true
 		}
 	}
 
-	// If not contained in a single range, we need to check if it's covered
-	// by multiple ranges. This is more expensive but handles fragmented coverage.
-	// For simplicity, we'll just check the start and end points.
-	// A complete implementation would need to check for gaps.
-	return p.Contains(r.Start()) && p.Contains(r.End())
+	// If not in a single range, we need to check if the range is covered
+	// by multiple pool ranges without gaps.
+
+	// For small ranges, check every address
+	size := r.Size()
+	if size.Cmp(big.NewInt(256)) <= 0 {
+		for addr := range r.Iterate() {
+			if !p.Contains(addr) {
+				return false
+			}
+		}
+		return true
+	}
+
+	// For larger ranges, we need a more efficient approach.
+	// Sort pool ranges and check for coverage without gaps.
+	return p.checkRangeCoverage(r)
+}
+
+// rangeFullyContains returns true if r1 fully contains r2
+func rangeFullyContains(r1, r2 Range) bool {
+	return r1.Start().Compare(r2.Start()) <= 0 && r1.End().Compare(r2.End()) >= 0
+}
+
+// checkRangeCoverage efficiently checks if a range is fully covered by the pool's ranges
+func (p *Pool) checkRangeCoverage(r Range) bool {
+	// Filter pool ranges that might overlap with r
+	var relevant []Range
+	for _, pr := range p.ranges {
+		// Check if pr overlaps with r
+		if pr.End().Compare(r.Start()) >= 0 && pr.Start().Compare(r.End()) <= 0 {
+			relevant = append(relevant, pr)
+		}
+	}
+
+	if len(relevant) == 0 {
+		return false
+	}
+
+	// Sort by start address
+	sortRangesByStart(relevant)
+
+	// Check if the sorted ranges cover r without gaps
+	currentCoverage := r.Start()
+
+	for _, pr := range relevant {
+		// If there's a gap between current coverage and this range
+		if pr.Start().Compare(currentCoverage) > 0 {
+			return false
+		}
+
+		// Extend coverage if this range extends it
+		if pr.End().Compare(currentCoverage) >= 0 {
+			currentCoverage = pr.End()
+
+			// If we've covered the entire range, we're done
+			if currentCoverage.Compare(r.End()) >= 0 {
+				return true
+			}
+
+			// Move to next address for continuous coverage check
+			next := currentCoverage.Next()
+			if next.IsValid() {
+				currentCoverage = next
+			}
+		}
+	}
+
+	// Check if we covered up to or past the end
+	return currentCoverage.Compare(r.End()) > 0
+}
+
+// sortRangesByStart sorts ranges by their start address
+func sortRangesByStart(ranges []Range) {
+	// Simple insertion sort for small slices
+	for i := 1; i < len(ranges); i++ {
+		j := i
+		for j > 0 && ranges[j-1].Start().Compare(ranges[j].Start()) > 0 {
+			ranges[j-1], ranges[j] = ranges[j], ranges[j-1]
+			j--
+		}
+	}
 }
 
 // Iterate returns an iterator over all IP addresses in all ranges.
@@ -184,50 +267,4 @@ func (p *Pool) Clone() *Pool {
 		return nil
 	}
 	return NewPool(p.ranges...)
-}
-
-// Format implements fmt.Formatter for custom formatting.
-// It supports the following verbs:
-//   - %s: default string representation (space-separated)
-//   - %q: quoted string representation
-//   - %v: same as %s
-//   - %+v: verbose format with range count and size
-func (p *Pool) Format(f fmt.State, verb rune) {
-	switch verb {
-	case 's':
-		if p == nil {
-			_, _ = f.Write([]byte("<nil>"))
-			return
-		}
-		_, _ = f.Write([]byte(p.String()))
-	case 'q':
-		if p == nil {
-			_, _ = f.Write([]byte(`"<nil>"`))
-			return
-		}
-		_, _ = fmt.Fprintf(f, "%q", p.String())
-	case 'v':
-		if f.Flag('+') {
-			// Handle %+v
-			if p == nil {
-				_, _ = f.Write([]byte("Pool(<nil>)"))
-				return
-			}
-			_, _ = fmt.Fprintf(f, "Pool(ranges=%d, addresses=%s)", p.Len(), p.Size())
-		} else {
-			// Handle %v
-			if p == nil {
-				_, _ = f.Write([]byte("<nil>"))
-				return
-			}
-			_, _ = f.Write([]byte(p.String()))
-		}
-	default:
-		// For other verbs, use default string representation
-		if p == nil {
-			_, _ = f.Write([]byte("<nil>"))
-			return
-		}
-		_, _ = f.Write([]byte(p.String()))
-	}
 }

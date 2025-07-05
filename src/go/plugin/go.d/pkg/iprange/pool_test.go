@@ -420,36 +420,6 @@ func TestPool_Ranges(t *testing.T) {
 	assert.Equal(t, 2, pool.Len())
 }
 
-func TestPool_Format(t *testing.T) {
-	t.Parallel()
-
-	pool, err := ParsePool("192.0.2.0-192.0.2.10")
-	require.NoError(t, err)
-
-	tests := []struct {
-		format string
-		want   string
-	}{
-		{"%s", "192.0.2.0-192.0.2.10"},
-		{"%v", "192.0.2.0-192.0.2.10"},
-		{"%q", `"192.0.2.0-192.0.2.10"`},
-		{"%+v", "Pool(ranges=1, addresses=11)"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.format, func(t *testing.T) {
-			got := fmt.Sprintf(tt.format, pool)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-
-	// Test nil pool
-	var nilPool *Pool
-	assert.Equal(t, "<nil>", fmt.Sprintf("%s", nilPool))
-	assert.Equal(t, `"<nil>"`, fmt.Sprintf("%q", nilPool))
-	assert.Equal(t, "Pool(<nil>)", fmt.Sprintf("%+v", nilPool))
-}
-
 // Benchmark tests
 func BenchmarkPool_Contains(b *testing.B) {
 	// Create a pool with multiple ranges
