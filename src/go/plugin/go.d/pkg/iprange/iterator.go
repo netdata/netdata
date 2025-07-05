@@ -4,38 +4,41 @@ package iprange
 
 import (
 	"iter"
-	"net"
+	"net/netip"
 )
 
-func iterate(r Range) iter.Seq[net.IP] {
-	ipCopy := make(net.IP, len(r.getStart()))
-	nextBuf := make(net.IP, len(r.getStart()))
+// iterate returns an iterator that yields each IP address in the range.
+// It handles both IPv4 and IPv6 ranges efficiently.
+func iterate(r Range) iter.Seq[netip.Addr] {
+	return func(yield func(netip.Addr) bool) {
+		current := r.Start()
+		end := r.End()
 
-	return func(yield func(net.IP) bool) {
-		for ip := r.getStart(); ip != nil; ip = nextIP(ip, nextBuf) {
-			copy(ipCopy, ip)
-			if !yield(ipCopy) {
+		// Handle empty or invalid range
+		if !current.IsValid() || !end.IsValid() {
+			return
+		}
+
+		for {
+			// Yield current address
+			if !yield(current) {
 				return
 			}
-			if ip.Equal(r.getEnd()) {
-				break
+
+			// Check if we've reached the end
+			if current == end {
+				return
 			}
+
+			// Move to next address
+			next := current.Next()
+
+			// Check for overflow or going past the end
+			if !next.IsValid() || next.Compare(end) > 0 {
+				return
+			}
+
+			current = next
 		}
 	}
-}
-
-func nextIP(ip net.IP, buf net.IP) net.IP {
-	ip = ip.To16()
-	if ip == nil {
-		return nil
-	}
-	copy(buf, ip)
-
-	for i := len(buf) - 1; i >= 0; i-- {
-		buf[i]++
-		if buf[i] != 0 {
-			break
-		}
-	}
-	return buf
 }

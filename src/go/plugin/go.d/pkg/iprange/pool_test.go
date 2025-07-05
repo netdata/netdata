@@ -5,100 +5,478 @@ package iprange
 import (
 	"fmt"
 	"math/big"
-	"net"
+	"net/netip"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestPool_String(t *testing.T) {
-	tests := map[string]struct {
-		input      string
-		wantString string
+func TestNewPool(t *testing.T) {
+	t.Parallel()
+
+	r1 := mustParseRange(t, "192.0.2.0", "192.0.2.10")
+	r2 := mustParseRange(t, "192.0.2.20", "192.0.2.30")
+
+	tests := []struct {
+		name      string
+		ranges    []Range
+		wantCount int
 	}{
-		"singe": {
-			input:      "192.0.2.0-192.0.2.10",
-			wantString: "192.0.2.0-192.0.2.10",
+		{
+			name:      "empty pool",
+			ranges:    nil,
+			wantCount: 0,
 		},
-		"multiple": {
-			input:      "192.0.2.0-192.0.2.10 2001:db8::-2001:db8::10",
-			wantString: "192.0.2.0-192.0.2.10 2001:db8::-2001:db8::10",
+		{
+			name:      "single range",
+			ranges:    []Range{r1},
+			wantCount: 1,
+		},
+		{
+			name:      "multiple ranges",
+			ranges:    []Range{r1, r2},
+			wantCount: 2,
+		},
+		{
+			name:      "with nil ranges",
+			ranges:    []Range{r1, nil, r2, nil},
+			wantCount: 2,
 		},
 	}
 
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			rs, err := ParseRanges(test.input)
-			require.NoError(t, err)
-			p := Pool(rs)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-			assert.Equal(t, test.wantString, p.String())
+			pool := NewPool(tt.ranges...)
+			assert.Equal(t, tt.wantCount, pool.Len())
 		})
 	}
 }
 
-func TestPool_Size(t *testing.T) {
-	tests := map[string]struct {
-		input    string
-		wantSize *big.Int
+func TestParsePool(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		input   string
+		wantLen int
+		wantErr bool
 	}{
-		"singe": {
-			input:    "192.0.2.0-192.0.2.10",
-			wantSize: big.NewInt(11),
+		{
+			name:    "single range",
+			input:   "192.0.2.0-192.0.2.10",
+			wantLen: 1,
 		},
-		"multiple": {
-			input:    "192.0.2.0-192.0.2.10 2001:db8::-2001:db8::10",
-			wantSize: big.NewInt(11 + 17),
+		{
+			name:    "multiple ranges",
+			input:   "192.0.2.0-192.0.2.10 2001:db8::-2001:db8::10",
+			wantLen: 2,
+		},
+		{
+			name:    "invalid range",
+			input:   "192.0.2.0-192.0.2.10 invalid",
+			wantErr: true,
+		},
+		{
+			name:    "empty string",
+			input:   "",
+			wantLen: 0,
 		},
 	}
 
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			rs, err := ParseRanges(test.input)
-			require.NoError(t, err)
-			p := Pool(rs)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-			assert.Equal(t, test.wantSize, p.Size())
+			pool, err := ParsePool(tt.input)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Nil(t, pool)
+			} else {
+				assert.NoError(t, err)
+				require.NotNil(t, pool)
+				assert.Equal(t, tt.wantLen, pool.Len())
+			}
+		})
+	}
+}
+
+func TestPool_String(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		input      string
+		wantString string
+	}{
+		{
+			name:       "single range",
+			input:      "192.0.2.0-192.0.2.10",
+			wantString: "192.0.2.0-192.0.2.10",
+		},
+		{
+			name:       "multiple ranges",
+			input:      "192.0.2.0-192.0.2.10 2001:db8::-2001:db8::10",
+			wantString: "192.0.2.0-192.0.2.10 2001:db8::-2001:db8::10",
+		},
+		{
+			name:       "empty pool",
+			input:      "",
+			wantString: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			pool, err := ParsePool(tt.input)
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.wantString, pool.String())
+		})
+	}
+}
+
+func TestPool_NilSafety(t *testing.T) {
+	t.Parallel()
+
+	var pool *Pool
+
+	// All methods should handle nil pool gracefully
+	assert.Equal(t, 0, pool.Len())
+	assert.True(t, pool.IsEmpty())
+	assert.Equal(t, "", pool.String())
+	assert.Equal(t, big.NewInt(0), pool.Size())
+	assert.False(t, pool.Contains(netip.MustParseAddr("192.0.2.1")))
+	assert.Nil(t, pool.Ranges())
+	assert.Nil(t, pool.Clone())
+
+	// Iterators should not panic
+	for range pool.Iterate() {
+		t.Fatal("nil pool should not yield any addresses")
+	}
+	for range pool.IterateRanges() {
+		t.Fatal("nil pool should not yield any ranges")
+	}
+}
+
+func TestPool_Size(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    string
+		wantSize int64
+	}{
+		{
+			name:     "single range",
+			input:    "192.0.2.0-192.0.2.10",
+			wantSize: 11,
+		},
+		{
+			name:     "multiple ranges",
+			input:    "192.0.2.0-192.0.2.10 2001:db8::-2001:db8::10",
+			wantSize: 11 + 17,
+		},
+		{
+			name:     "empty pool",
+			input:    "",
+			wantSize: 0,
+		},
+		{
+			name:     "overlapping ranges (counted separately)",
+			input:    "192.0.2.0-192.0.2.10 192.0.2.5-192.0.2.15",
+			wantSize: 11 + 11, // Overlaps are counted twice
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			pool, err := ParsePool(tt.input)
+			require.NoError(t, err)
+
+			assert.Equal(t, big.NewInt(tt.wantSize), pool.Size())
 		})
 	}
 }
 
 func TestPool_Contains(t *testing.T) {
-	tests := map[string]struct {
-		input    string
-		ip       string
-		wantFail bool
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		poolStr   string
+		ip        string
+		wantFound bool
 	}{
-		"inside first": {
-			input: "192.0.2.0-192.0.2.10 192.0.2.20-192.0.2.30 2001:db8::-2001:db8::10",
-			ip:    "192.0.2.5",
+		{
+			name:      "IP in first range",
+			poolStr:   "192.0.2.0-192.0.2.10 192.0.2.20-192.0.2.30 2001:db8::-2001:db8::10",
+			ip:        "192.0.2.5",
+			wantFound: true,
 		},
-		"inside last": {
-			input: "192.0.2.0-192.0.2.10 192.0.2.20-192.0.2.30 2001:db8::-2001:db8::10",
-			ip:    "2001:db8::5",
+		{
+			name:      "IP in last range",
+			poolStr:   "192.0.2.0-192.0.2.10 192.0.2.20-192.0.2.30 2001:db8::-2001:db8::10",
+			ip:        "2001:db8::5",
+			wantFound: true,
 		},
-		"outside": {
-			input:    "192.0.2.0-192.0.2.10 192.0.2.20-192.0.2.30 2001:db8::-2001:db8::10",
-			ip:       "192.0.2.100",
-			wantFail: true,
+		{
+			name:      "IP not in any range",
+			poolStr:   "192.0.2.0-192.0.2.10 192.0.2.20-192.0.2.30 2001:db8::-2001:db8::10",
+			ip:        "192.0.2.100",
+			wantFound: false,
+		},
+		{
+			name:      "IP in gap between ranges",
+			poolStr:   "192.0.2.0-192.0.2.10 192.0.2.20-192.0.2.30",
+			ip:        "192.0.2.15",
+			wantFound: false,
+		},
+		{
+			name:      "empty pool",
+			poolStr:   "",
+			ip:        "192.0.2.1",
+			wantFound: false,
 		},
 	}
 
-	for name, test := range tests {
-		name = fmt.Sprintf("%s (range: %s, ip: %s)", name, test.input, test.ip)
-		t.Run(name, func(t *testing.T) {
-			rs, err := ParseRanges(test.input)
-			require.NoError(t, err)
-			ip := net.ParseIP(test.ip)
-			require.NotNil(t, ip)
-			p := Pool(rs)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-			if test.wantFail {
-				assert.False(t, p.Contains(ip))
-			} else {
-				assert.True(t, p.Contains(ip))
-			}
+			pool, err := ParsePool(tt.poolStr)
+			require.NoError(t, err)
+
+			ip, err := netip.ParseAddr(tt.ip)
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.wantFound, pool.Contains(ip))
 		})
+	}
+}
+
+func TestPool_ContainsRange(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		poolStr      string
+		rangeStr     string
+		wantContains bool
+	}{
+		{
+			name:         "range fully within single pool range",
+			poolStr:      "192.0.2.0-192.0.2.100",
+			rangeStr:     "192.0.2.10-192.0.2.20",
+			wantContains: true,
+		},
+		{
+			name:         "range equals pool range",
+			poolStr:      "192.0.2.0-192.0.2.100",
+			rangeStr:     "192.0.2.0-192.0.2.100",
+			wantContains: true,
+		},
+		{
+			name:         "range extends beyond pool",
+			poolStr:      "192.0.2.0-192.0.2.100",
+			rangeStr:     "192.0.2.50-192.0.2.150",
+			wantContains: false,
+		},
+		{
+			name:         "range not in pool",
+			poolStr:      "192.0.2.0-192.0.2.100",
+			rangeStr:     "192.0.3.0-192.0.3.100",
+			wantContains: false,
+		},
+		{
+			name:         "empty pool",
+			poolStr:      "",
+			rangeStr:     "192.0.2.0-192.0.2.10",
+			wantContains: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			pool, err := ParsePool(tt.poolStr)
+			require.NoError(t, err)
+
+			r, err := ParseRange(tt.rangeStr)
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.wantContains, pool.ContainsRange(r))
+		})
+	}
+}
+
+func TestPool_Iterate(t *testing.T) {
+	t.Parallel()
+
+	pool, err := ParsePool("192.0.2.0-192.0.2.2 192.0.2.10-192.0.2.12")
+	require.NoError(t, err)
+
+	var addresses []string
+	for addr := range pool.Iterate() {
+		addresses = append(addresses, addr.String())
+	}
+
+	expected := []string{
+		"192.0.2.0", "192.0.2.1", "192.0.2.2",
+		"192.0.2.10", "192.0.2.11", "192.0.2.12",
+	}
+	assert.Equal(t, expected, addresses)
+}
+
+func TestPool_IterateRanges(t *testing.T) {
+	t.Parallel()
+
+	pool, err := ParsePool("192.0.2.0-192.0.2.10 2001:db8::-2001:db8::10")
+	require.NoError(t, err)
+
+	var ranges []string
+	for r := range pool.IterateRanges() {
+		ranges = append(ranges, r.String())
+	}
+
+	expected := []string{
+		"192.0.2.0-192.0.2.10",
+		"2001:db8::-2001:db8::10",
+	}
+	assert.Equal(t, expected, ranges)
+}
+
+func TestPool_Add(t *testing.T) {
+	t.Parallel()
+
+	pool := NewPool()
+	assert.Equal(t, 0, pool.Len())
+
+	r1 := mustParseRange(t, "192.0.2.0", "192.0.2.10")
+	pool.Add(r1)
+	assert.Equal(t, 1, pool.Len())
+
+	r2 := mustParseRange(t, "192.0.2.20", "192.0.2.30")
+	r3 := mustParseRange(t, "192.0.2.40", "192.0.2.50")
+	pool.Add(r2, nil, r3) // nil should be ignored
+	assert.Equal(t, 3, pool.Len())
+}
+
+func TestPool_AddString(t *testing.T) {
+	t.Parallel()
+
+	pool := NewPool()
+
+	err := pool.AddString("192.0.2.0-192.0.2.10 192.0.2.20/24")
+	assert.NoError(t, err)
+	assert.Equal(t, 2, pool.Len())
+
+	err = pool.AddString("invalid")
+	assert.Error(t, err)
+	assert.Equal(t, 2, pool.Len()) // Should not change
+}
+
+func TestPool_Clone(t *testing.T) {
+	t.Parallel()
+
+	original, err := ParsePool("192.0.2.0-192.0.2.10 192.0.2.20-192.0.2.30")
+	require.NoError(t, err)
+
+	clone := original.Clone()
+
+	// Should be equal
+	assert.Equal(t, original.String(), clone.String())
+	assert.Equal(t, original.Len(), clone.Len())
+
+	// But independent
+	r := mustParseRange(t, "192.0.2.40", "192.0.2.50")
+	clone.Add(r)
+
+	assert.NotEqual(t, original.Len(), clone.Len())
+}
+
+func TestPool_Ranges(t *testing.T) {
+	t.Parallel()
+
+	r1 := mustParseRange(t, "192.0.2.0", "192.0.2.10")
+	r2 := mustParseRange(t, "192.0.2.20", "192.0.2.30")
+
+	pool := NewPool(r1, r2)
+	ranges := pool.Ranges()
+
+	assert.Len(t, ranges, 2)
+	assert.Equal(t, []Range{r1, r2}, ranges)
+
+	// Modifying returned slice should not affect pool
+	ranges[0] = nil
+	assert.Equal(t, 2, pool.Len())
+}
+
+func TestPool_Format(t *testing.T) {
+	t.Parallel()
+
+	pool, err := ParsePool("192.0.2.0-192.0.2.10")
+	require.NoError(t, err)
+
+	tests := []struct {
+		format string
+		want   string
+	}{
+		{"%s", "192.0.2.0-192.0.2.10"},
+		{"%v", "192.0.2.0-192.0.2.10"},
+		{"%q", `"192.0.2.0-192.0.2.10"`},
+		{"%+v", "Pool(ranges=1, addresses=11)"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.format, func(t *testing.T) {
+			got := fmt.Sprintf(tt.format, pool)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+
+	// Test nil pool
+	var nilPool *Pool
+	assert.Equal(t, "<nil>", fmt.Sprintf("%s", nilPool))
+	assert.Equal(t, `"<nil>"`, fmt.Sprintf("%q", nilPool))
+	assert.Equal(t, "Pool(<nil>)", fmt.Sprintf("%+v", nilPool))
+}
+
+// Benchmark tests
+func BenchmarkPool_Contains(b *testing.B) {
+	// Create a pool with multiple ranges
+	pool := NewPool()
+	for i := 0; i < 10; i++ {
+		start := fmt.Sprintf("192.0.%d.0", i)
+		end := fmt.Sprintf("192.0.%d.255", i)
+		r, _ := ParseRange(fmt.Sprintf("%s-%s", start, end))
+		pool.Add(r)
+	}
+
+	ip := netip.MustParseAddr("192.0.5.100")
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = pool.Contains(ip)
+	}
+}
+
+func BenchmarkPool_Iterate(b *testing.B) {
+	pool, _ := ParsePool("192.0.2.0/24 192.0.3.0/24")
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		count := 0
+		for range pool.Iterate() {
+			count++
+		}
 	}
 }
