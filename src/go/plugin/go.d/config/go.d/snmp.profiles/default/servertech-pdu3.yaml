@@ -25,7 +25,7 @@ metrics:
       OID: 1.3.6.1.4.1.1718.3.1.6.0
       chart_meta:
         description: Total power consumption of the system
-        family: 'System/Power/Total'
+        family: 'PowerFlow/System/Total'
         unit: "W"
   - MIB: SENTRY3-MIB
     symbol:
@@ -45,55 +45,55 @@ metrics:
         OID: 1.3.6.1.4.1.1718.3.2.1.1.5
         chart_meta:
           description: Number of tower infeeds
-          family: 'Tower/Infeed/Count'
+          family: 'PowerFlow/Tower/Infeed/Count'
           unit: "{infeed}"
       - name: servertech.sentry3.towerVACapacity
         OID: 1.3.6.1.4.1.1718.3.2.1.1.9
         chart_meta:
           description: Tower VA capacity
-          family: 'Tower/Power/Capacity/Apparent'
+          family: 'PowerFlow/Tower/Capacity/Apparent'
           unit: "VA"
       - name: servertech.sentry3.towerVACapacityUsed
         OID: 1.3.6.1.4.1.1718.3.2.1.1.10
         chart_meta:
           description: Used tower VA capacity
-          family: 'Tower/Power/Used/Apparent'
+          family: 'PowerFlow/Tower/Used/Apparent'
           unit: "VA"
       - name: servertech.sentry3.towerActivePower
         OID: 1.3.6.1.4.1.1718.3.2.1.1.11
         chart_meta:
           description: Tower active power
-          family: 'Tower/Power/Active'
+          family: 'PowerFlow/Tower/Active'
           unit: "W"
       - name: servertech.sentry3.towerApparentPower
         OID: 1.3.6.1.4.1.1718.3.2.1.1.12
         chart_meta:
           description: Tower apparent power
-          family: 'Tower/Power/Apparent'
+          family: 'PowerFlow/Tower/Apparent'
           unit: "VA"
       - name: servertech.sentry3.towerPowerFactor
         OID: 1.3.6.1.4.1.1718.3.2.1.1.13
         chart_meta:
           description: Tower power factor
-          family: 'Tower/Power/Factor'
+          family: 'PowerFlow/Tower/Factor'
           unit: "%"
       - name: servertech.sentry3.towerEnergy
         OID: 1.3.6.1.4.1.1718.3.2.1.1.14
         chart_meta:
           description: Tower energy consumption
-          family: 'Tower/Energy/Total'
+          family: 'PowerFlow/Tower/Energy/Total'
           unit: "Wh"
       - name: servertech.sentry3.towerLineFrequency
         OID: 1.3.6.1.4.1.1718.3.2.1.1.15
         chart_meta:
           description: Tower line frequency
-          family: 'Tower/Frequency/Value'
+          family: 'PowerFlow/Tower/Frequency'
           unit: "Hz"
       - name: servertech.sentry3.towerStatus
         OID: 1.3.6.1.4.1.1718.3.2.1.1.4
         chart_meta:
           description: Tower operational status
-          family: 'Tower/Status'
+          family: 'Hardware/Tower/Status'
           unit: "{status}"
         mapping:
           0: normal
@@ -129,61 +129,61 @@ metrics:
         OID: 1.3.6.1.4.1.1718.3.2.2.1.7
         chart_meta:
           description: Infeed load value
-          family: 'Infeed/Load/Value'
+          family: 'PowerFlow/Infeed/Load/Value'
           unit: "W"
       - name: servertech.sentry3.infeedOutletCount
         OID: 1.3.6.1.4.1.1718.3.2.2.1.9
         chart_meta:
           description: Number of outlets on infeed
-          family: 'Infeed/Outlet/Count'
+          family: 'PowerFlow/Infeed/Outlet/Count'
           unit: "{outlet}"
       - name: servertech.sentry3.infeedCapacity
         OID: 1.3.6.1.4.1.1718.3.2.2.1.10
         chart_meta:
           description: Infeed capacity
-          family: 'Infeed/Power/Capacity'
+          family: 'PowerFlow/Infeed/Capacity'
           unit: "VA"
       - name: servertech.sentry3.infeedVoltage
         OID: 1.3.6.1.4.1.1718.3.2.2.1.11
         chart_meta:
           description: Infeed voltage
-          family: 'Infeed/Voltage/Value'
+          family: 'PowerFlow/Infeed/Voltage'
           unit: "V"
       - name: servertech.sentry3.infeedPower
         OID: 1.3.6.1.4.1.1718.3.2.2.1.12
         chart_meta:
           description: Infeed power
-          family: 'Infeed/Power/Active'
+          family: 'PowerFlow/Infeed/Active'
           unit: "W"
       - name: servertech.sentry3.infeedEnergy
         OID: 1.3.6.1.4.1.1718.3.2.2.1.16
         chart_meta:
           description: Infeed energy consumption
-          family: 'Infeed/Energy/Total'
+          family: 'PowerFlow/Infeed/Energy/Total'
           unit: "Wh"
       - name: servertech.sentry3.infeedPhaseVoltage
         OID: 1.3.6.1.4.1.1718.3.2.2.1.18
         chart_meta:
           description: Infeed phase voltage
-          family: 'Infeed/Phase/Voltage/Value'
+          family: 'PowerFlow/Infeed/Phase/Voltage'
           unit: "V"
       - name: servertech.sentry3.infeedPhaseCurrent
         OID: 1.3.6.1.4.1.1718.3.2.2.1.19
         chart_meta:
           description: Infeed phase current
-          family: 'Infeed/Phase/Current/Value'
+          family: 'PowerFlow/Infeed/Phase/Current'
           unit: "A"
       - name: servertech.sentry3.infeedCapacityUsed
         OID: 1.3.6.1.4.1.1718.3.2.2.1.20
         chart_meta:
           description: Used infeed capacity
-          family: 'Infeed/Power/Used'
+          family: 'PowerFlow/Infeed/Used'
           unit: "VA"
       - name: servertech.sentry3.infeedStatus
         OID: 1.3.6.1.4.1.1718.3.2.2.1.5
         chart_meta:
           description: Infeed operational status
-          family: 'Infeed/Status'
+          family: 'Hardware/Infeed/Status'
           unit: "{status}"
         mapping:
           0: off
@@ -200,7 +200,7 @@ metrics:
         OID: 1.3.6.1.4.1.1718.3.2.2.1.6
         chart_meta:
           description: Infeed load status
-          family: 'Infeed/Load/Status'
+          family: 'Hardware/Infeed/Load/Status'
           unit: "{status}"
         mapping:
           0: normal
@@ -215,7 +215,7 @@ metrics:
         OID: 1.3.6.1.4.1.1718.3.2.2.1.17
         chart_meta:
           description: Infeed reactance type
-          family: 'Infeed/Reactance/Type'
+          family: 'PowerFlow/Infeed/Reactance/Type'
           unit: "{status}"
         mapping:
           0: unknown
@@ -253,7 +253,7 @@ metrics:
         OID: 1.3.6.1.4.1.1718.3.2.3.1.5
         chart_meta:
           description: Outlet operational status
-          family: 'Outlet/Status'
+          family: 'Hardware/Outlet/Status'
           unit: "{status}"
         mapping:
           0: off
@@ -270,7 +270,7 @@ metrics:
         OID: 1.3.6.1.4.1.1718.3.2.3.1.10
         chart_meta:
           description: Outlet control state
-          family: 'Outlet/Control/State'
+          family: 'Hardware/Outlet/Control/State'
           unit: "{status}"
         mapping:
           0: idle_off
@@ -295,7 +295,7 @@ metrics:
         OID: 1.3.6.1.4.1.1718.3.2.3.1.19
         chart_meta:
           description: Outlet wakeup state configuration
-          family: 'Outlet/Wakeup/State'
+          family: 'Hardware/Outlet/Wakeup/State'
           unit: "{status}"
         mapping:
           1: last
@@ -320,7 +320,7 @@ metrics:
         OID: 1.3.6.1.4.1.1718.3.2.4.1.4
         chart_meta:
           description: Environmental monitor status
-          family: 'Environment/Monitor/Status'
+          family: 'Hardware/Sensor/Environmental/Status'
           unit: "{status}"
         mapping:
           0: normal
@@ -344,19 +344,19 @@ metrics:
         OID: 1.3.6.1.4.1.1718.3.2.5.1.6
         chart_meta:
           description: Temperature value from sensor
-          family: 'Sensor/Temperature/Value'
+          family: 'Hardware/Sensor/Temperature/Value'
           unit: "Cel"
       - name: servertech.sentry3.tempHumidSensorHumidValue
         OID: 1.3.6.1.4.1.1718.3.2.5.1.10
         chart_meta:
           description: Humidity value from sensor
-          family: 'Sensor/Humidity/Value'
+          family: 'Hardware/Sensor/Humidity/Value'
           unit: "%"
       - name: servertech.sentry3.tempHumidSensorStatus
         OID: 1.3.6.1.4.1.1718.3.2.5.1.4
         chart_meta:
           description: Temperature/humidity sensor communication status
-          family: 'Sensor/Communication/Status'
+          family: 'Hardware/Sensor/Communication/Status'
           unit: "{status}"
         mapping:
           0: found
@@ -367,7 +367,7 @@ metrics:
         OID: 1.3.6.1.4.1.1718.3.2.5.1.5
         chart_meta:
           description: Temperature sensor status
-          family: 'Sensor/Temperature/Status'
+          family: 'Hardware/Sensor/Temperature/Status'
           unit: "{status}"
         mapping:
           0: normal
@@ -382,7 +382,7 @@ metrics:
         OID: 1.3.6.1.4.1.1718.3.2.5.1.9
         chart_meta:
           description: Humidity sensor status
-          family: 'Sensor/Humidity/Status'
+          family: 'Hardware/Sensor/Humidity/Status'
           unit: "{status}"
         mapping:
           0: normal

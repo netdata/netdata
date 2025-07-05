@@ -337,14 +337,14 @@ metrics:
         chart_meta:
           description: The total number of octets received on the interface, including framing characters
           family: 'Interfaces/Traffic/Total/In'
-          unit: "bits/s"
+          unit: "bit/s"
         scale_factor: 8
       - OID: 1.3.6.1.4.1.789.1.22.1.2.1.31
         name: if64OutOctets
         chart_meta:
           description: The total number of octets transmitted out of the interface, including framing characters
           family: 'Interfaces/Traffic/Total/Out'
-          unit: "bits/s"
+          unit: "bit/s"
         scale_factor: 8
       - OID: 1.3.6.1.4.1.789.1.22.1.2.1.26
         name: if64InUcastPkts

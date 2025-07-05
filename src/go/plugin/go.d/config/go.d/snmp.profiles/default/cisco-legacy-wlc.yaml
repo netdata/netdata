@@ -44,7 +44,7 @@ metrics:
       name: cpu.usage
       chart_meta:
         description: Current CPU load of the switch
-        family: 'CPU/Usage'
+        family: 'System/CPU/Usage'
         unit: "%"
   - MIB: AIRESPACE-SWITCHING-MIB
     symbol:
@@ -52,7 +52,7 @@ metrics:
       name: memory.free
       chart_meta:
         description: Free RAM of the switch
-        family: 'Memory/RAM/Free'
+        family: 'System/Memory/RAM/Free'
         unit: "By"
   - MIB: AIRESPACE-SWITCHING-MIB
     symbol:
@@ -60,5 +60,5 @@ metrics:
       name: memory.total
       chart_meta:
         description: Total RAM of the switch
-        family: 'Memory/RAM/Total'
+        family: 'System/Memory/RAM/Total'
         unit: "By"
