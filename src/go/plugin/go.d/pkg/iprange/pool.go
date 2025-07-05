@@ -6,6 +6,7 @@ import (
 	"iter"
 	"math/big"
 	"net/netip"
+	"sort"
 	"strings"
 )
 
@@ -128,7 +129,8 @@ func (p *Pool) ContainsRange(r Range) bool {
 	// If not in a single range, we need to check if the range is covered
 	// by multiple pool ranges without gaps.
 
-	// For small ranges, check every address
+	// For small ranges (up to 256 IPs), check every address for completeness.
+	// This handles cases like a /24 network efficiently while being 100% accurate
 	size := r.Size()
 	if size.Cmp(big.NewInt(256)) <= 0 {
 		for addr := range r.Iterate() {
@@ -164,8 +166,9 @@ func (p *Pool) checkRangeCoverage(r Range) bool {
 		return false
 	}
 
-	// Sort by start address
-	sortRangesByStart(relevant)
+	sort.Slice(relevant, func(i, j int) bool {
+		return relevant[i].Start().Compare(relevant[j].Start()) < 0
+	})
 
 	// Check if the sorted ranges cover r without gaps
 	currentCoverage := r.Start()
@@ -195,18 +198,6 @@ func (p *Pool) checkRangeCoverage(r Range) bool {
 
 	// Check if we covered up to or past the end
 	return currentCoverage.Compare(r.End()) > 0
-}
-
-// sortRangesByStart sorts ranges by their start address
-func sortRangesByStart(ranges []Range) {
-	// Simple insertion sort for small slices
-	for i := 1; i < len(ranges); i++ {
-		j := i
-		for j > 0 && ranges[j-1].Start().Compare(ranges[j].Start()) > 0 {
-			ranges[j-1], ranges[j] = ranges[j], ranges[j-1]
-			j--
-		}
-	}
 }
 
 // Iterate returns an iterator over all IP addresses in all ranges.

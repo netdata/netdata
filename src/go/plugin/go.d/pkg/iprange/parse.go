@@ -5,6 +5,7 @@ package iprange
 import (
 	"errors"
 	"fmt"
+	"math/bits"
 	"net/netip"
 	"strings"
 )
@@ -103,7 +104,7 @@ func parseIPRange(s string) (Range, error) {
 	}
 
 	// Validate the range
-	if start.Is4() != end.Is4() || start.Is6() != end.Is6() {
+	if start.Is4() != end.Is4() {
 		return nil, ErrMixedAddressFamilies
 	}
 
@@ -185,21 +186,19 @@ func shouldExcludeNetworkAndBroadcast(addr netip.Addr, prefixLen int) bool {
 // lastAddrInPrefix returns the last address in the given prefix.
 func lastAddrInPrefix(p netip.Prefix) netip.Addr {
 	addr := p.Addr()
-	bits := p.Bits()
+	prefixBits := p.Bits()
 
 	if addr.Is4() {
-		// Calculate the host mask and apply it
-		hostBits := 32 - bits
-		if hostBits == 0 {
-			return addr
-		}
-
 		a := addr.As4()
 		addrUint := uint32(a[0])<<24 | uint32(a[1])<<16 | uint32(a[2])<<8 | uint32(a[3])
 
 		// Set all host bits to 1
-		mask := uint32(1<<hostBits - 1)
-		lastUint := addrUint | mask
+		hostBits := 32 - prefixBits
+		if hostBits == 0 {
+			return addr
+		}
+		hostMask := (uint32(1) << hostBits) - 1
+		lastUint := addrUint | hostMask
 
 		return netip.AddrFrom4([4]byte{
 			byte(lastUint >> 24),
@@ -210,21 +209,15 @@ func lastAddrInPrefix(p netip.Prefix) netip.Addr {
 	}
 
 	// IPv6
-	hostBits := 128 - bits
-	if hostBits == 0 {
-		return addr
-	}
-
 	a := addr.As16()
 	var last [16]byte
 	copy(last[:], a[:])
 
-	// Set host bits to 1
-	for i := bits / 8; i < 16; i++ {
-		if i == bits/8 {
+	// Set all host bits to 1
+	for i := prefixBits / 8; i < 16; i++ {
+		if i == prefixBits/8 && prefixBits%8 != 0 {
 			// Partial byte: set remaining bits to 1
-			mask := byte(0xFF >> (bits % 8))
-			last[i] |= mask
+			last[i] |= byte((1 << (8 - prefixBits%8)) - 1)
 		} else {
 			// Full byte: set all bits to 1
 			last[i] = 0xFF
@@ -244,27 +237,17 @@ func maskToPrefixLen(mask netip.Addr) (int, bool) {
 	m := mask.As4()
 	maskUint := uint32(m[0])<<24 | uint32(m[1])<<16 | uint32(m[2])<<8 | uint32(m[3])
 
-	// Check if it's a valid netmask by ensuring it's a contiguous sequence of 1s
-	// A valid netmask when inverted should be (2^n - 1) for some n
-	inverted := ^maskUint
-	if inverted == 0 {
-		return 32, true // 255.255.255.255
-	}
+	// Count the number of 1 bits
+	ones := bits.OnesCount32(maskUint)
 
-	// Check if inverted+1 is a power of 2
-	if (inverted+1)&inverted != 0 {
+	// Valid netmask must have all 1s followed by all 0s
+	// This means if we have 'ones' 1-bits, they must all be leading bits
+	// So the mask should equal ^((1 << (32 - ones)) - 1)
+	expectedMask := ^uint32(0) << (32 - ones)
+
+	if maskUint != expectedMask {
 		return 0, false
 	}
 
-	// Count the number of 1s in the mask
-	prefixLen := 0
-	for i := 31; i >= 0; i-- {
-		if maskUint&(1<<i) != 0 {
-			prefixLen++
-		} else {
-			break
-		}
-	}
-
-	return prefixLen, true
+	return ones, true
 }
