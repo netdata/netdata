@@ -1,0 +1,6 @@
+ALWAYS_PRESENT=should appear
+ERROR_CODE=E001
+LEVEL=INFO
+MESSAGE=Login
+MODULE=security
+
