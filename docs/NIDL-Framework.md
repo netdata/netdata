@@ -276,7 +276,7 @@ This guide walks through the thought process of designing metrics for a new coll
 
 #### Step 2: Organize into Families
 
-**Decision**: Flat structure (<10 families) or Tree structure (>10 families)?
+**Decision**: Flat structure (\<10 families) or Tree structure (\>10 families)?
 
 **PostgreSQL - Flat Structure**:
 ```
@@ -414,7 +414,7 @@ Family: tables
 #### Final Checklist
 
 - [ ] Each family represents a major functional area
-- [ ] Navigation structure is intuitive (<10 flat, >10 tree)
+- [ ] Navigation structure is intuitive (\<10 flat, \>10 tree)
 - [ ] All metrics in a family are about the same topic
 - [ ] Each context has consistent instance types
 - [ ] All instances in a context have identical dimensions

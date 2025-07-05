@@ -61,7 +61,7 @@ type Collector struct {
 	findPeersEvery   time.Duration
 	peerAddr         map[string]bool
 	peerIDs          []uint16
-	peerIPAddrFilter iprange.Pool
+	peerIPAddrFilter *iprange.Pool
 }
 
 func (c *Collector) Configuration() any {
@@ -79,7 +79,7 @@ func (c *Collector) Init(context.Context) error {
 		return fmt.Errorf("error on parsing ip range '%s': %v", txt, err)
 	}
 
-	c.peerIPAddrFilter = r
+	c.peerIPAddrFilter = iprange.NewPool(r...)
 
 	return nil
 }
