@@ -6,7 +6,12 @@ void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_dataf
     if(!having_lock)
         uv_rwlock_wrlock(&ctx->datafiles.rwlock);
 
-    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(ctx->datafiles.first, datafile, prev, next);
+    Pvoid_t *Pvalue = JudyLIns(&ctx->datafiles.JudyL, (Word_t ) datafile->fileno, PJE0);
+    if(!Pvalue || Pvalue == PJERR)
+        fatal("DBENGINE: cannot insert datafile %u of tier %d into the datafiles list",
+              datafile->fileno, ctx->config.tier);
+
+    *Pvalue = datafile;
 
     if(!having_lock)
         uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
@@ -14,7 +19,7 @@ void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_dataf
 
 void datafile_list_delete_unsafe(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile)
 {
-    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(ctx->datafiles.first, datafile, prev, next);
+    (void) JudyLDel(&ctx->datafiles.JudyL, (Word_t)datafile->fileno, PJE0);
 }
 
 
@@ -174,19 +179,10 @@ void generate_datafilepath(struct rrdengine_datafile *datafile, char *str, size_
 int close_data_file(struct rrdengine_datafile *datafile)
 {
     struct rrdengine_instance *ctx = datafile_ctx(datafile);
-    uv_fs_t req;
     int ret;
     char path[RRDENG_PATH_MAX];
-
     generate_datafilepath(datafile, path, sizeof(path));
-
-    ret = uv_fs_close(NULL, &req, datafile->file, NULL);
-    if (ret < 0) {
-        netdata_log_error("DBENGINE: uv_fs_close(%s): %s", path, uv_strerror(ret));
-        ctx_fs_error(ctx);
-    }
-    uv_fs_req_cleanup(&req);
-
+    CLOSE_FILE(ctx, path, datafile->file, ret);
     return ret;
 }
 
@@ -208,34 +204,13 @@ int unlink_data_file(struct rrdengine_datafile *datafile)
 int destroy_data_file_unsafe(struct rrdengine_datafile *datafile)
 {
     struct rrdengine_instance *ctx = datafile_ctx(datafile);
-    uv_fs_t req;
     int ret;
     char path[RRDENG_PATH_MAX];
 
     generate_datafilepath(datafile, path, sizeof(path));
 
-    ret = uv_fs_ftruncate(NULL, &req, datafile->file, 0, NULL);
-    if (ret < 0) {
-        netdata_log_error("DBENGINE: uv_fs_ftruncate(%s): %s", path, uv_strerror(ret));
-        ctx_fs_error(ctx);
-    }
-    uv_fs_req_cleanup(&req);
-
-    ret = uv_fs_close(NULL, &req, datafile->file, NULL);
-    if (ret < 0) {
-        netdata_log_error("DBENGINE: uv_fs_close(%s): %s", path, uv_strerror(ret));
-        ctx_fs_error(ctx);
-    }
-    uv_fs_req_cleanup(&req);
-
-    ret = uv_fs_unlink(NULL, &req, path, NULL);
-    if (ret < 0) {
-        netdata_log_error("DBENGINE: uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
-        ctx_fs_error(ctx);
-    }
-    uv_fs_req_cleanup(&req);
-
-    __atomic_add_fetch(&ctx->stats.datafile_deletions, 1, __ATOMIC_RELAXED);
+    CLOSE_FILE(ctx, path,  datafile->file, ret);
+    ret = unlink_data_file(datafile);
 
     return ret;
 }
@@ -280,7 +255,7 @@ int create_data_file(struct rrdengine_datafile *datafile)
 
     posix_memalign_freez(superblock);
     if (ret < 0) {
-        destroy_data_file_unsafe(datafile);
+        (void) destroy_data_file_unsafe(datafile);
         ctx_io_error(ctx);
         nd_log_limit_static_global_var(dbengine_erl, 10, 0);
         nd_log_limit(&dbengine_erl, NDLS_DAEMON, NDLP_ERR, "DBENGINE: Failed to create datafile %s", path);
@@ -329,7 +304,6 @@ static int check_data_file_superblock(uv_file file)
 static int load_data_file(struct rrdengine_datafile *datafile)
 {
     struct rrdengine_instance *ctx = datafile_ctx(datafile);
-    uv_fs_t req;
     uv_file file;
     int ret, fd, error;
     uint64_t file_size;
@@ -346,12 +320,12 @@ static int load_data_file(struct rrdengine_datafile *datafile)
 
     ret = check_file_properties(file, &file_size, sizeof(struct rrdeng_df_sb));
     if (ret)
-        goto error;
+        goto err_exit;
     file_size = ALIGN_BYTES_CEILING(file_size);
 
     ret = check_data_file_superblock(file);
     if (ret)
-        goto error;
+        goto err_exit;
 
     ctx_io_read_op_bytes(ctx, sizeof(struct rrdeng_df_sb));
 
@@ -362,14 +336,9 @@ static int load_data_file(struct rrdengine_datafile *datafile)
 
     return 0;
 
-    error:
+err_exit:
     error = ret;
-    ret = uv_fs_close(NULL, &req, file, NULL);
-    if (ret < 0) {
-        netdata_log_error("DBENGINE: uv_fs_close(%s): %s", path, uv_strerror(ret));
-        ctx_fs_error(ctx);
-    }
-    uv_fs_req_cleanup(&req);
+    CLOSE_FILE(ctx, path, file, ret);
     return error;
 }
 
@@ -593,7 +562,7 @@ int create_new_datafile_pair(struct rrdengine_instance *ctx, bool having_lock)
     return 0;
 
 error_after_journalfile:
-    destroy_data_file_unsafe(datafile);
+    (void) destroy_data_file_unsafe(datafile);
     freez(journalfile);
 
 error_after_datafile:
@@ -625,8 +594,14 @@ int init_data_files(struct rrdengine_instance *ctx)
         if (ctx->loading.create_new_datafile_pair)
             create_new_datafile_pair(ctx, false);
 
-        while(rrdeng_ctx_tier_cap_exceeded(ctx))
-            datafile_delete(ctx, ctx->datafiles.first, false, true, false);
+        while(rrdeng_ctx_tier_cap_exceeded(ctx)) {
+            Word_t Index = 0;
+            Pvoid_t *PValue = JudyLFirst(ctx->datafiles.JudyL, &Index, PJE0);
+            if (PValue && *PValue) {
+                struct rrdengine_datafile *datafile = *PValue;
+                datafile_delete(ctx, datafile, false, true, false);
+            }
+        }
     }
 
     pgc_reset_hot_max(open_cache);
@@ -654,7 +629,7 @@ void finalize_data_files(struct rrdengine_instance *ctx)
 {
     bool logged = false;
 
-    if (!ctx->datafiles.first)
+    if (!ctx->datafiles.JudyL)
         return;
 
     while(__atomic_load_n(&ctx->atomic.extents_currently_being_flushed, __ATOMIC_RELAXED)) {
@@ -665,13 +640,17 @@ void finalize_data_files(struct rrdengine_instance *ctx)
         sleep_usec(100 * USEC_PER_MS);
     }
 
-    do {
-        struct rrdengine_datafile *datafile = ctx->datafiles.first;
+    bool first_then_next = true;
+    Pvoid_t *PValue;
+    Word_t Index = 0;
+
+    while ((PValue = JudyLFirstThenNext(ctx->datafiles.JudyL, &Index, &first_then_next))) {
+        struct rrdengine_datafile *datafile = *PValue;
         struct rrdengine_journalfile *journalfile = datafile->journalfile;
 
         logged = false;
         size_t iterations = 10;
-        while(!datafile_acquire_for_deletion(datafile, true) && datafile != ctx->datafiles.first->prev && --iterations > 0) {
+        while(!datafile_acquire_for_deletion(datafile, true) && --iterations > 0) {
             if(!logged) {
                 netdata_log_info("Waiting to acquire data file %u of tier %d to close it...", datafile->fileno, ctx->config.tier);
                 logged = true;
@@ -711,6 +690,5 @@ void finalize_data_files(struct rrdengine_instance *ctx)
 
         freez(journalfile);
         freez(datafile);
-
-    } while(ctx->datafiles.first);
+    }
 }
