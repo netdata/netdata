@@ -7,7 +7,7 @@ package isc_dhcpd
 import (
 	"bufio"
 	"bytes"
-	"net"
+	"net/netip"
 	"os"
 )
 
@@ -41,11 +41,11 @@ DHCPv6 prepare declaration:
 */
 
 type leaseEntry struct {
-	ip           net.IP
+	addr         netip.Addr
 	bindingState string
 }
 
-func (l leaseEntry) hasIP() bool           { return l.ip != nil }
+func (l leaseEntry) isAddrValid() bool     { return l.addr.IsValid() }
 func (l leaseEntry) hasBindingState() bool { return l.bindingState != "" }
 
 func parseDHCPdLeasesFile(filepath string) ([]leaseEntry, error) {
@@ -62,21 +62,25 @@ func parseDHCPdLeasesFile(filepath string) ([]leaseEntry, error) {
 	for sc.Scan() {
 		bs := bytes.TrimSpace(sc.Bytes())
 		switch {
-		case !l.hasIP() && bytes.HasPrefix(bs, []byte("lease")):
+		case !l.isAddrValid() && bytes.HasPrefix(bs, []byte("lease")):
 			// "lease 192.168.0.1 {" => "192.168.0.1"
 			s := string(bs)
-			l.ip = net.ParseIP(s[6 : len(s)-2])
-		case !l.hasIP() && bytes.HasPrefix(bs, []byte("iaaddr")):
+			if addr, err := netip.ParseAddr(s[6 : len(s)-2]); err == nil && addr.IsValid() {
+				l.addr = addr
+			}
+		case !l.isAddrValid() && bytes.HasPrefix(bs, []byte("iaaddr")):
 			// "iaaddr 1985:470:1f0b:c9a::001 {" =>  "1985:470:1f0b:c9a::001"
 			s := string(bs)
-			l.ip = net.ParseIP(s[7 : len(s)-2])
-		case l.hasIP() && !l.hasBindingState() && bytes.HasPrefix(bs, []byte("binding state")):
+			if addr, err := netip.ParseAddr(s[7 : len(s)-2]); err == nil && addr.IsValid() {
+				l.addr = addr
+			}
+		case l.isAddrValid() && !l.hasBindingState() && bytes.HasPrefix(bs, []byte("binding state")):
 			// "binding state active;" => "active"
 			s := string(bs)
 			l.bindingState = s[14 : len(s)-1]
 		case bytes.HasPrefix(bs, []byte("}")):
-			if l.hasIP() && l.hasBindingState() {
-				leasesSet[l.ip.String()] = l
+			if l.isAddrValid() && l.hasBindingState() {
+				leasesSet[l.addr.String()] = l
 			}
 			l = leaseEntry{}
 		}

@@ -9,7 +9,7 @@ import (
 	"io"
 	"math"
 	"math/big"
-	"net"
+	"net/netip"
 	"os"
 	"strings"
 	"time"
@@ -70,7 +70,7 @@ func (c *Collector) collectV4V6Stats() {
 
 	c.mx["ipv4_dhcp_hosts"], c.mx["ipv6_dhcp_hosts"] = 0, 0
 	for _, ip := range c.dhcpHosts {
-		if ip.To4() == nil {
+		if ip.Is6() {
 			c.mx["ipv6_dhcp_hosts"]++
 		} else {
 			c.mx["ipv4_dhcp_hosts"]++
@@ -78,24 +78,24 @@ func (c *Collector) collectV4V6Stats() {
 	}
 }
 
-func (c *Collector) collectRangesStats(leases []net.IP) {
+func (c *Collector) collectRangesStats(leases []netip.Addr) {
 	for _, r := range c.dhcpRanges {
 		c.mx["dhcp_range_"+r.String()+"_allocated_leases"] = 0
 		c.mx["dhcp_range_"+r.String()+"_utilization"] = 0
 	}
 
-	for _, ip := range leases {
+	for _, addr := range leases {
 		for _, r := range c.dhcpRanges {
-			if r.Contains(ip) {
+			if r.Contains(addr) {
 				c.mx["dhcp_range_"+r.String()+"_allocated_leases"]++
 				break
 			}
 		}
 	}
 
-	for _, ip := range c.dhcpHosts {
+	for _, addr := range c.dhcpHosts {
 		for _, r := range c.dhcpRanges {
-			if r.Contains(ip) {
+			if r.Contains(addr) {
 				c.mx["dhcp_range_"+r.String()+"_allocated_leases"]++
 				break
 			}
@@ -134,13 +134,13 @@ func (c *Collector) updateCharts() bool {
 	return updated
 }
 
-func findLeases(r io.Reader) []net.IP {
+func findLeases(r io.Reader) []netip.Addr {
 	/*
 		1560300536 08:00:27:61:3c:ee 2.2.2.3 debian8 *
 		duid 00:01:00:01:24:90:cf:5b:08:00:27:61:2e:2c
 		1560300414 660684014 1234::20b * 00:01:00:01:24:90:cf:a3:08:00:27:61:3c:ee
 	*/
-	var ips []net.IP
+	var addrs []netip.Addr
 	s := bufio.NewScanner(r)
 
 	for s.Scan() {
@@ -149,14 +149,14 @@ func findLeases(r io.Reader) []net.IP {
 			continue
 		}
 
-		ip := net.ParseIP(parts[2])
-		if ip == nil {
+		addr, err := netip.ParseAddr(parts[2])
+		if err != nil {
 			continue
 		}
-		ips = append(ips, ip)
+		addrs = append(addrs, addr)
 	}
 
-	return ips
+	return addrs
 }
 
 func calcPercent(ips int64, hosts *big.Int) float64 {

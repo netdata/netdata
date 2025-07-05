@@ -7,7 +7,7 @@ package dnsmasq_dhcp
 import (
 	"bufio"
 	"fmt"
-	"net"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -17,7 +17,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/iprange"
 )
 
-func (c *Collector) parseDnsmasqDHCPConfiguration() ([]iprange.Range, []net.IP) {
+func (c *Collector) parseDnsmasqDHCPConfiguration() ([]iprange.Range, []netip.Addr) {
 	configs := findConfigurationFiles(c.ConfPath, c.ConfDir)
 
 	dhcpRanges := c.getDHCPRanges(configs)
@@ -58,8 +58,8 @@ func (c *Collector) getDHCPRanges(configs []*configFile) []iprange.Range {
 	return dhcpRanges
 }
 
-func (c *Collector) getDHCPHosts(configs []*configFile) []net.IP {
-	var dhcpHosts []net.IP
+func (c *Collector) getDHCPHosts(configs []*configFile) []netip.Addr {
+	var dhcpHosts []netip.Addr
 	seen := make(map[string]bool)
 	var parsed string
 
@@ -73,14 +73,14 @@ func (c *Collector) getDHCPHosts(configs []*configFile) []net.IP {
 			}
 			seen[parsed] = true
 
-			v := net.ParseIP(parsed)
-			if v == nil {
-				c.Warningf("error on parsing dhcp-host '%s', skipping it", parsed)
+			addr, err := netip.ParseAddr(parsed)
+			if err != nil {
+				c.Warningf("error on parsing dhcp-host '%s': %v, skipping it", parsed, err)
 				continue
 			}
 
 			c.Debugf("adding dhcp-host '%s'", parsed)
-			dhcpHosts = append(dhcpHosts, v)
+			dhcpHosts = append(dhcpHosts, addr)
 		}
 	}
 	return dhcpHosts
@@ -107,15 +107,16 @@ func parseDHCPRangeValue(s string) (r string) {
 
 	s = strings.ReplaceAll(s, " ", "")
 
-	var start, end net.IP
+	var start, end netip.Addr
 	parts := strings.Split(s, ",")
 
 	for _, v := range parts {
-		if start == nil {
-			start = net.ParseIP(v)
+		if !start.IsValid() {
+			start, _ = netip.ParseAddr(v)
 			continue
 		}
-		if end = net.ParseIP(v); end == nil || iprange.New(start, end) == nil {
+
+		if end, _ = netip.ParseAddr(v); !end.IsValid() || iprange.New(start, end) == nil {
 			return ""
 		}
 		return fmt.Sprintf("%s-%s", start, end)

@@ -9,7 +9,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
-	"net"
+	"net/netip"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -59,7 +59,7 @@ type Collector struct {
 	parseConfigTime  time.Time
 	parseConfigEvery time.Duration
 	dhcpRanges       []iprange.Range
-	dhcpHosts        []net.IP
+	dhcpHosts        []netip.Addr
 	cacheDHCPRanges  map[string]bool
 
 	mx map[string]int64

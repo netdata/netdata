@@ -15,7 +15,7 @@ import (
 
 type ipPool struct {
 	name      string
-	addresses iprange.Pool
+	addresses *iprange.Pool
 }
 
 func (c *Collector) validateConfig() error {
@@ -48,7 +48,7 @@ func (c *Collector) initPools() ([]ipPool, error) {
 			continue
 		}
 
-		pool := ipPool{name: cfg.Name, addresses: ipRange}
+		pool := ipPool{name: cfg.Name, addresses: iprange.NewPool(ipRange...)}
 		pools = append(pools, pool)
 	}
 
