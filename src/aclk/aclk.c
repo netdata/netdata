@@ -645,9 +645,6 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
             continue;
         }
 
-        struct mqtt_wss_proxy proxy_conf = { .host = NULL, .port = 0, .username = NULL, .password = NULL, .type = MQTT_WSS_DIRECT };
-        aclk_set_proxy((char**)&proxy_conf.host, &proxy_conf.port, (char**)&proxy_conf.username, (char**)&proxy_conf.password, &proxy_conf.type);
-
         struct mqtt_connect_params mqtt_conn_params = {
             .clientid   = "anon",
             .username   = "anon",
@@ -670,6 +667,9 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         url_t_destroy(&base_url);
         if (rc != HTTPS_CLIENT_RESP_OK) {
             aclk_status_set((ACLK_STATUS)rc);
+            aclk_env_t_destroy(aclk_env);
+            freez(aclk_env);
+            aclk_env = NULL;
             continue;
         }
 
@@ -728,9 +728,9 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         }
 
         memset(&mqtt_url, 0, sizeof(url_t));
-        if (url_parse(aclk_env->transports[rc]->endpoint, &mqtt_url)){
+        if (url_parse(aclk_env->transports[trp]->endpoint, &mqtt_url)){
             aclk_status_set(ACLK_STATUS_INVALID_ENV_TRANSPORT_URL);
-            error_report("ACLK: failed to parse target URL for /env trp idx %d \"%s\"", trp, aclk_env->transports[rc]->endpoint);
+            error_report("ACLK: failed to parse target URL for /env trp idx %d \"%s\"", trp, aclk_env->transports[trp]->endpoint);
             url_t_destroy(&mqtt_url);
             continue;
         }
@@ -743,6 +743,9 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         mqtt_conn_params.will_msg = aclk_generate_lwt(&mqtt_conn_params.will_msg_len);
 
         int ssl_flags = cloud_config_insecure_get() ? MQTT_WSS_SSL_ALLOW_SELF_SIGNED : MQTT_WSS_SSL_CERT_CHECK_FULL;
+
+        struct mqtt_wss_proxy proxy_conf = { .host = NULL, .port = 0, .username = NULL, .password = NULL, .type = MQTT_WSS_DIRECT };
+        aclk_set_proxy((char**)&proxy_conf.host, &proxy_conf.port, (char**)&proxy_conf.username, (char**)&proxy_conf.password, &proxy_conf.type);
 
 #ifdef ACLK_DISABLE_CHALLENGE
         int mqtt_rc = mqtt_wss_connect(client, base_url.host, base_url.port, &mqtt_conn_params, ssl_flags, &proxy_conf);

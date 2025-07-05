@@ -790,7 +790,6 @@ static int parse_json_env(const char *json_str, aclk_env_t *env) {
     return 0;
 
 exit:
-    aclk_env_t_destroy(env);
     json_object_put(json);
     return 1;
 }
