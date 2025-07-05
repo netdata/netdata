@@ -4,7 +4,7 @@ package ntpd
 
 import (
 	"fmt"
-	"net"
+	"net/netip"
 	"strconv"
 	"time"
 )
@@ -125,18 +125,20 @@ func (c *Collector) findPeers() error {
 			continue
 		}
 
-		addr, ok := info["srcadr"]
-		if ip := net.ParseIP(addr); !ok || ip == nil || c.peerIPAddrFilter.Contains(ip) {
+		srcAddr, ok := info["srcadr"]
+		addr, err := netip.ParseAddr(srcAddr)
+
+		if !ok || err != nil || !addr.IsValid() || c.peerIPAddrFilter.Contains(addr) {
 			c.Debugf("skipping NTP peer id='%d', srcadr='%s'", id, addr)
 			continue
 		}
 
-		seen[addr] = true
+		seen[addr.String()] = true
 
-		if !c.peerAddr[addr] {
-			c.peerAddr[addr] = true
+		if !c.peerAddr[addr.String()] {
+			c.peerAddr[addr.String()] = true
 			c.Debugf("new NTP peer id='%d', srcadr='%s': creating charts", id, addr)
-			c.addPeerCharts(addr)
+			c.addPeerCharts(addr.String())
 		}
 
 		c.peerIDs = append(c.peerIDs, id)

@@ -62,7 +62,7 @@ func collectPool(collected map[string]int64, pool ipPool, leases []leaseEntry) {
 
 func calcPoolActiveLeases(pool ipPool, leases []leaseEntry) (num int64) {
 	for _, l := range leases {
-		if pool.addresses.Contains(l.ip) {
+		if pool.addresses.Contains(l.addr) {
 			num++
 		}
 	}
