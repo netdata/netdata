@@ -156,10 +156,10 @@ func TestPool_NilSafety(t *testing.T) {
 	assert.Nil(t, pool.Clone())
 
 	// Iterators should not panic
-	for range pool.Iterate() {
+	for _ = range pool.Iterate() {
 		t.Fatal("nil pool should not yield any addresses")
 	}
-	for range pool.IterateRanges() {
+	for _ = range pool.IterateRanges() {
 		t.Fatal("nil pool should not yield any ranges")
 	}
 }
@@ -299,6 +299,42 @@ func TestPool_ContainsRange(t *testing.T) {
 			name:         "empty pool",
 			poolStr:      "",
 			rangeStr:     "192.0.2.0-192.0.2.10",
+			wantContains: false,
+		},
+		{
+			name:         "large range with gap in pool",
+			poolStr:      "10.0.0.0-10.0.0.255 10.0.2.0-10.0.3.255", // Gap: 10.0.1.0-10.0.1.255
+			rangeStr:     "10.0.0.128-10.0.2.128",                   // 513 addresses, spans the gap
+			wantContains: false,
+		},
+		{
+			name:         "large range fully covered by multiple pool ranges",
+			poolStr:      "10.0.0.0-10.0.1.255 10.0.2.0-10.0.3.255", // Combined: 1024 addresses
+			rangeStr:     "10.0.0.0-10.0.1.255",                     // 512 addresses
+			wantContains: true,
+		},
+		{
+			name:         "large range with adjacent pool ranges",
+			poolStr:      "172.16.0.0-172.16.0.255 172.16.1.0-172.16.1.255 172.16.2.0-172.16.2.255",
+			rangeStr:     "172.16.0.100-172.16.2.100", // >500 addresses, continuous coverage
+			wantContains: true,
+		},
+		{
+			name:         "large IPv6 range with gap",
+			poolStr:      "2001:db8::-2001:db8::fff 2001:db8::2000-2001:db8::2fff", // Gap from ::1000 to ::1fff
+			rangeStr:     "2001:db8::500-2001:db8::2500",                           // Spans the gap
+			wantContains: false,
+		},
+		{
+			name:         "large range at pool boundaries",
+			poolStr:      "192.168.0.0-192.168.1.255 192.168.2.0-192.168.3.255",
+			rangeStr:     "192.168.1.0-192.168.2.255", // 512 addresses, needs both ranges
+			wantContains: true,
+		},
+		{
+			name:         "very large range /16 with small gap",
+			poolStr:      "10.0.0.0/17 10.0.128.1-10.0.255.255", // Missing exactly 10.0.128.0
+			rangeStr:     "10.0.0.0/16",                         // 65536 addresses
 			wantContains: false,
 		},
 	}
@@ -445,7 +481,7 @@ func BenchmarkPool_Iterate(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		count := 0
-		for range pool.Iterate() {
+		for _ = range pool.Iterate() {
 			count++
 		}
 	}
