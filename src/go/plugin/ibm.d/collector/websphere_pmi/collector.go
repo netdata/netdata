@@ -223,19 +223,23 @@ type timeStat struct {
 }
 
 type rangeStat struct {
-	Name     string `xml:"name,attr"`
-	Current  string `xml:"value,attr"` // WebSphere uses "value" attribute for current value
-	Integral string `xml:"integral,attr"`
-	Mean     string `xml:"mean,attr"`
+	Name          string `xml:"name,attr"`
+	Current       string `xml:"value,attr"` // WebSphere uses "value" attribute for current value
+	Integral      string `xml:"integral,attr"`
+	Mean          string `xml:"mean,attr"`
+	HighWaterMark string `xml:"highWaterMark,attr"`
+	LowWaterMark  string `xml:"lowWaterMark,attr"`
 }
 
 type boundedRangeStat struct {
-	Name       string `xml:"name,attr"`
-	Current    string `xml:"value,attr"`
-	Integral   string `xml:"integral,attr"`
-	Mean       string `xml:"mean,attr"`
-	LowerBound string `xml:"lowerBound,attr"`
-	UpperBound string `xml:"upperBound,attr"`
+	Name          string `xml:"name,attr"`
+	Current       string `xml:"value,attr"`
+	Integral      string `xml:"integral,attr"`
+	Mean          string `xml:"mean,attr"`
+	LowerBound    string `xml:"lowerBound,attr"`
+	UpperBound    string `xml:"upperBound,attr"`
+	HighWaterMark string `xml:"highWaterMark,attr"`
+	LowWaterMark  string `xml:"lowWaterMark,attr"`
 }
 
 type doubleStat struct {
