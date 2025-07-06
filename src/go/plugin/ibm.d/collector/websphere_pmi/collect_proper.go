@@ -4,7 +4,6 @@ package websphere_pmi
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -326,30 +325,63 @@ func (w *WebSpherePMI) parseTransactionManager(stat *pmiStat, nodeName, serverNa
 	// Mark as seen
 	w.markInstanceSeen("transaction_manager", instance)
 	
-	// Process CountStatistics - based on ACTUAL XML
-	for _, cs := range stat.CountStatistics {
-		if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
-			switch cs.Name {
-			case "GlobalBegunCount":
-				mx[fmt.Sprintf("transaction_manager_%s_global_begun", w.cleanID(instance))] = val
-			case "CommittedCount":
-				mx[fmt.Sprintf("transaction_manager_%s_global_committed", w.cleanID(instance))] = val
-			case "LocalBegunCount":
-				mx[fmt.Sprintf("transaction_manager_%s_local_begun", w.cleanID(instance))] = val
-			case "LocalCommittedCount":
-				mx[fmt.Sprintf("transaction_manager_%s_local_committed", w.cleanID(instance))] = val
-			case "RolledbackCount":
-				mx[fmt.Sprintf("transaction_manager_%s_global_rolled_back", w.cleanID(instance))] = val
-			case "LocalRolledbackCount":
-				mx[fmt.Sprintf("transaction_manager_%s_local_rolled_back", w.cleanID(instance))] = val
-			case "GlobalTimeoutCount":
-				mx[fmt.Sprintf("transaction_manager_%s_global_timeout", w.cleanID(instance))] = val
-			case "LocalTimeoutCount":
-				mx[fmt.Sprintf("transaction_manager_%s_local_timeout", w.cleanID(instance))] = val
-			}
-		} else {
-			w.Errorf("ISSUE: parseTransactionManager failed to parse CountStatistic %s value '%s': %v", cs.Name, cs.Count, err)
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
+	
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "GlobalBegunCount":
+			mx[fmt.Sprintf("transaction_manager_%s_global_begun", cleanInst)] = metric.Value
+		case "CommittedCount":
+			mx[fmt.Sprintf("transaction_manager_%s_global_committed", cleanInst)] = metric.Value
+		case "LocalBegunCount":
+			mx[fmt.Sprintf("transaction_manager_%s_local_begun", cleanInst)] = metric.Value
+		case "LocalCommittedCount":
+			mx[fmt.Sprintf("transaction_manager_%s_local_committed", cleanInst)] = metric.Value
+		case "RolledbackCount":
+			mx[fmt.Sprintf("transaction_manager_%s_global_rolled_back", cleanInst)] = metric.Value
+		case "LocalRolledbackCount":
+			mx[fmt.Sprintf("transaction_manager_%s_local_rolled_back", cleanInst)] = metric.Value
+		case "GlobalTimeoutCount":
+			mx[fmt.Sprintf("transaction_manager_%s_global_timeout", cleanInst)] = metric.Value
+		case "LocalTimeoutCount":
+			mx[fmt.Sprintf("transaction_manager_%s_local_timeout", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use collection helper
+			w.collectCountMetric(mx, "transaction_manager", cleanInst, metric)
 		}
+	}
+	
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		w.collectTimeMetric(mx, "transaction_manager", cleanInst, metric)
+	}
+	
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		w.collectRangeMetric(mx, "transaction_manager", cleanInst, metric)
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		w.collectBoundedRangeMetric(mx, "transaction_manager", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		w.collectAverageMetric(mx, "transaction_manager", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		w.collectDoubleMetric(mx, "transaction_manager", cleanInst, metric)
 	}
 }
 
@@ -363,24 +395,62 @@ func (w *WebSpherePMI) parseJVMRuntime(stat *pmiStat, nodeName, serverName strin
 	// Mark as seen
 	w.markInstanceSeen("jvm_runtime", instance)
 	
-	// Process CountStatistics - based on ACTUAL XML
-	for _, cs := range stat.CountStatistics {
-		if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
-			switch cs.Name {
-			case "FreeMemory":
-				mx[fmt.Sprintf("jvm_memory_%s_free", w.cleanID(instance))] = val * 1024 // Convert KB to bytes
-			case "UsedMemory":
-				mx[fmt.Sprintf("jvm_memory_%s_used", w.cleanID(instance))] = val * 1024 // Convert KB to bytes
-			case "UpTime":
-				mx[fmt.Sprintf("jvm_uptime_%s_seconds", w.cleanID(instance))] = val / 1000 // Convert ms to seconds
-			case "ProcessCpuUsage":
-				mx[fmt.Sprintf("jvm_cpu_%s_usage", w.cleanID(instance))] = val
-			case "Heap":
-				mx[fmt.Sprintf("jvm_heap_%s_size", w.cleanID(instance))] = val * 1024 // Convert KB to bytes
-			}
-		} else {
-			w.Errorf("ISSUE: parseJVMRuntime failed to parse CountStatistic %s value '%s': %v", cs.Name, cs.Count, err)
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
+	
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "FreeMemory":
+			mx[fmt.Sprintf("jvm_memory_%s_free", cleanInst)] = metric.Value * 1024 // Convert KB to bytes
+		case "UsedMemory":
+			mx[fmt.Sprintf("jvm_memory_%s_used", cleanInst)] = metric.Value * 1024 // Convert KB to bytes
+		case "UpTime":
+			mx[fmt.Sprintf("jvm_uptime_%s_seconds", cleanInst)] = metric.Value / 1000 // Convert ms to seconds
+		case "ProcessCpuUsage":
+			mx[fmt.Sprintf("jvm_cpu_%s_usage", cleanInst)] = metric.Value
+		case "Heap":
+			mx[fmt.Sprintf("jvm_heap_%s_size", cleanInst)] = metric.Value * 1024 // Convert KB to bytes
+		default:
+			// For unknown count metrics, use collection helper
+			w.collectCountMetric(mx, "jvm_runtime", cleanInst, metric)
 		}
+	}
+	
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		// Use collection helper for all time metrics
+		w.collectTimeMetric(mx, "jvm_runtime", cleanInst, metric)
+	}
+	
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		// Use collection helper for all range metrics
+		w.collectRangeMetric(mx, "jvm_runtime", cleanInst, metric)
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		// Use collection helper for all bounded range metrics
+		w.collectBoundedRangeMetric(mx, "jvm_runtime", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		// Use collection helper for all average metrics
+		w.collectAverageMetric(mx, "jvm_runtime", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		// Use collection helper for all double metrics
+		w.collectDoubleMetric(mx, "jvm_runtime", cleanInst, metric)
 	}
 }
 
@@ -395,18 +465,60 @@ func (w *WebSpherePMI) parseThreadPool(stat *pmiStat, nodeName, serverName strin
 	// Mark as seen
 	w.markInstanceSeen("thread_pool", instance)
 	
-	// Process BoundedRangeStatistics
-	for _, brs := range stat.BoundedRangeStatistics {
-		if val, err := strconv.ParseInt(brs.Current, 10, 64); err == nil {
-			switch brs.Name {
-			case "ActiveCount":
-				mx[fmt.Sprintf("thread_pool_%s_active", w.cleanID(instance))] = val
-			case "PoolSize":
-				mx[fmt.Sprintf("thread_pool_%s_size", w.cleanID(instance))] = val
-			}
-		} else {
-			w.Errorf("ISSUE: parseThreadPool failed to parse BoundedRangeStatistic %s current value '%s': %v", brs.Name, brs.Current, err)
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
+	
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		// Check if MaxPoolSize exists and add chart if needed
+		if metric.Name == "MaxPoolSize" {
+			w.ensureThreadPoolMaxPoolSizeChart(instance, nodeName, serverName, poolName)
 		}
+		// Use collection helper for all count metrics
+		w.collectCountMetric(mx, "thread_pool", cleanInst, metric)
+	}
+	
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		// Use collection helper for all time metrics
+		w.collectTimeMetric(mx, "thread_pool", cleanInst, metric)
+	}
+	
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		// Use collection helper for all range metrics
+		w.collectRangeMetric(mx, "thread_pool", cleanInst, metric)
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		switch metric.Name {
+		case "ActiveCount":
+			mx[fmt.Sprintf("thread_pool_%s_active", cleanInst)] = metric.Value
+		case "PoolSize":
+			mx[fmt.Sprintf("thread_pool_%s_size", cleanInst)] = metric.Value
+		default:
+			// For unknown bounded range metrics, use collection helper
+			w.collectBoundedRangeMetric(mx, "thread_pool", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		// Use collection helper for all average metrics
+		w.collectAverageMetric(mx, "thread_pool", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		// Use collection helper for all double metrics
+		w.collectDoubleMetric(mx, "thread_pool", cleanInst, metric)
 	}
 }
 
@@ -430,74 +542,79 @@ func (w *WebSpherePMI) parseJDBCDataSource(stat *pmiStat, instance, nodeName, se
 	// Mark as seen
 	w.markInstanceSeen("jdbc_datasource", instance)
 	
-	// Process CountStatistics
-	for _, cs := range stat.CountStatistics {
-		if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
-			switch cs.Name {
-			case "CreateCount":
-				mx[fmt.Sprintf("jdbc_%s_connections_created", w.cleanID(instance))] = val
-			case "CloseCount":
-				mx[fmt.Sprintf("jdbc_%s_connections_closed", w.cleanID(instance))] = val
-			case "AllocateCount":
-				mx[fmt.Sprintf("jdbc_%s_connections_allocated", w.cleanID(instance))] = val
-			case "ReturnCount":
-				mx[fmt.Sprintf("jdbc_%s_connections_returned", w.cleanID(instance))] = val
-			}
-		} else {
-			w.Errorf("ISSUE: parseJDBCDataSource failed to parse CountStatistic %s value '%s': %v", cs.Name, cs.Count, err)
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
+	
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "CreateCount":
+			mx[fmt.Sprintf("jdbc_%s_connections_created", cleanInst)] = metric.Value
+		case "CloseCount":
+			mx[fmt.Sprintf("jdbc_%s_connections_closed", cleanInst)] = metric.Value
+		case "AllocateCount":
+			mx[fmt.Sprintf("jdbc_%s_connections_allocated", cleanInst)] = metric.Value
+		case "ReturnCount":
+			mx[fmt.Sprintf("jdbc_%s_connections_returned", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use collection helper
+			w.collectCountMetric(mx, "jdbc", cleanInst, metric)
 		}
 	}
 	
-	// Process RangeStatistics
-	for _, rs := range stat.RangeStatistics {
-		if val, err := strconv.ParseInt(rs.Current, 10, 64); err == nil {
-			switch rs.Name {
-			case "WaitingThreadCount":
-				mx[fmt.Sprintf("jdbc_%s_waiting_threads", w.cleanID(instance))] = val
-			}
-		} else {
-			w.Errorf("ISSUE: parseJDBCDataSource failed to parse RangeStatistic %s current value '%s': %v", rs.Name, rs.Current, err)
-		}
-	}
-	
-	// Process BoundedRangeStatistics
-	for _, brs := range stat.BoundedRangeStatistics {
-		if val, err := strconv.ParseInt(brs.Current, 10, 64); err == nil {
-			switch brs.Name {
-			case "FreePoolSize":
-				mx[fmt.Sprintf("jdbc_%s_pool_free", w.cleanID(instance))] = val
-			case "PoolSize":
-				mx[fmt.Sprintf("jdbc_%s_pool_size", w.cleanID(instance))] = val
-			}
-		} else {
-			w.Errorf("ISSUE: parseJDBCDataSource failed to parse BoundedRangeStatistic %s current value '%s': %v", brs.Name, brs.Current, err)
-		}
-	}
-	
-	// Process TimeStatistics
-	for _, ts := range stat.TimeStatistics {
-		switch ts.Name {
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		switch metric.Name {
 		case "WaitTime":
-			total := ts.TotalTime
-			if total == "" {
-				total = ts.Total
-			}
-			if val, err := strconv.ParseInt(total, 10, 64); err == nil {
-				mx[fmt.Sprintf("jdbc_%s_wait_time_total", w.cleanID(instance))] = val
-			} else {
-				w.Errorf("ISSUE: parseJDBCDataSource failed to parse TimeStatistic %s total value '%s': %v", ts.Name, total, err)
-			}
+			mx[fmt.Sprintf("jdbc_%s_wait_time_total", cleanInst)] = metric.Total
 		case "UseTime":
-			total := ts.TotalTime
-			if total == "" {
-				total = ts.Total
-			}
-			if val, err := strconv.ParseInt(total, 10, 64); err == nil {
-				mx[fmt.Sprintf("jdbc_%s_use_time_total", w.cleanID(instance))] = val
-			} else {
-				w.Errorf("ISSUE: parseJDBCDataSource failed to parse TimeStatistic %s total value '%s': %v", ts.Name, total, err)
-			}
+			mx[fmt.Sprintf("jdbc_%s_use_time_total", cleanInst)] = metric.Total
+		default:
+			// For unknown time metrics, use collection helper
+			w.collectTimeMetric(mx, "jdbc", cleanInst, metric)
 		}
+	}
+	
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		switch metric.Name {
+		case "WaitingThreadCount":
+			mx[fmt.Sprintf("jdbc_%s_waiting_threads", cleanInst)] = metric.Current
+		default:
+			// For unknown range metrics, use collection helper
+			w.collectRangeMetric(mx, "jdbc", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		switch metric.Name {
+		case "FreePoolSize":
+			mx[fmt.Sprintf("jdbc_%s_pool_free", cleanInst)] = metric.Value
+		case "PoolSize":
+			mx[fmt.Sprintf("jdbc_%s_pool_size", cleanInst)] = metric.Value
+		default:
+			// For unknown bounded range metrics, use collection helper
+			w.collectBoundedRangeMetric(mx, "jdbc", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		// Use collection helper for all average metrics
+		w.collectAverageMetric(mx, "jdbc", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		// Use collection helper for all double metrics
+		w.collectDoubleMetric(mx, "jdbc", cleanInst, metric)
 	}
 }
 
@@ -575,6 +692,29 @@ func (w *WebSpherePMI) ensureThreadPoolCharts(instance, nodeName, serverName, po
 	}
 }
 
+func (w *WebSpherePMI) ensureThreadPoolMaxPoolSizeChart(instance, nodeName, serverName, poolName string) {
+	chartKey := fmt.Sprintf("thread_pool_max_pool_size_%s", instance)
+	if _, exists := w.collectedInstances[chartKey]; !exists {
+		w.collectedInstances[chartKey] = true
+		
+		// Create MaxPoolSize chart (v9.0.5+ only)
+		chart := threadPoolMaxPoolSizeChartTmpl.Copy()
+		chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
+		chart.Labels = []module.Label{
+			{Key: "node", Value: nodeName},
+			{Key: "server", Value: serverName},
+			{Key: "pool", Value: poolName},
+		}
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
+		}
+		
+		if err := w.charts.Add(chart); err != nil {
+			w.Warning(err)
+		}
+	}
+}
+
 func (w *WebSpherePMI) ensureJDBCCharts(instance, nodeName, serverName, providerName, dsName string) {
 	chartKey := fmt.Sprintf("jdbc_datasource_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
@@ -613,91 +753,66 @@ func (w *WebSpherePMI) parseObjectPool(stat *pmiStat, nodeName, serverName strin
 	w.ensureObjectPoolCharts(instance, nodeName, serverName, poolName)
 	w.markInstanceSeen("object_pool", instance)
 	
-	// Process CountStatistics (like ObjectsCreatedCount)
-	for _, cs := range stat.CountStatistics {
-		if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
-			switch cs.Name {
-			case "ObjectsCreatedCount":
-				mx[fmt.Sprintf("object_pool_%s_created", w.cleanID(instance))] = val
-			}
-		} else {
-			w.Errorf("ISSUE: parseObjectPool failed to parse CountStatistic %s value '%s': %v", cs.Name, cs.Count, err)
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
+	
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "ObjectsCreatedCount":
+			mx[fmt.Sprintf("object_pool_%s_created", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use collection helper
+			w.collectCountMetric(mx, "object_pool", cleanInst, metric)
 		}
 	}
 	
-	// Process BoundedRangeStatistics (like ObjectsAllocatedCount, ObjectsReturnedCount, IdleObjectsSize)
-	// NOTE: XML 'value' attribute maps to struct 'Current' field
-	for _, brs := range stat.BoundedRangeStatistics {
-		if val, err := strconv.ParseInt(brs.Current, 10, 64); err == nil {
-			switch brs.Name {
-			case "ObjectsAllocatedCount":
-				mx[fmt.Sprintf("object_pool_%s_allocated", w.cleanID(instance))] = val
-			case "ObjectsReturnedCount":
-				mx[fmt.Sprintf("object_pool_%s_returned", w.cleanID(instance))] = val
-			case "IdleObjectsSize":
-				mx[fmt.Sprintf("object_pool_%s_idle", w.cleanID(instance))] = val
-			}
-		} else {
-			w.Errorf("ISSUE: parseObjectPool failed to parse BoundedRangeStatistic %s current value '%s': %v", brs.Name, brs.Current, err)
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		// Use collection helper for all time metrics
+		w.collectTimeMetric(mx, "object_pool", cleanInst, metric)
+	}
+	
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		// Use collection helper for all range metrics
+		w.collectRangeMetric(mx, "object_pool", cleanInst, metric)
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		switch metric.Name {
+		case "ObjectsAllocatedCount":
+			mx[fmt.Sprintf("object_pool_%s_allocated", cleanInst)] = metric.Value
+		case "ObjectsReturnedCount":
+			mx[fmt.Sprintf("object_pool_%s_returned", cleanInst)] = metric.Value
+		case "IdleObjectsSize":
+			mx[fmt.Sprintf("object_pool_%s_idle", cleanInst)] = metric.Value
+		default:
+			// For unknown bounded range metrics, use collection helper
+			w.collectBoundedRangeMetric(mx, "object_pool", cleanInst, metric)
 		}
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		// Use collection helper for all average metrics
+		w.collectAverageMetric(mx, "object_pool", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		// Use collection helper for all double metrics
+		w.collectDoubleMetric(mx, "object_pool", cleanInst, metric)
 	}
 }
 
-// parseObjectCache handles Object Cache metrics (different from Dynamic Caching)
-func (w *WebSpherePMI) parseObjectCache(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
-	// Extract cache name from stat name like "Object: ws/com.ibm.workplace/ExtensionRegistryCache"
-	// Note: cacheName extracted but using unified instance name for aggregation
-	_ = strings.TrimPrefix(stat.Name, "Object: ")
-	instance := fmt.Sprintf("%s.%s.Object_Cache", nodeName, serverName)
-	
-	// Create charts if not exists
-	w.ensureObjectCacheCharts(instance, nodeName, serverName)
-	
-	// Mark as seen
-	w.markInstanceSeen("object_cache", instance)
-	
-	// Process child stats (like "Object Cache" -> "Counters" or direct metrics)
-	for _, child := range stat.SubStats {
-		if child.Name == "Object Cache" {
-			// Process direct object cache metrics at this level
-			for _, cs := range child.CountStatistics {
-				if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
-					switch cs.Name {
-					case "InMemoryCacheEntryCount":
-						mx[fmt.Sprintf("object_cache_%s_objects", w.cleanID(instance))] = val
-					case "MaxInMemoryCacheEntryCount":
-						mx[fmt.Sprintf("object_cache_%s_max_objects", w.cleanID(instance))] = val
-					}
-				} else {
-					w.Errorf("ISSUE: parseObjectCache failed to parse CountStatistic %s value '%s': %v", cs.Name, cs.Count, err)
-				}
-			}
-			
-			// Look for "Counters" sub-stat
-			for _, counters := range child.SubStats {
-				if counters.Name == "Counters" {
-					// Process counter metrics
-					for _, cs := range counters.CountStatistics {
-						if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
-							switch cs.Name {
-							case "HitsInMemoryCount":
-								mx[fmt.Sprintf("object_cache_%s_memory_hits", w.cleanID(instance))] = val
-							case "HitsOnDiskCount":
-								mx[fmt.Sprintf("object_cache_%s_disk_hits", w.cleanID(instance))] = val
-							case "MissCount":
-								mx[fmt.Sprintf("object_cache_%s_misses", w.cleanID(instance))] = val
-							case "InMemoryAndDiskCacheEntryCount":
-								mx[fmt.Sprintf("object_cache_%s_total_entries", w.cleanID(instance))] = val
-							}
-						} else {
-							w.Errorf("ISSUE: parseObjectCache failed to parse CountStatistic %s value '%s': %v", cs.Name, cs.Count, err)
-						}
-					}
-				}
-			}
-		}
-	}
-}
 
 // Helper to clean IDs for use in metrics
 func (w *WebSpherePMI) cleanID(s string) string {

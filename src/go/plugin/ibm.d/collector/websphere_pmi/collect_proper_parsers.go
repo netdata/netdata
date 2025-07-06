@@ -98,31 +98,59 @@ func (w *WebSpherePMI) parseWebApplicationsContainer(stat *pmiStat, nodeName, se
 	// Mark as seen
 	w.markInstanceSeen("webapp_container", instance)
 	
-	// Track expected vs found metrics
-	expectedMetrics := []string{"LoadedServletCount", "RequestCount", "ErrorCount"}
-	foundMetrics := make(map[string]bool)
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
 	
-	// Container-level metrics
-	for _, cs := range stat.CountStatistics {
-		if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
-			switch cs.Name {
-			case "LoadedServletCount":
-				mx[fmt.Sprintf("webapp_container_%s_loaded_servlets", w.cleanID(instance))] = val
-				foundMetrics["LoadedServletCount"] = true
-			case "RequestCount":
-				mx[fmt.Sprintf("webapp_container_%s_requests", w.cleanID(instance))] = val
-				foundMetrics["RequestCount"] = true
-			case "ErrorCount":
-				mx[fmt.Sprintf("webapp_container_%s_errors", w.cleanID(instance))] = val
-				foundMetrics["ErrorCount"] = true
-			}
-		} else {
-			w.Debugf("parseWebApplicationsContainer: Failed to parse value for %s: %v", cs.Name, err)
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "LoadedServletCount":
+			mx[fmt.Sprintf("webapp_container_%s_loaded_servlets", cleanInst)] = metric.Value
+		case "RequestCount":
+			mx[fmt.Sprintf("webapp_container_%s_requests", cleanInst)] = metric.Value
+		case "ErrorCount":
+			mx[fmt.Sprintf("webapp_container_%s_errors", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use collection helper
+			w.collectCountMetric(mx, "webapp_container", cleanInst, metric)
 		}
 	}
 	
-	// Log any missing metrics
-	w.logParsingFailure("WebApplicationsContainer", stat.Name, stat, expectedMetrics, foundMetrics)
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		// Use collection helper for all time metrics
+		w.collectTimeMetric(mx, "webapp_container", cleanInst, metric)
+	}
+	
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		// Use collection helper for all range metrics
+		w.collectRangeMetric(mx, "webapp_container", cleanInst, metric)
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		// Use collection helper for all bounded range metrics
+		w.collectBoundedRangeMetric(mx, "webapp_container", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		// Use collection helper for all average metrics
+		w.collectAverageMetric(mx, "webapp_container", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		// Use collection helper for all double metrics
+		w.collectDoubleMetric(mx, "webapp_container", cleanInst, metric)
+	}
 }
 
 // parseWebApplication handles individual web application
@@ -136,15 +164,57 @@ func (w *WebSpherePMI) parseWebApplication(stat *pmiStat, nodeName, serverName s
 	// Mark as seen
 	w.markInstanceSeen("webapp", instance)
 	
-	// Define expected metrics using the helper
-	mappings := []MetricMapping{
-		{MetricName: "LoadedServletCount", CollectionKey: "webapp_" + w.cleanID(instance) + "_loaded_servlets", StatType: "count"},
-		{MetricName: "ReloadCount", CollectionKey: "webapp_" + w.cleanID(instance) + "_reloads", StatType: "count"},
-		// REMOVED: ServicesLoaded - this metric doesn't exist in WebSphere PMI XML
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
+	
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "LoadedServletCount":
+			mx[fmt.Sprintf("webapp_%s_loaded_servlets", cleanInst)] = metric.Value
+		case "ReloadCount":
+			mx[fmt.Sprintf("webapp_%s_reloads", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use collection helper
+			w.collectCountMetric(mx, "webapp", cleanInst, metric)
+		}
 	}
 	
-	// Use the helper to collect metrics with comprehensive logging
-	w.collectMetricsWithLogging("WebApplication", stat, instance, mx, mappings)
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		// Use collection helper for all time metrics
+		w.collectTimeMetric(mx, "webapp", cleanInst, metric)
+	}
+	
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		// Use collection helper for all range metrics
+		w.collectRangeMetric(mx, "webapp", cleanInst, metric)
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		// Use collection helper for all bounded range metrics
+		w.collectBoundedRangeMetric(mx, "webapp", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		// Use collection helper for all average metrics
+		w.collectAverageMetric(mx, "webapp", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		// Use collection helper for all double metrics
+		w.collectDoubleMetric(mx, "webapp", cleanInst, metric)
+	}
 	
 	// Process child components (Servlets, Sessions)
 	for _, child := range stat.SubStats {
@@ -174,21 +244,70 @@ func (w *WebSpherePMI) parseServlet(stat *pmiStat, nodeName, serverName, appName
 	// Mark as seen
 	w.markInstanceSeen("servlet", instance)
 	
-	// Define expected metrics using the helper
-	mappings := []MetricMapping{
-		// CountStatistics
-		{MetricName: "RequestCount", CollectionKey: fmt.Sprintf("servlet_%s_requests", w.cleanID(instance)), StatType: "count"},
-		{MetricName: "ErrorCount", CollectionKey: fmt.Sprintf("servlet_%s_errors", w.cleanID(instance)), StatType: "count"},
-		// REMOVED: LoadedServletCount and ReloadCount - these are webapp-level metrics, not servlet-level
-		// RangeStatistics
-		{MetricName: "ConcurrentRequests", CollectionKey: fmt.Sprintf("servlet_%s_concurrent", w.cleanID(instance)), StatType: "range"},
-		// TimeStatistics
-		{MetricName: "ServiceTime", CollectionKey: fmt.Sprintf("servlet_%s_service_time_total", w.cleanID(instance)), StatType: "time"},
-		{MetricName: "AsyncContext Response Time", CollectionKey: fmt.Sprintf("servlet_%s_async_response_time_total", w.cleanID(instance)), StatType: "time"},
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
+	
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "RequestCount":
+			mx[fmt.Sprintf("servlet_%s_requests", cleanInst)] = metric.Value
+		case "ErrorCount":
+			mx[fmt.Sprintf("servlet_%s_errors", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use collection helper
+			w.collectCountMetric(mx, "servlet", cleanInst, metric)
+		}
 	}
 	
-	// Use the helper to collect metrics with comprehensive logging
-	w.collectMetricsWithLogging("Servlet", stat, instance, mx, mappings)
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		switch metric.Name {
+		case "ServiceTime":
+			mx[fmt.Sprintf("servlet_%s_service_time_total", cleanInst)] = metric.Total
+			mx[fmt.Sprintf("servlet_%s_service_time_count", cleanInst)] = metric.Count
+		case "AsyncContext Response Time":
+			mx[fmt.Sprintf("servlet_%s_async_response_time_total", cleanInst)] = metric.Total
+		default:
+			// For unknown time metrics, use collection helper
+			w.collectTimeMetric(mx, "servlet", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		switch metric.Name {
+		case "ConcurrentRequests":
+			mx[fmt.Sprintf("servlet_%s_concurrent", cleanInst)] = metric.Current
+		default:
+			// For unknown range metrics, use collection helper
+			w.collectRangeMetric(mx, "servlet", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		// Use collection helper for all bounded range metrics
+		w.collectBoundedRangeMetric(mx, "servlet", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		// Use collection helper for all average metrics
+		w.collectAverageMetric(mx, "servlet", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		// Use collection helper for all double metrics
+		w.collectDoubleMetric(mx, "servlet", cleanInst, metric)
+	}
 	
 	// Special handling for ServiceTime count (not handled by helper)
 	for _, ts := range stat.TimeStatistics {
@@ -221,6 +340,12 @@ func (w *WebSpherePMI) parseSessionManagerContainer(stat *pmiStat, nodeName, ser
 	if len(stat.SubStats) == 0 {
 		// This is a direct session manager - process its metrics
 		w.parseSessionMetrics(stat, instance, nodeName, serverName, "global", mx)
+	} else {
+		// Process container-level metrics if any exist
+		if len(stat.CountStatistics) > 0 || len(stat.TimeStatistics) > 0 || len(stat.RangeStatistics) > 0 ||
+		   len(stat.BoundedRangeStatistics) > 0 || len(stat.AverageStatistics) > 0 || len(stat.DoubleStatistics) > 0 {
+			w.parseSessionMetrics(stat, instance, nodeName, serverName, "container", mx)
+		}
 	}
 	
 	// Process per-application session managers (children)
@@ -241,135 +366,89 @@ func (w *WebSpherePMI) parseSessionMetrics(stat *pmiStat, instance, nodeName, se
 	// Mark as seen
 	w.markInstanceSeen("sessions", instance)
 	
-	// Track expected vs found metrics
-	expectedMetrics := []string{
-		"CreateCount",
-		"InvalidateCount", 
-		"TimeoutInvalidationCount",
-		"NoRoomForNewSessionCount",
-		"ActiveCount",
-		"LiveCount",
-		"ActivateNonExistSessionCount",
-		"AffinityBreakCount",
-		"CacheDiscardCount",
-		"ExternalReadTime",
-		"ExternalWriteTime",
-		"LifeTime",
-		"SessionObjectSize",
-		"TimeSinceLastActivated",
-	}
-	foundMetrics := make(map[string]bool)
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
 	
-	// Process CountStatistics
-	for _, cs := range stat.CountStatistics {
-		if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
-			switch cs.Name {
-			case "CreateCount":
-				mx[fmt.Sprintf("sessions_%s_created", w.cleanID(instance))] = val
-				foundMetrics["CreateCount"] = true
-			case "InvalidateCount":
-				mx[fmt.Sprintf("sessions_%s_invalidated", w.cleanID(instance))] = val
-				foundMetrics["InvalidateCount"] = true
-			case "TimeoutInvalidationCount":
-				mx[fmt.Sprintf("sessions_%s_timeout_invalidated", w.cleanID(instance))] = val
-				foundMetrics["TimeoutInvalidationCount"] = true
-			case "NoRoomForNewSessionCount":
-				mx[fmt.Sprintf("sessions_%s_rejected", w.cleanID(instance))] = val
-				foundMetrics["NoRoomForNewSessionCount"] = true
-			case "ActivateNonExistSessionCount":
-				mx[fmt.Sprintf("sessions_%s_activate_nonexist", w.cleanID(instance))] = val
-				foundMetrics["ActivateNonExistSessionCount"] = true
-			case "AffinityBreakCount":
-				mx[fmt.Sprintf("sessions_%s_affinity_break", w.cleanID(instance))] = val
-				foundMetrics["AffinityBreakCount"] = true
-			case "CacheDiscardCount":
-				mx[fmt.Sprintf("sessions_%s_cache_discard", w.cleanID(instance))] = val
-				foundMetrics["CacheDiscardCount"] = true
-			}
-		} else {
-			w.Errorf("ISSUE: parseSessionMetrics failed to parse CountStatistic %s value '%s': %v", cs.Name, cs.Count, err)
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "CreateCount":
+			mx[fmt.Sprintf("sessions_%s_created", cleanInst)] = metric.Value
+		case "InvalidateCount":
+			mx[fmt.Sprintf("sessions_%s_invalidated", cleanInst)] = metric.Value
+		case "TimeoutInvalidationCount":
+			mx[fmt.Sprintf("sessions_%s_timeout_invalidated", cleanInst)] = metric.Value
+		case "NoRoomForNewSessionCount":
+			mx[fmt.Sprintf("sessions_%s_rejected", cleanInst)] = metric.Value
+		case "ActivateNonExistSessionCount":
+			mx[fmt.Sprintf("sessions_%s_activate_nonexist", cleanInst)] = metric.Value
+		case "AffinityBreakCount":
+			mx[fmt.Sprintf("sessions_%s_affinity_break", cleanInst)] = metric.Value
+		case "CacheDiscardCount":
+			mx[fmt.Sprintf("sessions_%s_cache_discard", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use collection helper
+			w.collectCountMetric(mx, "sessions", cleanInst, metric)
 		}
 	}
 	
-	// Process RangeStatistics
-	for _, rs := range stat.RangeStatistics {
-		if val, err := strconv.ParseInt(rs.Current, 10, 64); err == nil {
-			switch rs.Name {
-			case "ActiveCount":
-				mx[fmt.Sprintf("sessions_%s_active", w.cleanID(instance))] = val
-				foundMetrics["ActiveCount"] = true
-			case "LiveCount":
-				mx[fmt.Sprintf("sessions_%s_live", w.cleanID(instance))] = val
-				foundMetrics["LiveCount"] = true
-			}
-		} else {
-			w.Errorf("ISSUE: parseSessionMetrics failed to parse RangeStatistic %s current value '%s': %v", rs.Name, rs.Current, err)
-		}
-	}
-	
-	// Process TimeStatistics
-	for _, ts := range stat.TimeStatistics {
-		switch ts.Name {
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		switch metric.Name {
 		case "ExternalReadTime":
-			total := ts.TotalTime
-			if total == "" {
-				total = ts.Total
-			}
-			if val, err := strconv.ParseInt(total, 10, 64); err == nil {
-				mx[fmt.Sprintf("sessions_%s_external_read_time_total", w.cleanID(instance))] = val
-				foundMetrics["ExternalReadTime"] = true
-			} else {
-				w.Errorf("ISSUE: parseSessionMetrics failed to parse TimeStatistic ExternalReadTime total value '%s': %v", total, err)
-			}
+			mx[fmt.Sprintf("sessions_%s_external_read_time_total", cleanInst)] = metric.Total
 		case "ExternalWriteTime":
-			total := ts.TotalTime
-			if total == "" {
-				total = ts.Total
-			}
-			if val, err := strconv.ParseInt(total, 10, 64); err == nil {
-				mx[fmt.Sprintf("sessions_%s_external_write_time_total", w.cleanID(instance))] = val
-				foundMetrics["ExternalWriteTime"] = true
-			} else {
-				w.Errorf("ISSUE: parseSessionMetrics failed to parse TimeStatistic ExternalWriteTime total value '%s': %v", total, err)
-			}
+			mx[fmt.Sprintf("sessions_%s_external_write_time_total", cleanInst)] = metric.Total
 		case "LifeTime":
-			total := ts.TotalTime
-			if total == "" {
-				total = ts.Total
-			}
-			if val, err := strconv.ParseInt(total, 10, 64); err == nil {
-				mx[fmt.Sprintf("sessions_%s_life_time_total", w.cleanID(instance))] = val
-				foundMetrics["LifeTime"] = true
-			} else {
-				w.Errorf("ISSUE: parseSessionMetrics failed to parse TimeStatistic LifeTime total value '%s': %v", total, err)
-			}
+			mx[fmt.Sprintf("sessions_%s_life_time_total", cleanInst)] = metric.Total
 		case "SessionObjectSize":
-			total := ts.TotalTime
-			if total == "" {
-				total = ts.Total
-			}
-			if val, err := strconv.ParseInt(total, 10, 64); err == nil {
-				mx[fmt.Sprintf("sessions_%s_object_size_total", w.cleanID(instance))] = val
-				foundMetrics["SessionObjectSize"] = true
-			} else {
-				w.Errorf("ISSUE: parseSessionMetrics failed to parse TimeStatistic SessionObjectSize total value '%s': %v", total, err)
-			}
+			mx[fmt.Sprintf("sessions_%s_object_size_total", cleanInst)] = metric.Total
+			// Ensure chart exists for SessionObjectSize as TimeStatistic
+			w.ensureSessionObjectSizeTimeChart(instance, nodeName, serverName, appName)
 		case "TimeSinceLastActivated":
-			total := ts.TotalTime
-			if total == "" {
-				total = ts.Total
-			}
-			if val, err := strconv.ParseInt(total, 10, 64); err == nil {
-				mx[fmt.Sprintf("sessions_%s_time_since_activated_total", w.cleanID(instance))] = val
-				foundMetrics["TimeSinceLastActivated"] = true
-			} else {
-				w.Errorf("ISSUE: parseSessionMetrics failed to parse TimeStatistic TimeSinceLastActivated total value '%s': %v", total, err)
-			}
+			mx[fmt.Sprintf("sessions_%s_time_since_activated_total", cleanInst)] = metric.Total
+		default:
+			// For unknown time metrics, use collection helper
+			w.collectTimeMetric(mx, "sessions", cleanInst, metric)
 		}
 	}
 	
-	// Log any missing metrics
-	w.logParsingFailure("SessionMetrics", stat.Name, stat, expectedMetrics, foundMetrics)
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		switch metric.Name {
+		case "ActiveCount":
+			mx[fmt.Sprintf("sessions_%s_active", cleanInst)] = metric.Current
+		case "LiveCount":
+			mx[fmt.Sprintf("sessions_%s_live", cleanInst)] = metric.Current
+		default:
+			// For unknown range metrics, use collection helper
+			w.collectRangeMetric(mx, "sessions", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		// Use collection helper for all bounded range metrics
+		w.collectBoundedRangeMetric(mx, "sessions", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		// Use collection helper for all average metrics
+		w.collectAverageMetric(mx, "sessions", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		// Use collection helper for all double metrics
+		w.collectDoubleMetric(mx, "sessions", cleanInst, metric)
+	}
 }
 
 // parseCacheComponent handles standalone cache components like "Object Cache" and "Counters"
@@ -382,25 +461,68 @@ func (w *WebSpherePMI) parseCacheComponent(stat *pmiStat, nodeName, serverName s
 	// Mark as seen
 	w.markInstanceSeen("cache", instance)
 	
-	// Define expected metrics for operational cache components
+	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	mappings := []MetricMapping{
-		// Operational cache metrics (hits, misses, requests)
-		{MetricName: "HitsInMemoryCount", CollectionKey: "cache_" + cleanInst + "_memory_hits", StatType: "count"},
-		{MetricName: "HitsOnDiskCount", CollectionKey: "cache_" + cleanInst + "_disk_hits", StatType: "count"},
-		{MetricName: "MissCount", CollectionKey: "cache_" + cleanInst + "_misses", StatType: "count"},
-		{MetricName: "ClientRequestCount", CollectionKey: "cache_" + cleanInst + "_client_requests", StatType: "count"},
-		{MetricName: "InMemoryAndDiskCacheEntryCount", CollectionKey: "cache_" + cleanInst + "_total_entries", StatType: "count"},
-		// Additional cache invalidation metrics these components often have
-		{MetricName: "ExplicitInvalidationCount", CollectionKey: "cache_" + cleanInst + "_explicit_invalidations", StatType: "count"},
-		{MetricName: "LruInvalidationCount", CollectionKey: "cache_" + cleanInst + "_lru_invalidations", StatType: "count"},
-		{MetricName: "TimeoutInvalidationCount", CollectionKey: "cache_" + cleanInst + "_timeout_invalidations", StatType: "count"},
-		{MetricName: "RemoteHitCount", CollectionKey: "cache_" + cleanInst + "_remote_hits", StatType: "count"},
-		{MetricName: "DistributedRequestCount", CollectionKey: "cache_" + cleanInst + "_distributed_requests", StatType: "count"},
+	
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "HitsInMemoryCount":
+			mx[fmt.Sprintf("cache_%s_memory_hits", cleanInst)] = metric.Value
+		case "HitsOnDiskCount":
+			mx[fmt.Sprintf("cache_%s_disk_hits", cleanInst)] = metric.Value
+		case "MissCount":
+			mx[fmt.Sprintf("cache_%s_misses", cleanInst)] = metric.Value
+		case "ClientRequestCount":
+			mx[fmt.Sprintf("cache_%s_client_requests", cleanInst)] = metric.Value
+		case "InMemoryAndDiskCacheEntryCount":
+			mx[fmt.Sprintf("cache_%s_total_entries", cleanInst)] = metric.Value
+		case "ExplicitInvalidationCount":
+			mx[fmt.Sprintf("cache_%s_explicit_invalidations", cleanInst)] = metric.Value
+		case "LruInvalidationCount":
+			mx[fmt.Sprintf("cache_%s_lru_invalidations", cleanInst)] = metric.Value
+		case "TimeoutInvalidationCount":
+			mx[fmt.Sprintf("cache_%s_timeout_invalidations", cleanInst)] = metric.Value
+		case "RemoteHitCount":
+			mx[fmt.Sprintf("cache_%s_remote_hits", cleanInst)] = metric.Value
+		case "DistributedRequestCount":
+			mx[fmt.Sprintf("cache_%s_distributed_requests", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use collection helper
+			w.collectCountMetric(mx, "cache", cleanInst, metric)
+		}
 	}
 	
-	// Use helper to collect metrics with logging
-	w.collectMetricsWithLogging("CacheComponent", stat, instance, mx, mappings)
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		w.collectTimeMetric(mx, "cache", cleanInst, metric)
+	}
+	
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		w.collectRangeMetric(mx, "cache", cleanInst, metric)
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		w.collectBoundedRangeMetric(mx, "cache", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		w.collectAverageMetric(mx, "cache", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		w.collectDoubleMetric(mx, "cache", cleanInst, metric)
+	}
 }
 
 // parseDynamicCacheContainer handles Dynamic Cache metrics
@@ -413,21 +535,67 @@ func (w *WebSpherePMI) parseDynamicCacheContainer(stat *pmiStat, nodeName, serve
 	// Mark as seen
 	w.markInstanceSeen("cache", instance)
 	
-	// Define expected metrics
+	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	mappings := []MetricMapping{
-		// Note: These are typically found in child "Object:" stats, not at container level
-		{MetricName: "MaxInMemoryCacheEntryCount", CollectionKey: "cache_" + cleanInst + "_max_entries", StatType: "count"},
-		{MetricName: "InMemoryCacheEntryCount", CollectionKey: "cache_" + cleanInst + "_in_memory_entries", StatType: "count"},
-		{MetricName: "HitsInMemoryCount", CollectionKey: "cache_" + cleanInst + "_memory_hits", StatType: "count"},
-		{MetricName: "HitsOnDiskCount", CollectionKey: "cache_" + cleanInst + "_disk_hits", StatType: "count"},
-		{MetricName: "MissCount", CollectionKey: "cache_" + cleanInst + "_misses", StatType: "count"},
-		{MetricName: "ClientRequestCount", CollectionKey: "cache_" + cleanInst + "_client_requests", StatType: "count"},
-		{MetricName: "InMemoryAndDiskCacheEntryCount", CollectionKey: "cache_" + cleanInst + "_total_entries", StatType: "count"},
+	
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "MaxInMemoryCacheEntryCount":
+			mx[fmt.Sprintf("cache_%s_max_entries", cleanInst)] = metric.Value
+		case "InMemoryCacheEntryCount":
+			mx[fmt.Sprintf("cache_%s_in_memory_entries", cleanInst)] = metric.Value
+		case "HitsInMemoryCount":
+			mx[fmt.Sprintf("cache_%s_memory_hits", cleanInst)] = metric.Value
+		case "HitsOnDiskCount":
+			mx[fmt.Sprintf("cache_%s_disk_hits", cleanInst)] = metric.Value
+		case "MissCount":
+			mx[fmt.Sprintf("cache_%s_misses", cleanInst)] = metric.Value
+		case "ClientRequestCount":
+			mx[fmt.Sprintf("cache_%s_client_requests", cleanInst)] = metric.Value
+		case "InMemoryAndDiskCacheEntryCount":
+			mx[fmt.Sprintf("cache_%s_total_entries", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use collection helper
+			w.collectCountMetric(mx, "cache", cleanInst, metric)
+		}
 	}
 	
-	// Use helper to collect metrics with logging
-	w.collectMetricsWithLogging("DynamicCacheContainer", stat, instance, mx, mappings)
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		// Use collection helper for all time metrics
+		w.collectTimeMetric(mx, "cache", cleanInst, metric)
+	}
+	
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		// Use collection helper for all range metrics
+		w.collectRangeMetric(mx, "cache", cleanInst, metric)
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		// Use collection helper for all bounded range metrics
+		w.collectBoundedRangeMetric(mx, "cache", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		// Use collection helper for all average metrics
+		w.collectAverageMetric(mx, "cache", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		// Use collection helper for all double metrics
+		w.collectDoubleMetric(mx, "cache", cleanInst, metric)
+	}
 	
 	// Process child cache objects
 	for _, child := range stat.SubStats {
@@ -440,7 +608,7 @@ func (w *WebSpherePMI) parseDynamicCacheContainer(stat *pmiStat, nodeName, serve
 // parseCacheObject handles individual cache object metrics
 // XML Structure: Object: [cache_name] -> [direct metrics] + Object Cache -> [metrics and Counters substat]
 func (w *WebSpherePMI) parseCacheObject(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
-	cacheName := strings.TrimPrefix(stat.Name, "Object: ")
+	// cacheName := strings.TrimPrefix(stat.Name, "Object: ") // Not used - aggregating all cache objects
 	// Use aggregated instance name for NIDL compliance
 	instance := fmt.Sprintf("%s.%s.Object_Cache", nodeName, serverName)
 	
@@ -450,80 +618,108 @@ func (w *WebSpherePMI) parseCacheObject(stat *pmiStat, nodeName, serverName stri
 	// Mark as seen
 	w.markInstanceSeen("object_cache", instance)
 	
-	// Track expected vs found metrics
-	expectedMetrics := []string{
-		"InMemoryCacheEntryCount",
-		"MaxInMemoryCacheEntryCount",
-		"HitsInMemoryCount",
-		"HitsOnDiskCount",
-		"MissCount",
-		"InMemoryAndDiskCacheEntryCount",
-	}
-	foundMetrics := make(map[string]bool)
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
 	
-	// CRITICAL: Process direct CountStatistics of "Object: [cache_name]" stat first
-	// These contain InMemoryCacheEntryCount and MaxInMemoryCacheEntryCount
-	for _, cs := range stat.CountStatistics {
-		if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
-			switch cs.Name {
-			case "InMemoryCacheEntryCount":
-				mx[fmt.Sprintf("object_cache_%s_objects", w.cleanID(instance))] = val
-				foundMetrics["InMemoryCacheEntryCount"] = true
-			case "MaxInMemoryCacheEntryCount":
-				mx[fmt.Sprintf("object_cache_%s_max_objects", w.cleanID(instance))] = val
-				foundMetrics["MaxInMemoryCacheEntryCount"] = true
-			}
-		} else {
-			w.Errorf("ISSUE: parseCacheObject failed to parse CountStatistic %s value '%s': %v", cs.Name, cs.Count, err)
+	// Process direct CountStatistics at the top level
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "InMemoryCacheEntryCount":
+			mx[fmt.Sprintf("object_cache_%s_objects", cleanInst)] = metric.Value
+		case "MaxInMemoryCacheEntryCount":
+			mx[fmt.Sprintf("object_cache_%s_max_objects", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use collection helper
+			w.collectCountMetric(mx, "object_cache", cleanInst, metric)
 		}
 	}
 	
-	// Look for "Object Cache" sub-stat for additional metrics
-	objectCacheFound := false
-	countersFound := false
+	// Extract ALL other statistic types at top level
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		w.collectTimeMetric(mx, "object_cache", cleanInst, metric)
+	}
+	
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		w.collectRangeMetric(mx, "object_cache", cleanInst, metric)
+	}
+	
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		w.collectBoundedRangeMetric(mx, "object_cache", cleanInst, metric)
+	}
+	
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		w.collectAverageMetric(mx, "object_cache", cleanInst, metric)
+	}
+	
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		w.collectDoubleMetric(mx, "object_cache", cleanInst, metric)
+	}
+	
+	// Process "Object Cache" sub-stat for additional metrics
 	for _, child := range stat.SubStats {
 		if child.Name == "Object Cache" {
-			objectCacheFound = true
+			// Process direct metrics in Object Cache
+			childCountMetrics := w.extractCountStatistics(child.CountStatistics)
+			for _, metric := range childCountMetrics {
+				w.collectCountMetric(mx, "object_cache", cleanInst, metric)
+			}
+			
 			// Look for "Counters" sub-stat
 			for _, counters := range child.SubStats {
 				if counters.Name == "Counters" {
-					countersFound = true
 					// Process counter metrics
-					for _, cs := range counters.CountStatistics {
-						if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
-							switch cs.Name {
-							case "HitsInMemoryCount":
-								mx[fmt.Sprintf("object_cache_%s_memory_hits", w.cleanID(instance))] = val
-								foundMetrics["HitsInMemoryCount"] = true
-							case "HitsOnDiskCount":
-								mx[fmt.Sprintf("object_cache_%s_disk_hits", w.cleanID(instance))] = val
-								foundMetrics["HitsOnDiskCount"] = true
-							case "MissCount":
-								mx[fmt.Sprintf("object_cache_%s_misses", w.cleanID(instance))] = val
-								foundMetrics["MissCount"] = true
-							case "InMemoryAndDiskCacheEntryCount":
-								mx[fmt.Sprintf("object_cache_%s_total_entries", w.cleanID(instance))] = val
-								foundMetrics["InMemoryAndDiskCacheEntryCount"] = true
-							}
-						} else {
-							w.Errorf("ISSUE: parseCacheObject failed to parse CountStatistic %s value '%s' in Counters: %v", cs.Name, cs.Count, err)
+					counterMetrics := w.extractCountStatistics(counters.CountStatistics)
+					for _, metric := range counterMetrics {
+						switch metric.Name {
+						case "HitsInMemoryCount":
+							mx[fmt.Sprintf("object_cache_%s_memory_hits", cleanInst)] = metric.Value
+						case "HitsOnDiskCount":
+							mx[fmt.Sprintf("object_cache_%s_disk_hits", cleanInst)] = metric.Value
+						case "MissCount":
+							mx[fmt.Sprintf("object_cache_%s_misses", cleanInst)] = metric.Value
+						case "InMemoryAndDiskCacheEntryCount":
+							mx[fmt.Sprintf("object_cache_%s_total_entries", cleanInst)] = metric.Value
+						default:
+							// For unknown count metrics, use collection helper
+							w.collectCountMetric(mx, "object_cache", cleanInst, metric)
 						}
+					}
+					
+					// Also process any other statistic types in Counters
+					counterTimeMetrics := w.extractTimeStatistics(counters.TimeStatistics)
+					for _, metric := range counterTimeMetrics {
+						w.collectTimeMetric(mx, "object_cache", cleanInst, metric)
+					}
+					
+					counterRangeMetrics := w.extractRangeStatistics(counters.RangeStatistics)
+					for _, metric := range counterRangeMetrics {
+						w.collectRangeMetric(mx, "object_cache", cleanInst, metric)
+					}
+					
+					counterBoundedMetrics := w.extractBoundedRangeStatistics(counters.BoundedRangeStatistics)
+					for _, metric := range counterBoundedMetrics {
+						w.collectBoundedRangeMetric(mx, "object_cache", cleanInst, metric)
+					}
+					
+					counterAvgMetrics := w.extractAverageStatistics(counters.AverageStatistics)
+					for _, metric := range counterAvgMetrics {
+						w.collectAverageMetric(mx, "object_cache", cleanInst, metric)
+					}
+					
+					counterDoubleMetrics := w.extractDoubleStatistics(counters.DoubleStatistics)
+					for _, metric := range counterDoubleMetrics {
+						w.collectDoubleMetric(mx, "object_cache", cleanInst, metric)
 					}
 				}
 			}
-			
-			if !countersFound {
-				w.Errorf("ISSUE: parseCacheObject found 'Object Cache' sub-stat but no 'Counters' sub-stat for cache '%s'", cacheName)
-			}
 		}
 	}
-	
-	if !objectCacheFound {
-		w.Errorf("ISSUE: parseCacheObject did not find 'Object Cache' sub-stat for cache '%s'", cacheName)
-	}
-	
-	// Log any missing metrics
-	w.logParsingFailure("CacheObject", stat.Name, stat, expectedMetrics, foundMetrics)
 }
 
 // parseORB handles ORB (Object Request Broker) metrics
@@ -536,59 +732,65 @@ func (w *WebSpherePMI) parseORB(stat *pmiStat, nodeName, serverName string, mx m
 	// Mark as seen
 	w.markInstanceSeen("orb", instance)
 	
-	// Track expected vs found metrics
-	expectedMetrics := []string{
-		"RequestCount",
-		"ConcurrentRequestCount",
-		"LookupTime",
-	}
-	foundMetrics := make(map[string]bool)
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
 	
-	// Process CountStatistics
-	for _, cs := range stat.CountStatistics {
-		if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
-			switch cs.Name {
-			case "RequestCount":
-				mx[fmt.Sprintf("orb_%s_requests", w.cleanID(instance))] = val
-				foundMetrics["RequestCount"] = true
-			}
-		} else {
-			w.Errorf("ISSUE: parseORB failed to parse CountStatistic %s value '%s': %v", cs.Name, cs.Count, err)
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "RequestCount":
+			mx[fmt.Sprintf("orb_%s_requests", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use collection helper
+			w.collectCountMetric(mx, "orb", cleanInst, metric)
 		}
 	}
 	
-	// Process RangeStatistics
-	for _, rs := range stat.RangeStatistics {
-		if val, err := strconv.ParseInt(rs.Current, 10, 64); err == nil {
-			switch rs.Name {
-			case "ConcurrentRequestCount":
-				mx[fmt.Sprintf("orb_%s_concurrent_requests", w.cleanID(instance))] = val
-				foundMetrics["ConcurrentRequestCount"] = true
-			}
-		} else {
-			w.Errorf("ISSUE: parseORB failed to parse RangeStatistic %s current value '%s': %v", rs.Name, rs.Current, err)
-		}
-	}
-	
-	// Process TimeStatistics
-	for _, ts := range stat.TimeStatistics {
-		switch ts.Name {
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		switch metric.Name {
 		case "LookupTime":
-			total := ts.TotalTime
-			if total == "" {
-				total = ts.Total
-			}
-			if val, err := strconv.ParseInt(total, 10, 64); err == nil {
-				mx[fmt.Sprintf("orb_%s_lookup_time_total", w.cleanID(instance))] = val
-				foundMetrics["LookupTime"] = true
-			} else {
-				w.Errorf("ISSUE: parseORB failed to parse TimeStatistic %s total value '%s': %v", ts.Name, total, err)
-			}
+			mx[fmt.Sprintf("orb_%s_lookup_time_total", cleanInst)] = metric.Total
+		default:
+			// For unknown time metrics, use collection helper
+			w.collectTimeMetric(mx, "orb", cleanInst, metric)
 		}
 	}
 	
-	// Log any missing metrics
-	w.logParsingFailure("ORB", stat.Name, stat, expectedMetrics, foundMetrics)
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		switch metric.Name {
+		case "ConcurrentRequestCount":
+			mx[fmt.Sprintf("orb_%s_concurrent_requests", cleanInst)] = metric.Current
+		default:
+			// For unknown range metrics, use collection helper
+			w.collectRangeMetric(mx, "orb", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		// Use collection helper for all bounded range metrics
+		w.collectBoundedRangeMetric(mx, "orb", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		// Use collection helper for all average metrics
+		w.collectAverageMetric(mx, "orb", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		// Use collection helper for all double metrics
+		w.collectDoubleMetric(mx, "orb", cleanInst, metric)
+	}
 }
 
 // Chart creation helpers
@@ -871,6 +1073,65 @@ var objectCacheChartsTmpl = module.Charts{
 			{ID: "object_cache_%s_memory_hits", Name: "memory_hits", Algo: module.Incremental},
 			{ID: "object_cache_%s_disk_hits", Name: "disk_hits", Algo: module.Incremental},
 			{ID: "object_cache_%s_misses", Name: "misses", Algo: module.Incremental},
+			{ID: "object_cache_%s_HitsInMemoryCount", Name: "hits_in_memory_count", Algo: module.Incremental},
+			{ID: "object_cache_%s_HitsOnDiskCount", Name: "hits_on_disk_count", Algo: module.Incremental},
+			{ID: "object_cache_%s_MissCount", Name: "miss_count", Algo: module.Incremental},
+			{ID: "object_cache_%s_RemoteHitCount", Name: "remote_hit_count", Algo: module.Incremental},
+		},
+	},
+	{
+		ID:       "object_cache_%s_requests",
+		Title:    "Object Cache Requests",
+		Units:    "requests/s",
+		Fam:      "object_cache",
+		Ctx:      "websphere_pmi.object_cache_requests",
+		Type:     module.Line,
+		Priority: prioObjectCacheHits + 1,
+		Dims: module.Dims{
+			{ID: "object_cache_%s_ClientRequestCount", Name: "client_requests", Algo: module.Incremental},
+			{ID: "object_cache_%s_DistributedRequestCount", Name: "distributed_requests", Algo: module.Incremental},
+		},
+	},
+	{
+		ID:       "object_cache_%s_invalidations",
+		Title:    "Object Cache Invalidations",
+		Units:    "invalidations/s",
+		Fam:      "object_cache",
+		Ctx:      "websphere_pmi.object_cache_invalidations",
+		Type:     module.Line,
+		Priority: prioObjectCacheHits + 2,
+		Dims: module.Dims{
+			{ID: "object_cache_%s_ExplicitInvalidationCount", Name: "explicit", Algo: module.Incremental},
+			{ID: "object_cache_%s_ExplicitDiskInvalidationCount", Name: "explicit_disk", Algo: module.Incremental},
+			{ID: "object_cache_%s_ExplicitMemoryInvalidationCount", Name: "explicit_memory", Algo: module.Incremental},
+			{ID: "object_cache_%s_LocalExplicitInvalidationCount", Name: "local_explicit", Algo: module.Incremental},
+			{ID: "object_cache_%s_RemoteExplicitInvalidationCount", Name: "remote_explicit", Algo: module.Incremental},
+			{ID: "object_cache_%s_LruInvalidationCount", Name: "lru", Algo: module.Incremental},
+			{ID: "object_cache_%s_TimeoutInvalidationCount", Name: "timeout", Algo: module.Incremental},
+		},
+	},
+	{
+		ID:       "object_cache_%s_entries_total",
+		Title:    "Object Cache Total Entries",
+		Units:    "entries",
+		Fam:      "object_cache",
+		Ctx:      "websphere_pmi.object_cache_entries_total",
+		Type:     module.Line,
+		Priority: prioObjectCacheHits + 3,
+		Dims: module.Dims{
+			{ID: "object_cache_%s_InMemoryAndDiskCacheEntryCount", Name: "memory_and_disk", Algo: module.Incremental},
+		},
+	},
+	{
+		ID:       "object_cache_%s_remote_operations",
+		Title:    "Object Cache Remote Operations",
+		Units:    "operations/s",
+		Fam:      "object_cache",
+		Ctx:      "websphere_pmi.object_cache_remote_operations",
+		Type:     module.Line,
+		Priority: prioObjectCacheHits + 4,
+		Dims: module.Dims{
+			{ID: "object_cache_%s_RemoteCreationCount", Name: "remote_creation", Algo: module.Incremental},
 		},
 	},
 }
@@ -889,6 +1150,18 @@ var webAppContainerChartsTmpl = module.Charts{
 		},
 	},
 	{
+		ID:       "webapp_container_%s_reloads",
+		Title:    "Web Application Container Reloads",
+		Units:    "reloads/s",
+		Fam:      "webapp_container",
+		Ctx:      "websphere_pmi.webapp_container_reloads",
+		Type:     module.Line,
+		Priority: prioWebAppContainerServlets + 1,
+		Dims: module.Dims{
+			{ID: "webapp_container_%s_ReloadCount", Name: "reloads", Algo: module.Incremental},
+		},
+	},
+	{
 		ID:       "webapp_container_%s_requests",
 		Title:    "Web Application Container Requests",
 		Units:    "requests/s",
@@ -899,6 +1172,155 @@ var webAppContainerChartsTmpl = module.Charts{
 		Dims: module.Dims{
 			{ID: "webapp_container_%s_requests", Name: "requests", Algo: module.Incremental},
 			{ID: "webapp_container_%s_errors", Name: "errors", Algo: module.Incremental},
+			{ID: "webapp_container_%s_URIRequestCount", Name: "uri_requests", Algo: module.Incremental},
+		},
+	},
+	// New charts for discovered metrics
+	{
+		ID:       "webapp_container_%s_concurrent_requests",
+		Title:    "Web Application Container Concurrent Requests",
+		Units:    "requests",
+		Fam:      "webapp_container",
+		Ctx:      "websphere_pmi.webapp_container_concurrent_requests",
+		Type:     module.Line,
+		Priority: prioWebAppContainerRequests + 1,
+		Dims: module.Dims{
+			{ID: "webapp_container_%s_ConcurrentRequests_current", Name: "current"},
+			{ID: "webapp_container_%s_ConcurrentRequests_mean", Name: "mean"},
+			{ID: "webapp_container_%s_URIConcurrentRequests_current", Name: "uri_current"},
+			{ID: "webapp_container_%s_URIConcurrentRequests_mean", Name: "uri_mean"},
+			{ID: "webapp_container_%s_ConcurrentRequests_high_watermark", Name: "high_watermark", DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "webapp_container_%s_ConcurrentRequests_low_watermark", Name: "low_watermark", DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "webapp_container_%s_ConcurrentRequests_integral", Name: "integral", DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "webapp_container_%s_URIConcurrentRequests_high_watermark", Name: "uri_high_watermark", DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "webapp_container_%s_URIConcurrentRequests_low_watermark", Name: "uri_low_watermark", DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "webapp_container_%s_URIConcurrentRequests_integral", Name: "uri_integral", DimOpts: module.DimOpts{Hidden: true}},
+		},
+	},
+	{
+		ID:       "webapp_container_%s_response_time",
+		Title:    "Web Application Container Response Time",
+		Units:    "milliseconds",
+		Fam:      "webapp_container",
+		Ctx:      "websphere_pmi.webapp_container_response_time",
+		Type:     module.Line,
+		Priority: prioWebAppContainerRequests + 2,
+		Dims: module.Dims{
+			{ID: "webapp_container_%s_ServiceTime_mean", Name: "service_mean"},
+			{ID: "webapp_container_%s_AsyncContext_Response_Time_mean", Name: "async_mean"},
+			{ID: "webapp_container_%s_URIServiceTime_mean", Name: "uri_service_mean"},
+			{ID: "webapp_container_%s_URL_AsyncContext_Response_Time_mean", Name: "url_async_mean"},
+		},
+	},
+	{
+		ID:       "webapp_container_%s_response_time_total",
+		Title:    "Web Application Container Response Time Total",
+		Units:    "milliseconds/s",
+		Fam:      "webapp_container",
+		Ctx:      "websphere_pmi.webapp_container_response_time_total",
+		Type:     module.Line,
+		Priority: prioWebAppContainerRequests + 2,
+		Dims: module.Dims{
+			{ID: "webapp_container_%s_ServiceTime_total", Name: "service_total", Algo: module.Incremental},
+			{ID: "webapp_container_%s_AsyncContext_Response_Time_total", Name: "async_total", Algo: module.Incremental},
+			{ID: "webapp_container_%s_URIServiceTime_total", Name: "uri_service_total", Algo: module.Incremental},
+			{ID: "webapp_container_%s_URL_AsyncContext_Response_Time_total", Name: "url_async_total", Algo: module.Incremental},
+			{ID: "webapp_container_%s_ServiceTime_count", Name: "service_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "webapp_container_%s_ServiceTime_min", Name: "service_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "webapp_container_%s_ServiceTime_max", Name: "service_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "webapp_container_%s_AsyncContext_Response_Time_count", Name: "async_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "webapp_container_%s_AsyncContext_Response_Time_min", Name: "async_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "webapp_container_%s_AsyncContext_Response_Time_max", Name: "async_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "webapp_container_%s_URIServiceTime_count", Name: "uri_service_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "webapp_container_%s_URIServiceTime_min", Name: "uri_service_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "webapp_container_%s_URIServiceTime_max", Name: "uri_service_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "webapp_container_%s_URL_AsyncContext_Response_Time_count", Name: "url_async_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "webapp_container_%s_URL_AsyncContext_Response_Time_min", Name: "url_async_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "webapp_container_%s_URL_AsyncContext_Response_Time_max", Name: "url_async_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+		},
+	},
+	// Portlet-specific charts
+	{
+		ID:       "webapp_container_%s_portlets",
+		Title:    "Web Application Container Portlets",
+		Units:    "portlets",
+		Fam:      "webapp_container",
+		Ctx:      "websphere_pmi.webapp_container_portlets",
+		Type:     module.Line,
+		Priority: prioWebAppContainerRequests + 3,
+		Dims: module.Dims{
+			{ID: "webapp_container_%s_Number_of_loaded_portlets", Name: "loaded"},
+		},
+	},
+	{
+		ID:       "webapp_container_%s_portlet_requests",
+		Title:    "Web Application Container Portlet Requests",
+		Units:    "requests/s",
+		Fam:      "webapp_container",
+		Ctx:      "websphere_pmi.webapp_container_portlet_requests",
+		Type:     module.Line,
+		Priority: prioWebAppContainerRequests + 4,
+		Dims: module.Dims{
+			{ID: "webapp_container_%s_Number_of_portlet_requests", Name: "requests", Algo: module.Incremental},
+			{ID: "webapp_container_%s_Number_of_portlet_errors", Name: "errors", Algo: module.Incremental},
+		},
+	},
+	{
+		ID:       "webapp_container_%s_portlet_concurrent",
+		Title:    "Web Application Container Concurrent Portlet Requests",
+		Units:    "requests",
+		Fam:      "webapp_container",
+		Ctx:      "websphere_pmi.webapp_container_portlet_concurrent",
+		Type:     module.Line,
+		Priority: prioWebAppContainerRequests + 5,
+		Dims: module.Dims{
+			{ID: "webapp_container_%s_Number_of_concurrent_portlet_requests_current", Name: "current"},
+			{ID: "webapp_container_%s_Number_of_concurrent_portlet_requests_mean", Name: "mean"},
+			{ID: "webapp_container_%s_Number_of_concurrent_portlet_requests_high_watermark", Name: "high_watermark", DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "webapp_container_%s_Number_of_concurrent_portlet_requests_low_watermark", Name: "low_watermark", DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "webapp_container_%s_Number_of_concurrent_portlet_requests_integral", Name: "integral", DimOpts: module.DimOpts{Hidden: true}},
+		},
+	},
+	{
+		ID:       "webapp_container_%s_portlet_response_time",
+		Title:    "Web Application Container Portlet Response Time",
+		Units:    "milliseconds",
+		Fam:      "webapp_container",
+		Ctx:      "websphere_pmi.webapp_container_portlet_response_time",
+		Type:     module.Line,
+		Priority: prioWebAppContainerRequests + 6,
+		Dims: module.Dims{
+			{ID: "webapp_container_%s_Response_time_of_portlet_action_mean", Name: "action_mean"},
+			{ID: "webapp_container_%s_Response_time_of_portlet_render_mean", Name: "render_mean"},
+			{ID: "webapp_container_%s_Response_time_of_a_portlet_processEvent_request_mean", Name: "event_mean"},
+			{ID: "webapp_container_%s_Response_time_of_a_portlet_serveResource_request_mean", Name: "resource_mean"},
+		},
+	},
+	{
+		ID:       "webapp_container_%s_portlet_response_time_total",
+		Title:    "Web Application Container Portlet Response Time Total",
+		Units:    "milliseconds/s",
+		Fam:      "webapp_container",
+		Ctx:      "websphere_pmi.webapp_container_portlet_response_time_total",
+		Type:     module.Line,
+		Priority: prioWebAppContainerRequests + 7,
+		Dims: module.Dims{
+			{ID: "webapp_container_%s_Response_time_of_portlet_action_total", Name: "action_total", Algo: module.Incremental},
+			{ID: "webapp_container_%s_Response_time_of_portlet_render_total", Name: "render_total", Algo: module.Incremental},
+			{ID: "webapp_container_%s_Response_time_of_a_portlet_processEvent_request_total", Name: "event_total", Algo: module.Incremental},
+			{ID: "webapp_container_%s_Response_time_of_a_portlet_serveResource_request_total", Name: "resource_total", Algo: module.Incremental},
+			{ID: "webapp_container_%s_Response_time_of_portlet_action_count", Name: "action_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "webapp_container_%s_Response_time_of_portlet_action_min", Name: "action_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "webapp_container_%s_Response_time_of_portlet_action_max", Name: "action_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "webapp_container_%s_Response_time_of_portlet_render_count", Name: "render_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "webapp_container_%s_Response_time_of_portlet_render_min", Name: "render_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "webapp_container_%s_Response_time_of_portlet_render_max", Name: "render_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "webapp_container_%s_Response_time_of_a_portlet_processEvent_request_count", Name: "event_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "webapp_container_%s_Response_time_of_a_portlet_processEvent_request_min", Name: "event_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "webapp_container_%s_Response_time_of_a_portlet_processEvent_request_max", Name: "event_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "webapp_container_%s_Response_time_of_a_portlet_serveResource_request_count", Name: "resource_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "webapp_container_%s_Response_time_of_a_portlet_serveResource_request_min", Name: "resource_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "webapp_container_%s_Response_time_of_a_portlet_serveResource_request_max", Name: "resource_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
 		},
 	},
 }
@@ -931,6 +1353,7 @@ var cacheChartsTmpl = module.Charts{
 			{ID: "cache_%s_disk_hits", Name: "disk", Algo: module.Incremental},
 			{ID: "cache_%s_remote_hits", Name: "remote", Algo: module.Incremental},
 			{ID: "cache_%s_misses", Name: "misses", Algo: module.Incremental},
+			{ID: "cache_%s_RemoteHitCount", Name: "remote_hit_count", Algo: module.Incremental},
 		},
 	},
 	{
@@ -944,6 +1367,7 @@ var cacheChartsTmpl = module.Charts{
 		Dims: module.Dims{
 			{ID: "cache_%s_client_requests", Name: "client", Algo: module.Incremental},
 			{ID: "cache_%s_distributed_requests", Name: "distributed", Algo: module.Incremental},
+			{ID: "cache_%s_DistributedRequestCount", Name: "distributed_count", Algo: module.Incremental},
 		},
 	},
 	{
@@ -958,6 +1382,36 @@ var cacheChartsTmpl = module.Charts{
 			{ID: "cache_%s_explicit_invalidations", Name: "explicit", Algo: module.Incremental},
 			{ID: "cache_%s_lru_invalidations", Name: "lru", Algo: module.Incremental},
 			{ID: "cache_%s_timeout_invalidations", Name: "timeout", Algo: module.Incremental},
+			{ID: "cache_%s_ExplicitInvalidationCount", Name: "explicit_count", Algo: module.Incremental},
+			{ID: "cache_%s_LruInvalidationCount", Name: "lru_count", Algo: module.Incremental},
+			{ID: "cache_%s_TimeoutInvalidationCount", Name: "timeout_count", Algo: module.Incremental},
+		},
+	},
+	{
+		ID:       "cache_%s_detailed_invalidations",
+		Title:    "Dynamic Cache Detailed Invalidations",
+		Units:    "invalidations/s",
+		Fam:      "cache",
+		Ctx:      "websphere_pmi.cache_detailed_invalidations",
+		Type:     module.Line,
+		Priority: prioCacheHits + 3,
+		Dims: module.Dims{
+			{ID: "cache_%s_ExplicitDiskInvalidationCount", Name: "explicit_disk", Algo: module.Incremental},
+			{ID: "cache_%s_ExplicitMemoryInvalidationCount", Name: "explicit_memory", Algo: module.Incremental},
+			{ID: "cache_%s_LocalExplicitInvalidationCount", Name: "local_explicit", Algo: module.Incremental},
+			{ID: "cache_%s_RemoteExplicitInvalidationCount", Name: "remote_explicit", Algo: module.Incremental},
+		},
+	},
+	{
+		ID:       "cache_%s_remote_operations",
+		Title:    "Dynamic Cache Remote Operations",
+		Units:    "operations/s",
+		Fam:      "cache",
+		Ctx:      "websphere_pmi.cache_remote_operations",
+		Type:     module.Line,
+		Priority: prioCacheHits + 4,
+		Dims: module.Dims{
+			{ID: "cache_%s_RemoteCreationCount", Name: "remote_creation", Algo: module.Incremental},
 		},
 	},
 }
@@ -1127,16 +1581,39 @@ var sessionChartsTmpl = module.Charts{
 			{ID: "sessions_%s_time_since_activated_total", Name: "time_since_activated", Algo: module.Incremental},
 		},
 	},
+	// New charts for discovered AverageStatistics
 	{
-		ID:       "sessions_%s_object_size",
-		Title:    "Session Object Size",
-		Units:    "bytes/s",
+		ID:       "sessions_%s_external_read_size",
+		Title:    "Session External Read Size",
+		Units:    "bytes",
 		Fam:      "sessions",
-		Ctx:      "websphere_pmi.sessions_object_size",
+		Ctx:      "websphere_pmi.sessions_external_read_size",
 		Type:     module.Line,
-		Priority: prioSessionsLifecycle + 4,
+		Priority: prioSessionsLifecycle + 5,
 		Dims: module.Dims{
-			{ID: "sessions_%s_object_size_total", Name: "object_size", Algo: module.Incremental},
+			{ID: "sessions_%s_ExternalReadSize_mean", Name: "mean"},
+			{ID: "sessions_%s_ExternalReadSize_total", Name: "total", DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "sessions_%s_ExternalReadSize_count", Name: "count", DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "sessions_%s_ExternalReadSize_min", Name: "min", DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "sessions_%s_ExternalReadSize_max", Name: "max", DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "sessions_%s_ExternalReadSize_sum_of_squares", Name: "sum_of_squares", DimOpts: module.DimOpts{Hidden: true}},
+		},
+	},
+	{
+		ID:       "sessions_%s_external_write_size",
+		Title:    "Session External Write Size",
+		Units:    "bytes",
+		Fam:      "sessions",
+		Ctx:      "websphere_pmi.sessions_external_write_size",
+		Type:     module.Line,
+		Priority: prioSessionsLifecycle + 6,
+		Dims: module.Dims{
+			{ID: "sessions_%s_ExternalWriteSize_mean", Name: "mean"},
+			{ID: "sessions_%s_ExternalWriteSize_total", Name: "total", DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "sessions_%s_ExternalWriteSize_count", Name: "count", DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "sessions_%s_ExternalWriteSize_min", Name: "min", DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "sessions_%s_ExternalWriteSize_max", Name: "max", DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "sessions_%s_ExternalWriteSize_sum_of_squares", Name: "sum_of_squares", DimOpts: module.DimOpts{Hidden: true}},
 		},
 	},
 }
@@ -1486,33 +1963,90 @@ func (w *WebSpherePMI) parseJCAConnectionPool(stat *pmiStat, nodeName, serverNam
 	// Mark as seen
 	w.markInstanceSeen("jca_pool", instance)
 	
-	// Define expected metrics mappings - collect ALL available metrics
-	mappings := []MetricMapping{
-		// CountStatistics
-		{MetricName: "CreateCount", CollectionKey: fmt.Sprintf("jca_pool_%s_created", w.cleanID(instance)), StatType: "count"},
-		{MetricName: "CloseCount", CollectionKey: fmt.Sprintf("jca_pool_%s_closed", w.cleanID(instance)), StatType: "count"},
-		{MetricName: "AllocateCount", CollectionKey: fmt.Sprintf("jca_pool_%s_allocated", w.cleanID(instance)), StatType: "count"},
-		{MetricName: "FreedCount", CollectionKey: fmt.Sprintf("jca_pool_%s_returned", w.cleanID(instance)), StatType: "count"}, // Map FreedCount to returned
-		{MetricName: "FaultCount", CollectionKey: fmt.Sprintf("jca_pool_%s_faults", w.cleanID(instance)), StatType: "count"},
-		{MetricName: "ManagedConnectionCount", CollectionKey: fmt.Sprintf("jca_pool_%s_managed_connections", w.cleanID(instance)), StatType: "count"},
-		{MetricName: "ConnectionHandleCount", CollectionKey: fmt.Sprintf("jca_pool_%s_connection_handles", w.cleanID(instance)), StatType: "count"},
-		
-		// BoundedRangeStatistics
-		{MetricName: "FreePoolSize", CollectionKey: fmt.Sprintf("jca_pool_%s_free", w.cleanID(instance)), StatType: "bounded_range"},
-		{MetricName: "PoolSize", CollectionKey: fmt.Sprintf("jca_pool_%s_size", w.cleanID(instance)), StatType: "bounded_range"},
-		
-		// RangeStatistics
-		{MetricName: "WaitingThreadCount", CollectionKey: fmt.Sprintf("jca_pool_%s_waiting_threads", w.cleanID(instance)), StatType: "range"},
-		{MetricName: "PercentUsed", CollectionKey: fmt.Sprintf("jca_pool_%s_percent_used", w.cleanID(instance)), StatType: "range"},
-		{MetricName: "PercentMaxed", CollectionKey: fmt.Sprintf("jca_pool_%s_percent_maxed", w.cleanID(instance)), StatType: "range"},
-		
-		// TimeStatistics
-		{MetricName: "WaitTime", CollectionKey: fmt.Sprintf("jca_pool_%s_wait_time_total", w.cleanID(instance)), StatType: "time"},
-		{MetricName: "UseTime", CollectionKey: fmt.Sprintf("jca_pool_%s_use_time_total", w.cleanID(instance)), StatType: "time"},
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
+	
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "CreateCount":
+			mx[fmt.Sprintf("jca_pool_%s_created", cleanInst)] = metric.Value
+		case "CloseCount":
+			mx[fmt.Sprintf("jca_pool_%s_closed", cleanInst)] = metric.Value
+		case "AllocateCount":
+			mx[fmt.Sprintf("jca_pool_%s_allocated", cleanInst)] = metric.Value
+		case "FreedCount":
+			mx[fmt.Sprintf("jca_pool_%s_returned", cleanInst)] = metric.Value
+		case "FaultCount":
+			mx[fmt.Sprintf("jca_pool_%s_faults", cleanInst)] = metric.Value
+		case "ManagedConnectionCount":
+			mx[fmt.Sprintf("jca_pool_%s_managed_connections", cleanInst)] = metric.Value
+		case "ConnectionHandleCount":
+			mx[fmt.Sprintf("jca_pool_%s_connection_handles", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use collection helper
+			w.collectCountMetric(mx, "jca_pool", cleanInst, metric)
+		}
 	}
 	
-	// Use helper for comprehensive error logging
-	w.collectMetricsWithLogging("JCAConnectionPool", stat, instance, mx, mappings)
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		switch metric.Name {
+		case "WaitTime":
+			mx[fmt.Sprintf("jca_pool_%s_wait_time_total", cleanInst)] = metric.Total
+		case "UseTime":
+			mx[fmt.Sprintf("jca_pool_%s_use_time_total", cleanInst)] = metric.Total
+		default:
+			// For unknown time metrics, use collection helper
+			w.collectTimeMetric(mx, "jca_pool", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		switch metric.Name {
+		case "WaitingThreadCount":
+			mx[fmt.Sprintf("jca_pool_%s_waiting_threads", cleanInst)] = metric.Current
+		case "PercentUsed":
+			mx[fmt.Sprintf("jca_pool_%s_percent_used", cleanInst)] = metric.Current
+		case "PercentMaxed":
+			mx[fmt.Sprintf("jca_pool_%s_percent_maxed", cleanInst)] = metric.Current
+		default:
+			// For unknown range metrics, use collection helper
+			w.collectRangeMetric(mx, "jca_pool", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		switch metric.Name {
+		case "FreePoolSize":
+			mx[fmt.Sprintf("jca_pool_%s_free", cleanInst)] = metric.Value
+		case "PoolSize":
+			mx[fmt.Sprintf("jca_pool_%s_size", cleanInst)] = metric.Value
+		default:
+			// For unknown bounded range metrics, use collection helper
+			w.collectBoundedRangeMetric(mx, "jca_pool", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		// Use collection helper for all average metrics
+		w.collectAverageMetric(mx, "jca_pool", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		// Use collection helper for all double metrics
+		w.collectDoubleMetric(mx, "jca_pool", cleanInst, metric)
+	}
 }
 
 // parseEnterpriseApplication handles Enterprise Application metrics
@@ -1526,15 +2060,57 @@ func (w *WebSpherePMI) parseEnterpriseApplication(stat *pmiStat, nodeName, serve
 	// Mark as seen
 	w.markInstanceSeen("enterprise_app", instance)
 	
-	// Define expected metrics mappings
-	mappings := []MetricMapping{
-		// CountStatistics
-		{MetricName: "StartupTime", CollectionKey: fmt.Sprintf("enterprise_app_%s_startup_time", w.cleanID(instance)), StatType: "count"},
-		{MetricName: "LoadCount", CollectionKey: fmt.Sprintf("enterprise_app_%s_loads", w.cleanID(instance)), StatType: "count"},
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
+	
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "StartupTime":
+			mx[fmt.Sprintf("enterprise_app_%s_startup_time", cleanInst)] = metric.Value
+		case "LoadCount":
+			mx[fmt.Sprintf("enterprise_app_%s_loads", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use collection helper
+			w.collectCountMetric(mx, "enterprise_app", cleanInst, metric)
+		}
 	}
 	
-	// Use helper for comprehensive error logging
-	w.collectMetricsWithLogging("EnterpriseApplication", stat, instance, mx, mappings)
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		// Use collection helper for all time metrics
+		w.collectTimeMetric(mx, "enterprise_app", cleanInst, metric)
+	}
+	
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		// Use collection helper for all range metrics
+		w.collectRangeMetric(mx, "enterprise_app", cleanInst, metric)
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		// Use collection helper for all bounded range metrics
+		w.collectBoundedRangeMetric(mx, "enterprise_app", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		// Use collection helper for all average metrics
+		w.collectAverageMetric(mx, "enterprise_app", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		// Use collection helper for all double metrics
+		w.collectDoubleMetric(mx, "enterprise_app", cleanInst, metric)
+	}
 }
 
 // parseSystemData handles System Data metrics
@@ -1547,51 +2123,63 @@ func (w *WebSpherePMI) parseSystemData(stat *pmiStat, nodeName, serverName strin
 	// Mark as seen
 	w.markInstanceSeen("system_data", instance)
 	
-	// Track expected vs found metrics
-	expectedMetrics := []string{
-		"CPUUsageSinceLastMeasurement",
-		"FreeMemory",
-		"CPUUsageSinceServerStarted",
-	}
-	foundMetrics := make(map[string]bool)
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
 	
-	// Process CountStatistics
-	for _, cs := range stat.CountStatistics {
-		if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
-			switch cs.Name {
-			case "CPUUsageSinceLastMeasurement":
-				mx[fmt.Sprintf("system_data_%s_cpu_usage", w.cleanID(instance))] = val
-				foundMetrics["CPUUsageSinceLastMeasurement"] = true
-			case "FreeMemory":
-				mx[fmt.Sprintf("system_data_%s_free_memory", w.cleanID(instance))] = val
-				foundMetrics["FreeMemory"] = true
-			}
-		} else {
-			w.Errorf("ISSUE: parseSystemData failed to parse CountStatistic %s value '%s': %v", cs.Name, cs.Count, err)
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "CPUUsageSinceLastMeasurement":
+			mx[fmt.Sprintf("system_data_%s_cpu_usage", cleanInst)] = metric.Value
+		case "FreeMemory":
+			mx[fmt.Sprintf("system_data_%s_free_memory", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use collection helper
+			w.collectCountMetric(mx, "system_data", cleanInst, metric)
 		}
 	}
 	
-	// Process AverageStatistics (additional CPU metrics)
-	for _, as := range stat.AverageStatistics {
-		switch as.Name {
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		// Use collection helper for all time metrics
+		w.collectTimeMetric(mx, "system_data", cleanInst, metric)
+	}
+	
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		// Use collection helper for all range metrics
+		w.collectRangeMetric(mx, "system_data", cleanInst, metric)
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		// Use collection helper for all bounded range metrics
+		w.collectBoundedRangeMetric(mx, "system_data", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		switch metric.Name {
 		case "CPUUsageSinceServerStarted":
-			// Use Mean value for average CPU usage
-			if mean := as.Mean; mean != "" {
-				if val, err := strconv.ParseFloat(mean, 64); err == nil {
-					// Convert to integer with precision
-					mx[fmt.Sprintf("system_data_%s_cpu_average", w.cleanID(instance))] = int64(val * 100) // percentage with 2 decimal precision
-					foundMetrics["CPUUsageSinceServerStarted"] = true
-				} else {
-					w.Errorf("ISSUE: parseSystemData failed to parse AverageStatistic CPUUsageSinceServerStarted mean value '%s': %v", mean, err)
-				}
-			} else {
-				w.Errorf("ISSUE: parseSystemData AverageStatistic CPUUsageSinceServerStarted has empty mean value")
-			}
+			// Special handling for CPU average - scale to percentage
+			mx[fmt.Sprintf("system_data_%s_cpu_average", cleanInst)] = metric.Mean / 10 // Convert precision to percentage
+		default:
+			// For unknown average metrics, use collection helper
+			w.collectAverageMetric(mx, "system_data", cleanInst, metric)
 		}
 	}
 	
-	// Log any missing metrics
-	w.logParsingFailure("SystemData", stat.Name, stat, expectedMetrics, foundMetrics)
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		// Use collection helper for all double metrics
+		w.collectDoubleMetric(mx, "system_data", cleanInst, metric)
+	}
 }
 
 // parseWLM handles Work Load Management metrics
@@ -1604,14 +2192,55 @@ func (w *WebSpherePMI) parseWLM(stat *pmiStat, nodeName, serverName string, mx m
 	// Mark as seen
 	w.markInstanceSeen("wlm", instance)
 	
-	// Define expected metrics mappings
-	mappings := []MetricMapping{
-		// CountStatistics
-		{MetricName: "RequestCount", CollectionKey: fmt.Sprintf("wlm_%s_requests", w.cleanID(instance)), StatType: "count"},
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
+	
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "RequestCount":
+			mx[fmt.Sprintf("wlm_%s_requests", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use collection helper
+			w.collectCountMetric(mx, "wlm", cleanInst, metric)
+		}
 	}
 	
-	// Use helper for comprehensive error logging
-	w.collectMetricsWithLogging("WLM", stat, instance, mx, mappings)
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		// Use collection helper for all time metrics
+		w.collectTimeMetric(mx, "wlm", cleanInst, metric)
+	}
+	
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		// Use collection helper for all range metrics
+		w.collectRangeMetric(mx, "wlm", cleanInst, metric)
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		// Use collection helper for all bounded range metrics
+		w.collectBoundedRangeMetric(mx, "wlm", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		// Use collection helper for all average metrics
+		w.collectAverageMetric(mx, "wlm", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		// Use collection helper for all double metrics
+		w.collectDoubleMetric(mx, "wlm", cleanInst, metric)
+	}
 }
 
 // parseBeanManager handles Bean Manager metrics
@@ -1624,14 +2253,55 @@ func (w *WebSpherePMI) parseBeanManager(stat *pmiStat, nodeName, serverName stri
 	// Mark as seen
 	w.markInstanceSeen("bean_manager", instance)
 	
-	// Define expected metrics mappings
-	mappings := []MetricMapping{
-		// RangeStatistics
-		{MetricName: "LiveCount", CollectionKey: fmt.Sprintf("bean_manager_%s_live_beans", w.cleanID(instance)), StatType: "range"},
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
+	
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		// Use collection helper for all count metrics
+		w.collectCountMetric(mx, "bean_manager", cleanInst, metric)
 	}
 	
-	// Use helper for comprehensive error logging
-	w.collectMetricsWithLogging("BeanManager", stat, instance, mx, mappings)
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		// Use collection helper for all time metrics
+		w.collectTimeMetric(mx, "bean_manager", cleanInst, metric)
+	}
+	
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		switch metric.Name {
+		case "LiveCount":
+			mx[fmt.Sprintf("bean_manager_%s_live_beans", cleanInst)] = metric.Current
+		default:
+			// For unknown range metrics, use collection helper
+			w.collectRangeMetric(mx, "bean_manager", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		// Use collection helper for all bounded range metrics
+		w.collectBoundedRangeMetric(mx, "bean_manager", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		// Use collection helper for all average metrics
+		w.collectAverageMetric(mx, "bean_manager", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		// Use collection helper for all double metrics
+		w.collectDoubleMetric(mx, "bean_manager", cleanInst, metric)
+	}
 }
 
 // parseConnectionManager handles Connection Manager metrics
@@ -1644,14 +2314,55 @@ func (w *WebSpherePMI) parseConnectionManager(stat *pmiStat, nodeName, serverNam
 	// Mark as seen
 	w.markInstanceSeen("connection_manager", instance)
 	
-	// Define expected metrics mappings
-	mappings := []MetricMapping{
-		// RangeStatistics
-		{MetricName: "AllocatedCount", CollectionKey: fmt.Sprintf("connection_manager_%s_allocated", w.cleanID(instance)), StatType: "range"},
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
+	
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		// Use collection helper for all count metrics
+		w.collectCountMetric(mx, "connection_manager", cleanInst, metric)
 	}
 	
-	// Use helper for comprehensive error logging
-	w.collectMetricsWithLogging("ConnectionManager", stat, instance, mx, mappings)
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		// Use collection helper for all time metrics
+		w.collectTimeMetric(mx, "connection_manager", cleanInst, metric)
+	}
+	
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		switch metric.Name {
+		case "AllocatedCount":
+			mx[fmt.Sprintf("connection_manager_%s_allocated", cleanInst)] = metric.Current
+		default:
+			// For unknown range metrics, use collection helper
+			w.collectRangeMetric(mx, "connection_manager", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		// Use collection helper for all bounded range metrics
+		w.collectBoundedRangeMetric(mx, "connection_manager", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		// Use collection helper for all average metrics
+		w.collectAverageMetric(mx, "connection_manager", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		// Use collection helper for all double metrics
+		w.collectDoubleMetric(mx, "connection_manager", cleanInst, metric)
+	}
 }
 
 // parseJVMSubsystem handles JVM subsystem metrics
@@ -1665,51 +2376,124 @@ func (w *WebSpherePMI) parseJVMSubsystem(stat *pmiStat, nodeName, serverName str
 	// Mark as seen
 	w.markInstanceSeen("jvm_subsystem", instance)
 	
-	// Track expected vs found metrics based on subsystem
-	var expectedMetrics []string
-	switch stat.Name {
-	case "JVM.GC":
-		expectedMetrics = []string{"HeapDiscarded", "GCTime"}
-	case "JVM.Memory":
-		expectedMetrics = []string{"AllocatedMemory"}
-	case "JVM.Thread":
-		expectedMetrics = []string{"ActiveThreads"}
-	}
-	foundMetrics := make(map[string]bool)
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
 	
-	// Process JVM subsystem metrics
-	for _, cs := range stat.CountStatistics {
-		if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
-			switch stat.Name {
-			case "JVM.GC":
-				switch cs.Name {
-				case "HeapDiscarded":
-					mx[fmt.Sprintf("jvm_gc_%s_heap_discarded", w.cleanID(instance))] = val
-					foundMetrics["HeapDiscarded"] = true
-				case "GCTime":
-					mx[fmt.Sprintf("jvm_gc_%s_time", w.cleanID(instance))] = val
-					foundMetrics["GCTime"] = true
-				}
-			case "JVM.Memory":
-				switch cs.Name {
-				case "AllocatedMemory":
-					mx[fmt.Sprintf("jvm_memory_%s_allocated", w.cleanID(instance))] = val
-					foundMetrics["AllocatedMemory"] = true
-				}
-			case "JVM.Thread":
-				switch cs.Name {
-				case "ActiveThreads":
-					mx[fmt.Sprintf("jvm_thread_%s_active", w.cleanID(instance))] = val
-					foundMetrics["ActiveThreads"] = true
-				}
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch stat.Name {
+		case "JVM.GC":
+			switch metric.Name {
+			case "HeapDiscarded":
+				mx[fmt.Sprintf("jvm_gc_%s_heap_discarded", cleanInst)] = metric.Value
+			case "GCTime":
+				mx[fmt.Sprintf("jvm_gc_%s_time", cleanInst)] = metric.Value
+			default:
+				// For unknown count metrics, use collection helper
+				w.collectCountMetric(mx, "jvm_gc", cleanInst, metric)
 			}
-		} else {
-			w.Errorf("ISSUE: parseJVMSubsystem failed to parse CountStatistic %s value '%s': %v", cs.Name, cs.Count, err)
+		case "JVM.Memory":
+			switch metric.Name {
+			case "AllocatedMemory":
+				mx[fmt.Sprintf("jvm_memory_%s_allocated", cleanInst)] = metric.Value
+			default:
+				// For unknown count metrics, use collection helper
+				w.collectCountMetric(mx, "jvm_memory", cleanInst, metric)
+			}
+		case "JVM.Thread":
+			switch metric.Name {
+			case "ActiveThreads":
+				mx[fmt.Sprintf("jvm_thread_%s_active", cleanInst)] = metric.Value
+			default:
+				// For unknown count metrics, use collection helper
+				w.collectCountMetric(mx, "jvm_thread", cleanInst, metric)
+			}
+		default:
+			// For unknown subsystems, use generic collection helper
+			w.collectCountMetric(mx, "jvm_subsystem", cleanInst, metric)
 		}
 	}
 	
-	// Log any missing metrics
-	w.logParsingFailure("JVMSubsystem", stat.Name, stat, expectedMetrics, foundMetrics)
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		// Use collection helper for all time metrics with subsystem-specific prefix
+		prefix := "jvm_subsystem"
+		switch stat.Name {
+		case "JVM.GC":
+			prefix = "jvm_gc"
+		case "JVM.Memory":
+			prefix = "jvm_memory"
+		case "JVM.Thread":
+			prefix = "jvm_thread"
+		}
+		w.collectTimeMetric(mx, prefix, cleanInst, metric)
+	}
+	
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		// Use collection helper for all range metrics with subsystem-specific prefix
+		prefix := "jvm_subsystem"
+		switch stat.Name {
+		case "JVM.GC":
+			prefix = "jvm_gc"
+		case "JVM.Memory":
+			prefix = "jvm_memory"
+		case "JVM.Thread":
+			prefix = "jvm_thread"
+		}
+		w.collectRangeMetric(mx, prefix, cleanInst, metric)
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		// Use collection helper for all bounded range metrics with subsystem-specific prefix
+		prefix := "jvm_subsystem"
+		switch stat.Name {
+		case "JVM.GC":
+			prefix = "jvm_gc"
+		case "JVM.Memory":
+			prefix = "jvm_memory"
+		case "JVM.Thread":
+			prefix = "jvm_thread"
+		}
+		w.collectBoundedRangeMetric(mx, prefix, cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		// Use collection helper for all average metrics with subsystem-specific prefix
+		prefix := "jvm_subsystem"
+		switch stat.Name {
+		case "JVM.GC":
+			prefix = "jvm_gc"
+		case "JVM.Memory":
+			prefix = "jvm_memory"
+		case "JVM.Thread":
+			prefix = "jvm_thread"
+		}
+		w.collectAverageMetric(mx, prefix, cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		// Use collection helper for all double metrics with subsystem-specific prefix
+		prefix := "jvm_subsystem"
+		switch stat.Name {
+		case "JVM.GC":
+			prefix = "jvm_gc"
+		case "JVM.Memory":
+			prefix = "jvm_memory"
+		case "JVM.Thread":
+			prefix = "jvm_thread"
+		}
+		w.collectDoubleMetric(mx, prefix, cleanInst, metric)
+	}
 }
 
 // parseEJBContainer handles EJB container metrics
@@ -1722,14 +2506,55 @@ func (w *WebSpherePMI) parseEJBContainer(stat *pmiStat, nodeName, serverName str
 	// Mark as seen
 	w.markInstanceSeen("ejb_container", instance)
 	
-	// Define expected metrics mappings
-	mappings := []MetricMapping{
-		// CountStatistics
-		{MetricName: "TotalMethodCalls", CollectionKey: fmt.Sprintf("ejb_container_%s_method_calls", w.cleanID(instance)), StatType: "count"},
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
+	
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "TotalMethodCalls":
+			mx[fmt.Sprintf("ejb_container_%s_method_calls", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use collection helper
+			w.collectCountMetric(mx, "ejb_container", cleanInst, metric)
+		}
 	}
 	
-	// Use helper for comprehensive error logging
-	w.collectMetricsWithLogging("EJBContainer", stat, instance, mx, mappings)
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		// Use collection helper for all time metrics
+		w.collectTimeMetric(mx, "ejb_container", cleanInst, metric)
+	}
+	
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		// Use collection helper for all range metrics
+		w.collectRangeMetric(mx, "ejb_container", cleanInst, metric)
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		// Use collection helper for all bounded range metrics
+		w.collectBoundedRangeMetric(mx, "ejb_container", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		// Use collection helper for all average metrics
+		w.collectAverageMetric(mx, "ejb_container", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		// Use collection helper for all double metrics
+		w.collectDoubleMetric(mx, "ejb_container", cleanInst, metric)
+	}
 }
 
 // parseMDB handles Message Driven Bean metrics
@@ -1743,17 +2568,62 @@ func (w *WebSpherePMI) parseMDB(stat *pmiStat, nodeName, serverName string, mx m
 	// Mark as seen
 	w.markInstanceSeen("mdb", instance)
 	
-	// Define expected metrics mappings
-	mappings := []MetricMapping{
-		// CountStatistics
-		{MetricName: "MessageCount", CollectionKey: fmt.Sprintf("mdb_%s_messages", w.cleanID(instance)), StatType: "count"},
-		{MetricName: "MessageBackoutCount", CollectionKey: fmt.Sprintf("mdb_%s_backouts", w.cleanID(instance)), StatType: "count"},
-		// TimeStatistics - similar to other beans
-		{MetricName: "ServiceTime", CollectionKey: fmt.Sprintf("mdb_%s_service_time", w.cleanID(instance)), StatType: "time"},
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
+	
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "MessageCount":
+			mx[fmt.Sprintf("mdb_%s_messages", cleanInst)] = metric.Value
+		case "MessageBackoutCount":
+			mx[fmt.Sprintf("mdb_%s_backouts", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use collection helper
+			w.collectCountMetric(mx, "mdb", cleanInst, metric)
+		}
 	}
 	
-	// Use helper for comprehensive error logging
-	w.collectMetricsWithLogging("MDB", stat, instance, mx, mappings)
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		switch metric.Name {
+		case "ServiceTime":
+			mx[fmt.Sprintf("mdb_%s_service_time_total", cleanInst)] = metric.Total
+		default:
+			// For unknown time metrics, use collection helper
+			w.collectTimeMetric(mx, "mdb", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		// Use collection helper for all range metrics
+		w.collectRangeMetric(mx, "mdb", cleanInst, metric)
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		// Use collection helper for all bounded range metrics
+		w.collectBoundedRangeMetric(mx, "mdb", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		// Use collection helper for all average metrics
+		w.collectAverageMetric(mx, "mdb", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		// Use collection helper for all double metrics
+		w.collectDoubleMetric(mx, "mdb", cleanInst, metric)
+	}
 }
 
 // parseStatefulSessionBean handles Stateful Session Bean metrics
@@ -1767,19 +2637,66 @@ func (w *WebSpherePMI) parseStatefulSessionBean(stat *pmiStat, nodeName, serverN
 	// Mark as seen
 	w.markInstanceSeen("sfsb", instance)
 	
-	// Define expected metrics mappings
-	mappings := []MetricMapping{
-		// RangeStatistics
-		{MetricName: "LiveCount", CollectionKey: fmt.Sprintf("sfsb_%s_live", w.cleanID(instance)), StatType: "range"},
-		// CountStatistics - similar to other session beans
-		{MetricName: "CreateCount", CollectionKey: fmt.Sprintf("sfsb_%s_created", w.cleanID(instance)), StatType: "count"},
-		{MetricName: "RemoveCount", CollectionKey: fmt.Sprintf("sfsb_%s_removed", w.cleanID(instance)), StatType: "count"},
-		{MetricName: "ActivateCount", CollectionKey: fmt.Sprintf("sfsb_%s_activated", w.cleanID(instance)), StatType: "count"},
-		{MetricName: "PassivateCount", CollectionKey: fmt.Sprintf("sfsb_%s_passivated", w.cleanID(instance)), StatType: "count"},
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
+	
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "CreateCount":
+			mx[fmt.Sprintf("sfsb_%s_created", cleanInst)] = metric.Value
+		case "RemoveCount":
+			mx[fmt.Sprintf("sfsb_%s_removed", cleanInst)] = metric.Value
+		case "ActivateCount":
+			mx[fmt.Sprintf("sfsb_%s_activated", cleanInst)] = metric.Value
+		case "PassivateCount":
+			mx[fmt.Sprintf("sfsb_%s_passivated", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use collection helper
+			w.collectCountMetric(mx, "sfsb", cleanInst, metric)
+		}
 	}
 	
-	// Use helper for comprehensive error logging
-	w.collectMetricsWithLogging("StatefulSessionBean", stat, instance, mx, mappings)
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		// Use collection helper for all time metrics
+		w.collectTimeMetric(mx, "sfsb", cleanInst, metric)
+	}
+	
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		switch metric.Name {
+		case "LiveCount":
+			mx[fmt.Sprintf("sfsb_%s_live", cleanInst)] = metric.Current
+		default:
+			// For unknown range metrics, use collection helper
+			w.collectRangeMetric(mx, "sfsb", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		// Use collection helper for all bounded range metrics
+		w.collectBoundedRangeMetric(mx, "sfsb", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		// Use collection helper for all average metrics
+		w.collectAverageMetric(mx, "sfsb", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		// Use collection helper for all double metrics
+		w.collectDoubleMetric(mx, "sfsb", cleanInst, metric)
+	}
 }
 
 // parseStatelessSessionBean handles Stateless Session Bean metrics
@@ -1793,20 +2710,69 @@ func (w *WebSpherePMI) parseStatelessSessionBean(stat *pmiStat, nodeName, server
 	// Mark as seen
 	w.markInstanceSeen("slsb", instance)
 	
-	// Define expected metrics mappings
-	mappings := []MetricMapping{
-		// CountStatistics
-		{MetricName: "MethodCallCount", CollectionKey: fmt.Sprintf("slsb_%s_method_calls", w.cleanID(instance)), StatType: "count"},
-		{MetricName: "CreateCount", CollectionKey: fmt.Sprintf("slsb_%s_created", w.cleanID(instance)), StatType: "count"},
-		{MetricName: "RemoveCount", CollectionKey: fmt.Sprintf("slsb_%s_removed", w.cleanID(instance)), StatType: "count"},
-		// TimeStatistics
-		{MetricName: "ServiceTime", CollectionKey: fmt.Sprintf("slsb_%s_service_time", w.cleanID(instance)), StatType: "time"},
-		// RangeStatistics
-		{MetricName: "PooledCount", CollectionKey: fmt.Sprintf("slsb_%s_pooled", w.cleanID(instance)), StatType: "range"},
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
+	
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "MethodCallCount":
+			mx[fmt.Sprintf("slsb_%s_method_calls", cleanInst)] = metric.Value
+		case "CreateCount":
+			mx[fmt.Sprintf("slsb_%s_created", cleanInst)] = metric.Value
+		case "RemoveCount":
+			mx[fmt.Sprintf("slsb_%s_removed", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use collection helper
+			w.collectCountMetric(mx, "slsb", cleanInst, metric)
+		}
 	}
 	
-	// Use helper for comprehensive error logging
-	w.collectMetricsWithLogging("StatelessSessionBean", stat, instance, mx, mappings)
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		switch metric.Name {
+		case "ServiceTime":
+			mx[fmt.Sprintf("slsb_%s_service_time_total", cleanInst)] = metric.Total
+		default:
+			// For unknown time metrics, use collection helper
+			w.collectTimeMetric(mx, "slsb", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		switch metric.Name {
+		case "PooledCount":
+			mx[fmt.Sprintf("slsb_%s_pooled", cleanInst)] = metric.Current
+		default:
+			// For unknown range metrics, use collection helper
+			w.collectRangeMetric(mx, "slsb", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		// Use collection helper for all bounded range metrics
+		w.collectBoundedRangeMetric(mx, "slsb", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		// Use collection helper for all average metrics
+		w.collectAverageMetric(mx, "slsb", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		// Use collection helper for all double metrics
+		w.collectDoubleMetric(mx, "slsb", cleanInst, metric)
+	}
 }
 
 // parseEntityBean handles Entity Bean metrics
@@ -1820,23 +2786,74 @@ func (w *WebSpherePMI) parseEntityBean(stat *pmiStat, nodeName, serverName strin
 	// Mark as seen
 	w.markInstanceSeen("entity_bean", instance)
 	
-	// Define expected metrics mappings
-	mappings := []MetricMapping{
-		// CountStatistics
-		{MetricName: "ActivateCount", CollectionKey: fmt.Sprintf("entity_bean_%s_activations", w.cleanID(instance)), StatType: "count"},
-		{MetricName: "PassivateCount", CollectionKey: fmt.Sprintf("entity_bean_%s_passivations", w.cleanID(instance)), StatType: "count"},
-		{MetricName: "CreateCount", CollectionKey: fmt.Sprintf("entity_bean_%s_created", w.cleanID(instance)), StatType: "count"},
-		{MetricName: "RemoveCount", CollectionKey: fmt.Sprintf("entity_bean_%s_removed", w.cleanID(instance)), StatType: "count"},
-		{MetricName: "LoadCount", CollectionKey: fmt.Sprintf("entity_bean_%s_loaded", w.cleanID(instance)), StatType: "count"},
-		{MetricName: "StoreCount", CollectionKey: fmt.Sprintf("entity_bean_%s_stored", w.cleanID(instance)), StatType: "count"},
-		// RangeStatistics
-		{MetricName: "LiveCount", CollectionKey: fmt.Sprintf("entity_bean_%s_live", w.cleanID(instance)), StatType: "range"},
-		{MetricName: "PooledCount", CollectionKey: fmt.Sprintf("entity_bean_%s_pooled", w.cleanID(instance)), StatType: "range"},
-		{MetricName: "ReadyCount", CollectionKey: fmt.Sprintf("entity_bean_%s_ready", w.cleanID(instance)), StatType: "range"},
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
+	
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "ActivateCount":
+			mx[fmt.Sprintf("entity_bean_%s_activations", cleanInst)] = metric.Value
+		case "PassivateCount":
+			mx[fmt.Sprintf("entity_bean_%s_passivations", cleanInst)] = metric.Value
+		case "CreateCount":
+			mx[fmt.Sprintf("entity_bean_%s_created", cleanInst)] = metric.Value
+		case "RemoveCount":
+			mx[fmt.Sprintf("entity_bean_%s_removed", cleanInst)] = metric.Value
+		case "LoadCount":
+			mx[fmt.Sprintf("entity_bean_%s_loaded", cleanInst)] = metric.Value
+		case "StoreCount":
+			mx[fmt.Sprintf("entity_bean_%s_stored", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use collection helper
+			w.collectCountMetric(mx, "entity_bean", cleanInst, metric)
+		}
 	}
 	
-	// Use helper for comprehensive error logging
-	w.collectMetricsWithLogging("EntityBean", stat, instance, mx, mappings)
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		// Use collection helper for all time metrics
+		w.collectTimeMetric(mx, "entity_bean", cleanInst, metric)
+	}
+	
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		switch metric.Name {
+		case "LiveCount":
+			mx[fmt.Sprintf("entity_bean_%s_live", cleanInst)] = metric.Current
+		case "PooledCount":
+			mx[fmt.Sprintf("entity_bean_%s_pooled", cleanInst)] = metric.Current
+		case "ReadyCount":
+			mx[fmt.Sprintf("entity_bean_%s_ready", cleanInst)] = metric.Current
+		default:
+			// For unknown range metrics, use collection helper
+			w.collectRangeMetric(mx, "entity_bean", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		// Use collection helper for all bounded range metrics
+		w.collectBoundedRangeMetric(mx, "entity_bean", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		// Use collection helper for all average metrics
+		w.collectAverageMetric(mx, "entity_bean", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		// Use collection helper for all double metrics
+		w.collectDoubleMetric(mx, "entity_bean", cleanInst, metric)
+	}
 }
 
 // parseIndividualEJB handles individual EJB instances found dynamically
@@ -1850,72 +2867,71 @@ func (w *WebSpherePMI) parseIndividualEJB(stat *pmiStat, nodeName, serverName st
 	// Mark as seen
 	w.markInstanceSeen("generic_ejb", instance)
 	
-	// Track expected vs found metrics
-	expectedMetrics := []string{
-		"MethodCallCount", "InvocationCount",
-		"CreateCount", "RemoveCount",
-		"ServiceTime", "ResponseTime",
-		"LiveCount", "PooledCount",
-	}
-	foundMetrics := make(map[string]bool)
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
 	
-	// Process CountStatistics
-	for _, cs := range stat.CountStatistics {
-		if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
-			// Use generic metric names that work for most EJBs
-			switch cs.Name {
-			case "MethodCallCount", "InvocationCount":
-				mx[fmt.Sprintf("generic_ejb_%s_invocations", w.cleanID(instance))] = val
-				foundMetrics["MethodCallCount"] = true
-				foundMetrics["InvocationCount"] = true
-			case "CreateCount":
-				mx[fmt.Sprintf("generic_ejb_%s_creates", w.cleanID(instance))] = val
-				foundMetrics["CreateCount"] = true
-			case "RemoveCount":
-				mx[fmt.Sprintf("generic_ejb_%s_removes", w.cleanID(instance))] = val
-				foundMetrics["RemoveCount"] = true
-			}
-		} else {
-			w.Errorf("ISSUE: parseIndividualEJB failed to parse CountStatistic %s value '%s': %v", cs.Name, cs.Count, err)
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "MethodCallCount", "InvocationCount":
+			mx[fmt.Sprintf("generic_ejb_%s_invocations", cleanInst)] = metric.Value
+		case "CreateCount":
+			mx[fmt.Sprintf("generic_ejb_%s_creates", cleanInst)] = metric.Value
+		case "RemoveCount":
+			mx[fmt.Sprintf("generic_ejb_%s_removes", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use collection helper
+			w.collectCountMetric(mx, "generic_ejb", cleanInst, metric)
 		}
 	}
 	
-	// Process TimeStatistics
-	for _, ts := range stat.TimeStatistics {
-		switch ts.Name {
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		switch metric.Name {
 		case "ServiceTime", "ResponseTime":
-			total := ts.TotalTime
-			if total == "" {
-				total = ts.Total
-			}
-			if val, err := strconv.ParseInt(total, 10, 64); err == nil {
-				mx[fmt.Sprintf("generic_ejb_%s_service_time", w.cleanID(instance))] = val
-				foundMetrics["ServiceTime"] = true
-				foundMetrics["ResponseTime"] = true
-			} else {
-				w.Errorf("ISSUE: parseIndividualEJB failed to parse TimeStatistic %s total value '%s': %v", ts.Name, total, err)
-			}
+			mx[fmt.Sprintf("generic_ejb_%s_service_time_total", cleanInst)] = metric.Total
+		default:
+			// For unknown time metrics, use collection helper
+			w.collectTimeMetric(mx, "generic_ejb", cleanInst, metric)
 		}
 	}
 	
-	// Process RangeStatistics
-	for _, rs := range stat.RangeStatistics {
-		if val, err := strconv.ParseInt(rs.Current, 10, 64); err == nil {
-			switch rs.Name {
-			case "LiveCount":
-				mx[fmt.Sprintf("generic_ejb_%s_live", w.cleanID(instance))] = val
-				foundMetrics["LiveCount"] = true
-			case "PooledCount":
-				mx[fmt.Sprintf("generic_ejb_%s_pooled", w.cleanID(instance))] = val
-				foundMetrics["PooledCount"] = true
-			}
-		} else {
-			w.Errorf("ISSUE: parseIndividualEJB failed to parse RangeStatistic %s current value '%s': %v", rs.Name, rs.Current, err)
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		switch metric.Name {
+		case "LiveCount":
+			mx[fmt.Sprintf("generic_ejb_%s_live", cleanInst)] = metric.Current
+		case "PooledCount":
+			mx[fmt.Sprintf("generic_ejb_%s_pooled", cleanInst)] = metric.Current
+		default:
+			// For unknown range metrics, use collection helper
+			w.collectRangeMetric(mx, "generic_ejb", cleanInst, metric)
 		}
 	}
 	
-	// Log any missing metrics
-	w.logParsingFailure("IndividualEJB", stat.Name, stat, expectedMetrics, foundMetrics)
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		// Use collection helper for all bounded range metrics
+		w.collectBoundedRangeMetric(mx, "generic_ejb", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		// Use collection helper for all average metrics
+		w.collectAverageMetric(mx, "generic_ejb", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		// Use collection helper for all double metrics
+		w.collectDoubleMetric(mx, "generic_ejb", cleanInst, metric)
+	}
 }
 
 // parseGenericStat handles unclassified stats to capture remaining metrics
@@ -2054,16 +3070,59 @@ func (w *WebSpherePMI) parseExtensionRegistryStats(stat *pmiStat, nodeName, serv
 	// Mark as seen
 	w.markInstanceSeen("extension_registry", instance)
 	
+	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	mappings := []MetricMapping{
-		// Extension registry metrics (based on actual available metrics)
-		{MetricName: "RequestCount", CollectionKey: "extension_registry_" + cleanInst + "_requests", StatType: "count"},
-		{MetricName: "HitCount", CollectionKey: "extension_registry_" + cleanInst + "_hits", StatType: "count"},
-		{MetricName: "DisplacementCount", CollectionKey: "extension_registry_" + cleanInst + "_displacements", StatType: "count"},
-		{MetricName: "HitRate", CollectionKey: "extension_registry_" + cleanInst + "_hit_rate", StatType: "double"},
+	
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "RequestCount":
+			mx[fmt.Sprintf("extension_registry_%s_requests", cleanInst)] = metric.Value
+		case "HitCount":
+			mx[fmt.Sprintf("extension_registry_%s_hits", cleanInst)] = metric.Value
+		case "DisplacementCount":
+			mx[fmt.Sprintf("extension_registry_%s_displacements", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use collection helper
+			w.collectCountMetric(mx, "extension_registry", cleanInst, metric)
+		}
 	}
 	
-	w.collectMetricsWithLogging("ExtensionRegistry", stat, instance, mx, mappings)
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		w.collectTimeMetric(mx, "extension_registry", cleanInst, metric)
+	}
+	
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		w.collectRangeMetric(mx, "extension_registry", cleanInst, metric)
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		w.collectBoundedRangeMetric(mx, "extension_registry", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		w.collectAverageMetric(mx, "extension_registry", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		switch metric.Name {
+		case "HitRate":
+			mx[fmt.Sprintf("extension_registry_%s_hit_rate", cleanInst)] = metric.Value
+		default:
+			w.collectDoubleMetric(mx, "extension_registry", cleanInst, metric)
+		}
+	}
 }
 
 // parseSIBJMSAdapter handles Service Integration Bus JMS Resource Adapter metrics
@@ -2076,19 +3135,62 @@ func (w *WebSpherePMI) parseSIBJMSAdapter(stat *pmiStat, nodeName, serverName st
 	// Mark as seen
 	w.markInstanceSeen("sib_jms_adapter", instance)
 	
+	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	mappings := []MetricMapping{
-		// SIB JMS Resource Adapter metrics (actually JCA connection pool metrics)
-		{MetricName: "CreateCount", CollectionKey: "sib_jms_" + cleanInst + "_create_count", StatType: "count"},
-		{MetricName: "CloseCount", CollectionKey: "sib_jms_" + cleanInst + "_close_count", StatType: "count"},
-		{MetricName: "AllocateCount", CollectionKey: "sib_jms_" + cleanInst + "_allocate_count", StatType: "count"},
-		{MetricName: "FreedCount", CollectionKey: "sib_jms_" + cleanInst + "_freed_count", StatType: "count"},
-		{MetricName: "FaultCount", CollectionKey: "sib_jms_" + cleanInst + "_fault_count", StatType: "count"},
-		{MetricName: "ManagedConnectionCount", CollectionKey: "sib_jms_" + cleanInst + "_managed_connections", StatType: "count"},
-		{MetricName: "ConnectionHandleCount", CollectionKey: "sib_jms_" + cleanInst + "_connection_handles", StatType: "count"},
+	
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "CreateCount":
+			mx[fmt.Sprintf("sib_jms_%s_create_count", cleanInst)] = metric.Value
+		case "CloseCount":
+			mx[fmt.Sprintf("sib_jms_%s_close_count", cleanInst)] = metric.Value
+		case "AllocateCount":
+			mx[fmt.Sprintf("sib_jms_%s_allocate_count", cleanInst)] = metric.Value
+		case "FreedCount":
+			mx[fmt.Sprintf("sib_jms_%s_freed_count", cleanInst)] = metric.Value
+		case "FaultCount":
+			mx[fmt.Sprintf("sib_jms_%s_fault_count", cleanInst)] = metric.Value
+		case "ManagedConnectionCount":
+			mx[fmt.Sprintf("sib_jms_%s_managed_connections", cleanInst)] = metric.Value
+		case "ConnectionHandleCount":
+			mx[fmt.Sprintf("sib_jms_%s_connection_handles", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use generic naming
+			mx[fmt.Sprintf("sib_jms_%s_%s", cleanInst, w.cleanID(metric.Name))] = metric.Value
+		}
 	}
 	
-	w.collectMetricsWithLogging("SIBJMSAdapter", stat, instance, mx, mappings)
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		w.collectTimeMetric(mx, "sib_jms", cleanInst, metric)
+	}
+	
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		w.collectRangeMetric(mx, "sib_jms", cleanInst, metric)
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		w.collectBoundedRangeMetric(mx, "sib_jms", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		w.collectAverageMetric(mx, "sib_jms", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		w.collectDoubleMetric(mx, "sib_jms", cleanInst, metric)
+	}
 }
 
 // parseServletsComponent handles standalone Servlets component metrics
@@ -2101,17 +3203,72 @@ func (w *WebSpherePMI) parseServletsComponent(stat *pmiStat, nodeName, serverNam
 	// Mark as seen
 	w.markInstanceSeen("servlets_component", instance)
 	
+	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	mappings := []MetricMapping{
-		// Servlets component metrics (based on actual available metrics)
-		{MetricName: "RequestCount", CollectionKey: "servlets_component_" + cleanInst + "_requests", StatType: "count"},
-		{MetricName: "ErrorCount", CollectionKey: "servlets_component_" + cleanInst + "_errors", StatType: "count"},
-		{MetricName: "ServiceTime", CollectionKey: "servlets_component_" + cleanInst + "_service_time", StatType: "time"},
-		{MetricName: "AsyncContext Response Time", CollectionKey: "servlets_component_" + cleanInst + "_async_response_time", StatType: "time"},
-		{MetricName: "ConcurrentRequests", CollectionKey: "servlets_component_" + cleanInst + "_concurrent_requests", StatType: "range"},
+	
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "RequestCount":
+			mx[fmt.Sprintf("servlets_component_%s_requests", cleanInst)] = metric.Value
+		case "ErrorCount":
+			mx[fmt.Sprintf("servlets_component_%s_errors", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use generic naming
+			w.collectCountMetric(mx, "servlets_component", cleanInst, metric)
+		}
 	}
 	
-	w.collectMetricsWithLogging("ServletsComponent", stat, instance, mx, mappings)
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		switch metric.Name {
+		case "ServiceTime":
+			mx[fmt.Sprintf("servlets_component_%s_service_time", cleanInst)] = metric.Total
+		case "AsyncContext Response Time":
+			mx[fmt.Sprintf("servlets_component_%s_async_response_time", cleanInst)] = metric.Total
+		default:
+			// For unknown time metrics, use collection helper
+			w.collectTimeMetric(mx, "servlets_component", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		switch metric.Name {
+		case "ConcurrentRequests":
+			mx[fmt.Sprintf("servlets_component_%s_concurrent_requests", cleanInst)] = metric.Current
+		default:
+			// For unknown range metrics, use collection helper
+			w.collectRangeMetric(mx, "servlets_component", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		w.collectBoundedRangeMetric(mx, "servlets_component", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		w.collectAverageMetric(mx, "servlets_component", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		w.collectDoubleMetric(mx, "servlets_component", cleanInst, metric)
+	}
+	
+	totalExtracted := len(countMetrics) + len(timeMetrics) + len(rangeMetrics) + 
+					 len(boundedMetrics) + len(avgMetrics) + len(doubleMetrics)
+	w.Debugf("ServletsComponent extracted %d total metrics (%d count, %d time, %d range, %d bounded, %d avg, %d double) for instance %s", 
+		totalExtracted, len(countMetrics), len(timeMetrics), len(rangeMetrics), 
+		len(boundedMetrics), len(avgMetrics), len(doubleMetrics), instance)
 }
 
 // parseWIMComponent handles WebSphere Identity Manager component metrics
@@ -2124,18 +3281,64 @@ func (w *WebSpherePMI) parseWIMComponent(stat *pmiStat, nodeName, serverName str
 	// Mark as seen
 	w.markInstanceSeen("wim_component", instance)
 	
+	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	mappings := []MetricMapping{
-		// WIM component metrics (actually portlet metrics)
-		{MetricName: "Number of portlet requests", CollectionKey: "wim_" + cleanInst + "_portlet_requests", StatType: "count"},
-		{MetricName: "Number of portlet errors", CollectionKey: "wim_" + cleanInst + "_portlet_errors", StatType: "count"},
-		{MetricName: "Response time of portlet render", CollectionKey: "wim_" + cleanInst + "_render_time", StatType: "time"},
-		{MetricName: "Response time of portlet action", CollectionKey: "wim_" + cleanInst + "_action_time", StatType: "time"},
-		{MetricName: "Response time of a portlet processEvent request", CollectionKey: "wim_" + cleanInst + "_process_event_time", StatType: "time"},
-		{MetricName: "Response time of a portlet serveResource request", CollectionKey: "wim_" + cleanInst + "_serve_resource_time", StatType: "time"},
+	
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "Number of portlet requests":
+			mx[fmt.Sprintf("wim_%s_portlet_requests", cleanInst)] = metric.Value
+		case "Number of portlet errors":
+			mx[fmt.Sprintf("wim_%s_portlet_errors", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use generic naming
+			mx[fmt.Sprintf("wim_%s_%s", cleanInst, w.cleanID(metric.Name))] = metric.Value
+		}
 	}
 	
-	w.collectMetricsWithLogging("WIMComponent", stat, instance, mx, mappings)
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		switch metric.Name {
+		case "Response time of portlet render":
+			mx[fmt.Sprintf("wim_%s_render_time", cleanInst)] = metric.Total
+		case "Response time of portlet action":
+			mx[fmt.Sprintf("wim_%s_action_time", cleanInst)] = metric.Total
+		case "Response time of a portlet processEvent request":
+			mx[fmt.Sprintf("wim_%s_process_event_time", cleanInst)] = metric.Total
+		case "Response time of a portlet serveResource request":
+			mx[fmt.Sprintf("wim_%s_serve_resource_time", cleanInst)] = metric.Total
+		default:
+			// For unknown time metrics, use collection helper
+			w.collectTimeMetric(mx, "wim", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		w.collectRangeMetric(mx, "wim", cleanInst, metric)
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		w.collectBoundedRangeMetric(mx, "wim", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		w.collectAverageMetric(mx, "wim", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		w.collectDoubleMetric(mx, "wim", cleanInst, metric)
+	}
 }
 
 // parseWLMTaggedComponentManager handles Workload Management Tagged Component Manager metrics
@@ -2148,13 +3351,49 @@ func (w *WebSpherePMI) parseWLMTaggedComponentManager(stat *pmiStat, nodeName, s
 	// Mark as seen
 	w.markInstanceSeen("wlm_tagged_component", instance)
 	
+	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	mappings := []MetricMapping{
-		// WLM Tagged Component Manager metrics (based on actual available metrics)
-		{MetricName: "ProcessingTime", CollectionKey: "wlm_tagged_" + cleanInst + "_processing_time", StatType: "time"},
+	
+	// Extract ALL CountStatistics (none expected)
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		w.collectCountMetric(mx, "wlm_tagged", cleanInst, metric)
 	}
 	
-	w.collectMetricsWithLogging("WLMTaggedComponentManager", stat, instance, mx, mappings)
+	// Extract ALL TimeStatistics (only ProcessingTime expected)
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		switch metric.Name {
+		case "ProcessingTime":
+			mx[fmt.Sprintf("wlm_tagged_%s_processing_time", cleanInst)] = metric.Total
+		default:
+			w.collectTimeMetric(mx, "wlm_tagged", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL RangeStatistics (none expected)
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		w.collectRangeMetric(mx, "wlm_tagged", cleanInst, metric)
+	}
+	
+	// Extract ALL BoundedRangeStatistics (none expected)
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		w.collectBoundedRangeMetric(mx, "wlm_tagged", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics (none expected)
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		w.collectAverageMetric(mx, "wlm_tagged", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics (none expected)
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		w.collectDoubleMetric(mx, "wlm_tagged", cleanInst, metric)
+	}
 }
 
 // parsePMIWebServiceService handles PMI Web Service Service metrics
@@ -2167,45 +3406,159 @@ func (w *WebSpherePMI) parsePMIWebServiceService(stat *pmiStat, nodeName, server
 	// Mark as seen
 	w.markInstanceSeen("pmi_webservice_service", instance)
 	
+	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	mappings := []MetricMapping{
-		// PMI Web Service Service metrics (based on actual available metrics)
-		{MetricName: "RequestReceivedService", CollectionKey: "pmi_webservice_" + cleanInst + "_requests_received", StatType: "count"},
-		{MetricName: "RequestDispatchedService", CollectionKey: "pmi_webservice_" + cleanInst + "_requests_dispatched", StatType: "count"},
-		{MetricName: "RequestSuccessfulService", CollectionKey: "pmi_webservice_" + cleanInst + "_requests_successful", StatType: "count"},
-		{MetricName: "ResponseTimeService", CollectionKey: "pmi_webservice_" + cleanInst + "_response_time", StatType: "time"},
-		{MetricName: "RequestResponseService", CollectionKey: "pmi_webservice_" + cleanInst + "_request_response_time", StatType: "time"},
+	
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "RequestReceivedService":
+			mx[fmt.Sprintf("pmi_webservice_%s_requests_received", cleanInst)] = metric.Value
+		case "RequestDispatchedService":
+			mx[fmt.Sprintf("pmi_webservice_%s_requests_dispatched", cleanInst)] = metric.Value
+		case "RequestSuccessfulService":
+			mx[fmt.Sprintf("pmi_webservice_%s_requests_successful", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use collection helper
+			w.collectCountMetric(mx, "pmi_webservice", cleanInst, metric)
+		}
 	}
 	
-	w.collectMetricsWithLogging("PMIWebServiceService", stat, instance, mx, mappings)
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		switch metric.Name {
+		case "ResponseTimeService":
+			mx[fmt.Sprintf("pmi_webservice_%s_response_time", cleanInst)] = metric.Total
+		case "RequestResponseService":
+			mx[fmt.Sprintf("pmi_webservice_%s_request_response_time", cleanInst)] = metric.Total
+		default:
+			// For unknown time metrics, use collection helper
+			w.collectTimeMetric(mx, "pmi_webservice", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		w.collectRangeMetric(mx, "pmi_webservice", cleanInst, metric)
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		w.collectBoundedRangeMetric(mx, "pmi_webservice", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		w.collectAverageMetric(mx, "pmi_webservice", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		w.collectDoubleMetric(mx, "pmi_webservice", cleanInst, metric)
+	}
 }
 
 // parseTCPChannelDCS handles TCP Channel Data Communication Services metrics
 func (w *WebSpherePMI) parseTCPChannelDCS(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	instance := fmt.Sprintf("%s.%s", nodeName, serverName)
 	
-	// Create charts if not exists
-	w.ensureTCPChannelDCSCharts(instance, nodeName, serverName)
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
+	
+	// Check if MaxPoolSize is available (version-specific)
+	hasMaxPoolSize := false
+	for _, cs := range stat.CountStatistics {
+		if cs.Name == "MaxPoolSize" {
+			hasMaxPoolSize = true
+			break
+		}
+	}
+	
+	// Create charts if not exists, with version-specific handling
+	w.ensureTCPChannelDCSCharts(instance, nodeName, serverName, hasMaxPoolSize)
 	
 	// Mark as seen
 	w.markInstanceSeen("tcp_channel_dcs", instance)
 	
-	cleanInst := w.cleanID(instance)
-	mappings := []MetricMapping{
-		// TCP Channel DCS metrics (based on actual available metrics)
-		{MetricName: "CreateCount", CollectionKey: "tcp_dcs_" + cleanInst + "_create_count", StatType: "count"},
-		{MetricName: "DestroyCount", CollectionKey: "tcp_dcs_" + cleanInst + "_destroy_count", StatType: "count"},
-		{MetricName: "DeclaredThreadHungCount", CollectionKey: "tcp_dcs_" + cleanInst + "_thread_hung_count", StatType: "count"},
-		{MetricName: "ClearedThreadHangCount", CollectionKey: "tcp_dcs_" + cleanInst + "_thread_hang_cleared", StatType: "count"},
-		{MetricName: "ActiveTime", CollectionKey: "tcp_dcs_" + cleanInst + "_active_time", StatType: "time"},
-		{MetricName: "ConcurrentHungThreadCount", CollectionKey: "tcp_dcs_" + cleanInst + "_concurrent_hung_threads", StatType: "range"},
-		{MetricName: "ActiveCount", CollectionKey: "tcp_dcs_" + cleanInst + "_active_count", StatType: "bounded_range"},
-		{MetricName: "PoolSize", CollectionKey: "tcp_dcs_" + cleanInst + "_pool_size", StatType: "bounded_range"},
-		{MetricName: "PercentMaxed", CollectionKey: "tcp_dcs_" + cleanInst + "_percent_maxed", StatType: "bounded_range"},
-		{MetricName: "PercentUsed", CollectionKey: "tcp_dcs_" + cleanInst + "_percent_used", StatType: "bounded_range"},
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "CreateCount":
+			mx[fmt.Sprintf("tcp_dcs_%s_create_count", cleanInst)] = metric.Value
+		case "DestroyCount":
+			mx[fmt.Sprintf("tcp_dcs_%s_destroy_count", cleanInst)] = metric.Value
+		case "DeclaredThreadHungCount":
+			mx[fmt.Sprintf("tcp_dcs_%s_thread_hung_count", cleanInst)] = metric.Value
+		case "ClearedThreadHangCount":
+			mx[fmt.Sprintf("tcp_dcs_%s_thread_hang_cleared", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use collection helper
+			w.collectCountMetric(mx, "tcp_dcs", cleanInst, metric)
+		}
 	}
 	
-	w.collectMetricsWithLogging("TCPChannelDCS", stat, instance, mx, mappings)
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		switch metric.Name {
+		case "ActiveTime":
+			mx[fmt.Sprintf("tcp_dcs_%s_active_time", cleanInst)] = metric.Total
+		default:
+			// For unknown time metrics, use collection helper
+			w.collectTimeMetric(mx, "tcp_dcs", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		w.Debugf("TCP DCS RangeStatistic: %s", metric.Name)
+		switch metric.Name {
+		case "ConcurrentHungThreadCount":
+			mx[fmt.Sprintf("tcp_dcs_%s_concurrent_hung_threads", cleanInst)] = metric.Current
+		default:
+			// For unknown range metrics, use collection helper
+			w.Debugf("TCP DCS: Using collection helper for unknown RangeStatistic: %s", metric.Name)
+			w.collectRangeMetric(mx, "tcp_dcs", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		switch metric.Name {
+		case "ActiveCount":
+			mx[fmt.Sprintf("tcp_dcs_%s_active_count", cleanInst)] = metric.Value
+		case "PoolSize":
+			mx[fmt.Sprintf("tcp_dcs_%s_pool_size", cleanInst)] = metric.Value
+		case "PercentMaxed":
+			mx[fmt.Sprintf("tcp_dcs_%s_percent_maxed", cleanInst)] = metric.Value
+		case "PercentUsed":
+			mx[fmt.Sprintf("tcp_dcs_%s_percent_used", cleanInst)] = metric.Value
+		default:
+			// For unknown bounded range metrics, use collection helper
+			w.collectBoundedRangeMetric(mx, "tcp_dcs", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		w.collectAverageMetric(mx, "tcp_dcs", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		w.collectDoubleMetric(mx, "tcp_dcs", cleanInst, metric)
+	}
 }
 
 // parseDetailsComponent handles Details component metrics (context-sensitive)
@@ -2224,13 +3577,50 @@ func (w *WebSpherePMI) parseDetailsComponent(stat *pmiStat, nodeName, serverName
 	// Mark as seen
 	w.markInstanceSeen("details_component", instance)
 	
+	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	mappings := []MetricMapping{
-		// Details component metrics (actually portlet metrics)
-		{MetricName: "Number of loaded portlets", CollectionKey: "details_" + cleanInst + "_loaded_portlets", StatType: "count"},
+	
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "Number of loaded portlets":
+			mx[fmt.Sprintf("details_%s_loaded_portlets", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use collection helper
+			w.collectCountMetric(mx, "details", cleanInst, metric)
+		}
 	}
 	
-	w.collectMetricsWithLogging("DetailsComponent", stat, instance, mx, mappings)
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		w.collectTimeMetric(mx, "details", cleanInst, metric)
+	}
+	
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		w.collectRangeMetric(mx, "details", cleanInst, metric)
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		w.collectBoundedRangeMetric(mx, "details", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		w.collectAverageMetric(mx, "details", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		w.collectDoubleMetric(mx, "details", cleanInst, metric)
+	}
 }
 
 // parseISCProductDetails handles IBM Support Center Product Details metrics
@@ -2243,18 +3633,64 @@ func (w *WebSpherePMI) parseISCProductDetails(stat *pmiStat, nodeName, serverNam
 	// Mark as seen
 	w.markInstanceSeen("isc_product_details", instance)
 	
+	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	mappings := []MetricMapping{
-		// ISC Product Details metrics (actually portlet metrics)
-		{MetricName: "Number of portlet requests", CollectionKey: "isc_product_" + cleanInst + "_portlet_requests", StatType: "count"},
-		{MetricName: "Number of portlet errors", CollectionKey: "isc_product_" + cleanInst + "_portlet_errors", StatType: "count"},
-		{MetricName: "Response time of portlet render", CollectionKey: "isc_product_" + cleanInst + "_render_time", StatType: "time"},
-		{MetricName: "Response time of portlet action", CollectionKey: "isc_product_" + cleanInst + "_action_time", StatType: "time"},
-		{MetricName: "Response time of a portlet processEvent request", CollectionKey: "isc_product_" + cleanInst + "_process_event_time", StatType: "time"},
-		{MetricName: "Response time of a portlet serveResource request", CollectionKey: "isc_product_" + cleanInst + "_serve_resource_time", StatType: "time"},
+	
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "Number of portlet requests":
+			mx[fmt.Sprintf("isc_product_%s_portlet_requests", cleanInst)] = metric.Value
+		case "Number of portlet errors":
+			mx[fmt.Sprintf("isc_product_%s_portlet_errors", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use collection helper
+			w.collectCountMetric(mx, "isc_product", cleanInst, metric)
+		}
 	}
 	
-	w.collectMetricsWithLogging("ISCProductDetails", stat, instance, mx, mappings)
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		switch metric.Name {
+		case "Response time of portlet render":
+			mx[fmt.Sprintf("isc_product_%s_render_time", cleanInst)] = metric.Total
+		case "Response time of portlet action":
+			mx[fmt.Sprintf("isc_product_%s_action_time", cleanInst)] = metric.Total
+		case "Response time of a portlet processEvent request":
+			mx[fmt.Sprintf("isc_product_%s_process_event_time", cleanInst)] = metric.Total
+		case "Response time of a portlet serveResource request":
+			mx[fmt.Sprintf("isc_product_%s_serve_resource_time", cleanInst)] = metric.Total
+		default:
+			// For unknown time metrics, use collection helper
+			w.collectTimeMetric(mx, "isc_product", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		w.collectRangeMetric(mx, "isc_product", cleanInst, metric)
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		w.collectBoundedRangeMetric(mx, "isc_product", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		w.collectAverageMetric(mx, "isc_product", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		w.collectDoubleMetric(mx, "isc_product", cleanInst, metric)
+	}
 }
 
 // ensureExtensionRegistryCharts creates extension registry charts
@@ -2402,12 +3838,25 @@ func (w *WebSpherePMI) ensurePMIWebServiceServiceCharts(instance, nodeName, serv
 }
 
 // ensureTCPChannelDCSCharts creates TCP channel DCS charts
-func (w *WebSpherePMI) ensureTCPChannelDCSCharts(instance, nodeName, serverName string) {
+func (w *WebSpherePMI) ensureTCPChannelDCSCharts(instance, nodeName, serverName string, hasMaxPoolSize bool) {
 	chartKey := fmt.Sprintf("tcp_channel_dcs_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
 		
 		charts := tcpChannelDCSChartsTmpl.Copy()
+		
+		// Remove pool_limits chart if MaxPoolSize is not available (WebSphere 8.5.5)
+		if !hasMaxPoolSize {
+			// Find and remove the pool_limits chart
+			filtered := module.Charts{}
+			for _, chart := range *charts {
+				if chart.ID != "tcp_dcs_%s_pool_limits" {
+					filtered = append(filtered, chart)
+				}
+			}
+			charts = &filtered
+		}
+		
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
 			chart.Labels = []module.Label{
@@ -2829,133 +4278,94 @@ func (w *WebSpherePMI) parseSecurityAuthentication(stat *pmiStat, nodeName, serv
 	// Mark as seen
 	w.markInstanceSeen("security_auth", instance)
 	
-	// Track expected vs found metrics
-	expectedMetrics := []string{
-		"WebAuthenticationCount",
-		"TAIRequestCount",
-		"IdentityAssertionCount",
-		"BasicAuthenticationCount",
-		"TokenAuthenticationCount",
-		"WebAuthenticationTime",
-		"TAIRequestTime",
-		"IdentityAssertionTime",
-		"BasicAuthenticationTime",
-		"TokenAuthenticationTime",
-	}
-	foundMetrics := make(map[string]bool)
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
 	
-	// Process CountStatistics (authentication events)
-	for _, cs := range stat.CountStatistics {
-		if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
-			switch cs.Name {
-			// Traditional WebSphere detailed metrics
-			case "WebAuthenticationCount":
-				mx[fmt.Sprintf("security_auth_%s_web_auth", w.cleanID(instance))] = val
-				foundMetrics["WebAuthenticationCount"] = true
-			case "TAIRequestCount":
-				mx[fmt.Sprintf("security_auth_%s_tai_requests", w.cleanID(instance))] = val
-				foundMetrics["TAIRequestCount"] = true
-			case "IdentityAssertionCount":
-				mx[fmt.Sprintf("security_auth_%s_identity_assertions", w.cleanID(instance))] = val
-				foundMetrics["IdentityAssertionCount"] = true
-			case "BasicAuthenticationCount":
-				mx[fmt.Sprintf("security_auth_%s_basic_auth", w.cleanID(instance))] = val
-				foundMetrics["BasicAuthenticationCount"] = true
-			case "TokenAuthenticationCount":
-				mx[fmt.Sprintf("security_auth_%s_token_auth", w.cleanID(instance))] = val
-				foundMetrics["TokenAuthenticationCount"] = true
-			case "ClientCertAuthenticationCount":
-				mx[fmt.Sprintf("security_auth_%s_cert_auth", w.cleanID(instance))] = val
-			case "LTPATokenAuthenticationCount":
-				mx[fmt.Sprintf("security_auth_%s_ltpa_auth", w.cleanID(instance))] = val
-			case "CustomAuthenticationCount":
-				mx[fmt.Sprintf("security_auth_%s_custom_auth", w.cleanID(instance))] = val
-			case "AuthenticationFailureCount":
-				mx[fmt.Sprintf("security_auth_%s_failures", w.cleanID(instance))] = val
-			// Liberty/generic metrics
-			case "AuthenticationCount":
-				mx[fmt.Sprintf("security_auth_%s_total_auth", w.cleanID(instance))] = val
-			}
-		} else {
-			w.Errorf("ISSUE: parseSecurityAuthentication failed to parse CountStatistic %s value '%s': %v", cs.Name, cs.Count, err)
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		// Traditional WebSphere detailed metrics
+		case "WebAuthenticationCount":
+			mx[fmt.Sprintf("security_auth_%s_web_auth", cleanInst)] = metric.Value
+		case "TAIRequestCount":
+			mx[fmt.Sprintf("security_auth_%s_tai_requests", cleanInst)] = metric.Value
+		case "IdentityAssertionCount":
+			mx[fmt.Sprintf("security_auth_%s_identity_assertions", cleanInst)] = metric.Value
+		case "BasicAuthenticationCount":
+			mx[fmt.Sprintf("security_auth_%s_basic_auth", cleanInst)] = metric.Value
+		case "TokenAuthenticationCount":
+			mx[fmt.Sprintf("security_auth_%s_token_auth", cleanInst)] = metric.Value
+		case "ClientCertAuthenticationCount":
+			mx[fmt.Sprintf("security_auth_%s_cert_auth", cleanInst)] = metric.Value
+		case "LTPATokenAuthenticationCount":
+			mx[fmt.Sprintf("security_auth_%s_ltpa_auth", cleanInst)] = metric.Value
+		case "CustomAuthenticationCount":
+			mx[fmt.Sprintf("security_auth_%s_custom_auth", cleanInst)] = metric.Value
+		case "AuthenticationFailureCount":
+			mx[fmt.Sprintf("security_auth_%s_failures", cleanInst)] = metric.Value
+		// Liberty/generic metrics
+		case "AuthenticationCount":
+			mx[fmt.Sprintf("security_auth_%s_total_auth", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, skip for now until charts are created
+			// w.collectCountMetric(mx, "security_auth", cleanInst, metric)
+			w.Debugf("Skipping unknown security_auth count metric: %s", metric.Name)
 		}
 	}
 	
-	// Process TimeStatistics (authentication timing)
-	for _, ts := range stat.TimeStatistics {
-		switch ts.Name {
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		switch metric.Name {
 		// Traditional WebSphere detailed metrics
 		case "WebAuthenticationTime":
-			total := ts.TotalTime
-			if total == "" {
-				total = ts.Total
-			}
-			if val, err := strconv.ParseInt(total, 10, 64); err == nil {
-				mx[fmt.Sprintf("security_auth_%s_web_auth_time_total", w.cleanID(instance))] = val
-				foundMetrics["WebAuthenticationTime"] = true
-			} else {
-				w.Errorf("ISSUE: parseSecurityAuthentication failed to parse TimeStatistic WebAuthenticationTime total value '%s': %v", total, err)
-			}
+			mx[fmt.Sprintf("security_auth_%s_web_auth_time_total", cleanInst)] = metric.Total
 		case "TAIRequestTime":
-			total := ts.TotalTime
-			if total == "" {
-				total = ts.Total
-			}
-			if val, err := strconv.ParseInt(total, 10, 64); err == nil {
-				mx[fmt.Sprintf("security_auth_%s_tai_time_total", w.cleanID(instance))] = val
-				foundMetrics["TAIRequestTime"] = true
-			} else {
-				w.Errorf("ISSUE: parseSecurityAuthentication failed to parse TimeStatistic TAIRequestTime total value '%s': %v", total, err)
-			}
+			mx[fmt.Sprintf("security_auth_%s_tai_time_total", cleanInst)] = metric.Total
 		case "IdentityAssertionTime":
-			total := ts.TotalTime
-			if total == "" {
-				total = ts.Total
-			}
-			if val, err := strconv.ParseInt(total, 10, 64); err == nil {
-				mx[fmt.Sprintf("security_auth_%s_identity_time_total", w.cleanID(instance))] = val
-				foundMetrics["IdentityAssertionTime"] = true
-			} else {
-				w.Errorf("ISSUE: parseSecurityAuthentication failed to parse TimeStatistic IdentityAssertionTime total value '%s': %v", total, err)
-			}
+			mx[fmt.Sprintf("security_auth_%s_identity_time_total", cleanInst)] = metric.Total
 		case "BasicAuthenticationTime":
-			total := ts.TotalTime
-			if total == "" {
-				total = ts.Total
-			}
-			if val, err := strconv.ParseInt(total, 10, 64); err == nil {
-				mx[fmt.Sprintf("security_auth_%s_basic_auth_time_total", w.cleanID(instance))] = val
-				foundMetrics["BasicAuthenticationTime"] = true
-			} else {
-				w.Errorf("ISSUE: parseSecurityAuthentication failed to parse TimeStatistic BasicAuthenticationTime total value '%s': %v", total, err)
-			}
+			mx[fmt.Sprintf("security_auth_%s_basic_auth_time_total", cleanInst)] = metric.Total
 		case "TokenAuthenticationTime":
-			total := ts.TotalTime
-			if total == "" {
-				total = ts.Total
-			}
-			if val, err := strconv.ParseInt(total, 10, 64); err == nil {
-				mx[fmt.Sprintf("security_auth_%s_token_auth_time_total", w.cleanID(instance))] = val
-				foundMetrics["TokenAuthenticationTime"] = true
-			} else {
-				w.Errorf("ISSUE: parseSecurityAuthentication failed to parse TimeStatistic TokenAuthenticationTime total value '%s': %v", total, err)
-			}
+			mx[fmt.Sprintf("security_auth_%s_token_auth_time_total", cleanInst)] = metric.Total
 		// Liberty/generic metrics
 		case "AuthenticationResponseTime":
-			total := ts.TotalTime
-			if total == "" {
-				total = ts.Total
-			}
-			if val, err := strconv.ParseInt(total, 10, 64); err == nil {
-				mx[fmt.Sprintf("security_auth_%s_response_time_total", w.cleanID(instance))] = val
-			} else {
-				w.Errorf("ISSUE: parseSecurityAuthentication failed to parse TimeStatistic AuthenticationResponseTime total value '%s': %v", total, err)
-			}
+			mx[fmt.Sprintf("security_auth_%s_response_time_total", cleanInst)] = metric.Total
+		default:
+			// For unknown time metrics, skip for now until charts are created
+			// w.collectTimeMetric(mx, "security_auth", cleanInst, metric)
+			w.Debugf("Skipping unknown security_auth time metric: %s", metric.Name)
 		}
 	}
 	
-	// Log any missing metrics
-	w.logParsingFailure("SecurityAuthentication", stat.Name, stat, expectedMetrics, foundMetrics)
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		// Use collection helper for all range metrics
+		w.collectRangeMetric(mx, "security_auth", cleanInst, metric)
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		// Use collection helper for all bounded range metrics
+		w.collectBoundedRangeMetric(mx, "security_auth", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		// Use collection helper for all average metrics
+		w.collectAverageMetric(mx, "security_auth", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		// Use collection helper for all double metrics
+		w.collectDoubleMetric(mx, "security_auth", cleanInst, metric)
+	}
 }
 
 // parseSecurityAuthorization handles Security Authorization metrics
@@ -2968,93 +4378,65 @@ func (w *WebSpherePMI) parseSecurityAuthorization(stat *pmiStat, nodeName, serve
 	// Mark as seen
 	w.markInstanceSeen("security_authz", instance)
 	
-	// Track expected vs found metrics
-	expectedMetrics := []string{
-		"WebAuthorizationTime",
-		"EJBAuthorizationTime",
-	}
-	foundMetrics := make(map[string]bool)
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
 	
-	// Process TimeStatistics (authorization timing)
-	for _, ts := range stat.TimeStatistics {
-		switch ts.Name {
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		// Use collection helper for all count metrics
+		w.collectCountMetric(mx, "security_authz", cleanInst, metric)
+	}
+	
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		switch metric.Name {
 		case "WebAuthorizationTime":
-			total := ts.TotalTime
-			if total == "" {
-				total = ts.Total
-			}
-			if val, err := strconv.ParseInt(total, 10, 64); err == nil {
-				mx[fmt.Sprintf("security_authz_%s_web_authz_time_total", w.cleanID(instance))] = val
-				foundMetrics["WebAuthorizationTime"] = true
-			} else {
-				w.Errorf("ISSUE: parseSecurityAuthorization failed to parse TimeStatistic WebAuthorizationTime total value '%s': %v", total, err)
-			}
-			if count, err := strconv.ParseInt(ts.Count, 10, 64); err == nil {
-				mx[fmt.Sprintf("security_authz_%s_web_authz_count", w.cleanID(instance))] = count
-			} else {
-				w.Errorf("ISSUE: parseSecurityAuthorization failed to parse TimeStatistic WebAuthorizationTime count value '%s': %v", ts.Count, err)
-			}
+			mx[fmt.Sprintf("security_authz_%s_web_authz_time_total", cleanInst)] = metric.Total
+			mx[fmt.Sprintf("security_authz_%s_web_authz_count", cleanInst)] = metric.Count
 		case "EJBAuthorizationTime":
-			total := ts.TotalTime
-			if total == "" {
-				total = ts.Total
-			}
-			if val, err := strconv.ParseInt(total, 10, 64); err == nil {
-				mx[fmt.Sprintf("security_authz_%s_ejb_authz_time_total", w.cleanID(instance))] = val
-				foundMetrics["EJBAuthorizationTime"] = true
-			} else {
-				w.Errorf("ISSUE: parseSecurityAuthorization failed to parse TimeStatistic EJBAuthorizationTime total value '%s': %v", total, err)
-			}
-			if count, err := strconv.ParseInt(ts.Count, 10, 64); err == nil {
-				mx[fmt.Sprintf("security_authz_%s_ejb_authz_count", w.cleanID(instance))] = count
-			} else {
-				w.Errorf("ISSUE: parseSecurityAuthorization failed to parse TimeStatistic EJBAuthorizationTime count value '%s': %v", ts.Count, err)
-			}
+			mx[fmt.Sprintf("security_authz_%s_ejb_authz_time_total", cleanInst)] = metric.Total
+			mx[fmt.Sprintf("security_authz_%s_ejb_authz_count", cleanInst)] = metric.Count
 		case "AdminAuthorizationTime":
-			total := ts.TotalTime
-			if total == "" {
-				total = ts.Total
-			}
-			if val, err := strconv.ParseInt(total, 10, 64); err == nil {
-				mx[fmt.Sprintf("security_authz_%s_admin_authz_time_total", w.cleanID(instance))] = val
-				foundMetrics["AdminAuthorizationTime"] = true
-			} else {
-				w.Errorf("ISSUE: parseSecurityAuthorization failed to parse TimeStatistic AdminAuthorizationTime total value '%s': %v", total, err)
-			}
-			if count, err := strconv.ParseInt(ts.Count, 10, 64); err == nil {
-				mx[fmt.Sprintf("security_authz_%s_admin_authz_count", w.cleanID(instance))] = count
-			} else {
-				w.Errorf("ISSUE: parseSecurityAuthorization failed to parse TimeStatistic AdminAuthorizationTime count value '%s': %v", ts.Count, err)
-			}
+			mx[fmt.Sprintf("security_authz_%s_admin_authz_time_total", cleanInst)] = metric.Total
+			mx[fmt.Sprintf("security_authz_%s_admin_authz_count", cleanInst)] = metric.Count
 		case "JACCAuthorizationTime":
-			total := ts.TotalTime
-			if total == "" {
-				total = ts.Total
-			}
-			if val, err := strconv.ParseInt(total, 10, 64); err == nil {
-				mx[fmt.Sprintf("security_authz_%s_jacc_authz_time_total", w.cleanID(instance))] = val
-				foundMetrics["JACCAuthorizationTime"] = true
-			} else {
-				w.Errorf("ISSUE: parseSecurityAuthorization failed to parse TimeStatistic JACCAuthorizationTime total value '%s': %v", total, err)
-			}
-			if count, err := strconv.ParseInt(ts.Count, 10, 64); err == nil {
-				mx[fmt.Sprintf("security_authz_%s_jacc_authz_count", w.cleanID(instance))] = count
-			} else {
-				w.Errorf("ISSUE: parseSecurityAuthorization failed to parse TimeStatistic JACCAuthorizationTime count value '%s': %v", ts.Count, err)
-			}
+			mx[fmt.Sprintf("security_authz_%s_jacc_authz_time_total", cleanInst)] = metric.Total
+			mx[fmt.Sprintf("security_authz_%s_jacc_authz_count", cleanInst)] = metric.Count
+		default:
+			// For unknown time metrics, use collection helper
+			w.collectTimeMetric(mx, "security_authz", cleanInst, metric)
 		}
 	}
 	
-	// Add the missing metrics to expected list if found
-	if _, ok := foundMetrics["AdminAuthorizationTime"]; ok || len(stat.TimeStatistics) > 2 {
-		expectedMetrics = append(expectedMetrics, "AdminAuthorizationTime")
-	}
-	if _, ok := foundMetrics["JACCAuthorizationTime"]; ok || len(stat.TimeStatistics) > 3 {
-		expectedMetrics = append(expectedMetrics, "JACCAuthorizationTime")
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		// Use collection helper for all range metrics
+		w.collectRangeMetric(mx, "security_authz", cleanInst, metric)
 	}
 	
-	// Log any missing metrics
-	w.logParsingFailure("SecurityAuthorization", stat.Name, stat, expectedMetrics, foundMetrics)
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		// Use collection helper for all bounded range metrics
+		w.collectBoundedRangeMetric(mx, "security_authz", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		// Use collection helper for all average metrics
+		w.collectAverageMetric(mx, "security_authz", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		// Use collection helper for all double metrics
+		w.collectDoubleMetric(mx, "security_authz", cleanInst, metric)
+	}
 }
 
 // ===== SECURITY CHART TEMPLATES =====
@@ -3291,6 +4673,13 @@ var servletURLChartsTmpl = module.Charts{
 		Dims: module.Dims{
 			{ID: "servlet_url_%s_service_time_total", Name: "service", Algo: module.Incremental},
 			{ID: "servlet_url_%s_async_time_total", Name: "async", Algo: module.Incremental},
+			// Hidden dimensions for count, min, max
+			{ID: "servlet_url_%s_service_time_count", Name: "service_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "servlet_url_%s_service_time_min", Name: "service_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "servlet_url_%s_service_time_max", Name: "service_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "servlet_url_%s_async_time_count", Name: "async_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "servlet_url_%s_async_time_min", Name: "async_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "servlet_url_%s_async_time_max", Name: "async_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
 		},
 	},
 }
@@ -3388,6 +4777,51 @@ func (w *WebSpherePMI) ensureSecurityAuthzCharts(instance, nodeName, serverName 
 
 // parseInterceptorContainer handles Interceptors container metrics
 func (w *WebSpherePMI) parseInterceptorContainer(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
+	// Check if the container itself has metrics
+	if len(stat.CountStatistics) > 0 || len(stat.TimeStatistics) > 0 || len(stat.RangeStatistics) > 0 || 
+	   len(stat.BoundedRangeStatistics) > 0 || len(stat.AverageStatistics) > 0 || len(stat.DoubleStatistics) > 0 {
+		// Process container-level metrics using universal helpers
+		// instance := fmt.Sprintf("%s.%s", nodeName, serverName)
+		// cleanInst := w.cleanID(instance)
+		
+		// Extract all metric types but skip collection for now until charts are created
+		countMetrics := w.extractCountStatistics(stat.CountStatistics)
+		for _, metric := range countMetrics {
+			// w.collectCountMetric(mx, "interceptor_container", cleanInst, metric)
+			w.Debugf("Skipping interceptor_container count metric: %s", metric.Name)
+		}
+		
+		timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+		for _, metric := range timeMetrics {
+			// w.collectTimeMetric(mx, "interceptor_container", cleanInst, metric)
+			w.Debugf("Skipping interceptor_container time metric: %s", metric.Name)
+		}
+		
+		rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+		for _, metric := range rangeMetrics {
+			// w.collectRangeMetric(mx, "interceptor_container", cleanInst, metric)
+			w.Debugf("Skipping interceptor_container range metric: %s", metric.Name)
+		}
+		
+		boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+		for _, metric := range boundedMetrics {
+			// w.collectBoundedRangeMetric(mx, "interceptor_container", cleanInst, metric)
+			w.Debugf("Skipping interceptor_container bounded range metric: %s", metric.Name)
+		}
+		
+		avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+		for _, metric := range avgMetrics {
+			// w.collectAverageMetric(mx, "interceptor_container", cleanInst, metric)
+			w.Debugf("Skipping interceptor_container average metric: %s", metric.Name)
+		}
+		
+		doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+		for _, metric := range doubleMetrics {
+			// w.collectDoubleMetric(mx, "interceptor_container", cleanInst, metric)
+			w.Debugf("Skipping interceptor_container double metric: %s", metric.Name)
+		}
+	}
+	
 	// Process individual interceptors as children
 	for _, interceptor := range stat.SubStats {
 		w.parseIndividualInterceptor(&interceptor, nodeName, serverName, mx)
@@ -3405,34 +4839,56 @@ func (w *WebSpherePMI) parseIndividualInterceptor(stat *pmiStat, nodeName, serve
 	// Mark as seen
 	w.markInstanceSeen("interceptor", instance)
 	
-	// Track expected vs found metrics
-	expectedMetrics := []string{"ProcessingTime"}
-	foundMetrics := make(map[string]bool)
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
 	
-	// Process TimeStatistics
-	for _, ts := range stat.TimeStatistics {
-		switch ts.Name {
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		// Use collection helper for all count metrics
+		w.collectCountMetric(mx, "interceptor", cleanInst, metric)
+	}
+	
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		switch metric.Name {
 		case "ProcessingTime":
-			total := ts.TotalTime
-			if total == "" {
-				total = ts.Total
-			}
-			if val, err := strconv.ParseInt(total, 10, 64); err == nil {
-				mx[fmt.Sprintf("interceptor_%s_processing_time_total", w.cleanID(instance))] = val
-				foundMetrics["ProcessingTime"] = true
-			} else {
-				w.Errorf("ISSUE: parseInterceptor failed to parse TimeStatistic ProcessingTime total value '%s': %v", total, err)
-			}
-			if count, err := strconv.ParseInt(ts.Count, 10, 64); err == nil {
-				mx[fmt.Sprintf("interceptor_%s_processing_count", w.cleanID(instance))] = count
-			} else {
-				w.Errorf("ISSUE: parseInterceptor failed to parse TimeStatistic ProcessingTime count value '%s': %v", ts.Count, err)
-			}
+			mx[fmt.Sprintf("interceptor_%s_processing_time_total", cleanInst)] = metric.Total
+			mx[fmt.Sprintf("interceptor_%s_processing_count", cleanInst)] = metric.Count
+		default:
+			// For unknown time metrics, use collection helper
+			w.collectTimeMetric(mx, "interceptor", cleanInst, metric)
 		}
 	}
 	
-	// Log any missing metrics
-	w.logParsingFailure("Interceptor", stat.Name, stat, expectedMetrics, foundMetrics)
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		// Use collection helper for all range metrics
+		w.collectRangeMetric(mx, "interceptor", cleanInst, metric)
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		// Use collection helper for all bounded range metrics
+		w.collectBoundedRangeMetric(mx, "interceptor", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		// Use collection helper for all average metrics
+		w.collectAverageMetric(mx, "interceptor", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		// Use collection helper for all double metrics
+		w.collectDoubleMetric(mx, "interceptor", cleanInst, metric)
+	}
 }
 
 // parsePortlet handles individual portlet metrics  
@@ -3446,99 +4902,73 @@ func (w *WebSpherePMI) parsePortlet(stat *pmiStat, nodeName, serverName string, 
 	// Mark as seen
 	w.markInstanceSeen("portlet", instance)
 	
-	// Track expected vs found metrics
-	expectedMetrics := []string{
-		"Number of portlet requests",
-		"Number of portlet errors",
-		"Number of concurrent portlet requests",
-		"Response time of portlet render",
-		"Response time of portlet action",
-		"Response time of a portlet processEvent request",
-		"Response time of a portlet serveResource request",
-	}
-	foundMetrics := make(map[string]bool)
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
 	
-	// Process CountStatistics
-	for _, cs := range stat.CountStatistics {
-		if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
-			switch cs.Name {
-			case "Number of portlet requests":
-				mx[fmt.Sprintf("portlet_%s_requests", w.cleanID(instance))] = val
-				foundMetrics["Number of portlet requests"] = true
-			case "Number of portlet errors":
-				mx[fmt.Sprintf("portlet_%s_errors", w.cleanID(instance))] = val
-				foundMetrics["Number of portlet errors"] = true
-			}
-		} else {
-			w.Errorf("ISSUE: parsePortlet failed to parse CountStatistic %s value '%s': %v", cs.Name, cs.Count, err)
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "Number of portlet requests":
+			mx[fmt.Sprintf("portlet_%s_requests", cleanInst)] = metric.Value
+		case "Number of portlet errors":
+			mx[fmt.Sprintf("portlet_%s_errors", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use collection helper
+			w.collectCountMetric(mx, "portlet", cleanInst, metric)
 		}
 	}
 	
-	// Process RangeStatistics
-	for _, rs := range stat.RangeStatistics {
-		if val, err := strconv.ParseInt(rs.Current, 10, 64); err == nil {
-			switch rs.Name {
-			case "Number of concurrent portlet requests":
-				mx[fmt.Sprintf("portlet_%s_concurrent", w.cleanID(instance))] = val
-				foundMetrics["Number of concurrent portlet requests"] = true
-			}
-		} else {
-			w.Errorf("ISSUE: parsePortlet failed to parse RangeStatistic %s value '%s': %v", rs.Name, rs.Current, err)
-		}
-	}
-	
-	// Process TimeStatistics
-	for _, ts := range stat.TimeStatistics {
-		switch ts.Name {
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		switch metric.Name {
 		case "Response time of portlet render":
-			total := ts.TotalTime
-			if total == "" {
-				total = ts.Total
-			}
-			if val, err := strconv.ParseInt(total, 10, 64); err == nil {
-				mx[fmt.Sprintf("portlet_%s_render_time_total", w.cleanID(instance))] = val
-				foundMetrics["Response time of portlet render"] = true
-			} else {
-				w.Errorf("ISSUE: parsePortlet failed to parse TimeStatistic 'Response time of portlet render' total value '%s': %v", total, err)
-			}
+			mx[fmt.Sprintf("portlet_%s_render_time_total", cleanInst)] = metric.Total
 		case "Response time of portlet action":
-			total := ts.TotalTime
-			if total == "" {
-				total = ts.Total
-			}
-			if val, err := strconv.ParseInt(total, 10, 64); err == nil {
-				mx[fmt.Sprintf("portlet_%s_action_time_total", w.cleanID(instance))] = val
-				foundMetrics["Response time of portlet action"] = true
-			} else {
-				w.Errorf("ISSUE: parsePortlet failed to parse TimeStatistic 'Response time of portlet action' total value '%s': %v", total, err)
-			}
+			mx[fmt.Sprintf("portlet_%s_action_time_total", cleanInst)] = metric.Total
 		case "Response time of a portlet processEvent request":
-			total := ts.TotalTime
-			if total == "" {
-				total = ts.Total
-			}
-			if val, err := strconv.ParseInt(total, 10, 64); err == nil {
-				mx[fmt.Sprintf("portlet_%s_event_time_total", w.cleanID(instance))] = val
-				foundMetrics["Response time of a portlet processEvent request"] = true
-			} else {
-				w.Errorf("ISSUE: parsePortlet failed to parse TimeStatistic 'Response time of a portlet processEvent request' total value '%s': %v", total, err)
-			}
+			mx[fmt.Sprintf("portlet_%s_event_time_total", cleanInst)] = metric.Total
 		case "Response time of a portlet serveResource request":
-			total := ts.TotalTime
-			if total == "" {
-				total = ts.Total
-			}
-			if val, err := strconv.ParseInt(total, 10, 64); err == nil {
-				mx[fmt.Sprintf("portlet_%s_resource_time_total", w.cleanID(instance))] = val
-				foundMetrics["Response time of a portlet serveResource request"] = true
-			} else {
-				w.Errorf("ISSUE: parsePortlet failed to parse TimeStatistic 'Response time of a portlet serveResource request' total value '%s': %v", total, err)
-			}
+			mx[fmt.Sprintf("portlet_%s_resource_time_total", cleanInst)] = metric.Total
+		default:
+			// For unknown time metrics, use collection helper
+			w.collectTimeMetric(mx, "portlet", cleanInst, metric)
 		}
 	}
 	
-	// Log any missing metrics
-	w.logParsingFailure("Portlet", stat.Name, stat, expectedMetrics, foundMetrics)
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		switch metric.Name {
+		case "Number of concurrent portlet requests":
+			mx[fmt.Sprintf("portlet_%s_concurrent", cleanInst)] = metric.Current
+		default:
+			// For unknown range metrics, use collection helper
+			w.collectRangeMetric(mx, "portlet", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		// Use collection helper for all bounded range metrics
+		w.collectBoundedRangeMetric(mx, "portlet", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		// Use collection helper for all average metrics
+		w.collectAverageMetric(mx, "portlet", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		// Use collection helper for all double metrics
+		w.collectDoubleMetric(mx, "portlet", cleanInst, metric)
+	}
 }
 
 // parseWebServiceModule handles web service module metrics
@@ -3552,29 +4982,55 @@ func (w *WebSpherePMI) parseWebServiceModule(stat *pmiStat, nodeName, serverName
 	// Mark as seen
 	w.markInstanceSeen("web_service", instance)
 	
-	// Track expected vs found metrics  
-	// Note: Web service module .war files only contain ServicesLoaded metric
-	// The other metrics (RequestReceivedService, ResponseTimeService, etc.) are for actual web service operations
-	expectedMetrics := []string{
-		"ServicesLoaded",
-	}
-	foundMetrics := make(map[string]bool)
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
 	
-	// Process CountStatistics
-	for _, cs := range stat.CountStatistics {
-		if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
-			switch cs.Name {
-			case "ServicesLoaded":
-				mx[fmt.Sprintf("web_service_%s_services_loaded", w.cleanID(instance))] = val
-				foundMetrics["ServicesLoaded"] = true
-			}
-		} else {
-			w.Errorf("ISSUE: parseWebServiceModule failed to parse CountStatistic %s value '%s': %v", cs.Name, cs.Count, err)
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "ServicesLoaded":
+			mx[fmt.Sprintf("web_service_%s_services_loaded", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use collection helper
+			w.collectCountMetric(mx, "web_service", cleanInst, metric)
 		}
 	}
 	
-	// Log any missing metrics
-	w.logParsingFailure("WebServiceModule", stat.Name, stat, expectedMetrics, foundMetrics)
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		// Use collection helper for all time metrics
+		w.collectTimeMetric(mx, "web_service", cleanInst, metric)
+	}
+	
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		// Use collection helper for all range metrics
+		w.collectRangeMetric(mx, "web_service", cleanInst, metric)
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		// Use collection helper for all bounded range metrics
+		w.collectBoundedRangeMetric(mx, "web_service", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		// Use collection helper for all average metrics
+		w.collectAverageMetric(mx, "web_service", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		// Use collection helper for all double metrics
+		w.collectDoubleMetric(mx, "web_service", cleanInst, metric)
+	}
 }
 
 // parseURLContainer handles URLs container metrics
@@ -3587,71 +5043,67 @@ func (w *WebSpherePMI) parseURLContainer(stat *pmiStat, nodeName, serverName str
 	// Mark as seen
 	w.markInstanceSeen("urls", instance)
 	
-	// Track expected vs found metrics
-	expectedMetrics := []string{
-		"URIRequestCount",
-		"URIConcurrentRequests",
-		"URIServiceTime",
-		"URL AsyncContext Response Time",
-	}
-	foundMetrics := make(map[string]bool)
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
 	
-	// Process CountStatistics
-	for _, cs := range stat.CountStatistics {
-		if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
-			switch cs.Name {
-			case "URIRequestCount":
-				mx[fmt.Sprintf("urls_%s_requests", w.cleanID(instance))] = val
-				foundMetrics["URIRequestCount"] = true
-			}
-		} else {
-			w.Errorf("ISSUE: parseURLContainer failed to parse CountStatistic %s value '%s': %v", cs.Name, cs.Count, err)
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "URIRequestCount":
+			mx[fmt.Sprintf("urls_%s_requests", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use collection helper
+			w.collectCountMetric(mx, "urls", cleanInst, metric)
 		}
 	}
 	
-	// Process RangeStatistics
-	for _, rs := range stat.RangeStatistics {
-		if val, err := strconv.ParseInt(rs.Current, 10, 64); err == nil {
-			switch rs.Name {
-			case "URIConcurrentRequests":
-				mx[fmt.Sprintf("urls_%s_concurrent", w.cleanID(instance))] = val
-				foundMetrics["URIConcurrentRequests"] = true
-			}
-		} else {
-			w.Errorf("ISSUE: parseURLContainer failed to parse RangeStatistic %s value '%s': %v", rs.Name, rs.Current, err)
-		}
-	}
-	
-	// Process TimeStatistics
-	for _, ts := range stat.TimeStatistics {
-		switch ts.Name {
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		switch metric.Name {
 		case "URIServiceTime":
-			total := ts.TotalTime
-			if total == "" {
-				total = ts.Total
-			}
-			if val, err := strconv.ParseInt(total, 10, 64); err == nil {
-				mx[fmt.Sprintf("urls_%s_service_time_total", w.cleanID(instance))] = val
-				foundMetrics["URIServiceTime"] = true
-			} else {
-				w.Errorf("ISSUE: parseURLContainer failed to parse TimeStatistic URIServiceTime total value '%s': %v", total, err)
-			}
+			mx[fmt.Sprintf("urls_%s_service_time_total", cleanInst)] = metric.Total
 		case "URL AsyncContext Response Time":
-			total := ts.TotalTime
-			if total == "" {
-				total = ts.Total
-			}
-			if val, err := strconv.ParseInt(total, 10, 64); err == nil {
-				mx[fmt.Sprintf("urls_%s_async_time_total", w.cleanID(instance))] = val
-				foundMetrics["URL AsyncContext Response Time"] = true
-			} else {
-				w.Errorf("ISSUE: parseURLContainer failed to parse TimeStatistic 'URL AsyncContext Response Time' total value '%s': %v", total, err)
-			}
+			mx[fmt.Sprintf("urls_%s_async_time_total", cleanInst)] = metric.Total
+		default:
+			// For unknown time metrics, use collection helper
+			w.collectTimeMetric(mx, "urls", cleanInst, metric)
 		}
 	}
 	
-	// Log any missing metrics
-	w.logParsingFailure("URLContainer", stat.Name, stat, expectedMetrics, foundMetrics)
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		switch metric.Name {
+		case "URIConcurrentRequests":
+			mx[fmt.Sprintf("urls_%s_concurrent", cleanInst)] = metric.Current
+		default:
+			// For unknown range metrics, use collection helper
+			w.collectRangeMetric(mx, "urls", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		// Use collection helper for all bounded range metrics
+		w.collectBoundedRangeMetric(mx, "urls", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		// Use collection helper for all average metrics
+		w.collectAverageMetric(mx, "urls", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		// Use collection helper for all double metrics
+		w.collectDoubleMetric(mx, "urls", cleanInst, metric)
+	}
 }
 
 // parseServletURL handles individual servlet URL metrics
@@ -3665,71 +5117,73 @@ func (w *WebSpherePMI) parseServletURL(stat *pmiStat, nodeName, serverName strin
 	// Mark as seen
 	w.markInstanceSeen("servlet_url", instance)
 	
-	// Track expected vs found metrics
-	expectedMetrics := []string{
-		"URIRequestCount",
-		"URIConcurrentRequests",
-		"URIServiceTime",
-		"URL AsyncContext Response Time",
-	}
-	foundMetrics := make(map[string]bool)
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
 	
-	// Process CountStatistics
-	for _, cs := range stat.CountStatistics {
-		if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
-			switch cs.Name {
-			case "URIRequestCount":
-				mx[fmt.Sprintf("servlet_url_%s_requests", w.cleanID(instance))] = val
-				foundMetrics["URIRequestCount"] = true
-			}
-		} else {
-			w.Errorf("ISSUE: parseServletURL failed to parse CountStatistic %s value '%s': %v", cs.Name, cs.Count, err)
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "URIRequestCount":
+			mx[fmt.Sprintf("servlet_url_%s_requests", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use collection helper
+			w.collectCountMetric(mx, "servlet_url", cleanInst, metric)
 		}
 	}
 	
-	// Process RangeStatistics
-	for _, rs := range stat.RangeStatistics {
-		if val, err := strconv.ParseInt(rs.Current, 10, 64); err == nil {
-			switch rs.Name {
-			case "URIConcurrentRequests":
-				mx[fmt.Sprintf("servlet_url_%s_concurrent", w.cleanID(instance))] = val
-				foundMetrics["URIConcurrentRequests"] = true
-			}
-		} else {
-			w.Errorf("ISSUE: parseServletURL failed to parse RangeStatistic %s value '%s': %v", rs.Name, rs.Current, err)
-		}
-	}
-	
-	// Process TimeStatistics
-	for _, ts := range stat.TimeStatistics {
-		switch ts.Name {
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		switch metric.Name {
 		case "URIServiceTime":
-			total := ts.TotalTime
-			if total == "" {
-				total = ts.Total
-			}
-			if val, err := strconv.ParseInt(total, 10, 64); err == nil {
-				mx[fmt.Sprintf("servlet_url_%s_service_time_total", w.cleanID(instance))] = val
-				foundMetrics["URIServiceTime"] = true
-			} else {
-				w.Errorf("ISSUE: parseServletURL failed to parse TimeStatistic URIServiceTime total value '%s': %v", total, err)
-			}
+			mx[fmt.Sprintf("servlet_url_%s_service_time_total", cleanInst)] = metric.Total
+			mx[fmt.Sprintf("servlet_url_%s_service_time_count", cleanInst)] = metric.Count
+			mx[fmt.Sprintf("servlet_url_%s_service_time_min", cleanInst)] = metric.Min
+			mx[fmt.Sprintf("servlet_url_%s_service_time_max", cleanInst)] = metric.Max
 		case "URL AsyncContext Response Time":
-			total := ts.TotalTime
-			if total == "" {
-				total = ts.Total
-			}
-			if val, err := strconv.ParseInt(total, 10, 64); err == nil {
-				mx[fmt.Sprintf("servlet_url_%s_async_time_total", w.cleanID(instance))] = val
-				foundMetrics["URL AsyncContext Response Time"] = true
-			} else {
-				w.Errorf("ISSUE: parseServletURL failed to parse TimeStatistic 'URL AsyncContext Response Time' total value '%s': %v", total, err)
-			}
+			mx[fmt.Sprintf("servlet_url_%s_async_time_total", cleanInst)] = metric.Total
+			mx[fmt.Sprintf("servlet_url_%s_async_time_count", cleanInst)] = metric.Count
+			mx[fmt.Sprintf("servlet_url_%s_async_time_min", cleanInst)] = metric.Min
+			mx[fmt.Sprintf("servlet_url_%s_async_time_max", cleanInst)] = metric.Max
+		default:
+			// For unknown time metrics, use collection helper
+			w.collectTimeMetric(mx, "servlet_url", cleanInst, metric)
 		}
 	}
 	
-	// Log any missing metrics
-	w.logParsingFailure("ServletURL", stat.Name, stat, expectedMetrics, foundMetrics)
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		switch metric.Name {
+		case "URIConcurrentRequests":
+			mx[fmt.Sprintf("servlet_url_%s_concurrent", cleanInst)] = metric.Current
+		default:
+			// For unknown range metrics, use collection helper
+			w.collectRangeMetric(mx, "servlet_url", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		// Use collection helper for all bounded range metrics
+		w.collectBoundedRangeMetric(mx, "servlet_url", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		// Use collection helper for all average metrics
+		w.collectAverageMetric(mx, "servlet_url", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		// Use collection helper for all double metrics
+		w.collectDoubleMetric(mx, "servlet_url", cleanInst, metric)
+	}
 }
 
 // parseHAManager handles HA Manager metrics
@@ -3742,98 +5196,83 @@ func (w *WebSpherePMI) parseHAManager(stat *pmiStat, nodeName, serverName string
 	// Mark as seen
 	w.markInstanceSeen("ha_manager", instance)
 	
-	// Track expected vs found metrics
-	expectedMetrics := []string{
-		"LocalGroupCount",
-		"BulletinBoardSubjectCount", 
-		"BulletinBoardSubcriptionCount",
-		"LocalBulletinBoardSubjectCount",
-		"LocalBulletinBoardSubcriptionCount",
-		"GroupStateRebuildTime",
-		"BulletinBoardRebuildTime",
-	}
-	foundMetrics := make(map[string]bool)
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
 	
-	// Process RangeStatistics (if any)
-	for _, rs := range stat.RangeStatistics {
-		if val, err := strconv.ParseInt(rs.Current, 10, 64); err == nil {
-			switch rs.Name {
-			case "LocalGroupCount":
-				mx[fmt.Sprintf("ha_manager_%s_local_groups", w.cleanID(instance))] = val
-				foundMetrics["LocalGroupCount"] = true
-			case "BulletinBoardSubjectCount":
-				mx[fmt.Sprintf("ha_manager_%s_bulletin_subjects", w.cleanID(instance))] = val
-				foundMetrics["BulletinBoardSubjectCount"] = true
-			case "BulletinBoardSubcriptionCount":
-				mx[fmt.Sprintf("ha_manager_%s_bulletin_subscriptions", w.cleanID(instance))] = val
-				foundMetrics["BulletinBoardSubcriptionCount"] = true
-			case "LocalBulletinBoardSubjectCount":
-				mx[fmt.Sprintf("ha_manager_%s_local_bulletin_subjects", w.cleanID(instance))] = val
-				foundMetrics["LocalBulletinBoardSubjectCount"] = true
-			case "LocalBulletinBoardSubcriptionCount":
-				mx[fmt.Sprintf("ha_manager_%s_local_bulletin_subscriptions", w.cleanID(instance))] = val
-				foundMetrics["LocalBulletinBoardSubcriptionCount"] = true
-			}
-		} else {
-			w.Errorf("ISSUE: parseHAManager failed to parse RangeStatistic %s value '%s': %v", rs.Name, rs.Current, err)
-		}
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		// Use collection helper for all count metrics
+		w.collectCountMetric(mx, "ha_manager", cleanInst, metric)
 	}
 	
-	// HAManager uses BoundedRangeStatistics! Check Current field (maps to value attribute in XML)
-	for _, brs := range stat.BoundedRangeStatistics {
-		if val, err := strconv.ParseInt(brs.Current, 10, 64); err == nil {
-			switch brs.Name {
-			case "LocalGroupCount":
-				mx[fmt.Sprintf("ha_manager_%s_local_groups", w.cleanID(instance))] = val
-				foundMetrics["LocalGroupCount"] = true
-			case "BulletinBoardSubjectCount":
-				mx[fmt.Sprintf("ha_manager_%s_bulletin_subjects", w.cleanID(instance))] = val
-				foundMetrics["BulletinBoardSubjectCount"] = true
-			case "BulletinBoardSubcriptionCount":
-				mx[fmt.Sprintf("ha_manager_%s_bulletin_subscriptions", w.cleanID(instance))] = val
-				foundMetrics["BulletinBoardSubcriptionCount"] = true
-			case "LocalBulletinBoardSubjectCount":
-				mx[fmt.Sprintf("ha_manager_%s_local_bulletin_subjects", w.cleanID(instance))] = val
-				foundMetrics["LocalBulletinBoardSubjectCount"] = true
-			case "LocalBulletinBoardSubcriptionCount":
-				mx[fmt.Sprintf("ha_manager_%s_local_bulletin_subscriptions", w.cleanID(instance))] = val
-				foundMetrics["LocalBulletinBoardSubcriptionCount"] = true
-			}
-		} else {
-			w.Errorf("ISSUE: parseHAManager failed to parse BoundedRangeStatistic %s value '%s': %v", brs.Name, brs.Current, err)
-		}
-	}
-	
-	// Process TimeStatistics
-	for _, ts := range stat.TimeStatistics {
-		switch ts.Name {
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		switch metric.Name {
 		case "GroupStateRebuildTime":
-			total := ts.TotalTime
-			if total == "" {
-				total = ts.Total
-			}
-			if val, err := strconv.ParseInt(total, 10, 64); err == nil {
-				mx[fmt.Sprintf("ha_manager_%s_group_rebuild_time_total", w.cleanID(instance))] = val
-				foundMetrics["GroupStateRebuildTime"] = true
-			} else {
-				w.Errorf("ISSUE: parseHAManager failed to parse TimeStatistic %s total value '%s': %v", ts.Name, total, err)
-			}
+			mx[fmt.Sprintf("ha_manager_%s_group_rebuild_time_total", cleanInst)] = metric.Total
 		case "BulletinBoardRebuildTime":
-			total := ts.TotalTime
-			if total == "" {
-				total = ts.Total
-			}
-			if val, err := strconv.ParseInt(total, 10, 64); err == nil {
-				mx[fmt.Sprintf("ha_manager_%s_bulletin_rebuild_time_total", w.cleanID(instance))] = val
-				foundMetrics["BulletinBoardRebuildTime"] = true
-			} else {
-				w.Errorf("ISSUE: parseHAManager failed to parse TimeStatistic %s total value '%s': %v", ts.Name, total, err)
-			}
+			mx[fmt.Sprintf("ha_manager_%s_bulletin_rebuild_time_total", cleanInst)] = metric.Total
+		default:
+			// For unknown time metrics, use collection helper
+			w.collectTimeMetric(mx, "ha_manager", cleanInst, metric)
 		}
 	}
 	
-	// Log any missing metrics
-	w.logParsingFailure("HAManager", stat.Name, stat, expectedMetrics, foundMetrics)
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		switch metric.Name {
+		case "LocalGroupCount":
+			mx[fmt.Sprintf("ha_manager_%s_local_groups", cleanInst)] = metric.Current
+		case "BulletinBoardSubjectCount":
+			mx[fmt.Sprintf("ha_manager_%s_bulletin_subjects", cleanInst)] = metric.Current
+		case "BulletinBoardSubcriptionCount":
+			mx[fmt.Sprintf("ha_manager_%s_bulletin_subscriptions", cleanInst)] = metric.Current
+		case "LocalBulletinBoardSubjectCount":
+			mx[fmt.Sprintf("ha_manager_%s_local_bulletin_subjects", cleanInst)] = metric.Current
+		case "LocalBulletinBoardSubcriptionCount":
+			mx[fmt.Sprintf("ha_manager_%s_local_bulletin_subscriptions", cleanInst)] = metric.Current
+		default:
+			// For unknown range metrics, use collection helper
+			w.collectRangeMetric(mx, "ha_manager", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		switch metric.Name {
+		case "LocalGroupCount":
+			mx[fmt.Sprintf("ha_manager_%s_local_groups", cleanInst)] = metric.Value
+		case "BulletinBoardSubjectCount":
+			mx[fmt.Sprintf("ha_manager_%s_bulletin_subjects", cleanInst)] = metric.Value
+		case "BulletinBoardSubcriptionCount":
+			mx[fmt.Sprintf("ha_manager_%s_bulletin_subscriptions", cleanInst)] = metric.Value
+		case "LocalBulletinBoardSubjectCount":
+			mx[fmt.Sprintf("ha_manager_%s_local_bulletin_subjects", cleanInst)] = metric.Value
+		case "LocalBulletinBoardSubcriptionCount":
+			mx[fmt.Sprintf("ha_manager_%s_local_bulletin_subscriptions", cleanInst)] = metric.Value
+		default:
+			// For unknown bounded range metrics, use collection helper
+			w.collectBoundedRangeMetric(mx, "ha_manager", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		// Use collection helper for all average metrics
+		w.collectAverageMetric(mx, "ha_manager", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		// Use collection helper for all double metrics
+		w.collectDoubleMetric(mx, "ha_manager", cleanInst, metric)
+	}
 }
 
 // Chart creation functions for new parsers
@@ -3975,6 +5414,201 @@ func (w *WebSpherePMI) ensureHAManagerCharts(instance, nodeName, serverName stri
 		}
 		
 		if err := w.charts.Add(*charts...); err != nil {
+			w.Warning(err)
+		}
+	}
+}
+
+// parseObjectCache handles object cache metrics (appears under various parent objects)
+func (w *WebSpherePMI) parseObjectCache(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
+	// Object caches can appear as children of various containers
+	// The parent name is important for differentiation
+	parentName := ""
+	if len(stat.SubStats) > 0 {
+		// If it has substats, check if parent name is in the path
+		// This function might be called from different contexts
+		parentName = "cache" // Default parent context
+	}
+	
+	instance := fmt.Sprintf("%s.%s.%s.%s", nodeName, serverName, parentName, stat.Name)
+	
+	// Create charts if not exists
+	w.ensureObjectCacheCharts(instance, nodeName, serverName)
+	
+	// Mark as seen
+	w.markInstanceSeen("object_cache", instance)
+	
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
+	
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "ObjectsOnDisk":
+			mx[fmt.Sprintf("object_cache_%s_objects_on_disk", cleanInst)] = metric.Value
+		case "RefreshCount":
+			mx[fmt.Sprintf("object_cache_%s_refresh_count", cleanInst)] = metric.Value
+		case "ReferencedObjectCount":
+			mx[fmt.Sprintf("object_cache_%s_referenced_objects", cleanInst)] = metric.Value
+		case "HitsOnDisk":
+			mx[fmt.Sprintf("object_cache_%s_hits_on_disk", cleanInst)] = metric.Value
+		case "MissesOnDisk":
+			mx[fmt.Sprintf("object_cache_%s_misses_on_disk", cleanInst)] = metric.Value
+		case "ExplicitInvalidationsFromDisk":
+			mx[fmt.Sprintf("object_cache_%s_explicit_invalidations_from_disk", cleanInst)] = metric.Value
+		case "TimeoutInvalidationsFromDisk":
+			mx[fmt.Sprintf("object_cache_%s_timeout_invalidations_from_disk", cleanInst)] = metric.Value
+		case "ObjectReadFromDisk":
+			mx[fmt.Sprintf("object_cache_%s_objects_read_from_disk", cleanInst)] = metric.Value
+		case "ObjectWritesToDisk":
+			mx[fmt.Sprintf("object_cache_%s_objects_write_to_disk", cleanInst)] = metric.Value
+		case "ObjectDeleteFromDisk":
+			mx[fmt.Sprintf("object_cache_%s_objects_delete_from_disk", cleanInst)] = metric.Value
+		case "PendingRemovalFromDisk":
+			mx[fmt.Sprintf("object_cache_%s_pending_removal_from_disk", cleanInst)] = metric.Value
+		case "DependentIDsOnDisk":
+			mx[fmt.Sprintf("object_cache_%s_dependent_ids_on_disk", cleanInst)] = metric.Value
+		case "TemplatesOnDisk":
+			mx[fmt.Sprintf("object_cache_%s_templates_on_disk", cleanInst)] = metric.Value
+		case "HitsInMemory":
+			mx[fmt.Sprintf("object_cache_%s_hits_in_memory", cleanInst)] = metric.Value
+		case "LruInvalidationsFromMemory":
+			mx[fmt.Sprintf("object_cache_%s_lru_invalidations_from_memory", cleanInst)] = metric.Value
+		case "ExplicitInvalidationsFromMemory":
+			mx[fmt.Sprintf("object_cache_%s_explicit_invalidations_from_memory", cleanInst)] = metric.Value
+		case "TimeoutInvalidationsFromMemory":
+			mx[fmt.Sprintf("object_cache_%s_timeout_invalidations_from_memory", cleanInst)] = metric.Value
+		case "InMemoryAndDiskCacheEntries":
+			mx[fmt.Sprintf("object_cache_%s_entries_memory_and_disk", cleanInst)] = metric.Value
+		case "RemoteHitCount":
+			mx[fmt.Sprintf("object_cache_%s_remote_hits", cleanInst)] = metric.Value
+		case "MissCount":
+			mx[fmt.Sprintf("object_cache_%s_misses", cleanInst)] = metric.Value
+		case "RemoteInvalidationCount":
+			mx[fmt.Sprintf("object_cache_%s_remote_invalidations", cleanInst)] = metric.Value
+		case "RemoteUpdateCount":
+			mx[fmt.Sprintf("object_cache_%s_remote_updates", cleanInst)] = metric.Value
+		case "LocalInvalidationCount":
+			mx[fmt.Sprintf("object_cache_%s_local_invalidations", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use collection helper
+			w.collectCountMetric(mx, "object_cache", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL TimeStatistics
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	for _, metric := range timeMetrics {
+		switch metric.Name {
+		case "ObjectReadFromDiskTime":
+			mx[fmt.Sprintf("object_cache_%s_object_read_from_disk_time", cleanInst)] = metric.Count
+			mx[fmt.Sprintf("object_cache_%s_object_read_from_disk_time_total", cleanInst)] = metric.Total
+			mx[fmt.Sprintf("object_cache_%s_object_read_from_disk_time_min", cleanInst)] = metric.Min
+			mx[fmt.Sprintf("object_cache_%s_object_read_from_disk_time_max", cleanInst)] = metric.Max
+		case "ObjectWriteToDiskTime":
+			mx[fmt.Sprintf("object_cache_%s_object_write_to_disk_time", cleanInst)] = metric.Count
+			mx[fmt.Sprintf("object_cache_%s_object_write_to_disk_time_total", cleanInst)] = metric.Total
+			mx[fmt.Sprintf("object_cache_%s_object_write_to_disk_time_min", cleanInst)] = metric.Min
+			mx[fmt.Sprintf("object_cache_%s_object_write_to_disk_time_max", cleanInst)] = metric.Max
+		case "ObjectDeleteFromDiskTime":
+			mx[fmt.Sprintf("object_cache_%s_object_delete_from_disk_time", cleanInst)] = metric.Count
+			mx[fmt.Sprintf("object_cache_%s_object_delete_from_disk_time_total", cleanInst)] = metric.Total
+			mx[fmt.Sprintf("object_cache_%s_object_delete_from_disk_time_min", cleanInst)] = metric.Min
+			mx[fmt.Sprintf("object_cache_%s_object_delete_from_disk_time_max", cleanInst)] = metric.Max
+		case "AttributeReadFromDisk2KSize":
+			mx[fmt.Sprintf("object_cache_%s_attribute_read_from_disk_2k_size", cleanInst)] = metric.Count
+			mx[fmt.Sprintf("object_cache_%s_attribute_read_from_disk_2k_size_total", cleanInst)] = metric.Total
+			mx[fmt.Sprintf("object_cache_%s_attribute_read_from_disk_2k_size_min", cleanInst)] = metric.Min
+			mx[fmt.Sprintf("object_cache_%s_attribute_read_from_disk_2k_size_max", cleanInst)] = metric.Max
+		case "FromDisk5KSize":
+			mx[fmt.Sprintf("object_cache_%s_from_disk_5k_size", cleanInst)] = metric.Count
+			mx[fmt.Sprintf("object_cache_%s_from_disk_5k_size_total", cleanInst)] = metric.Total
+			mx[fmt.Sprintf("object_cache_%s_from_disk_5k_size_min", cleanInst)] = metric.Min
+			mx[fmt.Sprintf("object_cache_%s_from_disk_5k_size_max", cleanInst)] = metric.Max
+		case "AttributeReadFromDisk10KSize":
+			mx[fmt.Sprintf("object_cache_%s_attribute_read_from_disk_10k_size", cleanInst)] = metric.Count
+			mx[fmt.Sprintf("object_cache_%s_attribute_read_from_disk_10k_size_total", cleanInst)] = metric.Total
+			mx[fmt.Sprintf("object_cache_%s_attribute_read_from_disk_10k_size_min", cleanInst)] = metric.Min
+			mx[fmt.Sprintf("object_cache_%s_attribute_read_from_disk_10k_size_max", cleanInst)] = metric.Max
+		case "AttributeReadFromDisk40KSize":
+			mx[fmt.Sprintf("object_cache_%s_attribute_read_from_disk_40k_size", cleanInst)] = metric.Count
+			mx[fmt.Sprintf("object_cache_%s_attribute_read_from_disk_40k_size_total", cleanInst)] = metric.Total
+			mx[fmt.Sprintf("object_cache_%s_attribute_read_from_disk_40k_size_min", cleanInst)] = metric.Min
+			mx[fmt.Sprintf("object_cache_%s_attribute_read_from_disk_40k_size_max", cleanInst)] = metric.Max
+		case "AttributeReadFromDisk100KSize":
+			mx[fmt.Sprintf("object_cache_%s_attribute_read_from_disk_100k_size", cleanInst)] = metric.Count
+			mx[fmt.Sprintf("object_cache_%s_attribute_read_from_disk_100k_size_total", cleanInst)] = metric.Total
+			mx[fmt.Sprintf("object_cache_%s_attribute_read_from_disk_100k_size_min", cleanInst)] = metric.Min
+			mx[fmt.Sprintf("object_cache_%s_attribute_read_from_disk_100k_size_max", cleanInst)] = metric.Max
+		default:
+			// For unknown time metrics, use collection helper
+			w.collectTimeMetric(mx, "object_cache", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		switch metric.Name {
+		case "ObjectsInCache":
+			mx[fmt.Sprintf("object_cache_%s_objects_in_cache", cleanInst)] = metric.Current
+		case "RemoteCacheEntries":
+			mx[fmt.Sprintf("object_cache_%s_remote_cache_entries", cleanInst)] = metric.Current
+		default:
+			// For unknown range metrics, use collection helper
+			w.collectRangeMetric(mx, "object_cache", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		// For unknown bounded metrics, use collection helper
+		w.collectBoundedRangeMetric(mx, "object_cache", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		// For unknown average metrics, use collection helper
+		w.collectAverageMetric(mx, "object_cache", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		// For unknown double metrics, use collection helper
+		w.collectDoubleMetric(mx, "object_cache", cleanInst, metric)
+	}
+}
+
+// ensureSessionObjectSizeTimeChart creates a chart for SessionObjectSize as TimeStatistic if it does not exist
+func (w *WebSpherePMI) ensureSessionObjectSizeTimeChart(instance, nodeName, serverName, appName string) {
+	chartKey := fmt.Sprintf("session_object_size_time_%s", instance)
+	if _, exists := w.collectedInstances[chartKey]; !exists {
+		w.collectedInstances[chartKey] = true
+		
+		cleanInst := w.cleanID(instance)
+		chart := &module.Chart{
+			ID:       fmt.Sprintf("sessions_%s_object_size_time", cleanInst),
+			Title:    "Session Object Size Total",
+			Units:    "bytes",
+			Fam:      "sessions",
+			Ctx:      "websphere_pmi.session_object_size_time",
+			Type:     module.Line,
+			Priority: prioSessionsActive + 200, // Lower priority than main session charts
+			Dims: module.Dims{
+				{ID: fmt.Sprintf("sessions_%s_object_size_total", cleanInst), Name: "total", Algo: module.Incremental},
+			},
+			Labels: []module.Label{
+				{Key: "node", Value: nodeName},
+				{Key: "server", Value: serverName},
+				{Key: "app", Value: appName},
+			},
+		}
+		
+		if err := w.charts.Add(chart); err != nil {
 			w.Warning(err)
 		}
 	}
