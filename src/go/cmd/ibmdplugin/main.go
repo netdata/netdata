@@ -81,6 +81,7 @@ func main() {
 		RunJob:                    opts.Job,
 		MinUpdateEvery:            opts.UpdateEvery,
 		DumpMode:                  dumpMode,
+		DumpSummary:               opts.DumpSummary,
 	})
 
 	a.Debugf("plugin: name=%s, version=%s", a.Name, buildinfo.Version)
