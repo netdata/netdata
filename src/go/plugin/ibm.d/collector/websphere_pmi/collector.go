@@ -60,6 +60,7 @@ func New() *WebSpherePMI {
 		collectedInstances: make(map[string]bool),
 		seenInstances:      make(map[string]bool),
 		timeStatCache:      make(map[string]*timeStatCacheEntry),
+		avgStatCache:       make(map[string]*avgStatCacheEntry),
 	}
 }
 
@@ -149,12 +150,22 @@ type WebSpherePMI struct {
 	
 	// TimeStatistic processing
 	timeStatCache map[string]*timeStatCacheEntry
+	
+	// AverageStatistic processing
+	avgStatCache map[string]*avgStatCacheEntry
 }
 
 // timeStatCacheEntry stores previous TimeStatistic values for delta calculations
 type timeStatCacheEntry struct {
 	Count int64
 	Total int64
+}
+
+// avgStatCacheEntry stores previous AverageStatistic values for delta calculations
+type avgStatCacheEntry struct {
+	Count        int64
+	Total        int64
+	SumOfSquares int64
 }
 
 type pmiCacheEntry struct {

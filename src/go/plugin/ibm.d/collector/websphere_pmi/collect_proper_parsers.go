@@ -416,7 +416,13 @@ func (w *WebSpherePMI) parseSessionMetrics(stat *pmiStat, instance, nodeName, se
 	}, w.getVersionLabels()...)
 	
 	for i, metric := range timeMetrics {
-		// Process all TimeStatistics with the smart processor
+		// Skip SessionObjectSize if it will be processed as AverageStatistic
+		if metric.Name == "SessionObjectSize" {
+			// SessionObjectSize can appear as both TimeStatistic and AverageStatistic
+			// We prefer to process it as AverageStatistic for richer insights
+			continue
+		}
+		// Process all other TimeStatistics with the smart processor
 		w.processTimeStatisticWithContext(
 			"sessions",
 			cleanInst,
@@ -451,8 +457,22 @@ func (w *WebSpherePMI) parseSessionMetrics(stat *pmiStat, instance, nodeName, se
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
-		// Use collection helper for all average metrics
-		w.collectAverageMetric(mx, "sessions", cleanInst, metric)
+		if metric.Name == "SessionObjectSize" {
+			// Use smart processor for SessionObjectSize
+			w.processAverageStatistic(
+				"websphere_pmi.sessions",
+				"web/sessions",
+				cleanInst,
+				labels,
+				metric,
+				mx,
+				200, // Fixed priority offset to avoid conflicts
+				"bytes",  // SessionObjectSize is measured in bytes
+			)
+		} else {
+			// Use collection helper for other average metrics
+			w.collectAverageMetric(mx, "sessions", cleanInst, metric)
+		}
 	}
 	
 	// Extract ALL DoubleStatistics
