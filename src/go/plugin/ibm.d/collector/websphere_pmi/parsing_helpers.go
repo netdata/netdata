@@ -448,13 +448,6 @@ func (w *WebSpherePMI) collectAverageMetric(mx map[string]int64, prefix, cleanIn
 	mx[base+"_min"] = metric.Min
 	mx[base+"_max"] = metric.Max
 	mx[base+"_sum_of_squares"] = metric.SumOfSquares  // Always send, even if 0
-	
-	// Special handling for SessionObjectSize as AverageStatistic
-	// This metric can appear as both TimeStatistic (container level) and AverageStatistic (app level)
-	if prefix == "sessions" && metric.Name == "SessionObjectSize" {
-		// Ensure we have a chart for this specific session's object size average metric
-		w.ensureSessionObjectSizeAverageChart(cleanInst)
-	}
 }
 
 // collectDoubleMetric collects a single double metric into the mx map
@@ -462,63 +455,6 @@ func (w *WebSpherePMI) collectDoubleMetric(mx map[string]int64, prefix, cleanIns
 	mx[fmt.Sprintf("%s_%s_%s", prefix, cleanInst, w.cleanID(metric.Name))] = metric.Value
 }
 
-// ensureSessionObjectSizeAverageChart creates a chart for SessionObjectSize as AverageStatistic if it doesn't exist
-func (w *WebSpherePMI) ensureSessionObjectSizeAverageChart(cleanInst string) {
-	chartID := fmt.Sprintf("sessions_%s_SessionObjectSize_average", cleanInst)
-	
-	// Check if chart already exists
-	if w.Charts().Has(chartID) {
-		return
-	}
-	
-	// Create TWO charts for SessionObjectSize average statistics - one for absolute values, one for incremental
-	
-	// Chart 1: Absolute values (mean, min, max)
-	chartAbsolute := &module.Chart{
-		ID:       chartID,
-		Title:    "Session Object Size",
-		Units:    "bytes",
-		Fam:      "web/sessions",
-		Ctx:      "websphere_pmi.session_object_size_average",
-		Type:     module.Line,
-		Priority: prioWebSessions + 100, // Lower priority than main session charts
-		Dims: module.Dims{
-			{ID: fmt.Sprintf("sessions_%s_SessionObjectSize_mean", cleanInst), Name: "mean"},
-			{ID: fmt.Sprintf("sessions_%s_SessionObjectSize_min", cleanInst), Name: "min"},
-			{ID: fmt.Sprintf("sessions_%s_SessionObjectSize_max", cleanInst), Name: "max"},
-		},
-		Labels: append([]module.Label{
-			{Key: "instance", Value: cleanInst},
-		}, w.getVersionLabels()...),
-	}
-	
-	// Chart 2: Incremental counters
-	chartCounters := &module.Chart{
-		ID:       chartID + "_counters",
-		Title:    "Session Object Size Counters",
-		Units:    "operations/s",
-		Fam:      "web/sessions",
-		Ctx:      "websphere_pmi.session_object_size_counters",
-		Type:     module.Line,
-		Priority: prioWebSessions + 101, // Lower priority than main session charts
-		Dims: module.Dims{
-			{ID: fmt.Sprintf("sessions_%s_SessionObjectSize_count", cleanInst), Name: "count", Algo: module.Incremental},
-			{ID: fmt.Sprintf("sessions_%s_SessionObjectSize_total", cleanInst), Name: "total", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: fmt.Sprintf("sessions_%s_SessionObjectSize_sum_of_squares", cleanInst), Name: "sum_of_squares", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-		},
-		Labels: append([]module.Label{
-			{Key: "instance", Value: cleanInst},
-		}, w.getVersionLabels()...),
-	}
-	
-	if err := w.Charts().Add(chartAbsolute); err != nil {
-		w.Warning(err)
-	}
-	
-	if err := w.Charts().Add(chartCounters); err != nil {
-		w.Warning(err)
-	}
-}
 
 // =============================================================================
 // TIME STATISTIC PROCESSOR
@@ -739,5 +675,239 @@ func (w *WebSpherePMI) processTimeStatisticWithContext(
 		metric,
 		mx,
 		basePriority+priorityOffset,
+	)
+}
+
+// =============================================================================
+// AVERAGE STATISTIC PROCESSOR
+// =============================================================================
+// Smart processor for AverageStatistics that creates rate, current avg, current stddev, and lifetime charts
+
+// processAverageStatistic handles all aspects of an AverageStatistic metric
+func (w *WebSpherePMI) processAverageStatistic(
+	context string,     // Chart context (e.g., "websphere_pmi.session")
+	family string,      // Chart family (e.g., "web/sessions")
+	instance string,    // Clean instance name
+	labels []module.Label, // Chart labels
+	metric ExtractedAverageMetric,
+	mx map[string]int64,
+	priority int,       // Base priority for charts
+	units string,       // Units for the metric (e.g., "bytes", "milliseconds", "count")
+) {
+	// Create cache key for delta calculations
+	cacheKey := fmt.Sprintf("%s_%s_%s", context, instance, metric.Name)
+	
+	// Extract component prefix from context (e.g., "websphere_pmi.session" -> "session")
+	componentPrefix := strings.TrimPrefix(context, "websphere_pmi.")
+	
+	// 1. Always collect rate (operations/s)
+	mx[fmt.Sprintf("%s_%s_%s_operations", componentPrefix, instance, w.cleanID(metric.Name))] = metric.Count
+	
+	// 2. Always collect lifetime statistics
+	mx[fmt.Sprintf("%s_%s_%s_lifetime_min", componentPrefix, instance, w.cleanID(metric.Name))] = metric.Min
+	mx[fmt.Sprintf("%s_%s_%s_lifetime_max", componentPrefix, instance, w.cleanID(metric.Name))] = metric.Max
+	mx[fmt.Sprintf("%s_%s_%s_lifetime_mean", componentPrefix, instance, w.cleanID(metric.Name))] = metric.Mean
+	
+	// 3. Calculate current average and stddev if we have previous data
+	if prev, exists := w.avgStatCache[cacheKey]; exists {
+		deltaCount := metric.Count - prev.Count
+		deltaTotal := metric.Total - prev.Total
+		deltaSumOfSquares := metric.SumOfSquares - prev.SumOfSquares
+		
+		// Only process if no counter reset detected
+		if metric.Count >= prev.Count && metric.Total >= prev.Total && metric.SumOfSquares >= prev.SumOfSquares {
+			var currentAvg int64
+			if deltaCount > 0 {
+				currentAvg = deltaTotal / deltaCount
+			} else {
+				currentAvg = 0 // No new operations = 0 average
+			}
+			mx[fmt.Sprintf("%s_%s_%s_current_avg", componentPrefix, instance, w.cleanID(metric.Name))] = currentAvg
+			
+			// Calculate current standard deviation
+			var currentStdDev int64
+			if deltaCount > 1 && deltaSumOfSquares > 0 {
+				// variance = (sum_of_squares/count) - mean²
+				// Note: values are already multiplied by precision
+				meanSquared := (currentAvg * currentAvg) / precision
+				variance := (deltaSumOfSquares / deltaCount) - meanSquared
+				
+				if variance > 0 {
+					// Simple integer square root approximation
+					currentStdDev = w.intSqrt(variance)
+				} else {
+					currentStdDev = 0
+				}
+			} else {
+				currentStdDev = 0 // Not enough data for stddev
+			}
+			mx[fmt.Sprintf("%s_%s_%s_current_stddev", componentPrefix, instance, w.cleanID(metric.Name))] = currentStdDev
+		}
+	} else {
+		// First collection - set current values to 0
+		mx[fmt.Sprintf("%s_%s_%s_current_avg", componentPrefix, instance, w.cleanID(metric.Name))] = 0
+		mx[fmt.Sprintf("%s_%s_%s_current_stddev", componentPrefix, instance, w.cleanID(metric.Name))] = 0
+	}
+	
+	// 4. Update cache for next iteration
+	w.avgStatCache[cacheKey] = &avgStatCacheEntry{
+		Count:        metric.Count,
+		Total:        metric.Total,
+		SumOfSquares: metric.SumOfSquares,
+	}
+	
+	// 5. Ensure charts exist
+	w.ensureAvgStatCharts(context, family, instance, labels, metric.Name, priority, units)
+}
+
+// intSqrt calculates integer square root using Newton's method
+func (w *WebSpherePMI) intSqrt(x int64) int64 {
+	if x <= 0 {
+		return 0
+	}
+	
+	// Initial guess
+	guess := x / 2
+	if guess == 0 {
+		guess = 1
+	}
+	
+	// Newton's method: next = (guess + x/guess) / 2
+	for i := 0; i < 10; i++ { // Limit iterations
+		next := (guess + x/guess) / 2
+		if next == guess || next == guess-1 || next == guess+1 {
+			return next
+		}
+		guess = next
+	}
+	
+	return guess
+}
+
+// ensureAvgStatCharts creates the 4 charts for an AverageStatistic if they don't exist
+func (w *WebSpherePMI) ensureAvgStatCharts(
+	context string,
+	family string,
+	instance string,
+	labels []module.Label,
+	metricName string,
+	priority int,
+	units string,
+) {
+	cleanMetric := w.cleanID(metricName)
+	baseChartID := fmt.Sprintf("%s_%s_%s", cleanMetricName(context), instance, cleanMetric)
+	
+	// Check if we already created charts for this metric
+	chartKey := fmt.Sprintf("avgstat_%s", baseChartID)
+	if _, exists := w.collectedInstances[chartKey]; exists {
+		return
+	}
+	w.collectedInstances[chartKey] = true
+	
+	// Make contexts unique per metric to avoid conflicts
+	uniqueContext := fmt.Sprintf("%s_%s", context, w.cleanID(metricName))
+	
+	// Extract component prefix from context (e.g., "websphere_pmi.session" -> "session")
+	componentPrefix := strings.TrimPrefix(context, "websphere_pmi.")
+	
+	// Chart 1: Operation Rate
+	chartRate := &module.Chart{
+		ID:       baseChartID + "_rate",
+		Title:    fmt.Sprintf("%s Rate", metricName),
+		Units:    "operations/s",
+		Fam:      family,
+		Ctx:      uniqueContext + "_rate",
+		Type:     module.Line,
+		Priority: priority,
+		Dims: module.Dims{
+			{ID: fmt.Sprintf("%s_%s_%s_operations", componentPrefix, instance, cleanMetric), Name: "operations", Algo: module.Incremental},
+		},
+		Labels: labels,
+	}
+	
+	// Chart 2: Current Average (this iteration)
+	chartCurrentAvg := &module.Chart{
+		ID:       baseChartID + "_current_avg",
+		Title:    fmt.Sprintf("%s Current Average", metricName),
+		Units:    units,
+		Fam:      family,
+		Ctx:      uniqueContext + "_current_avg",
+		Type:     module.Line,
+		Priority: priority + 1,
+		Dims: module.Dims{
+			{ID: fmt.Sprintf("%s_%s_%s_current_avg", componentPrefix, instance, cleanMetric), Name: "average", Div: precision},
+		},
+		Labels: labels,
+	}
+	
+	// Chart 3: Current Standard Deviation (this iteration)
+	chartCurrentStdDev := &module.Chart{
+		ID:       baseChartID + "_current_stddev",
+		Title:    fmt.Sprintf("%s Current Standard Deviation", metricName),
+		Units:    units,
+		Fam:      family,
+		Ctx:      uniqueContext + "_current_stddev",
+		Type:     module.Line,
+		Priority: priority + 2,
+		Dims: module.Dims{
+			{ID: fmt.Sprintf("%s_%s_%s_current_stddev", componentPrefix, instance, cleanMetric), Name: "stddev", Div: precision},
+		},
+		Labels: labels,
+	}
+	
+	// Chart 4: Lifetime Statistics
+	chartLifetime := &module.Chart{
+		ID:       baseChartID + "_lifetime",
+		Title:    fmt.Sprintf("%s Lifetime Statistics", metricName),
+		Units:    units,
+		Fam:      family,
+		Ctx:      uniqueContext + "_lifetime",
+		Type:     module.Line,
+		Priority: priority + 3,
+		Dims: module.Dims{
+			{ID: fmt.Sprintf("%s_%s_%s_lifetime_min", componentPrefix, instance, cleanMetric), Name: "min", Div: precision},
+			{ID: fmt.Sprintf("%s_%s_%s_lifetime_mean", componentPrefix, instance, cleanMetric), Name: "mean", Div: precision},
+			{ID: fmt.Sprintf("%s_%s_%s_lifetime_max", componentPrefix, instance, cleanMetric), Name: "max", Div: precision},
+		},
+		Labels: labels,
+	}
+	
+	// Add all four charts
+	if err := w.Charts().Add(chartRate); err != nil {
+		w.Warning(err)
+	}
+	if err := w.Charts().Add(chartCurrentAvg); err != nil {
+		w.Warning(err)
+	}
+	if err := w.Charts().Add(chartCurrentStdDev); err != nil {
+		w.Warning(err)
+	}
+	if err := w.Charts().Add(chartLifetime); err != nil {
+		w.Warning(err)
+	}
+}
+
+// processAverageStatisticWithContext is a convenience wrapper that handles context-based metadata
+func (w *WebSpherePMI) processAverageStatisticWithContext(
+	contextName string,
+	instance string,
+	labels []module.Label,
+	metric ExtractedAverageMetric,
+	mx map[string]int64,
+	priorityOffset int,
+	units string,
+) {
+	family, basePriority := getContextMetadata(contextName)
+	context := fmt.Sprintf("websphere_pmi.%s", contextName)
+	
+	w.processAverageStatistic(
+		context,
+		family,
+		instance,
+		labels,
+		metric,
+		mx,
+		basePriority+priorityOffset,
+		units,
 	)
 }
