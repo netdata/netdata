@@ -5,6 +5,7 @@ package websphere_pmi
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
@@ -517,4 +518,226 @@ func (w *WebSpherePMI) ensureSessionObjectSizeAverageChart(cleanInst string) {
 	if err := w.Charts().Add(chartCounters); err != nil {
 		w.Warning(err)
 	}
+}
+
+// =============================================================================
+// TIME STATISTIC PROCESSOR
+// =============================================================================
+// Smart processor for TimeStatistics that creates rate, current latency, and lifetime charts
+
+// processTimeStatistic handles all aspects of a TimeStatistic metric
+func (w *WebSpherePMI) processTimeStatistic(
+	context string,     // Chart context (e.g., "websphere_pmi.servlet")
+	family string,      // Chart family (e.g., "web/servlets")
+	instance string,    // Clean instance name
+	labels []module.Label, // Chart labels
+	metric ExtractedTimeMetric,
+	mx map[string]int64,
+	priority int,       // Base priority for charts
+) {
+	// Create cache key for delta calculations
+	cacheKey := fmt.Sprintf("%s_%s_%s", context, instance, metric.Name)
+	
+	// Extract component prefix from context (e.g., "websphere_pmi.servlet" -> "servlet")
+	componentPrefix := strings.TrimPrefix(context, "websphere_pmi.")
+	
+	// 1. Always collect rate (operations/s)
+	mx[fmt.Sprintf("%s_%s_%s_operations", componentPrefix, instance, w.cleanID(metric.Name))] = metric.Count
+	
+	// 2. Always collect lifetime statistics (raw nanoseconds - Netdata will auto-scale)
+	mx[fmt.Sprintf("%s_%s_%s_min", componentPrefix, instance, w.cleanID(metric.Name))] = metric.Min
+	mx[fmt.Sprintf("%s_%s_%s_max", componentPrefix, instance, w.cleanID(metric.Name))] = metric.Max
+	mx[fmt.Sprintf("%s_%s_%s_mean", componentPrefix, instance, w.cleanID(metric.Name))] = metric.Mean
+	
+	// 3. Calculate current latency if we have previous data
+	if prev, exists := w.timeStatCache[cacheKey]; exists {
+		deltaCount := metric.Count - prev.Count
+		deltaTotal := metric.Total - prev.Total
+		
+		// Only skip if counter reset detected, otherwise send the data (including zeros)
+		if metric.Count >= prev.Count && metric.Total >= prev.Total {
+			var currentLatency int64
+			if deltaCount > 0 {
+				currentLatency = deltaTotal / deltaCount
+			} else {
+				currentLatency = 0 // No new operations = 0 latency
+			}
+			mx[fmt.Sprintf("%s_%s_%s_current", componentPrefix, instance, w.cleanID(metric.Name))] = currentLatency
+		}
+	}
+	
+	// 4. Update cache for next iteration
+	w.timeStatCache[cacheKey] = &timeStatCacheEntry{
+		Count: metric.Count,
+		Total: metric.Total,
+	}
+	
+	// 5. Ensure charts exist
+	w.ensureTimeStatCharts(context, family, instance, labels, metric.Name, priority)
+}
+
+// ensureTimeStatCharts creates the 3 charts for a TimeStatistic if they don't exist
+func (w *WebSpherePMI) ensureTimeStatCharts(
+	context string,
+	family string,
+	instance string,
+	labels []module.Label,
+	metricName string,
+	priority int,
+) {
+	cleanMetric := w.cleanID(metricName)
+	baseChartID := fmt.Sprintf("%s_%s_%s", cleanMetricName(context), instance, cleanMetric)
+	
+	// Check if we already created charts for this metric
+	chartKey := fmt.Sprintf("timestat_%s", baseChartID)
+	if _, exists := w.collectedInstances[chartKey]; exists {
+		return
+	}
+	w.collectedInstances[chartKey] = true
+	
+	// Make contexts unique per metric to avoid conflicts
+	uniqueContext := fmt.Sprintf("%s_%s", context, w.cleanID(metricName))
+	
+	// Extract component prefix from context (e.g., "websphere_pmi.servlet" -> "servlet")
+	componentPrefix := strings.TrimPrefix(context, "websphere_pmi.")
+	
+	// Chart 1: Operation Rate
+	chartRate := &module.Chart{
+		ID:       baseChartID + "_rate",
+		Title:    fmt.Sprintf("%s Rate", metricName),
+		Units:    "operations/s",
+		Fam:      family,
+		Ctx:      uniqueContext + "_rate",
+		Type:     module.Line,
+		Priority: priority,
+		Dims: module.Dims{
+			{ID: fmt.Sprintf("%s_%s_%s_operations", componentPrefix, instance, cleanMetric), Name: "operations", Algo: module.Incremental},
+		},
+		Labels: labels,
+	}
+	
+	// Chart 2: Current Latency (this iteration)
+	chartCurrent := &module.Chart{
+		ID:       baseChartID + "_current_latency",
+		Title:    fmt.Sprintf("%s Current Latency", metricName),
+		Units:    "nanoseconds",
+		Fam:      family,
+		Ctx:      uniqueContext + "_current_latency",
+		Type:     module.Line,
+		Priority: priority + 1,
+		Dims: module.Dims{
+			{ID: fmt.Sprintf("%s_%s_%s_current", componentPrefix, instance, cleanMetric), Name: "current"},
+		},
+		Labels: labels,
+	}
+	
+	// Chart 3: Lifetime Latency Statistics
+	chartLifetime := &module.Chart{
+		ID:       baseChartID + "_lifetime_latency",
+		Title:    fmt.Sprintf("%s Lifetime Latency", metricName),
+		Units:    "nanoseconds",
+		Fam:      family,
+		Ctx:      uniqueContext + "_lifetime_latency",
+		Type:     module.Line,
+		Priority: priority + 2,
+		Dims: module.Dims{
+			{ID: fmt.Sprintf("%s_%s_%s_min", componentPrefix, instance, cleanMetric), Name: "min"},
+			{ID: fmt.Sprintf("%s_%s_%s_mean", componentPrefix, instance, cleanMetric), Name: "mean"},
+			{ID: fmt.Sprintf("%s_%s_%s_max", componentPrefix, instance, cleanMetric), Name: "max"},
+		},
+		Labels: labels,
+	}
+	
+	// Add all three charts
+	if err := w.Charts().Add(chartRate); err != nil {
+		w.Warning(err)
+	}
+	if err := w.Charts().Add(chartCurrent); err != nil {
+		w.Warning(err)
+	}
+	if err := w.Charts().Add(chartLifetime); err != nil {
+		w.Warning(err)
+	}
+}
+
+// cleanMetricName removes the "websphere_pmi." prefix if present
+func cleanMetricName(name string) string {
+	if strings.HasPrefix(name, "websphere_pmi.") {
+		return strings.TrimPrefix(name, "websphere_pmi.")
+	}
+	return name
+}
+
+// getContextMetadata returns the appropriate family and priority for a given context
+func getContextMetadata(context string) (family string, basePriority int) {
+	switch context {
+	case "transaction_manager":
+		return "transactions", prioTransactionManager
+	case "jvm_runtime":
+		return "jvm", prioSystemJVM
+	case "thread_pool":
+		return "threadpools", prioThreadPools
+	case "jdbc":
+		return "jdbc", prioJDBCPools
+	case "jca_pool":
+		return "jca", prioJCAPools
+	case "webapp_container", "webapp":
+		return "web/apps", prioWebApps
+	case "servlet":
+		return "web/servlets", prioServlets
+	case "sessions":
+		return "web/sessions", prioSessions
+	case "cache":
+		return "cache", prioCacheManager
+	case "object_cache":
+		return "object_cache", prioObjectCache
+	case "orb":
+		return "orb", prioORB
+	case "enterprise_app":
+		return "apps", prioEnterpriseApps
+	case "ejb_container":
+		return "ejb", prioEJBContainer
+	case "portlet":
+		return "web/portlets", prioPortlets
+	case "web_service":
+		return "webservices", prioWebServices
+	case "sib_jms":
+		return "jms", prioJMSAdapter
+	case "security_auth", "security_authz":
+		return "security", prioSecurity
+	case "wlm":
+		return "wlm", prioWLM
+	case "system_data":
+		return "system", prioSystemData
+	case "connection_manager":
+		return "connections", prioConnectionManager
+	case "bean_manager":
+		return "ejb", prioEJBContainer
+	default:
+		// For any unknown context, use a generic family and priority
+		return "other", 9000
+	}
+}
+
+// processTimeStatisticWithContext is a convenience wrapper that handles context-based metadata
+func (w *WebSpherePMI) processTimeStatisticWithContext(
+	contextName string,
+	instance string,
+	labels []module.Label,
+	metric ExtractedTimeMetric,
+	mx map[string]int64,
+	priorityOffset int,
+) {
+	family, basePriority := getContextMetadata(contextName)
+	context := fmt.Sprintf("websphere_pmi.%s", contextName)
+	
+	w.processTimeStatistic(
+		context,
+		family,
+		instance,
+		labels,
+		metric,
+		mx,
+		basePriority+priorityOffset,
+	)
 }

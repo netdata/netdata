@@ -47,6 +47,7 @@ const (
 	
 	// Caching (5200-5399) - Performance optimization
 	prioDynaCache        = 5200
+	prioCacheManager     = 5200  // Alias for dynamic cache
 	prioObjectCache      = 5300
 	
 	// ORB/EJB (6000-6099) - Enterprise components
@@ -69,8 +70,17 @@ const (
 	prioExtensionRegistry = 8100
 	prioRegistry         = 8100  // Alias for extension registry
 	
-	// WLM (8200-8299)
-	prioWLM              = 8200
+	// System data (8200-8299)
+	prioSystemData       = 8200
+	
+	// WLM (8300-8399)
+	prioWLM              = 8300
+	
+	// Connection Manager (8400-8499)
+	prioConnectionManager = 8400
+	
+	// Security (already defined)
+	prioSecurity = prioSecurityAuth
 	
 	// SIB Messaging (8300-8399)
 	prioSIBMessaging     = 8300
@@ -122,6 +132,10 @@ var transactionChartsTmpl = module.Charts{
 			{ID: "transaction_manager_%s_LocalActiveCount", Name: "local_active"},
 		},
 	},
+	// DEPRECATED: Old TimeStatistic charts - replaced by smart processor
+	// These charts mixed total, count, min, max, and mean in single charts
+	// Now replaced by separate rate, current_latency, and lifetime_latency charts
+	/*
 	{
 		ID:       "transaction_manager_%s_global_times",
 		Title:    "Transaction Manager Global Transaction Times",
@@ -203,6 +217,7 @@ var transactionChartsTmpl = module.Charts{
 			{ID: "transaction_manager_%s_LocalBeforeCompletionTime_mean", Name: "avg_before_completion_time", Div: precision},
 		},
 	},
+	*/
 }
 
 var jvmChartsTmpl = module.Charts{
@@ -310,6 +325,8 @@ var threadPoolChartsTmpl = module.Charts{
 			{ID: "thread_pool_%s_ConcurrentHungThreadCount_integral", Name: "integral", Div: precision, DimOpts: module.DimOpts{Hidden: true}},
 		},
 	},
+	// DEPRECATED: Old ActiveTime charts - replaced by smart processor
+	/*
 	{
 		ID:       "thread_pool_%s_active_time",
 		Title:    "Thread Pool Active Time",
@@ -338,6 +355,7 @@ var threadPoolChartsTmpl = module.Charts{
 			{ID: "thread_pool_%s_ActiveTime_mean", Name: "avg_active_time", Div: precision},
 		},
 	},
+	*/
 	{
 		ID:       "thread_pool_%s_percent_used",
 		Title:    "Thread Pool Percent Used",
@@ -480,34 +498,6 @@ var jdbcChartsTmpl = module.Charts{
 		Dims: module.Dims{
 			{ID: "jdbc_%s_ManagedConnectionCount", Name: "managed"},
 			{ID: "jdbc_%s_ConnectionHandleCount", Name: "handles"},
-		},
-	},
-	{
-		ID:       "jdbc_%s_jdbc_time",
-		Title:    "JDBC Time",
-		Units:    "milliseconds/s",
-		Fam:      "connections/jdbc",
-		Ctx:      "websphere_pmi.jdbc_time",
-		Type:     module.Line,
-		Priority: prioJDBCPools + 70,
-		Dims: module.Dims{
-			{ID: "jdbc_%s_JDBCTime_total", Name: "jdbc_time", Algo: module.Incremental},
-			// Hidden dimensions for count, min, max
-			{ID: "jdbc_%s_JDBCTime_count", Name: "jdbc_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "jdbc_%s_JDBCTime_min", Name: "jdbc_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "jdbc_%s_JDBCTime_max", Name: "jdbc_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-		},
-	},
-	{
-		ID:       "jdbc_%s_jdbc_time_mean",
-		Title:    "JDBC Time Average",
-		Units:    "milliseconds",
-		Fam:      "connections/jdbc",
-		Ctx:      "websphere_pmi.jdbc_time_mean",
-		Type:     module.Line,
-		Priority: prioJDBCPools + 75,
-		Dims: module.Dims{
-			{ID: "jdbc_%s_JDBCTime_mean", Name: "mean"},
 		},
 	},
 	{
@@ -762,19 +752,6 @@ var servletsComponentChartsTmpl = module.Charts{
 		},
 	},
 	{
-		ID:       "servlets_component_%s_timing",
-		Title:    "Servlets Component Timing",
-		Units:    "milliseconds/s",
-		Fam:      "web/servlets",
-		Ctx:      "websphere_pmi.servlets_component_timing",
-		Type:     module.Line,
-		Priority: prioWebServlets + 10,
-		Dims: module.Dims{
-			{ID: "servlets_component_%s_service_time", Name: "service_time", Algo: module.Incremental},
-			{ID: "servlets_component_%s_async_response_time", Name: "async_response_time", Algo: module.Incremental},
-		},
-	},
-	{
 		ID:       "servlets_component_%s_concurrent",
 		Title:    "Servlets Component Concurrent Requests",
 		Units:    "requests",
@@ -791,38 +768,6 @@ var servletsComponentChartsTmpl = module.Charts{
 			{ID: "servlets_component_%s_URIConcurrentRequests_integral", Name: "uri_concurrent_integral", Div: precision},
 		},
 	},
-	{
-		ID:       "servlets_component_%s_uri_service_timing",
-		Title:    "Servlets Component URI Service Timing Details",
-		Units:    "milliseconds",
-		Fam:      "web/servlets",
-		Ctx:      "websphere_pmi.servlets_component_uri_service_timing",
-		Type:     module.Line,
-		Priority: prioWebServlets + 30,
-		Dims: module.Dims{
-			{ID: "servlets_component_%s_URIServiceTime_count", Name: "uri_service_count"},
-			{ID: "servlets_component_%s_URIServiceTime_total", Name: "uri_service_total"},
-			{ID: "servlets_component_%s_URIServiceTime_min", Name: "uri_service_min"},
-			{ID: "servlets_component_%s_URIServiceTime_max", Name: "uri_service_max"},
-			{ID: "servlets_component_%s_URIServiceTime_mean", Name: "uri_service_mean"},
-		},
-	},
-	{
-		ID:       "servlets_component_%s_async_timing",
-		Title:    "Servlets Component Async Response Timing Details",
-		Units:    "milliseconds",
-		Fam:      "web/servlets",
-		Ctx:      "websphere_pmi.servlets_component_async_timing",
-		Type:     module.Line,
-		Priority: prioWebServlets + 40,
-		Dims: module.Dims{
-			{ID: "servlets_component_%s_URL_AsyncContext_Response_Time_count", Name: "async_count"},
-			{ID: "servlets_component_%s_URL_AsyncContext_Response_Time_total", Name: "async_total"},
-			{ID: "servlets_component_%s_URL_AsyncContext_Response_Time_min", Name: "async_min"},
-			{ID: "servlets_component_%s_URL_AsyncContext_Response_Time_max", Name: "async_max"},
-			{ID: "servlets_component_%s_URL_AsyncContext_Response_Time_mean", Name: "async_mean", Div: precision},
-		},
-	},
 }
 
 var wimComponentChartsTmpl = module.Charts{
@@ -837,21 +782,6 @@ var wimComponentChartsTmpl = module.Charts{
 		Dims: module.Dims{
 			{ID: "wim_%s_portlet_requests", Name: "requests", Algo: module.Incremental},
 			{ID: "wim_%s_portlet_errors", Name: "errors", Algo: module.Incremental},
-		},
-	},
-	{
-		ID:       "wim_%s_portlet_timing",
-		Title:    "WIM Component Portlet Timing",
-		Units:    "milliseconds/s",
-		Fam:      "components",
-		Ctx:      "websphere_pmi.wim_portlet_timing",
-		Type:     module.Line,
-		Priority: prioComponents + 10,
-		Dims: module.Dims{
-			{ID: "wim_%s_render_time", Name: "render_time", Algo: module.Incremental},
-			{ID: "wim_%s_action_time", Name: "action_time", Algo: module.Incremental},
-			{ID: "wim_%s_process_event_time", Name: "process_event_time", Algo: module.Incremental},
-			{ID: "wim_%s_serve_resource_time", Name: "serve_resource_time", Algo: module.Incremental},
 		},
 	},
 	{
@@ -873,18 +803,6 @@ var wimComponentChartsTmpl = module.Charts{
 }
 
 var wlmTaggedComponentChartsTmpl = module.Charts{
-	{
-		ID:       "wlm_tagged_%s_processing_time",
-		Title:    "WLM Tagged Component Processing Time",
-		Units:    "milliseconds/s",
-		Fam:      "wlm",
-		Ctx:      "websphere_pmi.wlm_tagged_processing_time",
-		Type:     module.Line,
-		Priority: prioWLM,
-		Dims: module.Dims{
-			{ID: "wlm_tagged_%s_processing_time", Name: "processing_time", Algo: module.Incremental},
-		},
-	},
 }
 
 var pmiWebServiceServiceChartsTmpl = module.Charts{
@@ -900,51 +818,6 @@ var pmiWebServiceServiceChartsTmpl = module.Charts{
 			{ID: "pmi_webservice_%s_requests_received", Name: "received", Algo: module.Incremental},
 			{ID: "pmi_webservice_%s_requests_dispatched", Name: "dispatched", Algo: module.Incremental},
 			{ID: "pmi_webservice_%s_requests_successful", Name: "successful", Algo: module.Incremental},
-		},
-	},
-	{
-		ID:       "pmi_webservice_%s_timing",
-		Title:    "PMI Web Service Service Timing",
-		Units:    "milliseconds/s",
-		Fam:      "web_services",
-		Ctx:      "websphere_pmi.pmi_webservice_timing",
-		Type:     module.Line,
-		Priority: prioWebServices + 10,
-		Dims: module.Dims{
-			{ID: "pmi_webservice_%s_response_time", Name: "response_time", Algo: module.Incremental},
-			{ID: "pmi_webservice_%s_request_response_time", Name: "request_response_time", Algo: module.Incremental},
-		},
-	},
-	{
-		ID:       "pmi_webservice_%s_dispatch_response_timing",
-		Title:    "PMI Web Service Dispatch Response Timing",
-		Units:    "milliseconds",
-		Fam:      "web_services",
-		Ctx:      "websphere_pmi.pmi_webservice_dispatch_response_timing",
-		Type:     module.Line,
-		Priority: prioWebServices + 20,
-		Dims: module.Dims{
-			{ID: "pmi_webservice_%s_DispatchResponseService_count", Name: "dispatch_count"},
-			{ID: "pmi_webservice_%s_DispatchResponseService_total", Name: "dispatch_total"},
-			{ID: "pmi_webservice_%s_DispatchResponseService_min", Name: "dispatch_min"},
-			{ID: "pmi_webservice_%s_DispatchResponseService_max", Name: "dispatch_max"},
-			{ID: "pmi_webservice_%s_DispatchResponseService_mean", Name: "dispatch_mean", Div: precision},
-		},
-	},
-	{
-		ID:       "pmi_webservice_%s_reply_response_timing",
-		Title:    "PMI Web Service Reply Response Timing",
-		Units:    "milliseconds",
-		Fam:      "web_services",
-		Ctx:      "websphere_pmi.pmi_webservice_reply_response_timing",
-		Type:     module.Line,
-		Priority: prioWebServices + 30,
-		Dims: module.Dims{
-			{ID: "pmi_webservice_%s_ReplyResponseService_count", Name: "reply_count"},
-			{ID: "pmi_webservice_%s_ReplyResponseService_total", Name: "reply_total"},
-			{ID: "pmi_webservice_%s_ReplyResponseService_min", Name: "reply_min"},
-			{ID: "pmi_webservice_%s_ReplyResponseService_max", Name: "reply_max"},
-			{ID: "pmi_webservice_%s_ReplyResponseService_mean", Name: "reply_mean", Div: precision},
 		},
 	},
 	{
@@ -1055,18 +928,6 @@ var tcpChannelDCSChartsTmpl = module.Charts{
 		},
 	},
 	{
-		ID:       "tcp_dcs_%s_timing",
-		Title:    "TCP Channel DCS Active Time",
-		Units:    "milliseconds/s",
-		Fam:      "connections/tcp",
-		Ctx:      "websphere_pmi.tcp_dcs_timing",
-		Type:     module.Line,
-		Priority: prioTCPChannels + 40,
-		Dims: module.Dims{
-			{ID: "tcp_dcs_%s_active_time", Name: "active_time", Algo: module.Incremental},
-		},
-	},
-	{
 		ID:       "tcp_dcs_%s_pool_limits",
 		Title:    "TCP Channel DCS Pool Limits",
 		Units:    "threads",
@@ -1107,21 +968,6 @@ var iscProductDetailsChartsTmpl = module.Charts{
 		Dims: module.Dims{
 			{ID: "isc_product_%s_portlet_requests", Name: "requests", Algo: module.Incremental},
 			{ID: "isc_product_%s_portlet_errors", Name: "errors", Algo: module.Incremental},
-		},
-	},
-	{
-		ID:       "isc_product_%s_portlet_timing",
-		Title:    "ISC Product Details Portlet Timing",
-		Units:    "milliseconds/s",
-		Fam:      "components",
-		Ctx:      "websphere_pmi.isc_product_portlet_timing",
-		Type:     module.Line,
-		Priority: prioComponents + 210,
-		Dims: module.Dims{
-			{ID: "isc_product_%s_render_time", Name: "render_time", Algo: module.Incremental},
-			{ID: "isc_product_%s_action_time", Name: "action_time", Algo: module.Incremental},
-			{ID: "isc_product_%s_process_event_time", Name: "process_event_time", Algo: module.Incremental},
-			{ID: "isc_product_%s_serve_resource_time", Name: "serve_resource_time", Algo: module.Incremental},
 		},
 	},
 	{

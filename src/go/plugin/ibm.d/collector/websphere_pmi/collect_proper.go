@@ -357,10 +357,23 @@ func (w *WebSpherePMI) parseTransactionManager(stat *pmiStat, nodeName, serverNa
 		}
 	}
 	
-	// Extract ALL TimeStatistics
+	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
-	for _, metric := range timeMetrics {
-		w.collectTimeMetric(mx, "transaction_manager", cleanInst, metric)
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		w.processTimeStatisticWithContext(
+			"transaction_manager",
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			i*10, // Offset priority for each metric
+		)
 	}
 	
 	// Extract ALL RangeStatistics
@@ -421,11 +434,23 @@ func (w *WebSpherePMI) parseJVMRuntime(stat *pmiStat, nodeName, serverName strin
 		}
 	}
 	
-	// Extract ALL TimeStatistics
+	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
-	for _, metric := range timeMetrics {
-		// Use collection helper for all time metrics
-		w.collectTimeMetric(mx, "jvm_runtime", cleanInst, metric)
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		w.processTimeStatisticWithContext(
+			"jvm_runtime",
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			100+i*10, // Offset priority after main charts
+		)
 	}
 	
 	// Extract ALL RangeStatistics
@@ -482,11 +507,24 @@ func (w *WebSpherePMI) parseThreadPool(stat *pmiStat, nodeName, serverName strin
 		w.collectCountMetric(mx, "thread_pool", cleanInst, metric)
 	}
 	
-	// Extract ALL TimeStatistics
+	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
-	for _, metric := range timeMetrics {
-		// Use collection helper for all time metrics
-		w.collectTimeMetric(mx, "thread_pool", cleanInst, metric)
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+		{Key: "pool", Value: poolName},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		w.processTimeStatisticWithContext(
+			"thread_pool",
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			100+i*10, // Offset priority after main charts
+		)
 	}
 	
 	// Extract ALL RangeStatistics
@@ -575,18 +613,33 @@ func (w *WebSpherePMI) parseJDBCDataSource(stat *pmiStat, instance, nodeName, se
 		}
 	}
 	
-	// Extract ALL TimeStatistics
+	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
-	for _, metric := range timeMetrics {
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+		{Key: "datasource", Value: dsName},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		// For WaitTime and UseTime, still collect the total for backward compatibility
 		switch metric.Name {
 		case "WaitTime":
 			mx[fmt.Sprintf("jdbc_%s_wait_time_total", cleanInst)] = metric.Total
 		case "UseTime":
 			mx[fmt.Sprintf("jdbc_%s_use_time_total", cleanInst)] = metric.Total
-		default:
-			// For unknown time metrics, use collection helper
-			w.collectTimeMetric(mx, "jdbc", cleanInst, metric)
 		}
+		
+		// Process all TimeStatistics with the smart processor
+		w.processTimeStatisticWithContext(
+			"jdbc",
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			100+i*10, // Offset priority after main charts
+		)
 	}
 	
 	// Extract ALL RangeStatistics
@@ -780,11 +833,24 @@ func (w *WebSpherePMI) parseObjectPool(stat *pmiStat, nodeName, serverName strin
 		}
 	}
 	
-	// Extract ALL TimeStatistics
+	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
-	for _, metric := range timeMetrics {
-		// Use collection helper for all time metrics
-		w.collectTimeMetric(mx, "object_pool", cleanInst, metric)
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+		{Key: "pool", Value: poolName},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		w.processTimeStatisticWithContext(
+			"object_pool",
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			100+i*10, // Offset priority after main charts
+		)
 	}
 	
 	// Extract ALL RangeStatistics
