@@ -117,11 +117,23 @@ func (w *WebSpherePMI) parseWebApplicationsContainer(stat *pmiStat, nodeName, se
 		}
 	}
 	
-	// Extract ALL TimeStatistics
+	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
-	for _, metric := range timeMetrics {
-		// Use collection helper for all time metrics
-		w.collectTimeMetric(mx, "webapp_container", cleanInst, metric)
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		w.processTimeStatisticWithContext(
+			"webapp_container",
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			100+i*10, // Offset priority after main charts
+		)
 	}
 	
 	// Extract ALL RangeStatistics
@@ -181,11 +193,24 @@ func (w *WebSpherePMI) parseWebApplication(stat *pmiStat, nodeName, serverName s
 		}
 	}
 	
-	// Extract ALL TimeStatistics
+	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
-	for _, metric := range timeMetrics {
-		// Use collection helper for all time metrics
-		w.collectTimeMetric(mx, "webapp", cleanInst, metric)
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+		{Key: "app", Value: appName},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		w.processTimeStatisticWithContext(
+			"webapp",
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			100+i*10, // Offset priority after main charts
+		)
 	}
 	
 	// Extract ALL RangeStatistics
@@ -261,19 +286,26 @@ func (w *WebSpherePMI) parseServlet(stat *pmiStat, nodeName, serverName, appName
 		}
 	}
 	
-	// Extract ALL TimeStatistics
+	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
-	for _, metric := range timeMetrics {
-		switch metric.Name {
-		case "ServiceTime":
-			mx[fmt.Sprintf("servlet_%s_service_time_total", cleanInst)] = metric.Total
-			mx[fmt.Sprintf("servlet_%s_service_time_count", cleanInst)] = metric.Count
-		case "AsyncContext Response Time":
-			mx[fmt.Sprintf("servlet_%s_async_response_time_total", cleanInst)] = metric.Total
-		default:
-			// For unknown time metrics, use collection helper
-			w.collectTimeMetric(mx, "servlet", cleanInst, metric)
-		}
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+		{Key: "app", Value: appName},
+		{Key: "servlet", Value: servletName},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		// Process all TimeStatistics with the smart processor
+		w.processTimeStatisticWithContext(
+			"servlet",
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			100+i*10, // Offset priority after main charts
+		)
 	}
 	
 	// Extract ALL RangeStatistics
@@ -309,25 +341,6 @@ func (w *WebSpherePMI) parseServlet(stat *pmiStat, nodeName, serverName, appName
 		w.collectDoubleMetric(mx, "servlet", cleanInst, metric)
 	}
 	
-	// Special handling for ServiceTime count (not handled by helper)
-	for _, ts := range stat.TimeStatistics {
-		if ts.Name == "ServiceTime" {
-			if count, err := strconv.ParseInt(ts.Count, 10, 64); err == nil {
-				mx[fmt.Sprintf("servlet_%s_service_time_count", w.cleanID(instance))] = count
-			} else {
-				w.Errorf("ISSUE: parseServlet failed to parse ServiceTime count value '%s': %v", ts.Count, err)
-			}
-		}
-		if ts.Name == "AsyncContext Response Time" {
-			total := ts.TotalTime
-			if total == "" {
-				total = ts.Total
-			}
-			if val, err := strconv.ParseInt(total, 10, 64); err == nil {
-				mx[fmt.Sprintf("servlet_%s_async_response_time_total", w.cleanID(instance))] = val
-			}
-		}
-	}
 }
 
 // parseSessionManagerContainer handles the Servlet Session Manager
@@ -393,26 +406,25 @@ func (w *WebSpherePMI) parseSessionMetrics(stat *pmiStat, instance, nodeName, se
 		}
 	}
 	
-	// Extract ALL TimeStatistics
+	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
-	for _, metric := range timeMetrics {
-		switch metric.Name {
-		case "ExternalReadTime":
-			mx[fmt.Sprintf("sessions_%s_external_read_time_total", cleanInst)] = metric.Total
-		case "ExternalWriteTime":
-			mx[fmt.Sprintf("sessions_%s_external_write_time_total", cleanInst)] = metric.Total
-		case "LifeTime":
-			mx[fmt.Sprintf("sessions_%s_life_time_total", cleanInst)] = metric.Total
-		case "SessionObjectSize":
-			mx[fmt.Sprintf("sessions_%s_object_size_total", cleanInst)] = metric.Total
-			// Ensure chart exists for SessionObjectSize as TimeStatistic
-			w.ensureSessionObjectSizeTimeChart(instance, nodeName, serverName, appName)
-		case "TimeSinceLastActivated":
-			mx[fmt.Sprintf("sessions_%s_time_since_activated_total", cleanInst)] = metric.Total
-		default:
-			// For unknown time metrics, use collection helper
-			w.collectTimeMetric(mx, "sessions", cleanInst, metric)
-		}
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+		{Key: "app", Value: appName},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		// Process all TimeStatistics with the smart processor
+		w.processTimeStatisticWithContext(
+			"sessions",
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			100+i*10, // Offset priority after main charts
+		)
 	}
 	
 	// Extract ALL RangeStatistics
@@ -494,10 +506,23 @@ func (w *WebSpherePMI) parseCacheComponent(stat *pmiStat, nodeName, serverName s
 		}
 	}
 	
-	// Extract ALL TimeStatistics
+	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
-	for _, metric := range timeMetrics {
-		w.collectTimeMetric(mx, "cache", cleanInst, metric)
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		w.processTimeStatisticWithContext(
+			"cache",
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			100+i*10, // Offset priority after main charts
+		)
 	}
 	
 	// Extract ALL RangeStatistics
@@ -564,11 +589,23 @@ func (w *WebSpherePMI) parseDynamicCacheContainer(stat *pmiStat, nodeName, serve
 		}
 	}
 	
-	// Extract ALL TimeStatistics
+	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
-	for _, metric := range timeMetrics {
-		// Use collection helper for all time metrics
-		w.collectTimeMetric(mx, "cache", cleanInst, metric)
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		w.processTimeStatisticWithContext(
+			"cache",
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			100+i*10, // Offset priority after main charts
+		)
 	}
 	
 	// Extract ALL RangeStatistics
@@ -637,10 +674,23 @@ func (w *WebSpherePMI) parseCacheObject(stat *pmiStat, nodeName, serverName stri
 		}
 	}
 	
-	// Extract ALL other statistic types at top level
+	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
-	for _, metric := range timeMetrics {
-		w.collectTimeMetric(mx, "object_cache", cleanInst, metric)
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		w.processTimeStatisticWithContext(
+			"object_cache",
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			100+i*10, // Offset priority after main charts
+		)
 	}
 	
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
@@ -729,10 +779,17 @@ func (w *WebSpherePMI) parseCacheObject(stat *pmiStat, nodeName, serverName stri
 						}
 					}
 					
-					// Also process any other statistic types in Counters
+					// Also process any other statistic types in Counters with smart processor
 					counterTimeMetrics := w.extractTimeStatistics(counters.TimeStatistics)
-					for _, metric := range counterTimeMetrics {
-						w.collectTimeMetric(mx, "object_cache", cleanInst, metric)
+					for j, metric := range counterTimeMetrics {
+						w.processTimeStatisticWithContext(
+							"object_cache",
+							cleanInst,
+							labels,
+							metric,
+							mx,
+							200+j*10, // Higher priority offset for counter metrics
+						)
 					}
 					
 					counterRangeMetrics := w.extractRangeStatistics(counters.RangeStatistics)
@@ -785,16 +842,24 @@ func (w *WebSpherePMI) parseORB(stat *pmiStat, nodeName, serverName string, mx m
 		}
 	}
 	
-	// Extract ALL TimeStatistics
+	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
-	for _, metric := range timeMetrics {
-		switch metric.Name {
-		case "LookupTime":
-			mx[fmt.Sprintf("orb_%s_lookup_time_total", cleanInst)] = metric.Total
-		default:
-			// For unknown time metrics, use collection helper
-			w.collectTimeMetric(mx, "orb", cleanInst, metric)
-		}
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		// Process all TimeStatistics with the smart processor
+		w.processTimeStatisticWithContext(
+			"orb",
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			100+i*10, // Offset priority after main charts
+		)
 	}
 	
 	// Extract ALL RangeStatistics
@@ -1238,48 +1303,6 @@ var webAppContainerChartsTmpl = module.Charts{
 			{ID: "webapp_container_%s_URIConcurrentRequests_integral", Name: "uri_integral", DimOpts: module.DimOpts{Hidden: true}},
 		},
 	},
-	{
-		ID:       "webapp_container_%s_response_time",
-		Title:    "Web Application Container Response Time",
-		Units:    "milliseconds",
-		Fam:      "web/containers",
-		Ctx:      "websphere_pmi.webapp_container_response_time",
-		Type:     module.Line,
-		Priority: prioWebApps + 32,
-		Dims: module.Dims{
-			{ID: "webapp_container_%s_ServiceTime_mean", Name: "service_mean"},
-			{ID: "webapp_container_%s_AsyncContext_Response_Time_mean", Name: "async_mean"},
-			{ID: "webapp_container_%s_URIServiceTime_mean", Name: "uri_service_mean"},
-			{ID: "webapp_container_%s_URL_AsyncContext_Response_Time_mean", Name: "url_async_mean"},
-		},
-	},
-	{
-		ID:       "webapp_container_%s_response_time_total",
-		Title:    "Web Application Container Response Time Total",
-		Units:    "milliseconds/s",
-		Fam:      "web/containers",
-		Ctx:      "websphere_pmi.webapp_container_response_time_total",
-		Type:     module.Line,
-		Priority: prioWebApps + 32,
-		Dims: module.Dims{
-			{ID: "webapp_container_%s_ServiceTime_total", Name: "service_total", Algo: module.Incremental},
-			{ID: "webapp_container_%s_AsyncContext_Response_Time_total", Name: "async_total", Algo: module.Incremental},
-			{ID: "webapp_container_%s_URIServiceTime_total", Name: "uri_service_total", Algo: module.Incremental},
-			{ID: "webapp_container_%s_URL_AsyncContext_Response_Time_total", Name: "url_async_total", Algo: module.Incremental},
-			{ID: "webapp_container_%s_ServiceTime_count", Name: "service_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "webapp_container_%s_ServiceTime_min", Name: "service_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "webapp_container_%s_ServiceTime_max", Name: "service_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "webapp_container_%s_AsyncContext_Response_Time_count", Name: "async_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "webapp_container_%s_AsyncContext_Response_Time_min", Name: "async_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "webapp_container_%s_AsyncContext_Response_Time_max", Name: "async_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "webapp_container_%s_URIServiceTime_count", Name: "uri_service_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "webapp_container_%s_URIServiceTime_min", Name: "uri_service_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "webapp_container_%s_URIServiceTime_max", Name: "uri_service_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "webapp_container_%s_URL_AsyncContext_Response_Time_count", Name: "url_async_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "webapp_container_%s_URL_AsyncContext_Response_Time_min", Name: "url_async_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "webapp_container_%s_URL_AsyncContext_Response_Time_max", Name: "url_async_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-		},
-	},
 	// Portlet-specific charts
 	{
 		ID:       "webapp_container_%s_portlets",
@@ -1320,48 +1343,6 @@ var webAppContainerChartsTmpl = module.Charts{
 			{ID: "webapp_container_%s_Number_of_concurrent_portlet_requests_high_watermark", Name: "high_watermark", DimOpts: module.DimOpts{Hidden: true}},
 			{ID: "webapp_container_%s_Number_of_concurrent_portlet_requests_low_watermark", Name: "low_watermark", DimOpts: module.DimOpts{Hidden: true}},
 			{ID: "webapp_container_%s_Number_of_concurrent_portlet_requests_integral", Name: "integral", DimOpts: module.DimOpts{Hidden: true}},
-		},
-	},
-	{
-		ID:       "webapp_container_%s_portlet_response_time",
-		Title:    "Web Application Container Portlet Response Time",
-		Units:    "milliseconds",
-		Fam:      "web/containers",
-		Ctx:      "websphere_pmi.webapp_container_portlet_response_time",
-		Type:     module.Line,
-		Priority: prioWebApps + 36,
-		Dims: module.Dims{
-			{ID: "webapp_container_%s_Response_time_of_portlet_action_mean", Name: "action_mean"},
-			{ID: "webapp_container_%s_Response_time_of_portlet_render_mean", Name: "render_mean"},
-			{ID: "webapp_container_%s_Response_time_of_a_portlet_processEvent_request_mean", Name: "event_mean"},
-			{ID: "webapp_container_%s_Response_time_of_a_portlet_serveResource_request_mean", Name: "resource_mean"},
-		},
-	},
-	{
-		ID:       "webapp_container_%s_portlet_response_time_total",
-		Title:    "Web Application Container Portlet Response Time Total",
-		Units:    "milliseconds/s",
-		Fam:      "web/containers",
-		Ctx:      "websphere_pmi.webapp_container_portlet_response_time_total",
-		Type:     module.Line,
-		Priority: prioWebApps + 30 + 7,
-		Dims: module.Dims{
-			{ID: "webapp_container_%s_Response_time_of_portlet_action_total", Name: "action_total", Algo: module.Incremental},
-			{ID: "webapp_container_%s_Response_time_of_portlet_render_total", Name: "render_total", Algo: module.Incremental},
-			{ID: "webapp_container_%s_Response_time_of_a_portlet_processEvent_request_total", Name: "event_total", Algo: module.Incremental},
-			{ID: "webapp_container_%s_Response_time_of_a_portlet_serveResource_request_total", Name: "resource_total", Algo: module.Incremental},
-			{ID: "webapp_container_%s_Response_time_of_portlet_action_count", Name: "action_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "webapp_container_%s_Response_time_of_portlet_action_min", Name: "action_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "webapp_container_%s_Response_time_of_portlet_action_max", Name: "action_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "webapp_container_%s_Response_time_of_portlet_render_count", Name: "render_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "webapp_container_%s_Response_time_of_portlet_render_min", Name: "render_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "webapp_container_%s_Response_time_of_portlet_render_max", Name: "render_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "webapp_container_%s_Response_time_of_a_portlet_processEvent_request_count", Name: "event_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "webapp_container_%s_Response_time_of_a_portlet_processEvent_request_min", Name: "event_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "webapp_container_%s_Response_time_of_a_portlet_processEvent_request_max", Name: "event_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "webapp_container_%s_Response_time_of_a_portlet_serveResource_request_count", Name: "resource_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "webapp_container_%s_Response_time_of_a_portlet_serveResource_request_min", Name: "resource_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "webapp_container_%s_Response_time_of_a_portlet_serveResource_request_max", Name: "resource_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
 		},
 	},
 }
@@ -1514,31 +1495,6 @@ var servletChartsTmpl = module.Charts{
 		},
 	},
 	{
-		ID:       "servlet_%s_response_time",
-		Title:    "Servlet Response Time",
-		Units:    "milliseconds/s",
-		Fam:      "web/servlets",
-		Ctx:      "websphere_pmi.servlet_response_time",
-		Type:     module.Line,
-		Priority: prioWebServlets + 110,
-		Dims: module.Dims{
-			{ID: "servlet_%s_service_time_total", Name: "service_time", Algo: module.Incremental},
-			{ID: "servlet_%s_async_response_time_total", Name: "async_time", Algo: module.Incremental},
-		},
-	},
-	{
-		ID:       "servlet_%s_service_count",
-		Title:    "Servlet Service Count",
-		Units:    "requests",
-		Fam:      "web/servlets",
-		Ctx:      "websphere_pmi.servlet_service_count",
-		Type:     module.Line,
-		Priority: prioWebServlets + 120,
-		Dims: module.Dims{
-			{ID: "servlet_%s_service_time_count", Name: "service_count"},
-		},
-	},
-	{
 		ID:       "servlet_%s_concurrent",
 		Title:    "Servlet Concurrent Requests",
 		Units:    "requests",
@@ -1593,32 +1549,6 @@ var sessionChartsTmpl = module.Charts{
 			{ID: "sessions_%s_activate_nonexist", Name: "activate_nonexist", Algo: module.Incremental},
 			{ID: "sessions_%s_affinity_break", Name: "affinity_break", Algo: module.Incremental},
 			{ID: "sessions_%s_cache_discard", Name: "cache_discard", Algo: module.Incremental},
-		},
-	},
-	{
-		ID:       "sessions_%s_external_time",
-		Title:    "Session External Storage Time",
-		Units:    "milliseconds/s",
-		Fam:      "web/sessions",
-		Ctx:      "websphere_pmi.sessions_external_time",
-		Type:     module.Line,
-		Priority: prioWebSessions + 10 + 2,
-		Dims: module.Dims{
-			{ID: "sessions_%s_external_read_time_total", Name: "read_time", Algo: module.Incremental},
-			{ID: "sessions_%s_external_write_time_total", Name: "write_time", Algo: module.Incremental},
-		},
-	},
-	{
-		ID:       "sessions_%s_timing",
-		Title:    "Session Timing",
-		Units:    "milliseconds/s",
-		Fam:      "web/sessions",
-		Ctx:      "websphere_pmi.sessions_timing",
-		Type:     module.Line,
-		Priority: prioWebSessions + 10 + 3,
-		Dims: module.Dims{
-			{ID: "sessions_%s_life_time_total", Name: "life_time", Algo: module.Incremental},
-			{ID: "sessions_%s_time_since_activated_total", Name: "time_since_activated", Algo: module.Incremental},
 		},
 	},
 	// New charts for discovered AverageStatistics
@@ -1736,19 +1666,6 @@ var jcaPoolChartsTmpl = module.Charts{
 		Priority: prioJCAPools + 5,
 		Dims: module.Dims{
 			{ID: "jca_pool_%s_waiting_threads", Name: "waiting"},
-		},
-	},
-	{
-		ID:       "jca_pool_%s_time",
-		Title:    "JCA Connection Pool Time",
-		Units:    "milliseconds/s",
-		Fam:      "connections/jca",
-		Ctx:      "websphere_pmi.jca_pool_time",
-		Type:     module.Line,
-		Priority: prioJCAPools + 6,
-		Dims: module.Dims{
-			{ID: "jca_pool_%s_wait_time_total", Name: "wait_time", Algo: module.Incremental},
-			{ID: "jca_pool_%s_use_time_total", Name: "use_time", Algo: module.Incremental},
 		},
 	},
 }
@@ -1978,18 +1895,6 @@ var orbChartsTmpl = module.Charts{
 			{ID: "orb_%s_concurrent_requests", Name: "concurrent"},
 		},
 	},
-	{
-		ID:       "orb_%s_lookup_time",
-		Title:    "ORB Lookup Time",
-		Units:    "milliseconds/s",
-		Fam:      "orb",
-		Ctx:      "websphere_pmi.orb_lookup_time",
-		Type:     module.Line,
-		Priority: prioORB + 20,
-		Dims: module.Dims{
-			{ID: "orb_%s_lookup_time_total", Name: "lookup_time", Algo: module.Incremental},
-		},
-	},
 }
 
 // parseJCAConnectionPool handles JCA Connection Pool metrics
@@ -2030,18 +1935,25 @@ func (w *WebSpherePMI) parseJCAConnectionPool(stat *pmiStat, nodeName, serverNam
 		}
 	}
 	
-	// Extract ALL TimeStatistics
+	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
-	for _, metric := range timeMetrics {
-		switch metric.Name {
-		case "WaitTime":
-			mx[fmt.Sprintf("jca_pool_%s_wait_time_total", cleanInst)] = metric.Total
-		case "UseTime":
-			mx[fmt.Sprintf("jca_pool_%s_use_time_total", cleanInst)] = metric.Total
-		default:
-			// For unknown time metrics, use collection helper
-			w.collectTimeMetric(mx, "jca_pool", cleanInst, metric)
-		}
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+		{Key: "pool", Value: poolName},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		// Process all TimeStatistics with the smart processor
+		w.processTimeStatisticWithContext(
+			"jca_pool",
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			100+i*10, // Offset priority after main charts
+		)
 	}
 	
 	// Extract ALL RangeStatistics
@@ -2625,16 +2537,24 @@ func (w *WebSpherePMI) parseMDB(stat *pmiStat, nodeName, serverName string, mx m
 		}
 	}
 	
-	// Extract ALL TimeStatistics
+	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
-	for _, metric := range timeMetrics {
-		switch metric.Name {
-		case "ServiceTime":
-			mx[fmt.Sprintf("mdb_%s_service_time_total", cleanInst)] = metric.Total
-		default:
-			// For unknown time metrics, use collection helper
-			w.collectTimeMetric(mx, "mdb", cleanInst, metric)
-		}
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+		{Key: "bean", Value: beanName},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		w.processTimeStatisticWithContext(
+			"mdb",
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			100+i*10, // Offset priority after main charts
+		)
 	}
 	
 	// Extract ALL RangeStatistics
@@ -2769,16 +2689,24 @@ func (w *WebSpherePMI) parseStatelessSessionBean(stat *pmiStat, nodeName, server
 		}
 	}
 	
-	// Extract ALL TimeStatistics
+	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
-	for _, metric := range timeMetrics {
-		switch metric.Name {
-		case "ServiceTime":
-			mx[fmt.Sprintf("slsb_%s_service_time_total", cleanInst)] = metric.Total
-		default:
-			// For unknown time metrics, use collection helper
-			w.collectTimeMetric(mx, "slsb", cleanInst, metric)
-		}
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+		{Key: "bean", Value: beanName},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		w.processTimeStatisticWithContext(
+			"slsb",
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			100+i*10, // Offset priority after main charts
+		)
 	}
 	
 	// Extract ALL RangeStatistics
@@ -2926,16 +2854,24 @@ func (w *WebSpherePMI) parseIndividualEJB(stat *pmiStat, nodeName, serverName st
 		}
 	}
 	
-	// Extract ALL TimeStatistics
+	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
-	for _, metric := range timeMetrics {
-		switch metric.Name {
-		case "ServiceTime", "ResponseTime":
-			mx[fmt.Sprintf("generic_ejb_%s_service_time_total", cleanInst)] = metric.Total
-		default:
-			// For unknown time metrics, use collection helper
-			w.collectTimeMetric(mx, "generic_ejb", cleanInst, metric)
-		}
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+		{Key: "bean", Value: beanName},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		w.processTimeStatisticWithContext(
+			"generic_ejb",
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			100+i*10, // Offset priority after main charts
+		)
 	}
 	
 	// Extract ALL RangeStatistics
@@ -3260,18 +3196,23 @@ func (w *WebSpherePMI) parseServletsComponent(stat *pmiStat, nodeName, serverNam
 		}
 	}
 	
-	// Extract ALL TimeStatistics
+	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
-	for _, metric := range timeMetrics {
-		switch metric.Name {
-		case "ServiceTime":
-			mx[fmt.Sprintf("servlets_component_%s_service_time", cleanInst)] = metric.Total
-		case "AsyncContext Response Time":
-			mx[fmt.Sprintf("servlets_component_%s_async_response_time", cleanInst)] = metric.Total
-		default:
-			// For unknown time metrics, use collection helper
-			w.collectTimeMetric(mx, "servlets_component", cleanInst, metric)
-		}
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		w.processTimeStatisticWithContext(
+			"servlets_component",
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			100+i*10, // Offset priority after main charts
+		)
 	}
 	
 	// Extract ALL RangeStatistics
@@ -3338,22 +3279,23 @@ func (w *WebSpherePMI) parseWIMComponent(stat *pmiStat, nodeName, serverName str
 		}
 	}
 	
-	// Extract ALL TimeStatistics
+	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
-	for _, metric := range timeMetrics {
-		switch metric.Name {
-		case "Response time of portlet render":
-			mx[fmt.Sprintf("wim_%s_render_time", cleanInst)] = metric.Total
-		case "Response time of portlet action":
-			mx[fmt.Sprintf("wim_%s_action_time", cleanInst)] = metric.Total
-		case "Response time of a portlet processEvent request":
-			mx[fmt.Sprintf("wim_%s_process_event_time", cleanInst)] = metric.Total
-		case "Response time of a portlet serveResource request":
-			mx[fmt.Sprintf("wim_%s_serve_resource_time", cleanInst)] = metric.Total
-		default:
-			// For unknown time metrics, use collection helper
-			w.collectTimeMetric(mx, "wim", cleanInst, metric)
-		}
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		w.processTimeStatisticWithContext(
+			"wim",
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			100+i*10, // Offset priority after main charts
+		)
 	}
 	
 	// Extract ALL RangeStatistics
@@ -3400,15 +3342,23 @@ func (w *WebSpherePMI) parseWLMTaggedComponentManager(stat *pmiStat, nodeName, s
 		w.collectCountMetric(mx, "wlm_tagged", cleanInst, metric)
 	}
 	
-	// Extract ALL TimeStatistics (only ProcessingTime expected)
+	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
-	for _, metric := range timeMetrics {
-		switch metric.Name {
-		case "ProcessingTime":
-			mx[fmt.Sprintf("wlm_tagged_%s_processing_time", cleanInst)] = metric.Total
-		default:
-			w.collectTimeMetric(mx, "wlm_tagged", cleanInst, metric)
-		}
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		w.processTimeStatisticWithContext(
+			"wlm_tagged",
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			100+i*10, // Offset priority after main charts
+		)
 	}
 	
 	// Extract ALL RangeStatistics (none expected)
@@ -3465,18 +3415,23 @@ func (w *WebSpherePMI) parsePMIWebServiceService(stat *pmiStat, nodeName, server
 		}
 	}
 	
-	// Extract ALL TimeStatistics
+	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
-	for _, metric := range timeMetrics {
-		switch metric.Name {
-		case "ResponseTimeService":
-			mx[fmt.Sprintf("pmi_webservice_%s_response_time", cleanInst)] = metric.Total
-		case "RequestResponseService":
-			mx[fmt.Sprintf("pmi_webservice_%s_request_response_time", cleanInst)] = metric.Total
-		default:
-			// For unknown time metrics, use collection helper
-			w.collectTimeMetric(mx, "pmi_webservice", cleanInst, metric)
-		}
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		w.processTimeStatisticWithContext(
+			"pmi_webservice",
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			100+i*10, // Offset priority after main charts
+		)
 	}
 	
 	// Extract ALL RangeStatistics
@@ -3544,16 +3499,23 @@ func (w *WebSpherePMI) parseTCPChannelDCS(stat *pmiStat, nodeName, serverName st
 		}
 	}
 	
-	// Extract ALL TimeStatistics
+	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
-	for _, metric := range timeMetrics {
-		switch metric.Name {
-		case "ActiveTime":
-			mx[fmt.Sprintf("tcp_dcs_%s_active_time", cleanInst)] = metric.Total
-		default:
-			// For unknown time metrics, use collection helper
-			w.collectTimeMetric(mx, "tcp_dcs", cleanInst, metric)
-		}
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		w.processTimeStatisticWithContext(
+			"tcp_dcs",
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			100+i*10, // Offset priority after main charts
+		)
 	}
 	
 	// Extract ALL RangeStatistics
@@ -3690,22 +3652,23 @@ func (w *WebSpherePMI) parseISCProductDetails(stat *pmiStat, nodeName, serverNam
 		}
 	}
 	
-	// Extract ALL TimeStatistics
+	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
-	for _, metric := range timeMetrics {
-		switch metric.Name {
-		case "Response time of portlet render":
-			mx[fmt.Sprintf("isc_product_%s_render_time", cleanInst)] = metric.Total
-		case "Response time of portlet action":
-			mx[fmt.Sprintf("isc_product_%s_action_time", cleanInst)] = metric.Total
-		case "Response time of a portlet processEvent request":
-			mx[fmt.Sprintf("isc_product_%s_process_event_time", cleanInst)] = metric.Total
-		case "Response time of a portlet serveResource request":
-			mx[fmt.Sprintf("isc_product_%s_serve_resource_time", cleanInst)] = metric.Total
-		default:
-			// For unknown time metrics, use collection helper
-			w.collectTimeMetric(mx, "isc_product", cleanInst, metric)
-		}
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		w.processTimeStatisticWithContext(
+			"isc_product",
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			100+i*10, // Offset priority after main charts
+		)
 	}
 	
 	// Extract ALL RangeStatistics
@@ -4321,29 +4284,23 @@ func (w *WebSpherePMI) parseSecurityAuthentication(stat *pmiStat, nodeName, serv
 		}
 	}
 	
-	// Extract ALL TimeStatistics
+	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
-	for _, metric := range timeMetrics {
-		switch metric.Name {
-		// Traditional WebSphere detailed metrics
-		case "WebAuthenticationTime":
-			mx[fmt.Sprintf("security_auth_%s_web_auth_time_total", cleanInst)] = metric.Total
-		case "TAIRequestTime":
-			mx[fmt.Sprintf("security_auth_%s_tai_time_total", cleanInst)] = metric.Total
-		case "IdentityAssertionTime":
-			mx[fmt.Sprintf("security_auth_%s_identity_time_total", cleanInst)] = metric.Total
-		case "BasicAuthenticationTime":
-			mx[fmt.Sprintf("security_auth_%s_basic_auth_time_total", cleanInst)] = metric.Total
-		case "TokenAuthenticationTime":
-			mx[fmt.Sprintf("security_auth_%s_token_auth_time_total", cleanInst)] = metric.Total
-		// Liberty/generic metrics
-		case "AuthenticationResponseTime":
-			mx[fmt.Sprintf("security_auth_%s_response_time_total", cleanInst)] = metric.Total
-		default:
-			// For unknown time metrics, skip for now until charts are created
-			// w.collectTimeMetric(mx, "security_auth", cleanInst, metric)
-			w.Debugf("Skipping unknown security_auth time metric: %s", metric.Name)
-		}
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		w.processTimeStatisticWithContext(
+			"security_auth",
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			100+i*10, // Offset priority after main charts
+		)
 	}
 	
 	// Extract ALL RangeStatistics
@@ -4395,26 +4352,23 @@ func (w *WebSpherePMI) parseSecurityAuthorization(stat *pmiStat, nodeName, serve
 		w.collectCountMetric(mx, "security_authz", cleanInst, metric)
 	}
 	
-	// Extract ALL TimeStatistics
+	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
-	for _, metric := range timeMetrics {
-		switch metric.Name {
-		case "WebAuthorizationTime":
-			mx[fmt.Sprintf("security_authz_%s_web_authz_time_total", cleanInst)] = metric.Total
-			mx[fmt.Sprintf("security_authz_%s_web_authz_count", cleanInst)] = metric.Count
-		case "EJBAuthorizationTime":
-			mx[fmt.Sprintf("security_authz_%s_ejb_authz_time_total", cleanInst)] = metric.Total
-			mx[fmt.Sprintf("security_authz_%s_ejb_authz_count", cleanInst)] = metric.Count
-		case "AdminAuthorizationTime":
-			mx[fmt.Sprintf("security_authz_%s_admin_authz_time_total", cleanInst)] = metric.Total
-			mx[fmt.Sprintf("security_authz_%s_admin_authz_count", cleanInst)] = metric.Count
-		case "JACCAuthorizationTime":
-			mx[fmt.Sprintf("security_authz_%s_jacc_authz_time_total", cleanInst)] = metric.Total
-			mx[fmt.Sprintf("security_authz_%s_jacc_authz_count", cleanInst)] = metric.Count
-		default:
-			// For unknown time metrics, use collection helper
-			w.collectTimeMetric(mx, "security_authz", cleanInst, metric)
-		}
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		w.processTimeStatisticWithContext(
+			"security_authz",
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			100+i*10, // Offset priority after main charts
+		)
 	}
 	
 	// Extract ALL RangeStatistics
@@ -4466,84 +4420,15 @@ var securityAuthChartsTmpl = module.Charts{
 			{ID: "security_auth_%s_identity_assertions", Name: "identity", Algo: module.Incremental},
 		},
 	},
-	{
-		ID:       "security_auth_%s_timing",
-		Title:    "Security Authentication Response Time",
-		Units:    "milliseconds/s",
-		Fam:      "security/authentication",
-		Ctx:      "websphere_pmi.security_auth_timing",
-		Type:     module.Line,
-		Priority: prioSecurityAuth + 10,
-		Dims: module.Dims{
-			// Traditional WebSphere timing metrics (based on actual XML)
-			{ID: "security_auth_%s_web_auth_time_total", Name: "web", Algo: module.Incremental},
-			{ID: "security_auth_%s_basic_auth_time_total", Name: "basic", Algo: module.Incremental},
-			{ID: "security_auth_%s_token_auth_time_total", Name: "token", Algo: module.Incremental},
-			{ID: "security_auth_%s_tai_time_total", Name: "tai", Algo: module.Incremental},
-			{ID: "security_auth_%s_identity_time_total", Name: "identity", Algo: module.Incremental},
-		},
-	},
 }
 
 var securityAuthzChartsTmpl = module.Charts{
-	{
-		ID:       "security_authz_%s_events",
-		Title:    "Security Authorization Events",
-		Units:    "events/s",
-		Fam:      "security/authorization",
-		Ctx:      "websphere_pmi.security_authz_events",
-		Type:     module.Line,
-		Priority: prioSecurityAuthz,
-		Dims: module.Dims{
-			{ID: "security_authz_%s_web_authz_count", Name: "web", Algo: module.Incremental},
-			{ID: "security_authz_%s_ejb_authz_count", Name: "ejb", Algo: module.Incremental},
-			{ID: "security_authz_%s_admin_authz_count", Name: "admin", Algo: module.Incremental},
-			{ID: "security_authz_%s_jacc_authz_count", Name: "jacc", Algo: module.Incremental},
-		},
-	},
-	{
-		ID:       "security_authz_%s_timing",
-		Title:    "Security Authorization Response Time",
-		Units:    "milliseconds/s",
-		Fam:      "security/authorization",
-		Ctx:      "websphere_pmi.security_authz_timing",
-		Type:     module.Line,
-		Priority: prioSecurityAuthz + 10,
-		Dims: module.Dims{
-			{ID: "security_authz_%s_web_authz_time_total", Name: "web", Algo: module.Incremental},
-			{ID: "security_authz_%s_ejb_authz_time_total", Name: "ejb", Algo: module.Incremental},
-			{ID: "security_authz_%s_admin_authz_time_total", Name: "admin", Algo: module.Incremental},
-			{ID: "security_authz_%s_jacc_authz_time_total", Name: "jacc", Algo: module.Incremental},
-		},
-	},
+	// Empty - all timing is handled by smart processor
 }
 
 // Chart templates for new parsers
 var interceptorChartsTmpl = module.Charts{
-	{
-		ID:       "interceptor_%s_processing_time",
-		Title:    "Interceptor Processing Time",
-		Units:    "milliseconds/s",
-		Fam:      "interceptors",
-		Ctx:      "websphere_pmi.interceptor_processing_time",
-		Type:     module.Line,
-		Priority: prioInterceptors + 20,
-		Dims: module.Dims{
-			{ID: "interceptor_%s_processing_time_total", Name: "processing_time", Algo: module.Incremental},
-		},
-	},
-	{
-		ID:       "interceptor_%s_processing_count",
-		Title:    "Interceptor Processing Count",
-		Units:    "operations/s",
-		Fam:      "interceptors",
-		Ctx:      "websphere_pmi.interceptor_processing_count",
-		Type:     module.Line,
-		Priority: prioInterceptors + 20 + 1,
-		Dims: module.Dims{
-			{ID: "interceptor_%s_processing_count", Name: "operations", Algo: module.Incremental},
-		},
-	},
+	// Empty - all timing is handled by smart processor
 }
 
 var portletChartsTmpl = module.Charts{
@@ -4570,21 +4455,6 @@ var portletChartsTmpl = module.Charts{
 		Priority: prioWebPortlets + 1,
 		Dims: module.Dims{
 			{ID: "portlet_%s_concurrent", Name: "concurrent"},
-		},
-	},
-	{
-		ID:       "portlet_%s_response_time",
-		Title:    "Portlet Response Time",
-		Units:    "milliseconds/s",
-		Fam:      "web/portlets",
-		Ctx:      "websphere_pmi.portlet_response_time",
-		Type:     module.Line,
-		Priority: prioWebPortlets + 2,
-		Dims: module.Dims{
-			{ID: "portlet_%s_render_time_total", Name: "render", Algo: module.Incremental},
-			{ID: "portlet_%s_action_time_total", Name: "action", Algo: module.Incremental},
-			{ID: "portlet_%s_event_time_total", Name: "event", Algo: module.Incremental},
-			{ID: "portlet_%s_resource_time_total", Name: "resource", Algo: module.Incremental},
 		},
 	},
 }
@@ -4629,19 +4499,6 @@ var urlChartsTmpl = module.Charts{
 			{ID: "urls_%s_concurrent", Name: "concurrent"},
 		},
 	},
-	{
-		ID:       "urls_%s_response_time",
-		Title:    "URL Response Time",
-		Units:    "milliseconds/s",
-		Fam:      "web/urls",
-		Ctx:      "websphere_pmi.url_response_time",
-		Type:     module.Line,
-		Priority: prioWebServlets + 12,
-		Dims: module.Dims{
-			{ID: "urls_%s_service_time_total", Name: "service", Algo: module.Incremental},
-			{ID: "urls_%s_async_time_total", Name: "async", Algo: module.Incremental},
-		},
-	},
 }
 
 var servletURLChartsTmpl = module.Charts{
@@ -4667,26 +4524,6 @@ var servletURLChartsTmpl = module.Charts{
 		Priority: prioWebServlets + 21,
 		Dims: module.Dims{
 			{ID: "servlet_url_%s_concurrent", Name: "concurrent"},
-		},
-	},
-	{
-		ID:       "servlet_url_%s_response_time",
-		Title:    "Servlet URL Response Time",
-		Units:    "milliseconds/s",
-		Fam:      "web/urls",
-		Ctx:      "websphere_pmi.servlet_url_response_time",
-		Type:     module.Line,
-		Priority: prioWebServlets + 22,
-		Dims: module.Dims{
-			{ID: "servlet_url_%s_service_time_total", Name: "service", Algo: module.Incremental},
-			{ID: "servlet_url_%s_async_time_total", Name: "async", Algo: module.Incremental},
-			// Hidden dimensions for count, min, max
-			{ID: "servlet_url_%s_service_time_count", Name: "service_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "servlet_url_%s_service_time_min", Name: "service_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "servlet_url_%s_service_time_max", Name: "service_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "servlet_url_%s_async_time_count", Name: "async_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "servlet_url_%s_async_time_min", Name: "async_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "servlet_url_%s_async_time_max", Name: "async_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
 		},
 	},
 }
@@ -4717,19 +4554,6 @@ var haManagerChartsTmpl = module.Charts{
 			{ID: "ha_manager_%s_bulletin_subscriptions", Name: "subscriptions"},
 			{ID: "ha_manager_%s_local_bulletin_subjects", Name: "local_subjects"},
 			{ID: "ha_manager_%s_local_bulletin_subscriptions", Name: "local_subscriptions"},
-		},
-	},
-	{
-		ID:       "ha_manager_%s_rebuild_time",
-		Title:    "HA Manager Rebuild Time",
-		Units:    "milliseconds/s",
-		Fam:      "ha",
-		Ctx:      "websphere_pmi.ha_manager_rebuild_time",
-		Type:     module.Line,
-		Priority: prioHAManager + 2,
-		Dims: module.Dims{
-			{ID: "ha_manager_%s_group_rebuild_time_total", Name: "group_rebuild", Algo: module.Incremental},
-			{ID: "ha_manager_%s_bulletin_rebuild_time_total", Name: "bulletin_rebuild", Algo: module.Incremental},
 		},
 	},
 }
@@ -4856,17 +4680,24 @@ func (w *WebSpherePMI) parseIndividualInterceptor(stat *pmiStat, nodeName, serve
 		w.collectCountMetric(mx, "interceptor", cleanInst, metric)
 	}
 	
-	// Extract ALL TimeStatistics
+	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
-	for _, metric := range timeMetrics {
-		switch metric.Name {
-		case "ProcessingTime":
-			mx[fmt.Sprintf("interceptor_%s_processing_time_total", cleanInst)] = metric.Total
-			mx[fmt.Sprintf("interceptor_%s_processing_count", cleanInst)] = metric.Count
-		default:
-			// For unknown time metrics, use collection helper
-			w.collectTimeMetric(mx, "interceptor", cleanInst, metric)
-		}
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+		{Key: "interceptor", Value: interceptorName},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		w.processTimeStatisticWithContext(
+			"interceptor",
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			100+i*10, // Offset priority after main charts
+		)
 	}
 	
 	// Extract ALL RangeStatistics
@@ -4926,22 +4757,24 @@ func (w *WebSpherePMI) parsePortlet(stat *pmiStat, nodeName, serverName string, 
 		}
 	}
 	
-	// Extract ALL TimeStatistics
+	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
-	for _, metric := range timeMetrics {
-		switch metric.Name {
-		case "Response time of portlet render":
-			mx[fmt.Sprintf("portlet_%s_render_time_total", cleanInst)] = metric.Total
-		case "Response time of portlet action":
-			mx[fmt.Sprintf("portlet_%s_action_time_total", cleanInst)] = metric.Total
-		case "Response time of a portlet processEvent request":
-			mx[fmt.Sprintf("portlet_%s_event_time_total", cleanInst)] = metric.Total
-		case "Response time of a portlet serveResource request":
-			mx[fmt.Sprintf("portlet_%s_resource_time_total", cleanInst)] = metric.Total
-		default:
-			// For unknown time metrics, use collection helper
-			w.collectTimeMetric(mx, "portlet", cleanInst, metric)
-		}
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+		{Key: "portlet", Value: portletName},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		w.processTimeStatisticWithContext(
+			"portlet",
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			100+i*10, // Offset priority after main charts
+		)
 	}
 	
 	// Extract ALL RangeStatistics
@@ -5065,18 +4898,23 @@ func (w *WebSpherePMI) parseURLContainer(stat *pmiStat, nodeName, serverName str
 		}
 	}
 	
-	// Extract ALL TimeStatistics
+	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
-	for _, metric := range timeMetrics {
-		switch metric.Name {
-		case "URIServiceTime":
-			mx[fmt.Sprintf("urls_%s_service_time_total", cleanInst)] = metric.Total
-		case "URL AsyncContext Response Time":
-			mx[fmt.Sprintf("urls_%s_async_time_total", cleanInst)] = metric.Total
-		default:
-			// For unknown time metrics, use collection helper
-			w.collectTimeMetric(mx, "urls", cleanInst, metric)
-		}
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		w.processTimeStatisticWithContext(
+			"urls",
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			100+i*10, // Offset priority after main charts
+		)
 	}
 	
 	// Extract ALL RangeStatistics
@@ -5139,24 +4977,24 @@ func (w *WebSpherePMI) parseServletURL(stat *pmiStat, nodeName, serverName strin
 		}
 	}
 	
-	// Extract ALL TimeStatistics
+	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
-	for _, metric := range timeMetrics {
-		switch metric.Name {
-		case "URIServiceTime":
-			mx[fmt.Sprintf("servlet_url_%s_service_time_total", cleanInst)] = metric.Total
-			mx[fmt.Sprintf("servlet_url_%s_service_time_count", cleanInst)] = metric.Count
-			mx[fmt.Sprintf("servlet_url_%s_service_time_min", cleanInst)] = metric.Min
-			mx[fmt.Sprintf("servlet_url_%s_service_time_max", cleanInst)] = metric.Max
-		case "URL AsyncContext Response Time":
-			mx[fmt.Sprintf("servlet_url_%s_async_time_total", cleanInst)] = metric.Total
-			mx[fmt.Sprintf("servlet_url_%s_async_time_count", cleanInst)] = metric.Count
-			mx[fmt.Sprintf("servlet_url_%s_async_time_min", cleanInst)] = metric.Min
-			mx[fmt.Sprintf("servlet_url_%s_async_time_max", cleanInst)] = metric.Max
-		default:
-			// For unknown time metrics, use collection helper
-			w.collectTimeMetric(mx, "servlet_url", cleanInst, metric)
-		}
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+		{Key: "url", Value: urlPath},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		w.processTimeStatisticWithContext(
+			"servlet_url",
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			100+i*10, // Offset priority after main charts
+		)
 	}
 	
 	// Extract ALL RangeStatistics
@@ -5213,18 +5051,23 @@ func (w *WebSpherePMI) parseHAManager(stat *pmiStat, nodeName, serverName string
 		w.collectCountMetric(mx, "ha_manager", cleanInst, metric)
 	}
 	
-	// Extract ALL TimeStatistics
+	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
-	for _, metric := range timeMetrics {
-		switch metric.Name {
-		case "GroupStateRebuildTime":
-			mx[fmt.Sprintf("ha_manager_%s_group_rebuild_time_total", cleanInst)] = metric.Total
-		case "BulletinBoardRebuildTime":
-			mx[fmt.Sprintf("ha_manager_%s_bulletin_rebuild_time_total", cleanInst)] = metric.Total
-		default:
-			// For unknown time metrics, use collection helper
-			w.collectTimeMetric(mx, "ha_manager", cleanInst, metric)
-		}
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		w.processTimeStatisticWithContext(
+			"ha_manager",
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			100+i*10, // Offset priority after main charts
+		)
 	}
 	
 	// Extract ALL RangeStatistics
@@ -5504,54 +5347,23 @@ func (w *WebSpherePMI) parseObjectCache(stat *pmiStat, nodeName, serverName stri
 		}
 	}
 	
-	// Extract ALL TimeStatistics
+	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
-	for _, metric := range timeMetrics {
-		switch metric.Name {
-		case "ObjectReadFromDiskTime":
-			mx[fmt.Sprintf("object_cache_%s_object_read_from_disk_time", cleanInst)] = metric.Count
-			mx[fmt.Sprintf("object_cache_%s_object_read_from_disk_time_total", cleanInst)] = metric.Total
-			mx[fmt.Sprintf("object_cache_%s_object_read_from_disk_time_min", cleanInst)] = metric.Min
-			mx[fmt.Sprintf("object_cache_%s_object_read_from_disk_time_max", cleanInst)] = metric.Max
-		case "ObjectWriteToDiskTime":
-			mx[fmt.Sprintf("object_cache_%s_object_write_to_disk_time", cleanInst)] = metric.Count
-			mx[fmt.Sprintf("object_cache_%s_object_write_to_disk_time_total", cleanInst)] = metric.Total
-			mx[fmt.Sprintf("object_cache_%s_object_write_to_disk_time_min", cleanInst)] = metric.Min
-			mx[fmt.Sprintf("object_cache_%s_object_write_to_disk_time_max", cleanInst)] = metric.Max
-		case "ObjectDeleteFromDiskTime":
-			mx[fmt.Sprintf("object_cache_%s_object_delete_from_disk_time", cleanInst)] = metric.Count
-			mx[fmt.Sprintf("object_cache_%s_object_delete_from_disk_time_total", cleanInst)] = metric.Total
-			mx[fmt.Sprintf("object_cache_%s_object_delete_from_disk_time_min", cleanInst)] = metric.Min
-			mx[fmt.Sprintf("object_cache_%s_object_delete_from_disk_time_max", cleanInst)] = metric.Max
-		case "AttributeReadFromDisk2KSize":
-			mx[fmt.Sprintf("object_cache_%s_attribute_read_from_disk_2k_size", cleanInst)] = metric.Count
-			mx[fmt.Sprintf("object_cache_%s_attribute_read_from_disk_2k_size_total", cleanInst)] = metric.Total
-			mx[fmt.Sprintf("object_cache_%s_attribute_read_from_disk_2k_size_min", cleanInst)] = metric.Min
-			mx[fmt.Sprintf("object_cache_%s_attribute_read_from_disk_2k_size_max", cleanInst)] = metric.Max
-		case "FromDisk5KSize":
-			mx[fmt.Sprintf("object_cache_%s_from_disk_5k_size", cleanInst)] = metric.Count
-			mx[fmt.Sprintf("object_cache_%s_from_disk_5k_size_total", cleanInst)] = metric.Total
-			mx[fmt.Sprintf("object_cache_%s_from_disk_5k_size_min", cleanInst)] = metric.Min
-			mx[fmt.Sprintf("object_cache_%s_from_disk_5k_size_max", cleanInst)] = metric.Max
-		case "AttributeReadFromDisk10KSize":
-			mx[fmt.Sprintf("object_cache_%s_attribute_read_from_disk_10k_size", cleanInst)] = metric.Count
-			mx[fmt.Sprintf("object_cache_%s_attribute_read_from_disk_10k_size_total", cleanInst)] = metric.Total
-			mx[fmt.Sprintf("object_cache_%s_attribute_read_from_disk_10k_size_min", cleanInst)] = metric.Min
-			mx[fmt.Sprintf("object_cache_%s_attribute_read_from_disk_10k_size_max", cleanInst)] = metric.Max
-		case "AttributeReadFromDisk40KSize":
-			mx[fmt.Sprintf("object_cache_%s_attribute_read_from_disk_40k_size", cleanInst)] = metric.Count
-			mx[fmt.Sprintf("object_cache_%s_attribute_read_from_disk_40k_size_total", cleanInst)] = metric.Total
-			mx[fmt.Sprintf("object_cache_%s_attribute_read_from_disk_40k_size_min", cleanInst)] = metric.Min
-			mx[fmt.Sprintf("object_cache_%s_attribute_read_from_disk_40k_size_max", cleanInst)] = metric.Max
-		case "AttributeReadFromDisk100KSize":
-			mx[fmt.Sprintf("object_cache_%s_attribute_read_from_disk_100k_size", cleanInst)] = metric.Count
-			mx[fmt.Sprintf("object_cache_%s_attribute_read_from_disk_100k_size_total", cleanInst)] = metric.Total
-			mx[fmt.Sprintf("object_cache_%s_attribute_read_from_disk_100k_size_min", cleanInst)] = metric.Min
-			mx[fmt.Sprintf("object_cache_%s_attribute_read_from_disk_100k_size_max", cleanInst)] = metric.Max
-		default:
-			// For unknown time metrics, use collection helper
-			w.collectTimeMetric(mx, "object_cache", cleanInst, metric)
-		}
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		w.processTimeStatisticWithContext(
+			"object_cache",
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			100+i*10, // Offset priority after main charts
+		)
 	}
 	
 	// Extract ALL RangeStatistics

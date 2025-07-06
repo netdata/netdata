@@ -59,6 +59,7 @@ func New() *WebSpherePMI {
 		loggedWarnings:     make(map[string]bool),
 		collectedInstances: make(map[string]bool),
 		seenInstances:      make(map[string]bool),
+		timeStatCache:      make(map[string]*timeStatCacheEntry),
 	}
 }
 
@@ -145,6 +146,15 @@ type WebSpherePMI struct {
 	// Instance tracking for proper collection
 	collectedInstances map[string]bool
 	seenInstances      map[string]bool
+	
+	// TimeStatistic processing
+	timeStatCache map[string]*timeStatCacheEntry
+}
+
+// timeStatCacheEntry stores previous TimeStatistic values for delta calculations
+type timeStatCacheEntry struct {
+	Count int64
+	Total int64
 }
 
 type pmiCacheEntry struct {
