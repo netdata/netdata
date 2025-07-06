@@ -41,6 +41,7 @@ type Config struct {
 	RunJob                    []string
 	MinUpdateEvery            int
 	DumpMode                  time.Duration
+	DumpSummary               bool
 }
 
 // Agent represents orchestrator.
@@ -69,6 +70,7 @@ type Agent struct {
 
 	// Dump mode
 	dumpMode     time.Duration
+	dumpSummary  bool
 	dumpAnalyzer *DumpAnalyzer
 	mgr          *jobmgr.Manager
 }
@@ -93,11 +95,15 @@ func New(cfg Config) *Agent {
 		api:                       netdataapi.New(safewriter.Stdout),
 		quitCh:                    make(chan struct{}, 1),
 		dumpMode:                  cfg.DumpMode,
+		dumpSummary:               cfg.DumpSummary,
 	}
 
 	if a.dumpMode > 0 {
 		a.dumpAnalyzer = NewDumpAnalyzer()
 		a.Infof("dump mode enabled: will run for %v and analyze metric structure", a.dumpMode)
+		if a.dumpSummary {
+			a.Infof("dump summary enabled: will show consolidated summary across all jobs")
+		}
 	}
 
 	return a
@@ -288,5 +294,9 @@ func (a *Agent) collectDumpAnalysis() {
 	}
 
 	// Print the analysis report
-	a.dumpAnalyzer.PrintReport()
+	if a.dumpSummary {
+		a.dumpAnalyzer.PrintSummary()
+	} else {
+		a.dumpAnalyzer.PrintReport()
+	}
 }

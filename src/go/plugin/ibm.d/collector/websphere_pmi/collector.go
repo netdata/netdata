@@ -142,15 +142,9 @@ type WebSpherePMI struct {
 	wasVersion string
 	wasEdition string // traditional, liberty
 
-	// Dynamic collection system
-	dynamicCollector *DynamicCollector
-	
 	// Instance tracking for proper collection
 	collectedInstances map[string]bool
 	seenInstances      map[string]bool
-
-	// Unified collection system (replaces dynamic collector)
-	unifiedCollector *UnifiedCollector
 }
 
 type pmiCacheEntry struct {
@@ -695,11 +689,14 @@ func (w *WebSpherePMI) detectWebSphereVersion(stats *pmiStatsResponse) {
 	// Log detected version
 	if w.wasVersion != "" {
 		w.Infof("detected WebSphere version: %s (%s)", w.wasVersion, w.wasEdition)
-		w.addVersionLabelsToCharts()
-		w.adjustCollectionBasedOnVersion()
 	} else {
 		w.Debugf("WebSphere version not detected, assuming traditional WAS")
+		w.wasVersion = "unknown"
 	}
+	
+	// Always add version labels (even if unknown)
+	w.addVersionLabelsToCharts()
+	w.adjustCollectionBasedOnVersion()
 }
 
 func (w *WebSpherePMI) adjustCollectionBasedOnVersion() {
@@ -738,11 +735,26 @@ func (w *WebSpherePMI) adjustCollectionBasedOnVersion() {
 	}
 }
 
-func (w *WebSpherePMI) addVersionLabelsToCharts() {
-	versionLabels := []module.Label{
-		{Key: "websphere_version", Value: w.wasVersion},
-		{Key: "websphere_edition", Value: w.wasEdition},
+func (w *WebSpherePMI) getVersionLabels() []module.Label {
+	version := w.wasVersion
+	edition := w.wasEdition
+	
+	// Provide defaults if not set
+	if version == "" {
+		version = "unknown"
 	}
+	if edition == "" {
+		edition = "traditional"
+	}
+	
+	return []module.Label{
+		{Key: "was_version", Value: version},
+		{Key: "was_edition", Value: edition},
+	}
+}
+
+func (w *WebSpherePMI) addVersionLabelsToCharts() {
+	versionLabels := w.getVersionLabels()
 
 	// Add to all existing charts
 	for _, chart := range *w.charts {

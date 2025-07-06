@@ -31,6 +31,9 @@ func (w *WebSpherePMI) collectProper(stats *pmiStatsResponse) map[string]int64 {
 	// Clean up absent instances
 	w.cleanupAbsentInstances()
 	
+	// Post-process thread pool idle calculations
+	w.calculateThreadPoolIdleThreads(mx)
+	
 	return mx
 }
 
@@ -500,7 +503,16 @@ func (w *WebSpherePMI) parseThreadPool(stat *pmiStat, nodeName, serverName strin
 		case "ActiveCount":
 			mx[fmt.Sprintf("thread_pool_%s_active", cleanInst)] = metric.Value
 		case "PoolSize":
-			mx[fmt.Sprintf("thread_pool_%s_size", cleanInst)] = metric.Value
+			// Store the size temporarily for idle calculation
+			poolSize := metric.Value
+			sizeKey := fmt.Sprintf("thread_pool_%s_size", cleanInst)
+			mx[sizeKey] = poolSize
+			
+			// Calculate idle threads immediately if we have active count
+			activeKey := fmt.Sprintf("thread_pool_%s_active", cleanInst)
+			if activeCount, exists := mx[activeKey]; exists {
+				mx[fmt.Sprintf("thread_pool_%s_idle", cleanInst)] = poolSize - activeCount
+			}
 		default:
 			// For unknown bounded range metrics, use collection helper
 			w.collectBoundedRangeMetric(mx, "thread_pool", cleanInst, metric)
@@ -836,5 +848,154 @@ func (w *WebSpherePMI) cleanID(s string) string {
 func (w *WebSpherePMI) markInstanceSeen(category, instance string) {
 	key := fmt.Sprintf("%s_%s", category, instance)
 	w.seenInstances[key] = true
+}
+
+// calculateThreadPoolIdleThreads calculates idle threads for all thread pools
+func (w *WebSpherePMI) calculateThreadPoolIdleThreads(mx map[string]int64) {
+	// Find all thread pool instances
+	threadPools := make(map[string]bool)
+	for key := range mx {
+		if strings.HasPrefix(key, "thread_pool_") && strings.HasSuffix(key, "_size") {
+			// Extract instance name
+			instance := strings.TrimPrefix(key, "thread_pool_")
+			instance = strings.TrimSuffix(instance, "_size")
+			threadPools[instance] = true
+		}
+	}
+	
+	// Calculate idle for each thread pool
+	for instance := range threadPools {
+		sizeKey := fmt.Sprintf("thread_pool_%s_size", instance)
+		activeKey := fmt.Sprintf("thread_pool_%s_active", instance)
+		idleKey := fmt.Sprintf("thread_pool_%s_idle", instance)
+		
+		// Only calculate if we have both size and active
+		if size, hasSize := mx[sizeKey]; hasSize {
+			if active, hasActive := mx[activeKey]; hasActive {
+				mx[idleKey] = size - active
+			}
+			// If we don't have active count, we can't calculate idle
+			// Don't set any values - let Netdata show the gap
+			
+			// Remove the size metric as it's no longer needed
+			delete(mx, sizeKey)
+		}
+	}
+}
+
+// resetSeenTracking resets the seen instances map for this collection cycle
+func (w *WebSpherePMI) resetSeenTracking() {
+	w.seenInstances = make(map[string]bool)
+}
+
+// cleanupAbsentInstances removes charts for instances that are no longer seen
+func (w *WebSpherePMI) cleanupAbsentInstances() {
+	// Check which instances were collected but not seen
+	for key, collected := range w.collectedInstances {
+		if collected && !w.seenInstances[key] {
+			// Instance disappeared - mark its charts as obsolete
+			w.removeInstanceCharts(key)
+			delete(w.collectedInstances, key)
+		}
+	}
+}
+
+// removeInstanceCharts marks all charts for a specific instance as obsolete
+func (w *WebSpherePMI) removeInstanceCharts(instanceKey string) {
+	// Parse the instance key to determine what type of charts to remove
+	parts := strings.Split(instanceKey, "_")
+	if len(parts) < 2 {
+		return
+	}
+	
+	category := parts[0]
+	instance := strings.Join(parts[1:], "_")
+	
+	// Mark charts as obsolete based on category
+	switch category {
+	case "threadpool":
+		w.removeThreadPoolCharts(instance)
+	case "jdbc":
+		w.removeJDBCCharts(instance)
+	case "jca":
+		w.removeJCACharts(instance)
+	case "servlet":
+		w.removeServletCharts(instance)
+	case "session":
+		w.removeSessionCharts(instance)
+	case "portlet":
+		w.removePortletCharts(instance)
+	case "cache":
+		w.removeCacheCharts(instance)
+	case "interceptor":
+		w.removeInterceptorCharts(instance)
+	case "objectpool":
+		w.removeObjectPoolCharts(instance)
+	}
+}
+
+// removeThreadPoolCharts removes charts for a specific thread pool
+func (w *WebSpherePMI) removeThreadPoolCharts(cleanName string) {
+	prefix := fmt.Sprintf("thread_pool_%s_", cleanName)
+	w.markChartsObsolete(prefix)
+}
+
+// removeJDBCCharts removes charts for a specific JDBC datasource
+func (w *WebSpherePMI) removeJDBCCharts(cleanName string) {
+	prefix := fmt.Sprintf("jdbc_%s_", cleanName)
+	w.markChartsObsolete(prefix)
+}
+
+// removeJCACharts removes charts for a specific JCA connection factory
+func (w *WebSpherePMI) removeJCACharts(cleanName string) {
+	prefix := fmt.Sprintf("jca_%s_", cleanName)
+	w.markChartsObsolete(prefix)
+}
+
+// removeServletCharts removes charts for a specific servlet
+func (w *WebSpherePMI) removeServletCharts(cleanName string) {
+	prefix := fmt.Sprintf("servlet_%s_", cleanName)
+	w.markChartsObsolete(prefix)
+}
+
+// removeSessionCharts removes charts for a specific session manager
+func (w *WebSpherePMI) removeSessionCharts(cleanName string) {
+	prefix := fmt.Sprintf("session_%s_", cleanName)
+	w.markChartsObsolete(prefix)
+}
+
+// removePortletCharts removes charts for a specific portlet
+func (w *WebSpherePMI) removePortletCharts(cleanName string) {
+	prefix := fmt.Sprintf("portlet_%s_", cleanName)
+	w.markChartsObsolete(prefix)
+}
+
+// removeCacheCharts removes charts for a specific cache instance
+func (w *WebSpherePMI) removeCacheCharts(cleanName string) {
+	prefix := fmt.Sprintf("cache_%s_", cleanName)
+	w.markChartsObsolete(prefix)
+}
+
+// removeInterceptorCharts removes charts for a specific interceptor
+func (w *WebSpherePMI) removeInterceptorCharts(cleanName string) {
+	prefix := fmt.Sprintf("interceptor_%s_", cleanName)
+	w.markChartsObsolete(prefix)
+}
+
+// removeObjectPoolCharts removes charts for a specific object pool
+func (w *WebSpherePMI) removeObjectPoolCharts(cleanName string) {
+	prefix := fmt.Sprintf("object_pool_%s_", cleanName)
+	w.markChartsObsolete(prefix)
+}
+
+// markChartsObsolete marks all charts with the given prefix as obsolete
+func (w *WebSpherePMI) markChartsObsolete(prefix string) {
+	for _, chart := range *w.charts {
+		if strings.HasPrefix(chart.ID, prefix) && !chart.Obsolete {
+			chart.Obsolete = true
+			chart.MarkNotCreated() // Reset created flag to trigger CHART command
+			w.Debugf("Marked chart %s as obsolete", chart.ID)
+		}
+	}
 }
 
