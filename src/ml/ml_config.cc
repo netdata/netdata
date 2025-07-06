@@ -171,7 +171,7 @@ void ml_config_load(ml_config_t *cfg) {
     delete_models_older_than = clamp<unsigned>(delete_models_older_than, 60 * 60 * 24 * 1, 60 * 60 * 24 * 7);
 
     diff_n = clamp(diff_n, 0u, 1u);
-    max_samples_to_smooth = clamp(max_samples_to_smooth, 0UL, 5UL);
+    max_samples_to_smooth = clamp<size_t>(max_samples_to_smooth, 0, 5);
     lag_n = clamp(lag_n, 1u, 5u);
 
     max_kmeans_iters = clamp(max_kmeans_iters, 500u, 1000u);
@@ -184,7 +184,7 @@ void ml_config_load(ml_config_t *cfg) {
     num_worker_threads = clamp<size_t>(num_worker_threads, 4, netdata_conf_cpus());
     flush_models_batch_size = clamp<size_t>(flush_models_batch_size, 8, 512);
 
-    suppression_window = clamp(suppression_window, 1UL, (size_t)training_window);
+    suppression_window = clamp<size_t>(suppression_window, 1, training_window);
     suppression_threshold = clamp<size_t>(suppression_threshold, 1, suppression_window);
 
      /*
