@@ -182,6 +182,184 @@ func (da *DumpAnalyzer) PrintReport() {
 	}
 }
 
+// PrintSummary prints a consolidated summary across all jobs
+func (da *DumpAnalyzer) PrintSummary() {
+	da.mu.RLock()
+	defer da.mu.RUnlock()
+
+	// First print the regular report
+	da.PrintReport()
+
+	// Then print the consolidated summary
+	fmt.Println("\n" + strings.Repeat("═", 80))
+	fmt.Println("CONSOLIDATED SUMMARY ACROSS ALL JOBS")
+	fmt.Println(strings.Repeat("═", 80))
+
+	// Collect all contexts across all jobs
+	type contextSummary struct {
+		family    string
+		context   string
+		title     string
+		units     string
+		priority  int
+		chartType string
+		labelKeys []string
+		dimNames  []string
+		instances int
+		jobs      map[string]bool
+	}
+
+	contextMap := make(map[string]*contextSummary) // context -> summary
+
+	for jobName, job := range da.jobs {
+		for i := range job.Charts {
+			ca := &job.Charts[i]
+			
+			ctx := ca.Chart.Ctx
+			if _, exists := contextMap[ctx]; !exists {
+				// Collect unique label keys
+				labelKeysMap := make(map[string]bool)
+				for _, label := range ca.Chart.Labels {
+					labelKeysMap[label.Key] = true
+				}
+				labelKeys := []string{}
+				for key := range labelKeysMap {
+					labelKeys = append(labelKeys, key)
+				}
+				sort.Strings(labelKeys)
+
+				// Collect unique dimension names
+				dimNamesMap := make(map[string]bool)
+				for _, dim := range ca.Chart.Dims {
+					dimName := dim.Name
+					if dimName == "" {
+						dimName = dim.ID
+					}
+					dimNamesMap[dimName] = true
+				}
+				dimNames := []string{}
+				for name := range dimNamesMap {
+					dimNames = append(dimNames, name)
+				}
+				sort.Strings(dimNames)
+
+				contextMap[ctx] = &contextSummary{
+					family:    ca.Chart.Fam,
+					context:   ctx,
+					title:     ca.Chart.Title,
+					units:     ca.Chart.Units,
+					priority:  ca.Chart.Priority,
+					chartType: ca.Chart.Type.String(),
+					labelKeys: labelKeys,
+					dimNames:  dimNames,
+					instances: 0,
+					jobs:      make(map[string]bool),
+				}
+			}
+
+			// Update instance count and job tracking
+			contextMap[ctx].instances++
+			contextMap[ctx].jobs[jobName] = true
+
+			// Update label keys and dimension names if needed
+			for _, label := range ca.Chart.Labels {
+				found := false
+				for _, key := range contextMap[ctx].labelKeys {
+					if key == label.Key {
+						found = true
+						break
+					}
+				}
+				if !found {
+					contextMap[ctx].labelKeys = append(contextMap[ctx].labelKeys, label.Key)
+					sort.Strings(contextMap[ctx].labelKeys)
+				}
+			}
+
+			for _, dim := range ca.Chart.Dims {
+				dimName := dim.Name
+				if dimName == "" {
+					dimName = dim.ID
+				}
+				found := false
+				for _, name := range contextMap[ctx].dimNames {
+					if name == dimName {
+						found = true
+						break
+					}
+				}
+				if !found {
+					contextMap[ctx].dimNames = append(contextMap[ctx].dimNames, dimName)
+					sort.Strings(contextMap[ctx].dimNames)
+				}
+			}
+		}
+	}
+
+	// Group contexts by family
+	familyMap := make(map[string][]*contextSummary)
+	for _, cs := range contextMap {
+		family := cs.family
+		if family == "" {
+			family = "(no family)"
+		}
+		familyMap[family] = append(familyMap[family], cs)
+	}
+
+	// Sort families and contexts
+	var families []string
+	for fam := range familyMap {
+		families = append(families, fam)
+	}
+	sort.Strings(families)
+
+	// Print summary with ASCII art
+	for i, family := range families {
+		if i == 0 {
+			fmt.Printf("\n┌─ family: %s\n", family)
+		} else {
+			fmt.Printf("\n├─ family: %s\n", family)
+		}
+		
+		// Sort contexts by priority
+		contexts := familyMap[family]
+		sort.Slice(contexts, func(i, j int) bool {
+			return contexts[i].priority < contexts[j].priority
+		})
+
+		for j, cs := range contexts {
+			isLastContext := j == len(contexts)-1
+			contextPrefix := "├──"
+			detailPrefix := "│   ├─"
+			lastDetailPrefix := "│   └─"
+			
+			if isLastContext {
+				contextPrefix = "└──"
+				detailPrefix = "    ├─"
+				lastDetailPrefix = "    └─"
+			}
+			
+			fmt.Printf("│  %s context: %s, unit: %s, prio: %d, type: %s\n",
+				contextPrefix, cs.context, cs.units, cs.priority, cs.chartType)
+			fmt.Printf("│  %s title: %s\n", detailPrefix, cs.title)
+			
+			if len(cs.labelKeys) > 0 {
+				fmt.Printf("│  %s labels: %s\n", detailPrefix, strings.Join(cs.labelKeys, ", "))
+			} else {
+				fmt.Printf("│  %s labels: (none)\n", detailPrefix)
+			}
+			
+			fmt.Printf("│  %s dimensions: %s\n", detailPrefix, strings.Join(cs.dimNames, ", "))
+			fmt.Printf("│  %s instances: %d, jobs: %d\n", lastDetailPrefix, cs.instances, len(cs.jobs))
+		}
+	}
+	
+	// Add a bottom border for the last family
+	if len(families) > 0 {
+		fmt.Println("└─────────────────────────────────────────────────────────────")
+	}
+}
+
 // contextInfo holds information about a context within a family
 type contextInfo struct {
 	family      string
@@ -375,8 +553,11 @@ func (da *DumpAnalyzer) printJobAnalysis(job *JobAnalysis) {
 	statsFamilies := make(map[string]bool)
 	statsContexts := make(map[string]bool)
 	statsInstances := 0
-	statsDimensions := 0
+	statsTimeSeries := 0
 	statsCollectedValues := 0
+	
+	// Calculate distinct {context}.{dimension} combinations
+	uniqueContextDimensions := make(map[string]bool)
 
 	for i := range job.Charts {
 		ca := &job.Charts[i]
@@ -390,12 +571,23 @@ func (da *DumpAnalyzer) printJobAnalysis(job *JobAnalysis) {
 		statsFamilies[family] = true
 		statsContexts[ca.Chart.Ctx] = true
 
-		// Count dimensions and their collected values
-		statsDimensions += len(ca.Chart.Dims)
+		// Count dimensions (time-series) and track distinct {context}.{dimension} combinations
+		statsTimeSeries += len(ca.Chart.Dims)
 		for _, dim := range ca.Chart.Dims {
 			statsCollectedValues += len(ca.CollectedValues[dim.ID])
+			// Use dimension name for display, fall back to ID if name is empty
+			dimName := dim.Name
+			if dimName == "" {
+				dimName = dim.ID
+			}
+			// Create unique key as context.dimension
+			uniqueKey := fmt.Sprintf("%s.%s", ca.Chart.Ctx, dimName)
+			uniqueContextDimensions[uniqueKey] = true
 		}
 	}
+
+	// Count total distinct {context}.{dimension} combinations
+	statsDistinctDimensions := len(uniqueContextDimensions)
 
 	// Count unique metrics in mx map
 	uniqueMetricsInMx := len(job.AllSeenMetrics)
@@ -406,21 +598,21 @@ func (da *DumpAnalyzer) printJobAnalysis(job *JobAnalysis) {
 		warningText = fmt.Sprintf(", %d warnings", warningCount)
 	}
 	
-	if issueCount == 0 && statsDimensions == uniqueMetricsInMx {
+	if issueCount == 0 && statsTimeSeries == uniqueMetricsInMx {
 		if warningCount > 0 {
-			fmt.Printf("🟢 NO ISSUES FOUND%s, job %s defines: %d families, %d contexts, %d instances, %d dimensions, collects: %d unique metrics\n",
-				warningText, job.Name, len(statsFamilies), len(statsContexts), statsInstances, statsDimensions, uniqueMetricsInMx)
+			fmt.Printf("🟢 NO ISSUES FOUND%s, job %s defines: %d families, %d contexts, %d dimensions, %d instances, %d time-series, collects: %d unique metrics\n",
+				warningText, job.Name, len(statsFamilies), len(statsContexts), statsDistinctDimensions, statsInstances, statsTimeSeries, uniqueMetricsInMx)
 		} else {
-			fmt.Printf("🟢 NO ISSUES FOUND, job %s defines: %d families, %d contexts, %d instances, %d dimensions, collects: %d unique metrics\n",
-				job.Name, len(statsFamilies), len(statsContexts), statsInstances, statsDimensions, uniqueMetricsInMx)
+			fmt.Printf("🟢 NO ISSUES FOUND, job %s defines: %d families, %d contexts, %d dimensions, %d instances, %d time-series, collects: %d unique metrics\n",
+				job.Name, len(statsFamilies), len(statsContexts), statsDistinctDimensions, statsInstances, statsTimeSeries, uniqueMetricsInMx)
 		}
-	} else if issueCount == 0 && statsDimensions != uniqueMetricsInMx {
-		// Mismatch between dimensions and unique metrics even though no specific issues found
-		fmt.Printf("🟡 DIMENSION MISMATCH%s, job %s defines: %d families, %d contexts, %d instances, %d dimensions, collects: %d unique metrics\n",
-			warningText, job.Name, len(statsFamilies), len(statsContexts), statsInstances, statsDimensions, uniqueMetricsInMx)
+	} else if issueCount == 0 && statsTimeSeries != uniqueMetricsInMx {
+		// Mismatch between time-series and unique metrics even though no specific issues found
+		fmt.Printf("🟡 DIMENSION MISMATCH%s, job %s defines: %d families, %d contexts, %d dimensions, %d instances, %d time-series, collects: %d unique metrics\n",
+			warningText, job.Name, len(statsFamilies), len(statsContexts), statsDistinctDimensions, statsInstances, statsTimeSeries, uniqueMetricsInMx)
 	} else {
-		fmt.Printf("🔴 ISSUES FOUND%s, job %s defines: %d families, %d contexts, %d instances, %d dimensions, collects: %d unique metrics\n",
-			warningText, job.Name, len(statsFamilies), len(statsContexts), statsInstances, statsDimensions, uniqueMetricsInMx)
+		fmt.Printf("🔴 ISSUES FOUND%s, job %s defines: %d families, %d contexts, %d dimensions, %d instances, %d time-series, collects: %d unique metrics\n",
+			warningText, job.Name, len(statsFamilies), len(statsContexts), statsDistinctDimensions, statsInstances, statsTimeSeries, uniqueMetricsInMx)
 	}
 }
 

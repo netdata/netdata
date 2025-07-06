@@ -477,18 +477,18 @@ func (w *WebSpherePMI) ensureSessionObjectSizeAverageChart(cleanInst string) {
 		ID:       chartID,
 		Title:    "Session Object Size",
 		Units:    "bytes",
-		Fam:      "sessions",
+		Fam:      "web/sessions",
 		Ctx:      "websphere_pmi.session_object_size_average",
 		Type:     module.Line,
-		Priority: prioSessionsActive + 100, // Lower priority than main session charts
+		Priority: prioWebSessions + 100, // Lower priority than main session charts
 		Dims: module.Dims{
 			{ID: fmt.Sprintf("sessions_%s_SessionObjectSize_mean", cleanInst), Name: "mean"},
 			{ID: fmt.Sprintf("sessions_%s_SessionObjectSize_min", cleanInst), Name: "min"},
 			{ID: fmt.Sprintf("sessions_%s_SessionObjectSize_max", cleanInst), Name: "max"},
 		},
-		Labels: []module.Label{
+		Labels: append([]module.Label{
 			{Key: "instance", Value: cleanInst},
-		},
+		}, w.getVersionLabels()...),
 	}
 	
 	// Chart 2: Incremental counters
@@ -496,18 +496,18 @@ func (w *WebSpherePMI) ensureSessionObjectSizeAverageChart(cleanInst string) {
 		ID:       chartID + "_counters",
 		Title:    "Session Object Size Counters",
 		Units:    "operations/s",
-		Fam:      "sessions",
+		Fam:      "web/sessions",
 		Ctx:      "websphere_pmi.session_object_size_counters",
 		Type:     module.Line,
-		Priority: prioSessionsActive + 101, // Lower priority than main session charts
+		Priority: prioWebSessions + 101, // Lower priority than main session charts
 		Dims: module.Dims{
 			{ID: fmt.Sprintf("sessions_%s_SessionObjectSize_count", cleanInst), Name: "count", Algo: module.Incremental},
 			{ID: fmt.Sprintf("sessions_%s_SessionObjectSize_total", cleanInst), Name: "total", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
 			{ID: fmt.Sprintf("sessions_%s_SessionObjectSize_sum_of_squares", cleanInst), Name: "sum_of_squares", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
 		},
-		Labels: []module.Label{
+		Labels: append([]module.Label{
 			{Key: "instance", Value: cleanInst},
-		},
+		}, w.getVersionLabels()...),
 	}
 	
 	if err := w.Charts().Add(chartAbsolute); err != nil {

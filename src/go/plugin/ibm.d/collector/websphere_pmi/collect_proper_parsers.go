@@ -556,6 +556,8 @@ func (w *WebSpherePMI) parseDynamicCacheContainer(stat *pmiStat, nodeName, serve
 			mx[fmt.Sprintf("cache_%s_client_requests", cleanInst)] = metric.Value
 		case "InMemoryAndDiskCacheEntryCount":
 			mx[fmt.Sprintf("cache_%s_total_entries", cleanInst)] = metric.Value
+		case "RemoteHitCount":
+			mx[fmt.Sprintf("cache_%s_remote_hits", cleanInst)] = metric.Value
 		default:
 			// For unknown count metrics, use collection helper
 			w.collectCountMetric(mx, "cache", cleanInst, metric)
@@ -667,7 +669,20 @@ func (w *WebSpherePMI) parseCacheObject(stat *pmiStat, nodeName, serverName stri
 			// Process direct metrics in Object Cache
 			childCountMetrics := w.extractCountStatistics(child.CountStatistics)
 			for _, metric := range childCountMetrics {
-				w.collectCountMetric(mx, "object_cache", cleanInst, metric)
+				// Skip metrics that are handled elsewhere to avoid duplicates
+				switch metric.Name {
+				case "HitsInMemoryCount", "HitsOnDiskCount", "MissCount", 
+				     "InMemoryAndDiskCacheEntryCount", "RemoteHitCount",
+				     "ClientRequestCount", "DistributedRequestCount",
+				     "ExplicitInvalidationCount", "ExplicitDiskInvalidationCount",
+				     "ExplicitMemoryInvalidationCount", "LocalExplicitInvalidationCount",
+				     "RemoteExplicitInvalidationCount", "LruInvalidationCount",
+				     "TimeoutInvalidationCount", "RemoteCreationCount":
+					// These are handled in the Counters sub-stat
+					continue
+				default:
+					w.collectCountMetric(mx, "object_cache", cleanInst, metric)
+				}
 			}
 			
 			// Look for "Counters" sub-stat
@@ -685,6 +700,29 @@ func (w *WebSpherePMI) parseCacheObject(stat *pmiStat, nodeName, serverName stri
 							mx[fmt.Sprintf("object_cache_%s_misses", cleanInst)] = metric.Value
 						case "InMemoryAndDiskCacheEntryCount":
 							mx[fmt.Sprintf("object_cache_%s_total_entries", cleanInst)] = metric.Value
+							mx[fmt.Sprintf("object_cache_%s_entries_memory_and_disk", cleanInst)] = metric.Value
+						case "RemoteHitCount":
+							mx[fmt.Sprintf("object_cache_%s_remote_hits", cleanInst)] = metric.Value
+						case "ClientRequestCount":
+							mx[fmt.Sprintf("object_cache_%s_client_requests", cleanInst)] = metric.Value
+						case "DistributedRequestCount":
+							mx[fmt.Sprintf("object_cache_%s_distributed_requests", cleanInst)] = metric.Value
+						case "ExplicitInvalidationCount":
+							mx[fmt.Sprintf("object_cache_%s_explicit_invalidations", cleanInst)] = metric.Value
+						case "ExplicitDiskInvalidationCount":
+							mx[fmt.Sprintf("object_cache_%s_explicit_disk_invalidations", cleanInst)] = metric.Value
+						case "ExplicitMemoryInvalidationCount":
+							mx[fmt.Sprintf("object_cache_%s_explicit_memory_invalidations", cleanInst)] = metric.Value
+						case "LocalExplicitInvalidationCount":
+							mx[fmt.Sprintf("object_cache_%s_local_explicit_invalidations", cleanInst)] = metric.Value
+						case "RemoteExplicitInvalidationCount":
+							mx[fmt.Sprintf("object_cache_%s_remote_explicit_invalidations", cleanInst)] = metric.Value
+						case "LruInvalidationCount":
+							mx[fmt.Sprintf("object_cache_%s_lru_invalidations", cleanInst)] = metric.Value
+						case "TimeoutInvalidationCount":
+							mx[fmt.Sprintf("object_cache_%s_timeout_invalidations", cleanInst)] = metric.Value
+						case "RemoteCreationCount":
+							mx[fmt.Sprintf("object_cache_%s_remote_creations", cleanInst)] = metric.Value
 						default:
 							// For unknown count metrics, use collection helper
 							w.collectCountMetric(mx, "object_cache", cleanInst, metric)
@@ -794,6 +832,12 @@ func (w *WebSpherePMI) parseORB(stat *pmiStat, nodeName, serverName string, mx m
 }
 
 // Chart creation helpers
+
+// Helper to create chart labels with version information
+func (w *WebSpherePMI) createChartLabels(labels ...module.Label) []module.Label {
+	return append(labels, w.getVersionLabels()...)
+}
+
 func (w *WebSpherePMI) ensureWebAppCharts(instance, nodeName, serverName, appName string) {
 	chartKey := fmt.Sprintf("webapp_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
@@ -803,11 +847,11 @@ func (w *WebSpherePMI) ensureWebAppCharts(instance, nodeName, serverName, appNam
 		charts := webAppChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-				{Key: "application", Value: appName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+				module.Label{Key: "application", Value: appName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -828,12 +872,12 @@ func (w *WebSpherePMI) ensureServletCharts(instance, nodeName, serverName, appNa
 		charts := servletChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-				{Key: "application", Value: appName},
-				{Key: "servlet", Value: servletName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+				module.Label{Key: "application", Value: appName},
+				module.Label{Key: "servlet", Value: servletName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -854,11 +898,11 @@ func (w *WebSpherePMI) ensureSessionCharts(instance, nodeName, serverName, appNa
 		charts := sessionChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-				{Key: "application", Value: appName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+				module.Label{Key: "application", Value: appName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -879,10 +923,10 @@ func (w *WebSpherePMI) ensureORBCharts(instance, nodeName, serverName string) {
 		charts := orbChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -903,10 +947,10 @@ func (w *WebSpherePMI) ensureCacheCharts(instance, nodeName, serverName string) 
 		charts := cacheChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -927,11 +971,11 @@ func (w *WebSpherePMI) ensureCacheObjectCharts(instance, nodeName, serverName, c
 		charts := cacheObjectChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-				{Key: "cache", Value: cacheName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+				module.Label{Key: "cache", Value: cacheName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -952,10 +996,10 @@ func (w *WebSpherePMI) ensureWebAppContainerCharts(instance, nodeName, serverNam
 		charts := webAppContainerChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -976,11 +1020,11 @@ func (w *WebSpherePMI) ensureObjectPoolCharts(instance, nodeName, serverName, po
 		charts := objectPoolChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-				{Key: "pool", Value: poolName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+				module.Label{Key: "pool", Value: poolName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -1001,10 +1045,10 @@ func (w *WebSpherePMI) ensureObjectCacheCharts(instance, nodeName, serverName st
 		charts := objectCacheChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -1025,7 +1069,7 @@ var objectPoolChartsTmpl = module.Charts{
 		Fam:      "object_pools",
 		Ctx:      "websphere_pmi.object_pool_objects",
 		Type:     module.Line,
-		Priority: prioObjectPoolObjects,
+		Priority: prioObjectPools,
 		Dims: module.Dims{
 			{ID: "object_pool_%s_idle", Name: "idle"},
 		},
@@ -1037,7 +1081,7 @@ var objectPoolChartsTmpl = module.Charts{
 		Fam:      "object_pools",
 		Ctx:      "websphere_pmi.object_pool_lifecycle",
 		Type:     module.Line,
-		Priority: prioObjectPoolLifecycle,
+		Priority: prioObjectPools + 10,
 		Dims: module.Dims{
 			{ID: "object_pool_%s_created", Name: "created", Algo: module.Incremental},
 			{ID: "object_pool_%s_allocated", Name: "allocated", Algo: module.Incremental},
@@ -1051,10 +1095,10 @@ var objectCacheChartsTmpl = module.Charts{
 		ID:       "object_cache_%s_objects",
 		Title:    "Object Cache Objects",
 		Units:    "objects",
-		Fam:      "object_cache",
+		Fam:      "caching/object",
 		Ctx:      "websphere_pmi.object_cache_objects",
 		Type:     module.Line,
-		Priority: prioObjectCacheObjects,
+		Priority: prioObjectCache,
 		Dims: module.Dims{
 			{ID: "object_cache_%s_objects", Name: "current"},
 			{ID: "object_cache_%s_max_objects", Name: "max"},
@@ -1065,73 +1109,70 @@ var objectCacheChartsTmpl = module.Charts{
 		ID:       "object_cache_%s_hits",
 		Title:    "Object Cache Hits",
 		Units:    "hits/s",
-		Fam:      "object_cache",
+		Fam:      "caching/object",
 		Ctx:      "websphere_pmi.object_cache_hits",
 		Type:     module.Line,
-		Priority: prioObjectCacheHits,
+		Priority: prioObjectCache + 10,
 		Dims: module.Dims{
 			{ID: "object_cache_%s_memory_hits", Name: "memory_hits", Algo: module.Incremental},
 			{ID: "object_cache_%s_disk_hits", Name: "disk_hits", Algo: module.Incremental},
 			{ID: "object_cache_%s_misses", Name: "misses", Algo: module.Incremental},
-			{ID: "object_cache_%s_HitsInMemoryCount", Name: "hits_in_memory_count", Algo: module.Incremental},
-			{ID: "object_cache_%s_HitsOnDiskCount", Name: "hits_on_disk_count", Algo: module.Incremental},
-			{ID: "object_cache_%s_MissCount", Name: "miss_count", Algo: module.Incremental},
-			{ID: "object_cache_%s_RemoteHitCount", Name: "remote_hit_count", Algo: module.Incremental},
+			{ID: "object_cache_%s_remote_hits", Name: "remote_hits", Algo: module.Incremental},
 		},
 	},
 	{
 		ID:       "object_cache_%s_requests",
 		Title:    "Object Cache Requests",
 		Units:    "requests/s",
-		Fam:      "object_cache",
+		Fam:      "caching/object",
 		Ctx:      "websphere_pmi.object_cache_requests",
 		Type:     module.Line,
-		Priority: prioObjectCacheHits + 1,
+		Priority: prioObjectCache + 20,
 		Dims: module.Dims{
-			{ID: "object_cache_%s_ClientRequestCount", Name: "client_requests", Algo: module.Incremental},
-			{ID: "object_cache_%s_DistributedRequestCount", Name: "distributed_requests", Algo: module.Incremental},
+			{ID: "object_cache_%s_client_requests", Name: "client_requests", Algo: module.Incremental},
+			{ID: "object_cache_%s_distributed_requests", Name: "distributed_requests", Algo: module.Incremental},
 		},
 	},
 	{
 		ID:       "object_cache_%s_invalidations",
 		Title:    "Object Cache Invalidations",
 		Units:    "invalidations/s",
-		Fam:      "object_cache",
+		Fam:      "caching/object",
 		Ctx:      "websphere_pmi.object_cache_invalidations",
 		Type:     module.Line,
-		Priority: prioObjectCacheHits + 2,
+		Priority: prioObjectCache + 30,
 		Dims: module.Dims{
-			{ID: "object_cache_%s_ExplicitInvalidationCount", Name: "explicit", Algo: module.Incremental},
-			{ID: "object_cache_%s_ExplicitDiskInvalidationCount", Name: "explicit_disk", Algo: module.Incremental},
-			{ID: "object_cache_%s_ExplicitMemoryInvalidationCount", Name: "explicit_memory", Algo: module.Incremental},
-			{ID: "object_cache_%s_LocalExplicitInvalidationCount", Name: "local_explicit", Algo: module.Incremental},
-			{ID: "object_cache_%s_RemoteExplicitInvalidationCount", Name: "remote_explicit", Algo: module.Incremental},
-			{ID: "object_cache_%s_LruInvalidationCount", Name: "lru", Algo: module.Incremental},
-			{ID: "object_cache_%s_TimeoutInvalidationCount", Name: "timeout", Algo: module.Incremental},
+			{ID: "object_cache_%s_explicit_invalidations", Name: "explicit", Algo: module.Incremental},
+			{ID: "object_cache_%s_explicit_disk_invalidations", Name: "explicit_disk", Algo: module.Incremental},
+			{ID: "object_cache_%s_explicit_memory_invalidations", Name: "explicit_memory", Algo: module.Incremental},
+			{ID: "object_cache_%s_local_explicit_invalidations", Name: "local_explicit", Algo: module.Incremental},
+			{ID: "object_cache_%s_remote_explicit_invalidations", Name: "remote_explicit", Algo: module.Incremental},
+			{ID: "object_cache_%s_lru_invalidations", Name: "lru", Algo: module.Incremental},
+			{ID: "object_cache_%s_timeout_invalidations", Name: "timeout", Algo: module.Incremental},
 		},
 	},
 	{
 		ID:       "object_cache_%s_entries_total",
 		Title:    "Object Cache Total Entries",
 		Units:    "entries",
-		Fam:      "object_cache",
+		Fam:      "caching/object",
 		Ctx:      "websphere_pmi.object_cache_entries_total",
 		Type:     module.Line,
-		Priority: prioObjectCacheHits + 3,
+		Priority: prioObjectCache + 40,
 		Dims: module.Dims{
-			{ID: "object_cache_%s_InMemoryAndDiskCacheEntryCount", Name: "memory_and_disk", Algo: module.Incremental},
+			{ID: "object_cache_%s_entries_memory_and_disk", Name: "memory_and_disk", Algo: module.Incremental},
 		},
 	},
 	{
 		ID:       "object_cache_%s_remote_operations",
 		Title:    "Object Cache Remote Operations",
 		Units:    "operations/s",
-		Fam:      "object_cache",
+		Fam:      "caching/object",
 		Ctx:      "websphere_pmi.object_cache_remote_operations",
 		Type:     module.Line,
-		Priority: prioObjectCacheHits + 4,
+		Priority: prioObjectCache + 50,
 		Dims: module.Dims{
-			{ID: "object_cache_%s_RemoteCreationCount", Name: "remote_creation", Algo: module.Incremental},
+			{ID: "object_cache_%s_remote_creations", Name: "remote_creation", Algo: module.Incremental},
 		},
 	},
 }
@@ -1141,10 +1182,10 @@ var webAppContainerChartsTmpl = module.Charts{
 		ID:       "webapp_container_%s_servlets",
 		Title:    "Web Application Container Servlets",
 		Units:    "servlets",
-		Fam:      "webapp_container",
+		Fam:      "web/containers",
 		Ctx:      "websphere_pmi.webapp_container_servlets",
 		Type:     module.Line,
-		Priority: prioWebAppContainerServlets,
+		Priority: prioWebApps + 10,
 		Dims: module.Dims{
 			{ID: "webapp_container_%s_loaded_servlets", Name: "loaded"},
 		},
@@ -1153,10 +1194,10 @@ var webAppContainerChartsTmpl = module.Charts{
 		ID:       "webapp_container_%s_reloads",
 		Title:    "Web Application Container Reloads",
 		Units:    "reloads/s",
-		Fam:      "webapp_container",
+		Fam:      "web/containers",
 		Ctx:      "websphere_pmi.webapp_container_reloads",
 		Type:     module.Line,
-		Priority: prioWebAppContainerServlets + 1,
+		Priority: prioWebApps + 11,
 		Dims: module.Dims{
 			{ID: "webapp_container_%s_ReloadCount", Name: "reloads", Algo: module.Incremental},
 		},
@@ -1165,10 +1206,10 @@ var webAppContainerChartsTmpl = module.Charts{
 		ID:       "webapp_container_%s_requests",
 		Title:    "Web Application Container Requests",
 		Units:    "requests/s",
-		Fam:      "webapp_container",
+		Fam:      "web/containers",
 		Ctx:      "websphere_pmi.webapp_container_requests",
 		Type:     module.Line,
-		Priority: prioWebAppContainerRequests,
+		Priority: prioWebApps + 30,
 		Dims: module.Dims{
 			{ID: "webapp_container_%s_requests", Name: "requests", Algo: module.Incremental},
 			{ID: "webapp_container_%s_errors", Name: "errors", Algo: module.Incremental},
@@ -1180,10 +1221,10 @@ var webAppContainerChartsTmpl = module.Charts{
 		ID:       "webapp_container_%s_concurrent_requests",
 		Title:    "Web Application Container Concurrent Requests",
 		Units:    "requests",
-		Fam:      "webapp_container",
+		Fam:      "web/containers",
 		Ctx:      "websphere_pmi.webapp_container_concurrent_requests",
 		Type:     module.Line,
-		Priority: prioWebAppContainerRequests + 1,
+		Priority: prioWebApps + 31,
 		Dims: module.Dims{
 			{ID: "webapp_container_%s_ConcurrentRequests_current", Name: "current"},
 			{ID: "webapp_container_%s_ConcurrentRequests_mean", Name: "mean"},
@@ -1201,10 +1242,10 @@ var webAppContainerChartsTmpl = module.Charts{
 		ID:       "webapp_container_%s_response_time",
 		Title:    "Web Application Container Response Time",
 		Units:    "milliseconds",
-		Fam:      "webapp_container",
+		Fam:      "web/containers",
 		Ctx:      "websphere_pmi.webapp_container_response_time",
 		Type:     module.Line,
-		Priority: prioWebAppContainerRequests + 2,
+		Priority: prioWebApps + 32,
 		Dims: module.Dims{
 			{ID: "webapp_container_%s_ServiceTime_mean", Name: "service_mean"},
 			{ID: "webapp_container_%s_AsyncContext_Response_Time_mean", Name: "async_mean"},
@@ -1216,10 +1257,10 @@ var webAppContainerChartsTmpl = module.Charts{
 		ID:       "webapp_container_%s_response_time_total",
 		Title:    "Web Application Container Response Time Total",
 		Units:    "milliseconds/s",
-		Fam:      "webapp_container",
+		Fam:      "web/containers",
 		Ctx:      "websphere_pmi.webapp_container_response_time_total",
 		Type:     module.Line,
-		Priority: prioWebAppContainerRequests + 2,
+		Priority: prioWebApps + 32,
 		Dims: module.Dims{
 			{ID: "webapp_container_%s_ServiceTime_total", Name: "service_total", Algo: module.Incremental},
 			{ID: "webapp_container_%s_AsyncContext_Response_Time_total", Name: "async_total", Algo: module.Incremental},
@@ -1244,10 +1285,10 @@ var webAppContainerChartsTmpl = module.Charts{
 		ID:       "webapp_container_%s_portlets",
 		Title:    "Web Application Container Portlets",
 		Units:    "portlets",
-		Fam:      "webapp_container",
+		Fam:      "web/containers",
 		Ctx:      "websphere_pmi.webapp_container_portlets",
 		Type:     module.Line,
-		Priority: prioWebAppContainerRequests + 3,
+		Priority: prioWebApps + 33,
 		Dims: module.Dims{
 			{ID: "webapp_container_%s_Number_of_loaded_portlets", Name: "loaded"},
 		},
@@ -1256,10 +1297,10 @@ var webAppContainerChartsTmpl = module.Charts{
 		ID:       "webapp_container_%s_portlet_requests",
 		Title:    "Web Application Container Portlet Requests",
 		Units:    "requests/s",
-		Fam:      "webapp_container",
+		Fam:      "web/containers",
 		Ctx:      "websphere_pmi.webapp_container_portlet_requests",
 		Type:     module.Line,
-		Priority: prioWebAppContainerRequests + 4,
+		Priority: prioWebApps + 34,
 		Dims: module.Dims{
 			{ID: "webapp_container_%s_Number_of_portlet_requests", Name: "requests", Algo: module.Incremental},
 			{ID: "webapp_container_%s_Number_of_portlet_errors", Name: "errors", Algo: module.Incremental},
@@ -1269,10 +1310,10 @@ var webAppContainerChartsTmpl = module.Charts{
 		ID:       "webapp_container_%s_portlet_concurrent",
 		Title:    "Web Application Container Concurrent Portlet Requests",
 		Units:    "requests",
-		Fam:      "webapp_container",
+		Fam:      "web/containers",
 		Ctx:      "websphere_pmi.webapp_container_portlet_concurrent",
 		Type:     module.Line,
-		Priority: prioWebAppContainerRequests + 5,
+		Priority: prioWebApps + 35,
 		Dims: module.Dims{
 			{ID: "webapp_container_%s_Number_of_concurrent_portlet_requests_current", Name: "current"},
 			{ID: "webapp_container_%s_Number_of_concurrent_portlet_requests_mean", Name: "mean"},
@@ -1285,10 +1326,10 @@ var webAppContainerChartsTmpl = module.Charts{
 		ID:       "webapp_container_%s_portlet_response_time",
 		Title:    "Web Application Container Portlet Response Time",
 		Units:    "milliseconds",
-		Fam:      "webapp_container",
+		Fam:      "web/containers",
 		Ctx:      "websphere_pmi.webapp_container_portlet_response_time",
 		Type:     module.Line,
-		Priority: prioWebAppContainerRequests + 6,
+		Priority: prioWebApps + 36,
 		Dims: module.Dims{
 			{ID: "webapp_container_%s_Response_time_of_portlet_action_mean", Name: "action_mean"},
 			{ID: "webapp_container_%s_Response_time_of_portlet_render_mean", Name: "render_mean"},
@@ -1300,10 +1341,10 @@ var webAppContainerChartsTmpl = module.Charts{
 		ID:       "webapp_container_%s_portlet_response_time_total",
 		Title:    "Web Application Container Portlet Response Time Total",
 		Units:    "milliseconds/s",
-		Fam:      "webapp_container",
+		Fam:      "web/containers",
 		Ctx:      "websphere_pmi.webapp_container_portlet_response_time_total",
 		Type:     module.Line,
-		Priority: prioWebAppContainerRequests + 7,
+		Priority: prioWebApps + 30 + 7,
 		Dims: module.Dims{
 			{ID: "webapp_container_%s_Response_time_of_portlet_action_total", Name: "action_total", Algo: module.Incremental},
 			{ID: "webapp_container_%s_Response_time_of_portlet_render_total", Name: "render_total", Algo: module.Incremental},
@@ -1330,10 +1371,10 @@ var cacheChartsTmpl = module.Charts{
 		ID:       "cache_%s_entries",
 		Title:    "Dynamic Cache Entries",
 		Units:    "entries",
-		Fam:      "cache",
+		Fam:      "caching/dynamic",
 		Ctx:      "websphere_pmi.cache_entries",
 		Type:     module.Line,
-		Priority: prioCacheEntries,
+		Priority: prioDynaCache,
 		Dims: module.Dims{
 			{ID: "cache_%s_in_memory_entries", Name: "in_memory"},
 			{ID: "cache_%s_total_entries", Name: "total"},
@@ -1341,29 +1382,28 @@ var cacheChartsTmpl = module.Charts{
 		},
 	},
 	{
-		ID:       "cache_%s_hits",
-		Title:    "Dynamic Cache Hits",
-		Units:    "hits/s",
-		Fam:      "cache",
-		Ctx:      "websphere_pmi.cache_hits",
+		ID:       "cache_%s_performance",
+		Title:    "Dynamic Cache Performance",
+		Units:    "operations/s",
+		Fam:      "caching/dynamic",
+		Ctx:      "websphere_pmi.cache_performance",
 		Type:     module.Line,
-		Priority: prioCacheHits,
+		Priority: prioDynaCache + 10,
 		Dims: module.Dims{
-			{ID: "cache_%s_memory_hits", Name: "memory", Algo: module.Incremental},
-			{ID: "cache_%s_disk_hits", Name: "disk", Algo: module.Incremental},
-			{ID: "cache_%s_remote_hits", Name: "remote", Algo: module.Incremental},
-			{ID: "cache_%s_misses", Name: "misses", Algo: module.Incremental},
-			{ID: "cache_%s_RemoteHitCount", Name: "remote_hit_count", Algo: module.Incremental},
+			{ID: "cache_%s_memory_hits", Name: "memory_hit", Algo: module.Incremental},
+			{ID: "cache_%s_disk_hits", Name: "disk_hit", Algo: module.Incremental},
+			{ID: "cache_%s_remote_hits", Name: "remote_hit", Algo: module.Incremental},
+			{ID: "cache_%s_misses", Name: "miss", Algo: module.Incremental},
 		},
 	},
 	{
 		ID:       "cache_%s_requests",
 		Title:    "Dynamic Cache Requests",
 		Units:    "requests/s",
-		Fam:      "cache",
+		Fam:      "caching/dynamic",
 		Ctx:      "websphere_pmi.cache_requests",
 		Type:     module.Line,
-		Priority: prioCacheHits + 1,
+		Priority: prioDynaCache + 10 + 1,
 		Dims: module.Dims{
 			{ID: "cache_%s_client_requests", Name: "client", Algo: module.Incremental},
 			{ID: "cache_%s_distributed_requests", Name: "distributed", Algo: module.Incremental},
@@ -1374,10 +1414,10 @@ var cacheChartsTmpl = module.Charts{
 		ID:       "cache_%s_invalidations",
 		Title:    "Dynamic Cache Invalidations",
 		Units:    "invalidations/s",
-		Fam:      "cache",
+		Fam:      "caching/dynamic",
 		Ctx:      "websphere_pmi.cache_invalidations",
 		Type:     module.Line,
-		Priority: prioCacheHits + 2,
+		Priority: prioDynaCache + 10 + 2,
 		Dims: module.Dims{
 			{ID: "cache_%s_explicit_invalidations", Name: "explicit", Algo: module.Incremental},
 			{ID: "cache_%s_lru_invalidations", Name: "lru", Algo: module.Incremental},
@@ -1391,10 +1431,10 @@ var cacheChartsTmpl = module.Charts{
 		ID:       "cache_%s_detailed_invalidations",
 		Title:    "Dynamic Cache Detailed Invalidations",
 		Units:    "invalidations/s",
-		Fam:      "cache",
+		Fam:      "caching/dynamic",
 		Ctx:      "websphere_pmi.cache_detailed_invalidations",
 		Type:     module.Line,
-		Priority: prioCacheHits + 3,
+		Priority: prioDynaCache + 10 + 3,
 		Dims: module.Dims{
 			{ID: "cache_%s_ExplicitDiskInvalidationCount", Name: "explicit_disk", Algo: module.Incremental},
 			{ID: "cache_%s_ExplicitMemoryInvalidationCount", Name: "explicit_memory", Algo: module.Incremental},
@@ -1406,10 +1446,10 @@ var cacheChartsTmpl = module.Charts{
 		ID:       "cache_%s_remote_operations",
 		Title:    "Dynamic Cache Remote Operations",
 		Units:    "operations/s",
-		Fam:      "cache",
+		Fam:      "caching/dynamic",
 		Ctx:      "websphere_pmi.cache_remote_operations",
 		Type:     module.Line,
-		Priority: prioCacheHits + 4,
+		Priority: prioDynaCache + 10 + 4,
 		Dims: module.Dims{
 			{ID: "cache_%s_RemoteCreationCount", Name: "remote_creation", Algo: module.Incremental},
 		},
@@ -1421,10 +1461,10 @@ var cacheObjectChartsTmpl = module.Charts{
 		ID:       "cache_object_%s_entries",
 		Title:    "Cache Object Entries",
 		Units:    "entries",
-		Fam:      "cache_objects",
+		Fam:      "caching/dynamic",
 		Ctx:      "websphere_pmi.cache_object_entries",
 		Type:     module.Line,
-		Priority: prioCacheObjectEntries,
+		Priority: prioDynaCache + 20,
 		Dims: module.Dims{
 			{ID: "cache_object_%s_entries", Name: "current"},
 			{ID: "cache_object_%s_max_entries", Name: "max"},
@@ -1437,10 +1477,10 @@ var webAppChartsTmpl = module.Charts{
 		ID:       "webapp_%s_servlets",
 		Title:    "Web Application Servlets",
 		Units:    "servlets",
-		Fam:      "webapps",
+		Fam:      "web/apps",
 		Ctx:      "websphere_pmi.webapp_servlets",
 		Type:     module.Line,
-		Priority: prioWebAppServlets,
+		Priority: prioWebApps,
 		Dims: module.Dims{
 			{ID: "webapp_%s_loaded_servlets", Name: "loaded"},
 		},
@@ -1449,10 +1489,10 @@ var webAppChartsTmpl = module.Charts{
 		ID:       "webapp_%s_reloads",
 		Title:    "Web Application Reloads",
 		Units:    "reloads/s",
-		Fam:      "webapps",
+		Fam:      "web/apps",
 		Ctx:      "websphere_pmi.webapp_reloads",
 		Type:     module.Line,
-		Priority: prioWebAppReloads,
+		Priority: prioWebApps + 50,
 		Dims: module.Dims{
 			{ID: "webapp_%s_reloads", Name: "reloads", Algo: module.Incremental},
 		},
@@ -1464,10 +1504,10 @@ var servletChartsTmpl = module.Charts{
 		ID:       "servlet_%s_requests",
 		Title:    "Servlet Requests",
 		Units:    "requests/s",
-		Fam:      "servlets",
+		Fam:      "web/servlets",
 		Ctx:      "websphere_pmi.servlet_requests",
 		Type:     module.Line,
-		Priority: prioServletRequests,
+		Priority: prioWebServlets + 100,
 		Dims: module.Dims{
 			{ID: "servlet_%s_requests", Name: "requests", Algo: module.Incremental},
 			{ID: "servlet_%s_errors", Name: "errors", Algo: module.Incremental},
@@ -1477,10 +1517,10 @@ var servletChartsTmpl = module.Charts{
 		ID:       "servlet_%s_response_time",
 		Title:    "Servlet Response Time",
 		Units:    "milliseconds/s",
-		Fam:      "servlets",
+		Fam:      "web/servlets",
 		Ctx:      "websphere_pmi.servlet_response_time",
 		Type:     module.Line,
-		Priority: prioServletResponseTime,
+		Priority: prioWebServlets + 110,
 		Dims: module.Dims{
 			{ID: "servlet_%s_service_time_total", Name: "service_time", Algo: module.Incremental},
 			{ID: "servlet_%s_async_response_time_total", Name: "async_time", Algo: module.Incremental},
@@ -1490,10 +1530,10 @@ var servletChartsTmpl = module.Charts{
 		ID:       "servlet_%s_service_count",
 		Title:    "Servlet Service Count",
 		Units:    "requests",
-		Fam:      "servlets",
+		Fam:      "web/servlets",
 		Ctx:      "websphere_pmi.servlet_service_count",
 		Type:     module.Line,
-		Priority: prioServletServiceCount,
+		Priority: prioWebServlets + 120,
 		Dims: module.Dims{
 			{ID: "servlet_%s_service_time_count", Name: "service_count"},
 		},
@@ -1502,10 +1542,10 @@ var servletChartsTmpl = module.Charts{
 		ID:       "servlet_%s_concurrent",
 		Title:    "Servlet Concurrent Requests",
 		Units:    "requests",
-		Fam:      "servlets",
+		Fam:      "web/servlets",
 		Ctx:      "websphere_pmi.servlet_concurrent",
 		Type:     module.Line,
-		Priority: prioServletServiceCount + 1,
+		Priority: prioWebServlets + 120 + 1,
 		Dims: module.Dims{
 			{ID: "servlet_%s_concurrent", Name: "concurrent"},
 		},
@@ -1517,10 +1557,10 @@ var sessionChartsTmpl = module.Charts{
 		ID:       "sessions_%s_active",
 		Title:    "Active Sessions",
 		Units:    "sessions",
-		Fam:      "sessions",
+		Fam:      "web/sessions",
 		Ctx:      "websphere_pmi.sessions_active",
 		Type:     module.Line,
-		Priority: prioSessionsActive,
+		Priority: prioWebSessions,
 		Dims: module.Dims{
 			{ID: "sessions_%s_active", Name: "active"},
 			{ID: "sessions_%s_live", Name: "live"},
@@ -1530,10 +1570,10 @@ var sessionChartsTmpl = module.Charts{
 		ID:       "sessions_%s_lifecycle",
 		Title:    "Session Lifecycle",
 		Units:    "sessions/s",
-		Fam:      "sessions",
+		Fam:      "web/sessions",
 		Ctx:      "websphere_pmi.sessions_lifecycle",
 		Type:     module.Line,
-		Priority: prioSessionsLifecycle,
+		Priority: prioWebSessions + 10,
 		Dims: module.Dims{
 			{ID: "sessions_%s_created", Name: "created", Algo: module.Incremental},
 			{ID: "sessions_%s_invalidated", Name: "invalidated", Algo: module.Incremental},
@@ -1545,10 +1585,10 @@ var sessionChartsTmpl = module.Charts{
 		ID:       "sessions_%s_errors",
 		Title:    "Session Errors",
 		Units:    "errors/s",
-		Fam:      "sessions",
+		Fam:      "web/sessions",
 		Ctx:      "websphere_pmi.sessions_errors",
 		Type:     module.Line,
-		Priority: prioSessionsLifecycle + 1,
+		Priority: prioWebSessions + 10 + 1,
 		Dims: module.Dims{
 			{ID: "sessions_%s_activate_nonexist", Name: "activate_nonexist", Algo: module.Incremental},
 			{ID: "sessions_%s_affinity_break", Name: "affinity_break", Algo: module.Incremental},
@@ -1559,10 +1599,10 @@ var sessionChartsTmpl = module.Charts{
 		ID:       "sessions_%s_external_time",
 		Title:    "Session External Storage Time",
 		Units:    "milliseconds/s",
-		Fam:      "sessions",
+		Fam:      "web/sessions",
 		Ctx:      "websphere_pmi.sessions_external_time",
 		Type:     module.Line,
-		Priority: prioSessionsLifecycle + 2,
+		Priority: prioWebSessions + 10 + 2,
 		Dims: module.Dims{
 			{ID: "sessions_%s_external_read_time_total", Name: "read_time", Algo: module.Incremental},
 			{ID: "sessions_%s_external_write_time_total", Name: "write_time", Algo: module.Incremental},
@@ -1572,10 +1612,10 @@ var sessionChartsTmpl = module.Charts{
 		ID:       "sessions_%s_timing",
 		Title:    "Session Timing",
 		Units:    "milliseconds/s",
-		Fam:      "sessions",
+		Fam:      "web/sessions",
 		Ctx:      "websphere_pmi.sessions_timing",
 		Type:     module.Line,
-		Priority: prioSessionsLifecycle + 3,
+		Priority: prioWebSessions + 10 + 3,
 		Dims: module.Dims{
 			{ID: "sessions_%s_life_time_total", Name: "life_time", Algo: module.Incremental},
 			{ID: "sessions_%s_time_since_activated_total", Name: "time_since_activated", Algo: module.Incremental},
@@ -1586,10 +1626,10 @@ var sessionChartsTmpl = module.Charts{
 		ID:       "sessions_%s_external_read_size",
 		Title:    "Session External Read Size",
 		Units:    "bytes",
-		Fam:      "sessions",
+		Fam:      "web/sessions",
 		Ctx:      "websphere_pmi.sessions_external_read_size",
 		Type:     module.Line,
-		Priority: prioSessionsLifecycle + 5,
+		Priority: prioWebSessions + 10 + 5,
 		Dims: module.Dims{
 			{ID: "sessions_%s_ExternalReadSize_mean", Name: "mean"},
 			{ID: "sessions_%s_ExternalReadSize_total", Name: "total", DimOpts: module.DimOpts{Hidden: true}},
@@ -1603,10 +1643,10 @@ var sessionChartsTmpl = module.Charts{
 		ID:       "sessions_%s_external_write_size",
 		Title:    "Session External Write Size",
 		Units:    "bytes",
-		Fam:      "sessions",
+		Fam:      "web/sessions",
 		Ctx:      "websphere_pmi.sessions_external_write_size",
 		Type:     module.Line,
-		Priority: prioSessionsLifecycle + 6,
+		Priority: prioWebSessions + 10 + 6,
 		Dims: module.Dims{
 			{ID: "sessions_%s_ExternalWriteSize_mean", Name: "mean"},
 			{ID: "sessions_%s_ExternalWriteSize_total", Name: "total", DimOpts: module.DimOpts{Hidden: true}},
@@ -1624,10 +1664,10 @@ var jcaPoolChartsTmpl = module.Charts{
 		ID:       "jca_pool_%s_connections",
 		Title:    "JCA Connection Pool Connections",
 		Units:    "connections",
-		Fam:      "jca_pools",
+		Fam:      "connections/jca",
 		Ctx:      "websphere_pmi.jca_pool_connections",
 		Type:     module.Line,
-		Priority: prioJCAPoolConnections,
+		Priority: prioJCAPools,
 		Dims: module.Dims{
 			{ID: "jca_pool_%s_free", Name: "free"},
 			{ID: "jca_pool_%s_size", Name: "total"},
@@ -1637,10 +1677,10 @@ var jcaPoolChartsTmpl = module.Charts{
 		ID:       "jca_pool_%s_lifecycle",
 		Title:    "JCA Connection Pool Lifecycle",
 		Units:    "connections/s",
-		Fam:      "jca_pools",
+		Fam:      "connections/jca",
 		Ctx:      "websphere_pmi.jca_pool_lifecycle",
 		Type:     module.Line,
-		Priority: prioJCAPoolLifecycle,
+		Priority: prioJCAPools + 60,
 		Dims: module.Dims{
 			{ID: "jca_pool_%s_created", Name: "created", Algo: module.Incremental},
 			{ID: "jca_pool_%s_closed", Name: "closed", Algo: module.Incremental},
@@ -1652,10 +1692,10 @@ var jcaPoolChartsTmpl = module.Charts{
 		ID:       "jca_pool_%s_faults",
 		Title:    "JCA Connection Pool Faults",
 		Units:    "faults/s",
-		Fam:      "jca_pools",
+		Fam:      "connections/jca",
 		Ctx:      "websphere_pmi.jca_pool_faults",
 		Type:     module.Line,
-		Priority: prioJCAPoolConnections + 2,
+		Priority: prioJCAPools + 2,
 		Dims: module.Dims{
 			{ID: "jca_pool_%s_faults", Name: "faults", Algo: module.Incremental},
 		},
@@ -1664,10 +1704,10 @@ var jcaPoolChartsTmpl = module.Charts{
 		ID:       "jca_pool_%s_managed_connections",
 		Title:    "JCA Managed Connections",
 		Units:    "connections",
-		Fam:      "jca_pools",
+		Fam:      "connections/jca",
 		Ctx:      "websphere_pmi.jca_pool_managed_connections",
 		Type:     module.Line,
-		Priority: prioJCAPoolConnections + 3,
+		Priority: prioJCAPools + 3,
 		Dims: module.Dims{
 			{ID: "jca_pool_%s_managed_connections", Name: "managed"},
 			{ID: "jca_pool_%s_connection_handles", Name: "handles"},
@@ -1677,10 +1717,10 @@ var jcaPoolChartsTmpl = module.Charts{
 		ID:       "jca_pool_%s_utilization",
 		Title:    "JCA Connection Pool Utilization",
 		Units:    "percentage",
-		Fam:      "jca_pools",
+		Fam:      "connections/jca",
 		Ctx:      "websphere_pmi.jca_pool_utilization",
 		Type:     module.Line,
-		Priority: prioJCAPoolConnections + 4,
+		Priority: prioJCAPools + 4,
 		Dims: module.Dims{
 			{ID: "jca_pool_%s_percent_used", Name: "used"},
 			{ID: "jca_pool_%s_percent_maxed", Name: "maxed"},
@@ -1690,10 +1730,10 @@ var jcaPoolChartsTmpl = module.Charts{
 		ID:       "jca_pool_%s_wait",
 		Title:    "JCA Connection Pool Wait",
 		Units:    "threads",
-		Fam:      "jca_pools",
+		Fam:      "connections/jca",
 		Ctx:      "websphere_pmi.jca_pool_wait",
 		Type:     module.Line,
-		Priority: prioJCAPoolConnections + 5,
+		Priority: prioJCAPools + 5,
 		Dims: module.Dims{
 			{ID: "jca_pool_%s_waiting_threads", Name: "waiting"},
 		},
@@ -1702,10 +1742,10 @@ var jcaPoolChartsTmpl = module.Charts{
 		ID:       "jca_pool_%s_time",
 		Title:    "JCA Connection Pool Time",
 		Units:    "milliseconds/s",
-		Fam:      "jca_pools",
+		Fam:      "connections/jca",
 		Ctx:      "websphere_pmi.jca_pool_time",
 		Type:     module.Line,
-		Priority: prioJCAPoolConnections + 6,
+		Priority: prioJCAPools + 6,
 		Dims: module.Dims{
 			{ID: "jca_pool_%s_wait_time_total", Name: "wait_time", Algo: module.Incremental},
 			{ID: "jca_pool_%s_use_time_total", Name: "use_time", Algo: module.Incremental},
@@ -1718,10 +1758,10 @@ var enterpriseAppChartsTmpl = module.Charts{
 		ID:       "enterprise_app_%s_metrics",
 		Title:    "Enterprise Application Metrics",
 		Units:    "metrics",
-		Fam:      "enterprise_apps",
+		Fam:      "enterprise/apps",
 		Ctx:      "websphere_pmi.enterprise_app_metrics",
 		Type:     module.Line,
-		Priority: prioEnterpriseAppMetrics,
+		Priority: prioEnterpriseApps,
 		Dims: module.Dims{
 			{ID: "enterprise_app_%s_startup_time", Name: "startup_time"},
 			{ID: "enterprise_app_%s_loads", Name: "loads", Algo: module.Incremental},
@@ -1734,10 +1774,10 @@ var systemDataChartsTmpl = module.Charts{
 		ID:       "system_data_%s_cpu",
 		Title:    "System CPU Usage",
 		Units:    "percentage",
-		Fam:      "system_data",
+		Fam:      "system/cpu",
 		Ctx:      "websphere_pmi.system_data_cpu",
 		Type:     module.Line,
-		Priority: prioSystemDataMetrics,
+		Priority: prioSystemCPU,
 		Dims: module.Dims{
 			{ID: "system_data_%s_cpu_usage", Name: "current"},
 			{ID: "system_data_%s_cpu_average", Name: "average", Div: 100}, // Convert back from precision
@@ -1747,10 +1787,10 @@ var systemDataChartsTmpl = module.Charts{
 		ID:       "system_data_%s_memory",
 		Title:    "System Free Memory",
 		Units:    "bytes",
-		Fam:      "system_data",
+		Fam:      "system/memory",
 		Ctx:      "websphere_pmi.system_data_memory",
 		Type:     module.Line,
-		Priority: prioSystemDataMetrics + 10,
+		Priority: prioSystemCPU + 10,
 		Dims: module.Dims{
 			{ID: "system_data_%s_free_memory", Name: "free"},
 		},
@@ -1765,7 +1805,7 @@ var wlmChartsTmpl = module.Charts{
 		Fam:      "wlm",
 		Ctx:      "websphere_pmi.wlm_requests",
 		Type:     module.Line,
-		Priority: prioWLMMetrics,
+		Priority: prioWLM,
 		Dims: module.Dims{
 			{ID: "wlm_%s_requests", Name: "requests", Algo: module.Incremental},
 		},
@@ -1777,10 +1817,10 @@ var beanManagerChartsTmpl = module.Charts{
 		ID:       "bean_manager_%s_beans",
 		Title:    "Bean Manager Live Beans",
 		Units:    "beans",
-		Fam:      "bean_manager",
+		Fam:      "enterprise/ejb",
 		Ctx:      "websphere_pmi.bean_manager_beans",
 		Type:     module.Line,
-		Priority: prioBeanManagerMetrics,
+		Priority: prioEJBContainer + 400,
 		Dims: module.Dims{
 			{ID: "bean_manager_%s_live_beans", Name: "live"},
 		},
@@ -1792,10 +1832,10 @@ var connectionManagerChartsTmpl = module.Charts{
 		ID:       "connection_manager_%s_connections",
 		Title:    "Connection Manager Connections",
 		Units:    "connections",
-		Fam:      "connection_manager",
+		Fam:      "connections/manager",
 		Ctx:      "websphere_pmi.connection_manager_connections",
 		Type:     module.Line,
-		Priority: prioConnectionManagerMetrics,
+		Priority: prioConnectionMgr,
 		Dims: module.Dims{
 			{ID: "connection_manager_%s_allocated", Name: "allocated"},
 		},
@@ -1807,10 +1847,10 @@ var jvmSubsystemChartsTmpl = module.Charts{
 		ID:       "jvm_subsystem_%s_metrics",
 		Title:    "JVM Subsystem Metrics",
 		Units:    "metrics",
-		Fam:      "jvm_subsystem",
+		Fam:      "system/jvm",
 		Ctx:      "websphere_pmi.jvm_subsystem_metrics",
 		Type:     module.Line,
-		Priority: prioJVMSubsystemMetrics,
+		Priority: prioSystemJVM,
 		Dims: module.Dims{
 			{ID: "jvm_gc_%s_heap_discarded", Name: "gc_heap_discarded"},
 			{ID: "jvm_gc_%s_time", Name: "gc_time"},
@@ -1825,10 +1865,10 @@ var ejbContainerChartsTmpl = module.Charts{
 		ID:       "ejb_container_%s_methods",
 		Title:    "EJB Container Method Calls",
 		Units:    "calls/s",
-		Fam:      "ejb_container",
+		Fam:      "enterprise/ejb",
 		Ctx:      "websphere_pmi.ejb_container_methods",
 		Type:     module.Line,
-		Priority: prioEJBContainerMetrics,
+		Priority: prioEJBContainer,
 		Dims: module.Dims{
 			{ID: "ejb_container_%s_method_calls", Name: "method_calls", Algo: module.Incremental},
 		},
@@ -1840,10 +1880,10 @@ var mdbChartsTmpl = module.Charts{
 		ID:       "mdb_%s_messages",
 		Title:    "Message Driven Bean Messages",
 		Units:    "messages/s",
-		Fam:      "mdb",
+		Fam:      "enterprise/ejb",
 		Ctx:      "websphere_pmi.mdb_messages",
 		Type:     module.Line,
-		Priority: prioMDBMetrics,
+		Priority: prioEJBContainer + 100,
 		Dims: module.Dims{
 			{ID: "mdb_%s_messages", Name: "messages", Algo: module.Incremental},
 		},
@@ -1855,10 +1895,10 @@ var sfsbChartsTmpl = module.Charts{
 		ID:       "sfsb_%s_instances",
 		Title:    "Stateful Session Bean Instances",
 		Units:    "instances",
-		Fam:      "sfsb",
+		Fam:      "enterprise/ejb",
 		Ctx:      "websphere_pmi.sfsb_instances",
 		Type:     module.Line,
-		Priority: prioSFSBMetrics,
+		Priority: prioEJBContainer + 300,
 		Dims: module.Dims{
 			{ID: "sfsb_%s_live", Name: "live"},
 		},
@@ -1870,10 +1910,10 @@ var slsbChartsTmpl = module.Charts{
 		ID:       "slsb_%s_methods",
 		Title:    "Stateless Session Bean Method Calls",
 		Units:    "calls/s",
-		Fam:      "slsb",
+		Fam:      "enterprise/ejb",
 		Ctx:      "websphere_pmi.slsb_methods",
 		Type:     module.Line,
-		Priority: prioSLSBMetrics,
+		Priority: prioEJBContainer + 200,
 		Dims: module.Dims{
 			{ID: "slsb_%s_method_calls", Name: "method_calls", Algo: module.Incremental},
 		},
@@ -1885,10 +1925,10 @@ var entityBeanChartsTmpl = module.Charts{
 		ID:       "entity_bean_%s_lifecycle",
 		Title:    "Entity Bean Lifecycle",
 		Units:    "operations/s",
-		Fam:      "entity_beans",
+		Fam:      "enterprise/ejb",
 		Ctx:      "websphere_pmi.entity_bean_lifecycle",
 		Type:     module.Line,
-		Priority: prioEntityBeanMetrics,
+		Priority: prioEJBContainer + 500,
 		Dims: module.Dims{
 			{ID: "entity_bean_%s_activations", Name: "activations", Algo: module.Incremental},
 			{ID: "entity_bean_%s_passivations", Name: "passivations", Algo: module.Incremental},
@@ -1901,10 +1941,10 @@ var genericEJBChartsTmpl = module.Charts{
 		ID:       "generic_ejb_%s_operations",
 		Title:    "Generic EJB Operations",
 		Units:    "operations/s",
-		Fam:      "generic_ejb",
+		Fam:      "enterprise/ejb",
 		Ctx:      "websphere_pmi.generic_ejb_operations",
 		Type:     module.Line,
-		Priority: prioGenericEJBMetrics,
+		Priority: prioEJBContainer + 600,
 		Dims: module.Dims{
 			{ID: "generic_ejb_%s_invocations", Name: "invocations", Algo: module.Incremental},
 			{ID: "generic_ejb_%s_creates", Name: "creates", Algo: module.Incremental},
@@ -1921,7 +1961,7 @@ var orbChartsTmpl = module.Charts{
 		Fam:      "orb",
 		Ctx:      "websphere_pmi.orb_requests",
 		Type:     module.Line,
-		Priority: prioORBRequests,
+		Priority: prioORB,
 		Dims: module.Dims{
 			{ID: "orb_%s_requests", Name: "requests", Algo: module.Incremental},
 		},
@@ -1933,7 +1973,7 @@ var orbChartsTmpl = module.Charts{
 		Fam:      "orb",
 		Ctx:      "websphere_pmi.orb_concurrent",
 		Type:     module.Line,
-		Priority: prioORBConcurrent,
+		Priority: prioORB + 10,
 		Dims: module.Dims{
 			{ID: "orb_%s_concurrent_requests", Name: "concurrent"},
 		},
@@ -1945,7 +1985,7 @@ var orbChartsTmpl = module.Charts{
 		Fam:      "orb",
 		Ctx:      "websphere_pmi.orb_lookup_time",
 		Type:     module.Line,
-		Priority: prioORBLookupTime,
+		Priority: prioORB + 20,
 		Dims: module.Dims{
 			{ID: "orb_%s_lookup_time_total", Name: "lookup_time", Algo: module.Incremental},
 		},
@@ -3042,10 +3082,10 @@ func (w *WebSpherePMI) createDynamicGenericChart(instance, nodeName, serverName,
 			ID:       fmt.Sprintf("generic_stat_%s_metrics", w.cleanID(instance)),
 			Title:    fmt.Sprintf("Generic Metrics: %s", statName),
 			Units:    "metrics",
-			Fam:      "generic",
+			Fam:      "monitoring",
 			Ctx:      "websphere_pmi.generic_metrics",
 			Type:     module.Line,
-			Priority: prioGenericStatMetrics,
+			Priority: prioMonitoring,
 			Dims:     dims,
 			Labels: []module.Label{
 				{Key: "node", Value: nodeName},
@@ -3702,10 +3742,10 @@ func (w *WebSpherePMI) ensureExtensionRegistryCharts(instance, nodeName, serverN
 		charts := extensionRegistryChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -3726,10 +3766,10 @@ func (w *WebSpherePMI) ensureSIBJMSAdapterCharts(instance, nodeName, serverName 
 		charts := sibJMSAdapterChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -3750,10 +3790,10 @@ func (w *WebSpherePMI) ensureServletsComponentCharts(instance, nodeName, serverN
 		charts := servletsComponentChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -3774,10 +3814,10 @@ func (w *WebSpherePMI) ensureWIMComponentCharts(instance, nodeName, serverName s
 		charts := wimComponentChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -3798,10 +3838,10 @@ func (w *WebSpherePMI) ensureWLMTaggedComponentManagerCharts(instance, nodeName,
 		charts := wlmTaggedComponentChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -3822,10 +3862,10 @@ func (w *WebSpherePMI) ensurePMIWebServiceServiceCharts(instance, nodeName, serv
 		charts := pmiWebServiceServiceChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -3859,10 +3899,10 @@ func (w *WebSpherePMI) ensureTCPChannelDCSCharts(instance, nodeName, serverName 
 		
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -3883,11 +3923,11 @@ func (w *WebSpherePMI) ensureDetailsComponentCharts(instance, nodeName, serverNa
 		charts := detailsComponentChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-				{Key: "context", Value: parentContext},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+				module.Label{Key: "context", Value: parentContext},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -3908,10 +3948,10 @@ func (w *WebSpherePMI) ensureISCProductDetailsCharts(instance, nodeName, serverN
 		charts := iscProductDetailsChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -3923,40 +3963,7 @@ func (w *WebSpherePMI) ensureISCProductDetailsCharts(instance, nodeName, serverN
 	}
 }
 
-// Priority constants for new charts (non-duplicated ones)
-const (
-	prioWebAppContainerServlets  = 2350
-	prioWebAppContainerRequests  = 2360
-	prioWebAppServlets          = 2400
-	prioWebAppReloads           = 2410
-	prioServletRequests         = 2500
-	prioServletResponseTime     = 2510
-	prioServletServiceCount     = 2520
-	prioSessionsActive          = 2600
-	prioSessionsLifecycle       = 2610
-	prioORBRequests             = 2700
-	prioORBConcurrent           = 2710
-	prioORBLookupTime           = 2720
-	prioCacheEntries            = 2800
-	prioCacheHits               = 2810
-	prioCacheObjectEntries      = 2900
-	prioJCAPoolConnections      = 3200
-	prioJCAPoolLifecycle        = 3210
-	prioEnterpriseAppMetrics    = 3300
-	prioSystemDataMetrics       = 3400
-	prioWLMMetrics             = 3500
-	prioBeanManagerMetrics      = 3600
-	prioConnectionManagerMetrics = 3700
-	prioJVMSubsystemMetrics     = 3800
-	prioEJBContainerMetrics     = 3900
-	prioMDBMetrics             = 4000
-	prioSFSBMetrics            = 4100
-	prioSLSBMetrics            = 4200
-	prioEntityBeanMetrics      = 4300
-	prioGenericEJBMetrics      = 4400
-	prioSecurityAuthFailures   = 5010
-	prioGenericStatMetrics     = 9000  // Low priority for catch-all
-)
+// All priority constants are now defined in charts.go
 
 // Chart creation helpers for new parsers
 func (w *WebSpherePMI) ensureJCAPoolCharts(instance, nodeName, serverName, poolName string) {
@@ -3967,11 +3974,11 @@ func (w *WebSpherePMI) ensureJCAPoolCharts(instance, nodeName, serverName, poolN
 		charts := jcaPoolChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-				{Key: "pool", Value: poolName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+				module.Label{Key: "pool", Value: poolName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -3991,11 +3998,11 @@ func (w *WebSpherePMI) ensureEnterpriseAppCharts(instance, nodeName, serverName,
 		charts := enterpriseAppChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-				{Key: "application", Value: appName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+				module.Label{Key: "application", Value: appName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -4015,10 +4022,10 @@ func (w *WebSpherePMI) ensureSystemDataCharts(instance, nodeName, serverName str
 		charts := systemDataChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -4038,10 +4045,10 @@ func (w *WebSpherePMI) ensureWLMCharts(instance, nodeName, serverName string) {
 		charts := wlmChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -4061,10 +4068,10 @@ func (w *WebSpherePMI) ensureBeanManagerCharts(instance, nodeName, serverName st
 		charts := beanManagerChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -4084,10 +4091,10 @@ func (w *WebSpherePMI) ensureConnectionManagerCharts(instance, nodeName, serverN
 		charts := connectionManagerChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -4107,11 +4114,11 @@ func (w *WebSpherePMI) ensureJVMSubsystemCharts(instance, nodeName, serverName, 
 		charts := jvmSubsystemChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-				{Key: "subsystem", Value: subsystem},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+				module.Label{Key: "subsystem", Value: subsystem},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -4131,10 +4138,10 @@ func (w *WebSpherePMI) ensureEJBContainerCharts(instance, nodeName, serverName s
 		charts := ejbContainerChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -4154,11 +4161,11 @@ func (w *WebSpherePMI) ensureMDBCharts(instance, nodeName, serverName, beanName 
 		charts := mdbChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-				{Key: "bean", Value: beanName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+				module.Label{Key: "bean", Value: beanName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -4178,11 +4185,11 @@ func (w *WebSpherePMI) ensureSFSBCharts(instance, nodeName, serverName, beanName
 		charts := sfsbChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-				{Key: "bean", Value: beanName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+				module.Label{Key: "bean", Value: beanName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -4202,11 +4209,11 @@ func (w *WebSpherePMI) ensureSLSBCharts(instance, nodeName, serverName, beanName
 		charts := slsbChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-				{Key: "bean", Value: beanName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+				module.Label{Key: "bean", Value: beanName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -4226,11 +4233,11 @@ func (w *WebSpherePMI) ensureEntityBeanCharts(instance, nodeName, serverName, be
 		charts := entityBeanChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-				{Key: "bean", Value: beanName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+				module.Label{Key: "bean", Value: beanName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -4250,11 +4257,11 @@ func (w *WebSpherePMI) ensureGenericEJBCharts(instance, nodeName, serverName, be
 		charts := genericEJBChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-				{Key: "bean", Value: beanName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+				module.Label{Key: "bean", Value: beanName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -4446,10 +4453,10 @@ var securityAuthChartsTmpl = module.Charts{
 		ID:       "security_auth_%s_events",
 		Title:    "Security Authentication Events",
 		Units:    "events/s",
-		Fam:      "security",
+		Fam:      "security/authentication",
 		Ctx:      "websphere_pmi.security_auth_events",
 		Type:     module.Line,
-		Priority: prioSecurityAuthEvents,
+		Priority: prioSecurityAuth,
 		Dims: module.Dims{
 			// Traditional WebSphere metrics (based on actual XML)
 			{ID: "security_auth_%s_web_auth", Name: "web", Algo: module.Incremental},
@@ -4463,10 +4470,10 @@ var securityAuthChartsTmpl = module.Charts{
 		ID:       "security_auth_%s_timing",
 		Title:    "Security Authentication Response Time",
 		Units:    "milliseconds/s",
-		Fam:      "security",
+		Fam:      "security/authentication",
 		Ctx:      "websphere_pmi.security_auth_timing",
 		Type:     module.Line,
-		Priority: prioSecurityAuthTiming,
+		Priority: prioSecurityAuth + 10,
 		Dims: module.Dims{
 			// Traditional WebSphere timing metrics (based on actual XML)
 			{ID: "security_auth_%s_web_auth_time_total", Name: "web", Algo: module.Incremental},
@@ -4483,10 +4490,10 @@ var securityAuthzChartsTmpl = module.Charts{
 		ID:       "security_authz_%s_events",
 		Title:    "Security Authorization Events",
 		Units:    "events/s",
-		Fam:      "security",
+		Fam:      "security/authorization",
 		Ctx:      "websphere_pmi.security_authz_events",
 		Type:     module.Line,
-		Priority: prioSecurityAuthzEvents,
+		Priority: prioSecurityAuthz,
 		Dims: module.Dims{
 			{ID: "security_authz_%s_web_authz_count", Name: "web", Algo: module.Incremental},
 			{ID: "security_authz_%s_ejb_authz_count", Name: "ejb", Algo: module.Incremental},
@@ -4498,10 +4505,10 @@ var securityAuthzChartsTmpl = module.Charts{
 		ID:       "security_authz_%s_timing",
 		Title:    "Security Authorization Response Time",
 		Units:    "milliseconds/s",
-		Fam:      "security",
+		Fam:      "security/authorization",
 		Ctx:      "websphere_pmi.security_authz_timing",
 		Type:     module.Line,
-		Priority: prioSecurityAuthzTiming,
+		Priority: prioSecurityAuthz + 10,
 		Dims: module.Dims{
 			{ID: "security_authz_%s_web_authz_time_total", Name: "web", Algo: module.Incremental},
 			{ID: "security_authz_%s_ejb_authz_time_total", Name: "ejb", Algo: module.Incremental},
@@ -4520,7 +4527,7 @@ var interceptorChartsTmpl = module.Charts{
 		Fam:      "interceptors",
 		Ctx:      "websphere_pmi.interceptor_processing_time",
 		Type:     module.Line,
-		Priority: prioORBInterceptors,
+		Priority: prioInterceptors + 20,
 		Dims: module.Dims{
 			{ID: "interceptor_%s_processing_time_total", Name: "processing_time", Algo: module.Incremental},
 		},
@@ -4532,7 +4539,7 @@ var interceptorChartsTmpl = module.Charts{
 		Fam:      "interceptors",
 		Ctx:      "websphere_pmi.interceptor_processing_count",
 		Type:     module.Line,
-		Priority: prioORBInterceptors + 1,
+		Priority: prioInterceptors + 20 + 1,
 		Dims: module.Dims{
 			{ID: "interceptor_%s_processing_count", Name: "operations", Algo: module.Incremental},
 		},
@@ -4544,7 +4551,7 @@ var portletChartsTmpl = module.Charts{
 		ID:       "portlet_%s_requests",
 		Title:    "Portlet Requests",
 		Units:    "requests/s",
-		Fam:      "portlets",
+		Fam:      "web/portlets",
 		Ctx:      "websphere_pmi.portlet_requests",
 		Type:     module.Line,
 		Priority: prioWebPortlets,
@@ -4557,7 +4564,7 @@ var portletChartsTmpl = module.Charts{
 		ID:       "portlet_%s_concurrent",
 		Title:    "Portlet Concurrent Requests",
 		Units:    "requests",
-		Fam:      "portlets",
+		Fam:      "web/portlets",
 		Ctx:      "websphere_pmi.portlet_concurrent",
 		Type:     module.Line,
 		Priority: prioWebPortlets + 1,
@@ -4569,7 +4576,7 @@ var portletChartsTmpl = module.Charts{
 		ID:       "portlet_%s_response_time",
 		Title:    "Portlet Response Time",
 		Units:    "milliseconds/s",
-		Fam:      "portlets",
+		Fam:      "web/portlets",
 		Ctx:      "websphere_pmi.portlet_response_time",
 		Type:     module.Line,
 		Priority: prioWebPortlets + 2,
@@ -4602,7 +4609,7 @@ var urlChartsTmpl = module.Charts{
 		ID:       "urls_%s_requests",
 		Title:    "URL Requests",
 		Units:    "requests/s",
-		Fam:      "urls",
+		Fam:      "web/urls",
 		Ctx:      "websphere_pmi.url_requests",
 		Type:     module.Line,
 		Priority: prioWebServlets + 10,
@@ -4614,7 +4621,7 @@ var urlChartsTmpl = module.Charts{
 		ID:       "urls_%s_concurrent",
 		Title:    "URL Concurrent Requests",
 		Units:    "requests",
-		Fam:      "urls",
+		Fam:      "web/urls",
 		Ctx:      "websphere_pmi.url_concurrent",
 		Type:     module.Line,
 		Priority: prioWebServlets + 11,
@@ -4626,7 +4633,7 @@ var urlChartsTmpl = module.Charts{
 		ID:       "urls_%s_response_time",
 		Title:    "URL Response Time",
 		Units:    "milliseconds/s",
-		Fam:      "urls",
+		Fam:      "web/urls",
 		Ctx:      "websphere_pmi.url_response_time",
 		Type:     module.Line,
 		Priority: prioWebServlets + 12,
@@ -4642,7 +4649,7 @@ var servletURLChartsTmpl = module.Charts{
 		ID:       "servlet_url_%s_requests",
 		Title:    "Servlet URL Requests",
 		Units:    "requests/s",
-		Fam:      "servlet_urls",
+		Fam:      "web/urls",
 		Ctx:      "websphere_pmi.servlet_url_requests",
 		Type:     module.Line,
 		Priority: prioWebServlets + 20,
@@ -4654,7 +4661,7 @@ var servletURLChartsTmpl = module.Charts{
 		ID:       "servlet_url_%s_concurrent",
 		Title:    "Servlet URL Concurrent Requests",
 		Units:    "requests",
-		Fam:      "servlet_urls",
+		Fam:      "web/urls",
 		Ctx:      "websphere_pmi.servlet_url_concurrent",
 		Type:     module.Line,
 		Priority: prioWebServlets + 21,
@@ -4666,7 +4673,7 @@ var servletURLChartsTmpl = module.Charts{
 		ID:       "servlet_url_%s_response_time",
 		Title:    "Servlet URL Response Time",
 		Units:    "milliseconds/s",
-		Fam:      "servlet_urls",
+		Fam:      "web/urls",
 		Ctx:      "websphere_pmi.servlet_url_response_time",
 		Type:     module.Line,
 		Priority: prioWebServlets + 22,
@@ -4689,7 +4696,7 @@ var haManagerChartsTmpl = module.Charts{
 		ID:       "ha_manager_%s_groups",
 		Title:    "HA Manager Groups",
 		Units:    "groups",
-		Fam:      "ha_manager",
+		Fam:      "ha",
 		Ctx:      "websphere_pmi.ha_manager_groups",
 		Type:     module.Line,
 		Priority: prioHAManager,
@@ -4701,7 +4708,7 @@ var haManagerChartsTmpl = module.Charts{
 		ID:       "ha_manager_%s_bulletin_board",
 		Title:    "HA Manager Bulletin Board",
 		Units:    "items",
-		Fam:      "ha_manager",
+		Fam:      "ha",
 		Ctx:      "websphere_pmi.ha_manager_bulletin_board",
 		Type:     module.Line,
 		Priority: prioHAManager + 1,
@@ -4716,7 +4723,7 @@ var haManagerChartsTmpl = module.Charts{
 		ID:       "ha_manager_%s_rebuild_time",
 		Title:    "HA Manager Rebuild Time",
 		Units:    "milliseconds/s",
-		Fam:      "ha_manager",
+		Fam:      "ha",
 		Ctx:      "websphere_pmi.ha_manager_rebuild_time",
 		Type:     module.Line,
 		Priority: prioHAManager + 2,
@@ -4737,10 +4744,10 @@ func (w *WebSpherePMI) ensureSecurityAuthCharts(instance, nodeName, serverName s
 		charts := securityAuthChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -4760,10 +4767,10 @@ func (w *WebSpherePMI) ensureSecurityAuthzCharts(instance, nodeName, serverName 
 		charts := securityAuthzChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -5285,11 +5292,11 @@ func (w *WebSpherePMI) ensureInterceptorCharts(instance, nodeName, serverName, i
 		charts := interceptorChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-				{Key: "interceptor", Value: interceptorName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+				module.Label{Key: "interceptor", Value: interceptorName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -5309,11 +5316,11 @@ func (w *WebSpherePMI) ensurePortletCharts(instance, nodeName, serverName, portl
 		charts := portletChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-				{Key: "portlet", Value: portletName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+				module.Label{Key: "portlet", Value: portletName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -5333,11 +5340,11 @@ func (w *WebSpherePMI) ensureWebServiceCharts(instance, nodeName, serverName, mo
 		charts := webServiceChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-				{Key: "module", Value: moduleName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+				module.Label{Key: "module", Value: moduleName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -5357,10 +5364,10 @@ func (w *WebSpherePMI) ensureURLCharts(instance, nodeName, serverName string) {
 		charts := urlChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -5380,11 +5387,11 @@ func (w *WebSpherePMI) ensureServletURLCharts(instance, nodeName, serverName, ur
 		charts := servletURLChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-				{Key: "url", Value: urlPath},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+				module.Label{Key: "url", Value: urlPath},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -5404,10 +5411,10 @@ func (w *WebSpherePMI) ensureHAManagerCharts(instance, nodeName, serverName stri
 		charts := haManagerChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
-				{Key: "node", Value: nodeName},
-				{Key: "server", Value: serverName},
-			}
+			chart.Labels = w.createChartLabels(
+				module.Label{Key: "node", Value: nodeName},
+				module.Label{Key: "server", Value: serverName},
+			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -5594,10 +5601,10 @@ func (w *WebSpherePMI) ensureSessionObjectSizeTimeChart(instance, nodeName, serv
 			ID:       fmt.Sprintf("sessions_%s_object_size_time", cleanInst),
 			Title:    "Session Object Size Total",
 			Units:    "bytes",
-			Fam:      "sessions",
+			Fam:      "web/sessions",
 			Ctx:      "websphere_pmi.session_object_size_time",
 			Type:     module.Line,
-			Priority: prioSessionsActive + 200, // Lower priority than main session charts
+			Priority: prioWebSessions + 200, // Lower priority than main session charts
 			Dims: module.Dims{
 				{ID: fmt.Sprintf("sessions_%s_object_size_total", cleanInst), Name: "total", Algo: module.Incremental},
 			},
