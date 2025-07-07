@@ -38,7 +38,7 @@ metrics:
       name: pduRole
       chart_meta:
         description: PDU role
-        family: 'PDU/Role/Status'
+        family: 'Hardware/PDU/Role/Status'
         unit: "{status}"
       mapping:
         0: secondary
@@ -51,7 +51,7 @@ metrics:
       name: outOfService
       chart_meta:
         description: PDU operation status
-        family: 'PDU/Service/Status'
+        family: 'Hardware/PDU/Service/Status'
         unit: "{status}"
       mapping:
         1: out of service
@@ -107,7 +107,7 @@ metrics:
       name: line1curr
       chart_meta:
         description: Line 1 current draw
-        family: 'PDU/Line/1/Current'
+        family: 'PowerFlow/Line/1/Current/Value'
         unit: "A"
       scale_factor: 0.01
 
@@ -117,7 +117,7 @@ metrics:
       name: line2curr
       chart_meta:
         description: Line 2 current draw
-        family: 'PDU/Line/2/Current'
+        family: 'PowerFlow/Line/2/Current/Value'
         unit: "A"
       scale_factor: 0.01
 
@@ -127,7 +127,7 @@ metrics:
       name: line3curr
       chart_meta:
         description: Line 3 current draw
-        family: 'PDU/Line/3/Current'
+        family: 'PowerFlow/Line/3/Current/Value'
         unit: "A"
       scale_factor: 0.01
 
@@ -138,7 +138,7 @@ metrics:
       name: currentxy1
       chart_meta:
         description: XY1 current draw
-        family: 'PDU/Branch/XY1/Current'
+        family: 'PowerFlow/Branch/XY1/Current/Value'
         unit: "A"
       scale_factor: 0.01
 
@@ -148,7 +148,7 @@ metrics:
       name: currentyz1
       chart_meta:
         description: YZ1 current draw
-        family: 'PDU/Branch/YZ1/Current'
+        family: 'PowerFlow/Branch/YZ1/Current/Value'
         unit: "A"
       scale_factor: 0.01
 
@@ -158,7 +158,7 @@ metrics:
       name: currentzx1
       chart_meta:
         description: ZX1 current draw
-        family: 'PDU/Branch/ZX1/Current'
+        family: 'PowerFlow/Branch/ZX1/Current/Value'
         unit: "A"
       scale_factor: 0.01
 
@@ -168,7 +168,7 @@ metrics:
       name: currentxy2
       chart_meta:
         description: XY2 current draw
-        family: 'PDU/Branch/XY2/Current'
+        family: 'PowerFlow/Branch/XY2/Current/Value'
         unit: "A"
       scale_factor: 0.01
 
@@ -178,7 +178,7 @@ metrics:
       name: currentyz2
       chart_meta:
         description: YZ2 current draw
-        family: 'PDU/Branch/YZ2/Current'
+        family: 'PowerFlow/Branch/YZ2/Current/Value'
         unit: "A"
       scale_factor: 0.01
 
@@ -188,7 +188,7 @@ metrics:
       name: currentzx2
       chart_meta:
         description: ZX2 current draw
-        family: 'PDU/Branch/ZX2/Current'
+        family: 'PowerFlow/Branch/ZX2/Current/Value'
         unit: "A"
       scale_factor: 0.01
 
@@ -196,39 +196,39 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.2.1.0
       name: voltagexy1
-      chart_meta:
-        description: XY1 voltage in 1/10 volts
-        family: 'PDU/Branch/XY1/Voltage'
-        unit: "V"
       scale_factor: 0.1
+      chart_meta:
+        description: XY1 voltage in volts
+        family: 'PowerFlow/Branch/XY1/Voltage/Value'
+        unit: "V"
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.2.2.0
       name: voltageyz1
-      chart_meta:
-        description: YZ1 voltage in 1/10 volts
-        family: 'PDU/Branch/YZ1/Voltage'
-        unit: "V"
       scale_factor: 0.1
+      chart_meta:
+        description: YZ1 voltage in volts
+        family: 'PowerFlow/Branch/YZ1/Voltage/Value'
+        unit: "V"
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.2.3.0
       name: voltagezx1
-      chart_meta:
-        description: ZX1 voltage in 1/10 volts
-        family: 'PDU/Branch/ZX1/Voltage'
-        unit: "V"
       scale_factor: 0.1
+      chart_meta:
+        description: ZX1 voltage in volts
+        family: 'PowerFlow/Branch/ZX1/Voltage/Value'
+        unit: "V"
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.2.4.0
       name: voltagexy2
       chart_meta:
-        description: XY2 voltage in 1/10 volts
-        family: 'PDU/Branch/XY2/Voltage'
+        description: XY2 voltage in volts
+        family: 'PowerFlow/Branch/XY2/Voltage/Value'
         unit: "V"
       scale_factor: 0.1
 
@@ -236,19 +236,19 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.2.5.0
       name: voltageyz2
-      chart_meta:
-        description: YZ2 voltage in 1/10 volts
-        family: 'PDU/Branch/YZ2/Voltage'
-        unit: "V"
       scale_factor: 0.1
+      chart_meta:
+        description: YZ2 voltage in volts
+        family: 'PowerFlow/Branch/YZ2/Voltage/Value'
+        unit: "V"
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.2.6.0
       name: voltagezx2
       chart_meta:
-        description: ZX2 voltage in 1/10 volts
-        family: 'PDU/Branch/ZX2/Voltage'
+        description: ZX2 voltage in volts
+        family: 'PowerFlow/Branch/ZX2/Voltage/Value'
         unit: "V"
       scale_factor: 0.1
 
@@ -258,7 +258,7 @@ metrics:
       name: powerxy1
       chart_meta:
         description: XY1 power consumption in Watts
-        family: 'PDU/Branch/XY1/Power'
+        family: 'PowerFlow/Branch/XY1/Active'
         unit: "W"
 
   - MIB: CPI-UNITY-MIB
@@ -267,7 +267,7 @@ metrics:
       name: poweryz1
       chart_meta:
         description: YZ1 power consumption in Watts
-        family: 'PDU/Branch/YZ1/Power'
+        family: 'PowerFlow/Branch/YZ1/Active'
         unit: "W"
 
   - MIB: CPI-UNITY-MIB
@@ -276,7 +276,7 @@ metrics:
       name: powerzx1
       chart_meta:
         description: ZX1 power consumption in Watts
-        family: 'PDU/Branch/ZX1/Power'
+        family: 'PowerFlow/Branch/ZX1/Active'
         unit: "W"
 
   - MIB: CPI-UNITY-MIB
@@ -285,7 +285,7 @@ metrics:
       name: powerxy2
       chart_meta:
         description: XY2 power consumption in Watts
-        family: 'PDU/Branch/XY2/Power'
+        family: 'PowerFlow/Branch/XY2/Active'
         unit: "W"
 
   - MIB: CPI-UNITY-MIB
@@ -294,7 +294,7 @@ metrics:
       name: poweryz2
       chart_meta:
         description: YZ2 power consumption in Watts
-        family: 'PDU/Branch/YZ2/Power'
+        family: 'PowerFlow/Branch/YZ2/Active'
         unit: "W"
 
   - MIB: CPI-UNITY-MIB
@@ -303,7 +303,7 @@ metrics:
       name: powerzx2
       chart_meta:
         description: ZX2 power consumption in Watts
-        family: 'PDU/Branch/ZX2/Power'
+        family: 'PowerFlow/Branch/ZX2/Active'
         unit: "W"
 
   #  - MIB: CPI-UNITY-MIB
@@ -357,7 +357,7 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: XY1 branch energy accumulated
-        family: 'PDU/Branch/XY1/Energy'
+        family: 'PowerFlow/Branch/XY1/Energy/Total'
         unit: "da*W"
       scale_factor: 0.1
       # This and the following metrics were da*W*s, but because they are accumulated, it should be /s. s/s = 1 so removing the seconds.
@@ -369,7 +369,7 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: YZ1 branch energy accumulated
-        family: 'PDU/Branch/YZ1/Energy'
+        family: 'PowerFlow/Branch/YZ1/Energy/Total'
         unit: "da*W"
       scale_factor: 0.1
 
@@ -380,7 +380,7 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: ZX1 branch energy accumulated
-        family: 'PDU/Branch/ZX1/Energy'
+        family: 'PowerFlow/Branch/ZX1/Energy/Total'
         unit: "da*W"
       scale_factor: 0.1
 
@@ -391,7 +391,7 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: XY2 branch energy accumulated
-        family: 'PDU/Branch/XY2/Energy'
+        family: 'PowerFlow/Branch/XY2/Energy/Total'
         unit: "da*W"
       scale_factor: 0.1
 
@@ -402,7 +402,7 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: YZ2 branch energy accumulated
-        family: 'PDU/Branch/YZ2/Energy'
+        family: 'PowerFlow/Branch/YZ2/Energy/Total'
         unit: "da*W"
       scale_factor: 0.1
 
@@ -413,7 +413,7 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: ZX2 branch energy accumulated
-        family: 'PDU/Branch/ZX2/Energy'
+        family: 'PowerFlow/Branch/ZX2/Energy/Total'
         unit: "da*W"
       scale_factor: 0.1
 
@@ -424,7 +424,7 @@ metrics:
       name: outlet1Current
       chart_meta:
         description: Outlet1 current draw
-        family: 'PDU/Outlet/1/Current'
+        family: 'PowerFlow/Outlet/1/Current/Value'
         unit: "A"
       scale_factor: 0.01
 
@@ -434,7 +434,7 @@ metrics:
       name: outlet2Current
       chart_meta:
         description: Outlet2 current draw
-        family: 'PDU/Outlet/2/Current'
+        family: 'PowerFlow/Outlet/2/Current/Value'
         unit: "A"
       scale_factor: 0.01
 
@@ -444,7 +444,7 @@ metrics:
       name: outlet3Current
       chart_meta:
         description: Outlet3 current draw
-        family: 'PDU/Outlet/3/Current'
+        family: 'PowerFlow/Outlet/3/Current/Value'
         unit: "A"
       scale_factor: 0.01
 
@@ -454,7 +454,7 @@ metrics:
       name: outlet4Current
       chart_meta:
         description: Outlet4 current draw
-        family: 'PDU/Outlet/4/Current'
+        family: 'PowerFlow/Outlet/4/Current/Value'
         unit: "A"
       scale_factor: 0.01
 
@@ -464,7 +464,7 @@ metrics:
       name: outlet5Current
       chart_meta:
         description: Outlet5 current draw
-        family: 'PDU/Outlet/5/Current'
+        family: 'PowerFlow/Outlet/5/Current/Value'
         unit: "A"
       scale_factor: 0.01
 
@@ -474,7 +474,7 @@ metrics:
       name: outlet6Current
       chart_meta:
         description: Outlet6 current draw
-        family: 'PDU/Outlet/6/Current'
+        family: 'PowerFlow/Outlet/6/Current/Value'
         unit: "A"
       scale_factor: 0.01
 
@@ -484,7 +484,7 @@ metrics:
       name: outlet7Current
       chart_meta:
         description: Outlet7 current draw
-        family: 'PDU/Outlet/7/Current'
+        family: 'PowerFlow/Outlet/7/Current/Value'
         unit: "A"
       scale_factor: 0.01
 
@@ -494,7 +494,7 @@ metrics:
       name: outlet8Current
       chart_meta:
         description: Outlet8 current draw
-        family: 'PDU/Outlet/8/Current'
+        family: 'PowerFlow/Outlet/8/Current/Value'
         unit: "A"
       scale_factor: 0.01
 
@@ -502,31 +502,31 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.5.9.0
       name: outlet9Current
+      scale_factor: 0.01
       chart_meta:
         description: Outlet9 current draw
-        family: 'PDU/Outlet/9/Current'
+        family: 'PowerFlow/Outlet/9/Current/Value'
         unit: "A"
-      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.5.10.0
       name: outlet10Current
+      scale_factor: 0.01
       chart_meta:
         description: Outlet10 current draw
-        family: 'PDU/Outlet/10/Current'
+        family: 'PowerFlow/Outlet/10/Current/Value'
         unit: "A"
-      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.5.11.0
       name: outlet11Current
+      scale_factor: 0.01
       chart_meta:
         description: Outlet11 current draw
-        family: 'PDU/Outlet/11/Current'
+        family: 'PowerFlow/Outlet/11/Current/Value'
         unit: "A"
-      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
@@ -534,7 +534,7 @@ metrics:
       name: outlet12Current
       chart_meta:
         description: Outlet12 current draw
-        family: 'PDU/Outlet/12/Current'
+        family: 'PowerFlow/Outlet/12/Current/Value'
         unit: "A"
       scale_factor: 0.01
 
@@ -544,7 +544,7 @@ metrics:
       name: outlet13Current
       chart_meta:
         description: Outlet13 current draw
-        family: 'PDU/Outlet/13/Current'
+        family: 'PowerFlow/Outlet/13/Current/Value'
         unit: "A"
       scale_factor: 0.01
 
@@ -554,7 +554,7 @@ metrics:
       name: outlet14Current
       chart_meta:
         description: Outlet14 current draw
-        family: 'PDU/Outlet/14/Current'
+        family: 'PowerFlow/Outlet/14/Current/Value'
         unit: "A"
       scale_factor: 0.01
 
@@ -564,7 +564,7 @@ metrics:
       name: outlet15Current
       chart_meta:
         description: Outlet15 current draw
-        family: 'PDU/Outlet/15/Current'
+        family: 'PowerFlow/Outlet/15/Current/Value'
         unit: "A"
       scale_factor: 0.01
 
@@ -574,7 +574,7 @@ metrics:
       name: outlet16Current
       chart_meta:
         description: Outlet16 current draw
-        family: 'PDU/Outlet/16/Current'
+        family: 'PowerFlow/Outlet/16/Current/Value'
         unit: "A"
       scale_factor: 0.01
 
@@ -584,7 +584,7 @@ metrics:
       name: outlet17Current
       chart_meta:
         description: Outlet17 current draw
-        family: 'PDU/Outlet/17/Current'
+        family: 'PowerFlow/Outlet/17/Current/Value'
         unit: "A"
       scale_factor: 0.01
 
@@ -594,7 +594,7 @@ metrics:
       name: outlet18Current
       chart_meta:
         description: Outlet18 current draw
-        family: 'PDU/Outlet/18/Current'
+        family: 'PowerFlow/Outlet/18/Current/Value'
         unit: "A"
       scale_factor: 0.01
 
@@ -604,7 +604,7 @@ metrics:
       name: outlet19Current
       chart_meta:
         description: Outlet19 current draw
-        family: 'PDU/Outlet/19/Current'
+        family: 'PowerFlow/Outlet/19/Current/Value'
         unit: "A"
       scale_factor: 0.01
 
@@ -614,7 +614,7 @@ metrics:
       name: outlet20Current
       chart_meta:
         description: Outlet20 current draw
-        family: 'PDU/Outlet/20/Current'
+        family: 'PowerFlow/Outlet/20/Current/Value'
         unit: "A"
       scale_factor: 0.01
   # ---
@@ -625,7 +625,7 @@ metrics:
       name: outlet21Current
       chart_meta:
         description: Outlet21 current draw
-        family: 'PDU/Outlet/21/Current'
+        family: 'PowerFlow/Outlet/21/Current/Value'
         unit: "A"
       scale_factor: 0.01
 
@@ -635,7 +635,7 @@ metrics:
       name: outlet22Current
       chart_meta:
         description: Outlet22 current draw
-        family: 'PDU/Outlet/22/Current'
+        family: 'PowerFlow/Outlet/22/Current/Value'
         unit: "A"
       scale_factor: 0.01
 
@@ -645,7 +645,7 @@ metrics:
       name: outlet23Current
       chart_meta:
         description: Outlet23 current draw
-        family: 'PDU/Outlet/23/Current'
+        family: 'PowerFlow/Outlet/23/Current/Value'
         unit: "A"
       scale_factor: 0.01
 
@@ -655,7 +655,7 @@ metrics:
       name: outlet24Current
       chart_meta:
         description: Outlet24 current draw
-        family: 'PDU/Outlet/24/Current'
+        family: 'PowerFlow/Outlet/24/Current/Value'
         unit: "A"
       scale_factor: 0.01
 
@@ -666,7 +666,7 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: Outlet1 receptacle energy accumulated
-        family: 'PDU/Outlet/1/Energy'
+        family: 'PowerFlow/Outlet/1/Energy/Total'
         unit: "da*W"
       scale_factor: 0.1
 
@@ -676,10 +676,11 @@ metrics:
       OID: 1.3.6.1.4.1.30932.1.1.3.12.2.0
       name: receptacleEnergyoutlet2s
       metric_type: monotonic_count
-      description: Outlet2 receptacle energy accumulated
-      family: 'PDU/Outlet/2/Energy'
-      scaling_factor: 0.1
-      unit: "da*W"
+      chart_meta:
+        description: Outlet2 receptacle energy accumulated
+        family: 'PowerFlow/Outlet/2/Energy/Total'
+        unit: "da*W"
+      scale_factor: 0.1
 
   - MIB: CPI-UNITY-MIB
     symbol:
@@ -688,7 +689,7 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: Outlet3 receptacle energy accumulated
-        family: 'PDU/Outlet/3/Energy'
+        family: 'PowerFlow/Outlet/3/Energy/Total'
         unit: "da*W"
       scale_factor: 0.1
 
@@ -700,7 +701,7 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: Outlet4 receptacle energy accumulated
-        family: 'PDU/Outlet/4/Energy'
+        family: 'PowerFlow/Outlet/4/Energy/Total'
         unit: "da*W"
       scale_factor: 0.1
 
@@ -712,7 +713,7 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: Outlet5 receptacle energy accumulated
-        family: 'PDU/Outlet/5/Energy'
+        family: 'PowerFlow/Outlet/5/Energy/Total'
         unit: "da*W"
       scale_factor: 0.1
 
@@ -724,7 +725,7 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: Outlet6 receptacle energy accumulated
-        family: 'PDU/Outlet/6/Energy'
+        family: 'PowerFlow/Outlet/6/Energy/Total'
         unit: "da*W"
       scale_factor: 0.1
 
@@ -736,7 +737,7 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: Outlet7 receptacle energy accumulated
-        family: 'PDU/Outlet/7/Energy'
+        family: 'PowerFlow/Outlet/7/Energy/Total'
         unit: "da*W"
       scale_factor: 0.1
 
@@ -748,7 +749,7 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: Outlet8 receptacle energy accumulated
-        family: 'PDU/Outlet/8/Energy'
+        family: 'PowerFlow/Outlet/8/Energy/Total'
         unit: "da*W"
       scale_factor: 0.1
 
@@ -760,7 +761,7 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: Outlet9 receptacle energy accumulated
-        family: 'PDU/Outlet/9/Energy'
+        family: 'PowerFlow/Outlet/9/Energy/Total'
         unit: "da*W"
       scale_factor: 0.1
 
@@ -772,7 +773,7 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: Outlet10 receptacle energy accumulated
-        family: 'PDU/Outlet/10/Energy'
+        family: 'PowerFlow/Outlet/10/Energy/Total'
         unit: "da*W"
       scale_factor: 0.1
 
@@ -784,7 +785,7 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: Outlet11 receptacle energy accumulated
-        family: 'PDU/Outlet/11/Energy'
+        family: 'PowerFlow/Outlet/11/Energy/Total'
         unit: "da*W"
       scale_factor: 0.1
 
@@ -796,7 +797,7 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: Outlet12 receptacle energy accumulated
-        family: 'PDU/Outlet/12/Energy'
+        family: 'PowerFlow/Outlet/12/Energy/Total'
         unit: "da*W"
       scale_factor: 0.1
 
@@ -808,10 +809,9 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: Outlet13 receptacle energy accumulated
-        family: 'PDU/Outlet/13/Energy'
+        family: 'PowerFlow/Outlet/13/Energy/Total'
         unit: "da*W"
       scale_factor: 0.1
-
 
   - MIB: CPI-UNITY-MIB
     symbol:
@@ -820,7 +820,7 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: Outlet14 receptacle energy accumulated
-        family: 'PDU/Outlet/14/Energy'
+        family: 'PowerFlow/Outlet/14/Energy/Total'
         unit: "da*W"
       scale_factor: 0.1
 
@@ -832,7 +832,7 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: Outlet15 receptacle energy accumulated
-        family: 'PDU/Outlet/15/Energy'
+        family: 'PowerFlow/Outlet/15/Energy/Total'
         unit: "da*W"
       scale_factor: 0.1
 
@@ -844,7 +844,7 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: Outlet16 receptacle energy accumulated
-        family: 'PDU/Outlet/16/Energy'
+        family: 'PowerFlow/Outlet/16/Energy/Total'
         unit: "da*W"
       scale_factor: 0.1
 
@@ -856,7 +856,7 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: Outlet17 receptacle energy accumulated
-        family: 'PDU/Outlet/17/Energy'
+        family: 'PowerFlow/Outlet/17/Energy/Total'
         unit: "da*W"
       scale_factor: 0.1
 
@@ -868,7 +868,7 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: Outlet18 receptacle energy accumulated
-        family: 'PDU/Outlet/18/Energy'
+        family: 'PowerFlow/Outlet/18/Energy/Total'
         unit: "da*W"
       scale_factor: 0.1
 
@@ -880,7 +880,7 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: Outlet19 receptacle energy accumulated
-        family: 'PDU/Outlet/19/Energy'
+        family: 'PowerFlow/Outlet/19/Energy/Total'
         unit: "da*W"
       scale_factor: 0.1
 
@@ -892,7 +892,7 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: Outlet20 receptacle energy accumulated
-        family: 'PDU/Outlet/20/Energy'
+        family: 'PowerFlow/Outlet/20/Energy/Total'
         unit: "da*W"
       scale_factor: 0.1
 
@@ -904,7 +904,7 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: Outlet21 receptacle energy accumulated
-        family: 'PDU/Outlet/21/Energy'
+        family: 'PowerFlow/Outlet/21/Energy/Total'
         unit: "da*W"
       scale_factor: 0.1
 
@@ -916,7 +916,7 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: Outlet22 receptacle energy accumulated
-        family: 'PDU/Outlet/22/Energy'
+        family: 'PowerFlow/Outlet/22/Energy/Total'
         unit: "da*W"
       scale_factor: 0.1
 
@@ -928,7 +928,7 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: Outlet23 receptacle energy accumulated
-        family: 'PDU/Outlet/23/Energy'
+        family: 'PowerFlow/Outlet/23/Energy/Total'
         unit: "da*W"
       scale_factor: 0.1
 
@@ -940,7 +940,7 @@ metrics:
       metric_type: monotonic_count
       chart_meta:
         description: Outlet24 receptacle energy accumulated
-        family: 'PDU/Outlet/24/Energy'
+        family: 'PowerFlow/Outlet/24/Energy/Total'
         unit: "da*W"
       scale_factor: 0.1
 
@@ -958,7 +958,7 @@ metrics:
         name: cpiPduNumberBranches
         chart_meta:
           description: Number of branches in the PDU
-          family: 'PDU/Branch/Count'
+          family: 'Hardware/PDU/Branch/Count'
           unit: "{branch}"
 
         # Get the number of outlets in the PDU.
@@ -966,7 +966,7 @@ metrics:
         name: cpiPduNumberOutlets
         chart_meta:
           description: Number of outlets in the PDU
-          family: 'PDU/Outlet/Count'
+          family: 'Hardware/PDU/Outlet/Count'
           unit: "{outlet}"
 
         # Set or get whether the PDU is in-service: inservice(0), outofservice(1)
@@ -974,7 +974,7 @@ metrics:
         name: cpiPduOutOfService
         chart_meta:
           description: Whether the PDU is in service
-          family: 'PDU/Service/Status'
+          family: 'Hardware/PDU/Service/Status'
           unit: "{status}"
         mapping:
           0: in service
@@ -985,7 +985,7 @@ metrics:
         name: cpiPduUpgrade
         chart_meta:
           description: Indicator if the PDU firmware is being upgraded
-          family: 'PDU/Firmware/Upgrade/Status'
+          family: 'System/Firmware/Upgrade/Status'
           unit: "{status}"
         mapping:
           0: no
@@ -996,7 +996,7 @@ metrics:
         name: cpiPduChainRole
         chart_meta:
           description: Role of the PDU in a daisy chain
-          family: 'PDU/Chain/Role/Status'
+          family: 'Hardware/PDU/Chain/Role/Status'
           unit: "{status}"
         mapping:
           1: primary
@@ -1007,7 +1007,7 @@ metrics:
         name: cpiPduTotalPower
         chart_meta:
           description: Power for the entire PDU
-          family: 'PDU/Power/Total'
+          family: 'PowerFlow/PDU/Total'
           unit: "VA"
     metric_tags:
       - tag: pdu_macaddress
@@ -1049,7 +1049,7 @@ metrics:
         name: cpiPduEasStatus
         chart_meta:
           description: Status of the Electronic Access Control system
-          family: 'PDU/Lock/AccessControl/Status'
+          family: 'Hardware/Lock/AccessControl/Status'
           unit: "{status}"
         mapping:
           0: inactive
@@ -1061,7 +1061,7 @@ metrics:
         name: cpiPduDoorStatus
         chart_meta:
           description: Door sensor status, closed or open
-          family: 'PDU/Lock/Door/Status'
+          family: 'Hardware/Lock/Door/Status'
           unit: "{status}"
         mapping:
           0: closed
@@ -1072,7 +1072,7 @@ metrics:
         name: cpiPduLockStatus
         chart_meta:
           description: Lock status, closed or open
-          family: 'PDU/Lock/Status'
+          family: 'Hardware/Lock/Status'
           unit: "{status}"
         mapping:
           0: closed
@@ -1135,10 +1135,11 @@ metrics:
       # Get current draw in 1/100 amp of the line on the PDU. Convert the value by dividing by 100.
       - OID: 1.3.6.1.4.1.30932.1.10.1.3.10.1.3
         name: cpiPduLineCurrent
+        scale_factor: 0.01
         chart_meta:
           description: Current draw of the line on the PDU
-          family: 'PDU/Line/Current'
-          unit: "A/100"
+          family: 'PowerFlow/Line/Current/Value'
+          unit: "A"
     metric_tags:
       # Get the ID of the input line on the PDU.
       - tag: line_id
@@ -1157,33 +1158,36 @@ metrics:
       # Get the current draw in 1/100 amp of the branch on the PDU. Convert the value by dividing by 100.
       - OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.3
         name: cpiPduBranchCurrent
+        scale_factor: 0.01
         chart_meta:
           description: Current draw of the branch on the PDU
-          family: 'PDU/Branch/Current'
-          unit: "A/100"
+          family: 'PowerFlow/Branch/Current/Value'
+          unit: "A"
 
         # Get the maximum current draw in 1/100 amp of the branch on the PDU. Convert the value by dividing by 100.
       - OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.4
         name: cpiPduBranchMaxCurrent
+        scale_factor: 0.01
         chart_meta:
           description: Maximum current draw of the branch on the PDU
-          family: 'PDU/Branch/Current/Maximum'
-          unit: "A/100"
+          family: 'PowerFlow/Branch/Current/Maximum'
+          unit: "A"
 
         # Get the voltage in 1/10 volts of the branch on the PDU. Convert the value by dividing by 10.
       - OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.5
         name: cpiPduBranchVoltage
+        scale_factor: 0.1
         chart_meta:
-          description: Voltage in 1/10 volts of the branch on the PDU
-          family: 'PDU/Branch/Voltage'
-          unit: "V/10"
+          description: Voltage in volts of the branch on the PDU
+          family: 'PowerFlow/Branch/Voltage/Value'
+          unit: "V"
 
         # Get the power in volt-amps for the branch.
       - OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.6
         name: cpiPduBranchPower
         chart_meta:
           description: Power in volt-amps for the branch
-          family: 'PDU/Branch/Power'
+          family: 'PowerFlow/Branch/Apparent'
           unit: "VA"
 
         # Get the power factor for the branch.
@@ -1191,7 +1195,7 @@ metrics:
         name: cpiPduBranchPowerFactor
         chart_meta:
           description: Power factor for the branch
-          family: 'PDU/Branch/PowerFactor'
+          family: 'PowerFlow/Branch/Factor'
           unit: "10*2.1"
         # TODO don't think this helps
 
@@ -1200,7 +1204,7 @@ metrics:
         name: cpiPduBranchStatus
         chart_meta:
           description: Alarm status of the branch
-          family: 'PDU/Branch/Alarm/Status'
+          family: 'Hardware/Branch/Alarm/Status'
           unit: "{status}"
         mapping:
           0: noalarm
@@ -1211,7 +1215,7 @@ metrics:
         name: cpiPduBranchEnergy
         chart_meta:
           description: Branch energy accumulated in decaVA-secs, divide by 360 to obtain VA-hr
-          family: 'PDU/Branch/Energy'
+          family: 'PowerFlow/Branch/Energy/Total'
           unit: "V"
         scale_factor: 0.1
 
@@ -1251,25 +1255,27 @@ metrics:
       # Get the current draw in 1/100 amp of the outlet on the PDU. Convert the value by dividing by 100.
       - OID: 1.3.6.1.4.1.30932.1.10.1.4.10.1.6
         name: cpiPduOutletCurrent
+        scale_factor: 0.01
         chart_meta:
-          description: Current draw in 1/100 amp of the outlet on the PDU
-          family: 'PDU/Outlet/Current'
-          unit: "A/100"
+          description: Current draw in amp of the outlet on the PDU
+          family: 'PowerFlow/Outlet/Current/Value'
+          unit: "A"
 
         # Get the voltage in 1/10 volts of the outlet on the PDU. Convert the value by dividing by 10.
       - OID: 1.3.6.1.4.1.30932.1.10.1.4.10.1.7
         name: cpiPduOutletVoltage
+        scale_factor: 0.1
         chart_meta:
-          description: Voltage in 1/10 volts of the outlet on the PDU
-          family: 'PDU/Outlet/Voltage'
-          unit: "V/10"
+          description: Voltage in volts of the outlet on the PDU
+          family: 'PowerFlow/Outlet/Voltage/Value'
+          unit: "V"
 
         # The power in Volt-Amps of the outlet on the PDU.
       - OID: 1.3.6.1.4.1.30932.1.10.1.4.10.1.8
         name: cpiPduOutletPower
         chart_meta:
           description: Power in Volt-Amps of the outlet on the PDU
-          family: 'PDU/Outlet/Power'
+          family: 'PowerFlow/Outlet/Apparent'
           unit: "VA"
 
         # Get the alarm status of the outlet: noalarm(0), warning(1), alarm(2)
@@ -1277,7 +1283,7 @@ metrics:
         name: cpiPduOutletStatus
         chart_meta:
           description: Alarm status of the outlet
-          family: 'PDU/Outlet/Alarm/Status'
+          family: 'Hardware/Outlet/Alarm/Status'
           unit: "{status}"
         mapping:
           0: noalarm
@@ -1288,7 +1294,7 @@ metrics:
         name: cpiPduOutletEnergy
         chart_meta:
           description: Outlet energy accumulated in decaWatt-secs, divide by 360 to obtain Watt-hr
-          family: 'PDU/Outlet/Energy'
+          family: 'PowerFlow/Outlet/Energy/Total'
           unit: "W"
         scale_factor: 0.1
 
