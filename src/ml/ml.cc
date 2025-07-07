@@ -674,10 +674,17 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim)
             worker->training_cns, training_response.total_values,
             worker->training_samples
         };
-        // Calculate dynamic sampling ratio
+        
+        // Calculate dynamic sampling ratio based on expected output size
+        // After diff and smooth, we'll have approximately this many vectors
+        size_t expected_vectors = training_response.total_values;
+        if (Cfg.diff_n > 0) expected_vectors--;
+        if (smoothing_window > 1) expected_vectors = expected_vectors - smoothing_window + 1;
+        expected_vectors = expected_vectors - Cfg.lag_n;
+        
         double sampling_ratio = 1.0;
-        if (features.preprocessed_features.size() > Cfg.max_training_vectors) {
-            sampling_ratio = (double)Cfg.max_training_vectors / features.preprocessed_features.size();
+        if (expected_vectors > Cfg.max_training_vectors) {
+            sampling_ratio = (double)Cfg.max_training_vectors / expected_vectors;
         }
 
         // Apply sampling during lag feature extraction

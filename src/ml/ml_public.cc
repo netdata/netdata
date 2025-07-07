@@ -378,9 +378,10 @@ void ml_init()
     for (size_t idx = 0; idx != Cfg.num_worker_threads; idx++) {
         ml_worker_t *worker = &Cfg.workers[idx];
 
-        // Calculate max elements needed: time window / update frequency * lag samples
-        // Use a reasonable upper bound for any metric frequency
-        size_t max_elements_needed_for_training = (size_t) (Cfg.training_window) * (size_t) (Cfg.lag_n + 1);
+        // Calculate max elements needed based on the highest frequency metrics
+        // For 1-second metrics: training_window samples
+        // We allocate for worst case (1-second update frequency)
+        size_t max_elements_needed_for_training = (size_t) Cfg.training_window * (size_t) (Cfg.lag_n + 1);
         worker->training_cns = new calculated_number_t[max_elements_needed_for_training]();
         worker->scratch_training_cns = new calculated_number_t[max_elements_needed_for_training]();
 
