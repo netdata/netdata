@@ -199,7 +199,7 @@ func (w *WebSpherePMI) parseWebApplication(stat *pmiStat, nodeName, serverName s
 		{Key: "instance", Value: instance},
 		{Key: "node", Value: nodeName},
 		{Key: "server", Value: serverName},
-		{Key: "app", Value: appName},
+		{Key: "application", Value: appName},
 	}, w.getVersionLabels()...)
 	
 	for i, metric := range timeMetrics {
@@ -292,7 +292,7 @@ func (w *WebSpherePMI) parseServlet(stat *pmiStat, nodeName, serverName, appName
 		{Key: "instance", Value: instance},
 		{Key: "node", Value: nodeName},
 		{Key: "server", Value: serverName},
-		{Key: "app", Value: appName},
+		{Key: "application", Value: appName},
 		{Key: "servlet", Value: servletName},
 	}, w.getVersionLabels()...)
 	
@@ -357,7 +357,8 @@ func (w *WebSpherePMI) parseSessionManagerContainer(stat *pmiStat, nodeName, ser
 		// Process container-level metrics if any exist
 		if len(stat.CountStatistics) > 0 || len(stat.TimeStatistics) > 0 || len(stat.RangeStatistics) > 0 ||
 		   len(stat.BoundedRangeStatistics) > 0 || len(stat.AverageStatistics) > 0 || len(stat.DoubleStatistics) > 0 {
-			w.parseSessionMetrics(stat, instance, nodeName, serverName, "container", mx)
+			// Container-level session metrics belong in web/containers family
+			w.parseContainerSessionMetrics(stat, instance, nodeName, serverName, mx)
 		}
 	}
 	
@@ -412,17 +413,13 @@ func (w *WebSpherePMI) parseSessionMetrics(stat *pmiStat, instance, nodeName, se
 		{Key: "instance", Value: instance},
 		{Key: "node", Value: nodeName},
 		{Key: "server", Value: serverName},
-		{Key: "app", Value: appName},
+		{Key: "application", Value: appName},
 	}, w.getVersionLabels()...)
 	
 	for i, metric := range timeMetrics {
-		// Skip SessionObjectSize if it will be processed as AverageStatistic
-		if metric.Name == "SessionObjectSize" {
-			// SessionObjectSize can appear as both TimeStatistic and AverageStatistic
-			// We prefer to process it as AverageStatistic for richer insights
-			continue
-		}
-		// Process all other TimeStatistics with the smart processor
+		// Process all TimeStatistics with the smart processor
+		// Note: SessionObjectSize can appear as both TimeStatistic (app-level) and AverageStatistic (container-level)
+		// We process both to get full coverage
 		w.processTimeStatisticWithContext(
 			"sessions",
 			cleanInst,
@@ -457,22 +454,9 @@ func (w *WebSpherePMI) parseSessionMetrics(stat *pmiStat, instance, nodeName, se
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
-		if metric.Name == "SessionObjectSize" {
-			// Use smart processor for SessionObjectSize
-			w.processAverageStatistic(
-				"websphere_pmi.sessions",
-				"web/sessions",
-				cleanInst,
-				labels,
-				metric,
-				mx,
-				200, // Fixed priority offset to avoid conflicts
-				"bytes",  // SessionObjectSize is measured in bytes
-			)
-		} else {
-			// Use collection helper for other average metrics
-			w.collectAverageMetric(mx, "sessions", cleanInst, metric)
-		}
+		// Use collection helper for all average metrics
+		// Note: SessionObjectSize at container level is handled in parseContainerSessionMetrics
+		w.collectAverageMetric(mx, "sessions", cleanInst, metric)
 	}
 	
 	// Extract ALL DoubleStatistics
@@ -480,6 +464,114 @@ func (w *WebSpherePMI) parseSessionMetrics(stat *pmiStat, instance, nodeName, se
 	for _, metric := range doubleMetrics {
 		// Use collection helper for all double metrics
 		w.collectDoubleMetric(mx, "sessions", cleanInst, metric)
+	}
+}
+
+// parseContainerSessionMetrics handles container-level session metrics
+// These belong in the web/containers family, not web/sessions
+func (w *WebSpherePMI) parseContainerSessionMetrics(stat *pmiStat, instance, nodeName, serverName string, mx map[string]int64) {
+	// Create charts if not exists
+	w.ensureWebAppContainerSessionCharts(instance, nodeName, serverName)
+	
+	// Mark as seen
+	w.markInstanceSeen("webapp_container_sessions", instance)
+	
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
+	
+	// For container-level session metrics, use webapp_container prefix
+	// This ensures they appear in web/containers family
+	
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		// Use collection helper for all count metrics
+		w.collectCountMetric(mx, "webapp_container_sessions", cleanInst, metric)
+	}
+	
+	// Extract ALL TimeStatistics and process with smart processor
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+		{Key: "application", Value: "_container_"},  // Add placeholder for consistency with app-level sessions
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		// Process all TimeStatistics with the smart processor
+		w.processTimeStatisticWithContext(
+			"webapp_container_sessions",
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			3450+i*10, // Priority in web/containers range
+		)
+	}
+	
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		// Use collection helper for all range metrics
+		w.collectRangeMetric(mx, "webapp_container_sessions", cleanInst, metric)
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		// Use collection helper for all bounded range metrics
+		w.collectBoundedRangeMetric(mx, "webapp_container_sessions", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for i, metric := range avgMetrics {
+		switch metric.Name {
+		case "SessionObjectSize":
+			// Use smart processor with context-aware routing for SessionObjectSize
+			w.processAverageStatisticWithContext(
+				"webapp_container_sessions",
+				cleanInst,
+				labels,
+				metric,
+				mx,
+				10+i*10, // Priority offset
+				"bytes",  // SessionObjectSize is measured in bytes
+			)
+		case "ExternalReadSize":
+			// Use smart processor with context-aware routing for ExternalReadSize
+			w.processAverageStatisticWithContext(
+				"webapp_container_sessions",
+				cleanInst,
+				labels,
+				metric,
+				mx,
+				20+i*10, // Priority offset
+				"bytes",  // ExternalReadSize is measured in bytes
+			)
+		case "ExternalWriteSize":
+			// Use smart processor with context-aware routing for ExternalWriteSize
+			w.processAverageStatisticWithContext(
+				"webapp_container_sessions",
+				cleanInst,
+				labels,
+				metric,
+				mx,
+				30+i*10, // Priority offset
+				"bytes",  // ExternalWriteSize is measured in bytes
+			)
+		default:
+			// Use collection helper for unknown average metrics
+			w.collectAverageMetric(mx, "webapp_container_sessions", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		// Use collection helper for all double metrics
+		w.collectDoubleMetric(mx, "webapp_container_sessions", cleanInst, metric)
 	}
 }
 
@@ -933,6 +1025,7 @@ func (w *WebSpherePMI) ensureWebAppCharts(instance, nodeName, serverName, appNam
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
 			chart.Labels = w.createChartLabels(
+				module.Label{Key: "instance", Value: instance},
 				module.Label{Key: "node", Value: nodeName},
 				module.Label{Key: "server", Value: serverName},
 				module.Label{Key: "application", Value: appName},
@@ -958,6 +1051,7 @@ func (w *WebSpherePMI) ensureServletCharts(instance, nodeName, serverName, appNa
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
 			chart.Labels = w.createChartLabels(
+				module.Label{Key: "instance", Value: instance},
 				module.Label{Key: "node", Value: nodeName},
 				module.Label{Key: "server", Value: serverName},
 				module.Label{Key: "application", Value: appName},
@@ -984,6 +1078,7 @@ func (w *WebSpherePMI) ensureSessionCharts(instance, nodeName, serverName, appNa
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
 			chart.Labels = w.createChartLabels(
+				module.Label{Key: "instance", Value: instance},
 				module.Label{Key: "node", Value: nodeName},
 				module.Label{Key: "server", Value: serverName},
 				module.Label{Key: "application", Value: appName},
@@ -1009,6 +1104,7 @@ func (w *WebSpherePMI) ensureORBCharts(instance, nodeName, serverName string) {
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
 			chart.Labels = w.createChartLabels(
+				module.Label{Key: "instance", Value: instance},
 				module.Label{Key: "node", Value: nodeName},
 				module.Label{Key: "server", Value: serverName},
 			)
@@ -1033,6 +1129,7 @@ func (w *WebSpherePMI) ensureCacheCharts(instance, nodeName, serverName string) 
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
 			chart.Labels = w.createChartLabels(
+				module.Label{Key: "instance", Value: instance},
 				module.Label{Key: "node", Value: nodeName},
 				module.Label{Key: "server", Value: serverName},
 			)
@@ -1079,9 +1176,12 @@ func (w *WebSpherePMI) ensureWebAppContainerCharts(instance, nodeName, serverNam
 		
 		// Create webapp container charts
 		charts := webAppContainerChartsTmpl.Copy()
+		family, _ := getContextMetadata("webapp_container")
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
+			chart.Fam = family  // Use correct family from context metadata
 			chart.Labels = w.createChartLabels(
+				module.Label{Key: "instance", Value: instance},
 				module.Label{Key: "node", Value: nodeName},
 				module.Label{Key: "server", Value: serverName},
 			)
@@ -1121,6 +1221,101 @@ func (w *WebSpherePMI) ensureObjectPoolCharts(instance, nodeName, serverName, po
 	}
 }
 
+func (w *WebSpherePMI) ensureWebAppContainerSessionCharts(instance, nodeName, serverName string) {
+	chartKey := fmt.Sprintf("webapp_container_sessions_%s", instance)
+	if _, exists := w.collectedInstances[chartKey]; !exists {
+		w.collectedInstances[chartKey] = true
+		
+		cleanInst := w.cleanID(instance)
+		
+		// Get correct family for webapp_container_sessions
+		family, _ := getContextMetadata("webapp_container_sessions")
+		
+		// Create container session stats chart
+		chartStats := &module.Chart{
+			ID:       fmt.Sprintf("webapp_container_sessions_%s_stats", cleanInst),
+			Title:    "Container Session Statistics",
+			Units:    "sessions",
+			Fam:      family,
+			Ctx:      "websphere_pmi.webapp_container_sessions_stats",
+			Type:     module.Line,
+			Priority: prioWebApps + 100,
+			Dims: module.Dims{
+				{ID: fmt.Sprintf("webapp_container_sessions_%s_ActiveCount_current", cleanInst), Name: "active_current"},
+				{ID: fmt.Sprintf("webapp_container_sessions_%s_ActiveCount_high_watermark", cleanInst), Name: "active_high_watermark"},
+				{ID: fmt.Sprintf("webapp_container_sessions_%s_ActiveCount_low_watermark", cleanInst), Name: "active_low_watermark"},
+				{ID: fmt.Sprintf("webapp_container_sessions_%s_ActiveCount_mean", cleanInst), Name: "active_mean"},
+				{ID: fmt.Sprintf("webapp_container_sessions_%s_ActiveCount_integral", cleanInst), Name: "active_integral"},
+				{ID: fmt.Sprintf("webapp_container_sessions_%s_LiveCount_current", cleanInst), Name: "live_current"},
+				{ID: fmt.Sprintf("webapp_container_sessions_%s_LiveCount_high_watermark", cleanInst), Name: "live_high_watermark"},
+				{ID: fmt.Sprintf("webapp_container_sessions_%s_LiveCount_low_watermark", cleanInst), Name: "live_low_watermark"},
+				{ID: fmt.Sprintf("webapp_container_sessions_%s_LiveCount_mean", cleanInst), Name: "live_mean"},
+				{ID: fmt.Sprintf("webapp_container_sessions_%s_LiveCount_integral", cleanInst), Name: "live_integral"},
+			},
+			Labels: append([]module.Label{
+				{Key: "node", Value: nodeName},
+				{Key: "server", Value: serverName},
+			}, w.getVersionLabels()...),
+		}
+		
+		// Create container session lifecycle chart
+		chartLifecycle := &module.Chart{
+			ID:       fmt.Sprintf("webapp_container_sessions_%s_lifecycle", cleanInst),
+			Title:    "Container Session Lifecycle",
+			Units:    "sessions/s",
+			Fam:      family,
+			Ctx:      "websphere_pmi.webapp_container_sessions_lifecycle",
+			Type:     module.Line,
+			Priority: prioWebApps + 101,
+			Dims: module.Dims{
+				{ID: fmt.Sprintf("webapp_container_sessions_%s_CreateCount", cleanInst), Name: "created", Algo: module.Incremental},
+				{ID: fmt.Sprintf("webapp_container_sessions_%s_InvalidateCount", cleanInst), Name: "invalidated", Algo: module.Incremental},
+				{ID: fmt.Sprintf("webapp_container_sessions_%s_TimeoutInvalidationCount", cleanInst), Name: "timeout", Algo: module.Incremental},
+				{ID: fmt.Sprintf("webapp_container_sessions_%s_NoRoomForNewSessionCount", cleanInst), Name: "rejected", Algo: module.Incremental},
+			},
+			Labels: append([]module.Label{
+				{Key: "node", Value: nodeName},
+				{Key: "server", Value: serverName},
+			}, w.getVersionLabels()...),
+		}
+		
+		// Create container session errors chart
+		chartErrors := &module.Chart{
+			ID:       fmt.Sprintf("webapp_container_sessions_%s_errors", cleanInst),
+			Title:    "Container Session Errors",
+			Units:    "errors/s",
+			Fam:      family,
+			Ctx:      "websphere_pmi.webapp_container_sessions_errors",
+			Type:     module.Line,
+			Priority: prioWebApps + 102,
+			Dims: module.Dims{
+				{ID: fmt.Sprintf("webapp_container_sessions_%s_ActivateNonExistSessionCount", cleanInst), Name: "activate_nonexist", Algo: module.Incremental},
+				{ID: fmt.Sprintf("webapp_container_sessions_%s_AffinityBreakCount", cleanInst), Name: "affinity_break", Algo: module.Incremental},
+				{ID: fmt.Sprintf("webapp_container_sessions_%s_CacheDiscardCount", cleanInst), Name: "cache_discard", Algo: module.Incremental},
+			},
+			Labels: append([]module.Label{
+				{Key: "node", Value: nodeName},
+				{Key: "server", Value: serverName},
+			}, w.getVersionLabels()...),
+		}
+		
+		// Note: ExternalReadSize and ExternalWriteSize charts are now created dynamically
+		// by processAverageStatisticWithContext with smart family routing
+		
+		// Add charts
+		if err := w.charts.Add(chartStats); err != nil {
+			w.Warning(err)
+		}
+		if err := w.charts.Add(chartLifecycle); err != nil {
+			w.Warning(err)
+		}
+		if err := w.charts.Add(chartErrors); err != nil {
+			w.Warning(err)
+		}
+		// Note: chartReadSize and chartWriteSize removed - created dynamically by processAverageStatisticWithContext
+	}
+}
+
 func (w *WebSpherePMI) ensureObjectCacheCharts(instance, nodeName, serverName string) {
 	chartKey := fmt.Sprintf("object_cache_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
@@ -1131,6 +1326,7 @@ func (w *WebSpherePMI) ensureObjectCacheCharts(instance, nodeName, serverName st
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
 			chart.Labels = w.createChartLabels(
+				module.Label{Key: "instance", Value: instance},
 				module.Label{Key: "node", Value: nodeName},
 				module.Label{Key: "server", Value: serverName},
 			)
@@ -1717,7 +1913,7 @@ var systemDataChartsTmpl = module.Charts{
 		Priority: prioSystemCPU,
 		Dims: module.Dims{
 			{ID: "system_data_%s_cpu_usage", Name: "current"},
-			{ID: "system_data_%s_cpu_average", Name: "average", Div: 100}, // Convert back from precision
+			// NOTE: CPUUsageSinceServerStarted average is handled by smart processor creating separate charts
 		},
 	},
 	{
@@ -2135,11 +2331,26 @@ func (w *WebSpherePMI) parseSystemData(stat *pmiStat, nodeName, serverName strin
 	
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
-	for _, metric := range avgMetrics {
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range avgMetrics {
 		switch metric.Name {
 		case "CPUUsageSinceServerStarted":
-			// Special handling for CPU average - scale to percentage
-			mx[fmt.Sprintf("system_data_%s_cpu_average", cleanInst)] = metric.Mean / 10 // Convert precision to percentage
+			// Use smart processor for CPU usage statistics
+			w.processAverageStatistic(
+				"websphere_pmi.system_data",
+				"system",
+				cleanInst,
+				labels,
+				metric,
+				mx,
+				1800+i*10, // Priority offset
+				"percentage",  // CPUUsageSinceServerStarted is a percentage
+			)
 		default:
 			// For unknown average metrics, use collection helper
 			w.collectAverageMetric(mx, "system_data", cleanInst, metric)
@@ -2977,16 +3188,10 @@ func (w *WebSpherePMI) parseGenericStat(stat *pmiStat, nodeName, serverName stri
 		}
 	}
 	
-	for _, ts := range stat.TimeStatistics {
-		total := ts.TotalTime
-		if total == "" {
-			total = ts.Total
-		}
-		if val, err := strconv.ParseInt(total, 10, 64); err == nil {
-			metricKey := fmt.Sprintf("generic_stat_%s_%s_total", w.cleanID(instance), w.cleanID(ts.Name))
-			mx[metricKey] = val
-		}
-	}
+	// NOTE: TimeStatistics are now processed by smart processor (processTimeStatisticWithContext)
+	// in specific parsers. Generic fallback skips TimeStatistics to avoid duplication.
+	// TimeStatistics in generic stats would be extremely rare and likely indicate
+	// misconfigured PMI or unknown PMI components that need specific parser implementation.
 }
 
 // createDynamicGenericChart creates charts dynamically based on available metrics
@@ -3022,15 +3227,8 @@ func (w *WebSpherePMI) createDynamicGenericChart(instance, nodeName, serverName,
 		})
 	}
 	
-	// Add TimeStatistics dimensions
-	for _, ts := range stat.TimeStatistics {
-		dimID := fmt.Sprintf("generic_stat_%s_%s_total", w.cleanID(instance), w.cleanID(ts.Name))
-		dims = append(dims, &module.Dim{
-			ID:   dimID,
-			Name: w.cleanID(ts.Name) + "_total",
-			Algo: module.Incremental, // Time stats are typically incremental
-		})
-	}
+	// NOTE: Skip TimeStatistics - they're handled by smart processor in specific parsers
+	// to avoid duplication and ensure consistent 3-chart pattern (rate, current, lifetime)
 	
 	// Only create chart if we have dimensions
 	if len(dims) > 0 {
@@ -3468,8 +3666,48 @@ func (w *WebSpherePMI) parsePMIWebServiceService(stat *pmiStat, nodeName, server
 	
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
-	for _, metric := range avgMetrics {
-		w.collectAverageMetric(mx, "pmi_webservice", cleanInst, metric)
+	for i, metric := range avgMetrics {
+		switch metric.Name {
+		case "SizeService":
+			// Use smart processor for SizeService
+			w.processAverageStatistic(
+				"websphere_pmi.pmi_webservice",
+				"webservices_pmi",
+				cleanInst,
+				labels,
+				metric,
+				mx,
+				2500+i*10, // Priority offset
+				"bytes",  // SizeService is measured in bytes
+			)
+		case "RequestSizeService":
+			// Use smart processor for RequestSizeService
+			w.processAverageStatistic(
+				"websphere_pmi.pmi_webservice",
+				"webservices_pmi",
+				cleanInst,
+				labels,
+				metric,
+				mx,
+				2510+i*10, // Priority offset
+				"bytes",  // RequestSizeService is measured in bytes
+			)
+		case "ReplySizeService":
+			// Use smart processor for ReplySizeService
+			w.processAverageStatistic(
+				"websphere_pmi.pmi_webservice",
+				"webservices_pmi",
+				cleanInst,
+				labels,
+				metric,
+				mx,
+				2520+i*10, // Priority offset
+				"bytes",  // ReplySizeService is measured in bytes
+			)
+		default:
+			// Use collection helper for unknown average metrics
+			w.collectAverageMetric(mx, "pmi_webservice", cleanInst, metric)
+		}
 	}
 	
 	// Extract ALL DoubleStatistics
@@ -3726,6 +3964,7 @@ func (w *WebSpherePMI) ensureExtensionRegistryCharts(instance, nodeName, serverN
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
 			chart.Labels = w.createChartLabels(
+				module.Label{Key: "instance", Value: instance},
 				module.Label{Key: "node", Value: nodeName},
 				module.Label{Key: "server", Value: serverName},
 			)
@@ -3750,6 +3989,7 @@ func (w *WebSpherePMI) ensureSIBJMSAdapterCharts(instance, nodeName, serverName 
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
 			chart.Labels = w.createChartLabels(
+				module.Label{Key: "instance", Value: instance},
 				module.Label{Key: "node", Value: nodeName},
 				module.Label{Key: "server", Value: serverName},
 			)
@@ -3774,6 +4014,7 @@ func (w *WebSpherePMI) ensureServletsComponentCharts(instance, nodeName, serverN
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
 			chart.Labels = w.createChartLabels(
+				module.Label{Key: "instance", Value: instance},
 				module.Label{Key: "node", Value: nodeName},
 				module.Label{Key: "server", Value: serverName},
 			)
@@ -3798,6 +4039,7 @@ func (w *WebSpherePMI) ensureWIMComponentCharts(instance, nodeName, serverName s
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
 			chart.Labels = w.createChartLabels(
+				module.Label{Key: "instance", Value: instance},
 				module.Label{Key: "node", Value: nodeName},
 				module.Label{Key: "server", Value: serverName},
 			)
@@ -3822,6 +4064,7 @@ func (w *WebSpherePMI) ensureWLMTaggedComponentManagerCharts(instance, nodeName,
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
 			chart.Labels = w.createChartLabels(
+				module.Label{Key: "instance", Value: instance},
 				module.Label{Key: "node", Value: nodeName},
 				module.Label{Key: "server", Value: serverName},
 			)
@@ -3846,6 +4089,7 @@ func (w *WebSpherePMI) ensurePMIWebServiceServiceCharts(instance, nodeName, serv
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
 			chart.Labels = w.createChartLabels(
+				module.Label{Key: "instance", Value: instance},
 				module.Label{Key: "node", Value: nodeName},
 				module.Label{Key: "server", Value: serverName},
 			)
@@ -3883,6 +4127,7 @@ func (w *WebSpherePMI) ensureTCPChannelDCSCharts(instance, nodeName, serverName 
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
 			chart.Labels = w.createChartLabels(
+				module.Label{Key: "instance", Value: instance},
 				module.Label{Key: "node", Value: nodeName},
 				module.Label{Key: "server", Value: serverName},
 			)
@@ -3932,6 +4177,7 @@ func (w *WebSpherePMI) ensureISCProductDetailsCharts(instance, nodeName, serverN
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
 			chart.Labels = w.createChartLabels(
+				module.Label{Key: "instance", Value: instance},
 				module.Label{Key: "node", Value: nodeName},
 				module.Label{Key: "server", Value: serverName},
 			)
@@ -3982,6 +4228,7 @@ func (w *WebSpherePMI) ensureEnterpriseAppCharts(instance, nodeName, serverName,
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
 			chart.Labels = w.createChartLabels(
+				module.Label{Key: "instance", Value: instance},
 				module.Label{Key: "node", Value: nodeName},
 				module.Label{Key: "server", Value: serverName},
 				module.Label{Key: "application", Value: appName},
@@ -4006,6 +4253,7 @@ func (w *WebSpherePMI) ensureSystemDataCharts(instance, nodeName, serverName str
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
 			chart.Labels = w.createChartLabels(
+				module.Label{Key: "instance", Value: instance},
 				module.Label{Key: "node", Value: nodeName},
 				module.Label{Key: "server", Value: serverName},
 			)
@@ -4029,6 +4277,7 @@ func (w *WebSpherePMI) ensureWLMCharts(instance, nodeName, serverName string) {
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
 			chart.Labels = w.createChartLabels(
+				module.Label{Key: "instance", Value: instance},
 				module.Label{Key: "node", Value: nodeName},
 				module.Label{Key: "server", Value: serverName},
 			)
@@ -4052,6 +4301,7 @@ func (w *WebSpherePMI) ensureBeanManagerCharts(instance, nodeName, serverName st
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
 			chart.Labels = w.createChartLabels(
+				module.Label{Key: "instance", Value: instance},
 				module.Label{Key: "node", Value: nodeName},
 				module.Label{Key: "server", Value: serverName},
 			)
@@ -4075,6 +4325,7 @@ func (w *WebSpherePMI) ensureConnectionManagerCharts(instance, nodeName, serverN
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
 			chart.Labels = w.createChartLabels(
+				module.Label{Key: "instance", Value: instance},
 				module.Label{Key: "node", Value: nodeName},
 				module.Label{Key: "server", Value: serverName},
 			)
@@ -4122,6 +4373,7 @@ func (w *WebSpherePMI) ensureEJBContainerCharts(instance, nodeName, serverName s
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
 			chart.Labels = w.createChartLabels(
+				module.Label{Key: "instance", Value: instance},
 				module.Label{Key: "node", Value: nodeName},
 				module.Label{Key: "server", Value: serverName},
 			)
@@ -4526,7 +4778,7 @@ var servletURLChartsTmpl = module.Charts{
 		ID:       "servlet_url_%s_requests",
 		Title:    "Servlet URL Requests",
 		Units:    "requests/s",
-		Fam:      "web/urls",
+		Fam:      "web/servlet_urls",
 		Ctx:      "websphere_pmi.servlet_url_requests",
 		Type:     module.Line,
 		Priority: prioWebServlets + 20,
@@ -4538,7 +4790,7 @@ var servletURLChartsTmpl = module.Charts{
 		ID:       "servlet_url_%s_concurrent",
 		Title:    "Servlet URL Concurrent Requests",
 		Units:    "requests",
-		Fam:      "web/urls",
+		Fam:      "web/servlet_urls",
 		Ctx:      "websphere_pmi.servlet_url_concurrent",
 		Type:     module.Line,
 		Priority: prioWebServlets + 21,
@@ -4589,6 +4841,7 @@ func (w *WebSpherePMI) ensureSecurityAuthCharts(instance, nodeName, serverName s
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
 			chart.Labels = w.createChartLabels(
+				module.Label{Key: "instance", Value: instance},
 				module.Label{Key: "node", Value: nodeName},
 				module.Label{Key: "server", Value: serverName},
 			)
@@ -4612,6 +4865,7 @@ func (w *WebSpherePMI) ensureSecurityAuthzCharts(instance, nodeName, serverName 
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
 			chart.Labels = w.createChartLabels(
+				module.Label{Key: "instance", Value: instance},
 				module.Label{Key: "node", Value: nodeName},
 				module.Label{Key: "server", Value: serverName},
 			)
@@ -5180,6 +5434,7 @@ func (w *WebSpherePMI) ensurePortletCharts(instance, nodeName, serverName, portl
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
 			chart.Labels = w.createChartLabels(
+				module.Label{Key: "instance", Value: instance},
 				module.Label{Key: "node", Value: nodeName},
 				module.Label{Key: "server", Value: serverName},
 				module.Label{Key: "portlet", Value: portletName},
@@ -5228,6 +5483,7 @@ func (w *WebSpherePMI) ensureURLCharts(instance, nodeName, serverName string) {
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
 			chart.Labels = w.createChartLabels(
+				module.Label{Key: "instance", Value: instance},
 				module.Label{Key: "node", Value: nodeName},
 				module.Label{Key: "server", Value: serverName},
 			)
@@ -5251,6 +5507,7 @@ func (w *WebSpherePMI) ensureServletURLCharts(instance, nodeName, serverName, ur
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
 			chart.Labels = w.createChartLabels(
+				module.Label{Key: "instance", Value: instance},
 				module.Label{Key: "node", Value: nodeName},
 				module.Label{Key: "server", Value: serverName},
 				module.Label{Key: "url", Value: urlPath},
@@ -5275,6 +5532,7 @@ func (w *WebSpherePMI) ensureHAManagerCharts(instance, nodeName, serverName stri
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
 			chart.Labels = w.createChartLabels(
+				module.Label{Key: "instance", Value: instance},
 				module.Label{Key: "node", Value: nodeName},
 				module.Label{Key: "server", Value: serverName},
 			)
@@ -5443,7 +5701,7 @@ func (w *WebSpherePMI) ensureSessionObjectSizeTimeChart(instance, nodeName, serv
 			Labels: []module.Label{
 				{Key: "node", Value: nodeName},
 				{Key: "server", Value: serverName},
-				{Key: "app", Value: appName},
+				{Key: "application", Value: appName},
 			},
 		}
 		
