@@ -11,88 +11,68 @@ const precision = 1000
 
 // Priority constants for chart ordering
 const (
-	// System metrics (1000-1999) - Most important, shown first
+	// System (1000-1999) - Most critical for health monitoring
 	prioSystemCPU        = 1000
-	prioSystemMemory     = 1100
+	prioSystemMemory     = 1010
 	prioSystemGC         = 1200
 	prioSystemUptime     = 1300
-	prioSystemJVM        = 1400
+	prioSystemJVM        = 1000
+	prioSystemData       = 1000
+	prioThreadPools      = 1300
 	
-	// Connection pools (2000-2999) - Critical for app health
+	// Connectivity (2000-2999) - Critical for application functionality
 	prioJDBCPools        = 2000
 	prioJCAPools         = 2200
-	prioJMSAdapter       = 2400
+	prioJMSAdapter       = 2300
+	prioSIBMessaging     = 2300
 	prioTCPChannels      = 2600
+	prioConnectionMgr    = 2300
+	prioConnectionManager = 2300
 	
-	// Web components (3000-3999) - User-facing metrics
+	// Web (3000-4999) - Core business logic
 	prioServlets         = 3100
 	prioWebServlets      = 3100  // Alias
 	prioSessions         = 3200
 	prioWebSessions      = 3200  // Alias
-	prioWebContainers    = 3300
+	prioWebContainers    = 3310
 	prioWebApps          = 3300  // Alias
 	prioPortlets         = 3500
 	prioWebPortlets      = 3500  // Alias
-	prioURLs             = 3600
-	prioEnterpriseApps   = 3700
-	prioEJBContainer     = 3800
-	prioMDB              = 3810
-	prioSLSB             = 3820
-	prioSFSB             = 3830
-	prioEntityBean       = 3840
-	prioConnectionMgr    = 3900
+	prioURLs             = 3110
 	
-	// Transactions (4000-4999) - Business operations
+	// Transactions (4000-4999) - Important for data integrity
 	prioTransactionManager = 4000
 	
-	// Thread management (5000-5999) - Internal resources
-	prioThreadPools      = 5000
+	// Performance (5000-5999) - Caching and optimization
 	prioObjectPools      = 5100
-	
-	// Caching (5200-5399) - Performance optimization
 	prioDynaCache        = 5200
 	prioCacheManager     = 5200  // Alias for dynamic cache
 	prioObjectCache      = 5300
 	
-	// ORB/EJB (6000-6099) - Enterprise components
+	// Integration (6000-6999) - Web services and integration
 	prioORB              = 6000
-	
-	// Web Services (6100-6199)
 	prioWebServices      = 6100
+	prioMDB              = 6100
+	prioEJBContainer     = 6200
+	prioSLSB             = 6300
+	prioSFSB             = 6400
+	prioEntityBean       = 6500
 	
-	// Interceptors (6200-6299)
-	prioInterceptors     = 6220
-	
-	// Security (7000-7999)
+	// Security (7000-7999) - Authentication and authorization
 	prioSecurityAuth     = 7000
 	prioSecurityAuthz    = 7100
+	prioSecurity         = 7000
+	prioInterceptors     = 7500
+	prioWLM              = 7500
 	
-	// High availability (8000-8099)
+	// Availability (8000-8999) - HA and clustering
 	prioHAManager        = 8000
+	prioEnterpriseApps   = 8100
 	
-	// Extensions (8100-8199)
+	// Management (9000-9999) - Monitoring and diagnostics
 	prioExtensionRegistry = 8100
 	prioRegistry         = 8100  // Alias for extension registry
-	
-	// System data (8200-8299)
-	prioSystemData       = 8200
-	
-	// WLM (8300-8399)
-	prioWLM              = 8300
-	
-	// Connection Manager (8400-8499)
-	prioConnectionManager = 8400
-	
-	// Security (already defined)
-	prioSecurity = prioSecurityAuth
-	
-	// SIB Messaging (8300-8399)
-	prioSIBMessaging     = 8300
-	
-	// Components (10000+) - Application-specific
-	prioComponents       = 10000
-	
-	// Monitoring (catch-all)
+	prioComponents       = 10100
 	prioMonitoring       = 79000
 )
 
@@ -106,7 +86,7 @@ var transactionChartsTmpl = module.Charts{
 		ID:       "transaction_manager_%s",
 		Title:    "Transaction Manager",
 		Units:    "transactions/s",
-		Fam:      "transactions",
+		Fam:      "transactions/overview",
 		Ctx:      "websphere_pmi.transaction_manager",
 		Type:     module.Line,
 		Priority: prioTransactionManager,
@@ -127,7 +107,7 @@ var transactionChartsTmpl = module.Charts{
 		ID:       "transaction_manager_%s_active",
 		Title:    "Transaction Manager Active Transactions",
 		Units:    "transactions",
-		Fam:      "transactions",
+		Fam:      "transactions/overview",
 		Ctx:      "websphere_pmi.transaction_manager_active",
 		Type:     module.Line,
 		Priority: prioTransactionManager + 10,
@@ -144,7 +124,7 @@ var transactionChartsTmpl = module.Charts{
 		ID:       "transaction_manager_%s_global_times",
 		Title:    "Transaction Manager Global Transaction Times",
 		Units:    "milliseconds/s",
-		Fam:      "transactions",
+		Fam:      "transactions/overview",
 		Ctx:      "websphere_pmi.transaction_manager_global_times",
 		Type:     module.Line,
 		Priority: prioTransactionManager + 20,
@@ -172,7 +152,7 @@ var transactionChartsTmpl = module.Charts{
 		ID:       "transaction_manager_%s_local_times",
 		Title:    "Transaction Manager Local Transaction Times",
 		Units:    "milliseconds/s",
-		Fam:      "transactions",
+		Fam:      "transactions/overview",
 		Ctx:      "websphere_pmi.transaction_manager_local_times",
 		Type:     module.Line,
 		Priority: prioTransactionManager + 30,
@@ -196,7 +176,7 @@ var transactionChartsTmpl = module.Charts{
 		ID:       "transaction_manager_%s_global_avg_times",
 		Title:    "Transaction Manager Global Average Times",
 		Units:    "milliseconds",
-		Fam:      "transactions",
+		Fam:      "transactions/overview",
 		Ctx:      "websphere_pmi.transaction_manager_global_avg_times",
 		Type:     module.Line,
 		Priority: prioTransactionManager + 40,
@@ -211,7 +191,7 @@ var transactionChartsTmpl = module.Charts{
 		ID:       "transaction_manager_%s_local_avg_times",
 		Title:    "Transaction Manager Local Average Times",
 		Units:    "milliseconds",
-		Fam:      "transactions",
+		Fam:      "transactions/overview",
 		Ctx:      "websphere_pmi.transaction_manager_local_avg_times",
 		Type:     module.Line,
 		Priority: prioTransactionManager + 50,
@@ -288,7 +268,7 @@ var threadPoolChartsTmpl = module.Charts{
 		ID:       "thread_pool_%s_threads",
 		Title:    "Thread Pool Threads",
 		Units:    "threads",
-		Fam:      "thread_pools",
+		Fam:      "system/threads",
 		Ctx:      "websphere_pmi.thread_pool_threads",
 		Type:     module.Stacked,
 		Priority: prioThreadPools,
@@ -301,7 +281,7 @@ var threadPoolChartsTmpl = module.Charts{
 		ID:       "thread_pool_%s_lifecycle",
 		Title:    "Thread Pool Lifecycle",
 		Units:    "operations/s",
-		Fam:      "thread_pools",
+		Fam:      "system/threads",
 		Ctx:      "websphere_pmi.thread_pool_lifecycle",
 		Type:     module.Line,
 		Priority: prioThreadPools + 10,
@@ -316,7 +296,7 @@ var threadPoolChartsTmpl = module.Charts{
 		ID:       "thread_pool_%s_concurrent_hung",
 		Title:    "Thread Pool Concurrent Hung Threads",
 		Units:    "threads",
-		Fam:      "thread_pools",
+		Fam:      "system/threads",
 		Ctx:      "websphere_pmi.thread_pool_concurrent_hung",
 		Type:     module.Line,
 		Priority: prioThreadPools + 20,
@@ -335,7 +315,7 @@ var threadPoolChartsTmpl = module.Charts{
 		ID:       "thread_pool_%s_active_time",
 		Title:    "Thread Pool Active Time",
 		Units:    "milliseconds/s",
-		Fam:      "thread_pools",
+		Fam:      "system/threads",
 		Ctx:      "websphere_pmi.thread_pool_active_time",
 		Type:     module.Line,
 		Priority: prioThreadPools + 30,
@@ -351,7 +331,7 @@ var threadPoolChartsTmpl = module.Charts{
 		ID:       "thread_pool_%s_avg_active_time",
 		Title:    "Thread Pool Average Active Time",
 		Units:    "milliseconds",
-		Fam:      "thread_pools",
+		Fam:      "system/threads",
 		Ctx:      "websphere_pmi.thread_pool_avg_active_time",
 		Type:     module.Line,
 		Priority: prioThreadPools + 40,
@@ -364,7 +344,7 @@ var threadPoolChartsTmpl = module.Charts{
 		ID:       "thread_pool_%s_percent_used",
 		Title:    "Thread Pool Percent Used",
 		Units:    "percentage",
-		Fam:      "thread_pools",
+		Fam:      "system/threads",
 		Ctx:      "websphere_pmi.thread_pool_percent_used",
 		Type:     module.Line,
 		Priority: prioThreadPools + 50,
@@ -383,7 +363,7 @@ var threadPoolChartsTmpl = module.Charts{
 		ID:       "thread_pool_%s_percent_maxed",
 		Title:    "Thread Pool Percent Maxed",
 		Units:    "percentage",
-		Fam:      "thread_pools",
+		Fam:      "system/threads",
 		Ctx:      "websphere_pmi.thread_pool_percent_maxed",
 		Type:     module.Line,
 		Priority: prioThreadPools + 60,
@@ -405,7 +385,7 @@ var threadPoolMaxPoolSizeChartTmpl = module.Chart{
 	ID:       "thread_pool_%s_max_pool_size",
 	Title:    "Thread Pool Maximum Size",
 	Units:    "threads",
-	Fam:      "thread_pools",
+	Fam:      "system/threads",
 	Ctx:      "websphere_pmi.thread_pool_max_pool_size",
 	Type:     module.Line,
 	Priority: prioThreadPools + 70,
@@ -419,7 +399,7 @@ var jdbcChartsTmpl = module.Charts{
 		ID:       "jdbc_%s_connections",
 		Title:    "JDBC Connections",
 		Units:    "connections/s",
-		Fam:      "connections/jdbc",
+		Fam:      "connectivity/datasources",
 		Ctx:      "websphere_pmi.jdbc_connections",
 		Type:     module.Line,
 		Priority: prioJDBCPools,
@@ -434,7 +414,7 @@ var jdbcChartsTmpl = module.Charts{
 		ID:       "jdbc_%s_pool_size",
 		Title:    "JDBC Pool Size",
 		Units:    "connections",
-		Fam:      "connections/jdbc",
+		Fam:      "connectivity/datasources",
 		Ctx:      "websphere_pmi.jdbc_pool_size",
 		Type:     module.Line,
 		Priority: prioJDBCPools + 10,
@@ -447,7 +427,7 @@ var jdbcChartsTmpl = module.Charts{
 		ID:       "jdbc_%s_wait_time",
 		Title:    "JDBC Wait Time",
 		Units:    "milliseconds/s",
-		Fam:      "connections/jdbc",
+		Fam:      "connectivity/datasources",
 		Ctx:      "websphere_pmi.jdbc_wait_time",
 		Type:     module.Line,
 		Priority: prioJDBCPools + 20,
@@ -459,7 +439,7 @@ var jdbcChartsTmpl = module.Charts{
 		ID:       "jdbc_%s_waiting_threads",
 		Title:    "JDBC Waiting Threads",
 		Units:    "threads",
-		Fam:      "connections/jdbc",
+		Fam:      "connectivity/datasources",
 		Ctx:      "websphere_pmi.jdbc_waiting_threads",
 		Type:     module.Line,
 		Priority: prioJDBCPools + 30,
@@ -471,7 +451,7 @@ var jdbcChartsTmpl = module.Charts{
 		ID:       "jdbc_%s_use_time",
 		Title:    "JDBC Use Time",
 		Units:    "milliseconds/s",
-		Fam:      "connections/jdbc",
+		Fam:      "connectivity/datasources",
 		Ctx:      "websphere_pmi.jdbc_use_time",
 		Type:     module.Line,
 		Priority: prioJDBCPools + 40,
@@ -483,7 +463,7 @@ var jdbcChartsTmpl = module.Charts{
 		ID:       "jdbc_%s_faults",
 		Title:    "JDBC Faults",
 		Units:    "faults/s",
-		Fam:      "connections/jdbc",
+		Fam:      "connectivity/datasources",
 		Ctx:      "websphere_pmi.jdbc_faults",
 		Type:     module.Line,
 		Priority: prioJDBCPools + 50,
@@ -495,7 +475,7 @@ var jdbcChartsTmpl = module.Charts{
 		ID:       "jdbc_%s_managed_connections",
 		Title:    "JDBC Managed Connections",
 		Units:    "connections",
-		Fam:      "connections/jdbc",
+		Fam:      "connectivity/datasources",
 		Ctx:      "websphere_pmi.jdbc_managed_connections",
 		Type:     module.Line,
 		Priority: prioJDBCPools + 60,
@@ -508,7 +488,7 @@ var jdbcChartsTmpl = module.Charts{
 		ID:       "jdbc_%s_percent_used",
 		Title:    "JDBC Pool Percent Used",
 		Units:    "percentage",
-		Fam:      "connections/jdbc",
+		Fam:      "connectivity/datasources",
 		Ctx:      "websphere_pmi.jdbc_percent_used",
 		Type:     module.Line,
 		Priority: prioJDBCPools + 80,
@@ -524,7 +504,7 @@ var jdbcChartsTmpl = module.Charts{
 		ID:       "jdbc_%s_percent_maxed",
 		Title:    "JDBC Pool Percent Maxed",
 		Units:    "percentage",
-		Fam:      "connections/jdbc",
+		Fam:      "connectivity/datasources",
 		Ctx:      "websphere_pmi.jdbc_percent_maxed",
 		Type:     module.Line,
 		Priority: prioJDBCPools + 90,
@@ -540,7 +520,7 @@ var jdbcChartsTmpl = module.Charts{
 		ID:       "jdbc_%s_prepared_statement_discards",
 		Title:    "JDBC Prepared Statement Cache Discards",
 		Units:    "discards/s",
-		Fam:      "connections/jdbc",
+		Fam:      "connectivity/datasources",
 		Ctx:      "websphere_pmi.jdbc_prepared_statement_discards",
 		Type:     module.Line,
 		Priority: prioJDBCPools + 100,
@@ -557,7 +537,7 @@ var extensionRegistryChartsTmpl = module.Charts{
 		ID:       "extension_registry_%s_metrics",
 		Title:    "Extension Registry Metrics",
 		Units:    "requests/s",
-		Fam:      "registry",
+		Fam:      "management/registry",
 		Ctx:      "websphere_pmi.extension_registry_metrics",
 		Type:     module.Line,
 		Priority: prioRegistry,
@@ -571,7 +551,7 @@ var extensionRegistryChartsTmpl = module.Charts{
 		ID:       "extension_registry_%s_hit_rate",
 		Title:    "Extension Registry Hit Rate",
 		Units:    "percentage",
-		Fam:      "registry",
+		Fam:      "management/registry",
 		Ctx:      "websphere_pmi.extension_registry_hit_rate",
 		Type:     module.Line,
 		Priority: prioRegistry + 10,
@@ -586,7 +566,7 @@ var sibJMSAdapterChartsTmpl = module.Charts{
 		ID:       "sib_jms_%s_connections",
 		Title:    "SIB JMS Adapter Connections",
 		Units:    "connections/s",
-		Fam:      "connections/jms",
+		Fam:      "connectivity/messaging",
 		Ctx:      "websphere_pmi.sib_jms_connections",
 		Type:     module.Line,
 		Priority: prioSIBMessaging,
@@ -601,7 +581,7 @@ var sibJMSAdapterChartsTmpl = module.Charts{
 		ID:       "sib_jms_%s_faults",
 		Title:    "SIB JMS Adapter Faults",
 		Units:    "faults/s",
-		Fam:      "connections/jms",
+		Fam:      "connectivity/messaging",
 		Ctx:      "websphere_pmi.sib_jms_faults",
 		Type:     module.Line,
 		Priority: prioSIBMessaging + 10,
@@ -613,7 +593,7 @@ var sibJMSAdapterChartsTmpl = module.Charts{
 		ID:       "sib_jms_%s_managed",
 		Title:    "SIB JMS Adapter Managed Resources",
 		Units:    "resources",
-		Fam:      "connections/jms",
+		Fam:      "connectivity/messaging",
 		Ctx:      "websphere_pmi.sib_jms_managed",
 		Type:     module.Line,
 		Priority: prioSIBMessaging + 20,
@@ -626,7 +606,7 @@ var sibJMSAdapterChartsTmpl = module.Charts{
 		ID:       "sib_jms_%s_pool_size",
 		Title:    "SIB JMS Adapter Pool Sizes",
 		Units:    "connections",
-		Fam:      "connections/jms",
+		Fam:      "connectivity/messaging",
 		Ctx:      "websphere_pmi.sib_jms_pool_size",
 		Type:     module.Line,
 		Priority: prioSIBMessaging + 30,
@@ -647,7 +627,7 @@ var sibJMSAdapterChartsTmpl = module.Charts{
 		ID:       "sib_jms_%s_pool_bounds",
 		Title:    "SIB JMS Adapter Pool High/Low Water Marks",
 		Units:    "connections",
-		Fam:      "connections/jms",
+		Fam:      "connectivity/messaging",
 		Ctx:      "websphere_pmi.sib_jms_pool_bounds",
 		Type:     module.Line,
 		Priority: prioSIBMessaging + 40,
@@ -662,7 +642,7 @@ var sibJMSAdapterChartsTmpl = module.Charts{
 		ID:       "sib_jms_%s_utilization",
 		Title:    "SIB JMS Adapter Pool Utilization",
 		Units:    "percentage",
-		Fam:      "connections/jms",
+		Fam:      "connectivity/messaging",
 		Ctx:      "websphere_pmi.sib_jms_utilization",
 		Type:     module.Line,
 		Priority: prioSIBMessaging + 50,
@@ -679,7 +659,7 @@ var sibJMSAdapterChartsTmpl = module.Charts{
 		ID:       "sib_jms_%s_utilization_peaks",
 		Title:    "SIB JMS Adapter Utilization Peaks",
 		Units:    "percentage",
-		Fam:      "connections/jms",
+		Fam:      "connectivity/messaging",
 		Ctx:      "websphere_pmi.sib_jms_utilization_peaks",
 		Type:     module.Line,
 		Priority: prioSIBMessaging + 60,
@@ -694,7 +674,7 @@ var sibJMSAdapterChartsTmpl = module.Charts{
 		ID:       "sib_jms_%s_waiting_threads",
 		Title:    "SIB JMS Adapter Waiting Threads",
 		Units:    "threads",
-		Fam:      "connections/jms",
+		Fam:      "connectivity/messaging",
 		Ctx:      "websphere_pmi.sib_jms_waiting_threads",
 		Type:     module.Line,
 		Priority: prioSIBMessaging + 70,
@@ -710,7 +690,7 @@ var sibJMSAdapterChartsTmpl = module.Charts{
 		ID:       "sib_jms_%s_timing",
 		Title:    "SIB JMS Adapter Connection Timing",
 		Units:    "milliseconds",
-		Fam:      "connections/jms",
+		Fam:      "connectivity/messaging",
 		Ctx:      "websphere_pmi.sib_jms_timing",
 		Type:     module.Line,
 		Priority: prioSIBMessaging + 80,
@@ -726,7 +706,7 @@ var sibJMSAdapterChartsTmpl = module.Charts{
 		ID:       "sib_jms_%s_wait_timing",
 		Title:    "SIB JMS Adapter Wait Timing",
 		Units:    "milliseconds",
-		Fam:      "connections/jms",
+		Fam:      "connectivity/messaging",
 		Ctx:      "websphere_pmi.sib_jms_wait_timing",
 		Type:     module.Line,
 		Priority: prioSIBMessaging + 90,
@@ -745,7 +725,7 @@ var servletsComponentChartsTmpl = module.Charts{
 		ID:       "servlets_component_%s_requests",
 		Title:    "Servlets Component Requests",
 		Units:    "requests/s",
-		Fam:      "web/servlet_components",
+		Fam:      "web/servlets/components",
 		Ctx:      "websphere_pmi.servlets_component_requests",
 		Type:     module.Line,
 		Priority: prioWebServlets,
@@ -759,7 +739,7 @@ var servletsComponentChartsTmpl = module.Charts{
 		ID:       "servlets_component_%s_concurrent",
 		Title:    "Servlets Component Concurrent Requests",
 		Units:    "requests",
-		Fam:      "web/servlet_components",
+		Fam:      "web/servlets/components",
 		Ctx:      "websphere_pmi.servlets_component_concurrent",
 		Type:     module.Line,
 		Priority: prioWebServlets + 20,
@@ -779,7 +759,7 @@ var wimComponentChartsTmpl = module.Charts{
 		ID:       "wim_%s_portlet_requests",
 		Title:    "WIM Component Portlet Requests",
 		Units:    "requests/s",
-		Fam:      "components",
+		Fam:      "management/components",
 		Ctx:      "websphere_pmi.wim_portlet_requests",
 		Type:     module.Line,
 		Priority: prioComponents,
@@ -792,7 +772,7 @@ var wimComponentChartsTmpl = module.Charts{
 		ID:       "wim_%s_concurrent_requests",
 		Title:    "WIM Component Concurrent Portlet Requests",
 		Units:    "requests",
-		Fam:      "components",
+		Fam:      "management/components",
 		Ctx:      "websphere_pmi.wim_concurrent_requests",
 		Type:     module.Line,
 		Priority: prioComponents + 20,
@@ -814,7 +794,7 @@ var pmiWebServiceServiceChartsTmpl = module.Charts{
 		ID:       "pmi_webservice_%s_requests",
 		Title:    "PMI Web Service Service Requests",
 		Units:    "requests/s",
-		Fam:      "web_services",
+		Fam:      "integration/webservices",
 		Ctx:      "websphere_pmi.pmi_webservice_requests",
 		Type:     module.Line,
 		Priority: prioWebServices,
@@ -833,7 +813,7 @@ var tcpChannelDCSChartsTmpl = module.Charts{
 		ID:       "tcp_dcs_%s_lifecycle",
 		Title:    "TCP Channel DCS Lifecycle",
 		Units:    "operations/s",
-		Fam:      "connections/tcp",
+		Fam:      "connectivity/channels",
 		Ctx:      "websphere_pmi.tcp_dcs_lifecycle",
 		Type:     module.Line,
 		Priority: prioTCPChannels,
@@ -846,7 +826,7 @@ var tcpChannelDCSChartsTmpl = module.Charts{
 		ID:       "tcp_dcs_%s_threads",
 		Title:    "TCP Channel DCS Thread Management",
 		Units:    "threads/s",
-		Fam:      "connections/tcp",
+		Fam:      "connectivity/channels",
 		Ctx:      "websphere_pmi.tcp_dcs_threads",
 		Type:     module.Line,
 		Priority: prioTCPChannels + 10,
@@ -859,7 +839,7 @@ var tcpChannelDCSChartsTmpl = module.Charts{
 		ID:       "tcp_dcs_%s_pool_status",
 		Title:    "TCP Channel DCS Pool Status",
 		Units:    "threads",
-		Fam:      "connections/tcp",
+		Fam:      "connectivity/channels",
 		Ctx:      "websphere_pmi.tcp_dcs_pool_status",
 		Type:     module.Line,
 		Priority: prioTCPChannels + 20,
@@ -873,7 +853,7 @@ var tcpChannelDCSChartsTmpl = module.Charts{
 		ID:       "tcp_dcs_%s_utilization",
 		Title:    "TCP Channel DCS Pool Utilization",
 		Units:    "percentage",
-		Fam:      "connections/tcp",
+		Fam:      "connectivity/channels",
 		Ctx:      "websphere_pmi.tcp_dcs_utilization",
 		Type:     module.Line,
 		Priority: prioTCPChannels + 30,
@@ -886,7 +866,7 @@ var tcpChannelDCSChartsTmpl = module.Charts{
 		ID:       "tcp_dcs_%s_pool_limits",
 		Title:    "TCP Channel DCS Pool Limits",
 		Units:    "threads",
-		Fam:      "connections/tcp",
+		Fam:      "connectivity/channels",
 		Ctx:      "websphere_pmi.tcp_dcs_pool_limits",
 		Type:     module.Line,
 		Priority: prioTCPChannels + 50,
@@ -901,7 +881,7 @@ var detailsComponentChartsTmpl = module.Charts{
 		ID:       "details_%s_portlets",
 		Title:    "Details Component Loaded Portlets",
 		Units:    "portlets",
-		Fam:      "components",
+		Fam:      "management/components",
 		Ctx:      "websphere_pmi.details_portlets",
 		Type:     module.Line,
 		Priority: prioComponents + 100,
@@ -916,7 +896,7 @@ var iscProductDetailsChartsTmpl = module.Charts{
 		ID:       "isc_product_%s_portlet_requests",
 		Title:    "ISC Product Details Portlet Requests",
 		Units:    "requests/s",
-		Fam:      "components",
+		Fam:      "management/components",
 		Ctx:      "websphere_pmi.isc_product_portlet_requests",
 		Type:     module.Line,
 		Priority: prioComponents + 200,
@@ -929,7 +909,7 @@ var iscProductDetailsChartsTmpl = module.Charts{
 		ID:       "isc_product_%s_concurrent_requests",
 		Title:    "ISC Product Details Concurrent Portlet Requests",
 		Units:    "requests",
-		Fam:      "components",
+		Fam:      "management/components",
 		Ctx:      "websphere_pmi.isc_product_concurrent_requests",
 		Type:     module.Line,
 		Priority: prioComponents + 220,
