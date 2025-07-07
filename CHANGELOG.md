@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- MCP in Netdata Operations Diagram [\#20637](https://github.com/netdata/netdata/pull/20637) ([ktsaou](https://github.com/ktsaou))
+- refactor\(go.d/iprange\): migrate from net to net/netip [\#20636](https://github.com/netdata/netdata/pull/20636) ([ilyam8](https://github.com/ilyam8))
 - Update NIDL-Framework.md [\#20634](https://github.com/netdata/netdata/pull/20634) ([Ancairon](https://github.com/Ancairon))
 - build\(deps\): bump github.com/docker/docker from 28.3.0+incompatible to 28.3.1+incompatible in /src/go [\#20633](https://github.com/netdata/netdata/pull/20633) ([dependabot[bot]](https://github.com/apps/dependabot))
 - move NIDL to docs [\#20632](https://github.com/netdata/netdata/pull/20632) ([ktsaou](https://github.com/ktsaou))
@@ -463,8 +465,6 @@
 - Release memory after journalfile creation [\#20094](https://github.com/netdata/netdata/pull/20094) ([stelfrag](https://github.com/stelfrag))
 - Protection access improvements 1 [\#20093](https://github.com/netdata/netdata/pull/20093) ([ktsaou](https://github.com/ktsaou))
 - protected access against SIGBUS/SIGSEGV for journal v2 files [\#20092](https://github.com/netdata/netdata/pull/20092) ([ktsaou](https://github.com/ktsaou))
-- Regenerate integrations docs [\#20091](https://github.com/netdata/netdata/pull/20091) ([netdatabot](https://github.com/netdatabot))
-- Fix typo in .github/scripts/gen-docker-tags.py [\#20089](https://github.com/netdata/netdata/pull/20089) ([Ferroin](https://github.com/Ferroin))
 
 ## [v2.3.2](https://github.com/netdata/netdata/tree/v2.3.2) (2025-04-02)
 

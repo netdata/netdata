@@ -21,6 +21,8 @@ stateDiagram-v2
     Detect: Detect Anomalies
     Dashboard:::userFeature
     Dashboard: Netdata Dashboards
+    AIAssistant:::userFeature
+    AIAssistant: AI Assistant
     3rdDashboard:::userFeature
     3rdDashboard: 3rd party Dashboards
     Notifications:::userFeature
@@ -38,7 +40,9 @@ stateDiagram-v2
     Store --> Stream
     Store --> Export
     Query --> Visualize
+    Query --> MCP
     Score --> Visualize
+    Score --> MCP
     Check --> Alerts
     Learn --> Detect: trained ML models
     Alerts --> Notifications
@@ -46,6 +50,7 @@ stateDiagram-v2
     Export --> Others
     Others --> 3rdDashboard
     Visualize --> Dashboard
+    MCP --> AIAssistant
     Score:::usedByNC
     Query:::usedByNC
     Alerts:::usedByNC
