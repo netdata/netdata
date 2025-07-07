@@ -306,12 +306,29 @@ func (da *DumpAnalyzer) PrintSummary() {
 		familyMap[family] = append(familyMap[family], cs)
 	}
 
-	// Sort families and contexts
-	var families []string
-	for fam := range familyMap {
-		families = append(families, fam)
+	// Sort families by their minimum priority (priority of their lowest-priority context)
+	type familyPriority struct {
+		family string
+		minPriority int
 	}
-	sort.Strings(families)
+	var familyPriorities []familyPriority
+	for fam, contexts := range familyMap {
+		minPrio := contexts[0].priority
+		for _, ctx := range contexts {
+			if ctx.priority < minPrio {
+				minPrio = ctx.priority
+			}
+		}
+		familyPriorities = append(familyPriorities, familyPriority{family: fam, minPriority: minPrio})
+	}
+	sort.Slice(familyPriorities, func(i, j int) bool {
+		return familyPriorities[i].minPriority < familyPriorities[j].minPriority
+	})
+	
+	var families []string
+	for _, fp := range familyPriorities {
+		families = append(families, fp.family)
+	}
 
 	// Print summary with tree structure using colons
 	for i, family := range families {
