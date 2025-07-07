@@ -3165,29 +3165,30 @@ endif()
 if(ENABLE_PLUGIN_IBM)
     include(NetdataIBMPlugin)
     add_ibm_plugin_target()
-    
+
     install(PROGRAMS ${CMAKE_BINARY_DIR}/ibm.d.plugin
             COMPONENT plugin-ibm
             DESTINATION usr/libexec/netdata/plugins.d)
-    
+
     # Install IBM plugin configuration files
     install(FILES src/go/plugin/ibm.d/config/ibm.d.conf
             COMPONENT plugin-ibm
             DESTINATION usr/lib/netdata/conf.d)
-    
-    install(FILES 
+
+    install(FILES
             src/go/plugin/ibm.d/config/ibm.d/as400.conf
             src/go/plugin/ibm.d/config/ibm.d/db2.conf
             src/go/plugin/ibm.d/config/ibm.d/mq_pcf.conf
+            src/go/plugin/ibm.d/config/ibm.d/websphere_jmx.conf
             src/go/plugin/ibm.d/config/ibm.d/websphere_mp.conf
             src/go/plugin/ibm.d/config/ibm.d/websphere_pmi.conf
             COMPONENT plugin-ibm
             DESTINATION usr/lib/netdata/conf.d/ibm.d)
-    
+
     # Configure and install IBM library download script
     configure_file(packaging/installer/install-ibm-libs.sh.in
                    packaging/installer/install-ibm-libs.sh @ONLY)
-    
+
     install(PROGRAMS ${CMAKE_BINARY_DIR}/packaging/installer/install-ibm-libs.sh
             COMPONENT plugin-ibm
             DESTINATION usr/libexec/netdata)
