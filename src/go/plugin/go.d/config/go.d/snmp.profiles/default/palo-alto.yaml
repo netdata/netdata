@@ -84,7 +84,7 @@ metrics:
       name: panSessionUtilization
       chart_meta:
         description: Session table utilization percentage
-        family: 'Session/Utilization'
+        family: 'System/Activity/Session/Utilization'
         unit: "%"
   - MIB: PAN-COMMON-MIB
     symbol:
@@ -92,7 +92,7 @@ metrics:
       name: panSessionMax
       chart_meta:
         description: Total number of sessions supported
-        family: 'Session/Maximum'
+        family: 'System/Activity/Session/Maximum'
         unit: "{session}"
   - MIB: PAN-COMMON-MIB
     symbol:
@@ -100,7 +100,7 @@ metrics:
       name: panSessionActive
       chart_meta:
         description: Total number of active sessions
-        family: 'Session/Active/Total'
+        family: 'System/Activity/Session/Active/Total'
         unit: "{session}"
   - MIB: PAN-COMMON-MIB
     symbol:
@@ -108,7 +108,7 @@ metrics:
       name: panSessionActiveTcp
       chart_meta:
         description: Total number of active TCP sessions
-        family: 'Session/Active/TCP'
+        family: 'System/Activity/Session/Active/TCP'
         unit: "{session}"
   - MIB: PAN-COMMON-MIB
     symbol:
@@ -116,7 +116,7 @@ metrics:
       name: panSessionActiveUdp
       chart_meta:
         description: Total number of active UDP sessions
-        family: 'Session/Active/UDP'
+        family: 'System/Activity/Session/Active/UDP'
         unit: "{session}"
   - MIB: PAN-COMMON-MIB
     symbol:
@@ -124,7 +124,7 @@ metrics:
       name: panSessionActiveICMP
       chart_meta:
         description: Total number of active ICMP sessions
-        family: 'Session/Active/ICMP'
+        family: 'System/Activity/Session/Active/ICMP'
         unit: "{session}"
   - MIB: PAN-COMMON-MIB
     symbol:
@@ -132,7 +132,7 @@ metrics:
       name: panSessionActiveSslProxy
       chart_meta:
         description: Total number of active SSL proxy sessions
-        family: 'Session/SSLProxy/Active'
+        family: 'System/Activity/Session/SSLProxy/Active'
         unit: "{session}"
   - MIB: PAN-COMMON-MIB
     symbol:
@@ -140,7 +140,7 @@ metrics:
       name: panSessionSslProxyUtilization
       chart_meta:
         description: SSL proxy session utilization percentage
-        family: 'Session/SSLProxy/Utilization'
+        family: 'System/Activity/Session/SSLProxy/Utilization'
         unit: "%"
 
   #
@@ -152,7 +152,7 @@ metrics:
       name: panGPGWUtilizationPct
       chart_meta:
         description: GlobalProtect Gateway utilization percentage
-        family: 'GlobalProtect/Gateway/Utilization'
+        family: 'Network/VPN/GlobalProtect/Gateway/Utilization'
         unit: "%"
   - MIB: PAN-COMMON-MIB
     symbol:
@@ -160,7 +160,7 @@ metrics:
       name: panGPGWUtilizationMaxTunnels
       chart_meta:
         description: Max tunnels allowed
-        family: 'GlobalProtect/Gateway/Tunnel/Maximum'
+        family: 'Network/VPN/GlobalProtect/Gateway/Tunnel/Maximum'
         unit: "{tunnel}"
   - MIB: PAN-COMMON-MIB
     symbol:
@@ -168,7 +168,7 @@ metrics:
       name: panGPGWUtilizationActiveTunnels
       chart_meta:
         description: Number of active tunnels
-        family: 'GlobalProtect/Gateway/Tunnel/Active'
+        family: 'Network/VPN/GlobalProtect/Gateway/Tunnel/Active'
         unit: "{tunnel}"
   - MIB: PAN-ENTITY-EXT-MIB
     symbol:
@@ -195,13 +195,13 @@ metrics:
         name: panEntryFRUModulePowerUsed
         chart_meta:
           description: Power used by the FRU Module in watts
-          family: 'FRU/Module/Power'
+          family: 'Hardware/FRU/Module/Power/Used'
           unit: "W"
       - OID: 1.3.6.1.4.1.25461.1.1.7.1.2.1.1.2
         name: panEntryFRUModuleNumPorts
         chart_meta:
           description: Number of ports on the FRU Module
-          family: 'FRU/Module/Port/Count'
+          family: 'Hardware/FRU/Module/Port/Count'
           unit: "{port}"
     metric_tags:
       - MIB: ENTITY-MIB
@@ -220,7 +220,7 @@ metrics:
         name: panEntryFanTrayPowerUsed
         chart_meta:
           description: Power used by the Fan Tray in watts
-          family: 'FRU/FanTray/Power'
+          family: 'Hardware/FRU/FanTray/Power/Used'
           unit: "W"
     metric_tags:
       - MIB: ENTITY-MIB

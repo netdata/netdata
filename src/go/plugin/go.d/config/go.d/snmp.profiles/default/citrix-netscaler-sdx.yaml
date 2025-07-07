@@ -1,7 +1,9 @@
 extends:
   - citrix.yaml
+
 sysobjectid:
   - 1.3.6.1.4.1.5951.6
+
 metadata:
   device:
     fields:
@@ -17,312 +19,7 @@ metadata:
           name: netscaler.sdx.systemBuildNumber
       type:
         value: "load_balancer"
-metrics:
-  - MIB: SDX-ROOT-MIB
-    table:
-      name: hardwareResourceTable
-      OID: 1.3.6.1.4.1.5951.6.2.1000.1
-    symbols:
-      - name: netscaler.sdx.hardwareResource
-        constant_value_one: true
-        description: "Resource name"
-        unit: "{resource}"
-    metric_tags:
-      - symbol:
-          name: netscaler.sdx.hardwareResourceName
-          OID: 1.3.6.1.4.1.5951.6.2.1000.1.1.1
-        tag: netscaler_sdx_hardware_resource_name
-      - symbol:
-          OID: 1.3.6.1.4.1.5951.6.2.1000.1.1.7
-          name: netscaler.sdx.hardwareResourceStatus
-        tag: netscaler_sdx_hardware_resource_status
-  - MIB: SDX-ROOT-MIB
-    table:
-      name: softwareResourceTable
-      OID: 1.3.6.1.4.1.5951.6.2.1000.2
-    symbols:
-      - name: netscaler.sdx.softwareResource
-        constant_value_one: true
-        description: "Resource name"
-        unit: "{resource}"
-    metric_tags:
-      - symbol:
-          name: netscaler.sdx.softwareResourceName
-          OID: 1.3.6.1.4.1.5951.6.2.1000.2.1.1
-        tag: netscaler_sdx_software_resource_name
-      - symbol:
-          OID: 1.3.6.1.4.1.5951.6.2.1000.2.1.7
-          name: netscaler.sdx.softwareResourceStatus
-        tag: netscaler_sdx_software_resource_status
-  - MIB: SDX-ROOT-MIB
-    table:
-      name: srTable
-      OID: 1.3.6.1.4.1.5951.6.2.1000.4
-    symbols:
-      - name: netscaler.sdx.srUtilized
-        OID: 1.3.6.1.4.1.5951.6.2.1000.4.1.5
-        description: "Physical utilization of the storage repository"
-        unit: "By"
-      - name: netscaler.sdx.srSize
-        OID: 1.3.6.1.4.1.5951.6.2.1000.4.1.6
-        description: "Physical size of the storage repository"
-        unit: "By"
-    metric_tags:
-      - symbol:
-          name: netscaler.sdx.srName
-          OID: 1.3.6.1.4.1.5951.6.2.1000.4.1.1
-        tag: netscaler_sdx_sr_name
-      - symbol:
-          name: netscaler.sdx.srBayNumber
-          OID: 1.3.6.1.4.1.5951.6.2.1000.4.1.2
-        tag: netscaler_sdx_sr_bay_number
-      - symbol:
-          OID: 1.3.6.1.4.1.5951.6.2.1000.4.1.7
-          name: netscaler.sdx.srStatus
-        tag: netscaler_sdx_sr_status
-  - MIB: SDX-ROOT-MIB
-    table:
-      name: interfaceTable
-      OID: 1.3.6.1.4.1.5951.6.2.1000.5
-    symbols:
-      - name: netscaler.sdx.interfaceRxPackets
-        OID: 1.3.6.1.4.1.5951.6.2.1000.5.1.5
-        description: "Received packets"
-        unit: "{packet}"
-      - name: netscaler.sdx.interfaceTxPackets
-        OID: 1.3.6.1.4.1.5951.6.2.1000.5.1.6
-        description: "Transmitted packets"
-        unit: "{packet}"
-      - name: netscaler.sdx.interfaceRxBytes
-        OID: 1.3.6.1.4.1.5951.6.2.1000.5.1.7
-        description: "Received bytes"
-        unit: "By"
-      - name: netscaler.sdx.interfaceTxBytes
-        OID: 1.3.6.1.4.1.5951.6.2.1000.5.1.8
-        description: "Transmitted bytes"
-        unit: "By"
-      - name: netscaler.sdx.interfaceRxErrors
-        OID: 1.3.6.1.4.1.5951.6.2.1000.5.1.9
-        description: "Receiving errors"
-        unit: "{error}"
-      - name: netscaler.sdx.interfaceTxErrors
-        OID: 1.3.6.1.4.1.5951.6.2.1000.5.1.10
-        description: "Transmission errors"
-        unit: "{error}"
-    metric_tags:
-      - symbol:
-          name: netscaler.sdx.interfacePort
-          OID: 1.3.6.1.4.1.5951.6.2.1000.5.1.1
-        tag: netscaler_sdx_interface_port
-      - symbol:
-          name: netscaler.sdx.interfaceMappedPort
-          OID: 1.3.6.1.4.1.5951.6.2.1000.5.1.13
-        tag: netscaler_sdx_interface_mapped_port
-      - symbol:
-          OID: 1.3.6.1.4.1.5951.6.2.1000.5.1.4
-          name: netscaler.sdx.interfaceState
-        tag: netscaler_sdx_interface_state
-  - MIB: SDX-ROOT-MIB
-    table:
-      name: healthMonitoringTable
-      OID: 1.3.6.1.4.1.5951.6.2.1000.6
-    symbols:
-      - name: netscaler.sdx.hmCurrentValue
-        OID: 1.3.6.1.4.1.5951.6.2.1000.6.1.7
-        description: "Current value of the resource"
-        unit: "TBD"
-    metric_tags:
-      - symbol:
-          name: netscaler.sdx.hmName
-          OID: 1.3.6.1.4.1.5951.6.2.1000.6.1.1
-        tag: netscaler_sdx_hm_name
-      - symbol:
-          name: netscaler.sdx.hmUnit
-          OID: 1.3.6.1.4.1.5951.6.2.1000.6.1.6
-        tag: netscaler_sdx_hm_unit
-      - symbol:
-          OID: 1.3.6.1.4.1.5951.6.2.1000.6.1.4
-          name: netscaler.sdx.hmStatus
-        tag: netscaler_sdx_hm_status
-  - MIB: SDX-ROOT-MIB
-    table:
-      name: xenTable
-      OID: 1.3.6.1.4.1.5951.6.3.1
-    symbols:
-      - name: cpu.usage
-        OID: 1.3.6.1.4.1.5951.6.3.1.1.8
-        description: "Cpu usage percentage of host"
-        unit: "%"
-      - name: memory.usage
-        OID: 1.3.6.1.4.1.5951.6.3.1.1.11
-        description: "Memory usage percentage of host"
-        unit: "%"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.5951.6.3.1.1.1
-          name: netscaler.sdx.xenIpAddressType
-        tag: netscaler_sdx_xen_ip_address_type
-        mapping:
-          0: unknown
-          1: ipv4
-          2: ipv6
-          3: ipv4z
-          4: ipv6z
-          16: dns
-          25: l2vpn
-      - symbol:
-          OID: 1.3.6.1.4.1.5951.6.3.1.1.2
-          name: netscaler.sdx.xenIpAddress
-          format: ip_address
-        tag: netscaler_sdx_xen_ip_address
-      - symbol:
-          OID: 1.3.6.1.4.1.5951.6.3.1.1.6
-          name: netscaler.sdx.xenUuid
-        tag: netscaler_sdx_xen_uuid
-  - MIB: SDX-ROOT-MIB
-    table:
-      name: netscalerTable
-      OID: 1.3.6.1.4.1.5951.6.3.2
-    symbols:
-      - name: netscaler.sdx.nsNsCPUUsage
-        OID: 1.3.6.1.4.1.5951.6.3.2.1.33
-        description: "Cpu usage percentage of netscaler instance"
-        unit: "%"
-      - name: netscaler.sdx.nsNsMemoryUsage
-        OID: 1.3.6.1.4.1.5951.6.3.2.1.35
-        description: "Memory usage percentage"
-        unit: "%"
-      - name: netscaler.sdx.nsNsTx
-        OID: 1.3.6.1.4.1.5951.6.3.2.1.36
-        description: "Out throughput of netscaler instance in megabits per second"
-        unit: "Mbit/s"
-      - name: netscaler.sdx.nsNsRx
-        OID: 1.3.6.1.4.1.5951.6.3.2.1.37
-        description: "In throughput of netscaler instance in megabits per second"
-        unit: "Mbit/s"
-      - name: netscaler.sdx.nsHttpReq
-        OID: 1.3.6.1.4.1.5951.6.3.2.1.38
-        description: "Http requests per second"
-        unit: "1.s"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          name: netscaler.sdx.nsIpAddressType
-          OID: 1.3.6.1.4.1.5951.6.3.2.1.1
-        tag: netscaler_sdx_ns_ip_address_type
-        mapping:
-          0: unknown
-          1: ipv4
-          2: ipv6
-          3: ipv4z
-          4: ipv6z
-          16: dns
-          25: l2vpn
-      - symbol:
-          name: netscaler.sdx.nsIpAddress
-          OID: 1.3.6.1.4.1.5951.6.3.2.1.2
-          format: ip_address
-        tag: netscaler_sdx_ns_ip_address
-      - symbol:
-          name: netscaler.sdx.nsProfileName
-          OID: 1.3.6.1.4.1.5951.6.3.2.1.5
-        tag: netscaler_sdx_ns_profile_name
-      - symbol:
-          name: netscaler.sdx.nsName
-          OID: 1.3.6.1.4.1.5951.6.3.2.1.6
-        tag: netscaler_sdx_ns_name
-      - symbol:
-          name: netscaler.sdx.nsNetmaskType
-          OID: 1.3.6.1.4.1.5951.6.3.2.1.7
-        tag: netscaler_sdx_ns_netmask_type
-        mapping:
-          0: unknown
-          1: ipv4
-          2: ipv6
-          3: ipv4z
-          4: ipv6z
-          16: dns
-          25: l2vpn
-      - symbol:
-          name: netscaler.sdx.nsNetmask
-          OID: 1.3.6.1.4.1.5951.6.3.2.1.8
-          format: ip_address
-        tag: netscaler_sdx_ns_netmask
-      - symbol:
-          name: netscaler.sdx.nsGatewayType
-          OID: 1.3.6.1.4.1.5951.6.3.2.1.9
-        tag: netscaler_sdx_ns_gateway_type
-        mapping:
-          0: unknown
-          1: ipv4
-          2: ipv6
-          3: ipv4z
-          4: ipv6z
-          16: dns
-          25: l2vpn
-      - symbol:
-          name: netscaler.sdx.nsGateway
-          OID: 1.3.6.1.4.1.5951.6.3.2.1.10
-          format: ip_address
-        tag: netscaler_sdx_ns_gateway
-      - symbol:
-          name: netscaler.sdx.nsHostname
-          OID: 1.3.6.1.4.1.5951.6.3.2.1.11
-        tag: netscaler_sdx_ns_hostname
-      - symbol:
-          name: netscaler.sdx.nsDescription
-          OID: 1.3.6.1.4.1.5951.6.3.2.1.12
-        tag: netscaler_sdx_ns_description
-      - symbol:
-          name: netscaler.sdx.nsVersion
-          OID: 1.3.6.1.4.1.5951.6.3.2.1.13
-        tag: netscaler_sdx_ns_version
-      - symbol:
-          name: netscaler.sdx.nsVmDescription
-          OID: 1.3.6.1.4.1.5951.6.3.2.1.30
-        tag: netscaler_sdx_ns_vm_description
-      - symbol:
-          name: netscaler.sdx.nsThroughput
-          OID: 1.3.6.1.4.1.5951.6.3.2.1.31
-        tag: netscaler_sdx_ns_throughput
-      - symbol:
-          name: netscaler.sdx.nsHaIPAddressType
-          OID: 1.3.6.1.4.1.5951.6.3.2.1.42
-        tag: netscaler_sdx_ns_ha_ip_address_type
-        mapping:
-          0: unknown
-          1: ipv4
-          2: ipv6
-          3: ipv4z
-          4: ipv6z
-          16: dns
-          25: l2vpn
-      - symbol:
-          name: netscaler.sdx.nsHaIPAddress
-          OID: 1.3.6.1.4.1.5951.6.3.2.1.43
-          format: ip_address
-        tag: netscaler_sdx_ns_ha_ip_address
-      - symbol:
-          OID: 1.3.6.1.4.1.5951.6.3.2.1.15
-          name: netscaler.sdx.nsInstanceState
-        tag: netscaler_sdx_ns_instance_state
-      - symbol:
-          OID: 1.3.6.1.4.1.5951.6.3.2.1.18
-          name: netscaler.sdx.nsVmState
-        tag: netscaler_sdx_ns_vm_state
-      - symbol:
-          OID: 1.3.6.1.4.1.5951.6.3.2.1.41
-          name: netscaler.sdx.nsHaMasterState
-        tag: netscaler_sdx_ns_ha_master_state
-      - symbol:
-          OID: 1.3.6.1.4.1.5951.6.3.2.1.44
-          name: netscaler.sdx.nsNodeState
-        tag: netscaler_sdx_ns_node_state
-      - symbol:
-          OID: 1.3.6.1.4.1.5951.6.3.2.1.45
-          name: netscaler.sdx.nsHaSync
-        tag: netscaler_sdx_ns_ha_sync
+
 metric_tags:
   - OID: 1.3.6.1.4.1.5951.6.2.2.0
     symbol: systemProduct
@@ -410,3 +107,276 @@ metric_tags:
   - OID: 1.3.6.1.4.1.5951.6.2.19.0
     symbol: systemBiosVersion
     tag: netscaler_sdx_system_bios_version
+
+# https://mibbrowser.online/mibdb_search.php?mib=SDX-ROOT-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/citrix/SDX-ROOT-MIB
+
+metrics:
+  - MIB: SDX-ROOT-MIB
+    table:
+      name: hardwareResourceTable
+      OID: 1.3.6.1.4.1.5951.6.2.1000.1
+    symbols:
+      - OID: 1.3.6.1.4.1.5951.6.2.1000.1.1.7
+        name: netscaler.sdx.hardwareResourceStatus
+        chart_meta:
+          description: Health status of the resource
+          family: 'Hardware/Resource/Status'
+          unit: "{status}"
+        mapping:
+          OK: 1
+          ERROR: 2
+    metric_tags:
+      - tag: netscaler_sdx_hardware_resource_name
+        symbol:
+          name: netscaler.sdx.hardwareResourceName
+          OID: 1.3.6.1.4.1.5951.6.2.1000.1.1.1
+
+  - MIB: SDX-ROOT-MIB
+    table:
+      name: softwareResourceTable
+      OID: 1.3.6.1.4.1.5951.6.2.1000.2
+    symbols:
+      - OID: 1.3.6.1.4.1.5951.6.2.1000.2.1.7
+        name: netscaler.sdx.softwareResourceStatus
+        chart_meta:
+          description: Health status of the resource
+          family: 'System/Software/Resource/Status'
+          unit: "{status}"
+        mapping:
+          OK: 1
+          ERROR: 2
+    metric_tags:
+      - tag: netscaler_sdx_software_resource_name
+        symbol:
+          name: netscaler.sdx.softwareResourceName
+          OID: 1.3.6.1.4.1.5951.6.2.1000.2.1.1
+
+  - MIB: SDX-ROOT-MIB
+    table:
+      name: srTable
+      OID: 1.3.6.1.4.1.5951.6.2.1000.4
+    symbols:
+      - name: netscaler.sdx.srUtilized
+        OID: 1.3.6.1.4.1.5951.6.2.1000.4.1.5
+        chart_meta:
+          description: "Physical utilization of the storage repository"
+          family: 'Storage/Repository/Used'
+          unit: "By"
+      - name: netscaler.sdx.srSize
+        OID: 1.3.6.1.4.1.5951.6.2.1000.4.1.6
+        chart_meta:
+          description: "Physical size of the storage repository"
+          family: 'Storage/Repository/Size'
+          unit: "By"
+      - OID: 1.3.6.1.4.1.5951.6.2.1000.4.1.7
+        name: netscaler.sdx.srStatus
+        chart_meta:
+          description: Status of the storage repository
+          family: 'Storage/Repository/Status'
+          unit: "{status}"
+        mapping:
+          OK: 1
+          ERROR: 2
+    metric_tags:
+      - tag: netscaler_sdx_sr_name
+        symbol:
+          name: netscaler.sdx.srName
+          OID: 1.3.6.1.4.1.5951.6.2.1000.4.1.1
+      - tag: netscaler_sdx_sr_bay_number
+        symbol:
+          name: netscaler.sdx.srBayNumber
+          OID: 1.3.6.1.4.1.5951.6.2.1000.4.1.2
+
+  - MIB: SDX-ROOT-MIB
+    table:
+      name: interfaceTable
+      OID: 1.3.6.1.4.1.5951.6.2.1000.5
+    symbols:
+      - name: netscaler.sdx.interfaceRxPackets
+        OID: 1.3.6.1.4.1.5951.6.2.1000.5.1.5
+        chart_meta:
+          description: "Received packets"
+          family: 'Network/Interface/Packet/Total/In'
+          unit: "{packet}/s"
+      - name: netscaler.sdx.interfaceTxPackets
+        OID: 1.3.6.1.4.1.5951.6.2.1000.5.1.6
+        chart_meta:
+          description: "Transmitted packets"
+          family: 'Network/Interface/Packet/Total/Out'
+          unit: "{packet}/s"
+      - name: netscaler.sdx.interfaceRxBytes
+        OID: 1.3.6.1.4.1.5951.6.2.1000.5.1.7
+        scale_factor: 8
+        chart_meta:
+          description: "Received bytes"
+          family: 'Network/Interface/Traffic/Total/In'
+          unit: "bit/s"
+      - name: netscaler.sdx.interfaceTxBytes
+        OID: 1.3.6.1.4.1.5951.6.2.1000.5.1.8
+        scale_factor: 8
+        chart_meta:
+          description: "Transmitted bytes"
+          family: 'Network/Interface/Traffic/Total/Out'
+          unit: "bit/s"
+      - name: netscaler.sdx.interfaceRxErrors
+        OID: 1.3.6.1.4.1.5951.6.2.1000.5.1.9
+        chart_meta:
+          description: "Receiving errors"
+          family: 'Network/Interface/Error/Total/In'
+          unit: "{error}/s"
+      - name: netscaler.sdx.interfaceTxErrors
+        OID: 1.3.6.1.4.1.5951.6.2.1000.5.1.10
+        chart_meta:
+          description: "Transmission errors"
+          family: 'Network/Interface/Error/Total/Out'
+          unit: "{error}/s"
+      - OID: 1.3.6.1.4.1.5951.6.2.1000.5.1.4
+        name: netscaler.sdx.interfaceState
+        chart_meta:
+          description: State of the Interface
+          family: 'Network/Interface/Status/Operational'
+          unit: "{status}"
+        mapping:
+          UP: 1
+          DOWN: 2
+    metric_tags:
+      - tag: netscaler_sdx_interface_port
+        symbol:
+          name: netscaler.sdx.interfacePort
+          OID: 1.3.6.1.4.1.5951.6.2.1000.5.1.1
+      - tag: netscaler_sdx_interface_mapped_port
+        symbol:
+          name: netscaler.sdx.interfaceMappedPort
+          OID: 1.3.6.1.4.1.5951.6.2.1000.5.1.13
+
+  - MIB: SDX-ROOT-MIB
+    table:
+      name: xenTable
+      OID: 1.3.6.1.4.1.5951.6.3.1
+    symbols:
+      - name: cpu.usage
+        OID: 1.3.6.1.4.1.5951.6.3.1.1.8
+        chart_meta:
+          description: "Cpu usage percentage of host"
+          family: 'System/CPU/Usage'
+          unit: "%"
+      - name: memory.usage
+        OID: 1.3.6.1.4.1.5951.6.3.1.1.11
+        chart_meta:
+          description: "Memory usage percentage of host"
+          family: 'System/Memory/Usage'
+          unit: "%"
+    metric_tags:
+      - tag: netscaler_sdx_xen_ip_address_type
+        symbol:
+          OID: 1.3.6.1.4.1.5951.6.3.1.1.1
+          name: netscaler.sdx.xenIpAddressType
+        mapping:
+          0: unknown
+          1: ipv4
+          2: ipv6
+          3: ipv4z
+          4: ipv6z
+          16: dns
+          25: l2vpn
+      - tag: netscaler_sdx_xen_ip_address
+        symbol:
+          OID: 1.3.6.1.4.1.5951.6.3.1.1.2
+          name: netscaler.sdx.xenIpAddress
+          format: ip_address
+      - tag: netscaler_sdx_xen_uuid
+        symbol:
+          OID: 1.3.6.1.4.1.5951.6.3.1.1.6
+          name: netscaler.sdx.xenUuid
+
+  - MIB: SDX-ROOT-MIB
+    table:
+      name: netscalerTable
+      OID: 1.3.6.1.4.1.5951.6.3.2
+    symbols:
+      - name: netscaler.sdx.nsNsCPUUsage
+        OID: 1.3.6.1.4.1.5951.6.3.2.1.33
+        chart_meta:
+          description: "Cpu usage percentage of netscaler instance"
+          family: 'Virtualization/VirtualInstance/CPU/Usage'
+          unit: "%"
+      - name: netscaler.sdx.nsNsMemoryUsage
+        OID: 1.3.6.1.4.1.5951.6.3.2.1.35
+        chart_meta:
+          description: "Memory usage percentage"
+          family: 'Virtualization/VirtualInstance/Memory/Usage'
+          unit: "%"
+      - name: netscaler.sdx.nsNsTx
+        OID: 1.3.6.1.4.1.5951.6.3.2.1.36
+        scale_factor: 1000000 # MBits => Bits
+        chart_meta:
+          description: "Out throughput of netscaler instance in megabits per second"
+          family: 'Virtualization/VirtualInstance/Network/Traffic/Out'
+          unit: "bit/s"
+      - name: netscaler.sdx.nsNsRx
+        OID: 1.3.6.1.4.1.5951.6.3.2.1.37
+        scale_factor: 1000000 # MBits => Bits
+        chart_meta:
+          description: "In throughput of netscaler instance in megabits per second"
+          family: 'Virtualization/VirtualInstance/Network/Traffic/In'
+          unit: "bit/s"
+      - name: netscaler.sdx.nsHttpReq
+        OID: 1.3.6.1.4.1.5951.6.3.2.1.38
+        chart_meta:
+          description: "Http requests per second"
+          family: 'Virtualization/VirtualInstance/Network/HTTP/Request/Total'
+          unit: "{request}/s"
+    metric_tags:
+      - tag: netscaler_sdx_ns_uuid
+        symbol:
+          name: netscaler.sdx.nsUuid
+          OID: 1.3.6.1.4.1.5951.6.3.2.1.14
+      - tag: netscaler_sdx_ns_name
+        symbol:
+          name: netscaler.sdx.nsName
+          OID: 1.3.6.1.4.1.5951.6.3.2.1.6
+      - tag: _netscaler_sdx_ns_ip_address_type
+        symbol:
+          name: netscaler.sdx.nsIpAddressType
+          OID: 1.3.6.1.4.1.5951.6.3.2.1.1
+        mapping:
+          0: unknown
+          1: ipv4
+          2: ipv6
+          3: ipv4z
+          4: ipv6z
+          16: dns
+          25: l2vpn
+      - tag: _netscaler_sdx_ns_profile_name
+        symbol:
+          name: netscaler.sdx.nsProfileName
+          OID: 1.3.6.1.4.1.5951.6.3.2.1.5
+      - tag: _netscaler_sdx_ns_netmask_type
+        symbol:
+          name: netscaler.sdx.nsNetmaskType
+          OID: 1.3.6.1.4.1.5951.6.3.2.1.7
+        mapping:
+          0: unknown
+          1: ipv4
+          2: ipv6
+          3: ipv4z
+          4: ipv6z
+          16: dns
+          25: l2vpn
+      - tag: _netscaler_sdx_ns_hostname
+        symbol:
+          name: netscaler.sdx.nsHostname
+          OID: 1.3.6.1.4.1.5951.6.3.2.1.11
+      - tag: _netscaler_sdx_ns_description
+        symbol:
+          name: netscaler.sdx.nsDescription
+          OID: 1.3.6.1.4.1.5951.6.3.2.1.12
+      - tag: _netscaler_sdx_ns_version
+        symbol:
+          name: netscaler.sdx.nsVersion
+          OID: 1.3.6.1.4.1.5951.6.3.2.1.13
+      - tag: _netscaler_sdx_ns_throughput
+        symbol:
+          name: netscaler.sdx.nsThroughput
+          OID: 1.3.6.1.4.1.5951.6.3.2.1.31
