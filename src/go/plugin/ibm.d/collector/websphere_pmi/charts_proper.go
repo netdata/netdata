@@ -257,8 +257,8 @@ var jvmChartsTmpl = module.Charts{
 			{ID: "jvm_runtime_%s_HeapSize_high_watermark", Name: "high_watermark"},
 			{ID: "jvm_runtime_%s_HeapSize_low_watermark", Name: "low_watermark"},
 			// Hidden dimensions for mean and integral
-			{ID: "jvm_runtime_%s_HeapSize_mean", Name: "mean", DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "jvm_runtime_%s_HeapSize_integral", Name: "integral", DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "jvm_runtime_%s_HeapSize_mean", Name: "mean", Div: precision, DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "jvm_runtime_%s_HeapSize_integral", Name: "integral", Div: precision, DimOpts: module.DimOpts{Hidden: true}},
 		},
 	},
 }
@@ -556,7 +556,7 @@ var extensionRegistryChartsTmpl = module.Charts{
 		Type:     module.Line,
 		Priority: prioRegistry + 10,
 		Dims: module.Dims{
-			{ID: "extension_registry_%s_hit_rate", Name: "hit_rate"},
+			{ID: "extension_registry_%s_hit_rate", Name: "hit_rate", Div: precision},
 		},
 	},
 }
