@@ -1508,15 +1508,15 @@ var webAppContainerChartsTmpl = module.Charts{
 		Priority: prioWebApps + 31,
 		Dims: module.Dims{
 			{ID: "webapp_container_%s_ConcurrentRequests_current", Name: "current"},
-			{ID: "webapp_container_%s_ConcurrentRequests_mean", Name: "mean"},
+			{ID: "webapp_container_%s_ConcurrentRequests_mean", Name: "mean", Div: precision},
 			{ID: "webapp_container_%s_URIConcurrentRequests_current", Name: "uri_current"},
-			{ID: "webapp_container_%s_URIConcurrentRequests_mean", Name: "uri_mean"},
+			{ID: "webapp_container_%s_URIConcurrentRequests_mean", Name: "uri_mean", Div: precision},
 			{ID: "webapp_container_%s_ConcurrentRequests_high_watermark", Name: "high_watermark", DimOpts: module.DimOpts{Hidden: true}},
 			{ID: "webapp_container_%s_ConcurrentRequests_low_watermark", Name: "low_watermark", DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "webapp_container_%s_ConcurrentRequests_integral", Name: "integral", DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "webapp_container_%s_ConcurrentRequests_integral", Name: "integral", Div: precision, DimOpts: module.DimOpts{Hidden: true}},
 			{ID: "webapp_container_%s_URIConcurrentRequests_high_watermark", Name: "uri_high_watermark", DimOpts: module.DimOpts{Hidden: true}},
 			{ID: "webapp_container_%s_URIConcurrentRequests_low_watermark", Name: "uri_low_watermark", DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "webapp_container_%s_URIConcurrentRequests_integral", Name: "uri_integral", DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "webapp_container_%s_URIConcurrentRequests_integral", Name: "uri_integral", Div: precision, DimOpts: module.DimOpts{Hidden: true}},
 		},
 	},
 	// Portlet-specific charts
@@ -1555,10 +1555,10 @@ var webAppContainerChartsTmpl = module.Charts{
 		Priority: prioWebApps + 35,
 		Dims: module.Dims{
 			{ID: "webapp_container_%s_Number_of_concurrent_portlet_requests_current", Name: "current"},
-			{ID: "webapp_container_%s_Number_of_concurrent_portlet_requests_mean", Name: "mean"},
+			{ID: "webapp_container_%s_Number_of_concurrent_portlet_requests_mean", Name: "mean", Div: precision},
 			{ID: "webapp_container_%s_Number_of_concurrent_portlet_requests_high_watermark", Name: "high_watermark", DimOpts: module.DimOpts{Hidden: true}},
 			{ID: "webapp_container_%s_Number_of_concurrent_portlet_requests_low_watermark", Name: "low_watermark", DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "webapp_container_%s_Number_of_concurrent_portlet_requests_integral", Name: "integral", DimOpts: module.DimOpts{Hidden: true}},
+			{ID: "webapp_container_%s_Number_of_concurrent_portlet_requests_integral", Name: "integral", Div: precision, DimOpts: module.DimOpts{Hidden: true}},
 		},
 	},
 }
