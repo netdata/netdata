@@ -356,29 +356,22 @@ static int http_proxy_connect(mqtt_wss_client client)
     if(write(client->sockfd, r_buf_ptr, strlen(r_buf_ptr)) <= 0) { ; }
 
     if (client->proxy_uname) {
-        size_t creds_plain_len = strlen(client->proxy_uname) + strlen(client->proxy_passwd) + 2;
+        size_t pass_len = client->proxy_passwd ? strlen(client->proxy_passwd) : 0;
+        size_t creds_plain_len = strlen(client->proxy_uname) + pass_len + 2;
+
         char *creds_plain = mallocz(creds_plain_len);
-        if (!creds_plain) {
-            nd_log(NDLS_DAEMON, NDLP_ERR, "OOM creds_plain");
-            rc = 6;
-            goto cleanup;
-        }
-        int creds_base64_len = (((4 * creds_plain_len / 3) + 3) & ~3);
+        size_t creds_base64_len = (((4 * creds_plain_len / 3) + 3) & ~3);
         // OpenSSL encoder puts newline every 64 output bytes
         // we remove those but during encoding we need that space in the buffer
-        creds_base64_len += (1+(creds_base64_len/64)) * strlen("\n");
+        creds_base64_len += (1 + (creds_base64_len / 64)) * strlen("\n");
+
         char *creds_base64 = mallocz(creds_base64_len + 1);
-        if (!creds_base64) {
-            freez(creds_plain);
-            nd_log(NDLS_DAEMON, NDLP_ERR, "OOM creds_base64");
-            rc = 6;
-            goto cleanup;
-        }
         char *ptr = creds_plain;
         strcpy(ptr, client->proxy_uname);
         ptr += strlen(client->proxy_uname);
         *ptr++ = ':';
-        strcpy(ptr, client->proxy_passwd);
+        if (pass_len)
+            strcpy(ptr, client->proxy_passwd);
 
         (void) netdata_base64_encode((unsigned char*)creds_base64, (unsigned char*)creds_plain, strlen(creds_plain));
         freez(creds_plain);
