@@ -59,8 +59,6 @@ struct rrdengine_datafile {
     uv_rwlock_t extent_rwlock;
     struct rrdengine_instance *ctx;
     struct rrdengine_journalfile *journalfile;
-    struct rrdengine_datafile *prev;
-    struct rrdengine_datafile *next;
 
     struct {
         SPINLOCK spinlock;
