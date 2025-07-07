@@ -4,6 +4,7 @@ package websphere_pmi
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	
@@ -440,7 +441,13 @@ func (w *WebSpherePMI) collectBoundedRangeMetric(mx map[string]int64, prefix, cl
 }
 
 // collectAverageMetric collects all average statistic dimensions into the mx map
+// This function serves as a fallback for unknown/rare AverageStatistics.
+// Known metrics should be routed to processAverageStatistic for smart processing.
 func (w *WebSpherePMI) collectAverageMetric(mx map[string]int64, prefix, cleanInst string, metric ExtractedAverageMetric) {
+	// NOTE: SessionObjectSize is handled by processAverageStatistic in parseContainerSessionMetrics
+	// Add routing for other known AverageStatistics as we discover them in production
+	
+	// Default fallback: collect all 6 dimensions for unknown metrics
 	base := fmt.Sprintf("%s_%s_%s", prefix, cleanInst, w.cleanID(metric.Name))
 	mx[base+"_count"] = metric.Count
 	mx[base+"_total"] = metric.Total
@@ -531,8 +538,9 @@ func (w *WebSpherePMI) ensureTimeStatCharts(
 	}
 	w.collectedInstances[chartKey] = true
 	
-	// Make contexts unique per metric to avoid conflicts
-	uniqueContext := fmt.Sprintf("%s_%s", context, w.cleanID(metricName))
+	// Make contexts unique per metric to avoid conflicts (use snake_case)
+	snakeCaseMetric := strings.ToLower(regexp.MustCompile(`([a-z0-9])([A-Z])`).ReplaceAllString(metricName, `${1}_${2}`))
+	uniqueContext := fmt.Sprintf("%s_%s", context, w.cleanID(snakeCaseMetric))
 	
 	// Extract component prefix from context (e.g., "websphere_pmi.servlet" -> "servlet")
 	componentPrefix := strings.TrimPrefix(context, "websphere_pmi.")
@@ -607,6 +615,7 @@ func cleanMetricName(name string) string {
 // getContextMetadata returns the appropriate family and priority for a given context
 func getContextMetadata(context string) (family string, basePriority int) {
 	switch context {
+	// Core infrastructure - keep together
 	case "transaction_manager":
 		return "transactions", prioTransactionManager
 	case "jvm_runtime":
@@ -617,42 +626,223 @@ func getContextMetadata(context string) (family string, basePriority int) {
 		return "jdbc", prioJDBCPools
 	case "jca_pool":
 		return "jca", prioJCAPools
-	case "webapp_container", "webapp":
-		return "web/apps", prioWebApps
-	case "servlet":
-		return "web/servlets", prioServlets
-	case "sessions":
-		return "web/sessions", prioSessions
+	case "orb":
+		return "orb", prioORB
+	case "system_data":
+		return "system/data", prioSystemData
+	case "connection_manager":
+		return "connections", prioConnectionManager
 	case "cache":
 		return "cache", prioCacheManager
 	case "object_cache":
-		return "object_cache", prioObjectCache
-	case "orb":
-		return "orb", prioORB
-	case "enterprise_app":
-		return "apps", prioEnterpriseApps
-	case "ejb_container":
-		return "ejb", prioEJBContainer
+		return "cache/objects", prioObjectCache
+	
+	// Web layer - split by instance type following NIDL principles
+	case "webapp_container":
+		return "web/containers", prioWebApps  
+	case "webapp_container_sessions":
+		// Split container session metrics by functional area to reduce family size
+		return "sessions_container", prioWebApps + 100  
+	case "webapp_container_portlets", "webapp_container_portlet_requests", "webapp_container_portlet_concurrent":
+		return "web/portlets_container", prioPortlets + 50
+	case "webapp_container_servlets":
+		return "web/servlets", prioServlets + 50
+	case "webapp":
+		return "web/applications", prioWebApps
+	case "servlet":
+		return "web/servlets", prioServlets
+	case "servlets_component":
+		return "web/servlet_components", prioServlets
+	case "sessions":
+		// Split application session metrics by functional area to reduce family size
+		return "sessions_app", prioSessions
+	case "urls":
+		return "web/urls", prioURLs
+	case "servlet_url":
+		return "web/servlet_urls", prioURLs + 50
+	
+	// Portlets - split by source
 	case "portlet":
-		return "web/portlets", prioPortlets
+		return "web/portlets", prioPortlets  // Individual portlet metrics with portlet labels
+	case "isc_product":
+		return "portlets/isc", prioPortlets + 100
+	case "wim":
+		return "portlets/management", prioWebServices + 100
+	
+	// Web services
+	case "pmi_webservice":
+		return "webservices_pmi", prioWebServices
 	case "web_service":
-		return "webservices", prioWebServices
-	case "sib_jms":
-		return "jms", prioJMSAdapter
-	case "security_auth", "security_authz":
-		return "security", prioSecurity
-	case "wlm":
-		return "wlm", prioWLM
-	case "system_data":
-		return "system", prioSystemData
-	case "connection_manager":
-		return "connections", prioConnectionManager
+		return "webservices_soap", prioWebServices
+	
+	// EJB - keep subdivided  
+	case "ejb_container":
+		return "ejb/container", prioEJBContainer
 	case "bean_manager":
-		return "ejb", prioEJBContainer
+		return "ejb/management", prioEJBContainer
+	case "mdb":
+		return "ejb/mdb", prioMDB
+	case "slsb":
+		return "ejb/slsb", prioSLSB
+	case "sfsb":
+		return "ejb/sfsb", prioSFSB
+	case "entity_bean":
+		return "ejb/entity", prioEntityBean
+	case "generic_ejb":
+		return "ejb/generic", prioEJBContainer + 200
+	
+	// Security - split by type (max 2 levels)
+	case "security_auth":
+		return "security/authentication", prioSecurity
+	case "security_authz":
+		return "security/authorization", prioSecurity + 100
+	case "interceptor":
+		return "security/interceptors", prioInterceptors
+	
+	// Workload management
+	case "wlm":
+		return "workload_management", prioWLM
+	case "wlm_tagged":
+		return "workload_tagged", prioWLM
+	
+	// Enterprise/clustering
+	case "enterprise_app":
+		return "enterprise/apps", prioEnterpriseApps
+	case "ha_manager":
+		return "enterprise/clustering", prioHAManager
+	case "tcp_dcs":
+		return "enterprise/tcp", prioTCPChannels
+	
+	// Messaging
+	case "sib_jms":
+		return "messaging/jms", prioJMSAdapter
+	
 	default:
-		// For any unknown context, use a generic family and priority
+		// For any unknown context, route to appropriate fallback
 		return "other", 9000
 	}
+}
+
+// getSessionMetricFamily determines the appropriate family for session and container metrics based on metric type
+func getSessionMetricFamily(contextName, metricName string) string {
+	// For webapp_container context, route by metric type to reduce family sizes
+	if contextName == "webapp_container" {
+		metricLower := strings.ToLower(metricName)
+		if strings.Contains(metricLower, "portlet") {
+			return "web/portlets_container"  // Container-level portlet metrics (aggregated, no portlet label)
+		} else if strings.Contains(metricLower, "service") || strings.Contains(metricLower, "response") {
+			return "web/containers_performance"  // Performance metrics (ServiceTime, ResponseTime)
+		} else {
+			return "web/containers"  // Other webapp container metrics
+		}
+	} else if contextName == "sessions" {
+		metricLower := strings.ToLower(metricName)
+		if strings.Contains(metricLower, "external") {
+			return "sessions_io"  // I/O related metrics (ExternalReadTime, ExternalWriteTime, ExternalReadSize, ExternalWriteSize)
+		} else if strings.Contains(metricLower, "life") || strings.Contains(metricLower, "activated") {
+			return "sessions_lifecycle"  // Lifecycle related metrics (LifeTime, TimeSinceLastActivated)
+		} else if strings.Contains(metricLower, "size") || strings.Contains(metricLower, "object") {
+			return "sessions_size"  // Size related metrics (SessionObjectSize)
+		} else {
+			return "sessions_app"  // Other application session metrics
+		}
+	} else if contextName == "webapp_container_sessions" {
+		metricLower := strings.ToLower(metricName)
+		if strings.Contains(metricLower, "external") {
+			return "sessions_container_io"  // Container I/O metrics (ExternalReadTime, ExternalWriteTime, ExternalReadSize, ExternalWriteSize)
+		} else if strings.Contains(metricLower, "life") || strings.Contains(metricLower, "activated") {
+			return "sessions_container_lifecycle"  // Container lifecycle metrics (LifeTime, TimeSinceLastActivated)
+		} else if strings.Contains(metricLower, "size") || strings.Contains(metricLower, "object") {
+			return "sessions_container_size"  // Container size metrics (SessionObjectSize)
+		} else if metricName == "errors" || metricName == "stats" || metricName == "lifecycle" {
+			return "sessions_container_stats"  // Basic stats and errors (errors, stats, lifecycle)
+		} else {
+			return "sessions_container"  // Other container session metrics (any remaining)
+		}
+	}
+	
+	// For non-session contexts, use standard family routing
+	family, _ := getContextMetadata(contextName)
+	return family
+}
+
+// getSecurityMetricFamily determines the appropriate family for security metrics
+func getSecurityMetricFamily(contextName, metricName string) string {
+	metricLower := strings.ToLower(metricName)
+	
+	// Security authentication metrics - consolidate into fewer families
+	if contextName == "security_auth" {
+		if strings.Contains(metricLower, "jaas") {
+			return "security_auth_jaas"  // All JAAS authentication methods
+		} else if strings.Contains(metricLower, "web") || strings.Contains(metricLower, "basic") || strings.Contains(metricLower, "token") {
+			return "security_auth_web"  // Web-related authentication (web, basic, token)
+		} else if strings.Contains(metricLower, "identity") || strings.Contains(metricLower, "credential") || strings.Contains(metricLower, "tai") {
+			return "security_auth_identity"  // Identity and credential management
+		} else if strings.Contains(metricLower, "rmi") {
+			return "security_auth_rmi"  // RMI authentication
+		} else {
+			return "security_auth_other"  // Any other authentication metrics
+		}
+	} else if contextName == "security_authz" {
+		// Security authorization metrics - keep simple
+		if strings.Contains(metricLower, "web") || strings.Contains(metricLower, "admin") {
+			return "security_authz_web"  // Web and admin authorization
+		} else if strings.Contains(metricLower, "ejb") || strings.Contains(metricLower, "jacc") {
+			return "security_authz_ejb"  // EJB and JACC authorization
+		} else {
+			return "security_authz_other"  // Any other authorization metrics
+		}
+	}
+	
+	// Fallback to standard routing
+	family, _ := getContextMetadata(contextName)
+	return family
+}
+
+// getWebServiceMetricFamily determines the appropriate family for webservice metrics
+func getWebServiceMetricFamily(contextName, metricName string) string {
+	metricLower := strings.ToLower(metricName)
+	
+	// Split webservice metrics by operation type
+	if contextName == "pmi_webservice" {
+		if strings.Contains(metricLower, "request") && !strings.Contains(metricLower, "tairequest") {
+			return "webservices_pmi_request"  // Request-related metrics
+		} else if strings.Contains(metricLower, "reply") {
+			return "webservices_pmi_reply"  // Reply-related metrics
+		} else if strings.Contains(metricLower, "dispatch") {
+			return "webservices_pmi_dispatch"  // Dispatch-related metrics
+		} else if strings.Contains(metricLower, "size") || strings.Contains(metricLower, "total") || strings.Contains(metricLower, "response") {
+			return "webservices_pmi_performance"  // Size and performance metrics
+		} else {
+			return "webservices_pmi_other"  // Any other webservice metrics
+		}
+	}
+	
+	// Fallback to standard routing
+	family, _ := getContextMetadata(contextName)
+	return family
+}
+
+// getTransactionMetricFamily determines the appropriate family for transaction metrics
+func getTransactionMetricFamily(contextName, metricName string) string {
+	metricLower := strings.ToLower(metricName)
+	
+	// Split transaction metrics by scope and operation
+	if contextName == "transaction_manager" {
+		if strings.Contains(metricLower, "global") {
+			return "transactions_global"  // Global transaction metrics
+		} else if strings.Contains(metricLower, "local") {
+			return "transactions_local"  // Local transaction metrics
+		} else if strings.Contains(metricLower, "active") || strings.Contains(metricLower, "rollback") {
+			return "transactions_status"  // Transaction status metrics
+		} else {
+			return "transactions_other"  // Any other transaction metrics
+		}
+	}
+	
+	// Fallback to standard routing
+	family, _ := getContextMetadata(contextName)
+	return family
 }
 
 // processTimeStatisticWithContext is a convenience wrapper that handles context-based metadata
@@ -664,7 +854,24 @@ func (w *WebSpherePMI) processTimeStatisticWithContext(
 	mx map[string]int64,
 	priorityOffset int,
 ) {
-	family, basePriority := getContextMetadata(contextName)
+	// Use smart family routing for session, security, webservice, and transaction metrics
+	var family string
+	if strings.HasPrefix(contextName, "security_") {
+		family = getSecurityMetricFamily(contextName, metric.Name)
+	} else if contextName == "pmi_webservice" {
+		family = getWebServiceMetricFamily(contextName, metric.Name)
+	} else if contextName == "transaction_manager" {
+		family = getTransactionMetricFamily(contextName, metric.Name)
+	} else if contextName == "portlet" {
+		// For regular portlet contexts, use the standard family mapping
+		family, _ = getContextMetadata(contextName)
+	} else if contextName == "isc_product" || contextName == "wim" {
+		// For ISC and WIM, always use their specific families
+		family, _ = getContextMetadata(contextName)
+	} else {
+		family = getSessionMetricFamily(contextName, metric.Name)
+	}
+	_, basePriority := getContextMetadata(contextName)  // Still get priority from context
 	context := fmt.Sprintf("websphere_pmi.%s", contextName)
 	
 	w.processTimeStatistic(
@@ -804,8 +1011,9 @@ func (w *WebSpherePMI) ensureAvgStatCharts(
 	}
 	w.collectedInstances[chartKey] = true
 	
-	// Make contexts unique per metric to avoid conflicts
-	uniqueContext := fmt.Sprintf("%s_%s", context, w.cleanID(metricName))
+	// Make contexts unique per metric to avoid conflicts (use snake_case)
+	snakeCaseMetric := strings.ToLower(regexp.MustCompile(`([a-z0-9])([A-Z])`).ReplaceAllString(metricName, `${1}_${2}`))
+	uniqueContext := fmt.Sprintf("%s_%s", context, w.cleanID(snakeCaseMetric))
 	
 	// Extract component prefix from context (e.g., "websphere_pmi.session" -> "session")
 	componentPrefix := strings.TrimPrefix(context, "websphere_pmi.")
@@ -897,7 +1105,24 @@ func (w *WebSpherePMI) processAverageStatisticWithContext(
 	priorityOffset int,
 	units string,
 ) {
-	family, basePriority := getContextMetadata(contextName)
+	// Use smart family routing for session, security, webservice, and transaction metrics
+	var family string
+	if strings.HasPrefix(contextName, "security_") {
+		family = getSecurityMetricFamily(contextName, metric.Name)
+	} else if contextName == "pmi_webservice" {
+		family = getWebServiceMetricFamily(contextName, metric.Name)
+	} else if contextName == "transaction_manager" {
+		family = getTransactionMetricFamily(contextName, metric.Name)
+	} else if contextName == "portlet" {
+		// For regular portlet contexts, use the standard family mapping
+		family, _ = getContextMetadata(contextName)
+	} else if contextName == "isc_product" || contextName == "wim" {
+		// For ISC and WIM, always use their specific families
+		family, _ = getContextMetadata(contextName)
+	} else {
+		family = getSessionMetricFamily(contextName, metric.Name)
+	}
+	_, basePriority := getContextMetadata(contextName)  // Still get priority from context
 	context := fmt.Sprintf("websphere_pmi.%s", contextName)
 	
 	w.processAverageStatistic(

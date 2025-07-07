@@ -36,6 +36,10 @@ const (
 	prioURLs             = 3600
 	prioEnterpriseApps   = 3700
 	prioEJBContainer     = 3800
+	prioMDB              = 3810
+	prioSLSB             = 3820
+	prioSFSB             = 3830
+	prioEntityBean       = 3840
 	prioConnectionMgr    = 3900
 	
 	// Transactions (4000-4999) - Business operations
@@ -741,7 +745,7 @@ var servletsComponentChartsTmpl = module.Charts{
 		ID:       "servlets_component_%s_requests",
 		Title:    "Servlets Component Requests",
 		Units:    "requests/s",
-		Fam:      "web/servlets",
+		Fam:      "web/servlet_components",
 		Ctx:      "websphere_pmi.servlets_component_requests",
 		Type:     module.Line,
 		Priority: prioWebServlets,
@@ -755,7 +759,7 @@ var servletsComponentChartsTmpl = module.Charts{
 		ID:       "servlets_component_%s_concurrent",
 		Title:    "Servlets Component Concurrent Requests",
 		Units:    "requests",
-		Fam:      "web/servlets",
+		Fam:      "web/servlet_components",
 		Ctx:      "websphere_pmi.servlets_component_concurrent",
 		Type:     module.Line,
 		Priority: prioWebServlets + 20,
@@ -820,57 +824,8 @@ var pmiWebServiceServiceChartsTmpl = module.Charts{
 			{ID: "pmi_webservice_%s_requests_successful", Name: "successful", Algo: module.Incremental},
 		},
 	},
-	{
-		ID:       "pmi_webservice_%s_request_size",
-		Title:    "PMI Web Service Request Size",
-		Units:    "bytes",
-		Fam:      "web_services",
-		Ctx:      "websphere_pmi.pmi_webservice_request_size",
-		Type:     module.Line,
-		Priority: prioWebServices + 40,
-		Dims: module.Dims{
-			{ID: "pmi_webservice_%s_RequestSizeService_count", Name: "request_count"},
-			{ID: "pmi_webservice_%s_RequestSizeService_total", Name: "request_total"},
-			{ID: "pmi_webservice_%s_RequestSizeService_min", Name: "request_min"},
-			{ID: "pmi_webservice_%s_RequestSizeService_max", Name: "request_max"},
-			{ID: "pmi_webservice_%s_RequestSizeService_mean", Name: "request_mean", Div: precision},
-			{ID: "pmi_webservice_%s_RequestSizeService_sum_of_squares", Name: "request_sum_squares", Div: precision},
-		},
-	},
-	{
-		ID:       "pmi_webservice_%s_reply_size",
-		Title:    "PMI Web Service Reply Size",
-		Units:    "bytes",
-		Fam:      "web_services",
-		Ctx:      "websphere_pmi.pmi_webservice_reply_size",
-		Type:     module.Line,
-		Priority: prioWebServices + 50,
-		Dims: module.Dims{
-			{ID: "pmi_webservice_%s_ReplySizeService_count", Name: "reply_count"},
-			{ID: "pmi_webservice_%s_ReplySizeService_total", Name: "reply_total"},
-			{ID: "pmi_webservice_%s_ReplySizeService_min", Name: "reply_min"},
-			{ID: "pmi_webservice_%s_ReplySizeService_max", Name: "reply_max"},
-			{ID: "pmi_webservice_%s_ReplySizeService_mean", Name: "reply_mean", Div: precision},
-			{ID: "pmi_webservice_%s_ReplySizeService_sum_of_squares", Name: "reply_sum_squares", Div: precision},
-		},
-	},
-	{
-		ID:       "pmi_webservice_%s_total_size",
-		Title:    "PMI Web Service Total Size",
-		Units:    "bytes",
-		Fam:      "web_services",
-		Ctx:      "websphere_pmi.pmi_webservice_total_size",
-		Type:     module.Line,
-		Priority: prioWebServices + 60,
-		Dims: module.Dims{
-			{ID: "pmi_webservice_%s_SizeService_count", Name: "size_count"},
-			{ID: "pmi_webservice_%s_SizeService_total", Name: "size_total"},
-			{ID: "pmi_webservice_%s_SizeService_min", Name: "size_min"},
-			{ID: "pmi_webservice_%s_SizeService_max", Name: "size_max"},
-			{ID: "pmi_webservice_%s_SizeService_mean", Name: "size_mean", Div: precision},
-			{ID: "pmi_webservice_%s_SizeService_sum_of_squares", Name: "size_sum_squares", Div: precision},
-		},
-	},
+	// NOTE: RequestSizeService, ReplySizeService, and SizeService are handled by smart processors
+	// The static chart definitions have been removed to avoid dimension collection conflicts
 }
 
 var tcpChannelDCSChartsTmpl = module.Charts{
