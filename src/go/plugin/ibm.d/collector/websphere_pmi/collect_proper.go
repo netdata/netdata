@@ -219,7 +219,7 @@ func (w *WebSpherePMI) parseServerStats(nodeName, serverName string, stats []pmi
 		default:
 			// Handle JDBC datasources (start with "jdbc/")
 			if strings.HasPrefix(stat.Name, "jdbc/") {
-				w.parseJDBCDataSource(&stat, fmt.Sprintf("%s.%s.%s", nodeName, serverName, stat.Name), nodeName, serverName, "JDBC", stat.Name, mx)
+				w.parseJDBCDataSource(&stat, fmt.Sprintf("%s.%s.JDBC.%s", nodeName, serverName, stat.Name), nodeName, serverName, "JDBC", stat.Name, mx)
 			} else if strings.HasPrefix(stat.Name, "jms/") {
 				// Handle JMS connection factories
 				w.parseJCAConnectionPool(&stat, nodeName, serverName, mx)
@@ -289,7 +289,8 @@ func (w *WebSpherePMI) parseServerStats(nodeName, serverName string, stats []pmi
 				w.parseServletsComponent(&stat, nodeName, serverName, mx)
 			} else if strings.Contains(stat.Name, "WIM") && (strings.Contains(stat.Name, "User") || strings.Contains(stat.Name, "Group")) {
 				// WebSphere Identity Manager (WIM) user/group management metrics
-				w.parseWIMComponent(&stat, nodeName, serverName, mx)
+				// Route through generic parser for now as parseWIMComponent doesn't exist
+				w.parseGenericStat(&stat, nodeName, serverName, mx, currentPath)
 			} else if strings.Contains(stat.Name, "WLMTaggedComponentManager") {
 				// Workload Management Tagged Component Manager metrics
 				w.parseWLMTaggedComponentManager(&stat, nodeName, serverName, mx)
@@ -304,7 +305,8 @@ func (w *WebSpherePMI) parseServerStats(nodeName, serverName string, stats []pmi
 				w.parseDetailsComponent(&stat, nodeName, serverName, mx, currentPath)
 			} else if strings.Contains(stat.Name, "ISCProductDetails") {
 				// IBM Support Center Product Details metrics
-				w.parseISCProductDetails(&stat, nodeName, serverName, mx)
+				// Route through generic parser for now as parseISCProductDetails doesn't exist
+				w.parseGenericStat(&stat, nodeName, serverName, mx, currentPath)
 			} else {
 				// Generic stat parser for truly unhandled stat types
 				w.parseGenericStat(&stat, nodeName, serverName, mx, currentPath)
@@ -619,6 +621,7 @@ func (w *WebSpherePMI) parseJDBCDataSource(stat *pmiStat, instance, nodeName, se
 		{Key: "instance", Value: instance},
 		{Key: "node", Value: nodeName},
 		{Key: "server", Value: serverName},
+		{Key: "provider", Value: providerName},
 		{Key: "datasource", Value: dsName},
 	}, w.getVersionLabels()...)
 	
@@ -693,10 +696,11 @@ func (w *WebSpherePMI) ensureTransactionCharts(instance, nodeName, serverName st
 		charts := transactionChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
+			chart.Labels = append([]module.Label{
+				{Key: "instance", Value: instance},
 				{Key: "node", Value: nodeName},
 				{Key: "server", Value: serverName},
-			}
+			}, w.getVersionLabels()...)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -717,10 +721,11 @@ func (w *WebSpherePMI) ensureJVMCharts(instance, nodeName, serverName string) {
 		charts := jvmChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
+			chart.Labels = append([]module.Label{
+				{Key: "instance", Value: instance},
 				{Key: "node", Value: nodeName},
 				{Key: "server", Value: serverName},
-			}
+			}, w.getVersionLabels()...)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -741,11 +746,12 @@ func (w *WebSpherePMI) ensureThreadPoolCharts(instance, nodeName, serverName, po
 		charts := threadPoolChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
+			chart.Labels = append([]module.Label{
+				{Key: "instance", Value: instance},
 				{Key: "node", Value: nodeName},
 				{Key: "server", Value: serverName},
 				{Key: "pool", Value: poolName},
-			}
+			}, w.getVersionLabels()...)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
@@ -765,11 +771,12 @@ func (w *WebSpherePMI) ensureThreadPoolMaxPoolSizeChart(instance, nodeName, serv
 		// Create MaxPoolSize chart (v9.0.5+ only)
 		chart := threadPoolMaxPoolSizeChartTmpl.Copy()
 		chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-		chart.Labels = []module.Label{
+		chart.Labels = append([]module.Label{
+			{Key: "instance", Value: instance},
 			{Key: "node", Value: nodeName},
 			{Key: "server", Value: serverName},
 			{Key: "pool", Value: poolName},
-		}
+		}, w.getVersionLabels()...)
 		for _, dim := range chart.Dims {
 			dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 		}
@@ -789,12 +796,13 @@ func (w *WebSpherePMI) ensureJDBCCharts(instance, nodeName, serverName, provider
 		charts := jdbcChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Labels = []module.Label{
+			chart.Labels = append([]module.Label{
+				{Key: "instance", Value: instance},
 				{Key: "node", Value: nodeName},
 				{Key: "server", Value: serverName},
 				{Key: "provider", Value: providerName},
 				{Key: "datasource", Value: dsName},
-			}
+			}, w.getVersionLabels()...)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}

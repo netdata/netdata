@@ -313,7 +313,7 @@ func (da *DumpAnalyzer) PrintSummary() {
 	}
 	sort.Strings(families)
 
-	// Print summary with ASCII art
+	// Print summary with tree structure using colons
 	for i, family := range families {
 		if i == 0 {
 			fmt.Printf("\n┌─ family: %s\n", family)
@@ -489,6 +489,9 @@ func (da *DumpAnalyzer) printJobAnalysis(job *JobAnalysis) {
 	// Proper excess metrics analysis
 	da.analyzeMetricDimensionMatching(job, allDimIDs, contextIssues)
 
+	// Family structure analysis
+	da.analyzeFamilyStructureForJob(job, contextIssues)
+
 	// Sort families by minimum priority
 	var sortedFamilies []string
 	for fam := range families {
@@ -500,7 +503,7 @@ func (da *DumpAnalyzer) printJobAnalysis(job *JobAnalysis) {
 
 	// Print analysis for each family
 	for _, family := range sortedFamilies {
-		fmt.Printf("\n├─ family: %s\n", family)
+		fmt.Printf("\n├─ family= %s\n", family)
 
 		// Sort contexts by minimum priority
 		var sortedContexts []string
@@ -669,15 +672,15 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 	}
 
 	// Print context header
-	fmt.Printf("%s ⚡ context: %s\n", ctxPrefix, ctxInfo.context)
+	fmt.Printf("%s ⚡ context= %s\n", ctxPrefix, ctxInfo.context)
 
 	// Print titles
 	if len(titles) == 1 {
 		for title := range titles {
-			fmt.Printf("%s   ├─ title: %s ✅\n", treePrefix, title)
+			fmt.Printf("%s   ├─ title= %s ✅\n", treePrefix, title)
 		}
 	} else {
-		fmt.Printf("%s   ├─ title: ❌ INCONSISTENT (%d different titles)\n", treePrefix, len(titles))
+		fmt.Printf("%s   ├─ title= ❌ INCONSISTENT (%d different titles)\n", treePrefix, len(titles))
 		for title, count := range titles {
 			fmt.Printf("%s   │     ├─ %s (in %d charts)\n", treePrefix, title, count)
 		}
@@ -727,11 +730,11 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 		issues = append(issues, fmt.Sprintf("inconsistent chart types (%d different)", len(chartTypes)))
 	}
 
-	fmt.Printf("%s   ├─ units: %s%s, priority: %s%s, type: %s%s\n",
+	fmt.Printf("%s   ├─ units= %s%s, priority= %s%s, type= %s%s\n",
 		treePrefix, unitsStr, unitsEmoji, priorityStr, priorityEmoji, typeStr, typeEmoji)
 
 	// Print label keys
-	fmt.Printf("%s   ├─ label keys: ", treePrefix)
+	fmt.Printf("%s   ├─ label keys= ", treePrefix)
 	if len(allLabelKeys) == 0 {
 		fmt.Printf("(none) ✅\n")
 	} else {
@@ -783,7 +786,7 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 	}
 
 	// Print dimensions (names only at context level)
-	fmt.Printf("%s   ├─ dimensions:\n", treePrefix)
+	fmt.Printf("%s   ├─ dimensions=\n", treePrefix)
 	var dimNameList []string
 	for dimName := range allDimNames {
 		dimNameList = append(dimNameList, dimName)
@@ -1049,7 +1052,7 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 	issues = append(issues, missingDataDetails...)
 
 	// Print instances
-	fmt.Printf("%s   └─ instances:\n", treePrefix)
+	fmt.Printf("%s   └─ instances=\n", treePrefix)
 	for i, ca := range charts {
 		labelPairs := []string{}
 		for _, label := range ca.Chart.Labels {
@@ -1245,6 +1248,309 @@ func (da *DumpAnalyzer) analyzeMetricDimensionMatching(job *JobAnalysis, allDimI
 			fmt.Printf("❌ EXCESS VALUES: %d collected values have no corresponding chart dimensions\n", len(excessMetrics))
 		}
 	}
+}
+
+// gcd calculates the greatest common divisor
+func gcd(a, b int) int {
+	for b != 0 {
+		a, b = b, a%b
+	}
+	return a
+}
+
+// analyzeFamilyStructureForJob performs family-level structural analysis for a single job
+func (da *DumpAnalyzer) analyzeFamilyStructureForJob(job *JobAnalysis, contextIssues map[string][]string) {
+	// Get all charts from this job
+	allCharts := []*ChartAnalysis{}
+	for i := range job.Charts {
+		allCharts = append(allCharts, &job.Charts[i])
+	}
+
+	// Group charts by family
+	type familyInfo struct {
+		contexts      map[string][]*ChartAnalysis // context -> charts
+		labelPairs    map[string]int              // "key=value" -> count
+		hasSubfamilies bool
+		subfamilies   map[string]bool
+	}
+	
+	families := make(map[string]*familyInfo) // family -> info
+	topLevelFamilies := make(map[string]bool)
+
+	for _, ca := range allCharts {
+		family := ca.Chart.Fam
+		if family == "" {
+			family = "(no family)"
+		}
+
+		// We'll check family depth later after all families are processed
+
+		// Extract top-level family
+		topLevel := family
+		if idx := strings.Index(family, "/"); idx != -1 {
+			topLevel = family[:idx]
+		}
+		topLevelFamilies[topLevel] = true
+
+		// Initialize family info
+		if _, exists := families[family]; !exists {
+			families[family] = &familyInfo{
+				contexts:    make(map[string][]*ChartAnalysis),
+				labelPairs:  make(map[string]int),
+				subfamilies: make(map[string]bool),
+			}
+		}
+
+		// Track contexts
+		ctx := ca.Chart.Ctx
+		families[family].contexts[ctx] = append(families[family].contexts[ctx], ca)
+
+		// Track label pairs
+		for _, label := range ca.Chart.Labels {
+			pair := fmt.Sprintf("%s=%s", label.Key, label.Value)
+			families[family].labelPairs[pair]++
+		}
+
+		// Check for subfamilies
+		if strings.Contains(family, "/") {
+			parentFamily := family[:strings.Index(family, "/")]
+			if _, exists := families[parentFamily]; !exists {
+				families[parentFamily] = &familyInfo{
+					contexts:    make(map[string][]*ChartAnalysis),
+					labelPairs:  make(map[string]int),
+					subfamilies: make(map[string]bool),
+				}
+			}
+			families[parentFamily].hasSubfamilies = true
+			families[parentFamily].subfamilies[family] = true
+		}
+	}
+
+	// Rule 0: Check family depth (deferred until all families are processed)
+	for family, info := range families {
+		slashCount := strings.Count(family, "/")
+		if slashCount > 2 {
+			// Add to the first context in this family
+			for ctx := range info.contexts {
+				contextIssues[ctx] = append(contextIssues[ctx], 
+					fmt.Sprintf("family '%s' exceeds maximum depth of 3 (has %d slashes); possible cause: over-nested hierarchy; possible fix: flatten to maximum 3 levels", family, slashCount))
+				break
+			}
+		}
+	}
+
+	// Rule 1: Check label consistency within families
+	for family, info := range families {
+		if len(info.contexts) < 2 {
+			continue // Skip single-context families
+		}
+		
+		// Calculate total charts in this family
+		totalCharts := 0
+		for _, charts := range info.contexts {
+			totalCharts += len(charts)
+		}
+		
+		// Find inconsistent label pairs
+		inconsistentPairs := []string{}
+		
+		// The base unit is the number of contexts in the family
+		// Each label key-value pair should appear in multiples of this
+		baseUnit := len(info.contexts)
+		
+		// Check that each label pair count is a multiple of the base unit
+		for pair, actualCount := range info.labelPairs {
+			if baseUnit > 0 && actualCount % baseUnit != 0 {
+				inconsistentPairs = append(inconsistentPairs, fmt.Sprintf("'%s': %d", pair, actualCount))
+			}
+		}
+		
+		if len(inconsistentPairs) > 0 {
+			// Limit to first 10 pairs for readability
+			displayPairs := inconsistentPairs
+			if len(inconsistentPairs) > 10 {
+				displayPairs = inconsistentPairs[:10]
+				displayPairs = append(displayPairs, fmt.Sprintf("... and %d more", len(inconsistentPairs)-10))
+			}
+			
+			// Add to all contexts in this family
+			for ctx := range info.contexts {
+				contextIssues[ctx] = append(contextIssues[ctx], 
+					fmt.Sprintf("family '%s' has inconsistent label pairs. Each key-value pair should appear in multiples of %d (the number of contexts), but got: %s; possible cause: not all instances have the same labels; possible fix: ensure all charts in the family have consistent labels or split into separate families", 
+						family, baseUnit, strings.Join(displayPairs, ", ")))
+			}
+		}
+	}
+
+	// Rule 2: Check same number of instances per context in a family
+	for family, info := range families {
+		if len(info.contexts) > 1 {
+			instanceCounts := make(map[int][]string)
+			for ctx, charts := range info.contexts {
+				count := len(charts)
+				instanceCounts[count] = append(instanceCounts[count], ctx)
+			}
+			
+			if len(instanceCounts) > 1 {
+				details := []string{}
+				for count, contexts := range instanceCounts {
+					details = append(details, fmt.Sprintf("%d instances: %s", count, strings.Join(contexts, ", ")))
+				}
+				// Add to all contexts in this family
+				for ctx := range info.contexts {
+					contextIssues[ctx] = append(contextIssues[ctx], 
+						fmt.Sprintf("family '%s' has different number of instances per context (%s); possible cause: monitoring different types of objects or missing data collection; possible fix: split into separate families or fix data collection", 
+							family, strings.Join(details, "; ")))
+				}
+			}
+		}
+	}
+
+	// Rule 3: Check snake_case contexts
+	for _, ca := range allCharts {
+		ctx := ca.Chart.Ctx
+		if !isSnakeCase(ctx) {
+			contextIssues[ctx] = append(contextIssues[ctx], 
+				fmt.Sprintf("context '%s' is not in snake_case format; possible cause: incorrect naming convention; possible fix: use lowercase with underscores (e.g., 'my_metric_name')", ctx))
+		}
+	}
+
+	// Rule 4: Check families with >10 contexts
+	for family, info := range families {
+		if len(info.contexts) > 10 {
+			// Add to all contexts in this family
+			for ctx := range info.contexts {
+				contextIssues[ctx] = append(contextIssues[ctx], 
+					fmt.Sprintf("family '%s' has %d contexts (exceeds recommended 10); possible cause: too many metric types in one family; possible fix: split into subfamilies or make some contexts into instances with labels", 
+						family, len(info.contexts)))
+			}
+		}
+	}
+
+	// Rule 5: Check generic family names
+	genericFamilies := map[string]bool{
+		"other":          true,
+		"infrastructure": true,
+		"runtime":        true,
+	}
+	
+	for family := range families {
+		// Check only the base family name (before /)
+		baseName := family
+		if idx := strings.Index(family, "/"); idx != -1 {
+			baseName = family[:idx]
+		}
+		
+		if genericFamilies[strings.ToLower(baseName)] {
+			// Add to all contexts in this family
+			for ctx := range families[family].contexts {
+				contextIssues[ctx] = append(contextIssues[ctx], 
+					fmt.Sprintf("family '%s' uses generic name '%s'; possible cause: unclear categorization; possible fix: use specific names like 'database', 'webserver', 'messaging', etc.", 
+						family, baseName))
+			}
+		}
+	}
+
+	// Rule 6: Check families with both direct contexts and subfamilies
+	for family, info := range families {
+		if len(info.contexts) > 0 && info.hasSubfamilies {
+			// This is a parent family with both direct contexts and subfamilies
+			if !strings.Contains(family, "/") {
+				// Add to all contexts in this family
+				for ctx := range info.contexts {
+					contextIssues[ctx] = append(contextIssues[ctx], 
+						fmt.Sprintf("family '%s' has both direct contexts and subfamilies; possible cause: mixed hierarchy; possible fix: move direct contexts to '%s/overview' or similar", 
+							family, family))
+				}
+			}
+		}
+	}
+
+	// Rule 7: Check top-level family count
+	if len(topLevelFamilies) > 15 {
+		familyList := []string{}
+		for f := range topLevelFamilies {
+			familyList = append(familyList, f)
+		}
+		sort.Strings(familyList)
+		
+		// Add to general issues (first context found)
+		for _, ca := range allCharts {
+			contextIssues[ca.Chart.Ctx] = append(contextIssues[ca.Chart.Ctx], 
+				fmt.Sprintf("found %d top-level families (exceeds recommended 15): %s; possible cause: too many categories; possible fix: consolidate related families or use subfamilies", 
+					len(topLevelFamilies), strings.Join(familyList, ", ")))
+			break // Only add once
+		}
+	}
+
+	// Rule 8: Check subfamily counts
+	for family, info := range families {
+		if !strings.Contains(family, "/") && info.hasSubfamilies {
+			// This is a parent family, check its subfamilies
+			subfamilyCount := len(info.subfamilies)
+			
+			// Check for singleton subfamily without siblings
+			if subfamilyCount == 1 {
+				// Get the single subfamily name
+				var singleSubfamily string
+				for sf := range info.subfamilies {
+					singleSubfamily = sf
+				}
+				// Add to contexts in the parent family (if any) or the subfamily
+				if len(info.contexts) > 0 {
+					for ctx := range info.contexts {
+						contextIssues[ctx] = append(contextIssues[ctx], 
+							fmt.Sprintf("family '%s' has only one subfamily '%s'; possible cause: incomplete hierarchy; possible fix: either add more subfamilies or flatten the structure", 
+								family, singleSubfamily))
+					}
+				} else {
+					// Add to contexts in the single subfamily
+					if subfamilyInfo, exists := families[singleSubfamily]; exists {
+						for ctx := range subfamilyInfo.contexts {
+							contextIssues[ctx] = append(contextIssues[ctx], 
+								fmt.Sprintf("family '%s' has only one subfamily '%s'; possible cause: incomplete hierarchy; possible fix: either add more subfamilies or flatten the structure", 
+									family, singleSubfamily))
+						}
+					}
+				}
+			}
+			
+			// Check for too many subfamilies
+			if subfamilyCount > 5 {
+				// Add to contexts in the parent family (if any) or all subfamily contexts
+				if len(info.contexts) > 0 {
+					for ctx := range info.contexts {
+						contextIssues[ctx] = append(contextIssues[ctx], 
+							fmt.Sprintf("family '%s' has %d subfamilies (exceeds recommended 5); possible cause: too many subcategories; possible fix: consolidate related subfamilies or create a deeper hierarchy", 
+								family, subfamilyCount))
+					}
+				} else {
+					// Add to one context from each subfamily
+					for subfamily := range info.subfamilies {
+						if subfamilyInfo, exists := families[subfamily]; exists {
+							for ctx := range subfamilyInfo.contexts {
+								contextIssues[ctx] = append(contextIssues[ctx], 
+									fmt.Sprintf("family '%s' has %d subfamilies (exceeds recommended 5); possible cause: too many subcategories; possible fix: consolidate related subfamilies or create a deeper hierarchy", 
+										family, subfamilyCount))
+								break // Only add to one context per subfamily
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+// isSnakeCase checks if a string is in snake_case format
+func isSnakeCase(s string) bool {
+	// Should be lowercase with underscores, dots allowed for contexts
+	for _, ch := range s {
+		if !((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '_' || ch == '.') {
+			return false
+		}
+	}
+	return true
 }
 
 // PrintDebugInfo prints additional debug information
