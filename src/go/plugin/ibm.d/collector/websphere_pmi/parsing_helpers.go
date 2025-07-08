@@ -527,6 +527,20 @@ func (w *WebSpherePMI) collectRangeMetric(mx map[string]int64, prefix, cleanInst
 	mx[base+"_low_watermark"] = metric.LowWaterMark
 	mx[base+"_integral"] = metric.Integral  // Always send, even if 0
 	mx[base+"_mean"] = metric.Mean          // Always send, even if 0
+	
+	// Calculate weighted average for any metric with integral value
+	// This allows RangeStatistics with integral values to have weighted averages,
+	// fixing missing weighted averages for ConcurrentHungThreadCount and other metrics
+	// Always send the weighted average, even if 0, to avoid data gaps
+	metricName := w.cleanID(metric.Name)
+	cacheKey := fmt.Sprintf("%s_%s_%s_integral", prefix, cleanInst, metricName)
+	weightedAvg := w.calculateWeightedAverage(cacheKey, metric.Integral)
+	weightedAvgKey := base+"_weighted_avg"
+	mx[weightedAvgKey] = weightedAvg
+	if metric.Integral > 0 {
+		w.Debugf("RangeStatistic weighted avg: key=%s, value=%d, metric=%s, integral=%d", 
+			weightedAvgKey, weightedAvg, metric.Name, metric.Integral)
+	}
 }
 
 // collectBoundedRangeMetric collects all bounded range statistic dimensions into the mx map
@@ -548,16 +562,19 @@ func (w *WebSpherePMI) collectBoundedRangeMetric(mx map[string]int64, prefix, cl
 	
 	mx[base+"_integral"] = metric.Integral  // Always send, even if 0
 	
-	// Calculate weighted average for specific metrics with integral dimensions
+	// Calculate weighted average for any metric with integral value
+	// This allows all BoundedRangeStatistics with integral values to have weighted averages
+	// regardless of metric name, fixing missing weighted averages for PercentUsed, PercentMaxed,
+	// ConcurrentHungThreadCount, HeapSize, and any future metrics
+	// Always send the weighted average, even if 0, to avoid data gaps
 	metricName := w.cleanID(metric.Name)
-	if metricName == "WaitingThreadCount" || 
-	   metricName == "URIConcurrentRequests" || 
-	   metricName == "Number_of_concurrent_portlet_requests" ||
-	   metricName == "ConcurrentRequests" {
-		// Calculate weighted average from integral
-		cacheKey := fmt.Sprintf("%s_%s_%s_integral", prefix, cleanInst, metricName)
-		weightedAvg := w.calculateWeightedAverage(cacheKey, metric.Integral)
-		mx[base+"_weighted_avg"] = weightedAvg
+	cacheKey := fmt.Sprintf("%s_%s_%s_integral", prefix, cleanInst, metricName)
+	weightedAvg := w.calculateWeightedAverage(cacheKey, metric.Integral)
+	weightedAvgKey := base+"_weighted_avg"
+	mx[weightedAvgKey] = weightedAvg
+	if metric.Integral > 0 {
+		w.Debugf("BoundedRangeStatistic weighted avg: key=%s, value=%d, metric=%s, integral=%d", 
+			weightedAvgKey, weightedAvg, metric.Name, metric.Integral)
 	}
 }
 
@@ -860,22 +877,26 @@ func getContextMetadata(context string) (family string, basePriority int) {
 	case "servlet_url":
 		return "web/servlets/urls", 3120
 	case "urls":
-		return "web/servlets/urls", 3110
+		return "web/servlets/container", 3110
 	case "sessions":
 		// This gets routed by getSessionMetricFamily()
 		return "web/sessions/application", 3200
 	case "portlet":
 		return "web/portlets/instances", 3500
-	case "isc_product", "details_component":
-		return "management/components", 10100
+	case "isc_product":
+		return "management/isc", 10100
+	case "details_component":
+		return "management/details", 10100
 	case "wim":
-		return "management/portlets", 10100
+		return "management/wim", 10100
 	
 	// Connectivity (2000-2999) - Critical for application functionality
 	case "jdbc":
 		return "connectivity/jdbc", 2000
+	case "jca_container":
+		return "connectivity/jca/pools", 2200
 	case "jca_pool":
-		return "connectivity/jca", 2200
+		return "connectivity/jca/connections", 2200
 	case "sib_jms":
 		return "connectivity/jms", 2300
 	case "connection_manager":
@@ -918,6 +939,9 @@ func getContextMetadata(context string) (family string, basePriority int) {
 		return "integration/ejb/entity", 6500
 	case "generic_ejb":
 		return "integration/ejb/generic", 6600
+	case "ejb_method":
+		return "middleware/ejb/methods", 6250
+	// Note: EJB subfamilies (lifecycle, persistence, session) are handled by getEJBMetricFamily
 	
 	// Performance (5000-5999) - Caching and optimization
 	case "cache":
@@ -962,8 +986,21 @@ func getSessionMetricFamily(contextName, metricName string) string {
 		// All session metrics go to web/sessions/application
 		return "web/sessions/application"
 	} else if contextName == "webapp_container_sessions" {
-		// All container session metrics go to web/sessions/container
-		return "web/sessions/container"
+		// Split container session metrics to reduce contexts per family
+		metricLower := strings.ToLower(metricName)
+		if strings.Contains(metricLower, "sessionobjectsize") || strings.Contains(metricLower, "lifetime") {
+			return "web/sessions_container/sizes"  // Size and lifetime metrics
+		} else if strings.Contains(metricLower, "external") {
+			return "web/sessions_container/external"  // External read/write metrics
+		} else if strings.Contains(metricLower, "create") || strings.Contains(metricLower, "invalidate") || 
+		           strings.Contains(metricLower, "activate") || strings.Contains(metricLower, "time") {
+			return "web/sessions_container/lifecycle"  // Lifecycle timing metrics
+		} else if strings.Contains(metricLower, "active") || strings.Contains(metricLower, "live") ||
+		           strings.Contains(metricLower, "affinity") || strings.Contains(metricLower, "nopersist") {
+			return "web/sessions_container/status"  // Status and count metrics
+		} else {
+			return "web/sessions_container/other"  // Any other container session metrics
+		}
 	}
 	
 	// For non-session contexts, use standard family routing
@@ -1048,37 +1085,86 @@ func getTransactionMetricFamily(contextName, metricName string) string {
 	return family
 }
 
-// getEJBMetricFamily determines the appropriate family for EJB metrics
-func getEJBMetricFamily(contextName, metricName string) string {
+// getEJBTimeMetricPriorityOffset returns a consistent priority offset for EJB time metrics
+// This ensures the same metric type always gets the same priority across all EJB instances
+func getEJBTimeMetricPriorityOffset(metricName string) int {
 	metricLower := strings.ToLower(metricName)
 	
-	// Split generic EJB metrics by operation type
+	// Assign consistent offsets based on metric type
+	switch {
+	case strings.Contains(metricLower, "methodresponsetime"):
+		return 100
+	case strings.Contains(metricLower, "createtime"):
+		return 110
+	case strings.Contains(metricLower, "removetime"):
+		return 120
+	case strings.Contains(metricLower, "activationtime"):
+		return 130
+	case strings.Contains(metricLower, "passivationtime"):
+		return 140
+	case strings.Contains(metricLower, "loadtime"):
+		return 150
+	case strings.Contains(metricLower, "storetime"):
+		return 160
+	case strings.Contains(metricLower, "locktime"):
+		return 170
+	case strings.Contains(metricLower, "waittime") && !strings.Contains(metricLower, "asyncwaittime"):
+		return 180
+	case strings.Contains(metricLower, "asyncwaittime"):
+		return 190
+	default:
+		// For unknown metrics, use a hash of the name to get a consistent offset
+		// This ensures the same metric always gets the same priority
+		hash := 0
+		for _, r := range metricName {
+			hash = (hash*31 + int(r)) % 100
+		}
+		return 200 + hash
+	}
+}
+
+// getEJBMetricFamily determines the appropriate family for EJB metrics
+func getEJBMetricFamily(contextName, metricName string) string {
+	// For generic_ejb context, all metrics should go to the same family
+	// to avoid label inconsistencies since not all beans have the same metrics
 	if contextName == "generic_ejb" {
-		// Lifecycle operations
-		if strings.Contains(metricLower, "createtime") || strings.Contains(metricLower, "removetime") ||
-		   strings.Contains(metricLower, "activationtime") || strings.Contains(metricLower, "passivationtime") {
-			return "integration/ejb/lifecycle"
+		return "integration/ejb/beans"
+	}
+	
+	// For EJB container metrics, route to appropriate container families
+	if contextName == "ejb_container" {
+		metricLower := strings.ToLower(metricName)
+		
+		// Session-specific container metrics
+		if strings.Contains(metricLower, "session") || 
+		   strings.Contains(metricLower, "external") {
+			return "integration/ejb_container/session"
 		}
-		// Method execution
-		if strings.Contains(metricLower, "methodresponsetime") {
-			return "integration/ejb/methods"
+		
+		// Persistence-specific container metrics
+		if strings.Contains(metricLower, "activation") ||
+		   strings.Contains(metricLower, "passivation") ||
+		   strings.Contains(metricLower, "load") ||
+		   strings.Contains(metricLower, "store") ||
+		   strings.Contains(metricLower, "lock") ||
+		   strings.Contains(metricLower, "concurrent") {
+			return "integration/ejb_container/persistence"
 		}
-		// Persistence operations
-		if strings.Contains(metricLower, "loadtime") || strings.Contains(metricLower, "storetime") {
-			return "integration/ejb/persistence"
-		}
-		// Concurrency and locking
-		if strings.Contains(metricLower, "locktime") || strings.Contains(metricLower, "waittime") ||
-		   strings.Contains(metricLower, "asyncwaittime") {
-			return "integration/ejb/concurrency"
-		}
-		// Default fallback for other generic EJB metrics
-		return "integration/ejb/generic"
+		
+		// Default container metrics
+		return "integration/ejb_container/lifecycle"
 	}
 	
 	// Fallback to standard routing for other EJB contexts
 	family, _ := getContextMetadata(contextName)
 	return family
+}
+
+// getEJBMetricFamilyWithInstance determines the appropriate family for EJB metrics 
+// considering both metric name and instance/bean information
+func getEJBMetricFamilyWithInstance(contextName, metricName, instance string) string {
+	// Simply use the context-based routing which handles the separation properly
+	return getEJBMetricFamily(contextName, metricName)
 }
 
 // processTimeStatisticWithContext is a convenience wrapper that handles context-based metadata
@@ -1099,7 +1185,7 @@ func (w *WebSpherePMI) processTimeStatisticWithContext(
 	} else if contextName == "transaction_manager" {
 		family = getTransactionMetricFamily(contextName, metric.Name)
 	} else if contextName == "generic_ejb" {
-		family = getEJBMetricFamily(contextName, metric.Name)
+		family = getEJBMetricFamilyWithInstance(contextName, metric.Name, instance)
 	} else if contextName == "portlet" {
 		// For regular portlet contexts, use the standard family mapping
 		family, _ = getContextMetadata(contextName)
@@ -1338,7 +1424,7 @@ func (w *WebSpherePMI) processAverageStatisticWithContext(
 	} else if contextName == "transaction_manager" {
 		family = getTransactionMetricFamily(contextName, metric.Name)
 	} else if contextName == "generic_ejb" {
-		family = getEJBMetricFamily(contextName, metric.Name)
+		family = getEJBMetricFamilyWithInstance(contextName, metric.Name, instance)
 	} else if contextName == "portlet" {
 		// For regular portlet contexts, use the standard family mapping
 		family, _ = getContextMetadata(contextName)
