@@ -2,15 +2,15 @@ extends:
   - _system-base.yaml
 
 sysobjectid:
-  - 1.3.6.1.4.1.10642.1.1  # ZT410-203dpi ZPL
+  - 1.3.6.1.4.1.10642.1.1 # ZT410-203dpi ZPL
 
 metadata:
   device:
     fields:
       vendor:
-        value: "zebra"
+        value: "Zebra"
       type:
-        value: "printer"
+        value: "Printer"
       version:
         symbol:
           MIB: ZEBRA-MIB
@@ -37,7 +37,7 @@ metrics:
         name: zbrTrackedAlertsSeverity
         chart_meta:
           description: The severity level of tracked alerts
-          family: 'Alert/Severity/Status'
+          family: "Alert/Severity/Status"
           unit: "{status}"
         mapping:
           1: other
@@ -47,7 +47,7 @@ metrics:
         name: zbrTrackedAlertsCode
         chart_meta:
           description: The code associated with tracked alerts
-          family: 'Alert/Code/Status'
+          family: "Alert/Code/Status"
           unit: "{status}"
         mapping:
           1: paper-out
@@ -72,7 +72,7 @@ metrics:
     metric_tags:
       - tag: zbr_alert_index
         index: 1
-      - tag: zbr_tracked_alerts_training_level
+      - tag: _zbr_tracked_alerts_training_level
         symbol:
           OID: 1.3.6.1.4.1.10642.10.31.1.3
           name: zbrTrackedAlertsTrainingLevel
@@ -83,7 +83,7 @@ metrics:
           4: trained
           5: field_service
           6: management
-      - tag: zbr_tracked_alerts_group
+      - tag: _zbr_tracked_alerts_group
         symbol:
           OID: 1.3.6.1.4.1.10642.10.31.1.4
           name: zbrTrackedAlertsGroup
