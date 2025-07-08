@@ -235,9 +235,20 @@ func (w *WebSpherePMI) parseServerStats(nodeName, serverName string, stats []pmi
 			} else if len(currentPath) > 3 && currentPath[len(currentPath)-2] == "Servlets" {
 				// Handle individual servlet URLs (detected by path structure)
 				w.parseServlet(&stat, nodeName, serverName, currentPath[len(currentPath)-3], mx)
-			} else if strings.Contains(stat.Name, "Bean") && len(stat.CountStatistics) > 0 {
-				// Handle individual EJB beans (typically have bean-specific names)
+			} else if (strings.Contains(stat.Name, "Bean") || strings.Contains(stat.Name, "EJB")) && len(stat.CountStatistics) > 0 {
+				// Handle individual EJB beans (may contain "Bean" or "EJB" in the name)
 				w.parseIndividualEJB(&stat, nodeName, serverName, mx, currentPath)
+			} else if stat.Name == "Methods" && len(currentPath) > 0 {
+				// Handle EJB Methods container - process its children
+				// TODO: Create parseEJBMethod when we understand the metrics structure
+				// For now, let individual EJB parser handle method metrics
+				for _, method := range stat.SubStats {
+					w.parseGenericStat(&method, nodeName, serverName, mx, currentPath)
+				}
+			} else if len(currentPath) > 1 && currentPath[len(currentPath)-2] == "Methods" {
+				// Handle individual EJB methods under Methods container
+				// TODO: Create parseEJBMethod when we understand the metrics structure
+				w.parseGenericStat(&stat, nodeName, serverName, mx, currentPath)
 			} else if strings.Contains(stat.Name, "ResourceAdapter") || strings.Contains(stat.Name, "Connection Pool") {
 				// Handle JCA connection pools with provider names
 				w.parseJCAConnectionPool(&stat, nodeName, serverName, mx)
@@ -248,8 +259,8 @@ func (w *WebSpherePMI) parseServerStats(nodeName, serverName string, stats []pmi
 				stat.Name != "Portlet Application" && stat.Name != "Details" {
 				// Handle individual portlets (but not .war files, containers, or Details)
 				w.parsePortlet(&stat, nodeName, serverName, mx)
-			} else if strings.HasPrefix(stat.Name, "/") && strings.Contains(stat.Name, "servlet") {
-				// Handle servlet URLs 
+			} else if strings.HasPrefix(stat.Name, "/") {
+				// Handle all URLs starting with "/" (servlet URLs, REST endpoints, etc.)
 				w.parseServletURL(&stat, nodeName, serverName, mx)
 			} else if strings.Contains(stat.Name, ".war") {
 				// Check if this .war file has ServicesLoaded (web service module metrics)
@@ -289,8 +300,7 @@ func (w *WebSpherePMI) parseServerStats(nodeName, serverName string, stats []pmi
 				w.parseServletsComponent(&stat, nodeName, serverName, mx)
 			} else if strings.Contains(stat.Name, "WIM") && (strings.Contains(stat.Name, "User") || strings.Contains(stat.Name, "Group")) {
 				// WebSphere Identity Manager (WIM) user/group management metrics
-				// Route through generic parser for now as parseWIMComponent doesn't exist
-				w.parseGenericStat(&stat, nodeName, serverName, mx, currentPath)
+				w.parseWIMComponent(&stat, nodeName, serverName, mx)
 			} else if strings.Contains(stat.Name, "WLMTaggedComponentManager") {
 				// Workload Management Tagged Component Manager metrics
 				w.parseWLMTaggedComponentManager(&stat, nodeName, serverName, mx)
@@ -305,8 +315,7 @@ func (w *WebSpherePMI) parseServerStats(nodeName, serverName string, stats []pmi
 				w.parseDetailsComponent(&stat, nodeName, serverName, mx, currentPath)
 			} else if strings.Contains(stat.Name, "ISCProductDetails") {
 				// IBM Support Center Product Details metrics
-				// Route through generic parser for now as parseISCProductDetails doesn't exist
-				w.parseGenericStat(&stat, nodeName, serverName, mx, currentPath)
+				w.parseISCProductDetails(&stat, nodeName, serverName, mx)
 			} else {
 				// Generic stat parser for truly unhandled stat types
 				w.parseGenericStat(&stat, nodeName, serverName, mx, currentPath)
