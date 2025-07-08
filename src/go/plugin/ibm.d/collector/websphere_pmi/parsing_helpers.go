@@ -659,17 +659,17 @@ func (w *WebSpherePMI) ensureTimeStatCharts(
 	
 	// Note: Rate chart removed as redundant with existing CountStatistic counters
 	
-	// Chart 1: Current Latency (this iteration)
+	// Chart 1: Average Latency (this iteration)
 	chartCurrent := &module.Chart{
 		ID:       baseChartID + "_current_latency",
-		Title:    fmt.Sprintf("%s%s Current Latency", titlePrefix, metricName),
+		Title:    fmt.Sprintf("%s%s Average Latency", titlePrefix, metricName),
 		Units:    "nanoseconds",
 		Fam:      family,
 		Ctx:      uniqueContext + "_current_latency",
 		Type:     module.Line,
 		Priority: priority + 1,
 		Dims: module.Dims{
-			{ID: fmt.Sprintf("%s_%s_%s_current", componentPrefix, instance, cleanMetric), Name: "current"},
+			{ID: fmt.Sprintf("%s_%s_%s_current", componentPrefix, instance, cleanMetric), Name: "average"},
 		},
 		Labels: labels,
 	}
