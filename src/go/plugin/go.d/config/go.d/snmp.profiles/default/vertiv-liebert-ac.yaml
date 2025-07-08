@@ -4,14 +4,6 @@ extends:
 sysobjectid:
   - 1.3.6.1.4.1.476.1.42 # liebertGlobalProducts
 
-metric_tags:
-  - tag: lgp_agent_ident_model
-    OID: 1.3.6.1.4.1.476.1.42.2.1.2.0
-    symbol: lgpAgentIdentModel
-  - tag: lgp_agent_ident_serial_number
-    OID: 1.3.6.1.4.1.476.1.42.2.1.4.0
-    symbol: lgpAgentIdentSerialNumber
-
 metrics:
   - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
     symbol:
@@ -19,7 +11,7 @@ metrics:
       name: lgpEnvTemperatureSettingDegF
       chart_meta:
         description: The temperature setting used to control the well known temperature object lgpEnvControlTemperature
-        family: 'Environment/Temperature/Setpoint'
+        family: "Environment/Temperature/Setpoint"
         unit: "degF"
 
   - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
@@ -28,7 +20,7 @@ metrics:
       name: lgpEnvTemperatureToleranceDegF
       chart_meta:
         description: The acceptable variance from lgpEnvTemperatureSettingDegF without initiating a control action
-        family: 'Environment/Temperature/Tolerance'
+        family: "Environment/Temperature/Tolerance"
         unit: "degF"
 
   - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
@@ -40,19 +32,19 @@ metrics:
         name: lgpEnvTemperatureMeasurementDegF
         chart_meta:
           description: The measured temperature value
-          family: 'Environment/Temperature/Value'
+          family: "Environment/Temperature/Value"
           unit: "degF"
       - OID: 1.3.6.1.4.1.476.1.42.3.4.1.3.3.1.3
         name: lgpEnvTemperatureMeasurementDegC
         chart_meta:
           description: The measured temperature value
-          family: 'Environment/Temperature/Value'
+          family: "Environment/Temperature/Value"
           unit: "Cel"
       - OID: 1.3.6.1.4.1.476.1.42.3.4.2.2.3.1.3
         name: lgpEnvHumidityMeasurementRel
         chart_meta:
           description: The measured humidity value
-          family: 'Environment/Humidity/Value'
+          family: "Environment/Humidity/Value"
           unit: "%"
     metric_tags:
       - tag: lgp_env_temperature_descr_deg_f
@@ -66,7 +58,7 @@ metrics:
       name: lgpEnvStatisticsComp1RunHr
       chart_meta:
         description: Accumulated run hours of compressor 1
-        family: 'Component/Compressor/1/Runtime'
+        family: "Component/Compressor/1/Runtime"
         unit: "h"
 
   - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
@@ -75,7 +67,7 @@ metrics:
       name: lgpEnvStatisticsComp2RunHr
       chart_meta:
         description: Accumulated run hours of compressor 2
-        family: 'Component/Compressor/2/Runtime'
+        family: "Component/Compressor/2/Runtime"
         unit: "h"
 
   - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
@@ -84,7 +76,7 @@ metrics:
       name: lgpEnvStatisticsFanRunHr
       chart_meta:
         description: Accumulated run hours of the main fan
-        family: 'Component/Fan/Runtime'
+        family: "Component/Fan/Runtime"
         unit: "h"
 
   - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
@@ -93,7 +85,7 @@ metrics:
       name: lgpEnvStatisticsHumRunHr
       chart_meta:
         description: Accumulated run hours of the humidifier
-        family: 'Component/Humidifier/Runtime'
+        family: "Component/Humidifier/Runtime"
         unit: "h"
 
   - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
@@ -102,7 +94,7 @@ metrics:
       name: lgpEnvStatisticsReheat1RunHr
       chart_meta:
         description: Accumulated run hours of reheat element 1
-        family: 'Component/Reheat/1/Runtime'
+        family: "Component/Reheat/1/Runtime"
         unit: "h"
 
   - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
@@ -111,7 +103,7 @@ metrics:
       name: lgpEnvStatisticsReheat2RunHr
       chart_meta:
         description: Accumulated run hours of reheat element 2
-        family: 'Component/Reheat/2/Runtime'
+        family: "Component/Reheat/2/Runtime"
         unit: "h"
 
   - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
@@ -120,5 +112,13 @@ metrics:
       name: lgpEnvStatisticsReheat3RunHr
       chart_meta:
         description: Accumulated run hours of reheat element 3
-        family: 'Component/Reheat/3/Runtime'
+        family: "Component/Reheat/3/Runtime"
         unit: "h"
+
+metric_tags:
+  - tag: lgp_agent_ident_model
+    OID: 1.3.6.1.4.1.476.1.42.2.1.2.0
+    symbol: lgpAgentIdentModel
+  - tag: _lgp_agent_ident_serial_number
+    OID: 1.3.6.1.4.1.476.1.42.2.1.4.0
+    symbol: lgpAgentIdentSerialNumber
