@@ -56,6 +56,18 @@ static bool debug = false;
 static unsigned long netdata_update_every = 1;
 UPSCONN_t ups1, ups2;
 
+// Hash table mapping UPS name to another hashtable, which maps NUT variable string to
+// struct chart pointer.
+DICTIONARY *nd_ups_vars;
+
+// Hash table mapping UPS name to a boolean value indicating whether or not the UPS was
+// observed in the most recent 'LIST UPS' query.
+DICTIONARY *nd_ups_seen;
+
+// Hash table mapping UPS name to a 'cleaned' (normalized) version of the mapping name
+// which is suitable for use in NetData.
+DICTIONARY *nd_ups_name;
+
 // https://networkupstools.org/docs/developer-guide.chunked/new-drivers.html#_status_data
 struct nut_ups_status {
     unsigned int OL      : 1; // On line
@@ -89,7 +101,7 @@ struct nd_chart {
     const char *chart_dimension;
 };
 
-const struct nd_chart nd_charts[] = {
+struct nd_chart nd_charts[] = {
     {
         .nut_variable = "ups.load",
         .chart_id = "load_percentage",
@@ -367,18 +379,27 @@ void parse_command_line(int argc, char *argv[]) {
     }
 }
 
-char *clean_name(char *buf, size_t bufsize, const char *name) {
-    assert(buf);
+char *clean_name(char *name) {
     assert(name);
+    for (char *c = name; *c; c++)
+        *c = (*c  == ' ' || *c == '.') ? '_' : *c;
+    return name;
+}
 
-    for (size_t i = 0; i < bufsize; i++) {
-        buf[i] = (name[i] == ' ' || name[i] == '.') ? '_': name[i];
-        if (name[i] == '\0')
-            break;
-        if (i+1 == bufsize)
-            buf[i] = '\0';
+void delete_unseen_ups(void) {
+    bool *seen;
+    dfe_start_read(nd_ups_seen, seen) {
+        if (*seen) {
+            *seen = false;
+        } else {
+            DICTIONARY *ups_vars = dictionary_get(nd_ups_vars, seen_dfe.name);
+            dictionary_destroy(ups_vars);
+            dictionary_del(nd_ups_vars, seen_dfe.name);
+            dictionary_del(nd_ups_seen, seen_dfe.name);
+            dictionary_del(nd_ups_name, seen_dfe.name);
+        }
     }
-    return buf;
+    dfe_done(seen);
 }
 
 const char *nut_get_var(UPSCONN_t *conn, const char *ups_name, const char *var_name) {
@@ -563,13 +584,13 @@ void print_ups_realpower_metric(UPSCONN_t *conn, const char *ups_name, const cha
            clean_ups_name, (int)realpower);
 }
 
-void print_ups_charts(const char *ups_name) {
-    char buf[BUFLEN];
+void register_ups(char *ups_name) {
     const char *nut_value;
+    const char *clean_ups_name = clean_name(dictionary_set(nd_ups_name, ups_name, ups_name, strlen(ups_name)+1));
 
     // CHART type.id name title units [family [context [charttype [priority [update_every [options [plugin [module]]]]]]]]
     printf("CHART 'upsd_%s.status' '' 'UPS status' 'status' 'ups' 'upsd.ups_status' 'line' %u %u\n",
-           clean_name(buf, sizeof(buf), ups_name), NETDATA_CHART_PRIO_UPSD_UPS_STATUS, netdata_update_every);
+           clean_ups_name, NETDATA_CHART_PRIO_UPSD_UPS_STATUS, netdata_update_every);
 
     if ((nut_value = nut_get_var(&ups2, ups_name, "battery.type")))
         printf("CLABEL battery_type '%s' %u\n", nut_value, NETDATA_CLABEL_SOURCE_AUTO);
@@ -605,7 +626,10 @@ void print_ups_charts(const char *ups_name) {
     printf("DIMENSION forced_shutdown '' '' '' %u\n", NETDATA_PLUGIN_PRECISION);
     printf("DIMENSION other '' '' '' %u\n", NETDATA_PLUGIN_PRECISION);
 
-    for (const struct nd_chart *chart = nd_charts; chart->nut_variable; chart++) {
+    // Hash table mapping NUT variable (e.g. 'ups.status') to pointer to respective `struct nd_chart`.
+    DICTIONARY *ups_vars = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_FIXED_SIZE|DICT_OPTION_NAME_LINK_DONT_CLONE|DICT_OPTION_VALUE_LINK_DONT_CLONE);
+
+    for (struct nd_chart *chart = nd_charts; chart->nut_variable; chart++) {
         nut_value = nut_get_var(&ups2, ups_name, chart->nut_variable);
         if (!nut_value) {
             if (!streq(chart->nut_variable, "ups.realpower"))
@@ -619,7 +643,7 @@ void print_ups_charts(const char *ups_name) {
 
         // CHART type.id name title units [family [context [charttype [priority [update_every [options [plugin [module]]]]]]]]
         printf("CHART 'upsd_%s.%s' '' '%s' '%s' '%s' '%s' '%s' '%u' '%u' '' '" PLUGIN_UPSD_NAME "'\n",
-               clean_name(buf, sizeof(buf), ups_name), chart->chart_id, // type.id
+               clean_ups_name, chart->chart_id, // type.id
                chart->chart_title,    // title
                chart->chart_units,    // units
                chart->chart_family,   // family
@@ -647,22 +671,27 @@ void print_ups_charts(const char *ups_name) {
 
         // DIMENSION id [name [algorithm [multiplier [divisor [options]]]]]
         printf("DIMENSION '%s' '' '' '' %u\n", chart->chart_dimension, NETDATA_PLUGIN_PRECISION);
+
+        dictionary_set(ups_vars, chart->nut_variable, chart, 0);
     }
+    dictionary_set(nd_ups_vars, ups_name, ups_vars, 0);
 }
 
 int main(int argc, char *argv[]) {
     int rc;
     size_t numa;
     char **answer[1];
-    char buf[BUFLEN];
-    unsigned int first_ups_count = 0;
     const char *query[] = { "UPS" };
-    const char *nut_value;
+    struct nd_chart *chart;
 
     nd_log_initialize_for_external_plugins(PLUGIN_UPSD_NAME);
     netdata_threads_init_for_external_plugins(0);
 
     parse_command_line(argc, argv);
+
+    nd_ups_vars = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_FIXED_SIZE|DICT_OPTION_VALUE_LINK_DONT_CLONE);
+    nd_ups_seen = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_FIXED_SIZE);
+    nd_ups_name = dictionary_create(DICT_OPTION_SINGLE_THREADED);
 
     // If we fail to initialize libupsclient or connect to a local
     // UPS, then there's nothing more to be done; Netdata should disable
@@ -689,23 +718,26 @@ int main(int argc, char *argv[]) {
     }
 
     for (;;) {
+        // The output of upscli_list_next() is stored in `answer` like so:
+        //  [
+        //    { [0] = "UPS", [1] = <UPS name>, [2] = <UPS description> },
+        //    { [0] = "UPS", [1] = <UPS name>, [2] = <UPS description> },
+        //    { [0] = "END", [1] = "LIST", [2] = "UPS" },
+        //  ]
         rc = upscli_list_next(&ups1, LENGTHOF(query), query, &numa, (char***)&answer);
         if (unlikely(-1 == rc)) {
             netdata_log_error("failed to list UPSes from upsd: %s", upscli_upserror(&ups1));
             return NETDATA_PLUGIN_EXIT_AND_DISABLE;
         }
 
-        // Unfortunately, list_ups_next() will emit the list delimiter
-        // "END LIST UPS" as its last iteration before returning 0. We don't
-        // need it, so let's skip processing on that item.
+        // Unfortunately, upscli_list_next() will inform us of the end of the list
+        // only AFTER it has processed and returned the {"END","LIST","UPS"} entry.
+        // That entry could be confusing, and could mistakenly register a UPS
+        // named "LIST", so let's skip processing on that item.
         if (streq("END", answer[0][0]))
             break;
 
-        first_ups_count++;
-
-        // The output of nut_list_ups() will be something like:
-        //  { { [0] = "UPS", [1] = <UPS name>, [2] = <UPS description> } }
-        print_ups_charts(answer[0][1]);
+        register_ups(answer[0][1]);
     }
 
     time_t started_t = now_monotonic_sec();
@@ -717,8 +749,6 @@ int main(int argc, char *argv[]) {
 
         if (unlikely(exit_initiated_get()))
             break;
-
-        unsigned int this_ups_count = 0;
 
         rc = upscli_list_start(&ups1, LENGTHOF(query), query);
         if (unlikely(-1 == rc)) {
@@ -733,16 +763,18 @@ int main(int argc, char *argv[]) {
                 return NETDATA_PLUGIN_EXIT_AND_DISABLE;
             }
 
-            // Unfortunately, list_ups_next() will emit the list delimiter
-            // "END LIST UPS" as its last iteration before returning 0. We don't
-            // need it, so let's skip processing on that item.
             if (streq("END", answer[0][0]))
                 break;
 
-            this_ups_count++;
+            char *ups_name = answer[0][1];
+            char *clean_ups_name = dictionary_get(nd_ups_name, ups_name);
+            if (!clean_ups_name) {
+                register_ups(ups_name);
+                clean_ups_name = dictionary_get(nd_ups_name, ups_name);
+            }
 
-            const char *ups_name = answer[0][1];
-            const char *clean_ups_name = clean_name(buf, sizeof(buf), ups_name);
+            // Track this UPS for future data collection.
+            dictionary_set(nd_ups_seen, ups_name, &(bool){true}, sizeof(bool));
 
             // The 'ups.status' variable is a special case, because its chart has more
             // than one dimension. So, we can't simply print one data point.
@@ -753,22 +785,19 @@ int main(int argc, char *argv[]) {
             // ups.realpower.nominal variables.
             print_ups_realpower_metric(&ups2, ups_name, clean_ups_name);
 
-            for (const struct nd_chart *chart = nd_charts; chart->nut_variable; chart++) {
-                const char *nut_value = nut_get_var(&ups2, ups_name, chart->nut_variable);
-                if (!nut_value)
-                    continue;
-
-                NETDATA_DOUBLE nut_value_as_num = str2ndd(nut_value, NULL) * NETDATA_PLUGIN_PRECISION;
-
+            DICTIONARY *ups_vars = dictionary_get(nd_ups_vars, ups_name);
+            dfe_start_read(ups_vars, chart) {
+                const char *value = nut_get_var(&ups2, ups_name, chart->nut_variable);
+                NETDATA_DOUBLE nut_value_as_num = str2ndd(value, NULL) * NETDATA_PLUGIN_PRECISION;
                 // BEGIN type.id [microseconds]
                 // SET id = value
                 // END
                 printf("BEGIN 'upsd_%s.%s'\n"
                        "SET '%s' = %d\n"
                        "END\n",
-                       clean_ups_name, chart->chart_id,
-                       chart->chart_dimension, (int)nut_value_as_num);
+                       clean_ups_name, chart->chart_id, chart->chart_dimension, (int)nut_value_as_num);
             }
+            dfe_done(chart);
         }
 
         // stdout, stderr are connected to pipes.
@@ -780,20 +809,14 @@ int main(int argc, char *argv[]) {
             return NETDATA_PLUGIN_EXIT_AND_DISABLE;
         }
 
-        // If the last UPS count does not match the current UPS count, then there's a real
-        // chance that our UPS information is outdated; restart this plugin to get accurate UPSes.
-        if (unlikely(first_ups_count != this_ups_count)) {
-            netdata_log_error("Detected change in UPSes (count: %u -> %u); restarting to read UPS data.",
-                first_ups_count, this_ups_count);
-            break;
-        }
-
         if (unlikely(exit_initiated_get()))
             break;
 
         // restart check (14400 seconds)
         if (unlikely(now_monotonic_sec() - started_t > 14400))
             break;
+
+        delete_unseen_ups();
     }
 
     upscli_disconnect(&ups1);
