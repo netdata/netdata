@@ -1231,26 +1231,41 @@ func (w *WebSpherePMI) ensureWebAppContainerSessionCharts(instance, nodeName, se
 		// Get correct family for webapp_container_sessions
 		family, _ := getContextMetadata("webapp_container_sessions")
 		
-		// Create container session stats chart
-		chartStats := &module.Chart{
-			ID:       fmt.Sprintf("webapp_container_sessions_%s_stats", cleanInst),
-			Title:    "Container Session Statistics",
+		// Create container active sessions chart
+		chartActive := &module.Chart{
+			ID:       fmt.Sprintf("webapp_container_sessions_%s_active", cleanInst),
+			Title:    "Container Active Sessions",
 			Units:    "sessions",
 			Fam:      family,
-			Ctx:      "websphere_pmi.webapp_container_sessions_stats",
+			Ctx:      "websphere_pmi.webapp_container_sessions_active",
 			Type:     module.Line,
 			Priority: prioWebApps + 100,
 			Dims: module.Dims{
-				{ID: fmt.Sprintf("webapp_container_sessions_%s_ActiveCount_current", cleanInst), Name: "active_current"},
-				{ID: fmt.Sprintf("webapp_container_sessions_%s_ActiveCount_high_watermark", cleanInst), Name: "active_high_watermark"},
-				{ID: fmt.Sprintf("webapp_container_sessions_%s_ActiveCount_low_watermark", cleanInst), Name: "active_low_watermark"},
-				{ID: fmt.Sprintf("webapp_container_sessions_%s_ActiveCount_mean", cleanInst), Name: "active_mean"},
-				{ID: fmt.Sprintf("webapp_container_sessions_%s_ActiveCount_integral", cleanInst), Name: "active_integral"},
-				{ID: fmt.Sprintf("webapp_container_sessions_%s_LiveCount_current", cleanInst), Name: "live_current"},
-				{ID: fmt.Sprintf("webapp_container_sessions_%s_LiveCount_high_watermark", cleanInst), Name: "live_high_watermark"},
-				{ID: fmt.Sprintf("webapp_container_sessions_%s_LiveCount_low_watermark", cleanInst), Name: "live_low_watermark"},
-				{ID: fmt.Sprintf("webapp_container_sessions_%s_LiveCount_mean", cleanInst), Name: "live_mean"},
-				{ID: fmt.Sprintf("webapp_container_sessions_%s_LiveCount_integral", cleanInst), Name: "live_integral"},
+				{ID: fmt.Sprintf("webapp_container_sessions_%s_ActiveCount_current", cleanInst), Name: "current"},
+				{ID: fmt.Sprintf("webapp_container_sessions_%s_ActiveCount_high_watermark", cleanInst), Name: "high_watermark"},
+				{ID: fmt.Sprintf("webapp_container_sessions_%s_ActiveCount_low_watermark", cleanInst), Name: "low_watermark"},
+				{ID: fmt.Sprintf("webapp_container_sessions_%s_ActiveCount_mean", cleanInst), Name: "mean"},
+			},
+			Labels: append([]module.Label{
+				{Key: "node", Value: nodeName},
+				{Key: "server", Value: serverName},
+			}, w.getVersionLabels()...),
+		}
+		
+		// Create container live sessions chart
+		chartLive := &module.Chart{
+			ID:       fmt.Sprintf("webapp_container_sessions_%s_live", cleanInst),
+			Title:    "Container Live Sessions",
+			Units:    "sessions",
+			Fam:      family,
+			Ctx:      "websphere_pmi.webapp_container_sessions_live",
+			Type:     module.Line,
+			Priority: prioWebApps + 101,
+			Dims: module.Dims{
+				{ID: fmt.Sprintf("webapp_container_sessions_%s_LiveCount_current", cleanInst), Name: "current"},
+				{ID: fmt.Sprintf("webapp_container_sessions_%s_LiveCount_high_watermark", cleanInst), Name: "high_watermark"},
+				{ID: fmt.Sprintf("webapp_container_sessions_%s_LiveCount_low_watermark", cleanInst), Name: "low_watermark"},
+				{ID: fmt.Sprintf("webapp_container_sessions_%s_LiveCount_mean", cleanInst), Name: "mean"},
 			},
 			Labels: append([]module.Label{
 				{Key: "node", Value: nodeName},
@@ -1303,7 +1318,10 @@ func (w *WebSpherePMI) ensureWebAppContainerSessionCharts(instance, nodeName, se
 		// by processAverageStatisticWithContext with smart family routing
 		
 		// Add charts
-		if err := w.charts.Add(chartStats); err != nil {
+		if err := w.charts.Add(chartActive); err != nil {
+			w.Warning(err)
+		}
+		if err := w.charts.Add(chartLive); err != nil {
 			w.Warning(err)
 		}
 		if err := w.charts.Add(chartLifecycle); err != nil {
@@ -1511,7 +1529,7 @@ var webAppContainerChartsTmpl = module.Charts{
 			{ID: "webapp_container_%s_ConcurrentRequests_mean", Name: "mean", Div: precision},
 			{ID: "webapp_container_%s_ConcurrentRequests_high_watermark", Name: "high_watermark", DimOpts: module.DimOpts{Hidden: true}},
 			{ID: "webapp_container_%s_ConcurrentRequests_low_watermark", Name: "low_watermark", DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "webapp_container_%s_ConcurrentRequests_integral", Name: "integral", Div: precision, DimOpts: module.DimOpts{Hidden: true}},
+			// {ID: "webapp_container_%s_ConcurrentRequests_integral", Name: "integral", Div: precision, DimOpts: module.DimOpts{Hidden: true}}, // REMOVED: integral dimension
 		},
 	},
 	// Portlet-specific charts
@@ -1553,7 +1571,32 @@ var webAppContainerChartsTmpl = module.Charts{
 			{ID: "webapp_container_%s_Number_of_concurrent_portlet_requests_mean", Name: "mean", Div: precision},
 			{ID: "webapp_container_%s_Number_of_concurrent_portlet_requests_high_watermark", Name: "high_watermark", DimOpts: module.DimOpts{Hidden: true}},
 			{ID: "webapp_container_%s_Number_of_concurrent_portlet_requests_low_watermark", Name: "low_watermark", DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "webapp_container_%s_Number_of_concurrent_portlet_requests_integral", Name: "integral", Div: precision, DimOpts: module.DimOpts{Hidden: true}},
+			// {ID: "webapp_container_%s_Number_of_concurrent_portlet_requests_integral", Name: "integral", Div: precision, DimOpts: module.DimOpts{Hidden: true}}, // REMOVED: integral dimension
+		},
+	},
+	// Weighted average charts for concurrent requests with integral dimensions
+	{
+		ID:       "webapp_container_%s_concurrent_requests_weighted_avg",
+		Title:    "Web Application Container Concurrent Requests (Weighted Average)",
+		Units:    "requests",
+		Fam:      "web/containers",
+		Ctx:      "websphere_pmi.webapp_container_concurrent_requests_weighted_avg",
+		Type:     module.Line,
+		Priority: prioWebApps + 32,
+		Dims: module.Dims{
+			{ID: "webapp_container_%s_ConcurrentRequests_weighted_avg", Name: "weighted_avg", Div: precision},
+		},
+	},
+	{
+		ID:       "webapp_container_%s_portlet_concurrent_weighted_avg",
+		Title:    "Web Application Container Concurrent Portlet Requests (Weighted Average)",
+		Units:    "requests",
+		Fam:      "web/containers",
+		Ctx:      "websphere_pmi.webapp_container_portlet_concurrent_weighted_avg",
+		Type:     module.Line,
+		Priority: prioWebApps + 36,
+		Dims: module.Dims{
+			{ID: "webapp_container_%s_Number_of_concurrent_portlet_requests_weighted_avg", Name: "weighted_avg", Div: precision},
 		},
 	},
 }

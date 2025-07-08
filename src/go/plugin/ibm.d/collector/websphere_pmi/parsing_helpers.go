@@ -538,7 +538,27 @@ func (w *WebSpherePMI) collectBoundedRangeMetric(mx map[string]int64, prefix, cl
 	mx[base+"_high_watermark"] = metric.HighWaterMark
 	mx[base+"_low_watermark"] = metric.LowWaterMark
 	mx[base+"_mean"] = metric.Mean          // Always send, even if 0
+	
+	// Special handling for webapp_container_sessions metrics
+	if prefix == "webapp_container_sessions" && (metric.Name == "ActiveCount" || metric.Name == "LiveCount") {
+		// Skip integral dimension for ActiveCount and LiveCount
+		// These use the split chart design and don't need weighted averages
+		return
+	}
+	
 	mx[base+"_integral"] = metric.Integral  // Always send, even if 0
+	
+	// Calculate weighted average for specific metrics with integral dimensions
+	metricName := w.cleanID(metric.Name)
+	if metricName == "WaitingThreadCount" || 
+	   metricName == "URIConcurrentRequests" || 
+	   metricName == "Number_of_concurrent_portlet_requests" ||
+	   metricName == "ConcurrentRequests" {
+		// Calculate weighted average from integral
+		cacheKey := fmt.Sprintf("%s_%s_%s_integral", prefix, cleanInst, metricName)
+		weightedAvg := w.calculateWeightedAverage(cacheKey, metric.Integral)
+		mx[base+"_weighted_avg"] = weightedAvg
+	}
 }
 
 // collectAverageMetric collects all average statistic dimensions into the mx map
