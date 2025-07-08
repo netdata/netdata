@@ -1509,14 +1509,9 @@ var webAppContainerChartsTmpl = module.Charts{
 		Dims: module.Dims{
 			{ID: "webapp_container_%s_ConcurrentRequests_current", Name: "current"},
 			{ID: "webapp_container_%s_ConcurrentRequests_mean", Name: "mean", Div: precision},
-			{ID: "webapp_container_%s_URIConcurrentRequests_current", Name: "uri_current"},
-			{ID: "webapp_container_%s_URIConcurrentRequests_mean", Name: "uri_mean", Div: precision},
 			{ID: "webapp_container_%s_ConcurrentRequests_high_watermark", Name: "high_watermark", DimOpts: module.DimOpts{Hidden: true}},
 			{ID: "webapp_container_%s_ConcurrentRequests_low_watermark", Name: "low_watermark", DimOpts: module.DimOpts{Hidden: true}},
 			{ID: "webapp_container_%s_ConcurrentRequests_integral", Name: "integral", Div: precision, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "webapp_container_%s_URIConcurrentRequests_high_watermark", Name: "uri_high_watermark", DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "webapp_container_%s_URIConcurrentRequests_low_watermark", Name: "uri_low_watermark", DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "webapp_container_%s_URIConcurrentRequests_integral", Name: "uri_integral", Div: precision, DimOpts: module.DimOpts{Hidden: true}},
 		},
 	},
 	// Portlet-specific charts
@@ -2575,9 +2570,10 @@ func (w *WebSpherePMI) parseJVMSubsystem(stat *pmiStat, nodeName, serverName str
 		case "JVM.Memory":
 			switch metric.Name {
 			case "AllocatedMemory":
-				mx[fmt.Sprintf("jvm_memory_%s_allocated", cleanInst)] = metric.Value
+				// Apply unit conversion from XML unit to bytes
+				mx[fmt.Sprintf("jvm_memory_%s_allocated", cleanInst)] = convertUnit(metric.Value, metric.Unit, "BYTES")
 			default:
-				// For unknown count metrics, use collection helper
+				// For unknown count metrics, use collection helper (which now handles unit conversion)
 				w.collectCountMetric(mx, "jvm_memory", cleanInst, metric)
 			}
 		case "JVM.Thread":

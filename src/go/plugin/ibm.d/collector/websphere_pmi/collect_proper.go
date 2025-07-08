@@ -421,15 +421,19 @@ func (w *WebSpherePMI) parseJVMRuntime(stat *pmiStat, nodeName, serverName strin
 	for _, metric := range countMetrics {
 		switch metric.Name {
 		case "FreeMemory":
-			mx[fmt.Sprintf("jvm_memory_%s_free", cleanInst)] = metric.Value * 1024 // Convert KB to bytes
+			// Apply unit conversion from XML unit to bytes
+			mx[fmt.Sprintf("jvm_memory_%s_free", cleanInst)] = convertUnit(metric.Value, metric.Unit, "BYTES")
 		case "UsedMemory":
-			mx[fmt.Sprintf("jvm_memory_%s_used", cleanInst)] = metric.Value * 1024 // Convert KB to bytes
+			// Apply unit conversion from XML unit to bytes
+			mx[fmt.Sprintf("jvm_memory_%s_used", cleanInst)] = convertUnit(metric.Value, metric.Unit, "BYTES")
 		case "UpTime":
-			mx[fmt.Sprintf("jvm_uptime_%s_seconds", cleanInst)] = metric.Value / 1000 // Convert ms to seconds
+			// UpTime is already in seconds per XML
+			mx[fmt.Sprintf("jvm_uptime_%s_seconds", cleanInst)] = metric.Value
 		case "ProcessCpuUsage":
 			mx[fmt.Sprintf("jvm_cpu_%s_usage", cleanInst)] = metric.Value
 		case "Heap":
-			mx[fmt.Sprintf("jvm_heap_%s_size", cleanInst)] = metric.Value * 1024 // Convert KB to bytes
+			// Apply unit conversion from XML unit to bytes
+			mx[fmt.Sprintf("jvm_heap_%s_size", cleanInst)] = convertUnit(metric.Value, metric.Unit, "BYTES")
 		default:
 			// For unknown count metrics, use collection helper
 			w.collectCountMetric(mx, "jvm_runtime", cleanInst, metric)

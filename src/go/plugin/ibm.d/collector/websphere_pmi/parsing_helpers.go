@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 	
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
@@ -209,6 +210,7 @@ func (w *WebSpherePMI) collectMetricsWithLogging(
 type ExtractedCountMetric struct {
 	Name  string
 	Value int64
+	Unit  string
 }
 
 type ExtractedTimeMetric struct {
@@ -218,6 +220,7 @@ type ExtractedTimeMetric struct {
 	Min   int64
 	Max   int64
 	Mean  int64 // calculated if possible
+	Unit  string
 }
 
 type ExtractedRangeMetric struct {
@@ -227,6 +230,7 @@ type ExtractedRangeMetric struct {
 	LowWaterMark  int64
 	Integral      int64
 	Mean          int64
+	Unit          string
 }
 
 type ExtractedBoundedRangeMetric struct {
@@ -238,6 +242,7 @@ type ExtractedBoundedRangeMetric struct {
 	LowWaterMark  int64
 	Mean          int64
 	Integral      int64
+	Unit          string
 }
 
 type ExtractedAverageMetric struct {
@@ -248,11 +253,13 @@ type ExtractedAverageMetric struct {
 	Min          int64
 	Max          int64
 	SumOfSquares int64
+	Unit         string
 }
 
 type ExtractedDoubleMetric struct {
 	Name  string
 	Value int64 // with precision applied
+	Unit  string
 }
 
 // parseIntSafe safely converts string to int64, returning 0 on error
@@ -271,6 +278,84 @@ func parseFloatSafe(s string) float64 {
 	return 0.0
 }
 
+// =============================================================================
+// UNIT CONVERSION
+// =============================================================================
+
+// convertUnit converts a value from one unit to another
+func convertUnit(value int64, fromUnit, toUnit string) int64 {
+	// Normalize units to uppercase for comparison
+	from := strings.ToUpper(strings.TrimSpace(fromUnit))
+	to := strings.ToUpper(strings.TrimSpace(toUnit))
+	
+	// If units are the same, no conversion needed
+	if from == to {
+		return value
+	}
+	
+	// Handle time conversions
+	if (from == "MILLISECOND" || from == "MILLISECONDS" || from == "MS") && to == "SECONDS" {
+		return value / 1000
+	}
+	if from == "SECOND" && (to == "MILLISECONDS" || to == "MILLISECOND" || to == "MS") {
+		return value * 1000
+	}
+	
+	// Handle memory conversions
+	if from == "KILOBYTE" && to == "BYTES" {
+		return value * 1024
+	}
+	if from == "BYTE" && to == "KILOBYTES" {
+		return value / 1024
+	}
+	
+	// No conversion available or needed
+	return value
+}
+
+// isMemoryMetric checks if a metric name indicates it's a memory-related metric
+func isMemoryMetric(name string) bool {
+	// Normalize name to lowercase for comparison
+	lower := strings.ToLower(name)
+	
+	// Check for common memory-related keywords
+	return strings.Contains(lower, "memory") ||
+		strings.Contains(lower, "heap") ||
+		strings.Contains(lower, "heapsize") ||
+		strings.Contains(lower, "freememory") ||
+		strings.Contains(lower, "usedmemory") ||
+		strings.Contains(lower, "allocatedmemory") ||
+		strings.Contains(lower, "committedmemory") ||
+		strings.Contains(lower, "totalmemory")
+}
+
+// calculateWeightedAverage calculates the weighted average for an integral metric
+func (w *WebSpherePMI) calculateWeightedAverage(key string, currentIntegral int64) int64 {
+	currentTime := time.Now().Unix()
+	
+	// Get previous value from cache
+	if prev, exists := w.integralCache[key]; exists {
+		deltaIntegral := currentIntegral - prev.Value
+		deltaTime := currentTime - prev.Timestamp
+		
+		// Only calculate if we have a positive time delta and no counter reset
+		if deltaTime > 0 && deltaIntegral >= 0 {
+			// Calculate weighted average with precision
+			// Formula: (deltaIntegral * precision) / deltaTime
+			return (deltaIntegral * precision) / deltaTime
+		}
+	}
+	
+	// Update cache with current values
+	w.integralCache[key] = &integralCacheEntry{
+		Value:     currentIntegral,
+		Timestamp: currentTime,
+	}
+	
+	// Return 0 for first iteration or if counter reset
+	return 0
+}
+
 // extractCountStatistics extracts ALL CountStatistics and returns structured data
 func (w *WebSpherePMI) extractCountStatistics(stats []countStat) []ExtractedCountMetric {
 	var results []ExtractedCountMetric
@@ -279,6 +364,7 @@ func (w *WebSpherePMI) extractCountStatistics(stats []countStat) []ExtractedCoun
 		results = append(results, ExtractedCountMetric{
 			Name:  cs.Name,
 			Value: parseIntSafe(cs.Count),
+			Unit:  cs.Unit,
 		})
 	}
 	
@@ -313,6 +399,7 @@ func (w *WebSpherePMI) extractTimeStatistics(stats []timeStat) []ExtractedTimeMe
 			Min:   parseIntSafe(ts.Min),
 			Max:   parseIntSafe(ts.Max),
 			Mean:  mean,
+			Unit:  ts.Unit,
 		})
 	}
 	
@@ -332,6 +419,7 @@ func (w *WebSpherePMI) extractRangeStatistics(stats []rangeStat) []ExtractedRang
 			LowWaterMark:  parseIntSafe(rs.LowWaterMark),
 			Integral:      int64(parseFloatSafe(rs.Integral) * precision),
 			Mean:          int64(parseFloatSafe(rs.Mean) * precision),
+			Unit:          rs.Unit,
 		})
 	}
 	
@@ -353,6 +441,7 @@ func (w *WebSpherePMI) extractBoundedRangeStatistics(stats []boundedRangeStat) [
 			LowWaterMark:  parseIntSafe(brs.LowWaterMark),
 			Mean:          int64(parseFloatSafe(brs.Mean) * precision),
 			Integral:      int64(parseFloatSafe(brs.Integral) * precision),
+			Unit:          brs.Unit,
 		})
 	}
 	
@@ -373,6 +462,7 @@ func (w *WebSpherePMI) extractAverageStatistics(stats []averageStat) []Extracted
 			Min:          parseIntSafe(as.Min),
 			Max:          parseIntSafe(as.Max),
 			SumOfSquares: int64(parseFloatSafe(as.SumOfSquares) * precision),
+			Unit:         as.Unit,
 		})
 	}
 	
@@ -388,6 +478,7 @@ func (w *WebSpherePMI) extractDoubleStatistics(stats []doubleStat) []ExtractedDo
 		results = append(results, ExtractedDoubleMetric{
 			Name:  ds.Name,
 			Value: int64(parseFloatSafe(ds.Double) * precision),
+			Unit:  ds.Unit,
 		})
 	}
 	
@@ -405,7 +496,17 @@ func (w *WebSpherePMI) extractDoubleStatistics(stats []doubleStat) []ExtractedDo
 
 // collectCountMetric collects a single count metric into the mx map
 func (w *WebSpherePMI) collectCountMetric(mx map[string]int64, prefix, cleanInst string, metric ExtractedCountMetric) {
-	mx[fmt.Sprintf("%s_%s_%s", prefix, cleanInst, w.cleanID(metric.Name))] = metric.Value
+	// Apply unit conversion based on the metric name and unit
+	value := metric.Value
+	
+	// Check if this is a memory-related metric that needs conversion to bytes
+	if isMemoryMetric(metric.Name) && metric.Unit != "" {
+		value = convertUnit(value, metric.Unit, "BYTES")
+	}
+	// Time metrics are handled by chart definitions (Mul/Div)
+	// Other metrics typically don't need conversion
+	
+	mx[fmt.Sprintf("%s_%s_%s", prefix, cleanInst, w.cleanID(metric.Name))] = value
 }
 
 // collectTimeMetric collects all time statistic dimensions into the mx map
