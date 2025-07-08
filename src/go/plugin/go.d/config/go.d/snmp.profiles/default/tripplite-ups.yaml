@@ -22,7 +22,7 @@ metrics:
       name: tlUpsMainOutletState
       chart_meta:
         description: The current state of the main output of the device
-        family: "Hardware/Outlet/Main/Status"
+        family: 'Hardware/Outlet/Main/Status'
         unit: "{status}"
       mapping:
         0: unknown
@@ -35,7 +35,7 @@ metrics:
       name: tlUpsTemperature
       chart_meta:
         description: The ambient temperature
-        family: "Environment/Temperature/Value"
+        family: 'Environment/Temperature/Value'
         unit: "Cel"
   - MIB: TRIPPLITE-12X
     symbol:
@@ -43,7 +43,7 @@ metrics:
       name: tlUpsBatteryAge # The age of the battery in years.
       chart_meta:
         description: The age of the battery in years
-        family: "Hardware/Battery/Age/Internal"
+        family: 'Hardware/Battery/Age/Internal'
         unit: "{year}"
   - MIB: TRIPPLITE-12X
     symbol:
@@ -51,7 +51,7 @@ metrics:
       name: tlUpsTemperatureF
       chart_meta:
         description: The ambient temperature (F)
-        family: "Environment/Temperature/Value"
+        family: 'Environment/Temperature/Value'
         unit: "degF"
   - MIB: TRIPPLITE-12X
     symbol:
@@ -59,7 +59,7 @@ metrics:
       name: tlUpsExternalBatteryAge # The age of the battery in years.
       chart_meta:
         description: The age of external battery in years
-        family: "Hardware/Battery/Age/External"
+        family: 'Hardware/Battery/Age/External'
         unit: "{year}"
   - MIB: TRIPPLITE-12X
     symbol:
@@ -67,7 +67,7 @@ metrics:
       name: tlUpsAlarmsPresent
       chart_meta:
         description: The present number of active alarm conditions
-        family: "System/Alarm/Active/Count"
+        family: 'System/Alarm/Active/Count'
         unit: "{alarm}"
   #  - MIB: TRIPPLITE-12X
   #    symbol:
@@ -85,7 +85,7 @@ metrics:
       name: tlEnvTemperatureC
       chart_meta:
         description: The ambient temperature
-        family: "Environment/Temperature/Value"
+        family: 'Environment/Temperature/Value'
         unit: "Cel"
   - MIB: TRIPPLITE-12X
     symbol:
@@ -93,7 +93,7 @@ metrics:
       name: tlEnvTemperatureF
       chart_meta:
         description: The ambient temperature
-        family: "Environment/Temperature/Value"
+        family: 'Environment/Temperature/Value'
         unit: "degF"
   - MIB: TRIPPLITE-12X
     symbol:
@@ -101,7 +101,7 @@ metrics:
       name: tlEnvTemperatureInAlarm
       chart_meta:
         description: Indicates whether or not temperature is in alarm
-        family: "Environment/Temperature/Alarm/Status"
+        family: 'Environment/Temperature/Alarm/Status'
         unit: "{status}"
       mapping:
         true: 1
@@ -112,7 +112,7 @@ metrics:
       name: tlEnvHumidity
       chart_meta:
         description: The ambient humidity
-        family: "Environment/Humidity/Value"
+        family: 'Environment/Humidity/Value'
         unit: "%"
   - MIB: TRIPPLITE-12X
     symbol:
@@ -120,7 +120,7 @@ metrics:
       name: tlEnvHumidityInAlarm
       chart_meta:
         description: Indicates whether or not humidity is in alarm
-        family: "Environment/Humidity/Alarm/Status"
+        family: 'Environment/Humidity/Alarm/Status'
         unit: "{status}"
       mapping:
         true: 1
@@ -134,7 +134,7 @@ metrics:
         name: tlUpsInputVoltage
         chart_meta:
           description: The magnitude of the present input voltage
-          family: "PowerFlow/Input/Voltage/Value"
+          family: 'PowerFlow/Input/Voltage/Value'
           unit: "V"
     metric_tags:
       - tag: tl_ups_input_voltage_index
@@ -157,21 +157,21 @@ metrics:
         name: tlUpsOutputCircuitLoadCurrent
         chart_meta:
           description: The magnitude of the present output current
-          family: "PowerFlow/Output/Circuit/Current/Value"
+          family: 'PowerFlow/Output/Circuit/Current/Value'
           unit: "A"
         scale_factor: 0.1
       - OID: 1.3.6.1.4.1.850.100.1.4.7.1.4
         name: tlUpsOutputCircuitVoltage
         chart_meta:
           description: The magnitude of the present circuit voltage
-          family: "PowerFlow/Output/Circuit/Voltage/Value"
+          family: 'PowerFlow/Output/Circuit/Voltage/Value'
           unit: "V"
         scale_factor: 0.1
       - OID: 1.3.6.1.4.1.850.100.1.4.7.1.5
         name: tlUpsOutputCircuitPower
         chart_meta:
           description: The magnitude of the present power in watts
-          family: "PowerFlow/Output/Circuit/Active"
+          family: 'PowerFlow/Output/Circuit/Active'
           unit: "W"
     metric_tags:
       - tag: tl_ups_output_circuit_index
@@ -192,7 +192,7 @@ metrics:
         name: tlEnvContactStatus
         chart_meta:
           description: The current status of the contact
-          family: "Hardware/Sensor/Contact/Status"
+          family: 'Hardware/Sensor/Contact/Status'
           unit: "{status}"
         mapping:
           0: normal
@@ -219,7 +219,7 @@ metrics:
         name: tlUpsOutletGroupState
         chart_meta:
           description: The current state of the outlet group
-          family: "Hardware/Outlet/Group/Status"
+          family: 'Hardware/Outlet/Group/Status'
           unit: "{status}"
         mapping:
           0: unknown

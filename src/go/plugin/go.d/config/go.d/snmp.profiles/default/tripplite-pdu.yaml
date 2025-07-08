@@ -24,7 +24,7 @@ metrics:
         name: tlpDeviceStatus
         chart_meta:
           description: The currently most critical alarm status for the device
-          family: "Hardware/Device/Alarm/Status"
+          family: 'Hardware/Device/Alarm/Status'
           unit: "{status}"
         mapping:
           0: none
@@ -68,31 +68,31 @@ metrics:
         name: tlpPduDeviceTemperatureC
         chart_meta:
           description: The ambient temperature at or near the PDU casing.
-          family: "Environment/Temperature/Value"
+          family: 'Environment/Temperature/Value'
           unit: "Cel"
       - OID: 1.3.6.1.4.1.850.1.1.3.2.2.1.1.7
         name: tlpPduDeviceTemperatureF
         chart_meta:
           description: The ambient temperature at or near the PDU casing.
-          family: "Environment/Temperature/Value"
+          family: 'Environment/Temperature/Value'
           unit: "F"
       - OID: 1.3.6.1.4.1.850.1.1.3.2.2.1.1.8
         name: tlpPduDevicePhaseImbalance
         chart_meta:
           description: The percentage of imbalance of the three phases.
-          family: "PowerFlow/Phase/Imbalance/Value"
+          family: 'PowerFlow/Phase/Imbalance/Value'
           unit: "%"
       - OID: 1.3.6.1.4.1.850.1.1.3.2.2.1.1.9
         name: tlpPduDeviceOutputPowerTotal
         chart_meta:
           description: The AC output total power for all circuits.
-          family: "PowerFlow/Output/Total"
+          family: 'PowerFlow/Output/Total'
           unit: "W"
       - OID: 1.3.6.1.4.1.850.1.1.3.2.2.1.1.1
         name: tlpPduDeviceMainLoadState
         chart_meta:
           description: The current state of the main output of the device
-          family: "Hardware/Output/Main/Status"
+          family: 'Hardware/Output/Main/Status'
           unit: "{status}"
         mapping:
           0: unknown
@@ -119,25 +119,25 @@ metrics:
         name: tlpPduOutputVoltage
         chart_meta:
           description: The magnitude of the present output voltage for a given output line.
-          family: "PowerFlow/Output/Phase/Voltage/Value"
+          family: 'PowerFlow/Output/Phase/Voltage/Value'
           unit: "V"
       - OID: 1.3.6.1.4.1.850.1.1.3.2.3.2.1.1.5
         name: tlpPduOutputCurrent
         chart_meta:
           description: The output current, in hundreths of amps, for a given phase.
-          family: "PowerFlow/Output/Phase/Current/Value"
+          family: 'PowerFlow/Output/Phase/Current/Value'
           unit: "mA"
       - OID: 1.3.6.1.4.1.850.1.1.3.2.3.2.1.1.10
         name: tlpPduOutputSource
         chart_meta:
           description: The present source of output power.
-          family: "PowerFlow/Output/Source/Status"
+          family: 'PowerFlow/Output/Source/Status'
           unit: "{status}"
       - OID: 1.3.6.1.4.1.850.1.1.3.2.3.2.1.1.11
         name: tlpPduOutputFrequency
         chart_meta:
           description: The present output frequency.
-          family: "PowerFlow/Output/Frequency/Value"
+          family: 'PowerFlow/Output/Frequency/Value'
           unit: "Hz"
     # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
@@ -170,25 +170,25 @@ metrics:
         name: tlpPduOutletState
         chart_meta:
           description: The current state of the outlet.
-          family: "Hardware/Outlet/Status"
+          family: 'Hardware/Outlet/Status'
           unit: "{status}"
       - OID: 1.3.6.1.4.1.850.1.1.3.2.3.3.1.1.7
         name: tlpPduOutletVoltage
         chart_meta:
           description: The magnitude of the present output voltage for a given outlet.
-          family: "PowerFlow/Outlet/Voltage/Value"
+          family: 'PowerFlow/Outlet/Voltage/Value'
           unit: "V"
       - OID: 1.3.6.1.4.1.850.1.1.3.2.3.3.1.1.8
         name: tlpPduOutletCurrent
         chart_meta:
           description: The present output current, in hundreths of amps, of a given outlet.
-          family: "PowerFlow/Outlet/Current/Value"
+          family: 'PowerFlow/Outlet/Current/Value'
           unit: "mA"
       - OID: 1.3.6.1.4.1.850.1.1.3.2.3.3.1.1.9
         name: tlpPduOutletPower
         chart_meta:
           description: The output power of a given outlet.
-          family: "PowerFlow/Outlet/Active"
+          family: 'PowerFlow/Outlet/Active'
           unit: "W"
     metric_tags:
       - tag: tlp_pdu_outlet_name
@@ -209,7 +209,7 @@ metrics:
         name: tlpPduBreakerStatus
         chart_meta:
           description: The current state of the bank breaker
-          family: "Hardware/Breaker/Status"
+          family: 'Hardware/Breaker/Status'
           unit: "{status}"
         mapping:
           0: open
@@ -235,7 +235,7 @@ metrics:
       name: tlpAlarmsPresent
       chart_meta:
         description: The present number of active alarm conditions.
-        family: "System/Alarm/Active/Count"
+        family: 'System/Alarm/Active/Count'
         unit: "{alarm}"
 
   - MIB: TRIPPLITE-PRODUCTS
@@ -247,7 +247,7 @@ metrics:
         name: tlpAlarmState
         chart_meta:
           description: The current state of this alarm condition
-          family: "System/Alarm/Condition/Status"
+          family: 'System/Alarm/Condition/Status'
           unit: "{status}"
         mapping:
           1: active
@@ -256,7 +256,7 @@ metrics:
         name: tlpAlarmAcknowledged
         chart_meta:
           description: Denotes whether the alarm condition has been acknowledged
-          family: "System/Alarm/Condition/Acknowledgment/Status"
+          family: 'System/Alarm/Condition/Acknowledgment/Status'
           unit: "{status}"
         mapping:
           1: not_acknowledged

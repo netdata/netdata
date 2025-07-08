@@ -99,7 +99,7 @@ metrics:
         name: systemStatePowerSupplyStatusCombined
         chart_meta:
           description: Current administrative state of the interface
-          family: ''
+          family: ' ''
           unit: "{status}"
         mapping:
           1: other
