@@ -629,7 +629,7 @@ metrics:
         mapping:
           1: enabled
           2: addrdisabled
-          3: servdisabled'
+          3: servdisabled
           4: disabled
           5: forceddisabled
     metric_tags:

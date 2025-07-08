@@ -149,14 +149,6 @@ metrics:
         unit: "By/s"
   - MIB: NIMBLE-MIB
     symbol:
-      OID: 1.3.6.1.4.1.37447.1.3.10.0
-      name: nimble.ioWriteBytes
-      chart_meta:
-        description: Total cumulative number of Write I/O bytes (sequential and random).
-        family: "Storage/Throughput/Write/Total"
-        unit: "By/s"
-  - MIB: NIMBLE-MIB
-    symbol:
       OID: 1.3.6.1.4.1.37447.1.3.11.0
       name: nimble.ioSeqWriteBytes
       chart_meta:
