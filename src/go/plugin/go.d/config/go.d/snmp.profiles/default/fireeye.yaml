@@ -1,6 +1,10 @@
 extends:
   - _system-base.yaml
   - _std-if-mib.yaml
+  - _std-host-resources-mib-feat-base.yaml
+
+sysobjectid:
+  - 1.3.6.1.4.1.25597.1
 
 metadata:
   device:
@@ -8,209 +12,6 @@ metadata:
       vendor:
         value: "fireeye"
 
-sysobjectid:
-  - 1.3.6.1.4.1.25597.1
-
-metrics:
-  - MIB: HOST-RESOURCES-MIB
-    table:
-      OID: 1.3.6.1.2.1.25.3.3
-      name: hrProcessorTable
-    symbols:
-      - OID: 1.3.6.1.2.1.25.3.3.1.2
-        name: cpu.usage
-        description: Average percentage of time that this processor was not idle
-        unit: "%"
-    metric_tags:
-      - tag: hr_processor_frw_id
-        symbol:
-          OID: 1.3.6.1.2.1.25.3.3.1.1
-          name: hrProcessorFrwID
-  - MIB: HOST-RESOURCES-MIB
-    symbol:
-      OID: 1.3.6.1.2.1.25.2.3.1.6.1 # hrStorageUsed.1 = Physical memory
-      name: memory.total
-      description: Amount of physical memory allocated in units of allocation units
-      unit: "By"
-  - MIB: HOST-RESOURCES-MIB
-    symbol:
-      OID: 1.3.6.1.2.1.25.2.3.1.6.6 # hrStorageUsed.6 = Memory buffers
-      name: feMemoryBuffers
-      description: Amount of memory used for buffers in units of allocation units
-      unit: "By"
-  - MIB: HOST-RESOURCES-MIB
-    symbol:
-      OID: 1.3.6.1.2.1.25.2.3.1.6.7 # hrStorageUsed.7 = Cached memory
-      name: feCachedMemory
-      description: Amount of cached memory in units of allocation units
-      unit: "By"
-  # - MIB: FE-FIREEYE-MIB
-  #   symbol:
-  #     OID: 1.3.6.1.4.1.25597.11.5.1.10.0
-  #     name: feProductLicenseActive
-  #     enum:
-  #       true: 1
-  #       false: 2
-  #     TODO: enum in scalar metric is not supported yet (keep this metric and this
-  #       comment in profile until it's fixed)
-  # - MIB: FE-FIREEYE-MIB
-  #   symbol:
-  #     OID: 1.3.6.1.4.1.25597.11.1.1.1.0
-  #     name: feSystemStatus
-  # scalar string metric is not supported yet (keep this metric and this comment in profile until it's fixed)
-  # - MIB: FE-FIREEYE-MIB
-  #   symbol:
-  #     OID: 1.3.6.1.4.1.25597.11.1.1.6.0
-  #     name: feTemperatureIsHealthy
-  #     enum:
-  #       true: 1
-  #       false: 2
-  #     TODO: enum in scalar metric is not supported yet (keep this metric and this
-  #       comment in profile until it's fixed)
-  # - MIB: FE-FIREEYE-MIB
-  #   symbol:
-  #     OID: 1.3.6.1.4.1.25597.11.2.1.2.0
-  #     name: feRaidIsHealthy
-  #     enum:
-  #       true: 1
-  #       false: 2
-  #     TODO: enum in scalar metric is not supported yet (keep this metric and this
-  #       comment in profile until it's fixed)
-  - MIB: FE-FIREEYE-MIB
-    table:
-      OID: 1.3.6.1.4.1.25597.11.2.1.3
-      name: fePhysicalDiskTable
-    symbols:
-      - name: fePhysicalDisk
-        constant_value_one: true
-        description: Physical disk entity
-        unit: "{physical_disk}"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.25597.11.2.1.3.1.2
-          name: fePhysicalDiskName
-        tag: fe_physical_disk_name
-      - symbol:
-          OID: 1.3.6.1.4.1.25597.11.2.1.3.1.4
-          name: fePhysicalDiskIsHealthy
-        tag: fe_physical_disk_is_healthy
-        mapping:
-          1: 'true'
-          2: 'false'
-  # - MIB: FE-FIREEYE-MIB
-  #   symbol:
-  #     OID: 1.3.6.1.4.1.25597.11.3.1.2.0
-  #     name: fePowerSupplyOverallIsHealthy
-  #     enum:
-  #       true: 1
-  #       false: 2
-  #     TODO: enum in scalar metric is not supported yet (keep this metric and this
-  #       comment in profile until it's fixed)
-  # - MIB: FE-FIREEYE-MIB
-  #   symbol:
-  #     OID: 1.3.6.1.4.1.25597.11.4.1.2.0
-  #     name: feFanOverallIsHealthy
-  #     enum:
-  #       true: 1
-  #       false: 2
-  #     TODO: enum in scalar metric is not supported yet (keep this metric and this
-  #       comment in profile until it's fixed)
-  - MIB: FE-FIREEYE-MIB
-    symbol:
-      OID: 1.3.6.1.4.1.25597.13.1.1.0
-      name: feTotalEmailCount
-      description: Count of all emails coming into postfix including those without URL or attachment
-      unit: "{email}"
-    metric_type: monotonic_count
-  - MIB: FE-FIREEYE-MIB
-    symbol:
-      OID: 1.3.6.1.4.1.25597.13.1.4.0
-      name: feInfectedEmailCount
-      description: Count of all emails determined to be malicious
-      unit: "{email}"
-    metric_type: monotonic_count
-  - MIB: FE-FIREEYE-MIB
-    symbol:
-      OID: 1.3.6.1.4.1.25597.13.1.7.0
-      name: feAnalyzedEmailCount
-      description: Cumulative count of all emails analyzed
-      unit: "{email}"
-    metric_type: monotonic_count
-  - MIB: FE-FIREEYE-MIB
-    symbol:
-      OID: 1.3.6.1.4.1.25597.13.1.10.0
-      name: feTotalUrlCount
-      description: Count of all URLs received whether processed or not
-      unit: "{url}"
-    metric_type: monotonic_count
-  - MIB: FE-FIREEYE-MIB
-    symbol:
-      OID: 1.3.6.1.4.1.25597.13.1.13.0
-      name: feInfectedUrlCount
-      description: Count of all URLs determined to be malicious
-      unit: "{url}"
-    metric_type: monotonic_count
-  - MIB: FE-FIREEYE-MIB
-    symbol:
-      OID: 1.3.6.1.4.1.25597.13.1.16.0
-      name: feAnalyzedUrlCount
-      description: Cumulative count of all URLs analyzed
-      unit: "{url}"
-    metric_type: monotonic_count
-  - MIB: FE-FIREEYE-MIB
-    symbol:
-      OID: 1.3.6.1.4.1.25597.13.1.19.0
-      name: feTotalAttachmentCount
-      description: Count of all attachments received whether processed or not
-      unit: "{attachment}"
-    metric_type: monotonic_count
-  - MIB: FE-FIREEYE-MIB
-    symbol:
-      OID: 1.3.6.1.4.1.25597.13.1.22.0
-      name: feInfectedAttachmentCount
-      description: Count of all attachments determined to be malicious
-      unit: "{attachment}"
-    metric_type: monotonic_count
-  - MIB: FE-FIREEYE-MIB
-    symbol:
-      OID: 1.3.6.1.4.1.25597.13.1.25.0
-      name: feAnalyzedAttachmentCount
-      description: Cumulative count of all attachments analyzed for maliciousness
-      unit: "{attachment}"
-    metric_type: monotonic_count
-  - MIB: FE-FIREEYE-MIB
-    symbol:
-      OID: 1.3.6.1.4.1.25597.13.1.40.0
-      name: feeQuarantineUsage
-      description: Consumed capacity as percentage of max capacity
-      unit: "%"
-  - MIB: FE-FIREEYE-MIB
-    symbol:
-      OID: 1.3.6.1.4.1.25597.13.1.44.0
-      name: feDeferredEmailCount
-      description: Count of deferred emails representing current snapshot value
-      unit: "{email}"
-  - MIB: FE-FIREEYE-MIB
-    symbol:
-      OID: 1.3.6.1.4.1.25597.13.1.45.0
-      name: feHoldQueueEmailCount
-      description: Count of emails in the hold queue representing current snapshot value
-      unit: "{email}"
-  - MIB: FE-FIREEYE-MIB
-    symbol:
-      OID: 1.3.6.1.4.1.25597.15.1.1.0
-      name: feTotalObjectAnalyzedCount
-      description: Count of all objects analyzed including all children of any samples
-      unit: "{object}"
-    metric_type: monotonic_count
-  - MIB: FE-FIREEYE-MIB
-    symbol:
-      OID: 1.3.6.1.4.1.25597.15.1.4.0
-      name: feTotalMaliciousObjectCount
-      description: Count of all malicious samples detected
-      unit: "{object}"
-    metric_type: monotonic_count
 metric_tags:
   - tag: fe_hardware_model
     OID: 1.3.6.1.4.1.25597.11.1.1.2.0
@@ -218,3 +19,195 @@ metric_tags:
   - tag: fe_serial_number
     OID: 1.3.6.1.4.1.25597.11.1.1.3.0
     symbol: feSerialNumber
+
+# https://mibbrowser.online/mibdb_search.php?mib=FE-FIREEYE-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/fireeye/FE-FIREEYE-MIB
+
+metrics:
+  - MIB: FE-FIREEYE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25597.11.5.1.10.0
+      name: feProductLicenseActive
+      chart_meta:
+        description: Whether the product license is active
+        family: 'System/License/Status'
+        unit: "{status}"
+      mapping:
+        true: 1
+        false: 2
+  - MIB: FE-FIREEYE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25597.11.1.1.6.0
+      name: feIsTemperatureNormal
+      chart_meta:
+        description: Whether or not the temperature is normal
+        family: 'Hardware/Temperature/Status'
+        unit: "{status}"
+      mapping:
+        true: 1
+        false: 2
+  - MIB: FE-FIREEYE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25597.11.2.1.2.0
+      name: feRaidIsHealthy
+      chart_meta:
+        description: Whether or not RAID is healthy overall
+        family: 'Hardware/RAID/Status'
+        unit: "{status}"
+      mapping:
+        true: 1
+        false: 2
+  - MIB: FE-FIREEYE-MIB
+    table:
+      OID: 1.3.6.1.4.1.25597.11.2.1.3
+      name: fePhysicalDiskTable
+    symbols:
+      - OID: 1.3.6.1.4.1.25597.11.2.1.3.1.4
+        name: fePhysicalDiskIsHealthy
+        chart_meta:
+          description: Whether a physical disk is healthy
+          family: 'Hardware/Disk/Status'
+          unit: "{status}"
+        mapping:
+          true: 1
+          false: 2
+    metric_tags:
+      - tag: fe_physical_disk_name
+        symbol:
+          OID: 1.3.6.1.4.1.25597.11.2.1.3.1.2
+          name: fePhysicalDiskName
+
+  - MIB: FE-FIREEYE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25597.11.3.1.2.0
+      name: fePowerSupplyOverallIsHealthy
+      chart_meta:
+        description: Whether or not power supply is healthy overall
+        family: 'Hardware/Power/Status'
+        unit: "{status}"
+      mapping:
+        true: 1
+        false: 2
+  - MIB: FE-FIREEYE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25597.11.4.1.2.0
+      name: feFanOverallIsHealthy
+      chart_meta:
+        description: Whether or not fan is healthy overall
+        family: 'Hardware/Fan/Status'
+        unit: "{status}"
+      mapping:
+        true: 1
+        false: 2
+  - MIB: FE-FIREEYE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25597.13.1.1.0
+      name: feTotalEmailCount
+      chart_meta:
+        description: Count of all emails coming into postfix including those without URL or attachment
+        family: 'Security/Email/Total'
+        unit: "{email}/s"
+  - MIB: FE-FIREEYE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25597.13.1.4.0
+      name: feInfectedEmailCount
+      chart_meta:
+        description: Count of all emails determined to be malicious
+        family: 'Security/Email/Malicious'
+        unit: "{email}/s"
+  - MIB: FE-FIREEYE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25597.13.1.7.0
+      name: feAnalyzedEmailCount
+      chart_meta:
+        description: Cumulative count of all emails analyzed
+        family: 'Security/Email/Analyzed'
+        unit: "{email}/s"
+  - MIB: FE-FIREEYE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25597.13.1.10.0
+      name: feTotalUrlCount
+      chart_meta:
+        description: Count of all URLs received whether processed or not
+        family: 'Security/URL/Total'
+        unit: "{url}/s"
+  - MIB: FE-FIREEYE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25597.13.1.13.0
+      name: feInfectedUrlCount
+      chart_meta:
+        description: Count of all URLs determined to be malicious
+        family: 'Security/URL/Malicious'
+        unit: "{url}/s"
+  - MIB: FE-FIREEYE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25597.13.1.16.0
+      name: feAnalyzedUrlCount
+      chart_meta:
+        description: Cumulative count of all URLs analyzed
+        family: 'Security/URL/Analyzed'
+        unit: "{url}/s"
+  - MIB: FE-FIREEYE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25597.13.1.19.0
+      name: feTotalAttachmentCount
+      chart_meta:
+        description: Count of all attachments received whether processed or not
+        family: 'Security/Attachment/Total'
+        unit: "{attachment}/s"
+  - MIB: FE-FIREEYE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25597.13.1.22.0
+      name: feInfectedAttachmentCount
+      chart_meta:
+        description: Count of all attachments determined to be malicious
+        family: 'Security/Attachment/Malicious'
+        unit: "{attachment}/s"
+  - MIB: FE-FIREEYE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25597.13.1.25.0
+      name: feAnalyzedAttachmentCount
+      chart_meta:
+        description: Cumulative count of all attachments analyzed for maliciousness
+        family: 'Security/Attachment/Analyzed'
+        unit: "{attachment}/s"
+  - MIB: FE-FIREEYE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25597.13.1.40.0
+      name: feeQuarantineUsage
+      chart_meta:
+        description: Consumed capacity as percentage of max capacity
+        family: 'Security/Quarantine/Usage'
+        unit: "%"
+  - MIB: FE-FIREEYE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25597.13.1.44.0
+      name: feDeferredEmailCount
+      chart_meta:
+        description: Count of deferred emails representing current snapshot value
+        family: 'Security/Email/Queue/Deferred'
+        unit: "{email}"
+  - MIB: FE-FIREEYE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25597.13.1.45.0
+      name: feHoldQueueEmailCount
+      chart_meta:
+        description: Count of emails in the hold queue representing current snapshot value
+        family: 'Security/Email/Queue/Hold'
+        unit: "{email}"
+  - MIB: FE-FIREEYE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25597.15.1.1.0
+      name: feTotalObjectAnalyzedCount
+      chart_meta:
+        description: Count of all objects analyzed including all children of any samples
+        family: 'Security/Object/Analyzed'
+        unit: "{object}/s"
+  - MIB: FE-FIREEYE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25597.15.1.4.0
+      name: feTotalMaliciousObjectCount
+      chart_meta:
+        description: Count of all malicious samples detected
+        family: 'Security/Object/Malicious'
+        unit: "{object}/s"

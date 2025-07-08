@@ -15,10 +15,6 @@ extends:
   - _std-ip-mib.yaml
   - _f5-big-ip-cpu-memory.yaml
 
-device:
-  vendor: "f5"
-
-
 sysobjectid: 1.3.6.1.4.1.3375.2.1.3.4.*
 
 metadata:
@@ -26,6 +22,8 @@ metadata:
     fields:
       vendor:
         value: "f5"
+      type:
+        value: "load_balancer"
       serial_number:
         symbol:
           MIB: F5-BIGIP-SYSTEM-MIB
@@ -51,8 +49,15 @@ metadata:
         symbol:
           OID: 1.3.6.1.4.1.3375.2.1.6.3.0
           name: sysSystemRelease # The current system release level. e.g. 3.10.0-862.14.4.el7.ve.x86_64
-      type:
-        value: "load_balancer"
+
+
+# F5-BIGIP-SYSTEM-MIB
+# https://mibbrowser.online/mibdb_search.php?mib=F5-BIGIP-SYSTEM-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/f5/F5-BIGIP-SYSTEM-MIB
+
+# F5-BIGIP-LOCAL-MIB
+# https://mibbrowser.online/mibdb_search.php?mib=F5-BIGIP-LOCAL-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/f5/F5-BIGIP-LOCAL-MIB
 
 metrics:
   # Memory stats
@@ -61,57 +66,74 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.1.44.0
       name: sysStatMemoryTotal
-      description: The total memory available in bytes for TMM (Traffic Management Module)
-      unit: "By"
+      chart_meta:
+        description: The total memory available in bytes for TMM (Traffic Management Module)
+        family: 'System/Memory/TMM/Total'
+        unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.1.45.0
       name: sysStatMemoryUsed
-      description: The memory in use in bytes for TMM (Traffic Management Module)
-      unit: "By"
+      chart_meta:
+        description: The memory in use in bytes for TMM (Traffic Management Module)
+        family: 'System/Memory/TMM/Used'
+        unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.21.28.0
       name: sysGlobalTmmStatMemoryTotal
-      description: The total memory available in bytes for TMM (Traffic Management Module)
-      unit: "By"
+      chart_meta:
+        description: The total memory available in bytes for TMM (Traffic Management Module)
+        family: 'System/Memory/TMM/Total'
+        unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.21.29.0
       name: sysGlobalTmmStatMemoryUsed
-      description: The memory in use in bytes for TMM (Traffic Management Module)
-      unit: "By"
+      chart_meta:
+        description: The memory in use in bytes for TMM (Traffic Management Module)
+        family: 'System/Memory/TMM/Used'
+        unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.20.44.0
       name: sysGlobalHostOtherMemoryTotal
-      description: The total other non-TMM memory in bytes for the system
-      unit: "By"
+      chart_meta:
+        description: The total other non-TMM memory in bytes for the system
+        family: 'System/Memory/Host/Total'
+        unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.20.45.0
       name: sysGlobalHostOtherMemoryUsed
-      description: The other non-TMM memory in bytes currently in use for the system
-      unit: "By"
+      chart_meta:
+        description: The other non-TMM memory in bytes currently in use for the system
+        family: 'System/Memory/Host/Used'
+        unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.20.46.0
       name: sysGlobalHostSwapTotal
-      description: The total swap in bytes for the system
-      unit: "By"
+      chart_meta:
+        description: The total swap in bytes for the system
+        family: 'System/Memory/Swap/Total'
+        unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.20.47.0
       name: sysGlobalHostSwapUsed
-      description: The swap in bytes currently in use for the system
-      unit: "By"
+      chart_meta:
+        description: The swap in bytes currently in use for the system
+        family: 'System/Memory/Swap/Used'
+        unit: "By"
+
   # CPU
   - MIB: F5-BIGIP-SYSTEM-MIB
     table:
@@ -121,13 +143,16 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.11
         name: sysMultiHostCpuUsageRatio
-        description: This is usage ratio of CPU for the associated host
-        unit: "%"
+        chart_meta:
+          description: This is usage ratio of CPU for the associated host
+          family: 'System/CPU/Usage'
+          unit: "%"
     metric_tags:
-      - symbol:
+      - tag: cpu_id
+        symbol:
           OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.3
           name: sysMultiHostCpuId
-        tag: cpu
+
   - MIB: F5-BIGIP-SYSTEM-MIB
     table:
       OID: 1.3.6.1.4.1.3375.2.1.7.5.2
@@ -136,168 +161,213 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.4
         name: sysMultiHostCpuUser
-        description: The average time spent by the specified processor in user context for the associated host
-        unit: "%"
+        scale_factor: 100
+        chart_meta:
+          description: The average time spent by the specified processor in user context for the associated host
+          family: 'System/CPU/User'
+          unit: "%"
       - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.5
         name: sysMultiHostCpuNice
-        description: The average time spent by the specified processor running niced processes for the associated host
-        unit: "%"
+        scale_factor: 100
+        chart_meta:
+          description: The average time spent by the specified processor running niced processes for the associated host
+          family: 'System/CPU/Nice'
+          unit: "%"
       - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.6
         name: sysMultiHostCpuSystem
-        description: The average time spent by the specified processor servicing system calls for the associated host
-        unit: "%"
+        scale_factor: 100
+        chart_meta:
+          description: The average time spent by the specified processor servicing system calls for the associated host
+          family: 'System/CPU/System'
+          unit: "%"
       - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.7
         name: sysMultiHostCpuIdle
-        description: The average time spent by the specified processor doing nothing for the associated host
-        unit: "%"
+        scale_factor: 100
+        chart_meta:
+          description: The average time spent by the specified processor doing nothing for the associated host
+          family: 'System/CPU/Idle'
+          unit: "%"
       - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.8
         name: sysMultiHostCpuIrq
-        description: The average time spent by the specified processor servicing hardware interrupts for the associated host
-        unit: "%"
+        scale_factor: 100
+        chart_meta:
+          description: The average time spent by the specified processor servicing hardware interrupts for the associated host
+          family: 'System/CPU/IRQ'
+          unit: "%"
       - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.9
         name: sysMultiHostCpuSoftirq
-        description: The average time spent by the specified processor servicing soft interrupts for the associated host
-        unit: "%"
+        scale_factor: 100
+        chart_meta:
+          description: The average time spent by the specified processor servicing soft interrupts for the associated host
+          family: 'System/CPU/SoftIRQ'
+          unit: "%"
       - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.10
         name: sysMultiHostCpuIowait
-        description: The average time spent by the specified processor waiting for external I/O to complete for the associated host
-        unit: "%"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+        scale_factor: 100
+        chart_meta:
+          description: The average time spent by the specified processor waiting for external I/O to complete for the associated host
+          family: 'System/CPU/IOWait'
+          unit: "%"
     metric_tags:
-      - symbol:
+      - tag: cpu_id
+        symbol:
           OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.3
           name: sysMultiHostCpuId
-        tag: cpu
 
   # TCP stats
   - MIB: F5-BIGIP-SYSTEM-MIB
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.12.2.0
       name: sysTcpStatOpen
-      description: The number of current open connections
-      unit: "{connection}"
+      chart_meta:
+        description: The number of current open connections
+        family: 'Network/TCP/Connection/Open'
+        unit: "{connection}"
   - MIB: F5-BIGIP-SYSTEM-MIB
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.12.3.0
       name: sysTcpStatCloseWait
-      description: The number of current connections in CLOSE-WAIT/LAST-ACK
-      unit: "{connection}"
+      chart_meta:
+        description: The number of current connections in CLOSE-WAIT/LAST-ACK
+        family: 'Network/TCP/Connection/CloseWait'
+        unit: "{connection}"
   - MIB: F5-BIGIP-SYSTEM-MIB
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.12.4.0
       name: sysTcpStatFinWait
-      description: The number of current connections in FIN-WAIT/CLOSING
-      unit: "{connection}"
+      chart_meta:
+        description: The number of current connections in FIN-WAIT/CLOSING
+        family: 'Network/TCP/Connection/FinWait'
+        unit: "{connection}"
   - MIB: F5-BIGIP-SYSTEM-MIB
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.12.5.0
       name: sysTcpStatTimeWait
-      description: The number of current connections in TIME-WAIT
-      unit: "{connection}"
+      chart_meta:
+        description: The number of current connections in TIME-WAIT
+        family: 'Network/TCP/Connection/TimeWait'
+        unit: "{connection}"
   - MIB: F5-BIGIP-SYSTEM-MIB
-    metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.12.6.0
       name: sysTcpStatAccepts
-      description: The number of connections accepted
-      unit: "{connection}"
+      chart_meta:
+        description: The number of connections accepted
+        family: 'Network/TCP/Connection/Accepted'
+        unit: "{connection}/s"
   - MIB: F5-BIGIP-SYSTEM-MIB
-    metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.12.7.0
       name: sysTcpStatAcceptfails
-      description: The number of connections not accepted
-      unit: "{connection}"
+      chart_meta:
+        description: The number of connections not accepted
+        family: 'Network/TCP/Connection/AcceptFailed'
+        unit: "{connection}/s"
   - MIB: F5-BIGIP-SYSTEM-MIB
-    metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.12.8.0
       name: sysTcpStatConnects
-      description: The number of connections established
-      unit: "{connection}"
+      chart_meta:
+        description: The number of connections established
+        family: 'Network/TCP/Connection/Established'
+        unit: "{connection}/s"
   - MIB: F5-BIGIP-SYSTEM-MIB
-    metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.12.9.0
       name: sysTcpStatConnfails
-      description: The number of connections failures
-      unit: "{connection}"
+      chart_meta:
+        description: The number of connections failures
+        family: 'Network/TCP/Connection/Failed'
+        unit: "{connection}/s"
   # UDP stats
   - MIB: F5-BIGIP-SYSTEM-MIB
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.13.2.0
       name: sysUdpStatOpen
-      description: The number of current open connections
-      unit: "{connection}"
+      chart_meta:
+        description: The number of current open connections
+        family: 'Network/UDP/Connection/Open'
+        unit: "{connection}"
   - MIB: F5-BIGIP-SYSTEM-MIB
-    metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.13.3.0
       name: sysUdpStatAccepts
-      description: The number of connections accepted
-      unit: "{connection}"
+      chart_meta:
+        description: The number of connections accepted
+        family: 'Network/UDP/Connection/Accepted'
+        unit: "{connection}/s"
   - MIB: F5-BIGIP-SYSTEM-MIB
-    metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.13.4.0
       name: sysUdpStatAcceptfails
-      description: The number of connections not accepted
-      unit: "{connection}"
+      chart_meta:
+        description: The number of connections not accepted
+        family: 'Network/UDP/Connection/AcceptFailed'
+        unit: "{connection}/s"
   - MIB: F5-BIGIP-SYSTEM-MIB
-    metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.13.5.0
       name: sysUdpStatConnects
-      description: The number of connections established
-      unit: "{connection}"
+      chart_meta:
+        description: The number of connections established
+        family: 'Network/UDP/Connection/Established'
+        unit: "{connection}/s"
   - MIB: F5-BIGIP-SYSTEM-MIB
-    metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.13.6.0
       name: sysUdpStatConnfails
-      description: The number of connections failures
-      unit: "{connection}"
+      chart_meta:
+        description: The number of connections failures
+        family: 'Network/UDP/Connection/Failed'
+        unit: "{connection}/s"
   - MIB: F5-BIGIP-SYSTEM-MIB
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.9.2.0
       name: sysClientsslStatCurConns
-      description: The current number of concurrent connections with established SSL sessions being maintained by the filter
-      unit: "{connection}"
+      chart_meta:
+        description: The current number of concurrent connections with established SSL sessions being maintained by the filter
+        family: 'Network/SSL/Client/Connection/Current'
+        unit: "{connection}"
   - MIB: F5-BIGIP-SYSTEM-MIB
-    metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.9.10.0
       name: sysClientsslStatEncryptedBytesIn
-      description: The total encrypted bytes received
-      unit: "By"
+      chart_meta:
+        description: The total encrypted bytes received
+        family: 'Network/SSL/Client/Traffic/Encrypted/In'
+        unit: "By/s"
   - MIB: F5-BIGIP-SYSTEM-MIB
-    metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.9.11.0
       name: sysClientsslStatEncryptedBytesOut
-      description: The total encrypted bytes sent
-      unit: "By"
+      chart_meta:
+        description: The total encrypted bytes sent
+        family: 'Network/SSL/Client/Traffic/Encrypted/Out'
+        unit: "By/s"
   - MIB: F5-BIGIP-SYSTEM-MIB
-    metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.9.12.0
       name: sysClientsslStatDecryptedBytesIn
-      description: The total decrypted bytes received
-      unit: "By"
+      chart_meta:
+        description: The total decrypted bytes received
+        family: 'Network/SSL/Client/Traffic/Decrypted/In'
+        unit: "By/s"
   - MIB: F5-BIGIP-SYSTEM-MIB
-    metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.9.13.0
       name: sysClientsslStatDecryptedBytesOut
-      description: The total decrypted bytes sent
-      unit: "By"
+      chart_meta:
+        description: The total decrypted bytes sent
+        family: 'Network/SSL/Client/Traffic/Decrypted/Out'
+        unit: "By/s"
   - MIB: F5-BIGIP-SYSTEM-MIB
-    metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.9.29.0
       name: sysClientsslStatHandshakeFailures
-      description: The total number of handshake failures
-      unit: "{connection}"
+      chart_meta:
+        description: The total number of handshake failures
+        family: 'Network/SSL/Client/Handshake/Failed'
+        unit: "{connection}/s"
 
   # Metrics from F5-BIGIP-LOCAL-MIB provide monitoring information about virtual servers, nodes, and pools.
   # These concepts are related to the LTM (Local Traffic Management) features of BIG IP devices.
@@ -312,8 +382,10 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.3375.2.2.10.1.1
       name: ltmVirtualServNumber
-      description: The number of ltmVirtualServ entries in the table
-      unit: "{virtual_server}"
+      chart_meta:
+        description: The number of ltmVirtualServ entries in the table
+        family: 'LoadBalancer/VirtualServer/Count'
+        unit: "{virtual_server}"
 
   - MIB: F5-BIGIP-LOCAL-MIB
     table:
@@ -323,15 +395,18 @@ metrics:
       # Gauges
       - OID: 1.3.6.1.4.1.3375.2.2.10.1.2.1.9
         name: ltmVirtualServEnabled
-        description: The state indicating whether the specified virtual server is enabled or not
-        unit: "{virtual_server}"
+        chart_meta:
+          description: The state indicating whether the specified virtual server is enabled or not
+          family: 'LoadBalancer/VirtualServer/Enabled'
+          unit: "{virtual_server}"
       - OID: 1.3.6.1.4.1.3375.2.2.10.1.2.1.10
         name: ltmVirtualServConnLimit
-        description: The maximum number of connections the specified virtual server is allowed to have open at one time
-        unit: "{connection}"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+        chart_meta:
+          description: The maximum number of connections the specified virtual server is allowed to have open at one time
+          family: 'LoadBalancer/VirtualServer/Connection/Limit'
+          unit: "{connection}"
     metric_tags:
-      - tag: server
+      - tag: virtual_server_name
         symbol:
           OID: 1.3.6.1.4.1.3375.2.2.10.1.2.1.1
           name: ltmVirtualServName
@@ -341,10 +416,17 @@ metrics:
       OID: 1.3.6.1.4.1.3375.2.2.10.13.2
       name: ltmVsStatusTable
     symbols:
-      # Gauges
-      - name: ltmVsStatus
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+      - OID: 1.3.6.1.4.1.3375.2.2.10.13.2.1.3
+        name: ltmVsStatusEnabledState
+        chart_meta:
+          description: The activity status of the specified virtual server, as specified by the user.
+          family: 'LoadBalancer/VirtualServer/Status/Enabled'
+          unit: "{status}"
+        mapping:
+          0: none
+          1: enabled
+          2: disabled
+          3: disabledbyparent
     metric_tags:
       - tag: ltm_vs_status_avail_state
         symbol:
@@ -354,15 +436,7 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.3375.2.2.10.13.2.1.1
           name: ltmVsStatusName
-      - tag: ltm_vs_status_enabled_state
-        symbol:
-          OID: 1.3.6.1.4.1.3375.2.2.10.13.2.1.3
-          name: ltmVsStatusEnabledState
-        mapping:
-          0: none
-          1: enabled
-          2: disabled
-          3: disabledbyparent
+
   - MIB: F5-BIGIP-LOCAL-MIB
     table:
       OID: 1.3.6.1.4.1.3375.2.2.10.2.3
@@ -371,79 +445,97 @@ metrics:
       # Counters (= rates)
       - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.6
         name: ltmVirtualServStatClientPktsIn
-        description: The number of packets received by the specified virtual server from client-side
-        unit: "{packet}"
+        chart_meta:
+          description: The number of packets received by the specified virtual server from client-side
+          family: 'LoadBalancer/VirtualServer/Client/Packet/In'
+          unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.7
         name: ltmVirtualServStatClientBytesIn
-        description: The number of bytes received by the specified virtual server from client-side
-        unit: "By"
+        chart_meta:
+          description: The number of bytes received by the specified virtual server from client-side
+          family: 'LoadBalancer/VirtualServer/Client/Traffic/In'
+          unit: "By/s"
       - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.8
         name: ltmVirtualServStatClientPktsOut
-        description: The number of packets sent to client-side from the specified virtual server
-        unit: "{packet}"
+        chart_meta:
+          description: The number of packets sent to client-side from the specified virtual server
+          family: 'LoadBalancer/VirtualServer/Client/Packet/Out'
+          unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.9
         name: ltmVirtualServStatClientBytesOut
-        description: The number of bytes sent to client-side from the specified virtual server
-        unit: "By"
+        chart_meta:
+          description: The number of bytes sent to client-side from the specified virtual server
+          family: 'LoadBalancer/VirtualServer/Client/Traffic/Out'
+          unit: "By/s"
       # Gauges
       - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.12
         name: ltmVirtualServStatClientCurConns
-        description: The current connections from client-side to the specified virtual server
-        unit: "{connection}"
+        chart_meta:
+          description: The current connections from client-side to the specified virtual server
+          family: 'LoadBalancer/VirtualServer/Client/Connection/Current'
+          unit: "{connection}"
       - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.31
         name: ltmVirtualServStatVsUsageRatio5s
-        description: The percentage of time Virtual Server was busy over the last 5 seconds
-        unit: "%"
+        chart_meta:
+          description: The percentage of time Virtual Server was busy over the last 5 seconds
+          family: 'LoadBalancer/VirtualServer/Usage/5s'
+          unit: "%"
       - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.32
         name: ltmVirtualServStatVsUsageRatio1m
-        description: The percentage of time Virtual Server was busy over the last 1 minute
-        unit: "%"
+        chart_meta:
+          description: The percentage of time Virtual Server was busy over the last 1 minute
+          family: 'LoadBalancer/VirtualServer/Usage/1m'
+          unit: "%"
       - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.33
         name: ltmVirtualServStatVsUsageRatio5m
-        description: The percentage of time Virtual Server was busy over the last 5 minutes
-        unit: "%"
+        chart_meta:
+          description: The percentage of time Virtual Server was busy over the last 5 minutes
+          family: 'LoadBalancer/VirtualServer/Usage/5m'
+          unit: "%"
       - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.34
         name: ltmVirtualServStatCurrentConnsPerSec
-        description: The number of current connections per second to the specified virtual server
-        unit: "1.s"
+        chart_meta:
+          description: The number of current connections per second to the specified virtual server
+          family: 'LoadBalancer/VirtualServer/Connection/Rate'
+          unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.35
         name: ltmVirtualServStatDurationRateExceeded
-        description: Duration of time in seconds the specified virtual server has exceeded the configured connection rate limit
-        unit: "s"
-    metric_tags:
-      - tag: server
-        symbol:
-          OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.1
-          name: ltmVirtualServStatName
-
-  - MIB: F5-BIGIP-LOCAL-MIB
-    table:
-      OID: 1.3.6.1.4.1.3375.2.2.10.2.3
-      name: ltmVirtualServStatTable
-    symbols:
+        chart_meta:
+          description: Duration of time in seconds the specified virtual server has exceeded the configured connection rate limit
+          family: 'LoadBalancer/VirtualServer/RateLimit/Duration'
+          unit: "s"
       - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.5
         name: ltmVirtualServStatNoNodesErrors
-        description: The number of no-node errors
-        unit: "{error}"
+        chart_meta:
+          description: The number of no-node errors
+          family: 'LoadBalancer/VirtualServer/Error/NoNodes'
+          unit: "{error}/s"
       - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.11
         name: ltmVirtualServStatClientTotConns
-        description: The total connections from client-side to the specified virtual server
-        unit: "{connection}"
+        chart_meta:
+          description: The total connections from client-side to the specified virtual server
+          family: 'LoadBalancer/VirtualServer/Client/Connection/Total'
+          unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.27
         name: ltmVirtualServStatTotRequests
-        description: The total number of requests going through the specified virtual server
-        unit: "{request}"
+        chart_meta:
+          description: The total number of requests going through the specified virtual server
+          family: 'LoadBalancer/VirtualServer/Request/Total'
+          unit: "{request}/s"
       - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.40
         name: ltmVirtualServStatClientEvictedConns
-        description: The number of client-side connections that have been evicted on the specified virtual server
-        unit: "{connection}"
+        chart_meta:
+          description: The number of client-side connections that have been evicted on the specified virtual server
+          family: 'LoadBalancer/VirtualServer/Client/Connection/Evicted'
+          unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.41
         name: ltmVirtualServStatClientSlowKilled
-        description: The number of slow client-side connections that have been killed on the specified virtual server
-        unit: "{connection}"
-    metric_type: monotonic_count
+        chart_meta:
+          description: The number of slow client-side connections that have been killed on the specified virtual server
+          family: 'LoadBalancer/VirtualServer/Client/Connection/SlowKilled'
+          unit: "{connection}/s"
     metric_tags:
-      - tag: server
+      - tag: virtual_server_name
         symbol:
           OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.1
           name: ltmVirtualServStatName
@@ -454,8 +546,10 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.3375.2.2.4.1.1
       name: ltmNodeAddrNumber
-      description: The number of ltmNodeAddr entries in the table
-      unit: "{node}"
+      chart_meta:
+        description: The number of ltmNodeAddr entries in the table
+        family: 'LoadBalancer/Node/Count'
+        unit: "{node}"
 
   - MIB: F5-BIGIP-LOCAL-MIB
     table:
@@ -465,52 +559,28 @@ metrics:
       # Gauges
       - OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.3
         name: ltmNodeAddrConnLimit
-        description: The maximum number of connections the specified node address is allowed to have open at one time
-        unit: "{connection}"
+        chart_meta:
+          description: The maximum number of connections the specified node address is allowed to have open at one time
+          family: 'LoadBalancer/Node/Connection/Limit'
+          unit: "{connection}"
       - OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.4
         name: ltmNodeAddrRatio
-        description: The ratio of the specified node address used in load balance algorithm
-        unit: "{ratio}"
+        chart_meta:
+          description: The ratio of the specified node address used in load balance algorithm
+          family: 'LoadBalancer/Node/Ratio/Static'
+          unit: "{ratio}"
       - OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.5
         name: ltmNodeAddrDynamicRatio
-        description: The dynamic ratio of the specified node address used in load balance algorithm
-        unit: "{ratio}"
+        chart_meta:
+          description: The dynamic ratio of the specified node address used in load balance algorithm
+          family: 'LoadBalancer/Node/Ratio/Dynamic'
+          unit: "{ratio}"
       - OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.6
         name: ltmNodeAddrMonitorState
-        description: The internal tmm monitor state for the specified node address
-        unit: "TBD"
-      - OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.7
-        name: ltmNodeAddrMonitorStatus
-        description: The hierarchical load balance state for the specified node address including parent status
-        unit: "TBD"
-      - OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.10
-        name: ltmNodeAddrSessionStatus
-        description: The hierarchical status of the session including parent status for the specified node address
-        unit: "TBD"
-    metric_tags:
-      - tag: node
-        symbol:
-          OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.17
-          name: ltmNodeAddrName
-
-  - MIB: F5-BIGIP-LOCAL-MIB
-    table:
-      OID: 1.3.6.1.4.1.3375.2.2.4.1.2
-      name: ltmNodeAddrTable
-    symbols:
-      # Gauges
-      - name: ltmNodeAddr
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - tag: node
-        symbol:
-          OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.17
-          name: ltmNodeAddrName
-      - tag: monitor_state
-        symbol:
-          OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.6
-          name: ltmNodeAddrMonitorState
+        chart_meta:
+          description: The internal tmm monitor state for the specified node address
+          family: 'LoadBalancer/Node/Monitor/State'
+          unit: "{status}"
         mapping:
           0: unchecked
           1: checking
@@ -527,10 +597,12 @@ metrics:
           27: fqdn_down
           28: fqdn_up
           29: fqdn_up_no_address
-      - tag: monitor_status
-        symbol:
-          OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.7
-          name: ltmNodeAddrMonitorStatus
+      - OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.7
+        name: ltmNodeAddrMonitorStatus
+        chart_meta:
+          description: The hierarchical load balance state for the specified node address including parent status
+          family: 'LoadBalancer/Node/Monitor/Status'
+          unit: "{status}"
         mapping:
           0: unchecked
           1: checking
@@ -548,6 +620,24 @@ metrics:
           27: fqdn_down
           28: fqdn_up
           29: fqdn_up_no_address
+      - OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.10
+        name: ltmNodeAddrSessionStatus
+        chart_meta:
+          description: The hierarchical status of the session including parent status for the specified node address
+          family: 'LoadBalancer/Node/Session/Status'
+          unit: "{status}"
+        mapping:
+          1: enabled
+          2: addrdisabled
+          3: servdisabled
+          4: disabled
+          5: forceddisabled
+    metric_tags:
+      - tag: node_name
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.17
+          name: ltmNodeAddrName
+
   - MIB: F5-BIGIP-LOCAL-MIB
     table:
       OID: 1.3.6.1.4.1.3375.2.2.4.2.3
@@ -556,59 +646,67 @@ metrics:
       # Counters (= rates)
       - OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.3
         name: ltmNodeAddrStatServerPktsIn
-        description: The number of packets received by the specified node address from server-side
-        unit: "{packet}"
+        chart_meta:
+          description: The number of packets received by the specified node address from server-side
+          family: 'LoadBalancer/Node/Server/Packet/In'
+          unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.4
         name: ltmNodeAddrStatServerBytesIn
-        description: The number of bytes received by the specified node address from server-side
-        unit: "By"
+        chart_meta:
+          description: The number of bytes received by the specified node address from server-side
+          family: 'LoadBalancer/Node/Server/Traffic/In'
+          unit: "By/s"
       - OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.5
         name: ltmNodeAddrStatServerPktsOut
-        description: The number of packets sent to server-side from the specified node address
-        unit: "{packet}"
+        chart_meta:
+          description: The number of packets sent to server-side from the specified node address
+          family: 'LoadBalancer/Node/Server/Packet/Out'
+          unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.6
         name: ltmNodeAddrStatServerBytesOut
-        description: The number of bytes sent to server-side from the specified node address
-        unit: "By"
+        chart_meta:
+          description: The number of bytes sent to server-side from the specified node address
+          family: 'LoadBalancer/Node/Server/Traffic/Out'
+          unit: "By/s"
+      - OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.8
+        name: ltmNodeAddrStatServerTotConns
+        chart_meta:
+          description: The total connections from server-side to the specified node address
+          family: 'LoadBalancer/Node/Server/Connection/Total'
+          unit: "{connection}/s"
+      - OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.17
+        name: ltmNodeAddrStatTotRequests
+        chart_meta:
+          description: The total number of requests going through the specified node address
+          family: 'LoadBalancer/Node/Request/Total'
+          unit: "{request}/s"
       # Gauges
       - OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.9
         name: ltmNodeAddrStatServerCurConns
-        description: The current connections from server-side to the specified node address
-        unit: "{connection}"
+        chart_meta:
+          description: The current connections from server-side to the specified node address
+          family: 'LoadBalancer/Node/Server/Connection/Current'
+          unit: "{connection}"
       - OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.21
         name: ltmNodeAddrStatCurSessions
-        description: The number of current sessions going through the specified node address
-        unit: "{session}"
+        chart_meta:
+          description: The number of current sessions going through the specified node address
+          family: 'LoadBalancer/Node/Session/Current'
+          unit: "{session}"
       - OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.22
         name: ltmNodeAddrStatCurrentConnsPerSec
-        description: The number of current connections per second to the specified node address
-        unit: "1.s"
+        chart_meta:
+          description: The number of current connections per second to the specified node address
+          family: 'LoadBalancer/Node/Connection/Rate'
+          unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.23
         name: ltmNodeAddrStatDurationRateExceeded
-        description: Duration of time in seconds the specified node address has exceeded the configured connection rate limit
-        unit: "s"
+        chart_meta:
+          description: Duration of time in seconds the specified node address has exceeded the configured connection rate limit
+          family: 'LoadBalancer/Node/RateLimit/Duration'
+          unit: "s"
     metric_tags:
-      - tag: node
-        symbol:
-          OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.20
-          name: ltmNodeAddrStatNodeName
-
-  - MIB: F5-BIGIP-LOCAL-MIB
-    table:
-      OID: 1.3.6.1.4.1.3375.2.2.4.2.3
-      name: ltmNodeAddrStatTable
-    symbols:
-      - OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.8
-        name: ltmNodeAddrStatServerTotConns
-        description: The total connections from server-side to the specified node address
-        unit: "{connection}"
-      - OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.17
-        name: ltmNodeAddrStatTotRequests
-        description: The total number of requests going through the specified node address
-        unit: "{request}"
-    metric_type: monotonic_count
-    metric_tags:
-      - tag: node
+      - tag: node_name
         symbol:
           OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.20
           name: ltmNodeAddrStatNodeName
@@ -619,8 +717,10 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.3375.2.2.5.1.1
       name: ltmPoolNumber
-      description: The number of ltmPool entries in the table
-      unit: "{pool}"
+      chart_meta:
+        description: The number of ltmPool entries in the table
+        family: 'LoadBalancer/Pool/Count'
+        unit: "{pool}"
 
   - MIB: F5-BIGIP-LOCAL-MIB
     table:
@@ -630,18 +730,24 @@ metrics:
       # Gauges
       - OID: 1.3.6.1.4.1.3375.2.2.5.1.2.1.8
         name: ltmPoolActiveMemberCnt
-        description: The number of the current active members in the specified pool
-        unit: "{member}"
+        chart_meta:
+          description: The number of the current active members in the specified pool
+          family: 'LoadBalancer/Pool/Member/Active'
+          unit: "{member}"
       - OID: 1.3.6.1.4.1.3375.2.2.5.1.2.1.16
         name: ltmPoolDynamicRatioSum
-        description: The sum of the dynamic ratio from all the members of the specified pool
-        unit: "{ratio}"
+        chart_meta:
+          description: The sum of the dynamic ratio from all the members of the specified pool
+          family: 'LoadBalancer/Pool/Ratio/DynamicSum'
+          unit: "{ratio}"
       - OID: 1.3.6.1.4.1.3375.2.2.5.1.2.1.23
         name: ltmPoolMemberCnt
-        description: The total number of members in the specified pool
-        unit: "{member}"
+        chart_meta:
+          description: The total number of members in the specified pool
+          family: 'LoadBalancer/Pool/Member/Total'
+          unit: "{member}"
     metric_tags:
-      - tag: pool
+      - tag: pool_name
         symbol:
           OID: 1.3.6.1.4.1.3375.2.2.5.1.2.1.1
           name: ltmPoolName
@@ -654,63 +760,73 @@ metrics:
       # Counters (= rates)
       - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.2
         name: ltmPoolStatServerPktsIn
-        description: The number of packets received by the specified pool from server-side
-        unit: "{packet}"
+        chart_meta:
+          description: The number of packets received by the specified pool from server-side
+          family: 'LoadBalancer/Pool/Server/Packet/In'
+          unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.3
         name: ltmPoolStatServerBytesIn
-        description: The number of bytes received by the specified pool from server-side
-        unit: "By"
+        chart_meta:
+          description: The number of bytes received by the specified pool from server-side
+          family: 'LoadBalancer/Pool/Server/Traffic/In'
+          unit: "By/s"
       - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.4
         name: ltmPoolStatServerPktsOut
-        description: The number of packets sent to server-side from the specified pool
-        unit: "{packet}"
+        chart_meta:
+          description: The number of packets sent to server-side from the specified pool
+          family: 'LoadBalancer/Pool/Server/Packet/Out'
+          unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.5
         name: ltmPoolStatServerBytesOut
-        description: The number of bytes sent to server-side from the specified pool
-        unit: "By"
+        chart_meta:
+          description: The number of bytes sent to server-side from the specified pool
+          family: 'LoadBalancer/Pool/Server/Traffic/Out'
+          unit: "By/s"
+      - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.7
+        name: ltmPoolStatServerTotConns
+        chart_meta:
+          description: The total connections from server-side to the specified pool
+          family: 'LoadBalancer/Pool/Server/Connection/Total'
+          unit: "{connection}/s"
+      - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.23
+        name: ltmPoolStatConnqServiced
+        chart_meta:
+          description: Number of entries that have been removed from the queue, sum
+          family: 'LoadBalancer/Pool/Queue/Serviced'
+          unit: "{connection}/s"
+      - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.30
+        name: ltmPoolStatTotRequests
+        chart_meta:
+          description: The total number of requests to the specified pool
+          family: 'LoadBalancer/Pool/Request/Total'
+          unit: "{request}/s"
       # Gauges
       - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.8
         name: ltmPoolStatServerCurConns
-        description: The current connections from server-side to the specified pool
-        unit: "{connection}"
+        chart_meta:
+          description: The current connections from server-side to the specified pool
+          family: 'LoadBalancer/Pool/Server/Connection/Current'
+          unit: "{connection}"
       - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.18
         name: ltmPoolStatConnqDepth
-        description: Number of connections currently in queue, sum
-        unit: "{connection}"
+        chart_meta:
+          description: Number of connections currently in queue, sum
+          family: 'LoadBalancer/Pool/Queue/Depth'
+          unit: "{connection}"
       - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.19
         name: ltmPoolStatConnqAgeHead
-        description: Age in milliseconds of the oldest queue entry, max
-        unit: "ms"
+        chart_meta:
+          description: Age in milliseconds of the oldest queue entry, max
+          family: 'LoadBalancer/Pool/Queue/AgeHead'
+          unit: "ms"
       - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.31
         name: ltmPoolStatCurSessions
-        description: The current number of sessions to the specified pool
-        unit: "{session}"
+        chart_meta:
+          description: The current number of sessions to the specified pool
+          family: 'LoadBalancer/Pool/Session/Current'
+          unit: "{session}"
     metric_tags:
-      - tag: pool
-        symbol:
-          OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.1
-          name: ltmPoolStatName
-
-  - MIB: F5-BIGIP-LOCAL-MIB
-    table:
-      OID: 1.3.6.1.4.1.3375.2.2.5.2.3
-      name: ltmPoolStatTable
-    symbols:
-      - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.7
-        name: ltmPoolStatServerTotConns
-        description: The total connections from server-side to the specified pool
-        unit: "{connection}"
-      - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.23
-        name: ltmPoolStatConnqServiced
-        description: Number of entries that have been removed from the queue, sum
-        unit: "{connection}"
-      - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.30
-        name: ltmPoolStatTotRequests
-        description: The total number of requests to the specified pool
-        unit: "{request}"
-    metric_type: monotonic_count
-    metric_tags:
-      - tag: pool
+      - tag: pool_name
         symbol:
           OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.1
           name: ltmPoolStatName
@@ -721,8 +837,10 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.3375.2.2.5.3.1
       name: ltmPoolMemberNumber
-      description: The number of ltmPoolMember entries in the table
-      unit: "{member}"
+      chart_meta:
+        description: The number of ltmPoolMember entries in the table
+        family: 'LoadBalancer/PoolMember/Count'
+        unit: "{member}"
 
   - MIB: F5-BIGIP-LOCAL-MIB
     table:
@@ -732,61 +850,28 @@ metrics:
       # Gauges
       - OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.5
         name: ltmPoolMemberConnLimit
-        description: The maximum connections allowed to the specified pool member
-        unit: "{connection}"
+        chart_meta:
+          description: The maximum connections allowed to the specified pool member
+          family: 'LoadBalancer/PoolMember/Connection/Limit'
+          unit: "{connection}"
       - OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.6
         name: ltmPoolMemberRatio
-        description: The load balancing ratio of the specified pool member used in pool member ratio load balancing mode
-        unit: "{ratio}"
+        chart_meta:
+          description: The load balancing ratio of the specified pool member used in pool member ratio load balancing mode
+          family: 'LoadBalancer/PoolMember/Ratio/Static'
+          unit: "{ratio}"
       - OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.9
         name: ltmPoolMemberDynamicRatio
-        description: The dynamic ratio for the specified pool member used in load balance algorithm
-        unit: "{ratio}"
+        chart_meta:
+          description: The dynamic ratio for the specified pool member used in load balance algorithm
+          family: 'LoadBalancer/PoolMember/Ratio/Dynamic'
+          unit: "{ratio}"
       - OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.10
         name: ltmPoolMemberMonitorState
-        description: The internal tmm monitor state for the specified node address
-        unit: "TBD"
-      - OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.11
-        name: ltmPoolMemberMonitorStatus
-        description: The hierarchical load balance state for the specified node address including parent status
-        unit: "TBD"
-      - OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.13
-        name: ltmPoolMemberSessionStatus
-        description: The hierarchical status of the session including parent status for the specified pool member
-        unit: "TBD"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - tag: pool
-        symbol:
-          OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.1
-          name: ltmPoolMemberPoolName
-      - tag: node
-        symbol:
-          OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.19
-          name: ltmPoolMemberNodeName
-
-  - MIB: F5-BIGIP-LOCAL-MIB
-    table:
-      OID: 1.3.6.1.4.1.3375.2.2.5.3.2
-      name: ltmPoolMemberTable
-    symbols:
-      # Gauges
-      - name: ltmPoolMember
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - tag: pool
-        symbol:
-          OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.1
-          name: ltmPoolMemberPoolName
-      - tag: node
-        symbol:
-          OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.19
-          name: ltmPoolMemberNodeName
-      - tag: monitor_state
-        symbol:
-          OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.10
-          name: ltmPoolMemberMonitorState
+        chart_meta:
+          description: The internal tmm monitor state for the specified node address
+          family: 'LoadBalancer/PoolMember/Monitor/State'
+          unit: "{status}"
         mapping:
           0: unchecked
           1: checking
@@ -799,6 +884,46 @@ metrics:
           23: inband_down
           24: down_manual_resume
           25: disabled
+      - OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.11
+        name: ltmPoolMemberMonitorStatus
+        chart_meta:
+          description: The hierarchical load balance state for the specified node address including parent status
+          family: 'LoadBalancer/PoolMember/Monitor/Status'
+          unit: "{status}"
+        mapping:
+          0: unchecked
+          1: checking
+          2: inband
+          3: forced_up
+          4: up
+          19: down
+          20: forced_down
+          22: irule_down
+          23: inband_down
+          24: down_manual_resume
+          25: disabled
+      - OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.13
+        name: ltmPoolMemberSessionStatus
+        chart_meta:
+          description: The hierarchical status of the session including parent status for the specified pool member
+          family: 'LoadBalancer/PoolMember/Session/Status'
+          unit: "{status}"
+        mapping:
+          1: enabled
+          2: addrdisabled
+          3: servdisabled'
+          4: disabled
+          5: forceddisabled
+    metric_tags:
+      - tag: pool_name
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.1
+          name: ltmPoolMemberPoolName
+      - tag: node_name
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.19
+          name: ltmPoolMemberNodeName
+
   - MIB: F5-BIGIP-LOCAL-MIB
     table:
       OID: 1.3.6.1.4.1.3375.2.2.5.4.3
@@ -807,79 +932,52 @@ metrics:
       # Counters (= rates)
       - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.5
         name: ltmPoolMemberStatServerPktsIn
-        description: The number of packets received by the specified pool member from server-side
-        unit: "{packet}"
+        chart_meta:
+          description: The number of packets received by the specified pool member from server-side
+          family: 'LoadBalancer/PoolMember/Server/Packet/In'
+          unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.6
         name: ltmPoolMemberStatServerBytesIn
-        description: The number of bytes received by the specified pool member from server-side
-        unit: "By"
+        chart_meta:
+          description: The number of bytes received by the specified pool member from server-side
+          family: 'LoadBalancer/PoolMember/Server/Traffic/In'
+          unit: "By/s"
       - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.7
         name: ltmPoolMemberStatServerPktsOut
-        description: The number of packets sent to server-side from the specified pool member
-        unit: "{packet}"
+        chart_meta:
+          description: The number of packets sent to server-side from the specified pool member
+          family: 'LoadBalancer/PoolMember/Server/Packet/Out'
+          unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.8
         name: ltmPoolMemberStatServerBytesOut
-        description: The number of bytes sent to server-side from the specified pool member
-        unit: "By"
-      # Gauges
-      - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.11
-        name: ltmPoolMemberStatServerCurConns
-        description: The current connections from server-side to the pool member
-        unit: "{connection}"
-      - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.22
-        name: ltmPoolMemberStatConnqDepth
-        description: Number of connections currently in queue, sum
-        unit: "{connection}"
-      - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.23
-        name: ltmPoolMemberStatConnqAgeHead
-        description: Age in milliseconds of the oldest queue entry, max
-        unit: "ms"
-      - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.29
-        name: ltmPoolMemberStatCurSessions
-        description: The number of current sessions going through the specified pool member
-        unit: "{session}"
-      - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.30
-        name: ltmPoolMemberStatCurrentConnsPerSec
-        description: The number of current connections per second to the specified pool member
-        unit: "1.s"
-      - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.31
-        name: ltmPoolMemberStatDurationRateExceeded
-        description: Duration of time in seconds the specified pool member has exceeded the configured connection rate limit
-        unit: "s"
-    metric_tags:
-      - tag: pool
-        symbol:
-          OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.1
-          name: ltmPoolMemberStatPoolName
-      - tag: node
-        symbol:
-          OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.28
-          name: ltmPoolMemberStatNodeName
-
-  - MIB: F5-BIGIP-LOCAL-MIB
-    table:
-      OID: 1.3.6.1.4.1.3375.2.2.5.4.3
-      name: ltmPoolMemberStatTable
-    symbols:
+        chart_meta:
+          description: The number of bytes sent to server-side from the specified pool member
+          family: 'LoadBalancer/PoolMember/Server/Traffic/Out'
+          unit: "By/s"
       - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.10
         name: ltmPoolMemberStatServerTotConns
-        description: The total connections from server-side to the specified pool member
-        unit: "{connection}"
+        chart_meta:
+          description: The total connections from server-side to the specified pool member
+          family: 'LoadBalancer/PoolMember/Server/Connection/Total'
+          unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.19
         name: ltmPoolMemberStatTotRequests
-        description: The total number of requests going through the specified pool member
-        unit: "{request}"
+        chart_meta:
+          description: The total number of requests going through the specified pool member
+          family: 'LoadBalancer/PoolMember/Request/Total'
+          unit: "{request}/s"
       - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.27
         name: ltmPoolMemberStatConnqServiced
-        description: Number of entries that have been removed from the queue, sum
-        unit: "{connection}"
-    metric_type: monotonic_count
+        chart_meta:
+          description: Number of entries that have been removed from the queue, sum
+          family: 'LoadBalancer/PoolMember/Queue/Serviced'
+          unit: "{connection}/s"
     metric_tags:
-      - tag: pool
+      - tag: pool_name
         symbol:
           OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.1
           name: ltmPoolMemberStatPoolName
-      - tag: node
+      - tag: node_name
         symbol:
           OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.28
           name: ltmPoolMemberStatNodeName
