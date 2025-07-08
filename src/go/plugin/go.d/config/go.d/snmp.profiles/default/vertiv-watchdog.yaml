@@ -8,21 +8,10 @@ metadata:
   device:
     fields:
       type:
-        value: "sensor"
+        value: "Sensor"
 
-metric_tags:
-  - tag: vertiv_product_title
-    OID: 1.3.6.1.4.1.21239.5.1.1.1.0
-    symbol: productTitle
-  - tag: vertiv_product_version
-    OID: 1.3.6.1.4.1.21239.5.1.1.2.0
-    symbol: productVersion
-  - tag: vertiv_product_friendly_name
-    OID: 1.3.6.1.4.1.21239.5.1.1.3.0
-    symbol: productFriendlyName
-  - tag: vertiv_product_mac_address
-    OID: 1.3.6.1.4.1.21239.5.1.1.4.0
-    symbol: productMacAddress
+# VERTIV-BB-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/geist/VERTIV-BB-MIB
 
 metrics:
   - MIB: VERTIV-BB-MIB
@@ -61,7 +50,7 @@ metrics:
     metric_tags:
       - tag: vertiv_internal_index
         index: 1
-      - tag: vertiv_internal_serial
+      - tag: _vertiv_internal_serial
         symbol:
           OID: 1.3.6.1.4.1.21239.5.1.2.1.2
           name: vertiv.internalSerial
@@ -90,7 +79,7 @@ metrics:
     metric_tags:
       - tag: vertiv_sensor_index
         index: 1
-      - tag: vertiv_temp_sensor_serial
+      - tag: _vertiv_temp_sensor_serial
         symbol:
           OID: 1.3.6.1.4.1.21239.5.1.4.1.2
           name: vertiv.tempSensorSerial
@@ -98,3 +87,17 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.21239.5.1.4.1.3
           name: vertiv.tempSensorLabel
+
+metric_tags:
+  - tag: vertiv_product_title
+    OID: 1.3.6.1.4.1.21239.5.1.1.1.0
+    symbol: productTitle
+  - tag: vertiv_product_version
+    OID: 1.3.6.1.4.1.21239.5.1.1.2.0
+    symbol: productVersion
+  - tag: vertiv_product_friendly_name
+    OID: 1.3.6.1.4.1.21239.5.1.1.3.0
+    symbol: productFriendlyName
+  - tag: _vertiv_product_mac_address
+    OID: 1.3.6.1.4.1.21239.5.1.1.4.0
+    symbol: productMacAddress

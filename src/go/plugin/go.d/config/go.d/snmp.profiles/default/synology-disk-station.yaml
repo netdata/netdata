@@ -8,20 +8,48 @@ metadata:
   device:
     fields:
       vendor:
-        value: "synology"
+        value: "Synology"
       type:
-        value: "storage"
+        value: "Storage"
 
-metric_tags:
-  - tag: synology_model_name
-    OID: 1.3.6.1.4.1.6574.1.5.1.0
-    symbol: modelName
-  - tag: synology_serial_number
-    OID: 1.3.6.1.4.1.6574.1.5.2.0
-    symbol: serialNumber
-  - tag: synology_version
-    OID: 1.3.6.1.4.1.6574.1.5.3.0
-    symbol: version
+# UCD-SNMP-MIB
+# https://mibbrowser.online/mibdb_search.php?mib=UCD-SNMP-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/net-snmp/UCD-SNMP-MIB
+
+# HOST-RESOURCES-MIB
+# https://mibbrowser.online/mibdb_search.php?mib=HOST-RESOURCES-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/rfc/HOST-RESOURCES-MIB
+
+# SYNOLOGY-SYSTEM-MIB
+# https://mibbrowser.online/mibdb_search.php?mib=SYNOLOGY-SYSTEM-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/synology/SYNOLOGY-SYSTEM-MIB
+
+# SYNOLOGY-DISK-MIB
+# https://mibbrowser.online/mibdb_search.php?mib=SYNOLOGY-DISK-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/synology/SYNOLOGY-DISK-MIB
+
+# SYNOLOGY-RAID-MIB
+# https://mibbrowser.online/mibdb_search.php?mib=SYNOLOGY-RAID-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/synology/SYNOLOGY-RAID-MIB
+
+# SYNOLOGY-SMART-MIB
+# https://mibbrowser.online/mibdb_search.php?mib=SYNOLOGY-SMART-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/synology/SYNOLOGY-SMART-MIB
+
+# SYNOLOGY-SERVICES-MIB
+# https://mibbrowser.online/mibdb_search.php?mib=SYNOLOGY-SERVICES-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/synology/SYNOLOGY-SERVICES-MIB
+
+# SYNOLOGY-STORAGEIO-MIB
+# https://mibbrowser.online/mibdb_search.php?mib=SYNOLOGY-STORAGEIO-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/synology/SYNOLOGY-STORAGEIO-MIB
+
+# SYNOLOGY-SPACEIO-MIB
+# https://mibbrowser.online/mibdb_search.php?mib=SYNOLOGY-SPACEIO-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/synology/SYNOLOGY-SPACEIO-MIB
+
+# SYNOLOGY-GPUINFO-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/synology/SYNOLOGY-GPUINFO-MIB
 
 metrics:
   - MIB: UCD-SNMP-MIB
@@ -29,33 +57,34 @@ metrics:
       name: cpu.usage
       OID: 1.3.6.1.4.1.2021.10.1.5.1
       chart_meta:
-        description: The 1,5 and 15 minute load averages as an integer
+        description: The 1,5 and 15 minute load averages
         family: 'CPU/Load'
         unit: "{load_average}"
-  - MIB: HOST-RESOURCES-MIB
-    symbol:
-      name: memory.total
-      OID: 1.3.6.1.2.1.25.2.3.1.6.1  # hrStorageUsed.1 = Physical memory
-      chart_meta:
-        description: The amount of the storage represented by this entry that is allocated, in units of hrStorageAllocationUnits
-        family: 'Memory/Used'
-        unit: "By"
-  - MIB: HOST-RESOURCES-MIB
-    symbol:
-      OID: 1.3.6.1.2.1.25.2.3.1.6.6  # hrStorageUsed.6 = Memory buffers
-      name: hrMemoryBuffers
-      chart_meta:
-        description: The amount of the storage represented by this entry that is allocated, in units of hrStorageAllocationUnits
-        family: 'Memory/Buffer'
-        unit: "By"
-  - MIB: HOST-RESOURCES-MIB
-    symbol:
-      OID: 1.3.6.1.2.1.25.2.3.1.6.7  # hrStorageUsed.7 = Cached memory
-      name: hrCachedMemory
-      chart_meta:
-        description: The amount of the storage represented by this entry that is allocated, in units of hrStorageAllocationUnits
-        family: 'Memory/Cache'
-        unit: "By"
+  # TODO support for units like this is not yet implemented
+  # - MIB: HOST-RESOURCES-MIB
+  #   symbol:
+  #     name: memory.total
+  #     OID: 1.3.6.1.2.1.25.2.3.1.6.1 # hrStorageUsed.1 = Physical memory
+  #     chart_meta:
+  #       description: The amount of the storage represented by this entry that is allocated, in units of hrStorageAllocationUnits
+  #       family: "Memory/Used"
+  #       unit: "By"
+  # - MIB: HOST-RESOURCES-MIB
+  #   symbol:
+  #     OID: 1.3.6.1.2.1.25.2.3.1.6.6 # hrStorageUsed.6 = Memory buffers
+  #     name: hrMemoryBuffers
+  #     chart_meta:
+  #       description: The amount of the storage represented by this entry that is allocated, in units of hrStorageAllocationUnits
+  #       family: "Memory/Buffer"
+  #       unit: "By"
+  # - MIB: HOST-RESOURCES-MIB
+  #   symbol:
+  #     OID: 1.3.6.1.2.1.25.2.3.1.6.7 # hrStorageUsed.7 = Cached memory
+  #     name: hrCachedMemory
+  #     chart_meta:
+  #       description: The amount of the storage represented by this entry that is allocated, in units of hrStorageAllocationUnits
+  #       family: "Memory/Cache"
+  #       unit: "By"
   - MIB: SYNOLOGY-SYSTEM-MIB
     symbol:
       name: synology.system.systemStatus
@@ -72,7 +101,7 @@ metrics:
       name: synology.system.temperature
       OID: 1.3.6.1.4.1.6574.1.2.0
       chart_meta:
-        description: The temperature of Disk Station uses Celsius degree
+        description: The temperature of Disk Station
         family: 'System/Temperature/Value'
         unit: "Cel"
   - MIB: SYNOLOGY-SYSTEM-MIB
@@ -84,9 +113,8 @@ metrics:
         family: 'Power/Status'
         unit: "{status}"
       mapping:
-        normal: 1
-        failed: 2
-
+        1: normal
+        2: failed
   - MIB: SYNOLOGY-SYSTEM-MIB
     symbol:
       name: synology.system.systemFanStatus
@@ -96,9 +124,8 @@ metrics:
         family: 'Fan/System/Status'
         unit: "{status}"
       mapping:
-        normal: 1
-        failed: 2
-
+        1: normal
+        2: failed
   - MIB: SYNOLOGY-SYSTEM-MIB
     symbol:
       name: synology.system.cpuFanStatus
@@ -108,9 +135,8 @@ metrics:
         family: 'Fan/CPU/Status'
         unit: "{status}"
       mapping:
-        normal: 1
-        failed: 2
-
+        1: normal
+        2: failed
   - MIB: SYNOLOGY-SYSTEM-MIB
     symbol:
       name: synology.system.upgradeAvailable
@@ -120,12 +146,11 @@ metrics:
         family: 'System/Upgrade/Status'
         unit: "{status}"
       mapping:
-        available: 1
-        unavailable: 2
-        connecting: 3
-        disconnected: 4
-        others: 5
-
+        1: available
+        2: unavailable
+        3: connecting
+        4: disconnected
+        5: others
   - MIB: SYNOLOGY-DISK-MIB
     table:
       name: diskTable
@@ -162,7 +187,6 @@ metrics:
         symbol:
           name: synology.diskType
           OID: 1.3.6.1.4.1.6574.2.1.1.4
-
   - MIB: SYNOLOGY-RAID-MIB
     table:
       name: raidTable
@@ -212,11 +236,12 @@ metrics:
           21: raid_unknown_status
           # full list of mappings here https://global.download.synology.com/download/Document/Software/DeveloperGuide/Firmware/DSM/All/enu/Synology_DiskStation_MIB_Guide.pdf
     metric_tags:
+      - tag: raid_index
+        index: 1
       - tag: synology_raid_name
         symbol:
           name: synology.raid.raidName
           OID: 1.3.6.1.4.1.6574.3.1.1.2
-
   - MIB: SYNOLOGY-SMART-MIB
     table:
       name: diskSMARTTable
@@ -235,11 +260,11 @@ metrics:
           family: 'Disk/SMART/Threshold'
           unit: "1"
     metric_tags:
-      - tag: synology_disk_smart_info_dev_name
+      - tag: _synology_disk_smart_info_dev_name
         symbol:
           name: synology.diskSMARTInfoDevName
           OID: 1.3.6.1.4.1.6574.5.1.1.2
-      - tag: synology_disk_smart_attr_name
+      - tag: _synology_disk_smart_attr_name
         symbol:
           name: synology.diskSMARTAttrName
           OID: 1.3.6.1.4.1.6574.5.1.1.3
@@ -265,11 +290,12 @@ metrics:
           family: 'Service/User/Active'
           unit: "{user}"
     metric_tags:
+      - tag: service_index
+        index: 1
       - tag: synology_service_name
         symbol:
           name: synology.serviceName
           OID: 1.3.6.1.4.1.6574.6.1.1.2
-
   - MIB: SYNOLOGY-STORAGEIO-MIB
     table:
       name: synology.storageIO
@@ -290,7 +316,7 @@ metrics:
       - name: synology.storageIOLA
         OID: 1.3.6.1.4.1.6574.101.1.1.8
         chart_meta:
-          description: The load of disk (%)
+          description: The load of disk
           family: 'Storage/IO/Load'
           unit: "%"
       - name: synology.storageIONReadX
@@ -306,11 +332,12 @@ metrics:
           family: 'Storage/IO/Throughput/Write'
           unit: "By/s"
     metric_tags:
+      - tag: storage_io_device_index
+        index: 1
       - tag: synology_storage_io_device
         symbol:
           name: synology.storageIODevice
           OID: 1.3.6.1.4.1.6574.101.1.1.2
-
   - MIB: SYNOLOGY-SPACEIO-MIB
     table:
       name: synology.spaceIO
@@ -331,7 +358,7 @@ metrics:
       - name: synology.spaceIOLA
         OID: 1.3.6.1.4.1.6574.102.1.1.8
         chart_meta:
-          description: The load of disk (%)
+          description: The load of disk
           family: 'Volume/IO/Load'
           unit: "%"
       - name: synology.spaceIONReadX
@@ -347,6 +374,8 @@ metrics:
           family: 'Volume/IO/Throughput/Write'
           unit: "By/s"
     metric_tags:
+      - tag: space_io_device_index
+        index: 1
       - tag: synology_space_io_device
         symbol:
           name: synology.spaceIODevice
@@ -361,14 +390,14 @@ metrics:
         family: 'GPU/Support/Status'
         unit: "{status}"
       mapping:
-        supported: 0
-        unsupported: 1
+        0: supported
+        1: unsupported
   - MIB: SYNOLOGY-GPUINFO-MIB
     symbol:
       name: synology.gpuUtilization
       OID: 1.3.6.1.4.1.6574.108.2.0
       chart_meta:
-        description: GPU utilization percentage
+        description: GPU utilization
         family: 'GPU/Usage'
         unit: "%"
   - MIB: SYNOLOGY-GPUINFO-MIB
@@ -376,6 +405,17 @@ metrics:
       name: synology.gpuMemoryUtilization
       OID: 1.3.6.1.4.1.6574.108.3.0
       chart_meta:
-        description: GPU memory utilization percentage
+        description: GPU memory utilization
         family: 'GPU/Memory/Usage'
         unit: "%"
+
+metric_tags:
+  - tag: _synology_model_name
+    OID: 1.3.6.1.4.1.6574.1.5.1.0
+    symbol: modelName
+  - tag: _synology_serial_number
+    OID: 1.3.6.1.4.1.6574.1.5.2.0
+    symbol: serialNumber
+  - tag: _synology_version
+    OID: 1.3.6.1.4.1.6574.1.5.3.0
+    symbol: version
