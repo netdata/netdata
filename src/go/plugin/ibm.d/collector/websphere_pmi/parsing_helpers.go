@@ -594,15 +594,14 @@ func (w *WebSpherePMI) processTimeStatistic(
 	// Extract component prefix from context (e.g., "websphere_pmi.servlet" -> "servlet")
 	componentPrefix := strings.TrimPrefix(context, "websphere_pmi.")
 	
-	// 1. Always collect rate (operations/s)
-	mx[fmt.Sprintf("%s_%s_%s_operations", componentPrefix, instance, w.cleanID(metric.Name))] = metric.Count
+	// Note: Rate charts removed as they are redundant with existing CountStatistic counters
 	
-	// 2. Always collect lifetime statistics (raw nanoseconds - Netdata will auto-scale)
+	// 1. Always collect lifetime statistics (raw nanoseconds - Netdata will auto-scale)
 	mx[fmt.Sprintf("%s_%s_%s_min", componentPrefix, instance, w.cleanID(metric.Name))] = metric.Min
 	mx[fmt.Sprintf("%s_%s_%s_max", componentPrefix, instance, w.cleanID(metric.Name))] = metric.Max
 	mx[fmt.Sprintf("%s_%s_%s_mean", componentPrefix, instance, w.cleanID(metric.Name))] = metric.Mean
 	
-	// 3. Calculate current latency if we have previous data
+	// 2. Calculate current latency if we have previous data
 	if prev, exists := w.timeStatCache[cacheKey]; exists {
 		deltaCount := metric.Count - prev.Count
 		deltaTotal := metric.Total - prev.Total
@@ -619,17 +618,17 @@ func (w *WebSpherePMI) processTimeStatistic(
 		}
 	}
 	
-	// 4. Update cache for next iteration
+	// 3. Update cache for next iteration
 	w.timeStatCache[cacheKey] = &timeStatCacheEntry{
 		Count: metric.Count,
 		Total: metric.Total,
 	}
 	
-	// 5. Ensure charts exist
+	// 4. Ensure charts exist
 	w.ensureTimeStatCharts(context, family, instance, labels, metric.Name, priority)
 }
 
-// ensureTimeStatCharts creates the 3 charts for a TimeStatistic if they don't exist
+// ensureTimeStatCharts creates the 2 charts for a TimeStatistic if they don't exist
 func (w *WebSpherePMI) ensureTimeStatCharts(
 	context string,
 	family string,
@@ -658,22 +657,9 @@ func (w *WebSpherePMI) ensureTimeStatCharts(
 	// Get title prefix based on context
 	titlePrefix := getTitlePrefix(context)
 	
-	// Chart 1: Operation Rate
-	chartRate := &module.Chart{
-		ID:       baseChartID + "_rate",
-		Title:    fmt.Sprintf("%s%s Rate", titlePrefix, metricName),
-		Units:    "operations/s",
-		Fam:      family,
-		Ctx:      uniqueContext + "_rate",
-		Type:     module.Line,
-		Priority: priority,
-		Dims: module.Dims{
-			{ID: fmt.Sprintf("%s_%s_%s_operations", componentPrefix, instance, cleanMetric), Name: "operations", Algo: module.Incremental},
-		},
-		Labels: labels,
-	}
+	// Note: Rate chart removed as redundant with existing CountStatistic counters
 	
-	// Chart 2: Current Latency (this iteration)
+	// Chart 1: Current Latency (this iteration)
 	chartCurrent := &module.Chart{
 		ID:       baseChartID + "_current_latency",
 		Title:    fmt.Sprintf("%s%s Current Latency", titlePrefix, metricName),
@@ -688,7 +674,7 @@ func (w *WebSpherePMI) ensureTimeStatCharts(
 		Labels: labels,
 	}
 	
-	// Chart 3: Lifetime Latency Statistics
+	// Chart 2: Lifetime Latency Statistics
 	chartLifetime := &module.Chart{
 		ID:       baseChartID + "_lifetime_latency",
 		Title:    fmt.Sprintf("%s%s Lifetime Latency", titlePrefix, metricName),
@@ -705,10 +691,7 @@ func (w *WebSpherePMI) ensureTimeStatCharts(
 		Labels: labels,
 	}
 	
-	// Add all three charts
-	if err := w.Charts().Add(chartRate); err != nil {
-		w.Warning(err)
-	}
+	// Add both charts
 	if err := w.Charts().Add(chartCurrent); err != nil {
 		w.Warning(err)
 	}
@@ -1040,15 +1023,14 @@ func (w *WebSpherePMI) processAverageStatistic(
 	// Extract component prefix from context (e.g., "websphere_pmi.session" -> "session")
 	componentPrefix := strings.TrimPrefix(context, "websphere_pmi.")
 	
-	// 1. Always collect rate (operations/s)
-	mx[fmt.Sprintf("%s_%s_%s_operations", componentPrefix, instance, w.cleanID(metric.Name))] = metric.Count
+	// Note: Rate charts removed as they are redundant with existing CountStatistic counters
 	
-	// 2. Always collect lifetime statistics
+	// 1. Always collect lifetime statistics
 	mx[fmt.Sprintf("%s_%s_%s_lifetime_min", componentPrefix, instance, w.cleanID(metric.Name))] = metric.Min
 	mx[fmt.Sprintf("%s_%s_%s_lifetime_max", componentPrefix, instance, w.cleanID(metric.Name))] = metric.Max
 	mx[fmt.Sprintf("%s_%s_%s_lifetime_mean", componentPrefix, instance, w.cleanID(metric.Name))] = metric.Mean
 	
-	// 3. Calculate current average and stddev if we have previous data
+	// 2. Calculate current average and stddev if we have previous data
 	if prev, exists := w.avgStatCache[cacheKey]; exists {
 		deltaCount := metric.Count - prev.Count
 		deltaTotal := metric.Total - prev.Total
@@ -1089,14 +1071,14 @@ func (w *WebSpherePMI) processAverageStatistic(
 		mx[fmt.Sprintf("%s_%s_%s_current_stddev", componentPrefix, instance, w.cleanID(metric.Name))] = 0
 	}
 	
-	// 4. Update cache for next iteration
+	// 3. Update cache for next iteration
 	w.avgStatCache[cacheKey] = &avgStatCacheEntry{
 		Count:        metric.Count,
 		Total:        metric.Total,
 		SumOfSquares: metric.SumOfSquares,
 	}
 	
-	// 5. Ensure charts exist
+	// 4. Ensure charts exist
 	w.ensureAvgStatCharts(context, family, instance, labels, metric.Name, priority, units)
 }
 
@@ -1124,7 +1106,7 @@ func (w *WebSpherePMI) intSqrt(x int64) int64 {
 	return guess
 }
 
-// ensureAvgStatCharts creates the 4 charts for an AverageStatistic if they don't exist
+// ensureAvgStatCharts creates the 3 charts for an AverageStatistic if they don't exist
 func (w *WebSpherePMI) ensureAvgStatCharts(
 	context string,
 	family string,
@@ -1154,22 +1136,9 @@ func (w *WebSpherePMI) ensureAvgStatCharts(
 	// Get title prefix based on context
 	titlePrefix := getTitlePrefix(context)
 	
-	// Chart 1: Operation Rate
-	chartRate := &module.Chart{
-		ID:       baseChartID + "_rate",
-		Title:    fmt.Sprintf("%s%s Rate", titlePrefix, metricName),
-		Units:    "operations/s",
-		Fam:      family,
-		Ctx:      uniqueContext + "_rate",
-		Type:     module.Line,
-		Priority: priority,
-		Dims: module.Dims{
-			{ID: fmt.Sprintf("%s_%s_%s_operations", componentPrefix, instance, cleanMetric), Name: "operations", Algo: module.Incremental},
-		},
-		Labels: labels,
-	}
+	// Note: Rate chart removed as redundant with existing CountStatistic counters
 	
-	// Chart 2: Current Average (this iteration)
+	// Chart 1: Current Average (this iteration)
 	chartCurrentAvg := &module.Chart{
 		ID:       baseChartID + "_current_avg",
 		Title:    fmt.Sprintf("%s%s Current Average", titlePrefix, metricName),
@@ -1184,7 +1153,7 @@ func (w *WebSpherePMI) ensureAvgStatCharts(
 		Labels: labels,
 	}
 	
-	// Chart 3: Current Standard Deviation (this iteration)
+	// Chart 2: Current Standard Deviation (this iteration)
 	chartCurrentStdDev := &module.Chart{
 		ID:       baseChartID + "_current_stddev",
 		Title:    fmt.Sprintf("%s%s Current Standard Deviation", titlePrefix, metricName),
@@ -1199,7 +1168,7 @@ func (w *WebSpherePMI) ensureAvgStatCharts(
 		Labels: labels,
 	}
 	
-	// Chart 4: Lifetime Statistics
+	// Chart 3: Lifetime Statistics
 	chartLifetime := &module.Chart{
 		ID:       baseChartID + "_lifetime",
 		Title:    fmt.Sprintf("%s%s Lifetime Statistics", titlePrefix, metricName),
@@ -1216,10 +1185,7 @@ func (w *WebSpherePMI) ensureAvgStatCharts(
 		Labels: labels,
 	}
 	
-	// Add all four charts
-	if err := w.Charts().Add(chartRate); err != nil {
-		w.Warning(err)
-	}
+	// Add all three charts
 	if err := w.Charts().Add(chartCurrentAvg); err != nil {
 		w.Warning(err)
 	}
