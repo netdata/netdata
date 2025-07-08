@@ -13,6 +13,10 @@ metadata:
       type:
         value: "Switch"
 
+# ZYXEL-ES-COMMON
+# https://mibbrowser.online/mibdb_search.php?mib=ZYXEL-ES-COMMON
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/zyxel/ZYXEL-ES-COMMON
+
 metrics:
   - MIB: ZYXEL-ES-COMMON
     symbol:

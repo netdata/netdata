@@ -10,6 +10,9 @@ metadata:
       type:
         value: "Sensor"
 
+# VERTIV-BB-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/geist/VERTIV-BB-MIB
+
 metrics:
   - MIB: VERTIV-BB-MIB
     table:

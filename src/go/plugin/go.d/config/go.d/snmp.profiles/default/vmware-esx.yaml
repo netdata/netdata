@@ -14,6 +14,14 @@ metadata:
       type:
         value: "Server"
 
+# VMWARE-RESOURCES-MIB
+# https://mibbrowser.online/mibdb_search.php?mib=VMWARE-RESOURCES-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/vmware/VMWARE-RESOURCES-MIB
+
+# VMWARE-ENV-MIB
+# https://mibbrowser.online/mibdb_search.php?mib=VMWARE-ENV-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/vmware/VMWARE-ENV-MIB
+
 metrics:
   - MIB: VMWARE-RESOURCES-MIB
     table:
