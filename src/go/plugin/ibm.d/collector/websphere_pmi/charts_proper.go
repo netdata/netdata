@@ -256,9 +256,20 @@ var jvmChartsTmpl = module.Charts{
 			{ID: "jvm_runtime_%s_HeapSize_lower_bound", Name: "lower_bound"},
 			{ID: "jvm_runtime_%s_HeapSize_high_watermark", Name: "high_watermark"},
 			{ID: "jvm_runtime_%s_HeapSize_low_watermark", Name: "low_watermark"},
-			// Hidden dimensions for mean and integral
+			// Hidden dimension for mean
 			{ID: "jvm_runtime_%s_HeapSize_mean", Name: "mean", Div: precision, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "jvm_runtime_%s_HeapSize_integral", Name: "integral", Div: precision, DimOpts: module.DimOpts{Hidden: true}},
+		},
+	},
+	{
+		ID:       "jvm_heap_size_%s_weighted_avg",
+		Title:    "JVM Heap Size Weighted Average",
+		Units:    "bytes",
+		Fam:      "system/memory",
+		Ctx:      "websphere_pmi.jvm_heap_size_weighted_avg",
+		Type:     module.Line,
+		Priority: prioSystemMemory + 11,
+		Dims: module.Dims{
+			{ID: "jvm_runtime_%s_HeapSize_weighted_avg", Name: "weighted_avg", Div: precision},
 		},
 	},
 }
@@ -305,8 +316,6 @@ var threadPoolChartsTmpl = module.Charts{
 			{ID: "thread_pool_%s_ConcurrentHungThreadCount_high_watermark", Name: "high_watermark"},
 			{ID: "thread_pool_%s_ConcurrentHungThreadCount_low_watermark", Name: "low_watermark"},
 			{ID: "thread_pool_%s_ConcurrentHungThreadCount_mean", Name: "mean", Div: precision},
-			// Hidden dimension for integral
-			{ID: "thread_pool_%s_ConcurrentHungThreadCount_integral", Name: "integral", Div: precision, DimOpts: module.DimOpts{Hidden: true}},
 		},
 	},
 	// DEPRECATED: Old ActiveTime charts - replaced by smart processor
@@ -353,10 +362,9 @@ var threadPoolChartsTmpl = module.Charts{
 			{ID: "thread_pool_%s_PercentUsed_high_watermark", Name: "high_watermark"},
 			{ID: "thread_pool_%s_PercentUsed_low_watermark", Name: "low_watermark"},
 			{ID: "thread_pool_%s_PercentUsed_mean", Name: "mean", Div: precision},
-			// Hidden dimensions for bounds and integral
+			// Hidden dimensions for bounds
 			{ID: "thread_pool_%s_PercentUsed_upper_bound", Name: "upper_bound", DimOpts: module.DimOpts{Hidden: true}},
 			{ID: "thread_pool_%s_PercentUsed_lower_bound", Name: "lower_bound", DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "thread_pool_%s_PercentUsed_integral", Name: "integral", Div: precision, DimOpts: module.DimOpts{Hidden: true}},
 		},
 	},
 	{
@@ -372,10 +380,46 @@ var threadPoolChartsTmpl = module.Charts{
 			{ID: "thread_pool_%s_PercentMaxed_high_watermark", Name: "high_watermark"},
 			{ID: "thread_pool_%s_PercentMaxed_low_watermark", Name: "low_watermark"},
 			{ID: "thread_pool_%s_PercentMaxed_mean", Name: "mean", Div: precision},
-			// Hidden dimensions for bounds and integral
+			// Hidden dimensions for bounds
 			{ID: "thread_pool_%s_PercentMaxed_upper_bound", Name: "upper_bound", DimOpts: module.DimOpts{Hidden: true}},
 			{ID: "thread_pool_%s_PercentMaxed_lower_bound", Name: "lower_bound", DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "thread_pool_%s_PercentMaxed_integral", Name: "integral", Div: precision, DimOpts: module.DimOpts{Hidden: true}},
+		},
+	},
+	// Weighted average charts for integral dimensions
+	{
+		ID:       "thread_pool_%s_concurrent_hung_weighted_avg",
+		Title:    "Thread Pool Concurrent Hung Threads Weighted Average",
+		Units:    "threads",
+		Fam:      "system/threads",
+		Ctx:      "websphere_pmi.thread_pool_concurrent_hung_weighted_avg",
+		Type:     module.Line,
+		Priority: prioThreadPools + 21,
+		Dims: module.Dims{
+			{ID: "thread_pool_%s_ConcurrentHungThreadCount_weighted_avg", Name: "weighted_avg", Div: precision},
+		},
+	},
+	{
+		ID:       "thread_pool_%s_percent_used_weighted_avg",
+		Title:    "Thread Pool Percent Used Weighted Average",
+		Units:    "percentage",
+		Fam:      "system/threads",
+		Ctx:      "websphere_pmi.thread_pool_percent_used_weighted_avg",
+		Type:     module.Line,
+		Priority: prioThreadPools + 51,
+		Dims: module.Dims{
+			{ID: "thread_pool_%s_PercentUsed_weighted_avg", Name: "weighted_avg", Div: precision},
+		},
+	},
+	{
+		ID:       "thread_pool_%s_percent_maxed_weighted_avg",
+		Title:    "Thread Pool Percent Maxed Weighted Average",
+		Units:    "percentage",
+		Fam:      "system/threads",
+		Ctx:      "websphere_pmi.thread_pool_percent_maxed_weighted_avg",
+		Type:     module.Line,
+		Priority: prioThreadPools + 61,
+		Dims: module.Dims{
+			{ID: "thread_pool_%s_PercentMaxed_weighted_avg", Name: "weighted_avg", Div: precision},
 		},
 	},
 }
@@ -497,7 +541,6 @@ var jdbcChartsTmpl = module.Charts{
 			{ID: "jdbc_%s_PercentUsed_high_watermark", Name: "high_watermark"},
 			{ID: "jdbc_%s_PercentUsed_low_watermark", Name: "low_watermark"},
 			{ID: "jdbc_%s_PercentUsed_mean", Name: "mean", Div: precision},
-			{ID: "jdbc_%s_PercentUsed_integral", Name: "integral", Div: precision, DimOpts: module.DimOpts{Hidden: true}},
 		},
 	},
 	{
@@ -513,7 +556,6 @@ var jdbcChartsTmpl = module.Charts{
 			{ID: "jdbc_%s_PercentMaxed_high_watermark", Name: "high_watermark"},
 			{ID: "jdbc_%s_PercentMaxed_low_watermark", Name: "low_watermark"},
 			{ID: "jdbc_%s_PercentMaxed_mean", Name: "mean", Div: precision},
-			{ID: "jdbc_%s_PercentMaxed_integral", Name: "integral", Div: precision, DimOpts: module.DimOpts{Hidden: true}},
 		},
 	},
 	{
@@ -526,6 +568,31 @@ var jdbcChartsTmpl = module.Charts{
 		Priority: prioJDBCPools + 100,
 		Dims: module.Dims{
 			{ID: "jdbc_%s_PrepStmtCacheDiscardCount", Name: "discards", Algo: module.Incremental},
+		},
+	},
+	// Weighted average charts for integral dimensions
+	{
+		ID:       "jdbc_%s_percent_used_weighted_avg",
+		Title:    "JDBC Pool Percent Used Weighted Average",
+		Units:    "percentage",
+		Fam:      "connectivity/datasources",
+		Ctx:      "websphere_pmi.jdbc_percent_used_weighted_avg",
+		Type:     module.Line,
+		Priority: prioJDBCPools + 81,
+		Dims: module.Dims{
+			{ID: "jdbc_%s_PercentUsed_weighted_avg", Name: "weighted_avg", Div: precision},
+		},
+	},
+	{
+		ID:       "jdbc_%s_percent_maxed_weighted_avg",
+		Title:    "JDBC Pool Percent Maxed Weighted Average",
+		Units:    "percentage",
+		Fam:      "connectivity/datasources",
+		Ctx:      "websphere_pmi.jdbc_percent_maxed_weighted_avg",
+		Type:     module.Line,
+		Priority: prioJDBCPools + 91,
+		Dims: module.Dims{
+			{ID: "jdbc_%s_PercentMaxed_weighted_avg", Name: "weighted_avg", Div: precision},
 		},
 	},
 }
@@ -618,9 +685,7 @@ var sibJMSAdapterChartsTmpl = module.Charts{
 			{ID: "sib_jms_%s_FreePoolSize_upper_bound", Name: "max_free_pool_size"},
 			{ID: "sib_jms_%s_FreePoolSize_lower_bound", Name: "min_free_pool_size"},
 			{ID: "sib_jms_%s_PoolSize_mean", Name: "pool_size_mean", Div: precision},
-			{ID: "sib_jms_%s_PoolSize_integral", Name: "pool_size_integral", Div: precision},
 			{ID: "sib_jms_%s_FreePoolSize_mean", Name: "free_pool_size_mean", Div: precision},
-			{ID: "sib_jms_%s_FreePoolSize_integral", Name: "free_pool_size_integral", Div: precision},
 		},
 	},
 	{
@@ -650,9 +715,7 @@ var sibJMSAdapterChartsTmpl = module.Charts{
 			{ID: "sib_jms_%s_PercentUsed_current", Name: "percent_used"},
 			{ID: "sib_jms_%s_PercentMaxed_current", Name: "percent_maxed"},
 			{ID: "sib_jms_%s_PercentUsed_mean", Name: "percent_used_mean", Div: precision},
-			{ID: "sib_jms_%s_PercentUsed_integral", Name: "percent_used_integral", Div: precision},
 			{ID: "sib_jms_%s_PercentMaxed_mean", Name: "percent_maxed_mean", Div: precision},
-			{ID: "sib_jms_%s_PercentMaxed_integral", Name: "percent_maxed_integral", Div: precision},
 		},
 	},
 	{
@@ -683,7 +746,7 @@ var sibJMSAdapterChartsTmpl = module.Charts{
 			{ID: "sib_jms_%s_WaitingThreadCount_high_watermark", Name: "waiting_peak"},
 			{ID: "sib_jms_%s_WaitingThreadCount_low_watermark", Name: "waiting_min"},
 			{ID: "sib_jms_%s_WaitingThreadCount_mean", Name: "waiting_mean", Div: precision},
-			{ID: "sib_jms_%s_WaitingThreadCount_integral", Name: "waiting_integral", Div: precision},
+			// {ID: "sib_jms_%s_WaitingThreadCount_integral", Name: "waiting_integral", Div: precision}, // REMOVED: integral dimension
 		},
 	},
 	{
@@ -749,7 +812,7 @@ var servletsComponentChartsTmpl = module.Charts{
 			{ID: "servlets_component_%s_URIConcurrentRequests_high_watermark", Name: "uri_concurrent_peak"},
 			{ID: "servlets_component_%s_URIConcurrentRequests_low_watermark", Name: "uri_concurrent_min"},
 			{ID: "servlets_component_%s_URIConcurrentRequests_mean", Name: "uri_concurrent_mean", Div: precision},
-			{ID: "servlets_component_%s_URIConcurrentRequests_integral", Name: "uri_concurrent_integral", Div: precision},
+			// {ID: "servlets_component_%s_URIConcurrentRequests_integral", Name: "uri_concurrent_integral", Div: precision}, // REMOVED: integral dimension
 		},
 	},
 }
@@ -781,7 +844,7 @@ var wimComponentChartsTmpl = module.Charts{
 			{ID: "wim_%s_Number_of_concurrent_portlet_requests_high_watermark", Name: "concurrent_peak"},
 			{ID: "wim_%s_Number_of_concurrent_portlet_requests_low_watermark", Name: "concurrent_min"},
 			{ID: "wim_%s_Number_of_concurrent_portlet_requests_mean", Name: "concurrent_mean", Div: precision},
-			{ID: "wim_%s_Number_of_concurrent_portlet_requests_integral", Name: "concurrent_integral", Div: precision},
+			// {ID: "wim_%s_Number_of_concurrent_portlet_requests_integral", Name: "concurrent_integral", Div: precision}, // REMOVED: integral dimension
 		},
 	},
 }
@@ -918,7 +981,19 @@ var iscProductDetailsChartsTmpl = module.Charts{
 			{ID: "isc_product_%s_Number_of_concurrent_portlet_requests_high_watermark", Name: "high_watermark"},
 			{ID: "isc_product_%s_Number_of_concurrent_portlet_requests_low_watermark", Name: "low_watermark"},
 			{ID: "isc_product_%s_Number_of_concurrent_portlet_requests_mean", Name: "mean", Div: precision},
-			{ID: "isc_product_%s_Number_of_concurrent_portlet_requests_integral", Name: "integral", Div: precision},
+			// {ID: "isc_product_%s_Number_of_concurrent_portlet_requests_integral", Name: "integral", Div: precision}, // REMOVED: integral dimension
+		},
+	},
+	{
+		ID:       "isc_product_%s_concurrent_requests_weighted_avg",
+		Title:    "ISC Product Details Concurrent Portlet Requests Weighted Average",
+		Units:    "requests",
+		Fam:      "management/components",
+		Ctx:      "websphere_pmi.isc_product_concurrent_requests_weighted_avg",
+		Type:     module.Line,
+		Priority: prioComponents + 225,
+		Dims: module.Dims{
+			{ID: "isc_product_%s_Number_of_concurrent_portlet_requests_weighted_avg", Name: "weighted_avg", Div: precision},
 		},
 	},
 }
