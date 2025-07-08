@@ -35,7 +35,7 @@ metrics:
         name: connUnitSensorStatus
         chart_meta:
           description: The status indicated by the sensor
-          family: "Hardware/Sensor/Status"
+          family: 'Hardware/Sensor/Status'
           unit: "{status}"
         mapping:
           1: unknown
@@ -81,7 +81,7 @@ metrics:
         name: connUnitPortState
         chart_meta:
           description: The user selected state of the port hardware
-          family: "Network/FibreChannel/Port/Admin/Status"
+          family: 'Network/FibreChannel/Port/Admin/Status'
           unit: "{status}"
         mapping:
           1: unknown
@@ -93,7 +93,7 @@ metrics:
         name: connUnitPortStatus
         chart_meta:
           description: An overall protocol status for the port
-          family: "Network/FibreChannel/Port/Operational/Status"
+          family: 'Network/FibreChannel/Port/Operational/Status'
           unit: "{status}"
         mapping:
           1: unknown

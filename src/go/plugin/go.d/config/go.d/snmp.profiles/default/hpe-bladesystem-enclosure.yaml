@@ -20,13 +20,13 @@ metrics:
         OID: 1.3.6.1.4.1.232.22.2.3.1.2.1.6
         chart_meta:
           description: This is the current temperature sensor reading in degrees celsius
-          family: "Hardware/Sensor/Temperature/Value"
+          family: 'Hardware/Sensor/Temperature/Value'
           unit: "Cel"
       - OID: 1.3.6.1.4.1.232.22.2.3.1.2.1.8
         name: cpqRackCommonEnclosureTempCondition
         chart_meta:
           description: The Temperature sensor condition
-          family: "Hardware/Sensor/Temperature/Status"
+          family: 'Hardware/Sensor/Temperature/Status'
           unit: "{status}"
         mapping:
           1: other
@@ -73,7 +73,7 @@ metrics:
         name: cpqRackCommonEnclosureFanPresent
         chart_meta:
           description: This specifies if the fan described is present in the system
-          family: "Hardware/Fan/Presence/Status"
+          family: 'Hardware/Fan/Presence/Status'
           unit: "{status}"
         mapping:
           1: other
@@ -83,7 +83,7 @@ metrics:
         name: cpqRackCommonEnclosureFanRedundant
         chart_meta:
           description: This specifies if the fan is in a redundant configuration
-          family: "Hardware/Fan/Redundancy/Status"
+          family: 'Hardware/Fan/Redundancy/Status'
           unit: "{status}"
         mapping:
           1: other
@@ -93,7 +93,7 @@ metrics:
         name: cpqRackCommonEnclosureFanCondition
         chart_meta:
           description: The condition of the fan
-          family: "Hardware/Fan/Status"
+          family: 'Hardware/Fan/Status'
           unit: "{status}"
         mapping:
           1: other
@@ -143,7 +143,7 @@ metrics:
         name: cpqRackCommonEnclosureFusePresent
         chart_meta:
           description: This specifies if the fuse described is present in the system
-          family: "Hardware/Fuse/Presence/Status"
+          family: 'Hardware/Fuse/Presence/Status'
           unit: "{status}"
         mapping:
           1: other
@@ -153,7 +153,7 @@ metrics:
         name: cpqRackCommonEnclosureFuseCondition
         chart_meta:
           description: The condition of the fuse
-          family: "Hardware/Fuse/Status"
+          family: 'Hardware/Fuse/Status'
           unit: "{status}"
         mapping:
           1: other
@@ -190,7 +190,7 @@ metrics:
         name: cpqRackCommonEnclosureManagerRole
         chart_meta:
           description: This specifies the current role of the manager
-          family: "Hardware/EnclosureManager/Role/Status"
+          family: 'Hardware/EnclosureManager/Role/Status'
           unit: "{status}"
         mapping:
           1: standby
@@ -199,7 +199,7 @@ metrics:
         name: cpqRackCommonEnclosureManagerPresent
         chart_meta:
           description: This specifies if the manager described is present in the system
-          family: "Hardware/EnclosureManager/Presence/Status"
+          family: 'Hardware/EnclosureManager/Presence/Status'
           unit: "{status}"
         mapping:
           1: other
@@ -209,7 +209,7 @@ metrics:
         name: cpqRackCommonEnclosureManagerRedundant
         chart_meta:
           description: This specifies if the manager is in a redundant configuration
-          family: "Hardware/EnclosureManager/Redundancy/Status"
+          family: 'Hardware/EnclosureManager/Redundancy/Status'
           unit: "{status}"
         mapping:
           1: other
@@ -219,7 +219,7 @@ metrics:
         name: cpqRackCommonEnclosureManagerCondition
         chart_meta:
           description: The condition of the manager
-          family: "Hardware/EnclosureManager/Status"
+          family: 'Hardware/EnclosureManager/Status'
           unit: "{status}"
         mapping:
           1: other
@@ -269,7 +269,7 @@ metrics:
         name: cpqRackPowerEnclosureRedundant
         chart_meta:
           description: This indicates if the power supply enclosure is in a redundant state
-          family: "Hardware/PowerEnclosure/Redundancy/Status"
+          family: 'Hardware/PowerEnclosure/Redundancy/Status'
           unit: "{status}"
         mapping:
           1: other
@@ -279,7 +279,7 @@ metrics:
         name: cpqRackPowerEnclosureLoadBalanced
         chart_meta:
           description: This indicates if the power supply enclosure is in a load balanced state
-          family: "Hardware/PowerEnclosure/LoadBalance/Status"
+          family: 'Hardware/PowerEnclosure/LoadBalance/Status'
           unit: "{status}"
         mapping:
           1: other
@@ -289,7 +289,7 @@ metrics:
         name: cpqRackPowerEnclosureBladeAutopoweron
         chart_meta:
           description: This indicates current condition of the power enclosure
-          family: "Hardware/PowerEnclosure/AutoPowerOn/Status"
+          family: 'Hardware/PowerEnclosure/AutoPowerOn/Status'
           unit: "{status}"
         mapping:
           1: other
@@ -299,7 +299,7 @@ metrics:
         name: cpqRackPowerEnclosureCondition
         chart_meta:
           description: This indicates current condition of the power enclosure
-          family: "Hardware/PowerEnclosure/Status"
+          family: 'Hardware/PowerEnclosure/Status'
           unit: "{status}"
         mapping:
           1: other
@@ -341,19 +341,19 @@ metrics:
         OID: 1.3.6.1.4.1.232.22.2.4.1.1.1.22
         chart_meta:
           description: The major fault code of the blade fault reported by the enclosure manager
-          family: "Hardware/ServerBlade/Fault/Major"
+          family: 'Hardware/ServerBlade/Fault/Major'
           unit: "{fault_code}"
       - name: cpqRackServerBladeFaultMinor
         OID: 1.3.6.1.4.1.232.22.2.4.1.1.1.23
         chart_meta:
           description: The minor fault code of the blade fault reported by the enclosure manager
-          family: "Hardware/ServerBlade/Fault/Minor"
+          family: 'Hardware/ServerBlade/Fault/Minor'
           unit: "{fault_code}"
       - OID: 1.3.6.1.4.1.232.22.2.4.1.1.1.12
         name: cpqRackServerBladePresent
         chart_meta:
           description: This specifies if the server blade described is present in the enclosure
-          family: "Hardware/ServerBlade/Presence/Status"
+          family: 'Hardware/ServerBlade/Presence/Status'
           unit: "{status}"
         mapping:
           1: other
@@ -363,7 +363,7 @@ metrics:
         name: cpqRackServerBladeHasFuses
         chart_meta:
           description: This specifies if the server blade contains fuses
-          family: "Hardware/ServerBlade/Fuse/Status"
+          family: 'Hardware/ServerBlade/Fuse/Status'
           unit: "{status}"
         mapping:
           1: false
@@ -372,7 +372,7 @@ metrics:
         name: cpqRackServerBladePOSTStatus
         chart_meta:
           description: Blade server power-on self test (POST) status
-          family: "Hardware/ServerBlade/POST/Status"
+          family: 'Hardware/ServerBlade/POST/Status'
           unit: "{status}"
         mapping:
           1: other
@@ -383,7 +383,7 @@ metrics:
         name: cpqRackServerBladeStatus
         chart_meta:
           description: The health status of the blade
-          family: "Hardware/ServerBlade/Status"
+          family: 'Hardware/ServerBlade/Status'
           unit: "{status}"
         mapping:
           1: other
@@ -394,7 +394,7 @@ metrics:
         name: cpqRackServerBladePowered
         chart_meta:
           description: The power state of the blade
-          family: "Hardware/ServerBlade/Power/Status"
+          family: 'Hardware/ServerBlade/Power/Status'
           unit: "{status}"
         mapping:
           1: other
@@ -406,7 +406,7 @@ metrics:
         name: cpqRackServerBladeUIDState
         chart_meta:
           description: The Unit Identifier LED status
-          family: "Hardware/ServerBlade/UID/Status"
+          family: 'Hardware/ServerBlade/UID/Status'
           unit: "{status}"
         mapping:
           1: other
@@ -464,13 +464,13 @@ metrics:
         OID: 1.3.6.1.4.1.232.22.2.4.3.1.1.8
         chart_meta:
           description: This is the current temperature sensor reading in degrees celsius
-          family: "Hardware/ServerBlade/Temperature/Value"
+          family: 'Hardware/ServerBlade/Temperature/Value'
           unit: "Cel"
       - OID: 1.3.6.1.4.1.232.22.2.4.3.1.1.10
         name: cpqRackServerTempSensorCondition
         chart_meta:
           description: The Temperature sensor condition
-          family: "Hardware/ServerBlade/Temperature/Status"
+          family: 'Hardware/ServerBlade/Temperature/Status'
           unit: "{status}"
         mapping:
           1: other
@@ -517,25 +517,25 @@ metrics:
         OID: 1.3.6.1.4.1.232.22.2.5.1.1.1.10
         chart_meta:
           description: The current power output of the power supply in watts
-          family: "Hardware/Power/Output/Value"
+          family: 'Hardware/Power/Output/Value'
           unit: "W"
       - name: cpqRackPowerSupplyIntakeTemp
         OID: 1.3.6.1.4.1.232.22.2.5.1.1.1.12
         chart_meta:
           description: The current air temperature at the intake of the power supply in degrees celsius
-          family: "Hardware/Power/Temperature/Intake"
+          family: 'Hardware/Power/Temperature/Intake'
           unit: "Cel"
       - name: cpqRackPowerSupplyExhaustTemp
         OID: 1.3.6.1.4.1.232.22.2.5.1.1.1.13
         chart_meta:
           description: The current air temperature at the exhaust of the power supply in degrees celsius
-          family: "Hardware/Power/Temperature/Exhaust"
+          family: 'Hardware/Power/Temperature/Exhaust'
           unit: "Cel"
       - OID: 1.3.6.1.4.1.232.22.2.5.1.1.1.16
         name: cpqRackPowerSupplyPresent
         chart_meta:
           description: This specifies if the power supply described is present in the enclosure
-          family: "Hardware/Power/Presence/Status"
+          family: 'Hardware/Power/Presence/Status'
           unit: "{status}"
         mapping:
           1: other
@@ -545,7 +545,7 @@ metrics:
         name: cpqRackPowerSupplyStatus
         chart_meta:
           description: The status of the power supply
-          family: "Hardware/Power/Status"
+          family: 'Hardware/Power/Status'
           unit: "{status}"
         mapping:
           1: noError
@@ -568,7 +568,7 @@ metrics:
         name: cpqRackPowerSupplyInputLineStatus
         chart_meta:
           description: The status of line input power
-          family: "Hardware/Power/Input/Status"
+          family: 'Hardware/Power/Input/Status'
           unit: "{status}"
         mapping:
           1: noError
@@ -581,7 +581,7 @@ metrics:
         name: cpqRackPowerSupplyCondition
         chart_meta:
           description: The condition of the power supply
-          family: "Hardware/Power/Condition/Status"
+          family: 'Hardware/Power/Condition/Status'
           unit: "{status}"
         mapping:
           1: other

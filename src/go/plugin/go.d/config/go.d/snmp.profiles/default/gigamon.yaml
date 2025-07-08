@@ -42,5 +42,5 @@ metrics:
       extract_value: '(\d+)'
       chart_meta:
         description: Cpu usage
-        family: System/CPU/usage
+        family: 'System/CPU/usage'
         unit: "%"
