@@ -2,7 +2,7 @@ extends:
   - tripplite.yaml
 
 sysobjectid:
-  - 1.3.6.1.4.1.850.1.1.1     # Tripp Lite PDU
+  - 1.3.6.1.4.1.850.1.1.1 # Tripp Lite PDU
 
 metadata:
   device:
@@ -10,7 +10,10 @@ metadata:
       type:
         value: "PDU"
 
+# TRIPPLITE-PRODUCTS
 # https://mibbrowser.online/mibdb_search.php?mib=TRIPPLITE-PRODUCTS
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/tripplite/TRIPPLITE-PRODUCTS
+
 metrics:
   - MIB: TRIPPLITE-PRODUCTS
     table:
@@ -139,9 +142,9 @@ metrics:
     # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - tag: tlp_device_index
-        index: 1  # tlpDeviceIndex
+        index: 1 # tlpDeviceIndex
       - tag: tlp_pdu_output_index
-        index: 2  # tlpPduOutputIndex
+        index: 2 # tlpPduOutputIndex
       - tag: tlp_pdu_output_phase
         symbol:
           OID: 1.3.6.1.4.1.850.1.1.3.2.3.2.1.1.2
@@ -214,9 +217,9 @@ metrics:
           2: not_installed
     metric_tags:
       - tag: tlp_device_index
-        index: 1  # tlpDeviceIndex
+        index: 1 # tlpDeviceIndex
       - tag: tlp_pdu_breaker_index
-        index: 2  # tlpPduBreakerIndex
+        index: 2 # tlpPduBreakerIndex
       - symbol:
           OID: 1.3.6.1.4.1.850.1.1.3.2.3.5.1.1.2
           name: tlpPduBreakerStatus
@@ -260,8 +263,8 @@ metrics:
           2: acknowledged
     metric_tags:
       - tag: tlp_alarm_index
-        index: 1  # tlpAlarmId
+        index: 1 # tlpAlarmId
       - tag: _tlp_alarm_descr
         symbol:
           OID: 1.3.6.1.4.1.850.1.3.2.1.2
-          name: tlpAlarmDescr\
+          name: tlpAlarmDescr

@@ -10,6 +10,6 @@ metadata:
   device:
     fields:
       vendor:
-        value: "watchguard"
+        value: "WatchGuard"
       type:
-        value: "firewall"
+        value: "Firewall"
