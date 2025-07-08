@@ -68,6 +68,9 @@ sysobjectid:
   - 1.3.6.1.4.1.12356.103.3.40001 # Fortinet faz4000A
   - 1.3.6.1.4.1.12356.103.3.40002 # Fortinet faz4000B
 
+#  https://mibbrowser.online/mibdb_search.php?mib=FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/fortinet/FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
+
 metrics:
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     symbol:
@@ -214,6 +217,7 @@ metrics:
         description: Peer numbers in the Ha
         family: 'System/HA/Peer/Count'
         unit: "{peer}"
+
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     table:
       OID: 1.3.6.1.4.1.12356.103.6.2
@@ -263,7 +267,6 @@ metrics:
           0: unknown
           1: not-modified
           2: modified
-
       - OID: 1.3.6.1.4.1.12356.103.6.2.1.14
         name: fmDeviceEntConfigState
         chart_meta:
@@ -307,30 +310,35 @@ metrics:
           0: expired
           1: valid
     metric_tags:
-      - symbol:
+      - tag: fm_device_ent_index
+        symbol:
+          name: fmDeviceEntIndex
+          OID: 1.3.6.1.4.1.12356.103.6.2.1.1
+      - tag: _fm_device_ent_name
+        symbol:
           name: fmDeviceEntName
           OID: 1.3.6.1.4.1.12356.103.6.2.1.2
-        tag: fm_device_ent_name
-      - symbol:
+      - tag: _fm_device_ent_sn
+        symbol:
           name: fmDeviceEntSn
           OID: 1.3.6.1.4.1.12356.103.6.2.1.3
-        tag: fm_device_ent_sn
-      - symbol:
+      - tag: _fm_device_ent_adom
+        symbol:
           name: fmDeviceEntAdom
           OID: 1.3.6.1.4.1.12356.103.6.2.1.5
-        tag: fm_device_ent_adom
-      - symbol:
+      - tag: _fm_device_ent_ip
+        symbol:
           name: fmDeviceEntIp
           OID: 1.3.6.1.4.1.12356.103.6.2.1.6
-        tag: fm_device_ent_ip
-      - symbol:
+      - tag: _fm_device_ent_ha_group
+        symbol:
           name: fmDeviceEntHaGroup
           OID: 1.3.6.1.4.1.12356.103.6.2.1.11
-        tag: fm_device_ent_ha_group
-      - symbol:
+      - tag: _fm_device_ent_desc
+        symbol:
           name: fmDeviceEntDesc
           OID: 1.3.6.1.4.1.12356.103.6.2.1.24
-        tag: fm_device_ent_desc
+
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     table:
       OID: 1.3.6.1.4.1.12356.103.7.2
@@ -357,10 +365,11 @@ metrics:
           4: failed
           5: spare
     metric_tags:
-      - symbol:
+      - tag: fm_raid_disk_ent_index
+        symbol:
           OID: 1.3.6.1.4.1.12356.103.7.2.1.1
           name: fmRaidDiskEntIndex
-        tag: fm_raid_disk_ent_index
+
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     table:
       OID: 1.3.6.1.4.1.12356.103.8.2
@@ -382,19 +391,20 @@ metrics:
           5: input-lost
           6: not-present
     metric_tags:
-      - symbol:
+      - tag: fm_sensor_ent_name
+        symbol:
           name: fmSensorEntName
           OID: 1.3.6.1.4.1.12356.103.8.2.1.2
-        tag: fm_sensor_ent_name
-      - symbol:
+      - tag: fm_sensor_ent_type
+        symbol:
           name: fmSensorEntType
           OID: 1.3.6.1.4.1.12356.103.8.2.1.4
-        tag: fm_sensor_ent_type
         mapping:
           0: power
           1: fan
           2: temperature
           3: voltage
+
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     table:
       OID: 1.3.6.1.4.1.12356.103.9.2
@@ -411,23 +421,29 @@ metrics:
           1: negotiating
           2: synchronizing
           3: up
-    metric_tags:
-      - symbol:
-          name: fmHaPeerEntIp
-          OID: 1.3.6.1.4.1.12356.103.9.2.1.2
-        tag: fm_ha_peer_ent_ip
-      - symbol:
-          name: fmHaPeerEntSn
-          OID: 1.3.6.1.4.1.12356.103.9.2.1.3
-        tag: fm_ha_peer_ent_sn
-      - symbol:
-          name: fmHaPeerEntHostName
-          OID: 1.3.6.1.4.1.12356.103.9.2.1.5
-        tag: fm_ha_peer_ent_host_name
-      - symbol:
-          OID: 1.3.6.1.4.1.12356.103.9.2.1.4
-          name: fmHaPeerEntEnabled
-        tag: fm_ha_peer_ent_enabled
+      - OID: 1.3.6.1.4.1.12356.103.9.2.1.4
+        name: fmHaPeerEntEnabled
+        chart_meta:
+          description: Whether peer is enabled
+          family: 'System/HA/Peer/Status'
+          unit: "{status}"
         mapping:
           1: disabled
           2: enabled
+    metric_tags:
+      - tag: fm_ha_peer_ent_index
+        symbol:
+          name: fmHaPeerEntIndex
+          OID: 1.3.6.1.4.1.12356.103.9.2.1.1
+      - tag: _fm_ha_peer_ent_ip
+        symbol:
+          name: fmHaPeerEntIp
+          OID: 1.3.6.1.4.1.12356.103.9.2.1.2
+      - tag: _fm_ha_peer_ent_sn
+        symbol:
+          name: fmHaPeerEntSn
+          OID: 1.3.6.1.4.1.12356.103.9.2.1.3
+      - tag: _fm_ha_peer_ent_host_name
+        symbol:
+          name: fmHaPeerEntHostName
+          OID: 1.3.6.1.4.1.12356.103.9.2.1.5
