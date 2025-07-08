@@ -8,6 +8,7 @@
 
 - MCP in Netdata Operations Diagram [\#20637](https://github.com/netdata/netdata/pull/20637) ([ktsaou](https://github.com/ktsaou))
 - refactor\(go.d/iprange\): migrate from net to net/netip [\#20636](https://github.com/netdata/netdata/pull/20636) ([ilyam8](https://github.com/ilyam8))
+- chore\(go.d/snmp-profiles\): charts meta fixes and fam updates p5 [\#20635](https://github.com/netdata/netdata/pull/20635) ([ilyam8](https://github.com/ilyam8))
 - Update NIDL-Framework.md [\#20634](https://github.com/netdata/netdata/pull/20634) ([Ancairon](https://github.com/Ancairon))
 - build\(deps\): bump github.com/docker/docker from 28.3.0+incompatible to 28.3.1+incompatible in /src/go [\#20633](https://github.com/netdata/netdata/pull/20633) ([dependabot[bot]](https://github.com/apps/dependabot))
 - move NIDL to docs [\#20632](https://github.com/netdata/netdata/pull/20632) ([ktsaou](https://github.com/ktsaou))
@@ -15,6 +16,7 @@
 - Nidl Framework Documentation [\#20629](https://github.com/netdata/netdata/pull/20629) ([ktsaou](https://github.com/ktsaou))
 - Fix syntax error on learn doc [\#20628](https://github.com/netdata/netdata/pull/20628) ([Ancairon](https://github.com/Ancairon))
 - At a glance [\#20627](https://github.com/netdata/netdata/pull/20627) ([kanelatechnical](https://github.com/kanelatechnical))
+- Improve ACLK connection handling [\#20625](https://github.com/netdata/netdata/pull/20625) ([stelfrag](https://github.com/stelfrag))
 - Improve packet ID generation [\#20624](https://github.com/netdata/netdata/pull/20624) ([stelfrag](https://github.com/stelfrag))
 - chore\(go.d/snmp-profiles\): charts meta fixes and fam updates p4 [\#20623](https://github.com/netdata/netdata/pull/20623) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d/snmp-profiles\): charts meta fixes and fam updates p3 [\#20622](https://github.com/netdata/netdata/pull/20622) ([ilyam8](https://github.com/ilyam8))
@@ -50,6 +52,7 @@
 - remove devType/Vendor/ from ddsnmp metric families [\#20585](https://github.com/netdata/netdata/pull/20585) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d/ddsnmp\): include table name in config id [\#20584](https://github.com/netdata/netdata/pull/20584) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d/ddsnmp\): walk cross-table columns when referenced table has no metrics [\#20583](https://github.com/netdata/netdata/pull/20583) ([ilyam8](https://github.com/ilyam8))
+- Rework datafiles [\#20581](https://github.com/netdata/netdata/pull/20581) ([stelfrag](https://github.com/stelfrag))
 - Ignore duplicate entries when rebuilding the alert version table [\#20579](https://github.com/netdata/netdata/pull/20579) ([stelfrag](https://github.com/stelfrag))
 - Add Rocky Linux 10 to CI and package builds. [\#20578](https://github.com/netdata/netdata/pull/20578) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations docs [\#20577](https://github.com/netdata/netdata/pull/20577) ([netdatabot](https://github.com/netdatabot))
@@ -461,10 +464,6 @@
 - Improve journal file access error logging protect retention recalculation [\#20098](https://github.com/netdata/netdata/pull/20098) ([stelfrag](https://github.com/stelfrag))
 - Fix Windows registry name crashes [\#20097](https://github.com/netdata/netdata/pull/20097) ([ktsaou](https://github.com/ktsaou))
 - daemon status 27d [\#20096](https://github.com/netdata/netdata/pull/20096) ([ktsaou](https://github.com/ktsaou))
-- Fix ACLK Backoff Timeout Logic [\#20095](https://github.com/netdata/netdata/pull/20095) ([stelfrag](https://github.com/stelfrag))
-- Release memory after journalfile creation [\#20094](https://github.com/netdata/netdata/pull/20094) ([stelfrag](https://github.com/stelfrag))
-- Protection access improvements 1 [\#20093](https://github.com/netdata/netdata/pull/20093) ([ktsaou](https://github.com/ktsaou))
-- protected access against SIGBUS/SIGSEGV for journal v2 files [\#20092](https://github.com/netdata/netdata/pull/20092) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.3.2](https://github.com/netdata/netdata/tree/v2.3.2) (2025-04-02)
 
