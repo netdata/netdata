@@ -1432,13 +1432,13 @@ func (da *DumpAnalyzer) analyzeFamilyStructureForJob(job *JobAnalysis, contextIs
 		}
 	}
 
-	// Rule 4: Check families with >10 contexts
+	// Rule 4: Check families with >15 contexts
 	for family, info := range families {
-		if len(info.contexts) > 10 {
+		if len(info.contexts) > 15 {
 			// Add to all contexts in this family
 			for ctx := range info.contexts {
 				contextIssues[ctx] = append(contextIssues[ctx], 
-					fmt.Sprintf("family '%s' has %d contexts (exceeds recommended 10); possible cause: too many metric types in one family; possible fix: split into subfamilies or make some contexts into instances with labels", 
+					fmt.Sprintf("family '%s' has %d contexts (exceeds recommended 15); possible cause: too many metric types in one family; possible fix: split into subfamilies or make some contexts into instances with labels", 
 						family, len(info.contexts)))
 			}
 		}
@@ -1533,12 +1533,12 @@ func (da *DumpAnalyzer) analyzeFamilyStructureForJob(job *JobAnalysis, contextIs
 			}
 			
 			// Check for too many subfamilies
-			if subfamilyCount > 5 {
+			if subfamilyCount > 8 {
 				// Add to contexts in the parent family (if any) or all subfamily contexts
 				if len(info.contexts) > 0 {
 					for ctx := range info.contexts {
 						contextIssues[ctx] = append(contextIssues[ctx], 
-							fmt.Sprintf("family '%s' has %d subfamilies (exceeds recommended 5); possible cause: too many subcategories; possible fix: consolidate related subfamilies or create a deeper hierarchy", 
+							fmt.Sprintf("family '%s' has %d subfamilies (exceeds recommended 8); possible cause: too many subcategories; possible fix: consolidate related subfamilies or create a deeper hierarchy", 
 								family, subfamilyCount))
 					}
 				} else {
@@ -1547,7 +1547,7 @@ func (da *DumpAnalyzer) analyzeFamilyStructureForJob(job *JobAnalysis, contextIs
 						if subfamilyInfo, exists := families[subfamily]; exists {
 							for ctx := range subfamilyInfo.contexts {
 								contextIssues[ctx] = append(contextIssues[ctx], 
-									fmt.Sprintf("family '%s' has %d subfamilies (exceeds recommended 5); possible cause: too many subcategories; possible fix: consolidate related subfamilies or create a deeper hierarchy", 
+									fmt.Sprintf("family '%s' has %d subfamilies (exceeds recommended 8); possible cause: too many subcategories; possible fix: consolidate related subfamilies or create a deeper hierarchy", 
 										family, subfamilyCount))
 								break // Only add to one context per subfamily
 							}

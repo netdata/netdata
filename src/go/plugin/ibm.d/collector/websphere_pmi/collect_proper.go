@@ -235,20 +235,20 @@ func (w *WebSpherePMI) parseServerStats(nodeName, serverName string, stats []pmi
 			} else if len(currentPath) > 3 && currentPath[len(currentPath)-2] == "Servlets" {
 				// Handle individual servlet URLs (detected by path structure)
 				w.parseServlet(&stat, nodeName, serverName, currentPath[len(currentPath)-3], mx)
+			} else if stat.Name == "Enterprise Beans" {
+				// Handle Enterprise Beans container separately
+				w.parseEJBContainer(&stat, nodeName, serverName, mx)
 			} else if (strings.Contains(stat.Name, "Bean") || strings.Contains(stat.Name, "EJB")) && len(stat.CountStatistics) > 0 {
 				// Handle individual EJB beans (may contain "Bean" or "EJB" in the name)
 				w.parseIndividualEJB(&stat, nodeName, serverName, mx, currentPath)
 			} else if stat.Name == "Methods" && len(currentPath) > 0 {
 				// Handle EJB Methods container - process its children
-				// TODO: Create parseEJBMethod when we understand the metrics structure
-				// For now, let individual EJB parser handle method metrics
 				for _, method := range stat.SubStats {
-					w.parseGenericStat(&method, nodeName, serverName, mx, currentPath)
+					w.parseEJBMethod(&method, nodeName, serverName, mx, append(currentPath, method.Name))
 				}
 			} else if len(currentPath) > 1 && currentPath[len(currentPath)-2] == "Methods" {
 				// Handle individual EJB methods under Methods container
-				// TODO: Create parseEJBMethod when we understand the metrics structure
-				w.parseGenericStat(&stat, nodeName, serverName, mx, currentPath)
+				w.parseEJBMethod(&stat, nodeName, serverName, mx, currentPath)
 			} else if strings.Contains(stat.Name, "ResourceAdapter") || strings.Contains(stat.Name, "Connection Pool") {
 				// Handle JCA connection pools with provider names
 				w.parseJCAConnectionPool(&stat, nodeName, serverName, mx)
@@ -266,6 +266,9 @@ func (w *WebSpherePMI) parseServerStats(nodeName, serverName string, stats []pmi
 				// Check if this .war file has ServicesLoaded (web service module metrics)
 				hasServicesLoaded := false
 				hasSessionMetrics := false
+				hasWebServiceMetrics := false
+				
+				// Check for web service indicators
 				for _, cs := range stat.CountStatistics {
 					if cs.Name == "ServicesLoaded" {
 						hasServicesLoaded = true
@@ -275,7 +278,22 @@ func (w *WebSpherePMI) parseServerStats(nodeName, serverName string, stats []pmi
 						hasSessionMetrics = true
 					}
 				}
-				if hasServicesLoaded {
+				
+				// Check if parent is pmiWebServiceModule
+				if len(currentPath) > 1 && currentPath[len(currentPath)-2] == "pmiWebServiceModule" {
+					hasWebServiceMetrics = true
+				}
+				
+				// Check for web service time metrics
+				for _, ts := range stat.TimeStatistics {
+					if strings.Contains(ts.Name, "Request") || strings.Contains(ts.Name, "Reply") || 
+					   strings.Contains(ts.Name, "Dispatch") || strings.Contains(ts.Name, "Service") {
+						hasWebServiceMetrics = true
+						break
+					}
+				}
+				
+				if hasServicesLoaded || hasWebServiceMetrics {
 					// Route to web service module parser 
 					w.parseWebServiceModule(&stat, nodeName, serverName, mx)
 				} else if hasSessionMetrics || strings.Contains(stat.Name, "#") {
@@ -545,6 +563,7 @@ func (w *WebSpherePMI) parseThreadPool(stat *pmiStat, nodeName, serverName strin
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
+		w.Debugf("Thread pool %s RangeStatistic: %s (integral=%d)", instance, metric.Name, metric.Integral)
 		// Use collection helper for all range metrics
 		w.collectRangeMetric(mx, "thread_pool", cleanInst, metric)
 	}

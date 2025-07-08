@@ -1247,8 +1247,10 @@ func (w *WebSpherePMI) ensureWebAppContainerSessionCharts(instance, nodeName, se
 				{ID: fmt.Sprintf("webapp_container_sessions_%s_ActiveCount_mean", cleanInst), Name: "mean"},
 			},
 			Labels: append([]module.Label{
+				{Key: "instance", Value: instance},
 				{Key: "node", Value: nodeName},
 				{Key: "server", Value: serverName},
+				{Key: "application", Value: "_container_"},
 			}, w.getVersionLabels()...),
 		}
 		
@@ -1268,8 +1270,10 @@ func (w *WebSpherePMI) ensureWebAppContainerSessionCharts(instance, nodeName, se
 				{ID: fmt.Sprintf("webapp_container_sessions_%s_LiveCount_mean", cleanInst), Name: "mean"},
 			},
 			Labels: append([]module.Label{
+				{Key: "instance", Value: instance},
 				{Key: "node", Value: nodeName},
 				{Key: "server", Value: serverName},
+				{Key: "application", Value: "_container_"},
 			}, w.getVersionLabels()...),
 		}
 		
@@ -1289,8 +1293,10 @@ func (w *WebSpherePMI) ensureWebAppContainerSessionCharts(instance, nodeName, se
 				{ID: fmt.Sprintf("webapp_container_sessions_%s_NoRoomForNewSessionCount", cleanInst), Name: "rejected", Algo: module.Incremental},
 			},
 			Labels: append([]module.Label{
+				{Key: "instance", Value: instance},
 				{Key: "node", Value: nodeName},
 				{Key: "server", Value: serverName},
+				{Key: "application", Value: "_container_"},
 			}, w.getVersionLabels()...),
 		}
 		
@@ -1309,8 +1315,10 @@ func (w *WebSpherePMI) ensureWebAppContainerSessionCharts(instance, nodeName, se
 				{ID: fmt.Sprintf("webapp_container_sessions_%s_CacheDiscardCount", cleanInst), Name: "cache_discard", Algo: module.Incremental},
 			},
 			Labels: append([]module.Label{
+				{Key: "instance", Value: instance},
 				{Key: "node", Value: nodeName},
 				{Key: "server", Value: serverName},
+				{Key: "application", Value: "_container_"},
 			}, w.getVersionLabels()...),
 		}
 		
@@ -2152,11 +2160,18 @@ func (w *WebSpherePMI) parseJCAConnectionPool(stat *pmiStat, nodeName, serverNam
 	poolName := stat.Name
 	instance := fmt.Sprintf("%s.%s.%s", nodeName, serverName, poolName)
 	
+	// Determine if this is a container-level pool or a specific connection factory
+	isContainer := poolName == "JCA Connection Pools"
+	contextName := "jca_pool"
+	if isContainer {
+		contextName = "jca_container"
+	}
+	
 	// Create charts if not exists
 	w.ensureJCAPoolCharts(instance, nodeName, serverName, poolName)
 	
 	// Mark as seen
-	w.markInstanceSeen("jca_pool", instance)
+	w.markInstanceSeen(contextName, instance)
 	
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
@@ -2166,22 +2181,22 @@ func (w *WebSpherePMI) parseJCAConnectionPool(stat *pmiStat, nodeName, serverNam
 	for _, metric := range countMetrics {
 		switch metric.Name {
 		case "CreateCount":
-			mx[fmt.Sprintf("jca_pool_%s_created", cleanInst)] = metric.Value
+			mx[fmt.Sprintf("%s_%s_created", contextName, cleanInst)] = metric.Value
 		case "CloseCount":
-			mx[fmt.Sprintf("jca_pool_%s_closed", cleanInst)] = metric.Value
+			mx[fmt.Sprintf("%s_%s_closed", contextName, cleanInst)] = metric.Value
 		case "AllocateCount":
-			mx[fmt.Sprintf("jca_pool_%s_allocated", cleanInst)] = metric.Value
+			mx[fmt.Sprintf("%s_%s_allocated", contextName, cleanInst)] = metric.Value
 		case "FreedCount":
-			mx[fmt.Sprintf("jca_pool_%s_returned", cleanInst)] = metric.Value
+			mx[fmt.Sprintf("%s_%s_returned", contextName, cleanInst)] = metric.Value
 		case "FaultCount":
-			mx[fmt.Sprintf("jca_pool_%s_faults", cleanInst)] = metric.Value
+			mx[fmt.Sprintf("%s_%s_faults", contextName, cleanInst)] = metric.Value
 		case "ManagedConnectionCount":
-			mx[fmt.Sprintf("jca_pool_%s_managed_connections", cleanInst)] = metric.Value
+			mx[fmt.Sprintf("%s_%s_managed_connections", contextName, cleanInst)] = metric.Value
 		case "ConnectionHandleCount":
-			mx[fmt.Sprintf("jca_pool_%s_connection_handles", cleanInst)] = metric.Value
+			mx[fmt.Sprintf("%s_%s_connection_handles", contextName, cleanInst)] = metric.Value
 		default:
 			// For unknown count metrics, use collection helper
-			w.collectCountMetric(mx, "jca_pool", cleanInst, metric)
+			w.collectCountMetric(mx, contextName, cleanInst, metric)
 		}
 	}
 	
@@ -2197,7 +2212,7 @@ func (w *WebSpherePMI) parseJCAConnectionPool(stat *pmiStat, nodeName, serverNam
 	for i, metric := range timeMetrics {
 		// Process all TimeStatistics with the smart processor
 		w.processTimeStatisticWithContext(
-			"jca_pool",
+			contextName,
 			cleanInst,
 			labels,
 			metric,
@@ -2211,14 +2226,14 @@ func (w *WebSpherePMI) parseJCAConnectionPool(stat *pmiStat, nodeName, serverNam
 	for _, metric := range rangeMetrics {
 		switch metric.Name {
 		case "WaitingThreadCount":
-			mx[fmt.Sprintf("jca_pool_%s_waiting_threads", cleanInst)] = metric.Current
+			mx[fmt.Sprintf("%s_%s_waiting_threads", contextName, cleanInst)] = metric.Current
 		case "PercentUsed":
-			mx[fmt.Sprintf("jca_pool_%s_percent_used", cleanInst)] = metric.Current
+			mx[fmt.Sprintf("%s_%s_percent_used", contextName, cleanInst)] = metric.Current
 		case "PercentMaxed":
-			mx[fmt.Sprintf("jca_pool_%s_percent_maxed", cleanInst)] = metric.Current
+			mx[fmt.Sprintf("%s_%s_percent_maxed", contextName, cleanInst)] = metric.Current
 		default:
 			// For unknown range metrics, use collection helper
-			w.collectRangeMetric(mx, "jca_pool", cleanInst, metric)
+			w.collectRangeMetric(mx, contextName, cleanInst, metric)
 		}
 	}
 	
@@ -2227,12 +2242,12 @@ func (w *WebSpherePMI) parseJCAConnectionPool(stat *pmiStat, nodeName, serverNam
 	for _, metric := range boundedMetrics {
 		switch metric.Name {
 		case "FreePoolSize":
-			mx[fmt.Sprintf("jca_pool_%s_free", cleanInst)] = metric.Value
+			mx[fmt.Sprintf("%s_%s_free", contextName, cleanInst)] = metric.Value
 		case "PoolSize":
-			mx[fmt.Sprintf("jca_pool_%s_size", cleanInst)] = metric.Value
+			mx[fmt.Sprintf("%s_%s_size", contextName, cleanInst)] = metric.Value
 		default:
 			// For unknown bounded range metrics, use collection helper
-			w.collectBoundedRangeMetric(mx, "jca_pool", cleanInst, metric)
+			w.collectBoundedRangeMetric(mx, contextName, cleanInst, metric)
 		}
 	}
 	
@@ -2240,14 +2255,14 @@ func (w *WebSpherePMI) parseJCAConnectionPool(stat *pmiStat, nodeName, serverNam
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		// Use collection helper for all average metrics
-		w.collectAverageMetric(mx, "jca_pool", cleanInst, metric)
+		w.collectAverageMetric(mx, contextName, cleanInst, metric)
 	}
 	
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
 		// Use collection helper for all double metrics
-		w.collectDoubleMetric(mx, "jca_pool", cleanInst, metric)
+		w.collectDoubleMetric(mx, contextName, cleanInst, metric)
 	}
 }
 
@@ -2739,11 +2754,23 @@ func (w *WebSpherePMI) parseEJBContainer(stat *pmiStat, nodeName, serverName str
 		}
 	}
 	
-	// Extract ALL TimeStatistics
+	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
-	for _, metric := range timeMetrics {
-		// Use collection helper for all time metrics
-		w.collectTimeMetric(mx, "ejb_container", cleanInst, metric)
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		w.processTimeStatisticWithContext(
+			"ejb_container",
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			100+i*10, // Offset priority after main charts
+		)
 	}
 	
 	// Extract ALL RangeStatistics
@@ -3129,14 +3156,16 @@ func (w *WebSpherePMI) parseIndividualEJB(stat *pmiStat, nodeName, serverName st
 		{Key: "bean", Value: beanName},
 	}, w.getVersionLabels()...)
 	
-	for i, metric := range timeMetrics {
+	for _, metric := range timeMetrics {
+		// Use consistent priority offset based on metric name to avoid priority inconsistencies
+		offset := getEJBTimeMetricPriorityOffset(metric.Name)
 		w.processTimeStatisticWithContext(
 			"generic_ejb",
 			cleanInst,
 			labels,
 			metric,
 			mx,
-			100+i*10, // Offset priority after main charts
+			offset,
 		)
 	}
 	
@@ -3173,6 +3202,99 @@ func (w *WebSpherePMI) parseIndividualEJB(stat *pmiStat, nodeName, serverName st
 	for _, metric := range doubleMetrics {
 		// Use collection helper for all double metrics
 		w.collectDoubleMetric(mx, "generic_ejb", cleanInst, metric)
+	}
+}
+
+// parseEJBMethod handles individual EJB method metrics
+func (w *WebSpherePMI) parseEJBMethod(stat *pmiStat, nodeName, serverName string, mx map[string]int64, path []string) {
+	// Extract EJB name and method name from path
+	ejbName := "unknown"
+	if len(path) > 2 {
+		// Path typically: [node, server, ejbs, ejbName, Methods, methodName]
+		for i, p := range path {
+			if p == "Methods" && i > 0 {
+				ejbName = path[i-1]
+				break
+			}
+		}
+	}
+	
+	methodName := stat.Name
+	instance := fmt.Sprintf("%s.%s.%s.%s", nodeName, serverName, ejbName, methodName)
+	
+	// Create charts if not exists
+	w.ensureEJBMethodCharts(instance, nodeName, serverName, ejbName, methodName)
+	
+	// Mark as seen
+	w.markInstanceSeen("ejb_method", instance)
+	
+	// Use universal helpers to extract ALL available metrics
+	cleanInst := w.cleanID(instance)
+	
+	// Extract ALL CountStatistics
+	countMetrics := w.extractCountStatistics(stat.CountStatistics)
+	for _, metric := range countMetrics {
+		switch metric.Name {
+		case "MethodLevelCallCount":
+			mx[fmt.Sprintf("ejb_method_%s_call_count", cleanInst)] = metric.Value
+		default:
+			// For unknown count metrics, use collection helper
+			w.collectCountMetric(mx, "ejb_method", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL TimeStatistics and process with smart processor
+	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+		{Key: "ejb", Value: ejbName},
+		{Key: "method", Value: methodName},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		w.processTimeStatisticWithContext(
+			"ejb_method", // Use separate context for method metrics
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			100+i*10, // Offset priority after main charts
+		)
+	}
+	
+	// Extract ALL RangeStatistics
+	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
+	for _, metric := range rangeMetrics {
+		switch metric.Name {
+		case "MethodLevelConcurrentInvocations":
+			mx[fmt.Sprintf("ejb_method_%s_concurrent", cleanInst)] = metric.Current
+		default:
+			// For unknown range metrics, use collection helper
+			w.collectRangeMetric(mx, "ejb_method", cleanInst, metric)
+		}
+	}
+	
+	// Extract ALL BoundedRangeStatistics
+	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
+	for _, metric := range boundedMetrics {
+		// Use collection helper for all bounded range metrics
+		w.collectBoundedRangeMetric(mx, "ejb_method", cleanInst, metric)
+	}
+	
+	// Extract ALL AverageStatistics
+	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
+	for _, metric := range avgMetrics {
+		// Use collection helper for all average metrics
+		w.collectAverageMetric(mx, "ejb_method", cleanInst, metric)
+	}
+	
+	// Extract ALL DoubleStatistics
+	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
+	for _, metric := range doubleMetrics {
+		// Use collection helper for all double metrics
+		w.collectDoubleMetric(mx, "ejb_method", cleanInst, metric)
 	}
 }
 
@@ -3231,32 +3353,33 @@ func (w *WebSpherePMI) parseGenericStat(stat *pmiStat, nodeName, serverName stri
 
 // createDynamicGenericChart creates charts dynamically based on available metrics
 func (w *WebSpherePMI) createDynamicGenericChart(instance, nodeName, serverName, statName string, stat *pmiStat) {
-	// Create dynamic dimensions based on available metrics
-	var dims module.Dims
+	// Separate incremental (count) metrics from absolute (gauge) metrics
+	var countDims module.Dims
+	var gaugeDims module.Dims
 	
-	// Add CountStatistics dimensions
+	// Add CountStatistics dimensions (incremental)
 	for _, cs := range stat.CountStatistics {
 		dimID := fmt.Sprintf("generic_stat_%s_%s", w.cleanID(instance), w.cleanID(cs.Name))
-		dims = append(dims, &module.Dim{
+		countDims = append(countDims, &module.Dim{
 			ID:   dimID,
 			Name: w.cleanID(cs.Name),
-			Algo: module.Incremental, // Most count stats are incremental
+			Algo: module.Incremental,
 		})
 	}
 	
-	// Add RangeStatistics dimensions
+	// Add RangeStatistics dimensions (absolute)
 	for _, rs := range stat.RangeStatistics {
 		dimID := fmt.Sprintf("generic_stat_%s_%s", w.cleanID(instance), w.cleanID(rs.Name))
-		dims = append(dims, &module.Dim{
+		gaugeDims = append(gaugeDims, &module.Dim{
 			ID:   dimID,
 			Name: w.cleanID(rs.Name),
 		})
 	}
 	
-	// Add BoundedRangeStatistics dimensions
+	// Add BoundedRangeStatistics dimensions (absolute)
 	for _, brs := range stat.BoundedRangeStatistics {
 		dimID := fmt.Sprintf("generic_stat_%s_%s", w.cleanID(instance), w.cleanID(brs.Name))
-		dims = append(dims, &module.Dim{
+		gaugeDims = append(gaugeDims, &module.Dim{
 			ID:   dimID,
 			Name: w.cleanID(brs.Name),
 		})
@@ -3265,17 +3388,42 @@ func (w *WebSpherePMI) createDynamicGenericChart(instance, nodeName, serverName,
 	// NOTE: Skip TimeStatistics - they're handled by smart processor in specific parsers
 	// to avoid duplication and ensure consistent 3-chart pattern (rate, current, lifetime)
 	
-	// Only create chart if we have dimensions
-	if len(dims) > 0 {
+	// Create separate charts for counters and gauges to comply with Netdata rules
+	
+	// Create chart for counters (incremental metrics)
+	if len(countDims) > 0 {
 		chart := &module.Chart{
-			ID:       fmt.Sprintf("generic_stat_%s_metrics", w.cleanID(instance)),
-			Title:    fmt.Sprintf("Generic Metrics: %s", statName),
-			Units:    "metrics",
+			ID:       fmt.Sprintf("generic_stat_%s_counters", w.cleanID(instance)),
+			Title:    fmt.Sprintf("Generic Counters: %s", statName),
+			Units:    "operations/s",
 			Fam:      "uncategorized",
-			Ctx:      "websphere_pmi.generic_metrics",
+			Ctx:      "websphere_pmi.generic_counters",
 			Type:     module.Line,
 			Priority: prioMonitoring,
-			Dims:     dims,
+			Dims:     countDims,
+			Labels: []module.Label{
+				{Key: "node", Value: nodeName},
+				{Key: "server", Value: serverName},
+				{Key: "stat", Value: statName},
+			},
+		}
+		
+		if err := w.charts.Add(chart); err != nil {
+			w.Warning(err)
+		}
+	}
+	
+	// Create chart for gauges (absolute metrics)
+	if len(gaugeDims) > 0 {
+		chart := &module.Chart{
+			ID:       fmt.Sprintf("generic_stat_%s_gauges", w.cleanID(instance)),
+			Title:    fmt.Sprintf("Generic Gauges: %s", statName),
+			Units:    "value",
+			Fam:      "uncategorized", 
+			Ctx:      "websphere_pmi.generic_gauges",
+			Type:     module.Line,
+			Priority: prioMonitoring + 1,
+			Dims:     gaugeDims,
 			Labels: []module.Label{
 				{Key: "node", Value: nodeName},
 				{Key: "server", Value: serverName},
@@ -4186,7 +4334,6 @@ func (w *WebSpherePMI) ensureDetailsComponentCharts(instance, nodeName, serverNa
 			chart.Labels = w.createChartLabels(
 				module.Label{Key: "node", Value: nodeName},
 				module.Label{Key: "server", Value: serverName},
-				module.Label{Key: "context", Value: parentContext},
 			)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
@@ -4768,7 +4915,7 @@ var webServiceChartsTmpl = module.Charts{
 		ID:       "web_service_%s_services",
 		Title:    "Web Service Module Services",
 		Units:    "services",
-		Fam:      "integration/webservices",
+		Fam:      "integration/webservices/overview",
 		Ctx:      "websphere_pmi.web_service_services",
 		Type:     module.Line,
 		Priority: prioWebServices,
@@ -4783,7 +4930,7 @@ var urlChartsTmpl = module.Charts{
 		ID:       "urls_%s_requests",
 		Title:    "URL Requests",
 		Units:    "requests/s",
-		Fam:      "web/servlets/urls",
+		Fam:      "web/servlets/container",
 		Ctx:      "websphere_pmi.url_requests",
 		Type:     module.Line,
 		Priority: prioWebServlets + 10,
@@ -4795,7 +4942,7 @@ var urlChartsTmpl = module.Charts{
 		ID:       "urls_%s_concurrent",
 		Title:    "URL Concurrent Requests",
 		Units:    "requests",
-		Fam:      "web/servlets/urls",
+		Fam:      "web/servlets/container",
 		Ctx:      "websphere_pmi.url_concurrent",
 		Type:     module.Line,
 		Priority: prioWebServlets + 11,
@@ -5143,11 +5290,24 @@ func (w *WebSpherePMI) parseWebServiceModule(stat *pmiStat, nodeName, serverName
 		}
 	}
 	
-	// Extract ALL TimeStatistics
+	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
-	for _, metric := range timeMetrics {
-		// Use collection helper for all time metrics
-		w.collectTimeMetric(mx, "web_service", cleanInst, metric)
+	labels := append([]module.Label{
+		{Key: "instance", Value: instance},
+		{Key: "node", Value: nodeName},
+		{Key: "server", Value: serverName},
+		{Key: "module", Value: moduleName},
+	}, w.getVersionLabels()...)
+	
+	for i, metric := range timeMetrics {
+		w.processTimeStatisticWithContext(
+			"pmi_webservice",
+			cleanInst,
+			labels,
+			metric,
+			mx,
+			100+i*10, // Offset priority after main charts
+		)
 	}
 	
 	// Extract ALL RangeStatistics
@@ -5501,6 +5661,63 @@ func (w *WebSpherePMI) ensureWebServiceCharts(instance, nodeName, serverName, mo
 		}
 		
 		if err := w.charts.Add(*charts...); err != nil {
+			w.Warning(err)
+		}
+	}
+}
+
+// ensureEJBMethodCharts creates EJB method charts if they don't exist
+func (w *WebSpherePMI) ensureEJBMethodCharts(instance, nodeName, serverName, ejbName, methodName string) {
+	chartKey := fmt.Sprintf("ejb_method_%s", instance)
+	if _, exists := w.collectedInstances[chartKey]; !exists {
+		w.collectedInstances[chartKey] = true
+		
+		cleanInst := w.cleanID(instance)
+		
+		// Call count chart
+		chartCalls := &module.Chart{
+			ID:       fmt.Sprintf("ejb_method_%s_calls", cleanInst),
+			Title:    fmt.Sprintf("EJB Method %s Calls", methodName),
+			Units:    "calls/s",
+			Fam:      "middleware/ejb/methods",
+			Ctx:      "websphere_pmi.ejb_method_calls",
+			Type:     module.Line,
+			Priority: prioEJBContainer + 100,
+			Dims: module.Dims{
+				{ID: fmt.Sprintf("ejb_method_%s_call_count", cleanInst), Name: "calls", Algo: module.Incremental},
+			},
+			Labels: append([]module.Label{
+				{Key: "instance", Value: instance},
+				{Key: "node", Value: nodeName},
+				{Key: "server", Value: serverName},
+				{Key: "ejb", Value: ejbName},
+				{Key: "method", Value: methodName},
+			}, w.getVersionLabels()...),
+		}
+		
+		// Concurrent invocations chart
+		chartConcurrent := &module.Chart{
+			ID:       fmt.Sprintf("ejb_method_%s_concurrent", cleanInst),
+			Title:    fmt.Sprintf("EJB Method %s Concurrent Invocations", methodName),
+			Units:    "invocations",
+			Fam:      "middleware/ejb/methods",
+			Ctx:      "websphere_pmi.ejb_method_concurrent",
+			Type:     module.Line,
+			Priority: prioEJBContainer + 101,
+			Dims: module.Dims{
+				{ID: fmt.Sprintf("ejb_method_%s_concurrent", cleanInst), Name: "concurrent"},
+			},
+			Labels: append([]module.Label{
+				{Key: "instance", Value: instance},
+				{Key: "node", Value: nodeName},
+				{Key: "server", Value: serverName},
+				{Key: "ejb", Value: ejbName},
+				{Key: "method", Value: methodName},
+			}, w.getVersionLabels()...),
+		}
+		
+		// Add charts
+		if err := w.charts.Add(chartCalls, chartConcurrent); err != nil {
 			w.Warning(err)
 		}
 	}
