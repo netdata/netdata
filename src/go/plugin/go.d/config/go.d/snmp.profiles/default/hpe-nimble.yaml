@@ -146,7 +146,7 @@ metrics:
       chart_meta:
         description: Total cumulative number of Sequential Write I/O bytes.
         family: "Storage/IO/Throughput/Write/Sequential"
-        unit: "By/s"s"
+        unit: "By/s"
   - MIB: NIMBLE-MIB
     symbol:
       OID: 1.3.6.1.4.1.37447.1.3.10.0

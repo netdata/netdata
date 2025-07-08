@@ -39,6 +39,8 @@ metrics:
     symbol:
       name: cpuUtilization
       OID: 1.3.6.1.4.1.26866.2.13
-      extract_value: '(\d+)'.
-      description: Cpu usage
-      unit: "%"
+      extract_value: '(\d+)'
+      chart_meta:
+        description: Cpu usage
+        family: System/CPU/usage
+        unit: "%"
