@@ -596,7 +596,7 @@ func (w *WebSpherePMI) processTimeStatistic(
 	
 	// Note: Rate charts removed as they are redundant with existing CountStatistic counters
 	
-	// 1. Always collect lifetime statistics (raw nanoseconds - Netdata will auto-scale)
+	// 1. Always collect lifetime statistics (milliseconds from WebSphere PMI)
 	mx[fmt.Sprintf("%s_%s_%s_min", componentPrefix, instance, w.cleanID(metric.Name))] = metric.Min
 	mx[fmt.Sprintf("%s_%s_%s_max", componentPrefix, instance, w.cleanID(metric.Name))] = metric.Max
 	mx[fmt.Sprintf("%s_%s_%s_mean", componentPrefix, instance, w.cleanID(metric.Name))] = metric.Mean
@@ -610,7 +610,8 @@ func (w *WebSpherePMI) processTimeStatistic(
 		if metric.Count >= prev.Count && metric.Total >= prev.Total {
 			var currentLatency int64
 			if deltaCount > 0 {
-				currentLatency = deltaTotal / deltaCount
+				// Use precision to preserve fractional milliseconds in delta calculations
+				currentLatency = (deltaTotal * precision) / deltaCount
 			} else {
 				currentLatency = 0 // No new operations = 0 latency
 			}
@@ -663,13 +664,13 @@ func (w *WebSpherePMI) ensureTimeStatCharts(
 	chartCurrent := &module.Chart{
 		ID:       baseChartID + "_current_latency",
 		Title:    fmt.Sprintf("%s%s Average Latency", titlePrefix, metricName),
-		Units:    "nanoseconds",
+		Units:    "milliseconds",
 		Fam:      family,
 		Ctx:      uniqueContext + "_current_latency",
 		Type:     module.Line,
 		Priority: priority + 1,
 		Dims: module.Dims{
-			{ID: fmt.Sprintf("%s_%s_%s_current", componentPrefix, instance, cleanMetric), Name: "average"},
+			{ID: fmt.Sprintf("%s_%s_%s_current", componentPrefix, instance, cleanMetric), Name: "average", Div: precision},
 		},
 		Labels: labels,
 	}
@@ -678,7 +679,7 @@ func (w *WebSpherePMI) ensureTimeStatCharts(
 	chartLifetime := &module.Chart{
 		ID:       baseChartID + "_lifetime_latency",
 		Title:    fmt.Sprintf("%s%s Lifetime Latency", titlePrefix, metricName),
-		Units:    "nanoseconds",
+		Units:    "milliseconds",
 		Fam:      family,
 		Ctx:      uniqueContext + "_lifetime_latency",
 		Type:     module.Line,
