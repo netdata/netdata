@@ -2,34 +2,64 @@ extends:
   - _std-if-mib.yaml
   - _hp.yaml
   - _hp-base.yaml
+
 sysobjectid:
   - 1.3.6.1.4.1.11.2.51
+
 metadata:
   device:
     fields:
       type:
         value: "storage"
+
+metric_tags:
+  - tag: hpe_fibrechannel_cpq_si_sys_serial_num
+    OID: 1.3.6.1.4.1.232.2.2.2.1
+    symbol: cpqSiSysSerialNum
+  - OID: 1.3.6.1.4.1.232.2.2.2.6
+    symbol: cpqSiSysProductId
+    tag: hpe_fibrechannel_cpq_si_sys_product_id
+  - tag: hpe_fibrechannel_cpq_si_product_name
+    OID: 1.3.6.1.4.1.232.2.2.4.2
+    symbol: cpqSiProductName
+
+# https://mibbrowser.online/mibdb_search.php?mib=FCMGMT-MIB
+
 metrics:
   - MIB: FCMGMT-MIB
     table:
       OID: 1.3.6.1.3.94.1.8
       name: connUnitSensorTable
     symbols:
-      - name: hpe.fibrechannel.connUnitSensor
-        constant_value_one: true
-#      - OID: 1.3.6.1.3.94.1.8.1.6
-#        name: hpe.fibrechannel.connUnitSensorMessage
-# string metric is not supported yet (keep this metric and this comment in profile until it's fixed)
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+      - OID: 1.3.6.1.3.94.1.8.1.4
+        name: connUnitSensorStatus
+        chart_meta:
+          description: The status indicated by the sensor
+          family: "Hardware/Sensor/Status"
+          unit: "{status}"
+        mapping:
+          1: unknown
+          2: other
+          3: ok
+          4: warning
+          5: failed
     metric_tags:
-      - symbol:
+      - tag: hpe_fibrechannel_conn_unit_sensor_unit_id
+        symbol:
+          OID: 1.3.6.1.3.94.1.8.1.1
+          name: connUnitSensorUnitId
+      - tag: hpe_fibrechannel_conn_unit_sensor_index
+        symbol:
+          OID: 1.3.6.1.3.94.1.8.1.2
+          name: connUnitSensorIndex
+      - tag: hpe_fibrechannel_conn_unit_sensor_name
+        symbol:
           OID: 1.3.6.1.3.94.1.8.1.3
           name: connUnitSensorName
-        tag: hpe_fibrechannel_conn_unit_sensor_name
-      - symbol:
+      - tag: hpe_fibrechannel_conn_unit_sensor_characteristic
+        symbol:
           OID: 1.3.6.1.3.94.1.8.1.8
           name: connUnitSensorCharacteristic
-        tag: hpe_fibrechannel_conn_unit_sensor_characteristic
         mapping:
           1: unknown
           2: other
@@ -41,29 +71,53 @@ metrics:
           8: frequency
           9: power
           10: door
-      - symbol:
-          OID: 1.3.6.1.3.94.1.8.1.4
-          name: connUnitSensorStatus
-        tag: hpe_fibrechannel_conn_unit_sensor_status
-        mapping:
-          1: unknown
-          2: other
-          3: ok
-          4: warning
-          5: failed
+
   - MIB: FCMGMT-MIB
     table:
       OID: 1.3.6.1.3.94.1.10
       name: connUnitPortTable
     symbols:
-      - name: hpe.fibrechannel.connUnitPort
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+      - OID: 1.3.6.1.3.94.1.10.1.6
+        name: connUnitPortState
+        chart_meta:
+          description: The user selected state of the port hardware
+          family: "Network/FibreChannel/Port/Admin/Status"
+          unit: "{status}"
+        mapping:
+          1: unknown
+          2: online
+          3: offline
+          4: bypassed
+          5: diagnostics
+      - OID: 1.3.6.1.3.94.1.10.1.7
+        name: connUnitPortStatus
+        chart_meta:
+          description: An overall protocol status for the port
+          family: "Network/FibreChannel/Port/Operational/Status"
+          unit: "{status}"
+        mapping:
+          1: unknown
+          2: unused
+          3: ready
+          4: warning
+          5: failure
+          6: notparticipating
+          7: initializing
+          8: bypass
+          9: ols
     metric_tags:
-      - symbol:
+      - tag: hpe_fibrechannel_conn_unit_port_unit_id
+        symbol:
+          OID: 1.3.6.1.3.94.1.10.1.1
+          name: connUnitPortUnitId
+      - tag: hpe_fibrechannel_conn_unit_port_index
+        symbol:
+          OID: 1.3.6.1.3.94.1.10.1.2
+          name: connUnitPortIndex
+      - tag: hpe_fibrechannel_conn_unit_port_type
+        symbol:
           OID: 1.3.6.1.3.94.1.10.1.3
           name: connUnitPortType
-        tag: hpe_fibrechannel_conn_unit_port_type
         mapping:
           1: unknown
           2: other
@@ -84,10 +138,10 @@ metrics:
           17: ac
           18: dc
           19: ssa
-      - symbol:
+      - tag: hpe_fibrechannel_conn_unit_port_transmitter_type
+        symbol:
           OID: 1.3.6.1.3.94.1.10.1.8
           name: connUnitPortTransmitterType
-        tag: hpe_fibrechannel_conn_unit_port_transmitter_type
         mapping:
           1: unknown
           2: other
@@ -100,10 +154,10 @@ metrics:
           9: shortwave_no_ofc
           10: longwave_led
           11: ssa
-      - symbol:
+      - tag: hpe_fibrechannel_conn_unit_port_module_type
+        symbol:
           OID: 1.3.6.1.3.94.1.10.1.9
           name: connUnitPortModuleType
-        tag: hpe_fibrechannel_conn_unit_port_module_type
         mapping:
           1: unknown
           2: other
@@ -114,50 +168,16 @@ metrics:
           7: gbic_no_serial_id
           8: gbic_not_installed
           9: small_form_factor
-      - symbol:
+      - tag: _hpe_fibrechannel_conn_unit_port_wwn
+        symbol:
           OID: 1.3.6.1.3.94.1.10.1.10
           name: connUnitPortWwn
-        tag: hpe_fibrechannel_conn_unit_port_wwn
-      - symbol:
+      - tag: _hpe_fibrechannel_conn_unit_port_speed
+        symbol:
           OID: 1.3.6.1.3.94.1.10.1.15
           name: connUnitPortSpeed
-        tag: hpe_fibrechannel_conn_unit_port_speed
-      - symbol:
+      - tag: _hpe_fibrechannel_conn_unit_port_name
+        symbol:
           OID: 1.3.6.1.3.94.1.10.1.17
           name: connUnitPortName
-        tag: hpe_fibrechannel_conn_unit_port_name
-      # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-      - symbol:
-          OID: 1.3.6.1.3.94.1.10.1.6
-          name: connUnitPortState
-        tag: hpe_fibrechannel_conn_unit_port_state
-        mapping:
-          1: unknown
-          2: online
-          3: offline
-          4: bypassed
-          5: diagnostics
-      - symbol:
-          OID: 1.3.6.1.3.94.1.10.1.7
-          name: connUnitPortStatus
-        tag: hpe_fibrechannel_conn_unit_port_status
-        mapping:
-          1: unknown
-          2: unused
-          3: ready
-          4: warning
-          5: failure
-          6: notparticipating
-          7: initializing
-          8: bypass
-          9: ols
-metric_tags:
-  - tag: hpe_fibrechannel_cpq_si_sys_serial_num
-    OID: 1.3.6.1.4.1.232.2.2.2.1
-    symbol: cpqSiSysSerialNum
-  - OID: 1.3.6.1.4.1.232.2.2.2.6
-    symbol: cpqSiSysProductId
-    tag: hpe_fibrechannel_cpq_si_sys_product_id
-  - tag: hpe_fibrechannel_cpq_si_product_name
-    OID: 1.3.6.1.4.1.232.2.2.4.2
-    symbol: cpqSiProductName
+

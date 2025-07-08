@@ -1,13 +1,19 @@
 extends:
   - _hp.yaml
   - _std-if-mib.yaml
+
 sysobjectid:
   - 1.3.6.1.4.1.37447.3.1
+
 metadata:
   device:
     fields:
       type:
         value: "storage"
+
+# https://mibbrowser.online/mibdb_search.php?mib=NIMBLE-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/hp/NIMBLE-MIB
+
 metrics:
   - MIB: NIMBLE-MIB
     table:
@@ -16,135 +22,184 @@ metrics:
     symbols:
       - name: nimble.volSizeLow
         OID: 1.3.6.1.4.1.37447.1.2.1.4
-        description: Maximum defined size of a volume in bytes - low order bytes.
-        unit: "By"
+        chart_meta:
+          description: Maximum defined size of a volume in bytes - low order bytes.
+          family: "Storage/Volume/Size/Low"
+          unit: "By"
       - name: nimble.volSizeHigh
         OID: 1.3.6.1.4.1.37447.1.2.1.5
-        description: Maximum defined size of a volume in bytes - high order bytes.
-        unit: "By"
+        chart_meta:
+          description: Maximum defined size of a volume in bytes - high order bytes.
+          family: "Storage/Volume/Size/High"
+          unit: "By"
       - name: nimble.volUsageLow
         OID: 1.3.6.1.4.1.37447.1.2.1.6
-        description: Current number of bytes a volume is using - low order bytes.
-        unit: "By"
+        chart_meta:
+          description: Current number of bytes a volume is using - low order bytes.
+          family: "Storage/Volume/Usage/Low"
+          unit: "By"
       - name: nimble.volUsageHigh
         OID: 1.3.6.1.4.1.37447.1.2.1.7
-        description: Current number of bytes a volume is using - high order bytes.
-        unit: "By"
+        chart_meta:
+          description: Current number of bytes a volume is using - high order bytes.
+          family: "Storage/Volume/Usage/High"
+          unit: "By"
       - name: nimble.volReserveLow
         OID: 1.3.6.1.4.1.37447.1.2.1.8
-        description: Number of bytes reserved for a volume - low order bytes.
-        unit: "By"
+        chart_meta:
+          description: Number of bytes reserved for a volume - low order bytes.
+          family: "Storage/Volume/Reserved/Low"
+          unit: "By"
       - name: nimble.volReserveHigh
         OID: 1.3.6.1.4.1.37447.1.2.1.9
-        description: Number of bytes reserved for a volume - high order bytes.
-        unit: "By"
+        chart_meta:
+          description: Number of bytes reserved for a volume - high order bytes.
+          family: "Storage/Volume/Reserved/High"
+          unit: "By"
       - name: nimble.volIoReads
         OID: 1.3.6.1.4.1.37447.1.2.1.13
-        metric_type: monotonic_count
-        description: Total cumulative number of Read I/Os (sequential and random).
-        unit: "{read_io}"
+        chart_meta:
+          description: Total cumulative number of Read I/Os (sequential and random).
+          family: "Storage/Volume/IO/Operations/Read"
+          unit: "{read}/s"
       - name: nimble.volIoWrites
         OID: 1.3.6.1.4.1.37447.1.2.1.34
-        metric_type: monotonic_count
-        description: Total cumulative number of Write I/Os.
-        unit: "{write_io}"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+        chart_meta:
+          description: Total cumulative number of Write I/Os.
+          family: "Storage/Volume/IO/Operations/Write"
+          unit: "{write}/s"
+      - OID: 1.3.6.1.4.1.37447.1.2.1.10
+        name: nimble.volOnline
+        chart_meta:
+          description: Indicated whether the volume is online
+          family: "Storage/Volume/Status"
+          unit: "{status}"
+        mapping:
+          1: offline
+          2: online
     metric_tags:
-      - symbol:
+      - tag: nimble_vol_name
+        symbol:
           OID: 1.3.6.1.4.1.37447.1.2.1.3
           name: nimble.volName
-        tag: nimble_vol_name
-      - symbol:
-          OID: 1.3.6.1.4.1.37447.1.2.1.10
-          name: nimble.volOnline
-        tag: nimble_vol_online
-        mapping:
-          1: 'true'
-          2: 'false'
+
   - MIB: NIMBLE-MIB
     symbol:
       OID: 1.3.6.1.4.1.37447.1.3.2.0
       name: nimble.ioReads
-      description: Total cumulative number of Read I/Os (sequential and random).
-      unit: "{read_io}"
-    metric_type: monotonic_count
+      chart_meta:
+        description: Total cumulative number of Read I/Os (sequential and random).
+        family: "Storage/IO/Operations/Read"
+        unit: "{read}/s"
   - MIB: NIMBLE-MIB
     symbol:
       OID: 1.3.6.1.4.1.37447.1.3.4.0
       name: nimble.ioWrites
-      description: Total cumulative number of Write I/Os.
-      unit: "{write_io}"
-    metric_type: monotonic_count
+      chart_meta:
+        description: Total cumulative number of Write I/Os.
+        family: "Storage/IO/Operations/Write"
+        unit: "{write}/s"
   - MIB: NIMBLE-MIB
     symbol:
       OID: 1.3.6.1.4.1.37447.1.3.6.0
       name: nimble.ioReadTimeMicrosec
-      description: Total cumulative microseconds the system has spent processing Read I/Os. This includes system and disk latency, but not any network latency back to the initiator.
-      unit: "us"
-    metric_type: monotonic_count
+      chart_meta:
+        description: Total cumulative microseconds the system has spent processing Read I/Os. This includes system and disk latency, but not any network latency back to the initiator.
+        family: "Storage/IO/Latency/Read"
+        unit: "us"
   - MIB: NIMBLE-MIB
     symbol:
       OID: 1.3.6.1.4.1.37447.1.3.7.0
       name: nimble.ioWriteTimeMicrosec
-      description: Total cumulative microseconds the system has spent processing Write I/Os. This includes system and disk latency, but not any network latency back to the initiator.
-      unit: "us"
-    metric_type: monotonic_count
+      chart_meta:
+        description: Total cumulative microseconds the system has spent processing Write I/Os. This includes system and disk latency, but not any network latency back to the initiator.
+        family: "Storage/IO/Latency/Write"
+        unit: "us"
   - MIB: NIMBLE-MIB
     symbol:
       OID: 1.3.6.1.4.1.37447.1.3.8.0
       name: nimble.ioReadBytes
-      description: Total cumulative number of Read I/O bytes (sequential and random).
-      unit: "By"
-    metric_type: monotonic_count
+      chart_meta:
+        description: Total cumulative number of Read I/O bytes (sequential and random).
+        family: "Storage/IO/Throughput/Read/Total"
+        unit: "By/s"
   - MIB: NIMBLE-MIB
     symbol:
       OID: 1.3.6.1.4.1.37447.1.3.9.0
       name: nimble.ioSeqReadBytes
-      description: Total cumulative number of Sequential Read I/O bytes.
-      unit: "By"
-    metric_type: monotonic_count
+      chart_meta:
+        description: Total cumulative number of Sequential Read I/O bytes.
+        family: "Storage/IO/Throughput/Read/Sequential"
+        unit: "By/s"
   - MIB: NIMBLE-MIB
     symbol:
       OID: 1.3.6.1.4.1.37447.1.3.10.0
       name: nimble.ioWriteBytes
-      description: Total cumulative number of Write I/O bytes (sequential and random).
-      unit: "By"
-    metric_type: monotonic_count
+      chart_meta:
+        description: Total cumulative number of Write I/O bytes (sequential and random).
+        family: "Storage/IO/Throughput/Write/Total"
+        unit: "By/s"
   - MIB: NIMBLE-MIB
     symbol:
       OID: 1.3.6.1.4.1.37447.1.3.11.0
       name: nimble.ioSeqWriteBytes
-      description: Total cumulative number of Sequential Write I/O bytes.
-      unit: "By"
-    metric_type: monotonic_count
+      chart_meta:
+        description: Total cumulative number of Sequential Write I/O bytes.
+        family: "Storage/IO/Throughput/Write/Sequential"
+        unit: "By/s"s"
+  - MIB: NIMBLE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.37447.1.3.10.0
+      name: nimble.ioWriteBytes
+      chart_meta:
+        description: Total cumulative number of Write I/O bytes (sequential and random).
+        family: "Storage/Throughput/Write/Total"
+        unit: "By/s"
+  - MIB: NIMBLE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.37447.1.3.11.0
+      name: nimble.ioSeqWriteBytes
+      chart_meta:
+        description: Total cumulative number of Sequential Write I/O bytes.
+        family: "Storage/Throughput/Write/Sequential"
+        unit: "By/s"
   - MIB: NIMBLE-MIB
     symbol:
       OID: 1.3.6.1.4.1.37447.1.3.12.0
       name: nimble.diskVolBytesUsedLow
-      description: Total number of bytes used on disk for volumes - low order bytes.
-      unit: "By"
+      chart_meta:
+        description: Total number of bytes used on disk for volumes - low order bytes.
+        family: "Storage/Disk/Volume/Usage/Low"
+        unit: "By"
   - MIB: NIMBLE-MIB
     symbol:
       OID: 1.3.6.1.4.1.37447.1.3.13.0
       name: nimble.diskVolBytesUsedHigh
-      description: Total number of bytes used on disk for volumes - high order bytes.
-      unit: "By"
+      chart_meta:
+        description: Total number of bytes used on disk for volumes - high order bytes.
+        family: "Storage/Disk/Volume/Usage/High"
+        unit: "By"
   - MIB: NIMBLE-MIB
     symbol:
       OID: 1.3.6.1.4.1.37447.1.3.14.0
       name: nimble.diskSnapBytesUsedLow
-      description: Total number of bytes used on disk for snapshots - low order bytes.
-      unit: "By"
+      chart_meta:
+        description: Total number of bytes used on disk for snapshots - low order bytes.
+        family: "Storage/Disk/Snapshot/Usage/Low"
+        unit: "By"
   - MIB: NIMBLE-MIB
     symbol:
       OID: 1.3.6.1.4.1.37447.1.3.15.0
       name: nimble.diskSnapBytesUsedHigh
-      description: Total number of bytes used on disk for snapshots - high order bytes.
-      unit: "By"
+      chart_meta:
+        description: Total number of bytes used on disk for snapshots - high order bytes.
+        family: "Storage/Disk/Snapshot/Usage/High"
+        unit: "By"
   - MIB: NIMBLE-MIB
     symbol:
       OID: 1.3.6.1.4.1.37447.1.3.16.0
       name: nimble.ioNonseqReadHits
-      description: Total cumulative number of cache hits for Non-Sequential Read I/Os.
-      unit: "{cache_hit}"
-    metric_type: monotonic_count
+      chart_meta:
+        description: Total cumulative number of cache hits for Non-Sequential Read I/Os.
+        family: "Storage/Cache/Read/Hit"
+        unit: "{hit}/s"
