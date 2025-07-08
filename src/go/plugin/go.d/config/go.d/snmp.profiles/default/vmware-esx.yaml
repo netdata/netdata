@@ -10,9 +10,9 @@ metadata:
   device:
     fields:
       vendor:
-        value: "vmware"
+        value: "VMware"
       type:
-        value: "server"
+        value: "Server"
 
 metrics:
   - MIB: VMWARE-RESOURCES-MIB
@@ -24,7 +24,7 @@ metrics:
         name: vmwHbaStatus
         chart_meta:
           description: Current HBA status
-          family: 'Storage/HBA/Status'
+          family: "Storage/HBA/Status"
           unit: "{status}"
         mapping:
           1: unknown
@@ -47,7 +47,7 @@ metrics:
         name: vmwHardwareStatus
         chart_meta:
           description: Last reported status of this component
-          family: 'Hardware/Component/Status'
+          family: "Hardware/Component/Status"
           unit: "{status}"
         mapping:
           1: unknown
