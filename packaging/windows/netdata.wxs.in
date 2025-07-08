@@ -243,10 +243,13 @@
             <Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999" />
             <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchApplication" Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 and NOT Installed" />
 
-            <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="ViewLicenseDlg" Condition="NOT Installed" />
+            <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="NDWarningDialog" Condition="NOT Installed" />
             <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Condition="Installed AND PATCH" />
 
-            <Publish Dialog="ViewLicenseDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" />
+            <Publish Dialog="NDWarningDialog" Control="Back" Event="NewDialog" Value="WelcomeDlg" />
+            <Publish Dialog="NDWarningDialog" Control="Next" Event="NewDialog" Value="ViewLicenseDlg" />
+
+            <Publish Dialog="ViewLicenseDlg" Control="Back" Event="NewDialog" Value="NDWarningDialog" />
             <Publish Dialog="ViewLicenseDlg" Control="Next" Event="NewDialog" Value="NDConfigDialog" />
 
             <!-- We are hidden for while the directory to install netdata and forcing a default, because it is still necessary adjusts to test claim.conf in different directories -->
@@ -333,6 +336,28 @@
                 <Control Id="URL" Type="Edit" X="65" Y="145" Width="290" Height="18" Property="URL" HideCondition="OS_HAS_FILE" />
 
                 <Control Id="InsecureCheckbox" Type="CheckBox" X="10" Y="160" Width="290" Height="15" Property="INSECURE" CheckBoxValue="0"  Text="Insecure" HideCondition="OS_HAS_FILE" />
+
+                <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
+                <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)" />
+                <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+                    <Publish Event="SpawnDialog" Value="CancelDlg" />
+                </Control>
+            </Dialog>
+        </UI>
+
+        <UI>
+            <Dialog Id="NDWarningDialog" Width="370" Height="270" Title="Netdata on Windows">
+                <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="!(loc.LicenseAgreementDlgBannerBitmap)" />
+                <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+                <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+
+                <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" Text="Restrictions" />
+
+                <Control Id="WarningLabel1" Type="Text" X="10" Y="60" Width="350" Height="15" Text="The Windows Agent is available for users with paid Netdata subscriptions." />
+                <Control Id="WarningLabel2" Type="Text" X="10" Y="75" Width="350" Height="15" Text="Limitations for Free Users:" />
+                <Control Id="WarningLabel3" Type="Text" X="18" Y="90" Width="350" Height="15" Text="- Standalone Agent: UI is locked — No local monitoring." />
+                <Control Id="WarningLabel4" Type="Text" X="18" Y="105" Width="350" Height="15" Text="- Child Agent: No monitoring data in parent dashboard when streaming to a Linux-based" />
+                <Control Id="WarningLabel5" Type="Text" X="23" Y="120" Width="350" Height="15" Text="Netdata parent." />
 
                 <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
                 <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)" />
