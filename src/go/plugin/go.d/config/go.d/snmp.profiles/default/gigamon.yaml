@@ -7,11 +7,11 @@ metadata:
     fields:
       vendor:
         value: "gigamon"
-      manufacturer:
-        symbol:
-          MIB: GIGAMON-SNMP-MIB
-          OID: 1.3.6.1.4.1.26866.2.1
-          name: manufacturer
+      #      manufacturer:
+      #        symbol:
+      #          MIB: GIGAMON-SNMP-MIB
+      #          OID: 1.3.6.1.4.1.26866.2.1
+      #          name: manufacturer
       model:
         symbol:
           MIB: GIGAMON-SNMP-MIB
@@ -22,7 +22,7 @@ metadata:
           MIB: GIGAMON-SNMP-MIB
           OID: 1.3.6.1.4.1.26866.2.4
           name: serialNumber
-      system_description:
+      description:
         symbol:
           MIB: GIGAMON-SNMP-MIB
           OID: 1.3.6.1.4.1.26866.2.5

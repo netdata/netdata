@@ -972,3 +972,12 @@ metrics:
           description: Number of entries that have been removed from the queue, sum
           family: 'LoadBalancer/PoolMember/Queue/Serviced'
           unit: "{connection}/s"
+    metric_tags:
+      - tag: pool_name
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.1
+          name: ltmPoolMemberStatPoolName
+      - tag: node_name
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.28
+          name: ltmPoolMemberStatNodeName
