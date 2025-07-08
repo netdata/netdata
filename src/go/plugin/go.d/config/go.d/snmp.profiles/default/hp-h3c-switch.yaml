@@ -11,6 +11,9 @@ metadata:
       type:
         value: "switch"
 
+# https://mibbrowser.online/mibdb_search.php?mib=HH3C-ENTITY-EXT-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/hh3c/HH3C-ENTITY-EXT-MIB
+
 metrics:
   - MIB: HH3C-ENTITY-EXT-MIB
     table:
@@ -19,17 +22,16 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.25506.2.6.1.4.1.1.3
         name: hh3cProcessUtil5Min
-        description: "General idea of how busy a process caused the processor to be over a 5 minute period"
-        unit: "%"
+        chart_meta:
+          description: "General idea of how busy a process caused the processor to be over a 5 minute period"
+          family: 'System/Process/CPU/Usage/5m'
+          unit: "%"
     metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.25506.2.6.1.4.1.1.1
-          name: hh3cProcessID
-        tag: hh3c_process_id
-      - symbol:
+      - tag: hh3c_process_name
+        symbol:
           OID: 1.3.6.1.4.1.25506.2.6.1.4.1.1.2
           name: hh3cProcessName
-        tag: hh3c_process_name
+
   - MIB: HH3C-ENTITY-EXT-MIB
     table:
       OID: 1.3.6.1.4.1.25506.2.6.1.1.1
@@ -37,22 +39,24 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.25506.2.6.1.1.1.1.6
         name: cpu.usage
-        description: "Cpu usage for this entity"
-        unit: "%"
+        chart_meta:
+          description: "Cpu usage for this entity"
+          family: 'System/CPU/Usage'
+          unit: "%"
     metric_tags:
-      - MIB: HH3C-ENTITY-EXT-MIB
+      - tag: cpu_index
+        index: 1 # hh3cEntityExtPhysicalIndex
+      - tag: hh3c_entity_ext_physical_index
+        MIB: HH3C-ENTITY-EXT-MIB
         symbol:
           OID: 1.3.6.1.4.1.25506.2.6.1.1.1.1.1
           name: hh3cEntityExtPhysicalIndex
-        tag: hh3c_entity_ext_physical_index
-      - MIB: ENTITY-MIB
+      - tag: _ent_physical_name
+        MIB: ENTITY-MIB
+        table: entPhysicalTable
         symbol:
           OID: 1.3.6.1.2.1.47.1.1.1.1.7
           name: entPhysicalName
-        table: entPhysicalTable
-        tag: ent_physical_name
-      - tag: cpu
-        index: 1 # hh3cEntityExtPhysicalIndex
 
   - MIB: HH3C-ENTITY-EXT-MIB
     table:
@@ -61,19 +65,21 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.25506.2.6.1.1.1.1.8
         name: memory.usage
-        description: "Memory usage for the entity"
-        unit: "%"
+        chart_meta:
+          description: "Memory usage for the entity"
+          family: 'System/Memory/Usage'
+          unit: "%"
     metric_tags:
-      - MIB: HH3C-ENTITY-EXT-MIB
+      - tag: mem_index
+        index: 1 # hh3cEntityExtPhysicalIndex
+      - tag: hh3c_entity_ext_physical_index
+        MIB: HH3C-ENTITY-EXT-MIB
         symbol:
           OID: 1.3.6.1.4.1.25506.2.6.1.1.1.1.1
           name: hh3cEntityExtPhysicalIndex
-        tag: hh3c_entity_ext_physical_index
-      - MIB: ENTITY-MIB
+      - tag: _ent_physical_name
+        MIB: ENTITY-MIB
+        table: entPhysicalTable
         symbol:
           OID: 1.3.6.1.2.1.47.1.1.1.1.7
           name: entPhysicalName
-        table: entPhysicalTable
-        tag: ent_physical_name
-      - tag: mem
-        index: 1 # hh3cEntityExtPhysicalIndex
