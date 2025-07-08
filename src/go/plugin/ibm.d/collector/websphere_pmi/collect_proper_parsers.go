@@ -1604,7 +1604,6 @@ var cacheChartsTmpl = module.Charts{
 		Dims: module.Dims{
 			{ID: "cache_%s_client_requests", Name: "client", Algo: module.Incremental},
 			{ID: "cache_%s_distributed_requests", Name: "distributed", Algo: module.Incremental},
-			{ID: "cache_%s_DistributedRequestCount", Name: "distributed_count", Algo: module.Incremental},
 		},
 	},
 	{
@@ -1619,9 +1618,6 @@ var cacheChartsTmpl = module.Charts{
 			{ID: "cache_%s_explicit_invalidations", Name: "explicit", Algo: module.Incremental},
 			{ID: "cache_%s_lru_invalidations", Name: "lru", Algo: module.Incremental},
 			{ID: "cache_%s_timeout_invalidations", Name: "timeout", Algo: module.Incremental},
-			{ID: "cache_%s_ExplicitInvalidationCount", Name: "explicit_count", Algo: module.Incremental},
-			{ID: "cache_%s_LruInvalidationCount", Name: "lru_count", Algo: module.Incremental},
-			{ID: "cache_%s_TimeoutInvalidationCount", Name: "timeout_count", Algo: module.Incremental},
 		},
 	},
 	{
