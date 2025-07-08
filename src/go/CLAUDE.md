@@ -2179,4 +2179,40 @@ IMPORTANT: "chart" for go.d modules is "instance" for NIDL and "context" for go.
 
 ## Build Notes
 - To compile ibm.d.plugin, use cmake in `build-claude` directory with target `ibm-plugin`
+- To compile go.d.plugin, use cmake in `build-claude` directory with target `go-plugin`
 
+#### Running the plugin
+
+```bash
+# go.d.plugin
+script -c 'sudo /usr/libexec/netdata/plugins.d/go.d.plugin -d -m MODULE --dump=2s --dump-summary 2>&1' /dev/null
+
+# ibm.d.plugin
+script -c 'sudo /usr/libexec/netdata/plugins.d/ibm.d.plugin -d -m MODULE --dump=2s --dump-summary 2>&1' /dev/null
+```
+
+**⚠️ IMPORTANT NOTES:**
+- **MUST use `script`** - plugin waits for ENABLE from Netdata otherwise (will wait forever)
+- **MUST use `--dump=2s`** - plugin runs forever without timeout (adapt 2s to twice data collection frequency)
+- **DO NOT run any other way** - will not work or will hang
+- This mode shows ALL output including CHART, DIMENSION, BEGIN, SET, END commands
+
+In `--dump` mode the plugin detects many issues by itself. Grep for 'ISSUE':
+
+```bash
+# go.d.plugin
+script -c 'sudo /usr/libexec/netdata/plugins.d/go.d.plugin -d -m MODULE --dump=2s --dump-summary 2>&1' /dev/null | grep ISSUE
+
+# ibm.d.plugin
+script -c 'sudo /usr/libexec/netdata/plugins.d/ibm.d.plugin -d -m MODULE --dump=2s --dump-summary 2>&1' /dev/null | grep ISSUE
+```
+
+In `--dump-summary` mode the plugin shows the entire tree of charts as shown on the dashboard. Use this to extract it:
+
+```bash
+# go.d.plugin
+script -c 'sudo /usr/libexec/netdata/plugins.d/go.d.plugin -d -m MODULE --dump=2s --dump-summary 2>&1' /dev/null | grep -E "─ (family|context|title|labels|dimensions|instances): "
+
+# ibm.d.plugin
+script -c 'sudo /usr/libexec/netdata/plugins.d/ibm.d.plugin -d -m MODULE --dump=2s --dump-summary 2>&1' /dev/null | grep -E "─ (family|context|title|labels|dimensions|instances): "
+```

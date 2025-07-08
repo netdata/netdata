@@ -61,6 +61,7 @@ func New() *WebSpherePMI {
 		seenInstances:      make(map[string]bool),
 		timeStatCache:      make(map[string]*timeStatCacheEntry),
 		avgStatCache:       make(map[string]*avgStatCacheEntry),
+		integralCache:      make(map[string]*integralCacheEntry),
 	}
 }
 
@@ -153,6 +154,9 @@ type WebSpherePMI struct {
 	
 	// AverageStatistic processing
 	avgStatCache map[string]*avgStatCacheEntry
+	
+	// Integral weighted average processing
+	integralCache map[string]*integralCacheEntry
 }
 
 // timeStatCacheEntry stores previous TimeStatistic values for delta calculations
@@ -166,6 +170,12 @@ type avgStatCacheEntry struct {
 	Count        int64
 	Total        int64
 	SumOfSquares int64
+}
+
+// integralCacheEntry stores previous integral values for weighted average calculations
+type integralCacheEntry struct {
+	Value     int64
+	Timestamp int64
 }
 
 type pmiCacheEntry struct {
@@ -225,6 +235,7 @@ type pmiValue struct {
 type countStat struct {
 	Name  string `xml:"name,attr"`
 	Count string `xml:"count,attr"`
+	Unit  string `xml:"unit,attr"`
 }
 
 type timeStat struct {
@@ -235,6 +246,7 @@ type timeStat struct {
 	Mean      string `xml:"mean,attr"`
 	Min       string `xml:"min,attr"`
 	Max       string `xml:"max,attr"`
+	Unit      string `xml:"unit,attr"`
 }
 
 type rangeStat struct {
@@ -244,6 +256,7 @@ type rangeStat struct {
 	Mean          string `xml:"mean,attr"`
 	HighWaterMark string `xml:"highWaterMark,attr"`
 	LowWaterMark  string `xml:"lowWaterMark,attr"`
+	Unit          string `xml:"unit,attr"`
 }
 
 type boundedRangeStat struct {
@@ -255,11 +268,13 @@ type boundedRangeStat struct {
 	UpperBound    string `xml:"upperBound,attr"`
 	HighWaterMark string `xml:"highWaterMark,attr"`
 	LowWaterMark  string `xml:"lowWaterMark,attr"`
+	Unit          string `xml:"unit,attr"`
 }
 
 type doubleStat struct {
 	Name   string `xml:"name,attr"`
 	Double string `xml:"double,attr"`
+	Unit   string `xml:"unit,attr"`
 }
 
 type averageStat struct {
@@ -270,6 +285,7 @@ type averageStat struct {
 	Min          string `xml:"min,attr"`
 	Max          string `xml:"max,attr"`
 	SumOfSquares string `xml:"sumOfSquares,attr"`
+	Unit         string `xml:"unit,attr"`
 }
 
 // populateBackwardCompatibility populates single references from arrays for backward compatibility
