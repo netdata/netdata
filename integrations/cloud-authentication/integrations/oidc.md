@@ -33,8 +33,8 @@ The access settings for your client are the following:
 
 | field                    | value                                                 |
 | :--                      | :--                                                   |
-| Root URL                 | `https://app.netdata.cloud/``                           |
-| Home/Initiate login URL  | `https://app.netdata.cloud/api/v2/auth/account/auth-server?iss={your-server-issuer-url}&redirect_uri=https://app.netdata.cloud/sign-in&register_uri=https://app.netdata.cloud/sign-up/verify`  |
+| Root URL                 | `https://app.netdata.cloud/`                          |
+| Home/Initiate login URL  | `https://app.netdata.cloud/api/v2/auth/account/auth-server?id={netdata-space-id}&redirect_uri=https://app.netdata.cloud/sign-in&register_uri=https://app.netdata.cloud/sign-up/verify`  |
 | Redirect URL             | `https://app.netdata.cloud/api/v2/auth/account/auth-server/callback`  |
 
 ### Netdata Configuration Steps
