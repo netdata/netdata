@@ -8,15 +8,15 @@ extends:
   - _std-udp-mib.yaml
   - _std-ip-mib.yaml
 
-device:
-  vendor: "hp"
-
 sysobjectid: 1.3.6.1.4.1.232.*
+
 metadata:
   device:
     fields:
       product_name:
         value: ProLiant
+      vendor:
+        value: hp
       model:
         symbols:
           - MIB: CPQSINFO-MIB
@@ -26,45 +26,75 @@ metadata:
           - MIB: CPQSINFO-MIB
             OID: 1.3.6.1.4.1.232.2.2.4.2
             name: cpqSiProductName  # Fallback if unable to parse the product name
+
+# - CPQSTDEQ-MIB
+#     https://mibbrowser.online/mibdb_search.php?mib=CPQSTDEQ-MIB
+#     https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/hp/CPQSTDEQ-MIB
+# - CPQHOST-MIB
+#     https://mibbrowser.online/mibdb_search.php?mib=CPQHOST-MIB
+#     https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/hp/CPQHOST-MIB
+# - CPQSINFO-MIB
+#     https://mibbrowser.online/mibdb_search.php?mib=CPQSINFO-MIB
+#     https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/hp/CPQSINFO-MIB
+# - CPQNIC-MIB
+#     https://mibbrowser.online/mibdb_search.php?mib=CPQNIC-MIB
+#     https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/hp/CPQNIC-MIB
+#  - CPQIDA-MIB
+#     https://mibbrowser.online/mibdb_search.php?mib=CPQIDA-MIB
+#     https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/hp/CPQIDA-MIB
+
 metrics:
   - MIB: CPQSTDEQ-MIB
     table:
       OID: 1.3.6.1.4.1.232.1.2.2.1
       name: cpqSeCpuTable
     symbols:
-      - OID: 1.3.6.1.4.1.232.1.2.2.1.1.2
-        name: cpqSeCpuSlot
-        description: Cpu slot number
-        unit: "{slot}"
       - OID: 1.3.6.1.4.1.232.1.2.2.1.1.4
         name: cpqSeCpuSpeed
-        description: Current internal speed of the processor in megahertz
-        unit: "MHz"
+        chart_meta:
+          description: Current internal speed of the processor in megahertz
+          family: 'Hardware/CPU/Speed/Internal'
+          unit: "MHz"
       - OID: 1.3.6.1.4.1.232.1.2.2.1.1.6
         name: cpqSeCpuStatus
-        description: Status of the processor
-        unit: "TBD"
+        chart_meta:
+          description: Status of the processor
+          family: 'Hardware/CPU/Status'
+          unit: "{status}"
+        mapping:
+          1: unknown
+          2: ok
+          3: degraded
+          4: failed
+          5: disabled
       - OID: 1.3.6.1.4.1.232.1.2.2.1.1.7
         name: cpqSeCpuExtSpeed
-        description: External frequency of the processor bus in megahertz
-        unit: "MHz"
-      - OID: 1.3.6.1.4.1.232.1.2.2.1.1.15
-        name: cpqSeCpuCore
-        description: Number of cores in the CPU module
-        unit: "{core}"
-      - OID: 1.3.6.1.4.1.232.1.2.2.1.1.25
-        name: cpqSeCPUCoreMaxThreads
-        description: Maximum number of threads a CPU core is capable of
-        unit: "{thread}"
-      - OID: 1.3.6.1.4.1.232.1.2.2.1.1.27
-        name: cpqSeCpuPrimary
-        description: Indicates if the CPU is primary
-        unit: "TBD"
+        chart_meta:
+          description: External frequency of the processor bus in megahertz
+          family: 'Hardware/CPU/Speed/External'
+          unit: "MHz"
     metric_tags:
-      - symbol:
+      - tag: cpu_index
+        symbol:
           OID: 1.3.6.1.4.1.232.1.2.2.1.1.1
           name: cpqSeCpuUnitIndex
-        tag: cpu_index
+      - tag: cpu_max_threads
+        symbol:
+          OID: 1.3.6.1.4.1.232.1.2.2.1.1.25
+          name: cpqSeCPUCoreMaxThreads
+      - tag: cpu_cores
+        symbol:
+          OID: 1.3.6.1.4.1.232.1.2.2.1.1.15
+          name: cpqSeCpuCore
+      - tag: cpu_primary
+        symbol:
+          OID: 1.3.6.1.4.1.232.1.2.2.1.1.27
+          name: cpqSeCpuPrimary
+          mapping:
+            1: unknown
+            2: false
+            3: true
+
   - MIB: CPQHOST-MIB
     table:
       OID: 1.3.6.1.4.1.232.11.2.3.1
@@ -72,25 +102,34 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.232.11.2.3.1.1.2
         name: cpqHoCpuUtilMin
-        description: Cpu utilization as a percentage of the theoretical maximum during the last minute
-        unit: "%"
+        chart_meta:
+          description: Cpu utilization as a percentage of the theoretical maximum during the last minute
+          family: 'System/CPU/Usage/1Min'
+          unit: "%"
       - OID: 1.3.6.1.4.1.232.11.2.3.1.1.3
         name: cpqHoCpuUtilFiveMin
-        description: Cpu utilization as a percentage of the theoretical maximum during the last five minutes
-        unit: "%"
+        chart_meta:
+          description: Cpu utilization as a percentage of the theoretical maximum during the last five minutes
+          family: 'System/CPU/Usage/5Min'
+          unit: "%"
       - OID: 1.3.6.1.4.1.232.11.2.3.1.1.4
         name: cpqHoCpuUtilThirtyMin
-        description: Cpu utilization as a percentage of the theoretical maximum during the last thirty minutes
-        unit: "%"
+        chart_meta:
+          description: Cpu utilization as a percentage of the theoretical maximum during the last thirty minutes
+          family: 'System/CPU/Usage/30Min'
+          unit: "%"
       - OID: 1.3.6.1.4.1.232.11.2.3.1.1.5
         name: cpqHoCpuUtilHour
-        description: Cpu utilization as a percentage of the theoretical maximum during the last hour
-        unit: "%"
+        chart_meta:
+          description: Cpu utilization as a percentage of the theoretical maximum during the last hour
+          family: 'System/CPU/Usage/1Hour'
+          unit: "%"
     metric_tags:
-      - symbol:
+      - tag: cpu_unit_index
+        symbol:
           OID: 1.3.6.1.4.1.232.11.2.3.1.1.1
           name: cpqHoCpuUtilUnitIndex
-        tag: cpu_unit_index
+
   - MIB: CPQHOST-MIB
     table:
       OID: 1.3.6.1.4.1.232.11.2.4.1
@@ -98,33 +137,57 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.232.11.2.4.1.1.3
         name: cpqHoFileSysSpaceTotal
-        description: File system size in megabytes
-        unit: "MBy"
+        scale_factor: 1048576
+        chart_meta:
+          description: File system size in megabytes
+          family: 'System/FileSystem/Size'
+          unit: "By"
       - OID: 1.3.6.1.4.1.232.11.2.4.1.1.4
         name: cpqHoFileSysSpaceUsed
-        description: Megabytes of file system space currently in use
-        unit: "MBy"
+        scale_factor: 1048576
+        chart_meta:
+          description: Megabytes of file system space currently in use
+          family: 'System/FileSystem/Used'
+          unit: "By"
       - OID: 1.3.6.1.4.1.232.11.2.4.1.1.5
         name: cpqHoFileSysPercentSpaceUsed
-        description: Percent of file system space currently in use
-        unit: "%"
+        chart_meta:
+          description: Percent of file system space currently in use
+          family: 'System/FileSystem/Usage'
+          unit: "%"
       - OID: 1.3.6.1.4.1.232.11.2.4.1.1.6
         name: cpqHoFileSysAllocUnitsTotal
-        description: Total number of files that can be stored on the file system if a limit exists
-        unit: "{file}"
+        chart_meta:
+          description: Total number of files that can be stored on the file system if a limit exists
+          family: 'System/FileSystem/Files/Maximum'
+          unit: "{file}"
       - OID: 1.3.6.1.4.1.232.11.2.4.1.1.7
         name: cpqHoFileSysAllocUnitsUsed
-        description: Number of files on the file system
-        unit: "{file}"
+        chart_meta:
+          description: Number of files on the file system
+          family: 'System/FileSystem/Files/Used'
+          unit: "{file}"
       - OID: 1.3.6.1.4.1.232.11.2.4.1.1.8
         name: cpqHoFileSysStatus
-        description: Threshold status of the file system
-        unit: "TBD"
+        chart_meta:
+          description: Threshold status of the file system
+          family: 'System/FileSystem/Status'
+          unit: "{status}"
+        mapping:
+          1: unknown
+          2: ok
+          3: degraded
+          4: failed
     metric_tags:
-      - symbol:
+      - tag: file_sys_index
+        symbol:
           OID: 1.3.6.1.4.1.232.11.2.4.1.1.1
           name: cpqHoFileSysIndex
-        tag: file_sys_index
+      - tag: file_sys_descr
+        symbol:
+          OID: 1.3.6.1.4.1.232.11.2.4.1.1.2
+          name: cpqHoFileSysDesc
+
   - MIB: CPQSINFO-MIB
     table:
       OID: 1.3.6.1.4.1.232.2.2.4.5
@@ -132,63 +195,240 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.232.2.2.4.5.1.3
         name: cpqSiMemModuleSize
-        description: Module memory size in kilobytes
-        unit: "kBy"
-      - OID: 1.3.6.1.4.1.232.2.2.4.5.1.4
-        name: cpqSiMemModuleType
-        description: Type of memory module installed
-        unit: "TBD"
+        scale_factor: 1024
+        chart_meta:
+          description: Module memory size in kilobytes
+          family: 'Hardware/Memory/Size'
+          unit: "By"
       - OID: 1.3.6.1.4.1.232.2.2.4.5.1.5
         name: cpqSiMemModuleSpeed
-        description: Module memory speed in nanoseconds
-        unit: "ns"
-      - OID: 1.3.6.1.4.1.232.2.2.4.5.1.6
-        name: cpqSiMemModuleTechnology
-        description: Technology type of memory module installed
-        unit: "TBD"
+        chart_meta:
+          description: Module memory speed in nanoseconds
+          family: 'Hardware/Memory/Speed'
+          unit: "ns"
       - OID: 1.3.6.1.4.1.232.2.2.4.5.1.11
         name: cpqSiMemModuleECCStatus
-        description: Current status of correctable memory errors for this memory module
-        unit: "TBD"
+        chart_meta:
+          description: Current status of correctable memory errors for this memory module
+          family: 'Hardware/Memory/ECC/Status'
+          unit: "{status}"
+        mapping:
+          1: other
+          2: ok
+          3: degraded
+          4: degradedModuleIndexUnknown
       - OID: 1.3.6.1.4.1.232.2.2.4.5.1.13
         name: cpqSiMemModuleFrequency
-        description: Memory module frequency in megahertz
-        unit: "MHz"
+        chart_meta:
+          description: Memory module frequency in megahertz
+          family: 'Hardware/Memory/Frequency'
+          unit: "MHz"
       - OID: 1.3.6.1.4.1.232.2.2.4.5.1.15
         name: cpqSiMemModuleCellStatus
-        description: Current status for this memory module
-        unit: "TBD"
+        chart_meta:
+          description: Current status for this memory module
+          family: 'Hardware/Memory/Status'
+          unit: "{status}"
+        mapping:
+          1: other
+          2: ok
+          3: deconfigured
     metric_tags:
-      - symbol:
+      - tag: mem_board_index
+        symbol:
           OID: 1.3.6.1.4.1.232.2.2.4.5.1.1
           name: cpqSiMemBoardIndex
-        tag: mem_board_index
-      - symbol:
+      - tag: mem_module_index
+        symbol:
           OID: 1.3.6.1.4.1.232.2.2.4.5.1.2
           name: cpqSiMemModuleIndex
-        tag: mem_module_index
+      - tag: mem_module_technology
+        symbol:
+          OID: 1.3.6.1.4.1.232.2.2.4.5.1.6
+          name: cpqSiMemModuleTechnology
+          mapping:
+            1: other
+            2: fastPageMode
+            3: edoPageMode
+            4: burstEdoPageMode
+            5: synchronous
+            6: rdram
+      - tag: mem_module_type
+        symbol:
+          OID: 1.3.6.1.4.1.232.2.2.4.5.1.4
+          name: cpqSiMemModuleType
+          mapping:
+            1: other
+            2: board
+            3: cpqSingleWidthModule
+            4: cpqDoubleWidthModule
+            5: simm
+            6: pcmcia
+            7: compaq-specific
+            8: dimm
+            9: smallOutlineDimm
+            10: rimm
+            11: srimm
+            12: fb-dimm
+
   - MIB: CPQNIC-MIB
     table:
       OID: 1.3.6.1.4.1.232.18.2.3.1
       name: cpqNicIfPhysAdapterTable
     symbols:
+      - OID: 1.3.6.1.4.1.232.18.2.3.1.1.12
+        name: cpqNicIfPhysAdapterCondition
+        chart_meta:
+          description: The condition of this physical adapter
+          family: 'Network/Interface/Condition/Status'
+          unit: "{status}"
+        mapping:
+          1: other
+          2: ok
+          3: degraded
+          4: failed
       - OID: 1.3.6.1.4.1.232.18.2.3.1.1.13
         name: cpqNicIfPhysAdapterState
-        description: Fault tolerant state of the physical adapter
-        unit: "TBD"
+        chart_meta:
+          description: The fault tolerant state of this adapter
+          family: 'Network/Interface/Redundancy/Status'
+          unit: "{status}"
+        mapping:
+          1: unknown
+          2: active
+          3: standby
+          4: failed
       - OID: 1.3.6.1.4.1.232.18.2.3.1.1.14
         name: cpqNicIfPhysAdapterStatus
-        description: Physical adapter status
-        unit: "TBD"
+        chart_meta:
+          description: The physical adapter status
+          family: 'Network/Interface/Link/Status'
+          unit: "{status}"
+        mapping:
+          1: unknown
+          2: ok
+          3: generalFailure
+          4: linkFailure
+      - OID: 1.3.6.1.4.1.232.18.2.3.1.1.37
+        name: cpqNicIfPhysAdapterInOctets
+        scale_factor: 8
+        chart_meta:
+          description: Traffic received on the physical adapter
+          family: 'Network/Interface/Traffic/Total/In'
+          unit: "bit/s"
+      - OID: 1.3.6.1.4.1.232.18.2.3.1.1.38
+        name: cpqNicIfPhysAdapterOutOctets
+        scale_factor: 8
+        chart_meta:
+          description: Traffic sent on the physical adapter
+          family: 'Network/Interface/Traffic/Total/Out'
+          unit: "bit/s"
+      - OID: 1.3.6.1.4.1.232.18.2.3.1.1.16
+        name: cpqNicIfPhysAdapterGoodTransmits
+        chart_meta:
+          description: Successfully transmitted frames by the physical adapter
+          family: 'Network/Interface/Frame/Transmitted'
+          unit: "{frame}/s"
+      - OID: 1.3.6.1.4.1.232.18.2.3.1.1.17
+        name: cpqNicIfPhysAdapterGoodReceives
+        chart_meta:
+          description: Successfully received frames by the physical adapter
+          family: 'Network/Interface/Frame/Received'
+          unit: "{frame}/s"
+      - OID: 1.3.6.1.4.1.232.18.2.3.1.1.18
+        name: cpqNicIfPhysAdapterBadTransmits
+        chart_meta:
+          description: Frames that were not transmitted by the adapter because of an error
+          family: 'Network/Interface/Frame/Error/Total/Out'
+          unit: "{frame}/s"
+      - OID: 1.3.6.1.4.1.232.18.2.3.1.1.19
+        name: cpqNicIfPhysAdapterBadReceives
+        chart_meta:
+          description: Frames that were received by the adapter but which had an error
+          family: 'Network/Interface/Frame/Error/Total/In'
+          unit: "{frame}/s"
+      - OID: 1.3.6.1.4.1.232.18.2.3.1.1.20
+        name: cpqNicIfPhysAdapterAlignmentErrors
+        chart_meta:
+          description: Frames received on a particular interface that are not an integral number of octets in length and do not pass the FCS check
+          family: 'Network/Interface/Error/Alignment'
+          unit: "{frame}/s"
+      - OID: 1.3.6.1.4.1.232.18.2.3.1.1.21
+        name: cpqNicIfPhysAdapterFCSErrors
+        chart_meta:
+          description: Frames received on a particular interface that are an integral number of octets in length but do not pass the FCS check
+          family: 'Network/Interface/Error/FCS'
+          unit: "{frame}/s"
+      - OID: 1.3.6.1.4.1.232.18.2.3.1.1.22
+        name: cpqNicIfPhysAdapterSingleCollisionFrames
+        chart_meta:
+          description: Packets that are involved in a single collision and are subsequently transmitted successfully
+          family: 'Network/Interface/Collision/Single'
+          unit: "{frame}/s"
+      - OID: 1.3.6.1.4.1.232.18.2.3.1.1.23
+        name: cpqNicIfPhysAdapterMultipleCollisionFrames
+        chart_meta:
+          description: Packets that are involved in multiple collisions and are subsequently transmitted successfully
+          family: 'Network/Interface/Collision/Multiple'
+          unit: "{frame}/s"
+      - OID: 1.3.6.1.4.1.232.18.2.3.1.1.24
+        name: cpqNicIfPhysAdapterDeferredTransmissions
+        chart_meta:
+          description: Packets whose transmission was delayed on its first attempt because the medium was busy
+          family: 'Network/Interface/Transmission/Deferred'
+          unit: "{frame}/s"
+      - OID: 1.3.6.1.4.1.232.18.2.3.1.1.25
+        name: cpqNicIfPhysAdapterLateCollisions
+        chart_meta:
+          description: A late collision is one that occurred 64 bytes or more into the packet
+          family: 'Network/Interface/Collision/Late'
+          unit: "{frame}/s"
+      - OID: 1.3.6.1.4.1.232.18.2.3.1.1.26
+        name: cpqNicIfPhysAdapterExcessiveCollisions
+        chart_meta:
+          description: Packets that, due to excessive collisions, are not transmitted successfully
+          family: 'Network/Interface/Collision/Excessive'
+          unit: "{frame}/s"
+      - OID: 1.3.6.1.4.1.232.18.2.3.1.1.27
+        name: cpqNicIfPhysAdapterInternalMacTransmitErrors
+        chart_meta:
+          description: Frames for which transmission on a particular interface fails due to an internal MAC sublayer transmit error
+          family: 'Network/Interface/Error/MAC/Transmit'
+          unit: "{frame}/s"
+      - OID: 1.3.6.1.4.1.232.18.2.3.1.1.28
+        name: cpqNicIfPhysAdapterCarrierSenseErrors
+        chart_meta:
+          description: The number of times that the carrier sense signal from the physical layer interface was not asserted or was de-asserted during transmission of a packet without collision
+          family: 'Network/Interface/Error/CarrierSense'
+          unit: "{frame}/s"
+      - OID: 1.3.6.1.4.1.232.18.2.3.1.1.29
+        name: cpqNicIfPhysAdapterFrameTooLongs
+        chart_meta:
+          description: A count of frames received on a particular interface that exceed the maximum permitted frame size
+          family: 'Network/Interface/Error/FrameTooLong'
+          unit: "{frame}/s"
+      - OID: 1.3.6.1.4.1.232.18.2.3.1.1.30
+        name: cpqNicIfPhysAdapterInternalMacReceiveErrors
+        chart_meta:
+          description: A count of frames for which reception on a particular interface fails due to an internal MAC sublayer receive error
+          family: 'Network/Interface/Error/MAC/Receive'
+          unit: "{frame}/s"
+      - OID: 1.3.6.1.4.1.232.18.2.3.1.1.33
+        name: cpqNicIfPhysAdapterSpeed
+        chart_meta:
+          description: An estimate of the interface current bandwidth
+          family: 'Network/Interface/Speed'
+          unit: "bit/s"
     metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.232.18.2.3.1.1.4
-          name: cpqNicIfPhysAdapterMACAddress
-        tag: adapter_mac_addr
-      - symbol:
+      - tag: adapter_name
+        symbol:
           OID: 1.3.6.1.4.1.232.18.2.3.1.1.39
           name: cpqNicIfPhysAdapterName
-        tag: adapter_name
+      - tag: _adapter_mac_addr
+        symbol:
+          OID: 1.3.6.1.4.1.232.18.2.3.1.1.4
+          name: cpqNicIfPhysAdapterMACAddress
+
   - MIB: CPQIDA-MIB
     table:
       OID: 1.3.6.1.4.1.232.3.2.2.1
@@ -196,10 +436,25 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.232.3.2.2.1.1.6
         name: cpqDaCntlrCondition
-        description: Condition of the device controller
-        unit: "TBD"
+        chart_meta:
+          description: Condition of the device controller
+          family: 'Hardware/StorageController/Status'
+          unit: "{status}"
+        mapping:
+          1: other
+          2: ok
+          3: degraded
+          4: failed
     metric_tags:
-      - symbol:
+      - tag: controller_index
+        symbol:
           OID: 1.3.6.1.4.1.232.3.2.2.1.1.1
           name: cpqDaCntlrIndex
-        tag: controller_index
+      - tag: _controller_model
+        symbol:
+          OID: 1.3.6.1.4.1.232.3.2.2.1.1.2
+          name: cpqDaCntlrModel
+      - tag: _controller_slot
+        symbol:
+          OID: 1.3.6.1.4.1.232.3.2.2.1.1.5
+          name: cpqDaCntlrSlot
