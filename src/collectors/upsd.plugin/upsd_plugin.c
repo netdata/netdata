@@ -423,7 +423,7 @@ const char *nut_get_var(UPSCONN_t *conn, const char *ups_name, const char *var_n
 
 // This function parses the 'ups.status' variable and emits the Netdata metrics
 // for each status, printing 1 for each set status and 0 otherwise.
-void print_ups_status_metrics(UPSCONN_t *conn, const char *ups_name, const char *clean_ups_name) {
+void print_ups_status_metrics(UPSCONN_t *conn, const char *ups_name, const char *clean_ups_name, usec_t dt) {
     assert(conn);
     assert(ups_name);
     assert(clean_ups_name);
@@ -519,7 +519,7 @@ void print_ups_status_metrics(UPSCONN_t *conn, const char *ups_name, const char 
         }
     }
 
-    printf("BEGIN upsd_%s.status\n"
+    printf("BEGIN upsd_%s.status %" PRIu64 "\n"
            "SET 'on_line' = %u\n"
            "SET 'on_battery' = %u\n"
            "SET 'low_battery' = %u\n"
@@ -536,7 +536,7 @@ void print_ups_status_metrics(UPSCONN_t *conn, const char *ups_name, const char 
            "SET 'forced_shutdown' = %u\n"
            "SET 'other' = %u\n"
            "END\n",
-           clean_ups_name,
+           clean_ups_name, dt,
            status.OL,
            status.OB,
            status.LB,
@@ -554,7 +554,7 @@ void print_ups_status_metrics(UPSCONN_t *conn, const char *ups_name, const char 
            status.OTHER);
 }
 
-void print_ups_realpower_metric(UPSCONN_t *conn, const char *ups_name, const char *clean_ups_name) {
+void print_ups_realpower_metric(UPSCONN_t *conn, const char *ups_name, const char *clean_ups_name, usec_t dt) {
     assert(conn);
     assert(ups_name);
     assert(clean_ups_name);
@@ -578,10 +578,10 @@ void print_ups_realpower_metric(UPSCONN_t *conn, const char *ups_name, const cha
     // BEGIN type.id [microseconds]
     // SET id = value
     // END
-    printf("BEGIN 'upsd_%s.load_usage'\n"
+    printf("BEGIN upsd_%s.load_usage %" PRIu64 "\n"
            "SET load_usage = %d\n"
            "END\n",
-           clean_ups_name, (int)realpower);
+           clean_ups_name, dt, (int)realpower);
 }
 
 void register_ups(char *ups_name) {
@@ -745,7 +745,7 @@ int main(int argc, char *argv[]) {
     heartbeat_t hb;
     heartbeat_init(&hb, netdata_update_every * USEC_PER_SEC);
     for (;;) {
-        heartbeat_next(&hb);
+        usec_t dt = heartbeat_next(&hb);
 
         if (unlikely(exit_initiated_get()))
             break;
@@ -778,12 +778,12 @@ int main(int argc, char *argv[]) {
 
             // The 'ups.status' variable is a special case, because its chart has more
             // than one dimension. So, we can't simply print one data point.
-            print_ups_status_metrics(&ups2, ups_name, clean_ups_name);
+            print_ups_status_metrics(&ups2, ups_name, clean_ups_name, dt);
 
             // The 'ups.realpower' variable is another special case, because if it is
             // not available, then it can be calculated from the ups.load and
             // ups.realpower.nominal variables.
-            print_ups_realpower_metric(&ups2, ups_name, clean_ups_name);
+            print_ups_realpower_metric(&ups2, ups_name, clean_ups_name, dt);
 
             DICTIONARY *ups_vars = dictionary_get(nd_ups_vars, ups_name);
             dfe_start_read(ups_vars, chart) {
@@ -792,10 +792,10 @@ int main(int argc, char *argv[]) {
                 // BEGIN type.id [microseconds]
                 // SET id = value
                 // END
-                printf("BEGIN 'upsd_%s.%s'\n"
-                       "SET '%s' = %d\n"
+                printf("BEGIN upsd_%s.%s %" PRIu64 "\n"
+                       "SET %s = %d\n"
                        "END\n",
-                       clean_ups_name, chart->chart_id, chart->chart_dimension, (int)nut_value_as_num);
+                       clean_ups_name, chart->chart_id, dt, chart->chart_dimension, (int)nut_value_as_num);
             }
             dfe_done(chart);
         }
