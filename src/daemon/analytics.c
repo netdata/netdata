@@ -747,6 +747,36 @@ static void get_timezone_win_id(char *win_id, DWORD win_size)
 
     RegCloseKey(hKey);
 }
+
+static int map_windows_tz_to_ioanna(char *win_id) {
+    if (*win_id == '\0')
+        return -1;
+
+    FILE *fp = fopen("c:\\Windows\\Globalization\\Time Zone\\TimezoneMapping.xml", "r");
+    if (!fp)
+        return -1;
+
+    char buffer[CONFIG_FILE_LINE_MAX + 1];
+    while (fgets(buffer, CONFIG_FILE_LINE_MAX, fp) != NULL) {
+        buffer[CONFIG_FILE_LINE_MAX] = '\0';
+
+        char *s = strstr(buffer, win_id);
+        if (!s)
+            continue;
+
+        //Escape:'  <MapTZ TZID="'
+        s = &buffer[15];
+        char *end = strchr(s, '"');
+        if (!end)
+            continue;
+
+        *end = '\0';
+        strncpyz(win_id, s, strlen(s));
+    }
+
+    fclose(fp);
+    return 0;
+}
 #endif
 
 void get_system_timezone(void)
@@ -756,7 +786,8 @@ void get_system_timezone(void)
     const char *tz = NULL;
 #ifdef OS_WINDOWS
     get_timezone_win_id(buffer, FILENAME_MAX);
-    timezone = buffer;
+    if (!map_windows_tz_to_ioanna(buffer))
+        timezone = buffer;
 #else
     // avoid flood calls to stat(/etc/localtime)
     // http://stackoverflow.com/questions/4554271/how-to-avoid-excessive-stat-etc-localtime-calls-in-strftime-on-linux
