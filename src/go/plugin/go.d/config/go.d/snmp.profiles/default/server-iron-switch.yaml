@@ -7,9 +7,9 @@ metadata:
   device:
     fields:
       vendor:
-        value: "server_iron"
+        value: "Server Iron"
       type:
-        value: "load_balancer"
+        value: "Load Balancer"
 
 sysobjectid:
   - 1.3.6.1.4.1.1991.1.3.3.2  # Server Iron XL switches
