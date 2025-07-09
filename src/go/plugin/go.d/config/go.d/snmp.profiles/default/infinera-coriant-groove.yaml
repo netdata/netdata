@@ -11,13 +11,18 @@ metadata:
         value: "infinera"
 
 # https://mibbrowser.online/mibdb_search.php?mib=CORIANT-GROOVE-MIB
+# https://github.com/librenms/librenms/blob/master/mibs/infinera/CORIANT-GROOVE-MIB
 
 metrics:
-  # Commented since not present in latest CORIANT-GROOVE-MIB from 2022
-  #  - MIB: CORIANT-GROOVE-MIB
-  #    symbol:
-  #      OID: 1.3.6.1.4.1.42229.1.2.2.2.2.0
-  #      name: coriant.groove.systemPowerConsumptionCurrent
+  - MIB: CORIANT-GROOVE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.42229.1.2.2.2.2.0
+      name: coriant.groove.systemPowerConsumptionCurrent
+      chart_meta:
+        description: Current power consumption of the system
+        family: 'System/Power/Usage'
+        unit: "W"
+
   - MIB: CORIANT-GROOVE-MIB
     table:
       OID: 1.3.6.1.4.1.42229.1.2.3.1.1
@@ -25,63 +30,78 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.42229.1.2.3.1.1.1.3
         name: coriant.groove.shelfInletTemperature  # Type CoriantTypesTemperature is a string that represents a float in Celcius e.g. 23.8
-        description: Temperature at the monitoring point
-        unit: "Cel"
+        extract_value: '(\d+)'
+        chart_meta:
+          description: Shelf inlet temperature
+          family: 'Hardware/Shelf/Temperature/Inlet'
+          unit: "Cel"
       - OID: 1.3.6.1.4.1.42229.1.2.3.1.1.1.4
         name: coriant.groove.shelfOutletTemperature  # Type CoriantTypesTemperature is a string that represents a float in Celcius e.g. 23.8
-        description: Temperature at the monitoring point
-        unit: "Cel"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+        extract_value: '(\d+)'
+        chart_meta:
+          description: Shelf outlet temperature
+          family: 'Hardware/Shelf/Temperature/Outlet'
+          unit: "Cel"
+      - OID: 1.3.6.1.4.1.42229.1.2.3.1.1.1.5
+        name: coriant.groove.shelfAdminStatus
+        chart_meta:
+          description: The administrative state specifies the permission to use or prohibition against using the resource
+          family: 'Hardware/Shelf/Admin/Status'
+          unit: "{status}"
+        mapping:
+          1: up
+          2: down
+      - OID: 1.3.6.1.4.1.42229.1.2.3.1.1.1.6
+        name: coriant.groove.shelfOperStatus
+        chart_meta:
+          description: The operational state specifies whether or not a resource is able to provide service
+          family: 'Hardware/Shelf/Operational/Status'
+          unit: "{status}"
+        mapping:
+          1: up
+          2: down
+    # TODO: bits handling (https://github.com/librenms/librenms/blob/f30d292aa3601bbaf79c053037d9b74a1a2055aa/mibs/infinera/CORIANT-GROOVE-MIB#L2468)
+    #      - OID: 1.3.6.1.4.1.42229.1.2.3.1.1.1.7
+    #        name: coriant.groove.shelfAvailStatus
+    #        chart_meta:
+    #          description: Provided to qualify the operational, usage and/or administrative status attributes
+    #          unit: "{status}"
+    #        mapping:
+    #          0: none
+    #          1: failed
+    #          2: mismatch
+    #          3: lowerLayerDown
+    #          4: notPresent
+    #          5: shutdown
+    #          6: degraded
+    #          7: idle
+    #          8: busy
+    #          9: hibernation
+    #          10: inTest
+    #          11: loopback
+    #          12: softwareUpgrade
+    #          13: initializing
+    #          14: unknown
+    #          15: incomplete
+    #          16: laserSafetyShutoff
+    #          17: measuring
+    #          18: firmwareLoading
+    #          19: connected
+    #          20: communicationFailed
     metric_tags:
-      - symbol:
+      - tag: coriant_groove_shelf_id
+        symbol:
+          OID: 1.3.6.1.4.1.42229.1.2.3.1.1.1.1
+          name: coriant.groove.shelfId
+      - tag: coriant_groove_shelf_location
+        symbol:
           OID: 1.3.6.1.4.1.42229.1.2.3.1.1.1.2
           name: coriant.groove.shelfLocation
-        tag: coriant_groove_shelf_location
-      - symbol:
+      - tag: coriant_groove_shelf_alias_name
+        symbol:
           OID: 1.3.6.1.4.1.42229.1.2.3.1.1.1.8
           name: coriant.groove.shelfAliasName
-        tag: coriant_groove_shelf_alias_name
-      - symbol:
-          OID: 1.3.6.1.4.1.42229.1.2.3.1.1.1.5
-          name: coriant.groove.shelfAdminStatus
-        tag: coriant_groove_shelf_admin_status
-        mapping:
-          1: up
-          2: down
-          3: up_no_alm
-      - symbol:
-          OID: 1.3.6.1.4.1.42229.1.2.3.1.1.1.6
-          name: coriant.groove.shelfOperStatus
-        tag: coriant_groove_shelf_oper_status
-        mapping:
-          1: up
-          2: down
-      - symbol:
-          OID: 1.3.6.1.4.1.42229.1.2.3.1.1.1.7
-          name: coriant.groove.shelfAvailStatus
-        tag: coriant_groove_shelf_avail_status
-        mapping:
-          0: none
-          1: failed
-          2: mismatch
-          3: lower_layer_down
-          4: not_present
-          5: shutdown
-          6: degraded
-          7: idle
-          8: busy
-          9: hibernation
-          10: in_test
-          11: loopback
-          12: software_upgrade
-          13: initializing
-          14: unknown
-          15: incomplete
-          16: laser_safety_shutoff
-          17: measuring
-          18: firmware_loading
-          19: connected
-          20: communication_failed
+
   - MIB: CORIANT-GROOVE-MIB
     table:
       OID: 1.3.6.1.4.1.42229.1.2.3.3.1
@@ -89,18 +109,79 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.42229.1.2.3.3.1.1.7
         name: coriant.groove.cardFanSpeedRate
-        description: The fan speed of percentage
-        unit: "%"
+        chart_meta:
+          description: The fan speed of percentage
+          family: 'Hardware/Card/Fan/Speed'
+          unit: "%"
       - OID: 1.3.6.1.4.1.42229.1.2.3.3.1.1.9
         name: coriant.groove.cardTemperature  # Type CoriantTypesTemperature is a string that represents a float in Celcius e.g. 23.8
-        description: Temperature at the monitoring point
-        unit: "Cel"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+        extract_value: '(\d+)'
+        chart_meta:
+          description: Temperature at the monitoring point
+          family: 'Hardware/Card/Temperature/Value'
+          unit: "Cel"
+      - OID: 1.3.6.1.4.1.42229.1.2.3.3.1.1.3
+        name: coriant.groove.cardAdminStatus
+        chart_meta:
+          description: The administrative state specifies the permission to use or prohibition against using the resource
+          family: 'Hardware/Card/Admin/Status'
+          unit: "{status}"
+        mapping:
+          1: up
+          2: down
+      - OID: 1.3.6.1.4.1.42229.1.2.3.3.1.1.4
+        name: coriant.groove.cardOperStatus
+        chart_meta:
+          description: The operational state specifies whether or not a resource is able to provide service
+          family: 'Hardware/Card/Operational/Status'
+          unit: "{status}"
+        mapping:
+          1: up
+          2: down
+      - OID: 1.3.6.1.4.1.42229.1.2.3.3.1.1.10
+        name: coriant.groove.cardMode
+        chart_meta:
+          description: The card mode
+          family: 'Hardware/Card/Mode/Status'
+          unit: "{status}"
+        mapping:
+          0: notApplicable
+          1: normal
+          2: regen
+          3: mixFunction
+          4: greyMuxponder
+    # TODO: bits handling
+    #      - OID: 1.3.6.1.4.1.42229.1.2.3.3.1.1.5
+    #        name: coriant.groove.cardAvailStatus
+    #        chart_meta:
+    #          unit: "{status}"
+    #        mapping:
+    #          0: none
+    #          1: failed
+    #          2: mismatch
+    #          3: lowerLayerDown
+    #          4: notPresent
+    #          5: shutdown
+    #          6: degraded
+    #          7: idle
+    #          8: busy
+    #          9: hibernation
+    #          10: inTest
+    #          11: loopback
+    #          12: softwareUpgrade
+    #          13: initializing
+    #          14: unknown
+    #          15: incomplete
+    #          16: laserSafetyShutoff
+    #          17: measuring
+    #          18: firmwareLoading
+    #          19: connected
+    #          20: communicationFailed
     metric_tags:
-      - symbol:
+      - tag: coriant_groove_card_required_type
+        symbol:
           OID: 1.3.6.1.4.1.42229.1.2.3.3.1.1.1
           name: coriant.groove.cardRequiredType
-        tag: coriant_groove_card_required_type
         mapping:
           11: fan
           12: psu
@@ -143,65 +224,15 @@ metrics:
           130: dge2m2ofp2
           131: pbmtpp
           200: vir_sim
-      - symbol:
+      - tag: coriant_groove_card_equipment_name
+        symbol:
           OID: 1.3.6.1.4.1.42229.1.2.3.3.1.1.2
           name: coriant.groove.cardEquipmentName
-        tag: coriant_groove_card_equipment_name
-      - symbol:
+      - tag: coriant_groove_card_alias_name
+        symbol:
           OID: 1.3.6.1.4.1.42229.1.2.3.3.1.1.6
           name: coriant.groove.cardAliasName
-        tag: coriant_groove_card_alias_name
-      - symbol:
-          OID: 1.3.6.1.4.1.42229.1.2.3.3.1.1.3
-          name: coriant.groove.cardAdminStatus
-        tag: coriant_groove_card_admin_status
-        mapping:
-          1: up
-          2: down
-          3: up_no_alm
-      - symbol:
-          OID: 1.3.6.1.4.1.42229.1.2.3.3.1.1.4
-          name: coriant.groove.cardOperStatus
-        tag: coriant_groove_card_oper_status
-        mapping:
-          1: up
-          2: down
-      - symbol:
-          OID: 1.3.6.1.4.1.42229.1.2.3.3.1.1.5
-          name: coriant.groove.cardAvailStatus
-        tag: coriant_groove_card_avail_status
-        mapping:
-          0: none
-          1: failed
-          2: mismatch
-          3: lower_layer_down
-          4: not_present
-          5: shutdown
-          6: degraded
-          7: idle
-          8: busy
-          9: hibernation
-          10: in_test
-          11: loopback
-          12: software_upgrade
-          13: initializing
-          14: unknown
-          15: incomplete
-          16: laser_safety_shutoff
-          17: measuring
-          18: firmware_loading
-          19: connected
-          20: communication_failed
-      - symbol:
-          OID: 1.3.6.1.4.1.42229.1.2.3.3.1.1.10
-          name: coriant.groove.cardMode
-        tag: coriant_groove_card_mode
-        mapping:
-          0: not_applicable
-          1: normal
-          2: regen
-          3: mix_function
-          4: grey_muxponder
+
   - MIB: CORIANT-GROOVE-MIB
     table:
       OID: 1.3.6.1.4.1.42229.1.2.3.6.1
@@ -209,29 +240,36 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.42229.1.2.3.6.1.1.4
         name: coriant.groove.portRxOpticalPower  # Type CoriantTypesOpticalPower is a string that represents a float in dBm unit e.g. -14.5
-        description: Received optical power
-        unit: "dBm"
+        extract_value: '(-?\d+)'
+        chart_meta:
+          description: Received optical power
+          family: 'Network/Optical/Port/Power/Rx'
+          unit: "dBm"
       - OID: 1.3.6.1.4.1.42229.1.2.3.6.1.1.5
         name: coriant.groove.portTxOpticalPower  # Type CoriantTypesOpticalPower is a string that represents a float in dBm unit e.g. -14.5
-        description: Transmitted optical power
-        unit: "dBm"
+        extract_value: '(-?d+)'
+        chart_meta:
+          description: Transmitted optical power
+          family: 'Network/Optical/Port/Power/Tx'
+          unit: "dBm"
     metric_tags:
-      - symbol:
+      - tag: coriant_groove_port_name
+        symbol:
           OID: 1.3.6.1.4.1.42229.1.2.3.6.1.1.16
           name: coriant.groove.portName
-        tag: coriant_groove_port_name
-      - symbol:
+      - tag: coriant_groove_port_alias_name
+        symbol:
           OID: 1.3.6.1.4.1.42229.1.2.3.6.1.1.22
           name: coriant.groove.portAliasName
-        tag: coriant_groove_port_alias_name
-      - symbol:
+      - tag: _coriant_groove_port_service_label
+        symbol:
           OID: 1.3.6.1.4.1.42229.1.2.3.6.1.1.23
           name: coriant.groove.portServiceLabel
-        tag: coriant_groove_port_service_label
-      - symbol:
+      - tag: _coriant_groove_port_connected_to
+        symbol:
           OID: 1.3.6.1.4.1.42229.1.2.3.6.1.1.24
           name: coriant.groove.portConnectedTo
-        tag: coriant_groove_port_connected_to
+
   - MIB: CORIANT-GROOVE-MIB
     table:
       OID: 1.3.6.1.4.1.42229.1.2.4.1.19.1
@@ -239,14 +277,41 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.42229.1.2.4.1.19.1.1.23
         name: coriant.groove.ochOsCD
-        description: Value of Chromatic Dispersion
-        unit: "ps/nm"
+        chart_meta:
+          description: Value of Chromatic Dispersion
+          family: 'Network/Optical/Channel/ChromaticDispersion'
+          unit: "ps/nm"
       - OID: 1.3.6.1.4.1.42229.1.2.4.1.19.1.1.24
         name: coriant.groove.ochOsOSNR  # Type CoriantTypesOpticalDB is a string that represents a float in dB unit e.g. 33.5
-        description: Current value of OSNR
-        unit: "dB"
+        extract_value: '(\d+)'
+        chart_meta:
+          description: Current value of OSNR
+          family: 'Network/Optical/Channel/OSNR'
+          unit: "dB"
+      - OID: 1.3.6.1.4.1.42229.1.2.4.1.19.1.1.15
+        name: coriant.groove.ochOsAdminStatus
+        chart_meta:
+          description: The administrative state specifies the permission to use or prohibition against using the resource
+          family: 'Network/Optical/Channel/Admin/Status'
+          unit: "{status}"
+        mapping:
+          1: up
+          2: down
+      - OID: 1.3.6.1.4.1.42229.1.2.4.1.19.1.1.16
+        name: coriant.groove.ochOsOperStatus
+        chart_meta:
+          description: The operational state specifies whether or not a resource is able to provide service
+          family: 'Network/Optical/Channel/Operational/Status'
+          unit: "{status}"
+        mapping:
+          1: up
+          2: down
     metric_tags:
-      - symbol:
+      - tag: coriant_groove_och_os_alias_name
+        symbol:
+          OID: 1.3.6.1.4.1.42229.1.2.4.1.19.1.1.18
+          name: coriant.groove.ochOsAliasName
+      - tag: coriant_groove_och_os_service_label
+        symbol:
           OID: 1.3.6.1.4.1.42229.1.2.4.1.19.1.1.21
           name: coriant.groove.ochOsServiceLabel
-        tag: coriant_groove_och_os_service_label
