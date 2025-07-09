@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- chore\(go.d/snmp-profiles\): fix quotes [\#20645](https://github.com/netdata/netdata/pull/20645) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations docs [\#20644](https://github.com/netdata/netdata/pull/20644) ([netdatabot](https://github.com/netdatabot))
+- Update Cloud OIDC Authorization Server setup docs [\#20643](https://github.com/netdata/netdata/pull/20643) ([car12o](https://github.com/car12o))
+- SNMP Profiles pass ep1 [\#20641](https://github.com/netdata/netdata/pull/20641) ([Ancairon](https://github.com/Ancairon))
+- chore\(go.d/snmp-profiles\): charts meta fixes and fam updates p6 [\#20640](https://github.com/netdata/netdata/pull/20640) ([ilyam8](https://github.com/ilyam8))
+- Additional checks for ACLK proxy setting [\#20639](https://github.com/netdata/netdata/pull/20639) ([stelfrag](https://github.com/stelfrag))
 - MCP in Netdata Operations Diagram [\#20637](https://github.com/netdata/netdata/pull/20637) ([ktsaou](https://github.com/ktsaou))
 - refactor\(go.d/iprange\): migrate from net to net/netip [\#20636](https://github.com/netdata/netdata/pull/20636) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d/snmp-profiles\): charts meta fixes and fam updates p5 [\#20635](https://github.com/netdata/netdata/pull/20635) ([ilyam8](https://github.com/ilyam8))
@@ -43,6 +49,7 @@
 - docs: fix 404 link in README.md [\#20597](https://github.com/netdata/netdata/pull/20597) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): bump github.com/docker/docker from 28.2.2+incompatible to 28.3.0+incompatible in /src/go [\#20595](https://github.com/netdata/netdata/pull/20595) ([dependabot[bot]](https://github.com/apps/dependabot))
 - improve\(go.d/snmp-profiles\): extend transformEntitySensorValue [\#20594](https://github.com/netdata/netdata/pull/20594) ([ilyam8](https://github.com/ilyam8))
+- Add Screen to Windows installer [\#20593](https://github.com/netdata/netdata/pull/20593) ([thiagoftsm](https://github.com/thiagoftsm))
 - build\(deps\): bump github.com/go-viper/mapstructure/v2 from 2.2.1 to 2.3.0 in /src/go/otel-collector/exporter/journaldexporter [\#20592](https://github.com/netdata/netdata/pull/20592) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/go-viper/mapstructure/v2 from 2.2.1 to 2.3.0 in /src/go/otel-collector/exporter/netdataexporter [\#20591](https://github.com/netdata/netdata/pull/20591) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Regenerate integrations docs [\#20589](https://github.com/netdata/netdata/pull/20589) ([netdatabot](https://github.com/netdatabot))
@@ -441,7 +448,6 @@
 - Update platforms for CI and package builds. [\#20119](https://github.com/netdata/netdata/pull/20119) ([Ferroin](https://github.com/Ferroin))
 - Improve error handling and logging for journal and data files [\#20112](https://github.com/netdata/netdata/pull/20112) ([stelfrag](https://github.com/stelfrag))
 - Work to find leaks easily [\#20106](https://github.com/netdata/netdata/pull/20106) ([ktsaou](https://github.com/ktsaou))
-- SNMP, Custom descriptions and units [\#20100](https://github.com/netdata/netdata/pull/20100) ([Ancairon](https://github.com/Ancairon))
 
 ## [v2.4.0](https://github.com/netdata/netdata/tree/v2.4.0) (2025-04-14)
 
@@ -458,12 +464,6 @@
 - build\(deps\): bump github.com/go-sql-driver/mysql from 1.9.1 to 1.9.2 in /src/go [\#20109](https://github.com/netdata/netdata/pull/20109) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump golang.org/x/net from 0.38.0 to 0.39.0 in /src/go [\#20108](https://github.com/netdata/netdata/pull/20108) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/prometheus-community/pro-bing from 0.6.1 to 0.7.0 in /src/go [\#20107](https://github.com/netdata/netdata/pull/20107) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Further improve ACLK synchronization shutdown [\#20105](https://github.com/netdata/netdata/pull/20105) ([stelfrag](https://github.com/stelfrag))
-- daemon status 27f [\#20104](https://github.com/netdata/netdata/pull/20104) ([ktsaou](https://github.com/ktsaou))
-- daemon status 27e [\#20101](https://github.com/netdata/netdata/pull/20101) ([ktsaou](https://github.com/ktsaou))
-- Improve journal file access error logging protect retention recalculation [\#20098](https://github.com/netdata/netdata/pull/20098) ([stelfrag](https://github.com/stelfrag))
-- Fix Windows registry name crashes [\#20097](https://github.com/netdata/netdata/pull/20097) ([ktsaou](https://github.com/ktsaou))
-- daemon status 27d [\#20096](https://github.com/netdata/netdata/pull/20096) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.3.2](https://github.com/netdata/netdata/tree/v2.3.2) (2025-04-02)
 
