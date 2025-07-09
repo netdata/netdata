@@ -8,7 +8,7 @@
 | **Unlimited Everything** | Metrics, logs, retention, dashboards, containers, applications |
 | **AI-Powered Intelligence** | Chat with your infrastructure, get automated insights, detect anomalies |
 | **Zero Configuration** | Works out of the box with enterprise features enabled |
-| **Unbeatable Value** | 70% less expensive than most competitors with more features included |
+| **Unbeatable Value** | Easier on your budget, and packed with more features than most |
 
 ## Transform Your Infrastructure Monitoring in Minutes, Not Weeks
 
