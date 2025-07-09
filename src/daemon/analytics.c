@@ -729,20 +729,34 @@ void set_late_analytics_variables(struct rrdhost_system_info *system_info)
     analytics_get_install_type(system_info);
 }
 
+#ifdef OS_WINDOWS
+static void get_timezone_win_id(char *win_id, DWORD win_size)
+{
+    win_id[0] = '\0';
+    HKEY hKey;
+    LSTATUS ret = RegOpenKeyExA(HKEY_LOCAL_MACHINE,
+                                "SYSTEM\\CurrentControlSet\\Control\\TimeZoneInformation",
+                                0,
+                                KEY_READ,
+                                &hKey);
+    if (ret != ERROR_SUCCESS)
+        return;
+
+    DWORD valueType;
+    RegQueryValueExA(hKey, "TimeZoneKeyName", NULL, &valueType, (LPBYTE)win_id, &win_size);
+
+    RegCloseKey(hKey);
+}
+#endif
+
 void get_system_timezone(void)
 {
     char buffer[FILENAME_MAX + 1] = "";
     const char *timezone = NULL;
     const char *tz = NULL;
 #ifdef OS_WINDOWS
-    TIME_ZONE_INFORMATION win_tz;
-    DWORD tzresult = GetTimeZoneInformation(&win_tz);
-    if (tzresult != TIME_ZONE_ID_INVALID) {
-        WideCharToMultiByte(CP_UTF8, 0, win_tz.StandardName, -1, buffer, FILENAME_MAX, NULL, NULL);
-        if (strlen(buffer)) {
-            timezone = buffer;
-        }
-    }
+    get_timezone_win_id(buffer, FILENAME_MAX);
+    timezone = buffer;
 #else
     // avoid flood calls to stat(/etc/localtime)
     // http://stackoverflow.com/questions/4554271/how-to-avoid-excessive-stat-etc-localtime-calls-in-strftime-on-linux
