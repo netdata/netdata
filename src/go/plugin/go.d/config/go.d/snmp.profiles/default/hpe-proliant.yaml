@@ -139,7 +139,7 @@ metrics:
         name: cpqHoFileSysSpaceTotal
         scale_factor: 1048576
         chart_meta:
-          description: File system size in megabytes
+          description: File system size
           family: 'System/FileSystem/Size'
           unit: "By"
       - OID: 1.3.6.1.4.1.232.11.2.4.1.1.4
