@@ -49,7 +49,7 @@ Once logged into Netdata Cloud, you'll see connection instructions. There are th
 <details>
 <summary><strong>Method 2: From the Nodes Tab</strong></summary><br/>
 
-1. Go to the **Nodes** tab in your War Room
+1. Go to the **Nodes** tab in your Room
 2. Click **Add nodes** button
 3. Follow the step-by-step instructions
 
