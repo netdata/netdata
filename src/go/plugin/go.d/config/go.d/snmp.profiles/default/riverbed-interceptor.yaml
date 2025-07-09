@@ -3,6 +3,13 @@ extends:
 
 sysobjectid:
   - 1.3.6.1.4.1.17163.1.3  # Steelhead Interceptor 9200
+
+# HOST-RESOURCES-MIB
+# https://mibbrowser.online/mibdb_search.php?mib=HOST-RESOURCES-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/riverbed/HOST-RESOURCES-MIB
+
+# INTERCEPTOR-MIB
+
 metrics:
   - MIB: HOST-RESOURCES-MIB
     symbol:
@@ -16,12 +23,13 @@ metrics:
       OID: 1.3.6.1.2.1.25.2.3.1.6.1  # hrStorageUsed.1 (hrStorageUsed at index 1)
       description: Amount of the storage represented by this entry that is allocated in units of hrStorageAllocationUnits
       unit: "By"
-  - MIB: INTERCEPTOR-MIB
-    symbol:
-      name: cpu.usage
-      OID: 1.3.6.1.4.1.17163.1.3.5.1.4.0
-      description: TBD
-      unit: "TBD"
+  # - MIB: INTERCEPTOR-MIB
+  #   symbol:
+  #     name: cpu.usage
+  #     OID: 1.3.6.1.4.1.17163.1.3.5.1.4.0
+  #     description: TBD
+  #     unit: "TBD"
+  # TODO MIB not found
   #  - MIB: INTERCEPTOR-MIB
   #    symbol:
   #      name: riverbed.interceptor.health
@@ -40,14 +48,16 @@ metrics:
       - name: riverbed.interceptor.proc
         constant_value_one: true
     metric_tags:
-      - symbol:
+      - tag: proc_index
+        index: 1
+      - tag: riverbed_interceptor_proc_name
+        symbol:
           name: riverbed.interceptor.procName
           OID: 1.3.6.1.4.1.17163.1.3.2.5.1.2
-        tag: riverbed_interceptor_proc_name
-      - symbol:
+      - tag: _riverbed_interceptor_proc_status
+        symbol:
           OID: 1.3.6.1.4.1.17163.1.3.2.5.1.3
           name: riverbed.interceptor.procStatus
-        tag: riverbed_interceptor_proc_status
   - MIB: INTERCEPTOR-MIB
     table:
       name: neighborTable
@@ -58,14 +68,17 @@ metrics:
         description: Number of neighbor connections
         unit: "{connection}"
     metric_tags:
-      - symbol:
+      - tag: neighbor_index
+        index: 1
+      - tag: riverbed_interceptor_neighbor_name
+        symbol:
           name: riverbed.interceptor.neighborName
           OID: 1.3.6.1.4.1.17163.1.3.2.6.1.3
-        tag: riverbed_interceptor_neighbor_name
+
 metric_tags:
-  - OID: 1.3.6.1.4.1.17163.1.3.1.1.0
+  - tag: _riverbed_interceptor_model
+    OID: 1.3.6.1.4.1.17163.1.3.1.1.0
     symbol: model
-    tag: riverbed_interceptor_model
-  - OID: 1.3.6.1.4.1.17163.1.3.1.2.0
+  - tag: _riverbed_interceptor_serial_number
+    OID: 1.3.6.1.4.1.17163.1.3.1.2.0
     symbol: serialNumber
-    tag: riverbed_interceptor_serial_number
