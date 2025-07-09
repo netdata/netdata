@@ -11,9 +11,29 @@ metadata:
   device:
     fields:
       vendor:
-        value: "peplink"
+        value: "Peplink"
       type:
-        value: "router"
+        value: "Router"
+
+metric_tags:
+  - tag: _peplink_device_model
+    OID: 1.3.6.1.4.1.23695.200.1.1.1.1.1
+    symbol: deviceModel
+  - tag: _peplink_device_serial_number
+    OID: 1.3.6.1.4.1.23695.200.1.1.1.1.2
+    symbol: deviceSerialNumber
+  - tag: _peplink_device_firmware_version
+    OID: 1.3.6.1.4.1.23695.200.1.1.1.1.3
+    symbol: deviceFirmwareVersion
+  - tag: _peplink_bal_firmware
+    OID: 1.3.6.1.4.1.23695.1.1.1.1
+    symbol: balFirmware
+  - tag: _peplink_bal_serial_number
+    OID: 1.3.6.1.4.1.23695.1.1.1.2
+    symbol: balSerialNumber
+
+# PEPLINK-DEVICE
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/peplink/PEPLINK-DEVICE
 
 metrics:
   - MIB: PEPLINK-DEVICE
@@ -55,16 +75,15 @@ metrics:
         OID: 1.3.6.1.4.1.23695.200.1.1.1.4.1.1.5
         description: Device psu percentage
         unit: "%"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
-      - symbol:
+      - tag: device_psu_id
+        symbol:
           OID: 1.3.6.1.4.1.23695.200.1.1.1.4.1.1.1
           name: devicePSUId
-        tag: device_psu_id
-      - symbol:
+      - tag: _device_psu_status
+        symbol:
           OID: 1.3.6.1.4.1.23695.200.1.1.1.4.1.1.2
           name: devicePSUStatus
-        tag: device_psu_status
         mapping:
           0: error
           1: on
@@ -76,17 +95,16 @@ metrics:
       - name: peplink.deviceFanSpeed
         OID: 1.3.6.1.4.1.23695.200.1.1.1.4.2.1.3
         description: Device fan speed
-        unit: "1.s"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+        unit: "{revolution}/s"
     metric_tags:
-      - symbol:
+      - tag: device_fan_id
+        symbol:
           OID: 1.3.6.1.4.1.23695.200.1.1.1.4.2.1.1
           name: deviceFanId
-        tag: device_fan_id
-      - symbol:
+      - tag: _device_fan_status
+        symbol:
           OID: 1.3.6.1.4.1.23695.200.1.1.1.4.2.1.2
           name: deviceFanStatus
-        tag: device_fan_status
         mapping:
           0: error
           1: on
@@ -95,11 +113,13 @@ metrics:
       OID: 1.3.6.1.4.1.23695.200.1.1.1.4.3
       name: devicePowerSourceTable
     symbols:
-      - name: peplink.devicePowerSource
-        constant_value_one: true
-        description: Device power source
-        unit: "{power_source}"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+      - OID: 1.3.6.1.4.1.23695.200.1.1.1.4.3.1.3
+        name: devicePowerSourceStatus
+        description: Power source status
+        unit: "{status}"
+        mapping:
+          0: no_cable_detected
+          1: connected
     metric_tags:
       - symbol:
           name: devicePowerSourceId
@@ -109,13 +129,7 @@ metrics:
           name: devicePowerSourceName
           OID: 1.3.6.1.4.1.23695.200.1.1.1.4.3.1.2
         tag: device_power_source_name
-      - symbol:
-          OID: 1.3.6.1.4.1.23695.200.1.1.1.4.3.1.3
-          name: devicePowerSourceStatus
-        tag: device_power_source_status
-        mapping:
-          0: no_cable_detected
-          1: connected
+
   # - MIB: PEPLINK-BALANCE-MIB # TODO: Handle string for "up"/"down"
   #   symbol:
   #     name: peplink.balLanStatus
@@ -142,18 +156,18 @@ metrics:
         description: Number of bytes transferred through
         unit: "By"
     metric_tags:
-      - symbol:
+      - tag: link_conn_num
+        symbol:
           name: linkConnNum
           OID: 1.3.6.1.4.1.23695.1.1.2.2.1.1
-        tag: link_conn_num
-      - symbol:
+      - tag: link_name
+        symbol:
           name: linkName
           OID: 1.3.6.1.4.1.23695.1.1.2.2.1.2
-        tag: link_name
-      - symbol:
+      - tag: _link_status
+        symbol:
           OID: 1.3.6.1.4.1.23695.1.1.2.2.1.3
           name: linkStatus
-        tag: link_status
   - MIB: PEPLINK-BALANCE-MIB
     table:
       OID: 1.3.6.1.4.1.23695.1.1.3
@@ -179,19 +193,3 @@ metrics:
           name: wanUsageIndex
           OID: 1.3.6.1.4.1.23695.1.1.3.1.1
         tag: wan_usage_index
-metric_tags:
-  - OID: 1.3.6.1.4.1.23695.200.1.1.1.1.1
-    symbol: deviceModel
-    tag: peplink_device_model
-  - tag: peplink_device_serial_number
-    OID: 1.3.6.1.4.1.23695.200.1.1.1.1.2
-    symbol: deviceSerialNumber
-  - OID: 1.3.6.1.4.1.23695.200.1.1.1.1.3
-    symbol: deviceFirmwareVersion
-    tag: peplink_device_firmware_version
-  - tag: peplink_bal_firmware
-    OID: 1.3.6.1.4.1.23695.1.1.1.1
-    symbol: balFirmware
-  - OID: 1.3.6.1.4.1.23695.1.1.1.2
-    symbol: balSerialNumber
-    tag: peplink_bal_serial_number

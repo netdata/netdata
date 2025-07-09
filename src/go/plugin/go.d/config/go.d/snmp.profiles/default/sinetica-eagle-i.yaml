@@ -8,26 +8,29 @@ metadata:
   device:
     fields:
       vendor:
-        value: "sinetica"
-
+        value: "Sinetica"
 
 metric_tags:
-  - OID: 1.3.6.1.4.1.3711.24.1.1.99.9.0
+  - tag: _hawk_i2_inv_hw_revision
+    OID: 1.3.6.1.4.1.3711.24.1.1.99.9.0
     symbol: invHwRevision
-    tag: hawk_i2_inv_hw_revision
-  - OID: 1.3.6.1.4.1.3711.24.1.1.99.10.0
+  - tag: _hawk_i2_inv_fw_revision
+    OID: 1.3.6.1.4.1.3711.24.1.1.99.10.0
     symbol: invFwRevision
-    tag: hawk_i2_inv_fw_revision
-  - OID: 1.3.6.1.4.1.3711.24.1.1.99.11.0
+  - tag: _hawk_i2_inv_serial_num
+    OID: 1.3.6.1.4.1.3711.24.1.1.99.11.0
     symbol: invSerialNum
-    tag: hawk_i2_inv_serial_num
-  - OID: 1.3.6.1.4.1.3711.24.1.1.1.2.1.0
+  - tag: _hawk_i2_ip_temp_scale_flag
+    OID: 1.3.6.1.4.1.3711.24.1.1.1.2.1.0
     symbol: ipTempScaleFlag
-    tag: hawk_i2_ip_temp_scale_flag
     mapping:
       1: celsius
       2: fahrenheit
       3: kelvin
+
+# HAWK-I2-MIB
+# https://mibbrowser.online/mibdb_search.php?mib=HAWK-I2-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/panduit/HAWK-I2-MIB
 
 metrics:
   - MIB: HAWK-I2-MIB
@@ -42,14 +45,16 @@ metrics:
           family: 'Sensor/Analog/Value'
           unit: 1
     metric_tags:
-      - symbol:
+      - tag: THA_index
+        index: 1
+      - tag: _hawk_i2_ip_tha_name
+        symbol:
           name: hawk.i2.ipTHAName
           OID: 1.3.6.1.4.1.3711.24.1.1.1.2.2.1.3
-        tag: hawk_i2_ip_tha_name
-      - symbol:
+      - tag: _hawk_i2_ip_tha_locn
+        symbol:
           name: hawk.i2.ipTHALocn
           OID: 1.3.6.1.4.1.3711.24.1.1.1.2.2.1.4
-        tag: hawk_i2_ip_tha_locn
 
   - MIB: HAWK-I2-MIB
     table:
@@ -77,11 +82,13 @@ metrics:
           3: armed
           4: triggered
     metric_tags:
+      - tag: ipCont_index
+        index: 1
       - tag: hawk_i2_ip_cont_name
         symbol:
           name: hawk.i2.ipContName
           OID: 1.3.6.1.4.1.3711.24.1.1.1.3.1.1.3
-      - tag: hawk_i2_ip_cont_locn
+      - tag: _hawk_i2_ip_cont_locn
         symbol:
           name: hawk.i2.ipContLocn
           OID: 1.3.6.1.4.1.3711.24.1.1.1.3.1.1.4
@@ -120,11 +127,13 @@ metrics:
           2: deactivate
           3: logic
     metric_tags:
+      - tag: op_index
+        index: 1
       - tag: hawk_i2_op_name
         symbol:
           name: hawk.i2.opName
           OID: 1.3.6.1.4.1.3711.24.1.1.2.2.1.3
-      - tag: hawk_i2_op_locn
+      - tag: _hawk_i2_op_locn
         symbol:
           name: hawk.i2.opLocn
           OID: 1.3.6.1.4.1.3711.24.1.1.2.2.1.4
@@ -137,24 +146,28 @@ metrics:
       - name: hawk.i2.pduRMSVoltsValue
         OID: 1.3.6.1.4.1.3711.24.1.1.7.3.1.1.3
         chart_meta:
-          description: RMS Volts value in volts
+          description: RMS Volts value
           family: 'PDU/Voltage/Value'
           unit: "V"
       - name: hawk.i2.pduRMSAmpsValue
         OID: 1.3.6.1.4.1.3711.24.1.1.7.3.1.1.4
         scale_factor: 0.1
         chart_meta:
-          description: RMS current value in amperes
+          description: RMS current value
           family: 'PDU/Current/Value'
           unit: "A"
       - name: hawk.i2.pduTotalEnergyValue
         OID: 1.3.6.1.4.1.3711.24.1.1.7.3.1.1.5
+        scale_factor: 100
         chart_meta:
-          description: Total energy value in 0.1 kWh
+          description: Total energy value
           family: 'PDU/Energy/Total'
-          unit: "hW.h"
+          unit: "W.h"
     metric_tags:
+      - tag: pdu_index
+        index: 1
       - tag: hawk_i2_pdu_name
+        table: pduTable
         symbol:
           name: hawk.i2.pduName
           OID: 1.3.6.1.4.1.3711.24.1.1.7.1.2.1.3
