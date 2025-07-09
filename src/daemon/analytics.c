@@ -748,7 +748,14 @@ static void get_timezone_win_id(char *win_id, DWORD win_size)
     RegCloseKey(hKey);
 }
 
-static int map_windows_tz_to_ioanna(char *win_id) {
+static void get_win_geoiso(char *geo_name, int length) {
+    GEOID id = GetUserGeoID(GEOCLASS_NATION);
+    int res = GetGeoInfoA(id, GEO_ISO2, geo_name, length, 0);
+    if (!res)
+        geo_name[0] = '\0';
+}
+
+static int map_windows_tz_to_ioanna(char *out, char *win_id, char *geo_name) {
     if (*win_id == '\0')
         return -1;
 
@@ -757,12 +764,17 @@ static int map_windows_tz_to_ioanna(char *win_id) {
         return -1;
 
     char buffer[CONFIG_FILE_LINE_MAX + 1];
+    bool copied = 0;
     while (fgets(buffer, CONFIG_FILE_LINE_MAX, fp) != NULL) {
         buffer[CONFIG_FILE_LINE_MAX] = '\0';
 
         char *s = strstr(buffer, win_id);
-        if (!s)
-            continue;
+        if (!s) {
+            if (!copied)
+                continue;
+            else // Country codes do not match, but we found the zone
+                break;
+        }
 
         //Escape:'  <MapTZ TZID="'
         s = &buffer[15];
@@ -771,7 +783,15 @@ static int map_windows_tz_to_ioanna(char *win_id) {
             continue;
 
         *end = '\0';
-        strncpyz(win_id, s, strlen(s));
+
+        strncpyz(out, s, strlen(s));
+
+        //Escape:" Region="
+        char *cmpregion = end+ 10;
+        if (!strncmp(cmpregion, geo_name, 2))
+            break;
+
+        copied = 1;
     }
 
     fclose(fp);
@@ -785,8 +805,11 @@ void get_system_timezone(void)
     const char *timezone = NULL;
     const char *tz = NULL;
 #ifdef OS_WINDOWS
-    get_timezone_win_id(buffer, FILENAME_MAX);
-    if (!map_windows_tz_to_ioanna(buffer))
+    char geo_name[128];
+    char win_zone[256];
+    get_timezone_win_id(win_zone, 256);
+    get_win_geoiso(geo_name, 128);
+    if (!map_windows_tz_to_ioanna(buffer, win_zone, geo_name))
         timezone = buffer;
 #else
     // avoid flood calls to stat(/etc/localtime)
