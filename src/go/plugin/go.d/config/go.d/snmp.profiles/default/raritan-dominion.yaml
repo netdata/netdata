@@ -6,11 +6,16 @@ metadata:
   device:
     fields:
       vendor:
-        value: "raritan"
+        value: "Raritan"
 
 sysobjectid:
   - 1.3.6.1.4.1.13742.*         # Raritan Devices
   - 1.3.6.1.4.1.13742.3.2.10    # Raritan Dominion SXII DSX2-32
+
+# RemoteKVMDevice-MIB
+# https://mibbrowser.online/mibdb_search.php?mib=RemoteKVMDevice-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/raritan/RemoteKVMDevice-MIB
+
 metrics:
   - MIB: RemoteKVMDevice-MIB
     symbol:
@@ -35,10 +40,12 @@ metrics:
         unit: "{system_power_supply}"
     # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
-      - symbol:
+      - tag: psu_index
+        index: 1
+      - tag: _raritan_remotekvm_system_power_supply_power_on
+        symbol:
           OID: 1.3.6.1.4.1.13742.3.1.3.1.2
           name: raritan.remotekvm.systemPowerSupplyPowerOn
-        tag: raritan_remotekvm_system_power_supply_power_on
         mapping:
           1: 'true'
           2: 'false'
@@ -51,22 +58,23 @@ metrics:
         constant_value_one: true
         description: Port data presence
         unit: "{port_data}"
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.13742.3.1.4.1.3
-          name: raritan.remotekvm.portDataName
-        tag: raritan_remotekvm_port_data_name
-      - symbol:
-          OID: 1.3.6.1.4.1.13742.3.1.4.1.4
-          name: raritan.remotekvm.portDataType
-        tag: raritan_remotekvm_port_data_type
-      # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-      - symbol:
-          OID: 1.3.6.1.4.1.13742.3.1.4.1.5
-          name: raritan.remotekvm.portDataStatus
-        tag: raritan_remotekvm_port_data_status
+      - OID: 1.3.6.1.4.1.13742.3.1.4.1.5
+        name: raritan.remotekvm.portDataStatus
+        description: Port status and availability
+        unit: "{status}"
         mapping:
           1: inactive
           2: available
           3: connected
           4: busy
+    metric_tags:
+      - tag: portData_index
+        index: 1
+      - tag: raritan_remotekvm_port_data_name
+        symbol:
+          OID: 1.3.6.1.4.1.13742.3.1.4.1.3
+          name: raritan.remotekvm.portDataName
+      - tag: _raritan_remotekvm_port_data_type
+        symbol:
+          OID: 1.3.6.1.4.1.13742.3.1.4.1.4
+          name: raritan.remotekvm.portDataType

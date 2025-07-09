@@ -10,20 +10,24 @@ metadata:
   device:
     fields:
       vendor:
-        value: "sophos"
+        value: "Sophos"
       type:
-        value: "firewall"
+        value: "Firewall"
 
 metric_tags:
-  - OID: 1.3.6.1.4.1.2604.5.1.1.2.0
+  - tag: _sfos_device_type
+    OID: 1.3.6.1.4.1.2604.5.1.1.2.0
     symbol: sfosDeviceType
-    tag: sfos_device_type
-  - OID: 1.3.6.1.4.1.2604.5.1.1.3.0
+  - tag: sfos_device_fw_version
+    OID: 1.3.6.1.4.1.2604.5.1.1.3.0
     symbol: sfosDeviceFWVersion
-    tag: sfos_device_fw_version
-  - OID: 1.3.6.1.4.1.2604.5.1.1.6.0
+  - tag: _sfos_ips_version
+    OID: 1.3.6.1.4.1.2604.5.1.1.6.0
     symbol: sfosIPSVersion
-    tag: sfos_ips_version
+
+# SFOS-FIREWALL-MIB
+# https://mibbrowser.online/mibdb_search.php?mib=SFOS-FIREWALL-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/sophos/SFOS-FIREWALL-MIB
 
 metrics:
   - MIB: SFOS-FIREWALL-MIB
@@ -136,23 +140,25 @@ metrics:
           family: 'IPSec/Tunnel/Active'
           unit: "{tunnel}"
     metric_tags:
+      - tag: tunnel_index
+        index: 1
       - tag: sfos_ip_sec_vpn_conn_name
         symbol:
           name: sfosIPSecVpnConnName
           OID: 1.3.6.1.4.1.2604.5.1.6.1.1.1.1.2
-      - tag: sfos_ip_sec_vpn_conn_des
+      - tag: _sfos_ip_sec_vpn_conn_des
         symbol:
           name: sfosIPSecVpnConnDes
           OID: 1.3.6.1.4.1.2604.5.1.6.1.1.1.1.3
-      - tag: sfos_ip_sec_vpn_policy_name
+      - tag: _sfos_ip_sec_vpn_policy_name
         symbol:
           name: sfosIPSecVpnPolicyName
           OID: 1.3.6.1.4.1.2604.5.1.6.1.1.1.1.4
-      - tag: sfos_ip_sec_vpn_conn_mode
+      - tag: _sfos_ip_sec_vpn_conn_mode
         symbol:
           name: sfosIPSecVpnConnMode
           OID: 1.3.6.1.4.1.2604.5.1.6.1.1.1.1.5
-      - tag: sfos_ip_sec_vpn_conn_type
+      - tag: _sfos_ip_sec_vpn_conn_type
         symbol:
           OID: 1.3.6.1.4.1.2604.5.1.6.1.1.1.1.6
           name: sfosIPSecVpnConnType

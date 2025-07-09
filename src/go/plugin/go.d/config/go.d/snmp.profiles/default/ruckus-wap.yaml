@@ -8,7 +8,7 @@ metadata:
   device:
     fields:
       type:
-        value: "access_point"
+        value: "Access Point"
 metrics:
   - MIB: RUCKUS-SYSTEM-MIB
     symbol:
