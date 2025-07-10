@@ -20,6 +20,7 @@
 BOOL is_sqlexpress = FALSE;
 
 struct netdata_mssql_conn {
+    const char *instance;
     const char *driver;
     const char *server;
     const char *address;
@@ -27,6 +28,7 @@ struct netdata_mssql_conn {
     const char *password;
     int instances;
     bool windows_auth;
+    bool is_sqlexpress;
 
     SQLCHAR *connectionString;
 
@@ -941,7 +943,7 @@ void netdata_mount_mssql_connection_string(struct netdata_mssql_conn *dbInput)
     dbInput->connectionString = (SQLCHAR *)strdupz((char *)conn);
 }
 
-static void netdata_read_config_options(struct netdata_mssql_conn *dbconn)
+static void netdata_read_config_options(struct netdata_mssql_conn *dbconn, const char *instance)
 {
     dbconn->netdataSQLEnv = NULL;
     dbconn->netdataSQLHDBc = NULL;
@@ -967,6 +969,7 @@ static void netdata_read_config_options(struct netdata_mssql_conn *dbconn)
         snprintfz(&section_name[sizeof(NETDATA_DEFAULT_MSSQL_SECTION) - 1], 5, "%d", total_instances);
     }
 
+    dbconn->instance = inicfg_get(&netdata_config, section_name, "instance", instance);
     dbconn->driver = inicfg_get(&netdata_config, section_name, "driver", "SQL Server");
     dbconn->server = inicfg_get(&netdata_config, section_name, "server", NULL);
     dbconn->address = inicfg_get(&netdata_config, section_name, "address", NULL);
@@ -974,8 +977,11 @@ static void netdata_read_config_options(struct netdata_mssql_conn *dbconn)
     dbconn->password = inicfg_get(&netdata_config, section_name, "pwd", NULL);
     dbconn->instances = (int)inicfg_get_number(&netdata_config, section_name, "additional instances", 0);
     dbconn->windows_auth = inicfg_get_boolean(&netdata_config, section_name, "windows authentication", false);
+    dbconn->is_sqlexpress = inicfg_get_boolean(&netdata_config, section_name, "express", false);
 
-    netdata_mount_mssql_connection_string(dbconn);
+    if (dbconn->instance)
+        netdata_mount_mssql_connection_string(dbconn);
+
     if (!total_instances)
         expected_instances = dbconn->instances;
 
@@ -1033,7 +1039,7 @@ void dict_mssql_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *valu
 
     initialize_mssql_objects(mi, instance);
     initialize_mssql_keys(mi);
-    netdata_read_config_options(&mi->conn);
+    netdata_read_config_options(&mi->conn, instance);
 
     if (mi->conn.connectionString) {
         mi->conn.is_connected = netdata_MSSQL_initialize_conection(&mi->conn);
