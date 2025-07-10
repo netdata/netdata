@@ -421,6 +421,18 @@ const char *nut_get_var(UPSCONN_t *conn, const char *ups_name, const char *var_n
     return answer[0][3];
 }
 
+static inline void send_BEGIN(const char *type, const char *name, usec_t usec) {
+    printf("BEGIN upsd_%s.%s %" PRIu64 "\n", type, name, usec);
+}
+
+static inline void send_SET(const char *name, unsigned int value) {
+    printf("SET %s = %u\n", name, value);
+}
+
+static inline void send_END(void) {
+    puts("END");
+}
+
 // This function parses the 'ups.status' variable and emits the Netdata metrics
 // for each status, printing 1 for each set status and 0 otherwise.
 void print_ups_status_metrics(UPSCONN_t *conn, const char *ups_name, const char *clean_ups_name, usec_t dt) {
@@ -519,39 +531,23 @@ void print_ups_status_metrics(UPSCONN_t *conn, const char *ups_name, const char 
         }
     }
 
-    printf("BEGIN upsd_%s.status %" PRIu64 "\n"
-           "SET 'on_line' = %u\n"
-           "SET 'on_battery' = %u\n"
-           "SET 'low_battery' = %u\n"
-           "SET 'high_battery' = %u\n"
-           "SET 'replace_battery' = %u\n"
-           "SET 'charging' = %u\n"
-           "SET 'discharging' = %u\n"
-           "SET 'bypass' = %u\n"
-           "SET 'calibration' = %u\n"
-           "SET 'offline' = %u\n"
-           "SET 'overloaded' = %u\n"
-           "SET 'trim_input_voltage' = %u\n"
-           "SET 'boost_input_voltage' = %u\n"
-           "SET 'forced_shutdown' = %u\n"
-           "SET 'other' = %u\n"
-           "END\n",
-           clean_ups_name, dt,
-           status.OL,
-           status.OB,
-           status.LB,
-           status.HB,
-           status.RB,
-           status.CHRG,
-           status.DISCHRG,
-           status.BYPASS,
-           status.CAL,
-           status.OFF,
-           status.OVER,
-           status.TRIM,
-           status.BOOST,
-           status.FSD,
-           status.OTHER);
+    send_BEGIN(clean_ups_name, "status", dt);
+    send_SET("on_line", status.OL);
+    send_SET("on_battery", status.OB);
+    send_SET("low_battery", status.LB);
+    send_SET("high_battery", status.HB);
+    send_SET("replace_battery", status.RB);
+    send_SET("charging", status.CHRG);
+    send_SET("discharging", status.DISCHRG);
+    send_SET("bypass", status.BYPASS);
+    send_SET("calibration", status.CAL);
+    send_SET("offline", status.OFF);
+    send_SET("overloaded", status.OVER);
+    send_SET("trim_input_voltage", status.TRIM);
+    send_SET("boost_input_voltage", status.BOOST);
+    send_SET("forced_shutdown", status.FSD);
+    send_SET("other", status.OTHER);
+    send_END();
 }
 
 void print_ups_realpower_metric(UPSCONN_t *conn, const char *ups_name, const char *clean_ups_name, usec_t dt) {
@@ -575,13 +571,9 @@ void print_ups_realpower_metric(UPSCONN_t *conn, const char *ups_name, const cha
         realpower *= str2ndd(value, NULL) * NETDATA_PLUGIN_PRECISION;
     }
 
-    // BEGIN type.id [microseconds]
-    // SET id = value
-    // END
-    printf("BEGIN upsd_%s.load_usage %" PRIu64 "\n"
-           "SET load_usage = %d\n"
-           "END\n",
-           clean_ups_name, dt, (int)realpower);
+    send_BEGIN(clean_ups_name, "load_usage", dt);
+    send_SET("load_usage", realpower);
+    send_END();
 }
 
 void register_ups(char *ups_name) {
@@ -789,13 +781,9 @@ int main(int argc, char *argv[]) {
             dfe_start_read(ups_vars, chart) {
                 const char *value = nut_get_var(&ups2, ups_name, chart->nut_variable);
                 NETDATA_DOUBLE nut_value_as_num = str2ndd(value, NULL) * NETDATA_PLUGIN_PRECISION;
-                // BEGIN type.id [microseconds]
-                // SET id = value
-                // END
-                printf("BEGIN upsd_%s.%s %" PRIu64 "\n"
-                       "SET %s = %d\n"
-                       "END\n",
-                       clean_ups_name, chart->chart_id, dt, chart->chart_dimension, (int)nut_value_as_num);
+                send_BEGIN(clean_ups_name, chart->chart_id, dt);
+                send_SET(chart->chart_dimension, nut_value_as_num);
+                send_END();
             }
             dfe_done(chart);
         }
