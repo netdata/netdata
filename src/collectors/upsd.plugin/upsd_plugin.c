@@ -51,7 +51,6 @@
 #define BUFLEN 64
 #define LENGTHOF(arr) (sizeof(arr)/sizeof(arr[0]))
 
-static bool debug = false;
 static unsigned long netdata_update_every = 1;
 UPSCONN_t ups1, ups2;
 
@@ -333,7 +332,6 @@ static void print_help() {
           "\n"
           "options:\n"
           "  COLLECTION_FREQUENCY    data collection frequency in seconds (default: 1)\n"
-          "  -d                      enable verbose output (default: disabled)\n"
           "  -v                      print version and exit\n"
           "  -h                      print this message and exit\n",
           stderr
@@ -346,7 +344,7 @@ static void parse_command_line(int argc, char *argv[]) {
     int opt;
     char *endptr;
 
-    while ((opt = getopt(argc, argv, "hvd")) != -1) {
+    while ((opt = getopt(argc, argv, "hv")) != -1) {
         switch (opt) {
         case 'h':
             print_help();
@@ -354,9 +352,6 @@ static void parse_command_line(int argc, char *argv[]) {
         case 'v':
             print_version();
             exit(EXIT_SUCCESS);
-        case 'd':
-            debug = true;
-            break;
         default:
             print_help();
             exit(EXIT_FAILURE);
@@ -385,11 +380,15 @@ static char *clean_name(char *name) {
 }
 
 static const char *nut_get_var(UPSCONN_t *conn, const char *ups_name, const char *var_name) {
+    int rc;
     size_t numa;
     char **answer[1];
     const char *query[] = { "VAR", ups_name, var_name };
 
-    if (-1 == upscli_get(conn, LENGTHOF(query), query, &numa, (char***)answer))
+    rc = upscli_get(conn, LENGTHOF(query), query, &numa, (char***)answer);
+    netdata_log_debug(D_SYSTEM, "upscli_get(ups=%p, numq=%u, query={\"%s\",\"%s\",\"%s\"}, numa=%u, answer={\"%s\",\"%s\",\"%s\"}) returned %d",
+                      conn, LENGTHOF(query), query[0], query[1], query[2], numa, answer[0][1], answer[0][1], answer[0][2], rc);
+    if (unlikely(-1 == rc))
         return NULL;
 
     // The output of upscli_get() will be something like:
@@ -662,16 +661,24 @@ int main(int argc, char *argv[]) {
     nd_ups_seen = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_FIXED_SIZE|DICT_OPTION_VALUE_LINK_DONT_CLONE);
     nd_ups_name = dictionary_create(DICT_OPTION_SINGLE_THREADED);
 
-    // If we fail to initialize libupsclient or connect to a local
-    // UPS, then there's nothing more to be done; Netdata should disable
-    // this plugin, since it cannot offer any metrics.
-    if (-1 == upscli_init(0, NULL, NULL, NULL)) {
+    rc = upscli_init(0, NULL, NULL, NULL);
+    netdata_log_debug(D_SYSTEM, "upscli_init(certverify=0, certpath=NULL, certname=NULL, certpasswd=NULL) returned %d", rc);
+    if (unlikely(-1 == rc)) {
         netdata_log_error("failed to initialize libupsclient");
         return NETDATA_PLUGIN_EXIT_AND_DISABLE;
     }
 
-    if ((-1 == upscli_connect(&ups1, "127.0.0.1", 3493, 0)) ||
-        (-1 == upscli_connect(&ups2, "127.0.0.1", 3493, 0))) {
+    rc = upscli_connect(&ups1, "127.0.0.1", 3493, 0);
+    netdata_log_debug(D_SYSTEM, "upscli_connect(ups=%p, host=\"127.0.0.1\", port=3493, flags=0) returned %d", &ups1, rc);
+    if (unlikely(-1 == rc)) {
+        upscli_cleanup();
+        netdata_log_error("failed to connect to upsd at 127.0.0.1:3493");
+        return NETDATA_PLUGIN_EXIT_AND_DISABLE;
+    }
+
+    rc = upscli_connect(&ups2, "127.0.0.1", 3493, 0);
+    netdata_log_debug(D_SYSTEM, "upscli_connect(ups=%p, host=\"127.0.0.1\", port=3493, flags=0) returned %d", &ups2, rc);
+    if (unlikely(-1 == rc)) {
         upscli_cleanup();
         netdata_log_error("failed to connect to upsd at 127.0.0.1:3493");
         return NETDATA_PLUGIN_EXIT_AND_DISABLE;
@@ -681,6 +688,8 @@ int main(int argc, char *argv[]) {
     setvbuf(stdout, NULL, _IOFBF, BUFSIZ);
 
     rc = upscli_list_start(&ups1, LENGTHOF(query), query);
+    netdata_log_debug(D_SYSTEM, "upscli_list_start(ups=%p, numq=%u, query={\"%s\"}) returned %d",
+                      &ups1, LENGTHOF(query), query[0]);
     if (unlikely(-1 == rc)) {
         netdata_log_error("failed to list UPSes from upsd: %s", upscli_upserror(&ups1));
         return NETDATA_PLUGIN_EXIT_AND_DISABLE;
@@ -694,6 +703,8 @@ int main(int argc, char *argv[]) {
         //    { [0] = "END", [1] = "LIST", [2] = "UPS" },
         //  ]
         rc = upscli_list_next(&ups1, LENGTHOF(query), query, &numa, (char***)&answer);
+        netdata_log_debug(D_SYSTEM, "upscli_list_next(ups=%p, numq=%u, query={\"%s\"}, numa=%u, answer={\"%s\",\"%s\",\"%s\"}) returned %d",
+                          &ups1, LENGTHOF(query), query[0], numa, answer[0][0], answer[0][1], answer[0][2]);
         if (unlikely(-1 == rc)) {
             netdata_log_error("failed to list UPSes from upsd: %s", upscli_upserror(&ups1));
             return NETDATA_PLUGIN_EXIT_AND_DISABLE;
@@ -720,6 +731,8 @@ int main(int argc, char *argv[]) {
             break;
 
         rc = upscli_list_start(&ups1, LENGTHOF(query), query);
+        netdata_log_debug(D_SYSTEM, "upscli_list_start(ups=%p, numq=%u, query={\"%s\"}) returned %d",
+                          &ups1, LENGTHOF(query), query[0]);
         if (unlikely(-1 == rc)) {
             netdata_log_error("failed to list UPSes from upsd: %s", upscli_upserror(&ups1));
             return NETDATA_PLUGIN_EXIT_AND_DISABLE;
@@ -727,6 +740,8 @@ int main(int argc, char *argv[]) {
 
         for (;;) {
             rc = upscli_list_next(&ups1, LENGTHOF(query), query, &numa, (char***)&answer);
+            netdata_log_debug(D_SYSTEM, "upscli_list_next(ups=%p, numq=%u, query={\"%s\"}, numa=%u, answer={\"%s\",\"%s\",\"%s\"}) returned %d",
+                              &ups1, LENGTHOF(query), query[0], numa, answer[0][0], answer[0][1], answer[0][2]);
             if (unlikely(-1 == rc)) {
                 netdata_log_error("failed to list UPSes from upsd: %s", upscli_upserror(&ups1));
                 return NETDATA_PLUGIN_EXIT_AND_DISABLE;
@@ -768,7 +783,7 @@ int main(int argc, char *argv[]) {
         // So, if they are closed then netdata must have exited.
         // Flush the data out of the stream buffer to ensure netdata gets it immediately.
         fflush(stdout);
-        if (ferror(stdout) && errno == EPIPE) {
+        if (unlikely(ferror(stdout) && errno == EPIPE)) {
             netdata_log_error("failed to fflush(3) upsd data: %s", strerror(errno));
             return NETDATA_PLUGIN_EXIT_AND_DISABLE;
         }
