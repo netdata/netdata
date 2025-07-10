@@ -1891,6 +1891,10 @@ modules:
               description: ODBC driver used to connect to the SQL Server.
               default_value: SQL Server
               required: false
+            - name: instance
+              description: Instance name
+              default_value: empty
+              required: true
             - name: server
               description: Server address or instance name.
               default_value: empty
@@ -1915,6 +1919,10 @@ modules:
               description: Set to yes to use Windows credentials instead of SQL Server authentication.
               default_value: no
               required: false
+            - name: express
+              description: Set to yes when running SQL Express version.
+              default_value: no
+              required: false
         examples:
           folding:
             enabled: true
@@ -1927,9 +1935,11 @@ modules:
               config: |
                 [plugin:windows:PerflibMSSQL]
                    driver = SQL Server
+                   instance = Dev
                    server = 127.0.0.1\\Dev, 1433
                    uid = netdata_user
                    pwd = 1ReallyStrongPasswordShouldBeInsertedHere
+                   express = no
             - name: Multiple Instances
               description: An example configuration with two instances.
               folding:
@@ -1938,14 +1948,18 @@ modules:
                 [plugin:windows:PerflibMSSQL]
                   driver = SQL Server
                   server = 127.0.0.1\\Dev, 1433
+                  instance = Dev
                   uid = netdata_user
                   pwd = 1ReallyStrongPasswordShouldBeInsertedHere
                   additional instances = 1
+                  express = no
                 [plugin:windows:PerflibMSSQL1]
                   driver = SQL Server
                   server = 127.0.0.1\\Production, 1434
+                  instance = Production
                   uid = netdata_user
                   pwd = AnotherReallyStrongPasswordShouldBeInsertedHere2
+                  express = no
     troubleshooting:
       problems:
         list: []
