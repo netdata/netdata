@@ -676,10 +676,10 @@ int main(int argc, char *argv[]) {
     const char *query[] = { "UPS" };
     struct nd_chart *chart;
 
+    parse_command_line(argc, argv);
+
     nd_log_initialize_for_external_plugins(PLUGIN_UPSD_NAME);
     netdata_threads_init_for_external_plugins(0);
-
-    parse_command_line(argc, argv);
 
     nd_ups_vars = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_FIXED_SIZE|DICT_OPTION_VALUE_LINK_DONT_CLONE);
     nd_ups_seen = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_FIXED_SIZE);
