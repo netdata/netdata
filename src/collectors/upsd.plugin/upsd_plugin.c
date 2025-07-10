@@ -713,6 +713,7 @@ int main(int argc, char *argv[]) {
     heartbeat_t hb;
     heartbeat_init(&hb, netdata_update_every * USEC_PER_SEC);
     for (;;) {
+        const char *ups_name;
         usec_t dt = heartbeat_next(&hb);
 
         if (unlikely(exit_initiated_get()))
@@ -734,7 +735,7 @@ int main(int argc, char *argv[]) {
             if (streq("END", answer[0][0]))
                 break;
 
-            char *ups_name = answer[0][1];
+            ups_name = answer[0][1];
             char *clean_ups_name = dictionary_get(nd_ups_name, ups_name);
             if (!clean_ups_name) {
                 register_ups(ups_name);
