@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- SNMP profiles pass ep2 [\#20647](https://github.com/netdata/netdata/pull/20647) ([Ancairon](https://github.com/Ancairon))
 - chore\(go.d/snmp-profiles\): fix quotes [\#20645](https://github.com/netdata/netdata/pull/20645) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#20644](https://github.com/netdata/netdata/pull/20644) ([netdatabot](https://github.com/netdatabot))
 - Update Cloud OIDC Authorization Server setup docs [\#20643](https://github.com/netdata/netdata/pull/20643) ([car12o](https://github.com/car12o))
@@ -447,7 +448,6 @@
 - fix cleanup and exit and memory leaks [\#20120](https://github.com/netdata/netdata/pull/20120) ([ktsaou](https://github.com/ktsaou))
 - Update platforms for CI and package builds. [\#20119](https://github.com/netdata/netdata/pull/20119) ([Ferroin](https://github.com/Ferroin))
 - Improve error handling and logging for journal and data files [\#20112](https://github.com/netdata/netdata/pull/20112) ([stelfrag](https://github.com/stelfrag))
-- Work to find leaks easily [\#20106](https://github.com/netdata/netdata/pull/20106) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.4.0](https://github.com/netdata/netdata/tree/v2.4.0) (2025-04-14)
 
