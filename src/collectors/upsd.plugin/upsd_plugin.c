@@ -435,13 +435,12 @@ static inline void send_END(void) {
 
 // This function parses the 'ups.status' variable and emits the Netdata metrics
 // for each status, printing 1 for each set status and 0 otherwise.
-static void print_ups_status_metrics(UPSCONN_t *conn, const char *ups_name, const char *clean_ups_name, usec_t dt) {
-    assert(conn);
+static void send_metric_ups_status(const char *ups_name, const char *clean_ups_name, usec_t dt) {
     assert(ups_name);
     assert(clean_ups_name);
 
     struct nut_ups_status status = { 0 };
-    const char *ups_status_string = nut_get_var(conn, ups_name, "ups.status");
+    const char *ups_status_string = nut_get_var(&ups2, ups_name, "ups.status");
 
     for (const char *c = ups_status_string; c && *c; c++) {
         switch (*c) {
@@ -550,13 +549,12 @@ static void print_ups_status_metrics(UPSCONN_t *conn, const char *ups_name, cons
     send_END();
 }
 
-static void print_ups_realpower_metric(UPSCONN_t *conn, const char *ups_name, const char *clean_ups_name, usec_t dt) {
-    assert(conn);
+static void send_metric_ups_realpower(const char *ups_name, const char *clean_ups_name, usec_t dt) {
     assert(ups_name);
     assert(clean_ups_name);
 
     NETDATA_DOUBLE realpower;
-    const char *value = nut_get_var(conn, ups_name, "ups.realpower");
+    const char *value = nut_get_var(&ups2, ups_name, "ups.realpower");
 
     if (value) {
         realpower = str2ndd(value, NULL) * NETDATA_PLUGIN_PRECISION;
@@ -770,12 +768,12 @@ int main(int argc, char *argv[]) {
 
             // The 'ups.status' variable is a special case, because its chart has more
             // than one dimension. So, we can't simply print one data point.
-            print_ups_status_metrics(&ups2, ups_name, clean_ups_name, dt);
+            send_metric_ups_status(ups_name, clean_ups_name, dt);
 
             // The 'ups.realpower' variable is another special case, because if it is
             // not available, then it can be calculated from the ups.load and
             // ups.realpower.nominal variables.
-            print_ups_realpower_metric(&ups2, ups_name, clean_ups_name, dt);
+            send_metric_ups_realpower(ups_name, clean_ups_name, dt);
 
             DICTIONARY *ups_vars = dictionary_get(nd_ups_vars, ups_name);
             dfe_start_read(ups_vars, chart) {
