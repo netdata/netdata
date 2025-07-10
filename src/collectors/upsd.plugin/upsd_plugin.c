@@ -555,6 +555,8 @@ static void register_ups(char *ups_name) {
     const char *nut_value;
     const char *clean_ups_name = clean_name(dictionary_set(nd_ups_name, ups_name, ups_name, strlen(ups_name)+1));
 
+    netdata_log_info("Registering UPS '%s' for Netdata metric collection", ups_name);
+
     // CHART type.id name title units [family [context [charttype [priority [update_every [options [plugin [module]]]]]]]]
     printf("CHART 'upsd_%s.status' '' 'UPS status' 'status' 'ups' 'upsd.ups_status' 'line' %u %u\n",
            clean_ups_name, NETDATA_CHART_PRIO_UPSD_UPS_STATUS, netdata_update_every);
@@ -607,6 +609,8 @@ static void register_ups(char *ups_name) {
             if (!nut_get_var(&ups2, ups_name, "ups.load") || !nut_get_var(&ups2, ups_name, "ups.realpower.nominal"))
                 continue;
         }
+
+        netdata_log_info("Collecting UPS '%s' NUT variable: %s", ups_name, chart->nut_variable);
 
         // CHART type.id name title units [family [context [charttype [priority [update_every [options [plugin [module]]]]]]]]
         printf("CHART 'upsd_%s.%s' '' '%s' '%s' '%s' '%s' '%s' '%u' '%u' '' '" PLUGIN_UPSD_NAME "'\n",
