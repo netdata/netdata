@@ -384,22 +384,6 @@ static char *clean_name(char *name) {
     return name;
 }
 
-static void delete_unseen_ups(void) {
-    bool *seen;
-    dfe_start_read(nd_ups_seen, seen) {
-        if (*seen) {
-            *seen = false;
-        } else {
-            DICTIONARY *ups_vars = dictionary_get(nd_ups_vars, seen_dfe.name);
-            dictionary_destroy(ups_vars);
-            dictionary_del(nd_ups_vars, seen_dfe.name);
-            dictionary_del(nd_ups_seen, seen_dfe.name);
-            dictionary_del(nd_ups_name, seen_dfe.name);
-        }
-    }
-    dfe_done(seen);
-}
-
 static const char *nut_get_var(UPSCONN_t *conn, const char *ups_name, const char *var_name) {
     size_t numa;
     char **answer[1];
@@ -423,6 +407,14 @@ static inline void send_SET(const char *name, unsigned int value) {
 
 static inline void send_END(void) {
     puts("END");
+}
+
+static void set_seen(const char *ups_name, bool b) {
+    dictionary_set(nd_ups_seen, ups_name, (void *)b, 0);
+}
+
+static bool was_seen(const char *ups_name) {
+    return (bool)dictionary_get(nd_ups_seen, ups_name);
 }
 
 // This function parses the 'ups.status' variable and emits the Netdata metrics
@@ -666,7 +658,7 @@ int main(int argc, char *argv[]) {
     netdata_threads_init_for_external_plugins(0);
 
     nd_ups_vars = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_FIXED_SIZE|DICT_OPTION_VALUE_LINK_DONT_CLONE);
-    nd_ups_seen = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_FIXED_SIZE);
+    nd_ups_seen = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_FIXED_SIZE|DICT_OPTION_VALUE_LINK_DONT_CLONE);
     nd_ups_name = dictionary_create(DICT_OPTION_SINGLE_THREADED);
 
     // If we fail to initialize libupsclient or connect to a local
@@ -749,8 +741,7 @@ int main(int argc, char *argv[]) {
                 clean_ups_name = dictionary_get(nd_ups_name, ups_name);
             }
 
-            // Track this UPS for future data collection.
-            dictionary_set(nd_ups_seen, ups_name, &(bool){true}, sizeof(bool));
+            set_seen(ups_name, true);
 
             // The 'ups.status' variable is a special case, because its chart has more
             // than one dimension. So, we can't simply print one data point.
@@ -788,7 +779,19 @@ int main(int argc, char *argv[]) {
         if (unlikely(now_monotonic_sec() - started_t > 14400))
             break;
 
-        delete_unseen_ups();
+        // Delete unseen UPS entries from dictionary/memory.
+        dfe_start_read(nd_ups_name, ups_name) {
+            if (was_seen(ups_name)) {
+                set_seen(ups_name, false);
+            } else {
+                DICTIONARY *ups_vars = dictionary_get(nd_ups_vars, ups_name);
+                dictionary_destroy(ups_vars);
+                dictionary_del(nd_ups_vars, ups_name);
+                dictionary_del(nd_ups_seen, ups_name);
+                dictionary_del(nd_ups_name, ups_name);
+            }
+        }
+        dfe_done(ups_name);
     }
 
     upscli_disconnect(&ups1);
