@@ -46,13 +46,14 @@ struct netdata_mssql_conn {
 enum netdata_mssql_metrics {
     NETDATA_MSSQL_GENERAL_STATS,
     NETDATA_MSSQL_SQL_ERRORS,
-    NETDATA_MSSQL_DATABASE,
-    NETDATA_MSSQL_LOCKS,
-    NETDATA_MSSQL_WAITS,
     NETDATA_MSSQL_MEMORY,
     NETDATA_MSSQL_BUFFER_MANAGEMENT,
     NETDATA_MSSQL_SQL_STATS,
     NETDATA_MSSQL_ACCESS_METHODS,
+
+    NETDATA_MSSQL_DATABASE,
+    NETDATA_MSSQL_LOCKS,
+    NETDATA_MSSQL_WAITS,
 
     NETDATA_MSSQL_METRICS_END
 };
@@ -2521,13 +2522,16 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
     static void (*doMSSQL[])(PERF_DATA_BLOCK *, struct mssql_instance *, int) = {
         do_mssql_general_stats,
         do_mssql_errors,
-        do_mssql_databases,
-        do_mssql_locks,
-        do_mssql_waits,
         do_mssql_memory_mgr,
         do_mssql_buffer_management,
         do_mssql_sql_statistics,
-        do_mssql_access_methods};
+        do_mssql_access_methods,
+
+        do_mssql_databases,
+        do_mssql_locks,
+        do_mssql_waits,
+
+        NULL};
 
     DWORD i;
     for (i = 0; i < NETDATA_MSSQL_METRICS_END; i++) {
