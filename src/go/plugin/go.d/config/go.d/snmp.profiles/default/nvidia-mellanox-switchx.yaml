@@ -60,4 +60,4 @@ metadata:
   device:
     fields:
       type:
-        value: "switch"
+        value: "Switch"
