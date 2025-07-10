@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -380,7 +379,6 @@ static void parse_command_line(int argc, char *argv[]) {
 }
 
 static char *clean_name(char *name) {
-    assert(name);
     for (char *c = name; *c; c++)
         *c = (*c  == ' ' || *c == '.') ? '_' : *c;
     return name;
@@ -403,18 +401,12 @@ static void delete_unseen_ups(void) {
 }
 
 static const char *nut_get_var(UPSCONN_t *conn, const char *ups_name, const char *var_name) {
-    assert(conn);
-    assert(ups_name);
-    assert(var_name);
-
     size_t numa;
     char **answer[1];
     const char *query[] = { "VAR", ups_name, var_name };
 
-    if (-1 == upscli_get(conn, LENGTHOF(query), query, &numa, (char***)answer)) {
-        assert(upscli_upserror(conn) == UPSCLI_ERR_VARNOTSUPP);
+    if (-1 == upscli_get(conn, LENGTHOF(query), query, &numa, (char***)answer))
         return NULL;
-    }
 
     // The output of upscli_get() will be something like:
     //   { { [0] = "VAR", [1] = <UPS name>, [2] = <variable name>, [3] = <variable value> } }
@@ -436,9 +428,6 @@ static inline void send_END(void) {
 // This function parses the 'ups.status' variable and emits the Netdata metrics
 // for each status, printing 1 for each set status and 0 otherwise.
 static void send_metric_ups_status(const char *ups_name, const char *clean_ups_name, usec_t dt) {
-    assert(ups_name);
-    assert(clean_ups_name);
-
     struct nut_ups_status status = { 0 };
     const char *ups_status_string = nut_get_var(&ups2, ups_name, "ups.status");
 
@@ -550,9 +539,6 @@ static void send_metric_ups_status(const char *ups_name, const char *clean_ups_n
 }
 
 static void send_metric_ups_realpower(const char *ups_name, const char *clean_ups_name, usec_t dt) {
-    assert(ups_name);
-    assert(clean_ups_name);
-
     NETDATA_DOUBLE realpower;
     const char *value = nut_get_var(&ups2, ups_name, "ups.realpower");
 
