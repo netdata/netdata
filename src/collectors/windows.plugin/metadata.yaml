@@ -3452,23 +3452,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: serviced
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibNUMA
       monitored_instance:
         name: NUMA Architecture
         link: "https://learn.microsoft.com/en-us/windows/win32/procthread/numa-support"
-=======
-  - meta:
-      plugin_name: windows.plugin
-      module_name: PerflibASP
-      monitored_instance:
-        name: ASP.NET
-        link: "https://dotnet.microsoft.com/en-us/apps/aspnet"
->>>>>>> 695966b96 (asp: Fix rebases)
         categories:
           - data-collection.windows-systems
         icon_filename: "windows.svg"
@@ -3479,26 +3468,15 @@ modules:
         description: ""
       keywords:
         - windows
-<<<<<<< HEAD
         - NUMA
         - processor
-=======
-        - ASP
-        - webservice
->>>>>>> 695966b96 (asp: Fix rebases)
       most_popular: false
     overview:
       data_collection:
         metrics_description: |
-<<<<<<< HEAD
           This collector monitors NUMA Architecture on Windows.
         method_description: |
           It queries NUMA Node Memory from Perflib in order to gather the metrics.
-=======
-          This collector monitors ASP.NET applications.
-        method_description: |
-          It queries for the 'ASP.NET' and 'ASP.NET Applications' objects from Perflib in order to gather the metrics.
->>>>>>> 695966b96 (asp: Fix rebases)
       supported_platforms:
         include: ["windows"]
         exclude: []
@@ -3527,11 +3505,7 @@ modules:
             title: "Config option"
             enabled: false
           list:
-<<<<<<< HEAD
             - name: PerflibNUMA
-=======
-            - name: PerflibASP
->>>>>>> 695966b96 (asp: Fix rebases)
               description: An option to enable or disable the data collection.
               default_value: yes
               required: false
@@ -3551,7 +3525,6 @@ modules:
       description: ""
       availability: []
       scopes:
-<<<<<<< HEAD
         - name: NUMA
           description: "These metrics refer to memory utilization on NUMA systems."
           labels:
@@ -3566,41 +3539,95 @@ modules:
                 - name: free
                 - name: standby
                 - name: available
-=======
-        - name: Windows Service
-          description: "These metrics refer to ASP.NET global metrics."
-          labels: []
-          metrics:
-            - name: asp.application_restarts
-=======
+  - meta:
+      plugin_name: windows.plugin
+      module_name: PerflibASP
+      monitored_instance:
+        name: ASP.NET
+        link: "https://dotnet.microsoft.com/en-us/apps/aspnet"
+        categories:
+          - data-collection.windows-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - windows
+        - ASP
+        - webservice
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors ASP.NET applications.
+        method_description: |
+          It queries for the 'ASP.NET' and 'ASP.NET Applications' objects from Perflib in order to gather the metrics.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects all of the metrics, no further configuration is required.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: PerflibASP
+              description: An option to enable or disable the data collection.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
         - name: ASP.NET Global Data
           description: "These metrics refer to ASP.NET global metrics."
           labels: []
           metrics:
             - name: aspnet.application_restarts
->>>>>>> 695966b96 (asp: Fix rebases)
               description: Number of times the application has been restarted.
               unit: restarts
               chart_type: line
               dimensions:
                 - name: restarts
-<<<<<<< HEAD
-<<<<<<< HEAD
->>>>>>> d40509fa7 (asp: Add first global chart; Initialize the metadata)
-=======
-            - name: asp.worker_process_restarts
-=======
             - name: aspnet.worker_process_restarts
->>>>>>> 695966b96 (asp: Fix rebases)
               description: Number of times a worker process has restarted on the machine.
               unit: restarts
               chart_type: line
               dimensions:
                 - name: restarts
-<<<<<<< HEAD
->>>>>>> 9570ab69a (asp: Add worker process restart)
-=======
-=======
         - name: ASP.NET Applications
           description: "ASP.NET application performance counters"
           labels:
@@ -3776,6 +3803,3 @@ modules:
               chart_type: line
               dimensions:
                 - name: failure
->>>>>>> 695966b96 (asp: Fix rebases)
-
->>>>>>> fdc3b79be (asp: Add ASPNET Anonymous chart; Create a common standard)
