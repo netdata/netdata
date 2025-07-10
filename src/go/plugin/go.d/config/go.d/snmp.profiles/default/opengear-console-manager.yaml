@@ -4,10 +4,16 @@ extends:
   - _std-if-mib.yaml
   - _std-ucd-mib.yaml
   - _opengear.yaml
+
 sysobjectid:
   - 1.3.6.1.4.1.25049.1.*     # Open Gear Console Managers
   - 1.3.6.1.4.1.25049.1.10    # CM41xx series Console Managers
   - 1.3.6.1.4.1.25049.1.11    # CM71xx series Console Managers
+
+# OG-STATUSv2-MIB
+# https://mibbrowser.online/mibdb_search.php?mib=OG-STATUSv2-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/opengear/OG-STATUSv2-MIB
+
 metrics:
   - MIB: OG-STATUSv2-MIB
     table:
@@ -24,100 +30,99 @@ metrics:
         metric_type: monotonic_count
         description: Number of bytes transmitted on the serial port
         unit: "By"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
-      - index: 1  # ogSerialPortIndex
-        tag: og_serial_port_index
-      - symbol:
+      - tag: og_serial_port_index
+        index: 1  # ogSerialPortIndex
+      - tag: og_serial_port_label
+        symbol:
           name: ogSerialPortLabel
           OID: 1.3.6.1.4.1.25049.17.2.1.2
-        tag: og_serial_port_label
-      - symbol:
+      - tag: _og_serial_port_speed
+        symbol:
           name: ogSerialPortSpeed
           OID: 1.3.6.1.4.1.25049.17.2.1.3
-        tag: og_serial_port_speed
-      - symbol:
+      - tag: _og_serial_port_data_bits
+        symbol:
           name: ogSerialPortDataBits
           OID: 1.3.6.1.4.1.25049.17.2.1.4
-        tag: og_serial_port_data_bits
-      - symbol:
+      - tag: _og_serial_port_parity
+        symbol:
           name: ogSerialPortParity
           OID: 1.3.6.1.4.1.25049.17.2.1.5
-        tag: og_serial_port_parity
         mapping:
           1: none
           2: odd
           3: even
           4: mark
           5: space
-      - symbol:
+      - tag: _og_serial_port_stop_bits
+        symbol:
           name: ogSerialPortStopBits
           OID: 1.3.6.1.4.1.25049.17.2.1.6
-        tag: og_serial_port_stop_bits
         mapping:
           1: one
           2: two
           3: one_and_a_half
-      - symbol:
+      - tag: _og_serial_port_flow_control
+        symbol:
           name: ogSerialPortFlowControl
           OID: 1.3.6.1.4.1.25049.17.2.1.7
-        tag: og_serial_port_flow_control
         mapping:
           1: none
           2: hardware
           3: software
-      - symbol:
+      - tag: _og_serial_port_mode
+        symbol:
           name: ogSerialPortMode
           OID: 1.3.6.1.4.1.25049.17.2.1.8
-        tag: og_serial_port_mode
         mapping:
           1: none
           2: console
           3: sdt
           4: terminal
           5: bridge
-      - symbol:
+      - tag: _og_serial_port_log_level
+        symbol:
           name: ogSerialPortLogLevel
           OID: 1.3.6.1.4.1.25049.17.2.1.9
-        tag: og_serial_port_log_level
         mapping:
           1: disabled
           2: connect
           3: input_and_output
           4: input_only
           5: output_only
-      - symbol:
+      - tag: _og_serial_port_dcd
+        symbol:
           name: ogSerialPortDCD
           OID: 1.3.6.1.4.1.25049.17.2.1.16
-        tag: og_serial_port_dcd
         mapping:
           1: on
           2: off
-      - symbol:
+      - tag: _og_serial_port_dtr
+        symbol:
           name: ogSerialPortDTR
           OID: 1.3.6.1.4.1.25049.17.2.1.17
-        tag: og_serial_port_dtr
         mapping:
           1: on
           2: off
-      - symbol:
+      - tag: _og_serial_port_dsr
+        symbol:
           name: ogSerialPortDSR
           OID: 1.3.6.1.4.1.25049.17.2.1.18
-        tag: og_serial_port_dsr
         mapping:
           1: on
           2: off
-      - symbol:
+      - tag: _og_serial_port_cts
+        symbol:
           name: ogSerialPortCTS
           OID: 1.3.6.1.4.1.25049.17.2.1.19
-        tag: og_serial_port_cts
         mapping:
           1: on
           2: off
-      - symbol:
+      - tag: _og_serial_port_rts
+        symbol:
           name: ogSerialPortRTS
           OID: 1.3.6.1.4.1.25049.17.2.1.20
-        tag: og_serial_port_rts
         mapping:
           1: on
           2: off
@@ -131,29 +136,28 @@ metrics:
         metric_type: monotonic_count
         description: Number of cell modem events counted
         unit: "{event}"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
-      - index: 1  # ogCellModemIndex
-        tag: og_cell_modem_index
-      - symbol:
+      - tag: og_cell_modem_index
+        index: 1  # ogCellModemIndex
+      - tag: og_cell_modem_vendor
+        symbol:
           name: ogCellModemVendor
           OID: 1.3.6.1.4.1.25049.17.17.1.2
-        tag: og_cell_modem_vendor
-      - symbol:
+      - tag: og_cell_modem_model
+        symbol:
           name: ogCellModemModel
           OID: 1.3.6.1.4.1.25049.17.17.1.3
-        tag: og_cell_modem_model
-      - symbol:
+      - tag: _og_cell_modem_enabled
+        symbol:
           name: ogCellModemEnabled
           OID: 1.3.6.1.4.1.25049.17.17.1.4
-        tag: og_cell_modem_enabled
         mapping:
           1: enabled
           2: disabled
-      - symbol:
+      - tag: _og_cell_modem_connected
+        symbol:
           OID: 1.3.6.1.4.1.25049.17.17.1.5
           name: ogCellModemConnected
-        tag: og_cell_modem_connected
         mapping:
           1: connected
           2: disconnected

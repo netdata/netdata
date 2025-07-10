@@ -2,9 +2,15 @@ extends:
   - _std-if-mib.yaml
   - _std-ucd-mib.yaml
   - _opengear.yaml
+
 sysobjectid:
   - 1.3.6.1.4.1.25049.1.60    # IM4200
   - 1.3.6.1.4.1.25049.1.61    # IM7200
+
+# OG-STATUS-MIB
+# https://mibbrowser.online/mibdb_search.php?mib=OG-STATUS-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/opengear/OG-STATUS-MIB
+
 metrics:
   - MIB: OG-STATUS-MIB
     table:
@@ -23,50 +29,52 @@ metrics:
         unit: "By"
     # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
-      - symbol:
+      - tag: serial_port_index
+        index: 1
+      - tag: _og_serial_port_status_port
+        symbol:
           name: ogSerialPortStatusPort
           OID: 1.3.6.1.4.1.25049.16.1.1.2
-        tag: og_serial_port_status_port
-      - symbol:
+      - tag: _og_serial_port_status_speed
+        symbol:
           name: ogSerialPortStatusSpeed
           OID: 1.3.6.1.4.1.25049.16.1.1.5
-        tag: og_serial_port_status_speed
-      - symbol:
+      - tag: _og_serial_port_status_label
+        symbol:
           name: ogSerialPortStatusLabel
           OID: 1.3.6.1.4.1.25049.16.1.1.11
-        tag: og_serial_port_status_label
-      - symbol:
+      - tag: _og_serial_port_status_dcd
+        symbol:
           OID: 1.3.6.1.4.1.25049.16.1.1.6
           name: ogSerialPortStatusDCD
-        tag: og_serial_port_status_dcd
         mapping:
           0: off
           1: on
-      - symbol:
+      - tag: _og_serial_port_status_dtr
+        symbol:
           OID: 1.3.6.1.4.1.25049.16.1.1.7
           name: ogSerialPortStatusDTR
-        tag: og_serial_port_status_dtr
         mapping:
           0: off
           1: on
-      - symbol:
+      - tag: _og_serial_port_status_dsr
+        symbol:
           OID: 1.3.6.1.4.1.25049.16.1.1.8
           name: ogSerialPortStatusDSR
-        tag: og_serial_port_status_dsr
         mapping:
           0: off
           1: on
-      - symbol:
+      - tag: _og_serial_port_status_cts
+        symbol:
           OID: 1.3.6.1.4.1.25049.16.1.1.9
           name: ogSerialPortStatusCTS
-        tag: og_serial_port_status_cts
         mapping:
           0: off
           1: on
-      - symbol:
+      - tag: _og_serial_port_status_rts
+        symbol:
           OID: 1.3.6.1.4.1.25049.16.1.1.10
           name: ogSerialPortStatusRTS
-        tag: og_serial_port_status_rts
         mapping:
           0: off
           1: on
@@ -84,10 +92,12 @@ metrics:
         description: Number of alerts triggered on the RPC
         unit: "{alert}"
     metric_tags:
-      - symbol:
+      - tag: og_rpc_index
+        index: 1
+      - tag: og_rpc_status_name
+        symbol:
           name: ogRpcStatusName
           OID: 1.3.6.1.4.1.25049.16.3.1.2
-        tag: og_rpc_status_name
   - MIB: OG-STATUS-MIB
     table:
       name: ogEmdStatusTable
@@ -106,7 +116,9 @@ metrics:
         description: Number of alerts triggered on the EMD
         unit: "{alert}"
     metric_tags:
-      - symbol:
+      - tag: og_emd_index
+        index: 1
+      - tag: og_emd_status_name
+        symbol:
           name: ogEmdStatusName
           OID: 1.3.6.1.4.1.25049.16.4.1.2
-        tag: og_emd_status_name
