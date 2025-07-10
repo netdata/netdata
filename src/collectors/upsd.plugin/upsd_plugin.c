@@ -314,7 +314,7 @@ struct nd_chart nd_charts[] = {
     { 0 },
 };
 
-void print_version()
+static oid print_version()
 {
     fputs("netdata " PLUGIN_UPSD_NAME " " NETDATA_VERSION "\n"
           "\n"
@@ -327,7 +327,7 @@ void print_version()
     );
 }
 
-void print_help() {
+static void print_help() {
     fputs("usage: " PLUGIN_UPSD_NAME " [-d] [COLLECTION_FREQUENCY]\n"
           "       " PLUGIN_UPSD_NAME " -v\n"
           "       " PLUGIN_UPSD_NAME " -h\n"
@@ -343,7 +343,7 @@ void print_help() {
 
 // Netdata will call the plugin with just one command line parameter: the number of
 // seconds the user requested this plugin to update its data (by default is also 1).
-void parse_command_line(int argc, char *argv[]) {
+static void parse_command_line(int argc, char *argv[]) {
     int opt;
     char *endptr;
 
@@ -379,14 +379,14 @@ void parse_command_line(int argc, char *argv[]) {
     }
 }
 
-char *clean_name(char *name) {
+static char *clean_name(char *name) {
     assert(name);
     for (char *c = name; *c; c++)
         *c = (*c  == ' ' || *c == '.') ? '_' : *c;
     return name;
 }
 
-void delete_unseen_ups(void) {
+static void delete_unseen_ups(void) {
     bool *seen;
     dfe_start_read(nd_ups_seen, seen) {
         if (*seen) {
@@ -402,7 +402,7 @@ void delete_unseen_ups(void) {
     dfe_done(seen);
 }
 
-const char *nut_get_var(UPSCONN_t *conn, const char *ups_name, const char *var_name) {
+static const char *nut_get_var(UPSCONN_t *conn, const char *ups_name, const char *var_name) {
     assert(conn);
     assert(ups_name);
     assert(var_name);
@@ -435,7 +435,7 @@ static inline void send_END(void) {
 
 // This function parses the 'ups.status' variable and emits the Netdata metrics
 // for each status, printing 1 for each set status and 0 otherwise.
-void print_ups_status_metrics(UPSCONN_t *conn, const char *ups_name, const char *clean_ups_name, usec_t dt) {
+static void print_ups_status_metrics(UPSCONN_t *conn, const char *ups_name, const char *clean_ups_name, usec_t dt) {
     assert(conn);
     assert(ups_name);
     assert(clean_ups_name);
@@ -550,7 +550,7 @@ void print_ups_status_metrics(UPSCONN_t *conn, const char *ups_name, const char 
     send_END();
 }
 
-void print_ups_realpower_metric(UPSCONN_t *conn, const char *ups_name, const char *clean_ups_name, usec_t dt) {
+static void print_ups_realpower_metric(UPSCONN_t *conn, const char *ups_name, const char *clean_ups_name, usec_t dt) {
     assert(conn);
     assert(ups_name);
     assert(clean_ups_name);
@@ -576,7 +576,7 @@ void print_ups_realpower_metric(UPSCONN_t *conn, const char *ups_name, const cha
     send_END();
 }
 
-void register_ups(char *ups_name) {
+static void register_ups(char *ups_name) {
     const char *nut_value;
     const char *clean_ups_name = clean_name(dictionary_set(nd_ups_name, ups_name, ups_name, strlen(ups_name)+1));
 
