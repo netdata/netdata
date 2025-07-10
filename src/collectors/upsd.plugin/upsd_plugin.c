@@ -648,6 +648,7 @@ static void register_ups(char *ups_name) {
 int main(int argc, char *argv[]) {
     int rc;
     size_t numa;
+    char *ups_name;
     char **answer[1];
     const char *query[] = { "UPS" };
     struct nd_chart *chart;
@@ -713,7 +714,6 @@ int main(int argc, char *argv[]) {
     heartbeat_t hb;
     heartbeat_init(&hb, netdata_update_every * USEC_PER_SEC);
     for (;;) {
-        const char *ups_name;
         usec_t dt = heartbeat_next(&hb);
 
         if (unlikely(exit_initiated_get()))
