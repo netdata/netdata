@@ -314,7 +314,7 @@ struct nd_chart nd_charts[] = {
     { 0 },
 };
 
-static oid print_version()
+static void print_version()
 {
     fputs("netdata " PLUGIN_UPSD_NAME " " NETDATA_VERSION "\n"
           "\n"
@@ -559,11 +559,11 @@ static void send_metric_ups_realpower(const char *ups_name, const char *clean_up
     if (value) {
         realpower = str2ndd(value, NULL) * NETDATA_PLUGIN_PRECISION;
     } else {
-        value = nut_get_var(conn, ups_name, "ups.load");
+        value = nut_get_var(&ups2, ups_name, "ups.load");
         if (!value)
             return;
         realpower = str2ndd(value, NULL) / 100;
-        value = nut_get_var(conn, ups_name, "ups.realpower.nominal");
+        value = nut_get_var(&ups2, ups_name, "ups.realpower.nominal");
         if (!value)
             return;
         realpower *= str2ndd(value, NULL) * NETDATA_PLUGIN_PRECISION;
