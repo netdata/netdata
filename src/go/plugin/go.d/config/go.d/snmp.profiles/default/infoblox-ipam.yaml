@@ -3,6 +3,7 @@ extends:
   - _std-host-resources-mib-feat-base.yaml
   - _std-if-mib.yaml
   - _std-ucd-mib.yaml
+
 sysobjectid:
   - 1.3.6.1.4.1.7779.1.1004    # Virtual Device
   - 1.3.6.1.4.1.7779.1.1204    # IB-1552
@@ -54,30 +55,60 @@ sysobjectid:
   - 1.3.6.1.4.1.7779.2.4       # IB-1552
   - 1.3.6.1.4.1.7779.3.4       # IB-1552-A
   - 1.3.6.1.4.1.7779.3.7       # IB-2000-A
+
 metadata:
   device:
     fields:
       vendor:
         value: "infoblox"
+
+metric_tags:
+  - tag: ib_hardware_type
+    OID: 1.3.6.1.4.1.7779.3.1.1.2.1.4.0
+    symbol: ibHardwareType
+  - tag: ib_serial_number
+    OID: 1.3.6.1.4.1.7779.3.1.1.2.1.6.0
+    symbol: ibSerialNumber
+  - tag: ib_nios_version
+    OID: 1.3.6.1.4.1.7779.3.1.1.2.1.7.0
+    symbol: ibNiosVersion
+
+# - IB-DHCPONE-MIB
+#    https://mibbrowser.online/mibdb_search.php?mib=IB-DHCPONE-MIB
+#    https://github.com/librenms/librenms/blob/master/mibs/infoblox/IB-DHCPONE-MIB
+# - IB-DNSONE-MIB
+#    https://mibbrowser.online/mibdb_search.php?mib=IB-DNSONE-MIB
+#    https://github.com/librenms/librenms/blob/master/mibs/infoblox/IB-DNSONE-MIB
+# - IB-PLATFORMONE-MIB
+#    https://mibbrowser.online/mibdb_search.php?mib=IB-PLATFORMONE-MIB
+#    https://github.com/librenms/librenms/blob/master/mibs/infoblox/IB-PLATFORMONE-MIB
+
 metrics:
   - MIB: IB-PLATFORMONE-MIB
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.7779.3.1.1.2.1.8.1.1.0
-      description: Current average CPU usage
-      unit: "%"
+      chart_meta:
+        description: Current average CPU usage
+        family: 'System/CPU/Usage'
+        unit: "%"
   - MIB: IB-PLATFORMONE-MIB
     symbol:
       name: memory.usage
       OID: 1.3.6.1.4.1.7779.3.1.1.2.1.8.2.1.0
-      description: Current Memory usage
-      unit: "%"
+      chart_meta:
+        description: Current Memory usage
+        family: 'System/Memory/Usage'
+        unit: "%"
   - MIB: IB-DHCPONE-MIB
     symbol:
       name: ibDhcpDeferredQueueSize
       OID: 1.3.6.1.4.1.7779.3.1.1.4.1.4.0
-      description: The size of deferred dynamic DNS update queue
-      unit: "{session}"
+      chart_meta:
+        description: The size of deferred dynamic DNS update queue
+        family: 'DHCP/DDNS/Queue/Deferred'
+        unit: "{session}"
+
   - MIB: IB-DNSONE-MIB
     table:
       name: ibZoneStatisticsTable
@@ -85,73 +116,79 @@ metrics:
     symbols:
       - name: ibBindZoneSuccess
         OID: 1.3.6.1.4.1.7779.3.1.1.3.1.1.1.2
-        metric_type: monotonic_count
-        description: Number of Successful responses since DNS process started
-        unit: "{response}"
+        chart_meta:
+          description: Number of Successful responses since DNS process started
+          family: 'DNS/Zone/Response/Success'
+          unit: "{response}/s"
       - name: ibBindZoneReferral
         OID: 1.3.6.1.4.1.7779.3.1.1.3.1.1.1.3
-        metric_type: monotonic_count
-        description: Number of DNS referrals since DNS process started
-        unit: "{referral}"
+        chart_meta:
+          description: Number of DNS referrals since DNS process started
+          family: 'DNS/Zone/Response/Referral'
+          unit: "{referral}/s"
       - name: ibBindZoneNxRRset
         OID: 1.3.6.1.4.1.7779.3.1.1.3.1.1.1.4
-        metric_type: monotonic_count
-        description: Number of DNS query received for non-existent record
-        unit: "{query}"
+        chart_meta:
+          description: Number of DNS query received for non-existent record
+          family: 'DNS/Zone/Query/NxRRset'
+          unit: "{query}/s"
       - name: ibBindZoneNxDomain
         OID: 1.3.6.1.4.1.7779.3.1.1.3.1.1.1.5
-        metric_type: monotonic_count
-        description: Number of DNS query received for non-existent domain
-        unit: "{query}"
+        chart_meta:
+          description: Number of DNS query received for non-existent domain
+          family: 'DNS/Zone/Query/NxDomain'
+          unit: "{query}/s"
       - name: ibBindZoneRecursion
         OID: 1.3.6.1.4.1.7779.3.1.1.3.1.1.1.6
-        metric_type: monotonic_count
-        description: Number of Queries received using recursion since DNS process started
-        unit: "{query}"
+        chart_meta:
+          description: Number of Queries received using recursion since DNS process started
+          family: 'DNS/Zone/Query/Recursion'
+          unit: "{query}/s"
       - name: ibBindZoneFailure
         OID: 1.3.6.1.4.1.7779.3.1.1.3.1.1.1.7
-        metric_type: monotonic_count
-        description: Number of Failed queries since DNS process started
-        unit: "{query}"
+        chart_meta:
+          description: Number of Failed queries since DNS process started
+          family: 'DNS/Zone/Query/Failure'
+          unit: "{query}/s"
     metric_tags:
-      - symbol:
+      - tag: ib_bind_zone_name
+        symbol:
           name: ibBindZoneName
           OID: 1.3.6.1.4.1.7779.3.1.1.3.1.1.1.1
-        tag: ib_bind_zone_name
+
   - MIB: IB-DNSONE-MIB
     symbol:
       name: ibDDNSUpdateSuccess
       OID: 1.3.6.1.4.1.7779.3.1.1.3.1.3.1.0
-      description: Number of successful dynamic DNS update
-      unit: "{update}"
-      metric_type: monotonic_count
+      chart_meta:
+        description: Number of successful dynamic DNS update
+        family: 'DNS/DDNS/Update/Success'
+        unit: "{update}/s"
   - MIB: IB-DNSONE-MIB
     symbol:
       name: ibDDNSUpdateFailure
       OID: 1.3.6.1.4.1.7779.3.1.1.3.1.3.2.0
-      description: Number of failure dynamic DNS update
-      unit: "{update}"
-      metric_type: monotonic_count
+      chart_meta:
+        description: Number of failure dynamic DNS update
+        family: 'DNS/DDNS/Update/Failure'
+        unit: "{update}/s"
   - MIB: IB-DNSONE-MIB
     symbol:
       name: ibDDNSUpdateReject
       OID: 1.3.6.1.4.1.7779.3.1.1.3.1.3.3.0
-      description: Number of dynamic DNS update rejects maybe due to permission failure
-      unit: "{update}"
-      metric_type: monotonic_count
+      chart_meta:
+        description: Number of dynamic DNS update rejects maybe due to permission failure
+        family: 'DNS/DDNS/Update/Reject/Permission'
+        unit: "{update}/s"
   - MIB: IB-DNSONE-MIB
     symbol:
       name: ibDDNSUpdatePrerequisiteReject
       OID: 1.3.6.1.4.1.7779.3.1.1.3.1.3.4.0
-      description: Number of dynamic DNS update rejects due to prerequisite failure
-      unit: "{update}"
-      metric_type: monotonic_count
-  - MIB: IB-DNSONE-MIB
-    symbol:
-      name: ibDnsQueryRate
-      OID: 1.3.6.1.4.1.7779.3.1.1.3.1.6.0
-      description: DNS query rate
-      unit: "cs"
+      chart_meta:
+        description: Number of dynamic DNS update rejects due to prerequisite failure
+        family: 'DNS/DDNS/Update/Reject/Prerequisite'
+        unit: "{update}/s"
+
   - MIB: IB-PLATFORMONE-MIB
     table:
       name: ibClusterReplicationStatusTable
@@ -159,34 +196,44 @@ metrics:
     symbols:
       - name: ibNodeQueueFromMaster
         OID: 1.3.6.1.4.1.7779.3.1.1.2.1.2.1.3
-        description: Sent queue size from master
-        unit: "{session}"
+        chart_meta:
+          description: Sent queue size from master
+          family: 'System/Cluster/Replication/Queue/FromMaster'
+          unit: "{session}"
       - name: ibNodeQueueToMaster
         OID: 1.3.6.1.4.1.7779.3.1.1.2.1.2.1.5
-        description: Receive queue size to master
-        unit: "{session}"
+        chart_meta:
+          description: Receive queue size to master
+          family: 'System/Cluster/Replication/Queue/ToMaster'
+          unit: "{session}"
     metric_tags:
-      - symbol:
+      - tag: ib_node_ip_address
+        symbol:
           name: ibNodeIPAddress
           OID: 1.3.6.1.4.1.7779.3.1.1.2.1.2.1.1
-        tag: ib_node_ip_address
-      - symbol:
-          name: ibNodeReplicationStatus
-          OID: 1.3.6.1.4.1.7779.3.1.1.2.1.2.1.2
-        tag: ib_node_replication_status
+
   - MIB: IB-PLATFORMONE-MIB
     table:
       name: ibMemberServiceStatusTable
       OID: 1.3.6.1.4.1.7779.3.1.1.2.1.9
     symbols:
-      - name: ibMemberServiceStatus
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+      - OID: 1.3.6.1.4.1.7779.3.1.1.2.1.9.1.2
+        name: ibServiceStatus
+        chart_meta:
+          description: Service Status
+          family: 'System/Service/Status'
+          unit: "{status}"
+        mapping:
+          1: working
+          2: warning
+          3: failed
+          4: inactive
+          5: unknown
     metric_tags:
-      - symbol:
+      - tag: ib_service_name
+        symbol:
           name: ibServiceName
           OID: 1.3.6.1.4.1.7779.3.1.1.2.1.9.1.1
-        tag: ib_service_name
         mapping:
           1: dhcp
           2: dns
@@ -244,28 +291,12 @@ metrics:
           54: discovery-collector
           55: discovery-capacity
           56: threat-protection
-          58: recursive-clients
-      - symbol:
+          57: cloud-api
+          58: threat-analytics
+          59: taxii
+          60: bfd
+          61: outbound
+      - tag: ib_service_desc
+        symbol:
           name: ibServiceDesc
           OID: 1.3.6.1.4.1.7779.3.1.1.2.1.9.1.3
-        tag: ib_service_desc
-      - symbol:
-          OID: 1.3.6.1.4.1.7779.3.1.1.2.1.9.1.2
-          name: ibServiceStatus
-        tag: ib_service_status
-        mapping:
-          1: working
-          2: warning
-          3: failed
-          4: inactive
-          5: unknown
-metric_tags:
-  - OID: 1.3.6.1.4.1.7779.3.1.1.2.1.4.0
-    symbol: ibHardwareType
-    tag: ib_hardware_type
-  - tag: ib_serial_number
-    OID: 1.3.6.1.4.1.7779.3.1.1.2.1.6.0
-    symbol: ibSerialNumber
-  - OID: 1.3.6.1.4.1.7779.3.1.1.2.1.7.0
-    symbol: ibNiosVersion
-    tag: ib_nios_version
