@@ -33,7 +33,7 @@ Possible statuses:
 | redirect      | Received a redirect response (3xx status code) while `not_follow_redirects` is configured.                                                                                                   |
 | bad_status    | HTTP request completed with a status code outside the configured `status_accepted` range (default: non-200).                                                                                 |
 | bad_content   | HTTP request completed successfully but the response body does not match the expected content (when using `response_match`).                                                                 |
-| bad_header    | HTTP request completed successfully but response headers do not match the expected values (when using `headers_match`).                                                                      |
+| bad_header    | HTTP request completed successfully but response headers do not match the expected values (when using `header_match`).                                                                      |
 
 
 
@@ -144,10 +144,10 @@ The following options can be defined globally: update_every, autodetection_retry
 | url | Server URL. |  | yes |
 | status_accepted | HTTP accepted response statuses. Anything else will result in 'bad status' in the status chart. | [200] | no |
 | response_match | If the status code is accepted, the content of the response will be matched against this regular expression. |  | no |
-| headers_match | This option defines a set of rules that check for specific key-value pairs in the HTTP headers of the response. | [] | no |
-| headers_match.exclude | This option determines whether the rule should check for the presence of the specified key-value pair or the absence of it. | no | no |
-| headers_match.key | The exact name of the HTTP header to check for. |  | yes |
-| headers_match.value | The [pattern](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#supported-format) to match against the value of the specified header. |  | no |
+| header_match | This option defines a set of rules that check for specific key-value pairs in the HTTP headers of the response. | [] | no |
+| header_match.exclude | This option determines whether the rule should check for the presence of the specified key-value pair or the absence of it. | no | no |
+| header_match.key | The exact name of the HTTP header to check for. |  | yes |
+| header_match.value | The [pattern](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#supported-format) to match against the value of the specified header. |  | no |
 | cookie_file | Path to cookie file. See [cookie file format](https://everything.curl.dev/http/cookies/fileformat). |  | no |
 | timeout | HTTP request timeout. | 1 | no |
 | username | Username for basic HTTP authentication. |  | no |
