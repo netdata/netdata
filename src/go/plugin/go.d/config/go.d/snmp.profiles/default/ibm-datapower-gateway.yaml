@@ -1,227 +1,301 @@
 extends:
   - ibm.yaml
+
 sysobjectid:
   - 1.3.6.1.4.1.14685.1.8
+
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/ibm/DATAPOWER-STATUS-MIB
+
 metrics:
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.14685.3.1.14.2.0 # dpStatusCPUUsageoneMinute
-      description: Cpu usage percentage over one minute
-      unit: "%"
+      chart_meta:
+        description: Cpu usage percentage over one minute
+        family: 'System/CPU/Usage'
+        unit: "%"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: memory.usage
       OID: 1.3.6.1.4.1.14685.3.1.5.1.0 # dpStatusMemoryStatusUsage
-      description: Memory usage percentage
-      unit: "%"
+      chart_meta:
+        description: Memory usage percentage
+        family: 'System/Memory/Usage'
+        unit: "%"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusSystemUsageLoad
       OID: 1.3.6.1.4.1.14685.3.1.52.2.0
-      description: System load average
-      unit: "TBD"
+      chart_meta:
+        description: System load average
+        family: 'System/Load/Average'
+        unit: "{load}"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusTCPSummaryestablished
       OID: 1.3.6.1.4.1.14685.3.1.12.1.0
-      description: Number of established TCP connections
-      unit: "{connection}"
+      chart_meta:
+        description: Number of established TCP connections
+        family: 'Network/TCP/Connection/State/Established'
+        unit: "{connection}"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusTCPSummarysynsent
       OID: 1.3.6.1.4.1.14685.3.1.12.2.0
-      description: Number of TCP connections in SYN sent state
-      unit: "{connection}"
+      chart_meta:
+        description: Number of TCP connections in SYN sent state
+        family: 'Network/TCP/Connection/State/SynSent'
+        unit: "{connection}"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusTCPSummarysynreceived
       OID: 1.3.6.1.4.1.14685.3.1.12.3.0
-      description: Number of TCP connections in SYN received state
-      unit: "{connection}"
+      chart_meta:
+        description: Number of TCP connections in SYN received state
+        family: 'Network/TCP/Connection/State/SynReceived'
+        unit: "{connection}"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusTCPSummaryfinwait1
       OID: 1.3.6.1.4.1.14685.3.1.12.4.0
-      description: Number of TCP connections in FIN wait 1 state
-      unit: "{connection}"
+      chart_meta:
+        description: Number of TCP connections in FIN wait 1 state
+        family: 'Network/TCP/Connection/State/FinWait1'
+        unit: "{connection}"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusTCPSummaryfinwait2
       OID: 1.3.6.1.4.1.14685.3.1.12.5.0
-      description: Number of TCP connections in FIN wait 2 state
-      unit: "{connection}"
+      chart_meta:
+        description: Number of TCP connections in FIN wait 2 state
+        family: 'Network/TCP/Connection/State/FinWait2'
+        unit: "{connection}"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusTCPSummarytimewait
       OID: 1.3.6.1.4.1.14685.3.1.12.6.0
-      description: Number of TCP connections in TIME wait state
-      unit: "{connection}"
+      chart_meta:
+        description: Number of TCP connections in TIME wait state
+        family: 'Network/TCP/Connection/State/TimeWait'
+        unit: "{connection}"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusTCPSummaryclosed
       OID: 1.3.6.1.4.1.14685.3.1.12.7.0
-      description: Number of TCP connections in closed state
-      unit: "{connection}"
+      chart_meta:
+        description: Number of TCP connections in closed state
+        family: 'Network/TCP/Connection/State/Closed'
+        unit: "{connection}"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusTCPSummaryclosewait
       OID: 1.3.6.1.4.1.14685.3.1.12.8.0
-      description: Number of TCP connections in close wait state
-      unit: "{connection}"
+      chart_meta:
+        description: Number of TCP connections in close wait state
+        family: 'Network/TCP/Connection/State/CloseWait'
+        unit: "{connection}"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusTCPSummarylastack
       OID: 1.3.6.1.4.1.14685.3.1.12.9.0
-      description: Number of TCP connections in last ACK state
-      unit: "{connection}"
+      chart_meta:
+        description: Number of TCP connections in last ACK state
+        family: 'Network/TCP/Connection/State/LastAck'
+        unit: "{connection}"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusTCPSummarylisten
       OID: 1.3.6.1.4.1.14685.3.1.12.10.0
-      description: Number of TCP connections in listen state
-      unit: "{connection}"
+      chart_meta:
+        description: Number of TCP connections in listen state
+        family: 'Network/TCP/Connection/State/Listen'
+        unit: "{connection}"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusTCPSummaryclosing
       OID: 1.3.6.1.4.1.14685.3.1.12.11.0
-      description: Number of TCP connections in closing state
-      unit: "{connection}"
+      chart_meta:
+        description: Number of TCP connections in closing state
+        family: 'Network/TCP/Connection/State/Closing'
+        unit: "{connection}"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusConnectionsAcceptedtenSeconds
       OID: 1.3.6.1.4.1.14685.3.1.13.1.0
-      description: Number of connections accepted in last ten seconds
-      unit: "{connection}"
+      chart_meta:
+        description: Number of connections accepted in last ten seconds
+        family: 'Network/Connection/Accepted/10s'
+        unit: "{connection}"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusConnectionsAcceptedoneMinute
       OID: 1.3.6.1.4.1.14685.3.1.13.2.0
-      description: Number of connections accepted in last one minute
-      unit: "{connection}"
+      chart_meta:
+        description: Number of connections accepted in last one minute
+        family: 'Network/Connection/Accepted/1min'
+        unit: "{connection}"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusConnectionsAcceptedtenMinutes
       OID: 1.3.6.1.4.1.14685.3.1.13.3.0
-      description: Number of connections accepted in last ten minutes
-      unit: "{connection}"
+      chart_meta:
+        description: Number of connections accepted in last ten minutes
+        family: 'Network/Connection/Accepted/10min'
+        unit: "{connection}"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusConnectionsAcceptedoneHour
       OID: 1.3.6.1.4.1.14685.3.1.13.4.0
-      description: Number of connections accepted in last one hour
-      unit: "{connection}"
+      chart_meta:
+        description: Number of connections accepted in last one hour
+        family: 'Network/Connection/Accepted/1h'
+        unit: "{connection}"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusConnectionsAcceptedoneDay
       OID: 1.3.6.1.4.1.14685.3.1.13.5.0
-      description: Number of connections accepted in last one day
-      unit: "{connection}"
+      chart_meta:
+        description: Number of connections accepted in last one day
+        family: 'Network/Connection/Accepted/1d'
+        unit: "{connection}"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusFilesystemStatusFreeEncrypted
       OID: 1.3.6.1.4.1.14685.3.1.29.1.0
-      description: Free encrypted filesystem space
-      unit: "By"
+      chart_meta:
+        description: Free encrypted filesystem space
+        family: 'System/FileSystem/Encrypted/Free'
+        unit: "By"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusFilesystemStatusTotalEncrypted
       OID: 1.3.6.1.4.1.14685.3.1.29.2.0
-      description: Total encrypted filesystem space
-      unit: "By"
+      chart_meta:
+        description: Total encrypted filesystem space
+        family: 'System/FileSystem/Encrypted/Total'
+        unit: "By"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusFilesystemStatusFreeTemporary
       OID: 1.3.6.1.4.1.14685.3.1.29.5.0
-      description: Free temporary filesystem space
-      unit: "By"
+      chart_meta:
+        description: Free temporary filesystem space
+        family: 'System/FileSystem/Temporary/Free'
+        unit: "By"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusFilesystemStatusTotalTemporary
       OID: 1.3.6.1.4.1.14685.3.1.29.6.0
-      description: Total temporary filesystem space
-      unit: "By"
+      chart_meta:
+        description: Total temporary filesystem space
+        family: 'System/FileSystem/Temporary/Total'
+        unit: "By"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusFilesystemStatusFreeInternal
       OID: 1.3.6.1.4.1.14685.3.1.29.7.0
-      description: Free internal filesystem space
-      unit: "By"
+      chart_meta:
+        description: Free internal filesystem space
+        family: 'System/FileSystem/Internal/Free'
+        unit: "By"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusFilesystemStatusTotalInternal
       OID: 1.3.6.1.4.1.14685.3.1.29.8.0
-      description: Total internal filesystem space
-      unit: "By"
+      chart_meta:
+        description: Total internal filesystem space
+        family: 'System/FileSystem/Internal/Total'
+        unit: "By"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusEnvironmentalSensorssystemTemp
       OID: 1.3.6.1.4.1.14685.3.1.55.1.0
-      description: System temperature sensor reading
-      unit: "Cel"
+      chart_meta:
+        description: System temperature sensor reading
+        family: 'Hardware/Sensor/Temperature/System'
+        unit: "Cel"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusEnvironmentalSensorscpu1Temp
       OID: 1.3.6.1.4.1.14685.3.1.55.2.0
-      description: CPU 1 temperature sensor reading
-      unit: "Cel"
+      chart_meta:
+        description: CPU 1 temperature sensor reading
+        family: 'Hardware/CPU/Temperature/CPU1'
+        unit: "Cel"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusEnvironmentalSensorscpu2Temp
       OID: 1.3.6.1.4.1.14685.3.1.55.3.0
-      description: CPU 2 temperature sensor reading
-      unit: "Cel"
+      chart_meta:
+        description: CPU 2 temperature sensor reading
+        family: 'Hardware/CPU/Temperature/CPU2'
+        unit: "Cel"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusEnvironmentalSensorscpu1rpm
       OID: 1.3.6.1.4.1.14685.3.1.55.4.0
-      description: CPU 1 fan speed in revolutions per minute
-      unit: "1.min"
+      chart_meta:
+        description: CPU 1 fan speed in revolutions per minute
+        family: 'Hardware/Fan/Speed/CPU1'
+        unit: "1/min"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusEnvironmentalSensorscpu2rpm
       OID: 1.3.6.1.4.1.14685.3.1.55.5.0
-      description: CPU 2 fan speed in revolutions per minute
-      unit: "1.min"
+      chart_meta:
+        description: CPU 2 fan speed in revolutions per minute
+        family: 'Hardware/Fan/Speed/CPU2'
+        unit: "1/min"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusEnvironmentalSensorschassis1rpm
       OID: 1.3.6.1.4.1.14685.3.1.55.6.0
-      description: Chassis 1 fan speed in revolutions per minute
-      unit: "1.min"
+      chart_meta:
+        description: Chassis 1 fan speed in revolutions per minute
+        family: 'Hardware/Fan/Speed/Chassis1'
+        unit: "1/min"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusEnvironmentalSensorschassis2rpm
       OID: 1.3.6.1.4.1.14685.3.1.55.7.0
-      description: Chassis 2 fan speed in revolutions per minute
-      unit: "1.min"
+      chart_meta:
+        description: Chassis 2 fan speed in revolutions per minute
+        family: 'Hardware/Fan/Speed/Chassis2'
+        unit: "1/min"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusEnvironmentalSensorschassis3rpm
       OID: 1.3.6.1.4.1.14685.3.1.55.8.0
-      description: Chassis 3 fan speed in revolutions per minute
-      unit: "1.min"
-#  - MIB: DATAPOWER-STATUS-MIB
-#    symbol:
-#      name: ibm.dpStatusEnvironmentalSensorsCaseOpen
-#      OID: 1.3.6.1.4.1.14685.3.1.55.9.0
-#      enum:
-#        yes: 1
-#        no: 2
-#      TODO: enum in scalar metric is not supported yet (keep this metric and this
-#        comment in profile until it's fixed)
-#  - MIB: DATAPOWER-STATUS-MIB
-#    symbol:
-#      name: ibm.dpStatusEnvironmentalSensorsPowerSupply
-#      OID: 1.3.6.1.4.1.14685.3.1.55.13.0
-#      enum:
-#        ok: 1
-#        power-1-failure: 2
-#        power-2-failure: 3
-#        power-1-ac-lost: 4
-#        power-2-ac-lost: 5
-#      TODO: enum in scalar metric is not supported yet (keep this metric and this
-#        comment in profile until it's fixed)
+      chart_meta:
+        description: Chassis 3 fan speed in revolutions per minute
+        family: 'Hardware/Fan/Speed/Chassis3'
+        unit: "1/min"
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: ibm.dpStatusEnvironmentalSensorsCaseOpen
+      OID: 1.3.6.1.4.1.14685.3.1.55.9.0
+      chart_meta:
+        description: Indicates whether the sensor case is open
+        family: 'Hardware/Chassis/Case/Status'
+        unit: "{status}"
+      mapping:
+        1: yes
+        2: no
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: ibm.dpStatusEnvironmentalSensorsPowerSupply
+      OID: 1.3.6.1.4.1.14685.3.1.55.13.0
+      chart_meta:
+        description: The status of the components and systems that provide the necessary electrical power to the environmental sensors and the overall DP system
+        family: 'Hardware/Power/Status'
+        unit: "{status}"
+      mapping:
+        1: ok
+        2: power-1-failure
+        3: power-2-failure
+        4: power-1-ac-lost
+        5: power-2-ac-lost
   - MIB: DATAPOWER-STATUS-MIB
     table:
       name: dpStatusLogTargetStatusTable
@@ -229,39 +303,39 @@ metrics:
     symbols:
       - name: ibm.dpStatusLogTargetStatusEventsProcessed
         OID: 1.3.6.1.4.1.14685.3.1.28.1.3
-        metric_type: monotonic_count
-        description: Number of log target events processed
-        unit: "{event}"
+        chart_meta:
+          description: Number of log target events processed
+          family: 'System/Log/Event/Processed'
+          unit: "{event}/s"
       - name: ibm.dpStatusLogTargetStatusEventsDropped
         OID: 1.3.6.1.4.1.14685.3.1.28.1.4
-        metric_type: monotonic_count
-        description: Number of log target events dropped
-        unit: "{event}"
+        chart_meta:
+          description: Number of log target events dropped
+          family: 'System/Log/Event/Dropped'
+          unit: "{event}/s"
       - name: ibm.dpStatusLogTargetStatusEventsPending
         OID: 1.3.6.1.4.1.14685.3.1.28.1.5
-        metric_type: monotonic_count
-        description: Number of log target events pending
-        unit: "{event}"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          name: ibm.dpStatusLogTargetStatusLogTarget
-          OID: 1.3.6.1.4.1.14685.3.1.28.1.1
-        tag: ibm_dp_status_log_target_status_log_target
-      - symbol:
-          OID: 1.3.6.1.4.1.14685.3.1.28.1.2
-          name: ibm.dpStatusLogTargetStatusStatus
-        tag: ibm_dp_status_log_target_status_status
+        chart_meta:
+          description: Number of log target events pending
+          family: 'System/Log/Event/Pending'
+          unit: "{event}/s"
+      - OID: 1.3.6.1.4.1.14685.3.1.28.1.2
+        name: ibm.dpStatusLogTargetStatusStatus
+        chart_meta:
+          description: The status of the log target
+          family: 'System/Log/Status'
+          unit: "{status}"
         mapping:
           1: active
           2: warning
           3: failure
           4: suspended
-#      - symbol:
-#          OID: 1.3.6.1.4.1.14685.3.1.28.1.6
-#          name: ibm.dpStatusLogTargetStatusErrorInfo
-#        tag: ibm_dp_status_log_target_status_error_info
-# TODO : This tag might have high cardinality, to be investigated before adding
+    metric_tags:
+      - tag: ibm_dp_status_log_target_status_log_target
+        symbol:
+          name: ibm.dpStatusLogTargetStatusLogTarget
+          OID: 1.3.6.1.4.1.14685.3.1.28.1.1
+
   - MIB: DATAPOWER-STATUS-MIB
     table:
       name: dpStatusNetworkInterfaceStatusTable
@@ -269,64 +343,96 @@ metrics:
     symbols:
       - name: ibm.dpStatusNetworkInterfaceStatusRxHCBytes
         OID: 1.3.6.1.4.1.14685.3.1.124.1.19
-        metric_type: monotonic_count
-        description: Number of received high capacity bytes
-        unit: "By"
+        scale_factor: 8
+        chart_meta:
+          description: Number of received high capacity bytes
+          family: 'Network/Interface/Traffic/Total/In'
+          unit: "bits/s"
       - name: ibm.dpStatusNetworkInterfaceStatusRxHCPackets
         OID: 1.3.6.1.4.1.14685.3.1.124.1.20
-        metric_type: monotonic_count
-        description: Number of received high capacity packets
-        unit: "{packet}"
+        chart_meta:
+          description: Number of received high capacity packets
+          family: 'Network/Interface/Packet/Total/In'
+          unit: "{packet}/s"
       - name: ibm.dpStatusNetworkInterfaceStatusRxErrors2
         OID: 1.3.6.1.4.1.14685.3.1.124.1.21
-        metric_type: monotonic_count
-        description: Number of receive errors
-        unit: "{error}"
+        chart_meta:
+          description: Number of receive errors
+          family: 'Network/Interface/Error/Total/In'
+          unit: "{error}/s"
       - name: ibm.dpStatusNetworkInterfaceStatusRxDrops2
         OID: 1.3.6.1.4.1.14685.3.1.124.1.22
-        metric_type: monotonic_count
-        description: Number of received packets dropped
-        unit: "{packet}"
+        chart_meta:
+          description: Number of received packets dropped
+          family: 'Network/Interface/Packet/Dropped/In'
+          unit: "{packet}/s"
       - name: ibm.dpStatusNetworkInterfaceStatusTxHCBytes
         OID: 1.3.6.1.4.1.14685.3.1.124.1.23
-        metric_type: monotonic_count
-        description: Number of transmitted high capacity bytes
-        unit: "By"
+        scale_factor: 8
+        chart_meta:
+          description: Number of transmitted high capacity bytes
+          family: 'Network/Interface/Traffic/Total/Out'
+          unit: "bits/s"
       - name: ibm.dpStatusNetworkInterfaceStatusTxHCPackets
         OID: 1.3.6.1.4.1.14685.3.1.124.1.24
-        metric_type: monotonic_count
-        description: Number of transmitted high capacity packets
-        unit: "{packet}"
+        chart_meta:
+          description: Number of transmitted high capacity packets
+          family: 'Network/Interface/Packet/Total/Out'
+          unit: "{packet}/s"
       - name: ibm.dpStatusNetworkInterfaceStatusTxErrors2
         OID: 1.3.6.1.4.1.14685.3.1.124.1.25
-        metric_type: monotonic_count
-        description: Number of transmit errors
-        unit: "{error}"
+        chart_meta:
+          description: Number of transmit errors
+          family: 'Network/Interface/Error/Total/Out'
+          unit: "{error}/s"
       - name: ibm.dpStatusNetworkInterfaceStatusTxDrops2
         OID: 1.3.6.1.4.1.14685.3.1.124.1.26
-        metric_type: monotonic_count
-        description: Number of transmitted packets dropped
-        unit: "{packet}"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+        chart_meta:
+          description: Number of transmitted packets dropped
+          family: 'Network/Interface/Packet/Dropped/Out'
+          unit: "{packet}/s"
+      - OID: 1.3.6.1.4.1.14685.3.1.124.1.4
+        name: ibm.dpStatusNetworkInterfaceStatusAdminStatus
+        chart_meta:
+          description: The configured administrative state of the interface
+          family: 'Network/Interface/Status/Admin'
+          unit: "{status}"
+        mapping:
+          1: up
+          2: down
+      - OID: 1.3.6.1.4.1.14685.3.1.124.1.5
+        name: ibm.dpStatusNetworkInterfaceStatusOperStatus
+        chart_meta:
+          description: The current operational state of the interface
+          family: 'Network/Interface/Status/Operational/'
+          unit: "{status}"
+        mapping:
+          1: up
+          2: down
+          3: testing
+          4: unknown
+          5: dormant
+          6: notPresent
+          7: lowerLayerDown
     metric_tags:
-      - symbol:
+      - tag: ibm_dp_status_network_interface_status_interface_type
+        symbol:
           name: ibm.dpStatusNetworkInterfaceStatusInterfaceType
           OID: 1.3.6.1.4.1.14685.3.1.124.1.2
-        tag: ibm_dp_status_network_interface_status_interface_type
         mapping:
           1: other
           6: ethernet
           131: tunnel
           135: vlan
           161: aggregate
-      - symbol:
+      - tag: ibm_dp_status_network_interface_status_name
+        symbol:
           name: ibm.dpStatusNetworkInterfaceStatusName
           OID: 1.3.6.1.4.1.14685.3.1.124.1.3
-        tag: ibm_dp_status_network_interface_status_name
-      - symbol:
+      - tag: ibm_dp_status_network_interface_status_ip_type
+        symbol:
           name: ibm.dpStatusNetworkInterfaceStatusIPType
           OID: 1.3.6.1.4.1.14685.3.1.124.1.6
-        tag: ibm_dp_status_network_interface_status_ip_type
         mapping:
           0: unknown
           1: ipv4
@@ -335,32 +441,3 @@ metrics:
           4: ipv6z
           16: dns
           25: l2vpn
-      - symbol:
-          name: ibm.dpStatusNetworkInterfaceStatusIP
-          OID: 1.3.6.1.4.1.14685.3.1.124.1.7
-          format: ip_address
-        tag: ibm_dp_status_network_interface_status_ip
-      - symbol:
-          name: ibm.dpStatusNetworkInterfaceStatusMACAddress
-          OID: 1.3.6.1.4.1.14685.3.1.124.1.9
-          format: mac_address
-        tag: ibm_dp_status_network_interface_status_mac_address
-      - symbol:
-          OID: 1.3.6.1.4.1.14685.3.1.124.1.4
-          name: ibm.dpStatusNetworkInterfaceStatusAdminStatus
-        tag: ibm_dp_status_network_interface_status_admin_status
-        mapping:
-          1: up
-          2: down
-      - symbol:
-          OID: 1.3.6.1.4.1.14685.3.1.124.1.5
-          name: ibm.dpStatusNetworkInterfaceStatusOperStatus
-        tag: ibm_dp_status_network_interface_status_oper_status
-        mapping:
-          1: up
-          2: down
-          3: testing
-          4: unknown
-          5: dormant
-          6: not_present
-          7: lower_layer_down
