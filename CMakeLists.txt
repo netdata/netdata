@@ -175,6 +175,7 @@ mark_as_advanced(ENABLE_DASHBOARD)
 
 # Data collection plugins
 option(ENABLE_PLUGIN_GO "Enable metric collectors written in Go" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_NOM "Enable OpenTelemetry metrics collection via nom.plugin" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_PLUGIN_OTEL "Enable metrics collection via OpenTelemetry collector" False)
 option(ENABLE_PLUGIN_PYTHON "Enable metric collectors written in Python" ${DEFAULT_FEATURE_STATE})
 
@@ -232,10 +233,16 @@ cmake_dependent_option(ENABLE_NETDATA_JOURNAL_FILE_READER "Enable netdata's jour
 cmake_dependent_option(ENABLE_NETDATA_JOURNAL_FILE_READER_BENCHMARKS "Enable netdata's journal file reader implementation benchmarks" False "ENABLE_NETDATA_JOURNAL_FILE_READER" False)
 mark_as_advanced(ENABLE_NETDATA_JOURNAL_FILE_READER_BENCHMARKS)
 
-if(ENABLE_PLUGIN_SYSTEMD_JOURNAL AND NOT ENABLE_NETDATA_JOURNAL_FILE_READER)
-  set(ENABLE_LIBSYSTEMD_JOURNAL_FILE_READER True)
-else()
-  set(ENABLE_LIBSYSTEMD_JOURNAL_FILE_READER False)
+# Setup Rust/Corrosion for plugins that need it
+if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_NOM)
+    include(FetchContent)
+    FetchContent_Declare(
+        Corrosion
+        GIT_REPOSITORY https://github.com/netdata/corrosion.git
+        GIT_TAG f3b91559efca32c6b54837866ef35ba98ff5b2ca # stable/v0.5
+    )
+    FetchContent_MakeAvailable(Corrosion)
+    corrosion_import_crate(MANIFEST_PATH src/crates/jf/Cargo.toml)
 endif()
 
 option(ENABLE_MIMALLOC "Enable mimalloc allocator" OFF)
@@ -2875,15 +2882,6 @@ if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
         add_executable(systemd-journal.plugin ${SYSTEMD_JOURNAL_PLUGIN_FILES})
 
         if(ENABLE_NETDATA_JOURNAL_FILE_READER)
-                include(FetchContent)
-                FetchContent_Declare(
-                    Corrosion
-                    GIT_REPOSITORY https://github.com/corrosion-rs/corrosion.git
-                    GIT_TAG v0.5
-                )
-                FetchContent_MakeAvailable(Corrosion)
-
-                corrosion_import_crate(MANIFEST_PATH src/crates/jf/Cargo.toml)
                 target_compile_definitions(systemd-journal.plugin PRIVATE HAVE_RUST_PROVIDER)
                 target_link_libraries(systemd-journal.plugin journal_reader_ffi)
 
@@ -3320,6 +3318,15 @@ if(ENABLE_PLUGIN_OTEL)
   install(PROGRAMS ${CMAKE_BINARY_DIR}/otel-collector/otelcol.plugin
           COMPONENT plugin-otelcol
           DESTINATION usr/libexec/netdata/plugins.d)
+endif()
+
+#
+# nom.plugin
+#
+if(ENABLE_PLUGIN_NOM)
+    corrosion_install(TARGETS nom-plugin
+                      RUNTIME DESTINATION usr/libexec/netdata/plugins.d
+                      COMPONENT plugin-nom)
 endif()
 
 #
