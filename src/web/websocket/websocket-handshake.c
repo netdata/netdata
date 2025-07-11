@@ -171,12 +171,10 @@ undo:
     // Roll back the client count increment since assignment failed
     wsc->wth = NULL;
 
-    if(wth) {
-        spinlock_lock(&wth->clients_spinlock);
-        if (wth->clients_current > 0)
-            wth->clients_current--;
-        spinlock_unlock(&wth->clients_spinlock);
-    }
+    spinlock_lock(&wth->clients_spinlock);
+    if (wth->clients_current > 0)
+        wth->clients_current--;
+    spinlock_unlock(&wth->clients_spinlock);
 
     return NULL;
 }
