@@ -17,59 +17,80 @@ metrics:
     symbol:
       name: memory.total
       OID: 1.3.6.1.2.1.25.2.3.1.5.1  # hrStorageSize.1 (hrStorageSize at index 1)
-      description: Size of the storage represented by this entry, in units of hrStorageAllocationUnits
-      unit: "{logical_storage_area}"
+      chart_meta:
+        family: 'System/Memory/Total'
+        description: Size of the storage represented by this entry, in units of hrStorageAllocationUnits
+        unit: "By"
   - MIB: HOST-RESOURCES-MIB
     symbol:
       name: memory.used
       OID: 1.3.6.1.2.1.25.2.3.1.6.1  # hrStorageUsed.1 (hrStorageUsed at index 1)
-      description: Amount of the storage represented by this entry that is allocated, in units of hrStorageAllocationUnits
-      unit: "{logical_storage_area}"
+      chart_meta:
+        family: 'System/Memory/Used'
+        description: Amount of the storage represented by this entry that is allocated, in units of hrStorageAllocationUnits
+        unit: "By"
+
   - MIB: STEELHEAD-MIB
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.17163.1.1.5.1.1.0
-      description: One-minute CPU load in hundreths
-      unit: "{cpu_load}"
+      chart_meta:
+        family: 'System/CPU/Load'
+        description: One-minute CPU load in hundreths
+        unit: "{cpu_load}"
   - MIB: STEELHEAD-MIB
     symbol:
       name: riverbed.steelhead.optimizedConnections
       OID: 1.3.6.1.4.1.17163.1.1.5.2.1.0
-      description: Current total number of optimized connections
-      unit: "{connection}"
+      chart_meta:
+        family: 'Network/Steelhead/Connection/Optimized'
+        description: Current total number of optimized connections
+        unit: "{connection}"
   - MIB: STEELHEAD-MIB
     symbol:
       name: riverbed.steelhead.passthroughConnections
       OID: 1.3.6.1.4.1.17163.1.1.5.2.2.0
-      description: Current total number of pass-through connections
-      unit: "{connection}"
+      chart_meta:
+        family: 'Network/Steelhead/Connection/Passthrough'
+        description: Current total number of pass-through connections
+        unit: "{connection}"
   - MIB: STEELHEAD-MIB
     symbol:
       name: riverbed.steelhead.halfOpenedConnections
       OID: 1.3.6.1.4.1.17163.1.1.5.2.3.0
-      description: Current total number of half-opened (optimized) connections
-      unit: "{connection}"
+      chart_meta:
+        family: 'Network/Steelhead/Connection/HalfOpened'
+        description: Current total number of half-opened (optimized) connections
+        unit: "{connection}"
   - MIB: STEELHEAD-MIB
     symbol:
       name: riverbed.steelhead.halfClosedConnections
       OID: 1.3.6.1.4.1.17163.1.1.5.2.4.0
-      description: Current total number of half-closed (optimized) connections
-      unit: "{connection}"
+      chart_meta:
+        family: 'Network/Steelhead/Connection/HalfClosed'
+        description: Current total number of half-closed (optimized) connections
+        unit: "{connection}"
   - MIB: STEELHEAD-MIB
     symbol:
       name: riverbed.steelhead.establishedConnections
       OID: 1.3.6.1.4.1.17163.1.1.5.2.5.0
-      description: Current number of established (optimized) connections
-      unit: "{connection}"
+      chart_meta:
+        family: 'Network/Steelhead/Connection/Established'
+        description: Current number of established (optimized) connections
+        unit: "{connection}"
   - MIB: STEELHEAD-MIB
     symbol:
       name: riverbed.steelhead.activeConnections
       OID: 1.3.6.1.4.1.17163.1.1.5.2.6.0
-      description: Current number of active (optimized) connections
-      unit: "{connection}"
+      chart_meta:
+        family: 'Network/Steelhead/Connection/Active'
+        description: Current number of active (optimized) connections
+        unit: "{connection}"
   - MIB: STEELHEAD-MIB
     symbol:
       name: riverbed.steelhead.totalConnections
       OID: 1.3.6.1.4.1.17163.1.1.5.2.7.0
-      description: Total number of connections
-      unit: "{connection}"
+      chart_meta:
+        family: 'Network/Steelhead/Connection/Total'
+        description: Total number of connections
+        unit: "{connection}"
