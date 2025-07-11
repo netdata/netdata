@@ -2,13 +2,28 @@ extends:
   - _std-host-resources-mib-feat-base.yaml
   - _std-ucd-mib.yaml
   - nvidia.yaml
+
 sysobjectid:
   - 1.3.6.1.4.1.40310
+
 metadata:
   device:
     fields:
       type:
-        value: "switch"
+        value: "Switch"
+
+# CUMULUS-RESOURCES-MIB
+# https://mibbrowser.online/mibdb_search.php?mib=CUMULUS-RESOURCES-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/cumulus/CUMULUS-RESOURCES-MIB
+
+# CUMULUS-COUNTERS-MIB
+# https://mibbrowser.online/mibdb_search.php?mib=CUMULUS-COUNTERS-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/cumulus/CUMULUS-COUNTERS-MIB
+
+# CUMULUS-POE-MIB
+# https://mibbrowser.online/mibdb_search.php?mib=CUMULUS-POE-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/cumulus/CUMULUS-POE-MIB
+
 metrics:
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
@@ -62,98 +77,98 @@ metrics:
     symbol:
       name: cumulus.ingressAclCurrentEntries
       OID: 1.3.6.1.4.1.40310.1.1.11.0
-      description: TBD
-      unit: "TBD"
+      description: The current number of Ingress entries in the Network Access Control List table
+      unit: "{entry}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.ingressAclMaxEntries
       OID: 1.3.6.1.4.1.40310.1.1.12.0
-      description: TBD
-      unit: "TBD"
+      description: The maximum possible Ingress entries in the Network Access Control table
+      unit: "{entry}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.ingressAclCurrentCounters
       OID: 1.3.6.1.4.1.40310.1.1.13.0
-      description: TBD
-      unit: "TBD"
+      description: The current number of Ingress counters in the Network Access Control List table
+      unit: "{counter}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.ingressAclMaxCounters
       OID: 1.3.6.1.4.1.40310.1.1.14.0
-      description: TBD
-      unit: "TBD"
+      description: The maximum possible Ingress counters in the Network Access Control table
+      unit: "{counter}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.ingressAclCurrentMeters
       OID: 1.3.6.1.4.1.40310.1.1.15.0
-      description: TBD
-      unit: "TBD"
+      description: The current number of Ingress meters in the Network Access Control List table
+      unit: "{meter}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.ingressAclMaxMeters
       OID: 1.3.6.1.4.1.40310.1.1.16.0
-      description: TBD
-      unit: "TBD"
+      description: The maximum possible Ingress meters in the Network Access Control table
+      unit: "{meter}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.ingressAclCurrentSlices
       OID: 1.3.6.1.4.1.40310.1.1.17.0
-      description: TBD
-      unit: "TBD"
+      description: The current number of Ingress slices in the Network Access Control List table
+      unit: "{slice}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.ingressAclMaxSlices
       OID: 1.3.6.1.4.1.40310.1.1.18.0
-      description: TBD
-      unit: "TBD"
+      description: The maximum possible Ingress slices in the Network Access Control table
+      unit: "{slice}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.egressAclCurrentEntries
       OID: 1.3.6.1.4.1.40310.1.1.19.0
-      description: TBD
-      unit: "TBD"
+      description: The current number of Egress entries in the Network Access Control List table
+      unit: "{entries}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.egressAclMaxEntries
       OID: 1.3.6.1.4.1.40310.1.1.20.0
-      description: TBD
-      unit: "TBD"
+      description: The maximum possible Egress entries in the Network Access Control table
+      unit: "{entries}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.egressAclCurrentCounters
       OID: 1.3.6.1.4.1.40310.1.1.21.0
-      description: TBD
-      unit: "TBD"
+      description: The current number of Egress counters in the Network Access Control List table
+      unit: "{counter}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.egressAclMaxCounters
       OID: 1.3.6.1.4.1.40310.1.1.22.0
-      description: TBD
-      unit: "TBD"
+      description: The maximum possible Egress counters in the Network Access Control table
+      unit: "counter"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.egressAclCurrentMeters
       OID: 1.3.6.1.4.1.40310.1.1.23.0
-      description: TBD
-      unit: "TBD"
+      description: The current number of Egress meters in the Network Access Control List table
+      unit: "{meter}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.egressAclMaxMeters
       OID: 1.3.6.1.4.1.40310.1.1.24.0
-      description: TBD
-      unit: "TBD"
+      description: The maximum possible Egress meters in the Network Access Control table
+      unit: "{meter}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.egressAclCurrentSlices
       OID: 1.3.6.1.4.1.40310.1.1.25.0
-      description: TBD
-      unit: "TBD"
+      description: The current number of Egress slices in the Network Access Control List table
+      unit: "{slice}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.egressAclMaxSlices
       OID: 1.3.6.1.4.1.40310.1.1.26.0
-      description: TBD
-      unit: "TBD"
+      description: The maximum possible Egress slices in the Network Access Control table
+      unit: "{slice}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.l2MacTableCurrentEntries
@@ -192,10 +207,12 @@ metrics:
         description: Total number of packets discarded on egress due to reasons reasons other than queue overflow.
         unit: "{packet}"
     metric_tags:
-      - symbol:
+      - tag: cl_port_index
+        index: 1
+      - tag: cumulus_cl_port_name
+        symbol:
           name: cumulus.clPortName
           OID: 1.3.6.1.4.1.40310.2.1.2.1.1
-        tag: cumulus_cl_port_name
   - MIB: CUMULUS-COUNTERS-MIB
     table:
       name: interfaceClCountersTable
@@ -203,41 +220,43 @@ metrics:
     symbols:
       - name: cumulus.clIntInOctets
         OID: 1.3.6.1.4.1.40310.2.2.2.1.2
-        description: TBD
+        description: The number of input octets on the interface
         unit: "By"
       - name: cumulus.clIntInUcastPkts
         OID: 1.3.6.1.4.1.40310.2.2.2.1.3
-        description: TBD
+        description: The number of input unicast packets on the interface
         unit: "{packet}"
       - name: cumulus.clIntInBcastPkts
         OID: 1.3.6.1.4.1.40310.2.2.2.1.4
-        description: TBD
+        description: The number of input broadcast packets on the interface
         unit: "{packet}"
       - name: cumulus.clIntInMcastPkts
         OID: 1.3.6.1.4.1.40310.2.2.2.1.5
-        description: TBD
+        description: The number of input multicast packets on the interface
         unit: "{packet}"
       - name: cumulus.clIntOutOctets
         OID: 1.3.6.1.4.1.40310.2.2.2.1.6
-        description: TBD
+        description: The number of output octets on the interface
         unit: "By"
       - name: cumulus.clIntOutUcastPkts
         OID: 1.3.6.1.4.1.40310.2.2.2.1.7
-        description: TBD
+        description: The number of output unicast packets on the interface
         unit: "{packet}"
       - name: cumulus.clIntOutBcastPkts
         OID: 1.3.6.1.4.1.40310.2.2.2.1.8
-        description: TBD
+        description: The number of output broadcast packets on the interface
         unit: "{packet}"
       - name: cumulus.clIntOutMcastPkts
         OID: 1.3.6.1.4.1.40310.2.2.2.1.9
-        description: TBD
+        description: The number of output multicast packets on the interface
         unit: "{packet}"
     metric_tags:
-      - symbol:
+      - tag: cl_int_index
+        index: 1
+      - tag: cumulus_cl_int_port_name
+        symbol:
           name: cumulus.clIntPortName
           OID: 1.3.6.1.4.1.40310.2.2.2.1.1
-        tag: cumulus_cl_int_port_name
   - MIB: CUMULUS-COUNTERS-MIB
     table:
       name: pfcClCountersTable
@@ -245,98 +264,100 @@ metrics:
     symbols:
       - name: cumulus.clIntInPausePkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.2
-        description: TBD
+        description: The number of ethernet flow control pause packets received on the interface
         unit: "{packet}"
       - name: cumulus.clIntOutPausePkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.3
-        description: TBD
+        description: The number of ethernet flow control pause packets transmitted on the interface
         unit: "{packet}"
       - name: cumulus.clIntInPfc0Pkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.4
-        description: TBD
+        description: The number of ethernet priority flow control traffic class 0 packets received on the interface
         unit: "{packet}"
       - name: cumulus.clIntOutPfc0Pkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.5
-        description: TBD
+        description: The number of ethernet priority flow control traffic class 0 packets transmitted on the interface
         unit: "{packet}"
       - name: cumulus.clIntInPfc1Pkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.6
-        description: TBD
+        description: The number of ethernet priority flow control traffic class 1 packets received on the interface
         unit: "{packet}"
       - name: cumulus.clIntOutPfc1Pkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.7
-        description: TBD
+        description: The number of ethernet priority flow control traffic class 1 packets transmitted on the interface
         unit: "{packet}"
       - name: cumulus.clIntInPfc2Pkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.8
-        description: TBD
+        description: The number of ethernet priority flow control traffic class 2 packets received on the interface
         unit: "{packet}"
       - name: cumulus.clIntOutPfc2Pkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.9
-        description: TBD
+        description: The number of ethernet priority flow control traffic class 2 packets transmitted on the interface
         unit: "{packet}"
       - name: cumulus.clIntInPfc3Pkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.10
-        description: TBD
+        description: The number of ethernet priority flow control traffic class 3 packets received on the interface
         unit: "{packet}"
       - name: cumulus.clIntOutPfc3Pkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.11
-        description: TBD
+        description: The number of ethernet priority flow control traffic class 3 packets transmitted on the interface
         unit: "{packet}"
       - name: cumulus.clIntInPfc4Pkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.12
-        description: TBD
+        description: The number of ethernet priority flow control traffic class 4 packets received on the interface
         unit: "{packet}"
       - name: cumulus.clIntOutPfc4Pkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.13
-        description: TBD
+        description: The number of ethernet priority flow control traffic class 4 packets transmitted on the interface
         unit: "{packet}"
       - name: cumulus.clIntInPfc5Pkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.14
-        description: TBD
+        description: The number of ethernet priority flow control traffic class 5 packets received on the interface
         unit: "{packet}"
       - name: cumulus.clIntOutPfc5Pkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.15
-        description: TBD
+        description: The number of ethernet priority flow control traffic class 5 packets transmitted on the interface
         unit: "{packet}"
       - name: cumulus.clIntInPfc6Pkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.16
-        description: TBD
+        description: The number of ethernet priority flow control traffic class 6 packets received on the interface
         unit: "{packet}"
       - name: cumulus.clIntOutPfc6Pkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.17
-        description: TBD
+        description: The number of ethernet priority flow control traffic class 6 packets transmitted on the interface
         unit: "{packet}"
       - name: cumulus.clIntInPfc7Pkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.18
-        description: TBD
+        description: The number of ethernet priority flow control traffic class 7 packets received on the interface
         unit: "{packet}"
       - name: cumulus.clIntOutPfc7Pkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.19
-        description: TBD
+        description: The number of ethernet priority flow control traffic class 7 packets transmitted on the interface
         unit: "{packet}"
     metric_tags:
-      - symbol:
+      - tag: cl_int_pfc_index
+        index: 1
+      - tag: cumulus_cl_int_pfc_port_name
+        symbol:
           name: cumulus.clIntPfcPortName
           OID: 1.3.6.1.4.1.40310.2.2.3.1.1
-        tag: cumulus_cl_int_pfc_port_name
   - MIB: CUMULUS-POE-MIB
     symbol:
       name: cumulus.poeTotalSystemPower
       OID: 1.3.6.1.4.1.40310.3.1.1.0
-      description: The total power available to the system, shown with 3 decimal place of precision (milliwatts)
+      description: The total power available to the system
       unit: "mW"
   - MIB: CUMULUS-POE-MIB
     symbol:
       name: cumulus.poeTotalUsedPower
       OID: 1.3.6.1.4.1.40310.3.1.2.0
-      description: The total power USED by ports in the system, shown with 3 decimal places of precision (milliwatts)
+      description: The total power USED by ports in the system
       unit: "mW"
   - MIB: CUMULUS-POE-MIB
     symbol:
       name: cumulus.poeTotalAvailablePower
       OID: 1.3.6.1.4.1.40310.3.1.3.0
-      description: The total UNUSED and available power for the system in the common pool for new devices, shown with 3 decimal places of precision (milliwatts)
+      description: The total UNUSED and available power for the system in the common pool for new devices
       unit: "mW"
   - MIB: CUMULUS-POE-MIB
     symbol:

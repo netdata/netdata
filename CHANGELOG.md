@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- build\(deps\): bump golang.org/x/text from 0.26.0 to 0.27.0 in /src/go [\#20651](https://github.com/netdata/netdata/pull/20651) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/docker/docker from 28.3.1+incompatible to 28.3.2+incompatible in /src/go [\#20650](https://github.com/netdata/netdata/pull/20650) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/miekg/dns from 1.1.66 to 1.1.67 in /src/go [\#20649](https://github.com/netdata/netdata/pull/20649) ([dependabot[bot]](https://github.com/apps/dependabot))
+- SNMP profile edits ep3 [\#20648](https://github.com/netdata/netdata/pull/20648) ([Ancairon](https://github.com/Ancairon))
+- SNMP profiles pass ep2 [\#20647](https://github.com/netdata/netdata/pull/20647) ([Ancairon](https://github.com/Ancairon))
 - chore\(go.d/snmp-profiles\): fix quotes [\#20645](https://github.com/netdata/netdata/pull/20645) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#20644](https://github.com/netdata/netdata/pull/20644) ([netdatabot](https://github.com/netdatabot))
 - Update Cloud OIDC Authorization Server setup docs [\#20643](https://github.com/netdata/netdata/pull/20643) ([car12o](https://github.com/car12o))
@@ -447,7 +452,6 @@
 - fix cleanup and exit and memory leaks [\#20120](https://github.com/netdata/netdata/pull/20120) ([ktsaou](https://github.com/ktsaou))
 - Update platforms for CI and package builds. [\#20119](https://github.com/netdata/netdata/pull/20119) ([Ferroin](https://github.com/Ferroin))
 - Improve error handling and logging for journal and data files [\#20112](https://github.com/netdata/netdata/pull/20112) ([stelfrag](https://github.com/stelfrag))
-- Work to find leaks easily [\#20106](https://github.com/netdata/netdata/pull/20106) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.4.0](https://github.com/netdata/netdata/tree/v2.4.0) (2025-04-14)
 
@@ -460,10 +464,6 @@
 - fix memory leaks [\#20116](https://github.com/netdata/netdata/pull/20116) ([ktsaou](https://github.com/ktsaou))
 - netdatacli remove/mark stale, swap order in help output [\#20113](https://github.com/netdata/netdata/pull/20113) ([ilyam8](https://github.com/ilyam8))
 - Fix completion marking in ACLK cancel node update timer logic [\#20111](https://github.com/netdata/netdata/pull/20111) ([stelfrag](https://github.com/stelfrag))
-- docs: clarify static build transition process for EOL platforms [\#20110](https://github.com/netdata/netdata/pull/20110) ([ilyam8](https://github.com/ilyam8))
-- build\(deps\): bump github.com/go-sql-driver/mysql from 1.9.1 to 1.9.2 in /src/go [\#20109](https://github.com/netdata/netdata/pull/20109) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump golang.org/x/net from 0.38.0 to 0.39.0 in /src/go [\#20108](https://github.com/netdata/netdata/pull/20108) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/prometheus-community/pro-bing from 0.6.1 to 0.7.0 in /src/go [\#20107](https://github.com/netdata/netdata/pull/20107) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v2.3.2](https://github.com/netdata/netdata/tree/v2.3.2) (2025-04-02)
 

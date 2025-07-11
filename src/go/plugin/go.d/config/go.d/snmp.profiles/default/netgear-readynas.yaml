@@ -1,13 +1,19 @@
 extends:
   - _std-ucd-mib.yaml
   - netgear.yaml
+
 sysobjectid:
   - 1.3.6.1.4.1.4526.100.16.*
+
 metadata:
   device:
     fields:
       type:
-        value: "storage"
+        value: "Storage"
+
+# READYNASOS-MIB
+# https://www.downloads.netgear.com/files/ReadyNAS/READYNAS-MIB.txt
+
 metrics:
   # scalar string metric is not supported yet
   # - MIB: READYNASOS-MIB
@@ -42,7 +48,7 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.4526.22.3.1.3
           name: netgear.readynasos.diskSlotName
-      - tag: netgear_readynasos_disk_serial
+      - tag: _netgear_readynasos_disk_serial
         symbol:
           OID: 1.3.6.1.4.1.4526.22.3.1.4
           name: netgear.readynasos.diskSerial
@@ -57,11 +63,10 @@ metrics:
       - symbol:
           OID: 1.3.6.1.4.1.4526.22.3.1.9
           name: netgear.readynasos.diskState
-        tag: netgear_readynasos_disk_state
+        tag: _netgear_readynasos_disk_state
         mapping:
           0: online
           1: offline
-          # mapping in the metric description
   - MIB: READYNASOS-MIB
     table:
       OID: 1.3.6.1.4.1.4526.22.4
@@ -70,13 +75,14 @@ metrics:
       - OID: 1.3.6.1.4.1.4526.22.4.1.2
         name: netgear.readynasos.fanRPM
         description: Fan revolutions per minute
-        unit: "1.min"
-      - OID: 1.3.6.1.4.1.4526.22.4.1.3
-        name: netgear.readynasos.fanStatus
-        description: Fan status
-        unit: "TBD"
+        unit: "{revolution}/min"
+      # - OID: 1.3.6.1.4.1.4526.22.4.1.3
+      #   name: netgear.readynasos.fanStatus
+      #   description: Fan status
+      #   unit: "TBD"
+      # TODO mapping not found in MIB
     metric_tags:
-      - tag: netgear_readynasos_fan_type
+      - tag: _netgear_readynasos_fan_type
         symbol:
           OID: 1.3.6.1.4.1.4526.22.4.1.4
           name: netgear.readynasos.fanType
@@ -98,6 +104,8 @@ metrics:
         description: Maximum temperature
         unit: "Cel"
     metric_tags:
+      - tag: temp_index
+        index: 1
       - tag: netgear_readynasos_temperature_type
         symbol:
           OID: 1.3.6.1.4.1.4526.22.5.1.3
@@ -119,16 +127,10 @@ metrics:
         name: netgear.readynasos.volumeFreeSpace
         description: Volume free space
         unit: "By"
-    metric_tags:
-      - tag: netgear_readynasos_volume_name
-        symbol:
-          OID: 1.3.6.1.4.1.4526.22.7.1.2
-          name: netgear.readynasos.volumeName
-      # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-      - symbol:
-          OID: 1.3.6.1.4.1.4526.22.7.1.4
-          name: netgear.readynasos.volumeStatus
-        tag: netgear_readynasos_volume_status
+      - OID: 1.3.6.1.4.1.4526.22.7.1.4
+        name: netgear.readynasos.volumeStatus
+        description: Volume severity
+        unit: "{status}"
         mapping:
           1: redundant
           2: unprotected
@@ -136,23 +138,27 @@ metrics:
           4: dead
           5: inactive
           6: unknown
-          # mapping in the metric description
-  - MIB: READYNASOS-MIB
-    table:
-      OID: 1.3.6.1.4.1.4526.22.8
-      name: psuTable
-    symbols:
-      - name: netgear.readynasos.psu
-        constant_value_one: true
-        description: Power supply unit presence
-        unit: "{psu}"
     metric_tags:
-      - tag: netgear_readynasos_psu_desc
+      - tag: volume_index
+        index: 1
+      - tag: netgear_readynasos_volume_name
         symbol:
-          OID: 1.3.6.1.4.1.4526.22.8.1.2
-          name: netgear.readynasos.psuDesc
-      # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-      - symbol:
-          OID: 1.3.6.1.4.1.4526.22.8.1.3
-          name: netgear.readynasos.psuStatus
-        tag: netgear_readynasos_psu_status
+          OID: 1.3.6.1.4.1.4526.22.7.1.2
+          name: netgear.readynasos.volumeName
+  # - MIB: READYNASOS-MIB
+  #   table:
+  #     OID: 1.3.6.1.4.1.4526.22.8
+  #     name: psuTable
+  #   symbols:
+  #     - 
+  #   metric_tags:
+  #     - tag: netgear_readynasos_psu_desc
+  #       symbol:
+  #         OID: 1.3.6.1.4.1.4526.22.8.1.2
+  #         name: netgear.readynasos.psuDesc
+  #     # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+  #     - symbol:
+  #         OID: 1.3.6.1.4.1.4526.22.8.1.3
+  #         name: netgear.readynasos.psuStatus
+  #       tag: netgear_readynasos_psu_status
+  # only string metrics here
