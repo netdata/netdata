@@ -40,32 +40,43 @@ metrics:
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.23695.200.1.1.1.3.1.0
-      description: Cpu usage
-      unit: "%"
+      chart_meta:
+        family: 'System/CPU/Usage'
+        description: Cpu usage
+        unit: "%"
   - MIB: PEPLINK-DEVICE
     symbol:
       name: memory.total
       OID: 1.3.6.1.4.1.23695.200.1.1.1.3.2.0
-      description: Total memory
-      unit: "By"
+      chart_meta:
+        family: 'System/Memory/Total'
+        description: Total memory
+        unit: "By"
   - MIB: PEPLINK-DEVICE
     symbol:
       name: memory.usage
       OID: 1.3.6.1.4.1.23695.200.1.1.1.3.3.0
-      description: Memory usage
-      unit: "%"
+      chart_meta:
+        family: 'System/Memory/Usage'
+        description: Memory usage
+        unit: "%"
   - MIB: PEPLINK-DEVICE
     symbol:
       name: peplink.deviceTemperatureCelsius
       OID: 1.3.6.1.4.1.23695.200.1.1.1.4.4.1.0
-      description: Device temperature celsius
-      unit: "Cel"
+      chart_meta:
+        family: 'Hardware/Temperature/Value'
+        description: Device temperature celsius
+        unit: "Cel"
   - MIB: PEPLINK-DEVICE
     symbol:
       name: peplink.deviceTemperatureFahrenheit
       OID: 1.3.6.1.4.1.23695.200.1.1.1.4.4.2.0
-      description: Device temperature fahrenheit
-      unit: "{temperature}"
+      chart_meta:
+        family: 'Hardware/Temperature/Value'
+        description: Device temperature fahrenheit
+        unit: "degF"
+
   - MIB: PEPLINK-DEVICE
     table:
       OID: 1.3.6.1.4.1.23695.200.1.1.1.4.1
@@ -73,20 +84,25 @@ metrics:
     symbols:
       - name: peplink.devicePSUPercentage
         OID: 1.3.6.1.4.1.23695.200.1.1.1.4.1.1.5
-        description: Device psu percentage
-        unit: "%"
+        chart_meta:
+          family: 'Hardware/Power/Usage'
+          description: Device psu percentage
+          unit: "%"
+      - OID: 1.3.6.1.4.1.23695.200.1.1.1.4.1.1.2
+        name: devicePSUStatus
+        chart_meta:
+          family: 'Hardware/Power/Status'
+          description: Device psu status
+          unit: "{status}"
+        mapping:
+          0: error
+          1: on
     metric_tags:
       - tag: device_psu_id
         symbol:
           OID: 1.3.6.1.4.1.23695.200.1.1.1.4.1.1.1
           name: devicePSUId
-      - tag: _device_psu_status
-        symbol:
-          OID: 1.3.6.1.4.1.23695.200.1.1.1.4.1.1.2
-          name: devicePSUStatus
-        mapping:
-          0: error
-          1: on
+
   - MIB: PEPLINK-DEVICE
     table:
       OID: 1.3.6.1.4.1.23695.200.1.1.1.4.2
@@ -94,20 +110,25 @@ metrics:
     symbols:
       - name: peplink.deviceFanSpeed
         OID: 1.3.6.1.4.1.23695.200.1.1.1.4.2.1.3
-        description: Device fan speed
-        unit: "{revolution}/s"
+        chart_meta:
+          family: 'Hardware/Fan/Speed'
+          description: Device fan speed
+          unit: "{revolution}/s"
+      - OID: 1.3.6.1.4.1.23695.200.1.1.1.4.2.1.2
+        name: deviceFanStatus
+        chart_meta:
+          family: 'Hardware/Fan/Status'
+          description: Device fan status
+          unit: "{status}"
+        mapping:
+          0: error
+          1: on
     metric_tags:
       - tag: device_fan_id
         symbol:
           OID: 1.3.6.1.4.1.23695.200.1.1.1.4.2.1.1
           name: deviceFanId
-      - tag: _device_fan_status
-        symbol:
-          OID: 1.3.6.1.4.1.23695.200.1.1.1.4.2.1.2
-          name: deviceFanStatus
-        mapping:
-          0: error
-          1: on
+
   - MIB: PEPLINK-DEVICE
     table:
       OID: 1.3.6.1.4.1.23695.200.1.1.1.4.3
@@ -115,26 +136,29 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.23695.200.1.1.1.4.3.1.3
         name: devicePowerSourceStatus
-        description: Power source status
-        unit: "{status}"
+        chart_meta:
+          family: 'Hardware/Power/Source/Status'
+          description: Power source status
+          unit: "{status}"
         mapping:
-          0: no_cable_detected
+          0: noCableDetected
           1: connected
     metric_tags:
-      - symbol:
+      - tag: device_power_source_id
+        symbol:
           name: devicePowerSourceId
           OID: 1.3.6.1.4.1.23695.200.1.1.1.4.3.1.1
-        tag: device_power_source_id
-      - symbol:
+      - tag: device_power_source_name
+        symbol:
           name: devicePowerSourceName
           OID: 1.3.6.1.4.1.23695.200.1.1.1.4.3.1.2
-        tag: device_power_source_name
 
   # - MIB: PEPLINK-BALANCE-MIB # TODO: Handle string for "up"/"down"
   #   symbol:
   #     name: peplink.balLanStatus
   #     OID: 1.3.6.1.4.1.23695.1.1.1.6.1
   #     format: TODO_handle_conversion_to_one
+
   - MIB: PEPLINK-BALANCE-MIB
     table:
       OID: 1.3.6.1.4.1.23695.1.1.2.2
@@ -142,19 +166,22 @@ metrics:
     symbols:
       - name: peplink.linkThroughputIn
         OID: 1.3.6.1.4.1.23695.1.1.2.2.1.4
-        metric_type: monotonic_count
-        description: Number of inbound packets discarded to free buffer space
-        unit: "{packet}"
+        chart_meta:
+          family: 'Network/Link/Throughput/Total/In'
+          description: Number of inbound packets discarded to free buffer space
+          unit: "{packet}/s"
       - name: peplink.linkThroughputOut
         OID: 1.3.6.1.4.1.23695.1.1.2.2.1.5
-        metric_type: monotonic_count
-        description: Number of outbound packets discarded to free buffer space
-        unit: "{packet}"
+        chart_meta:
+          family: 'Network/Link/Throughput/Total/Out'
+          description: Number of outbound packets discarded to free buffer space
+          unit: "{packet}/s"
       - name: peplink.linkDataTransferred
         OID: 1.3.6.1.4.1.23695.1.1.2.2.1.6
-        metric_type: monotonic_count
-        description: Number of bytes transferred through
-        unit: "By"
+        chart_meta:
+          family: 'Network/Link/Data/Total'
+          description: Number of bytes transferred through
+          unit: "By/s"
     metric_tags:
       - tag: link_conn_num
         symbol:
@@ -164,10 +191,7 @@ metrics:
         symbol:
           name: linkName
           OID: 1.3.6.1.4.1.23695.1.1.2.2.1.2
-      - tag: _link_status
-        symbol:
-          OID: 1.3.6.1.4.1.23695.1.1.2.2.1.3
-          name: linkStatus
+
   - MIB: PEPLINK-BALANCE-MIB
     table:
       OID: 1.3.6.1.4.1.23695.1.1.3
@@ -175,21 +199,24 @@ metrics:
     symbols:
       - name: peplink.wanUsageThroughputIn
         OID: 1.3.6.1.4.1.23695.1.1.3.1.2
-        metric_type: monotonic_count
-        description: Number of inbound packets discarded to free buffer space
-        unit: "{packet}"
+        chart_meta:
+          family: 'Network/WAN/Throughput/Total/In'
+          description: Number of inbound packets discarded to free buffer space
+          unit: "{packet}/s"
       - name: peplink.wanUsageThroughputOut
         OID: 1.3.6.1.4.1.23695.1.1.3.1.3
-        metric_type: monotonic_count
-        description: Number of outbound packets discarded to free buffer space
-        unit: "{packet}"
+        chart_meta:
+          family: 'Network/WAN/Throughput/Total/Out'
+          description: Number of outbound packets discarded to free buffer space
+          unit: "{packet}/s"
       - name: peplink.wanUsageDataTransferred
         OID: 1.3.6.1.4.1.23695.1.1.3.1.4
-        metric_type: monotonic_count
-        description: Number of bytes transferred through
-        unit: "By"
+        chart_meta:
+          family: 'Network/WAN/Data/Total'
+          description: Number of bytes transferred through
+          unit: "By/s"
     metric_tags:
-      - symbol:
+      - tag: wan_usage_index
+        symbol:
           name: wanUsageIndex
           OID: 1.3.6.1.4.1.23695.1.1.3.1.1
-        tag: wan_usage_index
