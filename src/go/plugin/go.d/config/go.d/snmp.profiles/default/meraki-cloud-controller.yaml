@@ -5,9 +5,6 @@ extends:
   - _system-base.yaml
   - _std-if-mib.yaml
 
-device:
-  vendor: "meraki"
-
 metadata:
   device:
     fields:
@@ -18,79 +15,52 @@ sysobjectid:
   - 1.3.6.1.4.1.29671.1
   - 1.3.6.1.4.1.29671.1.*
 
+# 1. MERAKI-CLOUD-CONTROLLER-MIB
+#    https://mibbrowser.online/mibdb_search.php?mib=MERAKI-CLOUD-CONTROLLER-MIB
+#    https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/cisco/MERAKI-CLOUD-CONTROLLER-MIB
+
 metrics:
   - MIB: MERAKI-CLOUD-CONTROLLER-MIB
     table:
       OID: 1.3.6.1.4.1.29671.1.1.4
       name: devTable
       # devTable INDEX is: devMac
-    metric_type: gauge
     symbols:
       - OID: 1.3.6.1.4.1.29671.1.1.4.1.3
         name: devStatus
-        description: "The status of the device's connection to the Meraki Cloud Controller Enumeration: 'offline': 0, 'online': 1."
-        unit: "TBD"
-      - OID: 1.3.6.1.4.1.29671.1.1.4.1.5
-        name: devClientCount
-        description: The number of clients currently associated with the device.
-        unit: "{client}"
-    metric_tags:
-      # devMac is part of the devTable index
-      - symbol:
-          OID: 1.3.6.1.4.1.29671.1.1.4.1.1
-          name: devMac
-          format: mac_address
-        tag: mac_address
-      - symbol:
-          OID: 1.3.6.1.4.1.29671.1.1.4.1.2
-          name: devName
-        tag: device_name
-      - symbol:
-          OID: 1.3.6.1.4.1.29671.1.1.4.1.9
-          name: devProductCode
-        tag: product
-      - symbol:
-          OID: 1.3.6.1.4.1.29671.1.1.4.1.11
-          name: devNetworkName
-        tag: network
-  - MIB: MERAKI-CLOUD-CONTROLLER-MIB
-    table:
-      OID: 1.3.6.1.4.1.29671.1.1.4
-      name: devTable
-      # devTable INDEX is: devMac
-    metric_type: gauge
-    symbols:
-      - name: meraki.dev
-        constant_value_one: true
-        description: Meraki dev constant value one
-        unit: "TBD"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      # devMac is part of the devTable index
-      - symbol:
-          OID: 1.3.6.1.4.1.29671.1.1.4.1.1
-          name: devMac
-          format: mac_address
-        tag: mac_address
-      - symbol:
-          OID: 1.3.6.1.4.1.29671.1.1.4.1.2
-          name: devName
-        tag: device_name
-      - symbol:
-          OID: 1.3.6.1.4.1.29671.1.1.4.1.9
-          name: devProductCode
-        tag: product
-      - symbol:
-          OID: 1.3.6.1.4.1.29671.1.1.4.1.11
-          name: devNetworkName
-        tag: network
-      - symbol:
-          OID: 1.3.6.1.4.1.29671.1.1.4.1.3
-          name: devStatus
-        tag: status
+        chart_meta:
+          description: The status of the device's connection to the Meraki Cloud Controller
+          family: 'System/Device/CloudConnection/Status'
+          unit: "{status}"
         mapping:
           0: offline
           1: online
+      - OID: 1.3.6.1.4.1.29671.1.1.4.1.5
+        name: devClientCount
+        chart_meta:
+          description: The number of clients currently associated with the device.
+          family: 'Network/Client/Active'
+          unit: "{client}"
+    metric_tags:
+      # devMac is part of the devTable index
+      - tag: mac_address
+        symbol:
+          OID: 1.3.6.1.4.1.29671.1.1.4.1.1
+          name: devMac
+          format: mac_address
+      - tag: device_name
+        symbol:
+          OID: 1.3.6.1.4.1.29671.1.1.4.1.2
+          name: devName
+      - tag: _product_code
+        symbol:
+          OID: 1.3.6.1.4.1.29671.1.1.4.1.9
+          name: devProductCode
+      - tag: _network_name
+        symbol:
+          OID: 1.3.6.1.4.1.29671.1.1.4.1.11
+          name: devNetworkName
+
   - MIB: MERAKI-CLOUD-CONTROLLER-MIB
     table:
       OID: 1.3.6.1.4.1.29671.1.1.5
@@ -100,32 +70,42 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.29671.1.1.5.1.4
         name: devInterfaceSentPkts
-        description: The number of packets sent on this interface.
-        unit: "{packet}"
+        chart_meta:
+          description: The number of packets sent on this interface.
+          family: 'Network/Interface/Packet/Total/Out'
+          unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.29671.1.1.5.1.5
         name: devInterfaceRecvPkts
-        description: The number of packets received on this interface.
-        unit: "{packet}"
+        chart_meta:
+          description: The number of packets received on this interface.
+          family: 'Network/Interface/Packet/Total/In'
+          unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.29671.1.1.5.1.6
         name: devInterfaceSentBytes
-        description: The number of bytes sent on this interface.
-        unit: "By"
+        scale_factor: 8
+        chart_meta:
+          description: Traffic sent on this interface.
+          family: 'Network/Interface/Traffic/Total/Out'
+          unit: "bit/s"
       - OID: 1.3.6.1.4.1.29671.1.1.5.1.7
         name: devInterfaceRecvBytes
-        description: The number of bytes received on this interface.
-        unit: "By"
+        scale_factor: 8
+        chart_meta:
+          description: Traffic received on this interface.
+          family: 'Network/Interface/Traffic/Total/In'
+          unit: "bit/s"
     metric_tags:
       # devMac and devInterfaceIndex are part of the devInterfaceTable index
-      - symbol:
+      - tag: mac_address
+        symbol:
           OID: 1.3.6.1.4.1.29671.1.1.5.1.1
           name: devInterfaceDevMac
           format: mac_address
-        tag: mac_address
-      - symbol:
+      - tag: interface_index
+        symbol:
           OID: 1.3.6.1.4.1.29671.1.1.5.1.2
           name: devInterfaceIndex
-        tag: index
-      - symbol:
+      - tag: interface
+        symbol:
           OID: 1.3.6.1.4.1.29671.1.1.5.1.3
           name: devInterfaceName
-        tag: interface
