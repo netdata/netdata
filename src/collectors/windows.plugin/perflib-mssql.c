@@ -2520,6 +2520,24 @@ static void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instan
     }
 }
 
+static inline PERF_DATA_BLOCK *
+netdata_mssql_get_perf_data_block(bool *collect_perflib, struct mssql_instance *mi, DWORD idx)
+{
+    DWORD id = RegistryFindIDByName(mi->objectName[idx]);
+    if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND) {
+        collect_perflib[idx] = false;
+        return NULL;
+    }
+
+    PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
+    if (!pDataBlock) {
+        collect_perflib[idx] = true;
+        return NULL;
+    }
+
+    return pDataBlock;
+}
+
 int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     struct mssql_instance *mi = value;
@@ -2540,17 +2558,15 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
         NULL};
 
     DWORD i;
-    for (i = 0; i < NETDATA_MSSQL_METRICS_END; i++) {
-        if (!doMSSQL[i])
+    PERF_DATA_BLOCK *pDataBlock;
+    static bool collect_perflib[NETDATA_MSSQL_METRICS_END] = {true, true, true, true, true, true, true, true, true};
+    for (i = 0; doMSSQL[i]; i++) {
+        if (!collect_perflib[i])
             continue;
 
-        DWORD id = RegistryFindIDByName(mi->objectName[i]);
-        if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
-            return -1;
-
-        PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
+        pDataBlock = netdata_mssql_get_perf_data_block(collect_perflib, mi, i);
         if (!pDataBlock)
-            return -1;
+            continue;
 
         doMSSQL[i](pDataBlock, mi, *update_every);
     }
