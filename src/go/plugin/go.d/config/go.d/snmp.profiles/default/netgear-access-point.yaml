@@ -1,7 +1,9 @@
 extends:
   - netgear.yaml
+
 sysobjectid:
   - 1.3.6.1.4.1.4526.100.7.*
+
 metadata:
   device:
     fields:
