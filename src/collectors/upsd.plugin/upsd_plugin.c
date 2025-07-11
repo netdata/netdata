@@ -326,7 +326,7 @@ static void print_version()
 }
 
 static void print_help() {
-    fputs("usage: " PLUGIN_UPSD_NAME " [-d] [COLLECTION_FREQUENCY]\n"
+    fputs("usage: " PLUGIN_UPSD_NAME " [COLLECTION_FREQUENCY]\n"
           "       " PLUGIN_UPSD_NAME " -v\n"
           "       " PLUGIN_UPSD_NAME " -h\n"
           "\n"
