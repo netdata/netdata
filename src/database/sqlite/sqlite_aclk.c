@@ -1025,7 +1025,7 @@ void aclk_synchronization_shutdown(void)
     if (!aclk_sync_config.thread)
         return;
 
-    // Send shutdown command, not that the completion is initialized
+    // Send shutdown command, note that the completion is initialized
     // on init and still valid
     aclk_mqtt_client_reset();
 
