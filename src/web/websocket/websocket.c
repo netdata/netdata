@@ -157,7 +157,7 @@ void websocket_client_free(WS_CLIENT *wsc) {
     // We MUST make sure the socket is not in the poll before closing it
     // otherwise kernel structures may be corrupted due to socket reuse
     if(wsc->wth && wsc->wth->ndpl && wsc->sock.fd >= 0)
-        nd_poll_del(wsc->wth->ndpl, wsc->sock.fd);
+        (void) nd_poll_del(wsc->wth->ndpl, wsc->sock.fd);
 
     // Close socket using ND_SOCK abstraction
     nd_sock_close(&wsc->sock);
