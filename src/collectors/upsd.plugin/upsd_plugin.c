@@ -814,6 +814,19 @@ int main(int argc, char *argv[]) {
         dfe_done(ups_name);
     }
 
+    dfe_start_read(nd_ups_name, ups_name) {
+        DICTIONARY *ups_vars = dictionary_get(nd_ups_vars, ups_name);
+        dictionary_destroy(ups_vars);
+        dictionary_del(nd_ups_vars, ups_name);
+        dictionary_del(nd_ups_seen, ups_name);
+        dictionary_del(nd_ups_name, ups_name);
+    }
+    dfe_done(ups_name);
+
+    dictionary_destroy(nd_ups_vars);
+    dictionary_destroy(nd_ups_seen);
+    dictionary_destroy(nd_ups_name);
+
     upscli_disconnect(&ups1);
     upscli_disconnect(&ups2);
     upscli_cleanup();
