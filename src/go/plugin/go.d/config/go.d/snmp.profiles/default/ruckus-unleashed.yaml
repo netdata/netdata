@@ -83,11 +83,10 @@ metrics:
     symbol:
       name: ruckusUnleashedSystemStatsWLANTotalTxPkts
       OID: 1.3.6.1.4.1.25053.1.15.1.1.1.15.8.0
-      metric_type: monotonic_count
       chart_meta:
         family: 'Network/WLAN/Packet/Total/Out'
         description: Total transmitted packets of wireless interfaces
-        unit: "{packet}"
+        unit: "{packet}/s"
   - MIB: RUCKUS-UNLEASHED-SYSTEM-MIB
     symbol:
       name: ruckusUnleashedSystemStatsWLANTotalTxBytes

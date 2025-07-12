@@ -164,7 +164,7 @@ metrics:
           family: 'Hardware/PDU/Energy/Total'
           unit: "W.h"
     metric_tags:
-      - tag: awk_i2_pdu_index
+      - tag: hawk_i2_pdu_index
         index: 1
       - tag: hawk_i2_pdu_name
         table: pduTable

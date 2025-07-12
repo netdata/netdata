@@ -29,7 +29,7 @@ metrics:
           family: 'Network/SerialPort/Traffic/Out'
           description: Serial port bytes transmitted
           unit: "By/s"
-      - OID: 1.3.6.1.4.1.25049.17.17.1.6
+      - OID: 1.3.6.1.4.1.25049.16.1.1.6
         name: ogSerialPortStatusDCD
         chart_meta:
           family: 'Network/SerialPort/Signal/Status/DCD'
@@ -38,7 +38,7 @@ metrics:
         mapping:
           0: off
           1: on
-      - OID: 1.3.6.1.4.1.25049.17.17.1.7
+      - OID: 1.3.6.1.4.1.25049.16.1.1.7
         name: ogSerialPortStatusDTR
         chart_meta:
           family: 'Network/SerialPort/Signal/Status/DTR'
@@ -47,7 +47,7 @@ metrics:
         mapping:
           0: off
           1: on
-      - OID: 1.3.6.1.4.1.25049.17.17.1.8
+      - OID: 1.3.6.1.4.1.25049.16.1.1.8
         name: ogSerialPortStatusDSR
         chart_meta:
           family: 'Network/SerialPort/Signal/Status/DSR'
@@ -56,7 +56,7 @@ metrics:
         mapping:
           0: off
           1: on
-      - OID: 1.3.6.1.4.1.25049.17.17.1.9
+      - OID: 1.3.6.1.4.1.25049.16.1.1.9
         name: ogSerialPortStatusCTS
         chart_meta:
           family: 'Network/SerialPort/Signal/Status/CTS'
@@ -65,7 +65,7 @@ metrics:
         mapping:
           0: off
           1: on
-      - OID: 1.3.6.1.4.1.25049.17.17.1.10
+      - OID: 1.3.6.1.4.1.25049.16.1.1.10
         name: ogSerialPortStatusRTS
         chart_meta:
           family: 'Network/SerialPort/Signal/RTS/Status'

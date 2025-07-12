@@ -69,7 +69,7 @@ metrics:
           3: connected
           4: busy
     metric_tags:
-      - tag: aritan_remotekvm_port_data_index
+      - tag: raritan_remotekvm_port_data_index
         index: 1
       - tag: raritan_remotekvm_port_data_name
         symbol:
