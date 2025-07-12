@@ -1,50 +1,75 @@
 # Netdata Cloud
 
-Netdata Cloud is a powerful service that transforms standalone Netdata Agent installations into a unified, scalable observability solution. It achieves this without centralizing metric storage, ensuring optimal performance and cost-effectiveness even at enterprise scale.
+Netdata Cloud is a powerful service that transforms your standalone Netdata Agent installations into a unified, scalable observability solution. It achieves this without centralizing metric storage, ensuring optimal performance and cost-effectiveness even at enterprise scale.
 
-By serving as a lightweight control plane, Netdata Cloud provides:
+:::info
 
-- Seamless coordination across multiple teams and environments
-- Unified visibility across cloud providers and data centers
-- Real-time, high-fidelity monitoring at any scale
-- Flexible observability pipelines that grow with your infrastructure
+By serving as a lightweight control plane, Netdata Cloud provides you with:
+
+- **Seamless coordination** across multiple teams and environments
+- **Unified visibility** across cloud providers and data centers
+- **Real-time, high-fidelity** monitoring at any scale
+- **Flexible observability** pipelines that grow with your infrastructure
+
+:::
+
+<details>
+<summary><strong>Click to see visual representation of the architecture</strong></summary><br/>
 
 ```mermaid
 flowchart TB
-    NC("<b>☁️ Netdata Cloud</b>
-          Horizontal scalability,
-          Role based access,
-          Access from anywhere,
-          Central dispatch of Alert notifications
-          Custom Dashboards,
-          Advanced customization,
+    NC("**Netdata Cloud**
+          - Horizontal scalability,
+          - Role based access,
+          - Access from anywhere,
+          - Central dispatch of <br/>Alert notifications
+          - Custom Dashboards,
+          - Advanced customization
           ")
-    Users[["<b>✨ Unified Dashboards</b>
+    Users("**Unified Dashboards**
             across the infrastructure,
-            multi-cloud, hybrid-cloud"]]
-    Notifications["<b>🔔 Alert Notifications</b>
+            multi-cloud, hybrid-cloud")
+    Notifications("**Alert Notifications**
                     Slack, e-mail, Mobile App,
-                    PagerDuty, and more"]
+                    PagerDuty, and more")
     Users <--> NC
-    NC -->|deduplicated| Notifications
-    subgraph On-Prem Infrastructure
+    NC --> Notifications
+    subgraph infrastructure["On-Prem Infrastructure"]
         direction TB
-        Agents("<b>🌎 Netdata Agents</b>
+        Agents("**Netdata Agents**
                 Standalone,
                 Children, Parents
                 (possibly overlapping)")
-        TimeSeries[("<b>Time-Series</b>
+        TimeSeries("Time-Series
                     metric samples
-                    database")]
-        PrivateAgents("<b>🔒 Private
-                        Netdata Agents</b>")
+                    database")
+        PrivateAgents("Private
+                        Netdata Agents")
         Agents <--> TimeSeries
-        Agents ---|stream| PrivateAgents
+        Agents --- PrivateAgents
     end
-    NC <-->|secure connection| Agents
+    NC <--> Agents
+    
+    classDef cloud fill:#e8f4fd,stroke:#4a90e2,stroke-width:2px,color:#2c3e50,rx:10,ry:10
+    classDef users fill:#fff2e8,stroke:#f39c12,stroke-width:2px,color:#2c3e50,rx:10,ry:10
+    classDef notifications fill:#ffe8e8,stroke:#e74c3c,stroke-width:2px,color:#2c3e50,rx:10,ry:10
+    classDef agents fill:#e8f5e8,stroke:#27ae60,stroke-width:2px,color:#2c3e50,rx:10,ry:10
+    classDef timeseries fill:#f3e8ff,stroke:#9b59b6,stroke-width:2px,color:#2c3e50,rx:10,ry:10
+    classDef private fill:#f0f8ff,stroke:#87ceeb,stroke-width:2px,color:#2c3e50,rx:10,ry:10
+    classDef subgraphStyle fill:#f8f9fa,stroke:#6c757d,stroke-width:2px,color:#2c3e50
+    
+    class NC cloud
+    class Users users
+    class Notifications notifications
+    class Agents agents
+    class TimeSeries timeseries
+    class PrivateAgents private
+    class infrastructure subgraphStyle
 ```
 
-Netdata Cloud provides the following features, on top of what the Agents already provide:
+</details><br/>
+
+Netdata Cloud provides you with the following features, on top of what the Agents already provide:
 
 | Feature                                                                                                                 | Description                                                                                                                                                                                                                                                                      |
 |:------------------------------------------------------------------------------------------------------------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -55,18 +80,20 @@ Netdata Cloud provides the following features, on top of what the Agents already
 | [**Custom Dashboards**](/docs/dashboards-and-charts/dashboards-tab.md)                                                  | • Create and save custom views<br/>• Share dashboards across teams<br/>• Build focused views for specific needs                                                                                                                                                                  |
 | **Personal Customization**                                                                                              | • Individual user visualization preferences<br/>• Tailored dashboard experiences<br/>• Flexible viewing options for different roles                                                                                                                                              |
 
-## Stored metadata
+## Stored Metadata
 
 Netdata Cloud doesn't store your metrics or logs.
 
-**What Netdata Cloud Does Store**:
+:::info
+
+**What Netdata Cloud Does Store:**
 
 - Node information and labels
 - Metric names, labels, and retention periods
 - Active collectors
 - Alert configurations and state changes
 
-**How Data Flows**:
+**How Data Flows:**
 
 1. Metadata (listed above) is synchronized between Agents and Cloud
 2. Metric data and logs remain stored locally on your Agents
@@ -74,6 +101,8 @@ Netdata Cloud doesn't store your metrics or logs.
     - Data is transferred directly from Agents to your browser via Cloud
     - Cloud aggregates responses from multiple Agents into a unified view
     - No metric or log data is stored in Cloud during this process
+
+:::
 
 ## Fidelity and Resolution
 
@@ -87,15 +116,15 @@ The data you see is identical to what you would get by accessing Agents directly
 
 ## FAQ
 
-<details><summary>details</summary>
+<details><summary><strong>Does the Cloud require Observability Centralization Points?</strong></summary><br/>
 
-### Does the Cloud require Observability Centralization Points?
-
-No. Any or all Agents can be connected directly to the Cloud.
+No. You can connect any or all Agents directly to the Cloud.
 
 We recommend creating [Observability Centralization Points](/docs/observability-centralization-points/README.md), as required for operational efficiency (ephemeral nodes, teams or services isolation, central control of alerts, production systems performance), security policies (internet isolation), or cost optimization (use existing capacities before allocating new ones).
 
-### When I have Parents, do I need to connect the Children to the Cloud too?
+</details><br/>
+
+<details><summary><strong>When I have Parents, do I need to connect the Children to the Cloud too?</strong></summary><br/>
 
 No, it is not necessary, but it provides high availability.
 
@@ -109,6 +138,6 @@ The Cloud prefers:
 
 - The closest (to the Child) Parent available for [Top Monitoring](/docs/top-monitoring-netdata-functions.md). The streaming protocol of Parents and Children is able to forward such requests to the leaf child, via the Parents, to respond with live and accurate data.
 
-Children may be connected to the Cloud for high-availability, in cases where their Parents become unreachable.
+You may connect Children to the Cloud for high-availability, in cases where their Parents become unreachable.
 
 </details>
