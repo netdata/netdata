@@ -1,20 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "rrdengine.h"
 
-void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, bool having_lock)
+void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile)
 {
-    if(!having_lock)
-        uv_rwlock_wrlock(&ctx->datafiles.rwlock);
-
+    uv_rwlock_wrlock(&ctx->datafiles.rwlock);
     Pvoid_t *Pvalue = JudyLIns(&ctx->datafiles.JudyL, (Word_t ) datafile->fileno, PJE0);
     if(!Pvalue || Pvalue == PJERR)
         fatal("DBENGINE: cannot insert datafile %u of tier %d into the datafiles list",
               datafile->fileno, ctx->config.tier);
-
     *Pvalue = datafile;
-
-    if(!having_lock)
-        uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
+    uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
 }
 
 void datafile_list_delete_unsafe(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile)
@@ -515,7 +510,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
         }
 
         ctx_current_disk_space_increase(ctx, datafile->pos + journalfile->unsafe.pos);
-        datafile_list_insert(ctx, datafile, false);
+        datafile_list_insert(ctx, datafile);
     }
 
     matched_files -= failed_to_load;
@@ -525,7 +520,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
 }
 
 /* Creates a datafile and a journalfile pair */
-int create_new_datafile_pair(struct rrdengine_instance *ctx, bool having_lock)
+int create_new_datafile_pair(struct rrdengine_instance *ctx)
 {
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.datafile_creation_started, 1, __ATOMIC_RELAXED);
 
@@ -556,7 +551,7 @@ int create_new_datafile_pair(struct rrdengine_instance *ctx, bool having_lock)
     nd_log(NDLS_DAEMON, NDLP_INFO, "DBENGINE: created journal file \"%s\".", path);
 
     ctx_current_disk_space_increase(ctx, datafile->pos + journalfile->unsafe.pos);
-    datafile_list_insert(ctx, datafile, having_lock);
+    datafile_list_insert(ctx, datafile);
     ctx_last_fileno_increment(ctx);
 
     return 0;
@@ -584,7 +579,7 @@ int init_data_files(struct rrdengine_instance *ctx)
     } else if (0 == ret) {
         netdata_log_info("DBENGINE: data files not found, creating in path \"%s\".", ctx->config.dbfiles_path);
         ctx->atomic.last_fileno = 0;
-        ret = create_new_datafile_pair(ctx, false);
+        ret = create_new_datafile_pair(ctx);
         if (ret) {
             netdata_log_error("DBENGINE: failed to create data and journal files in path \"%s\".", ctx->config.dbfiles_path);
             return ret;
@@ -592,7 +587,7 @@ int init_data_files(struct rrdengine_instance *ctx)
     }
     else {
         if (ctx->loading.create_new_datafile_pair)
-            create_new_datafile_pair(ctx, false);
+            create_new_datafile_pair(ctx);
 
         while(rrdeng_ctx_tier_cap_exceeded(ctx)) {
             Word_t Index = 0;
