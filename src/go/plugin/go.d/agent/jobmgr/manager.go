@@ -66,6 +66,10 @@ type Manager struct {
 	FnReg          FunctionRegistry
 	Vnodes         map[string]*vnodes.VirtualNode
 
+	// Dump mode
+	DumpMode     bool
+	DumpAnalyzer interface{} // Will be *agent.DumpAnalyzer but avoid circular dependency
+
 	fileStatus *fileStatus
 
 	discoveredConfigs *discoveredConfigs
@@ -324,7 +328,10 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (*module.Job, error) 
 		IsStock:         cfg.SourceType() == "stock",
 		Module:          mod,
 		Out:             m.Out,
+		DumpMode:        m.DumpMode,
+		DumpAnalyzer:    m.DumpAnalyzer,
 	}
+
 	if vnode != nil {
 		jobCfg.Vnode = *vnode.Copy()
 	}
