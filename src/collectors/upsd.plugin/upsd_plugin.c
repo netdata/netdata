@@ -695,7 +695,7 @@ int main(int argc, char *argv[]) {
     netdata_log_debug(D_SYSTEM, "upscli_list_start(ups=%p, numq=%u, query={\"%s\"}) returned %d",
                       &ups1, LENGTHOF(query), query[0]);
     if (unlikely(-1 == rc)) {
-        netdata_log_error("failed to list UPSes from upsd: %s", upscli_upserror(&ups1));
+        netdata_log_error("failed to list UPSes from upsd: %s", upscli_strerror(&ups1));
         return NETDATA_PLUGIN_EXIT_AND_DISABLE;
     }
 
@@ -710,7 +710,7 @@ int main(int argc, char *argv[]) {
         netdata_log_debug(D_SYSTEM, "upscli_list_next(ups=%p, numq=%u, query={\"%s\"}, numa=%u, answer={\"%s\",\"%s\",\"%s\"}) returned %d",
                           &ups1, LENGTHOF(query), query[0], numa, answer[0][0], answer[0][1], answer[0][2]);
         if (unlikely(-1 == rc)) {
-            netdata_log_error("failed to list UPSes from upsd: %s", upscli_upserror(&ups1));
+            netdata_log_error("failed to list UPSes from upsd: %s", upscli_strerror(&ups1));
             return NETDATA_PLUGIN_EXIT_AND_DISABLE;
         }
 
@@ -738,7 +738,7 @@ int main(int argc, char *argv[]) {
         netdata_log_debug(D_SYSTEM, "upscli_list_start(ups=%p, numq=%u, query={\"%s\"}) returned %d",
                           &ups1, LENGTHOF(query), query[0]);
         if (unlikely(-1 == rc)) {
-            netdata_log_error("failed to list UPSes from upsd: %s", upscli_upserror(&ups1));
+            netdata_log_error("failed to list UPSes from upsd: %s", upscli_strerror(&ups1));
             return NETDATA_PLUGIN_EXIT_AND_DISABLE;
         }
 
@@ -747,7 +747,7 @@ int main(int argc, char *argv[]) {
             netdata_log_debug(D_SYSTEM, "upscli_list_next(ups=%p, numq=%u, query={\"%s\"}, numa=%u, answer={\"%s\",\"%s\",\"%s\"}) returned %d",
                               &ups1, LENGTHOF(query), query[0], numa, answer[0][0], answer[0][1], answer[0][2]);
             if (unlikely(-1 == rc)) {
-                netdata_log_error("failed to list UPSes from upsd: %s", upscli_upserror(&ups1));
+                netdata_log_error("failed to list UPSes from upsd: %s", upscli_strerror(&ups1));
                 return NETDATA_PLUGIN_EXIT_AND_DISABLE;
             }
 
