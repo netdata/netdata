@@ -351,7 +351,7 @@ Netdata's ML is not a replacement for deep statistical analysis or business-inte
 
 - **Need to detect infrastructure problems without a team of data scientists?**<br/>This gives you automated anomaly detection that actually works.
 
-The system's strength lies in its ability to provide trustworthy anomaly detection and surface correlations and dependencies across components and applications, without configuration or tuning. The trade-offs — limited temporal memory, binary detection, and conservative thresholds — are features, not bugs. They ensure the system works reliably out of the box without drowning you in false insights.
+The system's strength lies in its ability to provide trustworthy anomaly detection and surface correlations and dependencies across components and applications, without configuration or tuning. The trade-offs — limited temporal memory, binary detection, and conservative thresholds — represent a careful balance between sensitivity and reliability, false positives and false negatives. These design choices ensure the system maintains its 10^-36 false positive rate while still catching meaningful infrastructure issues, working reliably out of the box without drowning you in false insights.
 
 For environments requiring detection of weekly patterns or gradual degradation over months, you'll need supplementary approaches (we also plan to support this with additional configuration to define periodicity). But for detecting significant, unexpected behavioral changes in infrastructure metrics — the kind that actually break things — Netdata's ML delivers exceptional reliability with negligible overhead.
 
