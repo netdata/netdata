@@ -7,8 +7,9 @@
 %token_type {YYSTYPE}
 %token_prefix TOK_
 
-%type expr {EVAL_NODE*}
-%type program {EVAL_NODE*}
+%type expr {EVAL_NODE *}
+%type expr_list {EVAL_NODE *}
+%type program {EVAL_NODE *}
 
 %syntax_error {
     // Create a NOP node with count=0 as an error marker
@@ -37,9 +38,57 @@
     }
 }
 
-// Start symbol
-program ::= expr(E). {
+%destructor expr_list {
+    if ($$) {
+        eval_node_free($$);
+    }
+}
+
+// Start symbol - now supports multiple expressions separated by semicolons
+program ::= expr_list(E). {
     *result = E;
+}
+
+// List of expressions separated by semicolons
+expr_list(A) ::= expr(E). {
+    A = E;
+}
+
+expr_list(A) ::= expr(E) SEMICOLON. {
+    // Handle a trailing semicolon
+    A = E;
+}
+
+// Handle empty expressions (multiple semicolons in a row)
+expr_list(A) ::= SEMICOLON expr_list(L). {
+    A = L;
+}
+
+expr_list(A) ::= expr(E) SEMICOLON expr_list(L). {
+    // Create a special node for sequence of expressions
+    A = eval_node_alloc(2);
+    A->operator = EVAL_OPERATOR_SEMICOLON;
+    A->precedence = eval_precedence(EVAL_OPERATOR_SEMICOLON);
+    eval_node_set_value_to_node(A, 0, E);
+    eval_node_set_value_to_node(A, 1, L);
+}
+
+// Variable assignment
+expr(A) ::= VARIABLE(V) ASSIGN expr(E). {
+    A = eval_node_alloc(2);
+    A->operator = EVAL_OPERATOR_ASSIGNMENT;
+    A->precedence = eval_precedence(EVAL_OPERATOR_ASSIGNMENT);
+
+    // First operand is the variable name
+    EVAL_NODE *var_node = eval_node_alloc(1);
+    var_node->operator = EVAL_OPERATOR_NOP;
+    eval_node_set_value_to_variable(var_node, 0, V.strval);
+    eval_node_set_value_to_node(A, 0, var_node);
+
+    // Second operand is the expression to assign
+    eval_node_set_value_to_node(A, 1, E);
+
+    freez(V.strval); // Free the strdup'd string
 }
 
 // Basic expressions
@@ -86,12 +135,75 @@ expr(A) ::= NOT expr(B). {
     eval_node_set_value_to_node(A, 0, B);
 }
 
-// Function calls
-expr(A) ::= FUNCTION_ABS LPAREN expr(B) RPAREN. {
+// Generic function with various parameter counts
+// Function with no parameters
+expr(A) ::= FUNCTION(F) RPAREN. {
+    A = eval_node_alloc(0);
+    A->operator = F.op;
+    A->precedence = eval_precedence(EVAL_OPERATOR_FUNCTION);
+}
+
+// Function with one parameter
+expr(A) ::= FUNCTION(F) expr(B) RPAREN. {
     A = eval_node_alloc(1);
-    A->operator = EVAL_OPERATOR_ABS;
-    A->precedence = eval_precedence(EVAL_OPERATOR_ABS);
+    A->operator = F.op;
+    A->precedence = eval_precedence(EVAL_OPERATOR_FUNCTION);
     eval_node_set_value_to_node(A, 0, B);
+}
+
+// Function with two parameters
+expr(A) ::= FUNCTION(F) expr(B) COMMA expr(C) RPAREN. {
+    A = eval_node_alloc(2);
+    A->operator = F.op;
+    A->precedence = eval_precedence(EVAL_OPERATOR_FUNCTION);
+    eval_node_set_value_to_node(A, 0, B);
+    eval_node_set_value_to_node(A, 1, C);
+}
+
+// Function with three parameters
+expr(A) ::= FUNCTION(F) expr(B) COMMA expr(C) COMMA expr(D) RPAREN. {
+    A = eval_node_alloc(3);
+    A->operator = F.op;
+    A->precedence = eval_precedence(EVAL_OPERATOR_FUNCTION);
+    eval_node_set_value_to_node(A, 0, B);
+    eval_node_set_value_to_node(A, 1, C);
+    eval_node_set_value_to_node(A, 2, D);
+}
+
+// Function with four parameters
+expr(A) ::= FUNCTION(F) expr(B) COMMA expr(C) COMMA expr(D) COMMA expr(E) RPAREN. {
+    A = eval_node_alloc(4);
+    A->operator = F.op;
+    A->precedence = eval_precedence(EVAL_OPERATOR_FUNCTION);
+    eval_node_set_value_to_node(A, 0, B);
+    eval_node_set_value_to_node(A, 1, C);
+    eval_node_set_value_to_node(A, 2, D);
+    eval_node_set_value_to_node(A, 3, E);
+}
+
+// Function with five parameters
+expr(A) ::= FUNCTION(F) expr(B) COMMA expr(C) COMMA expr(D) COMMA expr(E) COMMA expr(G) RPAREN. {
+    A = eval_node_alloc(5);
+    A->operator = F.op;
+    A->precedence = eval_precedence(EVAL_OPERATOR_FUNCTION);
+    eval_node_set_value_to_node(A, 0, B);
+    eval_node_set_value_to_node(A, 1, C);
+    eval_node_set_value_to_node(A, 2, D);
+    eval_node_set_value_to_node(A, 3, E);
+    eval_node_set_value_to_node(A, 4, G);
+}
+
+// Function with six parameters
+expr(A) ::= FUNCTION(F) expr(B) COMMA expr(C) COMMA expr(D) COMMA expr(E) COMMA expr(G) COMMA expr(H) RPAREN. {
+    A = eval_node_alloc(6);
+    A->operator = F.op;
+    A->precedence = eval_precedence(EVAL_OPERATOR_FUNCTION);
+    eval_node_set_value_to_node(A, 0, B);
+    eval_node_set_value_to_node(A, 1, C);
+    eval_node_set_value_to_node(A, 2, D);
+    eval_node_set_value_to_node(A, 3, E);
+    eval_node_set_value_to_node(A, 4, G);
+    eval_node_set_value_to_node(A, 5, H);
 }
 
 // Binary operators
@@ -226,10 +338,13 @@ expr(A) ::= expr(B) QMARK expr(C) COLON expr(D). {
 // - %left: left-associative (a + b + c is parsed as (a + b) + c)
 // - %right: right-associative (a = b = c is parsed as a = (b = c))
 
-%right COLON QMARK.    // Ternary operator (right-associative)
-%left OR AND.          // Logical operators
-%left EQ NE.           // Equality operators
-%left LT LE GT GE.     // Comparison operators
-%left PLUS MINUS.      // Addition and subtraction
-%left MULTIPLY DIVIDE MODULO.  // Multiplication, division, and modulo
-%right UMINUS UPLUS NOT.       // Unary operators (highest precedence)
+%left SEMICOLON.                // Semicolon (used for separating expressions) - lowest precedence
+%left COMMA.                    // Comma (used for separating function parameters) - low precedence
+%right ASSIGN.                  // Assignment operator (right-associative, low precedence)
+%right COLON QMARK.             // Ternary operator (right-associative)
+%left OR AND.                   // Logical operators
+%left EQ NE.                    // Equality operators
+%left LT LE GT GE.              // Comparison operators
+%left PLUS MINUS.               // Addition and subtraction
+%left MULTIPLY DIVIDE MODULO.   // Multiplication, division, and modulo
+%right UMINUS UPLUS NOT.        // Unary operators (highest precedence)
