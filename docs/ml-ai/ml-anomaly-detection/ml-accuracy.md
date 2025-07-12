@@ -345,11 +345,11 @@ The consensus mechanism's reduction of false positives to 10^-36 represents a si
 
 Netdata's ML is not a replacement for deep statistical analysis or business-intent monitoring. But it is, unequivocally, **one of the most reliable, scalable, and maintenance-free anomaly detection engines for infrastructure and application metrics available today**.
 
-- **If you're running 20+ servers or a fleet of IoT/edge devices?**<br/>Turn this on and never look back.
+- **If you're running 20+ servers or a fleet of IoT/edge devices?**<br/>This is your early warning system for unexpected behaviors.
 
 - **Managing a complex microservice deployment with unpredictable patterns?**<br/>Layer this in as the safety net that never sleeps.
 
-- **Need to detect infrastructure problems without a team of data scientists?**<br/>This is your answer.
+- **Need to detect infrastructure problems without a team of data scientists?**<br/>This gives you automated anomaly detection that actually works.
 
 The system's strength lies in its ability to provide trustworthy anomaly detection and surface correlations and dependencies across components and applications, without configuration or tuning. The trade-offs — limited temporal memory, binary detection, and conservative thresholds — are features, not bugs. They ensure the system works reliably out of the box without drowning you in false insights.
 
