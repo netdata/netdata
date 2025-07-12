@@ -1046,14 +1046,13 @@ metrics:
           description: Status of the system slot
           unit: "{status}"
         mapping:
-          mapping:
-            1: other
-            2: unknown
-            3: ok
-            4: nonCritical
-            5: critical
-            6: nonRecoverable
-            7: absent
+          1: other
+          2: unknown
+          3: ok
+          4: nonCritical
+          5: critical
+          6: nonRecoverable
+          7: absent
     metric_tags:
       - tag: chassis_index
         symbol:
