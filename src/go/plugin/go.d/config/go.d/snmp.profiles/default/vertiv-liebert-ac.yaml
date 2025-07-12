@@ -4,6 +4,14 @@ extends:
 sysobjectid:
   - 1.3.6.1.4.1.476.1.42 # liebertGlobalProducts
 
+metric_tags:
+  - tag: lgp_agent_ident_model
+    OID: 1.3.6.1.4.1.476.1.42.2.1.2.0
+    symbol: lgpAgentIdentModel
+  - tag: lgp_agent_ident_serial_number
+    OID: 1.3.6.1.4.1.476.1.42.2.1.4.0
+    symbol: lgpAgentIdentSerialNumber
+
 # LIEBERT-GP-ENVIRONMENTAL-MIB
 # https://mibbrowser.online/mibdb_search.php?mib=LIEBERT-GP-ENVIRONMENTAL-MIB
 # https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/liebert/LIEBERT-GP-ENVIRONMENTAL-MIB
@@ -62,7 +70,7 @@ metrics:
       name: lgpEnvStatisticsComp1RunHr
       chart_meta:
         description: Accumulated run hours of compressor 1
-        family: 'Component/Compressor/1/Runtime'
+        family: 'Hardware/Compressor/1/Runtime'
         unit: "h"
 
   - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
@@ -71,7 +79,7 @@ metrics:
       name: lgpEnvStatisticsComp2RunHr
       chart_meta:
         description: Accumulated run hours of compressor 2
-        family: 'Component/Compressor/2/Runtime'
+        family: 'Hardware/Compressor/2/Runtime'
         unit: "h"
 
   - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
@@ -80,7 +88,7 @@ metrics:
       name: lgpEnvStatisticsFanRunHr
       chart_meta:
         description: Accumulated run hours of the main fan
-        family: 'Component/Fan/Runtime'
+        family: 'Hardware/Fan/Runtime'
         unit: "h"
 
   - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
@@ -89,7 +97,7 @@ metrics:
       name: lgpEnvStatisticsHumRunHr
       chart_meta:
         description: Accumulated run hours of the humidifier
-        family: 'Component/Humidifier/Runtime'
+        family: 'Hardware/Humidifier/Runtime'
         unit: "h"
 
   - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
@@ -98,7 +106,7 @@ metrics:
       name: lgpEnvStatisticsReheat1RunHr
       chart_meta:
         description: Accumulated run hours of reheat element 1
-        family: 'Component/Reheat/1/Runtime'
+        family: 'Hardware/Heater/Reheat/1/Runtime'
         unit: "h"
 
   - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
@@ -107,7 +115,7 @@ metrics:
       name: lgpEnvStatisticsReheat2RunHr
       chart_meta:
         description: Accumulated run hours of reheat element 2
-        family: 'Component/Reheat/2/Runtime'
+        family: 'Hardware/Heater/Reheat/2/Runtime'
         unit: "h"
 
   - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
@@ -116,13 +124,5 @@ metrics:
       name: lgpEnvStatisticsReheat3RunHr
       chart_meta:
         description: Accumulated run hours of reheat element 3
-        family: 'Component/Reheat/3/Runtime'
+        family: 'Hardware/Heater/Reheat/3/Runtime'
         unit: "h"
-
-metric_tags:
-  - tag: lgp_agent_ident_model
-    OID: 1.3.6.1.4.1.476.1.42.2.1.2.0
-    symbol: lgpAgentIdentModel
-  - tag: _lgp_agent_ident_serial_number
-    OID: 1.3.6.1.4.1.476.1.42.2.1.4.0
-    symbol: lgpAgentIdentSerialNumber

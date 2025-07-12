@@ -15,26 +15,6 @@ metadata:
 # https://mibbrowser.online/mibdb_search.php?mib=NETGEAR-SWITCHING-MIB
 # https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/netgear/NETGEAR-SWITCHING-MIB
 
-metrics:
-  - MIB: NETGEAR-SWITCHING-MIB
-    symbol:
-      name: memory.free
-      OID: 1.3.6.1.4.1.4526.10.1.1.4.1.0
-      description: "Serial number of the switch."
-      unit: "{serial_number}"
-  - MIB: NETGEAR-SWITCHING-MIB
-    symbol:
-      name: memory.total
-      OID: 1.3.6.1.4.1.4526.10.1.1.4.2.0
-      description: "FRU Number of the switch"
-      unit: "{fru_number}"
-  - MIB: NETGEAR-SWITCHING-MIB
-    symbol:
-      name: cpu.usage
-      OID: 1.3.6.1.4.1.4526.10.1.1.4.9.0  # agentSwitchCpuProcessTotalUtilization.0
-      extract_value: 60 Secs.*?([\d\.]+)
-      description: "Burned-In MAC Address"
-      unit: "{mac_address}"
 metric_tags:
   - tag: _agent_inventory_machine_model
     OID: 1.3.6.1.4.1.4526.10.1.1.1.3.0
@@ -42,3 +22,5 @@ metric_tags:
   - tag: _agent_inventory_software_version
     OID: 1.3.6.1.4.1.4526.10.1.1.1.13.0
     symbol: agentInventorySoftwareVersion
+
+# TODO: find metrics

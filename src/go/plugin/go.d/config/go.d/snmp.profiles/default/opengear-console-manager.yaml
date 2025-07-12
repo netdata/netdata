@@ -22,14 +22,16 @@ metrics:
     symbols:
       - name: ogSerialPortRxBytes
         OID: 1.3.6.1.4.1.25049.17.2.1.10
-        metric_type: monotonic_count
-        description: Number of bytes received on the serial port
-        unit: "By"
+        chart_meta:
+          family: 'Network/SerialPort/Traffic/In'
+          description: Number of bytes received on the serial port
+          unit: "By/s"
       - name: ogSerialPortTxBytes
         OID: 1.3.6.1.4.1.25049.17.2.1.11
-        metric_type: monotonic_count
-        description: Number of bytes transmitted on the serial port
-        unit: "By"
+        chart_meta:
+          family: 'Network/SerialPort/Traffic/Out'
+          description: Number of bytes transmitted on the serial port
+          unit: "By/s"
     metric_tags:
       - tag: og_serial_port_index
         index: 1  # ogSerialPortIndex
@@ -126,6 +128,7 @@ metrics:
         mapping:
           1: on
           2: off
+
   - MIB: OG-STATUSv2-MIB
     table:
       name: ogCellModemTable
@@ -133,9 +136,28 @@ metrics:
     symbols:
       - name: ogCellModemCounter
         OID: 1.3.6.1.4.1.25049.17.17.1.16
-        metric_type: monotonic_count
-        description: Number of cell modem events counted
-        unit: "{event}"
+        chart_meta:
+          family: 'Network/CellModem/Event'
+          description: Number of cell modem events counted
+          unit: "{event}/s"
+      - OID: 1.3.6.1.4.1.25049.17.17.1.4
+        name: ogCellModemEnabled
+        chart_meta:
+          family: 'Network/CellModem/Status/Enabled'
+          description: Indicates whether the model is enabled
+          unit: "{status}"
+        mapping:
+          1: enabled
+          2: disabled
+      - OID: 1.3.6.1.4.1.25049.17.17.1.5
+        name: ogCellModemConnected
+        chart_meta:
+          family: 'Network/CellModem/Status/Connected'
+          description: Indicates whether the model is connected
+          unit: "{status}"
+        mapping:
+          1: connected
+          2: disconnected
     metric_tags:
       - tag: og_cell_modem_index
         index: 1  # ogCellModemIndex
@@ -147,17 +169,3 @@ metrics:
         symbol:
           name: ogCellModemModel
           OID: 1.3.6.1.4.1.25049.17.17.1.3
-      - tag: _og_cell_modem_enabled
-        symbol:
-          name: ogCellModemEnabled
-          OID: 1.3.6.1.4.1.25049.17.17.1.4
-        mapping:
-          1: enabled
-          2: disabled
-      - tag: _og_cell_modem_connected
-        symbol:
-          OID: 1.3.6.1.4.1.25049.17.17.1.5
-          name: ogCellModemConnected
-        mapping:
-          1: connected
-          2: disconnected
