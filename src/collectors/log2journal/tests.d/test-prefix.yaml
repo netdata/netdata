@@ -1,0 +1,33 @@
+pattern: "(?P<level>\\w+)\\s+(?P<code>\\d+)\\s+(?P<message>.*)"
+
+# Test the prefix feature
+prefix: LOG2JOURNAL_
+
+inject:
+  - key: VERSION
+    value: "1.0"
+  - key: HOST
+    value: "localhost"
+
+rewrite:
+  # All captured groups should have the prefix
+  - key: SUMMARY
+    value: "${LOG2JOURNAL_level} ${LOG2JOURNAL_code}: ${LOG2JOURNAL_message}"
+    inject: yes
+    
+  # Test that injected keys also get the prefix
+  - key: FULL_VERSION
+    value: "v${LOG2JOURNAL_VERSION}"
+    inject: yes
+
+rename:
+  # Rename should work with prefixed names
+  - old_key: LOG2JOURNAL_level
+    new_key: LOG2JOURNAL_SEVERITY
+  - old_key: LOG2JOURNAL_code
+    new_key: LOG2JOURNAL_ERROR_CODE
+
+filter:
+  # Filter should work with prefixed names
+  include: "LOG2JOURNAL_.*"
+  exclude: "LOG2JOURNAL_message"  # Exclude the raw message

@@ -1,0 +1,23 @@
+---
+# Special character encoding test
+# Tests various encodings and character edge cases
+
+pattern: "(?P<prefix>[^:]+): (?P<content>.*)"
+
+inject:
+  - key: CONTROL_CHARS
+    value: "Tab:\t Newline:\n Carriage:\r Null handling"
+  - key: SYMBOLS
+    value: "Symbols: @#$%^&*()+=[]{}|\\:;\"'<>?/~`"
+  - key: ACCENTED
+    value: "Accented: café, naïve, résumé, piñata"
+  - key: MATHEMATICAL
+    value: "Math: ∑∏∆√∞≠≤≥±×÷"
+
+filename:
+  key: FILENAME
+
+rewrite:
+  - key: MESSAGE
+    value: 'Encoded[${prefix}] = ${content}'
+    inject: yes
