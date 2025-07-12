@@ -32,7 +32,7 @@ metrics:
         name: vmwHbaStatus
         chart_meta:
           description: Current HBA status
-          family: 'Storage/HBA/Status'
+          family: 'Hardware/HBA/Status'
           unit: "{status}"
         mapping:
           1: unknown

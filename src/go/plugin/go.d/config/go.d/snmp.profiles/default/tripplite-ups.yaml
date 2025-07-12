@@ -11,6 +11,20 @@ metadata:
       type:
         value: "UPS"
 
+metric_tags:
+  - tag: tl_ups_ident_serial_num
+    OID: 1.3.6.1.4.1.850.100.1.1.2.0
+    symbol: tlUpsIdentSerialNum
+  - tag: tl_ups_ident_id
+    OID: 1.3.6.1.4.1.850.100.1.1.3.0
+    symbol: tlUpsIdentID
+  - OID: 1.3.6.1.4.1.850.100.1.1.4.0
+    symbol: _tlUpsSnmpCardSerialNum
+    tag: tl_ups_snmp_card_serial_num
+  - tag: tl_ups_location
+    OID: 1.3.6.1.4.1.850.100.1.1.6.0
+    symbol: tlUpsLocation
+
 # TRIPPLITE-12X
 # https://mibbrowser.online/mibdb_search.php?mib=TRIPPLITE-12X
 # https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/tripplite/TRIPPLITE-12X
@@ -235,17 +249,3 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.850.100.1.11.2.1.4
           name: tlUpsOutletGroupDesc
-
-metric_tags:
-  - tag: _tl_ups_ident_serial_num
-    OID: 1.3.6.1.4.1.850.100.1.1.2.0
-    symbol: tlUpsIdentSerialNum
-  - OID: 1.3.6.1.4.1.850.100.1.1.3.0
-    symbol: tlUpsIdentID
-    tag: tl_ups_ident_id
-  - OID: 1.3.6.1.4.1.850.100.1.1.4.0
-    symbol: _tlUpsSnmpCardSerialNum
-    tag: tl_ups_snmp_card_serial_num
-  - OID: 1.3.6.1.4.1.850.100.1.1.6.0
-    symbol: tlUpsLocation
-    tag: tl_ups_location

@@ -16,13 +16,13 @@ metadata:
         value: "WLC"
 
 metric_tags:
-  - tag: _ruckus_unleashed_system_model
+  - tag: ruckus_unleashed_system_model
     OID: 1.3.6.1.4.1.25053.1.15.1.1.1.1.9.0
     symbol: ruckusUnleashedSystemModel
-  - tag: _ruckus_unleashed_system_licensed_aps
+  - tag: ruckus_unleashed_system_licensed_aps
     OID: 1.3.6.1.4.1.25053.1.15.1.1.1.1.12.0
     symbol: ruckusUnleashedSystemLicensedAPs
-  - tag: _ruckus_unleashed_system_serial_number
+  - tag: ruckus_unleashed_system_serial_number
     OID: 1.3.6.1.4.1.25053.1.15.1.1.1.1.15.0
     symbol: ruckusUnleashedSystemSerialNumber
 
@@ -34,78 +34,98 @@ metrics:
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.25053.1.15.1.1.1.15.13.0
-      description: CPU utilization
-      unit: "%"
+      chart_meta:
+        family: 'System/CPU/Usage'
+        description: CPU utilization
+        unit: "%"
   - MIB: RUCKUS-UNLEASHED-SYSTEM-MIB
     symbol:
       name: memory.usage
       OID: 1.3.6.1.4.1.25053.1.15.1.1.1.15.14.0
-      description: Memory utilization
-      unit: "%"
+      chart_meta:
+        family: 'System/Memory/Usage'
+        description: Memory utilization
+        unit: "%"
   - MIB: RUCKUS-UNLEASHED-SYSTEM-MIB
     symbol:
       name: ruckusUnleashedSystemStatsNumRegisteredAP
       OID: 1.3.6.1.4.1.25053.1.15.1.1.1.15.15.0
-      description: Number of registered AP
-      unit: "{access_point}"
+      chart_meta:
+        family: 'Network/AccessPoint/Registered'
+        description: Number of registered AP
+        unit: "{access_point}"
   - MIB: RUCKUS-UNLEASHED-SYSTEM-MIB
     symbol:
       name: ruckusUnleashedSystemStatsNumAP
       OID: 1.3.6.1.4.1.25053.1.15.1.1.1.15.1.0
-      description: Number of AP
-      unit: "{access_point}"
+      chart_meta:
+        family: 'Network/AccessPoint/Total'
+        description: Number of AP
+        unit: "{access_point}"
   - MIB: RUCKUS-UNLEASHED-SYSTEM-MIB
     symbol:
       name: ruckusUnleashedSystemStatsWLANTotalRxPkts
       OID: 1.3.6.1.4.1.25053.1.15.1.1.1.15.5.0
-      description: Total received packets of wireless interfaces
-      unit: "{packet}"
-      metric_type: monotonic_count
+      chart_meta:
+        family: 'Network/WLAN/Packet/Total/In'
+        description: Total received packets of wireless interfaces
+        unit: "{packet}/s"
   - MIB: RUCKUS-UNLEASHED-SYSTEM-MIB
     symbol:
       name: ruckusUnleashedSystemStatsWLANTotalRxBytes
       OID: 1.3.6.1.4.1.25053.1.15.1.1.1.15.6.0
-      description: Total received bytes of wireless interfaces
-      unit: "By"
-      metric_type: monotonic_count
+      scale_factor: 8
+      chart_meta:
+        family: 'Network/WLAN/Traffic/Total/In'
+        description: Total received bytes of wireless interfaces
+        unit: "bit/s"
   - MIB: RUCKUS-UNLEASHED-SYSTEM-MIB
     symbol:
       name: ruckusUnleashedSystemStatsWLANTotalTxPkts
       OID: 1.3.6.1.4.1.25053.1.15.1.1.1.15.8.0
-      description: Total transmitted packets of wireless interfaces
-      unit: "{packet}"
       metric_type: monotonic_count
+      chart_meta:
+        family: 'Network/WLAN/Packet/Total/Out'
+        description: Total transmitted packets of wireless interfaces
+        unit: "{packet}"
   - MIB: RUCKUS-UNLEASHED-SYSTEM-MIB
     symbol:
       name: ruckusUnleashedSystemStatsWLANTotalTxBytes
       OID: 1.3.6.1.4.1.25053.1.15.1.1.1.15.9.0
-      description: Total transmitted bytes of wireless interfaces
-      unit: "By"
-      metric_type: monotonic_count
+      scale_factor: 8
+      chart_meta:
+        family: 'Network/WLAN/Traffic/Total/Out'
+        description: Total transmitted bytes of wireless interfaces
+        unit: "bit/s"
   - MIB: RUCKUS-UNLEASHED-SYSTEM-MIB
     symbol:
       name: ruckusUnleashedSystemStatsWLANTotalTxFail
       OID: 1.3.6.1.4.1.25053.1.15.1.1.1.15.11.0
-      description: Total transmitted fail packets of wireless interfaces
-      unit: "{packet}"
-      metric_type: monotonic_count
+      chart_meta:
+        family: 'Network/WLAN/Packet/Failed/Out'
+        description: Total transmitted fail packets of wireless interfaces
+        unit: "{packet}/s"
   - MIB: RUCKUS-UNLEASHED-SYSTEM-MIB
     symbol:
       name: ruckusUnleashedSystemStatsWLANTotalTxRetry
       OID: 1.3.6.1.4.1.25053.1.15.1.1.1.15.12.0
-      description: Total transmitted retry packets of wireless interfaces
-      unit: "{packet}"
-      metric_type: monotonic_count
+      chart_meta:
+        family: 'Network/WLAN/Packet/Retry/Out'
+        description: Total transmitted retry packets of wireless interfaces
+        unit: "{packet}/s"
   - MIB: RUCKUS-UNLEASHED-SYSTEM-MIB
     symbol:
       name: ruckusUnleashedSystemStatsWLANTotalAssocFail
       OID: 1.3.6.1.4.1.25053.1.15.1.1.1.15.16.0
-      description: Total number of failed station associations.
-      unit: "{session}"
-      metric_type: monotonic_count
+      chart_meta:
+        family: 'Network/WLAN/Association/Failed'
+        description: Total number of failed station associations.
+        unit: "{session}/s"
   - MIB: RUCKUS-UNLEASHED-SYSTEM-MIB
     symbol:
       name: ruckusUnleashedSystemStatsAllNumSta
       OID: 1.3.6.1.4.1.25053.1.15.1.1.1.15.30.0
-      description: Number of All client devices
-      unit: "{device}"
+      chart_meta:
+        family: 'Network/Station/Connected'
+        description: Number of All client devices
+        unit: "{device}"
