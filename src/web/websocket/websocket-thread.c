@@ -186,7 +186,7 @@ static ssize_t read_pipe_block(int fd, void *buffer, size_t size) {
     char *buf = buffer;
     ssize_t total_read = 0;
 
-    while (total_read < size) {
+    while (total_read < (ssize_t) size) {
         ssize_t bytes = read(fd, buf + total_read, size - total_read);
 
         if (bytes < 0) {
