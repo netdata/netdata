@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- chore\(go.d/snmp-profiles\): charts meta fixes and fam updates p8 [\#20660](https://github.com/netdata/netdata/pull/20660) ([ilyam8](https://github.com/ilyam8))
 - Improve job completion handling with timeout mechanism [\#20657](https://github.com/netdata/netdata/pull/20657) ([stelfrag](https://github.com/stelfrag))
 - Fix coverity issues [\#20656](https://github.com/netdata/netdata/pull/20656) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations docs [\#20655](https://github.com/netdata/netdata/pull/20655) ([netdatabot](https://github.com/netdatabot))
@@ -456,7 +457,6 @@
 - Free ACLK message [\#20125](https://github.com/netdata/netdata/pull/20125) ([stelfrag](https://github.com/stelfrag))
 - Create Empty Directories \(Windows installer\) [\#20124](https://github.com/netdata/netdata/pull/20124) ([thiagoftsm](https://github.com/thiagoftsm))
 - Installation-Static Build-Windows [\#20122](https://github.com/netdata/netdata/pull/20122) ([kanelatechnical](https://github.com/kanelatechnical))
-- fix cleanup and exit and memory leaks [\#20120](https://github.com/netdata/netdata/pull/20120) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.4.0](https://github.com/netdata/netdata/tree/v2.4.0) (2025-04-14)
 
