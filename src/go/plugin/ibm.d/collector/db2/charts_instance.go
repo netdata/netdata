@@ -118,6 +118,46 @@ var (
 		},
 	}
 
+	bufferpoolWritesChartTmpl = module.Chart{
+		ID:       "bufferpool_%s_writes",
+		Title:    "Buffer Pool %s Writes",
+		Units:    "writes/s",
+		Fam:      "bufferpool",
+		Ctx:      "db2.bufferpool_instance_writes",
+		Priority: module.Priority + 211,
+		Dims: module.Dims{
+			{ID: "bufferpool_%s_writes", Name: "writes", Algo: module.Incremental},
+		},
+	}
+
+	bufferpoolXDAReadsChartTmpl = module.Chart{
+		ID:       "bufferpool_%s_xda_reads",
+		Title:    "Buffer Pool %s XDA Page Reads",
+		Units:    "reads/s",
+		Fam:      "bufferpool",
+		Ctx:      "db2.bufferpool_instance_xda_reads",
+		Priority: module.Priority + 205,
+		Type:     module.Stacked,
+		Dims: module.Dims{
+			{ID: "bufferpool_%s_xda_logical_reads", Name: "logical", Algo: module.Incremental},
+			{ID: "bufferpool_%s_xda_physical_reads", Name: "physical", Algo: module.Incremental},
+		},
+	}
+
+	bufferpoolColumnReadsChartTmpl = module.Chart{
+		ID:       "bufferpool_%s_column_reads",
+		Title:    "Buffer Pool %s Column Page Reads",
+		Units:    "reads/s",
+		Fam:      "bufferpool",
+		Ctx:      "db2.bufferpool_instance_column_reads",
+		Priority: module.Priority + 206,
+		Type:     module.Stacked,
+		Dims: module.Dims{
+			{ID: "bufferpool_%s_column_logical_reads", Name: "logical", Algo: module.Incremental},
+			{ID: "bufferpool_%s_column_physical_reads", Name: "physical", Algo: module.Incremental},
+		},
+	}
+
 	// Tablespace charts
 	tablespaceUsageChartTmpl = module.Chart{
 		ID:       "tablespace_%s_usage",
@@ -158,6 +198,18 @@ var (
 		},
 	}
 
+	tablespaceStateChartTmpl = module.Chart{
+		ID:       "tablespace_%s_state",
+		Title:    "Tablespace %s State",
+		Units:    "state",
+		Fam:      "tablespace",
+		Ctx:      "db2.tablespace_state",
+		Priority: module.Priority + 303,
+		Dims: module.Dims{
+			{ID: "tablespace_%s_state", Name: "state"},
+		},
+	}
+
 	// Connection charts
 	connectionStateChartTmpl = module.Chart{
 		ID:       "connection_%s_state",
@@ -182,6 +234,30 @@ var (
 		Dims: module.Dims{
 			{ID: "connection_%s_rows_read", Name: "read", Algo: module.Incremental},
 			{ID: "connection_%s_rows_written", Name: "written", Algo: module.Incremental, Mul: -1},
+		},
+	}
+
+	connectionCPUTimeChartTmpl = module.Chart{
+		ID:       "connection_%s_cpu_time",
+		Title:    "Connection %s CPU Time",
+		Units:    "milliseconds/s",
+		Fam:      "connection",
+		Ctx:      "db2.connection_cpu_time",
+		Priority: module.Priority + 402,
+		Dims: module.Dims{
+			{ID: "connection_%s_total_cpu_time", Name: "cpu_time", Algo: module.Incremental},
+		},
+	}
+
+	connectionExecutingChartTmpl = module.Chart{
+		ID:       "connection_%s_executing",
+		Title:    "Connection %s Query Execution",
+		Units:    "queries",
+		Fam:      "connection",
+		Ctx:      "db2.connection_executing",
+		Priority: module.Priority + 403,
+		Dims: module.Dims{
+			{ID: "connection_%s_executing_queries", Name: "executing"},
 		},
 	}
 
@@ -262,7 +338,10 @@ func (d *DB2) newBufferpoolCharts(bp *bufferpoolMetrics) *module.Charts {
 		bufferpoolReadsChartTmpl.Copy(),
 		bufferpoolDataReadsChartTmpl.Copy(),
 		bufferpoolIndexReadsChartTmpl.Copy(),
+		bufferpoolXDAReadsChartTmpl.Copy(),
+		bufferpoolColumnReadsChartTmpl.Copy(),
 		bufferpoolPagesChartTmpl.Copy(),
+		bufferpoolWritesChartTmpl.Copy(),
 	}
 
 	cleanName := cleanName(bp.name)
@@ -287,6 +366,7 @@ func (d *DB2) newTablespaceCharts(ts *tablespaceMetrics) *module.Charts {
 		tablespaceUsageChartTmpl.Copy(),
 		tablespaceSizeChartTmpl.Copy(),
 		tablespaceUsableSizeChartTmpl.Copy(),
+		tablespaceStateChartTmpl.Copy(),
 	}
 
 	cleanName := cleanName(ts.name)
@@ -312,6 +392,8 @@ func (d *DB2) newConnectionCharts(conn *connectionMetrics) *module.Charts {
 	charts := module.Charts{
 		connectionStateChartTmpl.Copy(),
 		connectionActivityChartTmpl.Copy(),
+		connectionCPUTimeChartTmpl.Copy(),
+		connectionExecutingChartTmpl.Copy(),
 	}
 
 	cleanID := cleanName(conn.applicationID)
