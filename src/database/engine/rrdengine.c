@@ -798,7 +798,7 @@ static struct rrdengine_datafile *get_datafile_to_write_extent(struct rrdengine_
         // take the latest datafile again - without this, multiple threads may create multiple files
         datafile = get_last_ctx_datafile(ctx, false);
 
-        if(datafile_is_full(ctx, datafile) && create_new_datafile_pair(ctx, true) == 0)
+        if(datafile_is_full(ctx, datafile) && create_new_datafile_pair(ctx) == 0)
             __atomic_store_n(&ctx->atomic.needs_indexing, true, __ATOMIC_RELAXED);
 
         netdata_mutex_unlock(&mutex);
