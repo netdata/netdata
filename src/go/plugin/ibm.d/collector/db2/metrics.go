@@ -37,21 +37,21 @@ type metricsData struct {
 	BufferpoolColumnHitRatio int64 `stm:"bufferpool_column_hit_ratio"`
 	BufferpoolLogicalReads   int64 `stm:"bufferpool_logical_reads"`
 	BufferpoolPhysicalReads  int64 `stm:"bufferpool_physical_reads"`
-	BufferpoolTotalReads     int64 `stm:"bufferpool_total_reads"`
+	BufferpoolTotalReads     int64 // No stm tag - calculated field
 
 	// Detailed buffer pool read metrics
 	BufferpoolDataLogicalReads    int64 `stm:"bufferpool_data_logical_reads"`
 	BufferpoolDataPhysicalReads   int64 `stm:"bufferpool_data_physical_reads"`
-	BufferpoolDataTotalReads      int64 `stm:"bufferpool_data_total_reads"`
+	BufferpoolDataTotalReads      int64 // No stm tag - calculated field
 	BufferpoolIndexLogicalReads   int64 `stm:"bufferpool_index_logical_reads"`
 	BufferpoolIndexPhysicalReads  int64 `stm:"bufferpool_index_physical_reads"`
-	BufferpoolIndexTotalReads     int64 `stm:"bufferpool_index_total_reads"`
+	BufferpoolIndexTotalReads     int64 // No stm tag - calculated field
 	BufferpoolXDALogicalReads     int64 `stm:"bufferpool_xda_logical_reads"`
 	BufferpoolXDAPhysicalReads    int64 `stm:"bufferpool_xda_physical_reads"`
-	BufferpoolXDATotalReads       int64 `stm:"bufferpool_xda_total_reads"`
+	BufferpoolXDATotalReads       int64 // No stm tag - calculated field
 	BufferpoolColumnLogicalReads  int64 `stm:"bufferpool_column_logical_reads"`
 	BufferpoolColumnPhysicalReads int64 `stm:"bufferpool_column_physical_reads"`
-	BufferpoolColumnTotalReads    int64 `stm:"bufferpool_column_total_reads"`
+	BufferpoolColumnTotalReads    int64 // No stm tag - calculated field
 
 	// Log metrics
 	LogUsedSpace      int64 `stm:"log_used_space"`
@@ -137,7 +137,7 @@ type databaseInstanceMetrics struct {
 
 type bufferpoolInstanceMetrics struct {
 	// Basic metrics
-	PageSize   int64 `stm:"page_size"`
+	PageSize   int64 // No stm tag - used for labels only
 	TotalPages int64 `stm:"total_pages"`
 	UsedPages  int64 `stm:"used_pages"`
 
@@ -151,7 +151,7 @@ type bufferpoolInstanceMetrics struct {
 	// Read metrics
 	LogicalReads        int64 `stm:"logical_reads"`
 	PhysicalReads       int64 `stm:"physical_reads"`
-	TotalReads          int64 `stm:"total_reads"`
+	TotalReads          int64 // No stm tag - calculated field
 	DataLogicalReads    int64 `stm:"data_logical_reads"`
 	DataPhysicalReads   int64 `stm:"data_physical_reads"`
 	IndexLogicalReads   int64 `stm:"index_logical_reads"`
@@ -172,7 +172,7 @@ type tablespaceInstanceMetrics struct {
 	FreeSize    int64 `stm:"free_size"`
 	UsableSize  int64 `stm:"usable_size"`
 	UsedPercent int64 `stm:"used_percent"`
-	PageSize    int64 `stm:"page_size"`
+	PageSize    int64 // No stm tag - used for labels only
 }
 
 type connectionInstanceMetrics struct {

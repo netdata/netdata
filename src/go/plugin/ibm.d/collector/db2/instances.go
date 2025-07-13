@@ -14,30 +14,39 @@ func (d *DB2) collectDatabaseInstances(ctx context.Context) error {
 		return nil
 	}
 
-	count := 0
+	var currentDB string
+	var currentMetrics databaseInstanceMetrics
+	
 	err := d.doQuery(ctx, fmt.Sprintf(queryDatabaseInstances, d.MaxDatabases), func(column, value string, lineEnd bool) {
-		var dbName string
-
 		switch column {
 		case "DB_NAME":
-			dbName = strings.TrimSpace(value)
+			// Save previous database metrics if we have any
+			if currentDB != "" {
+				d.mx.databases[currentDB] = currentMetrics
+			}
+			
+			dbName := strings.TrimSpace(value)
 			if dbName == "" {
+				currentDB = ""
 				return
 			}
 
 			// Apply selector if configured
 			if d.databaseSelector != nil && !d.databaseSelector.MatchString(dbName) {
+				currentDB = ""
 				return // Skip this database
 			}
 
+			currentDB = dbName
+			currentMetrics = databaseInstanceMetrics{}
+			
 			if _, exists := d.databases[dbName]; !exists {
 				d.databases[dbName] = &databaseMetrics{name: dbName}
 				d.addDatabaseCharts(d.databases[dbName])
 			}
-			count++
 
 		case "DB_STATUS":
-			if count > 0 && len(d.databases) > 0 {
+			if currentDB != "" {
 				// Map status to numeric value
 				statusValue := int64(0)
 				switch strings.ToUpper(value) {
@@ -48,37 +57,31 @@ func (d *DB2) collectDatabaseInstances(ctx context.Context) error {
 				default:
 					statusValue = -1
 				}
-
-				// Find the current database
-				for name, db := range d.databases {
-					if db.status == "" { // Not yet set
-						db.status = value
-						d.mx.databases[name] = databaseInstanceMetrics{
-							Status: statusValue,
-						}
-						break
-					}
-				}
+				
+				d.databases[currentDB].status = value
+				currentMetrics.Status = statusValue
 			}
 
 		case "APPLS_CUR_CONS":
-			if count > 0 && len(d.databases) > 0 {
+			if currentDB != "" {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					// Find the current database
-					for name, db := range d.databases {
-						if db.applications == 0 { // Not yet set
-							db.applications = v
-							if metrics, exists := d.mx.databases[name]; exists {
-								metrics.Applications = v
-								d.mx.databases[name] = metrics
-							}
-							break
-						}
-					}
+					d.databases[currentDB].applications = v
+					currentMetrics.Applications = v
 				}
 			}
 		}
+		
+		// At end of row, save the metrics
+		if lineEnd && currentDB != "" {
+			d.mx.databases[currentDB] = currentMetrics
+			currentDB = ""
+		}
 	})
+
+	// Save last database if query ended without lineEnd
+	if currentDB != "" {
+		d.mx.databases[currentDB] = currentMetrics
+	}
 
 	return err
 }
