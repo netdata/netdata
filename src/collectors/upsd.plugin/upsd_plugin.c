@@ -400,8 +400,8 @@ static inline void send_BEGIN(const char *type, const char *name, usec_t usec) {
     printf("BEGIN upsd_%s.%s %" PRIu64 "\n", type, name, usec);
 }
 
-static inline void send_SET(const char *name, unsigned int value) {
-    printf("SET %s = %u\n", name, value);
+static inline void send_SET(const char *name, int64_t value) {
+    printf("SET %s = %" PRId64 "\n", name, value);
 }
 
 static inline void send_END(void) {
