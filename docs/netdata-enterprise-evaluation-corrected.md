@@ -57,8 +57,8 @@ When connected to a Netdata Parent (the agent is in `child` mode), these require
 
 | Type       | Metric/s | CPU | Memory | Network | Storage |
 |------------|---------------|-----------|---------|---------|---------|
-| standalone | 3k - 10k | 4% - 20%<br/>of single core | 150 - 500 MiB | none | varies based on retention |
-| child      | 3k - 10k | 2% - 10%<br/>of single core | 100 - 300 MiB | \<1 Mbps | none |
+| standalone | 3k - 10k | 4% - 20% of single core | 150 - 500 MiB | none | varies based on retention |
+| child      | 3k - 10k | 2% - 10% of single core | 100 - 300 MiB | \<1 Mbps | none |
 
 For more information and ways to further reduce Agent resource utilization, see [Agent Resource Utilization](hhttps://github.com/netdata/netdata/blob/master/docs/netdata-agent/sizing-netdata-agents/README.md).
 
