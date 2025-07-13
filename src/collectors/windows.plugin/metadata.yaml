@@ -46,7 +46,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "[plugin:windows]"
+          section_name: "[plugin:windows:PerflibProcessor]"
           description: "The Netdata main configuration file"
         options:
           description: ""
@@ -54,9 +54,9 @@ modules:
             title: "Config option"
             enabled: false
           list:
-            - name: PerflibProcessor
-              description: An option to enable or disable the data collection.
-              default_value: yes
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
               required: false
         examples:
           folding:
@@ -150,7 +150,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "[plugin:windows]"
+          section_name: "[plugin:windows:PerflibMemory]"
           description: "The Netdata main configuration file"
         options:
           description: ""
@@ -158,9 +158,9 @@ modules:
             title: "Config option"
             enabled: false
           list:
-            - name: PerflibMemory
-              description: An option to enable or disable the data collection.
-              default_value: yes
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
               required: false
         examples:
           folding:
@@ -254,7 +254,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "[plugin:windows]"
+          section_name: "[plugin:windows:PerflibProcesses]"
           description: "The Netdata main configuration file"
         options:
           description: ""
@@ -262,9 +262,9 @@ modules:
             title: "Config option"
             enabled: false
           list:
-            - name: PerflibProcesses
-              description: An option to enable or disable the data collection.
-              default_value: yes
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
               required: false
         examples:
           folding:
@@ -358,7 +358,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "[plugin:windows]"
+          section_name: "[plugin:windows:PerflibStorage]"
           description: "The Netdata main configuration file"
         options:
           description: ""
@@ -366,9 +366,9 @@ modules:
             title: "Config option"
             enabled: false
           list:
-            - name: PerflibStorage
-              description: An option to enable or disable the data collection.
-              default_value: yes
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
               required: false
         examples:
           folding:
@@ -541,7 +541,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "[plugin:windows]"
+          section_name: "[plugin:windows:PerflibNetwork]"
           description: "The Netdata main configuration file"
         options:
           description: ""
@@ -549,9 +549,9 @@ modules:
             title: "Config option"
             enabled: false
           list:
-            - name: PerflibNetwork
-              description: An option to enable or disable the data collection.
-              default_value: yes
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
               required: false
         examples:
           folding:
@@ -865,7 +865,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "[plugin:windows]"
+          section_name: "[plugin:windows:PerflibObjects]"
           description: "The Netdata main configuration file"
         options:
           description: ""
@@ -873,9 +873,9 @@ modules:
             title: "Config option"
             enabled: false
           list:
-            - name: PerflibObjects
-              description: An option to enable or disable the data collection.
-              default_value: yes
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
               required: false
         examples:
           folding:
@@ -946,7 +946,7 @@ modules:
         list: []
       configuration:
         file:
-          section_name: "[plugin:windows]"
+          section_name: "[plugin:windows:PerflibThermalZone]"
           name: "netdata.conf"
           description: "The Netdata main configuration file."
         options:
@@ -955,9 +955,9 @@ modules:
             title: "Config Option"
             enabled: false
           list:
-            - name: PerflibThermalZone
-              description: An option to enable or disable the data collection.
-              default_value: yes
+            - name: update every
+              description: Data collection frequency.
+              default_value: 5
               required: false
         examples:
           folding:
@@ -1027,7 +1027,7 @@ modules:
         list: []
       configuration:
         file:
-          section_name: "[plugin:windows]"
+          section_name: "[plugin:windows:GetPowerSupply]"
           name: "netdata.conf"
           description: "The Netdata main configuration file."
         options:
@@ -1036,9 +1036,9 @@ modules:
             title: "Config Option"
             enabled: false
           list:
-            - name: GetPowerSupply
-              description: An option to enable or disable the data collection.
-              default_value: yes
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
               required: false
         examples:
           folding:
@@ -1123,7 +1123,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "[plugin:windows]"
+          section_name: "[plugin:windows:PerflibWebService]"
           description: "The Netdata main configuration file"
         options:
           description: ""
@@ -1131,9 +1131,9 @@ modules:
             title: "Config option"
             enabled: false
           list:
-            - name: PerflibWebService
-              description: An option to enable or disable the data collection.
-              default_value: yes
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
               required: false
         examples:
           folding:
@@ -1442,7 +1442,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "[plugin:windows]"
+          section_name: "[plugin:windows:PerflibHyperV]"
           description: "The Netdata main configuration file"
         options:
           description: ""
@@ -1450,9 +1450,9 @@ modules:
             title: "Config option"
             enabled: false
           list:
-            - name: PerflibHyperV
-              description: An option to enable or disable the data collection.
-              default_value: yes
+            - name: update every
+              description: Data collection frequency.
+              default_value: 5
               required: false
         examples:
           folding:
@@ -1883,6 +1883,10 @@ modules:
             title: "Config option"
             enabled: false
           list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 10
+              required: false
             - name: driver
               description: ODBC driver used to connect to the SQL Server.
               default_value: SQL Server
@@ -2242,7 +2246,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "[plugin:windows]"
+          section_name: "[plugin:windows:PerflibNetFramework]"
           description: "The Netdata main configuration file"
         options:
           description: ""
@@ -2250,9 +2254,9 @@ modules:
             title: "Config option"
             enabled: false
           list:
-            - name: PerflibNetFramework
-              description: An option to enable or disable the data collection.
-              default_value: yes
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
               required: false
         examples:
           folding:
@@ -2508,7 +2512,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "[plugin:windows]"
+          section_name: "[plugin:windows:PerflibAD]"
           description: "The Netdata main configuration file"
         options:
           description: ""
@@ -2516,9 +2520,9 @@ modules:
             title: "Config option"
             enabled: false
           list:
-            - name: PerflibAD
-              description: An option to enable or disable the data collection.
-              default_value: yes
+            - name: update every
+              description: Data collection frequency.
+              default_value: 10
               required: false
         examples:
           folding:
@@ -2687,7 +2691,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "[plugin:windows]"
+          section_name: "[plugin:windows:PerflibADCS]"
           description: "The Netdata main configuration file"
         options:
           description: ""
@@ -2695,9 +2699,9 @@ modules:
             title: "Config option"
             enabled: false
           list:
-            - name: PerflibADCS
-              description: An option to enable or disable the data collection.
-              default_value: yes
+            - name: update every
+              description: Data collection frequency.
+              default_value: 10
               required: false
         examples:
           folding:
@@ -2864,7 +2868,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "[plugin:windows]"
+          section_name: "[plugin:windows:PerflibADFS]"
           description: "The Netdata main configuration file"
         options:
           description: ""
@@ -2872,9 +2876,9 @@ modules:
             title: "Config option"
             enabled: false
           list:
-            - name: PerflibADFS
-              description: An option to enable or disable the data collection.
-              default_value: yes
+            - name: update every
+              description: Data collection frequency.
+              default_value: 10
               required: false
         examples:
           folding:
@@ -3140,7 +3144,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "[plugin:windows]"
+          section_name: "[plugin:windows:PerflibServices]"
           description: "The Netdata main configuration file"
         options:
           description: ""
@@ -3148,9 +3152,9 @@ modules:
             title: "Config option"
             enabled: false
           list:
-            - name: PerflibServices
-              description: An option to enable or disable the data collection.
-              default_value: yes
+            - name: update every
+              description: Data collection frequency.
+              default_value: 30
               required: false
         examples:
           folding:
@@ -3233,7 +3237,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "[plugin:windows]"
+          section_name: "[plugin:windows:PerflibExchange]"
           description: "The Netdata main configuration file"
         options:
           description: ""
@@ -3241,9 +3245,9 @@ modules:
             title: "Config option"
             enabled: false
           list:
-            - name: PerflibExchange
-              description: An option to enable or disable the data collection.
-              default_value: yes
+            - name: update every
+              description: Data collection frequency.
+              default_value: 10
               required: false
         examples:
           folding:
@@ -3497,7 +3501,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "[plugin:windows]"
+          section_name: "[plugin:windows:PerflibNUMA]"
           description: "The Netdata main configuration file"
         options:
           description: ""
@@ -3505,9 +3509,9 @@ modules:
             title: "Config option"
             enabled: false
           list:
-            - name: PerflibNUMA
-              description: An option to enable or disable the data collection.
-              default_value: yes
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
               required: false
         examples:
           folding:
