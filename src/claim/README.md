@@ -1,6 +1,6 @@
 # Connect Agent to Cloud
 
-This section guides you through installing and securely connecting a new Agent to Netdata Cloud via the encrypted Agent-Cloud Link  ([ACLK](/src/aclk/README.md)). Connecting your Agent to your Space unlocks centralized monitoring, easier collaboration and more.
+This section guides you through installing and securely connecting a new Agent to Netdata Cloud via the encrypted Agent-Cloud Link  ([ACLK](/src/aclk/README.md)). Connecting your Agent to your Space unlocks centralized monitoring, easier collaboration, and more.
 
 ## Quick Start - New Installation
 
@@ -188,7 +188,7 @@ To remove a node from your Space and connect it to another, follow these steps:
     ```
 
 4. **Connect to new Space**
-   
+
    Go to your new Space, copy the installation command with the new claim token and run it. If you're using a `docker-compose.yml` file, you will have to overwrite it with the new claiming token. The node should now appear online in that Space.
 
 </details>
@@ -204,6 +204,7 @@ Only **Administrators** of a Space in Netdata Cloud can regenerate Claim Tokens.
 :::
 
 **Steps:**
+
 1. Navigate to [any screen](#quick-start---new-installation) containing the Connection command
 2. Click the "Regenerate token" button. This action invalidates your previous token and generates a new one
 

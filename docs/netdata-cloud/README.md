@@ -18,67 +18,82 @@ By serving as a lightweight control plane, Netdata Cloud provides you with:
 
 ```mermaid
 flowchart TB
-    NC("**Netdata Cloud**
-          - Horizontal scalability,
-          - Role based access,
-          - Access from anywhere,
-          - Central dispatch of <br/>Alert notifications
-          - Custom Dashboards,
-          - Advanced customization
-          ")
-    Users("**Unified Dashboards**
-            across the infrastructure,
-            multi-cloud, hybrid-cloud")
-    Notifications("**Alert Notifications**
-                    Slack, e-mail, Mobile App,
-                    PagerDuty, and more")
-    Users <--> NC
-    NC --> Notifications
-    subgraph infrastructure["On-Prem Infrastructure"]
-        direction TB
-        Agents("**Netdata Agents**
-                Standalone,
-                Children, Parents
-                (possibly overlapping)")
-        TimeSeries("Time-Series
-                    metric samples
-                    database")
-        PrivateAgents("Private
-                        Netdata Agents")
-        Agents <--> TimeSeries
-        Agents --- PrivateAgents
-    end
-    NC <--> Agents
-    
-    classDef cloud fill:#e8f4fd,stroke:#4a90e2,stroke-width:2px,color:#2c3e50,rx:10,ry:10
-    classDef users fill:#fff2e8,stroke:#f39c12,stroke-width:2px,color:#2c3e50,rx:10,ry:10
-    classDef notifications fill:#ffe8e8,stroke:#e74c3c,stroke-width:2px,color:#2c3e50,rx:10,ry:10
-    classDef agents fill:#e8f5e8,stroke:#27ae60,stroke-width:2px,color:#2c3e50,rx:10,ry:10
-    classDef timeseries fill:#f3e8ff,stroke:#9b59b6,stroke-width:2px,color:#2c3e50,rx:10,ry:10
-    classDef private fill:#f0f8ff,stroke:#87ceeb,stroke-width:2px,color:#2c3e50,rx:10,ry:10
-    classDef subgraphStyle fill:#f8f9fa,stroke:#6c757d,stroke-width:2px,color:#2c3e50
-    
-    class NC cloud
-    class Users users
-    class Notifications notifications
-    class Agents agents
-    class TimeSeries timeseries
-    class PrivateAgents private
-    class infrastructure subgraphStyle
+   NC[NC]
+   Users[Users]
+   Notifications[Notifications]
+
+   NC("**Netdata Cloud**
+- Horizontal scalability
+- Role based access
+- Access from anywhere
+- Central dispatch of<br/>Alert notifications
+- Custom Dashboards
+- Advanced customization")
+
+Users("**Unified Dashboards**
+across the infrastructure,
+multi-cloud, hybrid-cloud")
+
+Notifications("**Alert Notifications**
+Slack, e-mail, Mobile App,
+PagerDuty, and more")
+
+Users <--> NC
+NC --> Notifications
+
+subgraph infrastructure["On-Prem Infrastructure"]
+direction TB
+Agents[Agents]
+TimeSeries[TimeSeries]
+PrivateAgents[PrivateAgents]
+
+Agents("**Netdata Agents**
+Standalone,
+Children, Parents
+(possibly overlapping)")
+
+TimeSeries("Time-Series
+metric samples
+database")
+
+PrivateAgents("Private
+Netdata Agents")
+
+Agents <--> TimeSeries
+Agents --- PrivateAgents
+end
+
+NC <--> Agents
+
+classDef cloud fill: #e8f4fd, stroke: #4a90e2, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
+classDef users fill: #fff2e8, stroke: #f39c12, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
+classDef notifications fill: #ffe8e8, stroke: #e74c3c, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
+classDef agents fill: #e8f5e8, stroke: #27ae60, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
+classDef timeseries fill: #f3e8ff, stroke: #9b59b6, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
+classDef private fill: #f0f8ff, stroke: #87ceeb, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
+classDef subgraphStyle fill: #f8f9fa, stroke: #6c757d, stroke-width: 2px, color: #2c3e50, rx: 15, ry: 15
+
+class NC cloud
+class Users users
+class Notifications notifications
+class Agents agents
+class TimeSeries timeseries
+class PrivateAgents private
+class infrastructure subgraphStyle
 ```
 
 </details><br/>
 
 Netdata Cloud provides you with the following features, on top of what the Agents already provide:
 
-| Feature                                                                                                                 | Description                                                                                                                                                                                                                                                                      |
-|:------------------------------------------------------------------------------------------------------------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Horizontal Scalability**                                                                                              | • Scale your observability infrastructure effortlessly<br/>• Add [Parents and Children](/docs/observability-centralization-points/README.md) as needed<br/>• Manage all nodes from a single [Space](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#spaces) |
-| [**Role-Based Access Control (RBAC)**](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md) | • Fine-grained access management<br/>• Control team member privileges across your Space<br/>• Secure, role-appropriate access to monitoring data                                                                                                                                 |
-| **Global Remote Access**                                                                                                | • Access your monitoring from anywhere<br/>• No VPN configuration required<br/>• Secure access to local dashboards while data stays on premises                                                                                                                                  |
-| **Centralized Alert Management**                                                                                        | • Unified alert dispatch from a central location<br/>• Cloud-specific alerts and monitoring<br/>• Mobile push notifications via [Netdata Mobile App](/integrations/cloud-notifications/integrations/netdata_mobile_app.md) (paid plans)                                          |
-| [**Custom Dashboards**](/docs/dashboards-and-charts/dashboards-tab.md)                                                  | • Create and save custom views<br/>• Share dashboards across teams<br/>• Build focused views for specific needs                                                                                                                                                                  |
-| **Personal Customization**                                                                                              | • Individual user visualization preferences<br/>• Tailored dashboard experiences<br/>• Flexible viewing options for different roles                                                                                                                                              |
+| Feature                                                                                                                 | Description                                                                                                                                                                                                                                                               |
+|:------------------------------------------------------------------------------------------------------------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Horizontal Scalability**                                                                                              | • Scale your observability infrastructure effortlessly<br/>• Add [Parents and Children](/docs/observability-centralization-points/README.md) as needed<br/>• Manage all nodes from a single [Space](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md) |
+| [**Role-Based Access Control (RBAC)**](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md) | • Fine-grained access management<br/>• Control team member privileges across your Space<br/>• Secure, role-appropriate access to monitoring data                                                                                                                          |
+| **Global Remote Access**                                                                                                | • Access your monitoring from anywhere<br/>• No VPN configuration required<br/>• Secure access to local dashboards while data stays on premises                                                                                                                           |
+| **Centralized Alert Management**                                                                                        | • Unified alert dispatch from a central location<br/>• Cloud-specific alerts and monitoring<br/>• Mobile push notifications via [Netdata Mobile App](/integrations/cloud-notifications/integrations/netdata_mobile_app.md) (paid plans)                                   |
+| [**Custom Dashboards**](/docs/dashboards-and-charts/dashboards-tab.md)                                                  | • Create and save custom views<br/>• Share dashboards across teams<br/>• Build focused views for specific needs                                                                                                                                                           |
+| **Personal Customization**                                                                                              | • Individual user visualization preferences<br/>• Tailored dashboard experiences<br/>• Flexible viewing options for different roles                                                                                                                                       |
 
 ## Stored Metadata
 
@@ -100,7 +115,7 @@ Netdata Cloud doesn't store your metrics or logs.
 3. When you view dashboards:
     - Data is transferred directly from Agents to your browser via Cloud
     - Cloud aggregates responses from multiple Agents into a unified view
-    - No metric or log data is stored in Cloud during this process
+    - No metric or log data is stored in the Cloud during this process
 
 :::
 
@@ -116,7 +131,8 @@ The data you see is identical to what you would get by accessing Agents directly
 
 ## FAQ
 
-<details><summary><strong>Does the Cloud require Observability Centralization Points?</strong></summary><br/>
+<details>
+<summary><strong>Does the Cloud require Observability Centralization Points?</strong></summary><br/>
 
 No. You can connect any or all Agents directly to the Cloud.
 
@@ -124,7 +140,8 @@ We recommend creating [Observability Centralization Points](/docs/observability-
 
 </details><br/>
 
-<details><summary><strong>When I have Parents, do I need to connect the Children to the Cloud too?</strong></summary><br/>
+<details>
+<summary><strong>When I have Parents, do I need to connect the Children to the Cloud too?</strong></summary><br/>
 
 No, it is not necessary, but it provides high availability.
 

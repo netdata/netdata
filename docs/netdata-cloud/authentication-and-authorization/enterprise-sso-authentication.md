@@ -10,12 +10,12 @@ Enterprise SSO handles authentication only. You must configure user and role man
 
 ## Prerequisites
 
-| Requirement | Details |
-|-------------|---------|
-| **SSO Provider** | Must be [supported by Netdata](https://learn.netdata.cloud/docs/netdata-cloud/authentication-&-authorization/cloud-authentication-&-authorization-integrations) |
-| **Account Status** | Active Netdata Cloud account |
-| **Subscription** | Business plan or higher |
-| **Access Level** | Space Administrator permissions |
+| Requirement        | Details                                                                                                                                                         |
+|--------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **SSO Provider**   | Must be [supported by Netdata](https://learn.netdata.cloud/docs/netdata-cloud/authentication-&-authorization/cloud-authentication-&-authorization-integrations) |
+| **Account Status** | Active Netdata Cloud account                                                                                                                                    |
+| **Subscription**   | Business plan or higher                                                                                                                                         |
+| **Access Level**   | Space Administrator permissions                                                                                                                                 |
 
 ## Setup
 
@@ -40,11 +40,11 @@ Domain verification is required to establish secure SSO connectivity:
     - Log into your domain provider's DNS management
     - Create a new TXT record with these specifications:
 
-| Field | Value |
-|-------|--------|
+| Field                        | Value                                        |
+|------------------------------|----------------------------------------------|
 | **Value/Answer/Description** | `"netdata-verification=[VERIFICATION CODE]"` |
-| **Name/Host/Alias** | Leave blank or use @ for subdomain |
-| **TTL (Time to Live)** | 86400 (or use provider default) |
+| **Name/Host/Alias**          | Leave blank or use @ for subdomain           |
+| **TTL (Time to Live)**       | 86400 (or use provider default)              |
 
 ### SSO Provider Configuration
 

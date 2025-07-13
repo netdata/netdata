@@ -22,10 +22,10 @@ You can access token management through the Netdata UI:
 
 You can limit each token to specific scopes that define its access permissions:
 
-| Scope | Description | API Access |
-|:------|:------------|:-----------|
-| `scope:all` | Grants the same permissions as the user who created the token. Use case: Terraform provider integration. | Full access to all API endpoints |
-| `scope:agent-ui` | Used by Agent for accessing the Cloud UI | Access to UI-related endpoints |
+| Scope                  | Description                                                                                                                                        | API Access                         |
+|:-----------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------|:-----------------------------------|
+| `scope:all`            | Grants the same permissions as the user who created the token. Use case: Terraform provider integration.                                           | Full access to all API endpoints   |
+| `scope:agent-ui`       | Used by Agent for accessing the Cloud UI                                                                                                           | Access to UI-related endpoints     |
 | `scope:grafana-plugin` | Used for the [Netdata Grafana plugin](https://github.com/netdata/netdata-grafana-datasource-plugin/blob/master/README.md) to access Netdata charts | Access to chart and data endpoints |
 
 ## API Versions
@@ -33,7 +33,7 @@ You can limit each token to specific scopes that define its access permissions:
 Netdata provides three API versions that you can access with API tokens:
 
 - **v1**: The original API, focused on single-node operations
-- **v2**: Multi-node API with advanced grouping and aggregation capabilities  
+- **v2**: Multi-node API with advanced grouping and aggregation capabilities
 - **v3**: The latest API version that combines v1 and v2 endpoints and may include additional features
 
 ## Common Endpoints
@@ -75,7 +75,7 @@ curl -H 'Accept: application/json' -H "Authorization: Bearer <token>" https://ap
 curl -H 'Accept: application/json' -H "Authorization: Bearer <token>" https://app.netdata.cloud/api/v2/data?contexts=system.cpu&after=-600
 ```
 
-**Get contexts information**
+**Get context information**
 
 ```console
 curl -H 'Accept: application/json' -H "Authorization: Bearer <token>" https://app.netdata.cloud/api/v2/contexts

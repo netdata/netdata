@@ -7,6 +7,7 @@ You can organize Nodes within Rooms automatically using configurable label-based
 Rules automatically assign Nodes to Rooms based on their host labels. When you create a rule, it continuously evaluates all Nodes and assigns them to the appropriate Room when they match your criteria.
 
 **Rule Evaluation Order:**
+
 - Exclusion rules are evaluated first
 - Inclusion rules are evaluated second
 
@@ -37,15 +38,15 @@ In cases where both an inclusion and exclusion rule match, the exclusion rule ta
 
 You can build rules with the following elements:
 
-| Element | Description                                                                                       |
-|:--------|:--------------------------------------------------------------------------------------------------|
+| Element     | Description                                                                                       |
+|:------------|:--------------------------------------------------------------------------------------------------|
 | **Action**  | Determines whether matching Nodes will be included or excluded from the Room                      |
 | **Clauses** | Set of conditions that determine which Nodes match the Rule (all must be satisfied - logical AND) |
 
 Each clause consists of:
 
-| Element  | Description                  |
-|:---------|:-----------------------------|
+| Element      | Description                  |
+|:-------------|:-----------------------------|
 | **Label**    | The host label to check      |
 | **Value**    | The comparison method        |
 | **Operator** | The value to compare against |

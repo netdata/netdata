@@ -55,11 +55,11 @@ All nodes automatically appear in the "All nodes" Room. Each Room has independen
 
 ### Room Organization Strategies
 
-| Strategy | Use Case | Examples |
-|----------|----------|----------|
-| **Service-Based Organization** | Group nodes by **specific services**, **purpose**, **location**, or **infrastructure type** | **Nginx**, **MySQL**, **Pulsar**, **webserver**, **database**, **application**, **physical location**, **bare metal**, **containers**, **cloud provider** |
-| **End-to-End Application Monitoring** | Create Rooms for **complete application stacks** and **service dependencies** | **Complete SaaS product stacks**, **internal service dependencies**, **full application ecosystems** including **Kubernetes clusters**, **Docker containers**, **Proxies**, **Databases**, **Web servers**, **Message brokers** |
-| **Incident Response** | Create dedicated Rooms for **troubleshooting** and **problem resolution** | **Active incident investigation**, **problem diagnosis**, **performance troubleshooting**, **root cause analysis** |
+| Strategy                              | Use Case                                                                                    | Examples                                                                                                                                                                                                                        |
+|---------------------------------------|---------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Service-Based Organization**        | Group nodes by **specific services**, **purpose**, **location**, or **infrastructure type** | **Nginx**, **MySQL**, **Pulsar**, **webserver**, **database**, **application**, **physical location**, **bare metal**, **containers**, **cloud provider**                                                                       |
+| **End-to-End Application Monitoring** | Create Rooms for **complete application stacks** and **service dependencies**               | **Complete SaaS product stacks**, **internal service dependencies**, **full application ecosystems** including **Kubernetes clusters**, **Docker containers**, **Proxies**, **Databases**, **Web servers**, **Message brokers** |
+| **Incident Response**                 | Create dedicated Rooms for **troubleshooting** and **problem resolution**                   | **Active incident investigation**, **problem diagnosis**, **performance troubleshooting**, **root cause analysis**                                                                                                              |
 
 ## Manage Your Setup
 
