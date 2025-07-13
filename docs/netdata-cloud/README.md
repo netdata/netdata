@@ -23,12 +23,12 @@ flowchart TB
    Notifications[Notifications]
 
    NC("**Netdata Cloud**
-- Horizontal scalability
-- Role based access
-- Access from anywhere
-- Central dispatch of<br/>Alert notifications
-- Custom Dashboards
-- Advanced customization")
+• Horizontal scalability
+• Role based access
+• Access from anywhere
+• Central dispatch of<br/>Alert notifications
+• Custom Dashboards
+• Advanced customization")
 
 Users("**Unified Dashboards**
 across the infrastructure,
