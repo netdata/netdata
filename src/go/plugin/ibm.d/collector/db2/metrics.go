@@ -29,12 +29,17 @@ type metricsData struct {
 	RowsModified int64 `stm:"rows_modified"`
 	RowsReturned int64 `stm:"rows_returned"`
 
-	// Buffer pool aggregate metrics
-	BufferpoolHitRatio       int64 `stm:"bufferpool_hit_ratio"`
-	BufferpoolDataHitRatio   int64 `stm:"bufferpool_data_hit_ratio"`
-	BufferpoolIndexHitRatio  int64 `stm:"bufferpool_index_hit_ratio"`
-	BufferpoolXDAHitRatio    int64 `stm:"bufferpool_xda_hit_ratio"`
-	BufferpoolColumnHitRatio int64 `stm:"bufferpool_column_hit_ratio"`
+	// Buffer pool hit/miss metrics for percentage-of-incremental-row
+	BufferpoolHits           int64 `stm:"bufferpool_hits"`
+	BufferpoolMisses         int64 `stm:"bufferpool_misses"`
+	BufferpoolDataHits       int64 `stm:"bufferpool_data_hits"`
+	BufferpoolDataMisses     int64 `stm:"bufferpool_data_misses"`
+	BufferpoolIndexHits      int64 `stm:"bufferpool_index_hits"`
+	BufferpoolIndexMisses    int64 `stm:"bufferpool_index_misses"`
+	BufferpoolXDAHits        int64 `stm:"bufferpool_xda_hits"`
+	BufferpoolXDAMisses      int64 `stm:"bufferpool_xda_misses"`
+	BufferpoolColumnHits     int64 `stm:"bufferpool_column_hits"`
+	BufferpoolColumnMisses   int64 `stm:"bufferpool_column_misses"`
 	BufferpoolLogicalReads   int64 `stm:"bufferpool_logical_reads"`
 	BufferpoolPhysicalReads  int64 `stm:"bufferpool_physical_reads"`
 	BufferpoolTotalReads     int64 // No stm tag - calculated field
@@ -156,12 +161,17 @@ type bufferpoolInstanceMetrics struct {
 	TotalPages int64 `stm:"total_pages"`
 	UsedPages  int64 `stm:"used_pages"`
 
-	// Hit ratios
-	HitRatio       int64 `stm:"hit_ratio"`
-	DataHitRatio   int64 `stm:"data_hit_ratio"`
-	IndexHitRatio  int64 `stm:"index_hit_ratio"`
-	XDAHitRatio    int64 `stm:"xda_hit_ratio"`
-	ColumnHitRatio int64 `stm:"column_hit_ratio"`
+	// Hit/miss metrics for percentage-of-incremental-row
+	Hits         int64 `stm:"hits"`
+	Misses       int64 `stm:"misses"`
+	DataHits     int64 `stm:"data_hits"`
+	DataMisses   int64 `stm:"data_misses"`
+	IndexHits    int64 `stm:"index_hits"`
+	IndexMisses  int64 `stm:"index_misses"`
+	XDAHits      int64 `stm:"xda_hits"`
+	XDAMisses    int64 `stm:"xda_misses"`
+	ColumnHits   int64 `stm:"column_hits"`
+	ColumnMisses int64 `stm:"column_misses"`
 
 	// Read metrics
 	LogicalReads        int64 `stm:"logical_reads"`

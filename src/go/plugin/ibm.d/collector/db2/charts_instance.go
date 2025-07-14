@@ -43,22 +43,60 @@ var (
 		Ctx:      "db2.bufferpool_instance_hit_ratio",
 		Priority: module.Priority + 200,
 		Dims: module.Dims{
-			{ID: "bufferpool_%s_hit_ratio", Name: "overall", Div: precision},
+			{ID: "bufferpool_%s_hits", Name: "hits", Algo: module.PercentOfIncremental},
+			{ID: "bufferpool_%s_misses", Name: "misses", Algo: module.PercentOfIncremental},
 		},
 	}
 
-	bufferpoolDetailedHitRatioChartTmpl = module.Chart{
-		ID:       "bufferpool_%s_detailed_hit_ratio",
-		Title:    "Buffer Pool %s Detailed Hit Ratios",
+	bufferpoolDataHitRatioChartTmpl = module.Chart{
+		ID:       "bufferpool_%s_data_hit_ratio",
+		Title:    "Buffer Pool %s Data Page Hit Ratio",
 		Units:    "percentage",
 		Fam:      "bufferpool",
-		Ctx:      "db2.bufferpool_instance_detailed_hit_ratio",
+		Ctx:      "db2.bufferpool_instance_data_hit_ratio",
 		Priority: module.Priority + 201,
 		Dims: module.Dims{
-			{ID: "bufferpool_%s_data_hit_ratio", Name: "data", Div: precision},
-			{ID: "bufferpool_%s_index_hit_ratio", Name: "index", Div: precision},
-			{ID: "bufferpool_%s_xda_hit_ratio", Name: "xda", Div: precision},
-			{ID: "bufferpool_%s_column_hit_ratio", Name: "column", Div: precision},
+			{ID: "bufferpool_%s_data_hits", Name: "hits", Algo: module.PercentOfIncremental},
+			{ID: "bufferpool_%s_data_misses", Name: "misses", Algo: module.PercentOfIncremental},
+		},
+	}
+
+	bufferpoolIndexHitRatioChartTmpl = module.Chart{
+		ID:       "bufferpool_%s_index_hit_ratio",
+		Title:    "Buffer Pool %s Index Page Hit Ratio",
+		Units:    "percentage",
+		Fam:      "bufferpool",
+		Ctx:      "db2.bufferpool_instance_index_hit_ratio",
+		Priority: module.Priority + 202,
+		Dims: module.Dims{
+			{ID: "bufferpool_%s_index_hits", Name: "hits", Algo: module.PercentOfIncremental},
+			{ID: "bufferpool_%s_index_misses", Name: "misses", Algo: module.PercentOfIncremental},
+		},
+	}
+
+	bufferpoolXDAHitRatioChartTmpl = module.Chart{
+		ID:       "bufferpool_%s_xda_hit_ratio",
+		Title:    "Buffer Pool %s XDA Page Hit Ratio",
+		Units:    "percentage",
+		Fam:      "bufferpool",
+		Ctx:      "db2.bufferpool_instance_xda_hit_ratio",
+		Priority: module.Priority + 203,
+		Dims: module.Dims{
+			{ID: "bufferpool_%s_xda_hits", Name: "hits", Algo: module.PercentOfIncremental},
+			{ID: "bufferpool_%s_xda_misses", Name: "misses", Algo: module.PercentOfIncremental},
+		},
+	}
+
+	bufferpoolColumnHitRatioChartTmpl = module.Chart{
+		ID:       "bufferpool_%s_column_hit_ratio",
+		Title:    "Buffer Pool %s Column Page Hit Ratio",
+		Units:    "percentage",
+		Fam:      "bufferpool",
+		Ctx:      "db2.bufferpool_instance_column_hit_ratio",
+		Priority: module.Priority + 204,
+		Dims: module.Dims{
+			{ID: "bufferpool_%s_column_hits", Name: "hits", Algo: module.PercentOfIncremental},
+			{ID: "bufferpool_%s_column_misses", Name: "misses", Algo: module.PercentOfIncremental},
 		},
 	}
 
@@ -167,7 +205,7 @@ var (
 		Ctx:      "db2.tablespace_usage",
 		Priority: module.Priority + 300,
 		Dims: module.Dims{
-			{ID: "tablespace_%s_used_percent", Name: "used", Div: precision},
+			{ID: "tablespace_%s_used_percent", Name: "used", Div: Precision},
 		},
 	}
 
@@ -397,7 +435,10 @@ func (d *DB2) newDatabaseCharts(db *databaseMetrics) *module.Charts {
 func (d *DB2) newBufferpoolCharts(bp *bufferpoolMetrics) *module.Charts {
 	charts := module.Charts{
 		bufferpoolHitRatioChartTmpl.Copy(),
-		bufferpoolDetailedHitRatioChartTmpl.Copy(),
+		bufferpoolDataHitRatioChartTmpl.Copy(),
+		bufferpoolIndexHitRatioChartTmpl.Copy(),
+		bufferpoolXDAHitRatioChartTmpl.Copy(),
+		bufferpoolColumnHitRatioChartTmpl.Copy(),
 		bufferpoolReadsChartTmpl.Copy(),
 		bufferpoolDataReadsChartTmpl.Copy(),
 		bufferpoolIndexReadsChartTmpl.Copy(),

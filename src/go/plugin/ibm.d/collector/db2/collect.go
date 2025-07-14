@@ -13,7 +13,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
 )
 
-const precision = 1000 // Precision multiplier for floating-point values
+const Precision = 1000 // Precision multiplier for floating-point values
 
 func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 	if d.db == nil {
@@ -445,7 +445,7 @@ func (d *DB2) collectLockMetrics(ctx context.Context) error {
 		case "LOCK_ACTIVE":
 			d.mx.LockActive = v
 		case "LOCK_WAIT_TIME":
-			d.mx.LockWaitTime = v * precision // Convert to milliseconds with precision
+			d.mx.LockWaitTime = v * Precision // Convert to milliseconds with Precision
 		case "LOCK_WAITING_AGENTS":
 			d.mx.LockWaitingAgents = v
 		case "LOCK_MEMORY_PAGES":
@@ -481,27 +481,57 @@ func (d *DB2) collectBufferpoolAggregateMetrics(ctx context.Context) error {
 		d.Debugf("using legacy SNAP views without column-organized metrics for bufferpool aggregate metrics")
 	}
 
+	// Temporary variables to calculate hits and misses
+	var dataHits, dataReads, indexHits, indexReads, xdaHits, xdaReads, colHits, colReads int64
+	
 	return d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
 		switch column {
-		case "HIT_RATIO":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				d.mx.BufferpoolHitRatio = int64(v * precision)
+		case "DATA_PAGES_FOUND":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				dataHits = v
 			}
-		case "DATA_HIT_RATIO":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				d.mx.BufferpoolDataHitRatio = int64(v * precision)
+		case "DATA_L_READS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				dataReads = v
+				// Calculate misses for data pages
+				d.mx.BufferpoolDataHits = dataHits
+				d.mx.BufferpoolDataMisses = dataReads - dataHits
+				if dataReads > 0 {
+					d.Debugf("Buffer pool data: hits=%d, reads=%d, misses=%d", dataHits, dataReads, dataReads-dataHits)
+				}
 			}
-		case "INDEX_HIT_RATIO":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				d.mx.BufferpoolIndexHitRatio = int64(v * precision)
+		case "INDEX_PAGES_FOUND":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				indexHits = v
 			}
-		case "XDA_HIT_RATIO":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				d.mx.BufferpoolXDAHitRatio = int64(v * precision)
+		case "INDEX_L_READS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				indexReads = v
+				// Calculate misses for index pages
+				d.mx.BufferpoolIndexHits = indexHits
+				d.mx.BufferpoolIndexMisses = indexReads - indexHits
 			}
-		case "COLUMN_HIT_RATIO":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				d.mx.BufferpoolColumnHitRatio = int64(v * precision)
+		case "XDA_PAGES_FOUND":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				xdaHits = v
+			}
+		case "XDA_L_READS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				xdaReads = v
+				// Calculate misses for XDA pages
+				d.mx.BufferpoolXDAHits = xdaHits
+				d.mx.BufferpoolXDAMisses = xdaReads - xdaHits
+			}
+		case "COL_PAGES_FOUND":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				colHits = v
+			}
+		case "COL_L_READS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				colReads = v
+				// Calculate misses for column pages
+				d.mx.BufferpoolColumnHits = colHits
+				d.mx.BufferpoolColumnMisses = colReads - colHits
 			}
 		case "LOGICAL_READS":
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -564,6 +594,35 @@ func (d *DB2) collectBufferpoolAggregateMetrics(ctx context.Context) error {
 				d.mx.BufferpoolColumnTotalReads = v
 			}
 		}
+		
+		// Calculate overall hits and misses at the end of the row
+		if lineEnd {
+			// If misses are negative, it means prefetch brought more pages than were requested
+			// In this case, set misses to 0 and reduce hits accordingly
+			if d.mx.BufferpoolDataMisses < 0 {
+				d.mx.BufferpoolDataHits = dataReads
+				d.mx.BufferpoolDataMisses = 0
+			}
+			if d.mx.BufferpoolIndexMisses < 0 {
+				d.mx.BufferpoolIndexHits = indexReads
+				d.mx.BufferpoolIndexMisses = 0
+			}
+			if d.mx.BufferpoolXDAMisses < 0 {
+				d.mx.BufferpoolXDAHits = xdaReads
+				d.mx.BufferpoolXDAMisses = 0
+			}
+			if d.mx.BufferpoolColumnMisses < 0 {
+				d.mx.BufferpoolColumnHits = colReads
+				d.mx.BufferpoolColumnMisses = 0
+			}
+			
+			// Overall buffer pool hits = sum of all hits
+			d.mx.BufferpoolHits = d.mx.BufferpoolDataHits + d.mx.BufferpoolIndexHits + 
+				d.mx.BufferpoolXDAHits + d.mx.BufferpoolColumnHits
+			// Overall buffer pool misses = sum of all misses
+			d.mx.BufferpoolMisses = d.mx.BufferpoolDataMisses + d.mx.BufferpoolIndexMisses + 
+				d.mx.BufferpoolXDAMisses + d.mx.BufferpoolColumnMisses
+		}
 	})
 }
 
@@ -590,7 +649,7 @@ func (d *DB2) collectLogSpaceMetrics(ctx context.Context) error {
 			}
 		case "LOG_UTILIZATION":
 			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				d.mx.LogUtilization = int64(v * precision)
+				d.mx.LogUtilization = int64(v * Precision)
 			}
 		case "LOG_READS":
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -653,7 +712,7 @@ func (d *DB2) doQuerySingleFloatValue(ctx context.Context, query string, target 
 		return err
 	}
 	if value.Valid {
-		*target = int64(value.Float64 * precision)
+		*target = int64(value.Float64 * Precision)
 	}
 	return nil
 }
@@ -890,7 +949,7 @@ func (d *DB2) collectLockMetricsResilience(ctx context.Context) {
 
 	_ = d.collectSingleMetric(ctx, "lock_wait_time", queryLockWaitTime, func(value string) {
 		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-			d.mx.LockWaitTime = v * precision // Convert to milliseconds with precision
+			d.mx.LockWaitTime = v * Precision // Convert to milliseconds with Precision
 		}
 	})
 
@@ -1045,28 +1104,24 @@ func (d *DB2) collectBufferpoolMetricsResilience(ctx context.Context) {
 	})
 
 	// Calculate hit ratios from components
-	totalLogical := dataLogical + indexLogical + xdaLogical + colLogical
-	totalHits := dataHits + indexHits + xdaHits + colHits
-
-	if totalLogical > 0 {
-		d.mx.BufferpoolHitRatio = int64((float64(totalHits) * 100.0 * float64(precision)) / float64(totalLogical))
-	}
-
-	if dataLogical > 0 {
-		d.mx.BufferpoolDataHitRatio = int64((float64(dataHits) * 100.0 * float64(precision)) / float64(dataLogical))
-	}
-
-	if indexLogical > 0 {
-		d.mx.BufferpoolIndexHitRatio = int64((float64(indexHits) * 100.0 * float64(precision)) / float64(indexLogical))
-	}
-
-	if xdaLogical > 0 {
-		d.mx.BufferpoolXDAHitRatio = int64((float64(xdaHits) * 100.0 * float64(precision)) / float64(xdaLogical))
-	}
-
-	if colLogical > 0 {
-		d.mx.BufferpoolColumnHitRatio = int64((float64(colHits) * 100.0 * float64(precision)) / float64(colLogical))
-	}
+	// Calculate hits and misses for each type
+	d.mx.BufferpoolDataHits = dataHits
+	d.mx.BufferpoolDataMisses = dataLogical - dataHits
+	
+	d.mx.BufferpoolIndexHits = indexHits
+	d.mx.BufferpoolIndexMisses = indexLogical - indexHits
+	
+	d.mx.BufferpoolXDAHits = xdaHits
+	d.mx.BufferpoolXDAMisses = xdaLogical - xdaHits
+	
+	d.mx.BufferpoolColumnHits = colHits
+	d.mx.BufferpoolColumnMisses = colLogical - colHits
+	
+	// Calculate overall hits and misses
+	d.mx.BufferpoolHits = d.mx.BufferpoolDataHits + d.mx.BufferpoolIndexHits + 
+		d.mx.BufferpoolXDAHits + d.mx.BufferpoolColumnHits
+	d.mx.BufferpoolMisses = d.mx.BufferpoolDataMisses + d.mx.BufferpoolIndexMisses + 
+		d.mx.BufferpoolXDAMisses + d.mx.BufferpoolColumnMisses
 }
 
 func (d *DB2) collectLogSpaceMetricsResilience(ctx context.Context) {
@@ -1102,7 +1157,7 @@ func (d *DB2) collectLogSpaceMetricsResilience(ctx context.Context) {
 	// Calculate log utilization
 	if logUsed > 0 && logAvailable > 0 {
 		total := logUsed + logAvailable
-		d.mx.LogUtilization = int64((float64(logUsed) * 100.0 * float64(precision)) / float64(total))
+		d.mx.LogUtilization = int64((float64(logUsed) * 100.0 * float64(Precision)) / float64(total))
 	}
 }
 
@@ -1290,40 +1345,24 @@ func (d *DB2) collectMonGetBufferpoolAggregate(ctx context.Context) error {
 	d.mx.BufferpoolXDATotalReads = xdaLogical + xdaPhysical
 	d.mx.BufferpoolColumnTotalReads = colLogical + colPhysical
 
-	// Calculate hit ratios using direct hit counts from MON_GET_BUFFERPOOL
-	// This is more accurate than calculating from logical/physical reads
-	totalLogical := dataLogical + indexLogical + xdaLogical + colLogical
-	totalHits := dataHits + indexHits + xdaHits + colHits
-
-	if totalLogical > 0 {
-		d.mx.BufferpoolHitRatio = int64((float64(totalHits) * 100.0 * float64(precision)) / float64(totalLogical))
-	} else {
-		d.mx.BufferpoolHitRatio = 100 * precision
-	}
-
-	if dataLogical > 0 {
-		d.mx.BufferpoolDataHitRatio = int64((float64(dataHits) * 100.0 * float64(precision)) / float64(dataLogical))
-	} else {
-		d.mx.BufferpoolDataHitRatio = 100 * precision
-	}
-
-	if indexLogical > 0 {
-		d.mx.BufferpoolIndexHitRatio = int64((float64(indexHits) * 100.0 * float64(precision)) / float64(indexLogical))
-	} else {
-		d.mx.BufferpoolIndexHitRatio = 100 * precision
-	}
-
-	if xdaLogical > 0 {
-		d.mx.BufferpoolXDAHitRatio = int64((float64(xdaHits) * 100.0 * float64(precision)) / float64(xdaLogical))
-	} else {
-		d.mx.BufferpoolXDAHitRatio = 100 * precision
-	}
-
-	if colLogical > 0 {
-		d.mx.BufferpoolColumnHitRatio = int64((float64(colHits) * 100.0 * float64(precision)) / float64(colLogical))
-	} else {
-		d.mx.BufferpoolColumnHitRatio = 100 * precision
-	}
+	// Calculate hits and misses for each type
+	d.mx.BufferpoolDataHits = dataHits
+	d.mx.BufferpoolDataMisses = dataLogical - dataHits
+	
+	d.mx.BufferpoolIndexHits = indexHits
+	d.mx.BufferpoolIndexMisses = indexLogical - indexHits
+	
+	d.mx.BufferpoolXDAHits = xdaHits
+	d.mx.BufferpoolXDAMisses = xdaLogical - xdaHits
+	
+	d.mx.BufferpoolColumnHits = colHits
+	d.mx.BufferpoolColumnMisses = colLogical - colHits
+	
+	// Calculate overall hits and misses
+	d.mx.BufferpoolHits = d.mx.BufferpoolDataHits + d.mx.BufferpoolIndexHits + 
+		d.mx.BufferpoolXDAHits + d.mx.BufferpoolColumnHits
+	d.mx.BufferpoolMisses = d.mx.BufferpoolDataMisses + d.mx.BufferpoolIndexMisses + 
+		d.mx.BufferpoolXDAMisses + d.mx.BufferpoolColumnMisses
 
 	return nil
 }
@@ -1341,7 +1380,7 @@ func (d *DB2) collectMonGetTransactionLog(ctx context.Context) error {
 			}
 		case "LOG_UTILIZATION":
 			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				d.mx.LogUtilization = int64(v * precision)
+				d.mx.LogUtilization = int64(v * Precision)
 			}
 		case "LOG_READS":
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
