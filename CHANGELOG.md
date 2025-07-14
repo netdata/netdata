@@ -6,7 +6,15 @@
 
 **Merged pull requests:**
 
+- Add comprehensive welcome document [\#20669](https://github.com/netdata/netdata/pull/20669) ([ktsaou](https://github.com/ktsaou))
+- build\(deps\): bump golang.org/x/net from 0.41.0 to 0.42.0 in /src/go [\#20667](https://github.com/netdata/netdata/pull/20667) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/bmatcuk/doublestar/v4 from 4.8.1 to 4.9.0 in /src/go [\#20666](https://github.com/netdata/netdata/pull/20666) ([dependabot[bot]](https://github.com/apps/dependabot))
+- docs: fix "Unsupported markdown: list" in NC readme diagram [\#20665](https://github.com/netdata/netdata/pull/20665) ([ilyam8](https://github.com/ilyam8))
+- Add ML anomaly detection accuracy analysis documentation [\#20663](https://github.com/netdata/netdata/pull/20663) ([ktsaou](https://github.com/ktsaou))
+- Fix datafile creation race condition [\#20662](https://github.com/netdata/netdata/pull/20662) ([stelfrag](https://github.com/stelfrag))
+- Cloud Docs: updated [\#20661](https://github.com/netdata/netdata/pull/20661) ([kanelatechnical](https://github.com/kanelatechnical))
 - chore\(go.d/snmp-profiles\): charts meta fixes and fam updates p8 [\#20660](https://github.com/netdata/netdata/pull/20660) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations docs [\#20659](https://github.com/netdata/netdata/pull/20659) ([netdatabot](https://github.com/netdatabot))
 - Improve job completion handling with timeout mechanism [\#20657](https://github.com/netdata/netdata/pull/20657) ([stelfrag](https://github.com/stelfrag))
 - Fix coverity issues [\#20656](https://github.com/netdata/netdata/pull/20656) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations docs [\#20655](https://github.com/netdata/netdata/pull/20655) ([netdatabot](https://github.com/netdatabot))
@@ -72,6 +80,7 @@
 - fix\(go.d/ddsnmp\): include table name in config id [\#20584](https://github.com/netdata/netdata/pull/20584) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d/ddsnmp\): walk cross-table columns when referenced table has no metrics [\#20583](https://github.com/netdata/netdata/pull/20583) ([ilyam8](https://github.com/ilyam8))
 - Rework datafiles [\#20581](https://github.com/netdata/netdata/pull/20581) ([stelfrag](https://github.com/stelfrag))
+- Windows Pluging \(Freedom to update every\) [\#20580](https://github.com/netdata/netdata/pull/20580) ([thiagoftsm](https://github.com/thiagoftsm))
 - Ignore duplicate entries when rebuilding the alert version table [\#20579](https://github.com/netdata/netdata/pull/20579) ([stelfrag](https://github.com/stelfrag))
 - Add Rocky Linux 10 to CI and package builds. [\#20578](https://github.com/netdata/netdata/pull/20578) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations docs [\#20577](https://github.com/netdata/netdata/pull/20577) ([netdatabot](https://github.com/netdatabot))
@@ -450,21 +459,10 @@
 - Update README.md [\#20133](https://github.com/netdata/netdata/pull/20133) ([kanelatechnical](https://github.com/kanelatechnical))
 - Improve metadata event loop shutdown [\#20132](https://github.com/netdata/netdata/pull/20132) ([stelfrag](https://github.com/stelfrag))
 - Fix Locks \(Windows Locks\) [\#20131](https://github.com/netdata/netdata/pull/20131) ([thiagoftsm](https://github.com/thiagoftsm))
-- Make sure pattern array items are added and evaluated in order [\#20130](https://github.com/netdata/netdata/pull/20130) ([stelfrag](https://github.com/stelfrag))
-- Fix compilation when using FSANITIZE\_ADDRESS [\#20129](https://github.com/netdata/netdata/pull/20129) ([stelfrag](https://github.com/stelfrag))
-- Handle corrupted journal data when populating the MRG during startup. [\#20128](https://github.com/netdata/netdata/pull/20128) ([stelfrag](https://github.com/stelfrag))
-- Expression evaluator in re2c/lemon [\#20126](https://github.com/netdata/netdata/pull/20126) ([ktsaou](https://github.com/ktsaou))
-- Free ACLK message [\#20125](https://github.com/netdata/netdata/pull/20125) ([stelfrag](https://github.com/stelfrag))
-- Create Empty Directories \(Windows installer\) [\#20124](https://github.com/netdata/netdata/pull/20124) ([thiagoftsm](https://github.com/thiagoftsm))
-- Installation-Static Build-Windows [\#20122](https://github.com/netdata/netdata/pull/20122) ([kanelatechnical](https://github.com/kanelatechnical))
 
 ## [v2.4.0](https://github.com/netdata/netdata/tree/v2.4.0) (2025-04-14)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v2.3.2...v2.4.0)
-
-**Merged pull requests:**
-
-- chore\(otel/journaldexporter\): add socket/remote clients [\#20121](https://github.com/netdata/netdata/pull/20121) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.3.2](https://github.com/netdata/netdata/tree/v2.3.2) (2025-04-02)
 
