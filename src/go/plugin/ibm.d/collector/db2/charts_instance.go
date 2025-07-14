@@ -213,7 +213,7 @@ var (
 	// Connection charts
 	connectionStateChartTmpl = module.Chart{
 		ID:       "connection_%s_state",
-		Title:    "Connection %s State",
+		Title:    "Connection State",
 		Units:    "state",
 		Fam:      "connection",
 		Ctx:      "db2.connection_state",
@@ -225,7 +225,7 @@ var (
 
 	connectionActivityChartTmpl = module.Chart{
 		ID:       "connection_%s_activity",
-		Title:    "Connection %s Row Activity",
+		Title:    "Connection Row Activity",
 		Units:    "rows/s",
 		Fam:      "connection",
 		Ctx:      "db2.connection_activity",
@@ -239,7 +239,7 @@ var (
 
 	connectionCPUTimeChartTmpl = module.Chart{
 		ID:       "connection_%s_cpu_time",
-		Title:    "Connection %s CPU Time",
+		Title:    "Connection CPU Time",
 		Units:    "milliseconds/s",
 		Fam:      "connection",
 		Ctx:      "db2.connection_cpu_time",
@@ -251,13 +251,76 @@ var (
 
 	connectionExecutingChartTmpl = module.Chart{
 		ID:       "connection_%s_executing",
-		Title:    "Connection %s Query Execution",
+		Title:    "Connection Query Execution",
 		Units:    "queries",
 		Fam:      "connection",
 		Ctx:      "db2.connection_executing",
 		Priority: module.Priority + 403,
 		Dims: module.Dims{
 			{ID: "connection_%s_executing_queries", Name: "executing"},
+		},
+	}
+
+	// Connection wait time charts (DB2 9.7+ LUW)
+	connectionWaitTimeChartTmpl = module.Chart{
+		ID:       "connection_%s_wait_time",
+		Title:    "Connection Wait Time",
+		Units:    "milliseconds/s",
+		Fam:      "connection",
+		Ctx:      "db2.connection_wait_time",
+		Priority: module.Priority + 404,
+		Type:     module.Stacked,
+		Dims: module.Dims{
+			{ID: "connection_%s_lock_wait_time", Name: "lock", Algo: module.Incremental},
+			{ID: "connection_%s_log_disk_wait_time", Name: "log_disk", Algo: module.Incremental},
+			{ID: "connection_%s_log_buffer_wait_time", Name: "log_buffer", Algo: module.Incremental},
+			{ID: "connection_%s_pool_read_time", Name: "pool_read", Algo: module.Incremental},
+			{ID: "connection_%s_pool_write_time", Name: "pool_write", Algo: module.Incremental},
+			{ID: "connection_%s_direct_read_time", Name: "direct_read", Algo: module.Incremental},
+			{ID: "connection_%s_direct_write_time", Name: "direct_write", Algo: module.Incremental},
+		},
+	}
+
+	connectionNetworkWaitTimeChartTmpl = module.Chart{
+		ID:       "connection_%s_network_wait_time",
+		Title:    "Connection Network Wait Time",
+		Units:    "milliseconds/s",
+		Fam:      "connection",
+		Ctx:      "db2.connection_network_wait_time",
+		Priority: module.Priority + 405,
+		Type:     module.Area,
+		Dims: module.Dims{
+			{ID: "connection_%s_fcm_recv_wait_time", Name: "recv", Algo: module.Incremental},
+			{ID: "connection_%s_fcm_send_wait_time", Name: "send", Algo: module.Incremental, Mul: -1},
+		},
+	}
+
+	connectionProcessingTimeChartTmpl = module.Chart{
+		ID:       "connection_%s_processing_time",
+		Title:    "Connection Processing Time",
+		Units:    "milliseconds/s",
+		Fam:      "connection",
+		Ctx:      "db2.connection_processing_time",
+		Priority: module.Priority + 406,
+		Type:     module.Stacked,
+		Dims: module.Dims{
+			{ID: "connection_%s_total_routine_time", Name: "routine", Algo: module.Incremental},
+			{ID: "connection_%s_total_compile_time", Name: "compile", Algo: module.Incremental},
+			{ID: "connection_%s_total_section_time", Name: "section", Algo: module.Incremental},
+		},
+	}
+
+	connectionTransactionTimeChartTmpl = module.Chart{
+		ID:       "connection_%s_transaction_time",
+		Title:    "Connection Transaction Time",
+		Units:    "milliseconds/s",
+		Fam:      "connection",
+		Ctx:      "db2.connection_transaction_time",
+		Priority: module.Priority + 407,
+		Type:     module.Area,
+		Dims: module.Dims{
+			{ID: "connection_%s_total_commit_time", Name: "commit", Algo: module.Incremental},
+			{ID: "connection_%s_total_rollback_time", Name: "rollback", Algo: module.Incremental, Mul: -1},
 		},
 	}
 
@@ -394,6 +457,16 @@ func (d *DB2) newConnectionCharts(conn *connectionMetrics) *module.Charts {
 		connectionActivityChartTmpl.Copy(),
 		connectionCPUTimeChartTmpl.Copy(),
 		connectionExecutingChartTmpl.Copy(),
+	}
+
+	// Add wait time charts if enabled and supported (DB2 9.7+ LUW)
+	if d.CollectWaitMetrics && d.useMonGetFunctions {
+		charts = append(charts,
+			connectionWaitTimeChartTmpl.Copy(),
+			connectionNetworkWaitTimeChartTmpl.Copy(),
+			connectionProcessingTimeChartTmpl.Copy(),
+			connectionTransactionTimeChartTmpl.Copy(),
+		)
 	}
 
 	cleanID := cleanName(conn.applicationID)

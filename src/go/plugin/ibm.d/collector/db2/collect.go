@@ -48,6 +48,9 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 		connections: make(map[string]connectionInstanceMetrics),
 		tables:      make(map[string]tableInstanceMetrics),
 		indexes:     make(map[string]indexInstanceMetrics),
+		statements:  make(map[string]statementInstanceMetrics),
+		memoryPools: make(map[string]memoryPoolInstanceMetrics),
+		tableIOs:    make(map[string]tableIOInstanceMetrics),
 	}
 
 	// Test connection with a ping before proceeding
@@ -144,6 +147,51 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 		}
 	}
 
+	// Collect new performance metrics
+	if d.CollectStatementMetrics {
+		d.Debugf("collecting statement cache metrics (limit: %d)", d.MaxStatements)
+		if err := d.collectStatementInstances(ctx); err != nil {
+			if isSQLFeatureError(err) {
+				d.logOnce("statement_cache_unavailable", "Statement cache collection failed (likely unsupported on this DB2 edition/version): %v", err)
+			} else {
+				d.Errorf("failed to collect statement cache: %v", err)
+			}
+		}
+	}
+
+	if d.CollectMemoryMetrics {
+		d.Debugf("collecting memory pool metrics")
+		if err := d.collectMemoryPoolInstances(ctx); err != nil {
+			if isSQLFeatureError(err) {
+				d.logOnce("memory_pool_unavailable", "Memory pool collection failed (likely unsupported on this DB2 edition/version): %v", err)
+			} else {
+				d.Errorf("failed to collect memory pools: %v", err)
+			}
+		}
+	}
+
+	if d.CollectWaitMetrics && d.CollectConnectionMetrics != nil && *d.CollectConnectionMetrics {
+		d.Debugf("collecting enhanced wait metrics")
+		if err := d.collectConnectionWaits(ctx); err != nil {
+			if isSQLFeatureError(err) {
+				d.logOnce("wait_metrics_unavailable", "Wait metrics collection failed (likely unsupported on this DB2 edition/version): %v", err)
+			} else {
+				d.Errorf("failed to collect wait metrics: %v", err)
+			}
+		}
+	}
+
+	if d.CollectTableIOMetrics {
+		d.Debugf("collecting table I/O metrics")
+		if err := d.collectTableIOInstances(ctx); err != nil {
+			if isSQLFeatureError(err) {
+				d.logOnce("table_io_unavailable", "Table I/O collection failed (likely unsupported on this DB2 edition/version): %v", err)
+			} else {
+				d.Errorf("failed to collect table I/O: %v", err)
+			}
+		}
+	}
+
 	// Cleanup stale instances
 	d.cleanupStaleInstances()
 
@@ -190,6 +238,28 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 		cleanName := cleanName(name)
 		for k, v := range stm.ToMap(metrics) {
 			mx[fmt.Sprintf("index_%s_%s", cleanName, k)] = v
+		}
+	}
+
+	// Add new metric types
+	for id, metrics := range d.mx.statements {
+		// ID is already cleaned by cleanStmtID
+		for k, v := range stm.ToMap(metrics) {
+			mx[fmt.Sprintf("statement_%s_%s", id, k)] = v
+		}
+	}
+
+	for poolType, metrics := range d.mx.memoryPools {
+		cleanType := cleanName(poolType)
+		for k, v := range stm.ToMap(metrics) {
+			mx[fmt.Sprintf("memory_pool_%s_%s", cleanType, k)] = v
+		}
+	}
+
+	for tableName, metrics := range d.mx.tableIOs {
+		cleanName := cleanName(tableName)
+		for k, v := range stm.ToMap(metrics) {
+			mx[fmt.Sprintf("table_io_%s_%s", cleanName, k)] = v
 		}
 	}
 

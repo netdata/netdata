@@ -62,6 +62,16 @@ func New() *DB2 {
 
 			// Backup history
 			BackupHistoryDays: 30,
+
+			// New performance monitoring defaults
+			CollectStatementMetrics: true,
+			MaxStatements:           50,
+			StatementMinExecutions:  10,
+			StatementMinCPUMs:       100,
+			CollectMemoryMetrics:    true,
+			CollectWaitMetrics:      true,
+			CollectTableIOMetrics:   true,
+			TableMinRowsRead:        1000,
 		},
 
 		charts:      baseCharts.Copy(),
@@ -73,6 +83,8 @@ func New() *DB2 {
 		connections: make(map[string]*connectionMetrics),
 		tables:      make(map[string]*tableMetrics),
 		indexes:     make(map[string]*indexMetrics),
+		statements:  make(map[string]*statementMetrics),
+		memoryPools: make(map[string]*memoryPoolMetrics),
 
 		// Initialize resilience tracking
 		disabledMetrics:  make(map[string]bool),
@@ -108,6 +120,16 @@ type Config struct {
 	// Backup history
 	BackupHistoryDays int `yaml:"backup_history_days,omitempty" json:"backup_history_days"`
 
+	// Performance monitoring
+	CollectStatementMetrics  bool `yaml:"collect_statement_metrics,omitempty" json:"collect_statement_metrics"`
+	MaxStatements           int  `yaml:"max_statements,omitempty" json:"max_statements"`
+	StatementMinExecutions  int  `yaml:"statement_min_executions,omitempty" json:"statement_min_executions"`
+	StatementMinCPUMs       int  `yaml:"statement_min_cpu_ms,omitempty" json:"statement_min_cpu_ms"`
+	CollectMemoryMetrics    bool `yaml:"collect_memory_metrics,omitempty" json:"collect_memory_metrics"`
+	CollectWaitMetrics      bool `yaml:"collect_wait_metrics,omitempty" json:"collect_wait_metrics"`
+	CollectTableIOMetrics   bool `yaml:"collect_table_io_metrics,omitempty" json:"collect_table_io_metrics"`
+	TableMinRowsRead        int  `yaml:"table_min_rows_read,omitempty" json:"table_min_rows_read"`
+
 	// Selectors for filtering
 	CollectDatabasesMatching   string `yaml:"collect_databases_matching,omitempty" json:"collect_databases_matching"`
 	CollectBufferpoolsMatching string `yaml:"collect_bufferpools_matching,omitempty" json:"collect_bufferpools_matching"`
@@ -134,6 +156,8 @@ type DB2 struct {
 	connections map[string]*connectionMetrics
 	tables      map[string]*tableMetrics
 	indexes     map[string]*indexMetrics
+	statements  map[string]*statementMetrics
+	memoryPools map[string]*memoryPoolMetrics
 
 	// Selectors
 	databaseSelector   matcher.Matcher
@@ -624,16 +648,34 @@ func (d *DB2) setConfigurationDefaults() {
 		d.Debugf("CollectIndexMetrics not configured, defaulting to %v (expensive operation)", defaultValue)
 	}
 
+	// Set defaults for new performance metrics
+	if d.MaxStatements == 0 {
+		d.MaxStatements = 50
+	}
+	if d.StatementMinExecutions == 0 {
+		d.StatementMinExecutions = 10
+	}
+	if d.StatementMinCPUMs == 0 {
+		d.StatementMinCPUMs = 1000
+	}
+	if d.TableMinRowsRead == 0 {
+		d.TableMinRowsRead = 1000
+	}
+
 	// Log final configuration
 	d.Infof("Configuration after defaults:")
 	d.Infof("  Collection settings: DatabaseMetrics=%v, BufferpoolMetrics=%v, TablespaceMetrics=%v",
 		*d.CollectDatabaseMetrics, *d.CollectBufferpoolMetrics, *d.CollectTablespaceMetrics)
 	d.Infof("  Collection settings: ConnectionMetrics=%v, LockMetrics=%v, TableMetrics=%v, IndexMetrics=%v",
 		*d.CollectConnectionMetrics, *d.CollectLockMetrics, *d.CollectTableMetrics, *d.CollectIndexMetrics)
+	d.Infof("  Performance settings: StatementMetrics=%v, MemoryMetrics=%v, WaitMetrics=%v, TableIOMetrics=%v",
+		d.CollectStatementMetrics, d.CollectMemoryMetrics, d.CollectWaitMetrics, d.CollectTableIOMetrics)
 	d.Infof("  Cardinality limits: MaxDatabases=%d, MaxBufferpools=%d, MaxTablespaces=%d",
 		d.MaxDatabases, d.MaxBufferpools, d.MaxTablespaces)
 	d.Infof("  Cardinality limits: MaxConnections=%d, MaxTables=%d, MaxIndexes=%d",
 		d.MaxConnections, d.MaxTables, d.MaxIndexes)
+	d.Infof("  Statement limits: MaxStatements=%d, MinExecutions=%d, MinCPUMs=%d",
+		d.MaxStatements, d.StatementMinExecutions, d.StatementMinCPUMs)
 
 }
 
