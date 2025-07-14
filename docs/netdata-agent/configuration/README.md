@@ -1,49 +1,76 @@
 # Netdata Agent Configuration
 
-> **Info**
->
-> Netdata Cloud lets you configure Agents on the fly. Check the [Dynamic Configuration Manager](/docs/netdata-agent/configuration/dynamic-configuration.md) documentation for details.
+:::info
 
-The main Netdata Agent configuration is `netdata.conf`.
+You can configure Netdata Agents on the fly using Netdata Cloud. Check the [Dynamic Configuration Manager](/docs/netdata-agent/configuration/dynamic-configuration.md) documentation for details.
 
-## The Netdata config directory
+:::
 
-On most Linux systems, the **Netdata config
-directory** will be `/etc/netdata/`. The config directory contains several configuration files with the `.conf` extension, a
-few directories, and a shell script named `edit-config`.
+You configure your Netdata Agent using the main configuration file `netdata.conf`. This guide shows you how to locate, edit, and manage this configuration file.
 
-> Some operating systems will use `/opt/netdata/etc/netdata/` as the config directory. If you're not sure where yours
-> is, navigate to `http://NODE:19999/netdata.conf` in your browser, replacing `NODE` with the IP address or hostname of
-> your node, and find the `# config directory =` setting. The value listed is the config directory for your system.
+## Locate Your Config Directory
 
-All of Netdata's documentation assumes that your config directory is at `/etc/netdata`, and that you're running any scripts from inside that directory.
+First, you need to find where your configuration files are stored. On most Linux systems, you'll find your **Netdata config directory** at `/etc/netdata/`. This directory contains:
 
-## Edit a configuration file using `edit-config`
+- Several configuration files with the `.conf` extension
+- A few directories for specific configurations  
+- A shell script named `edit-config` for safely editing files
 
-We recommend the use of the `edit-config` script for configuration changes.
+:::tip 
 
-It exists inside your config directory (read above) and helps manage and safely edit configuration files.
+Some operating systems use `/opt/netdata/etc/netdata/` as the config directory. 
+If you're **not sure where yours is located**, navigate to `http://NODE:19999/netdata.conf` in your browser (replace `NODE` with your node's IP address or hostname) and find the `# config directory =` setting. The value listed shows your system's config directory.
 
-To edit `netdata.conf`, run this on your terminal:
+:::
+
+:::note 
+
+All of Netdata's documentation **assumes your config directory is at** `/etc/netdata`, and that you run any scripts from inside that directory.
+
+:::
+
+## Edit Configuration Files
+
+<details>
+<summary><strong>Method 1: Using `edit-config` (Recommended)</strong></summary><br/>
+
+You should use the `edit-config` script for making configuration changes. This script lives inside your config directory and helps you manage and safely edit configuration files.
+
+To edit `netdata.conf`:
+
+1. Navigate to your config directory and run the edit script:
 
 ```bash
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config netdata.conf
 ```
 
-Your editor will open.
+2. Your default editor will open with the configuration file
+3. Make your changes and save the file
 
-## downloading `netdata.conf`
+</details>
 
-The running version of `netdata.conf` can be downloaded from a running Netdata Agent, at this URL:
+<details>
+<summary><strong>Method 2: Download Current Configuration</strong></summary><br/>
+
+If you want to work with the exact configuration currently running on your Agent, you can download it directly.
+
+You can download the running version of `netdata.conf` from your running Netdata Agent at this URL:
 
 ```url
 http://agent-ip:19999/netdata.conf
 ```
 
-You can save and use this version, using these commands:
+To download and replace your current configuration file:
 
 ```bash
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 curl -ksSLo /tmp/netdata.conf.new http://localhost:19999/netdata.conf && sudo mv -i /tmp/netdata.conf.new netdata.conf 
 ```
+
+This method is useful when you want to:
+- Backup your current running configuration
+- Start with the default settings that are currently active
+- Replicate configuration across multiple agents
+
+</details>
