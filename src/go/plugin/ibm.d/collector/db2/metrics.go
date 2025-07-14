@@ -80,6 +80,9 @@ type metricsData struct {
 	connections map[string]connectionInstanceMetrics
 	tables      map[string]tableInstanceMetrics
 	indexes     map[string]indexInstanceMetrics
+	statements  map[string]statementInstanceMetrics
+	memoryPools map[string]memoryPoolInstanceMetrics
+	tableIOs    map[string]tableIOInstanceMetrics
 }
 
 type databaseMetrics struct {
@@ -109,11 +112,23 @@ type connectionMetrics struct {
 }
 
 type tableMetrics struct {
-	name string
+	name      string
+	ioUpdated bool
 }
 
 type indexMetrics struct {
 	name string
+}
+
+type statementMetrics struct {
+	id          string
+	stmtPreview string
+	updated     bool
+}
+
+type memoryPoolMetrics struct {
+	poolType string
+	updated  bool
 }
 
 func (d *DB2) getTableMetrics(name string) *tableMetrics {
@@ -181,6 +196,24 @@ type connectionInstanceMetrics struct {
 	RowsRead         int64 `stm:"rows_read"`
 	RowsWritten      int64 `stm:"rows_written"`
 	TotalCPUTime     int64 `stm:"total_cpu_time"`
+	
+	// Wait time metrics (DB2 9.7+ LUW with MON_GET_CONNECTION)
+	// TotalWaitTime is not charted but collected for reference
+	TotalWaitTime      int64 // No stm tag - not sent to netdata
+	LockWaitTime       int64 `stm:"lock_wait_time"`
+	LogDiskWaitTime    int64 `stm:"log_disk_wait_time"`
+	LogBufferWaitTime  int64 `stm:"log_buffer_wait_time"`
+	PoolReadTime       int64 `stm:"pool_read_time"`
+	PoolWriteTime      int64 `stm:"pool_write_time"`
+	DirectReadTime     int64 `stm:"direct_read_time"`
+	DirectWriteTime    int64 `stm:"direct_write_time"`
+	FCMRecvWaitTime    int64 `stm:"fcm_recv_wait_time"`
+	FCMSendWaitTime    int64 `stm:"fcm_send_wait_time"`
+	TotalRoutineTime   int64 `stm:"total_routine_time"`
+	TotalCompileTime   int64 `stm:"total_compile_time"`
+	TotalSectionTime   int64 `stm:"total_section_time"`
+	TotalCommitTime    int64 `stm:"total_commit_time"`
+	TotalRollbackTime  int64 `stm:"total_rollback_time"`
 }
 
 type tableInstanceMetrics struct {
@@ -195,4 +228,30 @@ type indexInstanceMetrics struct {
 	LeafNodes  int64 `stm:"leaf_nodes"`
 	IndexScans int64 `stm:"index_scans"`
 	FullScans  int64 `stm:"full_scans"`
+}
+
+type statementInstanceMetrics struct {
+	NumExecutions   int64 `stm:"num_executions"`
+	AvgExecTime     int64 `stm:"avg_exec_time"`
+	TotalCPUTime    int64 `stm:"total_cpu_time"`
+	RowsRead        int64 `stm:"rows_read"`
+	RowsModified    int64 `stm:"rows_modified"`
+	LogicalReads    int64 `stm:"logical_reads"`
+	PhysicalReads   int64 `stm:"physical_reads"`
+	LockWaitTime    int64 `stm:"lock_wait_time"`
+	TotalSorts      int64 `stm:"total_sorts"`
+}
+
+type memoryPoolInstanceMetrics struct {
+	PoolUsed    int64 `stm:"pool_used"`
+	PoolUsedHWM int64 `stm:"pool_used_hwm"`
+}
+
+type tableIOInstanceMetrics struct {
+	TableScans       int64 `stm:"table_scans"`
+	RowsRead         int64 `stm:"rows_read"`
+	RowsInserted     int64 `stm:"rows_inserted"`
+	RowsUpdated      int64 `stm:"rows_updated"`
+	RowsDeleted      int64 `stm:"rows_deleted"`
+	OverflowAccesses int64 `stm:"overflow_accesses"`
 }

@@ -262,3 +262,13 @@ func (d *DB2) cleanupStaleInstances() {
 		}
 	}
 }
+
+// Generic chart removal method
+func (d *DB2) removeCharts(prefix string) {
+	for _, chart := range *d.charts {
+		if len(chart.ID) >= len(prefix) && chart.ID[:len(prefix)] == prefix {
+			chart.MarkRemove()
+			chart.MarkNotCreated()
+		}
+	}
+}
