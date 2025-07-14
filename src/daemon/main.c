@@ -409,6 +409,7 @@ int netdata_main(int argc, char **argv) {
                             if (unittest_waiting_queue()) return 1;
                             if (uuidmap_unittest()) return 1;
                             if (stacktrace_unittest()) return 1;
+                            if (test_cmd_pool_fifo()) return 1;
 #ifdef OS_WINDOWS
                             if (perflibnamestest_main()) return 1;
 #endif
