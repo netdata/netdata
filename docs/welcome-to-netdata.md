@@ -20,7 +20,7 @@ The system consists of three components:
 ## Performance at a Glance
 
 | Aspect | Netdata | Industry Standard |
-|--------|---------|-------------------|
+|-------:|:-------:|:-----------------:|
 | **Real-Time Monitoring** | | |
 | Data granularity | 1 second | 10-60 seconds |
 | Collection to visualization | 1 second | 30+ seconds |
@@ -37,15 +37,15 @@ The system consists of three components:
 | Metrics collected | Everything available | Manually selected |
 | Built-in collectors | 800+ integrations | Basic system metrics |
 | Hardware monitoring | Comprehensive | Limited or none |
-| Live monitoring | processes, network connections, containers, systemd services and units | Limited or none |
+| Live monitoring | processes, network connections, and more | Limited or none |
 
 ## Design Philosophy and Implementation
 
 ### Data at the Edge
 
-Observability data is vast, usually orders of magnitude larger than actual business data. Observability solutions struggle to scale, and even when they do scale, their complexity increases drastically and their total cost of ownership becomes unreasonable, in many cases matching or exceeding the actual infrastructure cost.
+> Observability data is vast, usually orders of magnitude larger than actual business data. Observability solutions struggle to scale, and even when they do scale, their complexity increases drastically and their total cost of ownership becomes unreasonable, in many cases matching or exceeding the actual infrastructure cost.
 
-At the same time, observability data is collected, stored and analyzed, but only a small percentage is actually ever viewed. The vast majority of observability data is there in case they are needed for troubleshooting or post-mortem analysis.
+Observability data is collected, stored and analyzed, but only a small percentage is actually ever viewed. The vast majority of observability data is there in case they are needed for troubleshooting, capacity planning, or post-mortem analysis.
 
 Netdata keeps the observability data at the edge (Netdata Agents), or as close to the edge as possible (Netdata Parents).
 
@@ -59,7 +59,11 @@ Netdata keeps the observability data at the edge (Netdata Agents), or as close t
 
 ### Complete Coverage
 
-Observability solutions are usually selective to control cost, complexity and the time and skills required to set up. Organizations are frequently instructed to select only what is important for them, based on their understanding and needs. This creates two fundamental problems: missing just one uncollected metric can obscure the root cause of an issue (leading to frustration and incomplete visibility during crisis), and the observability quality organizations get reflects the skills and experience of their people.
+> Observability solutions are usually selective to control cost, complexity and the time and skills required to set up. Organizations are frequently instructed to select only what is important for them, based on their understanding and needs.
+>
+> This creates two fundamental problems:
+> - missing just one uncollected metric can obscure the root cause of an issue, leading to frustration and incomplete visibility during crisis
+> - the observability quality organizations get reflects the skills and experience of their people.
 
 Netdata's design allows it to capture everything exposed by systems and applications — every metric, every log entry, every piece of telemetry available.
 
@@ -72,9 +76,13 @@ The comprehensive approach ensures:
 
 ### Real-Time, Low-Latency Visibility
 
-Most observability solutions lower granularity (the frequency data is collected) to control cost and scalability. For most of them 'real-time' is at best every 10 or 15 seconds. And for all of them even this is not strict, it can fluctuate without any direct impact on the analysis. Furthermore, observability pipelines introduce latency in making the data available and it is common to have dozens of seconds, or even minutes, of delay between data collection and visualization. These inherent weaknesses make observability a statistical analysis tool, not able to keep up with the actual pace of the infrastructure, forcing engineers to use console tools when precise, accurate and on-time information is required.
+> Observability solutions lower granularity (the frequency data is collected) to control cost and scalability. For most of them 'real-time' is at best every 10 or 15 seconds. For all of them even this frequency is not strict, it can fluctuate without any direct impact on the analysis.
+>
+> Additionally, observability pipelines introduce latency in making the data available and it is common to have several seconds to minutes of delay between data collection and visualization.
+>
+> These inherent weaknesses make observability a statistical analysis tool, not able to keep up with the actual pace of the infrastructure, forcing engineers to use console tools when precise, accurate and on-time information is required.
 
-Netdata collects everything per-second and has a fixed one-second data collection to visualization latency. Furthermore, Netdata works on a beat. Every sample needs to be collected on time. Missing a sample on time indicates that the monitored component or application is under stress, and Netdata shows gaps on the charts. This strict real-time approach delivers:
+Netdata collects everything per-second and has a fixed one-second data collection to visualization latency. Netdata works on a beat. Every sample needs to be collected on time. Delays in data collection indicate that the monitored component or application is under stress, and Netdata shows gaps on the charts. This strict real-time approach delivers:
 
 - **True real-time visibility**: See what's happening now, not what happened 30 seconds ago.
 - **Console-quality precision**: No need to SSH into servers for real-time data during incidents.
@@ -85,9 +93,11 @@ Netdata collects everything per-second and has a fixed one-second data collectio
 
 ### Data Accessibility
 
-Observability solutions assume users know and understand the data before they collect and visualize them. Many solutions require from users to also know the exact types and kinds of collected data in order to visualize them properly. Most solutions require from users to manually set up charts by learning a query language and configure dashboards, organizing them in a manner that is meaningful. This is usually the biggest obstacle to proper observability. Discipline, skills and a huge amount of work for something that should be there by default.
+> Observability solutions assume users know and understand the data before they collect and visualize them. Many solutions require from users to also know the exact types and kinds of collected data in order to visualize them properly. Most solutions require from users to manually set up charts by learning a query language and configure dashboards, organizing them in a manner that is meaningful.
+>
+> This is usually the biggest obstacle to proper observability. Discipline, skills and a huge amount of work for something that should be there by default.
 
-Netdata's solution comes from the observation that most of our infrastructure components are common: operating systems, databases, web servers, message brokers, containers, storage devices, network devices, and so on. We all use the same finite set of components, plus a few custom applications.
+Most of our infrastructure components are common: operating systems, databases, web servers, message brokers, containers, storage devices, network devices, and so on. We all use the same finite set of components, plus a few custom applications.
 
 Netdata dashboards are an algorithm, not a configuration. Each Netdata chart is a complete analytical tool that provides a 360 view of the data and its sources, allowing slicing and dicing of any data-set using point and click, optimized to provide a comprehensive view of what is available and where data is coming from. Netdata provides single-node, multi-node, and infrastructure level dashboards automatically. All metrics are organized in a meaningful manner with a universal table of contents that dynamically adapts to the data available, providing instant access to every metric. This approach delivers:
 
@@ -99,7 +109,7 @@ Netdata dashboards are an algorithm, not a configuration. Each Netdata chart is 
 
 ### Efficient Storage
 
-Centralized observability solutions introduce significant storage requirements in both capacity and I/O throughput, making observability the most important consumer of storage systems in the infrastructure.
+> Centralized observability solutions introduce significant storage requirements in both capacity and I/O throughput, making observability the most important consumer of storage systems in the infrastructure.
 
 Netdata is optimized for lightweight storage operations. Three storage tiers are updated in parallel (per-second, per-minute, per-hour). The high-resolution tier needs 0.6 bytes per sample on disk (Gorilla compression + ZSTD). The lower resolution tiers need 6-bytes and 18-bytes per sample respectively and maintain the ability to provide the same min, max, average and anomaly rate the high-resolution tier provides. Data are written in append-only files and are never reorganized on disk (Write Once Read Many - WORM). Writes are spread evenly over time. Netdata Agents write at 5 KiB/s, Netdata Parents aggregating 1M metrics/s write at 1MiB/s across all tiers.
 
@@ -113,14 +123,14 @@ This efficient storage architecture delivers years of data in gigabytes rather t
 
 ### Logs Management
 
-Log management has become one of the largest cost drivers in observability, with organizations spending millions on storage and processing infrastructure. Many resort to aggressive filtering and sampling just to make costs manageable, inevitably losing critical information when they need it most.
+> Log management has become one of the largest cost drivers in observability, with organizations spending millions on storage and processing infrastructure. Many resort to aggressive filtering and sampling just to make costs manageable, inevitably losing critical information when they need it most.
 
-Netdata takes a fundamentally different approach by leveraging the systemd journal format, native to Linux systems. This edge-based approach provides enterprise-grade capabilities without the enterprise costs:
+Netdata takes a fundamentally different approach by leveraging the systemd journal format, the native logs format on Linux systems. This edge-based approach provides enterprise-grade capabilities without the enterprise costs:
 
-- **Direct file access**: No query servers needed — clients open journal files directly, leveraging OS disk cache for blazing-fast performance
+- **Direct file access**: No query servers needed — clients open journal files directly, leveraging OS disk cache for fast performance
 - **Comprehensive indexing**: Every field in every log entry is automatically indexed, enabling instant queries across millions of entries
 - **Flexible schema**: Each log entry can have its own unique set of fields and values, all fully indexed and searchable
-- **Efficient storage**: Journal files match uncompressed text log sizes while providing full indexing — a balance between space efficiency and query performance
+- **Efficient storage**: Journal files typically match uncompressed text log sizes while providing full indexing — a balance between space efficiency and query performance
 - **Native tooling**: Built-in support for centralization, filtering, exporting, and integration with existing pipelines
 - **Security built-in**: Write Once Read Many (WORM) and Forward Secure Sealing (FSS) ensures log integrity and tamper detection
 - **Logs transformation**: The platform includes `log2journal` for converting any text, JSON, or logfmt logs into structured journal entries
@@ -132,9 +142,9 @@ Note: On Windows Netdata queries Windows Event Logs (WEL), Event Tracing for Win
 
 ### AI and Machine Learning
 
-Machine Learning (ML) in monitoring requires data scientists, training periods, and careful model management. This makes it accessible only to a few organizations with specialized teams, and even then is used selectively with limited scope.
+> Machine Learning (ML) in monitoring requires data scientists, training periods, and careful model management. This makes it accessible only to a few organizations with specialized teams, and even then is used selectively with limited scope.
 
-However, ML is the simplest way to model the behavior of our systems and applications. When done properly, ML can reliably detect anomalies, surface correlations between components and applications, provide valuable information about cascading effects under crisis, identify the blast radius of issues and even detect infrastructure level issues independently of the configured alerts.
+ML is the simplest way to model the behavior of our systems and applications. When done properly, ML can reliably detect anomalies, surface correlations between components and applications, provide valuable information about cascading effects under crisis, identify the blast radius of issues and even detect infrastructure level issues independently of the configured alerts.
 
 Netdata democratizes ML and AI by making it automatic and universal (no configuration is required). The system trains 18 k-means models per metric using different time windows, requiring unanimous agreement before flagging anomalies. This achieves a false positive rate of 10^-36 (1% per model ^ 18 models) while remaining sensitive to real issues:
 
@@ -146,11 +156,13 @@ Netdata democratizes ML and AI by making it automatic and universal (no configur
 
 Note: Netdata's ML focuses on detecting behavioral anomalies in metrics using their last 2 days of data. It is optimized for reliability rather than sensitivity and may miss slow (over days/weeks) infrastructure degradation or certain types of long-term anomalies (weekly, monthly, etc). However, it typically detects most types of abnormal behavior that break services.
 
+For more information see [Netdata's ML Accuracy, Reliability and Sensitivity](ml-ai/ml-anomaly-detection/ml-accuracy.md).
+
 ### Troubleshooting
 
-During a crisis, engineers typically need to make assumptions about possible root causes and validate or drop these assumptions. This is a painful process requiring expertise, deep understanding of the monitored infrastructure and dependencies that usually leads to days or weeks of investigation.
+> During a crisis, engineers typically need to make assumptions about possible root causes and validate or drop these assumptions. This is a painful process requiring expertise, deep understanding of the monitored infrastructure and dependencies that usually leads to days or weeks of investigation.
 
-Netdata introduces a significant shift to this process utilizing its unsupervised and real-time anomaly detection system. The "Anomaly Advisor" transforms troubleshooting:
+Netdata introduces a significant shift to the troubleshooting process utilizing its unsupervised and real-time anomaly detection system. The "Anomaly Advisor" transforms troubleshooting:
 
 - **Automatic scoring**: Ranks all metrics by anomaly severity within any time window
 - **Root cause prioritization**: Surfaces the most likely culprits in the first 30-50 metrics
@@ -162,7 +174,7 @@ This approach still requires interpretation skills but dramatically simplifies t
 
 ### Alerts
 
-Most monitoring solutions focus on aggregate metrics and business-level alerts, often missing component failures until they cascade into service outages. This approach leads to alert fatigue from false positives and missed issues from incomplete coverage.
+> Most monitoring solutions focus on aggregate metrics and business-level alerts, often missing component failures until they cascade into service outages. This approach leads to alert fatigue from false positives and missed issues from incomplete coverage.
 
 Netdata takes a fundamentally different approach: templated alerts that monitor individual component and application instances. Each alert watches a single instance, building a comprehensive safety net where every component has its own watchdog. This granular approach ensures:
 
@@ -176,9 +188,9 @@ Netdata ships with hundreds of pre-configured alerts, many intentionally silent 
 
 ### Scalability
 
-Centralized monitoring architectures hit bottlenecks — ingestion pipelines overflow, storage systems struggle, query engines slow down. Adding more infrastructure makes the monitoring system itself harder to manage.
+> Centralized monitoring architectures hit bottlenecks — ingestion pipelines overflow, storage systems struggle, query engines slow down. Adding more infrastructure makes the monitoring system itself harder to manage.
 
-Netdata's philosophy is that scalability must be inherent to the architecture, not an expensive add-on. Designed to be fully distributed, Netdata achieves linear scalability through:
+For Netdata scalability is inherent to the architecture, not an add-on. Designed to be fully distributed, Netdata achieves linear scalability through:
 
 - **Independent operation**: Each Agent and Parent operates autonomously without affecting others.
 - **Horizontal scaling**: Add more Parents to handle more Agents without redesigning architecture.
@@ -206,23 +218,23 @@ Netdata can operate independently or alongside your existing observability stack
 
 Typically, organizations deploying Netdata need to:
 
-1. Install Netdata Agents on all Linux, Windows, FreeBSD and MacOS physical servers and VMs
+1. **Install Netdata Agents** on all Linux, Windows, FreeBSD and MacOS physical servers and VMs
 2. Optionally: dedicate resources (VMs, storage) for Netdata Parents, providing high-availability and longer retention to observability data
 3. Optionally: configure logs transformation with `log2journal` and centralization using typical systemd-journald methodologies
-4. Configure collectors that need credentials to access protected applications (databases, message brokers, etc), data collection for custom applications, enable SNMP discovery and data collection, install Netdata with auto-discovery in Kubernetes clusters
-5. Review alerts (Netdata ships with preconfigured alerts) and set up alert notification channels
-6. Invite colleagues (enterprise SSO via IODC, Okta and SCIMv2 supported), assign roles and permissions
+4. **Configure collectors** that need credentials to access protected applications (databases, message brokers, etc), data collection for custom applications, enable SNMP discovery and data collection, install Netdata with auto-discovery in Kubernetes clusters
+5. **Review alerts** (Netdata ships with preconfigured alerts) and set up alert **notification channels**
+6. **Invite colleagues** (enterprise SSO via IODC, Okta and SCIMv2 supported), assign roles and permissions
 
 Netdata will automatically provide:
 
-1. Complete coverage of hardware, operating system and application metrics
-2. Real-time, low-latency Metrics and Logs Dashboards
-3. Live and interactive exploration of running processes, network connections, systemd units, systemd services, IMPI sensors, and more
-4. Unsupervised machine-learning based anomaly detection for all metrics
-5. Hundreds of pre-configured alerts for systems and applications
-6. AI insights (reports) and AI-assistant (chat) connections via MCP
+1. **Complete coverage** of hardware, operating system and application metrics
+2. Real-time, low-latency **Metrics and Logs Dashboards**
+3. Live and interactive exploration of running **processes**, **network connections**, **systemd units**, **systemd services**, **IMPI sensors**, and more
+4. Unsupervised **machine-learning based anomaly detection** for all metrics
+5. Hundreds of **pre-configured alerts** for systems and applications
+6. **AI insights** (reports) and **AI-assistant** (chat) connections via MCP
 
-Custom dashboards are supported but are optional. Netdata provides single-node, multi-node and infrastructure level dashboards automatically.
+Custom dashboards are supported but are optional. Netdata provides single-node, multi-node and **infrastructure level dashboards** automatically.
 
 Netdata configurations are infrastructure-as-code friendly, and provisioning systems can be used to automate deployment on large infrastructures.
 A complete Netdata deployment is usually achieved within a few days.
@@ -247,9 +259,13 @@ Notes:
 - Storage rates are for all tiers combined; actual disk usage depends on retention configuration
 - The recommended topology is having a cluster of Netdata Parents every 500 monitored nodes (2M metrics/s)
 
-The University of Amsterdam study found Netdata to be the most energy-efficient monitoring solution, with the lowest CPU overhead, memory usage, and execution time impact among compared tools.
+The [University of Amsterdam study](https://twitter.com/IMalavolta/status/1734208439096676680) found Netdata to be the most energy-efficient monitoring solution, with the lowest CPU overhead, memory usage, and execution time impact among compared tools.
+
+For more information see [Netdata's impact on resources](impact-on-resources.md).
 
 ## Practical Implications
+
+Please also see [Netdata Enterprise Evaluation Guide](netdata-enterprise-evaluation-corrected.md] and [Netdata's Security and Privacy Design](security-and-privacy-design/README.md).
 
 ### For Small Teams
 
