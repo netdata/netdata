@@ -17,7 +17,10 @@ var (
 		sortingChart.Copy(),
 		rowActivityChart.Copy(),
 		bufferpoolHitRatioChart.Copy(),
-		bufferpoolDetailedHitRatioChart.Copy(),
+		bufferpoolDataHitRatioChart.Copy(),
+		bufferpoolIndexHitRatioChart.Copy(),
+		bufferpoolXDAHitRatioChart.Copy(),
+		bufferpoolColumnHitRatioChart.Copy(),
 		bufferpoolReadsChart.Copy(),
 		bufferpoolDataReadsChart.Copy(),
 		bufferpoolIndexReadsChart.Copy(),
@@ -58,7 +61,7 @@ var (
 			{ID: "conn_active", Name: "active"},
 			{ID: "conn_executing", Name: "executing"},
 			{ID: "conn_idle", Name: "idle"},
-			{ID: "conn_max", Name: "max_seen"},
+			{ID: "conn_max", Name: "max_allowed"},
 		},
 	}
 
@@ -124,7 +127,7 @@ var (
 		Ctx:      "db2.lock_wait_time",
 		Priority: module.Priority + 13,
 		Dims: module.Dims{
-			{ID: "lock_wait_time", Name: "wait_time", Div: precision},
+			{ID: "lock_wait_time", Name: "wait_time", Div: Precision},
 		},
 	}
 
@@ -151,22 +154,62 @@ var (
 		Ctx:      "db2.bufferpool_hit_ratio",
 		Priority: module.Priority + 40,
 		Dims: module.Dims{
-			{ID: "bufferpool_hit_ratio", Name: "hit_ratio", Div: precision},
+			{ID: "bufferpool_hits", Name: "hits", Algo: module.PercentOfIncremental},
+			{ID: "bufferpool_misses", Name: "misses", Algo: module.PercentOfIncremental},
 		},
 	}
 
-	bufferpoolDetailedHitRatioChart = module.Chart{
-		ID:       "bufferpool_detailed_hit_ratio",
-		Title:    "Buffer Pool Detailed Hit Ratios",
+	// Note: We'll need separate charts for each type's hit ratio
+	// since percentage-of-incremental-row requires all dimensions to sum to 100%
+	bufferpoolDataHitRatioChart = module.Chart{
+		ID:       "bufferpool_data_hit_ratio",
+		Title:    "Buffer Pool Data Page Hit Ratio",
 		Units:    "percentage",
 		Fam:      "performance",
-		Ctx:      "db2.bufferpool_detailed_hit_ratio",
+		Ctx:      "db2.bufferpool_data_hit_ratio",
 		Priority: module.Priority + 41,
 		Dims: module.Dims{
-			{ID: "bufferpool_data_hit_ratio", Name: "data", Div: precision},
-			{ID: "bufferpool_index_hit_ratio", Name: "index", Div: precision},
-			{ID: "bufferpool_xda_hit_ratio", Name: "xda", Div: precision},
-			{ID: "bufferpool_column_hit_ratio", Name: "column", Div: precision},
+			{ID: "bufferpool_data_hits", Name: "hits", Algo: module.PercentOfIncremental},
+			{ID: "bufferpool_data_misses", Name: "misses", Algo: module.PercentOfIncremental},
+		},
+	}
+
+	bufferpoolIndexHitRatioChart = module.Chart{
+		ID:       "bufferpool_index_hit_ratio",
+		Title:    "Buffer Pool Index Page Hit Ratio",
+		Units:    "percentage",
+		Fam:      "performance",
+		Ctx:      "db2.bufferpool_index_hit_ratio",
+		Priority: module.Priority + 42,
+		Dims: module.Dims{
+			{ID: "bufferpool_index_hits", Name: "hits", Algo: module.PercentOfIncremental},
+			{ID: "bufferpool_index_misses", Name: "misses", Algo: module.PercentOfIncremental},
+		},
+	}
+
+	bufferpoolXDAHitRatioChart = module.Chart{
+		ID:       "bufferpool_xda_hit_ratio",
+		Title:    "Buffer Pool XDA Page Hit Ratio",
+		Units:    "percentage",
+		Fam:      "performance",
+		Ctx:      "db2.bufferpool_xda_hit_ratio",
+		Priority: module.Priority + 43,
+		Dims: module.Dims{
+			{ID: "bufferpool_xda_hits", Name: "hits", Algo: module.PercentOfIncremental},
+			{ID: "bufferpool_xda_misses", Name: "misses", Algo: module.PercentOfIncremental},
+		},
+	}
+
+	bufferpoolColumnHitRatioChart = module.Chart{
+		ID:       "bufferpool_column_hit_ratio",
+		Title:    "Buffer Pool Column Page Hit Ratio",
+		Units:    "percentage",
+		Fam:      "performance",
+		Ctx:      "db2.bufferpool_column_hit_ratio",
+		Priority: module.Priority + 44,
+		Dims: module.Dims{
+			{ID: "bufferpool_column_hits", Name: "hits", Algo: module.PercentOfIncremental},
+			{ID: "bufferpool_column_misses", Name: "misses", Algo: module.PercentOfIncremental},
 		},
 	}
 
@@ -176,7 +219,7 @@ var (
 		Units:    "reads/s",
 		Fam:      "performance",
 		Ctx:      "db2.bufferpool_reads",
-		Priority: module.Priority + 42,
+		Priority: module.Priority + 45,
 		Type:     module.Stacked,
 		Dims: module.Dims{
 			{ID: "bufferpool_logical_reads", Name: "logical", Algo: module.Incremental},
@@ -262,7 +305,7 @@ var (
 		Ctx:      "db2.log_utilization",
 		Priority: module.Priority + 51,
 		Dims: module.Dims{
-			{ID: "log_utilization", Name: "utilization", Div: precision},
+			{ID: "log_utilization", Name: "utilization", Div: Precision},
 		},
 	}
 
@@ -310,13 +353,13 @@ var (
 	backupAgeChart = module.Chart{
 		ID:       "backup_age",
 		Title:    "Time Since Last Backup",
-		Units:    "seconds",
+		Units:    "hours",
 		Fam:      "backup",
 		Ctx:      "db2.backup_age",
 		Priority: module.Priority + 71,
 		Dims: module.Dims{
-			{ID: "last_full_backup_age", Name: "full", Mul: 3600},
-			{ID: "last_incremental_backup_age", Name: "incremental", Mul: 3600},
+			{ID: "last_full_backup_age", Name: "full"},
+			{ID: "last_incremental_backup_age", Name: "incremental"},
 		},
 	}
 )

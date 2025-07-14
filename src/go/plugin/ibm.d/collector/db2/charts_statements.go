@@ -36,15 +36,26 @@ var (
 		},
 	}
 	
-	statementTimeChartTmpl = module.Chart{
-		ID:       "statement_%s_time",
-		Title:    "Statement Time",
+	statementAvgTimeChartTmpl = module.Chart{
+		ID:       "statement_%s_avg_time",
+		Title:    "Statement Average Execution Time",
 		Units:    "milliseconds",
 		Fam:      "statements",
-		Ctx:      "db2.statement_time",
+		Ctx:      "db2.statement_avg_time",
 		Priority: prioStatementTime,
 		Dims: module.Dims{
 			{ID: "statement_%s_avg_exec_time", Name: "avg_time"},
+		},
+	}
+	
+	statementCPUTimeChartTmpl = module.Chart{
+		ID:       "statement_%s_cpu_time",
+		Title:    "Statement CPU Time",
+		Units:    "milliseconds/s",
+		Fam:      "statements",
+		Ctx:      "db2.statement_cpu_time",
+		Priority: prioStatementTime + 1,
+		Dims: module.Dims{
 			{ID: "statement_%s_total_cpu_time", Name: "cpu_time", Algo: module.Incremental},
 		},
 	}
@@ -165,7 +176,8 @@ var (
 func (d *DB2) newStatementCharts(stmt *statementMetrics) *module.Charts {
 	charts := module.Charts{
 		statementExecutionsChartTmpl.Copy(),
-		statementTimeChartTmpl.Copy(),
+		statementAvgTimeChartTmpl.Copy(),
+		statementCPUTimeChartTmpl.Copy(),
 		statementRowsChartTmpl.Copy(),
 		statementIOChartTmpl.Copy(),
 		statementWaitsChartTmpl.Copy(),
