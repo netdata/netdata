@@ -171,15 +171,22 @@ static void *windows_plugin_thread_worker(void *ptr __maybe_unused)
     struct proc_module *mod = ptr;
     heartbeat_t hb;
     int update_every = mod->update_every;
-    heartbeat_init(&hb, update_every * USEC_PER_SEC);
 
+    heartbeat_init(&hb, USEC_PER_SEC);
+    usec_t step = USEC_PER_SEC * update_every;
+    usec_t real_step = USEC_PER_SEC;
+
+    usec_t last = now_realtime_usec();
     while (service_running(SERVICE_COLLECTORS)) {
-        usec_t hb_dt = heartbeat_next(&hb);
-
-        if (unlikely(!service_running(SERVICE_COLLECTORS)))
-            break;
-
-        mod->func(update_every, hb_dt);
+        heartbeat_next(&hb);
+        if (real_step < step) {
+            real_step += USEC_PER_SEC;
+            continue;
+        }
+        real_step = USEC_PER_SEC;
+        usec_t now = now_realtime_usec();
+        mod->func(update_every, now - last);
+        last = now;
     }
 
     return NULL;
