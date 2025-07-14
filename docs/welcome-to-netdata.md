@@ -237,7 +237,7 @@ Based on extensive real-world deployments and independent academic validation, N
 |------------------------|:-----------------------:|:-------------------:|:-------------------:|
 | **CPU**                | 5% of a single core     | 3% of a single core | ~10 cores total     |
 | **Memory**             | 200 MB                  | 150 MB              | ~40 GB              |
-| **Network**            | None                    | <1 Mbps to Parent   | ~100 Mbps inbound   |
+| **Network**            | None                    | \<1 Mbps to Parent   | ~100 Mbps inbound   |
 | **Storage Capacity**   | 3 GiB (configurable)    | None                | as needed           |
 | **Storage Throughput** | 5 KiB/s write           | None                | 1 MiB/s write       |
 | **Retention**          | 1 year (configurable)   | None                | as needed           |
