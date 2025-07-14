@@ -355,6 +355,24 @@ func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 				
 				metrics.ColumnHits = metrics.ColumnLogicalReads - metrics.ColumnPhysicalReads
 				metrics.ColumnMisses = metrics.ColumnPhysicalReads
+				
+				// Ensure hits are not negative (shouldn't happen with MON_GET approach but safety check)
+				if metrics.DataHits < 0 {
+					metrics.DataHits = 0
+					metrics.DataMisses = metrics.DataLogicalReads
+				}
+				if metrics.IndexHits < 0 {
+					metrics.IndexHits = 0
+					metrics.IndexMisses = metrics.IndexLogicalReads
+				}
+				if metrics.XDAHits < 0 {
+					metrics.XDAHits = 0
+					metrics.XDAMisses = metrics.XDALogicalReads
+				}
+				if metrics.ColumnHits < 0 {
+					metrics.ColumnHits = 0
+					metrics.ColumnMisses = metrics.ColumnLogicalReads
+				}
 			}
 
 			// Calculate overall hits and misses

@@ -1117,6 +1117,25 @@ func (d *DB2) collectBufferpoolMetricsResilience(ctx context.Context) {
 	d.mx.BufferpoolColumnHits = colHits
 	d.mx.BufferpoolColumnMisses = colLogical - colHits
 	
+	// If misses are negative, it means prefetch brought more pages than were requested
+	// In this case, set misses to 0 and reduce hits accordingly
+	if d.mx.BufferpoolDataMisses < 0 {
+		d.mx.BufferpoolDataHits = dataLogical
+		d.mx.BufferpoolDataMisses = 0
+	}
+	if d.mx.BufferpoolIndexMisses < 0 {
+		d.mx.BufferpoolIndexHits = indexLogical
+		d.mx.BufferpoolIndexMisses = 0
+	}
+	if d.mx.BufferpoolXDAMisses < 0 {
+		d.mx.BufferpoolXDAHits = xdaLogical
+		d.mx.BufferpoolXDAMisses = 0
+	}
+	if d.mx.BufferpoolColumnMisses < 0 {
+		d.mx.BufferpoolColumnHits = colLogical
+		d.mx.BufferpoolColumnMisses = 0
+	}
+	
 	// Calculate overall hits and misses
 	d.mx.BufferpoolHits = d.mx.BufferpoolDataHits + d.mx.BufferpoolIndexHits + 
 		d.mx.BufferpoolXDAHits + d.mx.BufferpoolColumnHits
@@ -1357,6 +1376,25 @@ func (d *DB2) collectMonGetBufferpoolAggregate(ctx context.Context) error {
 	
 	d.mx.BufferpoolColumnHits = colHits
 	d.mx.BufferpoolColumnMisses = colLogical - colHits
+	
+	// If misses are negative, it means prefetch brought more pages than were requested
+	// In this case, set misses to 0 and reduce hits accordingly
+	if d.mx.BufferpoolDataMisses < 0 {
+		d.mx.BufferpoolDataHits = dataLogical
+		d.mx.BufferpoolDataMisses = 0
+	}
+	if d.mx.BufferpoolIndexMisses < 0 {
+		d.mx.BufferpoolIndexHits = indexLogical
+		d.mx.BufferpoolIndexMisses = 0
+	}
+	if d.mx.BufferpoolXDAMisses < 0 {
+		d.mx.BufferpoolXDAHits = xdaLogical
+		d.mx.BufferpoolXDAMisses = 0
+	}
+	if d.mx.BufferpoolColumnMisses < 0 {
+		d.mx.BufferpoolColumnHits = colLogical
+		d.mx.BufferpoolColumnMisses = 0
+	}
 	
 	// Calculate overall hits and misses
 	d.mx.BufferpoolHits = d.mx.BufferpoolDataHits + d.mx.BufferpoolIndexHits + 
