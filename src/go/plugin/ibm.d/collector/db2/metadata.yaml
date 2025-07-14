@@ -448,7 +448,7 @@ modules:
                 - name: active
                 - name: executing
                 - name: idle
-                - name: max_seen
+                - name: max_allowed
             - name: db2.locking
               description: Database Locking
               unit: events/s
@@ -499,7 +499,7 @@ modules:
                 - name: status
             - name: db2.backup_age
               description: Time Since Last Backup
-              unit: seconds
+              unit: hours
               chart_type: line
               dimensions:
                 - name: full
@@ -772,12 +772,17 @@ modules:
               chart_type: line
               dimensions:
                 - name: executions
-            - name: db2.statement_time
-              description: Statement Time
+            - name: db2.statement_avg_time
+              description: Statement Average Execution Time
               unit: milliseconds
               chart_type: line
               dimensions:
                 - name: avg_time
+            - name: db2.statement_cpu_time
+              description: Statement CPU Time
+              unit: milliseconds/s
+              chart_type: line
+              dimensions:
                 - name: cpu_time
             - name: db2.statement_rows
               description: Statement Row Activity

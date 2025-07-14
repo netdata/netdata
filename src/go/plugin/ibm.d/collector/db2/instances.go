@@ -163,47 +163,38 @@ func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 				}
 			}
 
-		case "HIT_RATIO":
+		case "DATA_PAGES_FOUND":
 			if currentBP != "" {
-				if v, err := strconv.ParseFloat(value, 64); err == nil {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 					metrics := d.mx.bufferpools[currentBP]
-					metrics.HitRatio = int64(v * precision)
+					metrics.DataHits = v
 					d.mx.bufferpools[currentBP] = metrics
 				}
 			}
 
-		case "DATA_HIT_RATIO":
+		case "INDEX_PAGES_FOUND":
 			if currentBP != "" {
-				if v, err := strconv.ParseFloat(value, 64); err == nil {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 					metrics := d.mx.bufferpools[currentBP]
-					metrics.DataHitRatio = int64(v * precision)
+					metrics.IndexHits = v
 					d.mx.bufferpools[currentBP] = metrics
 				}
 			}
 
-		case "INDEX_HIT_RATIO":
+		case "XDA_PAGES_FOUND":
 			if currentBP != "" {
-				if v, err := strconv.ParseFloat(value, 64); err == nil {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 					metrics := d.mx.bufferpools[currentBP]
-					metrics.IndexHitRatio = int64(v * precision)
+					metrics.XDAHits = v
 					d.mx.bufferpools[currentBP] = metrics
 				}
 			}
 
-		case "XDA_HIT_RATIO":
+		case "COL_PAGES_FOUND":
 			if currentBP != "" {
-				if v, err := strconv.ParseFloat(value, 64); err == nil {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 					metrics := d.mx.bufferpools[currentBP]
-					metrics.XDAHitRatio = int64(v * precision)
-					d.mx.bufferpools[currentBP] = metrics
-				}
-			}
-
-		case "COLUMN_HIT_RATIO":
-			if currentBP != "" {
-				if v, err := strconv.ParseFloat(value, 64); err == nil {
-					metrics := d.mx.bufferpools[currentBP]
-					metrics.ColumnHitRatio = int64(v * precision)
+					metrics.ColumnHits = v
 					d.mx.bufferpools[currentBP] = metrics
 				}
 			}
@@ -240,6 +231,8 @@ func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 					metrics := d.mx.bufferpools[currentBP]
 					metrics.DataLogicalReads = v
+					// Calculate data misses
+					metrics.DataMisses = v - metrics.DataHits
 					d.mx.bufferpools[currentBP] = metrics
 				}
 			}
@@ -258,6 +251,8 @@ func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 					metrics := d.mx.bufferpools[currentBP]
 					metrics.IndexLogicalReads = v
+					// Calculate index misses
+					metrics.IndexMisses = v - metrics.IndexHits
 					d.mx.bufferpools[currentBP] = metrics
 				}
 			}
@@ -276,6 +271,8 @@ func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 					metrics := d.mx.bufferpools[currentBP]
 					metrics.XDALogicalReads = v
+					// Calculate XDA misses
+					metrics.XDAMisses = v - metrics.XDAHits
 					d.mx.bufferpools[currentBP] = metrics
 				}
 			}
@@ -294,6 +291,8 @@ func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 					metrics := d.mx.bufferpools[currentBP]
 					metrics.ColumnLogicalReads = v
+					// Calculate column misses
+					metrics.ColumnMisses = v - metrics.ColumnHits
 					d.mx.bufferpools[currentBP] = metrics
 				}
 			}
@@ -338,49 +337,33 @@ func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 			}
 		}
 
-		// Calculate hit ratios for MON_GET at end of line when using MON_GET
-		if d.useMonGetFunctions && lineEnd && currentBP != "" {
+		// Calculate hit/miss metrics at end of line
+		if lineEnd && currentBP != "" {
 			metrics := d.mx.bufferpools[currentBP]
 
-			// Calculate total reads for each type
-			dataReads := metrics.DataLogicalReads
-			if dataReads > 0 && metrics.DataPhysicalReads >= 0 {
-				metrics.DataHitRatio = int64(((float64(dataReads - metrics.DataPhysicalReads)) * 100.0 * float64(precision)) / float64(dataReads))
-			} else {
-				metrics.DataHitRatio = 100 * precision
+			// For MON_GET queries, we calculate hits from logical - physical
+			if d.useMonGetFunctions {
+				// Calculate hits for each type (hits = logical - physical)
+				metrics.DataHits = metrics.DataLogicalReads - metrics.DataPhysicalReads
+				metrics.DataMisses = metrics.DataPhysicalReads
+				
+				metrics.IndexHits = metrics.IndexLogicalReads - metrics.IndexPhysicalReads
+				metrics.IndexMisses = metrics.IndexPhysicalReads
+				
+				metrics.XDAHits = metrics.XDALogicalReads - metrics.XDAPhysicalReads
+				metrics.XDAMisses = metrics.XDAPhysicalReads
+				
+				metrics.ColumnHits = metrics.ColumnLogicalReads - metrics.ColumnPhysicalReads
+				metrics.ColumnMisses = metrics.ColumnPhysicalReads
 			}
 
-			indexReads := metrics.IndexLogicalReads
-			if indexReads > 0 && metrics.IndexPhysicalReads >= 0 {
-				metrics.IndexHitRatio = int64(((float64(indexReads - metrics.IndexPhysicalReads)) * 100.0 * float64(precision)) / float64(indexReads))
-			} else {
-				metrics.IndexHitRatio = 100 * precision
-			}
-
-			xdaReads := metrics.XDALogicalReads
-			if xdaReads > 0 && metrics.XDAPhysicalReads >= 0 {
-				metrics.XDAHitRatio = int64(((float64(xdaReads - metrics.XDAPhysicalReads)) * 100.0 * float64(precision)) / float64(xdaReads))
-			} else {
-				metrics.XDAHitRatio = 100 * precision
-			}
-
-			colReads := metrics.ColumnLogicalReads
-			if colReads > 0 && metrics.ColumnPhysicalReads >= 0 {
-				metrics.ColumnHitRatio = int64(((float64(colReads - metrics.ColumnPhysicalReads)) * 100.0 * float64(precision)) / float64(colReads))
-			} else {
-				metrics.ColumnHitRatio = 100 * precision
-			}
-
-			// Overall hit ratio
-			totalLogical := dataReads + indexReads + xdaReads + colReads
-			totalPhysical := metrics.DataPhysicalReads + metrics.IndexPhysicalReads + metrics.XDAPhysicalReads + metrics.ColumnPhysicalReads
-			if totalLogical > 0 && totalPhysical >= 0 {
-				metrics.HitRatio = int64(((float64(totalLogical - totalPhysical)) * 100.0 * float64(precision)) / float64(totalLogical))
-			} else {
-				metrics.HitRatio = 100 * precision
-			}
+			// Calculate overall hits and misses
+			metrics.Hits = metrics.DataHits + metrics.IndexHits + metrics.XDAHits + metrics.ColumnHits
+			metrics.Misses = metrics.DataMisses + metrics.IndexMisses + metrics.XDAMisses + metrics.ColumnMisses
 
 			// Calculate total reads
+			totalLogical := metrics.DataLogicalReads + metrics.IndexLogicalReads + metrics.XDALogicalReads + metrics.ColumnLogicalReads
+			totalPhysical := metrics.DataPhysicalReads + metrics.IndexPhysicalReads + metrics.XDAPhysicalReads + metrics.ColumnPhysicalReads
 			metrics.LogicalReads = totalLogical
 			metrics.PhysicalReads = totalPhysical
 			metrics.TotalReads = totalLogical + totalPhysical
@@ -490,7 +473,7 @@ func (d *DB2) collectTablespaceInstances(ctx context.Context) error {
 			if currentTbsp != "" {
 				if v, err := strconv.ParseFloat(value, 64); err == nil {
 					metrics := d.mx.tablespaces[currentTbsp]
-					metrics.UsedPercent = int64(v * precision)
+					metrics.UsedPercent = int64(v * Precision)
 					d.mx.tablespaces[currentTbsp] = metrics
 				}
 			}
