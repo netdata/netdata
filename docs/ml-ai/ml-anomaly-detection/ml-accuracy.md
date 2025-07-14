@@ -317,7 +317,7 @@ When evaluated against alternative approaches:
 |--------|------------|------------------|---------------|----------------|
 | False Positive Rate | 10^-36 | 0.3% | Variable | Typically 0.1-1% |
 | Configuration Required | None | Minimal | Extensive | Moderate to High |
-| Resource Overhead | 2-5% CPU | <1% CPU | 30-60% CPU | Unknown |
+| Resource Overhead | 2-5% CPU | \<1% CPU | 30-60% CPU | Unknown |
 | Pattern Memory | 57 hours<br/>(configurable) | Unlimited | Model-dependent | Days to Weeks |
 | Adaptation Speed | 3 hours<br/>(configurable) | Immediate | Retraining required | Hours to Days |
 | Metric Coverage | ALL metrics | Selected metrics | Selected metrics | Selected metrics |
