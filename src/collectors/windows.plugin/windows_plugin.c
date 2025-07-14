@@ -11,6 +11,7 @@ static struct proc_module {
     int update_every;
     int (*func)(int update_every, usec_t dt);
     RRDDIM *rd;
+    ND_THREAD *thread;
 } win_modules[] = {
 
     // system metrics
@@ -199,6 +200,7 @@ void *win_plugin_main(void *ptr)
     int update_every = localhost->rrd_update_every;
     for (i = 0; win_modules[i].name; i++) {
         struct proc_module *pm = &win_modules[i];
+        pm->thread = NULL;
 
         snprintfz(buf, CONFIG_MAX_NAME, "plugin:windows:%s", pm->name);
 
@@ -210,7 +212,7 @@ void *win_plugin_main(void *ptr)
         if (pm->enabled && unlikely(update_every != pm->update_every)) {
             char tag_name[ND_THREAD_TAG_MAX];
             snprintfz(tag_name, ND_THREAD_TAG_MAX - 1, "WIN_PLUGIN[%d]", i);
-            nd_thread_create(tag_name, NETDATA_THREAD_OPTION_DEFAULT, windows_plugin_thread_worker, pm);
+            pm->thread = nd_thread_create(tag_name, NETDATA_THREAD_OPTION_DEFAULT, windows_plugin_thread_worker, pm);
         }
 
         worker_register_job_name(i, win_modules[i].dim);
@@ -241,7 +243,8 @@ void *win_plugin_main(void *ptr)
                 break;
 
             struct proc_module *pm = &win_modules[i];
-            if (unlikely(update_every != win_modules[i].update_every))
+            // if we have a thread, we are already running it
+            if (pm->thread)
                 continue;
 
             if (unlikely(!pm->enabled))
@@ -252,6 +255,13 @@ void *win_plugin_main(void *ptr)
             pm->enabled = !pm->func(pm->update_every, hb_dt);
             lgs[LGS_MODULE_ID] = ND_LOG_FIELD_TXT(NDF_MODULE, PLUGIN_WINDOWS_NAME);
         }
+    }
+
+    // Join threads
+    for (i = 0; win_modules[i].name; i++) {
+        struct proc_module *pm = &win_modules[i];
+        if (pm->thread)
+            nd_thread_join(pm->thread);
     }
     return NULL;
 }
