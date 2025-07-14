@@ -294,6 +294,224 @@ Modern infrastructure changes constantly. Netdata enables teams to:
 - Track relationships that update dynamically as services scale
 - Benefit from ML models that continuously adapt to new patterns
 
+## Frequently Asked Questions on Design Philosophy
+
+### Q: Doesn't edge architecture create a management nightmare?
+
+**The opposite is true — edge architecture eliminates most management overhead.**
+
+<details>
+<summary>More details</summary>
+
+Traditional centralized systems require:
+- Database administration (backups, compaction, tuning)
+- Capacity planning for central storage
+- Pipeline management and scaling
+- Schema migration coordination
+- Downtime windows for maintenance
+
+Netdata's edge approach provides:
+- **Zero maintenance**: Agents and Parents run autonomously without administration
+- **Automatic updates**: Built-in update mechanisms or integration with provisioning tools
+- **Strong compatibility**: Backwards compatibility ensures upgrades don't break things
+- **Forward compatibility**: Can often downgrade without data loss (we implement forward-read capability before activating new schemas)
+- **No coordination needed**: Each agent updates independently — no "big bang" migrations
+- **Fixed relationships**: Parent-Child connections are one-time configuration with alerts for disconnections
+- **Cardinality protection**: Automated protections prevent runaway metrics from affecting the entire system
+- **Built-in high availability**: Streaming and replication provide data redundancy without complex setup
+
+The architecture also delivers operational benefits:
+- **Minimal disk I/O**: Data commits only every 17 minutes per metric (spread over time), while real-time streaming maintains data safety
+- **No backup complexity**: Observability data is ephemeral (rotated) and write-once-read-many (WORM), eliminating traditional backup requirements via replication
+- **Isolated failures**: Issues affect only parts of the ecosystem (e.g., a single parent), not the entire monitoring foundation
+
+**Why not use existing databases?**
+
+Existing time-series databases couldn't meet the requirements for edge deployment:
+- **Process independence**: No separate database processes to manage
+- **Write-once-read-many (WORM)**: Corruption-resistant with graceful degradation
+- **Zero maintenance**: No tuning, compaction, or optimization required
+- **Minimal footprint**: Small memory usage with extreme compression (0.6 bytes/sample)
+- **Optimized I/O**: Low disk writes spread over time to minimize impact
+- **Embedded ML**: Anomaly detection without additional storage overhead
+- **Partial resilience**: Continues operating even with partial disk corruption
+
+The "thousands of databases" concern misunderstands the architecture. These aren't databases you manage — they're autonomous components that manage themselves. It's like worrying about managing thousands of log files when you use syslog — the system handles it.
+
+In practice, organizations using Netdata routinely achieve multi-million samples/second, highly-available observability infrastructure without even noticing the complexity this would normally imply. The complexity isn't moved — it's eliminated through design.
+</details>
+
+### Q: Isn't collecting 'everything' fundamentally wasteful?
+
+**The opposite is true — Netdata is the most energy-efficient monitoring solution available.**
+
+<details>
+<summary>More details</summary>
+
+The University of Amsterdam study confirmed Netdata uses significantly fewer resources than selective monitoring solutions. Despite collecting everything and per-second, our optimized design and streamlined code make Netdata more efficient, not less.
+
+The real question is: **What's the business impact when critical troubleshooting data isn't available during a crisis?**
+
+Consider:
+- **Crisis happens when things break unexpectedly** — if they were expected, you'd have mitigations in place
+- **The very fact systems are in crisis** means the failure mode wasn't predicted
+- **Engineers can't predict what data they'll need** for problems they didn't anticipate
+
+The business case for complete coverage:
+- **Reduced MTTD/MTTR**: All data is available immediately when investigating issues
+- **No blind spots**: The metric you didn't think to collect often holds the key
+- **ML/AI effectiveness**: Algorithms can find correlations in "insignificant" metrics that humans miss
+- **Lower environmental impact**: More efficient than selective solutions despite broader coverage
+
+Selective monitoring creates a paradox: you must predict what will break to know what to monitor, but if you could predict it, you'd prevent it. Complete coverage eliminates this guessing game while actually reducing resource consumption through better engineering.
+</details>
+
+### Q: Does complete coverage create analysis paralysis?
+
+**Structure prevents paralysis — Netdata organizes data hierarchically, not as an unstructured pool.**
+
+<details>
+<summary>More details</summary>
+
+Unlike monitoring solutions that present metrics as a flat list, Netdata uses intelligent hierarchical organization:
+- 50 disk metrics stay within the disk section
+- 100 container metrics remain in the container view
+- Database metrics don't interfere with network analysis
+
+This means:
+- **No performance impact**: Finding database issues isn't slower because you have more network metrics
+- **No confusion**: Each subsystem's metrics are logically grouped and accessible
+- **Negligible cost**: One more metric adds just 18KB memory and 0.6 bytes/sample on disk
+
+**The real insight: Comprehensive data empowers different engineering approaches**
+
+Some engineers thrive with complete visibility — they can trace issues across subsystems, understand cascading failures, and prevent future problems. Others prefer simpler "is it working?" dashboards. Netdata supports both:
+
+- **For troubleshooters**: Full depth to understand root causes and prevent recurrence
+- **For quick fixes**: High-level dashboards and clear alerts for immediate action
+- **For everyone**: ML-driven Anomaly Advisor surfaces what matters without manual searching
+
+The philosophy isn't "more data is better" — it's "the right data should always be available." Hierarchical organization ensures engineers can work at their preferred depth without being overwhelmed by information they don't currently need.
+
+Organizations report that engineers who initially felt overwhelmed quickly adapt once they experience finding that one critical metric that solved a major incident — the metric they wouldn't have thought to collect in advance.
+</details>
+
+### Q: Is per-second granularity actually useful or just marketing?
+
+**Per-second is for engineers, not business metrics — it matches the speed at which systems actually operate.**
+
+<details>
+<summary>More details</summary>
+
+Consider the reality of modern systems:
+- CPUs execute **billions of instructions per second**
+- A single second contains enough time for entire cascading failures
+- In one minute, a system can process millions of requests, experience multiple garbage collections, or suffer intermittent network issues
+
+**Per-second is the standard for engineering tools**
+
+When engineers debug with console tools, they never use 10-second or minute averages. Why? Because averaging hides critical details:
+- Stress spikes that trigger failures
+- Micro-bursts that overwhelm queues
+- Brief stalls that compound into user-facing latency
+
+**Netdata was designed as a unified console replacement**
+
+Think of Netdata as the evolution of `top`, `iostat`, `netstat`, and hundreds of other console tools — but with:
+- The same per-second granularity engineers expect
+- Complete coverage across all subsystems
+- Historical data to trace issues backward
+- Visual representation of complex relationships
+- Machine Learning analyzing everything
+
+This is true tools consolidation: instead of jumping between dozens of console commands during an incident, engineers have one unified view at the resolution that matters. When a service degrades, you need to see the exact second it started, not a minute-average that obscures the trigger.
+
+**Immediate feedback is crucial for effective operations**
+
+When engineers make infrastructure changes, they need to see the impact immediately:
+- **During crisis**: Every second counts — you can't wait for minute-averages to confirm if your fix is working
+- **Configuration changes**: See instantly whether that parameter helped or made things worse
+- **Scaling operations**: Watch resource utilization respond in real-time as you add capacity
+- **Performance tuning**: Observe the immediate effect of cache size adjustments or thread pool changes
+
+This instant feedback loop dramatically accelerates problem resolution. Engineers can rapidly iterate through potential fixes, seeing results within seconds rather than waiting for averaged data that might hide whether the intervention actually helped.
+
+For business metrics, minute or hourly aggregations make sense. But for infrastructure monitoring and tuning, per-second granularity is the foundation of effective troubleshooting.
+</details>
+
+### Q: What about the observer effect? How do you guarantee per-second collection isn't impacting application performance?
+
+**Netdata's default collection frequencies are carefully configured to avoid impacting monitored applications.**
+
+<details>
+<summary>More details</summary>
+
+The goal is simple: collect all metrics at the maximum possible frequency without affecting performance. This means:
+
+**Thoughtfully configured defaults:**
+- **Most metrics**: Collected per-second when source data updates frequently
+- **Slower metrics**: Collected every 5-10 seconds when source data changes less frequently  
+- **Expensive metrics**: Disabled by default with optional configuration flags for specialized use cases
+
+**Performance-first defaults:**
+- Collection frequency is tuned based on the cost of data gathering
+- "Expensive" metrics (those affecting performance) have lower default frequencies
+- Some specialized metrics are completely disabled by default but can be enabled when their value justifies the overhead
+
+**User control:**
+- All frequencies are configurable — users can increase collection frequency if they need higher resolution for specific metrics
+- Can disable any collector that proves problematic in their specific environment
+- Can enable expensive collectors when their specialized value outweighs the performance cost
+
+This isn't about blindly collecting everything every second regardless of impact. It's about being intelligent enough to collect each metric at the optimal frequency for that specific data source and use case, defaulting to configurations that have been proven safe across thousands of production deployments.
+
+The University of Amsterdam study confirmed this approach works: despite comprehensive collection, Netdata has the lowest performance impact on the monitored applications among monitoring solutions.
+</details>
+
+### Q: Why systemd-journal instead of industry standards like Elasticsearch/Splunk?
+
+**systemd-journal IS the industry standard — it's already installed and running on every Linux system.**
+
+<details>
+<summary>More details</summary>
+
+The question misframes the choice. systemd-journal isn't competing with Elasticsearch/Splunk — it's the native log format they all read from. The real question is: why move data when you can query it directly?
+
+**Understanding the trade-offs:**
+
+| Approach | Storage Footprint | Query Performance | Indexing Strategy |
+|----------|------------------|-------------------|-------------------|
+| **Loki** | 1/4 to 1/2 of original logs | Slow (brute force scan after metadata filtering) | Limited metadata indexing |
+| **Elasticsearch/Splunk** | 2-5x larger than original logs | Fast full-text search | Word-level reverse indexing |
+| **systemd-journal** | ~Equal to original logs | Fast field-value queries | Forward indexing of all field values |
+
+**systemd-journal provides a balanced approach:**
+- **Open schema**: Each log entry can have unique fields, all automatically indexed
+- **Storage efficient**: Roughly same size as original logs
+- **Query optimized**: Fast lookups for any field value as a whole
+- **Universal compatibility**: Already the source for all other log systems
+
+**But systemd-journal is actually superior in critical ways:**
+- **Security features**: Forward Secure Sealing (FSS) for tamper detection — not even available in most commercial solutions
+- **Native access control**: Uses filesystem permissions for isolation — no additional security layer to breach
+- **Extreme performance**: Outperforms everything else in single-node ingestion throughput while being lightweight
+- **No query server**: All queries run in parallel, lockless, directly on files — infinitely scalable read performance
+- **OS-level optimization**: Naturally cached by the kernel, providing blazing-fast repeated queries
+- **Built-in distribution**: Native tools for log centralization within infrastructure, no additional software needed
+- **Edge-native**: Distributed by design, perfectly aligned with Netdata's architecture
+
+Furhermore, direct file access isn't a security risk — it's a security advantage. Access control is enforced by the operating system itself through native filesystem permissions. There's no query server to hack, no additional authentication layer to misconfigure, and no database permissions to manage. Multi-tenancy and log isolation work through the same filesystem permission model that has provided reliable security for decades.
+
+**What Netdata adds:**
+systemd-journal is powerful but lacks the visualization and analysis layer. Netdata provides:
+- Rich query interface and dashboards
+- Field statistics and histograms
+- Integration with metrics and anomaly detection
+- Web-based exploration tools
+
+The insight: instead of copying logs to expensive centralized systems, why not build better tools on the robust foundation already present in every Linux system? This eliminates data movement, reduces infrastructure costs, provides superior security, and delivers faster queries through native file access — all while maintaining the distributed architecture that makes modern infrastructure manageable.
+</details>
+
 ## Summary
 
 Netdata represents a fundamental rethink of monitoring architecture. By processing data at the edge, automating configuration, maintaining real-time resolution, applying ML universally, and making data accessible to everyone, it solves core monitoring challenges that have persisted for decades.
