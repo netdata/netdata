@@ -17,8 +17,6 @@
 #define SQLSERVER_MAX_NAME_LENGTH NETDATA_MAX_INSTANCE_OBJECT
 #define NETDATA_MSSQL_NEXT_TRY (60)
 
-BOOL is_sqlexpress = FALSE;
-
 struct netdata_mssql_conn {
     const char *instance;
     const char *driver;
@@ -798,10 +796,10 @@ static void initialize_mssql_objects(struct mssql_instance *mi, const char *inst
     char prefix[NETDATA_MAX_INSTANCE_NAME];
     if (!strcmp(instance, "MSSQLSERVER")) {
         strncpyz(prefix, "SQLServer:", sizeof(prefix) - 1);
-    } else if (!strcmp(instance, "SQLEXPRESS") || mi->conn->is_sqlexpress) {
+    } else if (!strcmp(instance, "SQLEXPRESS") || (mi->conn && mi->conn->is_sqlexpress)) {
         strncpyz(prefix, "MSSQL$SQLEXPRESS:", sizeof(prefix) - 1);
     } else {
-        char *express = (!is_sqlexpress || mi->conn->is_sqlexpress) ? "" : "SQLEXPRESS:";
+        char *express = (mi->conn && !mi->conn->is_sqlexpress) ? "" : "SQLEXPRESS:";
         snprintfz(prefix, sizeof(prefix) - 1, "MSSQL$%s%s:", express, instance);
     }
 
@@ -1100,10 +1098,6 @@ static int mssql_fill_dictionary(int update_every)
         ret = RegEnumValue(hKey, i, avalue, &length, NULL, NULL, NULL, NULL);
         if (ret != ERROR_SUCCESS)
             continue;
-
-        if (!strcmp(avalue, "SQLEXPRESS")) {
-            is_sqlexpress = TRUE;
-        }
 
         struct mssql_instance *p = dictionary_set(mssql_instances, avalue, NULL, sizeof(*p));
         p->update_every = update_every;
