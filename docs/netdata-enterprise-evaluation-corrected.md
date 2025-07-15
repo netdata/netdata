@@ -41,7 +41,7 @@ For more information see [Deployment Strategies](https://github.com/netdata/netd
 
 Netdata has been architected to minimize resource consumption while maximizing observability capabilities. This efficiency is achieved through several key design decisions:
 
-- **Storage Optimization**: Industry-leading compression achieving ~0.5 bytes per sample on disk for high-resolution data
+- **Storage Optimization**: Industry-leading compression achieving ~0.6 bytes per sample on disk for high-resolution data
 - **Edge Computing**: Distributed architecture keeps data processing close to its source, reducing bandwidth and central processing requirements - Netdata distributes the code instead of centralizing the data
 - **Intelligent ML**: Machine learning runs as low-priority background tasks, automatically yielding resources when needed for data collection. See [AI & ML Features](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/machine-learning-and-assisted-troubleshooting.md)
 - **Built-in Scalability**: Native clustering and high-availability features enable organizations to scale horizontally without architectural changes. See [Observability Centralization Points](https://github.com/netdata/netdata/blob/master/docs/observability-centralization-points/README.md).
@@ -57,8 +57,8 @@ When connected to a Netdata Parent (the agent is in `child` mode), these require
 
 | Type       | Metric/s | CPU | Memory | Network | Storage |
 |------------|---------------|-----------|---------|---------|---------|
-| standalone | 3k - 10k | 4% - 20%<br/>of single core | 150 - 500 MiB | none | varies based on retention |
-| child      | 3k - 10k | 2% - 10%<br/>of single core | 100 - 300 MiB | \<1 Mbps | none |
+| standalone | 3k - 10k | 4% - 20% of single core | 150 - 500 MiB | none | varies based on retention |
+| child      | 3k - 10k | 2% - 10% of single core | 100 - 300 MiB | \<1 Mbps | none |
 
 For more information and ways to further reduce Agent resource utilization, see [Agent Resource Utilization](hhttps://github.com/netdata/netdata/blob/master/docs/netdata-agent/sizing-netdata-agents/README.md).
 
@@ -97,10 +97,10 @@ Netdata users have multiple options to deploy Netdata on their systems. Netdata 
 
 ### Agent and Parent Deployment Options
 
-**1. Configuration Management Tools**: Use Ansible, Puppet, Chef, Salt, Terraform
-**2. Container Deployment**: Use official Docker images
-**3. Native Package Management**: Use native GPG-signed packages for Debian, Ubuntu, Red Hat, CentOS, SUSE, etc., with the ability to mirror Netdata repositories internally for air-gapped environments
-**4. One-Line Installation with Auto-Updates**: Single command installation that configures automatic updates, with a choice of release channels: stable (recommended) or nightly
+1. **Configuration Management Tools**: Use Ansible, Puppet, Chef, Salt, Terraform
+2. **Container Deployment**: Use official Docker images
+3. **Native Package Management**: Use native GPG-signed packages for Debian, Ubuntu, Red Hat, CentOS, SUSE, etc., with the ability to mirror Netdata repositories internally for air-gapped environments
+4. **One-Line Installation with Auto-Updates**: Single command installation that configures automatic updates, with a choice of release channels: stable (recommended) or nightly
 
 **Note**: Netdata Parents use the same software as Agents with different configuration. All deployment methods apply to both.
 
@@ -136,9 +136,9 @@ Netdata scales horizontally. There is no limit on how large a Netdata monitored 
 
 For data ingestion and storage, there is no limit, theoretical or practical. When using standalone agents, each agent is independent of the others. When using parent-child agents, each parent is sized independently of the others and the system scales by adding more parents.
 
-Practical limits exist when querying observability data, mainly due to the amount of information web browsers and aggregation points can reasonably handle at once. The system becomes slower depending on the amount of information queried at once (i.e. how many nodes, instances, time-series appear on the same chart or view).
+Practical limits exist when querying observability data, mainly due to the amount of information web browsers and aggregation points can reasonably handle at once. The system becomes slower depending on the amount of information queried at once (i.e. how many nodes, instances, time-series appear on the same chart or view), similar to all observability platforms (not Netdata specific).
 
-Due to the distributed nature of the architecture, Netdata responsiveness is usually significantly better compared to other monitoring solutions. Still, it is influenced by the amount of data queried at once.
+Due to the distributed nature of the architecture (parallel independent execution of smaller queries), Netdata responsiveness is usually significantly better compared to other monitoring solutions. Still, it is influenced by the amount of data queried at once.
 
 ## Impact on the Monitored Infrastructure
 

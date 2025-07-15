@@ -2453,7 +2453,7 @@ static void start_metadata_hosts(uv_work_t *req)
 
 #define EVENT_LOOP_NAME "METASYNC"
 
-#define MAX_SHUTDOWN_TIMEOUT_SECONDS (10)
+#define MAX_SHUTDOWN_TIMEOUT_SECONDS (15)
 #define SHUTDOWN_SLEEP_INTERVAL_MS (100)
 #define CMD_POOL_SIZE (32768)
 

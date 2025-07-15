@@ -98,7 +98,7 @@ No action required.
 #### File
 
 The configuration file name for this integration is `netdata.conf`.
-Configuration for this specific integration is located in the `[plugin:windows]` section within that file.
+Configuration for this specific integration is located in the `[plugin:windows:GetPowerSupply]` section within that file.
 
 The file format is a modified INI syntax. The general structure is:
 
@@ -123,7 +123,7 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| GetPowerSupply | An option to enable or disable the data collection. | yes | no |
+| update every | Data collection frequency. | 1 | no |
 
 #### Examples
 There are no configuration examples.

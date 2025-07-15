@@ -1,6 +1,7 @@
 extends:
   - _std-host-resources-mib.yaml
   - nvidia.yaml
+
 sysobjectid:
   - 1.3.6.1.4.1.33049.1.1.1.1012
   - 1.3.6.1.4.1.33049.1.1.1.10121
@@ -56,8 +57,9 @@ sysobjectid:
   - 1.3.6.1.4.1.33049.1.1.1.8200
   - 1.3.6.1.4.1.33049.1.1.1.8500
   - 1.3.6.1.4.1.33049.1.1.1.8700
+
 metadata:
   device:
     fields:
       type:
-        value: "switch"
+        value: "Switch"

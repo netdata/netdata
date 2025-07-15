@@ -111,9 +111,6 @@ int init_connectors(struct engine *engine)
             instance->exited = 1;
             return 1;
         }
-
-        analytics_statistic_t statistic = { "EXPORTING_START", "OK", instance->config.type_name };
-        analytics_statistic_send(&statistic);
     }
 
     return 0;

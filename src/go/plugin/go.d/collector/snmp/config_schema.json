@@ -351,9 +351,9 @@
       },
       "enable_profiles_table_metrics": {
         "title": "Enable SNMP Table Metrics",
-        "description": "Enable collection of SNMP table metrics from profiles. Enabling this may **increase collection time and memory usage** for devices with many network interfaces*",
+        "description": "Enable collection of SNMP table metrics from profiles. Enabling this may **increase collection time and memory usage** for devices with many network interfaces*.",
         "type": "boolean",
-        "default": false
+        "default": true
       },
       "disable_legacy_collection": {
         "title": "Disable Legacy SNMP Collection",

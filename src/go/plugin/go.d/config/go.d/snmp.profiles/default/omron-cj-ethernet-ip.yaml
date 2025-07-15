@@ -2,12 +2,12 @@ extends:
   - _system-base.yaml
   - _std-if-mib.yaml
 
+sysobjectid:
+  - 1.3.6.1.4.1.16838.1.*       # Omron
+  - 1.3.6.1.4.1.16838.1.1025.5  # Omron Ethernet-IP Unit
+
 metadata:
   device:
     fields:
       vendor:
-        value: "omron"
-
-sysobjectid:
-  - 1.3.6.1.4.1.16838.1.*       # Omron
-  - 1.3.6.1.4.1.16838.1.1025.5  # Omron Ethernet-IP Unit
+        value: "Omron"

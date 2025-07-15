@@ -2,9 +2,15 @@ extends:
   - _std-if-mib.yaml
   - _std-ucd-mib.yaml
   - _opengear.yaml
+
 sysobjectid:
   - 1.3.6.1.4.1.25049.1.60    # IM4200
   - 1.3.6.1.4.1.25049.1.61    # IM7200
+
+# OG-STATUS-MIB
+# https://mibbrowser.online/mibdb_search.php?mib=OG-STATUS-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/opengear/OG-STATUS-MIB
+
 metrics:
   - MIB: OG-STATUS-MIB
     table:
@@ -13,63 +19,77 @@ metrics:
     symbols:
       - name: ogSerialPortStatusRxBytes
         OID: 1.3.6.1.4.1.25049.16.1.1.3
-        metric_type: monotonic_count
-        description: Serial port bytes received
-        unit: "By"
+        chart_meta:
+          family: 'Network/SerialPort/Traffic/In'
+          description: Serial port bytes received
+          unit: "By/s"
       - name: ogSerialPortStatusTxBytes
         OID: 1.3.6.1.4.1.25049.16.1.1.4
-        metric_type: monotonic_count
-        description: Serial port bytes transmitted
-        unit: "By"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+        chart_meta:
+          family: 'Network/SerialPort/Traffic/Out'
+          description: Serial port bytes transmitted
+          unit: "By/s"
+      - OID: 1.3.6.1.4.1.25049.16.1.1.6
+        name: ogSerialPortStatusDCD
+        chart_meta:
+          family: 'Network/SerialPort/Signal/Status/DCD'
+          description: The status of the DCD signal
+          unit: "{status}"
+        mapping:
+          0: off
+          1: on
+      - OID: 1.3.6.1.4.1.25049.16.1.1.7
+        name: ogSerialPortStatusDTR
+        chart_meta:
+          family: 'Network/SerialPort/Signal/Status/DTR'
+          description: The status of the DTR signal
+          unit: "{status}"
+        mapping:
+          0: off
+          1: on
+      - OID: 1.3.6.1.4.1.25049.16.1.1.8
+        name: ogSerialPortStatusDSR
+        chart_meta:
+          family: 'Network/SerialPort/Signal/Status/DSR'
+          description: The status of the DSR signal
+          unit: "{status}"
+        mapping:
+          0: off
+          1: on
+      - OID: 1.3.6.1.4.1.25049.16.1.1.9
+        name: ogSerialPortStatusCTS
+        chart_meta:
+          family: 'Network/SerialPort/Signal/Status/CTS'
+          description: The status of the CTS signal
+          unit: "{status}"
+        mapping:
+          0: off
+          1: on
+      - OID: 1.3.6.1.4.1.25049.16.1.1.10
+        name: ogSerialPortStatusRTS
+        chart_meta:
+          family: 'Network/SerialPort/Signal/RTS/Status'
+          description: The status of the RTS signal
+          unit: "{status}"
+        mapping:
+          0: off
+          1: on
     metric_tags:
-      - symbol:
+      - tag: og_serial_port_index
+        index: 1
+      - tag: _og_serial_port_status_port
+        symbol:
           name: ogSerialPortStatusPort
           OID: 1.3.6.1.4.1.25049.16.1.1.2
-        tag: og_serial_port_status_port
-      - symbol:
+      - tag: _og_serial_port_status_speed
+        symbol:
           name: ogSerialPortStatusSpeed
           OID: 1.3.6.1.4.1.25049.16.1.1.5
-        tag: og_serial_port_status_speed
-      - symbol:
+      - tag: _og_serial_port_status_label
+        symbol:
           name: ogSerialPortStatusLabel
           OID: 1.3.6.1.4.1.25049.16.1.1.11
-        tag: og_serial_port_status_label
-      - symbol:
-          OID: 1.3.6.1.4.1.25049.16.1.1.6
-          name: ogSerialPortStatusDCD
-        tag: og_serial_port_status_dcd
-        mapping:
-          0: off
-          1: on
-      - symbol:
-          OID: 1.3.6.1.4.1.25049.16.1.1.7
-          name: ogSerialPortStatusDTR
-        tag: og_serial_port_status_dtr
-        mapping:
-          0: off
-          1: on
-      - symbol:
-          OID: 1.3.6.1.4.1.25049.16.1.1.8
-          name: ogSerialPortStatusDSR
-        tag: og_serial_port_status_dsr
-        mapping:
-          0: off
-          1: on
-      - symbol:
-          OID: 1.3.6.1.4.1.25049.16.1.1.9
-          name: ogSerialPortStatusCTS
-        tag: og_serial_port_status_cts
-        mapping:
-          0: off
-          1: on
-      - symbol:
-          OID: 1.3.6.1.4.1.25049.16.1.1.10
-          name: ogSerialPortStatusRTS
-        tag: og_serial_port_status_rts
-        mapping:
-          0: off
-          1: on
+
   - MIB: OG-STATUS-MIB
     table:
       name: ogRpcStatusTable
@@ -77,17 +97,24 @@ metrics:
     symbols:
       - name: ogRpcStatusMaxTemp
         OID: 1.3.6.1.4.1.25049.16.3.1.3
-        description: Maximum temperature on the RPC
-        unit: "Cel"
+        chart_meta:
+          family: 'Hardware/RPC/Temperature/Maximum'
+          description: Maximum temperature on the RPC
+          unit: "Cel"
       - name: ogRpcStatusAlertCount
         OID: 1.3.6.1.4.1.25049.16.3.1.4
-        description: Number of alerts triggered on the RPC
-        unit: "{alert}"
+        chart_meta:
+          family: 'Hardware/RPC/Alert'
+          description: Number of alerts triggered on the RPC
+          unit: "{alert}"
     metric_tags:
-      - symbol:
+      - tag: og_rpc_index
+        index: 1
+      - tag: og_rpc_status_name
+        symbol:
           name: ogRpcStatusName
           OID: 1.3.6.1.4.1.25049.16.3.1.2
-        tag: og_rpc_status_name
+
   - MIB: OG-STATUS-MIB
     table:
       name: ogEmdStatusTable
@@ -95,18 +122,26 @@ metrics:
     symbols:
       - name: ogEmdStatusTemp
         OID: 1.3.6.1.4.1.25049.16.4.1.3
-        description: Current temperature on the EMD
-        unit: "Cel"
+        chart_meta:
+          family: 'Environment/Temperature/Value'
+          description: Current temperature on the EMD
+          unit: "Cel"
       - name: ogEmdStatusHumidity
         OID: 1.3.6.1.4.1.25049.16.4.1.4
-        description: Humidity sensor on the EMD
-        unit: "%"
+        chart_meta:
+          family: 'Environment/Humidity/Value'
+          description: Humidity sensor on the EMD
+          unit: "%"
       - name: ogEmdStatusAlertCount
         OID: 1.3.6.1.4.1.25049.16.4.1.5
-        description: Number of alerts triggered on the EMD
-        unit: "{alert}"
+        chart_meta:
+          family: 'Environment/Alert'
+          description: Number of alerts triggered on the EMD
+          unit: "{alert}"
     metric_tags:
-      - symbol:
+      - tag: og_emd_index
+        index: 1
+      - tag: og_emd_status_name
+        symbol:
           name: ogEmdStatusName
           OID: 1.3.6.1.4.1.25049.16.4.1.2
-        tag: og_emd_status_name

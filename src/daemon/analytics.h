@@ -91,13 +91,6 @@ void get_system_timezone(void);
 void analytics_reset(void);
 void analytics_init(void);
 
-typedef struct {
-    const char *action;
-    const char *result;
-    const char *data;
-} analytics_statistic_t;
-
-void analytics_statistic_send(const analytics_statistic_t *statistic);
 bool analytics_check_enabled(void);
 
 extern struct analytics_data analytics_data;

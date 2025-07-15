@@ -660,9 +660,6 @@ void *analytics_main(void *ptr)
         goto cleanup;
 
     analytics_gather_mutable_meta_data();
-
-    analytics_statistic_t statistic = { "META_START", "-", "-"  };
-    analytics_statistic_send(&statistic);
     analytics_log_data();
 
     sec = 0;
@@ -677,9 +674,6 @@ void *analytics_main(void *ptr)
             continue;
 
         analytics_gather_mutable_meta_data();
-
-        analytics_statistic_t stt = { "META", "-", "-"  };
-        analytics_statistic_send(&stt);
         analytics_log_data();
 
         sec = 0;
@@ -729,16 +723,96 @@ void set_late_analytics_variables(struct rrdhost_system_info *system_info)
     analytics_get_install_type(system_info);
 }
 
+#ifdef OS_WINDOWS
+static void get_timezone_win_id(char *win_id, DWORD win_size)
+{
+    win_id[0] = '\0';
+    HKEY hKey;
+    LSTATUS ret = RegOpenKeyExA(HKEY_LOCAL_MACHINE,
+                                "SYSTEM\\CurrentControlSet\\Control\\TimeZoneInformation",
+                                0,
+                                KEY_READ,
+                                &hKey);
+    if (ret != ERROR_SUCCESS)
+        return;
+
+    DWORD valueType;
+    RegQueryValueExA(hKey, "TimeZoneKeyName", NULL, &valueType, (LPBYTE)win_id, &win_size);
+
+    RegCloseKey(hKey);
+}
+
+static void get_win_geoiso(char *geo_name, int length) {
+    GEOID id = GetUserGeoID(GEOCLASS_NATION);
+    int res = GetGeoInfoA(id, GEO_ISO2, geo_name, length, 0);
+    if (!res)
+        geo_name[0] = '\0';
+}
+
+static int map_windows_tz_to_ioanna(char *out, char *win_id, char *geo_name) {
+    if (*win_id == '\0')
+        return -1;
+
+    FILE *fp = fopen("c:\\Windows\\Globalization\\Time Zone\\TimezoneMapping.xml", "r");
+    if (!fp)
+        return -1;
+
+    char buffer[CONFIG_FILE_LINE_MAX + 1];
+    bool copied = 0;
+    while (fgets(buffer, CONFIG_FILE_LINE_MAX, fp) != NULL) {
+        buffer[CONFIG_FILE_LINE_MAX] = '\0';
+
+        char *s = strstr(buffer, win_id);
+        if (!s) {
+            if (!copied)
+                continue;
+            else // Country codes do not match, but we found the zone
+                break;
+        }
+
+        //Escape:'  <MapTZ TZID="'
+        s = &buffer[15];
+        char *end = strchr(s, '"');
+        if (!end)
+            continue;
+
+        *end = '\0';
+
+        strncpyz(out, s, strlen(s));
+
+        //Escape:" Region="
+        char *cmpregion = end+ 10;
+        if (!strncmp(cmpregion, geo_name, 2))
+            break;
+
+        copied = 1;
+    }
+
+    fclose(fp);
+    return 0;
+}
+#endif
+
 void get_system_timezone(void)
 {
-    // avoid flood calls to stat(/etc/localtime)
-    // http://stackoverflow.com/questions/4554271/how-to-avoid-excessive-stat-etc-localtime-calls-in-strftime-on-linux
-    const char *tz = getenv("TZ");
-    if (!tz || !*tz)
-        setenv("TZ", inicfg_get(&netdata_config, CONFIG_SECTION_ENV_VARS, "TZ", ":/etc/localtime"), 0);
-
     char buffer[FILENAME_MAX + 1] = "";
     const char *timezone = NULL;
+    const char *tz = NULL;
+#ifdef OS_WINDOWS
+    char geo_name[128];
+    char win_zone[256];
+    get_timezone_win_id(win_zone, 256);
+    get_win_geoiso(geo_name, 128);
+    if (!map_windows_tz_to_ioanna(buffer, win_zone, geo_name))
+        timezone = buffer;
+#else
+    // avoid flood calls to stat(/etc/localtime)
+    // http://stackoverflow.com/questions/4554271/how-to-avoid-excessive-stat-etc-localtime-calls-in-strftime-on-linux
+    tz = getenv("TZ");
+    if (!tz || !*tz)
+        setenv("TZ", inicfg_get(&netdata_config, CONFIG_SECTION_ENV_VARS, "TZ", ":/etc/localtime"), 0);
+#endif
+
     ssize_t ret;
 
     // use the TZ variable
@@ -858,12 +932,6 @@ void get_system_timezone(void)
     }
 }
 
-static bool analytics_script_exists(void) {
-    char filename[FILENAME_MAX + 1];
-    snprintfz(filename, sizeof(filename), "%s/anonymous-statistics.sh", netdata_configured_primary_plugins_dir);
-    return access(filename, R_OK) == 0;
-}
-
 bool analytics_check_enabled(void) {
     if(!netdata_anonymous_statistics_enabled)
         return false;
@@ -881,91 +949,6 @@ bool analytics_check_enabled(void) {
         netdata_anonymous_statistics_enabled = false;
 
     return netdata_anonymous_statistics_enabled;
-}
-
-void analytics_statistic_send(const analytics_statistic_t *statistic) {
-    if (!statistic || !statistic->action || !*statistic->action|| !analytics_check_enabled() || !analytics_script_exists())
-        return;
-
-    const char *action_result = statistic->result;
-    const char *action_data = statistic->data;
-
-    CLEAN_BUFFER *cmd = buffer_create(0, NULL);
-    buffer_sprintf(
-        cmd,
-        "%s/anonymous-statistics.sh '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' ",
-        netdata_configured_primary_plugins_dir,
-        statistic->action,
-        action_result ? action_result : "",
-        action_data ? action_data : "",
-        analytics_data.netdata_config_stream_enabled ? analytics_data.netdata_config_stream_enabled : "",
-        analytics_data.netdata_config_memory_mode ? analytics_data.netdata_config_memory_mode : "",
-        analytics_data.netdata_config_exporting_enabled ? analytics_data.netdata_config_exporting_enabled : "",
-        analytics_data.netdata_exporting_connectors ? analytics_data.netdata_exporting_connectors : "",
-        analytics_data.netdata_allmetrics_prometheus_used ? analytics_data.netdata_allmetrics_prometheus_used : "",
-        analytics_data.netdata_allmetrics_shell_used ? analytics_data.netdata_allmetrics_shell_used : "",
-        analytics_data.netdata_allmetrics_json_used ? analytics_data.netdata_allmetrics_json_used : "",
-        analytics_data.netdata_dashboard_used ? analytics_data.netdata_dashboard_used : "",
-        analytics_data.netdata_collectors ? analytics_data.netdata_collectors : "",
-        analytics_data.netdata_collectors_count ? analytics_data.netdata_collectors_count : "",
-        analytics_data.netdata_buildinfo ? analytics_data.netdata_buildinfo : "",
-        analytics_data.netdata_config_page_cache_size ? analytics_data.netdata_config_page_cache_size : "",
-        analytics_data.netdata_config_multidb_disk_quota ? analytics_data.netdata_config_multidb_disk_quota : "",
-        analytics_data.netdata_config_https_enabled ? analytics_data.netdata_config_https_enabled : "",
-        analytics_data.netdata_config_web_enabled ? analytics_data.netdata_config_web_enabled : "",
-        analytics_data.netdata_config_release_channel ? analytics_data.netdata_config_release_channel : "",
-        analytics_data.netdata_mirrored_host_count ? analytics_data.netdata_mirrored_host_count : "",
-        analytics_data.netdata_mirrored_hosts_reachable ? analytics_data.netdata_mirrored_hosts_reachable : "",
-        analytics_data.netdata_mirrored_hosts_unreachable ? analytics_data.netdata_mirrored_hosts_unreachable : "",
-        analytics_data.netdata_notification_methods ? analytics_data.netdata_notification_methods : "",
-        analytics_data.netdata_alarms_normal ? analytics_data.netdata_alarms_normal : "",
-        analytics_data.netdata_alarms_warning ? analytics_data.netdata_alarms_warning : "",
-        analytics_data.netdata_alarms_critical ? analytics_data.netdata_alarms_critical : "",
-        analytics_data.netdata_charts_count ? analytics_data.netdata_charts_count : "",
-        analytics_data.netdata_metrics_count ? analytics_data.netdata_metrics_count : "",
-        analytics_data.netdata_config_is_parent ? analytics_data.netdata_config_is_parent : "",
-        analytics_data.netdata_config_hosts_available ? analytics_data.netdata_config_hosts_available : "",
-        analytics_data.netdata_host_cloud_available ? analytics_data.netdata_host_cloud_available : "",
-        analytics_data.netdata_host_aclk_available ? analytics_data.netdata_host_aclk_available : "",
-        analytics_data.netdata_host_aclk_protocol ? analytics_data.netdata_host_aclk_protocol : "",
-        analytics_data.netdata_host_aclk_implementation ? analytics_data.netdata_host_aclk_implementation : "",
-        analytics_data.netdata_host_agent_claimed ? analytics_data.netdata_host_agent_claimed : "",
-        analytics_data.netdata_host_cloud_enabled ? analytics_data.netdata_host_cloud_enabled : "",
-        analytics_data.netdata_config_https_available ? analytics_data.netdata_config_https_available : "",
-        analytics_data.netdata_install_type ? analytics_data.netdata_install_type : "",
-        analytics_data.netdata_config_is_private_registry ? analytics_data.netdata_config_is_private_registry : "",
-        analytics_data.netdata_config_use_private_registry ? analytics_data.netdata_config_use_private_registry : "",
-        analytics_data.netdata_config_oom_score ? analytics_data.netdata_config_oom_score : "",
-        analytics_data.netdata_prebuilt_distro ? analytics_data.netdata_prebuilt_distro : "",
-        analytics_data.netdata_fail_reason ? analytics_data.netdata_fail_reason : ""
-        );
-
-    nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "%s/anonymous-statistics.sh '%s' '%s' '%s'",
-           netdata_configured_primary_plugins_dir, statistic->action,
-           action_result ? action_result : "", action_data ? action_data : "");
-
-    POPEN_INSTANCE *instance = spawn_popen_run(buffer_tostring(cmd));
-    if (instance) {
-        char buffer[4 + 1];
-        char *s = fgets(buffer, 4, spawn_popen_stdout(instance));
-        int exit_code = spawn_popen_wait(instance);
-        if (exit_code)
-
-            nd_log(NDLS_DAEMON, NDLP_NOTICE,
-                   "Statistics script returned error: %d",
-                   exit_code);
-
-        if (s && strncmp(buffer, "200", 3) != 0)
-            nd_log(NDLS_DAEMON, NDLP_NOTICE,
-                   "Statistics script returned http code: %s",
-                   buffer);
-
-    }
-    else
-        nd_log(NDLS_DAEMON, NDLP_NOTICE,
-               "Failed to run statistics script: %s/anonymous-statistics.sh",
-               netdata_configured_primary_plugins_dir);
 }
 
 void analytics_reset(void) {

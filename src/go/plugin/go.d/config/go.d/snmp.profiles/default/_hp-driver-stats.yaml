@@ -8,7 +8,7 @@ metrics:
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.6
         name: cpqDaPhyDrvStatus
         chart_meta:
-          family: "System/Disk/Status"
+          family: 'System/Disk/Status'
           description: The status of the physical drive
           unit: "{status}"
         mapping:
@@ -22,49 +22,49 @@ metrics:
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.8
         name: cpqDaPhyDrvUsedReallocs
         chart_meta:
-          family: "System/Disk/Reallocation/Used"
+          family: 'System/Disk/Reallocation/Used'
           description: Number of sectors of the reallocation area that have been used by the physical drive
           unit: "{sector}"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.9
         name: cpqDaPhyDrvRefHours
         chart_meta:
-          family: "System/Disk/Runtime"
+          family: 'System/Disk/Runtime'
           description: Total number of hours that a physical drive has been in operation since it was stamped
           unit: "h"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.16
         name: cpqDaPhyDrvHardReadErrs
         chart_meta:
-          family: "System/Disk/Error/Read/Hard"
+          family: 'System/Disk/Error/Read/Hard'
           description: Number of read errors that could not be recovered by a physical drive's ECC algorithm or retries
           unit: "{error}"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.17
         name: cpqDaPhyDrvRecvReadErrs
         chart_meta:
-          family: "System/Disk/Error/Read/Recovered"
+          family: 'System/Disk/Error/Read/Recovered'
           description: Number of read errors corrected through physical drive retries
           unit: "{error}"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.18
         name: cpqDaPhyDrvHardWriteErrs
         chart_meta:
-          family: "System/Disk/Error/Write/Hard"
+          family: 'System/Disk/Error/Write/Hard'
           description: Number of write errors that could not be recovered by a physical drive
           unit: "{error}"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.19
         name: cpqDaPhyDrvRecvWriteErrs
         chart_meta:
-          family: "System/Disk/Error/Write/Recovered"
+          family: 'System/Disk/Error/Write/Recovered'
           description: Number of write errors corrected through physical drive retries or recovered by a physical drive
           unit: "{error}"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.20
         name: cpqDaPhyDrvHSeekErrs
         chart_meta:
-          family: "System/Disk/Error/Seek/High"
+          family: 'System/Disk/Error/Seek/High'
           description: Total number of times the physical disk drive detected a seek error (high)
           unit: "{error}"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.21
         name: cpqDaPhyDrvSeekErrs
         chart_meta:
-          family: "System/Disk/Error/Seek/Low"
+          family: 'System/Disk/Error/Seek/Low'
           description: Total number of times the physical disk drive detected a seek error (low)
           unit: "{error}"
     metric_tags:
@@ -85,26 +85,26 @@ metrics:
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.7
         name: cpqDaPhyDrvFactReallocs
         chart_meta:
-          family: "System/Disk/Reallocation/Factory"
+          family: 'System/Disk/Reallocation/Factory'
           description: Number of spare sectors available for remapping at the time the physical drive was shipped
           unit: "{sector}"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.22
         name: cpqDaPhyDrvSpinupTime
         chart_meta:
-          family: "System/Disk/Spinup/Time"
+          family: 'System/Disk/Spinup/Time'
           description: Time it takes for a physical drive to spin up to full speed in tenths of seconds
           unit: "ds"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.45
         name: cpqDaPhyDrvSize
         scale_factor: 1048576 # MB => bytes
         chart_meta:
-          family: "System/Disk/Capacity"
+          family: 'System/Disk/Capacity'
           description: Size of the physical drive in megabytes
           unit: "By"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.57
         name: cpqDaPhyDrvSmartStatus
         chart_meta:
-          family: "System/Disk/SMART/Status"
+          family: 'System/Disk/SMART/Status'
           description: S.M.A.R.T status of the physical drive
           unit: "{status}"
         mapping:
@@ -114,7 +114,7 @@ metrics:
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.70
         name: cpqDaPhyDrvCurrentTemperature
         chart_meta:
-          family: "Hardware/Disk/Temperature/Value"
+          family: 'Hardware/Disk/Temperature/Value'
           description: Temperature of the physical drive in degrees Celsius
           unit: "Cel"
     metric_tags:

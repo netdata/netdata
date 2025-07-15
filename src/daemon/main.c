@@ -409,6 +409,7 @@ int netdata_main(int argc, char **argv) {
                             if (unittest_waiting_queue()) return 1;
                             if (uuidmap_unittest()) return 1;
                             if (stacktrace_unittest()) return 1;
+                            if (test_cmd_pool_fifo()) return 1;
 #ifdef OS_WINDOWS
                             if (perflibnamestest_main()) return 1;
 #endif
@@ -1118,17 +1119,6 @@ int netdata_main(int argc, char **argv) {
             delta_startup_time("anonymous analytics");
         else // collect data but do not send it (needed in /api/v1/info)
             delta_startup_time("anonymous analytics (disabled)");
-
-        analytics_statistic_t start_statistic = {"START", "-", "-"};
-        analytics_statistic_send(&start_statistic);
-        if (daemon_status_file_has_last_crashed(NULL)) {
-            analytics_statistic_t crash_statistic = {"CRASH", "-", "-"};
-            analytics_statistic_send(&crash_statistic);
-        }
-        if (daemon_status_file_was_incomplete_shutdown()) {
-            analytics_statistic_t incomplete_shutdown_statistic = {"INCOMPLETE_SHUTDOWN", "-", "-"};
-            analytics_statistic_send(&incomplete_shutdown_statistic);
-        }
 
         // check if ANALYTICS needs to start
         for (i = 0; static_threads[i].name != NULL; i++) {

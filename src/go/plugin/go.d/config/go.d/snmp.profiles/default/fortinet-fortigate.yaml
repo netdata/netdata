@@ -64,6 +64,9 @@ metadata:
           match_value: "$1"
           # Examples: `5.6.4` from `v5.6.4,build1575,180425 (GA)`
 
+# https://mibbrowser.online/mibdb_search.php?mib=FORTINET-FORTIGATE-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/fortinet/FORTINET-FORTIGATE-MIB
+
 metrics:
   ### CPU
   - MIB: FORTINET-FORTIGATE-MIB
@@ -104,6 +107,7 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.12356.101.4.4.2.1.1
           name: fgProcessorEntIndex
+
   - MIB: FORTINET-FORTIGATE-MIB
     table:
       OID: 1.3.6.1.4.1.12356.101.4.4.2
@@ -145,11 +149,11 @@ metrics:
       # Total physical memory (RAM) installed (KB).
       OID: 1.3.6.1.4.1.12356.101.4.1.5.0
       name: fgSysMemCapacity
+      scale_factor: 1024
       chart_meta:
-        description: Total physical memory installed in kilobytes
+        description: Total physical memory installed
         family: 'System/Memory/Total'
         unit: "By"
-      scale_factor: 1024
   - MIB: FORTINET-FORTIGATE-MIB
     symbol:
       # Current lowmem utilization (percentage). Lowmem is memory available for the kernel's own data structures and kernel specific tables. The system can get into a bad state if it runs out of lowmem.
@@ -164,11 +168,11 @@ metrics:
       # Total lowmem capacity (KB). See fgSysLowMemUsage for the description of lowmem.
       OID: 1.3.6.1.4.1.12356.101.4.1.10.0
       name: fgSysLowMemCapacity
+      scale_factor: 1024
       chart_meta:
-        description: Total low memory capacity in kilobytes
+        description: Total low memory capacity
         family: 'System/Memory/LowMem/Total'
         unit: "By"
-      scale_factor: 1024
 
   ### Disk
   - MIB: FORTINET-FORTIGATE-MIB
@@ -176,21 +180,21 @@ metrics:
       # Current hard disk usage (MB), if disk is present.
       OID: 1.3.6.1.4.1.12356.101.4.1.6.0
       name: fgSysDiskUsage
+      scale_factor: 1048576
       chart_meta:
-        description: Current hard disk usage in megabytes
+        description: Current hard disk usage
         family: 'System/Disk/Space/Used'
         unit: "By"
-      scale_factor: 1048576
   - MIB: FORTINET-FORTIGATE-MIB
     symbol:
       # Total hard disk capacity (MB), if disk is present.
       OID: 1.3.6.1.4.1.12356.101.4.1.7.0
       name: fgSysDiskCapacity
+      scale_factor: 1048576
       chart_meta:
-        description: Total hard disk capacity in megabytes
+        description: Total hard disk capacity
         family: 'System/Disk/Space/Total'
         unit: "By"
-      scale_factor: 1048576
 
   ### Virtual Domains
   # A table of virtual domains configured on the device.
@@ -277,29 +281,6 @@ metrics:
         family: 'Security/VirtualDomain/Maximum'
         unit: "{domain}"
 
-  ### Interfaces
-  # Fortinet specific extensions to MIB-2 ifTable.
-  #  - MIB: FORTINET-FORTIGATE-MIB
-  #    table:
-  #      OID: 1.3.6.1.4.1.12356.101.7.2.1
-  #      name: fgIntfTable
-  #    symbols:
-  #      - OID: 1.3.6.1.4.1.12356.101.7.2.1.1.1
-  #        name: fgIntfEntVdom
-  #        description: The virtual domain the interface belongs to. This index corresponds to the index used by fgVdTable.
-  #        unit: "1"
-  #    metric_tags:
-  #      - tag: virtualdomain_index
-  #        symbol:
-  #          OID: 1.3.6.1.4.1.12356.101.3.2.1.1.1
-  #          name: fgVdEntIndex
-  #      - MIB: IF-MIB
-  #        symbol:
-  #          OID: 1.3.6.1.2.1.31.1.1.1.1
-  #          name: ifName
-  #        table: ifXTable
-  #        tag: interface
-
   ### Sessions
   - MIB: FORTINET-FORTIGATE-MIB
     symbol:
@@ -379,11 +360,12 @@ metrics:
           unit: "By/s"
     metric_tags:
       # Internal virtual domain index used to uniquely identify rows in this table. This index is also used by other tables referencing a virtual domain.
-      - index: 1
-        tag: virtualdomain_index
+      - tag: virtualdomain_index
+        index: 1
       # Firewall policy ID. Only enabled policies are present in this table. Policy IDs are only unique within a virtual domain.
-      - index: 2
-        tag: policy_index
+      - tag: policy_index
+        index: 2
+
   # Firewall policy6 statistics table.
   - MIB: FORTINET-FORTIGATE-MIB
     table:
@@ -406,8 +388,8 @@ metrics:
           unit: "By/s"
     metric_tags:
       # Internal virtual domain index used to uniquely identify rows in this table. This index is also used by other tables referencing a virtual domain.
-      - index: 1
-        tag: virtualdomain_index
+      - tag: virtualdomain_index
+        index: 1
       # Firewall policy6 ID. Only enabled policies are present in this table. Policy IDs are only unique within a virtual domain.
-      - index: 2
-        tag: policy6_index
+      - tag: policy6_index
+        index: 2

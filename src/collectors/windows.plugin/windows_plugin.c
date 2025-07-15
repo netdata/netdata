@@ -11,6 +11,7 @@ static struct proc_module {
     int update_every;
     int (*func)(int update_every, usec_t dt);
     RRDDIM *rd;
+    ND_THREAD *thread;
 } win_modules[] = {
 
     // system metrics
@@ -67,13 +68,13 @@ static struct proc_module {
     {.name = "PerflibHyperV",
      .dim = "PerflibHyperV",
      .enabled = CONFIG_BOOLEAN_YES,
-     .update_every = UPDATE_EVERY_MIN,
+     .update_every = 5 * UPDATE_EVERY_MIN,
      .func = do_PerflibHyperV},
 
     {.name = "PerflibThermalZone",
      .dim = "PerflibThermalZone",
      .enabled = CONFIG_BOOLEAN_NO,
-     .update_every = UPDATE_EVERY_MIN,
+     .update_every = 5*UPDATE_EVERY_MIN,
      .func = do_PerflibThermalZone},
 
     {.name = "PerflibWebService",
@@ -81,7 +82,11 @@ static struct proc_module {
      .enabled = CONFIG_BOOLEAN_YES,
      .update_every = UPDATE_EVERY_MIN,
      .func = do_PerflibWebService},
-    {.name = "PerflibMSSQL", .dim = "PerflibMSSQL", .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibMSSQL},
+    {.name = "PerflibMSSQL",
+     .dim = "PerflibMSSQL",
+     .enabled = CONFIG_BOOLEAN_YES,
+     .update_every = 10 * UPDATE_EVERY_MIN,
+     .func = do_PerflibMSSQL},
 
     {.name = "PerflibNetFramework",
      .dim = "PerflibNetFramework",
@@ -91,19 +96,19 @@ static struct proc_module {
     {.name = "PerflibAD",
      .dim = "PerflibAD",
      .enabled = CONFIG_BOOLEAN_YES,
-     .update_every = UPDATE_EVERY_MIN,
+     .update_every = 10 * UPDATE_EVERY_MIN,
      .func = do_PerflibAD},
 
     {.name = "PerflibADCS",
      .dim = "PerflibADCS",
      .enabled = CONFIG_BOOLEAN_YES,
-     .update_every = UPDATE_EVERY_MIN,
+     .update_every = 10 * UPDATE_EVERY_MIN,
      .func = do_PerflibADCS},
 
     {.name = "PerflibADFS",
      .dim = "PerflibADFS",
      .enabled = CONFIG_BOOLEAN_YES,
-     .update_every = UPDATE_EVERY_MIN,
+     .update_every = 10 * UPDATE_EVERY_MIN,
      .func = do_PerflibADFS},
 
     {.name = "PerflibServices",
@@ -113,9 +118,9 @@ static struct proc_module {
      .func = do_PerflibServices},
 
     {.name = "PerflibExchange",
-     .dim = "PerflibADFS",
+     .dim = "PerflibExchange",
      .enabled = CONFIG_BOOLEAN_YES,
-     .update_every = UPDATE_EVERY_MIN,
+     .update_every = 10 * UPDATE_EVERY_MIN,
      .func = do_PerflibExchange},
 
     {.name = "PerflibNUMA",
@@ -125,6 +130,13 @@ static struct proc_module {
      .func = do_PerflibNUMA},
 
     // the terminator of this array
+    {.name = "PerflibASP",
+     .dim = "PerflibASP",
+     .enabled = CONFIG_BOOLEAN_YES,
+     .update_every = UPDATE_EVERY_MIN,
+     .func = do_PerflibASP},
+
+     // the terminator of this array
     {.name = NULL, .dim = NULL, .func = NULL}};
 
 #if WORKER_UTILIZATION_MAX_JOB_TYPES < 36
@@ -154,6 +166,32 @@ static bool log_windows_module(BUFFER *wb, void *data)
     return true;
 }
 
+static void *windows_plugin_thread_worker(void *ptr __maybe_unused)
+{
+    struct proc_module *mod = ptr;
+    heartbeat_t hb;
+    int update_every = mod->update_every;
+
+    heartbeat_init(&hb, USEC_PER_SEC);
+    usec_t step = USEC_PER_SEC * update_every;
+    usec_t real_step = USEC_PER_SEC;
+
+    usec_t last = now_realtime_usec();
+    while (service_running(SERVICE_COLLECTORS)) {
+        heartbeat_next(&hb);
+        if (real_step < step) {
+            real_step += USEC_PER_SEC;
+            continue;
+        }
+        real_step = USEC_PER_SEC;
+        usec_t now = now_realtime_usec();
+        mod->func(update_every, now - last);
+        last = now;
+    }
+
+    return NULL;
+}
+
 void *win_plugin_main(void *ptr)
 {
     worker_register("WIN");
@@ -166,16 +204,23 @@ void *win_plugin_main(void *ptr)
     // check the enabled status for each module
     int i;
     char buf[CONFIG_MAX_NAME + 1];
+    int update_every = localhost->rrd_update_every;
     for (i = 0; win_modules[i].name; i++) {
         struct proc_module *pm = &win_modules[i];
+        pm->thread = NULL;
 
         snprintfz(buf, CONFIG_MAX_NAME, "plugin:windows:%s", pm->name);
 
         pm->enabled = inicfg_get_boolean(&netdata_config, "plugin:windows", pm->name, pm->enabled);
         pm->rd = NULL;
 
-        pm->update_every =
-            (int)inicfg_get_duration_seconds(&netdata_config, buf, "update every", localhost->rrd_update_every);
+        pm->update_every = (int)inicfg_get_duration_seconds(&netdata_config, buf, "update every", (update_every != pm->update_every)? pm->update_every: update_every);
+
+        if (pm->enabled && unlikely(update_every != pm->update_every)) {
+            char tag_name[ND_THREAD_TAG_MAX];
+            snprintfz(tag_name, ND_THREAD_TAG_MAX - 1, "WIN_PLUGIN[%d]", i);
+            pm->thread = nd_thread_create(tag_name, NETDATA_THREAD_OPTION_DEFAULT, windows_plugin_thread_worker, pm);
+        }
 
         worker_register_job_name(i, win_modules[i].dim);
     }
@@ -205,6 +250,10 @@ void *win_plugin_main(void *ptr)
                 break;
 
             struct proc_module *pm = &win_modules[i];
+            // if we have a thread, we are already running it
+            if (pm->thread)
+                continue;
+
             if (unlikely(!pm->enabled))
                 continue;
 
@@ -213,6 +262,13 @@ void *win_plugin_main(void *ptr)
             pm->enabled = !pm->func(pm->update_every, hb_dt);
             lgs[LGS_MODULE_ID] = ND_LOG_FIELD_TXT(NDF_MODULE, PLUGIN_WINDOWS_NAME);
         }
+    }
+
+    // Join threads
+    for (i = 0; win_modules[i].name; i++) {
+        struct proc_module *pm = &win_modules[i];
+        if (pm->thread)
+            nd_thread_join(pm->thread);
     }
     return NULL;
 }

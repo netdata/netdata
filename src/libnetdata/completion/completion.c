@@ -92,20 +92,27 @@ ALWAYS_INLINE unsigned completion_wait_for_a_job(struct completion *p, unsigned 
 ALWAYS_INLINE unsigned completion_wait_for_a_job_with_timeout(struct completion *p, unsigned completed_jobs, uint64_t timeout_ms)
 {
     uint64_t timeout_ns = timeout_ms * NSEC_PER_MSEC;
-    if(!timeout_ns) timeout_ns = 1;
+    if (timeout_ns == 0) timeout_ns = 1;
 
-    uint64_t start_time_ns = uv_hrtime();
+    uint64_t deadline_ns = uv_hrtime() + timeout_ns;
 
     uv_mutex_lock(&p->mutex);
-    while (0 == p->completed && p->completed_jobs <= completed_jobs) {
-        int rc = uv_cond_timedwait(&p->cond, &p->mutex, timeout_ns);
-        if(rc == UV_ETIMEDOUT)
-            break;
 
-        uint64_t elapsed = uv_hrtime() - start_time_ns;
-        if (elapsed >= timeout_ns) break;
-        timeout_ns -= elapsed;
+    while (p->completed == 0 && p->completed_jobs <= completed_jobs) {
+        uint64_t current_time_ns = uv_hrtime();
+
+        // Check if we've already exceeded the deadline
+        if (current_time_ns >= deadline_ns) {
+            break;
+        }
+
+        uint64_t remaining_timeout_ns = deadline_ns - current_time_ns;
+
+        int rc = uv_cond_timedwait(&p->cond, &p->mutex, remaining_timeout_ns);
+        if (rc == UV_ETIMEDOUT)
+            break;
     }
+
     completed_jobs = p->completed_jobs;
     uv_mutex_unlock(&p->mutex);
 
