@@ -346,8 +346,11 @@ size_t dictionary_destroy_delayed_count(void) {
     return count;
 }
 
-size_t cleanup_destroyed_dictionaries(bool shutdown __maybe_unused) {
-    netdata_mutex_lock(&dictionaries_waiting_to_be_destroyed_mutex);
+size_t cleanup_destroyed_dictionaries(bool shutdown __maybe_unused)
+{
+    if (netdata_mutex_trylock(&dictionaries_waiting_to_be_destroyed_mutex) != 0)
+        return 0;
+
     if (!dictionaries_waiting_to_be_destroyed) {
         netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
         return 0;
