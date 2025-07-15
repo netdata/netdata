@@ -6,7 +6,13 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations docs [\#20675](https://github.com/netdata/netdata/pull/20675) ([netdatabot](https://github.com/netdatabot))
+- feat\(go.d/snmp\): enable table metrics by default [\#20674](https://github.com/netdata/netdata/pull/20674) ([ilyam8](https://github.com/ilyam8))
+- Code cleanup [\#20673](https://github.com/netdata/netdata/pull/20673) ([stelfrag](https://github.com/stelfrag))
+- Improve agent shutdown on windows [\#20672](https://github.com/netdata/netdata/pull/20672) ([stelfrag](https://github.com/stelfrag))
+- Escape chars on documentation [\#20671](https://github.com/netdata/netdata/pull/20671) ([Ancairon](https://github.com/Ancairon))
 - Add comprehensive welcome document [\#20669](https://github.com/netdata/netdata/pull/20669) ([ktsaou](https://github.com/ktsaou))
+- Regenerate integrations docs [\#20668](https://github.com/netdata/netdata/pull/20668) ([netdatabot](https://github.com/netdatabot))
 - build\(deps\): bump golang.org/x/net from 0.41.0 to 0.42.0 in /src/go [\#20667](https://github.com/netdata/netdata/pull/20667) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/bmatcuk/doublestar/v4 from 4.8.1 to 4.9.0 in /src/go [\#20666](https://github.com/netdata/netdata/pull/20666) ([dependabot[bot]](https://github.com/apps/dependabot))
 - docs: fix "Unsupported markdown: list" in NC readme diagram [\#20665](https://github.com/netdata/netdata/pull/20665) ([ilyam8](https://github.com/ilyam8))
@@ -202,6 +208,7 @@
 - build\(deps\): bump golang.org/x/net from 0.40.0 to 0.41.0 in /src/go [\#20444](https://github.com/netdata/netdata/pull/20444) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Weblog collector: Exclude 429 from 4xx [\#20443](https://github.com/netdata/netdata/pull/20443) ([Slind14](https://github.com/Slind14))
 - chore\(go.d/ddsnmp\): add basic SNMP table walking functionality [\#20441](https://github.com/netdata/netdata/pull/20441) ([ilyam8](https://github.com/ilyam8))
+- nd-mcp add claude cli cmd for adding netdata mcp [\#20440](https://github.com/netdata/netdata/pull/20440) ([andrewm4894](https://github.com/andrewm4894))
 - improvement\(go.d/ddsnmp\): use dev type and vendor from meta for family [\#20439](https://github.com/netdata/netdata/pull/20439) ([ilyam8](https://github.com/ilyam8))
 - Fix registry save integer overflow and add failure backoff [\#20437](https://github.com/netdata/netdata/pull/20437) ([ktsaou](https://github.com/ktsaou))
 - Mcp3 [\#20435](https://github.com/netdata/netdata/pull/20435) ([ktsaou](https://github.com/ktsaou))
@@ -453,12 +460,6 @@
 - Some fixes for macOS \< 11 [\#20145](https://github.com/netdata/netdata/pull/20145) ([barracuda156](https://github.com/barracuda156))
 - docs: cleanup language and fix minor grammar issues [\#20144](https://github.com/netdata/netdata/pull/20144) ([luiizaferreirafonseca](https://github.com/luiizaferreirafonseca))
 - chore\(otel/journaldexporter\): improve remote tests [\#20143](https://github.com/netdata/netdata/pull/20143) ([ilyam8](https://github.com/ilyam8))
-- Improve MSSQL \(Windows.plugin Part II\) [\#20141](https://github.com/netdata/netdata/pull/20141) ([thiagoftsm](https://github.com/thiagoftsm))
-- Install fix admonition docs [\#20136](https://github.com/netdata/netdata/pull/20136) ([kanelatechnical](https://github.com/kanelatechnical))
-- Update MSI to use a single unified EULA instead of multiple license pages. [\#20134](https://github.com/netdata/netdata/pull/20134) ([Ferroin](https://github.com/Ferroin))
-- Update README.md [\#20133](https://github.com/netdata/netdata/pull/20133) ([kanelatechnical](https://github.com/kanelatechnical))
-- Improve metadata event loop shutdown [\#20132](https://github.com/netdata/netdata/pull/20132) ([stelfrag](https://github.com/stelfrag))
-- Fix Locks \(Windows Locks\) [\#20131](https://github.com/netdata/netdata/pull/20131) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v2.4.0](https://github.com/netdata/netdata/tree/v2.4.0) (2025-04-14)
 
