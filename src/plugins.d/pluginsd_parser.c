@@ -1204,7 +1204,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
                     2 * 60 * MSEC_PER_SEC, true);
 
             if(unlikely(ret != BUFFERED_READER_READ_OK)) {
-                nd_log(NDLS_COLLECTORS, NDLP_INFO, "PLUGINSD: buffered reader not OK (%u)", (unsigned)ret);
+                nd_log(NDLS_COLLECTORS, NDLP_INFO, "PLUGINSD: buffered reader not OK (%d)", ret);
                 if(ret == BUFFERED_READER_READ_POLLERR || ret == BUFFERED_READER_READ_POLLHUP)
                     send_quit = false;
                 break;
