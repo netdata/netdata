@@ -460,8 +460,8 @@ void dict_mssql_fill_locks(struct mssql_db_instance *mdi, const char *dbname)
         goto endlocks;
     }
 
-    ret =
-        SQLBindCol(mdi->parent->conn->dbLocksSTMT, 1, SQL_C_CHAR, resource_type, sizeof(resource_type), &col_object_len);
+    ret = SQLBindCol(
+        mdi->parent->conn->dbLocksSTMT, 1, SQL_C_CHAR, resource_type, sizeof(resource_type), &col_object_len);
     if (ret != SQL_SUCCESS) {
         netdata_MSSQL_error(
             SQL_HANDLE_STMT, mdi->parent->conn->dbLocksSTMT, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
@@ -559,7 +559,8 @@ int dict_mssql_fill_waits(struct mssql_instance *mi)
         goto endwait;
     }
 
-    ret = SQLBindCol(mi->conn->dbWaitsSTMT, 7, SQL_C_CHAR, wait_category, sizeof(wait_category), &col_wait_category_len);
+    ret =
+        SQLBindCol(mi->conn->dbWaitsSTMT, 7, SQL_C_CHAR, wait_category, sizeof(wait_category), &col_wait_category_len);
     if (ret != SQL_SUCCESS) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbWaitsSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
         goto endwait;
@@ -964,10 +965,7 @@ static void netdata_read_config_options()
     const char *instance = inicfg_get(&netdata_config, section_name, "instance", instance);
     int additional_instances = (int)inicfg_get_number(&netdata_config, section_name, "additional instances", 0);
     if (!instance || strlen(instance) > NETDATA_MAX_INSTANCE_OBJECT) {
-        nd_log(
-            NDLS_COLLECTORS,
-            NDLP_ERR,
-            "You must specify a valid 'instance' name to collect data from database. ");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "You must specify a valid 'instance' name to collect data from database. ");
         goto end_conf_parse;
     }
 
@@ -1000,8 +998,8 @@ end_conf_parse:
     total_instances++;
 }
 
-
-static inline struct netdata_mssql_conn *netdata_mssql_get_conn_option(const char *instance) {
+static inline struct netdata_mssql_conn *netdata_mssql_get_conn_option(const char *instance)
+{
     return (struct netdata_mssql_conn *)dictionary_get(conn_options, instance);
 }
 
@@ -1180,7 +1178,7 @@ static int initialize(int update_every)
     dictionary_register_insert_callback(mssql_instances, dict_mssql_insert_cb, &create_thread);
 
     conn_options = dictionary_create_advanced(
-            DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct netdata_mssql_conn));
+        DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct netdata_mssql_conn));
     dictionary_register_insert_callback(conn_options, dict_mssql_insert_conn_option, NULL);
 
     netdata_read_config_options();
