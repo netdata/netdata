@@ -7,7 +7,7 @@ While Netdata Agents work seamlessly out-of-the-box with comprehensive monitorin
 By default, your Netdata Agent provides:
 
 - **Automatic Application Discovery**: Continuously detects and monitors applications on your node
-- **Real-time Metric Collection**: Collects metrics every second  
+- **Real-time Metric Collection**: Collects metrics every second
 - **Health Monitoring**: Actively tracks health status with built-in alerting
 - **Machine Learning**: Trains anomaly detection models for each metric ([Anomaly Detection](/src/ml/README.md))
 
@@ -23,20 +23,21 @@ See [Resource Utilization](/docs/netdata-agent/sizing-netdata-agents/README.md) 
 
 Here's how each optimization strategy reduces resource usage:
 
-| Optimization Strategy | Reduces CPU | Reduces RAM | Reduces Disk IO |
-|----------------------|-------------|-------------|-----------------|
-| [Set up Parent-Child architecture](#set-up-parent-child-architecture) | ✓ | ✓ | ✓ |
-| [Disable unneeded collectors](#disable-unneeded-collectors) | ✓ | ✓ | ✓ |
-| [Reduce collection frequency](#reduce-collection-frequency) | ✓ | | ✓ |
-| [Adjust metric retention](#adjust-metric-retention) | | ✓ | ✓ |
-| [Switch to RAM mode](#switch-to-ram-mode) | | ✓ | ✓ |
-| [Turn off ML on Children](#turn-off-ml-on-children) | ✓ | | |
+| Optimization Strategy                                                 | Reduces CPU | Reduces RAM | Reduces Disk IO |
+|-----------------------------------------------------------------------|-------------|-------------|-----------------|
+| [Set up Parent-Child architecture](#set-up-parent-child-architecture) | ✓           | ✓           | ✓               |
+| [Disable unneeded collectors](#disable-unneeded-collectors)           | ✓           | ✓           | ✓               |
+| [Reduce collection frequency](#reduce-collection-frequency)           | ✓           |             | ✓               |
+| [Adjust metric retention](#adjust-metric-retention)                   |             | ✓           | ✓               |
+| [Switch to RAM mode](#switch-to-ram-mode)                             |             | ✓           | ✓               |
+| [Turn off ML on Children](#turn-off-ml-on-children)                   | ✓           |             |                 |
 
 ## Set up Parent-Child architecture
 
 Transform your monitoring by using Parent nodes as centralization points. Parents collect and aggregate data from multiple Child nodes, significantly reducing the load on individual systems.
 
 In this setup:
+
 - **Children** stream their metrics to Parents instead of storing everything locally
 - **Parents** handle data aggregation, storage, and dashboard queries
 - **You** access all metrics through the Parent nodes
@@ -60,8 +61,9 @@ Follow our [configuration guide](/src/collectors/REFERENCE.md) to identify and d
 Save CPU and disk IO by collecting metrics less frequently. If you don't need per-second precision, or if your Agent consumes too much CPU during periods of low dashboard activity, increase the collection interval.
 
 This change:
+
 - Significantly reduces CPU usage
-- Decreases disk write operations  
+- Decreases disk write operations
 - Maintains meaningful monitoring capabilities
 
 Learn how to adjust collection frequency in our [configuration guide](/src/collectors/REFERENCE.md).
@@ -69,6 +71,7 @@ Learn how to adjust collection frequency in our [configuration guide](/src/colle
 ## Adjust metric retention
 
 Control memory and disk usage by changing how long your Agent stores historical data. Shorter retention periods mean:
+
 - Less RAM needed for in-memory metrics
 - Reduced disk space requirements
 - Faster Agent startup times
@@ -78,6 +81,7 @@ Configure retention settings using our [database configuration guide](/src/datab
 ## Switch to RAM mode
 
 For IoT devices and Child nodes in [Parent-Child setups](/docs/observability-centralization-points/README.md), switch to RAM mode to eliminate disk operations entirely. This mode:
+
 - Stores all metrics in memory only
 - Eliminates disk IO for metric storage
 - Significantly reduces overall resource usage
@@ -93,10 +97,11 @@ Set up RAM mode following our [database configuration guide](/src/database/CONFI
 ## Turn off ML on Children
 
 Optimize resource allocation by running Machine Learning only where it matters most. We recommend:
+
 - **Enable ML on Parents**: They have the complete data picture and typically more resources
 - **Disable ML on Children**: They focus on collecting and streaming metrics
 
-To disable ML, edit your configuration using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config):
+To disable ML, edit your configuration using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files):
 
 ```text
 [ml]
@@ -114,4 +119,4 @@ This configuration particularly benefits Child nodes, allowing them to focus on 
 1. **Identify your needs**: Determine whether you need optimization for resource constraints or architectural efficiency
 2. **Start with architecture**: If monitoring multiple systems, implement Parent-Child setup first
 3. **Fine-tune individual Agents**: Apply specific optimizations based on each system's role and resources
-4. **Monitor the impact**: Use Netdata dashboards to verify your optimizations maintain the monitoring coverage you need
+4. **Monitor the impact**: Use Netdata dashboards to confirm your optimizations haven't compromised monitoring visibility

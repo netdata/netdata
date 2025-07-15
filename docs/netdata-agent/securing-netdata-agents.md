@@ -14,7 +14,7 @@ You can protect your Agents by implementing any of these security measures:
 
 You can secure your nodes by disabling local dashboard access while maintaining Cloud monitoring capabilities. This eliminates public exposure of metrics and system information while maintaining secure metrics viewing through Netdata Cloud via [ACLK](/src/aclk/README.md).
 
-Edit the `[web]` section in `netdata.conf` using the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script:
+Edit the `[web]` section in `netdata.conf` using the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) script:
 
 ```text
 [web]
@@ -36,6 +36,7 @@ For Docker deployments, set `NETDATA_HEALTHCHECK_TARGET=cli` in your environment
 You can enhance security by deploying Parent nodes as border gateways, eliminating the need for direct internet access from production Agents.
 
 Parent nodes provide security by:
+
 - Acting as application firewalls
 - Receiving metrics from Child Agents securely
 - Serving dashboard requests using local data
@@ -60,7 +61,7 @@ You can enhance security by binding the Agent to your organization's private man
 
 **Configuration:**
 
-Edit the `[web]` section in `netdata.conf` using the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script:
+Edit the `[web]` section in `netdata.conf` using the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) script:
 
 ```text
 [web]
@@ -86,7 +87,7 @@ You can restrict access to your local dashboard while maintaining Netdata Cloud 
 
 **Basic Access Control:**
 
-Edit the `[web]` section in `netdata.conf` using the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script.
+Edit the `[web]` section in `netdata.conf` using the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) script.
 
 Use the `allow connections from` setting to permit specific IP addresses or hostnames:
 
@@ -119,8 +120,9 @@ While `allow connections from` globally controls access to all Netdata services,
 ```
 
 **Additional Security Options:**
+
 - Review detailed access list options in the [Web Server documentation](/src/web/server/README.md#access-lists)
-- Consider [enabling SSL](/src/web/server/README.md#enable-httpstls-support) to encrypt local dashboard traffic (Netdata Cloud connections are always TLS-encrypted)
+- Consider [enabling SSL](/src/web/server/README.md#examples) to encrypt local dashboard traffic (Netdata Cloud connections are always TLS-encrypted)
 
 </details>
 

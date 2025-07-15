@@ -1,6 +1,6 @@
 # Netdata Agent
 
-The Netdata Agent is the main building block in the Netdata ecosystem. You install it on all monitored systems to monitor system components, containers and applications.
+The Netdata Agent is the main building block in the Netdata ecosystem. You install it on all monitored systems to monitor system components, containers, and applications.
 
 The Netdata Agent is an **observability pipeline in a box** that you can either operate standalone, or blend into a bigger pipeline made by more Netdata Agents (Children and Parents).
 
@@ -15,56 +15,59 @@ You can extend the pipeline by creating Metrics Observability Centralization Poi
 
 ```mermaid
 flowchart TD
-    Start([Remote Netdata Input]) --> Discover("<b>Discover</b><br/>Auto-detect metric sources<br/>Auto-discover on Kubernetes")
-    
-    LocalAgent("<b>Local Netdata Agent</b>") --> Discover
-    
-    Discover --> Collect("<b>Collect</b><br/>Query data sources<br/>800+ integrations<br/>OpenMetrics, StatsD")
-    
-    Collect --> Detect("<b>Detect Anomalies</b><br/>Machine learning models<br/>Real-time outlier detection")
-    
-    Detect --> Store("<b>Store</b><br/>Time-series database<br/>Anomaly status tracking")
-    
-    Store --> Learn("<b>Learn</b><br/>Train ML models<br/>Behavior patterns")
-    
-    Store --> Check("<b>Check</b><br/>Health engine<br/>Alert triggering")
-    
-    Store --> Query("<b>Query</b><br/>Time-series data queries")
-    
-    Store --> Score("<b>Score</b><br/>Metric comparison<br/>Correlation analysis")
-    
-    Store --> Stream("<b>Stream</b><br/>Connect Agents<br/>Centralization Points")
-    
-    Store --> Export("<b>Export</b><br/>Third-party databases<br/>External tools")
-    
-    Learn --> Detect
-    Check --> Alerts("<b>Alert Transitions</b>")
-    Query --> Visualize("<b>Visualize</b><br/>Automated dashboards")
-    Score --> Visualize
-    Query --> MCP("<b>MCP</b><br/>Model Context Protocol")
+    Start(["<b>Remote Netdata Input</b>"]) --> Discover
+    LocalAgent["<b>Local Netdata Agent</b>"] --> Discover
+    Discover["<b>Discover</b><br/>Auto-detect metric sources<br/>Auto-discover on Kubernetes"] --> Collect
+    Collect["<b>Collect</b><br/>Query data sources<br/>800+ integrations<br/>OpenMetrics, StatsD"] --> Detect
+    Detect["<b>Detect Anomalies</b><br/>Machine learning models<br/>Real-time outlier detection"] --> Store
+    Store["<b>Store</b><br/>Time-series database<br/>Anomaly status tracking"] --> Learn
+    Store --> Check
+    Store --> Query
+    Store --> Score
+    Store --> Stream
+    Store --> Export
+    Learn["<b>Learn</b><br/>Train ML models<br/>Behavior patterns"] --> Detect
+    Check["<b>Check</b><br/>Health engine<br/>Alert triggering"] --> Alerts
+    Query["<b>Query</b><br/>Time-series data queries"] --> Visualize
+    Score["<b>Score</b><br/>Metric comparison<br/>Correlation analysis"] --> Visualize
+    Query --> MCP
     Score --> MCP
-    
-    Alerts --> Notifications("<b>Alert Notifications</b><br/>Multi-channel delivery")
-    Stream --> End([Remote Netdata Output])
-    Export --> ThirdParty("<b>Third-party DBs</b><br/>External systems")
-    
-    Visualize --> Dashboard("<b>Netdata Dashboards</b><br/>Real-time visualization")
-    MCP --> AIAssistant("<b>AI Assistant</b><br/>Intelligent analysis")
-    ThirdParty --> ExternalDash("<b>Third-party Dashboards</b><br/>Grafana, etc.")
-    
-    classDef input fill:#e8f4fd,stroke:#4a90e2,stroke-width:3px,color:#2c3e50,rx:15,ry:15,font-size:14px
-    classDef process fill:#e8f5e8,stroke:#27ae60,stroke-width:3px,color:#2c3e50,rx:15,ry:15,font-size:14px
-    classDef storage fill:#f3e8ff,stroke:#9b59b6,stroke-width:3px,color:#2c3e50,rx:15,ry:15,font-size:14px
-    classDef output fill:#ffe8e8,stroke:#e74c3c,stroke-width:3px,color:#2c3e50,rx:15,ry:15,font-size:14px
-    classDef userFeature fill:#fff2e8,stroke:#f39c12,stroke-width:3px,color:#2c3e50,rx:15,ry:15,font-size:14px
-    classDef cloudFeature fill:#f0f8ff,stroke:#87ceeb,stroke-width:3px,color:#2c3e50,rx:15,ry:15,font-size:14px
-    
-    class Start,LocalAgent,End input
-    class Discover,Collect,Detect,Learn,Check process
+    Alerts["<b>Alert Transitions</b>"] --> Notifications
+    Stream --> End(["<b>Remote Netdata Output</b>"])
+    Export --> ThirdParty
+    Visualize --> Dashboard
+    MCP --> AIAssistant
+    ThirdParty["<b>Third-party DBs</b><br/>External systems"] --> ExternalDash
+    Dashboard["<b>Netdata Dashboards</b><br/>Real-time visualization"]
+    AIAssistant["<b>AI Assistant</b><br/>Intelligent analysis"]
+    ExternalDash["<b>Third-party Dashboards</b><br/>Grafana, etc."]
+    Notifications["<b>Alert Notifications</b><br/>Multi-channel delivery"]
+    classDef input fill: #e8f4fd, stroke: #4a90e2, stroke-width: 3px, color: #2c3e50, rx: 15, ry: 15, font-size: 14px
+    classDef process fill: #e8f5e8, stroke: #27ae60, stroke-width: 3px, color: #2c3e50, rx: 15, ry: 15, font-size: 14px
+    classDef storage fill: #f3e8ff, stroke: #9b59b6, stroke-width: 3px, color: #2c3e50, rx: 15, ry: 15, font-size: 14px
+    classDef output fill: #ffe8e8, stroke: #e74c3c, stroke-width: 3px, color: #2c3e50, rx: 15, ry: 15, font-size: 14px
+    classDef userFeature fill: #fff2e8, stroke: #f39c12, stroke-width: 3px, color: #2c3e50, rx: 15, ry: 15, font-size: 14px
+    classDef cloudFeature fill: #f0f8ff, stroke: #87ceeb, stroke-width: 3px, color: #2c3e50, rx: 15, ry: 15, font-size: 14px
+    class Start input
+    class LocalAgent input
+    class End input
+    class Discover process
+    class Collect process
+    class Detect process
+    class Learn process
+    class Check process
     class Store storage
-    class Stream,Export,Alerts output
-    class Dashboard,AIAssistant,ExternalDash,Notifications userFeature
-    class Query,Score,MCP,Visualize cloudFeature
+    class Stream output
+    class Export output
+    class Alerts output
+    class Dashboard userFeature
+    class AIAssistant userFeature
+    class ExternalDash userFeature
+    class Notifications userFeature
+    class Query cloudFeature
+    class Score cloudFeature
+    class MCP cloudFeature
+    class Visualize cloudFeature
 ```
 
 </details><br/>
@@ -83,13 +86,13 @@ flowchart TD
 
 ## Comparison to Other Observability Solutions
 
-| Aspect | Traditional Solutions | Netdata |
-|--------|----------------------|---------|
-| **Architecture** | Multiple components (metrics exporters, time-series databases, visualization engines) requiring separate maintenance | One integrated package with everything included, even for Metrics Centralization Points |
-| **Setup & Configuration** | Manual configuration and setup required | Fully automated with comprehensive dashboards and alerts available instantly with zero configuration |
-| **Monitoring Fidelity** | Variable granularity depending on configuration | Console-level granularity and fidelity, plus holistic monitoring tools like [Top Monitoring](/docs/top-monitoring-netdata-functions.md) |
-| **System Impact** | Higher CPU usage, RAM utilization, and execution time impact on monitored systems | Minimal impact on monitored systems and applications, verified by [independent studies](https://www.ivanomalavolta.com/files/papers/ICSOC_2023.pdf) |
-| **Energy Efficiency** | Higher energy consumption | [Most energy efficient monitoring tool](https://twitter.com/IMalavolta/status/1734208439096676680) according to University of Amsterdam research |
+| Aspect                    | Traditional Solutions                                                                                                | Netdata                                                                                                                                             |
+|---------------------------|----------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Architecture**          | Multiple components (metrics exporters, time-series databases, visualization engines) requiring separate maintenance | One integrated package with everything included, even for Metrics Centralization Points                                                             |
+| **Setup & Configuration** | Manual configuration and setup required                                                                              | Fully automated with comprehensive dashboards and alerts available instantly with zero configuration                                                |
+| **Monitoring Fidelity**   | Variable granularity depending on configuration                                                                      | Console-level granularity and fidelity, plus holistic monitoring tools like [Top Monitoring](/docs/top-monitoring-netdata-functions.md)             |
+| **System Impact**         | Higher CPU usage, RAM utilization, and execution time impact on monitored systems                                    | Minimal impact on monitored systems and applications, verified by [independent studies](https://www.ivanomalavolta.com/files/papers/ICSOC_2023.pdf) |
+| **Energy Efficiency**     | Higher energy consumption                                                                                            | [Most energy efficient monitoring tool](https://twitter.com/IMalavolta/status/1734208439096676680) according to University of Amsterdam research    |
 
 ## Dashboard Versions
 

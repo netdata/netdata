@@ -18,22 +18,22 @@ The configuration file uses an INI-style format with `[SECTION]` headers and a s
 
 Your configuration file contains these main sections:
 
-| Section | Controls |
-|---------|----------|
-| [`[global]`](#global-section-options) | [Daemon](/src/daemon/README.md) |
-| [`[db]`](#db-section-options) | [Database](/src/database/README.md) |
-| [`[directories]`](#directories-section-options) | Directories used by Netdata |
-| [`[logs]`](#logs-section-options) | Logging |
-| [`[environment variables]`](#environment-variables-section-options) | Environment variables |
-| [`[sqlite]`](#sqlite-section-options) | SQLite |
-| `[ml]` | [Machine Learning](/src/ml/README.md) |
-| [`[health]`](#health-section-options) | [Health monitoring](/src/health/README.md) |
-| `[web]` | [Web Server](/src/web/server/README.md) |
-| `[registry]` | [Registry](/src/registry/README.md) |
-| `[telemetry]` | Internal monitoring |
-| `[statsd]` | [StatsD plugin](/src/collectors/statsd.plugin/README.md) |
-| [`[plugins]`](#plugins-section-options) | Data collection Plugins (Collectors) |
-| [`[plugin:NAME]`](#per-plugin-configuration) | Individual [Plugins](#per-plugin-configuration) |
+| Section                                                     | Controls                                                 |
+|-------------------------------------------------------------|----------------------------------------------------------|
+| [`[global]`](#configuration-section-details)                | [Daemon](/src/daemon/README.md)                          |
+| [`[db]`](#configuration-section-details)                    | [Database](/src/database/README.md)                      |
+| [`[directories]`](#configuration-section-details)           | Directories used by Netdata                              |
+| [`[logs]`](#configuration-section-details)                  | Logging                                                  |
+| [`[environment variables]`](#configuration-section-details) | Environment variables                                    |
+| [`[sqlite]`](#configuration-section-details)                | SQLite                                                   |
+| `[ml]`                                                      | [Machine Learning](/src/ml/README.md)                    |
+| [`[health]`](#configuration-section-details)                | [Health monitoring](/src/health/README.md)               |
+| `[web]`                                                     | [Web Server](/src/web/server/README.md)                  |
+| `[registry]`                                                | [Registry](/src/registry/README.md)                      |
+| `[telemetry]`                                               | Internal monitoring                                      |
+| `[statsd]`                                                  | [StatsD plugin](/src/collectors/statsd.plugin/README.md) |
+| `[plugins]`                                                 | Data collection Plugins (Collectors)                     |
+| [`[plugin:NAME]`](#per-plugin-configuration)                | Individual [Plugins](#per-plugin-configuration)          |
 
 ## Apply Configuration Changes
 
@@ -66,7 +66,7 @@ After you modify `netdata.conf`, you need to [restart Netdata](/docs/netdata-age
 
 The profiles are detected in this order:
 
-1. `iot` is used when the system has 1 CPU core and/or less than 1GiB of RAM. It has the highest priority among all the profiles, so that if this is detected, it will be used instead of any of the others.
+1. `iot` is used when the system has 1 CPU core and/or less than 1GiB of RAM. It has the highest priority among all the profiles, so that if this is detected, it will be used instead of the others.
 2. `parent` is detected when `stream.conf` has configuration for receiving data from child nodes and the system is not `iot`.
 3. `child` is detected when `stream.conf` has configuration for sending data to a parent node, does not have configuration for receiving data from other nodes, and the system is not `iot`.
 4. `standalone` is the fallback profile when none of the above are detected.
@@ -224,7 +224,7 @@ Most internal plugins will provide additional options. Check [Internal Plugins](
 
 :::note
 
-By default, Netdata will enable monitoring metrics for disks, memory, and network only when they are not zero. If they are constantly zero, they are ignored. Metrics that will start having values, after Netdata is started, will be detected and charts will be automatically added to the dashboard when refreshed. 
+By default, Netdata will enable monitoring metrics for disks, memory, and network only when they are not zero. If they are constantly zero, they are ignored. Metrics that will start having values, after Netdata is started, will be detected and charts will be automatically added to the dashboard when refreshed.
 
 :::
 

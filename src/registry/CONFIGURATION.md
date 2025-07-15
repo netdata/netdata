@@ -14,7 +14,7 @@ Any Netdata Agent can function as a Registry.
 
 **Set up your Registry node:**
 
-1. Modify `netdata.conf` using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config):
+1. Modify `netdata.conf` using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files):
 
    ```text
    [registry]
@@ -68,26 +68,26 @@ DNS resolution for pattern matching can impact performance on systems handling m
     allow by dns = heuristic
 ```
 
-| Option | Description |
-|--------|-------------|
-| `yes` | Enables hostname pattern matching using DNS |
-| `no` | Restricts patterns to match IP addresses only |
+| Option      | Description                                                                                      |
+|-------------|--------------------------------------------------------------------------------------------------|
+| `yes`       | Enables hostname pattern matching using DNS                                                      |
+| `no`        | Restricts patterns to match IP addresses only                                                    |
 | `heuristic` | Automatically determines whether to use DNS based on pattern syntax (presence of `:` or letters) |
 
 ## Registry Database Location
 
 The Registry maintains its data in two text-based database files located at `/var/lib/netdata/registry/`.
 
-| File | Purpose | Behavior |
-|------|---------|----------|
-| `registry-log.db` | Records all real-time Registry operations | Captures every modification to the Registry as it occurs |
-| `registry.db` | Stores the consolidated Registry data | Updates after every `[registry].registry save db every new entries` entries in the transaction log, at which point the main database is refreshed and the transaction log is cleared |
+| File              | Purpose                                   | Behavior                                                                                                                                                                             |
+|-------------------|-------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `registry-log.db` | Records all real-time Registry operations | Captures every modification to the Registry as it occurs                                                                                                                             |
+| `registry.db`     | Stores the consolidated Registry data     | Updates after every `[registry].registry save db every new entries` entries in the transaction log, at which point the main database is refreshed and the transaction log is cleared |
 
 ## Configure Cookie Security Settings
 
 By default, the Netdata Agent's web server sets `SameSite=none` and `Secure` attributes for its cookies. If these security settings interfere with accessing your Agent dashboard or Netdata Cloud, you can disable them.
 
-To modify cookie settings, edit `netdata.conf` using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config):
+To modify cookie settings, edit `netdata.conf` using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files):
 
 ```text
 [registry]

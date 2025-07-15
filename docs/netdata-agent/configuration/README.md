@@ -13,17 +13,17 @@ You configure your Netdata Agent using the main configuration file `netdata.conf
 First, you need to find where your configuration files are stored. On most Linux systems, you'll find your **Netdata config directory** at `/etc/netdata/`. This directory contains:
 
 - Several configuration files with the `.conf` extension
-- A few directories for specific configurations  
+- A few directories for specific configurations
 - A shell script named `edit-config` for safely editing files
 
-:::tip 
+:::tip
 
-Some operating systems use `/opt/netdata/etc/netdata/` as the config directory. 
+Some operating systems use `/opt/netdata/etc/netdata/` as the config directory.
 If you're **not sure where yours is located**, navigate to `http://NODE:19999/netdata.conf` in your browser (replace `NODE` with your node's IP address or hostname) and find the `# config directory =` setting. The value listed shows your system's config directory.
 
 :::
 
-:::note 
+:::note
 
 All of Netdata's documentation **assumes your config directory is at** `/etc/netdata`, and that you run any scripts from inside that directory.
 
@@ -40,10 +40,10 @@ To edit `netdata.conf`:
 
 1. Navigate to your config directory and run the edit script:
 
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config netdata.conf
-```
+   ```bash
+   cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+   sudo ./edit-config netdata.conf
+   ```
 
 2. Your default editor will open with the configuration file
 3. Make your changes and save the file
@@ -69,6 +69,7 @@ curl -ksSLo /tmp/netdata.conf.new http://localhost:19999/netdata.conf && sudo mv
 ```
 
 This method is useful when you want to:
+
 - Backup your current running configuration
 - Start with the default settings that are currently active
 - Replicate configuration across multiple agents
