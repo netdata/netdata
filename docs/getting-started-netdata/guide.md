@@ -13,11 +13,13 @@ This guide will show you how simple it is to get started with Netdata and experi
 ### Getting Started
 
 [**Getting Started Guide Netdata**](https://www.youtube.com/watch?v=he-ysUlrZIw)
-## [1. Sign in & Access Your Space](https://github.com/netdata/netdata/blob/master/src/claim/README.md)
 
-Getting started is as simple as visiting [app.netdata.cloud](https://app.netdata.cloud/) and creating your account. 
+## [1. Sign in & Access Your Space](/src/claim/README.md)
+
+Getting started is as simple as visiting [app.netdata.cloud](https://app.netdata.cloud/) and creating your account.
 
 **What happens next:**
+
 - Your personalized Space is automatically created
 - You get your central hub for all monitoring needs
 - The dashboard is ready to receive your first node
@@ -28,7 +30,7 @@ Getting started is as simple as visiting [app.netdata.cloud](https://app.netdata
 
 :::
 
-## [2. Connect a Node & See Instant Results](https://github.com/netdata/netdata/blob/master/src/claim/README.md)
+## [2. Connect a Node & See Instant Results](/src/claim/README.md)
 
 **Connect Your First Agent**
 Once logged into Netdata Cloud, you'll see connection instructions. There are three easy ways to connect:
@@ -69,6 +71,7 @@ All methods will show you a command like this:
 ```bash
 bash <(curl -Ss https://my-netdata.io/kickstart.sh) --claim-token YOUR_TOKEN --claim-rooms YOUR_ROOMS --claim-url https://app.netdata.cloud
 ```
+
 :::
 
 :::info
@@ -88,15 +91,17 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh) --claim-token YOUR_TOKEN --c
 **What You'll See When Connected:**
 
 Within seconds of connection, you'll experience the power of real-time observability:
+
 - **Your node appears live in your Space**
 - **Charts immediately start streaming real-time data**
 - **System Overview dashboard populates automatically**
 - **All metrics update with 1-second granularity**
 - **Zero additional configuration required**
 
-## [3. Analyze Your Data & See What You Get Out-of-the-Box](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/README.md)
+## [3. Analyze Your Data & See What You Get Out-of-the-Box](/docs/dashboards-and-charts/README.md)
 
 **Automatic Dashboards:**
+
 - **System Overview** - Fully automated dashboard showing all your nodes
 - **Nodes Tab** - Unified view of all infrastructure with key metrics
 - **Composite Charts** - Data from multiple nodes combined intelligently
@@ -104,16 +109,17 @@ Within seconds of connection, you'll experience the power of real-time observabi
 
 **Auto-Discovery in Action:**
 Netdata automatically discovers and monitors:
+
 - **System Resources** - CPU, memory, disk, network
 - **Containers** - Docker, Kubernetes, LXC
 - **Databases** - MySQL, PostgreSQL, MongoDB, Redis
 - **Web Servers** - Apache, Nginx, IIS
 - **Applications** - Over 1000+ integrations available
 
-**[Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/metric-correlations.md):**
+**[Metric Correlations](/docs/metric-correlations.md):**
 Click the correlation button on any chart to instantly find related metrics that help diagnose issues - turning complex troubleshooting into point-and-click simplicity.
 
-## [4. Customize & Set New Alerts](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md)
+## [4. Customize & Set New Alerts](/src/health/REFERENCE.md)
 
 **Out-of-the-Box Alerts:**
 Netdata comes with intelligent alerts pre-configured for common issues. But you can easily customize them.
@@ -128,6 +134,7 @@ crit: $this > 90
 ```
 
 **Create New Alerts:**
+
 ```bash
 # Example: Custom RAM alert
 alarm: custom_ram_usage
@@ -139,6 +146,7 @@ alarm: custom_ram_usage
 
 **Notification Methods:**
 Configure alerts to reach you through:
+
 - **Email** - Direct email notifications
 - **Slack** - Team channel integration
 - **PagerDuty** - Incident management
@@ -150,6 +158,7 @@ Configure alerts to reach you through:
 **Silencing Alerts:** Need to temporarily quiet alerts during maintenance?
 
 **Quick Silence Options:**
+
 - **Individual alerts** - Change `to: silent` in alert configuration
 - **Specific alerts** - Edit `netdata.conf` with `enabled alarms = !alert_name *`
 - **All alerts** - Set `enabled = no` in `[health]` section
@@ -157,20 +166,23 @@ Configure alerts to reach you through:
 **Temporary Control:** Use the Health Management API for dynamic control without config changes - perfect for maintenance windows.
 
 **Permanent Solutions:**
+
 - **Disable specific alerts permanently** - Comment out alert definitions in health configuration files and reload with `sudo netdatacli reload-health`
 - **Remove noisy alerts completely** - Delete unwanted alert configurations from `health.d/*.conf` files
 
 :::
 
-## [5. Organize Your Infrastructure & Invite Your Team](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md)
+## [5. Organize Your Infrastructure & Invite Your Team](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md)
 
 **Spaces and Rooms:**
+
 - **Space** - Your main collaboration environment for the entire team
 - **Rooms** - Flexible groupings within Spaces (by service, location, or purpose)
 - **Example**: Create rooms for "Production", "Development", "Database Servers"
 
 **Team Collaboration:**
 Click "Invite Users" in your Space sidebar to add team members. Set appropriate access levels:
+
 - **Admins** - Full control over Spaces, Rooms, and billing
 - **Managers** - Room and user management
 - **Troubleshooters** - Monitoring and analysis access
@@ -184,18 +196,19 @@ Click "Invite Users" in your Space sidebar to add team members. Set appropriate 
 
 **Organize by Your Needs:**
 
-| **Category** | **Examples** |
-|---|---|
-| **By Service** | Web servers, databases, applications |
-| **By Location** | Data centers, cloud regions |
-| **By Team** | DevOps, SRE, development teams |
-| **By Environment** | Production, staging, development |
+| **Category**       | **Examples**                         |
+|--------------------|--------------------------------------|
+| **By Service**     | Web servers, databases, applications |
+| **By Location**    | Data centers, cloud regions          |
+| **By Team**        | DevOps, SRE, development teams       |
+| **By Environment** | Production, staging, development     |
 
 ## What's the Value for You
 
 ### Experience the Difference with Business Plan
 
 **[Start Your Free Business Trial](https://netdata.cloud/pricing):** Experience the full power of Netdata Business with our free trial:
+
 - **No credit card required** - Start immediately
 - **Full access to all features** - Nothing held back
 - **Cancel anytime** - No commitments
@@ -203,27 +216,27 @@ Click "Invite Users" in your Space sidebar to add team members. Set appropriate 
 
 ### Traditional Monitoring vs Netdata Business
 
-| **Traditional Monitoring** | | **Netdata Business** |
-|---|:---:|---|
-| **Navigate complex interfaces** during incidents | | **Get instant analysis** with natural language |
-| **Build dashboards** during incidents | **VS** | **Automatic dashboards** with zero configuration |
-| **Manually correlate data** across systems | | **AI-powered correlation** and root cause analysis |
-| **Wait 15 seconds to 1 minute** for updates | | **Real-time 1-second granularity** |
-| **Pay per metric with surprise bills** | | **70% less expensive than most competitors** |
+| **Traditional Monitoring**                       |        | **Netdata Business**                               |
+|--------------------------------------------------|:------:|----------------------------------------------------|
+| **Navigate complex interfaces** during incidents |        | **Get instant analysis** with natural language     |
+| **Build dashboards** during incidents            | **VS** | **Automatic dashboards** with zero configuration   |
+| **Manually correlate data** across systems       |        | **AI-powered correlation** and root cause analysis |
+| **Wait 15 seconds to 1 minute** for updates      |        | **Real-time 1-second granularity**                 |
+| **Pay per metric with surprise bills**           |        | **70% less expensive than most competitors**       |
 
-### [AI Capabilities That Transform Operations](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/machine-learning-and-assisted-troubleshooting.md)
+### [AI Capabilities That Transform Operations](/docs/category-overview-pages/machine-learning-and-assisted-troubleshooting.md)
 
 Experience the future of infrastructure monitoring with AI that actually works. Chat with your infrastructure in natural language, get professional reports in minutes, and let machine learning find problems before they impact your users. From automated troubleshooting to predictive insights, Netdata's AI capabilities turn complex monitoring into simple conversations.
 
 **AI Features Overview:**
 
-| **Capability** | **What It Does** | **Access** |
-|---|---|---|
-| **AI Chat with Netdata** | Ask questions in natural language | Available now for all deployments |
-| **AI DevOps Copilot** | CLI-based AI automation | Available now with MCP tools |
-| **AI Insights** | Professional reports in 2-3 minutes | Business plans get unlimited reports |
-| **Anomaly Advisor** | Find root causes in minutes | Available to all users |
-| **ML Anomaly Detection** | Continuous anomaly detection | Free for everyone |
+| **Capability**           | **What It Does**                    | **Access**                           |
+|--------------------------|-------------------------------------|--------------------------------------|
+| **AI Chat with Netdata** | Ask questions in natural language   | Available now for all deployments    |
+| **AI DevOps Copilot**    | CLI-based AI automation             | Available now with MCP tools         |
+| **AI Insights**          | Professional reports in 2-3 minutes | Business plans get unlimited reports |
+| **Anomaly Advisor**      | Find root causes in minutes         | Available to all users               |
+| **ML Anomaly Detection** | Continuous anomaly detection        | Free for everyone                    |
 
 #### Ask Questions & Get Answers
 
@@ -272,8 +285,9 @@ Generate comprehensive reports in 2-3 minutes that explain what happened, why it
 **Why this matters:** Perfect for capacity planning, performance reviews, and executive briefings. Get comprehensive analysis of your infrastructure trends, optimization opportunities, and future requirements in professionally formatted PDFs.
 
 **Four report types:**
+
 - **Infrastructure Summary** - Complete system health and incident analysis
-- **Capacity Planning** - Growth projections and resource recommendations  
+- **Capacity Planning** - Growth projections and resource recommendations
 - **Performance Optimization** - Bottleneck identification and tuning suggestions
 - **Anomaly Analysis** - Deep dive into unusual patterns and their impacts
 
@@ -310,6 +324,7 @@ The foundation of Netdata's AI capabilities. Machine learning models run locally
 :::tip
 
 **What Happens Next:**
+
 1. **Sign up for your free trial** - No credit card required
 2. **Connect your Agents** - Use the simple one-command installation
 3. **Experience real-time observability** - 1-second granularity across all metrics
