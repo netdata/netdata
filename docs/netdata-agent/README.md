@@ -11,7 +11,7 @@ Your Netdata observability pipeline looks like in the following graph.
 You can extend the pipeline by creating Metrics Observability Centralization Points that are linked all together (`from a remote Netdata`, `to a remote Netdata`), so that all Netdata you install become a vast integrated observability pipeline.
 
 <details>
-<summary><strong>Click to see visual representation of the observability pipeline</strong></summary><br/>
+<summary><strong>Click to see visual representation of the observability pipeline</strong></summary>
 
 ```mermaid
 flowchart TD

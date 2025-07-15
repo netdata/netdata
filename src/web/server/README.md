@@ -101,7 +101,7 @@ Once a connection is allowed globally, these settings control access to specific
 ```
 
 <details>
-<summary><strong>Advanced: DNS Resolution Settings</strong></summary><br/>
+<summary><strong>Advanced: DNS Resolution Settings</strong></summary>
 
 To check the FQDN of the connection without opening the Netdata Agent to DNS-spoofing, a reverse-dns record must be setup for the connecting host. At connection time, the reverse-dns of the peer IP address is resolved, and a forward DNS resolution is made to validate the IP address against the name-pattern.
 
@@ -137,7 +137,7 @@ If you publish your Netdata web server to the internet, you may want to apply so
 ## Examples
 
 <details>
-<summary><strong>Disable the Web Server</strong></summary><br/>
+<summary><strong>Disable the Web Server</strong></summary>
 
 Edit `netdata.conf` using the [`edit-config` script](/docs/netdata-agent/configuration/README.md#edit-configuration-files)
 
@@ -149,7 +149,7 @@ Edit `netdata.conf` using the [`edit-config` script](/docs/netdata-agent/configu
 </details>
 
 <details>
-<summary><strong>Change the Number of Threads</strong></summary><br/>
+<summary><strong>Change the Number of Threads</strong></summary>
 
 Control the number of threads and sockets with the following settings:
 
@@ -162,7 +162,7 @@ Control the number of threads and sockets with the following settings:
 </details>
 
 <details>
-<summary><strong>Binding Netdata to Multiple Ports</strong></summary><br/>
+<summary><strong>Binding Netdata to Multiple Ports</strong></summary>
 
 Netdata can bind to multiple IPs and ports, offering access to different services on each. Up to 100 sockets can be used (increase it at compile time with `CFLAGS="-DMAX_LISTEN_FDS=200" ./netdata-installer.sh ...`).
 
@@ -199,7 +199,7 @@ The API requests are serviced as follows:
 </details>
 
 <details>
-<summary><strong>Enable HTTPS/TLS Support</strong></summary><br/>
+<summary><strong>Enable HTTPS/TLS Support</strong></summary>
 
 Since v1.16.0, Netdata supports encrypted HTTP connections to the web server, plus encryption of streaming data to a parent from its child nodes, via the TLS protocol.
 
@@ -237,7 +237,7 @@ openssl speed rsa2048 rsa4096
 </details>
 
 <details>
-<summary><strong>Select TLS Version</strong></summary><br/>
+<summary><strong>Select TLS Version</strong></summary>
 
 Beginning with version `v1.21.0`, specify the TLS version and the ciphers that you want to use:
 
@@ -296,7 +296,7 @@ Most of the time, these errors are due to incompatibilities between your browser
 </details>
 
 <details>
-<summary><strong>WebSocket Support</strong></summary><br/>
+<summary><strong>WebSocket Support</strong></summary>
 
 Netdata supports WebSocket connections for real-time data streaming and interactive features. For detailed information on WebSocket protocols, configuration options, and examples, see the [WebSocket documentation](/src/web/websocket/README.md).
 

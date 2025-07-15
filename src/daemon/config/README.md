@@ -46,7 +46,7 @@ After you modify `netdata.conf`, you need to [restart Netdata](/docs/netdata-age
 ## Configuration Section Details
 
 <details>
-<summary><strong>Global Section Options</strong></summary><br/>
+<summary><strong>Global Section Options</strong></summary>
 
 |              setting               |    default     | info                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 |:----------------------------------:|:--------------:|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -87,7 +87,7 @@ A few of these settings can be individually configured in `netdata.conf`, like t
 </details>
 
 <details>
-<summary><strong>Database Section Options</strong></summary><br/>
+<summary><strong>Database Section Options</strong></summary>
 
 |                    setting                    |            default             | info                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 |:---------------------------------------------:|:------------------------------:|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -113,7 +113,7 @@ The multiplication of all the **enabled** tiers `dbengine tier N update every it
 </details>
 
 <details>
-<summary><strong>Directories Section Options</strong></summary><br/>
+<summary><strong>Directories Section Options</strong></summary>
 
 |       setting       |                              default                               | info                                                                                                                                                                               |
 |:-------------------:|:------------------------------------------------------------------:|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -133,7 +133,7 @@ The multiplication of all the **enabled** tiers `dbengine tier N update every it
 </details>
 
 <details>
-<summary><strong>Logs Section Options</strong></summary><br/>
+<summary><strong>Logs Section Options</strong></summary>
 
 There are additional configuration options for the logs. For more info, see [Netdata Logging](/src/libnetdata/log/README.md).
 
@@ -154,7 +154,7 @@ There are additional configuration options for the logs. For more info, see [Net
 </details>
 
 <details>
-<summary><strong>Environment Variables Section Options</strong></summary><br/>
+<summary><strong>Environment Variables Section Options</strong></summary>
 
 |  setting   |      default      | info                                                       |
 |:----------:|:-----------------:|:-----------------------------------------------------------|
@@ -165,7 +165,7 @@ There are additional configuration options for the logs. For more info, see [Net
 </details>
 
 <details>
-<summary><strong>SQLite Section Options</strong></summary><br/>
+<summary><strong>SQLite Section Options</strong></summary>
 
 |      setting       |    default    | info                                                                                                                                                                             |
 |:------------------:|:-------------:|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -179,7 +179,7 @@ There are additional configuration options for the logs. For more info, see [Net
 </details>
 
 <details>
-<summary><strong>Health Section Options</strong></summary><br/>
+<summary><strong>Health Section Options</strong></summary>
 
 This section controls the general behavior of the Health monitoring capabilities of Netdata.
 
@@ -200,7 +200,7 @@ Specific Alerts are configured in per-collector config files under the `health.d
 </details>
 
 <details>
-<summary><strong>Plugins Section Options</strong></summary><br/>
+<summary><strong>Plugins Section Options</strong></summary>
 
 In this section you will see be a boolean (`yes`/`no`) option for each plugin (e.g., tc, cgroups, apps, proc etc.). Note that the configuration options in this section for the orchestrator plugins `python.d` and  `charts.d` control **all the modules** written for that orchestrator. For instance, setting `python.d = no` means that all Python modules under `collectors/python.d.plugin` will be disabled.
 

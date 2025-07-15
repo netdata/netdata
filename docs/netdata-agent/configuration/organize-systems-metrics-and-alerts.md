@@ -15,20 +15,24 @@ Netdata provides multiple organization methods that work together:
 
 <details>
 <summary><strong>Spaces</strong> are your primary collaboration environment where you:</summary>
-<br/>
-• Organize team members and manage access levels<br/>
-• Connect nodes for monitoring<br/>
-• Create a unified monitoring environment
-</details><br/>
+
+- Organize team members and manage access levels
+- Connect nodes for monitoring
+- Create a unified monitoring environment
+
+</details>
 
 <details>
 <summary><strong>Rooms</strong> function as organizational units within Spaces, providing:</summary>
+
+- Infrastructure-wide dashboards
+- Real-time metrics visualization
+- Focused monitoring views
+- Flexible node grouping
+
+</details>
+
 <br/>
-• Infrastructure-wide dashboards<br/>
-• Real-time metrics visualization<br/>
-• Focused monitoring views<br/>
-• Flexible node grouping
-</details><br/>
 
 :::info
 

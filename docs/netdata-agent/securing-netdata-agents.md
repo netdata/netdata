@@ -53,7 +53,7 @@ For more information, see [Observability Centralization Points](/docs/observabil
 ### Alternative Methods
 
 <details>
-<summary><strong>Restrict Dashboard Access to Private Networks</strong></summary><br/>
+<summary><strong>Restrict Dashboard Access to Private Networks</strong></summary>
 
 **Best for:** Organizations with private management networks
 
@@ -79,7 +79,7 @@ For `gvpe` specifically, we maintain a [deployment tool](https://github.com/netd
 </details>
 
 <details>
-<summary><strong>Configure Granular Access Control</strong></summary><br/>
+<summary><strong>Configure Granular Access Control</strong></summary>
 
 **Best for:** Specific IP address or hostname-based access requirements
 
@@ -127,7 +127,7 @@ While `allow connections from` globally controls access to all Netdata services,
 </details>
 
 <details>
-<summary><strong>Deploy a Reverse Proxy</strong></summary><br/>
+<summary><strong>Deploy a Reverse Proxy</strong></summary>
 
 **Best for:** Multi-agent environments requiring unified authentication and SSL termination
 

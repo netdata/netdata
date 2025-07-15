@@ -32,7 +32,7 @@ All of Netdata's documentation **assumes your config directory is at** `/etc/net
 ## Edit Configuration Files
 
 <details>
-<summary><strong>Method 1: Using `edit-config` (Recommended)</strong></summary><br/>
+<summary><strong>Method 1: Using `edit-config` (Recommended)</strong></summary>
 
 You should use the `edit-config` script for making configuration changes. This script lives inside your config directory and helps you manage and safely edit configuration files.
 
@@ -51,7 +51,7 @@ To edit `netdata.conf`:
 </details>
 
 <details>
-<summary><strong>Method 2: Download Current Configuration</strong></summary><br/>
+<summary><strong>Method 2: Download Current Configuration</strong></summary>
 
 If you want to work with the exact configuration currently running on your Agent, you can download it directly.
 

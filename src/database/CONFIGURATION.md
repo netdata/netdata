@@ -53,7 +53,7 @@ You can change these limits using [`edit-config`](/docs/netdata-agent/configurat
 ### Legacy Configuration
 
 <details>
-<summary><strong>v1.99.0 and prior</strong></summary><br/>
+<summary><strong>v1.99.0 and prior</strong></summary>
 
 Netdata prior to v2 supports the following configuration options in `netdata.conf`. They have the same defaults as the latest v2, but the unit of each value is given in the option name, not at the value.
 
@@ -73,7 +73,7 @@ dbengine tier 2 retention days = 730
 </details>
 
 <details>
-<summary><strong>v1.45.6 and prior</strong></summary><br/>
+<summary><strong>v1.45.6 and prior</strong></summary>
 
 Netdata versions prior to v1.46.0 relied on disk space-based retention.
 
