@@ -975,7 +975,7 @@ if ! getent group %{name} > /dev/null; then
   groupadd --system %{name}
 fi
 
-%files plugin-systemd-journal
+%files plugin-systemd-units
 %defattr(0750,root,netdata,0750)
 %{_libexecdir}/%{name}/plugins.d/systemd-units.plugin
 %endif
@@ -1047,6 +1047,8 @@ fi
 %{_datadir}/%{name}/web
 
 %changelog
+* Tue Jul 15 2025 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-33
+- Fix file handling for systemd-journal and systemd-units plugins
 * Tue May 27 2025 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-32
 - Correctly handle systmed-units plugin as it’s own package
 * Fri Mar 21 2025 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-31
