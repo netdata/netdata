@@ -1,10 +1,10 @@
 # Database Configuration Reference
 
-This document provides details on configuring the Agent's Database. For a deeper understanding of the Database components, see the [Database overview](/src/database/README.md).
+You can configure the Agent's Database through the database settings. For a deeper understanding of the Database components, see the [Database overview](/src/database/README.md).
 
 ## Modes
 
-Use [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) to open `netdata.conf` and set your preferred mode:
+Use [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) to open `netdata.conf` and set your preferred mode:
 
 ```text
 [db]
@@ -16,9 +16,11 @@ Use [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configura
 
 ### Retention Settings
 
-> **Important**
->
-> In a Parent-Child setup, these settings manage the entire storage space used by the Parent for storing metrics collected both by itself and its Children.
+:::note
+
+In a Parent-Child setup, these settings manage the entire storage space used by the Parent for storing metrics collected both by itself and its Children.
+
+:::
 
 You can fine-tune retention for each tier by setting a time limit or size limit. Setting a limit to 0 disables it. This enables the following retention strategies:
 
@@ -28,7 +30,7 @@ You can fine-tune retention for each tier by setting a time limit or size limit.
 | Time Limit = 0, Size Limit > 0 | **Space based:** data is stored with a disk space limit, regardless of time                                                              |
 | Time Limit > 0, Size Limit > 0 | **Combined time and space limits:** data is deleted once it reaches either the time limit or the disk space limit, whichever comes first |
 
-You can change these limits using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) to open `netdata.conf`:
+You can change these limits using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) to open `netdata.conf`:
 
 ```text
 [db]
@@ -48,12 +50,12 @@ You can change these limits using [`edit-config`](/docs/netdata-agent/configurat
     dbengine tier 2 retention time = 2y
 ```
 
-### Legacy configuration
+### Legacy Configuration
 
-<details><summary>v1.99.0 and prior</summary>
+<details>
+<summary><strong>v1.99.0 and prior</strong></summary>
 
-Netdata prior to v2 supports the following configuration options in  `netdata.conf`.
-They have the same defaults as the latest v2, but the unit of each value is given in the option name, not at the value.
+Netdata prior to v2 supports the following configuration options in `netdata.conf`. They have the same defaults as the latest v2, but the unit of each value is given in the option name, not at the value.
 
 ```text
 storage tiers = 3
@@ -70,17 +72,18 @@ dbengine tier 2 retention days = 730
 
 </details>
 
-<details><summary>v1.45.6 and prior</summary>
+<details>
+<summary><strong>v1.45.6 and prior</strong></summary>
 
 Netdata versions prior to v1.46.0 relied on disk space-based retention.
 
-**Default Retention Limits**:
+**Default Retention Limits:**
 
-| Tier |     Resolution      | Size Limit |
-|:----:|:-------------------:|:----------:|
-|  0   |  high (per second)  |   256 MB   |
-|  1   | middle (per minute) |   128 MB   |
-|  2   |   low (per hour)    |   64 GiB   |
+| Tier | Resolution          | Size Limit |
+|------|---------------------|------------|
+| 0    | high (per second)   | 256 MB     |
+| 1    | middle (per minute) | 128 MB     |
+| 2    | low (per hour)      | 64 GiB     |
 
 You can change these limits in `netdata.conf`:
 
@@ -98,11 +101,15 @@ You can change these limits in `netdata.conf`:
 
 </details>
 
-## Cache sizes
+## Cache Sizes
 
-There are two cache sizes that can be configured in `netdata.conf` to better optimize the Database:
+There are two cache sizes that you can configure in `netdata.conf` to better optimize the Database:
 
 1. `[db].dbengine page cache size`: controls the size of the cache that keeps metric data on memory.
 2. `[db].dbengine extent cache size`: controls the size of the cache that keeps in memory compressed data blocks.
 
+:::info
+
 Both of them are dynamically adjusted to use some of the total memory computed above. The configuration in `netdata.conf` allows providing additional memory to them, increasing their caching efficiency.
+
+:::

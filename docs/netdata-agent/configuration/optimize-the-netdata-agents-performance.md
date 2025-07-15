@@ -1,71 +1,122 @@
 # Agent Performance Optimization Guide
 
-While Netdata Agents prioritize simplicity and out-of-the-box functionality, their default configuration focuses on comprehensive monitoring rather than performance optimization.
+While Netdata Agents work seamlessly out-of-the-box with comprehensive monitoring, you can tune their configuration for better performance when needed.
 
-By default, Agents provide:
+## Why optimize your Agent
 
-- **Automatic Application Discovery**: Continuously detects and monitors applications running on your node without manual configuration.
-- **Real-time Metric Collection**: Collects metrics with one-second granularity.
-- **Health Monitoring**: Actively tracks the health status of your applications and system components with built-in alerting.
-- **Machine Learning**: Trains models for each metric to detect anomalies and unusual patterns in your system's behavior ([Anomaly Detection](/src/ml/README.md)).
+By default, your Netdata Agent provides:
 
-> **Note**
->
-> For details about Agent resource requirements, see [Resource Utilization](/docs/netdata-agent/sizing-netdata-agents/README.md).
+- **Automatic Application Discovery**: Continuously detects and monitors applications on your node
+- **Real-time Metric Collection**: Collects metrics every second
+- **Health Monitoring**: Actively tracks health status with built-in alerting
+- **Machine Learning**: Trains anomaly detection models for each metric ([Anomaly Detection](/src/ml/README.md))
 
-This document describes various strategies to optimize Netdata's performance for your specific monitoring needs.
+These features deliver comprehensive monitoring but consume system resources. You might need to optimize when running Agents on resource-constrained systems or when scaling your monitoring infrastructure.
 
-## Summary of performance optimizations
+:::note
 
-The following table summarizes the effect of each optimization on the CPU, RAM and Disk IO utilization in production.
+See [Resource Utilization](/docs/netdata-agent/sizing-netdata-agents/README.md) for detailed Agent resource requirements.
 
-| Optimization                                                              | CPU                | RAM                | Disk IO            |
-|---------------------------------------------------------------------------|--------------------|--------------------|--------------------|
-| [Implement Centralization Points](#implement-centralization-points)       | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
-| [Disable Plugins or Collectors](#disable-plugins-or-collectors)           | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
-| [Adjust data collection frequency](#adjust-data-collection-frequency)     | :heavy_check_mark: |                    | :heavy_check_mark: |
-| [Optimize metric retention settings](#optimize-metric-retention-settings) |                    | :heavy_check_mark: | :heavy_check_mark: |
-| [Select appropriate Database Mode](#select-appropriate-database-mode)     |                    | :heavy_check_mark: | :heavy_check_mark: |
-| [Disable ML on Children](#disable-machine-learning-on-children)           | :heavy_check_mark: |                    |                    |
+:::
 
-## Implement Centralization Points
+## How to optimize performance
 
-In production environments, use Parent nodes as centralization points to collect and aggregate data from Child nodes across your infrastructure. This architecture follows our recommended [Centralization Points](/docs/observability-centralization-points/README.md) pattern.
+Here's how each optimization strategy reduces resource usage:
 
-## Disable Plugins or Collectors
+| Optimization Strategy                                                 | Reduces CPU | Reduces RAM | Reduces Disk IO |
+|-----------------------------------------------------------------------|-------------|-------------|-----------------|
+| [Set up Parent-Child architecture](#set-up-parent-child-architecture) | ✓           | ✓           | ✓               |
+| [Disable unneeded collectors](#disable-unneeded-collectors)           | ✓           | ✓           | ✓               |
+| [Reduce collection frequency](#reduce-collection-frequency)           | ✓           |             | ✓               |
+| [Adjust metric retention](#adjust-metric-retention)                   |             | ✓           | ✓               |
+| [Switch to RAM mode](#switch-to-ram-mode)                             |             | ✓           | ✓               |
+| [Turn off ML on Children](#turn-off-ml-on-children)                   | ✓           |             |                 |
 
-You can improve Agent performance by selectively disabling [Plugins or Collectors](/src/collectors/README.md) that you don't need for your monitoring requirements.
+## Set up Parent-Child architecture
 
-> **Note**
->
-> Inactive Plugins and Collectors automatically shut down and don't consume system resources. Performance benefits come only from disabling those that are actively collecting metrics.
+Transform your monitoring by using Parent nodes as centralization points. Parents collect and aggregate data from multiple Child nodes, significantly reducing the load on individual systems.
 
-For detailed instructions on managing Plugins and Collectors, see [configuration guide](/src/collectors/REFERENCE.md).
+In this setup:
 
-## Adjust Data Collection Frequency
+- **Children** stream their metrics to Parents instead of storing everything locally
+- **Parents** handle data aggregation, storage, and dashboard queries
+- **You** access all metrics through the Parent nodes
 
-One of the most effective ways to reduce the Agent's resource consumption is to modify its data collection frequency.
+:::tip
+This architecture works especially well in production environments where you monitor many systems. Learn more in our [Centralization Points documentation](/docs/observability-centralization-points/README.md).
+:::
 
-If you don't require per-second precision, or if your Agent is consuming excessive CPU during periods of low dashboard activity, you can [reduce the collection frequency](/src/collectors/REFERENCE.md).
-This adjustment can significantly improve CPU utilization while maintaining meaningful monitoring capabilities.
+## Disable unneeded collectors
 
-## Optimize Metric Retention Settings
+Reduce resource usage by turning off [Plugins or Collectors](/src/collectors/README.md) you don't need.
 
-You can reduce memory and disk usage by adjusting [how long the Agent stores metrics](/src/database/CONFIGURATION.md).
+:::warning Important
+Only active collectors consume resources. Inactive plugins and collectors shut down automatically, so you only save resources by disabling those currently running and collecting metrics.
+:::
 
-## Select Appropriate Database Mode
+Follow our [configuration guide](/src/collectors/REFERENCE.md) to identify and disable specific collectors.
 
-For IoT devices and Child nodes in [Centralization Point setups](/docs/observability-centralization-points/README.md), you can optimize performance by [switching to RAM mode](/src/database/CONFIGURATION.md). This can significantly reduce resource usage while maintaining essential monitoring capabilities.
+## Reduce collection frequency
 
-## Disable Machine Learning on Children
+Save CPU and disk IO by collecting metrics less frequently. If you don't need per-second precision, or if your Agent consumes too much CPU during periods of low dashboard activity, increase the collection interval.
 
-For optimal resource allocation, we recommend running Machine Learning only on Parent nodes, or on systems with sufficient CPU and memory capacity.
+This change:
 
-To reduce resource usage on Child nodes or less powerful systems, you can disable ML by modifying `netdata.conf` using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config):
+- Significantly reduces CPU usage
+- Decreases disk write operations
+- Maintains meaningful monitoring capabilities
+
+Learn how to adjust collection frequency in our [configuration guide](/src/collectors/REFERENCE.md).
+
+## Adjust metric retention
+
+Control memory and disk usage by changing how long your Agent stores historical data. Shorter retention periods mean:
+
+- Less RAM needed for in-memory metrics
+- Reduced disk space requirements
+- Faster Agent startup times
+
+Configure retention settings using our [database configuration guide](/src/database/CONFIGURATION.md).
+
+## Switch to RAM mode
+
+For IoT devices and Child nodes in [Parent-Child setups](/docs/observability-centralization-points/README.md), switch to RAM mode to eliminate disk operations entirely. This mode:
+
+- Stores all metrics in memory only
+- Eliminates disk IO for metric storage
+- Significantly reduces overall resource usage
+
+:::tip
+
+Since Child nodes stream metrics to Parents, they don't need persistent local storage. RAM mode is ideal for this use case.
+
+:::
+
+Set up RAM mode following our [database configuration guide](/src/database/CONFIGURATION.md).
+
+## Turn off ML on Children
+
+Optimize resource allocation by running Machine Learning only where it matters most. We recommend:
+
+- **Enable ML on Parents**: They have the complete data picture and typically more resources
+- **Disable ML on Children**: They focus on collecting and streaming metrics
+
+To disable ML, edit your configuration using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files):
 
 ```text
 [ml]
    enabled = no
 ```
 
-This configuration is particularly beneficial for Child nodes since their primary role is to collect and stream metrics to Parent nodes, where ML analysis can be performed centrally.
+:::tip
+
+This configuration particularly benefits Child nodes, allowing them to focus on their primary role of collecting and streaming metrics to Parent nodes where ML analysis happens centrally.
+
+:::
+
+## Next steps
+
+1. **Identify your needs**: Determine whether you need optimization for resource constraints or architectural efficiency
+2. **Start with architecture**: If monitoring multiple systems, implement Parent-Child setup first
+3. **Fine-tune individual Agents**: Apply specific optimizations based on each system's role and resources
+4. **Monitor the impact**: Use Netdata dashboards to confirm your optimizations haven't compromised monitoring visibility
