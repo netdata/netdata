@@ -348,11 +348,6 @@ include:
       <<: *ubuntu_packages
       repo_distro: ubuntu/plucky
   - <<: *ubuntu
-    version: "24.10"
-    packages:
-      <<: *ubuntu_packages
-      repo_distro: ubuntu/oracular
-  - <<: *ubuntu
     version: "22.04"
     packages:
       <<: *ubuntu_packages
@@ -407,6 +402,11 @@ legacy: # Info for platforms we used to support and still need to handle package
     packages:
       <<: *ubuntu_packages
       repo_distro: ubuntu/mantic
+  - <<: *ubuntu
+    version: "24.10"
+    packages:
+      <<: *ubuntu_packages
+      repo_distro: ubuntu/oracular
 no_include: # Info for platforms not covered in CI
   - distro: docker
     version: "19.03 or newer"
