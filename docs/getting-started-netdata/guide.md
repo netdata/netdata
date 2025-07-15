@@ -1,21 +1,18 @@
 # Getting Started with Netdata
 
-### Why Netdata Changes Everything
-
-| **Feature** | **Benefit** |
-|---|---|
-| **1-Second Granularity** | See what's happening right now, not 15 seconds ago |
-| **Unlimited Everything** | Metrics, logs, retention, dashboards, containers, applications |
-| **AI-Powered Intelligence** | Chat with your infrastructure, get automated insights, detect anomalies |
-| **Zero Configuration** | Works out of the box with enterprise features enabled |
-| **Unbeatable Value** | Easier on your budget, and packed with more features than most |
-
 ## Transform Your Infrastructure Monitoring in Minutes, Not Weeks
 
 Netdata Cloud gives you complete visibility into every system and application performance metric across your entire infrastructure, whether it's on-premises or in the cloud. Bring teams together to find answers faster and squash the threat of anomalies or outages with composite charts, metric correlations, pre-built and custom dashboards, intelligent alarms, and collaboration tools to help you drive down your time to resolution.
 
+:::tip
+
 This guide will show you how simple it is to get started with Netdata and experience the instant value of real-time observability.
 
+:::
+
+### Getting Started
+
+[**Getting Started Guide Netdata**](https://www.youtube.com/watch?v=he-ysUlrZIw)
 ## [1. Sign in & Access Your Space](https://github.com/netdata/netdata/blob/master/src/claim/README.md)
 
 Getting started is as simple as visiting [app.netdata.cloud](https://app.netdata.cloud/) and creating your account. 
