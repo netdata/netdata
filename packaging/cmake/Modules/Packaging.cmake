@@ -319,9 +319,10 @@ set(CPACK_COMPONENT_PLUGIN-IBM_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-IBM_DESCRIPTION
 		"The IBM ecosystem metrics collection plugin for the Netdata Agent
  This plugin allows the Netdata Agent to collect metrics from IBM
- systems including AS/400 (IBM i), DB2 databases, and WebSphere
- application servers. It requires IBM DB2 client libraries which
- will be downloaded automatically on first run.")
+ systems including AS/400 (IBM i), DB2 databases, MQ queues, and WebSphere
+ application servers. Database collectors use unixODBC and require appropriate
+ ODBC drivers. MQ collectors require IBM MQ client libraries which will be
+ downloaded automatically on first run.")
 
 set(CPACK_DEBIAN_PLUGIN-IBM_PACKAGE_NAME "netdata-plugin-ibm")
 set(CPACK_DEBIAN_PLUGIN-IBM_PACKAGE_SECTION "net")

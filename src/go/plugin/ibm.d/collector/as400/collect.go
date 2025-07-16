@@ -16,6 +16,12 @@ import (
 const precision = 1000 // Precision multiplier for floating-point values
 
 func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
+	startTime := time.Now()
+	defer func() {
+		duration := time.Since(startTime)
+		a.Debugf("collection iteration completed in %v", duration)
+	}()
+	
 	if a.db == nil {
 		db, err := a.initDatabase(ctx)
 		if err != nil {
@@ -59,14 +65,22 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 		return nil, fmt.Errorf("failed to collect memory pools: %v", err)
 	}
 
-	// Collect aggregate disk status
+	// Collect aggregate disk status - optional, gracefully handle missing disk tables
 	if err := a.collectDiskStatus(ctx); err != nil {
-		return nil, fmt.Errorf("failed to collect disk status: %v", err)
+		if isSQLFeatureError(err) {
+			a.Warningf("disk status monitoring not available on this IBM i version: %v", err)
+		} else {
+			return nil, fmt.Errorf("failed to collect disk status: %v", err)
+		}
 	}
 
-	// Collect aggregate job info
+	// Collect aggregate job info - optional, gracefully handle missing job tables
 	if err := a.collectJobInfo(ctx); err != nil {
-		return nil, fmt.Errorf("failed to collect job info: %v", err)
+		if isSQLFeatureError(err) {
+			a.Warningf("job info monitoring not available on this IBM i version: %v", err)
+		} else {
+			return nil, fmt.Errorf("failed to collect job info: %v", err)
+		}
 	}
 
 	// Collect job type breakdown
@@ -122,19 +136,31 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 	// Collect per-instance metrics if enabled
 	if a.CollectDiskMetrics != nil && *a.CollectDiskMetrics {
 		if err := a.collectDiskInstances(ctx); err != nil {
-			a.Errorf("failed to collect disk instances: %v", err)
+			if isSQLFeatureError(err) {
+				a.Warningf("disk instances monitoring not available on this IBM i version: %v", err)
+			} else {
+				a.Errorf("failed to collect disk instances: %v", err)
+			}
 		}
 	}
 
 	if a.CollectSubsystemMetrics != nil && *a.CollectSubsystemMetrics {
 		if err := a.collectSubsystemInstances(ctx); err != nil {
-			a.Errorf("failed to collect subsystem instances: %v", err)
+			if isSQLFeatureError(err) {
+				a.Warningf("subsystem instances monitoring not available on this IBM i version: %v", err)
+			} else {
+				a.Errorf("failed to collect subsystem instances: %v", err)
+			}
 		}
 	}
 
 	if a.CollectJobQueueMetrics != nil && *a.CollectJobQueueMetrics {
 		if err := a.collectJobQueueInstances(ctx); err != nil {
-			a.Errorf("failed to collect job queue instances: %v", err)
+			if isSQLFeatureError(err) {
+				a.Warningf("job queue instances monitoring not available on this IBM i version: %v", err)
+			} else {
+				a.Warningf("failed to collect job queue instances: %v", err)
+			}
 		}
 	}
 
@@ -301,23 +327,53 @@ func (a *AS400) collectMemoryPools(ctx context.Context) error {
 }
 
 func (a *AS400) collectDiskStatus(ctx context.Context) error {
-	return a.doQuery(ctx, queryDiskStatus, func(column, value string, lineEnd bool) {
+	// Try modern query first
+	err := a.doQuery(ctx, queryDiskStatus, func(column, value string, lineEnd bool) {
 		if column == "AVG_DISK_BUSY" {
 			if v, err := strconv.ParseFloat(value, 64); err == nil {
 				a.mx.DiskBusyPercentage = int64(v * precision)
 			}
 		}
 	})
+	
+	// If modern query fails, try legacy fallback
+	if err != nil && isSQLFeatureError(err) {
+		a.Debugf("modern disk status query failed, trying legacy fallback: %v", err)
+		return a.doQuery(ctx, queryDiskStatusLegacy, func(column, value string, lineEnd bool) {
+			if column == "AVG_DISK_BUSY" {
+				if v, err := strconv.ParseFloat(value, 64); err == nil {
+					a.mx.DiskBusyPercentage = int64(v * precision)
+				}
+			}
+		})
+	}
+	
+	return err
 }
 
 func (a *AS400) collectJobInfo(ctx context.Context) error {
-	return a.doQuery(ctx, queryJobInfo, func(column, value string, lineEnd bool) {
+	// Try modern query first
+	err := a.doQuery(ctx, queryJobInfo, func(column, value string, lineEnd bool) {
 		if column == "JOB_QUEUE_LENGTH" {
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 				a.mx.JobQueueLength = v
 			}
 		}
 	})
+	
+	// If modern query fails, try fallback
+	if err != nil && isSQLFeatureError(err) {
+		a.Debugf("modern job info query failed, trying fallback: %v", err)
+		return a.doQuery(ctx, queryJobInfoFallback, func(column, value string, lineEnd bool) {
+			if column == "JOB_QUEUE_LENGTH" {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					a.mx.JobQueueLength = v
+				}
+			}
+		})
+	}
+	
+	return err
 }
 
 func (a *AS400) doQuery(ctx context.Context, query string, assign func(column, value string, lineEnd bool)) error {

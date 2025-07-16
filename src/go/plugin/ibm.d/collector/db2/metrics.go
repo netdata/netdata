@@ -3,6 +3,43 @@
 package db2
 
 type metricsData struct {
+	// Database Overview metrics (Screen 01)
+	DatabaseActive          int64 `stm:"database_active"`
+	DatabaseInactive        int64 `stm:"database_inactive"`
+	CPUUser                 int64 `stm:"cpu_user"`
+	CPUSystem               int64 `stm:"cpu_system"`
+	CPUIdle                 int64 `stm:"cpu_idle"`
+	CPUIowait               int64 `stm:"cpu_iowait"`
+	ConnectionsActive       int64 `stm:"connections_active"`
+	ConnectionsTotal        int64 `stm:"connections_total"`
+	MemoryDatabaseCommitted int64 `stm:"memory_database_committed"`
+	MemoryInstanceCommitted int64 `stm:"memory_instance_committed"`
+	MemoryBufferpoolUsed    int64 `stm:"memory_bufferpool_used"`
+	MemorySharedSortUsed    int64 `stm:"memory_shared_sort_used"`
+	OpsSelectStmts          int64 `stm:"ops_select_stmts"`
+	OpsUIDStmts             int64 `stm:"ops_uid_stmts"`
+	OpsTransactions         int64 `stm:"ops_transactions"`
+	OpsActivitiesAborted    int64 `stm:"ops_activities_aborted"`
+	TimeAvgDirectRead       int64 `stm:"time_avg_direct_read"`
+	TimeAvgDirectWrite      int64 `stm:"time_avg_direct_write"`
+	TimeAvgPoolRead         int64 `stm:"time_avg_pool_read"`
+	TimeAvgPoolWrite        int64 `stm:"time_avg_pool_write"`
+
+	// Enhanced logging metrics (Screen 18)
+	LogCommits           int64 `stm:"log_commits"`
+	LogRollbacks         int64 `stm:"log_rollbacks"`
+	LogBufferFullEvents  int64 `stm:"log_buffer_full_events"`
+	LogAvgCommitTime     int64 `stm:"log_avg_commit_time"`
+	LogAvgReadTime       int64 `stm:"log_avg_read_time"`
+	LogAvgWriteTime      int64 `stm:"log_avg_write_time"`
+
+	// Federation metrics (Screen 32)
+	FedConnectionsActive int64 `stm:"fed_connections_active"`
+	FedConnectionsIdle   int64 `stm:"fed_connections_idle"`
+	FedRowsRead          int64 `stm:"fed_rows_read"`
+	FedSelectStmts       int64 `stm:"fed_select_stmts"`
+	FedWaitsTotal        int64 `stm:"fed_waits_total"`
+
 	// Connection metrics
 	ConnTotal     int64 `stm:"conn_total"`
 	ConnActive    int64 `stm:"conn_active"`
@@ -62,8 +99,10 @@ type metricsData struct {
 	LogUsedSpace      int64 `stm:"log_used_space"`
 	LogAvailableSpace int64 `stm:"log_available_space"`
 	LogUtilization    int64 `stm:"log_utilization"`
-	LogReads          int64 `stm:"log_reads"`
-	LogWrites         int64 `stm:"log_writes"`
+	LogIOReads        int64 `stm:"log_io_reads"`
+	LogIOWrites       int64 `stm:"log_io_writes"`
+	LogOpReads        int64 `stm:"log_op_reads"`
+	LogOpWrites       int64 `stm:"log_op_writes"`
 
 	// Query metrics
 	LongRunningQueries         int64 `stm:"long_running_queries"`
@@ -79,15 +118,17 @@ type metricsData struct {
 	CanConnect     int64 `stm:"can_connect"`
 	DatabaseStatus int64 `stm:"database_status"`
 
-	databases   map[string]databaseInstanceMetrics
-	bufferpools map[string]bufferpoolInstanceMetrics
-	tablespaces map[string]tablespaceInstanceMetrics
-	connections map[string]connectionInstanceMetrics
-	tables      map[string]tableInstanceMetrics
-	indexes     map[string]indexInstanceMetrics
-	statements  map[string]statementInstanceMetrics
-	memoryPools map[string]memoryPoolInstanceMetrics
-	tableIOs    map[string]tableIOInstanceMetrics
+	databases    map[string]databaseInstanceMetrics
+	bufferpools  map[string]bufferpoolInstanceMetrics
+	tablespaces  map[string]tablespaceInstanceMetrics
+	connections  map[string]connectionInstanceMetrics
+	tables       map[string]tableInstanceMetrics
+	indexes      map[string]indexInstanceMetrics
+	statements   map[string]statementInstanceMetrics
+	memoryPools  map[string]memoryPoolInstanceMetrics
+	tableIOs     map[string]tableIOInstanceMetrics
+	memorySets   map[string]memorySetInstanceMetrics
+	prefetchers  map[string]prefetcherInstanceMetrics
 }
 
 type databaseMetrics struct {
@@ -264,4 +305,28 @@ type tableIOInstanceMetrics struct {
 	RowsUpdated      int64 `stm:"rows_updated"`
 	RowsDeleted      int64 `stm:"rows_deleted"`
 	OverflowAccesses int64 `stm:"overflow_accesses"`
+}
+
+type memorySetInstanceMetrics struct {
+	// Screen 26: Instance Memory Sets metrics
+	Used                  int64  `stm:"used"`                    // MEMORY_SET_USED
+	Committed             int64  `stm:"committed"`               // MEMORY_SET_COMMITTED  
+	HighWaterMark         int64  `stm:"high_water_mark"`         // MEMORY_SET_USED_HWM
+	AdditionalCommitted   int64  `stm:"additional_committed"`    // MEMORY_SET_COMMITTED - MEMORY_SET_USED
+	PercentUsedHWM        int64  `stm:"percent_used_hwm"`        // (MEMORY_SET_USED * 100) / MEMORY_SET_USED_HWM
+	
+	// Metadata
+	hostName    string
+	dbName      string
+	setType     string
+	member      int64
+}
+
+type prefetcherInstanceMetrics struct {
+	PrefetchRatio int64 `stm:"prefetch_ratio"`
+	CleanerRatio  int64 `stm:"cleaner_ratio"`
+	PhysicalReads int64 `stm:"physical_reads"`
+	AsyncReads    int64 `stm:"async_reads"`
+	UnreadPages   int64 `stm:"unread_pages"`
+	AvgWaitTime   int64 `stm:"avg_wait_time"`
 }

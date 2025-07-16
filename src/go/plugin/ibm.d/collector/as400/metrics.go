@@ -54,6 +54,19 @@ type metricsData struct {
 	SystemCriticalMessages   int64 `stm:"system_critical_messages"`
 	QSYSOPRCriticalMessages  int64 `stm:"qsysopr_critical_messages"`
 
+	// Network interface metrics
+	NetworkInterfacesActive   int64 `stm:"network_interfaces_active"`
+	NetworkInterfacesInactive int64 `stm:"network_interfaces_inactive"`
+
+	// Database performance metrics
+	DatabaseTotalRows    int64 `stm:"database_total_rows"`
+	DatabaseTableScans   int64 `stm:"database_table_scans"`
+	DatabaseActiveTables int64 `stm:"database_active_tables"`
+
+	// Hardware resource metrics
+	HardwareOperational    int64 `stm:"hardware_operational"`
+	HardwareNonOperational int64 `stm:"hardware_non_operational"`
+
 	// Per-instance metrics (not included in stm)
 	disks             map[string]diskInstanceMetrics
 	subsystems        map[string]subsystemInstanceMetrics

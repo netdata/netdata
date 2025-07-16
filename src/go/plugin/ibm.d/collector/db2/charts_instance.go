@@ -15,7 +15,7 @@ var (
 		Title:    "Database %s Status",
 		Units:    "status",
 		Fam:      "database",
-		Ctx:      "db2.database_status",
+		Ctx:      "db2.database_instance_status",
 		Priority: module.Priority + 100,
 		Dims: module.Dims{
 			{ID: "database_%s_status", Name: "status"},
@@ -406,6 +406,130 @@ var (
 			{ID: "index_%s_full_scans", Name: "full", Algo: module.Incremental, Mul: -1},
 		},
 	}
+
+	// Memory Set charts (Screen 26: Instance Memory Sets)
+	memorySetUsageChartTmpl = module.Chart{
+		ID:       "memory_set_%s_usage",
+		Title:    "Memory Set %s Usage",
+		Units:    "bytes",
+		Fam:      "memory",
+		Ctx:      "db2.memory_set_usage",
+		Priority: module.Priority + 700,
+		Type:     module.Stacked,
+		Dims: module.Dims{
+			{ID: "memory_set_%s_used", Name: "used"},
+			{ID: "memory_set_%s_additional_committed", Name: "additional"},
+		},
+	}
+
+	memorySetCommittedChartTmpl = module.Chart{
+		ID:       "memory_set_%s_committed",
+		Title:    "Memory Set %s Committed Memory",
+		Units:    "bytes",
+		Fam:      "memory",
+		Ctx:      "db2.memory_set_committed",
+		Priority: module.Priority + 701,
+		Dims: module.Dims{
+			{ID: "memory_set_%s_committed", Name: "committed"},
+		},
+	}
+
+	memorySetHighWaterMarkChartTmpl = module.Chart{
+		ID:       "memory_set_%s_hwm",
+		Title:    "Memory Set %s High Water Mark",
+		Units:    "bytes", 
+		Fam:      "memory",
+		Ctx:      "db2.memory_set_hwm",
+		Priority: module.Priority + 702,
+		Dims: module.Dims{
+			{ID: "memory_set_%s_high_water_mark", Name: "hwm"},
+		},
+	}
+
+	memorySetUtilizationChartTmpl = module.Chart{
+		ID:       "memory_set_%s_utilization",
+		Title:    "Memory Set %s Utilization",
+		Units:    "percentage",
+		Fam:      "memory",
+		Ctx:      "db2.memory_set_utilization",
+		Priority: module.Priority + 703,
+		Dims: module.Dims{
+			{ID: "memory_set_%s_percent_used_hwm", Name: "utilization", Div: Precision},
+		},
+	}
+
+	// Prefetcher charts (Screen 15: Prefetchers)
+	prefetcherPrefetchRatioChartTmpl = module.Chart{
+		ID:       "prefetcher_%s_prefetch_ratio",
+		Title:    "Buffer Pool %s Prefetch Ratio",
+		Units:    "percentage",
+		Fam:      "prefetchers",
+		Ctx:      "db2.prefetcher_prefetch_ratio",
+		Priority: module.Priority + 800,
+		Dims: module.Dims{
+			{ID: "prefetcher_%s_prefetch_ratio", Name: "prefetch_ratio", Div: Precision},
+		},
+	}
+
+	prefetcherCleanerRatioChartTmpl = module.Chart{
+		ID:       "prefetcher_%s_cleaner_ratio",
+		Title:    "Buffer Pool %s Cleaner Ratio",
+		Units:    "percentage",
+		Fam:      "prefetchers",
+		Ctx:      "db2.prefetcher_cleaner_ratio",
+		Priority: module.Priority + 801,
+		Dims: module.Dims{
+			{ID: "prefetcher_%s_cleaner_ratio", Name: "cleaner_ratio", Div: Precision},
+		},
+	}
+
+	prefetcherPhysicalReadsChartTmpl = module.Chart{
+		ID:       "prefetcher_%s_physical_reads",
+		Title:    "Buffer Pool %s Physical Reads",
+		Units:    "pages/s",
+		Fam:      "prefetchers",
+		Ctx:      "db2.prefetcher_physical_reads",
+		Priority: module.Priority + 802,
+		Dims: module.Dims{
+			{ID: "prefetcher_%s_physical_reads", Name: "physical_reads", Algo: module.Incremental},
+		},
+	}
+
+	prefetcherAsyncReadsChartTmpl = module.Chart{
+		ID:       "prefetcher_%s_async_reads",
+		Title:    "Buffer Pool %s Asynchronous Reads",
+		Units:    "pages/s",
+		Fam:      "prefetchers",
+		Ctx:      "db2.prefetcher_async_reads",
+		Priority: module.Priority + 803,
+		Dims: module.Dims{
+			{ID: "prefetcher_%s_async_reads", Name: "async_reads", Algo: module.Incremental},
+		},
+	}
+
+	prefetcherWaitTimeChartTmpl = module.Chart{
+		ID:       "prefetcher_%s_wait_time",
+		Title:    "Buffer Pool %s Prefetch Wait Time",
+		Units:    "milliseconds",
+		Fam:      "prefetchers",
+		Ctx:      "db2.prefetcher_wait_time",
+		Priority: module.Priority + 804,
+		Dims: module.Dims{
+			{ID: "prefetcher_%s_avg_wait_time", Name: "avg_wait_time", Div: Precision},
+		},
+	}
+
+	prefetcherUnreadPagesChartTmpl = module.Chart{
+		ID:       "prefetcher_%s_unread_pages",
+		Title:    "Buffer Pool %s Unread Prefetch Pages",
+		Units:    "pages/s",
+		Fam:      "prefetchers",
+		Ctx:      "db2.prefetcher_unread_pages",
+		Priority: module.Priority + 805,
+		Dims: module.Dims{
+			{ID: "prefetcher_%s_unread_pages", Name: "unread_pages", Algo: module.Incremental},
+		},
+	}
 )
 
 // Chart creation functions
@@ -562,6 +686,65 @@ func (d *DB2) newIndexCharts(i *indexMetrics) *module.Charts {
 		chart.ID = fmt.Sprintf(chart.ID, cleanName)
 		chart.Labels = []module.Label{
 			{Key: "index", Value: i.name},
+			{Key: "db2_edition", Value: d.edition},
+			{Key: "db2_version", Value: d.version},
+		}
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, cleanName)
+		}
+	}
+
+	return &charts
+}
+
+func (d *DB2) newMemorySetCharts(ms *memorySetInstanceMetrics) *module.Charts {
+	charts := module.Charts{
+		memorySetUsageChartTmpl.Copy(),
+		memorySetCommittedChartTmpl.Copy(),
+		memorySetHighWaterMarkChartTmpl.Copy(),
+		memorySetUtilizationChartTmpl.Copy(),
+	}
+
+	// Create unique ID from host.db.settype.member to match collection
+	setIdentifier := fmt.Sprintf("%s_%s_%s_%d", 
+		cleanName(ms.hostName), 
+		cleanName(ms.dbName), 
+		cleanName(ms.setType),
+		ms.member)
+	
+	for _, chart := range charts {
+		chart.ID = fmt.Sprintf(chart.ID, setIdentifier)
+		chart.Labels = []module.Label{
+			{Key: "host_name", Value: ms.hostName},
+			{Key: "db_name", Value: ms.dbName},
+			{Key: "memory_set_type", Value: ms.setType},
+			{Key: "member", Value: fmt.Sprintf("%d", ms.member)},
+			{Key: "db2_edition", Value: d.edition},
+			{Key: "db2_version", Value: d.version},
+		}
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, setIdentifier)
+		}
+	}
+
+	return &charts
+}
+
+func (d *DB2) newPrefetcherCharts(p *prefetcherInstanceMetrics, bufferPoolName string) *module.Charts {
+	charts := module.Charts{
+		prefetcherPrefetchRatioChartTmpl.Copy(),
+		prefetcherCleanerRatioChartTmpl.Copy(),
+		prefetcherPhysicalReadsChartTmpl.Copy(),
+		prefetcherAsyncReadsChartTmpl.Copy(),
+		prefetcherWaitTimeChartTmpl.Copy(),
+		prefetcherUnreadPagesChartTmpl.Copy(),
+	}
+
+	cleanName := cleanName(bufferPoolName)
+	for _, chart := range charts {
+		chart.ID = fmt.Sprintf(chart.ID, cleanName)
+		chart.Labels = []module.Label{
+			{Key: "buffer_pool", Value: bufferPoolName},
 			{Key: "db2_edition", Value: d.edition},
 			{Key: "db2_version", Value: d.version},
 		}
