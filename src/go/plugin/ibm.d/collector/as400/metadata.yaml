@@ -58,6 +58,8 @@ modules:
 
           Per-instance metrics (when enabled) include:
           - Individual disk performance (I/O, throughput, response time)
+          - Disk space usage and capacity
+          - SSD health and age metrics (when SSDs are present)
           - Subsystem job counts and storage usage
           - Job queue lengths and status
         method_description: |
@@ -378,6 +380,10 @@ modules:
         metric: as400.disk_avg_time
         info: Disk ${label:disk_unit} average response time is above 50ms
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/as400.conf
+      - name: as400_disk_ssd_health_low
+        metric: as400.disk_ssd_health
+        info: SSD ${label:disk_unit} life remaining is below 10%
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/as400.conf
       - name: as400_subsystem_jobs_held
         metric: as400.subsystem_jobs
         info: Subsystem ${label:subsystem} has held jobs above threshold
@@ -551,6 +557,38 @@ modules:
               chart_type: line
               dimensions:
                 - name: response_time
+            - name: as400.disk_space_usage
+              description: Disk Space Usage
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: as400.disk_capacity
+              description: Disk Capacity
+              unit: GB
+              chart_type: stacked
+              dimensions:
+                - name: available
+                - name: used
+            - name: as400.disk_blocks
+              description: Disk Block Operations
+              unit: blocks/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: as400.disk_ssd_health
+              description: Disk SSD Health
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: life_remaining
+            - name: as400.disk_ssd_age
+              description: Disk SSD Power On Days
+              unit: days
+              chart_type: line
+              dimensions:
+                - name: power_on_days
         - name: subsystem
           description: These metrics refer to individual subsystems.
           labels:

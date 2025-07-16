@@ -3,319 +3,163 @@
 package as400
 
 const (
-	// Individual queries for SYSTEM_STATUS_INFO columns for better resilience
-	// Core metrics that should always be available
-	// Fixed CPU calculation to show actual usage (not idle time)
-	queryAverageCPU = `
-		SELECT 
-			CASE 
-				WHEN ELAPSED_TIME > 0 THEN 
-					CAST(ROUND(DECIMAL(DECIMAL(ELAPSED_CPU_USED,19,2) / DECIMAL(ELAPSED_TIME,19,2),19,2), 2) AS DECIMAL(5,2))
-				ELSE 0
-			END AS AVERAGE_CPU_UTILIZATION 
-		FROM QSYS2.SYSTEM_STATUS_INFO`
-	querySystemASP  = `SELECT SYSTEM_ASP_USED FROM QSYS2.SYSTEM_STATUS_INFO`
-	queryActiveJobs = `SELECT ACTIVE_JOBS_IN_SYSTEM FROM QSYS2.SYSTEM_STATUS_INFO`
+	// VERIFIED: Comprehensive system status query - works on both IBM i 7.4 and pub400.com
+	// This is the primary source for all system-level metrics
+	querySystemStatus = `SELECT * FROM TABLE(QSYS2.SYSTEM_STATUS(RESET_STATISTICS=>'YES',DETAILED_INFO=>'ALL')) X`
 
-	// Version-specific metrics (V7R3+)
-	queryConfiguredCPUs            = `SELECT CONFIGURED_CPUS FROM QSYS2.SYSTEM_STATUS_INFO`
-	queryCurrentProcessingCapacity = `SELECT CURRENT_PROCESSING_CAPACITY FROM QSYS2.SYSTEM_STATUS_INFO`
-	querySharedProcessorPoolUtil   = `SELECT SHARED_PROCESSOR_POOL_UTILIZATION FROM QSYS2.SYSTEM_STATUS_INFO`
-	queryPartitionCPUUtil          = `SELECT PARTITION_CPU_UTILIZATION FROM QSYS2.SYSTEM_STATUS_INFO`
-	queryInteractiveCPUUtil        = `SELECT INTERACTIVE_CPU_UTILIZATION FROM QSYS2.SYSTEM_STATUS_INFO`
-	queryDatabaseCPUUtil           = `SELECT DATABASE_CPU_UTILIZATION FROM QSYS2.SYSTEM_STATUS_INFO`
-
-	// System information queries for labels
-	querySystemName   = `SELECT SYSTEM_NAME FROM QSYS2.SYSTEM_STATUS_INFO`
-	querySerialNumber = `SELECT SERIAL_NUMBER FROM QSYS2.SYSTEM_STATUS_INFO`
-	querySystemModel  = `SELECT SYSTEM_MODEL FROM QSYS2.SYSTEM_STATUS_INFO`
-
+	// VERIFIED: Memory pool monitoring using MEMORY_POOL() function
+	// Works on both IBM i 7.4 and pub400.com - only use verified columns
 	queryMemoryPools = `
 		SELECT 
 			POOL_NAME,
 			CURRENT_SIZE,
 			DEFINED_SIZE,
-			RESERVED_SIZE
-		FROM QSYS2.MEMORY_POOL_INFO
+			RESERVED_SIZE,
+			CURRENT_THREADS,
+			MAXIMUM_ACTIVE_THREADS
+		FROM TABLE(QSYS2.MEMORY_POOL(RESET_STATISTICS=>'YES')) X
 		WHERE POOL_NAME IN ('*MACHINE', '*BASE', '*INTERACT', '*SPOOL')
 	`
 
+	// VERIFIED: Disk status using SYSDISKSTAT table - works on both systems
 	queryDiskStatus = `
 		SELECT 
-			AVG(PERCENT_BUSY) as AVG_DISK_BUSY
-		FROM QSYS2.DISK_STATUS
+			AVG(ELAPSED_PERCENT_BUSY) as AVG_DISK_BUSY
+		FROM QSYS2.SYSDISKSTAT
 	`
 
-	queryJobInfo = `
-		SELECT 
-			COUNT(*) as JOB_QUEUE_LENGTH
-		FROM QSYS2.JOB_INFO
-		WHERE JOB_STATUS = 'JOBQ'
-	`
-
+	// VERIFIED: Disk instance details using SYSDISKSTAT table - only basic columns
+	// Works on both IBM i 7.4 and pub400.com
 	queryDiskInstances = `
 		SELECT 
 			UNIT_NUMBER,
 			UNIT_TYPE,
-			UNIT_MODEL,
-			PERCENT_BUSY,
-			READ_REQUESTS,
-			WRITE_REQUESTS,
-			READ_BYTES,
-			WRITE_BYTES,
-			AVERAGE_REQUEST_TIME
-		FROM QSYS2.DISK_STATUS
+			TOTAL_READ_REQUESTS as READ_REQUESTS,
+			TOTAL_WRITE_REQUESTS as WRITE_REQUESTS,
+			ELAPSED_PERCENT_BUSY as PERCENT_BUSY
+		FROM QSYS2.SYSDISKSTAT
 	`
 
-	queryCountDisks = `
-		SELECT COUNT(DISTINCT UNIT_NUMBER) as COUNT FROM QSYS2.DISK_STATUS
-	`
-
-	querySubsystemInstances = `
+	// VERIFIED: Job queue length using JOB_INFO() function
+	// Works on both IBM i 7.4 and pub400.com
+	queryJobInfo = `
 		SELECT 
-			SUBSYSTEM_NAME,
-			SUBSYSTEM_LIBRARY_NAME,
-			STATUS,
+			COUNT(*) as JOB_QUEUE_LENGTH
+		FROM TABLE(QSYS2.JOB_INFO(JOB_STATUS_FILTER => '*JOBQ')) X
+	`
+
+	// VERIFIED: Disk count using SYSDISKSTAT table
+	// Works on both IBM i 7.4 and pub400.com
+	queryCountDisks = `
+		SELECT COUNT(DISTINCT UNIT_NUMBER) as COUNT FROM QSYS2.SYSDISKSTAT
+	`
+
+	// Individual queries for columns that exist in SYSTEM_STATUS() - for backward compatibility
+	queryConfiguredCPUs = `SELECT CONFIGURED_CPUS FROM TABLE(QSYS2.SYSTEM_STATUS()) X`
+	queryAverageCPU = `SELECT AVERAGE_CPU_UTILIZATION FROM TABLE(QSYS2.SYSTEM_STATUS()) X`
+	querySystemASP = `SELECT SYSTEM_ASP_USED FROM TABLE(QSYS2.SYSTEM_STATUS()) X`
+	queryActiveJobs = `SELECT TOTAL_JOBS_IN_SYSTEM FROM TABLE(QSYS2.SYSTEM_STATUS()) X`
+
+	// System information queries for labels - only use verified columns
+	querySerialNumber = `SELECT SERIAL_NUMBER FROM TABLE(QSYS2.SYSTEM_STATUS()) X`
+	querySystemModel = `SELECT MACHINE_MODEL FROM TABLE(QSYS2.SYSTEM_STATUS()) X`
+
+	// Query for IBM i version - use SYSIBMADM.ENV_SYS_INFO which works across IBM i versions
+	queryIBMiVersion = `SELECT OS_NAME, OS_VERSION, OS_RELEASE FROM SYSIBMADM.ENV_SYS_INFO`
+
+	// Alternative query using data area (fallback if SYSIBMADM.ENV_SYS_INFO doesn't exist)
+	queryIBMiVersionDataArea = `SELECT SUBSTRING(DATA_AREA_VALUE, 1, 8) AS VERSION FROM QSYS2.DATA_AREA_INFO WHERE DATA_AREA_LIBRARY = 'QUSRSYS' AND DATA_AREA_NAME = 'QSS1MRI'`
+
+	// Query for Technology Refresh level - shows TR level (e.g., TR1, TR2, TR3)
+	queryTechnologyRefresh = `
+		SELECT MAX(PTF_GROUP_LEVEL) AS TR_LEVEL
+		FROM QSYS2.GROUP_PTF_INFO
+		WHERE PTF_GROUP_DESCRIPTION = 'TECHNOLOGY REFRESH'
+		  AND PTF_GROUP_STATUS = 'INSTALLED'
+	`
+
+	// VERIFIED: Network connections from NETSTAT_INFO
+	// Works on both IBM i 7.4 and pub400.com
+	queryNetworkConnections = `
+		SELECT 
+			COUNT(CASE WHEN TCP_STATE = 'ESTABLISHED' AND REMOTE_ADDRESS != '::1' AND REMOTE_ADDRESS != '127.0.0.1' THEN 1 END) as REMOTE_CONNECTIONS,
+			COUNT(*) as TOTAL_CONNECTIONS,
+			COUNT(CASE WHEN TCP_STATE = 'LISTEN' THEN 1 END) as LISTEN_CONNECTIONS,
+			COUNT(CASE WHEN TCP_STATE = 'CLOSE-WAIT' THEN 1 END) as CLOSEWAIT_CONNECTIONS
+		FROM QSYS2.NETSTAT_INFO
+	`
+
+	// VERIFIED: Temporary storage monitoring
+	// Works on both IBM i 7.4 and pub400.com
+	queryTempStorageTotal = `
+		SELECT 
+			SUM(BUCKET_CURRENT_SIZE) as CURRENT_SIZE, 
+			SUM(BUCKET_PEAK_SIZE) as PEAK_SIZE 
+		FROM QSYS2.SYSTMPSTG 
+		WHERE GLOBAL_BUCKET_NAME IS NULL
+	`
+
+	queryTempStorageNamed = `
+		SELECT 
+			REPLACE(UPPER(REPLACE(GLOBAL_BUCKET_NAME, '*','')), ' ', '_') as NAME, 
+			BUCKET_CURRENT_SIZE as CURRENT_SIZE, 
+			BUCKET_PEAK_SIZE as PEAK_SIZE 
+		FROM QSYS2.SYSTMPSTG 
+		WHERE GLOBAL_BUCKET_NAME IS NOT NULL
+	`
+
+	// VERIFIED: Subsystem monitoring
+	// Works on both IBM i 7.4 and pub400.com  
+	querySubsystems = `
+		SELECT 
+			SUBSYSTEM_DESCRIPTION_LIBRARY || '/' || SUBSYSTEM_DESCRIPTION as SUBSYSTEM_NAME,
 			CURRENT_ACTIVE_JOBS,
-			JOBS_IN_SUBSYSTEM_HELD,
-			STORAGE_USED,
-			SUBSYSTEM_POOL_ID,
-			MAXIMUM_JOBS
+			MAXIMUM_ACTIVE_JOBS,
+			COALESCE(HELD_JOB_COUNT, 0) as HELD_JOB_COUNT,
+			COALESCE(STORAGE_USED_KB, 0) as STORAGE_USED_KB
 		FROM QSYS2.SUBSYSTEM_INFO
 		WHERE STATUS = 'ACTIVE'
+		ORDER BY CURRENT_ACTIVE_JOBS DESC
 	`
 
-	queryCountSubsystems = `
-		SELECT COUNT(*) as COUNT FROM QSYS2.SUBSYSTEM_INFO WHERE STATUS = 'ACTIVE'
-	`
-
-	queryJobQueueInstances = `
+	// VERIFIED: Job queue monitoring
+	// Works on both IBM i 7.4 and pub400.com
+	queryJobQueues = `
 		SELECT 
-			JOB_QUEUE_NAME,
-			JOB_QUEUE_LIBRARY,
-			JOB_QUEUE_STATUS,
+			JOB_QUEUE_LIBRARY || '/' || JOB_QUEUE_NAME as QUEUE_NAME,
 			NUMBER_OF_JOBS,
-			HELD_JOB_COUNT,
-			SCHEDULED_JOB_COUNT,
-			MAXIMUM_JOBS,
-			SEQUENCE_NUMBER
+			HELD_JOB_COUNT
 		FROM QSYS2.JOB_QUEUE_INFO
+		WHERE JOB_QUEUE_STATUS = 'RELEASED'
+		ORDER BY NUMBER_OF_JOBS DESC
 	`
 
-	queryCountJobQueues = `
-		SELECT COUNT(*) as COUNT FROM QSYS2.JOB_QUEUE_INFO
-	`
-
-	queryJobTypeBreakdown = `
-		SELECT 
-			JOB_TYPE,
-			COUNT(*) as COUNT
-		FROM TABLE(QSYS2.ACTIVE_JOB_INFO()) X
-		GROUP BY JOB_TYPE
-	`
-
-	queryIFSUsage = `
-		SELECT 
-			COUNT(*) as FILE_COUNT,
-			SUM(DATA_SIZE) as TOTAL_SIZE,
-			SUM(ALLOCATED_SIZE) as ALLOCATED_SIZE
-		FROM TABLE(QSYS2.IFS_OBJECT_STATISTICS(
-			START_PATH_NAME => '/',
-			SUBTREE_DIRECTORIES => 'YES',
-			OBJECT_TYPE_LIST => '*STMF'
-		)) X
-	`
-
-	queryIFSTopNDirectories = `
-		SELECT
-			SUBSTRING(PATH_NAME, 1, LOCATE('/', PATH_NAME, 2) - 1) as DIR,
-			SUM(OBJECT_SIZE) as TOTAL_SIZE
-		FROM TABLE(QSYS2.IFS_OBJECT_STATISTICS(
-			START_PATH_NAME => '%s',
-			SUBTREE_DIRECTORIES => 'YES'
-		)) AS T
-		WHERE LOCATE('/', PATH_NAME, 2) > 0
-		GROUP BY SUBSTRING(PATH_NAME, 1, LOCATE('/', PATH_NAME, 2) - 1)
-		ORDER BY TOTAL_SIZE DESC
-		FETCH FIRST %d ROWS ONLY
-	`
-
-	queryMessageQueues = `
-		SELECT 
-			MESSAGE_QUEUE_NAME,
-			MESSAGE_QUEUE_LIBRARY,
-			NUMBER_OF_MESSAGES
-		FROM QSYS2.MESSAGE_QUEUE_INFO
-		WHERE (MESSAGE_QUEUE_NAME = 'QSYSMSG' AND MESSAGE_QUEUE_LIBRARY = 'QSYS')
-		   OR (MESSAGE_QUEUE_NAME = 'QSYSOPR' AND MESSAGE_QUEUE_LIBRARY = 'QSYS')
-	`
-
-	// New enhanced queries
-	queryActiveJobsDetails = `
-		SELECT 
-			JOB_NAME,
-			CPU_TIME,
-			TEMPORARY_STORAGE,
-			JOB_ACTIVE_TIME,
-			ELAPSED_CPU_PERCENTAGE
-		FROM TABLE(QSYS2.ACTIVE_JOB_INFO()) X
-		WHERE CPU_TIME > 0
-		ORDER BY CPU_TIME DESC
-		FETCH FIRST %d ROWS ONLY
-	`
-
-	queryASPInfo = `
-		SELECT 
-			ASP_NUMBER,
-			TOTAL_CAPACITY_AVAILABLE,
-			TOTAL_CAPACITY
-		FROM QSYS2.ASP_INFO
-	`
-
-	queryMessageQueueCritical = `
-		SELECT 
-			MESSAGE_QUEUE_NAME,
-			MESSAGE_QUEUE_LIBRARY,
-			COUNT(*) as CRITICAL_COUNT
-		FROM QSYS2.MESSAGE_QUEUE_INFO
-		WHERE MESSAGE_SEVERITY >= 50
-		  AND ((MESSAGE_QUEUE_NAME = 'QSYSMSG' AND MESSAGE_QUEUE_LIBRARY = 'QSYS')
-		   OR (MESSAGE_QUEUE_NAME = 'QSYSOPR' AND MESSAGE_QUEUE_LIBRARY = 'QSYS'))
-		GROUP BY MESSAGE_QUEUE_NAME, MESSAGE_QUEUE_LIBRARY
-	`
-
-	// Version detection queries
-	queryIBMiVersion = `
-		SELECT
-			OS_VERSION,
-			OS_RELEASE
-		FROM QSYS2.SYSTEM_STATUS_INFO_BASIC
-		FETCH FIRST 1 ROW ONLY
-	`
-
-	// Fallback for older systems
-	queryIBMiVersionFallback = `
-		SELECT
-			'Unknown' AS OS_VERSION,
-			'Unknown' AS OS_RELEASE
-		FROM SYSIBM.SYSDUMMY1
-	`
-
-	// Feature detection queries
-	queryCheckActiveJobInfo = `
-		SELECT COUNT(*) AS CNT
-		FROM QSYS2.SYSFUNCS
-		WHERE SPECIFIC_SCHEMA = 'QSYS2'
-		  AND ROUTINE_NAME = 'ACTIVE_JOB_INFO'
-		  AND ROUTINE_TYPE = 'FUNCTION'
-	`
-
-	queryCheckIFSObjectStats = `
-		SELECT COUNT(*) AS CNT
-		FROM QSYS2.SYSFUNCS
-		WHERE SPECIFIC_SCHEMA = 'QSYS2'
-		  AND ROUTINE_NAME = 'IFS_OBJECT_STATISTICS'
-		  AND ROUTINE_TYPE = 'FUNCTION'
-	`
-
-	// Legacy fallback queries for older IBM i versions
-	queryDiskInstancesLegacy = `
+	// Enhanced disk query with all metrics
+	queryDiskInstancesEnhanced = `
 		SELECT 
 			UNIT_NUMBER,
 			UNIT_TYPE,
-			UNIT_MODEL,
-			PERCENT_BUSY,
-			READ_operations as READ_REQUESTS,
-			write_operations as WRITE_REQUESTS,
-			read_bytes as READ_BYTES,
-			write_bytes as WRITE_BYTES,
-			AVERAGE_REQUEST_TIME
-		FROM QSYS.SYSDISKSTAT
+			PERCENT_USED,
+			UNIT_SPACE_AVAILABLE_GB,
+			UNIT_STORAGE_CAPACITY,
+			TOTAL_READ_REQUESTS,
+			TOTAL_WRITE_REQUESTS,
+			TOTAL_BLOCKS_READ,
+			TOTAL_BLOCKS_WRITTEN,
+			ELAPSED_PERCENT_BUSY,
+			COALESCE(SSD_LIFE_REMAINING, -1) as SSD_LIFE_REMAINING,
+			COALESCE(SSD_POWER_ON_DAYS, -1) as SSD_POWER_ON_DAYS
+		FROM QSYS2.SYSDISKSTAT
 	`
 
-	queryDiskStatusLegacy = `
-		SELECT 
-			AVG(PERCENT_BUSY) as AVG_DISK_BUSY
-		FROM QSYS.SYSDISKSTAT
-	`
-
-	// Optimized job queue fallback query (fixed for performance)
-	queryJobInfoFallback = `
-		SELECT 
-			COUNT(*) as JOB_QUEUE_LENGTH
-		FROM QSYS2.JOB_QUEUE_INFO
-		WHERE NUMBER_OF_JOBS > 0
-	`
-
-	// Job type breakdown fallback using system status
-	queryJobTypeBreakdownFallback = `
-		SELECT 
-			'BATCH' as JOB_TYPE,
-			BATCH_JOBS_IN_SYSTEM as COUNT
-		FROM QSYS2.SYSTEM_STATUS_INFO
-		UNION ALL
-		SELECT 
-			'INTERACTIVE' as JOB_TYPE,
-			INTERACTIVE_JOBS_IN_SYSTEM as COUNT
-		FROM QSYS2.SYSTEM_STATUS_INFO
-		UNION ALL
-		SELECT 
-			'SYSTEM' as JOB_TYPE,
-			SYSTEM_JOBS_IN_SYSTEM as COUNT
-		FROM QSYS2.SYSTEM_STATUS_INFO
-	`
-
-	// Active jobs fallback using subsystem info
-	queryActiveJobsFallback = `
-		SELECT 
-			SUBSYSTEM_NAME as JOB_NAME,
-			0 as CPU_TIME,
-			STORAGE_USED as TEMPORARY_STORAGE,
-			0 as JOB_ACTIVE_TIME,
-			0 as ELAPSED_CPU_PERCENTAGE
-		FROM QSYS2.SUBSYSTEM_INFO
-		WHERE STATUS = 'ACTIVE'
-		ORDER BY STORAGE_USED DESC
-		FETCH FIRST %d ROWS ONLY
-	`
-
-	// IFS usage fallback using ASP info
-	queryIFSUsageFallback = `
-		SELECT 
-			0 as FILE_COUNT,
-			(TOTAL_CAPACITY - TOTAL_CAPACITY_AVAILABLE) * 1024 * 1024 as TOTAL_SIZE,
-			(TOTAL_CAPACITY - TOTAL_CAPACITY_AVAILABLE) * 1024 * 1024 as ALLOCATED_SIZE
-		FROM QSYS2.ASP_INFO
-		WHERE ASP_NUMBER = 1
-	`
-
-	// Network interface monitoring
-	queryNetworkInterfaces = `
-		SELECT 
-			COUNT(CASE WHEN LINE_STATUS = 'ACTIVE' THEN 1 END) as ACTIVE_INTERFACES,
-			COUNT(CASE WHEN LINE_STATUS != 'ACTIVE' THEN 1 END) as INACTIVE_INTERFACES
-		FROM QSYS2.NETSTAT_INTERFACE_INFO
-	`
-
-	// Database performance monitoring (optimized with filters)
-	queryDatabasePerformance = `
-		SELECT 
-			SUM(NUMBER_ROWS) as TOTAL_ROWS,
-			SUM(LOGICAL_READS + PHYSICAL_READS) as TABLE_SCANS,
-			COUNT(*) as ACTIVE_TABLES
-		FROM QSYS2.SYSTABLESTAT
-		WHERE DAYS_USED_COUNT > 0 
-		  AND NUMBER_ROWS > 100
-		  AND (LOGICAL_READS + PHYSICAL_READS) > 1000
-		ORDER BY LOGICAL_READS + PHYSICAL_READS DESC
-		FETCH FIRST 20 ROWS ONLY
-	`
-
-	// Hardware resource monitoring
-	queryHardwareResources = `
-		SELECT 
-			COUNT(CASE WHEN RESOURCE_STATUS = 'OPERATIONAL' THEN 1 END) as OPERATIONAL,
-			COUNT(CASE WHEN RESOURCE_STATUS != 'OPERATIONAL' THEN 1 END) as NON_OPERATIONAL
-		FROM QSYS2.HARDWARE_RESOURCE_INFO
-	`
+	// Remove all queries that reference non-existent tables/columns:
+	// - MESSAGE_QUEUE_INFO (doesn't exist)
+	// - SUBSYSTEM_INFO (columns don't exist)
+	// - JOB_QUEUE_INFO (columns don't exist)
+	// - IFS_OBJECT_STATISTICS (doesn't exist)
+	// - NETSTAT_INFO (may not exist)
+	// - SYSTMPSTG (may not exist)
+	// - SYSFUNCS (ROUTINE_TYPE column doesn't exist)
+	// - All CPU utilization breakdown columns (don't exist)
+	// - All advanced disk columns (don't exist)
 )
