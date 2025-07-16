@@ -19,8 +19,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
-
-	_ "github.com/ibmdb/go_ibm_db"
+	
+	// Import database drivers
+	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/pkg/dbdriver"
 )
 
 //go:embed "config_schema.json"
@@ -85,6 +86,8 @@ func New() *DB2 {
 		indexes:     make(map[string]*indexMetrics),
 		statements:  make(map[string]*statementMetrics),
 		memoryPools: make(map[string]*memoryPoolMetrics),
+		memorySets:  make(map[string]*memorySetInstanceMetrics),
+		prefetchers: make(map[string]*prefetcherInstanceMetrics),
 
 		// Initialize resilience tracking
 		disabledMetrics:  make(map[string]bool),
@@ -181,6 +184,19 @@ type DB2 struct {
 	// Modern monitoring support
 	useMonGetFunctions            bool // Use MON_GET_* functions instead of SNAP* views when available
 	supportsColumnOrganizedTables bool // Whether column-organized table metrics are available
+	supportsExtendedMetrics       bool // Whether extended metrics (CPU, memory details) are available
+	supportsFederation            bool // Whether federation is configured and available
+
+	// Memory set instance tracking (Screen 26) 
+	memorySets                  map[string]*memorySetInstanceMetrics
+	currentMemorySetHostName    string
+	currentMemorySetDBName      string
+	currentMemorySetType        string
+	currentMemorySetMember      int64
+
+	// Prefetcher instance tracking (Screen 15)
+	prefetchers              map[string]*prefetcherInstanceMetrics
+	currentBufferPoolName    string
 }
 
 type serverInfo struct {
@@ -301,9 +317,29 @@ func (d *DB2) verifyConfig() error {
 func (d *DB2) initDatabase(ctx context.Context) (*sql.DB, error) {
 	d.Infof("connecting to DB2 with DSN: %s", safeDSN(d.DSN))
 
-	db, err := sql.Open("go_ibm_db", d.DSN)
-	if err != nil {
-		return nil, fmt.Errorf("error opening database connection: %v", err)
+	var db *sql.DB
+	var err error
+
+	// Parse the existing DSN or use it as-is if it's already ODBC format
+	if strings.Contains(d.DSN, "Driver=") {
+		// Already ODBC format - use directly
+		db, err = sql.Open("odbc", d.DSN)
+		if err != nil {
+			return nil, fmt.Errorf("error opening ODBC database connection: %v", err)
+		}
+		d.Infof("connected to DB2 using ODBC driver")
+	} else {
+		// Convert existing DB2 DSN to ODBC format
+		// For now, just try to use ODBC with the DSN as-is
+		// In practice, the DSN would need to be converted from DB2 format to ODBC format
+		odbcDSN := convertDB2DSNToODBC(d.DSN)
+		
+		db, err = sql.Open("odbc", odbcDSN)
+		if err != nil {
+			return nil, fmt.Errorf("error opening ODBC connection with converted DSN: %v", err)
+		}
+		
+		d.Infof("connected to DB2 using ODBC with converted DSN")
 	}
 
 	db.SetMaxOpenConns(d.MaxDbConns)
@@ -394,6 +430,16 @@ func safeDSN(dsn string) string {
 	return masked
 }
 
+// convertDB2DSNToODBC converts a DB2 DSN format to ODBC format
+func convertDB2DSNToODBC(db2DSN string) string {
+	// For this test, assume it's already close to ODBC format
+	// Add IBM DB2 ODBC driver if not present
+	if !strings.Contains(db2DSN, "Driver=") {
+		return "Driver={IBM DB2 ODBC DRIVER};" + db2DSN
+	}
+	return db2DSN
+}
+
 // Resilience functions following AS/400 pattern
 
 // logOnce logs a warning message only once per key to avoid spam
@@ -430,7 +476,8 @@ func isSQLFeatureError(err error) bool {
 		strings.Contains(errStr, "SQLCODE=-204") || // Alternative format
 		strings.Contains(errStr, "SQLCODE=-206") ||
 		strings.Contains(errStr, "SQLCODE=-443") ||
-		strings.Contains(errStr, "SQLCODE=-551")
+		strings.Contains(errStr, "SQLCODE=-551") ||
+		strings.Contains(errStr, "UNSUPPORTED COLUMN TYPE") // ODBC driver limitation
 }
 
 // collectSingleMetric executes a single-value query and handles version-specific errors gracefully
@@ -825,4 +872,115 @@ func (d *DB2) detectColumnOrganizedSupport(ctx context.Context) {
 	// Column exists and query succeeded
 	d.supportsColumnOrganizedTables = true
 	d.Infof("Column-organized table metrics detected and available")
+}
+
+// detectExtendedMetricsSupport checks if extended metrics (CPU, detailed memory) are available
+func (d *DB2) detectExtendedMetricsSupport(ctx context.Context) {
+	// Extended metrics require newer DB2 versions and specific system tables
+	// DB2 11+ typically has better support for system resource metrics
+	
+	// Try to query CPU metrics from ENV_GET_SYSTEM_RESOURCES
+	testQuery := `SELECT CPU_USER FROM TABLE(SYSPROC.ENV_GET_SYSTEM_RESOURCES()) AS T FETCH FIRST 1 ROW ONLY`
+	
+	queryCtx, cancel := context.WithTimeout(ctx, time.Duration(d.Timeout))
+	defer cancel()
+	
+	var testValue sql.NullFloat64
+	err := d.db.QueryRowContext(queryCtx, testQuery).Scan(&testValue)
+	if err != nil {
+		if isSQLFeatureError(err) {
+			d.Infof("Extended system metrics not available (ENV_GET_SYSTEM_RESOURCES): %v", err)
+			d.supportsExtendedMetrics = false
+		} else {
+			d.Warningf("Error testing extended metrics support: %v, assuming not supported", err)
+			d.supportsExtendedMetrics = false
+		}
+		return
+	}
+	
+	// Extended metrics are available
+	d.supportsExtendedMetrics = true
+	d.Infof("Extended system metrics detected and available")
+}
+
+// detectFederationSupport checks if federation is configured and available
+func (d *DB2) detectFederationSupport(ctx context.Context) {
+	// Federation requires specific configuration and is typically used in
+	// distributed database environments
+	
+	// Check if there are any federated connections
+	testQuery := `SELECT COUNT(*) FROM TABLE(MON_GET_CONNECTION(NULL, -2)) WHERE ROWS_RETURNED_FROM_REMOTE > 0`
+	
+	queryCtx, cancel := context.WithTimeout(ctx, time.Duration(d.Timeout))
+	defer cancel()
+	
+	var count int
+	err := d.db.QueryRowContext(queryCtx, testQuery).Scan(&count)
+	if err != nil {
+		// Check if it's because federation columns don't exist
+		if strings.Contains(strings.ToUpper(err.Error()), "ROWS_RETURNED_FROM_REMOTE") {
+			d.Infof("Federation metrics not available (ROWS_RETURNED_FROM_REMOTE column missing)")
+			d.supportsFederation = false
+			return
+		}
+		d.Debugf("Error testing federation support: %v, assuming not configured", err)
+		d.supportsFederation = false
+		return
+	}
+	
+	// Federation columns exist - federation is available
+	d.supportsFederation = true
+	d.Infof("Federation support detected")
+}
+
+// Memory set chart management methods for Screen 26
+func (d *DB2) addMemorySetCharts(setKey string) {
+	ms := d.memorySets[setKey]
+	if ms == nil {
+		return
+	}
+
+	charts := d.newMemorySetCharts(ms)
+	if err := d.charts.Add(*charts...); err != nil {
+		d.Warningf("failed to add memory set charts for %s: %v", setKey, err)
+	} else {
+		d.Debugf("added memory set charts for %s (%s.%s.%s)", setKey, ms.hostName, ms.dbName, ms.setType)
+	}
+}
+
+func (d *DB2) removeMemorySetCharts(setKey string) {
+	setIdentifier := strings.ReplaceAll(setKey, ".", "_")
+	
+	// Mark all charts for this memory set as obsolete
+	for _, chart := range *d.charts {
+		if strings.Contains(chart.ID, fmt.Sprintf("memory_set_%s", setIdentifier)) {
+			chart.MarkRemove()
+			chart.MarkNotCreated()
+		}
+	}
+	
+	d.Debugf("removed memory set charts for %s", setKey)
+}
+
+func (d *DB2) addPrefetcherCharts(p *prefetcherInstanceMetrics, bufferPoolName string) {
+	charts := d.newPrefetcherCharts(p, bufferPoolName)
+	if err := d.charts.Add(*charts...); err != nil {
+		d.Warningf("failed to add prefetcher charts for %s: %v", bufferPoolName, err)
+	} else {
+		d.Debugf("added prefetcher charts for buffer pool %s", bufferPoolName)
+	}
+}
+
+func (d *DB2) removePrefetcherCharts(bufferPoolName string) {
+	cleanName := cleanName(bufferPoolName)
+	
+	// Mark all charts for this prefetcher as obsolete
+	for _, chart := range *d.charts {
+		if strings.Contains(chart.ID, fmt.Sprintf("prefetcher_%s", cleanName)) {
+			chart.MarkRemove()
+			chart.MarkNotCreated()
+		}
+	}
+	
+	d.Debugf("removed prefetcher charts for buffer pool %s", bufferPoolName)
 }

@@ -1,12 +1,14 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# This script downloads and installs IBM DB2 and MQ client libraries
-# required for the ibm.d.plugin to work.
+# This script downloads and installs IBM MQ client libraries
+# required for the ibm.d.plugin MQ PCF collector to work.
+#
+# Note: Database collectors (AS/400, DB2) now use unixODBC exclusively
+# and do not require IBM DB2 client libraries.
 
 set -e
 
-DB2_DRIVER_URL="https://public.dhe.ibm.com/ibmdl/export/pub/software/data/db2/drivers/odbc_cli/v12.1.0/linuxx64_odbc_cli.tar.gz"
 MQ_CLIENT_URL="https://public.dhe.ibm.com/ibmdl/export/pub/software/websphere/messaging/mqdev/redist/9.4.1.0-IBM-MQC-Redist-LinuxX64.tar.gz"
 
 # Set installation directory from CMake
@@ -20,28 +22,12 @@ else
     echo "Using Netdata installation directory: $BASE_DIR"
 fi
 
-DB2_DRIVER_DIR="${BASE_DIR}/ibm-clidriver"
 MQ_CLIENT_DIR="${BASE_DIR}/ibm-mqclient"
 
-# Track what needs to be installed
-NEED_DB2=1
-NEED_MQ=1
-
 # Check if already installed
-if [ -f "$DB2_DRIVER_DIR/lib/libdb2.so" ]; then
-    echo "IBM DB2 client libraries are already installed"
-    echo "  Path: $DB2_DRIVER_DIR"
-    NEED_DB2=0
-fi
-
 if [ -f "$MQ_CLIENT_DIR/lib64/libmqm.so" ]; then
     echo "IBM MQ client libraries are already installed"
     echo "  Path: $MQ_CLIENT_DIR"
-    NEED_MQ=0
-fi
-
-# Exit if both are already installed
-if [ $NEED_DB2 -eq 0 ] && [ $NEED_MQ -eq 0 ]; then
     exit 0
 fi
 
@@ -51,107 +37,53 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
-# Install DB2 libraries if needed
-if [ $NEED_DB2 -eq 1 ]; then
-    echo "Installing IBM DB2 client libraries to: $DB2_DRIVER_DIR"
-    mkdir -p "$DB2_DRIVER_DIR"
-    cd "$DB2_DRIVER_DIR"
-    
-    # Download
-    echo "Downloading IBM DB2 client libraries..."
-    if command -v wget >/dev/null 2>&1; then
-        wget -q --show-progress -O clidriver.tar.gz "$DB2_DRIVER_URL" || {
-            echo "ERROR: Failed to download IBM DB2 client libraries"
-            exit 1
-        }
-    elif command -v curl >/dev/null 2>&1; then
-        curl -# -L -o clidriver.tar.gz "$DB2_DRIVER_URL" || {
-            echo "ERROR: Failed to download IBM DB2 client libraries"
-            exit 1
-        }
-    else
-        echo "ERROR: Neither wget nor curl found. Cannot download IBM libraries."
-        echo "Please install wget or curl and try again."
-        exit 1
-    fi
-    
-    # Extract
-    echo "Extracting IBM DB2 client libraries..."
-    tar -xzf clidriver.tar.gz || {
-        echo "ERROR: Failed to extract IBM DB2 client libraries"
-        rm -f clidriver.tar.gz
+# Install MQ libraries
+echo "Installing IBM MQ client libraries to: $MQ_CLIENT_DIR"
+mkdir -p "$MQ_CLIENT_DIR"
+cd "$MQ_CLIENT_DIR"
+
+# Download
+echo "Downloading IBM MQ client libraries..."
+if command -v wget >/dev/null 2>&1; then
+    wget -q --show-progress -O mqclient.tar.gz "$MQ_CLIENT_URL" || {
+        echo "ERROR: Failed to download IBM MQ client libraries"
         exit 1
     }
-    rm -f clidriver.tar.gz
-    
-    # Move clidriver contents to parent directory
-    if [ -d "clidriver" ]; then
-        mv clidriver/* .
-        rmdir clidriver
-    fi
-    
-    # Set proper permissions
-    chown -R root:root "$DB2_DRIVER_DIR"
-    chmod -R 755 "$DB2_DRIVER_DIR"
-    echo "IBM DB2 client libraries installed successfully."
-    echo "  Installation path: $DB2_DRIVER_DIR"
-    echo "  Headers: $DB2_DRIVER_DIR/include"
-    echo "  Libraries: $DB2_DRIVER_DIR/lib"
-    echo "  Binaries: $DB2_DRIVER_DIR/bin"
+elif command -v curl >/dev/null 2>&1; then
+    curl -# -L -o mqclient.tar.gz "$MQ_CLIENT_URL" || {
+        echo "ERROR: Failed to download IBM MQ client libraries"
+        exit 1
+    }
+else
+    echo "ERROR: Neither wget nor curl found. Cannot download IBM libraries."
+    echo "Please install wget or curl and try again."
+    exit 1
 fi
 
-# Install MQ libraries if needed
-if [ $NEED_MQ -eq 1 ]; then
-    echo "Installing IBM MQ client libraries to: $MQ_CLIENT_DIR"
-    mkdir -p "$MQ_CLIENT_DIR"
-    cd "$MQ_CLIENT_DIR"
-    
-    # Download
-    echo "Downloading IBM MQ client libraries..."
-    if command -v wget >/dev/null 2>&1; then
-        wget -q --show-progress -O mqclient.tar.gz "$MQ_CLIENT_URL" || {
-            echo "ERROR: Failed to download IBM MQ client libraries"
-            exit 1
-        }
-    elif command -v curl >/dev/null 2>&1; then
-        curl -# -L -o mqclient.tar.gz "$MQ_CLIENT_URL" || {
-            echo "ERROR: Failed to download IBM MQ client libraries"
-            exit 1
-        }
-    fi
-    
-    # Extract
-    echo "Extracting IBM MQ client libraries..."
-    tar -xzf mqclient.tar.gz || {
-        echo "ERROR: Failed to extract IBM MQ client libraries"
-        rm -f mqclient.tar.gz
-        exit 1
-    }
+# Extract
+echo "Extracting IBM MQ client libraries..."
+tar -xzf mqclient.tar.gz || {
+    echo "ERROR: Failed to extract IBM MQ client libraries"
     rm -f mqclient.tar.gz
-    
-    # Set proper permissions
-    chown -R root:root "$MQ_CLIENT_DIR"
-    chmod -R 755 "$MQ_CLIENT_DIR"
-    echo "IBM MQ client libraries installed successfully."
-    echo "  Installation path: $MQ_CLIENT_DIR"
-    echo "  Headers: $MQ_CLIENT_DIR/inc"
-    echo "  Libraries: $MQ_CLIENT_DIR/lib64"
-    echo "  Binaries: $MQ_CLIENT_DIR/bin"
-fi
+    exit 1
+}
+rm -f mqclient.tar.gz
+
+# Set proper permissions
+chown -R root:root "$MQ_CLIENT_DIR"
+chmod -R 755 "$MQ_CLIENT_DIR"
+echo "IBM MQ client libraries installed successfully."
+echo "  Installation path: $MQ_CLIENT_DIR"
+echo "  Headers: $MQ_CLIENT_DIR/inc"
+echo "  Libraries: $MQ_CLIENT_DIR/lib64"
+echo "  Binaries: $MQ_CLIENT_DIR/bin"
 
 echo ""
 echo "=========================================="
-echo "IBM Client Libraries Installation Summary"
+echo "IBM MQ Client Libraries Installation Summary"
 echo "=========================================="
 echo ""
 echo "Base installation directory: $BASE_DIR"
-echo ""
-if [ -f "$DB2_DRIVER_DIR/lib/libdb2.so" ]; then
-    echo "DB2 Client Libraries:"
-    echo "  Path: $DB2_DRIVER_DIR"
-    echo "  Headers: $DB2_DRIVER_DIR/include"
-    echo "  Libraries: $DB2_DRIVER_DIR/lib"
-fi
 echo ""
 if [ -f "$MQ_CLIENT_DIR/lib64/libmqm.so" ]; then
     echo "MQ Client Libraries:"
@@ -161,10 +93,13 @@ if [ -f "$MQ_CLIENT_DIR/lib64/libmqm.so" ]; then
 fi
 echo ""
 echo "The ibm.d.plugin should now be able to connect to:"
-echo "  - IBM DB2 databases"
-echo "  - IBM AS/400 systems"
 echo "  - IBM MQ queue managers"
-echo "  - IBM WebSphere Application Server"
+echo "  - IBM WebSphere Application Server (via MQ)"
+echo ""
+echo "For database monitoring (DB2, AS/400), install unixODBC and appropriate ODBC drivers:"
+echo "  - unixODBC: apt-get install unixodbc (Ubuntu) or yum install unixODBC (RHEL)"
+echo "  - IBM DB2 ODBC Driver: Download from IBM Data Server Driver Package"
+echo "  - IBM i Access ODBC Driver: Download from IBM i Access Client Solutions"
 echo ""
 echo "Note: You may need to restart the Netdata service for the changes to take effect:"
 echo "  systemctl restart netdata    # For systemd systems"

@@ -24,6 +24,10 @@ var (
 		messageQueueDepthChart.Copy(),
 		messageQueueCriticalChart.Copy(),
 		ifsDirectoryUsageChart.Copy(),
+		networkInterfacesChart.Copy(),
+		databaseTablesChart.Copy(),
+		databaseActivityChart.Copy(),
+		hardwareResourcesChart.Copy(),
 	}
 )
 
@@ -235,6 +239,59 @@ var (
 		Dims: module.Dims{
 			{ID: "system_critical_messages", Name: "system"},
 			{ID: "qsysopr_critical_messages", Name: "qsysopr"},
+		},
+	}
+
+	networkInterfacesChart = module.Chart{
+		ID:       "network_interfaces",
+		Title:    "Network Interface Status",
+		Units:    "interfaces",
+		Fam:      "network",
+		Ctx:      "as400.network_interfaces",
+		Priority: module.Priority + 70,
+		Type:     module.Stacked,
+		Dims: module.Dims{
+			{ID: "network_interfaces_active", Name: "active"},
+			{ID: "network_interfaces_inactive", Name: "inactive"},
+		},
+	}
+
+	databaseTablesChart = module.Chart{
+		ID:       "database_tables",
+		Title:    "Database Active Tables",
+		Units:    "tables",
+		Fam:      "database",
+		Ctx:      "as400.database_tables",
+		Priority: module.Priority + 80,
+		Dims: module.Dims{
+			{ID: "database_active_tables", Name: "active"},
+		},
+	}
+
+	databaseActivityChart = module.Chart{
+		ID:       "database_activity",
+		Title:    "Database Activity",
+		Units:    "operations",
+		Fam:      "database",
+		Ctx:      "as400.database_activity",
+		Priority: module.Priority + 81,
+		Dims: module.Dims{
+			{ID: "database_total_rows", Name: "rows"},
+			{ID: "database_table_scans", Name: "scans"},
+		},
+	}
+
+	hardwareResourcesChart = module.Chart{
+		ID:       "hardware_resources",
+		Title:    "Hardware Resource Status",
+		Units:    "resources",
+		Fam:      "hardware",
+		Ctx:      "as400.hardware_resources",
+		Priority: module.Priority + 90,
+		Type:     module.Stacked,
+		Dims: module.Dims{
+			{ID: "hardware_operational", Name: "operational"},
+			{ID: "hardware_non_operational", Name: "non_operational"},
 		},
 	}
 )
