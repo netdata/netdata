@@ -13,6 +13,8 @@ type diskMetrics struct {
 	readBytes     int64
 	writeBytes    int64
 	averageTime   int64
+	ssdLifeRemaining int64 // -1 if not SSD
+	ssdPowerOnDays   int64 // -1 if not SSD
 
 	updated   bool
 	hasCharts bool
@@ -60,10 +62,24 @@ type messageQueueMetrics struct {
 	hasCharts bool
 }
 
+// tempStorageMetrics holds metrics for a named temporary storage bucket
+type tempStorageMetrics struct {
+	name        string
+	currentSize int64
+	peakSize    int64
+
+	updated   bool
+	hasCharts bool
+}
+
 // Per-instance metric methods
 func (a *AS400) getDiskMetrics(unit string) *diskMetrics {
 	if _, ok := a.disks[unit]; !ok {
-		a.disks[unit] = &diskMetrics{unit: unit}
+		a.disks[unit] = &diskMetrics{
+			unit: unit,
+			ssdLifeRemaining: -1, // Default to -1 (not SSD)
+			ssdPowerOnDays: -1,   // Default to -1 (not SSD)
+		}
 	}
 	return a.disks[unit]
 }
@@ -87,4 +103,11 @@ func (a *AS400) getMessageQueueMetrics(key string) *messageQueueMetrics {
 		a.messageQueues[key] = &messageQueueMetrics{}
 	}
 	return a.messageQueues[key]
+}
+
+func (a *AS400) getTempStorageMetrics(name string) *tempStorageMetrics {
+	if _, ok := a.tempStorageNamed[name]; !ok {
+		a.tempStorageNamed[name] = &tempStorageMetrics{name: name}
+	}
+	return a.tempStorageNamed[name]
 }

@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
 )
 
@@ -30,14 +29,12 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 		a.db = db
 	}
 
-	// Reset metrics
+	// Reset metrics - initialize all instance maps
 	a.mx = &metricsData{
-		disks:             make(map[string]diskInstanceMetrics),
-		subsystems:        make(map[string]subsystemInstanceMetrics),
-		jobQueues:         make(map[string]jobQueueInstanceMetrics),
-		jobs:              make(map[string]jobMetrics),
-		aspPools:          make(map[string]aspMetrics),
-		IFSDirectoryUsage: make(map[string]int64),
+		disks:            make(map[string]diskInstanceMetrics),
+		subsystems:       make(map[string]subsystemInstanceMetrics),
+		jobQueues:        make(map[string]jobQueueInstanceMetrics),
+		tempStorageNamed: make(map[string]tempStorageInstanceMetrics),
 	}
 
 	// Test connection with a ping before proceeding
@@ -83,83 +80,57 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 		}
 	}
 
-	// Collect job type breakdown
-	if err := a.collectJobTypeBreakdown(ctx); err != nil {
-		a.Warningf("failed to collect job type breakdown: %v", err)
+	// Collect network connections - optional
+	if err := a.collectNetworkConnections(ctx); err != nil {
+		if isSQLFeatureError(err) {
+			a.Warningf("network connections monitoring not available on this IBM i version: %v", err)
+		} else {
+			a.Errorf("failed to collect network connections: %v", err)
+		}
 	}
 
-	// Collect IFS usage
-	if err := a.collectIFSUsage(ctx); err != nil {
-		a.Warningf("failed to collect IFS usage: %v", err)
+	// Collect temporary storage - optional
+	if err := a.collectTempStorage(ctx); err != nil {
+		if isSQLFeatureError(err) {
+			a.Warningf("temporary storage monitoring not available on this IBM i version: %v", err)
+		} else {
+			a.Errorf("failed to collect temporary storage: %v", err)
+		}
 	}
 
-	if a.IFSTopNDirectories > 0 {
-		if err := a.collectIFSTopNDirectories(ctx); err != nil {
+	// Collect subsystems - optional  
+	if a.CollectSubsystemMetrics != nil && *a.CollectSubsystemMetrics {
+		if err := a.collectSubsystems(ctx); err != nil {
 			if isSQLFeatureError(err) {
-				a.logOnce("ifs_top_directories_unavailable", "IFS top directories collection failed (likely unsupported on this IBM i version): %v", err)
+				a.Warningf("subsystem monitoring not available on this IBM i version: %v", err)
 			} else {
-				a.Warningf("failed to collect IFS top N directories: %v", err)
+				a.Errorf("failed to collect subsystems: %v", err)
 			}
 		}
 	}
 
-	// Collect message queue depths
-	if err := a.collectMessageQueues(ctx); err != nil {
-		if isSQLFeatureError(err) {
-			a.logOnce("message_queues_unavailable", "Message queue collection failed (likely unsupported on this IBM i version): %v", err)
-		} else {
-			a.Warningf("failed to collect message queues: %v", err)
-		}
-	}
-
-	// Collect critical message counts
-	if err := a.collectCriticalMessages(ctx); err != nil {
-		a.Warningf("failed to collect critical messages: %v", err)
-	}
-
-	// Collect ASP (storage pool) information
-	if err := a.collectASPInfo(ctx); err != nil {
-		a.Warningf("failed to collect ASP info: %v", err)
-	}
-
-	// Collect top active jobs if enabled
-	if a.CollectActiveJobs != nil && *a.CollectActiveJobs && a.MaxActiveJobs > 0 {
-		if err := a.collectActiveJobs(ctx); err != nil {
+	// Collect job queues - optional
+	if a.CollectJobQueueMetrics != nil && *a.CollectJobQueueMetrics {
+		if err := a.collectJobQueues(ctx); err != nil {
 			if isSQLFeatureError(err) {
-				a.logOnce("active_jobs_unavailable", "Active job collection failed (likely unsupported on this IBM i version): %v", err)
+				a.Warningf("job queue monitoring not available on this IBM i version: %v", err)
 			} else {
-				a.Warningf("failed to collect active jobs: %v", err)
+				a.Errorf("failed to collect job queues: %v", err)
 			}
 		}
 	}
 
 	// Collect per-instance metrics if enabled
 	if a.CollectDiskMetrics != nil && *a.CollectDiskMetrics {
-		if err := a.collectDiskInstances(ctx); err != nil {
+		if err := a.collectDiskInstancesEnhanced(ctx); err != nil {
 			if isSQLFeatureError(err) {
-				a.Warningf("disk instances monitoring not available on this IBM i version: %v", err)
+				// Fall back to basic disk collection
+				a.Warningf("enhanced disk metrics not available, using basic collection: %v", err)
+				if err := a.collectDiskInstances(ctx); err != nil {
+					a.Errorf("failed to collect disk instances: %v", err)
+				}
 			} else {
-				a.Errorf("failed to collect disk instances: %v", err)
-			}
-		}
-	}
-
-	if a.CollectSubsystemMetrics != nil && *a.CollectSubsystemMetrics {
-		if err := a.collectSubsystemInstances(ctx); err != nil {
-			if isSQLFeatureError(err) {
-				a.Warningf("subsystem instances monitoring not available on this IBM i version: %v", err)
-			} else {
-				a.Errorf("failed to collect subsystem instances: %v", err)
-			}
-		}
-	}
-
-	if a.CollectJobQueueMetrics != nil && *a.CollectJobQueueMetrics {
-		if err := a.collectJobQueueInstances(ctx); err != nil {
-			if isSQLFeatureError(err) {
-				a.Warningf("job queue instances monitoring not available on this IBM i version: %v", err)
-			} else {
-				a.Warningf("failed to collect job queue instances: %v", err)
+				a.Errorf("failed to collect enhanced disk instances: %v", err)
 			}
 		}
 	}
@@ -171,13 +142,31 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 	mx := stm.ToMap(a.mx)
 
 	// Add per-instance metrics
+	// Disks
 	for unit, metrics := range a.mx.disks {
 		cleanUnit := cleanName(unit)
-		for k, v := range stm.ToMap(metrics) {
+		metricsMap := stm.ToMap(metrics)
+		
+		// Check if this disk has SSD metrics - if not, remove them from the map
+		if disk, ok := a.disks[unit]; ok {
+			if disk.ssdLifeRemaining < 0 {
+				delete(metricsMap, "ssd_life_remaining")
+			}
+			if disk.ssdPowerOnDays < 0 {
+				delete(metricsMap, "ssd_power_on_days")
+			}
+		}
+		
+		for k, v := range metricsMap {
 			mx[fmt.Sprintf("disk_%s_%s", cleanUnit, k)] = v
+		}
+		// Calculate used_gb from capacity - available
+		if metrics.CapacityGB > 0 && metrics.AvailableGB > 0 {
+			mx[fmt.Sprintf("disk_%s_used_gb", cleanUnit)] = metrics.CapacityGB - metrics.AvailableGB
 		}
 	}
 
+	// Subsystems
 	for name, metrics := range a.mx.subsystems {
 		cleanName := cleanName(name)
 		for k, v := range stm.ToMap(metrics) {
@@ -185,102 +174,109 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 		}
 	}
 
-	for key, metrics := range a.mx.jobQueues {
-		cleanKey := cleanName(key)
+	// Job queues
+	for name, metrics := range a.mx.jobQueues {
+		cleanName := cleanName(name)
 		for k, v := range stm.ToMap(metrics) {
-			mx[fmt.Sprintf("jobqueue_%s_%s", cleanKey, k)] = v
+			mx[fmt.Sprintf("jobqueue_%s_%s", cleanName, k)] = v
 		}
 	}
 
-	// Add individual job metrics if enabled
-	if a.CollectActiveJobs != nil && *a.CollectActiveJobs {
-		for jobName, metrics := range a.mx.jobs {
-			cleanJobName := cleanName(jobName)
-			for k, v := range stm.ToMap(metrics) {
-				mx[fmt.Sprintf("job_%s_%s", cleanJobName, k)] = v
-			}
-		}
-	}
-
-	// Add ASP pool metrics
-	for aspNum, metrics := range a.mx.aspPools {
-		cleanASP := cleanName(aspNum)
+	// Temp storage buckets
+	for name, metrics := range a.mx.tempStorageNamed {
+		cleanName := cleanName(name)
 		for k, v := range stm.ToMap(metrics) {
-			mx[fmt.Sprintf("asp_%s_%s", cleanASP, k)] = v
+			mx[fmt.Sprintf("tempstorage_%s_%s", cleanName, k)] = v
 		}
-	}
-
-	// Add IFS directory usage metrics
-	for dir, size := range a.mx.IFSDirectoryUsage {
-		cleanDir := cleanName(dir)
-		mx[fmt.Sprintf("ifs_directory_%s_size", cleanDir)] = size
 	}
 
 	return mx, nil
 }
 
 func (a *AS400) collectSystemStatus(ctx context.Context) error {
-	// Core metrics - should always be available
-	if err := a.collectSingleMetric(ctx, "average_cpu", queryAverageCPU, func(value string) {
-		if v, err := strconv.ParseFloat(value, 64); err == nil {
-			a.mx.CPUPercentage = int64(v * precision)
+	// Use comprehensive query to get all system status metrics at once
+	err := a.doQuery(ctx, querySystemStatus, func(column, value string, lineEnd bool) {
+		// Skip empty values
+		if value == "" {
+			return
 		}
-	}); err != nil {
-		return err // Fatal - basic metric must work
+
+		switch column {
+		// CPU metrics
+		case "AVERAGE_CPU_UTILIZATION":
+			if v, err := strconv.ParseFloat(value, 64); err == nil {
+				a.mx.CPUPercentage = int64(v * precision)
+			}
+		case "CURRENT_CPU_CAPACITY":
+			if v, err := strconv.ParseFloat(value, 64); err == nil {
+				a.mx.CurrentCPUCapacity = int64(v * precision)
+			}
+		case "CONFIGURED_CPUS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				a.mx.ConfiguredCPUs = v
+			}
+
+		// Memory metrics
+		case "MAIN_STORAGE_SIZE":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				a.mx.MainStorageSize = v // KB
+			}
+		case "CURRENT_TEMPORARY_STORAGE":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				a.mx.CurrentTemporaryStorage = v // MB
+			}
+		case "MAXIMUM_TEMPORARY_STORAGE_USED":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				a.mx.MaximumTemporaryStorageUsed = v // MB
+			}
+
+		// Job metrics
+		case "TOTAL_JOBS_IN_SYSTEM":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				a.mx.TotalJobsInSystem = v
+			}
+		case "ACTIVE_JOBS_IN_SYSTEM":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				a.mx.ActiveJobsInSystem = v
+			}
+		case "INTERACTIVE_JOBS_IN_SYSTEM":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				a.mx.InteractiveJobsInSystem = v
+			}
+		case "BATCH_RUNNING":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				a.mx.BatchJobsRunning = v
+			}
+
+		// Storage metrics
+		case "SYSTEM_ASP_USED":
+			if v, err := strconv.ParseFloat(value, 64); err == nil {
+				a.mx.SystemASPUsed = int64(v * precision)
+			}
+		case "SYSTEM_ASP_STORAGE":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				a.mx.SystemASPStorage = v // MB
+			}
+		case "TOTAL_AUXILIARY_STORAGE":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				a.mx.TotalAuxiliaryStorage = v // MB
+			}
+
+		// Thread metrics
+		case "ACTIVE_THREADS_IN_SYSTEM":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				a.mx.ActiveThreadsInSystem = v
+			}
+		case "THREADS_PER_PROCESSOR":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				a.mx.ThreadsPerProcessor = v
+			}
+		}
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to collect system status: %v", err)
 	}
-
-	if err := a.collectSingleMetric(ctx, "system_asp", querySystemASP, func(value string) {
-		if v, err := strconv.ParseFloat(value, 64); err == nil {
-			a.mx.SystemASPUsed = int64(v * precision)
-		}
-	}); err != nil {
-		return err // Fatal - basic metric must work
-	}
-
-	if err := a.collectSingleMetric(ctx, "active_jobs", queryActiveJobs, func(value string) {
-		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-			a.mx.ActiveJobsCount = v
-		}
-	}); err != nil {
-		return err // Fatal - basic metric must work
-	}
-
-	// Version-specific metrics - gracefully handle missing columns
-	_ = a.collectSingleMetric(ctx, "configured_cpus", queryConfiguredCPUs, func(value string) {
-		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-			a.mx.ConfiguredCPUs = v
-		}
-	})
-
-	_ = a.collectSingleMetric(ctx, "current_processing_capacity", queryCurrentProcessingCapacity, func(value string) {
-		if v, err := strconv.ParseFloat(value, 64); err == nil {
-			a.mx.CurrentProcessingCapacity = int64(v * precision)
-		}
-	})
-
-	_ = a.collectSingleMetric(ctx, "shared_processor_pool_util", querySharedProcessorPoolUtil, func(value string) {
-		if v, err := strconv.ParseFloat(value, 64); err == nil {
-			a.mx.SharedProcessorPoolUsage = int64(v * precision)
-		}
-	})
-
-	_ = a.collectSingleMetric(ctx, "partition_cpu_util", queryPartitionCPUUtil, func(value string) {
-		if v, err := strconv.ParseFloat(value, 64); err == nil {
-			a.mx.PartitionCPUUtilization = int64(v * precision)
-		}
-	})
-
-	_ = a.collectSingleMetric(ctx, "interactive_cpu_util", queryInteractiveCPUUtil, func(value string) {
-		if v, err := strconv.ParseFloat(value, 64); err == nil {
-			a.mx.InteractiveCPUUtilization = int64(v * precision)
-		}
-	})
-
-	_ = a.collectSingleMetric(ctx, "database_cpu_util", queryDatabaseCPUUtil, func(value string) {
-		if v, err := strconv.ParseFloat(value, 64); err == nil {
-			a.mx.DatabaseCPUUtilization = int64(v * precision)
-		}
-	})
 
 	return nil
 }
@@ -322,6 +318,24 @@ func (a *AS400) collectMemoryPools(ctx context.Context) error {
 					a.mx.BasePoolReservedSize = v
 				}
 			}
+		case "CURRENT_THREADS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				switch currentPoolName {
+				case "*MACHINE":
+					a.mx.MachinePoolThreads = v
+				case "*BASE":
+					a.mx.BasePoolThreads = v
+				}
+			}
+		case "MAXIMUM_ACTIVE_THREADS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				switch currentPoolName {
+				case "*MACHINE":
+					a.mx.MachinePoolMaxThreads = v
+				case "*BASE":
+					a.mx.BasePoolMaxThreads = v
+				}
+			}
 		}
 	})
 }
@@ -336,17 +350,6 @@ func (a *AS400) collectDiskStatus(ctx context.Context) error {
 		}
 	})
 	
-	// If modern query fails, try legacy fallback
-	if err != nil && isSQLFeatureError(err) {
-		a.Debugf("modern disk status query failed, trying legacy fallback: %v", err)
-		return a.doQuery(ctx, queryDiskStatusLegacy, func(column, value string, lineEnd bool) {
-			if column == "AVG_DISK_BUSY" {
-				if v, err := strconv.ParseFloat(value, 64); err == nil {
-					a.mx.DiskBusyPercentage = int64(v * precision)
-				}
-			}
-		})
-	}
 	
 	return err
 }
@@ -361,17 +364,6 @@ func (a *AS400) collectJobInfo(ctx context.Context) error {
 		}
 	})
 	
-	// If modern query fails, try fallback
-	if err != nil && isSQLFeatureError(err) {
-		a.Debugf("modern job info query failed, trying fallback: %v", err)
-		return a.doQuery(ctx, queryJobInfoFallback, func(column, value string, lineEnd bool) {
-			if column == "JOB_QUEUE_LENGTH" {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					a.mx.JobQueueLength = v
-				}
-			}
-		})
-	}
 	
 	return err
 }
@@ -505,39 +497,6 @@ func (a *AS400) collectDiskInstances(ctx context.Context) error {
 					}
 				}
 			}
-		case "READ_BYTES":
-			if currentUnit != "" && a.disks[currentUnit] != nil {
-				disk := a.disks[currentUnit]
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					disk.readBytes = v
-					if m, ok := a.mx.disks[currentUnit]; ok {
-						m.ReadBytes = v
-						a.mx.disks[currentUnit] = m
-					}
-				}
-			}
-		case "WRITE_BYTES":
-			if currentUnit != "" && a.disks[currentUnit] != nil {
-				disk := a.disks[currentUnit]
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					disk.writeBytes = v
-					if m, ok := a.mx.disks[currentUnit]; ok {
-						m.WriteBytes = v
-						a.mx.disks[currentUnit] = m
-					}
-				}
-			}
-		case "AVERAGE_REQUEST_TIME":
-			if currentUnit != "" && a.disks[currentUnit] != nil {
-				disk := a.disks[currentUnit]
-				if v, err := strconv.ParseFloat(value, 64); err == nil {
-					disk.averageTime = int64(v * 1000) // Convert to milliseconds
-					if m, ok := a.mx.disks[currentUnit]; ok {
-						m.AverageTime = disk.averageTime
-						a.mx.disks[currentUnit] = m
-					}
-				}
-			}
 		}
 	})
 }
@@ -554,97 +513,152 @@ func (a *AS400) countDisks(ctx context.Context) (int, error) {
 	return count, err
 }
 
-func (a *AS400) collectSubsystemInstances(ctx context.Context) error {
-	// Check cardinality
-	if len(a.subsystems) == 0 && a.MaxSubsystems > 0 {
-		count, err := a.countSubsystems(ctx)
-		if err != nil {
-			return err
+// Network connections collection
+func (a *AS400) collectNetworkConnections(ctx context.Context) error {
+	return a.doQuery(ctx, queryNetworkConnections, func(column, value string, lineEnd bool) {
+		switch column {
+		case "REMOTE_CONNECTIONS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				a.mx.RemoteConnections = v
+			}
+		case "TOTAL_CONNECTIONS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				a.mx.TotalConnections = v
+			}
+		case "LISTEN_CONNECTIONS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				a.mx.ListenConnections = v
+			}
+		case "CLOSEWAIT_CONNECTIONS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				a.mx.CloseWaitConnections = v
+			}
 		}
-		if count > a.MaxSubsystems {
-			return fmt.Errorf("subsystem count (%d) exceeds limit (%d), skipping per-subsystem metrics", count, a.MaxSubsystems)
+	})
+}
+
+// Temporary storage collection
+func (a *AS400) collectTempStorage(ctx context.Context) error {
+	// Collect total temp storage
+	err := a.doQuery(ctx, queryTempStorageTotal, func(column, value string, lineEnd bool) {
+		switch column {
+		case "CURRENT_SIZE":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				a.mx.TempStorageCurrentTotal = v
+			}
+		case "PEAK_SIZE":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				a.mx.TempStoragePeakTotal = v
+			}
 		}
+	})
+	if err != nil {
+		return err
 	}
 
-	// Note: We apply selector in the result processing, not in the SQL query
+	// Collect named temp storage buckets
+	var currentBucket string
+	return a.doQuery(ctx, queryTempStorageNamed, func(column, value string, lineEnd bool) {
+		switch column {
+		case "NAME":
+			currentBucket = value
+			bucket := a.getTempStorageMetrics(currentBucket)
+			bucket.updated = true
+			// Note: Charts will be created when we have actual data
 
-	var currentName string
-	return a.doQuery(ctx, querySubsystemInstances, func(column, value string, lineEnd bool) {
+		case "CURRENT_SIZE":
+			if currentBucket != "" && a.tempStorageNamed[currentBucket] != nil {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					if m, ok := a.mx.tempStorageNamed[currentBucket]; ok {
+						m.CurrentSize = v
+						a.mx.tempStorageNamed[currentBucket] = m
+					} else {
+						a.mx.tempStorageNamed[currentBucket] = tempStorageInstanceMetrics{
+							CurrentSize: v,
+						}
+					}
+					
+					// Create charts only when we have actual data
+					bucket := a.tempStorageNamed[currentBucket]
+					if !bucket.hasCharts && v > 0 {
+						bucket.hasCharts = true
+						a.addTempStorageCharts(bucket)
+					}
+				}
+			}
+		case "PEAK_SIZE":
+			if currentBucket != "" && a.tempStorageNamed[currentBucket] != nil {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					if m, ok := a.mx.tempStorageNamed[currentBucket]; ok {
+						m.PeakSize = v
+						a.mx.tempStorageNamed[currentBucket] = m
+					}
+					
+					// Create charts only when we have actual data
+					bucket := a.tempStorageNamed[currentBucket]
+					if !bucket.hasCharts && v > 0 {
+						bucket.hasCharts = true
+						a.addTempStorageCharts(bucket)
+					}
+				}
+			}
+		}
+	})
+}
 
+// Subsystems collection
+func (a *AS400) collectSubsystems(ctx context.Context) error {
+	var currentSubsystem string
+	return a.doQuery(ctx, querySubsystems, func(column, value string, lineEnd bool) {
 		switch column {
 		case "SUBSYSTEM_NAME":
-			currentName = value
-
-			// Apply selector if configured
-			if a.subsystemSelector != nil && !a.subsystemSelector.MatchString(currentName) {
-				currentName = "" // Skip this subsystem
-				return
-			}
-
-			subsystem := a.getSubsystemMetrics(currentName)
+			currentSubsystem = value
+			subsystem := a.getSubsystemMetrics(currentSubsystem)
 			subsystem.updated = true
 
+			// Add charts on first encounter
 			if !subsystem.hasCharts {
 				subsystem.hasCharts = true
 				a.addSubsystemCharts(subsystem)
 			}
 
-		case "SUBSYSTEM_LIBRARY_NAME":
-			if currentName != "" && a.subsystems[currentName] != nil {
-				subsystem := a.subsystems[currentName]
-				subsystem.library = value
-			}
-		case "STATUS":
-			if currentName != "" && a.subsystems[currentName] != nil {
-				subsystem := a.subsystems[currentName]
-				subsystem.status = value
-			}
 		case "CURRENT_ACTIVE_JOBS":
-			if currentName != "" && a.subsystems[currentName] != nil {
-				subsystem := a.subsystems[currentName]
+			if currentSubsystem != "" && a.subsystems[currentSubsystem] != nil {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					subsystem.jobsActive = v
-					if m, ok := a.mx.subsystems[currentName]; ok {
-						m.JobsActive = v
-						a.mx.subsystems[currentName] = m
+					if m, ok := a.mx.subsystems[currentSubsystem]; ok {
+						m.CurrentActiveJobs = v
+						a.mx.subsystems[currentSubsystem] = m
 					} else {
-						a.mx.subsystems[currentName] = subsystemInstanceMetrics{
-							JobsActive: v,
+						a.mx.subsystems[currentSubsystem] = subsystemInstanceMetrics{
+							CurrentActiveJobs: v,
 						}
 					}
 				}
 			}
-		case "JOBS_IN_SUBSYSTEM_HELD":
-			if currentName != "" && a.subsystems[currentName] != nil {
-				subsystem := a.subsystems[currentName]
+		case "MAXIMUM_ACTIVE_JOBS":
+			if currentSubsystem != "" && a.subsystems[currentSubsystem] != nil {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					subsystem.jobsHeld = v
-					if m, ok := a.mx.subsystems[currentName]; ok {
-						m.JobsHeld = v
-						a.mx.subsystems[currentName] = m
+					if m, ok := a.mx.subsystems[currentSubsystem]; ok {
+						m.MaximumActiveJobs = v
+						a.mx.subsystems[currentSubsystem] = m
 					}
 				}
 			}
-		case "STORAGE_USED":
-			if currentName != "" && a.subsystems[currentName] != nil {
-				subsystem := a.subsystems[currentName]
+		case "HELD_JOB_COUNT":
+			if currentSubsystem != "" && a.subsystems[currentSubsystem] != nil {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					subsystem.storageUsed = v
-					if m, ok := a.mx.subsystems[currentName]; ok {
+					if m, ok := a.mx.subsystems[currentSubsystem]; ok {
+						m.HeldJobCount = v
+						a.mx.subsystems[currentSubsystem] = m
+					}
+				}
+			}
+		case "STORAGE_USED_KB":
+			if currentSubsystem != "" && a.subsystems[currentSubsystem] != nil {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					if m, ok := a.mx.subsystems[currentSubsystem]; ok {
 						m.StorageUsedKB = v
-						a.mx.subsystems[currentName] = m
-					}
-				}
-			}
-		case "MAXIMUM_JOBS":
-			if currentName != "" && a.subsystems[currentName] != nil {
-				subsystem := a.subsystems[currentName]
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					subsystem.maxJobs = v
-					subsystem.currentJobs = subsystem.jobsActive + subsystem.jobsHeld
-					if m, ok := a.mx.subsystems[currentName]; ok {
-						m.CurrentJobs = subsystem.currentJobs
-						a.mx.subsystems[currentName] = m
+						a.mx.subsystems[currentSubsystem] = m
 					}
 				}
 			}
@@ -652,409 +666,182 @@ func (a *AS400) collectSubsystemInstances(ctx context.Context) error {
 	})
 }
 
-func (a *AS400) countSubsystems(ctx context.Context) (int, error) {
-	var count int
-	err := a.doQuery(ctx, queryCountSubsystems, func(column, value string, lineEnd bool) {
-		if column == "COUNT" {
-			if v, err := strconv.Atoi(value); err == nil {
-				count = v
-			}
-		}
-	})
-
-	return count, err
-}
-
-func (a *AS400) collectJobQueueInstances(ctx context.Context) error {
-	// Check cardinality
-	if len(a.jobQueues) == 0 && a.MaxJobQueues > 0 {
-		count, err := a.countJobQueues(ctx)
-		if err != nil {
-			return err
-		}
-		if count > a.MaxJobQueues {
-			return fmt.Errorf("job queue count (%d) exceeds limit (%d), skipping per-queue metrics", count, a.MaxJobQueues)
-		}
-	}
-
-	// Note: We apply selector in the result processing, not in the SQL query
-
-	var currentName, currentLib, key string
-	return a.doQuery(ctx, queryJobQueueInstances, func(column, value string, lineEnd bool) {
-
+// Job queues collection
+func (a *AS400) collectJobQueues(ctx context.Context) error {
+	var currentQueue string
+	return a.doQuery(ctx, queryJobQueues, func(column, value string, lineEnd bool) {
 		switch column {
-		case "JOB_QUEUE_NAME":
-			currentName = value
-		case "JOB_QUEUE_LIBRARY":
-			currentLib = value
-			key = fmt.Sprintf("%s_%s", currentName, currentLib)
+		case "QUEUE_NAME":
+			currentQueue = value
+			queue := a.getJobQueueMetrics(currentQueue)
+			queue.updated = true
 
-			// Apply selector if configured (matches on queue name)
-			if a.jobQueueSelector != nil && !a.jobQueueSelector.MatchString(currentName) {
-				key = "" // Skip this job queue
-				return
+			// Add charts on first encounter
+			if !queue.hasCharts {
+				queue.hasCharts = true
+				a.addJobQueueCharts(queue, currentQueue)
 			}
 
-			jobQueue := a.getJobQueueMetrics(key)
-			jobQueue.updated = true
-			jobQueue.name = currentName
-			jobQueue.library = currentLib
-
-			if !jobQueue.hasCharts {
-				jobQueue.hasCharts = true
-				a.addJobQueueCharts(jobQueue, key)
-			}
-
-		case "JOB_QUEUE_STATUS":
-			if key != "" && a.jobQueues[key] != nil {
-				jobQueue := a.jobQueues[key]
-				jobQueue.status = value
-			}
 		case "NUMBER_OF_JOBS":
-			if key != "" && a.jobQueues[key] != nil {
-				jobQueue := a.jobQueues[key]
+			if currentQueue != "" && a.jobQueues[currentQueue] != nil {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					jobQueue.jobsWaiting = v
-					if m, ok := a.mx.jobQueues[key]; ok {
-						m.JobsWaiting = v
-						a.mx.jobQueues[key] = m
+					if m, ok := a.mx.jobQueues[currentQueue]; ok {
+						m.NumberOfJobs = v
+						a.mx.jobQueues[currentQueue] = m
 					} else {
-						a.mx.jobQueues[key] = jobQueueInstanceMetrics{
-							JobsWaiting: v,
+						a.mx.jobQueues[currentQueue] = jobQueueInstanceMetrics{
+							NumberOfJobs: v,
 						}
 					}
 				}
 			}
 		case "HELD_JOB_COUNT":
-			if key != "" && a.jobQueues[key] != nil {
-				jobQueue := a.jobQueues[key]
+			if currentQueue != "" && a.jobQueues[currentQueue] != nil {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					jobQueue.jobsHeld = v
-					if m, ok := a.mx.jobQueues[key]; ok {
-						m.JobsHeld = v
-						a.mx.jobQueues[key] = m
+					if m, ok := a.mx.jobQueues[currentQueue]; ok {
+						m.HeldJobCount = v
+						a.mx.jobQueues[currentQueue] = m
 					}
-				}
-			}
-		case "SCHEDULED_JOB_COUNT":
-			if key != "" && a.jobQueues[key] != nil {
-				jobQueue := a.jobQueues[key]
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					jobQueue.jobsScheduled = v
-					if m, ok := a.mx.jobQueues[key]; ok {
-						m.JobsScheduled = v
-						a.mx.jobQueues[key] = m
-					}
-				}
-			}
-		case "SEQUENCE_NUMBER":
-			if key != "" && a.jobQueues[key] != nil {
-				jobQueue := a.jobQueues[key]
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					jobQueue.priority = v
 				}
 			}
 		}
 	})
 }
 
-func (a *AS400) countJobQueues(ctx context.Context) (int, error) {
-	var count int
-	err := a.doQuery(ctx, queryCountJobQueues, func(column, value string, lineEnd bool) {
-		if column == "COUNT" {
-			if v, err := strconv.Atoi(value); err == nil {
-				count = v
-			}
+// Enhanced disk collection with all metrics
+func (a *AS400) collectDiskInstancesEnhanced(ctx context.Context) error {
+	// First check cardinality if we haven't yet
+	if len(a.disks) == 0 && a.MaxDisks > 0 {
+		count, err := a.countDisks(ctx)
+		if err != nil {
+			return err
 		}
-	})
-
-	return count, err
-}
-
-func (a *AS400) collectJobTypeBreakdown(ctx context.Context) error {
-	// Check if ACTIVE_JOB_INFO is disabled
-	if a.isDisabled("active_job_info") {
-		return nil
+		if count > a.MaxDisks {
+			return fmt.Errorf("disk count (%d) exceeds limit (%d), skipping per-disk metrics", count, a.MaxDisks)
+		}
 	}
 
-	// Reset job type counts
-	a.mx.BatchJobs = 0
-	a.mx.InteractiveJobs = 0
-	a.mx.SystemJobs = 0
-	a.mx.SpooledJobs = 0
-	a.mx.OtherJobs = 0
-
-	var currentJobType string
-	err := a.doQuery(ctx, queryJobTypeBreakdown, func(column, value string, lineEnd bool) {
+	var currentUnit string
+	return a.doQuery(ctx, queryDiskInstancesEnhanced, func(column, value string, lineEnd bool) {
 		switch column {
-		case "JOB_TYPE":
-			// Store current job type for next COUNT value
-			currentJobType = value
-		case "COUNT":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				switch currentJobType {
-				case "BAT":
-					a.mx.BatchJobs = v
-				case "INT":
-					a.mx.InteractiveJobs = v
-				case "SYS":
-					a.mx.SystemJobs = v
-				case "WTR", "RDR":
-					a.mx.SpooledJobs += v
-				default:
-					a.mx.OtherJobs += v
-				}
-			}
-		}
-	})
+		case "UNIT_NUMBER":
+			currentUnit = value
 
-	// Handle table function errors
-	if err != nil && isSQLFeatureError(err) {
-		a.logOnce("active_job_info", "ACTIVE_JOB_INFO function not available on this IBM i version: %v", err)
-		a.disabled["active_job_info"] = true
-		return nil
-	}
+			// Apply selector if configured
+			if a.diskSelector != nil && !a.diskSelector.MatchString(currentUnit) {
+				currentUnit = "" // Skip this disk
+				return
+			}
 
-	return err
-}
+			disk := a.getDiskMetrics(currentUnit)
+			disk.updated = true
 
-func (a *AS400) collectIFSUsage(ctx context.Context) error {
-	// Check if IFS_OBJECT_STATISTICS is disabled
-	if a.isDisabled("ifs_object_statistics") {
-		return nil
-	}
-	err := a.doQuery(ctx, queryIFSUsage, func(column, value string, lineEnd bool) {
-		switch column {
-		case "FILE_COUNT":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				a.mx.IFSFileCount = v
+			// Add charts on first encounter
+			if !disk.hasCharts {
+				disk.hasCharts = true
+				a.addDiskCharts(disk)
 			}
-		case "TOTAL_SIZE":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				a.mx.IFSTotalSize = v
-			}
-		case "ALLOCATED_SIZE":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				a.mx.IFSUsedSize = v
-			}
-		}
-	})
 
-	// Handle table function errors
-	if err != nil && isSQLFeatureError(err) {
-		a.logOnce("ifs_object_statistics", "IFS_OBJECT_STATISTICS function not available on this IBM i version: %v", err)
-		a.disabled["ifs_object_statistics"] = true
-		return nil
-	}
-
-	return err
-}
-
-func (a *AS400) collectMessageQueues(ctx context.Context) error {
-	// Collect system message queue depth
-	var currentQueue string
-	var currentLib string
-
-	return a.doQuery(ctx, queryMessageQueues, func(column, value string, lineEnd bool) {
-		switch column {
-		case "MESSAGE_QUEUE_NAME":
-			currentQueue = value
-		case "MESSAGE_QUEUE_LIBRARY":
-			currentLib = value
-		case "NUMBER_OF_MESSAGES":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				if currentQueue == "QSYSMSG" && currentLib == "QSYS" {
-					a.mx.SystemMessageQueueDepth = v
-				} else if currentQueue == "QSYSOPR" && currentLib == "QSYS" {
-					a.mx.QSYSOPRMessageQueueDepth = v
-				}
+		case "UNIT_TYPE":
+			if currentUnit != "" && a.disks[currentUnit] != nil {
+				a.disks[currentUnit].typeField = value
 			}
-		}
-	})
-}
-
-// New collection functions for enhanced metrics
-func (a *AS400) collectCriticalMessages(ctx context.Context) error {
-	var currentQueue, currentLib string
-	return a.doQuery(ctx, queryMessageQueueCritical, func(column, value string, lineEnd bool) {
-		switch column {
-		case "MESSAGE_QUEUE_NAME":
-			currentQueue = value
-		case "MESSAGE_QUEUE_LIBRARY":
-			currentLib = value
-		case "CRITICAL_COUNT":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				if currentQueue == "QSYSMSG" && currentLib == "QSYS" {
-					a.mx.SystemCriticalMessages = v
-				} else if currentQueue == "QSYSOPR" && currentLib == "QSYS" {
-					a.mx.QSYSOPRCriticalMessages = v
-				}
-			}
-		}
-	})
-}
-
-func (a *AS400) collectASPInfo(ctx context.Context) error {
-	var currentASP string
-	return a.doQuery(ctx, queryASPInfo, func(column, value string, lineEnd bool) {
-		switch column {
-		case "ASP_NUMBER":
-			currentASP = value
-		case "TOTAL_CAPACITY_AVAILABLE":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				if currentASP == "1" { // System ASP
-					if asp, ok := a.mx.aspPools[currentASP]; ok {
-						asp.TotalCapacityAvailable = v
-						a.mx.aspPools[currentASP] = asp
-					} else {
-						a.mx.aspPools[currentASP] = aspMetrics{TotalCapacityAvailable: v}
-					}
-				}
-			}
-		case "TOTAL_CAPACITY":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				if currentASP == "1" { // System ASP
-					if asp, ok := a.mx.aspPools[currentASP]; ok {
-						asp.TotalCapacity = v
-						a.mx.aspPools[currentASP] = asp
-					} else {
-						a.mx.aspPools[currentASP] = aspMetrics{TotalCapacity: v}
-					}
-				}
-			}
-		}
-	})
-}
-
-func (a *AS400) collectActiveJobs(ctx context.Context) error {
-	// Check if ACTIVE_JOB_INFO is disabled
-	if a.isDisabled("active_job_info") {
-		return nil
-	}
-
-	query := fmt.Sprintf(queryActiveJobsDetails, a.MaxActiveJobs)
-	var currentJobName string
-	err := a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
-		switch column {
-		case "JOB_NAME":
-			currentJobName = value
-			if _, exists := a.mx.jobs[currentJobName]; !exists {
-				a.mx.jobs[currentJobName] = jobMetrics{}
-			}
-		case "CPU_TIME":
-			if currentJobName != "" {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					if job, ok := a.mx.jobs[currentJobName]; ok {
-						job.CPUTime = v
-						a.mx.jobs[currentJobName] = job
-					}
-				}
-			}
-		case "TEMPORARY_STORAGE":
-			if currentJobName != "" {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					if job, ok := a.mx.jobs[currentJobName]; ok {
-						job.TemporaryStorage = v
-						a.mx.jobs[currentJobName] = job
-					}
-				}
-			}
-		case "JOB_ACTIVE_TIME":
-			if currentJobName != "" {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					if job, ok := a.mx.jobs[currentJobName]; ok {
-						job.JobActiveTime = v
-						a.mx.jobs[currentJobName] = job
-					}
-				}
-			}
-		case "ELAPSED_CPU_PERCENTAGE":
-			if currentJobName != "" {
+		case "PERCENT_USED":
+			if currentUnit != "" && a.disks[currentUnit] != nil {
 				if v, err := strconv.ParseFloat(value, 64); err == nil {
-					if job, ok := a.mx.jobs[currentJobName]; ok {
-						job.ElapsedCPUPercentage = int64(v * precision)
-						a.mx.jobs[currentJobName] = job
+					if m, ok := a.mx.disks[currentUnit]; ok {
+						m.PercentUsed = int64(v * precision)
+						a.mx.disks[currentUnit] = m
+					} else {
+						a.mx.disks[currentUnit] = diskInstanceMetrics{
+							PercentUsed: int64(v * precision),
+						}
 					}
 				}
 			}
-		}
-	})
-
-	// Handle table function errors
-	if err != nil && isSQLFeatureError(err) {
-		a.logOnce("active_job_info", "ACTIVE_JOB_INFO function not available on this IBM i version: %v", err)
-		a.disabled["active_job_info"] = true
-		return nil
-	}
-
-	return err
-}
-
-func (a *AS400) collectIFSTopNDirectories(ctx context.Context) error {
-	// Check if IFS_OBJECT_STATISTICS is disabled
-	if a.isDisabled("ifs_object_statistics") {
-		return nil
-	}
-	query := fmt.Sprintf(queryIFSTopNDirectories, a.IFSStartPath, a.IFSTopNDirectories)
-	var currentDir string
-	err := a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
-		switch column {
-		case "DIR":
-			currentDir = value
-		case "TOTAL_SIZE":
-			if currentDir != "" {
+		case "UNIT_SPACE_AVAILABLE_GB":
+			if currentUnit != "" && a.disks[currentUnit] != nil {
+				if v, err := strconv.ParseFloat(value, 64); err == nil {
+					if m, ok := a.mx.disks[currentUnit]; ok {
+						m.AvailableGB = int64(v * precision)
+						a.mx.disks[currentUnit] = m
+					}
+				}
+			}
+		case "UNIT_STORAGE_CAPACITY":
+			if currentUnit != "" && a.disks[currentUnit] != nil {
+				if v, err := strconv.ParseFloat(value, 64); err == nil {
+					if m, ok := a.mx.disks[currentUnit]; ok {
+						m.CapacityGB = int64(v * precision)
+						a.mx.disks[currentUnit] = m
+					}
+				}
+			}
+		case "TOTAL_READ_REQUESTS":
+			if currentUnit != "" && a.disks[currentUnit] != nil {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					a.mx.IFSDirectoryUsage[currentDir] = v
-					// Add directory to chart if not already present
-					if !a.hasIFSDirectoryDim(currentDir) {
-						a.addIFSDirectoryDim(currentDir)
+					if m, ok := a.mx.disks[currentUnit]; ok {
+						m.ReadRequests = v
+						a.mx.disks[currentUnit] = m
+					}
+				}
+			}
+		case "TOTAL_WRITE_REQUESTS":
+			if currentUnit != "" && a.disks[currentUnit] != nil {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					if m, ok := a.mx.disks[currentUnit]; ok {
+						m.WriteRequests = v
+						a.mx.disks[currentUnit] = m
+					}
+				}
+			}
+		case "TOTAL_BLOCKS_READ":
+			if currentUnit != "" && a.disks[currentUnit] != nil {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					if m, ok := a.mx.disks[currentUnit]; ok {
+						m.BlocksRead = v
+						a.mx.disks[currentUnit] = m
+					}
+				}
+			}
+		case "TOTAL_BLOCKS_WRITTEN":
+			if currentUnit != "" && a.disks[currentUnit] != nil {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					if m, ok := a.mx.disks[currentUnit]; ok {
+						m.BlocksWritten = v
+						a.mx.disks[currentUnit] = m
+					}
+				}
+			}
+		case "ELAPSED_PERCENT_BUSY":
+			if currentUnit != "" && a.disks[currentUnit] != nil {
+				if v, err := strconv.ParseFloat(value, 64); err == nil {
+					if m, ok := a.mx.disks[currentUnit]; ok {
+						m.BusyPercent = int64(v * precision)
+						a.mx.disks[currentUnit] = m
+					}
+				}
+			}
+		case "SSD_LIFE_REMAINING":
+			if currentUnit != "" && a.disks[currentUnit] != nil {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					a.disks[currentUnit].ssdLifeRemaining = v
+					if m, ok := a.mx.disks[currentUnit]; ok {
+						m.SSDLifeRemaining = v
+						a.mx.disks[currentUnit] = m
+					}
+				}
+			}
+		case "SSD_POWER_ON_DAYS":
+			if currentUnit != "" && a.disks[currentUnit] != nil {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					a.disks[currentUnit].ssdPowerOnDays = v
+					if m, ok := a.mx.disks[currentUnit]; ok {
+						m.SSDPowerOnDays = v
+						a.mx.disks[currentUnit] = m
 					}
 				}
 			}
 		}
 	})
-
-	// Handle table function errors
-	if err != nil && isSQLFeatureError(err) {
-		a.logOnce("ifs_object_statistics", "IFS_OBJECT_STATISTICS function not available on this IBM i version: %v", err)
-		a.disabled["ifs_object_statistics"] = true
-		return nil
-	}
-
-	return err
-}
-
-func (a *AS400) hasIFSDirectoryDim(dir string) bool {
-	cleanDir := cleanName(dir)
-	dimID := fmt.Sprintf("ifs_directory_%s_size", cleanDir)
-
-	for _, chart := range *a.charts {
-		if chart.ID == "ifs_directory_usage" {
-			for _, dim := range chart.Dims {
-				if dim.ID == dimID {
-					return true
-				}
-			}
-			break
-		}
-	}
-	return false
-}
-
-func (a *AS400) addIFSDirectoryDim(dir string) {
-	cleanDir := cleanName(dir)
-	dimID := fmt.Sprintf("ifs_directory_%s_size", cleanDir)
-
-	for _, chart := range *a.charts {
-		if chart.ID == "ifs_directory_usage" {
-			dim := &module.Dim{
-				ID:   dimID,
-				Name: dir,
-			}
-			if err := chart.AddDim(dim); err != nil {
-				a.Warningf("failed to add IFS directory dimension for %s: %v", dir, err)
-			}
-			break
-		}
-	}
 }

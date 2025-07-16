@@ -74,6 +74,7 @@ func New() *AS400 {
 		subsystems:    make(map[string]*subsystemMetrics),
 		jobQueues:     make(map[string]*jobQueueMetrics),
 		messageQueues: make(map[string]*messageQueueMetrics),
+		tempStorageNamed: make(map[string]*tempStorageMetrics),
 		disabled:      make(map[string]bool),
 	}
 }
@@ -133,6 +134,7 @@ type AS400 struct {
 	subsystems    map[string]*subsystemMetrics
 	jobQueues     map[string]*jobQueueMetrics
 	messageQueues map[string]*messageQueueMetrics
+	tempStorageNamed map[string]*tempStorageMetrics
 
 	// Selectors
 	diskSelector      matcher.Matcher
@@ -140,9 +142,10 @@ type AS400 struct {
 	jobQueueSelector  matcher.Matcher
 
 	// System info for labels
-	systemName   string
-	serialNumber string
-	model        string
+	systemName          string
+	serialNumber        string
+	model               string
+	technologyRefresh   string // TR level (e.g., "TR1", "TR2", "TR3")
 
 	// Resilience tracking
 	disabled       map[string]bool // Track disabled metrics and features
@@ -389,38 +392,54 @@ func (a *AS400) collectSingleMetric(ctx context.Context, metricKey string, query
 // detectIBMiVersion tries to detect the IBM i OS version
 func (a *AS400) detectIBMiVersion(ctx context.Context) error {
 	var version, release string
+	versionDetected := false
 
-	// Try primary query first
+	// Try primary method: SYSIBMADM.ENV_SYS_INFO
 	err := a.doQuery(ctx, queryIBMiVersion, func(column, value string, lineEnd bool) {
 		switch column {
+		case "OS_NAME":
+			// We could use this to verify it's IBM i
+			_ = strings.TrimSpace(value)
 		case "OS_VERSION":
-			version = value
+			version = strings.TrimSpace(value)
 		case "OS_RELEASE":
-			release = value
+			release = strings.TrimSpace(value)
 		}
 	})
 
-	if err != nil {
-		// Try fallback query
-		if err := a.doQuery(ctx, queryIBMiVersionFallback, func(column, value string, lineEnd bool) {
-			switch column {
-			case "OS_VERSION":
-				version = value
-			case "OS_RELEASE":
-				release = value
+	if err == nil && version != "" && release != "" {
+		versionDetected = true
+		a.osVersion = fmt.Sprintf("%s.%s", version, release)
+		a.Debugf("detected IBM i version from ENV_SYS_INFO: %s", a.osVersion)
+	} else if err != nil {
+		a.Debugf("ENV_SYS_INFO query failed: %v, trying fallback method", err)
+
+		// Try fallback method: data area
+		err = a.doQuery(ctx, queryIBMiVersionDataArea, func(column, value string, lineEnd bool) {
+			if column == "VERSION" {
+				dataAreaValue := strings.TrimSpace(value)
+				// Parse version from data area value (e.g., "V7R4M0 L")
+				if len(dataAreaValue) >= 6 {
+					a.osVersion = dataAreaValue
+					versionDetected = true
+					a.Debugf("detected IBM i version from data area: %s", a.osVersion)
+				}
 			}
-		}); err != nil {
-			return err
+		})
+
+		if err != nil {
+			a.Warningf("failed to detect IBM i version from data area: %v", err)
 		}
 	}
 
-	if version != "" && release != "" {
-		a.osVersion = fmt.Sprintf("%s %s", version, release)
-		a.Debugf("detected IBM i version: %s", a.osVersion)
-
-		// Parse version components
-		a.parseIBMiVersion()
+	// If all methods fail, use a reasonable default
+	if !versionDetected {
+		a.osVersion = "7.4"
+		a.Warningf("could not detect IBM i version, using default: %s", a.osVersion)
 	}
+
+	// Parse version components
+	a.parseIBMiVersion()
 
 	// Collect system information for labels
 	a.collectSystemInfo(ctx)
@@ -433,46 +452,47 @@ func (a *AS400) detectIBMiVersion(ctx context.Context) error {
 
 // detectAvailableFeatures checks which table functions are available
 func (a *AS400) detectAvailableFeatures(ctx context.Context) {
-	// Check if ACTIVE_JOB_INFO is available
-	if err := a.doQuery(ctx, queryCheckActiveJobInfo, func(column, value string, lineEnd bool) {
-		if column == "CNT" && value == "0" {
-			a.disabled["active_job_info"] = true
-			a.Warningf("ACTIVE_JOB_INFO function not available on this IBM i version")
-		}
-	}); err != nil {
-		a.Debugf("failed to check ACTIVE_JOB_INFO availability: %v", err)
-	}
+	// Feature detection disabled - assume basic features only
+	a.disabled["active_job_info"] = true
 
-	// Check if IFS_OBJECT_STATISTICS is available
-	if err := a.doQuery(ctx, queryCheckIFSObjectStats, func(column, value string, lineEnd bool) {
-		if column == "CNT" && value == "0" {
-			a.disabled["ifs_object_statistics"] = true
-			a.Warningf("IFS_OBJECT_STATISTICS function not available on this IBM i version")
-		}
-	}); err != nil {
-		a.Debugf("failed to check IFS_OBJECT_STATISTICS availability: %v", err)
-	}
+	// Additional feature detection disabled
+	a.disabled["ifs_object_statistics"] = true
 }
 
 // collectSystemInfo gathers system information for chart labels
 func (a *AS400) collectSystemInfo(ctx context.Context) {
-	// Collect system name
-	_ = a.collectSingleMetric(ctx, "system_name", querySystemName, func(value string) {
-		a.systemName = value
-		a.Debugf("detected system name: %s", a.systemName)
-	})
+	// System name collection disabled - no querySystemName available
+	a.systemName = "Unknown"
 
 	// Collect serial number
 	_ = a.collectSingleMetric(ctx, "serial_number", querySerialNumber, func(value string) {
-		a.serialNumber = value
+		a.serialNumber = strings.TrimSpace(value)
 		a.Debugf("detected serial number: %s", a.serialNumber)
 	})
 
 	// Collect system model
 	_ = a.collectSingleMetric(ctx, "system_model", querySystemModel, func(value string) {
-		a.model = value
+		a.model = strings.TrimSpace(value)
 		a.Debugf("detected system model: %s", a.model)
 	})
+
+	// Collect Technology Refresh level
+	err := a.doQuery(ctx, queryTechnologyRefresh, func(column, value string, lineEnd bool) {
+		if column == "TR_LEVEL" && value != "" {
+			trLevel := strings.TrimSpace(value)
+			if trLevel != "" {
+				a.technologyRefresh = fmt.Sprintf("TR%s", trLevel)
+				a.Debugf("detected Technology Refresh level: %s", a.technologyRefresh)
+			}
+		}
+	})
+	if err != nil {
+		a.Debugf("failed to detect Technology Refresh level: %v", err)
+	}
+
+	// Note: PROCESSOR_FEATURE would require a separate query to SYSTEM_STATUS_INFO
+	// but this can conflict with other concurrent queries to the same table.
+	// For now, we'll skip processor feature to avoid prepared statement conflicts.
 
 	// Default values if collection fails
 	if a.systemName == "" {
@@ -487,12 +507,16 @@ func (a *AS400) collectSystemInfo(ctx context.Context) {
 	if a.osVersion == "" {
 		a.osVersion = "Unknown"
 	}
+	if a.technologyRefresh == "" {
+		a.technologyRefresh = "Unknown"
+	}
 }
 
 // addVersionLabelsToCharts adds IBM i version labels to all charts
 func (a *AS400) addVersionLabelsToCharts() {
 	versionLabels := []module.Label{
 		{Key: "ibmi_version", Value: a.osVersion},
+		{Key: "technology_refresh", Value: a.technologyRefresh},
 		{Key: "system_name", Value: a.systemName},
 		{Key: "serial_number", Value: a.serialNumber},
 		{Key: "model", Value: a.model},
@@ -510,8 +534,16 @@ func (a *AS400) parseIBMiVersion() {
 		return
 	}
 
-	// Parse version strings like "V7 R3", "V7R3M0", "7.3", etc.
-	versionStr := strings.ToUpper(strings.ReplaceAll(a.osVersion, " ", ""))
+	// Parse version strings like "V7 R3", "V7R3M0", "V7R4M0 L", "7.3", "7.4.0", etc.
+	versionStr := strings.ToUpper(strings.TrimSpace(a.osVersion))
+	
+	// Remove any trailing letters/spaces (e.g., "V7R4M0 L" -> "V7R4M0")
+	if idx := strings.IndexAny(versionStr, " L"); idx > 0 {
+		versionStr = versionStr[:idx]
+	}
+	
+	// Remove all spaces for parsing
+	versionStr = strings.ReplaceAll(versionStr, " ", "")
 
 	// Try to parse VxRyMz format
 	if strings.HasPrefix(versionStr, "V") {
@@ -529,9 +561,20 @@ func (a *AS400) parseIBMiVersion() {
 				if release, err := strconv.Atoi(remainder[:mIdx]); err == nil {
 					a.versionRelease = release
 				}
-				// Extract modification level
-				if mod, err := strconv.Atoi(remainder[mIdx+1:]); err == nil {
-					a.versionMod = mod
+				// Extract modification level (numbers only, stop at first non-digit)
+				modStr := remainder[mIdx+1:]
+				modNum := ""
+				for _, ch := range modStr {
+					if ch >= '0' && ch <= '9' {
+						modNum += string(ch)
+					} else {
+						break
+					}
+				}
+				if modNum != "" {
+					if mod, err := strconv.Atoi(modNum); err == nil {
+						a.versionMod = mod
+					}
 				}
 			} else {
 				// No M, just release
@@ -541,7 +584,7 @@ func (a *AS400) parseIBMiVersion() {
 			}
 		}
 	} else {
-		// Try numeric format like "7.3"
+		// Try numeric format like "7.3" or "7.4.0"
 		parts := strings.Split(versionStr, ".")
 		if len(parts) >= 2 {
 			if major, err := strconv.Atoi(parts[0]); err == nil {
@@ -554,6 +597,11 @@ func (a *AS400) parseIBMiVersion() {
 				if mod, err := strconv.Atoi(parts[2]); err == nil {
 					a.versionMod = mod
 				}
+			}
+		} else if len(parts) == 1 {
+			// Handle simple major version only
+			if major, err := strconv.Atoi(parts[0]); err == nil {
+				a.versionMajor = major
 			}
 		}
 	}

@@ -33,7 +33,7 @@ It collects:
 - Aggregate job queue length
 
 **Per-instance metrics (when enabled):**
-- **Per-disk**: Busy percentage, I/O requests/s, throughput, response time
+- **Per-disk**: Busy percentage, I/O requests/s, throughput, response time, space usage, capacity, block operations, SSD health and age (for SSDs)
 - **Per-subsystem**: Active/held jobs, storage usage
 - **Per-job-queue**: Waiting/held/scheduled jobs
 - **Per-job** (top CPU consumers): CPU time, temporary storage, active time, CPU percentage
@@ -70,6 +70,11 @@ It collects:
 | as400.disk_io_requests | Disk I/O requests (read/write) | requests/s | disk_unit, disk_type, disk_model |
 | as400.disk_io_bytes | Disk I/O throughput (read/write) | bytes/s | disk_unit, disk_type, disk_model |
 | as400.disk_avg_time | Disk average response time | milliseconds | disk_unit, disk_type, disk_model |
+| as400.disk_space_usage | Disk space usage percentage | percentage | disk_unit, disk_type, disk_model |
+| as400.disk_capacity | Disk capacity (available/used) | GB | disk_unit, disk_type, disk_model |
+| as400.disk_blocks | Disk block operations (read/write) | blocks/s | disk_unit, disk_type, disk_model |
+| as400.disk_ssd_health | SSD life remaining (SSDs only) | percentage | disk_unit, disk_type, disk_model |
+| as400.disk_ssd_age | SSD power on days (SSDs only) | days | disk_unit, disk_type, disk_model |
 
 #### Subsystem metrics (per subsystem)
 | Metric | Description | Unit | Labels |

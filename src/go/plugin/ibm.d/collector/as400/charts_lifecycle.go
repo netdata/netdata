@@ -63,6 +63,24 @@ func (a *AS400) removeJobQueueCharts(key string) {
 	}
 }
 
+// Temp storage charts
+func (a *AS400) addTempStorageCharts(bucket *tempStorageMetrics) {
+	charts := a.newTempStorageCharts(bucket)
+	if err := a.Charts().Add(*charts...); err != nil {
+		a.Warning(err)
+	}
+}
+
+func (a *AS400) removeTempStorageCharts(bucket *tempStorageMetrics) {
+	prefix := fmt.Sprintf("tempstorage_%s_", cleanName(bucket.name))
+	for _, chart := range *a.Charts() {
+		if strings.HasPrefix(chart.ID, prefix) {
+			chart.MarkRemove()
+			chart.MarkNotCreated()
+		}
+	}
+}
+
 // Cleanup stale instances
 func (a *AS400) cleanupStaleInstances() {
 	// Cleanup disks
@@ -98,6 +116,28 @@ func (a *AS400) cleanupStaleInstances() {
 			}
 		} else {
 			jobQueue.updated = false
+		}
+	}
+
+	// Cleanup temp storage buckets
+	for name, bucket := range a.tempStorageNamed {
+		if !bucket.updated {
+			delete(a.tempStorageNamed, name)
+			if bucket.hasCharts {
+				a.removeTempStorageCharts(bucket)
+			}
+		} else {
+			bucket.updated = false
+		}
+	}
+
+	// Cleanup message queues (if collecting)
+	for key, queue := range a.messageQueues {
+		if !queue.updated {
+			delete(a.messageQueues, key)
+			// Message queue charts not implemented yet
+		} else {
+			queue.updated = false
 		}
 	}
 }
