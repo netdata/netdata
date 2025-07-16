@@ -1037,9 +1037,9 @@ fi
 # -----------------------------------------------------------------------------
 # If IBM plugin is enabled, try to download IBM libraries
 if [ ${ENABLE_IBM} -eq 1 ] && [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/install-ibm-libs.sh" ]; then
-  progress "Downloading IBM DB2 client libraries for IBM plugin"
+  progress "Downloading IBM MQ client libraries for IBM plugin"
   if ! NETDATA_PREFIX="${NETDATA_PREFIX}" run "${NETDATA_PREFIX}/usr/libexec/netdata/install-ibm-libs.sh"; then
-    warning "Failed to download IBM DB2 client libraries. The IBM plugin will not work until libraries are installed."
+    warning "Failed to download IBM MQ client libraries. The MQ PCF collector will not work until libraries are installed."
     warning "You can manually run: NETDATA_PREFIX=\"${NETDATA_PREFIX}\" ${NETDATA_PREFIX}/usr/libexec/netdata/install-ibm-libs.sh"
   fi
 fi

@@ -19,8 +19,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
-
-	_ "github.com/ibmdb/go_ibm_db"
+	
+	// Import database drivers and connection utilities
+	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/pkg/dbdriver"
+	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/pkg/dbdriver"
 )
 
 //go:embed "config_schema.json"
@@ -84,6 +86,16 @@ type Config struct {
 	MaxDbConns    int              `yaml:"max_db_conns,omitempty" json:"max_db_conns"`
 	MaxDbLifeTime confopt.Duration `yaml:"max_db_life_time,omitempty" json:"max_db_life_time"`
 
+	// Individual connection parameters (alternative to DSN)
+	Hostname       string `yaml:"hostname,omitempty" json:"hostname"`
+	Port           int    `yaml:"port,omitempty" json:"port"`
+	Username       string `yaml:"username,omitempty" json:"username"`
+	Password       string `yaml:"password,omitempty" json:"password"`
+	Database       string `yaml:"database,omitempty" json:"database"`
+	ConnectionType string `yaml:"connection_type,omitempty" json:"connection_type"`
+	ODBCDriver     string `yaml:"odbc_driver,omitempty" json:"odbc_driver"`
+	UseSSL         bool   `yaml:"use_ssl,omitempty" json:"use_ssl"`
+
 	// Instance collection settings
 	CollectDiskMetrics      *bool `yaml:"collect_disk_metrics,omitempty" json:"collect_disk_metrics"`
 	CollectSubsystemMetrics *bool `yaml:"collect_subsystem_metrics,omitempty" json:"collect_subsystem_metrics"`
@@ -108,7 +120,7 @@ type Config struct {
 
 type AS400 struct {
 	module.Base
-	Config `json:""`
+	Config `yaml:",inline" json:""`
 
 	charts *module.Charts
 
@@ -145,8 +157,30 @@ func (a *AS400) Configuration() any {
 }
 
 func (a *AS400) Init(ctx context.Context) error {
+	a.Debugf("Init called with DSN='%s'", a.DSN)
+	
+	// If no DSN provided, try to build one from individual parameters
 	if a.DSN == "" {
-		return errors.New("dsn required but not set")
+		a.Debugf("no DSN provided, checking individual parameters: hostname='%s', username='%s', password='%s'", a.Hostname, a.Username, a.Password)
+		if a.Hostname != "" && a.Username != "" && a.Password != "" {
+			// Build DSN from individual parameters
+			config := &dbdriver.ConnectionConfig{
+				Hostname:   a.Hostname,
+				Port:       a.Port,
+				Username:   a.Username,
+				Password:   a.Password,
+				Database:   a.Database,
+				SystemType: "AS400",
+				ODBCDriver: a.ODBCDriver,
+				UseSSL:     a.UseSSL,
+			}
+			
+			// Use ODBC connection by default for AS/400
+			a.DSN = dbdriver.BuildODBCDSN(config)
+			a.Infof("built DSN from connection parameters for AS/400 system: %s", a.Hostname)
+		} else {
+			return fmt.Errorf("dsn required but not set, and insufficient connection parameters provided (need hostname, username, password). Got: hostname='%s', username='%s', password='%s'", a.Hostname, a.Username, a.Password)
+		}
 	}
 
 	// Initialize selectors
@@ -245,7 +279,7 @@ func (a *AS400) verifyConfig() error {
 }
 
 func (a *AS400) initDatabase(ctx context.Context) (*sql.DB, error) {
-	db, err := sql.Open("go_ibm_db", a.DSN)
+	db, err := sql.Open("odbc", a.DSN)
 	if err != nil {
 		return nil, fmt.Errorf("error opening database: %v", err)
 	}

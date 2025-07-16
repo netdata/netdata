@@ -608,3 +608,255 @@ func (d *DB2) collectConnectionInstances(ctx context.Context) error {
 
 	return err
 }
+
+// Screen 26: Instance Memory Sets collection using MON_GET_MEMORY_SET
+func (d *DB2) collectMemorySetInstances(ctx context.Context) error {
+	if !d.useMonGetFunctions {
+		d.Debugf("MON_GET_MEMORY_SET not available, skipping memory set collection")
+		return nil
+	}
+
+	// Use a reasonable limit for memory sets (typically 5-20 per instance)
+	maxMemorySets := 50
+	query := fmt.Sprintf(queryMonGetMemorySet, maxMemorySets)
+	
+	d.Debugf("collecting memory set instances using MON_GET_MEMORY_SET")
+
+	// Track seen memory sets for lifecycle management
+	seen := make(map[string]bool)
+
+	err := d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+		if column == "HOST_NAME" {
+			d.currentMemorySetHostName = value
+			return
+		}
+
+		if d.currentMemorySetHostName == "" {
+			return // Skip until we have a host name
+		}
+
+		switch column {
+		case "DB_NAME":
+			d.currentMemorySetDBName = value
+		case "MEMORY_SET_TYPE":
+			d.currentMemorySetType = value
+		case "MEMBER":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.currentMemorySetMember = v
+			}
+		}
+
+		// Process metrics when we have complete record
+		if lineEnd && d.currentMemorySetHostName != "" && d.currentMemorySetDBName != "" {
+			// Use DATABASE as default type if not set (ODBC panic might prevent collection)
+			if d.currentMemorySetType == "" {
+				d.currentMemorySetType = "DATABASE"
+			}
+			
+			// Create unique identifier for this memory set
+			setKey := fmt.Sprintf("%s.%s.%s.%d", 
+				d.currentMemorySetHostName, 
+				d.currentMemorySetDBName, 
+				d.currentMemorySetType,
+				d.currentMemorySetMember)
+			
+			seen[setKey] = true
+
+			// Initialize memory set if not seen before
+			if _, exists := d.memorySets[setKey]; !exists {
+				d.memorySets[setKey] = &memorySetInstanceMetrics{
+					hostName: d.currentMemorySetHostName,
+					dbName:   d.currentMemorySetDBName, 
+					setType:  d.currentMemorySetType,
+					member:   d.currentMemorySetMember,
+				}
+				d.addMemorySetCharts(setKey)
+				d.Debugf("created memory set instance: %s (type: %s)", setKey, d.currentMemorySetType)
+			}
+
+			// Reset for next record
+			d.currentMemorySetHostName = ""
+			d.currentMemorySetDBName = ""
+			d.currentMemorySetType = ""
+			d.currentMemorySetMember = 0
+		}
+
+		// Process individual metrics
+		if d.currentMemorySetHostName != "" && d.currentMemorySetDBName != "" {
+			// Use DATABASE as default type if not set
+			memSetType := d.currentMemorySetType
+			if memSetType == "" {
+				memSetType = "DATABASE"
+			}
+			
+			setKey := fmt.Sprintf("%s.%s.%s.%d", 
+				d.currentMemorySetHostName, 
+				d.currentMemorySetDBName, 
+				memSetType,
+				d.currentMemorySetMember)
+
+			// Initialize memory set if it doesn't exist
+			if _, exists := d.memorySets[setKey]; !exists {
+				d.memorySets[setKey] = &memorySetInstanceMetrics{
+					hostName: d.currentMemorySetHostName,
+					dbName:   d.currentMemorySetDBName,
+					setType:  memSetType,
+					member:   d.currentMemorySetMember,
+				}
+			}
+			
+			// Update the metrics
+			ms := d.memorySets[setKey]
+			switch column {
+			case "MEMORY_SET_USED":
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					ms.Used = v
+				}
+			case "MEMORY_SET_COMMITTED":
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					ms.Committed = v
+				}
+			case "MEMORY_SET_USED_HWM":
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					ms.HighWaterMark = v
+				}
+			case "ADDITIONAL_COMMITTED":
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					ms.AdditionalCommitted = v
+				}
+			case "PERCENT_USED_HWM":
+				if v, err := strconv.ParseFloat(value, 64); err == nil {
+					ms.PercentUsedHWM = int64(v * Precision)
+				}
+			}
+		}
+	})
+
+	// Ensure charts are created for all memory sets that were seen
+	// This is needed because ODBC panic might prevent the normal chart creation
+	for setKey := range seen {
+		if _, exists := d.memorySets[setKey]; exists {
+			// Check if charts exist for this memory set
+			// Need to match the format used in newMemorySetCharts
+			parts := strings.Split(setKey, ".")
+			if len(parts) >= 4 {
+				setIdentifier := fmt.Sprintf("%s_%s_%s_%s",
+					cleanName(parts[0]), // host name
+					cleanName(parts[1]), // db name
+					cleanName(parts[2]), // set type
+					parts[3])            // member number
+				chartID := fmt.Sprintf("memory_set_%s_usage", setIdentifier)
+				if d.charts.Get(chartID) == nil {
+					// Charts don't exist, create them now
+					d.addMemorySetCharts(setKey)
+					d.Debugf("created missing charts for memory set %s", setKey)
+				}
+			}
+		}
+	}
+
+	// Remove stale memory sets
+	for setKey := range d.memorySets {
+		if !seen[setKey] {
+			delete(d.memorySets, setKey)
+			d.removeMemorySetCharts(setKey)
+		}
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to collect memory set instances: %w", err)
+	}
+
+	d.Debugf("collected %d memory set instances", len(seen))
+	for k := range seen {
+		d.Debugf("  memory set: %s", k)
+	}
+	return nil
+}
+
+func (d *DB2) collectPrefetcherInstances(ctx context.Context) error {
+	if !d.useMonGetFunctions {
+		d.Debugf("prefetcher metrics require MON_GET functions, skipping")
+		return nil
+	}
+
+	// Track seen prefetcher instances
+	seen := make(map[string]bool)
+	d.currentBufferPoolName = ""
+
+	err := d.doQuery(ctx, queryPrefetcherMetrics, func(column, value string, lineEnd bool) {
+		switch column {
+		case "BUFFERPOOL_NAME":
+			bufferPoolName := strings.TrimSpace(value)
+			if bufferPoolName == "" {
+				return
+			}
+
+			d.currentBufferPoolName = bufferPoolName
+			seen[bufferPoolName] = true
+
+			// Create prefetcher instance if new
+			if _, exists := d.prefetchers[bufferPoolName]; !exists {
+				d.prefetchers[bufferPoolName] = &prefetcherInstanceMetrics{}
+				d.addPrefetcherCharts(d.prefetchers[bufferPoolName], bufferPoolName)
+			}
+
+		case "PREFETCH_RATIO_PCT":
+			if d.currentBufferPoolName != "" && d.prefetchers[d.currentBufferPoolName] != nil {
+				if v, err := strconv.ParseFloat(value, 64); err == nil {
+					d.prefetchers[d.currentBufferPoolName].PrefetchRatio = int64(v * Precision)
+				}
+			}
+
+		case "CLEANER_RATIO_PCT":
+			if d.currentBufferPoolName != "" && d.prefetchers[d.currentBufferPoolName] != nil {
+				if v, err := strconv.ParseFloat(value, 64); err == nil {
+					d.prefetchers[d.currentBufferPoolName].CleanerRatio = int64(v * Precision)
+				}
+			}
+
+		case "PHYSICAL_READS":
+			if d.currentBufferPoolName != "" && d.prefetchers[d.currentBufferPoolName] != nil {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					d.prefetchers[d.currentBufferPoolName].PhysicalReads = v
+				}
+			}
+
+		case "ASYNCHRONOUS_READS":
+			if d.currentBufferPoolName != "" && d.prefetchers[d.currentBufferPoolName] != nil {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					d.prefetchers[d.currentBufferPoolName].AsyncReads = v
+				}
+			}
+
+		case "PREFETCH_WAITS_TIME_MS":
+			if d.currentBufferPoolName != "" && d.prefetchers[d.currentBufferPoolName] != nil {
+				if v, err := strconv.ParseFloat(value, 64); err == nil {
+					d.prefetchers[d.currentBufferPoolName].AvgWaitTime = int64(v * Precision)
+				}
+			}
+
+		case "UNREAD_PREFETCH_PAGES":
+			if d.currentBufferPoolName != "" && d.prefetchers[d.currentBufferPoolName] != nil {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					d.prefetchers[d.currentBufferPoolName].UnreadPages = v
+				}
+			}
+		}
+	})
+
+	// Remove stale prefetcher instances
+	for bufferPoolName := range d.prefetchers {
+		if !seen[bufferPoolName] {
+			delete(d.prefetchers, bufferPoolName)
+			d.removePrefetcherCharts(bufferPoolName)
+		}
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to collect prefetcher instances: %w", err)
+	}
+
+	d.Debugf("collected %d prefetcher instances", len(seen))
+	return nil
+}

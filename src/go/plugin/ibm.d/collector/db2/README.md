@@ -26,15 +26,25 @@ This allows you to:
 
 ## Requirements
 
-- Netdata automatically downloads and installs IBM Data Server Driver Package v12.1.0
+**Database Connectivity:**
+
+This collector uses **unixODBC exclusively** for database connectivity, which provides several advantages:
+
+✅ **No IBM DB2 client library licensing required**  
+✅ **Works with both DB2 and AS/400 systems**  
+✅ **Simplified deployment and configuration**  
+✅ **Consistent behavior across all IBM database types**
+
+**Prerequisites:**
+- unixODBC driver manager installed
+- IBM DB2 ODBC driver installed and configured  
 - Database user with SELECT permissions on monitoring views
 - Network connectivity to DB2 database
 
-**Important Driver Restrictions:**
-- **XA Connections**: Not supported against IBM i servers
-- **CLIENT Authentication**: Not supported by the IBM Data Server Driver
-
-For complete restrictions and limitations, see [IBM Data Server Driver Restrictions](https://www.ibm.com/docs/en/db2/12.1.0?topic=drivers-data-server-driver-restrictions).
+**ODBC Driver Sources:**
+- IBM Data Server Driver Package (includes ODBC drivers)
+- IBM i Access Client Solutions (for AS/400 connectivity)
+- Distribution packages (e.g., `unixodbc`, `ibm-db2-odbc`)
 
 ## Metrics
 
@@ -56,37 +66,80 @@ The collector provides:
 
 ## Configuration
 
-### DSN Configuration
+### ODBC Configuration
 
-The `dsn` (Data Source Name) string is used to connect to the DB2 database. Here are some common examples:
+The collector uses unixODBC for all database connections. You can configure connections using either component-based parameters (recommended) or ODBC DSN strings.
 
-**Standard TCP/IP Connection:**
+#### Option 1: Component-based Configuration (Recommended)
+
 ```yaml
-dsn: 'DATABASE=sample;HOSTNAME=localhost;PORT=50000;PROTOCOL=TCPIP;UID=db2inst1;PWD=password'
+# Standard DB2 LUW connection
+hostname: localhost
+port: 50000
+database: sample
+username: db2inst1
+password: password
+odbc_driver: "IBM DB2 ODBC DRIVER"  # Optional: auto-detected if not specified
 ```
 
-**Db2 on Cloud with SSL:**
 ```yaml
-dsn: 'DATABASE=bludb;HOSTNAME=xxx.databases.appdomain.cloud;PORT=32733;PROTOCOL=TCPIP;UID=user;PWD=pass;SECURITY=SSL;SSLServerCertificate=/path/to/cert.crt'
+# DB2 on Cloud with SSL
+hostname: xxx.databases.appdomain.cloud
+port: 32733
+database: bludb
+username: your_username
+password: your_password
+use_ssl: true
+ssl_server_cert_path: "/path/to/DigiCertGlobalRootCA.crt"
+odbc_driver: "IBM DB2 ODBC DRIVER"
 ```
 
-**DSN Parameters:**
+#### Option 2: ODBC DSN String
 
-*   `DATABASE`: The name of the database to connect to.
-*   `HOSTNAME`: The hostname or IP address of the DB2 server.
-*   `PORT`: The port number of the DB2 server.
-*   `PROTOCOL`: The connection protocol (usually `TCPIP`).
-*   `UID`: The username to connect with.
-*   `PWD`: The password for the specified user.
-*   `SECURITY`: Set to `SSL` to enable SSL/TLS encryption.
-*   `SSLServerCertificate`: The path to the SSL server certificate (if required).
+```yaml
+# ODBC connection string format
+dsn: 'Driver={IBM DB2 ODBC DRIVER};Database=sample;Hostname=localhost;Port=50000;Protocol=TCPIP;Uid=db2inst1;Pwd=password'
+```
+
+```yaml
+# DB2 on Cloud with SSL
+dsn: 'Driver={IBM DB2 ODBC DRIVER};Database=bludb;Hostname=xxx.databases.appdomain.cloud;Port=32733;Protocol=TCPIP;Uid=username;Pwd=password;Security=SSL;SSLServerCertificate=/path/to/cert.crt'
+```
+
+### Configuration Parameters
+
+**Connection Parameters:**
+*   `hostname`: The hostname or IP address of the DB2 server
+*   `port`: The port number (50000 for DB2 LUW, 446 for AS/400, 5023 for z/OS)
+*   `database`: The name of the database to connect to
+*   `username`: The username to connect with
+*   `password`: The password for the specified user
+*   `use_ssl`: Enable SSL/TLS encryption (boolean)
+*   `ssl_server_cert_path`: Path to SSL server certificate file
+*   `odbc_driver`: ODBC driver name (auto-detected: "IBM DB2 ODBC DRIVER" or "IBM i Access ODBC Driver")
+
+**DSN String Parameters (when using `dsn`):**
+*   `Driver`: The ODBC driver name (e.g., `{IBM DB2 ODBC DRIVER}`)
+*   `Database`: The name of the database to connect to
+*   `Hostname`: The hostname or IP address of the DB2 server
+*   `Port`: The port number of the DB2 server
+*   `Protocol`: The connection protocol (usually `TCPIP`)
+*   `Uid`: The username to connect with
+*   `Pwd`: The password for the specified user
+*   `Security`: Set to `SSL` to enable SSL/TLS encryption
+*   `SSLServerCertificate`: The path to the SSL server certificate
 
 ### Example Job Configuration
 
 ```yaml
 jobs:
-  - name: db2_local
-    dsn: 'DATABASE=sample;HOSTNAME=localhost;PORT=50000;PROTOCOL=TCPIP;UID=db2inst1;PWD=password'
+  - name: db2_production
+    # Component-based configuration (recommended)
+    hostname: db2.example.com
+    port: 50000
+    database: sample
+    username: db2inst1
+    password: password
     
     # Cardinality limits (to prevent memory issues)
     max_databases: 10
@@ -103,26 +156,40 @@ jobs:
     # Selectors for filtering
     collect_tables_matching: 'USER.*'
     collect_indexes_matching: 'USER.*'
+
+  - name: db2_cloud
+    # Alternative: ODBC DSN string format
+    dsn: 'Driver={IBM DB2 ODBC DRIVER};Database=bludb;Hostname=xxx.databases.appdomain.cloud;Port=32733;Protocol=TCPIP;Uid=username;Pwd=password;Security=SSL'
+    ssl_server_cert_path: "/path/to/DigiCertGlobalRootCA.crt"
+    timeout: 10
 ```
 
 ## Troubleshooting
 
+### ODBC Setup
+
+**Driver Installation:**
+- Ensure unixODBC is installed: `sudo apt-get install unixodbc` or `sudo yum install unixODBC`
+- Install IBM ODBC drivers from IBM Data Server Driver Package or IBM i Access Client Solutions
+- Verify driver registration: `odbcinst -q -d`
+- Test connection: `isql -v "DSN_STRING"`
+
 ### Edition-Specific Behavior
 
-The collector automatically adapts to different DB2 editions:
+The collector automatically adapts to different DB2 editions via ODBC:
 
-- **DB2 LUW**: Full feature set available
+- **DB2 LUW**: Full feature set available through ODBC
 - **DB2 for z/OS**: Limited buffer pool metrics, mainframe-specific features
-- **DB2 for i (AS/400)**: SYSIBMADM views not available, basic monitoring only
+- **DB2 for i (AS/400)**: SYSIBMADM views may not be available, basic monitoring
 - **Db2 on Cloud**: System-level metrics restricted
 
 ### Common Issues
 
+- **Connection refused**: Verify ODBC driver installation and DSN configuration
 - **SQL0204N errors**: Expected on older versions or limited editions. The collector logs which features are disabled.
 - **Missing metrics**: Check logs for feature availability messages. Some metrics are edition/version specific.
 - **Version detection**: The collector logs detected edition and version on startup.
-- **XA transaction failures**: XA connections are not supported against IBM i servers.
-- **Authentication failures**: Use SERVER authentication instead of CLIENT (not supported by IBM Data Server Driver).
+- **ODBC driver not found**: Check `/etc/odbcinst.ini` for proper driver registration.
 
 ### Logs to Monitor
 

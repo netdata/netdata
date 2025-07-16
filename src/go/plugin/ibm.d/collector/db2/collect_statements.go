@@ -109,6 +109,11 @@ func (d *DB2) collectStatementInstances(ctx context.Context) error {
 	})
 	
 	if err != nil {
+		// Handle specific ODBC driver issues with DB2 column types
+		if strings.Contains(err.Error(), "unsupported column type") {
+			d.logOnce("statement_cache_column_type", "Statement cache collection disabled due to unsupported column types (ODBC driver limitation): %v", err)
+			return nil // Don't fail collection, just skip statement cache
+		}
 		return err
 	}
 	

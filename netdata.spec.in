@@ -892,8 +892,9 @@ Requires: %{name} = %{version}
 Conflicts: %{name} < %{version}
 
 %description plugin-ibm
-This plugin adds IBM ecosystem collectors (AS/400, DB2, WebSphere) to the Netdata Agent.
-It requires IBM DB2 client libraries to be installed separately.
+This plugin adds IBM ecosystem collectors (AS/400, DB2, MQ, WebSphere) to the Netdata Agent.
+Database collectors (AS/400, DB2) use unixODBC exclusively and require appropriate ODBC drivers.
+MQ collectors require IBM MQ client libraries to be installed separately.
 
 %pre plugin-ibm
 

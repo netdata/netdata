@@ -5,7 +5,15 @@ package as400
 const (
 	// Individual queries for SYSTEM_STATUS_INFO columns for better resilience
 	// Core metrics that should always be available
-	queryAverageCPU = `SELECT AVERAGE_CPU_UTILIZATION FROM QSYS2.SYSTEM_STATUS_INFO`
+	// Fixed CPU calculation to show actual usage (not idle time)
+	queryAverageCPU = `
+		SELECT 
+			CASE 
+				WHEN ELAPSED_TIME > 0 THEN 
+					CAST(ROUND(DECIMAL(DECIMAL(ELAPSED_CPU_USED,19,2) / DECIMAL(ELAPSED_TIME,19,2),19,2), 2) AS DECIMAL(5,2))
+				ELSE 0
+			END AS AVERAGE_CPU_UTILIZATION 
+		FROM QSYS2.SYSTEM_STATUS_INFO`
 	querySystemASP  = `SELECT SYSTEM_ASP_USED FROM QSYS2.SYSTEM_STATUS_INFO`
 	queryActiveJobs = `SELECT ACTIVE_JOBS_IN_SYSTEM FROM QSYS2.SYSTEM_STATUS_INFO`
 
@@ -208,5 +216,106 @@ const (
 		WHERE SPECIFIC_SCHEMA = 'QSYS2'
 		  AND ROUTINE_NAME = 'IFS_OBJECT_STATISTICS'
 		  AND ROUTINE_TYPE = 'FUNCTION'
+	`
+
+	// Legacy fallback queries for older IBM i versions
+	queryDiskInstancesLegacy = `
+		SELECT 
+			UNIT_NUMBER,
+			UNIT_TYPE,
+			UNIT_MODEL,
+			PERCENT_BUSY,
+			READ_operations as READ_REQUESTS,
+			write_operations as WRITE_REQUESTS,
+			read_bytes as READ_BYTES,
+			write_bytes as WRITE_BYTES,
+			AVERAGE_REQUEST_TIME
+		FROM QSYS.SYSDISKSTAT
+	`
+
+	queryDiskStatusLegacy = `
+		SELECT 
+			AVG(PERCENT_BUSY) as AVG_DISK_BUSY
+		FROM QSYS.SYSDISKSTAT
+	`
+
+	// Optimized job queue fallback query (fixed for performance)
+	queryJobInfoFallback = `
+		SELECT 
+			COUNT(*) as JOB_QUEUE_LENGTH
+		FROM QSYS2.JOB_QUEUE_INFO
+		WHERE NUMBER_OF_JOBS > 0
+	`
+
+	// Job type breakdown fallback using system status
+	queryJobTypeBreakdownFallback = `
+		SELECT 
+			'BATCH' as JOB_TYPE,
+			BATCH_JOBS_IN_SYSTEM as COUNT
+		FROM QSYS2.SYSTEM_STATUS_INFO
+		UNION ALL
+		SELECT 
+			'INTERACTIVE' as JOB_TYPE,
+			INTERACTIVE_JOBS_IN_SYSTEM as COUNT
+		FROM QSYS2.SYSTEM_STATUS_INFO
+		UNION ALL
+		SELECT 
+			'SYSTEM' as JOB_TYPE,
+			SYSTEM_JOBS_IN_SYSTEM as COUNT
+		FROM QSYS2.SYSTEM_STATUS_INFO
+	`
+
+	// Active jobs fallback using subsystem info
+	queryActiveJobsFallback = `
+		SELECT 
+			SUBSYSTEM_NAME as JOB_NAME,
+			0 as CPU_TIME,
+			STORAGE_USED as TEMPORARY_STORAGE,
+			0 as JOB_ACTIVE_TIME,
+			0 as ELAPSED_CPU_PERCENTAGE
+		FROM QSYS2.SUBSYSTEM_INFO
+		WHERE STATUS = 'ACTIVE'
+		ORDER BY STORAGE_USED DESC
+		FETCH FIRST %d ROWS ONLY
+	`
+
+	// IFS usage fallback using ASP info
+	queryIFSUsageFallback = `
+		SELECT 
+			0 as FILE_COUNT,
+			(TOTAL_CAPACITY - TOTAL_CAPACITY_AVAILABLE) * 1024 * 1024 as TOTAL_SIZE,
+			(TOTAL_CAPACITY - TOTAL_CAPACITY_AVAILABLE) * 1024 * 1024 as ALLOCATED_SIZE
+		FROM QSYS2.ASP_INFO
+		WHERE ASP_NUMBER = 1
+	`
+
+	// Network interface monitoring
+	queryNetworkInterfaces = `
+		SELECT 
+			COUNT(CASE WHEN LINE_STATUS = 'ACTIVE' THEN 1 END) as ACTIVE_INTERFACES,
+			COUNT(CASE WHEN LINE_STATUS != 'ACTIVE' THEN 1 END) as INACTIVE_INTERFACES
+		FROM QSYS2.NETSTAT_INTERFACE_INFO
+	`
+
+	// Database performance monitoring (optimized with filters)
+	queryDatabasePerformance = `
+		SELECT 
+			SUM(NUMBER_ROWS) as TOTAL_ROWS,
+			SUM(LOGICAL_READS + PHYSICAL_READS) as TABLE_SCANS,
+			COUNT(*) as ACTIVE_TABLES
+		FROM QSYS2.SYSTABLESTAT
+		WHERE DAYS_USED_COUNT > 0 
+		  AND NUMBER_ROWS > 100
+		  AND (LOGICAL_READS + PHYSICAL_READS) > 1000
+		ORDER BY LOGICAL_READS + PHYSICAL_READS DESC
+		FETCH FIRST 20 ROWS ONLY
+	`
+
+	// Hardware resource monitoring
+	queryHardwareResources = `
+		SELECT 
+			COUNT(CASE WHEN RESOURCE_STATUS = 'OPERATIONAL' THEN 1 END) as OPERATIONAL,
+			COUNT(CASE WHEN RESOURCE_STATUS != 'OPERATIONAL' THEN 1 END) as NON_OPERATIONAL
+		FROM QSYS2.HARDWARE_RESOURCE_INFO
 	`
 )

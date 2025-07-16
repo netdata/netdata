@@ -38,6 +38,12 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 
 		// Check if column-organized table metrics are available
 		d.detectColumnOrganizedSupport(ctx)
+		
+		// Check if extended metrics are available
+		d.detectExtendedMetricsSupport(ctx)
+		
+		// Check if federation is configured
+		d.detectFederationSupport(ctx)
 	}
 
 	// Reset metrics
@@ -50,6 +56,7 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 		indexes:     make(map[string]indexInstanceMetrics),
 		statements:  make(map[string]statementInstanceMetrics),
 		memoryPools: make(map[string]memoryPoolInstanceMetrics),
+		memorySets:  make(map[string]memorySetInstanceMetrics),
 		tableIOs:    make(map[string]tableIOInstanceMetrics),
 	}
 
@@ -168,6 +175,26 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 				d.Errorf("failed to collect memory pools: %v", err)
 			}
 		}
+
+		// Screen 26: Collect Instance Memory Sets
+		d.Debugf("collecting memory set instances (Screen 26)")
+		if err := d.collectMemorySetInstances(ctx); err != nil {
+			if isSQLFeatureError(err) {
+				d.logOnce("memory_set_unavailable", "Memory set collection failed (likely unsupported on this DB2 edition/version): %v", err)
+			} else {
+				d.Errorf("failed to collect memory sets: %v", err)
+			}
+		}
+
+		// Screen 15: Collect Prefetchers
+		d.Debugf("collecting prefetcher instances (Screen 15)")
+		if err := d.collectPrefetcherInstances(ctx); err != nil {
+			if isSQLFeatureError(err) {
+				d.logOnce("prefetcher_unavailable", "Prefetcher collection failed (likely unsupported on this DB2 edition/version): %v", err)
+			} else {
+				d.Errorf("failed to collect prefetchers: %v", err)
+			}
+		}
 	}
 
 	if d.CollectWaitMetrics && d.CollectConnectionMetrics != nil && *d.CollectConnectionMetrics {
@@ -263,6 +290,34 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 		}
 	}
 
+	// Add memory set metrics
+	for setKey, metrics := range d.memorySets {
+		// Split the key to apply cleanName to each component
+		parts := strings.Split(setKey, ".")
+		if len(parts) >= 3 {
+			// Apply cleanName to match chart dimension IDs
+			setIdentifier := fmt.Sprintf("%s_%s_%s",
+				cleanName(parts[0]), // host name
+				cleanName(parts[1]), // db name
+				cleanName(parts[2])) // set type
+			// Add member if present
+			if len(parts) >= 4 {
+				setIdentifier += "_" + parts[3] // member number
+			}
+			for k, v := range stm.ToMap(metrics) {
+				mx[fmt.Sprintf("memory_set_%s_%s", setIdentifier, k)] = v
+			}
+		}
+	}
+
+	// Add prefetcher metrics
+	for bufferPoolName, metrics := range d.prefetchers {
+		cleanName := cleanName(bufferPoolName)
+		for k, v := range stm.ToMap(metrics) {
+			mx[fmt.Sprintf("prefetcher_%s_%s", cleanName, k)] = v
+		}
+	}
+
 	return mx, nil
 }
 
@@ -330,6 +385,22 @@ func (d *DB2) collectGlobalMetrics(ctx context.Context) error {
 	// Connection metrics - core functionality that should always work
 	if err := d.collectConnectionMetricsResilience(ctx); err != nil {
 		return err // Connection metrics are critical
+	}
+
+	// Database Overview metrics (Screen 01) - always collect if possible
+	if err := d.collectDatabaseOverview(ctx); err != nil {
+		d.Warningf("failed to collect database overview metrics: %v", err)
+	}
+	
+	// Enhanced Logging Performance metrics (Screen 18)
+	if err := d.collectLoggingPerformance(ctx); err != nil {
+		d.Warningf("failed to collect enhanced logging performance metrics: %v", err)
+	}
+	
+	// Federation metrics (Screen 32) - only if supported
+	if err := d.collectFederationMetrics(ctx); err != nil {
+		// Not logging as warning since federation might not be configured
+		d.Debugf("federation metrics collection skipped: %v", err)
 	}
 
 	// Use modern MON_GET_* functions for better performance when available
@@ -653,11 +724,11 @@ func (d *DB2) collectLogSpaceMetrics(ctx context.Context) error {
 			}
 		case "LOG_READS":
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				d.mx.LogReads = v
+				d.mx.LogIOReads = v
 			}
 		case "LOG_WRITES":
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				d.mx.LogWrites = v
+				d.mx.LogIOWrites = v
 			}
 		}
 	})
@@ -729,18 +800,52 @@ func (d *DB2) readRows(rows *sql.Rows, assign func(column, value string, lineEnd
 		valuePtrs[i] = &values[i]
 	}
 
-	for rows.Next() {
-		if err := rows.Scan(valuePtrs...); err != nil {
-			return err
+	// Track which query is being processed for better error reporting
+	var currentQuery string
+	if len(columns) > 0 {
+		// Try to identify query by column pattern
+		switch {
+		case contains(columns, "MEMORY_SET_TYPE", "MEMORY_SET_USED"):
+			currentQuery = "MON_GET_MEMORY_SET"
+		case contains(columns, "MEMORY_POOL_TYPE", "MEMORY_POOL_USED"):
+			currentQuery = "MON_GET_MEMORY_POOL"
+		default:
+			currentQuery = "unknown"
 		}
+	}
 
-		for i, column := range columns {
-			if values[i].Valid {
-				assign(column, values[i].String, i == len(columns)-1)
-			} else {
-				assign(column, "", i == len(columns)-1)
-			}
+	// Universal fix for ODBC driver issue with DB2/AS400 negative values
+	defer func() {
+		if r := recover(); r != nil {
+			// This is a known ODBC driver bug where it incorrectly handles certain DB2 data types
+			// The driver attempts to use negative values as slice indices, causing panics
+			d.Debugf("ODBC driver panic in %s query (columns: %v): %v", currentQuery, columns, r)
+			d.Debugf("This is a known ODBC driver limitation with certain DB2 data types")
 		}
+	}()
+
+	for rows.Next() {
+		// Wrap Scan in panic recovery as well since it can also trigger ODBC issues
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					d.Debugf("ODBC scan panic recovered: %v", r)
+				}
+			}()
+			
+			if err := rows.Scan(valuePtrs...); err != nil {
+				d.Debugf("Row scan error: %v", err)
+				return
+			}
+
+			for i, column := range columns {
+				if values[i].Valid {
+					assign(column, values[i].String, i == len(columns)-1)
+				} else {
+					assign(column, "", i == len(columns)-1)
+				}
+			}
+		}()
 	}
 
 	return rows.Err()
@@ -775,15 +880,24 @@ func (d *DB2) collectBackupStatus(ctx context.Context) error {
 	queryCtx, cancel := context.WithTimeout(ctx, time.Duration(d.Timeout))
 	defer cancel()
 
-	// Get the most recent backup attempt
-	err := d.db.QueryRowContext(queryCtx, `
-		SELECT SQLCODE, START_TIME
-		FROM SYSIBMADM.DB_HISTORY 
-		WHERE OPERATION = 'B' 
-		  AND OPERATIONTYPE = 'F'
-		ORDER BY START_TIME DESC
-		FETCH FIRST 1 ROW ONLY
-	`).Scan(&lastBackupSQLCode, &lastBackupTime)
+	// Get the most recent backup attempt with ODBC-safe error handling
+	var err error
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				d.Debugf("backup history query failed due to ODBC driver issue: %v", r)
+				err = fmt.Errorf("odbc driver error: %v", r)
+			}
+		}()
+		err = d.db.QueryRowContext(queryCtx, `
+			SELECT SQLCODE, START_TIME
+			FROM SYSIBMADM.DB_HISTORY 
+			WHERE OPERATION = 'B' 
+			  AND OPERATIONTYPE = 'F'
+			ORDER BY START_TIME DESC
+			FETCH FIRST 1 ROW ONLY
+		`).Scan(&lastBackupSQLCode, &lastBackupTime)
+	}()
 
 	if err == nil && lastBackupSQLCode.Valid {
 		// Check if the last backup was successful (SQLCODE = 0)
@@ -797,15 +911,23 @@ func (d *DB2) collectBackupStatus(ctx context.Context) error {
 		d.mx.LastBackupStatus = 0 // Don't raise alert if no backup history
 	}
 
-	// Get the last successful full backup
+	// Get the last successful full backup with ODBC-safe error handling
 	var lastFullBackup sql.NullString
-	err = d.db.QueryRowContext(queryCtx, `
-		SELECT MAX(START_TIME) 
-		FROM SYSIBMADM.DB_HISTORY 
-		WHERE OPERATION = 'B' 
-		  AND OPERATIONTYPE = 'F' 
-		  AND SQLCODE = 0
-	`).Scan(&lastFullBackup)
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				d.Debugf("full backup query failed due to ODBC driver issue: %v", r)
+				err = fmt.Errorf("odbc driver error: %v", r)
+			}
+		}()
+		err = d.db.QueryRowContext(queryCtx, `
+			SELECT MAX(START_TIME) 
+			FROM SYSIBMADM.DB_HISTORY 
+			WHERE OPERATION = 'B' 
+			  AND OPERATIONTYPE = 'F' 
+			  AND SQLCODE = 0
+		`).Scan(&lastFullBackup)
+	}()
 
 	if err == nil && lastFullBackup.Valid {
 		if t, err := time.Parse("2006-01-02-15.04.05", lastFullBackup.String); err == nil {
@@ -819,15 +941,23 @@ func (d *DB2) collectBackupStatus(ctx context.Context) error {
 		d.mx.LastFullBackupAge = 720 // 30 days in hours - old but reasonable
 	}
 
-	// Get the last successful incremental backup
+	// Get the last successful incremental backup with ODBC-safe error handling
 	var lastIncrementalBackup sql.NullString
-	err = d.db.QueryRowContext(queryCtx, `
-		SELECT MAX(START_TIME) 
-		FROM SYSIBMADM.DB_HISTORY 
-		WHERE OPERATION = 'B' 
-		  AND OPERATIONTYPE IN ('I', 'O', 'D') 
-		  AND SQLCODE = 0
-	`).Scan(&lastIncrementalBackup)
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				d.Debugf("incremental backup query failed due to ODBC driver issue: %v", r)
+				err = fmt.Errorf("odbc driver error: %v", r)
+			}
+		}()
+		err = d.db.QueryRowContext(queryCtx, `
+			SELECT MAX(START_TIME) 
+			FROM SYSIBMADM.DB_HISTORY 
+			WHERE OPERATION = 'B' 
+			  AND OPERATIONTYPE IN ('I', 'O', 'D') 
+			  AND SQLCODE = 0
+		`).Scan(&lastIncrementalBackup)
+	}()
 
 	if err == nil && lastIncrementalBackup.Valid {
 		if t, err := time.Parse("2006-01-02-15.04.05", lastIncrementalBackup.String); err == nil {
@@ -1163,13 +1293,13 @@ func (d *DB2) collectLogSpaceMetricsResilience(ctx context.Context) {
 
 	_ = d.collectSingleMetric(ctx, "log_reads", queryLogReads, func(value string) {
 		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-			d.mx.LogReads = v
+			d.mx.LogIOReads = v
 		}
 	})
 
 	_ = d.collectSingleMetric(ctx, "log_writes", queryLogWrites, func(value string) {
 		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-			d.mx.LogWrites = v
+			d.mx.LogIOWrites = v
 		}
 	})
 
@@ -1422,12 +1552,368 @@ func (d *DB2) collectMonGetTransactionLog(ctx context.Context) error {
 			}
 		case "LOG_READS":
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				d.mx.LogReads = v
+				d.mx.LogIOReads = v
 			}
 		case "LOG_WRITES":
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				d.mx.LogWrites = v
+				d.mx.LogIOWrites = v
 			}
 		}
 	})
+}
+
+// Database Overview collection (Screen 01)
+func (d *DB2) collectDatabaseOverview(ctx context.Context) error {
+	// Use simple queries approach (based on dcmtop) for more resilience
+	// Run multiple simple queries instead of one complex query
+	
+	// Helper function to run a simple query and handle errors gracefully
+	// It tries the MON_GET query first, then falls back to SNAP query if that fails
+	runSimpleQuery := func(queryMonGet, querySnap string, handler func(column, value string)) {
+		var err error
+		if d.useMonGetFunctions && queryMonGet != "" {
+			err = d.doQuery(ctx, queryMonGet, func(column, value string, lineEnd bool) {
+				handler(column, value)
+			})
+			if err != nil && isSQLFeatureError(err) {
+				d.Debugf("MON_GET query not supported, trying SNAP query: %v", err)
+				if querySnap != "" {
+					err = d.doQuery(ctx, querySnap, func(column, value string, lineEnd bool) {
+						handler(column, value)
+					})
+				}
+			}
+		} else if querySnap != "" {
+			err = d.doQuery(ctx, querySnap, func(column, value string, lineEnd bool) {
+				handler(column, value)
+			})
+		}
+		if err != nil {
+			d.Debugf("query failed (will continue): %v", err)
+		}
+	}
+	
+	// Database status
+	runSimpleQuery(querySimpleDatabaseStatus, querySnapDatabaseStatus, func(column, value string) {
+		if column == "DATABASE_STATUS" && value == "ACTIVE" {
+			d.mx.DatabaseActive = 1
+			d.mx.DatabaseInactive = 0
+		} else {
+			d.mx.DatabaseActive = 0
+			d.mx.DatabaseInactive = 1
+		}
+	})
+	
+	// CPU metrics
+	// Temporary storage for raw nanosecond values
+	var cpuUserNs, cpuSystemNs, cpuIdleNs, cpuIowaitNs float64
+	
+	runSimpleQuery(querySimpleCPUSystem, "", func(column, value string) {
+		switch column {
+		case "CPU_USER_TOTAL":
+			if v, err := strconv.ParseFloat(value, 64); err == nil {
+				cpuUserNs = v // Store raw nanoseconds
+			}
+		case "CPU_SYSTEM_TOTAL":
+			if v, err := strconv.ParseFloat(value, 64); err == nil {
+				cpuSystemNs = v
+			}
+		case "CPU_IDLE_TOTAL":
+			if v, err := strconv.ParseFloat(value, 64); err == nil {
+				cpuIdleNs = v
+			}
+		case "CPU_IOWAIT_TOTAL":
+			if v, err := strconv.ParseFloat(value, 64); err == nil {
+				cpuIowaitNs = v
+			}
+		}
+	})
+	
+	// Convert nanoseconds to percentages
+	totalNs := cpuUserNs + cpuSystemNs + cpuIdleNs + cpuIowaitNs
+	if totalNs > 0 {
+		// Calculate percentages and apply Precision for storage
+		d.mx.CPUUser = int64((cpuUserNs / totalNs) * 100 * Precision)
+		d.mx.CPUSystem = int64((cpuSystemNs / totalNs) * 100 * Precision)
+		d.mx.CPUIdle = int64((cpuIdleNs / totalNs) * 100 * Precision)
+		d.mx.CPUIowait = int64((cpuIowaitNs / totalNs) * 100 * Precision)
+	}
+	
+	// Connection metrics
+	runSimpleQuery(querySimpleConnectionsActive, querySnapConnectionsActive, func(column, value string) {
+		if column == "ACTIVE_CONNECTIONS" {
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.ConnectionsActive = v
+			}
+		}
+	})
+	
+	runSimpleQuery(querySimpleConnectionsTotal, querySnapConnectionsTotal, func(column, value string) {
+		if column == "TOTAL_CONNECTIONS" {
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.ConnectionsTotal = v
+			}
+		}
+	})
+	
+	// Memory metrics
+	runSimpleQuery(querySimpleMemoryInstance, "", func(column, value string) {
+		if column == "INSTANCE_MEM_COMMITTED" {
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.MemoryInstanceCommitted = v
+			}
+		}
+	})
+	
+	runSimpleQuery(querySimpleMemoryDatabase, "", func(column, value string) {
+		if column == "DATABASE_MEM_COMMITTED" {
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.MemoryDatabaseCommitted = v
+			}
+		}
+	})
+	
+	runSimpleQuery(querySimpleMemoryBufferpool, "", func(column, value string) {
+		if column == "BUFFERPOOL_MEM_USED" {
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.MemoryBufferpoolUsed = v
+			}
+		}
+	})
+	
+	runSimpleQuery(querySimpleMemorySharedSort, "", func(column, value string) {
+		if column == "SHARED_SORT_MEM_USED" {
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.MemorySharedSortUsed = v
+			}
+		}
+	})
+	
+	// Throughput metrics
+	runSimpleQuery(querySimpleTransactions, querySnapTransactions, func(column, value string) {
+		if column == "TRANSACTIONS" {
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.OpsTransactions = v
+			}
+		}
+	})
+	
+	runSimpleQuery(querySimpleSelectStmts, querySnapSelectStmts, func(column, value string) {
+		if column == "SELECT_STMTS" {
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.OpsSelectStmts = v
+			}
+		}
+	})
+	
+	runSimpleQuery(querySimpleUIDStmts, querySnapUIDStmts, func(column, value string) {
+		if column == "UID_STMTS" {
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.OpsUIDStmts = v
+			}
+		}
+	})
+	
+	runSimpleQuery(querySimpleActivitiesAborted, "", func(column, value string) {
+		if column == "ACTIVITIES_ABORTED" {
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.OpsActivitiesAborted = v
+			}
+		}
+	})
+	
+	// Time spent metrics
+	runSimpleQuery(querySimpleAvgDirectReadTime, querySnapAvgDirectReadTime, func(column, value string) {
+		if column == "AVG_DIRECT_READ_TIME" {
+			if v, err := strconv.ParseFloat(value, 64); err == nil {
+				d.mx.TimeAvgDirectRead = int64(v * Precision * 1000) // Convert to microseconds
+			}
+		}
+	})
+	
+	runSimpleQuery(querySimpleAvgDirectWriteTime, querySnapAvgDirectWriteTime, func(column, value string) {
+		if column == "AVG_DIRECT_WRITE_TIME" {
+			if v, err := strconv.ParseFloat(value, 64); err == nil {
+				d.mx.TimeAvgDirectWrite = int64(v * Precision * 1000)
+			}
+		}
+	})
+	
+	runSimpleQuery(querySimpleAvgPoolReadTime, querySnapAvgPoolReadTime, func(column, value string) {
+		if column == "AVG_POOL_READ_TIME" {
+			if v, err := strconv.ParseFloat(value, 64); err == nil {
+				d.mx.TimeAvgPoolRead = int64(v * Precision * 1000)
+			}
+		}
+	})
+	
+	runSimpleQuery(querySimpleAvgPoolWriteTime, querySnapAvgPoolWriteTime, func(column, value string) {
+		if column == "AVG_POOL_WRITE_TIME" {
+			if v, err := strconv.ParseFloat(value, 64); err == nil {
+				d.mx.TimeAvgPoolWrite = int64(v * Precision * 1000)
+			}
+		}
+	})
+	
+	// Additional metrics that were not in the original complex query
+	// but are collected by dcmtop
+	
+	// Lock metrics
+	runSimpleQuery(querySimpleLockHeld, querySnapLockHeld, func(column, value string) {
+		if column == "LOCKS_HELD" {
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.LockActive = v
+			}
+		}
+	})
+	
+	runSimpleQuery(querySimpleLockWaits, querySnapLockWaits, func(column, value string) {
+		if column == "LOCK_WAITS" {
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.LockWaits = v
+			}
+		}
+	})
+	
+	runSimpleQuery(querySimpleLockTimeouts, querySnapLockTimeouts, func(column, value string) {
+		if column == "LOCK_TIMEOUTS" {
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.LockTimeouts = v
+			}
+		}
+	})
+	
+	runSimpleQuery(querySimpleDeadlocks, querySnapDeadlocks, func(column, value string) {
+		if column == "DEADLOCKS" {
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.Deadlocks = v
+			}
+		}
+	})
+	
+	// Log operations
+	runSimpleQuery(querySimpleLogReads, querySnapLogReads, func(column, value string) {
+		if column == "LOG_READS" {
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.LogOpReads = v
+			}
+		}
+	})
+	
+	runSimpleQuery(querySimpleLogWrites, querySnapLogWrites, func(column, value string) {
+		if column == "LOG_WRITES" {
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.LogOpWrites = v
+			}
+		}
+	})
+	
+	// Sorts
+	runSimpleQuery(querySimpleSorts, querySnapSorts, func(column, value string) {
+		if column == "SORTS" {
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.TotalSorts = v
+			}
+		}
+	})
+	
+	runSimpleQuery(querySimpleSortOverflows, querySnapSortOverflows, func(column, value string) {
+		if column == "SORT_OVERFLOWS" {
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.SortOverflows = v
+			}
+		}
+	})
+	
+	return nil // Always return nil since we run queries individually and handle errors gracefully
+}
+
+// Enhanced Logging Performance collection (Screen 18)
+func (d *DB2) collectLoggingPerformance(ctx context.Context) error {
+	// Use individual tested queries from dcmtop instead of complex combined queries
+	
+	// Collect log commits (from TOTAL_APP_COMMITS)
+	_ = d.collectSingleMetric(ctx, "log_commits", queryLogCommits, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.LogCommits = v
+		}
+	})
+	
+	// Collect log rollbacks (from TOTAL_APP_ROLLBACKS)
+	_ = d.collectSingleMetric(ctx, "log_rollbacks", queryLogRollbacks, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.LogRollbacks = v
+		}
+	})
+	
+	// Collect log I/O reads (from NUM_LOG_READ_IO)
+	_ = d.collectSingleMetric(ctx, "log_io_reads", queryLoggingReads, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.LogIOReads = v
+		}
+	})
+	
+	// Collect log I/O writes (from NUM_LOG_WRITE_IO)
+	_ = d.collectSingleMetric(ctx, "log_io_writes", queryLoggingWrites, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.LogIOWrites = v
+		}
+	})
+	
+	return nil
+}
+
+// Federation metrics collection (Screen 32)
+func (d *DB2) collectFederationMetrics(ctx context.Context) error {
+	// Skip if federation is not supported
+	if !d.supportsFederation {
+		return nil
+	}
+	
+	query := queryFederationMetrics
+	if !d.supportsExtendedMetrics {
+		query = queryFederationMetricsSimple
+	}
+	
+	return d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+		switch column {
+		case "FED_CONNECTIONS_ACTIVE":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.FedConnectionsActive = v
+			}
+		case "FED_CONNECTIONS_IDLE":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.FedConnectionsIdle = v
+			}
+		case "FED_ROWS_READ":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.FedRowsRead = v
+			}
+		case "FED_SELECT_STMTS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.FedSelectStmts = v
+			}
+		case "FED_WAITS_TOTAL":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.FedWaitsTotal = v
+			}
+		}
+	})
+}
+
+// contains is a helper function to check if all target strings are present in the slice
+func contains(slice []string, targets ...string) bool {
+	for _, target := range targets {
+		found := false
+		for _, s := range slice {
+			if s == target {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }

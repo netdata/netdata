@@ -8,6 +8,15 @@ import (
 
 var (
 	baseCharts = module.Charts{
+		// Overview charts (Screen 01)
+		databaseStatusChart.Copy(),
+		cpuUsageChart.Copy(),
+		activeConnectionsChart.Copy(),
+		memoryUsageChart.Copy(),
+		throughputOperationsChart.Copy(),
+		timeSpentChart.Copy(),
+		
+		// Existing charts
 		serviceHealthChart.Copy(),
 		connectionsChart.Copy(),
 		lockingChart.Copy(),
@@ -26,12 +35,23 @@ var (
 		bufferpoolIndexReadsChart.Copy(),
 		bufferpoolXDAReadsChart.Copy(),
 		bufferpoolColumnReadsChart.Copy(),
+		
+		// Enhanced logging charts (Screen 18)
+		logOperationsChart.Copy(),
+		logTimingChart.Copy(),
+		logBufferEventsChart.Copy(),
+		
+		// Existing log charts
 		logSpaceChart.Copy(),
 		logUtilizationChart.Copy(),
 		logIOChart.Copy(),
 		longRunningQueriesChart.Copy(),
 		backupStatusChart.Copy(),
 		backupAgeChart.Copy(),
+		
+		// Federation charts (Screen 32)
+		federationConnectionsChart.Copy(),
+		federationOperationsChart.Copy(),
 	}
 )
 
@@ -318,8 +338,8 @@ var (
 		Priority: module.Priority + 52,
 		Type:     module.Area,
 		Dims: module.Dims{
-			{ID: "log_reads", Name: "reads", Algo: module.Incremental},
-			{ID: "log_writes", Name: "writes", Algo: module.Incremental, Mul: -1},
+			{ID: "log_io_reads", Name: "reads", Algo: module.Incremental},
+			{ID: "log_io_writes", Name: "writes", Algo: module.Incremental, Mul: -1},
 		},
 	}
 
@@ -360,6 +380,165 @@ var (
 		Dims: module.Dims{
 			{ID: "last_full_backup_age", Name: "full"},
 			{ID: "last_incremental_backup_age", Name: "incremental"},
+		},
+	}
+
+	// Database Overview charts (Screen 01)
+	databaseStatusChart = module.Chart{
+		ID:       "database_status",
+		Title:    "Database Status",
+		Units:    "status",
+		Fam:      "overview",
+		Ctx:      "db2.database_status",
+		Priority: module.Priority - 100,
+		Dims: module.Dims{
+			{ID: "database_active", Name: "active"},
+			{ID: "database_inactive", Name: "inactive"},
+		},
+	}
+
+	cpuUsageChart = module.Chart{
+		ID:       "cpu_usage",
+		Title:    "CPU Usage (100% = 1 CPU core)",
+		Units:    "percentage",
+		Fam:      "overview",
+		Ctx:      "db2.cpu_usage",
+		Priority: module.Priority - 99,
+		Type:     module.Stacked,
+		Dims: module.Dims{
+			{ID: "cpu_user", Name: "user", Div: Precision},
+			{ID: "cpu_system", Name: "system", Div: Precision},
+			{ID: "cpu_idle", Name: "idle", Div: Precision},
+			{ID: "cpu_iowait", Name: "iowait", Div: Precision},
+		},
+	}
+
+	activeConnectionsChart = module.Chart{
+		ID:       "active_connections",
+		Title:    "Active Connections",
+		Units:    "connections",
+		Fam:      "overview",
+		Ctx:      "db2.active_connections",
+		Priority: module.Priority - 98,
+		Dims: module.Dims{
+			{ID: "connections_active", Name: "active"},
+			{ID: "connections_total", Name: "total"},
+		},
+	}
+
+	memoryUsageChart = module.Chart{
+		ID:       "memory_usage",
+		Title:    "Memory Usage",
+		Units:    "MB",
+		Fam:      "overview",
+		Ctx:      "db2.memory_usage",
+		Priority: module.Priority - 97,
+		Type:     module.Stacked,
+		Dims: module.Dims{
+			{ID: "memory_database_committed", Name: "database", Div: 1048576},
+			{ID: "memory_instance_committed", Name: "instance", Div: 1048576},
+			{ID: "memory_bufferpool_used", Name: "bufferpool", Div: 1048576},
+			{ID: "memory_shared_sort_used", Name: "shared_sort", Div: 1048576},
+		},
+	}
+
+	throughputOperationsChart = module.Chart{
+		ID:       "throughput_operations",
+		Title:    "Database Operations",
+		Units:    "operations/s",
+		Fam:      "overview",
+		Ctx:      "db2.throughput_operations",
+		Priority: module.Priority - 96,
+		Dims: module.Dims{
+			{ID: "ops_select_stmts", Name: "selects", Algo: module.Incremental},
+			{ID: "ops_uid_stmts", Name: "uid_stmts", Algo: module.Incremental},
+			{ID: "ops_transactions", Name: "transactions", Algo: module.Incremental},
+			{ID: "ops_activities_aborted", Name: "aborted", Algo: module.Incremental},
+		},
+	}
+
+	timeSpentChart = module.Chart{
+		ID:       "time_spent",
+		Title:    "Average Operation Times",
+		Units:    "milliseconds",
+		Fam:      "overview",
+		Ctx:      "db2.time_spent",
+		Priority: module.Priority - 95,
+		Dims: module.Dims{
+			{ID: "time_avg_direct_read", Name: "direct_read", Div: 1000},
+			{ID: "time_avg_direct_write", Name: "direct_write", Div: 1000},
+			{ID: "time_avg_pool_read", Name: "pool_read", Div: 1000},
+			{ID: "time_avg_pool_write", Name: "pool_write", Div: 1000},
+		},
+	}
+
+	// Enhanced logging charts (Screen 18)
+	logOperationsChart = module.Chart{
+		ID:       "log_operations",
+		Title:    "Log Operations",
+		Units:    "operations/s",
+		Fam:      "logging",
+		Ctx:      "db2.log_operations",
+		Priority: module.Priority + 53,
+		Dims: module.Dims{
+			{ID: "log_commits", Name: "commits", Algo: module.Incremental},
+			{ID: "log_rollbacks", Name: "rollbacks", Algo: module.Incremental},
+			{ID: "log_op_reads", Name: "reads", Algo: module.Incremental},
+			{ID: "log_op_writes", Name: "writes", Algo: module.Incremental},
+		},
+	}
+
+	logTimingChart = module.Chart{
+		ID:       "log_timing",
+		Title:    "Log Operation Times",
+		Units:    "milliseconds",
+		Fam:      "logging",
+		Ctx:      "db2.log_timing",
+		Priority: module.Priority + 54,
+		Dims: module.Dims{
+			{ID: "log_avg_commit_time", Name: "avg_commit", Div: 1000},
+			{ID: "log_avg_read_time", Name: "avg_read", Div: 1000},
+			{ID: "log_avg_write_time", Name: "avg_write", Div: 1000},
+		},
+	}
+
+	logBufferEventsChart = module.Chart{
+		ID:       "log_buffer_events",
+		Title:    "Log Buffer Full Events",
+		Units:    "events/s",
+		Fam:      "logging",
+		Ctx:      "db2.log_buffer_events",
+		Priority: module.Priority + 55,
+		Dims: module.Dims{
+			{ID: "log_buffer_full_events", Name: "buffer_full", Algo: module.Incremental},
+		},
+	}
+
+	// Federation charts (Screen 32)
+	federationConnectionsChart = module.Chart{
+		ID:       "federation_connections",
+		Title:    "Federated Connections",
+		Units:    "connections",
+		Fam:      "federation",
+		Ctx:      "db2.federation_connections",
+		Priority: module.Priority + 80,
+		Dims: module.Dims{
+			{ID: "fed_connections_active", Name: "active"},
+			{ID: "fed_connections_idle", Name: "idle"},
+		},
+	}
+
+	federationOperationsChart = module.Chart{
+		ID:       "federation_operations",
+		Title:    "Federated Operations",
+		Units:    "operations/s",
+		Fam:      "federation",
+		Ctx:      "db2.federation_operations",
+		Priority: module.Priority + 81,
+		Dims: module.Dims{
+			{ID: "fed_rows_read", Name: "rows_read", Algo: module.Incremental},
+			{ID: "fed_select_stmts", Name: "selects", Algo: module.Incremental},
+			{ID: "fed_waits_total", Name: "waits", Algo: module.Incremental},
 		},
 	}
 )

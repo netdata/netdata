@@ -58,8 +58,14 @@ modules:
           - Memory pool usage and high water marks
           - Table I/O statistics (scans, reads, DML activity)
         method_description: |
-          The collector uses IBM DB2 driver to connect to the database and queries system catalog tables
-          in SYSIBMADM schema to gather performance metrics.
+          The collector uses unixODBC with IBM DB2 ODBC drivers to connect to the database and queries 
+          system catalog tables in SYSIBMADM schema to gather performance metrics.
+          
+          **Key Benefits of ODBC Approach:**
+          - No IBM DB2 client library licensing required
+          - Works with both DB2 and AS/400 systems  
+          - Simplified deployment and configuration
+          - Consistent behavior across all IBM database types
           
           For DB2 9.7+ LUW editions, the collector also uses MON_GET_* table functions for:
           - Statement cache analysis (MON_GET_PKG_CACHE_STMT)
@@ -106,15 +112,22 @@ modules:
               This collector is part of the ibm.d.plugin which requires CGO and is not included in the default build.
               See the AS/400 collector documentation for build instructions.
 
-          - title: IBM DB2 Client Libraries
+          - title: ODBC Driver Setup
             description: |
-              Netdata automatically downloads and installs IBM Data Server Driver Package v12.1.0.
+              This collector uses unixODBC exclusively for database connectivity, eliminating IBM DB2 client library licensing requirements.
               
-              **Important Restrictions:**
-              - **XA Connections**: Not supported against IBM i servers
-              - **CLIENT Authentication**: Not supported by the IBM Data Server Driver
+              **Required Components:**
+              1. **unixODBC driver manager**: `sudo apt-get install unixodbc` or `sudo yum install unixODBC`
+              2. **IBM DB2 ODBC drivers**: Available from:
+                 - IBM Data Server Driver Package (includes ODBC drivers)
+                 - IBM i Access Client Solutions (for AS/400 connectivity)
+                 - Distribution packages (e.g., `ibm-db2-odbc`)
+              3. **Driver registration**: Verify with `odbcinst -q -d`
               
-              For complete restrictions and limitations, see [IBM Data Server Driver Restrictions](https://www.ibm.com/docs/en/db2/12.1.0?topic=drivers-data-server-driver-restrictions).
+              **Benefits:**
+              - ✅ **No IBM DB2 client library licensing required**
+              - ✅ **Works with both DB2 and AS/400 systems**
+              - ✅ **Simplified deployment and configuration**
 
           - title: Database User Permissions
             description: |
@@ -148,20 +161,66 @@ modules:
               default_value: 5
               required: false
             - name: dsn
-              description: IBM DB2 connection string.
+              description: ODBC connection string (alternative to component-based config).
               default_value: ""
-              required: true
+              required: false
               detailed_description: |
-                The connection string format:
-                `DATABASE=dbname;HOSTNAME=host;PORT=port;PROTOCOL=TCPIP;UID=username;PWD=password`
+                ODBC connection string format:
+                `Driver={IBM DB2 ODBC DRIVER};Database=dbname;Hostname=host;Port=port;Protocol=TCPIP;Uid=username;Pwd=password`
 
                 For SSL connections, add:
-                `;SECURITY=SSL;SSLServerCertificate=/path/to/certificate.crt`
-
+                `;Security=SSL;SSLServerCertificate=/path/to/certificate.crt`
+            - name: hostname
+              description: Database server hostname or IP address.
+              default_value: ""
+              required: false
+              detailed_description: |
+                Use with component-based configuration instead of DSN string.
+                Required when not using DSN parameter.
+            - name: port
+              description: Database server port number.
+              default_value: 0
+              required: false
+              detailed_description: |
                 Common ports:
                 - 50000: Default for DB2 LUW
-                - 446: Default for DB2 for i
+                - 446: Default for DB2 for i (AS/400)
                 - 5023: Common for DB2 z/OS
+            - name: database
+              description: Database name to connect to.
+              default_value: ""
+              required: false
+              detailed_description: |
+                The target database name. Required when using component-based configuration.
+            - name: username
+              description: Database username.
+              default_value: ""
+              required: false
+              detailed_description: |
+                Database user with SELECT permissions on SYSIBMADM views.
+            - name: password
+              description: Database password.
+              default_value: ""
+              required: false
+              detailed_description: |
+                Password for the database user.
+            - name: use_ssl
+              description: Enable SSL/TLS encryption.
+              default_value: false
+              required: false
+            - name: ssl_server_cert_path
+              description: Path to SSL server certificate file.
+              default_value: ""
+              required: false
+            - name: odbc_driver
+              description: ODBC driver name (auto-detected if not specified).
+              default_value: ""
+              required: false
+              detailed_description: |
+                ODBC driver name. Common values:
+                - "IBM DB2 ODBC DRIVER" (for DB2 LUW)
+                - "IBM i Access ODBC Driver" (for AS/400)
+                Auto-detected based on available drivers if not specified.
             - name: timeout
               description: Query timeout in seconds.
               default_value: 2
@@ -329,25 +388,45 @@ modules:
             title: Config examples
             enabled: true
           list:
-            - name: Basic DB2 LUW connection
-              description: Connect to DB2 on Linux/Unix/Windows.
+            - name: Component-based configuration (recommended)
+              description: Connect using component parameters (automatically uses ODBC).
               config: |
                 jobs:
                   - name: db2_prod
-                    dsn: 'DATABASE=sample;HOSTNAME=db2.example.com;PORT=50000;PROTOCOL=TCPIP;UID=db2inst1;PWD=password'
+                    hostname: db2.example.com
+                    port: 50000
+                    database: sample
+                    username: db2inst1
+                    password: password
+            - name: ODBC DSN string format
+              description: Connect using ODBC connection string.
+              config: |
+                jobs:
+                  - name: db2_odbc
+                    dsn: 'Driver={IBM DB2 ODBC DRIVER};Database=sample;Hostname=db2.example.com;Port=50000;Protocol=TCPIP;Uid=db2inst1;Pwd=password'
             - name: DB2 on Cloud with SSL
-              description: Connect to IBM Db2 on Cloud.
+              description: Connect to IBM Db2 on Cloud using SSL.
               config: |
                 jobs:
                   - name: db2_cloud
-                    dsn: 'DATABASE=bludb;HOSTNAME=dashdb-txn-sbox-yp-dal09-14.services.dal.bluemix.net;PORT=50001;PROTOCOL=TCPIP;UID=username;PWD=password;SECURITY=SSL;SSLServerCertificate=/path/to/DigiCertGlobalRootCA.crt'
-                    timeout: 5
+                    hostname: xxx.databases.appdomain.cloud
+                    port: 32733
+                    database: bludb
+                    username: your_username
+                    password: your_password
+                    use_ssl: true
+                    ssl_server_cert_path: "/path/to/DigiCertGlobalRootCA.crt"
+                    timeout: 10
             - name: Limited cardinality monitoring
               description: Monitor with cardinality limits to prevent resource exhaustion.
               config: |
                 jobs:
                   - name: db2_limited
-                    dsn: 'DATABASE=sample;HOSTNAME=db2.example.com;PORT=50000;PROTOCOL=TCPIP;UID=db2inst1;PWD=password'
+                    hostname: db2.example.com
+                    port: 50000
+                    database: sample
+                    username: db2inst1
+                    password: password
                     max_databases: 5
                     max_tablespaces: 50
                     max_connections: 100
@@ -357,7 +436,11 @@ modules:
               config: |
                 jobs:
                   - name: db2_custom
-                    dsn: 'DATABASE=sample;HOSTNAME=db2custom.example.com;PORT=50000;PROTOCOL=TCPIP;UID=db2inst1;PWD=password'
+                    hostname: db2custom.example.com
+                    port: 50000
+                    database: sample
+                    username: db2inst1
+                    password: password
                     # Enable features explicitly - collector will attempt them regardless of detected edition
                     collect_database_metrics: true
                     collect_bufferpool_metrics: true
@@ -367,12 +450,14 @@ modules:
       problems:
         list:
           - name: Connection refused
-            description: Unable to connect to DB2 database.
+            description: Unable to connect to DB2 database via ODBC.
             recommendations:
               - Verify the database hostname/IP is correct and reachable
               - Check if the DB2 port is open (common ports: 50000, 446, 5023)
               - Verify the database name and credentials are correct
-              - Ensure IBM DB2 client libraries are installed and accessible
+              - Ensure unixODBC and IBM DB2 ODBC drivers are installed
+              - Check ODBC driver registration with `odbcinst -q -d`
+              - Test connection with `isql -v "CONNECTION_STRING"`
           - name: Permission denied on SYSIBMADM views
             description: User doesn't have permission to query system views.
             recommendations:
