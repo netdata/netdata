@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- Fix log message format for buffered reader error [\#20687](https://github.com/netdata/netdata/pull/20687) ([stelfrag](https://github.com/stelfrag))
+- Fix systemd-journal-plugin RPM package. [\#20686](https://github.com/netdata/netdata/pull/20686) ([Ferroin](https://github.com/Ferroin))
+- Remove Ubuntu 24.10 from CI and package builds. [\#20681](https://github.com/netdata/netdata/pull/20681) ([Ferroin](https://github.com/Ferroin))
+- chore\(charts.d\): suppress broken pipe error from echo during cleanup [\#20680](https://github.com/netdata/netdata/pull/20680) ([ilyam8](https://github.com/ilyam8))
+- Fix deadlock in dictionary cleanup [\#20679](https://github.com/netdata/netdata/pull/20679) ([stelfrag](https://github.com/stelfrag))
+- Agent docs alignement [\#20676](https://github.com/netdata/netdata/pull/20676) ([kanelatechnical](https://github.com/kanelatechnical))
 - Regenerate integrations docs [\#20675](https://github.com/netdata/netdata/pull/20675) ([netdatabot](https://github.com/netdatabot))
 - feat\(go.d/snmp\): enable table metrics by default [\#20674](https://github.com/netdata/netdata/pull/20674) ([ilyam8](https://github.com/ilyam8))
 - Code cleanup [\#20673](https://github.com/netdata/netdata/pull/20673) ([stelfrag](https://github.com/stelfrag))
@@ -454,12 +460,6 @@
 - improvement\(cgroups\): filter systemd-nspawn payload by default [\#20155](https://github.com/netdata/netdata/pull/20155) ([ilyam8](https://github.com/ilyam8))
 - Fix compilation with DBENGINE disabled [\#20154](https://github.com/netdata/netdata/pull/20154) ([stelfrag](https://github.com/stelfrag))
 - build\(deps\): bump github.com/docker/docker from 28.0.4+incompatible to 28.1.1+incompatible in /src/go [\#20153](https://github.com/netdata/netdata/pull/20153) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/invopop/jsonschema from 0.12.0 to 0.13.0 in /src/go [\#20152](https://github.com/netdata/netdata/pull/20152) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/go-ldap/ldap/v3 from 3.4.10 to 3.4.11 in /src/go [\#20151](https://github.com/netdata/netdata/pull/20151) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/gosnmp/gosnmp from 1.39.0 to 1.40.0 in /src/go [\#20149](https://github.com/netdata/netdata/pull/20149) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Some fixes for macOS \< 11 [\#20145](https://github.com/netdata/netdata/pull/20145) ([barracuda156](https://github.com/barracuda156))
-- docs: cleanup language and fix minor grammar issues [\#20144](https://github.com/netdata/netdata/pull/20144) ([luiizaferreirafonseca](https://github.com/luiizaferreirafonseca))
-- chore\(otel/journaldexporter\): improve remote tests [\#20143](https://github.com/netdata/netdata/pull/20143) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.4.0](https://github.com/netdata/netdata/tree/v2.4.0) (2025-04-14)
 
