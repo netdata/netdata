@@ -2,24 +2,6 @@
 
 #include "common.h"
 
-/* Run service jobs every X seconds */
-#define SERVICE_HEARTBEAT 10
-
-#define WORKER_JOB_CHILD_CHART_OBSOLETION_CHECK     1
-#define WORKER_JOB_CLEANUP_OBSOLETE_CHARTS          2
-#define WORKER_JOB_ARCHIVE_CHART                    3
-#define WORKER_JOB_ARCHIVE_CHART_DIMENSIONS         4
-#define WORKER_JOB_ARCHIVE_DIMENSION                5
-#define WORKER_JOB_CLEANUP_ORPHAN_HOSTS             6
-#define WORKER_JOB_CLEANUP_OBSOLETE_CHARTS_ON_HOSTS 7
-#define WORKER_JOB_FREE_HOST                        9
-#define WORKER_JOB_FREE_CHART                       12
-#define WORKER_JOB_FREE_DIMENSION                   15
-#define WORKER_JOB_PGC_MAIN_EVICT                   16
-#define WORKER_JOB_PGC_MAIN_FLUSH                   17
-#define WORKER_JOB_PGC_OPEN_EVICT                   18
-#define WORKER_JOB_PGC_OPEN_FLUSH                   19
-
 static bool svc_rrddim_obsolete_to_archive(RRDDIM *rd) {
     RRDSET *st = rd->rrdset;
 
@@ -32,7 +14,7 @@ static bool svc_rrddim_obsolete_to_archive(RRDDIM *rd) {
     else
         return false;
 
-    worker_is_busy(WORKER_JOB_ARCHIVE_DIMENSION);
+    worker_is_busy(UV_EVENT_ARCHIVE_DIMENSION);
 
     if (rd->rrd_memory_mode == RRD_DB_MODE_DBENGINE) {
         if (!rrddim_finalize_collection_and_check_retention(rd)) {
@@ -41,7 +23,7 @@ static bool svc_rrddim_obsolete_to_archive(RRDDIM *rd) {
         }
     }
 
-    worker_is_busy(WORKER_JOB_FREE_DIMENSION);
+    worker_is_busy(UV_EVENT_FREE_DIMENSION);
     rrddim_free(st, rd);
     return true;
 }
@@ -50,7 +32,7 @@ static inline bool svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool all_d
     if(!all_dimensions && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS))
         return true;
 
-    worker_is_busy(WORKER_JOB_ARCHIVE_CHART_DIMENSIONS);
+    worker_is_busy(UV_EVENT_ARCHIVE_CHART_DIMENSIONS);
 
     rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS);
 
@@ -69,14 +51,9 @@ static inline bool svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool all_d
             if(rd->collector.last_collected_time.tv_sec + rrdset_free_obsolete_time_s < now) {
                 size_t references = dictionary_acquired_item_references(rd_dfe.item);
                 if(references == 1) {
-//                    netdata_log_info("Removing obsolete dimension 'host:%s/chart:%s/dim:%s'",
-//                                     rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(rd));
                     if(svc_rrddim_obsolete_to_archive(rd))
                         dim_archives++;
                 }
-//                else
-//                    netdata_log_info("Cannot remove obsolete dimension 'host:%s/chart:%s/dim:%s'",
-//                            rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(rd));
             }
         }
     }
@@ -109,7 +86,7 @@ static inline void svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
     if(!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS|RRDHOST_FLAG_PENDING_OBSOLETE_DIMENSIONS))
         return;
 
-    worker_is_busy(WORKER_JOB_CLEANUP_OBSOLETE_CHARTS);
+    worker_is_busy(UV_EVENT_CLEANUP_OBSOLETE_CHARTS);
 
     rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS|RRDHOST_FLAG_PENDING_OBSOLETE_DIMENSIONS);
 
@@ -140,7 +117,7 @@ static inline void svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
                 if(svc_rrdset_archive_obsolete_dimensions(st, true)) {
                     full_archives++;
 
-                    worker_is_busy(WORKER_JOB_FREE_CHART);
+                    worker_is_busy(UV_EVENT_FREE_CHART);
                     rrdset_free(st);
                 }
                 else
@@ -170,16 +147,12 @@ void svc_rrdhost_obsolete_all_charts(RRDHOST *host) {
 }
 
 static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
-    worker_is_busy(WORKER_JOB_CLEANUP_OBSOLETE_CHARTS_ON_HOSTS);
+    worker_is_busy(UV_EVENT_CLEANUP_OBSOLETE_CHARTS_ON_HOSTS);
 
     rrd_rdlock();
 
     RRDHOST *host;
     rrdhost_foreach_read(host) {
-
-        if (!service_running(SERVICE_MAINTENANCE))
-            break;
-
         if(rrdhost_receiver_replicating_charts(host) || rrdhost_sender_replicating_charts(host))
             continue;
 
@@ -205,7 +178,7 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
 }
 
 static void svc_rrdhost_cleanup_orphan_hosts(RRDHOST *protected_host) {
-    worker_is_busy(WORKER_JOB_CLEANUP_ORPHAN_HOSTS);
+    worker_is_busy(UV_EVENT_CLEANUP_ORPHAN_HOSTS);
 
     time_t now = now_realtime_sec();
 
@@ -233,7 +206,7 @@ static void svc_rrdhost_cleanup_orphan_hosts(RRDHOST *protected_host) {
                 continue;
         }
 
-        worker_is_busy(WORKER_JOB_FREE_HOST);
+        worker_is_busy(UV_EVENT_FREE_HOST);
 
         if (delete) {
             netdata_log_info("Host '%s' with machine guid '%s' is archived, ephemeral clean up.", rrdhost_hostname(host), host->machine_guid);
@@ -248,62 +221,7 @@ static void svc_rrdhost_cleanup_orphan_hosts(RRDHOST *protected_host) {
     rrd_wrunlock();
 }
 
-static void service_main_cleanup(void *pptr)
-{
-    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
-    if(!static_thread) return;
-
-    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
-
-    worker_unregister();
-
-    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
-}
-
-/*
- * The service thread.
- */
-void *service_main(void *ptr)
-{
-    worker_register("SERVICE");
-    worker_register_job_name(WORKER_JOB_CHILD_CHART_OBSOLETION_CHECK, "child chart obsoletion check");
-    worker_register_job_name(WORKER_JOB_CLEANUP_OBSOLETE_CHARTS, "cleanup obsolete charts");
-    worker_register_job_name(WORKER_JOB_ARCHIVE_CHART, "archive chart");
-    worker_register_job_name(WORKER_JOB_ARCHIVE_CHART_DIMENSIONS, "archive chart dimensions");
-    worker_register_job_name(WORKER_JOB_ARCHIVE_DIMENSION, "archive dimension");
-    worker_register_job_name(WORKER_JOB_CLEANUP_ORPHAN_HOSTS, "cleanup orphan hosts");
-    worker_register_job_name(WORKER_JOB_CLEANUP_OBSOLETE_CHARTS_ON_HOSTS, "cleanup obsolete charts on all hosts");
-    worker_register_job_name(WORKER_JOB_FREE_HOST, "free host");
-    worker_register_job_name(WORKER_JOB_FREE_CHART, "free chart");
-    worker_register_job_name(WORKER_JOB_FREE_DIMENSION, "free dimension");
-    worker_register_job_name(WORKER_JOB_PGC_MAIN_EVICT, "main cache evictions");
-    worker_register_job_name(WORKER_JOB_PGC_MAIN_FLUSH, "main cache flushes");
-    worker_register_job_name(WORKER_JOB_PGC_OPEN_EVICT, "open cache evictions");
-    worker_register_job_name(WORKER_JOB_PGC_OPEN_FLUSH, "open cache flushes");
-
-    CLEANUP_FUNCTION_REGISTER(service_main_cleanup) cleanup_ptr = ptr;
-
-    heartbeat_t hb;
-    heartbeat_init(&hb, USEC_PER_SEC);
-    usec_t step = USEC_PER_SEC * SERVICE_HEARTBEAT;
-    usec_t real_step = USEC_PER_SEC;
-
-    netdata_log_debug(D_SYSTEM, "Service thread starts");
-
-    while (service_running(SERVICE_MAINTENANCE)) {
-        worker_is_idle();
-        heartbeat_next(&hb);
-        if (real_step < step) {
-            real_step += USEC_PER_SEC;
-            continue;
-        }
-        real_step = USEC_PER_SEC;
-
-        svc_rrd_cleanup_obsolete_charts_from_all_hosts();
-
-        if (service_running(SERVICE_MAINTENANCE))
-            svc_rrdhost_cleanup_orphan_hosts(localhost);
-    }
-
-    return NULL;
+void run_maintenace() {
+    svc_rrd_cleanup_obsolete_charts_from_all_hosts();
+    svc_rrdhost_cleanup_orphan_hosts(localhost);
 }
