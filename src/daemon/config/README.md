@@ -62,7 +62,7 @@ After you modify `netdata.conf`, you need to [restart Netdata](/docs/netdata-age
 |         pthread stack size         | auto-detected  |                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 |           crash reports            | `all` or `off` | `all` when anonymous telemetry is enabled, or the agent is claimed or connected to Netdata Cloud (directly or via a Netdata Parent). When it is `all` Netdata reports restarts and crashes. It can also be `crashes` to report only crashes. When it is `off` nothing is reported. Each kind of event is deduplicated and reported at most once per day. [Read more at this blog post](https://www.netdata.cloud/blog/2025-03-06-monitoring-netdata-restarts/). |  
 
-### Profiles
+**Profiles**:
 
 The profiles are detected in this order:
 
