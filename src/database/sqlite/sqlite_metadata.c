@@ -2429,10 +2429,14 @@ static void store_hosts_metadata(struct meta_config_s *config, BUFFER *work_buff
     }
 }
 
+void run_maintenace();
+
 // Worker thread to scan hosts for pending metadata to store
 static void start_metadata_hosts(uv_work_t *req)
 {
     register_libuv_worker_jobs();
+
+    run_maintenace();
 
     worker_data_t *worker = req->data;
     struct meta_config_s *config = worker->config;
