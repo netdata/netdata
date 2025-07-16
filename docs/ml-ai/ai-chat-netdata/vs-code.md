@@ -32,37 +32,38 @@ Autonomous coding agent that can use MCP tools.
 
 ### Configuration
 
-1. Open Command Palette (Ctrl+Shift+P)
-2. Type "Continue: Open config.json"
-3. Add Netdata MCP configuration:
+#### Step 1: Add Claude Model
 
-```json
-{
-  "models": [
-    {
-      "title": "Claude 3.5 Sonnet",
-      "provider": "anthropic",
-      "model": "claude-3-5-sonnet-20241022",
-      "apiKey": "YOUR_ANTHROPIC_KEY"
-    }
-  ],
-  "mcpServers": {
-    "netdata": {
-      "command": "/usr/sbin/nd-mcp",
-      "args": [
-        "ws://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY"
-      ]
-    }
-  }
-}
-```
+1. Click "**Select model**" dropdown at the bottom (next to Chat dropdown)
+2. Click "**+ Add Chat model**"
+3. In the configuration screen:
+    - **Provider**: Change to "Anthropic"
+    - **Model**: Select `Claude-3.5-Sonnet`
+    - **API key**: Enter your Anthropic API key
+    - Click "**Connect**"
 
-Replace:
+#### Step 2: Add Netdata MCP Server
 
-- `/usr/sbin/nd-mcp` - With your [actual nd-mcp path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge)
-- `YOUR_NETDATA_IP` - IP address or hostname of your Netdata Agent/Parent
-- `NETDATA_MCP_API_KEY` - Your [Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
-- `YOUR_ANTHROPIC_KEY` - Your Anthropic API key
+1. Click "**MCP**" in the top toolbar
+2. Click "**+ Add MCP Servers**"
+3. This opens `~/.continue/mcpServers/new-mcp-server.yaml`
+4. Replace the content with:
+    ```yaml
+    name: Netdata MCP
+    version: 0.0.1
+    schema: v1
+    mcpServers:
+       - name: netdata
+         command: /usr/sbin/nd-mcp
+         args:
+            - ws://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY
+         env: {}
+    ```
+5. Replace:
+    - `/usr/sbin/nd-mcp` with your actual nd-mcp path
+    - `YOUR_NETDATA_IP` with your Netdata instance IP/hostname
+    - `NETDATA_MCP_API_KEY` with your Netdata MCP API key
+6. Save the file
 
 ### Usage
 
@@ -105,9 +106,9 @@ Press `Ctrl+L` to open Continue chat, then:
 
 1. Open Cline (Ctrl+Shift+P → "Cline: Open Chat")
 2. Cline can autonomously:
-   - Analyze performance issues
-   - Create monitoring scripts
-   - Debug based on metrics
+    - Analyze performance issues
+    - Create monitoring scripts
+    - Debug based on metrics
 
 Example:
 
@@ -126,7 +127,9 @@ Create `.vscode/settings.json` in your project:
   "continue.mcpServers": {
     "netdata-prod": {
       "command": "/usr/sbin/nd-mcp",
-      "args": ["ws://prod-parent:19999/mcp?api_key=PROD_NETDATA_MCP_API_KEY"]
+      "args": [
+        "ws://prod-parent:19999/mcp?api_key=PROD_NETDATA_MCP_API_KEY"
+      ]
     }
   }
 }
@@ -169,7 +172,10 @@ Add Netdata checks to tasks.json:
       "label": "Check Production Metrics",
       "type": "shell",
       "command": "continue",
-      "args": ["--ask", "@netdata show current system status"]
+      "args": [
+        "--ask",
+        "@netdata show current system status"
+      ]
     }
   ]
 }
@@ -193,13 +199,13 @@ Create snippets that include metric checks:
 
 ## Extension Comparison
 
-| Feature | Continue | Cline | Codeium | Copilot Chat |
-|---------|----------|-------|---------|--------------|
-| MCP Support | ✅ Full | ✅ Full | ❓ Check | ❓ Future |
-| Autonomous Actions | ❌ | ✅ | ❌ | ❌ |
-| Multiple Models | ✅ | ✅ | ❌ | ❌ |
-| Free Tier | ❌ | ❌ | ✅ | ❌ |
-| Open Source | ✅ | ✅ | ❌ | ❌ |
+| Feature            | Continue | Cline  | Codeium | Copilot Chat |
+|--------------------|----------|--------|---------|--------------|
+| MCP Support        | ✅ Full   | ✅ Full | ❓ Check | ❓ Future     |
+| Autonomous Actions | ❌        | ✅      | ❌       | ❌            |
+| Multiple Models    | ✅        | ✅      | ❌       | ❌            |
+| Free Tier          | ❌        | ❌      | ✅       | ❌            |
+| Open Source        | ✅        | ✅      | ❌       | ❌            |
 
 ## Troubleshooting
 
