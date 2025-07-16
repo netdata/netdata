@@ -46,7 +46,7 @@ Autonomous coding agent that can use MCP tools.
 
 1. Click "**MCP**" in the top toolbar
 2. Click "**+ Add MCP Servers**"
-3. This opens `~/.continue/mcpServers/new-mcp-server.yaml`
+3. It creates the file in your current project's `.continue/mcpServers/` directory as `new-mcp-server.yaml`. You might want to rename the file to something more descriptive like `netdata.yaml` after editing.
 4. Replace the content with:
     ```yaml
     name: Netdata MCP
