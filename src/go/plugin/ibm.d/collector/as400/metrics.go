@@ -79,10 +79,11 @@ type diskInstanceMetrics struct {
 	PercentUsed      int64  `stm:"percent_used"`        // PERCENT_USED
 	AvailableGB      int64  `stm:"available_gb"`        // UNIT_SPACE_AVAILABLE_GB
 	CapacityGB       int64                               // UNIT_STORAGE_CAPACITY - used only for calculation
+	UsedGB           int64  `stm:"used_gb"`             // Calculated: CapacityGB - AvailableGB
 	BlocksRead       int64  `stm:"blocks_read"`         // TOTAL_BLOCKS_READ
 	BlocksWritten    int64  `stm:"blocks_written"`      // TOTAL_BLOCKS_WRITTEN
-	SSDLifeRemaining int64  `stm:"ssd_life_remaining"`  // SSD_LIFE_REMAINING
-	SSDPowerOnDays   int64  `stm:"ssd_power_on_days"`   // SSD_POWER_ON_DAYS
+	SSDLifeRemaining int64  // SSD_LIFE_REMAINING - manually added to map when > 0
+	SSDPowerOnDays   int64  // SSD_POWER_ON_DAYS - manually added to map when > 0
 	HardwareStatus   string                             // HARDWARE_STATUS - for labels only
 	DiskModel        string                             // DISK_MODEL - for labels only
 	SerialNumber     string                             // SERIAL_NUMBER - for labels only
@@ -91,13 +92,12 @@ type diskInstanceMetrics struct {
 type subsystemInstanceMetrics struct {
 	CurrentActiveJobs  int64 `stm:"current_active_jobs"`  // CURRENT_ACTIVE_JOBS
 	MaximumActiveJobs  int64 `stm:"maximum_active_jobs"`  // MAXIMUM_ACTIVE_JOBS
-	HeldJobCount       int64 `stm:"held_job_count"`       // HELD_JOB_COUNT
-	StorageUsedKB      int64 `stm:"storage_used_kb"`      // STORAGE_USED_KB
+	// Note: HELD_JOB_COUNT and STORAGE_USED_KB removed - columns don't exist in SUBSYSTEM_INFO table
 }
 
 type jobQueueInstanceMetrics struct {
 	NumberOfJobs    int64 `stm:"number_of_jobs"`    // NUMBER_OF_JOBS
-	HeldJobCount    int64 `stm:"held_job_count"`    // HELD_JOB_COUNT
+	// Note: HELD_JOB_COUNT removed - column doesn't exist in JOB_QUEUE_INFO table
 }
 
 type tempStorageInstanceMetrics struct {

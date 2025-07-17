@@ -113,6 +113,7 @@ func (a *AS400) getDiskMetrics(unit string) *diskMetrics {
 	if _, ok := a.disks[unit]; !ok {
 		a.disks[unit] = &diskMetrics{
 			unit: unit,
+			typeField: "UNKNOWN",        // Default for disk type when not specified
 			ssdLifeRemaining: -1, // Default to -1 (not SSD)
 			ssdPowerOnDays: -1,   // Default to -1 (not SSD)
 			hardwareStatus: "UNKNOWN", // Default for hardware status
