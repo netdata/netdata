@@ -17,7 +17,7 @@ func (d *DB2) collectDatabaseInstances(ctx context.Context) error {
 	var currentDB string
 	var currentMetrics databaseInstanceMetrics
 	
-	err := d.doQuery(ctx, fmt.Sprintf(queryDatabaseInstances, d.MaxDatabases), func(column, value string, lineEnd bool) {
+	err := d.doQuery(ctx, queryDatabaseInstances, func(column, value string, lineEnd bool) {
 		switch column {
 		case "DB_NAME":
 			// Save previous database metrics if we have any
@@ -98,13 +98,13 @@ func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 		query = queryMonGetBufferpool
 		d.Debugf("using MON_GET_BUFFERPOOL for bufferpool instances (modern approach)")
 	} else if d.edition == "Cloud" {
-		query = fmt.Sprintf(queryBufferpoolInstancesCloud, d.MaxBufferpools)
+		query = queryBufferpoolInstancesCloud
 		d.Debugf("using Cloud-specific bufferpool query for Db2 on Cloud")
 	} else if d.supportsColumnOrganizedTables {
-		query = fmt.Sprintf(queryBufferpoolInstances, d.MaxBufferpools)
+		query = queryBufferpoolInstances
 		d.Debugf("using SNAP views with column-organized metrics for bufferpool instances")
 	} else {
-		query = fmt.Sprintf(queryBufferpoolInstancesLegacy, d.MaxBufferpools)
+		query = queryBufferpoolInstancesLegacy
 		d.Debugf("using legacy SNAP views without column-organized metrics for bufferpool instances")
 	}
 
@@ -401,10 +401,10 @@ func (d *DB2) collectTablespaceInstances(ctx context.Context) error {
 	// Choose query based on monitoring approach
 	var query string
 	if d.useMonGetFunctions {
-		query = fmt.Sprintf(queryMonGetTablespace, d.MaxTablespaces)
+		query = queryMonGetTablespace
 		d.Debugf("using MON_GET_TABLESPACE for tablespace metrics (modern approach)")
 	} else {
-		query = fmt.Sprintf(queryTablespaceInstances, d.MaxTablespaces)
+		query = queryTablespaceInstances
 		d.Debugf("using SNAP views for tablespace metrics (legacy approach)")
 	}
 
@@ -518,13 +518,13 @@ func (d *DB2) collectConnectionInstances(ctx context.Context) error {
 	// Choose query based on monitoring approach
 	var query string
 	if d.useMonGetFunctions {
-		query = fmt.Sprintf(queryMonGetConnectionDetails, d.MaxConnections)
+		query = queryMonGetConnectionDetails
 		d.Debugf("using MON_GET_CONNECTION for connection instances (modern approach)")
 	} else if d.edition == "Cloud" {
-		query = fmt.Sprintf(queryConnectionInstancesCloud, d.MaxConnections)
+		query = queryConnectionInstancesCloud
 		d.Debugf("using Cloud-specific connection query for Db2 on Cloud")
 	} else {
-		query = fmt.Sprintf(queryConnectionInstances, d.MaxConnections)
+		query = queryConnectionInstances
 		d.Debugf("using SNAP views for connection instances (legacy approach)")
 	}
 
@@ -551,6 +551,11 @@ func (d *DB2) collectConnectionInstances(ctx context.Context) error {
 		case "CLIENT_HOSTNAME":
 			if currentAppID != "" {
 				d.connections[currentAppID].clientHostname = value
+			}
+
+		case "CLIENT_IPADDR":
+			if currentAppID != "" {
+				d.connections[currentAppID].clientIP = value
 			}
 
 		case "SESSION_AUTH_ID":
@@ -616,9 +621,7 @@ func (d *DB2) collectMemorySetInstances(ctx context.Context) error {
 		return nil
 	}
 
-	// Use a reasonable limit for memory sets (typically 5-20 per instance)
-	maxMemorySets := 50
-	query := fmt.Sprintf(queryMonGetMemorySet, maxMemorySets)
+	query := queryMonGetMemorySet
 	
 	d.Debugf("collecting memory set instances using MON_GET_MEMORY_SET")
 

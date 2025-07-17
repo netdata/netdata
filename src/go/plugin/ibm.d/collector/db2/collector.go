@@ -68,7 +68,6 @@ func New() *DB2 {
 			CollectMemoryMetrics:    true,
 			CollectWaitMetrics:      true,
 			CollectTableIOMetrics:   true,
-			TableMinRowsRead:        1000,
 		},
 
 		charts:      baseCharts.Copy(),
@@ -122,7 +121,6 @@ type Config struct {
 	CollectMemoryMetrics    bool `yaml:"collect_memory_metrics,omitempty" json:"collect_memory_metrics"`
 	CollectWaitMetrics      bool `yaml:"collect_wait_metrics,omitempty" json:"collect_wait_metrics"`
 	CollectTableIOMetrics   bool `yaml:"collect_table_io_metrics,omitempty" json:"collect_table_io_metrics"`
-	TableMinRowsRead        int  `yaml:"table_min_rows_read,omitempty" json:"table_min_rows_read"`
 
 	// Selectors for filtering
 	CollectDatabasesMatching   string `yaml:"collect_databases_matching,omitempty" json:"collect_databases_matching"`
@@ -166,6 +164,14 @@ type DB2 struct {
 	versionMajor int    // Parsed major version (e.g., 11 from "11.5.7")
 	versionMinor int    // Parsed minor version (e.g., 5 from "11.5.7")
 	serverInfo   serverInfo
+
+	// Filtering mode (persistent state)
+	databaseFilterMode   bool
+	bufferpoolFilterMode bool
+	tablespaceFilterMode bool
+	connectionFilterMode bool
+	tableFilterMode      bool
+	indexFilterMode      bool
 
 	// Resilience tracking (following AS/400 pattern)
 	disabledMetrics  map[string]bool // Track disabled metrics due to version incompatibility
@@ -692,9 +698,6 @@ func (d *DB2) setConfigurationDefaults() {
 	}
 
 	// Set defaults for new performance metrics
-	if d.TableMinRowsRead == 0 {
-		d.TableMinRowsRead = 1000
-	}
 
 	// Log final configuration
 	d.Infof("Configuration after defaults:")

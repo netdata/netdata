@@ -14,7 +14,7 @@ func (d *DB2) collectIndexInstances(ctx context.Context) error {
 	}
 
 	var currentSchema, currentIndex, key string
-	err := d.doQuery(ctx, fmt.Sprintf(queryIndexInstances, d.MaxIndexes), func(column, value string, lineEnd bool) {
+	err := d.doQuery(ctx, queryIndexInstances, func(column, value string, lineEnd bool) {
 		switch column {
 		case "INDSCHEMA":
 			currentSchema = value

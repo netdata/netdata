@@ -14,7 +14,7 @@ func (d *DB2) collectTableInstances(ctx context.Context) error {
 	}
 
 	var currentTable, currentSchema, key string
-	err := d.doQuery(ctx, fmt.Sprintf(queryTableInstances, d.MaxTables), func(column, value string, lineEnd bool) {
+	err := d.doQuery(ctx, queryTableInstances, func(column, value string, lineEnd bool) {
 		switch column {
 		case "TABSCHEMA":
 			currentSchema = value

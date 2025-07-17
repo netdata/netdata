@@ -142,7 +142,6 @@ const (
 			DB_STATUS,
 			APPLS_CUR_CONS
 		FROM SYSIBMADM.SNAPDB
-		FETCH FIRST %d ROWS ONLY
 	`
 
 	queryBufferpoolInstances = `
@@ -172,7 +171,6 @@ const (
 			-- Write metrics
 			POOL_DATA_P_READS + POOL_INDEX_P_READS + POOL_XDA_P_READS + POOL_COL_P_READS as WRITES
 		FROM SYSIBMADM.SNAPBP
-		FETCH FIRST %d ROWS ONLY
 	`
 
 	// Legacy buffer pool query without column-organized metrics (for DB2 < 10.5 or when column support unavailable)
@@ -203,7 +201,6 @@ const (
 			-- Write metrics (without column metrics)
 			POOL_DATA_P_READS + POOL_INDEX_P_READS + POOL_XDA_P_READS as WRITES
 		FROM SYSIBMADM.SNAPBP
-		FETCH FIRST %d ROWS ONLY
 	`
 
 	queryTablespaceInstances = `
@@ -224,8 +221,6 @@ const (
 			TBSP_PAGE_SIZE
 		FROM SYSIBMADM.TBSP_UTILIZATION
 		WHERE TBSP_TYPE = 'DMS'
-		ORDER BY TBSP_USED_SIZE_KB DESC
-		FETCH FIRST %d ROWS ONLY
 	`
 
 	queryConnectionInstances = `
@@ -241,8 +236,6 @@ const (
 			TOTAL_CPU_TIME
 		FROM SYSIBMADM.APPLICATIONS
 		WHERE APPL_STATUS IN ('CONNECTED', 'UOWEXEC')
-		ORDER BY TOTAL_CPU_TIME DESC
-		FETCH FIRST %d ROWS ONLY
 	`
 
 	queryTableInstances = `
@@ -255,8 +248,6 @@ const (
 			ROWS_READ,
 			ROWS_WRITTEN
 		FROM SYSIBMADM.ADMINTABINFO
-		ORDER BY DATA_OBJECT_P_SIZE DESC
-		FETCH FIRST %d ROWS ONLY
 	`
 
 	queryIndexInstances = `
@@ -267,8 +258,6 @@ const (
 			INDEX_SCANS,
 			FULL_SCANS
 		FROM SYSCAT.INDEXES
-		ORDER BY NLEAF DESC
-		FETCH FIRST %d ROWS ONLY
 	`
 
 	queryDatabaseStatus = `
@@ -375,7 +364,6 @@ const (
 			-- Write metrics
 			POOL_DATA_P_READS + POOL_INDEX_P_READS + POOL_XDA_P_READS as WRITES
 		FROM SYSIBMADM.SNAPBP
-		FETCH FIRST 10 ROWS ONLY
 	`
 
 	queryConnectionInstancesCloud = `
@@ -391,8 +379,6 @@ const (
 			TOTAL_CPU_TIME
 		FROM SYSIBMADM.APPLICATIONS
 		WHERE APPL_STATUS IN ('CONNECTED', 'UOWEXEC')
-		ORDER BY TOTAL_CPU_TIME DESC
-		FETCH FIRST 100 ROWS ONLY
 	`
 
 	queryGlobalConnectionsCloud = `
@@ -520,8 +506,6 @@ const (
 			TBSP_PAGE_SIZE
 		FROM TABLE(MON_GET_TABLESPACE('',-2)) AS T
 		WHERE TBSP_TYPE = 'DMS'
-		ORDER BY TBSP_USED_PAGES DESC
-		FETCH FIRST %d ROWS ONLY
 	`
 
 	// Connection metrics using MON_GET_CONNECTION
@@ -541,6 +525,7 @@ const (
 			APPLICATION_ID,
 			APPLICATION_NAME,
 			CLIENT_HOSTNAME,
+			CLIENT_IPADDR,
 			SESSION_AUTH_ID,
 			CASE 
 				WHEN UOW_START_TIME IS NOT NULL THEN 'UOWEXEC'
@@ -614,7 +599,6 @@ const (
 			ROWS_DELETED,
 			OVERFLOW_ACCESSES
 		FROM TABLE(MON_GET_TABLE(NULL, NULL, -2)) AS T
-		WHERE ROWS_READ >= %d
 	`
 
 	// Enhanced buffer pool metrics
