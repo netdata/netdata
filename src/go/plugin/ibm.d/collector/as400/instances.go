@@ -94,6 +94,20 @@ type activeJobMetrics struct {
 	hasCharts bool
 }
 
+type networkInterfaceMetrics struct {
+	name            string
+	interfaceType   string // INTERFACE_LINE_TYPE
+	interfaceStatus string // INTERFACE_STATUS
+	connectionType  string // CONNECTION_TYPE
+	internetAddress string // INTERNET_ADDRESS
+	networkAddress  string // NETWORK_ADDRESS
+	subnetMask      string // INTERFACE_SUBNET_MASK
+	mtu             int64  // MAXIMUM_TRANSMISSION_UNIT
+
+	updated   bool
+	hasCharts bool
+}
+
 // Per-instance metric methods
 func (a *AS400) getDiskMetrics(unit string) *diskMetrics {
 	if _, ok := a.disks[unit]; !ok {
@@ -142,4 +156,11 @@ func (a *AS400) getActiveJobMetrics(jobName string) *activeJobMetrics {
 		a.activeJobs[jobName] = &activeJobMetrics{jobName: jobName}
 	}
 	return a.activeJobs[jobName]
+}
+
+func (a *AS400) getNetworkInterfaceMetrics(name string) *networkInterfaceMetrics {
+	if _, ok := a.networkInterfaces[name]; !ok {
+		a.networkInterfaces[name] = &networkInterfaceMetrics{name: name}
+	}
+	return a.networkInterfaces[name]
 }

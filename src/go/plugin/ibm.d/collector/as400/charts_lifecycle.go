@@ -140,4 +140,16 @@ func (a *AS400) cleanupStaleInstances() {
 			queue.updated = false
 		}
 	}
+
+	// Cleanup network interfaces
+	for name, intf := range a.networkInterfaces {
+		if !intf.updated {
+			delete(a.networkInterfaces, name)
+			if intf.hasCharts {
+				a.removeNetworkInterfaceCharts(intf)
+			}
+		} else {
+			intf.updated = false
+		}
+	}
 }

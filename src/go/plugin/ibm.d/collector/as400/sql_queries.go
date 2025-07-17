@@ -89,6 +89,29 @@ const (
 		FROM QSYS2.NETSTAT_INFO
 	`
 
+	// Network interface information from NETSTAT_INTERFACE_INFO
+	// Provides interface configuration and status (requires IBM i 7.2 TR3+)
+	queryNetworkInterfaces = `
+		SELECT 
+			COALESCE(LINE_DESCRIPTION, 'UNKNOWN') as LINE_DESCRIPTION,
+			COALESCE(INTERFACE_LINE_TYPE, 'UNKNOWN') as INTERFACE_LINE_TYPE,
+			COALESCE(INTERFACE_STATUS, 'UNKNOWN') as INTERFACE_STATUS,
+			COALESCE(CONNECTION_TYPE, 'UNKNOWN') as CONNECTION_TYPE,
+			COALESCE(INTERNET_ADDRESS, '') as INTERNET_ADDRESS,
+			COALESCE(NETWORK_ADDRESS, '') as NETWORK_ADDRESS,
+			COALESCE(MAXIMUM_TRANSMISSION_UNIT, 0) as MTU
+		FROM QSYS2.NETSTAT_INTERFACE_INFO
+		WHERE LINE_DESCRIPTION != '*LOOPBACK'
+		ORDER BY LINE_DESCRIPTION
+	`
+
+	// Count network interfaces for cardinality check
+	queryCountNetworkInterfaces = `
+		SELECT COUNT(*) as COUNT
+		FROM QSYS2.NETSTAT_INTERFACE_INFO
+		WHERE LINE_DESCRIPTION != '*LOOPBACK'
+	`
+
 	// VERIFIED: Temporary storage monitoring
 	// Works on both IBM i 7.4 and pub400.com
 	queryTempStorageTotal = `

@@ -24,8 +24,7 @@ import (
 	// Register IBM ecosystem collectors
 	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/as400"         // Requires CGO
 	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/db2"           // Requires CGO
-	// Temporarily disabled due to missing MQ headers
-	// _ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/mq_pcf"        // Requires CGO and IBM MQ library
+	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/mq_pcf"        // Requires CGO and IBM MQ library
 	// _ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/websphere_jmx" // Requires CGO
 	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/websphere_mp"  // Pure Go
 	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/websphere_pmi" // Pure Go
