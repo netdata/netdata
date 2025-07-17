@@ -6,8 +6,12 @@
 
 **Merged pull requests:**
 
+- docs: remove Profiles heading from collapsible section [\#20691](https://github.com/netdata/netdata/pull/20691) ([ilyam8](https://github.com/ilyam8))
+- docs: fix file location in continue setup [\#20690](https://github.com/netdata/netdata/pull/20690) ([ilyam8](https://github.com/ilyam8))
+- docs: update continue ext setup [\#20689](https://github.com/netdata/netdata/pull/20689) ([ilyam8](https://github.com/ilyam8))
 - Fix log message format for buffered reader error [\#20687](https://github.com/netdata/netdata/pull/20687) ([stelfrag](https://github.com/stelfrag))
 - Fix systemd-journal-plugin RPM package. [\#20686](https://github.com/netdata/netdata/pull/20686) ([Ferroin](https://github.com/Ferroin))
+- Remove Fedora 40 from CI and package builds. [\#20685](https://github.com/netdata/netdata/pull/20685) ([Ferroin](https://github.com/Ferroin))
 - Remove Ubuntu 24.10 from CI and package builds. [\#20681](https://github.com/netdata/netdata/pull/20681) ([Ferroin](https://github.com/Ferroin))
 - chore\(charts.d\): suppress broken pipe error from echo during cleanup [\#20680](https://github.com/netdata/netdata/pull/20680) ([ilyam8](https://github.com/ilyam8))
 - Fix deadlock in dictionary cleanup [\#20679](https://github.com/netdata/netdata/pull/20679) ([stelfrag](https://github.com/stelfrag))
@@ -454,12 +458,6 @@
 - SNMP profiles units and description generation [\#20163](https://github.com/netdata/netdata/pull/20163) ([Ancairon](https://github.com/Ancairon))
 - Dashboards and charts [\#20162](https://github.com/netdata/netdata/pull/20162) ([kanelatechnical](https://github.com/kanelatechnical))
 - fix\(dyncfg/health\): correct db lookup absolute option name [\#20161](https://github.com/netdata/netdata/pull/20161) ([ilyam8](https://github.com/ilyam8))
-- Fix memory leaks and service thread corruption [\#20159](https://github.com/netdata/netdata/pull/20159) ([ktsaou](https://github.com/ktsaou))
-- Fix labels memory accounting [\#20158](https://github.com/netdata/netdata/pull/20158) ([stelfrag](https://github.com/stelfrag))
-- chore\(go.d/apcupsd\): log UPS response in debug mode [\#20157](https://github.com/netdata/netdata/pull/20157) ([ilyam8](https://github.com/ilyam8))
-- improvement\(cgroups\): filter systemd-nspawn payload by default [\#20155](https://github.com/netdata/netdata/pull/20155) ([ilyam8](https://github.com/ilyam8))
-- Fix compilation with DBENGINE disabled [\#20154](https://github.com/netdata/netdata/pull/20154) ([stelfrag](https://github.com/stelfrag))
-- build\(deps\): bump github.com/docker/docker from 28.0.4+incompatible to 28.1.1+incompatible in /src/go [\#20153](https://github.com/netdata/netdata/pull/20153) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v2.4.0](https://github.com/netdata/netdata/tree/v2.4.0) (2025-04-14)
 
