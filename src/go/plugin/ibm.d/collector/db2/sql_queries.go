@@ -535,6 +535,7 @@ const (
 	`
 
 	// Individual connection details
+	// FIXED: Removed dynamic "top X" ORDER BY + FETCH FIRST pattern for stable time-series
 	queryMonGetConnectionDetails = `
 		SELECT 
 			APPLICATION_ID,
@@ -550,43 +551,8 @@ const (
 			TOTAL_CPU_TIME
 		FROM TABLE(MON_GET_CONNECTION(NULL,-2)) AS T
 		WHERE APPLICATION_HANDLE IS NOT NULL
-		ORDER BY TOTAL_CPU_TIME DESC
-		FETCH FIRST %d ROWS ONLY
 	`
 
-	// Statement cache monitoring using MON_GET_PKG_CACHE_STMT
-	queryMonGetPkgCacheStmt = `
-		SELECT 
-			EXECUTABLE_ID,
-			NUM_EXECUTIONS,
-			NUM_EXEC_WITH_METRICS,
-			TOTAL_ACT_TIME,
-			TOTAL_ACT_WAIT_TIME,
-			TOTAL_CPU_TIME,
-			TOTAL_SECTION_TIME,
-			CASE WHEN NUM_EXEC_WITH_METRICS > 0 
-				THEN TOTAL_ACT_TIME / NUM_EXEC_WITH_METRICS 
-				ELSE 0 
-			END as AVG_EXEC_TIME_MS,
-			ROWS_READ,
-			ROWS_MODIFIED,
-			CASE WHEN NUM_EXEC_WITH_METRICS > 0 
-				THEN ROWS_READ / NUM_EXEC_WITH_METRICS 
-				ELSE 0 
-			END as AVG_ROWS_READ,
-			TOTAL_SORTS,
-			TOTAL_SECTION_SORT_TIME,
-			LOCK_WAIT_TIME,
-			TOTAL_ROUTINE_TIME,
-			POOL_DATA_L_READS + POOL_INDEX_L_READS as LOGICAL_READS,
-			POOL_DATA_P_READS + POOL_INDEX_P_READS as PHYSICAL_READS
-		FROM TABLE(MON_GET_PKG_CACHE_STMT(NULL, NULL, NULL, -2)) AS T
-		WHERE NUM_EXECUTIONS > 0
-			AND TOTAL_CPU_TIME >= %d
-			AND NUM_EXECUTIONS >= %d
-		ORDER BY TOTAL_CPU_TIME DESC
-		FETCH FIRST %d ROWS ONLY
-	`
 
 	// Memory pool monitoring using MON_GET_MEMORY_POOL
 	queryMonGetMemoryPool = `
@@ -600,6 +566,7 @@ const (
 	`
 
 	// Instance Memory Sets monitoring (Screen 26) using MON_GET_MEMORY_SET
+	// FIXED: Removed dynamic "top X" ORDER BY + FETCH FIRST pattern for stable time-series
 	queryMonGetMemorySet = `
 		SELECT 
 			HOST_NAME,
@@ -616,11 +583,10 @@ const (
 				ELSE 0 
 			END as PERCENT_USED_HWM
 		FROM TABLE(MON_GET_MEMORY_SET(NULL, NULL, -2)) AS T
-		ORDER BY MEMORY_SET_COMMITTED DESC
-		FETCH FIRST %d ROWS ONLY
 	`
 
 	// Enhanced connection wait metrics
+	// FIXED: Removed dynamic "top X" ORDER BY + FETCH FIRST pattern for stable time-series
 	queryMonGetConnectionWaits = `
 		SELECT 
 			APPLICATION_ID,
@@ -633,11 +599,10 @@ const (
 		FROM TABLE(MON_GET_CONNECTION(NULL, -2)) AS T
 		WHERE APPLICATION_HANDLE IS NOT NULL
 			AND TOTAL_WAIT_TIME > 0
-		ORDER BY TOTAL_WAIT_TIME DESC
-		FETCH FIRST %d ROWS ONLY
 	`
 
 	// Table I/O statistics using MON_GET_TABLE
+	// FIXED: Removed dynamic "top X" ORDER BY + FETCH FIRST pattern for stable time-series
 	queryMonGetTable = `
 		SELECT 
 			TABSCHEMA,
@@ -650,8 +615,6 @@ const (
 			OVERFLOW_ACCESSES
 		FROM TABLE(MON_GET_TABLE(NULL, NULL, -2)) AS T
 		WHERE ROWS_READ >= %d
-		ORDER BY ROWS_READ DESC
-		FETCH FIRST %d ROWS ONLY
 	`
 
 	// Enhanced buffer pool metrics

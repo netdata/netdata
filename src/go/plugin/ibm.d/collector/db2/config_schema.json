@@ -162,34 +162,6 @@
         "minimum": 1,
         "default": 30
       },
-      "collect_statement_metrics": {
-        "title": "Collect statement metrics",
-        "description": "Enable collection of SQL statement performance metrics from the package cache.",
-        "type": "boolean",
-        "default": true
-      },
-      "max_statements": {
-        "title": "Max statements",
-        "description": "Maximum number of SQL statements to monitor.",
-        "type": "integer",
-        "minimum": 10,
-        "maximum": 200,
-        "default": 50
-      },
-      "statement_min_executions": {
-        "title": "Min statement executions",
-        "description": "Minimum number of executions for a statement to be monitored.",
-        "type": "integer",
-        "minimum": 1,
-        "default": 10
-      },
-      "statement_min_cpu_ms": {
-        "title": "Min statement CPU (ms)",
-        "description": "Minimum total CPU time (milliseconds) for a statement to be monitored.",
-        "type": "integer",
-        "minimum": 0,
-        "default": 1000
-      },
       "collect_memory_metrics": {
         "title": "Collect memory metrics",
         "description": "Enable collection of memory pool metrics.",
@@ -262,7 +234,6 @@
         {
           "title": "Performance Metrics",
           "fields": [
-            "collect_statement_metrics",
             "collect_memory_metrics",
             "collect_wait_metrics",
             "collect_table_io_metrics"
@@ -277,9 +248,6 @@
             "max_connections",
             "max_tables",
             "max_indexes",
-            "max_statements",
-            "statement_min_executions",
-            "statement_min_cpu_ms",
             "table_min_rows_read"
           ]
         },
