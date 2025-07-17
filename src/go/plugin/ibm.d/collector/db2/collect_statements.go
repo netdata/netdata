@@ -106,7 +106,6 @@ func (d *DB2) collectConnectionWaits(ctx context.Context) error {
 		FROM TABLE(MON_GET_CONNECTION(NULL,-2)) AS T
 		WHERE APPLICATION_HANDLE IS NOT NULL
 		ORDER BY TOTAL_WAIT_TIME DESC
-		FETCH FIRST %d ROWS ONLY
 	`
 	
 	var currentAppID string
@@ -128,7 +127,7 @@ func (d *DB2) collectConnectionWaits(ctx context.Context) error {
 		TotalRollbackTime   int64
 	}
 	
-	err := d.doQuery(ctx, fmt.Sprintf(query, d.MaxConnections), func(column, value string, lineEnd bool) {
+	err := d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
 		switch column {
 		case "APPLICATION_ID":
 			currentAppID = strings.TrimSpace(value)
@@ -278,7 +277,7 @@ func (d *DB2) collectTableIOInstances(ctx context.Context) error {
 		table.ioUpdated = false
 	}
 
-	query := fmt.Sprintf(queryMonGetTable, d.TableMinRowsRead, d.MaxTables)
+	query := queryMonGetTable
 	
 	var currentTableName string
 	var currentMetrics tableIOInstanceMetrics

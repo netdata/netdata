@@ -360,10 +360,6 @@ modules:
               description: Enable collection of table I/O statistics.
               default_value: true
               required: false
-            - name: table_min_rows_read
-              description: Minimum rows read for a table to be monitored for I/O statistics.
-              default_value: 1000
-              required: false
         examples:
           folding:
             title: Config examples
