@@ -9,7 +9,7 @@ import (
 var (
 	baseCharts = module.Charts{
 		// Overview charts (Screen 01)
-		databaseStatusChart.Copy(),
+		databaseCountChart.Copy(),
 		cpuUsageChart.Copy(),
 		activeConnectionsChart.Copy(),
 		memoryUsageChart.Copy(),
@@ -385,12 +385,12 @@ var (
 	}
 
 	// Database Overview charts (Screen 01)
-	databaseStatusChart = module.Chart{
-		ID:       "database_status",
-		Title:    "Database Status",
-		Units:    "status",
+	databaseCountChart = module.Chart{
+		ID:       "database_count",
+		Title:    "Database Count",
+		Units:    "databases",
 		Fam:      "overview",
-		Ctx:      "db2.database_status",
+		Ctx:      "db2.database_count",
 		Priority: module.Priority - 100,
 		Dims: module.Dims{
 			{ID: "database_active", Name: "active"},
