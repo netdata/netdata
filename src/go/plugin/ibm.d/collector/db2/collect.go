@@ -363,7 +363,7 @@ func (d *DB2) detectVersion(ctx context.Context) error {
 
 	// If that fails, might be AS/400 (DB2 for i)
 	query = queryDetectVersionI
-	var dummy string
+	var dummy sql.NullString
 	err = d.db.QueryRow(query).Scan(&dummy)
 	if err == nil {
 		d.edition = "i"

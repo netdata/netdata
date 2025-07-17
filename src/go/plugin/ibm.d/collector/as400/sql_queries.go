@@ -133,13 +133,12 @@ const (
 
 	// VERIFIED: Subsystem monitoring
 	// Works on both IBM i 7.4 and pub400.com  
+	// Note: HELD_JOB_COUNT and STORAGE_USED_KB columns don't exist, removed per AS400.md verification
 	querySubsystems = `
 		SELECT 
 			SUBSYSTEM_DESCRIPTION_LIBRARY || '/' || SUBSYSTEM_DESCRIPTION as SUBSYSTEM_NAME,
 			CURRENT_ACTIVE_JOBS,
-			MAXIMUM_ACTIVE_JOBS,
-			COALESCE(HELD_JOB_COUNT, 0) as HELD_JOB_COUNT,
-			COALESCE(STORAGE_USED_KB, 0) as STORAGE_USED_KB
+			MAXIMUM_ACTIVE_JOBS
 		FROM QSYS2.SUBSYSTEM_INFO
 		WHERE STATUS = 'ACTIVE'
 		ORDER BY CURRENT_ACTIVE_JOBS DESC
@@ -147,11 +146,11 @@ const (
 
 	// VERIFIED: Job queue monitoring
 	// Works on both IBM i 7.4 and pub400.com
+	// Note: HELD_JOB_COUNT column doesn't exist, removed per AS400.md verification
 	queryJobQueues = `
 		SELECT 
 			JOB_QUEUE_LIBRARY || '/' || JOB_QUEUE_NAME as QUEUE_NAME,
-			NUMBER_OF_JOBS,
-			HELD_JOB_COUNT
+			NUMBER_OF_JOBS
 		FROM QSYS2.JOB_QUEUE_INFO
 		WHERE JOB_QUEUE_STATUS = 'RELEASED'
 		ORDER BY NUMBER_OF_JOBS DESC
