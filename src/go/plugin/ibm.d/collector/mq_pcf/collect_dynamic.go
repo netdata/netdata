@@ -29,25 +29,38 @@ func (c *Collector) collectQueueMetricsWithDynamicCharts(ctx context.Context, qu
 	}
 
 	// Try to collect queue configuration metrics (MQCMD_INQUIRE_Q)
-	configMetrics := c.collectQueueConfigurationData(ctx, queueName)
-	if len(configMetrics) > 0 {
+	queueInfo := c.collectQueueConfigurationData(ctx, queueName)
+	if queueInfo != nil && len(queueInfo.Metrics) > 0 {
 		// Configuration collection succeeded - create relevant charts and add metrics
-		c.addQueueConfigMetricsWithCharts(queueName, configMetrics, queueLabels, tempMx)
+		// Use queue type-specific subfamily for better organization
+		queueLabels["queue_type"] = queueInfo.QueueType
+		c.addQueueConfigMetricsWithCharts(queueName, queueInfo.QueueType, queueInfo.Metrics, queueLabels, tempMx)
 	}
 
 	// Try to collect queue runtime metrics (MQCMD_INQUIRE_Q_STATUS)
-	runtimeMetrics := c.collectQueueRuntimeData(ctx, queueName)
-	if len(runtimeMetrics) > 0 {
-		// Runtime collection succeeded - create relevant charts and add metrics
-		c.addQueueRuntimeMetricsWithCharts(queueName, runtimeMetrics, queueLabels, tempMx)
+	// Only collect runtime metrics for local queues (others don't have meaningful runtime state)
+	var queueType string
+	if queueInfo != nil {
+		queueType = queueInfo.QueueType
+	} else {
+		queueType = "unknown"
+	}
+	
+	if queueType == "local" || queueType == "unknown" {
+		runtimeMetrics := c.collectQueueRuntimeData(ctx, queueName)
+		if len(runtimeMetrics) > 0 {
+			// Runtime collection succeeded - create relevant charts and add metrics
+			c.addQueueRuntimeMetricsWithCharts(queueName, queueType, runtimeMetrics, queueLabels, tempMx)
+		}
 	}
 
-	// Try to collect queue reset statistics (if enabled)
-	if c.CollectResetQueueStats != nil && *c.CollectResetQueueStats {
+	// Try to collect queue reset statistics (if enabled and applicable)
+	// Only meaningful for local queues
+	if (queueType == "local" || queueType == "unknown") && c.CollectResetQueueStats != nil && *c.CollectResetQueueStats {
 		resetMetrics := c.collectQueueResetData(ctx, queueName)
 		if len(resetMetrics) > 0 {
 			// Reset stats collection succeeded - create relevant charts and add metrics
-			c.addQueueResetMetricsWithCharts(queueName, resetMetrics, queueLabels, tempMx)
+			c.addQueueResetMetricsWithCharts(queueName, queueType, resetMetrics, queueLabels, tempMx)
 		}
 	}
 
@@ -59,8 +72,14 @@ func (c *Collector) collectQueueMetricsWithDynamicCharts(ctx context.Context, qu
 	c.Debugf("Collected %d metrics for queue %s", len(tempMx), queueName)
 }
 
+// QueueTypeInfo contains the queue type and metrics that were successfully collected
+type QueueTypeInfo struct {
+	QueueType string            // local, model, remote, alias, cluster
+	Metrics   map[string]int64  // successfully collected metrics
+}
+
 // collectQueueConfigurationData attempts to collect configuration metrics and returns what was found
-func (c *Collector) collectQueueConfigurationData(ctx context.Context, queueName string) map[string]int64 {
+func (c *Collector) collectQueueConfigurationData(ctx context.Context, queueName string) *QueueTypeInfo {
 	params := []pcfParameter{
 		newStringParameter(C.MQCA_Q_NAME, queueName),
 	}
@@ -85,6 +104,9 @@ func (c *Collector) collectQueueConfigurationData(ctx context.Context, queueName
 		}
 	}
 
+	// Determine queue type first
+	queueType := c.determineQueueType(queueName, attrs)
+	
 	// Extract available configuration metrics
 	metrics := make(map[string]int64)
 	
@@ -160,7 +182,51 @@ func (c *Collector) collectQueueConfigurationData(ctx context.Context, queueName
 		}
 	}
 
-	return metrics
+	return &QueueTypeInfo{
+		QueueType: queueType,
+		Metrics:   metrics,
+	}
+}
+
+// determineQueueType analyzes queue attributes to determine the queue type
+func (c *Collector) determineQueueType(queueName string, attrs map[C.MQLONG]interface{}) string {
+	// Check queue type attribute first
+	if val, ok := attrs[C.MQIA_Q_TYPE]; ok {
+		if qtype, ok := val.(int32); ok {
+			switch qtype {
+			case C.MQQT_LOCAL:
+				return "local"
+			case C.MQQT_MODEL:
+				return "model"  
+			case C.MQQT_ALIAS:
+				return "alias"
+			case C.MQQT_REMOTE:
+				return "remote"
+			case C.MQQT_CLUSTER:
+				return "cluster"
+			}
+		}
+	}
+	
+	// Fallback to name-based heuristics if type attribute not available
+	queueNameUpper := strings.ToUpper(queueName)
+	
+	// Model queues typically end with .MODEL
+	if strings.HasSuffix(queueNameUpper, ".MODEL") {
+		return "model"
+	}
+	
+	// System queues are often local but with special handling
+	if strings.HasPrefix(queueNameUpper, "SYSTEM.") {
+		// Most system queues are local, but some are model queues
+		if strings.Contains(queueNameUpper, "MODEL") {
+			return "model"
+		}
+		return "local"
+	}
+	
+	// Default to local queue type
+	return "local"
 }
 
 // collectQueueRuntimeData attempts to collect runtime metrics and returns what was found
@@ -264,8 +330,11 @@ func (c *Collector) collectQueueResetData(ctx context.Context, queueName string)
 
 
 // addQueueConfigMetricsWithCharts creates charts and adds metrics with properly synchronized dimension IDs
-func (c *Collector) addQueueConfigMetricsWithCharts(queueName string, metrics map[string]int64, labels map[string]string, mx map[string]int64) {
+func (c *Collector) addQueueConfigMetricsWithCharts(queueName, queueType string, metrics map[string]int64, labels map[string]string, mx map[string]int64) {
 	cleanName := c.cleanName(queueName)
+	
+	// Use queue type-specific subfamily for consistent grouping
+	family := fmt.Sprintf("queues/%s", queueType)
 	
 	// Create charts based on what metrics are actually available and store metrics with matching dimension IDs
 	
@@ -275,13 +344,17 @@ func (c *Collector) addQueueConfigMetricsWithCharts(queueName string, metrics ma
 		depthDims = append(depthDims, "depth")
 	}
 	if len(depthDims) > 0 {
-		chartID := fmt.Sprintf("queue_depth_%s", cleanName)
+		context := fmt.Sprintf("mq_pcf.queue_%s_depth", queueType)
+		// Extract chartID from context to match what ensureChartExists will create
+		contextWithoutModule := strings.TrimPrefix(context, "mq_pcf.")
+		chartID := fmt.Sprintf("%s_%s", contextWithoutModule, cleanName)
+		
 		c.ensureChartExists(
-			"mq_pcf.queue_depth",
+			context,
 			"Queue Current Depth",
 			"messages",
 			"line",
-			"queues",
+			family,
 			prioQueueDepth,
 			depthDims,
 			queueName,
@@ -307,13 +380,17 @@ func (c *Collector) addQueueConfigMetricsWithCharts(queueName string, metrics ma
 		configDims = append(configDims, "trigger_depth")
 	}
 	if len(configDims) > 0 {
-		chartID := fmt.Sprintf("queue_config_%s", cleanName)
+		context := fmt.Sprintf("mq_pcf.queue_%s_config", queueType)
+		// Extract chartID from context to match what ensureChartExists will create
+		contextWithoutModule := strings.TrimPrefix(context, "mq_pcf.")
+		chartID := fmt.Sprintf("%s_%s", contextWithoutModule, cleanName)
+		
 		c.ensureChartExists(
-			"mq_pcf.queue_config",
+			context,
 			"Queue Configuration Limits",
 			"messages",
 			"line",
-			"queues",
+			family,
 			prioQueueDepth+1,
 			configDims,
 			queueName,
@@ -336,13 +413,17 @@ func (c *Collector) addQueueConfigMetricsWithCharts(queueName string, metrics ma
 		inhibitDims = append(inhibitDims, "inhibit_put")
 	}
 	if len(inhibitDims) > 0 {
-		chartID := fmt.Sprintf("queue_inhibit_%s", cleanName)
+		context := fmt.Sprintf("mq_pcf.queue_%s_inhibit", queueType)
+		// Extract chartID from context to match what ensureChartExists will create
+		contextWithoutModule := strings.TrimPrefix(context, "mq_pcf.")
+		chartID := fmt.Sprintf("%s_%s", contextWithoutModule, cleanName)
+		
 		c.ensureChartExists(
-			"mq_pcf.queue_inhibit",
+			context,
 			"Queue Inhibit Status",
 			"status",
 			"line",
-			"queues",
+			family,
 			prioQueueDepth+2,
 			inhibitDims,
 			queueName,
@@ -356,32 +437,51 @@ func (c *Collector) addQueueConfigMetricsWithCharts(queueName string, metrics ma
 		}
 	}
 
-	// Queue defaults
-	defaultDims := []string{}
+	// Queue default priority (if available)
 	if _, hasPriority := metrics["def_priority"]; hasPriority {
-		defaultDims = append(defaultDims, "def_priority")
-	}
-	if _, hasPersistence := metrics["def_persistence"]; hasPersistence {
-		defaultDims = append(defaultDims, "def_persistence")
-	}
-	if len(defaultDims) > 0 {
-		chartID := fmt.Sprintf("queue_defaults_%s", cleanName)
+		context := fmt.Sprintf("mq_pcf.queue_%s_priority", queueType)
+		// Extract chartID from context to match what ensureChartExists will create
+		contextWithoutModule := strings.TrimPrefix(context, "mq_pcf.")
+		chartID := fmt.Sprintf("%s_%s", contextWithoutModule, cleanName)
+		
 		c.ensureChartExists(
-			"mq_pcf.queue_defaults",
-			"Queue Default Settings",
-			"value",
+			context,
+			"Queue Default Priority",
+			"priority",
 			"line",
-			"queues",
+			family,
 			prioQueueDepth+3,
-			defaultDims,
+			[]string{"def_priority"},
 			queueName,
 			labels,
 		)
 		// Store metrics with dimension IDs that match chart expectations
-		for _, dim := range defaultDims {
-			if value, exists := metrics[dim]; exists {
-				mx[fmt.Sprintf("%s_%s", chartID, dim)] = value
-			}
+		if value, exists := metrics["def_priority"]; exists {
+			mx[fmt.Sprintf("%s_def_priority", chartID)] = value
+		}
+	}
+
+	// Queue default persistence mode (if available)
+	if _, hasPersistence := metrics["def_persistence"]; hasPersistence {
+		context := fmt.Sprintf("mq_pcf.queue_%s_persistence", queueType)
+		// Extract chartID from context to match what ensureChartExists will create
+		contextWithoutModule := strings.TrimPrefix(context, "mq_pcf.")
+		chartID := fmt.Sprintf("%s_%s", contextWithoutModule, cleanName)
+		
+		c.ensureChartExists(
+			context,
+			"Queue Default Persistence Mode",
+			"mode",
+			"line",
+			family,
+			prioQueueDepth+4,
+			[]string{"def_persistence"},
+			queueName,
+			labels,
+		)
+		// Store metrics with dimension IDs that match chart expectations
+		if value, exists := metrics["def_persistence"]; exists {
+			mx[fmt.Sprintf("%s_def_persistence", chartID)] = value
 		}
 	}
 
@@ -394,13 +494,17 @@ func (c *Collector) addQueueConfigMetricsWithCharts(queueName string, metrics ma
 		counterDims = append(counterDims, "dequeued")
 	}
 	if len(counterDims) > 0 {
-		chartID := fmt.Sprintf("queue_messages_%s", cleanName)
+		context := fmt.Sprintf("mq_pcf.queue_%s_messages", queueType)
+		// Extract chartID from context to match what ensureChartExists will create
+		contextWithoutModule := strings.TrimPrefix(context, "mq_pcf.")
+		chartID := fmt.Sprintf("%s_%s", contextWithoutModule, cleanName)
+		
 		c.ensureChartExists(
-			"mq_pcf.queue_messages",
+			context,
 			"Queue Message Counters",
 			"messages/s",
 			"line",
-			"queues",
+			family,
 			prioQueueMessages,
 			counterDims,
 			queueName,
@@ -423,13 +527,17 @@ func (c *Collector) addQueueConfigMetricsWithCharts(queueName string, metrics ma
 		eventDims = append(eventDims, "depth_low_limit")
 	}
 	if len(eventDims) > 0 {
-		chartID := fmt.Sprintf("queue_depth_events_%s", cleanName)
+		context := fmt.Sprintf("mq_pcf.queue_%s_depth_events", queueType)
+		// Extract chartID from context to match what ensureChartExists will create
+		contextWithoutModule := strings.TrimPrefix(context, "mq_pcf.")
+		chartID := fmt.Sprintf("%s_%s", contextWithoutModule, cleanName)
+		
 		c.ensureChartExists(
-			"mq_pcf.queue_depth_events",
+			context,
 			"Queue Depth Event Thresholds",
 			"messages",
 			"line",
-			"queues",
+			family,
 			prioQueueDepth+5,
 			eventDims,
 			queueName,
@@ -445,8 +553,11 @@ func (c *Collector) addQueueConfigMetricsWithCharts(queueName string, metrics ma
 }
 
 // addQueueRuntimeMetricsWithCharts creates charts and adds metrics with properly synchronized dimension IDs
-func (c *Collector) addQueueRuntimeMetricsWithCharts(queueName string, metrics map[string]int64, labels map[string]string, mx map[string]int64) {
+func (c *Collector) addQueueRuntimeMetricsWithCharts(queueName, queueType string, metrics map[string]int64, labels map[string]string, mx map[string]int64) {
 	cleanName := c.cleanName(queueName)
+	
+	// Use queue type-specific subfamily for consistent grouping
+	family := fmt.Sprintf("queues/%s", queueType)
 	
 	// Queue activity (open handles)
 	activityDims := []string{}
@@ -457,13 +568,17 @@ func (c *Collector) addQueueRuntimeMetricsWithCharts(queueName string, metrics m
 		activityDims = append(activityDims, "open_output_count")
 	}
 	if len(activityDims) > 0 {
-		chartID := fmt.Sprintf("queue_activity_%s", cleanName)
+		context := fmt.Sprintf("mq_pcf.queue_%s_activity", queueType)
+		// Extract chartID from context to match what ensureChartExists will create
+		contextWithoutModule := strings.TrimPrefix(context, "mq_pcf.")
+		chartID := fmt.Sprintf("%s_%s", contextWithoutModule, cleanName)
+		
 		c.ensureChartExists(
-			"mq_pcf.queue_activity",
+			context,
 			"Queue Activity Metrics",
 			"connections",
 			"line",
-			"queues",
+			family,
 			prioQueueDepth+4,
 			activityDims,
 			queueName,
@@ -479,8 +594,11 @@ func (c *Collector) addQueueRuntimeMetricsWithCharts(queueName string, metrics m
 }
 
 // addQueueResetMetricsWithCharts creates charts and adds metrics with properly synchronized dimension IDs
-func (c *Collector) addQueueResetMetricsWithCharts(queueName string, metrics map[string]int64, labels map[string]string, mx map[string]int64) {
+func (c *Collector) addQueueResetMetricsWithCharts(queueName, queueType string, metrics map[string]int64, labels map[string]string, mx map[string]int64) {
 	cleanName := c.cleanName(queueName)
+	
+	// Use queue type-specific subfamily for consistent grouping
+	family := fmt.Sprintf("queues/%s", queueType)
 	
 	// Peak depth and other reset statistics
 	resetDims := []string{}
@@ -496,13 +614,17 @@ func (c *Collector) addQueueResetMetricsWithCharts(queueName string, metrics map
 	}
 
 	if len(resetDims) > 0 {
-		chartID := fmt.Sprintf("queue_reset_stats_%s", cleanName)
+		context := fmt.Sprintf("mq_pcf.queue_%s_reset_stats", queueType)
+		// Extract chartID from context to match what ensureChartExists will create
+		contextWithoutModule := strings.TrimPrefix(context, "mq_pcf.")
+		chartID := fmt.Sprintf("%s_%s", contextWithoutModule, cleanName)
+		
 		c.ensureChartExists(
-			"mq_pcf.queue_reset_stats",
+			context,
 			"Queue Reset Statistics",
 			"value",
 			"line",
-			"queues",
+			family,
 			prioQueueDepth+6,
 			resetDims,
 			queueName,
