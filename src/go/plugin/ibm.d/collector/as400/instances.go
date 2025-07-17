@@ -15,6 +15,9 @@ type diskMetrics struct {
 	averageTime   int64
 	ssdLifeRemaining int64 // -1 if not SSD
 	ssdPowerOnDays   int64 // -1 if not SSD
+	hardwareStatus   string // Hardware status from SYSDISKSTAT
+	diskModel        string // Disk model from SYSDISKSTAT
+	serialNumber     string // Serial number from SYSDISKSTAT
 
 	updated   bool
 	hasCharts bool
@@ -72,6 +75,25 @@ type tempStorageMetrics struct {
 	hasCharts bool
 }
 
+// activeJobMetrics holds metrics for an individual active job
+type activeJobMetrics struct {
+	jobName                string
+	jobStatus              string
+	subsystem              string
+	jobType                string
+	runPriority            int64
+	elapsedCPUTime         int64  // seconds
+	elapsedTime            int64  // seconds
+	temporaryStorage       int64  // MB
+	cpuPercentage          int64  // percentage * precision
+	interactiveTransactions int64
+	diskIO                 int64
+	threadCount            int64
+
+	updated   bool
+	hasCharts bool
+}
+
 // Per-instance metric methods
 func (a *AS400) getDiskMetrics(unit string) *diskMetrics {
 	if _, ok := a.disks[unit]; !ok {
@@ -79,6 +101,9 @@ func (a *AS400) getDiskMetrics(unit string) *diskMetrics {
 			unit: unit,
 			ssdLifeRemaining: -1, // Default to -1 (not SSD)
 			ssdPowerOnDays: -1,   // Default to -1 (not SSD)
+			hardwareStatus: "UNKNOWN", // Default for hardware status
+			diskModel: "UNKNOWN",      // Default for disk model
+			serialNumber: "UNKNOWN",   // Default for serial number
 		}
 	}
 	return a.disks[unit]
@@ -110,4 +135,11 @@ func (a *AS400) getTempStorageMetrics(name string) *tempStorageMetrics {
 		a.tempStorageNamed[name] = &tempStorageMetrics{name: name}
 	}
 	return a.tempStorageNamed[name]
+}
+
+func (a *AS400) getActiveJobMetrics(jobName string) *activeJobMetrics {
+	if _, ok := a.activeJobs[jobName]; !ok {
+		a.activeJobs[jobName] = &activeJobMetrics{jobName: jobName}
+	}
+	return a.activeJobs[jobName]
 }

@@ -62,6 +62,7 @@ modules:
           - SSD health and age metrics (when SSDs are present)
           - Subsystem job counts and storage usage
           - Job queue lengths and status
+          - Active job analytics (CPU usage, resource consumption, activity, thread count)
         method_description: |
           The collector uses IBM DB2 driver to connect to the IBM i system and queries system catalog tables
           in QSYS2 schema to gather performance metrics.
@@ -630,3 +631,49 @@ modules:
                 - name: waiting
                 - name: held
                 - name: scheduled
+        - name: activejob
+          description: These metrics refer to top active jobs by CPU usage.
+          labels:
+            - name: job_name
+              description: Job name
+            - name: job_status
+              description: Job status
+            - name: subsystem
+              description: Subsystem name
+            - name: job_type
+              description: Job type
+            - name: run_priority
+              description: Run priority
+          metrics:
+            - name: as400.activejob_cpu
+              description: Active Job CPU Usage
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: cpu
+            - name: as400.activejob_resources
+              description: Active Job Resource Usage
+              unit: MB
+              chart_type: stacked
+              dimensions:
+                - name: temp_storage
+            - name: as400.activejob_time
+              description: Active Job Elapsed Time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: cpu_time
+                - name: total_time
+            - name: as400.activejob_activity
+              description: Active Job Activity
+              unit: operations/s
+              chart_type: area
+              dimensions:
+                - name: disk_io
+                - name: interactive_transactions
+            - name: as400.activejob_threads
+              description: Active Job Thread Count
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: threads
