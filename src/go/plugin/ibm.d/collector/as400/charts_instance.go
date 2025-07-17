@@ -233,6 +233,33 @@ var (
 			{ID: "netintf_%s_mtu", Name: "mtu"},
 		},
 	}
+
+	// System activity charts
+	systemActivityCPURateChart = module.Chart{
+		ID:       "system_activity_cpu_rate",
+		Title:    "System CPU Rate",
+		Units:    "percentage",
+		Fam:      "system_activity",
+		Ctx:      "as400.system_activity_cpu_rate",
+		Priority: module.Priority + 600,
+		Dims: module.Dims{
+			{ID: "system_activity_average_cpu_rate", Name: "average", Div: precision},
+		},
+	}
+
+	systemActivityCPUUtilizationChart = module.Chart{
+		ID:       "system_activity_cpu_utilization",
+		Title:    "System CPU Utilization",
+		Units:    "percentage",
+		Fam:      "system_activity",
+		Ctx:      "as400.system_activity_cpu_utilization",
+		Priority: module.Priority + 601,
+		Dims: module.Dims{
+			{ID: "system_activity_average_cpu_utilization", Name: "average", Div: precision},
+			{ID: "system_activity_minimum_cpu_utilization", Name: "minimum", Div: precision},
+			{ID: "system_activity_maximum_cpu_utilization", Name: "maximum", Div: precision},
+		},
+	}
 )
 
 // Chart creation functions

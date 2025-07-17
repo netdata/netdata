@@ -44,6 +44,10 @@ var (
 		
 		// Temporary storage charts
 		tempStorageTotalChart.Copy(),
+		
+		// System activity charts
+		systemActivityCPURateChart.Copy(),
+		systemActivityCPUUtilizationChart.Copy(),
 	}
 )
 
