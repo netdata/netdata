@@ -10,13 +10,53 @@ import (
 )
 
 func (d *DB2) collectDatabaseInstances(ctx context.Context) error {
-	if d.MaxDatabases <= 0 {
-		return nil
+	// Handle MaxDatabases == 0 (collect all)
+	if d.MaxDatabases == 0 {
+		return d.doCollectDatabaseInstances(ctx, false, nil)
 	}
 
+	// Handle MaxDatabases == -1 (always filter)
+	if d.MaxDatabases == -1 {
+		d.databaseFilterMode = true // Force filter mode
+		return d.doCollectDatabaseInstances(ctx, true, nil)
+	}
+
+	// Handle MaxDatabases > 0 (dynamic threshold)
+	if d.databaseFilterMode {
+		// Already in filter mode, apply selector
+		return d.doCollectDatabaseInstances(ctx, true, nil)
+	}
+
+	// Not in filter mode yet, try to collect all and check count
+	collectedCount := 0
+	err := d.doCollectDatabaseInstances(ctx, false, &collectedCount)
+	if err != nil {
+		return err
+	}
+
+	if collectedCount > d.MaxDatabases {
+		d.databaseFilterMode = true // Exceeded limit, switch to filter mode
+		d.Warningf("Number of databases (%d) exceeded MaxDatabases (%d). Switching to filter mode. Only databases matching '%s' will be collected.", collectedCount, d.MaxDatabases, d.CollectDatabasesMatching)
+		// Re-collect with filtering applied for this cycle
+		return d.doCollectDatabaseInstances(ctx, true, nil)
+	}
+
+	return nil // Already collected in the check phase
+}
+
+// Helper function to encapsulate the actual database instance collection logic
+func (d *DB2) doCollectDatabaseInstances(ctx context.Context, applySelector bool, collectedCount *int) error {
+	// Reset metrics for this collection pass
+	d.mx.databases = make(map[string]databaseInstanceMetrics)
+	
 	var currentDB string
 	var currentMetrics databaseInstanceMetrics
 	
+	// Reset collectedCount if provided
+	if collectedCount != nil {
+		*collectedCount = 0
+	}
+
 	err := d.doQuery(ctx, queryDatabaseInstances, func(column, value string, lineEnd bool) {
 		switch column {
 		case "DB_NAME":
@@ -31,11 +71,16 @@ func (d *DB2) collectDatabaseInstances(ctx context.Context) error {
 				return
 			}
 
-			// Apply selector if configured
-			if d.databaseSelector != nil && !d.databaseSelector.MatchString(dbName) {
+			// Apply selector if applySelector is true AND selector is configured
+			if applySelector && d.databaseSelector != nil && !d.databaseSelector.MatchString(dbName) {
 				currentDB = ""
 				return // Skip this database
 			}
+            
+            // Increment count if we are counting
+            if collectedCount != nil {
+                *collectedCount++
+            }
 
 			currentDB = dbName
 			currentMetrics = databaseInstanceMetrics{}
@@ -133,7 +178,9 @@ func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 				d.addBufferpoolCharts(d.bufferpools[currentBP])
 				count++
 			}
-			d.mx.bufferpools[currentBP] = bufferpoolInstanceMetrics{}
+			if _, exists := d.mx.bufferpools[currentBP]; !exists {
+				d.mx.bufferpools[currentBP] = bufferpoolInstanceMetrics{}
+			}
 
 		case "PAGESIZE":
 			if currentBP != "" {

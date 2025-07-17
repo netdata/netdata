@@ -278,16 +278,16 @@ type indexInstanceMetrics struct {
 
 
 type memoryPoolInstanceMetrics struct {
-	PoolUsed    int64 `stm:"pool_used"`
-	PoolUsedHWM int64 `stm:"pool_used_hwm"`
+	PoolUsed    int64 `stm:"used"`
+	PoolUsedHWM int64 `stm:"hwm"`
 }
 
 type tableIOInstanceMetrics struct {
-	TableScans       int64 `stm:"table_scans"`
-	RowsRead         int64 `stm:"rows_read"`
-	RowsInserted     int64 `stm:"rows_inserted"`
-	RowsUpdated      int64 `stm:"rows_updated"`
-	RowsDeleted      int64 `stm:"rows_deleted"`
+	TableScans       int64 `stm:"scans"`
+	RowsRead         int64 `stm:"read"`
+	RowsInserted     int64 `stm:"inserts"`
+	RowsUpdated      int64 `stm:"updates"`
+	RowsDeleted      int64 `stm:"deletes"`
 	OverflowAccesses int64 `stm:"overflow_accesses"`
 }
 
