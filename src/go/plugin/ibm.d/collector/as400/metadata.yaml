@@ -35,7 +35,7 @@ modules:
           - **V6R1 (6.1)**: Basic monitoring with core metrics (CPU, ASP, jobs, memory)
           - **V7R1 (7.1)**: Enhanced SQL services become available
           - **V7R2 (7.2)**: MESSAGE_QUEUE_INFO and JOB_QUEUE_ENTRIES support added
-          - **V7R3 (7.3)**: Full feature set including ACTIVE_JOB_INFO and IFS_OBJECT_STATISTICS
+          - **V7R3 (7.3)**: Full feature set including ACTIVE_JOB_INFO
           - **V7R4 (7.4)** and **V7R5 (7.5)**: Latest performance enhancements
 
           The collector automatically detects your IBM i version and enables only compatible features.
@@ -51,7 +51,6 @@ modules:
           - System ASP usage
           - Active jobs count and job type breakdown
           - Top active jobs by CPU usage (when enabled)
-          - IFS (Integrated File System) usage and file count
           - System message queue depths (QSYSMSG, QSYSOPR)
           - Critical message counts in system queues
           - Aggregate disk busy percentage
@@ -75,7 +74,7 @@ modules:
           - Comprehensive logging of available and disabled features during startup
           - Logs version compatibility issues only once to avoid log spam
           - Core metrics work on all IBM i versions (V6R1+)
-          - Advanced features (ACTIVE_JOB_INFO, IFS_OBJECT_STATISTICS) require V7R3+
+          - Advanced features (ACTIVE_JOB_INFO) require V7R3+
           - Version information added as labels to all charts for filtering and grouping
       supported_platforms:
         include: []
@@ -135,7 +134,7 @@ modules:
           list:
             - name: update_every
               description: Data collection frequency.
-              default_value: 5
+              default_value: 10
               required: false
             - name: dsn
               description: IBM DB2 connection string.
@@ -199,32 +198,20 @@ modules:
                 See Virtual Nodes documentation for details on organizing systems, metrics and alerts.
             - name: max_disks
               description: Maximum number of disks to monitor. Set to 0 for unlimited.
-              default_value: 50
+              default_value: 100
               required: false
             - name: max_subsystems
               description: Maximum number of subsystems to monitor. Set to 0 for unlimited.
-              default_value: 20
+              default_value: 100
               required: false
             - name: max_job_queues
               description: Maximum number of job queues to monitor.
-              default_value: 50
+              default_value: 100
               required: false
             - name: max_active_jobs
               description: Maximum number of active jobs to monitor when collect_active_jobs is enabled.
-              default_value: 10
+              default_value: 100
               required: false
-            - name: ifs_top_n_directories
-              description: Monitor top N IFS directories by size.
-              default_value: 20
-              required: false
-            - name: ifs_start_path
-              description: Starting path for IFS directory monitoring.
-              default_value: "/"
-              required: false
-              detailed_description: |
-                Starting path for IFS directory monitoring. Useful for monitoring specific
-                subdirectories on large file systems. The collector will only scan directories
-                under this path when collecting IFS directory usage statistics.
             - name: collect_disks_matching
               description: Pattern to filter disks. Supports wildcards (*, ?) and multiple patterns separated by |.
               default_value: ""
@@ -349,7 +336,7 @@ modules:
                   - V6R1: Basic monitoring only, limited SQL services
                   - V7R1: SQL services available, some advanced features missing
                   - V7R2: MESSAGE_QUEUE_INFO and JOB_QUEUE_ENTRIES added
-                  - V7R3: ACTIVE_JOB_INFO and IFS_OBJECT_STATISTICS added
+                  - V7R3: ACTIVE_JOB_INFO added
                   - V7R4-V7R5: Enhanced performance services
               - The collector attempts all configured features with graceful error handling
               - Admin configuration always takes precedence - if you enable a feature, the collector will attempt it regardless of version
@@ -518,10 +505,6 @@ modules:
               dimensions:
                 - name: system
                 - name: qsysopr
-            - name: as400.ifs_directory_usage
-              description: IFS Directory Usage
-              unit: bytes
-              chart_type: stacked
         - name: disk
           description: These metrics refer to individual disk units.
           labels:

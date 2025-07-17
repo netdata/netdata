@@ -9,129 +9,6 @@ import (
 	"strings"
 )
 
-// collectStatementInstances collects SQL statement performance metrics from package cache
-func (d *DB2) collectStatementInstances(ctx context.Context) error {
-	if d.MaxStatements <= 0 {
-		return nil
-	}
-
-	// Initialize maps if needed
-	if d.mx.statements == nil {
-		d.mx.statements = make(map[string]statementInstanceMetrics)
-	}
-
-	// Mark all statements as not updated
-	for _, stmt := range d.statements {
-		stmt.updated = false
-	}
-
-	query := fmt.Sprintf(queryMonGetPkgCacheStmt, d.StatementMinCPUMs, d.StatementMinExecutions, d.MaxStatements)
-	
-	var currentStmtID string
-	var currentMetrics statementInstanceMetrics
-	collected := 0
-	
-	err := d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
-		switch column {
-		case "EXECUTABLE_ID":
-			currentStmtID = cleanStmtID(value)
-			
-			// Create or update statement metadata
-			if _, exists := d.statements[currentStmtID]; !exists {
-				d.statements[currentStmtID] = &statementMetrics{
-					id: currentStmtID,
-				}
-				// Add charts for new statement
-				if err := d.addStatementCharts(d.statements[currentStmtID]); err != nil {
-					d.Warningf("failed to add statement charts for %s: %v", currentStmtID, err)
-				}
-			}
-			d.statements[currentStmtID].updated = true
-			collected++
-			
-		case "STMT_PREVIEW":
-			if currentStmtID != "" && d.statements[currentStmtID] != nil {
-				d.statements[currentStmtID].stmtPreview = value
-			}
-			
-		case "NUM_EXECUTIONS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				currentMetrics.NumExecutions = v
-			}
-			
-		case "AVG_EXEC_TIME_MS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				currentMetrics.AvgExecTime = v
-			}
-			
-		case "TOTAL_CPU_TIME":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				currentMetrics.TotalCPUTime = v
-			}
-			
-		case "ROWS_READ":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				currentMetrics.RowsRead = v
-			}
-			
-		case "ROWS_MODIFIED":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				currentMetrics.RowsModified = v
-			}
-			
-		case "LOGICAL_READS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				currentMetrics.LogicalReads = v
-			}
-			
-		case "PHYSICAL_READS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				currentMetrics.PhysicalReads = v
-			}
-			
-		case "LOCK_WAIT_TIME":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				currentMetrics.LockWaitTime = v
-			}
-			
-		case "TOTAL_SORTS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				currentMetrics.TotalSorts = v
-			}
-		}
-		
-		// At end of row, save metrics
-		if lineEnd && currentStmtID != "" {
-			d.mx.statements[currentStmtID] = currentMetrics
-			currentStmtID = ""
-			currentMetrics = statementInstanceMetrics{}
-		}
-	})
-	
-	if err != nil {
-		// Handle specific ODBC driver issues with DB2 column types
-		if strings.Contains(err.Error(), "unsupported column type") {
-			d.logOnce("statement_cache_column_type", "Statement cache collection disabled due to unsupported column types (ODBC driver limitation): %v", err)
-			return nil // Don't fail collection, just skip statement cache
-		}
-		return err
-	}
-	
-	// Remove stale statements
-	for id, stmt := range d.statements {
-		if !stmt.updated {
-			delete(d.statements, id)
-			d.removeStatementCharts(id)
-			delete(d.mx.statements, id)
-		}
-	}
-	
-	if collected == d.MaxStatements {
-		d.Debugf("reached max_statements limit (%d), some statements may not be collected", d.MaxStatements)
-	}
-	
-	return nil
-}
 
 // collectMemoryPoolInstances collects memory pool metrics
 func (d *DB2) collectMemoryPoolInstances(ctx context.Context) error {
@@ -159,9 +36,7 @@ func (d *DB2) collectMemoryPoolInstances(ctx context.Context) error {
 					poolType: value,
 				}
 				// Add charts for new pool
-				if err := d.addMemoryPoolCharts(d.memoryPools[currentPoolType]); err != nil {
-					d.Warningf("failed to add memory pool charts for %s: %v", currentPoolType, err)
-				}
+				d.addMemoryPoolCharts(d.memoryPools[currentPoolType])
 			}
 			d.memoryPools[currentPoolType].updated = true
 			
@@ -426,9 +301,7 @@ func (d *DB2) collectTableIOInstances(ctx context.Context) error {
 					name: currentTableName,
 				}
 				// Add charts for new table
-				if err := d.addTableIOCharts(d.tables[cleanName]); err != nil {
-					d.Warningf("failed to add table I/O charts for %s: %v", currentTableName, err)
-				}
+				d.addTableIOCharts(d.tables[cleanName])
 			}
 			d.tables[cleanName].ioUpdated = true
 			collected++
@@ -491,32 +364,5 @@ func (d *DB2) collectTableIOInstances(ctx context.Context) error {
 	}
 	
 	return nil
-}
-
-// Helper to clean statement IDs for use in metric names
-func cleanStmtID(id string) string {
-	// Remove all whitespace and non-alphanumeric characters
-	cleaned := ""
-	for _, r := range id {
-		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
-			cleaned += string(r)
-		}
-	}
-	
-	// If cleaned is empty, use a hash
-	if cleaned == "" {
-		h := 0
-		for _, r := range id {
-			h = h*31 + int(r)
-		}
-		cleaned = fmt.Sprintf("stmt_%d", h)
-	}
-	
-	// Limit length
-	if len(cleaned) > 20 {
-		cleaned = cleaned[:20]
-	}
-	
-	return strings.ToLower(cleaned)
 }
 
