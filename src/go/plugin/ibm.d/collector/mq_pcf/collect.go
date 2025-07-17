@@ -387,7 +387,7 @@ func (c *Collector) ensureConnection(ctx context.Context) error {
 	cno.ClientConnPtr = C.MQPTR(unsafe.Pointer(cd))
 
 	// Set connection options for better stability
-	cno.Options = C.MQCNO_RECONNECT | C.MQCNO_HANDLE_SHARE_BLOCK
+	cno.Options = C.MQCNO_CLIENT_BINDING | C.MQCNO_RECONNECT | C.MQCNO_HANDLE_SHARE_BLOCK
 
 	// Set up authentication if password is provided
 	var cspUser, cspPassword *C.char

@@ -208,6 +208,31 @@ var (
 			{ID: "activejob_%s_thread_count", Name: "threads"},
 		},
 	}
+
+	// Network interface chart templates
+	networkInterfaceStatusChartTmpl = module.Chart{
+		ID:       "netintf_%s_status",
+		Title:    "Network Interface Status",
+		Units:    "status",
+		Fam:      "network_interfaces",
+		Ctx:      "as400.network_interface_status",
+		Priority: module.Priority + 500,
+		Dims: module.Dims{
+			{ID: "netintf_%s_interface_status", Name: "active"},
+		},
+	}
+
+	networkInterfaceMTUChartTmpl = module.Chart{
+		ID:       "netintf_%s_mtu",
+		Title:    "Network Interface MTU",
+		Units:    "bytes",
+		Fam:      "network_interfaces",
+		Ctx:      "as400.network_interface_mtu",
+		Priority: module.Priority + 501,
+		Dims: module.Dims{
+			{ID: "netintf_%s_mtu", Name: "mtu"},
+		},
+	}
 )
 
 // Chart creation functions
@@ -322,6 +347,35 @@ func (a *AS400) newJobQueueCharts(jobQueue *jobQueueMetrics, key string) *module
 			{Key: "library", Value: jobQueue.library},
 			{Key: "status", Value: jobQueue.status},
 			{Key: "ibmi_version", Value: a.osVersion},
+			{Key: "system_name", Value: a.systemName},
+			{Key: "serial_number", Value: a.serialNumber},
+			{Key: "model", Value: a.model},
+		}
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, cleanKey)
+		}
+	}
+
+	return &charts
+}
+
+func (a *AS400) newNetworkInterfaceCharts(intf *networkInterfaceMetrics) *module.Charts {
+	cleanKey := cleanName(intf.name)
+	charts := module.Charts{
+		networkInterfaceStatusChartTmpl.Copy(),
+		networkInterfaceMTUChartTmpl.Copy(),
+	}
+
+	for _, chart := range charts {
+		chart.ID = fmt.Sprintf(chart.ID, cleanKey)
+		chart.Labels = []module.Label{
+			{Key: "interface", Value: intf.name},
+			{Key: "interface_type", Value: intf.interfaceType},
+			{Key: "connection_type", Value: intf.connectionType},
+			{Key: "internet_address", Value: intf.internetAddress},
+			{Key: "network_address", Value: intf.networkAddress},
+			{Key: "subnet_mask", Value: intf.subnetMask},
+			{Key: "version", Value: a.osVersion},
 			{Key: "system_name", Value: a.systemName},
 			{Key: "serial_number", Value: a.serialNumber},
 			{Key: "model", Value: a.model},

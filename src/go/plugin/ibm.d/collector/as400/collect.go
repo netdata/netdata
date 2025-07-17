@@ -154,6 +154,15 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 		}
 	}
 
+	// Collect network interfaces (requires IBM i 7.2 TR3+)
+	if err := a.collectNetworkInterfaces(ctx); err != nil {
+		if isSQLFeatureError(err) {
+			a.Warningf("network interface monitoring not available on this IBM i version: %v", err)
+		} else {
+			a.Errorf("failed to collect network interfaces: %v", err)
+		}
+	}
+
 	// Cleanup stale instances
 	a.cleanupStaleInstances()
 
@@ -214,6 +223,14 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 		cleanJobName := cleanName(jobName)
 		for k, v := range stm.ToMap(metrics) {
 			mx[fmt.Sprintf("activejob_%s_%s", cleanJobName, k)] = v
+		}
+	}
+
+	// Network interfaces
+	for interfaceName, metrics := range a.mx.networkInterfaces {
+		cleanInterfaceName := cleanName(interfaceName)
+		for k, v := range stm.ToMap(metrics) {
+			mx[fmt.Sprintf("netintf_%s_%s", cleanInterfaceName, k)] = v
 		}
 	}
 
@@ -939,4 +956,106 @@ func (a *AS400) collectDiskInstancesEnhanced(ctx context.Context) error {
 			}
 		}
 	})
+}
+
+func (a *AS400) collectNetworkInterfaces(ctx context.Context) error {
+	// First check cardinality
+	var count int64
+	err := a.doQueryRow(ctx, queryCountNetworkInterfaces, func(column, value string) {
+		if column == "COUNT" {
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				count = v
+			}
+		}
+	})
+	if err != nil {
+		return fmt.Errorf("failed to count network interfaces: %w", err)
+	}
+
+	if count > 50 { // Reasonable limit for network interfaces
+		a.Warningf("too many network interfaces (%d), skipping collection to avoid performance issues", count)
+		return nil
+	}
+
+	// Mark all interfaces as not updated
+	for _, intf := range a.networkInterfaces {
+		intf.updated = false
+	}
+
+	// Collect interface data
+	rows, err := a.db.QueryContext(ctx, queryNetworkInterfaces)
+	if err != nil {
+		return fmt.Errorf("failed to query network interfaces: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var lineDesc, interfaceType, interfaceStatus, connectionType string
+		var internetAddr, networkAddr string
+		var mtu int64
+
+		if err := rows.Scan(&lineDesc, &interfaceType, &interfaceStatus, &connectionType,
+			&internetAddr, &networkAddr, &mtu); err != nil {
+			a.Warningf("failed to scan network interface row: %v", err)
+			continue
+		}
+
+		// Get or create interface metrics
+		intf := a.getNetworkInterfaceMetrics(lineDesc)
+		intf.interfaceType = interfaceType
+		intf.interfaceStatus = interfaceStatus
+		intf.connectionType = connectionType
+		intf.internetAddress = internetAddr
+		intf.networkAddress = networkAddr
+		intf.subnetMask = "" // Not available in all IBM i versions
+		intf.mtu = mtu
+		intf.updated = true
+
+		// Create charts if needed
+		if !intf.hasCharts {
+			intf.hasCharts = true
+			a.addNetworkInterfaceCharts(intf)
+		}
+
+		// Set metrics in the map
+		cleanKey := cleanName(lineDesc)
+		
+		// Interface status: 1 if ACTIVE, 0 otherwise
+		statusValue := int64(0)
+		if interfaceStatus == "ACTIVE" {
+			statusValue = 1
+		}
+
+		if a.mx.networkInterfaces == nil {
+			a.mx.networkInterfaces = make(map[string]networkInterfaceInstanceMetrics)
+		}
+
+		a.mx.networkInterfaces[cleanKey] = networkInterfaceInstanceMetrics{
+			InterfaceStatus: statusValue,
+			MTU:             mtu,
+			InterfaceType:   interfaceType,
+			ConnectionType:  connectionType,
+			InternetAddress: internetAddr,
+			NetworkAddress:  networkAddr,
+			SubnetMask:      "", // Not available in all IBM i versions
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("error iterating network interface rows: %w", err)
+	}
+
+	// Remove stale interfaces
+	for name, intf := range a.networkInterfaces {
+		if !intf.updated {
+			a.removeNetworkInterfaceCharts(intf)
+			delete(a.networkInterfaces, name)
+			cleanKey := cleanName(name)
+			if a.mx.networkInterfaces != nil {
+				delete(a.mx.networkInterfaces, cleanKey)
+			}
+		}
+	}
+
+	return nil
 }
