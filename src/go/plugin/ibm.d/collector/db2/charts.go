@@ -13,7 +13,8 @@ var (
 		cpuUsageChart.Copy(),
 		activeConnectionsChart.Copy(),
 		memoryUsageChart.Copy(),
-		throughputOperationsChart.Copy(),
+		sqlStatementsChart.Copy(),
+		transactionActivityChart.Copy(),
 		timeSpentChart.Copy(),
 		
 		// Existing charts
@@ -60,7 +61,7 @@ var (
 		ID:       "service_health",
 		Title:    "Service Health Status",
 		Units:    "status",
-		Fam:      "health",
+		Fam:      "overview",
 		Ctx:      "db2.service_health",
 		Priority: module.Priority - 10,
 		Dims: module.Dims{
@@ -73,7 +74,7 @@ var (
 		ID:       "connections",
 		Title:    "Database Connections",
 		Units:    "connections",
-		Fam:      "connections",
+		Fam:      "connections/overview",
 		Ctx:      "db2.connections",
 		Priority: module.Priority,
 		Dims: module.Dims{
@@ -115,7 +116,7 @@ var (
 		ID:       "sorting",
 		Title:    "Database Sorting",
 		Units:    "sorts/s",
-		Fam:      "performance",
+		Fam:      "activity/sorting",
 		Ctx:      "db2.sorting",
 		Priority: module.Priority + 20,
 		Type:     module.Stacked,
@@ -155,7 +156,7 @@ var (
 		ID:       "row_activity",
 		Title:    "Row Activity",
 		Units:    "rows/s",
-		Fam:      "activity",
+		Fam:      "activity/rows",
 		Ctx:      "db2.row_activity",
 		Priority: module.Priority + 30,
 		Type:     module.Area,
@@ -170,7 +171,7 @@ var (
 		ID:       "bufferpool_hit_ratio",
 		Title:    "Buffer Pool Hit Ratio",
 		Units:    "percentage",
-		Fam:      "performance",
+		Fam:      "bufferpools/overview",
 		Ctx:      "db2.bufferpool_hit_ratio",
 		Priority: module.Priority + 40,
 		Dims: module.Dims{
@@ -185,7 +186,7 @@ var (
 		ID:       "bufferpool_data_hit_ratio",
 		Title:    "Buffer Pool Data Page Hit Ratio",
 		Units:    "percentage",
-		Fam:      "performance",
+		Fam:      "bufferpools/data",
 		Ctx:      "db2.bufferpool_data_hit_ratio",
 		Priority: module.Priority + 41,
 		Dims: module.Dims{
@@ -198,7 +199,7 @@ var (
 		ID:       "bufferpool_index_hit_ratio",
 		Title:    "Buffer Pool Index Page Hit Ratio",
 		Units:    "percentage",
-		Fam:      "performance",
+		Fam:      "bufferpools/index",
 		Ctx:      "db2.bufferpool_index_hit_ratio",
 		Priority: module.Priority + 42,
 		Dims: module.Dims{
@@ -211,7 +212,7 @@ var (
 		ID:       "bufferpool_xda_hit_ratio",
 		Title:    "Buffer Pool XDA Page Hit Ratio",
 		Units:    "percentage",
-		Fam:      "performance",
+		Fam:      "bufferpools/xda",
 		Ctx:      "db2.bufferpool_xda_hit_ratio",
 		Priority: module.Priority + 43,
 		Dims: module.Dims{
@@ -224,7 +225,7 @@ var (
 		ID:       "bufferpool_column_hit_ratio",
 		Title:    "Buffer Pool Column Page Hit Ratio",
 		Units:    "percentage",
-		Fam:      "performance",
+		Fam:      "bufferpools/columns",
 		Ctx:      "db2.bufferpool_column_hit_ratio",
 		Priority: module.Priority + 44,
 		Dims: module.Dims{
@@ -237,7 +238,7 @@ var (
 		ID:       "bufferpool_reads",
 		Title:    "Buffer Pool Reads",
 		Units:    "reads/s",
-		Fam:      "performance",
+		Fam:      "bufferpools/overview",
 		Ctx:      "db2.bufferpool_reads",
 		Priority: module.Priority + 45,
 		Type:     module.Stacked,
@@ -251,7 +252,7 @@ var (
 		ID:       "bufferpool_data_reads",
 		Title:    "Buffer Pool Data Page Reads",
 		Units:    "reads/s",
-		Fam:      "performance",
+		Fam:      "bufferpools/data",
 		Ctx:      "db2.bufferpool_data_reads",
 		Priority: module.Priority + 43,
 		Type:     module.Stacked,
@@ -265,7 +266,7 @@ var (
 		ID:       "bufferpool_index_reads",
 		Title:    "Buffer Pool Index Page Reads",
 		Units:    "reads/s",
-		Fam:      "performance",
+		Fam:      "bufferpools/index",
 		Ctx:      "db2.bufferpool_index_reads",
 		Priority: module.Priority + 44,
 		Type:     module.Stacked,
@@ -279,7 +280,7 @@ var (
 		ID:       "bufferpool_xda_reads",
 		Title:    "Buffer Pool XDA Page Reads",
 		Units:    "reads/s",
-		Fam:      "performance",
+		Fam:      "bufferpools/xda",
 		Ctx:      "db2.bufferpool_xda_reads",
 		Priority: module.Priority + 45,
 		Type:     module.Stacked,
@@ -293,7 +294,7 @@ var (
 		ID:       "bufferpool_column_reads",
 		Title:    "Buffer Pool Column Page Reads",
 		Units:    "reads/s",
-		Fam:      "performance",
+		Fam:      "bufferpools/columns",
 		Ctx:      "db2.bufferpool_column_reads",
 		Priority: module.Priority + 46,
 		Type:     module.Stacked,
@@ -307,7 +308,7 @@ var (
 		ID:       "log_space",
 		Title:    "Log Space Usage",
 		Units:    "bytes",
-		Fam:      "storage",
+		Fam:      "storage/space",
 		Ctx:      "db2.log_space",
 		Priority: module.Priority + 50,
 		Type:     module.Stacked,
@@ -321,7 +322,7 @@ var (
 		ID:       "log_utilization",
 		Title:    "Log Space Utilization",
 		Units:    "percentage",
-		Fam:      "storage",
+		Fam:      "storage/space",
 		Ctx:      "db2.log_utilization",
 		Priority: module.Priority + 51,
 		Dims: module.Dims{
@@ -333,7 +334,7 @@ var (
 		ID:       "log_io",
 		Title:    "Log I/O Operations",
 		Units:    "operations/s",
-		Fam:      "storage",
+		Fam:      "storage/operations",
 		Ctx:      "db2.log_io",
 		Priority: module.Priority + 52,
 		Type:     module.Area,
@@ -347,7 +348,7 @@ var (
 		ID:       "long_running_queries",
 		Title:    "Long Running Queries",
 		Units:    "queries",
-		Fam:      "performance",
+		Fam:      "activity/requests",
 		Ctx:      "db2.long_running_queries",
 		Priority: module.Priority + 60,
 		Type:     module.Stacked,
@@ -362,7 +363,7 @@ var (
 		ID:       "backup_status",
 		Title:    "Last Backup Status",
 		Units:    "status",
-		Fam:      "backup",
+		Fam:      "storage/backup",
 		Ctx:      "db2.backup_status",
 		Priority: module.Priority + 70,
 		Dims: module.Dims{
@@ -374,7 +375,7 @@ var (
 		ID:       "backup_age",
 		Title:    "Time Since Last Backup",
 		Units:    "hours",
-		Fam:      "backup",
+		Fam:      "storage/backup",
 		Ctx:      "db2.backup_age",
 		Priority: module.Priority + 71,
 		Dims: module.Dims{
@@ -417,7 +418,7 @@ var (
 		ID:       "active_connections",
 		Title:    "Active Connections",
 		Units:    "connections",
-		Fam:      "overview",
+		Fam:      "connections/overview",
 		Ctx:      "db2.active_connections",
 		Priority: module.Priority - 98,
 		Dims: module.Dims{
@@ -442,17 +443,31 @@ var (
 		},
 	}
 
-	throughputOperationsChart = module.Chart{
-		ID:       "throughput_operations",
-		Title:    "Database Operations",
-		Units:    "operations/s",
-		Fam:      "overview",
-		Ctx:      "db2.throughput_operations",
+	// Split into additive charts following RULE #1: Non-Overlapping Dimensions
+	sqlStatementsChart = module.Chart{
+		ID:       "sql_statements",
+		Title:    "SQL Statements",
+		Units:    "statements/s",
+		Fam:      "activity/requests",
+		Ctx:      "db2.sql_statements", 
 		Priority: module.Priority - 96,
+		Type:     module.Stacked,
 		Dims: module.Dims{
 			{ID: "ops_select_stmts", Name: "selects", Algo: module.Incremental},
-			{ID: "ops_uid_stmts", Name: "uid_stmts", Algo: module.Incremental},
-			{ID: "ops_transactions", Name: "transactions", Algo: module.Incremental},
+			{ID: "ops_uid_stmts", Name: "modifications", Algo: module.Incremental},
+		},
+	}
+
+	transactionActivityChart = module.Chart{
+		ID:       "transaction_activity",
+		Title:    "Transaction Activity", 
+		Units:    "transactions/s",
+		Fam:      "activity/transactions",
+		Ctx:      "db2.transaction_activity",
+		Priority: module.Priority - 95,
+		Type:     module.Stacked,
+		Dims: module.Dims{
+			{ID: "ops_transactions", Name: "committed", Algo: module.Incremental},
 			{ID: "ops_activities_aborted", Name: "aborted", Algo: module.Incremental},
 		},
 	}
@@ -461,7 +476,7 @@ var (
 		ID:       "time_spent",
 		Title:    "Average Operation Times",
 		Units:    "milliseconds",
-		Fam:      "overview",
+		Fam:      "activity/time-spent",
 		Ctx:      "db2.time_spent",
 		Priority: module.Priority - 95,
 		Dims: module.Dims{
@@ -477,7 +492,7 @@ var (
 		ID:       "log_operations",
 		Title:    "Log Operations",
 		Units:    "operations/s",
-		Fam:      "logging",
+		Fam:      "storage/operations",
 		Ctx:      "db2.log_operations",
 		Priority: module.Priority + 53,
 		Dims: module.Dims{
@@ -492,7 +507,7 @@ var (
 		ID:       "log_timing",
 		Title:    "Log Operation Times",
 		Units:    "milliseconds",
-		Fam:      "logging",
+		Fam:      "storage/operations",
 		Ctx:      "db2.log_timing",
 		Priority: module.Priority + 54,
 		Dims: module.Dims{
@@ -506,7 +521,7 @@ var (
 		ID:       "log_buffer_events",
 		Title:    "Log Buffer Full Events",
 		Units:    "events/s",
-		Fam:      "logging",
+		Fam:      "storage/operations",
 		Ctx:      "db2.log_buffer_events",
 		Priority: module.Priority + 55,
 		Dims: module.Dims{
