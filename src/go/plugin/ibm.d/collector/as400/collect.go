@@ -19,6 +19,73 @@ func boolPtr(v bool) *bool {
 	return &v
 }
 
+// isSystemMetric determines if a metric key represents a system-level metric
+// (as opposed to instance-specific metrics like per-disk, per-subsystem, etc.)
+func isSystemMetric(key string) bool {
+	systemMetrics := map[string]bool{
+		// CPU metrics
+		"cpu_percentage":        true,
+		"configured_cpus":       true,
+		"current_cpu_capacity":  true,
+		
+		// Memory metrics
+		"main_storage_size":             true,
+		"current_temporary_storage":     true,
+		"maximum_temporary_storage_used": true,
+		
+		// Job metrics  
+		"total_jobs_in_system":       true,
+		"active_jobs_in_system":      true,
+		"interactive_jobs_in_system": true,
+		"batch_jobs_running":         true,
+		"job_queue_length":           true,
+		
+		// Storage metrics
+		"system_asp_used":          true,
+		"system_asp_storage":       true,
+		"total_auxiliary_storage":  true,
+		
+		// Thread metrics
+		"active_threads_in_system": true,
+		"threads_per_processor":    true,
+		
+		// Memory pool metrics
+		"machine_pool_size":         true,
+		"base_pool_size":           true,
+		"interactive_pool_size":    true,
+		"spool_pool_size":          true,
+		"machine_pool_defined_size":  true,
+		"machine_pool_reserved_size": true,
+		"base_pool_defined_size":    true,
+		"base_pool_reserved_size":   true,
+		"machine_pool_threads":      true,
+		"machine_pool_max_threads":  true,
+		"base_pool_threads":         true,
+		"base_pool_max_threads":     true,
+		
+		// Network metrics
+		"remote_connections":      true,
+		"total_connections":       true,
+		"listen_connections":      true,
+		"closewait_connections":   true,
+		
+		// Temporary storage metrics
+		"temp_storage_current_total": true,
+		"temp_storage_peak_total":    true,
+		
+		// Disk aggregate metrics
+		"disk_busy_percentage": true,
+		
+		// System activity metrics
+		"system_activity_average_cpu_rate":        true,
+		"system_activity_average_cpu_utilization": true,
+		"system_activity_minimum_cpu_utilization": true,
+		"system_activity_maximum_cpu_utilization": true,
+	}
+	
+	return systemMetrics[key]
+}
+
 func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 	startTime := time.Now()
 	defer func() {
@@ -43,6 +110,9 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 		activeJobs:       make(map[string]activeJobInstanceMetrics),
 	}
 
+	// Create final metrics map - only populate with successfully collected metrics
+	mx := make(map[string]int64)
+
 	// Test connection with a ping before proceeding
 	if err := a.ping(ctx); err != nil {
 		// Try to reconnect once
@@ -59,49 +129,121 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 		}
 	}
 
-	// Collect system-wide metrics
-	if err := a.collectSystemStatus(ctx); err != nil {
-		return nil, fmt.Errorf("failed to collect system status: %v", err)
+	// Collect system-wide metrics - only add to mx if collection succeeds
+	if err := a.collectSystemStatus(ctx); err == nil {
+		// System status collection succeeded - add metrics to mx
+		systemMetrics := stm.ToMap(a.mx)
+		for k, v := range systemMetrics {
+			// Only add system-level metrics (not instance-specific ones)
+			if isSystemMetric(k) {
+				mx[k] = v
+			}
+		}
+	} else {
+		if isSQLTemporaryError(err) {
+			a.Debugf("system status collection failed with temporary error, will show gaps: %v", err)
+		} else {
+			a.Errorf("failed to collect system status: %v", err)
+		}
+		// Don't add any system status metrics to mx - this creates proper gaps
 	}
 
-	if err := a.collectMemoryPools(ctx); err != nil {
-		return nil, fmt.Errorf("failed to collect memory pools: %v", err)
+	// Collect memory pools - only add to mx if collection succeeds
+	if err := a.collectMemoryPools(ctx); err == nil {
+		// Memory pools collection succeeded - add metrics to mx
+		memoryMetrics := stm.ToMap(a.mx)
+		for k, v := range memoryMetrics {
+			if isSystemMetric(k) {
+				mx[k] = v
+			}
+		}
+	} else {
+		if isSQLTemporaryError(err) {
+			a.Debugf("memory pools collection failed with temporary error, will show gaps: %v", err)
+		} else {
+			a.Errorf("failed to collect memory pools: %v", err)
+		}
+		// Don't add any memory pool metrics to mx - this creates proper gaps
 	}
 
-	// Collect aggregate disk status - optional, gracefully handle missing disk tables
-	if err := a.collectDiskStatus(ctx); err != nil {
+	// Collect aggregate disk status - only add to mx if collection succeeds
+	if err := a.collectDiskStatus(ctx); err == nil {
+		// Disk status metrics are part of system metrics
+		diskMetrics := stm.ToMap(a.mx)
+		for k, v := range diskMetrics {
+			if isSystemMetric(k) {
+				mx[k] = v
+			}
+		}
+	} else {
 		if isSQLFeatureError(err) {
 			a.Warningf("disk status monitoring not available on this IBM i version: %v", err)
+		} else if isSQLTemporaryError(err) {
+			a.Debugf("disk status collection failed with temporary error, will show gaps: %v", err)
 		} else {
-			return nil, fmt.Errorf("failed to collect disk status: %v", err)
+			a.Errorf("failed to collect disk status: %v", err)
 		}
+		// Don't add disk status metrics to mx - this creates proper gaps
 	}
 
-	// Collect aggregate job info - optional, gracefully handle missing job tables
-	if err := a.collectJobInfo(ctx); err != nil {
+	// Collect aggregate job info - only add to mx if collection succeeds
+	if err := a.collectJobInfo(ctx); err == nil {
+		// Job info metrics are part of system metrics
+		jobMetrics := stm.ToMap(a.mx)
+		for k, v := range jobMetrics {
+			if isSystemMetric(k) {
+				mx[k] = v
+			}
+		}
+	} else {
 		if isSQLFeatureError(err) {
 			a.Warningf("job info monitoring not available on this IBM i version: %v", err)
+		} else if isSQLTemporaryError(err) {
+			a.Debugf("job info collection failed with temporary error, will show gaps: %v", err)
 		} else {
-			return nil, fmt.Errorf("failed to collect job info: %v", err)
+			a.Errorf("failed to collect job info: %v", err)
 		}
+		// Don't add job info metrics to mx - this creates proper gaps
 	}
 
-	// Collect network connections - optional
-	if err := a.collectNetworkConnections(ctx); err != nil {
+	// Collect network connections - only add to mx if collection succeeds
+	if err := a.collectNetworkConnections(ctx); err == nil {
+		// Network metrics are part of system metrics
+		networkMetrics := stm.ToMap(a.mx)
+		for k, v := range networkMetrics {
+			if isSystemMetric(k) {
+				mx[k] = v
+			}
+		}
+	} else {
 		if isSQLFeatureError(err) {
 			a.Warningf("network connections monitoring not available on this IBM i version: %v", err)
+		} else if isSQLTemporaryError(err) {
+			a.Debugf("network connections collection failed with temporary error, will show gaps: %v", err)
 		} else {
 			a.Errorf("failed to collect network connections: %v", err)
 		}
+		// Don't add network metrics to mx - this creates proper gaps
 	}
 
-	// Collect temporary storage - optional
-	if err := a.collectTempStorage(ctx); err != nil {
+	// Collect temporary storage - only add to mx if collection succeeds
+	if err := a.collectTempStorage(ctx); err == nil {
+		// Temporary storage metrics are part of system metrics
+		tempMetrics := stm.ToMap(a.mx)
+		for k, v := range tempMetrics {
+			if isSystemMetric(k) {
+				mx[k] = v
+			}
+		}
+	} else {
 		if isSQLFeatureError(err) {
 			a.Warningf("temporary storage monitoring not available on this IBM i version: %v", err)
+		} else if isSQLTemporaryError(err) {
+			a.Debugf("temporary storage collection failed with temporary error, will show gaps: %v", err)
 		} else {
 			a.Errorf("failed to collect temporary storage: %v", err)
 		}
+		// Don't add temporary storage metrics to mx - this creates proper gaps
 	}
 
 	// Collect subsystems - optional  
@@ -163,10 +305,17 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 		}
 	}
 
+	// Track if system activity collection succeeds
+	systemActivitySuccess := false
+	
 	// Collect system activity metrics (requires IBM i 7.3+)
-	if err := a.collectSystemActivity(ctx); err != nil {
+	if err := a.collectSystemActivity(ctx); err == nil {
+		systemActivitySuccess = true
+	} else {
 		if isSQLFeatureError(err) {
 			a.Warningf("system activity monitoring not available on this IBM i version: %v", err)
+		} else if isSQLTemporaryError(err) {
+			a.Debugf("system activity collection failed with temporary error, will show gaps: %v", err)
 		} else {
 			a.Errorf("failed to collect system activity: %v", err)
 		}
@@ -175,31 +324,32 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 	// Cleanup stale instances
 	a.cleanupStaleInstances()
 
-	// Build final metrics map
-	mx := stm.ToMap(a.mx)
-
 	// Add per-instance metrics
 	// Disks
 	for unit, metrics := range a.mx.disks {
 		cleanUnit := cleanName(unit)
 		metricsMap := stm.ToMap(metrics)
 		
-		// Check if this disk has SSD metrics - if not, remove them from the map
-		if disk, ok := a.disks[unit]; ok {
-			if disk.ssdLifeRemaining < 0 {
-				delete(metricsMap, "ssd_life_remaining")
-			}
-			if disk.ssdPowerOnDays < 0 {
-				delete(metricsMap, "ssd_power_on_days")
-			}
+		// Manually add SSD metrics only if they have values >= 0 (matches chart creation logic)
+		if metrics.SSDLifeRemaining >= 0 {
+			metricsMap["ssd_life_remaining"] = metrics.SSDLifeRemaining
+		}
+		if metrics.SSDPowerOnDays >= 0 {
+			metricsMap["ssd_power_on_days"] = metrics.SSDPowerOnDays
 		}
 		
 		for k, v := range metricsMap {
 			mx[fmt.Sprintf("disk_%s_%s", cleanUnit, k)] = v
 		}
 		// Calculate used_gb from capacity - available
-		if metrics.CapacityGB > 0 && metrics.AvailableGB > 0 {
-			mx[fmt.Sprintf("disk_%s_used_gb", cleanUnit)] = metrics.CapacityGB - metrics.AvailableGB
+		// Always calculate used_gb if we have capacity information
+		if metrics.CapacityGB > 0 {
+			usedGB := metrics.CapacityGB - metrics.AvailableGB
+			// Ensure used_gb is not negative
+			if usedGB < 0 {
+				usedGB = 0
+			}
+			mx[fmt.Sprintf("disk_%s_used_gb", cleanUnit)] = usedGB
 		}
 	}
 
@@ -243,9 +393,11 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 		}
 	}
 
-	// System activity metrics
-	for k, v := range stm.ToMap(a.mx.systemActivity) {
-		mx[fmt.Sprintf("system_activity_%s", k)] = v
+	// System activity metrics - only add if collection succeeded
+	if systemActivitySuccess {
+		for k, v := range stm.ToMap(a.mx.systemActivity) {
+			mx[fmt.Sprintf("system_activity_%s", k)] = v
+		}
 	}
 
 	return mx, nil
@@ -435,6 +587,8 @@ func (a *AS400) doQuery(ctx context.Context, query string, assign func(column, v
 		// Log expected SQL feature errors at DEBUG level to reduce noise
 		if isSQLFeatureError(err) {
 			a.Debugf("query failed with expected feature error: %s, error: %v", query, err)
+		} else if isSQLTemporaryError(err) {
+			a.Debugf("query failed with temporary database error: %s, error: %v", query, err)
 		} else {
 			a.Errorf("failed to execute query: %s, error: %v", query, err)
 		}
@@ -483,6 +637,8 @@ func (a *AS400) doQueryRow(ctx context.Context, query string, assign func(column
 	if err != nil {
 		if isSQLFeatureError(err) {
 			a.Debugf("query failed with expected feature error: %s, error: %v", query, err)
+		} else if isSQLTemporaryError(err) {
+			a.Debugf("query failed with temporary database error: %s, error: %v", query, err)
 		} else {
 			a.Errorf("failed to execute query: %s, error: %v", query, err)
 		}
@@ -533,7 +689,7 @@ func (a *AS400) collectDiskInstances(ctx context.Context) error {
 	}
 
 	var currentUnit string
-	return a.doQuery(ctx, queryDiskInstances, func(column, value string, lineEnd bool) {
+	return a.doQuery(ctx, queryDiskInstancesEnhanced, func(column, value string, lineEnd bool) {
 
 		switch column {
 		case "UNIT_NUMBER":
@@ -556,7 +712,19 @@ func (a *AS400) collectDiskInstances(ctx context.Context) error {
 
 		case "UNIT_TYPE":
 			if currentUnit != "" && a.disks[currentUnit] != nil {
-				a.disks[currentUnit].typeField = value
+				// Map IBM i disk type values to meaningful labels
+				switch value {
+				case "0":
+					a.disks[currentUnit].typeField = "HDD"
+				case "1":
+					a.disks[currentUnit].typeField = "SSD"
+				case "":
+					a.disks[currentUnit].typeField = "UNKNOWN"
+				default:
+					a.disks[currentUnit].typeField = value // Keep unknown values as-is
+				}
+				// Update labels on existing charts for this disk
+				a.updateDiskChartLabels(currentUnit)
 			}
 		case "UNIT_MODEL":
 			if currentUnit != "" && a.disks[currentUnit] != nil {
@@ -597,6 +765,167 @@ func (a *AS400) collectDiskInstances(ctx context.Context) error {
 						m.WriteRequests = v
 						a.mx.disks[currentUnit] = m
 					}
+				}
+			}
+		case "PERCENT_USED":
+			if currentUnit != "" && a.disks[currentUnit] != nil {
+				if v, err := strconv.ParseFloat(value, 64); err == nil {
+					if m, ok := a.mx.disks[currentUnit]; ok {
+						m.PercentUsed = int64(v * precision)
+						a.mx.disks[currentUnit] = m
+					} else {
+						a.mx.disks[currentUnit] = diskInstanceMetrics{
+							PercentUsed: int64(v * precision),
+						}
+					}
+				}
+			}
+		case "UNIT_SPACE_AVAILABLE_GB":
+			if currentUnit != "" && a.disks[currentUnit] != nil {
+				if v, err := strconv.ParseFloat(value, 64); err == nil {
+					if m, ok := a.mx.disks[currentUnit]; ok {
+						m.AvailableGB = int64(v * precision)
+						a.mx.disks[currentUnit] = m
+					} else {
+						a.mx.disks[currentUnit] = diskInstanceMetrics{
+							AvailableGB: int64(v * precision),
+						}
+					}
+				}
+			}
+		case "UNIT_STORAGE_CAPACITY":
+			if currentUnit != "" && a.disks[currentUnit] != nil {
+				if v, err := strconv.ParseFloat(value, 64); err == nil {
+					if m, ok := a.mx.disks[currentUnit]; ok {
+						m.CapacityGB = int64(v * precision)
+						a.mx.disks[currentUnit] = m
+					} else {
+						a.mx.disks[currentUnit] = diskInstanceMetrics{
+							CapacityGB: int64(v * precision),
+						}
+					}
+				}
+			}
+		case "TOTAL_BLOCKS_READ":
+			if currentUnit != "" && a.disks[currentUnit] != nil {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					if m, ok := a.mx.disks[currentUnit]; ok {
+						m.BlocksRead = v
+						a.mx.disks[currentUnit] = m
+					} else {
+						a.mx.disks[currentUnit] = diskInstanceMetrics{
+							BlocksRead: v,
+						}
+					}
+				}
+			}
+		case "TOTAL_BLOCKS_WRITTEN":
+			if currentUnit != "" && a.disks[currentUnit] != nil {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					if m, ok := a.mx.disks[currentUnit]; ok {
+						m.BlocksWritten = v
+						a.mx.disks[currentUnit] = m
+					} else {
+						a.mx.disks[currentUnit] = diskInstanceMetrics{
+							BlocksWritten: v,
+						}
+					}
+				}
+			}
+		case "SSD_LIFE_REMAINING":
+			if currentUnit != "" && a.disks[currentUnit] != nil {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil && v > 0 {
+					disk := a.disks[currentUnit]
+					disk.ssdLifeRemaining = v
+					if m, ok := a.mx.disks[currentUnit]; ok {
+						m.SSDLifeRemaining = v
+						a.mx.disks[currentUnit] = m
+					} else {
+						a.mx.disks[currentUnit] = diskInstanceMetrics{
+							SSDLifeRemaining: v,
+						}
+					}
+					// Add SSD health chart if not already present
+					ssdHealthChartID := fmt.Sprintf("disk_%s_ssd_health", cleanName(disk.unit))
+					if a.Charts().Get(ssdHealthChartID) == nil {
+						a.addSSDHealthChart(disk)
+					}
+				}
+			}
+		case "SSD_POWER_ON_DAYS":
+			if currentUnit != "" && a.disks[currentUnit] != nil {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil && v > 0 {
+					disk := a.disks[currentUnit]
+					disk.ssdPowerOnDays = v
+					if m, ok := a.mx.disks[currentUnit]; ok {
+						m.SSDPowerOnDays = v
+						a.mx.disks[currentUnit] = m
+					} else {
+						a.mx.disks[currentUnit] = diskInstanceMetrics{
+							SSDPowerOnDays: v,
+						}
+					}
+					// Add SSD age chart if not already present
+					ssdAgeChartID := fmt.Sprintf("disk_%s_ssd_age", cleanName(disk.unit))
+					if a.Charts().Get(ssdAgeChartID) == nil {
+						a.addSSDPowerOnChart(disk)
+					}
+				}
+			}
+		case "HARDWARE_STATUS":
+			if currentUnit != "" && a.disks[currentUnit] != nil {
+				disk := a.disks[currentUnit]
+				disk.hardwareStatus = value
+				if m, ok := a.mx.disks[currentUnit]; ok {
+					m.HardwareStatus = value
+					a.mx.disks[currentUnit] = m
+				} else {
+					a.mx.disks[currentUnit] = diskInstanceMetrics{
+						HardwareStatus: value,
+					}
+				}
+			}
+		case "DISK_MODEL":
+			if currentUnit != "" && a.disks[currentUnit] != nil {
+				disk := a.disks[currentUnit]
+				disk.diskModel = value
+				if m, ok := a.mx.disks[currentUnit]; ok {
+					m.DiskModel = value
+					a.mx.disks[currentUnit] = m
+				} else {
+					a.mx.disks[currentUnit] = diskInstanceMetrics{
+						DiskModel: value,
+					}
+				}
+			}
+		case "SERIAL_NUMBER":
+			if currentUnit != "" && a.disks[currentUnit] != nil {
+				disk := a.disks[currentUnit]
+				disk.serialNumber = value
+				if m, ok := a.mx.disks[currentUnit]; ok {
+					m.SerialNumber = value
+					a.mx.disks[currentUnit] = m
+				} else {
+					a.mx.disks[currentUnit] = diskInstanceMetrics{
+						SerialNumber: value,
+					}
+				}
+			}
+		}
+		
+		// After processing all columns for this disk, calculate used_gb if we have the required data
+		if lineEnd && currentUnit != "" {
+			if m, ok := a.mx.disks[currentUnit]; ok {
+				// Calculate used_gb from capacity - available
+				// Always calculate used_gb if we have capacity information
+				if m.CapacityGB > 0 {
+					usedGB := m.CapacityGB - m.AvailableGB
+					// Ensure used_gb is not negative
+					if usedGB < 0 {
+						usedGB = 0
+					}
+					m.UsedGB = usedGB
+					a.mx.disks[currentUnit] = m
 				}
 			}
 		}
@@ -746,24 +1075,7 @@ func (a *AS400) collectSubsystems(ctx context.Context) error {
 					}
 				}
 			}
-		case "HELD_JOB_COUNT":
-			if currentSubsystem != "" && a.subsystems[currentSubsystem] != nil {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					if m, ok := a.mx.subsystems[currentSubsystem]; ok {
-						m.HeldJobCount = v
-						a.mx.subsystems[currentSubsystem] = m
-					}
-				}
-			}
-		case "STORAGE_USED_KB":
-			if currentSubsystem != "" && a.subsystems[currentSubsystem] != nil {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					if m, ok := a.mx.subsystems[currentSubsystem]; ok {
-						m.StorageUsedKB = v
-						a.mx.subsystems[currentSubsystem] = m
-					}
-				}
-			}
+		// Note: HELD_JOB_COUNT and STORAGE_USED_KB columns removed - they don't exist in SUBSYSTEM_INFO table
 		}
 	})
 }
@@ -797,15 +1109,7 @@ func (a *AS400) collectJobQueues(ctx context.Context) error {
 					}
 				}
 			}
-		case "HELD_JOB_COUNT":
-			if currentQueue != "" && a.jobQueues[currentQueue] != nil {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					if m, ok := a.mx.jobQueues[currentQueue]; ok {
-						m.HeldJobCount = v
-						a.mx.jobQueues[currentQueue] = m
-					}
-				}
-			}
+		// Note: HELD_JOB_COUNT column removed - it doesn't exist in JOB_QUEUE_INFO table
 		}
 	})
 }
@@ -846,7 +1150,19 @@ func (a *AS400) collectDiskInstancesEnhanced(ctx context.Context) error {
 
 		case "UNIT_TYPE":
 			if currentUnit != "" && a.disks[currentUnit] != nil {
-				a.disks[currentUnit].typeField = value
+				// Map IBM i disk type values to meaningful labels
+				switch value {
+				case "0":
+					a.disks[currentUnit].typeField = "HDD"
+				case "1":
+					a.disks[currentUnit].typeField = "SSD"
+				case "":
+					a.disks[currentUnit].typeField = "UNKNOWN"
+				default:
+					a.disks[currentUnit].typeField = value // Keep unknown values as-is
+				}
+				// Update labels on existing charts for this disk
+				a.updateDiskChartLabels(currentUnit)
 			}
 		case "PERCENT_USED":
 			if currentUnit != "" && a.disks[currentUnit] != nil {
@@ -926,21 +1242,33 @@ func (a *AS400) collectDiskInstancesEnhanced(ctx context.Context) error {
 			}
 		case "SSD_LIFE_REMAINING":
 			if currentUnit != "" && a.disks[currentUnit] != nil {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					a.disks[currentUnit].ssdLifeRemaining = v
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil && v > 0 {
+					disk := a.disks[currentUnit]
+					disk.ssdLifeRemaining = v
 					if m, ok := a.mx.disks[currentUnit]; ok {
 						m.SSDLifeRemaining = v
 						a.mx.disks[currentUnit] = m
+					}
+					// Add SSD health chart if not already present
+					ssdHealthChartID := fmt.Sprintf("disk_%s_ssd_health", cleanName(disk.unit))
+					if a.Charts().Get(ssdHealthChartID) == nil {
+						a.addSSDHealthChart(disk)
 					}
 				}
 			}
 		case "SSD_POWER_ON_DAYS":
 			if currentUnit != "" && a.disks[currentUnit] != nil {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					a.disks[currentUnit].ssdPowerOnDays = v
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil && v > 0 {
+					disk := a.disks[currentUnit]
+					disk.ssdPowerOnDays = v
 					if m, ok := a.mx.disks[currentUnit]; ok {
 						m.SSDPowerOnDays = v
 						a.mx.disks[currentUnit] = m
+					}
+					// Add SSD age chart if not already present
+					ssdAgeChartID := fmt.Sprintf("disk_%s_ssd_age", cleanName(disk.unit))
+					if a.Charts().Get(ssdAgeChartID) == nil {
+						a.addSSDPowerOnChart(disk)
 					}
 				}
 			}
@@ -1075,13 +1403,14 @@ func (a *AS400) collectNetworkInterfaces(ctx context.Context) error {
 }
 
 func (a *AS400) collectSystemActivity(ctx context.Context) error {
-	// Query SYSTEM_ACTIVITY_INFO with default 1 second delay
+	// Query SYSTEM_STATUS_INFO view for CPU utilization metrics
+	// This is more reliable than SYSTEM_ACTIVITY_INFO() table function
 	query := `SELECT 
 		AVERAGE_CPU_RATE,
 		AVERAGE_CPU_UTILIZATION,
 		MINIMUM_CPU_UTILIZATION,
 		MAXIMUM_CPU_UTILIZATION
-	FROM TABLE(QSYS2.SYSTEM_ACTIVITY_INFO())`
+	FROM QSYS2.SYSTEM_STATUS_INFO`
 
 	err := a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
 		if value == "" {

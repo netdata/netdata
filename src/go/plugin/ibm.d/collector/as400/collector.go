@@ -286,7 +286,8 @@ func (a *AS400) verifyConfig() error {
 }
 
 func (a *AS400) initDatabase(ctx context.Context) (*sql.DB, error) {
-	db, err := sql.Open("odbc", a.DSN)
+	// Use optimized ODBC bridge that prevents SQL0519 errors
+	db, err := sql.Open("odbcbridge", a.DSN)
 	if err != nil {
 		return nil, fmt.Errorf("error opening database: %v", err)
 	}
@@ -370,6 +371,16 @@ func isSQLFeatureError(err error) bool {
 		strings.Contains(errStr, "SQLCODE=-443") ||
 		strings.Contains(errStr, "SQLCODE=-551") ||
 		strings.Contains(errStr, "SQLCODE=-707")
+}
+
+func isSQLTemporaryError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := strings.ToUpper(err.Error())
+	// Temporary database errors that should not fail the job
+	return strings.Contains(errStr, "SQL0519") || // prepared statement in use
+		strings.Contains(errStr, "SQLCODE=-519")   // alternative format
 }
 
 // collectSingleMetric executes a single-value query and handles errors gracefully

@@ -17,6 +17,43 @@ func (a *AS400) addDiskCharts(disk *diskMetrics) {
 	}
 }
 
+func (a *AS400) addSSDHealthChart(disk *diskMetrics) {
+	ssdHealthChart := a.newSSDHealthChart(disk)
+	if err := a.Charts().Add(ssdHealthChart); err != nil {
+		a.Warning(err)
+	}
+}
+
+func (a *AS400) addSSDPowerOnChart(disk *diskMetrics) {
+	ssdPowerOnChart := a.newSSDPowerOnChart(disk)
+	if err := a.Charts().Add(ssdPowerOnChart); err != nil {
+		a.Warning(err)
+	}
+}
+
+func (a *AS400) updateDiskChartLabels(unit string) {
+	disk, ok := a.disks[unit]
+	if !ok {
+		return
+	}
+	
+	cleanUnit := cleanName(unit)
+	prefix := fmt.Sprintf("disk_%s_", cleanUnit)
+	
+	// Update labels on all charts for this disk
+	for _, chart := range *a.Charts() {
+		if strings.HasPrefix(chart.ID, prefix) {
+			// Update the disk_type label with the new value
+			for i, label := range chart.Labels {
+				if label.Key == "disk_type" {
+					chart.Labels[i].Value = disk.typeField
+					break
+				}
+			}
+		}
+	}
+}
+
 func (a *AS400) removeDiskCharts(disk *diskMetrics) {
 	prefix := fmt.Sprintf("disk_%s_", cleanName(disk.unit))
 	for _, chart := range *a.Charts() {

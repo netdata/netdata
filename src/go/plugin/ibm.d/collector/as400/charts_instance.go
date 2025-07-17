@@ -109,24 +109,13 @@ var (
 		Fam:      "subsystem",
 		Ctx:      "as400.subsystem_jobs",
 		Priority: module.Priority + 200,
-		Type:     module.Stacked,
 		Dims: module.Dims{
-			{ID: "subsystem_%s_jobs_active", Name: "active"},
-			{ID: "subsystem_%s_jobs_held", Name: "held"},
+			{ID: "subsystem_%s_current_active_jobs", Name: "active"},
+			{ID: "subsystem_%s_maximum_active_jobs", Name: "maximum"},
 		},
 	}
 
-	subsystemStorageChartTmpl = module.Chart{
-		ID:       "subsystem_%s_storage",
-		Title:    "Subsystem %s Storage Usage",
-		Units:    "bytes",
-		Fam:      "subsystem",
-		Ctx:      "as400.subsystem_storage",
-		Priority: module.Priority + 201,
-		Dims: module.Dims{
-			{ID: "subsystem_%s_storage_used_kb", Name: "used", Mul: 1024},
-		},
-	}
+	// Note: subsystemStorageChartTmpl removed - STORAGE_USED_KB column doesn't exist
 
 	// Job queue charts
 	jobQueueLengthChartTmpl = module.Chart{
@@ -136,11 +125,8 @@ var (
 		Fam:      "jobqueue",
 		Ctx:      "as400.jobqueue_length",
 		Priority: module.Priority + 300,
-		Type:     module.Stacked,
 		Dims: module.Dims{
-			{ID: "jobqueue_%s_jobs_waiting", Name: "waiting"},
-			{ID: "jobqueue_%s_jobs_held", Name: "held"},
-			{ID: "jobqueue_%s_jobs_scheduled", Name: "scheduled"},
+			{ID: "jobqueue_%s_number_of_jobs", Name: "jobs"},
 		},
 	}
 
@@ -291,54 +277,57 @@ func (a *AS400) newDiskCharts(disk *diskMetrics) *module.Charts {
 		}
 	}
 
-	// Add SSD-specific charts if this is an SSD
-	if disk.ssdLifeRemaining >= 0 {
-		ssdHealthChart := diskSSDHealthChartTmpl.Copy()
-		ssdHealthChart.ID = fmt.Sprintf(ssdHealthChart.ID, cleanUnit)
-		ssdHealthChart.Labels = []module.Label{
-			{Key: "disk_unit", Value: disk.unit},
-			{Key: "disk_type", Value: disk.typeField},
-			{Key: "disk_model", Value: disk.diskModel},
-			{Key: "hardware_status", Value: disk.hardwareStatus},
-			{Key: "disk_serial_number", Value: disk.serialNumber},
-			{Key: "ibmi_version", Value: a.osVersion},
-			{Key: "system_name", Value: a.systemName},
-			{Key: "serial_number", Value: a.serialNumber},
-			{Key: "model", Value: a.model},
-		}
-		for _, dim := range ssdHealthChart.Dims {
-			dim.ID = fmt.Sprintf(dim.ID, cleanUnit)
-		}
-		charts = append(charts, ssdHealthChart)
-	}
-
-	if disk.ssdPowerOnDays >= 0 {
-		ssdAgeChart := diskSSDAgeChartTmpl.Copy()
-		ssdAgeChart.ID = fmt.Sprintf(ssdAgeChart.ID, cleanUnit)
-		ssdAgeChart.Labels = []module.Label{
-			{Key: "disk_unit", Value: disk.unit},
-			{Key: "disk_type", Value: disk.typeField},
-			{Key: "disk_model", Value: disk.diskModel},
-			{Key: "hardware_status", Value: disk.hardwareStatus},
-			{Key: "disk_serial_number", Value: disk.serialNumber},
-			{Key: "ibmi_version", Value: a.osVersion},
-			{Key: "system_name", Value: a.systemName},
-			{Key: "serial_number", Value: a.serialNumber},
-			{Key: "model", Value: a.model},
-		}
-		for _, dim := range ssdAgeChart.Dims {
-			dim.ID = fmt.Sprintf(dim.ID, cleanUnit)
-		}
-		charts = append(charts, ssdAgeChart)
-	}
+	// SSD charts are created dynamically when SSD metrics are discovered during collection
 
 	return &charts
+}
+
+func (a *AS400) newSSDHealthChart(disk *diskMetrics) *module.Chart {
+	cleanUnit := cleanName(disk.unit)
+	ssdHealthChart := diskSSDHealthChartTmpl.Copy()
+	ssdHealthChart.ID = fmt.Sprintf(ssdHealthChart.ID, cleanUnit)
+	ssdHealthChart.Labels = []module.Label{
+		{Key: "disk_unit", Value: disk.unit},
+		{Key: "disk_type", Value: disk.typeField},
+		{Key: "disk_model", Value: disk.diskModel},
+		{Key: "hardware_status", Value: disk.hardwareStatus},
+		{Key: "disk_serial_number", Value: disk.serialNumber},
+		{Key: "ibmi_version", Value: a.osVersion},
+		{Key: "system_name", Value: a.systemName},
+		{Key: "serial_number", Value: a.serialNumber},
+		{Key: "model", Value: a.model},
+	}
+	for _, dim := range ssdHealthChart.Dims {
+		dim.ID = fmt.Sprintf(dim.ID, cleanUnit)
+	}
+	return ssdHealthChart
+}
+
+func (a *AS400) newSSDPowerOnChart(disk *diskMetrics) *module.Chart {
+	cleanUnit := cleanName(disk.unit)
+	ssdAgeChart := diskSSDAgeChartTmpl.Copy()
+	ssdAgeChart.ID = fmt.Sprintf(ssdAgeChart.ID, cleanUnit)
+	ssdAgeChart.Labels = []module.Label{
+		{Key: "disk_unit", Value: disk.unit},
+		{Key: "disk_type", Value: disk.typeField},
+		{Key: "disk_model", Value: disk.diskModel},
+		{Key: "hardware_status", Value: disk.hardwareStatus},
+		{Key: "disk_serial_number", Value: disk.serialNumber},
+		{Key: "ibmi_version", Value: a.osVersion},
+		{Key: "system_name", Value: a.systemName},
+		{Key: "serial_number", Value: a.serialNumber},
+		{Key: "model", Value: a.model},
+	}
+	for _, dim := range ssdAgeChart.Dims {
+		dim.ID = fmt.Sprintf(dim.ID, cleanUnit)
+	}
+	return ssdAgeChart
 }
 
 func (a *AS400) newSubsystemCharts(subsystem *subsystemMetrics) *module.Charts {
 	charts := module.Charts{
 		subsystemJobsChartTmpl.Copy(),
-		subsystemStorageChartTmpl.Copy(),
+		// Note: subsystemStorageChartTmpl removed - STORAGE_USED_KB column doesn't exist
 	}
 
 	cleanSubsystem := cleanName(subsystem.name)

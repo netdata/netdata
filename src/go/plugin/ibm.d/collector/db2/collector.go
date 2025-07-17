@@ -322,24 +322,24 @@ func (d *DB2) initDatabase(ctx context.Context) (*sql.DB, error) {
 
 	// Parse the existing DSN or use it as-is if it's already ODBC format
 	if strings.Contains(d.DSN, "Driver=") {
-		// Already ODBC format - use directly
-		db, err = sql.Open("odbc", d.DSN)
+		// Already ODBC format - use optimized ODBC bridge
+		db, err = sql.Open("odbcbridge", d.DSN)
 		if err != nil {
 			return nil, fmt.Errorf("error opening ODBC database connection: %v", err)
 		}
-		d.Infof("connected to DB2 using ODBC driver")
+		d.Infof("connected to DB2 using optimized ODBC bridge driver")
 	} else {
 		// Convert existing DB2 DSN to ODBC format
 		// For now, just try to use ODBC with the DSN as-is
 		// In practice, the DSN would need to be converted from DB2 format to ODBC format
 		odbcDSN := convertDB2DSNToODBC(d.DSN)
 		
-		db, err = sql.Open("odbc", odbcDSN)
+		db, err = sql.Open("odbcbridge", odbcDSN)
 		if err != nil {
-			return nil, fmt.Errorf("error opening ODBC connection with converted DSN: %v", err)
+			return nil, fmt.Errorf("error opening ODBC bridge connection with converted DSN: %v", err)
 		}
 		
-		d.Infof("connected to DB2 using ODBC with converted DSN")
+		d.Infof("connected to DB2 using optimized ODBC bridge with converted DSN")
 	}
 
 	db.SetMaxOpenConns(d.MaxDbConns)
@@ -486,11 +486,11 @@ func (d *DB2) collectSingleMetric(ctx context.Context, metricKey string, query s
 		return nil
 	}
 
-	var value string
+	var nullValue sql.NullString
 	queryCtx, cancel := context.WithTimeout(ctx, time.Duration(d.Timeout))
 	defer cancel()
 
-	err := d.db.QueryRowContext(queryCtx, query).Scan(&value)
+	err := d.db.QueryRowContext(queryCtx, query).Scan(&nullValue)
 	if err != nil {
 		if isSQLFeatureError(err) {
 			d.logOnce(metricKey, "metric %s not available on this DB2 edition/version: %v", metricKey, err)
@@ -500,8 +500,8 @@ func (d *DB2) collectSingleMetric(ctx context.Context, metricKey string, query s
 		return err
 	}
 
-	if value != "" {
-		handler(value)
+	if nullValue.Valid && nullValue.String != "" {
+		handler(nullValue.String)
 	}
 
 	return nil
