@@ -68,6 +68,7 @@ type metricsData struct {
 	tempStorageNamed map[string]tempStorageInstanceMetrics
 	activeJobs      map[string]activeJobInstanceMetrics
 	networkInterfaces map[string]networkInterfaceInstanceMetrics
+	systemActivity   systemActivityMetrics
 }
 
 // Per-instance metric structures for stm conversion
@@ -122,4 +123,11 @@ type networkInterfaceInstanceMetrics struct {
 	InternetAddress string                               // INTERNET_ADDRESS - for labels only
 	NetworkAddress  string                               // NETWORK_ADDRESS - for labels only
 	SubnetMask      string                               // INTERFACE_SUBNET_MASK - for labels only
+}
+
+type systemActivityMetrics struct {
+	AverageCPURate        int64 `stm:"average_cpu_rate"`        // AVERAGE_CPU_RATE (percentage with precision)
+	AverageCPUUtilization int64 `stm:"average_cpu_utilization"` // AVERAGE_CPU_UTILIZATION (percentage with precision)
+	MinimumCPUUtilization int64 `stm:"minimum_cpu_utilization"` // MINIMUM_CPU_UTILIZATION (percentage with precision)
+	MaximumCPUUtilization int64 `stm:"maximum_cpu_utilization"` // MAXIMUM_CPU_UTILIZATION (percentage with precision)
 }

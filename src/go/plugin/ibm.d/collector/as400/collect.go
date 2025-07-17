@@ -163,6 +163,15 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 		}
 	}
 
+	// Collect system activity metrics (requires IBM i 7.3+)
+	if err := a.collectSystemActivity(ctx); err != nil {
+		if isSQLFeatureError(err) {
+			a.Warningf("system activity monitoring not available on this IBM i version: %v", err)
+		} else {
+			a.Errorf("failed to collect system activity: %v", err)
+		}
+	}
+
 	// Cleanup stale instances
 	a.cleanupStaleInstances()
 
@@ -232,6 +241,11 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 		for k, v := range stm.ToMap(metrics) {
 			mx[fmt.Sprintf("netintf_%s_%s", cleanInterfaceName, k)] = v
 		}
+	}
+
+	// System activity metrics
+	for k, v := range stm.ToMap(a.mx.systemActivity) {
+		mx[fmt.Sprintf("system_activity_%s", k)] = v
 	}
 
 	return mx, nil
@@ -1055,6 +1069,47 @@ func (a *AS400) collectNetworkInterfaces(ctx context.Context) error {
 				delete(a.mx.networkInterfaces, cleanKey)
 			}
 		}
+	}
+
+	return nil
+}
+
+func (a *AS400) collectSystemActivity(ctx context.Context) error {
+	// Query SYSTEM_ACTIVITY_INFO with default 1 second delay
+	query := `SELECT 
+		AVERAGE_CPU_RATE,
+		AVERAGE_CPU_UTILIZATION,
+		MINIMUM_CPU_UTILIZATION,
+		MAXIMUM_CPU_UTILIZATION
+	FROM TABLE(QSYS2.SYSTEM_ACTIVITY_INFO())`
+
+	err := a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+		if value == "" {
+			return
+		}
+
+		switch column {
+		case "AVERAGE_CPU_RATE":
+			if v, err := strconv.ParseFloat(value, 64); err == nil {
+				a.mx.systemActivity.AverageCPURate = int64(v * precision)
+			}
+		case "AVERAGE_CPU_UTILIZATION":
+			if v, err := strconv.ParseFloat(value, 64); err == nil {
+				a.mx.systemActivity.AverageCPUUtilization = int64(v * precision)
+			}
+		case "MINIMUM_CPU_UTILIZATION":
+			if v, err := strconv.ParseFloat(value, 64); err == nil {
+				a.mx.systemActivity.MinimumCPUUtilization = int64(v * precision)
+			}
+		case "MAXIMUM_CPU_UTILIZATION":
+			if v, err := strconv.ParseFloat(value, 64); err == nil {
+				a.mx.systemActivity.MaximumCPUUtilization = int64(v * precision)
+			}
+		}
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to collect system activity: %w", err)
 	}
 
 	return nil
