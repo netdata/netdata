@@ -152,6 +152,7 @@ type connectionMetrics struct {
 	applicationID   string
 	applicationName string
 	clientHostname  string
+	clientIP        string
 	clientUser      string
 	connectionState string
 }

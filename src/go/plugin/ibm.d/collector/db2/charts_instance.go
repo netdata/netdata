@@ -895,6 +895,9 @@ func (d *DB2) newConnectionCharts(conn *connectionMetrics) *module.Charts {
 		if conn.clientHostname != "" && conn.clientHostname != "-" {
 			labels = append(labels, module.Label{Key: "client_hostname", Value: conn.clientHostname})
 		}
+		if conn.clientIP != "" && conn.clientIP != "-" {
+			labels = append(labels, module.Label{Key: "client_ip", Value: conn.clientIP})
+		}
 		if conn.clientUser != "" && conn.clientUser != "-" {
 			labels = append(labels, module.Label{Key: "client_user", Value: conn.clientUser})
 		}

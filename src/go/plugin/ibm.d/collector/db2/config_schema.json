@@ -180,13 +180,6 @@
         "type": "boolean",
         "default": true
       },
-      "table_min_rows_read": {
-        "title": "Min table rows read",
-        "description": "Minimum rows read for a table to be monitored.",
-        "type": "integer",
-        "minimum": 0,
-        "default": 1000
-      },
       "vnode": {
         "title": "Vnode",
         "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
@@ -247,8 +240,7 @@
             "max_tablespaces",
             "max_connections",
             "max_tables",
-            "max_indexes",
-            "table_min_rows_read"
+            "max_indexes"
           ]
         },
         {
