@@ -222,11 +222,67 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 		}
 	}
 
+	// Debug bufferpool count
+	if len(d.mx.bufferpools) > 0 {
+		d.Debugf("Processing %d bufferpools in mx", len(d.mx.bufferpools))
+	}
+	
 	for name, metrics := range d.mx.bufferpools {
 		cleanName := cleanName(name)
 		for k, v := range stm.ToMap(metrics) {
 			mx[fmt.Sprintf("bufferpool_%s_%s", cleanName, k)] = v
 		}
+		
+		// Calculate hit ratios for instance charts
+		// Overall hit ratio
+		totalReads := metrics.Hits + metrics.Misses
+		if totalReads > 0 {
+			hitRatio := float64(metrics.Hits) * 100.0 / float64(totalReads)
+			mx[fmt.Sprintf("bufferpool_%s_hit_ratio", cleanName)] = int64(hitRatio * Precision)
+		} else {
+			// No reads means 100% hit ratio (no misses)
+			mx[fmt.Sprintf("bufferpool_%s_hit_ratio", cleanName)] = 100 * Precision
+		}
+		
+		// Data hit ratio
+		dataReads := metrics.DataHits + metrics.DataMisses
+		if dataReads > 0 {
+			dataHitRatio := float64(metrics.DataHits) * 100.0 / float64(dataReads)
+			mx[fmt.Sprintf("bufferpool_%s_data_hit_ratio", cleanName)] = int64(dataHitRatio * Precision)
+		} else {
+			mx[fmt.Sprintf("bufferpool_%s_data_hit_ratio", cleanName)] = 100 * Precision
+		}
+		
+		// Index hit ratio
+		indexReads := metrics.IndexHits + metrics.IndexMisses
+		if indexReads > 0 {
+			indexHitRatio := float64(metrics.IndexHits) * 100.0 / float64(indexReads)
+			mx[fmt.Sprintf("bufferpool_%s_index_hit_ratio", cleanName)] = int64(indexHitRatio * Precision)
+		} else {
+			mx[fmt.Sprintf("bufferpool_%s_index_hit_ratio", cleanName)] = 100 * Precision
+		}
+		
+		// XDA hit ratio
+		xdaReads := metrics.XDAHits + metrics.XDAMisses
+		if xdaReads > 0 {
+			xdaHitRatio := float64(metrics.XDAHits) * 100.0 / float64(xdaReads)
+			mx[fmt.Sprintf("bufferpool_%s_xda_hit_ratio", cleanName)] = int64(xdaHitRatio * Precision)
+		} else {
+			mx[fmt.Sprintf("bufferpool_%s_xda_hit_ratio", cleanName)] = 100 * Precision
+		}
+		
+		// Column hit ratio
+		columnReads := metrics.ColumnHits + metrics.ColumnMisses
+		if columnReads > 0 {
+			columnHitRatio := float64(metrics.ColumnHits) * 100.0 / float64(columnReads)
+			mx[fmt.Sprintf("bufferpool_%s_column_hit_ratio", cleanName)] = int64(columnHitRatio * Precision)
+		} else {
+			mx[fmt.Sprintf("bufferpool_%s_column_hit_ratio", cleanName)] = 100 * Precision
+		}
+		
+		// Debug
+		d.Debugf("Bufferpool %s: hits=%d, misses=%d, dataHits=%d, dataMisses=%d", 
+			name, metrics.Hits, metrics.Misses, metrics.DataHits, metrics.DataMisses)
 	}
 
 	for name, metrics := range d.mx.tablespaces {
