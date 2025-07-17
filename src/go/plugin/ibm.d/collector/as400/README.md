@@ -25,8 +25,6 @@ It collects:
 - System ASP (Auxiliary Storage Pool) usage
 - Memory pool usage (Machine, Base, Interactive, Spool)
 - Memory pool sizes (current, defined, reserved for Machine and Base pools)
-- IFS (Integrated File System) usage and file count
-- IFS top directories by size
 - System message queue depths (QSYSMSG, QSYSOPR)
 - Critical message counts in system queues
 - Aggregate disk busy percentage
@@ -55,9 +53,6 @@ It collects:
 | as400.memory_pool_reserved | Memory pool reserved sizes | bytes |
 | as400.disk_busy | Average disk busy percentage (aggregate) | percentage |
 | as400.job_queue_length | Number of jobs in queue (aggregate) | jobs |
-| as400.ifs_usage | IFS usage (used and total) | bytes |
-| as400.ifs_files | IFS file count | files |
-| as400.ifs_directory_usage | IFS top directories by size | bytes |
 | as400.message_queue_depth | System message queue depths | messages |
 | as400.message_queue_critical | Critical messages in system queues | messages |
 
@@ -130,9 +125,6 @@ jobs:
   - name: as400_production
     dsn: 'DATABASE=;HOSTNAME=as400.example.com;PORT=446;PROTOCOL=TCPIP;UID=monitor;PWD=secret'
     timeout: 5
-
-    # Monitor top 20 IFS directories by size
-    ifs_top_n_directories: 20
 
     # Cardinality control
     max_disks: 20
@@ -235,7 +227,6 @@ The collector uses individual queries for each metric to ensure maximum compatib
 | MESSAGE_QUEUE_INFO | V7R2+ | Disabled on older versions |
 | JOB_QUEUE_ENTRIES | V7R2+ | Disabled on older versions |
 | ACTIVE_JOB_INFO function | V7R3+ | Disabled before V7R3 |
-| IFS_OBJECT_STATISTICS | V7R3+ | Disabled before V7R3 |
 | Enhanced performance metrics | V7R4+ | Latest features on V7R4-V7R5 |
 
 ### Feature Availability Logging
@@ -243,13 +234,12 @@ The collector uses individual queries for each metric to ensure maximum compatib
 At startup, the collector logs:
 - **Detected version**: "detected IBM i version: V7 R3"
 - **Feature gates applied**: "Feature disabled: active_job_info - ACTIVE_JOB_INFO requires IBM i 7.3 or later"
-- **Available features**: "Feature availability: IBM i 7.3 detected - ACTIVE_JOB_INFO and IFS_OBJECT_STATISTICS available"
+- **Available features**: "Feature availability: IBM i 7.3 detected - ACTIVE_JOB_INFO available"
 
 ### Known Compatibility Issues
 
 1. **Table Functions**: Some metrics use table functions (UDTFs) that may not be available on older IBM i versions:
    - `ACTIVE_JOB_INFO()` - Used for job type breakdown and active job details
-   - `IFS_OBJECT_STATISTICS()` - Used for IFS file system metrics
 
 2. **Column Availability**: Some columns in QSYS2 tables were added in newer versions:
    - `CONFIGURED_CPUS`, `CURRENT_PROCESSING_CAPACITY` (V7R3+)

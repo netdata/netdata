@@ -65,10 +65,6 @@ func New() *DB2 {
 			BackupHistoryDays: 30,
 
 			// New performance monitoring defaults
-			CollectStatementMetrics: true,
-			MaxStatements:           50,
-			StatementMinExecutions:  10,
-			StatementMinCPUMs:       100,
 			CollectMemoryMetrics:    true,
 			CollectWaitMetrics:      true,
 			CollectTableIOMetrics:   true,
@@ -84,7 +80,6 @@ func New() *DB2 {
 		connections: make(map[string]*connectionMetrics),
 		tables:      make(map[string]*tableMetrics),
 		indexes:     make(map[string]*indexMetrics),
-		statements:  make(map[string]*statementMetrics),
 		memoryPools: make(map[string]*memoryPoolMetrics),
 		memorySets:  make(map[string]*memorySetInstanceMetrics),
 		prefetchers: make(map[string]*prefetcherInstanceMetrics),
@@ -124,10 +119,6 @@ type Config struct {
 	BackupHistoryDays int `yaml:"backup_history_days,omitempty" json:"backup_history_days"`
 
 	// Performance monitoring
-	CollectStatementMetrics  bool `yaml:"collect_statement_metrics,omitempty" json:"collect_statement_metrics"`
-	MaxStatements           int  `yaml:"max_statements,omitempty" json:"max_statements"`
-	StatementMinExecutions  int  `yaml:"statement_min_executions,omitempty" json:"statement_min_executions"`
-	StatementMinCPUMs       int  `yaml:"statement_min_cpu_ms,omitempty" json:"statement_min_cpu_ms"`
 	CollectMemoryMetrics    bool `yaml:"collect_memory_metrics,omitempty" json:"collect_memory_metrics"`
 	CollectWaitMetrics      bool `yaml:"collect_wait_metrics,omitempty" json:"collect_wait_metrics"`
 	CollectTableIOMetrics   bool `yaml:"collect_table_io_metrics,omitempty" json:"collect_table_io_metrics"`
@@ -159,7 +150,6 @@ type DB2 struct {
 	connections map[string]*connectionMetrics
 	tables      map[string]*tableMetrics
 	indexes     map[string]*indexMetrics
-	statements  map[string]*statementMetrics
 	memoryPools map[string]*memoryPoolMetrics
 
 	// Selectors
@@ -180,6 +170,11 @@ type DB2 struct {
 	// Resilience tracking (following AS/400 pattern)
 	disabledMetrics  map[string]bool // Track disabled metrics due to version incompatibility
 	disabledFeatures map[string]bool // Track disabled features (tables, views, functions)
+
+	// Edition flags
+	isDB2ForAS400 bool // DB2 for i (AS/400)
+	isDB2ForZOS   bool // DB2 for z/OS
+	isDB2Cloud    bool // Db2 on Cloud
 
 	// Modern monitoring support
 	useMonGetFunctions            bool // Use MON_GET_* functions instead of SNAP* views when available
@@ -266,6 +261,7 @@ func (d *DB2) Init(ctx context.Context) error {
 		}
 		d.indexSelector = m
 	}
+
 
 	return nil
 }
@@ -696,15 +692,6 @@ func (d *DB2) setConfigurationDefaults() {
 	}
 
 	// Set defaults for new performance metrics
-	if d.MaxStatements == 0 {
-		d.MaxStatements = 50
-	}
-	if d.StatementMinExecutions == 0 {
-		d.StatementMinExecutions = 10
-	}
-	if d.StatementMinCPUMs == 0 {
-		d.StatementMinCPUMs = 1000
-	}
 	if d.TableMinRowsRead == 0 {
 		d.TableMinRowsRead = 1000
 	}
@@ -715,14 +702,12 @@ func (d *DB2) setConfigurationDefaults() {
 		*d.CollectDatabaseMetrics, *d.CollectBufferpoolMetrics, *d.CollectTablespaceMetrics)
 	d.Infof("  Collection settings: ConnectionMetrics=%v, LockMetrics=%v, TableMetrics=%v, IndexMetrics=%v",
 		*d.CollectConnectionMetrics, *d.CollectLockMetrics, *d.CollectTableMetrics, *d.CollectIndexMetrics)
-	d.Infof("  Performance settings: StatementMetrics=%v, MemoryMetrics=%v, WaitMetrics=%v, TableIOMetrics=%v",
-		d.CollectStatementMetrics, d.CollectMemoryMetrics, d.CollectWaitMetrics, d.CollectTableIOMetrics)
+	d.Infof("  Performance settings: MemoryMetrics=%v, WaitMetrics=%v, TableIOMetrics=%v",
+		d.CollectMemoryMetrics, d.CollectWaitMetrics, d.CollectTableIOMetrics)
 	d.Infof("  Cardinality limits: MaxDatabases=%d, MaxBufferpools=%d, MaxTablespaces=%d",
 		d.MaxDatabases, d.MaxBufferpools, d.MaxTablespaces)
 	d.Infof("  Cardinality limits: MaxConnections=%d, MaxTables=%d, MaxIndexes=%d",
 		d.MaxConnections, d.MaxTables, d.MaxIndexes)
-	d.Infof("  Statement limits: MaxStatements=%d, MinExecutions=%d, MinCPUMs=%d",
-		d.MaxStatements, d.StatementMinExecutions, d.StatementMinCPUMs)
 
 }
 

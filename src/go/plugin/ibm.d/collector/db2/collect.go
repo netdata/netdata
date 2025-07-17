@@ -54,7 +54,6 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 		connections: make(map[string]connectionInstanceMetrics),
 		tables:      make(map[string]tableInstanceMetrics),
 		indexes:     make(map[string]indexInstanceMetrics),
-		statements:  make(map[string]statementInstanceMetrics),
 		memoryPools: make(map[string]memoryPoolInstanceMetrics),
 		memorySets:  make(map[string]memorySetInstanceMetrics),
 		tableIOs:    make(map[string]tableIOInstanceMetrics),
@@ -155,16 +154,6 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 	}
 
 	// Collect new performance metrics
-	if d.CollectStatementMetrics {
-		d.Debugf("collecting statement cache metrics (limit: %d)", d.MaxStatements)
-		if err := d.collectStatementInstances(ctx); err != nil {
-			if isSQLFeatureError(err) {
-				d.logOnce("statement_cache_unavailable", "Statement cache collection failed (likely unsupported on this DB2 edition/version): %v", err)
-			} else {
-				d.Errorf("failed to collect statement cache: %v", err)
-			}
-		}
-	}
 
 	if d.CollectMemoryMetrics {
 		d.Debugf("collecting memory pool metrics")
@@ -269,12 +258,6 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 	}
 
 	// Add new metric types
-	for id, metrics := range d.mx.statements {
-		// ID is already cleaned by cleanStmtID
-		for k, v := range stm.ToMap(metrics) {
-			mx[fmt.Sprintf("statement_%s_%s", id, k)] = v
-		}
-	}
 
 	for poolType, metrics := range d.mx.memoryPools {
 		cleanType := cleanName(poolType)

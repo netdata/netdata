@@ -124,7 +124,6 @@ type metricsData struct {
 	connections  map[string]connectionInstanceMetrics
 	tables       map[string]tableInstanceMetrics
 	indexes      map[string]indexInstanceMetrics
-	statements   map[string]statementInstanceMetrics
 	memoryPools  map[string]memoryPoolInstanceMetrics
 	tableIOs     map[string]tableIOInstanceMetrics
 	memorySets   map[string]memorySetInstanceMetrics
@@ -166,11 +165,6 @@ type indexMetrics struct {
 	name string
 }
 
-type statementMetrics struct {
-	id          string
-	stmtPreview string
-	updated     bool
-}
 
 type memoryPoolMetrics struct {
 	poolType string
@@ -281,17 +275,6 @@ type indexInstanceMetrics struct {
 	FullScans  int64 `stm:"full_scans"`
 }
 
-type statementInstanceMetrics struct {
-	NumExecutions   int64 `stm:"num_executions"`
-	AvgExecTime     int64 `stm:"avg_exec_time"`
-	TotalCPUTime    int64 `stm:"total_cpu_time"`
-	RowsRead        int64 `stm:"rows_read"`
-	RowsModified    int64 `stm:"rows_modified"`
-	LogicalReads    int64 `stm:"logical_reads"`
-	PhysicalReads   int64 `stm:"physical_reads"`
-	LockWaitTime    int64 `stm:"lock_wait_time"`
-	TotalSorts      int64 `stm:"total_sorts"`
-}
 
 type memoryPoolInstanceMetrics struct {
 	PoolUsed    int64 `stm:"pool_used"`

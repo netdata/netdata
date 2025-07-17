@@ -152,6 +152,55 @@ func (d *DB2) removeIndexCharts(name string) {
 	}
 }
 
+func (d *DB2) addMemoryPoolCharts(pool *memoryPoolMetrics) {
+	charts := d.newMemoryPoolCharts(pool)
+	for _, chart := range *charts {
+		if err := d.charts.Add(chart.Copy()); err != nil {
+			d.Warningf("failed to add memory pool chart for %s: %v", pool.poolType, err)
+		}
+	}
+}
+
+func (d *DB2) removeMemoryPoolCharts(poolType string) {
+	cleanName := cleanName(poolType)
+	chartPrefixes := []string{
+		fmt.Sprintf("memory_pool_%s_usage", cleanName),
+		fmt.Sprintf("memory_pool_%s_hwm", cleanName),
+	}
+
+	for _, prefix := range chartPrefixes {
+		if chart := d.charts.Get(prefix); chart != nil {
+			chart.MarkRemove()
+			chart.MarkNotCreated()
+		}
+	}
+}
+
+func (d *DB2) addTableIOCharts(table *tableMetrics) {
+	charts := d.newTableIOCharts(table)
+	for _, chart := range *charts {
+		if err := d.charts.Add(chart.Copy()); err != nil {
+			d.Warningf("failed to add table I/O chart for %s: %v", table.name, err)
+		}
+	}
+}
+
+func (d *DB2) removeTableIOCharts(name string) {
+	cleanName := cleanName(name)
+	chartPrefixes := []string{
+		fmt.Sprintf("table_io_%s_scans", cleanName),
+		fmt.Sprintf("table_io_%s_rows", cleanName),
+		fmt.Sprintf("table_io_%s_activity", cleanName),
+	}
+
+	for _, prefix := range chartPrefixes {
+		if chart := d.charts.Get(prefix); chart != nil {
+			chart.MarkRemove()
+			chart.MarkNotCreated()
+		}
+	}
+}
+
 // Track instance updates for cleanup
 type instanceUpdate struct {
 	lastSeen time.Time

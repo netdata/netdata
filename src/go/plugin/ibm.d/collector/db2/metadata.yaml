@@ -54,7 +54,6 @@ modules:
           - Individual buffer pool performance
           - Tablespace usage and sizes
           - Connection-level activity
-          - SQL statement performance (executions, CPU time, rows, I/O, waits)
           - Memory pool usage and high water marks
           - Table I/O statistics (scans, reads, DML activity)
         method_description: |
@@ -68,7 +67,6 @@ modules:
           - Consistent behavior across all IBM database types
           
           For DB2 9.7+ LUW editions, the collector also uses MON_GET_* table functions for:
-          - Statement cache analysis (MON_GET_PKG_CACHE_STMT)
           - Memory pool monitoring (MON_GET_MEMORY_POOL)
           - Table I/O statistics (MON_GET_TABLE)
           - Connection wait time analysis (MON_GET_CONNECTION)
@@ -141,7 +139,6 @@ modules:
               GRANT SELECT ON SYSIBMADM.ENV_INST_INFO TO username;
               
               -- For MON_GET_* functions (DB2 9.7+ LUW):
-              GRANT EXECUTE ON FUNCTION SYSPROC.MON_GET_PKG_CACHE_STMT TO username;
               GRANT EXECUTE ON FUNCTION SYSPROC.MON_GET_MEMORY_POOL TO username;
               GRANT EXECUTE ON FUNCTION SYSPROC.MON_GET_TABLE TO username;
               GRANT EXECUTE ON FUNCTION SYSPROC.MON_GET_CONNECTION TO username;
@@ -350,22 +347,6 @@ modules:
             - name: vnode
               description: Virtual node (vnode) assignment for Netdata Cloud.
               default_value: ""
-              required: false
-            - name: collect_statement_metrics
-              description: Enable collection of SQL statement performance metrics from package cache.
-              default_value: true
-              required: false
-            - name: max_statements
-              description: Maximum number of SQL statements to monitor.
-              default_value: 50
-              required: false
-            - name: statement_min_executions
-              description: Minimum number of executions for a statement to be monitored.
-              default_value: 10
-              required: false
-            - name: statement_min_cpu_ms
-              description: Minimum CPU time in milliseconds for a statement to be monitored.
-              default_value: 100
               required: false
             - name: collect_memory_metrics
               description: Enable collection of memory pool metrics.
@@ -839,57 +820,6 @@ modules:
               dimensions:
                 - name: index
                 - name: full
-        - name: statement
-          description: These metrics refer to individual SQL statements in the package cache.
-          labels:
-            - name: statement_id
-              description: Statement executable ID
-            - name: statement_preview
-              description: First 50 characters of the SQL statement
-            - name: db2_edition
-              description: DB2 edition (LUW, z/OS, i, Cloud)
-            - name: db2_version
-              description: DB2 version string
-          metrics:
-            - name: db2.statement_executions
-              description: Statement Executions
-              unit: executions/s
-              chart_type: line
-              dimensions:
-                - name: executions
-            - name: db2.statement_avg_time
-              description: Statement Average Execution Time
-              unit: milliseconds
-              chart_type: line
-              dimensions:
-                - name: avg_time
-            - name: db2.statement_cpu_time
-              description: Statement CPU Time
-              unit: milliseconds/s
-              chart_type: line
-              dimensions:
-                - name: cpu_time
-            - name: db2.statement_rows
-              description: Statement Row Activity
-              unit: rows/s
-              chart_type: area
-              dimensions:
-                - name: read
-                - name: modified
-            - name: db2.statement_io
-              description: Statement I/O Operations
-              unit: operations/s
-              chart_type: area
-              dimensions:
-                - name: logical
-                - name: physical
-            - name: db2.statement_waits
-              description: Statement Waits and Sorts
-              unit: milliseconds
-              chart_type: line
-              dimensions:
-                - name: lock_wait
-                - name: sorts
         - name: memory_pool
           description: These metrics refer to individual memory pools.
           labels:

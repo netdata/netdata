@@ -41,7 +41,7 @@ func New() *AS400 {
 		Config: Config{
 			DSN:           "",
 			Timeout:       confopt.Duration(time.Second * 2),
-			UpdateEvery:   5,
+			UpdateEvery:   10,
 			MaxDbConns:    1,
 			MaxDbLifeTime: confopt.Duration(time.Minute * 10),
 
@@ -52,19 +52,15 @@ func New() *AS400 {
 			// CollectActiveJobs:       nil,
 
 			// Cardinality limits
-			MaxDisks:      50,
-			MaxSubsystems: 20,
-			MaxJobQueues:  50,
-			MaxActiveJobs: 10,
+			MaxDisks:      100,
+			MaxSubsystems: 100,
+			MaxJobQueues:  100,
+			MaxActiveJobs: 100,
 
 			// Selectors (empty = collect all)
 			DiskSelector:      "",
 			SubsystemSelector: "",
 			JobQueueSelector:  "",
-
-			// IFS monitoring
-			IFSTopNDirectories: 20,
-			IFSStartPath:       "/",
 		},
 
 		charts:        baseCharts.Copy(),
@@ -116,9 +112,6 @@ type Config struct {
 	SubsystemSelector string `yaml:"collect_subsystems_matching,omitempty" json:"collect_subsystems_matching"`
 	JobQueueSelector  string `yaml:"collect_job_queues_matching,omitempty" json:"collect_job_queues_matching"`
 
-	// IFS monitoring
-	IFSTopNDirectories int    `yaml:"ifs_top_n_directories,omitempty" json:"ifs_top_n_directories"`
-	IFSStartPath       string `yaml:"ifs_start_path,omitempty" json:"ifs_start_path"`
 }
 
 type AS400 struct {

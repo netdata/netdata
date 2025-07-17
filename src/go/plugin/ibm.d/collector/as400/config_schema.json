@@ -9,7 +9,7 @@
         "description": "Data collection interval, measured in seconds.",
         "type": "integer",
         "minimum": 1,
-        "default": 5
+        "default": 10
       },
       "dsn": {
         "title": "DSN",
@@ -67,28 +67,28 @@
         "description": "Maximum number of disks to collect metrics for. Set to 0 for unlimited.",
         "type": "integer",
         "minimum": 0,
-        "default": 50
+        "default": 100
       },
       "max_subsystems": {
         "title": "Maximum subsystems",
         "description": "Maximum number of subsystems to collect metrics for. Set to 0 for unlimited.",
         "type": "integer",
         "minimum": 0,
-        "default": 20
+        "default": 100
       },
       "max_job_queues": {
         "title": "Maximum job queues",
         "description": "Maximum number of job queues to collect metrics for. Set to 0 for unlimited.",
         "type": "integer",
         "minimum": 0,
-        "default": 50
+        "default": 100
       },
       "max_active_jobs": {
         "title": "Maximum active jobs",
         "description": "Maximum number of active jobs to collect metrics for.",
         "type": "integer",
         "minimum": 1,
-        "default": 10
+        "default": 100
       },
       "collect_disks_matching": {
         "title": "Disk selector",
@@ -107,19 +107,6 @@
         "description": "Pattern to filter job queues. Supports wildcards (*, ?) and multiple patterns separated by |. Examples: 'QBATCH*' for batch queues, '*PROD*|*TEST*' for prod or test queues.",
         "type": "string",
         "default": ""
-      },
-      "ifs_top_n_directories": {
-        "title": "IFS top N directories",
-        "description": "Monitor top N IFS directories by size. Set to 0 to disable.",
-        "type": "integer",
-        "minimum": 0,
-        "default": 20
-      },
-      "ifs_start_path": {
-        "title": "IFS start path",
-        "description": "Starting path for IFS directory monitoring. Useful for monitoring specific subdirectories on large file systems.",
-        "type": "string",
-        "default": "/"
       },
       "vnode": {
         "title": "Vnode",
@@ -165,9 +152,7 @@
             "max_active_jobs",
             "collect_disks_matching",
             "collect_subsystems_matching",
-            "collect_job_queues_matching",
-            "ifs_top_n_directories",
-            "ifs_start_path"
+            "collect_job_queues_matching"
           ]
         },
         {
