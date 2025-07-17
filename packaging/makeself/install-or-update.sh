@@ -252,6 +252,44 @@ replace_symlink() {
     ln -s "${target}" "${name}"
 }
 
+ensure_static_curl_certificates() {
+    local target_cert="/opt/netdata/etc/ssl/certs/ca-certificates.crt"
+    
+    # If ca-certificates.crt already exists, we're done
+    [ -e "${target_cert}" ] && return 0
+    
+    # These MUST match the paths in src/daemon/config/netdata-conf-ssl.c
+    local cert_paths=(
+        "/etc/ssl/certs/ca-certificates.crt"               # Debian, Ubuntu, Arch
+        "/etc/ssl/certs/ca-bundle.crt"                     # Rocky Linux (via symlinks)
+        "/etc/pki/tls/certs/ca-bundle.crt"                 # RHEL, CentOS, Fedora
+        "/etc/ssl/ca-bundle.pem"                           # OpenSUSE
+        "/etc/ssl/cert.pem"                                # Alpine
+        "/opt/netdata/etc/ssl/certs/ca-certificates.crt"   # Netdata static build
+        "/opt/netdata/share/ssl/certs/ca-certificates.crt" # Netdata static build - fallback
+    )
+    
+    # Find the first valid certificate bundle
+    for cert_path in "${cert_paths[@]}"; do
+        if [ -f "${cert_path}" ] && [ -r "${cert_path}" ]; then
+            echo "Found system certificates at ${cert_path}"
+            
+            # Ensure the certs directory exists (needed for Alpine/OpenSUSE)
+            if [ ! -d "/opt/netdata/etc/ssl/certs" ]; then
+                mkdir -p "/opt/netdata/etc/ssl/certs"
+            fi
+            
+            # Create symlink to the system certificate
+            ln -sf "${cert_path}" "${target_cert}"
+            echo "Created symlink: ${cert_path} -> ${target_cert}"
+            return 0
+        fi
+    done
+    
+    echo "Warning: No valid certificate bundle found"
+    return 1
+}
+
 select_system_certs() {
   if [ -d /etc/pki/tls ] ; then
     echo "${1} /etc/pki/tls for TLS configuration and certificates"
@@ -260,6 +298,9 @@ select_system_certs() {
     echo "${1} /etc/ssl for TLS configuration and certificates"
     replace_symlink /etc/ssl /opt/netdata/etc/ssl
   fi
+  
+  # Ensure static curl can find the certificates
+  ensure_static_curl_certificates
 }
 
 select_internal_certs() {
