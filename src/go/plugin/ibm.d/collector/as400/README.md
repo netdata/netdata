@@ -36,7 +36,7 @@ It collects:
 - **Per-disk**: Busy percentage, I/O requests/s, throughput, response time, space usage, capacity, block operations, SSD health and age (for SSDs)
 - **Per-subsystem**: Active/held jobs, storage usage
 - **Per-job-queue**: Waiting/held/scheduled jobs
-- **Per-job** (top CPU consumers): CPU time, temporary storage, active time, CPU percentage
+- **Per-active-job** (top CPU consumers, requires IBM i 7.3+): CPU usage, resource consumption, elapsed time, disk I/O, interactive transactions, thread count
 
 ## Collected metrics
 
@@ -86,6 +86,15 @@ It collects:
 | Metric | Description | Unit | Labels |
 |--------|-------------|------|--------|
 | as400.jobqueue_length | Jobs in queue (waiting/held/scheduled) | jobs | job_queue, library, status |
+
+#### Active job metrics (top CPU consumers, requires IBM i 7.3+)
+| Metric | Description | Unit | Labels |
+|--------|-------------|------|--------|
+| as400.activejob_cpu | Active job CPU usage | percentage | job_name, job_status, subsystem, job_type, run_priority |
+| as400.activejob_resources | Active job resource usage (temporary storage) | MB | job_name, job_status, subsystem, job_type, run_priority |
+| as400.activejob_time | Active job elapsed time (CPU time, total time) | seconds | job_name, job_status, subsystem, job_type, run_priority |
+| as400.activejob_activity | Active job activity (disk I/O, interactive transactions) | operations/s | job_name, job_status, subsystem, job_type, run_priority |
+| as400.activejob_threads | Active job thread count | threads | job_name, job_status, subsystem, job_type, run_priority |
 
 ## Configuration
 

@@ -75,6 +75,7 @@ func New() *AS400 {
 		jobQueues:     make(map[string]*jobQueueMetrics),
 		messageQueues: make(map[string]*messageQueueMetrics),
 		tempStorageNamed: make(map[string]*tempStorageMetrics),
+		activeJobs:    make(map[string]*activeJobMetrics),
 		disabled:      make(map[string]bool),
 	}
 }
@@ -135,6 +136,7 @@ type AS400 struct {
 	jobQueues     map[string]*jobQueueMetrics
 	messageQueues map[string]*messageQueueMetrics
 	tempStorageNamed map[string]*tempStorageMetrics
+	activeJobs    map[string]*activeJobMetrics
 
 	// Selectors
 	diskSelector      matcher.Matcher
