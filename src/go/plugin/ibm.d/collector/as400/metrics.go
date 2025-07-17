@@ -67,6 +67,7 @@ type metricsData struct {
 	jobQueues       map[string]jobQueueInstanceMetrics
 	tempStorageNamed map[string]tempStorageInstanceMetrics
 	activeJobs      map[string]activeJobInstanceMetrics
+	networkInterfaces map[string]networkInterfaceInstanceMetrics
 }
 
 // Per-instance metric structures for stm conversion
@@ -111,4 +112,14 @@ type activeJobInstanceMetrics struct {
 	ThreadCount                int64 `stm:"thread_count"`                  // THREAD_COUNT
 	ElapsedDiskIO              int64 `stm:"elapsed_disk_io"`               // ELAPSED_TOTAL_DISK_IO_COUNT
 	ElapsedInteractiveTransactions int64 `stm:"elapsed_interactive_transactions"` // ELAPSED_INTERACTIVE_TRANSACTIONS
+}
+
+type networkInterfaceInstanceMetrics struct {
+	InterfaceStatus int64  `stm:"interface_status"`      // 1 if ACTIVE, 0 if not
+	MTU             int64  `stm:"mtu"`                    // MAXIMUM_TRANSMISSION_UNIT
+	InterfaceType   string                               // INTERFACE_LINE_TYPE - for labels only
+	ConnectionType  string                               // CONNECTION_TYPE - for labels only
+	InternetAddress string                               // INTERNET_ADDRESS - for labels only
+	NetworkAddress  string                               // NETWORK_ADDRESS - for labels only
+	SubnetMask      string                               // INTERFACE_SUBNET_MASK - for labels only
 }
