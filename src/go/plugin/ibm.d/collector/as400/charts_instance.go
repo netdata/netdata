@@ -143,6 +143,71 @@ var (
 			{ID: "jobqueue_%s_jobs_scheduled", Name: "scheduled"},
 		},
 	}
+
+	// Active job charts
+	activeJobCPUChartTmpl = module.Chart{
+		ID:       "activejob_%s_cpu",
+		Title:    "Active Job %s CPU Usage",
+		Units:    "percentage",
+		Fam:      "activejobs",
+		Ctx:      "as400.activejob_cpu",
+		Priority: module.Priority + 400,
+		Dims: module.Dims{
+			{ID: "activejob_%s_cpu_percentage", Name: "cpu", Div: precision},
+		},
+	}
+
+	activeJobResourcesChartTmpl = module.Chart{
+		ID:       "activejob_%s_resources",
+		Title:    "Active Job %s Resource Usage",
+		Units:    "MB",
+		Fam:      "activejobs",
+		Ctx:      "as400.activejob_resources",
+		Priority: module.Priority + 401,
+		Type:     module.Stacked,
+		Dims: module.Dims{
+			{ID: "activejob_%s_temporary_storage", Name: "temp_storage"},
+		},
+	}
+
+	activeJobTimeChartTmpl = module.Chart{
+		ID:       "activejob_%s_time",
+		Title:    "Active Job %s Elapsed Time",
+		Units:    "seconds",
+		Fam:      "activejobs",
+		Ctx:      "as400.activejob_time",
+		Priority: module.Priority + 402,
+		Dims: module.Dims{
+			{ID: "activejob_%s_elapsed_cpu_time", Name: "cpu_time"},
+			{ID: "activejob_%s_elapsed_time", Name: "total_time"},
+		},
+	}
+
+	activeJobActivityChartTmpl = module.Chart{
+		ID:       "activejob_%s_activity",
+		Title:    "Active Job %s Activity",
+		Units:    "operations/s",
+		Fam:      "activejobs",
+		Ctx:      "as400.activejob_activity",
+		Priority: module.Priority + 403,
+		Type:     module.Area,
+		Dims: module.Dims{
+			{ID: "activejob_%s_elapsed_disk_io", Name: "disk_io", Algo: module.Incremental},
+			{ID: "activejob_%s_elapsed_interactive_transactions", Name: "interactive_transactions", Algo: module.Incremental, Mul: -1},
+		},
+	}
+
+	activeJobThreadsChartTmpl = module.Chart{
+		ID:       "activejob_%s_threads",
+		Title:    "Active Job %s Thread Count",
+		Units:    "threads",
+		Fam:      "activejobs",
+		Ctx:      "as400.activejob_threads",
+		Priority: module.Priority + 404,
+		Dims: module.Dims{
+			{ID: "activejob_%s_thread_count", Name: "threads"},
+		},
+	}
 )
 
 // Chart creation functions
@@ -161,7 +226,9 @@ func (a *AS400) newDiskCharts(disk *diskMetrics) *module.Charts {
 		chart.Labels = []module.Label{
 			{Key: "disk_unit", Value: disk.unit},
 			{Key: "disk_type", Value: disk.typeField},
-			{Key: "disk_model", Value: disk.model},
+			{Key: "disk_model", Value: disk.diskModel},
+			{Key: "hardware_status", Value: disk.hardwareStatus},
+			{Key: "disk_serial_number", Value: disk.serialNumber},
 			{Key: "ibmi_version", Value: a.osVersion},
 			{Key: "system_name", Value: a.systemName},
 			{Key: "serial_number", Value: a.serialNumber},
@@ -179,7 +246,9 @@ func (a *AS400) newDiskCharts(disk *diskMetrics) *module.Charts {
 		ssdHealthChart.Labels = []module.Label{
 			{Key: "disk_unit", Value: disk.unit},
 			{Key: "disk_type", Value: disk.typeField},
-			{Key: "disk_model", Value: disk.model},
+			{Key: "disk_model", Value: disk.diskModel},
+			{Key: "hardware_status", Value: disk.hardwareStatus},
+			{Key: "disk_serial_number", Value: disk.serialNumber},
 			{Key: "ibmi_version", Value: a.osVersion},
 			{Key: "system_name", Value: a.systemName},
 			{Key: "serial_number", Value: a.serialNumber},
@@ -197,7 +266,9 @@ func (a *AS400) newDiskCharts(disk *diskMetrics) *module.Charts {
 		ssdAgeChart.Labels = []module.Label{
 			{Key: "disk_unit", Value: disk.unit},
 			{Key: "disk_type", Value: disk.typeField},
-			{Key: "disk_model", Value: disk.model},
+			{Key: "disk_model", Value: disk.diskModel},
+			{Key: "hardware_status", Value: disk.hardwareStatus},
+			{Key: "disk_serial_number", Value: disk.serialNumber},
 			{Key: "ibmi_version", Value: a.osVersion},
 			{Key: "system_name", Value: a.systemName},
 			{Key: "serial_number", Value: a.serialNumber},

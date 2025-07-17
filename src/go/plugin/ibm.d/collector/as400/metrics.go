@@ -66,20 +66,24 @@ type metricsData struct {
 	subsystems      map[string]subsystemInstanceMetrics
 	jobQueues       map[string]jobQueueInstanceMetrics
 	tempStorageNamed map[string]tempStorageInstanceMetrics
+	activeJobs      map[string]activeJobInstanceMetrics
 }
 
 // Per-instance metric structures for stm conversion
 type diskInstanceMetrics struct {
-	BusyPercent      int64 `stm:"busy_percent"`
-	ReadRequests     int64 `stm:"read_requests"`
-	WriteRequests    int64 `stm:"write_requests"`
-	PercentUsed      int64 `stm:"percent_used"`        // PERCENT_USED
-	AvailableGB      int64 `stm:"available_gb"`        // UNIT_SPACE_AVAILABLE_GB
-	CapacityGB       int64                              // UNIT_STORAGE_CAPACITY - used only for calculation
-	BlocksRead       int64 `stm:"blocks_read"`         // TOTAL_BLOCKS_READ
-	BlocksWritten    int64 `stm:"blocks_written"`      // TOTAL_BLOCKS_WRITTEN
-	SSDLifeRemaining int64 `stm:"ssd_life_remaining"`  // SSD_LIFE_REMAINING
-	SSDPowerOnDays   int64 `stm:"ssd_power_on_days"`   // SSD_POWER_ON_DAYS
+	BusyPercent      int64  `stm:"busy_percent"`
+	ReadRequests     int64  `stm:"read_requests"`
+	WriteRequests    int64  `stm:"write_requests"`
+	PercentUsed      int64  `stm:"percent_used"`        // PERCENT_USED
+	AvailableGB      int64  `stm:"available_gb"`        // UNIT_SPACE_AVAILABLE_GB
+	CapacityGB       int64                               // UNIT_STORAGE_CAPACITY - used only for calculation
+	BlocksRead       int64  `stm:"blocks_read"`         // TOTAL_BLOCKS_READ
+	BlocksWritten    int64  `stm:"blocks_written"`      // TOTAL_BLOCKS_WRITTEN
+	SSDLifeRemaining int64  `stm:"ssd_life_remaining"`  // SSD_LIFE_REMAINING
+	SSDPowerOnDays   int64  `stm:"ssd_power_on_days"`   // SSD_POWER_ON_DAYS
+	HardwareStatus   string                             // HARDWARE_STATUS - for labels only
+	DiskModel        string                             // DISK_MODEL - for labels only
+	SerialNumber     string                             // SERIAL_NUMBER - for labels only
 }
 
 type subsystemInstanceMetrics struct {
@@ -97,4 +101,14 @@ type jobQueueInstanceMetrics struct {
 type tempStorageInstanceMetrics struct {
 	CurrentSize int64 `stm:"current_size"` // BUCKET_CURRENT_SIZE
 	PeakSize    int64 `stm:"peak_size"`    // BUCKET_PEAK_SIZE
+}
+
+type activeJobInstanceMetrics struct {
+	CPUPercentage              int64 `stm:"cpu_percentage"`                // CPU_PERCENTAGE
+	ElapsedCPUTime             int64 `stm:"elapsed_cpu_time"`              // ELAPSED_CPU_TIME (seconds)
+	ElapsedTime                int64 `stm:"elapsed_time"`                  // ELAPSED_TIME (seconds)
+	TemporaryStorage           int64 `stm:"temporary_storage"`             // TEMPORARY_STORAGE (MB)
+	ThreadCount                int64 `stm:"thread_count"`                  // THREAD_COUNT
+	ElapsedDiskIO              int64 `stm:"elapsed_disk_io"`               // ELAPSED_TOTAL_DISK_IO_COUNT
+	ElapsedInteractiveTransactions int64 `stm:"elapsed_interactive_transactions"` // ELAPSED_INTERACTIVE_TRANSACTIONS
 }

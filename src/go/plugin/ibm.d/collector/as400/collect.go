@@ -14,6 +14,11 @@ import (
 
 const precision = 1000 // Precision multiplier for floating-point values
 
+// boolPtr returns a pointer to the bool value
+func boolPtr(v bool) *bool {
+	return &v
+}
+
 func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 	startTime := time.Now()
 	defer func() {
@@ -35,6 +40,7 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 		subsystems:       make(map[string]subsystemInstanceMetrics),
 		jobQueues:        make(map[string]jobQueueInstanceMetrics),
 		tempStorageNamed: make(map[string]tempStorageInstanceMetrics),
+		activeJobs:       make(map[string]activeJobInstanceMetrics),
 	}
 
 	// Test connection with a ping before proceeding
@@ -135,6 +141,19 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 		}
 	}
 
+	// Collect active jobs if enabled (requires IBM i 7.3+)
+	if a.CollectActiveJobs != nil && *a.CollectActiveJobs {
+		if err := a.collectActiveJobs(ctx); err != nil {
+			if isSQLFeatureError(err) {
+				a.Warningf("active job metrics not available on this IBM i version: %v", err)
+				// Disable it for future collections
+				a.CollectActiveJobs = boolPtr(false)
+			} else {
+				a.Errorf("failed to collect active jobs: %v", err)
+			}
+		}
+	}
+
 	// Cleanup stale instances
 	a.cleanupStaleInstances()
 
@@ -187,6 +206,14 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 		cleanName := cleanName(name)
 		for k, v := range stm.ToMap(metrics) {
 			mx[fmt.Sprintf("tempstorage_%s_%s", cleanName, k)] = v
+		}
+	}
+
+	// Active jobs
+	for jobName, metrics := range a.mx.activeJobs {
+		cleanJobName := cleanName(jobName)
+		for k, v := range stm.ToMap(metrics) {
+			mx[fmt.Sprintf("activejob_%s_%s", cleanJobName, k)] = v
 		}
 	}
 
@@ -410,6 +437,50 @@ func (a *AS400) readRows(rows *sql.Rows, assign func(column, value string, lineE
 				val = values[i].String
 			}
 			assign(col, val, i == len(columns)-1)
+		}
+	}
+
+	return rows.Err()
+}
+
+// doQueryRow executes a query that returns a single row
+func (a *AS400) doQueryRow(ctx context.Context, query string, assign func(column, value string)) error {
+	queryCtx, cancel := context.WithTimeout(ctx, time.Duration(a.Timeout))
+	defer cancel()
+
+	rows, err := a.db.QueryContext(queryCtx, query)
+	if err != nil {
+		if isSQLFeatureError(err) {
+			a.Debugf("query failed with expected feature error: %s, error: %v", query, err)
+		} else {
+			a.Errorf("failed to execute query: %s, error: %v", query, err)
+		}
+		return err
+	}
+	defer rows.Close()
+
+	columns, err := rows.Columns()
+	if err != nil {
+		return err
+	}
+
+	values := make([]sql.NullString, len(columns))
+	valuePtrs := make([]interface{}, len(columns))
+	for i := range values {
+		valuePtrs[i] = &values[i]
+	}
+
+	if rows.Next() {
+		if err := rows.Scan(valuePtrs...); err != nil {
+			return err
+		}
+
+		for i, col := range columns {
+			val := "NULL"
+			if values[i].Valid {
+				val = values[i].String
+			}
+			assign(col, val)
 		}
 	}
 
@@ -840,6 +911,30 @@ func (a *AS400) collectDiskInstancesEnhanced(ctx context.Context) error {
 						m.SSDPowerOnDays = v
 						a.mx.disks[currentUnit] = m
 					}
+				}
+			}
+		case "HARDWARE_STATUS":
+			if currentUnit != "" && a.disks[currentUnit] != nil {
+				a.disks[currentUnit].hardwareStatus = value
+				if m, ok := a.mx.disks[currentUnit]; ok {
+					m.HardwareStatus = value
+					a.mx.disks[currentUnit] = m
+				}
+			}
+		case "DISK_MODEL":
+			if currentUnit != "" && a.disks[currentUnit] != nil {
+				a.disks[currentUnit].diskModel = value
+				if m, ok := a.mx.disks[currentUnit]; ok {
+					m.DiskModel = value
+					a.mx.disks[currentUnit] = m
+				}
+			}
+		case "SERIAL_NUMBER":
+			if currentUnit != "" && a.disks[currentUnit] != nil {
+				a.disks[currentUnit].serialNumber = value
+				if m, ok := a.mx.disks[currentUnit]; ok {
+					m.SerialNumber = value
+					a.mx.disks[currentUnit] = m
 				}
 			}
 		}
