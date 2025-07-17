@@ -1714,7 +1714,7 @@ func (d *DB2) collectDatabaseOverview(ctx context.Context) error {
 		}
 	})
 	
-	runSimpleQuery(querySimpleActivitiesAborted, "", func(column, value string) {
+	runSimpleQuery(querySimpleActivitiesAborted, querySnapActivitiesAborted, func(column, value string) {
 		if column == "ACTIVITIES_ABORTED" {
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 				d.mx.OpsActivitiesAborted = v

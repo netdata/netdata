@@ -108,7 +108,7 @@ var (
 		ID:       "memory_pool_%s_usage",
 		Title:    "Memory Pool Usage",
 		Units:    "bytes",
-		Fam:      "memory",
+		Fam:      "memory/pools",
 		Ctx:      "db2.memory_pool_usage",
 		Priority: prioMemoryPoolUsage,
 		Dims: module.Dims{
@@ -120,7 +120,7 @@ var (
 		ID:       "memory_pool_%s_hwm",
 		Title:    "Memory Pool High Water Mark",
 		Units:    "bytes",
-		Fam:      "memory",
+		Fam:      "memory/pools",
 		Ctx:      "db2.memory_pool_hwm",
 		Priority: prioMemoryPoolHWM,
 		Dims: module.Dims{
