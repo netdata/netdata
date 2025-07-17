@@ -1142,6 +1142,8 @@ void *netdata_mssql_queries(void *ptr __maybe_unused)
     return NULL;
 }
 
+static ND_THREAD *mssql_queries_thread = NULL;
+
 static int initialize(int update_every)
 {
     static bool create_thread = false;
@@ -1155,7 +1157,7 @@ static int initialize(int update_every)
     }
 
     if (create_thread)
-        nd_thread_create("mssql_queries", NETDATA_THREAD_OPTION_DEFAULT, netdata_mssql_queries, &update_every);
+        mssql_queries_thread = nd_thread_create("mssql_queries", NETDATA_THREAD_OPTION_DEFAULT, netdata_mssql_queries, &update_every);
 
     return 0;
 }
@@ -2564,4 +2566,10 @@ int do_PerflibMSSQL(int update_every, usec_t dt __maybe_unused)
     dictionary_sorted_walkthrough_read(mssql_instances, dict_mssql_charts_cb, &update_every);
 
     return 0;
+}
+
+void do_PerflibMSSQL_cleanup()
+{
+    if (nd_thread_join(mssql_queries_thread))
+        nd_log_daemon(NDLP_ERR, "Failed to join mssql queries thread");
 }
