@@ -134,7 +134,7 @@ if(payload) {
 
 | Aspect | GET (Legacy) | POST (Modern v3) |
 |--------|--------------|------------------|
-| Version | v < 3 | v = 3 |
+| Version | v \< 3 | v = 3 |
 | Field IDs | 11-char hashes | Plain names |
 | Parameters | URL encoded | JSON body |
 | Facet filters | `field_hash:value1,value2` | `{"field": ["value1", "value2"]}` |
