@@ -12,14 +12,36 @@ This guide will show you how simple it is to get started with Netdata and experi
 
 <!--unhideme
 
-<iframe
-  className="video-16-9"
-  src="https://www.youtube.com/embed/he-ysUlrZIw?si=e2SjkaRUGXyWcZwN"
-  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-  allowFullScreen
-  loading="lazy"
-  title="Demo Video"
-/>
+<div
+  style={{
+    width: '100%',
+    margin: '0 auto',
+    position: 'relative',
+    paddingBottom: '56.25%', // 16:9 aspect ratio
+    height: 0,
+    overflow: 'hidden',
+    borderRadius: '12px',
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+  }}
+>
+  <iframe
+    src="https://www.youtube.com/embed/he-ysUlrZIw?si=e2SjkaRUGXyWcZwN"
+    style={{
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      width: '100%',
+      height: '100%',
+      border: 0,
+      borderRadius: '12px',
+    }}
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+    allowFullScreen
+    loading="lazy"
+    title="Demo Video"
+  />
+</div>
+
 
 unhideme-->
 
