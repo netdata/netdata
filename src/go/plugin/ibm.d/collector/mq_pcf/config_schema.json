@@ -63,6 +63,12 @@
       "type": "boolean",
       "default": false
     },
+    "collect_channel_config": {
+      "title": "Collect channel configuration",
+      "description": "Enable collection of static channel configuration values (timeouts, limits, etc). These rarely change and consume storage.",
+      "type": "boolean",
+      "default": false
+    },
     "queue_selector": {
       "title": "Queue name selector",
       "description": "Regular expression to filter which queues to monitor.",

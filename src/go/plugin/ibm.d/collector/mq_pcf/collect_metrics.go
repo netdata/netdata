@@ -660,10 +660,13 @@ func (c *Collector) collectChannelMetrics(ctx context.Context, channelName, clea
 	}
 
 	// Try to collect channel configuration metrics (MQCMD_INQUIRE_CHANNEL)
-	configMetrics := c.collectChannelConfigurationData(ctx, channelName)
-	if len(configMetrics) > 0 {
-		// Configuration collection succeeded - create relevant charts and add metrics
-		c.addChannelConfigMetricsWithCharts(channelName, configMetrics, channelLabels, tempMx)
+	// Only collect if enabled - these are static values that rarely change
+	if c.CollectChannelConfig != nil && *c.CollectChannelConfig {
+		configMetrics := c.collectChannelConfigurationData(ctx, channelName)
+		if len(configMetrics) > 0 {
+			// Configuration collection succeeded - create relevant charts and add metrics
+			c.addChannelConfigMetricsWithCharts(channelName, configMetrics, channelLabels, tempMx)
+		}
 	}
 
 	// Add all successfully collected metrics to main map
@@ -1130,7 +1133,7 @@ func (c *Collector) addChannelConfigMetricsWithCharts(channelName string, metric
 			"Channel Maximum Message Length",
 			"bytes",
 			"line",
-			"channels/config/limits",
+			"channels/config/max_msg_length",
 			prioChannelStatus+5,
 			[]string{"max_msg_length"},
 			channelName,
@@ -1150,7 +1153,7 @@ func (c *Collector) addChannelConfigMetricsWithCharts(channelName string, metric
 			"Channel Sharing Conversations",
 			"conversations",
 			"line",
-			"channels/config/limits",
+			"channels/config/sharing_conversations",
 			prioChannelStatus+6,
 			[]string{"sharing_conversations"},
 			channelName,
@@ -1170,7 +1173,7 @@ func (c *Collector) addChannelConfigMetricsWithCharts(channelName string, metric
 			"Channel Network Priority",
 			"priority",
 			"line",
-			"channels/config/limits",
+			"channels/config/network_priority",
 			prioChannelStatus+7,
 			[]string{"network_priority"},
 			channelName,
