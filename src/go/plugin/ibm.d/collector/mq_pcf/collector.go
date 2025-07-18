@@ -63,8 +63,8 @@ type Collector struct {
 
 	charts *module.Charts
 
-	// Dynamic collector for synchronized chart creation and instance tracking
-	dynamicCollector *DynamicCollector
+	// Chart creation and instance tracking
+	chartManager *ChartManager
 
 	// MQ connection
 	mqConn *mqConnection

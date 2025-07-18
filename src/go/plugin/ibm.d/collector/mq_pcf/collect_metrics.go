@@ -15,11 +15,11 @@ import (
 	"strings"
 )
 
-// collectQueueMetricsWithDynamicCharts implements the WebSphere PMI pattern:
+// collectQueueMetrics collects queue metrics and creates charts:
 // 1. First attempt data collection
 // 2. Only create charts if collection succeeds
 // 3. Create charts specific to the metrics that were actually collected
-func (c *Collector) collectQueueMetricsWithDynamicCharts(ctx context.Context, queueName, cleanName string, mx map[string]int64) {
+func (c *Collector) collectQueueMetrics(ctx context.Context, queueName, cleanName string, mx map[string]int64) {
 	// Temporary map to collect metrics before chart creation
 	tempMx := make(map[string]int64)
 	
@@ -639,11 +639,11 @@ func (c *Collector) addQueueResetMetricsWithCharts(queueName, queueType string, 
 	}
 }
 
-// collectChannelMetricsWithDynamicCharts implements the WebSphere PMI pattern for channels:
+// collectChannelMetrics collects channel metrics and creates charts:
 // 1. First attempt data collection
 // 2. Only create charts if collection succeeds
 // 3. Create charts specific to the metrics that were actually collected
-func (c *Collector) collectChannelMetricsWithDynamicCharts(ctx context.Context, channelName, cleanName string, mx map[string]int64) {
+func (c *Collector) collectChannelMetrics(ctx context.Context, channelName, cleanName string, mx map[string]int64) {
 	// Temporary map to collect metrics before chart creation
 	tempMx := make(map[string]int64)
 	
@@ -1155,8 +1155,8 @@ func (c *Collector) addChannelConfigMetricsWithCharts(channelName string, metric
 	}
 }
 
-// collectTopicMetricsWithDynamicCharts implements the dynamic pattern for topics
-func (c *Collector) collectTopicMetricsWithDynamicCharts(ctx context.Context, topicName, cleanName string, mx map[string]int64) {
+// collectTopicMetrics collects topic metrics and creates charts
+func (c *Collector) collectTopicMetrics(ctx context.Context, topicName, cleanName string, mx map[string]int64) {
 	// Temporary map to collect metrics before chart creation
 	tempMx := make(map[string]int64)
 	
