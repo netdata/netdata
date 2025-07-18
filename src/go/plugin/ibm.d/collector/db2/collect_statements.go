@@ -271,6 +271,8 @@ func (d *DB2) collectTableIOInstances(ctx context.Context) error {
 	if d.mx.tableIOs == nil {
 		d.mx.tableIOs = make(map[string]tableIOInstanceMetrics)
 	}
+	
+	d.Debugf("collectTableIOInstances: starting collection, MaxTables=%d", d.MaxTables)
 
 	// Mark all tables as not updated for I/O metrics
 	for _, table := range d.tables {
@@ -287,11 +289,11 @@ func (d *DB2) collectTableIOInstances(ctx context.Context) error {
 		switch column {
 		case "TABSCHEMA":
 			if value != "" {
-				currentTableName = value + "."
+				currentTableName = strings.TrimSpace(value) + "."
 			}
 			
 		case "TABNAME":
-			currentTableName += value
+			currentTableName += strings.TrimSpace(value)
 			cleanName := cleanName(currentTableName)
 			
 			// Create table metadata if new
@@ -361,6 +363,8 @@ func (d *DB2) collectTableIOInstances(ctx context.Context) error {
 	if collected == d.MaxTables {
 		d.Debugf("reached max_tables limit (%d) for I/O metrics, some tables may not be collected", d.MaxTables)
 	}
+	
+	d.Debugf("collectTableIOInstances: completed, collected=%d tables, tableIOs map size=%d", collected, len(d.mx.tableIOs))
 	
 	return nil
 }

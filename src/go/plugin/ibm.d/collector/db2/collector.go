@@ -177,16 +177,10 @@ type DB2 struct {
 	disabledMetrics  map[string]bool // Track disabled metrics due to version incompatibility
 	disabledFeatures map[string]bool // Track disabled features (tables, views, functions)
 
-	// Edition flags
+	// Edition flags (for labels only)
 	isDB2ForAS400 bool // DB2 for i (AS/400)
 	isDB2ForZOS   bool // DB2 for z/OS
 	isDB2Cloud    bool // Db2 on Cloud
-
-	// Modern monitoring support
-	useMonGetFunctions            bool // Use MON_GET_* functions instead of SNAP* views when available
-	supportsColumnOrganizedTables bool // Whether column-organized table metrics are available
-	supportsExtendedMetrics       bool // Whether extended metrics (CPU, memory details) are available
-	supportsFederation            bool // Whether federation is configured and available
 
 	// Memory set instance tracking (Screen 26) 
 	memorySets                  map[string]*memorySetInstanceMetrics
@@ -552,39 +546,7 @@ func (d *DB2) detectDB2Edition(ctx context.Context) error {
 		return nil
 	}
 
-	// Try to detect Db2 on Cloud - first method
-	err = d.collectSingleMetric(ctx, "version_detection_cloud", queryDetectVersionCloud, func(value string) {
-		d.edition = "Cloud"
-		d.version = d.version // Keep LUW version if already detected
-		if d.version == "" {
-			d.version = "Db2 on Cloud"
-		}
-		d.Debugf("detected Db2 on Cloud edition via BLUADMIN schema")
-	})
-
-	if err == nil && d.edition != "" {
-		d.logVersionInformation()
-		d.addVersionLabelsToCharts()
-		return nil
-	}
-
-	// Try alternative Cloud detection
-	err = d.collectSingleMetric(ctx, "version_detection_cloud_alt", queryDetectVersionCloudAlt, func(value string) {
-		if value == "Db2 on Cloud" {
-			d.edition = "Cloud"
-			d.version = d.version // Keep LUW version if already detected
-			if d.version == "" {
-				d.version = "Db2 on Cloud"
-			}
-			d.Debugf("detected Db2 on Cloud edition via PROD_RELEASE")
-		}
-	})
-
-	if err == nil && d.edition != "" {
-		d.logVersionInformation()
-		d.addVersionLabelsToCharts()
-		return nil
-	}
+	// Cloud detection removed - Cloud queries had static values
 
 	// Default to LUW if all detection fails
 	d.edition = "LUW"
@@ -768,158 +730,54 @@ func (d *DB2) addVersionLabelsToCharts() {
 	}
 }
 
-// detectMonGetSupport checks if MON_GET_* functions are available and usable
-func (d *DB2) detectMonGetSupport(ctx context.Context) {
-	// MON_GET_* functions are available in DB2 9.7+ for LUW
-	// They're not available on DB2 for i (AS/400) or older versions
-
-	// First check if we should even try (edition and version check)
-	if d.edition == "i" {
-		d.Infof("MON_GET_* functions not available on DB2 for i, using SNAP* views")
-		d.useMonGetFunctions = false
-		return
-	}
-
-	if d.edition == "LUW" && d.versionMajor > 0 {
-		if d.versionMajor < 9 || (d.versionMajor == 9 && d.versionMinor < 7) {
-			d.Infof("MON_GET_* functions require DB2 9.7+, using SNAP* views for version %d.%d", d.versionMajor, d.versionMinor)
-			d.useMonGetFunctions = false
-			return
-		}
-	}
-
-	// Try a simple MON_GET_DATABASE query to verify it works
-	testQuery := `SELECT COUNT(*) FROM TABLE(MON_GET_DATABASE(-1)) AS T`
-	var count int
-
-	queryCtx, cancel := context.WithTimeout(ctx, time.Duration(d.Timeout))
-	defer cancel()
-
-	err := d.db.QueryRowContext(queryCtx, testQuery).Scan(&count)
-	if err != nil {
-		if isSQLFeatureError(err) {
-			d.Infof("MON_GET_* functions not available or not authorized: %v, using SNAP* views", err)
-			d.useMonGetFunctions = false
-		} else {
-			d.Warningf("Error testing MON_GET_* support: %v, falling back to SNAP* views", err)
-			d.useMonGetFunctions = false
-		}
-		return
-	}
-
-	// MON_GET functions are available and working
-	d.useMonGetFunctions = true
-	d.Infof("MON_GET_* functions detected and available - using modern monitoring approach for better performance")
-}
+// detectMonGetSupport is no longer needed - we always use MON_GET functions
+// Legacy SNAP views have been removed due to static value issues
 
 // detectColumnOrganizedSupport checks if column-organized table metrics are available
+// detectColumnOrganizedSupport checks if column-organized metrics are available
+// This now simply adds charts based on MON_GET_BUFFERPOOL availability
 func (d *DB2) detectColumnOrganizedSupport(ctx context.Context) {
 	// Column-organized tables (BLU Acceleration) were introduced in DB2 10.5
-	// However, the feature may not be enabled or available in all installations
-
-	// First check version requirements
+	// MON_GET_BUFFERPOOL always includes column metrics, even if zero
+	
 	if d.edition == "i" {
 		d.Infof("Column-organized tables not available on DB2 for i")
-		d.supportsColumnOrganizedTables = false
 		return
 	}
 
 	if d.versionMajor > 0 && d.versionMajor < 10 {
 		d.Infof("Column-organized tables require DB2 10.5+, current version %d.%d", d.versionMajor, d.versionMinor)
-		d.supportsColumnOrganizedTables = false
 		return
 	}
 
 	if d.versionMajor == 10 && d.versionMinor < 5 {
 		d.Infof("Column-organized tables require DB2 10.5+, current version %d.%d", d.versionMajor, d.versionMinor)
-		d.supportsColumnOrganizedTables = false
 		return
 	}
 
-	// Test if POOL_COL_L_READS column exists in SYSIBMADM.SNAPBP
-	testQuery := `SELECT POOL_COL_L_READS FROM SYSIBMADM.SNAPBP FETCH FIRST 1 ROW ONLY`
-
-	queryCtx, cancel := context.WithTimeout(ctx, time.Duration(d.Timeout))
-	defer cancel()
-
-	var testValue sql.NullInt64
-	err := d.db.QueryRowContext(queryCtx, testQuery).Scan(&testValue)
-	if err != nil {
-		if strings.Contains(err.Error(), "POOL_COL_L_READS") ||
-			strings.Contains(err.Error(), "column") ||
-			strings.Contains(err.Error(), "COLUMN") {
-			d.Infof("Column-organized table metrics not available (POOL_COL_L_READS column missing): %v", err)
-			d.supportsColumnOrganizedTables = false
-		} else {
-			d.Warningf("Error testing column-organized table support: %v, assuming not supported", err)
-			d.supportsColumnOrganizedTables = false
-		}
-		return
-	}
-
-	// Column exists and query succeeded
-	d.supportsColumnOrganizedTables = true
-	d.Infof("Column-organized table metrics detected and available")
+	// For DB2 10.5+, add column-organized charts
+	// MON_GET_BUFFERPOOL will provide the metrics (may be zero in Community Edition)
+	d.addColumnOrganizedCharts()
 }
 
-// detectExtendedMetricsSupport checks if extended metrics (CPU, detailed memory) are available
-func (d *DB2) detectExtendedMetricsSupport(ctx context.Context) {
-	// Extended metrics require newer DB2 versions and specific system tables
-	// DB2 11+ typically has better support for system resource metrics
-	
-	// Try to query CPU metrics from ENV_GET_SYSTEM_RESOURCES
-	testQuery := `SELECT CPU_USER FROM TABLE(SYSPROC.ENV_GET_SYSTEM_RESOURCES()) AS T FETCH FIRST 1 ROW ONLY`
-	
-	queryCtx, cancel := context.WithTimeout(ctx, time.Duration(d.Timeout))
-	defer cancel()
-	
-	var testValue sql.NullFloat64
-	err := d.db.QueryRowContext(queryCtx, testQuery).Scan(&testValue)
-	if err != nil {
-		if isSQLFeatureError(err) {
-			d.Infof("Extended system metrics not available (ENV_GET_SYSTEM_RESOURCES): %v", err)
-			d.supportsExtendedMetrics = false
-		} else {
-			d.Warningf("Error testing extended metrics support: %v, assuming not supported", err)
-			d.supportsExtendedMetrics = false
-		}
-		return
+// addColumnOrganizedCharts adds charts for column-organized buffer pool metrics
+func (d *DB2) addColumnOrganizedCharts() {
+	columnCharts := module.Charts{
+		bufferpoolColumnHitRatioChart.Copy(),
+		bufferpoolColumnReadsChart.Copy(),
 	}
 	
-	// Extended metrics are available
-	d.supportsExtendedMetrics = true
-	d.Infof("Extended system metrics detected and available")
+	for _, chart := range columnCharts {
+		if err := d.charts.Add(chart); err != nil {
+			d.Warningf("failed to add column-organized chart %s: %v", chart.ID, err)
+		}
+	}
+	
+	d.Infof("Added %d column-organized buffer pool charts", len(columnCharts))
 }
 
-// detectFederationSupport checks if federation is configured and available
-func (d *DB2) detectFederationSupport(ctx context.Context) {
-	// Federation requires specific configuration and is typically used in
-	// distributed database environments
-	
-	// Check if there are any federated connections
-	testQuery := `SELECT COUNT(*) FROM TABLE(MON_GET_CONNECTION(NULL, -2)) WHERE ROWS_RETURNED_FROM_REMOTE > 0`
-	
-	queryCtx, cancel := context.WithTimeout(ctx, time.Duration(d.Timeout))
-	defer cancel()
-	
-	var count int
-	err := d.db.QueryRowContext(queryCtx, testQuery).Scan(&count)
-	if err != nil {
-		// Check if it's because federation columns don't exist
-		if strings.Contains(strings.ToUpper(err.Error()), "ROWS_RETURNED_FROM_REMOTE") {
-			d.Infof("Federation metrics not available (ROWS_RETURNED_FROM_REMOTE column missing)")
-			d.supportsFederation = false
-			return
-		}
-		d.Debugf("Error testing federation support: %v, assuming not configured", err)
-		d.supportsFederation = false
-		return
-	}
-	
-	// Federation columns exist - federation is available
-	d.supportsFederation = true
-	d.Infof("Federation support detected")
-}
+// Extended metrics and federation detection removed
+// These features will be attempted during collection with graceful error handling
 
 // Memory set chart management methods for Screen 26
 func (d *DB2) addMemorySetCharts(setKey string) {

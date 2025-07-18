@@ -33,17 +33,8 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 		// Set configuration defaults based on detected version (only if admin hasn't configured)
 		d.setConfigurationDefaults()
 
-		// Check if we can use modern MON_GET_* functions
-		d.detectMonGetSupport(ctx)
-
 		// Check if column-organized table metrics are available
 		d.detectColumnOrganizedSupport(ctx)
-		
-		// Check if extended metrics are available
-		d.detectExtendedMetricsSupport(ctx)
-		
-		// Check if federation is configured
-		d.detectFederationSupport(ctx)
 	}
 
 	// Reset metrics
@@ -442,69 +433,38 @@ func (d *DB2) collectGlobalMetrics(ctx context.Context) error {
 		d.Debugf("federation metrics collection skipped: %v", err)
 	}
 
-	// Use modern MON_GET_* functions for better performance when available
-	if d.useMonGetFunctions {
-		// Collect all database-level metrics in one efficient call
-		if !d.isDisabled("advanced_monitoring") {
-			if err := d.collectMonGetDatabase(ctx); err != nil {
-				d.Warningf("failed to collect database metrics using MON_GET_DATABASE: %v, falling back to individual queries", err)
-				// Fall back to individual SNAP queries
-				d.collectLockMetricsResilience(ctx)
-				d.collectSortingMetricsResilience(ctx)
-				d.collectRowActivityMetricsResilience(ctx)
-			}
-		} else {
-			d.logOnce("advanced_monitoring_skipped", "Advanced monitoring metrics collection skipped - Not available on this DB2 edition/version")
-		}
-
-		// Buffer pool metrics using MON_GET_BUFFERPOOL
-		if !d.isDisabled("bufferpool_detailed_metrics") {
-			if err := d.collectMonGetBufferpoolAggregate(ctx); err != nil {
-				d.Warningf("failed to collect bufferpool metrics using MON_GET_BUFFERPOOL: %v, falling back to SNAP views", err)
-				d.collectBufferpoolMetricsResilience(ctx)
-			}
-		} else {
-			d.logOnce("bufferpool_detailed_skipped", "Detailed buffer pool metrics collection skipped - Limited on this DB2 edition")
-		}
-
-		// Log space metrics using MON_GET_TRANSACTION_LOG
-		if !d.isDisabled("system_level_metrics") {
-			if err := d.collectMonGetTransactionLog(ctx); err != nil {
-				d.Warningf("failed to collect log metrics using MON_GET_TRANSACTION_LOG: %v, falling back to SNAP views", err)
-				d.collectLogSpaceMetricsResilience(ctx)
-			}
-		} else {
-			d.logOnce("system_level_skipped", "System-level metrics collection skipped - Restricted on this DB2 edition")
+	// Always use modern MON_GET_* functions
+	// Collect all database-level metrics in one efficient call
+	if !d.isDisabled("advanced_monitoring") {
+		if err := d.collectMonGetDatabase(ctx); err != nil {
+			d.Warningf("failed to collect database metrics using MON_GET_DATABASE: %v", err)
+			// Try individual metric collection as fallback
+			d.collectLockMetricsResilience(ctx)
+			d.collectSortingMetricsResilience(ctx)
+			d.collectRowActivityMetricsResilience(ctx)
 		}
 	} else {
-		// Fall back to SNAP views approach
-		// Advanced monitoring metrics - skip if disabled for this edition/version
-		if !d.isDisabled("advanced_monitoring") {
-			// Lock metrics - graceful degradation
-			d.collectLockMetricsResilience(ctx)
+		d.logOnce("advanced_monitoring_skipped", "Advanced monitoring metrics collection skipped - Not available on this DB2 edition/version")
+	}
 
-			// Sorting metrics - graceful degradation
-			d.collectSortingMetricsResilience(ctx)
-
-			// Row activity metrics - graceful degradation
-			d.collectRowActivityMetricsResilience(ctx)
-		} else {
-			d.logOnce("advanced_monitoring_skipped", "Advanced monitoring metrics collection skipped - Not available on this DB2 edition/version")
-		}
-
-		// Buffer pool metrics - may be limited on some editions
-		if !d.isDisabled("bufferpool_detailed_metrics") {
+	// Buffer pool metrics using MON_GET_BUFFERPOOL
+	if !d.isDisabled("bufferpool_detailed_metrics") {
+		if err := d.collectMonGetBufferpoolAggregate(ctx); err != nil {
+			d.Warningf("failed to collect bufferpool metrics using MON_GET_BUFFERPOOL: %v", err)
 			d.collectBufferpoolMetricsResilience(ctx)
-		} else {
-			d.logOnce("bufferpool_detailed_skipped", "Detailed buffer pool metrics collection skipped - Limited on this DB2 edition")
 		}
+	} else {
+		d.logOnce("bufferpool_detailed_skipped", "Detailed buffer pool metrics collection skipped - Limited on this DB2 edition")
+	}
 
-		// Log space metrics - graceful degradation
-		if !d.isDisabled("system_level_metrics") {
+	// Log space metrics using MON_GET_TRANSACTION_LOG
+	if !d.isDisabled("system_level_metrics") {
+		if err := d.collectMonGetTransactionLog(ctx); err != nil {
+			d.Warningf("failed to collect log metrics using MON_GET_TRANSACTION_LOG: %v", err)
 			d.collectLogSpaceMetricsResilience(ctx)
-		} else {
-			d.logOnce("system_level_skipped", "System-level metrics collection skipped - Restricted on this DB2 edition")
 		}
+	} else {
+		d.logOnce("system_level_skipped", "System-level metrics collection skipped - Restricted on this DB2 edition")
 	}
 
 	// Long-running queries and backup status - collected separately as they don't have MON_GET equivalents
@@ -522,20 +482,9 @@ func (d *DB2) collectGlobalMetrics(ctx context.Context) error {
 
 func (d *DB2) collectLockMetrics(ctx context.Context) error {
 	// Choose query based on monitoring approach
-	var query string
-	if d.useMonGetFunctions {
-		// Use modern MON_GET_DATABASE for lock metrics
-		query = queryMonGetDatabase
-		d.Debugf("using MON_GET_DATABASE for lock metrics (modern approach)")
-	} else if d.edition == "Cloud" {
-		// Use Cloud-specific SNAP query
-		query = queryLockMetricsCloud
-		d.Debugf("using Cloud-specific lock metrics query for Db2 on Cloud")
-	} else {
-		// Use standard SNAP query
-		query = queryLockMetrics
-		d.Debugf("using SNAP views for lock metrics (legacy approach)")
-	}
+	// Always use modern MON_GET_DATABASE for lock metrics
+	query := queryMonGetDatabase
+	d.Debugf("using MON_GET_DATABASE for lock metrics")
 
 	return d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
 		v, err := strconv.ParseInt(value, 10, 64)
@@ -575,177 +524,15 @@ func (d *DB2) collectLockMetrics(ctx context.Context) error {
 }
 
 func (d *DB2) collectBufferpoolAggregateMetrics(ctx context.Context) error {
-	// Choose query based on monitoring approach and column support
-	var query string
-	if d.useMonGetFunctions {
-		query = queryMonGetBufferpoolAggregate
-		d.Debugf("using MON_GET_BUFFERPOOL for aggregate metrics (modern approach)")
-
-		// With MON_GET, we need to calculate hit ratios differently
-		return d.collectMonGetBufferpoolAggregate(ctx)
-	} else if d.supportsColumnOrganizedTables {
-		query = queryBufferpoolAggregateMetrics
-		d.Debugf("using SNAP views with column-organized metrics for bufferpool aggregate metrics")
-	} else {
-		query = queryBufferpoolAggregateMetricsLegacy
-		d.Debugf("using legacy SNAP views without column-organized metrics for bufferpool aggregate metrics")
-	}
-
-	// Temporary variables to calculate hits and misses
-	var dataHits, dataReads, indexHits, indexReads, xdaHits, xdaReads, colHits, colReads int64
-	
-	return d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
-		switch column {
-		case "DATA_PAGES_FOUND":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				dataHits = v
-			}
-		case "DATA_L_READS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				dataReads = v
-				// Calculate misses for data pages
-				d.mx.BufferpoolDataHits = dataHits
-				d.mx.BufferpoolDataMisses = dataReads - dataHits
-				if dataReads > 0 {
-					d.Debugf("Buffer pool data: hits=%d, reads=%d, misses=%d", dataHits, dataReads, dataReads-dataHits)
-				}
-			}
-		case "INDEX_PAGES_FOUND":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				indexHits = v
-			}
-		case "INDEX_L_READS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				indexReads = v
-				// Calculate misses for index pages
-				d.mx.BufferpoolIndexHits = indexHits
-				d.mx.BufferpoolIndexMisses = indexReads - indexHits
-			}
-		case "XDA_PAGES_FOUND":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				xdaHits = v
-			}
-		case "XDA_L_READS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				xdaReads = v
-				// Calculate misses for XDA pages
-				d.mx.BufferpoolXDAHits = xdaHits
-				d.mx.BufferpoolXDAMisses = xdaReads - xdaHits
-			}
-		case "COL_PAGES_FOUND":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				colHits = v
-			}
-		case "COL_L_READS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				colReads = v
-				// Calculate misses for column pages
-				d.mx.BufferpoolColumnHits = colHits
-				d.mx.BufferpoolColumnMisses = colReads - colHits
-			}
-		case "LOGICAL_READS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				d.mx.BufferpoolLogicalReads = v
-			}
-		case "PHYSICAL_READS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				d.mx.BufferpoolPhysicalReads = v
-			}
-		case "TOTAL_READS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				d.mx.BufferpoolTotalReads = v
-			}
-		case "DATA_LOGICAL_READS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				d.mx.BufferpoolDataLogicalReads = v
-			}
-		case "DATA_PHYSICAL_READS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				d.mx.BufferpoolDataPhysicalReads = v
-			}
-		case "DATA_TOTAL_READS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				d.mx.BufferpoolDataTotalReads = v
-			}
-		case "INDEX_LOGICAL_READS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				d.mx.BufferpoolIndexLogicalReads = v
-			}
-		case "INDEX_PHYSICAL_READS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				d.mx.BufferpoolIndexPhysicalReads = v
-			}
-		case "INDEX_TOTAL_READS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				d.mx.BufferpoolIndexTotalReads = v
-			}
-		case "XDA_LOGICAL_READS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				d.mx.BufferpoolXDALogicalReads = v
-			}
-		case "XDA_PHYSICAL_READS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				d.mx.BufferpoolXDAPhysicalReads = v
-			}
-		case "XDA_TOTAL_READS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				d.mx.BufferpoolXDATotalReads = v
-			}
-		case "COLUMN_LOGICAL_READS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				d.mx.BufferpoolColumnLogicalReads = v
-			}
-		case "COLUMN_PHYSICAL_READS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				d.mx.BufferpoolColumnPhysicalReads = v
-			}
-		case "COLUMN_TOTAL_READS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				d.mx.BufferpoolColumnTotalReads = v
-			}
-		}
-		
-		// Calculate overall hits and misses at the end of the row
-		if lineEnd {
-			// If misses are negative, it means prefetch brought more pages than were requested
-			// In this case, set misses to 0 and reduce hits accordingly
-			if d.mx.BufferpoolDataMisses < 0 {
-				d.mx.BufferpoolDataHits = dataReads
-				d.mx.BufferpoolDataMisses = 0
-			}
-			if d.mx.BufferpoolIndexMisses < 0 {
-				d.mx.BufferpoolIndexHits = indexReads
-				d.mx.BufferpoolIndexMisses = 0
-			}
-			if d.mx.BufferpoolXDAMisses < 0 {
-				d.mx.BufferpoolXDAHits = xdaReads
-				d.mx.BufferpoolXDAMisses = 0
-			}
-			if d.mx.BufferpoolColumnMisses < 0 {
-				d.mx.BufferpoolColumnHits = colReads
-				d.mx.BufferpoolColumnMisses = 0
-			}
-			
-			// Overall buffer pool hits = sum of all hits
-			d.mx.BufferpoolHits = d.mx.BufferpoolDataHits + d.mx.BufferpoolIndexHits + 
-				d.mx.BufferpoolXDAHits + d.mx.BufferpoolColumnHits
-			// Overall buffer pool misses = sum of all misses
-			d.mx.BufferpoolMisses = d.mx.BufferpoolDataMisses + d.mx.BufferpoolIndexMisses + 
-				d.mx.BufferpoolXDAMisses + d.mx.BufferpoolColumnMisses
-		}
-	})
+	// Always use modern MON_GET_BUFFERPOOL for aggregate metrics
+	d.Debugf("using MON_GET_BUFFERPOOL for aggregate metrics")
+	return d.collectMonGetBufferpoolAggregate(ctx)
 }
 
 func (d *DB2) collectLogSpaceMetrics(ctx context.Context) error {
-	// Choose query based on monitoring approach
-	var query string
-	if d.useMonGetFunctions {
-		query = queryMonGetTransactionLog
-		d.Debugf("using MON_GET_TRANSACTION_LOG for log metrics (modern approach)")
-	} else {
-		query = queryLogSpaceMetrics
-		d.Debugf("using SNAP views for log metrics (legacy approach)")
-	}
+	// Always use MON_GET_TRANSACTION_LOG for log metrics
+	query := queryMonGetTransactionLog
+	d.Debugf("using MON_GET_TRANSACTION_LOG for log metrics")
 
 	return d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
 		switch column {
@@ -1036,12 +823,12 @@ func (d *DB2) collectServiceHealthResilience(ctx context.Context) error {
 }
 
 func (d *DB2) collectConnectionMetricsResilience(ctx context.Context) error {
-	// Use MON_GET if available for better performance
-	if d.useMonGetFunctions {
-		return d.collectMonGetConnections(ctx)
+	// Always try MON_GET first for better performance
+	if err := d.collectMonGetConnections(ctx); err == nil {
+		return nil
 	}
 
-	// Fall back to SNAP views
+	// Fall back to individual queries if MON_GET fails
 	// Core connection metrics - must work on all DB2 editions
 	if err := d.collectSingleMetric(ctx, "total_connections", queryTotalConnections, func(value string) {
 		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -1515,6 +1302,8 @@ func (d *DB2) collectMonGetBufferpoolAggregate(ctx context.Context) error {
 			d.mx.BufferpoolColumnPhysicalReads = v
 		case "COLUMN_HITS":
 			colHits = v
+		case "TOTAL_WRITES":
+			d.mx.BufferpoolWrites = v
 		}
 	})
 
@@ -1610,7 +1399,7 @@ func (d *DB2) collectDatabaseOverview(ctx context.Context) error {
 	// It tries the MON_GET query first, then falls back to SNAP query if that fails
 	runSimpleQuery := func(queryMonGet, querySnap string, handler func(column, value string)) {
 		var err error
-		if d.useMonGetFunctions && queryMonGet != "" {
+		if queryMonGet != "" {
 			err = d.doQuery(ctx, queryMonGet, func(column, value string, lineEnd bool) {
 				handler(column, value)
 			})
@@ -1908,42 +1697,11 @@ func (d *DB2) collectLoggingPerformance(ctx context.Context) error {
 	return nil
 }
 
-// Federation metrics collection (Screen 32)
+// Federation metrics collection removed
+// The federation queries contained static values and have been removed
 func (d *DB2) collectFederationMetrics(ctx context.Context) error {
-	// Skip if federation is not supported
-	if !d.supportsFederation {
-		return nil
-	}
-	
-	query := queryFederationMetrics
-	if !d.supportsExtendedMetrics {
-		query = queryFederationMetricsSimple
-	}
-	
-	return d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
-		switch column {
-		case "FED_CONNECTIONS_ACTIVE":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				d.mx.FedConnectionsActive = v
-			}
-		case "FED_CONNECTIONS_IDLE":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				d.mx.FedConnectionsIdle = v
-			}
-		case "FED_ROWS_READ":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				d.mx.FedRowsRead = v
-			}
-		case "FED_SELECT_STMTS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				d.mx.FedSelectStmts = v
-			}
-		case "FED_WAITS_TOTAL":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				d.mx.FedWaitsTotal = v
-			}
-		}
-	})
+	// Federation support was removed along with Cloud-specific queries
+	return nil
 }
 
 // contains is a helper function to check if all target strings are present in the slice

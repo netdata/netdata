@@ -97,6 +97,9 @@ type metricsData struct {
 	BufferpoolColumnPhysicalReads int64 `stm:"bufferpool_column_physical_reads"`
 	BufferpoolColumnTotalReads    int64 // No stm tag - calculated field
 
+	// Write metrics
+	BufferpoolWrites int64 `stm:"bufferpool_writes"`
+
 	// Log metrics
 	LogUsedSpace      int64 `stm:"log_used_space"`
 	LogAvailableSpace int64 `stm:"log_available_space"`
