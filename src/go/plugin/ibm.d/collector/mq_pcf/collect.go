@@ -723,7 +723,7 @@ func (c *Collector) getPCFResponse(requestMd *C.MQMD, hReplyObj C.MQHOBJ) ([]byt
 		C.memset(unsafe.Pointer(&gmo), 0, C.sizeof_MQGMO)
 		C.set_gmo_struc_id(&gmo)
 		gmo.Version = C.MQGMO_VERSION_1
-		gmo.Options = C.MQGMO_WAIT | C.MQGMO_FAIL_IF_QUIESCING | C.MQGMO_CONVERT
+		gmo.Options = C.MQGMO_WAIT | C.MQGMO_FAIL_IF_QUIESCING
 		gmo.WaitInterval = 1000 // 1 second timeout for subsequent messages
 
 		// Get message length first
@@ -1448,9 +1448,51 @@ func (c *Collector) collectSingleChannelMetrics(ctx context.Context, channelName
 		return fmt.Errorf("failed to parse channel status response for %s: %w", channelName, err)
 	}
 
-	// Extract metrics
+	// Extract metrics - convert enumerated status to boolean dimensions
 	if status, ok := attrs[C.MQIACH_CHANNEL_STATUS]; ok {
-		mx[fmt.Sprintf("channel_%s_status", cleanName)] = int64(status.(int32))
+		if statusVal, ok := status.(int32); ok {
+			// Initialize all status dimensions to 0
+			mx[fmt.Sprintf("channel_%s_inactive", cleanName)] = 0
+			mx[fmt.Sprintf("channel_%s_binding", cleanName)] = 0
+			mx[fmt.Sprintf("channel_%s_starting", cleanName)] = 0
+			mx[fmt.Sprintf("channel_%s_running", cleanName)] = 0
+			mx[fmt.Sprintf("channel_%s_stopping", cleanName)] = 0
+			mx[fmt.Sprintf("channel_%s_retrying", cleanName)] = 0
+			mx[fmt.Sprintf("channel_%s_stopped", cleanName)] = 0
+			mx[fmt.Sprintf("channel_%s_requesting", cleanName)] = 0
+			mx[fmt.Sprintf("channel_%s_paused", cleanName)] = 0
+			mx[fmt.Sprintf("channel_%s_disconnected", cleanName)] = 0
+			mx[fmt.Sprintf("channel_%s_initializing", cleanName)] = 0
+			mx[fmt.Sprintf("channel_%s_switching", cleanName)] = 0
+			
+			// Set the active status to 1
+			switch statusVal {
+			case 0: // MQCHS_INACTIVE
+				mx[fmt.Sprintf("channel_%s_inactive", cleanName)] = 1
+			case 1: // MQCHS_BINDING
+				mx[fmt.Sprintf("channel_%s_binding", cleanName)] = 1
+			case 2: // MQCHS_STARTING
+				mx[fmt.Sprintf("channel_%s_starting", cleanName)] = 1
+			case 3: // MQCHS_RUNNING
+				mx[fmt.Sprintf("channel_%s_running", cleanName)] = 1
+			case 4: // MQCHS_STOPPING
+				mx[fmt.Sprintf("channel_%s_stopping", cleanName)] = 1
+			case 5: // MQCHS_RETRYING
+				mx[fmt.Sprintf("channel_%s_retrying", cleanName)] = 1
+			case 6: // MQCHS_STOPPED
+				mx[fmt.Sprintf("channel_%s_stopped", cleanName)] = 1
+			case 7: // MQCHS_REQUESTING
+				mx[fmt.Sprintf("channel_%s_requesting", cleanName)] = 1
+			case 8: // MQCHS_PAUSED
+				mx[fmt.Sprintf("channel_%s_paused", cleanName)] = 1
+			case 9: // MQCHS_DISCONNECTED
+				mx[fmt.Sprintf("channel_%s_disconnected", cleanName)] = 1
+			case 13: // MQCHS_INITIALIZING
+				mx[fmt.Sprintf("channel_%s_initializing", cleanName)] = 1
+			case 14: // MQCHS_SWITCHING
+				mx[fmt.Sprintf("channel_%s_switching", cleanName)] = 1
+			}
+		}
 	}
 
 	if messages, ok := attrs[C.MQIACH_MSGS]; ok {
