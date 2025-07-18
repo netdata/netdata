@@ -703,9 +703,52 @@ func (c *Collector) collectChannelRuntimeData(ctx context.Context, channelName s
 	// Extract available runtime metrics
 	metrics := make(map[string]int64)
 
-	// Channel status
+	// Channel status - convert enumerated value to boolean dimensions
 	if val, ok := attrs[C.MQIACH_CHANNEL_STATUS]; ok {
 		if status, ok := val.(int32); ok {
+			// Initialize all status dimensions to 0
+			metrics["inactive"] = 0
+			metrics["binding"] = 0
+			metrics["starting"] = 0
+			metrics["running"] = 0
+			metrics["stopping"] = 0
+			metrics["retrying"] = 0
+			metrics["stopped"] = 0
+			metrics["requesting"] = 0
+			metrics["paused"] = 0
+			metrics["disconnected"] = 0
+			metrics["initializing"] = 0
+			metrics["switching"] = 0
+			
+			// Set the active status to 1
+			switch status {
+			case 0: // MQCHS_INACTIVE
+				metrics["inactive"] = 1
+			case 1: // MQCHS_BINDING
+				metrics["binding"] = 1
+			case 2: // MQCHS_STARTING
+				metrics["starting"] = 1
+			case 3: // MQCHS_RUNNING
+				metrics["running"] = 1
+			case 4: // MQCHS_STOPPING
+				metrics["stopping"] = 1
+			case 5: // MQCHS_RETRYING
+				metrics["retrying"] = 1
+			case 6: // MQCHS_STOPPED
+				metrics["stopped"] = 1
+			case 7: // MQCHS_REQUESTING
+				metrics["requesting"] = 1
+			case 8: // MQCHS_PAUSED
+				metrics["paused"] = 1
+			case 9: // MQCHS_DISCONNECTED
+				metrics["disconnected"] = 1
+			case 13: // MQCHS_INITIALIZING
+				metrics["initializing"] = 1
+			case 14: // MQCHS_SWITCHING
+				metrics["switching"] = 1
+			}
+			
+			// Keep the original status for backward compatibility or debugging
 			metrics["status"] = int64(status)
 		}
 	}
@@ -838,25 +881,29 @@ func (c *Collector) collectChannelConfigurationData(ctx context.Context, channel
 func (c *Collector) addChannelRuntimeMetricsWithCharts(channelName string, metrics map[string]int64, labels map[string]string, mx map[string]int64) {
 	cleanName := c.cleanName(channelName)
 
-	// Channel status
+	// Channel status - check for any status-related metrics
 	statusDims := []string{}
 	if _, hasStatus := metrics["status"]; hasStatus {
-		statusDims = append(statusDims, "status")
+		// Add all possible status dimensions
+		statusDims = []string{
+			"inactive", "binding", "starting", "running", "stopping", "retrying",
+			"stopped", "requesting", "paused", "disconnected", "initializing", "switching",
+		}
 	}
 	if len(statusDims) > 0 {
 		chartID := fmt.Sprintf("channel_status_%s", cleanName)
 		c.ensureChartExists(
 			"mq_pcf.channel_status",
 			"Channel Status",
-			"status",
+			"boolean",
 			"line",
-			"channels",
+			"channels/status",
 			prioChannelStatus,
 			statusDims,
 			channelName,
 			labels,
 		)
-		// Store metrics with dimension IDs that match chart expectations
+		// Store boolean metrics with dimension IDs that match chart expectations
 		for _, dim := range statusDims {
 			if value, exists := metrics[dim]; exists {
 				mx[fmt.Sprintf("%s_%s", chartID, dim)] = value
@@ -876,7 +923,7 @@ func (c *Collector) addChannelRuntimeMetricsWithCharts(channelName string, metri
 			"Channel Message Rate",
 			"messages/s",
 			"line",
-			"channels",
+			"channels/activity",
 			prioChannelMessages,
 			messageDims,
 			channelName,
@@ -902,7 +949,7 @@ func (c *Collector) addChannelRuntimeMetricsWithCharts(channelName string, metri
 			"Channel Data Transfer Rate",
 			"bytes/s",
 			"line",
-			"channels",
+			"channels/activity",
 			prioChannelBytes,
 			byteDims,
 			channelName,
@@ -928,7 +975,7 @@ func (c *Collector) addChannelRuntimeMetricsWithCharts(channelName string, metri
 			"Channel Batch Rate",
 			"batches/s",
 			"line",
-			"channels",
+			"channels/activity",
 			prioChannelBatches,
 			batchDims,
 			channelName,
@@ -962,7 +1009,7 @@ func (c *Collector) addChannelConfigMetricsWithCharts(channelName string, metric
 			"Channel Batch Configuration",
 			"value",
 			"line",
-			"channels",
+			"channels/config/batch",
 			prioChannelStatus+1,
 			batchDims,
 			channelName,
@@ -994,7 +1041,7 @@ func (c *Collector) addChannelConfigMetricsWithCharts(channelName string, metric
 			"Channel Timeout Settings",
 			"seconds",
 			"line",
-			"channels",
+			"channels/config/timeout",
 			prioChannelStatus+2,
 			timeoutDims,
 			channelName,
@@ -1029,7 +1076,7 @@ func (c *Collector) addChannelConfigMetricsWithCharts(channelName string, metric
 			"Channel Retry Configuration",
 			"value",
 			"line",
-			"channels",
+			"channels/config/retry",
 			prioChannelStatus+3,
 			retryDims,
 			channelName,
@@ -1061,7 +1108,7 @@ func (c *Collector) addChannelConfigMetricsWithCharts(channelName string, metric
 			"Channel Limits",
 			"value",
 			"line",
-			"channels",
+			"channels/config/limit",
 			prioChannelStatus+4,
 			limitsDims,
 			channelName,
