@@ -12,7 +12,19 @@ This guide will show you how simple it is to get started with Netdata and experi
 
 ### Getting Started
 
-[**Getting Started Guide Netdata**](https://www.youtube.com/watch?v=he-ysUlrZIw)
+<iframe
+  src="https://www.youtube.com/embed/he-ysUlrZIw?si=e2SjkaRUGXyWcZwN"
+  title="YouTube video player" 
+  style={{
+    width: "100%",
+    aspectRatio: "16/9",  /* ↩️ this is the magic */
+    border: 0,
+  }}
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+  loading="lazy"
+  title="Demo Video"
+/>
 
 ## [1. Sign in & Access Your Space](/src/claim/README.md)
 
