@@ -1242,17 +1242,31 @@ func (c *Collector) collectAllChannels(ctx context.Context, mx map[string]int64)
 }
 
 func (c *Collector) collectAllTopics(ctx context.Context, mx map[string]int64) error {
+	// Initialize overview metrics
+	mx["topics_monitored"] = 0
+	mx["topics_excluded"] = 0
+	mx["topics_unauthorized"] = 0
+	mx["topics_failed"] = 0
+
 	// Get list of topics
 	topics, err := c.getTopicList(ctx)
 	if err != nil {
+		// Check if it's an authorization error
+		if strings.Contains(err.Error(), "2035") {
+			mx["topics_unauthorized"] = 1
+		} else {
+			mx["topics_failed"] = 1
+		}
 		return fmt.Errorf("failed to get topic list: %w", err)
 	}
 
 	c.Debugf("Found %d topics", len(topics))
 
 	collected := 0
+	excluded := 0
 	for _, topicName := range topics {
 		if !c.shouldCollectTopic(topicName) {
+			excluded++
 			continue
 		}
 		collected++
@@ -1262,6 +1276,10 @@ func (c *Collector) collectAllTopics(ctx context.Context, mx map[string]int64) e
 		// Collect data first, then create charts based on what we successfully collected
 		c.collectTopicMetrics(ctx, topicName, cleanName, mx)
 	}
+
+	// Update overview metrics
+	mx["topics_monitored"] = int64(collected)
+	mx["topics_excluded"] = int64(excluded)
 
 	c.Debugf("Monitoring %d out of %d topics", collected, len(topics))
 	return nil
