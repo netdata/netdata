@@ -8,9 +8,9 @@ The IBM MQ PCF (Programmable Command Format) collector monitors IBM MQ queue man
 
 This collector gathers metrics from:
 
-- **Queue Manager**: Status, CPU usage, memory usage, log usage
-- **Queues**: Current depth, message rates (enqueue/dequeue), oldest message age  
-- **Channels**: Status, message rates, data transfer rates, batch rates
+- **Queue Manager**: Status and monitoring overview statistics
+- **Queues**: Current depth, configuration limits, inhibit status, activity metrics, message rates (when available)
+- **Channels**: Status, message rates, data transfer rates, batch rates, configuration parameters
 - **Topics**: Publishers, subscribers, message rates (optional)
 
 All metrics include proper labeling for multi-instance environments and support dynamic discovery of MQ objects. Each chart includes version labels (`mq_version`, `mq_edition`) for filtering and grouping by MQ version/edition.
@@ -78,6 +78,9 @@ jobs:
 | `collect_queues` | `true` | Enable queue statistics collection |
 | `collect_channels` | `true` | Enable channel statistics collection |
 | `collect_topics` | `false` | Enable topic statistics collection |
+| `collect_system_queues` | `true` | Enable system queue statistics collection (SYSTEM.* queues) |
+| `collect_system_channels` | `true` | Enable system channel statistics collection (SYSTEM.* channels) |
+| `collect_channel_config` | `false` | Enable static channel configuration collection (timeouts, limits, etc) |
 | `queue_selector` | | Regular expression to filter queue names |
 | `channel_selector` | | Regular expression to filter channel names |
 | `collect_reset_queue_stats` | `false` | **DESTRUCTIVE**: Enable message counter collection using MQCMD_RESET_Q_STATS |
@@ -94,12 +97,13 @@ This collector uses IBM MQ's Programmable Command Format (PCF) interface to:
 
 ### PCF Commands Used
 
-- `MQCMD_INQUIRE_Q_MGR_STATUS` - Queue manager status and performance
-- `MQCMD_INQUIRE_Q` - Queue discovery
-- `MQCMD_INQUIRE_Q_STATUS` - Queue depth and statistics  
-- `MQCMD_INQUIRE_CHANNEL` - Channel discovery
+- `MQCMD_INQUIRE_Q_MGR_STATUS` - Queue manager status
+- `MQCMD_INQUIRE_Q` - Queue discovery and configuration
+- `MQCMD_INQUIRE_Q_STATUS` - Queue runtime statistics  
+- `MQCMD_INQUIRE_CHANNEL` - Channel discovery and configuration
 - `MQCMD_INQUIRE_CHANNEL_STATUS` - Channel status and throughput
 - `MQCMD_INQUIRE_TOPIC_STATUS` - Topic activity (when enabled)
+- `MQCMD_RESET_Q_STATS` - Message counters (optional, destructive)
 
 ## Permissions Required
 
@@ -177,8 +181,14 @@ SETMQAUT -m QM1 -t queue -n 'SYSTEM.ADMIN.COMMAND.REPLY.MODEL' -p netdata +get
 Charts are organized into families:
 
 - **queue_manager**: Queue manager level metrics
-- **queues**: Per-queue metrics with `queue` label
-- **channels**: Per-channel metrics with `channel` label  
+- **overview**: Monitoring status overview
+- **queues/local**: Local queue metrics with `queue` label
+- **queues/alias**: Alias queue metrics with `queue` label
+- **queues/remote**: Remote queue metrics with `queue` label
+- **queues/model**: Model queue metrics with `queue` label
+- **channels/status**: Channel status metrics with `channel` label
+- **channels/activity**: Channel activity metrics with `channel` label
+- **channels/config**: Channel configuration metrics with `channel` label (when enabled)
 - **topics**: Per-topic metrics with `topic` label (when enabled)
 
 Each dynamic instance (queue/channel/topic) gets its own set of charts with appropriate labeling for filtering and grouping in the Netdata dashboard.
@@ -196,6 +206,10 @@ These labels enable powerful filtering in Netdata Cloud dashboards, such as:
 - Group multiple queue managers by version during upgrades
 
 ## Runtime Metrics Limitations
+
+### Queue Manager CPU/Memory/Log Metrics
+
+**Note**: Queue Manager CPU usage, memory usage, and log usage metrics are **not available** through standard PCF commands. These metrics require IBM MQ resource monitoring to be enabled, which is outside the scope of PCF monitoring. The PCF interface provides operational metrics but not system resource utilization.
 
 ### IBM MQ Design Constraints
 

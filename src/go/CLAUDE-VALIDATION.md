@@ -365,3 +365,23 @@ metadata.yaml is the PRIMARY documentation source shown on the Netdata integrati
 
 The file /docs/NIDL-Framework.md describes how Netdata metrcis, charts and dashboards work. You **MUST** read it before working with metrics in collectors.
 IMPORTANT: "chart" for go.d modules is "instance" for NIDL and "context" for go.d modules in "chart" for NIDL.
+
+
+## METADATA UPDATE
+
+### CONFIGURATION
+
+1. Build a list of all the configuration options supported by the module
+2. Verify that exactly these (no more, no less) configuration options are used:
+  - in `config_schema.json`, so that dynamic configuration of the collector will work on the dashboards
+  - in `metadata.yaml`, so that users can see them
+  - in stock config, so that users editing the config can see the options
+
+### CONTEXTS/METRICS
+
+1. Build a list of all static and dynamic contexts, units, titles and dimensions the collector may collect
+2. Verify that exactly these contexts (no more, no less) are used:
+  - in `metadata.yaml`, so that users can see them
+  - in `README.md`, so that developers and users can see them
+  - in any stock alerts
+

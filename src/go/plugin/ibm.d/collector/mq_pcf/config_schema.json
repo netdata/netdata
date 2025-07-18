@@ -63,6 +63,18 @@
       "type": "boolean",
       "default": false
     },
+    "collect_system_queues": {
+      "title": "Collect system queue metrics",
+      "description": "Enable collection of system queue statistics (SYSTEM.* queues).",
+      "type": "boolean",
+      "default": true
+    },
+    "collect_system_channels": {
+      "title": "Collect system channel metrics",
+      "description": "Enable collection of system channel statistics (SYSTEM.* channels).",
+      "type": "boolean",
+      "default": true
+    },
     "collect_channel_config": {
       "title": "Collect channel configuration",
       "description": "Enable collection of static channel configuration values (timeouts, limits, etc). These rarely change and consume storage.",
