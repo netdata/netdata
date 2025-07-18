@@ -1632,16 +1632,22 @@ func (d *DB2) collectDatabaseOverview(ctx context.Context) error {
 		}
 	}
 	
-	// Database status
+	// Database status (current connected database)
 	runSimpleQuery(querySimpleDatabaseStatus, querySnapDatabaseStatus, func(column, value string) {
 		if column == "DATABASE_STATUS" && value == "ACTIVE" {
-			d.mx.DatabaseActive = 1
-			d.mx.DatabaseInactive = 0
+			d.mx.DatabaseStatusActive = 1
+			d.mx.DatabaseStatusInactive = 0
 		} else {
-			d.mx.DatabaseActive = 0
-			d.mx.DatabaseInactive = 1
+			d.mx.DatabaseStatusActive = 0
+			d.mx.DatabaseStatusInactive = 1
 		}
 	})
+	
+	// Database count (all databases in the instance)
+	// This will be updated by collectDatabaseInstances()
+	// Initialize to zero here
+	d.mx.DatabaseCountActive = 0
+	d.mx.DatabaseCountInactive = 0
 	
 	// CPU metrics
 	// Temporary storage for raw nanosecond values
