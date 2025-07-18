@@ -658,8 +658,8 @@ func (c *Collector) parseQueueListResponse(response []byte, command string) *Que
 }
 
 // Parse topic list response
-func (c *Collector) parseTopicListResponse(response []byte, command string) ([]string, error) {
-	var topics []string
+func (c *Collector) parseTopicListResponse(response []byte, command string) ([]TopicInfo, error) {
+	var topics []TopicInfo
 
 	// Parse response in chunks (each topic gets its own response message)
 	offset := 0
@@ -722,12 +722,28 @@ func (c *Collector) parseTopicListResponse(response []byte, command string) ([]s
 			c.pcfTracker.trackArrayItem(command, compCode, mqError)
 		}
 
+		// Extract topic info
+		var topicInfo TopicInfo
+		foundTopic := false
+		
 		// Extract topic name
 		if topicName, ok := attrs[C.MQCA_TOPIC_NAME]; ok {
 			if name, ok := topicName.(string); ok && name != "" {
 				topicNameStr = strings.TrimSpace(name)
-				topics = append(topics, topicNameStr)
+				topicInfo.Name = topicNameStr
+				foundTopic = true
 			}
+		}
+		
+		// Extract topic string
+		if topicString, ok := attrs[C.MQCA_TOPIC_STRING]; ok {
+			if str, ok := topicString.(string); ok {
+				topicInfo.TopicString = strings.TrimSpace(str)
+			}
+		}
+		
+		if foundTopic {
+			topics = append(topics, topicInfo)
 		}
 
 		// Log individual array item failures
