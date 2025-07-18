@@ -12,8 +12,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
-// DynamicCollector manages dynamic chart creation and instance tracking for MQ PCF
-type DynamicCollector struct {
+// ChartManager manages chart creation and instance tracking for MQ PCF
+type ChartManager struct {
 	mu           sync.RWMutex
 	seen         map[string]bool // Track what instances we've seen this cycle
 	collected    map[string]bool // Track what instances we've collected before
@@ -21,9 +21,9 @@ type DynamicCollector struct {
 	charts       *module.Charts  // Reference to main charts collection
 }
 
-// NewDynamicCollector creates a new dynamic collector
-func NewDynamicCollector() *DynamicCollector {
-	return &DynamicCollector{
+// NewChartManager creates a new dynamic collector
+func NewChartManager() *ChartManager {
+	return &ChartManager{
 		seen:         make(map[string]bool),
 		collected:    make(map[string]bool),
 		chartCreated: make(map[string]bool),
@@ -31,42 +31,42 @@ func NewDynamicCollector() *DynamicCollector {
 }
 
 // SetCharts sets the reference to the main charts collection
-func (dc *DynamicCollector) SetCharts(charts *module.Charts) {
+func (dc *ChartManager) SetCharts(charts *module.Charts) {
 	dc.mu.Lock()
 	defer dc.mu.Unlock()
 	dc.charts = charts
 }
 
 // ResetSeen resets the tracking for the current collection cycle
-func (dc *DynamicCollector) ResetSeen() {
+func (dc *ChartManager) ResetSeen() {
 	dc.mu.Lock()
 	defer dc.mu.Unlock()
 	dc.seen = make(map[string]bool)
 }
 
 // MarkSeen marks an instance as seen in this collection cycle
-func (dc *DynamicCollector) MarkSeen(instanceKey string) {
+func (dc *ChartManager) MarkSeen(instanceKey string) {
 	dc.mu.Lock()
 	defer dc.mu.Unlock()
 	dc.seen[instanceKey] = true
 }
 
 // IsChartCreated checks if a chart type has been created
-func (dc *DynamicCollector) IsChartCreated(chartContext string) bool {
+func (dc *ChartManager) IsChartCreated(chartContext string) bool {
 	dc.mu.RLock()
 	defer dc.mu.RUnlock()
 	return dc.chartCreated[chartContext]
 }
 
 // MarkChartCreated marks a chart type as created
-func (dc *DynamicCollector) MarkChartCreated(chartContext string) {
+func (dc *ChartManager) MarkChartCreated(chartContext string) {
 	dc.mu.Lock()
 	defer dc.mu.Unlock()
 	dc.chartCreated[chartContext] = true
 }
 
 // GetAbsentInstances returns instances that were collected before but not seen this cycle
-func (dc *DynamicCollector) GetAbsentInstances() []string {
+func (dc *ChartManager) GetAbsentInstances() []string {
 	dc.mu.RLock()
 	defer dc.mu.RUnlock()
 
@@ -80,14 +80,14 @@ func (dc *DynamicCollector) GetAbsentInstances() []string {
 }
 
 // MarkCollected marks an instance as collected
-func (dc *DynamicCollector) MarkCollected(instanceKey string) {
+func (dc *ChartManager) MarkCollected(instanceKey string) {
 	dc.mu.Lock()
 	defer dc.mu.Unlock()
 	dc.collected[instanceKey] = true
 }
 
 // RemoveCollected removes an instance from collected tracking
-func (dc *DynamicCollector) RemoveCollected(instanceKey string) {
+func (dc *ChartManager) RemoveCollected(instanceKey string) {
 	dc.mu.Lock()
 	defer dc.mu.Unlock()
 	delete(dc.collected, instanceKey)
@@ -96,9 +96,9 @@ func (dc *DynamicCollector) RemoveCollected(instanceKey string) {
 // ensureChartExists creates a chart if it doesn't exist and adds instance tracking
 // This is the key synchronization method that only creates charts when data is available
 func (c *Collector) ensureChartExists(context, title, units, chartType, family string, priority int, dimensions []string, instanceName string, labels map[string]string) {
-	if c.dynamicCollector == nil {
-		c.dynamicCollector = NewDynamicCollector()
-		c.dynamicCollector.SetCharts(c.charts)
+	if c.chartManager == nil {
+		c.chartManager = NewChartManager()
+		c.chartManager.SetCharts(c.charts)
 	}
 
 	// Create unique chart ID for this instance
@@ -108,7 +108,7 @@ func (c *Collector) ensureChartExists(context, title, units, chartType, family s
 	instanceKey := fmt.Sprintf("%s|%s", context, instanceName)
 
 	// Mark instance as seen in this cycle
-	c.dynamicCollector.MarkSeen(instanceKey)
+	c.chartManager.MarkSeen(instanceKey)
 
 	// Check if chart already exists
 	if c.charts.Has(chartID) {
@@ -168,21 +168,21 @@ func (c *Collector) ensureChartExists(context, title, units, chartType, family s
 	}
 
 	// Mark instance as collected
-	c.dynamicCollector.MarkCollected(instanceKey)
+	c.chartManager.MarkCollected(instanceKey)
 
 	c.Debugf("created chart %s for instance %s", chartID, instanceName)
 }
 
 // cleanupAbsentInstances removes charts for instances that are no longer present
 func (c *Collector) cleanupAbsentInstances() {
-	if c.dynamicCollector == nil {
+	if c.chartManager == nil {
 		return
 	}
 
-	absentInstances := c.dynamicCollector.GetAbsentInstances()
+	absentInstances := c.chartManager.GetAbsentInstances()
 	for _, instanceKey := range absentInstances {
 		c.removeInstanceCharts(instanceKey)
-		c.dynamicCollector.RemoveCollected(instanceKey)
+		c.chartManager.RemoveCollected(instanceKey)
 	}
 }
 
@@ -222,9 +222,9 @@ func splitInstanceKey(instanceKey string) []string {
 
 // resetSeenTracking resets the tracking for what we've seen this cycle
 func (c *Collector) resetSeenTracking() {
-	if c.dynamicCollector == nil {
-		c.dynamicCollector = NewDynamicCollector()
-		c.dynamicCollector.SetCharts(c.charts)
+	if c.chartManager == nil {
+		c.chartManager = NewChartManager()
+		c.chartManager.SetCharts(c.charts)
 	}
-	c.dynamicCollector.ResetSeen()
+	c.chartManager.ResetSeen()
 }

@@ -290,7 +290,7 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	// Collect queue metrics (respect admin configuration)
 	if c.CollectQueues != nil && *c.CollectQueues {
 		queueStart := time.Now()
-		if err := c.collectQueueMetrics(ctx, mx); err != nil {
+		if err := c.collectAllQueues(ctx, mx); err != nil {
 			c.Warningf("failed to collect queue metrics: %v", err)
 		}
 		c.Debugf("Queue metrics collection took %v", time.Since(queueStart))
@@ -299,7 +299,7 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	// Collect channel metrics (respect admin configuration)
 	if c.CollectChannels != nil && *c.CollectChannels {
 		channelStart := time.Now()
-		if err := c.collectChannelMetrics(ctx, mx); err != nil {
+		if err := c.collectAllChannels(ctx, mx); err != nil {
 			c.Warningf("failed to collect channel metrics: %v", err)
 		}
 		c.Debugf("Channel metrics collection took %v", time.Since(channelStart))
@@ -308,7 +308,7 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	// Collect topic metrics (respect admin configuration)
 	if c.CollectTopics != nil && *c.CollectTopics {
 		topicStart := time.Now()
-		if err := c.collectTopicMetrics(ctx, mx); err != nil {
+		if err := c.collectAllTopics(ctx, mx); err != nil {
 			c.Warningf("failed to collect topic metrics: %v", err)
 		}
 		c.Debugf("Topic metrics collection took %v", time.Since(topicStart))
@@ -338,7 +338,7 @@ func (c *Collector) ensureConnection(ctx context.Context) error {
 		c.disconnect()
 	}
 
-	c.Infof("Creating NEW MQ connection - this will create 2 new queues")
+	c.Infof("Creating MQ connection - this will create 2 new queues")
 
 	c.mqConn = &mqConnection{}
 
@@ -842,7 +842,7 @@ func (c *Collector) collectQueueManagerMetrics(ctx context.Context, mx map[strin
 	return nil
 }
 
-func (c *Collector) collectQueueMetrics(ctx context.Context, mx map[string]int64) error {
+func (c *Collector) collectAllQueues(ctx context.Context, mx map[string]int64) error {
 	// Initialize overview metrics
 	mx["queues_monitored"] = 0
 	mx["queues_excluded"] = 0
@@ -932,8 +932,8 @@ func (c *Collector) collectQueueMetrics(ctx context.Context, mx map[string]int64
 
 		cleanName := c.cleanName(queueName)
 
-		// NEW PATTERN: Collect data first, then create charts based on what we successfully collected
-		c.collectQueueMetricsWithDynamicCharts(ctx, queueName, cleanName, mx)
+		// Collect data first, then create charts based on what we successfully collected
+		c.collectQueueMetrics(ctx, queueName, cleanName, mx)
 	}
 
 	// Update overview metrics
@@ -1152,7 +1152,7 @@ func (c *Collector) collectQueueResetStats(ctx context.Context, mx map[string]in
 	return nil
 }
 
-func (c *Collector) collectChannelMetrics(ctx context.Context, mx map[string]int64) error {
+func (c *Collector) collectAllChannels(ctx context.Context, mx map[string]int64) error {
 	// Initialize overview metrics
 	mx["channels_monitored"] = 0
 	mx["channels_excluded"] = 0
@@ -1229,8 +1229,8 @@ func (c *Collector) collectChannelMetrics(ctx context.Context, mx map[string]int
 
 		cleanName := c.cleanName(channelName)
 
-		// NEW PATTERN: Collect data first, then create charts based on what we successfully collected
-		c.collectChannelMetricsWithDynamicCharts(ctx, channelName, cleanName, mx)
+		// Collect data first, then create charts based on what we successfully collected
+		c.collectChannelMetrics(ctx, channelName, cleanName, mx)
 	}
 
 	// Update overview metrics
@@ -1241,7 +1241,7 @@ func (c *Collector) collectChannelMetrics(ctx context.Context, mx map[string]int
 	return nil
 }
 
-func (c *Collector) collectTopicMetrics(ctx context.Context, mx map[string]int64) error {
+func (c *Collector) collectAllTopics(ctx context.Context, mx map[string]int64) error {
 	// Get list of topics
 	topics, err := c.getTopicList(ctx)
 	if err != nil {
@@ -1259,8 +1259,8 @@ func (c *Collector) collectTopicMetrics(ctx context.Context, mx map[string]int64
 
 		cleanName := c.cleanName(topicName)
 
-		// NEW PATTERN: Collect data first, then create charts based on what we successfully collected
-		c.collectTopicMetricsWithDynamicCharts(ctx, topicName, cleanName, mx)
+		// Collect data first, then create charts based on what we successfully collected
+		c.collectTopicMetrics(ctx, topicName, cleanName, mx)
 	}
 
 	c.Debugf("Monitoring %d out of %d topics", collected, len(topics))
@@ -1343,155 +1343,6 @@ func (c *Collector) shouldCollectChannel(channelName string) bool {
 	}
 
 	return true
-}
-
-// OLD: Remove unused function
-func (c *Collector) collectSingleQueueMetrics_UNUSED(ctx context.Context, queueName, cleanName string, mx map[string]int64) error {
-	// Send INQUIRE_Q_STATUS for specific queue
-	params := []pcfParameter{
-		newStringParameter(C.MQCA_Q_NAME, queueName),
-	}
-
-	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_Q_STATUS, params)
-	if err != nil {
-		return fmt.Errorf("failed to send MQCMD_INQUIRE_Q_STATUS for %s: %w", queueName, err)
-	}
-
-	// Parse response
-	attrs, err := c.parsePCFResponse(response, "MQCMD_INQUIRE_Q_STATUS")
-	if err != nil {
-		return fmt.Errorf("failed to parse queue status response for %s: %w", queueName, err)
-	}
-
-	// Check for MQ errors in the response
-	if reasonCode, ok := attrs[C.MQIACF_REASON_CODE]; ok {
-		if reason, ok := reasonCode.(int32); ok && reason != 0 {
-			// Map common reason codes to meaningful messages
-			switch reason {
-			case 2085: // MQRC_UNKNOWN_OBJECT_NAME
-				return fmt.Errorf("cannot get status for model queue (MQRC_UNKNOWN_OBJECT_NAME)")
-			case 2035: // MQRC_NOT_AUTHORIZED
-				return fmt.Errorf("not authorized to query queue (MQRC_NOT_AUTHORIZED)")
-			default:
-				return fmt.Errorf("MQCMD_INQUIRE_Q_STATUS failed: reason %d (%s)", reason, mqReasonString(reason))
-			}
-		}
-	}
-
-	// Extract metrics - always set depth as it's critical
-	if depth, ok := attrs[C.MQIA_CURRENT_Q_DEPTH]; ok {
-		mx[fmt.Sprintf("queue_%s_depth", cleanName)] = int64(depth.(int32))
-	} else {
-		// Queue depth should always be available from INQUIRE_Q_STATUS
-		c.Warningf("MQIA_CURRENT_Q_DEPTH (%d) not found for queue %s - setting to 0", C.MQIA_CURRENT_Q_DEPTH, queueName)
-		mx[fmt.Sprintf("queue_%s_depth", cleanName)] = 0
-	}
-
-	// Note: MQIA_MSG_ENQ_COUNT and MQIA_MSG_DEQ_COUNT are not returned by INQUIRE_Q_STATUS
-	// These would need MQCMD_INQUIRE_Q or reset queue statistics to be enabled
-	// For now, we don't set these metrics if not available
-	if enqueued, ok := attrs[C.MQIA_MSG_ENQ_COUNT]; ok {
-		mx[fmt.Sprintf("queue_%s_enqueued", cleanName)] = int64(enqueued.(int32))
-	}
-
-	if dequeued, ok := attrs[C.MQIA_MSG_DEQ_COUNT]; ok {
-		mx[fmt.Sprintf("queue_%s_dequeued", cleanName)] = int64(dequeued.(int32))
-	}
-
-	// Extract oldest message age if available (seconds)
-	// Note: Oldest message age metric is not available through standard PCF inquiries
-	// This would require specific queue statistics or reset commands
-
-	// Extract runtime activity metrics that are available from INQUIRE_Q_STATUS
-	if openInputCount, ok := attrs[C.MQIA_OPEN_INPUT_COUNT]; ok {
-		mx[fmt.Sprintf("queue_%s_open_input_count", cleanName)] = int64(openInputCount.(int32))
-	}
-
-	if openOutputCount, ok := attrs[C.MQIA_OPEN_OUTPUT_COUNT]; ok {
-		mx[fmt.Sprintf("queue_%s_open_output_count", cleanName)] = int64(openOutputCount.(int32))
-	}
-
-	return nil
-}
-
-// OLD: Remove unused function
-func (c *Collector) collectSingleChannelMetrics_UNUSED(ctx context.Context, channelName, cleanName string, mx map[string]int64) error {
-	// Send INQUIRE_CHANNEL_STATUS for specific channel
-	params := []pcfParameter{
-		newStringParameter(C.MQCACH_CHANNEL_NAME, channelName),
-	}
-
-	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_CHANNEL_STATUS, params)
-	if err != nil {
-		return fmt.Errorf("failed to send MQCMD_INQUIRE_CHANNEL_STATUS for %s: %w", channelName, err)
-	}
-
-	// Parse response
-	attrs, err := c.parsePCFResponse(response, "MQCMD_INQUIRE_CHANNEL_STATUS")
-	if err != nil {
-		return fmt.Errorf("failed to parse channel status response for %s: %w", channelName, err)
-	}
-
-	// Extract metrics - convert enumerated status to boolean dimensions
-	if status, ok := attrs[C.MQIACH_CHANNEL_STATUS]; ok {
-		if statusVal, ok := status.(int32); ok {
-			// Initialize all status dimensions to 0
-			mx[fmt.Sprintf("channel_%s_inactive", cleanName)] = 0
-			mx[fmt.Sprintf("channel_%s_binding", cleanName)] = 0
-			mx[fmt.Sprintf("channel_%s_starting", cleanName)] = 0
-			mx[fmt.Sprintf("channel_%s_running", cleanName)] = 0
-			mx[fmt.Sprintf("channel_%s_stopping", cleanName)] = 0
-			mx[fmt.Sprintf("channel_%s_retrying", cleanName)] = 0
-			mx[fmt.Sprintf("channel_%s_stopped", cleanName)] = 0
-			mx[fmt.Sprintf("channel_%s_requesting", cleanName)] = 0
-			mx[fmt.Sprintf("channel_%s_paused", cleanName)] = 0
-			mx[fmt.Sprintf("channel_%s_disconnected", cleanName)] = 0
-			mx[fmt.Sprintf("channel_%s_initializing", cleanName)] = 0
-			mx[fmt.Sprintf("channel_%s_switching", cleanName)] = 0
-			
-			// Set the active status to 1
-			switch statusVal {
-			case 0: // MQCHS_INACTIVE
-				mx[fmt.Sprintf("channel_%s_inactive", cleanName)] = 1
-			case 1: // MQCHS_BINDING
-				mx[fmt.Sprintf("channel_%s_binding", cleanName)] = 1
-			case 2: // MQCHS_STARTING
-				mx[fmt.Sprintf("channel_%s_starting", cleanName)] = 1
-			case 3: // MQCHS_RUNNING
-				mx[fmt.Sprintf("channel_%s_running", cleanName)] = 1
-			case 4: // MQCHS_STOPPING
-				mx[fmt.Sprintf("channel_%s_stopping", cleanName)] = 1
-			case 5: // MQCHS_RETRYING
-				mx[fmt.Sprintf("channel_%s_retrying", cleanName)] = 1
-			case 6: // MQCHS_STOPPED
-				mx[fmt.Sprintf("channel_%s_stopped", cleanName)] = 1
-			case 7: // MQCHS_REQUESTING
-				mx[fmt.Sprintf("channel_%s_requesting", cleanName)] = 1
-			case 8: // MQCHS_PAUSED
-				mx[fmt.Sprintf("channel_%s_paused", cleanName)] = 1
-			case 9: // MQCHS_DISCONNECTED
-				mx[fmt.Sprintf("channel_%s_disconnected", cleanName)] = 1
-			case 13: // MQCHS_INITIALIZING
-				mx[fmt.Sprintf("channel_%s_initializing", cleanName)] = 1
-			case 14: // MQCHS_SWITCHING
-				mx[fmt.Sprintf("channel_%s_switching", cleanName)] = 1
-			}
-		}
-	}
-
-	if messages, ok := attrs[C.MQIACH_MSGS]; ok {
-		mx[fmt.Sprintf("channel_%s_messages", cleanName)] = int64(messages.(int32))
-	}
-
-	if bytes, ok := attrs[C.MQIACH_BYTES_SENT]; ok {
-		mx[fmt.Sprintf("channel_%s_bytes", cleanName)] = int64(bytes.(int32))
-	}
-
-	if batches, ok := attrs[C.MQIACH_BATCHES]; ok {
-		mx[fmt.Sprintf("channel_%s_batches", cleanName)] = int64(batches.(int32))
-	}
-
-	return nil
 }
 
 // collectChannelConfigMetrics collects channel configuration attributes using MQCMD_INQUIRE_CHANNEL
@@ -1602,39 +1453,6 @@ func (c *Collector) shouldCollectTopic(topicName string) bool {
 	// Apply topic selector if configured (future enhancement)
 	// For now, collect all non-system topics
 	return true
-}
-
-// OLD: Remove unused function
-func (c *Collector) collectSingleTopicMetrics_UNUSED(ctx context.Context, topicName, cleanName string, mx map[string]int64) error {
-	// Send INQUIRE_TOPIC_STATUS for specific topic
-	params := []pcfParameter{
-		newStringParameter(C.MQCA_TOPIC_NAME, topicName),
-	}
-
-	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_TOPIC_STATUS, params)
-	if err != nil {
-		return fmt.Errorf("failed to send MQCMD_INQUIRE_TOPIC_STATUS for %s: %w", topicName, err)
-	}
-
-	// Parse response
-	attrs, err := c.parsePCFResponse(response, "MQCMD_INQUIRE_TOPIC_STATUS")
-	if err != nil {
-		return fmt.Errorf("failed to parse topic status response for %s: %w", topicName, err)
-	}
-
-	// Extract metrics
-	if publishers, ok := attrs[C.MQIA_PUB_COUNT]; ok {
-		mx[fmt.Sprintf("topic_%s_publishers", cleanName)] = int64(publishers.(int32))
-	}
-
-	if subscribers, ok := attrs[C.MQIA_SUB_COUNT]; ok {
-		mx[fmt.Sprintf("topic_%s_subscribers", cleanName)] = int64(subscribers.(int32))
-	}
-
-	// Note: Topic message count is not available through standard topic inquiries
-	// This would require specific topic statistics if available
-
-	return nil
 }
 
 func (c *Collector) detectVersion(ctx context.Context) error {
