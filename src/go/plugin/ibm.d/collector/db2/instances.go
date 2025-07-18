@@ -148,28 +148,16 @@ func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 		return nil
 	}
 
-	// Choose query based on monitoring approach and column support
-	var query string
-	if d.useMonGetFunctions {
-		// Note: MON_GET_BUFFERPOOL doesn't support FETCH FIRST, so we'll handle limit in post-processing
-		query = queryMonGetBufferpool
-		d.Debugf("using MON_GET_BUFFERPOOL for bufferpool instances (modern approach)")
-	} else if d.edition == "Cloud" {
-		query = queryBufferpoolInstancesCloud
-		d.Debugf("using Cloud-specific bufferpool query for Db2 on Cloud")
-	} else if d.supportsColumnOrganizedTables {
-		query = queryBufferpoolInstances
-		d.Debugf("using SNAP views with column-organized metrics for bufferpool instances")
-	} else {
-		query = queryBufferpoolInstancesLegacy
-		d.Debugf("using legacy SNAP views without column-organized metrics for bufferpool instances")
-	}
+	// Always use MON_GET_BUFFERPOOL for bufferpool instances
+	// Note: MON_GET_BUFFERPOOL doesn't support FETCH FIRST, so we'll handle limit in post-processing
+	query := queryMonGetBufferpool
+	d.Debugf("using MON_GET_BUFFERPOOL for bufferpool instances")
 
 	var currentBP string
 	count := 0
 	err := d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
 		// Handle limit for MON_GET queries
-		if d.useMonGetFunctions && count >= d.MaxBufferpools {
+		if count >= d.MaxBufferpools {
 			return
 		}
 		switch column {
@@ -376,7 +364,7 @@ func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 
 		// MON_GET specific fields for buffer pool instances
 		case "POOL_CUR_SIZE":
-			if currentBP != "" && d.useMonGetFunctions {
+			if currentBP != "" {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 					// For MON_GET, this is already in pages
 					metrics := d.mx.bufferpools[currentBP]
@@ -386,7 +374,7 @@ func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 			}
 
 		case "POOL_WATERMARK":
-			if currentBP != "" && d.useMonGetFunctions {
+			if currentBP != "" {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 					// Watermark can be used as an indicator of usage
 					metrics := d.mx.bufferpools[currentBP]
@@ -401,37 +389,35 @@ func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 			metrics := d.mx.bufferpools[currentBP]
 
 			// For MON_GET queries, we calculate hits from logical - physical
-			if d.useMonGetFunctions {
-				// Calculate hits for each type (hits = logical - physical)
-				metrics.DataHits = metrics.DataLogicalReads - metrics.DataPhysicalReads
-				metrics.DataMisses = metrics.DataPhysicalReads
-				
-				metrics.IndexHits = metrics.IndexLogicalReads - metrics.IndexPhysicalReads
-				metrics.IndexMisses = metrics.IndexPhysicalReads
-				
-				metrics.XDAHits = metrics.XDALogicalReads - metrics.XDAPhysicalReads
-				metrics.XDAMisses = metrics.XDAPhysicalReads
-				
-				metrics.ColumnHits = metrics.ColumnLogicalReads - metrics.ColumnPhysicalReads
-				metrics.ColumnMisses = metrics.ColumnPhysicalReads
-				
-				// Ensure hits are not negative (shouldn't happen with MON_GET approach but safety check)
-				if metrics.DataHits < 0 {
-					metrics.DataHits = 0
-					metrics.DataMisses = metrics.DataLogicalReads
-				}
-				if metrics.IndexHits < 0 {
-					metrics.IndexHits = 0
-					metrics.IndexMisses = metrics.IndexLogicalReads
-				}
-				if metrics.XDAHits < 0 {
-					metrics.XDAHits = 0
-					metrics.XDAMisses = metrics.XDALogicalReads
-				}
-				if metrics.ColumnHits < 0 {
-					metrics.ColumnHits = 0
-					metrics.ColumnMisses = metrics.ColumnLogicalReads
-				}
+			// Calculate hits for each type (hits = logical - physical)
+			metrics.DataHits = metrics.DataLogicalReads - metrics.DataPhysicalReads
+			metrics.DataMisses = metrics.DataPhysicalReads
+			
+			metrics.IndexHits = metrics.IndexLogicalReads - metrics.IndexPhysicalReads
+			metrics.IndexMisses = metrics.IndexPhysicalReads
+			
+			metrics.XDAHits = metrics.XDALogicalReads - metrics.XDAPhysicalReads
+			metrics.XDAMisses = metrics.XDAPhysicalReads
+			
+			metrics.ColumnHits = metrics.ColumnLogicalReads - metrics.ColumnPhysicalReads
+			metrics.ColumnMisses = metrics.ColumnPhysicalReads
+			
+			// Ensure hits are not negative (shouldn't happen with MON_GET approach but safety check)
+			if metrics.DataHits < 0 {
+				metrics.DataHits = 0
+				metrics.DataMisses = metrics.DataLogicalReads
+			}
+			if metrics.IndexHits < 0 {
+				metrics.IndexHits = 0
+				metrics.IndexMisses = metrics.IndexLogicalReads
+			}
+			if metrics.XDAHits < 0 {
+				metrics.XDAHits = 0
+				metrics.XDAMisses = metrics.XDALogicalReads
+			}
+			if metrics.ColumnHits < 0 {
+				metrics.ColumnHits = 0
+				metrics.ColumnMisses = metrics.ColumnLogicalReads
 			}
 
 			// Calculate overall hits and misses
@@ -457,15 +443,9 @@ func (d *DB2) collectTablespaceInstances(ctx context.Context) error {
 		return nil
 	}
 
-	// Choose query based on monitoring approach
-	var query string
-	if d.useMonGetFunctions {
-		query = queryMonGetTablespace
-		d.Debugf("using MON_GET_TABLESPACE for tablespace metrics (modern approach)")
-	} else {
-		query = queryTablespaceInstances
-		d.Debugf("using SNAP views for tablespace metrics (legacy approach)")
-	}
+	// Always use MON_GET_TABLESPACE for tablespace metrics
+	query := queryMonGetTablespace
+	d.Debugf("using MON_GET_TABLESPACE for tablespace metrics")
 
 	var currentTbsp string
 	err := d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
@@ -574,18 +554,9 @@ func (d *DB2) collectConnectionInstances(ctx context.Context) error {
 		return nil
 	}
 
-	// Choose query based on monitoring approach
-	var query string
-	if d.useMonGetFunctions {
-		query = queryMonGetConnectionDetails
-		d.Debugf("using MON_GET_CONNECTION for connection instances (modern approach)")
-	} else if d.edition == "Cloud" {
-		query = queryConnectionInstancesCloud
-		d.Debugf("using Cloud-specific connection query for Db2 on Cloud")
-	} else {
-		query = queryConnectionInstances
-		d.Debugf("using SNAP views for connection instances (legacy approach)")
-	}
+	// Always use MON_GET_CONNECTION for connection instances
+	query := queryMonGetConnectionDetails
+	d.Debugf("using MON_GET_CONNECTION for connection instances")
 
 	var currentAppID string
 	err := d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
@@ -675,11 +646,7 @@ func (d *DB2) collectConnectionInstances(ctx context.Context) error {
 
 // Screen 26: Instance Memory Sets collection using MON_GET_MEMORY_SET
 func (d *DB2) collectMemorySetInstances(ctx context.Context) error {
-	if !d.useMonGetFunctions {
-		d.Debugf("MON_GET_MEMORY_SET not available, skipping memory set collection")
-		return nil
-	}
-
+	// Always use MON_GET_MEMORY_SET for memory set metrics
 	query := queryMonGetMemorySet
 	
 	d.Debugf("collecting memory set instances using MON_GET_MEMORY_SET")
@@ -837,11 +804,7 @@ func (d *DB2) collectMemorySetInstances(ctx context.Context) error {
 }
 
 func (d *DB2) collectPrefetcherInstances(ctx context.Context) error {
-	if !d.useMonGetFunctions {
-		d.Debugf("prefetcher metrics require MON_GET functions, skipping")
-		return nil
-	}
-
+	// Always use MON_GET functions for prefetcher metrics
 	// Track seen prefetcher instances
 	seen := make(map[string]bool)
 	d.currentBufferPoolName = ""

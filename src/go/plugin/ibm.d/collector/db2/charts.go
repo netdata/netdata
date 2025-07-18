@@ -31,12 +31,11 @@ var (
 		bufferpoolDataHitRatioChart.Copy(),
 		bufferpoolIndexHitRatioChart.Copy(),
 		bufferpoolXDAHitRatioChart.Copy(),
-		bufferpoolColumnHitRatioChart.Copy(),
 		bufferpoolReadsChart.Copy(),
 		bufferpoolDataReadsChart.Copy(),
 		bufferpoolIndexReadsChart.Copy(),
 		bufferpoolXDAReadsChart.Copy(),
-		bufferpoolColumnReadsChart.Copy(),
+		bufferpoolWritesChart.Copy(),
 		
 		// Enhanced logging charts (Screen 18)
 		logOperationsChart.Copy(),
@@ -302,6 +301,19 @@ var (
 		Dims: module.Dims{
 			{ID: "bufferpool_column_logical_reads", Name: "logical", Algo: module.Incremental},
 			{ID: "bufferpool_column_physical_reads", Name: "physical", Algo: module.Incremental},
+		},
+	}
+
+	bufferpoolWritesChart = module.Chart{
+		ID:       "bufferpool_writes",
+		Title:    "Buffer Pool Writes",
+		Units:    "writes/s",
+		Fam:      "bufferpools/overview",
+		Ctx:      "db2.bufferpool_writes",
+		Priority: module.Priority + 47,
+		Type:     module.Line,
+		Dims: module.Dims{
+			{ID: "bufferpool_writes", Name: "writes", Algo: module.Incremental},
 		},
 	}
 

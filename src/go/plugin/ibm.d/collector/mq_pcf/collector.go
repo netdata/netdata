@@ -63,11 +63,7 @@ type Collector struct {
 
 	charts *module.Charts
 
-	// Instance tracking for dynamic chart creation
-	collected map[string]bool
-	seen      map[string]bool // Track what we've seen this collection cycle
-
-	// Dynamic collector for synchronized chart creation
+	// Dynamic collector for synchronized chart creation and instance tracking
 	dynamicCollector *DynamicCollector
 
 	// MQ connection
@@ -92,7 +88,6 @@ type Collector struct {
 func New() *Collector {
 	return &Collector{
 		charts:     baseCharts.Copy(),
-		collected:  make(map[string]bool),
 		pcfTracker: newPCFTracker(),
 	}
 }
