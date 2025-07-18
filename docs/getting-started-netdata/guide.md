@@ -17,7 +17,7 @@ This guide will show you how simple it is to get started with Netdata and experi
   title="YouTube video player" 
   style={{
     width: "100%",
-    aspectRatio: "16/9",  /* ↩️ this is the magic */
+    aspectRatio: "16/9",
     border: 0,
   }}
   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
