@@ -258,8 +258,7 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	// Reset PCF tracking for this collection cycle
 	c.pcfTracker = newPCFTracker()
 
-	// Reset seen tracking for this collection cycle (both old and new systems)
-	c.seen = make(map[string]bool)
+	// Reset seen tracking for this collection cycle
 	c.resetSeenTracking()
 
 	// Connect to queue manager if not connected
@@ -315,8 +314,7 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 		c.Debugf("Topic metrics collection took %v", time.Since(topicStart))
 	}
 
-	// Clean up obsolete charts for instances that no longer exist (both old and new systems)
-	c.markObsoleteCharts()
+	// Clean up obsolete charts for instances that no longer exist
 	c.cleanupAbsentInstances()
 
 	// Log comprehensive collection summary including PCF command tracking
@@ -930,8 +928,7 @@ func (c *Collector) collectQueueMetrics(ctx context.Context, mx map[string]int64
 		}
 		collected++
 
-		// Mark as seen (both old and new tracking systems)
-		c.seen[queueName] = true
+		// Mark as seen for cleanup tracking
 
 		cleanName := c.cleanName(queueName)
 
@@ -1228,8 +1225,7 @@ func (c *Collector) collectChannelMetrics(ctx context.Context, mx map[string]int
 		}
 		collected++
 
-		// Mark as seen
-		c.seen[channelName] = true
+		// Mark as seen for cleanup tracking
 
 		cleanName := c.cleanName(channelName)
 
@@ -1261,24 +1257,10 @@ func (c *Collector) collectTopicMetrics(ctx context.Context, mx map[string]int64
 		}
 		collected++
 
-		// Mark as seen
-		c.seen[topicName] = true
-
 		cleanName := c.cleanName(topicName)
 
-		// Add topic charts if not already present
-		if !c.collected[topicName] {
-			c.collected[topicName] = true
-			charts := c.newTopicCharts(topicName)
-			if err := c.charts.Add(*charts...); err != nil {
-				c.Warning(err)
-			}
-		}
-
-		// Collect topic metrics
-		if err := c.collectSingleTopicMetrics(ctx, topicName, cleanName, mx); err != nil {
-			c.Warningf("failed to collect metrics for topic %s (MQCMD_INQUIRE_TOPIC_STATUS): %v", topicName, err)
-		}
+		// NEW PATTERN: Collect data first, then create charts based on what we successfully collected
+		c.collectTopicMetricsWithDynamicCharts(ctx, topicName, cleanName, mx)
 	}
 
 	c.Debugf("Monitoring %d out of %d topics", collected, len(topics))
@@ -1363,7 +1345,8 @@ func (c *Collector) shouldCollectChannel(channelName string) bool {
 	return true
 }
 
-func (c *Collector) collectSingleQueueMetrics(ctx context.Context, queueName, cleanName string, mx map[string]int64) error {
+// OLD: Remove unused function
+func (c *Collector) collectSingleQueueMetrics_UNUSED(ctx context.Context, queueName, cleanName string, mx map[string]int64) error {
 	// Send INQUIRE_Q_STATUS for specific queue
 	params := []pcfParameter{
 		newStringParameter(C.MQCA_Q_NAME, queueName),
@@ -1431,7 +1414,8 @@ func (c *Collector) collectSingleQueueMetrics(ctx context.Context, queueName, cl
 	return nil
 }
 
-func (c *Collector) collectSingleChannelMetrics(ctx context.Context, channelName, cleanName string, mx map[string]int64) error {
+// OLD: Remove unused function
+func (c *Collector) collectSingleChannelMetrics_UNUSED(ctx context.Context, channelName, cleanName string, mx map[string]int64) error {
 	// Send INQUIRE_CHANNEL_STATUS for specific channel
 	params := []pcfParameter{
 		newStringParameter(C.MQCACH_CHANNEL_NAME, channelName),
@@ -1620,7 +1604,8 @@ func (c *Collector) shouldCollectTopic(topicName string) bool {
 	return true
 }
 
-func (c *Collector) collectSingleTopicMetrics(ctx context.Context, topicName, cleanName string, mx map[string]int64) error {
+// OLD: Remove unused function
+func (c *Collector) collectSingleTopicMetrics_UNUSED(ctx context.Context, topicName, cleanName string, mx map[string]int64) error {
 	// Send INQUIRE_TOPIC_STATUS for specific topic
 	params := []pcfParameter{
 		newStringParameter(C.MQCA_TOPIC_NAME, topicName),
@@ -1722,40 +1707,6 @@ func (c *Collector) cleanName(name string) string {
 		")", "_",
 	)
 	return strings.ToLower(r.Replace(name))
-}
-
-// markObsoleteCharts marks charts as obsolete when their instances no longer exist
-func (c *Collector) markObsoleteCharts() {
-	// Check all collected instances
-	for name := range c.collected {
-		if !c.seen[name] {
-			// Instance no longer exists - mark all its charts as obsolete
-			cleanName := c.cleanName(name)
-			c.Debugf("Instance %s no longer exists, marking charts as obsolete", name)
-
-			// Find all charts for this instance
-			chartsMarked := 0
-			for _, chart := range *c.charts {
-				// Check if this chart belongs to the missing instance
-				// Queue charts have IDs like "queue_cleanname_depth"
-				// Channel charts have IDs like "channel_cleanname_status", etc.
-				if strings.Contains(chart.ID, cleanName) {
-					if !chart.Obsolete {
-						// Set Obsolete flag and reset created flag so framework will send CHART command
-						// Don't set remove flag yet - this allows the framework to send the obsolete chart command
-						chart.Obsolete = true
-						chart.MarkNotCreated() // Reset created flag to trigger CHART command
-						chartsMarked++
-						c.Debugf("Marked chart %s as obsolete", chart.ID)
-					}
-				}
-			}
-
-			// Remove from collected map
-			delete(c.collected, name)
-			c.Infof("Removed instance %s - marked %d charts as obsolete", name, chartsMarked)
-		}
-	}
 }
 
 // testConnection performs a lightweight test to verify the MQ connection is still valid

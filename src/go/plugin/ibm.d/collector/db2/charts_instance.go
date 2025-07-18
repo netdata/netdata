@@ -38,11 +38,15 @@ var (
 	prioBufferpoolDataReadsInstance      = module.Priority + 113
 	prioBufferpoolIndexReadsInstance     = module.Priority + 114
 	prioBufferpoolPagesInstance          = module.Priority + 115
+	prioBufferpoolWritesInstance         = module.Priority + 116
 	prioTablespaceUsage                  = module.Priority + 120
 	prioTablespaceSize                   = module.Priority + 121
 	prioTablespaceUsableSize             = module.Priority + 122
+	prioTablespaceState                  = module.Priority + 123
 	prioConnectionState                  = module.Priority + 130
 	prioConnectionActivity               = module.Priority + 131
+	prioConnectionWaitTime               = module.Priority + 132
+	prioConnectionProcessingTime         = module.Priority + 133
 	prioTableSize                        = module.Priority + 140
 	prioTableActivity                    = module.Priority + 141
 	prioIndexUsage                       = module.Priority + 150
@@ -74,7 +78,7 @@ var globalCharts = module.Charts{
 		ID:       "connections",
 		Title:    "Database Connections",
 		Units:    "connections",
-		Fam:      "connections",
+		Fam:      "connections/instances",
 		Ctx:      "db2.connections",
 		Type:     module.Line,
 		Priority: prioConnections,
@@ -381,7 +385,7 @@ var (
 		ID:       "bufferpool_%s_hit_ratio",
 		Title:    "Buffer Pool Hit Ratio",
 		Units:    "percentage",
-		Fam:      "bufferpools",
+		Fam:      "bufferpools/instances",
 		Ctx:      "db2.bufferpool_instance_hit_ratio",
 		Type:     module.Line,
 		Priority: prioBufferpoolHitRatioInstance,
@@ -394,7 +398,7 @@ var (
 		ID:       "bufferpool_%s_detailed_hit_ratio",
 		Title:    "Buffer Pool Detailed Hit Ratios",
 		Units:    "percentage",
-		Fam:      "bufferpools",
+		Fam:      "bufferpools/instances",
 		Ctx:      "db2.bufferpool_instance_detailed_hit_ratio",
 		Type:     module.Line,
 		Priority: prioBufferpoolDetailedHitRatioInstance,
@@ -410,7 +414,7 @@ var (
 		ID:       "bufferpool_%s_reads",
 		Title:    "Buffer Pool Reads",
 		Units:    "reads/s",
-		Fam:      "bufferpools",
+		Fam:      "bufferpools/instances",
 		Ctx:      "db2.bufferpool_instance_reads",
 		Type:     module.Stacked,
 		Priority: prioBufferpoolReadsInstance,
@@ -424,7 +428,7 @@ var (
 		ID:       "bufferpool_%s_data_reads",
 		Title:    "Buffer Pool Data Page Reads",
 		Units:    "reads/s",
-		Fam:      "bufferpools",
+		Fam:      "bufferpools/instances",
 		Ctx:      "db2.bufferpool_instance_data_reads",
 		Type:     module.Stacked,
 		Priority: prioBufferpoolDataReadsInstance,
@@ -438,7 +442,7 @@ var (
 		ID:       "bufferpool_%s_index_reads",
 		Title:    "Buffer Pool Index Page Reads",
 		Units:    "reads/s",
-		Fam:      "bufferpools",
+		Fam:      "bufferpools/instances",
 		Ctx:      "db2.bufferpool_instance_index_reads",
 		Type:     module.Stacked,
 		Priority: prioBufferpoolIndexReadsInstance,
@@ -452,13 +456,26 @@ var (
 		ID:       "bufferpool_%s_pages",
 		Title:    "Buffer Pool Pages",
 		Units:    "pages",
-		Fam:      "bufferpools",
+		Fam:      "bufferpools/instances",
 		Ctx:      "db2.bufferpool_instance_pages",
 		Type:     module.Stacked,
 		Priority: prioBufferpoolPagesInstance,
 		Dims: module.Dims{
 			{ID: "bufferpool_%s_used_pages", Name: "used"},
 			{ID: "bufferpool_%s_total_pages", Name: "total"},
+		},
+	}
+
+	bufferpoolWritesChartTmpl = module.Chart{
+		ID:       "bufferpool_%s_writes",
+		Title:    "Buffer Pool Writes",
+		Units:    "writes/s",
+		Fam:      "bufferpools/instances",
+		Ctx:      "db2.bufferpool_instance_writes",
+		Type:     module.Line,
+		Priority: prioBufferpoolWritesInstance,
+		Dims: module.Dims{
+			{ID: "bufferpool_%s_writes", Name: "writes", Algo: module.Incremental},
 		},
 	}
 
@@ -503,11 +520,24 @@ var (
 		},
 	}
 
+	tablespaceStateChartTmpl = module.Chart{
+		ID:       "tablespace_%s_state",
+		Title:    "Tablespace State",
+		Units:    "state",
+		Fam:      "tablespaces",
+		Ctx:      "db2.tablespace_state",
+		Type:     module.Line,
+		Priority: prioTablespaceState,
+		Dims: module.Dims{
+			{ID: "tablespace_%s_state", Name: "state"},
+		},
+	}
+
 	connectionStateChartTmpl = module.Chart{
 		ID:       "connection_%s_state",
 		Title:    "Connection State",
 		Units:    "state",
-		Fam:      "connections",
+		Fam:      "connections/instances",
 		Ctx:      "db2.connection_state",
 		Type:     module.Line,
 		Priority: prioConnectionState,
@@ -520,13 +550,51 @@ var (
 		ID:       "connection_%s_activity",
 		Title:    "Connection Row Activity",
 		Units:    "rows/s",
-		Fam:      "connections",
+		Fam:      "connections/instances",
 		Ctx:      "db2.connection_activity",
 		Type:     module.Area,
 		Priority: prioConnectionActivity,
 		Dims: module.Dims{
 			{ID: "connection_%s_rows_read", Name: "read", Algo: module.Incremental},
 			{ID: "connection_%s_rows_written", Name: "written", Algo: module.Incremental},
+		},
+	}
+
+	connectionWaitTimeChartTmpl = module.Chart{
+		ID:       "connection_%s_wait_time",
+		Title:    "Connection Wait Time",
+		Units:    "milliseconds",
+		Fam:      "connections/instances",
+		Ctx:      "db2.connection_wait_time",
+		Type:     module.Stacked,
+		Priority: prioConnectionWaitTime,
+		Dims: module.Dims{
+			{ID: "connection_%s_lock_wait_time", Name: "lock", Algo: module.Incremental},
+			{ID: "connection_%s_log_disk_wait_time", Name: "log_disk", Algo: module.Incremental},
+			{ID: "connection_%s_log_buffer_wait_time", Name: "log_buffer", Algo: module.Incremental},
+			{ID: "connection_%s_pool_read_time", Name: "pool_read", Algo: module.Incremental},
+			{ID: "connection_%s_pool_write_time", Name: "pool_write", Algo: module.Incremental},
+			{ID: "connection_%s_direct_read_time", Name: "direct_read", Algo: module.Incremental},
+			{ID: "connection_%s_direct_write_time", Name: "direct_write", Algo: module.Incremental},
+			{ID: "connection_%s_fcm_recv_wait_time", Name: "fcm_recv", Algo: module.Incremental},
+			{ID: "connection_%s_fcm_send_wait_time", Name: "fcm_send", Algo: module.Incremental},
+		},
+	}
+
+	connectionProcessingTimeChartTmpl = module.Chart{
+		ID:       "connection_%s_processing_time",
+		Title:    "Connection Processing Time",
+		Units:    "milliseconds",
+		Fam:      "connections/instances",
+		Ctx:      "db2.connection_processing_time",
+		Type:     module.Stacked,
+		Priority: prioConnectionProcessingTime,
+		Dims: module.Dims{
+			{ID: "connection_%s_total_routine_time", Name: "routine", Algo: module.Incremental},
+			{ID: "connection_%s_total_compile_time", Name: "compile", Algo: module.Incremental},
+			{ID: "connection_%s_total_section_time", Name: "section", Algo: module.Incremental},
+			{ID: "connection_%s_total_commit_time", Name: "commit", Algo: module.Incremental},
+			{ID: "connection_%s_total_rollback_time", Name: "rollback", Algo: module.Incremental},
 		},
 	}
 
@@ -637,6 +705,19 @@ var (
 			{ID: "table_io_%s_inserts", Name: "inserts", Algo: module.Incremental},
 			{ID: "table_io_%s_updates", Name: "updates", Algo: module.Incremental},
 			{ID: "table_io_%s_deletes", Name: "deletes", Algo: module.Incremental},
+		},
+	}
+
+	tableIOOverflowChartTmpl = module.Chart{
+		ID:       "table_io_%s_overflow",
+		Title:    "Table Overflow Accesses",
+		Units:    "accesses/s",
+		Fam:      "table_io",
+		Ctx:      "db2.table_io_overflow",
+		Type:     module.Line,
+		Priority: prioTableIOActivity + 1,
+		Dims: module.Dims{
+			{ID: "table_io_%s_overflow_accesses", Name: "overflow", Algo: module.Incremental},
 		},
 	}
 
@@ -818,6 +899,7 @@ func (d *DB2) newBufferpoolCharts(bp *bufferpoolMetrics) *module.Charts {
 		bufferpoolHitRatioChartTmpl.Copy(),
 		bufferpoolReadsChartTmpl.Copy(),
 		bufferpoolPagesChartTmpl.Copy(),
+		bufferpoolWritesChartTmpl.Copy(),
 	}
 
 	// Add detailed hit ratio charts if edition supports it
@@ -838,6 +920,10 @@ func (d *DB2) newBufferpoolCharts(bp *bufferpoolMetrics) *module.Charts {
 			{Key: "db2_edition", Value: d.edition},
 			{Key: "db2_version", Value: d.version},
 		}
+		
+		// Column dimension is now always included since we use MON_GET_BUFFERPOOL
+		// The values may be zero in Community Edition
+		
 		for _, dim := range chart.Dims {
 			dim.ID = fmt.Sprintf(dim.ID, cleanName)
 		}
@@ -851,6 +937,7 @@ func (d *DB2) newTablespaceCharts(ts *tablespaceMetrics) *module.Charts {
 		tablespaceUsageChartTmpl.Copy(),
 		tablespaceSizeChartTmpl.Copy(),
 		tablespaceUsableSizeChartTmpl.Copy(),
+		tablespaceStateChartTmpl.Copy(),
 	}
 
 	cleanName := cleanName(ts.name)
@@ -876,6 +963,8 @@ func (d *DB2) newConnectionCharts(conn *connectionMetrics) *module.Charts {
 	charts := module.Charts{
 		connectionStateChartTmpl.Copy(),
 		connectionActivityChartTmpl.Copy(),
+		connectionWaitTimeChartTmpl.Copy(),
+		connectionProcessingTimeChartTmpl.Copy(),
 	}
 
 	cleanID := cleanName(conn.applicationID)
@@ -1038,6 +1127,7 @@ func (d *DB2) newTableIOCharts(table *tableMetrics) *module.Charts {
 		tableIOScansChartTmpl.Copy(),
 		tableIORowsChartTmpl.Copy(),
 		tableIOActivityChartTmpl.Copy(),
+		tableIOOverflowChartTmpl.Copy(),
 	}
 
 	cleanName := cleanName(table.name)

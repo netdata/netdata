@@ -1122,3 +1122,135 @@ func (c *Collector) addChannelConfigMetricsWithCharts(channelName string, metric
 		}
 	}
 }
+
+// collectTopicMetricsWithDynamicCharts implements the dynamic pattern for topics
+func (c *Collector) collectTopicMetricsWithDynamicCharts(ctx context.Context, topicName, cleanName string, mx map[string]int64) {
+	// Temporary map to collect metrics before chart creation
+	tempMx := make(map[string]int64)
+	
+	// Labels for all topic charts
+	topicLabels := map[string]string{
+		"topic": topicName,
+	}
+
+	// Try to collect topic metrics
+	topicMetrics := c.collectTopicData(ctx, topicName)
+	if len(topicMetrics) > 0 {
+		// Collection succeeded - create relevant charts and add metrics
+		c.addTopicMetricsWithCharts(topicName, topicMetrics, topicLabels, tempMx)
+	}
+
+	// Copy all collected metrics to the main mx map
+	for key, value := range tempMx {
+		mx[key] = value
+	}
+
+	c.Debugf("Collected %d metrics for topic %s", len(tempMx), topicName)
+}
+
+// collectTopicData attempts to collect topic metrics and returns what was found
+func (c *Collector) collectTopicData(ctx context.Context, topicName string) map[string]int64 {
+	params := []pcfParameter{
+		newStringParameter(C.MQCA_TOPIC_NAME, topicName),
+	}
+
+	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_TOPIC_STATUS, params)
+	if err != nil {
+		c.Debugf("Failed to collect topic status for %s: %v", topicName, err)
+		return nil
+	}
+
+	attrs, err := c.parsePCFResponse(response, "INQUIRE_TOPIC_STATUS")
+	if err != nil {
+		c.Debugf("Failed to parse topic status response for %s: %v", topicName, err)
+		return nil
+	}
+
+	// Extract available metrics
+	metrics := make(map[string]int64)
+
+	// Publishers count
+	if val, ok := attrs[C.MQIA_PUB_COUNT]; ok {
+		if publishers, ok := val.(int32); ok {
+			metrics["publishers"] = int64(publishers)
+		}
+	}
+
+	// Subscribers count
+	if val, ok := attrs[C.MQIA_SUB_COUNT]; ok {
+		if subscribers, ok := val.(int32); ok {
+			metrics["subscribers"] = int64(subscribers)
+		}
+	}
+
+	// Messages published (if available)
+	if val, ok := attrs[C.MQIA_MSG_COUNT]; ok {
+		if messages, ok := val.(int32); ok {
+			metrics["messages"] = int64(messages)
+		}
+	}
+
+	return metrics
+}
+
+// addTopicMetricsWithCharts creates charts and adds metrics with properly synchronized dimension IDs
+func (c *Collector) addTopicMetricsWithCharts(topicName string, metrics map[string]int64, labels map[string]string, mx map[string]int64) {
+	cleanName := c.cleanName(topicName)
+	
+	// Topic publishers chart (if we have publishers metric)
+	if _, hasPublishers := metrics["publishers"]; hasPublishers {
+		chartID := fmt.Sprintf("topic_publishers_%s", cleanName)
+		c.ensureChartExists(
+			"mq_pcf.topic_publishers",
+			"Topic Publishers",
+			"publishers",
+			"line",
+			"topics",
+			prioTopicPublishers,
+			[]string{"publishers"},
+			topicName,
+			labels,
+		)
+		// Store metrics with dimension IDs that match chart expectations
+		dimID := fmt.Sprintf("%s_publishers", chartID)
+		mx[dimID] = metrics["publishers"]
+	}
+
+	// Topic subscribers chart (if we have subscribers metric)
+	if _, hasSubscribers := metrics["subscribers"]; hasSubscribers {
+		chartID := fmt.Sprintf("topic_subscribers_%s", cleanName)
+		c.ensureChartExists(
+			"mq_pcf.topic_subscribers",
+			"Topic Subscribers",
+			"subscribers",
+			"line",
+			"topics",
+			prioTopicSubscribers,
+			[]string{"subscribers"},
+			topicName,
+			labels,
+		)
+		// Store metrics with dimension IDs that match chart expectations
+		dimID := fmt.Sprintf("%s_subscribers", chartID)
+		mx[dimID] = metrics["subscribers"]
+	}
+
+	// Topic messages chart (if we have messages metric)
+	if _, hasMessages := metrics["messages"]; hasMessages {
+		chartID := fmt.Sprintf("topic_messages_%s", cleanName)
+		c.ensureChartExists(
+			"mq_pcf.topic_messages",
+			"Topic Message Rate",
+			"messages/s",
+			"line",
+			"topics",
+			prioTopicMessages,
+			[]string{"messages"},
+			topicName,
+			labels,
+		)
+		// Store metrics with dimension IDs that match chart expectations
+		dimID := fmt.Sprintf("%s_messages", chartID)
+		mx[dimID] = metrics["messages"]
+	}
+}
