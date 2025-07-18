@@ -1183,7 +1183,7 @@ func (c *Collector) collectTopicMetrics(ctx context.Context, topicName, cleanNam
 // collectTopicData attempts to collect topic metrics and returns what was found
 func (c *Collector) collectTopicData(ctx context.Context, topicName string) map[string]int64 {
 	params := []pcfParameter{
-		newStringParameter(C.MQCA_TOPIC_NAME, topicName),
+		newStringParameter(C.MQCA_TOPIC_STRING, topicName),
 	}
 
 	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_TOPIC_STATUS, params)
