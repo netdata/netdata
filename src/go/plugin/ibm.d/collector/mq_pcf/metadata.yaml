@@ -13,8 +13,12 @@ modules:
       data_collection:
         metrics_description: |
           Collects comprehensive metrics for IBM MQ queue managers, queues, channels, and topics using the Programmable Command Format (PCF) interface. Provides detailed monitoring of message flow, resource utilization, and system performance.
+          
+          Note: Queue Manager CPU, memory, and log usage metrics are not available through standard PCF commands. These metrics require IBM MQ resource monitoring to be enabled, which is outside the scope of PCF monitoring.
         method_description: |
           Uses IBM MQ PCF (Programmable Command Format) commands to query queue manager statistics, queue depths, channel status, and topic activity. Requires IBM MQ client libraries and appropriate authentication.
+          
+          The collector dynamically creates charts based on discovered queues, channels, and topics. Rate metrics (messages/s, bytes/s) are calculated using Netdata's incremental algorithm from counter values provided by MQ.
       supported_platforms:
         include:
           - Linux
@@ -88,6 +92,22 @@ modules:
               required: false
             - name: collect_topics
               description: Enable collection of topic statistics.
+              default_value: false
+              required: false
+            - name: collect_system_queues
+              description: Enable collection of system queue statistics (SYSTEM.* queues).
+              default_value: true
+              required: false
+            - name: collect_system_channels
+              description: Enable collection of system channel statistics (SYSTEM.* channels).
+              default_value: true
+              required: false
+            - name: collect_channel_config
+              description: Enable collection of static channel configuration values (timeouts, limits, etc).
+              default_value: false
+              required: false
+            - name: collect_reset_queue_stats
+              description: WARNING - DESTRUCTIVE - Enables collection using MQCMD_RESET_Q_STATS which RESETS counters to zero. Only enable if Netdata is the ONLY monitoring tool.
               default_value: false
               required: false
             - name: queue_selector
@@ -181,53 +201,309 @@ modules:
               chart_type: line
               dimensions:
                 - name: status
-            - name: mq_pcf.qmgr_cpu_usage
-              description: Queue Manager CPU Usage
-              unit: "percentage"
-              chart_type: line
+            - name: mq_pcf.queues_overview
+              description: Queues Monitoring Status
+              unit: "queues"
+              chart_type: stacked
               dimensions:
-                - name: cpu_usage
-            - name: mq_pcf.qmgr_memory_usage
-              description: Queue Manager Memory Usage
-              unit: "bytes"
-              chart_type: line
+                - name: monitored
+                - name: excluded
+                - name: model
+                - name: unauthorized
+                - name: unknown
+                - name: failed
+            - name: mq_pcf.channels_overview
+              description: Channels Monitoring Status
+              unit: "channels"
+              chart_type: stacked
               dimensions:
-                - name: memory_usage
-            - name: mq_pcf.qmgr_log_usage
-              description: Queue Manager Log Usage
-              unit: "percentage"
-              chart_type: line
+                - name: monitored
+                - name: excluded
+                - name: unauthorized
+                - name: failed
+            - name: mq_pcf.topics_overview
+              description: Topics Monitoring Status
+              unit: "topics"
+              chart_type: stacked
               dimensions:
-                - name: log_usage
+                - name: monitored
+                - name: excluded
+                - name: unauthorized
+                - name: failed
         - name: queue
-          description: "Metrics for individual MQ queues."
+          description: "Metrics for individual MQ queues (local, alias, remote, model, cluster types)."
           labels:
             - name: queue
               description: "Queue name"
+            - name: queue_type
+              description: "Queue type (local, alias, remote, model, cluster)"
             - name: mq_version
               description: "IBM MQ version"
             - name: mq_edition
               description: "IBM MQ edition (Advanced, Standard, Express)"
           metrics:
-            - name: mq_pcf.queue_depth
+            - name: mq_pcf.queue_local_depth
               description: Queue Current Depth
               unit: "messages"
               chart_type: line
               dimensions:
                 - name: depth
-            - name: mq_pcf.queue_messages
-              description: Queue Message Rate
+            - name: mq_pcf.queue_local_config
+              description: Queue Configuration Limits
+              unit: "messages"
+              chart_type: line
+              dimensions:
+                - name: max_depth
+                - name: backout_threshold
+                - name: trigger_depth
+            - name: mq_pcf.queue_local_inhibit
+              description: Queue Inhibit Status
+              unit: "status"
+              chart_type: line
+              dimensions:
+                - name: inhibit_get
+                - name: inhibit_put
+            - name: mq_pcf.queue_local_priority
+              description: Queue Default Priority
+              unit: "priority"
+              chart_type: line
+              dimensions:
+                - name: def_priority
+            - name: mq_pcf.queue_local_persistence
+              description: Queue Default Persistence Mode
+              unit: "mode"
+              chart_type: line
+              dimensions:
+                - name: def_persistence
+            - name: mq_pcf.queue_local_messages
+              description: Queue Message Counters
               unit: "messages/s"
               chart_type: line
               dimensions:
                 - name: enqueued
                 - name: dequeued
-            - name: mq_pcf.queue_oldest_message_age
-              description: Queue Oldest Message Age
-              unit: "seconds"
+            - name: mq_pcf.queue_local_depth_events
+              description: Queue Depth Event Thresholds
+              unit: "messages"
               chart_type: line
               dimensions:
-                - name: age
+                - name: depth_high_limit
+                - name: depth_low_limit
+            - name: mq_pcf.queue_local_activity
+              description: Queue Activity Metrics
+              unit: "connections"
+              chart_type: line
+              dimensions:
+                - name: open_input_count
+                - name: open_output_count
+            - name: mq_pcf.queue_local_reset_stats
+              description: Queue Reset Statistics
+              unit: "value"
+              chart_type: line
+              dimensions:
+                - name: high_q_depth
+            # Configuration metrics for non-local queue types
+            - name: mq_pcf.queue_alias_depth
+              description: Alias Queue Current Depth
+              unit: "messages"
+              chart_type: line
+              dimensions:
+                - name: depth
+            - name: mq_pcf.queue_alias_config
+              description: Alias Queue Configuration Limits
+              unit: "messages"
+              chart_type: line
+              dimensions:
+                - name: max_depth
+                - name: backout_threshold
+                - name: trigger_depth
+            - name: mq_pcf.queue_alias_inhibit
+              description: Alias Queue Inhibit Status
+              unit: "status"
+              chart_type: line
+              dimensions:
+                - name: inhibit_get
+                - name: inhibit_put
+            - name: mq_pcf.queue_alias_priority
+              description: Alias Queue Default Priority
+              unit: "priority"
+              chart_type: line
+              dimensions:
+                - name: def_priority
+            - name: mq_pcf.queue_alias_persistence
+              description: Alias Queue Default Persistence Mode
+              unit: "mode"
+              chart_type: line
+              dimensions:
+                - name: def_persistence
+            - name: mq_pcf.queue_alias_messages
+              description: Alias Queue Message Counters
+              unit: "messages/s"
+              chart_type: line
+              dimensions:
+                - name: enqueued
+                - name: dequeued
+            - name: mq_pcf.queue_alias_depth_events
+              description: Alias Queue Depth Event Thresholds
+              unit: "messages"
+              chart_type: line
+              dimensions:
+                - name: depth_high_limit
+                - name: depth_low_limit
+            - name: mq_pcf.queue_alias_activity
+              description: Alias Queue Activity Metrics
+              unit: "connections"
+              chart_type: line
+              dimensions:
+                - name: open_input_count
+                - name: open_output_count
+            - name: mq_pcf.queue_alias_reset_stats
+              description: Alias Queue Reset Statistics
+              unit: "value"
+              chart_type: line
+              dimensions:
+                - name: high_q_depth
+            - name: mq_pcf.queue_remote_depth
+              description: Remote Queue Current Depth
+              unit: "messages"
+              chart_type: line
+              dimensions:
+                - name: depth
+            - name: mq_pcf.queue_remote_config
+              description: Remote Queue Configuration Limits
+              unit: "messages"
+              chart_type: line
+              dimensions:
+                - name: max_depth
+                - name: backout_threshold
+                - name: trigger_depth
+            - name: mq_pcf.queue_remote_inhibit
+              description: Remote Queue Inhibit Status
+              unit: "status"
+              chart_type: line
+              dimensions:
+                - name: inhibit_get
+                - name: inhibit_put
+            - name: mq_pcf.queue_remote_priority
+              description: Remote Queue Default Priority
+              unit: "priority"
+              chart_type: line
+              dimensions:
+                - name: def_priority
+            - name: mq_pcf.queue_remote_persistence
+              description: Remote Queue Default Persistence Mode
+              unit: "mode"
+              chart_type: line
+              dimensions:
+                - name: def_persistence
+            - name: mq_pcf.queue_remote_messages
+              description: Remote Queue Message Counters
+              unit: "messages/s"
+              chart_type: line
+              dimensions:
+                - name: enqueued
+                - name: dequeued
+            - name: mq_pcf.queue_remote_depth_events
+              description: Remote Queue Depth Event Thresholds
+              unit: "messages"
+              chart_type: line
+              dimensions:
+                - name: depth_high_limit
+                - name: depth_low_limit
+            - name: mq_pcf.queue_model_depth
+              description: Model Queue Current Depth
+              unit: "messages"
+              chart_type: line
+              dimensions:
+                - name: depth
+            - name: mq_pcf.queue_model_config
+              description: Model Queue Configuration Limits
+              unit: "messages"
+              chart_type: line
+              dimensions:
+                - name: max_depth
+                - name: backout_threshold
+                - name: trigger_depth
+            - name: mq_pcf.queue_model_inhibit
+              description: Model Queue Inhibit Status
+              unit: "status"
+              chart_type: line
+              dimensions:
+                - name: inhibit_get
+                - name: inhibit_put
+            - name: mq_pcf.queue_model_priority
+              description: Model Queue Default Priority
+              unit: "priority"
+              chart_type: line
+              dimensions:
+                - name: def_priority
+            - name: mq_pcf.queue_model_persistence
+              description: Model Queue Default Persistence Mode
+              unit: "mode"
+              chart_type: line
+              dimensions:
+                - name: def_persistence
+            - name: mq_pcf.queue_model_messages
+              description: Model Queue Message Counters
+              unit: "messages/s"
+              chart_type: line
+              dimensions:
+                - name: enqueued
+                - name: dequeued
+            - name: mq_pcf.queue_model_depth_events
+              description: Model Queue Depth Event Thresholds
+              unit: "messages"
+              chart_type: line
+              dimensions:
+                - name: depth_high_limit
+                - name: depth_low_limit
+            - name: mq_pcf.queue_cluster_depth
+              description: Cluster Queue Current Depth
+              unit: "messages"
+              chart_type: line
+              dimensions:
+                - name: depth
+            - name: mq_pcf.queue_cluster_config
+              description: Cluster Queue Configuration Limits
+              unit: "messages"
+              chart_type: line
+              dimensions:
+                - name: max_depth
+                - name: backout_threshold
+                - name: trigger_depth
+            - name: mq_pcf.queue_cluster_inhibit
+              description: Cluster Queue Inhibit Status
+              unit: "status"
+              chart_type: line
+              dimensions:
+                - name: inhibit_get
+                - name: inhibit_put
+            - name: mq_pcf.queue_cluster_priority
+              description: Cluster Queue Default Priority
+              unit: "priority"
+              chart_type: line
+              dimensions:
+                - name: def_priority
+            - name: mq_pcf.queue_cluster_persistence
+              description: Cluster Queue Default Persistence Mode
+              unit: "mode"
+              chart_type: line
+              dimensions:
+                - name: def_persistence
+            - name: mq_pcf.queue_cluster_messages
+              description: Cluster Queue Message Counters
+              unit: "messages/s"
+              chart_type: line
+              dimensions:
+                - name: enqueued
+                - name: dequeued
+            - name: mq_pcf.queue_cluster_depth_events
+              description: Cluster Queue Depth Event Thresholds
+              unit: "messages"
+              chart_type: line
+              dimensions:
+                - name: depth_high_limit
+                - name: depth_low_limit
         - name: channel
           description: "Metrics for individual MQ channels."
           labels:
@@ -240,10 +516,22 @@ modules:
           metrics:
             - name: mq_pcf.channel_status
               description: Channel Status
-              unit: "status"
+              unit: "boolean"
               chart_type: line
               dimensions:
-                - name: status
+                - name: inactive
+                - name: binding
+                - name: starting
+                - name: running
+                - name: stopping
+                - name: retrying
+                - name: stopped
+                - name: requesting
+                - name: paused
+                - name: disconnected
+                - name: initializing
+                - name: switching
+                - name: unknown
             - name: mq_pcf.channel_messages
               description: Channel Message Rate
               unit: "messages/s"
@@ -262,6 +550,58 @@ modules:
               chart_type: line
               dimensions:
                 - name: batches
+            - name: mq_pcf.channel_batch_size
+              description: Channel Batch Size
+              unit: "messages"
+              chart_type: line
+              dimensions:
+                - name: batch_size
+            - name: mq_pcf.channel_batch_interval
+              description: Channel Batch Interval
+              unit: "seconds"
+              chart_type: line
+              dimensions:
+                - name: batch_interval
+            - name: mq_pcf.channel_timeouts_config
+              description: Channel Timeout Settings
+              unit: "seconds"
+              chart_type: line
+              dimensions:
+                - name: disc_interval
+                - name: hb_interval
+                - name: keep_alive_interval
+            - name: mq_pcf.channel_retry_counts
+              description: Channel Retry Counts
+              unit: "retries"
+              chart_type: line
+              dimensions:
+                - name: short_retry
+                - name: long_retry
+            - name: mq_pcf.channel_retry_timers
+              description: Channel Retry Timers
+              unit: "seconds"
+              chart_type: line
+              dimensions:
+                - name: short_timer
+                - name: long_timer
+            - name: mq_pcf.channel_max_msg_length
+              description: Channel Maximum Message Length
+              unit: "bytes"
+              chart_type: line
+              dimensions:
+                - name: max_msg_length
+            - name: mq_pcf.channel_sharing_conversations
+              description: Channel Sharing Conversations
+              unit: "conversations"
+              chart_type: line
+              dimensions:
+                - name: sharing_conversations
+            - name: mq_pcf.channel_network_priority
+              description: Channel Network Priority
+              unit: "priority"
+              chart_type: line
+              dimensions:
+                - name: network_priority
         - name: topic
           description: "Metrics for individual MQ topics (when enabled)."
           labels:
