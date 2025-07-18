@@ -47,9 +47,11 @@ func (p *stringParameter) size() C.size_t {
 	// The MQCFST struct already includes space for one MQCHAR, so we subtract it
 	strLen := len(p.value)
 
-	// Check if this is an MQ object name parameter
-	if p.parameter == C.MQCA_Q_NAME || p.parameter == C.MQCACH_CHANNEL_NAME {
-		strLen = 48
+	// Check if this is an MQ object name parameter - use correct sizes
+	if p.parameter == C.MQCA_Q_NAME || p.parameter == C.MQCA_TOPIC_NAME {
+		strLen = 48  // Queue names and topic names use 48 characters
+	} else if p.parameter == C.MQCACH_CHANNEL_NAME {
+		strLen = 20  // Channel names use 20 characters
 	}
 
 	paddedLen := (strLen + 3) & ^3 // Round up to multiple of 4
@@ -63,16 +65,20 @@ func (p *stringParameter) marshal(buffer unsafe.Pointer) {
 	cfst.Parameter = p.parameter
 	cfst.CodedCharSetId = C.MQCCSI_DEFAULT
 
-	// For MQ object names, we need special handling
+	// For MQ object names, we need special handling - use correct sizes
 	strLen := len(p.value)
-	isObjectName := p.parameter == C.MQCA_Q_NAME || p.parameter == C.MQCACH_CHANNEL_NAME
+	isObjectName := p.parameter == C.MQCA_Q_NAME || p.parameter == C.MQCACH_CHANNEL_NAME || p.parameter == C.MQCA_TOPIC_NAME
 
 	// StringLength is always the actual string length, not the padded length
 	cfst.StringLength = C.MQLONG(len(p.value))
 
 	if isObjectName {
-		// MQ object names are padded to 48 characters
-		strLen = 48
+		// Use correct padding lengths for different object types
+		if p.parameter == C.MQCA_Q_NAME || p.parameter == C.MQCA_TOPIC_NAME {
+			strLen = 48  // Queue names and topic names use 48 characters
+		} else if p.parameter == C.MQCACH_CHANNEL_NAME {
+			strLen = 20  // Channel names use 20 characters
+		}
 	}
 
 	// Calculate the actual buffer size for the string data (must match size())
@@ -123,9 +129,11 @@ func (p *stringFilterParameter) size() C.size_t {
 	// The MQCFSF struct already includes space for one MQCHAR, so we subtract it
 	strLen := len(p.value)
 
-	// Check if this is an MQ object name parameter
-	if p.parameter == C.MQCA_Q_NAME || p.parameter == C.MQCACH_CHANNEL_NAME {
-		strLen = 48
+	// Check if this is an MQ object name parameter - use correct sizes
+	if p.parameter == C.MQCA_Q_NAME || p.parameter == C.MQCA_TOPIC_NAME {
+		strLen = 48  // Queue names and topic names use 48 characters
+	} else if p.parameter == C.MQCACH_CHANNEL_NAME {
+		strLen = 20  // Channel names use 20 characters
 	}
 
 	paddedLen := (strLen + 3) & ^3 // Round up to multiple of 4
@@ -140,9 +148,18 @@ func (p *stringFilterParameter) marshal(buffer unsafe.Pointer) {
 	cfsf.CodedCharSetId = C.MQCCSI_DEFAULT
 	cfsf.Operator = p.operator
 
-	// For MQ object names, we need special handling
+	// For MQ object names, we need special handling - use correct sizes
 	strLen := len(p.value)
-	isObjectName := p.parameter == C.MQCA_Q_NAME || p.parameter == C.MQCACH_CHANNEL_NAME
+	isObjectName := p.parameter == C.MQCA_Q_NAME || p.parameter == C.MQCACH_CHANNEL_NAME || p.parameter == C.MQCA_TOPIC_NAME
+
+	if isObjectName {
+		// Use correct padding lengths for different object types
+		if p.parameter == C.MQCA_Q_NAME || p.parameter == C.MQCA_TOPIC_NAME {
+			strLen = 48  // Queue names and topic names use 48 characters
+		} else if p.parameter == C.MQCACH_CHANNEL_NAME {
+			strLen = 20  // Channel names use 20 characters
+		}
+	}
 
 	// Calculate the actual buffer size for the string data (must match size())
 	paddedLen := (strLen + 3) & ^3
