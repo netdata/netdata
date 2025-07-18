@@ -18,6 +18,7 @@ const (
 	// Overview charts priority (higher priority = shown first)
 	prioQueuesOverview
 	prioChannelsOverview
+	prioTopicsOverview
 
 	prioQueueDepth
 	prioQueueMessages
@@ -78,6 +79,21 @@ var baseCharts = module.Charts{
 			{ID: "channels_excluded", Name: "excluded"},
 			{ID: "channels_unauthorized", Name: "unauthorized"},
 			{ID: "channels_failed", Name: "failed"},
+		},
+	},
+	{
+		ID:       "topics_overview",
+		Title:    "Topics Monitoring Status",
+		Units:    "topics",
+		Fam:      "overview",
+		Ctx:      "mq_pcf.topics_overview",
+		Priority: prioTopicsOverview,
+		Type:     module.Stacked,
+		Dims: module.Dims{
+			{ID: "topics_monitored", Name: "monitored"},
+			{ID: "topics_excluded", Name: "excluded"},
+			{ID: "topics_unauthorized", Name: "unauthorized"},
+			{ID: "topics_failed", Name: "failed"},
 		},
 	},
 	// Note: Queue Manager CPU usage is not available through standard PCF commands
