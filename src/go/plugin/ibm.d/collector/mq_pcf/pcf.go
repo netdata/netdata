@@ -23,6 +23,42 @@ import (
 // If a constant is not available in the headers, we can define it, but we should
 // prefer using the actual IBM constants to ensure compilation fails if we're wrong.
 
+// Object name parameter information
+type objectNameInfo struct {
+	padLength int    // Padding length in bytes
+	fillChar  byte   // Fill character for padding
+}
+
+// MQ object name parameter definitions
+// These define the correct padding lengths and fill characters for different MQ object types
+var mqObjectNameParams = map[C.MQLONG]objectNameInfo{
+	// Queue names - 48 characters, space-padded
+	C.MQCA_Q_NAME: {padLength: 48, fillChar: ' '},
+	// Channel names - 20 characters, space-padded
+	C.MQCACH_CHANNEL_NAME: {padLength: 20, fillChar: ' '},
+	// Topic names - 256 characters, space-padded
+	C.MQCA_TOPIC_NAME: {padLength: 256, fillChar: ' '},
+	// Process names - 48 characters, space-padded
+	C.MQCA_PROCESS_NAME: {padLength: 48, fillChar: ' '},
+	// Namelist names - 48 characters, space-padded
+	C.MQCA_NAMELIST_NAME: {padLength: 48, fillChar: ' '},
+	// CF Structure names - 12 characters, space-padded
+	C.MQCA_CF_STRUC_NAME: {padLength: 12, fillChar: ' '},
+	// Authentication Info names - 48 characters, space-padded
+	C.MQCA_AUTH_INFO_NAME: {padLength: 48, fillChar: ' '},
+	// Storage Class names - 8 characters, space-padded
+	C.MQCA_STORAGE_CLASS: {padLength: 8, fillChar: ' '},
+}
+
+// getObjectNameInfo returns the object name information for a given parameter
+// Returns nil if the parameter is not an MQ object name parameter
+func getObjectNameInfo(param C.MQLONG) *objectNameInfo {
+	if info, exists := mqObjectNameParams[param]; exists {
+		return &info
+	}
+	return nil
+}
+
 // PCF parameter interface
 type pcfParameter interface {
 	size() C.size_t
@@ -48,10 +84,8 @@ func (p *stringParameter) size() C.size_t {
 	strLen := len(p.value)
 
 	// Check if this is an MQ object name parameter - use correct sizes
-	if p.parameter == C.MQCA_Q_NAME || p.parameter == C.MQCA_TOPIC_NAME {
-		strLen = 48  // Queue names and topic names use 48 characters
-	} else if p.parameter == C.MQCACH_CHANNEL_NAME {
-		strLen = 20  // Channel names use 20 characters
+	if objInfo := getObjectNameInfo(p.parameter); objInfo != nil {
+		strLen = objInfo.padLength
 	}
 
 	paddedLen := (strLen + 3) & ^3 // Round up to multiple of 4
@@ -65,20 +99,17 @@ func (p *stringParameter) marshal(buffer unsafe.Pointer) {
 	cfst.Parameter = p.parameter
 	cfst.CodedCharSetId = C.MQCCSI_DEFAULT
 
-	// For MQ object names, we need special handling - use correct sizes
-	strLen := len(p.value)
-	isObjectName := p.parameter == C.MQCA_Q_NAME || p.parameter == C.MQCACH_CHANNEL_NAME || p.parameter == C.MQCA_TOPIC_NAME
-
 	// StringLength is always the actual string length, not the padded length
 	cfst.StringLength = C.MQLONG(len(p.value))
 
-	if isObjectName {
-		// Use correct padding lengths for different object types
-		if p.parameter == C.MQCA_Q_NAME || p.parameter == C.MQCA_TOPIC_NAME {
-			strLen = 48  // Queue names and topic names use 48 characters
-		} else if p.parameter == C.MQCACH_CHANNEL_NAME {
-			strLen = 20  // Channel names use 20 characters
-		}
+	// Determine string length and fill character
+	strLen := len(p.value)
+	fillChar := byte(0) // Default: zero-fill
+	
+	if objInfo := getObjectNameInfo(p.parameter); objInfo != nil {
+		// This is an MQ object name parameter - use correct padding
+		strLen = objInfo.padLength
+		fillChar = objInfo.fillChar
 	}
 
 	// Calculate the actual buffer size for the string data (must match size())
@@ -88,18 +119,13 @@ func (p *stringParameter) marshal(buffer unsafe.Pointer) {
 	// Calculate offset: Type(4) + StrucLength(4) + Parameter(4) + CodedCharSetId(4) + StringLength(4) = 20 bytes
 	stringDataPtr := unsafe.Pointer(uintptr(buffer) + 20)
 
-	// For MQ object names, fill with spaces first
-	if isObjectName {
-		C.memset(stringDataPtr, ' ', C.size_t(paddedLen))
-	} else {
-		// Zero out the entire padded area to ensure proper termination and padding
-		C.memset(stringDataPtr, 0, C.size_t(paddedLen))
-	}
+	// Fill the entire padded area with the appropriate character
+	C.memset(stringDataPtr, C.int(fillChar), C.size_t(paddedLen))
 
 	// Convert Go string to byte slice
 	goBytes := []byte(p.value)
 
-	// Copy the actual string value bytes
+	// Copy the actual string value bytes (up to the maximum length)
 	if len(goBytes) > 0 {
 		bytesToCopy := len(goBytes)
 		if bytesToCopy > strLen {
@@ -130,10 +156,8 @@ func (p *stringFilterParameter) size() C.size_t {
 	strLen := len(p.value)
 
 	// Check if this is an MQ object name parameter - use correct sizes
-	if p.parameter == C.MQCA_Q_NAME || p.parameter == C.MQCA_TOPIC_NAME {
-		strLen = 48  // Queue names and topic names use 48 characters
-	} else if p.parameter == C.MQCACH_CHANNEL_NAME {
-		strLen = 20  // Channel names use 20 characters
+	if objInfo := getObjectNameInfo(p.parameter); objInfo != nil {
+		strLen = objInfo.padLength
 	}
 
 	paddedLen := (strLen + 3) & ^3 // Round up to multiple of 4
@@ -148,38 +172,30 @@ func (p *stringFilterParameter) marshal(buffer unsafe.Pointer) {
 	cfsf.CodedCharSetId = C.MQCCSI_DEFAULT
 	cfsf.Operator = p.operator
 
-	// For MQ object names, we need special handling - use correct sizes
+	// Determine string length and fill character
 	strLen := len(p.value)
-	isObjectName := p.parameter == C.MQCA_Q_NAME || p.parameter == C.MQCACH_CHANNEL_NAME || p.parameter == C.MQCA_TOPIC_NAME
-
-	if isObjectName {
-		// Use correct padding lengths for different object types
-		if p.parameter == C.MQCA_Q_NAME || p.parameter == C.MQCA_TOPIC_NAME {
-			strLen = 48  // Queue names and topic names use 48 characters
-		} else if p.parameter == C.MQCACH_CHANNEL_NAME {
-			strLen = 20  // Channel names use 20 characters
-		}
+	fillChar := byte(0) // Default: zero-fill
+	
+	if objInfo := getObjectNameInfo(p.parameter); objInfo != nil {
+		// This is an MQ object name parameter - use correct padding
+		strLen = objInfo.padLength
+		fillChar = objInfo.fillChar
 	}
 
 	// Calculate the actual buffer size for the string data (must match size())
 	paddedLen := (strLen + 3) & ^3
 
 	// The String field is part of MQCFSF structure, positioned after the fixed fields
-	// MQCFSF has one extra field (Operator) compared to MQCFST, so offset is 24 bytes
-	stringDataPtr := unsafe.Pointer(uintptr(buffer) + 24)
+	// MQCFSF: Type(4) + StrucLength(4) + Parameter(4) + CodedCharSetId(4) + Operator(4) = 20 bytes
+	stringDataPtr := unsafe.Pointer(uintptr(buffer) + 20)
 
-	// For MQ object names, fill with spaces first
-	if isObjectName {
-		C.memset(stringDataPtr, ' ', C.size_t(paddedLen))
-	} else {
-		// Zero out the entire padded area to ensure proper termination and padding
-		C.memset(stringDataPtr, 0, C.size_t(paddedLen))
-	}
+	// Fill the entire padded area with the appropriate character
+	C.memset(stringDataPtr, C.int(fillChar), C.size_t(paddedLen))
 
 	// Convert Go string to byte slice
 	goBytes := []byte(p.value)
 
-	// Copy the actual string value bytes
+	// Copy the actual string value bytes (up to the maximum length)
 	if len(goBytes) > 0 {
 		bytesToCopy := len(goBytes)
 		if bytesToCopy > strLen {
