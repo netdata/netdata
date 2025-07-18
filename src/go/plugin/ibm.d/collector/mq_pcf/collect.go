@@ -673,7 +673,7 @@ func (c *Collector) sendPCFCommand(command C.MQLONG, parameters []pcfParameter) 
 	md.MsgType = C.MQMT_REQUEST
 	md.Expiry = C.MQEI_UNLIMITED // No expiry
 	md.Encoding = C.MQENC_NATIVE
-	md.CodedCharSetId = C.MQCCSI_Q_MGR
+	md.CodedCharSetId = 1208 // UTF-8 - Netdata is UTF-8 everywhere
 	md.Priority = C.MQPRI_PRIORITY_AS_Q_DEF
 	md.Persistence = C.MQPER_NOT_PERSISTENT
 

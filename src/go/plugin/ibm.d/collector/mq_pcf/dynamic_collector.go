@@ -132,10 +132,17 @@ func (c *Collector) ensureChartExists(context, title, units, chartType, family s
 	// For NIDL compliance, dimension names are shared, but IDs include the chart ID
 	for _, dim := range dimensions {
 		dimID := fmt.Sprintf("%s_%s", chartID, dim)
-		chart.Dims = append(chart.Dims, &module.Dim{
+		dimension := &module.Dim{
 			ID:   dimID, // Unique dimension ID that matches mx map key
 			Name: dim,   // Shared dimension name for NIDL compliance
-		})
+		}
+		
+		// Set algorithm for rate units (charts with "/s", "/min", "/hour")
+		if strings.Contains(units, "/s") || strings.Contains(units, "/min") || strings.Contains(units, "/hour") {
+			dimension.Algo = module.Incremental
+		}
+		
+		chart.Dims = append(chart.Dims, dimension)
 	}
 
 	// Add labels
