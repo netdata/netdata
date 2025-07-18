@@ -128,6 +128,18 @@ func (d *DB2) doCollectDatabaseInstances(ctx context.Context, applySelector bool
 		d.mx.databases[currentDB] = currentMetrics
 	}
 
+	// Count active and inactive databases
+	for dbName, db := range d.databases {
+		if _, exists := d.mx.databases[dbName]; exists {
+			// Database was collected this cycle
+			if strings.ToUpper(db.status) == "ACTIVE" {
+				d.mx.DatabaseCountActive++
+			} else {
+				d.mx.DatabaseCountInactive++
+			}
+		}
+	}
+
 	return err
 }
 

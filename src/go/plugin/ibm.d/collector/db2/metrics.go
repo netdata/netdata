@@ -4,8 +4,10 @@ package db2
 
 type metricsData struct {
 	// Database Overview metrics (Screen 01)
-	DatabaseActive          int64 `stm:"database_active"`
-	DatabaseInactive        int64 `stm:"database_inactive"`
+	DatabaseStatusActive    int64 `stm:"database_status_active"`
+	DatabaseStatusInactive  int64 `stm:"database_status_inactive"`
+	DatabaseCountActive     int64 `stm:"database_count_active"`
+	DatabaseCountInactive   int64 `stm:"database_count_inactive"`
 	CPUUser                 int64 `stm:"cpu_user"`
 	CPUSystem               int64 `stm:"cpu_system"`
 	CPUIdle                 int64 `stm:"cpu_idle"`
