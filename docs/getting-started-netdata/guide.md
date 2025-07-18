@@ -21,6 +21,8 @@ This guide will show you how simple it is to get started with Netdata and experi
   title="Demo Video"
 />
 
+unhideme-->
+
 ## [1. Sign in & Access Your Space](/src/claim/README.md)
 
 Getting started is as simple as visiting [app.netdata.cloud](https://app.netdata.cloud/) and creating your account.
