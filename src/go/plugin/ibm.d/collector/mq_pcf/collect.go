@@ -1264,17 +1264,17 @@ func (c *Collector) collectAllTopics(ctx context.Context, mx map[string]int64) e
 
 	collected := 0
 	excluded := 0
-	for _, topicName := range topics {
-		if !c.shouldCollectTopic(topicName) {
+	for _, topic := range topics {
+		if !c.shouldCollectTopic(topic.Name) {
 			excluded++
 			continue
 		}
 		collected++
 
-		cleanName := c.cleanName(topicName)
+		cleanName := c.cleanName(topic.Name)
 
 		// Collect data first, then create charts based on what we successfully collected
-		c.collectTopicMetrics(ctx, topicName, cleanName, mx)
+		c.collectTopicMetrics(ctx, topic.Name, topic.TopicString, cleanName, mx)
 	}
 
 	// Update overview metrics
@@ -1442,7 +1442,7 @@ func (c *Collector) collectChannelConfigMetrics(ctx context.Context, channelName
 	return nil
 }
 
-func (c *Collector) getTopicList(ctx context.Context) ([]string, error) {
+func (c *Collector) getTopicList(ctx context.Context) ([]TopicInfo, error) {
 	// Send INQUIRE_TOPIC command with generic topic name
 	params := []pcfParameter{
 		newStringParameter(C.MQCA_TOPIC_NAME, "*"),

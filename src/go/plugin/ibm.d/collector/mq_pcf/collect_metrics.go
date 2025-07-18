@@ -1156,7 +1156,7 @@ func (c *Collector) addChannelConfigMetricsWithCharts(channelName string, metric
 }
 
 // collectTopicMetrics collects topic metrics and creates charts
-func (c *Collector) collectTopicMetrics(ctx context.Context, topicName, cleanName string, mx map[string]int64) {
+func (c *Collector) collectTopicMetrics(ctx context.Context, topicName, topicString, cleanName string, mx map[string]int64) {
 	// Temporary map to collect metrics before chart creation
 	tempMx := make(map[string]int64)
 	
@@ -1166,7 +1166,7 @@ func (c *Collector) collectTopicMetrics(ctx context.Context, topicName, cleanNam
 	}
 
 	// Try to collect topic metrics
-	topicMetrics := c.collectTopicData(ctx, topicName)
+	topicMetrics := c.collectTopicData(ctx, topicString)
 	if len(topicMetrics) > 0 {
 		// Collection succeeded - create relevant charts and add metrics
 		c.addTopicMetricsWithCharts(topicName, topicMetrics, topicLabels, tempMx)
@@ -1181,20 +1181,20 @@ func (c *Collector) collectTopicMetrics(ctx context.Context, topicName, cleanNam
 }
 
 // collectTopicData attempts to collect topic metrics and returns what was found
-func (c *Collector) collectTopicData(ctx context.Context, topicName string) map[string]int64 {
+func (c *Collector) collectTopicData(ctx context.Context, topicString string) map[string]int64 {
 	params := []pcfParameter{
-		newStringParameter(C.MQCA_TOPIC_STRING, topicName),
+		newStringParameter(C.MQCA_TOPIC_STRING, topicString),
 	}
 
 	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_TOPIC_STATUS, params)
 	if err != nil {
-		c.Debugf("Failed to collect topic status for %s: %v", topicName, err)
+		c.Debugf("Failed to collect topic status for %s: %v", topicString, err)
 		return nil
 	}
 
 	attrs, err := c.parsePCFResponse(response, "INQUIRE_TOPIC_STATUS")
 	if err != nil {
-		c.Debugf("Failed to parse topic status response for %s: %v", topicName, err)
+		c.Debugf("Failed to parse topic status response for %s: %v", topicString, err)
 		return nil
 	}
 
