@@ -27,7 +27,7 @@ Simple table functions display current system state - processes, connections, se
 **Implementation Architecture:**
 - **Frontend handles**: Filtering, search, facet counting, sorting
 - **Backend provides**: Raw data, column definitions, optional charts
-- **Performance**: Limited by browser processing (good for <10k rows)
+- **Performance**: Limited by browser processing (good for \<10k rows)
 - **Query parameter**: Processed in frontend only (substring search)
 - **Histograms**: Not supported
 
@@ -170,7 +170,7 @@ Make your table more useful with these enhancements:
 Simple tables have certain limitations due to their frontend-only processing architecture:
 
 - **No histograms**: Time-based visualization is not supported
-- **Performance limits**: Frontend processing is limited by browser memory (recommend <10k rows)  
+- **Performance limits**: Frontend processing is limited by browser memory (recommend \<10k rows)  
 - **No backend search**: Query parameter is not sent to backend - search happens client-side only
 - **Static facet counts**: Counts are computed by frontend from all received data
 
