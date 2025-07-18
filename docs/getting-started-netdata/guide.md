@@ -10,7 +10,7 @@ This guide will show you how simple it is to get started with Netdata and experi
 
 :::
 
-### Getting Started
+<!--unhideme
 
 <iframe
   src="https://www.youtube.com/embed/he-ysUlrZIw?si=e2SjkaRUGXyWcZwN"
@@ -25,6 +25,7 @@ This guide will show you how simple it is to get started with Netdata and experi
   loading="lazy"
   title="Demo Video"
 />
+unhideme-->
 
 ## [1. Sign in & Access Your Space](/src/claim/README.md)
 
