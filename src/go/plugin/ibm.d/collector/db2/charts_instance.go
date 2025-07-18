@@ -356,7 +356,7 @@ var (
 		Title:    "Database Status",
 		Units:    "status",
 		Fam:      "databases",
-		Ctx:      "db2.database_status",
+		Ctx:      "db2.database_instance_status",
 		Type:     module.Line,
 		Priority: prioDatabaseStatus,
 		Dims: module.Dims{
