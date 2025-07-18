@@ -47,6 +47,9 @@ type Config struct {
 	CollectSystemQueues   *bool `yaml:"collect_system_queues"`
 	CollectSystemChannels *bool `yaml:"collect_system_channels"`
 
+	// Static configuration collection
+	CollectChannelConfig *bool `yaml:"collect_channel_config"`
+
 	// Filtering
 	QueueSelector   string `yaml:"queue_selector"`
 	ChannelSelector string `yaml:"channel_selector"`
@@ -153,6 +156,12 @@ func (c *Collector) Init(ctx context.Context) error {
 		c.CollectSystemChannels = &defaultValue
 	}
 
+	if c.CollectChannelConfig == nil {
+		// Auto-detection: Default to false for static channel config (rarely changes, saves storage)
+		defaultValue := false
+		c.CollectChannelConfig = &defaultValue
+	}
+
 	// Compile selector regular expressions if provided
 	if c.QueueSelector != "" {
 		var err error
@@ -170,8 +179,8 @@ func (c *Collector) Init(ctx context.Context) error {
 		}
 	}
 
-	c.Infof("Collection settings: queues=%v, channels=%v, topics=%v, system_queues=%v, system_channels=%v",
-		*c.CollectQueues, *c.CollectChannels, *c.CollectTopics, *c.CollectSystemQueues, *c.CollectSystemChannels)
+	c.Infof("Collection settings: queues=%v, channels=%v, topics=%v, system_queues=%v, system_channels=%v, channel_config=%v",
+		*c.CollectQueues, *c.CollectChannels, *c.CollectTopics, *c.CollectSystemQueues, *c.CollectSystemChannels, *c.CollectChannelConfig)
 
 	// Warn about destructive statistics collection
 	if c.CollectResetQueueStats != nil && *c.CollectResetQueueStats {
