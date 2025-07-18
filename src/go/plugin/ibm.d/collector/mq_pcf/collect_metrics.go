@@ -1122,35 +1122,63 @@ func (c *Collector) addChannelConfigMetricsWithCharts(channelName string, metric
 		}
 	}
 
-	// Limits configuration
-	limitsDims := []string{}
+	// Max message length
 	if _, hasMaxMsgLength := metrics["max_msg_length"]; hasMaxMsgLength {
-		limitsDims = append(limitsDims, "max_msg_length")
-	}
-	if _, hasSharingConversations := metrics["sharing_conversations"]; hasSharingConversations {
-		limitsDims = append(limitsDims, "sharing_conversations")
-	}
-	if _, hasNetworkPriority := metrics["network_priority"]; hasNetworkPriority {
-		limitsDims = append(limitsDims, "network_priority")
-	}
-	if len(limitsDims) > 0 {
-		chartID := fmt.Sprintf("channel_limits_config_%s", cleanName)
+		chartID := fmt.Sprintf("channel_max_msg_length_%s", cleanName)
 		c.ensureChartExists(
-			"mq_pcf.channel_limits_config",
-			"Channel Limits",
-			"value",
+			"mq_pcf.channel_max_msg_length",
+			"Channel Maximum Message Length",
+			"bytes",
 			"line",
-			"channels/config/limit",
+			"channels/config/limits",
 			prioChannelStatus+5,
-			limitsDims,
+			[]string{"max_msg_length"},
 			channelName,
 			labels,
 		)
 		// Store metrics with dimension IDs that match chart expectations
-		for _, dim := range limitsDims {
-			if value, exists := metrics[dim]; exists {
-				mx[fmt.Sprintf("%s_%s", chartID, dim)] = value
-			}
+		if value, exists := metrics["max_msg_length"]; exists {
+			mx[fmt.Sprintf("%s_max_msg_length", chartID)] = value
+		}
+	}
+
+	// Sharing conversations
+	if _, hasSharingConversations := metrics["sharing_conversations"]; hasSharingConversations {
+		chartID := fmt.Sprintf("channel_sharing_conversations_%s", cleanName)
+		c.ensureChartExists(
+			"mq_pcf.channel_sharing_conversations",
+			"Channel Sharing Conversations",
+			"conversations",
+			"line",
+			"channels/config/limits",
+			prioChannelStatus+6,
+			[]string{"sharing_conversations"},
+			channelName,
+			labels,
+		)
+		// Store metrics with dimension IDs that match chart expectations
+		if value, exists := metrics["sharing_conversations"]; exists {
+			mx[fmt.Sprintf("%s_sharing_conversations", chartID)] = value
+		}
+	}
+
+	// Network priority
+	if _, hasNetworkPriority := metrics["network_priority"]; hasNetworkPriority {
+		chartID := fmt.Sprintf("channel_network_priority_%s", cleanName)
+		c.ensureChartExists(
+			"mq_pcf.channel_network_priority",
+			"Channel Network Priority",
+			"priority",
+			"line",
+			"channels/config/limits",
+			prioChannelStatus+7,
+			[]string{"network_priority"},
+			channelName,
+			labels,
+		)
+		// Store metrics with dimension IDs that match chart expectations
+		if value, exists := metrics["network_priority"]; exists {
+			mx[fmt.Sprintf("%s_network_priority", chartID)] = value
 		}
 	}
 }
