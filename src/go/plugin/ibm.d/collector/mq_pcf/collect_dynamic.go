@@ -994,33 +994,42 @@ func (c *Collector) addChannelRuntimeMetricsWithCharts(channelName string, metri
 func (c *Collector) addChannelConfigMetricsWithCharts(channelName string, metrics map[string]int64, labels map[string]string, mx map[string]int64) {
 	cleanName := c.cleanName(channelName)
 
-	// Batch configuration
-	batchDims := []string{}
+	// Channel batch size chart (if we have batch size metric)
 	if _, hasBatchSize := metrics["batch_size"]; hasBatchSize {
-		batchDims = append(batchDims, "batch_size")
-	}
-	if _, hasBatchInterval := metrics["batch_interval"]; hasBatchInterval {
-		batchDims = append(batchDims, "batch_interval")
-	}
-	if len(batchDims) > 0 {
-		chartID := fmt.Sprintf("channel_batch_config_%s", cleanName)
+		chartID := fmt.Sprintf("channel_batch_size_%s", cleanName)
 		c.ensureChartExists(
-			"mq_pcf.channel_batch_config",
-			"Channel Batch Configuration",
-			"value",
+			"mq_pcf.channel_batch_size",
+			"Channel Batch Size",
+			"messages",
 			"line",
-			"channels/config/batch",
+			"channels/config/batch_size",
 			prioChannelStatus+1,
-			batchDims,
+			[]string{"batch_size"},
 			channelName,
 			labels,
 		)
 		// Store metrics with dimension IDs that match chart expectations
-		for _, dim := range batchDims {
-			if value, exists := metrics[dim]; exists {
-				mx[fmt.Sprintf("%s_%s", chartID, dim)] = value
-			}
-		}
+		dimID := fmt.Sprintf("%s_batch_size", chartID)
+		mx[dimID] = metrics["batch_size"]
+	}
+
+	// Channel batch interval chart (if we have batch interval metric)
+	if _, hasBatchInterval := metrics["batch_interval"]; hasBatchInterval {
+		chartID := fmt.Sprintf("channel_batch_interval_%s", cleanName)
+		c.ensureChartExists(
+			"mq_pcf.channel_batch_interval",
+			"Channel Batch Interval",
+			"seconds",
+			"line",
+			"channels/config/batch_interval",
+			prioChannelStatus+2,
+			[]string{"batch_interval"},
+			channelName,
+			labels,
+		)
+		// Store metrics with dimension IDs that match chart expectations
+		dimID := fmt.Sprintf("%s_batch_interval", chartID)
+		mx[dimID] = metrics["batch_interval"]
 	}
 
 	// Timeout configuration
@@ -1042,7 +1051,7 @@ func (c *Collector) addChannelConfigMetricsWithCharts(channelName string, metric
 			"seconds",
 			"line",
 			"channels/config/timeout",
-			prioChannelStatus+2,
+			prioChannelStatus+3,
 			timeoutDims,
 			channelName,
 			labels,
@@ -1055,35 +1064,58 @@ func (c *Collector) addChannelConfigMetricsWithCharts(channelName string, metric
 		}
 	}
 
-	// Retry configuration
-	retryDims := []string{}
+	// Retry counts (short_retry, long_retry)
+	retryCountDims := []string{}
 	if _, hasShortRetry := metrics["short_retry"]; hasShortRetry {
-		retryDims = append(retryDims, "short_retry")
-	}
-	if _, hasShortTimer := metrics["short_timer"]; hasShortTimer {
-		retryDims = append(retryDims, "short_timer")
+		retryCountDims = append(retryCountDims, "short_retry")
 	}
 	if _, hasLongRetry := metrics["long_retry"]; hasLongRetry {
-		retryDims = append(retryDims, "long_retry")
+		retryCountDims = append(retryCountDims, "long_retry")
 	}
-	if _, hasLongTimer := metrics["long_timer"]; hasLongTimer {
-		retryDims = append(retryDims, "long_timer")
-	}
-	if len(retryDims) > 0 {
-		chartID := fmt.Sprintf("channel_retry_config_%s", cleanName)
+	if len(retryCountDims) > 0 {
+		chartID := fmt.Sprintf("channel_retry_counts_%s", cleanName)
 		c.ensureChartExists(
-			"mq_pcf.channel_retry_config",
-			"Channel Retry Configuration",
-			"value",
+			"mq_pcf.channel_retry_counts",
+			"Channel Retry Counts",
+			"retries",
 			"line",
 			"channels/config/retry",
-			prioChannelStatus+3,
-			retryDims,
+			prioChannelStatus+4,
+			retryCountDims,
 			channelName,
 			labels,
 		)
 		// Store metrics with dimension IDs that match chart expectations
-		for _, dim := range retryDims {
+		for _, dim := range retryCountDims {
+			if value, exists := metrics[dim]; exists {
+				mx[fmt.Sprintf("%s_%s", chartID, dim)] = value
+			}
+		}
+	}
+
+	// Retry timers (short_timer, long_timer) - in seconds
+	retryTimerDims := []string{}
+	if _, hasShortTimer := metrics["short_timer"]; hasShortTimer {
+		retryTimerDims = append(retryTimerDims, "short_timer")
+	}
+	if _, hasLongTimer := metrics["long_timer"]; hasLongTimer {
+		retryTimerDims = append(retryTimerDims, "long_timer")
+	}
+	if len(retryTimerDims) > 0 {
+		chartID := fmt.Sprintf("channel_retry_timers_%s", cleanName)
+		c.ensureChartExists(
+			"mq_pcf.channel_retry_timers",
+			"Channel Retry Timers",
+			"seconds",
+			"line",
+			"channels/config/retry",
+			prioChannelStatus+5,
+			retryTimerDims,
+			channelName,
+			labels,
+		)
+		// Store metrics with dimension IDs that match chart expectations
+		for _, dim := range retryTimerDims {
 			if value, exists := metrics[dim]; exists {
 				mx[fmt.Sprintf("%s_%s", chartID, dim)] = value
 			}
@@ -1109,7 +1141,7 @@ func (c *Collector) addChannelConfigMetricsWithCharts(channelName string, metric
 			"value",
 			"line",
 			"channels/config/limit",
-			prioChannelStatus+4,
+			prioChannelStatus+5,
 			limitsDims,
 			channelName,
 			labels,
@@ -1184,7 +1216,7 @@ func (c *Collector) collectTopicData(ctx context.Context, topicName string) map[
 	}
 
 	// Messages published (if available)
-	if val, ok := attrs[C.MQIA_MSG_COUNT]; ok {
+	if val, ok := attrs[C.MQIAMO_PUBLISH_MSG_COUNT]; ok {
 		if messages, ok := val.(int32); ok {
 			metrics["messages"] = int64(messages)
 		}

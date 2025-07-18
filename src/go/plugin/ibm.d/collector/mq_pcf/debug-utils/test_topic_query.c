@@ -48,7 +48,6 @@ int main() {
     }
     
     // Open admin queue
-    memset(&od, 0, sizeof(od));
     strcpy(od.ObjectName, "SYSTEM.ADMIN.COMMAND.QUEUE");
     od.ObjectType = MQOT_Q;
     MQOPEN(hConn, &od, MQOO_OUTPUT | MQOO_FAIL_IF_QUIESCING, &hObj, &compCode, &reason);
@@ -58,12 +57,14 @@ int main() {
         return 1;
     }
     
+    printf("Admin queue opened successfully with handle: %d\n", hObj);
+    
     // Create temporary reply queue
-    memset(&od, 0, sizeof(od));
-    strcpy(od.ObjectName, "SYSTEM.DEFAULT.MODEL.QUEUE");
-    strcpy(od.DynamicQName, "TOPIC.TEST.*");
-    od.ObjectType = MQOT_Q;
-    MQOPEN(hConn, &od, MQOO_INPUT_AS_Q_DEF | MQOO_FAIL_IF_QUIESCING, &hReplyQ, &compCode, &reason);
+    MQOD replyOd = {MQOD_DEFAULT};
+    strcpy(replyOd.ObjectName, "SYSTEM.DEFAULT.MODEL.QUEUE");
+    strcpy(replyOd.DynamicQName, "TOPIC.TEST.*");
+    replyOd.ObjectType = MQOT_Q;
+    MQOPEN(hConn, &replyOd, MQOO_INPUT_AS_Q_DEF | MQOO_FAIL_IF_QUIESCING, &hReplyQ, &compCode, &reason);
     if (compCode != MQCC_OK) {
         printf("MQOPEN reply queue failed: CompCode=%d, Reason=%d\n", compCode, reason);
         MQCLOSE(hConn, &hObj, MQCO_NONE, &compCode, &reason);
@@ -71,7 +72,7 @@ int main() {
         return 1;
     }
     
-    printf("Reply queue created: %s\n", od.ObjectName);
+    printf("Reply queue created: %s\n", replyOd.ObjectName);
     
     // Create MQCMD_INQUIRE_TOPIC command
     char buffer[4096];
@@ -99,14 +100,20 @@ int main() {
     // Send command
     strcpy(md.Format, MQFMT_ADMIN);
     md.MsgType = MQMT_REQUEST;
-    md.CodedCharSetId = MQCCSI_Q_MGR;  // Use same as Go code
+    md.CodedCharSetId = 1208;  // UTF-8 - test the fix
     md.Encoding = MQENC_NATIVE;
-    memcpy(md.ReplyToQ, od.ObjectName, 48);
+    memcpy(md.ReplyToQ, replyOd.ObjectName, 48);
     
+    pmo.Options = MQPMO_NO_SYNCPOINT | MQPMO_FAIL_IF_QUIESCING;
+    
+    printf("About to MQPUT to admin queue handle: %d\n", hObj);
     MQPUT(hConn, hObj, &md, &pmo, MQCFH_STRUC_LENGTH + cfst->StrucLength, 
           buffer, &compCode, &reason);
     if (compCode != MQCC_OK) {
         printf("MQPUT failed: CompCode=%d, Reason=%d\n", compCode, reason);
+        if (reason == 2050) {
+            printf("MQRC_OBJECT_NOT_OPEN - admin queue is not open for output\n");
+        }
         goto cleanup;
     }
     
@@ -115,7 +122,7 @@ int main() {
     // Get response
     memcpy(md.CorrelId, md.MsgId, sizeof(md.MsgId));
     memset(md.MsgId, 0, sizeof(md.MsgId));
-    gmo.Options = MQGMO_WAIT;
+    gmo.Options = MQGMO_WAIT | MQGMO_CONVERT;
     gmo.WaitInterval = 5000;
     
     MQLONG bufLen = sizeof(buffer);
