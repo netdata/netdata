@@ -1,5 +1,17 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.6.0...HEAD)
+
+**Merged pull requests:**
+
+- Update UPDATE.md [\#20701](https://github.com/netdata/netdata/pull/20701) ([kanelatechnical](https://github.com/kanelatechnical))
+- Escape \< character in plaintext [\#20699](https://github.com/netdata/netdata/pull/20699) ([Ancairon](https://github.com/Ancairon))
+- Replace legacy functions-table.md with comprehensive UI documentation [\#20697](https://github.com/netdata/netdata/pull/20697) ([ktsaou](https://github.com/ktsaou))
+- update otel-collector components deps [\#20693](https://github.com/netdata/netdata/pull/20693) ([ilyam8](https://github.com/ilyam8))
+- Add Getting Started Netdata guide [\#20642](https://github.com/netdata/netdata/pull/20642) ([kanelatechnical](https://github.com/kanelatechnical))
+
 ## [v2.6.0](https://github.com/netdata/netdata/tree/v2.6.0) (2025-07-17)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v2.5.4...v2.6.0)
@@ -454,10 +466,6 @@
 - Update kickstart.md [\#20167](https://github.com/netdata/netdata/pull/20167) ([kanelatechnical](https://github.com/kanelatechnical))
 - chore\(go.d\): remove wmi-\>win collector rename handling [\#20166](https://github.com/netdata/netdata/pull/20166) ([ilyam8](https://github.com/ilyam8))
 - docs: update macOS/freeBSD versions in  Versions & Platforms [\#20165](https://github.com/netdata/netdata/pull/20165) ([ilyam8](https://github.com/ilyam8))
-- chore\(go.d/snmp\): remove unused ddsnmp [\#20164](https://github.com/netdata/netdata/pull/20164) ([ilyam8](https://github.com/ilyam8))
-- SNMP profiles units and description generation [\#20163](https://github.com/netdata/netdata/pull/20163) ([Ancairon](https://github.com/Ancairon))
-- Dashboards and charts [\#20162](https://github.com/netdata/netdata/pull/20162) ([kanelatechnical](https://github.com/kanelatechnical))
-- fix\(dyncfg/health\): correct db lookup absolute option name [\#20161](https://github.com/netdata/netdata/pull/20161) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.4.0](https://github.com/netdata/netdata/tree/v2.4.0) (2025-04-14)
 
