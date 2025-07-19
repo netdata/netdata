@@ -1,0 +1,11 @@
+Connected to QM1 on localhost:1414 via DEV.APP.SVRCONN
+Opened reply queue: NETDATA.PCF.REPLY
+
+=== Sending MQCMD_RESET_Q_STATS with specific attributes for: TEST.QUEUE1.943 ===
+Requesting only: MSG_ENQ_COUNT, MSG_DEQ_COUNT, HIGH_Q_DEPTH, TIME_SINCE_RESET
+Sent MQCMD_RESET_Q_STATS command
+
+=== MQCMD_RESET_Q_STATS Response ===
+CompCode=2, Reason=3020, Parameters=0
+
+Command failed!
