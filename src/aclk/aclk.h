@@ -82,8 +82,6 @@ extern time_t aclk_block_until;
 extern int aclk_connection_counter;
 extern ACLK_DISCONNECT_ACTION disconnect_req;
 
-void *aclk_main(void *ptr);
-
 extern struct aclk_shared_state {
     // To wait for `disconnect` message PUBACK
     // when shutting down

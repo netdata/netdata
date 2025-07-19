@@ -12,7 +12,6 @@ void *analytics_main(void *ptr);
 void *cpuidlejitter_main(void *ptr);
 void *health_main(void *ptr);
 void *pluginsd_main(void *ptr);
-void *service_main(void *ptr);
 void *statsd_main(void *ptr);
 void *profile_main(void *ptr);
 void *replication_thread_main(void *ptr);
@@ -98,15 +97,6 @@ const struct netdata_static_thread static_threads_common[] = {
         .thread = NULL,
         .init_routine = NULL,
         .start_routine = pluginsd_main
-    },
-    {
-        .name = "SERVICE",
-        .config_section = NULL,
-        .config_name = NULL,
-        .enabled = 1,
-        .thread = NULL,
-        .init_routine = NULL,
-        .start_routine = service_main
     },
     {
         .name = "STATSD_FLUSH",

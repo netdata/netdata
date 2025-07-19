@@ -86,6 +86,16 @@ static void register_libuv_worker_jobs_internal(void) {
     // netdatacli
     worker_register_job_name(UV_EVENT_SCHEDULE_CMD, "schedule command");
 
+    // maintenance
+    worker_register_job_name(UV_EVENT_CLEANUP_OBSOLETE_CHARTS, "cleanup obsolete charts");
+    worker_register_job_name(UV_EVENT_ARCHIVE_CHART_DIMENSIONS, "archive chart dimensions");
+    worker_register_job_name(UV_EVENT_ARCHIVE_DIMENSION, "archive dimension");
+    worker_register_job_name(UV_EVENT_CLEANUP_ORPHAN_HOSTS, "cleanup orphan hosts");
+    worker_register_job_name(UV_EVENT_CLEANUP_OBSOLETE_CHARTS_ON_HOSTS, "cleanup obsolete charts on all hosts");
+    worker_register_job_name(UV_EVENT_FREE_HOST, "free host");
+    worker_register_job_name(UV_EVENT_FREE_CHART, "free chart");
+    worker_register_job_name(UV_EVENT_FREE_DIMENSION, "free dimension");
+
     // make sure we have the right thread id
     gettid_uncached();
 
