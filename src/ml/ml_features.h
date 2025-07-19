@@ -21,6 +21,6 @@ typedef struct {
     std::vector<DSample> &preprocessed_features;
 } ml_features_t;
 
-void ml_features_preprocess(ml_features_t *features);
+void ml_features_preprocess(ml_features_t *features, double sampling_ratio);
 
 #endif /* ML_FEATURES_H */
