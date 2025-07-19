@@ -29,7 +29,7 @@ function(netdata_bundle_libbpf)
     if(USE_LEGACY_LIBBPF)
         set(_libbpf_tag 673424c56127bb556e64095f41fd60c26f9083ec) # v0.0.9_netdata-1
     else()
-        set(_libbpf_tag 3890b7fa29c1670a75195dfc53be61d99a0c99c5) # v1.5.1p_netdata
+        set(_libbpf_tag 02bdeb7a2c2e7cb2c9cecb125527a9c5a6bbf139) # v1.6.0p_netdata
     endif()
 
     if(DEFINED BUILD_SHARED_LIBS)
