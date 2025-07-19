@@ -9,7 +9,9 @@ import (
 	"fmt"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 )
@@ -90,13 +92,18 @@ func (c *Collector) listNVMeDevices() error {
 	seen := make(map[string]bool)
 
 	for _, dev := range devList.Devices {
-		path := dev.DevicePath
+		path := extractControllerPathFromDevicePath(dev.DevicePath)
+		if path == "" {
+			continue
+		}
+
 		seen[path] = true
 		if !c.devicePaths[path] {
 			c.devicePaths[path] = true
 			c.addDeviceCharts(path, dev.ModelNumber)
 		}
 	}
+
 	for path := range c.devicePaths {
 		if !seen[path] {
 			delete(c.devicePaths, path)
@@ -105,6 +112,29 @@ func (c *Collector) listNVMeDevices() error {
 	}
 
 	return nil
+}
+
+func extractControllerPathFromDevicePath(devicePath string) string {
+	if !strings.Contains(devicePath, "nvme") {
+		return ""
+	}
+
+	// "/dev/nvme0n1" -> "/dev/nvme0"
+	//	"/dev/nvme10n1" -> "/dev/nvme10"
+
+	// Find where "nX" (namespace part) starts
+	idx := strings.LastIndex(devicePath, "n")
+	if idx <= 0 || idx+1 >= len(devicePath) {
+		return devicePath
+	}
+
+	// Check if character before and after 'n' is a digit (indicating namespace)
+	before, after := devicePath[idx-1], devicePath[idx+1]
+	if !unicode.IsDigit(rune(before)) || !unicode.IsDigit(rune(after)) {
+		return devicePath
+	}
+
+	return devicePath[:idx]
 }
 
 func extractDeviceFromPath(devicePath string) string {
