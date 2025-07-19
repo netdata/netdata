@@ -31,7 +31,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorcon/rcon v1.4.0
 	github.com/gosnmp/gosnmp v1.41.0
-	github.com/ibmdb/go_ibm_db v0.4.5 // Used by ibm.d.plugin (requires CGO)
+	github.com/ibmdb/go_ibm_db v0.4.5 // indirect; Used by ibm.d.plugin (requires CGO)
 	github.com/invopop/jsonschema v0.13.0
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/jackc/pgx/v5 v5.7.5
@@ -67,6 +67,8 @@ require (
 	k8s.io/client-go v0.33.2
 	layeh.com/radius v0.0.0-20190322222518-890bc1058917
 )
+
+require github.com/netdata/netdata/go/plugins/plugin/ibm.d v0.0.0-00010101000000-000000000000
 
 require (
 	dario.cat/mergo v1.0.1 // indirect
@@ -107,8 +109,6 @@ require (
 	github.com/grafana/regexp v0.0.0-20240518133315-a468a5bfb3bc // indirect
 	github.com/hailocab/go-hostpool v0.0.0-20160125115350-e80d13ce29ed // indirect
 	github.com/huandu/xstrings v1.5.0 // indirect
-	github.com/ibm-messaging/mq-golang v3.0.0+incompatible // indirect
-	github.com/ibm-messaging/mq-golang/v5 v5.6.4 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgconn v1.14.3 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
@@ -148,7 +148,6 @@ require (
 	github.com/spf13/pflag v1.0.6 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
-	github.com/weigj/go-odbc v0.0.0-20120414035027-f09eefba7e19 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect

@@ -1,0 +1,115 @@
+# Generated metadata.yaml for example module
+plugin_name: ibm.d.plugin
+modules:
+  - meta:
+      plugin_name: ibm.d.plugin
+      module_name: example
+      monitored_instance:
+        name: Example Framework Demo
+        link: https://github.com/netdata/netdata/tree/master/src/go/plugin/ibm.d/modules/example
+        categories:
+          - data-collection.synthetic-checks
+        icon_filename: "icon.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - example
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          Demonstrates the IBM.D framework capabilities with test metrics and dynamic instances.
+Collects sample metrics to showcase framework features including precision handling,
+instance management, and chart lifecycle.
+
+        method_description: |
+          The collector connects to Example Framework Demo and collects metrics via its monitoring interface.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Enable monitoring interface
+            description: |
+              Ensure the Example Framework Demo monitoring interface is accessible.
+      configuration:
+        file:
+          name: ibm.d/example.conf
+        options:
+          description: |
+            Configuration options for the example collector.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: endpoint
+              description: Connection endpoint.
+              default_value: "dummy://localhost"
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: Config
+          list:
+            - name: Basic
+              description: Basic configuration example.
+              config: |
+                jobs:
+                  - name: local
+                    endpoint: dummy://localhost
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: item
+          description: These metrics refer to item instances.
+          labels:
+            - name: slot
+              description: Slot identifier
+          metrics:
+            - name: example.item_percentage
+              description: Item Percentage
+              unit: percentage
+              chart_type: stacked
+              dimensions:
+                - name: percentage
+            - name: example.item_counter
+              description: Item Counter
+              unit: count/s
+              chart_type: line
+              dimensions:
+                - name: counter
+        - name: global
+          description: These metrics refer to the entire monitored instance.
+          labels: []
+          metrics:
+            - name: example.test_absolute
+              description: Test Absolute Value (timestamp % 60)
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: value
+            - name: example.test_incremental
+              description: Test Incremental Counter
+              unit: count/s
+              chart_type: line
+              dimensions:
+                - name: counter
