@@ -102,6 +102,7 @@ typedef enum __attribute__((packed)) {
     BIB_PLUGIN_NFACCT,
     BIB_PLUGIN_PERF,
     BIB_PLUGIN_SLABINFO,
+    BIB_PLUGIN_UPSD,
     BIB_PLUGIN_XEN,
     BIB_PLUGIN_XEN_VBD_ERROR,
     BIB_EXPORT_AWS_KINESIS,
@@ -920,6 +921,14 @@ static struct {
                 .json = "slabinfo",
                 .value = NULL,
         },
+        [BIB_PLUGIN_UPSD] = {
+                .category = BIC_PLUGINS,
+                .type = BIT_BOOLEAN,
+                .analytics = "upsd",
+                .print = "upsd (monitor Network-UPS-Tools daemon)",
+                .json = "upsd",
+                .value = NULL,
+        },
         [BIB_PLUGIN_XEN] = {
                 .category = BIC_PLUGINS,
                 .type = BIT_BOOLEAN,
@@ -1343,6 +1352,9 @@ __attribute__((constructor)) void initialize_build_info(void) {
 #endif
 #ifdef ENABLE_PLUGIN_SLABINFO
     build_info_set_status(BIB_PLUGIN_SLABINFO, true);
+#endif
+#ifdef ENABLE_PLUGIN_UPSD
+    build_info_set_status(BIB_PLUGIN_UPSD, true);
 #endif
 #ifdef ENABLE_PLUGIN_XENSTAT
     build_info_set_status(BIB_PLUGIN_XEN, true);
