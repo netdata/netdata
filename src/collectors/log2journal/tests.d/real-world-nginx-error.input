@@ -1,0 +1,1 @@
+2024/01/15 10:30:25 [error] 1234#0: *5678 connect() failed (111: Connection refused) while connecting to upstream, client: 192.168.1.100, server: example.com, request: "GET /api/data HTTP/1.1", upstream: "http://backend:8080/api/data", host: "example.com"

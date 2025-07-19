@@ -1,0 +1,6 @@
+BASE_VAR=NESTED
+COMBINED=prefix_NESTED_final_value_suffix
+MESSAGE=test log with nested variables
+NESTED_VAR=final_value
+SIMPLE_NESTED=final_value
+
