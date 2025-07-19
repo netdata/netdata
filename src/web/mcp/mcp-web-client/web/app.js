@@ -7014,6 +7014,9 @@ class NetdataMCPChat {
     
     // Messaging
     async sendMessage(chatId, messageParam = null, isResume = false) {
+        const chat = this.chats.get(chatId);
+        if (!chat) {return;}
+
         // If no message provided, get it from the input
         let message = messageParam;
         if (message === null) {
@@ -7039,10 +7042,7 @@ class NetdataMCPChat {
                 return;
             }
         }
-        
-        const chat = this.chats.get(chatId);
-        if (!chat) {return;}
-        
+
         // Clear error state when sending new message
         chat.hasError = false;
         chat.lastError = null;
