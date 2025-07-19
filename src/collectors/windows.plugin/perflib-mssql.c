@@ -978,7 +978,7 @@ static void netdata_read_config_options()
 
     struct netdata_mssql_conn *dbconn = dictionary_set(conn_options, upper_instance, NULL, sizeof(*dbconn));
 
-    dbconn->instance = strdup(upper_instance);
+    dbconn->instance = strdupz(upper_instance);
     dbconn->driver = inicfg_get(&netdata_config, section_name, "driver", "SQL Server");
     dbconn->server = inicfg_get(&netdata_config, section_name, "server", NULL);
     dbconn->address = inicfg_get(&netdata_config, section_name, "address", NULL);
@@ -993,7 +993,7 @@ static void netdata_read_config_options()
 
 end_conf_parse:
     if (!total_instances)
-        expected_instances = dbconn->instances;
+        expected_instances = additional_instances;
 
     total_instances++;
 }
@@ -1703,6 +1703,9 @@ int dict_mssql_locks_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
 
 static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every __maybe_unused)
 {
+    if (!pDataBlock)
+        goto end_mssql_locks;
+
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, mi->objectName[NETDATA_MSSQL_LOCKS]);
     if (pObjectType) {
         if (pObjectType->NumInstances) {
@@ -1729,6 +1732,7 @@ static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *m
         }
     }
 
+end_mssql_locks:
     dictionary_sorted_walkthrough_read(mi->locks_instances, dict_mssql_locks_charts_cb, mi);
 }
 
@@ -1928,9 +1932,6 @@ static void do_mssql_waits(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *m
 
 static void mssql_database_backup_restore_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mdi->parent->conn || !mdi->parent->conn->is_connected))
-        return;
-
     char id[RRD_ID_LENGTH_MAX + 1];
 
     if (!mdi->st_db_backup_restore_operations) {
@@ -1971,9 +1972,6 @@ static void mssql_database_backup_restore_chart(struct mssql_db_instance *mdi, c
 
 static void mssql_database_log_flushes_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mdi->parent->conn || !mdi->parent->conn->is_connected))
-        return;
-
     char id[RRD_ID_LENGTH_MAX + 1];
 
     if (!mdi->st_db_log_flushes) {
@@ -2009,9 +2007,6 @@ static void mssql_database_log_flushes_chart(struct mssql_db_instance *mdi, cons
 
 static void mssql_database_log_flushed_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mdi->parent->conn || !mdi->parent->conn->is_connected))
-        return;
-
     char id[RRD_ID_LENGTH_MAX + 1];
 
     if (!mdi->st_db_log_flushed) {
@@ -2045,9 +2040,6 @@ static void mssql_database_log_flushed_chart(struct mssql_db_instance *mdi, cons
 
 static void mssql_transactions_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mdi->parent->conn || !mdi->parent->conn->is_connected))
-        return;
-
     char id[RRD_ID_LENGTH_MAX + 1];
 
     if (!mdi->st_db_transactions) {
@@ -2084,9 +2076,6 @@ static void mssql_transactions_chart(struct mssql_db_instance *mdi, const char *
 
 static void mssql_write_transactions_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mdi->parent->conn || !mdi->parent->conn->is_connected))
-        return;
-
     char id[RRD_ID_LENGTH_MAX + 1];
 
     if (!mdi->st_db_write_transactions) {
@@ -2124,9 +2113,6 @@ static void mssql_write_transactions_chart(struct mssql_db_instance *mdi, const 
 
 static void mssql_lockwait_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mdi->parent->conn || !mdi->parent->conn->is_connected))
-        return;
-
     char id[RRD_ID_LENGTH_MAX + 1];
 
     if (!mdi->st_db_lockwait) {
@@ -2160,9 +2146,6 @@ static void mssql_lockwait_chart(struct mssql_db_instance *mdi, const char *db, 
 
 static void mssql_deadlock_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mdi->parent->conn || !mdi->parent->conn->is_connected))
-        return;
-
     char id[RRD_ID_LENGTH_MAX + 1];
 
     if (!mdi->st_db_deadlock) {
@@ -2196,9 +2179,6 @@ static void mssql_deadlock_chart(struct mssql_db_instance *mdi, const char *db, 
 
 static void mssql_lock_request_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mdi->parent->conn || !mdi->parent->conn->is_connected))
-        return;
-
     char id[RRD_ID_LENGTH_MAX + 1];
 
     if (!mdi->st_lock_requests) {
@@ -2232,9 +2212,6 @@ static void mssql_lock_request_chart(struct mssql_db_instance *mdi, const char *
 
 static void mssql_lock_timeout_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mdi->parent->conn || !mdi->parent->conn->is_connected))
-        return;
-
     char id[RRD_ID_LENGTH_MAX + 1];
 
     if (!mdi->st_lock_timeouts) {
@@ -2268,9 +2245,6 @@ static void mssql_lock_timeout_chart(struct mssql_db_instance *mdi, const char *
 
 static void mssql_active_transactions_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mdi->parent->conn || !mdi->parent->conn->is_connected))
-        return;
-
     char id[RRD_ID_LENGTH_MAX + 1];
 
     if (!mdi->st_db_active_transactions) {
@@ -2308,9 +2282,6 @@ static void mssql_active_transactions_chart(struct mssql_db_instance *mdi, const
 
 static inline void mssql_data_file_size_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mdi->parent->conn || !mdi->parent->conn->is_connected))
-        return;
-
     char id[RRD_ID_LENGTH_MAX + 1];
 
     if (unlikely(!mdi->st_db_data_file_size)) {
@@ -2381,6 +2352,9 @@ endchartcb:
 
 static void do_mssql_databases(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
 {
+    if (!pDataBlock)
+        goto end_mssql_databases;
+
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, mi->objectName[NETDATA_MSSQL_DATABASE]);
     if (!pObjectType)
         return;
@@ -2406,6 +2380,7 @@ static void do_mssql_databases(PERF_DATA_BLOCK *pDataBlock, struct mssql_instanc
         }
     }
 
+end_mssql_databases:
     dictionary_sorted_walkthrough_read(mi->databases, dict_mssql_databases_charts_cb, &update_every);
 }
 
@@ -2581,13 +2556,22 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
     DWORD i;
     PERF_DATA_BLOCK *pDataBlock;
     static bool collect_perflib[NETDATA_MSSQL_METRICS_END] = {true, true, true, true, true, true, true, true, true};
-    for (i = 0; doMSSQL[i]; i++) {
+    for (i = 0; i < NETDATA_MSSQL_ACCESS_METHODS; i++) {
         if (!collect_perflib[i])
             continue;
 
         pDataBlock = netdata_mssql_get_perf_data_block(collect_perflib, mi, i);
         if (!pDataBlock)
             continue;
+
+        doMSSQL[i](pDataBlock, mi, *update_every);
+    }
+
+    if (unlikely(!mi->conn || !mi->conn->is_connected))
+        return 1;
+
+    for (i = NETDATA_MSSQL_DATABASE; doMSSQL[i]; i++) {
+        pDataBlock = (collect_perflib[i]) ? netdata_mssql_get_perf_data_block(collect_perflib, mi, i): NULL;
 
         doMSSQL[i](pDataBlock, mi, *update_every);
     }
