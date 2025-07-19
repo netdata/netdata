@@ -1,0 +1,40 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "collect_items": {
+        "default": true,
+        "title": "Enable collection of item metrics",
+        "type": "boolean"
+      },
+      "connect_timeout": {
+        "default": 5,
+        "maximum": 300,
+        "minimum": 1,
+        "title": "Connection timeout in seconds",
+        "type": "integer"
+      },
+      "endpoint": {
+        "default": "dummy://localhost",
+        "examples": [
+          "dummy://localhost",
+          "tcp://server:1414"
+        ],
+        "title": "Connection endpoint URL",
+        "type": "string"
+      },
+      "max_items": {
+        "default": 10,
+        "maximum": 1000,
+        "minimum": 1,
+        "title": "Maximum number of items to collect",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "collect_items"
+    ],
+    "title": "example collector configuration",
+    "type": "object"
+  }
+}
