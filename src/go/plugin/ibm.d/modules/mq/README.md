@@ -121,167 +121,24 @@ sudo ./edit-config ibm.d/mq.conf
 
 The following options can be defined globally or per job.
 
-
-#### QueueManager
-
-QueueManager configuration option
-
-- **Default**: `<no value>`
-- **Required**: yes
-
-
-
-
-#### Channel
-
-Channel configuration option
-
-- **Default**: `<no value>`
-- **Required**: yes
-
-
-
-
-#### Host
-
-Host configuration option
-
-- **Default**: `<no value>`
-- **Required**: yes
-
-
-
-
-#### Port
-
-Port configuration option
-
-- **Default**: `<no value>`
-- **Required**: yes
-
-
-
-
-#### User
-
-User configuration option
-
-- **Default**: `<no value>`
-- **Required**: yes
-
-
-
-
-#### Password
-
-Password configuration option
-
-- **Default**: `<no value>`
-- **Required**: yes
-
-
-
-
-#### CollectQueues
-
-CollectQueues configuration option
-
-- **Default**: `<no value>`
-- **Required**: yes
-
-
-
-
-#### CollectChannels
-
-CollectChannels configuration option
-
-- **Default**: `<no value>`
-- **Required**: yes
-
-
-
-
-#### CollectTopics
-
-CollectTopics configuration option
-
-- **Default**: `<no value>`
-- **Required**: yes
-
-
-
-
-#### CollectSystemQueues
-
-CollectSystemQueues configuration option
-
-- **Default**: `<no value>`
-- **Required**: yes
-
-
-
-
-#### CollectSystemChannels
-
-CollectSystemChannels configuration option
-
-- **Default**: `<no value>`
-- **Required**: yes
-
-
-
-
-#### CollectChannelConfig
-
-CollectChannelConfig configuration option
-
-- **Default**: `<no value>`
-- **Required**: yes
-
-
-
-
-#### CollectQueueConfig
-
-CollectQueueConfig configuration option
-
-- **Default**: `<no value>`
-- **Required**: yes
-
-
-
-
-#### QueueSelector
-
-QueueSelector configuration option
-
-- **Default**: `<no value>`
-- **Required**: yes
-
-
-
-
-#### ChannelSelector
-
-ChannelSelector configuration option
-
-- **Default**: `<no value>`
-- **Required**: yes
-
-
-
-
-#### CollectResetQueueStats
-
-CollectResetQueueStats configuration option
-
-- **Default**: `<no value>`
-- **Required**: yes
-
-
-
-
+| Name | Description | Default | Required | Min | Max |
+|:-----|:------------|:--------|:---------|:----|:----|
+| QueueManager | QueueManager configuration option | `<no value>` | yes | - | - |
+| Channel | Channel configuration option | `<no value>` | yes | - | - |
+| Host | Host configuration option | `<no value>` | yes | - | - |
+| Port | Port configuration option | `<no value>` | yes | - | - |
+| User | User configuration option | `<no value>` | yes | - | - |
+| Password | Password configuration option | `<no value>` | yes | - | - |
+| CollectQueues | CollectQueues configuration option | `<no value>` | yes | - | - |
+| CollectChannels | CollectChannels configuration option | `<no value>` | yes | - | - |
+| CollectTopics | CollectTopics configuration option | `<no value>` | yes | - | - |
+| CollectSystemQueues | CollectSystemQueues configuration option | `<no value>` | yes | - | - |
+| CollectSystemChannels | CollectSystemChannels configuration option | `<no value>` | yes | - | - |
+| CollectChannelConfig | CollectChannelConfig configuration option | `<no value>` | yes | - | - |
+| CollectQueueConfig | CollectQueueConfig configuration option | `<no value>` | yes | - | - |
+| QueueSelector | QueueSelector configuration option | `<no value>` | yes | - | - |
+| ChannelSelector | ChannelSelector configuration option | `<no value>` | yes | - | - |
+| CollectResetQueueStats | CollectResetQueueStats configuration option | `<no value>` | yes | - | - |
 
 ### Examples
 
