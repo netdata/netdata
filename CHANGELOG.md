@@ -6,7 +6,9 @@
 
 **Merged pull requests:**
 
+- fix\(nvme\)!: query controller instead of namespace for SMART metrics [\#20704](https://github.com/netdata/netdata/pull/20704) ([ilyam8](https://github.com/ilyam8))
 - Update UPDATE.md [\#20701](https://github.com/netdata/netdata/pull/20701) ([kanelatechnical](https://github.com/kanelatechnical))
+- Ensure chat exists before handling message input [\#20700](https://github.com/netdata/netdata/pull/20700) ([emmanuel-ferdman](https://github.com/emmanuel-ferdman))
 - Escape \< character in plaintext [\#20699](https://github.com/netdata/netdata/pull/20699) ([Ancairon](https://github.com/Ancairon))
 - Replace legacy functions-table.md with comprehensive UI documentation [\#20697](https://github.com/netdata/netdata/pull/20697) ([ktsaou](https://github.com/ktsaou))
 - update otel-collector components deps [\#20693](https://github.com/netdata/netdata/pull/20693) ([ilyam8](https://github.com/ilyam8))
@@ -463,9 +465,6 @@
 - Regenerate integrations docs [\#20170](https://github.com/netdata/netdata/pull/20170) ([netdatabot](https://github.com/netdatabot))
 - fix integrations config file sample [\#20169](https://github.com/netdata/netdata/pull/20169) ([ilyam8](https://github.com/ilyam8))
 - improvement\(cgroups\): improve systemd-nspawn filter for default [\#20168](https://github.com/netdata/netdata/pull/20168) ([rhoriguchi](https://github.com/rhoriguchi))
-- Update kickstart.md [\#20167](https://github.com/netdata/netdata/pull/20167) ([kanelatechnical](https://github.com/kanelatechnical))
-- chore\(go.d\): remove wmi-\>win collector rename handling [\#20166](https://github.com/netdata/netdata/pull/20166) ([ilyam8](https://github.com/ilyam8))
-- docs: update macOS/freeBSD versions in  Versions & Platforms [\#20165](https://github.com/netdata/netdata/pull/20165) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.4.0](https://github.com/netdata/netdata/tree/v2.4.0) (2025-04-14)
 
