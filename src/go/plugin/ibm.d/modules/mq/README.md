@@ -31,6 +31,7 @@ Metrics:
 | mq.queues.overview | monitored, excluded, model, unauthorized, unknown, failed | queues |
 | mq.channels.overview | monitored, excluded, unauthorized, failed | channels |
 | mq.topics.overview | monitored, excluded, unauthorized, failed | topics |
+| mq.listeners.overview | monitored, excluded, failed | listeners |
 
 
 

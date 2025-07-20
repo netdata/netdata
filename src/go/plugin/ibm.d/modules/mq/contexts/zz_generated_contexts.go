@@ -1490,6 +1490,27 @@ func (c QueueManagerTopicsOverviewContext) Set(state *framework.CollectorState, 
 	})
 }
 
+// QueueManagerListenersOverviewValues defines the type-safe values for QueueManager.ListenersOverview context
+type QueueManagerListenersOverviewValues struct {
+	Monitored int64
+	Excluded int64
+	Failed int64
+}
+
+// QueueManagerListenersOverviewContext provides type-safe operations for QueueManager.ListenersOverview context
+type QueueManagerListenersOverviewContext struct {
+	framework.Context[EmptyLabels]
+}
+
+// Set provides type-safe dimension setting for QueueManager.ListenersOverview context
+func (c QueueManagerListenersOverviewContext) Set(state *framework.CollectorState, labels EmptyLabels, values QueueManagerListenersOverviewValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
+		"monitored": values.Monitored,
+		"excluded": values.Excluded,
+		"failed": values.Failed,
+	})
+}
+
 
 
 
@@ -1501,6 +1522,7 @@ var QueueManager = struct {
 	QueuesOverview QueueManagerQueuesOverviewContext
 	ChannelsOverview QueueManagerChannelsOverviewContext
 	TopicsOverview QueueManagerTopicsOverviewContext
+	ListenersOverview QueueManagerListenersOverviewContext
 }{
 	Status: QueueManagerStatusContext{
 		Context: framework.Context[EmptyLabels]{
@@ -1711,6 +1733,42 @@ var QueueManager = struct {
 		},
 		},
 	},
+	ListenersOverview: QueueManagerListenersOverviewContext{
+		Context: framework.Context[EmptyLabels]{
+		Name:       "mq.listeners.overview",
+		Family:     "overview",
+		Title:      "Listeners Monitoring Status",
+		Units:      "listeners",
+		Type:       module.Stacked,
+		Priority:   1103,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "monitored",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "excluded",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "failed",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+		},
+		},
+	},
 }
 
 
@@ -1896,6 +1954,7 @@ func GetAllContexts() []interface{} {
 		&QueueManager.QueuesOverview.Context,
 		&QueueManager.ChannelsOverview.Context,
 		&QueueManager.TopicsOverview.Context,
+		&QueueManager.ListenersOverview.Context,
 		&Topic.Publishers.Context,
 		&Topic.Subscribers.Context,
 		&Topic.Messages.Context,

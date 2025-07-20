@@ -325,6 +325,14 @@ using the PCF (Programmable Command Format) protocol.
                 - name: excluded
                 - name: unauthorized
                 - name: failed
+            - name: mq.listeners.overview
+              description: Listeners Monitoring Status
+              unit: listeners
+              chart_type: stacked
+              dimensions:
+                - name: monitored
+                - name: excluded
+                - name: failed
         - name: topic
           description: These metrics refer to topic instances.
           labels:
