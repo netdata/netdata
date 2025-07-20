@@ -25,7 +25,7 @@ func (c *Client) ParsePCFResponse(response []byte, command string) (map[C.MQLONG
 	cfh := (*C.MQCFH)(unsafe.Pointer(&response[0]))
 	
 	// Validate PCF header
-	if cfh.Type != C.MQCFT_RESPONSE && cfh.Type != C.MQCFT_COMMAND {
+	if cfh.Type != C.MQCFT_RESPONSE && cfh.Type != C.MQCFT_COMMAND && cfh.Type != C.MQCFT_STATISTICS {
 		return nil, fmt.Errorf("unexpected PCF message type: %d", cfh.Type)
 	}
 	

@@ -112,6 +112,14 @@ func (c *Collector) collectQueueMetrics() error {
 			Max:     queue.MaxDepth,
 		})
 		
+		// Calculate and set depth percentage
+		if queue.MaxDepth > 0 {
+			percentage := float64(queue.CurrentDepth) / float64(queue.MaxDepth) * 100.0
+			contexts.Queue.DepthPercentage.Set(c.State, labels, contexts.QueueDepthPercentageValues{
+				Percentage: int64(percentage * 1000), // Pre-multiply for precision
+			})
+		}
+		
 		// Status metrics (if status collection succeeded)
 		if queue.HasStatusMetrics {
 			// Only send connections if both values are collected
@@ -133,6 +141,13 @@ func (c *Collector) collectQueueMetrics() error {
 			if queue.UncommittedMsgs.IsCollected() {
 				contexts.Queue.UncommittedMessages.Set(c.State, labels, contexts.QueueUncommittedMessagesValues{
 					Uncommitted: queue.UncommittedMsgs.Int64(),
+				})
+			}
+			
+			// Average queue time - only send if collected
+			if queue.AvgQueueTime.IsCollected() {
+				contexts.Queue.AverageQueueTime.Set(c.State, labels, contexts.QueueAverageQueueTimeValues{
+					Avg_queue_time: queue.AvgQueueTime.Int64(),
 				})
 			}
 			
@@ -205,6 +220,94 @@ func (c *Collector) collectQueueMetrics() error {
 			if queue.BackoutThreshold.IsCollected() {
 				contexts.Queue.BackoutThreshold.Set(c.State, labels, contexts.QueueBackoutThresholdValues{
 					Backout_threshold: queue.BackoutThreshold.Int64(),
+				})
+			}
+			
+			// New configuration metrics
+			if queue.ServiceInterval.IsCollected() {
+				contexts.Queue.ServiceInterval.Set(c.State, labels, contexts.QueueServiceIntervalValues{
+					Service_interval: queue.ServiceInterval.Int64(),
+				})
+			}
+			
+			if queue.RetentionInterval.IsCollected() {
+				contexts.Queue.RetentionInterval.Set(c.State, labels, contexts.QueueRetentionIntervalValues{
+					Retention_interval: queue.RetentionInterval.Int64(),
+				})
+			}
+			
+			// Message persistence configuration
+			if queue.DefPersistence.IsCollected() {
+				persistent := int64(0)
+				nonPersistent := int64(0)
+				if queue.DefPersistence.Int64() == 1 {
+					persistent = 1
+				} else {
+					nonPersistent = 1
+				}
+				contexts.Queue.MessagePersistence.Set(c.State, labels, contexts.QueueMessagePersistenceValues{
+					Persistent:     persistent,
+					Non_persistent: nonPersistent,
+				})
+			}
+			
+			// Queue Scope (0=MQSCO_Q_MGR, 1=MQSCO_CELL)
+			if queue.Scope.IsCollected() {
+				queueManager := int64(0)
+				cell := int64(0)
+				if queue.Scope.Int64() == 0 {
+					queueManager = 1
+				} else {
+					cell = 1
+				}
+				contexts.Queue.QueueScope.Set(c.State, labels, contexts.QueueQueueScopeValues{
+					Queue_manager: queueManager,
+					Cell:          cell,
+				})
+			}
+			
+			// Queue Usage (0=MQUS_NORMAL, 1=MQUS_TRANSMISSION)
+			if queue.Usage.IsCollected() {
+				normal := int64(0)
+				transmission := int64(0)
+				if queue.Usage.Int64() == 0 {
+					normal = 1
+				} else {
+					transmission = 1
+				}
+				contexts.Queue.QueueUsage.Set(c.State, labels, contexts.QueueQueueUsageValues{
+					Normal:       normal,
+					Transmission: transmission,
+				})
+			}
+			
+			// Message Delivery Sequence (0=MQMDS_PRIORITY, 1=MQMDS_FIFO)
+			if queue.MsgDeliverySequence.IsCollected() {
+				priority := int64(0)
+				fifo := int64(0)
+				if queue.MsgDeliverySequence.Int64() == 0 {
+					priority = 1
+				} else {
+					fifo = 1
+				}
+				contexts.Queue.MessageDeliverySequence.Set(c.State, labels, contexts.QueueMessageDeliverySequenceValues{
+					Priority: priority,
+					Fifo:     fifo,
+				})
+			}
+			
+			// Harden Get Backout (0=disabled, 1=enabled)
+			if queue.HardenGetBackout.IsCollected() {
+				enabled := int64(0)
+				disabled := int64(0)
+				if queue.HardenGetBackout.Int64() == 1 {
+					enabled = 1
+				} else {
+					disabled = 1
+				}
+				contexts.Queue.HardenGetBackout.Set(c.State, labels, contexts.QueueHardenGetBackoutValues{
+					Enabled:  enabled,
+					Disabled: disabled,
 				})
 			}
 		}

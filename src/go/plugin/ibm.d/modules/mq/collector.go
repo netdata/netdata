@@ -67,8 +67,16 @@ func (c *Collector) CollectOnce() error {
 		}
 	}
 
+	// Collect statistics queue metrics (advanced metrics) - every iteration
+	if c.Config.CollectStatisticsQueue {
+		if err := c.collectStatistics(); err != nil {
+			c.Warningf("failed to collect statistics queue metrics: %v", err)
+		}
+	}
+
 	return nil
 }
+
 
 func (c *Collector) collectQueueManagerMetrics() error {
 	metrics, err := c.client.GetQueueManagerStatus()

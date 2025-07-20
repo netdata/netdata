@@ -667,6 +667,249 @@ var Channel = struct {
 }
 
 
+// --- ChannelStatistics ---
+
+
+// ChannelStatisticsMessagesValues defines the type-safe values for ChannelStatistics.Messages context
+type ChannelStatisticsMessagesValues struct {
+	Messages int64
+}
+
+// ChannelStatisticsMessagesContext provides type-safe operations for ChannelStatistics.Messages context
+type ChannelStatisticsMessagesContext struct {
+	framework.Context[ChannelStatisticsLabels]
+}
+
+// Set provides type-safe dimension setting for ChannelStatistics.Messages context
+func (c ChannelStatisticsMessagesContext) Set(state *framework.CollectorState, labels ChannelStatisticsLabels, values ChannelStatisticsMessagesValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"messages": values.Messages,
+	})
+}
+
+// ChannelStatisticsBytesValues defines the type-safe values for ChannelStatistics.Bytes context
+type ChannelStatisticsBytesValues struct {
+	Bytes int64
+}
+
+// ChannelStatisticsBytesContext provides type-safe operations for ChannelStatistics.Bytes context
+type ChannelStatisticsBytesContext struct {
+	framework.Context[ChannelStatisticsLabels]
+}
+
+// Set provides type-safe dimension setting for ChannelStatistics.Bytes context
+func (c ChannelStatisticsBytesContext) Set(state *framework.CollectorState, labels ChannelStatisticsLabels, values ChannelStatisticsBytesValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"bytes": values.Bytes,
+	})
+}
+
+// ChannelStatisticsBatchesValues defines the type-safe values for ChannelStatistics.Batches context
+type ChannelStatisticsBatchesValues struct {
+	Full_batches int64
+	Incomplete_batches int64
+}
+
+// ChannelStatisticsBatchesContext provides type-safe operations for ChannelStatistics.Batches context
+type ChannelStatisticsBatchesContext struct {
+	framework.Context[ChannelStatisticsLabels]
+}
+
+// Set provides type-safe dimension setting for ChannelStatistics.Batches context
+func (c ChannelStatisticsBatchesContext) Set(state *framework.CollectorState, labels ChannelStatisticsLabels, values ChannelStatisticsBatchesValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"full_batches": values.Full_batches,
+		"incomplete_batches": values.Incomplete_batches,
+	})
+}
+
+// ChannelStatisticsBatchSizeValues defines the type-safe values for ChannelStatistics.BatchSize context
+type ChannelStatisticsBatchSizeValues struct {
+	Avg_batch_size int64
+}
+
+// ChannelStatisticsBatchSizeContext provides type-safe operations for ChannelStatistics.BatchSize context
+type ChannelStatisticsBatchSizeContext struct {
+	framework.Context[ChannelStatisticsLabels]
+}
+
+// Set provides type-safe dimension setting for ChannelStatistics.BatchSize context
+func (c ChannelStatisticsBatchSizeContext) Set(state *framework.CollectorState, labels ChannelStatisticsLabels, values ChannelStatisticsBatchSizeValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"avg_batch_size": values.Avg_batch_size,
+	})
+}
+
+// ChannelStatisticsPutRetriesValues defines the type-safe values for ChannelStatistics.PutRetries context
+type ChannelStatisticsPutRetriesValues struct {
+	Put_retries int64
+}
+
+// ChannelStatisticsPutRetriesContext provides type-safe operations for ChannelStatistics.PutRetries context
+type ChannelStatisticsPutRetriesContext struct {
+	framework.Context[ChannelStatisticsLabels]
+}
+
+// Set provides type-safe dimension setting for ChannelStatistics.PutRetries context
+func (c ChannelStatisticsPutRetriesContext) Set(state *framework.CollectorState, labels ChannelStatisticsLabels, values ChannelStatisticsPutRetriesValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"put_retries": values.Put_retries,
+	})
+}
+
+
+
+// ChannelStatisticsLabels defines the required labels for ChannelStatistics contexts
+type ChannelStatisticsLabels struct {
+	Channel string
+	Type string
+}
+
+// InstanceID generates a unique instance ID using the hardcoded label order from YAML
+func (l ChannelStatisticsLabels) InstanceID(contextName string) string {
+	// Label order from YAML: channel, type
+	return contextName + "." + cleanLabelValue(l.Channel) + "_" + cleanLabelValue(l.Type)
+}
+
+
+// ChannelStatistics contains all metric contexts for ChannelStatistics
+var ChannelStatistics = struct {
+	Messages ChannelStatisticsMessagesContext
+	Bytes ChannelStatisticsBytesContext
+	Batches ChannelStatisticsBatchesContext
+	BatchSize ChannelStatisticsBatchSizeContext
+	PutRetries ChannelStatisticsPutRetriesContext
+}{
+	Messages: ChannelStatisticsMessagesContext{
+		Context: framework.Context[ChannelStatisticsLabels]{
+		Name:       "mq.channel_stats.messages",
+		Family:     "channels/statistics",
+		Title:      "Channel Messages (Statistics)",
+		Units:      "messages/s",
+		Type:       module.Line,
+		Priority:   7000,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "messages",
+				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"channel",
+			"type",
+		},
+		},
+	},
+	Bytes: ChannelStatisticsBytesContext{
+		Context: framework.Context[ChannelStatisticsLabels]{
+		Name:       "mq.channel_stats.bytes",
+		Family:     "channels/statistics",
+		Title:      "Channel Bytes (Statistics)",
+		Units:      "bytes/s",
+		Type:       module.Line,
+		Priority:   7001,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "bytes",
+				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"channel",
+			"type",
+		},
+		},
+	},
+	Batches: ChannelStatisticsBatchesContext{
+		Context: framework.Context[ChannelStatisticsLabels]{
+		Name:       "mq.channel_stats.batches",
+		Family:     "channels/statistics",
+		Title:      "Channel Batches (Statistics)",
+		Units:      "batches/s",
+		Type:       module.Line,
+		Priority:   7002,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "full_batches",
+				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "incomplete_batches",
+				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"channel",
+			"type",
+		},
+		},
+	},
+	BatchSize: ChannelStatisticsBatchSizeContext{
+		Context: framework.Context[ChannelStatisticsLabels]{
+		Name:       "mq.channel_stats.batch_size",
+		Family:     "channels/statistics",
+		Title:      "Channel Average Batch Size (Statistics)",
+		Units:      "messages",
+		Type:       module.Line,
+		Priority:   7003,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "avg_batch_size",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"channel",
+			"type",
+		},
+		},
+	},
+	PutRetries: ChannelStatisticsPutRetriesContext{
+		Context: framework.Context[ChannelStatisticsLabels]{
+		Name:       "mq.channel_stats.put_retries",
+		Family:     "channels/statistics",
+		Title:      "Channel Put Retries (Statistics)",
+		Units:      "retries/s",
+		Type:       module.Line,
+		Priority:   7004,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "put_retries",
+				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"channel",
+			"type",
+		},
+		},
+	},
+}
+
+
 // --- Listener ---
 
 
@@ -879,6 +1122,23 @@ func (c QueueDepthContext) Set(state *framework.CollectorState, labels QueueLabe
 	})
 }
 
+// QueueDepthPercentageValues defines the type-safe values for Queue.DepthPercentage context
+type QueueDepthPercentageValues struct {
+	Percentage int64
+}
+
+// QueueDepthPercentageContext provides type-safe operations for Queue.DepthPercentage context
+type QueueDepthPercentageContext struct {
+	framework.Context[QueueLabels]
+}
+
+// Set provides type-safe dimension setting for Queue.DepthPercentage context
+func (c QueueDepthPercentageContext) Set(state *framework.CollectorState, labels QueueLabels, values QueueDepthPercentageValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"percentage": values.Percentage,
+	})
+}
+
 // QueueMessagesValues defines the type-safe values for Queue.Messages context
 type QueueMessagesValues struct {
 	Enqueued int64
@@ -934,23 +1194,6 @@ func (c QueueHighDepthContext) Set(state *framework.CollectorState, labels Queue
 	})
 }
 
-// QueueOldestMessageAgeValues defines the type-safe values for Queue.OldestMessageAge context
-type QueueOldestMessageAgeValues struct {
-	Oldest_msg_age int64
-}
-
-// QueueOldestMessageAgeContext provides type-safe operations for Queue.OldestMessageAge context
-type QueueOldestMessageAgeContext struct {
-	framework.Context[QueueLabels]
-}
-
-// Set provides type-safe dimension setting for Queue.OldestMessageAge context
-func (c QueueOldestMessageAgeContext) Set(state *framework.CollectorState, labels QueueLabels, values QueueOldestMessageAgeValues) {
-	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"oldest_msg_age": values.Oldest_msg_age,
-	})
-}
-
 // QueueUncommittedMessagesValues defines the type-safe values for Queue.UncommittedMessages context
 type QueueUncommittedMessagesValues struct {
 	Uncommitted int64
@@ -987,6 +1230,57 @@ func (c QueueLastActivityContext) Set(state *framework.CollectorState, labels Qu
 	})
 }
 
+// QueueOldestMessageAgeValues defines the type-safe values for Queue.OldestMessageAge context
+type QueueOldestMessageAgeValues struct {
+	Oldest_msg_age int64
+}
+
+// QueueOldestMessageAgeContext provides type-safe operations for Queue.OldestMessageAge context
+type QueueOldestMessageAgeContext struct {
+	framework.Context[QueueLabels]
+}
+
+// Set provides type-safe dimension setting for Queue.OldestMessageAge context
+func (c QueueOldestMessageAgeContext) Set(state *framework.CollectorState, labels QueueLabels, values QueueOldestMessageAgeValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"oldest_msg_age": values.Oldest_msg_age,
+	})
+}
+
+// QueueAverageQueueTimeValues defines the type-safe values for Queue.AverageQueueTime context
+type QueueAverageQueueTimeValues struct {
+	Avg_queue_time int64
+}
+
+// QueueAverageQueueTimeContext provides type-safe operations for Queue.AverageQueueTime context
+type QueueAverageQueueTimeContext struct {
+	framework.Context[QueueLabels]
+}
+
+// Set provides type-safe dimension setting for Queue.AverageQueueTime context
+func (c QueueAverageQueueTimeContext) Set(state *framework.CollectorState, labels QueueLabels, values QueueAverageQueueTimeValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"avg_queue_time": values.Avg_queue_time,
+	})
+}
+
+// QueueServiceIntervalValues defines the type-safe values for Queue.ServiceInterval context
+type QueueServiceIntervalValues struct {
+	Service_interval int64
+}
+
+// QueueServiceIntervalContext provides type-safe operations for Queue.ServiceInterval context
+type QueueServiceIntervalContext struct {
+	framework.Context[QueueLabels]
+}
+
+// Set provides type-safe dimension setting for Queue.ServiceInterval context
+func (c QueueServiceIntervalContext) Set(state *framework.CollectorState, labels QueueLabels, values QueueServiceIntervalValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"service_interval": values.Service_interval,
+	})
+}
+
 // QueueInhibitStatusValues defines the type-safe values for Queue.InhibitStatus context
 type QueueInhibitStatusValues struct {
 	Inhibit_get int64
@@ -1020,6 +1314,42 @@ type QueuePriorityContext struct {
 func (c QueuePriorityContext) Set(state *framework.CollectorState, labels QueueLabels, values QueuePriorityValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"def_priority": values.Def_priority,
+	})
+}
+
+// QueueMessagePersistenceValues defines the type-safe values for Queue.MessagePersistence context
+type QueueMessagePersistenceValues struct {
+	Persistent int64
+	Non_persistent int64
+}
+
+// QueueMessagePersistenceContext provides type-safe operations for Queue.MessagePersistence context
+type QueueMessagePersistenceContext struct {
+	framework.Context[QueueLabels]
+}
+
+// Set provides type-safe dimension setting for Queue.MessagePersistence context
+func (c QueueMessagePersistenceContext) Set(state *framework.CollectorState, labels QueueLabels, values QueueMessagePersistenceValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"persistent": values.Persistent,
+		"non_persistent": values.Non_persistent,
+	})
+}
+
+// QueueRetentionIntervalValues defines the type-safe values for Queue.RetentionInterval context
+type QueueRetentionIntervalValues struct {
+	Retention_interval int64
+}
+
+// QueueRetentionIntervalContext provides type-safe operations for Queue.RetentionInterval context
+type QueueRetentionIntervalContext struct {
+	framework.Context[QueueLabels]
+}
+
+// Set provides type-safe dimension setting for Queue.RetentionInterval context
+func (c QueueRetentionIntervalContext) Set(state *framework.CollectorState, labels QueueLabels, values QueueRetentionIntervalValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"retention_interval": values.Retention_interval,
 	})
 }
 
@@ -1076,6 +1406,82 @@ func (c QueueMaxMessageLengthContext) Set(state *framework.CollectorState, label
 	})
 }
 
+// QueueQueueScopeValues defines the type-safe values for Queue.QueueScope context
+type QueueQueueScopeValues struct {
+	Queue_manager int64
+	Cell int64
+}
+
+// QueueQueueScopeContext provides type-safe operations for Queue.QueueScope context
+type QueueQueueScopeContext struct {
+	framework.Context[QueueLabels]
+}
+
+// Set provides type-safe dimension setting for Queue.QueueScope context
+func (c QueueQueueScopeContext) Set(state *framework.CollectorState, labels QueueLabels, values QueueQueueScopeValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"queue_manager": values.Queue_manager,
+		"cell": values.Cell,
+	})
+}
+
+// QueueQueueUsageValues defines the type-safe values for Queue.QueueUsage context
+type QueueQueueUsageValues struct {
+	Normal int64
+	Transmission int64
+}
+
+// QueueQueueUsageContext provides type-safe operations for Queue.QueueUsage context
+type QueueQueueUsageContext struct {
+	framework.Context[QueueLabels]
+}
+
+// Set provides type-safe dimension setting for Queue.QueueUsage context
+func (c QueueQueueUsageContext) Set(state *framework.CollectorState, labels QueueLabels, values QueueQueueUsageValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"normal": values.Normal,
+		"transmission": values.Transmission,
+	})
+}
+
+// QueueMessageDeliverySequenceValues defines the type-safe values for Queue.MessageDeliverySequence context
+type QueueMessageDeliverySequenceValues struct {
+	Priority int64
+	Fifo int64
+}
+
+// QueueMessageDeliverySequenceContext provides type-safe operations for Queue.MessageDeliverySequence context
+type QueueMessageDeliverySequenceContext struct {
+	framework.Context[QueueLabels]
+}
+
+// Set provides type-safe dimension setting for Queue.MessageDeliverySequence context
+func (c QueueMessageDeliverySequenceContext) Set(state *framework.CollectorState, labels QueueLabels, values QueueMessageDeliverySequenceValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"priority": values.Priority,
+		"fifo": values.Fifo,
+	})
+}
+
+// QueueHardenGetBackoutValues defines the type-safe values for Queue.HardenGetBackout context
+type QueueHardenGetBackoutValues struct {
+	Enabled int64
+	Disabled int64
+}
+
+// QueueHardenGetBackoutContext provides type-safe operations for Queue.HardenGetBackout context
+type QueueHardenGetBackoutContext struct {
+	framework.Context[QueueLabels]
+}
+
+// Set provides type-safe dimension setting for Queue.HardenGetBackout context
+func (c QueueHardenGetBackoutContext) Set(state *framework.CollectorState, labels QueueLabels, values QueueHardenGetBackoutValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"enabled": values.Enabled,
+		"disabled": values.Disabled,
+	})
+}
+
 
 
 // QueueLabels defines the required labels for Queue contexts
@@ -1094,22 +1500,31 @@ func (l QueueLabels) InstanceID(contextName string) string {
 // Queue contains all metric contexts for Queue
 var Queue = struct {
 	Depth QueueDepthContext
+	DepthPercentage QueueDepthPercentageContext
 	Messages QueueMessagesContext
 	Connections QueueConnectionsContext
 	HighDepth QueueHighDepthContext
-	OldestMessageAge QueueOldestMessageAgeContext
 	UncommittedMessages QueueUncommittedMessagesContext
 	LastActivity QueueLastActivityContext
+	OldestMessageAge QueueOldestMessageAgeContext
+	AverageQueueTime QueueAverageQueueTimeContext
+	ServiceInterval QueueServiceIntervalContext
 	InhibitStatus QueueInhibitStatusContext
 	Priority QueuePriorityContext
+	MessagePersistence QueueMessagePersistenceContext
+	RetentionInterval QueueRetentionIntervalContext
 	Triggers QueueTriggersContext
 	BackoutThreshold QueueBackoutThresholdContext
 	MaxMessageLength QueueMaxMessageLengthContext
+	QueueScope QueueQueueScopeContext
+	QueueUsage QueueQueueUsageContext
+	MessageDeliverySequence QueueMessageDeliverySequenceContext
+	HardenGetBackout QueueHardenGetBackoutContext
 }{
 	Depth: QueueDepthContext{
 		Context: framework.Context[QueueLabels]{
 		Name:       "mq.queue.depth",
-		Family:     "queues",
+		Family:     "queues/activity",
 		Title:      "Queue Depth",
 		Units:      "messages",
 		Type:       module.Line,
@@ -1137,14 +1552,38 @@ var Queue = struct {
 		},
 		},
 	},
+	DepthPercentage: QueueDepthPercentageContext{
+		Context: framework.Context[QueueLabels]{
+		Name:       "mq.queue.depth_percentage",
+		Family:     "queues/activity",
+		Title:      "Queue Depth Percentage",
+		Units:      "percentage",
+		Type:       module.Line,
+		Priority:   2001,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "percentage",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1000,
+				Precision: 1000,
+			},
+		},
+		LabelKeys: []string{
+			"queue",
+			"type",
+		},
+		},
+	},
 	Messages: QueueMessagesContext{
 		Context: framework.Context[QueueLabels]{
 		Name:       "mq.queue.messages",
-		Family:     "queues",
+		Family:     "queues/activity",
 		Title:      "Queue Messages",
 		Units:      "messages/s",
 		Type:       module.Line,
-		Priority:   2001,
+		Priority:   2002,
 		UpdateEvery: 1,
 		Dimensions: []framework.Dimension{
 			{
@@ -1171,11 +1610,11 @@ var Queue = struct {
 	Connections: QueueConnectionsContext{
 		Context: framework.Context[QueueLabels]{
 		Name:       "mq.queue.connections",
-		Family:     "queues",
+		Family:     "queues/activity",
 		Title:      "Queue Connections",
 		Units:      "connections",
 		Type:       module.Line,
-		Priority:   2002,
+		Priority:   2003,
 		UpdateEvery: 1,
 		Dimensions: []framework.Dimension{
 			{
@@ -1202,11 +1641,11 @@ var Queue = struct {
 	HighDepth: QueueHighDepthContext{
 		Context: framework.Context[QueueLabels]{
 		Name:       "mq.queue.high_depth",
-		Family:     "queues",
+		Family:     "queues/activity",
 		Title:      "Queue Peak Depth",
 		Units:      "messages",
 		Type:       module.Line,
-		Priority:   2003,
+		Priority:   2004,
 		UpdateEvery: 1,
 		Dimensions: []framework.Dimension{
 			{
@@ -1223,34 +1662,10 @@ var Queue = struct {
 		},
 		},
 	},
-	OldestMessageAge: QueueOldestMessageAgeContext{
-		Context: framework.Context[QueueLabels]{
-		Name:       "mq.queue.oldest_msg_age",
-		Family:     "queues",
-		Title:      "Queue Oldest Message Age",
-		Units:      "seconds",
-		Type:       module.Line,
-		Priority:   2004,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "oldest_msg_age",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-			"queue",
-			"type",
-		},
-		},
-	},
 	UncommittedMessages: QueueUncommittedMessagesContext{
 		Context: framework.Context[QueueLabels]{
 		Name:       "mq.queue.uncommitted_msgs",
-		Family:     "queues",
+		Family:     "queues/activity",
 		Title:      "Queue Uncommitted Messages",
 		Units:      "messages",
 		Type:       module.Line,
@@ -1274,7 +1689,7 @@ var Queue = struct {
 	LastActivity: QueueLastActivityContext{
 		Context: framework.Context[QueueLabels]{
 		Name:       "mq.queue.last_activity",
-		Family:     "queues",
+		Family:     "queues/activity",
 		Title:      "Time Since Last Queue Activity",
 		Units:      "seconds",
 		Type:       module.Line,
@@ -1302,14 +1717,86 @@ var Queue = struct {
 		},
 		},
 	},
+	OldestMessageAge: QueueOldestMessageAgeContext{
+		Context: framework.Context[QueueLabels]{
+		Name:       "mq.queue.oldest_msg_age",
+		Family:     "queues/performance",
+		Title:      "Queue Oldest Message Age",
+		Units:      "seconds",
+		Type:       module.Line,
+		Priority:   2100,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "oldest_msg_age",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"queue",
+			"type",
+		},
+		},
+	},
+	AverageQueueTime: QueueAverageQueueTimeContext{
+		Context: framework.Context[QueueLabels]{
+		Name:       "mq.queue.avg_queue_time",
+		Family:     "queues/performance",
+		Title:      "Average Queue Time",
+		Units:      "microseconds",
+		Type:       module.Line,
+		Priority:   2101,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "avg_queue_time",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"queue",
+			"type",
+		},
+		},
+	},
+	ServiceInterval: QueueServiceIntervalContext{
+		Context: framework.Context[QueueLabels]{
+		Name:       "mq.queue.service_interval",
+		Family:     "queues/performance",
+		Title:      "Queue Service Interval",
+		Units:      "milliseconds",
+		Type:       module.Line,
+		Priority:   2102,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "service_interval",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"queue",
+			"type",
+		},
+		},
+	},
 	InhibitStatus: QueueInhibitStatusContext{
 		Context: framework.Context[QueueLabels]{
 		Name:       "mq.queue.inhibit_status",
-		Family:     "queues",
+		Family:     "queues/configuration",
 		Title:      "Queue Inhibit Status",
 		Units:      "status",
 		Type:       module.Line,
-		Priority:   2007,
+		Priority:   2200,
 		UpdateEvery: 1,
 		Dimensions: []framework.Dimension{
 			{
@@ -1336,11 +1823,11 @@ var Queue = struct {
 	Priority: QueuePriorityContext{
 		Context: framework.Context[QueueLabels]{
 		Name:       "mq.queue.priority",
-		Family:     "queues",
+		Family:     "queues/configuration",
 		Title:      "Queue Priority Configuration",
 		Units:      "priority",
 		Type:       module.Line,
-		Priority:   2008,
+		Priority:   2201,
 		UpdateEvery: 1,
 		Dimensions: []framework.Dimension{
 			{
@@ -1357,14 +1844,69 @@ var Queue = struct {
 		},
 		},
 	},
+	MessagePersistence: QueueMessagePersistenceContext{
+		Context: framework.Context[QueueLabels]{
+		Name:       "mq.queue.message_persistence",
+		Family:     "queues/configuration",
+		Title:      "Queue Default Message Persistence",
+		Units:      "boolean",
+		Type:       module.Line,
+		Priority:   2202,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "persistent",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "non_persistent",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"queue",
+			"type",
+		},
+		},
+	},
+	RetentionInterval: QueueRetentionIntervalContext{
+		Context: framework.Context[QueueLabels]{
+		Name:       "mq.queue.retention_interval",
+		Family:     "queues/configuration",
+		Title:      "Queue Retention Interval",
+		Units:      "hours",
+		Type:       module.Line,
+		Priority:   2203,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "retention_interval",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"queue",
+			"type",
+		},
+		},
+	},
 	Triggers: QueueTriggersContext{
 		Context: framework.Context[QueueLabels]{
 		Name:       "mq.queue.triggers",
-		Family:     "queues",
+		Family:     "queues/limits",
 		Title:      "Queue Trigger Configuration",
 		Units:      "messages",
 		Type:       module.Line,
-		Priority:   2009,
+		Priority:   2300,
 		UpdateEvery: 1,
 		Dimensions: []framework.Dimension{
 			{
@@ -1391,11 +1933,11 @@ var Queue = struct {
 	BackoutThreshold: QueueBackoutThresholdContext{
 		Context: framework.Context[QueueLabels]{
 		Name:       "mq.queue.backout_threshold",
-		Family:     "queues",
+		Family:     "queues/limits",
 		Title:      "Queue Error Handling",
 		Units:      "retries",
 		Type:       module.Line,
-		Priority:   2010,
+		Priority:   2301,
 		UpdateEvery: 1,
 		Dimensions: []framework.Dimension{
 			{
@@ -1415,15 +1957,139 @@ var Queue = struct {
 	MaxMessageLength: QueueMaxMessageLengthContext{
 		Context: framework.Context[QueueLabels]{
 		Name:       "mq.queue.max_msg_length",
-		Family:     "queues",
+		Family:     "queues/limits",
 		Title:      "Queue Max Message Length",
 		Units:      "bytes",
 		Type:       module.Line,
-		Priority:   2011,
+		Priority:   2302,
 		UpdateEvery: 1,
 		Dimensions: []framework.Dimension{
 			{
 				Name:      "max_msg_length",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"queue",
+			"type",
+		},
+		},
+	},
+	QueueScope: QueueQueueScopeContext{
+		Context: framework.Context[QueueLabels]{
+		Name:       "mq.queue.scope",
+		Family:     "queues/behavior",
+		Title:      "Queue Scope",
+		Units:      "boolean",
+		Type:       module.Line,
+		Priority:   2400,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "queue_manager",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "cell",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"queue",
+			"type",
+		},
+		},
+	},
+	QueueUsage: QueueQueueUsageContext{
+		Context: framework.Context[QueueLabels]{
+		Name:       "mq.queue.usage",
+		Family:     "queues/behavior",
+		Title:      "Queue Usage Type",
+		Units:      "boolean",
+		Type:       module.Line,
+		Priority:   2401,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "normal",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "transmission",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"queue",
+			"type",
+		},
+		},
+	},
+	MessageDeliverySequence: QueueMessageDeliverySequenceContext{
+		Context: framework.Context[QueueLabels]{
+		Name:       "mq.queue.msg_delivery_sequence",
+		Family:     "queues/behavior",
+		Title:      "Message Delivery Sequence",
+		Units:      "boolean",
+		Type:       module.Line,
+		Priority:   2402,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "priority",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "fifo",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"queue",
+			"type",
+		},
+		},
+	},
+	HardenGetBackout: QueueHardenGetBackoutContext{
+		Context: framework.Context[QueueLabels]{
+		Name:       "mq.queue.harden_get_backout",
+		Family:     "queues/behavior",
+		Title:      "Harden Get Backout",
+		Units:      "boolean",
+		Type:       module.Line,
+		Priority:   2403,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "enabled",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "disabled",
 				Algorithm: module.Absolute,
 				Mul:       1,
 				Div:       1,
@@ -1839,6 +2505,426 @@ var QueueManager = struct {
 }
 
 
+// --- QueueStatistics ---
+
+
+// QueueStatisticsDepthMinMaxValues defines the type-safe values for QueueStatistics.DepthMinMax context
+type QueueStatisticsDepthMinMaxValues struct {
+	Min_depth int64
+	Max_depth int64
+}
+
+// QueueStatisticsDepthMinMaxContext provides type-safe operations for QueueStatistics.DepthMinMax context
+type QueueStatisticsDepthMinMaxContext struct {
+	framework.Context[QueueStatisticsLabels]
+}
+
+// Set provides type-safe dimension setting for QueueStatistics.DepthMinMax context
+func (c QueueStatisticsDepthMinMaxContext) Set(state *framework.CollectorState, labels QueueStatisticsLabels, values QueueStatisticsDepthMinMaxValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"min_depth": values.Min_depth,
+		"max_depth": values.Max_depth,
+	})
+}
+
+// QueueStatisticsAvgQueueTimeValues defines the type-safe values for QueueStatistics.AvgQueueTime context
+type QueueStatisticsAvgQueueTimeValues struct {
+	Non_persistent int64
+	Persistent int64
+}
+
+// QueueStatisticsAvgQueueTimeContext provides type-safe operations for QueueStatistics.AvgQueueTime context
+type QueueStatisticsAvgQueueTimeContext struct {
+	framework.Context[QueueStatisticsLabels]
+}
+
+// Set provides type-safe dimension setting for QueueStatistics.AvgQueueTime context
+func (c QueueStatisticsAvgQueueTimeContext) Set(state *framework.CollectorState, labels QueueStatisticsLabels, values QueueStatisticsAvgQueueTimeValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"non_persistent": values.Non_persistent,
+		"persistent": values.Persistent,
+	})
+}
+
+// QueueStatisticsOperationsValues defines the type-safe values for QueueStatistics.Operations context
+type QueueStatisticsOperationsValues struct {
+	Puts_non_persistent int64
+	Puts_persistent int64
+	Gets_non_persistent int64
+	Gets_persistent int64
+	Put1s int64
+	Browses int64
+}
+
+// QueueStatisticsOperationsContext provides type-safe operations for QueueStatistics.Operations context
+type QueueStatisticsOperationsContext struct {
+	framework.Context[QueueStatisticsLabels]
+}
+
+// Set provides type-safe dimension setting for QueueStatistics.Operations context
+func (c QueueStatisticsOperationsContext) Set(state *framework.CollectorState, labels QueueStatisticsLabels, values QueueStatisticsOperationsValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"puts_non_persistent": values.Puts_non_persistent,
+		"puts_persistent": values.Puts_persistent,
+		"gets_non_persistent": values.Gets_non_persistent,
+		"gets_persistent": values.Gets_persistent,
+		"put1s": values.Put1s,
+		"browses": values.Browses,
+	})
+}
+
+// QueueStatisticsBytesValues defines the type-safe values for QueueStatistics.Bytes context
+type QueueStatisticsBytesValues struct {
+	Put_bytes_non_persistent int64
+	Put_bytes_persistent int64
+	Get_bytes_non_persistent int64
+	Get_bytes_persistent int64
+	Browse_bytes int64
+}
+
+// QueueStatisticsBytesContext provides type-safe operations for QueueStatistics.Bytes context
+type QueueStatisticsBytesContext struct {
+	framework.Context[QueueStatisticsLabels]
+}
+
+// Set provides type-safe dimension setting for QueueStatistics.Bytes context
+func (c QueueStatisticsBytesContext) Set(state *framework.CollectorState, labels QueueStatisticsLabels, values QueueStatisticsBytesValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"put_bytes_non_persistent": values.Put_bytes_non_persistent,
+		"put_bytes_persistent": values.Put_bytes_persistent,
+		"get_bytes_non_persistent": values.Get_bytes_non_persistent,
+		"get_bytes_persistent": values.Get_bytes_persistent,
+		"browse_bytes": values.Browse_bytes,
+	})
+}
+
+// QueueStatisticsFailuresValues defines the type-safe values for QueueStatistics.Failures context
+type QueueStatisticsFailuresValues struct {
+	Puts_failed int64
+	Put1s_failed int64
+	Gets_failed int64
+	Browses_failed int64
+}
+
+// QueueStatisticsFailuresContext provides type-safe operations for QueueStatistics.Failures context
+type QueueStatisticsFailuresContext struct {
+	framework.Context[QueueStatisticsLabels]
+}
+
+// Set provides type-safe dimension setting for QueueStatistics.Failures context
+func (c QueueStatisticsFailuresContext) Set(state *framework.CollectorState, labels QueueStatisticsLabels, values QueueStatisticsFailuresValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"puts_failed": values.Puts_failed,
+		"put1s_failed": values.Put1s_failed,
+		"gets_failed": values.Gets_failed,
+		"browses_failed": values.Browses_failed,
+	})
+}
+
+// QueueStatisticsMessageLifecycleValues defines the type-safe values for QueueStatistics.MessageLifecycle context
+type QueueStatisticsMessageLifecycleValues struct {
+	Expired int64
+	Purged int64
+	Not_queued int64
+}
+
+// QueueStatisticsMessageLifecycleContext provides type-safe operations for QueueStatistics.MessageLifecycle context
+type QueueStatisticsMessageLifecycleContext struct {
+	framework.Context[QueueStatisticsLabels]
+}
+
+// Set provides type-safe dimension setting for QueueStatistics.MessageLifecycle context
+func (c QueueStatisticsMessageLifecycleContext) Set(state *framework.CollectorState, labels QueueStatisticsLabels, values QueueStatisticsMessageLifecycleValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"expired": values.Expired,
+		"purged": values.Purged,
+		"not_queued": values.Not_queued,
+	})
+}
+
+
+
+// QueueStatisticsLabels defines the required labels for QueueStatistics contexts
+type QueueStatisticsLabels struct {
+	Queue string
+	Type string
+}
+
+// InstanceID generates a unique instance ID using the hardcoded label order from YAML
+func (l QueueStatisticsLabels) InstanceID(contextName string) string {
+	// Label order from YAML: queue, type
+	return contextName + "." + cleanLabelValue(l.Queue) + "_" + cleanLabelValue(l.Type)
+}
+
+
+// QueueStatistics contains all metric contexts for QueueStatistics
+var QueueStatistics = struct {
+	DepthMinMax QueueStatisticsDepthMinMaxContext
+	AvgQueueTime QueueStatisticsAvgQueueTimeContext
+	Operations QueueStatisticsOperationsContext
+	Bytes QueueStatisticsBytesContext
+	Failures QueueStatisticsFailuresContext
+	MessageLifecycle QueueStatisticsMessageLifecycleContext
+}{
+	DepthMinMax: QueueStatisticsDepthMinMaxContext{
+		Context: framework.Context[QueueStatisticsLabels]{
+		Name:       "mq.queue_stats.depth_min_max",
+		Family:     "queues/statistics",
+		Title:      "Queue Depth Min/Max (Statistics)",
+		Units:      "messages",
+		Type:       module.Line,
+		Priority:   6000,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "min_depth",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "max_depth",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"queue",
+			"type",
+		},
+		},
+	},
+	AvgQueueTime: QueueStatisticsAvgQueueTimeContext{
+		Context: framework.Context[QueueStatisticsLabels]{
+		Name:       "mq.queue_stats.avg_queue_time",
+		Family:     "queues/statistics",
+		Title:      "Queue Average Time (Statistics)",
+		Units:      "microseconds",
+		Type:       module.Line,
+		Priority:   6001,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "non_persistent",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "persistent",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"queue",
+			"type",
+		},
+		},
+	},
+	Operations: QueueStatisticsOperationsContext{
+		Context: framework.Context[QueueStatisticsLabels]{
+		Name:       "mq.queue_stats.operations",
+		Family:     "queues/statistics",
+		Title:      "Queue Operations (Statistics)",
+		Units:      "operations/s",
+		Type:       module.Line,
+		Priority:   6002,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "puts_non_persistent",
+				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "puts_persistent",
+				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "gets_non_persistent",
+				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "gets_persistent",
+				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "put1s",
+				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "browses",
+				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"queue",
+			"type",
+		},
+		},
+	},
+	Bytes: QueueStatisticsBytesContext{
+		Context: framework.Context[QueueStatisticsLabels]{
+		Name:       "mq.queue_stats.bytes",
+		Family:     "queues/statistics",
+		Title:      "Queue Bytes (Statistics)",
+		Units:      "bytes/s",
+		Type:       module.Line,
+		Priority:   6003,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "put_bytes_non_persistent",
+				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "put_bytes_persistent",
+				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "get_bytes_non_persistent",
+				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "get_bytes_persistent",
+				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "browse_bytes",
+				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"queue",
+			"type",
+		},
+		},
+	},
+	Failures: QueueStatisticsFailuresContext{
+		Context: framework.Context[QueueStatisticsLabels]{
+		Name:       "mq.queue_stats.failures",
+		Family:     "queues/statistics",
+		Title:      "Queue Operation Failures (Statistics)",
+		Units:      "failures/s",
+		Type:       module.Line,
+		Priority:   6004,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "puts_failed",
+				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "put1s_failed",
+				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "gets_failed",
+				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "browses_failed",
+				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"queue",
+			"type",
+		},
+		},
+	},
+	MessageLifecycle: QueueStatisticsMessageLifecycleContext{
+		Context: framework.Context[QueueStatisticsLabels]{
+		Name:       "mq.queue_stats.message_lifecycle",
+		Family:     "queues/statistics",
+		Title:      "Queue Message Lifecycle (Statistics)",
+		Units:      "messages/s",
+		Type:       module.Line,
+		Priority:   6005,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "expired",
+				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "purged",
+				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "not_queued",
+				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"queue",
+			"type",
+		},
+		},
+	},
+}
+
+
 // --- Topic ---
 
 
@@ -2001,21 +3087,35 @@ func GetAllContexts() []interface{} {
 		&Channel.MaxMessageLength.Context,
 		&Channel.SharingConversations.Context,
 		&Channel.NetworkPriority.Context,
+		&ChannelStatistics.Messages.Context,
+		&ChannelStatistics.Bytes.Context,
+		&ChannelStatistics.Batches.Context,
+		&ChannelStatistics.BatchSize.Context,
+		&ChannelStatistics.PutRetries.Context,
 		&Listener.Status.Context,
 		&Listener.Backlog.Context,
 		&Listener.Uptime.Context,
 		&Queue.Depth.Context,
+		&Queue.DepthPercentage.Context,
 		&Queue.Messages.Context,
 		&Queue.Connections.Context,
 		&Queue.HighDepth.Context,
-		&Queue.OldestMessageAge.Context,
 		&Queue.UncommittedMessages.Context,
 		&Queue.LastActivity.Context,
+		&Queue.OldestMessageAge.Context,
+		&Queue.AverageQueueTime.Context,
+		&Queue.ServiceInterval.Context,
 		&Queue.InhibitStatus.Context,
 		&Queue.Priority.Context,
+		&Queue.MessagePersistence.Context,
+		&Queue.RetentionInterval.Context,
 		&Queue.Triggers.Context,
 		&Queue.BackoutThreshold.Context,
 		&Queue.MaxMessageLength.Context,
+		&Queue.QueueScope.Context,
+		&Queue.QueueUsage.Context,
+		&Queue.MessageDeliverySequence.Context,
+		&Queue.HardenGetBackout.Context,
 		&QueueManager.Status.Context,
 		&QueueManager.ConnectionCount.Context,
 		&QueueManager.Uptime.Context,
@@ -2023,6 +3123,12 @@ func GetAllContexts() []interface{} {
 		&QueueManager.ChannelsOverview.Context,
 		&QueueManager.TopicsOverview.Context,
 		&QueueManager.ListenersOverview.Context,
+		&QueueStatistics.DepthMinMax.Context,
+		&QueueStatistics.AvgQueueTime.Context,
+		&QueueStatistics.Operations.Context,
+		&QueueStatistics.Bytes.Context,
+		&QueueStatistics.Failures.Context,
+		&QueueStatistics.MessageLifecycle.Context,
 		&Topic.Publishers.Context,
 		&Topic.Subscribers.Context,
 		&Topic.Messages.Context,

@@ -169,6 +169,45 @@ using the PCF (Programmable Command Format) protocol.
               chart_type: line
               dimensions:
                 - name: network_priority
+        - name: channelstatistics
+          description: These metrics refer to channelstatistics instances.
+          labels:
+            - name: channel
+              description: Channel identifier
+            - name: type
+              description: Type identifier
+          metrics:
+            - name: mq.channel_stats.messages
+              description: Channel Messages (Statistics)
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: messages
+            - name: mq.channel_stats.bytes
+              description: Channel Bytes (Statistics)
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: bytes
+            - name: mq.channel_stats.batches
+              description: Channel Batches (Statistics)
+              unit: batches/s
+              chart_type: line
+              dimensions:
+                - name: full_batches
+                - name: incomplete_batches
+            - name: mq.channel_stats.batch_size
+              description: Channel Average Batch Size (Statistics)
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: avg_batch_size
+            - name: mq.channel_stats.put_retries
+              description: Channel Put Retries (Statistics)
+              unit: retries/s
+              chart_type: line
+              dimensions:
+                - name: put_retries
         - name: listener
           description: These metrics refer to listener instances.
           labels:
@@ -216,6 +255,12 @@ using the PCF (Programmable Command Format) protocol.
               dimensions:
                 - name: current
                 - name: max
+            - name: mq.queue.depth_percentage
+              description: Queue Depth Percentage
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: percentage
             - name: mq.queue.messages
               description: Queue Messages
               unit: messages/s
@@ -236,12 +281,6 @@ using the PCF (Programmable Command Format) protocol.
               chart_type: line
               dimensions:
                 - name: high_depth
-            - name: mq.queue.oldest_msg_age
-              description: Queue Oldest Message Age
-              unit: seconds
-              chart_type: line
-              dimensions:
-                - name: oldest_msg_age
             - name: mq.queue.uncommitted_msgs
               description: Queue Uncommitted Messages
               unit: messages
@@ -255,6 +294,24 @@ using the PCF (Programmable Command Format) protocol.
               dimensions:
                 - name: since_last_get
                 - name: since_last_put
+            - name: mq.queue.oldest_msg_age
+              description: Queue Oldest Message Age
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: oldest_msg_age
+            - name: mq.queue.avg_queue_time
+              description: Average Queue Time
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: avg_queue_time
+            - name: mq.queue.service_interval
+              description: Queue Service Interval
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: service_interval
             - name: mq.queue.inhibit_status
               description: Queue Inhibit Status
               unit: status
@@ -268,6 +325,19 @@ using the PCF (Programmable Command Format) protocol.
               chart_type: line
               dimensions:
                 - name: def_priority
+            - name: mq.queue.message_persistence
+              description: Queue Default Message Persistence
+              unit: boolean
+              chart_type: line
+              dimensions:
+                - name: persistent
+                - name: non_persistent
+            - name: mq.queue.retention_interval
+              description: Queue Retention Interval
+              unit: hours
+              chart_type: line
+              dimensions:
+                - name: retention_interval
             - name: mq.queue.triggers
               description: Queue Trigger Configuration
               unit: messages
@@ -287,6 +357,34 @@ using the PCF (Programmable Command Format) protocol.
               chart_type: line
               dimensions:
                 - name: max_msg_length
+            - name: mq.queue.scope
+              description: Queue Scope
+              unit: boolean
+              chart_type: line
+              dimensions:
+                - name: queue_manager
+                - name: cell
+            - name: mq.queue.usage
+              description: Queue Usage Type
+              unit: boolean
+              chart_type: line
+              dimensions:
+                - name: normal
+                - name: transmission
+            - name: mq.queue.msg_delivery_sequence
+              description: Message Delivery Sequence
+              unit: boolean
+              chart_type: line
+              dimensions:
+                - name: priority
+                - name: fifo
+            - name: mq.queue.harden_get_backout
+              description: Harden Get Backout
+              unit: boolean
+              chart_type: line
+              dimensions:
+                - name: enabled
+                - name: disabled
         - name: global
           description: These metrics refer to the entire monitored instance.
           labels: []
@@ -345,6 +443,66 @@ using the PCF (Programmable Command Format) protocol.
                 - name: excluded
                 - name: invisible
                 - name: failed
+        - name: queuestatistics
+          description: These metrics refer to queuestatistics instances.
+          labels:
+            - name: queue
+              description: Queue identifier
+            - name: type
+              description: Type identifier
+          metrics:
+            - name: mq.queue_stats.depth_min_max
+              description: Queue Depth Min/Max (Statistics)
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: min_depth
+                - name: max_depth
+            - name: mq.queue_stats.avg_queue_time
+              description: Queue Average Time (Statistics)
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: non_persistent
+                - name: persistent
+            - name: mq.queue_stats.operations
+              description: Queue Operations (Statistics)
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: puts_non_persistent
+                - name: puts_persistent
+                - name: gets_non_persistent
+                - name: gets_persistent
+                - name: put1s
+                - name: browses
+            - name: mq.queue_stats.bytes
+              description: Queue Bytes (Statistics)
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: put_bytes_non_persistent
+                - name: put_bytes_persistent
+                - name: get_bytes_non_persistent
+                - name: get_bytes_persistent
+                - name: browse_bytes
+            - name: mq.queue_stats.failures
+              description: Queue Operation Failures (Statistics)
+              unit: failures/s
+              chart_type: line
+              dimensions:
+                - name: puts_failed
+                - name: put1s_failed
+                - name: gets_failed
+                - name: browses_failed
+            - name: mq.queue_stats.message_lifecycle
+              description: Queue Message Lifecycle (Statistics)
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: expired
+                - name: purged
+                - name: not_queued
         - name: topic
           description: These metrics refer to topic instances.
           labels:

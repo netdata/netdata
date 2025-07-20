@@ -42,6 +42,11 @@
         "title": "Enable collection of queue statistics (destructive operation)",
         "type": "boolean"
       },
+      "collect_statistics_queue": {
+        "default": false,
+        "title": "Enable collection of statistics queue metrics (SYSTEM.ADMIN.STATISTICS.QUEUE provides advanced metrics like min/max depth)",
+        "type": "boolean"
+      },
       "collect_system_channels": {
         "default": true,
         "title": "Enable collection of system channel metrics (SYSTEM.* channels show clustering and administrative health)",
@@ -119,6 +124,11 @@
         "default": "",
         "title": "Pattern to filter queues (wildcards supported)",
         "type": "string"
+      },
+      "statistics_interval": {
+        "default": 60,
+        "title": "Statistics collection interval in seconds (must match MQ STATINT setting to avoid wasted calls)",
+        "type": "integer"
       },
       "topic_selector": {
         "default": "",
