@@ -67,11 +67,10 @@ func (c *Collector) collectQueueMetrics() error {
 				Output: queue.OpenOutputCount,
 			})
 			
-			// Additional status metrics if they have meaningful values
-			if queue.OldestMsgAge > 0 {
-				// Only set oldest message age if there are messages
-				// TODO: Add oldest message age context if needed
-			}
+			// Oldest message age - send whatever we collected
+			contexts.Queue.OldestMessageAge.Set(c.State, labels, contexts.QueueOldestMessageAgeValues{
+				Oldest_msg_age: queue.OldestMsgAge,
+			})
 			
 			if queue.UncommittedMsgs > 0 {
 				// Only set uncommitted messages if there are any

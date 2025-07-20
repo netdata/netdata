@@ -97,13 +97,22 @@ Queue:
         priority: 2003
         dimensions:
           - { name: high_depth, algo: absolute }
+      - name: OldestMessageAge
+        context: mq.queue.oldest_msg_age
+        title: Queue Oldest Message Age
+        units: seconds
+        family: queues
+        type: line
+        priority: 2004
+        dimensions:
+          - { name: oldest_msg_age, algo: absolute }
       - name: InhibitStatus
         context: mq.queue.inhibit_status
         title: Queue Inhibit Status
         units: status
         family: queues
         type: line
-        priority: 2004
+        priority: 2005
         dimensions:
           - { name: inhibit_get, algo: absolute }
           - { name: inhibit_put, algo: absolute }
@@ -113,7 +122,7 @@ Queue:
         units: priority
         family: queues
         type: line
-        priority: 2005
+        priority: 2006
         dimensions:
           - { name: def_priority, algo: absolute }
       - name: Triggers
@@ -122,7 +131,7 @@ Queue:
         units: messages
         family: queues
         type: line
-        priority: 2006
+        priority: 2007
         dimensions:
           - { name: trigger_depth, algo: absolute }
           - { name: trigger_type, algo: absolute }
@@ -132,7 +141,7 @@ Queue:
         units: retries
         family: queues
         type: line
-        priority: 2007
+        priority: 2008
         dimensions:
           - { name: backout_threshold, algo: absolute }
       - name: MaxMessageLength
@@ -141,7 +150,7 @@ Queue:
         units: bytes
         family: queues
         type: line
-        priority: 2008
+        priority: 2009
         dimensions:
           - { name: max_msg_length, algo: absolute }
 
