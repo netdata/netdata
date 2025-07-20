@@ -665,6 +665,23 @@ func (c QueueOldestMessageAgeContext) Set(state *framework.CollectorState, label
 	})
 }
 
+// QueueUncommittedMessagesValues defines the type-safe values for Queue.UncommittedMessages context
+type QueueUncommittedMessagesValues struct {
+	Uncommitted int64
+}
+
+// QueueUncommittedMessagesContext provides type-safe operations for Queue.UncommittedMessages context
+type QueueUncommittedMessagesContext struct {
+	framework.Context[QueueLabels]
+}
+
+// Set provides type-safe dimension setting for Queue.UncommittedMessages context
+func (c QueueUncommittedMessagesContext) Set(state *framework.CollectorState, labels QueueLabels, values QueueUncommittedMessagesValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"uncommitted": values.Uncommitted,
+	})
+}
+
 // QueueInhibitStatusValues defines the type-safe values for Queue.InhibitStatus context
 type QueueInhibitStatusValues struct {
 	Inhibit_get int64
@@ -776,6 +793,7 @@ var Queue = struct {
 	Connections QueueConnectionsContext
 	HighDepth QueueHighDepthContext
 	OldestMessageAge QueueOldestMessageAgeContext
+	UncommittedMessages QueueUncommittedMessagesContext
 	InhibitStatus QueueInhibitStatusContext
 	Priority QueuePriorityContext
 	Triggers QueueTriggersContext
@@ -923,6 +941,30 @@ var Queue = struct {
 		},
 		},
 	},
+	UncommittedMessages: QueueUncommittedMessagesContext{
+		Context: framework.Context[QueueLabels]{
+		Name:       "mq.queue.uncommitted_msgs",
+		Family:     "queues",
+		Title:      "Queue Uncommitted Messages",
+		Units:      "messages",
+		Type:       module.Line,
+		Priority:   2005,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "uncommitted",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"queue",
+			"type",
+		},
+		},
+	},
 	InhibitStatus: QueueInhibitStatusContext{
 		Context: framework.Context[QueueLabels]{
 		Name:       "mq.queue.inhibit_status",
@@ -930,7 +972,7 @@ var Queue = struct {
 		Title:      "Queue Inhibit Status",
 		Units:      "status",
 		Type:       module.Line,
-		Priority:   2005,
+		Priority:   2006,
 		UpdateEvery: 1,
 		Dimensions: []framework.Dimension{
 			{
@@ -961,7 +1003,7 @@ var Queue = struct {
 		Title:      "Queue Priority Configuration",
 		Units:      "priority",
 		Type:       module.Line,
-		Priority:   2006,
+		Priority:   2007,
 		UpdateEvery: 1,
 		Dimensions: []framework.Dimension{
 			{
@@ -985,7 +1027,7 @@ var Queue = struct {
 		Title:      "Queue Trigger Configuration",
 		Units:      "messages",
 		Type:       module.Line,
-		Priority:   2007,
+		Priority:   2008,
 		UpdateEvery: 1,
 		Dimensions: []framework.Dimension{
 			{
@@ -1016,7 +1058,7 @@ var Queue = struct {
 		Title:      "Queue Error Handling",
 		Units:      "retries",
 		Type:       module.Line,
-		Priority:   2008,
+		Priority:   2009,
 		UpdateEvery: 1,
 		Dimensions: []framework.Dimension{
 			{
@@ -1040,7 +1082,7 @@ var Queue = struct {
 		Title:      "Queue Max Message Length",
 		Units:      "bytes",
 		Type:       module.Line,
-		Priority:   2009,
+		Priority:   2010,
 		UpdateEvery: 1,
 		Dimensions: []framework.Dimension{
 			{
@@ -1495,6 +1537,7 @@ func GetAllContexts() []interface{} {
 		&Queue.Connections.Context,
 		&Queue.HighDepth.Context,
 		&Queue.OldestMessageAge.Context,
+		&Queue.UncommittedMessages.Context,
 		&Queue.InhibitStatus.Context,
 		&Queue.Priority.Context,
 		&Queue.Triggers.Context,

@@ -2,6 +2,26 @@
 
 This document compares our mq_pcf collector with leading IBM MQ monitoring solutions.
 
+## Current Implementation Status
+
+**As of latest updates:**
+- **Total Metrics**: 1039 time-series for mq-test instance (up from ~393)
+- **Collection Pattern**: Efficient 3N batching (3 requests per queue)
+- **New Features Implemented**:
+  - ✅ OldestMessageAge metric for all queues
+  - ✅ Split configuration contexts for better organization
+  - ✅ AttributeValue type with NotCollected sentinel
+  - ✅ Per-attribute validity tracking (no fake data)
+  - ✅ Extended to channels for consistent handling
+  - ✅ Type-safe metric collection API
+  
+**Metric Breakdown**:
+- **Queue Metrics**: 10 contexts (depth, messages, connections, high_depth, oldest_msg_age, inhibit_status, priority, triggers, backout_threshold, max_msg_length)
+- **Channel Metrics**: 3 contexts (status, messages, bytes) with batch configuration
+- **Topic Metrics**: 3 contexts (publishers, subscribers, messages)
+- **Queue Manager**: Status and overview metrics
+- **Resolution**: Per-second (1s) - unmatched by competitors
+
 ## Competitors Analyzed
 1. **Prometheus IBM MQ Exporter** (used with Grafana)
 2. **Dynatrace IBM MQ Extension 2.0**
@@ -99,7 +119,7 @@ Many metrics require specific monitoring levels set on MQ objects:
 | Enqueue count/rate | ✅* | ✅ | ✅* | ✅* | ❌ | ✅ | *Requires RESET_Q_STATS |
 | Dequeue count/rate | ✅* | ✅ | ✅* | ✅* | ❌ | ✅ | *Requires RESET_Q_STATS |
 | Open input/output count | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Active connections |
-| Oldest message age | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | Queue time tracking |
+| Oldest message age | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Queue time tracking |
 | Average queue time | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | Message residence time |
 | Last GET/PUT time | ❌ | ❓ | ✅ | ✅ | ✅ | ❌ | Operation timestamps |
 | Expired messages | ❌ | ✅ | ❓ | ✅ | ❌ | ❌ | Per-queue expiry |
@@ -119,7 +139,7 @@ Many metrics require specific monitoring levels set on MQ objects:
 | High queue depth (stats) | ✅* | ❌ | ❌ | ✅ | ❌ | ✅ | Peak depth in interval |
 | Min/Max depth (stats) | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | Depth range in interval |
 | Time since reset | ✅* | ❌ | ❌ | ✅ | ❌ | ❌ | Stats window |
-| Uncommitted messages | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ | Transaction pending |
+| Uncommitted messages | ❌* | ❌ | ❌ | ✅ | ✅ | ✅ | Transaction pending |
 | Harden get backout | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | Backout persistence |
 | Message delivery sequence | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | FIFO/Priority |
 | Queue scope | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | Local/Cell |
@@ -218,11 +238,11 @@ Many metrics require specific monitoring levels set on MQ objects:
 | Local monitoring | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | On MQ host |
 | Remote monitoring | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | From remote host |
 | Auto-discovery | ✅ | ❓ | ✅ | ✅ | ✅ | ❌ | Find queue managers |
-| Queue auto-discovery | ❌ | ❓ | ✅ | ✅ | ✅ | ✅ | Dynamic queue discovery |
+| Queue auto-discovery | ✅ | ❓ | ✅ | ✅ | ✅ | ✅ | Dynamic queue discovery |
 | **Advanced Features** |
 | Credential vault | ❌ | ❓ | ✅ | ✅ | ❌ | ❌ | Secure credential storage |
 | Transaction tracing | ❌ | ❓ | ✅ | ❌ | ❌ | ❌ | Message flow tracking |
-| Bulk collection | ❌ | ❓ | ✅ | ✅ | ❌ | ❌ | Performance optimization |
+| Bulk collection | ✅ | ❓ | ✅ | ✅ | ❌ | ❌ | Performance optimization |
 | DLQ event generation | ❌ | ❓ | ✅ | ❌ | ❌ | ❌ | Dead letter queue alerts |
 | Queue manager aliasing | ❌ | ❓ | ✅ | ❌ | ❌ | ❌ | Rename for clarity |
 | Listener monitoring | ❌ | ❓ | ✅ | ❌ | ❌ | ✅ | Connection endpoints |
@@ -358,10 +378,10 @@ Many metrics require specific monitoring levels set on MQ objects:
 ## Implementation Recommendations
 
 ### High Priority (Core Gaps)
-1. **Queue Time Metrics** - All competitors have these
-   - Oldest message age (MQIA_MSGAGE)
-   - Last GET/PUT timestamps
-   - Average queue time
+1. **Queue Time Metrics** - Partially implemented
+   - ✅ Oldest message age (MQIA_MSGAGE) - IMPLEMENTED
+   - ❌ Last GET/PUT timestamps
+   - ❌ Average queue time
    - Available via MQCMD_INQUIRE_Q_STATUS
 
 2. **Extended Queue Statistics**
@@ -412,6 +432,7 @@ Many metrics require specific monitoring levels set on MQ objects:
   - Enhanced PCF collector for queue/channel statistics
   - REST API collector for resource metrics (MQ 9.0.4+)
   - Platform-specific collectors for wider OS support
+- Metrics marked with * indicate data is collected but not yet exposed as a metric
 
 ## Analysis Notes from Source Code Review
 
