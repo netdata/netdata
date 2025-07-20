@@ -26,16 +26,52 @@ func cleanLabelValue(value string) string {
 	return strings.ToLower(r.Replace(value))
 }
 
-// emptyLabels is used for contexts without labels
-type emptyLabels struct{}
+// EmptyLabels is used for contexts without labels
+type EmptyLabels struct{}
 
 // InstanceID for empty labels just returns the context name
-func (emptyLabels) InstanceID(contextName string) string {
+func (EmptyLabels) InstanceID(contextName string) string {
 	return contextName
 }
 
 
 // --- Item ---
+
+
+// ItemItemPercentageValues defines the type-safe values for Item.ItemPercentage context
+type ItemItemPercentageValues struct {
+	Percentage int64
+}
+
+// ItemItemPercentageContext provides type-safe operations for Item.ItemPercentage context
+type ItemItemPercentageContext struct {
+	framework.Context[ItemLabels]
+}
+
+// Set provides type-safe dimension setting for Item.ItemPercentage context
+func (c ItemItemPercentageContext) Set(state *framework.CollectorState, labels ItemLabels, values ItemItemPercentageValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"percentage": values.Percentage,
+	})
+}
+
+// ItemItemCounterValues defines the type-safe values for Item.ItemCounter context
+type ItemItemCounterValues struct {
+	Counter int64
+}
+
+// ItemItemCounterContext provides type-safe operations for Item.ItemCounter context
+type ItemItemCounterContext struct {
+	framework.Context[ItemLabels]
+}
+
+// Set provides type-safe dimension setting for Item.ItemCounter context
+func (c ItemItemCounterContext) Set(state *framework.CollectorState, labels ItemLabels, values ItemItemCounterValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"counter": values.Counter,
+	})
+}
+
 
 
 // ItemLabels defines the required labels for Item contexts
@@ -52,10 +88,11 @@ func (l ItemLabels) InstanceID(contextName string) string {
 
 // Item contains all metric contexts for Item
 var Item = struct {
-	ItemPercentage framework.Context[ItemLabels]
-	ItemCounter framework.Context[ItemLabels]
+	ItemPercentage ItemItemPercentageContext
+	ItemCounter ItemItemCounterContext
 }{
-	ItemPercentage: framework.Context[ItemLabels]{
+	ItemPercentage: ItemItemPercentageContext{
+		Context: framework.Context[ItemLabels]{
 		Name:       "example.item_percentage",
 		Family:     "items",
 		Title:      "Item Percentage",
@@ -75,8 +112,10 @@ var Item = struct {
 		LabelKeys: []string{
 			"slot",
 		},
+		},
 	},
-	ItemCounter: framework.Context[ItemLabels]{
+	ItemCounter: ItemItemCounterContext{
+		Context: framework.Context[ItemLabels]{
 		Name:       "example.item_counter",
 		Family:     "items",
 		Title:      "Item Counter",
@@ -96,6 +135,7 @@ var Item = struct {
 		LabelKeys: []string{
 			"slot",
 		},
+		},
 	},
 }
 
@@ -103,13 +143,50 @@ var Item = struct {
 // --- Test ---
 
 
+// TestTestAbsoluteValues defines the type-safe values for Test.TestAbsolute context
+type TestTestAbsoluteValues struct {
+	Value int64
+}
+
+// TestTestAbsoluteContext provides type-safe operations for Test.TestAbsolute context
+type TestTestAbsoluteContext struct {
+	framework.Context[EmptyLabels]
+}
+
+// Set provides type-safe dimension setting for Test.TestAbsolute context
+func (c TestTestAbsoluteContext) Set(state *framework.CollectorState, labels EmptyLabels, values TestTestAbsoluteValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
+		"value": values.Value,
+	})
+}
+
+// TestTestIncrementalValues defines the type-safe values for Test.TestIncremental context
+type TestTestIncrementalValues struct {
+	Counter int64
+}
+
+// TestTestIncrementalContext provides type-safe operations for Test.TestIncremental context
+type TestTestIncrementalContext struct {
+	framework.Context[EmptyLabels]
+}
+
+// Set provides type-safe dimension setting for Test.TestIncremental context
+func (c TestTestIncrementalContext) Set(state *framework.CollectorState, labels EmptyLabels, values TestTestIncrementalValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
+		"counter": values.Counter,
+	})
+}
+
+
+
 
 // Test contains all metric contexts for Test
 var Test = struct {
-	TestAbsolute framework.Context[emptyLabels]
-	TestIncremental framework.Context[emptyLabels]
+	TestAbsolute TestTestAbsoluteContext
+	TestIncremental TestTestIncrementalContext
 }{
-	TestAbsolute: framework.Context[emptyLabels]{
+	TestAbsolute: TestTestAbsoluteContext{
+		Context: framework.Context[EmptyLabels]{
 		Name:       "example.test_absolute",
 		Family:     "test",
 		Title:      "Test Absolute Value (timestamp % 60)",
@@ -128,8 +205,10 @@ var Test = struct {
 		},
 		LabelKeys: []string{
 		},
+		},
 	},
-	TestIncremental: framework.Context[emptyLabels]{
+	TestIncremental: TestTestIncrementalContext{
+		Context: framework.Context[EmptyLabels]{
 		Name:       "example.test_incremental",
 		Family:     "test",
 		Title:      "Test Incremental Counter",
@@ -148,6 +227,7 @@ var Test = struct {
 		},
 		LabelKeys: []string{
 		},
+		},
 	},
 }
 
@@ -156,9 +236,9 @@ var Test = struct {
 // GetAllContexts returns all contexts for framework registration
 func GetAllContexts() []interface{} {
 	return []interface{}{
-		&Item.ItemPercentage,
-		&Item.ItemCounter,
-		&Test.TestAbsolute,
-		&Test.TestIncremental,
+		&Item.ItemPercentage.Context,
+		&Item.ItemCounter.Context,
+		&Test.TestAbsolute.Context,
+		&Test.TestIncremental.Context,
 	}
 }

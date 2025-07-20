@@ -6,6 +6,7 @@ This document describes the IBM.D framework - a new framework built on top of go
 
 ### Key Features
 - **Compile-time safety** through code generation from YAML
+- **Type-safe dimension API** - compile errors for typos, IDE autocomplete
 - **Automatic chart lifecycle** - creation, updates, and obsoletion
 - **Global labels** automatically applied to all charts
 - **Zero boilerplate** - 80%+ code reduction vs traditional go.d
@@ -64,14 +65,15 @@ The IBM.D framework is designed to:
 
 ## Core Principles
 
-1. **Compile-Time Safety**: All metric operations are type-checked at compile time
-2. **Zero Manual Chart Management**: Framework handles all chart lifecycle automatically
-3. **Protocol Abstraction**: Collectors orchestrate, protocols handle communication
-4. **Automatic Obsoletion**: Instances disappear automatically when no longer present
-5. **Global Label Support**: Job-level labels apply to all charts transparently
-6. **No Boilerplate**: 80%+ reduction in code compared to traditional go.d modules
-7. **Data Integrity**: Never cache or fake data - missing data shows as gaps
-8. **Separation of Concerns**: Collectors only orchestrate, never implement protocols
+1. **Compile-Time Safety**: All metric operations and dimension names are type-checked at compile time
+2. **Type-Safe Dimensions**: Impossible to misspell dimension names - compile errors catch all typos
+3. **Zero Manual Chart Management**: Framework handles all chart lifecycle automatically
+4. **Protocol Abstraction**: Collectors orchestrate, protocols handle communication
+5. **Automatic Obsoletion**: Instances disappear automatically when no longer present
+6. **Global Label Support**: Job-level labels apply to all charts transparently
+7. **No Boilerplate**: 80%+ reduction in code compared to traditional go.d modules
+8. **Data Integrity**: Never cache or fake data - missing data shows as gaps
+9. **Separation of Concerns**: Collectors only orchestrate, never implement protocols
 
 ## Core Components
 
@@ -179,10 +181,10 @@ labels := contexts.QueueLabels{
     Type:  "local",
 }
 
-// Type-safe metric setting
-c.State.Set(contexts.Queue.Depth, labels, map[string]int64{
-    "current": 42,
-    "max":     1000,
+// Type-safe metric setting with compile-time dimension validation
+contexts.Queue.Depth.Set(c.State, labels, contexts.QueueDepthValues{
+    Current: 42,     // Compile-time checked field name
+    Max:     1000,   // IDE autocomplete shows available fields
 })
 ```
 
@@ -194,21 +196,49 @@ The framework ensures dimension IDs are unique across the entire job:
 
 ## State Management
 
-### Setting Metrics
+### Setting Metrics - Type-Safe API
+
+The framework provides **compile-time type-safe** metric setting that prevents dimension name errors:
 
 ```go
-// Global metrics (no labels)
-c.State.SetGlobal(contexts.System.CPUUsage, map[string]int64{
-    "user":   75,
-    "system": 25,
+// Global metrics (no labels) - using type-safe API
+contexts.System.CPUUsage.Set(c.State, contexts.EmptyLabels{}, contexts.SystemCPUUsageValues{
+    User:   75,
+    System: 25,
 })
 
-// Labeled metrics
+// Labeled metrics - using type-safe API
 labels := contexts.QueueLabels{Queue: "Q1", Type: "local"}
-c.State.Set(contexts.Queue.Depth, labels, map[string]int64{
-    "current": 100,
+contexts.Queue.Depth.Set(c.State, labels, contexts.QueueDepthValues{
+    Current: 100,
+    Max:     1000,
 })
 ```
+
+### Type-Safe Dimension Validation
+
+The framework ensures **compile-time validation** of dimension names:
+
+```go
+// ❌ OLD WAY - Runtime errors possible
+c.State.Set(contexts.Queue.Depth, labels, map[string]int64{
+    "currnet": 100,  // Typo! Silently ignored at runtime
+    "max": 1000,
+})
+
+// ✅ NEW WAY - Compile-time safety
+contexts.Queue.Depth.Set(c.State, labels, contexts.QueueDepthValues{
+    Currnet: 100,  // Compile error! Field 'Currnet' does not exist
+    Max: 1000,
+})
+```
+
+**Benefits:**
+- **Impossible to misspell dimension names** - compile errors catch typos
+- **IDE autocomplete** - see available dimensions as you type
+- **Refactoring safety** - renaming dimensions updates all usages
+- **Works with conditional metrics** - validation at compile time, not runtime
+- **Zero overhead** - type safety with no performance cost
 
 ### Automatic Instance Management
 
@@ -321,8 +351,8 @@ For counters that increase over time:
 // Collector tracks raw value
 counterValue, err := c.client.GetCounter()
 if counterValue > c.lastCounter {  // Only send if changed
-    c.State.SetGlobal(contexts.System.Operations, map[string]int64{
-        "total": counterValue,  // Raw counter value
+    contexts.System.Operations.Set(c.State, contexts.EmptyLabels{}, contexts.SystemOperationsValues{
+        Total: counterValue,  // Raw counter value
     })
     c.lastCounter = counterValue
 }
@@ -344,9 +374,9 @@ func (c *Collector) collectQueues() error {
             Type:  queue.Type,
         }
         
-        c.State.Set(contexts.Queue.Depth, labels, map[string]int64{
-            "current": queue.Depth,
-            "max":     queue.MaxDepth,
+        contexts.Queue.Depth.Set(c.State, labels, contexts.QueueDepthValues{
+            Current: queue.Depth,
+            Max:     queue.MaxDepth,
         })
     }
     // Framework handles chart creation/obsoletion automatically
@@ -560,6 +590,7 @@ stats, err := c.restClient.GetStats()        // Via REST API
 ## Example Module
 
 See `/modules/example/` for a complete working example that demonstrates:
+- Type-safe dimension API with compile-time validation
 - Dynamic instance management
 - Incremental and absolute metrics  
 - Global labels
@@ -956,8 +987,8 @@ The base units architecture simplifies unit handling by converting everything to
 ```go
 // Collector provides milliseconds
 responseTimeMs := int64(45)  // 45 milliseconds
-c.State.SetGlobal(contexts.System.ResponseTime, map[string]int64{
-    "response_time": responseTimeMs,
+contexts.System.ResponseTime.Set(c.State, contexts.EmptyLabels{}, contexts.SystemResponseTimeValues{
+    ResponseTime: responseTimeMs,
 })
 
 // YAML - Convert to base unit (seconds)
@@ -977,8 +1008,8 @@ dimensions:
 ```go
 // Collector provides float as integer (pre-multiplied)
 cpuUsage := 87.654  // 87.654% CPU usage
-c.State.SetGlobal(contexts.System.CPU, map[string]int64{
-    "usage": int64(cpuUsage * 1000),  // 87654 (preserving 3 decimals)
+contexts.System.CPU.Set(c.State, contexts.EmptyLabels{}, contexts.SystemCPUValues{
+    Usage: int64(cpuUsage * 1000),  // 87654 (preserving 3 decimals)
 })
 
 // YAML - Value already has precision applied
@@ -998,8 +1029,8 @@ dimensions:
 ```go
 // Collector provides bytes
 memoryBytes := int64(1073741824)  // 1GB in bytes
-c.State.SetGlobal(contexts.System.Memory, map[string]int64{
-    "used": memoryBytes,
+contexts.System.Memory.Set(c.State, contexts.EmptyLabels{}, contexts.SystemMemoryValues{
+    Used: memoryBytes,
 })
 
 // YAML - Keep in bytes (already base unit)
@@ -1019,8 +1050,8 @@ dimensions:
 ```go
 // Collector provides requests per minute
 requestsPerMin := int64(1200)  // 1200 requests/minute
-c.State.SetGlobal(contexts.System.Requests, map[string]int64{
-    "rate": requestsPerMin,
+contexts.System.Requests.Set(c.State, contexts.EmptyLabels{}, contexts.SystemRequestsValues{
+    Rate: requestsPerMin,
 })
 
 // YAML - Convert to per-second (base unit for rates)
@@ -1112,6 +1143,8 @@ Queue:
 The metricgen tool generates:
 - Type-safe label structs with validation
 - Context definitions with compile-time checked dimensions
+- **Values structs** for each context with typed dimension fields
+- **Set() methods** that provide compile-time dimension validation
 - Instance ID generation methods
 - Clean label value functions
 
@@ -1123,6 +1156,25 @@ type QueueLabels struct {
     Type  string
 }
 
+// QueueDepthValues defines the type-safe values for Queue.Depth context
+type QueueDepthValues struct {
+    Current int64
+    Max     int64
+}
+
+// QueueDepthContext provides type-safe operations for Queue.Depth context
+type QueueDepthContext struct {
+    framework.Context[QueueLabels]
+}
+
+// Set provides type-safe dimension setting for Queue.Depth context
+func (c QueueDepthContext) Set(state *framework.CollectorState, labels QueueLabels, values QueueDepthValues) {
+    state.Set(&c.Context, labels, map[string]int64{
+        "current": values.Current,
+        "max":     values.Max,
+    })
+}
+
 // InstanceID generates a unique instance ID
 func (l QueueLabels) InstanceID(contextName string) string {
     return contextName + "." + cleanLabelValue(l.Queue) + "_" + cleanLabelValue(l.Type)
@@ -1130,21 +1182,15 @@ func (l QueueLabels) InstanceID(contextName string) string {
 
 // Queue contains all metric contexts for Queue
 var Queue = struct {
-    Depth framework.Context[QueueLabels]
+    Depth QueueDepthContext
+    // ... other contexts
 }{
-    Depth: framework.Context[QueueLabels]{
-        Name:       "mq.queue.depth",
-        Family:     "queues",
-        Title:      "Queue Depth",
-        Units:      "messages",
-        Type:       module.Stacked,
-        Priority:   2000,
-        Dimensions: []framework.Dimension{
-            {Name: "current", Algorithm: module.Absolute},
-            {Name: "max", Algorithm: module.Absolute},
+    Depth: QueueDepthContext{
+        Context: framework.Context[QueueLabels]{
+            Name:       "mq.queue.depth",
+            Family:     "queues",
+            // ... full context definition
         },
-        LabelKeys: []string{"queue", "type"},
-    },
 }
 ```
 
@@ -1309,10 +1355,53 @@ if err != nil {
     // Don't set any value - let gap appear
     return
 }
-c.State.SetGlobal(contexts.System.Metric, map[string]int64{
-    "value": value,
+contexts.System.Metric.Set(c.State, contexts.EmptyLabels{}, contexts.SystemMetricValues{
+    Value: value,
 })
 ```
+
+### 7. Handling Partial Dimension Collection
+
+**IMPORTANT**: When using the type-safe API, you MUST provide values for ALL dimensions defined in the context. If collection fails for any dimension, skip the entire metric.
+
+```go
+// CORRECT: Skip entire metric if any dimension fails
+current, err1 := getQueueDepth()
+max, err2 := getQueueMaxDepth()
+
+if err1 == nil && err2 == nil {
+    // All dimensions collected successfully
+    contexts.Queue.Depth.Set(c.State, labels, contexts.QueueDepthValues{
+        Current: current,
+        Max:     max,
+    })
+} else {
+    // One or more dimensions failed - skip entire metric
+    c.Debugf("skipping queue depth metric: current err=%v, max err=%v", err1, err2)
+}
+```
+
+**BAD PRACTICE**: Bypassing the type-safe API to send partial data:
+```go
+// ❌ BAD PRACTICE - DO NOT DO THIS
+mx := make(map[string]int64)
+if current, err := getQueueDepth(); err == nil {
+    mx["current"] = current
+}
+if max, err := getQueueMaxDepth(); err == nil {
+    mx["max"] = max
+}
+// Bypassing type safety defeats the purpose of the framework
+c.State.Set(contexts.Queue.Depth, labels, mx)  // DON'T DO THIS
+```
+
+**Why this is bad:**
+1. **Defeats compile-time safety** - The whole point is to catch errors at compile time
+2. **Inconsistent data** - Charts may show partial data which is misleading
+3. **Framework philosophy** - "Missing data = data" - gaps are meaningful
+4. **Maintenance nightmare** - Future developers lose type safety guarantees
+
+**Remember**: The framework's philosophy is that missing data shows as gaps, which is valuable information about system health.
 
 ## Creating a New Collector
 
@@ -1517,9 +1606,9 @@ func (c *Collector) collectSystemStatus() error {
         return err
     }
     
-    c.State.SetGlobal(contexts.System.Status, map[string]int64{
-        "up":   status.Up,
-        "down": status.Down,
+    contexts.System.Status.Set(c.State, contexts.EmptyLabels{}, contexts.SystemStatusValues{
+        Up:   status.Up,
+        Down: status.Down,
     })
     
     return nil
@@ -1542,9 +1631,9 @@ func (c *Collector) collectComponents() error {
             Type: comp.Type,
         }
         
-        c.State.Set(contexts.Component.Performance, labels, map[string]int64{
-            "requests": comp.RequestCount,
-            "errors":   comp.ErrorCount,
+        contexts.Component.Performance.Set(c.State, labels, contexts.ComponentPerformanceValues{
+            Requests: comp.RequestCount,
+            Errors:   comp.ErrorCount,
         })
     }
     

@@ -24,6 +24,7 @@ type Collector struct {
 func (c *Collector) Init(ctx context.Context) error {
 	// Initialize state
 	c.State = NewCollectorState()
+	c.State.collector = &c.Base // Set logger reference
 	c.contextMap = make(map[string]interface{})
 	c.charts = &module.Charts{}
 	c.globalLabels = make([]module.Label, 0)
@@ -35,9 +36,6 @@ func (c *Collector) Init(ctx context.Context) error {
 	if c.Config.UpdateEvery == 0 {
 		c.Config.UpdateEvery = 1
 	}
-	
-	// Register contexts from generated code
-	c.registerContexts()
 	
 	// Validate configuration
 	if err := c.validateConfig(); err != nil {
@@ -122,27 +120,6 @@ func (c *Collector) validateConfig() error {
 	return nil
 }
 
-// registerContexts registers all contexts from generated code
-func (c *Collector) registerContexts() {
-	c.Debugf("registerContexts: %d contexts registered", len(c.registeredContexts))
-	// For contexts without labels, create charts immediately
-	for _, ctx := range c.registeredContexts {
-		contextMeta := extractContextMetadata(ctx)
-		if contextMeta != nil && !contextMeta.HasLabels {
-			// For unlabeled contexts, instance ID is just the context name
-			instanceID := contextMeta.Name
-			// Create chart from context
-			chart := c.createChartFromContext(ctx, instanceID)
-			if chart != nil {
-				c.Debugf("Created chart: %s", chart.ID)
-				c.charts.Add(chart)
-			} else {
-				c.Debugf("Failed to create chart from context")
-			}
-		}
-	}
-	c.Debugf("Total charts created: %d", len(*c.charts))
-}
 
 // convertMetrics converts framework metrics to go.d format
 func (c *Collector) convertMetrics() map[string]int64 {
@@ -162,7 +139,7 @@ func (c *Collector) convertMetrics() map[string]int64 {
 			// Find the context this instance belongs to
 			for _, ctx := range c.registeredContexts {
 				contextMeta := extractContextMetadata(ctx)
-				if contextMeta != nil && contextMeta.Name == metric.Instance.contextName && contextMeta.HasLabels {
+				if contextMeta != nil && contextMeta.Name == metric.Instance.contextName {
 					// Create charts for this new instance
 					chart := c.createChartFromContext(ctx, instanceKey)
 					if chart != nil {

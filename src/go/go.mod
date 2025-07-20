@@ -4,7 +4,6 @@ go 1.24.0
 
 replace github.com/netdata/netdata/go/plugins/plugin/go.d => ./plugin/go.d
 
-replace github.com/netdata/netdata/go/plugins/plugin/ibm.d => ./plugin/ibm.d
 
 replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.302.0
 
@@ -68,7 +67,6 @@ require (
 	layeh.com/radius v0.0.0-20190322222518-890bc1058917
 )
 
-require github.com/netdata/netdata/go/plugins/plugin/ibm.d v0.0.0-00010101000000-000000000000
 
 require (
 	dario.cat/mergo v1.0.1 // indirect

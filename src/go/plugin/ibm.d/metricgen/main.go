@@ -71,16 +71,35 @@ func cleanLabelValue(value string) string {
 	return strings.ToLower(r.Replace(value))
 }
 
-// emptyLabels is used for contexts without labels
-type emptyLabels struct{}
+// EmptyLabels is used for contexts without labels
+type EmptyLabels struct{}
 
 // InstanceID for empty labels just returns the context name
-func (emptyLabels) InstanceID(contextName string) string {
+func (EmptyLabels) InstanceID(contextName string) string {
 	return contextName
 }
 
 {{range $className, $class := .Classes}}
 // --- {{$className}} ---
+
+{{range $class.Contexts}}
+// {{$className}}{{.Name}}Values defines the type-safe values for {{$className}}.{{.Name}} context
+type {{$className}}{{.Name}}Values struct {
+{{range .Dimensions}}	{{title .Name}} int64
+{{end}}}
+
+// {{$className}}{{.Name}}Context provides type-safe operations for {{$className}}.{{.Name}} context
+type {{$className}}{{.Name}}Context struct {
+	framework.Context[{{if $class.Labels}}{{$className}}Labels{{else}}EmptyLabels{{end}}]
+}
+
+// Set provides type-safe dimension setting for {{$className}}.{{.Name}} context
+func (c {{$className}}{{.Name}}Context) Set(state *framework.CollectorState, labels {{if $class.Labels}}{{$className}}Labels{{else}}EmptyLabels{{end}}, values {{$className}}{{.Name}}Values) {
+	state.SetMetricsForGeneratedCode(&c.Context, {{if $class.Labels}}labels{{else}}nil{{end}}, map[string]int64{
+{{range .Dimensions}}		"{{.Name}}": values.{{title .Name}},
+{{end}}	})
+}
+{{end}}
 
 {{if $class.Labels}}
 // {{$className}}Labels defines the required labels for {{$className}} contexts
@@ -97,9 +116,10 @@ func (l {{$className}}Labels) InstanceID(contextName string) string {
 
 // {{$className}} contains all metric contexts for {{$className}}
 var {{$className}} = struct {
-{{range $class.Contexts}}	{{.Name}} framework.Context[{{if $class.Labels}}{{$className}}Labels{{else}}emptyLabels{{end}}]
+{{range $class.Contexts}}	{{.Name}} {{$className}}{{.Name}}Context
 {{end}}}{
-{{range $class.Contexts}}	{{.Name}}: framework.Context[{{if $class.Labels}}{{$className}}Labels{{else}}emptyLabels{{end}}]{
+{{range $class.Contexts}}	{{.Name}}: {{$className}}{{.Name}}Context{
+		Context: framework.Context[{{if $class.Labels}}{{$className}}Labels{{else}}EmptyLabels{{end}}]{
 		Name:       "{{.Context}}",
 		Family:     "{{.Family}}",
 		Title:      "{{.Title}}",
@@ -119,6 +139,7 @@ var {{$className}} = struct {
 		LabelKeys: []string{
 {{range $class.Labels}}			"{{.}}",
 {{end}}		},
+		},
 	},
 {{end}}}
 
@@ -127,7 +148,7 @@ var {{$className}} = struct {
 // GetAllContexts returns all contexts for framework registration
 func GetAllContexts() []interface{} {
 	return []interface{}{
-{{range $className, $class := .Classes}}{{range $class.Contexts}}		&{{$className}}.{{.Name}},
+{{range $className, $class := .Classes}}{{range $class.Contexts}}		&{{$className}}.{{.Name}}.Context,
 {{end}}{{end}}	}
 }
 `

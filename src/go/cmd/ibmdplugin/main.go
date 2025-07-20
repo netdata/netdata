@@ -24,13 +24,15 @@ import (
 	// Register IBM ecosystem collectors
 	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/as400"         // Requires CGO
 	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/db2"           // Requires CGO
-	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/mq_pcf"        // Requires CGO and IBM MQ library
+	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/mq_pcf"        // Legacy MQ collector
+	// Note: New framework-based MQ module is registered below
 	// _ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/websphere_jmx" // Requires CGO
 	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/websphere_mp"  // Pure Go
 	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/websphere_pmi" // Pure Go
 	
 	// New framework example
 	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/example" // Framework demo
+	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/mq"      // MQ monitoring with PCF protocol
 )
 
 const pluginName = "ibm.d.plugin"

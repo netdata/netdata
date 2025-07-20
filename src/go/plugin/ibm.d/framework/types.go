@@ -5,6 +5,14 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
+// Logger interface for logging functionality
+type Logger interface {
+	Debugf(format string, args ...interface{})
+	Warningf(format string, args ...interface{})
+	Errorf(format string, args ...interface{})
+	Infof(format string, args ...interface{})
+}
+
 // Context represents a metric collection context with compile-time type safety
 type Context[T any] struct {
 	Name       string           // Full context name (e.g., "mq_pcf.queue.depth")
@@ -51,6 +59,7 @@ type CollectorState struct {
 	iteration         int64    // Global iteration counter (incremented every CollectOnce)
 	errors            map[string]error
 	protocols         map[string]*ProtocolMetrics
+	collector         Logger   // Reference to collector for logging
 }
 
 // ProtocolMetrics tracks protocol-level observability
