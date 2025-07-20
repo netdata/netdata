@@ -554,17 +554,9 @@ sudo ./edit-config ibm.d/{{.ModuleName}}.conf
 
 The following options can be defined globally or per job.
 
-{{range .Fields}}
-#### {{.Name}}
-
-{{.Description}}
-
-- **Default**: ` + "`" + `{{.Default}}` + "`" + `
-- **Required**: {{if .Required}}yes{{else}}no{{end}}
-{{if .Minimum}}- **Min**: {{.Minimum}}{{end}}
-{{if .Maximum}}- **Max**: {{.Maximum}}{{end}}
-
-{{end}}
+| Name | Description | Default | Required | Min | Max |
+|:-----|:------------|:--------|:---------|:----|:----|{{range .Fields}}
+| {{.Name}} | {{.Description}} | ` + "`" + `{{.Default}}` + "`" + ` | {{if .Required}}yes{{else}}no{{end}} | {{if .Minimum}}{{.Minimum}}{{else}}-{{end}} | {{if .Maximum}}{{.Maximum}}{{else}}-{{end}} |{{end}}
 
 ### Examples
 
