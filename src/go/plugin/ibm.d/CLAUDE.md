@@ -271,6 +271,59 @@ type Config struct {
 }
 ```
 
+### Configuration Defaults
+
+**CRITICAL**: Default values must be defined in ONE place to ensure consistency.
+
+1. **Define defaults in `defaultConfig()` function** in init.go:
+```go
+// defaultConfig returns a new Config with all default values set
+func defaultConfig() Config {
+    return Config{
+        // Connection defaults
+        Host:    "localhost",
+        Port:    1414,
+        Channel: "SYSTEM.DEF.SVRCONN",
+        
+        // Collection defaults
+        CollectQueues:   true,
+        CollectChannels: true,
+        
+        // Selector defaults
+        QueueSelector: "*",
+    }
+}
+```
+
+2. **Use `defaultConfig()` in module registration** (module.go):
+```go
+func New() *Collector {
+    return &Collector{
+        Collector: framework.Collector{
+            Config: framework.Config{
+                UpdateEvery:          1,
+                ObsoletionIterations: 60,
+            },
+        },
+        Config: defaultConfig(),  // Initialize with defaults
+    }
+}
+
+func init() {
+    module.Register("mymodule", module.Creator{
+        Config: func() any {
+            config := defaultConfig()  // Same defaults for UI
+            return &config
+        },
+    })
+}
+```
+
+This ensures:
+- YAML unmarshaling preserves defaults for unspecified fields
+- Documentation generator extracts defaults from `defaultConfig()`
+- Single source of truth for all default values
+
 ### Configuration Field Comments
 
 **CRITICAL**: All configuration fields MUST have descriptive comments that become the field descriptions in generated documentation.
@@ -768,7 +821,7 @@ The tool uses Go's AST (Abstract Syntax Tree) parser to extract configuration fi
 - **Type Detection**: Automatically converts Go types to JSON Schema types (`string`, `int64` → `integer`, `bool` → `boolean`)
 - **Tag Parsing**: Extracts YAML/JSON field names from struct tags
 - **Required Fields**: Determines optional vs required based on `omitempty` tags
-- **Smart Defaults**: Generates intelligent defaults for common field patterns
+- **Default Value Extraction**: Parses `defaultConfig()` function from init.go to extract actual default values
 - **Framework Awareness**: Automatically excludes embedded `framework.Config` fields
 
 Example config.go parsing:
@@ -1571,15 +1624,6 @@ type Config struct {
     CollectComponents bool `yaml:"collect_components" json:"collect_components"`
 }
 
-func (c *Config) SetDefaults() {
-    if c.UpdateEvery == 0 {
-        c.UpdateEvery = 1
-    }
-    if c.ObsoletionIterations == 0 {
-        c.ObsoletionIterations = 60
-    }
-    c.CollectComponents = true
-}
 ```
 
 #### 6. Create Collector Structure (collector.go)
@@ -1637,7 +1681,7 @@ import (
 )
 
 func (c *Collector) Init(ctx context.Context) error {
-    // Set defaults
+    // Call SetDefaults if you have one (optional)
     c.config.SetDefaults()
     
     // Initialize framework

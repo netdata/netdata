@@ -2,6 +2,7 @@ package mq
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 	
@@ -48,20 +49,13 @@ func convertMQDateTimeToSecondsSince(date, timeVal pcf.AttributeValue) int64 {
 
 func (c *Collector) collectQueueMetrics() error {
 	
-	// Build queue selector pattern for efficient collection
-	queuePattern := c.Config.QueueSelector
-	if !c.Config.CollectSystemQueues {
-		// If system queues are disabled and pattern is "*", exclude SYSTEM queues
-		if queuePattern == "*" {
-			// We'll filter SYSTEM queues after collection since PCF patterns don't support negation
-		}
-	}
+	// Always query ALL queues for discovery, then apply filtering ourselves
+	c.Debugf("Collecting all queues with reset_stats: %v, will apply selector '%s' locally", 
+		c.Config.CollectResetQueueStats, c.Config.QueueSelector)
 	
-	c.Debugf("Using queue pattern: '%s', reset_stats: %v", queuePattern, c.Config.CollectResetQueueStats)
-	
-	// Configure comprehensive queue collection
+	// Configure comprehensive queue collection - always use "*" for discovery
 	config := pcf.QueueCollectionConfig{
-		QueuePattern:      queuePattern,
+		QueuePattern:      "*",  // Always get ALL queues
 		CollectResetStats: c.Config.CollectResetQueueStats,
 	}
 	
@@ -76,14 +70,22 @@ func (c *Collector) collectQueueMetrics() error {
 	
 	// Process all collected metrics
 	for _, queue := range queueMetrics {
-		// Apply system queue filtering (post-collection since PCF doesn't support negation)
+		// Apply queue selector filtering
+		if c.Config.QueueSelector != "" && c.Config.QueueSelector != "*" {
+			matched, err := filepath.Match(c.Config.QueueSelector, queue.Name)
+			if err != nil {
+				c.Warningf("Invalid queue selector pattern '%s': %v", c.Config.QueueSelector, err)
+			} else if !matched {
+				excluded++
+				continue
+			}
+		}
+		
+		// Apply system queue filtering
 		if !c.Config.CollectSystemQueues && strings.HasPrefix(queue.Name, "SYSTEM.") {
 			excluded++
 			continue
 		}
-		
-		// Additional filtering could be added here if needed
-		// For now, we rely on the PCF glob pattern filtering
 		
 		monitored++
 		

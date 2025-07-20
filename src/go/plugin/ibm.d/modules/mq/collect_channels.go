@@ -1,6 +1,7 @@
 package mq
 
 import (
+	"path/filepath"
 	"strings"
 	
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/mq/contexts"
@@ -17,14 +18,22 @@ func (c *Collector) collectChannelMetrics() error {
 	var monitored, excluded, failed int64
 
 	for _, channelName := range channels {
+		// Apply channel selector filtering
+		if c.Config.ChannelSelector != "" && c.Config.ChannelSelector != "*" {
+			matched, err := filepath.Match(c.Config.ChannelSelector, channelName)
+			if err != nil {
+				c.Warningf("Invalid channel selector pattern '%s': %v", c.Config.ChannelSelector, err)
+			} else if !matched {
+				excluded++
+				continue
+			}
+		}
+		
 		// Apply system channel filtering
 		if !c.Config.CollectSystemChannels && strings.HasPrefix(channelName, "SYSTEM.") {
 			excluded++
 			continue
 		}
-		
-		// Additional filtering could be added here if needed
-		// For now, we rely on the PCF glob pattern filtering
 
 		metrics, err := c.client.GetChannelMetrics(channelName)
 		if err != nil {
@@ -99,10 +108,16 @@ func (c *Collector) collectChannelMetrics() error {
 			if err != nil {
 				c.Debugf("failed to get config for channel %s: %v", channelName, err)
 			} else {
-				// Set batch configuration - only if both values are collected
-				if config.BatchSize.IsCollected() && config.BatchInterval.IsCollected() {
-					contexts.Channel.BatchConfig.Set(c.State, labels, contexts.ChannelBatchConfigValues{
-						Batch_size:     config.BatchSize.Int64(),
+				// Set batch size - only if collected
+				if config.BatchSize.IsCollected() {
+					contexts.Channel.BatchSize.Set(c.State, labels, contexts.ChannelBatchSizeValues{
+						Batch_size: config.BatchSize.Int64(),
+					})
+				}
+				
+				// Set batch interval - only if collected
+				if config.BatchInterval.IsCollected() {
+					contexts.Channel.BatchInterval.Set(c.State, labels, contexts.ChannelBatchIntervalValues{
 						Batch_interval: config.BatchInterval.Int64(),
 					})
 				}
@@ -116,11 +131,17 @@ func (c *Collector) collectChannelMetrics() error {
 					})
 				}
 				
-				// Set retry configuration - only if both values are collected
-				if config.ShortRetry.IsCollected() && config.LongRetry.IsCollected() {
-					contexts.Channel.RetryConfig.Set(c.State, labels, contexts.ChannelRetryConfigValues{
+				// Set short retry count - only if collected
+				if config.ShortRetry.IsCollected() {
+					contexts.Channel.ShortRetryCount.Set(c.State, labels, contexts.ChannelShortRetryCountValues{
 						Short_retry: config.ShortRetry.Int64(),
-						Long_retry:  config.LongRetry.Int64(),
+					})
+				}
+				
+				// Set long retry interval - only if collected
+				if config.LongRetry.IsCollected() {
+					contexts.Channel.LongRetryInterval.Set(c.State, labels, contexts.ChannelLongRetryIntervalValues{
+						Long_retry: config.LongRetry.Int64(),
 					})
 				}
 				
@@ -131,11 +152,17 @@ func (c *Collector) collectChannelMetrics() error {
 					})
 				}
 				
-				// Set conversation configuration - only if both values are collected
-				if config.SharingConversations.IsCollected() && config.NetworkPriority.IsCollected() {
-					contexts.Channel.ConversationConfig.Set(c.State, labels, contexts.ChannelConversationConfigValues{
+				// Set sharing conversations - only if collected
+				if config.SharingConversations.IsCollected() {
+					contexts.Channel.SharingConversations.Set(c.State, labels, contexts.ChannelSharingConversationsValues{
 						Sharing_conversations: config.SharingConversations.Int64(),
-						Network_priority:      config.NetworkPriority.Int64(),
+					})
+				}
+				
+				// Set network priority - only if collected
+				if config.NetworkPriority.IsCollected() {
+					contexts.Channel.NetworkPriority.Set(c.State, labels, contexts.ChannelNetworkPriorityValues{
+						Network_priority: config.NetworkPriority.Int64(),
 					})
 				}
 			}

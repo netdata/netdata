@@ -19,6 +19,7 @@ func New() *Collector {
 				ObsoletionIterations: 60,
 			},
 		},
+		config: defaultConfig(),  // Initialize with defaults
 	}
 }
 
@@ -35,7 +36,8 @@ func init() {
 			return New()
 		},
 		Config: func() any {
-			return &Config{}
+			config := defaultConfig()
+			return &config
 		},
 	})
 }

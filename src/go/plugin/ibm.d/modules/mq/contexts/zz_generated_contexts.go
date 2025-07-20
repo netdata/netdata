@@ -128,21 +128,36 @@ func (c ChannelBatchesContext) Set(state *framework.CollectorState, labels Chann
 	})
 }
 
-// ChannelBatchConfigValues defines the type-safe values for Channel.BatchConfig context
-type ChannelBatchConfigValues struct {
+// ChannelBatchSizeValues defines the type-safe values for Channel.BatchSize context
+type ChannelBatchSizeValues struct {
 	Batch_size int64
-	Batch_interval int64
 }
 
-// ChannelBatchConfigContext provides type-safe operations for Channel.BatchConfig context
-type ChannelBatchConfigContext struct {
+// ChannelBatchSizeContext provides type-safe operations for Channel.BatchSize context
+type ChannelBatchSizeContext struct {
 	framework.Context[ChannelLabels]
 }
 
-// Set provides type-safe dimension setting for Channel.BatchConfig context
-func (c ChannelBatchConfigContext) Set(state *framework.CollectorState, labels ChannelLabels, values ChannelBatchConfigValues) {
+// Set provides type-safe dimension setting for Channel.BatchSize context
+func (c ChannelBatchSizeContext) Set(state *framework.CollectorState, labels ChannelLabels, values ChannelBatchSizeValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"batch_size": values.Batch_size,
+	})
+}
+
+// ChannelBatchIntervalValues defines the type-safe values for Channel.BatchInterval context
+type ChannelBatchIntervalValues struct {
+	Batch_interval int64
+}
+
+// ChannelBatchIntervalContext provides type-safe operations for Channel.BatchInterval context
+type ChannelBatchIntervalContext struct {
+	framework.Context[ChannelLabels]
+}
+
+// Set provides type-safe dimension setting for Channel.BatchInterval context
+func (c ChannelBatchIntervalContext) Set(state *framework.CollectorState, labels ChannelLabels, values ChannelBatchIntervalValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"batch_interval": values.Batch_interval,
 	})
 }
@@ -168,21 +183,36 @@ func (c ChannelIntervalsContext) Set(state *framework.CollectorState, labels Cha
 	})
 }
 
-// ChannelRetryConfigValues defines the type-safe values for Channel.RetryConfig context
-type ChannelRetryConfigValues struct {
+// ChannelShortRetryCountValues defines the type-safe values for Channel.ShortRetryCount context
+type ChannelShortRetryCountValues struct {
 	Short_retry int64
-	Long_retry int64
 }
 
-// ChannelRetryConfigContext provides type-safe operations for Channel.RetryConfig context
-type ChannelRetryConfigContext struct {
+// ChannelShortRetryCountContext provides type-safe operations for Channel.ShortRetryCount context
+type ChannelShortRetryCountContext struct {
 	framework.Context[ChannelLabels]
 }
 
-// Set provides type-safe dimension setting for Channel.RetryConfig context
-func (c ChannelRetryConfigContext) Set(state *framework.CollectorState, labels ChannelLabels, values ChannelRetryConfigValues) {
+// Set provides type-safe dimension setting for Channel.ShortRetryCount context
+func (c ChannelShortRetryCountContext) Set(state *framework.CollectorState, labels ChannelLabels, values ChannelShortRetryCountValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"short_retry": values.Short_retry,
+	})
+}
+
+// ChannelLongRetryIntervalValues defines the type-safe values for Channel.LongRetryInterval context
+type ChannelLongRetryIntervalValues struct {
+	Long_retry int64
+}
+
+// ChannelLongRetryIntervalContext provides type-safe operations for Channel.LongRetryInterval context
+type ChannelLongRetryIntervalContext struct {
+	framework.Context[ChannelLabels]
+}
+
+// Set provides type-safe dimension setting for Channel.LongRetryInterval context
+func (c ChannelLongRetryIntervalContext) Set(state *framework.CollectorState, labels ChannelLabels, values ChannelLongRetryIntervalValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"long_retry": values.Long_retry,
 	})
 }
@@ -204,21 +234,36 @@ func (c ChannelMaxMessageLengthContext) Set(state *framework.CollectorState, lab
 	})
 }
 
-// ChannelConversationConfigValues defines the type-safe values for Channel.ConversationConfig context
-type ChannelConversationConfigValues struct {
+// ChannelSharingConversationsValues defines the type-safe values for Channel.SharingConversations context
+type ChannelSharingConversationsValues struct {
 	Sharing_conversations int64
-	Network_priority int64
 }
 
-// ChannelConversationConfigContext provides type-safe operations for Channel.ConversationConfig context
-type ChannelConversationConfigContext struct {
+// ChannelSharingConversationsContext provides type-safe operations for Channel.SharingConversations context
+type ChannelSharingConversationsContext struct {
 	framework.Context[ChannelLabels]
 }
 
-// Set provides type-safe dimension setting for Channel.ConversationConfig context
-func (c ChannelConversationConfigContext) Set(state *framework.CollectorState, labels ChannelLabels, values ChannelConversationConfigValues) {
+// Set provides type-safe dimension setting for Channel.SharingConversations context
+func (c ChannelSharingConversationsContext) Set(state *framework.CollectorState, labels ChannelLabels, values ChannelSharingConversationsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"sharing_conversations": values.Sharing_conversations,
+	})
+}
+
+// ChannelNetworkPriorityValues defines the type-safe values for Channel.NetworkPriority context
+type ChannelNetworkPriorityValues struct {
+	Network_priority int64
+}
+
+// ChannelNetworkPriorityContext provides type-safe operations for Channel.NetworkPriority context
+type ChannelNetworkPriorityContext struct {
+	framework.Context[ChannelLabels]
+}
+
+// Set provides type-safe dimension setting for Channel.NetworkPriority context
+func (c ChannelNetworkPriorityContext) Set(state *framework.CollectorState, labels ChannelLabels, values ChannelNetworkPriorityValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"network_priority": values.Network_priority,
 	})
 }
@@ -243,11 +288,14 @@ var Channel = struct {
 	Messages ChannelMessagesContext
 	Bytes ChannelBytesContext
 	Batches ChannelBatchesContext
-	BatchConfig ChannelBatchConfigContext
+	BatchSize ChannelBatchSizeContext
+	BatchInterval ChannelBatchIntervalContext
 	Intervals ChannelIntervalsContext
-	RetryConfig ChannelRetryConfigContext
+	ShortRetryCount ChannelShortRetryCountContext
+	LongRetryInterval ChannelLongRetryIntervalContext
 	MaxMessageLength ChannelMaxMessageLengthContext
-	ConversationConfig ChannelConversationConfigContext
+	SharingConversations ChannelSharingConversationsContext
+	NetworkPriority ChannelNetworkPriorityContext
 }{
 	Status: ChannelStatusContext{
 		Context: framework.Context[ChannelLabels]{
@@ -418,12 +466,12 @@ var Channel = struct {
 		},
 		},
 	},
-	BatchConfig: ChannelBatchConfigContext{
+	BatchSize: ChannelBatchSizeContext{
 		Context: framework.Context[ChannelLabels]{
-		Name:       "mq.channel.batch_config",
+		Name:       "mq.channel.batch_size",
 		Family:     "channels",
-		Title:      "Channel Batch Configuration",
-		Units:      "value",
+		Title:      "Channel Batch Size",
+		Units:      "messages",
 		Type:       module.Line,
 		Priority:   3004,
 		UpdateEvery: 1,
@@ -435,6 +483,22 @@ var Channel = struct {
 				Div:       1,
 				Precision: 1,
 			},
+		},
+		LabelKeys: []string{
+			"channel",
+		},
+		},
+	},
+	BatchInterval: ChannelBatchIntervalContext{
+		Context: framework.Context[ChannelLabels]{
+		Name:       "mq.channel.batch_interval",
+		Family:     "channels",
+		Title:      "Channel Batch Interval",
+		Units:      "milliseconds",
+		Type:       module.Line,
+		Priority:   3005,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
 			{
 				Name:      "batch_interval",
 				Algorithm: module.Absolute,
@@ -455,7 +519,7 @@ var Channel = struct {
 		Title:      "Channel Intervals",
 		Units:      "seconds",
 		Type:       module.Line,
-		Priority:   3005,
+		Priority:   3006,
 		UpdateEvery: 1,
 		Dimensions: []framework.Dimension{
 			{
@@ -485,14 +549,14 @@ var Channel = struct {
 		},
 		},
 	},
-	RetryConfig: ChannelRetryConfigContext{
+	ShortRetryCount: ChannelShortRetryCountContext{
 		Context: framework.Context[ChannelLabels]{
-		Name:       "mq.channel.retry_config",
+		Name:       "mq.channel.short_retry_count",
 		Family:     "channels",
-		Title:      "Channel Retry Configuration",
-		Units:      "count",
+		Title:      "Channel Short Retry Count",
+		Units:      "retries",
 		Type:       module.Line,
-		Priority:   3006,
+		Priority:   3007,
 		UpdateEvery: 1,
 		Dimensions: []framework.Dimension{
 			{
@@ -502,6 +566,22 @@ var Channel = struct {
 				Div:       1,
 				Precision: 1,
 			},
+		},
+		LabelKeys: []string{
+			"channel",
+		},
+		},
+	},
+	LongRetryInterval: ChannelLongRetryIntervalContext{
+		Context: framework.Context[ChannelLabels]{
+		Name:       "mq.channel.long_retry_interval",
+		Family:     "channels",
+		Title:      "Channel Long Retry Interval",
+		Units:      "seconds",
+		Type:       module.Line,
+		Priority:   3008,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
 			{
 				Name:      "long_retry",
 				Algorithm: module.Absolute,
@@ -522,7 +602,7 @@ var Channel = struct {
 		Title:      "Channel Max Message Length",
 		Units:      "bytes",
 		Type:       module.Line,
-		Priority:   3007,
+		Priority:   3009,
 		UpdateEvery: 1,
 		Dimensions: []framework.Dimension{
 			{
@@ -538,14 +618,14 @@ var Channel = struct {
 		},
 		},
 	},
-	ConversationConfig: ChannelConversationConfigContext{
+	SharingConversations: ChannelSharingConversationsContext{
 		Context: framework.Context[ChannelLabels]{
-		Name:       "mq.channel.conversation_config",
+		Name:       "mq.channel.sharing_conversations",
 		Family:     "channels",
-		Title:      "Channel Conversation Configuration",
-		Units:      "value",
+		Title:      "Channel Sharing Conversations",
+		Units:      "conversations",
 		Type:       module.Line,
-		Priority:   3008,
+		Priority:   3010,
 		UpdateEvery: 1,
 		Dimensions: []framework.Dimension{
 			{
@@ -555,6 +635,22 @@ var Channel = struct {
 				Div:       1,
 				Precision: 1,
 			},
+		},
+		LabelKeys: []string{
+			"channel",
+		},
+		},
+	},
+	NetworkPriority: ChannelNetworkPriorityContext{
+		Context: framework.Context[ChannelLabels]{
+		Name:       "mq.channel.network_priority",
+		Family:     "channels",
+		Title:      "Channel Network Priority",
+		Units:      "priority",
+		Type:       module.Line,
+		Priority:   3011,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
 			{
 				Name:      "network_priority",
 				Algorithm: module.Absolute,
@@ -1772,11 +1868,14 @@ func GetAllContexts() []interface{} {
 		&Channel.Messages.Context,
 		&Channel.Bytes.Context,
 		&Channel.Batches.Context,
-		&Channel.BatchConfig.Context,
+		&Channel.BatchSize.Context,
+		&Channel.BatchInterval.Context,
 		&Channel.Intervals.Context,
-		&Channel.RetryConfig.Context,
+		&Channel.ShortRetryCount.Context,
+		&Channel.LongRetryInterval.Context,
 		&Channel.MaxMessageLength.Context,
-		&Channel.ConversationConfig.Context,
+		&Channel.SharingConversations.Context,
+		&Channel.NetworkPriority.Context,
 		&Listener.Status.Context,
 		&Listener.Port.Context,
 		&Queue.Depth.Context,

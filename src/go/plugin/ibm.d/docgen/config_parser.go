@@ -5,6 +5,8 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"unicode"
 )
@@ -36,6 +38,19 @@ func (g *DocGenerator) parseConfigFromGoFile() ([]ConfigField, error) {
 
 	if configStruct != nil {
 		fields = extractFieldsFromStruct(configStruct, node.Comments)
+	}
+
+	// Try to parse defaults from init.go
+	defaults := g.parseDefaultsFromInitFile()
+	if defaults != nil {
+		// Apply defaults to fields
+		for i := range fields {
+			if defaultValue, exists := defaults[fields[i].Name]; exists {
+				fields[i].Default = defaultValue
+				// If field has a default, it's not required
+				fields[i].Required = false
+			}
+		}
 	}
 
 	return fields, nil
@@ -365,4 +380,84 @@ func setFieldDefaults(field *ConfigField) {
 	
 	// TODO: In the future, extract defaults from SetDefaults method in config.go
 	// This would make defaults module-specific rather than hardcoded in framework
+}
+
+// parseDefaultsFromInitFile parses init.go to find the defaultConfig() function
+// and extract default values from the returned Config struct
+func (g *DocGenerator) parseDefaultsFromInitFile() map[string]interface{} {
+	// Construct path to init.go
+	dir := filepath.Dir(g.ConfigFile)
+	initFile := filepath.Join(dir, "init.go")
+	
+	fset := token.NewFileSet()
+	node, err := parser.ParseFile(fset, initFile, nil, parser.ParseComments)
+	if err != nil {
+		// init.go might not exist or be parseable
+		return nil
+	}
+	
+	defaults := make(map[string]interface{})
+	
+	// Find the defaultConfig function
+	ast.Inspect(node, func(n ast.Node) bool {
+		switch x := n.(type) {
+		case *ast.FuncDecl:
+			if x.Name.Name == "defaultConfig" {
+				// Look for return statement with Config literal
+				ast.Inspect(x.Body, func(bodyNode ast.Node) bool {
+					switch stmt := bodyNode.(type) {
+					case *ast.ReturnStmt:
+						if len(stmt.Results) > 0 {
+							if lit, ok := stmt.Results[0].(*ast.CompositeLit); ok {
+								extractDefaultsFromLiteral(lit, defaults)
+								return false
+							}
+						}
+					}
+					return true
+				})
+				return false
+			}
+		}
+		return true
+	})
+	
+	return defaults
+}
+
+// extractDefaultsFromLiteral extracts field values from a Config{} literal
+func extractDefaultsFromLiteral(lit *ast.CompositeLit, defaults map[string]interface{}) {
+	for _, elt := range lit.Elts {
+		if kv, ok := elt.(*ast.KeyValueExpr); ok {
+			if ident, ok := kv.Key.(*ast.Ident); ok {
+				fieldName := ident.Name
+				defaults[fieldName] = extractValue(kv.Value)
+			}
+		}
+	}
+}
+
+// extractValue converts an AST expression to a Go value
+func extractValue(expr ast.Expr) interface{} {
+	switch v := expr.(type) {
+	case *ast.BasicLit:
+		switch v.Kind {
+		case token.STRING:
+			// Remove quotes
+			return strings.Trim(v.Value, `"`)
+		case token.INT:
+			if i, err := strconv.Atoi(v.Value); err == nil {
+				return i
+			}
+		}
+	case *ast.Ident:
+		// Handle boolean values
+		switch v.Name {
+		case "true":
+			return true
+		case "false":
+			return false
+		}
+	}
+	return nil
 }

@@ -3,16 +3,44 @@ package mq
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/mq/contexts"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/protocols/pcf"
 )
 
+// defaultConfig returns a new Config with all default values set.
+// This is used both for New() and for the module registration to ensure
+// consistency and single source of truth for defaults.
+func defaultConfig() Config {
+	return Config{
+		// Connection defaults
+		QueueManager: "QM1",
+		Host:         "localhost",
+		Port:         1414,
+		Channel:      "SYSTEM.DEF.SVRCONN",
+		
+		// Collection defaults - these are enabled by default
+		CollectQueues:         true,
+		CollectChannels:       true,
+		CollectListeners:      true,
+		CollectSystemQueues:   true,
+		CollectSystemChannels: true,
+		
+		// These are disabled by default
+		CollectTopics:          false,
+		CollectChannelConfig:   false,
+		CollectQueueConfig:     false,
+		CollectResetQueueStats: false,
+		
+		// Selector defaults
+		QueueSelector:   "*",
+		ChannelSelector: "*",
+	}
+}
+
 func (c *Collector) Init(ctx context.Context) error {
-	// Set configuration defaults first
-	c.Config.SetDefaults()
-	
 	// Set this collector as the implementation
 	c.SetImpl(c)
 	
@@ -36,11 +64,10 @@ func (c *Collector) Init(ctx context.Context) error {
 		return err
 	}
 
-	// Debug log the configuration values
-	c.Debugf("Creating PCF client with config: QueueManager='%s', Host='%s', Port=%d, Channel='%s', User='%s'",
-		c.Config.QueueManager, c.Config.Host, c.Config.Port, c.Config.Channel, c.Config.User)
-	c.Debugf("Collection config: QueueSelector='%s', CollectResetQueueStats=%v, CollectSystemQueues=%v",
-		c.Config.QueueSelector, c.Config.CollectResetQueueStats, c.Config.CollectSystemQueues)
+	// Debug log the complete configuration as JSON
+	if configJSON, err := json.Marshal(c.Config); err == nil {
+		c.Debugf("Running with configuration: %s", string(configJSON))
+	}
 	
 	// Create client
 	c.client = pcf.NewClient(pcf.Config{
@@ -52,12 +79,18 @@ func (c *Collector) Init(ctx context.Context) error {
 		Password:     c.Config.Password,
 	}, c.State)
 
-	// QueueSelector is used as a glob pattern for PCF commands, not regex
-	// So we don't compile it as regex here - it's used directly in PCF calls
-	c.Infof("Queue selector configured: %s (glob pattern)", c.Config.QueueSelector)
+	// Log the selectors - these are applied locally after discovery
+	if c.Config.QueueSelector != "" && c.Config.QueueSelector != "*" {
+		c.Infof("Queue selector configured: %s (applied after discovery)", c.Config.QueueSelector)
+	} else {
+		c.Infof("Queue selector: all queues will be collected")
+	}
 	
-	// ChannelSelector is also used as glob pattern
-	c.Infof("Channel selector configured: %s (glob pattern)", c.Config.ChannelSelector)
+	if c.Config.ChannelSelector != "" && c.Config.ChannelSelector != "*" {
+		c.Infof("Channel selector configured: %s (applied after discovery)", c.Config.ChannelSelector)
+	} else {
+		c.Infof("Channel selector: all channels will be collected")
+	}
 
 	// Warn about destructive statistics collection
 	if c.Config.CollectResetQueueStats {

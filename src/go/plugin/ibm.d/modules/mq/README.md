@@ -26,6 +26,8 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:-------|:-----------|:-----|
 | mq.qmgr.status | status | status |
+| mq.qmgr.connection_count | connections | connections |
+| mq.qmgr.uptime | uptime | seconds |
 | mq.queues.overview | monitored, excluded, model, unauthorized, unknown, failed | queues |
 | mq.channels.overview | monitored, excluded, unauthorized, failed | channels |
 | mq.topics.overview | monitored, excluded, unauthorized, failed | topics |
@@ -50,11 +52,31 @@ Metrics:
 | mq.channel.messages | messages | messages/s |
 | mq.channel.bytes | bytes | bytes/s |
 | mq.channel.batches | batches | batches/s |
-| mq.channel.batch_config | batch_size, batch_interval | value |
+| mq.channel.batch_size | batch_size | messages |
+| mq.channel.batch_interval | batch_interval | milliseconds |
 | mq.channel.intervals | disc_interval, hb_interval, keep_alive_interval | seconds |
-| mq.channel.retry_config | short_retry, long_retry | count |
+| mq.channel.short_retry_count | short_retry | retries |
+| mq.channel.long_retry_interval | long_retry | seconds |
 | mq.channel.max_msg_length | max_msg_length | bytes |
-| mq.channel.conversation_config | sharing_conversations, network_priority | value |
+| mq.channel.sharing_conversations | sharing_conversations | conversations |
+| mq.channel.network_priority | network_priority | priority |
+
+### Per listener
+
+These metrics refer to individual listener instances.
+
+Labels:
+
+| Label | Description |
+|:------|:------------|
+| listener | Listener identifier |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:-------|:-----------|:-----|
+| mq.listener.status | running, stopped | status |
+| mq.listener.port | port | port |
 
 ### Per queue
 
@@ -123,22 +145,23 @@ The following options can be defined globally or per job.
 
 | Name | Description | Default | Required | Min | Max |
 |:-----|:------------|:--------|:---------|:----|:----|
-| QueueManager | IBM MQ Queue Manager name to connect to | `<no value>` | yes | - | - |
-| Channel | IBM MQ channel name for connection | `<no value>` | yes | - | - |
-| Host | IBM MQ server hostname or IP address | `<no value>` | yes | - | - |
-| Port | IBM MQ server port number | `<no value>` | yes | 1 | 65535 |
+| QueueManager | IBM MQ Queue Manager name to connect to | `QM1` | no | - | - |
+| Channel | IBM MQ channel name for connection | `SYSTEM.DEF.SVRCONN` | no | - | - |
+| Host | IBM MQ server hostname or IP address | `localhost` | no | - | - |
+| Port | IBM MQ server port number | `1414` | no | 1 | 65535 |
 | User | Username for IBM MQ authentication | `<no value>` | yes | - | - |
 | Password | Password for IBM MQ authentication | `<no value>` | yes | - | - |
-| CollectQueues | Enable collection of queue metrics | `<no value>` | yes | - | - |
-| CollectChannels | Enable collection of channel metrics | `<no value>` | yes | - | - |
-| CollectTopics | Enable collection of topic metrics | `<no value>` | yes | - | - |
-| CollectSystemQueues | Enable collection of system queue metrics | `<no value>` | yes | - | - |
-| CollectSystemChannels | Enable collection of system channel metrics | `<no value>` | yes | - | - |
-| CollectChannelConfig | Enable collection of channel configuration metrics | `<no value>` | yes | - | - |
-| CollectQueueConfig | Enable collection of queue configuration metrics | `<no value>` | yes | - | - |
-| QueueSelector | Pattern to filter queues (wildcards supported) | `<no value>` | yes | - | - |
-| ChannelSelector | Pattern to filter channels (wildcards supported) | `<no value>` | yes | - | - |
-| CollectResetQueueStats | Enable collection of queue statistics (destructive operation) | `<no value>` | yes | - | - |
+| CollectQueues | Enable collection of queue metrics | `true` | no | - | - |
+| CollectChannels | Enable collection of channel metrics | `true` | no | - | - |
+| CollectTopics | Enable collection of topic metrics | `false` | no | - | - |
+| CollectListeners | Enable collection of listener metrics | `true` | no | - | - |
+| CollectSystemQueues | Enable collection of system queue metrics | `true` | no | - | - |
+| CollectSystemChannels | Enable collection of system channel metrics | `true` | no | - | - |
+| CollectChannelConfig | Enable collection of channel configuration metrics | `false` | no | - | - |
+| CollectQueueConfig | Enable collection of queue configuration metrics | `false` | no | - | - |
+| QueueSelector | Pattern to filter queues (wildcards supported) | `*` | no | - | - |
+| ChannelSelector | Pattern to filter channels (wildcards supported) | `*` | no | - | - |
+| CollectResetQueueStats | Enable collection of queue statistics (destructive operation) | `false` | no | - | - |
 
 ### Examples
 

@@ -119,12 +119,17 @@ using the PCF (Programmable Command Format) protocol.
               chart_type: line
               dimensions:
                 - name: batches
-            - name: mq.channel.batch_config
-              description: Channel Batch Configuration
-              unit: value
+            - name: mq.channel.batch_size
+              description: Channel Batch Size
+              unit: messages
               chart_type: line
               dimensions:
                 - name: batch_size
+            - name: mq.channel.batch_interval
+              description: Channel Batch Interval
+              unit: milliseconds
+              chart_type: line
+              dimensions:
                 - name: batch_interval
             - name: mq.channel.intervals
               description: Channel Intervals
@@ -134,12 +139,17 @@ using the PCF (Programmable Command Format) protocol.
                 - name: disc_interval
                 - name: hb_interval
                 - name: keep_alive_interval
-            - name: mq.channel.retry_config
-              description: Channel Retry Configuration
-              unit: count
+            - name: mq.channel.short_retry_count
+              description: Channel Short Retry Count
+              unit: retries
               chart_type: line
               dimensions:
                 - name: short_retry
+            - name: mq.channel.long_retry_interval
+              description: Channel Long Retry Interval
+              unit: seconds
+              chart_type: line
+              dimensions:
                 - name: long_retry
             - name: mq.channel.max_msg_length
               description: Channel Max Message Length
@@ -147,13 +157,37 @@ using the PCF (Programmable Command Format) protocol.
               chart_type: line
               dimensions:
                 - name: max_msg_length
-            - name: mq.channel.conversation_config
-              description: Channel Conversation Configuration
-              unit: value
+            - name: mq.channel.sharing_conversations
+              description: Channel Sharing Conversations
+              unit: conversations
               chart_type: line
               dimensions:
                 - name: sharing_conversations
+            - name: mq.channel.network_priority
+              description: Channel Network Priority
+              unit: priority
+              chart_type: line
+              dimensions:
                 - name: network_priority
+        - name: listener
+          description: These metrics refer to listener instances.
+          labels:
+            - name: listener
+              description: Listener identifier
+          metrics:
+            - name: mq.listener.status
+              description: Listener Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: running
+                - name: stopped
+            - name: mq.listener.port
+              description: Listener Port
+              unit: port
+              chart_type: line
+              dimensions:
+                - name: port
         - name: queue
           description: These metrics refer to queue instances.
           labels:
@@ -250,6 +284,18 @@ using the PCF (Programmable Command Format) protocol.
               chart_type: line
               dimensions:
                 - name: status
+            - name: mq.qmgr.connection_count
+              description: Queue Manager Connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: connections
+            - name: mq.qmgr.uptime
+              description: Queue Manager Uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime
             - name: mq.queues.overview
               description: Queues Monitoring Status
               unit: queues

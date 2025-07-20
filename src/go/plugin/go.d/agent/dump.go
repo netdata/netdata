@@ -549,11 +549,15 @@ func (da *DumpAnalyzer) printJobAnalysis(job *JobAnalysis) {
 
 	errorCount := 0
 	warningCount := 0
+	infoCount := 0
 	for ctx, issues := range contextIssues {
 		if len(issues) > 0 {
 			for _, issue := range issues {
 				emoji := "❌"
-				if strings.Contains(issue, "WARNING") {
+				if strings.HasPrefix(issue, "INFO:") {
+					emoji = "ℹ️"
+					infoCount++
+				} else if strings.Contains(issue, "WARNING") {
 					emoji = "🟡"
 					warningCount++
 				} else if strings.Contains(issue, "SEVERE BUG") {
@@ -1393,7 +1397,7 @@ func (da *DumpAnalyzer) analyzeFamilyStructureForJob(job *JobAnalysis, contextIs
 			// Add to all contexts in this family
 			for ctx := range info.contexts {
 				contextIssues[ctx] = append(contextIssues[ctx], 
-					fmt.Sprintf("family '%s' has inconsistent label pairs. Each key-value pair should appear in multiples of %d (the number of contexts), but got: %s; possible cause: not all instances have the same labels; possible fix: ensure all charts in the family have consistent labels or split into separate families", 
+					fmt.Sprintf("INFO: family '%s' has inconsistent label pairs. Each key-value pair should appear in multiples of %d (the number of contexts), but got: %s; possible cause: not all instances have the same labels; possible fix: ensure all charts in the family have consistent labels or split into separate families", 
 						family, baseUnit, strings.Join(displayPairs, ", ")))
 			}
 		}
@@ -1416,7 +1420,7 @@ func (da *DumpAnalyzer) analyzeFamilyStructureForJob(job *JobAnalysis, contextIs
 				// Add to all contexts in this family
 				for ctx := range info.contexts {
 					contextIssues[ctx] = append(contextIssues[ctx], 
-						fmt.Sprintf("family '%s' has different number of instances per context (%s); possible cause: monitoring different types of objects or missing data collection; possible fix: split into separate families or fix data collection", 
+						fmt.Sprintf("INFO: family '%s' has different number of instances per context (%s); possible cause: monitoring different types of objects or missing data collection; possible fix: split into separate families or fix data collection", 
 							family, strings.Join(details, "; ")))
 				}
 			}
