@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 
@@ -97,9 +98,9 @@ func (c *Client) GetQueueList() ([]QueueInfo, error) {
 }
 
 // GetQueues collects comprehensive queue metrics with full transparency statistics
-func (c *Client) GetQueues(collectConfig, collectMetrics, collectReset bool, maxQueues int, selector string) (*QueueCollectionResult, error) {
-	c.protocol.Debugf("PCF: Collecting queue metrics with selector '%s', max=%d, config=%v, metrics=%v, reset=%v", 
-		selector, maxQueues, collectConfig, collectMetrics, collectReset)
+func (c *Client) GetQueues(collectConfig, collectMetrics, collectReset bool, maxQueues int, selector string, collectSystem bool) (*QueueCollectionResult, error) {
+	c.protocol.Debugf("PCF: Collecting queue metrics with selector '%s', max=%d, config=%v, metrics=%v, reset=%v, system=%v", 
+		selector, maxQueues, collectConfig, collectMetrics, collectReset, collectSystem)
 	
 	result := &QueueCollectionResult{
 		Stats: CollectionStats{},
@@ -160,14 +161,27 @@ func (c *Client) GetQueues(collectConfig, collectMetrics, collectReset bool, max
 	// Step 3: Apply filtering
 	var queuesToEnrich []string
 	if enrichAll || selector == "*" {
-		// Enrich everything we can see
-		queuesToEnrich = parsed.Queues
-		result.Stats.Discovery.IncludedItems = int64(len(parsed.Queues))
-		result.Stats.Discovery.ExcludedItems = 0
-		c.protocol.Debugf("PCF: Enriching all %d visible queues", len(queuesToEnrich))
-	} else {
-		// Apply selector pattern
+		// Enrich everything we can see (with system filtering)
 		for _, queueName := range parsed.Queues {
+			// Filter out system queues if not wanted
+			if !collectSystem && strings.HasPrefix(queueName, "SYSTEM.") {
+				result.Stats.Discovery.ExcludedItems++
+				continue
+			}
+			queuesToEnrich = append(queuesToEnrich, queueName)
+			result.Stats.Discovery.IncludedItems++
+		}
+		c.protocol.Debugf("PCF: Enriching %d queues (excluded %d system queues)", 
+			len(queuesToEnrich), result.Stats.Discovery.ExcludedItems)
+	} else {
+		// Apply selector pattern and system filtering
+		for _, queueName := range parsed.Queues {
+			// Filter out system queues first if not wanted
+			if !collectSystem && strings.HasPrefix(queueName, "SYSTEM.") {
+				result.Stats.Discovery.ExcludedItems++
+				continue
+			}
+			
 			matched, err := filepath.Match(selector, queueName)
 			if err != nil {
 				c.protocol.Warningf("PCF: Invalid selector pattern '%s': %v", selector, err)
@@ -181,7 +195,7 @@ func (c *Client) GetQueues(collectConfig, collectMetrics, collectReset bool, max
 				result.Stats.Discovery.ExcludedItems++
 			}
 		}
-		c.protocol.Debugf("PCF: Selector '%s' matched %d queues, excluded %d", 
+		c.protocol.Debugf("PCF: Selector '%s' matched %d queues, excluded %d (including system filtering)", 
 			selector, result.Stats.Discovery.IncludedItems, result.Stats.Discovery.ExcludedItems)
 	}
 	

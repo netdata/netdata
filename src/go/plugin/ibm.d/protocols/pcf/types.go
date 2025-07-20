@@ -76,6 +76,18 @@ type ChannelMetrics struct {
 	// Buffer metrics (only for sender/receiver channels)
 	BuffersUsed *int64
 	BuffersMax  *int64
+	
+	// Configuration metrics (populated when collectConfig is true)
+	BatchSize            AttributeValue
+	BatchInterval        AttributeValue
+	DiscInterval         AttributeValue
+	HbInterval           AttributeValue
+	KeepAliveInterval    AttributeValue
+	ShortRetry           AttributeValue
+	LongRetry            AttributeValue
+	MaxMsgLength         AttributeValue
+	SharingConversations AttributeValue
+	NetworkPriority      AttributeValue
 }
 
 // ChannelConfig contains configuration for a channel
