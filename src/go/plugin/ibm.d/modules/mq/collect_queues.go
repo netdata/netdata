@@ -2,8 +2,6 @@ package mq
 
 import (
 	"fmt"
-	"path/filepath"
-	"strings"
 	"time"
 	
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/mq/contexts"
@@ -48,46 +46,59 @@ func convertMQDateTimeToSecondsSince(date, timeVal pcf.AttributeValue) int64 {
 }
 
 func (c *Collector) collectQueueMetrics() error {
+	c.Debugf("Collecting queues with selector '%s', config: %v, reset_stats: %v", 
+		c.Config.QueueSelector, c.Config.CollectQueueConfig, c.Config.CollectResetQueueStats)
 	
-	// Always query ALL queues for discovery, then apply filtering ourselves
-	c.Debugf("Collecting all queues with reset_stats: %v, will apply selector '%s' locally", 
-		c.Config.CollectResetQueueStats, c.Config.QueueSelector)
-	
-	// Configure comprehensive queue collection - always use "*" for discovery
-	config := pcf.QueueCollectionConfig{
-		QueuePattern:      "*",  // Always get ALL queues
-		CollectResetStats: c.Config.CollectResetQueueStats,
-	}
-	
-	// Protocol handles all the complex orchestration
-	queueMetrics, err := c.client.GetQueueMetrics(config)
+	// Use new GetQueues with transparency
+	result, err := c.client.GetQueues(
+		c.Config.CollectQueueConfig,     // collectConfig
+		true,                            // collectMetrics (always)
+		c.Config.CollectResetQueueStats, // collectReset
+		c.Config.MaxQueues,              // maxQueues (0 = no limit)
+		c.Config.QueueSelector,          // selector pattern
+	)
 	if err != nil {
 		return fmt.Errorf("failed to collect queue metrics: %w", err)
 	}
 	
-	// Track overview metrics
-	var monitored, excluded, failed int64
+	// Check discovery success
+	if !result.Stats.Discovery.Success {
+		c.Errorf("Queue discovery failed completely")
+		return fmt.Errorf("queue discovery failed")
+	}
 	
-	// Process all collected metrics
-	for _, queue := range queueMetrics {
-		// Apply queue selector filtering
-		if c.Config.QueueSelector != "" && c.Config.QueueSelector != "*" {
-			matched, err := filepath.Match(c.Config.QueueSelector, queue.Name)
-			if err != nil {
-				c.Warningf("Invalid queue selector pattern '%s': %v", c.Config.QueueSelector, err)
-			} else if !matched {
-				excluded++
-				continue
-			}
-		}
-		
-		// Apply system queue filtering
-		if !c.Config.CollectSystemQueues && strings.HasPrefix(queue.Name, "SYSTEM.") {
-			excluded++
-			continue
-		}
-		
-		monitored++
+	// Map transparency counters to user-facing semantics
+	monitored := int64(0)
+	if result.Stats.Metrics != nil {
+		monitored = result.Stats.Metrics.OkItems
+	}
+	
+	failed := result.Stats.Discovery.UnparsedItems
+	if result.Stats.Metrics != nil {
+		failed += result.Stats.Metrics.FailedItems
+	}
+	// Note: Config and Reset failures are not counted as they're optional
+	
+	// Update overview metrics with correct semantics  
+	c.setQueueOverviewMetrics(
+		monitored,                             // monitored (successfully enriched)
+		result.Stats.Discovery.ExcludedItems,  // excluded (filtered by user)
+		result.Stats.Discovery.InvisibleItems, // invisible (discovery errors)
+		failed,                                // failed (unparsed + enrichment failures)
+	)
+	
+	// Log collection summary
+	c.Debugf("Queue collection complete - discovered:%d visible:%d included:%d collected:%d failed:%d",
+		result.Stats.Discovery.AvailableItems,
+		result.Stats.Discovery.AvailableItems - result.Stats.Discovery.InvisibleItems,
+		result.Stats.Discovery.IncludedItems,
+		len(result.Queues),
+		failed)
+	
+	// Process collected queue metrics
+	for _, queue := range result.Queues {
+		// Note: Protocol already applied selector and system queue filtering
+		// We just need to set the metrics
 		
 		labels := contexts.QueueLabels{
 			Queue: queue.Name,
@@ -197,9 +208,6 @@ func (c *Collector) collectQueueMetrics() error {
 			}
 		}
 	}
-	
-	// Set overview metrics
-	c.setQueueOverviewMetrics(monitored, excluded, 0, 0, 0, failed)
 	
 	return nil
 }

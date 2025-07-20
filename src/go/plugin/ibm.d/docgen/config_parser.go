@@ -5,6 +5,8 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"log"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -42,15 +44,25 @@ func (g *DocGenerator) parseConfigFromGoFile() ([]ConfigField, error) {
 
 	// Try to parse defaults from init.go
 	defaults := g.parseDefaultsFromInitFile()
-	if defaults != nil {
-		// Apply defaults to fields
-		for i := range fields {
-			if defaultValue, exists := defaults[fields[i].Name]; exists {
-				fields[i].Default = defaultValue
-				// If field has a default, it's not required
-				fields[i].Required = false
-			}
+	if defaults == nil {
+		return nil, fmt.Errorf("failed to parse defaultConfig() function from init.go - all configuration fields must have defaults defined")
+	}
+
+	// Validate that ALL fields have defaults and apply them
+	var missingDefaults []string
+	for i := range fields {
+		if defaultValue, exists := defaults[fields[i].Name]; exists {
+			fields[i].Default = defaultValue
+			// If field has a default, it's not required
+			fields[i].Required = false
+		} else {
+			missingDefaults = append(missingDefaults, fields[i].Name)
 		}
+	}
+
+	// FAIL HARD if any field lacks a default
+	if len(missingDefaults) > 0 {
+		return nil, fmt.Errorf("defaultConfig() function must provide default values for ALL configuration fields. Missing defaults for: %v", missingDefaults)
 	}
 
 	return fields, nil
@@ -389,39 +401,63 @@ func (g *DocGenerator) parseDefaultsFromInitFile() map[string]interface{} {
 	dir := filepath.Dir(g.ConfigFile)
 	initFile := filepath.Join(dir, "init.go")
 	
+	// Check if init.go exists
+	if _, err := os.Stat(initFile); os.IsNotExist(err) {
+		log.Printf("ERROR: init.go not found at %s - defaultConfig() function is required", initFile)
+		return nil
+	}
+	
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, initFile, nil, parser.ParseComments)
 	if err != nil {
-		// init.go might not exist or be parseable
+		log.Printf("ERROR: Failed to parse init.go: %v", err)
 		return nil
 	}
 	
 	defaults := make(map[string]interface{})
+	foundDefaultConfig := false
 	
 	// Find the defaultConfig function
 	ast.Inspect(node, func(n ast.Node) bool {
 		switch x := n.(type) {
 		case *ast.FuncDecl:
 			if x.Name.Name == "defaultConfig" {
+				foundDefaultConfig = true
 				// Look for return statement with Config literal
+				foundReturn := false
 				ast.Inspect(x.Body, func(bodyNode ast.Node) bool {
 					switch stmt := bodyNode.(type) {
 					case *ast.ReturnStmt:
 						if len(stmt.Results) > 0 {
 							if lit, ok := stmt.Results[0].(*ast.CompositeLit); ok {
 								extractDefaultsFromLiteral(lit, defaults)
+								foundReturn = true
 								return false
 							}
 						}
 					}
 					return true
 				})
+				if !foundReturn {
+					log.Printf("ERROR: defaultConfig() function found but no valid Config{} return statement")
+				}
 				return false
 			}
 		}
 		return true
 	})
 	
+	if !foundDefaultConfig {
+		log.Printf("ERROR: defaultConfig() function not found in %s - this function is mandatory", initFile)
+		return nil
+	}
+	
+	if len(defaults) == 0 {
+		log.Printf("ERROR: defaultConfig() function found but extracted no default values")
+		return nil
+	}
+	
+	log.Printf("Successfully extracted %d default values from defaultConfig()", len(defaults))
 	return defaults
 }
 

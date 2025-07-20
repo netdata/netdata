@@ -28,9 +28,9 @@ Metrics:
 | mq.qmgr.status | status | status |
 | mq.qmgr.connection_count | connections | connections |
 | mq.qmgr.uptime | uptime | seconds |
-| mq.queues.overview | monitored, excluded, model, unauthorized, unknown, failed | queues |
-| mq.channels.overview | monitored, excluded, unauthorized, failed | channels |
-| mq.topics.overview | monitored, excluded, unauthorized, failed | topics |
+| mq.queues.overview | monitored, excluded, invisible, failed | queues |
+| mq.channels.overview | monitored, excluded, invisible, failed | channels |
+| mq.topics.overview | monitored, excluded, invisible, failed | topics |
 | mq.listeners.overview | monitored, excluded, failed | listeners |
 
 
@@ -150,8 +150,8 @@ The following options can be defined globally or per job.
 | Channel | IBM MQ channel name for connection | `SYSTEM.DEF.SVRCONN` | no | - | - |
 | Host | IBM MQ server hostname or IP address | `localhost` | no | - | - |
 | Port | IBM MQ server port number | `1414` | no | 1 | 65535 |
-| User | Username for IBM MQ authentication | `<no value>` | yes | - | - |
-| Password | Password for IBM MQ authentication | `<no value>` | yes | - | - |
+| User | Username for IBM MQ authentication | `` | no | - | - |
+| Password | Password for IBM MQ authentication | `` | no | - | - |
 | CollectQueues | Enable collection of queue metrics | `true` | no | - | - |
 | CollectChannels | Enable collection of channel metrics | `true` | no | - | - |
 | CollectTopics | Enable collection of topic metrics | `false` | no | - | - |
@@ -160,8 +160,14 @@ The following options can be defined globally or per job.
 | CollectSystemChannels | Enable collection of system channel metrics | `true` | no | - | - |
 | CollectChannelConfig | Enable collection of channel configuration metrics | `false` | no | - | - |
 | CollectQueueConfig | Enable collection of queue configuration metrics | `false` | no | - | - |
-| QueueSelector | Pattern to filter queues (wildcards supported) | `*` | no | - | - |
-| ChannelSelector | Pattern to filter channels (wildcards supported) | `*` | no | - | - |
+| QueueSelector | Pattern to filter queues (wildcards supported) | `` | no | - | - |
+| ChannelSelector | Pattern to filter channels (wildcards supported) | `` | no | - | - |
+| TopicSelector | Pattern to filter topics (wildcards supported) | `` | no | - | - |
+| ListenerSelector | Pattern to filter listeners (wildcards supported) | `` | no | - | - |
+| MaxQueues | Maximum number of queues to collect (0 = no limit) | `100` | no | - | - |
+| MaxChannels | Maximum number of channels to collect (0 = no limit) | `100` | no | - | - |
+| MaxTopics | Maximum number of topics to collect (0 = no limit) | `100` | no | - | - |
+| MaxListeners | Maximum number of listeners to collect (0 = no limit) | `100` | no | - | - |
 | CollectResetQueueStats | Enable collection of queue statistics (destructive operation) | `false` | no | - | - |
 
 ### Examples

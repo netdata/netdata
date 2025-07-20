@@ -43,6 +43,18 @@ type Config struct {
 	QueueSelector   string `yaml:"queue_selector" json:"queue_selector"`
 	// Pattern to filter channels (wildcards supported)
 	ChannelSelector string `yaml:"channel_selector" json:"channel_selector"`
+	// Pattern to filter topics (wildcards supported)
+	TopicSelector   string `yaml:"topic_selector" json:"topic_selector"`
+	// Pattern to filter listeners (wildcards supported)
+	ListenerSelector string `yaml:"listener_selector" json:"listener_selector"`
+	// Maximum number of queues to collect (0 = no limit)
+	MaxQueues       int    `yaml:"max_queues" json:"max_queues"`
+	// Maximum number of channels to collect (0 = no limit)
+	MaxChannels     int    `yaml:"max_channels" json:"max_channels"`
+	// Maximum number of topics to collect (0 = no limit)
+	MaxTopics       int    `yaml:"max_topics" json:"max_topics"`
+	// Maximum number of listeners to collect (0 = no limit)
+	MaxListeners    int    `yaml:"max_listeners" json:"max_listeners"`
 
 	// Enable collection of queue statistics (destructive operation)
 	CollectResetQueueStats bool `yaml:"collect_reset_queue_stats" json:"collect_reset_queue_stats"`

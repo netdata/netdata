@@ -198,17 +198,16 @@ func (g *DocGenerator) parseModuleInfo() (*ModuleInfo, error) {
 }
 
 func (g *DocGenerator) parseConfig() ([]ConfigField, error) {
-	// Try to parse the actual Go file
+	// Try to parse the actual Go file - this MUST succeed
 	fields, err := g.parseConfigFromGoFile()
 	if err != nil {
-		log.Printf("Warning: failed to parse config Go file: %v, using fallback", err)
-		// Fallback to hardcoded fields for robustness
-		return g.getFallbackConfigFields(), nil
+		// FAIL HARD - no fallback for validation errors
+		return nil, fmt.Errorf("config validation failed: %w", err)
 	}
 
-	// If we got no fields from parsing, use fallback
+	// If we got no fields from parsing, this is also an error
 	if len(fields) == 0 {
-		return g.getFallbackConfigFields(), nil
+		return nil, fmt.Errorf("no configuration fields found in config.go")
 	}
 
 	return fields, nil

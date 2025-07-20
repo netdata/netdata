@@ -8,7 +8,7 @@
         "type": "string"
       },
       "channel_selector": {
-        "default": "*",
+        "default": "",
         "title": "Pattern to filter channels (wildcards supported)",
         "type": "string"
       },
@@ -62,7 +62,33 @@
         "title": "IBM MQ server hostname or IP address",
         "type": "string"
       },
+      "listener_selector": {
+        "default": "",
+        "title": "Pattern to filter listeners (wildcards supported)",
+        "type": "string"
+      },
+      "max_channels": {
+        "default": 100,
+        "title": "Maximum number of channels to collect (0 = no limit)",
+        "type": "integer"
+      },
+      "max_listeners": {
+        "default": 100,
+        "title": "Maximum number of listeners to collect (0 = no limit)",
+        "type": "integer"
+      },
+      "max_queues": {
+        "default": 100,
+        "title": "Maximum number of queues to collect (0 = no limit)",
+        "type": "integer"
+      },
+      "max_topics": {
+        "default": 100,
+        "title": "Maximum number of topics to collect (0 = no limit)",
+        "type": "integer"
+      },
       "password": {
+        "default": "",
         "format": "password",
         "title": "Password for IBM MQ authentication",
         "type": "string"
@@ -80,19 +106,22 @@
         "type": "string"
       },
       "queue_selector": {
-        "default": "*",
+        "default": "",
         "title": "Pattern to filter queues (wildcards supported)",
         "type": "string"
       },
+      "topic_selector": {
+        "default": "",
+        "title": "Pattern to filter topics (wildcards supported)",
+        "type": "string"
+      },
       "user": {
+        "default": "",
         "title": "Username for IBM MQ authentication",
         "type": "string"
       }
     },
-    "required": [
-      "user",
-      "password"
-    ],
+    "required": null,
     "title": "mq collector configuration",
     "type": "object"
   }

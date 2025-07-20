@@ -20,6 +20,8 @@ func defaultConfig() Config {
 		Host:         "localhost",
 		Port:         1414,
 		Channel:      "SYSTEM.DEF.SVRCONN",
+		User:         "", // No authentication by default
+		Password:     "", // No authentication by default
 		
 		// Collection defaults - these are enabled by default
 		CollectQueues:         true,
@@ -34,9 +36,17 @@ func defaultConfig() Config {
 		CollectQueueConfig:     false,
 		CollectResetQueueStats: false,
 		
-		// Selector defaults
-		QueueSelector:   "*",
-		ChannelSelector: "*",
+		// Selector defaults - empty means collect nothing (user must explicitly configure)
+		QueueSelector:   "",
+		ChannelSelector: "",
+		TopicSelector:   "",
+		ListenerSelector: "",
+		
+		// Cardinality control defaults
+		MaxQueues:    100,
+		MaxChannels:  100,
+		MaxTopics:    100,
+		MaxListeners: 100,
 	}
 }
 
@@ -80,16 +90,20 @@ func (c *Collector) Init(ctx context.Context) error {
 	}, c.State)
 
 	// Log the selectors - these are applied locally after discovery
-	if c.Config.QueueSelector != "" && c.Config.QueueSelector != "*" {
-		c.Infof("Queue selector configured: %s (applied after discovery)", c.Config.QueueSelector)
-	} else {
+	if c.Config.QueueSelector == "" {
+		c.Infof("Queue selector: empty (no queues will be collected)")
+	} else if c.Config.QueueSelector == "*" {
 		c.Infof("Queue selector: all queues will be collected")
+	} else {
+		c.Infof("Queue selector configured: %s (applied after discovery)", c.Config.QueueSelector)
 	}
 	
-	if c.Config.ChannelSelector != "" && c.Config.ChannelSelector != "*" {
-		c.Infof("Channel selector configured: %s (applied after discovery)", c.Config.ChannelSelector)
-	} else {
+	if c.Config.ChannelSelector == "" {
+		c.Infof("Channel selector: empty (no channels will be collected)")
+	} else if c.Config.ChannelSelector == "*" {
 		c.Infof("Channel selector: all channels will be collected")
+	} else {
+		c.Infof("Channel selector configured: %s (applied after discovery)", c.Config.ChannelSelector)
 	}
 
 	// Warn about destructive statistics collection
