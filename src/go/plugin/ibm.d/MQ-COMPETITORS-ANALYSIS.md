@@ -121,7 +121,7 @@ Many metrics require specific monitoring levels set on MQ objects:
 | Open input/output count | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Active connections |
 | Oldest message age | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Queue time tracking |
 | Average queue time | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | Message residence time |
-| Last GET/PUT time | ❌ | ❓ | ✅ | ✅ | ✅ | ❌ | Operation timestamps |
+| Last GET/PUT time | ✅* | ❓ | ✅ | ✅ | ✅ | ❌ | Operation timestamps |
 | Expired messages | ❌ | ✅ | ❓ | ✅ | ❌ | ❌ | Per-queue expiry |
 | Get/Put bytes | ❌ | ✅ | ❓ | ✅ | ❌ | ❌ | Data volume metrics |
 | Browse count/bytes | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | Non-destructive reads |
@@ -139,7 +139,7 @@ Many metrics require specific monitoring levels set on MQ objects:
 | High queue depth (stats) | ✅* | ❌ | ❌ | ✅ | ❌ | ✅ | Peak depth in interval |
 | Min/Max depth (stats) | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | Depth range in interval |
 | Time since reset | ✅* | ❌ | ❌ | ✅ | ❌ | ❌ | Stats window |
-| Uncommitted messages | ❌* | ❌ | ❌ | ✅ | ✅ | ✅ | Transaction pending |
+| Uncommitted messages | ✅ | ❌ | ❌ | ✅ | ✅ | ✅ | Transaction pending |
 | Harden get backout | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | Backout persistence |
 | Message delivery sequence | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | FIFO/Priority |
 | Queue scope | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | Local/Cell |
@@ -378,9 +378,9 @@ Many metrics require specific monitoring levels set on MQ objects:
 ## Implementation Recommendations
 
 ### High Priority (Core Gaps)
-1. **Queue Time Metrics** - Partially implemented
+1. **Queue Time Metrics** - Mostly implemented
    - ✅ Oldest message age (MQIA_MSGAGE) - IMPLEMENTED
-   - ❌ Last GET/PUT timestamps
+   - ✅ Last GET/PUT timestamps - IMPLEMENTED (as time since last activity)
    - ❌ Average queue time
    - Available via MQCMD_INQUIRE_Q_STATUS
 
