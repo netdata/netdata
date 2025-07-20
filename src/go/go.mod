@@ -26,7 +26,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.6.0
 	github.com/gorcon/rcon v1.4.0
-	github.com/gosnmp/gosnmp v1.41.0
+	github.com/gosnmp/gosnmp v1.42.0
 	github.com/invopop/jsonschema v0.13.0
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/jackc/pgx/v5 v5.7.5
