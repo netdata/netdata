@@ -62,6 +62,27 @@ Metrics:
 | mq.channel.sharing_conversations | sharing_conversations | conversations |
 | mq.channel.network_priority | network_priority | priority |
 
+### Per channelstatistics
+
+These metrics refer to individual channelstatistics instances.
+
+Labels:
+
+| Label | Description |
+|:------|:------------|
+| channel | Channel identifier |
+| type | Type identifier |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:-------|:-----------|:-----|
+| mq.channel_stats.messages | messages | messages/s |
+| mq.channel_stats.bytes | bytes | bytes/s |
+| mq.channel_stats.batches | full_batches, incomplete_batches | batches/s |
+| mq.channel_stats.batch_size | avg_batch_size | messages |
+| mq.channel_stats.put_retries | put_retries | retries/s |
+
 ### Per listener
 
 These metrics refer to individual listener instances.
@@ -98,17 +119,48 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:-------|:-----------|:-----|
 | mq.queue.depth | current, max | messages |
+| mq.queue.depth_percentage | percentage | percentage |
 | mq.queue.messages | enqueued, dequeued | messages/s |
 | mq.queue.connections | input, output | connections |
 | mq.queue.high_depth | high_depth | messages |
-| mq.queue.oldest_msg_age | oldest_msg_age | seconds |
 | mq.queue.uncommitted_msgs | uncommitted | messages |
 | mq.queue.last_activity | since_last_get, since_last_put | seconds |
+| mq.queue.oldest_msg_age | oldest_msg_age | seconds |
+| mq.queue.avg_queue_time | avg_queue_time | microseconds |
+| mq.queue.service_interval | service_interval | milliseconds |
 | mq.queue.inhibit_status | inhibit_get, inhibit_put | status |
 | mq.queue.priority | def_priority | priority |
+| mq.queue.message_persistence | persistent, non_persistent | boolean |
+| mq.queue.retention_interval | retention_interval | hours |
 | mq.queue.triggers | trigger_depth, trigger_type | messages |
 | mq.queue.backout_threshold | backout_threshold | retries |
 | mq.queue.max_msg_length | max_msg_length | bytes |
+| mq.queue.scope | queue_manager, cell | boolean |
+| mq.queue.usage | normal, transmission | boolean |
+| mq.queue.msg_delivery_sequence | priority, fifo | boolean |
+| mq.queue.harden_get_backout | enabled, disabled | boolean |
+
+### Per queuestatistics
+
+These metrics refer to individual queuestatistics instances.
+
+Labels:
+
+| Label | Description |
+|:------|:------------|
+| queue | Queue identifier |
+| type | Type identifier |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:-------|:-----------|:-----|
+| mq.queue_stats.depth_min_max | min_depth, max_depth | messages |
+| mq.queue_stats.avg_queue_time | non_persistent, persistent | microseconds |
+| mq.queue_stats.operations | puts_non_persistent, puts_persistent, gets_non_persistent, gets_persistent, put1s, browses | operations/s |
+| mq.queue_stats.bytes | put_bytes_non_persistent, put_bytes_persistent, get_bytes_non_persistent, get_bytes_persistent, browse_bytes | bytes/s |
+| mq.queue_stats.failures | puts_failed, put1s_failed, gets_failed, browses_failed | failures/s |
+| mq.queue_stats.message_lifecycle | expired, purged, not_queued | messages/s |
 
 ### Per topic
 
@@ -174,6 +226,8 @@ The following options can be defined globally or per job.
 | MaxTopics | Maximum number of topics to collect (0 = no limit) | `100` | no | - | - |
 | MaxListeners | Maximum number of listeners to collect (0 = no limit) | `100` | no | - | - |
 | CollectResetQueueStats | Enable collection of queue statistics (destructive operation) | `false` | no | - | - |
+| CollectStatisticsQueue | Enable collection of statistics queue metrics (SYSTEM.ADMIN.STATISTICS.QUEUE provides advanced metrics like min/max depth) | `false` | no | - | - |
+| StatisticsInterval | Statistics collection interval in seconds (must match MQ STATINT setting to avoid wasted calls) | `60` | no | - | - |
 
 ### Examples
 

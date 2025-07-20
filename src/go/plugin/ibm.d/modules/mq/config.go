@@ -62,6 +62,10 @@ type Config struct {
 
 	// Enable collection of queue statistics (destructive operation)
 	CollectResetQueueStats bool `yaml:"collect_reset_queue_stats" json:"collect_reset_queue_stats"`
+	// Enable collection of statistics queue metrics (SYSTEM.ADMIN.STATISTICS.QUEUE provides advanced metrics like min/max depth)
+	CollectStatisticsQueue bool `yaml:"collect_statistics_queue" json:"collect_statistics_queue"`
+	// Statistics collection interval in seconds (should match MQ STATINT setting for optimal data freshness)
+	StatisticsInterval     int  `yaml:"statistics_interval" json:"statistics_interval"`
 }
 
 

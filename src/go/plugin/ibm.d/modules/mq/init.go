@@ -37,6 +37,10 @@ func defaultConfig() Config {
 		
 		// Only destructive operations are disabled by default
 		CollectResetQueueStats: false,
+		// Statistics queue collection is disabled by default (may not be available on all systems)
+		CollectStatisticsQueue: false,
+		// Statistics collection interval should match MQ STATINT setting (default 60 seconds)
+		StatisticsInterval:     60,
 		
 		// Selector defaults - empty means collect nothing (user must explicitly configure)
 		QueueSelector:   "",
@@ -114,6 +118,13 @@ func (c *Collector) Init(ctx context.Context) error {
 		c.Warningf("Queue message counters will be RESET TO ZERO after each collection!")
 		c.Warningf("This WILL BREAK other monitoring tools using the same statistics!")
 		c.Warningf("Only use this if Netdata is the ONLY monitoring tool for MQ!")
+	}
+
+	// Log statistics queue collection status
+	if c.Config.CollectStatisticsQueue {
+		c.Infof("Statistics queue collection is ENABLED")
+		c.Infof("Will collect advanced metrics from SYSTEM.ADMIN.STATISTICS.QUEUE")
+		c.Infof("Note: Statistics must be enabled on the queue manager (STATQ, STATINT settings)")
 	}
 
 	return nil

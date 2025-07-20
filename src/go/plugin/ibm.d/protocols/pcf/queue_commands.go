@@ -25,13 +25,20 @@ type QueueInfo struct {
 	MaxDepth     int64
 	
 	// Configuration attributes (extracted from individual queue queries)
-	InhibitGet       AttributeValue
-	InhibitPut       AttributeValue
-	BackoutThreshold AttributeValue
-	TriggerDepth     AttributeValue
-	TriggerType      AttributeValue
-	MaxMsgLength     AttributeValue
-	DefPriority      AttributeValue
+	InhibitGet          AttributeValue
+	InhibitPut          AttributeValue
+	BackoutThreshold    AttributeValue
+	TriggerDepth        AttributeValue
+	TriggerType         AttributeValue
+	MaxMsgLength        AttributeValue
+	DefPriority         AttributeValue
+	ServiceInterval     AttributeValue
+	RetentionInterval   AttributeValue
+	Scope               AttributeValue
+	Usage               AttributeValue
+	MsgDeliverySequence AttributeValue
+	HardenGetBackout    AttributeValue
+	DefPersistence      AttributeValue
 }
 
 // QueueTypeString converts MQ queue type to string for labels
@@ -394,6 +401,13 @@ func (c *Client) getQueueConfiguration(queueName string) (*QueueInfo, error) {
 	queueInfo.TriggerType = NotCollected
 	queueInfo.MaxMsgLength = NotCollected
 	queueInfo.DefPriority = NotCollected
+	queueInfo.ServiceInterval = NotCollected
+	queueInfo.RetentionInterval = NotCollected
+	queueInfo.Scope = NotCollected
+	queueInfo.Usage = NotCollected
+	queueInfo.MsgDeliverySequence = NotCollected
+	queueInfo.HardenGetBackout = NotCollected
+	queueInfo.DefPersistence = NotCollected
 	
 	if attr, ok := attrs[C.MQIA_INHIBIT_GET]; ok {
 		if val, ok := attr.(int32); ok {
@@ -434,6 +448,49 @@ func (c *Client) getQueueConfiguration(queueName string) (*QueueInfo, error) {
 	if attr, ok := attrs[C.MQIA_DEF_PRIORITY]; ok {
 		if val, ok := attr.(int32); ok {
 			queueInfo.DefPriority = AttributeValue(val)
+		}
+	}
+	
+	// Extract new configuration attributes
+	if attr, ok := attrs[C.MQIA_Q_SERVICE_INTERVAL]; ok {
+		if val, ok := attr.(int32); ok {
+			queueInfo.ServiceInterval = AttributeValue(val)
+		}
+	}
+	
+	if attr, ok := attrs[C.MQIA_RETENTION_INTERVAL]; ok {
+		if val, ok := attr.(int32); ok {
+			queueInfo.RetentionInterval = AttributeValue(val)
+		}
+	}
+	
+	if attr, ok := attrs[C.MQIA_SCOPE]; ok {
+		if val, ok := attr.(int32); ok {
+			queueInfo.Scope = AttributeValue(val)
+		}
+	}
+	
+	if attr, ok := attrs[C.MQIA_USAGE]; ok {
+		if val, ok := attr.(int32); ok {
+			queueInfo.Usage = AttributeValue(val)
+		}
+	}
+	
+	if attr, ok := attrs[C.MQIA_MSG_DELIVERY_SEQUENCE]; ok {
+		if val, ok := attr.(int32); ok {
+			queueInfo.MsgDeliverySequence = AttributeValue(val)
+		}
+	}
+	
+	if attr, ok := attrs[C.MQIA_HARDEN_GET_BACKOUT]; ok {
+		if val, ok := attr.(int32); ok {
+			queueInfo.HardenGetBackout = AttributeValue(val)
+		}
+	}
+	
+	if attr, ok := attrs[C.MQIA_DEF_PERSISTENCE]; ok {
+		if val, ok := attr.(int32); ok {
+			queueInfo.DefPersistence = AttributeValue(val)
 		}
 	}
 	
@@ -489,13 +546,20 @@ func (c *Client) getQueueListWithBasicMetrics(pattern string) ([]QueueMetrics, e
 			CurrentDepth: 0, // Will be filled from detailed query if available
 			MaxDepth:     0, // Will be filled from detailed query if available
 			// Configuration data from discovery call
-			InhibitGet:       queueInfo.InhibitGet,
-			InhibitPut:       queueInfo.InhibitPut,
-			BackoutThreshold: queueInfo.BackoutThreshold,
-			TriggerDepth:     queueInfo.TriggerDepth,
-			TriggerType:      queueInfo.TriggerType,
-			MaxMsgLength:     queueInfo.MaxMsgLength,
-			DefPriority:      queueInfo.DefPriority,
+			InhibitGet:          queueInfo.InhibitGet,
+			InhibitPut:          queueInfo.InhibitPut,
+			BackoutThreshold:    queueInfo.BackoutThreshold,
+			TriggerDepth:        queueInfo.TriggerDepth,
+			TriggerType:         queueInfo.TriggerType,
+			MaxMsgLength:        queueInfo.MaxMsgLength,
+			DefPriority:         queueInfo.DefPriority,
+			ServiceInterval:     queueInfo.ServiceInterval,
+			RetentionInterval:   queueInfo.RetentionInterval,
+			Scope:               queueInfo.Scope,
+			Usage:               queueInfo.Usage,
+			MsgDeliverySequence: queueInfo.MsgDeliverySequence,
+			HardenGetBackout:    queueInfo.HardenGetBackout,
+			DefPersistence:      queueInfo.DefPersistence,
 			// Status metrics initialized to NotCollected
 			OpenInputCount:  NotCollected,
 			OpenOutputCount: NotCollected,
@@ -594,6 +658,14 @@ func (c *Client) enrichWithStatus(metrics *QueueMetrics) error {
 			if timeInt, err := strconv.ParseInt(timeStr, 10, 64); err == nil {
 				metrics.LastPutTime = AttributeValue(timeInt)
 			}
+		}
+	}
+	
+	// Extract average queue time
+	if val, ok := attrs[C.MQIACF_Q_TIME_INDICATOR]; ok {
+		if timeVal, ok := val.(int32); ok {
+			metrics.AvgQueueTime = AttributeValue(timeVal)
+			c.protocol.Debugf("PCF: Queue '%s' average queue time: %d microseconds", metrics.Name, timeVal)
 		}
 	}
 	

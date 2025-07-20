@@ -5,7 +5,7 @@ This document compares our mq_pcf collector with leading IBM MQ monitoring solut
 ## Current Implementation Status
 
 **As of latest updates:**
-- **Total Metrics**: 1043+ time-series for mq-test instance (up from 1042)
+- **Total Metrics**: 1043+ time-series for mq-test instance
 - **Collection Pattern**: Efficient 3N batching (3 requests per queue)
 - **New Features Implemented**:
   - ✅ OldestMessageAge metric for all queues
@@ -17,14 +17,27 @@ This document compares our mq_pcf collector with leading IBM MQ monitoring solut
   - ✅ Extended to channels for consistent handling
   - ✅ Type-safe metric collection API
   - ✅ Queue Manager Connection Count metric
-  - ✅ Active Listener Status monitoring
+  - ✅ Queue Manager Uptime metric
+  - ✅ Enhanced Listener monitoring (status, backlog, uptime)
+  - ✅ Transparency pattern for all collectors
+  - ✅ Shared time parsing utilities
+  - ✅ **NEW: Depth Percentage calculation**
+  - ✅ **NEW: Average Queue Time (MQIACF_Q_TIME_INDICATOR)**
+  - ✅ **NEW: Service Interval and Retention Interval metrics**
+  - ✅ **NEW: Message Persistence configuration metric**
+  - ✅ **NEW: Additional queue attributes collected (scope, usage, etc.)**
   
 **Metric Breakdown**:
-- **Queue Metrics**: 12 contexts (depth, messages, connections, high_depth, oldest_msg_age, uncommitted_msgs, last_activity, inhibit_status, priority, triggers, backout_threshold, max_msg_length)
+- **Queue Metrics**: 20 contexts organized into 5 families:
+  - **queues/activity**: depth, depth_percentage, messages, connections, high_depth, uncommitted_msgs, last_activity
+  - **queues/performance**: oldest_msg_age, avg_queue_time, service_interval
+  - **queues/configuration**: inhibit_status, priority, message_persistence, retention_interval
+  - **queues/limits**: triggers, backout_threshold, max_msg_length
+  - **queues/behavior**: queue_scope, queue_usage, msg_delivery_sequence, harden_get_backout
 - **Channel Metrics**: 3 contexts (status, messages, bytes) with batch configuration
 - **Topic Metrics**: 3 contexts (publishers, subscribers, messages)
-- **Queue Manager**: Status, connection count, and overview metrics
-- **Listener Metrics**: 2 contexts (status, port)
+- **Queue Manager**: Status, connection count, uptime, and overview metrics
+- **Listener Metrics**: 3 contexts (status, backlog, uptime) with IP/port labels
 - **Resolution**: Per-second (1s) - unmatched by competitors
 
 ## Competitors Analyzed
@@ -52,7 +65,6 @@ This document compares our mq_pcf collector with leading IBM MQ monitoring solut
 - ❌ = Not implemented
 - ❓ = Unknown/unclear from documentation
 - ⚠️ = Claimed in documentation but NOT found in source code (fake metric)
-- ✅* = Partially implemented or via indirect method
 
 ## General Collection Requirements
 
@@ -118,42 +130,48 @@ Many metrics require specific monitoring levels set on MQ objects:
 
 | Metric | Netdata | Prometheus | Dynatrace | Datadog | Zabbix | SignalFx | Notes |
 |--------|---------|------------|-----------|---------|---------|----------|-------|
-| Current depth | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Messages in queue |
-| Depth percentage | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | % of max depth |
-| Max depth | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Configuration limit |
-| Enqueue count/rate | ✅* | ✅ | ✅* | ✅* | ❌ | ✅ | *Requires RESET_Q_STATS |
-| Dequeue count/rate | ✅* | ✅ | ✅* | ✅* | ❌ | ✅ | *Requires RESET_Q_STATS |
-| Open input/output count | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Active connections |
-| Oldest message age | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Queue time tracking |
-| Average queue time | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | Message residence time |
-| Last GET/PUT time | ✅* | ❓ | ✅ | ✅ | ✅ | ❌ | Operation timestamps |
-| Expired messages | ❌ | ✅ | ❓ | ✅ | ❌ | ❌ | Per-queue expiry |
-| Get/Put bytes | ❌ | ✅ | ❓ | ✅ | ❌ | ❌ | Data volume metrics |
-| Browse count/bytes | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | Non-destructive reads |
-| Get/Put fail counts | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | Failed operations |
-| Non-queued messages | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | Direct transfers |
-| Purge count | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | Purged messages |
-| MQOPEN/CLOSE/INQ/SET counts | ❌ | ✅ | ❓ | ❌ | ❌ | ❌ | API operation counts |
-| Short/Long time indicators | ❌ | ❓ | ✅ | ❌ | ❌ | ✅ | Queue time distribution |
+| Current depth | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Messages in queue (MQIA_CURRENT_Q_DEPTH) |
+| Depth percentage | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | % of max depth (calculated) |
+| Max depth | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Configuration limit (MQIA_MAX_Q_DEPTH) |
+| Enqueue count/rate | ✅³ | ✅ | ✅* | ✅* | ❌ | ✅ | Via RESET_Q_STATS (MQIA_MSG_ENQ_COUNT) |
+| Dequeue count/rate | ✅³ | ✅ | ✅* | ✅* | ❌ | ✅ | Via RESET_Q_STATS (MQIA_MSG_DEQ_COUNT) |
+| Open input/output count | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Active connections (MQIA_OPEN_INPUT/OUTPUT_COUNT) |
+| Oldest message age | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Queue time tracking (MQIACF_OLDEST_MSG_AGE) |
+| Average queue time | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | MQIACF_Q_TIME_INDICATOR |
+| Last GET/PUT time | ✅ | ❓ | ✅ | ✅ | ✅ | ❌ | As "time since" metric (MQCACF_LAST_GET/PUT_DATE/TIME) |
+| Expired messages | ✅² | ✅ | ❓ | ✅ | ❌ | ❌ | Via STATISTICS.QUEUE |
+| Get/Put bytes | ✅² | ✅ | ❓ | ✅ | ❌ | ❌ | Via STATISTICS.QUEUE |
+| Browse count/bytes | ✅² | ❌ | ❌ | ✅ | ❌ | ❌ | Via STATISTICS.QUEUE |
+| Get/Put fail counts | ✅² | ❌ | ❌ | ✅ | ❌ | ❌ | Via STATISTICS.QUEUE |
+| Non-queued messages | ✅² | ❌ | ❌ | ✅ | ❌ | ❌ | Via STATISTICS.QUEUE |
+| Purge count | ✅² | ❌ | ❌ | ✅ | ❌ | ❌ | Via STATISTICS.QUEUE |
+| MQOPEN/CLOSE/INQ/SET counts | ❌² | ✅ | ❓ | ❌ | ❌ | ❌ | Via statistics queue |
+| Short/Long time indicators | ❌² | ❓ | ✅ | ❌ | ❌ | ✅ | Via statistics queue |
 | High/Low depth events | ✅ | ❓ | ✅ | ✅ | ❌ | ✅ | Threshold monitoring |
 | Inhibit status | ✅ | ❓ | ✅ | ✅ | ❌ | ❌ | Get/Put inhibited |
 | Backout threshold | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | Poison msg handling |
-| Trigger settings | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | Trigger configuration |
-| Service interval | ❌ | ❌ | ❌ | ✅ | ❌ | ✅ | Target service time |
-| Retention interval | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | Queue lifetime |
-| High queue depth (stats) | ✅* | ❌ | ❌ | ✅ | ❌ | ✅ | Peak depth in interval |
-| Min/Max depth (stats) | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | Depth range in interval |
-| Time since reset | ✅* | ❌ | ❌ | ✅ | ❌ | ❌ | Stats window |
+| Trigger settings | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | Depth, type config |
+| Service interval | ✅ | ❌ | ❌ | ✅ | ❌ | ✅ | MQIA_Q_SERVICE_INTERVAL |
+| Retention interval | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | MQIA_RETENTION_INTERVAL |
+| High queue depth (stats) | ✅ | ❌ | ❌ | ✅ | ❌ | ✅ | Peak depth via RESET |
+| Min/Max depth (stats) | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | Via STATISTICS.QUEUE |
+| Time since reset | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | Stats window tracking |
 | Uncommitted messages | ✅ | ❌ | ❌ | ✅ | ✅ | ✅ | Transaction pending |
-| Harden get backout | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | Backout persistence |
-| Message delivery sequence | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | FIFO/Priority |
-| Queue scope | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | Local/Cell |
-| Queue type | ✅ | ❓ | ❓ | ✅ | ✅ | ✅ | Local/Alias/Remote |
-| Queue usage | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | Normal/Transmission |
-| Default persistence | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | Message persistence |
+| Harden get backout | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | MQIA_HARDEN_GET_BACKOUT |
+| Message delivery sequence | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | MQIA_MSG_DELIVERY_SEQUENCE |
+| Queue scope | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | MQIA_SCOPE |
+| Queue type | ✅ | ❓ | ❓ | ✅ | ✅ | ✅ | Local/Alias/Remote/etc |
+| Queue usage | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | MQIA_USAGE |
+| Default persistence | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | MQIA_DEF_PERSISTENCE |
 | Default priority | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | Message priority |
-| Queue file size | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | Current file size |
-| Max queue file size | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | Maximum file size |
+| Queue file size | ❌⁴ | ❌ | ❌ | ❌ | ❌ | ✅ | Filesystem metric |
+| Max queue file size | ❌⁴ | ❌ | ❌ | ❌ | ❌ | ✅ | Filesystem metric |
+
+**Legend:**
+- ❌¹ = Available via PCF, not yet implemented (easy to add)
+- ❌² = Requires SYSTEM.ADMIN.STATISTICS.QUEUE consumer (different architecture)
+- ✅³ = Implemented but disabled by default (destructive operation - user must enable)
+- ❌⁴ = Not available via MQ APIs (filesystem metrics)
 
 ### Channel Level Metrics
 **Cardinality**: Per-Channel (typically tens to hundreds)  
@@ -166,26 +184,26 @@ Many metrics require specific monitoring levels set on MQ objects:
 
 | Metric | Netdata | Prometheus | Dynatrace | Datadog | Zabbix | SignalFx | Notes |
 |--------|---------|------------|-----------|---------|---------|----------|-------|
-| Status | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Running/stopped/retrying |
-| Connection status | ❌ | ❌ | ❌ | ✅* | ❌ | ❌ | Connection state |
-| Active connections | ❌ | ❌ | ❌ | ⚠️ | ❌ | ❌ | Per channel instances |
-| Message rate | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | Messages/second |
-| Byte rate | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | Bytes/second |
-| Buffers sent/received | ❌ | ❌ | ❌ | ✅ | ❌ | ✅ | Buffer counts |
-| Batch metrics | ✅ | ❓ | ✅ | ✅ | ❌ | ❌ | Batch size/rate |
-| Full/incomplete batches | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | Batch efficiency |
-| Average batch size | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | Batch statistics |
-| Put retries | ❌ | ❌ | ❌ | ✅ | ❌ | ✅ | Message retry count |
-| Current messages | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | In-doubt messages |
-| Configuration | ✅ | ❓ | ✅ | ✅ | ❌ | ❌ | Timeouts, retries, etc |
-| XMITQ time | ❌ | ✅ | ❓ | ❌ | ❌ | ❌ | Transmission queue wait |
-| MCA status | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | Agent status |
-| In-doubt status | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | Transaction state |
-| SSL key resets | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | Security resets |
-| NPM speed | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | Non-persistent msg speed |
-| Message retry settings | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | MR count/interval |
-| Max sharing conversations | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | Max conversations |
-| Current sharing conversations | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | Current conversations |
+| Status | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | All status states (inactive/binding/starting/running/stopping/retrying/stopped/requesting/paused/disconnected/initializing/switching) |
+| Connection status | ❌¹ | ❌ | ❌ | ✅ | ❌ | ❌ | Connection state |
+| Active connections | ❌¹ | ❌ | ❌ | ❌ | ❌ | ❌ | Per channel instances |
+| Message rate | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | Messages/second (MQIACH_MSGS) |
+| Byte rate | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | Bytes/second (MQIACH_BYTES_SENT) |
+| Buffers sent/received | ❌¹ | ❌ | ❌ | ✅ | ❌ | ✅ | Buffer counts (MQIACH_BUFFERS_SENT/RCVD) |
+| Batch metrics | ✅ | ❓ | ✅ | ✅ | ❌ | ❌ | Batch size/rate (MQIACH_BATCHES) |
+| Full/incomplete batches | ❌² | ❌ | ❌ | ✅ | ❌ | ❌ | Batch efficiency (via stats queue) |
+| Average batch size | ❌² | ❌ | ❌ | ✅ | ❌ | ❌ | Batch statistics (via stats queue) |
+| Put retries | ❌² | ❌ | ❌ | ✅ | ❌ | ✅ | Message retry count (via stats queue) |
+| Current messages | ❌¹ | ❌ | ❌ | ✅ | ❌ | ❌ | In-doubt messages (MQIACH_CURRENT_MSGS) |
+| Configuration | ✅ | ❓ | ✅ | ✅ | ❌ | ❌ | Timeouts, retries, batch size/interval |
+| XMITQ time | ❌¹ | ✅ | ❓ | ❌ | ❌ | ❌ | Transmission queue wait |
+| MCA status | ❌¹ | ❌ | ❌ | ✅ | ❌ | ❌ | Agent status (MQIACH_MCA_STATUS) |
+| In-doubt status | ❌¹ | ❌ | ❌ | ✅ | ❌ | ❌ | Transaction state (MQIACH_INDOUBT_STATUS) |
+| SSL key resets | ❌¹ | ❌ | ❌ | ✅ | ❌ | ❌ | Security resets (MQIACH_SSL_KEY_RESETS) |
+| NPM speed | ❌¹ | ❌ | ❌ | ✅ | ❌ | ❌ | Non-persistent msg speed (MQIACH_NPM_SPEED) |
+| Message retry settings | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | MR count/interval (MQIACH_MR_COUNT/INTERVAL) |
+| Max sharing conversations | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ | Max conversations (MQIACH_SHARING_CONVERSATIONS) |
+| Current sharing conversations | ❌¹ | ❌ | ❌ | ❌ | ❌ | ✅ | Current conversations |
 
 ### Topic Level Metrics
 **Cardinality**: Per-Topic (variable, typically less than queues)  
@@ -225,9 +243,11 @@ Many metrics require specific monitoring levels set on MQ objects:
 
 | Metric | Netdata | Prometheus | Dynatrace | Datadog | Zabbix | SignalFx | Notes |
 |--------|---------|------------|-----------|---------|---------|----------|-------|
-| Status | ❌ | ✅ | ✅ | ❌ | ❌ | ✅ | Running/stopped |
-| Port | ❌ | ✅ | ✅ | ❌ | ❌ | ✅ | Listening port |
-| Backlog | ❌ | ❓ | ❓ | ❌ | ❌ | ❌ | Connection backlog |
+| Status | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | All 5 states: stopped/starting/running/stopping/retrying |
+| Port | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | Listening port (as label) |
+| Backlog | ✅ | ❓ | ❓ | ❌ | ❌ | ❌ | Connection backlog limit |
+| IP Address | ✅ | ❓ | ❓ | ❌ | ❌ | ❌ | Bind address (as label) |
+| Uptime | ✅ | ❓ | ❓ | ❌ | ❌ | ❌ | Time since listener started |
 
 ### Platform & Features
 
@@ -382,22 +402,39 @@ Many metrics require specific monitoring levels set on MQ objects:
 
 ## Implementation Recommendations
 
-### High Priority (Core Gaps)
-1. **Queue Time Metrics** - Mostly implemented
-   - ✅ Oldest message age (MQIA_MSGAGE) - IMPLEMENTED
-   - ✅ Last GET/PUT timestamps - IMPLEMENTED (as time since last activity)
-   - ❌ Average queue time
-   - Available via MQCMD_INQUIRE_Q_STATUS
+### Phase 1: PCF-Based Metrics ✅ COMPLETED
+All PCF-available queue metrics have been implemented:
+- ✅ Depth percentage calculation
+- ✅ Average queue time (MQIACF_Q_TIME_INDICATOR)
+- ✅ Service interval (MQIA_Q_SERVICE_INTERVAL)
+- ✅ Retention interval (MQIA_RETENTION_INTERVAL)
+- ✅ Message persistence (MQIA_DEF_PERSISTENCE)
+- ✅ Queue scope (MQIA_SCOPE)
+- ✅ Queue usage (MQIA_USAGE)
+- ✅ Message delivery sequence (MQIA_MSG_DELIVERY_SEQUENCE)
+- ✅ Harden get backout (MQIA_HARDEN_GET_BACKOUT)
 
-2. **Extended Queue Statistics**
-   - Get/Put bytes (not just counts)
-   - Failed operation counts
-   - Browse statistics
-   - Available via MQCMD_INQUIRE_Q_STATUS with MQIACF_Q_STATISTICS
+### Phase 2: Extended Statistics Queue Metrics ✅ COMPLETED
+Requires consuming SYSTEM.ADMIN.STATISTICS.QUEUE messages:
+- ✅ Get/Put bytes (MQIAMO64_GET_BYTES, MQIAMO64_PUT_BYTES)
+- ✅ Failed operation counts (MQIAMO_GETS_FAILED, MQIAMO_PUTS_FAILED)
+- ✅ Browse statistics (MQIAMO_BROWSES, MQIAMO64_BROWSE_BYTES)
+- ✅ Purge counts (MQIAMO_MSGS_PURGED)
+- ✅ Non-queued messages (MQIAMO_MSGS_NOT_QUEUED)
+- ✅ Min/Max depth statistics (MQIAMO_Q_MIN_DEPTH, MQIAMO_Q_MAX_DEPTH)
+- ✅ Average queue time split by persistence (MQIAMO64_AVG_Q_TIME)
+- ✅ Message lifecycle metrics (MQIAMO_MSGS_EXPIRED)
+- ✅ Channel statistics (messages, bytes, batches, put retries)
+- ❌ MQOPEN/CLOSE/INQ/SET counts (not implemented yet)
 
-3. **Platform Support**
+### Phase 3: Platform and Advanced Features
+1. **Platform Support**
    - Windows support (remove CGO dependency)
    - Consider pure Go implementation
+
+2. **Resource Monitoring** (Requires REST API)
+   - CPU/Memory/Disk metrics
+   - REST API collector for MQ 9.0.4+
 
 ### Medium Priority (Competitive Features)
 1. **Auto-discovery**

@@ -146,13 +146,23 @@ type QueueMetrics struct {
 	
 	// Configuration metrics (from discovery MQCMD_INQUIRE_Q)
 	// Note: NotCollected means "attribute not collected/available"
-	InhibitGet       AttributeValue  // Range: 0-1 (boolean), NotCollected = not available
-	InhibitPut       AttributeValue  // Range: 0-1 (boolean), NotCollected = not available
-	BackoutThreshold AttributeValue  // Range: 0-999999999, NotCollected = not available
-	TriggerDepth     AttributeValue  // Range: 1-999999999, NotCollected = not available
-	TriggerType      AttributeValue  // Range: 0-3 (NONE/FIRST/EVERY/DEPTH), NotCollected = not available
-	MaxMsgLength     AttributeValue  // Range: 0-max_int32, NotCollected = not available
-	DefPriority      AttributeValue  // Range: 0-9, NotCollected = not available
+	InhibitGet          AttributeValue  // Range: 0-1 (boolean), NotCollected = not available
+	InhibitPut          AttributeValue  // Range: 0-1 (boolean), NotCollected = not available
+	BackoutThreshold    AttributeValue  // Range: 0-999999999, NotCollected = not available
+	TriggerDepth        AttributeValue  // Range: 1-999999999, NotCollected = not available
+	TriggerType         AttributeValue  // Range: 0-3 (NONE/FIRST/EVERY/DEPTH), NotCollected = not available
+	MaxMsgLength        AttributeValue  // Range: 0-max_int32, NotCollected = not available
+	DefPriority         AttributeValue  // Range: 0-9, NotCollected = not available
+	ServiceInterval     AttributeValue  // MQIA_Q_SERVICE_INTERVAL - Target service time in milliseconds
+	RetentionInterval   AttributeValue  // MQIA_RETENTION_INTERVAL - Queue retention hours
+	Scope               AttributeValue  // MQIA_SCOPE - Queue scope (0=MQSCO_Q_MGR, 1=MQSCO_CELL)
+	Usage               AttributeValue  // MQIA_USAGE - Queue usage (0=MQUS_NORMAL, 1=MQUS_TRANSMISSION)
+	MsgDeliverySequence AttributeValue  // MQIA_MSG_DELIVERY_SEQUENCE (0=MQMDS_PRIORITY, 1=MQMDS_FIFO)
+	HardenGetBackout    AttributeValue  // MQIA_HARDEN_GET_BACKOUT - Backout persistence (0/1)
+	DefPersistence      AttributeValue  // MQIA_DEF_PERSISTENCE (0=MQPER_NOT_PERSISTENT, 1=MQPER_PERSISTENT)
+	
+	// Additional status metrics (from MQCMD_INQUIRE_Q_STATUS)
+	AvgQueueTime        AttributeValue  // MQIACF_Q_TIME_INDICATOR - Average time messages on queue (microseconds)
 }
 
 // QueueConfig contains configuration for a queue
@@ -290,4 +300,102 @@ func NewPCFError(code int32, format string, args ...interface{}) *PCFError {
 		Message: fmt.Sprintf(format, args...),
 		Code:    code,
 	}
+}
+
+// StatisticsType represents the type of statistics message
+type StatisticsType int32
+
+const (
+	StatisticsTypeQueue   StatisticsType = 1 // MQCMD_STATISTICS_Q
+	StatisticsTypeChannel StatisticsType = 2 // MQCMD_STATISTICS_CHANNEL
+)
+
+// QueueStatistics contains extended queue metrics from statistics queue
+type QueueStatistics struct {
+	Name string
+	Type QueueType
+	
+	// Min/Max depth metrics
+	MinDepth AttributeValue  // MQIAMO_Q_MIN_DEPTH - Minimum queue depth since statistics reset
+	MaxDepth AttributeValue  // MQIAMO_Q_MAX_DEPTH - Maximum queue depth since statistics reset
+	
+	// Average queue time metrics (split by persistence)
+	AvgQTimeNonPersistent AttributeValue  // MQIAMO64_AVG_Q_TIME[0] - Average time on queue for non-persistent messages (microseconds)
+	AvgQTimePersistent    AttributeValue  // MQIAMO64_AVG_Q_TIME[1] - Average time on queue for persistent messages (microseconds)
+	
+	// Operation counters (split by persistence)
+	PutsNonPersistent AttributeValue  // MQIAMO_PUTS[0] - Non-persistent put operations
+	PutsPersistent    AttributeValue  // MQIAMO_PUTS[1] - Persistent put operations
+	GetsNonPersistent AttributeValue  // MQIAMO_GETS[0] - Non-persistent get operations
+	GetsPersistent    AttributeValue  // MQIAMO_GETS[1] - Persistent get operations
+	
+	// Byte counters (split by persistence)
+	PutBytesNonPersistent AttributeValue  // MQIAMO64_PUT_BYTES[0] - Bytes put (non-persistent)
+	PutBytesPersistent    AttributeValue  // MQIAMO64_PUT_BYTES[1] - Bytes put (persistent)
+	GetBytesNonPersistent AttributeValue  // MQIAMO64_GET_BYTES[0] - Bytes retrieved (non-persistent)
+	GetBytesPersistent    AttributeValue  // MQIAMO64_GET_BYTES[1] - Bytes retrieved (persistent)
+	
+	// Failure counters
+	PutsFailed       AttributeValue  // MQIAMO_PUTS_FAILED - Failed put operations
+	Put1sFailed      AttributeValue  // MQIAMO_PUT1S_FAILED - Failed put1 operations
+	GetsFailed       AttributeValue  // MQIAMO_GETS_FAILED - Failed get operations
+	BrowsesFailed    AttributeValue  // MQIAMO_BROWSES_FAILED - Failed browse operations
+	
+	// Message lifecycle counters
+	MsgsExpired    AttributeValue  // MQIAMO_MSGS_EXPIRED - Messages that expired
+	MsgsPurged     AttributeValue  // MQIAMO_MSGS_PURGED - Messages purged
+	MsgsNotQueued  AttributeValue  // MQIAMO_MSGS_NOT_QUEUED - Messages not queued
+	
+	// Browse metrics
+	BrowseCount AttributeValue  // MQIAMO_BROWSES - Browse operations
+	BrowseBytes AttributeValue  // MQIAMO64_BROWSE_BYTES - Bytes browsed
+	Put1Count   AttributeValue  // MQIAMO_PUT1S - Put1 operations
+	
+	// Timestamp when statistics were collected
+	StartDate AttributeValue  // Statistics start date (YYYYMMDD format)
+	StartTime AttributeValue  // Statistics start time (HHMMSSSS format)  
+	EndDate   AttributeValue  // Statistics end date (YYYYMMDD format)
+	EndTime   AttributeValue  // Statistics end time (HHMMSSSS format)
+}
+
+// ChannelStatistics contains extended channel metrics from statistics queue
+type ChannelStatistics struct {
+	Name   string
+	Type   ChannelType
+	Status ChannelStatus
+	
+	// Message metrics
+	Messages      AttributeValue  // MQIAMO_MSGS - Messages sent/received
+	Bytes         AttributeValue  // MQIAMO64_BYTES - Bytes sent/received
+	FullBatches   AttributeValue  // MQIAMO_FULL_BATCHES - Full batches
+	IncompleteBatches AttributeValue  // MQIAMO_INCOMPLETE_BATCHES - Incomplete batches
+	AvgBatchSize  AttributeValue  // MQIAMO_AVG_BATCH_SIZE - Average batch size
+	PutRetries    AttributeValue  // MQIAMO_PUT_RETRIES - Put retry count
+	
+	// Timestamp when statistics were collected
+	StartDate AttributeValue  // Statistics start date (YYYYMMDD format)
+	StartTime AttributeValue  // Statistics start time (HHMMSSSS format)
+	EndDate   AttributeValue  // Statistics end date (YYYYMMDD format)
+	EndTime   AttributeValue  // Statistics end time (HHMMSSSS format)
+}
+
+// StatisticsMessage represents a statistics message from SYSTEM.ADMIN.STATISTICS.QUEUE
+type StatisticsMessage struct {
+	Type     StatisticsType  // Type of statistics (queue or channel)
+	Command  int32          // MQ command that generated the statistics
+	
+	// Parsed statistics data (only one will be populated based on Type)
+	QueueStats   []QueueStatistics   // Queue statistics (if Type == StatisticsTypeQueue)
+	ChannelStats []ChannelStatistics // Channel statistics (if Type == StatisticsTypeChannel)
+	
+	// Message metadata
+	MessageLength int32      // Length of the statistics message
+	PutDate       string     // Date message was put (YYYYMMDD)
+	PutTime       string     // Time message was put (HHMMSSSS)
+}
+
+// StatisticsCollectionResult contains statistics metrics and collection information
+type StatisticsCollectionResult struct {
+	Messages []StatisticsMessage
+	Stats    CollectionStats
 }
