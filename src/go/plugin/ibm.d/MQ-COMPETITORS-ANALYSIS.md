@@ -96,7 +96,7 @@ Many metrics require specific monitoring levels set on MQ objects:
 | Status (running/stopped) | ✅ | ✅ | ✅ | ✅* | ✅ | ✅ | Basic operational status |
 | Connection count | ✅ | ✅ | ✅ | ⚠️ | ✅ | ✅ | Current connections |
 | Active listeners | ✅ | ✅ | ✅ | ⚠️ | ❌ | ✅ | Listener status |
-| Uptime | ❌ | ✅ | ✅ | ⚠️ | ❌ | ❌ | QMgr uptime |
+| Uptime | ✅ | ✅ | ✅ | ⚠️ | ❌ | ❌ | QMgr uptime |
 | CPU usage | ❌ | ✅ | ❓ | ⚠️ | ❌ | ❌ | Requires resource monitoring |
 | Memory usage | ❌ | ✅ | ❓ | ⚠️ | ❌ | ❌ | Requires resource monitoring |
 | Log usage/performance | ❌ | ✅ | ❓ | ⚠️ | ✅ | ✅ | Transaction log metrics |
