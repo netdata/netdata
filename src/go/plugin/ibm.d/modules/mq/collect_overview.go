@@ -5,34 +5,32 @@ import (
 )
 
 // setQueueOverviewMetrics updates the queue overview chart with monitoring status
-func (c *Collector) setQueueOverviewMetrics(monitored, excluded, model, unauthorized, unknown, failed int64) {
+func (c *Collector) setQueueOverviewMetrics(monitored, excluded, invisible, failed int64) {
 	contexts.QueueManager.QueuesOverview.Set(c.State, contexts.EmptyLabels{}, contexts.QueueManagerQueuesOverviewValues{
-		Monitored:    monitored,
-		Excluded:     excluded,
-		Model:        model,
-		Unauthorized: unauthorized,
-		Unknown:      unknown,
-		Failed:       failed,
+		Monitored: monitored,
+		Excluded:  excluded,
+		Invisible: invisible,
+		Failed:    failed,
 	})
 }
 
 // setChannelOverviewMetrics updates the channel overview chart with monitoring status
-func (c *Collector) setChannelOverviewMetrics(monitored, excluded, unauthorized, failed int64) {
+func (c *Collector) setChannelOverviewMetrics(monitored, excluded, invisible, failed int64) {
 	contexts.QueueManager.ChannelsOverview.Set(c.State, contexts.EmptyLabels{}, contexts.QueueManagerChannelsOverviewValues{
-		Monitored:    monitored,
-		Excluded:     excluded,
-		Unauthorized: unauthorized,
-		Failed:       failed,
+		Monitored: monitored,
+		Excluded:  excluded,
+		Invisible: invisible,
+		Failed:    failed,
 	})
 }
 
 // setTopicOverviewMetrics updates the topic overview chart with monitoring status
-func (c *Collector) setTopicOverviewMetrics(monitored, excluded, unauthorized, failed int64) {
+func (c *Collector) setTopicOverviewMetrics(monitored, excluded, invisible, failed int64) {
 	contexts.QueueManager.TopicsOverview.Set(c.State, contexts.EmptyLabels{}, contexts.QueueManagerTopicsOverviewValues{
-		Monitored:    monitored,
-		Excluded:     excluded,
-		Unauthorized: unauthorized,
-		Failed:       failed,
+		Monitored: monitored,
+		Excluded:  excluded,
+		Invisible: invisible,
+		Failed:    failed,
 	})
 }
 

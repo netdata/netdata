@@ -4,7 +4,10 @@
 
 package pcf
 
-import "math"
+import (
+	"fmt"
+	"math"
+)
 
 // AttributeValue represents a configuration attribute value
 type AttributeValue int64
@@ -101,12 +104,6 @@ type ChannelConfig struct {
 
 // QueueType represents the type of MQ queue
 type QueueType int32
-
-// QueueCollectionConfig configures what queue data to collect
-type QueueCollectionConfig struct {
-	QueuePattern      string // Glob pattern for queue selection (e.g., "*", "SYSTEM.*", "APP.QUEUE.*")
-	CollectResetStats bool   // Whether to collect destructive reset statistics
-}
 
 // QueueMetrics contains runtime metrics for a queue
 type QueueMetrics struct {
@@ -205,4 +202,71 @@ type ListenerMetrics struct {
 	Name   string
 	Status ListenerStatus
 	Port   int64
+}
+
+// EnrichmentStats tracks the success/failure of enrichment operations
+type EnrichmentStats struct {
+	TotalItems  int64           // Items attempted to enrich
+	OkItems     int64           // Successfully enriched
+	FailedItems int64           // Failed to enrich
+	ErrorCounts map[int32]int   // Count by MQ error code
+}
+
+// CollectionStats provides complete transparency for collection operations
+type CollectionStats struct {
+	Discovery struct {
+		Success        bool            // Did discovery work at all?
+		AvailableItems int64           // Total items discovered (all responses, success + errors)
+		InvisibleItems int64           // Items that returned errors (any error code)
+		IncludedItems  int64           // Visible items matched by selector
+		ExcludedItems  int64           // Visible items excluded by selector
+		UnparsedItems  int64           // Visible items we couldn't parse
+		ErrorCounts    map[int32]int   // Count by MQ error code
+	}
+	
+	Config  *EnrichmentStats       // Config enrichment stats (optional)
+	Metrics *EnrichmentStats       // Metrics enrichment stats (optional)
+	Reset   *EnrichmentStats       // Reset stats enrichment (optional)
+}
+
+// QueueCollectionResult contains queue metrics and collection statistics
+type QueueCollectionResult struct {
+	Queues []QueueMetrics
+	Stats  CollectionStats
+}
+
+// ChannelCollectionResult contains channel metrics and collection statistics
+type ChannelCollectionResult struct {
+	Channels []ChannelMetrics
+	Stats    CollectionStats
+}
+
+// TopicCollectionResult contains topic metrics and collection statistics
+type TopicCollectionResult struct {
+	Topics []TopicMetrics
+	Stats  CollectionStats
+}
+
+// ListenerCollectionResult contains listener metrics and collection statistics
+type ListenerCollectionResult struct {
+	Listeners []ListenerMetrics
+	Stats     CollectionStats
+}
+
+// PCFError represents an error with an MQ reason code
+type PCFError struct {
+	Message string
+	Code    int32  // MQ reason code (MQRC_*)
+}
+
+func (e *PCFError) Error() string {
+	return e.Message
+}
+
+// NewPCFError creates a new PCF error with reason code
+func NewPCFError(code int32, format string, args ...interface{}) *PCFError {
+	return &PCFError{
+		Message: fmt.Sprintf(format, args...),
+		Code:    code,
+	}
 }

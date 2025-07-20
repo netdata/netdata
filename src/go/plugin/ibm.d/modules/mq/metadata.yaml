@@ -303,9 +303,7 @@ using the PCF (Programmable Command Format) protocol.
               dimensions:
                 - name: monitored
                 - name: excluded
-                - name: model
-                - name: unauthorized
-                - name: unknown
+                - name: invisible
                 - name: failed
             - name: mq.channels.overview
               description: Channels Monitoring Status
@@ -314,7 +312,7 @@ using the PCF (Programmable Command Format) protocol.
               dimensions:
                 - name: monitored
                 - name: excluded
-                - name: unauthorized
+                - name: invisible
                 - name: failed
             - name: mq.topics.overview
               description: Topics Monitoring Status
@@ -323,7 +321,7 @@ using the PCF (Programmable Command Format) protocol.
               dimensions:
                 - name: monitored
                 - name: excluded
-                - name: unauthorized
+                - name: invisible
                 - name: failed
             - name: mq.listeners.overview
               description: Listeners Monitoring Status

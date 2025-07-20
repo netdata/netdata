@@ -1421,9 +1421,7 @@ func (c QueueManagerUptimeContext) Set(state *framework.CollectorState, labels E
 type QueueManagerQueuesOverviewValues struct {
 	Monitored int64
 	Excluded int64
-	Model int64
-	Unauthorized int64
-	Unknown int64
+	Invisible int64
 	Failed int64
 }
 
@@ -1437,9 +1435,7 @@ func (c QueueManagerQueuesOverviewContext) Set(state *framework.CollectorState, 
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
 		"monitored": values.Monitored,
 		"excluded": values.Excluded,
-		"model": values.Model,
-		"unauthorized": values.Unauthorized,
-		"unknown": values.Unknown,
+		"invisible": values.Invisible,
 		"failed": values.Failed,
 	})
 }
@@ -1448,7 +1444,7 @@ func (c QueueManagerQueuesOverviewContext) Set(state *framework.CollectorState, 
 type QueueManagerChannelsOverviewValues struct {
 	Monitored int64
 	Excluded int64
-	Unauthorized int64
+	Invisible int64
 	Failed int64
 }
 
@@ -1462,7 +1458,7 @@ func (c QueueManagerChannelsOverviewContext) Set(state *framework.CollectorState
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
 		"monitored": values.Monitored,
 		"excluded": values.Excluded,
-		"unauthorized": values.Unauthorized,
+		"invisible": values.Invisible,
 		"failed": values.Failed,
 	})
 }
@@ -1471,7 +1467,7 @@ func (c QueueManagerChannelsOverviewContext) Set(state *framework.CollectorState
 type QueueManagerTopicsOverviewValues struct {
 	Monitored int64
 	Excluded int64
-	Unauthorized int64
+	Invisible int64
 	Failed int64
 }
 
@@ -1485,7 +1481,7 @@ func (c QueueManagerTopicsOverviewContext) Set(state *framework.CollectorState, 
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
 		"monitored": values.Monitored,
 		"excluded": values.Excluded,
-		"unauthorized": values.Unauthorized,
+		"invisible": values.Invisible,
 		"failed": values.Failed,
 	})
 }
@@ -1615,21 +1611,7 @@ var QueueManager = struct {
 				Precision: 1,
 			},
 			{
-				Name:      "model",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "unauthorized",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "unknown",
+				Name:      "invisible",
 				Algorithm: module.Absolute,
 				Mul:       1,
 				Div:       1,
@@ -1672,7 +1654,7 @@ var QueueManager = struct {
 				Precision: 1,
 			},
 			{
-				Name:      "unauthorized",
+				Name:      "invisible",
 				Algorithm: module.Absolute,
 				Mul:       1,
 				Div:       1,
@@ -1715,7 +1697,7 @@ var QueueManager = struct {
 				Precision: 1,
 			},
 			{
-				Name:      "unauthorized",
+				Name:      "invisible",
 				Algorithm: module.Absolute,
 				Mul:       1,
 				Div:       1,

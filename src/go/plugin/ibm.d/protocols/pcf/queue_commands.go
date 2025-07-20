@@ -9,6 +9,7 @@ import "C"
 
 import (
 	"fmt"
+	"path/filepath"
 	"strconv"
 )
 
@@ -95,79 +96,195 @@ func (c *Client) GetQueueList() ([]QueueInfo, error) {
 	return result.Queues, nil
 }
 
-// GetQueueMetrics collects comprehensive queue metrics using 3N pattern for full configuration data
-func (c *Client) GetQueueMetrics(config QueueCollectionConfig) ([]QueueMetrics, error) {
-	c.protocol.Debugf("PCF: Collecting queue metrics with pattern '%s', reset_stats=%v", 
-		config.QueuePattern, config.CollectResetStats)
+// GetQueues collects comprehensive queue metrics with full transparency statistics
+func (c *Client) GetQueues(collectConfig, collectMetrics, collectReset bool, maxQueues int, selector string) (*QueueCollectionResult, error) {
+	c.protocol.Debugf("PCF: Collecting queue metrics with selector '%s', max=%d, config=%v, metrics=%v, reset=%v", 
+		selector, maxQueues, collectConfig, collectMetrics, collectReset)
 	
-	// Step 1: Discovery - get queue names only (1 request for queue list)
-	queueNames, err := c.getQueueNamesList(config.QueuePattern)
+	result := &QueueCollectionResult{
+		Stats: CollectionStats{},
+	}
+	
+	// Step 1: Discovery - get all queue names
+	response, err := c.SendPCFCommand(C.MQCMD_INQUIRE_Q, []pcfParameter{
+		newStringParameter(C.MQCA_Q_NAME, "*"), // Always discover ALL queues
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to discover queues: %w", err)
+		result.Stats.Discovery.Success = false
+		c.protocol.Errorf("PCF: Queue discovery failed: %v", err)
+		return result, fmt.Errorf("queue discovery failed: %w", err)
 	}
 	
-	if len(queueNames) == 0 {
-		c.protocol.Debugf("PCF: No queues match pattern '%s'", config.QueuePattern)
-		return nil, nil
+	result.Stats.Discovery.Success = true
+	
+	// Parse discovery response
+	parsed := c.parseQueueListResponse(response)
+	
+	// Track discovery statistics
+	successfulItems := int64(len(parsed.Queues))
+	
+	// Count all errors as invisible items (ErrorCounts includes both MQ errors and internal errors)
+	var invisibleItems int64
+	for _, count := range parsed.ErrorCounts {
+		invisibleItems += int64(count)
 	}
 	
-	c.protocol.Debugf("PCF: Found %d queues matching pattern '%s'", len(queueNames), config.QueuePattern)
+	result.Stats.Discovery.AvailableItems = successfulItems + invisibleItems
+	result.Stats.Discovery.InvisibleItems = invisibleItems
+	result.Stats.Discovery.UnparsedItems = 0 // No unparsed items at discovery level
+	result.Stats.Discovery.ErrorCounts = parsed.ErrorCounts
 	
-	var results []QueueMetrics
-	var errors []string
+	// Log discovery errors
+	for errCode, count := range parsed.ErrorCounts {
+		if errCode < 0 {
+			c.protocol.Warningf("PCF: Internal error %d occurred %d times during queue discovery", errCode, count)
+		} else {
+			c.protocol.Warningf("PCF: MQ error %d (%s) occurred %d times during queue discovery", 
+				errCode, mqReasonString(errCode), count)
+		}
+	}
 	
-	// Step 2: Collect detailed metrics for each queue (3N pattern)
-	for _, queueName := range queueNames {
-		// Step 2a: Get full configuration data (1 request per queue)
-		configData, err := c.getQueueConfiguration(queueName)
-		if err != nil {
-			c.protocol.Warningf("PCF: Failed to get configuration for queue '%s': %v", queueName, err)
-			errors = append(errors, fmt.Sprintf("configuration collection failed for queue %s: %v", queueName, err))
-			continue // Skip this queue entirely if we can't get basic config
+	if len(parsed.Queues) == 0 {
+		c.protocol.Debugf("PCF: No queues discovered")
+		return result, nil
+	}
+	
+	// Step 2: Smart filtering decision
+	visibleItems := result.Stats.Discovery.AvailableItems - result.Stats.Discovery.InvisibleItems - result.Stats.Discovery.UnparsedItems
+	enrichAll := maxQueues <= 0 || visibleItems <= int64(maxQueues)
+	
+	c.protocol.Debugf("PCF: Discovery found %d visible queues (total: %d, invisible: %d, unparsed: %d). EnrichAll=%v", 
+		visibleItems, result.Stats.Discovery.AvailableItems, result.Stats.Discovery.InvisibleItems, 
+		result.Stats.Discovery.UnparsedItems, enrichAll)
+	
+	// Step 3: Apply filtering
+	var queuesToEnrich []string
+	if enrichAll || selector == "*" {
+		// Enrich everything we can see
+		queuesToEnrich = parsed.Queues
+		result.Stats.Discovery.IncludedItems = int64(len(parsed.Queues))
+		result.Stats.Discovery.ExcludedItems = 0
+		c.protocol.Debugf("PCF: Enriching all %d visible queues", len(queuesToEnrich))
+	} else {
+		// Apply selector pattern
+		for _, queueName := range parsed.Queues {
+			matched, err := filepath.Match(selector, queueName)
+			if err != nil {
+				c.protocol.Warningf("PCF: Invalid selector pattern '%s': %v", selector, err)
+				matched = false
+			}
+			
+			if matched {
+				queuesToEnrich = append(queuesToEnrich, queueName)
+				result.Stats.Discovery.IncludedItems++
+			} else {
+				result.Stats.Discovery.ExcludedItems++
+			}
+		}
+		c.protocol.Debugf("PCF: Selector '%s' matched %d queues, excluded %d", 
+			selector, result.Stats.Discovery.IncludedItems, result.Stats.Discovery.ExcludedItems)
+	}
+	
+	// Step 4: Enrich selected queues
+	for _, queueName := range queuesToEnrich {
+		qm := QueueMetrics{Name: queueName}
+		
+		// 4a: Collect configuration if requested
+		if collectConfig {
+			if result.Stats.Config == nil {
+				result.Stats.Config = &EnrichmentStats{
+					TotalItems:  int64(len(queuesToEnrich)),
+					ErrorCounts: make(map[int32]int),
+				}
+			}
+			
+			configData, err := c.getQueueConfiguration(queueName)
+			if err != nil {
+				result.Stats.Config.FailedItems++
+				// Extract error code if possible
+				if pcfErr, ok := err.(*PCFError); ok {
+					result.Stats.Config.ErrorCounts[pcfErr.Code]++
+				} else {
+					result.Stats.Config.ErrorCounts[-1]++ // Unknown error
+				}
+				c.protocol.Debugf("PCF: Failed to get config for queue '%s': %v", queueName, err)
+				// Continue with next queue - don't add incomplete data
+				continue
+			}
+			
+			result.Stats.Config.OkItems++
+			
+			// Copy config data
+			qm.Type = QueueType(configData.Type)
+			qm.CurrentDepth = configData.CurrentDepth
+			qm.MaxDepth = configData.MaxDepth
+			qm.InhibitGet = configData.InhibitGet
+			qm.InhibitPut = configData.InhibitPut
+			qm.BackoutThreshold = configData.BackoutThreshold
+			qm.TriggerDepth = configData.TriggerDepth
+			qm.TriggerType = configData.TriggerType
+			qm.MaxMsgLength = configData.MaxMsgLength
+			qm.DefPriority = configData.DefPriority
 		}
 		
-		metrics := QueueMetrics{
-			Name:             queueName,
-			Type:             QueueType(configData.Type),
-			CurrentDepth:     configData.CurrentDepth,
-			MaxDepth:         configData.MaxDepth,
-			// Configuration data from individual queue query
-			InhibitGet:       configData.InhibitGet,
-			InhibitPut:       configData.InhibitPut,
-			BackoutThreshold: configData.BackoutThreshold,
-			TriggerDepth:     configData.TriggerDepth,
-			TriggerType:      configData.TriggerType,
-			MaxMsgLength:     configData.MaxMsgLength,
-			DefPriority:      configData.DefPriority,
-		}
-		
-		// Step 2b: Get runtime status (1 request per queue)
-		if err := c.enrichWithStatus(&metrics); err != nil {
-			c.protocol.Warningf("PCF: Failed to get status for queue '%s': %v", queueName, err)
-			errors = append(errors, fmt.Sprintf("status collection failed for queue %s: %v", queueName, err))
-			// Continue with partial data
-		}
-		
-		// Step 2c: Get reset statistics if requested (1 request per queue, optional)
-		if config.CollectResetStats {
-			if err := c.enrichWithResetStats(&metrics); err != nil {
-				c.protocol.Debugf("PCF: Failed to get reset stats for queue '%s': %v", queueName, err)
-				// Don't add to errors - reset stats are optional and not all queues support them
+		// 4b: Collect metrics if requested
+		if collectMetrics {
+			if result.Stats.Metrics == nil {
+				result.Stats.Metrics = &EnrichmentStats{
+					TotalItems:  int64(len(queuesToEnrich)),
+					ErrorCounts: make(map[int32]int),
+				}
+			}
+			
+			err := c.enrichWithStatus(&qm)
+			if err != nil {
+				result.Stats.Metrics.FailedItems++
+				if pcfErr, ok := err.(*PCFError); ok {
+					result.Stats.Metrics.ErrorCounts[pcfErr.Code]++
+				} else {
+					result.Stats.Metrics.ErrorCounts[-1]++
+				}
+				c.protocol.Debugf("PCF: Failed to get metrics for queue '%s': %v", queueName, err)
+			} else {
+				result.Stats.Metrics.OkItems++
 			}
 		}
 		
-		results = append(results, metrics)
+		// 4c: Collect reset stats if requested
+		if collectReset {
+			if result.Stats.Reset == nil {
+				result.Stats.Reset = &EnrichmentStats{
+					TotalItems:  int64(len(queuesToEnrich)),
+					ErrorCounts: make(map[int32]int),
+				}
+			}
+			
+			err := c.enrichWithResetStats(&qm)
+			if err != nil {
+				result.Stats.Reset.FailedItems++
+				if pcfErr, ok := err.(*PCFError); ok {
+					result.Stats.Reset.ErrorCounts[pcfErr.Code]++
+				} else {
+					result.Stats.Reset.ErrorCounts[-1]++
+				}
+				// Reset stats failures are not critical - many queues don't support them
+				c.protocol.Debugf("PCF: Failed to get reset stats for queue '%s': %v", queueName, err)
+			} else {
+				result.Stats.Reset.OkItems++
+			}
+		}
+		
+		result.Queues = append(result.Queues, qm)
 	}
 	
 	// Log summary
-	c.protocol.Infof("PCF: Collected metrics for %d queues (pattern: '%s', reset_stats: %v, 3N requests)", 
-		len(results), config.QueuePattern, config.CollectResetStats)
+	c.protocol.Infof("PCF: Queue collection complete - discovered:%d visible:%d included:%d enriched:%d", 
+		result.Stats.Discovery.AvailableItems, 
+		result.Stats.Discovery.AvailableItems - result.Stats.Discovery.InvisibleItems,
+		result.Stats.Discovery.IncludedItems,
+		len(result.Queues))
 	
-	if len(errors) > 0 {
-		c.protocol.Warningf("PCF: Encountered %d errors during collection: %v", len(errors), errors)
-	}
-	
-	return results, nil
+	return result, nil
 }
 
 // getQueueNamesList gets queue names matching pattern (lightweight discovery)
@@ -506,24 +623,6 @@ func (c *Client) enrichWithResetStats(metrics *QueueMetrics) error {
 	return nil
 }
 
-// Legacy method for backward compatibility - will be removed
-func (c *Client) GetQueueMetrics_Legacy(queueName string) (*QueueMetrics, error) {
-	config := QueueCollectionConfig{
-		QueuePattern:      queueName,
-		CollectResetStats: false,
-	}
-	
-	results, err := c.GetQueueMetrics(config)
-	if err != nil {
-		return nil, err
-	}
-	
-	if len(results) == 0 {
-		return nil, fmt.Errorf("queue not found: %s", queueName)
-	}
-	
-	return &results[0], nil
-}
 
 // GetQueueConfig returns configuration for a specific queue.
 func (c *Client) GetQueueConfig(queueName string) (*QueueConfig, error) {
