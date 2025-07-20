@@ -524,11 +524,10 @@ Metrics:
 These metrics refer to individual {{lower $className}} instances.
 
 Labels:
-{{range $class.Labels}}
+
 | Label | Description |
-|:------|:------------|
-| {{.}} | {{title .}} identifier |
-{{end}}
+|:------|:------------|{{range $class.Labels}}
+| {{.}} | {{title .}} identifier |{{end}}
 
 Metrics:
 

@@ -189,6 +189,25 @@ using the PCF (Programmable Command Format) protocol.
               chart_type: line
               dimensions:
                 - name: high_depth
+            - name: mq.queue.oldest_msg_age
+              description: Queue Oldest Message Age
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: oldest_msg_age
+            - name: mq.queue.uncommitted_msgs
+              description: Queue Uncommitted Messages
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: uncommitted
+            - name: mq.queue.last_activity
+              description: Time Since Last Queue Activity
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: since_last_get
+                - name: since_last_put
             - name: mq.queue.inhibit_status
               description: Queue Inhibit Status
               unit: status
@@ -196,15 +215,25 @@ using the PCF (Programmable Command Format) protocol.
               dimensions:
                 - name: inhibit_get
                 - name: inhibit_put
-            - name: mq.queue.configuration
-              description: Queue Configuration
-              unit: value
+            - name: mq.queue.priority
+              description: Queue Priority Configuration
+              unit: priority
               chart_type: line
               dimensions:
                 - name: def_priority
-                - name: backout_threshold
+            - name: mq.queue.triggers
+              description: Queue Trigger Configuration
+              unit: messages
+              chart_type: line
+              dimensions:
                 - name: trigger_depth
                 - name: trigger_type
+            - name: mq.queue.backout_threshold
+              description: Queue Error Handling
+              unit: retries
+              chart_type: line
+              dimensions:
+                - name: backout_threshold
             - name: mq.queue.max_msg_length
               description: Queue Max Message Length
               unit: bytes
