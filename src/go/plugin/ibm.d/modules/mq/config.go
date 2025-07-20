@@ -26,6 +26,8 @@ type Config struct {
 	CollectChannels bool `yaml:"collect_channels" json:"collect_channels"`
 	// Enable collection of topic metrics
 	CollectTopics   bool `yaml:"collect_topics" json:"collect_topics"`
+	// Enable collection of listener metrics
+	CollectListeners bool `yaml:"collect_listeners" json:"collect_listeners"`
 
 	// Enable collection of system queue metrics
 	CollectSystemQueues   bool `yaml:"collect_system_queues" json:"collect_system_queues"`

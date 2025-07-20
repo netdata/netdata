@@ -17,12 +17,14 @@ This document compares our mq_pcf collector with leading IBM MQ monitoring solut
   - ✅ Extended to channels for consistent handling
   - ✅ Type-safe metric collection API
   - ✅ Queue Manager Connection Count metric
+  - ✅ Active Listener Status monitoring
   
 **Metric Breakdown**:
 - **Queue Metrics**: 12 contexts (depth, messages, connections, high_depth, oldest_msg_age, uncommitted_msgs, last_activity, inhibit_status, priority, triggers, backout_threshold, max_msg_length)
 - **Channel Metrics**: 3 contexts (status, messages, bytes) with batch configuration
 - **Topic Metrics**: 3 contexts (publishers, subscribers, messages)
 - **Queue Manager**: Status, connection count, and overview metrics
+- **Listener Metrics**: 2 contexts (status, port)
 - **Resolution**: Per-second (1s) - unmatched by competitors
 
 ## Competitors Analyzed
@@ -93,7 +95,7 @@ Many metrics require specific monitoring levels set on MQ objects:
 |--------|---------|------------|-----------|---------|---------|----------|-------|
 | Status (running/stopped) | ✅ | ✅ | ✅ | ✅* | ✅ | ✅ | Basic operational status |
 | Connection count | ✅ | ✅ | ✅ | ⚠️ | ✅ | ✅ | Current connections |
-| Active listeners | ❌ | ✅ | ✅ | ⚠️ | ❌ | ✅ | Listener status |
+| Active listeners | ✅ | ✅ | ✅ | ⚠️ | ❌ | ✅ | Listener status |
 | Uptime | ❌ | ✅ | ✅ | ⚠️ | ❌ | ❌ | QMgr uptime |
 | CPU usage | ❌ | ✅ | ❓ | ⚠️ | ❌ | ❌ | Requires resource monitoring |
 | Memory usage | ❌ | ✅ | ❓ | ⚠️ | ❌ | ❌ | Requires resource monitoring |

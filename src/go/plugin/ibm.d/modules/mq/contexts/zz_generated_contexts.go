@@ -571,6 +571,120 @@ var Channel = struct {
 }
 
 
+// --- Listener ---
+
+
+// ListenerStatusValues defines the type-safe values for Listener.Status context
+type ListenerStatusValues struct {
+	Running int64
+	Stopped int64
+}
+
+// ListenerStatusContext provides type-safe operations for Listener.Status context
+type ListenerStatusContext struct {
+	framework.Context[ListenerLabels]
+}
+
+// Set provides type-safe dimension setting for Listener.Status context
+func (c ListenerStatusContext) Set(state *framework.CollectorState, labels ListenerLabels, values ListenerStatusValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"running": values.Running,
+		"stopped": values.Stopped,
+	})
+}
+
+// ListenerPortValues defines the type-safe values for Listener.Port context
+type ListenerPortValues struct {
+	Port int64
+}
+
+// ListenerPortContext provides type-safe operations for Listener.Port context
+type ListenerPortContext struct {
+	framework.Context[ListenerLabels]
+}
+
+// Set provides type-safe dimension setting for Listener.Port context
+func (c ListenerPortContext) Set(state *framework.CollectorState, labels ListenerLabels, values ListenerPortValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"port": values.Port,
+	})
+}
+
+
+
+// ListenerLabels defines the required labels for Listener contexts
+type ListenerLabels struct {
+	Listener string
+}
+
+// InstanceID generates a unique instance ID using the hardcoded label order from YAML
+func (l ListenerLabels) InstanceID(contextName string) string {
+	// Label order from YAML: listener
+	return contextName + "." + cleanLabelValue(l.Listener)
+}
+
+
+// Listener contains all metric contexts for Listener
+var Listener = struct {
+	Status ListenerStatusContext
+	Port ListenerPortContext
+}{
+	Status: ListenerStatusContext{
+		Context: framework.Context[ListenerLabels]{
+		Name:       "mq.listener.status",
+		Family:     "listeners",
+		Title:      "Listener Status",
+		Units:      "status",
+		Type:       module.Line,
+		Priority:   5000,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "running",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "stopped",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"listener",
+		},
+		},
+	},
+	Port: ListenerPortContext{
+		Context: framework.Context[ListenerLabels]{
+		Name:       "mq.listener.port",
+		Family:     "listeners",
+		Title:      "Listener Port",
+		Units:      "port",
+		Type:       module.Line,
+		Priority:   5001,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "port",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"listener",
+		},
+		},
+	},
+}
+
+
 // --- Queue ---
 
 
@@ -1623,6 +1737,8 @@ func GetAllContexts() []interface{} {
 		&Channel.RetryConfig.Context,
 		&Channel.MaxMessageLength.Context,
 		&Channel.ConversationConfig.Context,
+		&Listener.Status.Context,
+		&Listener.Port.Context,
 		&Queue.Depth.Context,
 		&Queue.Messages.Context,
 		&Queue.Connections.Context,
