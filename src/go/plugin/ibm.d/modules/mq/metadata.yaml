@@ -1,0 +1,276 @@
+# Generated metadata.yaml for mq module
+plugin_name: ibm.d.plugin
+modules:
+  - meta:
+      plugin_name: ibm.d.plugin
+      module_name: mq
+      monitored_instance:
+        name: IBM MQ
+        link: https://www.ibm.com/products/mq
+        categories:
+          - data-collection.message-brokers
+        icon_filename: "ibm-mq.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - mq
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          Monitors IBM MQ queue managers, queues, channels, and topics
+using the PCF (Programmable Command Format) protocol.
+
+        method_description: |
+          The collector connects to IBM MQ and collects metrics via its monitoring interface.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Enable monitoring interface
+            description: |
+              Ensure the IBM MQ monitoring interface is accessible.
+      configuration:
+        file:
+          name: ibm.d/mq.conf
+        options:
+          description: |
+            Configuration options for the mq collector.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: endpoint
+              description: Connection endpoint.
+              default_value: "dummy://localhost"
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: Config
+          list:
+            - name: Basic
+              description: Basic configuration example.
+              config: |
+                jobs:
+                  - name: local
+                    endpoint: dummy://localhost
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: channel
+          description: These metrics refer to channel instances.
+          labels:
+            - name: channel
+              description: Channel identifier
+          metrics:
+            - name: mq.channel.status
+              description: Channel Status
+              unit: status
+              chart_type: stacked
+              dimensions:
+                - name: inactive
+                - name: binding
+                - name: starting
+                - name: running
+                - name: stopping
+                - name: retrying
+                - name: stopped
+                - name: requesting
+                - name: paused
+                - name: disconnected
+                - name: initializing
+                - name: switching
+            - name: mq.channel.messages
+              description: Channel Message Rate
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: messages
+            - name: mq.channel.bytes
+              description: Channel Data Transfer Rate
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: bytes
+            - name: mq.channel.batches
+              description: Channel Batch Rate
+              unit: batches/s
+              chart_type: line
+              dimensions:
+                - name: batches
+            - name: mq.channel.batch_config
+              description: Channel Batch Configuration
+              unit: value
+              chart_type: line
+              dimensions:
+                - name: batch_size
+                - name: batch_interval
+            - name: mq.channel.intervals
+              description: Channel Intervals
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: disc_interval
+                - name: hb_interval
+                - name: keep_alive_interval
+            - name: mq.channel.retry_config
+              description: Channel Retry Configuration
+              unit: count
+              chart_type: line
+              dimensions:
+                - name: short_retry
+                - name: long_retry
+            - name: mq.channel.max_msg_length
+              description: Channel Max Message Length
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: max_msg_length
+            - name: mq.channel.conversation_config
+              description: Channel Conversation Configuration
+              unit: value
+              chart_type: line
+              dimensions:
+                - name: sharing_conversations
+                - name: network_priority
+        - name: queue
+          description: These metrics refer to queue instances.
+          labels:
+            - name: queue
+              description: Queue identifier
+            - name: type
+              description: Type identifier
+          metrics:
+            - name: mq.queue.depth
+              description: Queue Depth
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: current
+                - name: max
+            - name: mq.queue.messages
+              description: Queue Messages
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: enqueued
+                - name: dequeued
+            - name: mq.queue.connections
+              description: Queue Connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: input
+                - name: output
+            - name: mq.queue.high_depth
+              description: Queue Peak Depth
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: high_depth
+            - name: mq.queue.inhibit_status
+              description: Queue Inhibit Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: inhibit_get
+                - name: inhibit_put
+            - name: mq.queue.configuration
+              description: Queue Configuration
+              unit: value
+              chart_type: line
+              dimensions:
+                - name: def_priority
+                - name: backout_threshold
+                - name: trigger_depth
+                - name: trigger_type
+            - name: mq.queue.max_msg_length
+              description: Queue Max Message Length
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: max_msg_length
+        - name: global
+          description: These metrics refer to the entire monitored instance.
+          labels: []
+          metrics:
+            - name: mq.qmgr.status
+              description: Queue Manager Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: status
+            - name: mq.queues.overview
+              description: Queues Monitoring Status
+              unit: queues
+              chart_type: stacked
+              dimensions:
+                - name: monitored
+                - name: excluded
+                - name: model
+                - name: unauthorized
+                - name: unknown
+                - name: failed
+            - name: mq.channels.overview
+              description: Channels Monitoring Status
+              unit: channels
+              chart_type: stacked
+              dimensions:
+                - name: monitored
+                - name: excluded
+                - name: unauthorized
+                - name: failed
+            - name: mq.topics.overview
+              description: Topics Monitoring Status
+              unit: topics
+              chart_type: stacked
+              dimensions:
+                - name: monitored
+                - name: excluded
+                - name: unauthorized
+                - name: failed
+        - name: topic
+          description: These metrics refer to topic instances.
+          labels:
+            - name: topic
+              description: Topic identifier
+          metrics:
+            - name: mq.topic.publishers
+              description: Topic Publishers
+              unit: publishers
+              chart_type: line
+              dimensions:
+                - name: publishers
+            - name: mq.topic.subscribers
+              description: Topic Subscribers
+              unit: subscribers
+              chart_type: line
+              dimensions:
+                - name: subscribers
+            - name: mq.topic.messages
+              description: Topic Message Rate
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: messages

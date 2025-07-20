@@ -1,0 +1,86 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "channel": {
+        "title": "Channel configuration option",
+        "type": "string"
+      },
+      "channel_selector": {
+        "title": "ChannelSelector configuration option",
+        "type": "string"
+      },
+      "collect_channel_config": {
+        "title": "CollectChannelConfig configuration option",
+        "type": "boolean"
+      },
+      "collect_channels": {
+        "title": "CollectChannels configuration option",
+        "type": "boolean"
+      },
+      "collect_queues": {
+        "title": "CollectQueues configuration option",
+        "type": "boolean"
+      },
+      "collect_reset_queue_stats": {
+        "title": "CollectResetQueueStats configuration option",
+        "type": "boolean"
+      },
+      "collect_system_channels": {
+        "title": "CollectSystemChannels configuration option",
+        "type": "boolean"
+      },
+      "collect_system_queues": {
+        "title": "CollectSystemQueues configuration option",
+        "type": "boolean"
+      },
+      "collect_topics": {
+        "title": "CollectTopics configuration option",
+        "type": "boolean"
+      },
+      "host": {
+        "title": "Host configuration option",
+        "type": "string"
+      },
+      "password": {
+        "title": "Password configuration option",
+        "type": "string"
+      },
+      "port": {
+        "title": "Port configuration option",
+        "type": "integer"
+      },
+      "queue_manager": {
+        "title": "QueueManager configuration option",
+        "type": "string"
+      },
+      "queue_selector": {
+        "title": "QueueSelector configuration option",
+        "type": "string"
+      },
+      "user": {
+        "title": "User configuration option",
+        "type": "string"
+      }
+    },
+    "required": [
+      "queue_manager",
+      "channel",
+      "host",
+      "port",
+      "user",
+      "password",
+      "collect_queues",
+      "collect_channels",
+      "collect_topics",
+      "collect_system_queues",
+      "collect_system_channels",
+      "collect_channel_config",
+      "queue_selector",
+      "channel_selector",
+      "collect_reset_queue_stats"
+    ],
+    "title": "mq collector configuration",
+    "type": "object"
+  }
+}

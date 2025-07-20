@@ -26,9 +26,9 @@ func (c *Collector) collectItemMetrics() error {
 			Slot: fmt.Sprintf("%d", item.Slot),
 		}
 		
-		// Set the absolute percentage value
-		c.State.Set(contexts.Item.ItemPercentage, labels, map[string]int64{
-			"percentage": int64(item.Percentage * 100), // Convert to percentage integer
+		// Set the absolute percentage value using type-safe API
+		contexts.Item.ItemPercentage.Set(c.State, labels, contexts.ItemItemPercentageValues{
+			Percentage: int64(item.Percentage * 100), // Convert to percentage integer
 		})
 		
 		// Get or create persistent data for this item
@@ -41,9 +41,9 @@ func (c *Collector) collectItemMetrics() error {
 		// Increment the item counter by the percentage value
 		data.Counter += int64(item.Percentage * 100)
 		
-		// Set the incremental counter
-		c.State.Set(contexts.Item.ItemCounter, labels, map[string]int64{
-			"counter": data.Counter,
+		// Set the incremental counter using type-safe API
+		contexts.Item.ItemCounter.Set(c.State, labels, contexts.ItemItemCounterValues{
+			Counter: data.Counter,
 		})
 	}
 	

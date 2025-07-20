@@ -12,9 +12,9 @@ func (c *Collector) collectTimestampMetrics() error {
 		return err
 	}
 	
-	// Set the absolute value metric
-	c.State.SetGlobal(contexts.Test.TestAbsolute, map[string]int64{
-		"value": value,
+	// Set the absolute value metric using type-safe API
+	contexts.Test.TestAbsolute.Set(c.State, contexts.EmptyLabels{}, contexts.TestTestAbsoluteValues{
+		Value: value,
 	})
 	
 	// Get the counter value from the protocol (server maintains the counter)
@@ -25,10 +25,10 @@ func (c *Collector) collectTimestampMetrics() error {
 	
 	// Track the incremental change locally
 	if counterValue > c.counter {
-		// Set the incremental metric with the counter value
+		// Set the incremental metric with the counter value using type-safe API
 		// The framework will calculate the rate because algo is "incremental"
-		c.State.SetGlobal(contexts.Test.TestIncremental, map[string]int64{
-			"counter": counterValue,
+		contexts.Test.TestIncremental.Set(c.State, contexts.EmptyLabels{}, contexts.TestTestIncrementalValues{
+			Counter: counterValue,
 		})
 		c.counter = counterValue
 	}
