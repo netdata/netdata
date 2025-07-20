@@ -41,7 +41,6 @@ Labels:
 |:------|:------------|
 | slot | Slot identifier |
 
-
 Metrics:
 
 | Metric | Dimensions | Unit |
@@ -68,47 +67,12 @@ sudo ./edit-config ibm.d/example.conf
 
 The following options can be defined globally or per job.
 
-
-#### Endpoint
-
-Connection endpoint URL
-
-- **Default**: `dummy://localhost`
-- **Required**: no
-
-
-
-
-#### ConnectTimeout
-
-Connection timeout in seconds
-
-- **Default**: `5`
-- **Required**: no
-- **Min**: 1
-- **Max**: 300
-
-
-#### CollectItems
-
-Enable collection of item metrics
-
-- **Default**: `true`
-- **Required**: yes
-
-
-
-
-#### MaxItems
-
-Maximum number of items to collect
-
-- **Default**: `10`
-- **Required**: no
-- **Min**: 1
-- **Max**: 1000
-
-
+| Name | Description | Default | Required | Min | Max |
+|:-----|:------------|:--------|:---------|:----|:----|
+| Endpoint | Connection endpoint URL | `dummy://localhost` | no | - | - |
+| ConnectTimeout | Connection timeout in seconds | `5` | no | 1 | 300 |
+| CollectItems | Enable collection of item metrics | `true` | yes | - | - |
+| MaxItems | Maximum number of items to collect | `10` | no | 1 | 1000 |
 
 ### Examples
 

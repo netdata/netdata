@@ -271,6 +271,89 @@ type Config struct {
 }
 ```
 
+### Configuration Field Comments
+
+**CRITICAL**: All configuration fields MUST have descriptive comments that become the field descriptions in generated documentation.
+
+The automated documentation generator (`docgen`) extracts field descriptions directly from Go comments in config.go using AST parsing. These comments become the user-facing documentation in:
+- README.md configuration tables
+- config_schema.json for web UI
+- metadata.yaml for integrations page
+
+#### Best Practices for Config Comments
+
+```go
+type Config struct {
+    framework.Config `yaml:",inline" json:",inline"`
+
+    // IBM MQ Queue Manager name to connect to
+    QueueManager string `yaml:"queue_manager" json:"queue_manager"`
+    // IBM MQ server hostname or IP address  
+    Host         string `yaml:"host" json:"host"`
+    // IBM MQ server port number
+    Port         int    `yaml:"port" json:"port"`
+    // Username for IBM MQ authentication
+    User         string `yaml:"user" json:"user"`
+    // Password for IBM MQ authentication  
+    Password     string `yaml:"password" json:"password"`
+    
+    // Enable collection of queue metrics
+    CollectQueues   bool `yaml:"collect_queues" json:"collect_queues"`
+    // Enable collection of system queue metrics (may impact performance)
+    CollectSystemQueues bool `yaml:"collect_system_queues" json:"collect_system_queues"`
+    
+    // Pattern to filter queues (wildcards supported)
+    QueueSelector   string `yaml:"queue_selector" json:"queue_selector"`
+    // Enable collection of queue statistics (destructive operation)
+    CollectResetQueueStats bool `yaml:"collect_reset_queue_stats" json:"collect_reset_queue_stats"`
+}
+```
+
+#### Comment Guidelines
+
+1. **Descriptive, not redundant**: "IBM MQ Queue Manager name to connect to" not "QueueManager field"
+2. **Include important details**: Mention wildcards support, performance impact, destructive operations
+3. **Protocol-specific**: Use proper terminology (IBM MQ, not generic "server")
+4. **Concise but complete**: One line that tells users exactly what the field does
+5. **Actionable**: Help users understand how to configure the field
+
+#### Examples of Good vs Bad Comments
+
+```go
+// ❌ BAD: Generic and redundant
+// Host configuration option
+Host string `yaml:"host" json:"host"`
+
+// ✅ GOOD: Specific and informative  
+// IBM MQ server hostname or IP address
+Host string `yaml:"host" json:"host"`
+
+// ❌ BAD: Missing important context
+// Enable system queues
+CollectSystemQueues bool `yaml:"collect_system_queues" json:"collect_system_queues"`
+
+// ✅ GOOD: Includes performance implications
+// Enable collection of system queue metrics (may impact performance)
+CollectSystemQueues bool `yaml:"collect_system_queues" json:"collect_system_queues"`
+
+// ❌ BAD: No explanation of destructive nature
+// Enable reset queue stats
+CollectResetQueueStats bool `yaml:"collect_reset_queue_stats" json:"collect_reset_queue_stats"`
+
+// ✅ GOOD: Warns about destructive operation
+// Enable collection of queue statistics (destructive operation)
+CollectResetQueueStats bool `yaml:"collect_reset_queue_stats" json:"collect_reset_queue_stats"`
+```
+
+#### Architecture Benefits
+
+This comment-based approach maintains proper separation of concerns:
+- **Framework remains generic**: No module-specific logic in docgen
+- **Module-specific documentation**: Each module provides its own descriptions
+- **Single source of truth**: Comments in config.go drive all documentation
+- **Compile-time validation**: Comments are extracted via AST parsing, ensuring accuracy
+- **Developer efficiency**: Write comments once, documentation generates automatically
+
 ## Collection Patterns
 
 ### Basic Collection Flow
@@ -580,6 +663,7 @@ stats, err := c.restClient.GetStats()        // Via REST API
 - Embed `framework.Config` for standard options
 - Use struct tags for validation and defaults
 - Keep configuration minimal and intuitive
+- **MANDATORY**: Add descriptive comments to ALL configuration fields (used for auto-generated documentation)
 
 ### 5. Testing
 
@@ -680,6 +764,7 @@ go generate
 
 The tool uses Go's AST (Abstract Syntax Tree) parser to extract configuration fields with 100% accuracy:
 
+- **Comment Extraction**: Reads field descriptions directly from Go comments in config.go
 - **Type Detection**: Automatically converts Go types to JSON Schema types (`string`, `int64` → `integer`, `bool` → `boolean`)
 - **Tag Parsing**: Extracts YAML/JSON field names from struct tags
 - **Required Fields**: Determines optional vs required based on `omitempty` tags
@@ -691,23 +776,28 @@ Example config.go parsing:
 type Config struct {
     framework.Config `yaml:",inline" json:",inline"`  // Automatically excluded
     
+    // Connection endpoint URL
     Endpoint string `yaml:"endpoint" json:"endpoint"`                    // Required (no omitempty)
+    // Username for authentication  
     Username string `yaml:"username,omitempty" json:"username"`          // Optional 
+    // Password for authentication
     Password string `yaml:"password,omitempty" json:"password"`          // Optional, format: password
+    // Connection timeout in seconds
     Timeout  int    `yaml:"timeout,omitempty" json:"timeout"`            // Optional integer
+    // Enable SSL/TLS encrypted connection
     EnableSSL bool  `yaml:"enable_ssl" json:"enable_ssl"`               // Required boolean
 }
 ```
 
-Generates JSON Schema:
+Generates JSON Schema (titles from Go comments):
 ```json
 {
   "properties": {
-    "endpoint": { "type": "string", "title": "Connection endpoint" },
-    "username": { "type": "string", "title": "Username" },
-    "password": { "type": "string", "format": "password", "title": "Password" },
-    "timeout": { "type": "integer", "title": "Timeout", "minimum": 1 },
-    "enable_ssl": { "type": "boolean", "title": "Enable SSL", "default": false }
+    "endpoint": { "type": "string", "title": "Connection endpoint URL" },
+    "username": { "type": "string", "title": "Username for authentication" },
+    "password": { "type": "string", "format": "password", "title": "Password for authentication" },
+    "timeout": { "type": "integer", "title": "Connection timeout in seconds", "minimum": 1 },
+    "enable_ssl": { "type": "boolean", "title": "Enable SSL/TLS encrypted connection", "default": false }
   },
   "required": ["endpoint", "enable_ssl"]
 }
