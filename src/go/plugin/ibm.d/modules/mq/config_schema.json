@@ -3,67 +3,70 @@
     "$schema": "http://json-schema.org/draft-07/schema#",
     "properties": {
       "channel": {
-        "title": "Channel configuration option",
+        "title": "IBM MQ channel name for connection",
         "type": "string"
       },
       "channel_selector": {
-        "title": "ChannelSelector configuration option",
+        "title": "Pattern to filter channels (wildcards supported)",
         "type": "string"
       },
       "collect_channel_config": {
-        "title": "CollectChannelConfig configuration option",
+        "title": "Enable collection of channel configuration metrics",
         "type": "boolean"
       },
       "collect_channels": {
-        "title": "CollectChannels configuration option",
+        "title": "Enable collection of channel metrics",
         "type": "boolean"
       },
       "collect_queue_config": {
-        "title": "CollectQueueConfig configuration option",
+        "title": "Enable collection of queue configuration metrics",
         "type": "boolean"
       },
       "collect_queues": {
-        "title": "CollectQueues configuration option",
+        "title": "Enable collection of queue metrics",
         "type": "boolean"
       },
       "collect_reset_queue_stats": {
-        "title": "CollectResetQueueStats configuration option",
+        "title": "Enable collection of queue statistics (destructive operation)",
         "type": "boolean"
       },
       "collect_system_channels": {
-        "title": "CollectSystemChannels configuration option",
+        "title": "Enable collection of system channel metrics",
         "type": "boolean"
       },
       "collect_system_queues": {
-        "title": "CollectSystemQueues configuration option",
+        "title": "Enable collection of system queue metrics",
         "type": "boolean"
       },
       "collect_topics": {
-        "title": "CollectTopics configuration option",
+        "title": "Enable collection of topic metrics",
         "type": "boolean"
       },
       "host": {
-        "title": "Host configuration option",
+        "title": "IBM MQ server hostname or IP address",
         "type": "string"
       },
       "password": {
-        "title": "Password configuration option",
+        "format": "password",
+        "title": "Password for IBM MQ authentication",
         "type": "string"
       },
       "port": {
-        "title": "Port configuration option",
+        "maximum": 65535,
+        "minimum": 1,
+        "title": "IBM MQ server port number",
         "type": "integer"
       },
       "queue_manager": {
-        "title": "QueueManager configuration option",
+        "title": "IBM MQ Queue Manager name to connect to",
         "type": "string"
       },
       "queue_selector": {
-        "title": "QueueSelector configuration option",
+        "title": "Pattern to filter queues (wildcards supported)",
         "type": "string"
       },
       "user": {
-        "title": "User configuration option",
+        "title": "Username for IBM MQ authentication",
         "type": "string"
       }
     },

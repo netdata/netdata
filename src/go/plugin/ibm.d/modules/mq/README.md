@@ -123,22 +123,22 @@ The following options can be defined globally or per job.
 
 | Name | Description | Default | Required | Min | Max |
 |:-----|:------------|:--------|:---------|:----|:----|
-| QueueManager | QueueManager configuration option | `<no value>` | yes | - | - |
-| Channel | Channel configuration option | `<no value>` | yes | - | - |
-| Host | Host configuration option | `<no value>` | yes | - | - |
-| Port | Port configuration option | `<no value>` | yes | - | - |
-| User | User configuration option | `<no value>` | yes | - | - |
-| Password | Password configuration option | `<no value>` | yes | - | - |
-| CollectQueues | CollectQueues configuration option | `<no value>` | yes | - | - |
-| CollectChannels | CollectChannels configuration option | `<no value>` | yes | - | - |
-| CollectTopics | CollectTopics configuration option | `<no value>` | yes | - | - |
-| CollectSystemQueues | CollectSystemQueues configuration option | `<no value>` | yes | - | - |
-| CollectSystemChannels | CollectSystemChannels configuration option | `<no value>` | yes | - | - |
-| CollectChannelConfig | CollectChannelConfig configuration option | `<no value>` | yes | - | - |
-| CollectQueueConfig | CollectQueueConfig configuration option | `<no value>` | yes | - | - |
-| QueueSelector | QueueSelector configuration option | `<no value>` | yes | - | - |
-| ChannelSelector | ChannelSelector configuration option | `<no value>` | yes | - | - |
-| CollectResetQueueStats | CollectResetQueueStats configuration option | `<no value>` | yes | - | - |
+| QueueManager | IBM MQ Queue Manager name to connect to | `<no value>` | yes | - | - |
+| Channel | IBM MQ channel name for connection | `<no value>` | yes | - | - |
+| Host | IBM MQ server hostname or IP address | `<no value>` | yes | - | - |
+| Port | IBM MQ server port number | `<no value>` | yes | 1 | 65535 |
+| User | Username for IBM MQ authentication | `<no value>` | yes | - | - |
+| Password | Password for IBM MQ authentication | `<no value>` | yes | - | - |
+| CollectQueues | Enable collection of queue metrics | `<no value>` | yes | - | - |
+| CollectChannels | Enable collection of channel metrics | `<no value>` | yes | - | - |
+| CollectTopics | Enable collection of topic metrics | `<no value>` | yes | - | - |
+| CollectSystemQueues | Enable collection of system queue metrics | `<no value>` | yes | - | - |
+| CollectSystemChannels | Enable collection of system channel metrics | `<no value>` | yes | - | - |
+| CollectChannelConfig | Enable collection of channel configuration metrics | `<no value>` | yes | - | - |
+| CollectQueueConfig | Enable collection of queue configuration metrics | `<no value>` | yes | - | - |
+| QueueSelector | Pattern to filter queues (wildcards supported) | `<no value>` | yes | - | - |
+| ChannelSelector | Pattern to filter channels (wildcards supported) | `<no value>` | yes | - | - |
+| CollectResetQueueStats | Enable collection of queue statistics (destructive operation) | `<no value>` | yes | - | - |
 
 ### Examples
 
