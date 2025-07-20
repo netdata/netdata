@@ -1,0 +1,94 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "channel": {
+        "title": "IBM MQ channel name for connection",
+        "type": "string"
+      },
+      "channel_selector": {
+        "title": "Pattern to filter channels (wildcards supported)",
+        "type": "string"
+      },
+      "collect_channel_config": {
+        "title": "Enable collection of channel configuration metrics",
+        "type": "boolean"
+      },
+      "collect_channels": {
+        "title": "Enable collection of channel metrics",
+        "type": "boolean"
+      },
+      "collect_queue_config": {
+        "title": "Enable collection of queue configuration metrics",
+        "type": "boolean"
+      },
+      "collect_queues": {
+        "title": "Enable collection of queue metrics",
+        "type": "boolean"
+      },
+      "collect_reset_queue_stats": {
+        "title": "Enable collection of queue statistics (destructive operation)",
+        "type": "boolean"
+      },
+      "collect_system_channels": {
+        "title": "Enable collection of system channel metrics",
+        "type": "boolean"
+      },
+      "collect_system_queues": {
+        "title": "Enable collection of system queue metrics",
+        "type": "boolean"
+      },
+      "collect_topics": {
+        "title": "Enable collection of topic metrics",
+        "type": "boolean"
+      },
+      "host": {
+        "title": "IBM MQ server hostname or IP address",
+        "type": "string"
+      },
+      "password": {
+        "format": "password",
+        "title": "Password for IBM MQ authentication",
+        "type": "string"
+      },
+      "port": {
+        "maximum": 65535,
+        "minimum": 1,
+        "title": "IBM MQ server port number",
+        "type": "integer"
+      },
+      "queue_manager": {
+        "title": "IBM MQ Queue Manager name to connect to",
+        "type": "string"
+      },
+      "queue_selector": {
+        "title": "Pattern to filter queues (wildcards supported)",
+        "type": "string"
+      },
+      "user": {
+        "title": "Username for IBM MQ authentication",
+        "type": "string"
+      }
+    },
+    "required": [
+      "queue_manager",
+      "channel",
+      "host",
+      "port",
+      "user",
+      "password",
+      "collect_queues",
+      "collect_channels",
+      "collect_topics",
+      "collect_system_queues",
+      "collect_system_channels",
+      "collect_channel_config",
+      "collect_queue_config",
+      "queue_selector",
+      "channel_selector",
+      "collect_reset_queue_stats"
+    ],
+    "title": "mq collector configuration",
+    "type": "object"
+  }
+}
