@@ -23,17 +23,18 @@ func defaultConfig() Config {
 		User:         "", // No authentication by default
 		Password:     "", // No authentication by default
 		
-		// Collection defaults - these are enabled by default
-		CollectQueues:         true,
-		CollectChannels:       true,
-		CollectListeners:      true,
-		CollectSystemQueues:   true,
-		CollectSystemChannels: true,
+		// Collection defaults - collect everything by default
+		CollectQueues:           true,
+		CollectChannels:         true,
+		CollectTopics:           true,
+		CollectListeners:        true,
+		CollectSystemQueues:     true,
+		CollectSystemChannels:   true,
+		CollectSystemTopics:     true,
+		CollectChannelConfig:    true,
+		CollectQueueConfig:      true,
 		
-		// These are disabled by default
-		CollectTopics:          false,
-		CollectChannelConfig:   false,
-		CollectQueueConfig:     false,
+		// Only destructive operations are disabled by default
 		CollectResetQueueStats: false,
 		
 		// Selector defaults - empty means collect nothing (user must explicitly configure)

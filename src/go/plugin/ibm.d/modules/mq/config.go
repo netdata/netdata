@@ -29,10 +29,12 @@ type Config struct {
 	// Enable collection of listener metrics
 	CollectListeners bool `yaml:"collect_listeners" json:"collect_listeners"`
 
-	// Enable collection of system queue metrics
+	// Enable collection of system queue metrics (SYSTEM.* queues provide critical infrastructure visibility)
 	CollectSystemQueues   bool `yaml:"collect_system_queues" json:"collect_system_queues"`
-	// Enable collection of system channel metrics
+	// Enable collection of system channel metrics (SYSTEM.* channels show clustering and administrative health)
 	CollectSystemChannels bool `yaml:"collect_system_channels" json:"collect_system_channels"`
+	// Enable collection of system topic metrics (SYSTEM.* topics show internal messaging patterns)
+	CollectSystemTopics   bool `yaml:"collect_system_topics" json:"collect_system_topics"`
 
 	// Enable collection of channel configuration metrics
 	CollectChannelConfig bool `yaml:"collect_channel_config" json:"collect_channel_config"`

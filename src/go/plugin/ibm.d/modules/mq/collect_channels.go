@@ -1,58 +1,73 @@
 package mq
 
 import (
-	"path/filepath"
-	"strings"
+	"fmt"
 	
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/mq/contexts"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/protocols/pcf"
 )
 
 func (c *Collector) collectChannelMetrics() error {
-	channels, err := c.client.GetChannelList()
+	c.Debugf("Collecting channels with selector '%s', config: %v, system: %v", 
+		c.Config.ChannelSelector, c.Config.CollectChannelConfig, c.Config.CollectSystemChannels)
+	
+	// Use new GetChannels with transparency
+	result, err := c.client.GetChannels(
+		c.Config.CollectChannelConfig, // collectConfig
+		true,                          // collectMetrics (always)
+		c.Config.MaxChannels,          // maxChannels (0 = no limit)
+		c.Config.ChannelSelector,      // selector pattern
+		c.Config.CollectSystemChannels, // collectSystem
+	)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to collect channel metrics: %w", err)
 	}
-
-	// Track overview metrics
-	var monitored, excluded, failed int64
-
-	for _, channelName := range channels {
-		// Apply channel selector filtering
-		if c.Config.ChannelSelector != "" && c.Config.ChannelSelector != "*" {
-			matched, err := filepath.Match(c.Config.ChannelSelector, channelName)
-			if err != nil {
-				c.Warningf("Invalid channel selector pattern '%s': %v", c.Config.ChannelSelector, err)
-			} else if !matched {
-				excluded++
-				continue
-			}
-		}
-		
-		// Apply system channel filtering
-		if !c.Config.CollectSystemChannels && strings.HasPrefix(channelName, "SYSTEM.") {
-			excluded++
-			continue
-		}
-
-		metrics, err := c.client.GetChannelMetrics(channelName)
-		if err != nil {
-			c.Warningf("failed to get metrics for channel %s: %v", channelName, err)
-			failed++
-			continue
-		}
-
-		monitored++
-
+	
+	// Check discovery success
+	if !result.Stats.Discovery.Success {
+		c.Errorf("Channel discovery failed completely")
+		return fmt.Errorf("channel discovery failed")
+	}
+	
+	// Map transparency counters to user-facing semantics
+	monitored := int64(0)
+	if result.Stats.Metrics != nil {
+		monitored = result.Stats.Metrics.OkItems
+	}
+	
+	failed := result.Stats.Discovery.UnparsedItems
+	if result.Stats.Metrics != nil {
+		failed += result.Stats.Metrics.FailedItems
+	}
+	// Note: Config failures are not counted as they're optional
+	
+	// Update overview metrics with correct semantics  
+	c.setChannelOverviewMetrics(
+		monitored,                             // monitored (successfully enriched)
+		result.Stats.Discovery.ExcludedItems,  // excluded (filtered by user)
+		result.Stats.Discovery.InvisibleItems, // invisible (discovery errors)
+		failed,                                // failed (unparsed + enrichment failures)
+	)
+	
+	// Log collection summary
+	c.Debugf("Channel collection complete - discovered:%d visible:%d included:%d collected:%d failed:%d",
+		result.Stats.Discovery.AvailableItems,
+		result.Stats.Discovery.AvailableItems - result.Stats.Discovery.InvisibleItems,
+		result.Stats.Discovery.IncludedItems,
+		len(result.Channels),
+		failed)
+	
+	// Process collected channel metrics
+	for _, channel := range result.Channels {
 		labels := contexts.ChannelLabels{
-			Channel: channelName,
+			Channel: channel.Name,
 		}
 
 		// Set channel status - convert enum to individual metrics
 		statusValues := contexts.ChannelStatusValues{}
 		
 		// Set the active status to 1
-		switch metrics.Status {
+		switch channel.Status {
 		case pcf.ChannelStatusInactive:
 			statusValues.Inactive = 1
 		case pcf.ChannelStatusBinding:
@@ -82,95 +97,95 @@ func (c *Collector) collectChannelMetrics() error {
 		contexts.Channel.Status.Set(c.State, labels, statusValues)
 		
 		// Set channel messages (incremental) - only if available
-		if metrics.Messages != nil {
+		if channel.Messages != nil {
 			contexts.Channel.Messages.Set(c.State, labels, contexts.ChannelMessagesValues{
-				Messages: *metrics.Messages,
+				Messages: *channel.Messages,
 			})
 		}
 		
 		// Set channel bytes (incremental) - only if available
-		if metrics.Bytes != nil {
+		if channel.Bytes != nil {
 			contexts.Channel.Bytes.Set(c.State, labels, contexts.ChannelBytesValues{
-				Bytes: *metrics.Bytes,
+				Bytes: *channel.Bytes,
 			})
 		}
 		
 		// Set channel batches (incremental) - only if available
-		if metrics.Batches != nil {
+		if channel.Batches != nil {
 			contexts.Channel.Batches.Set(c.State, labels, contexts.ChannelBatchesValues{
-				Batches: *metrics.Batches,
+				Batches: *channel.Batches,
 			})
 		}
 		
-		// Collect channel configuration if enabled
+		// Configuration metrics - only set when configuration collection is enabled
 		if c.Config.CollectChannelConfig {
-			config, err := c.client.GetChannelConfig(channelName)
-			if err != nil {
-				c.Debugf("failed to get config for channel %s: %v", channelName, err)
-			} else {
-				// Set batch size - only if collected
-				if config.BatchSize.IsCollected() {
-					contexts.Channel.BatchSize.Set(c.State, labels, contexts.ChannelBatchSizeValues{
-						Batch_size: config.BatchSize.Int64(),
-					})
+			// Set batch size - only if available
+			if channel.BatchSize.IsCollected() {
+				contexts.Channel.BatchSize.Set(c.State, labels, contexts.ChannelBatchSizeValues{
+					Batch_size: channel.BatchSize.Int64(),
+				})
+			}
+			
+			// Set batch interval - only if available
+			if channel.BatchInterval.IsCollected() {
+				contexts.Channel.BatchInterval.Set(c.State, labels, contexts.ChannelBatchIntervalValues{
+					Batch_interval: channel.BatchInterval.Int64(),
+				})
+			}
+			
+			// Set intervals - only if at least one is available
+			if channel.DiscInterval.IsCollected() || channel.HbInterval.IsCollected() || channel.KeepAliveInterval.IsCollected() {
+				intervalValues := contexts.ChannelIntervalsValues{}
+				
+				if channel.DiscInterval.IsCollected() {
+					intervalValues.Disc_interval = channel.DiscInterval.Int64()
+				}
+				if channel.HbInterval.IsCollected() {
+					intervalValues.Hb_interval = channel.HbInterval.Int64()
+				}
+				if channel.KeepAliveInterval.IsCollected() {
+					intervalValues.Keep_alive_interval = channel.KeepAliveInterval.Int64()
 				}
 				
-				// Set batch interval - only if collected
-				if config.BatchInterval.IsCollected() {
-					contexts.Channel.BatchInterval.Set(c.State, labels, contexts.ChannelBatchIntervalValues{
-						Batch_interval: config.BatchInterval.Int64(),
-					})
-				}
-				
-				// Set intervals - only if all values are collected
-				if config.DiscInterval.IsCollected() && config.HbInterval.IsCollected() && config.KeepAliveInterval.IsCollected() {
-					contexts.Channel.Intervals.Set(c.State, labels, contexts.ChannelIntervalsValues{
-						Disc_interval:       config.DiscInterval.Int64(),
-						Hb_interval:         config.HbInterval.Int64(),
-						Keep_alive_interval: config.KeepAliveInterval.Int64(),
-					})
-				}
-				
-				// Set short retry count - only if collected
-				if config.ShortRetry.IsCollected() {
-					contexts.Channel.ShortRetryCount.Set(c.State, labels, contexts.ChannelShortRetryCountValues{
-						Short_retry: config.ShortRetry.Int64(),
-					})
-				}
-				
-				// Set long retry interval - only if collected
-				if config.LongRetry.IsCollected() {
-					contexts.Channel.LongRetryInterval.Set(c.State, labels, contexts.ChannelLongRetryIntervalValues{
-						Long_retry: config.LongRetry.Int64(),
-					})
-				}
-				
-				// Set max message length - only if collected
-				if config.MaxMsgLength.IsCollected() {
-					contexts.Channel.MaxMessageLength.Set(c.State, labels, contexts.ChannelMaxMessageLengthValues{
-						Max_msg_length: config.MaxMsgLength.Int64(),
-					})
-				}
-				
-				// Set sharing conversations - only if collected
-				if config.SharingConversations.IsCollected() {
-					contexts.Channel.SharingConversations.Set(c.State, labels, contexts.ChannelSharingConversationsValues{
-						Sharing_conversations: config.SharingConversations.Int64(),
-					})
-				}
-				
-				// Set network priority - only if collected
-				if config.NetworkPriority.IsCollected() {
-					contexts.Channel.NetworkPriority.Set(c.State, labels, contexts.ChannelNetworkPriorityValues{
-						Network_priority: config.NetworkPriority.Int64(),
-					})
-				}
+				contexts.Channel.Intervals.Set(c.State, labels, intervalValues)
+			}
+			
+			// Set short retry count - only if available
+			if channel.ShortRetry.IsCollected() {
+				contexts.Channel.ShortRetryCount.Set(c.State, labels, contexts.ChannelShortRetryCountValues{
+					Short_retry: channel.ShortRetry.Int64(),
+				})
+			}
+			
+			// Set long retry interval - only if available
+			if channel.LongRetry.IsCollected() {
+				contexts.Channel.LongRetryInterval.Set(c.State, labels, contexts.ChannelLongRetryIntervalValues{
+					Long_retry: channel.LongRetry.Int64(),
+				})
+			}
+			
+			// Set max message length - only if available
+			if channel.MaxMsgLength.IsCollected() {
+				contexts.Channel.MaxMessageLength.Set(c.State, labels, contexts.ChannelMaxMessageLengthValues{
+					Max_msg_length: channel.MaxMsgLength.Int64(),
+				})
+			}
+			
+			// Set sharing conversations - only if available
+			if channel.SharingConversations.IsCollected() {
+				contexts.Channel.SharingConversations.Set(c.State, labels, contexts.ChannelSharingConversationsValues{
+					Sharing_conversations: channel.SharingConversations.Int64(),
+				})
+			}
+			
+			// Set network priority - only if available
+			if channel.NetworkPriority.IsCollected() {
+				contexts.Channel.NetworkPriority.Set(c.State, labels, contexts.ChannelNetworkPriorityValues{
+					Network_priority: channel.NetworkPriority.Int64(),
+				})
 			}
 		}
 	}
-	
-	// Set overview metrics
-	c.setChannelOverviewMetrics(monitored, excluded, 0, failed)
 	
 	return nil
 }

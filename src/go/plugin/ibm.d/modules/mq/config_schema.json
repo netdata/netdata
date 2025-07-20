@@ -13,7 +13,7 @@
         "type": "string"
       },
       "collect_channel_config": {
-        "default": false,
+        "default": true,
         "title": "Enable collection of channel configuration metrics",
         "type": "boolean"
       },
@@ -28,7 +28,7 @@
         "type": "boolean"
       },
       "collect_queue_config": {
-        "default": false,
+        "default": true,
         "title": "Enable collection of queue configuration metrics",
         "type": "boolean"
       },
@@ -44,16 +44,21 @@
       },
       "collect_system_channels": {
         "default": true,
-        "title": "Enable collection of system channel metrics",
+        "title": "Enable collection of system channel metrics (SYSTEM.* channels show clustering and administrative health)",
         "type": "boolean"
       },
       "collect_system_queues": {
         "default": true,
-        "title": "Enable collection of system queue metrics",
+        "title": "Enable collection of system queue metrics (SYSTEM.* queues provide critical infrastructure visibility)",
+        "type": "boolean"
+      },
+      "collect_system_topics": {
+        "default": true,
+        "title": "Enable collection of system topic metrics (SYSTEM.* topics show internal messaging patterns)",
         "type": "boolean"
       },
       "collect_topics": {
-        "default": false,
+        "default": true,
         "title": "Enable collection of topic metrics",
         "type": "boolean"
       },

@@ -1,46 +1,75 @@
 package mq
 
 import (
+	"fmt"
+	
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/mq/contexts"
 )
 
 func (c *Collector) collectTopicMetrics() error {
-	topics, err := c.client.GetTopicList()
+	c.Debugf("Collecting topics with selector '%s', system: %v", c.Config.TopicSelector, c.Config.CollectSystemTopics)
+	
+	// Use new GetTopics with transparency
+	result, err := c.client.GetTopics(
+		true,                      // collectMetrics (always)
+		c.Config.MaxTopics,        // maxTopics (0 = no limit)
+		c.Config.TopicSelector,    // selector pattern
+		c.Config.CollectSystemTopics, // collectSystem
+	)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to collect topic metrics: %w", err)
 	}
-
-	// Track overview metrics
-	var monitored, excluded, failed int64
-
-	for _, topicName := range topics {
-		metrics, err := c.client.GetTopicMetrics(topicName)
-		if err != nil {
-			c.Warningf("failed to get metrics for topic %s: %v", topicName, err)
-			failed++
-			continue
-		}
-
-		monitored++
-
+	
+	// Check discovery success
+	if !result.Stats.Discovery.Success {
+		c.Errorf("Topic discovery failed completely")
+		return fmt.Errorf("topic discovery failed")
+	}
+	
+	// Map transparency counters to user-facing semantics
+	monitored := int64(0)
+	if result.Stats.Metrics != nil {
+		monitored = result.Stats.Metrics.OkItems
+	}
+	
+	failed := result.Stats.Discovery.UnparsedItems
+	if result.Stats.Metrics != nil {
+		failed += result.Stats.Metrics.FailedItems
+	}
+	
+	// Update overview metrics with correct semantics  
+	c.setTopicOverviewMetrics(
+		monitored,                             // monitored (successfully enriched)
+		result.Stats.Discovery.ExcludedItems,  // excluded (filtered by user)
+		result.Stats.Discovery.InvisibleItems, // invisible (discovery errors)
+		failed,                                // failed (unparsed + enrichment failures)
+	)
+	
+	// Log collection summary
+	c.Debugf("Topic collection complete - discovered:%d visible:%d included:%d collected:%d failed:%d",
+		result.Stats.Discovery.AvailableItems,
+		result.Stats.Discovery.AvailableItems - result.Stats.Discovery.InvisibleItems,
+		result.Stats.Discovery.IncludedItems,
+		len(result.Topics),
+		failed)
+	
+	// Process collected topic metrics
+	for _, topic := range result.Topics {
 		labels := contexts.TopicLabels{
-			Topic: topicName,
+			Topic: topic.TopicString,
 		}
 
 		// Use structured data from protocol
 		contexts.Topic.Publishers.Set(c.State, labels, contexts.TopicPublishersValues{
-			Publishers: metrics.Publishers,
+			Publishers: topic.Publishers,
 		})
 		contexts.Topic.Subscribers.Set(c.State, labels, contexts.TopicSubscribersValues{
-			Subscribers: metrics.Subscribers,
+			Subscribers: topic.Subscribers,
 		})
 		contexts.Topic.Messages.Set(c.State, labels, contexts.TopicMessagesValues{
-			Messages: metrics.PublishMsgCount,
+			Messages: topic.PublishMsgCount,
 		})
 	}
-	
-	// Set overview metrics
-	c.setTopicOverviewMetrics(monitored, excluded, 0, failed)
 	
 	return nil
 }

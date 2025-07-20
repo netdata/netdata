@@ -46,8 +46,8 @@ func convertMQDateTimeToSecondsSince(date, timeVal pcf.AttributeValue) int64 {
 }
 
 func (c *Collector) collectQueueMetrics() error {
-	c.Debugf("Collecting queues with selector '%s', config: %v, reset_stats: %v", 
-		c.Config.QueueSelector, c.Config.CollectQueueConfig, c.Config.CollectResetQueueStats)
+	c.Debugf("Collecting queues with selector '%s', config: %v, reset_stats: %v, system: %v", 
+		c.Config.QueueSelector, c.Config.CollectQueueConfig, c.Config.CollectResetQueueStats, c.Config.CollectSystemQueues)
 	
 	// Use new GetQueues with transparency
 	result, err := c.client.GetQueues(
@@ -56,6 +56,7 @@ func (c *Collector) collectQueueMetrics() error {
 		c.Config.CollectResetQueueStats, // collectReset
 		c.Config.MaxQueues,              // maxQueues (0 = no limit)
 		c.Config.QueueSelector,          // selector pattern
+		c.Config.CollectSystemQueues,    // collectSystem
 	)
 	if err != nil {
 		return fmt.Errorf("failed to collect queue metrics: %w", err)

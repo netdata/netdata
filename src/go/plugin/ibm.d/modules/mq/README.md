@@ -154,12 +154,13 @@ The following options can be defined globally or per job.
 | Password | Password for IBM MQ authentication | `` | no | - | - |
 | CollectQueues | Enable collection of queue metrics | `true` | no | - | - |
 | CollectChannels | Enable collection of channel metrics | `true` | no | - | - |
-| CollectTopics | Enable collection of topic metrics | `false` | no | - | - |
+| CollectTopics | Enable collection of topic metrics | `true` | no | - | - |
 | CollectListeners | Enable collection of listener metrics | `true` | no | - | - |
-| CollectSystemQueues | Enable collection of system queue metrics | `true` | no | - | - |
-| CollectSystemChannels | Enable collection of system channel metrics | `true` | no | - | - |
-| CollectChannelConfig | Enable collection of channel configuration metrics | `false` | no | - | - |
-| CollectQueueConfig | Enable collection of queue configuration metrics | `false` | no | - | - |
+| CollectSystemQueues | Enable collection of system queue metrics (SYSTEM.* queues provide critical infrastructure visibility) | `true` | no | - | - |
+| CollectSystemChannels | Enable collection of system channel metrics (SYSTEM.* channels show clustering and administrative health) | `true` | no | - | - |
+| CollectSystemTopics | Enable collection of system topic metrics (SYSTEM.* topics show internal messaging patterns) | `true` | no | - | - |
+| CollectChannelConfig | Enable collection of channel configuration metrics | `true` | no | - | - |
+| CollectQueueConfig | Enable collection of queue configuration metrics | `true` | no | - | - |
 | QueueSelector | Pattern to filter queues (wildcards supported) | `` | no | - | - |
 | ChannelSelector | Pattern to filter channels (wildcards supported) | `` | no | - | - |
 | TopicSelector | Pattern to filter topics (wildcards supported) | `` | no | - | - |
