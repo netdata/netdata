@@ -73,5 +73,12 @@ func (c *Collector) collectQueueManagerMetrics() error {
 		Status: metrics.Status,
 	})
 	
+	// Collect connection count if available
+	if metrics.ConnectionCount.IsCollected() {
+		contexts.QueueManager.ConnectionCount.Set(c.State, contexts.EmptyLabels{}, contexts.QueueManagerConnectionCountValues{
+			Connections: metrics.ConnectionCount.Int64(),
+		})
+	}
+	
 	return nil
 }
