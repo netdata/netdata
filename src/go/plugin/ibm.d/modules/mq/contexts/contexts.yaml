@@ -23,6 +23,15 @@ QueueManager:
         priority: 1001
         dimensions:
           - { name: connections, algo: absolute }
+      - name: Uptime
+        context: mq.qmgr.uptime
+        title: Queue Manager Uptime
+        units: seconds
+        family: queue_manager
+        type: line
+        priority: 1002
+        dimensions:
+          - { name: uptime, algo: absolute }
       - name: QueuesOverview
         context: mq.queues.overview
         title: Queues Monitoring Status
