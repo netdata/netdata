@@ -672,8 +672,11 @@ var Channel = struct {
 
 // ListenerStatusValues defines the type-safe values for Listener.Status context
 type ListenerStatusValues struct {
-	Running int64
 	Stopped int64
+	Starting int64
+	Running int64
+	Stopping int64
+	Retrying int64
 }
 
 // ListenerStatusContext provides type-safe operations for Listener.Status context
@@ -684,25 +687,45 @@ type ListenerStatusContext struct {
 // Set provides type-safe dimension setting for Listener.Status context
 func (c ListenerStatusContext) Set(state *framework.CollectorState, labels ListenerLabels, values ListenerStatusValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"running": values.Running,
 		"stopped": values.Stopped,
+		"starting": values.Starting,
+		"running": values.Running,
+		"stopping": values.Stopping,
+		"retrying": values.Retrying,
 	})
 }
 
-// ListenerPortValues defines the type-safe values for Listener.Port context
-type ListenerPortValues struct {
-	Port int64
+// ListenerBacklogValues defines the type-safe values for Listener.Backlog context
+type ListenerBacklogValues struct {
+	Backlog int64
 }
 
-// ListenerPortContext provides type-safe operations for Listener.Port context
-type ListenerPortContext struct {
+// ListenerBacklogContext provides type-safe operations for Listener.Backlog context
+type ListenerBacklogContext struct {
 	framework.Context[ListenerLabels]
 }
 
-// Set provides type-safe dimension setting for Listener.Port context
-func (c ListenerPortContext) Set(state *framework.CollectorState, labels ListenerLabels, values ListenerPortValues) {
+// Set provides type-safe dimension setting for Listener.Backlog context
+func (c ListenerBacklogContext) Set(state *framework.CollectorState, labels ListenerLabels, values ListenerBacklogValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"port": values.Port,
+		"backlog": values.Backlog,
+	})
+}
+
+// ListenerUptimeValues defines the type-safe values for Listener.Uptime context
+type ListenerUptimeValues struct {
+	Uptime int64
+}
+
+// ListenerUptimeContext provides type-safe operations for Listener.Uptime context
+type ListenerUptimeContext struct {
+	framework.Context[ListenerLabels]
+}
+
+// Set provides type-safe dimension setting for Listener.Uptime context
+func (c ListenerUptimeContext) Set(state *framework.CollectorState, labels ListenerLabels, values ListenerUptimeValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"uptime": values.Uptime,
 	})
 }
 
@@ -711,19 +734,22 @@ func (c ListenerPortContext) Set(state *framework.CollectorState, labels Listene
 // ListenerLabels defines the required labels for Listener contexts
 type ListenerLabels struct {
 	Listener string
+	Port string
+	Ip_address string
 }
 
 // InstanceID generates a unique instance ID using the hardcoded label order from YAML
 func (l ListenerLabels) InstanceID(contextName string) string {
-	// Label order from YAML: listener
-	return contextName + "." + cleanLabelValue(l.Listener)
+	// Label order from YAML: listener, port, ip_address
+	return contextName + "." + cleanLabelValue(l.Listener) + "_" + cleanLabelValue(l.Port) + "_" + cleanLabelValue(l.Ip_address)
 }
 
 
 // Listener contains all metric contexts for Listener
 var Listener = struct {
 	Status ListenerStatusContext
-	Port ListenerPortContext
+	Backlog ListenerBacklogContext
+	Uptime ListenerUptimeContext
 }{
 	Status: ListenerStatusContext{
 		Context: framework.Context[ListenerLabels]{
@@ -736,6 +762,20 @@ var Listener = struct {
 		UpdateEvery: 1,
 		Dimensions: []framework.Dimension{
 			{
+				Name:      "stopped",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "starting",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
 				Name:      "running",
 				Algorithm: module.Absolute,
 				Mul:       1,
@@ -743,7 +783,14 @@ var Listener = struct {
 				Precision: 1,
 			},
 			{
-				Name:      "stopped",
+				Name:      "stopping",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "retrying",
 				Algorithm: module.Absolute,
 				Mul:       1,
 				Div:       1,
@@ -752,21 +799,23 @@ var Listener = struct {
 		},
 		LabelKeys: []string{
 			"listener",
+			"port",
+			"ip_address",
 		},
 		},
 	},
-	Port: ListenerPortContext{
+	Backlog: ListenerBacklogContext{
 		Context: framework.Context[ListenerLabels]{
-		Name:       "mq.listener.port",
+		Name:       "mq.listener.backlog",
 		Family:     "listeners",
-		Title:      "Listener Port",
-		Units:      "port",
+		Title:      "Listener Connection Backlog",
+		Units:      "connections",
 		Type:       module.Line,
 		Priority:   5001,
 		UpdateEvery: 1,
 		Dimensions: []framework.Dimension{
 			{
-				Name:      "port",
+				Name:      "backlog",
 				Algorithm: module.Absolute,
 				Mul:       1,
 				Div:       1,
@@ -775,6 +824,33 @@ var Listener = struct {
 		},
 		LabelKeys: []string{
 			"listener",
+			"port",
+			"ip_address",
+		},
+		},
+	},
+	Uptime: ListenerUptimeContext{
+		Context: framework.Context[ListenerLabels]{
+		Name:       "mq.listener.uptime",
+		Family:     "listeners",
+		Title:      "Listener Uptime",
+		Units:      "seconds",
+		Type:       module.Line,
+		Priority:   5002,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "uptime",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"listener",
+			"port",
+			"ip_address",
 		},
 		},
 	},
@@ -1926,7 +2002,8 @@ func GetAllContexts() []interface{} {
 		&Channel.SharingConversations.Context,
 		&Channel.NetworkPriority.Context,
 		&Listener.Status.Context,
-		&Listener.Port.Context,
+		&Listener.Backlog.Context,
+		&Listener.Uptime.Context,
 		&Queue.Depth.Context,
 		&Queue.Messages.Context,
 		&Queue.Connections.Context,

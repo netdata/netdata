@@ -9,8 +9,6 @@ import "C"
 
 import (
 	"fmt"
-	"time"
-	"strconv"
 )
 
 // GetQueueManagerStatus returns the status of the queue manager.
@@ -96,7 +94,7 @@ func (c *Client) GetQueueManagerStatus() (*QueueManagerMetrics, error) {
 			startTime = "00:00:00"
 			c.protocol.Infof("PCF: Queue manager '%s' - no start time found, assuming 00:00:00", c.config.QueueManager)
 		}
-		if uptime, err := calculateQueueManagerUptime(startDate, startTime); err == nil {
+		if uptime, err := CalculateUptimeSeconds(startDate, startTime); err == nil {
 			metrics.Uptime = AttributeValue(uptime)
 			c.protocol.Infof("PCF: Queue manager '%s' uptime: %d seconds", c.config.QueueManager, uptime)
 		} else {
@@ -201,52 +199,3 @@ func getPlatformString(platform int32) string {
 	}
 }
 
-// calculateQueueManagerUptime calculates uptime in seconds from IBM MQ start date and time
-// Supports both old format (YYYYMMDD, HHMMSSSS) and new format (YYYY-MM-DD, HH:MM:SS)
-func calculateQueueManagerUptime(startDate, startTime string) (int64, error) {
-	if startDate == "" || startTime == "" {
-		return 0, fmt.Errorf("empty start date or time")
-	}
-	
-	var parsedTime time.Time
-	var err error
-	
-	// Try new format first: "YYYY-MM-DD" + "HH:MM:SS"
-	if len(startDate) == 10 && startDate[4] == '-' {
-		// New format: "2024-01-15" + "14:30:25"
-		datetime := startDate + "T" + startTime + "Z"
-		parsedTime, err = time.Parse("2006-01-02T15:04:05Z", datetime)
-		if err != nil {
-			return 0, fmt.Errorf("failed to parse new format date/time %s + %s: %v", startDate, startTime, err)
-		}
-	} else {
-		// Try old format: "YYYYMMDD" + "HHMMSSSS" 
-		if len(startDate) != 8 {
-			return 0, fmt.Errorf("invalid date format: %s (expected YYYYMMDD or YYYY-MM-DD)", startDate)
-		}
-		if len(startTime) != 8 {
-			return 0, fmt.Errorf("invalid time format: %s (expected HHMMSSSS or HH:MM:SS)", startTime)
-		}
-		
-		// Parse YYYYMMDD
-		year, _ := strconv.Atoi(startDate[0:4])
-		month, _ := strconv.Atoi(startDate[4:6])
-		day, _ := strconv.Atoi(startDate[6:8])
-		
-		// Parse HHMMSSSS (HH MM SS SS where last SS is centiseconds)
-		hour, _ := strconv.Atoi(startTime[0:2])
-		minute, _ := strconv.Atoi(startTime[2:4])
-		second, _ := strconv.Atoi(startTime[4:6])
-		// Ignore centiseconds for uptime calculation
-		
-		parsedTime = time.Date(year, time.Month(month), day, hour, minute, second, 0, time.UTC)
-	}
-	
-	// Calculate uptime as seconds since start time
-	uptime := time.Since(parsedTime)
-	if uptime < 0 {
-		return 0, fmt.Errorf("start time is in the future: %v", parsedTime)
-	}
-	
-	return int64(uptime.Seconds()), nil
-}

@@ -56,33 +56,58 @@ func (c *Collector) collectListenerMetrics() error {
 		failed)
 	
 	// Process collected listener metrics
-	for _, listener := range result.Listeners {
+	for _, lm := range result.Listeners {
+		// Create labels with port and IP address
+		ipAddress := lm.IPAddress
+		if ipAddress == "" {
+			ipAddress = "*"  // Default for listeners bound to all interfaces
+		}
+		
 		labels := contexts.ListenerLabels{
-			Listener: listener.Name,
+			Listener:   lm.Name,
+			Port:       fmt.Sprintf("%d", lm.Port),
+			Ip_address: ipAddress,
 		}
 
-		// Collect listener status - convert enum to individual dimensions
-		statusValues := contexts.ListenerStatusValues{}
+		// Set status - only one status can be active at a time
+		statusValues := contexts.ListenerStatusValues{
+			Stopped:  0,
+			Starting: 0,
+			Running:  0,
+			Stopping: 0,
+			Retrying: 0,
+		}
 		
-		switch listener.Status {
+		switch lm.Status {
+		case pcf.ListenerStatusStopped:
+			statusValues.Stopped = 1
+		case pcf.ListenerStatusStarting:
+			statusValues.Starting = 1
 		case pcf.ListenerStatusRunning:
 			statusValues.Running = 1
-			statusValues.Stopped = 0
-		case pcf.ListenerStatusStopped:
-			statusValues.Running = 0
-			statusValues.Stopped = 1
+		case pcf.ListenerStatusStopping:
+			statusValues.Stopping = 1
+		case pcf.ListenerStatusRetrying:
+			statusValues.Retrying = 1
 		default:
 			// Unknown status - treat as stopped
-			statusValues.Running = 0
 			statusValues.Stopped = 1
+			c.Debugf("Unknown listener status %d for %s", lm.Status, lm.Name)
 		}
-
+		
 		contexts.Listener.Status.Set(c.State, labels, statusValues)
 
-		// Collect listener port if available
-		if listener.Port > 0 {
-			contexts.Listener.Port.Set(c.State, labels, contexts.ListenerPortValues{
-				Port: listener.Port,
+		// Set backlog if collected
+		if lm.Backlog.IsCollected() {
+			contexts.Listener.Backlog.Set(c.State, labels, contexts.ListenerBacklogValues{
+				Backlog: lm.Backlog.Int64(),
+			})
+		}
+
+		// Set uptime if running
+		if lm.Status == pcf.ListenerStatusRunning && lm.Uptime > 0 {
+			contexts.Listener.Uptime.Set(c.State, labels, contexts.ListenerUptimeValues{
+				Uptime: lm.Uptime,
 			})
 		}
 	}

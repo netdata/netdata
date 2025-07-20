@@ -174,20 +174,33 @@ using the PCF (Programmable Command Format) protocol.
           labels:
             - name: listener
               description: Listener identifier
+            - name: port
+              description: Port identifier
+            - name: ip_address
+              description: Ip_address identifier
           metrics:
             - name: mq.listener.status
               description: Listener Status
               unit: status
               chart_type: line
               dimensions:
-                - name: running
                 - name: stopped
-            - name: mq.listener.port
-              description: Listener Port
-              unit: port
+                - name: starting
+                - name: running
+                - name: stopping
+                - name: retrying
+            - name: mq.listener.backlog
+              description: Listener Connection Backlog
+              unit: connections
               chart_type: line
               dimensions:
-                - name: port
+                - name: backlog
+            - name: mq.listener.uptime
+              description: Listener Uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime
         - name: queue
           description: These metrics refer to queue instances.
           labels:
