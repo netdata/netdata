@@ -62,20 +62,27 @@ func (c *Collector) collectQueueMetrics() error {
 		
 		// Status metrics (if status collection succeeded)
 		if queue.HasStatusMetrics {
-			contexts.Queue.Connections.Set(c.State, labels, contexts.QueueConnectionsValues{
-				Input:  queue.OpenInputCount,
-				Output: queue.OpenOutputCount,
-			})
+			// Only send connections if both values are collected
+			if queue.OpenInputCount.IsCollected() && queue.OpenOutputCount.IsCollected() {
+				contexts.Queue.Connections.Set(c.State, labels, contexts.QueueConnectionsValues{
+					Input:  queue.OpenInputCount.Int64(),
+					Output: queue.OpenOutputCount.Int64(),
+				})
+			}
 			
-			// Oldest message age - send whatever we collected
-			contexts.Queue.OldestMessageAge.Set(c.State, labels, contexts.QueueOldestMessageAgeValues{
-				Oldest_msg_age: queue.OldestMsgAge,
-			})
+			// Oldest message age - only send if collected
+			if queue.OldestMsgAge.IsCollected() {
+				contexts.Queue.OldestMessageAge.Set(c.State, labels, contexts.QueueOldestMessageAgeValues{
+					Oldest_msg_age: queue.OldestMsgAge.Int64(),
+				})
+			}
 			
-			// Uncommitted messages - send whatever we collected
-			contexts.Queue.UncommittedMessages.Set(c.State, labels, contexts.QueueUncommittedMessagesValues{
-				Uncommitted: queue.UncommittedMsgs,
-			})
+			// Uncommitted messages - only send if collected
+			if queue.UncommittedMsgs.IsCollected() {
+				contexts.Queue.UncommittedMessages.Set(c.State, labels, contexts.QueueUncommittedMessagesValues{
+					Uncommitted: queue.UncommittedMsgs.Int64(),
+				})
+			}
 		}
 		
 		// Message count metrics (if reset stats were collected)

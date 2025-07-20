@@ -364,7 +364,11 @@ func (c *Client) getQueueListWithBasicMetrics(pattern string) ([]QueueMetrics, e
 			TriggerType:      queueInfo.TriggerType,
 			MaxMsgLength:     queueInfo.MaxMsgLength,
 			DefPriority:      queueInfo.DefPriority,
-			// Note: Individual config attributes now tracked per-attribute with AttributeValue type
+			// Status metrics initialized to NotCollected
+			OpenInputCount:  NotCollected,
+			OpenOutputCount: NotCollected,
+			OldestMsgAge:    NotCollected,
+			UncommittedMsgs: NotCollected,
 		})
 	}
 	
@@ -399,18 +403,24 @@ func (c *Client) enrichWithStatus(metrics *QueueMetrics) error {
 		metrics.MaxDepth = int64(maxDepth.(int32))
 	}
 	
-	// Extract status metrics
+	// Initialize status metrics to NotCollected
+	metrics.OpenInputCount = NotCollected
+	metrics.OpenOutputCount = NotCollected
+	metrics.OldestMsgAge = NotCollected
+	metrics.UncommittedMsgs = NotCollected
+	
+	// Extract status metrics - only set if actually present
 	if val, ok := attrs[C.MQIA_OPEN_INPUT_COUNT]; ok {
-		metrics.OpenInputCount = int64(val.(int32))
+		metrics.OpenInputCount = AttributeValue(val.(int32))
 	}
 	if val, ok := attrs[C.MQIA_OPEN_OUTPUT_COUNT]; ok {
-		metrics.OpenOutputCount = int64(val.(int32))
+		metrics.OpenOutputCount = AttributeValue(val.(int32))
 	}
 	if val, ok := attrs[C.MQIACF_OLDEST_MSG_AGE]; ok {
-		metrics.OldestMsgAge = int64(val.(int32))
+		metrics.OldestMsgAge = AttributeValue(val.(int32))
 	}
 	if val, ok := attrs[C.MQIACF_UNCOMMITTED_MSGS]; ok {
-		metrics.UncommittedMsgs = int64(val.(int32))
+		metrics.UncommittedMsgs = AttributeValue(val.(int32))
 	}
 	
 	// Mark as successfully collected
