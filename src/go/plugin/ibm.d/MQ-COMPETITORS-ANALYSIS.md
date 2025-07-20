@@ -5,10 +5,12 @@ This document compares our mq_pcf collector with leading IBM MQ monitoring solut
 ## Current Implementation Status
 
 **As of latest updates:**
-- **Total Metrics**: 1039 time-series for mq-test instance (up from ~393)
+- **Total Metrics**: 1042 time-series for mq-test instance (up from 1039)
 - **Collection Pattern**: Efficient 3N batching (3 requests per queue)
 - **New Features Implemented**:
   - ✅ OldestMessageAge metric for all queues
+  - ✅ UncommittedMessages metric tracking in-flight transactions
+  - ✅ LastActivity metrics showing time since last GET/PUT operations
   - ✅ Split configuration contexts for better organization
   - ✅ AttributeValue type with NotCollected sentinel
   - ✅ Per-attribute validity tracking (no fake data)
@@ -16,7 +18,7 @@ This document compares our mq_pcf collector with leading IBM MQ monitoring solut
   - ✅ Type-safe metric collection API
   
 **Metric Breakdown**:
-- **Queue Metrics**: 10 contexts (depth, messages, connections, high_depth, oldest_msg_age, inhibit_status, priority, triggers, backout_threshold, max_msg_length)
+- **Queue Metrics**: 12 contexts (depth, messages, connections, high_depth, oldest_msg_age, uncommitted_msgs, last_activity, inhibit_status, priority, triggers, backout_threshold, max_msg_length)
 - **Channel Metrics**: 3 contexts (status, messages, bytes) with batch configuration
 - **Topic Metrics**: 3 contexts (publishers, subscribers, messages)
 - **Queue Manager**: Status and overview metrics
@@ -470,6 +472,25 @@ Based on source code analysis, these metrics appear in documentation but NOT in 
    - Comprehensive queue metrics (depths, rates, configs)
    - Channel status and statistics
    - Optional statistics from SYSTEM.ADMIN.STATISTICS.QUEUE
+
+### Netdata Implementation Details
+
+**Queue Status Metrics Approach**:
+- All status metrics use **AttributeValue** pattern with NotCollected sentinel
+- Never sends fake zeros when attributes missing from PCF response
+- Maintains data integrity: "missing data = data"
+
+**LastActivity Implementation**:
+- Calculates **time since** last GET/PUT operations (like Datadog)
+- Converts MQ date/time format (YYYYMMDD/HHMMSSSS) to seconds
+- Handles empty strings gracefully (no activity recorded)
+- Different from SignalFx which tracks average message residence time (onqtime)
+
+**Status Metric Collection**:
+- Single MQCMD_INQUIRE_Q_STATUS per queue (part of 3N pattern)
+- Collects: OldestMsgAge, UncommittedMsgs, OpenInput/OutputCount, LastGet/PutDate/Time
+- HasStatusMetrics flag doesn't guarantee all attributes present
+- Each attribute tracked individually with AttributeValue
 
 ### Key Takeaways
 1. **Netdata's per-second resolution remains unique** - All competitors limited to 15s+
