@@ -18,6 +18,10 @@
         "title": "CollectChannels configuration option",
         "type": "boolean"
       },
+      "collect_queue_config": {
+        "title": "CollectQueueConfig configuration option",
+        "type": "boolean"
+      },
       "collect_queues": {
         "title": "CollectQueues configuration option",
         "type": "boolean"
@@ -76,6 +80,7 @@
       "collect_system_queues",
       "collect_system_channels",
       "collect_channel_config",
+      "collect_queue_config",
       "queue_selector",
       "channel_selector",
       "collect_reset_queue_stats"

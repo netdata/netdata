@@ -42,7 +42,6 @@ Labels:
 |:------|:------------|
 | channel | Channel identifier |
 
-
 Metrics:
 
 | Metric | Dimensions | Unit |
@@ -66,11 +65,7 @@ Labels:
 | Label | Description |
 |:------|:------------|
 | queue | Queue identifier |
-
-| Label | Description |
-|:------|:------------|
 | type | Type identifier |
-
 
 Metrics:
 
@@ -80,8 +75,13 @@ Metrics:
 | mq.queue.messages | enqueued, dequeued | messages/s |
 | mq.queue.connections | input, output | connections |
 | mq.queue.high_depth | high_depth | messages |
+| mq.queue.oldest_msg_age | oldest_msg_age | seconds |
+| mq.queue.uncommitted_msgs | uncommitted | messages |
+| mq.queue.last_activity | since_last_get, since_last_put | seconds |
 | mq.queue.inhibit_status | inhibit_get, inhibit_put | status |
-| mq.queue.configuration | def_priority, backout_threshold, trigger_depth, trigger_type | value |
+| mq.queue.priority | def_priority | priority |
+| mq.queue.triggers | trigger_depth, trigger_type | messages |
+| mq.queue.backout_threshold | backout_threshold | retries |
 | mq.queue.max_msg_length | max_msg_length | bytes |
 
 ### Per topic
@@ -93,7 +93,6 @@ Labels:
 | Label | Description |
 |:------|:------------|
 | topic | Topic identifier |
-
 
 Metrics:
 
@@ -236,6 +235,16 @@ CollectSystemChannels configuration option
 #### CollectChannelConfig
 
 CollectChannelConfig configuration option
+
+- **Default**: `<no value>`
+- **Required**: yes
+
+
+
+
+#### CollectQueueConfig
+
+CollectQueueConfig configuration option
 
 - **Default**: `<no value>`
 - **Required**: yes
