@@ -58,7 +58,7 @@ require (
 	gopkg.in/rethinkdb/rethinkdb-go.v6 v6.2.2
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.33.2
-	k8s.io/apimachinery v0.33.2
+	k8s.io/apimachinery v0.33.3
 	k8s.io/client-go v0.33.2
 	layeh.com/radius v0.0.0-20190322222518-890bc1058917
 )
