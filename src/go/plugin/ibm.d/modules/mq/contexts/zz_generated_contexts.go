@@ -1490,6 +1490,7 @@ func (c QueueManagerTopicsOverviewContext) Set(state *framework.CollectorState, 
 type QueueManagerListenersOverviewValues struct {
 	Monitored int64
 	Excluded int64
+	Invisible int64
 	Failed int64
 }
 
@@ -1503,6 +1504,7 @@ func (c QueueManagerListenersOverviewContext) Set(state *framework.CollectorStat
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
 		"monitored": values.Monitored,
 		"excluded": values.Excluded,
+		"invisible": values.Invisible,
 		"failed": values.Failed,
 	})
 }
@@ -1734,6 +1736,13 @@ var QueueManager = struct {
 			},
 			{
 				Name:      "excluded",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "invisible",
 				Algorithm: module.Absolute,
 				Mul:       1,
 				Div:       1,

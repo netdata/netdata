@@ -31,7 +31,7 @@ Metrics:
 | mq.queues.overview | monitored, excluded, invisible, failed | queues |
 | mq.channels.overview | monitored, excluded, invisible, failed | channels |
 | mq.topics.overview | monitored, excluded, invisible, failed | topics |
-| mq.listeners.overview | monitored, excluded, failed | listeners |
+| mq.listeners.overview | monitored, excluded, invisible, failed | listeners |
 
 
 
@@ -159,6 +159,7 @@ The following options can be defined globally or per job.
 | CollectSystemQueues | Enable collection of system queue metrics (SYSTEM.* queues provide critical infrastructure visibility) | `true` | no | - | - |
 | CollectSystemChannels | Enable collection of system channel metrics (SYSTEM.* channels show clustering and administrative health) | `true` | no | - | - |
 | CollectSystemTopics | Enable collection of system topic metrics (SYSTEM.* topics show internal messaging patterns) | `true` | no | - | - |
+| CollectSystemListeners | Enable collection of system listener metrics (SYSTEM.* listeners show internal connectivity) | `true` | no | - | - |
 | CollectChannelConfig | Enable collection of channel configuration metrics | `true` | no | - | - |
 | CollectQueueConfig | Enable collection of queue configuration metrics | `true` | no | - | - |
 | QueueSelector | Pattern to filter queues (wildcards supported) | `` | no | - | - |

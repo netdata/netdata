@@ -31,6 +31,7 @@ func defaultConfig() Config {
 		CollectSystemQueues:     true,
 		CollectSystemChannels:   true,
 		CollectSystemTopics:     true,
+		CollectSystemListeners:  true,
 		CollectChannelConfig:    true,
 		CollectQueueConfig:      true,
 		
