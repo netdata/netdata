@@ -9,6 +9,7 @@ import "C"
 
 import (
 	"fmt"
+	"strconv"
 )
 
 
@@ -369,6 +370,10 @@ func (c *Client) getQueueListWithBasicMetrics(pattern string) ([]QueueMetrics, e
 			OpenOutputCount: NotCollected,
 			OldestMsgAge:    NotCollected,
 			UncommittedMsgs: NotCollected,
+			LastGetDate:     NotCollected,
+			LastGetTime:     NotCollected,
+			LastPutDate:     NotCollected,
+			LastPutTime:     NotCollected,
 		})
 	}
 	
@@ -408,6 +413,10 @@ func (c *Client) enrichWithStatus(metrics *QueueMetrics) error {
 	metrics.OpenOutputCount = NotCollected
 	metrics.OldestMsgAge = NotCollected
 	metrics.UncommittedMsgs = NotCollected
+	metrics.LastGetDate = NotCollected
+	metrics.LastGetTime = NotCollected
+	metrics.LastPutDate = NotCollected
+	metrics.LastPutTime = NotCollected
 	
 	// Extract status metrics - only set if actually present
 	if val, ok := attrs[C.MQIA_OPEN_INPUT_COUNT]; ok {
@@ -421,6 +430,40 @@ func (c *Client) enrichWithStatus(metrics *QueueMetrics) error {
 	}
 	if val, ok := attrs[C.MQIACF_UNCOMMITTED_MSGS]; ok {
 		metrics.UncommittedMsgs = AttributeValue(val.(int32))
+	}
+	
+	// Extract last get/put date and time - string attributes
+	if val, ok := attrs[C.MQCACF_LAST_GET_DATE]; ok {
+		if dateStr, ok := val.(string); ok && dateStr != "" {
+			// Convert YYYYMMDD string to int64
+			if dateInt, err := strconv.ParseInt(dateStr, 10, 64); err == nil {
+				metrics.LastGetDate = AttributeValue(dateInt)
+			}
+		}
+	}
+	if val, ok := attrs[C.MQCACF_LAST_GET_TIME]; ok {
+		if timeStr, ok := val.(string); ok && timeStr != "" {
+			// Convert HHMMSSSS string to int64
+			if timeInt, err := strconv.ParseInt(timeStr, 10, 64); err == nil {
+				metrics.LastGetTime = AttributeValue(timeInt)
+			}
+		}
+	}
+	if val, ok := attrs[C.MQCACF_LAST_PUT_DATE]; ok {
+		if dateStr, ok := val.(string); ok && dateStr != "" {
+			// Convert YYYYMMDD string to int64
+			if dateInt, err := strconv.ParseInt(dateStr, 10, 64); err == nil {
+				metrics.LastPutDate = AttributeValue(dateInt)
+			}
+		}
+	}
+	if val, ok := attrs[C.MQCACF_LAST_PUT_TIME]; ok {
+		if timeStr, ok := val.(string); ok && timeStr != "" {
+			// Convert HHMMSSSS string to int64
+			if timeInt, err := strconv.ParseInt(timeStr, 10, 64); err == nil {
+				metrics.LastPutTime = AttributeValue(timeInt)
+			}
+		}
 	}
 	
 	// Mark as successfully collected
