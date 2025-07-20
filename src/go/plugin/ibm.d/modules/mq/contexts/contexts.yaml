@@ -70,6 +70,17 @@ QueueManager:
           - { name: excluded, algo: absolute }
           - { name: unauthorized, algo: absolute }
           - { name: failed, algo: absolute }
+      - name: ListenersOverview
+        context: mq.listeners.overview
+        title: Listeners Monitoring Status
+        units: listeners
+        family: overview
+        type: stacked
+        priority: 1103
+        dimensions:
+          - { name: monitored, algo: absolute }
+          - { name: excluded, algo: absolute }
+          - { name: failed, algo: absolute }
 
 Queue:
   labels:

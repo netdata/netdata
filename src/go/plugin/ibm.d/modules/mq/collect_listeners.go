@@ -8,6 +8,9 @@ func (c *Collector) collectListenerMetrics() error {
 		return err
 	}
 
+	// Track overview metrics
+	var monitored, excluded, failed int64
+
 	for _, listener := range listeners {
 		labels := contexts.ListenerLabels{
 			Listener: listener.Name,
@@ -39,7 +42,12 @@ func (c *Collector) collectListenerMetrics() error {
 				Port: listener.Port,
 			})
 		}
+
+		monitored++
 	}
+
+	// Set overview metrics
+	c.setListenerOverviewMetrics(monitored, excluded, failed)
 
 	return nil
 }
