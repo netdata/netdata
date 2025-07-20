@@ -60,6 +60,13 @@ func (c *Collector) CollectOnce() error {
 		}
 	}
 
+	// Collect listener metrics
+	if c.Config.CollectListeners {
+		if err := c.collectListenerMetrics(); err != nil {
+			c.Warningf("failed to collect listener metrics: %v", err)
+		}
+	}
+
 	return nil
 }
 

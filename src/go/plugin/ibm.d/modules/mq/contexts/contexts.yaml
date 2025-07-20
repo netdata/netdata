@@ -315,3 +315,26 @@ Topic:
         priority: 4002
         dimensions:
           - { name: messages, algo: incremental }
+
+Listener:
+  labels: [listener]
+  contexts:
+      - name: Status
+        context: mq.listener.status
+        title: Listener Status
+        units: status
+        family: listeners
+        type: line
+        priority: 5000
+        dimensions:
+          - { name: running, algo: absolute }
+          - { name: stopped, algo: absolute }
+      - name: Port
+        context: mq.listener.port
+        title: Listener Port
+        units: port
+        family: listeners
+        type: line
+        priority: 5001
+        dimensions:
+          - { name: port, algo: absolute }
