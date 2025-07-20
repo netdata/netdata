@@ -182,6 +182,9 @@ type TopicMetrics struct {
 type QueueManagerMetrics struct {
 	// Status - 1 if running, 0 if not responding
 	Status int64
+	
+	// Connection count - number of active connections to the queue manager
+	ConnectionCount AttributeValue  // Range: 0-max_connections, NotCollected = not available
 }
 
 // ListenerStatus represents the status of a listener

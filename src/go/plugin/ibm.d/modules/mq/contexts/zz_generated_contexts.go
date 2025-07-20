@@ -1173,6 +1173,23 @@ func (c QueueManagerStatusContext) Set(state *framework.CollectorState, labels E
 	})
 }
 
+// QueueManagerConnectionCountValues defines the type-safe values for QueueManager.ConnectionCount context
+type QueueManagerConnectionCountValues struct {
+	Connections int64
+}
+
+// QueueManagerConnectionCountContext provides type-safe operations for QueueManager.ConnectionCount context
+type QueueManagerConnectionCountContext struct {
+	framework.Context[EmptyLabels]
+}
+
+// Set provides type-safe dimension setting for QueueManager.ConnectionCount context
+func (c QueueManagerConnectionCountContext) Set(state *framework.CollectorState, labels EmptyLabels, values QueueManagerConnectionCountValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
+		"connections": values.Connections,
+	})
+}
+
 // QueueManagerQueuesOverviewValues defines the type-safe values for QueueManager.QueuesOverview context
 type QueueManagerQueuesOverviewValues struct {
 	Monitored int64
@@ -1252,6 +1269,7 @@ func (c QueueManagerTopicsOverviewContext) Set(state *framework.CollectorState, 
 // QueueManager contains all metric contexts for QueueManager
 var QueueManager = struct {
 	Status QueueManagerStatusContext
+	ConnectionCount QueueManagerConnectionCountContext
 	QueuesOverview QueueManagerQueuesOverviewContext
 	ChannelsOverview QueueManagerChannelsOverviewContext
 	TopicsOverview QueueManagerTopicsOverviewContext
@@ -1268,6 +1286,28 @@ var QueueManager = struct {
 		Dimensions: []framework.Dimension{
 			{
 				Name:      "status",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+		},
+		},
+	},
+	ConnectionCount: QueueManagerConnectionCountContext{
+		Context: framework.Context[EmptyLabels]{
+		Name:       "mq.qmgr.connection_count",
+		Family:     "queue_manager",
+		Title:      "Queue Manager Connections",
+		Units:      "connections",
+		Type:       module.Line,
+		Priority:   1001,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "connections",
 				Algorithm: module.Absolute,
 				Mul:       1,
 				Div:       1,
@@ -1596,6 +1636,7 @@ func GetAllContexts() []interface{} {
 		&Queue.BackoutThreshold.Context,
 		&Queue.MaxMessageLength.Context,
 		&QueueManager.Status.Context,
+		&QueueManager.ConnectionCount.Context,
 		&QueueManager.QueuesOverview.Context,
 		&QueueManager.ChannelsOverview.Context,
 		&QueueManager.TopicsOverview.Context,

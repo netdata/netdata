@@ -5,7 +5,7 @@ This document compares our mq_pcf collector with leading IBM MQ monitoring solut
 ## Current Implementation Status
 
 **As of latest updates:**
-- **Total Metrics**: 1042 time-series for mq-test instance (up from 1039)
+- **Total Metrics**: 1043+ time-series for mq-test instance (up from 1042)
 - **Collection Pattern**: Efficient 3N batching (3 requests per queue)
 - **New Features Implemented**:
   - ✅ OldestMessageAge metric for all queues
@@ -16,12 +16,13 @@ This document compares our mq_pcf collector with leading IBM MQ monitoring solut
   - ✅ Per-attribute validity tracking (no fake data)
   - ✅ Extended to channels for consistent handling
   - ✅ Type-safe metric collection API
+  - ✅ Queue Manager Connection Count metric
   
 **Metric Breakdown**:
 - **Queue Metrics**: 12 contexts (depth, messages, connections, high_depth, oldest_msg_age, uncommitted_msgs, last_activity, inhibit_status, priority, triggers, backout_threshold, max_msg_length)
 - **Channel Metrics**: 3 contexts (status, messages, bytes) with batch configuration
 - **Topic Metrics**: 3 contexts (publishers, subscribers, messages)
-- **Queue Manager**: Status and overview metrics
+- **Queue Manager**: Status, connection count, and overview metrics
 - **Resolution**: Per-second (1s) - unmatched by competitors
 
 ## Competitors Analyzed
@@ -91,7 +92,7 @@ Many metrics require specific monitoring levels set on MQ objects:
 | Metric | Netdata | Prometheus | Dynatrace | Datadog | Zabbix | SignalFx | Notes |
 |--------|---------|------------|-----------|---------|---------|----------|-------|
 | Status (running/stopped) | ✅ | ✅ | ✅ | ✅* | ✅ | ✅ | Basic operational status |
-| Connection count | ❌ | ✅ | ✅ | ⚠️ | ✅ | ✅ | Current connections |
+| Connection count | ✅ | ✅ | ✅ | ⚠️ | ✅ | ✅ | Current connections |
 | Active listeners | ❌ | ✅ | ✅ | ⚠️ | ❌ | ✅ | Listener status |
 | Uptime | ❌ | ✅ | ✅ | ⚠️ | ❌ | ❌ | QMgr uptime |
 | CPU usage | ❌ | ✅ | ❓ | ⚠️ | ❌ | ❌ | Requires resource monitoring |

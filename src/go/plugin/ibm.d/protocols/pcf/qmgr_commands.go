@@ -26,7 +26,7 @@ func (c *Client) GetQueueManagerStatus() (*QueueManagerMetrics, error) {
 		}
 	}
 
-	_, err = c.ParsePCFResponse(response, "")
+	attrs, err := c.ParsePCFResponse(response, "")
 	if err != nil {
 		c.protocol.Errorf("PCF: Failed to parse status response for queue manager '%s': %v", c.config.QueueManager, err)
 		return nil, err
@@ -34,7 +34,19 @@ func (c *Client) GetQueueManagerStatus() (*QueueManagerMetrics, error) {
 
 	// If we get a successful response, the queue manager is running
 	metrics := &QueueManagerMetrics{
-		Status: 1,
+		Status:          1,
+		ConnectionCount: NotCollected, // Default to not collected
+	}
+
+	// Extract connection count if available (only from MQCMD_INQUIRE_Q_MGR_STATUS)
+	c.protocol.Debugf("PCF: Available attributes for queue manager '%s': %v", c.config.QueueManager, attrs)
+	if connectionCount, ok := attrs[C.MQIACF_CONNECTION_COUNT]; ok {
+		if count, ok := connectionCount.(int32); ok {
+			metrics.ConnectionCount = AttributeValue(count)
+			c.protocol.Debugf("PCF: Queue manager '%s' connection count: %d", c.config.QueueManager, count)
+		}
+	} else {
+		c.protocol.Debugf("PCF: Queue manager '%s' - MQIACF_CONNECTION_COUNT (value %d) not found in response", c.config.QueueManager, C.MQIACF_CONNECTION_COUNT)
 	}
 
 	return metrics, nil
