@@ -72,10 +72,10 @@ func (c *Collector) collectQueueMetrics() error {
 				Oldest_msg_age: queue.OldestMsgAge,
 			})
 			
-			if queue.UncommittedMsgs > 0 {
-				// Only set uncommitted messages if there are any
-				// TODO: Add uncommitted messages context if needed  
-			}
+			// Uncommitted messages - send whatever we collected
+			contexts.Queue.UncommittedMessages.Set(c.State, labels, contexts.QueueUncommittedMessagesValues{
+				Uncommitted: queue.UncommittedMsgs,
+			})
 		}
 		
 		// Message count metrics (if reset stats were collected)
