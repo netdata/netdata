@@ -118,10 +118,10 @@ type QueueMetrics struct {
 	MaxDepth     int64
 	
 	// Status metrics (from MQCMD_INQUIRE_Q_STATUS)
-	OpenInputCount  int64
-	OpenOutputCount int64
-	OldestMsgAge    int64
-	UncommittedMsgs int64
+	OpenInputCount  AttributeValue
+	OpenOutputCount AttributeValue
+	OldestMsgAge    AttributeValue
+	UncommittedMsgs AttributeValue
 	HasStatusMetrics bool  // Indicates if status collection succeeded
 	
 	// Reset statistics (from MQCMD_RESET_Q_STATS)
