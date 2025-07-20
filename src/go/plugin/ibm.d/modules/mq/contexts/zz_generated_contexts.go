@@ -1304,6 +1304,23 @@ func (c QueueManagerConnectionCountContext) Set(state *framework.CollectorState,
 	})
 }
 
+// QueueManagerUptimeValues defines the type-safe values for QueueManager.Uptime context
+type QueueManagerUptimeValues struct {
+	Uptime int64
+}
+
+// QueueManagerUptimeContext provides type-safe operations for QueueManager.Uptime context
+type QueueManagerUptimeContext struct {
+	framework.Context[EmptyLabels]
+}
+
+// Set provides type-safe dimension setting for QueueManager.Uptime context
+func (c QueueManagerUptimeContext) Set(state *framework.CollectorState, labels EmptyLabels, values QueueManagerUptimeValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
+		"uptime": values.Uptime,
+	})
+}
+
 // QueueManagerQueuesOverviewValues defines the type-safe values for QueueManager.QueuesOverview context
 type QueueManagerQueuesOverviewValues struct {
 	Monitored int64
@@ -1384,6 +1401,7 @@ func (c QueueManagerTopicsOverviewContext) Set(state *framework.CollectorState, 
 var QueueManager = struct {
 	Status QueueManagerStatusContext
 	ConnectionCount QueueManagerConnectionCountContext
+	Uptime QueueManagerUptimeContext
 	QueuesOverview QueueManagerQueuesOverviewContext
 	ChannelsOverview QueueManagerChannelsOverviewContext
 	TopicsOverview QueueManagerTopicsOverviewContext
@@ -1422,6 +1440,28 @@ var QueueManager = struct {
 		Dimensions: []framework.Dimension{
 			{
 				Name:      "connections",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+		},
+		},
+	},
+	Uptime: QueueManagerUptimeContext{
+		Context: framework.Context[EmptyLabels]{
+		Name:       "mq.qmgr.uptime",
+		Family:     "queue_manager",
+		Title:      "Queue Manager Uptime",
+		Units:      "seconds",
+		Type:       module.Line,
+		Priority:   1002,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "uptime",
 				Algorithm: module.Absolute,
 				Mul:       1,
 				Div:       1,
@@ -1753,6 +1793,7 @@ func GetAllContexts() []interface{} {
 		&Queue.MaxMessageLength.Context,
 		&QueueManager.Status.Context,
 		&QueueManager.ConnectionCount.Context,
+		&QueueManager.Uptime.Context,
 		&QueueManager.QueuesOverview.Context,
 		&QueueManager.ChannelsOverview.Context,
 		&QueueManager.TopicsOverview.Context,

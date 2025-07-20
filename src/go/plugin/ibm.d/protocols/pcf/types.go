@@ -185,6 +185,11 @@ type QueueManagerMetrics struct {
 	
 	// Connection count - number of active connections to the queue manager
 	ConnectionCount AttributeValue  // Range: 0-max_connections, NotCollected = not available
+	
+	// Queue manager start date/time and calculated uptime
+	StartDate AttributeValue  // Start date in YYYYMMDD format, NotCollected = not available
+	StartTime AttributeValue  // Start time in HHMMSSSS format, NotCollected = not available  
+	Uptime    AttributeValue  // Calculated uptime in seconds, NotCollected = not available
 }
 
 // ListenerStatus represents the status of a listener

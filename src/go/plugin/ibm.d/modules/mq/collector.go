@@ -87,5 +87,12 @@ func (c *Collector) collectQueueManagerMetrics() error {
 		})
 	}
 	
+	// Collect uptime if available
+	if metrics.Uptime.IsCollected() {
+		contexts.QueueManager.Uptime.Set(c.State, contexts.EmptyLabels{}, contexts.QueueManagerUptimeValues{
+			Uptime: metrics.Uptime.Int64(),
+		})
+	}
+	
 	return nil
 }
