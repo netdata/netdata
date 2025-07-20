@@ -682,6 +682,25 @@ func (c QueueUncommittedMessagesContext) Set(state *framework.CollectorState, la
 	})
 }
 
+// QueueLastActivityValues defines the type-safe values for Queue.LastActivity context
+type QueueLastActivityValues struct {
+	Since_last_get int64
+	Since_last_put int64
+}
+
+// QueueLastActivityContext provides type-safe operations for Queue.LastActivity context
+type QueueLastActivityContext struct {
+	framework.Context[QueueLabels]
+}
+
+// Set provides type-safe dimension setting for Queue.LastActivity context
+func (c QueueLastActivityContext) Set(state *framework.CollectorState, labels QueueLabels, values QueueLastActivityValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"since_last_get": values.Since_last_get,
+		"since_last_put": values.Since_last_put,
+	})
+}
+
 // QueueInhibitStatusValues defines the type-safe values for Queue.InhibitStatus context
 type QueueInhibitStatusValues struct {
 	Inhibit_get int64
@@ -794,6 +813,7 @@ var Queue = struct {
 	HighDepth QueueHighDepthContext
 	OldestMessageAge QueueOldestMessageAgeContext
 	UncommittedMessages QueueUncommittedMessagesContext
+	LastActivity QueueLastActivityContext
 	InhibitStatus QueueInhibitStatusContext
 	Priority QueuePriorityContext
 	Triggers QueueTriggersContext
@@ -965,6 +985,37 @@ var Queue = struct {
 		},
 		},
 	},
+	LastActivity: QueueLastActivityContext{
+		Context: framework.Context[QueueLabels]{
+		Name:       "mq.queue.last_activity",
+		Family:     "queues",
+		Title:      "Time Since Last Queue Activity",
+		Units:      "seconds",
+		Type:       module.Line,
+		Priority:   2006,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "since_last_get",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "since_last_put",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"queue",
+			"type",
+		},
+		},
+	},
 	InhibitStatus: QueueInhibitStatusContext{
 		Context: framework.Context[QueueLabels]{
 		Name:       "mq.queue.inhibit_status",
@@ -972,7 +1023,7 @@ var Queue = struct {
 		Title:      "Queue Inhibit Status",
 		Units:      "status",
 		Type:       module.Line,
-		Priority:   2006,
+		Priority:   2007,
 		UpdateEvery: 1,
 		Dimensions: []framework.Dimension{
 			{
@@ -1003,7 +1054,7 @@ var Queue = struct {
 		Title:      "Queue Priority Configuration",
 		Units:      "priority",
 		Type:       module.Line,
-		Priority:   2007,
+		Priority:   2008,
 		UpdateEvery: 1,
 		Dimensions: []framework.Dimension{
 			{
@@ -1027,7 +1078,7 @@ var Queue = struct {
 		Title:      "Queue Trigger Configuration",
 		Units:      "messages",
 		Type:       module.Line,
-		Priority:   2008,
+		Priority:   2009,
 		UpdateEvery: 1,
 		Dimensions: []framework.Dimension{
 			{
@@ -1058,7 +1109,7 @@ var Queue = struct {
 		Title:      "Queue Error Handling",
 		Units:      "retries",
 		Type:       module.Line,
-		Priority:   2009,
+		Priority:   2010,
 		UpdateEvery: 1,
 		Dimensions: []framework.Dimension{
 			{
@@ -1082,7 +1133,7 @@ var Queue = struct {
 		Title:      "Queue Max Message Length",
 		Units:      "bytes",
 		Type:       module.Line,
-		Priority:   2010,
+		Priority:   2011,
 		UpdateEvery: 1,
 		Dimensions: []framework.Dimension{
 			{
@@ -1538,6 +1589,7 @@ func GetAllContexts() []interface{} {
 		&Queue.HighDepth.Context,
 		&Queue.OldestMessageAge.Context,
 		&Queue.UncommittedMessages.Context,
+		&Queue.LastActivity.Context,
 		&Queue.InhibitStatus.Context,
 		&Queue.Priority.Context,
 		&Queue.Triggers.Context,

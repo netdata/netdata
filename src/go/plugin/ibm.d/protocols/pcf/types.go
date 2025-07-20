@@ -122,6 +122,10 @@ type QueueMetrics struct {
 	OpenOutputCount AttributeValue
 	OldestMsgAge    AttributeValue
 	UncommittedMsgs AttributeValue
+	LastGetDate     AttributeValue  // YYYYMMDD format (e.g., 20240120)
+	LastGetTime     AttributeValue  // HHMMSSSS format (e.g., 14302500 = 14:30:25.00)
+	LastPutDate     AttributeValue  // YYYYMMDD format (e.g., 20240120)
+	LastPutTime     AttributeValue  // HHMMSSSS format (e.g., 14302500 = 14:30:25.00)
 	HasStatusMetrics bool  // Indicates if status collection succeeded
 	
 	// Reset statistics (from MQCMD_RESET_Q_STATS)

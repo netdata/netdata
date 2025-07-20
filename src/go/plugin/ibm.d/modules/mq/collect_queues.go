@@ -3,10 +3,48 @@ package mq
 import (
 	"fmt"
 	"strings"
+	"time"
 	
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/mq/contexts"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/protocols/pcf"
 )
+
+// convertMQDateTimeToSecondsSince converts MQ date (YYYYMMDD) and time (HHMMSSSS) to seconds since that time
+// Returns -1 if the date/time is invalid or not collected
+func convertMQDateTimeToSecondsSince(date, timeVal pcf.AttributeValue) int64 {
+	if !date.IsCollected() || !timeVal.IsCollected() {
+		return -1
+	}
+	
+	dateInt := date.Int64()
+	timeInt := timeVal.Int64()
+	
+	// Extract date components from YYYYMMDD
+	year := dateInt / 10000
+	month := (dateInt % 10000) / 100
+	day := dateInt % 100
+	
+	// Extract time components from HHMMSSSS
+	hour := timeInt / 1000000
+	minute := (timeInt % 1000000) / 10000
+	second := (timeInt % 10000) / 100
+	centisecond := timeInt % 100
+	
+	// Create time.Time object
+	t := time.Date(int(year), time.Month(month), int(day), 
+		int(hour), int(minute), int(second), int(centisecond)*10000000, 
+		time.UTC)
+	
+	// Calculate seconds since that time
+	secondsSince := int64(time.Since(t).Seconds())
+	
+	// Return -1 if the time is in the future or too far in the past (invalid)
+	if secondsSince < 0 || secondsSince > 365*24*60*60 { // More than a year
+		return -1
+	}
+	
+	return secondsSince
+}
 
 func (c *Collector) collectQueueMetrics() error {
 	
@@ -81,6 +119,26 @@ func (c *Collector) collectQueueMetrics() error {
 			if queue.UncommittedMsgs.IsCollected() {
 				contexts.Queue.UncommittedMessages.Set(c.State, labels, contexts.QueueUncommittedMessagesValues{
 					Uncommitted: queue.UncommittedMsgs.Int64(),
+				})
+			}
+			
+			// Last activity times - calculate seconds since last get/put
+			sinceLastGet := convertMQDateTimeToSecondsSince(queue.LastGetDate, queue.LastGetTime)
+			sinceLastPut := convertMQDateTimeToSecondsSince(queue.LastPutDate, queue.LastPutTime)
+			
+			// Only send if we have at least one valid time
+			if sinceLastGet >= 0 || sinceLastPut >= 0 {
+				// If one is invalid, use -1 to indicate no activity
+				if sinceLastGet < 0 {
+					sinceLastGet = -1
+				}
+				if sinceLastPut < 0 {
+					sinceLastPut = -1
+				}
+				
+				contexts.Queue.LastActivity.Set(c.State, labels, contexts.QueueLastActivityValues{
+					Since_last_get: sinceLastGet,
+					Since_last_put: sinceLastPut,
 				})
 			}
 		}

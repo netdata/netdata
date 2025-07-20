@@ -115,13 +115,23 @@ Queue:
         priority: 2005
         dimensions:
           - { name: uncommitted, algo: absolute }
+      - name: LastActivity
+        context: mq.queue.last_activity
+        title: Time Since Last Queue Activity
+        units: seconds
+        family: queues
+        type: line
+        priority: 2006
+        dimensions:
+          - { name: since_last_get, algo: absolute }
+          - { name: since_last_put, algo: absolute }
       - name: InhibitStatus
         context: mq.queue.inhibit_status
         title: Queue Inhibit Status
         units: status
         family: queues
         type: line
-        priority: 2006
+        priority: 2007
         dimensions:
           - { name: inhibit_get, algo: absolute }
           - { name: inhibit_put, algo: absolute }
@@ -131,7 +141,7 @@ Queue:
         units: priority
         family: queues
         type: line
-        priority: 2007
+        priority: 2008
         dimensions:
           - { name: def_priority, algo: absolute }
       - name: Triggers
@@ -140,7 +150,7 @@ Queue:
         units: messages
         family: queues
         type: line
-        priority: 2008
+        priority: 2009
         dimensions:
           - { name: trigger_depth, algo: absolute }
           - { name: trigger_type, algo: absolute }
@@ -150,7 +160,7 @@ Queue:
         units: retries
         family: queues
         type: line
-        priority: 2009
+        priority: 2010
         dimensions:
           - { name: backout_threshold, algo: absolute }
       - name: MaxMessageLength
@@ -159,7 +169,7 @@ Queue:
         units: bytes
         family: queues
         type: line
-        priority: 2010
+        priority: 2011
         dimensions:
           - { name: max_msg_length, algo: absolute }
 
