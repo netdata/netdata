@@ -47,6 +47,11 @@
         "title": "Enable collection of system channel metrics (SYSTEM.* channels show clustering and administrative health)",
         "type": "boolean"
       },
+      "collect_system_listeners": {
+        "default": true,
+        "title": "Enable collection of system listener metrics (SYSTEM.* listeners show internal connectivity)",
+        "type": "boolean"
+      },
       "collect_system_queues": {
         "default": true,
         "title": "Enable collection of system queue metrics (SYSTEM.* queues provide critical infrastructure visibility)",

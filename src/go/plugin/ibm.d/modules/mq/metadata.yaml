@@ -330,6 +330,7 @@ using the PCF (Programmable Command Format) protocol.
               dimensions:
                 - name: monitored
                 - name: excluded
+                - name: invisible
                 - name: failed
         - name: topic
           description: These metrics refer to topic instances.

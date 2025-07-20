@@ -35,6 +35,8 @@ type Config struct {
 	CollectSystemChannels bool `yaml:"collect_system_channels" json:"collect_system_channels"`
 	// Enable collection of system topic metrics (SYSTEM.* topics show internal messaging patterns)
 	CollectSystemTopics   bool `yaml:"collect_system_topics" json:"collect_system_topics"`
+	// Enable collection of system listener metrics (SYSTEM.* listeners show internal connectivity)
+	CollectSystemListeners bool `yaml:"collect_system_listeners" json:"collect_system_listeners"`
 
 	// Enable collection of channel configuration metrics
 	CollectChannelConfig bool `yaml:"collect_channel_config" json:"collect_channel_config"`

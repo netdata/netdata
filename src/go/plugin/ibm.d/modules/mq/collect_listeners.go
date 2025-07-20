@@ -1,40 +1,83 @@
 package mq
 
-import "github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/mq/contexts"
+import (
+	"fmt"
+	
+	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/mq/contexts"
+	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/protocols/pcf"
+)
 
 func (c *Collector) collectListenerMetrics() error {
-	listeners, err := c.client.GetListeners()
+	c.Debugf("Collecting listeners with selector '%s', system: %v", 
+		c.Config.ListenerSelector, c.Config.CollectSystemListeners)
+	
+	// Use new GetListeners with transparency
+	result, err := c.client.GetListeners(
+		true,                             // collectMetrics (always)
+		c.Config.MaxListeners,            // maxListeners (0 = no limit)
+		c.Config.ListenerSelector,        // selector pattern
+		c.Config.CollectSystemListeners,  // collectSystem
+	)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to collect listener metrics: %w", err)
 	}
-
-	// Track overview metrics
-	var monitored, excluded, failed int64
-
-	for _, listener := range listeners {
+	
+	// Check discovery success
+	if !result.Stats.Discovery.Success {
+		c.Errorf("Listener discovery failed completely")
+		return fmt.Errorf("listener discovery failed")
+	}
+	
+	// Map transparency counters to user-facing semantics
+	monitored := int64(0)
+	if result.Stats.Metrics != nil {
+		monitored = result.Stats.Metrics.OkItems
+	}
+	
+	failed := result.Stats.Discovery.UnparsedItems
+	if result.Stats.Metrics != nil {
+		failed += result.Stats.Metrics.FailedItems
+	}
+	
+	// Update overview metrics with correct semantics  
+	c.setListenerOverviewMetrics(
+		monitored,                             // monitored (successfully enriched)
+		result.Stats.Discovery.ExcludedItems,  // excluded (filtered by user)
+		result.Stats.Discovery.InvisibleItems, // invisible (discovery errors)
+		failed,                                // failed (unparsed + enrichment failures)
+	)
+	
+	// Log collection summary
+	c.Debugf("Listener collection complete - discovered:%d visible:%d included:%d collected:%d failed:%d",
+		result.Stats.Discovery.AvailableItems,
+		result.Stats.Discovery.AvailableItems - result.Stats.Discovery.InvisibleItems,
+		result.Stats.Discovery.IncludedItems,
+		len(result.Listeners),
+		failed)
+	
+	// Process collected listener metrics
+	for _, listener := range result.Listeners {
 		labels := contexts.ListenerLabels{
 			Listener: listener.Name,
 		}
 
 		// Collect listener status - convert enum to individual dimensions
-		var running, stopped int64
+		statusValues := contexts.ListenerStatusValues{}
+		
 		switch listener.Status {
-		case 1: // Running
-			running = 1
-			stopped = 0
-		case 0: // Stopped
-			running = 0
-			stopped = 1
+		case pcf.ListenerStatusRunning:
+			statusValues.Running = 1
+			statusValues.Stopped = 0
+		case pcf.ListenerStatusStopped:
+			statusValues.Running = 0
+			statusValues.Stopped = 1
 		default:
 			// Unknown status - treat as stopped
-			running = 0
-			stopped = 1
+			statusValues.Running = 0
+			statusValues.Stopped = 1
 		}
 
-		contexts.Listener.Status.Set(c.State, labels, contexts.ListenerStatusValues{
-			Running: running,
-			Stopped: stopped,
-		})
+		contexts.Listener.Status.Set(c.State, labels, statusValues)
 
 		// Collect listener port if available
 		if listener.Port > 0 {
@@ -42,12 +85,7 @@ func (c *Collector) collectListenerMetrics() error {
 				Port: listener.Port,
 			})
 		}
-
-		monitored++
 	}
-
-	// Set overview metrics
-	c.setListenerOverviewMetrics(monitored, excluded, failed)
-
+	
 	return nil
 }

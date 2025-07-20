@@ -35,10 +35,11 @@ func (c *Collector) setTopicOverviewMetrics(monitored, excluded, invisible, fail
 }
 
 // setListenerOverviewMetrics updates the listener overview chart with monitoring status
-func (c *Collector) setListenerOverviewMetrics(monitored, excluded, failed int64) {
+func (c *Collector) setListenerOverviewMetrics(monitored, excluded, invisible, failed int64) {
 	contexts.QueueManager.ListenersOverview.Set(c.State, contexts.EmptyLabels{}, contexts.QueueManagerListenersOverviewValues{
 		Monitored: monitored,
 		Excluded:  excluded,
+		Invisible: invisible,
 		Failed:    failed,
 	})
 }

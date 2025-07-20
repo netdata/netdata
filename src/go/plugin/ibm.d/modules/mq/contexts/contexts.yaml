@@ -78,6 +78,7 @@ QueueManager:
         dimensions:
           - { name: monitored, algo: absolute }
           - { name: excluded, algo: absolute }
+          - { name: invisible, algo: absolute }
           - { name: failed, algo: absolute }
 
 Queue:
