@@ -205,15 +205,24 @@ type QueueManagerMetrics struct {
 type ListenerStatus int32
 
 const (
-	ListenerStatusStopped ListenerStatus = 0
-	ListenerStatusRunning ListenerStatus = 1
+	ListenerStatusStopped  ListenerStatus = 0  // MQSVC_STATUS_STOPPED
+	ListenerStatusStarting ListenerStatus = 1  // MQSVC_STATUS_STARTING
+	ListenerStatusRunning  ListenerStatus = 2  // MQSVC_STATUS_RUNNING
+	ListenerStatusStopping ListenerStatus = 3  // MQSVC_STATUS_STOPPING
+	ListenerStatusRetrying ListenerStatus = 4  // MQSVC_STATUS_RETRYING
 )
 
 // ListenerMetrics contains runtime metrics for a listener
 type ListenerMetrics struct {
-	Name   string
-	Status ListenerStatus
-	Port   int64
+	Name        string
+	Status      ListenerStatus
+	Port        int64
+	Backlog     AttributeValue  // Connection backlog limit
+	IPAddress   string          // IP address the listener binds to
+	Description string          // Listener description
+	StartDate   string          // Start date in YYYYMMDD format
+	StartTime   string          // Start time in HHMMSSSS format
+	Uptime      int64           // Uptime in seconds (calculated)
 }
 
 // EnrichmentStats tracks the success/failure of enrichment operations

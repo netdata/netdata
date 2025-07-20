@@ -360,7 +360,7 @@ Topic:
           - { name: messages, algo: incremental }
 
 Listener:
-  labels: [listener]
+  labels: [listener, port, ip_address]
   contexts:
       - name: Status
         context: mq.listener.status
@@ -370,14 +370,26 @@ Listener:
         type: line
         priority: 5000
         dimensions:
-          - { name: running, algo: absolute }
           - { name: stopped, algo: absolute }
-      - name: Port
-        context: mq.listener.port
-        title: Listener Port
-        units: port
+          - { name: starting, algo: absolute }
+          - { name: running, algo: absolute }
+          - { name: stopping, algo: absolute }
+          - { name: retrying, algo: absolute }
+      - name: Backlog
+        context: mq.listener.backlog
+        title: Listener Connection Backlog
+        units: connections
         family: listeners
         type: line
         priority: 5001
         dimensions:
-          - { name: port, algo: absolute }
+          - { name: backlog, algo: absolute }
+      - name: Uptime
+        context: mq.listener.uptime
+        title: Listener Uptime
+        units: seconds
+        family: listeners
+        type: line
+        priority: 5002
+        dimensions:
+          - { name: uptime, algo: absolute }

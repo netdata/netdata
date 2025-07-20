@@ -169,6 +169,59 @@ func (c *Client) GetListenerStatus(listenerName string) (*ListenerMetrics, error
 	if port, ok := attrs[C.MQIA_LISTENER_PORT_NUMBER]; ok {
 		metrics.Port = int64(port.(int32))
 	}
+	
+	// Get backlog
+	if backlog, ok := attrs[C.MQIACH_BACKLOG]; ok {
+		if val, ok := backlog.(int32); ok {
+			metrics.Backlog = AttributeValue(val)
+		}
+	} else {
+		metrics.Backlog = NotCollected
+	}
+	
+	// Get IP address
+	if ipAddr, ok := attrs[C.MQCACH_IP_ADDRESS]; ok {
+		if val, ok := ipAddr.(string); ok {
+			metrics.IPAddress = strings.TrimSpace(val)
+		}
+	}
+	
+	// Get description
+	if desc, ok := attrs[C.MQCACH_LISTENER_DESC]; ok {
+		if val, ok := desc.(string); ok {
+			metrics.Description = strings.TrimSpace(val)
+		}
+	}
+	
+	// Get start date and time to calculate uptime
+	if startDate, ok := attrs[C.MQCACH_LISTENER_START_DATE]; ok {
+		if dateStr, ok := startDate.(string); ok {
+			metrics.StartDate = strings.TrimSpace(dateStr)
+		}
+	}
+	
+	if startTime, ok := attrs[C.MQCACH_LISTENER_START_TIME]; ok {
+		if timeStr, ok := startTime.(string); ok {
+			metrics.StartTime = strings.TrimSpace(timeStr)
+		}
+	}
+	
+	// Calculate uptime if we have both start date and time (only for running listeners)
+	if metrics.StartDate != "" && metrics.StartTime != "" && metrics.Status == ListenerStatusRunning {
+		uptime, err := CalculateUptimeSeconds(metrics.StartDate, metrics.StartTime)
+		if err != nil {
+			c.protocol.Debugf("PCF: Failed to calculate uptime for listener '%s': %v", listenerName, err)
+			metrics.Uptime = -1  // Indicate error in calculation
+		} else {
+			metrics.Uptime = uptime
+			c.protocol.Debugf("PCF: Listener '%s' uptime: %d seconds (start: %s %s)", 
+				listenerName, uptime, metrics.StartDate, metrics.StartTime)
+		}
+	} else {
+		metrics.Uptime = 0  // Not running or no start time available
+		c.protocol.Debugf("PCF: Listener '%s' - no uptime: status=%v, date='%s', time='%s'", 
+			listenerName, metrics.Status, metrics.StartDate, metrics.StartTime)
+	}
 
 	return metrics, nil
 }
@@ -302,9 +355,15 @@ func (c *Client) GetListeners(collectMetrics bool, maxListeners int, selector st
 			} else {
 				result.Stats.Metrics.OkItems++
 				
-				// Copy metrics data
+				// Copy all metrics data
 				lm.Status = metricsData.Status
 				lm.Port = metricsData.Port
+				lm.Backlog = metricsData.Backlog
+				lm.IPAddress = metricsData.IPAddress
+				lm.Description = metricsData.Description
+				lm.StartDate = metricsData.StartDate
+				lm.StartTime = metricsData.StartTime
+				lm.Uptime = metricsData.Uptime
 			}
 		}
 		
@@ -321,6 +380,21 @@ func (c *Client) GetListeners(collectMetrics bool, maxListeners int, selector st
 		if lst.Port > 0 {
 			fieldCounts["port"]++
 		}
+		
+		// Backlog
+		if lst.Backlog.IsCollected() {
+			fieldCounts["backlog"]++
+		}
+		
+		// IP address
+		if lst.IPAddress != "" {
+			fieldCounts["ip_address"]++
+		}
+		
+		// Uptime
+		if lst.Uptime > 0 {
+			fieldCounts["uptime"]++
+		}
 	}
 	
 	// Log summary
@@ -331,8 +405,9 @@ func (c *Client) GetListeners(collectMetrics bool, maxListeners int, selector st
 		len(result.Listeners))
 	
 	// Log field collection summary
-	c.protocol.Infof("PCF: Listener field collection summary: status=%d port=%d",
-		fieldCounts["status"], fieldCounts["port"])
+	c.protocol.Infof("PCF: Listener field collection summary: status=%d port=%d backlog=%d ip_address=%d uptime=%d",
+		fieldCounts["status"], fieldCounts["port"], fieldCounts["backlog"], 
+		fieldCounts["ip_address"], fieldCounts["uptime"])
 	
 	return result, nil
 }
@@ -343,3 +418,4 @@ type ListenerListResult struct {
 	InternalErrors int
 	ErrorCounts    map[int32]int
 }
+

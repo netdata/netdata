@@ -71,13 +71,16 @@ Labels:
 | Label | Description |
 |:------|:------------|
 | listener | Listener identifier |
+| port | Port identifier |
+| ip_address | Ip_address identifier |
 
 Metrics:
 
 | Metric | Dimensions | Unit |
 |:-------|:-----------|:-----|
-| mq.listener.status | running, stopped | status |
-| mq.listener.port | port | port |
+| mq.listener.status | stopped, starting, running, stopping, retrying | status |
+| mq.listener.backlog | backlog | connections |
+| mq.listener.uptime | uptime | seconds |
 
 ### Per queue
 
