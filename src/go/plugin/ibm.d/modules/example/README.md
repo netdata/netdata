@@ -69,9 +69,9 @@ The following options can be defined globally or per job.
 
 | Name | Description | Default | Required | Min | Max |
 |:-----|:------------|:--------|:---------|:----|:----|
-| Endpoint | Connection endpoint URL | `dummy://localhost` | no | - | - |
+| Endpoint | Connection endpoint (for demonstration) | `dummy://localhost` | no | - | - |
 | ConnectTimeout | Connection timeout in seconds | `5` | no | 1 | 300 |
-| CollectItems | Enable collection of item metrics | `true` | yes | - | - |
+| CollectItems | Whether to collect item metrics | `true` | no | - | - |
 | MaxItems | Maximum number of items to collect | `10` | no | 1 | 1000 |
 
 ### Examples

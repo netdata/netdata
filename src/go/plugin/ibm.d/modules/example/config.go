@@ -19,29 +19,3 @@ type Config struct {
 	// Maximum number of items to collect
 	MaxItems int `yaml:"max_items,omitempty" json:"max_items"`
 }
-
-// SetDefaults sets default configuration values
-func (c *Config) SetDefaults() {
-	// Framework defaults
-	if c.ObsoletionIterations == 0 {
-		c.ObsoletionIterations = 60
-	}
-	if c.UpdateEvery == 0 {
-		c.UpdateEvery = 1
-	}
-	
-	// Module-specific defaults
-	if c.Endpoint == "" {
-		c.Endpoint = "dummy://localhost"
-	}
-	if c.ConnectTimeout == 0 {
-		c.ConnectTimeout = 5
-	}
-	// Default to collecting items
-	c.CollectItems = true
-	
-	// Default max items
-	if c.MaxItems == 0 {
-		c.MaxItems = 10
-	}
-}

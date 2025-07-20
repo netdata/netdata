@@ -3,46 +3,62 @@
     "$schema": "http://json-schema.org/draft-07/schema#",
     "properties": {
       "channel": {
+        "default": "SYSTEM.DEF.SVRCONN",
         "title": "IBM MQ channel name for connection",
         "type": "string"
       },
       "channel_selector": {
+        "default": "*",
         "title": "Pattern to filter channels (wildcards supported)",
         "type": "string"
       },
       "collect_channel_config": {
+        "default": false,
         "title": "Enable collection of channel configuration metrics",
         "type": "boolean"
       },
       "collect_channels": {
+        "default": true,
         "title": "Enable collection of channel metrics",
         "type": "boolean"
       },
+      "collect_listeners": {
+        "default": true,
+        "title": "Enable collection of listener metrics",
+        "type": "boolean"
+      },
       "collect_queue_config": {
+        "default": false,
         "title": "Enable collection of queue configuration metrics",
         "type": "boolean"
       },
       "collect_queues": {
+        "default": true,
         "title": "Enable collection of queue metrics",
         "type": "boolean"
       },
       "collect_reset_queue_stats": {
+        "default": false,
         "title": "Enable collection of queue statistics (destructive operation)",
         "type": "boolean"
       },
       "collect_system_channels": {
+        "default": true,
         "title": "Enable collection of system channel metrics",
         "type": "boolean"
       },
       "collect_system_queues": {
+        "default": true,
         "title": "Enable collection of system queue metrics",
         "type": "boolean"
       },
       "collect_topics": {
+        "default": false,
         "title": "Enable collection of topic metrics",
         "type": "boolean"
       },
       "host": {
+        "default": "localhost",
         "title": "IBM MQ server hostname or IP address",
         "type": "string"
       },
@@ -52,16 +68,19 @@
         "type": "string"
       },
       "port": {
+        "default": 1414,
         "maximum": 65535,
         "minimum": 1,
         "title": "IBM MQ server port number",
         "type": "integer"
       },
       "queue_manager": {
+        "default": "QM1",
         "title": "IBM MQ Queue Manager name to connect to",
         "type": "string"
       },
       "queue_selector": {
+        "default": "*",
         "title": "Pattern to filter queues (wildcards supported)",
         "type": "string"
       },
@@ -71,22 +90,8 @@
       }
     },
     "required": [
-      "queue_manager",
-      "channel",
-      "host",
-      "port",
       "user",
-      "password",
-      "collect_queues",
-      "collect_channels",
-      "collect_topics",
-      "collect_system_queues",
-      "collect_system_channels",
-      "collect_channel_config",
-      "collect_queue_config",
-      "queue_selector",
-      "channel_selector",
-      "collect_reset_queue_stats"
+      "password"
     ],
     "title": "mq collector configuration",
     "type": "object"

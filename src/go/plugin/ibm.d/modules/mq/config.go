@@ -48,43 +48,4 @@ type Config struct {
 	CollectResetQueueStats bool `yaml:"collect_reset_queue_stats" json:"collect_reset_queue_stats"`
 }
 
-// SetDefaults sets default values for the configuration
-// Only sets defaults for unspecified values, preserves user configuration
-func (c *Config) SetDefaults() {
-	// Framework defaults
-	if c.UpdateEvery == 0 {
-		c.UpdateEvery = 1
-	}
-	if c.ObsoletionIterations == 0 {
-		c.ObsoletionIterations = 60
-	}
-	
-	// Connection defaults
-	if c.Port == 0 {
-		c.Port = 1414 // Default MQ port
-	}
-	if c.Channel == "" {
-		c.Channel = "SYSTEM.DEF.SVRCONN"
-	}
-	
-	// Collection defaults - preserve user settings by using a marker/flag approach
-	// Note: Go's zero-value for bool is false, so we can't distinguish between
-	// user-set false and uninitialized false. We'll only set true defaults.
-	// For bool fields that default to false, we don't need to set them here.
-	
-	// These default to true only if not explicitly configured
-	// TODO: This is a limitation of bool types - consider using *bool in the future
-	// For now, we'll document that these default to true
-	
-	// Filtering defaults
-	if c.QueueSelector == "" {
-		c.QueueSelector = "*" // All queues by default
-	}
-	if c.ChannelSelector == "" {
-		c.ChannelSelector = "*" // All channels by default
-	}
-	
-	// Note: Bool fields with false defaults don't need to be set here since
-	// Go's zero value for bool is false. User can explicitly set them to true.
-}
 

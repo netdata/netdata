@@ -4,7 +4,7 @@
     "properties": {
       "collect_items": {
         "default": true,
-        "title": "Enable collection of item metrics",
+        "title": "Whether to collect item metrics",
         "type": "boolean"
       },
       "connect_timeout": {
@@ -20,7 +20,7 @@
           "dummy://localhost",
           "tcp://server:1414"
         ],
-        "title": "Connection endpoint URL",
+        "title": "Connection endpoint (for demonstration)",
         "type": "string"
       },
       "max_items": {
@@ -31,9 +31,7 @@
         "type": "integer"
       }
     },
-    "required": [
-      "collect_items"
-    ],
+    "required": null,
     "title": "example collector configuration",
     "type": "object"
   }

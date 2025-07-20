@@ -242,15 +242,23 @@ Channel:
         priority: 3003
         dimensions:
           - { name: batches, algo: incremental }
-      - name: BatchConfig
-        context: mq.channel.batch_config
-        title: Channel Batch Configuration
-        units: value
+      - name: BatchSize
+        context: mq.channel.batch_size
+        title: Channel Batch Size
+        units: messages
         family: channels
         type: line
         priority: 3004
         dimensions:
           - { name: batch_size, algo: absolute }
+      - name: BatchInterval
+        context: mq.channel.batch_interval
+        title: Channel Batch Interval
+        units: milliseconds
+        family: channels
+        type: line
+        priority: 3005
+        dimensions:
           - { name: batch_interval, algo: absolute }
       - name: Intervals
         context: mq.channel.intervals
@@ -258,20 +266,28 @@ Channel:
         units: seconds
         family: channels
         type: line
-        priority: 3005
+        priority: 3006
         dimensions:
           - { name: disc_interval, algo: absolute }
           - { name: hb_interval, algo: absolute }
           - { name: keep_alive_interval, algo: absolute }
-      - name: RetryConfig
-        context: mq.channel.retry_config
-        title: Channel Retry Configuration
-        units: count
+      - name: ShortRetryCount
+        context: mq.channel.short_retry_count
+        title: Channel Short Retry Count
+        units: retries
         family: channels
         type: line
-        priority: 3006
+        priority: 3007
         dimensions:
           - { name: short_retry, algo: absolute }
+      - name: LongRetryInterval
+        context: mq.channel.long_retry_interval
+        title: Channel Long Retry Interval
+        units: seconds
+        family: channels
+        type: line
+        priority: 3008
+        dimensions:
           - { name: long_retry, algo: absolute }
       - name: MaxMessageLength
         context: mq.channel.max_msg_length
@@ -279,18 +295,26 @@ Channel:
         units: bytes
         family: channels
         type: line
-        priority: 3007
+        priority: 3009
         dimensions:
           - { name: max_msg_length, algo: absolute }
-      - name: ConversationConfig
-        context: mq.channel.conversation_config
-        title: Channel Conversation Configuration
-        units: value
+      - name: SharingConversations
+        context: mq.channel.sharing_conversations
+        title: Channel Sharing Conversations
+        units: conversations
         family: channels
         type: line
-        priority: 3008
+        priority: 3010
         dimensions:
           - { name: sharing_conversations, algo: absolute }
+      - name: NetworkPriority
+        context: mq.channel.network_priority
+        title: Channel Network Priority
+        units: priority
+        family: channels
+        type: line
+        priority: 3011
+        dimensions:
           - { name: network_priority, algo: absolute }
 
 Topic:

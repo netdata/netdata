@@ -19,6 +19,7 @@ func New() *Collector {
 				ObsoletionIterations: 60,
 			},
 		},
+		Config: defaultConfig(),
 	}
 }
 
@@ -33,23 +34,8 @@ func init() {
 			return New()
 		},
 		Config: func() any {
-			return &Config{
-				// Connection defaults
-				Host:    "localhost",
-				Port:    1414,
-				Channel: "SYSTEM.DEF.SVRCONN",
-				
-				// Collection defaults - these are enabled by default
-				CollectQueues:         true,
-				CollectChannels:       true,
-				CollectSystemQueues:   true,
-				CollectSystemChannels: true,
-				
-				// These are disabled by default
-				CollectTopics:          false,
-				CollectChannelConfig:   false,
-				CollectResetQueueStats: false,
-			}
+			config := defaultConfig()
+			return &config
 		},
 	})
 }
