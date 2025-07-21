@@ -224,7 +224,7 @@ func (c *Collector) createChartFromContext(ctx interface{}, instanceID string, i
 	
 	chart := &module.Chart{
 		ID:       chartID,
-		OverID:   instanceID,  // Set OverID to instance ID (with dots, not underscores)
+		// OverID:   instanceID,  // Commented out - let go.d framework handle chart naming
 		Title:    contextMeta.Title,
 		Units:    contextMeta.Units,
 		Fam:      contextMeta.Family,
