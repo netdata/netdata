@@ -537,6 +537,19 @@ func (c *Client) enrichWithStatus(metrics *QueueMetrics) error {
 		}
 	}
 
+	// Queue file size metrics (IBM MQ 9.1.5+)
+	metrics.CurrentFileSize = NotCollected
+	metrics.CurrentMaxFileSize = NotCollected
+	
+	if val, ok := attrs[C.MQLONG(MQIACF_CUR_Q_FILE_SIZE)]; ok {
+		metrics.CurrentFileSize = AttributeValue(val.(int32))
+		c.protocol.Debugf("Queue '%s' current file size: %d bytes", metrics.Name, val.(int32))
+	}
+	if val, ok := attrs[C.MQLONG(MQIACF_CUR_MAX_FILE_SIZE)]; ok {
+		metrics.CurrentMaxFileSize = AttributeValue(val.(int32))
+		c.protocol.Debugf("Queue '%s' current max file size: %d bytes", metrics.Name, val.(int32))
+	}
+
 	metrics.HasStatusMetrics = true
 	return nil
 }

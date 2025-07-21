@@ -143,13 +143,23 @@ Queue:
         priority: 2005
         dimensions:
           - { name: uncommitted, algo: absolute }
+      - name: FileSize
+        context: mq.queue.file_size
+        title: Queue File Size
+        units: bytes
+        family: queues/activity
+        type: line
+        priority: 2006
+        dimensions:
+          - { name: current, algo: absolute }
+          - { name: max, algo: absolute }
       - name: LastActivity
         context: mq.queue.last_activity
         title: Time Since Last Queue Activity
         units: seconds
         family: queues/activity
         type: line
-        priority: 2006
+        priority: 2007
         dimensions:
           - { name: since_last_get, algo: absolute }
           - { name: since_last_put, algo: absolute }
@@ -413,6 +423,79 @@ Channel:
         priority: 3011
         dimensions:
           - { name: network_priority, algo: absolute }
+      - name: BufferCounts
+        context: mq.channel.buffer_counts
+        title: Channel Buffer Counts
+        units: buffers
+        family: channels
+        type: line
+        priority: 3012
+        dimensions:
+          - { name: sent, algo: absolute }
+          - { name: received, algo: absolute }
+      - name: CurrentMessages
+        context: mq.channel.current_messages
+        title: Channel Current Messages
+        units: messages
+        family: channels
+        type: line
+        priority: 3013
+        dimensions:
+          - { name: current, algo: absolute }
+      - name: XmitQueueTime
+        context: mq.channel.xmitq_time
+        title: Channel Transmission Queue Time
+        units: milliseconds
+        family: channels
+        type: line
+        priority: 3014
+        dimensions:
+          - { name: xmitq_time, algo: absolute }
+      - name: MCAStatus
+        context: mq.channel.mca_status
+        title: Channel MCA Status
+        units: status
+        family: channels
+        type: line
+        priority: 3015
+        dimensions:
+          - { name: mca_status, algo: absolute }
+      - name: InDoubtStatus
+        context: mq.channel.indoubt_status
+        title: Channel In-Doubt Status
+        units: status
+        family: channels
+        type: line
+        priority: 3016
+        dimensions:
+          - { name: indoubt_status, algo: absolute }
+      - name: SSLKeyResets
+        context: mq.channel.ssl_key_resets
+        title: Channel SSL Key Resets
+        units: resets
+        family: channels
+        type: line
+        priority: 3017
+        dimensions:
+          - { name: ssl_key_resets, algo: absolute }
+      - name: NPMSpeed
+        context: mq.channel.npm_speed
+        title: Channel Non-Persistent Message Speed
+        units: speed
+        family: channels
+        type: line
+        priority: 3018
+        dimensions:
+          - { name: npm_speed, algo: absolute }
+      - name: CurrentSharingConversations
+        context: mq.channel.current_sharing_convs
+        title: Channel Current Sharing Conversations
+        units: conversations
+        family: channels
+        type: line
+        priority: 3019
+        dimensions:
+          - { name: current_sharing, algo: absolute }
 
 Topic:
   labels:
@@ -667,3 +750,25 @@ MQIStatistics:
         dimensions:
           - { name: sets_total, algo: incremental }
           - { name: sets_failed, algo: incremental }
+
+Subscription:
+  labels: [subscription, topic]
+  contexts:
+      - name: MessageCount
+        context: mq.subscription.messages
+        title: IBM MQ Subscription Messages
+        units: messages
+        family: subscriptions
+        type: line
+        priority: 9000
+        dimensions:
+          - { name: pending, algo: absolute }
+      - name: LastMessageAge
+        context: mq.subscription.last_message_age
+        title: IBM MQ Subscription Last Message Age
+        units: seconds
+        family: subscriptions
+        type: line
+        priority: 9001
+        dimensions:
+          - { name: age, algo: absolute }

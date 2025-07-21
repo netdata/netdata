@@ -328,6 +328,184 @@ func (c ChannelNetworkPriorityContext) SetUpdateEvery(state *framework.Collector
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
+// ChannelBufferCountsValues defines the type-safe values for Channel.BufferCounts context
+type ChannelBufferCountsValues struct {
+	Sent int64
+	Received int64
+}
+
+// ChannelBufferCountsContext provides type-safe operations for Channel.BufferCounts context
+type ChannelBufferCountsContext struct {
+	framework.Context[ChannelLabels]
+}
+
+// Set provides type-safe dimension setting for Channel.BufferCounts context
+func (c ChannelBufferCountsContext) Set(state *framework.CollectorState, labels ChannelLabels, values ChannelBufferCountsValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"sent": values.Sent,
+		"received": values.Received,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c ChannelBufferCountsContext) SetUpdateEvery(state *framework.CollectorState, labels ChannelLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// ChannelCurrentMessagesValues defines the type-safe values for Channel.CurrentMessages context
+type ChannelCurrentMessagesValues struct {
+	Current int64
+}
+
+// ChannelCurrentMessagesContext provides type-safe operations for Channel.CurrentMessages context
+type ChannelCurrentMessagesContext struct {
+	framework.Context[ChannelLabels]
+}
+
+// Set provides type-safe dimension setting for Channel.CurrentMessages context
+func (c ChannelCurrentMessagesContext) Set(state *framework.CollectorState, labels ChannelLabels, values ChannelCurrentMessagesValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"current": values.Current,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c ChannelCurrentMessagesContext) SetUpdateEvery(state *framework.CollectorState, labels ChannelLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// ChannelXmitQueueTimeValues defines the type-safe values for Channel.XmitQueueTime context
+type ChannelXmitQueueTimeValues struct {
+	Xmitq_time int64
+}
+
+// ChannelXmitQueueTimeContext provides type-safe operations for Channel.XmitQueueTime context
+type ChannelXmitQueueTimeContext struct {
+	framework.Context[ChannelLabels]
+}
+
+// Set provides type-safe dimension setting for Channel.XmitQueueTime context
+func (c ChannelXmitQueueTimeContext) Set(state *framework.CollectorState, labels ChannelLabels, values ChannelXmitQueueTimeValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"xmitq_time": values.Xmitq_time,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c ChannelXmitQueueTimeContext) SetUpdateEvery(state *framework.CollectorState, labels ChannelLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// ChannelMCAStatusValues defines the type-safe values for Channel.MCAStatus context
+type ChannelMCAStatusValues struct {
+	Mca_status int64
+}
+
+// ChannelMCAStatusContext provides type-safe operations for Channel.MCAStatus context
+type ChannelMCAStatusContext struct {
+	framework.Context[ChannelLabels]
+}
+
+// Set provides type-safe dimension setting for Channel.MCAStatus context
+func (c ChannelMCAStatusContext) Set(state *framework.CollectorState, labels ChannelLabels, values ChannelMCAStatusValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"mca_status": values.Mca_status,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c ChannelMCAStatusContext) SetUpdateEvery(state *framework.CollectorState, labels ChannelLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// ChannelInDoubtStatusValues defines the type-safe values for Channel.InDoubtStatus context
+type ChannelInDoubtStatusValues struct {
+	Indoubt_status int64
+}
+
+// ChannelInDoubtStatusContext provides type-safe operations for Channel.InDoubtStatus context
+type ChannelInDoubtStatusContext struct {
+	framework.Context[ChannelLabels]
+}
+
+// Set provides type-safe dimension setting for Channel.InDoubtStatus context
+func (c ChannelInDoubtStatusContext) Set(state *framework.CollectorState, labels ChannelLabels, values ChannelInDoubtStatusValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"indoubt_status": values.Indoubt_status,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c ChannelInDoubtStatusContext) SetUpdateEvery(state *framework.CollectorState, labels ChannelLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// ChannelSSLKeyResetsValues defines the type-safe values for Channel.SSLKeyResets context
+type ChannelSSLKeyResetsValues struct {
+	Ssl_key_resets int64
+}
+
+// ChannelSSLKeyResetsContext provides type-safe operations for Channel.SSLKeyResets context
+type ChannelSSLKeyResetsContext struct {
+	framework.Context[ChannelLabels]
+}
+
+// Set provides type-safe dimension setting for Channel.SSLKeyResets context
+func (c ChannelSSLKeyResetsContext) Set(state *framework.CollectorState, labels ChannelLabels, values ChannelSSLKeyResetsValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"ssl_key_resets": values.Ssl_key_resets,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c ChannelSSLKeyResetsContext) SetUpdateEvery(state *framework.CollectorState, labels ChannelLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// ChannelNPMSpeedValues defines the type-safe values for Channel.NPMSpeed context
+type ChannelNPMSpeedValues struct {
+	Npm_speed int64
+}
+
+// ChannelNPMSpeedContext provides type-safe operations for Channel.NPMSpeed context
+type ChannelNPMSpeedContext struct {
+	framework.Context[ChannelLabels]
+}
+
+// Set provides type-safe dimension setting for Channel.NPMSpeed context
+func (c ChannelNPMSpeedContext) Set(state *framework.CollectorState, labels ChannelLabels, values ChannelNPMSpeedValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"npm_speed": values.Npm_speed,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c ChannelNPMSpeedContext) SetUpdateEvery(state *framework.CollectorState, labels ChannelLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// ChannelCurrentSharingConversationsValues defines the type-safe values for Channel.CurrentSharingConversations context
+type ChannelCurrentSharingConversationsValues struct {
+	Current_sharing int64
+}
+
+// ChannelCurrentSharingConversationsContext provides type-safe operations for Channel.CurrentSharingConversations context
+type ChannelCurrentSharingConversationsContext struct {
+	framework.Context[ChannelLabels]
+}
+
+// Set provides type-safe dimension setting for Channel.CurrentSharingConversations context
+func (c ChannelCurrentSharingConversationsContext) Set(state *framework.CollectorState, labels ChannelLabels, values ChannelCurrentSharingConversationsValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"current_sharing": values.Current_sharing,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c ChannelCurrentSharingConversationsContext) SetUpdateEvery(state *framework.CollectorState, labels ChannelLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
 
 
 // ChannelLabels defines the required labels for Channel contexts
@@ -356,6 +534,14 @@ var Channel = struct {
 	MaxMessageLength ChannelMaxMessageLengthContext
 	SharingConversations ChannelSharingConversationsContext
 	NetworkPriority ChannelNetworkPriorityContext
+	BufferCounts ChannelBufferCountsContext
+	CurrentMessages ChannelCurrentMessagesContext
+	XmitQueueTime ChannelXmitQueueTimeContext
+	MCAStatus ChannelMCAStatusContext
+	InDoubtStatus ChannelInDoubtStatusContext
+	SSLKeyResets ChannelSSLKeyResetsContext
+	NPMSpeed ChannelNPMSpeedContext
+	CurrentSharingConversations ChannelCurrentSharingConversationsContext
 }{
 	Status: ChannelStatusContext{
 		Context: framework.Context[ChannelLabels]{
@@ -713,6 +899,197 @@ var Channel = struct {
 		Dimensions: []framework.Dimension{
 			{
 				Name:      "network_priority",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"channel",
+		},
+		},
+	},
+	BufferCounts: ChannelBufferCountsContext{
+		Context: framework.Context[ChannelLabels]{
+		Name:       "mq.channel.buffer_counts",
+		Family:     "channels",
+		Title:      "Channel Buffer Counts",
+		Units:      "buffers",
+		Type:       module.Line,
+		Priority:   3012,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "sent",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "received",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"channel",
+		},
+		},
+	},
+	CurrentMessages: ChannelCurrentMessagesContext{
+		Context: framework.Context[ChannelLabels]{
+		Name:       "mq.channel.current_messages",
+		Family:     "channels",
+		Title:      "Channel Current Messages",
+		Units:      "messages",
+		Type:       module.Line,
+		Priority:   3013,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "current",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"channel",
+		},
+		},
+	},
+	XmitQueueTime: ChannelXmitQueueTimeContext{
+		Context: framework.Context[ChannelLabels]{
+		Name:       "mq.channel.xmitq_time",
+		Family:     "channels",
+		Title:      "Channel Transmission Queue Time",
+		Units:      "milliseconds",
+		Type:       module.Line,
+		Priority:   3014,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "xmitq_time",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"channel",
+		},
+		},
+	},
+	MCAStatus: ChannelMCAStatusContext{
+		Context: framework.Context[ChannelLabels]{
+		Name:       "mq.channel.mca_status",
+		Family:     "channels",
+		Title:      "Channel MCA Status",
+		Units:      "status",
+		Type:       module.Line,
+		Priority:   3015,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "mca_status",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"channel",
+		},
+		},
+	},
+	InDoubtStatus: ChannelInDoubtStatusContext{
+		Context: framework.Context[ChannelLabels]{
+		Name:       "mq.channel.indoubt_status",
+		Family:     "channels",
+		Title:      "Channel In-Doubt Status",
+		Units:      "status",
+		Type:       module.Line,
+		Priority:   3016,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "indoubt_status",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"channel",
+		},
+		},
+	},
+	SSLKeyResets: ChannelSSLKeyResetsContext{
+		Context: framework.Context[ChannelLabels]{
+		Name:       "mq.channel.ssl_key_resets",
+		Family:     "channels",
+		Title:      "Channel SSL Key Resets",
+		Units:      "resets",
+		Type:       module.Line,
+		Priority:   3017,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "ssl_key_resets",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"channel",
+		},
+		},
+	},
+	NPMSpeed: ChannelNPMSpeedContext{
+		Context: framework.Context[ChannelLabels]{
+		Name:       "mq.channel.npm_speed",
+		Family:     "channels",
+		Title:      "Channel Non-Persistent Message Speed",
+		Units:      "speed",
+		Type:       module.Line,
+		Priority:   3018,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "npm_speed",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"channel",
+		},
+		},
+	},
+	CurrentSharingConversations: ChannelCurrentSharingConversationsContext{
+		Context: framework.Context[ChannelLabels]{
+		Name:       "mq.channel.current_sharing_convs",
+		Family:     "channels",
+		Title:      "Channel Current Sharing Conversations",
+		Units:      "conversations",
+		Type:       module.Line,
+		Priority:   3019,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "current_sharing",
 				Algorithm: module.Absolute,
 				Mul:       1,
 				Div:       1,
@@ -1584,6 +1961,30 @@ func (c QueueUncommittedMessagesContext) SetUpdateEvery(state *framework.Collect
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
+// QueueFileSizeValues defines the type-safe values for Queue.FileSize context
+type QueueFileSizeValues struct {
+	Current int64
+	Max int64
+}
+
+// QueueFileSizeContext provides type-safe operations for Queue.FileSize context
+type QueueFileSizeContext struct {
+	framework.Context[QueueLabels]
+}
+
+// Set provides type-safe dimension setting for Queue.FileSize context
+func (c QueueFileSizeContext) Set(state *framework.CollectorState, labels QueueLabels, values QueueFileSizeValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"current": values.Current,
+		"max": values.Max,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueFileSizeContext) SetUpdateEvery(state *framework.CollectorState, labels QueueLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
 // QueueLastActivityValues defines the type-safe values for Queue.LastActivity context
 type QueueLastActivityValues struct {
 	Since_last_get int64
@@ -1955,6 +2356,7 @@ var Queue = struct {
 	Connections QueueConnectionsContext
 	HighDepth QueueHighDepthContext
 	UncommittedMessages QueueUncommittedMessagesContext
+	FileSize QueueFileSizeContext
 	LastActivity QueueLastActivityContext
 	OldestMessageAge QueueOldestMessageAgeContext
 	QueueTimeIndicators QueueQueueTimeIndicatorsContext
@@ -2136,6 +2538,37 @@ var Queue = struct {
 		},
 		},
 	},
+	FileSize: QueueFileSizeContext{
+		Context: framework.Context[QueueLabels]{
+		Name:       "mq.queue.file_size",
+		Family:     "queues/activity",
+		Title:      "Queue File Size",
+		Units:      "bytes",
+		Type:       module.Line,
+		Priority:   2006,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "current",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "max",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"queue",
+			"type",
+		},
+		},
+	},
 	LastActivity: QueueLastActivityContext{
 		Context: framework.Context[QueueLabels]{
 		Name:       "mq.queue.last_activity",
@@ -2143,7 +2576,7 @@ var Queue = struct {
 		Title:      "Time Since Last Queue Activity",
 		Units:      "seconds",
 		Type:       module.Line,
-		Priority:   2006,
+		Priority:   2007,
 		UpdateEvery: 1,
 		Dimensions: []framework.Dimension{
 			{
@@ -3503,6 +3936,124 @@ var QueueStatistics = struct {
 }
 
 
+// --- Subscription ---
+
+
+// SubscriptionMessageCountValues defines the type-safe values for Subscription.MessageCount context
+type SubscriptionMessageCountValues struct {
+	Pending int64
+}
+
+// SubscriptionMessageCountContext provides type-safe operations for Subscription.MessageCount context
+type SubscriptionMessageCountContext struct {
+	framework.Context[SubscriptionLabels]
+}
+
+// Set provides type-safe dimension setting for Subscription.MessageCount context
+func (c SubscriptionMessageCountContext) Set(state *framework.CollectorState, labels SubscriptionLabels, values SubscriptionMessageCountValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"pending": values.Pending,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c SubscriptionMessageCountContext) SetUpdateEvery(state *framework.CollectorState, labels SubscriptionLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// SubscriptionLastMessageAgeValues defines the type-safe values for Subscription.LastMessageAge context
+type SubscriptionLastMessageAgeValues struct {
+	Age int64
+}
+
+// SubscriptionLastMessageAgeContext provides type-safe operations for Subscription.LastMessageAge context
+type SubscriptionLastMessageAgeContext struct {
+	framework.Context[SubscriptionLabels]
+}
+
+// Set provides type-safe dimension setting for Subscription.LastMessageAge context
+func (c SubscriptionLastMessageAgeContext) Set(state *framework.CollectorState, labels SubscriptionLabels, values SubscriptionLastMessageAgeValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"age": values.Age,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c SubscriptionLastMessageAgeContext) SetUpdateEvery(state *framework.CollectorState, labels SubscriptionLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+
+
+// SubscriptionLabels defines the required labels for Subscription contexts
+type SubscriptionLabels struct {
+	Subscription string
+	Topic string
+}
+
+// InstanceID generates a unique instance ID using the hardcoded label order from YAML
+func (l SubscriptionLabels) InstanceID(contextName string) string {
+	// Label order from YAML: subscription, topic
+	return contextName + "." + cleanLabelValue(l.Subscription) + "_" + cleanLabelValue(l.Topic)
+}
+
+
+// Subscription contains all metric contexts for Subscription
+var Subscription = struct {
+	MessageCount SubscriptionMessageCountContext
+	LastMessageAge SubscriptionLastMessageAgeContext
+}{
+	MessageCount: SubscriptionMessageCountContext{
+		Context: framework.Context[SubscriptionLabels]{
+		Name:       "mq.subscription.messages",
+		Family:     "subscriptions",
+		Title:      "IBM MQ Subscription Messages",
+		Units:      "messages",
+		Type:       module.Line,
+		Priority:   9000,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "pending",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"subscription",
+			"topic",
+		},
+		},
+	},
+	LastMessageAge: SubscriptionLastMessageAgeContext{
+		Context: framework.Context[SubscriptionLabels]{
+		Name:       "mq.subscription.last_message_age",
+		Family:     "subscriptions",
+		Title:      "IBM MQ Subscription Last Message Age",
+		Units:      "seconds",
+		Type:       module.Line,
+		Priority:   9001,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "age",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"subscription",
+			"topic",
+		},
+		},
+	},
+}
+
+
 // --- Topic ---
 
 
@@ -3726,6 +4277,14 @@ func GetAllContexts() []interface{} {
 		&Channel.MaxMessageLength.Context,
 		&Channel.SharingConversations.Context,
 		&Channel.NetworkPriority.Context,
+		&Channel.BufferCounts.Context,
+		&Channel.CurrentMessages.Context,
+		&Channel.XmitQueueTime.Context,
+		&Channel.MCAStatus.Context,
+		&Channel.InDoubtStatus.Context,
+		&Channel.SSLKeyResets.Context,
+		&Channel.NPMSpeed.Context,
+		&Channel.CurrentSharingConversations.Context,
 		&ChannelStatistics.Messages.Context,
 		&ChannelStatistics.Bytes.Context,
 		&ChannelStatistics.Batches.Context,
@@ -3744,6 +4303,7 @@ func GetAllContexts() []interface{} {
 		&Queue.Connections.Context,
 		&Queue.HighDepth.Context,
 		&Queue.UncommittedMessages.Context,
+		&Queue.FileSize.Context,
 		&Queue.LastActivity.Context,
 		&Queue.OldestMessageAge.Context,
 		&Queue.QueueTimeIndicators.Context,
@@ -3773,6 +4333,8 @@ func GetAllContexts() []interface{} {
 		&QueueStatistics.Bytes.Context,
 		&QueueStatistics.Failures.Context,
 		&QueueStatistics.MessageLifecycle.Context,
+		&Subscription.MessageCount.Context,
+		&Subscription.LastMessageAge.Context,
 		&Topic.Publishers.Context,
 		&Topic.Subscribers.Context,
 		&Topic.Messages.Context,

@@ -28,6 +28,8 @@ type Config struct {
 	CollectTopics   bool `yaml:"collect_topics" json:"collect_topics"`
 	// Enable collection of listener metrics
 	CollectListeners bool `yaml:"collect_listeners" json:"collect_listeners"`
+	// Enable collection of subscription metrics
+	CollectSubscriptions bool `yaml:"collect_subscriptions" json:"collect_subscriptions"`
 
 	// Enable collection of system queue metrics (SYSTEM.* queues provide critical infrastructure visibility)
 	CollectSystemQueues   bool `yaml:"collect_system_queues" json:"collect_system_queues"`
@@ -51,6 +53,8 @@ type Config struct {
 	TopicSelector   string `yaml:"topic_selector" json:"topic_selector"`
 	// Pattern to filter listeners (wildcards supported)
 	ListenerSelector string `yaml:"listener_selector" json:"listener_selector"`
+	// Pattern to filter subscriptions (wildcards supported)
+	SubscriptionSelector string `yaml:"subscription_selector" json:"subscription_selector"`
 	// Maximum number of queues to collect (0 = no limit)
 	MaxQueues       int    `yaml:"max_queues" json:"max_queues"`
 	// Maximum number of channels to collect (0 = no limit)

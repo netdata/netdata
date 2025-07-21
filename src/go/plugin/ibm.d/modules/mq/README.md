@@ -61,6 +61,14 @@ Metrics:
 | mq.channel.max_msg_length | max_msg_length | bytes |
 | mq.channel.sharing_conversations | sharing_conversations | conversations |
 | mq.channel.network_priority | network_priority | priority |
+| mq.channel.buffer_counts | sent, received | buffers |
+| mq.channel.current_messages | current | messages |
+| mq.channel.xmitq_time | xmitq_time | milliseconds |
+| mq.channel.mca_status | mca_status | status |
+| mq.channel.indoubt_status | indoubt_status | status |
+| mq.channel.ssl_key_resets | ssl_key_resets | resets |
+| mq.channel.npm_speed | npm_speed | speed |
+| mq.channel.current_sharing_convs | current_sharing | conversations |
 
 ### Per channelstatistics
 
@@ -143,6 +151,7 @@ Metrics:
 | mq.queue.connections | input, output | connections |
 | mq.queue.high_depth | high_depth | messages |
 | mq.queue.uncommitted_msgs | uncommitted | messages |
+| mq.queue.file_size | current, max | bytes |
 | mq.queue.last_activity | since_last_get, since_last_put | seconds |
 | mq.queue.oldest_msg_age | oldest_msg_age | seconds |
 | mq.queue.time_indicators | short_period, long_period | microseconds |
@@ -181,6 +190,24 @@ Metrics:
 | mq.queue_stats.bytes | put_bytes_non_persistent, put_bytes_persistent, get_bytes_non_persistent, get_bytes_persistent, browse_bytes | bytes/s |
 | mq.queue_stats.failures | puts_failed, put1s_failed, gets_failed, browses_failed | failures/s |
 | mq.queue_stats.message_lifecycle | expired, purged, not_queued | messages/s |
+
+### Per subscription
+
+These metrics refer to individual subscription instances.
+
+Labels:
+
+| Label | Description |
+|:------|:------------|
+| subscription | Subscription identifier |
+| topic | Topic identifier |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:-------|:-----------|:-----|
+| mq.subscription.messages | pending | messages |
+| mq.subscription.last_message_age | age | seconds |
 
 ### Per topic
 
@@ -232,6 +259,7 @@ The following options can be defined globally or per job.
 | CollectChannels | Enable collection of channel metrics | `true` | no | - | - |
 | CollectTopics | Enable collection of topic metrics | `true` | no | - | - |
 | CollectListeners | Enable collection of listener metrics | `true` | no | - | - |
+| CollectSubscriptions | Enable collection of subscription metrics | `true` | no | - | - |
 | CollectSystemQueues | Enable collection of system queue metrics (SYSTEM.* queues provide critical infrastructure visibility) | `true` | no | - | - |
 | CollectSystemChannels | Enable collection of system channel metrics (SYSTEM.* channels show clustering and administrative health) | `true` | no | - | - |
 | CollectSystemTopics | Enable collection of system topic metrics (SYSTEM.* topics show internal messaging patterns) | `true` | no | - | - |
@@ -242,6 +270,7 @@ The following options can be defined globally or per job.
 | ChannelSelector | Pattern to filter channels (wildcards supported) | `` | no | - | - |
 | TopicSelector | Pattern to filter topics (wildcards supported) | `` | no | - | - |
 | ListenerSelector | Pattern to filter listeners (wildcards supported) | `` | no | - | - |
+| SubscriptionSelector | Pattern to filter subscriptions (wildcards supported) | `` | no | - | - |
 | MaxQueues | Maximum number of queues to collect (0 = no limit) | `100` | no | - | - |
 | MaxChannels | Maximum number of channels to collect (0 = no limit) | `100` | no | - | - |
 | MaxTopics | Maximum number of topics to collect (0 = no limit) | `100` | no | - | - |

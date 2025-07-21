@@ -91,6 +91,63 @@ func (c *Client) GetChannelMetrics(channelName string) (*ChannelMetrics, error) 
 		metrics.Batches = &val
 	}
 
+	// Initialize extended status metrics as NotCollected
+	metrics.BuffersSent = NotCollected
+	metrics.BuffersReceived = NotCollected
+	metrics.CurrentMessages = NotCollected
+	metrics.XmitQueueTime = NotCollected
+	metrics.MCAStatus = NotCollected
+	metrics.InDoubtStatus = NotCollected
+	metrics.SSLKeyResets = NotCollected
+	metrics.NPMSpeed = NotCollected
+	metrics.CurrentSharingConvs = NotCollected
+
+	// Collect extended status metrics if available
+	if val, ok := attrs[C.MQLONG(MQIACH_BUFFERS_SENT)]; ok {
+		metrics.BuffersSent = AttributeValue(val.(int32))
+		c.protocol.Debugf("Channel '%s' buffers sent: %d", channelName, val.(int32))
+	}
+	if val, ok := attrs[C.MQLONG(MQIACH_BUFFERS_RCVD)]; ok {
+		metrics.BuffersReceived = AttributeValue(val.(int32))
+		c.protocol.Debugf("Channel '%s' buffers received: %d", channelName, val.(int32))
+	}
+	if val, ok := attrs[C.MQLONG(MQIACH_CURRENT_MSGS)]; ok {
+		metrics.CurrentMessages = AttributeValue(val.(int32))
+		c.protocol.Debugf("Channel '%s' current messages: %d", channelName, val.(int32))
+	}
+	if val, ok := attrs[C.MQLONG(MQIACH_XMITQ_TIME_INDICATOR)]; ok {
+		metrics.XmitQueueTime = AttributeValue(val.(int32))
+		c.protocol.Debugf("Channel '%s' XMITQ time: %d", channelName, val.(int32))
+	}
+	if val, ok := attrs[C.MQLONG(MQIACH_MCA_STATUS)]; ok {
+		metrics.MCAStatus = AttributeValue(val.(int32))
+		c.protocol.Debugf("Channel '%s' MCA status: %d", channelName, val.(int32))
+	}
+	if val, ok := attrs[C.MQLONG(MQIACH_INDOUBT_STATUS)]; ok {
+		metrics.InDoubtStatus = AttributeValue(val.(int32))
+		c.protocol.Debugf("Channel '%s' in-doubt status: %d", channelName, val.(int32))
+	}
+	if val, ok := attrs[C.MQLONG(MQIACH_SSL_KEY_RESETS)]; ok {
+		metrics.SSLKeyResets = AttributeValue(val.(int32))
+		c.protocol.Debugf("Channel '%s' SSL key resets: %d", channelName, val.(int32))
+	}
+	if val, ok := attrs[C.MQLONG(MQIACH_NPM_SPEED)]; ok {
+		metrics.NPMSpeed = AttributeValue(val.(int32))
+		c.protocol.Debugf("Channel '%s' NPM speed: %d", channelName, val.(int32))
+	}
+	if val, ok := attrs[C.MQLONG(MQIACH_CURRENT_SHARING_CONVS)]; ok {
+		metrics.CurrentSharingConvs = AttributeValue(val.(int32))
+		c.protocol.Debugf("Channel '%s' current sharing conversations: %d", channelName, val.(int32))
+	}
+
+	// Connection name (string attribute)
+	if val, ok := attrs[C.MQCACH_CONNECTION_NAME]; ok {
+		if connStr, ok := val.(string); ok {
+			metrics.ConnectionName = strings.TrimSpace(connStr)
+			c.protocol.Debugf("Channel '%s' connection name: '%s'", channelName, metrics.ConnectionName)
+		}
+	}
+
 	return metrics, nil
 }
 
@@ -362,6 +419,18 @@ func (c *Client) enrichChannelWithMetrics(cm *ChannelMetrics, result *ChannelCol
 		cm.Connections = metricsData.Connections
 		cm.BuffersUsed = metricsData.BuffersUsed
 		cm.BuffersMax = metricsData.BuffersMax
+		
+		// Copy extended status metrics
+		cm.BuffersSent = metricsData.BuffersSent
+		cm.BuffersReceived = metricsData.BuffersReceived
+		cm.CurrentMessages = metricsData.CurrentMessages
+		cm.XmitQueueTime = metricsData.XmitQueueTime
+		cm.MCAStatus = metricsData.MCAStatus
+		cm.InDoubtStatus = metricsData.InDoubtStatus
+		cm.SSLKeyResets = metricsData.SSLKeyResets
+		cm.NPMSpeed = metricsData.NPMSpeed
+		cm.CurrentSharingConvs = metricsData.CurrentSharingConvs
+		cm.ConnectionName = metricsData.ConnectionName
 	}
 }
 

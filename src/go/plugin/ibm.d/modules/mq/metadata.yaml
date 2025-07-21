@@ -169,6 +169,55 @@ using the PCF (Programmable Command Format) protocol.
               chart_type: line
               dimensions:
                 - name: network_priority
+            - name: mq.channel.buffer_counts
+              description: Channel Buffer Counts
+              unit: buffers
+              chart_type: line
+              dimensions:
+                - name: sent
+                - name: received
+            - name: mq.channel.current_messages
+              description: Channel Current Messages
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: current
+            - name: mq.channel.xmitq_time
+              description: Channel Transmission Queue Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: xmitq_time
+            - name: mq.channel.mca_status
+              description: Channel MCA Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: mca_status
+            - name: mq.channel.indoubt_status
+              description: Channel In-Doubt Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: indoubt_status
+            - name: mq.channel.ssl_key_resets
+              description: Channel SSL Key Resets
+              unit: resets
+              chart_type: line
+              dimensions:
+                - name: ssl_key_resets
+            - name: mq.channel.npm_speed
+              description: Channel Non-Persistent Message Speed
+              unit: speed
+              chart_type: line
+              dimensions:
+                - name: npm_speed
+            - name: mq.channel.current_sharing_convs
+              description: Channel Current Sharing Conversations
+              unit: conversations
+              chart_type: line
+              dimensions:
+                - name: current_sharing
         - name: channelstatistics
           description: These metrics refer to channelstatistics instances.
           labels:
@@ -321,6 +370,13 @@ using the PCF (Programmable Command Format) protocol.
               chart_type: line
               dimensions:
                 - name: uncommitted
+            - name: mq.queue.file_size
+              description: Queue File Size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: current
+                - name: max
             - name: mq.queue.last_activity
               description: Time Since Last Queue Activity
               unit: seconds
@@ -545,6 +601,26 @@ using the PCF (Programmable Command Format) protocol.
                 - name: expired
                 - name: purged
                 - name: not_queued
+        - name: subscription
+          description: These metrics refer to subscription instances.
+          labels:
+            - name: subscription
+              description: Subscription identifier
+            - name: topic
+              description: Topic identifier
+          metrics:
+            - name: mq.subscription.messages
+              description: IBM MQ Subscription Messages
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: pending
+            - name: mq.subscription.last_message_age
+              description: IBM MQ Subscription Last Message Age
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: age
         - name: topic
           description: These metrics refer to topic instances.
           labels:
