@@ -1191,15 +1191,15 @@ metrics:
           unit: "VA"
 
         # Get the power factor for the branch.
-      - OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.7
-        name: cpiPduBranchPowerFactor
-        chart_meta:
-          description: Power factor for the branch
-          family: 'PowerFlow/Branch/Factor'
-          unit: "10*2.1"
-        # TODO don't think this helps
+      # - OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.7
+      #   name: cpiPduBranchPowerFactor
+      #   chart_meta:
+      #     description: Power factor for the branch
+      #     family: 'PowerFlow/Branch/Factor'
+      #     unit: "10*2.1"
+      # # TODO don't think this helps
 
-        # Get the alarm status of the branch: noalarm(0), warning(1), alarm(2)
+      # Get the alarm status of the branch: noalarm(0), warning(1), alarm(2)
       - OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.8
         name: cpiPduBranchStatus
         chart_meta:
