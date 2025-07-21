@@ -620,7 +620,7 @@ MQIStatistics:
         context: mq.mqi_stats.opens
         title: MQOPEN Operations (Statistics)
         units: operations/s
-        family: mqi/statistics
+        family: queues/mqi_operations
         type: line
         priority: 8000
         dimensions:
@@ -630,7 +630,7 @@ MQIStatistics:
         context: mq.mqi_stats.closes
         title: MQCLOSE Operations (Statistics)
         units: operations/s
-        family: mqi/statistics
+        family: queues/mqi_operations
         type: line
         priority: 8001
         dimensions:
@@ -640,7 +640,7 @@ MQIStatistics:
         context: mq.mqi_stats.inqs
         title: MQINQ Operations (Statistics)
         units: operations/s
-        family: mqi/statistics
+        family: queues/mqi_operations
         type: line
         priority: 8002
         dimensions:
@@ -650,7 +650,7 @@ MQIStatistics:
         context: mq.mqi_stats.sets
         title: MQSET Operations (Statistics)
         units: operations/s
-        family: mqi/statistics
+        family: queues/mqi_operations
         type: line
         priority: 8003
         dimensions:

@@ -1323,7 +1323,7 @@ var MQIStatistics = struct {
 	Opens: MQIStatisticsOpensContext{
 		Context: framework.Context[MQIStatisticsLabels]{
 		Name:       "mq.mqi_stats.opens",
-		Family:     "mqi/statistics",
+		Family:     "queues/mqi_operations",
 		Title:      "MQOPEN Operations (Statistics)",
 		Units:      "operations/s",
 		Type:       module.Line,
@@ -1353,7 +1353,7 @@ var MQIStatistics = struct {
 	Closes: MQIStatisticsClosesContext{
 		Context: framework.Context[MQIStatisticsLabels]{
 		Name:       "mq.mqi_stats.closes",
-		Family:     "mqi/statistics",
+		Family:     "queues/mqi_operations",
 		Title:      "MQCLOSE Operations (Statistics)",
 		Units:      "operations/s",
 		Type:       module.Line,
@@ -1383,7 +1383,7 @@ var MQIStatistics = struct {
 	Inqs: MQIStatisticsInqsContext{
 		Context: framework.Context[MQIStatisticsLabels]{
 		Name:       "mq.mqi_stats.inqs",
-		Family:     "mqi/statistics",
+		Family:     "queues/mqi_operations",
 		Title:      "MQINQ Operations (Statistics)",
 		Units:      "operations/s",
 		Type:       module.Line,
@@ -1413,7 +1413,7 @@ var MQIStatistics = struct {
 	Sets: MQIStatisticsSetsContext{
 		Context: framework.Context[MQIStatisticsLabels]{
 		Name:       "mq.mqi_stats.sets",
-		Family:     "mqi/statistics",
+		Family:     "queues/mqi_operations",
 		Title:      "MQSET Operations (Statistics)",
 		Units:      "operations/s",
 		Type:       module.Line,
