@@ -334,12 +334,13 @@ using the PCF (Programmable Command Format) protocol.
               chart_type: line
               dimensions:
                 - name: oldest_msg_age
-            - name: mq.queue.avg_queue_time
-              description: Average Queue Time
+            - name: mq.queue.time_indicators
+              description: Queue Time Indicators
               unit: microseconds
               chart_type: line
               dimensions:
-                - name: avg_queue_time
+                - name: short_period
+                - name: long_period
             - name: mq.queue.service_interval
               description: Queue Service Interval
               unit: milliseconds
@@ -499,6 +500,13 @@ using the PCF (Programmable Command Format) protocol.
               dimensions:
                 - name: non_persistent
                 - name: persistent
+            - name: mq.queue_stats.time_indicators
+              description: Queue Time Indicators (Statistics)
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: short_period
+                - name: long_period
             - name: mq.queue_stats.operations
               description: Queue Operations (Statistics)
               unit: operations/s

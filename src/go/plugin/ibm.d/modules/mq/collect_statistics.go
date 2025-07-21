@@ -76,6 +76,15 @@ func (c *Collector) collectQueueStatistics(queueStats []pcf.QueueStatistics) err
 			})
 			contexts.QueueStatistics.AvgQueueTime.SetUpdateEvery(c.State, labels, c.Config.StatisticsInterval)
 		}
+		
+		// Queue time indicators (short/long period)
+		if stat.QTimeShort.IsCollected() && stat.QTimeLong.IsCollected() {
+			contexts.QueueStatistics.QueueTimeIndicators.Set(c.State, labels, contexts.QueueStatisticsQueueTimeIndicatorsValues{
+				Short_period: stat.QTimeShort.Int64(),
+				Long_period:  stat.QTimeLong.Int64(),
+			})
+			contexts.QueueStatistics.QueueTimeIndicators.SetUpdateEvery(c.State, labels, c.Config.StatisticsInterval)
+		}
 
 		// Operation counters (incremental - rates per second)
 		contexts.QueueStatistics.Operations.Set(c.State, labels, contexts.QueueStatisticsOperationsValues{

@@ -133,20 +133,25 @@ func (c *Collector) collectChannelMetrics() error {
 				})
 			}
 			
-			// Set intervals - only if at least one is available
-			if channel.DiscInterval.IsCollected() || channel.HbInterval.IsCollected() || channel.KeepAliveInterval.IsCollected() {
-				intervalValues := contexts.ChannelIntervalsValues{}
-				
-				if channel.DiscInterval.IsCollected() {
-					intervalValues.Disc_interval = channel.DiscInterval.Int64()
-				}
-				if channel.HbInterval.IsCollected() {
-					intervalValues.Hb_interval = channel.HbInterval.Int64()
-				}
-				if channel.KeepAliveInterval.IsCollected() {
-					intervalValues.Keep_alive_interval = channel.KeepAliveInterval.Int64()
-				}
-				
+			// Set intervals - only if at least one is available and not -1 (which means disabled/not applicable)
+			intervalValues := contexts.ChannelIntervalsValues{}
+			hasAnyInterval := false
+			
+			if channel.DiscInterval.IsCollected() && channel.DiscInterval.Int64() != -1 {
+				intervalValues.Disc_interval = channel.DiscInterval.Int64()
+				hasAnyInterval = true
+			}
+			if channel.HbInterval.IsCollected() && channel.HbInterval.Int64() != -1 {
+				intervalValues.Hb_interval = channel.HbInterval.Int64()
+				hasAnyInterval = true
+			}
+			if channel.KeepAliveInterval.IsCollected() && channel.KeepAliveInterval.Int64() != -1 {
+				intervalValues.Keep_alive_interval = channel.KeepAliveInterval.Int64()
+				hasAnyInterval = true
+			}
+			
+			// Only send the metric if we have at least one valid (non -1) interval
+			if hasAnyInterval {
 				contexts.Channel.Intervals.Set(c.State, labels, intervalValues)
 			}
 			

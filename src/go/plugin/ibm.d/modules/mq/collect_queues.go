@@ -130,8 +130,8 @@ func (c *Collector) collectQueueMetrics() error {
 				})
 			}
 			
-			// Oldest message age - only send if collected
-			if queue.OldestMsgAge.IsCollected() {
+			// Oldest message age - only send if collected and not -1 (which means no messages)
+			if queue.OldestMsgAge.IsCollected() && queue.OldestMsgAge.Int64() != -1 {
 				contexts.Queue.OldestMessageAge.Set(c.State, labels, contexts.QueueOldestMessageAgeValues{
 					Oldest_msg_age: queue.OldestMsgAge.Int64(),
 				})
@@ -144,10 +144,12 @@ func (c *Collector) collectQueueMetrics() error {
 				})
 			}
 			
-			// Average queue time - only send if collected
-			if queue.AvgQueueTime.IsCollected() {
-				contexts.Queue.AverageQueueTime.Set(c.State, labels, contexts.QueueAverageQueueTimeValues{
-					Avg_queue_time: queue.AvgQueueTime.Int64(),
+			// Queue time indicators (short/long period) - only send if both collected and not -1
+			if queue.QTimeShort.IsCollected() && queue.QTimeLong.IsCollected() &&
+				queue.QTimeShort.Int64() != -1 && queue.QTimeLong.Int64() != -1 {
+				contexts.Queue.QueueTimeIndicators.Set(c.State, labels, contexts.QueueQueueTimeIndicatorsValues{
+					Short_period: queue.QTimeShort.Int64(),
+					Long_period:  queue.QTimeLong.Int64(),
 				})
 			}
 			

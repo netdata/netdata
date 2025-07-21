@@ -165,7 +165,8 @@ type QueueMetrics struct {
 	DefPersistence      AttributeValue  // MQIA_DEF_PERSISTENCE (0=MQPER_NOT_PERSISTENT, 1=MQPER_PERSISTENT)
 	
 	// Additional status metrics (from MQCMD_INQUIRE_Q_STATUS)
-	AvgQueueTime        AttributeValue  // MQIACF_Q_TIME_INDICATOR - Average time messages on queue (microseconds)
+	QTimeShort          AttributeValue  // MQIACF_Q_TIME_INDICATOR[0] - Queue time over short period (microseconds)
+	QTimeLong           AttributeValue  // MQIACF_Q_TIME_INDICATOR[1] - Queue time over long period (microseconds)
 }
 
 // QueueConfig contains configuration for a queue
@@ -330,6 +331,10 @@ type QueueStatistics struct {
 	// Average queue time metrics (split by persistence)
 	AvgQTimeNonPersistent AttributeValue  // MQIAMO64_AVG_Q_TIME[0] - Average time on queue for non-persistent messages (microseconds)
 	AvgQTimePersistent    AttributeValue  // MQIAMO64_AVG_Q_TIME[1] - Average time on queue for persistent messages (microseconds)
+	
+	// Short/Long time indicators
+	QTimeShort AttributeValue  // MQIAMO_Q_TIME_SHORT - Queue time over short period (microseconds)
+	QTimeLong  AttributeValue  // MQIAMO_Q_TIME_LONG - Queue time over long period (microseconds)
 	
 	// Operation counters (split by persistence)
 	PutsNonPersistent AttributeValue  // MQIAMO_PUTS[0] - Non-persistent put operations

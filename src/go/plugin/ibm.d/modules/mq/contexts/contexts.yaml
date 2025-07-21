@@ -162,15 +162,16 @@ Queue:
         priority: 2100
         dimensions:
           - { name: oldest_msg_age, algo: absolute }
-      - name: AverageQueueTime
-        context: mq.queue.avg_queue_time
-        title: Average Queue Time
+      - name: QueueTimeIndicators
+        context: mq.queue.time_indicators
+        title: Queue Time Indicators
         units: microseconds
         family: queues/performance
         type: line
         priority: 2101
         dimensions:
-          - { name: avg_queue_time, algo: absolute }
+          - { name: short_period, algo: absolute }
+          - { name: long_period, algo: absolute }
       - name: ServiceInterval
         context: mq.queue.service_interval
         title: Queue Service Interval
@@ -512,13 +513,23 @@ QueueStatistics:
         dimensions:
           - { name: non_persistent, algo: absolute }
           - { name: persistent, algo: absolute }
+      - name: QueueTimeIndicators
+        context: mq.queue_stats.time_indicators
+        title: Queue Time Indicators (Statistics)
+        units: microseconds
+        family: queues/statistics
+        type: line
+        priority: 6002
+        dimensions:
+          - { name: short_period, algo: absolute }
+          - { name: long_period, algo: absolute }
       - name: Operations
         context: mq.queue_stats.operations
         title: Queue Operations (Statistics)
         units: operations/s
         family: queues/statistics
         type: line
-        priority: 6002
+        priority: 6003
         dimensions:
           - { name: puts_non_persistent, algo: incremental }
           - { name: puts_persistent, algo: incremental }
@@ -532,7 +543,7 @@ QueueStatistics:
         units: bytes/s
         family: queues/statistics
         type: line
-        priority: 6003
+        priority: 6004
         dimensions:
           - { name: put_bytes_non_persistent, algo: incremental }
           - { name: put_bytes_persistent, algo: incremental }
@@ -545,7 +556,7 @@ QueueStatistics:
         units: failures/s
         family: queues/statistics
         type: line
-        priority: 6004
+        priority: 6005
         dimensions:
           - { name: puts_failed, algo: incremental }
           - { name: put1s_failed, algo: incremental }
@@ -557,7 +568,7 @@ QueueStatistics:
         units: messages/s
         family: queues/statistics
         type: line
-        priority: 6005
+        priority: 6006
         dimensions:
           - { name: expired, algo: incremental }
           - { name: purged, algo: incremental }
