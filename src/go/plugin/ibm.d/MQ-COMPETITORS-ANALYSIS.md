@@ -26,16 +26,22 @@ This document compares our mq_pcf collector with leading IBM MQ monitoring solut
   - ✅ **NEW: Service Interval and Retention Interval metrics**
   - ✅ **NEW: Message Persistence configuration metric**
   - ✅ **NEW: Additional queue attributes collected (scope, usage, etc.)**
+  - ✅ **NEW: Time since last message metric for topics**
+  - ✅ **NEW: MQI statistics collection for comprehensive monitoring**
+  - ✅ **NEW: Reorganized MQI statistics under queues family**
+  - ✅ **NEW: Improved PCF command logging with descriptive names**
+  - ✅ **NEW: Generic patterns for maintainable PCF protocol code**
   
 **Metric Breakdown**:
-- **Queue Metrics**: 20 contexts organized into 5 families:
+- **Queue Metrics**: 30+ contexts organized into 6 families:
   - **queues/activity**: depth, depth_percentage, messages, connections, high_depth, uncommitted_msgs, last_activity
   - **queues/performance**: oldest_msg_age, avg_queue_time, service_interval
   - **queues/configuration**: inhibit_status, priority, message_persistence, retention_interval
   - **queues/limits**: triggers, backout_threshold, max_msg_length
   - **queues/behavior**: queue_scope, queue_usage, msg_delivery_sequence, harden_get_backout
+  - **queues/statistics**: MQI operation statistics (get/put/browse bytes, failed ops, expired msgs, purges)
 - **Channel Metrics**: 3 contexts (status, messages, bytes) with batch configuration
-- **Topic Metrics**: 3 contexts (publishers, subscribers, messages)
+- **Topic Metrics**: 4 contexts (publishers, subscribers, messages, time_since_last_message)
 - **Queue Manager**: Status, connection count, uptime, and overview metrics
 - **Listener Metrics**: 3 contexts (status, backlog, uptime) with IP/port labels
 - **Resolution**: Per-second (1s) - unmatched by competitors
@@ -218,7 +224,7 @@ Many metrics require specific monitoring levels set on MQ objects:
 | Publisher count | ✅ | ✅ | ✅ | ⚠️ | ❌ | ✅ | Active publishers |
 | Subscriber count | ✅ | ✅ | ✅ | ⚠️ | ❌ | ✅ | Active subscribers |
 | Message count | ✅ | ✅ | ✅ | ⚠️ | ❌ | ✅ | Published messages |
-| Time since last message | ❌ | ✅ | ❓ | ⚠️ | ❌ | ❌ | Activity tracking |
+| Time since last message | ✅ | ✅ | ❓ | ⚠️ | ❌ | ❌ | Activity tracking |
 
 ### Subscription Level Metrics
 **Cardinality**: Per-Subscription (potentially very high)  
@@ -372,6 +378,19 @@ Many metrics require specific monitoring levels set on MQ objects:
    - Successful metric collection indicates service health
    - No separate health check needed - if collecting, it's working
 
+5. **Comprehensive MQI Statistics**
+   - Complete MQI operation tracking (opens, closes, inquires, sets)
+   - Get/Put/Browse operation bytes and counts
+   - Failed operation tracking
+   - Message expiry and lifecycle monitoring
+   - Organized under intuitive queue families
+
+6. **Advanced Framework Features**
+   - Generic PCF patterns for maintainable code
+   - Descriptive MQCMD command logging 
+   - Type-safe metric collection API
+   - Automatic chart lifecycle management
+
 ### Common Gaps in Netdata
 1. **Queue Time Metrics** (All major competitors have these)
    - Oldest message age
@@ -425,9 +444,23 @@ Requires consuming SYSTEM.ADMIN.STATISTICS.QUEUE messages:
 - ✅ Average queue time split by persistence (MQIAMO64_AVG_Q_TIME)
 - ✅ Message lifecycle metrics (MQIAMO_MSGS_EXPIRED)
 - ✅ Channel statistics (messages, bytes, batches, put retries)
-- ❌ MQOPEN/CLOSE/INQ/SET counts (not implemented yet)
+- ✅ MQOPEN/CLOSE/INQ/SET counts (MQIAMO_OPENS, MQIAMO_CLOSES, etc.)
+- ✅ **NEW: MQI statistics reorganized under queues family for better organization**
+- ✅ **NEW: Time since last message metric for topics (MQCACF_LAST_PUB_TIME)**
 
-### Phase 3: Platform and Advanced Features
+### Phase 3: Code Quality and Maintainability Improvements ✅ COMPLETED
+1. **Framework Improvements**
+   - ✅ Generic patterns for PCF protocol maintainability
+   - ✅ Improved error handling and command logging
+   - ✅ Reduced code duplication through abstraction
+   - ✅ Enhanced transparency in collection operations
+
+2. **Developer Experience**
+   - ✅ Descriptive MQCMD command names instead of numbers
+   - ✅ Reduced log verbosity for normal operations
+   - ✅ Better debugging and troubleshooting capabilities
+
+### Phase 4: Platform and Advanced Features
 1. **Platform Support**
    - Windows support (remove CGO dependency)
    - Consider pure Go implementation

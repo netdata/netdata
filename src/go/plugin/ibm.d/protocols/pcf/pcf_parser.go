@@ -43,7 +43,7 @@ func (c *Client) ParsePCFResponse(response []byte, command string) (map[C.MQLONG
 
 	for i := 0; i < paramCount && offset < len(response); i++ {
 		if offset+8 > len(response) { // Need at least 8 bytes for type + length
-			c.protocol.Debugf("PCF response truncated at parameter %d/%d", i+1, paramCount)
+			c.protocol.Debugf("response truncated at parameter %d/%d", i+1, paramCount)
 			break
 		}
 

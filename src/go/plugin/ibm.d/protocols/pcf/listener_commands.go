@@ -15,7 +15,7 @@ import (
 
 // GetListenerList returns a list of listeners.
 func (c *Client) GetListenerList() ([]string, error) {
-	c.protocol.Debugf("PCF: Getting listener list from queue manager '%s'", c.config.QueueManager)
+	c.protocol.Debugf("Getting listener list from queue manager '%s'", c.config.QueueManager)
 
 	const pattern = "*"
 	params := []pcfParameter{
@@ -23,7 +23,7 @@ func (c *Client) GetListenerList() ([]string, error) {
 	}
 	response, err := c.SendPCFCommand(C.MQCMD_INQUIRE_LISTENER, params)
 	if err != nil {
-		c.protocol.Errorf("PCF: Failed to get listener list from queue manager '%s': %v", c.config.QueueManager, err)
+		c.protocol.Errorf("Failed to get listener list from queue manager '%s': %v", c.config.QueueManager, err)
 		return nil, err
 	}
 
@@ -32,23 +32,23 @@ func (c *Client) GetListenerList() ([]string, error) {
 
 	// Log any errors encountered during parsing
 	if result.InternalErrors > 0 {
-		c.protocol.Warningf("PCF: Encountered %d internal errors while parsing listener list from queue manager '%s'",
+		c.protocol.Warningf("Encountered %d internal errors while parsing listener list from queue manager '%s'",
 			result.InternalErrors, c.config.QueueManager)
 	}
 
 	for errCode, count := range result.ErrorCounts {
 		if errCode < 0 {
 			// Internal error
-			c.protocol.Warningf("PCF: Internal error %d occurred %d times while parsing listener list from queue manager '%s'",
+			c.protocol.Warningf("Internal error %d occurred %d times while parsing listener list from queue manager '%s'",
 				errCode, count, c.config.QueueManager)
 		} else {
 			// MQ error
-			c.protocol.Warningf("PCF: MQ error %d (%s) occurred %d times while parsing listener list from queue manager '%s'",
+			c.protocol.Warningf("MQ error %d (%s) occurred %d times while parsing listener list from queue manager '%s'",
 				errCode, mqReasonString(errCode), count, c.config.QueueManager)
 		}
 	}
 
-	c.protocol.Debugf("PCF: Retrieved %d listeners from queue manager '%s'", len(result.Listeners), c.config.QueueManager)
+	c.protocol.Debugf("Retrieved %d listeners from queue manager '%s'", len(result.Listeners), c.config.QueueManager)
 
 	return result.Listeners, nil
 }
@@ -78,21 +78,21 @@ func (c *Client) parseListenerListResponse(response []byte) *ListenerListResult 
 
 // GetListenerStatus returns runtime status for a specific listener.
 func (c *Client) GetListenerStatus(listenerName string) (*ListenerMetrics, error) {
-	c.protocol.Debugf("PCF: Getting status for listener '%s' from queue manager '%s'", listenerName, c.config.QueueManager)
+	c.protocol.Debugf("Getting status for listener '%s' from queue manager '%s'", listenerName, c.config.QueueManager)
 
 	params := []pcfParameter{
 		newStringParameter(C.MQCACH_LISTENER_NAME, listenerName),
 	}
 	response, err := c.SendPCFCommand(C.MQCMD_INQUIRE_LISTENER_STATUS, params)
 	if err != nil {
-		c.protocol.Errorf("PCF: Failed to get status for listener '%s' from queue manager '%s': %v",
+		c.protocol.Errorf("Failed to get status for listener '%s' from queue manager '%s': %v",
 			listenerName, c.config.QueueManager, err)
 		return nil, err
 	}
 
 	attrs, err := c.ParsePCFResponse(response, "")
 	if err != nil {
-		c.protocol.Errorf("PCF: Failed to parse status response for listener '%s' from queue manager '%s': %v",
+		c.protocol.Errorf("Failed to parse status response for listener '%s' from queue manager '%s': %v",
 			listenerName, c.config.QueueManager, err)
 		return nil, err
 	}
@@ -151,16 +151,16 @@ func (c *Client) GetListenerStatus(listenerName string) (*ListenerMetrics, error
 	if metrics.StartDate != "" && metrics.StartTime != "" && metrics.Status == ListenerStatusRunning {
 		uptime, err := CalculateUptimeSeconds(metrics.StartDate, metrics.StartTime)
 		if err != nil {
-			c.protocol.Debugf("PCF: Failed to calculate uptime for listener '%s': %v", listenerName, err)
+			c.protocol.Debugf("Failed to calculate uptime for listener '%s': %v", listenerName, err)
 			metrics.Uptime = -1 // Indicate error in calculation
 		} else {
 			metrics.Uptime = uptime
-			c.protocol.Debugf("PCF: Listener '%s' uptime: %d seconds (start: %s %s)",
+			c.protocol.Debugf("Listener '%s' uptime: %d seconds (start: %s %s)",
 				listenerName, uptime, metrics.StartDate, metrics.StartTime)
 		}
 	} else {
 		metrics.Uptime = 0 // Not running or no start time available
-		c.protocol.Debugf("PCF: Listener '%s' - no uptime: status=%v, date='%s', time='%s'",
+		c.protocol.Debugf("Listener '%s' - no uptime: status=%v, date='%s', time='%s'",
 			listenerName, metrics.Status, metrics.StartDate, metrics.StartTime)
 	}
 
@@ -169,7 +169,7 @@ func (c *Client) GetListenerStatus(listenerName string) (*ListenerMetrics, error
 
 // GetListeners collects comprehensive listener metrics with full transparency statistics
 func (c *Client) GetListeners(collectMetrics bool, maxListeners int, selector string, collectSystem bool) (*ListenerCollectionResult, error) {
-	c.protocol.Debugf("PCF: Collecting listener metrics with selector '%s', max=%d, metrics=%v, system=%v",
+	c.protocol.Debugf("Collecting listener metrics with selector '%s', max=%d, metrics=%v, system=%v",
 		selector, maxListeners, collectMetrics, collectSystem)
 
 	result := &ListenerCollectionResult{
@@ -182,7 +182,7 @@ func (c *Client) GetListeners(collectMetrics bool, maxListeners int, selector st
 	})
 	if err != nil {
 		result.Stats.Discovery.Success = false
-		c.protocol.Errorf("PCF: Listener discovery failed: %v", err)
+		c.protocol.Errorf("Listener discovery failed: %v", err)
 		return result, fmt.Errorf("listener discovery failed: %w", err)
 	}
 
@@ -208,15 +208,15 @@ func (c *Client) GetListeners(collectMetrics bool, maxListeners int, selector st
 	// Log discovery errors
 	for errCode, count := range parsed.ErrorCounts {
 		if errCode < 0 {
-			c.protocol.Warningf("PCF: Internal error %d occurred %d times during listener discovery", errCode, count)
+			c.protocol.Warningf("Internal error %d occurred %d times during listener discovery", errCode, count)
 		} else {
-			c.protocol.Warningf("PCF: MQ error %d (%s) occurred %d times during listener discovery",
+			c.protocol.Warningf("MQ error %d (%s) occurred %d times during listener discovery",
 				errCode, mqReasonString(errCode), count)
 		}
 	}
 
 	if len(parsed.Listeners) == 0 {
-		c.protocol.Debugf("PCF: No listeners discovered")
+		c.protocol.Debugf("No listeners discovered")
 		return result, nil
 	}
 
@@ -224,7 +224,7 @@ func (c *Client) GetListeners(collectMetrics bool, maxListeners int, selector st
 	visibleItems := result.Stats.Discovery.AvailableItems - result.Stats.Discovery.InvisibleItems - result.Stats.Discovery.UnparsedItems
 	enrichAll := maxListeners <= 0 || visibleItems <= int64(maxListeners)
 
-	c.protocol.Debugf("PCF: Discovery found %d visible listeners (total: %d, invisible: %d, unparsed: %d). EnrichAll=%v",
+	c.protocol.Debugf("Discovery found %d visible listeners (total: %d, invisible: %d, unparsed: %d). EnrichAll=%v",
 		visibleItems, result.Stats.Discovery.AvailableItems, result.Stats.Discovery.InvisibleItems,
 		result.Stats.Discovery.UnparsedItems, enrichAll)
 
@@ -241,7 +241,7 @@ func (c *Client) GetListeners(collectMetrics bool, maxListeners int, selector st
 			listenersToEnrich = append(listenersToEnrich, listenerName)
 			result.Stats.Discovery.IncludedItems++
 		}
-		c.protocol.Debugf("PCF: Enriching %d listeners (excluded %d system listeners)",
+		c.protocol.Debugf("Enriching %d listeners (excluded %d system listeners)",
 			len(listenersToEnrich), result.Stats.Discovery.ExcludedItems)
 	} else {
 		// Apply selector pattern and system filtering
@@ -254,7 +254,7 @@ func (c *Client) GetListeners(collectMetrics bool, maxListeners int, selector st
 
 			matched, err := filepath.Match(selector, listenerName)
 			if err != nil {
-				c.protocol.Warningf("PCF: Invalid selector pattern '%s': %v", selector, err)
+				c.protocol.Warningf("Invalid selector pattern '%s': %v", selector, err)
 				matched = false
 			}
 
@@ -265,7 +265,7 @@ func (c *Client) GetListeners(collectMetrics bool, maxListeners int, selector st
 				result.Stats.Discovery.ExcludedItems++
 			}
 		}
-		c.protocol.Debugf("PCF: Selector '%s' matched %d listeners, excluded %d (including system filtering)",
+		c.protocol.Debugf("Selector '%s' matched %d listeners, excluded %d (including system filtering)",
 			selector, result.Stats.Discovery.IncludedItems, result.Stats.Discovery.ExcludedItems)
 	}
 
@@ -292,7 +292,7 @@ func (c *Client) GetListeners(collectMetrics bool, maxListeners int, selector st
 				} else {
 					result.Stats.Metrics.ErrorCounts[-1]++
 				}
-				c.protocol.Debugf("PCF: Failed to get metrics for listener '%s': %v", listenerName, err)
+				c.protocol.Debugf("Failed to get metrics for listener '%s': %v", listenerName, err)
 			} else {
 				result.Stats.Metrics.OkItems++
 
@@ -339,14 +339,14 @@ func (c *Client) GetListeners(collectMetrics bool, maxListeners int, selector st
 	}
 
 	// Log summary
-	c.protocol.Debugf("PCF: Listener collection complete - discovered:%d visible:%d included:%d enriched:%d",
+	c.protocol.Debugf("Listener collection complete - discovered:%d visible:%d included:%d enriched:%d",
 		result.Stats.Discovery.AvailableItems,
 		result.Stats.Discovery.AvailableItems - result.Stats.Discovery.InvisibleItems,
 		result.Stats.Discovery.IncludedItems,
 		len(result.Listeners))
 
 	// Log field collection summary
-	c.protocol.Debugf("PCF: Listener field collection summary: status=%d port=%d backlog=%d ip_address=%d uptime=%d",
+	c.protocol.Debugf("Listener field collection summary: status=%d port=%d backlog=%d ip_address=%d uptime=%d",
 		fieldCounts["status"], fieldCounts["port"], fieldCounts["backlog"], 
 		fieldCounts["ip_address"], fieldCounts["uptime"])
 

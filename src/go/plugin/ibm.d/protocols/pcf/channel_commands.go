@@ -15,7 +15,7 @@ import (
 
 // GetChannelList returns a list of channels.
 func (c *Client) GetChannelList() ([]string, error) {
-	c.protocol.Debugf("PCF: Getting channel list from queue manager '%s'", c.config.QueueManager)
+	c.protocol.Debugf("Getting channel list from queue manager '%s'", c.config.QueueManager)
 
 	const pattern = "*"
 	params := []pcfParameter{
@@ -23,49 +23,49 @@ func (c *Client) GetChannelList() ([]string, error) {
 	}
 	response, err := c.SendPCFCommand(C.MQCMD_INQUIRE_CHANNEL, params)
 	if err != nil {
-		c.protocol.Errorf("PCF: Failed to get channel list from queue manager '%s': %v", c.config.QueueManager, err)
+		c.protocol.Errorf("Failed to get channel list from queue manager '%s': %v", c.config.QueueManager, err)
 		return nil, err
 	}
 
 	result := c.parseChannelListResponse(response)
 
 	if result.InternalErrors > 0 {
-		c.protocol.Warningf("PCF: Encountered %d internal errors while parsing channel list from queue manager '%s'",
+		c.protocol.Warningf("Encountered %d internal errors while parsing channel list from queue manager '%s'",
 			result.InternalErrors, c.config.QueueManager)
 	}
 
 	for errCode, count := range result.ErrorCounts {
 		if errCode < 0 {
-			c.protocol.Warningf("PCF: Internal error %d occurred %d times while parsing channel list from queue manager '%s'",
+			c.protocol.Warningf("Internal error %d occurred %d times while parsing channel list from queue manager '%s'",
 				errCode, count, c.config.QueueManager)
 		} else {
-			c.protocol.Warningf("PCF: MQ error %d (%s) occurred %d times while parsing channel list from queue manager '%s'",
+			c.protocol.Warningf("MQ error %d (%s) occurred %d times while parsing channel list from queue manager '%s'",
 				errCode, mqReasonString(errCode), count, c.config.QueueManager)
 		}
 	}
 
-	c.protocol.Debugf("PCF: Retrieved %d channels from queue manager '%s'", len(result.Channels), c.config.QueueManager)
+	c.protocol.Debugf("Retrieved %d channels from queue manager '%s'", len(result.Channels), c.config.QueueManager)
 
 	return result.Channels, nil
 }
 
 // GetChannelMetrics returns metrics for a specific channel.
 func (c *Client) GetChannelMetrics(channelName string) (*ChannelMetrics, error) {
-	c.protocol.Debugf("PCF: Getting metrics for channel '%s' from queue manager '%s'", channelName, c.config.QueueManager)
+	c.protocol.Debugf("Getting metrics for channel '%s' from queue manager '%s'", channelName, c.config.QueueManager)
 
 	params := []pcfParameter{
 		newStringParameter(C.MQCACH_CHANNEL_NAME, channelName),
 	}
 	response, err := c.SendPCFCommand(C.MQCMD_INQUIRE_CHANNEL_STATUS, params)
 	if err != nil {
-		c.protocol.Errorf("PCF: Failed to get metrics for channel '%s' from queue manager '%s': %v",
+		c.protocol.Errorf("Failed to get metrics for channel '%s' from queue manager '%s': %v",
 			channelName, c.config.QueueManager, err)
 		return nil, err
 	}
 
 	attrs, err := c.ParsePCFResponse(response, "")
 	if err != nil {
-		c.protocol.Errorf("PCF: Failed to parse metrics response for channel '%s' from queue manager '%s': %v",
+		c.protocol.Errorf("Failed to parse metrics response for channel '%s' from queue manager '%s': %v",
 			channelName, c.config.QueueManager, err)
 		return nil, err
 	}
@@ -167,7 +167,7 @@ func (c *Client) GetChannelConfig(channelName string) (*ChannelConfig, error) {
 
 // GetChannels collects comprehensive channel metrics with full transparency statistics
 func (c *Client) GetChannels(collectConfig, collectMetrics bool, maxChannels int, selector string, collectSystem bool) (*ChannelCollectionResult, error) {
-	c.protocol.Debugf("PCF: Collecting channel metrics with selector '%s', max=%d, config=%v, metrics=%v, system=%v",
+	c.protocol.Debugf("Collecting channel metrics with selector '%s', max=%d, config=%v, metrics=%v, system=%v",
 		selector, maxChannels, collectConfig, collectMetrics, collectSystem)
 
 	result := &ChannelCollectionResult{
@@ -197,7 +197,7 @@ func (c *Client) discoverChannels(result *ChannelCollectionResult) ([]string, er
 	})
 	if err != nil {
 		result.Stats.Discovery.Success = false
-		c.protocol.Errorf("PCF: Channel discovery failed: %v", err)
+		c.protocol.Errorf("Channel discovery failed: %v", err)
 		return nil, fmt.Errorf("channel discovery failed: %w", err)
 	}
 
@@ -216,15 +216,15 @@ func (c *Client) discoverChannels(result *ChannelCollectionResult) ([]string, er
 
 	for errCode, count := range parsed.ErrorCounts {
 		if errCode < 0 {
-			c.protocol.Warningf("PCF: Internal error %d occurred %d times during channel discovery", errCode, count)
+			c.protocol.Warningf("Internal error %d occurred %d times during channel discovery", errCode, count)
 		} else {
-			c.protocol.Warningf("PCF: MQ error %d (%s) occurred %d times during channel discovery",
+			c.protocol.Warningf("MQ error %d (%s) occurred %d times during channel discovery",
 				errCode, mqReasonString(errCode), count)
 		}
 	}
 
 	if len(parsed.Channels) == 0 {
-		c.protocol.Debugf("PCF: No channels discovered")
+		c.protocol.Debugf("No channels discovered")
 	}
 
 	return parsed.Channels, nil
@@ -234,7 +234,7 @@ func (c *Client) filterChannels(channels []string, selector string, collectSyste
 	visibleItems := result.Stats.Discovery.AvailableItems - result.Stats.Discovery.InvisibleItems
 	enrichAll := maxChannels <= 0 || visibleItems <= int64(maxChannels)
 
-	c.protocol.Debugf("PCF: Discovery found %d visible channels (total: %d, invisible: %d). EnrichAll=%v",
+	c.protocol.Debugf("Discovery found %d visible channels (total: %d, invisible: %d). EnrichAll=%v",
 		visibleItems, result.Stats.Discovery.AvailableItems, result.Stats.Discovery.InvisibleItems, enrichAll)
 
 	var channelsToEnrich []string
@@ -247,7 +247,7 @@ func (c *Client) filterChannels(channels []string, selector string, collectSyste
 			channelsToEnrich = append(channelsToEnrich, channelName)
 			result.Stats.Discovery.IncludedItems++
 		}
-		c.protocol.Debugf("PCF: Enriching %d channels (excluded %d system channels)",
+		c.protocol.Debugf("Enriching %d channels (excluded %d system channels)",
 			len(channelsToEnrich), result.Stats.Discovery.ExcludedItems)
 	} else {
 		for _, channelName := range channels {
@@ -258,7 +258,7 @@ func (c *Client) filterChannels(channels []string, selector string, collectSyste
 
 			matched, err := filepath.Match(selector, channelName)
 			if err != nil {
-				c.protocol.Warningf("PCF: Invalid selector pattern '%s': %v", selector, err)
+				c.protocol.Warningf("Invalid selector pattern '%s': %v", selector, err)
 				matched = false
 			}
 
@@ -269,7 +269,7 @@ func (c *Client) filterChannels(channels []string, selector string, collectSyste
 				result.Stats.Discovery.ExcludedItems++
 			}
 		}
-		c.protocol.Debugf("PCF: Selector '%s' matched %d channels, excluded %d (including system filtering)",
+		c.protocol.Debugf("Selector '%s' matched %d channels, excluded %d (including system filtering)",
 			selector, result.Stats.Discovery.IncludedItems, result.Stats.Discovery.ExcludedItems)
 	}
 	return channelsToEnrich
@@ -319,7 +319,7 @@ func (c *Client) enrichChannelWithConfig(cm *ChannelMetrics, result *ChannelColl
 		} else {
 			result.Stats.Config.ErrorCounts[-1]++
 		}
-		c.protocol.Debugf("PCF: Failed to get config for channel '%s': %v", cm.Name, err)
+		c.protocol.Debugf("Failed to get config for channel '%s': %v", cm.Name, err)
 	} else {
 		result.Stats.Config.OkItems++
 		cm.Type = configData.Type
@@ -352,7 +352,7 @@ func (c *Client) enrichChannelWithMetrics(cm *ChannelMetrics, result *ChannelCol
 		} else {
 			result.Stats.Metrics.ErrorCounts[-1]++
 		}
-		c.protocol.Debugf("PCF: Failed to get metrics for channel '%s': %v", cm.Name, err)
+		c.protocol.Debugf("Failed to get metrics for channel '%s': %v", cm.Name, err)
 	} else {
 		result.Stats.Metrics.OkItems++
 		cm.Status = metricsData.Status
@@ -419,13 +419,13 @@ func (c *Client) logChannelCollectionSummary(result *ChannelCollectionResult) {
 		}
 	}
 
-	c.protocol.Debugf("PCF: Channel collection complete - discovered:%d visible:%d included:%d enriched:%d",
+	c.protocol.Debugf("Channel collection complete - discovered:%d visible:%d included:%d enriched:%d",
 		result.Stats.Discovery.AvailableItems,
 		result.Stats.Discovery.AvailableItems-result.Stats.Discovery.InvisibleItems,
 		result.Stats.Discovery.IncludedItems,
 		len(result.Channels))
 
-	c.protocol.Debugf("PCF: Channel field collection summary: status=%d messages=%d bytes=%d batches=%d connections=%d "+
+	c.protocol.Debugf("Channel field collection summary: status=%d messages=%d bytes=%d batches=%d connections=%d "+
 		"buffers_used=%d buffers_max=%d batch_size=%d batch_interval=%d disc_interval=%d hb_interval=%d "+
 		"keep_alive_interval=%d short_retry=%d long_retry=%d max_msg_length=%d sharing_conversations=%d network_priority=%d",
 		fieldCounts["status"], fieldCounts["messages"], fieldCounts["bytes"], fieldCounts["batches"],

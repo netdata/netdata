@@ -43,7 +43,7 @@ func (c *Client) GetTopicList() ([]string, error) {
 
 // GetTopicMetrics returns metrics for a specific topic.
 func (c *Client) GetTopicMetrics(topicString string) (*TopicMetrics, error) {
-	c.protocol.Debugf("PCF: Getting metrics for topic '%s' from queue manager '%s'", topicString, c.config.QueueManager)
+	c.protocol.Debugf("Getting metrics for topic '%s' from queue manager '%s'", topicString, c.config.QueueManager)
 
 	params := []pcfParameter{
 		newStringParameter(C.MQCA_TOPIC_STRING, topicString),
@@ -51,14 +51,14 @@ func (c *Client) GetTopicMetrics(topicString string) (*TopicMetrics, error) {
 	}
 	response, err := c.SendPCFCommand(C.MQCMD_INQUIRE_TOPIC_STATUS, params)
 	if err != nil {
-		c.protocol.Errorf("PCF: Failed to get metrics for topic '%s' from queue manager '%s': %v",
+		c.protocol.Errorf("Failed to get metrics for topic '%s' from queue manager '%s': %v",
 			topicString, c.config.QueueManager, err)
 		return nil, err
 	}
 
 	attrs, err := c.ParsePCFResponse(response, "")
 	if err != nil {
-		c.protocol.Errorf("PCF: Failed to parse metrics response for topic '%s' from queue manager '%s': %v",
+		c.protocol.Errorf("Failed to parse metrics response for topic '%s' from queue manager '%s': %v",
 			topicString, c.config.QueueManager, err)
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func (c *Client) GetTopicMetrics(topicString string) (*TopicMetrics, error) {
 			metrics.LastPubDate = AttributeValue(timestamp.Unix())
 			metrics.LastPubTime = AttributeValue(timestamp.Unix())
 		} else {
-			c.protocol.Debugf("PCF: Failed to parse last publication timestamp for topic '%s': %v", topicString, err)
+			c.protocol.Debugf("Failed to parse last publication timestamp for topic '%s': %v", topicString, err)
 		}
 	}
 
@@ -106,7 +106,7 @@ func (c *Client) GetTopicMetrics(topicString string) (*TopicMetrics, error) {
 
 // GetTopics collects comprehensive topic metrics with full transparency statistics
 func (c *Client) GetTopics(collectMetrics bool, maxTopics int, selector string, collectSystem bool) (*TopicCollectionResult, error) {
-	c.protocol.Debugf("PCF: Collecting topic metrics with selector '%s', max=%d, metrics=%v, system=%v",
+	c.protocol.Debugf("Collecting topic metrics with selector '%s', max=%d, metrics=%v, system=%v",
 		selector, maxTopics, collectMetrics, collectSystem)
 
 	result := &TopicCollectionResult{
@@ -125,7 +125,7 @@ func (c *Client) GetTopics(collectMetrics bool, maxTopics int, selector string, 
 	// Step 3: Enrichment
 	c.enrichTopics(topicsToEnrich, collectMetrics, result)
 
-	c.protocol.Debugf("PCF: Topic collection complete - discovered:%d visible:%d included:%d enriched:%d",
+	c.protocol.Debugf("Topic collection complete - discovered:%d visible:%d included:%d enriched:%d",
 		result.Stats.Discovery.AvailableItems,
 		result.Stats.Discovery.AvailableItems-result.Stats.Discovery.InvisibleItems,
 		result.Stats.Discovery.IncludedItems,
@@ -140,7 +140,7 @@ func (c *Client) discoverTopics(result *TopicCollectionResult) ([]string, error)
 	})
 	if err != nil {
 		result.Stats.Discovery.Success = false
-		c.protocol.Errorf("PCF: Topic discovery failed: %v", err)
+		c.protocol.Errorf("Topic discovery failed: %v", err)
 		return nil, fmt.Errorf("topic discovery failed: %w", err)
 	}
 
@@ -159,15 +159,15 @@ func (c *Client) discoverTopics(result *TopicCollectionResult) ([]string, error)
 
 	for errCode, count := range parsed.ErrorCounts {
 		if errCode < 0 {
-			c.protocol.Warningf("PCF: Internal error %d occurred %d times during topic discovery", errCode, count)
+			c.protocol.Warningf("Internal error %d occurred %d times during topic discovery", errCode, count)
 		} else {
-			c.protocol.Warningf("PCF: MQ error %d (%s) occurred %d times during topic discovery",
+			c.protocol.Warningf("MQ error %d (%s) occurred %d times during topic discovery",
 				errCode, mqReasonString(errCode), count)
 		}
 	}
 
 	if len(parsed.Topics) == 0 {
-		c.protocol.Debugf("PCF: No topics discovered")
+		c.protocol.Debugf("No topics discovered")
 	}
 
 	return parsed.Topics, nil
@@ -177,7 +177,7 @@ func (c *Client) filterTopics(topics []string, selector string, collectSystem bo
 	visibleItems := result.Stats.Discovery.AvailableItems - result.Stats.Discovery.InvisibleItems
 	enrichAll := maxTopics <= 0 || visibleItems <= int64(maxTopics)
 
-	c.protocol.Debugf("PCF: Discovery found %d visible topics (total: %d, invisible: %d). EnrichAll=%v",
+	c.protocol.Debugf("Discovery found %d visible topics (total: %d, invisible: %d). EnrichAll=%v",
 		visibleItems, result.Stats.Discovery.AvailableItems, result.Stats.Discovery.InvisibleItems, enrichAll)
 
 	var topicsToEnrich []string
@@ -190,7 +190,7 @@ func (c *Client) filterTopics(topics []string, selector string, collectSystem bo
 			topicsToEnrich = append(topicsToEnrich, topicName)
 			result.Stats.Discovery.IncludedItems++
 		}
-		c.protocol.Debugf("PCF: Enriching %d topics (excluded %d system topics)",
+		c.protocol.Debugf("Enriching %d topics (excluded %d system topics)",
 			len(topicsToEnrich), result.Stats.Discovery.ExcludedItems)
 	} else {
 		for _, topicName := range topics {
@@ -201,7 +201,7 @@ func (c *Client) filterTopics(topics []string, selector string, collectSystem bo
 
 			matched, err := filepath.Match(selector, topicName)
 			if err != nil {
-				c.protocol.Warningf("PCF: Invalid selector pattern '%s': %v", selector, err)
+				c.protocol.Warningf("Invalid selector pattern '%s': %v", selector, err)
 				matched = false
 			}
 
@@ -212,7 +212,7 @@ func (c *Client) filterTopics(topics []string, selector string, collectSystem bo
 				result.Stats.Discovery.ExcludedItems++
 			}
 		}
-		c.protocol.Debugf("PCF: Selector '%s' matched %d topics, excluded %d (including system filtering)",
+		c.protocol.Debugf("Selector '%s' matched %d topics, excluded %d (including system filtering)",
 			selector, result.Stats.Discovery.IncludedItems, result.Stats.Discovery.ExcludedItems)
 	}
 	return topicsToEnrich
@@ -246,7 +246,7 @@ func (c *Client) enrichTopicWithMetrics(tm *TopicMetrics, result *TopicCollectio
 		} else {
 			result.Stats.Metrics.ErrorCounts[-1]++
 		}
-		c.protocol.Debugf("PCF: Failed to get metrics for topic '%s': %v", tm.TopicString, err)
+		c.protocol.Debugf("Failed to get metrics for topic '%s': %v", tm.TopicString, err)
 	} else {
 		result.Stats.Metrics.OkItems++
 		tm.Name = metricsData.Name

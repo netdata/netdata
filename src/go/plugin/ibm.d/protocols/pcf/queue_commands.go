@@ -60,45 +60,45 @@ func QueueTypeString(qtype int32) string {
 
 // GetQueueList returns a list of queues with their types.
 func (c *Client) GetQueueList() ([]QueueInfo, error) {
-	c.protocol.Debugf("PCF: Getting queue list from queue manager '%s'", c.config.QueueManager)
+	c.protocol.Debugf("Getting queue list from queue manager '%s'", c.config.QueueManager)
 
 	const pattern = "*"
 	params := []pcfParameter{
 		newStringParameter(C.MQCA_Q_NAME, pattern),
 	}
 
-	c.protocol.Debugf("PCF: Queue name parameter - value='%s', length=%d", pattern, len(pattern))
+	c.protocol.Debugf("Queue name parameter - value='%s', length=%d", pattern, len(pattern))
 	response, err := c.SendPCFCommand(C.MQCMD_INQUIRE_Q, params)
 	if err != nil {
-		c.protocol.Errorf("PCF: Failed to get queue list from queue manager '%s': %v", c.config.QueueManager, err)
+		c.protocol.Errorf("Failed to get queue list from queue manager '%s': %v", c.config.QueueManager, err)
 		return nil, err
 	}
 
 	result := c.parseQueueListResponseWithType(response)
 
 	if result.InternalErrors > 0 {
-		c.protocol.Warningf("PCF: Encountered %d internal errors while parsing queue list from queue manager '%s'",
+		c.protocol.Warningf("Encountered %d internal errors while parsing queue list from queue manager '%s'",
 			result.InternalErrors, c.config.QueueManager)
 	}
 
 	for errCode, count := range result.ErrorCounts {
 		if errCode < 0 {
-			c.protocol.Warningf("PCF: Internal error %d occurred %d times while parsing queue list from queue manager '%s'",
+			c.protocol.Warningf("Internal error %d occurred %d times while parsing queue list from queue manager '%s'",
 				errCode, count, c.config.QueueManager)
 		} else {
-			c.protocol.Warningf("PCF: MQ error %d (%s) occurred %d times while parsing queue list from queue manager '%s'",
+			c.protocol.Warningf("MQ error %d (%s) occurred %d times while parsing queue list from queue manager '%s'",
 				errCode, mqReasonString(errCode), count, c.config.QueueManager)
 		}
 	}
 
-	c.protocol.Debugf("PCF: Retrieved %d queues from queue manager '%s'", len(result.Queues), c.config.QueueManager)
+	c.protocol.Debugf("Retrieved %d queues from queue manager '%s'", len(result.Queues), c.config.QueueManager)
 
 	return result.Queues, nil
 }
 
 // GetQueues collects comprehensive queue metrics with full transparency statistics
 func (c *Client) GetQueues(collectConfig, collectMetrics, collectReset bool, maxQueues int, selector string, collectSystem bool) (*QueueCollectionResult, error) {
-	c.protocol.Debugf("PCF: Collecting queue metrics with selector '%s', max=%d, config=%v, metrics=%v, reset=%v, system=%v",
+	c.protocol.Debugf("Collecting queue metrics with selector '%s', max=%d, config=%v, metrics=%v, reset=%v, system=%v",
 		selector, maxQueues, collectConfig, collectMetrics, collectReset, collectSystem)
 
 	result := &QueueCollectionResult{
@@ -117,7 +117,7 @@ func (c *Client) GetQueues(collectConfig, collectMetrics, collectReset bool, max
 	// Step 3: Enrichment
 	c.enrichQueues(queuesToEnrich, collectConfig, collectMetrics, collectReset, result)
 
-	c.protocol.Debugf("PCF: Queue collection complete - discovered:%d visible:%d included:%d enriched:%d",
+	c.protocol.Debugf("Queue collection complete - discovered:%d visible:%d included:%d enriched:%d",
 		result.Stats.Discovery.AvailableItems,
 		result.Stats.Discovery.AvailableItems-result.Stats.Discovery.InvisibleItems,
 		result.Stats.Discovery.IncludedItems,
@@ -132,7 +132,7 @@ func (c *Client) discoverQueues(result *QueueCollectionResult) ([]string, error)
 	})
 	if err != nil {
 		result.Stats.Discovery.Success = false
-		c.protocol.Errorf("PCF: Queue discovery failed: %v", err)
+		c.protocol.Errorf("Queue discovery failed: %v", err)
 		return nil, fmt.Errorf("queue discovery failed: %w", err)
 	}
 
@@ -151,15 +151,15 @@ func (c *Client) discoverQueues(result *QueueCollectionResult) ([]string, error)
 
 	for errCode, count := range parsed.ErrorCounts {
 		if errCode < 0 {
-			c.protocol.Warningf("PCF: Internal error %d occurred %d times during queue discovery", errCode, count)
+			c.protocol.Warningf("Internal error %d occurred %d times during queue discovery", errCode, count)
 		} else {
-			c.protocol.Warningf("PCF: MQ error %d (%s) occurred %d times during queue discovery",
+			c.protocol.Warningf("MQ error %d (%s) occurred %d times during queue discovery",
 				errCode, mqReasonString(errCode), count)
 		}
 	}
 
 	if len(parsed.Queues) == 0 {
-		c.protocol.Debugf("PCF: No queues discovered")
+		c.protocol.Debugf("No queues discovered")
 	}
 
 	return parsed.Queues, nil
@@ -169,7 +169,7 @@ func (c *Client) filterQueues(queues []string, selector string, collectSystem bo
 	visibleItems := result.Stats.Discovery.AvailableItems - result.Stats.Discovery.InvisibleItems
 	enrichAll := maxQueues <= 0 || visibleItems <= int64(maxQueues)
 
-	c.protocol.Debugf("PCF: Discovery found %d visible queues (total: %d, invisible: %d). EnrichAll=%v",
+	c.protocol.Debugf("Discovery found %d visible queues (total: %d, invisible: %d). EnrichAll=%v",
 		visibleItems, result.Stats.Discovery.AvailableItems, result.Stats.Discovery.InvisibleItems, enrichAll)
 
 	var queuesToEnrich []string
@@ -182,7 +182,7 @@ func (c *Client) filterQueues(queues []string, selector string, collectSystem bo
 			queuesToEnrich = append(queuesToEnrich, queueName)
 			result.Stats.Discovery.IncludedItems++
 		}
-		c.protocol.Debugf("PCF: Enriching %d queues (excluded %d system queues)",
+		c.protocol.Debugf("Enriching %d queues (excluded %d system queues)",
 			len(queuesToEnrich), result.Stats.Discovery.ExcludedItems)
 	} else {
 		for _, queueName := range queues {
@@ -193,7 +193,7 @@ func (c *Client) filterQueues(queues []string, selector string, collectSystem bo
 
 			matched, err := filepath.Match(selector, queueName)
 			if err != nil {
-				c.protocol.Warningf("PCF: Invalid selector pattern '%s': %v", selector, err)
+				c.protocol.Warningf("Invalid selector pattern '%s': %v", selector, err)
 				matched = false
 			}
 
@@ -204,7 +204,7 @@ func (c *Client) filterQueues(queues []string, selector string, collectSystem bo
 				result.Stats.Discovery.ExcludedItems++
 			}
 		}
-		c.protocol.Debugf("PCF: Selector '%s' matched %d queues, excluded %d (including system filtering)",
+		c.protocol.Debugf("Selector '%s' matched %d queues, excluded %d (including system filtering)",
 			selector, result.Stats.Discovery.IncludedItems, result.Stats.Discovery.ExcludedItems)
 	}
 	return queuesToEnrich
@@ -246,7 +246,7 @@ func (c *Client) enrichQueueWithConfig(qm *QueueMetrics, result *QueueCollection
 		} else {
 			result.Stats.Config.ErrorCounts[-1]++
 		}
-		c.protocol.Debugf("PCF: Failed to get config for queue '%s': %v", qm.Name, err)
+		c.protocol.Debugf("Failed to get config for queue '%s': %v", qm.Name, err)
 		return
 	}
 
@@ -279,7 +279,7 @@ func (c *Client) enrichQueueWithMetrics(qm *QueueMetrics, result *QueueCollectio
 		} else {
 			result.Stats.Metrics.ErrorCounts[-1]++
 		}
-		c.protocol.Debugf("PCF: Failed to get metrics for queue '%s': %v", qm.Name, err)
+		c.protocol.Debugf("Failed to get metrics for queue '%s': %v", qm.Name, err)
 	} else {
 		result.Stats.Metrics.OkItems++
 	}
@@ -301,7 +301,7 @@ func (c *Client) enrichQueueWithResetStats(qm *QueueMetrics, result *QueueCollec
 		} else {
 			result.Stats.Reset.ErrorCounts[-1]++
 		}
-		c.protocol.Debugf("PCF: Failed to get reset stats for queue '%s': %v", qm.Name, err)
+		c.protocol.Debugf("Failed to get reset stats for queue '%s': %v", qm.Name, err)
 	} else {
 		result.Stats.Reset.OkItems++
 	}
@@ -309,7 +309,7 @@ func (c *Client) enrichQueueWithResetStats(qm *QueueMetrics, result *QueueCollec
 
 // getQueueConfiguration gets full configuration data for a specific queue
 func (c *Client) getQueueConfiguration(queueName string) (*QueueInfo, error) {
-	c.protocol.Debugf("PCF: Getting configuration for queue '%s'", queueName)
+	c.protocol.Debugf("Getting configuration for queue '%s'", queueName)
 
 	params := []pcfParameter{
 		newStringParameter(C.MQCA_Q_NAME, queueName),
@@ -445,7 +445,7 @@ func (c *Client) getQueueConfiguration(queueName string) (*QueueInfo, error) {
 		}
 	}
 
-	c.protocol.Debugf("PCF: Retrieved configuration for queue '%s' (type: %d)",
+	c.protocol.Debugf("Retrieved configuration for queue '%s' (type: %d)",
 		queueName, queueInfo.Type)
 
 	return queueInfo, nil
@@ -530,7 +530,7 @@ func (c *Client) enrichWithStatus(metrics *QueueMetrics) error {
 	if val, ok := attrs[C.MQIACF_Q_TIME_INDICATOR]; ok {
 		if timeVal, ok := val.(int32); ok {
 			metrics.AvgQueueTime = AttributeValue(timeVal)
-			c.protocol.Debugf("PCF: Queue '%s' average queue time: %d microseconds", metrics.Name, timeVal)
+			c.protocol.Debugf("Queue '%s' average queue time: %d microseconds", metrics.Name, timeVal)
 		}
 	}
 
