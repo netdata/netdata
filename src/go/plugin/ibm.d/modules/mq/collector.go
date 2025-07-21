@@ -81,6 +81,13 @@ func (c *Collector) CollectOnce() error {
 		}
 	}
 
+	// Collect $SYS topic metrics (resource metrics) - every iteration
+	if c.Config.CollectSysTopics {
+		if err := c.collectSysTopics(); err != nil {
+			c.Warningf("failed to collect $SYS topic metrics: %v", err)
+		}
+	}
+
 	return nil
 }
 

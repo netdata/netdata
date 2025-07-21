@@ -58,4 +58,18 @@ static inline void set_gmo_struc_id(MQGMO* gmo) {
     memcpy(gmo->StrucId, MQGMO_STRUC_ID, sizeof(gmo->StrucId));
 }
 
+static inline void set_dynamic_q_name(MQOD* od, const char* name) {
+    // Dynamic queue name pattern
+    memset(od->DynamicQName, ' ', sizeof(od->DynamicQName));
+    size_t len = strlen(name);
+    if (len > sizeof(od->DynamicQName)) {
+        len = sizeof(od->DynamicQName);
+    }
+    memcpy(od->DynamicQName, name, len);
+}
+
+static inline void set_sd_struc_id(MQSD* sd) {
+    memcpy(sd->StrucId, MQSD_STRUC_ID, sizeof(sd->StrucId));
+}
+
 #endif // PCF_HELPERS_H

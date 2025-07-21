@@ -52,6 +52,11 @@
         "title": "Enable collection of subscription metrics",
         "type": "boolean"
       },
+      "collect_sys_topics": {
+        "default": false,
+        "title": "Enable collection of $SYS topic metrics (provides Queue Manager CPU, memory, and log utilization)",
+        "type": "boolean"
+      },
       "collect_system_channels": {
         "default": true,
         "title": "Enable collection of system channel metrics (SYSTEM.* channels show clustering and administrative health)",
@@ -139,6 +144,11 @@
         "default": "",
         "title": "Pattern to filter subscriptions (wildcards supported)",
         "type": "string"
+      },
+      "sys_topic_interval": {
+        "default": 180,
+        "title": "$SYS topic collection interval in seconds (should match MQ MONINT setting for optimal data freshness)",
+        "type": "integer"
       },
       "topic_selector": {
         "default": "",

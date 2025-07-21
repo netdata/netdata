@@ -70,6 +70,11 @@ type Config struct {
 	CollectStatisticsQueue bool `yaml:"collect_statistics_queue" json:"collect_statistics_queue"`
 	// Statistics collection interval in seconds (should match MQ STATINT setting for optimal data freshness)
 	StatisticsInterval     int  `yaml:"statistics_interval" json:"statistics_interval"`
+	
+	// Enable collection of $SYS topic metrics (provides Queue Manager CPU, memory, and log utilization)
+	CollectSysTopics bool `yaml:"collect_sys_topics" json:"collect_sys_topics"`
+	// $SYS topic collection interval in seconds (should match MQ MONINT setting for optimal data freshness)
+	SysTopicInterval int  `yaml:"sys_topic_interval" json:"sys_topic_interval"`
 }
 
 

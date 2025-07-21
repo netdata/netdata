@@ -81,6 +81,66 @@ QueueManager:
           - { name: invisible, algo: absolute }
           - { name: failed, algo: absolute }
 
+# Add Queue Manager Resource metrics from $SYS topics
+QueueManagerResources:
+  labels: []
+  contexts:
+      - name: CPUUsage
+        context: mq.qmgr.cpu_usage
+        title: Queue Manager CPU Usage
+        units: percentage
+        family: resources
+        type: stacked
+        priority: 1050
+        dimensions:
+          - { name: user, algo: absolute, div: 100 }    # Convert from 0.01% to %
+          - { name: system, algo: absolute, div: 100 }  # Convert from 0.01% to %
+      - name: MemoryUsage
+        context: mq.qmgr.memory_usage
+        title: Queue Manager Memory Usage
+        units: bytes
+        family: resources
+        type: line
+        priority: 1051
+        dimensions:
+          - { name: total, algo: absolute }
+      - name: RAMUsage
+        context: mq.qmgr.ram_usage
+        title: Queue Manager RAM Usage
+        units: bytes
+        family: resources
+        type: line
+        priority: 1052
+        dimensions:
+          - { name: total, algo: absolute }
+      - name: LogUtilization
+        context: mq.qmgr.log_utilization
+        title: Queue Manager Log Utilization
+        units: percentage
+        family: resources
+        type: line
+        priority: 1053
+        dimensions:
+          - { name: used, algo: absolute, div: 100 }    # Convert from 0.01% to %
+      - name: LogFileSize
+        context: mq.qmgr.log_file_size
+        title: Queue Manager Log File Size
+        units: bytes
+        family: resources
+        type: line
+        priority: 1054
+        dimensions:
+          - { name: size, algo: absolute }
+      - name: LogWriteRate
+        context: mq.qmgr.log_write_rate
+        title: Queue Manager Log Write Rate
+        units: bytes/s
+        family: resources
+        type: line
+        priority: 1055
+        dimensions:
+          - { name: rate, algo: absolute }
+
 Queue:
   labels:
     - queue

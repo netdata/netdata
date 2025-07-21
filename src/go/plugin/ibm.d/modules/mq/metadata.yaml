@@ -534,6 +534,47 @@ using the PCF (Programmable Command Format) protocol.
                 - name: excluded
                 - name: invisible
                 - name: failed
+        - name: global
+          description: These metrics refer to the entire monitored instance.
+          labels: []
+          metrics:
+            - name: mq.qmgr.cpu_usage
+              description: Queue Manager CPU Usage
+              unit: percentage
+              chart_type: stacked
+              dimensions:
+                - name: user
+                - name: system
+            - name: mq.qmgr.memory_usage
+              description: Queue Manager Memory Usage
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: total
+            - name: mq.qmgr.ram_usage
+              description: Queue Manager RAM Usage
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: total
+            - name: mq.qmgr.log_utilization
+              description: Queue Manager Log Utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: mq.qmgr.log_file_size
+              description: Queue Manager Log File Size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: size
+            - name: mq.qmgr.log_write_rate
+              description: Queue Manager Log Write Rate
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: rate
         - name: queuestatistics
           description: These metrics refer to queuestatistics instances.
           labels:
