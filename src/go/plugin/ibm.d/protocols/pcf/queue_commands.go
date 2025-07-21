@@ -299,7 +299,7 @@ func (c *Client) GetQueues(collectConfig, collectMetrics, collectReset bool, max
 	}
 	
 	// Log summary
-	c.protocol.Infof("PCF: Queue collection complete - discovered:%d visible:%d included:%d enriched:%d", 
+	c.protocol.Debugf("PCF: Queue collection complete - discovered:%d visible:%d included:%d enriched:%d", 
 		result.Stats.Discovery.AvailableItems, 
 		result.Stats.Discovery.AvailableItems - result.Stats.Discovery.InvisibleItems,
 		result.Stats.Discovery.IncludedItems,

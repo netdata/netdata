@@ -398,14 +398,14 @@ func (c *Client) GetListeners(collectMetrics bool, maxListeners int, selector st
 	}
 	
 	// Log summary
-	c.protocol.Infof("PCF: Listener collection complete - discovered:%d visible:%d included:%d enriched:%d", 
+	c.protocol.Debugf("PCF: Listener collection complete - discovered:%d visible:%d included:%d enriched:%d", 
 		result.Stats.Discovery.AvailableItems, 
 		result.Stats.Discovery.AvailableItems - result.Stats.Discovery.InvisibleItems,
 		result.Stats.Discovery.IncludedItems,
 		len(result.Listeners))
 	
 	// Log field collection summary
-	c.protocol.Infof("PCF: Listener field collection summary: status=%d port=%d backlog=%d ip_address=%d uptime=%d",
+	c.protocol.Debugf("PCF: Listener field collection summary: status=%d port=%d backlog=%d ip_address=%d uptime=%d",
 		fieldCounts["status"], fieldCounts["port"], fieldCounts["backlog"], 
 		fieldCounts["ip_address"], fieldCounts["uptime"])
 	

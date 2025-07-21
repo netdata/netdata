@@ -56,13 +56,13 @@ func (c *Client) GetQueueManagerStatus() (*QueueManagerMetrics, error) {
 	var startDate, startTime string
 	
 	// Try to get start date (constant 3175 = MQCACF_Q_MGR_START_DATE)
-	c.protocol.Infof("PCF: Looking for start date in attributes map with %d entries", len(attrs))
+	c.protocol.Debugf("PCF: Looking for start date in attributes map with %d entries", len(attrs))
 	if date, ok := attrs[C.MQLONG(3175)]; ok {
-		c.protocol.Infof("PCF: Found attribute 3175, type: %T, value: %v", date, date)
+		c.protocol.Debugf("PCF: Found attribute 3175, type: %T, value: %v", date, date)
 		if dateStr, ok := date.(string); ok {
 			startDate = dateStr
 			metrics.StartDate = AttributeValue(len(dateStr)) // Store length as indicator
-			c.protocol.Infof("PCF: Queue manager '%s' start date: %s", c.config.QueueManager, dateStr)
+			c.protocol.Debugf("PCF: Queue manager '%s' start date: %s", c.config.QueueManager, dateStr)
 		} else {
 			c.protocol.Warningf("PCF: Attribute 3175 is not a string, type: %T", date)
 		}
@@ -92,11 +92,11 @@ func (c *Client) GetQueueManagerStatus() (*QueueManagerMetrics, error) {
 		if startTime == "" {
 			// If no start time provided, assume start of day (00:00:00)
 			startTime = "00:00:00"
-			c.protocol.Infof("PCF: Queue manager '%s' - no start time found, assuming 00:00:00", c.config.QueueManager)
+			c.protocol.Debugf("PCF: Queue manager '%s' - no start time found, assuming 00:00:00", c.config.QueueManager)
 		}
 		if uptime, err := CalculateUptimeSeconds(startDate, startTime); err == nil {
 			metrics.Uptime = AttributeValue(uptime)
-			c.protocol.Infof("PCF: Queue manager '%s' uptime: %d seconds", c.config.QueueManager, uptime)
+			c.protocol.Debugf("PCF: Queue manager '%s' uptime: %d seconds", c.config.QueueManager, uptime)
 		} else {
 			c.protocol.Warningf("PCF: Failed to calculate uptime for queue manager '%s': %v", c.config.QueueManager, err)
 		}
@@ -147,7 +147,7 @@ func (c *Client) refreshStaticData() {
 		}
 	}
 	
-	c.protocol.Infof("PCF: Static data refreshed for queue manager '%s' - version: %s, platform: %s", 
+	c.protocol.Debugf("PCF: Static data refreshed for queue manager '%s' - version: %s, platform: %s", 
 		c.config.QueueManager, c.cachedVersion, c.cachedEdition)
 }
 

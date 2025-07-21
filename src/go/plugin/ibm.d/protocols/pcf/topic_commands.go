@@ -256,7 +256,7 @@ func (c *Client) GetTopics(collectMetrics bool, maxTopics int, selector string, 
 	}
 	
 	// Log summary
-	c.protocol.Infof("PCF: Topic collection complete - discovered:%d visible:%d included:%d enriched:%d", 
+	c.protocol.Debugf("PCF: Topic collection complete - discovered:%d visible:%d included:%d enriched:%d", 
 		result.Stats.Discovery.AvailableItems, 
 		result.Stats.Discovery.AvailableItems - result.Stats.Discovery.InvisibleItems,
 		result.Stats.Discovery.IncludedItems,
