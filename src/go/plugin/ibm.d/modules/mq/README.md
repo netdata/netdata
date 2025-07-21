@@ -103,6 +103,25 @@ Metrics:
 | mq.listener.backlog | backlog | connections |
 | mq.listener.uptime | uptime | seconds |
 
+### Per mqistatistics
+
+These metrics refer to individual mqistatistics instances.
+
+Labels:
+
+| Label | Description |
+|:------|:------------|
+| queue_manager | Queue_manager identifier |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:-------|:-----------|:-----|
+| mq.mqi_stats.opens | opens_total, opens_failed | operations/s |
+| mq.mqi_stats.closes | closes_total, closes_failed | operations/s |
+| mq.mqi_stats.inqs | inqs_total, inqs_failed | operations/s |
+| mq.mqi_stats.sets | sets_total, sets_failed | operations/s |
+
 ### Per queue
 
 These metrics refer to individual queue instances.

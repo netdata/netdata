@@ -217,7 +217,7 @@ func (c *Client) parseStatisticsMessage(buffer []byte, md *C.MQMD) (*StatisticsM
 	// Determine statistics type based on command
 	switch cfh.Command {
 	case C.MQCMD_STATISTICS_Q:
-		msg.Type = StatisticsTypeQueue
+		msg.Type = StatisticsType(cfh.Command)
 		queueStats, err := c.parseQueueStatistics(buffer)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse queue statistics: %w", err)
@@ -225,12 +225,20 @@ func (c *Client) parseStatisticsMessage(buffer []byte, md *C.MQMD) (*StatisticsM
 		msg.QueueStats = queueStats
 		
 	case C.MQCMD_STATISTICS_CHANNEL:
-		msg.Type = StatisticsTypeChannel
+		msg.Type = StatisticsType(cfh.Command)
 		channelStats, err := c.parseChannelStatistics(buffer)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse channel statistics: %w", err)
 		}
 		msg.ChannelStats = channelStats
+		
+	case C.MQCMD_STATISTICS_MQI:
+		msg.Type = StatisticsType(cfh.Command)
+		mqiStats, err := c.parseMQIStatistics(buffer)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse MQI statistics: %w", err)
+		}
+		msg.MQIStats = mqiStats
 		
 	default:
 		return nil, fmt.Errorf("unsupported statistics command: %s (%d)", 
@@ -479,4 +487,124 @@ func (c *Client) parseChannelStatistics(buffer []byte) ([]ChannelStatistics, err
 		stat.Name, stat.Messages, stat.Bytes)
 
 	return stats, nil
+}
+
+// parseMQIStatistics parses MQI statistics from the raw PCF message
+func (c *Client) parseMQIStatistics(buffer []byte) ([]MQIStatistics, error) {
+	attrs, err := c.ParsePCFResponse(buffer, "STATISTICS_MQI")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse MQI statistics: %w", err)
+	}
+	
+	var mqiStats []MQIStatistics
+	var stat MQIStatistics
+	
+	// Extract name (could be queue manager or queue name depending on STATMQI setting)
+	if val, ok := attrs[C.MQCA_Q_MGR_NAME]; ok {
+		if strVal, ok := val.(string); ok {
+			stat.Name = strings.TrimSpace(strVal)
+		}
+	}
+	// If not queue manager name, try queue name
+	if stat.Name == "" {
+		if val, ok := attrs[C.MQCA_Q_NAME]; ok {
+			if strVal, ok := val.(string); ok {
+				stat.Name = strings.TrimSpace(strVal)
+			}
+		}
+	}
+	
+	// Extract MQOPEN operations
+	if val, ok := attrs[C.MQIAMO_OPENS]; ok {
+		if intVal, ok := val.(int32); ok {
+			stat.Opens = AttributeValue(intVal)
+		}
+	}
+	if val, ok := attrs[C.MQIAMO_OPENS_FAILED]; ok {
+		if intVal, ok := val.(int32); ok {
+			stat.OpensFailed = AttributeValue(intVal)
+		}
+	}
+	
+	// Extract MQCLOSE operations
+	if val, ok := attrs[C.MQIAMO_CLOSES]; ok {
+		if intVal, ok := val.(int32); ok {
+			stat.Closes = AttributeValue(intVal)
+		}
+	}
+	if val, ok := attrs[C.MQIAMO_CLOSES_FAILED]; ok {
+		if intVal, ok := val.(int32); ok {
+			stat.ClosesFailed = AttributeValue(intVal)
+		}
+	}
+	
+	// Extract MQINQ operations
+	if val, ok := attrs[C.MQIAMO_INQS]; ok {
+		if intVal, ok := val.(int32); ok {
+			stat.Inqs = AttributeValue(intVal)
+		}
+	}
+	if val, ok := attrs[C.MQIAMO_INQS_FAILED]; ok {
+		if intVal, ok := val.(int32); ok {
+			stat.InqsFailed = AttributeValue(intVal)
+		}
+	}
+	
+	// Extract MQSET operations
+	if val, ok := attrs[C.MQIAMO_SETS]; ok {
+		if intVal, ok := val.(int32); ok {
+			stat.Sets = AttributeValue(intVal)
+		}
+	}
+	if val, ok := attrs[C.MQIAMO_SETS_FAILED]; ok {
+		if intVal, ok := val.(int32); ok {
+			stat.SetsFailed = AttributeValue(intVal)
+		}
+	}
+	
+	// Extract timestamp information
+	var startDate, startTime, endDate, endTime string
+	if val, ok := attrs[C.MQCAMO_START_DATE]; ok {
+		if strVal, ok := val.(string); ok {
+			startDate = strings.TrimSpace(strVal)
+		}
+	}
+	if val, ok := attrs[C.MQCAMO_START_TIME]; ok {
+		if strVal, ok := val.(string); ok {
+			startTime = strings.TrimSpace(strVal)
+		}
+	}
+	if val, ok := attrs[C.MQCAMO_END_DATE]; ok {
+		if strVal, ok := val.(string); ok {
+			endDate = strings.TrimSpace(strVal)
+		}
+	}
+	if val, ok := attrs[C.MQCAMO_END_TIME]; ok {
+		if strVal, ok := val.(string); ok {
+			endTime = strings.TrimSpace(strVal)
+		}
+	}
+	
+	// Convert timestamps to Unix epoch if we have both date and time
+	if startDate != "" && startTime != "" {
+		if startTimestamp, err := ParseMQDateTime(startDate, startTime); err == nil {
+			stat.StartDate = AttributeValue(startTimestamp.Unix())
+			stat.StartTime = AttributeValue(startTimestamp.Unix())
+		}
+	}
+	if endDate != "" && endTime != "" {
+		if endTimestamp, err := ParseMQDateTime(endDate, endTime); err == nil {
+			stat.EndDate = AttributeValue(endTimestamp.Unix())
+			stat.EndTime = AttributeValue(endTimestamp.Unix())
+		}
+	}
+	
+	// Add the statistics entry
+	mqiStats = append(mqiStats, stat)
+	
+	c.protocol.Debugf("PCF: Parsed MQI statistics for '%s' - opens: %v (failed: %v), closes: %v (failed: %v), inqs: %v (failed: %v), sets: %v (failed: %v)", 
+		stat.Name, stat.Opens, stat.OpensFailed, stat.Closes, stat.ClosesFailed, 
+		stat.Inqs, stat.InqsFailed, stat.Sets, stat.SetsFailed)
+	
+	return mqiStats, nil
 }

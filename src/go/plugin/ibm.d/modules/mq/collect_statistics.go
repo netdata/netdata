@@ -36,6 +36,10 @@ func (c *Collector) collectStatistics() error {
 			if err := c.collectChannelStatistics(msg.ChannelStats); err != nil {
 				c.Warningf("Failed to process channel statistics: %v", err)
 			}
+		case pcf.StatisticsTypeMQI:
+			if err := c.collectMQIStatistics(msg.MQIStats); err != nil {
+				c.Warningf("Failed to process MQI statistics: %v", err)
+			}
 		default:
 			c.Debugf("Unknown statistics message type: %d", msg.Type)
 		}
@@ -168,6 +172,56 @@ func (c *Collector) collectChannelStatistics(channelStats []pcf.ChannelStatistic
 		}
 
 		c.Debugf("Collected statistics for channel '%s' (type: %s)", channelName, channelType)
+	}
+
+	return nil
+}
+
+// collectMQIStatistics processes MQI statistics messages
+func (c *Collector) collectMQIStatistics(mqiStats []pcf.MQIStatistics) error {
+	for _, stat := range mqiStats {
+		// MQI stats are at queue manager level
+		labels := contexts.MQIStatisticsLabels{
+			Queue_manager: stat.Name,
+		}
+
+		// MQOPEN operations (incremental - rates per second)
+		if stat.Opens.IsCollected() || stat.OpensFailed.IsCollected() {
+			contexts.MQIStatistics.Opens.Set(c.State, labels, contexts.MQIStatisticsOpensValues{
+				Opens_total:  getValue(stat.Opens),
+				Opens_failed: getValue(stat.OpensFailed),
+			})
+			contexts.MQIStatistics.Opens.SetUpdateEvery(c.State, labels, c.Config.StatisticsInterval)
+		}
+
+		// MQCLOSE operations (incremental - rates per second)
+		if stat.Closes.IsCollected() || stat.ClosesFailed.IsCollected() {
+			contexts.MQIStatistics.Closes.Set(c.State, labels, contexts.MQIStatisticsClosesValues{
+				Closes_total:  getValue(stat.Closes),
+				Closes_failed: getValue(stat.ClosesFailed),
+			})
+			contexts.MQIStatistics.Closes.SetUpdateEvery(c.State, labels, c.Config.StatisticsInterval)
+		}
+
+		// MQINQ operations (incremental - rates per second)
+		if stat.Inqs.IsCollected() || stat.InqsFailed.IsCollected() {
+			contexts.MQIStatistics.Inqs.Set(c.State, labels, contexts.MQIStatisticsInqsValues{
+				Inqs_total:  getValue(stat.Inqs),
+				Inqs_failed: getValue(stat.InqsFailed),
+			})
+			contexts.MQIStatistics.Inqs.SetUpdateEvery(c.State, labels, c.Config.StatisticsInterval)
+		}
+
+		// MQSET operations (incremental - rates per second)
+		if stat.Sets.IsCollected() || stat.SetsFailed.IsCollected() {
+			contexts.MQIStatistics.Sets.Set(c.State, labels, contexts.MQIStatisticsSetsValues{
+				Sets_total:  getValue(stat.Sets),
+				Sets_failed: getValue(stat.SetsFailed),
+			})
+			contexts.MQIStatistics.Sets.SetUpdateEvery(c.State, labels, c.Config.StatisticsInterval)
+		}
+
+		c.Debugf("Collected MQI statistics for queue manager '%s'", stat.Name)
 	}
 
 	return nil
