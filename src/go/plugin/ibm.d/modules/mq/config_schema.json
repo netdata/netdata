@@ -47,6 +47,11 @@
         "title": "Enable collection of statistics queue metrics (SYSTEM.ADMIN.STATISTICS.QUEUE provides advanced metrics like min/max depth)",
         "type": "boolean"
       },
+      "collect_subscriptions": {
+        "default": true,
+        "title": "Enable collection of subscription metrics",
+        "type": "boolean"
+      },
       "collect_system_channels": {
         "default": true,
         "title": "Enable collection of system channel metrics (SYSTEM.* channels show clustering and administrative health)",
@@ -129,6 +134,11 @@
         "default": 60,
         "title": "Statistics collection interval in seconds (should match MQ STATINT setting for optimal data freshness)",
         "type": "integer"
+      },
+      "subscription_selector": {
+        "default": "",
+        "title": "Pattern to filter subscriptions (wildcards supported)",
+        "type": "string"
       },
       "topic_selector": {
         "default": "",

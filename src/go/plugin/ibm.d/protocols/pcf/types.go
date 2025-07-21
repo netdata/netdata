@@ -91,6 +91,18 @@ type ChannelMetrics struct {
 	MaxMsgLength         AttributeValue
 	SharingConversations AttributeValue
 	NetworkPriority      AttributeValue
+	
+	// Extended status metrics (from MQCMD_INQUIRE_CHANNEL_STATUS)
+	BuffersSent            AttributeValue  // MQIACH_BUFFERS_SENT - Total buffers sent
+	BuffersReceived        AttributeValue  // MQIACH_BUFFERS_RCVD - Total buffers received
+	CurrentMessages        AttributeValue  // MQIACH_CURRENT_MSGS - In-doubt messages
+	XmitQueueTime          AttributeValue  // MQIACH_XMITQ_TIME_INDICATOR - Transmission queue wait time
+	MCAStatus              AttributeValue  // MQIACH_MCA_STATUS - Message Channel Agent status
+	InDoubtStatus          AttributeValue  // MQIACH_INDOUBT_STATUS - Transaction in-doubt status
+	SSLKeyResets           AttributeValue  // MQIACH_SSL_KEY_RESETS - SSL key reset count
+	NPMSpeed               AttributeValue  // MQIACH_NPM_SPEED - Non-persistent message speed
+	CurrentSharingConvs    AttributeValue  // MQIACH_CURRENT_SHARING_CONVS - Current sharing conversations
+	ConnectionName         string          // MQCACH_CONNECTION_NAME - Connection name/address
 }
 
 // ChannelConfig contains configuration for a channel
@@ -167,6 +179,10 @@ type QueueMetrics struct {
 	// Additional status metrics (from MQCMD_INQUIRE_Q_STATUS)
 	QTimeShort          AttributeValue  // MQIACF_Q_TIME_INDICATOR[0] - Queue time over short period (microseconds)
 	QTimeLong           AttributeValue  // MQIACF_Q_TIME_INDICATOR[1] - Queue time over long period (microseconds)
+	
+	// Queue file size metrics (IBM MQ 9.1.5+)
+	CurrentFileSize     AttributeValue  // MQIACF_CUR_Q_FILE_SIZE - Current queue file size in bytes
+	CurrentMaxFileSize  AttributeValue  // MQIACF_CUR_MAX_FILE_SIZE - Current maximum queue file size in bytes
 }
 
 // QueueConfig contains configuration for a queue
@@ -290,6 +306,22 @@ type TopicCollectionResult struct {
 type ListenerCollectionResult struct {
 	Listeners []ListenerMetrics
 	Stats     CollectionStats
+}
+
+// SubscriptionMetrics contains runtime metrics for a subscription
+type SubscriptionMetrics struct {
+	Name            string
+	TopicString     string
+	Type            AttributeValue // MQSUBTYPE_*
+	MessageCount    AttributeValue // Number of pending messages
+	LastMessageDate string         // MQCACF_LAST_MSG_DATE
+	LastMessageTime string         // MQCACF_LAST_MSG_TIME
+}
+
+// SubscriptionCollectionResult contains subscription metrics and collection statistics
+type SubscriptionCollectionResult struct {
+	Subscriptions []SubscriptionMetrics
+	Stats         CollectionStats
 }
 
 // PCFError represents an error with an MQ reason code

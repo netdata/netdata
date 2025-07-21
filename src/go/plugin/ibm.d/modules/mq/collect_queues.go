@@ -144,6 +144,25 @@ func (c *Collector) collectQueueMetrics() error {
 				})
 			}
 			
+			// File size metrics - only send if at least one is collected (IBM MQ 9.1.5+)
+			if queue.CurrentFileSize.IsCollected() || queue.CurrentMaxFileSize.IsCollected() {
+				fileSizeValues := contexts.QueueFileSizeValues{}
+				hasAnyFileSize := false
+				
+				if queue.CurrentFileSize.IsCollected() {
+					fileSizeValues.Current = queue.CurrentFileSize.Int64()
+					hasAnyFileSize = true
+				}
+				if queue.CurrentMaxFileSize.IsCollected() {
+					fileSizeValues.Max = queue.CurrentMaxFileSize.Int64()
+					hasAnyFileSize = true
+				}
+				
+				if hasAnyFileSize {
+					contexts.Queue.FileSize.Set(c.State, labels, fileSizeValues)
+				}
+			}
+			
 			// Queue time indicators (short/long period) - only send if both collected and not -1
 			if queue.QTimeShort.IsCollected() && queue.QTimeLong.IsCollected() &&
 				queue.QTimeShort.Int64() != -1 && queue.QTimeLong.Int64() != -1 {

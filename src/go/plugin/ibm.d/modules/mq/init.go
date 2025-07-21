@@ -28,6 +28,7 @@ func defaultConfig() Config {
 		CollectChannels:         true,
 		CollectTopics:           true,
 		CollectListeners:        true,
+		CollectSubscriptions:    true,
 		CollectSystemQueues:     true,
 		CollectSystemChannels:   true,
 		CollectSystemTopics:     true,
@@ -47,6 +48,7 @@ func defaultConfig() Config {
 		ChannelSelector: "",
 		TopicSelector:   "",
 		ListenerSelector: "",
+		SubscriptionSelector: "",
 		
 		// Cardinality control defaults
 		MaxQueues:    100,

@@ -67,6 +67,13 @@ func (c *Collector) CollectOnce() error {
 		}
 	}
 
+	// Collect subscription metrics
+	if c.Config.CollectSubscriptions {
+		if err := c.collectSubscriptions(); err != nil {
+			c.Warningf("failed to collect subscription metrics: %v", err)
+		}
+	}
+
 	// Collect statistics queue metrics (advanced metrics) - every iteration
 	if c.Config.CollectStatisticsQueue {
 		if err := c.collectStatistics(); err != nil {
@@ -76,6 +83,7 @@ func (c *Collector) CollectOnce() error {
 
 	return nil
 }
+
 
 
 func (c *Collector) collectQueueManagerMetrics() error {

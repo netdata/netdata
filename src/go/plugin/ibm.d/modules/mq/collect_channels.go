@@ -190,6 +190,76 @@ func (c *Collector) collectChannelMetrics() error {
 				})
 			}
 		}
+		
+		// Extended status metrics - only send if collected and available for all channels
+		
+		// Buffer counts - only send if at least one is collected
+		if channel.BuffersSent.IsCollected() || channel.BuffersReceived.IsCollected() {
+			bufferValues := contexts.ChannelBufferCountsValues{}
+			hasAnyBuffer := false
+			
+			if channel.BuffersSent.IsCollected() {
+				bufferValues.Sent = channel.BuffersSent.Int64()
+				hasAnyBuffer = true
+			}
+			if channel.BuffersReceived.IsCollected() {
+				bufferValues.Received = channel.BuffersReceived.Int64()
+				hasAnyBuffer = true
+			}
+			
+			if hasAnyBuffer {
+				contexts.Channel.BufferCounts.Set(c.State, labels, bufferValues)
+			}
+		}
+		
+		// Current messages - only if collected
+		if channel.CurrentMessages.IsCollected() {
+			contexts.Channel.CurrentMessages.Set(c.State, labels, contexts.ChannelCurrentMessagesValues{
+				Current: channel.CurrentMessages.Int64(),
+			})
+		}
+		
+		// XMITQ time indicator - only if collected
+		if channel.XmitQueueTime.IsCollected() {
+			contexts.Channel.XmitQueueTime.Set(c.State, labels, contexts.ChannelXmitQueueTimeValues{
+				Xmitq_time: channel.XmitQueueTime.Int64(),
+			})
+		}
+		
+		// MCA status - only if collected
+		if channel.MCAStatus.IsCollected() {
+			contexts.Channel.MCAStatus.Set(c.State, labels, contexts.ChannelMCAStatusValues{
+				Mca_status: channel.MCAStatus.Int64(),
+			})
+		}
+		
+		// In-doubt status - only if collected
+		if channel.InDoubtStatus.IsCollected() {
+			contexts.Channel.InDoubtStatus.Set(c.State, labels, contexts.ChannelInDoubtStatusValues{
+				Indoubt_status: channel.InDoubtStatus.Int64(),
+			})
+		}
+		
+		// SSL key resets - only if collected
+		if channel.SSLKeyResets.IsCollected() {
+			contexts.Channel.SSLKeyResets.Set(c.State, labels, contexts.ChannelSSLKeyResetsValues{
+				Ssl_key_resets: channel.SSLKeyResets.Int64(),
+			})
+		}
+		
+		// NPM speed - only if collected
+		if channel.NPMSpeed.IsCollected() {
+			contexts.Channel.NPMSpeed.Set(c.State, labels, contexts.ChannelNPMSpeedValues{
+				Npm_speed: channel.NPMSpeed.Int64(),
+			})
+		}
+		
+		// Current sharing conversations - only if collected
+		if channel.CurrentSharingConvs.IsCollected() {
+			contexts.Channel.CurrentSharingConversations.Set(c.State, labels, contexts.ChannelCurrentSharingConversationsValues{
+				Current_sharing: channel.CurrentSharingConvs.Int64(),
+			})
+		}
 	}
 	
 	return nil
