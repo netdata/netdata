@@ -638,7 +638,25 @@ func (j *Job) updateChart(chart *Chart, collected map[string]int64, sinceLastRun
 		return false
 	}
 
-	if !chart.updated {
+	// Handle SkipGaps: check if any dimension has data
+	if chart.SkipGaps {
+		hasData := false
+		for _, dim := range chart.Dims {
+			if dim.remove {
+				continue
+			}
+			if _, ok := collected[dim.ID]; ok {
+				hasData = true
+				break
+			}
+		}
+		if !hasData {
+			// No dimensions have data - skip this chart entirely
+			return false
+		}
+		// At least one dimension has data - proceed with deltaTime=0
+		sinceLastRun = 0
+	} else if !chart.updated {
 		sinceLastRun = 0
 	}
 
