@@ -24,12 +24,12 @@ const (
 // like min/max depth, average queue time, operation counts, etc.
 func (c *Client) GetStatisticsQueue() (*StatisticsCollectionResult, error) {
 	if !c.connected {
-		c.protocol.Warningf("PCF: Cannot get statistics queue messages from queue manager '%s' - not connected", 
+		c.protocol.Warningf("Cannot get statistics queue messages from queue manager '%s' - not connected", 
 			c.config.QueueManager)
 		return nil, fmt.Errorf("not connected")
 	}
 
-	c.protocol.Debugf("PCF: Opening SYSTEM.ADMIN.STATISTICS.QUEUE on queue manager '%s'", c.config.QueueManager)
+	c.protocol.Debugf("Opening SYSTEM.ADMIN.STATISTICS.QUEUE on queue manager '%s'", c.config.QueueManager)
 
 	// Open the statistics queue for input
 	var od C.MQOD
@@ -49,7 +49,7 @@ func (c *Client) GetStatisticsQueue() (*StatisticsCollectionResult, error) {
 	C.MQOPEN(c.hConn, C.PMQVOID(unsafe.Pointer(&od)), openOptions, &hStatisticsObj, &compCode, &reason)
 
 	if compCode != C.MQCC_OK {
-		c.protocol.Errorf("PCF: Failed to open SYSTEM.ADMIN.STATISTICS.QUEUE on queue manager '%s' - completion code %d, reason %d (%s)",
+		c.protocol.Errorf("Failed to open SYSTEM.ADMIN.STATISTICS.QUEUE on queue manager '%s' - completion code %d, reason %d (%s)",
 			c.config.QueueManager, compCode, reason, mqReasonString(int32(reason)))
 		return nil, fmt.Errorf("MQOPEN statistics queue failed: completion code %d, reason %d (%s)", 
 			compCode, reason, mqReasonString(int32(reason)))
@@ -59,12 +59,12 @@ func (c *Client) GetStatisticsQueue() (*StatisticsCollectionResult, error) {
 		// Close the statistics queue
 		C.MQCLOSE(c.hConn, &hStatisticsObj, C.MQCO_NONE, &compCode, &reason)
 		if compCode != C.MQCC_OK {
-			c.protocol.Warningf("PCF: Failed to close SYSTEM.ADMIN.STATISTICS.QUEUE on queue manager '%s' - completion code %d, reason %d (%s)",
+			c.protocol.Warningf("Failed to close SYSTEM.ADMIN.STATISTICS.QUEUE on queue manager '%s' - completion code %d, reason %d (%s)",
 				c.config.QueueManager, compCode, reason, mqReasonString(int32(reason)))
 		}
 	}()
 
-	c.protocol.Debugf("PCF: Successfully opened SYSTEM.ADMIN.STATISTICS.QUEUE on queue manager '%s', handle: %d", 
+	c.protocol.Debugf("Successfully opened SYSTEM.ADMIN.STATISTICS.QUEUE on queue manager '%s', handle: %d", 
 		c.config.QueueManager, hStatisticsObj)
 
 	var result StatisticsCollectionResult
@@ -91,7 +91,7 @@ func (c *Client) GetStatisticsQueue() (*StatisticsCollectionResult, error) {
 
 		// Get message length first
 		var bufferLength C.MQLONG = 0
-		c.protocol.Debugf("PCF: Attempting to get statistics message #%d from queue manager '%s' (no wait)", 
+		c.protocol.Debugf("Attempting to get statistics message #%d from queue manager '%s' (no wait)", 
 			messageCount, c.config.QueueManager)
 		
 		C.MQGET(c.hConn, hStatisticsObj, C.PMQVOID(unsafe.Pointer(&md)), C.PMQVOID(unsafe.Pointer(&gmo)), 
@@ -99,7 +99,7 @@ func (c *Client) GetStatisticsQueue() (*StatisticsCollectionResult, error) {
 
 		if reason == C.MQRC_NO_MSG_AVAILABLE {
 			// No more messages available
-			c.protocol.Debugf("PCF: No more statistics messages available from queue manager '%s' (processed %d messages)", 
+			c.protocol.Debugf("No more statistics messages available from queue manager '%s' (processed %d messages)", 
 				c.config.QueueManager, messageCount-1)
 			break
 		}
@@ -107,26 +107,26 @@ func (c *Client) GetStatisticsQueue() (*StatisticsCollectionResult, error) {
 		if reason != C.MQRC_TRUNCATED_MSG_FAILED {
 			if messageCount == 1 {
 				// First message failed - this is a real error
-				c.protocol.Errorf("PCF: Failed to get statistics message length from queue manager '%s' - completion code %d, reason %d (%s)",
+				c.protocol.Errorf("Failed to get statistics message length from queue manager '%s' - completion code %d, reason %d (%s)",
 					c.config.QueueManager, compCode, reason, mqReasonString(int32(reason)))
 				return nil, fmt.Errorf("MQGET statistics length failed: completion code %d, reason %d (%s)", 
 					compCode, reason, mqReasonString(int32(reason)))
 			} else {
 				// Subsequent message failed - log and continue
-				c.protocol.Warningf("PCF: Failed to get statistics message #%d from queue manager '%s' - completion code %d, reason %d (%s)",
+				c.protocol.Warningf("Failed to get statistics message #%d from queue manager '%s' - completion code %d, reason %d (%s)",
 					messageCount, c.config.QueueManager, compCode, reason, mqReasonString(int32(reason)))
 				break
 			}
 		}
 
 		if bufferLength > maxMQGetBufferSize {
-			c.protocol.Errorf("PCF: Statistics message from queue manager '%s' too large (%d bytes), maximum allowed is %d bytes", 
+			c.protocol.Errorf("Statistics message from queue manager '%s' too large (%d bytes), maximum allowed is %d bytes", 
 				c.config.QueueManager, bufferLength, maxMQGetBufferSize)
 			return nil, fmt.Errorf("statistics message too large (%d bytes), maximum allowed is %d bytes", 
 				bufferLength, maxMQGetBufferSize)
 		}
 
-		c.protocol.Debugf("PCF: Statistics message size is %d bytes, allocating buffer", bufferLength)
+		c.protocol.Debugf("Statistics message size is %d bytes, allocating buffer", bufferLength)
 
 		// Allocate buffer and get actual message
 		buffer := make([]byte, bufferLength)
@@ -136,25 +136,25 @@ func (c *Client) GetStatisticsQueue() (*StatisticsCollectionResult, error) {
 		if compCode != C.MQCC_OK {
 			if messageCount == 1 {
 				// First message failed - this is a real error
-				c.protocol.Errorf("PCF: Failed to get statistics message data from queue manager '%s' - completion code %d, reason %d (%s)",
+				c.protocol.Errorf("Failed to get statistics message data from queue manager '%s' - completion code %d, reason %d (%s)",
 					c.config.QueueManager, compCode, reason, mqReasonString(int32(reason)))
 				return nil, fmt.Errorf("MQGET statistics data failed: completion code %d, reason %d (%s)", 
 					compCode, reason, mqReasonString(int32(reason)))
 			} else {
 				// Subsequent message failed - log and continue
-				c.protocol.Warningf("PCF: Failed to get statistics message #%d data from queue manager '%s' - completion code %d, reason %d (%s)",
+				c.protocol.Warningf("Failed to get statistics message #%d data from queue manager '%s' - completion code %d, reason %d (%s)",
 					messageCount, c.config.QueueManager, compCode, reason, mqReasonString(int32(reason)))
 				break
 			}
 		}
 
-		c.protocol.Debugf("PCF: Successfully received statistics message #%d (%d bytes) from queue manager '%s'", 
+		c.protocol.Debugf("Successfully received statistics message #%d (%d bytes) from queue manager '%s'", 
 			messageCount, bufferLength, c.config.QueueManager)
 
 		// Parse the statistics message
 		statisticsMsg, err := c.parseStatisticsMessage(buffer[:bufferLength], &md)
 		if err != nil {
-			c.protocol.Warningf("PCF: Failed to parse statistics message #%d from queue manager '%s': %v", 
+			c.protocol.Warningf("Failed to parse statistics message #%d from queue manager '%s': %v", 
 				messageCount, c.config.QueueManager, err)
 			result.Stats.Discovery.UnparsedItems++
 			continue
@@ -162,7 +162,7 @@ func (c *Client) GetStatisticsQueue() (*StatisticsCollectionResult, error) {
 
 		// Filter out old statistics messages (only process messages created after job started)
 		if c.shouldSkipOldStatisticsMessage(statisticsMsg) {
-			c.protocol.Debugf("PCF: Skipping old statistics message #%d (put time: %s %s, job started: %s)", 
+			c.protocol.Debugf("Skipping old statistics message #%d (put time: %s %s, job started: %s)", 
 				messageCount, statisticsMsg.PutDate, statisticsMsg.PutTime, c.jobCreationTime.Format("2006-01-02 15:04:05"))
 			continue
 		}
@@ -174,11 +174,11 @@ func (c *Client) GetStatisticsQueue() (*StatisticsCollectionResult, error) {
 	}
 
 	if messageCount >= maxStatisticsMessages {
-		c.protocol.Errorf("PCF: CRITICAL - Reached statistics messages limit (%d) for queue manager '%s' - this indicates an extremely large deployment", 
+		c.protocol.Errorf("CRITICAL - Reached statistics messages limit (%d) for queue manager '%s' - this indicates an extremely large deployment", 
 			maxStatisticsMessages, c.config.QueueManager)
 	}
 
-	c.protocol.Debugf("PCF: Statistics collection completed for queue manager '%s' - processed %d messages", 
+	c.protocol.Debugf("Statistics collection completed for queue manager '%s' - processed %d messages", 
 		c.config.QueueManager, len(result.Messages))
 
 	return &result, nil
@@ -199,7 +199,7 @@ func (c *Client) parseStatisticsMessage(buffer []byte, md *C.MQMD) (*StatisticsM
 			cfh.Type, C.MQCFT_STATISTICS)
 	}
 
-	c.protocol.Debugf("PCF: Parsing statistics message - command: %s, parameters: %d, length: %d", 
+	c.protocol.Debugf("Parsing statistics message - command: %s, parameters: %d, length: %d", 
 		mqcmdToString(cfh.Command), cfh.ParameterCount, cfh.StrucLength)
 
 	var msg StatisticsMessage
@@ -255,7 +255,7 @@ func (c *Client) shouldSkipOldStatisticsMessage(msg *StatisticsMessage) bool {
 	msgTime, err := ParseMQDateTime(strings.TrimSpace(msg.PutDate), strings.TrimSpace(msg.PutTime))
 	if err != nil {
 		// If we can't parse the timestamp, assume it's old and skip it
-		c.protocol.Warningf("PCF: Failed to parse statistics message timestamp (%s %s): %v - skipping message", 
+		c.protocol.Warningf("Failed to parse statistics message timestamp (%s %s): %v - skipping message", 
 			msg.PutDate, msg.PutTime, err)
 		return true
 	}
@@ -413,7 +413,7 @@ func (c *Client) parseQueueStatistics(buffer []byte) ([]QueueStatistics, error) 
 
 	stats = append(stats, stat)
 	
-	c.protocol.Debugf("PCF: Parsed queue statistics for queue '%s' - min_depth: %v, max_depth: %v", 
+	c.protocol.Debugf("Parsed queue statistics for queue '%s' - min_depth: %v, max_depth: %v", 
 		stat.Name, stat.MinDepth, stat.MaxDepth)
 
 	return stats, nil
@@ -483,7 +483,7 @@ func (c *Client) parseChannelStatistics(buffer []byte) ([]ChannelStatistics, err
 
 	stats = append(stats, stat)
 	
-	c.protocol.Debugf("PCF: Parsed channel statistics for channel '%s' - messages: %v, bytes: %v", 
+	c.protocol.Debugf("Parsed channel statistics for channel '%s' - messages: %v, bytes: %v", 
 		stat.Name, stat.Messages, stat.Bytes)
 
 	return stats, nil
@@ -602,7 +602,7 @@ func (c *Client) parseMQIStatistics(buffer []byte) ([]MQIStatistics, error) {
 	// Add the statistics entry
 	mqiStats = append(mqiStats, stat)
 	
-	c.protocol.Debugf("PCF: Parsed MQI statistics for '%s' - opens: %v (failed: %v), closes: %v (failed: %v), inqs: %v (failed: %v), sets: %v (failed: %v)", 
+	c.protocol.Debugf("Parsed MQI statistics for '%s' - opens: %v (failed: %v), closes: %v (failed: %v), inqs: %v (failed: %v), sets: %v (failed: %v)", 
 		stat.Name, stat.Opens, stat.OpensFailed, stat.Closes, stat.ClosesFailed, 
 		stat.Inqs, stat.InqsFailed, stat.Sets, stat.SetsFailed)
 	

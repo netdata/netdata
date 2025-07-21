@@ -67,7 +67,7 @@ func (c *Client) parseGenericListResponse(response []byte, nameAttr C.MQLONG, pr
 
 		attrs, err := c.ParsePCFResponse(response[offset:messageEnd], "")
 		if err != nil {
-			c.protocol.Warningf("PCF: Failed to parse response message at offset %d for queue manager '%s': %v",
+			c.protocol.Warningf("Failed to parse response message at offset %d for queue manager '%s': %v",
 				offset, c.config.QueueManager, err)
 			result.InternalErrors++
 			result.ErrorCounts[ErrInternalParsing]++

@@ -15,31 +15,31 @@ import (
 
 // Connect connects to the queue manager.
 func (c *Client) Connect() error {
-	c.protocol.Debugf("PCF protocol starting connection attempt to queue manager '%s' on %s:%d via channel '%s' (user: '%s')", 
+	c.protocol.Debugf("protocol starting connection attempt to queue manager '%s' on %s:%d via channel '%s' (user: '%s')", 
 		c.config.QueueManager, c.config.Host, c.config.Port, c.config.Channel, c.config.User)
 	
 	backoff := c.protocol.GetBackoff()
 	attemptCount := 0
 	err := backoff.Retry(func() error {
 		attemptCount++
-		c.protocol.Debugf("PCF connection attempt #%d to %s:%d (queue manager: '%s', channel: '%s')", 
+		c.protocol.Debugf("connection attempt #%d to %s:%d (queue manager: '%s', channel: '%s')", 
 			attemptCount, c.config.Host, c.config.Port, c.config.QueueManager, c.config.Channel)
 		return c.doConnect()
 	})
 	if err != nil {
-		c.protocol.Errorf("PCF connection failed to queue manager '%s' at %s:%d after %d attempts: %v", 
+		c.protocol.Errorf("connection failed to queue manager '%s' at %s:%d after %d attempts: %v", 
 			c.config.QueueManager, c.config.Host, c.config.Port, attemptCount, err)
 		return err
 	}
 	c.protocol.MarkConnected()
-	c.protocol.Debugf("PCF successfully connected to queue manager '%s' at %s:%d (channel: '%s', user: '%s') after %d attempts", 
+	c.protocol.Debugf("successfully connected to queue manager '%s' at %s:%d (channel: '%s', user: '%s') after %d attempts", 
 		c.config.QueueManager, c.config.Host, c.config.Port, c.config.Channel, c.config.User, attemptCount)
 	return nil
 }
 
 func (c *Client) doConnect() error {
 	if c.connected {
-		c.protocol.Debugf("PCF already connected to queue manager '%s' at %s:%d, skipping connection attempt", 
+		c.protocol.Debugf("already connected to queue manager '%s' at %s:%d, skipping connection attempt", 
 			c.config.QueueManager, c.config.Host, c.config.Port)
 		return nil
 	}
@@ -49,7 +49,7 @@ func (c *Client) doConnect() error {
 	// causing MQRCCF_CFH_PARM_ID_ERROR and MQRCCF_COMMAND_FAILED errors.
 	// We must unset LC_ALL to allow MQ to use the default locale handling.
 	if os.Getenv("LC_ALL") == "C" {
-		c.protocol.Debugf("PCF: Unsetting LC_ALL=C for IBM MQ compatibility (queue manager: '%s')", c.config.QueueManager)
+		c.protocol.Debugf("Unsetting LC_ALL=C for IBM MQ compatibility (queue manager: '%s')", c.config.QueueManager)
 		os.Unsetenv("LC_ALL")
 	}
 
@@ -76,7 +76,7 @@ func (c *Client) doConnect() error {
 
 	// Set connection name (host and port)
 	connName := fmt.Sprintf("%s(%d)", c.config.Host, c.config.Port)
-	c.protocol.Debugf("PCF: Setting connection name to '%s' for queue manager '%s'", connName, c.config.QueueManager)
+	c.protocol.Debugf("Setting connection name to '%s' for queue manager '%s'", connName, c.config.QueueManager)
 	cConnName := C.CString(connName)
 	defer C.free(unsafe.Pointer(cConnName))
 	C.strncpy((*C.char)(unsafe.Pointer(&cd.ConnectionName)), cConnName, C.MQ_CONN_NAME_LENGTH)
@@ -124,17 +124,17 @@ func (c *Client) doConnect() error {
 	var reason C.MQLONG
 
 	// Connect to queue manager
-	c.protocol.Debugf("PCF: Calling MQCONNX to connect to queue manager '%s' at %s:%d via channel '%s'", 
+	c.protocol.Debugf("Calling MQCONNX to connect to queue manager '%s' at %s:%d via channel '%s'", 
 		c.config.QueueManager, c.config.Host, c.config.Port, c.config.Channel)
 	C.MQCONNX(qmName, cno, &c.hConn, &compCode, &reason)
 
 	if compCode != C.MQCC_OK {
-		c.protocol.Errorf("PCF: MQCONNX failed for queue manager '%s' at %s:%d - completion code %d, reason %d (%s)",
+		c.protocol.Errorf("MQCONNX failed for queue manager '%s' at %s:%d - completion code %d, reason %d (%s)",
 			c.config.QueueManager, c.config.Host, c.config.Port, compCode, reason, mqReasonString(int32(reason)))
 		return fmt.Errorf("MQCONNX failed: completion code %d, reason %d (%s) (check queue manager '%s' is running and accessible on %s:%d)",
 			compCode, reason, mqReasonString(int32(reason)), c.config.QueueManager, c.config.Host, c.config.Port)
 	}
-	c.protocol.Debugf("PCF: MQCONNX successful for queue manager '%s', connection handle: %d", c.config.QueueManager, c.hConn)
+	c.protocol.Debugf("MQCONNX successful for queue manager '%s', connection handle: %d", c.config.QueueManager, c.hConn)
 
 	// Open system command input queue for PCF commands
 	var od C.MQOD
@@ -152,7 +152,7 @@ func (c *Client) doConnect() error {
 	compCode = C.MQCC_FAILED
 	reason = C.MQRC_UNEXPECTED_ERROR
 
-	c.protocol.Debugf("PCF: Opening SYSTEM.ADMIN.COMMAND.QUEUE for queue manager '%s'", c.config.QueueManager)
+	c.protocol.Debugf("Opening SYSTEM.ADMIN.COMMAND.QUEUE for queue manager '%s'", c.config.QueueManager)
 	C.MQOPEN(c.hConn, C.PMQVOID(unsafe.Pointer(&od)), openOptions, &c.hObj, &compCode, &reason)
 
 	if compCode != C.MQCC_OK {
@@ -160,14 +160,14 @@ func (c *Client) doConnect() error {
 		openCompCode := compCode
 		openReason := reason
 
-		c.protocol.Errorf("PCF: MQOPEN failed for SYSTEM.ADMIN.COMMAND.QUEUE on queue manager '%s' - completion code %d, reason %d (%s)",
+		c.protocol.Errorf("MQOPEN failed for SYSTEM.ADMIN.COMMAND.QUEUE on queue manager '%s' - completion code %d, reason %d (%s)",
 			c.config.QueueManager, openCompCode, openReason, mqReasonString(int32(openReason)))
 
 		var discCompCode, discReason C.MQLONG
 		C.MQDISC(&c.hConn, &discCompCode, &discReason)
 		return fmt.Errorf("MQOPEN failed: completion code %d, reason %d (%s) (check PCF permissions for SYSTEM.ADMIN.COMMAND.QUEUE)", openCompCode, openReason, mqReasonString(int32(openReason)))
 	}
-	c.protocol.Debugf("PCF: Successfully opened SYSTEM.ADMIN.COMMAND.QUEUE for queue manager '%s', handle: %d", c.config.QueueManager, c.hObj)
+	c.protocol.Debugf("Successfully opened SYSTEM.ADMIN.COMMAND.QUEUE for queue manager '%s', handle: %d", c.config.QueueManager, c.hObj)
 
 	// Create a persistent dynamic reply queue for all PCF commands
 	var replyOd C.MQOD
@@ -187,14 +187,14 @@ func (c *Client) doConnect() error {
 
 	var replyOpenOptions C.MQLONG = C.MQOO_INPUT_AS_Q_DEF | C.MQOO_FAIL_IF_QUIESCING
 
-	c.protocol.Debugf("PCF: Creating dynamic reply queue for queue manager '%s' using model queue SYSTEM.DEFAULT.MODEL.QUEUE", c.config.QueueManager)
+	c.protocol.Debugf("Creating dynamic reply queue for queue manager '%s' using model queue SYSTEM.DEFAULT.MODEL.QUEUE", c.config.QueueManager)
 	C.MQOPEN(c.hConn, C.PMQVOID(unsafe.Pointer(&replyOd)), replyOpenOptions, &c.hReplyObj, &compCode, &reason)
 	if compCode != C.MQCC_OK {
 		// Save the actual error codes before disconnect
 		replyOpenCompCode := compCode
 		replyOpenReason := reason
 
-		c.protocol.Errorf("PCF: Failed to create dynamic reply queue for queue manager '%s' - completion code %d, reason %d (%s)",
+		c.protocol.Errorf("Failed to create dynamic reply queue for queue manager '%s' - completion code %d, reason %d (%s)",
 			c.config.QueueManager, replyOpenCompCode, replyOpenReason, mqReasonString(int32(replyOpenReason)))
 
 		// Close admin queue
@@ -212,7 +212,7 @@ func (c *Client) doConnect() error {
 	replyQNameBytes := make([]byte, 48)
 	C.memcpy(unsafe.Pointer(&replyQNameBytes[0]), unsafe.Pointer(&replyOd.ObjectName), 48)
 	replyQNameStr := string(replyQNameBytes[:])
-	c.protocol.Debugf("PCF: Successfully created dynamic reply queue '%s' for queue manager '%s', handle: %d", 
+	c.protocol.Debugf("Successfully created dynamic reply queue '%s' for queue manager '%s', handle: %d", 
 		replyQNameStr, c.config.QueueManager, c.hReplyObj)
 
 	c.connected = true
@@ -226,21 +226,21 @@ func (c *Client) doConnect() error {
 // Disconnect disconnects from the queue manager.
 func (c *Client) Disconnect() {
 	if !c.connected {
-		c.protocol.Debugf("PCF: Already disconnected from queue manager '%s', skipping disconnect", c.config.QueueManager)
+		c.protocol.Debugf("Already disconnected from queue manager '%s', skipping disconnect", c.config.QueueManager)
 		return
 	}
 
-	c.protocol.Debugf("PCF: Starting disconnect from queue manager '%s' at %s:%d", 
+	c.protocol.Debugf("Starting disconnect from queue manager '%s' at %s:%d", 
 		c.config.QueueManager, c.config.Host, c.config.Port)
 
 	var compCode, reason C.MQLONG
 
 	// Close reply queue
 	if c.hReplyObj != 0 {
-		c.protocol.Debugf("PCF: Closing reply queue for queue manager '%s'", c.config.QueueManager)
+		c.protocol.Debugf("Closing reply queue for queue manager '%s'", c.config.QueueManager)
 		C.MQCLOSE(c.hConn, &c.hReplyObj, C.MQCO_DELETE_PURGE, &compCode, &reason)
 		if compCode != C.MQCC_OK {
-			c.protocol.Warningf("PCF: Failed to close reply queue for queue manager '%s' - completion code %d, reason %d (%s)",
+			c.protocol.Warningf("Failed to close reply queue for queue manager '%s' - completion code %d, reason %d (%s)",
 				c.config.QueueManager, compCode, reason, mqReasonString(int32(reason)))
 		}
 		c.hReplyObj = 0
@@ -248,10 +248,10 @@ func (c *Client) Disconnect() {
 
 	// Close admin queue
 	if c.hObj != 0 {
-		c.protocol.Debugf("PCF: Closing SYSTEM.ADMIN.COMMAND.QUEUE for queue manager '%s'", c.config.QueueManager)
+		c.protocol.Debugf("Closing SYSTEM.ADMIN.COMMAND.QUEUE for queue manager '%s'", c.config.QueueManager)
 		C.MQCLOSE(c.hConn, &c.hObj, C.MQCO_NONE, &compCode, &reason)
 		if compCode != C.MQCC_OK {
-			c.protocol.Warningf("PCF: Failed to close SYSTEM.ADMIN.COMMAND.QUEUE for queue manager '%s' - completion code %d, reason %d (%s)",
+			c.protocol.Warningf("Failed to close SYSTEM.ADMIN.COMMAND.QUEUE for queue manager '%s' - completion code %d, reason %d (%s)",
 				c.config.QueueManager, compCode, reason, mqReasonString(int32(reason)))
 		}
 		c.hObj = 0
@@ -259,15 +259,15 @@ func (c *Client) Disconnect() {
 
 	// Disconnect from queue manager
 	if c.hConn != 0 {
-		c.protocol.Debugf("PCF: Disconnecting from queue manager '%s'", c.config.QueueManager)
+		c.protocol.Debugf("Disconnecting from queue manager '%s'", c.config.QueueManager)
 		C.MQDISC(&c.hConn, &compCode, &reason)
 		if compCode != C.MQCC_OK {
-			c.protocol.Warningf("PCF: MQDISC failed for queue manager '%s' - completion code %d, reason %d (%s)",
+			c.protocol.Warningf("MQDISC failed for queue manager '%s' - completion code %d, reason %d (%s)",
 				c.config.QueueManager, compCode, reason, mqReasonString(int32(reason)))
 		}
 		c.hConn = 0
 	}
 
 	c.connected = false
-	c.protocol.Debugf("PCF: Successfully disconnected from queue manager '%s'", c.config.QueueManager)
+	c.protocol.Debugf("Successfully disconnected from queue manager '%s'", c.config.QueueManager)
 }
