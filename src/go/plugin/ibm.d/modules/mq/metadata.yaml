@@ -561,3 +561,9 @@ using the PCF (Programmable Command Format) protocol.
               chart_type: line
               dimensions:
                 - name: messages
+            - name: mq.topic.time_since_last_message
+              description: Time Since Last Message
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: time_since_last_msg

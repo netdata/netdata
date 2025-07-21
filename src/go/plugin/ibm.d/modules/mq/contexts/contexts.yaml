@@ -444,6 +444,15 @@ Topic:
         priority: 4002
         dimensions:
           - { name: messages, algo: incremental }
+      - name: TimeSinceLastMessage
+        context: mq.topic.time_since_last_message
+        title: Time Since Last Message
+        units: seconds
+        family: topics
+        type: line
+        priority: 4003
+        dimensions:
+          - { name: time_since_last_msg, algo: absolute }
 
 Listener:
   labels: [listener, port, ip_address]

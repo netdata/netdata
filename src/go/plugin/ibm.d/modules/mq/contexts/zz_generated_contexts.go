@@ -3507,6 +3507,28 @@ func (c TopicMessagesContext) SetUpdateEvery(state *framework.CollectorState, la
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
+// TopicTimeSinceLastMessageValues defines the type-safe values for Topic.TimeSinceLastMessage context
+type TopicTimeSinceLastMessageValues struct {
+	Time_since_last_msg int64
+}
+
+// TopicTimeSinceLastMessageContext provides type-safe operations for Topic.TimeSinceLastMessage context
+type TopicTimeSinceLastMessageContext struct {
+	framework.Context[TopicLabels]
+}
+
+// Set provides type-safe dimension setting for Topic.TimeSinceLastMessage context
+func (c TopicTimeSinceLastMessageContext) Set(state *framework.CollectorState, labels TopicLabels, values TopicTimeSinceLastMessageValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"time_since_last_msg": values.Time_since_last_msg,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c TopicTimeSinceLastMessageContext) SetUpdateEvery(state *framework.CollectorState, labels TopicLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
 
 
 // TopicLabels defines the required labels for Topic contexts
@@ -3526,6 +3548,7 @@ var Topic = struct {
 	Publishers TopicPublishersContext
 	Subscribers TopicSubscribersContext
 	Messages TopicMessagesContext
+	TimeSinceLastMessage TopicTimeSinceLastMessageContext
 }{
 	Publishers: TopicPublishersContext{
 		Context: framework.Context[TopicLabels]{
@@ -3586,6 +3609,29 @@ var Topic = struct {
 			{
 				Name:      "messages",
 				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"topic",
+		},
+		},
+	},
+	TimeSinceLastMessage: TopicTimeSinceLastMessageContext{
+		Context: framework.Context[TopicLabels]{
+		Name:       "mq.topic.time_since_last_message",
+		Family:     "topics",
+		Title:      "Time Since Last Message",
+		Units:      "seconds",
+		Type:       module.Line,
+		Priority:   4003,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "time_since_last_msg",
+				Algorithm: module.Absolute,
 				Mul:       1,
 				Div:       1,
 				Precision: 1,
@@ -3664,5 +3710,6 @@ func GetAllContexts() []interface{} {
 		&Topic.Publishers.Context,
 		&Topic.Subscribers.Context,
 		&Topic.Messages.Context,
+		&Topic.TimeSinceLastMessage.Context,
 	}
 }
