@@ -527,10 +527,13 @@ func (c *Client) enrichWithStatus(metrics *QueueMetrics) error {
 		}
 	}
 
+	// MQIACF_Q_TIME_INDICATOR returns an array with [short_period, long_period] time indicators
 	if val, ok := attrs[C.MQIACF_Q_TIME_INDICATOR]; ok {
-		if timeVal, ok := val.(int32); ok {
-			metrics.AvgQueueTime = AttributeValue(timeVal)
-			c.protocol.Debugf("Queue '%s' average queue time: %d microseconds", metrics.Name, timeVal)
+		if arrayVal, ok := val.([]int32); ok && len(arrayVal) >= 2 {
+			metrics.QTimeShort = AttributeValue(arrayVal[0])
+			metrics.QTimeLong = AttributeValue(arrayVal[1])
+			c.protocol.Debugf("Queue '%s' time indicators - short: %d, long: %d microseconds", 
+				metrics.Name, arrayVal[0], arrayVal[1])
 		}
 	}
 

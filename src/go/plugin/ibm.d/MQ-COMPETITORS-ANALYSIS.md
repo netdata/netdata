@@ -151,8 +151,8 @@ Many metrics require specific monitoring levels set on MQ objects:
 | Get/Put fail counts | ✅² | ❌ | ❌ | ✅ | ❌ | ❌ | Via STATISTICS.QUEUE |
 | Non-queued messages | ✅² | ❌ | ❌ | ✅ | ❌ | ❌ | Via STATISTICS.QUEUE |
 | Purge count | ✅² | ❌ | ❌ | ✅ | ❌ | ❌ | Via STATISTICS.QUEUE |
-| MQOPEN/CLOSE/INQ/SET counts | ❌² | ✅ | ❓ | ❌ | ❌ | ❌ | Via statistics queue |
-| Short/Long time indicators | ❌² | ❓ | ✅ | ❌ | ❌ | ✅ | Via statistics queue |
+| MQOPEN/CLOSE/INQ/SET counts | ✅² | ✅ | ❓ | ❌ | ❌ | ❌ | Via statistics queue |
+| Short/Long time indicators | ✅² | ❓ | ✅ | ❌ | ❌ | ✅ | Via statistics queue |
 | High/Low depth events | ✅ | ❓ | ✅ | ✅ | ❌ | ✅ | Threshold monitoring |
 | Inhibit status | ✅ | ❓ | ✅ | ✅ | ❌ | ❌ | Get/Put inhibited |
 | Backout threshold | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | Poison msg handling |
@@ -175,7 +175,7 @@ Many metrics require specific monitoring levels set on MQ objects:
 
 **Legend:**
 - ❌¹ = Available via PCF, not yet implemented (easy to add)
-- ❌² = Requires SYSTEM.ADMIN.STATISTICS.QUEUE consumer (different architecture)
+- ✅² = Implemented via SYSTEM.ADMIN.STATISTICS.QUEUE consumer
 - ✅³ = Implemented but disabled by default (destructive operation - user must enable)
 - ❌⁴ = Not available via MQ APIs (filesystem metrics)
 
@@ -447,6 +447,7 @@ Requires consuming SYSTEM.ADMIN.STATISTICS.QUEUE messages:
 - ✅ MQOPEN/CLOSE/INQ/SET counts (MQIAMO_OPENS, MQIAMO_CLOSES, etc.)
 - ✅ **NEW: MQI statistics reorganized under queues family for better organization**
 - ✅ **NEW: Time since last message metric for topics (MQCACF_LAST_PUB_TIME)**
+- ✅ **NEW: Short/Long time indicators (MQIAMO_Q_TIME_SHORT/LONG)**
 
 ### Phase 3: Code Quality and Maintainability Improvements ✅ COMPLETED
 1. **Framework Improvements**

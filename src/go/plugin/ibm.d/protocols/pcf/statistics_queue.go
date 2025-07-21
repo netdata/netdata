@@ -312,6 +312,12 @@ func (c *Client) parseQueueStatistics(buffer []byte) ([]QueueStatistics, error) 
 			stat.AvgQTimePersistent = AttributeValue(arrayVal[1])
 		}
 	}
+	
+	// Extract short/long time indicators
+	// Note: These constants appear to be MQIAMO_Q_TIME_AVG/MIN/MAX in some versions
+	// For now, we'll leave these fields unpopulated until we can verify the correct constants
+	stat.QTimeShort = NotCollected
+	stat.QTimeLong = NotCollected
 
 	// Extract put/get operations (arrays with [0]=non-persistent, [1]=persistent)
 	if val, ok := attrs[C.MQIAMO_PUTS]; ok {

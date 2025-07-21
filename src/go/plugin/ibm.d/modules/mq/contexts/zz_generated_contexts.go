@@ -1630,25 +1630,27 @@ func (c QueueOldestMessageAgeContext) SetUpdateEvery(state *framework.CollectorS
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-// QueueAverageQueueTimeValues defines the type-safe values for Queue.AverageQueueTime context
-type QueueAverageQueueTimeValues struct {
-	Avg_queue_time int64
+// QueueQueueTimeIndicatorsValues defines the type-safe values for Queue.QueueTimeIndicators context
+type QueueQueueTimeIndicatorsValues struct {
+	Short_period int64
+	Long_period int64
 }
 
-// QueueAverageQueueTimeContext provides type-safe operations for Queue.AverageQueueTime context
-type QueueAverageQueueTimeContext struct {
+// QueueQueueTimeIndicatorsContext provides type-safe operations for Queue.QueueTimeIndicators context
+type QueueQueueTimeIndicatorsContext struct {
 	framework.Context[QueueLabels]
 }
 
-// Set provides type-safe dimension setting for Queue.AverageQueueTime context
-func (c QueueAverageQueueTimeContext) Set(state *framework.CollectorState, labels QueueLabels, values QueueAverageQueueTimeValues) {
+// Set provides type-safe dimension setting for Queue.QueueTimeIndicators context
+func (c QueueQueueTimeIndicatorsContext) Set(state *framework.CollectorState, labels QueueLabels, values QueueQueueTimeIndicatorsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"avg_queue_time": values.Avg_queue_time,
+		"short_period": values.Short_period,
+		"long_period": values.Long_period,
 	})
 }
 
 // SetUpdateEvery sets the update interval for this instance
-func (c QueueAverageQueueTimeContext) SetUpdateEvery(state *framework.CollectorState, labels QueueLabels, updateEvery int) {
+func (c QueueQueueTimeIndicatorsContext) SetUpdateEvery(state *framework.CollectorState, labels QueueLabels, updateEvery int) {
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
@@ -1955,7 +1957,7 @@ var Queue = struct {
 	UncommittedMessages QueueUncommittedMessagesContext
 	LastActivity QueueLastActivityContext
 	OldestMessageAge QueueOldestMessageAgeContext
-	AverageQueueTime QueueAverageQueueTimeContext
+	QueueTimeIndicators QueueQueueTimeIndicatorsContext
 	ServiceInterval QueueServiceIntervalContext
 	InhibitStatus QueueInhibitStatusContext
 	Priority QueuePriorityContext
@@ -2189,18 +2191,25 @@ var Queue = struct {
 		},
 		},
 	},
-	AverageQueueTime: QueueAverageQueueTimeContext{
+	QueueTimeIndicators: QueueQueueTimeIndicatorsContext{
 		Context: framework.Context[QueueLabels]{
-		Name:       "mq.queue.avg_queue_time",
+		Name:       "mq.queue.time_indicators",
 		Family:     "queues/performance",
-		Title:      "Average Queue Time",
+		Title:      "Queue Time Indicators",
 		Units:      "microseconds",
 		Type:       module.Line,
 		Priority:   2101,
 		UpdateEvery: 1,
 		Dimensions: []framework.Dimension{
 			{
-				Name:      "avg_queue_time",
+				Name:      "short_period",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "long_period",
 				Algorithm: module.Absolute,
 				Mul:       1,
 				Div:       1,
@@ -3039,6 +3048,30 @@ func (c QueueStatisticsAvgQueueTimeContext) SetUpdateEvery(state *framework.Coll
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
+// QueueStatisticsQueueTimeIndicatorsValues defines the type-safe values for QueueStatistics.QueueTimeIndicators context
+type QueueStatisticsQueueTimeIndicatorsValues struct {
+	Short_period int64
+	Long_period int64
+}
+
+// QueueStatisticsQueueTimeIndicatorsContext provides type-safe operations for QueueStatistics.QueueTimeIndicators context
+type QueueStatisticsQueueTimeIndicatorsContext struct {
+	framework.Context[QueueStatisticsLabels]
+}
+
+// Set provides type-safe dimension setting for QueueStatistics.QueueTimeIndicators context
+func (c QueueStatisticsQueueTimeIndicatorsContext) Set(state *framework.CollectorState, labels QueueStatisticsLabels, values QueueStatisticsQueueTimeIndicatorsValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"short_period": values.Short_period,
+		"long_period": values.Long_period,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueStatisticsQueueTimeIndicatorsContext) SetUpdateEvery(state *framework.CollectorState, labels QueueStatisticsLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
 // QueueStatisticsOperationsValues defines the type-safe values for QueueStatistics.Operations context
 type QueueStatisticsOperationsValues struct {
 	Puts_non_persistent int64
@@ -3174,6 +3207,7 @@ func (l QueueStatisticsLabels) InstanceID(contextName string) string {
 var QueueStatistics = struct {
 	DepthMinMax QueueStatisticsDepthMinMaxContext
 	AvgQueueTime QueueStatisticsAvgQueueTimeContext
+	QueueTimeIndicators QueueStatisticsQueueTimeIndicatorsContext
 	Operations QueueStatisticsOperationsContext
 	Bytes QueueStatisticsBytesContext
 	Failures QueueStatisticsFailuresContext
@@ -3241,6 +3275,37 @@ var QueueStatistics = struct {
 		},
 		},
 	},
+	QueueTimeIndicators: QueueStatisticsQueueTimeIndicatorsContext{
+		Context: framework.Context[QueueStatisticsLabels]{
+		Name:       "mq.queue_stats.time_indicators",
+		Family:     "queues/statistics",
+		Title:      "Queue Time Indicators (Statistics)",
+		Units:      "microseconds",
+		Type:       module.Line,
+		Priority:   6002,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "short_period",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "long_period",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"queue",
+			"type",
+		},
+		},
+	},
 	Operations: QueueStatisticsOperationsContext{
 		Context: framework.Context[QueueStatisticsLabels]{
 		Name:       "mq.queue_stats.operations",
@@ -3248,7 +3313,7 @@ var QueueStatistics = struct {
 		Title:      "Queue Operations (Statistics)",
 		Units:      "operations/s",
 		Type:       module.Line,
-		Priority:   6002,
+		Priority:   6003,
 		UpdateEvery: 1,
 		Dimensions: []framework.Dimension{
 			{
@@ -3307,7 +3372,7 @@ var QueueStatistics = struct {
 		Title:      "Queue Bytes (Statistics)",
 		Units:      "bytes/s",
 		Type:       module.Line,
-		Priority:   6003,
+		Priority:   6004,
 		UpdateEvery: 1,
 		Dimensions: []framework.Dimension{
 			{
@@ -3359,7 +3424,7 @@ var QueueStatistics = struct {
 		Title:      "Queue Operation Failures (Statistics)",
 		Units:      "failures/s",
 		Type:       module.Line,
-		Priority:   6004,
+		Priority:   6005,
 		UpdateEvery: 1,
 		Dimensions: []framework.Dimension{
 			{
@@ -3404,7 +3469,7 @@ var QueueStatistics = struct {
 		Title:      "Queue Message Lifecycle (Statistics)",
 		Units:      "messages/s",
 		Type:       module.Line,
-		Priority:   6005,
+		Priority:   6006,
 		UpdateEvery: 1,
 		Dimensions: []framework.Dimension{
 			{
@@ -3681,7 +3746,7 @@ func GetAllContexts() []interface{} {
 		&Queue.UncommittedMessages.Context,
 		&Queue.LastActivity.Context,
 		&Queue.OldestMessageAge.Context,
-		&Queue.AverageQueueTime.Context,
+		&Queue.QueueTimeIndicators.Context,
 		&Queue.ServiceInterval.Context,
 		&Queue.InhibitStatus.Context,
 		&Queue.Priority.Context,
@@ -3703,6 +3768,7 @@ func GetAllContexts() []interface{} {
 		&QueueManager.ListenersOverview.Context,
 		&QueueStatistics.DepthMinMax.Context,
 		&QueueStatistics.AvgQueueTime.Context,
+		&QueueStatistics.QueueTimeIndicators.Context,
 		&QueueStatistics.Operations.Context,
 		&QueueStatistics.Bytes.Context,
 		&QueueStatistics.Failures.Context,

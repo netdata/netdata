@@ -145,7 +145,7 @@ Metrics:
 | mq.queue.uncommitted_msgs | uncommitted | messages |
 | mq.queue.last_activity | since_last_get, since_last_put | seconds |
 | mq.queue.oldest_msg_age | oldest_msg_age | seconds |
-| mq.queue.avg_queue_time | avg_queue_time | microseconds |
+| mq.queue.time_indicators | short_period, long_period | microseconds |
 | mq.queue.service_interval | service_interval | milliseconds |
 | mq.queue.inhibit_status | inhibit_get, inhibit_put | status |
 | mq.queue.priority | def_priority | priority |
@@ -176,6 +176,7 @@ Metrics:
 |:-------|:-----------|:-----|
 | mq.queue_stats.depth_min_max | min_depth, max_depth | messages |
 | mq.queue_stats.avg_queue_time | non_persistent, persistent | microseconds |
+| mq.queue_stats.time_indicators | short_period, long_period | microseconds |
 | mq.queue_stats.operations | puts_non_persistent, puts_persistent, gets_non_persistent, gets_persistent, put1s, browses | operations/s |
 | mq.queue_stats.bytes | put_bytes_non_persistent, put_bytes_persistent, get_bytes_non_persistent, get_bytes_persistent, browse_bytes | bytes/s |
 | mq.queue_stats.failures | puts_failed, put1s_failed, gets_failed, browses_failed | failures/s |
