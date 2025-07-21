@@ -95,6 +95,7 @@ type (
 		Ctx        string
 		Type       ChartType
 		Priority   int
+		UpdateEvery int // Override for this chart's update interval (0 means use job default)
 		Opts
 
 		Labels []Label

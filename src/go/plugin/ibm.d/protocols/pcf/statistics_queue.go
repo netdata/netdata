@@ -9,6 +9,7 @@ import "C"
 
 import (
 	"fmt"
+	"strings"
 	"unsafe"
 )
 
@@ -159,6 +160,13 @@ func (c *Client) GetStatisticsQueue() (*StatisticsCollectionResult, error) {
 			continue
 		}
 
+		// Filter out old statistics messages (only process messages created after job started)
+		if c.shouldSkipOldStatisticsMessage(statisticsMsg) {
+			c.protocol.Debugf("PCF: Skipping old statistics message #%d (put time: %s %s, job started: %s)", 
+				messageCount, statisticsMsg.PutDate, statisticsMsg.PutTime, c.jobCreationTime.Format("2006-01-02 15:04:05"))
+			continue
+		}
+
 		result.Messages = append(result.Messages, *statisticsMsg)
 		result.Stats.Discovery.AvailableItems++
 		
@@ -230,6 +238,26 @@ func (c *Client) parseStatisticsMessage(buffer []byte, md *C.MQMD) (*StatisticsM
 	}
 
 	return &msg, nil
+}
+
+// shouldSkipOldStatisticsMessage checks if a statistics message should be skipped
+// because it was created before the job started (old accumulated message)
+func (c *Client) shouldSkipOldStatisticsMessage(msg *StatisticsMessage) bool {
+	// Parse the message timestamp
+	msgTime, err := ParseMQDateTime(strings.TrimSpace(msg.PutDate), strings.TrimSpace(msg.PutTime))
+	if err != nil {
+		// If we can't parse the timestamp, assume it's old and skip it
+		c.protocol.Warningf("PCF: Failed to parse statistics message timestamp (%s %s): %v - skipping message", 
+			msg.PutDate, msg.PutTime, err)
+		return true
+	}
+	
+	// Skip messages that were created before the job started
+	if msgTime.Before(c.jobCreationTime) {
+		return true
+	}
+	
+	return false
 }
 
 // parseQueueStatistics parses queue statistics from a PCF message

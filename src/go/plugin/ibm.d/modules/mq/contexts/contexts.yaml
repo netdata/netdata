@@ -490,7 +490,6 @@ QueueStatistics:
         family: queues/statistics
         type: line
         priority: 6000
-        min_update_every: 10
         dimensions:
           - { name: min_depth, algo: absolute }
           - { name: max_depth, algo: absolute }
@@ -501,7 +500,6 @@ QueueStatistics:
         family: queues/statistics
         type: line
         priority: 6001
-        min_update_every: 10
         dimensions:
           - { name: non_persistent, algo: absolute }
           - { name: persistent, algo: absolute }
@@ -512,7 +510,6 @@ QueueStatistics:
         family: queues/statistics
         type: line
         priority: 6002
-        min_update_every: 10
         dimensions:
           - { name: puts_non_persistent, algo: incremental }
           - { name: puts_persistent, algo: incremental }
@@ -527,7 +524,6 @@ QueueStatistics:
         family: queues/statistics
         type: line
         priority: 6003
-        min_update_every: 10
         dimensions:
           - { name: put_bytes_non_persistent, algo: incremental }
           - { name: put_bytes_persistent, algo: incremental }
@@ -541,7 +537,6 @@ QueueStatistics:
         family: queues/statistics
         type: line
         priority: 6004
-        min_update_every: 10
         dimensions:
           - { name: puts_failed, algo: incremental }
           - { name: put1s_failed, algo: incremental }
@@ -554,7 +549,6 @@ QueueStatistics:
         family: queues/statistics
         type: line
         priority: 6005
-        min_update_every: 10
         dimensions:
           - { name: expired, algo: incremental }
           - { name: purged, algo: incremental }
@@ -570,7 +564,6 @@ ChannelStatistics:
         family: channels/statistics
         type: line
         priority: 7000
-        min_update_every: 10
         dimensions:
           - { name: messages, algo: incremental }
       - name: Bytes
@@ -580,7 +573,6 @@ ChannelStatistics:
         family: channels/statistics
         type: line
         priority: 7001
-        min_update_every: 10
         dimensions:
           - { name: bytes, algo: incremental }
       - name: Batches
@@ -590,7 +582,6 @@ ChannelStatistics:
         family: channels/statistics
         type: line
         priority: 7002
-        min_update_every: 10
         dimensions:
           - { name: full_batches, algo: incremental }
           - { name: incomplete_batches, algo: incremental }
@@ -601,7 +592,6 @@ ChannelStatistics:
         family: channels/statistics
         type: line
         priority: 7003
-        min_update_every: 10
         dimensions:
           - { name: avg_batch_size, algo: absolute }
       - name: PutRetries
@@ -611,6 +601,5 @@ ChannelStatistics:
         family: channels/statistics
         type: line
         priority: 7004
-        min_update_every: 10
         dimensions:
           - { name: put_retries, algo: incremental }

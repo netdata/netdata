@@ -227,7 +227,7 @@ The following options can be defined globally or per job.
 | MaxListeners | Maximum number of listeners to collect (0 = no limit) | `100` | no | - | - |
 | CollectResetQueueStats | Enable collection of queue statistics (destructive operation) | `false` | no | - | - |
 | CollectStatisticsQueue | Enable collection of statistics queue metrics (SYSTEM.ADMIN.STATISTICS.QUEUE provides advanced metrics like min/max depth) | `false` | no | - | - |
-| StatisticsInterval | Statistics collection interval in seconds (must match MQ STATINT setting to avoid wasted calls) | `60` | no | - | - |
+| StatisticsInterval | Statistics collection interval in seconds (should match MQ STATINT setting for optimal data freshness) | `60` | no | - | - |
 
 ### Examples
 

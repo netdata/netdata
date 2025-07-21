@@ -55,6 +55,11 @@ func (c ItemItemPercentageContext) Set(state *framework.CollectorState, labels I
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c ItemItemPercentageContext) SetUpdateEvery(state *framework.CollectorState, labels ItemLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
 // ItemItemCounterValues defines the type-safe values for Item.ItemCounter context
 type ItemItemCounterValues struct {
 	Counter int64
@@ -70,6 +75,11 @@ func (c ItemItemCounterContext) Set(state *framework.CollectorState, labels Item
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"counter": values.Counter,
 	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c ItemItemCounterContext) SetUpdateEvery(state *framework.CollectorState, labels ItemLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
 
@@ -160,6 +170,11 @@ func (c TestTestAbsoluteContext) Set(state *framework.CollectorState, labels Emp
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c TestTestAbsoluteContext) SetUpdateEvery(state *framework.CollectorState, labels EmptyLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, nil, updateEvery)
+}
+
 // TestTestIncrementalValues defines the type-safe values for Test.TestIncremental context
 type TestTestIncrementalValues struct {
 	Counter int64
@@ -175,6 +190,11 @@ func (c TestTestIncrementalContext) Set(state *framework.CollectorState, labels 
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
 		"counter": values.Counter,
 	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c TestTestIncrementalContext) SetUpdateEvery(state *framework.CollectorState, labels EmptyLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, nil, updateEvery)
 }
 
 

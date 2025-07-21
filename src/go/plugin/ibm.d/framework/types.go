@@ -37,10 +37,11 @@ type Dimension struct {
 
 // Instance represents a unique instance of a context with labels
 type Instance struct {
-	key         string
-	contextName string
-	labels      map[string]string
-	lastSeen    time.Time
+	key                string
+	contextName        string
+	labels             map[string]string
+	lastSeen           time.Time
+	UpdateEveryOverride int // Override for this instance's update interval (0 means use default)
 }
 
 // MetricValue holds a single metric value

@@ -24,15 +24,15 @@ type Class struct {
 }
 
 type Context struct {
-	Name         string      `yaml:"name"`
-	Context      string      `yaml:"context"`      // Full context name
-	Family       string      `yaml:"family"`
-	Title        string      `yaml:"title"`
-	Units        string      `yaml:"units"`
-	Type         string      `yaml:"type"`
-	Priority     int         `yaml:"priority"`
-	UpdateEvery  int         `yaml:"update_every"`  // Min collection interval
-	Dimensions   []Dimension `yaml:"dimensions"`
+	Name            string      `yaml:"name"`
+	Context         string      `yaml:"context"`         // Full context name
+	Family          string      `yaml:"family"`
+	Title           string      `yaml:"title"`
+	Units           string      `yaml:"units"`
+	Type            string      `yaml:"type"`
+	Priority        int         `yaml:"priority"`
+	MinUpdateEvery  int         `yaml:"min_update_every"` // Minimum update interval
+	Dimensions      []Dimension `yaml:"dimensions"`
 }
 
 type Dimension struct {
@@ -99,6 +99,11 @@ func (c {{$className}}{{.Name}}Context) Set(state *framework.CollectorState, lab
 {{range .Dimensions}}		"{{.Name}}": values.{{title .Name}},
 {{end}}	})
 }
+
+// SetUpdateEvery sets the update interval for this instance
+func (c {{$className}}{{.Name}}Context) SetUpdateEvery(state *framework.CollectorState, labels {{if $class.Labels}}{{$className}}Labels{{else}}EmptyLabels{{end}}, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, {{if $class.Labels}}labels{{else}}nil{{end}}, updateEvery)
+}
 {{end}}
 
 {{if $class.Labels}}
@@ -126,7 +131,7 @@ var {{$className}} = struct {
 		Units:      "{{.Units}}",
 		Type:       module.{{title .Type}},
 		Priority:   {{.Priority}},
-		UpdateEvery: {{.UpdateEvery}},
+		UpdateEvery: {{if .MinUpdateEvery}}{{.MinUpdateEvery}}{{else}}1{{end}},
 		Dimensions: []framework.Dimension{
 {{range .Dimensions}}			{
 				Name:      "{{.Name}}",
@@ -211,9 +216,9 @@ func processConfig(config *Config, modulePrefix string) {
 				}
 			}
 			
-			// Set default update_every
-			if ctx.UpdateEvery == 0 {
-				ctx.UpdateEvery = 1
+			// Set default min_update_every
+			if ctx.MinUpdateEvery == 0 {
+				ctx.MinUpdateEvery = 1
 			}
 			
 			// Set default priority

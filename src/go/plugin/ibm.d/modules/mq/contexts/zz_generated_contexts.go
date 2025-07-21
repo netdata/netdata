@@ -77,6 +77,11 @@ func (c ChannelStatusContext) Set(state *framework.CollectorState, labels Channe
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c ChannelStatusContext) SetUpdateEvery(state *framework.CollectorState, labels ChannelLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
 // ChannelMessagesValues defines the type-safe values for Channel.Messages context
 type ChannelMessagesValues struct {
 	Messages int64
@@ -92,6 +97,11 @@ func (c ChannelMessagesContext) Set(state *framework.CollectorState, labels Chan
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"messages": values.Messages,
 	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c ChannelMessagesContext) SetUpdateEvery(state *framework.CollectorState, labels ChannelLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
 // ChannelBytesValues defines the type-safe values for Channel.Bytes context
@@ -111,6 +121,11 @@ func (c ChannelBytesContext) Set(state *framework.CollectorState, labels Channel
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c ChannelBytesContext) SetUpdateEvery(state *framework.CollectorState, labels ChannelLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
 // ChannelBatchesValues defines the type-safe values for Channel.Batches context
 type ChannelBatchesValues struct {
 	Batches int64
@@ -126,6 +141,11 @@ func (c ChannelBatchesContext) Set(state *framework.CollectorState, labels Chann
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"batches": values.Batches,
 	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c ChannelBatchesContext) SetUpdateEvery(state *framework.CollectorState, labels ChannelLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
 // ChannelBatchSizeValues defines the type-safe values for Channel.BatchSize context
@@ -145,6 +165,11 @@ func (c ChannelBatchSizeContext) Set(state *framework.CollectorState, labels Cha
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c ChannelBatchSizeContext) SetUpdateEvery(state *framework.CollectorState, labels ChannelLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
 // ChannelBatchIntervalValues defines the type-safe values for Channel.BatchInterval context
 type ChannelBatchIntervalValues struct {
 	Batch_interval int64
@@ -160,6 +185,11 @@ func (c ChannelBatchIntervalContext) Set(state *framework.CollectorState, labels
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"batch_interval": values.Batch_interval,
 	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c ChannelBatchIntervalContext) SetUpdateEvery(state *framework.CollectorState, labels ChannelLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
 // ChannelIntervalsValues defines the type-safe values for Channel.Intervals context
@@ -183,6 +213,11 @@ func (c ChannelIntervalsContext) Set(state *framework.CollectorState, labels Cha
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c ChannelIntervalsContext) SetUpdateEvery(state *framework.CollectorState, labels ChannelLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
 // ChannelShortRetryCountValues defines the type-safe values for Channel.ShortRetryCount context
 type ChannelShortRetryCountValues struct {
 	Short_retry int64
@@ -198,6 +233,11 @@ func (c ChannelShortRetryCountContext) Set(state *framework.CollectorState, labe
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"short_retry": values.Short_retry,
 	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c ChannelShortRetryCountContext) SetUpdateEvery(state *framework.CollectorState, labels ChannelLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
 // ChannelLongRetryIntervalValues defines the type-safe values for Channel.LongRetryInterval context
@@ -217,6 +257,11 @@ func (c ChannelLongRetryIntervalContext) Set(state *framework.CollectorState, la
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c ChannelLongRetryIntervalContext) SetUpdateEvery(state *framework.CollectorState, labels ChannelLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
 // ChannelMaxMessageLengthValues defines the type-safe values for Channel.MaxMessageLength context
 type ChannelMaxMessageLengthValues struct {
 	Max_msg_length int64
@@ -232,6 +277,11 @@ func (c ChannelMaxMessageLengthContext) Set(state *framework.CollectorState, lab
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"max_msg_length": values.Max_msg_length,
 	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c ChannelMaxMessageLengthContext) SetUpdateEvery(state *framework.CollectorState, labels ChannelLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
 // ChannelSharingConversationsValues defines the type-safe values for Channel.SharingConversations context
@@ -251,6 +301,11 @@ func (c ChannelSharingConversationsContext) Set(state *framework.CollectorState,
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c ChannelSharingConversationsContext) SetUpdateEvery(state *framework.CollectorState, labels ChannelLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
 // ChannelNetworkPriorityValues defines the type-safe values for Channel.NetworkPriority context
 type ChannelNetworkPriorityValues struct {
 	Network_priority int64
@@ -266,6 +321,11 @@ func (c ChannelNetworkPriorityContext) Set(state *framework.CollectorState, labe
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"network_priority": values.Network_priority,
 	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c ChannelNetworkPriorityContext) SetUpdateEvery(state *framework.CollectorState, labels ChannelLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
 
@@ -687,6 +747,11 @@ func (c ChannelStatisticsMessagesContext) Set(state *framework.CollectorState, l
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c ChannelStatisticsMessagesContext) SetUpdateEvery(state *framework.CollectorState, labels ChannelStatisticsLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
 // ChannelStatisticsBytesValues defines the type-safe values for ChannelStatistics.Bytes context
 type ChannelStatisticsBytesValues struct {
 	Bytes int64
@@ -702,6 +767,11 @@ func (c ChannelStatisticsBytesContext) Set(state *framework.CollectorState, labe
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"bytes": values.Bytes,
 	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c ChannelStatisticsBytesContext) SetUpdateEvery(state *framework.CollectorState, labels ChannelStatisticsLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
 // ChannelStatisticsBatchesValues defines the type-safe values for ChannelStatistics.Batches context
@@ -723,6 +793,11 @@ func (c ChannelStatisticsBatchesContext) Set(state *framework.CollectorState, la
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c ChannelStatisticsBatchesContext) SetUpdateEvery(state *framework.CollectorState, labels ChannelStatisticsLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
 // ChannelStatisticsBatchSizeValues defines the type-safe values for ChannelStatistics.BatchSize context
 type ChannelStatisticsBatchSizeValues struct {
 	Avg_batch_size int64
@@ -740,6 +815,11 @@ func (c ChannelStatisticsBatchSizeContext) Set(state *framework.CollectorState, 
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c ChannelStatisticsBatchSizeContext) SetUpdateEvery(state *framework.CollectorState, labels ChannelStatisticsLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
 // ChannelStatisticsPutRetriesValues defines the type-safe values for ChannelStatistics.PutRetries context
 type ChannelStatisticsPutRetriesValues struct {
 	Put_retries int64
@@ -755,6 +835,11 @@ func (c ChannelStatisticsPutRetriesContext) Set(state *framework.CollectorState,
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"put_retries": values.Put_retries,
 	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c ChannelStatisticsPutRetriesContext) SetUpdateEvery(state *framework.CollectorState, labels ChannelStatisticsLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
 
@@ -938,6 +1023,11 @@ func (c ListenerStatusContext) Set(state *framework.CollectorState, labels Liste
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c ListenerStatusContext) SetUpdateEvery(state *framework.CollectorState, labels ListenerLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
 // ListenerBacklogValues defines the type-safe values for Listener.Backlog context
 type ListenerBacklogValues struct {
 	Backlog int64
@@ -955,6 +1045,11 @@ func (c ListenerBacklogContext) Set(state *framework.CollectorState, labels List
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c ListenerBacklogContext) SetUpdateEvery(state *framework.CollectorState, labels ListenerLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
 // ListenerUptimeValues defines the type-safe values for Listener.Uptime context
 type ListenerUptimeValues struct {
 	Uptime int64
@@ -970,6 +1065,11 @@ func (c ListenerUptimeContext) Set(state *framework.CollectorState, labels Liste
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"uptime": values.Uptime,
 	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c ListenerUptimeContext) SetUpdateEvery(state *framework.CollectorState, labels ListenerLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
 
@@ -1122,6 +1222,11 @@ func (c QueueDepthContext) Set(state *framework.CollectorState, labels QueueLabe
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueDepthContext) SetUpdateEvery(state *framework.CollectorState, labels QueueLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
 // QueueDepthPercentageValues defines the type-safe values for Queue.DepthPercentage context
 type QueueDepthPercentageValues struct {
 	Percentage int64
@@ -1137,6 +1242,11 @@ func (c QueueDepthPercentageContext) Set(state *framework.CollectorState, labels
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"percentage": values.Percentage,
 	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueDepthPercentageContext) SetUpdateEvery(state *framework.CollectorState, labels QueueLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
 // QueueMessagesValues defines the type-safe values for Queue.Messages context
@@ -1158,6 +1268,11 @@ func (c QueueMessagesContext) Set(state *framework.CollectorState, labels QueueL
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueMessagesContext) SetUpdateEvery(state *framework.CollectorState, labels QueueLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
 // QueueConnectionsValues defines the type-safe values for Queue.Connections context
 type QueueConnectionsValues struct {
 	Input int64
@@ -1177,6 +1292,11 @@ func (c QueueConnectionsContext) Set(state *framework.CollectorState, labels Que
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueConnectionsContext) SetUpdateEvery(state *framework.CollectorState, labels QueueLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
 // QueueHighDepthValues defines the type-safe values for Queue.HighDepth context
 type QueueHighDepthValues struct {
 	High_depth int64
@@ -1194,6 +1314,11 @@ func (c QueueHighDepthContext) Set(state *framework.CollectorState, labels Queue
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueHighDepthContext) SetUpdateEvery(state *framework.CollectorState, labels QueueLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
 // QueueUncommittedMessagesValues defines the type-safe values for Queue.UncommittedMessages context
 type QueueUncommittedMessagesValues struct {
 	Uncommitted int64
@@ -1209,6 +1334,11 @@ func (c QueueUncommittedMessagesContext) Set(state *framework.CollectorState, la
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"uncommitted": values.Uncommitted,
 	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueUncommittedMessagesContext) SetUpdateEvery(state *framework.CollectorState, labels QueueLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
 // QueueLastActivityValues defines the type-safe values for Queue.LastActivity context
@@ -1230,6 +1360,11 @@ func (c QueueLastActivityContext) Set(state *framework.CollectorState, labels Qu
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueLastActivityContext) SetUpdateEvery(state *framework.CollectorState, labels QueueLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
 // QueueOldestMessageAgeValues defines the type-safe values for Queue.OldestMessageAge context
 type QueueOldestMessageAgeValues struct {
 	Oldest_msg_age int64
@@ -1245,6 +1380,11 @@ func (c QueueOldestMessageAgeContext) Set(state *framework.CollectorState, label
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"oldest_msg_age": values.Oldest_msg_age,
 	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueOldestMessageAgeContext) SetUpdateEvery(state *framework.CollectorState, labels QueueLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
 // QueueAverageQueueTimeValues defines the type-safe values for Queue.AverageQueueTime context
@@ -1264,6 +1404,11 @@ func (c QueueAverageQueueTimeContext) Set(state *framework.CollectorState, label
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueAverageQueueTimeContext) SetUpdateEvery(state *framework.CollectorState, labels QueueLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
 // QueueServiceIntervalValues defines the type-safe values for Queue.ServiceInterval context
 type QueueServiceIntervalValues struct {
 	Service_interval int64
@@ -1279,6 +1424,11 @@ func (c QueueServiceIntervalContext) Set(state *framework.CollectorState, labels
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"service_interval": values.Service_interval,
 	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueServiceIntervalContext) SetUpdateEvery(state *framework.CollectorState, labels QueueLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
 // QueueInhibitStatusValues defines the type-safe values for Queue.InhibitStatus context
@@ -1300,6 +1450,11 @@ func (c QueueInhibitStatusContext) Set(state *framework.CollectorState, labels Q
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueInhibitStatusContext) SetUpdateEvery(state *framework.CollectorState, labels QueueLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
 // QueuePriorityValues defines the type-safe values for Queue.Priority context
 type QueuePriorityValues struct {
 	Def_priority int64
@@ -1315,6 +1470,11 @@ func (c QueuePriorityContext) Set(state *framework.CollectorState, labels QueueL
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"def_priority": values.Def_priority,
 	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c QueuePriorityContext) SetUpdateEvery(state *framework.CollectorState, labels QueueLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
 // QueueMessagePersistenceValues defines the type-safe values for Queue.MessagePersistence context
@@ -1336,6 +1496,11 @@ func (c QueueMessagePersistenceContext) Set(state *framework.CollectorState, lab
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueMessagePersistenceContext) SetUpdateEvery(state *framework.CollectorState, labels QueueLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
 // QueueRetentionIntervalValues defines the type-safe values for Queue.RetentionInterval context
 type QueueRetentionIntervalValues struct {
 	Retention_interval int64
@@ -1351,6 +1516,11 @@ func (c QueueRetentionIntervalContext) Set(state *framework.CollectorState, labe
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"retention_interval": values.Retention_interval,
 	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueRetentionIntervalContext) SetUpdateEvery(state *framework.CollectorState, labels QueueLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
 // QueueTriggersValues defines the type-safe values for Queue.Triggers context
@@ -1372,6 +1542,11 @@ func (c QueueTriggersContext) Set(state *framework.CollectorState, labels QueueL
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueTriggersContext) SetUpdateEvery(state *framework.CollectorState, labels QueueLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
 // QueueBackoutThresholdValues defines the type-safe values for Queue.BackoutThreshold context
 type QueueBackoutThresholdValues struct {
 	Backout_threshold int64
@@ -1389,6 +1564,11 @@ func (c QueueBackoutThresholdContext) Set(state *framework.CollectorState, label
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueBackoutThresholdContext) SetUpdateEvery(state *framework.CollectorState, labels QueueLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
 // QueueMaxMessageLengthValues defines the type-safe values for Queue.MaxMessageLength context
 type QueueMaxMessageLengthValues struct {
 	Max_msg_length int64
@@ -1404,6 +1584,11 @@ func (c QueueMaxMessageLengthContext) Set(state *framework.CollectorState, label
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"max_msg_length": values.Max_msg_length,
 	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueMaxMessageLengthContext) SetUpdateEvery(state *framework.CollectorState, labels QueueLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
 // QueueQueueScopeValues defines the type-safe values for Queue.QueueScope context
@@ -1425,6 +1610,11 @@ func (c QueueQueueScopeContext) Set(state *framework.CollectorState, labels Queu
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueQueueScopeContext) SetUpdateEvery(state *framework.CollectorState, labels QueueLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
 // QueueQueueUsageValues defines the type-safe values for Queue.QueueUsage context
 type QueueQueueUsageValues struct {
 	Normal int64
@@ -1442,6 +1632,11 @@ func (c QueueQueueUsageContext) Set(state *framework.CollectorState, labels Queu
 		"normal": values.Normal,
 		"transmission": values.Transmission,
 	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueQueueUsageContext) SetUpdateEvery(state *framework.CollectorState, labels QueueLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
 // QueueMessageDeliverySequenceValues defines the type-safe values for Queue.MessageDeliverySequence context
@@ -1463,6 +1658,11 @@ func (c QueueMessageDeliverySequenceContext) Set(state *framework.CollectorState
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueMessageDeliverySequenceContext) SetUpdateEvery(state *framework.CollectorState, labels QueueLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
 // QueueHardenGetBackoutValues defines the type-safe values for Queue.HardenGetBackout context
 type QueueHardenGetBackoutValues struct {
 	Enabled int64
@@ -1480,6 +1680,11 @@ func (c QueueHardenGetBackoutContext) Set(state *framework.CollectorState, label
 		"enabled": values.Enabled,
 		"disabled": values.Disabled,
 	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueHardenGetBackoutContext) SetUpdateEvery(state *framework.CollectorState, labels QueueLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
 
@@ -2125,6 +2330,11 @@ func (c QueueManagerStatusContext) Set(state *framework.CollectorState, labels E
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueManagerStatusContext) SetUpdateEvery(state *framework.CollectorState, labels EmptyLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, nil, updateEvery)
+}
+
 // QueueManagerConnectionCountValues defines the type-safe values for QueueManager.ConnectionCount context
 type QueueManagerConnectionCountValues struct {
 	Connections int64
@@ -2142,6 +2352,11 @@ func (c QueueManagerConnectionCountContext) Set(state *framework.CollectorState,
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueManagerConnectionCountContext) SetUpdateEvery(state *framework.CollectorState, labels EmptyLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, nil, updateEvery)
+}
+
 // QueueManagerUptimeValues defines the type-safe values for QueueManager.Uptime context
 type QueueManagerUptimeValues struct {
 	Uptime int64
@@ -2157,6 +2372,11 @@ func (c QueueManagerUptimeContext) Set(state *framework.CollectorState, labels E
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
 		"uptime": values.Uptime,
 	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueManagerUptimeContext) SetUpdateEvery(state *framework.CollectorState, labels EmptyLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, nil, updateEvery)
 }
 
 // QueueManagerQueuesOverviewValues defines the type-safe values for QueueManager.QueuesOverview context
@@ -2182,6 +2402,11 @@ func (c QueueManagerQueuesOverviewContext) Set(state *framework.CollectorState, 
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueManagerQueuesOverviewContext) SetUpdateEvery(state *framework.CollectorState, labels EmptyLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, nil, updateEvery)
+}
+
 // QueueManagerChannelsOverviewValues defines the type-safe values for QueueManager.ChannelsOverview context
 type QueueManagerChannelsOverviewValues struct {
 	Monitored int64
@@ -2203,6 +2428,11 @@ func (c QueueManagerChannelsOverviewContext) Set(state *framework.CollectorState
 		"invisible": values.Invisible,
 		"failed": values.Failed,
 	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueManagerChannelsOverviewContext) SetUpdateEvery(state *framework.CollectorState, labels EmptyLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, nil, updateEvery)
 }
 
 // QueueManagerTopicsOverviewValues defines the type-safe values for QueueManager.TopicsOverview context
@@ -2228,6 +2458,11 @@ func (c QueueManagerTopicsOverviewContext) Set(state *framework.CollectorState, 
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueManagerTopicsOverviewContext) SetUpdateEvery(state *framework.CollectorState, labels EmptyLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, nil, updateEvery)
+}
+
 // QueueManagerListenersOverviewValues defines the type-safe values for QueueManager.ListenersOverview context
 type QueueManagerListenersOverviewValues struct {
 	Monitored int64
@@ -2249,6 +2484,11 @@ func (c QueueManagerListenersOverviewContext) Set(state *framework.CollectorStat
 		"invisible": values.Invisible,
 		"failed": values.Failed,
 	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueManagerListenersOverviewContext) SetUpdateEvery(state *framework.CollectorState, labels EmptyLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, nil, updateEvery)
 }
 
 
@@ -2527,6 +2767,11 @@ func (c QueueStatisticsDepthMinMaxContext) Set(state *framework.CollectorState, 
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueStatisticsDepthMinMaxContext) SetUpdateEvery(state *framework.CollectorState, labels QueueStatisticsLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
 // QueueStatisticsAvgQueueTimeValues defines the type-safe values for QueueStatistics.AvgQueueTime context
 type QueueStatisticsAvgQueueTimeValues struct {
 	Non_persistent int64
@@ -2544,6 +2789,11 @@ func (c QueueStatisticsAvgQueueTimeContext) Set(state *framework.CollectorState,
 		"non_persistent": values.Non_persistent,
 		"persistent": values.Persistent,
 	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueStatisticsAvgQueueTimeContext) SetUpdateEvery(state *framework.CollectorState, labels QueueStatisticsLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
 // QueueStatisticsOperationsValues defines the type-safe values for QueueStatistics.Operations context
@@ -2573,6 +2823,11 @@ func (c QueueStatisticsOperationsContext) Set(state *framework.CollectorState, l
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueStatisticsOperationsContext) SetUpdateEvery(state *framework.CollectorState, labels QueueStatisticsLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
 // QueueStatisticsBytesValues defines the type-safe values for QueueStatistics.Bytes context
 type QueueStatisticsBytesValues struct {
 	Put_bytes_non_persistent int64
@@ -2598,6 +2853,11 @@ func (c QueueStatisticsBytesContext) Set(state *framework.CollectorState, labels
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueStatisticsBytesContext) SetUpdateEvery(state *framework.CollectorState, labels QueueStatisticsLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
 // QueueStatisticsFailuresValues defines the type-safe values for QueueStatistics.Failures context
 type QueueStatisticsFailuresValues struct {
 	Puts_failed int64
@@ -2621,6 +2881,11 @@ func (c QueueStatisticsFailuresContext) Set(state *framework.CollectorState, lab
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueStatisticsFailuresContext) SetUpdateEvery(state *framework.CollectorState, labels QueueStatisticsLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
 // QueueStatisticsMessageLifecycleValues defines the type-safe values for QueueStatistics.MessageLifecycle context
 type QueueStatisticsMessageLifecycleValues struct {
 	Expired int64
@@ -2640,6 +2905,11 @@ func (c QueueStatisticsMessageLifecycleContext) Set(state *framework.CollectorSt
 		"purged": values.Purged,
 		"not_queued": values.Not_queued,
 	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueStatisticsMessageLifecycleContext) SetUpdateEvery(state *framework.CollectorState, labels QueueStatisticsLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
 
@@ -2945,6 +3215,11 @@ func (c TopicPublishersContext) Set(state *framework.CollectorState, labels Topi
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c TopicPublishersContext) SetUpdateEvery(state *framework.CollectorState, labels TopicLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
 // TopicSubscribersValues defines the type-safe values for Topic.Subscribers context
 type TopicSubscribersValues struct {
 	Subscribers int64
@@ -2962,6 +3237,11 @@ func (c TopicSubscribersContext) Set(state *framework.CollectorState, labels Top
 	})
 }
 
+// SetUpdateEvery sets the update interval for this instance
+func (c TopicSubscribersContext) SetUpdateEvery(state *framework.CollectorState, labels TopicLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
 // TopicMessagesValues defines the type-safe values for Topic.Messages context
 type TopicMessagesValues struct {
 	Messages int64
@@ -2977,6 +3257,11 @@ func (c TopicMessagesContext) Set(state *framework.CollectorState, labels TopicL
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"messages": values.Messages,
 	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c TopicMessagesContext) SetUpdateEvery(state *framework.CollectorState, labels TopicLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
 

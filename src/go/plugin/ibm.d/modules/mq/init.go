@@ -80,6 +80,12 @@ func (c *Collector) Init(ctx context.Context) error {
 		return err
 	}
 
+	// Statistics contexts will be configured with appropriate update interval 
+	// when they are first collected during statistics collection
+	if c.Config.CollectStatisticsQueue {
+		c.Infof("Statistics collection enabled - charts will use %d second update interval", c.Config.StatisticsInterval)
+	}
+
 	// Debug log the complete configuration as JSON
 	if configJSON, err := json.Marshal(c.Config); err == nil {
 		c.Debugf("Running with configuration: %s", string(configJSON))

@@ -9,6 +9,7 @@ import "C"
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 )
@@ -26,6 +27,9 @@ type Client struct {
 	replyQueueName  [48]C.char // Store the actual reply queue name
 	connected       bool
 	protocol        *framework.ProtocolClient
+	
+	// Job creation timestamp for filtering statistics messages
+	jobCreationTime time.Time
 	
 	// Cached static data (refreshed on reconnection)
 	cachedVersion      string
@@ -47,8 +51,9 @@ type Config struct {
 // NewClient creates a new PCF client.
 func NewClient(config Config, state *framework.CollectorState) *Client {
 	return &Client{
-		config:   config,
-		protocol: framework.NewProtocolClient("pcf", state),
+		config:          config,
+		protocol:        framework.NewProtocolClient("pcf", state),
+		jobCreationTime: time.Now(), // Record job creation time for statistics filtering
 	}
 }
 
