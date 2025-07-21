@@ -43,12 +43,14 @@ This guide evaluates IBM MQ monitoring capabilities across major monitoring plat
 
 | Metric | Netdata | Datadog | Dynatrace | Splunk | Grafana | Zabbix | Collection Method |
 |--------|---------|---------|-----------|--------|---------|--------|-------------------|
-| CPU usage | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | $SYS topics |
-| Memory usage | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | $SYS topics |
+| CPU usage | ✅* | ❌ | ❌ | ❌ | ✅ | ❌ | $SYS topics |
+| Memory usage | ✅* | ❌ | ❌ | ❌ | ✅ | ❌ | $SYS topics |
 | Log write latency | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | $SYS topics |
 | File system usage | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | $SYS topics |
-| Log bytes used | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ | See log utilization |
+| Log bytes used | ✅* | ❌ | ✅ | ❌ | ✅ | ❌ | See log utilization |
 | Transaction counts | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | $SYS topics |
+
+*Framework implemented, requires MQ 9.0+ with MONINT configured and attribute ID mapping
 
 ### Queue Manager Log Utilization
 **Cardinality**: 1 metric set per queue manager  

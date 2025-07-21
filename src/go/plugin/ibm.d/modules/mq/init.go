@@ -43,6 +43,11 @@ func defaultConfig() Config {
 		// Statistics collection interval should match MQ STATINT setting (default 60 seconds)
 		StatisticsInterval:     60,
 		
+		// $SYS topic collection is disabled by default (requires MQ 9.0+)
+		CollectSysTopics: false,
+		// $SYS topic interval should match MQ MONINT setting (default 180 seconds)
+		SysTopicInterval: 180,
+		
 		// Selector defaults - empty means collect nothing (user must explicitly configure)
 		QueueSelector:   "",
 		ChannelSelector: "",
@@ -133,6 +138,13 @@ func (c *Collector) Init(ctx context.Context) error {
 		c.Infof("Statistics queue collection is ENABLED")
 		c.Infof("Will collect advanced metrics from SYSTEM.ADMIN.STATISTICS.QUEUE")
 		c.Infof("Note: Statistics must be enabled on the queue manager (STATQ, STATINT settings)")
+	}
+
+	// Log $SYS topic collection status
+	if c.Config.CollectSysTopics {
+		c.Infof("$SYS topic collection is ENABLED")
+		c.Infof("Will collect resource metrics (CPU, memory, log) from $SYS topics")
+		c.Infof("Note: Requires MQ 9.0+ with MONINT configured")
 	}
 
 	return nil

@@ -3430,6 +3430,297 @@ var QueueManager = struct {
 }
 
 
+// --- QueueManagerResources ---
+
+
+// QueueManagerResourcesCPUUsageValues defines the type-safe values for QueueManagerResources.CPUUsage context
+type QueueManagerResourcesCPUUsageValues struct {
+	User int64
+	System int64
+}
+
+// QueueManagerResourcesCPUUsageContext provides type-safe operations for QueueManagerResources.CPUUsage context
+type QueueManagerResourcesCPUUsageContext struct {
+	framework.Context[EmptyLabels]
+}
+
+// Set provides type-safe dimension setting for QueueManagerResources.CPUUsage context
+func (c QueueManagerResourcesCPUUsageContext) Set(state *framework.CollectorState, labels EmptyLabels, values QueueManagerResourcesCPUUsageValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
+		"user": values.User,
+		"system": values.System,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueManagerResourcesCPUUsageContext) SetUpdateEvery(state *framework.CollectorState, labels EmptyLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, nil, updateEvery)
+}
+
+// QueueManagerResourcesMemoryUsageValues defines the type-safe values for QueueManagerResources.MemoryUsage context
+type QueueManagerResourcesMemoryUsageValues struct {
+	Total int64
+}
+
+// QueueManagerResourcesMemoryUsageContext provides type-safe operations for QueueManagerResources.MemoryUsage context
+type QueueManagerResourcesMemoryUsageContext struct {
+	framework.Context[EmptyLabels]
+}
+
+// Set provides type-safe dimension setting for QueueManagerResources.MemoryUsage context
+func (c QueueManagerResourcesMemoryUsageContext) Set(state *framework.CollectorState, labels EmptyLabels, values QueueManagerResourcesMemoryUsageValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
+		"total": values.Total,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueManagerResourcesMemoryUsageContext) SetUpdateEvery(state *framework.CollectorState, labels EmptyLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, nil, updateEvery)
+}
+
+// QueueManagerResourcesRAMUsageValues defines the type-safe values for QueueManagerResources.RAMUsage context
+type QueueManagerResourcesRAMUsageValues struct {
+	Total int64
+}
+
+// QueueManagerResourcesRAMUsageContext provides type-safe operations for QueueManagerResources.RAMUsage context
+type QueueManagerResourcesRAMUsageContext struct {
+	framework.Context[EmptyLabels]
+}
+
+// Set provides type-safe dimension setting for QueueManagerResources.RAMUsage context
+func (c QueueManagerResourcesRAMUsageContext) Set(state *framework.CollectorState, labels EmptyLabels, values QueueManagerResourcesRAMUsageValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
+		"total": values.Total,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueManagerResourcesRAMUsageContext) SetUpdateEvery(state *framework.CollectorState, labels EmptyLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, nil, updateEvery)
+}
+
+// QueueManagerResourcesLogUtilizationValues defines the type-safe values for QueueManagerResources.LogUtilization context
+type QueueManagerResourcesLogUtilizationValues struct {
+	Used int64
+}
+
+// QueueManagerResourcesLogUtilizationContext provides type-safe operations for QueueManagerResources.LogUtilization context
+type QueueManagerResourcesLogUtilizationContext struct {
+	framework.Context[EmptyLabels]
+}
+
+// Set provides type-safe dimension setting for QueueManagerResources.LogUtilization context
+func (c QueueManagerResourcesLogUtilizationContext) Set(state *framework.CollectorState, labels EmptyLabels, values QueueManagerResourcesLogUtilizationValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
+		"used": values.Used,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueManagerResourcesLogUtilizationContext) SetUpdateEvery(state *framework.CollectorState, labels EmptyLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, nil, updateEvery)
+}
+
+// QueueManagerResourcesLogFileSizeValues defines the type-safe values for QueueManagerResources.LogFileSize context
+type QueueManagerResourcesLogFileSizeValues struct {
+	Size int64
+}
+
+// QueueManagerResourcesLogFileSizeContext provides type-safe operations for QueueManagerResources.LogFileSize context
+type QueueManagerResourcesLogFileSizeContext struct {
+	framework.Context[EmptyLabels]
+}
+
+// Set provides type-safe dimension setting for QueueManagerResources.LogFileSize context
+func (c QueueManagerResourcesLogFileSizeContext) Set(state *framework.CollectorState, labels EmptyLabels, values QueueManagerResourcesLogFileSizeValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
+		"size": values.Size,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueManagerResourcesLogFileSizeContext) SetUpdateEvery(state *framework.CollectorState, labels EmptyLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, nil, updateEvery)
+}
+
+// QueueManagerResourcesLogWriteRateValues defines the type-safe values for QueueManagerResources.LogWriteRate context
+type QueueManagerResourcesLogWriteRateValues struct {
+	Rate int64
+}
+
+// QueueManagerResourcesLogWriteRateContext provides type-safe operations for QueueManagerResources.LogWriteRate context
+type QueueManagerResourcesLogWriteRateContext struct {
+	framework.Context[EmptyLabels]
+}
+
+// Set provides type-safe dimension setting for QueueManagerResources.LogWriteRate context
+func (c QueueManagerResourcesLogWriteRateContext) Set(state *framework.CollectorState, labels EmptyLabels, values QueueManagerResourcesLogWriteRateValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
+		"rate": values.Rate,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueManagerResourcesLogWriteRateContext) SetUpdateEvery(state *framework.CollectorState, labels EmptyLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, nil, updateEvery)
+}
+
+
+
+
+// QueueManagerResources contains all metric contexts for QueueManagerResources
+var QueueManagerResources = struct {
+	CPUUsage QueueManagerResourcesCPUUsageContext
+	MemoryUsage QueueManagerResourcesMemoryUsageContext
+	RAMUsage QueueManagerResourcesRAMUsageContext
+	LogUtilization QueueManagerResourcesLogUtilizationContext
+	LogFileSize QueueManagerResourcesLogFileSizeContext
+	LogWriteRate QueueManagerResourcesLogWriteRateContext
+}{
+	CPUUsage: QueueManagerResourcesCPUUsageContext{
+		Context: framework.Context[EmptyLabels]{
+		Name:       "mq.qmgr.cpu_usage",
+		Family:     "resources",
+		Title:      "Queue Manager CPU Usage",
+		Units:      "percentage",
+		Type:       module.Stacked,
+		Priority:   1050,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "user",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       100,
+				Precision: 1,
+			},
+			{
+				Name:      "system",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       100,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+		},
+		},
+	},
+	MemoryUsage: QueueManagerResourcesMemoryUsageContext{
+		Context: framework.Context[EmptyLabels]{
+		Name:       "mq.qmgr.memory_usage",
+		Family:     "resources",
+		Title:      "Queue Manager Memory Usage",
+		Units:      "bytes",
+		Type:       module.Line,
+		Priority:   1051,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "total",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+		},
+		},
+	},
+	RAMUsage: QueueManagerResourcesRAMUsageContext{
+		Context: framework.Context[EmptyLabels]{
+		Name:       "mq.qmgr.ram_usage",
+		Family:     "resources",
+		Title:      "Queue Manager RAM Usage",
+		Units:      "bytes",
+		Type:       module.Line,
+		Priority:   1052,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "total",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+		},
+		},
+	},
+	LogUtilization: QueueManagerResourcesLogUtilizationContext{
+		Context: framework.Context[EmptyLabels]{
+		Name:       "mq.qmgr.log_utilization",
+		Family:     "resources",
+		Title:      "Queue Manager Log Utilization",
+		Units:      "percentage",
+		Type:       module.Line,
+		Priority:   1053,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "used",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       100,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+		},
+		},
+	},
+	LogFileSize: QueueManagerResourcesLogFileSizeContext{
+		Context: framework.Context[EmptyLabels]{
+		Name:       "mq.qmgr.log_file_size",
+		Family:     "resources",
+		Title:      "Queue Manager Log File Size",
+		Units:      "bytes",
+		Type:       module.Line,
+		Priority:   1054,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "size",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+		},
+		},
+	},
+	LogWriteRate: QueueManagerResourcesLogWriteRateContext{
+		Context: framework.Context[EmptyLabels]{
+		Name:       "mq.qmgr.log_write_rate",
+		Family:     "resources",
+		Title:      "Queue Manager Log Write Rate",
+		Units:      "bytes/s",
+		Type:       module.Line,
+		Priority:   1055,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "rate",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+		},
+		},
+	},
+}
+
+
 // --- QueueStatistics ---
 
 
@@ -4326,6 +4617,12 @@ func GetAllContexts() []interface{} {
 		&QueueManager.ChannelsOverview.Context,
 		&QueueManager.TopicsOverview.Context,
 		&QueueManager.ListenersOverview.Context,
+		&QueueManagerResources.CPUUsage.Context,
+		&QueueManagerResources.MemoryUsage.Context,
+		&QueueManagerResources.RAMUsage.Context,
+		&QueueManagerResources.LogUtilization.Context,
+		&QueueManagerResources.LogFileSize.Context,
+		&QueueManagerResources.LogWriteRate.Context,
 		&QueueStatistics.DepthMinMax.Context,
 		&QueueStatistics.AvgQueueTime.Context,
 		&QueueStatistics.QueueTimeIndicators.Context,

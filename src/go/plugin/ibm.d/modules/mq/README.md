@@ -33,6 +33,21 @@ Metrics:
 | mq.topics.overview | monitored, excluded, invisible, failed | topics |
 | mq.listeners.overview | monitored, excluded, invisible, failed | listeners |
 
+These metrics refer to the entire monitored IBM MQ instance.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:-------|:-----------|:-----|
+| mq.qmgr.cpu_usage | user, system | percentage |
+| mq.qmgr.memory_usage | total | bytes |
+| mq.qmgr.ram_usage | total | bytes |
+| mq.qmgr.log_utilization | used | percentage |
+| mq.qmgr.log_file_size | size | bytes |
+| mq.qmgr.log_write_rate | rate | bytes/s |
+
 
 
 ### Per channel
@@ -278,6 +293,8 @@ The following options can be defined globally or per job.
 | CollectResetQueueStats | Enable collection of queue statistics (destructive operation) | `false` | no | - | - |
 | CollectStatisticsQueue | Enable collection of statistics queue metrics (SYSTEM.ADMIN.STATISTICS.QUEUE provides advanced metrics like min/max depth) | `false` | no | - | - |
 | StatisticsInterval | Statistics collection interval in seconds (should match MQ STATINT setting for optimal data freshness) | `60` | no | - | - |
+| CollectSysTopics | Enable collection of $SYS topic metrics (provides Queue Manager CPU, memory, and log utilization) | `false` | no | - | - |
+| SysTopicInterval | $SYS topic collection interval in seconds (should match MQ MONINT setting for optimal data freshness) | `180` | no | - | - |
 
 ### Examples
 
