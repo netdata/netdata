@@ -4,6 +4,9 @@
 
 package pcf
 
+// #include "pcf_helpers.h"
+import "C"
+
 import (
 	"fmt"
 	"math"
@@ -29,34 +32,34 @@ func (a AttributeValue) Int64() int64 {
 type ChannelType int32
 
 const (
-	ChannelTypeSender      ChannelType = 1
-	ChannelTypeServer      ChannelType = 2
-	ChannelTypeReceiver    ChannelType = 3
-	ChannelTypeRequester   ChannelType = 4
-	ChannelTypeClntconn    ChannelType = 6
-	ChannelTypeSvrconn     ChannelType = 7
-	ChannelTypeClussdr     ChannelType = 8
-	ChannelTypeClusrcvr    ChannelType = 9
-	ChannelTypeMqtt        ChannelType = 10
-	ChannelTypeAMQP        ChannelType = 11
+	ChannelTypeSender      ChannelType = C.MQCHT_SENDER
+	ChannelTypeServer      ChannelType = C.MQCHT_SERVER
+	ChannelTypeReceiver    ChannelType = C.MQCHT_RECEIVER
+	ChannelTypeRequester   ChannelType = C.MQCHT_REQUESTER
+	ChannelTypeClntconn    ChannelType = C.MQCHT_CLNTCONN
+	ChannelTypeSvrconn     ChannelType = C.MQCHT_SVRCONN
+	ChannelTypeClussdr     ChannelType = C.MQCHT_CLUSSDR
+	ChannelTypeClusrcvr    ChannelType = C.MQCHT_CLUSRCVR
+	ChannelTypeMqtt        ChannelType = C.MQCHT_MQTT
+	ChannelTypeAMQP        ChannelType = C.MQCHT_AMQP
 )
 
 // ChannelStatus represents the current status of a channel
 type ChannelStatus int32
 
 const (
-	ChannelStatusInactive     ChannelStatus = 0
-	ChannelStatusBinding      ChannelStatus = 1
-	ChannelStatusStarting     ChannelStatus = 2
-	ChannelStatusRunning      ChannelStatus = 3
-	ChannelStatusStopping     ChannelStatus = 4
-	ChannelStatusRetrying     ChannelStatus = 5
-	ChannelStatusStopped      ChannelStatus = 6
-	ChannelStatusRequesting   ChannelStatus = 7
-	ChannelStatusPaused       ChannelStatus = 8
-	ChannelStatusDisconnected ChannelStatus = 9
-	ChannelStatusInitializing ChannelStatus = 13
-	ChannelStatusSwitching    ChannelStatus = 14
+	ChannelStatusInactive     ChannelStatus = C.MQCHS_INACTIVE
+	ChannelStatusBinding      ChannelStatus = C.MQCHS_BINDING
+	ChannelStatusStarting     ChannelStatus = C.MQCHS_STARTING
+	ChannelStatusRunning      ChannelStatus = C.MQCHS_RUNNING
+	ChannelStatusStopping     ChannelStatus = C.MQCHS_STOPPING
+	ChannelStatusRetrying     ChannelStatus = C.MQCHS_RETRYING
+	ChannelStatusStopped      ChannelStatus = C.MQCHS_STOPPED
+	ChannelStatusRequesting   ChannelStatus = C.MQCHS_REQUESTING
+	ChannelStatusPaused       ChannelStatus = C.MQCHS_PAUSED
+	ChannelStatusDisconnected ChannelStatus = C.MQCHS_DISCONNECTED
+	ChannelStatusInitializing ChannelStatus = C.MQCHS_INITIALIZING
+	ChannelStatusSwitching    ChannelStatus = C.MQCHS_SWITCHING
 )
 
 // ChannelMetrics contains runtime metrics for a channel
@@ -215,11 +218,11 @@ type QueueManagerMetrics struct {
 type ListenerStatus int32
 
 const (
-	ListenerStatusStopped  ListenerStatus = 0  // MQSVC_STATUS_STOPPED
-	ListenerStatusStarting ListenerStatus = 1  // MQSVC_STATUS_STARTING
-	ListenerStatusRunning  ListenerStatus = 2  // MQSVC_STATUS_RUNNING
-	ListenerStatusStopping ListenerStatus = 3  // MQSVC_STATUS_STOPPING
-	ListenerStatusRetrying ListenerStatus = 4  // MQSVC_STATUS_RETRYING
+	ListenerStatusStopped  ListenerStatus = C.MQSVC_STATUS_STOPPED
+	ListenerStatusStarting ListenerStatus = C.MQSVC_STATUS_STARTING
+	ListenerStatusRunning  ListenerStatus = C.MQSVC_STATUS_RUNNING
+	ListenerStatusStopping ListenerStatus = C.MQSVC_STATUS_STOPPING
+	ListenerStatusRetrying ListenerStatus = C.MQSVC_STATUS_RETRYING
 )
 
 // ListenerMetrics contains runtime metrics for a listener
@@ -306,8 +309,9 @@ func NewPCFError(code int32, format string, args ...interface{}) *PCFError {
 type StatisticsType int32
 
 const (
-	StatisticsTypeQueue   StatisticsType = 1 // MQCMD_STATISTICS_Q
-	StatisticsTypeChannel StatisticsType = 2 // MQCMD_STATISTICS_CHANNEL
+	StatisticsTypeMQI     StatisticsType = C.MQCMD_STATISTICS_MQI
+	StatisticsTypeQueue   StatisticsType = C.MQCMD_STATISTICS_Q
+	StatisticsTypeChannel StatisticsType = C.MQCMD_STATISTICS_CHANNEL
 )
 
 // QueueStatistics contains extended queue metrics from statistics queue
@@ -379,14 +383,43 @@ type ChannelStatistics struct {
 	EndTime   AttributeValue  // Statistics end time (HHMMSSSS format)
 }
 
+// MQIStatistics contains MQI-level statistics (MQOPEN/CLOSE/INQ/SET operations)
+type MQIStatistics struct {
+	// Queue Manager or Queue name (depending on STATMQI setting)
+	Name string
+	
+	// MQOPEN operations
+	Opens       AttributeValue  // MQIAMO_OPENS - Total MQOPEN count (successful + failed)
+	OpensFailed AttributeValue  // MQIAMO_OPENS_FAILED - Failed MQOPEN count
+	
+	// MQCLOSE operations
+	Closes       AttributeValue  // MQIAMO_CLOSES - Total MQCLOSE count (successful + failed)
+	ClosesFailed AttributeValue  // MQIAMO_CLOSES_FAILED - Failed MQCLOSE count
+	
+	// MQINQ operations
+	Inqs       AttributeValue  // MQIAMO_INQS - Total MQINQ count (successful + failed)
+	InqsFailed AttributeValue  // MQIAMO_INQS_FAILED - Failed MQINQ count
+	
+	// MQSET operations
+	Sets       AttributeValue  // MQIAMO_SETS - Total MQSET count (successful + failed)
+	SetsFailed AttributeValue  // MQIAMO_SETS_FAILED - Failed MQSET count
+	
+	// Timestamp when statistics were collected
+	StartDate AttributeValue  // Statistics start date (YYYYMMDD format)
+	StartTime AttributeValue  // Statistics start time (HHMMSSSS format)
+	EndDate   AttributeValue  // Statistics end date (YYYYMMDD format)
+	EndTime   AttributeValue  // Statistics end time (HHMMSSSS format)
+}
+
 // StatisticsMessage represents a statistics message from SYSTEM.ADMIN.STATISTICS.QUEUE
 type StatisticsMessage struct {
-	Type     StatisticsType  // Type of statistics (queue or channel)
+	Type     StatisticsType  // Type of statistics (queue, channel, or MQI)
 	Command  int32          // MQ command that generated the statistics
 	
 	// Parsed statistics data (only one will be populated based on Type)
 	QueueStats   []QueueStatistics   // Queue statistics (if Type == StatisticsTypeQueue)
 	ChannelStats []ChannelStatistics // Channel statistics (if Type == StatisticsTypeChannel)
+	MQIStats     []MQIStatistics     // MQI statistics (if Type == StatisticsTypeMQI)
 	
 	// Message metadata
 	MessageLength int32      // Length of the statistics message

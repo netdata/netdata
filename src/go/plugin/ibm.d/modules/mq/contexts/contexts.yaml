@@ -603,3 +603,47 @@ ChannelStatistics:
         priority: 7004
         dimensions:
           - { name: put_retries, algo: incremental }
+
+MQIStatistics:
+  labels: [queue_manager]  # MQI stats are at queue manager level
+  contexts:
+      - name: Opens
+        context: mq.mqi_stats.opens
+        title: MQOPEN Operations (Statistics)
+        units: operations/s
+        family: mqi/statistics
+        type: line
+        priority: 8000
+        dimensions:
+          - { name: opens_total, algo: incremental }
+          - { name: opens_failed, algo: incremental }
+      - name: Closes
+        context: mq.mqi_stats.closes
+        title: MQCLOSE Operations (Statistics)
+        units: operations/s
+        family: mqi/statistics
+        type: line
+        priority: 8001
+        dimensions:
+          - { name: closes_total, algo: incremental }
+          - { name: closes_failed, algo: incremental }
+      - name: Inqs
+        context: mq.mqi_stats.inqs
+        title: MQINQ Operations (Statistics)
+        units: operations/s
+        family: mqi/statistics
+        type: line
+        priority: 8002
+        dimensions:
+          - { name: inqs_total, algo: incremental }
+          - { name: inqs_failed, algo: incremental }
+      - name: Sets
+        context: mq.mqi_stats.sets
+        title: MQSET Operations (Statistics)
+        units: operations/s
+        family: mqi/statistics
+        type: line
+        priority: 8003
+        dimensions:
+          - { name: sets_total, algo: incremental }
+          - { name: sets_failed, algo: incremental }

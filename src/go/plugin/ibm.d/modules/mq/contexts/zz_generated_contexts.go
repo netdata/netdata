@@ -1200,6 +1200,249 @@ var Listener = struct {
 }
 
 
+// --- MQIStatistics ---
+
+
+// MQIStatisticsOpensValues defines the type-safe values for MQIStatistics.Opens context
+type MQIStatisticsOpensValues struct {
+	Opens_total int64
+	Opens_failed int64
+}
+
+// MQIStatisticsOpensContext provides type-safe operations for MQIStatistics.Opens context
+type MQIStatisticsOpensContext struct {
+	framework.Context[MQIStatisticsLabels]
+}
+
+// Set provides type-safe dimension setting for MQIStatistics.Opens context
+func (c MQIStatisticsOpensContext) Set(state *framework.CollectorState, labels MQIStatisticsLabels, values MQIStatisticsOpensValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"opens_total": values.Opens_total,
+		"opens_failed": values.Opens_failed,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c MQIStatisticsOpensContext) SetUpdateEvery(state *framework.CollectorState, labels MQIStatisticsLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// MQIStatisticsClosesValues defines the type-safe values for MQIStatistics.Closes context
+type MQIStatisticsClosesValues struct {
+	Closes_total int64
+	Closes_failed int64
+}
+
+// MQIStatisticsClosesContext provides type-safe operations for MQIStatistics.Closes context
+type MQIStatisticsClosesContext struct {
+	framework.Context[MQIStatisticsLabels]
+}
+
+// Set provides type-safe dimension setting for MQIStatistics.Closes context
+func (c MQIStatisticsClosesContext) Set(state *framework.CollectorState, labels MQIStatisticsLabels, values MQIStatisticsClosesValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"closes_total": values.Closes_total,
+		"closes_failed": values.Closes_failed,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c MQIStatisticsClosesContext) SetUpdateEvery(state *framework.CollectorState, labels MQIStatisticsLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// MQIStatisticsInqsValues defines the type-safe values for MQIStatistics.Inqs context
+type MQIStatisticsInqsValues struct {
+	Inqs_total int64
+	Inqs_failed int64
+}
+
+// MQIStatisticsInqsContext provides type-safe operations for MQIStatistics.Inqs context
+type MQIStatisticsInqsContext struct {
+	framework.Context[MQIStatisticsLabels]
+}
+
+// Set provides type-safe dimension setting for MQIStatistics.Inqs context
+func (c MQIStatisticsInqsContext) Set(state *framework.CollectorState, labels MQIStatisticsLabels, values MQIStatisticsInqsValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"inqs_total": values.Inqs_total,
+		"inqs_failed": values.Inqs_failed,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c MQIStatisticsInqsContext) SetUpdateEvery(state *framework.CollectorState, labels MQIStatisticsLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// MQIStatisticsSetsValues defines the type-safe values for MQIStatistics.Sets context
+type MQIStatisticsSetsValues struct {
+	Sets_total int64
+	Sets_failed int64
+}
+
+// MQIStatisticsSetsContext provides type-safe operations for MQIStatistics.Sets context
+type MQIStatisticsSetsContext struct {
+	framework.Context[MQIStatisticsLabels]
+}
+
+// Set provides type-safe dimension setting for MQIStatistics.Sets context
+func (c MQIStatisticsSetsContext) Set(state *framework.CollectorState, labels MQIStatisticsLabels, values MQIStatisticsSetsValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"sets_total": values.Sets_total,
+		"sets_failed": values.Sets_failed,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c MQIStatisticsSetsContext) SetUpdateEvery(state *framework.CollectorState, labels MQIStatisticsLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+
+
+// MQIStatisticsLabels defines the required labels for MQIStatistics contexts
+type MQIStatisticsLabels struct {
+	Queue_manager string
+}
+
+// InstanceID generates a unique instance ID using the hardcoded label order from YAML
+func (l MQIStatisticsLabels) InstanceID(contextName string) string {
+	// Label order from YAML: queue_manager
+	return contextName + "." + cleanLabelValue(l.Queue_manager)
+}
+
+
+// MQIStatistics contains all metric contexts for MQIStatistics
+var MQIStatistics = struct {
+	Opens MQIStatisticsOpensContext
+	Closes MQIStatisticsClosesContext
+	Inqs MQIStatisticsInqsContext
+	Sets MQIStatisticsSetsContext
+}{
+	Opens: MQIStatisticsOpensContext{
+		Context: framework.Context[MQIStatisticsLabels]{
+		Name:       "mq.mqi_stats.opens",
+		Family:     "mqi/statistics",
+		Title:      "MQOPEN Operations (Statistics)",
+		Units:      "operations/s",
+		Type:       module.Line,
+		Priority:   8000,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "opens_total",
+				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "opens_failed",
+				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"queue_manager",
+		},
+		},
+	},
+	Closes: MQIStatisticsClosesContext{
+		Context: framework.Context[MQIStatisticsLabels]{
+		Name:       "mq.mqi_stats.closes",
+		Family:     "mqi/statistics",
+		Title:      "MQCLOSE Operations (Statistics)",
+		Units:      "operations/s",
+		Type:       module.Line,
+		Priority:   8001,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "closes_total",
+				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "closes_failed",
+				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"queue_manager",
+		},
+		},
+	},
+	Inqs: MQIStatisticsInqsContext{
+		Context: framework.Context[MQIStatisticsLabels]{
+		Name:       "mq.mqi_stats.inqs",
+		Family:     "mqi/statistics",
+		Title:      "MQINQ Operations (Statistics)",
+		Units:      "operations/s",
+		Type:       module.Line,
+		Priority:   8002,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "inqs_total",
+				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "inqs_failed",
+				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"queue_manager",
+		},
+		},
+	},
+	Sets: MQIStatisticsSetsContext{
+		Context: framework.Context[MQIStatisticsLabels]{
+		Name:       "mq.mqi_stats.sets",
+		Family:     "mqi/statistics",
+		Title:      "MQSET Operations (Statistics)",
+		Units:      "operations/s",
+		Type:       module.Line,
+		Priority:   8003,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "sets_total",
+				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "sets_failed",
+				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+			"queue_manager",
+		},
+		},
+	},
+}
+
+
 // --- Queue ---
 
 
@@ -3380,6 +3623,10 @@ func GetAllContexts() []interface{} {
 		&Listener.Status.Context,
 		&Listener.Backlog.Context,
 		&Listener.Uptime.Context,
+		&MQIStatistics.Opens.Context,
+		&MQIStatistics.Closes.Context,
+		&MQIStatistics.Inqs.Context,
+		&MQIStatistics.Sets.Context,
 		&Queue.Depth.Context,
 		&Queue.DepthPercentage.Context,
 		&Queue.Messages.Context,

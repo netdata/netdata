@@ -240,6 +240,40 @@ using the PCF (Programmable Command Format) protocol.
               chart_type: line
               dimensions:
                 - name: uptime
+        - name: mqistatistics
+          description: These metrics refer to mqistatistics instances.
+          labels:
+            - name: queue_manager
+              description: Queue_manager identifier
+          metrics:
+            - name: mq.mqi_stats.opens
+              description: MQOPEN Operations (Statistics)
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: opens_total
+                - name: opens_failed
+            - name: mq.mqi_stats.closes
+              description: MQCLOSE Operations (Statistics)
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: closes_total
+                - name: closes_failed
+            - name: mq.mqi_stats.inqs
+              description: MQINQ Operations (Statistics)
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: inqs_total
+                - name: inqs_failed
+            - name: mq.mqi_stats.sets
+              description: MQSET Operations (Statistics)
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: sets_total
+                - name: sets_failed
         - name: queue
           description: These metrics refer to queue instances.
           labels:
