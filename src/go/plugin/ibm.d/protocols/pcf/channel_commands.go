@@ -437,14 +437,14 @@ func (c *Client) GetChannels(collectConfig, collectMetrics bool, maxChannels int
 	}
 	
 	// Log summary
-	c.protocol.Infof("PCF: Channel collection complete - discovered:%d visible:%d included:%d enriched:%d", 
+	c.protocol.Debugf("PCF: Channel collection complete - discovered:%d visible:%d included:%d enriched:%d", 
 		result.Stats.Discovery.AvailableItems, 
 		result.Stats.Discovery.AvailableItems - result.Stats.Discovery.InvisibleItems,
 		result.Stats.Discovery.IncludedItems,
 		len(result.Channels))
 	
 	// Log field collection summary
-	c.protocol.Infof("PCF: Channel field collection summary: status=%d messages=%d bytes=%d batches=%d connections=%d "+
+	c.protocol.Debugf("PCF: Channel field collection summary: status=%d messages=%d bytes=%d batches=%d connections=%d "+
 		"buffers_used=%d buffers_max=%d batch_size=%d batch_interval=%d disc_interval=%d hb_interval=%d "+
 		"keep_alive_interval=%d short_retry=%d long_retry=%d max_msg_length=%d sharing_conversations=%d network_priority=%d",
 		fieldCounts["status"], fieldCounts["messages"], fieldCounts["bytes"], fieldCounts["batches"],
