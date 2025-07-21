@@ -4,7 +4,7 @@ Netdata monitors everything from tiny IoT devices to massive cloud infrastructur
 
 ## Overview
 
-Think of Netdata as three LEGO blocks that snap together to create complete observability for your infrastructure.
+Think of Netdata individual components as three LEGO blocks that come together to create an architecture of complete observability for your infrastructure.
 
 ## Components
 
