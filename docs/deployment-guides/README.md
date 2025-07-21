@@ -1,42 +1,55 @@
 # Deployment Guides
 
-Netdata provides real-time monitoring for various infrastructure types, from small IoT devices to complex hybrid environments that combine on-premise and cloud infrastructure. It supports bare-metal servers, virtual machines, and containers.
+Netdata monitors everything from tiny IoT devices to massive cloud infrastructures. Deploy it on bare metal, VMs, or containers - it just works.
 
-## Core Components of a Netdata Deployment
+## Overview
 
-A Netdata deployment consists of three main components:
+Think of Netdata as three LEGO blocks that snap together to create complete observability for your infrastructure.
 
-### 1. Netdata Agents
+## Components
 
-Netdata Agents collect real-time metrics from your infrastructure's physical or virtual nodes, including applications and containers running on them. They are open-source and licensed under GPL v3+.
+### Netdata Agents
+The foundation of every deployment. Install an Agent on each system you want to monitor.
 
-### 2. Netdata Parents
+**What they do:**
+- Collect real-time metrics from systems, applications, and containers
+- Store metrics locally with configurable retention
+- Serve their own dashboard and API
+- Run health checks and trigger alerts
 
-Netdata Parents serve as central aggregation points for monitoring data. They help reduce the resource load on individual Netdata Agents, provide high availability for collected metrics, extend data retention, and enable better isolation of monitored nodes.
+**Key point:** Install an Agent, get instant monitoring. No configuration required.
 
-- Netdata Parents are built using the same Netdata Agent software.
-- Any Netdata Agent can function as both an Agent for a node and a Parent for other Agents.
-- Deploying multiple Netdata Parents ensures redundancy and seamless integration with Netdata Cloud.
+### Netdata Parents
+Scale your monitoring by designating some Agents as "Parents" that collect data from other Agents ("Children").
 
-### 3. Netdata Cloud
+**Benefits:**
+- **Resource optimization** - Children use minimal CPU and RAM
+- **Data persistence** - Metrics survive even when systems are terminated
+- **Centralized storage** - Organize data by region, environment, or team
+- **High availability** - Easy redundancy with multiple Parents
 
-Netdata Cloud is a SaaS platform that unifies all Netdata Agents and Parents into a distributed, scalable monitoring solution. It provides:
+**Key point:** A Parent is just a regular Netdata Agent with streaming enabled. Any Agent can become a Parent.
 
-- Centralized infrastructure monitoring
-- Advanced data analysis and visualization tools
-- Customizable dashboards
-- User management features
-- Alerting and anomaly detection capabilities
+### Netdata Cloud
+Unifies your entire infrastructure into a single interface. Optional but powerful.
 
-## Key Features of Netdata Agents
+**Features:**
+- Unified dashboards across all Agents and Parents
+- Mobile app alerts and notifications
+- Team collaboration and user management
+- Custom dashboards and data analysis
+- Infrastructure overview and insights
 
-Netdata Agents offer a modular monitoring solution with capabilities that include:
+**Key point:** Your data stays on your servers. Cloud provides the viewing layer.
 
-- Extensive data collection through built-in plugins
-- A high-performance time-series database optimized for real-time analytics
-- A query engine for flexible data retrieval
-- Integrated health monitoring and alerting
-- Machine learning-based anomaly detection
-- Exporting of metrics to third-party systems
+## How They Work Together
 
-This structured deployment allows for scalable, efficient monitoring of any infrastructure, ensuring optimal performance and proactive issue resolution.
+```
+Agents (collect) → Parents (centralize) → Cloud (unify)
+```
+
+:::info
+
+Each component builds on the previous one. Start with Agents for immediate monitoring. Add Parents when you need centralization. Connect to Cloud when you want unified visibility.
+
+:::
