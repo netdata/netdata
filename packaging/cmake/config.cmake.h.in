@@ -126,7 +126,6 @@
 
 #cmakedefine ENABLE_ML
 #cmakedefine ENABLE_EXPORTING_MONGODB
-#cmakedefine ENABLE_H2O
 #cmakedefine ENABLE_DBENGINE
 #cmakedefine ENABLE_LZ4
 #cmakedefine ENABLE_ZSTD

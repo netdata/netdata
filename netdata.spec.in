@@ -399,7 +399,6 @@ advanced correlations and fast root cause analysis, native horizontal scalabilit
 	-DENABLE_EXPORTER_MONGODB=Off \
 	%endif
 	-DENABLE_DBENGINE=On \
-	-DENABLE_H2O=On \
 	-DENABLE_PLUGIN_APPS=On \
 	-DENABLE_PLUGIN_CGROUP_NETWORK=On \
 	-DENABLE_PLUGIN_DEBUGFS=On \

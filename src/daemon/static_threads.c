@@ -144,19 +144,6 @@ const struct netdata_static_thread static_threads_common[] = {
         .start_routine = socket_listen_main_static_threaded
     },
 
-#ifdef ENABLE_H2O
-    {
-        .name = "h2o",
-        .config_section = NULL,
-        .config_name = NULL,
-        .enable_routine = httpd_is_enabled,
-        .enabled = 0,
-        .thread = NULL,
-        .init_routine = NULL,
-        .start_routine = h2o_main
-    },
-#endif
-
     {
         .name = "ACLK_MAIN",
         .config_section = NULL,
