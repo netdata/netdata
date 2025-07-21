@@ -237,6 +237,10 @@ func (c *Collector) createChartFromContext(ctx interface{}, instanceID string, i
 	// Set UpdateEvery override if instance has one
 	if instance != nil && instance.UpdateEveryOverride > 0 {
 		chart.UpdateEvery = instance.UpdateEveryOverride
+		// For charts with longer update intervals (like statistics), skip gaps
+		if instance.UpdateEveryOverride > 1 {
+			chart.SkipGaps = true
+		}
 	}
 	
 	// Add dimensions with full dimension IDs
