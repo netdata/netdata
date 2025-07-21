@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- build\(deps\): bump github.com/gosnmp/gosnmp from 1.41.0 to 1.42.0 in /src/go [\#20707](https://github.com/netdata/netdata/pull/20707) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump k8s.io/client-go from 0.33.2 to 0.33.3 in /src/go [\#20705](https://github.com/netdata/netdata/pull/20705) ([dependabot[bot]](https://github.com/apps/dependabot))
 - fix\(nvme\)!: query controller instead of namespace for SMART metrics [\#20704](https://github.com/netdata/netdata/pull/20704) ([ilyam8](https://github.com/ilyam8))
 - Update UPDATE.md [\#20701](https://github.com/netdata/netdata/pull/20701) ([kanelatechnical](https://github.com/kanelatechnical))
 - Ensure chat exists before handling message input [\#20700](https://github.com/netdata/netdata/pull/20700) ([emmanuel-ferdman](https://github.com/emmanuel-ferdman))
@@ -461,10 +463,6 @@
 - build\(deps\): update go toolchain to v1.24.2 [\#20176](https://github.com/netdata/netdata/pull/20176) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): bump k8s.io/client-go from 0.32.3 to 0.33.0 in /src/go [\#20175](https://github.com/netdata/netdata/pull/20175) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/vmware/govmomi from 0.49.0 to 0.50.0 in /src/go [\#20173](https://github.com/netdata/netdata/pull/20173) ([dependabot[bot]](https://github.com/apps/dependabot))
-- chore\(otel/netdataexporter\): add exporter module skeleton [\#20171](https://github.com/netdata/netdata/pull/20171) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations docs [\#20170](https://github.com/netdata/netdata/pull/20170) ([netdatabot](https://github.com/netdatabot))
-- fix integrations config file sample [\#20169](https://github.com/netdata/netdata/pull/20169) ([ilyam8](https://github.com/ilyam8))
-- improvement\(cgroups\): improve systemd-nspawn filter for default [\#20168](https://github.com/netdata/netdata/pull/20168) ([rhoriguchi](https://github.com/rhoriguchi))
 
 ## [v2.4.0](https://github.com/netdata/netdata/tree/v2.4.0) (2025-04-14)
 
