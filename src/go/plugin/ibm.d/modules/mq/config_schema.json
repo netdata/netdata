@@ -127,7 +127,7 @@
       },
       "statistics_interval": {
         "default": 60,
-        "title": "Statistics collection interval in seconds (must match MQ STATINT setting to avoid wasted calls)",
+        "title": "Statistics collection interval in seconds (should match MQ STATINT setting for optimal data freshness)",
         "type": "integer"
       },
       "topic_selector": {

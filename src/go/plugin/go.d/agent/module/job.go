@@ -559,6 +559,11 @@ func (j *Job) createChart(chart *Chart) {
 		chart.Priority = j.priority
 		j.priority++
 	}
+	updateEvery := j.updateEvery
+	if chart.UpdateEvery > 0 {
+		updateEvery = chart.UpdateEvery
+	}
+
 	j.api.CHART(netdataapi.ChartOpts{
 		TypeID:      getChartType(chart, j),
 		ID:          getChartID(chart),
@@ -569,7 +574,7 @@ func (j *Job) createChart(chart *Chart) {
 		Context:     chart.Ctx,
 		ChartType:   chart.Type.String(),
 		Priority:    chart.Priority,
-		UpdateEvery: j.updateEvery,
+		UpdateEvery: updateEvery,
 		Options:     chart.Opts.String(),
 		Plugin:      j.pluginName,
 		Module:      j.moduleName,

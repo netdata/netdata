@@ -140,8 +140,14 @@ func (c *Collector) convertMetrics() map[string]int64 {
 			for _, ctx := range c.registeredContexts {
 				contextMeta := extractContextMetadata(ctx)
 				if contextMeta != nil && contextMeta.Name == metric.Instance.contextName {
+					// Get the current instance from state (not the copy in metric)
+					currentInstance := c.State.instances[instanceKey]
+					if currentInstance == nil {
+						// Fallback to metric instance if not found (shouldn't happen)
+						currentInstance = &metric.Instance
+					}
 					// Create charts for this new instance
-					chart := c.createChartFromContext(ctx, instanceKey)
+					chart := c.createChartFromContext(ctx, instanceKey, currentInstance)
 					if chart != nil {
 						c.Debugf("Creating dynamic chart for instance: %s", instanceKey)
 						// Add labels from the instance
@@ -201,7 +207,7 @@ func cleanLabelValue(value string) string {
 }
 
 // createChartFromContext creates a go.d chart from a Context[T]
-func (c *Collector) createChartFromContext(ctx interface{}, instanceID string) *module.Chart {
+func (c *Collector) createChartFromContext(ctx interface{}, instanceID string, instance *Instance) *module.Chart {
 	// Use reflection to extract context metadata
 	contextMeta := extractContextMetadata(ctx)
 	if contextMeta == nil {
@@ -226,6 +232,11 @@ func (c *Collector) createChartFromContext(ctx interface{}, instanceID string) *
 		Type:     contextMeta.Type,
 		Priority: contextMeta.Priority,
 		Opts:     module.Opts{},
+	}
+	
+	// Set UpdateEvery override if instance has one
+	if instance != nil && instance.UpdateEveryOverride > 0 {
+		chart.UpdateEvery = instance.UpdateEveryOverride
 	}
 	
 	// Add dimensions with full dimension IDs
