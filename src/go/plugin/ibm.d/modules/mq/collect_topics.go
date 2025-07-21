@@ -2,6 +2,7 @@ package mq
 
 import (
 	"fmt"
+	"time"
 	
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/mq/contexts"
 )
@@ -69,6 +70,16 @@ func (c *Collector) collectTopicMetrics() error {
 		contexts.Topic.Messages.Set(c.State, labels, contexts.TopicMessagesValues{
 			Messages: topic.PublishMsgCount,
 		})
+		
+		// Calculate time since last message if timestamp is available
+		if topic.LastPubTime > 0 {
+			currentTime := time.Now().Unix()
+			timeSinceLastMsg := currentTime - int64(topic.LastPubTime)
+			
+			contexts.Topic.TimeSinceLastMessage.Set(c.State, labels, contexts.TopicTimeSinceLastMessageValues{
+				Time_since_last_msg: timeSinceLastMsg,
+			})
+		}
 	}
 	
 	return nil

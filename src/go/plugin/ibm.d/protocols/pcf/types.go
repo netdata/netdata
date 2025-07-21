@@ -198,6 +198,10 @@ type TopicMetrics struct {
 	
 	// Message count
 	PublishMsgCount int64
+	
+	// Timestamps
+	LastPubDate AttributeValue  // MQCACF_LAST_PUB_DATE - Unix timestamp
+	LastPubTime AttributeValue  // MQCACF_LAST_PUB_TIME - Unix timestamp (combined with date)
 }
 
 // QueueManagerMetrics contains runtime metrics for a queue manager

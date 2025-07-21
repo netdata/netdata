@@ -52,6 +52,7 @@ func (c *Client) GetTopicMetrics(topicString string) (*TopicMetrics, error) {
 	
 	params := []pcfParameter{
 		newStringParameter(C.MQCA_TOPIC_STRING, topicString),
+		newIntParameter(C.MQIACF_TOPIC_STATUS_TYPE, C.MQIACF_TOPIC_PUB),
 	}
 	response, err := c.SendPCFCommand(C.MQCMD_INQUIRE_TOPIC_STATUS, params)
 	if err != nil {
@@ -89,6 +90,25 @@ func (c *Client) GetTopicMetrics(topicString string) (*TopicMetrics, error) {
 	// Message count
 	if messages, ok := attrs[C.MQIAMO_PUBLISH_MSG_COUNT]; ok {
 		metrics.PublishMsgCount = int64(messages.(int32))
+	}
+	
+	// Last publication timestamps
+	var lastPubDate, lastPubTime string
+	if date, ok := attrs[C.MQCACF_LAST_PUB_DATE]; ok {
+		lastPubDate = strings.TrimSpace(date.(string))
+	}
+	if time, ok := attrs[C.MQCACF_LAST_PUB_TIME]; ok {
+		lastPubTime = strings.TrimSpace(time.(string))
+	}
+	
+	// Convert to Unix timestamp if both date and time are available
+	if lastPubDate != "" && lastPubTime != "" {
+		if timestamp, err := ParseMQDateTime(lastPubDate, lastPubTime); err == nil {
+			metrics.LastPubDate = AttributeValue(timestamp.Unix())
+			metrics.LastPubTime = AttributeValue(timestamp.Unix())
+		} else {
+			c.protocol.Debugf("PCF: Failed to parse last publication timestamp for topic '%s': %v", topicString, err)
+		}
 	}
 
 	return metrics, nil
@@ -227,6 +247,8 @@ func (c *Client) GetTopics(collectMetrics bool, maxTopics int, selector string, 
 				tm.Publishers = metricsData.Publishers
 				tm.Subscribers = metricsData.Subscribers
 				tm.PublishMsgCount = metricsData.PublishMsgCount
+				tm.LastPubDate = metricsData.LastPubDate
+				tm.LastPubTime = metricsData.LastPubTime
 			}
 		}
 		
