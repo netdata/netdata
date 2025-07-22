@@ -204,7 +204,7 @@ dict_win_services_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *va
     return 1;
 }
 
-int do_PerflibServices(int update_every, usec_t dt __maybe_unused)
+int do_GetServicesStatus(int update_every, usec_t dt __maybe_unused)
 {
 #define NETDATA_SERVICE_MAX_TRY (5)
     static int limit = 0;

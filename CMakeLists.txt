@@ -2045,6 +2045,7 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/GetSystemRAM.c
         src/collectors/windows.plugin/GetSystemCPU.c
         src/collectors/windows.plugin/GetPowerSupply.c
+        src/collectors/windows.plugin/GetServicesStatus.c
         src/collectors/windows.plugin/perflib-adcs.c
         src/collectors/windows.plugin/perflib-adfs.c
         src/collectors/windows.plugin/perflib-rrd.c
@@ -2061,7 +2062,6 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/perflib-memory.c
         src/collectors/windows.plugin/perflib-processes.c
         src/collectors/windows.plugin/perflib-web-service.c
-        src/collectors/windows.plugin/perflib-services.c
         src/collectors/windows.plugin/perflib-hyperv.c
         src/collectors/windows.plugin/perflib-exchange.c
         src/collectors/windows.plugin/perflib-numa.c

@@ -30,6 +30,11 @@ static struct proc_module {
      .enabled = CONFIG_BOOLEAN_YES,
      .update_every = UPDATE_EVERY_MIN,
      .func = do_GetPowerSupply},
+    {.name = "PerflibServices",
+     .dim = "PerflibServices",
+     .enabled = CONFIG_BOOLEAN_YES,
+     .update_every = 30 * UPDATE_EVERY_MIN,
+     .func = do_GetServicesStatus},
 
     // the same is provided by PerflibProcessor, with more detailed analysis
     //{.name = "GetSystemCPU",        .dim = "GetSystemCPU",       .enabled = CONFIG_BOOLEAN_YES,
@@ -74,7 +79,7 @@ static struct proc_module {
     {.name = "PerflibThermalZone",
      .dim = "PerflibThermalZone",
      .enabled = CONFIG_BOOLEAN_NO,
-     .update_every = 5*UPDATE_EVERY_MIN,
+     .update_every = 5 * UPDATE_EVERY_MIN,
      .func = do_PerflibThermalZone},
 
     {.name = "PerflibWebService",
@@ -111,12 +116,6 @@ static struct proc_module {
      .update_every = 10 * UPDATE_EVERY_MIN,
      .func = do_PerflibADFS},
 
-    {.name = "PerflibServices",
-     .dim = "PerflibServices",
-     .enabled = CONFIG_BOOLEAN_YES,
-     .update_every = 30 * UPDATE_EVERY_MIN,
-     .func = do_PerflibServices},
-
     {.name = "PerflibExchange",
      .dim = "PerflibExchange",
      .enabled = CONFIG_BOOLEAN_YES,
@@ -136,7 +135,7 @@ static struct proc_module {
      .update_every = UPDATE_EVERY_MIN,
      .func = do_PerflibASP},
 
-     // the terminator of this array
+    // the terminator of this array
     {.name = NULL, .dim = NULL, .func = NULL}};
 
 #if WORKER_UTILIZATION_MAX_JOB_TYPES < 36
@@ -214,7 +213,8 @@ void *win_plugin_main(void *ptr)
         pm->enabled = inicfg_get_boolean(&netdata_config, "plugin:windows", pm->name, pm->enabled);
         pm->rd = NULL;
 
-        pm->update_every = (int)inicfg_get_duration_seconds(&netdata_config, buf, "update every", (update_every != pm->update_every)? pm->update_every: update_every);
+        pm->update_every = (int)inicfg_get_duration_seconds(
+            &netdata_config, buf, "update every", (update_every != pm->update_every) ? pm->update_every : update_every);
 
         if (pm->enabled && unlikely(update_every != pm->update_every)) {
             char tag_name[ND_THREAD_TAG_MAX];
