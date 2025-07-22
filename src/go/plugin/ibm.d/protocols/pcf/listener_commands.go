@@ -1,16 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//go:build linux && cgo
-
 package pcf
-
-// #include "pcf_helpers.h"
-import "C"
 
 import (
 	"fmt"
 	"path/filepath"
 	"strings"
+
+	"github.com/ibm-messaging/mq-golang/v5/ibmmq"
 )
 
 // GetListenerList returns a list of listeners.
@@ -19,16 +16,16 @@ func (c *Client) GetListenerList() ([]string, error) {
 
 	const pattern = "*"
 	params := []pcfParameter{
-		newStringParameter(C.MQCACH_LISTENER_NAME, pattern),
+		newStringParameter(ibmmq.MQCACH_LISTENER_NAME, pattern),
 	}
-	response, err := c.SendPCFCommand(C.MQCMD_INQUIRE_LISTENER, params)
+	response, err := c.sendPCFCommand(ibmmq.MQCMD_INQUIRE_LISTENER, params)
 	if err != nil {
 		c.protocol.Errorf("Failed to get listener list from queue manager '%s': %v", c.config.QueueManager, err)
 		return nil, err
 	}
 
 	// Parse the multi-message response
-	result := c.parseListenerListResponse(response)
+	result := c.parseListenerListResponseFromParams(response)
 
 	// Log any errors encountered during parsing
 	if result.InternalErrors > 0 {
@@ -53,44 +50,22 @@ func (c *Client) GetListenerList() ([]string, error) {
 	return result.Listeners, nil
 }
 
-// parseListenerListResponse parses the multi-message response from INQUIRE_LISTENER
-func (c *Client) parseListenerListResponse(response []byte) *ListenerListResult {
-	processor := func(attrs map[C.MQLONG]interface{}) (interface{}, error) {
-		if name, ok := attrs[C.MQCACH_LISTENER_NAME]; ok {
-			if nameStr, ok := name.(string); ok && nameStr != "" {
-				return strings.TrimSpace(nameStr), nil
-			}
-		}
-		return nil, fmt.Errorf("listener name not found")
-	}
-
-	genericResult := c.parseGenericListResponse(response, C.MQCACH_LISTENER_NAME, processor)
-
-	result := &ListenerListResult{
-		ErrorCounts:    genericResult.ErrorCounts,
-		InternalErrors: genericResult.InternalErrors,
-	}
-	for _, item := range genericResult.Items {
-		result.Listeners = append(result.Listeners, item.(string))
-	}
-	return result
-}
 
 // GetListenerStatus returns runtime status for a specific listener.
 func (c *Client) GetListenerStatus(listenerName string) (*ListenerMetrics, error) {
 	c.protocol.Debugf("Getting status for listener '%s' from queue manager '%s'", listenerName, c.config.QueueManager)
 
 	params := []pcfParameter{
-		newStringParameter(C.MQCACH_LISTENER_NAME, listenerName),
+		newStringParameter(ibmmq.MQCACH_LISTENER_NAME, listenerName),
 	}
-	response, err := c.SendPCFCommand(C.MQCMD_INQUIRE_LISTENER_STATUS, params)
+	response, err := c.sendPCFCommand(ibmmq.MQCMD_INQUIRE_LISTENER_STATUS, params)
 	if err != nil {
 		c.protocol.Errorf("Failed to get status for listener '%s' from queue manager '%s': %v",
 			listenerName, c.config.QueueManager, err)
 		return nil, err
 	}
 
-	attrs, err := c.ParsePCFResponse(response, "")
+	attrs, err := c.parsePCFResponseFromParams(response, "")
 	if err != nil {
 		c.protocol.Errorf("Failed to parse status response for listener '%s' from queue manager '%s': %v",
 			listenerName, c.config.QueueManager, err)
@@ -102,17 +77,17 @@ func (c *Client) GetListenerStatus(listenerName string) (*ListenerMetrics, error
 	}
 
 	// Get listener status
-	if status, ok := attrs[C.MQIACH_LISTENER_STATUS]; ok {
+	if status, ok := attrs[ibmmq.MQIACH_LISTENER_STATUS]; ok {
 		metrics.Status = ListenerStatus(status.(int32))
 	}
 
 	// Get listener port
-	if port, ok := attrs[C.MQIA_LISTENER_PORT_NUMBER]; ok {
+	if port, ok := attrs[ibmmq.MQIA_LISTENER_PORT_NUMBER]; ok {
 		metrics.Port = int64(port.(int32))
 	}
 
 	// Get backlog
-	if backlog, ok := attrs[C.MQIACH_BACKLOG]; ok {
+	if backlog, ok := attrs[ibmmq.MQIACH_BACKLOG]; ok {
 		if val, ok := backlog.(int32); ok {
 			metrics.Backlog = AttributeValue(val)
 		}
@@ -121,27 +96,27 @@ func (c *Client) GetListenerStatus(listenerName string) (*ListenerMetrics, error
 	}
 
 	// Get IP address
-	if ipAddr, ok := attrs[C.MQCACH_IP_ADDRESS]; ok {
+	if ipAddr, ok := attrs[ibmmq.MQCACH_IP_ADDRESS]; ok {
 		if val, ok := ipAddr.(string); ok {
 			metrics.IPAddress = strings.TrimSpace(val)
 		}
 	}
 
 	// Get description
-	if desc, ok := attrs[C.MQCACH_LISTENER_DESC]; ok {
+	if desc, ok := attrs[ibmmq.MQCACH_LISTENER_DESC]; ok {
 		if val, ok := desc.(string); ok {
 			metrics.Description = strings.TrimSpace(val)
 		}
 	}
 
 	// Get start date and time to calculate uptime
-	if startDate, ok := attrs[C.MQCACH_LISTENER_START_DATE]; ok {
+	if startDate, ok := attrs[ibmmq.MQCACH_LISTENER_START_DATE]; ok {
 		if dateStr, ok := startDate.(string); ok {
 			metrics.StartDate = strings.TrimSpace(dateStr)
 		}
 	}
 
-	if startTime, ok := attrs[C.MQCACH_LISTENER_START_TIME]; ok {
+	if startTime, ok := attrs[ibmmq.MQCACH_LISTENER_START_TIME]; ok {
 		if timeStr, ok := startTime.(string); ok {
 			metrics.StartTime = strings.TrimSpace(timeStr)
 		}
@@ -177,8 +152,8 @@ func (c *Client) GetListeners(collectMetrics bool, maxListeners int, selector st
 	}
 
 	// Step 1: Discovery - get all listener names
-	response, err := c.SendPCFCommand(C.MQCMD_INQUIRE_LISTENER, []pcfParameter{
-		newStringParameter(C.MQCACH_LISTENER_NAME, "*"), // Always discover ALL listeners
+	response, err := c.sendPCFCommand(ibmmq.MQCMD_INQUIRE_LISTENER, []pcfParameter{
+		newStringParameter(ibmmq.MQCACH_LISTENER_NAME, "*"), // Always discover ALL listeners
 	})
 	if err != nil {
 		result.Stats.Discovery.Success = false
@@ -189,7 +164,7 @@ func (c *Client) GetListeners(collectMetrics bool, maxListeners int, selector st
 	result.Stats.Discovery.Success = true
 
 	// Parse discovery response
-	parsed := c.parseListenerListResponse(response)
+	parsed := c.parseListenerListResponseFromParams(response)
 
 	// Track discovery statistics
 	successfulItems := int64(len(parsed.Listeners))

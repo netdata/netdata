@@ -40,13 +40,12 @@ func defaultConfig() Config {
 		CollectResetQueueStats: false,
 		// Statistics queue collection is disabled by default (may not be available on all systems)
 		CollectStatisticsQueue: false,
-		// Statistics collection interval should match MQ STATINT setting (default 60 seconds)
-		StatisticsInterval:     60,
-		
 		// $SYS topic collection is disabled by default (requires MQ 9.0+)
 		CollectSysTopics: false,
-		// $SYS topic interval should match MQ MONINT setting (default 180 seconds)
-		SysTopicInterval: 180,
+		
+		// Interval defaults
+		StatisticsInterval: 60,  // Default 60s, auto-detected STATINT overwrites if available
+		SysTopicInterval:   10,  // Default 10s per IBM docs, user can override if customized
 		
 		// Selector defaults - empty means collect nothing (user must explicitly configure)
 		QueueSelector:   "",
@@ -90,7 +89,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	// Statistics contexts will be configured with appropriate update interval 
 	// when they are first collected during statistics collection
 	if c.Config.CollectStatisticsQueue {
-		c.Infof("Statistics collection enabled - charts will use %d second update interval", c.Config.StatisticsInterval)
+		c.Infof("Statistics collection enabled - interval will be determined during Check()")
 	}
 
 	// Debug log the complete configuration as JSON
@@ -155,6 +154,9 @@ func (c *Collector) Check(ctx context.Context) error {
 	if err := c.client.Connect(); err != nil {
 		return fmt.Errorf("connection check failed: %w", err)
 	}
+
+	// Auto-detect intervals from queue manager configuration
+	c.resolveIntervals()
 
 	return nil
 }

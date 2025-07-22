@@ -65,7 +65,7 @@ func (c *Collector) collectQueueStatistics(queueStats []pcf.QueueStatistics) err
 				Min_depth: stat.MinDepth.Int64(),
 				Max_depth: stat.MaxDepth.Int64(),
 			})
-			contexts.QueueStatistics.DepthMinMax.SetUpdateEvery(c.State, labels, c.Config.StatisticsInterval)
+			contexts.QueueStatistics.DepthMinMax.SetUpdateEvery(c.State, labels, c.GetEffectiveStatisticsInterval())
 		}
 
 		// Average queue time metrics (split by persistence)
@@ -74,7 +74,7 @@ func (c *Collector) collectQueueStatistics(queueStats []pcf.QueueStatistics) err
 				Non_persistent: stat.AvgQTimeNonPersistent.Int64(),
 				Persistent:     stat.AvgQTimePersistent.Int64(),
 			})
-			contexts.QueueStatistics.AvgQueueTime.SetUpdateEvery(c.State, labels, c.Config.StatisticsInterval)
+			contexts.QueueStatistics.AvgQueueTime.SetUpdateEvery(c.State, labels, c.GetEffectiveStatisticsInterval())
 		}
 		
 		// Queue time indicators (short/long period)
@@ -83,7 +83,7 @@ func (c *Collector) collectQueueStatistics(queueStats []pcf.QueueStatistics) err
 				Short_period: stat.QTimeShort.Int64(),
 				Long_period:  stat.QTimeLong.Int64(),
 			})
-			contexts.QueueStatistics.QueueTimeIndicators.SetUpdateEvery(c.State, labels, c.Config.StatisticsInterval)
+			contexts.QueueStatistics.QueueTimeIndicators.SetUpdateEvery(c.State, labels, c.GetEffectiveStatisticsInterval())
 		}
 
 		// Operation counters (incremental - rates per second)
@@ -95,7 +95,7 @@ func (c *Collector) collectQueueStatistics(queueStats []pcf.QueueStatistics) err
 			Put1s:               getValue(stat.Put1Count),
 			Browses:             getValue(stat.BrowseCount),
 		})
-		contexts.QueueStatistics.Operations.SetUpdateEvery(c.State, labels, c.Config.StatisticsInterval)
+		contexts.QueueStatistics.Operations.SetUpdateEvery(c.State, labels, c.GetEffectiveStatisticsInterval())
 
 		// Byte counters (incremental - rates per second)
 		contexts.QueueStatistics.Bytes.Set(c.State, labels, contexts.QueueStatisticsBytesValues{
@@ -105,7 +105,7 @@ func (c *Collector) collectQueueStatistics(queueStats []pcf.QueueStatistics) err
 			Get_bytes_persistent:     getValue(stat.GetBytesPersistent),
 			Browse_bytes:             getValue(stat.BrowseBytes),
 		})
-		contexts.QueueStatistics.Bytes.SetUpdateEvery(c.State, labels, c.Config.StatisticsInterval)
+		contexts.QueueStatistics.Bytes.SetUpdateEvery(c.State, labels, c.GetEffectiveStatisticsInterval())
 
 		// Failure counters (incremental - rates per second)
 		contexts.QueueStatistics.Failures.Set(c.State, labels, contexts.QueueStatisticsFailuresValues{
@@ -114,7 +114,7 @@ func (c *Collector) collectQueueStatistics(queueStats []pcf.QueueStatistics) err
 			Gets_failed:    getValue(stat.GetsFailed),
 			Browses_failed: getValue(stat.BrowsesFailed),
 		})
-		contexts.QueueStatistics.Failures.SetUpdateEvery(c.State, labels, c.Config.StatisticsInterval)
+		contexts.QueueStatistics.Failures.SetUpdateEvery(c.State, labels, c.GetEffectiveStatisticsInterval())
 
 		// Message lifecycle counters (incremental - rates per second)
 		contexts.QueueStatistics.MessageLifecycle.Set(c.State, labels, contexts.QueueStatisticsMessageLifecycleValues{
@@ -122,7 +122,7 @@ func (c *Collector) collectQueueStatistics(queueStats []pcf.QueueStatistics) err
 			Purged:     getValue(stat.MsgsPurged),
 			Not_queued: getValue(stat.MsgsNotQueued),
 		})
-		contexts.QueueStatistics.MessageLifecycle.SetUpdateEvery(c.State, labels, c.Config.StatisticsInterval)
+		contexts.QueueStatistics.MessageLifecycle.SetUpdateEvery(c.State, labels, c.GetEffectiveStatisticsInterval())
 
 		c.Debugf("Collected statistics for queue '%s' (type: %s)", queueName, queueType)
 	}
@@ -146,7 +146,7 @@ func (c *Collector) collectChannelStatistics(channelStats []pcf.ChannelStatistic
 			contexts.ChannelStatistics.Messages.Set(c.State, labels, contexts.ChannelStatisticsMessagesValues{
 				Messages: stat.Messages.Int64(),
 			})
-			contexts.ChannelStatistics.Messages.SetUpdateEvery(c.State, labels, c.Config.StatisticsInterval)
+			contexts.ChannelStatistics.Messages.SetUpdateEvery(c.State, labels, c.GetEffectiveStatisticsInterval())
 		}
 
 		// Byte metrics (incremental - rates per second)
@@ -154,7 +154,7 @@ func (c *Collector) collectChannelStatistics(channelStats []pcf.ChannelStatistic
 			contexts.ChannelStatistics.Bytes.Set(c.State, labels, contexts.ChannelStatisticsBytesValues{
 				Bytes: stat.Bytes.Int64(),
 			})
-			contexts.ChannelStatistics.Bytes.SetUpdateEvery(c.State, labels, c.Config.StatisticsInterval)
+			contexts.ChannelStatistics.Bytes.SetUpdateEvery(c.State, labels, c.GetEffectiveStatisticsInterval())
 		}
 
 		// Batch metrics (incremental - rates per second)
@@ -162,14 +162,14 @@ func (c *Collector) collectChannelStatistics(channelStats []pcf.ChannelStatistic
 			Full_batches:       getValue(stat.FullBatches),
 			Incomplete_batches: getValue(stat.IncompleteBatches),
 		})
-		contexts.ChannelStatistics.Batches.SetUpdateEvery(c.State, labels, c.Config.StatisticsInterval)
+		contexts.ChannelStatistics.Batches.SetUpdateEvery(c.State, labels, c.GetEffectiveStatisticsInterval())
 
 		// Average batch size (absolute value)
 		if stat.AvgBatchSize.IsCollected() {
 			contexts.ChannelStatistics.BatchSize.Set(c.State, labels, contexts.ChannelStatisticsBatchSizeValues{
 				Avg_batch_size: stat.AvgBatchSize.Int64(),
 			})
-			contexts.ChannelStatistics.BatchSize.SetUpdateEvery(c.State, labels, c.Config.StatisticsInterval)
+			contexts.ChannelStatistics.BatchSize.SetUpdateEvery(c.State, labels, c.GetEffectiveStatisticsInterval())
 		}
 
 		// Put retry metrics (incremental - rates per second)
@@ -177,7 +177,7 @@ func (c *Collector) collectChannelStatistics(channelStats []pcf.ChannelStatistic
 			contexts.ChannelStatistics.PutRetries.Set(c.State, labels, contexts.ChannelStatisticsPutRetriesValues{
 				Put_retries: stat.PutRetries.Int64(),
 			})
-			contexts.ChannelStatistics.PutRetries.SetUpdateEvery(c.State, labels, c.Config.StatisticsInterval)
+			contexts.ChannelStatistics.PutRetries.SetUpdateEvery(c.State, labels, c.GetEffectiveStatisticsInterval())
 		}
 
 		c.Debugf("Collected statistics for channel '%s' (type: %s)", channelName, channelType)
@@ -200,7 +200,7 @@ func (c *Collector) collectMQIStatistics(mqiStats []pcf.MQIStatistics) error {
 				Opens_total:  getValue(stat.Opens),
 				Opens_failed: getValue(stat.OpensFailed),
 			})
-			contexts.MQIStatistics.Opens.SetUpdateEvery(c.State, labels, c.Config.StatisticsInterval)
+			contexts.MQIStatistics.Opens.SetUpdateEvery(c.State, labels, c.GetEffectiveStatisticsInterval())
 		}
 
 		// MQCLOSE operations (incremental - rates per second)
@@ -209,7 +209,7 @@ func (c *Collector) collectMQIStatistics(mqiStats []pcf.MQIStatistics) error {
 				Closes_total:  getValue(stat.Closes),
 				Closes_failed: getValue(stat.ClosesFailed),
 			})
-			contexts.MQIStatistics.Closes.SetUpdateEvery(c.State, labels, c.Config.StatisticsInterval)
+			contexts.MQIStatistics.Closes.SetUpdateEvery(c.State, labels, c.GetEffectiveStatisticsInterval())
 		}
 
 		// MQINQ operations (incremental - rates per second)
@@ -218,7 +218,7 @@ func (c *Collector) collectMQIStatistics(mqiStats []pcf.MQIStatistics) error {
 				Inqs_total:  getValue(stat.Inqs),
 				Inqs_failed: getValue(stat.InqsFailed),
 			})
-			contexts.MQIStatistics.Inqs.SetUpdateEvery(c.State, labels, c.Config.StatisticsInterval)
+			contexts.MQIStatistics.Inqs.SetUpdateEvery(c.State, labels, c.GetEffectiveStatisticsInterval())
 		}
 
 		// MQSET operations (incremental - rates per second)
@@ -227,7 +227,7 @@ func (c *Collector) collectMQIStatistics(mqiStats []pcf.MQIStatistics) error {
 				Sets_total:  getValue(stat.Sets),
 				Sets_failed: getValue(stat.SetsFailed),
 			})
-			contexts.MQIStatistics.Sets.SetUpdateEvery(c.State, labels, c.Config.StatisticsInterval)
+			contexts.MQIStatistics.Sets.SetUpdateEvery(c.State, labels, c.GetEffectiveStatisticsInterval())
 		}
 
 		c.Debugf("Collected MQI statistics for queue manager '%s'", stat.Name)

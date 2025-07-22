@@ -1,476 +1,100 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//go:build linux && cgo
-
 package pcf
-
-// #include "pcf_helpers.h"
-import "C"
 
 import (
 	"fmt"
+	"strconv"
+
+	"github.com/ibm-messaging/mq-golang/v5/ibmmq"
 )
 
 // mqcmdToString returns a human-readable name for MQCMD command constants
-// Only includes constants that exist in the IBM MQ C header files
-func mqcmdToString(command C.MQLONG) string {
-	switch command {
-	case C.MQCMD_NONE:
-		return "MQCMD_NONE"
-	case C.MQCMD_CHANGE_Q_MGR:
-		return "MQCMD_CHANGE_Q_MGR"
-	case C.MQCMD_INQUIRE_Q_MGR:
-		return "MQCMD_INQUIRE_Q_MGR"
-	case C.MQCMD_CHANGE_Q:
-		return "MQCMD_CHANGE_Q"
-	case C.MQCMD_CLEAR_Q:
-		return "MQCMD_CLEAR_Q"
-	case C.MQCMD_COPY_Q:
-		return "MQCMD_COPY_Q"
-	case C.MQCMD_CREATE_Q:
-		return "MQCMD_CREATE_Q"
-	case C.MQCMD_DELETE_Q:
-		return "MQCMD_DELETE_Q"
-	case C.MQCMD_INQUIRE_Q:
-		return "MQCMD_INQUIRE_Q"
-	case C.MQCMD_REFRESH_Q_MGR:
-		return "MQCMD_REFRESH_Q_MGR"
-	case C.MQCMD_RESET_Q_STATS:
-		return "MQCMD_RESET_Q_STATS"
-	case C.MQCMD_INQUIRE_Q_MGR_STATUS:
-		return "MQCMD_INQUIRE_Q_MGR_STATUS"
-	case C.MQCMD_INQUIRE_Q_STATUS:
-		return "MQCMD_INQUIRE_Q_STATUS"
-	case C.MQCMD_CHANGE_PROCESS:
-		return "MQCMD_CHANGE_PROCESS"
-	case C.MQCMD_COPY_PROCESS:
-		return "MQCMD_COPY_PROCESS"
-	case C.MQCMD_CREATE_PROCESS:
-		return "MQCMD_CREATE_PROCESS"
-	case C.MQCMD_DELETE_PROCESS:
-		return "MQCMD_DELETE_PROCESS"
-	case C.MQCMD_INQUIRE_PROCESS:
-		return "MQCMD_INQUIRE_PROCESS"
-	case C.MQCMD_CHANGE_NAMELIST:
-		return "MQCMD_CHANGE_NAMELIST"
-	case C.MQCMD_COPY_NAMELIST:
-		return "MQCMD_COPY_NAMELIST"
-	case C.MQCMD_CREATE_NAMELIST:
-		return "MQCMD_CREATE_NAMELIST"
-	case C.MQCMD_DELETE_NAMELIST:
-		return "MQCMD_DELETE_NAMELIST"
-	case C.MQCMD_INQUIRE_NAMELIST:
-		return "MQCMD_INQUIRE_NAMELIST"
-	case C.MQCMD_ESCAPE:
-		return "MQCMD_ESCAPE"
-	case C.MQCMD_RESOLVE_CHANNEL:
-		return "MQCMD_RESOLVE_CHANNEL"
-	case C.MQCMD_PING_CHANNEL:
-		return "MQCMD_PING_CHANNEL"
-	case C.MQCMD_RESET_CHANNEL:
-		return "MQCMD_RESET_CHANNEL"
-	case C.MQCMD_START_CHANNEL:
-		return "MQCMD_START_CHANNEL"
-	case C.MQCMD_STOP_CHANNEL:
-		return "MQCMD_STOP_CHANNEL"
-	case C.MQCMD_START_CHANNEL_INIT:
-		return "MQCMD_START_CHANNEL_INIT"
-	case C.MQCMD_START_CHANNEL_LISTENER:
-		return "MQCMD_START_CHANNEL_LISTENER"
-	case C.MQCMD_CHANGE_CHANNEL:
-		return "MQCMD_CHANGE_CHANNEL"
-	case C.MQCMD_COPY_CHANNEL:
-		return "MQCMD_COPY_CHANNEL"
-	case C.MQCMD_CREATE_CHANNEL:
-		return "MQCMD_CREATE_CHANNEL"
-	case C.MQCMD_DELETE_CHANNEL:
-		return "MQCMD_DELETE_CHANNEL"
-	case C.MQCMD_INQUIRE_CHANNEL:
-		return "MQCMD_INQUIRE_CHANNEL"
-	case C.MQCMD_INQUIRE_CHANNEL_STATUS:
-		return "MQCMD_INQUIRE_CHANNEL_STATUS"
-	case C.MQCMD_MOVE_Q:
-		return "MQCMD_MOVE_Q"
-	case C.MQCMD_RECOVER_BSDS:
-		return "MQCMD_RECOVER_BSDS"
-	case C.MQCMD_START_Q_MGR:
-		return "MQCMD_START_Q_MGR"
-	case C.MQCMD_START_TRACE:
-		return "MQCMD_START_TRACE"
-	case C.MQCMD_STOP_TRACE:
-		return "MQCMD_STOP_TRACE"
-	case C.MQCMD_PING_Q_MGR:
-		return "MQCMD_PING_Q_MGR"
-	case C.MQCMD_INQUIRE_CHANNEL_NAMES:
-		return "MQCMD_INQUIRE_CHANNEL_NAMES"
-	case C.MQCMD_CHANNEL_EVENT:
-		return "MQCMD_CHANNEL_EVENT"
-	case C.MQCMD_DELETE_PUBLICATION:
-		return "MQCMD_DELETE_PUBLICATION"
-	case C.MQCMD_CREATE_SUBSCRIPTION:
-		return "MQCMD_CREATE_SUBSCRIPTION"
-	case C.MQCMD_CHANGE_SUBSCRIPTION:
-		return "MQCMD_CHANGE_SUBSCRIPTION"
-	case C.MQCMD_DELETE_SUBSCRIPTION:
-		return "MQCMD_DELETE_SUBSCRIPTION"
-	case C.MQCMD_INQUIRE_SUBSCRIPTION:
-		return "MQCMD_INQUIRE_SUBSCRIPTION"
-	case C.MQCMD_INQUIRE_SUB_STATUS:
-		return "MQCMD_INQUIRE_SUB_STATUS"
-	case C.MQCMD_CREATE_TOPIC:
-		return "MQCMD_CREATE_TOPIC"
-	case C.MQCMD_DELETE_TOPIC:
-		return "MQCMD_DELETE_TOPIC"
-	case C.MQCMD_CHANGE_TOPIC:
-		return "MQCMD_CHANGE_TOPIC"
-	case C.MQCMD_INQUIRE_TOPIC:
-		return "MQCMD_INQUIRE_TOPIC"
-	case C.MQCMD_INQUIRE_TOPIC_STATUS:
-		return "MQCMD_INQUIRE_TOPIC_STATUS"
-	case C.MQCMD_ACTIVITY_MSG:
-		return "MQCMD_ACTIVITY_MSG"
-	case C.MQCMD_INQUIRE_CLUSTER_Q_MGR:
-		return "MQCMD_INQUIRE_CLUSTER_Q_MGR"
-	case C.MQCMD_RESUME_Q_MGR_CLUSTER:
-		return "MQCMD_RESUME_Q_MGR_CLUSTER"
-	case C.MQCMD_SUSPEND_Q_MGR_CLUSTER:
-		return "MQCMD_SUSPEND_Q_MGR_CLUSTER"
-	case C.MQCMD_REFRESH_CLUSTER:
-		return "MQCMD_REFRESH_CLUSTER"
-	case C.MQCMD_RESET_CLUSTER:
-		return "MQCMD_RESET_CLUSTER"
-	case C.MQCMD_TRACE_ROUTE:
-		return "MQCMD_TRACE_ROUTE"
-	case C.MQCMD_REFRESH_SECURITY:
-		return "MQCMD_REFRESH_SECURITY"
-	case C.MQCMD_DELETE_AUTH_REC:
-		return "MQCMD_DELETE_AUTH_REC"
-	case C.MQCMD_INQUIRE_AUTH_RECS:
-		return "MQCMD_INQUIRE_AUTH_RECS"
-	case C.MQCMD_INQUIRE_AUTH_SERVICE:
-		return "MQCMD_INQUIRE_AUTH_SERVICE"
-	case C.MQCMD_INQUIRE_ENTITY_AUTH:
-		return "MQCMD_INQUIRE_ENTITY_AUTH"
-	case C.MQCMD_SET_AUTH_REC:
-		return "MQCMD_SET_AUTH_REC"
-	case C.MQCMD_LOGGER_EVENT:
-		return "MQCMD_LOGGER_EVENT"
-	case C.MQCMD_RESET_Q_MGR:
-		return "MQCMD_RESET_Q_MGR"
-	case C.MQCMD_CHANGE_AUTH_INFO:
-		return "MQCMD_CHANGE_AUTH_INFO"
-	case C.MQCMD_COPY_AUTH_INFO:
-		return "MQCMD_COPY_AUTH_INFO"
-	case C.MQCMD_CREATE_AUTH_INFO:
-		return "MQCMD_CREATE_AUTH_INFO"
-	case C.MQCMD_DELETE_AUTH_INFO:
-		return "MQCMD_DELETE_AUTH_INFO"
-	case C.MQCMD_INQUIRE_AUTH_INFO:
-		return "MQCMD_INQUIRE_AUTH_INFO"
-	case C.MQCMD_CHANGE_CF_STRUC:
-		return "MQCMD_CHANGE_CF_STRUC"
-	case C.MQCMD_COPY_CF_STRUC:
-		return "MQCMD_COPY_CF_STRUC"
-	case C.MQCMD_CREATE_CF_STRUC:
-		return "MQCMD_CREATE_CF_STRUC"
-	case C.MQCMD_DELETE_CF_STRUC:
-		return "MQCMD_DELETE_CF_STRUC"
-	case C.MQCMD_INQUIRE_CF_STRUC:
-		return "MQCMD_INQUIRE_CF_STRUC"
-	case C.MQCMD_INQUIRE_CF_STRUC_STATUS:
-		return "MQCMD_INQUIRE_CF_STRUC_STATUS"
-	case C.MQCMD_CHANGE_STG_CLASS:
-		return "MQCMD_CHANGE_STG_CLASS"
-	case C.MQCMD_COPY_STG_CLASS:
-		return "MQCMD_COPY_STG_CLASS"
-	case C.MQCMD_CREATE_STG_CLASS:
-		return "MQCMD_CREATE_STG_CLASS"
-	case C.MQCMD_DELETE_STG_CLASS:
-		return "MQCMD_DELETE_STG_CLASS"
-	case C.MQCMD_INQUIRE_STG_CLASS:
-		return "MQCMD_INQUIRE_STG_CLASS"
-	case C.MQCMD_CHANGE_TRACE:
-		return "MQCMD_CHANGE_TRACE"
-	case C.MQCMD_ARCHIVE_LOG:
-		return "MQCMD_ARCHIVE_LOG"
-	case C.MQCMD_BACKUP_CF_STRUC:
-		return "MQCMD_BACKUP_CF_STRUC"
-	case C.MQCMD_CREATE_BUFFER_POOL:
-		return "MQCMD_CREATE_BUFFER_POOL"
-	case C.MQCMD_CHANGE_BUFFER_POOL:
-		return "MQCMD_CHANGE_BUFFER_POOL"
-	case C.MQCMD_DELETE_BUFFER_POOL:
-		return "MQCMD_DELETE_BUFFER_POOL"
-	case C.MQCMD_CHANGE_PAGE_SET:
-		return "MQCMD_CHANGE_PAGE_SET"
-	case C.MQCMD_CREATE_PAGE_SET:
-		return "MQCMD_CREATE_PAGE_SET"
-	case C.MQCMD_DELETE_PAGE_SET:
-		return "MQCMD_DELETE_PAGE_SET"
-	case C.MQCMD_CREATE_LOG:
-		return "MQCMD_CREATE_LOG"
-	case C.MQCMD_STATISTICS_MQI:
-		return "MQCMD_STATISTICS_MQI"
-	case C.MQCMD_STATISTICS_Q:
-		return "MQCMD_STATISTICS_Q"
-	case C.MQCMD_STATISTICS_CHANNEL:
-		return "MQCMD_STATISTICS_CHANNEL"
-	case C.MQCMD_ACCOUNTING_MQI:
-		return "MQCMD_ACCOUNTING_MQI"
-	case C.MQCMD_ACCOUNTING_Q:
-		return "MQCMD_ACCOUNTING_Q"
-	case C.MQCMD_START_SMDSCONN:
-		return "MQCMD_START_SMDSCONN"
-	case C.MQCMD_STOP_SMDSCONN:
-		return "MQCMD_STOP_SMDSCONN"
-	case C.MQCMD_INQUIRE_SMDSCONN:
-		return "MQCMD_INQUIRE_SMDSCONN"
-	case C.MQCMD_CREATE_LISTENER:
-		return "MQCMD_CREATE_LISTENER"
-	case C.MQCMD_CHANGE_LISTENER:
-		return "MQCMD_CHANGE_LISTENER"
-	case C.MQCMD_COPY_LISTENER:
-		return "MQCMD_COPY_LISTENER"
-	case C.MQCMD_DELETE_LISTENER:
-		return "MQCMD_DELETE_LISTENER"
-	case C.MQCMD_INQUIRE_LISTENER:
-		return "MQCMD_INQUIRE_LISTENER"
-	case C.MQCMD_INQUIRE_LISTENER_STATUS:
-		return "MQCMD_INQUIRE_LISTENER_STATUS"
-	case C.MQCMD_CREATE_SERVICE:
-		return "MQCMD_CREATE_SERVICE"
-	case C.MQCMD_CHANGE_SERVICE:
-		return "MQCMD_CHANGE_SERVICE"
-	case C.MQCMD_COPY_SERVICE:
-		return "MQCMD_COPY_SERVICE"
-	case C.MQCMD_DELETE_SERVICE:
-		return "MQCMD_DELETE_SERVICE"
-	case C.MQCMD_INQUIRE_SERVICE:
-		return "MQCMD_INQUIRE_SERVICE"
-	case C.MQCMD_INQUIRE_SERVICE_STATUS:
-		return "MQCMD_INQUIRE_SERVICE_STATUS"
-	case C.MQCMD_START_SERVICE:
-		return "MQCMD_START_SERVICE"
-	case C.MQCMD_STOP_SERVICE:
-		return "MQCMD_STOP_SERVICE"
-	case C.MQCMD_CREATE_COMM_INFO:
-		return "MQCMD_CREATE_COMM_INFO"
-	case C.MQCMD_INQUIRE_COMM_INFO:
-		return "MQCMD_INQUIRE_COMM_INFO"
-	case C.MQCMD_CHANGE_COMM_INFO:
-		return "MQCMD_CHANGE_COMM_INFO"
-	case C.MQCMD_COPY_COMM_INFO:
-		return "MQCMD_COPY_COMM_INFO"
-	case C.MQCMD_DELETE_COMM_INFO:
-		return "MQCMD_DELETE_COMM_INFO"
-	case C.MQCMD_PURGE_CHANNEL:
-		return "MQCMD_PURGE_CHANNEL"
-	case C.MQCMD_MQXR_DIAGNOSTICS:
-		return "MQCMD_MQXR_DIAGNOSTICS"
-	case C.MQCMD_CHANGE_PROT_POLICY:
-		return "MQCMD_CHANGE_PROT_POLICY"
-	case C.MQCMD_CREATE_PROT_POLICY:
-		return "MQCMD_CREATE_PROT_POLICY"
-	case C.MQCMD_INQUIRE_PROT_POLICY:
-		return "MQCMD_INQUIRE_PROT_POLICY"
-	case C.MQCMD_ACTIVITY_TRACE:
-		return "MQCMD_ACTIVITY_TRACE"
-	case C.MQCMD_RESET_CF_STRUC:
-		return "MQCMD_RESET_CF_STRUC"
-	case C.MQCMD_INQUIRE_XR_CAPABILITY:
-		return "MQCMD_INQUIRE_XR_CAPABILITY"
-	case C.MQCMD_INQUIRE_USAGE:
-		return "MQCMD_INQUIRE_USAGE"
-	case C.MQCMD_INQUIRE_CHLAUTH_RECS:
-		return "MQCMD_INQUIRE_CHLAUTH_RECS"
-	case C.MQCMD_START_CLIENT_TRACE:
-		return "MQCMD_START_CLIENT_TRACE"
-	case C.MQCMD_STOP_CLIENT_TRACE:
-		return "MQCMD_STOP_CLIENT_TRACE"
-	case C.MQCMD_DELETE_PROT_POLICY:
-		return "MQCMD_DELETE_PROT_POLICY"
-	case C.MQCMD_SET_CHLAUTH_REC:
-		return "MQCMD_SET_CHLAUTH_REC"
-	case C.MQCMD_INQUIRE_PUBSUB_STATUS:
-		return "MQCMD_INQUIRE_PUBSUB_STATUS"
-	case C.MQCMD_INQUIRE_SMDS:
-		return "MQCMD_INQUIRE_SMDS"
-	case C.MQCMD_CHANGE_SMDS:
-		return "MQCMD_CHANGE_SMDS"
-	case C.MQCMD_RESET_SMDS:
-		return "MQCMD_RESET_SMDS"
-	case C.MQCMD_INQUIRE_APPL_STATUS:
-		return "MQCMD_INQUIRE_APPL_STATUS"
-	case C.MQCMD_INQUIRE_CONNECTION:
-		return "MQCMD_INQUIRE_CONNECTION"
-	case C.MQCMD_STOP_CONNECTION:
-		return "MQCMD_STOP_CONNECTION"
-	case C.MQCMD_INQUIRE_TOPIC_NAMES:
-		return "MQCMD_INQUIRE_TOPIC_NAMES"
-	case C.MQCMD_CLEAR_TOPIC_STRING:
-		return "MQCMD_CLEAR_TOPIC_STRING"
-	case C.MQCMD_INQUIRE_LOG:
-		return "MQCMD_INQUIRE_LOG"
-	case C.MQCMD_INQUIRE_ARCHIVE:
-		return "MQCMD_INQUIRE_ARCHIVE"
-	case C.MQCMD_CHANGE_SECURITY:
-		return "MQCMD_CHANGE_SECURITY"
-	case C.MQCMD_INQUIRE_SECURITY:
-		return "MQCMD_INQUIRE_SECURITY"
-	case C.MQCMD_CONFIG_EVENT:
-		return "MQCMD_CONFIG_EVENT"
-	case C.MQCMD_Q_MGR_EVENT:
-		return "MQCMD_Q_MGR_EVENT"
-	case C.MQCMD_PERFM_EVENT:
-		return "MQCMD_PERFM_EVENT"
-	case C.MQCMD_COMMAND_EVENT:
-		return "MQCMD_COMMAND_EVENT"
-	case C.MQCMD_SUSPEND_Q_MGR:
-		return "MQCMD_SUSPEND_Q_MGR"
-	case C.MQCMD_RESUME_Q_MGR:
-		return "MQCMD_RESUME_Q_MGR"
-	case C.MQCMD_AMQP_DIAGNOSTICS:
-		return "MQCMD_AMQP_DIAGNOSTICS"
-	
-	default:
+func mqcmdToString(command int32) string {
+	// Use the library's built-in function to get the string name
+	name := ibmmq.MQItoString("CMD", int(command))
+
+	// If the library returns a numeric string, it means the constant is unknown
+	if name == fmt.Sprintf("%d", command) {
 		return fmt.Sprintf("MQCMD_%d", command)
 	}
+
+	// Return the full name with prefix for clarity
+	return name
 }
 
 // mqReasonString returns a human-readable name for MQ reason codes
 func mqReasonString(reason int32) string {
-	switch C.MQLONG(reason) {
-	case C.MQRC_NONE:
-		return "MQRC_NONE"
-	case C.MQRC_CONNECTION_BROKEN:
-		return "MQRC_CONNECTION_BROKEN"
-	case C.MQRC_HCONN_ERROR:
-		return "MQRC_HCONN_ERROR"
-	case C.MQRC_NO_MSG_AVAILABLE:
-		return "MQRC_NO_MSG_AVAILABLE"
-	case C.MQRC_NOT_AUTHORIZED:
-		return "MQRC_NOT_AUTHORIZED"
-	case C.MQRC_Q_MGR_NAME_ERROR:
-		return "MQRC_Q_MGR_NAME_ERROR"
-	case C.MQRC_Q_MGR_NOT_AVAILABLE:
-		return "MQRC_Q_MGR_NOT_AVAILABLE"
-	case C.MQRC_OBJECT_NAME_ERROR:
-		return "MQRC_OBJECT_NAME_ERROR"
-	case C.MQRC_OBJECT_IN_USE:
-		return "MQRC_OBJECT_IN_USE"
-	case C.MQRC_OBJECT_TYPE_ERROR:
-		return "MQRC_OBJECT_TYPE_ERROR"
-	case C.MQRC_TRUNCATED_MSG_FAILED:
-		return "MQRC_TRUNCATED_MSG_FAILED"
-	case C.MQRC_UNKNOWN_OBJECT_NAME:
-		return "MQRC_UNKNOWN_OBJECT_NAME"
-	case C.MQRC_NO_MSG_UNDER_CURSOR:
-		return "MQRC_NO_MSG_UNDER_CURSOR"
-	case C.MQRC_UNEXPECTED_ERROR:
-		return "MQRC_UNEXPECTED_ERROR"
-	case C.MQRC_Q_MGR_STOPPING:
-		return "MQRC_Q_MGR_STOPPING"
-	case C.MQRC_Q_MGR_QUIESCING:
-		return "MQRC_Q_MGR_QUIESCING"
-	case C.MQRC_HOST_NOT_AVAILABLE:
-		return "MQRC_HOST_NOT_AVAILABLE"
-	case C.MQRC_CHANNEL_CONFIG_ERROR:
-		return "MQRC_CHANNEL_CONFIG_ERROR"
-	case C.MQRC_CHANNEL_NOT_AVAILABLE:
-		return "MQRC_CHANNEL_NOT_AVAILABLE"
-	case C.MQRCCF_COMMAND_FAILED:
-		return "MQRCCF_COMMAND_FAILED"
-	case C.MQRCCF_OBJECT_OPEN:
-		return "MQRCCF_OBJECT_OPEN"
-	case C.MQRCCF_Q_TYPE_ERROR:
-		return "MQRCCF_Q_TYPE_ERROR"
-	case C.MQRCCF_OBJECT_NAME_ERROR:
-		return "MQRCCF_OBJECT_NAME_ERROR"
-	case C.MQRCCF_CHANNEL_NOT_FOUND:
-		return "MQRCCF_CHANNEL_NOT_FOUND"
-	case C.MQRCCF_CHANNEL_NOT_ACTIVE:
-		return "MQRCCF_CHANNEL_NOT_ACTIVE"
-	case C.MQRCCF_Q_NAME_ERROR:
-		return "MQRCCF_Q_NAME_ERROR"
-	case C.MQRCCF_OBJECT_BEING_DELETED:
-		return "MQRCCF_OBJECT_BEING_DELETED"
-	default:
+	// First try RC (reason codes)
+	name := ibmmq.MQItoString("RC", int(reason))
+
+	// If RC didn't work, try RCCF (PCF reason codes)
+	if name == fmt.Sprintf("%d", reason) {
+		name = ibmmq.MQItoString("RCCF", int(reason))
+	}
+
+	// If still not found, return numeric format
+	if name == fmt.Sprintf("%d", reason) {
 		return fmt.Sprintf("MQRC_%d", reason)
 	}
+
+	// Return the full name with prefix for clarity
+	return name
 }
 
-// mqParameterToString returns a human-readable name for MQCA/MQIA parameter constants
-func mqParameterToString(parameter C.MQLONG) string {
-	switch parameter {
-	// Queue Manager parameters
-	case C.MQCA_Q_MGR_NAME:
-		return "Q_MGR_NAME"
-	case C.MQIA_COMMAND_LEVEL:
-		return "COMMAND_LEVEL"
-	case C.MQIA_PLATFORM:
-		return "PLATFORM"
-	// Queue parameters
-	case C.MQCA_Q_NAME:
-		return "QUEUE_NAME"
-	case C.MQIA_Q_TYPE:
-		return "QUEUE_TYPE"
-	case C.MQIA_CURRENT_Q_DEPTH:
-		return "CURRENT_DEPTH"
-	case C.MQIA_MAX_Q_DEPTH:
-		return "MAX_DEPTH"
-	case C.MQIA_OPEN_INPUT_COUNT:
-		return "OPEN_INPUT_COUNT"
-	case C.MQIA_OPEN_OUTPUT_COUNT:
-		return "OPEN_OUTPUT_COUNT"
-	// Channel parameters
-	case C.MQCACH_CHANNEL_NAME:
-		return "CHANNEL_NAME"
-	case C.MQIACH_CHANNEL_TYPE:
-		return "CHANNEL_TYPE"
-	case C.MQIACH_CHANNEL_STATUS:
-		return "CHANNEL_STATUS"
-	// Common attribute filters
-	case C.MQIACF_Q_ATTRS:
-		return "ATTRS"
-	case C.MQIACF_CHANNEL_ATTRS:
-		return "CHANNEL_ATTRS"
-	// Status parameters
-	case C.MQIACF_Q_STATUS_ATTRS:
-		return "STATUS_ATTRS"
-	// Subscription parameters (using supported constants only)
-	case 7010: // C.MQBACF_ACCOUNTING_TOKEN
-		return "ACCOUNTING_TOKEN" // MQBACF_ACCOUNTING_TOKEN - Message accounting token
-	case 7015: // C.MQBACF_DESTINATION_CORREL_ID  
-		return "DESTINATION_CORREL_ID" // MQBACF_DESTINATION_CORREL_ID - Destination correlation ID
-	case C.MQBACF_SUB_ID:
-		return "SUB_ID" // MQBACF_SUB_ID - Subscription identifier
-	default:
-		return fmt.Sprintf("PARAM_%d", parameter)
+func mqParameterToString(parameter int32) string {
+	paramStr := strconv.Itoa(int(parameter))
+
+	// Try integer attributes (includes MQIA_* and MQIACF_*)
+	name := ibmmq.MQItoString("IA", int(parameter))
+	if name != "" && name != paramStr {
+		return name
 	}
+
+	// Try character attributes (includes MQCA_* and MQCACF_*)
+	name = ibmmq.MQItoString("CA", int(parameter))
+	if name != "" && name != paramStr {
+		return name
+	}
+
+	// Try byte attributes
+	name = ibmmq.MQItoString("BACF", int(parameter))
+	if name != "" && name != paramStr {
+		return name
+	}
+
+	// Try group attributes
+	name = ibmmq.MQItoString("GACF", int(parameter))
+	if name != "" && name != paramStr {
+		return name
+	}
+
+	// Unknown parameter
+	return "PARAM_" + paramStr
 }
 
 // mqOperatorToString returns a human-readable name for MQ filter operators
-func mqOperatorToString(operator C.MQLONG) string {
+func mqOperatorToString(operator int32) string {
 	switch operator {
-	case C.MQCFOP_EQUAL:
+	case ibmmq.MQCFOP_EQUAL:
 		return "EQ"
-	case C.MQCFOP_NOT_EQUAL:
+	case ibmmq.MQCFOP_NOT_EQUAL:
 		return "NE"
-	case C.MQCFOP_LESS:
+	case ibmmq.MQCFOP_LESS:
 		return "LT"
-	case C.MQCFOP_GREATER:
+	case ibmmq.MQCFOP_GREATER:
 		return "GT"
-	case C.MQCFOP_NOT_LESS:
+	case ibmmq.MQCFOP_NOT_LESS:
 		return "GE"
-	case C.MQCFOP_NOT_GREATER:
+	case ibmmq.MQCFOP_NOT_GREATER:
 		return "LE"
-	case C.MQCFOP_LIKE:
+	case ibmmq.MQCFOP_LIKE:
 		return "LIKE"
-	case C.MQCFOP_NOT_LIKE:
+	case ibmmq.MQCFOP_NOT_LIKE:
 		return "NOT_LIKE"
-	case C.MQCFOP_CONTAINS:
+	case ibmmq.MQCFOP_CONTAINS:
 		return "CONTAINS"
-	case C.MQCFOP_EXCLUDES:
+	case ibmmq.MQCFOP_EXCLUDES:
 		return "EXCLUDES"
 	default:
 		return fmt.Sprintf("OP_%d", operator)
@@ -478,69 +102,29 @@ func mqOperatorToString(operator C.MQLONG) string {
 }
 
 // mqPCFTypeToString returns a human-readable name for PCF message types
-func mqPCFTypeToString(msgType C.MQLONG) string {
-	switch msgType {
-	case C.MQCFT_COMMAND:
-		return "MQCFT_COMMAND"
-	case C.MQCFT_RESPONSE:
-		return "MQCFT_RESPONSE"
-	case C.MQCFT_INTEGER:
-		return "MQCFT_INTEGER"
-	case C.MQCFT_STRING:
-		return "MQCFT_STRING"
-	case C.MQCFT_INTEGER_LIST:
-		return "MQCFT_INTEGER_LIST"
-	case C.MQCFT_STRING_LIST:
-		return "MQCFT_STRING_LIST"
-	case C.MQCFT_EVENT:
-		return "MQCFT_EVENT"
-	case C.MQCFT_USER:
-		return "MQCFT_USER"
-	case C.MQCFT_BYTE_STRING:
-		return "MQCFT_BYTE_STRING"
-	case C.MQCFT_TRACE_ROUTE:
-		return "MQCFT_TRACE_ROUTE"
-	case C.MQCFT_REPORT:
-		return "MQCFT_REPORT"
-	case C.MQCFT_INTEGER_FILTER:
-		return "MQCFT_INTEGER_FILTER"
-	case C.MQCFT_STRING_FILTER:
-		return "MQCFT_STRING_FILTER"
-	case C.MQCFT_BYTE_STRING_FILTER:
-		return "MQCFT_BYTE_STRING_FILTER"
-	case C.MQCFT_COMMAND_XR:
-		return "MQCFT_COMMAND_XR"
-	case C.MQCFT_XR_MSG:
-		return "MQCFT_XR_MSG"
-	case C.MQCFT_XR_ITEM:
-		return "MQCFT_XR_ITEM"
-	case C.MQCFT_XR_SUMMARY:
-		return "MQCFT_XR_SUMMARY"
-	case C.MQCFT_GROUP:
-		return "MQCFT_GROUP"
-	case C.MQCFT_STATISTICS:
-		return "MQCFT_STATISTICS"
-	case C.MQCFT_ACCOUNTING:
-		return "MQCFT_ACCOUNTING"
-	case C.MQCFT_INTEGER64:
-		return "MQCFT_INTEGER64"
-	case C.MQCFT_INTEGER64_LIST:
-		return "MQCFT_INTEGER64_LIST"
-	case C.MQCFT_APP_ACTIVITY:
-		return "MQCFT_APP_ACTIVITY"
-	default:
+func mqPCFTypeToString(msgType int32) string {
+	// Use the library's built-in function to get the string name
+	name := ibmmq.MQItoString("CFT", int(msgType))
+
+	// If the library returns a numeric string, it means the constant is unknown
+	if name == fmt.Sprintf("%d", msgType) {
 		return fmt.Sprintf("MQCFT_%d", msgType)
 	}
+
+	// Return the full name with prefix for clarity
+	return name
 }
 
 // mqPCFControlToString returns a human-readable name for PCF control options
-func mqPCFControlToString(control C.MQLONG) string {
-	switch control {
-	case C.MQCFC_LAST:
-		return "MQCFC_LAST"
-	case C.MQCFC_NOT_LAST:
-		return "MQCFC_NOT_LAST"
-	default:
+func mqPCFControlToString(control int32) string {
+	// Use the library's built-in function to get the string name
+	name := ibmmq.MQItoString("CFC", int(control))
+
+	// If the library returns a numeric string, it means the constant is unknown
+	if name == fmt.Sprintf("%d", control) {
 		return fmt.Sprintf("MQCFC_%d", control)
 	}
+
+	// Return the full name with prefix for clarity
+	return name
 }

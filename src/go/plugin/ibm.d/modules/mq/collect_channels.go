@@ -61,6 +61,7 @@ func (c *Collector) collectChannelMetrics() error {
 	for _, channel := range result.Channels {
 		labels := contexts.ChannelLabels{
 			Channel: channel.Name,
+			Type:    channel.Type.String(),  // Add the channel type
 		}
 
 		// Set channel status - convert enum to individual metrics

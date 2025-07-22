@@ -135,9 +135,9 @@
         "title": "Pattern to filter queues (wildcards supported)",
         "type": "string"
       },
-      "statistics_interval": {
+      "statistics_interval,omitempty": {
         "default": 60,
-        "title": "Statistics collection interval in seconds (should match MQ STATINT setting for optimal data freshness)",
+        "title": "Statistics collection interval in seconds (auto-detected STATINT overwrites this value)",
         "type": "integer"
       },
       "subscription_selector": {
@@ -145,9 +145,9 @@
         "title": "Pattern to filter subscriptions (wildcards supported)",
         "type": "string"
       },
-      "sys_topic_interval": {
-        "default": 180,
-        "title": "$SYS topic collection interval in seconds (should match MQ MONINT setting for optimal data freshness)",
+      "sys_topic_interval,omitempty": {
+        "default": 10,
+        "title": "$SYS topic collection interval in seconds (user override for customized MQ configurations)",
         "type": "integer"
       },
       "topic_selector": {

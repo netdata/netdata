@@ -68,13 +68,14 @@ type Config struct {
 	CollectResetQueueStats bool `yaml:"collect_reset_queue_stats" json:"collect_reset_queue_stats"`
 	// Enable collection of statistics queue metrics (SYSTEM.ADMIN.STATISTICS.QUEUE provides advanced metrics like min/max depth)
 	CollectStatisticsQueue bool `yaml:"collect_statistics_queue" json:"collect_statistics_queue"`
-	// Statistics collection interval in seconds (should match MQ STATINT setting for optimal data freshness)
-	StatisticsInterval     int  `yaml:"statistics_interval" json:"statistics_interval"`
 	
 	// Enable collection of $SYS topic metrics (provides Queue Manager CPU, memory, and log utilization)
 	CollectSysTopics bool `yaml:"collect_sys_topics" json:"collect_sys_topics"`
-	// $SYS topic collection interval in seconds (should match MQ MONINT setting for optimal data freshness)
-	SysTopicInterval int  `yaml:"sys_topic_interval" json:"sys_topic_interval"`
+	
+	// Statistics collection interval in seconds (auto-detected STATINT overwrites this value)
+	StatisticsInterval int `yaml:"statistics_interval,omitempty" json:"statistics_interval,omitempty"`
+	// $SYS topic collection interval in seconds (user override for customized MQ configurations)  
+	SysTopicInterval   int `yaml:"sys_topic_interval,omitempty" json:"sys_topic_interval,omitempty"`
 }
 
 
