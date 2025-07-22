@@ -906,7 +906,7 @@ scopes:
 Create `module.yaml` for rich module information:
 
 ```yaml
-name: mq_pcf
+name: mq
 display_name: IBM MQ (PCF Protocol)
 description: |
   Monitors IBM MQ queue managers, queues, channels, and listeners
@@ -1419,7 +1419,7 @@ The framework abstracts these differences:
 
 ✅ **CORRECT Structure**:
 ```
-modules/mq_pcf/
+modules/mq/
 ├── collector.go      # Orchestration only
 ├── collect_*.go      # Collection logic
 └── protocol/         # Protocol implementation

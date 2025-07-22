@@ -15,7 +15,7 @@ type Logger interface {
 
 // Context represents a metric collection context with compile-time type safety
 type Context[T any] struct {
-	Name       string           // Full context name (e.g., "mq_pcf.queue.depth")
+	Name       string           // Full context name (e.g., "mq.queue.depth")
 	Family     string           // Chart family
 	Title      string           // Human-readable title
 	Units      string           // Units of measurement
@@ -107,7 +107,7 @@ type Config struct {
 
 // ContextMetadata is a non-generic version of Context for runtime reflection
 type ContextMetadata struct {
-	Name       string              // Full context name (e.g., "mq_pcf.queue.depth")
+	Name       string              // Full context name (e.g., "mq.queue.depth")
 	Family     string              // Chart family
 	Title      string              // Human-readable title
 	Units      string              // Units of measurement
