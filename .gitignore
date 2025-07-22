@@ -204,3 +204,5 @@ packaging/tools/agent-events/go.sum
 build-ibm.sh
 compile.sh
 run-ibm.sh
+
+tmp/

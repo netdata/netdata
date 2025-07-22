@@ -24,8 +24,7 @@ const (
 // like min/max depth, average queue time, operation counts, etc.
 func (c *Client) GetStatisticsQueue() (*StatisticsCollectionResult, error) {
 	if !c.connected {
-		c.protocol.Warningf("Cannot get statistics queue messages from queue manager '%s' - not connected", 
-			c.config.QueueManager)
+		c.protocol.Debugf("GetStatisticsQueue FAILED: not connected")
 		return nil, fmt.Errorf("not connected")
 	}
 
@@ -51,6 +50,7 @@ func (c *Client) GetStatisticsQueue() (*StatisticsCollectionResult, error) {
 	if compCode != C.MQCC_OK {
 		c.protocol.Errorf("Failed to open SYSTEM.ADMIN.STATISTICS.QUEUE on queue manager '%s' - completion code %d, reason %d (%s)",
 			c.config.QueueManager, compCode, reason, mqReasonString(int32(reason)))
+		c.protocol.Debugf("GetStatisticsQueue FAILED: MQOPEN failed")
 		return nil, fmt.Errorf("MQOPEN statistics queue failed: completion code %d, reason %d (%s)", 
 			compCode, reason, mqReasonString(int32(reason)))
 	}
@@ -180,7 +180,7 @@ func (c *Client) GetStatisticsQueue() (*StatisticsCollectionResult, error) {
 
 	c.protocol.Debugf("Statistics collection completed for queue manager '%s' - processed %d messages", 
 		c.config.QueueManager, len(result.Messages))
-
+	c.protocol.Debugf("GetStatisticsQueue SUCCESS")
 	return &result, nil
 }
 

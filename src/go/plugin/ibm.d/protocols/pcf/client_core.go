@@ -18,6 +18,15 @@ const (
 	maxMQGetBufferSize = 10 * 1024 * 1024 // 10MB maximum buffer size for MQGET responses
 )
 
+// ResourceStatus represents the state of resource monitoring discovery
+type ResourceStatus int
+
+const (
+	ResourceStatusDisabled ResourceStatus = 0 // Default - not attempted yet
+	ResourceStatusEnabled  ResourceStatus = 1 // Discovery succeeded, monitoring active
+	ResourceStatusFailed   ResourceStatus = 2 // Discovery failed permanently, never try again
+)
+
 // Client is the PCF protocol client.
 type Client struct {
 	config          Config
@@ -36,6 +45,11 @@ type Client struct {
 	cachedEdition      string
 	cachedCommandLevel int32
 	cachedPlatform     int32
+	
+	// Resource monitor for $SYS topic monitoring
+	resourceMonitor *ResourceMonitor
+	resourceMonitoringEnabled bool  // Track if resource monitoring should be enabled
+	resourceStatus ResourceStatus   // Global status: disabled(0), enabled(1), failed(2)
 }
 
 // Config is the configuration for the PCF client.

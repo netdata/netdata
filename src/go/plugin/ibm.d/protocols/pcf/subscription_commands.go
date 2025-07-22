@@ -28,7 +28,7 @@ func (c *Client) InquireSubscription(subName string) ([]SubscriptionMetrics, err
 	}
 	
 	// Send PCF command
-	response, err := c.SendPCFCommand(C.MQLONG(MQCMD_INQUIRE_SUBSCRIPTION), params)
+	response, err := c.SendPCFCommand(C.MQCMD_INQUIRE_SUBSCRIPTION, params)
 	if err != nil {
 		c.protocol.Errorf("Failed to inquire subscriptions: %v", err)
 		return nil, err
@@ -56,7 +56,7 @@ func (c *Client) InquireSubscriptionStatus(subName string) (*SubscriptionMetrics
 	}
 	
 	// Send PCF command
-	response, err := c.SendPCFCommand(C.MQLONG(MQCMD_INQUIRE_SUB_STATUS), params)
+	response, err := c.SendPCFCommand(C.MQCMD_INQUIRE_SUB_STATUS, params)
 	if err != nil {
 		c.protocol.Errorf("Failed to inquire subscription status for '%s': %v", subName, err)
 		return nil, err
@@ -116,21 +116,21 @@ func (c *Client) parseSubscriptionListResponse(response []byte) *SubscriptionPar
 		}
 		
 		// Get subscription name
-		if name, ok := attrs[C.MQLONG(MQCACF_SUB_NAME)]; ok {
+		if name, ok := attrs[C.MQCACF_SUB_NAME]; ok {
 			if nameStr, ok := name.(string); ok {
 				sub.Name = strings.TrimSpace(nameStr)
 			}
 		}
 		
 		// Get topic string
-		if topic, ok := attrs[C.MQLONG(MQCA_TOPIC_STRING)]; ok {
+		if topic, ok := attrs[C.MQCA_TOPIC_STRING]; ok {
 			if topicStr, ok := topic.(string); ok {
 				sub.TopicString = strings.TrimSpace(topicStr)
 			}
 		}
 		
 		// Get subscription type
-		if subType, ok := attrs[C.MQLONG(MQIACF_SUB_TYPE)]; ok {
+		if subType, ok := attrs[C.MQIACF_SUB_TYPE]; ok {
 			if typeVal, ok := subType.(int32); ok {
 				sub.Type = AttributeValue(typeVal)
 			}
@@ -143,7 +143,7 @@ func (c *Client) parseSubscriptionListResponse(response []byte) *SubscriptionPar
 		return sub, nil
 	}
 	
-	genericResult := c.parseGenericListResponse(response, C.MQLONG(MQCACF_SUB_NAME), processor)
+	genericResult := c.parseGenericListResponse(response, C.MQCACF_SUB_NAME, processor)
 	
 	result := &SubscriptionParseResult{
 		ErrorCounts:    genericResult.ErrorCounts,
@@ -169,33 +169,33 @@ func (c *Client) parseSubscriptionStatusResponse(response []byte) *SubscriptionP
 		}
 		
 		// Get subscription name
-		if name, ok := attrs[C.MQLONG(MQCACF_SUB_NAME)]; ok {
+		if name, ok := attrs[C.MQCACF_SUB_NAME]; ok {
 			if nameStr, ok := name.(string); ok {
 				sub.Name = strings.TrimSpace(nameStr)
 			}
 		}
 		
 		// Get topic string
-		if topic, ok := attrs[C.MQLONG(MQCA_TOPIC_STRING)]; ok {
+		if topic, ok := attrs[C.MQCA_TOPIC_STRING]; ok {
 			if topicStr, ok := topic.(string); ok {
 				sub.TopicString = strings.TrimSpace(topicStr)
 			}
 		}
 		
 		// Get message count
-		if count, ok := attrs[C.MQLONG(MQIACF_MESSAGE_COUNT)]; ok {
+		if count, ok := attrs[C.MQIACF_MESSAGE_COUNT]; ok {
 			if countVal, ok := count.(int32); ok {
 				sub.MessageCount = AttributeValue(countVal)
 			}
 		}
 		
 		// Get last message date/time
-		if dateStr, ok := attrs[C.MQLONG(MQCACF_LAST_MSG_DATE)]; ok {
+		if dateStr, ok := attrs[C.MQCACF_LAST_MSG_DATE]; ok {
 			if dateVal, ok := dateStr.(string); ok {
 				sub.LastMessageDate = strings.TrimSpace(dateVal)
 			}
 		}
-		if timeStr, ok := attrs[C.MQLONG(MQCACF_LAST_MSG_TIME)]; ok {
+		if timeStr, ok := attrs[C.MQCACF_LAST_MSG_TIME]; ok {
 			if timeVal, ok := timeStr.(string); ok {
 				sub.LastMessageTime = strings.TrimSpace(timeVal)
 			}
@@ -208,7 +208,7 @@ func (c *Client) parseSubscriptionStatusResponse(response []byte) *SubscriptionP
 		return sub, nil
 	}
 	
-	genericResult := c.parseGenericListResponse(response, C.MQLONG(MQCACF_SUB_NAME), processor)
+	genericResult := c.parseGenericListResponse(response, C.MQCACF_SUB_NAME, processor)
 	
 	result := &SubscriptionParseResult{
 		ErrorCounts:    genericResult.ErrorCounts,
