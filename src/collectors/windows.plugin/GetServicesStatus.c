@@ -6,6 +6,7 @@
 // Service data
 struct win_service {
     char *service_name;
+    DWORD pid;
 
     RRDSET *st_service_state;
     RRDDIM *rd_service_state_running;
@@ -105,6 +106,7 @@ static BOOL fill_dictionary_with_content()
             continue;
 
         p->ServiceState.current.Data = service->ServiceStatusProcess.dwCurrentState;
+        p->pid = service->ServiceStatusProcess.dwProcessId;
     }
 
     ret = TRUE;
