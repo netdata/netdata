@@ -953,9 +953,6 @@ datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_dat
 
 static void after_extent_write(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* uv_work_req __maybe_unused, int status __maybe_unused)
 {
-    if(completion)
-        completion_mark_complete(completion);
-
     check_and_schedule_db_rotation(ctx);
 }
 
@@ -1010,6 +1007,7 @@ static void *extent_write_tp_worker(
 
 done:
     __atomic_sub_fetch(&ctx->atomic.extents_currently_being_flushed, 1, __ATOMIC_RELAXED);
+    completion_mark_complete(completion);
     worker_is_idle();
     return NULL;
 }
