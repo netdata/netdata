@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- build\(deps\): bump github.com/gosnmp/gosnmp from 1.42.0 to 1.42.1 in /src/go [\#20709](https://github.com/netdata/netdata/pull/20709) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/gosnmp/gosnmp from 1.41.0 to 1.42.0 in /src/go [\#20707](https://github.com/netdata/netdata/pull/20707) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump k8s.io/client-go from 0.33.2 to 0.33.3 in /src/go [\#20705](https://github.com/netdata/netdata/pull/20705) ([dependabot[bot]](https://github.com/apps/dependabot))
 - fix\(nvme\)!: query controller instead of namespace for SMART metrics [\#20704](https://github.com/netdata/netdata/pull/20704) ([ilyam8](https://github.com/ilyam8))
@@ -13,6 +14,7 @@
 - Ensure chat exists before handling message input [\#20700](https://github.com/netdata/netdata/pull/20700) ([emmanuel-ferdman](https://github.com/emmanuel-ferdman))
 - Escape \< character in plaintext [\#20699](https://github.com/netdata/netdata/pull/20699) ([Ancairon](https://github.com/Ancairon))
 - Replace legacy functions-table.md with comprehensive UI documentation [\#20697](https://github.com/netdata/netdata/pull/20697) ([ktsaou](https://github.com/ktsaou))
+- Update LIBBPF [\#20696](https://github.com/netdata/netdata/pull/20696) ([thiagoftsm](https://github.com/thiagoftsm))
 - update otel-collector components deps [\#20693](https://github.com/netdata/netdata/pull/20693) ([ilyam8](https://github.com/ilyam8))
 - Add Getting Started Netdata guide [\#20642](https://github.com/netdata/netdata/pull/20642) ([kanelatechnical](https://github.com/kanelatechnical))
 
@@ -462,7 +464,6 @@
 - Add Fedora 42 to CI and package builds. [\#20177](https://github.com/netdata/netdata/pull/20177) ([Ferroin](https://github.com/Ferroin))
 - build\(deps\): update go toolchain to v1.24.2 [\#20176](https://github.com/netdata/netdata/pull/20176) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): bump k8s.io/client-go from 0.32.3 to 0.33.0 in /src/go [\#20175](https://github.com/netdata/netdata/pull/20175) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/vmware/govmomi from 0.49.0 to 0.50.0 in /src/go [\#20173](https://github.com/netdata/netdata/pull/20173) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v2.4.0](https://github.com/netdata/netdata/tree/v2.4.0) (2025-04-14)
 
