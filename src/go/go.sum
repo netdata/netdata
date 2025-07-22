@@ -196,6 +196,8 @@ github.com/hashicorp/go-uuid v1.0.3/go.mod h1:6SBZvOh/SIDV7/2o3Jml5SYk/TvGqwFJ/b
 github.com/hpcloud/tail v1.0.0/go.mod h1:ab1qPbhIpdTxEkNHXyeSf5vhxWSCs/tWer42PpOxQnU=
 github.com/huandu/xstrings v1.5.0 h1:2ag3IFq9ZDANvthTwTiqSSZLjDc+BedvHPAp5tJy2TI=
 github.com/huandu/xstrings v1.5.0/go.mod h1:y5/lhBue+AyNmUVz9RLU9xbLR0o4KIIExikq4ovT0aE=
+github.com/ibm-messaging/mq-golang/v5 v5.6.4 h1:C7b0xUCXc+urjeoFfPmMn5Dq7J/yD5Hanqx2xacsQd8=
+github.com/ibm-messaging/mq-golang/v5 v5.6.4/go.mod h1:xCV0vl1+ik3VyWZnwAj++2J89vSTzhXP1gXhG0X3IYE=
 github.com/ibmdb/go_ibm_db v0.4.5 h1:a0qKWbA5shCRo5HRRnAuENwhjg6AkgfPNr9xx0IZ160=
 github.com/ibmdb/go_ibm_db v0.4.5/go.mod h1:nl5aUh1IzBVExcqYXaZLApaq8RUvTEph3VP49UTmEvg=
 github.com/invopop/jsonschema v0.13.0 h1:KvpoAJWEjR3uD9Kbm2HWJmqsEaHt8lBUpd0qHcIi21E=

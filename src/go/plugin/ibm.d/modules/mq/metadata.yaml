@@ -83,6 +83,8 @@ using the PCF (Programmable Command Format) protocol.
           labels:
             - name: channel
               description: Channel identifier
+            - name: type
+              description: Type identifier
           metrics:
             - name: mq.channel.status
               description: Channel Status

@@ -1,16 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//go:build linux && cgo
 
 package pcf
 
-// #include "pcf_helpers.h"
-import "C"
 
 import (
 	"fmt"
 	"path/filepath"
 	"strings"
+
+	"github.com/ibm-messaging/mq-golang/v5/ibmmq"
 )
 
 // GetChannelList returns a list of channels.
@@ -19,15 +18,15 @@ func (c *Client) GetChannelList() ([]string, error) {
 
 	const pattern = "*"
 	params := []pcfParameter{
-		newStringParameter(C.MQCACH_CHANNEL_NAME, pattern),
+		newStringParameter(ibmmq.MQCACH_CHANNEL_NAME, pattern),
 	}
-	response, err := c.SendPCFCommand(C.MQCMD_INQUIRE_CHANNEL, params)
+	response, err := c.sendPCFCommand(ibmmq.MQCMD_INQUIRE_CHANNEL, params)
 	if err != nil {
 		c.protocol.Errorf("Failed to get channel list from queue manager '%s': %v", c.config.QueueManager, err)
 		return nil, err
 	}
 
-	result := c.parseChannelListResponse(response)
+	result := c.parseChannelListResponseFromParams(response)
 
 	if result.InternalErrors > 0 {
 		c.protocol.Warningf("Encountered %d internal errors while parsing channel list from queue manager '%s'",
@@ -54,16 +53,16 @@ func (c *Client) GetChannelMetrics(channelName string) (*ChannelMetrics, error) 
 	c.protocol.Debugf("Getting metrics for channel '%s' from queue manager '%s'", channelName, c.config.QueueManager)
 
 	params := []pcfParameter{
-		newStringParameter(C.MQCACH_CHANNEL_NAME, channelName),
+		newStringParameter(ibmmq.MQCACH_CHANNEL_NAME, channelName),
 	}
-	response, err := c.SendPCFCommand(C.MQCMD_INQUIRE_CHANNEL_STATUS, params)
+	response, err := c.sendPCFCommand(ibmmq.MQCMD_INQUIRE_CHANNEL_STATUS, params)
 	if err != nil {
 		c.protocol.Errorf("Failed to get metrics for channel '%s' from queue manager '%s': %v",
 			channelName, c.config.QueueManager, err)
 		return nil, err
 	}
 
-	attrs, err := c.ParsePCFResponse(response, "")
+	attrs, err := c.parsePCFResponseFromParams(response, "")
 	if err != nil {
 		c.protocol.Errorf("Failed to parse metrics response for channel '%s' from queue manager '%s': %v",
 			channelName, c.config.QueueManager, err)
@@ -74,19 +73,19 @@ func (c *Client) GetChannelMetrics(channelName string) (*ChannelMetrics, error) 
 		Name: channelName,
 	}
 
-	if status, ok := attrs[C.MQIACH_CHANNEL_STATUS]; ok {
+	if status, ok := attrs[ibmmq.MQIACH_CHANNEL_STATUS]; ok {
 		metrics.Status = ChannelStatus(status.(int32))
 	}
 
-	if messages, ok := attrs[C.MQIACH_MSGS]; ok {
+	if messages, ok := attrs[ibmmq.MQIACH_MSGS]; ok {
 		val := int64(messages.(int32))
 		metrics.Messages = &val
 	}
-	if bytes, ok := attrs[C.MQIACH_BYTES_SENT]; ok {
+	if bytes, ok := attrs[ibmmq.MQIACH_BYTES_SENT]; ok {
 		val := int64(bytes.(int32))
 		metrics.Bytes = &val
 	}
-	if batches, ok := attrs[C.MQIACH_BATCHES]; ok {
+	if batches, ok := attrs[ibmmq.MQIACH_BATCHES]; ok {
 		val := int64(batches.(int32))
 		metrics.Batches = &val
 	}
@@ -103,45 +102,45 @@ func (c *Client) GetChannelMetrics(channelName string) (*ChannelMetrics, error) 
 	metrics.CurrentSharingConvs = NotCollected
 
 	// Collect extended status metrics if available
-	if val, ok := attrs[C.MQIACH_BUFFERS_SENT]; ok {
+	if val, ok := attrs[ibmmq.MQIACH_BUFFERS_SENT]; ok {
 		metrics.BuffersSent = AttributeValue(val.(int32))
 		c.protocol.Debugf("Channel '%s' buffers sent: %d", channelName, val.(int32))
 	}
-	if val, ok := attrs[C.MQIACH_BUFFERS_RCVD]; ok {
+	if val, ok := attrs[ibmmq.MQIACH_BUFFERS_RCVD]; ok {
 		metrics.BuffersReceived = AttributeValue(val.(int32))
 		c.protocol.Debugf("Channel '%s' buffers received: %d", channelName, val.(int32))
 	}
-	if val, ok := attrs[C.MQIACH_CURRENT_MSGS]; ok {
+	if val, ok := attrs[ibmmq.MQIACH_CURRENT_MSGS]; ok {
 		metrics.CurrentMessages = AttributeValue(val.(int32))
 		c.protocol.Debugf("Channel '%s' current messages: %d", channelName, val.(int32))
 	}
-	if val, ok := attrs[C.MQIACH_XMITQ_TIME_INDICATOR]; ok {
+	if val, ok := attrs[ibmmq.MQIACH_XMITQ_TIME_INDICATOR]; ok {
 		metrics.XmitQueueTime = AttributeValue(val.(int32))
 		c.protocol.Debugf("Channel '%s' XMITQ time: %d", channelName, val.(int32))
 	}
-	if val, ok := attrs[C.MQIACH_MCA_STATUS]; ok {
+	if val, ok := attrs[ibmmq.MQIACH_MCA_STATUS]; ok {
 		metrics.MCAStatus = AttributeValue(val.(int32))
 		c.protocol.Debugf("Channel '%s' MCA status: %d", channelName, val.(int32))
 	}
-	if val, ok := attrs[C.MQIACH_INDOUBT_STATUS]; ok {
+	if val, ok := attrs[ibmmq.MQIACH_INDOUBT_STATUS]; ok {
 		metrics.InDoubtStatus = AttributeValue(val.(int32))
 		c.protocol.Debugf("Channel '%s' in-doubt status: %d", channelName, val.(int32))
 	}
-	if val, ok := attrs[C.MQIACH_SSL_KEY_RESETS]; ok {
+	if val, ok := attrs[ibmmq.MQIACH_SSL_KEY_RESETS]; ok {
 		metrics.SSLKeyResets = AttributeValue(val.(int32))
 		c.protocol.Debugf("Channel '%s' SSL key resets: %d", channelName, val.(int32))
 	}
-	if val, ok := attrs[C.MQIACH_NPM_SPEED]; ok {
+	if val, ok := attrs[ibmmq.MQIACH_NPM_SPEED]; ok {
 		metrics.NPMSpeed = AttributeValue(val.(int32))
 		c.protocol.Debugf("Channel '%s' NPM speed: %d", channelName, val.(int32))
 	}
-	if val, ok := attrs[C.MQIACH_CURRENT_SHARING_CONVS]; ok {
+	if val, ok := attrs[ibmmq.MQIACH_CURRENT_SHARING_CONVS]; ok {
 		metrics.CurrentSharingConvs = AttributeValue(val.(int32))
 		c.protocol.Debugf("Channel '%s' current sharing conversations: %d", channelName, val.(int32))
 	}
 
 	// Connection name (string attribute)
-	if val, ok := attrs[C.MQCACH_CONNECTION_NAME]; ok {
+	if val, ok := attrs[ibmmq.MQCACH_CONNECTION_NAME]; ok {
 		if connStr, ok := val.(string); ok {
 			metrics.ConnectionName = strings.TrimSpace(connStr)
 			c.protocol.Debugf("Channel '%s' connection name: '%s'", channelName, metrics.ConnectionName)
@@ -154,14 +153,14 @@ func (c *Client) GetChannelMetrics(channelName string) (*ChannelMetrics, error) 
 // GetChannelConfig returns configuration for a specific channel.
 func (c *Client) GetChannelConfig(channelName string) (*ChannelConfig, error) {
 	params := []pcfParameter{
-		newStringParameter(C.MQCACH_CHANNEL_NAME, channelName),
+		newStringParameter(ibmmq.MQCACH_CHANNEL_NAME, channelName),
 	}
-	response, err := c.SendPCFCommand(C.MQCMD_INQUIRE_CHANNEL, params)
+	response, err := c.sendPCFCommand(ibmmq.MQCMD_INQUIRE_CHANNEL, params)
 	if err != nil {
 		return nil, err
 	}
 
-	attrs, err := c.ParsePCFResponse(response, "")
+	attrs, err := c.parsePCFResponseFromParams(response, "")
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +169,7 @@ func (c *Client) GetChannelConfig(channelName string) (*ChannelConfig, error) {
 		Name: channelName,
 	}
 
-	if channelType, ok := attrs[C.MQIACH_CHANNEL_TYPE]; ok {
+	if channelType, ok := attrs[ibmmq.MQIACH_CHANNEL_TYPE]; ok {
 		config.Type = ChannelType(channelType.(int32))
 	}
 
@@ -185,37 +184,37 @@ func (c *Client) GetChannelConfig(channelName string) (*ChannelConfig, error) {
 	config.SharingConversations = NotCollected
 	config.NetworkPriority = NotCollected
 
-	if batchSize, ok := attrs[C.MQIACH_BATCH_SIZE]; ok {
+	if batchSize, ok := attrs[ibmmq.MQIACH_BATCH_SIZE]; ok {
 		config.BatchSize = AttributeValue(batchSize.(int32))
 	}
-	if batchInterval, ok := attrs[C.MQIACH_BATCH_INTERVAL]; ok {
+	if batchInterval, ok := attrs[ibmmq.MQIACH_BATCH_INTERVAL]; ok {
 		config.BatchInterval = AttributeValue(batchInterval.(int32))
 	}
 
-	if discInterval, ok := attrs[C.MQIACH_DISC_INTERVAL]; ok {
+	if discInterval, ok := attrs[ibmmq.MQIACH_DISC_INTERVAL]; ok {
 		config.DiscInterval = AttributeValue(discInterval.(int32))
 	}
-	if hbInterval, ok := attrs[C.MQIACH_HB_INTERVAL]; ok {
+	if hbInterval, ok := attrs[ibmmq.MQIACH_HB_INTERVAL]; ok {
 		config.HbInterval = AttributeValue(hbInterval.(int32))
 	}
-	if keepAliveInterval, ok := attrs[C.MQIACH_KEEP_ALIVE_INTERVAL]; ok {
+	if keepAliveInterval, ok := attrs[ibmmq.MQIACH_KEEP_ALIVE_INTERVAL]; ok {
 		config.KeepAliveInterval = AttributeValue(keepAliveInterval.(int32))
 	}
 
-	if shortRetry, ok := attrs[C.MQIACH_SHORT_RETRY]; ok {
+	if shortRetry, ok := attrs[ibmmq.MQIACH_SHORT_RETRY]; ok {
 		config.ShortRetry = AttributeValue(shortRetry.(int32))
 	}
-	if longRetry, ok := attrs[C.MQIACH_LONG_RETRY]; ok {
+	if longRetry, ok := attrs[ibmmq.MQIACH_LONG_RETRY]; ok {
 		config.LongRetry = AttributeValue(longRetry.(int32))
 	}
 
-	if maxMsgLength, ok := attrs[C.MQIACH_MAX_MSG_LENGTH]; ok {
+	if maxMsgLength, ok := attrs[ibmmq.MQIACH_MAX_MSG_LENGTH]; ok {
 		config.MaxMsgLength = AttributeValue(maxMsgLength.(int32))
 	}
-	if sharingConvs, ok := attrs[C.MQIACH_SHARING_CONVERSATIONS]; ok {
+	if sharingConvs, ok := attrs[ibmmq.MQIACH_SHARING_CONVERSATIONS]; ok {
 		config.SharingConversations = AttributeValue(sharingConvs.(int32))
 	}
-	if netPriority, ok := attrs[C.MQIACH_NETWORK_PRIORITY]; ok {
+	if netPriority, ok := attrs[ibmmq.MQIACH_NETWORK_PRIORITY]; ok {
 		config.NetworkPriority = AttributeValue(netPriority.(int32))
 	}
 
@@ -231,26 +230,26 @@ func (c *Client) GetChannels(collectConfig, collectMetrics bool, maxChannels int
 		Stats: CollectionStats{},
 	}
 
-	// Step 1: Discovery
-	discoveredChannels, err := c.discoverChannels(result)
+	// Step 1: Enhanced Discovery (with channel types)
+	channelInfos, err := c.discoverChannelsWithInfo(result)
 	if err != nil {
 		return result, err
 	}
 
-	// Step 2: Filtering
-	channelsToEnrich := c.filterChannels(discoveredChannels, selector, collectSystem, maxChannels, result)
+	// Step 2: Filtering (including template filtering)
+	channelInfosToEnrich := c.filterChannelsEnhanced(channelInfos, selector, collectSystem, maxChannels, result)
 
-	// Step 3: Enrichment
-	c.enrichChannels(channelsToEnrich, collectConfig, collectMetrics, result)
+	// Step 3: Enrichment (now pass channel info with types)
+	c.enrichChannelsWithTypes(channelInfosToEnrich, collectConfig, collectMetrics, result)
 
 	c.logChannelCollectionSummary(result)
 
 	return result, nil
 }
 
-func (c *Client) discoverChannels(result *ChannelCollectionResult) ([]string, error) {
-	response, err := c.SendPCFCommand(C.MQCMD_INQUIRE_CHANNEL, []pcfParameter{
-		newStringParameter(C.MQCACH_CHANNEL_NAME, "*"),
+func (c *Client) discoverChannelsWithInfo(result *ChannelCollectionResult) ([]ChannelInfo, error) {
+	response, err := c.sendPCFCommand(ibmmq.MQCMD_INQUIRE_CHANNEL, []pcfParameter{
+		newStringParameter(ibmmq.MQCACH_CHANNEL_NAME, "*"),
 	})
 	if err != nil {
 		result.Stats.Discovery.Success = false
@@ -259,83 +258,161 @@ func (c *Client) discoverChannels(result *ChannelCollectionResult) ([]string, er
 	}
 
 	result.Stats.Discovery.Success = true
-	parsed := c.parseChannelListResponse(response)
-
-	successfulItems := int64(len(parsed.Channels))
+	
+	// Parse channel info including type
+	channelInfos := c.parseChannelInfoFromParams(response)
+	
+	successfulItems := int64(len(channelInfos))
 	var invisibleItems int64
-	for _, count := range parsed.ErrorCounts {
-		invisibleItems += int64(count)
-	}
+	// TODO: Add error counting when we update parseChannelInfoFromParams
 
 	result.Stats.Discovery.AvailableItems = successfulItems + invisibleItems
 	result.Stats.Discovery.InvisibleItems = invisibleItems
-	result.Stats.Discovery.ErrorCounts = parsed.ErrorCounts
 
-	for errCode, count := range parsed.ErrorCounts {
-		if errCode < 0 {
-			c.protocol.Warningf("Internal error %d occurred %d times during channel discovery", errCode, count)
-		} else {
-			c.protocol.Warningf("MQ error %d (%s) occurred %d times during channel discovery",
-				errCode, mqReasonString(errCode), count)
+	if len(channelInfos) == 0 {
+		c.protocol.Debugf("No channels discovered")
+	} else {
+		// Log channel types for debugging
+		c.protocol.Debugf("Discovered %d channels with types", len(channelInfos))
+		for _, info := range channelInfos {
+			c.protocol.Debugf("  Channel '%s' type=%d", info.Name, info.Type)
 		}
 	}
 
-	if len(parsed.Channels) == 0 {
-		c.protocol.Debugf("No channels discovered")
-	}
-
-	return parsed.Channels, nil
+	return channelInfos, nil
 }
 
-func (c *Client) filterChannels(channels []string, selector string, collectSystem bool, maxChannels int, result *ChannelCollectionResult) []string {
+// Keep old function for compatibility
+func (c *Client) discoverChannels(result *ChannelCollectionResult) ([]string, error) {
+	infos, err := c.discoverChannelsWithInfo(result)
+	if err != nil {
+		return nil, err
+	}
+	
+	var names []string
+	for _, info := range infos {
+		names = append(names, info.Name)
+	}
+	return names, nil
+}
+
+func (c *Client) filterChannelsEnhanced(channelInfos []ChannelInfo, selector string, collectSystem bool, maxChannels int, result *ChannelCollectionResult) []ChannelInfo {
 	visibleItems := result.Stats.Discovery.AvailableItems - result.Stats.Discovery.InvisibleItems
 	enrichAll := maxChannels <= 0 || visibleItems <= int64(maxChannels)
 
 	c.protocol.Debugf("Discovery found %d visible channels (total: %d, invisible: %d). EnrichAll=%v",
 		visibleItems, result.Stats.Discovery.AvailableItems, result.Stats.Discovery.InvisibleItems, enrichAll)
 
-	var channelsToEnrich []string
+	var channelsToEnrich []ChannelInfo
+	var templateChannelsSkipped int64
+	
 	if enrichAll || selector == "*" {
-		for _, channelName := range channels {
-			if !collectSystem && strings.HasPrefix(channelName, "SYSTEM.") {
+		for _, info := range channelInfos {
+			// Skip template channels (SYSTEM.DEF.*)
+			if strings.HasPrefix(info.Name, "SYSTEM.DEF.") {
+				templateChannelsSkipped++
+				c.protocol.Debugf("Skipping template channel '%s' (type=%d) - no runtime status available", 
+					info.Name, info.Type)
+				continue
+			}
+			
+			if !collectSystem && strings.HasPrefix(info.Name, "SYSTEM.") {
 				result.Stats.Discovery.ExcludedItems++
 				continue
 			}
-			channelsToEnrich = append(channelsToEnrich, channelName)
+			channelsToEnrich = append(channelsToEnrich, info)
 			result.Stats.Discovery.IncludedItems++
 		}
-		c.protocol.Debugf("Enriching %d channels (excluded %d system channels)",
-			len(channelsToEnrich), result.Stats.Discovery.ExcludedItems)
+		c.protocol.Debugf("Enriching %d channels (excluded %d system channels, skipped %d template channels)",
+			len(channelsToEnrich), result.Stats.Discovery.ExcludedItems, templateChannelsSkipped)
 	} else {
-		for _, channelName := range channels {
-			if !collectSystem && strings.HasPrefix(channelName, "SYSTEM.") {
+		for _, info := range channelInfos {
+			// Skip template channels (SYSTEM.DEF.*)
+			if strings.HasPrefix(info.Name, "SYSTEM.DEF.") {
+				templateChannelsSkipped++
+				c.protocol.Debugf("Skipping template channel '%s' (type=%d) - no runtime status available", 
+					info.Name, info.Type)
+				continue
+			}
+			
+			if !collectSystem && strings.HasPrefix(info.Name, "SYSTEM.") {
 				result.Stats.Discovery.ExcludedItems++
 				continue
 			}
 
-			matched, err := filepath.Match(selector, channelName)
+			matched, err := filepath.Match(selector, info.Name)
 			if err != nil {
 				c.protocol.Warningf("Invalid selector pattern '%s': %v", selector, err)
 				matched = false
 			}
 
 			if matched {
-				channelsToEnrich = append(channelsToEnrich, channelName)
+				channelsToEnrich = append(channelsToEnrich, info)
 				result.Stats.Discovery.IncludedItems++
 			} else {
 				result.Stats.Discovery.ExcludedItems++
 			}
 		}
-		c.protocol.Debugf("Selector '%s' matched %d channels, excluded %d (including system filtering)",
-			selector, result.Stats.Discovery.IncludedItems, result.Stats.Discovery.ExcludedItems)
+		c.protocol.Debugf("Selector '%s' matched %d channels, excluded %d (including system filtering), skipped %d templates",
+			selector, result.Stats.Discovery.IncludedItems, result.Stats.Discovery.ExcludedItems, templateChannelsSkipped)
 	}
+	
+	// Update stats to account for template channels
+	result.Stats.Discovery.AvailableItems -= templateChannelsSkipped
+	
 	return channelsToEnrich
+}
+
+// Keep old function for compatibility
+func (c *Client) filterChannels(channels []string, selector string, collectSystem bool, maxChannels int, result *ChannelCollectionResult) []string {
+	// Convert to ChannelInfo with unknown type for backward compatibility
+	var infos []ChannelInfo
+	for _, name := range channels {
+		infos = append(infos, ChannelInfo{Name: name, Type: 0})
+	}
+	filteredInfos := c.filterChannelsEnhanced(infos, selector, collectSystem, maxChannels, result)
+	
+	// Convert back to strings
+	var names []string
+	for _, info := range filteredInfos {
+		names = append(names, info.Name)
+	}
+	return names
 }
 
 func (c *Client) enrichChannels(channelsToEnrich []string, collectConfig, collectMetrics bool, result *ChannelCollectionResult) {
 	for _, channelName := range channelsToEnrich {
 		cm := ChannelMetrics{
 			Name:                 channelName,
+			BatchSize:            NotCollected,
+			BatchInterval:        NotCollected,
+			DiscInterval:         NotCollected,
+			HbInterval:           NotCollected,
+			KeepAliveInterval:    NotCollected,
+			ShortRetry:           NotCollected,
+			LongRetry:            NotCollected,
+			MaxMsgLength:         NotCollected,
+			SharingConversations: NotCollected,
+			NetworkPriority:      NotCollected,
+		}
+
+		if collectConfig {
+			c.enrichChannelWithConfig(&cm, result)
+		}
+
+		if collectMetrics {
+			c.enrichChannelWithMetrics(&cm, result)
+		}
+
+		result.Channels = append(result.Channels, cm)
+	}
+}
+
+func (c *Client) enrichChannelsWithTypes(channelInfosToEnrich []ChannelInfo, collectConfig, collectMetrics bool, result *ChannelCollectionResult) {
+	for _, info := range channelInfosToEnrich {
+		cm := ChannelMetrics{
+			Name:                 info.Name,
+			Type:                 info.Type,  // Set type from discovery
 			BatchSize:            NotCollected,
 			BatchInterval:        NotCollected,
 			DiscInterval:         NotCollected,

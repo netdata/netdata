@@ -4,7 +4,6 @@ go 1.24.0
 
 replace github.com/netdata/netdata/go/plugins/plugin/go.d => ./plugin/go.d
 
-
 replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.302.0
 
 require (
@@ -67,6 +66,11 @@ require (
 	layeh.com/radius v0.0.0-20190322222518-890bc1058917
 )
 
+require (
+	github.com/alexbrainman/odbc v0.0.0-20250601004241-49e6b2bc0cf0
+	github.com/ibm-messaging/mq-golang/v5 v5.6.4
+	gopkg.in/yaml.v3 v3.0.1
+)
 
 require (
 	dario.cat/mergo v1.0.1 // indirect
@@ -76,7 +80,6 @@ require (
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.3.0 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
-	github.com/alexbrainman/odbc v0.0.0-20250601004241-49e6b2bc0cf0 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -171,7 +174,6 @@ require (
 	gopkg.in/cenkalti/backoff.v2 v2.2.1 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20250318190949-c8a335a9a2ff // indirect
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738 // indirect

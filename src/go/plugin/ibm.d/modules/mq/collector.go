@@ -12,6 +12,10 @@ type Collector struct {
 	framework.Collector
 	Config `yaml:",inline" json:",inline"`  // Embed config to receive YAML unmarshal
 	client *pcf.Client
+	
+	// Resolved effective intervals (auto-detected or user-configured)
+	effectiveStatisticsInterval int
+	effectiveSysTopicInterval   int
 }
 
 // CollectOnce is called by the framework to collect metrics.
@@ -118,4 +122,33 @@ func (c *Collector) collectQueueManagerMetrics() error {
 	}
 	
 	return nil
+}
+
+// GetEffectiveStatisticsInterval returns the resolved statistics interval
+// (auto-detected from STATINT or user-configured value)
+func (c *Collector) GetEffectiveStatisticsInterval() int {
+	return c.effectiveStatisticsInterval
+}
+
+// GetEffectiveSysTopicInterval returns the resolved $SYS topic interval
+// (auto-detected from MONINT or user-configured value)
+func (c *Collector) GetEffectiveSysTopicInterval() int {
+	return c.effectiveSysTopicInterval
+}
+
+// resolveIntervals determines the effective intervals to use
+func (c *Collector) resolveIntervals() {
+	// Statistics interval: auto-detected STATINT overwrites user configuration
+	if autoDetected := c.client.GetStatisticsInterval(); autoDetected > 0 {
+		c.effectiveStatisticsInterval = int(autoDetected)
+		c.Infof("Using auto-detected statistics interval from STATINT: %d seconds (overwrites config)", c.effectiveStatisticsInterval)
+	} else {
+		// Use configured value (default 60s)
+		c.effectiveStatisticsInterval = c.Config.StatisticsInterval
+		c.Infof("Using configured statistics interval: %d seconds (STATINT not available)", c.effectiveStatisticsInterval)
+	}
+
+	// $SYS topic interval: use configured value (default 10s, user can override)
+	c.effectiveSysTopicInterval = c.Config.SysTopicInterval
+	c.Infof("Using configured $SYS topic interval: %d seconds", c.effectiveSysTopicInterval)
 }

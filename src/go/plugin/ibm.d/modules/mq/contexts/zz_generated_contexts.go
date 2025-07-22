@@ -511,12 +511,13 @@ func (c ChannelCurrentSharingConversationsContext) SetUpdateEvery(state *framewo
 // ChannelLabels defines the required labels for Channel contexts
 type ChannelLabels struct {
 	Channel string
+	Type string
 }
 
 // InstanceID generates a unique instance ID using the hardcoded label order from YAML
 func (l ChannelLabels) InstanceID(contextName string) string {
-	// Label order from YAML: channel
-	return contextName + "." + cleanLabelValue(l.Channel)
+	// Label order from YAML: channel, type
+	return contextName + "." + cleanLabelValue(l.Channel) + "_" + cleanLabelValue(l.Type)
 }
 
 
@@ -640,6 +641,7 @@ var Channel = struct {
 		},
 		LabelKeys: []string{
 			"channel",
+			"type",
 		},
 		},
 	},
@@ -663,6 +665,7 @@ var Channel = struct {
 		},
 		LabelKeys: []string{
 			"channel",
+			"type",
 		},
 		},
 	},
@@ -686,6 +689,7 @@ var Channel = struct {
 		},
 		LabelKeys: []string{
 			"channel",
+			"type",
 		},
 		},
 	},
@@ -709,6 +713,7 @@ var Channel = struct {
 		},
 		LabelKeys: []string{
 			"channel",
+			"type",
 		},
 		},
 	},
@@ -732,6 +737,7 @@ var Channel = struct {
 		},
 		LabelKeys: []string{
 			"channel",
+			"type",
 		},
 		},
 	},
@@ -755,6 +761,7 @@ var Channel = struct {
 		},
 		LabelKeys: []string{
 			"channel",
+			"type",
 		},
 		},
 	},
@@ -792,6 +799,7 @@ var Channel = struct {
 		},
 		LabelKeys: []string{
 			"channel",
+			"type",
 		},
 		},
 	},
@@ -815,6 +823,7 @@ var Channel = struct {
 		},
 		LabelKeys: []string{
 			"channel",
+			"type",
 		},
 		},
 	},
@@ -838,6 +847,7 @@ var Channel = struct {
 		},
 		LabelKeys: []string{
 			"channel",
+			"type",
 		},
 		},
 	},
@@ -861,6 +871,7 @@ var Channel = struct {
 		},
 		LabelKeys: []string{
 			"channel",
+			"type",
 		},
 		},
 	},
@@ -884,6 +895,7 @@ var Channel = struct {
 		},
 		LabelKeys: []string{
 			"channel",
+			"type",
 		},
 		},
 	},
@@ -907,6 +919,7 @@ var Channel = struct {
 		},
 		LabelKeys: []string{
 			"channel",
+			"type",
 		},
 		},
 	},
@@ -937,6 +950,7 @@ var Channel = struct {
 		},
 		LabelKeys: []string{
 			"channel",
+			"type",
 		},
 		},
 	},
@@ -960,6 +974,7 @@ var Channel = struct {
 		},
 		LabelKeys: []string{
 			"channel",
+			"type",
 		},
 		},
 	},
@@ -983,6 +998,7 @@ var Channel = struct {
 		},
 		LabelKeys: []string{
 			"channel",
+			"type",
 		},
 		},
 	},
@@ -1006,6 +1022,7 @@ var Channel = struct {
 		},
 		LabelKeys: []string{
 			"channel",
+			"type",
 		},
 		},
 	},
@@ -1029,6 +1046,7 @@ var Channel = struct {
 		},
 		LabelKeys: []string{
 			"channel",
+			"type",
 		},
 		},
 	},
@@ -1052,6 +1070,7 @@ var Channel = struct {
 		},
 		LabelKeys: []string{
 			"channel",
+			"type",
 		},
 		},
 	},
@@ -1075,6 +1094,7 @@ var Channel = struct {
 		},
 		LabelKeys: []string{
 			"channel",
+			"type",
 		},
 		},
 	},
@@ -1098,6 +1118,7 @@ var Channel = struct {
 		},
 		LabelKeys: []string{
 			"channel",
+			"type",
 		},
 		},
 	},

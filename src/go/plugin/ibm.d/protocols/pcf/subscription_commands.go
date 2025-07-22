@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//go:build linux && cgo
 
 package pcf
 
-// #include "pcf_helpers.h"
-import "C"
 import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/ibm-messaging/mq-golang/v5/ibmmq"
 )
 
 // InquireSubscription queries subscription information from the queue manager
@@ -21,21 +20,21 @@ func (c *Client) InquireSubscription(subName string) ([]SubscriptionMetrics, err
 	
 	// Add subscription name filter if provided
 	if subName != "" {
-		params = append(params, newStringParameter(C.MQCACF_SUB_NAME, subName))
+		params = append(params, newStringParameter(ibmmq.MQCACF_SUB_NAME, subName))
 	} else {
 		// Use wildcard to get all subscriptions
-		params = append(params, newStringParameter(C.MQCACF_SUB_NAME, "*"))
+		params = append(params, newStringParameter(ibmmq.MQCACF_SUB_NAME, "*"))
 	}
 	
 	// Send PCF command
-	response, err := c.SendPCFCommand(C.MQCMD_INQUIRE_SUBSCRIPTION, params)
+	response, err := c.sendPCFCommand(ibmmq.MQCMD_INQUIRE_SUBSCRIPTION, params)
 	if err != nil {
 		c.protocol.Errorf("Failed to inquire subscriptions: %v", err)
 		return nil, err
 	}
 	
-	// Parse the response
-	result := c.parseSubscriptionListResponse(response)
+	// Parse the response using new parameters-based method
+	result := c.parseSubscriptionListResponseFromParams(response)
 	
 	if result.InternalErrors > 0 {
 		c.protocol.Warningf("Encountered %d internal errors while parsing subscription list",
@@ -52,18 +51,18 @@ func (c *Client) InquireSubscriptionStatus(subName string) (*SubscriptionMetrics
 	
 	// Build parameters - subscription name is required
 	params := []pcfParameter{
-		newStringParameter(C.MQCACF_SUB_NAME, subName),
+		newStringParameter(ibmmq.MQCACF_SUB_NAME, subName),
 	}
 	
 	// Send PCF command
-	response, err := c.SendPCFCommand(C.MQCMD_INQUIRE_SUB_STATUS, params)
+	response, err := c.sendPCFCommand(ibmmq.MQCMD_INQUIRE_SUB_STATUS, params)
 	if err != nil {
 		c.protocol.Errorf("Failed to inquire subscription status for '%s': %v", subName, err)
 		return nil, err
 	}
 	
-	// Parse the response
-	result := c.parseSubscriptionStatusResponse(response)
+	// Parse the response using new parameters-based method
+	result := c.parseSubscriptionStatusResponseFromParams(response)
 	
 	if result.InternalErrors > 0 {
 		c.protocol.Warningf("Encountered %d internal errors while parsing subscription status",
@@ -107,120 +106,90 @@ type SubscriptionParseResult struct {
 	ErrorCounts    map[int32]int
 }
 
-// parseSubscriptionListResponse parses a subscription list response
-func (c *Client) parseSubscriptionListResponse(response []byte) *SubscriptionParseResult {
-	processor := func(attrs map[C.MQLONG]interface{}) (interface{}, error) {
-		sub := SubscriptionMetrics{
-			Type:         NotCollected,
-			MessageCount: NotCollected,
-		}
-		
-		// Get subscription name
-		if name, ok := attrs[C.MQCACF_SUB_NAME]; ok {
-			if nameStr, ok := name.(string); ok {
-				sub.Name = strings.TrimSpace(nameStr)
-			}
-		}
-		
-		// Get topic string
-		if topic, ok := attrs[C.MQCA_TOPIC_STRING]; ok {
-			if topicStr, ok := topic.(string); ok {
-				sub.TopicString = strings.TrimSpace(topicStr)
-			}
-		}
-		
-		// Get subscription type
-		if subType, ok := attrs[C.MQIACF_SUB_TYPE]; ok {
-			if typeVal, ok := subType.(int32); ok {
-				sub.Type = AttributeValue(typeVal)
-			}
-		}
-		
-		if sub.Name == "" {
-			return nil, fmt.Errorf("subscription name not found")
-		}
-		
-		return sub, nil
-	}
-	
-	genericResult := c.parseGenericListResponse(response, C.MQCACF_SUB_NAME, processor)
-	
+// parseSubscriptionListResponseFromParams parses PCF parameters into SubscriptionParseResult
+func (c *Client) parseSubscriptionListResponseFromParams(params []*ibmmq.PCFParameter) *SubscriptionParseResult {
 	result := &SubscriptionParseResult{
-		ErrorCounts:    genericResult.ErrorCounts,
-		InternalErrors: genericResult.InternalErrors,
-		Subscriptions:  make([]SubscriptionMetrics, 0, len(genericResult.Items)),
+		Subscriptions:  make([]SubscriptionMetrics, 0),
+		ErrorCounts:    make(map[int32]int),
+		InternalErrors: 0,
+	}
+
+	// Convert IBM PCFParameter array to attrs format for existing logic
+	attrs := convertPCFParametersToAttrs(params)
+
+	// Create a subscription metrics object from the parameters
+	sub := SubscriptionMetrics{
+		Type:         NotCollected,
+		MessageCount: NotCollected,
 	}
 	
-	for _, item := range genericResult.Items {
-		if sub, ok := item.(SubscriptionMetrics); ok {
-			result.Subscriptions = append(result.Subscriptions, sub)
+	// Get subscription name
+	if name, ok := attrs[ibmmq.MQCACF_SUB_NAME]; ok {
+		if nameStr, ok := name.(string); ok && nameStr != "" {
+			sub.Name = strings.TrimSpace(nameStr)
 		}
 	}
-	
+
+	if sub.Name != "" {
+		result.Subscriptions = append(result.Subscriptions, sub)
+	}
+
 	return result
 }
 
-// parseSubscriptionStatusResponse parses a subscription status response
-func (c *Client) parseSubscriptionStatusResponse(response []byte) *SubscriptionParseResult {
-	processor := func(attrs map[C.MQLONG]interface{}) (interface{}, error) {
-		sub := SubscriptionMetrics{
-			Type:         NotCollected,
-			MessageCount: NotCollected,
-		}
-		
-		// Get subscription name
-		if name, ok := attrs[C.MQCACF_SUB_NAME]; ok {
-			if nameStr, ok := name.(string); ok {
-				sub.Name = strings.TrimSpace(nameStr)
-			}
-		}
-		
-		// Get topic string
-		if topic, ok := attrs[C.MQCA_TOPIC_STRING]; ok {
-			if topicStr, ok := topic.(string); ok {
-				sub.TopicString = strings.TrimSpace(topicStr)
-			}
-		}
-		
-		// Get message count
-		if count, ok := attrs[C.MQIACF_MESSAGE_COUNT]; ok {
-			if countVal, ok := count.(int32); ok {
-				sub.MessageCount = AttributeValue(countVal)
-			}
-		}
-		
-		// Get last message date/time
-		if dateStr, ok := attrs[C.MQCACF_LAST_MSG_DATE]; ok {
-			if dateVal, ok := dateStr.(string); ok {
-				sub.LastMessageDate = strings.TrimSpace(dateVal)
-			}
-		}
-		if timeStr, ok := attrs[C.MQCACF_LAST_MSG_TIME]; ok {
-			if timeVal, ok := timeStr.(string); ok {
-				sub.LastMessageTime = strings.TrimSpace(timeVal)
-			}
-		}
-		
-		if sub.Name == "" {
-			return nil, fmt.Errorf("subscription name not found")
-		}
-		
-		return sub, nil
-	}
-	
-	genericResult := c.parseGenericListResponse(response, C.MQCACF_SUB_NAME, processor)
-	
+// parseSubscriptionStatusResponseFromParams parses PCF parameters into subscription status
+func (c *Client) parseSubscriptionStatusResponseFromParams(params []*ibmmq.PCFParameter) *SubscriptionParseResult {
 	result := &SubscriptionParseResult{
-		ErrorCounts:    genericResult.ErrorCounts,
-		InternalErrors: genericResult.InternalErrors,
-		Subscriptions:  make([]SubscriptionMetrics, 0, len(genericResult.Items)),
+		Subscriptions:  make([]SubscriptionMetrics, 0),
+		ErrorCounts:    make(map[int32]int),
+		InternalErrors: 0,
+	}
+
+	// Convert IBM PCFParameter array to attrs format for existing logic
+	attrs := convertPCFParametersToAttrs(params)
+
+	// Create a subscription metrics object from the parameters
+	sub := SubscriptionMetrics{
+		Type:         NotCollected,
+		MessageCount: NotCollected,
 	}
 	
-	for _, item := range genericResult.Items {
-		if sub, ok := item.(SubscriptionMetrics); ok {
-			result.Subscriptions = append(result.Subscriptions, sub)
+	// Get subscription name
+	if name, ok := attrs[ibmmq.MQCACF_SUB_NAME]; ok {
+		if nameStr, ok := name.(string); ok && nameStr != "" {
+			sub.Name = strings.TrimSpace(nameStr)
+		}
+	}
+
+	// Get subscription type if available
+	if subType, ok := attrs[ibmmq.MQIACF_SUB_TYPE]; ok {
+		if typeVal, ok := subType.(int32); ok {
+			sub.Type = AttributeValue(typeVal)
 		}
 	}
 	
+	// Get message count if available
+	if count, ok := attrs[ibmmq.MQIACF_MESSAGE_COUNT]; ok {
+		if countVal, ok := count.(int32); ok {
+			sub.MessageCount = AttributeValue(countVal)
+		}
+	}
+	
+	// Get last message date/time
+	if dateStr, ok := attrs[ibmmq.MQCACF_LAST_MSG_DATE]; ok {
+		if dateVal, ok := dateStr.(string); ok {
+			sub.LastMessageDate = strings.TrimSpace(dateVal)
+		}
+	}
+	if timeStr, ok := attrs[ibmmq.MQCACF_LAST_MSG_TIME]; ok {
+		if timeVal, ok := timeStr.(string); ok {
+			sub.LastMessageTime = strings.TrimSpace(timeVal)
+		}
+	}
+
+	if sub.Name != "" {
+		result.Subscriptions = append(result.Subscriptions, sub)
+	}
+
 	return result
 }

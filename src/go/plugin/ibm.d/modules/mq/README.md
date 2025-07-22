@@ -59,6 +59,7 @@ Labels:
 | Label | Description |
 |:------|:------------|
 | channel | Channel identifier |
+| type | Type identifier |
 
 Metrics:
 
@@ -292,9 +293,9 @@ The following options can be defined globally or per job.
 | MaxListeners | Maximum number of listeners to collect (0 = no limit) | `100` | no | - | - |
 | CollectResetQueueStats | Enable collection of queue statistics (destructive operation) | `false` | no | - | - |
 | CollectStatisticsQueue | Enable collection of statistics queue metrics (SYSTEM.ADMIN.STATISTICS.QUEUE provides advanced metrics like min/max depth) | `false` | no | - | - |
-| StatisticsInterval | Statistics collection interval in seconds (should match MQ STATINT setting for optimal data freshness) | `60` | no | - | - |
 | CollectSysTopics | Enable collection of $SYS topic metrics (provides Queue Manager CPU, memory, and log utilization) | `false` | no | - | - |
-| SysTopicInterval | $SYS topic collection interval in seconds (should match MQ MONINT setting for optimal data freshness) | `180` | no | - | - |
+| StatisticsInterval | Statistics collection interval in seconds (auto-detected STATINT overwrites this value) | `60` | no | - | - |
+| SysTopicInterval | $SYS topic collection interval in seconds (user override for customized MQ configurations) | `10` | no | - | - |
 
 ### Examples
 

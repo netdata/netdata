@@ -49,6 +49,7 @@ func (c *Collector) collectSysTopics() error {
 			values.System = result.SystemCPUPercent.Int64() * 100
 		}
 		
+		contexts.QueueManagerResources.CPUUsage.SetUpdateEvery(c.State, contexts.EmptyLabels{}, c.GetEffectiveSysTopicInterval())
 		contexts.QueueManagerResources.CPUUsage.Set(c.State, contexts.EmptyLabels{}, values)
 	}
 
@@ -58,6 +59,7 @@ func (c *Collector) collectSysTopics() error {
 			// Convert MB to bytes
 			Total: result.MemoryUsedMB.Int64() * 1024 * 1024,
 		}
+		contexts.QueueManagerResources.MemoryUsage.SetUpdateEvery(c.State, contexts.EmptyLabels{}, c.GetEffectiveSysTopicInterval())
 		contexts.QueueManagerResources.MemoryUsage.Set(c.State, contexts.EmptyLabels{}, values)
 	}
 
@@ -70,6 +72,7 @@ func (c *Collector) collectSysTopics() error {
 		if max > 0 {
 			// Convert to 0.01% units (basis points) as expected by the context
 			utilPercent := (used * 10000) / max
+			contexts.QueueManagerResources.LogUtilization.SetUpdateEvery(c.State, contexts.EmptyLabels{}, c.GetEffectiveSysTopicInterval())
 			contexts.QueueManagerResources.LogUtilization.Set(c.State, contexts.EmptyLabels{}, 
 				contexts.QueueManagerResourcesLogUtilizationValues{
 					Used: utilPercent,
@@ -77,6 +80,7 @@ func (c *Collector) collectSysTopics() error {
 		}
 		
 		// Also set log file size
+		contexts.QueueManagerResources.LogFileSize.SetUpdateEvery(c.State, contexts.EmptyLabels{}, c.GetEffectiveSysTopicInterval())
 		contexts.QueueManagerResources.LogFileSize.Set(c.State, contexts.EmptyLabels{},
 			contexts.QueueManagerResourcesLogFileSizeValues{
 				Size: max,

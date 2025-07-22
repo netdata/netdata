@@ -1,16 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//go:build linux && cgo
-
 package pcf
-
-// #include "pcf_helpers.h"
-import "C"
 
 import (
 	"fmt"
 	"math"
+	
+	"github.com/ibm-messaging/mq-golang/v5/ibmmq"
 )
+
+// Type alias for IBM PCF parameter for compatibility with existing code
+type pcfParameter = *ibmmq.PCFParameter
+
+// Helper functions for creating PCF parameters (aliases to transport functions)
+var newStringParameter = buildStringParameter
+var newIntParameter = buildIntParameter
 
 // AttributeValue represents a configuration attribute value
 type AttributeValue int64
@@ -32,34 +36,34 @@ func (a AttributeValue) Int64() int64 {
 type ChannelType int32
 
 const (
-	ChannelTypeSender      ChannelType = C.MQCHT_SENDER
-	ChannelTypeServer      ChannelType = C.MQCHT_SERVER
-	ChannelTypeReceiver    ChannelType = C.MQCHT_RECEIVER
-	ChannelTypeRequester   ChannelType = C.MQCHT_REQUESTER
-	ChannelTypeClntconn    ChannelType = C.MQCHT_CLNTCONN
-	ChannelTypeSvrconn     ChannelType = C.MQCHT_SVRCONN
-	ChannelTypeClussdr     ChannelType = C.MQCHT_CLUSSDR
-	ChannelTypeClusrcvr    ChannelType = C.MQCHT_CLUSRCVR
-	ChannelTypeMqtt        ChannelType = C.MQCHT_MQTT
-	ChannelTypeAMQP        ChannelType = C.MQCHT_AMQP
+	ChannelTypeSender      ChannelType = ChannelType(ibmmq.MQCHT_SENDER)
+	ChannelTypeServer      ChannelType = ChannelType(ibmmq.MQCHT_SERVER)
+	ChannelTypeReceiver    ChannelType = ChannelType(ibmmq.MQCHT_RECEIVER)
+	ChannelTypeRequester   ChannelType = ChannelType(ibmmq.MQCHT_REQUESTER)
+	ChannelTypeClntconn    ChannelType = ChannelType(ibmmq.MQCHT_CLNTCONN)
+	ChannelTypeSvrconn     ChannelType = ChannelType(ibmmq.MQCHT_SVRCONN)
+	ChannelTypeClussdr     ChannelType = ChannelType(ibmmq.MQCHT_CLUSSDR)
+	ChannelTypeClusrcvr    ChannelType = ChannelType(ibmmq.MQCHT_CLUSRCVR)
+	ChannelTypeMqtt        ChannelType = ChannelType(ibmmq.MQCHT_MQTT)
+	ChannelTypeAMQP        ChannelType = ChannelType(ibmmq.MQCHT_AMQP)
 )
 
 // ChannelStatus represents the current status of a channel
 type ChannelStatus int32
 
 const (
-	ChannelStatusInactive     ChannelStatus = C.MQCHS_INACTIVE
-	ChannelStatusBinding      ChannelStatus = C.MQCHS_BINDING
-	ChannelStatusStarting     ChannelStatus = C.MQCHS_STARTING
-	ChannelStatusRunning      ChannelStatus = C.MQCHS_RUNNING
-	ChannelStatusStopping     ChannelStatus = C.MQCHS_STOPPING
-	ChannelStatusRetrying     ChannelStatus = C.MQCHS_RETRYING
-	ChannelStatusStopped      ChannelStatus = C.MQCHS_STOPPED
-	ChannelStatusRequesting   ChannelStatus = C.MQCHS_REQUESTING
-	ChannelStatusPaused       ChannelStatus = C.MQCHS_PAUSED
-	ChannelStatusDisconnected ChannelStatus = C.MQCHS_DISCONNECTED
-	ChannelStatusInitializing ChannelStatus = C.MQCHS_INITIALIZING
-	ChannelStatusSwitching    ChannelStatus = C.MQCHS_SWITCHING
+	ChannelStatusInactive     ChannelStatus = ChannelStatus(ibmmq.MQCHS_INACTIVE)
+	ChannelStatusBinding      ChannelStatus = ChannelStatus(ibmmq.MQCHS_BINDING)
+	ChannelStatusStarting     ChannelStatus = ChannelStatus(ibmmq.MQCHS_STARTING)
+	ChannelStatusRunning      ChannelStatus = ChannelStatus(ibmmq.MQCHS_RUNNING)
+	ChannelStatusStopping     ChannelStatus = ChannelStatus(ibmmq.MQCHS_STOPPING)
+	ChannelStatusRetrying     ChannelStatus = ChannelStatus(ibmmq.MQCHS_RETRYING)
+	ChannelStatusStopped      ChannelStatus = ChannelStatus(ibmmq.MQCHS_STOPPED)
+	ChannelStatusRequesting   ChannelStatus = ChannelStatus(ibmmq.MQCHS_REQUESTING)
+	ChannelStatusPaused       ChannelStatus = ChannelStatus(ibmmq.MQCHS_PAUSED)
+	ChannelStatusDisconnected ChannelStatus = ChannelStatus(ibmmq.MQCHS_DISCONNECTED)
+	ChannelStatusInitializing ChannelStatus = ChannelStatus(ibmmq.MQCHS_INITIALIZING)
+	ChannelStatusSwitching    ChannelStatus = ChannelStatus(ibmmq.MQCHS_SWITCHING)
 )
 
 // ChannelMetrics contains runtime metrics for a channel
@@ -221,6 +225,14 @@ type TopicMetrics struct {
 	LastPubTime AttributeValue  // MQCACF_LAST_PUB_TIME - Unix timestamp (combined with date)
 }
 
+// QueueManagerInfo contains static information about a queue manager
+type QueueManagerInfo struct {
+	Version      string
+	Edition      string
+	CommandLevel int32
+	Platform     int32
+}
+
 // QueueManagerMetrics contains runtime metrics for a queue manager
 type QueueManagerMetrics struct {
 	// Status - 1 if running, 0 if not responding
@@ -239,11 +251,11 @@ type QueueManagerMetrics struct {
 type ListenerStatus int32
 
 const (
-	ListenerStatusStopped  ListenerStatus = C.MQSVC_STATUS_STOPPED
-	ListenerStatusStarting ListenerStatus = C.MQSVC_STATUS_STARTING
-	ListenerStatusRunning  ListenerStatus = C.MQSVC_STATUS_RUNNING
-	ListenerStatusStopping ListenerStatus = C.MQSVC_STATUS_STOPPING
-	ListenerStatusRetrying ListenerStatus = C.MQSVC_STATUS_RETRYING
+	ListenerStatusStopped  ListenerStatus = ListenerStatus(ibmmq.MQSVC_STATUS_STOPPED)
+	ListenerStatusStarting ListenerStatus = ListenerStatus(ibmmq.MQSVC_STATUS_STARTING)
+	ListenerStatusRunning  ListenerStatus = ListenerStatus(ibmmq.MQSVC_STATUS_RUNNING)
+	ListenerStatusStopping ListenerStatus = ListenerStatus(ibmmq.MQSVC_STATUS_STOPPING)
+	ListenerStatusRetrying ListenerStatus = ListenerStatus(ibmmq.MQSVC_STATUS_RETRYING)
 )
 
 // ListenerMetrics contains runtime metrics for a listener
@@ -346,9 +358,9 @@ func NewPCFError(code int32, format string, args ...interface{}) *PCFError {
 type StatisticsType int32
 
 const (
-	StatisticsTypeMQI     StatisticsType = C.MQCMD_STATISTICS_MQI
-	StatisticsTypeQueue   StatisticsType = C.MQCMD_STATISTICS_Q
-	StatisticsTypeChannel StatisticsType = C.MQCMD_STATISTICS_CHANNEL
+	StatisticsTypeMQI     StatisticsType = StatisticsType(ibmmq.MQCMD_STATISTICS_MQI)
+	StatisticsTypeQueue   StatisticsType = StatisticsType(ibmmq.MQCMD_STATISTICS_Q)
+	StatisticsTypeChannel StatisticsType = StatisticsType(ibmmq.MQCMD_STATISTICS_CHANNEL)
 )
 
 // QueueStatistics contains extended queue metrics from statistics queue
@@ -472,4 +484,38 @@ type StatisticsMessage struct {
 type StatisticsCollectionResult struct {
 	Messages []StatisticsMessage
 	Stats    CollectionStats
+}
+
+// ChannelInfo contains basic channel information from discovery
+type ChannelInfo struct {
+	Name string
+	Type ChannelType
+}
+
+// String returns the string representation of a ChannelType
+func (ct ChannelType) String() string {
+	switch ct {
+	case ChannelTypeSender:
+		return "sender"
+	case ChannelTypeServer:
+		return "server"
+	case ChannelTypeReceiver:
+		return "receiver"
+	case ChannelTypeRequester:
+		return "requester"
+	case ChannelTypeClntconn:
+		return "clntconn"
+	case ChannelTypeSvrconn:
+		return "svrconn"
+	case ChannelTypeClussdr:
+		return "clussdr"
+	case ChannelTypeClusrcvr:
+		return "clusrcvr"
+	case ChannelTypeMqtt:
+		return "mqtt"
+	case ChannelTypeAMQP:
+		return "amqp"
+	default:
+		return "unknown"
+	}
 }

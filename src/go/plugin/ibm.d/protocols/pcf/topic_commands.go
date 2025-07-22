@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//go:build linux && cgo
 
 package pcf
 
@@ -8,23 +7,23 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+
+	"github.com/ibm-messaging/mq-golang/v5/ibmmq"
 )
 
-// #include "pcf_helpers.h"
-import "C"
 
 // GetTopicList returns a list of topics.
 func (c *Client) GetTopicList() ([]string, error) {
 	const pattern = "*"
 	params := []pcfParameter{
-		newStringParameter(C.MQCA_TOPIC_NAME, pattern),
+		newStringParameter(ibmmq.MQCA_TOPIC_NAME, pattern),
 	}
-	response, err := c.SendPCFCommand(C.MQCMD_INQUIRE_TOPIC, params)
+	response, err := c.sendPCFCommand(ibmmq.MQCMD_INQUIRE_TOPIC, params)
 	if err != nil {
 		return nil, err
 	}
 
-	result := c.parseTopicListResponse(response)
+	result := c.parseTopicListResponseFromParams(response)
 
 	if result.InternalErrors > 0 {
 		c.protocol.Warningf("encountered %d internal errors while parsing topic list", result.InternalErrors)
@@ -46,17 +45,17 @@ func (c *Client) GetTopicMetrics(topicString string) (*TopicMetrics, error) {
 	c.protocol.Debugf("Getting metrics for topic '%s' from queue manager '%s'", topicString, c.config.QueueManager)
 
 	params := []pcfParameter{
-		newStringParameter(C.MQCA_TOPIC_STRING, topicString),
-		newIntParameter(C.MQIACF_TOPIC_STATUS_TYPE, C.MQIACF_TOPIC_PUB),
+		newStringParameter(ibmmq.MQCA_TOPIC_STRING, topicString),
+		newIntParameter(ibmmq.MQIACF_TOPIC_STATUS_TYPE, ibmmq.MQIACF_TOPIC_PUB),
 	}
-	response, err := c.SendPCFCommand(C.MQCMD_INQUIRE_TOPIC_STATUS, params)
+	response, err := c.sendPCFCommand(ibmmq.MQCMD_INQUIRE_TOPIC_STATUS, params)
 	if err != nil {
 		c.protocol.Errorf("Failed to get metrics for topic '%s' from queue manager '%s': %v",
 			topicString, c.config.QueueManager, err)
 		return nil, err
 	}
 
-	attrs, err := c.ParsePCFResponse(response, "")
+	attrs, err := c.parsePCFResponseFromParams(response, "")
 	if err != nil {
 		c.protocol.Errorf("Failed to parse metrics response for topic '%s' from queue manager '%s': %v",
 			topicString, c.config.QueueManager, err)
@@ -67,33 +66,34 @@ func (c *Client) GetTopicMetrics(topicString string) (*TopicMetrics, error) {
 		TopicString: topicString,
 	}
 
-	if name, ok := attrs[C.MQCA_TOPIC_NAME]; ok {
+	if name, ok := attrs[ibmmq.MQCA_TOPIC_NAME]; ok {
 		metrics.Name = strings.TrimSpace(name.(string))
 	} else {
 		metrics.Name = topicString
 	}
 
-	if publishers, ok := attrs[C.MQIA_PUB_COUNT]; ok {
+	if publishers, ok := attrs[ibmmq.MQIA_PUB_COUNT]; ok {
 		metrics.Publishers = int64(publishers.(int32))
 	}
-	if subscribers, ok := attrs[C.MQIA_SUB_COUNT]; ok {
+	if subscribers, ok := attrs[ibmmq.MQIA_SUB_COUNT]; ok {
 		metrics.Subscribers = int64(subscribers.(int32))
 	}
 
-	if messages, ok := attrs[C.MQIAMO_PUBLISH_MSG_COUNT]; ok {
+	if messages, ok := attrs[ibmmq.MQIAMO_PUBLISH_MSG_COUNT]; ok {
 		metrics.PublishMsgCount = int64(messages.(int32))
 	}
 
 	var lastPubDate, lastPubTime string
-	if date, ok := attrs[C.MQCACF_LAST_PUB_DATE]; ok {
+	if date, ok := attrs[ibmmq.MQCACF_LAST_PUB_DATE]; ok {
 		lastPubDate = strings.TrimSpace(date.(string))
 	}
-	if time, ok := attrs[C.MQCACF_LAST_PUB_TIME]; ok {
+	if time, ok := attrs[ibmmq.MQCACF_LAST_PUB_TIME]; ok {
 		lastPubTime = strings.TrimSpace(time.(string))
 	}
 
 	if lastPubDate != "" && lastPubTime != "" {
-		if timestamp, err := ParseMQDateTime(lastPubDate, lastPubTime); err == nil {
+		// MQCACF_LAST_PUB_DATE/TIME are message-related timestamps, so they should be UTC
+		if timestamp, err := ParseMQMessageDateTime(lastPubDate, lastPubTime); err == nil {
 			metrics.LastPubDate = AttributeValue(timestamp.Unix())
 			metrics.LastPubTime = AttributeValue(timestamp.Unix())
 		} else {
@@ -135,8 +135,8 @@ func (c *Client) GetTopics(collectMetrics bool, maxTopics int, selector string, 
 }
 
 func (c *Client) discoverTopics(result *TopicCollectionResult) ([]string, error) {
-	response, err := c.SendPCFCommand(C.MQCMD_INQUIRE_TOPIC, []pcfParameter{
-		newStringParameter(C.MQCA_TOPIC_NAME, "*"),
+	response, err := c.sendPCFCommand(ibmmq.MQCMD_INQUIRE_TOPIC, []pcfParameter{
+		newStringParameter(ibmmq.MQCA_TOPIC_NAME, "*"),
 	})
 	if err != nil {
 		result.Stats.Discovery.Success = false
@@ -145,7 +145,7 @@ func (c *Client) discoverTopics(result *TopicCollectionResult) ([]string, error)
 	}
 
 	result.Stats.Discovery.Success = true
-	parsed := c.parseTopicListResponse(response)
+	parsed := c.parseTopicListResponseFromParams(response)
 
 	successfulItems := int64(len(parsed.Topics))
 	var invisibleItems int64

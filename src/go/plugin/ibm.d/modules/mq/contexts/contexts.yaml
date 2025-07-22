@@ -361,6 +361,7 @@ Queue:
 Channel:
   labels:
     - channel
+    - type
   contexts:
       - name: Status
         context: mq.channel.status
