@@ -113,7 +113,7 @@ static struct proc_module {
 
     {.name = "PerflibServices",
      .dim = "PerflibServices",
-     .enabled = CONFIG_BOOLEAN_NO,
+     .enabled = CONFIG_BOOLEAN_YES,
      .update_every = 30 * UPDATE_EVERY_MIN,
      .func = do_PerflibServices},
 
