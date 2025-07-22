@@ -103,39 +103,39 @@ func (c *Client) GetChannelMetrics(channelName string) (*ChannelMetrics, error) 
 	metrics.CurrentSharingConvs = NotCollected
 
 	// Collect extended status metrics if available
-	if val, ok := attrs[C.MQLONG(MQIACH_BUFFERS_SENT)]; ok {
+	if val, ok := attrs[C.MQIACH_BUFFERS_SENT]; ok {
 		metrics.BuffersSent = AttributeValue(val.(int32))
 		c.protocol.Debugf("Channel '%s' buffers sent: %d", channelName, val.(int32))
 	}
-	if val, ok := attrs[C.MQLONG(MQIACH_BUFFERS_RCVD)]; ok {
+	if val, ok := attrs[C.MQIACH_BUFFERS_RCVD]; ok {
 		metrics.BuffersReceived = AttributeValue(val.(int32))
 		c.protocol.Debugf("Channel '%s' buffers received: %d", channelName, val.(int32))
 	}
-	if val, ok := attrs[C.MQLONG(MQIACH_CURRENT_MSGS)]; ok {
+	if val, ok := attrs[C.MQIACH_CURRENT_MSGS]; ok {
 		metrics.CurrentMessages = AttributeValue(val.(int32))
 		c.protocol.Debugf("Channel '%s' current messages: %d", channelName, val.(int32))
 	}
-	if val, ok := attrs[C.MQLONG(MQIACH_XMITQ_TIME_INDICATOR)]; ok {
+	if val, ok := attrs[C.MQIACH_XMITQ_TIME_INDICATOR]; ok {
 		metrics.XmitQueueTime = AttributeValue(val.(int32))
 		c.protocol.Debugf("Channel '%s' XMITQ time: %d", channelName, val.(int32))
 	}
-	if val, ok := attrs[C.MQLONG(MQIACH_MCA_STATUS)]; ok {
+	if val, ok := attrs[C.MQIACH_MCA_STATUS]; ok {
 		metrics.MCAStatus = AttributeValue(val.(int32))
 		c.protocol.Debugf("Channel '%s' MCA status: %d", channelName, val.(int32))
 	}
-	if val, ok := attrs[C.MQLONG(MQIACH_INDOUBT_STATUS)]; ok {
+	if val, ok := attrs[C.MQIACH_INDOUBT_STATUS]; ok {
 		metrics.InDoubtStatus = AttributeValue(val.(int32))
 		c.protocol.Debugf("Channel '%s' in-doubt status: %d", channelName, val.(int32))
 	}
-	if val, ok := attrs[C.MQLONG(MQIACH_SSL_KEY_RESETS)]; ok {
+	if val, ok := attrs[C.MQIACH_SSL_KEY_RESETS]; ok {
 		metrics.SSLKeyResets = AttributeValue(val.(int32))
 		c.protocol.Debugf("Channel '%s' SSL key resets: %d", channelName, val.(int32))
 	}
-	if val, ok := attrs[C.MQLONG(MQIACH_NPM_SPEED)]; ok {
+	if val, ok := attrs[C.MQIACH_NPM_SPEED]; ok {
 		metrics.NPMSpeed = AttributeValue(val.(int32))
 		c.protocol.Debugf("Channel '%s' NPM speed: %d", channelName, val.(int32))
 	}
-	if val, ok := attrs[C.MQLONG(MQIACH_CURRENT_SHARING_CONVS)]; ok {
+	if val, ok := attrs[C.MQIACH_CURRENT_SHARING_CONVS]; ok {
 		metrics.CurrentSharingConvs = AttributeValue(val.(int32))
 		c.protocol.Debugf("Channel '%s' current sharing conversations: %d", channelName, val.(int32))
 	}

@@ -8,6 +8,8 @@ package pcf
 import "C"
 
 import (
+	"fmt"
+	"strings"
 	"unsafe"
 )
 
@@ -15,6 +17,7 @@ import (
 type pcfParameter interface {
 	size() C.size_t
 	marshal(buffer unsafe.Pointer)
+	logString() string
 }
 
 // String parameter
@@ -93,6 +96,16 @@ func (p *stringParameter) marshal(buffer unsafe.Pointer) {
 	}
 }
 
+func (p *stringParameter) logString() string {
+	paramName := mqParameterToString(p.parameter)
+	value := p.value
+	// Truncate long values for readability
+	if len(value) > 50 {
+		value = value[:47] + "..."
+	}
+	return fmt.Sprintf("%s=%s", paramName, value)
+}
+
 // Integer parameter
 type intParameter struct {
 	parameter C.MQLONG
@@ -116,6 +129,11 @@ func (p *intParameter) marshal(buffer unsafe.Pointer) {
 	cfin.StrucLength = C.MQCFIN_STRUC_LENGTH
 	cfin.Parameter = p.parameter
 	cfin.Value = C.MQLONG(p.value)
+}
+
+func (p *intParameter) logString() string {
+	paramName := mqParameterToString(p.parameter)
+	return fmt.Sprintf("%s=%d", paramName, p.value)
 }
 
 // String filter parameter
@@ -191,6 +209,17 @@ func (p *stringFilterParameter) marshal(buffer unsafe.Pointer) {
 	// Keeping exact compatibility by not setting it
 }
 
+func (p *stringFilterParameter) logString() string {
+	paramName := mqParameterToString(p.parameter)
+	operatorStr := mqOperatorToString(p.operator)
+	value := p.value
+	// Truncate long values for readability
+	if len(value) > 50 {
+		value = value[:47] + "..."
+	}
+	return fmt.Sprintf("%s=%s(%s)", paramName, value, operatorStr)
+}
+
 // Integer list parameter
 type intListParameter struct {
 	parameter C.MQLONG
@@ -223,4 +252,19 @@ func (p *intListParameter) marshal(buffer unsafe.Pointer) {
 			*(*C.MQLONG)(unsafe.Pointer(uintptr(valuesPtr) + uintptr(i*4))) = C.MQLONG(val)
 		}
 	}
+}
+
+func (p *intListParameter) logString() string {
+	paramName := mqParameterToString(p.parameter)
+	// Create string representation of values
+	valueStrs := make([]string, len(p.values))
+	for i, val := range p.values {
+		valueStrs[i] = fmt.Sprintf("%d", val)
+	}
+	// Truncate long lists for readability
+	valueStr := strings.Join(valueStrs, ",")
+	if len(p.values) > 10 {
+		valueStr = strings.Join(valueStrs[:10], ",") + ",..."
+	}
+	return fmt.Sprintf("%s=[%s]", paramName, valueStr)
 }

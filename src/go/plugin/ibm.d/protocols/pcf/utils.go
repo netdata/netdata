@@ -115,6 +115,8 @@ func mqcmdToString(command C.MQLONG) string {
 		return "MQCMD_DELETE_SUBSCRIPTION"
 	case C.MQCMD_INQUIRE_SUBSCRIPTION:
 		return "MQCMD_INQUIRE_SUBSCRIPTION"
+	case C.MQCMD_INQUIRE_SUB_STATUS:
+		return "MQCMD_INQUIRE_SUB_STATUS"
 	case C.MQCMD_CREATE_TOPIC:
 		return "MQCMD_CREATE_TOPIC"
 	case C.MQCMD_DELETE_TOPIC:
@@ -285,6 +287,50 @@ func mqcmdToString(command C.MQLONG) string {
 		return "MQCMD_START_CLIENT_TRACE"
 	case C.MQCMD_STOP_CLIENT_TRACE:
 		return "MQCMD_STOP_CLIENT_TRACE"
+	case C.MQCMD_DELETE_PROT_POLICY:
+		return "MQCMD_DELETE_PROT_POLICY"
+	case C.MQCMD_SET_CHLAUTH_REC:
+		return "MQCMD_SET_CHLAUTH_REC"
+	case C.MQCMD_INQUIRE_PUBSUB_STATUS:
+		return "MQCMD_INQUIRE_PUBSUB_STATUS"
+	case C.MQCMD_INQUIRE_SMDS:
+		return "MQCMD_INQUIRE_SMDS"
+	case C.MQCMD_CHANGE_SMDS:
+		return "MQCMD_CHANGE_SMDS"
+	case C.MQCMD_RESET_SMDS:
+		return "MQCMD_RESET_SMDS"
+	case C.MQCMD_INQUIRE_APPL_STATUS:
+		return "MQCMD_INQUIRE_APPL_STATUS"
+	case C.MQCMD_INQUIRE_CONNECTION:
+		return "MQCMD_INQUIRE_CONNECTION"
+	case C.MQCMD_STOP_CONNECTION:
+		return "MQCMD_STOP_CONNECTION"
+	case C.MQCMD_INQUIRE_TOPIC_NAMES:
+		return "MQCMD_INQUIRE_TOPIC_NAMES"
+	case C.MQCMD_CLEAR_TOPIC_STRING:
+		return "MQCMD_CLEAR_TOPIC_STRING"
+	case C.MQCMD_INQUIRE_LOG:
+		return "MQCMD_INQUIRE_LOG"
+	case C.MQCMD_INQUIRE_ARCHIVE:
+		return "MQCMD_INQUIRE_ARCHIVE"
+	case C.MQCMD_CHANGE_SECURITY:
+		return "MQCMD_CHANGE_SECURITY"
+	case C.MQCMD_INQUIRE_SECURITY:
+		return "MQCMD_INQUIRE_SECURITY"
+	case C.MQCMD_CONFIG_EVENT:
+		return "MQCMD_CONFIG_EVENT"
+	case C.MQCMD_Q_MGR_EVENT:
+		return "MQCMD_Q_MGR_EVENT"
+	case C.MQCMD_PERFM_EVENT:
+		return "MQCMD_PERFM_EVENT"
+	case C.MQCMD_COMMAND_EVENT:
+		return "MQCMD_COMMAND_EVENT"
+	case C.MQCMD_SUSPEND_Q_MGR:
+		return "MQCMD_SUSPEND_Q_MGR"
+	case C.MQCMD_RESUME_Q_MGR:
+		return "MQCMD_RESUME_Q_MGR"
+	case C.MQCMD_AMQP_DIAGNOSTICS:
+		return "MQCMD_AMQP_DIAGNOSTICS"
 	
 	default:
 		return fmt.Sprintf("MQCMD_%d", command)
@@ -350,5 +396,151 @@ func mqReasonString(reason int32) string {
 		return "MQRCCF_OBJECT_BEING_DELETED"
 	default:
 		return fmt.Sprintf("MQRC_%d", reason)
+	}
+}
+
+// mqParameterToString returns a human-readable name for MQCA/MQIA parameter constants
+func mqParameterToString(parameter C.MQLONG) string {
+	switch parameter {
+	// Queue Manager parameters
+	case C.MQCA_Q_MGR_NAME:
+		return "Q_MGR_NAME"
+	case C.MQIA_COMMAND_LEVEL:
+		return "COMMAND_LEVEL"
+	case C.MQIA_PLATFORM:
+		return "PLATFORM"
+	// Queue parameters
+	case C.MQCA_Q_NAME:
+		return "QUEUE_NAME"
+	case C.MQIA_Q_TYPE:
+		return "QUEUE_TYPE"
+	case C.MQIA_CURRENT_Q_DEPTH:
+		return "CURRENT_DEPTH"
+	case C.MQIA_MAX_Q_DEPTH:
+		return "MAX_DEPTH"
+	case C.MQIA_OPEN_INPUT_COUNT:
+		return "OPEN_INPUT_COUNT"
+	case C.MQIA_OPEN_OUTPUT_COUNT:
+		return "OPEN_OUTPUT_COUNT"
+	// Channel parameters
+	case C.MQCACH_CHANNEL_NAME:
+		return "CHANNEL_NAME"
+	case C.MQIACH_CHANNEL_TYPE:
+		return "CHANNEL_TYPE"
+	case C.MQIACH_CHANNEL_STATUS:
+		return "CHANNEL_STATUS"
+	// Common attribute filters
+	case C.MQIACF_Q_ATTRS:
+		return "ATTRS"
+	case C.MQIACF_CHANNEL_ATTRS:
+		return "CHANNEL_ATTRS"
+	// Status parameters
+	case C.MQIACF_Q_STATUS_ATTRS:
+		return "STATUS_ATTRS"
+	// Subscription parameters (using supported constants only)
+	case 7010: // C.MQBACF_ACCOUNTING_TOKEN
+		return "ACCOUNTING_TOKEN" // MQBACF_ACCOUNTING_TOKEN - Message accounting token
+	case 7015: // C.MQBACF_DESTINATION_CORREL_ID  
+		return "DESTINATION_CORREL_ID" // MQBACF_DESTINATION_CORREL_ID - Destination correlation ID
+	case C.MQBACF_SUB_ID:
+		return "SUB_ID" // MQBACF_SUB_ID - Subscription identifier
+	default:
+		return fmt.Sprintf("PARAM_%d", parameter)
+	}
+}
+
+// mqOperatorToString returns a human-readable name for MQ filter operators
+func mqOperatorToString(operator C.MQLONG) string {
+	switch operator {
+	case C.MQCFOP_EQUAL:
+		return "EQ"
+	case C.MQCFOP_NOT_EQUAL:
+		return "NE"
+	case C.MQCFOP_LESS:
+		return "LT"
+	case C.MQCFOP_GREATER:
+		return "GT"
+	case C.MQCFOP_NOT_LESS:
+		return "GE"
+	case C.MQCFOP_NOT_GREATER:
+		return "LE"
+	case C.MQCFOP_LIKE:
+		return "LIKE"
+	case C.MQCFOP_NOT_LIKE:
+		return "NOT_LIKE"
+	case C.MQCFOP_CONTAINS:
+		return "CONTAINS"
+	case C.MQCFOP_EXCLUDES:
+		return "EXCLUDES"
+	default:
+		return fmt.Sprintf("OP_%d", operator)
+	}
+}
+
+// mqPCFTypeToString returns a human-readable name for PCF message types
+func mqPCFTypeToString(msgType C.MQLONG) string {
+	switch msgType {
+	case C.MQCFT_COMMAND:
+		return "MQCFT_COMMAND"
+	case C.MQCFT_RESPONSE:
+		return "MQCFT_RESPONSE"
+	case C.MQCFT_INTEGER:
+		return "MQCFT_INTEGER"
+	case C.MQCFT_STRING:
+		return "MQCFT_STRING"
+	case C.MQCFT_INTEGER_LIST:
+		return "MQCFT_INTEGER_LIST"
+	case C.MQCFT_STRING_LIST:
+		return "MQCFT_STRING_LIST"
+	case C.MQCFT_EVENT:
+		return "MQCFT_EVENT"
+	case C.MQCFT_USER:
+		return "MQCFT_USER"
+	case C.MQCFT_BYTE_STRING:
+		return "MQCFT_BYTE_STRING"
+	case C.MQCFT_TRACE_ROUTE:
+		return "MQCFT_TRACE_ROUTE"
+	case C.MQCFT_REPORT:
+		return "MQCFT_REPORT"
+	case C.MQCFT_INTEGER_FILTER:
+		return "MQCFT_INTEGER_FILTER"
+	case C.MQCFT_STRING_FILTER:
+		return "MQCFT_STRING_FILTER"
+	case C.MQCFT_BYTE_STRING_FILTER:
+		return "MQCFT_BYTE_STRING_FILTER"
+	case C.MQCFT_COMMAND_XR:
+		return "MQCFT_COMMAND_XR"
+	case C.MQCFT_XR_MSG:
+		return "MQCFT_XR_MSG"
+	case C.MQCFT_XR_ITEM:
+		return "MQCFT_XR_ITEM"
+	case C.MQCFT_XR_SUMMARY:
+		return "MQCFT_XR_SUMMARY"
+	case C.MQCFT_GROUP:
+		return "MQCFT_GROUP"
+	case C.MQCFT_STATISTICS:
+		return "MQCFT_STATISTICS"
+	case C.MQCFT_ACCOUNTING:
+		return "MQCFT_ACCOUNTING"
+	case C.MQCFT_INTEGER64:
+		return "MQCFT_INTEGER64"
+	case C.MQCFT_INTEGER64_LIST:
+		return "MQCFT_INTEGER64_LIST"
+	case C.MQCFT_APP_ACTIVITY:
+		return "MQCFT_APP_ACTIVITY"
+	default:
+		return fmt.Sprintf("MQCFT_%d", msgType)
+	}
+}
+
+// mqPCFControlToString returns a human-readable name for PCF control options
+func mqPCFControlToString(control C.MQLONG) string {
+	switch control {
+	case C.MQCFC_LAST:
+		return "MQCFC_LAST"
+	case C.MQCFC_NOT_LAST:
+		return "MQCFC_NOT_LAST"
+	default:
+		return fmt.Sprintf("MQCFC_%d", control)
 	}
 }

@@ -72,4 +72,35 @@ static inline void set_sd_struc_id(MQSD* sd) {
     memcpy(sd->StrucId, MQSD_STRUC_ID, sizeof(sd->StrucId));
 }
 
+static inline void set_sub_name(MQSD* sd, const char* name) {
+    // SubName is an MQCHARV structure, not a simple char array
+    // Set the string pointer and length
+    sd->SubName.VSPtr = (MQPTR)name;
+    sd->SubName.VSLength = (MQLONG)strlen(name);
+}
+
+static inline void set_topic_string(MQSD* sd, const char* topic) {
+    // ObjectString is an MQCHARV structure for topic strings
+    sd->ObjectString.VSPtr = (MQPTR)topic;
+    sd->ObjectString.VSLength = (MQLONG)strlen(topic);
+}
+
+static inline void init_mqsd(MQSD* sd) {
+    memset(sd, 0, sizeof(MQSD));
+    set_sd_struc_id(sd);
+    sd->Version = MQSD_VERSION_1;
+}
+
+static inline void init_mqmd(MQMD* md) {
+    memset(md, 0, sizeof(MQMD));
+    set_md_struc_id(md);
+    md->Version = MQMD_VERSION_1;
+}
+
+static inline void init_mqgmo(MQGMO* gmo) {
+    memset(gmo, 0, sizeof(MQGMO));
+    set_gmo_struc_id(gmo);
+    gmo->Version = MQGMO_VERSION_1;
+}
+
 #endif // PCF_HELPERS_H

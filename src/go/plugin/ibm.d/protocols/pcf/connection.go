@@ -29,11 +29,13 @@ func (c *Client) Connect() error {
 	if err != nil {
 		c.protocol.Errorf("connection failed to queue manager '%s' at %s:%d after %d attempts: %v", 
 			c.config.QueueManager, c.config.Host, c.config.Port, attemptCount, err)
+		c.protocol.Debugf("Connect FAILED")
 		return err
 	}
 	c.protocol.MarkConnected()
 	c.protocol.Debugf("successfully connected to queue manager '%s' at %s:%d (channel: '%s', user: '%s') after %d attempts", 
 		c.config.QueueManager, c.config.Host, c.config.Port, c.config.Channel, c.config.User, attemptCount)
+	c.protocol.Debugf("Connect SUCCESS")
 	return nil
 }
 
@@ -220,6 +222,15 @@ func (c *Client) doConnect() error {
 	// Refresh static data on successful connection
 	c.refreshStaticData()
 	
+	// Re-enable resource monitoring if it was previously enabled
+	if c.resourceMonitoringEnabled {
+		c.protocol.Debugf("Re-enabling resource monitoring after reconnection")
+		if err := c.EnableResourceMonitoring(); err != nil {
+			c.protocol.Warningf("Failed to re-enable resource monitoring after reconnection: %v", err)
+			// Don't fail the connection, just log the warning
+		}
+	}
+	
 	return nil
 }
 
@@ -232,6 +243,12 @@ func (c *Client) Disconnect() {
 
 	c.protocol.Debugf("Starting disconnect from queue manager '%s' at %s:%d", 
 		c.config.QueueManager, c.config.Host, c.config.Port)
+
+	// Clean up resource monitor if initialized
+	if c.resourceMonitor != nil {
+		c.resourceMonitor.Cleanup()
+		c.resourceMonitor = nil
+	}
 
 	var compCode, reason C.MQLONG
 

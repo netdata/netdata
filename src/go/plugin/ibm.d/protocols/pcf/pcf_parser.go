@@ -102,6 +102,20 @@ func (c *Client) ParsePCFResponse(response []byte, command string) (map[C.MQLONG
 			attrs[cfst.Parameter] = trimmedValue
 			offset += int(cfst.StrucLength)
 
+		case C.MQCFT_INTEGER64:
+			if offset+int(C.sizeof_MQCFIN64) > len(response) {
+				c.protocol.Debugf("truncated MQCFIN64 at offset %d", offset)
+				break
+			}
+			cfin64 := (*C.MQCFIN64)(unsafe.Pointer(&response[offset]))
+			if cfin64.StrucLength != C.MQCFIN64_STRUC_LENGTH {
+				c.protocol.Debugf("unexpected MQCFIN64 length %d", cfin64.StrucLength)
+				offset += int(paramLength)
+				continue
+			}
+			attrs[cfin64.Parameter] = int64(cfin64.Value)
+			offset += int(cfin64.StrucLength)
+
 		case C.MQCFT_INTEGER_LIST:
 			if offset+int(C.sizeof_MQCFIL) > len(response) {
 				c.protocol.Debugf("truncated MQCFIL at offset %d", offset)
@@ -117,6 +131,68 @@ func (c *Client) ParsePCFResponse(response []byte, command string) (map[C.MQLONG
 			// For now, we just skip integer lists as the original did
 			// TODO: Parse integer list values if needed
 			offset += int(cfil.StrucLength)
+
+		case C.MQCFT_BYTE_STRING:
+			// PCF parameter type 9 - MQCFT_BYTE_STRING
+			if offset+int(C.sizeof_MQCFBS) > len(response) {
+				c.protocol.Debugf("truncated MQCFBS at offset %d", offset)
+				break
+			}
+			cfbs := (*C.MQCFBS)(unsafe.Pointer(&response[offset]))
+			if int(cfbs.StrucLength) != int(paramLength) {
+				c.protocol.Debugf("MQCFBS length mismatch: header=%d, param=%d", cfbs.StrucLength, paramLength)
+				offset += int(paramLength)
+				continue
+			}
+
+			c.protocol.Debugf("found MQCFBS %s (%d) with %d bytes of data at offset %d", 
+				mqParameterToString(cfbs.Parameter), cfbs.Parameter, cfbs.StringLength, offset)
+			
+			// For now, skip byte string data as it's typically binary data not needed for monitoring
+			// Could extract if needed: byteData := response[headerEnd:headerEnd+StringLength]
+			offset += int(cfbs.StrucLength)
+
+		case C.MQCFT_GROUP:
+			// PCF parameter type 20 - MQCFT_GROUP
+			// This is a group parameter that contains a nested structure of parameters
+			if offset+int(C.sizeof_MQCFGR) > len(response) {
+				c.protocol.Debugf("truncated MQCFGR at offset %d", offset)
+				break
+			}
+			cfgr := (*C.MQCFGR)(unsafe.Pointer(&response[offset]))
+			if int(cfgr.StrucLength) != int(paramLength) {
+				c.protocol.Debugf("MQCFGR length mismatch: header=%d, param=%d", cfgr.StrucLength, paramLength)
+				offset += int(paramLength)
+				continue
+			}
+
+			c.protocol.Debugf("found MQCFGR group parameter %d with %d nested parameters at offset %d", 
+				cfgr.Parameter, cfgr.ParameterCount, offset)
+			
+			// For now, skip the group structure as parsing nested parameters would be complex
+			// Most monitoring metrics are not typically in groups
+			offset += int(cfgr.StrucLength)
+
+		case C.MQCFT_INTEGER64_LIST:
+			// PCF parameter type 25 - MQCFT_INTEGER64_LIST  
+			// This contains an array of 64-bit integer values
+			if offset+int(C.sizeof_MQCFIL64) > len(response) {
+				c.protocol.Debugf("truncated MQCFIL64 at offset %d", offset)
+				break
+			}
+			cfil64 := (*C.MQCFIL64)(unsafe.Pointer(&response[offset]))
+			if int(cfil64.StrucLength) != int(paramLength) {
+				c.protocol.Debugf("MQCFIL64 length mismatch: header=%d, param=%d", cfil64.StrucLength, paramLength)
+				offset += int(paramLength)
+				continue
+			}
+
+			c.protocol.Debugf("found MQCFIL64 parameter %d with %d int64 values at offset %d", 
+				cfil64.Parameter, cfil64.Count, offset)
+			
+			// For now, skip int64 list parsing as it's typically not needed for basic monitoring
+			// Could extract values if needed for specific metrics
+			offset += int(cfil64.StrucLength)
 
 		default:
 			// Unknown parameter type - skip it

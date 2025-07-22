@@ -1,76 +1,87 @@
 package mq
 
 import (
-	"strings"
-	
-	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/protocols/pcf"
+	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/mq/contexts"
 )
 
-// collectSysTopics collects resource metrics from $SYS topics
-// This provides Queue Manager CPU, memory, and log utilization metrics
+// collectSysTopics collects resource metrics using IBM MQ's resource monitoring system
 func (c *Collector) collectSysTopics() error {
 	if !c.Config.CollectSysTopics {
 		// $SYS topic collection is disabled
 		return nil
 	}
 
-	c.Debugf("Collecting metrics from $SYS topics")
+	c.Debugf("Collecting metrics from $SYS topics using resource monitoring")
 
-	// Get the list of topics to monitor
-	// Replace QM1 with actual queue manager name
-	topics := []string{
-		"$SYS/MQ/INFO/QMGR/" + c.Config.QueueManager + "/ResourceStatistics/QueueManager",
-		"$SYS/MQ/INFO/QMGR/" + c.Config.QueueManager + "/Log/Log_Utilization_Summary",
+	// Check if resource monitoring is supported
+	if !c.client.IsResourceMonitoringSupported() {
+		c.Infof("Resource monitoring not supported on this queue manager (requires MQ V9+ on distributed platforms)")
+		// Disable future collection attempts
+		c.Config.CollectSysTopics = false
+		return nil
 	}
 
-	// Collect messages from $SYS topics
-	result, err := c.client.GetSysTopicMessages(topics)
-	if err != nil {
-		c.Warningf("Failed to collect $SYS topic messages: %v", err)
+	// Enable resource monitoring on first use
+	if err := c.client.EnableResourceMonitoring(); err != nil {
+		c.Warningf("Failed to enable resource monitoring: %v", err)
 		return nil // Don't fail the entire collection
 	}
 
-	c.Debugf("Retrieved %d messages from $SYS topics", len(result.Messages))
+	// Get resource publications
+	result, err := c.client.GetResourcePublications()
+	if err != nil {
+		c.Warningf("Failed to get resource publications: %v", err)
+		return nil // Don't fail the entire collection
+	}
 
-	// Process the messages by topic type
-	for _, msg := range result.Messages {
-		switch {
-		case strings.Contains(msg.Topic, "ResourceStatistics/QueueManager"):
-			c.processSysResourceStats(msg)
-		case strings.Contains(msg.Topic, "Log_Utilization_Summary"):
-			c.processSysLogUtilization(msg)
+	c.Debugf("Retrieved %d resource publications", result.Stats.Discovery.AvailableItems)
+
+	// Process CPU metrics
+	if result.UserCPUPercent.IsCollected() || result.SystemCPUPercent.IsCollected() {
+		values := contexts.QueueManagerResourcesCPUUsageValues{}
+		
+		if result.UserCPUPercent.IsCollected() {
+			// Convert percentage (0-100) to basis points (0-10000) for precision
+			values.User = result.UserCPUPercent.Int64() * 100
 		}
+		if result.SystemCPUPercent.IsCollected() {
+			// Convert percentage (0-100) to basis points (0-10000) for precision
+			values.System = result.SystemCPUPercent.Int64() * 100
+		}
+		
+		contexts.QueueManagerResources.CPUUsage.Set(c.State, contexts.EmptyLabels{}, values)
+	}
+
+	// Process memory metrics
+	if result.MemoryUsedMB.IsCollected() {
+		values := contexts.QueueManagerResourcesMemoryUsageValues{
+			// Convert MB to bytes
+			Total: result.MemoryUsedMB.Int64() * 1024 * 1024,
+		}
+		contexts.QueueManagerResources.MemoryUsage.Set(c.State, contexts.EmptyLabels{}, values)
+	}
+
+	// Process log utilization metrics
+	if result.LogUsedBytes.IsCollected() && result.LogMaxBytes.IsCollected() {
+		used := result.LogUsedBytes.Int64()
+		max := result.LogMaxBytes.Int64()
+		
+		// Calculate utilization percentage if both values are available
+		if max > 0 {
+			// Convert to 0.01% units (basis points) as expected by the context
+			utilPercent := (used * 10000) / max
+			contexts.QueueManagerResources.LogUtilization.Set(c.State, contexts.EmptyLabels{}, 
+				contexts.QueueManagerResourcesLogUtilizationValues{
+					Used: utilPercent,
+				})
+		}
+		
+		// Also set log file size
+		contexts.QueueManagerResources.LogFileSize.Set(c.State, contexts.EmptyLabels{},
+			contexts.QueueManagerResourcesLogFileSizeValues{
+				Size: max,
+			})
 	}
 
 	return nil
-}
-
-// processSysResourceStats processes Queue Manager resource statistics from $SYS topics
-func (c *Collector) processSysResourceStats(msg pcf.SysTopicMessage) {
-	// Since we don't know the exact attribute IDs, we log what we find
-	// and skip metrics if attributes aren't available
-	c.Debugf("Processing $SYS resource statistics with %d attributes", len(msg.Data))
-	
-	// For now, we'll skip metric collection until we can determine the correct attribute IDs
-	// from an actual MQ instance with $SYS topics enabled
-	c.Warningf("$SYS topic resource metrics are not yet implemented - unknown attribute mappings")
-	
-	// Log all attributes for debugging to help identify the correct ones
-	for key, value := range msg.Data {
-		c.Debugf("  Resource stat attribute %v = %v", key, value)
-	}
-}
-
-// processSysLogUtilization processes log utilization metrics from $SYS topics
-func (c *Collector) processSysLogUtilization(msg pcf.SysTopicMessage) {
-	// Since we don't know the exact attribute IDs, we log what we find
-	c.Debugf("Processing $SYS log utilization with %d attributes", len(msg.Data))
-	
-	// For now, we'll skip metric collection until we can determine the correct attribute IDs
-	c.Warningf("$SYS topic log metrics are not yet implemented - unknown attribute mappings")
-	
-	// Log all attributes for debugging
-	for key, value := range msg.Data {
-		c.Debugf("  Log stat attribute %v = %v", key, value)
-	}
 }
