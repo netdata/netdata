@@ -163,7 +163,7 @@ func main() {
 		input   = flag.String("input", "contexts.yaml", "Input YAML file")
 		output  = flag.String("output", "zz_generated_contexts.go", "Output Go file") 
 		pkg     = flag.String("package", "contexts", "Package name")
-		module  = flag.String("module", "", "Module prefix (e.g., mq_pcf)")
+		module  = flag.String("module", "", "Module prefix (e.g., as400, db2, mq)")
 	)
 	flag.Parse()
 
