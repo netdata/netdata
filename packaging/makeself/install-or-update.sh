@@ -265,12 +265,21 @@ ensure_ca_certificates_link() {
         "cert.pem"              # Alpine
     )
 
-    mkdir -p "$(basename "${link_path}")"
+    mkdir -p "$(dirname "${link_path}")"
 
     for cert_name in "${cert_names[@]}"; do
         local target="${ssl_prefix}/${cert_name}"
 
         if [ -f "${target}" ] && [ -r "${target}" ]; then
+            # Use of relative path here is intentional
+            #
+            # The symlink will end up in the system SSL/TLS configuration
+            # directory (because `${ssl_prefix}` is a symlink to that
+            # directory at this point), and thus may get picked up by
+            # other tools that are not part of Netdata. Thus, it needs
+            # to be created in a way that it will not break if Netdata is
+            # later uninstalled or wechoose to handle SSL/TLS certificate
+            # handling in a different way in the future.
             ln -s "${cert_name}" "${link_path}"
             return 0
         fi
