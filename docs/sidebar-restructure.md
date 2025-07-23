@@ -1,4 +1,4 @@
-- **NETDATA PROJECT**
+- **NETDATA CONCEPTS**
   - Netdata Agent
   - Netdata Cloud
   - Netdata Cloud On-prem
