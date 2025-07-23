@@ -24,6 +24,7 @@ int do_GetSystemUptime(int update_every, usec_t dt);
 int do_GetSystemRAM(int update_every, usec_t dt);
 int do_GetSystemCPU(int update_every, usec_t dt);
 int do_GetPowerSupply(int update_every, usec_t dt);
+int do_GetServicesStatus(int update_every, usec_t dt);
 
 // Perflib
 int do_PerflibStorage(int update_every, usec_t dt);
@@ -40,7 +41,6 @@ int do_PerflibAD(int update_every, usec_t dt);
 int do_PerflibADCS(int update_every, usec_t dt);
 int do_PerflibADFS(int update_every, usec_t dt);
 int do_PerflibHyperV(int update_every, usec_t dt);
-int do_PerflibServices(int update_every, usec_t dt);
 int do_PerflibExchange(int update_every, usec_t dt __maybe_unused);
 int do_PerflibNUMA(int update_every, usec_t dt __maybe_unused);
 int do_PerflibASP(int update_every, usec_t dt __maybe_unused);
