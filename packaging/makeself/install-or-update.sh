@@ -252,40 +252,30 @@ replace_symlink() {
     ln -s "${target}" "${name}"
 }
 
-ensure_static_curl_certificates() {
-    local target_cert="/opt/netdata/etc/ssl/certs/ca-certificates.crt"
-    
+ensure_ca_certificates_link() {
+    local ssl_prefix="/opt/netdata/etc/ssl/"
+    local link_path="${ssl_prefix}/certs/ca-certificates.crt"
+
     # If ca-certificates.crt already exists, we're done
-    [ -e "${target_cert}" ] && return 0
-    
-    # These MUST match the paths in src/daemon/config/netdata-conf-ssl.c
-    local cert_paths=(
-        "/etc/ssl/certs/ca-certificates.crt"               # Debian, Ubuntu, Arch
-        "/etc/ssl/certs/ca-bundle.crt"                     # Rocky Linux (via symlinks)
-        "/etc/pki/tls/certs/ca-bundle.crt"                 # RHEL, CentOS, Fedora
-        "/etc/ssl/ca-bundle.pem"                           # OpenSUSE
-        "/etc/ssl/cert.pem"                                # Alpine
-        "/opt/netdata/etc/ssl/certs/ca-certificates.crt"   # Netdata static build
-        "/opt/netdata/share/ssl/certs/ca-certificates.crt" # Netdata static build - fallback
+    [ -e "${link_path}" ] && return 0
+
+    local cert_names=(
+        "certs/ca-bundle.crt"   # RHEL, Fedora, RHEL clones
+        "ca-bundle.pem"         # SLE, OpenSUSE
+        "cert.pem"              # Alpine
     )
-    
-    # Find the first valid certificate bundle
-    for cert_path in "${cert_paths[@]}"; do
-        if [ -f "${cert_path}" ] && [ -r "${cert_path}" ]; then
-            echo "Found system certificates at ${cert_path}"
-            
-            # Ensure the certs directory exists (needed for Alpine/OpenSUSE)
-            if [ ! -d "/opt/netdata/etc/ssl/certs" ]; then
-                mkdir -p "/opt/netdata/etc/ssl/certs"
-            fi
-            
-            # Create symlink to the system certificate
-            ln -sf "${cert_path}" "${target_cert}"
-            echo "Created symlink: ${cert_path} -> ${target_cert}"
+
+    mkdir -p "$(basename "${link_path}")"
+
+    for cert_name in "${cert_names[@]}"; do
+        local target="${ssl_prefix}/${cert_name}"
+
+        if [ -f "${target}" ] && [ -r "${target}" ]; then
+            ln -s "${cert_name}" "${link_path}"
             return 0
         fi
     done
-    
+
     echo "Warning: No valid certificate bundle found"
     return 1
 }
@@ -298,9 +288,9 @@ select_system_certs() {
     echo "${1} /etc/ssl for TLS configuration and certificates"
     replace_symlink /etc/ssl /opt/netdata/etc/ssl
   fi
-  
+
   # Ensure static curl can find the certificates
-  ensure_static_curl_certificates
+  ensure_ca_certificates_link
 }
 
 select_internal_certs() {
