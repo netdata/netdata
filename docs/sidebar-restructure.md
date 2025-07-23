@@ -2,7 +2,7 @@
   - Netdata Agent
   - Netdata Cloud
   - Netdata Cloud On-prem
-  - Deployment Guides -> Install now
+  - Deployment Guides
   - Top Monitoring
   - Live Demo
     
