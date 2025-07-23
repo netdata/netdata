@@ -5,7 +5,9 @@
   - Deployment Guides
   - Top Monitoring
   - Live Demo
-    **ARCHITECTURE**
+
+    - **ARCHITECTURE**
+    
 - **OBSERVABILITY**
   - Observability Centralization Points
 
