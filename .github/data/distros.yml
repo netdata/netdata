@@ -262,16 +262,23 @@ include:
         - aarch64
     test:
       ebpf-core: true
+      skip-local-build: true
   - <<: *oracle
     version: "9"
     packages:
       <<: *oracle_packages
       repo_distro: ol/9
+    test:
+      ebpf-core: true
+      skip-local-build: false
   - <<: *oracle
     version: "8"
     packages:
       <<: *oracle_packages
       repo_distro: ol/8
+    test:
+      ebpf-core: true
+      skip-local-build: false
 
   - &rocky
     distro: rockylinux
