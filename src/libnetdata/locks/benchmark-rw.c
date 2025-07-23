@@ -291,7 +291,9 @@ static void run_test(const char *name, int readers, int writers,
 }
 
 int rwlocks_stress_test(void) {
-    pthread_rwlock_t pthread_rwlock = PTHREAD_RWLOCK_INITIALIZER;
+    pthread_rwlock_t pthread_rwlock;
+    pthread_rwlock_init(&pthread_rwlock, NULL);
+
     RW_SPINLOCK rw_spinlock = RW_SPINLOCK_INITIALIZER;
     summary_stats_t summary = {0};
 
@@ -301,12 +303,13 @@ int rwlocks_stress_test(void) {
 
     // Initialize per-thread controls for both locks
     for(int i = 0; i < MAX_THREADS; i++) {
-        pthread_control.thread_controls[i].cond = (pthread_cond_t)PTHREAD_COND_INITIALIZER;
-        pthread_control.thread_controls[i].cond_mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
+        pthread_cond_init(&pthread_control.thread_controls[i].cond, NULL);
+        pthread_mutex_init(&pthread_control.thread_controls[i].cond_mutex,NULL);
         pthread_control.thread_controls[i].run_flag = 0;
 
-        spinlock_control.thread_controls[i].cond = (pthread_cond_t)PTHREAD_COND_INITIALIZER;
-        spinlock_control.thread_controls[i].cond_mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
+        pthread_cond_init(&spinlock_control.thread_controls[i].cond, NULL);
+        pthread_mutex_init(&spinlock_control.thread_controls[i].cond_mutex,NULL);
+
         spinlock_control.thread_controls[i].run_flag = 0;
     }
 
