@@ -9,11 +9,6 @@ ssize_t send_to_plugin(const char *txt, PARSER *parser, STREAM_TRAFFIC_TYPE type
     if(parser->send_to_plugin_cb)
         return parser->send_to_plugin_cb(txt, parser->send_to_plugin_data, type);
 
-#ifdef ENABLE_H2O
-    if(parser->h2o_ctx)
-        return h2o_stream_write(parser->h2o_ctx, txt, strlen(txt));
-#endif
-
     spinlock_lock(&parser->writer.spinlock);
 
     ND_SOCK tmp = { .fd = parser->fd_output, };
