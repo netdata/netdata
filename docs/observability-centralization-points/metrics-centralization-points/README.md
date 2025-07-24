@@ -1,6 +1,4 @@
-# Configure Netdata Parents to centralize metrics from multiple production systems with streaming, replication, and high availability configurations.
-
-:::
+# Configure Netdata Parents to centralize metrics
 
 ## How Metrics Centralization Works
 

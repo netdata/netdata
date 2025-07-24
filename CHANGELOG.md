@@ -1,5 +1,29 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.6.0...HEAD)
+
+**Merged pull requests:**
+
+- docs: add Network-connections to the functions table [\#20721](https://github.com/netdata/netdata/pull/20721) ([ilyam8](https://github.com/ilyam8))
+- Enable services status \(windows.plugin\) [\#20720](https://github.com/netdata/netdata/pull/20720) ([thiagoftsm](https://github.com/thiagoftsm))
+- Mark the completion from the worker thread [\#20719](https://github.com/netdata/netdata/pull/20719) ([stelfrag](https://github.com/stelfrag))
+- improve\(go.d/snmp\): add profile device meta to vnode labels [\#20718](https://github.com/netdata/netdata/pull/20718) ([ilyam8](https://github.com/ilyam8))
+- Remove H2O web server code from Netdata. [\#20713](https://github.com/netdata/netdata/pull/20713) ([Ferroin](https://github.com/Ferroin))
+- Detect missing ACLK MQTT packet acknowledgents [\#20711](https://github.com/netdata/netdata/pull/20711) ([stelfrag](https://github.com/stelfrag))
+- build\(deps\): bump github.com/gosnmp/gosnmp from 1.42.0 to 1.42.1 in /src/go [\#20709](https://github.com/netdata/netdata/pull/20709) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/gosnmp/gosnmp from 1.41.0 to 1.42.0 in /src/go [\#20707](https://github.com/netdata/netdata/pull/20707) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump k8s.io/client-go from 0.33.2 to 0.33.3 in /src/go [\#20705](https://github.com/netdata/netdata/pull/20705) ([dependabot[bot]](https://github.com/apps/dependabot))
+- fix\(nvme\)!: query controller instead of namespace for SMART metrics [\#20704](https://github.com/netdata/netdata/pull/20704) ([ilyam8](https://github.com/ilyam8))
+- Update UPDATE.md [\#20701](https://github.com/netdata/netdata/pull/20701) ([kanelatechnical](https://github.com/kanelatechnical))
+- Ensure chat exists before handling message input [\#20700](https://github.com/netdata/netdata/pull/20700) ([emmanuel-ferdman](https://github.com/emmanuel-ferdman))
+- Escape \< character in plaintext [\#20699](https://github.com/netdata/netdata/pull/20699) ([Ancairon](https://github.com/Ancairon))
+- Replace legacy functions-table.md with comprehensive UI documentation [\#20697](https://github.com/netdata/netdata/pull/20697) ([ktsaou](https://github.com/ktsaou))
+- Update LIBBPF [\#20696](https://github.com/netdata/netdata/pull/20696) ([thiagoftsm](https://github.com/thiagoftsm))
+- update otel-collector components deps [\#20693](https://github.com/netdata/netdata/pull/20693) ([ilyam8](https://github.com/ilyam8))
+- Add Getting Started Netdata guide [\#20642](https://github.com/netdata/netdata/pull/20642) ([kanelatechnical](https://github.com/kanelatechnical))
+
 ## [v2.6.0](https://github.com/netdata/netdata/tree/v2.6.0) (2025-07-17)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v2.5.4...v2.6.0)
@@ -439,25 +463,6 @@
 - ensure atomicity when logging pending message 1/3 [\#20185](https://github.com/netdata/netdata/pull/20185) ([ktsaou](https://github.com/ktsaou))
 - Improve systemd journal logs documentation [\#20184](https://github.com/netdata/netdata/pull/20184) ([kanelatechnical](https://github.com/kanelatechnical))
 - Reorganize code \(IIS\) [\#20182](https://github.com/netdata/netdata/pull/20182) ([thiagoftsm](https://github.com/thiagoftsm))
-- improve pgc fatal errors [\#20181](https://github.com/netdata/netdata/pull/20181) ([ktsaou](https://github.com/ktsaou))
-- Group anomaly rate per chart context instead of type. [\#20180](https://github.com/netdata/netdata/pull/20180) ([vkalintiris](https://github.com/vkalintiris))
-- bump go mod 1.24.0 [\#20179](https://github.com/netdata/netdata/pull/20179) ([ilyam8](https://github.com/ilyam8))
-- Retry nightly changelog generation. [\#20178](https://github.com/netdata/netdata/pull/20178) ([Ferroin](https://github.com/Ferroin))
-- Add Fedora 42 to CI and package builds. [\#20177](https://github.com/netdata/netdata/pull/20177) ([Ferroin](https://github.com/Ferroin))
-- build\(deps\): update go toolchain to v1.24.2 [\#20176](https://github.com/netdata/netdata/pull/20176) ([ilyam8](https://github.com/ilyam8))
-- build\(deps\): bump k8s.io/client-go from 0.32.3 to 0.33.0 in /src/go [\#20175](https://github.com/netdata/netdata/pull/20175) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/vmware/govmomi from 0.49.0 to 0.50.0 in /src/go [\#20173](https://github.com/netdata/netdata/pull/20173) ([dependabot[bot]](https://github.com/apps/dependabot))
-- chore\(otel/netdataexporter\): add exporter module skeleton [\#20171](https://github.com/netdata/netdata/pull/20171) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations docs [\#20170](https://github.com/netdata/netdata/pull/20170) ([netdatabot](https://github.com/netdatabot))
-- fix integrations config file sample [\#20169](https://github.com/netdata/netdata/pull/20169) ([ilyam8](https://github.com/ilyam8))
-- improvement\(cgroups\): improve systemd-nspawn filter for default [\#20168](https://github.com/netdata/netdata/pull/20168) ([rhoriguchi](https://github.com/rhoriguchi))
-- Update kickstart.md [\#20167](https://github.com/netdata/netdata/pull/20167) ([kanelatechnical](https://github.com/kanelatechnical))
-- chore\(go.d\): remove wmi-\>win collector rename handling [\#20166](https://github.com/netdata/netdata/pull/20166) ([ilyam8](https://github.com/ilyam8))
-- docs: update macOS/freeBSD versions in  Versions & Platforms [\#20165](https://github.com/netdata/netdata/pull/20165) ([ilyam8](https://github.com/ilyam8))
-- chore\(go.d/snmp\): remove unused ddsnmp [\#20164](https://github.com/netdata/netdata/pull/20164) ([ilyam8](https://github.com/ilyam8))
-- SNMP profiles units and description generation [\#20163](https://github.com/netdata/netdata/pull/20163) ([Ancairon](https://github.com/Ancairon))
-- Dashboards and charts [\#20162](https://github.com/netdata/netdata/pull/20162) ([kanelatechnical](https://github.com/kanelatechnical))
-- fix\(dyncfg/health\): correct db lookup absolute option name [\#20161](https://github.com/netdata/netdata/pull/20161) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.4.0](https://github.com/netdata/netdata/tree/v2.4.0) (2025-04-14)
 

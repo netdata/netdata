@@ -20,7 +20,7 @@ typedef struct {
 
 typedef struct {
     pthread_cond_t cond;              // Individual condition for each thread
-    pthread_mutex_t cond_mutex;       // Individual mutex for each thread
+    netdata_mutex_t cond_mutex;       // Individual mutex for each thread
     uint64_t run_flag;               // Individual run flag for each thread
 } thread_control_t;
 
@@ -321,8 +321,11 @@ int locks_stress_test(void) {
     summary_stats_t summary = {0};
 
     // Initialize actual locks
-    pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-    pthread_rwlock_t rwlock = PTHREAD_RWLOCK_INITIALIZER;
+    netdata_mutex_t mutex;
+    netdata_rwlock_t rwlock;
+    netdata_mutex_init(&mutex);
+    netdata_rwlock_init(&rwlock);
+
     SPINLOCK spinlock = SPINLOCK_INITIALIZER;
     RW_SPINLOCK rw_spinlock = RW_SPINLOCK_INITIALIZER;
     WAITQ waitq = WAITQ_INITIALIZER;
@@ -340,8 +343,8 @@ int locks_stress_test(void) {
     for(int i = 0; i < NUM_LOCK_TYPES; i++) {
         // Initialize per-thread condition variables and mutexes
         for(int j = 0; j < MAX_THREADS; j++) {
-            controls[i].thread_controls[j].cond = (pthread_cond_t)PTHREAD_COND_INITIALIZER;
-            controls[i].thread_controls[j].cond_mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
+            pthread_cond_init(&controls[i].thread_controls[j].cond, NULL);
+            pthread_mutex_init(&controls[i].thread_controls[j].cond_mutex, NULL);
             controls[i].thread_controls[j].run_flag = 0;
         }
     }
@@ -406,10 +409,10 @@ int locks_stress_test(void) {
     for(int type = 0; type < NUM_LOCK_TYPES; type++) {
         for(int i = 0; i < MAX_THREADS; i++) {
             thread_control_t *thread_control = &controls[type].thread_controls[i];
-            pthread_mutex_lock(&thread_control->cond_mutex);
+            netdata_mutex_lock(&thread_control->cond_mutex);
             thread_control->run_flag = STOP_SIGNAL;
             pthread_cond_signal(&thread_control->cond);
-            pthread_mutex_unlock(&thread_control->cond_mutex);
+            netdata_mutex_unlock(&thread_control->cond_mutex);
         }
     }
 
@@ -425,7 +428,7 @@ int locks_stress_test(void) {
     for(int type = 0; type < NUM_LOCK_TYPES; type++) {
         for(int i = 0; i < MAX_THREADS; i++) {
             pthread_cond_destroy(&controls[type].thread_controls[i].cond);
-            pthread_mutex_destroy(&controls[type].thread_controls[i].cond_mutex);
+            netdata_mutex_destroy(&controls[type].thread_controls[i].cond_mutex);
         }
         free(threads[type]);
     }

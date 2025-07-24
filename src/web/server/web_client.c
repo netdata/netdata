@@ -1329,7 +1329,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                     }
 
                     w->response.code = stream_receiver_accept_connection(
-                        w, (char *)buffer_tostring(w->url_query_string_decoded), NULL);
+                        w, (char *)buffer_tostring(w->url_query_string_decoded));
                     return;
                 
                 case HTTP_REQUEST_MODE_WEBSOCKET:
