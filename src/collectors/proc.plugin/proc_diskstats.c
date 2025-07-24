@@ -22,7 +22,15 @@
 // always 512 on Linux (https://github.com/torvalds/linux/blob/daa121128a2d2ac6006159e2c47676e4fcd21eab/include/linux/blk_types.h#L25-L34)
 #define SECTOR_SIZE 512
 
-static netdata_mutex_t diskstats_dev_mutex = NETDATA_MUTEX_INITIALIZER;
+static netdata_mutex_t diskstats_dev_mutex;
+
+static void __attribute__((constructor)) init_mutex(void) {
+    netdata_mutex_init(&diskstats_dev_mutex);
+}
+
+static void __attribute__((destructor)) destroy_mutex(void) {
+    netdata_mutex_destroy(&diskstats_dev_mutex);
+}
 
 static struct disk {
     char *disk;             // the name of the disk (sda, sdb, etc, after being looked up)
