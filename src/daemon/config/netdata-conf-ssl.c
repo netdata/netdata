@@ -55,11 +55,12 @@ const char *detect_libcurl_default_ca() {
 
 static inline const char *detect_ca_path(void) {
     static const char *paths[] = {
+        "/opt/netdata/etc/ssl/certs/ca-certificates.crt",   // Netdata static build (needs to come first for consistency with standalone cURL in static builds)
         "/etc/ssl/certs/ca-certificates.crt",               // Debian, Ubuntu, Arch
+        "/etc/ssl/certs/ca-bundle.crt",                     // Rocky Linux (via symlinks)
         "/etc/pki/tls/certs/ca-bundle.crt",                 // RHEL, CentOS, Fedora
         "/etc/ssl/ca-bundle.pem",                           // OpenSUSE
         "/etc/ssl/cert.pem",                                // Alpine
-        "/opt/netdata/etc/ssl/certs/ca-certificates.crt",   // Netdata static build
         "/opt/netdata/share/ssl/certs/ca-certificates.crt", // Netdata static build - fallback
         NULL
     };
