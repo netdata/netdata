@@ -5,7 +5,16 @@
 
 #include "windows-events.h"
 
-netdata_mutex_t stdout_mutex = NETDATA_MUTEX_INITIALIZER;
+netdata_mutex_t stdout_mutex;
+
+static void __attribute__((constructor)) init_mutex(void) {
+    netdata_mutex_init(&stdout_mutex);
+}
+
+static void __attribute__((destructor)) destroy_mutex(void) {
+    netdata_mutex_destroy(&stdout_mutex);
+}
+
 static bool plugin_should_exit = false;
 
 #define WEVT_ALWAYS_VISIBLE_KEYS                NULL

@@ -773,6 +773,15 @@ struct rrdengine_datafile *get_last_ctx_datafile(struct rrdengine_instance *ctx,
     return get_ctx_datafile_first_or_last(ctx, false, with_lock);
 }
 
+static netdata_mutex_t mutex;
+
+static void __attribute__((constructor)) init_mutex(void) {
+    netdata_mutex_init(&mutex);
+}
+
+static void __attribute__((destructor)) destroy_mutex(void) {
+    netdata_mutex_destroy(&mutex);
+}
 
 static struct rrdengine_datafile *get_datafile_to_write_extent(struct rrdengine_instance *ctx) {
     struct rrdengine_datafile *datafile;
@@ -792,7 +801,7 @@ static struct rrdengine_datafile *get_datafile_to_write_extent(struct rrdengine_
         struct rrdengine_datafile *old_datafile = datafile;
 
         // only 1 datafile creation at a time
-        static netdata_mutex_t mutex = NETDATA_MUTEX_INITIALIZER;
+
         netdata_mutex_lock(&mutex);
 
         // take the latest datafile again - without this, multiple threads may create multiple files

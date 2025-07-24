@@ -18,7 +18,15 @@
 #define WORKER_TRAIN_FLUSH_MODELS      7
 
 sqlite3 *ml_db = NULL;
-static netdata_mutex_t db_mutex = NETDATA_MUTEX_INITIALIZER;
+static netdata_mutex_t db_mutex;
+
+static void __attribute__((constructor)) init_mutex(void) {
+    netdata_mutex_init(&db_mutex);
+}
+
+static void __attribute__((destructor)) destroy_mutex(void) {
+    netdata_mutex_destroy(&db_mutex);
+}
 
 typedef struct {
     // First/last entry of the dimension in DB when generating the response

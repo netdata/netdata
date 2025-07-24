@@ -11,7 +11,6 @@
 // #endif
 
 typedef pthread_mutex_t netdata_mutex_t;
-#define NETDATA_MUTEX_INITIALIZER PTHREAD_MUTEX_INITIALIZER
 
 #ifdef NETDATA_TRACE_RWLOCKS
 
@@ -57,10 +56,6 @@ typedef struct netdata_rwlock_t {
 typedef struct netdata_rwlock_t {
     pthread_rwlock_t rwlock_t;
 } netdata_rwlock_t;
-
-#define NETDATA_RWLOCK_INITIALIZER { \
-        .rwlock_t = PTHREAD_RWLOCK_INITIALIZER \
-    }
 
 #endif // NETDATA_TRACE_RWLOCKS
 
