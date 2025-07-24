@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Update README.md [\#20724](https://github.com/netdata/netdata/pull/20724) ([kanelatechnical](https://github.com/kanelatechnical))
+- Update README.md [\#20723](https://github.com/netdata/netdata/pull/20723) ([kanelatechnical](https://github.com/kanelatechnical))
+- Avoid static initialization [\#20722](https://github.com/netdata/netdata/pull/20722) ([stelfrag](https://github.com/stelfrag))
 - docs: add Network-connections to the functions table [\#20721](https://github.com/netdata/netdata/pull/20721) ([ilyam8](https://github.com/ilyam8))
 - Enable services status \(windows.plugin\) [\#20720](https://github.com/netdata/netdata/pull/20720) ([thiagoftsm](https://github.com/thiagoftsm))
 - Mark the completion from the worker thread [\#20719](https://github.com/netdata/netdata/pull/20719) ([stelfrag](https://github.com/stelfrag))
@@ -461,8 +464,6 @@
 - added dyncfg docs [\#20187](https://github.com/netdata/netdata/pull/20187) ([ktsaou](https://github.com/ktsaou))
 - Fix repeating alert crash [\#20186](https://github.com/netdata/netdata/pull/20186) ([stelfrag](https://github.com/stelfrag))
 - ensure atomicity when logging pending message 1/3 [\#20185](https://github.com/netdata/netdata/pull/20185) ([ktsaou](https://github.com/ktsaou))
-- Improve systemd journal logs documentation [\#20184](https://github.com/netdata/netdata/pull/20184) ([kanelatechnical](https://github.com/kanelatechnical))
-- Reorganize code \(IIS\) [\#20182](https://github.com/netdata/netdata/pull/20182) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v2.4.0](https://github.com/netdata/netdata/tree/v2.4.0) (2025-04-14)
 
