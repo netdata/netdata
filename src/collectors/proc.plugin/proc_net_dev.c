@@ -379,7 +379,15 @@ static void netdev_free(struct netdev *d) {
     freez((void *)d);
 }
 
-static netdata_mutex_t netdev_mutex = NETDATA_MUTEX_INITIALIZER;
+static netdata_mutex_t netdev_mutex;
+
+static void __attribute__((constructor)) init_mutex(void) {
+    netdata_mutex_init(&netdev_mutex);
+}
+
+static void __attribute__((destructor)) destroy_mutex(void) {
+    netdata_mutex_destroy(&netdev_mutex);
+}
 
 // ----------------------------------------------------------------------------
 

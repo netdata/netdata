@@ -84,7 +84,16 @@ static void netdata_update_ipmi_sel_events_count(struct netdata_ipmi_state *stt,
 
 /* Communication Configuration - Initialize accordingly */
 
-static netdata_mutex_t stdout_mutex = NETDATA_MUTEX_INITIALIZER;
+static netdata_mutex_t stdout_mutex;
+
+static void __attribute__((constructor)) init_mutex(void) {
+    netdata_mutex_init(&stdout_mutex);
+}
+
+static void __attribute__((destructor)) destroy_mutex(void) {
+    netdata_mutex_destroy(&stdout_mutex);
+}
+
 static bool function_plugin_should_exit = false;
 
 int update_every = IPMI_SENSORS_MIN_UPDATE_EVERY; // this is the minimum update frequency
