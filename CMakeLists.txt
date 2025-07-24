@@ -3805,7 +3805,7 @@ endif()
 #
 
 install(CODE "
-        execute_process(COMMAND gzip -c \"${CMAKE_BINARY_DIR}/CMakeCache.txt\"
+        execute_process(COMMAND gzip -nc \"${CMAKE_BINARY_DIR}/CMakeCache.txt\"
                         OUTPUT_FILE \"${BUILD_INFO_CMAKE_CACHE_ARCHIVE_NAME}\"
                         WORKING_DIRECTORY \"${CMAKE_BINARY_DIR}\"
                         RESULT_VARIABLE result)
