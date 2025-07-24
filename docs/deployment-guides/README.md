@@ -1,55 +1,72 @@
 # Deployment Guides
 
-Netdata monitors everything from tiny IoT devices to massive cloud infrastructures. Deploy it on bare metal, VMs, or containers - it just works.
+Get Netdata up and running in your infrastructure. Choose a deployment method that fits your needs.
 
-## Overview
+## Quick Start
 
-Think of Netdata's individual components as three LEGO blocks that come together to create a robust architecture design of complete observability for your infrastructure.
+:::tip Getting Started
 
-## Components
+- **Testing Netdata?** → [Docker deployment](/packaging/docker/README.md) (2 minutes, easy cleanup)
+- **Monitoring one server?** → [Standalone installation](/docs/deployment-guides/standalone-deployment.md) (1 minute, upgradeable)
+- **Production ready?** → [Parent-Child setup](/docs/deployment-guides/deployment-with-centralization-points.md) (recommended)
 
-### Netdata Agents
-The foundation of every deployment. Install an Agent on each system you want to monitor.
+:::
 
-**What they do:**
-- Collect real-time metrics from systems, applications, and containers
-- Store metrics locally with configurable retention
-- Serve their own dashboard and API
-- Run health checks and trigger alerts
+## Deployment Methods
 
-**Key point:** Install an Agent, get instant monitoring. No configuration required.
+### Standalone
 
-### Netdata Parents
-Scale your monitoring by designating some Agents as "Parents" that collect data from other Agents ("Children").
+Single Netdata Agent monitoring one system. Perfect for getting started or monitoring individual servers.
 
-**Benefits:**
-- **Resource optimization** - Children use minimal CPU and RAM
-- **Data persistence** - Metrics survive even when systems are terminated
-- **Centralized storage** - Organize data by region, environment, or team
-- **High availability** - Easy redundancy with multiple Parents
+**Best for:** Testing or simple single-server monitoring
 
-**Key point:** A Parent is just a regular Netdata Agent with streaming enabled. Any Agent can become a Parent.
+**Setup time:** < 1 minute
 
-### Netdata Cloud
-Unifies your entire infrastructure into a single interface. Optional but powerful.
+[→ Deploy Standalone Agent](/docs/deployment-guides/standalone-deployment.md)
 
-**Features:**
-- Unified dashboards across all Agents and Parents
-- Mobile app alerts and notifications
-- Team collaboration and user management
-- Custom dashboards and data analysis
-- Infrastructure overview and insights
+### Parent-Child Streaming (Recommended)
 
-**Key point:** Your data stays on your servers. Cloud provides the viewing layer.
+The recommended production setup. Stream metrics from Child Agents to centralized Parent nodes for better data persistence and resource optimization.
 
-## How They Work Together
+**Best for:** Production environments of any size, high availability requirements
 
-```
-Agents (collect) → Parents (centralize) → Cloud (unify)
-```
+**Setup time:** 10-15 minutes
 
-:::info
+[→ Deploy Parent-Child Setup](/docs/deployment-guides/deployment-with-centralization-points.md)
 
-Each component builds on the previous one. Start with Agents for immediate monitoring. Add Parents when you need centralization. Connect to Cloud when you want unified visibility.
+### Kubernetes
+
+Deploy Netdata across your Kubernetes clusters with our Helm chart. Required for proper Kubernetes monitoring.
+
+**Best for:** Kubernetes environments (required for full K8s observability)
+
+**Setup time:** 5-10 minutes
+
+[→ Deploy on Kubernetes](https://github.com/netdata/helmchart#netdata-helm-chart-for-kubernetes-deployments)
+
+### Docker
+
+Run Netdata in containers for quick testing. Note: Some features are limited compared to host installation.
+
+**Best for:** Quick testing, ephemeral environments
+
+**Setup time:** 2-5 minutes
+
+[→ Deploy with Docker](/packaging/docker/README.md)
+
+## Which Deployment Should I Choose?
+
+| Environment             | Recommended Method                                                                                                                                                 | Why                                                                 |
+|-------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------|
+| **Production servers**  | [Parent-Child](/docs/deployment-guides/deployment-with-centralization-points.md)                                                                                   | Best data persistence, resource optimization, and high availability |
+| **Kubernetes**          | [Helm Chart](https://github.com/netdata/helmchart#netdata-helm-chart-for-kubernetes-deployments)                                                                   | Required for K8s API access and pod metadata collection             |
+| **Testing/Development** | [Standalone](/docs/deployment-guides/standalone-deployment.md) or [Docker](/packaging/docker/README.md)                                                            | Quick setup, easy to remove                                         |
+| **Single server**       | [Standalone](/docs/deployment-guides/standalone-deployment.md) (upgrade to [Parent-Child](/docs/deployment-guides/deployment-with-centralization-points.md) later) | Start simple, upgrade when ready for production                     |
+
+:::warning Important Notes
+
+- **Kubernetes**: Always use our Helm chart. Direct host installation won't have access to K8s API for pod metadata and service discovery.
+- **Docker**: Limited feature set compared to host installation. Best for testing, not recommended for production.
+- **Production**: Parent-Child is recommended regardless of cluster size for better reliability and data persistence.
 
 :::
