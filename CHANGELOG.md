@@ -6,8 +6,12 @@
 
 **Merged pull requests:**
 
+- docs: add Network-connections to the functions table [\#20721](https://github.com/netdata/netdata/pull/20721) ([ilyam8](https://github.com/ilyam8))
+- Enable services status \(windows.plugin\) [\#20720](https://github.com/netdata/netdata/pull/20720) ([thiagoftsm](https://github.com/thiagoftsm))
 - Mark the completion from the worker thread [\#20719](https://github.com/netdata/netdata/pull/20719) ([stelfrag](https://github.com/stelfrag))
 - improve\(go.d/snmp\): add profile device meta to vnode labels [\#20718](https://github.com/netdata/netdata/pull/20718) ([ilyam8](https://github.com/ilyam8))
+- Remove H2O web server code from Netdata. [\#20713](https://github.com/netdata/netdata/pull/20713) ([Ferroin](https://github.com/Ferroin))
+- Detect missing ACLK MQTT packet acknowledgents [\#20711](https://github.com/netdata/netdata/pull/20711) ([stelfrag](https://github.com/stelfrag))
 - build\(deps\): bump github.com/gosnmp/gosnmp from 1.42.0 to 1.42.1 in /src/go [\#20709](https://github.com/netdata/netdata/pull/20709) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/gosnmp/gosnmp from 1.41.0 to 1.42.0 in /src/go [\#20707](https://github.com/netdata/netdata/pull/20707) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump k8s.io/client-go from 0.33.2 to 0.33.3 in /src/go [\#20705](https://github.com/netdata/netdata/pull/20705) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -459,10 +463,6 @@
 - ensure atomicity when logging pending message 1/3 [\#20185](https://github.com/netdata/netdata/pull/20185) ([ktsaou](https://github.com/ktsaou))
 - Improve systemd journal logs documentation [\#20184](https://github.com/netdata/netdata/pull/20184) ([kanelatechnical](https://github.com/kanelatechnical))
 - Reorganize code \(IIS\) [\#20182](https://github.com/netdata/netdata/pull/20182) ([thiagoftsm](https://github.com/thiagoftsm))
-- improve pgc fatal errors [\#20181](https://github.com/netdata/netdata/pull/20181) ([ktsaou](https://github.com/ktsaou))
-- Group anomaly rate per chart context instead of type. [\#20180](https://github.com/netdata/netdata/pull/20180) ([vkalintiris](https://github.com/vkalintiris))
-- bump go mod 1.24.0 [\#20179](https://github.com/netdata/netdata/pull/20179) ([ilyam8](https://github.com/ilyam8))
-- Retry nightly changelog generation. [\#20178](https://github.com/netdata/netdata/pull/20178) ([Ferroin](https://github.com/Ferroin))
 
 ## [v2.4.0](https://github.com/netdata/netdata/tree/v2.4.0) (2025-04-14)
 
