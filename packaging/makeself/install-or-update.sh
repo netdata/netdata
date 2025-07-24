@@ -9,7 +9,7 @@ export LC_ALL=C
 umask 002
 
 # Be nice on production environments
-renice 19 $$ > /dev/null 2> /dev/null
+renice 19 $$ >/dev/null 2>/dev/null
 
 NETDATA_PREFIX="/opt/netdata"
 NETDATA_USER_CONFIG_DIR="${NETDATA_PREFIX}/etc/netdata"
@@ -52,10 +52,13 @@ while [ "${1}" ]; do
       ;;
     "--certificates")
       case "${2}" in
-        auto|system) NETDATA_CERT_MODE="auto" ;;
+        auto | system) NETDATA_CERT_MODE="auto" ;;
         check) NETDATA_CERT_MODE="check" ;;
         bundled) NETDATA_CERT_MODE="bundled" ;;
-        *) run_failed "Unknown certificate handling mode '${2}'. Supported modes are auto, check, system, and bundled."; exit 1 ;;
+        *)
+          run_failed "Unknown certificate handling mode '${2}'. Supported modes are auto, check, system, and bundled."
+          exit 1
+          ;;
       esac
       shift 1
       ;;
@@ -246,50 +249,50 @@ done
 # -----------------------------------------------------------------------------
 
 replace_symlink() {
-    target="${1}"
-    name="${2}"
-    rm -f "${name}"
-    ln -s "${target}" "${name}"
+  target="${1}"
+  name="${2}"
+  rm -f "${name}"
+  ln -s "${target}" "${name}"
 }
 
 ensure_ca_certificates_link() {
-    local ssl_prefix="/opt/netdata/etc/ssl/"
-    local link_path="${ssl_prefix}/certs/ca-certificates.crt"
+  local ssl_prefix="/opt/netdata/etc/ssl/"
+  local link_path="${ssl_prefix}/certs/ca-certificates.crt"
 
-    # If ca-certificates.crt already exists, we're done
-    [ -e "${link_path}" ] && return 0
+  # If ca-certificates.crt already exists, we're done
+  [ -e "${link_path}" ] && return 0
 
-    local cert_names=(
-        "certs/ca-bundle.crt"   # RHEL, Fedora, RHEL clones
-        "ca-bundle.pem"         # SLE, OpenSUSE
-        "cert.pem"              # Alpine
-    )
+  local cert_names=(
+    "certs/ca-bundle.crt" # RHEL, Fedora, RHEL clones
+    "ca-bundle.pem"       # SLE, OpenSUSE
+    "cert.pem"            # Alpine
+  )
 
-    mkdir -p "$(dirname "${link_path}")"
+  mkdir -p "$(dirname "${link_path}")"
 
-    for cert_name in "${cert_names[@]}"; do
-        local target="${ssl_prefix}/${cert_name}"
+  for cert_name in "${cert_names[@]}"; do
+    local target="${ssl_prefix}/${cert_name}"
 
-        if [ -f "${target}" ] && [ -r "${target}" ]; then
-            # Create relative symlink to avoid breaking if Netdata is uninstalled
-            if command -v realpath >/dev/null 2>&1; then
-                ln -s "$(realpath --relative-to="$(dirname "${link_path}")" "${target}")" "${link_path}"
-            else
-                ln -s "../${cert_name}" "${link_path}"
-            fi
-            return 0
-        fi
-    done
+    if [ -f "${target}" ] && [ -r "${target}" ]; then
+      # Create relative symlink to avoid breaking if Netdata is uninstalled
+      if command -v realpath >/dev/null 2>&1; then
+        ln -s "$(realpath --relative-to="$(dirname "${link_path}")" "${target}")" "${link_path}"
+      else
+        ln -s "../${cert_name}" "${link_path}"
+      fi
+      return 0
+    fi
+  done
 
-    echo "Warning: No valid certificate bundle found"
-    return 1
+  echo "Warning: No valid certificate bundle found"
+  return 1
 }
 
 select_system_certs() {
-  if [ -d /etc/pki/tls ] ; then
+  if [ -d /etc/pki/tls ]; then
     echo "${1} /etc/pki/tls for TLS configuration and certificates"
     replace_symlink /etc/pki/tls /opt/netdata/etc/ssl
-  elif [ -d /etc/ssl ] ; then
+  elif [ -d /etc/ssl ]; then
     echo "${1} /etc/ssl for TLS configuration and certificates"
     replace_symlink /etc/ssl /opt/netdata/etc/ssl
   fi
@@ -311,16 +314,25 @@ test_certs() {
   /opt/netdata/bin/curl --fail --max-time 300 --silent --output /dev/null "${NETDATA_CERT_TEST_URL}"
 
   case "$?" in
-    35|77) echo "Failed to load certificate files for test." ; return 1 ;;
-    60|82|83) echo "Certificates cannot be used to connect to ${NETDATA_CERT_TEST_URL}" ; return 1 ;;
-    53|54|66) echo "Unable to use OpenSSL configuration associated with certificates" ; return 1 ;;
+    35 | 77)
+      echo "Failed to load certificate files for test."
+      return 1
+      ;;
+    60 | 82 | 83)
+      echo "Certificates cannot be used to connect to ${NETDATA_CERT_TEST_URL}"
+      return 1
+      ;;
+    53 | 54 | 66)
+      echo "Unable to use OpenSSL configuration associated with certificates"
+      return 1
+      ;;
     0) echo "Successfully connected to ${NETDATA_CERT_TEST_URL} using certificates" ;;
     *) echo "Unable to test certificates due to networking problems, blindly assuming they work" ;;
   esac
 }
 
 # If the user has manually set up certificates, don’t mess with it.
-if [ ! -L /opt/netdata/etc/ssl ] && [ -d /opt/netdata/etc/ssl ] ; then
+if [ ! -L /opt/netdata/etc/ssl ] && [ -d /opt/netdata/etc/ssl ]; then
   echo "Preserving existing user configuration for TLS"
 else
   echo "Configure TLS certificate paths (mode: ${NETDATA_CERT_MODE})"
@@ -346,7 +358,7 @@ fi
 # -----------------------------------------------------------------------------
 
 echo "Save install options"
-grep -qv 'IS_NETDATA_STATIC_BINARY="yes"' "${NETDATA_PREFIX}/etc/netdata/.environment" || echo IS_NETDATA_STATIC_BINARY=\"yes\" >> "${NETDATA_PREFIX}/etc/netdata/.environment"
+grep -qv 'IS_NETDATA_STATIC_BINARY="yes"' "${NETDATA_PREFIX}/etc/netdata/.environment" || echo IS_NETDATA_STATIC_BINARY=\"yes\" >>"${NETDATA_PREFIX}/etc/netdata/.environment"
 REINSTALL_OPTIONS="$(echo "${REINSTALL_OPTIONS}" | awk '{gsub("/", "\\/"); print}')"
 sed -i "s/REINSTALL_OPTIONS=\".*\"/REINSTALL_OPTIONS=\"${REINSTALL_OPTIONS}\"/" "${NETDATA_PREFIX}/etc/netdata/.environment"
 
