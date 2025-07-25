@@ -4,10 +4,10 @@ Netdata categorizes nodes as **ephemeral** or **permanent** to help you tailor a
 
 ## Node Types
 
-| Type          | Description                                    | Common Use Cases                                                                                                                               |
-|---------------|------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Ephemeral** | Expected to disconnect or reconnect frequently | • Auto-scaling cloud instances<br />• Dynamic containers and VMs<br />• IoT devices with intermittent connectivity<br />• Test environments        |
-| **Permanent** | Expected to maintain continuous connectivity   | • Production servers<br />• Core infrastructure nodes<br />• Critical monitoring systems<br />• Stable database servers                          |
+| Type          | Description                                    | Common Use Cases                                                                                                                            |
+|---------------|------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------|
+| **Ephemeral** | Expected to disconnect or reconnect frequently | • Auto-scaling cloud instances<br />• Dynamic containers and VMs<br />• IoT devices with intermittent connectivity<br />• Test environments |
+| **Permanent** | Expected to maintain continuous connectivity   | • Production servers<br />• Core infrastructure nodes<br />• Critical monitoring systems<br />• Stable database servers                     |
 
 :::note
 
@@ -48,13 +48,15 @@ flowchart TD
     D --> E[Node Now Marked as Ephemeral]
     E --> F[_is_ephemeral Label Applied]
     F --> G[Label Propagates to Parents and Cloud]
-
-    classDef step fill:#e8f5e8,stroke:#27ae60,stroke-width:2px,color:#2c3e50,rx:10,ry:10
-    classDef label fill:#f3e8ff,stroke:#9b59b6,stroke-width:2px,color:#2c3e50,rx:10,ry:10
-    classDef subgraphStyle fill:#f8f9fa,stroke:#6c757d,stroke-width:2px,color:#2c3e50,rx:15,ry:15
-
-    class A,B,C,D step
-    class E,F label
+    classDef step fill: #e8f5e8, stroke: #27ae60, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
+    classDef label fill: #f3e8ff, stroke: #9b59b6, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
+    classDef subgraphStyle fill: #f8f9fa, stroke: #6c757d, stroke-width: 2px, color: #2c3e50, rx: 15, ry: 15
+    class A step
+    class B step
+    class C step
+    class D step
+    class E label
+    class F label
     class G subgraphStyle
 ```
 
@@ -64,10 +66,10 @@ flowchart TD
 
 Netdata v2.3.0 introduces two alerts specific to permanent nodes:
 
-| Alert                       | Trigger Condition                                         |
-|-----------------------------|-----------------------------------------------------------|
-| `streaming_never_connected` | A permanent node has never connected to a Parent.         |
-| `streaming_disconnected`    | A previously connected permanent node has disconnected.   |
+| Alert                       | Trigger Condition                                       |
+|-----------------------------|---------------------------------------------------------|
+| `streaming_never_connected` | A permanent node has never connected to a Parent.       |
+| `streaming_disconnected`    | A previously connected permanent node has disconnected. |
 
 ## Monitoring and Managing Node Status
 
@@ -91,13 +93,18 @@ flowchart TD
     C --> D[Metrics Remain Available]
     C --> E[Active Alerts Cleared]
     C --> F{Node Reconnects?}
-    F -->|Yes (No Config)| G[Reverts to Permanent]
+    F -->|Yes - no config| G[Reverts to Permanent]
     F -->|No| H[Remains Ephemeral]
-
-    classDef step fill:#e8f5e8,stroke:#27ae60,stroke-width:2px,color:#2c3e50,rx:10,ry:10
-    classDef alert fill:#ffe8e8,stroke:#e74c3c,stroke-width:2px,color:#2c3e50,rx:10,ry:10
-    class A,B,C,D,E step
-    class F,G,H alert
+    classDef step fill: #e8f5e8, stroke: #27ae60, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
+    classDef alert fill: #ffe8e8, stroke: #e74c3c, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
+    class A step
+    class B step
+    class C step
+    class D step
+    class E step
+    class F alert
+    class G alert
+    class H alert
 ```
 
 </details>
@@ -125,10 +132,13 @@ flowchart TD
     B --> C[Node Removed from System]
     C --> D[Node No Longer Queryable]
     C --> E[Alerts for Node Cleared]
-
-    classDef step fill:#e8f5e8,stroke:#27ae60,stroke-width:2px,color:#2c3e50,rx:10,ry:10
-    classDef alert fill:#ffe8e8,stroke:#e74c3c,stroke-width:2px,color:#2c3e50,rx:10,ry:10
-    class A,B,C,D,E step
+    classDef step fill: #e8f5e8, stroke: #27ae60, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
+    classDef alert fill: #ffe8e8, stroke: #e74c3c, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
+    class A step
+    class B step
+    class C step
+    class D step
+    class E step
 ```
 
 </details>
@@ -161,10 +171,16 @@ flowchart TD
     D -->|No| F[Node Remains in System]
     E --> G{All Parents Removed Node?}
     G -->|Yes| H[Node Removed from Cloud]
-
-    classDef step fill:#e8f5e8,stroke:#27ae60,stroke-width:2px,color:#2c3e50,rx:10,ry:10
-    classDef alert fill:#ffe8e8,stroke:#e74c3c,stroke-width:2px,color:#2c3e50,rx:10,ry:10
-    class A,B,C,D,E,F,G,H step
+    classDef step fill: #e8f5e8, stroke: #27ae60, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
+    classDef alert fill: #ffe8e8, stroke: #e74c3c, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
+    class A step
+    class B step
+    class C step
+    class D step
+    class E step
+    class F step
+    class G step
+    class H step
 ```
 
 </details>

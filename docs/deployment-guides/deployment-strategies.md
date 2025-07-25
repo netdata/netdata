@@ -1,10 +1,10 @@
 # Configuration Examples
 
-These examples help you optimize different Netdata setups for real-world scenarios.
+These practical examples will help you optimize Netdata for various real-world deployment scenarios.
 
 ## Single Agent Configuration
 
-Single Agents work great out of the box with sensible defaults. 
+Single Agents work great out of the box with sensible defaults.
 
 :::tip
 
@@ -21,17 +21,19 @@ This example helps you make Children super lightweight by offloading work to Par
 <details>
 <summary><strong>Click to see lightweight Child configuration</strong></summary><br/>
 
-**Why minimize Child footprint:**
+**Why minimize Child footprint?**
 We don't recommend connecting Children to Cloud directly. This reduces the Netdata Agent footprint on your production systems, as some capabilities can be switched OFF for the Child and kept ON for the Parent.
 
 **What this does:**
-- Stores metrics in RAM only (no disk usage)
+
+- Stores metrics in RAM only (zero disk I/O)
 - Disables machine learning (Parent handles it)
 - Disables alerts (Parent handles them)
 - Keeps only 20 minutes of data locally
 - Restricts dashboard to localhost only
 
-Edit `netdata.conf` on the Child using the [edit-config](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script:
+Edit `netdata.conf` on the Child using the [edit-config](/docs/netdata-agent/configuration/README.md#locate-your-config-directory) script:
+
 ```ini
 [db]
     # https://github.com/netdata/netdata/blob/master/src/database/README.md
@@ -58,7 +60,8 @@ Edit `netdata.conf` on the Child using the [edit-config](/docs/netdata-agent/con
     # enable running new plugins = no
 ```
 
-Edit `stream.conf` on the Child using the [edit-config](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script:
+Edit `stream.conf` on the Child using the [edit-config](/docs/netdata-agent/configuration/README.md#locate-your-config-directory) script:
+
 ```ini
 [stream]
     # Stream metrics to another Netdata
@@ -83,15 +86,18 @@ This example helps you configure a Parent with intelligent storage tiers to stor
 This example provides configuration for multiple [tiers of metrics storage](/src/database/README.md#tiers), for 10 Children with about 2k metrics each.
 
 **What this gives you:**
-- 1s granularity at tier 0 for 1 week
-- 1m granularity at tier 1 for 1 month
-- 1h granularity at tier 2 for 1 year
+
+- 1-second resolution for 1 week (recent data at full detail)
+- 1-minute resolution for 1 month (medium-term trends)
+- 1-hour resolution for 1 year (long-term patterns)
 
 **Resource requirements:**
-- 25GB of disk
-- 3.5GB of RAM (2.5GB under pressure)
 
-Edit `netdata.conf` on the Parent using the [edit-config](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script:
+- Disk space: 25GB total
+- RAM usage: 3.5GB typical (2.5GB under memory pressure)
+
+Edit `netdata.conf` on the Parent using the [edit-config](/docs/netdata-agent/configuration/README.md#locate-your-config-directory) script:
+
 ```ini
 [db]
     mode = dbengine
@@ -118,7 +124,8 @@ Edit `netdata.conf` on the Parent using the [edit-config](/docs/netdata-agent/co
     # bind to = *
 ```
 
-Edit `stream.conf` on the Parent using the [edit-config](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script:
+Edit `stream.conf` on the Parent using the [edit-config](/docs/netdata-agent/configuration/README.md#locate-your-config-directory) script:
+
 ```ini
 [API_KEY]
     # Accept metrics streaming from other Agents with the specified API key
@@ -136,25 +143,16 @@ This example guides you through setting up active-active Parents that sync with 
 <details>
 <summary><strong>Click to see high availability configuration</strong></summary><br/>
 
-:::note
-
-To set up active-active streaming between Parent 1 and Parent 2, Parent 1 needs to be instructed to stream data to Parent 2 and Parent 2 to stream data to Parent 1. 
-
-:::
-
 :::info
 
-The Child Agents need to be configured with the addresses of both Parent Agents. An Agent will only connect to one Parent at a time, falling back to the next upon failure. 
+- To set up active-active streaming between Parent 1 and Parent 2, Parent 1 needs to be instructed to stream data to Parent 2 and Parent 2 to stream data to Parent 1.
 
-:::
-
-:::note
-
-These examples use the same API key between Parent Agents and for connections for Child Agents.
+- The Child Agents need to be configured with the addresses of both Parent Agents. An Agent will only connect to one Parent at a time, falling back to the next upon failure.
 
 :::
 
 **Parent 1 stream.conf:**
+
 ```ini
 [stream]
     # Stream metrics to another Netdata
@@ -169,6 +167,7 @@ These examples use the same API key between Parent Agents and for connections fo
 ```
 
 **Parent 2 stream.conf:**
+
 ```ini
 [stream]
     # Stream metrics to another Netdata
@@ -182,6 +181,7 @@ These examples use the same API key between Parent Agents and for connections fo
 ```
 
 **Children stream.conf:**
+
 ```ini
 [stream]
     # Stream metrics to another Netdata

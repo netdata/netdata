@@ -28,27 +28,24 @@ flowchart TB
         C1[C1]
         C2[C2]
         P[P]
-        
         C1("**Child 1**<br/>Collects metrics")
         C2("**Child 2**<br/>Collects metrics")
         P("**Parent**<br/>Stores all metrics")
-        
-        C1 -->|Streams real-time metrics| P
+        C1 -->|Streams real - time metrics| P
         C1 -.->|Replicates historical data| P
-        C2 -->|Streams real-time metrics| P
+        C2 -->|Streams real - time metrics| P
         C2 -.->|Replicates historical data| P
     end
-    
+
     U[U]
     U("**You**<br/>Access unified dashboard")
     P -->|Presents all data| U
-    
-    classDef child fill:#e8f5e8,stroke:#27ae60,stroke-width:2px,color:#2c3e50,rx:10,ry:10
-    classDef parent fill:#f3e8ff,stroke:#9b59b6,stroke-width:2px,color:#2c3e50,rx:10,ry:10
-    classDef user fill:#fff2e8,stroke:#f39c12,stroke-width:2px,color:#2c3e50,rx:10,ry:10
-    classDef subgraphStyle fill:#f8f9fa,stroke:#6c757d,stroke-width:2px,color:#2c3e50,rx:15,ry:15
-    
-    class C1,C2 child
+    classDef child fill: #e8f5e8, stroke: #27ae60, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
+    classDef parent fill: #f3e8ff, stroke: #9b59b6, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
+    classDef user fill: #fff2e8, stroke: #f39c12, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
+    classDef subgraphStyle fill: #f8f9fa, stroke: #6c757d, stroke-width: 2px, color: #2c3e50, rx: 15, ry: 15
+    class C1 child
+    class C2 child
     class P parent
     class U user
     class infrastructure subgraphStyle
@@ -80,12 +77,12 @@ flowchart TB
 
 ## Quick Reference
 
-| Task | Configuration | Example |
-|------|---------------|---------|
-| Enable streaming on a Child | Set `enabled = yes` in `[stream]` section | `[stream]`<br/>`enabled = yes`<br/>`destination = 192.168.1.5` |
-| Configure a Parent to accept connections | Create an `[API_KEY]` section | `[API_KEY]`<br/>`enabled = yes`<br/>`allow from = *` |
-| Set up high availability | Configure multiple destinations on Child | `[stream]`<br/>`destination = parent1:19999 parent2:19999` |
-| Filter which metrics to send | Use `send charts matching` setting | `send charts matching = system.* !system.uptime` |
+| Task                                     | Configuration                             | Example                                                        |
+|------------------------------------------|-------------------------------------------|----------------------------------------------------------------|
+| Enable streaming on a Child              | Set `enabled = yes` in `[stream]` section | `[stream]`<br/>`enabled = yes`<br/>`destination = 192.168.1.5` |
+| Configure a Parent to accept connections | Create an `[API_KEY]` section             | `[API_KEY]`<br/>`enabled = yes`<br/>`allow from = *`           |
+| Set up high availability                 | Configure multiple destinations on Child  | `[stream]`<br/>`destination = parent1:19999 parent2:19999`     |
+| Filter which metrics to send             | Use `send charts matching` setting        | `send charts matching = system.* !system.uptime`               |
 
 ## Configuration Overview
 
@@ -140,33 +137,34 @@ flowchart TB
     C1[C1]
     D1[D1]
     E1[E1]
-    
     A("**Recommended Strategies**")
     B("Multiple Parent Nodes")
     C("Optimized Data Retention")
     D("Secure Communications")
     E("Performance Monitoring")
-    
     B1("Improved redundancy<br/>and resilience")
     C1("Balance storage costs<br/>and data availability")
     D1("Enable encryption<br/>and authentication")
     E1("Regular log and<br/>metric reviews")
-    
     A --> B
     A --> C
     A --> D
     A --> E
-    
     B --> B1
     C --> C1
     D --> D1
     E --> E1
-    
-    classDef default fill:#f9f9f9,stroke:#333,stroke-width:2px,color:#2c3e50,rx:10,ry:10
-    classDef strategies fill:#e8f5e8,stroke:#27ae60,stroke-width:2px,color:#2c3e50,rx:10,ry:10
-    
+    classDef default fill: #f9f9f9, stroke: #333, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
+    classDef strategies fill: #e8f5e8, stroke: #27ae60, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
     class A default
-    class B,C,D,E,B1,C1,D1,E1 strategies
+    class B strategies
+    class C strategies
+    class D strategies
+    class E strategies
+    class B1 strategies
+    class C1 strategies
+    class D1 strategies
+    class E1 strategies
 ```
 
 </details><br/>
@@ -215,69 +213,69 @@ Regularly evaluate the **health of your** streaming **setup**:
 
 With these settings, you can configure how your Child nodes send metrics to Parent nodes.
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `enabled` | `no` | Enables streaming. Set to `yes` to allow this node to send metrics. |
-| [`destination`](#destination) | (empty) | Defines one or more Parent nodes to send data to. |
-| `ssl skip certificate verification` | `yes` | Accepts self-signed or expired SSL certificates. |
-| `CApath` | `/etc/ssl/certs/` | Directory for trusted SSL certificates. |
-| `CAfile` | `/etc/ssl/certs/cert.pem` | File containing trusted certificates. |
-| `api key` | (empty) | API key used by the Child to authenticate with the Parent. |
-| `timeout` | `1m` | Connection timeout duration. |
-| `default port` | `19999` | Default port for streaming if not specified in `destination`. |
-| [`send charts matching`](#send-charts-matching) | `*` | Filters which charts are streamed. |
-| `buffer size bytes` | `10485760` | Buffer size (10MB by default). Increase for higher latencies. |
-| `reconnect delay` | `5s` | Time before retrying connection to the Parent. |
-| `initial clock resync iterations` | `60` | Syncs chart clocks during startup. |
-| `parent using h2o` | `no` | Set to `yes` if connecting to a Parent using the H2O web server. |
+| Setting                                         | Default                   | Description                                                         |
+|-------------------------------------------------|---------------------------|---------------------------------------------------------------------|
+| `enabled`                                       | `no`                      | Enables streaming. Set to `yes` to allow this node to send metrics. |
+| [`destination`](#destination)                   | (empty)                   | Defines one or more Parent nodes to send data to.                   |
+| `ssl skip certificate verification`             | `yes`                     | Accepts self-signed or expired SSL certificates.                    |
+| `CApath`                                        | `/etc/ssl/certs/`         | Directory for trusted SSL certificates.                             |
+| `CAfile`                                        | `/etc/ssl/certs/cert.pem` | File containing trusted certificates.                               |
+| `api key`                                       | (empty)                   | API key used by the Child to authenticate with the Parent.          |
+| `timeout`                                       | `1m`                      | Connection timeout duration.                                        |
+| `default port`                                  | `19999`                   | Default port for streaming if not specified in `destination`.       |
+| [`send charts matching`](#send-charts-matching) | `*`                       | Filters which charts are streamed.                                  |
+| `buffer size bytes`                             | `10485760`                | Buffer size (10MB by default). Increase for higher latencies.       |
+| `reconnect delay`                               | `5s`                      | Time before retrying connection to the Parent.                      |
+| `initial clock resync iterations`               | `60`                      | Syncs chart clocks during startup.                                  |
+| `parent using h2o`                              | `no`                      | Set to `yes` if connecting to a Parent using the H2O web server.    |
 
 ### `[API_KEY]` Section (Parent Node Authentication)
 
 Here you can define settings for authentication and access control between Parents and Children.
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `enabled` | `no` | Enables or disables this API key. |
-| `type` | `api` | Defines the section as an API key configuration. |
-| [`allow from`](#allow-from) | `*` | Specifies which Child nodes (IP addresses) can connect. |
-| `retention` | `1h` | How long to keep Child node metrics in RAM-based storage. |
-| [`db`](#db) | `dbengine` | Specifies the database type for this API key. |
-| `health enabled` | `auto` | Controls alerts and notifications (`auto`, `yes`, or `no`). |
-| `postpone alerts on connect` | `1m` | Delay alerts for a period after the Child connects. |
-| `health log retention` | `5d` | Duration (in seconds) to keep health log events. |
-| `proxy enabled` | (empty) | Enables routing metrics through a proxy. |
-| `proxy destination` | (empty) | IP and port of the proxy server. |
-| `proxy api key` | (empty) | API key for the proxy server. |
-| `send charts matching` | `*` | Defines which charts to stream. |
-| `enable compression` | `yes` | Enables or disables data compression. |
-| `enable replication` | `yes` | Enables or disables data replication. |
-| `replication period` | `1d` | Maximum time window replicated from each Child. |
-| `replication step` | `10m` | Time interval for each replication step. |
-| `is ephemeral node` | `no` | Marks the Child as ephemeral (removes it after inactivity). |
+| Setting                      | Default    | Description                                                 |
+|------------------------------|------------|-------------------------------------------------------------|
+| `enabled`                    | `no`       | Enables or disables this API key.                           |
+| `type`                       | `api`      | Defines the section as an API key configuration.            |
+| [`allow from`](#allow-from)  | `*`        | Specifies which Child nodes (IP addresses) can connect.     |
+| `retention`                  | `1h`       | How long to keep Child node metrics in RAM-based storage.   |
+| [`db`](#db)                  | `dbengine` | Specifies the database type for this API key.               |
+| `health enabled`             | `auto`     | Controls alerts and notifications (`auto`, `yes`, or `no`). |
+| `postpone alerts on connect` | `1m`       | Delay alerts for a period after the Child connects.         |
+| `health log retention`       | `5d`       | Duration (in seconds) to keep health log events.            |
+| `proxy enabled`              | (empty)    | Enables routing metrics through a proxy.                    |
+| `proxy destination`          | (empty)    | IP and port of the proxy server.                            |
+| `proxy api key`              | (empty)    | API key for the proxy server.                               |
+| `send charts matching`       | `*`        | Defines which charts to stream.                             |
+| `enable compression`         | `yes`      | Enables or disables data compression.                       |
+| `enable replication`         | `yes`      | Enables or disables data replication.                       |
+| `replication period`         | `1d`       | Maximum time window replicated from each Child.             |
+| `replication step`           | `10m`      | Time interval for each replication step.                    |
+| `is ephemeral node`          | `no`       | Marks the Child as ephemeral (removes it after inactivity). |
 
 ### `[MACHINE_GUID]` Section (Per-Node Customization)
 
 This area lets you customize settings for specific Child nodes by their unique ID.
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `enabled` | `no` | Enables or disables this specific node's configuration. |
-| `type` | `machine` | Defines the section as a machine-specific configuration. |
-| [`allow from`](#allow-from) | `*` | Lists IP addresses allowed to stream metrics. |
-| `retention` | `3600` | Retention period for Child metrics in RAM-based storage. |
-| [`db`](#db) | `dbengine` | Database type for this node. |
-| `health enabled` | `auto` | Controls alerts (`auto`, `yes`, `no`). |
-| `postpone alerts on connect` | `1m` | Delay alerts for a period after connection. |
-| `health log retention` | `5d` | Duration to keep health log events. |
-| `proxy enabled` | (empty) | Routes metrics through a proxy if enabled. |
-| `proxy destination` | (empty) | Proxy server IP and port. |
-| `proxy api key` | (empty) | API key for the proxy. |
-| `send charts matching` | `*` | Filters streamed charts. |
-| `enable compression` | `yes` | Enables or disables compression. |
-| `enable replication` | `yes` | Enables or disables replication. |
-| `replication period` | `1d` | Maximum replication window. |
-| `replication step` | `10m` | Time interval for each replication step. |
-| `is ephemeral node` | `no` | Marks the node as ephemeral (removes after inactivity). |
+| Setting                      | Default    | Description                                              |
+|------------------------------|------------|----------------------------------------------------------|
+| `enabled`                    | `no`       | Enables or disables this specific node's configuration.  |
+| `type`                       | `machine`  | Defines the section as a machine-specific configuration. |
+| [`allow from`](#allow-from)  | `*`        | Lists IP addresses allowed to stream metrics.            |
+| `retention`                  | `3600`     | Retention period for Child metrics in RAM-based storage. |
+| [`db`](#db)                  | `dbengine` | Database type for this node.                             |
+| `health enabled`             | `auto`     | Controls alerts (`auto`, `yes`, `no`).                   |
+| `postpone alerts on connect` | `1m`       | Delay alerts for a period after connection.              |
+| `health log retention`       | `5d`       | Duration to keep health log events.                      |
+| `proxy enabled`              | (empty)    | Routes metrics through a proxy if enabled.               |
+| `proxy destination`          | (empty)    | Proxy server IP and port.                                |
+| `proxy api key`              | (empty)    | API key for the proxy.                                   |
+| `send charts matching`       | `*`        | Filters streamed charts.                                 |
+| `enable compression`         | `yes`      | Enables or disables compression.                         |
+| `enable replication`         | `yes`      | Enables or disables replication.                         |
+| `replication period`         | `1d`       | Maximum replication window.                              |
+| `replication step`           | `10m`      | Time interval for each replication step.                 |
+| `is ephemeral node`          | `no`       | Marks the node as ephemeral (removes after inactivity).  |
 
 ### Additional Settings
 
