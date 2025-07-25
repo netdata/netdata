@@ -270,7 +270,7 @@ metrics:
       chart_meta:
         description: Chassis 3 fan speed in revolutions per minute
         family: 'Hardware/Fan/Speed/Chassis3'
-        unit: "1/min"
+        unit: "{revolution}/min"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusEnvironmentalSensorsCaseOpen
