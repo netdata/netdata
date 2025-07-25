@@ -64,6 +64,20 @@ type (
 	}
 )
 
+func (c *Collector) CollectDeviceMetadata() (map[string]map[string]string, error) {
+	meta := make(map[string]map[string]string)
+
+	for _, prof := range c.profiles {
+		dm, err := c.deviceMetadataCollector.Collect(prof.profile)
+		if err != nil {
+			return nil, err
+		}
+		meta[prof.profile.SourceFile] = dm
+	}
+
+	return meta, nil
+}
+
 func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 	var metrics []*ddsnmp.ProfileMetrics
 	var errs []error
