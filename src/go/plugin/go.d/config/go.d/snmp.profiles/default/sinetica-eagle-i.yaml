@@ -163,7 +163,7 @@ metrics:
         chart_meta:
           description: Total energy value
           family: 'Hardware/PDU/Energy/Total'
-          unit: "W.h"
+          unit: "Wh"
     metric_tags:
       - tag: hawk_i2_pdu_index
         index: 1

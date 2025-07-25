@@ -115,7 +115,7 @@ metrics:
         chart_meta:
           description: Energy consumed by the input cord
           family: 'PowerFlow/InputCord/Energy/Total'
-          unit: "W.h"
+          unit: "Wh"
       - name: servertech.sentry4.st4InputCordFrequency
         OID: 1.3.6.1.4.1.1718.4.1.3.3.1.11
         chart_meta:
@@ -444,7 +444,7 @@ metrics:
         chart_meta:
           description: Energy consumed by the phase
           family: 'PowerFlow/Phase/Energy/Total'
-          unit: "W.h"
+          unit: "Wh"
       - OID: 1.3.6.1.4.1.1718.4.1.5.3.1.1
         name: servertech.sentry4.st4PhaseState
         chart_meta:
