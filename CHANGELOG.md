@@ -13,6 +13,7 @@
 - Enable services status \(windows.plugin\) [\#20720](https://github.com/netdata/netdata/pull/20720) ([thiagoftsm](https://github.com/thiagoftsm))
 - Mark the completion from the worker thread [\#20719](https://github.com/netdata/netdata/pull/20719) ([stelfrag](https://github.com/stelfrag))
 - improve\(go.d/snmp\): add profile device meta to vnode labels [\#20718](https://github.com/netdata/netdata/pull/20718) ([ilyam8](https://github.com/ilyam8))
+- Ignore timestamps recording in gzip metadata \(for reproducible builds\) [\#20714](https://github.com/netdata/netdata/pull/20714) ([Antiz96](https://github.com/Antiz96))
 - Remove H2O web server code from Netdata. [\#20713](https://github.com/netdata/netdata/pull/20713) ([Ferroin](https://github.com/Ferroin))
 - Detect missing ACLK MQTT packet acknowledgents [\#20711](https://github.com/netdata/netdata/pull/20711) ([stelfrag](https://github.com/stelfrag))
 - build\(deps\): bump github.com/gosnmp/gosnmp from 1.42.0 to 1.42.1 in /src/go [\#20709](https://github.com/netdata/netdata/pull/20709) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -24,6 +25,7 @@
 - Escape \< character in plaintext [\#20699](https://github.com/netdata/netdata/pull/20699) ([Ancairon](https://github.com/Ancairon))
 - Replace legacy functions-table.md with comprehensive UI documentation [\#20697](https://github.com/netdata/netdata/pull/20697) ([ktsaou](https://github.com/ktsaou))
 - Update LIBBPF [\#20696](https://github.com/netdata/netdata/pull/20696) ([thiagoftsm](https://github.com/thiagoftsm))
+- Fix SSL certificate detection for Rocky Linux and static curl [\#20695](https://github.com/netdata/netdata/pull/20695) ([ktsaou](https://github.com/ktsaou))
 - update otel-collector components deps [\#20693](https://github.com/netdata/netdata/pull/20693) ([ilyam8](https://github.com/ilyam8))
 - Add Getting Started Netdata guide [\#20642](https://github.com/netdata/netdata/pull/20642) ([kanelatechnical](https://github.com/kanelatechnical))
 
@@ -462,8 +464,6 @@
 - ensure atomicity when logging pending message 3/3 [\#20189](https://github.com/netdata/netdata/pull/20189) ([ktsaou](https://github.com/ktsaou))
 - ensure atomicity when logging pending message 2/3 [\#20188](https://github.com/netdata/netdata/pull/20188) ([ktsaou](https://github.com/ktsaou))
 - added dyncfg docs [\#20187](https://github.com/netdata/netdata/pull/20187) ([ktsaou](https://github.com/ktsaou))
-- Fix repeating alert crash [\#20186](https://github.com/netdata/netdata/pull/20186) ([stelfrag](https://github.com/stelfrag))
-- ensure atomicity when logging pending message 1/3 [\#20185](https://github.com/netdata/netdata/pull/20185) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.4.0](https://github.com/netdata/netdata/tree/v2.4.0) (2025-04-14)
 
