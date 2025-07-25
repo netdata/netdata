@@ -239,7 +239,7 @@ metrics:
       chart_meta:
         description: SSL sessions per second between client and NetScaler appliance
         family: 'Network/SSL/Session/Rate'
-        unit: "1/s"
+        unit: "{session}/s"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.tcpCurClientConnEstablished
@@ -1062,7 +1062,7 @@ metrics:
         chart_meta:
           description: Request rate in requests per second for this service or virtual server
           family: 'Network/LoadBalancer/Service/Request/Rate'
-          unit: "1/s"
+          unit: "{session}/s"
       - name: netscaler.svcRxBytesRate
         OID: 1.3.6.1.4.1.5951.4.1.2.1.1.43
         chart_meta:

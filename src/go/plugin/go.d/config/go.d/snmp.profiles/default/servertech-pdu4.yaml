@@ -103,18 +103,19 @@ metrics:
           description: Power utilized by the input cord
           family: 'PowerFlow/InputCord/Utilized'
           unit: "W"
-      - name: servertech.sentry4.st4InputCordPowerFactor
-        OID: 1.3.6.1.4.1.1718.4.1.3.3.1.8
-        chart_meta:
-          description: Power factor of the input cord
-          family: 'PowerFlow/InputCord/Factor'
-          unit: "10*2.1"
+      # - name: servertech.sentry4.st4InputCordPowerFactor
+      #   OID: 1.3.6.1.4.1.1718.4.1.3.3.1.8
+      #   chart_meta:
+      #     description: Power factor of the input cord
+      #     family: 'PowerFlow/InputCord/Factor'
+      #     unit: "10*2.1"
+      # TODO this is not a metric, but a power factor
       - name: servertech.sentry4.st4InputCordEnergy
         OID: 1.3.6.1.4.1.1718.4.1.3.3.1.10
         chart_meta:
           description: Energy consumed by the input cord
           family: 'PowerFlow/InputCord/Energy/Total'
-          unit: "Wh"
+          unit: "W.h"
       - name: servertech.sentry4.st4InputCordFrequency
         OID: 1.3.6.1.4.1.1718.4.1.3.3.1.11
         chart_meta:
@@ -443,7 +444,7 @@ metrics:
         chart_meta:
           description: Energy consumed by the phase
           family: 'PowerFlow/Phase/Energy/Total'
-          unit: "Wh"
+          unit: "W.h"
       - OID: 1.3.6.1.4.1.1718.4.1.5.3.1.1
         name: servertech.sentry4.st4PhaseState
         chart_meta:

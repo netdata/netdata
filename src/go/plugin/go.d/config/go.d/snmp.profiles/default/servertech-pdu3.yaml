@@ -86,7 +86,7 @@ metrics:
         chart_meta:
           description: Tower energy consumption
           family: 'PowerFlow/Tower/Energy/Total'
-          unit: "Wh"
+          unit: "W.h"
       - name: servertech.sentry3.towerLineFrequency
         OID: 1.3.6.1.4.1.1718.3.2.1.1.15
         chart_meta:
@@ -164,7 +164,7 @@ metrics:
         chart_meta:
           description: Infeed energy consumption
           family: 'PowerFlow/Infeed/Energy/Total'
-          unit: "Wh"
+          unit: "W.h"
       - name: servertech.sentry3.infeedPhaseVoltage
         OID: 1.3.6.1.4.1.1718.3.2.2.1.18
         chart_meta:

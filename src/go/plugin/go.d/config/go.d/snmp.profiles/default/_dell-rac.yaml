@@ -1259,7 +1259,7 @@ metrics:
         chart_meta:
           family: 'Hardware/Power/Energy/Cumulative'
           description: Cumulative chassis power usage in kilowatt hours since last reset
-          unit: "kW.h"
+          unit: "kWh"
     metric_tags:
       - tag: chassis_index
         symbol:
