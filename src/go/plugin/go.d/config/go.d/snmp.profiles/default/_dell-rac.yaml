@@ -799,7 +799,7 @@ metrics:
         chart_meta:
           family: 'Hardware/Cooling/Device/Speed'
           description: Reading of the cooling device
-          unit: "rpm"
+          unit: "{revolution}/min"
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.18
         name: coolingDeviceDiscreteReading
         chart_meta:
@@ -1259,7 +1259,7 @@ metrics:
         chart_meta:
           family: 'Hardware/Power/Energy/Cumulative'
           description: Cumulative chassis power usage in kilowatt hours since last reset
-          unit: "kW.h"
+          unit: "kWh"
     metric_tags:
       - tag: chassis_index
         symbol:

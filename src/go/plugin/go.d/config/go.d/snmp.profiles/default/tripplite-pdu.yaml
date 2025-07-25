@@ -75,7 +75,7 @@ metrics:
         chart_meta:
           description: The ambient temperature at or near the PDU casing.
           family: 'Environment/Temperature/Value'
-          unit: "F"
+          unit: "degF"
       - OID: 1.3.6.1.4.1.850.1.1.3.2.2.1.1.8
         name: tlpPduDevicePhaseImbalance
         chart_meta:
