@@ -113,7 +113,7 @@ metrics:
         chart_meta:
           family: 'Hardware/Fan/Speed'
           description: Device fan speed
-          unit: "{revolution}/s"
+          unit: "{revolution}/min"
       - OID: 1.3.6.1.4.1.23695.200.1.1.1.4.2.1.2
         name: deviceFanStatus
         chart_meta:

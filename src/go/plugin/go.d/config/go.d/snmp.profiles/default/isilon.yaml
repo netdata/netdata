@@ -93,7 +93,7 @@ metrics:
         chart_meta:
           description: The current speed of the fan in revolutions per minute
           family: 'Hardware/Fan/Speed'
-          unit: "rpm"
+          unit: "{revolution}/min"
     metric_tags:
       - tag: fan_number
         symbol:
