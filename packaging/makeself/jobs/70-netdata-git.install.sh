@@ -28,16 +28,15 @@ export NETDATA_BUILD_DIR
 
 case "${BUILDARCH}" in
     armv6l)
-        export NETDATA_CMAKE_OPTIONS="-DENABLE_LIBBACKTRACE=On"
         export INSTALLER_ARGS="--disable-plugin-systemd-journal"
         ;;
     *)
-        export NETDATA_CMAKE_OPTIONS="-DENABLE_LIBBACKTRACE=On"
         export INSTALLER_ARGS="--enable-plugin-systemd-journal --internal-systemd-journal"
         ;;
 esac
 
 export RUSTFLAGS="-C target-feature=+crt-static"
+export NETDATA_CMAKE_OPTIONS="-DENABLE_LIBBACKTRACE=On -DBUILD_FOR_PACKAGING=On -DPACKAGE_TYPE=static"
 
 run ./netdata-installer.sh \
   --install-prefix "${NETDATA_INSTALL_PARENT}" \
