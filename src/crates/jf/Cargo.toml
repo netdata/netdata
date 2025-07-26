@@ -11,6 +11,8 @@ members = [
     # "journal_forwarder",
     "window_manager",
     "sigbus",
+    "nom-plugin",
+    "flatten_otel",
 ]
 
 [workspace.package]
@@ -31,6 +33,13 @@ walkdir = "2"
 ruzstd = "0.8"
 # systemd = { path = "/home/vk/repos/crates/rust-systemd"}
 libc = "0.2"
+
+# nom
+prost = "0.14"
+regex = "1.10"
+tokio = { version = "1.45", features = ["rt-multi-thread"] }
+tonic = "0.13"
+opentelemetry-proto = "0.30"
 
 [profile.release]
 lto = true
