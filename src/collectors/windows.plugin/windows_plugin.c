@@ -12,6 +12,7 @@ static struct proc_module {
     int (*func)(int update_every, usec_t dt);
     RRDDIM *rd;
     ND_THREAD *thread;
+    void (*cleanup)();
 } win_modules[] = {
 
     // system metrics
@@ -19,17 +20,26 @@ static struct proc_module {
      .dim = "GetSystemUptime",
      .enabled = CONFIG_BOOLEAN_YES,
      .update_every = UPDATE_EVERY_MIN,
-     .func = do_GetSystemUptime},
+     .func = do_GetSystemUptime,
+     .rd = NULL,
+     .thread = NULL,
+     .cleanup = NULL},
     {.name = "GetSystemRAM",
      .dim = "GetSystemRAM",
      .enabled = CONFIG_BOOLEAN_YES,
      .update_every = UPDATE_EVERY_MIN,
-     .func = do_GetSystemRAM},
+     .func = do_GetSystemRAM,
+     .rd = NULL,
+     .thread = NULL,
+     .cleanup = NULL},
     {.name = "GetPowerSupply",
      .dim = "GetPowerSupply",
      .enabled = CONFIG_BOOLEAN_YES,
      .update_every = UPDATE_EVERY_MIN,
-     .func = do_GetPowerSupply},
+     .func = do_GetPowerSupply,
+     .rd = NULL,
+     .thread = NULL,
+     .cleanup = NULL},
     {.name = "PerflibServices",
      .dim = "PerflibServices",
      .enabled = CONFIG_BOOLEAN_YES,
@@ -44,99 +54,141 @@ static struct proc_module {
      .dim = "PerflibProcesses",
      .enabled = CONFIG_BOOLEAN_YES,
      .update_every = UPDATE_EVERY_MIN,
-     .func = do_PerflibProcesses},
+     .func = do_PerflibProcesses,
+     .rd = NULL,
+     .thread = NULL,
+     .cleanup = NULL},
     {.name = "PerflibProcessor",
      .dim = "PerflibProcessor",
      .enabled = CONFIG_BOOLEAN_YES,
      .update_every = UPDATE_EVERY_MIN,
-     .func = do_PerflibProcessor},
+     .func = do_PerflibProcessor,
+     .rd = NULL,
+     .thread = NULL,
+     .cleanup = NULL},
     {.name = "PerflibMemory",
      .dim = "PerflibMemory",
      .enabled = CONFIG_BOOLEAN_YES,
      .update_every = UPDATE_EVERY_MIN,
-     .func = do_PerflibMemory},
+     .func = do_PerflibMemory,
+     .rd = NULL,
+     .thread = NULL,
+     .cleanup = NULL},
     {.name = "PerflibStorage",
      .dim = "PerflibStorage",
      .enabled = CONFIG_BOOLEAN_YES,
      .update_every = UPDATE_EVERY_MIN,
-     .func = do_PerflibStorage},
+     .func = do_PerflibStorage,
+     .rd = NULL,
+     .thread = NULL,
+     .cleanup = NULL},
     {.name = "PerflibNetwork",
      .dim = "PerflibNetwork",
      .enabled = CONFIG_BOOLEAN_YES,
      .update_every = UPDATE_EVERY_MIN,
-     .func = do_PerflibNetwork},
+     .func = do_PerflibNetwork,
+     .rd = NULL,
+     .thread = NULL,
+     .cleanup = NULL},
     {.name = "PerflibObjects",
      .dim = "PerflibObjects",
      .enabled = CONFIG_BOOLEAN_YES,
      .update_every = UPDATE_EVERY_MIN,
-     .func = do_PerflibObjects},
+     .func = do_PerflibObjects,
+     .rd = NULL,
+     .thread = NULL,
+     .cleanup = NULL},
     {.name = "PerflibHyperV",
      .dim = "PerflibHyperV",
      .enabled = CONFIG_BOOLEAN_YES,
      .update_every = 5 * UPDATE_EVERY_MIN,
-     .func = do_PerflibHyperV},
-
+     .func = do_PerflibHyperV,
+     .rd = NULL,
+     .thread = NULL,
+     .cleanup = NULL},
     {.name = "PerflibThermalZone",
      .dim = "PerflibThermalZone",
      .enabled = CONFIG_BOOLEAN_NO,
      .update_every = 5 * UPDATE_EVERY_MIN,
-     .func = do_PerflibThermalZone},
-
+     .func = do_PerflibThermalZone,
+     .rd = NULL,
+     .thread = NULL,
+     .cleanup = NULL},
     {.name = "PerflibWebService",
      .dim = "PerflibWebService",
      .enabled = CONFIG_BOOLEAN_YES,
      .update_every = UPDATE_EVERY_MIN,
-     .func = do_PerflibWebService},
+     .func = do_PerflibWebService,
+     .rd = NULL,
+     .thread = NULL,
+     .cleanup = NULL},
     {.name = "PerflibMSSQL",
      .dim = "PerflibMSSQL",
      .enabled = CONFIG_BOOLEAN_YES,
      .update_every = 10 * UPDATE_EVERY_MIN,
-     .func = do_PerflibMSSQL},
-
+     .func = do_PerflibMSSQL,
+     .rd = NULL,
+     .thread = NULL,
+     .cleanup = do_PerflibMSSQL_cleanup},
     {.name = "PerflibNetFramework",
      .dim = "PerflibNetFramework",
      .enabled = CONFIG_BOOLEAN_YES,
      .update_every = UPDATE_EVERY_MIN,
-     .func = do_PerflibNetFramework},
+     .func = do_PerflibNetFramework,
+     .rd = NULL,
+     .thread = NULL,
+     .cleanup = NULL},
     {.name = "PerflibAD",
      .dim = "PerflibAD",
      .enabled = CONFIG_BOOLEAN_YES,
      .update_every = 10 * UPDATE_EVERY_MIN,
-     .func = do_PerflibAD},
-
+     .func = do_PerflibAD,
+     .rd = NULL,
+     .thread = NULL,
+     .cleanup = NULL},
     {.name = "PerflibADCS",
      .dim = "PerflibADCS",
      .enabled = CONFIG_BOOLEAN_YES,
      .update_every = 10 * UPDATE_EVERY_MIN,
-     .func = do_PerflibADCS},
-
+     .func = do_PerflibADCS,
+     .rd = NULL,
+     .thread = NULL,
+     .cleanup = NULL},
     {.name = "PerflibADFS",
      .dim = "PerflibADFS",
      .enabled = CONFIG_BOOLEAN_YES,
      .update_every = 10 * UPDATE_EVERY_MIN,
-     .func = do_PerflibADFS},
-
+     .func = do_PerflibADFS,
+     .rd = NULL,
+     .thread = NULL,
+     .cleanup = NULL},
     {.name = "PerflibExchange",
      .dim = "PerflibExchange",
      .enabled = CONFIG_BOOLEAN_YES,
      .update_every = 10 * UPDATE_EVERY_MIN,
-     .func = do_PerflibExchange},
-
+     .func = do_PerflibExchange,
+     .rd = NULL,
+     .thread = NULL,
+     .cleanup = NULL},
     {.name = "PerflibNUMA",
      .dim = "PerflibNUMA",
      .enabled = CONFIG_BOOLEAN_YES,
      .update_every = UPDATE_EVERY_MIN,
-     .func = do_PerflibNUMA},
-
+     .func = do_PerflibNUMA,
+     .rd = NULL,
+     .thread = NULL,
+     .cleanup = NULL},
     // the terminator of this array
     {.name = "PerflibASP",
      .dim = "PerflibASP",
      .enabled = CONFIG_BOOLEAN_YES,
      .update_every = UPDATE_EVERY_MIN,
-     .func = do_PerflibASP},
-
+     .func = do_PerflibASP,
+     .rd = NULL,
+     .thread = NULL,
+     .cleanup = NULL},
     // the terminator of this array
-    {.name = NULL, .dim = NULL, .func = NULL}};
+    {.name = NULL, .dim = NULL, .func = NULL, .rd = NULL, .thread = NULL, .cleanup = NULL}};
 
 #if WORKER_UTILIZATION_MAX_JOB_TYPES < 36
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 36
@@ -206,8 +258,6 @@ void *win_plugin_main(void *ptr)
     int update_every = localhost->rrd_update_every;
     for (i = 0; win_modules[i].name; i++) {
         struct proc_module *pm = &win_modules[i];
-        pm->thread = NULL;
-
         snprintfz(buf, CONFIG_MAX_NAME, "plugin:windows:%s", pm->name);
 
         pm->enabled = inicfg_get_boolean(&netdata_config, "plugin:windows", pm->name, pm->enabled);
@@ -267,8 +317,12 @@ void *win_plugin_main(void *ptr)
     // Join threads
     for (i = 0; win_modules[i].name; i++) {
         struct proc_module *pm = &win_modules[i];
-        if (pm->thread)
+        if (pm->cleanup)
+            pm->cleanup();
+
+        if (pm->thread) {
             nd_thread_join(pm->thread);
+        }
     }
     return NULL;
 }
