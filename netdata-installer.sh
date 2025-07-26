@@ -216,6 +216,8 @@ USAGE: ${PROGRAM} [options]
   --enable-plugin-systemd-journal Enable the systemd journal plugin. Default: enable it when libsystemd is available.
   --disable-plugin-systemd-journal Explicitly disable the systemd journal plugin.
   --internal-systemd-journal Enable the internal journal file reader instead of using libsystemd
+  --enable-plugin-upsd       Enable the upsd plugin. Default: enable it when libupsclient-dev is available.
+  --disable-plugin-upsd      Explicitly disable the upsd plugin.
   --enable-exporting-kinesis Enable AWS Kinesis exporting connector. Default: enable it when libaws_cpp_sdk_kinesis
                              and its dependencies are available.
   --disable-exporting-kinesis Explicitly disable AWS Kinesis exporting connector.
@@ -296,6 +298,8 @@ while [ -n "${1}" ]; do
     "--enable-plugin-systemd-journal") ENABLE_SYSTEMD_JOURNAL=1 ;;
     "--disable-plugin-systemd-journal") ENABLE_SYSTEMD_JOURNAL=0 ;;
     "--internal-systemd-journal") USE_RUST_JOURNAL_FILE=1 ;;
+    "--enable-plugin-upsd") ENABLE_UPSD=1 ;;
+    "--disable-plugin-upsd") ENABLE_UPSD=0 ;;
     "--enable-exporting-kinesis" | "--enable-backend-kinesis")
       # TODO: Needs CMake Support
       ;;
