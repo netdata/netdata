@@ -45,6 +45,9 @@ typedef enum {
 
     // timeout while shutting down
     EXIT_REASON_SHUTDOWN_TIMEOUT    = (1 << 19),
+    
+    // process was killed without a signal we recognize
+    EXIT_REASON_HARD_KILLED         = (1 << 20),
 } EXIT_REASON;
 
 #define EXIT_REASON_NORMAL              \
@@ -78,6 +81,7 @@ typedef enum {
         | EXIT_REASON_ALREADY_RUNNING   \
         | EXIT_REASON_OUT_OF_MEMORY     \
         | EXIT_REASON_SHUTDOWN_TIMEOUT  \
+        | EXIT_REASON_HARD_KILLED       \
     )
 
 #define is_deadly_signal(reason) ((reason) & (EXIT_REASON_DEADLY_SIGNAL))
