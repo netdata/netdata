@@ -2,10 +2,11 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v2.6.0...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.6.1...HEAD)
 
 **Merged pull requests:**
 
+- Reset chart variable after release [\#20727](https://github.com/netdata/netdata/pull/20727) ([stelfrag](https://github.com/stelfrag))
 - Update README.md [\#20724](https://github.com/netdata/netdata/pull/20724) ([kanelatechnical](https://github.com/kanelatechnical))
 - Update README.md [\#20723](https://github.com/netdata/netdata/pull/20723) ([kanelatechnical](https://github.com/kanelatechnical))
 - Avoid static initialization [\#20722](https://github.com/netdata/netdata/pull/20722) ([stelfrag](https://github.com/stelfrag))
@@ -15,7 +16,9 @@
 - improve\(go.d/snmp\): add profile device meta to vnode labels [\#20718](https://github.com/netdata/netdata/pull/20718) ([ilyam8](https://github.com/ilyam8))
 - Ignore timestamps recording in gzip metadata \(for reproducible builds\) [\#20714](https://github.com/netdata/netdata/pull/20714) ([Antiz96](https://github.com/Antiz96))
 - Remove H2O web server code from Netdata. [\#20713](https://github.com/netdata/netdata/pull/20713) ([Ferroin](https://github.com/Ferroin))
+- Deployment Guides: add and update documentation for deployment strate… [\#20712](https://github.com/netdata/netdata/pull/20712) ([kanelatechnical](https://github.com/kanelatechnical))
 - Detect missing ACLK MQTT packet acknowledgents [\#20711](https://github.com/netdata/netdata/pull/20711) ([stelfrag](https://github.com/stelfrag))
+- SNMP: make units ucum [\#20710](https://github.com/netdata/netdata/pull/20710) ([Ancairon](https://github.com/Ancairon))
 - build\(deps\): bump github.com/gosnmp/gosnmp from 1.42.0 to 1.42.1 in /src/go [\#20709](https://github.com/netdata/netdata/pull/20709) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/gosnmp/gosnmp from 1.41.0 to 1.42.0 in /src/go [\#20707](https://github.com/netdata/netdata/pull/20707) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump k8s.io/client-go from 0.33.2 to 0.33.3 in /src/go [\#20705](https://github.com/netdata/netdata/pull/20705) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -28,6 +31,10 @@
 - Fix SSL certificate detection for Rocky Linux and static curl [\#20695](https://github.com/netdata/netdata/pull/20695) ([ktsaou](https://github.com/ktsaou))
 - update otel-collector components deps [\#20693](https://github.com/netdata/netdata/pull/20693) ([ilyam8](https://github.com/ilyam8))
 - Add Getting Started Netdata guide [\#20642](https://github.com/netdata/netdata/pull/20642) ([kanelatechnical](https://github.com/kanelatechnical))
+
+## [v2.6.1](https://github.com/netdata/netdata/tree/v2.6.1) (2025-07-25)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.6.0...v2.6.1)
 
 ## [v2.6.0](https://github.com/netdata/netdata/tree/v2.6.0) (2025-07-17)
 
@@ -459,11 +466,6 @@
 - rrdset/rrddim find function do not return obsolete metadata [\#20196](https://github.com/netdata/netdata/pull/20196) ([ktsaou](https://github.com/ktsaou))
 - cleanup ML cached pointers on child disconnection [\#20195](https://github.com/netdata/netdata/pull/20195) ([ktsaou](https://github.com/ktsaou))
 - limit the max number of threads based on memory too [\#20192](https://github.com/netdata/netdata/pull/20192) ([ktsaou](https://github.com/ktsaou))
-- Exporting exit fix [\#20191](https://github.com/netdata/netdata/pull/20191) ([ktsaou](https://github.com/ktsaou))
-- ignore maintenance signals on exit [\#20190](https://github.com/netdata/netdata/pull/20190) ([ktsaou](https://github.com/ktsaou))
-- ensure atomicity when logging pending message 3/3 [\#20189](https://github.com/netdata/netdata/pull/20189) ([ktsaou](https://github.com/ktsaou))
-- ensure atomicity when logging pending message 2/3 [\#20188](https://github.com/netdata/netdata/pull/20188) ([ktsaou](https://github.com/ktsaou))
-- added dyncfg docs [\#20187](https://github.com/netdata/netdata/pull/20187) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.4.0](https://github.com/netdata/netdata/tree/v2.4.0) (2025-04-14)
 
