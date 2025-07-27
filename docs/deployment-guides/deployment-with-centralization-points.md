@@ -1,122 +1,204 @@
-# Deployment with Centralization Points
+# Parents: Your Centralization Points
 
-An observability centralization point can centralize both metrics and logs. The sending systems are called Children, while the receiving systems are called Parents.
+***Parents*** are Netdata Agents that collect and store data from other Agents ("***Children***"). They act as centralization points for your observability data.
 
-When metrics and logs are centralized, the Children are never queried for metrics and logs. The Netdata Parents have all the data needed to satisfy queries.
+## How It Works
 
-- **Metrics** are centralized by Netdata, with a feature we call **Streaming**. The Parents listen for incoming connections and permit access only to Children that connect to it with the right API key. Children are configured to push their metrics to the Parents, and they initiate the connections to do so.
+1. **You designate some Agents as Parents** - Configure them to receive streaming data
+2. **Children stream their data to Parents** - They push metrics continuously
+3. **Parents store and process everything** - All metrics and logs from all Children
+4. **You access Parents for dashboards and alerts** - Centralized monitoring interface
+5. **Cloud queries Parents when configured** - Reduces load on production systems
 
-- **Logs** are centralized with methodologies provided by `systemd-journald`. This involves installing `systemd-journal-remote` on both the Parent and the Children, and configuring the keys required for this communication.
+:::info
 
-|                    Feature                    |                                                 How it works                                                  |
-|:---------------------------------------------:|:-------------------------------------------------------------------------------------------------------------:|
-| Unified infrastructure dashboards for metrics |                                             Yes, at Netdata Cloud                                             |
-|  Unified infrastructure dashboards for logs   | All logs are accessible via the same dashboard at Netdata Cloud, although they are unified per Netdata Parent |
-|          Centrally configured alerts          |                                            Yes, at Netdata Parents                                            |
-|   Centrally dispatched alert notifications    |                                             Yes, at Netdata Cloud                                             |
-|         Data are exclusively on-prem          |                    Yes, Netdata Cloud queries Netdata Agents to satisfy dashboard queries.                    |
+Parents give you centralized collection with distributed architecture benefits.
 
-A configuration with 2 observability centralization points looks like this:
+:::
 
-```mermaid
-flowchart LR
-    WEB[["One unified
-        dashboard
-        for all nodes"]]
-    NC(["<b>Netdata Cloud</b>
-        decides which Agents
-        need to be queried"])
-    SA1["Netdata at AWS
-         A1"]
-    SA2["Netdata at AWS
-         A2"]
-    SAN["Netdata at AWS
-         AN"]
-    PA["<b>Netdata Parent A</b>
-        at AWS
-        having all metrics & logs
-        for all Ax nodes"]
-    SB1["Netdata On-Prem
-         B1"]
-    SB2["Netdata On-Prem
-         B2"]
-    SBN["Netdata On-Prem
-         BN"]
-    PB["<b>Netdata Parent B</b>
-        On-Prem
-        having all metrics & logs
-        for all Bx nodes"]
-    WEB -->|query| NC -->|query| PA & PB
-    PA ---|stream| SA1 & SA2 & SAN
-    PB ---|stream| SB1 & SB2 & SBN 
-```
+## What Parents Do
 
-Netdata Cloud queries the Netdata Parents to provide aggregated dashboard views.
+Parents are specialized Netdata installations that you can configure to **receive, store, and process** observability data (metrics and logs) from multiple other systems in your infrastructure.
 
-For alerts, the dispatch of notifications looks like in the following chart:
+These Parents give you several core functions:
+
+* **Receiving and storing** metrics and logs from multiple systems
+* **Processing and analyzing** your collected data
+* **Running health checks and alerts**
+* Providing **unified dashboards** across all your systems
+* **Replicating data** for your historical analysis
+
+:::info
+
+This **distributed yet centralized** approach gives you the benefits of both decentralized collection and centralized analysis.
+
+:::
+
+## Why Use Parents
+
+| Use Case                                        | Description                                                                                    | Benefits                                                                                      |
+|-------------------------------------------------|------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------|
+| **Ephemeral Systems**                           | Ideal for your Kubernetes nodes or temporary VMs that frequently go offline                    | You retain metrics and logs for analysis and troubleshooting even after node termination      |
+| **Limited Resources**                           | Offloads observability tasks from your systems with low disk space, CPU, RAM, or I/O bandwidth | Your production systems run efficiently without performance trade-offs                        |
+| **Multi-Node Dashboards Without Netdata Cloud** | Aggregates data from all your nodes for centralized dashboards                                 | You get Cloud-like functionality in environments that prefer or require on-premises solutions |
+| **Restricted Netdata Cloud Access**             | Acts as a bridge when your monitored systems can't connect to Netdata Cloud                    | You can still use Cloud features despite firewall restrictions or security policies           |
+
+## How Multiple Parents Work
+
+<details>
+<summary><strong>Click to see Parent architecture options</strong></summary><br/>
 
 ```mermaid
-flowchart LR
-    NC(["<b>Netdata Cloud</b>
-        applies silencing
-        & user settings"])
-    SA1["Netdata at AWS
-         A1"]
-    SA2["Netdata at AWS
-         A2"]
-    SAN["Netdata at AWS
-         AN"]
-    PA["<b>Netdata Parent A</b>
-        at AWS
-        having all metrics & logs
-        for all Ax nodes"]
-    SB1["Netdata On-Prem
-         B1"]
-    SB2["Netdata On-Prem
-         B2"]
-    SBN["Netdata On-Prem
-         BN"]
-    PB["<b>Netdata Parent B</b>
-        On-Prem
-        having all metrics & logs
-        for all Bx nodes"]
-    EMAIL[["<b>e-mail</b>
-        notifications"]]
-    MOBILEAPP[["<b>Netdata Mobile App</b>
-        notifications"]]
-    SLACK[["<b>Slack</b>
-        notifications"]]
-    OTHER[["Other
-        notifications"]]
-    PA & PB -->|alert transitions| NC -->|notification| EMAIL & MOBILEAPP & SLACK & OTHER 
-    SA1 & SA2 & SAN ---|stream| PA
-    SB1 & SB2 & SBN ---|stream| PB 
+flowchart TB
+    subgraph architectures["Parent Architecture Options"]
+        direction TB
+
+        subgraph single["Single Parent"]
+            SP[SP]
+            SC1[SC1]
+            SC2[SC2]
+            SC3[SC3]
+            SP("**Parent**<br/>All data in one place")
+            SC1("Child 1")
+            SC2("Child 2")
+            SC3("Child 3")
+            SC1 --> SP
+            SC2 --> SP
+            SC3 --> SP
+        end
+
+        subgraph multiple["Multiple Parents"]
+            MP1[MP1]
+            MP2[MP2]
+            MC1[MC1]
+            MC2[MC2]
+            MC3[MC3]
+            MC4[MC4]
+            MP1("**Parent 1**<br/>Region/Team A")
+            MP2("**Parent 2**<br/>Region/Team B")
+            MC1("Child 1")
+            MC2("Child 2")
+            MC3("Child 3")
+            MC4("Child 4")
+            MC1 --> MP1
+            MC2 --> MP1
+            MC3 --> MP2
+            MC4 --> MP2
+        end
+
+        subgraph ha["High Availability"]
+            HP1[HP1]
+            HP2[HP2]
+            HC1[HC1]
+            HC2[HC2]
+            HP1("**Parent 1**<br/>Active")
+            HP2("**Parent 2**<br/>Active")
+            HC1("Child 1")
+            HC2("Child 2")
+            HC1 --> HP1
+            HC2 --> HP1
+            HC1 -.-> HP2
+            HC2 -.-> HP2
+            HP1 <--> HP2
+        end
+    end
+
+    classDef parent fill: #f3e8ff, stroke: #9b59b6, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
+    classDef child fill: #e8f5e8, stroke: #27ae60, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
+    classDef subgraphStyle fill: #f8f9fa, stroke: #6c757d, stroke-width: 2px, color: #2c3e50, rx: 15, ry: 15
+    classDef innerStyle fill: #f0f8ff, stroke: #87ceeb, stroke-width: 2px, color: #2c3e50, rx: 12, ry: 12
+    class SP parent
+    class MP1 parent
+    class MP2 parent
+    class HP1 parent
+    class HP2 parent
+    class SC1 child
+    class SC2 child
+    class SC3 child
+    class MC1 child
+    class MC2 child
+    class MC3 child
+    class MC4 child
+    class HC1 child
+    class HC2 child
+    class architectures subgraphStyle
+    class single innerStyle
+    class multiple innerStyle
+    class ha innerStyle
 ```
 
-## Active–Active Parent Deployment
+</details><br/>
 
-For high availability, Parents can be configured to stream data for their Children between them, and keep their data sets in sync. Children are configured with the addresses of both Parents, but will only stream to one of them at a time. When one Parent becomes unavailable, the Child reconnects to the other. When the first Parent becomes available again, that Parent will catch up by receiving the backlog from the second.
+| Scenario                    | Operation                                                  | Advantages                                                               |
+|-----------------------------|------------------------------------------------------------|--------------------------------------------------------------------------|
+| **With Netdata Cloud**      | Queries all your Parents in parallel for a unified view    | You get a seamless experience regardless of your underlying architecture |
+| **Without Netdata Cloud**   | Your Parents consolidate data from connected systems       | You have a local view of metrics and logs without external dependencies  |
+| **High Availability Setup** | Your Parents share data with each other, forming a cluster | You won't lose data if one Parent fails                                  |
 
-With both Parent Agents connected to Netdata Cloud, it will route queries to either of them transparently, depending on their availability. Alerts trigger on either Parent will stream to Cloud, and Cloud will deduplicate and debounce state changes to prevent spurious notifications.
+## Technical Implementation
 
-## Configuration steps for deploying Netdata with Observability Centralization Points
+Parents consist of two major components you can deploy:
 
-For Metrics:
+1. **Metrics Centralization** - Uses Netdata's streaming and replication features to centralize your metrics data
+2. **Logs Centralization** - Uses systemd-journald methodologies to centralize your log data
 
-- Install Netdata Agents on all systems and the Netdata Parents.
+You can configure your systems to connect to **multiple Parents** for redundancy. If a connection fails, they automatically switch to an available alternative.
 
-- Configure `stream.conf` at the Netdata Parents to enable streaming access with an API key.
+In a **high-availability setup**, your Parents can form a cluster by sharing data with each other, ensuring all points have a complete copy of all your metrics and logs.
 
-- Configure `stream.conf` at the Netdata Children to enable streaming to the configured Netdata Parents.
+<details>
+<summary><strong>Click to see how high availability works</strong></summary><br/>
 
-Check the [related section in our documentation](/docs/observability-centralization-points/metrics-centralization-points/README.md) for more info.
+```mermaid
+flowchart TB
+    NC[NC]
+    NC("**Netdata Cloud**<br/>Queries available Parents")
 
-For Logs:
+    subgraph infrastructure["Your Infrastructure"]
+        direction TB
+        P1[P1]
+        P2[P2]
+        C1[C1]
+        C2[C2]
+        C3[C3]
+        C4[C4]
+        P1("**Parent 1**<br/>Active")
+        P2("**Parent 2**<br/>Active")
+        C1("Child 1")
+        C2("Child 2")
+        C3("Child 3")
+        C4("Child 4")
+        C1 -->|primary| P1
+        C2 -->|primary| P1
+        C3 -->|primary| P2
+        C4 -->|primary| P2
+        C1 -.->|failover| P2
+        C2 -.->|failover| P2
+        C3 -.->|failover| P1
+        C4 -.->|failover| P1
+        P1 <-->|sync| P2
+    end
 
-- Install `systemd-journal-remote` on all systems and the Netdata Parents.
+    NC <--> P1
+    NC <--> P2
+    classDef cloud fill: #e8f4fd, stroke: #4a90e2, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
+    classDef parent fill: #f3e8ff, stroke: #9b59b6, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
+    classDef child fill: #e8f5e8, stroke: #27ae60, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
+    classDef subgraphStyle fill: #f8f9fa, stroke: #6c757d, stroke-width: 2px, color: #2c3e50, rx: 15, ry: 15
+    class NC cloud
+    class P1 parent
+    class P2 parent
+    class C1 child
+    class C2 child
+    class C3 child
+    class C4 child
+    class infrastructure subgraphStyle
+```
 
-- Configure `systemd-journal-remote` at the Netdata Parents to enable logs reception.
+</details><br/>
 
-- Configure `systemd-journal-upload` at the Netdata Children to enable transmission of their logs to the Netdata Parents.
+:::tip
 
-Check the [related section in our documentation](/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/README.md) for more info.
+Check out our [Parent-Child Deployment Guide](/docs/deployment-guides/deployment-with-centralization-points.md) for step-by-step instructions.
+
+:::
