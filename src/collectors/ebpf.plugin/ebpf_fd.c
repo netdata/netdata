@@ -428,7 +428,7 @@ static void ebpf_obsolete_fd_services(ebpf_module_t *em, char *id)
  */
 static inline void ebpf_obsolete_fd_cgroup_charts(ebpf_module_t *em)
 {
-    pthread_mutex_lock(&mutex_cgroup_shm);
+    netdata_mutex_lock(&mutex_cgroup_shm);
 
     ebpf_cgroup_target_t *ect;
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
@@ -440,7 +440,7 @@ static inline void ebpf_obsolete_fd_cgroup_charts(ebpf_module_t *em)
 
         ebpf_obsolete_specific_fd_charts(ect->name, em);
     }
-    pthread_mutex_unlock(&mutex_cgroup_shm);
+    netdata_mutex_unlock(&mutex_cgroup_shm);
 }
 
 /**
@@ -454,7 +454,7 @@ void ebpf_obsolete_fd_apps_charts(struct ebpf_module *em)
 {
     struct ebpf_target *w;
     int update_every = em->update_every;
-    pthread_mutex_lock(&collect_data_mutex);
+    netdata_mutex_lock(&collect_data_mutex);
     for (w = apps_groups_root_target; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_FD_IDX))))
             continue;
@@ -512,7 +512,7 @@ void ebpf_obsolete_fd_apps_charts(struct ebpf_module *em)
         }
         w->charts_created &= ~(1 << EBPF_MODULE_FD_IDX);
     }
-    pthread_mutex_unlock(&collect_data_mutex);
+    netdata_mutex_unlock(&collect_data_mutex);
 }
 
 /**
@@ -565,15 +565,15 @@ static void ebpf_fd_exit(void *pptr)
     if (!em)
         return;
 
-    pthread_mutex_lock(&lock);
+    netdata_mutex_lock(&lock);
     collect_pids &= ~(1 << EBPF_MODULE_FD_IDX);
-    pthread_mutex_unlock(&lock);
+    netdata_mutex_unlock(&lock);
 
     if (ebpf_read_fd.thread)
         nd_thread_signal_cancel(ebpf_read_fd.thread);
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
-        pthread_mutex_lock(&lock);
+        netdata_mutex_lock(&lock);
         if (em->cgroup_charts) {
             ebpf_obsolete_fd_cgroup_charts(em);
             fflush(stdout);
@@ -586,7 +586,7 @@ static void ebpf_fd_exit(void *pptr)
         ebpf_obsolete_fd_global(em);
 
         fflush(stdout);
-        pthread_mutex_unlock(&lock);
+        netdata_mutex_unlock(&lock);
     }
 
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_REMOVE);
@@ -603,10 +603,10 @@ static void ebpf_fd_exit(void *pptr)
         em->probe_links = NULL;
     }
 
-    pthread_mutex_lock(&ebpf_exit_cleanup);
+    netdata_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     ebpf_update_stats(&plugin_statistics, em);
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
+    netdata_mutex_unlock(&ebpf_exit_cleanup);
 }
 
 /*****************************************************************
@@ -773,14 +773,14 @@ void ebpf_fd_resume_apps_data()
 {
     struct ebpf_target *w;
 
-    pthread_mutex_lock(&collect_data_mutex);
+    netdata_mutex_lock(&collect_data_mutex);
     for (w = apps_groups_root_target; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_FD_IDX))))
             continue;
 
         ebpf_fd_sum_pids(&w->fd, w->root_pid);
     }
-    pthread_mutex_unlock(&collect_data_mutex);
+    netdata_mutex_unlock(&collect_data_mutex);
 }
 
 /**
@@ -794,7 +794,7 @@ static void ebpf_update_fd_cgroup()
 {
     ebpf_cgroup_target_t *ect;
 
-    pthread_mutex_lock(&mutex_cgroup_shm);
+    netdata_mutex_lock(&mutex_cgroup_shm);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         struct pid_on_target2 *pids;
         for (pids = ect->pids; pids; pids = pids->next) {
@@ -810,7 +810,7 @@ static void ebpf_update_fd_cgroup()
             memcpy(out, in, sizeof(netdata_publish_fd_stat_t));
         }
     }
-    pthread_mutex_unlock(&mutex_cgroup_shm);
+    netdata_mutex_unlock(&mutex_cgroup_shm);
 }
 
 /**
@@ -856,14 +856,14 @@ void ebpf_read_fd_thread(void *ptr)
 
         counter = 0;
 
-        pthread_mutex_lock(&ebpf_exit_cleanup);
+        netdata_mutex_lock(&ebpf_exit_cleanup);
         if (running_time && !em->running_time)
             running_time = update_every;
         else
             running_time += update_every;
 
         em->running_time = running_time;
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
+        netdata_mutex_unlock(&ebpf_exit_cleanup);
     }
 }
 
@@ -876,7 +876,7 @@ void ebpf_read_fd_thread(void *ptr)
 void ebpf_fd_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
 {
     struct ebpf_target *w;
-    pthread_mutex_lock(&collect_data_mutex);
+    netdata_mutex_lock(&collect_data_mutex);
     for (w = root; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_FD_IDX))))
             continue;
@@ -901,7 +901,7 @@ void ebpf_fd_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
             ebpf_write_end_chart();
         }
     }
-    pthread_mutex_unlock(&collect_data_mutex);
+    netdata_mutex_unlock(&collect_data_mutex);
 }
 
 /**
@@ -1239,7 +1239,7 @@ static void ebpf_send_systemd_fd_charts(ebpf_module_t *em)
 */
 static void ebpf_fd_send_cgroup_data(ebpf_module_t *em)
 {
-    pthread_mutex_lock(&mutex_cgroup_shm);
+    netdata_mutex_lock(&mutex_cgroup_shm);
     ebpf_cgroup_target_t *ect;
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         ebpf_fd_sum_cgroup_pids(&ect->publish_systemd_fd, ect->pids);
@@ -1272,7 +1272,7 @@ static void ebpf_fd_send_cgroup_data(ebpf_module_t *em)
         }
     }
 
-    pthread_mutex_unlock(&mutex_cgroup_shm);
+    netdata_mutex_unlock(&mutex_cgroup_shm);
 }
 
 /**
@@ -1300,7 +1300,7 @@ static void fd_collector(ebpf_module_t *em)
         netdata_apps_integration_flags_t apps = em->apps_charts;
         ebpf_fd_read_global_tables(stats, maps_per_core);
 
-        pthread_mutex_lock(&lock);
+        netdata_mutex_lock(&lock);
 
         ebpf_fd_send_data(em);
 
@@ -1310,16 +1310,16 @@ static void fd_collector(ebpf_module_t *em)
         if (cgroups && shm_ebpf_cgroup.header)
             ebpf_fd_send_cgroup_data(em);
 
-        pthread_mutex_unlock(&lock);
+        netdata_mutex_unlock(&lock);
 
-        pthread_mutex_lock(&ebpf_exit_cleanup);
+        netdata_mutex_lock(&ebpf_exit_cleanup);
         if (running_time && !em->running_time)
             running_time = update_every;
         else
             running_time += update_every;
 
         em->running_time = running_time;
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
+        netdata_mutex_unlock(&ebpf_exit_cleanup);
     }
 }
 
@@ -1549,12 +1549,12 @@ void ebpf_fd_thread(void *ptr)
     ebpf_global_labels(
         fd_aggregated_data, fd_publish_aggregated, fd_dimension_names, fd_id_names, algorithms, NETDATA_FD_SYSCALL_END);
 
-    pthread_mutex_lock(&lock);
+    netdata_mutex_lock(&lock);
     ebpf_create_fd_global_charts(em);
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
 
-    pthread_mutex_unlock(&lock);
+    netdata_mutex_unlock(&lock);
 
     ebpf_read_fd.thread = nd_thread_create(ebpf_read_fd.name, NETDATA_THREAD_OPTION_DEFAULT, ebpf_read_fd_thread, em);
 

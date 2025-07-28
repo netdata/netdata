@@ -357,7 +357,7 @@ static void ebpf_function_socket_manipulation(
             }
         } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_PERIOD, sizeof(EBPF_FUNCTION_SOCKET_PERIOD) - 1) == 0) {
             name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_PERIOD) - 1];
-            pthread_mutex_lock(&ebpf_exit_cleanup);
+            netdata_mutex_lock(&ebpf_exit_cleanup);
             period = str2i(name);
             if (period > 0) {
                 em->lifetime = period;
@@ -367,7 +367,7 @@ static void ebpf_function_socket_manipulation(
 #ifdef NETDATA_DEV_MODE
             collector_info("Lifetime modified for %u", em->lifetime);
 #endif
-            pthread_mutex_unlock(&ebpf_exit_cleanup);
+            netdata_mutex_unlock(&ebpf_exit_cleanup);
         } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_RESOLVE, sizeof(EBPF_FUNCTION_SOCKET_RESOLVE) - 1) == 0) {
             previous = network_viewer_opt.service_resolution_enabled;
             uint32_t resolution;
@@ -433,19 +433,19 @@ static void ebpf_function_socket_manipulation(
         rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
         collect_pids |= 1 << EBPF_MODULE_SOCKET_IDX;
-        pthread_mutex_lock(&ebpf_exit_cleanup);
+        netdata_mutex_lock(&ebpf_exit_cleanup);
         if (ebpf_function_start_thread(em, period)) {
             ebpf_function_error(transaction, HTTP_RESP_INTERNAL_SERVER_ERROR, "Cannot start thread.");
-            pthread_mutex_unlock(&ebpf_exit_cleanup);
+            netdata_mutex_unlock(&ebpf_exit_cleanup);
             return;
         }
     } else {
-        pthread_mutex_lock(&ebpf_exit_cleanup);
+        netdata_mutex_lock(&ebpf_exit_cleanup);
         if (period < 0)
             em->lifetime = (em->enabled != NETDATA_THREAD_EBPF_FUNCTION_RUNNING) ? EBPF_NON_FUNCTION_LIFE_TIME :
                                                                                    EBPF_DEFAULT_LIFETIME;
     }
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
+    netdata_mutex_unlock(&ebpf_exit_cleanup);
 
     BUFFER *wb = buffer_create(4096, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAY_ITEMS);
@@ -810,7 +810,7 @@ void ebpf_function_thread(void *ptr)
     functions_evloop_add_function(
         wg, EBPF_FUNCTION_SOCKET, ebpf_function_socket_manipulation, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, NULL);
 
-    pthread_mutex_lock(&lock);
+    netdata_mutex_lock(&lock);
     int i;
     for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
         ebpf_module_t *em = &ebpf_modules[i];
@@ -819,7 +819,7 @@ void ebpf_function_thread(void *ptr)
 
         EBPF_PLUGIN_FUNCTIONS(em->functions.fcnt_name, em->functions.fcnt_desc, em->update_every);
     }
-    pthread_mutex_unlock(&lock);
+    netdata_mutex_unlock(&lock);
 
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);

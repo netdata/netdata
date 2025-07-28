@@ -183,15 +183,15 @@ void ebpf_process_thread(void *ptr);
 void ebpf_socket_thread(void *ptr);
 
 // Common variables
-extern pthread_mutex_t lock;
-extern pthread_mutex_t ebpf_exit_cleanup;
+extern netdata_mutex_t lock;
+extern netdata_mutex_t ebpf_exit_cleanup;
 extern int ebpf_nprocs;
 extern int running_on_kernel;
 extern int isrh;
 extern char *ebpf_plugin_dir;
 extern int process_pid_fd;
 
-extern pthread_mutex_t collect_data_mutex;
+extern netdata_mutex_t collect_data_mutex;
 
 // Common functions
 void ebpf_global_labels(

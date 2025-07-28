@@ -303,7 +303,7 @@ static void ebpf_obsolete_swap_services(ebpf_module_t *em, char *id)
  */
 static inline void ebpf_obsolete_swap_cgroup_charts(ebpf_module_t *em)
 {
-    pthread_mutex_lock(&mutex_cgroup_shm);
+    netdata_mutex_lock(&mutex_cgroup_shm);
 
     ebpf_cgroup_target_t *ect;
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
@@ -315,7 +315,7 @@ static inline void ebpf_obsolete_swap_cgroup_charts(ebpf_module_t *em)
 
         ebpf_obsolete_specific_swap_charts(ect->name, em->update_every);
     }
-    pthread_mutex_unlock(&mutex_cgroup_shm);
+    netdata_mutex_unlock(&mutex_cgroup_shm);
 }
 
 /**
@@ -329,7 +329,7 @@ void ebpf_obsolete_swap_apps_charts(struct ebpf_module *em)
 {
     struct ebpf_target *w;
     int update_every = em->update_every;
-    pthread_mutex_lock(&collect_data_mutex);
+    netdata_mutex_lock(&collect_data_mutex);
     for (w = apps_groups_root_target; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_SWAP_IDX))))
             continue;
@@ -359,7 +359,7 @@ void ebpf_obsolete_swap_apps_charts(struct ebpf_module *em)
             update_every);
         w->charts_created &= ~(1 << EBPF_MODULE_SWAP_IDX);
     }
-    pthread_mutex_unlock(&collect_data_mutex);
+    netdata_mutex_unlock(&collect_data_mutex);
 }
 
 /**
@@ -396,15 +396,15 @@ static void ebpf_swap_exit(void *ptr)
     pids_fd[NETDATA_EBPF_PIDS_SWAP_IDX] = -1;
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
-    pthread_mutex_lock(&lock);
+    netdata_mutex_lock(&lock);
     collect_pids &= ~(1 << EBPF_MODULE_SWAP_IDX);
-    pthread_mutex_unlock(&lock);
+    netdata_mutex_unlock(&lock);
 
     if (ebpf_read_swap.thread)
         nd_thread_signal_cancel(ebpf_read_swap.thread);
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
-        pthread_mutex_lock(&lock);
+        netdata_mutex_lock(&lock);
         if (em->cgroup_charts) {
             ebpf_obsolete_swap_cgroup_charts(em);
             fflush(stdout);
@@ -417,7 +417,7 @@ static void ebpf_swap_exit(void *ptr)
         ebpf_obsolete_swap_global(em);
 
         fflush(stdout);
-        pthread_mutex_unlock(&lock);
+        netdata_mutex_unlock(&lock);
     }
 
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_REMOVE);
@@ -434,10 +434,10 @@ static void ebpf_swap_exit(void *ptr)
         em->probe_links = NULL;
     }
 
-    pthread_mutex_lock(&ebpf_exit_cleanup);
+    netdata_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     ebpf_update_stats(&plugin_statistics, em);
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
+    netdata_mutex_unlock(&ebpf_exit_cleanup);
 }
 
 /*****************************************************************
@@ -480,7 +480,7 @@ static void swap_apps_accumulator(netdata_ebpf_swap_t *out, int maps_per_core)
 static void ebpf_update_swap_cgroup()
 {
     ebpf_cgroup_target_t *ect;
-    pthread_mutex_lock(&mutex_cgroup_shm);
+    netdata_mutex_lock(&mutex_cgroup_shm);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         struct pid_on_target2 *pids;
         for (pids = ect->pids; pids; pids = pids->next) {
@@ -494,7 +494,7 @@ static void ebpf_update_swap_cgroup()
             memcpy(out, in, sizeof(netdata_publish_swap_t));
         }
     }
-    pthread_mutex_unlock(&mutex_cgroup_shm);
+    netdata_mutex_unlock(&mutex_cgroup_shm);
 }
 
 /**
@@ -532,14 +532,14 @@ static void ebpf_swap_sum_pids(netdata_publish_swap_t *swap, struct ebpf_pid_on_
 void ebpf_swap_resume_apps_data()
 {
     struct ebpf_target *w;
-    pthread_mutex_lock(&collect_data_mutex);
+    netdata_mutex_lock(&collect_data_mutex);
     for (w = apps_groups_root_target; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_SWAP_IDX))))
             continue;
 
         ebpf_swap_sum_pids(&w->swap, w->root_pid);
     }
-    pthread_mutex_unlock(&collect_data_mutex);
+    netdata_mutex_unlock(&collect_data_mutex);
 }
 
 /**
@@ -629,14 +629,14 @@ void ebpf_read_swap_thread(void *ptr)
 
         counter = 0;
 
-        pthread_mutex_lock(&ebpf_exit_cleanup);
+        netdata_mutex_lock(&ebpf_exit_cleanup);
         if (running_time && !em->running_time)
             running_time = update_every;
         else
             running_time += update_every;
 
         em->running_time = running_time;
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
+        netdata_mutex_unlock(&ebpf_exit_cleanup);
     }
 }
 
@@ -691,7 +691,7 @@ static void ebpf_swap_read_global_table(netdata_idx_t *stats, int maps_per_core)
 void ebpf_swap_send_apps_data(struct ebpf_target *root)
 {
     struct ebpf_target *w;
-    pthread_mutex_lock(&collect_data_mutex);
+    netdata_mutex_lock(&collect_data_mutex);
     for (w = root; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_SWAP_IDX))))
             continue;
@@ -704,7 +704,7 @@ void ebpf_swap_send_apps_data(struct ebpf_target *root)
         write_chart_dimension("calls", (long long)w->swap.write);
         ebpf_write_end_chart();
     }
-    pthread_mutex_unlock(&collect_data_mutex);
+    netdata_mutex_unlock(&collect_data_mutex);
 }
 
 /**
@@ -915,7 +915,7 @@ static void ebpf_create_systemd_swap_charts(int update_every)
 */
 void ebpf_swap_send_cgroup_data(int update_every)
 {
-    pthread_mutex_lock(&mutex_cgroup_shm);
+    netdata_mutex_lock(&mutex_cgroup_shm);
     ebpf_cgroup_target_t *ect;
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         ebpf_swap_sum_cgroup_pids(&ect->publish_systemd_swap, ect->pids);
@@ -948,7 +948,7 @@ void ebpf_swap_send_cgroup_data(int update_every)
         }
     }
 
-    pthread_mutex_unlock(&mutex_cgroup_shm);
+    netdata_mutex_unlock(&mutex_cgroup_shm);
 }
 
 /**
@@ -976,7 +976,7 @@ static void swap_collector(ebpf_module_t *em)
         netdata_apps_integration_flags_t apps = em->apps_charts;
         ebpf_swap_read_global_table(stats, maps_per_core);
 
-        pthread_mutex_lock(&lock);
+        netdata_mutex_lock(&lock);
 
         swap_send_global();
 
@@ -986,16 +986,16 @@ static void swap_collector(ebpf_module_t *em)
         if (cgroup && shm_ebpf_cgroup.header)
             ebpf_swap_send_cgroup_data(update_every);
 
-        pthread_mutex_unlock(&lock);
+        netdata_mutex_unlock(&lock);
 
-        pthread_mutex_lock(&ebpf_exit_cleanup);
+        netdata_mutex_lock(&ebpf_exit_cleanup);
         if (running_time && !em->running_time)
             running_time = update_every;
         else
             running_time += update_every;
 
         em->running_time = running_time;
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
+        netdata_mutex_unlock(&ebpf_exit_cleanup);
     }
 }
 
@@ -1212,11 +1212,11 @@ void ebpf_swap_thread(void *ptr)
         algorithms,
         NETDATA_SWAP_END);
 
-    pthread_mutex_lock(&lock);
+    netdata_mutex_lock(&lock);
     ebpf_create_swap_charts(em->update_every);
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
-    pthread_mutex_unlock(&lock);
+    netdata_mutex_unlock(&lock);
 
     ebpf_read_swap.thread =
         nd_thread_create(ebpf_read_swap.name, NETDATA_THREAD_OPTION_DEFAULT, ebpf_read_swap_thread, em);

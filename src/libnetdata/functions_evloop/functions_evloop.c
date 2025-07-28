@@ -43,8 +43,8 @@ struct functions_evloop_globals {
     const char *tag;
 
     DICTIONARY *worker_queue;
-    pthread_mutex_t worker_mutex;
-    pthread_cond_t worker_cond_var;
+    netdata_mutex_t worker_mutex;
+    netdata_cond_t worker_cond_var;
     size_t workers;
 
     netdata_mutex_t *stdout_mutex;
@@ -77,10 +77,10 @@ struct functions_evloop_globals {
 
 static void rrd_functions_worker_canceller(void *data) {
     struct functions_evloop_globals *wg = data;
-    pthread_mutex_lock(&wg->worker_mutex);
+    netdata_mutex_lock(&wg->worker_mutex);
     wg->workers_exit = true;
-    pthread_cond_signal(&wg->worker_cond_var);
-    pthread_mutex_unlock(&wg->worker_mutex);
+    netdata_cond_signal(&wg->worker_cond_var);
+    netdata_mutex_unlock(&wg->worker_mutex);
 }
 
 static void rrd_functions_worker_globals_worker_main(void *arg) {
@@ -90,15 +90,15 @@ static void rrd_functions_worker_globals_worker_main(void *arg) {
 
     bool last_acquired = true;
     while (true) {
-        pthread_mutex_lock(&wg->worker_mutex);
+        netdata_mutex_lock(&wg->worker_mutex);
 
         if(wg->workers_exit || nd_thread_signaled_to_cancel()) {
-            pthread_mutex_unlock(&wg->worker_mutex);
+            netdata_mutex_unlock(&wg->worker_mutex);
             break;
         }
 
         if(dictionary_entries(wg->worker_queue) == 0 || !last_acquired)
-            pthread_cond_wait(&wg->worker_cond_var, &wg->worker_mutex);
+            netdata_cond_wait(&wg->worker_cond_var, &wg->worker_mutex);
 
         const DICTIONARY_ITEM *acquired = NULL;
         struct functions_evloop_worker_job *j;
@@ -112,7 +112,7 @@ static void rrd_functions_worker_globals_worker_main(void *arg) {
         }
         dfe_done(j);
 
-        pthread_mutex_unlock(&wg->worker_mutex);
+        netdata_mutex_unlock(&wg->worker_mutex);
 
         if(wg->workers_exit || nd_thread_signaled_to_cancel()) {
             if(acquired)
@@ -185,9 +185,9 @@ static void worker_add_job(struct functions_evloop_globals *wg, const char *keyw
                 else {
                     found = true;
                     j->used = true;
-                    pthread_mutex_lock(&wg->worker_mutex);
-                    pthread_cond_signal(&wg->worker_cond_var);
-                    pthread_mutex_unlock(&wg->worker_mutex);
+                    netdata_mutex_lock(&wg->worker_mutex);
+                    netdata_cond_signal(&wg->worker_cond_var);
+                    netdata_mutex_unlock(&wg->worker_mutex);
                 }
             }
         }
@@ -349,8 +349,8 @@ struct functions_evloop_globals *functions_evloop_init(size_t worker_threads, co
 
     wg->dyncfg.nodes = dyncfg_nodes_dictionary_create();
 
-    pthread_mutex_init(&wg->worker_mutex, NULL);
-    pthread_cond_init(&wg->worker_cond_var, NULL);
+    netdata_mutex_init(&wg->worker_mutex);
+    netdata_cond_init(&wg->worker_cond_var);
 
     wg->plugin_should_exit = plugin_should_exit;
     wg->stdout_mutex = stdout_mutex;

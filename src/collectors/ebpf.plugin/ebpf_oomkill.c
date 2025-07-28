@@ -68,7 +68,7 @@ static void ebpf_obsolete_oomkill_services(ebpf_module_t *em, char *id)
  */
 static inline void ebpf_obsolete_oomkill_cgroup_charts(ebpf_module_t *em)
 {
-    pthread_mutex_lock(&mutex_cgroup_shm);
+    netdata_mutex_lock(&mutex_cgroup_shm);
 
     ebpf_cgroup_target_t *ect;
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
@@ -80,7 +80,7 @@ static inline void ebpf_obsolete_oomkill_cgroup_charts(ebpf_module_t *em)
 
         ebpf_obsolete_specific_oomkill_charts(ect->name, em->update_every);
     }
-    pthread_mutex_unlock(&mutex_cgroup_shm);
+    netdata_mutex_unlock(&mutex_cgroup_shm);
 }
 
 /**
@@ -94,7 +94,7 @@ static void ebpf_obsolete_oomkill_apps(ebpf_module_t *em)
 {
     struct ebpf_target *w;
     int update_every = em->update_every;
-    pthread_mutex_lock(&collect_data_mutex);
+    netdata_mutex_lock(&collect_data_mutex);
     for (w = apps_groups_root_target; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_OOMKILL_IDX))))
             continue;
@@ -113,7 +113,7 @@ static void ebpf_obsolete_oomkill_apps(ebpf_module_t *em)
 
         w->charts_created &= ~(1 << EBPF_MODULE_OOMKILL_IDX);
     }
-    pthread_mutex_unlock(&collect_data_mutex);
+    netdata_mutex_unlock(&collect_data_mutex);
 }
 
 /**
@@ -127,12 +127,12 @@ static void oomkill_cleanup(void *pptr)
     if (!em)
         return;
 
-    pthread_mutex_lock(&lock);
+    netdata_mutex_lock(&lock);
     collect_pids &= ~(1 << EBPF_MODULE_OOMKILL_IDX);
-    pthread_mutex_unlock(&lock);
+    netdata_mutex_unlock(&lock);
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
-        pthread_mutex_lock(&lock);
+        netdata_mutex_lock(&lock);
 
         if (em->cgroup_charts) {
             ebpf_obsolete_oomkill_cgroup_charts(em);
@@ -141,7 +141,7 @@ static void oomkill_cleanup(void *pptr)
         ebpf_obsolete_oomkill_apps(em);
 
         fflush(stdout);
-        pthread_mutex_unlock(&lock);
+        netdata_mutex_unlock(&lock);
     }
 
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_REMOVE);
@@ -152,10 +152,10 @@ static void oomkill_cleanup(void *pptr)
         em->probe_links = NULL;
     }
 
-    pthread_mutex_lock(&ebpf_exit_cleanup);
+    netdata_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     ebpf_update_stats(&plugin_statistics, em);
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
+    netdata_mutex_unlock(&ebpf_exit_cleanup);
 }
 
 static void oomkill_write_data(int32_t *keys, uint32_t total)
@@ -163,7 +163,7 @@ static void oomkill_write_data(int32_t *keys, uint32_t total)
     // for each app, see if it was OOM killed. record as 1 if so otherwise 0.
     struct ebpf_target *w;
     uint32_t used_pid = 0;
-    pthread_mutex_lock(&collect_data_mutex);
+    netdata_mutex_lock(&collect_data_mutex);
     for (w = apps_groups_root_target; w != NULL; w = w->next) {
         if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_OOMKILL_IDX))))
             continue;
@@ -203,7 +203,7 @@ static void oomkill_write_data(int32_t *keys, uint32_t total)
         ebpf_write_end_chart();
     }
 
-    pthread_mutex_unlock(&collect_data_mutex);
+    netdata_mutex_unlock(&collect_data_mutex);
 }
 
 /**
@@ -333,7 +333,7 @@ static void ebpf_obsolete_specific_oomkill_charts(char *type, int update_every)
 */
 void ebpf_oomkill_send_cgroup_data(int update_every)
 {
-    pthread_mutex_lock(&mutex_cgroup_shm);
+    netdata_mutex_lock(&mutex_cgroup_shm);
     ebpf_cgroup_target_t *ect;
 
     if (shm_ebpf_cgroup.header->systemd_enabled) {
@@ -362,7 +362,7 @@ void ebpf_oomkill_send_cgroup_data(int update_every)
         }
     }
 
-    pthread_mutex_unlock(&mutex_cgroup_shm);
+    netdata_mutex_unlock(&mutex_cgroup_shm);
 }
 
 /**
@@ -416,7 +416,7 @@ static uint32_t oomkill_read_data(int32_t *keys)
 static void ebpf_update_oomkill_cgroup(int32_t *keys, uint32_t total)
 {
     ebpf_cgroup_target_t *ect;
-    pthread_mutex_lock(&mutex_cgroup_shm);
+    netdata_mutex_lock(&mutex_cgroup_shm);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         ect->oomkill = 0;
         struct pid_on_target2 *pids;
@@ -431,7 +431,7 @@ static void ebpf_update_oomkill_cgroup(int32_t *keys, uint32_t total)
             }
         }
     }
-    pthread_mutex_unlock(&mutex_cgroup_shm);
+    netdata_mutex_unlock(&mutex_cgroup_shm);
 }
 
 /**
@@ -446,14 +446,14 @@ static void ebpf_update_oomkill_cgroup(int32_t *keys, uint32_t total)
  */
 static int ebpf_update_oomkill_period(int running_time, ebpf_module_t *em)
 {
-    pthread_mutex_lock(&ebpf_exit_cleanup);
+    netdata_mutex_lock(&ebpf_exit_cleanup);
     if (running_time && !em->running_time)
         running_time = em->update_every;
     else
         running_time += em->update_every;
 
     em->running_time = running_time;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
+    netdata_mutex_unlock(&ebpf_exit_cleanup);
 
     return running_time;
 }
@@ -493,7 +493,7 @@ static void oomkill_collector(ebpf_module_t *em)
             ebpf_update_oomkill_cgroup(keys, count);
 
         netdata_apps_integration_flags_t apps = em->apps_charts;
-        pthread_mutex_lock(&lock);
+        netdata_mutex_lock(&lock);
         // write everything from the ebpf map.
         if (cgroups && shm_ebpf_cgroup.header)
             ebpf_oomkill_send_cgroup_data(update_every);
@@ -501,7 +501,7 @@ static void oomkill_collector(ebpf_module_t *em)
         if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             oomkill_write_data(keys, count);
 
-        pthread_mutex_unlock(&lock);
+        netdata_mutex_unlock(&lock);
 
         running_time = ebpf_update_oomkill_period(running_time, em);
     }
@@ -567,17 +567,17 @@ void ebpf_oomkill_thread(void *ptr)
     if (unlikely(!em->apps_charts)) {
         // When we are not running integration with apps, we won't fill necessary variables for this thread to run, so
         // we need to disable it.
-        pthread_mutex_lock(&ebpf_exit_cleanup);
+        netdata_mutex_lock(&ebpf_exit_cleanup);
         if (em->enabled)
             netdata_log_info("%s apps integration is completely disabled.", NETDATA_DEFAULT_OOM_DISABLED_MSG);
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
+        netdata_mutex_unlock(&ebpf_exit_cleanup);
 
         goto endoomkill;
     } else if (running_on_kernel < NETDATA_EBPF_KERNEL_4_14) {
-        pthread_mutex_lock(&ebpf_exit_cleanup);
+        netdata_mutex_lock(&ebpf_exit_cleanup);
         if (em->enabled)
             netdata_log_info("%s kernel does not have necessary tracepoints.", NETDATA_DEFAULT_OOM_DISABLED_MSG);
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
+        netdata_mutex_unlock(&ebpf_exit_cleanup);
 
         goto endoomkill;
     }
@@ -594,10 +594,10 @@ void ebpf_oomkill_thread(void *ptr)
         goto endoomkill;
     }
 
-    pthread_mutex_lock(&lock);
+    netdata_mutex_lock(&lock);
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
-    pthread_mutex_unlock(&lock);
+    netdata_mutex_unlock(&lock);
 
     oomkill_collector(em);
 

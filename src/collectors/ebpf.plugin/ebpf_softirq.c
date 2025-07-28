@@ -88,11 +88,11 @@ static void softirq_cleanup(void *pptr)
         return;
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
-        pthread_mutex_lock(&lock);
+        netdata_mutex_lock(&lock);
 
         ebpf_obsolete_softirq_global(em);
 
-        pthread_mutex_unlock(&lock);
+        netdata_mutex_unlock(&lock);
         fflush(stdout);
     }
 
@@ -110,10 +110,10 @@ static void softirq_cleanup(void *pptr)
     freez(softirq_ebpf_vals);
     softirq_ebpf_vals = NULL;
 
-    pthread_mutex_lock(&ebpf_exit_cleanup);
+    netdata_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     ebpf_update_stats(&plugin_statistics, em);
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
+    netdata_mutex_unlock(&ebpf_exit_cleanup);
 }
 
 /*****************************************************************
@@ -198,12 +198,12 @@ static void softirq_collector(ebpf_module_t *em)
     softirq_ebpf_vals = callocz(ebpf_nprocs, sizeof(softirq_ebpf_val_t));
 
     // create chart and static dims.
-    pthread_mutex_lock(&lock);
+    netdata_mutex_lock(&lock);
     softirq_create_charts(em->update_every);
     softirq_create_dims();
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
-    pthread_mutex_unlock(&lock);
+    netdata_mutex_unlock(&lock);
 
     // loop and read from published data until ebpf plugin is closed.
     heartbeat_t hb;
@@ -221,23 +221,23 @@ static void softirq_collector(ebpf_module_t *em)
 
         counter = 0;
         softirq_read_latency_map(maps_per_core);
-        pthread_mutex_lock(&lock);
+        netdata_mutex_lock(&lock);
 
         // write dims now for all hitherto discovered IRQs.
         ebpf_write_begin_chart(NETDATA_EBPF_SYSTEM_GROUP, "softirq_latency", "");
         softirq_write_dims();
         ebpf_write_end_chart();
 
-        pthread_mutex_unlock(&lock);
+        netdata_mutex_unlock(&lock);
 
-        pthread_mutex_lock(&ebpf_exit_cleanup);
+        netdata_mutex_lock(&ebpf_exit_cleanup);
         if (running_time && !em->running_time)
             running_time = update_every;
         else
             running_time += update_every;
 
         em->running_time = running_time;
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
+        netdata_mutex_unlock(&ebpf_exit_cleanup);
     }
 }
 

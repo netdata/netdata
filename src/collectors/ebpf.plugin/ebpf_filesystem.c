@@ -596,7 +596,7 @@ static void ebpf_create_fs_charts(int update_every)
  */
 int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
 {
-    pthread_mutex_lock(&lock);
+    netdata_mutex_lock(&lock);
     int i;
     const char *saved_name = em->info.thread_name;
     uint64_t kernels = em->kernels;
@@ -615,7 +615,7 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
                     em->info.thread_name = saved_name;
                     em->kernels = kernels;
                     em->maps = NULL;
-                    pthread_mutex_unlock(&lock);
+                    netdata_mutex_unlock(&lock);
                     return -1;
                 }
             }
@@ -625,12 +625,12 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
                 if (!efp->fs_obj) {
                     em->info.thread_name = saved_name;
                     em->kernels = kernels;
-                    pthread_mutex_unlock(&lock);
+                    netdata_mutex_unlock(&lock);
                     return -1;
                 } else if (ebpf_fs_load_and_attach(em->maps, efp->fs_obj, efp->functions, NULL)) {
                     em->info.thread_name = saved_name;
                     em->kernels = kernels;
-                    pthread_mutex_unlock(&lock);
+                    netdata_mutex_unlock(&lock);
                     return -1;
                 }
             }
@@ -646,7 +646,7 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
         efp->flags &= ~NETDATA_FILESYSTEM_LOAD_EBPF_PROGRAM;
     }
     em->info.thread_name = saved_name;
-    pthread_mutex_unlock(&lock);
+    netdata_mutex_unlock(&lock);
     em->kernels = kernels;
     em->maps = NULL;
 
@@ -889,11 +889,11 @@ static void ebpf_filesystem_exit(void *pptr)
         return;
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
-        pthread_mutex_lock(&lock);
+        netdata_mutex_lock(&lock);
         ebpf_obsolete_filesystem_global(em);
 
         fflush(stdout);
-        pthread_mutex_unlock(&lock);
+        netdata_mutex_unlock(&lock);
     }
 
     ebpf_filesystem_cleanup_ebpf_data();
@@ -916,10 +916,10 @@ static void ebpf_filesystem_exit(void *pptr)
         efp->flags = NETDATA_FILESYSTEM_FLAG_NO_PARTITION;
     }
 
-    pthread_mutex_lock(&ebpf_exit_cleanup);
+    netdata_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     ebpf_update_stats(&plugin_statistics, em);
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
+    netdata_mutex_unlock(&ebpf_exit_cleanup);
 }
 
 /*****************************************************************
@@ -1099,21 +1099,21 @@ static void filesystem_collector(ebpf_module_t *em)
 
         counter = 0;
         ebpf_filesystem_read_hash(em);
-        pthread_mutex_lock(&lock);
+        netdata_mutex_lock(&lock);
 
         ebpf_create_fs_charts(update_every);
         ebpf_histogram_send_data();
 
-        pthread_mutex_unlock(&lock);
+        netdata_mutex_unlock(&lock);
 
-        pthread_mutex_lock(&ebpf_exit_cleanup);
+        netdata_mutex_lock(&ebpf_exit_cleanup);
         if (running_time && !em->running_time)
             running_time = update_every;
         else
             running_time += update_every;
 
         em->running_time = running_time;
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
+        netdata_mutex_unlock(&ebpf_exit_cleanup);
     }
 }
 
@@ -1196,10 +1196,10 @@ void ebpf_filesystem_thread(void *ptr)
         algorithms,
         NETDATA_EBPF_HIST_MAX_BINS);
 
-    pthread_mutex_lock(&lock);
+    netdata_mutex_lock(&lock);
     ebpf_create_fs_charts(em->update_every);
     ebpf_update_stats(&plugin_statistics, em);
-    pthread_mutex_unlock(&lock);
+    netdata_mutex_unlock(&lock);
 
     filesystem_collector(em);
 
