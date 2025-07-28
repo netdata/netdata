@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- build\(deps\): bump github.com/bmatcuk/doublestar/v4 from 4.9.0 to 4.9.1 in /src/go [\#20730](https://github.com/netdata/netdata/pull/20730) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Revert "Deployment Guides: add and update documentation for deployment strate" [\#20728](https://github.com/netdata/netdata/pull/20728) ([ilyam8](https://github.com/ilyam8))
 - Reset chart variable after release [\#20727](https://github.com/netdata/netdata/pull/20727) ([stelfrag](https://github.com/stelfrag))
 - Update README.md [\#20724](https://github.com/netdata/netdata/pull/20724) ([kanelatechnical](https://github.com/kanelatechnical))
 - Update README.md [\#20723](https://github.com/netdata/netdata/pull/20723) ([kanelatechnical](https://github.com/kanelatechnical))
@@ -465,7 +467,6 @@
 - spinlocks now timeout at 10 minutes, to reveal deadlocks [\#20197](https://github.com/netdata/netdata/pull/20197) ([ktsaou](https://github.com/ktsaou))
 - rrdset/rrddim find function do not return obsolete metadata [\#20196](https://github.com/netdata/netdata/pull/20196) ([ktsaou](https://github.com/ktsaou))
 - cleanup ML cached pointers on child disconnection [\#20195](https://github.com/netdata/netdata/pull/20195) ([ktsaou](https://github.com/ktsaou))
-- limit the max number of threads based on memory too [\#20192](https://github.com/netdata/netdata/pull/20192) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.4.0](https://github.com/netdata/netdata/tree/v2.4.0) (2025-04-14)
 
