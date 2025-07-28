@@ -389,7 +389,7 @@ static bool stream_thread_process_poll_slot(struct stream_thread *sth, nd_poll_r
     return false;
 }
 
-void *stream_thread(void *ptr) {
+void stream_thread(void *ptr) {
     struct stream_thread *sth = ptr;
 
     nd_thread_can_run_sql(false);
@@ -490,7 +490,7 @@ void *stream_thread(void *ptr) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM THREAD[%zu]: cannot create required pipe.", sth->id);
         sth->pipe.fds[PIPE_READ] = -1;
         sth->pipe.fds[PIPE_WRITE] = -1;
-        return NULL;
+        return;
     }
 
     sth->tid = gettid_cached();
@@ -653,8 +653,6 @@ void *stream_thread(void *ptr) {
     worker_unregister();
 
     rrd_collector_finished();
-
-    return NULL;
 }
 
 // --------------------------------------------------------------------------------------------------------------------

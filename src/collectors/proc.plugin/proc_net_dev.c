@@ -1711,7 +1711,7 @@ static void netdev_main_cleanup(void *pptr) {
     worker_unregister();
 }
 
-void *netdev_main(void *ptr_is_null __maybe_unused)
+void netdev_main(void *ptr_is_null __maybe_unused)
 {
     CLEANUP_FUNCTION_REGISTER(netdev_main_cleanup) cleanup_ptr = (void *)0x01;
 
@@ -1746,6 +1746,4 @@ void *netdev_main(void *ptr_is_null __maybe_unused)
             break;
         netdata_mutex_unlock(&netdev_mutex);
     }
-
-    return NULL;
 }

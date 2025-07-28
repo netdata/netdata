@@ -1741,13 +1741,13 @@ __thread sqlite3 *db_meta_thread = NULL;
 __thread sqlite3 *db_context_thread = NULL;
 __thread bool main_context_thread = false;
 
-static void *restore_host_context(void *arg)
+static void restore_host_context(void *arg)
 {
     struct host_context_load_thread *hclt = arg;
     RRDHOST *host = hclt->host;
 
     if (!host)
-        return NULL;
+        return;
 
     if (!db_meta_thread) {
         if (hclt->db_meta_thread) {
@@ -1794,7 +1794,6 @@ static void *restore_host_context(void *arg)
     }
 
     __atomic_store_n(&hclt->finished, true, __ATOMIC_RELEASE);
-    return NULL;
 }
 
 // Callback after scan of hosts is done
@@ -2457,7 +2456,7 @@ static void start_metadata_hosts(uv_work_t *req)
 #define SHUTDOWN_SLEEP_INTERVAL_MS (100)
 #define CMD_POOL_SIZE (32768)
 
-static void *metadata_event_loop(void *arg)
+static void metadata_event_loop(void *arg)
 {
     struct meta_config_s *config = arg;
     uv_thread_set_name_np(EVENT_LOOP_NAME);
@@ -2713,8 +2712,6 @@ static void *metadata_event_loop(void *arg)
     worker_unregister();
     service_exits();
     completion_mark_complete(&config->start_stop_complete);
-
-    return NULL;
 }
 
 void metadata_sync_shutdown(void)
@@ -2949,7 +2946,7 @@ void get_agent_event_time_median_init(void) {
 // unitests
 //
 
-static void *unittest_queue_metadata(void *arg) {
+static void unittest_queue_metadata(void *arg) {
     struct thread_unittest *tu = arg;
 
     cmd_data_t cmd;
@@ -2963,7 +2960,6 @@ static void *unittest_queue_metadata(void *arg) {
         metadata_enq_cmd(&cmd, true);
         sleep_usec(10000);
     } while (!__atomic_load_n(&tu->join, __ATOMIC_RELAXED));
-    return arg;
 }
 
 static void *metadata_unittest_threads(void)

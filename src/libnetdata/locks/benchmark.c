@@ -88,7 +88,7 @@ static void wait_for_signal(pthread_cond_t *cond, pthread_mutex_t *mutex, uint64
     pthread_mutex_unlock(mutex);
 }
 
-static void* benchmark_thread(void *arg) {
+static void benchmark_thread(void *arg) {
     thread_context_t *ctx = (thread_context_t *)arg;
     thread_stats_t *stats = &ctx->control->stats[ctx->thread_id];
     thread_control_t *thread_control = &ctx->control->thread_controls[ctx->thread_id];
@@ -166,8 +166,6 @@ static void* benchmark_thread(void *arg) {
         __atomic_store_n(&stats->locks, local_counter, __ATOMIC_RELEASE);
         __atomic_store_n(&stats->ready, 1, __ATOMIC_RELEASE);
     }
-
-    return NULL;
 }
 
 static void print_thread_stats(const char *test_name, int threads, thread_context_t *contexts,

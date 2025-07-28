@@ -755,7 +755,7 @@ static void ebpf_set_sync_maps()
  *
  * @return It always return NULL
  */
-void *ebpf_sync_thread(void *ptr)
+void ebpf_sync_thread(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
@@ -795,6 +795,4 @@ void *ebpf_sync_thread(void *ptr)
 
 endsync:
     ebpf_update_disabled_plugin_stats(em);
-
-    return NULL;
 }

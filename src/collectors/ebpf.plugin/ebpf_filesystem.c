@@ -1164,7 +1164,7 @@ static void ebpf_set_maps()
  *
  * @return It always return NULL
  */
-void *ebpf_filesystem_thread(void *ptr)
+void ebpf_filesystem_thread(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
@@ -1205,6 +1205,4 @@ void *ebpf_filesystem_thread(void *ptr)
 
 endfilesystem:
     ebpf_update_disabled_plugin_stats(em);
-
-    return NULL;
 }

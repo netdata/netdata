@@ -573,7 +573,7 @@ struct thread_unittest {
     struct dictionary_stats stats;
 };
 
-static void *unittest_dict_thread(void *arg) {
+static void unittest_dict_thread(void *arg) {
     struct thread_unittest *tu = arg;
     for(; 1 ;) {
         if(__atomic_load_n(&tu->join, __ATOMIC_RELAXED))
@@ -661,8 +661,6 @@ static void *unittest_dict_thread(void *arg) {
             }
         }
     }
-
-    return arg;
 }
 
 static int dictionary_unittest_threads() {
@@ -767,7 +765,7 @@ struct thread_view_unittest {
     int dups;
 };
 
-static void *unittest_dict_master_thread(void *arg) {
+static void unittest_dict_master_thread(void *arg) {
     struct thread_view_unittest *tv = arg;
 
     DICTIONARY_ITEM *item = NULL;
@@ -803,11 +801,9 @@ static void *unittest_dict_master_thread(void *arg) {
         item = NULL;
         loops = 0;
     }
-
-    return arg;
 }
 
-static void *unittest_dict_view_thread(void *arg) {
+static void unittest_dict_view_thread(void *arg) {
     struct thread_view_unittest *tv = arg;
 
     DICTIONARY_ITEM *m_item = NULL;
@@ -837,8 +833,6 @@ static void *unittest_dict_view_thread(void *arg) {
 
         dictionary_acquired_item_release(tv->view, v_item);
     }
-
-    return arg;
 }
 
 static struct dictionary_stats stats_master = { 0 };

@@ -537,7 +537,7 @@ static bool process_inotify_events(struct buffered_reader *reader, Watcher *watc
     return unmount_event;
 }
 
-void *nd_journal_watcher_main(void *arg __maybe_unused)
+void nd_journal_watcher_main(void *arg __maybe_unused)
 {
     while (1) {
         size_t journal_watcher_session_id = __atomic_load_n(&journal_watcher_wanted_session_id, __ATOMIC_RELAXED);
@@ -555,7 +555,7 @@ void *nd_journal_watcher_main(void *arg __maybe_unused)
         if (inotifyFd < 0) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "inotify_init() failed.");
             free_watches(&watcher, inotifyFd);
-            return NULL;
+            return;
         }
 
         for (unsigned i = 0; i < MAX_JOURNAL_DIRECTORIES; i++) {
@@ -610,6 +610,4 @@ void *nd_journal_watcher_main(void *arg __maybe_unused)
 
         sleep_usec(2 * USEC_PER_SEC);
     }
-
-    return NULL;
 }

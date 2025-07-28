@@ -1364,7 +1364,7 @@ void cgroup_read_host_total_ram() {
     procfile_close(ff);
 }
 
-void *cgroups_main(void *ptr) {
+void cgroups_main(void *ptr) {
     CLEANUP_FUNCTION_REGISTER(cgroup_main_cleanup) cleanup_ptr = ptr;
 
     worker_register("CGROUPS");
@@ -1383,7 +1383,7 @@ void *cgroups_main(void *ptr) {
 
     if (uv_mutex_init(&cgroup_root_mutex)) {
         collector_error("CGROUP: cannot initialize mutex for the main cgroup list");
-        goto exit;
+        return;
     }
 
     // we register this only on localhost
@@ -1394,18 +1394,18 @@ void *cgroups_main(void *ptr) {
 
     if (uv_mutex_init(&discovery_thread.mutex)) {
         collector_error("CGROUP: cannot initialize mutex for discovery thread");
-        goto exit;
+        return;
     }
     if (uv_cond_init(&discovery_thread.cond_var)) {
         collector_error("CGROUP: cannot initialize conditional variable for discovery thread");
-        goto exit;
+        return;
     }
 
     discovery_thread.thread = nd_thread_create("CGDISCOVER", NETDATA_THREAD_OPTION_DEFAULT, cgroup_discovery_worker, NULL);
 
     if (!discovery_thread.thread) {
         collector_error("CGROUP: cannot create thread worker");
-        goto exit;
+        return;
     }
 
     rrd_function_add_inline(localhost, NULL, "containers-vms", 10,
@@ -1465,9 +1465,4 @@ void *cgroups_main(void *ptr) {
         worker_is_idle();
         uv_mutex_unlock(&cgroup_root_mutex);
     }
-
-    // uv_thread_join(&discovery_thread.thread);
-
-exit:
-    return NULL;
 }

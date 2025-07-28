@@ -83,7 +83,7 @@ static void rrd_functions_worker_canceller(void *data) {
     pthread_mutex_unlock(&wg->worker_mutex);
 }
 
-static void *rrd_functions_worker_globals_worker_main(void *arg) {
+static void rrd_functions_worker_globals_worker_main(void *arg) {
     struct functions_evloop_globals *wg = arg;
 
     nd_thread_register_canceller(rrd_functions_worker_canceller, wg);
@@ -138,8 +138,6 @@ static void *rrd_functions_worker_globals_worker_main(void *arg) {
         else
             last_acquired = false;
     }
-
-    return NULL;
 }
 
 static void worker_add_job(struct functions_evloop_globals *wg, const char *keyword, char *transaction, char *function, char *timeout_s, BUFFER *payload, const char *access, const char *source) {
@@ -302,7 +300,7 @@ static bool rrd_function_worker_global_process_input(struct functions_evloop_glo
     return false;
 }
 
-static void *rrd_functions_worker_globals_reader_main(void *arg) {
+static void rrd_functions_worker_globals_reader_main(void *arg) {
     struct functions_evloop_globals *wg = arg;
 
     buffered_reader_init(&wg->reader);

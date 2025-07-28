@@ -112,7 +112,7 @@ static void watcher_wait_for_step(const watcher_step_id_t step_id, usec_t shutdo
     }
 }
 
-void *watcher_main(void *arg)
+void watcher_main(void *arg)
 {
     UNUSED(arg);
 
@@ -159,8 +159,6 @@ void *watcher_main(void *arg)
 
     daemon_status_file_shutdown_step(NULL, buffer_tostring(steps_timings));
     daemon_status_file_update_status(DAEMON_STATUS_EXITED);
-
-    return NULL;
 }
 
 void watcher_thread_start() {

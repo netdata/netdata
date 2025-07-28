@@ -179,8 +179,8 @@ typedef struct ebpf_tracepoint {
 enum ebpf_algorithms_list { NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_INCREMENTAL_IDX };
 
 // Threads
-void *ebpf_process_thread(void *ptr);
-void *ebpf_socket_thread(void *ptr);
+void ebpf_process_thread(void *ptr);
+void ebpf_socket_thread(void *ptr);
 
 // Common variables
 extern pthread_mutex_t lock;

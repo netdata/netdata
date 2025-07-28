@@ -914,7 +914,7 @@ static int ebpf_disk_load_bpf(ebpf_module_t *em)
  *
  * @return It always return NULL
  */
-void *ebpf_disk_thread(void *ptr)
+void ebpf_disk_thread(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
@@ -960,6 +960,4 @@ void *ebpf_disk_thread(void *ptr)
 
 enddisk:
     ebpf_update_disabled_plugin_stats(em);
-
-    return NULL;
 }

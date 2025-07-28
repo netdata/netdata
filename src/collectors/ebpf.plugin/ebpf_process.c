@@ -1525,7 +1525,7 @@ static int ebpf_process_enable_tracepoints()
  *
  * @return It always return NULL
  */
-void *ebpf_process_thread(void *ptr)
+void ebpf_process_thread(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
@@ -1573,6 +1573,4 @@ void *ebpf_process_thread(void *ptr)
     pthread_mutex_lock(&ebpf_exit_cleanup);
     ebpf_update_disabled_plugin_stats(em);
     pthread_mutex_unlock(&ebpf_exit_cleanup);
-
-    return NULL;
 }

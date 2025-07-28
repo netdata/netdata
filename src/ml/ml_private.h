@@ -8,8 +8,8 @@
 
 #include "ml_config.h"
 
-void *ml_train_main(void *arg);
-void *ml_detect_main(void *arg);
+void ml_train_main(void *arg);
+void ml_detect_main(void *arg);
 
 extern sqlite3 *ml_db;
 extern const char *db_models_create_table;

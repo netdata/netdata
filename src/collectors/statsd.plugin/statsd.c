@@ -1100,7 +1100,7 @@ static bool statsd_should_stop(void) {
     return !service_running(SERVICE_COLLECTORS);
 }
 
-void *statsd_collector_thread(void *ptr) {
+void statsd_collector_thread(void *ptr) {
     struct collection_thread_status *status = ptr;
     spinlock_lock(&status->spinlock);
     status->initializing = false;
@@ -1150,8 +1150,6 @@ void *statsd_collector_thread(void *ptr) {
             , ptr // timer_data
             , status->max_sockets
     );
-
-    return NULL;
 }
 
 

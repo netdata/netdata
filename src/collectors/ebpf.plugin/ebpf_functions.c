@@ -801,7 +801,7 @@ close_and_send:
  *
  * @return always NULL.
  */
-void *ebpf_function_thread(void *ptr)
+void ebpf_function_thread(void *ptr)
 {
     (void)ptr;
 
@@ -830,6 +830,4 @@ void *ebpf_function_thread(void *ptr)
             break;
         }
     }
-
-    return NULL;
 }

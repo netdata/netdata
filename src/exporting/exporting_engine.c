@@ -184,19 +184,19 @@ static void exporting_main_cleanup(void *pptr)
  *
  * @return It always returns NULL.
  */
-void *exporting_main(void *ptr)
+void exporting_main(void *ptr)
 {
     CLEANUP_FUNCTION_REGISTER(exporting_main_cleanup) cleanup_ptr = ptr;
 
     engine = read_exporting_config();
     if (!engine) {
         netdata_log_info("EXPORTING: no exporting connectors configured");
-        goto cleanup;
+        return;
     }
 
     if (init_connectors(engine) != 0) {
         netdata_log_error("EXPORTING: cannot initialize exporting connectors");
-        goto cleanup;
+        return;
     }
 
     RRDSET *st_main_rusage = NULL;
@@ -221,7 +221,4 @@ void *exporting_main(void *ptr)
 #endif
     }
     service_exits();
-
-cleanup:
-    return NULL;
 }

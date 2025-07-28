@@ -594,7 +594,7 @@ static void timer_cb(uv_timer_t *handle)
 #define ACLK_JOBS_ARE_RUNNING                                                                                          \
     (config->aclk_queries_running || config->alert_push_running || config->aclk_batch_job_is_running)
 
-static void *aclk_synchronization_event_loop(void *arg)
+static void aclk_synchronization_event_loop(void *arg)
 {
     struct aclk_sync_config_s *config = arg;
     uv_thread_set_name_np("ACLKSYNC");
@@ -915,7 +915,6 @@ static void *aclk_synchronization_event_loop(void *arg)
     worker_unregister();
     service_exits();
     completion_mark_complete(&config->start_stop_complete);
-    return NULL;
 }
 
 static void aclk_initialize_event_loop(void)

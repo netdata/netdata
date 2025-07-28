@@ -497,7 +497,7 @@ static int ebpf_mount_load_bpf(ebpf_module_t *em)
  *
  * @return It always returns NULL
  */
-void *ebpf_mount_thread(void *ptr)
+void ebpf_mount_thread(void *ptr)
 {
     ebpf_module_t *em = ptr;
     CLEANUP_FUNCTION_REGISTER(ebpf_mount_exit) cleanup_ptr = em;
@@ -531,6 +531,4 @@ void *ebpf_mount_thread(void *ptr)
 
 endmount:
     ebpf_update_disabled_plugin_stats(em);
-
-    return NULL;
 }

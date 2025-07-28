@@ -872,7 +872,7 @@ static void tc_main_cleanup(void *pptr) {
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 10
 #endif
 
-void *tc_main(void *ptr) {
+void tc_main(void *ptr) {
     CLEANUP_FUNCTION_REGISTER(tc_main_cleanup) cleanup_ptr = ptr;
 
     worker_register("TC");
@@ -922,7 +922,7 @@ void *tc_main(void *ptr) {
         tc_child_instance = spawn_popen_run(command);
         if(!tc_child_instance) {
             collector_error("TC: Cannot popen(\"%s\", \"r\").", command);
-            goto cleanup;
+            return;
         }
 
         char buffer[TC_LINE_MAX+1] = "";
@@ -1143,18 +1143,15 @@ void *tc_main(void *ptr) {
         }
 
         if(unlikely(!service_running(SERVICE_COLLECTORS)))
-            goto cleanup;
+            return;
 
         if(code == 1 || code == 127) {
             // 1 = DISABLE
             // 127 = cannot even run it
             collector_error("TC: tc-qos-helper.sh exited with code %d. Disabling it.", code);
-            goto cleanup;
+            return;
         }
 
         sleep((unsigned int) localhost->rrd_update_every);
-    }
-
-cleanup: ; // added semi-colon to prevent older gcc error: label at end of compound statement
-    return NULL;
+    };
 }

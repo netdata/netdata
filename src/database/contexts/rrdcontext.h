@@ -127,7 +127,7 @@ void rrdcontext_hub_stop_streaming_command(void *cmd);
 // public API for threads
 
 void rrdcontext_db_rotation(void);
-void *rrdcontext_main(void *);
+void rrdcontext_main(void *);
 
 // ----------------------------------------------------------------------------
 // public API for queries

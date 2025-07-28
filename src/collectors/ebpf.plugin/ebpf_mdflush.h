@@ -40,7 +40,7 @@ enum netdata_mdflush_targets {
     NETDATA_MD_FLUSH_END
 };
 
-void *ebpf_mdflush_thread(void *ptr);
+void ebpf_mdflush_thread(void *ptr);
 
 extern struct config mdflush_config;
 extern netdata_ebpf_targets_t mdflush_targets[];

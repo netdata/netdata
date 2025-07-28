@@ -487,7 +487,7 @@ struct thread_unittest {
     int dups;
 };
 
-static void *string_thread(void *arg) {
+static void string_thread(void *arg) {
     struct thread_unittest *tu = arg;
 
     for(; 1 ;) {
@@ -504,8 +504,6 @@ static void *string_thread(void *arg) {
 
         string_freez(s);
     }
-
-    return arg;
 }
 
 static char **string_unittest_generate_names(size_t entries) {
