@@ -4,7 +4,7 @@
 
 #include <AvailabilityMacros.h>
 
-void *macos_main(void *ptr);
+void macos_main(void *ptr);
 
 #if MAC_OS_X_VERSION_MIN_REQUIRED >= 101300
     void *timex_main(void *ptr);
