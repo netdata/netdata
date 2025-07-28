@@ -36,6 +36,7 @@ int do_PerflibObjects(int update_every, usec_t dt);
 int do_PerflibThermalZone(int update_every, usec_t dt);
 int do_PerflibWebService(int update_every, usec_t dt);
 int do_PerflibMSSQL(int update_every, usec_t dt);
+void do_PerflibMSSQL_cleanup();
 int do_PerflibNetFramework(int update_every, usec_t dt);
 int do_PerflibAD(int update_every, usec_t dt);
 int do_PerflibADCS(int update_every, usec_t dt);
