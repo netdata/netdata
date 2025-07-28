@@ -45,6 +45,7 @@ run ./netdata-installer.sh \
   --dont-start-it \
   --disable-exporting-mongodb \
   --enable-plugin-systemd-journal \
+  --enable-plugin-otel-metrics \
   --dont-scrub-cflags-even-though-it-may-break-things \
   --one-time-build \
   --enable-lto \
