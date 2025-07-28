@@ -233,6 +233,12 @@ cmake_dependent_option(ENABLE_NETDATA_JOURNAL_FILE_READER "Enable netdata's jour
 cmake_dependent_option(ENABLE_NETDATA_JOURNAL_FILE_READER_BENCHMARKS "Enable netdata's journal file reader implementation benchmarks" False "ENABLE_NETDATA_JOURNAL_FILE_READER" False)
 mark_as_advanced(ENABLE_NETDATA_JOURNAL_FILE_READER_BENCHMARKS)
 
+if(ENABLE_PLUGIN_SYSTEMD_JOURNAL AND NOT ENABLE_NETDATA_JOURNAL_FILE_READER)
+  set(ENABLE_LIBSYSTEMD_JOURNAL_FILE_READER True)
+else()
+  set(ENABLE_LIBSYSTEMD_JOURNAL_FILE_READER False)
+endif()
+
 # Setup Rust/Corrosion for plugins that need it
 if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_NOM)
     include(FetchContent)
