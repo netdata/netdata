@@ -217,7 +217,7 @@ static bool log_windows_module(BUFFER *wb, void *data)
     return true;
 }
 
-static void *windows_plugin_thread_worker(void *ptr __maybe_unused)
+static void windows_plugin_thread_worker(void *ptr __maybe_unused)
 {
     struct proc_module *mod = ptr;
     heartbeat_t hb;
@@ -239,11 +239,9 @@ static void *windows_plugin_thread_worker(void *ptr __maybe_unused)
         mod->func(update_every, now - last);
         last = now;
     }
-
-    return NULL;
 }
 
-void *win_plugin_main(void *ptr)
+void win_plugin_main(void *ptr)
 {
     worker_register("WIN");
 
@@ -324,5 +322,4 @@ void *win_plugin_main(void *ptr)
             nd_thread_join(pm->thread);
         }
     }
-    return NULL;
 }

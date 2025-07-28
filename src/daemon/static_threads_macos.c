@@ -7,7 +7,7 @@
 void macos_main(void *ptr);
 
 #if MAC_OS_X_VERSION_MIN_REQUIRED >= 101300
-    void *timex_main(void *ptr);
+    void timex_main(void *ptr);
 #endif
 
 static const struct netdata_static_thread static_threads_macos[] = {
