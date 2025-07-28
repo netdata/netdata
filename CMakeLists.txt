@@ -241,14 +241,32 @@ endif()
 
 # Setup Rust/Corrosion for plugins that need it
 if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_NOM)
-    include(FetchContent)
-    FetchContent_Declare(
-        Corrosion
-        GIT_REPOSITORY https://github.com/netdata/corrosion.git
-        GIT_TAG f3b91559efca32c6b54837866ef35ba98ff5b2ca # stable/v0.5
+  include(FetchContent)
+  FetchContent_Declare(
+    Corrosion
+    GIT_REPOSITORY https://github.com/netdata/corrosion.git
+    GIT_TAG f3b91559efca32c6b54837866ef35ba98ff5b2ca # stable/v0.5
+  )
+  FetchContent_MakeAvailable(Corrosion)
+
+  if(NOT ${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
+    message(CHECK_START "Determining target triple for use with Rust")
+    execute_process(
+      COMMAND ${CMAKE_C_COMPILER} ${CMAKE_C_FLAGS} -dumpmachine
+      RESULT_VARIABLE return_code
+      OUTPUT_VARIABLE output_data
     )
-    FetchContent_MakeAvailable(Corrosion)
-    corrosion_import_crate(MANIFEST_PATH src/crates/jf/Cargo.toml)
+
+    if(return_code EQUAL 0)
+      set(Rust_CARGO_TARGET "${output_data}")
+      message(CHECK_PASS "${output_data}")
+    else()
+      message(CHECK_FAIL "failed")
+      message(WARNING "Failed to determine target triple for cargo build, falling back to default cargo target")
+    endif()
+  endif()
+
+  corrosion_import_crate(MANIFEST_PATH src/crates/jf/Cargo.toml)
 endif()
 
 option(ENABLE_MIMALLOC "Enable mimalloc allocator" OFF)
