@@ -64,12 +64,11 @@ AutoReqProv: yes
 
 # Only try to build OTel Metrics plugin if we have rust
 %global _nd_rust_cmd %(command -v rustc)
-%global _nd_cargo_cmd %(command -v cargo)
 
-%if 0%{?_nd_rust_cmd} && 0%{?_nd_cargo_cmd}
-%global _have_rust 1
-%else
+%if "%{_nd_rustc_cmd}" == ""
 %global _have_rust 0
+%else
+%global _have_rust 1
 %endif
 
 # Disable FreeIPMI on Amazon Linux 2023 and newer
@@ -1078,7 +1077,7 @@ fi
 
 %files plugin-nom
 %defattr(0750,root,netdata,0750)
-%caps(cap_net_bind_service=eip) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/nom.plugin
+%caps(cap_net_bind_service=eip) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/nom-plugin
 %endif
 
 %changelog
