@@ -21,6 +21,9 @@
 #include <fcntl.h>
 #endif
 
+#define MQTT_DEFAULT_MAX_BUF_SIZE  (25 * 1024 * 1024)
+#define MQTT_PARENT_MAX_BUF_SIZE  (128 * 1024 * 1024)
+
 int aclk_pubacks_per_conn = 0; // How many PubAcks we got since MQTT conn est.
 int aclk_rcvd_cloud_msgs = 0;
 int aclk_connection_counter = 0;
@@ -864,9 +867,8 @@ void *aclk_main(void *ptr)
 #endif
 
     // Enable MQTT buffer growth if necessary
-    // e.g. old cloud architecture clients with huge nodes
-    // that send JSON payloads of 10 MB as single messages
-    mqtt_wss_set_max_buf_size(mqttwss_client, 25*1024*1024);
+    size_t max_buf_size = netdata_conf_is_parent() ? MQTT_PARENT_MAX_BUF_SIZE : MQTT_DEFAULT_MAX_BUF_SIZE;
+    mqtt_wss_set_max_buf_size(mqttwss_client, max_buf_size);
 
     // Keep reconnecting and talking until our time has come
     // and the Grim Reaper (exit_initiated) calls

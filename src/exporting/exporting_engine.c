@@ -196,9 +196,6 @@ void *exporting_main(void *ptr)
 
     if (init_connectors(engine) != 0) {
         netdata_log_error("EXPORTING: cannot initialize exporting connectors");
-
-        analytics_statistic_t statistic = { "EXPORTING_START", "FAIL", "-" };
-        analytics_statistic_send(&statistic);
         goto cleanup;
     }
 

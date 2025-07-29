@@ -7,9 +7,6 @@ extends:
   - _std-tcp-mib.yaml
   - _std-udp-mib.yaml
 
-device:
-  vendor: "dell"
-
 sysobjectid:
   - 1.3.6.1.4.1.12124.*
 
@@ -28,6 +25,8 @@ metadata:
     fields:
       vendor:
         value: "dell"
+      type:
+        value: "storage"
       serial_number:
         symbol:
           OID: 1.3.6.1.4.1.12124.2.51.1.3.1
@@ -66,8 +65,21 @@ metadata:
           match_value: '$1'
           # Examples:
           #  - device-name-3 263829375 Isilon OneFS v8.2.0.0
-      type:
-        value: "storage"
+
+metric_tags:
+  - tag: cluster_name
+    OID: 1.3.6.1.4.1.12124.1.1.1.0
+    symbol: clusterName
+  - tag: node_name
+    OID: 1.3.6.1.4.1.12124.2.1.1.0
+    symbol: nodeName
+  - tag: node_type
+    OID: 1.3.6.1.4.1.12124.2.1.3.0
+    symbol: nodeType
+
+# - ISILON-MIB
+#    https://mibbrowser.online/mibdb_search.php?mib=ISILON-MIB
+#    https://github.com/librenms/librenms/blob/master/mibs/emc/ISILON-MIB
 
 metrics:
   # fan hardware
@@ -78,71 +90,102 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.12124.2.53.1.4
         name: fanSpeed
-        description: The current speed of the fan in revolutions per minute
-        unit: "rpm"
+        chart_meta:
+          description: The current speed of the fan in revolutions per minute
+          family: 'Hardware/Fan/Speed'
+          unit: "{revolution}/min"
     metric_tags:
-      - tag: fan_name
-        symbol:
-          OID: 1.3.6.1.4.1.12124.2.53.1.2
-          name: fanName
       - tag: fan_number
         symbol:
           OID: 1.3.6.1.4.1.12124.2.53.1.1
           name: fanNumber
+      - tag: fan_name
+        symbol:
+          OID: 1.3.6.1.4.1.12124.2.53.1.2
+          name: fanName
 
   # cluster
   - MIB: ISILON-MIB
     symbol:
       OID: 1.3.6.1.4.1.12124.1.1.2.0
       name: clusterHealth
-      description: The overall health of the cluster
-      unit: "{state}"
+      chart_meta:
+        description: The overall health of the cluster
+        family: 'System/Cluster/Health/Status'
+        unit: "{status}"
+      mapping:
+        0: ok
+        1: attn
+        2: down
+        3: invalid
+
   - MIB: ISILON-MIB
     symbol:
       OID: 1.3.6.1.4.1.12124.1.2.1.1.0
       name: clusterIfsInBytes
-      description: The cumulative number of bytes into /ifs
-      unit: "By"
+      chart_meta:
+        description: The cumulative number of bytes into /ifs
+        family: 'Storage/FileSystem/Throughput/In'
+        unit: "By/s"
+
   - MIB: ISILON-MIB
     symbol:
       OID: 1.3.6.1.4.1.12124.1.2.1.3.0
       name: clusterIfsOutBytes
-      description: The cumulative number of bytes out of /ifs
-      unit: "By"
+      chart_meta:
+        description: The cumulative number of bytes out of /ifs
+        family: 'Storage/FileSystem/Throughput/Out'
+        unit: "By/s"
 
   # file system
   - MIB: ISILON-MIB
     symbol:
       OID: 1.3.6.1.4.1.12124.1.3.2.0
       name: ifsUsedBytes
-      description: The number of bytes used in the /ifs filesystem
-      unit: "By"
+      chart_meta:
+        description: The number of bytes used in the /ifs filesystem
+        family: 'Storage/FileSystem/Used'
+        unit: "By"
   - MIB: ISILON-MIB
     symbol:
       OID: 1.3.6.1.4.1.12124.1.3.1.0
       name: ifsTotalBytes
-      description: The total cluster capacity of the /ifs filesystem in bytes
-      unit: "By"
+      chart_meta:
+        description: The total cluster capacity of the /ifs filesystem in bytes
+        family: 'Storage/FileSystem/Total'
+        unit: "By"
 
   # node
   - MIB: ISILON-MIB
     symbol:
       OID: 1.3.6.1.4.1.12124.2.1.2.0
       name: nodeHealth
-      description: The overall health of the node
-      unit: "{state}"
+      chart_meta:
+        description: The overall health of the node
+        family: 'System/Node/Health/Status'
+        unit: "{status}"
+      mapping:
+        0: ok
+        1: attn
+        2: down
+        3: invalid
+
   - MIB: ISILON-MIB
     symbol:
       OID: 1.3.6.1.4.1.12124.2.2.1.1.0
       name: nodeIfsInBytes
-      description: The number of bytes into /ifs through this node
-      unit: "By"
+      chart_meta:
+        description: The number of bytes into /ifs through this node
+        family: 'System/Node/Throughput/In'
+        unit: "By/s"
   - MIB: ISILON-MIB
     symbol:
       OID: 1.3.6.1.4.1.12124.2.2.1.3.0
       name: nodeIfsOutBytes
-      description: The number of bytes out of /ifs through this node
-      unit: "By"
+      chart_meta:
+        description: The number of bytes out of /ifs through this node
+        family: 'System/Node/Throughput/Out'
+        unit: "By/s"
 
   # disk
   - MIB: ISILON-MIB
@@ -152,18 +195,48 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.12124.2.52.1.9
         name: diskSizeBytes
-        description: The size of the disk in bytes
-        unit: "By"
+        chart_meta:
+          description: The size of the disk in bytes
+          family: 'Hardware/Disk/Size'
+          unit: "By"
+      - OID: 1.3.6.1.4.1.12124.2.52.1.5
+        name: diskStatus
+        chart_meta:
+          description: The operational status of the disk
+          family: 'Hardware/Disk/Status'
+          unit: "{status}"
+        mapping:
+          # Commonly returned values include (but not limited to):
+          # TODO: need some "other" for mappings
+          HEALTHY: 1
+          L3: 2
+          DEAD: 3
+          SMARTFAIL: 4
     metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.12124.2.52.1.5
-          name: diskStatus
-        tag: disk_status
-      - symbol:
+      - tag: disk_bay
+        symbol:
           OID: 1.3.6.1.4.1.12124.2.52.1.1
           name: diskBay
-        tag: disk_bay
-
+      - tag: disk_logical_number
+        symbol:
+          OID: 1.3.6.1.4.1.12124.2.52.1.2
+          name: diskLogicalNumber
+      - tag: disk_chassis_number
+        symbol:
+          OID: 1.3.6.1.4.1.12124.2.52.1.3
+          name: diskChassisNumber
+      - tag: _disk_device_name
+        symbol:
+          OID: 1.3.6.1.4.1.12124.2.52.1.4
+          name: diskDeviceName
+      - tag: _disk_device_model
+        symbol:
+          OID: 1.3.6.1.4.1.12124.2.52.1.6
+          name: diskDeviceModel
+      - tag: _disk_serial_number
+        symbol:
+          OID: 1.3.6.1.4.1.12124.2.52.1.7
+          name: diskSerialNumber
 
   # protocol
   - MIB: ISILON-MIB
@@ -173,20 +246,28 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.12124.2.2.10.1.3
         name: protocolOpsPerSecond
-        description: The number of operations per second for the last 5 second
-        unit: "1.s"
+        chart_meta:
+          description: The number of operations per second for the last 5 second
+          family: 'Storage/Protocol/Operations'
+          unit: "{operation}/s"
       - OID: 1.3.6.1.4.1.12124.2.2.10.1.14
         name: latencyMin
-        description: The minimum latency in microseconds for all operations for the protocol
-        unit: "us"
+        chart_meta:
+          description: The minimum latency in microseconds for all operations for the protocol
+          family: 'Storage/Protocol/Latency/Min'
+          unit: "us"
       - OID: 1.3.6.1.4.1.12124.2.2.10.1.15
         name: latencyMax
-        description: The maximum latency in microseconds for all operations for the protocol
-        unit: "us"
+        chart_meta:
+          description: The maximum latency in microseconds for all operations for the protocol
+          family: 'Storage/Protocol/Latency/Max'
+          unit: "us"
       - OID: 1.3.6.1.4.1.12124.2.2.10.1.16
         name: latencyAverage
-        description: The average latency in microseconds for all operations for the protocol
-        unit: "us"
+        chart_meta:
+          description: The average latency in microseconds for all operations for the protocol
+          family: 'Storage/Protocol/Latency/Average'
+          unit: "us"
     metric_tags:
       - tag: protocol_name
         symbol:
@@ -201,21 +282,33 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.12124.1.12.1.1.7
         name: quotaHardThreshold
-        description: The hard threshold in bytes
-        unit: "By"
+        chart_meta:
+          description: The hard threshold in bytes
+          family: 'Storage/Quota/Threshold/Hard'
+          unit: "By"
       - OID: 1.3.6.1.4.1.12124.1.12.1.1.9
         name: quotaSoftThreshold
-        description: The soft threshold in bytes
-        unit: "By"
+        chart_meta:
+          description: The soft threshold in bytes
+          family: 'Storage/Quota/Threshold/Soft'
+          unit: "By"
       - OID: 1.3.6.1.4.1.12124.1.12.1.1.13
         name: quotaUsage
-        description: The current quota usage in bytes
-        unit: "By"
+        chart_meta:
+          description: The current quota usage in bytes
+          family: 'Storage/Quota/Usage'
+          unit: "By"
       - OID: 1.3.6.1.4.1.12124.1.12.1.1.11
         name: quotaAdvisoryThreshold
-        description: The advisory threshold in bytes
-        unit: "By"
+        chart_meta:
+          description: The advisory threshold in bytes
+          family: 'Storage/Quota/Threshold/Advisory'
+          unit: "By"
     metric_tags:
+      - tag: quota_domain_id
+        symbol:
+          OID: 1.3.6.1.4.1.12124.1.12.1.1.1
+          name: quotaDomainID
       - tag: quota_type
         symbol:
           OID: 1.3.6.1.4.1.12124.1.12.1.1.2
@@ -224,13 +317,3 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.12124.1.12.1.1.3
           name: quotaID
-metric_tags:
-  - tag: cluster_name
-    OID: 1.3.6.1.4.1.12124.1.1.1.0
-    symbol: clusterName
-  - tag: node_name
-    OID: 1.3.6.1.4.1.12124.2.1.1.0
-    symbol: nodeName
-  - tag: node_type
-    OID: 1.3.6.1.4.1.12124.2.1.3.0
-    symbol: nodeType

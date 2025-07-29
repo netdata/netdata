@@ -9,7 +9,6 @@ exclude_paths:
   - src/libnetdata/libjudy/**
   - src/database/sqlite/sqlite3.c
   - src/ml/dlib/**
-  - src/web/server/h2o/libh2o/**
   - build/**
   - build_external/**
   - packaging/**

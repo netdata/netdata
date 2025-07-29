@@ -99,16 +99,7 @@ struct receiver_state {
         FILE *fp;
     } log;
 #endif
-
-#ifdef ENABLE_H2O
-    void *h2o_ctx;
-#endif
 };
-
-#ifdef ENABLE_H2O
-#define is_h2o_rrdpush(x) ((x)->h2o_ctx != NULL)
-#define unless_h2o_rrdpush(x) if(!is_h2o_rrdpush(x))
-#endif
 
 bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt);
 void rrdhost_clear_receiver(struct receiver_state *rpt, STREAM_HANDSHAKE reason);

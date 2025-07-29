@@ -17,6 +17,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/discoverer/snmpsd"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 )
 
 func (c *Collector) collect() (map[string]int64, error) {
@@ -26,18 +27,27 @@ func (c *Collector) collect() (map[string]int64, error) {
 			return nil, err
 		}
 
-		c.sysInfo = si
+		if c.DisableLegacyCollection || c.EnableProfiles {
+			c.snmpProfiles = c.setupProfiles(si.SysObjectID)
+		}
+
+		if c.ddSnmpColl == nil {
+			c.ddSnmpColl = ddsnmpcollector.New(c.snmpClient, c.snmpProfiles, c.Logger)
+			c.ddSnmpColl.DoTableMetrics = c.EnableProfilesTableMetrics
+		}
 
 		if c.CreateVnode {
-			c.vnode = c.setupVnode(si)
+			deviceMeta, err := c.ddSnmpColl.CollectDeviceMetadata()
+			if err != nil {
+				return nil, err
+			}
+			c.vnode = c.setupVnode(si, deviceMeta)
 		}
+
+		c.sysInfo = si
 
 		if !c.DisableLegacyCollection {
 			c.addSysUptimeChart()
-		}
-
-		if c.DisableLegacyCollection || c.EnableProfiles {
-			c.snmpProfiles = c.setupProfiles()
 		}
 	}
 
@@ -93,7 +103,7 @@ func (c *Collector) walkAll(rootOid string) ([]gosnmp.SnmpPDU, error) {
 	return c.snmpClient.BulkWalkAll(rootOid)
 }
 
-func (c *Collector) setupVnode(si *snmpsd.SysInfo) *vnodes.VirtualNode {
+func (c *Collector) setupVnode(si *snmpsd.SysInfo, deviceMeta map[string]map[string]string) *vnodes.VirtualNode {
 	if c.Vnode.GUID == "" {
 		c.Vnode.GUID = uuid.NewSHA1(uuid.NameSpaceDNS, []byte(c.Hostname)).String()
 	}
@@ -120,6 +130,14 @@ func (c *Collector) setupVnode(si *snmpsd.SysInfo) *vnodes.VirtualNode {
 	// FIXME: vendor should be obtained from sysDescr, org should be used as a fallback
 	labels["vendor"] = si.Organization
 
+	for _, meta := range deviceMeta {
+		for k, v := range meta {
+			if _, ok := labels[k]; !ok {
+				labels[k] = v
+			}
+		}
+	}
+
 	return &vnodes.VirtualNode{
 		GUID:     c.Vnode.GUID,
 		Hostname: c.Vnode.Hostname,
@@ -127,9 +145,10 @@ func (c *Collector) setupVnode(si *snmpsd.SysInfo) *vnodes.VirtualNode {
 	}
 }
 
-func (c *Collector) setupProfiles() []*ddsnmp.Profile {
-	snmpProfiles := ddsnmp.FindProfiles(c.sysInfo.SysObjectID)
+func (c *Collector) setupProfiles(sysObjectID string) []*ddsnmp.Profile {
+	snmpProfiles := ddsnmp.FindProfiles(sysObjectID)
 	var profInfo []string
+
 	for _, prof := range snmpProfiles {
 		if logger.Level.Enabled(slog.LevelDebug) {
 			profInfo = append(profInfo, prof.SourceTree())
@@ -138,8 +157,9 @@ func (c *Collector) setupProfiles() []*ddsnmp.Profile {
 			profInfo = append(profInfo, name)
 		}
 	}
-	c.Infof("device matched %d profile(s): %s (sysObjectID: %s)",
-		len(snmpProfiles), strings.Join(profInfo, ", "), c.sysInfo.SysObjectID)
+
+	c.Infof("device matched %d profile(s): %s (sysObjectID: %s)", len(snmpProfiles), strings.Join(profInfo, ", "), sysObjectID)
+
 	return snmpProfiles
 }
 

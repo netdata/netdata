@@ -13,29 +13,6 @@ metadata:
       type:
         value: "Switch"
 
-# ZYXEL-ES-COMMON
-# https://mibbrowser.online/mibdb_search.php?mib=ZYXEL-ES-COMMON
-# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/zyxel/ZYXEL-ES-COMMON
-
-metrics:
-  - MIB: ZYXEL-ES-COMMON
-    symbol:
-      name: cpu.usage
-      OID: 1.3.6.1.4.1.890.1.15.3.2.4.0
-      chart_meta:
-        description: Device CPU usage
-        family: 'CPU/Usage'
-        unit: "%"
-
-  - MIB: ZYXEL-ES-COMMON
-    symbol:
-      name: memory.usage
-      OID: 1.3.6.1.4.1.890.1.15.3.2.5.0
-      chart_meta:
-        description: Device memory usage
-        family: 'Memory/Usage'
-        unit: "%"
-
 metric_tags:
   - tag: zyxel_sys_sw_platform
     OID: 1.3.6.1.4.1.890.1.15.3.1.1.0
@@ -47,9 +24,32 @@ metric_tags:
   - tag: zyxel_sys_sw_version_string
     OID: 1.3.6.1.4.1.890.1.15.3.1.6.0
     symbol: sysSwVersionString
-  - tag: _zyxel_sys_product_model
+  - tag: zyxel_sys_product_model
     OID: 1.3.6.1.4.1.890.1.15.3.1.11.0
     symbol: sysProductModel
-  - tag: _zyxel_sys_product_serial_number
+  - tag: zyxel_sys_product_serial_number
     OID: 1.3.6.1.4.1.890.1.15.3.1.12.0
     symbol: sysProductSerialNumber
+
+# ZYXEL-ES-COMMON
+# https://mibbrowser.online/mibdb_search.php?mib=ZYXEL-ES-COMMON
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/zyxel/ZYXEL-ES-COMMON
+
+metrics:
+  - MIB: ZYXEL-ES-COMMON
+    symbol:
+      name: cpu.usage
+      OID: 1.3.6.1.4.1.890.1.15.3.2.4.0
+      chart_meta:
+        description: Device CPU usage
+        family: 'System/CPU/Usage'
+        unit: "%"
+
+  - MIB: ZYXEL-ES-COMMON
+    symbol:
+      name: memory.usage
+      OID: 1.3.6.1.4.1.890.1.15.3.2.5.0
+      chart_meta:
+        description: Device memory usage
+        family: 'System/Memory/Usage'
+        unit: "%"

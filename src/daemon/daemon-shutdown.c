@@ -202,10 +202,6 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     }
 #endif
 
-    // notify we are exiting
-    //analytics_statistic_t statistic = (analytics_statistic_t) {"EXIT", abnormal?"ERROR":"OK","-"};
-    //analytics_statistic_send(&statistic);
-
     webrtc_close_all_connections();
     watcher_step_complete(WATCHER_STEP_ID_CLOSE_WEBRTC_CONNECTIONS);
 

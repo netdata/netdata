@@ -35,8 +35,9 @@ func init() {
 func New() *Collector {
 	return &Collector{
 		Config: Config{
-			CreateVnode:    true,
-			EnableProfiles: true,
+			CreateVnode:                true,
+			EnableProfiles:             true,
+			EnableProfilesTableMetrics: true,
 			Options: Options{
 				Port:           161,
 				Retries:        1,

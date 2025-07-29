@@ -11,10 +11,10 @@ metadata:
         value: "PDU"
 
 metric_tags:
-  - tag: _servertech_sentry3_system_version
+  - tag: servertech_sentry3_system_version
     OID: 1.3.6.1.4.1.1718.3.1.1.0
     symbol: systemVersion
-  - tag: _servertech_sentry3_system_nic_serial_number
+  - tag: servertech_sentry3_system_nic_serial_number
     OID: 1.3.6.1.4.1.1718.3.1.2.0
     symbol: systemNICSerialNumber
 

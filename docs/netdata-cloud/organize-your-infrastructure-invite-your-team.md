@@ -1,118 +1,75 @@
 # Spaces and Rooms
 
-This guide explains how to effectively organize your infrastructure monitoring using Netdata Cloud.
+This guide explains how you can effectively organize your infrastructure monitoring using Netdata Cloud.
 
-Netdata Cloud uses two primary organizational concepts:
+## Overview
 
-- [Spaces](#spaces): High-level containers for your entire infrastructure.
-- [Rooms](#rooms): Flexible groupings within Spaces for specific monitoring needs.
+You can organize your monitoring with two primary concepts that work together.
 
-## Spaces
+**Spaces** serve as your primary collaboration environment where you organize team members and manage access levels, connect nodes for monitoring, and create a unified monitoring environment.
 
-**What is a Space?**
+**Rooms** function as organizational units within Spaces that provide infrastructure-wide dashboards, real-time metrics visualization, focused monitoring views, and flexible node grouping.
 
-Space serves as your primary collaboration environment in Netdata Cloud. It allows you to:
+**Key Relationship:** Each node can only belong to **one** Space, but you can assign a node to **multiple** Rooms within that Space.
 
-- Organize team members and manage access levels.
-- Connect nodes for monitoring.
-- Create a unified monitoring environment.
+## Getting Started
 
-**Key Space Characteristics**
+### Create Your Space
 
-- Each node can only belong to **one** Space.
-- You can create multiple Spaces, but we recommend using a single Space for most use cases.
-- All team members in a Space can access its monitoring data based on their assigned roles.
+1. Use the left-most sidebar to switch between Spaces
+2. Click the plus (**+**) icon to create a new Space
 
-### Space Management
+:::tip
 
-**Navigation**
+You can create multiple Spaces, but we recommend using a single Space for most use cases. All team members in a Space can access its monitoring data based on their assigned roles.
 
-1. Use the left-most sidebar to switch between Spaces.
-2. Click the plus (**+**) icon to create a new Space.
+:::
 
-**Settings and Configuration**
+### Set Up Team Access
 
-1. Select your Space.
-2. Click the gear icon in the lower left corner.
-3. Access settings for:
-    - Room management.
-    - Node configuration.
-    - Integration setup.
-    - General Space settings.
+1. Click "Invite Users" in the Space's sidebar
+2. Set appropriate access levels:
+    - Rooms
+    - User roles
 
-## Rooms
+:::tip
 
-**What is a Room?**
+**Best Practices for Team Access:** Invite all relevant team members (SRE, DevOps, ITOps) and configure role-based access control. Maintain clear permission hierarchies and conduct regular access reviews and updates.
 
-Rooms are organizational units within a Space that provide:
+:::
 
-- Infrastructure-wide dashboards.
-- Real-time metrics visualization.
-- Focused monitoring views.
-- Flexible node grouping.
+### Create Your First Room
 
-**Key Room Characteristics**
-
-- A node can belong to **multiple** Rooms.
-- All nodes automatically appear in the "All nodes" Room.
-- Each Room has independent dashboards and monitoring tools.
-
-### Room Organization Strategies
-
-1. **Service-Based Organization**
-
-   Group nodes by:
-    - Specific services (Nginx, MySQL, Pulsar).
-    - Purpose (webserver, database, application).
-    - Physical location.
-    - Infrastructure type (bare metal, containers).
-    - Cloud provider.
-
-2. **End-to-End Application Monitoring**
-
-   Create Rooms for:
-    - Complete SaaS product stacks.
-    - Internal service dependencies.
-    - Full application ecosystems including Kubernetes clusters, Docker containers, Proxies, Databases, Web servers, and Message brokers.
-
-3. **Incident Response**
-
-   Create dedicated Rooms for:
-    - Active incident investigation.
-    - Problem diagnosis.
-    - Performance troubleshooting.
-    - Root cause analysis.
-
-### Room Management
-
-**Navigation**
-
-1. Access Rooms through the Space's sidebar.
-2. Click the green plus (**+**) icon next to "Rooms" to create new Rooms.
+1. Access Rooms through the Space's sidebar
+2. Click the green plus (**+**) icon next to "Rooms" to create new Rooms
 
    <img src="https://github.com/user-attachments/assets/16958ba8-53ac-4e78-a51f-7ea328e97f31" height="400px" alt="Individual Space sidebar"/>
 
-**Settings and Configuration**
+:::info
 
-1. Click the gear icon next to the Room name.
-2. Manage:
-    - Room access.
-    - Node grouping.
-    - Dashboard settings.
-    - Monitoring configurations.
+All nodes automatically appear in the "All nodes" Room. Each Room has independent dashboards and monitoring tools.
 
-## Team Collaboration
+:::
 
-**Inviting Team Members**
+## Organize Your Infrastructure
 
-1. Click "Invite Users" in the Space's sidebar.
-2. Set appropriate access levels:
-    - Rooms.
-    - User roles.
+### Room Organization Strategies
 
-**Best Practices for Team Access**
+| Strategy                              | Use Case                                                                                    | Examples                                                                                                                                                                                                                        |
+|---------------------------------------|---------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Service-Based Organization**        | Group nodes by **specific services**, **purpose**, **location**, or **infrastructure type** | **Nginx**, **MySQL**, **Pulsar**, **webserver**, **database**, **application**, **physical location**, **bare metal**, **containers**, **cloud provider**                                                                       |
+| **End-to-End Application Monitoring** | Create Rooms for **complete application stacks** and **service dependencies**               | **Complete SaaS product stacks**, **internal service dependencies**, **full application ecosystems** including **Kubernetes clusters**, **Docker containers**, **Proxies**, **Databases**, **Web servers**, **Message brokers** |
+| **Incident Response**                 | Create dedicated Rooms for **troubleshooting** and **problem resolution**                   | **Active incident investigation**, **problem diagnosis**, **performance troubleshooting**, **root cause analysis**                                                                                                              |
 
-- Invite all relevant team members (SRE, DevOps, ITOps).
-- Configure role-based access control.
-- Maintain clear permission hierarchies.
-- Regular access review and updates.
+## Manage Your Setup
+
+### Space Configuration
+
+1. Select your Space
+2. Click the ⚙️ in the lower left corner
+3. Access settings for room management, node configuration, integration setup, and general Space settings
+
+### Room Configuration
+
+1. Click the ⚙️ next to the Room name
+2. Manage room access, node grouping, dashboard settings, and monitoring configurations

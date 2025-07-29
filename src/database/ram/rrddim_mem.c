@@ -4,7 +4,15 @@
 #include "Judy.h"
 
 static Pvoid_t rrddim_Judy_array = NULL;
-static netdata_rwlock_t rrddim_Judy_rwlock = NETDATA_RWLOCK_INITIALIZER;
+static netdata_rwlock_t rrddim_Judy_rwlock;
+
+static void __attribute__((constructor)) init_lock(void) {
+    netdata_rwlock_init(&rrddim_Judy_rwlock);
+}
+
+static void __attribute__((destructor)) destroy_lock(void) {
+    netdata_rwlock_destroy(&rrddim_Judy_rwlock);
+}
 
 // ----------------------------------------------------------------------------
 // metrics groups

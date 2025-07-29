@@ -170,7 +170,7 @@ metrics:
         chart_meta:
           description: Speed in RPMs of the chassis fan
           family: 'Hardware/Fan/Speed'
-          unit: "{rotation}/m"
+          unit: "{revolution}/min"
     metric_tags:
       - tag: ironport_fan_name
         symbol:

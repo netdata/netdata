@@ -1,6 +1,7 @@
 extends:
   - _system-base.yaml
   - _std-if-mib.yaml
+  - _std-host-resources-mib-feat-base.yaml
 
 metadata:
   device:

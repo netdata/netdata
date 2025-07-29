@@ -9,6 +9,16 @@ metric_tags:
     symbol: hwEntitySystemModel
     tag: huawei_hw_entity_system_model
 
+# - HUAWEI-ENTITY-EXTENT-MIB
+#     https://mibbrowser.online/mibdb_search.php?mib=HUAWEI-ENTITY-EXTENT-MIB
+#     https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/huawei/HUAWEI-ENTITY-EXTENT-MIB
+# - HUAWEI-DEVICE-MIB
+#     https://mibbrowser.online/mibdb_search.php?mib=HUAWEI-DEVICE-MIB
+#     https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/huawei/HUAWEI-DEVICE-MIB
+#  - HUAWEI-OSPFV2-MIB
+#     https://mibbrowser.online/mibdb_search.php?mib=HUAWEI-OSPFV2-MIB
+#     https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/huawei/HUAWEI-OSPFV2-MIB
+
 metrics:
   - MIB: HUAWEI-ENTITY-EXTENT-MIB
     table:
@@ -26,19 +36,19 @@ metrics:
         OID: 1.3.6.1.4.1.2011.5.25.31.1.1.1.1.11
         chart_meta:
           description: The temperature for the entity
-          family: 'Entity/Temperature/Value'
+          family: 'Hardware/Sensor/Temperature/Value'
           unit: "Cel"
       - name: huawei.hwEntityVoltage
         OID: 1.3.6.1.4.1.2011.5.25.31.1.1.1.1.13
         chart_meta:
           description: The voltage for the entity
-          family: 'Entity/Voltage/Value'
+          family: 'Hardware/Sensor/Voltage/Value'
           unit: "V"
       - OID: 1.3.6.1.4.1.2011.5.25.31.1.1.1.1.1
         name: huawei.hwEntityAdminStatus
         chart_meta:
           description: Administrative status of the entity
-          family: 'Entity/Status/Administrative'
+          family: 'Hardware/Module/Admin/Status'
           unit: "{status}"
         mapping:
           1: not_supported
@@ -52,7 +62,7 @@ metrics:
         name: huawei.hwEntityOperStatus
         chart_meta:
           description: Operational status of the entity
-          family: 'Entity/Status/Operational'
+          family: 'Hardware/Module/Operational/Status'
           unit: "{status}"
         mapping:
           1: not_supported
@@ -71,7 +81,7 @@ metrics:
         name: huawei.hwEntityStandbyStatus
         chart_meta:
           description: Standby status of the entity
-          family: 'Entity/Status/Standby'
+          family: 'Hardware/Module/Standby/Status'
           unit: "{status}"
         mapping:
           1: not_supported
@@ -82,7 +92,7 @@ metrics:
         name: huawei.hwEntityFaultLight
         chart_meta:
           description: Fault light status of the entity
-          family: 'Entity/Status/FaultLight'
+          family: 'Hardware/Module/FaultLight/Status'
           unit: "{status}"
         mapping:
           1: not_supported
@@ -103,13 +113,13 @@ metrics:
         OID: 1.3.6.1.4.1.2011.5.25.31.1.1.10.1.5
         chart_meta:
           description: This object indicates the rotation speed in percentage of the full speed of the fan
-          family: 'Fan/Speed/Value'
+          family: 'Hardware/Fan/Speed'
           unit: "%"
       - OID: 1.3.6.1.4.1.2011.5.25.31.1.1.10.1.3
         name: huawei.hwEntityFanReg
         chart_meta:
           description: Whether the fan is registered
-          family: 'Fan/Registration/Status'
+          family: 'Hardware/Fan/Registration/Status'
           unit: "{status}"
         mapping:
           1: yes
@@ -118,7 +128,7 @@ metrics:
         name: huawei.hwEntityFanSpdAdjMode
         chart_meta:
           description: Fan speed adjustment mode
-          family: 'Fan/Speed/Mode'
+          family: 'Hardware/Fan/Speed/Mode'
           unit: "{status}"
         mapping:
           1: auto
@@ -129,7 +139,7 @@ metrics:
         name: huawei.hwEntityFanPresent
         chart_meta:
           description: Whether the fan is present
-          family: 'Fan/Presence/Status'
+          family: 'Hardware/Fan/Presence/Status'
           unit: "{status}"
         mapping:
           1: present
@@ -138,7 +148,7 @@ metrics:
         name: huawei.hwEntityFanState
         chart_meta:
           description: Operational state of the fan
-          family: 'Fan/Status'
+          family: 'Hardware/Fan/Status'
           unit: "{status}"
         mapping:
           1: normal
@@ -162,25 +172,63 @@ metrics:
         OID: 1.3.6.1.4.1.2011.5.25.31.1.1.14.1.2
         chart_meta:
           description: Device total power
-          family: 'Power/Capacity/Total'
+          family: 'Hardware/Power/Capacity/Total'
           unit: "W"
       - name: huawei.hwSystemPowerUsedPower
         OID: 1.3.6.1.4.1.2011.5.25.31.1.1.14.1.3
         chart_meta:
           description: Device used power
-          family: 'Power/Usage/Current'
+          family: 'Hardware/Power/Usage'
           unit: "W"
       - name: huawei.hwSystemPowerRemainPower
         OID: 1.3.6.1.4.1.2011.5.25.31.1.1.14.1.4
         chart_meta:
           description: Device remaining power
-          family: 'Power/Capacity/Remaining'
+          family: 'Hardware/Power/Capacity/Remaining'
           unit: "W"
     metric_tags:
       - tag: huawei_hw_system_power_device_id
         symbol:
           name: huawei.hwSystemPowerDeviceID
           OID: 1.3.6.1.4.1.2011.5.25.31.1.1.14.1.1
+
+  - MIB: HUAWEI-DEVICE-MIB
+    table:
+      name: hwCpuDevTable
+      OID: 1.3.6.1.4.1.2011.6.3.4
+    symbols:
+      - name: huawei.hwAvgDuty1min
+        OID: 1.3.6.1.4.1.2011.6.3.4.1.3
+        chart_meta:
+          description: The overall CPU duty percentage in the last 1 minute period
+          family: 'System/CPU/Usage'
+          unit: "%"
+    metric_tags:
+      - tag: cpu_index
+        index: 1
+
+  - MIB: HUAWEI-DEVICE-MIB
+    table:
+      name: hwMemoryDevTable
+      OID: 1.3.6.1.4.1.2011.6.3.5.1
+    symbols:
+      - name: huawei.hwMemoryDevSize
+        OID: 1.3.6.1.4.1.2011.6.3.5.1.1.2
+        metric_type: monotonic_count
+        chart_meta:
+          description: Indicates the total size of the memory module which is on the managed object
+          family: 'System/Memory/Total'
+          unit: "By"
+      - name: huawei.hwMemoryDevFree
+        OID: 1.3.6.1.4.1.2011.6.3.5.1.1.3
+        metric_type: monotonic_count
+        chart_meta:
+          description: Indicates the free size of the memory
+          family: 'System/Memory/Free'
+          unit: "By"
+    metric_tags:
+      - tag: mem_index
+        index: 1
 
   #  - MIB: HUAWEI-OSPFV2-MIB
   #    table:
@@ -254,41 +302,3 @@ metrics:
   #          2: doing_gr
   #          3: helper
   #          4: notsupport
-
-  - MIB: HUAWEI-DEVICE-MIB
-    table:
-      name: hwCpuDevTable
-      OID: 1.3.6.1.4.1.2011.6.3.4
-    symbols:
-      - name: huawei.hwAvgDuty1min
-        OID: 1.3.6.1.4.1.2011.6.3.4.1.3
-        chart_meta:
-          description: The overall CPU duty percentage in the last 1 minute period
-          family: 'CPU/Usage'
-          unit: "%"
-    metric_tags:
-      - tag: cpu_index
-        index: 1
-
-  - MIB: HUAWEI-DEVICE-MIB
-    table:
-      name: hwMemoryDevTable
-      OID: 1.3.6.1.4.1.2011.6.3.5.1
-    symbols:
-      - name: huawei.hwMemoryDevSize
-        OID: 1.3.6.1.4.1.2011.6.3.5.1.1.2
-        metric_type: monotonic_count
-        chart_meta:
-          description: Indicates the total size of the memory module which is on the managed object
-          family: 'Memory/Total'
-          unit: "By"
-      - name: huawei.hwMemoryDevFree
-        OID: 1.3.6.1.4.1.2011.6.3.5.1.1.3
-        metric_type: monotonic_count
-        chart_meta:
-          description: Indicates the free size of the memory
-          family: 'Memory/Free'
-          unit: "By"
-    metric_tags:
-      - tag: mem_index
-        index: 1

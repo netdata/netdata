@@ -223,13 +223,6 @@ include:
       repo_distro: fedora/41
     test:
       ebpf-core: true
-  - <<: *fedora
-    version: "40"
-    packages:
-      <<: *fedora_packages
-      repo_distro: fedora/40
-    test:
-      ebpf-core: true
 
   - &opensuse
     distro: opensuse
@@ -348,11 +341,6 @@ include:
       <<: *ubuntu_packages
       repo_distro: ubuntu/plucky
   - <<: *ubuntu
-    version: "24.10"
-    packages:
-      <<: *ubuntu_packages
-      repo_distro: ubuntu/oracular
-  - <<: *ubuntu
     version: "22.04"
     packages:
       <<: *ubuntu_packages
@@ -385,6 +373,13 @@ legacy: # Info for platforms we used to support and still need to handle package
       repo_distro: fedora/39
     test:
       ebpf-core: true
+  - <<: *fedora
+    version: "40"
+    packages:
+      <<: *fedora_packages
+      repo_distro: fedora/40
+    test:
+      ebpf-core: true
   - <<: *opensuse
     version: "15.4"
     packages:
@@ -407,6 +402,11 @@ legacy: # Info for platforms we used to support and still need to handle package
     packages:
       <<: *ubuntu_packages
       repo_distro: ubuntu/mantic
+  - <<: *ubuntu
+    version: "24.10"
+    packages:
+      <<: *ubuntu_packages
+      repo_distro: ubuntu/oracular
 no_include: # Info for platforms not covered in CI
   - distro: docker
     version: "19.03 or newer"

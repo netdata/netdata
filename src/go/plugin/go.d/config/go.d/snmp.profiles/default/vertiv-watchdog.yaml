@@ -10,6 +10,20 @@ metadata:
       type:
         value: "Sensor"
 
+metric_tags:
+  - tag: vertiv_product_title
+    OID: 1.3.6.1.4.1.21239.5.1.1.1.0
+    symbol: productTitle
+  - tag: vertiv_product_version
+    OID: 1.3.6.1.4.1.21239.5.1.1.2.0
+    symbol: productVersion
+  - tag: vertiv_product_friendly_name
+    OID: 1.3.6.1.4.1.21239.5.1.1.3.0
+    symbol: productFriendlyName
+  - tag: vertiv_product_mac_address
+    OID: 1.3.6.1.4.1.21239.5.1.1.4.0
+    symbol: productMacAddress
+
 # VERTIV-BB-MIB
 # https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/geist/VERTIV-BB-MIB
 
@@ -23,25 +37,25 @@ metrics:
         name: vertiv.internalTemp
         chart_meta:
           description: Internal temperature measurement
-          family: 'Sensor/Temperature/Value'
+          family: 'Hardware/Sensor/Temperature/Value'
           unit: "Cel"
       - OID: 1.3.6.1.4.1.21239.5.1.2.1.6
         name: vertiv.internalHumidity
         chart_meta:
           description: Internal humidity measurement
-          family: 'Sensor/Humidity/Value'
+          family: 'Hardware/Sensor/Humidity/Value'
           unit: "%"
       - OID: 1.3.6.1.4.1.21239.5.1.2.1.7
         name: vertiv.internalDewPoint
         chart_meta:
           description: Internal dew point temperature
-          family: 'Sensor/DewPoint/Value'
+          family: 'Hardware/Sensor/DewPoint/Value'
           unit: "Cel"
       - OID: 1.3.6.1.4.1.21239.5.1.2.1.4
         name: vertiv.internalAvail
         chart_meta:
           description: Internal availability status
-          family: 'Sensor/Availability/Status'
+          family: 'Hardware/Sensor/Status/Availability'
           unit: "{status}"
         mapping:
           0: unavailable
@@ -64,13 +78,13 @@ metrics:
         name: vertiv.tempSensorTemp
         chart_meta:
           description: Temperature measured by the temperature sensor
-          family: 'Sensor/Temperature/Value'
+          family: 'Hardware/Sensor/Temperature/Value'
           unit: "Cel"
       - OID: 1.3.6.1.4.1.21239.5.1.4.1.4
         name: vertiv.tempSensorAvail
         chart_meta:
           description: Sensor availability status
-          family: 'Sensor/Availability/Status'
+          family: 'Hardware/Sensor/Status/Availability'
           unit: "{status}"
         mapping:
           0: unavailable
@@ -87,17 +101,3 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.21239.5.1.4.1.3
           name: vertiv.tempSensorLabel
-
-metric_tags:
-  - tag: vertiv_product_title
-    OID: 1.3.6.1.4.1.21239.5.1.1.1.0
-    symbol: productTitle
-  - tag: vertiv_product_version
-    OID: 1.3.6.1.4.1.21239.5.1.1.2.0
-    symbol: productVersion
-  - tag: vertiv_product_friendly_name
-    OID: 1.3.6.1.4.1.21239.5.1.1.3.0
-    symbol: productFriendlyName
-  - tag: _vertiv_product_mac_address
-    OID: 1.3.6.1.4.1.21239.5.1.1.4.0
-    symbol: productMacAddress

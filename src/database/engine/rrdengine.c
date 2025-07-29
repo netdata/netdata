@@ -773,6 +773,15 @@ struct rrdengine_datafile *get_last_ctx_datafile(struct rrdengine_instance *ctx,
     return get_ctx_datafile_first_or_last(ctx, false, with_lock);
 }
 
+static netdata_mutex_t mutex;
+
+static void __attribute__((constructor)) init_mutex(void) {
+    netdata_mutex_init(&mutex);
+}
+
+static void __attribute__((destructor)) destroy_mutex(void) {
+    netdata_mutex_destroy(&mutex);
+}
 
 static struct rrdengine_datafile *get_datafile_to_write_extent(struct rrdengine_instance *ctx) {
     struct rrdengine_datafile *datafile;
@@ -792,13 +801,13 @@ static struct rrdengine_datafile *get_datafile_to_write_extent(struct rrdengine_
         struct rrdengine_datafile *old_datafile = datafile;
 
         // only 1 datafile creation at a time
-        static netdata_mutex_t mutex = NETDATA_MUTEX_INITIALIZER;
+
         netdata_mutex_lock(&mutex);
 
         // take the latest datafile again - without this, multiple threads may create multiple files
         datafile = get_last_ctx_datafile(ctx, false);
 
-        if(datafile_is_full(ctx, datafile) && create_new_datafile_pair(ctx, true) == 0)
+        if(datafile_is_full(ctx, datafile) && create_new_datafile_pair(ctx) == 0)
             __atomic_store_n(&ctx->atomic.needs_indexing, true, __ATOMIC_RELAXED);
 
         netdata_mutex_unlock(&mutex);
@@ -953,9 +962,6 @@ datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_dat
 
 static void after_extent_write(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* uv_work_req __maybe_unused, int status __maybe_unused)
 {
-    if(completion)
-        completion_mark_complete(completion);
-
     check_and_schedule_db_rotation(ctx);
 }
 
@@ -1010,6 +1016,7 @@ static void *extent_write_tp_worker(
 
 done:
     __atomic_sub_fetch(&ctx->atomic.extents_currently_being_flushed, 1, __ATOMIC_RELAXED);
+    completion_mark_complete(completion);
     worker_is_idle();
     return NULL;
 }

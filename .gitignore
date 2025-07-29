@@ -56,6 +56,9 @@ README
 TODO.md
 TODO.txt
 
+# vscode extension Continue
+.continue
+
 # related to karma/javascript/node
 /node_modules/
 /coverage/

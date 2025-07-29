@@ -267,6 +267,7 @@ These options allow the collector to connect to your MSSQL instance and collect 
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
+| update every | Data collection frequency. | 10 | no |
 | driver | ODBC driver used to connect to the SQL Server. | SQL Server | no |
 | server | Server address or instance name. | empty | yes |
 | address | Alternative to `server`; supports named pipes if the server supports them. | empty | yes |

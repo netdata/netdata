@@ -88,8 +88,15 @@ static struct prometheus_server {
     struct prometheus_server *next;
 } *prometheus_server_root = NULL;
 
-static netdata_mutex_t prometheus_server_root_mutex = NETDATA_MUTEX_INITIALIZER;
+static netdata_mutex_t prometheus_server_root_mutex;
 
+static void __attribute__((constructor)) init_mutex(void) {
+    netdata_mutex_init(&prometheus_server_root_mutex);
+}
+
+static void __attribute__((destructor)) destroy_mutex(void) {
+    netdata_mutex_destroy(&prometheus_server_root_mutex);
+}
 /**
  * Clean server root local structure
  */

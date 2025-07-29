@@ -1,5 +1,12 @@
 # Provide metrics that can be found in Dell devices that are or contain DRAC components
 
+# 1. DELL-RAC-MIB
+#    https://mibbrowser.online/mibdb_search.php?mib=DELL-RAC-MIB
+#    https://github.com/librenms/librenms/blob/master/mibs/dell/DELL-RAC-MIB
+# 2. IDRAC-MIB-SMIv2
+#    https://mibbrowser.online/mibdb_search.php?mib=IDRAC-MIB-SMIv2
+#    https://github.com/librenms/librenms/blob/master/mibs/dell/IDRAC-MIB-SMIv2
+
 metrics:
   - MIB: IDRAC-MIB-SMIv2
     table:
@@ -9,7 +16,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.4
         name: systemStateChassisStatus
         chart_meta:
-          family: 'Chassis/Status'
+          family: 'Hardware/Chassis/Status'
           description: Chassis status of the system state
           unit: "{status}"
         mapping:
@@ -22,7 +29,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.6
         name: systemStatePowerUnitStatusRedundancy
         chart_meta:
-          family: 'PowerUnit/Redundancy/Status'
+          family: 'Hardware/Power/Unit/Redundancy/Status'
           description: Power unit status redundancy of the system state
           unit: "{status}"
         mapping:
@@ -36,7 +43,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.9
         name: systemStatePowerSupplyStatusCombined
         chart_meta:
-          family: 'PowerSupply/Status/Combined'
+          family: 'Hardware/Power/Supply/Status/Combined'
           description: Combined power supply status of the system state
           unit: "{state}"
         mapping:
@@ -49,7 +56,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.15
         name: systemStateAmperageStatusCombined
         chart_meta:
-          family: 'Amperage/Status/Combined'
+          family: 'Hardware/Sensor/Amperage/Status/Combined'
           description: Combined amperage status of the system state
           unit: "{status}"
         mapping:
@@ -62,7 +69,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.18
         name: systemStateCoolingUnitStatusRedundancy
         chart_meta:
-          family: 'CoolingUnit/Redundancy/Status'
+          family: 'Hardware/Cooling/Unit/Redundancy/Status'
           description: Cooling unit status redundancy of the system state
           unit: "{status}"
         mapping:
@@ -76,7 +83,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.21
         name: systemStateCoolingDeviceStatusCombined
         chart_meta:
-          family: 'CoolingDevice/Status/Combined'
+          family: 'Hardware/Cooling/Device/Status/Combined'
           description: Combined cooling device status of the system state
           unit: "{status}"
         mapping:
@@ -89,7 +96,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.24
         name: systemStateTemperatureStatusCombined
         chart_meta:
-          family: 'Temperature/Status/Combined'
+          family: 'Hardware/Sensor/Temperature/Status/Combined'
           description: Combined temperature status of the system state
           unit: "{status}"
         mapping:
@@ -102,7 +109,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.27
         name: systemStateMemoryDeviceStatusCombined
         chart_meta:
-          family: 'MemoryDevice/Status/Combined'
+          family: 'Hardware/Memory/Device/Status/Combined'
           description: Combined memory device status of the system state
           unit: "{status}"
         mapping:
@@ -115,7 +122,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.30
         name: systemStateChassisIntrusionStatusCombined
         chart_meta:
-          family: 'ChassisIntrusion/Status/Combined'
+          family: 'Hardware/Chassis/Intrusion/Status/Combined'
           description: Combined chassis intrusion status of the system state
           unit: "{status}"
         mapping:
@@ -128,7 +135,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.42
         name: systemStatePowerUnitStatusCombined
         chart_meta:
-          family: 'PowerUnit/Status/Combined'
+          family: 'Hardware/Power/Unit/Status/Combined'
           description: Combined power unit status of the system state
           unit: "{status}"
         mapping:
@@ -141,7 +148,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.44
         name: systemStateCoolingUnitStatusCombined
         chart_meta:
-          family: 'CoolingUnit/Status/Combined'
+          family: 'Hardware/Cooling/Unit/Status/Combined'
           description: Combined cooling unit status of the system state
           unit: "{status}"
         mapping:
@@ -154,7 +161,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.50
         name: systemStateProcessorDeviceStatusCombined
         chart_meta:
-          family: 'ProcessorDevice/Status/Combined'
+          family: 'Hardware/Processor/Device/Status/Combined'
           description: Combined processor device status of the system state
           unit: "{status}"
         mapping:
@@ -167,7 +174,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.63
         name: systemStateTemperatureStatisticsStatusCombined
         chart_meta:
-          family: 'TemperatureStatistics/Status/Combined'
+          family: 'Hardware/Sensor/Temperature/Statistics/Status/Combined'
           description: Combined temperature statistics status of the system state
           unit: "{status}"
         mapping:
@@ -191,7 +198,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.4
         name: physicalDiskState
         chart_meta:
-          family: 'Disk/Physical/State'
+          family: 'Hardware/Disk/Physical/State'
           description: State of the physical disk
           unit: "{status}"
         mapping:
@@ -209,21 +216,21 @@ metrics:
         name: physicalDiskCapacityInMB
         scale_factor: 1048576
         chart_meta:
-          family: 'Disk/Physical/Capacity'
+          family: 'Hardware/Disk/Physical/Capacity'
           description: Capacity of the physical disk in megabytes
           unit: "By"
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.17
         name: physicalDiskUsedSpaceInMB
         scale_factor: 1048576
         chart_meta:
-          family: 'Disk/Physical/Used'
+          family: 'Hardware/Disk/Physical/Used'
           description: Used space of the physical disk in megabytes
           unit: "By"
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.19
         name: physicalDiskFreeSpaceInMB
         scale_factor: 1048576
         chart_meta:
-          family: 'Disk/Physical/Free'
+          family: 'Hardware/Disk/Physical/Free'
           description: Free space of the physical disk in megabytes
           unit: "By"
     metric_tags:
@@ -232,7 +239,7 @@ metrics:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.1
           name: physicalDiskNumber
       - tag: disk_name
-      - symbol:
+        symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.2
           name: physicalDiskName
 
@@ -244,7 +251,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.9.1.4
         name: enclosurePowerSupplyState
         chart_meta:
-          family: 'Enclosure/PowerSupply/State'
+          family: 'Hardware/Enclosure/PowerSupply/State'
           description: State of the enclosure power supply
           unit: "{status}"
         mapping:
@@ -275,7 +282,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.15.1.4
         name: batteryState
         chart_meta:
-          family: 'Battery/State'
+          family: 'Hardware/Battery/State'
           description: State of the battery
           unit: "{status}"
         mapping:
@@ -304,7 +311,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.37
         name: controllerRollUpStatus
         chart_meta:
-          family: 'Controller/Status/RollUp'
+          family: 'Hardware/Controller/Status/RollUp'
           description: Roll up status of the controller
           unit: "{status}"
         mapping:
@@ -340,7 +347,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.80.1.5
         name: pCIDeviceStatus
         chart_meta:
-          family: 'PCIDevice/Status'
+          family: 'Hardware/PCIDevice/Status'
           description: Status of the PCI device
           unit: "{status}"
         mapping:
@@ -368,7 +375,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.1200.10.1.5
         name: systemSlotStatus
         chart_meta:
-          family: 'Slot/Status'
+          family: 'Hardware/Slot/Status'
           description: Status of the system slot
           unit: "{status}"
         mapping:
@@ -396,7 +403,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.90.1.3
         name: networkDeviceStatus
         chart_meta:
-          family: 'NetworkDevice/Status'
+          family: 'Network/Device/Status'
           description: Status of the network device
           unit: "{status}"
         mapping:
@@ -428,7 +435,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.300.50.1.5
         name: systemBIOSStatus
         chart_meta:
-          family: 'BIOS/Status'
+          family: 'System/BIOS/Status'
           description: Status of the system BIOS
           unit: "{status}"
         mapping:
@@ -456,7 +463,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.300.70.1.5
         name: intrusionStatus
         chart_meta:
-          family: 'Intrusion/Status'
+          family: 'Hardware/Intrusion/Status'
           description: Status of the intrusion
           unit: "{status}"
         mapping:
@@ -469,7 +476,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.300.70.1.6
         name: intrusionReading
         chart_meta:
-          family: 'Intrusion/Reading'
+          family: 'Hardware/Intrusion/Reading'
           description: Reading of the intrusion
           unit: "{reading}"
     metric_tags:
@@ -494,19 +501,19 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.12.1.6
         name: powerSupplyOutputWatts
         chart_meta:
-          family: 'PowerSupply/Output/Power'
+          family: 'Hardware/PowerSupply/Output/Power'
           description: Output power of the power supply in watts
           unit: "W"
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.12.1.9
         name: powerSupplyMaximumInputVoltage
         chart_meta:
-          family: 'PowerSupply/Input/Voltage/Maximum'
+          family: 'Hardware/PowerSupply/Input/Voltage/Maximum'
           description: Maximum input voltage of the power supply
           unit: "V"
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.12.1.16
         name: powerSupplyCurrentInputVoltage
         chart_meta:
-          family: 'PowerSupply/Input/Voltage/Current'
+          family: 'Hardware/PowerSupply/Input/Voltage/Current'
           description: Current input voltage of the power supply
           unit: "V"
     metric_tags:
@@ -531,7 +538,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.5
         name: amperageProbeStatus
         chart_meta:
-          family: 'Sensor/Amperage/Status'
+          family: 'Hardware/Sensor/Amperage/Status'
           description: Status of the amperage probe
           unit: "{status}"
         mapping:
@@ -548,7 +555,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.6
         name: amperageProbeReading
         chart_meta:
-          family: 'Sensor/Amperage/Value'
+          family: 'Hardware/Sensor/Amperage/Value'
           description: Reading of the amperage probe in amperes
           unit: "A"
     metric_tags:
@@ -557,26 +564,26 @@ metrics:
           OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.7
           name: amperageProbeType
         mapping:
-          1: amperage_probe_type_is_other
-          2: amperage_probe_type_is_unknown
-          3: amperage_probe_type_is_1point5_volt    # 1.5 volt
-          4: amperage_probe_type_is_3point3_volt    # 3.3 volt
-          5: amperage_probe_type_is_5_volt          # 5 volt
-          6: amperage_probe_type_is_minus5_volt     # -5 volt
-          7: amperage_probe_type_is_12_volt         # 12 volt
-          8: amperage_probe_type_is_minus12_volt    # -12 volt
-          9: amperage_probe_type_is_io
-          10: amperage_probe_type_is_core
-          11: amperage_probe_type_is_flea
-          12: amperage_probe_type_is_battery
-          13: amperage_probe_type_is_terminator
-          14: amperage_probe_type_is_2point5_volt   # 2.5 volt
-          15: amperage_probe_type_is_gtl
-          16: amperage_probe_type_is_discrete
-          23: amperage_probe_type_is_power_supply_amps
-          24: amperage_probe_type_is_power_supply_watts
-          25: amperage_probe_type_is_system_amps
-          26: amperage_probe_type_is_system_watts
+          1: other
+          2: unknown
+          3: 1point5_volt    # 1.5 volt
+          4: 3point3_volt    # 3.3 volt
+          5: 5_volt          # 5 volt
+          6: minus5_volt     # -5 volt
+          7: 12_volt         # 12 volt
+          8: minus12_volt    # -12 volt
+          9: io
+          10: core
+          11: flea
+          12: battery
+          13: terminator
+          14: 2point5_volt   # 2.5 volt
+          15: gtl
+          16: discrete
+          23: power_supply_amps
+          24: power_supply_watts
+          25: system_amps
+          26: system_watts
       - tag: chassis_index
         symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.1
@@ -594,7 +601,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.60.1.5
         name: powerUsageStatus
         chart_meta:
-          family: 'PowerUsage/Status'
+          family: 'System/Power/Usage/Status'
           description: Status of the power usage
           unit: "{status}"
         mapping:
@@ -626,7 +633,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.20.1.5
         name: voltageProbeStatus
         chart_meta:
-          family: 'Sensor/Voltage/Status'
+          family: 'Hardware/Sensor/Voltage/Status'
           description: Status of the voltage probe
           unit: "{status}"
         mapping:
@@ -643,7 +650,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.20.1.6
         name: voltageProbeReading
         chart_meta:
-          family: 'Sensor/Voltage/Value'
+          family: 'Hardware/Sensor/Voltage/Value'
           description: Reading of the voltage probe in volts
           unit: "V"
     metric_tags:
@@ -660,25 +667,25 @@ metrics:
           OID: 1.3.6.1.4.1.674.10892.5.4.600.20.1.7
           name: voltageProbeType
         mapping:
-          1: voltage_probe_type_is_other
-          2: voltage_probe_type_is_unknown
-          3: voltage_probe_type_is_1point5_volt   # 1.5 volt
-          4: voltage_probe_type_is_3point3_volt   # 3.3 volt
-          5: voltage_probe_type_is_5_volt         # 5 volt
-          6: voltage_probe_type_is_minus5_volt    # -5 volt
-          7: voltage_probe_type_is_12_volt        # 12 volt
-          8: voltage_probe_type_is_minus12_volt   # -12 volt
-          9: voltage_probe_type_is_io
-          10: voltage_probe_type_is_core
-          11: voltage_probe_type_is_flea
-          12: voltage_probe_type_is_battery
-          13: voltage_probe_type_is_terminator
-          14: voltage_probe_type_is_2point5_volt  # 2.5 volt
-          15: voltage_probe_type_is_gtl
-          16: voltage_probe_type_is_discrete
-          17: voltage_probe_type_is_generic_discrete
-          18: voltage_probe_type_is_ps_voltage
-          19: voltage_probe_type_is_memory_status
+          1: other
+          2: unknown
+          3: 1point5_volt   # 1.5 volt
+          4: 3point3_volt   # 3.3 volt
+          5: 5_volt         # 5 volt
+          6: minus5_volt    # -5 volt
+          7: 12_volt        # 12 volt
+          8: minus12_volt   # -12 volt
+          9: io
+          10: core
+          11: flea
+          12: battery
+          13: terminator
+          14: 2point5_volt  # 2.5 volt
+          15: gtl
+          16: discrete
+          17: generic_discrete
+          18: ps_voltage
+          19: memory_status
 
   - MIB: IDRAC-MIB-SMIv2
     table:
@@ -688,7 +695,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.50.1.5
         name: systemBatteryStatus
         chart_meta:
-          family: 'SystemBattery/Status'
+          family: 'Hardware/Battery/System/Status'
           description: Status of the system battery
           unit: "{status}"
         mapping:
@@ -701,7 +708,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.50.1.6
         name: systemBatteryReading
         chart_meta:
-          family: 'SystemBattery/Reading'
+          family: 'Hardware/Battery/System/Reading'
           description: Reading of the system battery
           unit: "{reading}"
     metric_tags:
@@ -726,7 +733,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.10.1.5
         name: coolingUnitRedundancyStatus
         chart_meta:
-          family: 'CoolingUnit/Redundancy/Status'
+          family: 'Hardware/Cooling/Unit/Redundancy/Status'
           description: Redundancy status of the cooling unit
           unit: "{status}"
         mapping:
@@ -740,7 +747,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.10.1.8
         name: coolingUnitStatus
         chart_meta:
-          family: 'CoolingUnit/Status'
+          family: 'Hardware/Cooling/Unit/Status'
           description: Status of the cooling unit
           unit: "{status}"
         mapping:
@@ -773,7 +780,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.5
         name: coolingDeviceStatus
         chart_meta:
-          family: 'CoolingDevice/Status'
+          family: 'Hardware/Cooling/Device/Status'
           description: Status of the cooling device
           unit: "{status}"
         mapping:
@@ -790,13 +797,13 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.6
         name: coolingDeviceReading
         chart_meta:
-          family: 'CoolingDevice/Speed'
+          family: 'Hardware/Cooling/Device/Speed'
           description: Reading of the cooling device
-          unit: "rpm"
+          unit: "{revolution}/min"
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.18
         name: coolingDeviceDiscreteReading
         chart_meta:
-          family: 'CoolingDevice/DiscreteReading'
+          family: 'Hardware/Cooling/Device/DiscreteReading'
           description: Discrete reading of the cooling device
           unit: "{reading}"
     metric_tags:
@@ -813,17 +820,17 @@ metrics:
           OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.7
           name: coolingDeviceType
         mapping:
-          1: cooling_device_type_is_other
-          2: cooling_device_type_is_unknown
-          3: cooling_device_type_is_a_fan
-          4: cooling_device_type_is_a_blower
-          5: cooling_device_type_is_a_chip_fan
-          6: cooling_device_type_is_a_cabinet_fan
-          7: cooling_device_type_is_a_power_supply_fan
-          8: cooling_device_type_is_a_heat_pipe
-          9: cooling_device_type_is_refrigeration
-          10: cooling_device_type_is_active_cooling
-          11: cooling_device_type_is_passive_cooling
+          1: other
+          2: unknown
+          3: a_fan
+          4: a_blower
+          5: a_chip_fan
+          6: a_cabinet_fan
+          7: a_power_supply_fan
+          8: a_heat_pipe
+          9: refrigeration
+          10: active_cooling
+          11: passive_cooling
       - tag: cooling_device_location_name
         symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.8
@@ -841,7 +848,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.20.1.5
         name: temperatureProbeStatus
         chart_meta:
-          family: 'Sensor/Temperature/Status'
+          family: 'Hardware/Sensor/Temperature/Status'
           description: Status of the temperature probe
           unit: "{status}"
         mapping:
@@ -858,13 +865,13 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.20.1.6
         name: temperatureProbeReading
         chart_meta:
-          family: 'Sensor/Temperature/Value'
+          family: 'Hardware/Sensor/Temperature/Value'
           description: Reading of the temperature probe in degrees Celsius
           unit: "Cel"
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.20.1.16
         name: temperatureProbeDiscreteReading
         chart_meta:
-          family: 'Sensor/Temperature/DiscreteReading'
+          family: 'Hardware/Sensor/Temperature/DiscreteReading'
           description: Discrete reading of the temperature probe
           unit: "{reading}"
     metric_tags:
@@ -881,10 +888,10 @@ metrics:
           OID: 1.3.6.1.4.1.674.10892.5.4.700.20.1.7
           name: temperatureProbeType
         mapping:
-          1: temperature_probe_type_is_other
-          2: temperature_probe_type_is_unknown
-          3: temperature_probe_type_is_ambient_esm
-          16: temperature_probe_type_is_discrete
+          1: other
+          2: unknown
+          3: ambient_esm
+          16: discrete
       - tag: temperature_probe_location_name
         symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.700.20.1.8
@@ -898,7 +905,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.30.1.5
         name: processorDeviceStatus
         chart_meta:
-          family: 'Processor/Status'
+          family: 'Hardware/Processor/Status'
           description: Status of the processor device
           unit: "{status}"
         mapping:
@@ -911,19 +918,19 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.30.1.11
         name: processorDeviceMaximumSpeed
         chart_meta:
-          family: 'Processor/Speed/Maximum'
+          family: 'Hardware/Processor/Speed/Maximum'
           description: Maximum speed of the processor device in megahertz
           unit: "MHz"
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.30.1.12
         name: processorDeviceCurrentSpeed
         chart_meta:
-          family: 'Processor/Speed/Current'
+          family: 'Hardware/Processor/Speed/Current'
           description: Current speed of the processor device in megahertz
           unit: "MHz"
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.30.1.14
         name: processorDeviceVoltage
         chart_meta:
-          family: 'Processor/Voltage'
+          family: 'Hardware/Processor/Voltage'
           description: Voltage of the processor device in volts
           unit: "V"
     metric_tags:
@@ -952,7 +959,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.32.1.5
         name: processorDeviceStatusStatus
         chart_meta:
-          family: 'ProcessorDeviceStatus/Status'
+          family: 'Hardware/Processor/Device/Status/Status'
           description: Status of the processor device status
           unit: "{status}"
         mapping:
@@ -965,7 +972,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.32.1.6
         name: processorDeviceStatusReading
         chart_meta:
-          family: 'ProcessorDeviceStatus/Reading'
+          family: 'Hardware/Processor/Device/Status/Reading'
           description: Reading of the processor device status
           unit: "{reading}"
     metric_tags:
@@ -990,7 +997,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.50.1.5
         name: memoryDeviceStatus
         chart_meta:
-          family: 'Memory/Status'
+          family: 'Hardware/Memory/Status'
           description: Status of the memory device
           unit: "{status}"
         mapping:
@@ -1018,29 +1025,29 @@ metrics:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.50.1.7
           name: memoryDeviceType
         mapping:
-          1: device_type_is_other
-          2: device_type_is_unknown
-          3: device_type_is_dram
-          4: device_type_is_edram
-          5: device_type_is_vram
-          6: device_type_is_sram
-          7: device_type_is_ram
-          8: device_type_is_rom
-          9: device_type_is_flash
-          10: device_type_is_eeprom
-          11: device_type_is_feprom
-          12: device_type_is_eprom
-          13: device_type_is_cdram
-          14: device_type_is_3dram
-          15: device_type_is_sdram
-          16: device_type_is_sgram
-          17: device_type_is_rdram
-          18: device_type_is_ddr
-          19: device_type_is_ddr2
-          20: device_type_is_ddr2_fbdimm
-          24: device_type_is_ddr3
-          25: device_type_is_fbd2
-          26: device_type_is_ddr4
+          1: other
+          2: unknown
+          3: dram
+          4: edram
+          5: vram
+          6: sram
+          7: ram
+          8: rom
+          9: flash
+          10: eeprom
+          11: feprom
+          12: eprom
+          13: cdram
+          14: 3dram
+          15: sdram
+          16: sgram
+          17: rdram
+          18: ddr
+          19: ddr2
+          20: ddr2_fbdimm
+          24: ddr3
+          25: fbd2
+          26: ddr4
 
   - MIB: IDRAC-MIB-SMIv2
     table:
@@ -1050,7 +1057,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.4.2000.10.1.3
         name: fruInformationStatus
         chart_meta:
-          family: 'FRU/Status'
+          family: 'Hardware/FRU/Status'
           description: Status of the FRU information
           unit: "{status}"
         mapping:
@@ -1082,7 +1089,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1.1.4
         name: virtualDiskState
         chart_meta:
-          family: 'Disk/Virtual/State'
+          family: 'System/Disk/Virtual/State'
           description: State of the virtual disk
           unit: "{status}"
         mapping:
@@ -1094,13 +1101,13 @@ metrics:
         name: virtualDiskSizeInMB
         scale_factor: 1048576
         chart_meta:
-          family: 'Disk/Virtual/Size'
+          family: 'System/Disk/Virtual/Size'
           description: Size of the virtual disk in megabytes
           unit: "By"
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1.1.20
         name: virtualDiskComponentStatus
         chart_meta:
-          family: 'Disk/Virtual/ComponentStatus'
+          family: 'System/Disk/Virtual/ComponentStatus'
           description: Component status of the virtual disk
           unit: "{status}"
         mapping:
@@ -1113,7 +1120,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1.1.37
         name: virtualDiskT10PIStatus
         chart_meta:
-          family: 'Disk/Virtual/T10PIStatus'
+          family: 'System/Disk/Virtual/T10PIStatus'
           description: T10 PI status of the virtual disk
           unit: "{status}"
         mapping:
@@ -1139,7 +1146,7 @@ metrics:
       OID: 1.3.6.1.4.1.674.10892.2.3.1.9.0
       name: drsCMCCurrStatus
       chart_meta:
-        family: 'CMC/Status'
+        family: 'Hardware/CMC/Status'
         description: CMC health status being monitored by the chassis management card
         unit: "{status}"
       mapping:
@@ -1155,7 +1162,7 @@ metrics:
       OID: 1.3.6.1.4.1.674.10892.2.3.1.1.0
       name: drsGlobalCurrStatus
       chart_meta:
-        family: 'Global/Status'
+        family: 'System/Global/Status'
         description: Overall chassis status being monitored by the chassis management card
         unit: "{status}"
       mapping:
@@ -1171,7 +1178,7 @@ metrics:
       OID: 1.3.6.1.4.1.674.10892.2.3.1.5.0
       name: drsPowerCurrStatus
       chart_meta:
-        family: 'Power/Status'
+        family: 'Hardware/Power/Status'
         description: Power subsystem health status being monitored by the chassis management card
         unit: "{status}"
       mapping:
@@ -1186,29 +1193,33 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.674.10892.2.3.1.4.0
       name: drsRedCurrStatus
-      description: Redundancy status being monitored by the chassis management card
-      unit: "{status}"
-    mapping:
-      1: other
-      2: unknown
-      3: ok
-      4: non_critical
-      5: critical
-      6: non_recoverable
+      chart_meta:
+        family: 'System/Redundancy/Status'
+        description: Redundancy status being monitored by the chassis management card
+        unit: "{status}"
+      mapping:
+        1: other
+        2: unknown
+        3: ok
+        4: non_critical
+        5: critical
+        6: non_recoverable
 
   - MIB: DELL-RAC-MIB
     symbol:
       OID: 1.3.6.1.4.1.674.10892.2.2.1.0
       name: drsGlobalSystemStatus
-      description: Overall chassis status being monitored by the chassis management card
-      unit: "{status}"
-    mapping:
-      1: other
-      2: unknown
-      3: ok
-      4: non_critical
-      5: critical
-      6: non_recoverable
+      chart_meta:
+        family: 'System/Global/SystemStatus'
+        description: Overall chassis status being monitored by the chassis management card
+        unit: "{status}"
+      mapping:
+        1: other
+        2: unknown
+        3: ok
+        4: non_critical
+        5: critical
+        6: non_recoverable
 
   - MIB: DELL-RAC-MIB
     table:
@@ -1217,12 +1228,16 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.2.4.1.1.13
         name: drsWattsReading
-        description: Instantaneous chassis power usage in watts
-        unit: "W"
+        chart_meta:
+          family: 'Hardware/Power/Usage'
+          description: Instantaneous chassis power usage in watts
+          unit: "W"
       - OID: 1.3.6.1.4.1.674.10892.2.4.1.1.14
         name: drsAmpsReading
-        description: Instantaneous chassis current usage in amperes
-        unit: "A"
+        chart_meta:
+          family: 'Hardware/Power/Current'
+          description: Instantaneous chassis current usage in amperes
+          unit: "A"
     metric_tags:
       - tag: chassis_index
         symbol:
@@ -1241,8 +1256,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.2.4.1.1.6
         name: drsKWhCumulative
-        description: Cumulative chassis power usage in kilowatt hours since last reset
-        unit: "kW.h"
+        chart_meta:
+          family: 'Hardware/Power/Energy/Cumulative'
+          description: Cumulative chassis power usage in kilowatt hours since last reset
+          unit: "kWh"
     metric_tags:
       - tag: chassis_index
         symbol:
