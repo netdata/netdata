@@ -105,10 +105,9 @@ struct dbengine_initialization {
     int ret;
 };
 
-void *dbengine_tier_init(void *ptr) {
+void dbengine_tier_init(void *ptr) {
     struct dbengine_initialization *dbi = ptr;
     dbi->ret = rrdeng_init(NULL, dbi->path, dbi->disk_space_mb, dbi->tier, dbi->retention_seconds);
-    return ptr;
 }
 
 RRD_BACKFILL get_dbengine_backfill(RRD_BACKFILL backfill)

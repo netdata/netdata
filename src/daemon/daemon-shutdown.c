@@ -98,10 +98,9 @@ void cancel_main_threads(void) {
 }
 
 #ifdef ENABLE_DBENGINE
-static void *rrdeng_exit_background(void *ptr) {
+static void rrdeng_exit_background(void *ptr) {
     struct rrdengine_instance *ctx = ptr;
     rrdeng_exit(ctx);
-    return NULL;
 }
 
 static void rrdeng_quiesce_all()

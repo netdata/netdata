@@ -65,7 +65,7 @@ enum directory_cache_counters {
 
 enum directory_cache_targets { NETDATA_DC_TARGET_LOOKUP_FAST, NETDATA_DC_TARGET_D_LOOKUP };
 
-void *ebpf_dcstat_thread(void *ptr);
+void ebpf_dcstat_thread(void *ptr);
 void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr);
 void ebpf_dcstat_release(netdata_publish_dcstat_t *stat);
 extern struct config dcstat_config;

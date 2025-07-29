@@ -1524,7 +1524,7 @@ struct mrg_load_thread {
 size_t max_running_threads = 0;
 size_t running_threads = 0;
 
-void *journalfile_v2_populate_retention_to_mrg_worker(void *arg)
+void journalfile_v2_populate_retention_to_mrg_worker(void *arg)
 {
     struct mrg_load_thread *mlt = arg;
     uv_sem_wait(mlt->sem);
@@ -1548,7 +1548,6 @@ void *journalfile_v2_populate_retention_to_mrg_worker(void *arg)
 
     // Signal completion - this needs to be last
     __atomic_store_n(&mlt->finished, true, __ATOMIC_RELEASE);
-    return NULL;
 }
 
 static void after_populate_mrg(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
@@ -2277,7 +2276,7 @@ void rrdeng_calculate_tier_disk_space_percentage(void)
 #define NOT_INDEXING_FILES(ctx)                                                                                        \
     (!__atomic_load_n(&(ctx)->atomic.migration_to_v2_running, __ATOMIC_RELAXED))
 
-void *dbengine_event_loop(void* arg) {
+void dbengine_event_loop(void* arg) {
     sanity_check();
     uv_thread_set_name_np("DBENGINE");
     service_register(NULL, NULL, NULL);
@@ -2514,7 +2513,6 @@ void *dbengine_event_loop(void* arg) {
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "Shutting down dbengine thread");
     (void) uv_loop_close(&main->loop);
     worker_unregister();
-    return NULL;
 }
 
 void dbengine_shutdown()

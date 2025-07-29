@@ -794,7 +794,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
  *
  * @return It always returns NULL
  */
-void *aclk_main(void *ptr)
+void aclk_main(void *ptr)
 {
     struct netdata_static_thread *static_thread = ptr;
 
@@ -840,7 +840,7 @@ void *aclk_main(void *ptr)
     if (proxy_type == PROXY_TYPE_SOCKS5) {
         netdata_log_error("ACLK: SOCKS5 proxy is not supported by ACLK-NG yet.");
         static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
-        return NULL;
+        return;
     }
 
     aclk_init_rx_msg_handlers();
@@ -916,7 +916,6 @@ exit:
         freez(aclk_env);
     }
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
-    return NULL;
 }
 
 bool aclk_host_state_update_auto(RRDHOST *host) {

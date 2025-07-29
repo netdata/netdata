@@ -201,7 +201,7 @@ void websocket_threads_init(void);
 void websocket_threads_join(void);
 bool websocket_thread_send_command(WEBSOCKET_THREAD *wth, uint8_t cmd, uint32_t id);
 bool websocket_thread_send_broadcast(WEBSOCKET_THREAD *wth, WEBSOCKET_OPCODE opcode, const char *message);
-void *websocket_thread(void *ptr);
+void websocket_thread(void *ptr);
 void websocket_thread_enqueue_client(WEBSOCKET_THREAD *wth, struct websocket_server_client *wsc);
 bool websocket_thread_update_client_poll_flags(struct websocket_server_client *wsc);
 

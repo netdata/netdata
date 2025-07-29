@@ -28,10 +28,10 @@ extern bool pulse_extended_enabled;
 #include "pulse-network.h"
 #include "pulse-parents.h"
 
-void *pulse_thread_main(void *ptr);
-void *pulse_thread_sqlite3_main(void *ptr);
-void *pulse_thread_workers_main(void *ptr);
-void *pulse_thread_memory_extended_main(void *ptr);
+void pulse_thread_main(void *ptr);
+void pulse_thread_sqlite3_main(void *ptr);
+void pulse_thread_workers_main(void *ptr);
+void pulse_thread_memory_extended_main(void *ptr);
 
 #define p1_add_fetch(variable, value) __atomic_add_fetch(variable, value, __ATOMIC_RELAXED)
 #define p1_sub_fetch(variable, value) __atomic_sub_fetch(variable, value, __ATOMIC_RELAXED)

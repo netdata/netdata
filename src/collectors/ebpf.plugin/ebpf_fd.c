@@ -822,7 +822,7 @@ static void ebpf_update_fd_cgroup()
  *
  * @return It always return NULL
  */
-void *ebpf_read_fd_thread(void *ptr)
+void ebpf_read_fd_thread(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
@@ -830,7 +830,7 @@ void *ebpf_read_fd_thread(void *ptr)
     int update_every = em->update_every;
     int collect_pid = (em->apps_charts || em->cgroup_charts);
     if (!collect_pid)
-        return NULL;
+        return;
 
     int counter = update_every - 1;
 
@@ -865,8 +865,6 @@ void *ebpf_read_fd_thread(void *ptr)
         em->running_time = running_time;
         pthread_mutex_unlock(&ebpf_exit_cleanup);
     }
-
-    return NULL;
 }
 
 /**
@@ -1529,7 +1527,7 @@ static int ebpf_fd_load_bpf(ebpf_module_t *em)
  *
  * @return It always returns NULL
  */
-void *ebpf_fd_thread(void *ptr)
+void ebpf_fd_thread(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
@@ -1564,6 +1562,4 @@ void *ebpf_fd_thread(void *ptr)
 
 endfd:
     ebpf_update_disabled_plugin_stats(em);
-
-    return NULL;
 }

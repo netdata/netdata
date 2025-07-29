@@ -598,7 +598,7 @@ static int ebpf_hardirq_load_bpf(ebpf_module_t *em)
  * @param ptr a `ebpf_module_t *`.
  * @return always NULL.
  */
-void *ebpf_hardirq_thread(void *ptr)
+void ebpf_hardirq_thread(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
@@ -622,6 +622,4 @@ void *ebpf_hardirq_thread(void *ptr)
 
 endhardirq:
     ebpf_update_disabled_plugin_stats(em);
-
-    return NULL;
 }

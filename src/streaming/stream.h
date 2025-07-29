@@ -16,7 +16,7 @@ struct receiver_state;
 #include "stream-parents.h"
 
 // starting and stopping senders
-void *stream_sender_start_localhost(void *ptr);
+void stream_sender_start_localhost(void *ptr);
 void stream_sender_start_host(struct rrdhost *host);
 void stream_sender_signal_to_stop_and_wait(struct rrdhost *host, STREAM_HANDSHAKE reason, bool wait);
 void stream_connector_remove_host(RRDHOST *host);

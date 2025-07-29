@@ -1952,7 +1952,7 @@ static void ebpf_update_socket_cgroup()
  *
  * @return It always return NULL
  */
-void *ebpf_read_socket_thread(void *ptr)
+void ebpf_read_socket_thread(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
@@ -1962,7 +1962,7 @@ void *ebpf_read_socket_thread(void *ptr)
     int counter = update_every - 1;
     int collect_pid = (em->apps_charts || em->cgroup_charts);
     if (!collect_pid)
-        return NULL;
+        return;
 
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
@@ -1984,8 +1984,6 @@ void *ebpf_read_socket_thread(void *ptr)
 
         counter = 0;
     }
-
-    return NULL;
 }
 
 /**
@@ -2995,7 +2993,7 @@ static int ebpf_socket_load_bpf(ebpf_module_t *em)
  *
  * @return It always return NULL
  */
-void *ebpf_socket_thread(void *ptr)
+void ebpf_socket_thread(void *ptr)
 {
     pids_fd[NETDATA_EBPF_PIDS_SOCKET_IDX] = -1;
     ebpf_module_t *em = (ebpf_module_t *)ptr;
@@ -3004,7 +3002,7 @@ void *ebpf_socket_thread(void *ptr)
 
     if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         collector_error("There is already a thread %s running", em->info.thread_name);
-        return NULL;
+        return;
     }
 
     em->maps = socket_maps;
@@ -3065,5 +3063,4 @@ void *ebpf_socket_thread(void *ptr)
 
 endsocket:
     ebpf_update_disabled_plugin_stats(em);
-    return NULL;
 }

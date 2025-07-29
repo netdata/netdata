@@ -2,11 +2,11 @@
 
 #include "common.h"
 
-void *cgroups_main(void *ptr);
-void *proc_main(void *ptr);
-void *diskspace_main(void *ptr);
-void *tc_main(void *ptr);
-void *timex_main(void *ptr);
+void cgroups_main(void *ptr);
+void proc_main(void *ptr);
+void diskspace_main(void *ptr);
+void tc_main(void *ptr);
+void timex_main(void *ptr);
 
 static const struct netdata_static_thread static_threads_linux[] = {
     {

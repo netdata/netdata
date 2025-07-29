@@ -880,12 +880,12 @@ void ebpf_cachestat_resume_apps_data()
  *
  * @return It always return NULL
  */
-void *ebpf_read_cachestat_thread(void *ptr)
+void ebpf_read_cachestat_thread(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     int collect_pid = (em->apps_charts || em->cgroup_charts);
     if (!collect_pid)
-        return NULL;
+        return;
 
     int maps_per_core = em->maps_per_core;
     int update_every = em->update_every;
@@ -921,8 +921,6 @@ void *ebpf_read_cachestat_thread(void *ptr)
         em->running_time = running_time;
         pthread_mutex_unlock(&ebpf_exit_cleanup);
     }
-
-    return NULL;
 }
 
 /**
@@ -1718,7 +1716,7 @@ static int ebpf_cachestat_load_bpf(ebpf_module_t *em)
  *
  * @return It always return NULL
  */
-void *ebpf_cachestat_thread(void *ptr)
+void ebpf_cachestat_thread(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
@@ -1766,6 +1764,4 @@ void *ebpf_cachestat_thread(void *ptr)
 
 endcachestat:
     ebpf_update_disabled_plugin_stats(em);
-
-    return NULL;
 }

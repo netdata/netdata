@@ -106,7 +106,7 @@ static void wait_for_start(pthread_cond_t *cond, pthread_mutex_t *mutex, uint64_
     pthread_mutex_unlock(mutex);
 }
 
-static void* benchmark_thread(void *arg) {
+static void benchmark_thread(void *arg) {
     thread_context_t *ctx = (thread_context_t *)arg;
     rwlock_control_t *control = ctx->control;
 
@@ -166,8 +166,6 @@ static void* benchmark_thread(void *arg) {
         __atomic_store_n(&control->stats[ctx->thread_id].operations, operations, __ATOMIC_RELEASE);
         __atomic_store_n(&control->stats[ctx->thread_id].ready, 1, __ATOMIC_RELEASE);
     }
-
-    return NULL;
 }
 
 static void print_summary(const summary_stats_t *summary) {

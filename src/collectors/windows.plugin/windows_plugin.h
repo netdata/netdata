@@ -15,7 +15,7 @@
 #define MEGA_FACTOR (1048576)
 #endif
 
-void *win_plugin_main(void *ptr);
+void win_plugin_main(void *ptr);
 
 extern char windows_shared_buffer[8192];
 

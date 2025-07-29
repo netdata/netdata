@@ -555,7 +555,7 @@ void ebpf_oomkill_create_apps_charts(struct ebpf_module *em, void *ptr)
  * @param ptr a `ebpf_module_t *`.
  * @return always NULL.
  */
-void *ebpf_oomkill_thread(void *ptr)
+void ebpf_oomkill_thread(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
@@ -603,6 +603,4 @@ void *ebpf_oomkill_thread(void *ptr)
 
 endoomkill:
     ebpf_update_disabled_plugin_stats(em);
-
-    return NULL;
 }

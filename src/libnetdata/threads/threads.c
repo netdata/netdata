@@ -19,8 +19,8 @@ struct nd_thread {
     void *arg;
     pid_t tid;
     char tag[ND_THREAD_TAG_MAX + 1];
-    void *ret; // the return value of start routine
-    void *(*start_routine) (void *);
+    //void *ret; // the return value of start routine
+    void (*start_routine) (void *);
     NETDATA_THREAD_OPTIONS options;
     uv_thread_t thread;
     bool cancel_atomic;
@@ -364,7 +364,7 @@ static void nd_thread_starting_point(void *ptr) {
     spinlock_unlock(&threads_globals.running.spinlock);
 
     // run the thread code
-    nti->ret = nti->start_routine(nti->arg);
+    nti->start_routine(nti->arg);
 
     nd_thread_exit(nti);
 }
@@ -397,7 +397,7 @@ static int create_uv_thread(uv_thread_t *thread, uv_thread_cb thread_func, void 
     return err;
 }
 
-ND_THREAD *nd_thread_create(const char *tag, NETDATA_THREAD_OPTIONS options, void *(*start_routine)(void *), void *arg)
+ND_THREAD *nd_thread_create(const char *tag, NETDATA_THREAD_OPTIONS options, void (*start_routine)(void *), void *arg)
 {
     ND_THREAD *nti = callocz(1, sizeof(*nti));
     spinlock_init(&nti->canceller.spinlock);

@@ -409,7 +409,7 @@ static int ebpf_mdflush_load_bpf(ebpf_module_t *em)
  * @param ptr a `ebpf_module_t *`.
  * @return always NULL.
  */
-void *ebpf_mdflush_thread(void *ptr)
+void ebpf_mdflush_thread(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     CLEANUP_FUNCTION_REGISTER(mdflush_exit) cleanup_ptr = em;
@@ -436,6 +436,4 @@ void *ebpf_mdflush_thread(void *ptr)
 endmdflush:
     freez(md_flush_request);
     ebpf_update_disabled_plugin_stats(em);
-
-    return NULL;
 }

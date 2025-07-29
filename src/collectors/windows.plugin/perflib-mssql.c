@@ -1124,7 +1124,7 @@ int dict_mssql_query_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value,
     return 1;
 }
 
-void *netdata_mssql_queries(void *ptr __maybe_unused)
+static void netdata_mssql_queries(void *ptr __maybe_unused)
 {
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);
@@ -1138,8 +1138,6 @@ void *netdata_mssql_queries(void *ptr __maybe_unused)
 
         dictionary_sorted_walkthrough_read(mssql_instances, dict_mssql_query_cb, &update_every);
     }
-
-    return NULL;
 }
 
 static ND_THREAD *mssql_queries_thread = NULL;

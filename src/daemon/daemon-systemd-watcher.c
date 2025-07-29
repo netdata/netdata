@@ -135,7 +135,7 @@ finish:
     sd_bus_unref(bus);
 }
 
-void *systemd_watcher_thread(void *arg) {
+void systemd_watcher_thread(void *arg) {
     struct netdata_static_thread *static_thread = arg;
 
     service_register(NULL, NULL, NULL);
@@ -145,5 +145,4 @@ void *systemd_watcher_thread(void *arg) {
     service_exits();
     worker_unregister();
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
-    return NULL;
 }

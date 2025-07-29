@@ -251,7 +251,7 @@ static void softirq_collector(ebpf_module_t *em)
  * @param ptr a `ebpf_module_t *`.
  * @return always NULL.
  */
-void *ebpf_softirq_thread(void *ptr)
+void ebpf_softirq_thread(void *ptr)
 {
     ebpf_module_t *em = ptr;
 
@@ -275,6 +275,4 @@ void *ebpf_softirq_thread(void *ptr)
 
 endsoftirq:
     ebpf_update_disabled_plugin_stats(em);
-
-    return NULL;
 }

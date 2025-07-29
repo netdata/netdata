@@ -1078,7 +1078,7 @@ void ebpf_shm_resume_apps_data()
  *
  * @return It always return NULL
  */
-void *ebpf_read_shm_thread(void *ptr)
+void ebpf_read_shm_thread(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
@@ -1086,7 +1086,7 @@ void *ebpf_read_shm_thread(void *ptr)
     int update_every = em->update_every;
     int collect_pid = (em->apps_charts || em->cgroup_charts);
     if (!collect_pid)
-        return NULL;
+        return;
 
     int counter = update_every - 1;
 
@@ -1120,8 +1120,6 @@ void *ebpf_read_shm_thread(void *ptr)
         em->running_time = running_time;
         pthread_mutex_unlock(&ebpf_exit_cleanup);
     }
-
-    return NULL;
 }
 
 /**
@@ -1355,7 +1353,7 @@ static int ebpf_shm_load_bpf(ebpf_module_t *em)
  * @param ptr a pointer to `struct ebpf_module`
  * @return It always return NULL
  */
-void *ebpf_shm_thread(void *ptr)
+void ebpf_shm_thread(void *ptr)
 {
     pids_fd[NETDATA_EBPF_PIDS_SHM_IDX] = -1;
     ebpf_module_t *em = (ebpf_module_t *)ptr;
@@ -1401,6 +1399,4 @@ void *ebpf_shm_thread(void *ptr)
 
 endshm:
     ebpf_update_disabled_plugin_stats(em);
-
-    return NULL;
 }
