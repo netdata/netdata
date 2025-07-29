@@ -44,6 +44,9 @@ ACLK_PROXY_TYPE aclk_verify_proxy(const char *string)
 // for logging purposes
 void safe_log_proxy_censor(char *proxy)
 {
+    if (!proxy)
+        return;
+
     size_t length = strlen(proxy);
     char *auth = proxy + length - 1;
     char *cur;
@@ -130,31 +133,18 @@ const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type)
         return proxy;
 
     if (strcmp(proxy, ACLK_PROXY_ENV) == 0) {
-        if (check_socks_enviroment(&proxy) == 0) {
-#ifdef LWS_WITH_SOCKS5
+        if (check_socks_enviroment(&proxy) == 0)
             *type = PROXY_TYPE_SOCKS5;
-            return proxy;
-#else
-            safe_log_proxy_error("socks_proxy environment variable set to use SOCKS5 proxy "
-                "but Libwebsockets used doesn't have SOCKS5 support built in. "
-                "Ignoring and checking for other options.",
-                proxy);
-#endif
-        }
-        if (check_http_environment(&proxy) == 0)
-            *type = PROXY_TYPE_HTTP;
+        else
+            if (check_http_environment(&proxy) == 0)
+                *type = PROXY_TYPE_HTTP;
+            else
+                proxy = NULL;
         return proxy;
     }
 
     *type = aclk_verify_proxy(proxy);
-#ifndef LWS_WITH_SOCKS5
-    if (*type == PROXY_TYPE_SOCKS5) {
-        safe_log_proxy_error(
-            "Config var \"" ACLK_PROXY_CONFIG_VAR
-            "\" set to use SOCKS5 proxy but Libwebsockets used is built without support for SOCKS proxy. ACLK will be disabled.",
-            proxy);
-    }
-#endif
+
     if (*type == PROXY_TYPE_UNKNOWN) {
         *type = PROXY_DISABLED;
         safe_log_proxy_error(
@@ -169,14 +159,23 @@ const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type)
 // helper function to read settings only once (static)
 // as claiming, challenge/response and ACLK
 // read the same thing, no need to parse again
-const char *aclk_get_proxy(ACLK_PROXY_TYPE *type)
+const char *aclk_get_proxy(ACLK_PROXY_TYPE *return_type, bool for_logging)
 {
     static const char *proxy = NULL;
+    static const char *safe_proxy = NULL;
     static ACLK_PROXY_TYPE proxy_type = PROXY_NOT_SET;
 
-    if (proxy_type == PROXY_NOT_SET)
+    if (proxy_type == PROXY_NOT_SET) {
         proxy = aclk_lws_wss_get_proxy_setting(&proxy_type);
+        char *log = NULL;
+        if (proxy) {
+            log = strdupz(proxy);
+            safe_log_proxy_censor(log);
+        }
+        safe_proxy = log;
+    }
 
-    *type = proxy_type;
-    return proxy;
+    if (return_type)
+        *return_type = proxy_type;
+    return for_logging ? safe_proxy : proxy;
 }
