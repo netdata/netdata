@@ -3069,7 +3069,7 @@ class NetdataMCPChat {
             // Get the API type from the provider configuration
             const providerApiType = proxyProvider.availableProviders?.[providerType]?.type || providerType;
             
-            const provider = createLLMProvider(providerApiType, proxyProvider.proxyUrl, modelName);
+            const provider = createLLMProvider(providerApiType, proxyProvider.proxyUrl, modelName, chat.config.model);
             provider.onLog = (logEntry) => {
                 const prefix = logEntry.direction === 'sent' ? 'llm-request' : 'llm-response';
                 const providerName = providerType.charAt(0).toUpperCase() + providerType.slice(1);
@@ -4251,7 +4251,7 @@ class NetdataMCPChat {
         const providerApiType = proxyProvider.availableProviders?.[providerType]?.type || providerType;
         
         // Create the LLM provider
-        const provider = createLLMProvider(providerApiType, proxyProvider.proxyUrl, modelName);
+        const provider = createLLMProvider(providerApiType, proxyProvider.proxyUrl, modelName, chat.config.model);
         provider.onLog = (logEntry) => {
             const prefix = logEntry.direction === 'sent' ? 'llm-request' : 'llm-response';
             const providerName = providerType.charAt(0).toUpperCase() + providerType.slice(1);
@@ -7214,7 +7214,7 @@ class NetdataMCPChat {
         const providerApiType = proxyProvider.availableProviders?.[providerType]?.type || providerType;
         
         // Create the actual LLM provider instance
-        const provider = window.createLLMProvider(providerApiType, proxyProvider.proxyUrl, modelName);
+        const provider = window.createLLMProvider(providerApiType, proxyProvider.proxyUrl, modelName, chat.config.model);
         provider.onLog = (logEntry) => {
             const prefix = logEntry.direction === 'sent' ? 'llm-request' : 'llm-response';
             const providerName = providerType.charAt(0).toUpperCase() + providerType.slice(1);
@@ -11557,7 +11557,7 @@ class NetdataMCPChat {
                 }
                 // Get the API type from the provider configuration
                 const providerApiType = proxyProvider.availableProviders?.[providerType]?.type || providerType;
-                const p = createLLMProvider(providerApiType, proxyProvider.proxyUrl, modelName);
+                const p = createLLMProvider(providerApiType, proxyProvider.proxyUrl, modelName, chat.config.model);
                 p.onLog = (logEntry) => {
                     const prefix = logEntry.direction === 'sent' ? 'llm-request' : 'llm-response';
                     const providerName = providerType.charAt(0).toUpperCase() + providerType.slice(1);
@@ -11762,7 +11762,8 @@ class NetdataMCPChat {
             const provider = window.createLLMProvider(
                 providerApiType,
                 llmProviderConfig.proxyUrl,
-                modelName
+                modelName,
+                chat.config.model
             );
             provider.onLog = (logEntry) => {
                 const prefix = logEntry.direction === 'sent' ? 'llm-request' : 'llm-response';
