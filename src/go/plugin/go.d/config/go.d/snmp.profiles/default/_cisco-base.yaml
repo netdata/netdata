@@ -7,7 +7,6 @@ extends:
   - _std-ospf-mib.yaml
   - _std-bgp4-mib.yaml
   - _std-ip-mib.yaml
-  - _cisco-cpu-memory.yaml
   - _cisco-metadata.yaml
 
 metrics:
