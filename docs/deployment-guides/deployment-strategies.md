@@ -104,15 +104,18 @@ Edit `netdata.conf` on the Parent using the [edit-config](/docs/netdata-agent/co
     dbengine tier backfill = new
     storage tiers = 3
     dbengine page cache size = 1.4GiB
+
     # storage tier 0
     update every = 1
-    dbengine tier 0 retention space = 12GiB
+    dbengine tier 0 retention size = 12GiB
+
     # storage tier 1
     dbengine tier 1 update every iterations = 60
-    dbengine tier 1 retention space = 4GiB
+    dbengine tier 1 retention size = 4GiB
+
     # storage tier 2
     dbengine tier 2 update every iterations = 60
-    dbengine tier 2 retention space = 2GiB
+    dbengine tier 2 retention size = 2GiB
 [ml]
     # Enabled by default
     # enabled = yes
