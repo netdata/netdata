@@ -2581,11 +2581,11 @@ class OllamaProvider extends LLMProvider {
         
         // Check if model supports tools before including them
         let useToolFallback = false;
-        const modelSupportsTools = this.modelConfig?.supportsTools !== false;
+        const modelSupportsTools = this.modelConfig?.supportsTools === true;
         
         if (ollamaTools.length > 0) {
             if (modelSupportsTools) {
-                // Model supports tools (or we don't know), so include them
+                // Model explicitly supports tools, so include them
                 requestBody.tools = ollamaTools;
             } else {
                 // Model doesn't support tools, use fallback immediately
@@ -2716,12 +2716,6 @@ class OllamaProvider extends LLMProvider {
         // Log the full response
         console.log(`[OLLAMA RECEIVED] (${mode}, subchat: ${chat?.isSubChat || false}):`, data);
         
-        // Debug log for tool parsing
-        if (data.message && data.message.content) {
-            console.log('[OLLAMA DEBUG] Message content:', data.message.content);
-            console.log('[OLLAMA DEBUG] Content includes python_tag?', data.message.content.includes('python_tag'));
-            console.log('[OLLAMA DEBUG] Content includes <|python_tag|>?', data.message.content.includes('<|python_tag|>'));
-        }
         
         // Convert Ollama response to unified format
         const contentArray = [];
@@ -2907,11 +2901,17 @@ class OllamaProvider extends LLMProvider {
             prompt += `Parameters: ${JSON.stringify(tool.function.parameters, null, 2)}\n\n`;
         });
         
-        prompt += 'To use a tool, respond with a JSON block in the following format:\n';
+        prompt += '## How to Use Tools\n\n';
+        prompt += 'When you need to use a tool, you MUST format your response as follows:\n\n';
+        prompt += '1. First, explain what you\'re going to do (optional but recommended)\n';
+        prompt += '2. Then include a JSON code block with the exact format shown below\n';
+        prompt += '3. After the tool call, you can add more explanation or wait for the result\n\n';
+        prompt += '**IMPORTANT**: The JSON block MUST be wrapped in ```json and ``` markers.\n\n';
+        prompt += 'Example format:\n';
         prompt += '```json\n';
         prompt += '{\n';
         prompt += '  "tool_use": {\n';
-        prompt += '    "name": "tool_name",\n';
+        prompt += '    "name": "exact_tool_name_from_list",\n';
         prompt += '    "arguments": {\n';
         prompt += '      "param1": "value1",\n';
         prompt += '      "param2": "value2"\n';
@@ -2919,7 +2919,13 @@ class OllamaProvider extends LLMProvider {
         prompt += '  }\n';
         prompt += '}\n';
         prompt += '```\n\n';
-        prompt += 'You can include explanatory text before or after the tool use JSON block.';
+        prompt += '**Key Rules**:\n';
+        prompt += '- The tool name must EXACTLY match one of the tools listed above\n';
+        prompt += '- All required parameters must be provided in the arguments object\n';
+        prompt += '- The JSON must be valid (proper quotes, commas, etc.)\n';
+        prompt += '- You can call multiple tools by including multiple JSON blocks\n';
+        prompt += '- Always wait for tool results before making conclusions\n\n';
+        prompt += 'Remember: Tools help you access real-time information and perform actions. Use them whenever needed!';
         
         return prompt;
     }
