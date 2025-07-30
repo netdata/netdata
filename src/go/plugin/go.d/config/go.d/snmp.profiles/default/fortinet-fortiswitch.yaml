@@ -27,10 +27,10 @@ metric_tags:
 metrics:
   - MIB: FORTINET-FORTISWITCH-MIB
     symbol:
-      name: cpu.usage
+      name: cpu.usage # fsSysCpuUsage
       OID: 1.3.6.1.4.1.12356.106.4.1.2.0
       chart_meta:
-        description: Current CPU usage
+        description: The current CPU utilization
         family: 'System/CPU/Usage'
         unit: "%"
   - MIB: FORTINET-FORTISWITCH-MIB

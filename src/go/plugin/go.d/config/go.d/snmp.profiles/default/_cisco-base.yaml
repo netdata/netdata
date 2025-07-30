@@ -56,15 +56,16 @@ metrics:
     metric_tags:
       - tag: fru_index
         index: 1
+
   - MIB: CISCO-PROCESS-MIB
     table:
       OID: 1.3.6.1.4.1.9.9.109.1.1.1
       name: cpmCPUTotalTable
     symbols:
       - OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.10
-        name: cpmCPUTotalMonIntervalValue
+        name: cpu.usage # cpmCPUTotalMonIntervalValue
         chart_meta:
-          description: Overall CPU busy percentage in the last monitoring interval
+          description: The current CPU utilization
           family: 'System/CPU/Usage'
           unit: "%"
       - OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.7

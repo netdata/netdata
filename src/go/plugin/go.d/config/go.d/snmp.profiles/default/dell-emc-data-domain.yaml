@@ -42,6 +42,9 @@ sysobjectid:
   - 1.3.6.1.4.1.19746.3.1.36    # EMC dd2500
   - 1.3.6.1.4.1.19746.3.1.37    # EMC dd4200
 
+# -  DATA-DOMAIN-MIB
+#   https://mibbrowser.online/mibdb_search.php?mib=DATA-DOMAIN-MIB
+
 metrics:
   - MIB: HOST-RESOURCES-MIB
     symbol:
@@ -292,17 +295,12 @@ metrics:
       name: systemStatsTable
       OID: 1.3.6.1.4.1.19746.1.5.1.1
     symbols:
-      - name: cpu.usage
+      - name: cpu.usage # cpu0PercentageBusy
+        # TODO: need to collect both cpu0PercentageBusy and cpu1PercentageBusy
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.2
         chart_meta:
           family: 'System/CPU/Usage'
-          description: CPU 0 percentage busy
-          unit: "%"
-      - name: datadomain.cpuMaxPercentageBusy
-        OID: 1.3.6.1.4.1.19746.1.5.1.1.1.3
-        chart_meta:
-          family: 'System/CPU/Usage/Maximum'
-          description: CPU 1 percentage busy
+          description: The current CPU utilization
           unit: "%"
       - name: datadomain.nfsOpsPerSecond
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.4

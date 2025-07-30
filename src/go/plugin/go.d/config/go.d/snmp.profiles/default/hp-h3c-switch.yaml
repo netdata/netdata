@@ -38,9 +38,9 @@ metrics:
       name: hh3cEntityExtStateTable
     symbols:
       - OID: 1.3.6.1.4.1.25506.2.6.1.1.1.1.6
-        name: cpu.usage
+        name: cpu.usage # hh3cEntityExtCpuUsage
         chart_meta:
-          description: "Cpu usage for this entity"
+          description: The current CPU utilization
           family: 'System/CPU/Usage'
           unit: "%"
     metric_tags:

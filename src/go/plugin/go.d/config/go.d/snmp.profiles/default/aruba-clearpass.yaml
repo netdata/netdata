@@ -42,10 +42,10 @@ metric_tags:
 metrics:
   - MIB: HOST-RESOURCES-MIB
     symbol:
-      name: hrProcessorLoad
+      name: cpu.usage # hrProcessorLoad
       OID: 1.3.6.1.2.1.25.3.3.1.2.196608
       chart_meta:
-        description: Average percentage of time that this processor was not idle over the last minute
+        description: The current CPU utilization
         family: 'System/CPU/Usage'
         unit: "%"
   - MIB: UCD-SNMP-MIB
