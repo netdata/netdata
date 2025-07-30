@@ -464,8 +464,11 @@ export function getModelDisplayName(modelString) {
     
     // If it's a string with provider:model format
     if (typeof modelString === 'string' && modelString.includes(':')) {
-        const parts = modelString.split(':');
-        return parts.slice(1).join(':');
+        // Split only on the first colon to handle models like "ollama:llama3.3:latest"
+        const colonIndex = modelString.indexOf(':');
+        if (colonIndex !== -1) {
+            return modelString.substring(colonIndex + 1);
+        }
     }
     
     // Otherwise return as-is
