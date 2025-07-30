@@ -2528,10 +2528,11 @@ class GoogleProvider extends LLMProvider {
  * Ollama Provider
  */
 class OllamaProvider extends LLMProvider {
-    constructor(proxyUrl, model = 'llama3.3:latest') {
+    constructor(proxyUrl, model = 'llama3.3:latest', modelConfig = null) {
         super(proxyUrl);
         this.model = model;
         this.type = 'ollama';
+        this.modelConfig = modelConfig;
     }
 
     get apiUrl() {
@@ -2578,10 +2579,30 @@ class OllamaProvider extends LLMProvider {
             }
         };
         
-        // Try first with tools if available
+        // Check if model supports tools before including them
         let useToolFallback = false;
+        const modelSupportsTools = this.modelConfig?.supportsTools !== false;
+        
         if (ollamaTools.length > 0) {
-            requestBody.tools = ollamaTools;
+            if (modelSupportsTools) {
+                // Model supports tools (or we don't know), so include them
+                requestBody.tools = ollamaTools;
+            } else {
+                // Model doesn't support tools, use fallback immediately
+                console.log('[OllamaProvider] Model does not support tools according to config, using system prompt injection');
+                useToolFallback = true;
+                const toolsPrompt = this.formatToolsForSystemPrompt(ollamaTools);
+                const systemMessageIndex = ollamaMessages.findIndex(msg => msg.role === 'system');
+                if (systemMessageIndex >= 0) {
+                    ollamaMessages[systemMessageIndex].content += '\n\n' + toolsPrompt;
+                } else {
+                    ollamaMessages.unshift({
+                        role: 'system',
+                        content: toolsPrompt
+                    });
+                }
+                requestBody.messages = ollamaMessages;
+            }
         }
 
         this.log('sent', JSON.stringify(requestBody, null, 2), { 
@@ -3098,7 +3119,7 @@ class OllamaProvider extends LLMProvider {
 /**
  * Factory function to create appropriate LLM provider
  */
-function createLLMProvider(provider, proxyUrl, model) {
+function createLLMProvider(provider, proxyUrl, model, modelConfig = null) {
     switch (provider) {
         case 'openai':
         case 'openai-responses':
@@ -3108,7 +3129,7 @@ function createLLMProvider(provider, proxyUrl, model) {
         case 'google':
             return new GoogleProvider(proxyUrl, model);
         case 'ollama':
-            return new OllamaProvider(proxyUrl, model);
+            return new OllamaProvider(proxyUrl, model, modelConfig);
         default:
             const error = `Unknown provider type: ${provider}`;
             console.error('[createLLMProvider]', error);
