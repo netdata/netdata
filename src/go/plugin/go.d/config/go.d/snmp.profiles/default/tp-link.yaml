@@ -23,9 +23,9 @@ metrics:
       OID: 1.3.6.1.4.1.11863.6.4.1.1.1
     symbols:
       - name: cpu.usage
-        OID: 1.3.6.1.4.1.11863.6.4.1.1.1.1.3
+        OID: 1.3.6.1.4.1.11863.6.4.1.1.1.1.2 # tpSysMonitorCpu5Seconds
         chart_meta:
-          description: CPU utilization in 1 minute
+          description: The current CPU utilization
           family: 'System/CPU/Usage'
           unit: "%"
     metric_tags:

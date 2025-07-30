@@ -37,9 +37,9 @@ metrics:
   - MIB: JUNIPER-IVE-MIB
     symbol:
       OID: 1.3.6.1.4.1.12532.10.0
-      name: iveCpuUtil
+      name: cpu.usage # iveCpuUtil
       chart_meta:
-        description: The cpu utilization of the ive system
+        description: The current CPU utilization
         family: 'System/CPU/Usage'
         unit: "%"
   - MIB: JUNIPER-IVE-MIB
