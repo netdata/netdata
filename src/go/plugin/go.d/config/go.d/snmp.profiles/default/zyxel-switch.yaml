@@ -38,10 +38,10 @@ metric_tags:
 metrics:
   - MIB: ZYXEL-ES-COMMON
     symbol:
-      name: cpu.usage
+      name: cpu.usage # sysMgmtCPUUsage
       OID: 1.3.6.1.4.1.890.1.15.3.2.4.0
       chart_meta:
-        description: Device CPU usage
+        description: The current CPU utilization
         family: 'System/CPU/Usage'
         unit: "%"
 
