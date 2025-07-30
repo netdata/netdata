@@ -43,12 +43,13 @@ metrics:
 
   - MIB: A10-AX-MIB
     symbol:
-      name: axSysAverageCpuUsage
+      name: cpu.usage # axSysAverageCpuUsage
       OID: 1.3.6.1.4.1.22610.2.4.1.3.3.0
       chart_meta:
         family: 'System/CPU/Usage'
-        description: The average CPU usage in last 5 seconds
+        description: The current CPU utilization
         unit: "%"
+
   - MIB: A10-AX-MIB
     symbol:
       name: axSysDiskTotalSpace

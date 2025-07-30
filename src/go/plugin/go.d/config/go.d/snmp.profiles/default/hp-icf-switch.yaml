@@ -20,10 +20,10 @@ metadata:
 metrics:
   - MIB: STATISTICS-MIB
     symbol:
-      name: cpu.usage
+      name: cpu.usage # hpSwitchCpuStat
       OID: 1.3.6.1.4.1.11.2.14.11.5.1.9.6.1.0
       chart_meta:
-        description: The CPU utilization in percent(%).
+        description: The current CPU utilization
         family: 'System/CPU/Usage'
         unit: "%"
   - MIB: NETSWITCH-MIB
