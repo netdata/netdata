@@ -194,8 +194,12 @@ export function getTitleGenerationProvider(chat, llmProvider, defaultProvider, c
     if (chat.config?.optimisation?.titleGeneration?.enabled && 
         chat.config.optimisation.titleGeneration.model) {
         const titleModel = chat.config.optimisation.titleGeneration.model;
+        
+        // Get the API type from the provider configuration
+        const providerApiType = llmProvider.availableProviders?.[titleModel.provider]?.type || titleModel.provider;
+        
         const provider = createLLMProvider(
-            titleModel.provider,
+            providerApiType,
             llmProvider.proxyUrl,
             titleModel.id
         );

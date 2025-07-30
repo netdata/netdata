@@ -2525,18 +2525,592 @@ class GoogleProvider extends LLMProvider {
 }
 
 /**
+ * Ollama Provider
+ */
+class OllamaProvider extends LLMProvider {
+    constructor(proxyUrl, model = 'llama3.3:latest') {
+        super(proxyUrl);
+        this.model = model;
+        this.type = 'ollama';
+    }
+
+    get apiUrl() {
+        return `${this.proxyUrl}/proxy/ollama/api/chat`;
+    }
+
+    /**
+     * Send messages to Ollama API
+     * @param {Array} messages - Array of message objects
+     * @param {Array} tools - Array of available tools
+     * @param {number} temperature - Temperature for response generation
+     * @param {string} mode - Tool inclusion mode (unused for Ollama)
+     * @param {number|null} _cachePosition - Cache position (unused for Ollama)
+     * @returns {Promise<LLMResponse>}
+     */
+    async sendMessage(messages, tools, temperature, mode, _cachePosition = null, chat = null) {
+        // Validate messages before processing
+        validateMessagesForAPI(messages);
+        
+        // Convert messages to Ollama format
+        const ollamaMessages = this.convertMessages(messages);
+        
+        // Convert tools to Ollama format
+        const ollamaTools = tools.map(tool => {
+            const injectedTool = this.injectToolMetadata(tool, chat);
+            return {
+                type: 'function',
+                function: {
+                    name: injectedTool.name,
+                    description: injectedTool.description,
+                    parameters: injectedTool.inputSchema || {}
+                }
+            };
+        });
+
+        // Build request body
+        const requestBody = {
+            model: this.model,
+            messages: ollamaMessages,
+            temperature,
+            stream: false,
+            options: {
+                num_predict: 4096  // Similar to max_tokens
+            }
+        };
+        
+        // Try first with tools if available
+        let useToolFallback = false;
+        if (ollamaTools.length > 0) {
+            requestBody.tools = ollamaTools;
+        }
+
+        this.log('sent', JSON.stringify(requestBody, null, 2), { 
+            provider: 'ollama', 
+            model: this.model,
+            url: this.apiUrl
+        });
+
+        // Check request size before sending
+        this.checkRequestSize(requestBody);
+
+        // Log the full request
+        console.log(`[OLLAMA SEND] (${mode}, subchat: ${chat?.isSubChat || false}):`, requestBody);
+
+        let response;
+        try {
+            response = await fetch(this.apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestBody)
+            });
+        } catch (error) {
+            this.log('error', `Failed to send request: ${error.message}`, { 
+                provider: 'ollama',
+                error: error.toString(),
+                url: this.apiUrl
+            });
+            if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+                const connectionError = `Connection Error: Cannot reach Ollama API at ${this.apiUrl}. Please ensure Ollama is running.`;
+                console.error('[OllamaProvider] Connection error:', connectionError, '\nOriginal error:', error);
+                throw new Error(connectionError);
+            }
+            throw error;
+        }
+
+        if (!response.ok) {
+            let error;
+            try {
+                error = await response.json();
+            } catch {
+                error = { error: response.statusText };
+            }
+            
+            // Check if the error is about tool support
+            const errorMessage = error.error || response.statusText;
+            if (errorMessage.includes('does not support tools') && ollamaTools.length > 0) {
+                console.log('[OllamaProvider] Model does not support tools, falling back to system prompt injection');
+                
+                // Retry without tools, injecting them into system prompt instead
+                useToolFallback = true;
+                delete requestBody.tools;
+                
+                // Inject tools into system prompt
+                const toolsPrompt = this.formatToolsForSystemPrompt(ollamaTools);
+                const systemMessageIndex = ollamaMessages.findIndex(msg => msg.role === 'system');
+                if (systemMessageIndex >= 0) {
+                    ollamaMessages[systemMessageIndex].content += '\n\n' + toolsPrompt;
+                } else {
+                    // Add system message if it doesn't exist
+                    ollamaMessages.unshift({
+                        role: 'system',
+                        content: toolsPrompt
+                    });
+                }
+                requestBody.messages = ollamaMessages;
+                
+                // Retry the request
+                try {
+                    response = await fetch(this.apiUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(requestBody)
+                    });
+                    
+                    if (!response.ok) {
+                        let retryError;
+                        try {
+                            retryError = await response.json();
+                        } catch {
+                            retryError = { error: response.statusText };
+                        }
+                        const retryApiError = `Ollama API error (fallback): ${retryError.error || response.statusText}`;
+                        console.error('[OllamaProvider] API error on retry:', retryApiError);
+                        throw new Error(retryApiError);
+                    }
+                } catch (retryError) {
+                    console.error('[OllamaProvider] Failed to retry with tool fallback:', retryError);
+                    throw retryError;
+                }
+            } else {
+                // Not a tool support error, throw as is
+                this.log('error', `API error response: ${JSON.stringify(error)}`, { 
+                    provider: 'ollama',
+                    status: response.status,
+                    statusText: response.statusText
+                });
+                
+                const apiError = `Ollama API error: ${errorMessage}`;
+                console.error('[OllamaProvider] API error:', apiError, '\nStatus:', response.status, '\nResponse:', error);
+                throw new Error(apiError);
+            }
+        }
+
+        const data = await response.json();
+        this.log('received', JSON.stringify(data, null, 2), { provider: 'ollama' });
+        
+        // Log the full response
+        console.log(`[OLLAMA RECEIVED] (${mode}, subchat: ${chat?.isSubChat || false}):`, data);
+        
+        // Debug log for tool parsing
+        if (data.message && data.message.content) {
+            console.log('[OLLAMA DEBUG] Message content:', data.message.content);
+            console.log('[OLLAMA DEBUG] Content includes python_tag?', data.message.content.includes('python_tag'));
+            console.log('[OLLAMA DEBUG] Content includes <|python_tag|>?', data.message.content.includes('<|python_tag|>'));
+        }
+        
+        // Convert Ollama response to unified format
+        const contentArray = [];
+        
+        // If we used tool fallback, parse tools from text response
+        if (useToolFallback && data.message && data.message.content) {
+            const parsedContent = this.parseToolCallsFromText(data.message.content, tools);
+            contentArray.push(...parsedContent);
+        } else {
+            // Check if content contains tool calls in special formats
+            let contentHasToolCalls = false;
+            if (data.message && data.message.content) {
+                const content = data.message.content;
+                // Check for various tool call indicators
+                if (content.includes('python_tag') || 
+                    content.includes('"type": "function"') ||
+                    (content.includes('```json') && content.includes('"tool_use"'))) {
+                    console.log('[OllamaProvider] Detected tool calls in content, parsing...', content);
+                    const parsedContent = this.parseToolCallsFromText(content, tools);
+                    contentArray.push(...parsedContent);
+                    contentHasToolCalls = true;
+                }
+            }
+            
+            // Add text content if present and we didn't parse tool calls from it
+            if (data.message && data.message.content && !contentHasToolCalls) {
+                contentArray.push({ type: 'text', text: data.message.content });
+            }
+            
+            // Handle tool calls if present in the proper field
+            if (data.message && data.message.tool_calls) {
+                for (const toolCall of data.message.tool_calls) {
+                    contentArray.push({
+                        type: 'tool_use',
+                        id: toolCall.id || this.generateId(),
+                        name: toolCall.function.name,
+                        input: toolCall.function.arguments || {}
+                    });
+                }
+            }
+        }
+        
+        // Calculate token usage from response metadata
+        const usage = {
+            promptTokens: data.prompt_eval_count || 0,
+            completionTokens: data.eval_count || 0,
+            totalTokens: (data.prompt_eval_count || 0) + (data.eval_count || 0),
+            cacheReadInputTokens: 0,  // Ollama doesn't support caching
+            cacheCreationInputTokens: 0
+        };
+        
+        return {
+            content: contentArray,
+            toolCalls: [],
+            usage
+        };
+    }
+
+    /**
+     * Convert messages from internal format to Ollama format
+     * @param {Array} messages - Internal format messages
+     * @returns {Array} Ollama format messages
+     */
+    convertMessages(messages) {
+        const converted = [];
+        
+        for (const msg of messages) {
+            const msgRole = msg.role;
+            
+            if (msgRole === 'system') {
+                converted.push({
+                    role: 'system',
+                    content: msg.content
+                });
+            } else if (msgRole === 'user') {
+                // Add datetime prefix to user messages
+                const content = this.addDateTimePrefix(msg.content, msg.timestamp);
+                converted.push({
+                    role: 'user',
+                    content
+                });
+            } else if (msgRole === 'assistant') {
+                // Convert assistant message - check for tool calls
+                const assistantMsg = { role: 'assistant' };
+                
+                if (Array.isArray(msg.content)) {
+                    // Extract text and tool calls from content array
+                    let textContent = '';
+                    const toolCalls = [];
+                    
+                    for (const block of msg.content) {
+                        if (block.type === 'text') {
+                            textContent += block.text;
+                        } else if (block.type === 'tool_use') {
+                            toolCalls.push({
+                                id: block.id,
+                                type: 'function',
+                                function: {
+                                    name: block.name,
+                                    arguments: block.input
+                                }
+                            });
+                        }
+                    }
+                    
+                    if (textContent) {
+                        assistantMsg.content = textContent;
+                    }
+                    if (toolCalls.length > 0) {
+                        assistantMsg.tool_calls = toolCalls;
+                    }
+                } else {
+                    assistantMsg.content = msg.content || '';
+                }
+                
+                converted.push(assistantMsg);
+            } else if (msgRole === 'tool-results') {
+                // Convert tool results to Ollama format
+                if (msg.toolResults && Array.isArray(msg.toolResults)) {
+                    for (const toolResult of msg.toolResults) {
+                        converted.push({
+                            role: 'tool',
+                            content: this.formatToolResult(toolResult.result),
+                            tool_call_id: toolResult.toolCallId
+                        });
+                    }
+                }
+            }
+        }
+        
+        return converted;
+    }
+    
+    /**
+     * Format tool result for Ollama
+     * @param {any} result - Tool result
+     * @returns {string} Formatted result
+     */
+    formatToolResult(result) {
+        const formatted = MessageConversionUtils.formatMCPToolResult(result);
+        
+        if (formatted.type === 'text') {
+            return formatted.content;
+        } else if (formatted.type === 'multi') {
+            // Handle multiple content items
+            const parts = [];
+            for (const item of formatted.items) {
+                if (item.type === 'text') {
+                    parts.push(item.content);
+                } else if (item.type === 'image') {
+                    parts.push(`[Image: ${item.mimeType}]`);
+                } else if (item.type === 'resource') {
+                    parts.push(`[Resource: ${item.uri}]\n${item.text || ''}`);
+                }
+            }
+            return parts.join('\n\n');
+        } else if (formatted.type === 'json') {
+            return JSON.stringify(formatted.content, null, 2);
+        } else {
+            return JSON.stringify(result);
+        }
+    }
+    
+    /**
+     * Generate a unique ID for tool calls
+     * @returns {string} Unique ID
+     */
+    generateId() {
+        return 'tool_' + Math.random().toString(36).substr(2, 9);
+    }
+    
+    /**
+     * Format tools for inclusion in system prompt
+     * @param {Array} tools - Array of tool objects
+     * @returns {string} Formatted tools prompt
+     */
+    formatToolsForSystemPrompt(tools) {
+        let prompt = 'You have access to the following tools:\n\n';
+        
+        tools.forEach(tool => {
+            prompt += `Tool: ${tool.function.name}\n`;
+            prompt += `Description: ${tool.function.description}\n`;
+            prompt += `Parameters: ${JSON.stringify(tool.function.parameters, null, 2)}\n\n`;
+        });
+        
+        prompt += 'To use a tool, respond with a JSON block in the following format:\n';
+        prompt += '```json\n';
+        prompt += '{\n';
+        prompt += '  "tool_use": {\n';
+        prompt += '    "name": "tool_name",\n';
+        prompt += '    "arguments": {\n';
+        prompt += '      "param1": "value1",\n';
+        prompt += '      "param2": "value2"\n';
+        prompt += '    }\n';
+        prompt += '  }\n';
+        prompt += '}\n';
+        prompt += '```\n\n';
+        prompt += 'You can include explanatory text before or after the tool use JSON block.';
+        
+        return prompt;
+    }
+    
+    /**
+     * Parse tool calls from text response
+     * @param {string} text - Text response that may contain tool calls
+     * @param {Array} availableTools - Available tools for validation
+     * @returns {Array} Array of content blocks
+     */
+    parseToolCallsFromText(text, availableTools) {
+        const contentArray = [];
+        
+        // Regular expressions for different tool call formats
+        const patterns = [
+            // JSON blocks with tool_use format
+            {
+                regex: /```json\s*\n?\s*(\{[\s\S]*?"tool_use"[\s\S]*?\})\s*\n?\s*```/g,
+                parser: (match) => {
+                    const toolCallJson = JSON.parse(match[1]);
+                    if (toolCallJson.tool_use && toolCallJson.tool_use.name) {
+                        return {
+                            name: toolCallJson.tool_use.name,
+                            input: toolCallJson.tool_use.arguments || {}
+                        };
+                    }
+                    return null;
+                }
+            },
+            // Llama's python_tag format - handle multi-line JSON
+            {
+                regex: /<\|python_tag\|>/g,
+                parser: (match, fullText, matchIndex) => {
+                    // Find the JSON starting after the python_tag
+                    const startIndex = matchIndex + match[0].length;
+                    const textAfterTag = fullText.substring(startIndex);
+                    
+                    // Find the complete JSON object by counting braces
+                    let braceCount = 0;
+                    let inString = false;
+                    let escapeNext = false;
+                    let endIndex = -1;
+                    let jsonStartIndex = -1;
+                    
+                    for (let i = 0; i < textAfterTag.length; i++) {
+                        const char = textAfterTag[i];
+                        
+                        // Skip whitespace before JSON starts
+                        if (jsonStartIndex === -1 && char === '{') {
+                            jsonStartIndex = i;
+                        }
+                        
+                        if (jsonStartIndex === -1) continue;
+                        
+                        if (escapeNext) {
+                            escapeNext = false;
+                            continue;
+                        }
+                        
+                        if (char === '\\') {
+                            escapeNext = true;
+                            continue;
+                        }
+                        
+                        if (char === '"' && !escapeNext) {
+                            inString = !inString;
+                        }
+                        
+                        if (!inString) {
+                            if (char === '{') braceCount++;
+                            else if (char === '}') {
+                                braceCount--;
+                                if (braceCount === 0) {
+                                    endIndex = i + 1;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (jsonStartIndex === -1 || endIndex === -1) {
+                        console.log('[OllamaProvider] Could not find complete JSON after python_tag');
+                        return null;
+                    }
+                    
+                    const jsonStr = textAfterTag.substring(jsonStartIndex, endIndex);
+                    
+                    try {
+                        const toolCallJson = JSON.parse(jsonStr);
+                        if (toolCallJson.type === 'function' && toolCallJson.name) {
+                            // Convert parameters to input format
+                            const params = toolCallJson.parameters || {};
+                            // Remove any meta parameters that aren't actual tool parameters
+                            const { 
+                                context_for_interpretation, 
+                                expected_format, 
+                                key_information, 
+                                success_indicators, 
+                                tool_purpose,
+                                ...actualParams 
+                            } = params;
+                            
+                            return {
+                                name: toolCallJson.name,
+                                input: actualParams
+                            };
+                        }
+                    } catch (e) {
+                        console.log('[OllamaProvider] Failed to parse Llama tool JSON:', jsonStr, e);
+                    }
+                    return null;
+                }
+            }
+        ];
+        
+        let lastIndex = 0;
+        const allMatches = [];
+        
+        // Find all matches from all patterns
+        for (const pattern of patterns) {
+            pattern.regex.lastIndex = 0;
+            let match;
+            while ((match = pattern.regex.exec(text)) !== null) {
+                allMatches.push({
+                    index: match.index,
+                    length: match[0].length,
+                    parser: pattern.parser,
+                    match: match
+                });
+            }
+        }
+        
+        // Sort matches by index
+        allMatches.sort((a, b) => a.index - b.index);
+        
+        // Process matches in order
+        for (const matchInfo of allMatches) {
+            // Add any text before the tool call
+            if (matchInfo.index > lastIndex) {
+                const textBefore = text.substring(lastIndex, matchInfo.index).trim();
+                if (textBefore) {
+                    contentArray.push({ type: 'text', text: textBefore });
+                }
+            }
+            
+            try {
+                const parsed = matchInfo.parser(matchInfo.match, text, matchInfo.index);
+                if (parsed) {
+                    // Validate that the tool exists
+                    const toolName = parsed.name;
+                    const toolExists = availableTools.some(t => 
+                        (t.name === toolName) || 
+                        (t.function && t.function.name === toolName)
+                    );
+                    
+                    if (toolExists) {
+                        contentArray.push({
+                            type: 'tool_use',
+                            id: this.generateId(),
+                            name: toolName,
+                            input: parsed.input
+                        });
+                    } else {
+                        // Tool doesn't exist, treat as text
+                        contentArray.push({ type: 'text', text: matchInfo.match[0] });
+                    }
+                } else {
+                    // Invalid format, treat as text
+                    contentArray.push({ type: 'text', text: matchInfo.match[0] });
+                }
+            } catch (e) {
+                // Parsing failed, treat as text
+                console.log('[OllamaProvider] Failed to parse tool call:', e, matchInfo.match[0]);
+                contentArray.push({ type: 'text', text: matchInfo.match[0] });
+            }
+            
+            lastIndex = matchInfo.index + matchInfo.length;
+        }
+        
+        // Add any remaining text
+        if (lastIndex < text.length) {
+            const remainingText = text.substring(lastIndex).trim();
+            if (remainingText) {
+                contentArray.push({ type: 'text', text: remainingText });
+            }
+        }
+        
+        // If no content was parsed, return the original text
+        if (contentArray.length === 0) {
+            contentArray.push({ type: 'text', text: text });
+        }
+        
+        return contentArray;
+    }
+}
+
+/**
  * Factory function to create appropriate LLM provider
  */
 function createLLMProvider(provider, proxyUrl, model) {
     switch (provider) {
         case 'openai':
+        case 'openai-responses':
             return new OpenAIProvider(proxyUrl, model);
         case 'anthropic':
             return new AnthropicProvider(proxyUrl, model);
         case 'google':
             return new GoogleProvider(proxyUrl, model);
+        case 'ollama':
+            return new OllamaProvider(proxyUrl, model);
         default:
-            const error = `Unknown provider: ${provider}`;
+            const error = `Unknown provider type: ${provider}`;
             console.error('[createLLMProvider]', error);
             throw new Error(error);
     }
