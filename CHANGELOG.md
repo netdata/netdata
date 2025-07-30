@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- build\(deps\): bump github.com/docker/docker from 28.3.2+incompatible to 28.3.3+incompatible in /src/go [\#20739](https://github.com/netdata/netdata/pull/20739) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump openssl and curl version in static build [\#20734](https://github.com/netdata/netdata/pull/20734) ([ilyam8](https://github.com/ilyam8))
+- Thread creation code cleanup [\#20732](https://github.com/netdata/netdata/pull/20732) ([stelfrag](https://github.com/stelfrag))
 - Add additional database checks during shutdown  [\#20731](https://github.com/netdata/netdata/pull/20731) ([stelfrag](https://github.com/stelfrag))
 - build\(deps\): bump github.com/bmatcuk/doublestar/v4 from 4.9.0 to 4.9.1 in /src/go [\#20730](https://github.com/netdata/netdata/pull/20730) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Revert "Deployment Guides: add and update documentation for deployment strate" [\#20728](https://github.com/netdata/netdata/pull/20728) ([ilyam8](https://github.com/ilyam8))
@@ -464,10 +467,6 @@
 - Use one spinlock to access v2 and mmap related data [\#20202](https://github.com/netdata/netdata/pull/20202) ([stelfrag](https://github.com/stelfrag))
 - Add a default busy timeout [\#20201](https://github.com/netdata/netdata/pull/20201) ([stelfrag](https://github.com/stelfrag))
 - rrd metadata needs to be discoverable while replication is running [\#20200](https://github.com/netdata/netdata/pull/20200) ([ktsaou](https://github.com/ktsaou))
-- chore\(otel/netdataexporter\): poc version [\#20199](https://github.com/netdata/netdata/pull/20199) ([ilyam8](https://github.com/ilyam8))
-- add fast path to waitq [\#20198](https://github.com/netdata/netdata/pull/20198) ([ktsaou](https://github.com/ktsaou))
-- spinlocks now timeout at 10 minutes, to reveal deadlocks [\#20197](https://github.com/netdata/netdata/pull/20197) ([ktsaou](https://github.com/ktsaou))
-- rrdset/rrddim find function do not return obsolete metadata [\#20196](https://github.com/netdata/netdata/pull/20196) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.4.0](https://github.com/netdata/netdata/tree/v2.4.0) (2025-04-14)
 
