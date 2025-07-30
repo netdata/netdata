@@ -188,6 +188,9 @@ Edit the configuration file to add your API keys:
 - **Secure API Key Management**: API keys are stored only in the proxy server, never in the browser
 - **Multiple LLM Support**: Use OpenAI, Anthropic, Google AI, or Ollama models
 - **Ollama Support**: Full support for local Ollama models with automatic discovery
+- **Multiple Provider Instances**: Configure multiple instances of the same provider with different settings
+- **Model-Specific Endpoints**: Support for different API endpoints per model (e.g., o1 models use /v1/responses)
+- **Tool Control Per Model**: Enable/disable MCP tools on a per-model basis
 - **Model Selection**: Choose specific models for each chat with automatic pricing info
 - **MCP Integration**: Full access to Netdata metrics and functions
 - **Chat History**: All conversations are saved locally
@@ -371,6 +374,89 @@ node llm-proxy.js --update-config --sync --check-availability
 ```
 
 For Ollama, the proxy automatically discovers all models installed locally and makes them available through the web interface. Model names with multiple colons (e.g., "llama3.3:latest", "hermes3:70b") are fully supported.
+
+### Advanced Provider Configuration
+
+#### Multiple Provider Instances
+
+You can configure multiple instances of the same provider type with different settings:
+
+```json
+{
+  "providers": {
+    "openai-gpt4": {
+      "apiKey": "sk-YOUR-API-KEY",
+      "type": "openai",
+      "baseUrl": "https://api.openai.com",
+      "models": [
+        {
+          "id": "gpt-4o",
+          "contextWindow": 128000,
+          "pricing": { "input": 2.50, "output": 10.00, "cacheRead": 0.625 }
+        }
+      ]
+    },
+    "openai-o1": {
+      "apiKey": "sk-YOUR-API-KEY",
+      "type": "openai",
+      "baseUrl": "https://api.openai.com",
+      "models": [
+        {
+          "id": "o1-mini",
+          "contextWindow": 128000,
+          "endpoint": "responses",
+          "supportsTools": false,
+          "pricing": { "input": 3.00, "output": 12.00, "cacheRead": 0.75 }
+        }
+      ]
+    },
+    "ollama-local": {
+      "type": "ollama",
+      "endpoint": "http://localhost:11434",
+      "models": []
+    },
+    "ollama-remote": {
+      "type": "ollama",
+      "endpoint": "http://remote-server:11434",
+      "models": []
+    }
+  }
+}
+```
+
+This allows you to:
+- Separate models by use case (e.g., GPT-4 for complex tasks, o1 for reasoning)
+- Use different API keys or endpoints for the same provider
+- Connect to multiple Ollama instances (local and remote)
+
+#### Model-Specific Configuration
+
+Each model can have custom settings:
+
+```json
+{
+  "id": "o1-mini",
+  "contextWindow": 128000,
+  "endpoint": "responses",      // Use /v1/responses instead of /v1/chat/completions
+  "supportsTools": false,       // Disable tool/function calling for this model
+  "pricing": {
+    "input": 3.00,
+    "output": 12.00,
+    "cacheRead": 0.75
+  }
+}
+```
+
+**Model Configuration Options:**
+- `endpoint`: Specify which API endpoint to use ("responses" for o1/o3 models)
+- `supportsTools`: Enable/disable native tool calling (MCP tools)
+  - `true`: Model supports function/tool calling (default for most models)
+  - `false`: Disable tools for models that don't support them (e.g., o1 series)
+
+**Note**: The web client automatically handles these configurations:
+- Routes requests to the correct endpoint based on model configuration
+- Filters out tools when sending requests to models with `supportsTools: false`
+- Preserves full tool functionality for models that support it
 
 ### Pricing Information
 
