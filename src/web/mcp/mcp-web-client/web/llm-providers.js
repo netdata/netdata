@@ -3026,7 +3026,7 @@ class OllamaProvider extends LLMProvider {
                     index: match.index,
                     length: match[0].length,
                     parser: pattern.parser,
-                    match: match
+                    match
                 });
             }
         }
@@ -3088,7 +3088,7 @@ class OllamaProvider extends LLMProvider {
         
         // If no content was parsed, return the original text
         if (contentArray.length === 0) {
-            contentArray.push({ type: 'text', text: text });
+            contentArray.push({ type: 'text', text });
         }
         
         return contentArray;

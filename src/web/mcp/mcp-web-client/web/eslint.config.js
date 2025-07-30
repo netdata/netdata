@@ -2,7 +2,7 @@
 
 export default [
   {
-    files: ['**/*.js'],
+    files: ['**/*.js', '../llm-proxy.js'],
     plugins: {
       sonarjs
     },

@@ -722,51 +722,6 @@ class NetdataMCPChat {
         }
     }
 
-    // Fix incomplete model names in messages (missing provider prefix)
-    fixIncompleteModelNames(chat) {
-        let needsSave = false;
-        const chatModelString = ChatConfig.getChatModelString(chat);
-        
-        // Extract provider type from chat model string
-        let providerType = null;
-        if (chatModelString && chatModelString.includes(':')) {
-            providerType = chatModelString.substring(0, chatModelString.indexOf(':'));
-        }
-        
-        for (const message of chat.messages) {
-            if (message.model && !message.model.includes(':')) {
-                // This model name is missing the provider prefix
-                if (providerType) {
-                    // Fix it by adding the provider prefix
-                    message.model = `${providerType}:${message.model}`;
-                    needsSave = true;
-                } else {
-                    // Try to infer provider type from model name patterns
-                    if (message.model.includes('gpt') || message.model.includes('o1')) {
-                        message.model = `openai:${message.model}`;
-                        needsSave = true;
-                    } else if (message.model.includes('claude')) {
-                        message.model = `anthropic:${message.model}`;
-                        needsSave = true;
-                    } else if (message.model.includes('llama') || message.model.includes('mistral') || 
-                              message.model.includes('gemma') || message.model.includes('hermes') ||
-                              message.model.includes('qwen') || message.model.includes(':')) {
-                        // This looks like an Ollama model
-                        message.model = `ollama:${message.model}`;
-                        needsSave = true;
-                    }
-                }
-            }
-        }
-        
-        if (needsSave) {
-            // Recalculate pricing with fixed model names
-            this.updateChatTokenPricing(chat);
-            this.saveChatToStorage(chat.id);
-        }
-        
-        return needsSave;
-    }
     
     // Migrate old chat data to include token pricing
     migrateTokenPricing(chat) {
@@ -784,9 +739,6 @@ class NetdataMCPChat {
         if (!chat.perModelTokensPrice) {
             chat.perModelTokensPrice = {};
         }
-        
-        // Fix incomplete model names first
-        this.fixIncompleteModelNames(chat);
         
         // Process all messages to calculate prices
         for (const message of chat.messages) {
@@ -3690,7 +3642,10 @@ class NetdataMCPChat {
             const isRateLimitError = error.message && (
                 error.message.includes('Rate limit') || 
                 error.message.includes('429') ||
-                error.message.includes('rate_limit_exceeded')
+                error.message.includes('rate_limit_exceeded') ||
+                error.message.includes('529') ||
+                error.message.includes('overloaded_error') ||
+                error.message.includes('Overloaded')
             );
             
             // Extract retry-after seconds if available (handles multiple formats)
@@ -4375,7 +4330,14 @@ class NetdataMCPChat {
             }
         } catch (error) {
             // Check for rate limit error
-            const isRateLimitError = error.message.includes('Rate limit') || error.message.includes('429');
+            const isRateLimitError = error.message && (
+                error.message.includes('Rate limit') || 
+                error.message.includes('429') ||
+                error.message.includes('rate_limit_exceeded') ||
+                error.message.includes('529') ||
+                error.message.includes('overloaded_error') ||
+                error.message.includes('Overloaded')
+            );
             const retryMatch = error.message.match(/Please try again in (\d+(?:\.\d+)?)s/);
             const retryAfterSeconds = retryMatch ? parseFloat(retryMatch[1]) : null;
             
@@ -7094,8 +7056,8 @@ class NetdataMCPChat {
             // Get chat-specific input
             const chatInput = this.getChatInput(chatId);
             if (!chatInput) {
-                const chat = this.chats.get(chatId);
-                if (!chat || !chat.isSubChat) {
+                const chatData = this.chats.get(chatId);
+                if (!chatData || !chatData.isSubChat) {
                     // Only log error for main chats - sub-chats don't have input elements
                     console.error('[updateSendButton] ERROR: Could not find input for chat', chatId);
                 }
@@ -7369,8 +7331,15 @@ class NetdataMCPChat {
                 // Clean up states
                 this.assistantFailed(chat.id, error);
             } else {
-                // Check for rate limit error (429)
-                const isRateLimitError = error.message.includes('Rate limit') || error.message.includes('429');
+                // Check for rate limit error (429 or 529)
+                const isRateLimitError = error.message && (
+                    error.message.includes('Rate limit') || 
+                    error.message.includes('429') ||
+                    error.message.includes('rate_limit_exceeded') ||
+                    error.message.includes('529') ||
+                    error.message.includes('overloaded_error') ||
+                    error.message.includes('Overloaded')
+                );
                 const retryMatch = error.message.match(/Please try again in (\d+(?:\.\d+)?)s/);
                 const retryAfterSeconds = retryMatch ? parseFloat(retryMatch[1]) : null;
                 
