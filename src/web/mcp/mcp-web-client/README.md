@@ -61,7 +61,7 @@ Logs will be written to `./logs/`.
 
 - Node.js (v14 or higher)
 - A running Netdata instance with MCP server enabled
-- API keys for at least one LLM provider (OpenAI, Anthropic, or Google)
+- API keys for at least one LLM provider (OpenAI, Anthropic, or Google) OR a local Ollama installation
 
 ### 1. Setting up the LLM Proxy Server
 
@@ -101,6 +101,12 @@ Edit the configuration file to add your API keys:
          "apiKey": "YOUR-GOOGLE-AI-KEY",
          "models": [
            // Models are automatically populated from built-in definitions
+         ]
+       },
+       "ollama": {
+         "endpoint": "http://localhost:11434",
+         "models": [
+           // Models are automatically discovered from your Ollama installation
          ]
        }
      }
@@ -180,7 +186,8 @@ Edit the configuration file to add your API keys:
 ## Features
 
 - **Secure API Key Management**: API keys are stored only in the proxy server, never in the browser
-- **Multiple LLM Support**: Use OpenAI, Anthropic, or Google AI models
+- **Multiple LLM Support**: Use OpenAI, Anthropic, Google AI, or Ollama models
+- **Ollama Support**: Full support for local Ollama models with automatic discovery
 - **Model Selection**: Choose specific models for each chat with automatic pricing info
 - **MCP Integration**: Full access to Netdata metrics and functions
 - **Chat History**: All conversations are saved locally
@@ -188,7 +195,7 @@ Edit the configuration file to add your API keys:
 - **Context Window Tracking**: Monitor token usage in real-time
 - **Cost Accounting**: Automatic tracking of all LLM usage with detailed cost breakdown
 - **Compressed Response Support**: Handles gzip, deflate, and brotli compressed responses
-- **Model Discovery**: Automatic model fetching from OpenAI and Google APIs
+- **Model Discovery**: Automatic model fetching from OpenAI, Google, and Ollama APIs
 - **Built-in Model Database**: Comprehensive pricing and context window information
 - **Strict Model Validation**: Enforces provider-specific pricing requirements to prevent silent failures
 
@@ -356,11 +363,14 @@ For some providers, the proxy can fetch available models directly:
 - **OpenAI**: Fetches from `/v1/models` endpoint
 - **Google**: Fetches from `/v1/models` endpoint  
 - **Anthropic**: No models endpoint available
+- **Ollama**: Fetches from `/api/tags` endpoint (discovers all locally installed models)
 
 To check which models are actually available with your API key:
 ```bash
 node llm-proxy.js --update-config --sync --check-availability
 ```
+
+For Ollama, the proxy automatically discovers all models installed locally and makes them available through the web interface. Model names with multiple colons (e.g., "llama3.3:latest", "hermes3:70b") are fully supported.
 
 ### Pricing Information
 
@@ -507,6 +517,12 @@ Status codes:
 - Run `node llm-proxy.js --sync --update-config` to sync models (development)
 - Restart the proxy after configuration changes
 - Test the connection in the LLM provider settings
+
+### Ollama model names display incorrectly
+- **Fixed in latest version**: Models with multiple colons (e.g., "llama3.3:latest") now display correctly
+- The web client automatically migrates existing chat data with incomplete model names
+- Model names are now consistently stored with provider prefix (e.g., "ollama:llama3.3:latest")
+- Token usage breakdown and accounting nodes properly display full model names
 
 ### Zero costs in accounting logs
 - **This should no longer occur with strict validation** - invalid models are now rejected at startup
