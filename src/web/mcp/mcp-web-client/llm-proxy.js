@@ -665,8 +665,8 @@ function loadConfig() {
       if (!requiresApiKey || (settings.apiKey && settings.apiKey.length > 0)) {
         const validModels = (settings.models || []).filter((model) => {
           if (typeof model === 'string') return false;
-          const providerType = settings.type || provider;
-          return !validateModelConfig(provider, model, providerType);
+          const modelProviderType = settings.type || provider;
+          return !validateModelConfig(provider, model, modelProviderType);
         });
         
         if (validModels.length > 0) {
@@ -1188,8 +1188,8 @@ async function fetchAvailableModels(provider, apiKey, providerConfig = null) {
                       
                       models.push({
                         id: model.name,
-                        contextWindow: contextWindow,
-                        supportsTools: supportsTools,
+                        contextWindow,
+                        supportsTools,
                         pricing: null // Ollama models are free (local)
                       });
                     } else {
@@ -1271,7 +1271,7 @@ function serveStaticFile(req, res) {
   }
   
   // Normalize the path and remove any directory traversal attempts
-  requestPath = path.normalize(requestPath).replace(/^(\.\.[\/\\])+/, '');
+  requestPath = path.normalize(requestPath).replace(/^(\.\.[\\/\\])+/, '');
   
   // Define the web root directory
   const webRoot = path.join(__dirname, 'web');
@@ -1283,10 +1283,10 @@ function serveStaticFile(req, res) {
   if (req.url !== '/favicon.ico') {  // Skip favicon requests in logs
     console.log(`[${new Date().toISOString()}] 📁 Static file request:`, {
       url: req.url,
-      requestPath: requestPath,
-      __dirname: __dirname,
-      webRoot: webRoot,
-      filePath: filePath,
+      requestPath,
+      __dirname,
+      webRoot,
+      filePath,
       resolvedWebRoot: path.resolve(webRoot),
       startsWith: filePath.startsWith(path.resolve(webRoot))
     });
@@ -1310,8 +1310,8 @@ function serveStaticFile(req, res) {
     }
     
     // Read and serve the file
-    fs.readFile(filePath, (err, content) => {
-      if (err) {
+    fs.readFile(filePath, (readErr, content) => {
+      if (readErr) {
         res.writeHead(500, { 'Content-Type': 'text/plain' });
         res.end('Internal Server Error');
         return;
@@ -1780,8 +1780,8 @@ const server = http.createServer(async (req, res) => {
               if (!modelId) return null;
               
               // Validate model configuration
-              const providerType = providerConfig.type || provider;
-              const validationError = validateModelConfig(provider, model, providerType);
+              const modelProviderType = providerConfig.type || provider;
+              const validationError = validateModelConfig(provider, model, modelProviderType);
               if (validationError) {
                 // Silently skip invalid models (these are typically audio/video models)
                 return null;
@@ -1922,7 +1922,7 @@ const server = http.createServer(async (req, res) => {
     }
   } else if (providerType === 'openai' || providerType === 'openai-responses') {
     // Default OpenAI-style authentication
-    headers['Authorization'] = 'Bearer ' + providerConfig.apiKey;
+    headers.Authorization = 'Bearer ' + providerConfig.apiKey;
   } else if (providerType === 'anthropic') {
     // Default Anthropic-style authentication
     headers['x-api-key'] = providerConfig.apiKey;
