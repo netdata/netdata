@@ -1,40 +1,40 @@
-# Deployment Examples
+# Configuration Examples
 
-## Deployment Options Overview
+These practical examples will help you optimize Netdata for various real-world deployment scenarios.
 
-This section provides a quick overview of a few common deployment options for Netdata.
+## Single Agent Configuration
 
-You can read about [Standalone Deployment](/docs/deployment-guides/standalone-deployment.md) and [Deployment with Centralization Points](/docs/deployment-guides/deployment-with-centralization-points.md) in the documentation inside this section.
+Single Agents work great out of the box with sensible defaults.
 
-The sections below go into configuration examples about these deployment concepts.
+:::tip
 
-## Deployment Configuration Details
+Check out our [configuration documentation](/docs/netdata-agent/configuration/README.md) for all available options.
 
-### Stand-alone
+:::
 
-The stand-alone setup is configured out of the box with reasonable defaults, but please consult our [configuration documentation](/docs/netdata-agent/configuration/README.md) for more details.
+## Parent-Child Configuration Examples
 
-### Parent – Child
+### Lightweight Child Configuration
 
-For setups involving Parent and Child Agents, they need to be configured for [streaming](/docs/observability-centralization-points/metrics-centralization-points/configuration.md), through the configuration file `stream.conf`.
+This example helps you make Children super lightweight by offloading work to Parents, minimizing resource usage on production systems.
 
-This will instruct the Child to stream data to the Parent and the Parent to accept streaming connections for one or more Child Agents. To secure this connection, both need a shared API key (to replace the string `API_KEY` in the examples below). Additionally, the Child can be configured with one or more addresses of Parent Agents (`PARENT_IP_ADDRESS`).
+<details>
+<summary><strong>Click to see lightweight Child configuration</strong></summary><br/>
 
-An API key is a key created with `uuidgen` and is used for authentication and/or customization on the Parent side. For example, a Child can stream using the API key, and a Parent can be configured to accept connections from the Child, but it can also apply different options for Children by using multiple different API keys. The easiest setup uses just one API key for all Child Agents.
+**Why minimize Child footprint?**
+We don't recommend connecting Children to Cloud directly. This reduces the Netdata Agent footprint on your production systems, as some capabilities can be switched OFF for the Child and kept ON for the Parent.
 
-#### Child config
+**What this does:**
 
-As mentioned above, we do not recommend connecting the Child to Cloud directly during your setup.
+- Stores metrics in RAM only (zero disk I/O)
+- Disables machine learning (Parent handles it)
+- Disables alerts (Parent handles them)
+- Keeps only 20 minutes of data locally
+- Restricts dashboard to localhost only
 
-This is done to reduce the footprint of the Netdata Agent on your production system, as some capabilities can be switched OFF for the Child and kept ON for the Parent.
+Edit `netdata.conf` on the Child using the [edit-config](/docs/netdata-agent/configuration/README.md#locate-your-config-directory) script:
 
-In this example, Machine Learning and Alerting are disabled for the Child, so that the Parent can take the load. We also use RAM instead of disk to store metrics with limited retention, covering temporary network issues.
-
-##### netdata.conf
-
-On the child node, edit `netdata.conf` by using the [edit-config](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script and set the following parameters:
-
-```text
+```ini
 [db]
     # https://github.com/netdata/netdata/blob/master/src/database/README.md
     # none = no retention, ram = some retention in ram
@@ -60,11 +60,9 @@ On the child node, edit `netdata.conf` by using the [edit-config](/docs/netdata-
     # enable running new plugins = no
 ```
 
-##### stream.conf
+Edit `stream.conf` on the Child using the [edit-config](/docs/netdata-agent/configuration/README.md#locate-your-config-directory) script:
 
-To edit `stream.conf`, use again the [edit-config](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script and set the following parameters:
-
-```text
+```ini
 [stream]
     # Stream metrics to another Netdata
     enabled = yes
@@ -74,38 +72,50 @@ To edit `stream.conf`, use again the [edit-config](/docs/netdata-agent/configura
     api key = API_KEY
 ```
 
-#### Parent config
+**Perfect for:** IoT devices, containers, or any resource-constrained system.
 
-For the Parent, besides setting up streaming, this example also provides configuration for multiple [tiers of metrics storage](/src/database/README.md#tiers), for 10 Children, with about 2k metrics each. This allows for:
+</details><br/>
 
-- 1s granularity at tier 0 for 1 week
-- 1m granularity at tier 1 for 1 month
-- 1h granularity at tier 2 for 1 year
+### Parent with Tiered Storage
 
-Requiring:
+This example helps you configure a Parent with intelligent storage tiers to store different time ranges at different resolutions.
 
-- 25GB of disk
-- 3.5GB of RAM (2.5GB under pressure)
+<details>
+<summary><strong>Click to see Parent with tiered storage configuration</strong></summary><br/>
 
-##### netdata.conf
+This example provides configuration for multiple [tiers of metrics storage](/src/database/README.md#tiers), for 10 Children with about 2k metrics each.
 
-On the Parent, edit `netdata.conf` by using the [edit-config](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script and set the following parameters:
+**What this gives you:**
 
-```text
+- 1-second resolution for 1 week (recent data at full detail)
+- 1-minute resolution for 1 month (medium-term trends)
+- 1-hour resolution for 1 year (long-term patterns)
+
+**Resource requirements:**
+
+- Disk space: 25GB total
+- RAM usage: 3.5GB typical (2.5GB under memory pressure)
+
+Edit `netdata.conf` on the Parent using the [edit-config](/docs/netdata-agent/configuration/README.md#locate-your-config-directory) script:
+
+```ini
 [db]
     mode = dbengine
     dbengine tier backfill = new
     storage tiers = 3
     dbengine page cache size = 1.4GiB
+
     # storage tier 0
     update every = 1
-    dbengine tier 0 retention space = 12GiB
+    dbengine tier 0 retention size = 12GiB
+
     # storage tier 1
     dbengine tier 1 update every iterations = 60
-    dbengine tier 1 retention space = 4GiB
+    dbengine tier 1 retention size = 4GiB
+
     # storage tier 2
     dbengine tier 2 update every iterations = 60
-    dbengine tier 2 retention space = 2GiB
+    dbengine tier 2 retention size = 2GiB
 [ml]
     # Enabled by default
     # enabled = yes
@@ -117,25 +127,36 @@ On the Parent, edit `netdata.conf` by using the [edit-config](/docs/netdata-agen
     # bind to = *
 ```
 
-##### stream.conf
+Edit `stream.conf` on the Parent using the [edit-config](/docs/netdata-agent/configuration/README.md#locate-your-config-directory) script:
 
-On the Parent node, edit `stream.conf` by using the [edit-config](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script and set the following parameters:
-
-```yaml
+```ini
 [API_KEY]
-  # Accept metrics streaming from other Agents with the specified API key
-  enabled = yes
+    # Accept metrics streaming from other Agents with the specified API key
+    enabled = yes
 ```
 
-### Active–Active Parents
+**Perfect for:** Central monitoring servers with enough storage for historical data.
 
-To set up active–active streaming between Parent 1 and Parent 2, Parent 1 needs to be instructed to stream data to Parent 2 and Parent 2 to stream data to Parent 1. The Child Agents need to be configured with the addresses of both Parent Agents. An Agent will only connect to one Parent at a time, falling back to the next upon failure. These examples use the same API key between Parent Agents and for connections for Child Agents.
+</details><br/>
 
-On both Netdata Parent and all Child Agents, edit `stream.conf` by using the [edit-config](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script:
+### Active-Active Parents
 
-#### stream.conf on Parent 1
+This example guides you through setting up active-active Parents that sync with each other for high availability.
 
-```text
+<details>
+<summary><strong>Click to see high availability configuration</strong></summary><br/>
+
+:::info
+
+- To set up active-active streaming between Parent 1 and Parent 2, Parent 1 needs to be instructed to stream data to Parent 2 and Parent 2 to stream data to Parent 1.
+
+- The Child Agents need to be configured with the addresses of both Parent Agents. An Agent will only connect to one Parent at a time, falling back to the next upon failure.
+
+:::
+
+**Parent 1 stream.conf:**
+
+```ini
 [stream]
     # Stream metrics to another Netdata
     enabled = yes
@@ -146,12 +167,11 @@ On both Netdata Parent and all Child Agents, edit `stream.conf` by using the [ed
 [API_KEY]
     # Accept metrics streams from Parent 2 and Child Agents
     enabled = yes
-
 ```
 
-#### stream.conf on Parent 2
+**Parent 2 stream.conf:**
 
-```text
+```ini
 [stream]
     # Stream metrics to another Netdata
     enabled = yes
@@ -163,9 +183,9 @@ On both Netdata Parent and all Child Agents, edit `stream.conf` by using the [ed
     enabled = yes
 ```
 
-#### stream.conf on Child Agents
+**Children stream.conf:**
 
-```text
+```ini
 [stream]
     # Stream metrics to another Netdata
     enabled = yes
@@ -174,6 +194,8 @@ On both Netdata Parent and all Child Agents, edit `stream.conf` by using the [ed
     # The shared API key, generated by uuidgen
     api key = API_KEY
 ```
+
+</details><br/>
 
 ## Further Reading
 
