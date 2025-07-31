@@ -21,6 +21,41 @@
 // ----------------------------------------------------------------------------
 // mutex
 
+ALWAYS_INLINE int __netdata_cond_init(netdata_cond_t *cond) {
+    int ret = pthread_cond_init(cond, NULL);
+    if(unlikely(ret != 0))
+        netdata_log_error("COND: failed to initialize (code %d).", ret);
+    return ret;
+}
+
+ALWAYS_INLINE int __netdata_cond_destroy(netdata_cond_t *cond) {
+    int ret = pthread_cond_destroy(cond);
+    if(unlikely(ret != 0))
+        netdata_log_error("COND: failed to destroy (code %d).", ret);
+    return ret;
+}
+
+ALWAYS_INLINE int __netdata_cond_signal(netdata_cond_t *cond) {
+    int ret = pthread_cond_signal(cond);
+    if(unlikely(ret != 0))
+        netdata_log_error("COND: failed to signal (code %d).", ret);
+    return ret;
+}
+
+ALWAYS_INLINE int __netdata_cond_wait(netdata_cond_t *cond, netdata_mutex_t *mutex)
+{
+    int ret = pthread_cond_wait(cond, mutex);
+    if (unlikely(ret != 0))
+        netdata_log_error("COND: failed to signal (code %d).", ret);
+    return ret;
+}
+
+ALWAYS_INLINE int __netdata_cond_timedwait(netdata_cond_t *cond, netdata_mutex_t *mutex, struct timespec *tp)
+{
+    int ret = pthread_cond_timedwait(cond, mutex, tp);
+    return ret;
+}
+
 ALWAYS_INLINE int __netdata_mutex_init(netdata_mutex_t *mutex) {
     int ret = pthread_mutex_init(mutex, NULL);
     if(unlikely(ret != 0))

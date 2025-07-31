@@ -53,7 +53,7 @@ static netdata_publish_syscall_t disk_publish_aggregated[NETDATA_EBPF_HIST_MAX_B
 static netdata_idx_t *disk_hash_values = NULL;
 
 ebpf_publish_disk_t *plot_disks = NULL;
-pthread_mutex_t plot_mutex;
+netdata_mutex_t plot_mutex;
 
 #ifdef LIBBPF_MAJOR_VERSION
 /**
@@ -519,11 +519,11 @@ static void ebpf_disk_exit(void *pptr)
         return;
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
-        pthread_mutex_lock(&lock);
+        netdata_mutex_lock(&lock);
 
         ebpf_obsolete_disk_global(em);
 
-        pthread_mutex_unlock(&lock);
+        netdata_mutex_unlock(&lock);
         fflush(stdout);
     }
     ebpf_disk_disable_tracepoints();
@@ -541,15 +541,15 @@ static void ebpf_disk_exit(void *pptr)
 
     freez(disk_hash_values);
     disk_hash_values = NULL;
-    pthread_mutex_destroy(&plot_mutex);
+    netdata_mutex_destroy(&plot_mutex);
 
     ebpf_cleanup_plot_disks();
     ebpf_cleanup_disk_list();
 
-    pthread_mutex_lock(&ebpf_exit_cleanup);
+    netdata_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     ebpf_update_stats(&plugin_statistics, em);
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
+    netdata_mutex_unlock(&ebpf_exit_cleanup);
 }
 
 /*****************************************************************
@@ -565,13 +565,13 @@ static void ebpf_disk_exit(void *pptr)
  */
 static void ebpf_fill_plot_disks(netdata_ebpf_disks_t *ptr)
 {
-    pthread_mutex_lock(&plot_mutex);
+    netdata_mutex_lock(&plot_mutex);
     ebpf_publish_disk_t *w;
     if (likely(plot_disks)) {
         ebpf_publish_disk_t *move = plot_disks, *store = plot_disks;
         while (move) {
             if (move->plot == ptr) {
-                pthread_mutex_unlock(&plot_mutex);
+                netdata_mutex_unlock(&plot_mutex);
                 return;
             }
 
@@ -586,7 +586,7 @@ static void ebpf_fill_plot_disks(netdata_ebpf_disks_t *ptr)
         plot_disks = callocz(1, sizeof(ebpf_publish_disk_t));
         plot_disks->plot = ptr;
     }
-    pthread_mutex_unlock(&plot_mutex);
+    netdata_mutex_unlock(&plot_mutex);
 
     ptr->flags |= NETDATA_DISK_ADDED_TO_PLOT_LIST;
 }
@@ -726,7 +726,7 @@ static void ebpf_remove_pointer_from_plot_disk(ebpf_module_t *em)
 {
     time_t current_time = now_realtime_sec();
     time_t limit = 10 * em->update_every;
-    pthread_mutex_lock(&plot_mutex);
+    netdata_mutex_lock(&plot_mutex);
     ebpf_publish_disk_t *move = plot_disks, *prev = plot_disks;
     int update_every = em->update_every;
     while (move) {
@@ -753,7 +753,7 @@ static void ebpf_remove_pointer_from_plot_disk(ebpf_module_t *em)
         prev = move;
         move = move->next;
     }
-    pthread_mutex_unlock(&plot_mutex);
+    netdata_mutex_unlock(&plot_mutex);
 }
 
 /**
@@ -765,9 +765,9 @@ static void ebpf_remove_pointer_from_plot_disk(ebpf_module_t *em)
  */
 static void ebpf_latency_send_hd_data(int update_every)
 {
-    pthread_mutex_lock(&plot_mutex);
+    netdata_mutex_lock(&plot_mutex);
     if (!plot_disks) {
-        pthread_mutex_unlock(&plot_mutex);
+        netdata_mutex_unlock(&plot_mutex);
         return;
     }
 
@@ -788,7 +788,7 @@ static void ebpf_latency_send_hd_data(int update_every)
 
         move = move->next;
     }
-    pthread_mutex_unlock(&plot_mutex);
+    netdata_mutex_unlock(&plot_mutex);
 }
 
 /**
@@ -813,22 +813,22 @@ static void disk_collector(ebpf_module_t *em)
 
         counter = 0;
         read_hard_disk_tables(disk_maps[NETDATA_DISK_IO].map_fd, maps_per_core);
-        pthread_mutex_lock(&lock);
+        netdata_mutex_lock(&lock);
         ebpf_remove_pointer_from_plot_disk(em);
         ebpf_latency_send_hd_data(update_every);
 
-        pthread_mutex_unlock(&lock);
+        netdata_mutex_unlock(&lock);
 
         ebpf_update_disks(em);
 
-        pthread_mutex_lock(&ebpf_exit_cleanup);
+        netdata_mutex_lock(&ebpf_exit_cleanup);
         if (running_time && !em->running_time)
             running_time = update_every;
         else
             running_time += update_every;
 
         em->running_time = running_time;
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
+        netdata_mutex_unlock(&ebpf_exit_cleanup);
     }
 }
 
@@ -931,7 +931,7 @@ void ebpf_disk_thread(void *ptr)
         goto enddisk;
     }
 
-    if (pthread_mutex_init(&plot_mutex, NULL)) {
+    if (netdata_mutex_init(&plot_mutex)) {
         netdata_log_error("Cannot initialize local mutex");
         goto enddisk;
     }
@@ -951,10 +951,10 @@ void ebpf_disk_thread(void *ptr)
     ebpf_global_labels(
         disk_aggregated_data, disk_publish_aggregated, dimensions, dimensions, algorithms, NETDATA_EBPF_HIST_MAX_BINS);
 
-    pthread_mutex_lock(&lock);
+    netdata_mutex_lock(&lock);
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, disk_maps, EBPF_ACTION_STAT_ADD);
-    pthread_mutex_unlock(&lock);
+    netdata_mutex_unlock(&lock);
 
     disk_collector(em);
 
