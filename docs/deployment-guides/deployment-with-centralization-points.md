@@ -139,8 +139,9 @@ flowchart TB
 
 Parents consist of two major components you can deploy:
 
-1. **Metrics Centralization** - Uses Netdata's streaming and replication features to centralize your metrics data
-2. **Logs Centralization** - Uses systemd-journald methodologies to centralize your log data
+1. **[Metrics Centralization](/docs/observability-centralization-points/metrics-centralization-points/README.md)** - Uses Netdata's streaming and replication features to centralize your metrics data
+
+2. **[Logs Centralization](/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/README.md)** - Uses systemd-journald methodologies to centralize your log data
 
 You can configure your systems to connect to **multiple Parents** for redundancy. If a connection fails, they automatically switch to an available alternative.
 
