@@ -1169,11 +1169,13 @@ async function fetchAvailableModels(provider, apiKey, providerConfig = null) {
                     
                     if (modelInfo && modelInfo.model_info) {
                       // Extract context length from the model info
-                      // The keys are flat strings like "llama.context_length"
+                      // Ollama uses "num_ctx" for context window size
+                      // The keys are flat strings like "llama.num_ctx" or just "num_ctx"
                       let contextWindow = 4096; // default
                       
-                      // Look for any key ending with "context_length"
+                      // Look for num_ctx or any key ending with "num_ctx"
                       const contextKey = Object.keys(modelInfo.model_info).find(key => 
+                        key.endsWith('.num_ctx') || key === 'num_ctx' || 
                         key.endsWith('.context_length') || key === 'context_length'
                       );
                       
