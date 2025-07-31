@@ -679,9 +679,10 @@ function loadConfig() {
       }
     });
     
-    // Skip validation if we're updating config
+    // Skip validation if we're updating config or showing models
     const isUpdatingConfig = process.argv.includes('--update-config');
-    if (!isUpdatingConfig && (configuredProviders.length === 0 || totalValidModels === 0)) {
+    const isShowingModels = process.argv.includes('--show-models');
+    if (!isUpdatingConfig && !isShowingModels && (configuredProviders.length === 0 || totalValidModels === 0)) {
       console.error('\n❌ Error: No valid models configured!');
       console.error('\n📝 Please edit the configuration file and add valid models:');
       console.error(`   ${CONFIG_FILE}`);
@@ -1338,7 +1339,7 @@ if (process.argv.includes('--help') || process.argv.includes('-h')) {
   console.log('   node llm-proxy.js [options]');
   console.log('\n🎯 Options:');
   console.log('   --help, -h                   Show this help message');
-  console.log('   --show-models                Display all configured models with their pricing information');
+  console.log('   --show-models                Display all models from all providers with their pricing information');
   console.log('   --update-config              Update the configuration file with latest model definitions');
   console.log('                                while preserving your API keys and custom settings');
   console.log('   --sync                       When used with --update-config, sync configuration with');
@@ -1366,13 +1367,14 @@ if (process.argv.includes('--help') || process.argv.includes('-h')) {
 }
 
 if (process.argv.includes('--show-models')) {
-  console.log('\n📊 Configured Models and Pricing Information');
+  console.log('\n📊 All Provider Models and Pricing Information');
   console.log('='.repeat(120));
   
   Object.entries(config.providers).forEach(([provider, providerConfig]) => {
-    if (!providerConfig.apiKey) return;
-    
     console.log(`\n🏢 ${provider.toUpperCase()}`);
+    if (!providerConfig.apiKey) {
+      console.log('   ⚠️  No API key configured');
+    }
     console.log('-'.repeat(120));
     
     if (!providerConfig.models || providerConfig.models.length === 0) {
