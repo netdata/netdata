@@ -948,54 +948,54 @@ void netdata_mount_mssql_connection_string(struct netdata_mssql_conn *dbInput)
 
 static void netdata_read_config_options()
 {
-    static uint16_t expected_instances = 1;
-    static uint16_t total_instances = 0;
-    if (total_instances > expected_instances)
-        return;
-
 #define NETDATA_MAX_MSSSQL_SECTION_LENGTH (40)
 #define NETDATA_DEFAULT_MSSQL_SECTION "plugin:windows:PerflibMSSQL"
-    char section_name[NETDATA_MAX_MSSSQL_SECTION_LENGTH + 1];
-    char upper_instance[NETDATA_MAX_INSTANCE_OBJECT + 1];
-    strncpyz(section_name, NETDATA_DEFAULT_MSSQL_SECTION, sizeof(NETDATA_DEFAULT_MSSQL_SECTION));
-    if (total_instances) {
-        snprintfz(&section_name[sizeof(NETDATA_DEFAULT_MSSQL_SECTION) - 1], 5, "%d", total_instances);
+    uint16_t expected_instances = 1;
+    uint16_t total_instances = 0;
+    for (; total_instances < expected_instances; total_instances++) {
+        char section_name[NETDATA_MAX_MSSSQL_SECTION_LENGTH + 1];
+        char upper_instance[NETDATA_MAX_INSTANCE_OBJECT + 1];
+        strncpyz(section_name, NETDATA_DEFAULT_MSSQL_SECTION, sizeof(NETDATA_DEFAULT_MSSQL_SECTION));
+        if (total_instances) {
+            snprintfz(&section_name[sizeof(NETDATA_DEFAULT_MSSQL_SECTION) - 1], 5, "%d", total_instances);
+        }
+        const char *instance = inicfg_get(&netdata_config, section_name, "instance", NULL);
+        int additional_instances = (int)inicfg_get_number(&netdata_config, section_name, "additional instances", 0);
+        if (!instance || strlen(instance) > NETDATA_MAX_INSTANCE_OBJECT) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "You must specify a valid 'instance' name to collect data from database in section %s.", section_name);
+            continue;
+        }
+
+        if (!total_instances && additional_instances) {
+            if (additional_instances > 64) {
+                nd_log(NDLS_COLLECTORS, NDLP_ERR, "Number of instances is bigger than expected (64)");
+                expected_instances = 64;
+            }
+            expected_instances = additional_instances + 1;
+        }
+
+        const char *move = instance;
+        int i;
+        for (i = 0; *move; move++, i++) {
+            upper_instance[i] = toupper(*move);
+        }
+        upper_instance[i] = '\0';
+
+        struct netdata_mssql_conn *dbconn = dictionary_set(conn_options, upper_instance, NULL, sizeof(*dbconn));
+
+        dbconn->instance = strdupz(upper_instance);
+        dbconn->driver = inicfg_get(&netdata_config, section_name, "driver", "SQL Server");
+        dbconn->server = inicfg_get(&netdata_config, section_name, "server", NULL);
+        dbconn->address = inicfg_get(&netdata_config, section_name, "address", NULL);
+        dbconn->username = inicfg_get(&netdata_config, section_name, "uid", NULL);
+        dbconn->password = inicfg_get(&netdata_config, section_name, "pwd", NULL);
+        dbconn->instances = additional_instances;
+        dbconn->windows_auth = inicfg_get_boolean(&netdata_config, section_name, "windows authentication", false);
+        dbconn->is_sqlexpress = inicfg_get_boolean(&netdata_config, section_name, "express", false);
+        dbconn->is_connected = FALSE;
+
+        netdata_mount_mssql_connection_string(dbconn);
     }
-
-    const char *instance = inicfg_get(&netdata_config, section_name, "instance", instance);
-    int additional_instances = (int)inicfg_get_number(&netdata_config, section_name, "additional instances", 0);
-    if (!instance || strlen(instance) > NETDATA_MAX_INSTANCE_OBJECT) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "You must specify a valid 'instance' name to collect data from database. ");
-        goto end_conf_parse;
-    }
-
-    const char *move = instance;
-    int i;
-    for (i = 0; *move; move++, i++) {
-        upper_instance[i] = toupper(*move);
-    }
-    upper_instance[i] = '\0';
-
-    struct netdata_mssql_conn *dbconn = dictionary_set(conn_options, upper_instance, NULL, sizeof(*dbconn));
-
-    dbconn->instance = strdupz(upper_instance);
-    dbconn->driver = inicfg_get(&netdata_config, section_name, "driver", "SQL Server");
-    dbconn->server = inicfg_get(&netdata_config, section_name, "server", NULL);
-    dbconn->address = inicfg_get(&netdata_config, section_name, "address", NULL);
-    dbconn->username = inicfg_get(&netdata_config, section_name, "uid", NULL);
-    dbconn->password = inicfg_get(&netdata_config, section_name, "pwd", NULL);
-    dbconn->instances = additional_instances;
-    dbconn->windows_auth = inicfg_get_boolean(&netdata_config, section_name, "windows authentication", false);
-    dbconn->is_sqlexpress = inicfg_get_boolean(&netdata_config, section_name, "express", false);
-    dbconn->is_connected = FALSE;
-
-    netdata_mount_mssql_connection_string(dbconn);
-
-end_conf_parse:
-    if (!total_instances)
-        expected_instances = additional_instances;
-
-    total_instances++;
 }
 
 static inline struct netdata_mssql_conn *netdata_mssql_get_conn_option(const char *instance)
@@ -1068,13 +1068,13 @@ void dict_mssql_insert_conn_option(const DICTIONARY_ITEM *item __maybe_unused, v
     ;
 }
 
-static int mssql_fill_dictionary(int update_every)
+static void mssql_fill_dictionary(int update_every)
 {
     HKEY hKey;
     LSTATUS ret = RegOpenKeyExA(
         HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Microsoft SQL Server\\Instance Names\\SQL", 0, KEY_READ, &hKey);
     if (ret != ERROR_SUCCESS)
-        return -1;
+        return;
 
     DWORD values = 0;
 
@@ -1107,8 +1107,6 @@ static int mssql_fill_dictionary(int update_every)
 
 endMSSQLFillDict:
     RegCloseKey(hKey);
-
-    return (ret == ERROR_SUCCESS) ? 0 : -1;
 }
 
 int netdata_mssql_reset_value(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
@@ -1178,9 +1176,7 @@ static int initialize(int update_every)
     dictionary_register_insert_callback(conn_options, dict_mssql_insert_conn_option, NULL);
 
     netdata_read_config_options();
-    if (mssql_fill_dictionary(update_every)) {
-        return -1;
-    }
+    mssql_fill_dictionary(update_every);
 
     if (create_thread)
         mssql_queries_thread = nd_thread_create("mssql_queries", NETDATA_THREAD_OPTION_DEFAULT, netdata_mssql_queries, &update_every);
