@@ -2080,7 +2080,8 @@ int handle_incoming_traffic(struct mqtt_ng_client *client)
                 client->client_state = MQTT_STATE_CONNECTED;
                 break;
             }
-            client->client_state = MQTT_STATE_ERROR;            return MQTT_NG_CLIENT_SERVER_RETURNED_ERROR;
+            client->client_state = MQTT_STATE_ERROR;
+            return MQTT_NG_CLIENT_SERVER_RETURNED_ERROR;
 
         case MQTT_CPT_PUBACK:
             worker_is_busy(WORKER_ACLK_CPT_PUBACK);
