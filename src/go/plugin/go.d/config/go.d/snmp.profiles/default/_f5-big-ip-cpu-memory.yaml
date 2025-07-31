@@ -11,7 +11,7 @@ metrics:
         name: cpu.usage # sysMultiHostCpuUsageRatio1m
         chart_meta:
           family: 'System/CPU/Usage'
-          description: This is average usage ratio of CPU for the associated host in the last one minute
+          description: The current CPU utilization
           unit: "%"
     metric_tags:
       - tag: cpu

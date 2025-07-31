@@ -11,14 +11,18 @@ metadata:
       type:
         value: "switch"
 
+# -  F10-S-SERIES-CHASSIS-MIB
+#   https://mibbrowser.online/mibdb_search.php?mib=F10-S-SERIES-CHASSIS-MIB
+#   https://github.com/librenms/librenms/blob/master/mibs/dell/F10-S-SERIES-CHASSIS-MIB
+
 metrics:
   - MIB: F10-S-SERIES-CHASSIS-MIB
     symbol:
-      OID: 1.3.6.1.4.1.6027.3.10.1.2.9.1.4
+      OID: 1.3.6.1.4.1.6027.3.10.1.2.9.1.2 # chStackUnitCpuUtil5Sec
       name: cpu.usage
       chart_meta:
         family: 'System/CPU/Usage'
-        description: Cpu utilization in percentage for last 5 minutes.
+        description: The current CPU utilization
         unit: "%"
   - MIB: F10-S-SERIES-CHASSIS-MIB
     symbol:

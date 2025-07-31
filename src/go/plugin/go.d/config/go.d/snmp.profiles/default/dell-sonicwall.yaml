@@ -26,14 +26,18 @@ metadata:
           OID: 1.3.6.1.4.1.8741.2.1.1.1.0
           name: snwlSysModel
 
+# -  SONICWALL-FIREWALL-IP-STATISTICS-MIB
+#   https://mibbrowser.online/mibdb_search.php?mib=SONICWALL-FIREWALL-IP-STATISTICS-MIB
+#   https://github.com/librenms/librenms/blob/master/mibs/sonicwall/SONICWALL-FIREWALL-IP-STATISTICS-MIB
+
 metrics:
   - MIB: SONICWALL-FIREWALL-IP-STATISTICS-MIB
     symbol:
-      name: cpu.usage
+      name: cpu.usage #  sonicCurrentCPUUtil
       OID: 1.3.6.1.4.1.8741.1.3.1.3.0
       chart_meta:
         family: 'System/CPU/Usage'
-        description: Instantaneous CPU Utilization in percent
+        description: The current CPU utilization
         unit: "%"
   - MIB: SONICWALL-FIREWALL-IP-STATISTICS-MIB
     symbol:

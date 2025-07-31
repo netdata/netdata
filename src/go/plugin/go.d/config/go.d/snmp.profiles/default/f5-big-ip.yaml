@@ -142,9 +142,9 @@ metrics:
     metric_type: gauge
     symbols:
       - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.11
-        name: sysMultiHostCpuUsageRatio
+        name: cpu.usage # sysMultiHostCpuUsageRatio
         chart_meta:
-          description: This is usage ratio of CPU for the associated host
+          description: The current CPU utilization
           family: 'System/CPU/Usage'
           unit: "%"
     metric_tags:

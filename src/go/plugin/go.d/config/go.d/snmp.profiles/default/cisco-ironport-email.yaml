@@ -48,7 +48,7 @@ metrics:
       name: cpu.usage
       OID: 1.3.6.1.4.1.15497.1.1.1.2.0
       chart_meta:
-        description: This object provides a general idea of how busy the CPU is according to the appliance software, within the last 5 seconds of utilization
+        description: The current CPU utilization
         family: 'System/CPU/Usage'
         unit: "%"
   - MIB: ASYNCOS-MAIL-MIB

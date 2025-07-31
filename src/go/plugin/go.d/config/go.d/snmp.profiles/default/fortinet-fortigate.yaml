@@ -72,9 +72,9 @@ metrics:
   - MIB: FORTINET-FORTIGATE-MIB
     symbol:
       OID: 1.3.6.1.4.1.12356.101.4.1.3.0
-      name: fgSysCpuUsage
+      name: cpu.usage # fgSysCpuUsage
       chart_meta:
-        description: Current CPU usage
+        description: The current CPU utilization
         family: 'System/CPU/Usage'
         unit: "%"
 

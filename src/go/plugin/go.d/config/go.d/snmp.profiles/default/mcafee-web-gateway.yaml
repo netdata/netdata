@@ -65,10 +65,10 @@ metric_tags:
 metrics:
   - MIB: MCAFEE-MWG-MIB
     symbol:
-      name: cpu.usage
+      name: cpu.usage # stCPULoad
       OID: 1.3.6.1.4.1.1230.2.7.2.5.1.0
       chart_meta:
-        description: Current overall CPU usage in percent
+        description: The current CPU utilization
         family: 'System/CPU/Usage'
         unit: "%"
   - MIB: MCAFEE-MWG-MIB
