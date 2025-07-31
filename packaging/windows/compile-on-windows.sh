@@ -44,6 +44,7 @@ CFLAGS="${BUILD_CFLAGS}" /usr/bin/cmake \
     -DENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE=Off \
     -DENABLE_BUNDLED_JSONC=On \
     -DENABLE_BUNDLED_PROTOBUF=Off \
+    -DRust_COMPILER=/ucrt64/bin/rustc \
     ${EXTRA_CMAKE_OPTIONS:-}
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
