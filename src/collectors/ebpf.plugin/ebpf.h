@@ -309,7 +309,7 @@ extern struct config collector_config;
 extern netdata_ebpf_cgroup_shm_t shm_ebpf_cgroup;
 extern int shm_fd_ebpf_cgroup;
 extern sem_t *shm_sem_ebpf_cgroup;
-extern pthread_mutex_t mutex_cgroup_shm;
+extern netdata_mutex_t mutex_cgroup_shm;
 extern size_t ebpf_all_pids_count;
 extern ebpf_plugin_stats_t plugin_statistics;
 #ifdef LIBBPF_MAJOR_VERSION
