@@ -620,24 +620,6 @@ int mqtt_wss_connect(
     return 0;
 }
 
-#define NSEC_PER_USEC   1000ULL
-#define USEC_PER_SEC    1000000ULL
-#define NSEC_PER_MSEC   1000000ULL
-#define NSEC_PER_SEC    1000000000ULL
-
-static uint64_t boottime_usec(void) {
-    struct timespec ts;
-#if defined(__APPLE__) || defined(__FreeBSD__)
-    if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1) {
-#else
-    if (clock_gettime(CLOCK_BOOTTIME, &ts) == -1) {
-#endif
-        nd_log(NDLS_DAEMON, NDLP_ERR, "clock_gettimte failed");
-        return 0;
-    }
-    return (uint64_t)ts.tv_sec * USEC_PER_SEC + (ts.tv_nsec % NSEC_PER_SEC) / NSEC_PER_USEC;
-}
-
 #define MWS_TIMED_OUT 1
 #define MWS_ERROR 2
 #define MWS_OK 0
@@ -656,10 +638,10 @@ static const char *mqtt_wss_error_tos(int ec)
 
 static int mqtt_wss_service_all(mqtt_wss_client client, int timeout_ms)
 {
-    uint64_t exit_by_us = boottime_usec() + (timeout_ms * NSEC_PER_MSEC);
+    uint64_t exit_by_us = now_boottime_usec() + (timeout_ms * NSEC_PER_MSEC);
     client->poll_fds[POLLFD_SOCKET].events |= POLLOUT; // TODO when entering mwtt_wss_service use out buffer size to arm POLLOUT
     while (rbuf_bytes_available(client->ws_client->buf_write)) {
-        const uint64_t now_us = boottime_usec();
+        const uint64_t now_us = now_boottime_usec();
         if (now_us >= exit_by_us)
             return MWS_TIMED_OUT;
         if (mqtt_wss_service(client, (exit_by_us - now_us) / USEC_PER_SEC))
