@@ -78,20 +78,21 @@ static inline void safe_log_proxy_error(char *str, const char *proxy)
 
 static inline int check_socks_enviroment(const char **proxy)
 {
-    char *tmp = getenv("socks_proxy");
-
-    if (!tmp || !*tmp)
-        return 1;
-
-    if (aclk_verify_proxy(tmp) == PROXY_TYPE_SOCKS5) {
-        *proxy = tmp;
-        return 0;
-    }
-
-    safe_log_proxy_error(
-        "Environment var \"socks_proxy\" defined but of unknown format. Supported syntax: \"socks5[h]://[user:pass@]host:port\".",
-        tmp);
     return 1;
+//    char *tmp = getenv("socks_proxy");
+//
+//    if (!tmp || !*tmp)
+//        return 1;
+//
+//    if (aclk_verify_proxy(tmp) == PROXY_TYPE_SOCKS5) {
+//        *proxy = tmp;
+//        return 0;
+//    }
+//
+//    safe_log_proxy_error(
+//        "Environment var \"socks_proxy\" defined but of unknown format. Supported syntax: \"socks5[h]://[user:pass@]host:port\".",
+//        tmp);
+//    return 1;
 }
 
 static inline int check_http_environment(const char **proxy)
