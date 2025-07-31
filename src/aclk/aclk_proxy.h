@@ -1,8 +1,7 @@
 #ifndef ACLK_PROXY_H
 #define ACLK_PROXY_H
 
-#include <config.h>
-#include <stdbool.h>
+#include "aclk.h"
 
 #define ACLK_PROXY_PROTO_ADDR_SEPARATOR "://"
 

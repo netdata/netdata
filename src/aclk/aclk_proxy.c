@@ -1,7 +1,5 @@
 #include "aclk_proxy.h"
 
-#include "database/rrd.h"
-
 #define ACLK_PROXY_ENV "env"
 #define ACLK_PROXY_CONFIG_VAR "proxy"
 
