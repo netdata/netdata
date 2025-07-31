@@ -6,11 +6,15 @@
 
 **Merged pull requests:**
 
+- chore\(go.d/snmp-profiles\): use same metric name for cpu usage  [\#20745](https://github.com/netdata/netdata/pull/20745) ([ilyam8](https://github.com/ilyam8))
+- docs: remove customize.md [\#20742](https://github.com/netdata/netdata/pull/20742) ([ilyam8](https://github.com/ilyam8))
+- Fix SNDR thread startup [\#20740](https://github.com/netdata/netdata/pull/20740) ([stelfrag](https://github.com/stelfrag))
 - build\(deps\): bump github.com/docker/docker from 28.3.2+incompatible to 28.3.3+incompatible in /src/go [\#20739](https://github.com/netdata/netdata/pull/20739) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump openssl and curl version in static build [\#20734](https://github.com/netdata/netdata/pull/20734) ([ilyam8](https://github.com/ilyam8))
 - Thread creation code cleanup [\#20732](https://github.com/netdata/netdata/pull/20732) ([stelfrag](https://github.com/stelfrag))
 - Add additional database checks during shutdown  [\#20731](https://github.com/netdata/netdata/pull/20731) ([stelfrag](https://github.com/stelfrag))
 - build\(deps\): bump github.com/bmatcuk/doublestar/v4 from 4.9.0 to 4.9.1 in /src/go [\#20730](https://github.com/netdata/netdata/pull/20730) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Revert "Revert "Deployment Guides: add and update documentation for deployment strate"" [\#20729](https://github.com/netdata/netdata/pull/20729) ([ilyam8](https://github.com/ilyam8))
 - Revert "Deployment Guides: add and update documentation for deployment strate" [\#20728](https://github.com/netdata/netdata/pull/20728) ([ilyam8](https://github.com/ilyam8))
 - Reset chart variable after release [\#20727](https://github.com/netdata/netdata/pull/20727) ([stelfrag](https://github.com/stelfrag))
 - Improve thread shutdown handling for MSSQL plugin [\#20725](https://github.com/netdata/netdata/pull/20725) ([stelfrag](https://github.com/stelfrag))
@@ -463,10 +467,6 @@
 - call spinlock\_init\(\) when initializing rrdlabels spinlock [\#20206](https://github.com/netdata/netdata/pull/20206) ([ktsaou](https://github.com/ktsaou))
 - remove the status file spinlock to avoid deadlocks [\#20205](https://github.com/netdata/netdata/pull/20205) ([ktsaou](https://github.com/ktsaou))
 - Avoid indexing journal files when db rotation is running [\#20204](https://github.com/netdata/netdata/pull/20204) ([stelfrag](https://github.com/stelfrag))
-- rrd metadata search fix [\#20203](https://github.com/netdata/netdata/pull/20203) ([ktsaou](https://github.com/ktsaou))
-- Use one spinlock to access v2 and mmap related data [\#20202](https://github.com/netdata/netdata/pull/20202) ([stelfrag](https://github.com/stelfrag))
-- Add a default busy timeout [\#20201](https://github.com/netdata/netdata/pull/20201) ([stelfrag](https://github.com/stelfrag))
-- rrd metadata needs to be discoverable while replication is running [\#20200](https://github.com/netdata/netdata/pull/20200) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.4.0](https://github.com/netdata/netdata/tree/v2.4.0) (2025-04-14)
 
