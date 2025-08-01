@@ -1,84 +1,196 @@
 # Netdata Streaming Routing
 
-## What is Streaming Routing?
+Streaming routing controls how Netdata child nodes connect to parent nodes when multiple parents are available. It handles three key operations: initial parent selection, connection management, and failover.
 
-Streaming routing determines how Netdata child nodes connect to parent nodes in a distributed monitoring setup. When multiple parents are available, the routing algorithm automatically selects the best destination and handles failover.
+:::info Prerequisites
 
-:::note 
-This feature requires configuring streaming in `netdata.conf`. See [Streaming Configuration](/src/streaming/README.md) for setup instructions.
+This feature requires configuring streaming in `netdata.conf`. See [Streaming Configuration](https://learn.netdata.cloud/docs/streaming) for setup instructions.
+
 :::
 
-## How Parent Selection Works
+## How Streaming Routing Works
 
-When a child node initiates or loses connection, it selects a parent, using this priority:
+### 1. Initial Parent Selection
 
-1. **Check data completeness** - Prefer parents that already have this node's historical data
-2. **Load balance** - Randomly choose among equally suitable parents
-3. **Failover** - If connection fails, try the next parent in the list
+When a child node starts, it selects a parent from the configured list using this algorithm:
+
+```mermaid
+graph LR
+    A[Start] --> B{Has data?}
+    B -->|Yes| C[Parents with data]
+    B -->|No| D[All parents]
+    C --> E[Random select]
+    D --> E
+    E --> F[Connect]
+```
+
+**Example:**
+
+```ini
+# In child's stream.conf
+[stream]
+    enabled = yes
+    destination = parent-a:19999 parent-b:19999 parent-c:19999
+    api key = YOUR_API_KEY
+```
+
+With this configuration:
 
 ```
-Child Node
+Child Node startup:
     │
-    ├─→ Parent A (has historical data) ✓ Selected
-    ├─→ Parent B (has historical data)
-    └─→ Parent C (no historical data)
+    ├─→ Parent A (has historical data) ✓ Selected (random between A & B)
+    ├─→ Parent B (has historical data) 
+    └─→ Parent C (no historical data)   ← Lower priority
 ```
 
-## Multi-Tier Architecture
+### 2. Connection Management
 
-In larger deployments, you can create multiple tiers:
+Once connected, the child maintains a persistent connection:
 
-```
-Ingest Layer ──→ Proxy Layer ──→ Storage Layer
-```
+- **Connection timeout**: 60 seconds (default)
+- **Keepalive**: Continuous streaming maintains connection
+- **No automatic rebalancing**: Child stays connected until failure
+- **Data integrity**: All metrics buffered during brief disconnections
 
-This setup distributes the workload:
-- **Ingest Layer**: Children collect metrics
-- **Proxy Layer**: Parents forward data without heavy processing
-- **Storage Layer**: Store data and run analytics
+:::warning Important
 
-## Query Routing
+Children do not automatically reconnect to their original parent after failover. This prevents connection flapping but requires manual intervention for load redistribution.
 
-Netdata Cloud optimizes query performance by routing requests intelligently:
+:::
 
-- **Historical queries** → Sent to the furthest parent (better resources)
-- **Live queries** → Sent to the closest node (lower latency)
+### 3. Failover and Reconnection
 
-## Machine Learning Workload
+When the active connection fails:
 
-The ML workload distribution depends on your configuration:
-
-| Child ML Setting | Impact                                                           |
-|------------------|------------------------------------------------------------------|
-| Disabled         | Parent must train models from scratch (high CPU usage)           |
-| Enabled          | Child trains models locally and sends results (lower parent CPU) |
-
-## Key Behaviors
-
-### Network vs. Data Priority
-
-Unlike traditional networking, Netdata prioritizes **data integrity** over network efficiency:
-
-- May connect to geographically distant parents if they have better data
-- Ensures no metrics are lost during failures
-- Automatically rebalances load after recovery
-
-### Failover Example
-
-```
-Normal operation:
-Child → Parent A (primary)
-
-During Parent A outage:
-Child → Parent B (failover)
-
-After recovery:
-Child may stay with Parent B if it now has complete data
+```mermaid
+graph LR
+    A[Failed] --> B[Wait 5-X sec]
+    B --> C{Next?}
+    C -->|Yes| D[Try next]
+    C -->|No| E[Restart list]
+    E --> D
+    D --> F{OK?}
+    F -->|No| B
+    F -->|Yes| G[Stream]
 ```
 
-### Connection Behavior
+:::note Reconnection Timing
 
-- **Reconnection interval**: 1 second (configurable via `reconnect delay seconds`)
-- **Connection timeout**: 60 seconds default
-- **Persistent connections**: Child maintains connection until failure
-- **No automatic rebalancing**: Child won't switch parents unless current connection fails
+The wait time is randomized between 5 seconds and your configured `reconnect delay` value (default: 5). This prevents thundering herd when multiple children reconnect simultaneously.
+
+:::
+
+**Failover Example:**
+
+```
+Normal:     Child → Parent A
+            
+Failure:    Child ✗ Parent A (connection lost)
+            Child → Parent B (immediate failover)
+            
+Recovery:   Parent A comes back online
+            Child → Parent B (stays connected - no automatic switch)
+```
+
+## Key Routing Behaviors
+
+| Behavior                   | Description                                                              | Impact                                                    |
+|----------------------------|--------------------------------------------------------------------------|-----------------------------------------------------------|
+| **Data-Driven Selection**  | Prioritizes parents with complete historical data over network proximity | Child may connect to distant parent if it has better data |
+| **Sticky Connections**     | No automatic rebalancing after failover                                  | Requires manual intervention to redistribute load         |
+| **Round-Robin Failover**   | Tries parents in configuration order, cycles through entire list         | No parent blacklisting; failed parents are retried        |
+| **Connection Persistence** | Maintains connection until failure occurs                                | Prevents unnecessary reconnections and data gaps          |
+| **No Health Checks**       | Doesn't proactively test parent availability                             | Discovers failures only when connection breaks            |
+| **Randomized Delays**      | Reconnection waits random time (5s to configured maximum)                | Prevents thundering herd during mass reconnections        |
+
+## Configuration Reference
+
+### Essential Parameters
+
+```ini
+[stream]
+    # Streaming targets (space-separated list)
+    destination = parent1:19999 parent2:19999 parent3:19999
+    
+    # Reconnection delay - randomized between 5 and this value (seconds)
+    # Default: 5, Minimum: 5
+    reconnect delay = 5
+    
+    # Initial connection timeout
+    timeout seconds = 60
+```
+
+:::tip Performance Tip
+
+List parents in order of preference. While selection is random among equals, the order matters during failover - the child will try parents in the listed sequence.
+
+:::
+
+### Multi-Tier Setup
+
+For larger deployments:
+
+```
+Child Nodes ──→ Parent Proxies ──→ Ultimate Parents
+                 (forward only)      (store & analyze)
+```
+
+Configure intermediate parents as proxies to distribute load without storage overhead.
+
+## Monitoring Streaming Status
+
+### Check Connection Status
+
+#### Using the UI
+
+The **Netdata Streaming** function (under the "Functions" tab) provides:
+
+- Comprehensive overview of all streaming connections
+- Status, replication completion time, and connection details
+- Works on both parent and child nodes:
+    - **On child**: Shows outgoing connections
+    - **On parent**: Shows incoming connections (InHops = 1 for direct children, >1 for proxied connections)
+
+#### Viewing Logs
+
+```bash
+# Check journal for streaming-related messages
+journalctl _SYSTEMD_INVOCATION_ID="$(systemctl show --value --property=InvocationID netdata)" --namespace=netdata --grep stream
+```
+
+### Verify Parent Connectivity
+
+```bash
+# Test each parent
+nc -zv parent-a 19999
+nc -zv parent-b 19999
+```
+
+:::note Troubleshooting
+
+If a child connects to an unexpected parent, check the data retention on all parents. The child prefers parents that already have its historical data.
+
+:::
+
+## Common Scenarios
+
+| Scenario          | What Happens                            | Why                      |
+|-------------------|-----------------------------------------|--------------------------|
+| Parent A fails    | Child switches to Parent B              | Automatic failover       |
+| All parents fail  | Child cycles through list every second  | Continuous retry         |
+| Parent A recovers | Child stays on Parent B                 | No automatic rebalancing |
+| New child starts  | Randomly selects from parents with data | Load distribution        |
+
+:::caution Maintenance Planning
+
+When taking a parent offline for maintenance, its children will failover to other parents and won't automatically return. Plan capacity accordingly.
+
+:::
+
+## Best Practices
+
+1. **List parents in priority order** - First parent is preferred if all equal
+2. **Configure at least 3 parents** - Ensures availability during maintenance
+3. **Monitor parent data completeness** - Affects routing decisions
+4. **Plan maintenance carefully** - Children won't automatically return
