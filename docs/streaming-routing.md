@@ -12,17 +12,29 @@ This feature requires configuring streaming in `netdata.conf`. See [Streaming Co
 
 ### 1. Initial Parent Selection
 
-When a child node starts, it selects a parent from the configured list using this algorithm:
+When a child node starts, it queries all configured parents simultaneously to determine the best connection:
 
 ```mermaid
 graph LR
-    A[Start] --> B{Has data?}
-    B -->|Yes| C[Parents with data]
-    B -->|No| D[All parents]
-    C --> E[Random select]
-    D --> E
-    E --> F[Connect]
+    A[Start] --> B[Query all parents]
+    B --> C{Data recency<br/>delta < 1min?}
+    C -->|Multiple| D[Random select]
+    C -->|One best| E[Connect to<br/>most recent]
+    C -->|No data| D
+    D --> F[Connect]
+    E --> F
 ```
+
+**How it works:**
+
+1. Child sends HTTP requests to all parents in parallel
+2. Each parent responds with:
+
+- Last timestamp of this child's data (if any)
+- Random seed for load balancing
+
+3. Child calculates time delta for each parent
+4. Selection based on data recency (not data amount)
 
 **Example:**
 
@@ -73,23 +85,22 @@ Children do not automatically reconnect to their original parent after failover.
 
 ### 3. Failover and Reconnection
 
-When the active connection fails:
+When the active connection fails, the child repeats the parent selection process:
 
 ```mermaid
 graph LR
     A[Failed] --> B[Wait 5-X sec]
-    B --> C{Next?}
-    C -->|Yes| D[Try next]
-    C -->|No| E[Restart list]
-    E --> D
-    D --> F{OK?}
+    B --> C[Query all parents]
+    C --> D{Select best<br/>by recency}
+    D --> E[Try connect]
+    E --> F{OK?}
     F -->|No| B
     F -->|Yes| G[Stream]
 ```
 
-:::note Reconnection Timing
+:::note Smart Failover
 
-The wait time is randomized between 5 seconds and your configured `reconnect delay` value (default: 5). This prevents thundering herd when multiple children reconnect simultaneously.
+Unlike traditional round-robin failover, Netdata re-evaluates all parents on each attempt. This means a child might connect to a different parent than expected if data states have changed.
 
 :::
 
@@ -107,14 +118,15 @@ Recovery:   Parent A comes back online
 
 ## Key Routing Behaviors
 
-| Behavior                   | Description                                                              | Impact                                                    |
-|----------------------------|--------------------------------------------------------------------------|-----------------------------------------------------------|
-| **Data-Driven Selection**  | Prioritizes parents with complete historical data over network proximity | Child may connect to distant parent if it has better data |
-| **Sticky Connections**     | No automatic rebalancing after failover                                  | Requires manual intervention to redistribute load         |
-| **Round-Robin Failover**   | Tries parents in configuration order, cycles through entire list         | No parent blacklisting; failed parents are retried        |
-| **Connection Persistence** | Maintains connection until failure occurs                                | Prevents unnecessary reconnections and data gaps          |
-| **No Health Checks**       | Doesn't proactively test parent availability                             | Discovers failures only when connection breaks            |
-| **Randomized Delays**      | Reconnection waits random time (5s to configured maximum)                | Prevents thundering herd during mass reconnections        |
+| Behavior                   | Description                                               | Impact                                                      |
+|----------------------------|-----------------------------------------------------------|-------------------------------------------------------------|
+| **Data Recency Priority**  | Selects parent with most recent data (lowest time delta)  | Minimizes gap in historical data                            |
+| **Parallel Parent Query**  | Queries all parents simultaneously via HTTP               | Fast parent selection, no sequential delays                 |
+| **Sticky Connections**     | No automatic rebalancing after failover                   | Requires manual intervention to redistribute load           |
+| **Smart Failover**         | Re-evaluates all parents on each connection attempt       | May connect to different parent based on current data state |
+| **Connection Persistence** | Maintains connection until failure occurs                 | Prevents unnecessary reconnections and data gaps            |
+| **No Health Checks**       | Doesn't proactively test parent availability              | Discovers failures only when connection breaks              |
+| **Randomized Delays**      | Reconnection waits random time (5s to configured maximum) | Prevents thundering herd during mass reconnections          |
 
 ## Configuration Reference
 
@@ -123,21 +135,16 @@ Recovery:   Parent A comes back online
 ```ini
 [stream]
     # Streaming targets (space-separated list)
+    # Order doesn't matter - selection is based on data recency
     destination = parent1:19999 parent2:19999 parent3:19999
     
     # Reconnection delay - randomized between 5 and this value (seconds)
     # Default: 5, Minimum: 5
-    reconnect delay = 5
+    reconnect delay seconds = 5
     
     # Initial connection timeout
     timeout seconds = 60
 ```
-
-:::tip Performance Tip
-
-List parents in order of preference. While selection is random among equals, the order matters during failover - the child will try parents in the listed sequence.
-
-:::
 
 ### Multi-Tier Setup
 
