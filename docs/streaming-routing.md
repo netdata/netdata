@@ -1,135 +1,84 @@
-# Netdata Streaming Routing Architecture
+# Netdata Streaming Routing
 
-## Overview
+## What is Streaming Routing?
 
-Netdata's streaming architecture implements an intelligent routing algorithm designed to optimize data consistency, computational load distribution, and fault tolerance in distributed monitoring environments. This document describes the technical implementation and operational characteristics of the streaming topology.
+Streaming routing determines how Netdata child nodes connect to parent nodes in a distributed monitoring setup. When multiple parents are available, the routing algorithm automatically selects the best destination and handles failover.
 
-## Architecture Principles
+:::note 
+This feature requires configuring streaming in `netdata.conf`. See [Streaming Configuration](/src/streaming/README.md) for setup instructions.
+:::
 
-### Core Design Goals
+## How Parent Selection Works
 
-1. **Data Consistency**: Ensures complete metric collection and historical data preservation
-2. **Load Distribution**: Balances computational workload across infrastructure nodes
-3. **Fault Tolerance**: Maintains monitoring continuity during network disruptions
-4. **Scalability**: Supports hierarchical deployments with automatic load balancing
+When a child node initiates or loses connection, it selects a parent, using this priority:
 
-### Routing Algorithm
-
-The parent selection algorithm operates on the following priorities:
-
-1. **Data Completeness Assessment**: Evaluates potential parents based on existing historical data coverage
-2. **Load Distribution**: Implements randomized selection among equally qualified parents
-3. **Failover Mechanism**: Maintains round-robin connection lists for rapid recovery
-
-## Technical Implementation
-
-### Parent Selection Logic
+1. **Check data completeness** - Prefer parents that already have this node's historical data
+2. **Load balance** - Randomly choose among equally suitable parents
+3. **Failover** - If connection fails, try the next parent in the list
 
 ```
-Priority Order:
-1. Evaluate data completeness across available parents
-2. Apply randomization for load distribution
-3. Execute failover to first available parent during outages
+Child Node
+    │
+    ├─→ Parent A (has historical data) ✓ Selected
+    ├─→ Parent B (has historical data)
+    └─→ Parent C (no historical data)
 ```
 
-### Workload Distribution Strategies
+## Multi-Tier Architecture
 
-#### Machine Learning Processing
-
-The system optimizes ML workload based on node configuration:
-
-- **Child ML Disabled**: Parent nodes train models from scratch, requiring significant computational resources
-- **Child ML Enabled**: Models trained locally and transferred to parents with pre-computed anomaly detection
-
-#### Streaming Load Balance
-
-Multi-tier deployments distribute processing load through:
-
-- **Reception Layer**: Lightweight data ingestion
-- **Proxy Layer**: Data forwarding with computational overhead
-- **Storage Layer**: Final data persistence and analysis
-
-### Multi-Tier Deployment Model
+In larger deployments, you can create multiple tiers:
 
 ```
-Child Nodes ──→ Parent Proxies ──→ Ultimate Parents
-    │                 │                    │
-    ├─ Data Collection├─ Data Relay       ├─ Data Storage
-    └─ ML Training    └─ Load Balance     └─ Analysis
+Ingest Layer ──→ Proxy Layer ──→ Storage Layer
 ```
 
-## Query Optimization
+This setup distributes the workload:
+- **Ingest Layer**: Children collect metrics
+- **Proxy Layer**: Parents forward data without heavy processing
+- **Storage Layer**: Store data and run analytics
 
-Netdata Cloud implements dual routing strategies based on query type:
+## Query Routing
 
-### Historical Data Queries
+Netdata Cloud optimizes query performance by routing requests intelligently:
 
-- **Target**: Furthest parent in hierarchy
-- **Benefit**: Automatic load distribution
-- **Result**: Leverages computational resources at higher tiers
+- **Historical queries** → Sent to the furthest parent (better resources)
+- **Live queries** → Sent to the closest node (lower latency)
 
-### Live Function Execution
+## Machine Learning Workload
 
-- **Target**: Closest available node
-- **Benefit**: Minimized latency
-- **Result**: Real-time data extraction from source systems
+The ML workload distribution depends on your configuration:
 
-## Operational Characteristics
+| Child ML Setting | Impact                                                           |
+|------------------|------------------------------------------------------------------|
+| Disabled         | Parent must train models from scratch (high CPU usage)           |
+| Enabled          | Child trains models locally and sends results (lower parent CPU) |
 
-### Network Topology Behavior
+## Key Behaviors
 
-The routing algorithm prioritizes operational objectives over traditional network metrics:
+### Network vs. Data Priority
 
-| Traditional Networks | Netdata Streaming |
-|---------------------|-------------------|
-| Latency optimization | Data integrity |
-| Geographic proximity | Historical completeness |
-| Static routes | Dynamic load balancing |
-| Path efficiency | Fault resilience |
+Unlike traditional networking, Netdata prioritizes **data integrity** over network efficiency:
 
-### Failover Patterns
+- May connect to geographically distant parents if they have better data
+- Ensures no metrics are lost during failures
+- Automatically rebalances load after recovery
 
-During network disruptions, the system may establish connections across geographically distant nodes. This behavior ensures:
+### Failover Example
 
-- Continuous metric collection
-- Preserved ML model accuracy
-- Maintained historical context
-- Prevented parent overload during recovery
+```
+Normal operation:
+Child → Parent A (primary)
 
-## Deployment Considerations
+During Parent A outage:
+Child → Parent B (failover)
 
-### Infrastructure Planning
+After recovery:
+Child may stay with Parent B if it now has complete data
+```
 
-- Size parent nodes based on ML training requirements
-- Design for regional failure scenarios
-- Implement hierarchical structures for query optimization
-- Consider computational distribution over network proximity
+### Connection Behavior
 
-### Monitoring and Operations
-
-- Monitor ML training distribution metrics
-- Track data completeness across parents
-- Analyze failover event patterns
-- Leverage automatic query routing for performance
-
-## Performance Characteristics
-
-### Benefits
-
-1. **Data Integrity**: Zero metric loss during complex failure scenarios
-2. **Computational Efficiency**: Distributed processing prevents bottlenecks
-3. **Automatic Optimization**: Self-balancing without manual intervention
-4. **Resilient Architecture**: Maintains functionality during partial outages
-
-### Trade-offs
-
-The architecture optimizes for monitoring reliability over network efficiency. This design choice ensures:
-
-- Complete data collection under adverse conditions
-- Consistent ML model accuracy
-- Scalable computational distribution
-- Automatic recovery from failures
-
-## Conclusion
-
-Netdata's streaming routing architecture implements a data-centric approach to distributed monitoring. By prioritizing consistency, load distribution, and fault tolerance, the system delivers reliable observability infrastructure that automatically adapts to changing conditions while maintaining operational efficiency.
+- **Reconnection interval**: 1 second (configurable via `reconnect delay seconds`)
+- **Connection timeout**: 60 seconds default
+- **Persistent connections**: Child maintains connection until failure
+- **No automatic rebalancing**: Child won't switch parents unless current connection fails
