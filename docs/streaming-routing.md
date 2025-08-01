@@ -51,7 +51,19 @@ Once connected, the child maintains a persistent connection:
 - **Connection timeout**: 60 seconds (default)
 - **Keepalive**: Continuous streaming maintains connection
 - **No automatic rebalancing**: Child stays connected until failure
-- **Data integrity**: All metrics buffered during brief disconnections
+- **Data integrity**: Historical metrics are replicated automatically after reconnection
+
+:::info Data Recovery
+
+Netdata automatically replicates missing historical data when reconnection occurs. Data is only lost if:
+
+- Child restarts during disconnection AND
+- Child uses `memory mode = ram` (metrics stored in memory) AND
+- Disconnection exceeds retention period (default: 1 hour for RAM mode)
+
+For persistent data, use `memory mode = dbengine`.
+
+:::
 
 :::warning Important
 
