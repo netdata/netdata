@@ -6,10 +6,14 @@
 
 **Merged pull requests:**
 
+- Update deployment-with-centralization-points.md [\#20748](https://github.com/netdata/netdata/pull/20748) ([kanelatechnical](https://github.com/kanelatechnical))
+- Change remaining pthread\_ cases [\#20746](https://github.com/netdata/netdata/pull/20746) ([stelfrag](https://github.com/stelfrag))
 - chore\(go.d/snmp-profiles\): use same metric name for cpu usage  [\#20745](https://github.com/netdata/netdata/pull/20745) ([ilyam8](https://github.com/ilyam8))
+- Remove redundant defines [\#20744](https://github.com/netdata/netdata/pull/20744) ([stelfrag](https://github.com/stelfrag))
 - docs: remove customize.md [\#20742](https://github.com/netdata/netdata/pull/20742) ([ilyam8](https://github.com/ilyam8))
 - Fix SNDR thread startup [\#20740](https://github.com/netdata/netdata/pull/20740) ([stelfrag](https://github.com/stelfrag))
 - build\(deps\): bump github.com/docker/docker from 28.3.2+incompatible to 28.3.3+incompatible in /src/go [\#20739](https://github.com/netdata/netdata/pull/20739) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Use netdata mutex cond and lock [\#20737](https://github.com/netdata/netdata/pull/20737) ([stelfrag](https://github.com/stelfrag))
 - build\(deps\): bump openssl and curl version in static build [\#20734](https://github.com/netdata/netdata/pull/20734) ([ilyam8](https://github.com/ilyam8))
 - Thread creation code cleanup [\#20732](https://github.com/netdata/netdata/pull/20732) ([stelfrag](https://github.com/stelfrag))
 - Add additional database checks during shutdown  [\#20731](https://github.com/netdata/netdata/pull/20731) ([stelfrag](https://github.com/stelfrag))
@@ -41,6 +45,7 @@
 - Update LIBBPF [\#20696](https://github.com/netdata/netdata/pull/20696) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix SSL certificate detection for Rocky Linux and static curl [\#20695](https://github.com/netdata/netdata/pull/20695) ([ktsaou](https://github.com/ktsaou))
 - update otel-collector components deps [\#20693](https://github.com/netdata/netdata/pull/20693) ([ilyam8](https://github.com/ilyam8))
+- Split collection \(Windows.plugin\) [\#20677](https://github.com/netdata/netdata/pull/20677) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add Getting Started Netdata guide [\#20642](https://github.com/netdata/netdata/pull/20642) ([kanelatechnical](https://github.com/kanelatechnical))
 
 ## [v2.6.1](https://github.com/netdata/netdata/tree/v2.6.1) (2025-07-25)
@@ -461,12 +466,6 @@
 - use nd threads in exporting [\#20212](https://github.com/netdata/netdata/pull/20212) ([ktsaou](https://github.com/ktsaou))
 - Clean up prepared statements on thread exit [\#20211](https://github.com/netdata/netdata/pull/20211) ([stelfrag](https://github.com/stelfrag))
 - fix hardcoding of eval variables [\#20210](https://github.com/netdata/netdata/pull/20210) ([ktsaou](https://github.com/ktsaou))
-- Small fixes [\#20209](https://github.com/netdata/netdata/pull/20209) ([ktsaou](https://github.com/ktsaou))
-- Security and Privacy Design [\#20208](https://github.com/netdata/netdata/pull/20208) ([kanelatechnical](https://github.com/kanelatechnical))
-- added more annotations in spinlock deadlock detection [\#20207](https://github.com/netdata/netdata/pull/20207) ([ktsaou](https://github.com/ktsaou))
-- call spinlock\_init\(\) when initializing rrdlabels spinlock [\#20206](https://github.com/netdata/netdata/pull/20206) ([ktsaou](https://github.com/ktsaou))
-- remove the status file spinlock to avoid deadlocks [\#20205](https://github.com/netdata/netdata/pull/20205) ([ktsaou](https://github.com/ktsaou))
-- Avoid indexing journal files when db rotation is running [\#20204](https://github.com/netdata/netdata/pull/20204) ([stelfrag](https://github.com/stelfrag))
 
 ## [v2.4.0](https://github.com/netdata/netdata/tree/v2.4.0) (2025-04-14)
 
