@@ -200,3 +200,6 @@ packaging/tools/agent-events/go.mod
 packaging/tools/agent-events/go.sum
 
 **/.claude/settings.local.json
+.mcp.json
+.users_cache.json
+.channels_cache_v2.json
