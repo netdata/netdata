@@ -4,7 +4,7 @@ Streaming routing controls how Netdata child nodes connect to parent nodes when 
 
 :::info Prerequisites
 
-This feature requires configuring streaming in `netdata.conf`. See [Streaming Configuration](https://learn.netdata.cloud/docs/streaming) for setup instructions.
+This feature requires configuring streaming in `netdata.conf`. See [Streaming Configuration](/src/streaming/README.md) for setup instructions.
 
 :::
 
