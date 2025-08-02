@@ -8,7 +8,7 @@ metadata:
   device:
     fields:
       type:
-        value: "router"
+        value: "Router"
 
 # https://mibbrowser.online/mibdb_search.php?mib=HUAWEI-BGP-VPN-MIB
 # https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/huawei/HUAWEI-BGP-VPN-MIB

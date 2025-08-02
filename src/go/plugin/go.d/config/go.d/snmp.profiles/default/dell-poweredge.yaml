@@ -23,9 +23,9 @@ metadata:
   device:
     fields:
       type:
-        value: "server"
+        value: "Server"
       vendor:
-        value: "dell"
+        value: "Dell"
 
 
 # 1. DCS3FRU-MIB

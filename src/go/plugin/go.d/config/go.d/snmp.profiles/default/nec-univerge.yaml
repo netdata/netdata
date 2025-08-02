@@ -11,7 +11,7 @@ metadata:
   device:
     fields:
       vendor:
-        value: "nec"
+        value: "NEC"
 
 # 1. PICO-IPSEC-FLOW-MONITOR-MIB
 #    https://jpn.nec.com/univerge/ix/Manual/MIB/PICO-IPSEC-FLOW-MONITOR-MIB.txt

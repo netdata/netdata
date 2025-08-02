@@ -10,7 +10,7 @@ metadata:
   device:
     fields:
       type:
-        value: "storage"
+        value: "Storage"
 
 metric_tags:
   - tag: hpe_fibrechannel_cpq_si_sys_serial_num
