@@ -238,6 +238,14 @@ static const char *drive_type_to_str(UINT type)
     }
 }
 
+static inline void netdata_set_hd_usage(PERF_DATA_BLOCK *pDataBlock,
+                                        PERF_OBJECT_TYPE *pObjectType,
+                                        PERF_INSTANCE_DEFINITION *pi,
+                                        struct logical_disk *d)
+{
+    perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskFree);
+}
+
 static bool do_logical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec_t now_ut)
 {
     DICTIONARY *dict = logicalDisks;
@@ -266,7 +274,7 @@ static bool do_logical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec_
             d->collected_metadata = true;
         }
 
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskFree);
+        netdata_set_hd_usage(pDataBlock, pObjectType, pi, d);
         // perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->freeMegabytes);
 
         if (!d->st_disk_space) {
