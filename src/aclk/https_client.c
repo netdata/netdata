@@ -664,7 +664,6 @@ static https_client_resp_t handle_http_request(https_req_ctx_t *ctx) {
 
     buffer_strcat(hdr, HTTP_1_1 HTTP_ENDL);
 
-    //TODO Headers!
     buffer_sprintf(hdr, "Host: %s\x0D\x0A", ctx->request->host);
     buffer_strcat(hdr, "User-Agent: Netdata/rocks newhttpclient\x0D\x0A");
 
@@ -755,9 +754,22 @@ https_client_resp_t https_request(https_req_t *request, https_req_response_t *re
     int ret;
     char connect_port_str[PORT_STR_MAX_BYTES];
 
-    const char *connect_host = request->proxy_host ? request->proxy_host : request->host;
-    int connect_port = request->proxy_host ? request->proxy_port : request->port;
-    struct timeval timeout = { .tv_sec = 10, .tv_usec = 0 };
+    bool proxy_used = (request->proxy_host != NULL);
+
+    // assume no proxy
+    const char *connect_host;
+    int connect_port;
+    const char *proxy_used_str = " (no proxy)";
+
+
+    if (unlikely(proxy_used)) {
+        connect_host = request->proxy_host;
+        connect_port = request->proxy_port;
+        proxy_used_str = request->proxy;
+    } else {
+        connect_host = request->host;
+        connect_port = request->port;
+    }
 
     https_req_ctx_t *ctx = callocz(1, sizeof(https_req_ctx_t));
     ctx->req_start_time = now_realtime_sec();
@@ -771,6 +783,11 @@ https_client_resp_t https_request(https_req_t *request, https_req_response_t *re
 
     snprintfz(connect_port_str, PORT_STR_MAX_BYTES, "%d", connect_port);
 
+    nd_log_daemon(NDLP_INFO, "ACLK: Connecting to %s:%d%s%s",
+                  request->host, request->port,
+                  proxy_used ? " via proxy " : "", proxy_used_str);
+
+    struct timeval timeout = { .tv_sec = 10, .tv_usec = 0 };
     ctx->sock = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, connect_host, 0, connect_port_str, &timeout, fallback_ipv4);
     if (ctx->sock < 0) {
         rc = -ctx->sock;
@@ -887,6 +904,7 @@ https_client_resp_t https_request(https_req_t *request, https_req_response_t *re
         // only exact data without affixed 0x00
         ((char*)response->payload)[response->payload_size] = 0; // mallocz(response->payload_size + 1);
     }
+    errno_clear();
     netdata_log_info("ACLK: HTTPS \"%s\" request to \"%s\" finished with HTTP code: %d", http_req_type_to_str(ctx->request->request_type), ctx->request->host, response->http_code);
 
     rc = HTTPS_CLIENT_RESP_OK;

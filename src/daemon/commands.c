@@ -672,7 +672,6 @@ static void pipe_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf
     if (0 == nread) {
         netdata_log_info("%s: Zero bytes read by command pipe.", __func__);
     } else if (UV_EOF == nread) {
-        netdata_log_info("EOF found in command pipe.");
         parse_commands(cmd_ctx);
     } else if (nread < 0) {
         netdata_log_error("%s: %s", __func__, uv_strerror(nread));

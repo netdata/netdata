@@ -95,6 +95,7 @@ struct mqtt_wss_proxy {
     int port;
     const char *username;
     const char *password;
+    const char *proxy_destination;
 };
 
 /* TODO!!! update the description

@@ -488,6 +488,12 @@ int mqtt_wss_connect(
     char port_str[16];
     snprintf(port_str, sizeof(port_str) -1, "%d", client->port);
 
+    bool proxy_used = (proxy && proxy->proxy_destination != NULL);
+
+    nd_log_daemon(NDLP_INFO, "ACLK: Connecting to %s:%d%s%s",
+                  client->target_host, client->target_port,
+                  proxy_used ? " via proxy " : " (no proxy)", proxy_used ? proxy->proxy_destination : "");
+
     struct timeval timeout = { .tv_sec = 10, .tv_usec = 0 };
     int fd = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, client->host, 0, port_str, &timeout, fallback_ipv4);
     if (fd < 0) {
@@ -582,7 +588,6 @@ int mqtt_wss_connect(
 
     client->mqtt_keepalive = (mqtt_params->keep_alive ? mqtt_params->keep_alive : 400);
 
-    nd_log(NDLS_DAEMON, NDLP_INFO, "Going to connect using internal MQTT 5 implementation");
     struct mqtt_auth_properties auth;
     auth.client_id = (char*)mqtt_params->clientid;
     auth.client_id_free = NULL;
