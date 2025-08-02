@@ -572,7 +572,7 @@ void health_prototype_copy_config(struct rrd_alert_config *dst, struct rrd_alert
     dst->options = src->options;
 
     const char *failed_at = NULL;
-    int error = 0;
+    EVAL_ERROR error = 0;
 
     dst->calculation = expression_parse(expression_source(src->calculation), &failed_at, &error);
     dst->warning = expression_parse(expression_source(src->warning), &failed_at, &error);
