@@ -10,9 +10,9 @@ metadata:
   device:
     fields:
       vendor:
-        value: "extreme-networks"
+        value: "Extreme"
       type:
-        value: "switch"
+        value: "Switch"
 
 metric_tags:
   - tag: primary_software_rev

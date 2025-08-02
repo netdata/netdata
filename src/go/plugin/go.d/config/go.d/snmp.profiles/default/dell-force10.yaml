@@ -9,7 +9,7 @@ metadata:
   device:
     fields:
       type:
-        value: "switch"
+        value: "Switch"
 
 # -  F10-S-SERIES-CHASSIS-MIB
 #   https://mibbrowser.online/mibdb_search.php?mib=F10-S-SERIES-CHASSIS-MIB

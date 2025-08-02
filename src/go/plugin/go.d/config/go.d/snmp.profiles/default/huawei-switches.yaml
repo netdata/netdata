@@ -9,7 +9,7 @@ metadata:
   device:
     fields:
       type:
-        value: "switch"
+        value: "Switch"
 
 # https://mibbrowser.online/mibdb_search.php?mib=HUAWEI-STACK-MIB
 # https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/huawei/HUAWEI-STACK-MIB
