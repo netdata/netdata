@@ -6,10 +6,12 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations docs [\#20749](https://github.com/netdata/netdata/pull/20749) ([netdatabot](https://github.com/netdatabot))
 - Update deployment-with-centralization-points.md [\#20748](https://github.com/netdata/netdata/pull/20748) ([kanelatechnical](https://github.com/kanelatechnical))
 - Change remaining pthread\_ cases [\#20746](https://github.com/netdata/netdata/pull/20746) ([stelfrag](https://github.com/stelfrag))
 - chore\(go.d/snmp-profiles\): use same metric name for cpu usage  [\#20745](https://github.com/netdata/netdata/pull/20745) ([ilyam8](https://github.com/ilyam8))
 - Remove redundant defines [\#20744](https://github.com/netdata/netdata/pull/20744) ([stelfrag](https://github.com/stelfrag))
+- streaming routing documentation [\#20743](https://github.com/netdata/netdata/pull/20743) ([ktsaou](https://github.com/ktsaou))
 - docs: remove customize.md [\#20742](https://github.com/netdata/netdata/pull/20742) ([ilyam8](https://github.com/ilyam8))
 - Fix SNDR thread startup [\#20740](https://github.com/netdata/netdata/pull/20740) ([stelfrag](https://github.com/stelfrag))
 - build\(deps\): bump github.com/docker/docker from 28.3.2+incompatible to 28.3.3+incompatible in /src/go [\#20739](https://github.com/netdata/netdata/pull/20739) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -464,8 +466,6 @@
 - documentation and helpers for centralizing namespaced logs [\#20217](https://github.com/netdata/netdata/pull/20217) ([ktsaou](https://github.com/ktsaou))
 - Improve health log cleanup [\#20213](https://github.com/netdata/netdata/pull/20213) ([stelfrag](https://github.com/stelfrag))
 - use nd threads in exporting [\#20212](https://github.com/netdata/netdata/pull/20212) ([ktsaou](https://github.com/ktsaou))
-- Clean up prepared statements on thread exit [\#20211](https://github.com/netdata/netdata/pull/20211) ([stelfrag](https://github.com/stelfrag))
-- fix hardcoding of eval variables [\#20210](https://github.com/netdata/netdata/pull/20210) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.4.0](https://github.com/netdata/netdata/tree/v2.4.0) (2025-04-14)
 
