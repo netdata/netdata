@@ -12,7 +12,7 @@ metadata:
   device:
     fields:
       vendor:
-        value: "juniper-networks"
+        value: "Juniper"
       os_name:
         value: "JUNOS"
       os_version:

@@ -21,9 +21,9 @@ metadata:
   device:
     fields:
       vendor:
-        value: "f5"
+        value: "F5"
       type:
-        value: "load_balancer"
+        value: "LoadBalancer"
       serial_number:
         symbol:
           MIB: F5-BIGIP-SYSTEM-MIB

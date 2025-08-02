@@ -21,7 +21,7 @@ metadata:
   device:
     fields:
       vendor:
-        value: "fortinet"
+        value: "Fortinet"
       serial_number:
         symbol:
           MIB: ENTITY-MIB

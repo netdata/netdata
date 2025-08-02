@@ -16,7 +16,7 @@ metadata:
       product_name:
         value: Integrated Lights-Out
       type:
-        value: "server"
+        value: "Server"
 
 # - CPQSM2-MIB
 #   https://mibbrowser.online/mibdb_search.php?mib=CPQSM2-MIB

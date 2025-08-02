@@ -60,7 +60,7 @@ metadata:
   device:
     fields:
       vendor:
-        value: "infoblox"
+        value: "Infoblox"
 
 metric_tags:
   - tag: ib_hardware_type

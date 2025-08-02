@@ -9,7 +9,7 @@ metadata:
   device:
     fields:
       vendor:
-        value: "mcafee"
+        value: "McAfee"
 
 metric_tags:
   - tag: mcafee_mwg_k_product_name

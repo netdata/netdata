@@ -9,7 +9,7 @@ metadata:
   device:
     fields:
       type:
-        value: "switch"
+        value: "Switch"
 
 # https://mibbrowser.online/mibdb_search.php?mib=STATISTICS-MIB
 # https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/hp/STATISTICS-MIB
