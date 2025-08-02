@@ -9,7 +9,7 @@ metadata:
   device:
     fields:
       type:
-        value: "switch"
+        value: "Switch"
 
 # https://mibbrowser.online/mibdb_search.php?mib=HH3C-ENTITY-EXT-MIB
 # https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/hh3c/HH3C-ENTITY-EXT-MIB

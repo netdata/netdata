@@ -9,7 +9,7 @@ metadata:
   device:
     fields:
       type:
-        value: "firewall"
+        value: "Firewall"
       serial_number:
         symbol:
           MIB: SONICWALL-COMMON-MIB

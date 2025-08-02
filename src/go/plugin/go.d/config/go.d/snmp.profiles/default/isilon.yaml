@@ -24,9 +24,9 @@ metadata:
   device:
     fields:
       vendor:
-        value: "dell"
+        value: "Dell"
       type:
-        value: "storage"
+        value: "Storage"
       serial_number:
         symbol:
           OID: 1.3.6.1.4.1.12124.2.51.1.3.1

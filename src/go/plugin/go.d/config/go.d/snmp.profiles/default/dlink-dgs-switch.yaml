@@ -9,7 +9,7 @@ metadata:
   device:
     fields:
       type:
-        value: "switch"
+        value: "Switch"
 
 #  - DLINKSW-ENTITY-EXT-MIB
 #   https://mibbrowser.online/mibdb_search.php?mib=DLINKSW-ENTITY-EXT-MIB

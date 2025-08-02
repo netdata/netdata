@@ -11,7 +11,7 @@ metadata:
   device:
     fields:
       type:
-        value: "server"
+        value: "Server"
 
 metric_tags:
   - tag: ibm_imm_machine_level_serial_number
