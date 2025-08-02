@@ -127,8 +127,11 @@ func (c *Collector) setupVnode(si *snmpsd.SysInfo, deviceMeta map[string]map[str
 	if si.Location != "" {
 		labels["sysLocation"] = si.Location
 	}
-	// FIXME: vendor should be obtained from sysDescr, org should be used as a fallback
+
 	labels["vendor"] = si.Organization
+	if v, ok := orgToVendorMap[si.Organization]; ok {
+		labels["vendor"] = v
+	}
 
 	for _, meta := range deviceMeta {
 		for k, v := range meta {
@@ -170,6 +173,95 @@ func pduToInt(pdu gosnmp.SnmpPDU) (int64, error) {
 	default:
 		return 0, fmt.Errorf("unussported type: '%v'", pdu.Type)
 	}
+}
+
+var orgToVendorMap = map[string]string{
+	"allied networks GmbH":                             "Allied",
+	"Allied Data Technologies":                         "Allied",
+	"Allied Telesis, Inc.":                             "Allied",
+	"American Power Conversion Corp.":                  "APC",
+	"Arista Networks, Inc. (formerly 'Arastra, Inc.')": "Arista",
+	"Aruba PEC S.p.A.":                                 "Aruba",
+	"Aruba S.r.l.":                                     "Aruba",
+	"Aruba, a Hewlett Packard Enterprise company":      "Aruba",
+	"AVAYA":               "Avaya",
+	"Avaya Atlanta Lab":   "Avaya",
+	"Avaya Communication": "Avaya",
+	"Barracuda Networks AG (previous was 'phion Information Technologies')": "Barracuda",
+	"Barracuda Networks, Inc.":                                                "Barracuda",
+	"barracuda digitale agentur GmbH":                                         "Barracuda",
+	"Blade Network Technologies. Inc.":                                        "BLADE",
+	"Brocade Communication Systems, Inc. (formerly 'Foundry Networks, Inc.')": "Brocade",
+	"Brocade Communication Systems, Inc. (formerly 'Rhapsody Networks Inc.')": "Brocade",
+	"Brocade Communications Systems, Inc.":                                    "Brocade",
+	"Brocade Communications Systems, Inc. (formerly 'McDATA Corp.')":          "Brocade",
+	"Brocade Communications Systems, Inc. (formerly 'McDATA Corporation')":    "Brocade",
+	"Brocade Communications Systems, Inc. (formerly 'McDATA,Inc')":            "Brocade",
+	"Brocade Communications Systems, Inc. (formerly 'NuView Inc.')":           "Brocade",
+	"CIENA Corporation (formerly 'ONI Systems Corp.')":                        "Ciena",
+	"Ciena (formerly 'Akara Inc.')":                                           "Ciena",
+	"Ciena Corporation":                                                       "Ciena",
+	"Ciena Corporation (formerly 'Catena Networks')":                          "Ciena",
+	"Cisco Flex Platform":                                                     "Cisco",
+	"Cisco Sera":                                                              "Cisco",
+	"Cisco SolutionsLab":                                                      "Cisco",
+	"Cisco Sytems, Inc.":                                                      "Cisco",
+	"Cisco Systems":                                                           "Cisco",
+	"Cisco Systems Inc":                                                       "Cisco",
+	"Cisco Systems India Private Limited":                                     "Cisco",
+	"Cisco Systems, Inc.":                                                     "Cisco",
+	"Cisco Systems, Inc. (formerly 'Arch Rock Corporation')":                  "Cisco",
+	"ciscoSystems":                                                            "Cisco",
+	"D-Link Systems, Inc.":                                                    "D-Link",
+	"Dell Inc.":                                                               "Dell",
+	"Ericsson AB":                                                             "Ericsson",
+	"Ericsson AB - 4G5G (formerly 'Ellemtel Telecommunication Systems Laboratories')": "Ericsson",
+	"Ericsson AB - Packet Core Networks":                                              "Ericsson",
+	"Ericsson Ahead Communications Systems GmbH":                                      "Ericsson",
+	"Ericsson Communications Ltd.":                                                    "Erricson",
+	"Ericsson Denmark A/S, Telebit Division":                                          "Ericsson",
+	"Ericsson Inc. (formerly 'BelAir Networks')":                                      "Ericsson",
+	"Ericsson Mobile Platforms AB":                                                    "Ericsson",
+	"Ericsson Nikola Tesla d.d.":                                                      "Ericsson",
+	"Ericsson Research Montreal (LMC)":                                                "Ericsson",
+	"Ericsson Wireless LAN Systems":                                                   "Ericsson",
+	"ERICSSON FIBER ACCESS":                                                           "Ericsson",
+	"Extreme Networks":                                                                "Extreme",
+	"Extreme Networks (formerly 'Ipanema Technologies')":                              "Extreme",
+	"F5 Labs, Inc.":                                                                   "F5",
+	"F5 Networks Inc":                                                                 "F5",
+	"Fortinet, Inc.":                                                                  "Fortinet",
+	"Fortinet. Inc.":                                                                  "Fortinet",
+	"Hewlett-Packard":                                                                 "HP",
+	"Hewlett-Packard (Schweiz) GmbH":                                                  "HP",
+	"Hewlett-Packard Slovakia":                                                        "HP",
+	"HUAWEI Technology Co.,Ltd":                                                       "Huawei",
+	"Huawei Symantec Technologies Co.,Ltd":                                            "Huawei",
+	"Juniper Financial Corp.":                                                         "Juniper",
+	"Juniper Networks, Inc.":                                                          "Juniper",
+	"Juniper Networks/Funk Software":                                                  "Juniper",
+	"Juniper Networks/Unisphere":                                                      "Juniper",
+	"KYOCERA Corporation":                                                             "Kyocera",
+	"Kyocera Communication Systems Co.Ltd":                                            "Kyocera",
+	"Meraki Networks, Inc.":                                                           "Meraki",
+	"Network Appliance Corporation":                                                   "NetApp",
+	"Nokia (formerly 'Alcatel-Lucent')":                                               "Nokia",
+	"Nokia (formerly 'Novarra, Inc.')":                                                "Nokia",
+	"Nokia Distributed Access":                                                        "Nokia",
+	"Nokia Networks (formerly 'Nokia Siemens Networks')":                              "Nokia",
+	"Nokia Shanghai Bell":                                                             "Nokia",
+	"NVIDIA Corporation":                                                              "NVIDIA",
+	"PALO ALTO NETWORKS":                                                              "Palo Alto",
+	"Palo Alto Research Center, Inc.":                                                 "Palo Alto",
+	"Palo Alto Software, Inc.":                                                        "Palo Alto",
+	"Ruckus Wireless, Inc.":                                                           "Ruckus",
+	"SVTO Hewlett-Packard":                                                            "HP",
+	"Tejas Networks":                                                                  "Tejas",
+	"TP-Link Systems Inc.":                                                            "TP-Link",
+	"Ubiquiti Networks, Inc.":                                                         "Ubiquiti",
+	"VMware Inc.":                                                                     "VMware",
+	"Yokogawa-Hewlett-Packard":                                                        "HP",
+	"ZyXEL Communications Corp.":                                                      "Zyxel",
 }
 
 //func physAddressToString(pdu gosnmp.SnmpPDU) (string, error) {
