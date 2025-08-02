@@ -243,7 +243,7 @@ var orgToVendorMap = map[string]string{
 	"HUAWEI Technology Co.,Ltd":                                                       "Huawei",
 	"Huawei Symantec Technologies Co.,Ltd":                                            "Huawei",
 	"Infinera Corp.":                                                                  "Infinera",
-	"InfoBlox Inc.":                                                                   "InfoBlox",
+	"InfoBlox Inc.":                                                                   "Infoblox",
 	"Infoblox, WinConnect (formerly 'Ipanto')":                                        "Infoblox",
 	"Juniper Financial Corp.":                                                         "Juniper",
 	"Juniper Networks, Inc.":                                                          "Juniper",
