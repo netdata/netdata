@@ -111,7 +111,7 @@ func (c *Collector) setupVnode(si *snmpsd.SysInfo, deviceMeta map[string]map[str
 	hostnames := []string{c.Vnode.Hostname, si.Name, "snmp-device"}
 	i := slices.IndexFunc(hostnames, func(s string) bool { return s != "" })
 
-	c.Vnode.Hostname = fmt.Sprintf("SNMP-%s(%s)", hostnames[i], c.Hostname)
+	c.Vnode.Hostname = fmt.Sprintf("%s(%s)", hostnames[i], c.Hostname)
 
 	labels := make(map[string]string)
 
@@ -240,6 +240,7 @@ var orgToVendorMap = map[string]string{
 	"Hewlett-Packard":                                                                 "HP",
 	"Hewlett-Packard (Schweiz) GmbH":                                                  "HP",
 	"Hewlett-Packard Slovakia":                                                        "HP",
+	"Hewlett Packard Enterprise":                                                      "HPE",
 	"HUAWEI Technology Co.,Ltd":                                                       "Huawei",
 	"Huawei Symantec Technologies Co.,Ltd":                                            "Huawei",
 	"Infinera Corp.":                                                                  "Infinera",
