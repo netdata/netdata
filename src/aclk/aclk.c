@@ -747,8 +747,14 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
 
         int ssl_flags = cloud_config_insecure_get() ? MQTT_WSS_SSL_ALLOW_SELF_SIGNED : MQTT_WSS_SSL_CERT_CHECK_FULL;
 
-        struct mqtt_wss_proxy proxy_conf = { .host = NULL, .port = 0, .username = NULL, .password = NULL, .type = MQTT_WSS_DIRECT };
-        aclk_set_proxy((char**)&proxy_conf.host, &proxy_conf.port, (char**)&proxy_conf.username, (char**)&proxy_conf.password, &proxy_conf.type);
+        struct mqtt_wss_proxy proxy_conf = { .host = NULL, .port = 0, .username = NULL, .password = NULL, .proxy_destination = NULL, .type = MQTT_WSS_DIRECT };
+        aclk_set_proxy(
+            (char **)&proxy_conf.host,
+            &proxy_conf.port,
+            (char **)&proxy_conf.username,
+            (char **)&proxy_conf.password,
+            (char **)&proxy_conf.proxy_destination,
+            &proxy_conf.type);
 
 #ifdef ACLK_DISABLE_CHALLENGE
         int mqtt_rc = mqtt_wss_connect(client, base_url.host, base_url.port, &mqtt_conn_params, ssl_flags, &proxy_conf);
@@ -836,7 +842,7 @@ void aclk_main(void *ptr)
     worker_register_job_name(WORKER_ACLK_WAITING_TO_CONNECT, "conn wait");
 
     ACLK_PROXY_TYPE proxy_type;
-    aclk_get_proxy(&proxy_type);
+    aclk_get_proxy(&proxy_type, false);
     if (proxy_type == PROXY_TYPE_SOCKS5) {
         netdata_log_error("ACLK: SOCKS5 proxy is not supported by ACLK-NG yet.");
         static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
@@ -1073,7 +1079,8 @@ char *aclk_state(void)
         buffer_strcat(wb, "No\n");
     else {
         const char *cloud_base_url = cloud_config_url_get();
-        buffer_sprintf(wb, "Yes\nClaimed Id: %s\nCloud URL: %s\n", claim_id.str, cloud_base_url ? cloud_base_url : "null");
+        char *aclk_proxy = (char *)aclk_get_proxy(NULL, true);
+        buffer_sprintf(wb, "Yes\nClaimed Id: %s\nCloud URL: %s\nACLK Proxy: %s\n", claim_id.str, cloud_base_url ? cloud_base_url : "null", aclk_proxy ? aclk_proxy : "none");
     }
 
     buffer_sprintf(wb, "Online: %s\nReconnect count: %d\nBanned By Cloud: %s\n", aclk_online() ? "Yes" : "No", aclk_connection_counter > 0 ? (aclk_connection_counter - 1) : 0, aclk_disable_runtime ? "Yes" : "No");
@@ -1200,6 +1207,10 @@ char *aclk_state_json(void)
     tmp = cloud_base_url ? json_object_new_string(cloud_base_url) : NULL;
     json_object_object_add(msg, "cloud-url", tmp);
 
+    char *aclk_proxy = (char *)aclk_get_proxy(NULL, true);
+    tmp = aclk_proxy ? json_object_new_string(aclk_proxy) : NULL;
+    json_object_object_add(msg, "aclk_proxy", tmp);
+
     tmp = json_object_new_boolean(aclk_online());
     json_object_object_add(msg, "online", tmp);
 
@@ -1288,7 +1299,7 @@ void add_aclk_host_labels(void) {
     rrdlabels_add(labels, "_aclk_available", "true", RRDLABEL_SRC_AUTO|RRDLABEL_SRC_ACLK);
     ACLK_PROXY_TYPE aclk_proxy;
     char *proxy_str;
-    aclk_get_proxy(&aclk_proxy);
+    aclk_get_proxy(&aclk_proxy, false);
 
     switch(aclk_proxy) {
         case PROXY_TYPE_SOCKS5:
