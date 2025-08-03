@@ -240,6 +240,7 @@ var orgToVendorMap = map[string]string{
 	"Hewlett-Packard":                                                                 "HP",
 	"Hewlett-Packard (Schweiz) GmbH":                                                  "HP",
 	"Hewlett-Packard Slovakia":                                                        "HP",
+	"Hewlett Packard Enterprise":                                                      "HPE",
 	"HUAWEI Technology Co.,Ltd":                                                       "Huawei",
 	"Huawei Symantec Technologies Co.,Ltd":                                            "Huawei",
 	"Infinera Corp.":                                                                  "Infinera",
