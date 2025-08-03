@@ -243,7 +243,27 @@ static inline void netdata_set_hd_usage(PERF_DATA_BLOCK *pDataBlock,
                                         PERF_INSTANCE_DEFINITION *pi,
                                         struct logical_disk *d)
 {
-    perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskFree);
+    ULARGE_INTEGER totalNumberOfBytes;
+    ULARGE_INTEGER totalNumberOfFreeBytes;
+
+// https://learn.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation?tabs=registry
+#define MAX_DRIVE_LENGTH 255
+    char path[MAX_DRIVE_LENGTH + 1];
+    snprintfz(path, MAX_DRIVE_LENGTH, "%s\\", windows_shared_buffer);
+
+    // Description of incompatibilities present in both methods we are using
+    // https://devblogs.microsoft.com/oldnewthing/20071101-00/?p=24613
+    // We are using the variable that should not be affected by qyota ()
+    if ((GetDriveTypeA(path) != DRIVE_FIXED) || !GetDiskFreeSpaceExA(path,
+                                                                     NULL,
+                                                                     &totalNumberOfBytes,
+                                                                     &totalNumberOfFreeBytes)) {
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskFree);
+        return;
+    }
+
+    d->percentDiskFree.current.Data = (totalNumberOfFreeBytes.QuadPart) / (1024 * 1024);
+    d->percentDiskFree.current.Time = (totalNumberOfBytes.QuadPart)/ (1024 * 1024);
 }
 
 static bool do_logical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec_t now_ut)
