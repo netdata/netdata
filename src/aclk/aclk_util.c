@@ -386,10 +386,12 @@ static inline int aclk_parse_userpass_pair(const char *src, const char c, char *
 }
 
 #define HTTP_PROXY_PREFIX "http://"
-void aclk_set_proxy(char **ohost, int *port, char **uname, char **pwd, enum mqtt_wss_proxy_type *type)
+void aclk_set_proxy(char **ohost, int *port, char **uname, char **pwd,
+    char **log_proxy, enum mqtt_wss_proxy_type *type)
 {
     ACLK_PROXY_TYPE pt;
-    const char *ptr = aclk_get_proxy(&pt);
+    const char *ptr = aclk_get_proxy(&pt, false);
+    *log_proxy = (char *) aclk_get_proxy(&pt, true);
     char *tmp;
 
     if (pt != PROXY_TYPE_HTTP)
