@@ -8,14 +8,21 @@ static https_client_resp_t aclk_https_request(https_req_t *request, https_req_re
     https_client_resp_t rc;
     // wrapper for ACLK only which loads ACLK specific proxy settings
     // then only calls https_request
-    struct mqtt_wss_proxy proxy_conf = { .host = NULL, .port = 0, .username = NULL, .password = NULL, .type = MQTT_WSS_DIRECT };
-    aclk_set_proxy((char**)&proxy_conf.host, &proxy_conf.port, (char**)&proxy_conf.username, (char**)&proxy_conf.password, &proxy_conf.type);
+    struct mqtt_wss_proxy proxy_conf = { .host = NULL, .port = 0, .username = NULL, .password = NULL, .proxy_destination = NULL, .type = MQTT_WSS_DIRECT };
+    aclk_set_proxy(
+        (char **)&proxy_conf.host,
+        &proxy_conf.port,
+        (char **)&proxy_conf.username,
+        (char **)&proxy_conf.password,
+        (char **)&proxy_conf.proxy_destination,
+        &proxy_conf.type);
 
     if (proxy_conf.type == MQTT_WSS_PROXY_HTTP) {
-        request->proxy_host = (char*)proxy_conf.host; // TODO make it const as well
+        request->proxy_host = (char *)proxy_conf.host;
         request->proxy_port = proxy_conf.port;
         request->proxy_username = proxy_conf.username;
         request->proxy_password = proxy_conf.password;
+        request->proxy = proxy_conf.proxy_destination;
     }
 
     rc = https_request(request, response, fallback_ipv4);
@@ -33,7 +40,7 @@ struct auth_data {
 
 #define PARSE_ENV_JSON_CHK_TYPE(it, type, name)                                                                        \
     if (json_object_get_type(json_object_iter_peek_value(it)) != type) {                                               \
-        netdata_log_error("ACLK: value of key \"%s\" should be %s", name, #type);                                            \
+        netdata_log_error("ACLK: value of key \"%s\" should be %s", name, #type);                                      \
         goto exit;                                                                                                     \
     }
 
