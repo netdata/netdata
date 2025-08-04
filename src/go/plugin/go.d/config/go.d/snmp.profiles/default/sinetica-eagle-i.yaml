@@ -8,7 +8,7 @@ metadata:
   device:
     fields:
       vendor:
-        value: "Sinetica"
+        value: "Panduit"
 
 metric_tags:
   - tag: hawk_i2_inv_hw_revision
