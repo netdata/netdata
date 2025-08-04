@@ -246,7 +246,7 @@ include:
 
   - &oracle
     distro: oraclelinux
-    version: "8"
+    version: "10"
     support_type: Core
     notes: ''
     eol_check: true
@@ -255,18 +255,30 @@ include:
       dnf remove -y json-c-devel
     packages: &oracle_packages
       type: rpm
-      repo_distro: ol/8
+      repo_distro: ol/10
       builder_rev: *def_builder_rev
       arches:
         - x86_64
         - aarch64
     test:
       ebpf-core: true
+      skip-local-build: true
   - <<: *oracle
     version: "9"
     packages:
       <<: *oracle_packages
       repo_distro: ol/9
+    test:
+      ebpf-core: true
+      skip-local-build: false
+  - <<: *oracle
+    version: "8"
+    packages:
+      <<: *oracle_packages
+      repo_distro: ol/8
+    test:
+      ebpf-core: true
+      skip-local-build: false
 
   - &rocky
     distro: rockylinux
