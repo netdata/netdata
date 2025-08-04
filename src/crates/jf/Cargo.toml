@@ -4,13 +4,18 @@ members = [
     "error",
     # "main",
     "journal_file",
-    # "journal_writer",
-    "journal_reader",
     "journal_reader_ffi",
     # "journal_logger",
     # "journal_forwarder",
+    "journal_log",
+    "journal_log_test",
+    "journal_benchmark",
     "window_manager",
     "sigbus",
+    "otel-plugin",
+    "flatten_otel",
+    "netdata-bridge",
+    "my-plugin"
 ]
 
 [workspace.package]
@@ -31,6 +36,30 @@ walkdir = "2"
 ruzstd = "0.8"
 # systemd = { path = "/home/vk/repos/crates/rust-systemd"}
 libc = "0.2"
+hex = "0.4"
+tempfile = "3"
+indexmap = "2.9"
+uuid = { version = "1.0", features = ["v4", "rng"] }
+
+# otel-plugin
+prost = "0.13"
+regex = "1.10"
+tokio = { version = "1.45", features = ["rt-multi-thread"] }
+tokio-stream = "0.1"
+tonic = "0.13"
+tonic-build = "0.13"
+prost-build = "0.13"
+hyper-util = "0.1"
+tower = "0.5"
+opentelemetry-proto = "0.30"
+atty = "0.2"
+anyhow = "1.0"
+humantime-serde = "1.1"
+humantime = "2.2"
+bytesize = "1.0"
+bytesize-serde = "0.2"
+
+clap = { version = "4.5", features = ["derive", "env"] }
 
 [profile.release]
 lto = true

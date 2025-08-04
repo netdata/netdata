@@ -1,0 +1,17 @@
+[package]
+name = "netdata-bridge"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tonic = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+hyper-util = { workspace = true }
+tower = { workspace = true }
+prost = { workspace = true }
+tokio-util = "0.7.15"
+
+[build-dependencies]
+tonic-build = { workspace = true }
+prost-build = { workspace = true }

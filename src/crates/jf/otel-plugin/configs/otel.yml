@@ -1,0 +1,49 @@
+# OpenTelemetry Plugin Configuration
+# This file configures the OpenTelemetry metrics and logs ingestion for Netdata
+
+endpoint:
+  # gRPC endpoint to listen on for OpenTelemetry data
+  path: "0.0.0.0:21213"
+
+  # Path to TLS certificate file (enables TLS when provided)
+  tls_cert_path: null
+
+  # Path to TLS private key file (required when TLS certificate is provided)
+  tls_key_path: null
+
+  # Path to TLS CA certificate file for client authentication (optional)
+  tls_ca_cert_path: null
+
+metrics:
+  # Print flattened metrics to stdout for debugging, instead of ingesting them
+  print_flattened: false
+
+  # Number of samples to buffer for collection interval detection
+  buffer_samples: 10
+
+  # Maximum number of new charts to create per collection interval
+  throttle_charts: 100
+
+  # Directory with configuration files for mapping OTEL metrics to Netdata charts
+  # (relative paths are resolved based on Netdata's user configuration directory)
+  chart_configs_dir: otel.d/v1/metrics
+
+logs:
+  # Directory to store journal files for logs.
+  # (relative paths are resolved based on Netdata's log directory)
+  journal_dir: otel/v1
+
+  # Maximum file size for individual journal files (e.g., "100MB", "1.5GB").
+  size_of_journal_file: "100MB"
+
+  # Maximum number of journal files to keep.
+  number_of_journal_files: 10
+
+  # Maximum total size for all journal files combined (e.g., "1GB", "500MB")
+  size_of_journal_files: "1GB"
+
+  # Maximum age for journal entries (e.g., "7 days", "1 week", "168h").
+  duration_of_journal_files: "7 days"
+
+  # Maximum time span that entries in a single journal file can cover (e.g., "2 hours", "1h", "30m").
+  duration_of_journal_file: "2 hours"

@@ -126,7 +126,7 @@ endif()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_C_FLAGS}")
 
-add_required_compiler_flag("-fexceptions")
+# add_required_compiler_flag("-fexceptions")
 
 if(NOT ${DISABLE_HARDENING})
         add_double_extra_compiler_flag("stack-protector" "-fstack-protector-strong" "-fstack-protector")

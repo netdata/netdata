@@ -1,0 +1,27 @@
+syntax = "proto3";
+package netdata;
+
+service NetdataPlugin {
+  // Basic ping/pong for health checks
+  rpc Ping(PingRequest) returns (PongResponse);
+
+  // New: Simulate work that can be cancelled
+  rpc DoWork(WorkRequest) returns (WorkResponse);
+}
+
+// Basic ping/pong messages
+message PingRequest {}
+message PongResponse {
+  string message = 1;
+}
+
+// Work messages
+message WorkRequest {
+  string job_id = 1;
+  uint64 duration_ms = 2;
+}
+
+message WorkResponse {
+  string job_id = 1;
+  string result = 2;
+}

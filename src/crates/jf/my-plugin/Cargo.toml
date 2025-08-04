@@ -1,0 +1,10 @@
+[package]
+name = "my-plugin"
+version.workspace = true
+edition.workspace = true
+
+
+[dependencies]
+netdata-bridge = { path = "../netdata-bridge" }
+tonic = { workspace = true }
+tokio = { workspace = true, features = ["full"] }

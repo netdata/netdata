@@ -1,0 +1,11 @@
+[package]
+name = "journal_log_test"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "journal_log_test"
+path = "src/main.rs"
+
+[dependencies]
+journal_log = { path = "../journal_log" }
