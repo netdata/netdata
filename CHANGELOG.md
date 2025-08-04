@@ -6,9 +6,11 @@
 
 **Merged pull requests:**
 
+- chore\(go.d/snmp\): remove SNMP prefix from hostname [\#20751](https://github.com/netdata/netdata/pull/20751) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d/snmp\): add org to vendor map [\#20750](https://github.com/netdata/netdata/pull/20750) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#20749](https://github.com/netdata/netdata/pull/20749) ([netdatabot](https://github.com/netdatabot))
 - Update deployment-with-centralization-points.md [\#20748](https://github.com/netdata/netdata/pull/20748) ([kanelatechnical](https://github.com/kanelatechnical))
+- Record proxy information when establishing ACLK [\#20747](https://github.com/netdata/netdata/pull/20747) ([stelfrag](https://github.com/stelfrag))
 - Change remaining pthread\_ cases [\#20746](https://github.com/netdata/netdata/pull/20746) ([stelfrag](https://github.com/stelfrag))
 - chore\(go.d/snmp-profiles\): use same metric name for cpu usage  [\#20745](https://github.com/netdata/netdata/pull/20745) ([ilyam8](https://github.com/ilyam8))
 - Remove redundant defines [\#20744](https://github.com/netdata/netdata/pull/20744) ([stelfrag](https://github.com/stelfrag))
@@ -465,7 +467,6 @@
 - build\(deps\): bump github.com/redis/go-redis/v9 from 9.7.3 to 9.8.0 in /src/go [\#20220](https://github.com/netdata/netdata/pull/20220) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Small fixes2 [\#20219](https://github.com/netdata/netdata/pull/20219) ([ktsaou](https://github.com/ktsaou))
 - documentation and helpers for centralizing namespaced logs [\#20217](https://github.com/netdata/netdata/pull/20217) ([ktsaou](https://github.com/ktsaou))
-- Improve health log cleanup [\#20213](https://github.com/netdata/netdata/pull/20213) ([stelfrag](https://github.com/stelfrag))
 
 ## [v2.4.0](https://github.com/netdata/netdata/tree/v2.4.0) (2025-04-14)
 
