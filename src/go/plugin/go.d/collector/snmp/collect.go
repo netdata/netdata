@@ -118,8 +118,9 @@ func (c *Collector) setupVnode(si *snmpsd.SysInfo, deviceMeta map[string]map[str
 	c.Vnode.Hostname = fmt.Sprintf("%s(%s)", hostnames[i], c.Hostname)
 
 	labels := map[string]string{
-		"hostname":    c.Hostname,
-		"_vnode_type": "snmp",
+		"_vnode_type":     "snmp",
+		"_clean_hostname": hostnames[i],
+		"address":         c.Hostname,
 	}
 
 	maps.Copy(labels, c.Vnode.Labels)
