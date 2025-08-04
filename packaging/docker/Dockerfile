@@ -28,7 +28,7 @@ RUN chmod +x netdata-installer.sh && \
    cp -rp /deps/* /usr/local/ && \
    /bin/echo -e "INSTALL_TYPE='oci'\nPREBUILT_ARCH='$(uname -m)'" > ./system/.install-type && \
    CFLAGS="$(packaging/docker/gen-cflags.sh)" LDFLAGS="-Wl,--gc-sections" ./netdata-installer.sh --dont-wait --dont-start-it --use-system-protobuf \
-   ${EXTRA_INSTALL_OPTS} --disable-ebpf --install-no-prefix / "$([ "$RELEASE_CHANNEL" = stable ] && echo --stable-channel)"
+   ${EXTRA_INSTALL_OPTS} --disable-ebpf --enable-plugin-otel --install-no-prefix / "$([ "$RELEASE_CHANNEL" = stable ] && echo --stable-channel)"
 
 # files to one directory
 RUN mkdir -p /app/usr/sbin/ \
@@ -126,6 +126,7 @@ RUN addgroup --gid ${NETDATA_GID} --system "${DOCKER_GRP}" && \
                 ndsudo \
                 slabinfo.plugin \
                 network-viewer.plugin \
+                otel-plugin \
                 systemd-journal.plugin; do \
         [ -f "/usr/libexec/netdata/plugins.d/$name" ] && chmod 4755 "/usr/libexec/netdata/plugins.d/$name"; \
     done && \
