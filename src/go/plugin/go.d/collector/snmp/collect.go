@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -108,36 +109,43 @@ func (c *Collector) setupVnode(si *snmpsd.SysInfo, deviceMeta map[string]map[str
 		c.Vnode.GUID = uuid.NewSHA1(uuid.NameSpaceDNS, []byte(c.Hostname)).String()
 	}
 
-	hostnames := []string{c.Vnode.Hostname, si.Name, "snmp-device"}
+	hostnames := []string{
+		c.Vnode.Hostname,
+		si.Name,
+		"snmp-device",
+	}
 	i := slices.IndexFunc(hostnames, func(s string) bool { return s != "" })
-
 	c.Vnode.Hostname = fmt.Sprintf("%s(%s)", hostnames[i], c.Hostname)
 
-	labels := make(map[string]string)
-
-	for k, v := range c.Vnode.Labels {
-		labels[k] = v
-	}
-	if si.Descr != "" {
-		labels["sysDescr"] = si.Descr
-	}
-	if si.Contact != "" {
-		labels["sysContact"] = si.Contact
-	}
-	if si.Location != "" {
-		labels["sysLocation"] = si.Location
+	labels := map[string]string{
+		"hostname":    c.Hostname,
+		"_vnode_type": "snmp",
 	}
 
-	labels["vendor"] = si.Organization
-	if v, ok := orgToVendorMap[si.Organization]; ok {
-		labels["vendor"] = v
-	}
-
+	maps.Copy(labels, c.Vnode.Labels)
 	for _, meta := range deviceMeta {
-		for k, v := range meta {
-			if _, ok := labels[k]; !ok {
-				labels[k] = v
-			}
+		maps.Copy(labels, meta)
+	}
+
+	if _, ok := labels["sys_object_id"]; !ok {
+		labels["sys_object_id"] = si.SysObjectID
+	}
+	if _, ok := labels["name"]; !ok {
+		labels["name"] = si.Name
+	}
+	if _, ok := labels["description"]; !ok && si.Descr != "" {
+		labels["description"] = si.Descr
+	}
+	if _, ok := labels["contact"]; !ok && si.Contact != "" {
+		labels["contact"] = si.Contact
+	}
+	if _, ok := labels["location"]; !ok && si.Location != "" {
+		labels["location"] = si.Location
+	}
+	if _, ok := labels["vendor"]; !ok && si.Organization != "" {
+		labels["vendor"] = si.Organization
+		if v, ok := orgToVendorMap[si.Organization]; ok {
+			labels["vendor"] = v
 		}
 	}
 
