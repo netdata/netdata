@@ -3194,6 +3194,7 @@ endif()
 #
 if(ENABLE_PLUGIN_NOM)
     corrosion_install(TARGETS nom-plugin
+                      PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE
                       RUNTIME DESTINATION usr/libexec/netdata/plugins.d
                       COMPONENT plugin-nom)
 endif()
