@@ -1,10 +1,6 @@
 # Welcome to Netdata
 
-## The Challenge
-
-As infrastructures become more ephemeral, distributed, and complex, traditional centralized observability pipelines are reaching their limits. Container orchestration, microservices, multi-cloud deployments, and edge computing have created environments where infrastructure changes faster than monitoring can be configured, data volumes exceed what centralized systems can economically process, and the skills gap between what monitoring requires and what teams possess continues to widen.
-
-## What is Netdata?
+## Who we are
 
 Netdata is a distributed, real-time observability platform that monitors metrics and logs from systems and applications, built on a foundation designed to seamlessly extend to distributed tracing. It collects data at per-second granularity, stores it at (or as close to) the edge where it's generated, provides automated dashboards, machine learning anomaly detection, and AI-powered analysis without requiring configuration or specialized skills.
 
