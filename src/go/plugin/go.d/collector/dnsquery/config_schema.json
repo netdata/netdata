@@ -107,10 +107,7 @@
     "required": [
       "domains",
       "network"
-    ],
-    "patternProperties": {
-      "^name$": {}
-    }
+    ]
   },
   "uiSchema": {
     "uiOptions": {

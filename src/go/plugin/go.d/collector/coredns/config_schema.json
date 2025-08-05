@@ -198,10 +198,7 @@
     },
     "required": [
       "url"
-    ],
-    "patternProperties": {
-      "^name$": {}
-    }
+    ]
   },
   "uiSchema": {
     "uiOptions": {
