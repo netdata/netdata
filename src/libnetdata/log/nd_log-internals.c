@@ -778,6 +778,8 @@ int nd_log_collectors_fd(void) {
     if(nd_log.sources[NDLS_COLLECTORS].method == NDLM_FILE && nd_log.sources[NDLS_COLLECTORS].fd != -1)
         return nd_log.sources[NDLS_COLLECTORS].fd;
 
+    // For NDLM_JOURNAL, return STDERR_FILENO so the log-forwarder
+    // can read from the pipe and properly format messages for journal
     return STDERR_FILENO;
 }
 
