@@ -65,7 +65,7 @@ func ValidateBinaryPath(path string) error {
 
 	stat, ok = dirInfo.Sys().(*syscall.Stat_t)
 	if !ok {
-		return fmt.Errorf("unable to get file stat information for %s", dir)
+		return fmt.Errorf("unable to get directory stat information for %s", dir)
 	}
 	if stat.Uid != 0 {
 		return fmt.Errorf("directory %s must be owned by root (current uid: %d)", dir, stat.Uid)
