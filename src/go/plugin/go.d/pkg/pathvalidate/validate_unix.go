@@ -46,9 +46,9 @@ func ValidateBinaryPath(path string) error {
 		return fmt.Errorf("binary at %s must be owned by root (current uid: %d)", absPath, fileStat.Uid)
 	}
 
-	if fileInfo.Mode().Perm()&0022 != 0 {
-		return fmt.Errorf("binary at %s must not be writable by group/others (current: %04o)",
-			absPath, fileInfo.Mode().Perm())
+	if perm := fileInfo.Mode().Perm(); perm&0022 != 0 {
+		return fmt.Errorf("binary at %s must not be writable by group/others (current permissions: %s / %04o)",
+			absPath, fileInfo.Mode().String(), perm)
 	}
 
 	// Step 6: Check executable bit
@@ -71,8 +71,7 @@ func ValidateBinaryPath(path string) error {
 		return fmt.Errorf("directory %s must be owned by root (current uid: %d)", dir, dirStat.Uid)
 	}
 
-	perm := dirInfo.Mode().Perm()
-	if perm&0022 != 0 {
+	if perm := dirInfo.Mode().Perm(); perm&0022 != 0 {
 		return fmt.Errorf("directory %s must not be writable by group/others (current permissions: %s / %04o)",
 			dir, dirInfo.Mode().String(), perm)
 	}
