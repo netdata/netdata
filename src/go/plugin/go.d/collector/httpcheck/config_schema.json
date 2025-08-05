@@ -192,10 +192,7 @@
     "required": [
       "url",
       "status_accepted"
-    ],
-    "patternProperties": {
-      "^name$": {}
-    }
+    ]
   },
   "uiSchema": {
     "ui:flavour": "tabs",

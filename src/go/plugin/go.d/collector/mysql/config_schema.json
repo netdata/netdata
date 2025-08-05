@@ -44,10 +44,7 @@
     },
     "required": [
       "dsn"
-    ],
-    "patternProperties": {
-      "^name$": {}
-    }
+    ]
   },
   "uiSchema": {
     "uiOptions": {

@@ -75,10 +75,7 @@
       }
     },
     "required": [
-    ],
-    "patternProperties": {
-      "^name$": {}
-    }
+    ]
   },
   "uiSchema": {
     "uiOptions": {

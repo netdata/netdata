@@ -366,10 +366,7 @@
       "hostname",
       "community",
       "options"
-    ],
-    "patternProperties": {
-      "^name$": {}
-    }
+    ]
   },
   "uiSchema": {
     "uiOptions": {

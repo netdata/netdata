@@ -11,9 +11,6 @@
         "minimum": 1,
         "default": 1
       }
-    },
-    "patternProperties": {
-      "^name$": {}
     }
   },
   "uiSchema": {
