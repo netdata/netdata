@@ -284,7 +284,7 @@ Netdata assigns unique UUIDs to specific event types for easy filtering and corr
 | `d1f59606-dd4d-41e3-b217-a0cfcae8e632` | Extreme Cardinality  | Metric cardinality exceeds safe limits        |
 | `4fdf4081-6c12-4623-a032-b7fe73beacb8` | User Configuration   | Dynamic configuration changed by user         |
 
-You can view these events using the Netdata systemd-journal.plugin at the `MESSAGE_ID` filter,
+You can view these events using the Netdata `log-viewer` plugin at the `MESSAGE_ID` filter,
 or using `journalctl` like this:
 
 ```bash

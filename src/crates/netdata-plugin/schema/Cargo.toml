@@ -1,0 +1,20 @@
+[package]
+name = "netdata-plugin-schema"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Library for generating Netdata-compatible JSON Schema with UI annotations"
+license = "MIT OR Apache-2.0"
+
+[lib]
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+netdata-plugin-error = { path = "../error" }
+netdata-plugin-types = { path = "../types" }
+schemars = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

@@ -1,0 +1,40 @@
+[package]
+name = "journal-function"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+allocative = ["dep:allocative"]
+
+[dependencies]
+async-stream = { workspace = true }
+async-trait = { workspace = true }
+futures = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+notify = { workspace = true }
+foyer = { workspace = true }
+parking_lot = { workspace = true, features = ["send_guard"] }
+schemars = { workspace = true }
+chrono = { workspace = true, features = ["serde"] }
+nix = { workspace = true, features = ["user"] }
+
+journal-core = { workspace = true }
+journal-index = { workspace = true }
+journal-engine = { workspace = true }
+journal-registry = { workspace = true }
+rt = { path = "../../netdata-plugin/rt" }
+
+allocative = { workspace = true, optional = true }
+
+[dev-dependencies]
+chrono = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+tracing-subscriber = { workspace = true }

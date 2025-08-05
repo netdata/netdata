@@ -263,7 +263,7 @@ Log databases often contain out-of-order entries:
 ## Integration with Netdata Architecture
 
 ### Plugin Communication
-- The facets library runs within plugins (systemd-journal.plugin, windows-events.plugin)
+- The facets library runs within plugins
 - Plugins can run anywhere in the Netdata ecosystem (parent nodes, child nodes, etc.)
 - Communication with plugins happens via **rrdfunctions** - Netdata's function execution framework
 - rrdfunctions provide the transport layer to send requests to plugins and receive responses

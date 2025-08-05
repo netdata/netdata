@@ -1,0 +1,177 @@
+[workspace]
+resolver = "2"
+members = [
+    # Individual crates
+    "journal-common",
+    "journal-core",
+    "journal-index",
+    "journal-log-writer",
+    "journal-engine",
+    "journal-registry",
+    "rdp",
+
+    # Netdata plugin workspace members
+    "netdata-plugin/error",
+    "netdata-plugin/protocol",
+    "netdata-plugin/rt",
+    "netdata-plugin/schema",
+    "netdata-plugin/types",
+    "netdata-plugin/bridge",
+    "netdata-plugin/charts-derive",
+
+    # Netdata log viewer workspace members
+    "netdata-log-viewer/journal-function",
+    "netdata-log-viewer/journal-viewer-plugin",
+
+    # Netdata OTEL workspace members
+    "netdata-otel/otel-plugin",
+    "netdata-otel/flatten_otel",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+
+[workspace.lints.clippy]
+collapsible_if = "allow"
+
+[workspace.dependencies]
+static_assertions = "1.1"
+thiserror = "2"
+zerocopy = { version = "0.9.0-alpha.0" }
+libc = "0.2"
+memmap2 = "0.9"
+uuid = { version = "1.0"}
+nix = { version = "0.30" }
+
+ruzstd = "0.8"
+zstd = "0.13"
+siphasher = "1.0"
+hashers = "1.0"
+twox-hash = { version = "2.1", default-features = false }
+rand = "0.9"
+lz4 = "1.25"
+md5 = "0.7"
+
+roaring = { git = "https://github.com/netdata/roaring-rs.git", branch="allocative" }
+serde = { version = "1.0" }
+rustc-hash = "2.1"
+bincode = { version = "1.3" }
+notify = "8.2"
+
+walkdir = "2.4"
+
+async-stream = "0.3"
+crossbeam-channel = "0.5"
+regex = "1.10"
+bitvec = "1.0.1"
+serde_json = "1.0"
+anyhow = "1.0"
+arbitrary = "1.3"
+chrono = { version = "0.4" }
+
+
+async-trait = "0.1.89"
+serde_yaml = "0.9.34"
+serde_regex = "1.1.0"
+tokio = { version = "1.45", features = ["full"] }
+
+# Tracing
+tracing = "0.1"
+tracing-journald = "0.3"
+tracing-futures = { version = "0.2.5" }
+tracing-opentelemetry = "0.32.0"
+tracing-subscriber = "0.3"
+opentelemetry = "0.31.0"
+opentelemetry_sdk = { version = "0.31.0", features = ["rt-tokio", "logs"] }
+opentelemetry-otlp = { version = "0.31.0", features = ["grpc-tonic", "logs"] }
+opentelemetry-proto = "0.31"
+
+# Netdata plugin
+schemars = "1.0"
+
+# Journal histogram dependencies
+atoi = "2.0"
+bitflags = "2.9"
+bytes = "1"
+futures = "0.3"
+phf = { version = "0.12", default-features = false }
+phf_codegen = "0.12"
+tokio-stream = "0.1"
+tokio-util = { version = "0.7", features = ["codec"] }
+foyer = { version = "0.20.0", features = ["serde"] }
+lru = "0.16"
+parking_lot = "0.12"
+allocative = { version = "0.3.4" }
+
+hdrhistogram = { version = "7.5" }
+rayon = "1.11.0"
+itoa = "1.0"
+
+# OTEL-specific dependencies
+atty = "0.2"
+bytesize = "1.3"
+bytesize-serde = "0.2"
+clap = { version = "4", features = ["derive"] }
+duct = "0.13"
+humantime = "2.2"
+humantime-serde = "1.1"
+hyper-util = "0.1"
+indexmap = "2.9"
+tonic = "0.14"
+tower = "0.5"
+
+flatten-serde-json = { git = "https://github.com/meilisearch/meilisearch", tag = "v1.22.1" }
+
+# Internal workspace crates
+journal-common = { path = "journal-common" }
+journal-core = { path = "journal-core" }
+journal-index = { path = "journal-index" }
+journal-log-writer = { path = "journal-log-writer" }
+journal-engine = { path = "journal-engine" }
+journal-registry = { path = "journal-registry" }
+journalctl = { path = "journalctl" }
+rdp = { path = "rdp" }
+
+# Netdata plugin crates
+netdata-plugin-error = { path = "netdata-plugin/error" }
+netdata-plugin-protocol = { path = "netdata-plugin/protocol" }
+netdata-plugin-rt = { path = "netdata-plugin/rt" }
+netdata-plugin-schema = { path = "netdata-plugin/schema" }
+netdata-plugin-types = { path = "netdata-plugin/types" }
+netdata-plugin-bridge = { path = "netdata-plugin/bridge" }
+netdata-plugin-charts-derive = { path = "netdata-plugin/charts-derive" }
+rt = { path = "netdata-plugin/rt" }
+
+# Netdata log viewer crates
+journal-function = { path = "netdata-log-viewer/journal-function" }
+journal-viewer-plugin = { path = "netdata-log-viewer/journal-viewer-plugin" }
+
+# Netdata OTEL crates
+otel-plugin = { path = "netdata-otel/otel-plugin" }
+flatten_otel = { path = "netdata-otel/flatten_otel" }
+
+tempfile = { version = "3" }
+
+proptest = "1.9"
+
+[profile.dev]
+opt-level = 1
+debug = true
+debug-assertions = true
+
+[profile.release]
+debug = true
+# lto = true
+opt-level = "z"
+# strip = true
+# codegen-units = 1
+
+[profile.release-min]
+inherits = "release"
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+strip = true
+panic = "abort"

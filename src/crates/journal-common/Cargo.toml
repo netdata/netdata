@@ -1,0 +1,18 @@
+[package]
+name = "journal-common"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+allocative = ["dep:allocative"]
+
+[dependencies]
+allocative = { workspace = true, optional = true }
+rustc-hash = { workspace = true }
+uuid = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+nix = { workspace = true, features = ["time"] }

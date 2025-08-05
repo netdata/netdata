@@ -1,0 +1,44 @@
+[package]
+name = "journal-viewer-plugin"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "journal-viewer-plugin"
+path = "src/main.rs"
+
+[dependencies]
+async-trait = { workspace = true }
+
+rt = { workspace = true }
+netdata-plugin-error = { workspace = true }
+netdata-plugin-protocol = { workspace = true }
+netdata-plugin-schema = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }
+notify = { workspace = true }
+thiserror = { workspace = true }
+foyer = { workspace = true }
+
+# Configuration support
+anyhow = { workspace = true }
+bytesize = { workspace = true }
+bytesize-serde = { workspace = true }
+num_cpus = "1"
+serde_yaml = { workspace = true }
+
+# Business logic
+# journal-engine = { workspace = true }
+# types = { path = "../types" }
+
+journal-core = { workspace = true }
+journal-index = { workspace = true }
+journal-function = { workspace = true }
+journal-registry = { workspace = true }

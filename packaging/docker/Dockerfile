@@ -134,7 +134,7 @@ RUN addgroup --gid ${NETDATA_GID} --system "${DOCKER_GRP}" && \
                 slabinfo.plugin \
                 network-viewer.plugin \
                 otel-plugin \
-                systemd-journal.plugin; do \
+                journal-viewer-plugin; do \
         [ -f "/usr/libexec/netdata/plugins.d/$name" ] && chmod 4755 "/usr/libexec/netdata/plugins.d/$name"; \
     done && \
     # Group write permissions due to: https://github.com/netdata/netdata/pull/6543
