@@ -801,8 +801,8 @@ if [ "$(id -u)" -eq 0 ]; then
   run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type d -exec chmod 0755 {} \;
   run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -exec chmod 0644 {} \;
   # shellcheck disable=SC2086
-  run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -a -name \*.plugin -exec chown :${NETDATA_GROUP} {} \;
-  run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -a -name \*.plugin -exec chmod 0750 {} \;
+  run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -a -name \*plugin -exec chown :${NETDATA_GROUP} {} \;
+  run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -a -name \*plugin -exec chmod 0750 {} \;
   run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -a -name \*.sh -exec chmod 0755 {} \;
 
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin" ]; then
@@ -947,6 +947,21 @@ if [ "$(id -u)" -eq 0 ]; then
     if [ $capabilities -eq 0 ]; then
       # fix go.d.plugin to be setuid to root
       run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
+    fi
+  fi
+
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/nom-plugin" ]; then
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/nom-plugin"
+    capabilities=0
+    if ! iscontainer && command -v setcap 1>/dev/null 2>&1; then
+      run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/nom-plugin"
+      if run setcap cap_net_bind_service=eip "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/nom-plugin"; then
+        capabilities=1
+      fi
+    fi
+
+    if [ $capabilities -eq 0 ]; then
+      run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/nom-plugin"
     fi
   fi
 
