@@ -38,12 +38,12 @@ func ValidateBinaryPath(path string) error {
 	}
 
 	// Step 5: Check file ownership and permissions
-	stat, ok := fileInfo.Sys().(*syscall.Stat_t)
+	fileStat, ok := fileInfo.Sys().(*syscall.Stat_t)
 	if !ok {
 		return fmt.Errorf("unable to get file stat information for %s", absPath)
 	}
-	if stat.Uid != 0 {
-		return fmt.Errorf("binary at %s must be owned by root (current uid: %d)", absPath, stat.Uid)
+	if fileStat.Uid != 0 {
+		return fmt.Errorf("binary at %s must be owned by root (current uid: %d)", absPath, fileStat.Uid)
 	}
 
 	if fileInfo.Mode().Perm()&0022 != 0 {
@@ -63,18 +63,18 @@ func ValidateBinaryPath(path string) error {
 		return fmt.Errorf("directory stat error for %s: %w", dir, err)
 	}
 
-	stat, ok = dirInfo.Sys().(*syscall.Stat_t)
+	dirStat, ok := dirInfo.Sys().(*syscall.Stat_t)
 	if !ok {
 		return fmt.Errorf("unable to get directory stat information for %s", dir)
 	}
-	if stat.Uid != 0 {
-		return fmt.Errorf("directory %s must be owned by root (current uid: %d)", dir, stat.Uid)
+	if dirStat.Uid != 0 {
+		return fmt.Errorf("directory %s must be owned by root (current uid: %d)", dir, dirStat.Uid)
 	}
 
 	perm := dirInfo.Mode().Perm()
 	if perm&0022 != 0 {
 		return fmt.Errorf("directory %s must not be writable by group/others (current permissions: %s / %04o)",
-			dir, perm.String(), perm)
+			dir, dirInfo.Mode().String(), perm)
 	}
 
 	return nil
