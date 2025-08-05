@@ -19,10 +19,7 @@
         "default": 2
       }
     },
-    "required": [],
-    "patternProperties": {
-      "^name$": {}
-    }
+    "required": []
   },
   "uiSchema": {
     "uiOptions": {

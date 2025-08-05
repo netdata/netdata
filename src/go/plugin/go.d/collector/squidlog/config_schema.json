@@ -40,9 +40,6 @@
       "path",
       "log_type"
     ],
-    "patternProperties": {
-      "^name$": {}
-    },
     "dependencies": {
       "log_type": {
         "oneOf": [

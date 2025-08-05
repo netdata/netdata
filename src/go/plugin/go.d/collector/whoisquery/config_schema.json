@@ -45,10 +45,7 @@
     },
     "required": [
       "source"
-    ],
-    "patternProperties": {
-      "^name$": {}
-    }
+    ]
   },
   "uiSchema": {
     "uiOptions": {
