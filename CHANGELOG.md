@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- chore\(go.d/snmp\): update org to vendor mapping [\#20757](https://github.com/netdata/netdata/pull/20757) ([ilyam8](https://github.com/ilyam8))
+- chore\(go.d/snmp\): update hostname to not include IP [\#20756](https://github.com/netdata/netdata/pull/20756) ([ilyam8](https://github.com/ilyam8))
+- chore\(go.d/snmp\): add \_clean\_hostname host label [\#20755](https://github.com/netdata/netdata/pull/20755) ([ilyam8](https://github.com/ilyam8))
+- chore\(go.d/snmp\): add \_vnode\_type host label and rm duplicates [\#20754](https://github.com/netdata/netdata/pull/20754) ([ilyam8](https://github.com/ilyam8))
+- build\(deps\): bump github.com/miekg/dns from 1.1.67 to 1.1.68 in /src/go [\#20753](https://github.com/netdata/netdata/pull/20753) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Improve Disk Usage Measure \(Windows.plugin\) [\#20752](https://github.com/netdata/netdata/pull/20752) ([thiagoftsm](https://github.com/thiagoftsm))
 - chore\(go.d/snmp\): remove SNMP prefix from hostname [\#20751](https://github.com/netdata/netdata/pull/20751) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d/snmp\): add org to vendor map [\#20750](https://github.com/netdata/netdata/pull/20750) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#20749](https://github.com/netdata/netdata/pull/20749) ([netdatabot](https://github.com/netdatabot))
@@ -50,6 +56,7 @@
 - Update LIBBPF [\#20696](https://github.com/netdata/netdata/pull/20696) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix SSL certificate detection for Rocky Linux and static curl [\#20695](https://github.com/netdata/netdata/pull/20695) ([ktsaou](https://github.com/ktsaou))
 - update otel-collector components deps [\#20693](https://github.com/netdata/netdata/pull/20693) ([ilyam8](https://github.com/ilyam8))
+- Add Oracle Linux 10 to CI and package builds. [\#20684](https://github.com/netdata/netdata/pull/20684) ([Ferroin](https://github.com/Ferroin))
 - Split collection \(Windows.plugin\) [\#20677](https://github.com/netdata/netdata/pull/20677) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add Getting Started Netdata guide [\#20642](https://github.com/netdata/netdata/pull/20642) ([kanelatechnical](https://github.com/kanelatechnical))
 
@@ -431,7 +438,6 @@
 - Revert "Revert "fix\(go.d/couchdb\): correct db size charts unit"" [\#20235](https://github.com/netdata/netdata/pull/20235) ([ilyam8](https://github.com/ilyam8))
 - Improve MSSQL \(Part III\) [\#20230](https://github.com/netdata/netdata/pull/20230) ([thiagoftsm](https://github.com/thiagoftsm))
 - Make all threads joinable and join on agent shutdown [\#20228](https://github.com/netdata/netdata/pull/20228) ([stelfrag](https://github.com/stelfrag))
-- ci: ignore changes in src/go/otel-collector/release-config.yaml.in [\#20222](https://github.com/netdata/netdata/pull/20222) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
@@ -463,10 +469,6 @@
 - Fix potential null pointer dereference when accessing journalfile [\#20226](https://github.com/netdata/netdata/pull/20226) ([stelfrag](https://github.com/stelfrag))
 - fix crashes 8 [\#20225](https://github.com/netdata/netdata/pull/20225) ([ktsaou](https://github.com/ktsaou))
 - fix crashes 7 [\#20224](https://github.com/netdata/netdata/pull/20224) ([ktsaou](https://github.com/ktsaou))
-- Enable analytics data collection  [\#20221](https://github.com/netdata/netdata/pull/20221) ([stelfrag](https://github.com/stelfrag))
-- build\(deps\): bump github.com/redis/go-redis/v9 from 9.7.3 to 9.8.0 in /src/go [\#20220](https://github.com/netdata/netdata/pull/20220) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Small fixes2 [\#20219](https://github.com/netdata/netdata/pull/20219) ([ktsaou](https://github.com/ktsaou))
-- documentation and helpers for centralizing namespaced logs [\#20217](https://github.com/netdata/netdata/pull/20217) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.4.0](https://github.com/netdata/netdata/tree/v2.4.0) (2025-04-14)
 
