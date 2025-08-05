@@ -343,6 +343,7 @@ impl JournalWriter {
     ) -> Result<()> {
         // Navigate to the tail of the array chain
         let mut current_index = 0u64;
+        #[allow(unused_assignments)]
         let mut tail_offset = array_offset;
 
         loop {

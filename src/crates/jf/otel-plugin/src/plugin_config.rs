@@ -183,7 +183,7 @@ pub struct PluginConfig {
     // netdata env variables
     #[arg(skip)]
     #[serde(skip)]
-    pub netdata_env: NetdataEnv,
+    pub _netdata_env: NetdataEnv,
 }
 
 impl PluginConfig {
