@@ -61,10 +61,7 @@
     },
     "required": [
       "host"
-    ],
-    "patternProperties": {
-      "^name$": {}
-    }
+    ]
   },
   "uiSchema": {
     "ui:flavour": "tabs",
