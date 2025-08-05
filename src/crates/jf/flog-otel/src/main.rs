@@ -191,6 +191,7 @@ async fn send_otel_logs(logs: Vec<LogRecord>, endpoint: &str) -> Result<()> {
                 },
             ],
             dropped_attributes_count: 0,
+            entity_refs: vec![],
         }),
         scope_logs: vec![ScopeLogs {
             scope: Some(

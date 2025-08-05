@@ -1,21 +1,21 @@
 [package]
 name = "flog-otel"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
 
 [dependencies]
-tokio = { version = "1.0", features = ["full"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-chrono = { version = "0.4", features = ["serde"] }
-clap = { version = "4.0", features = ["derive"] }
-uuid = { version = "1.0", features = ["v4"] }
-anyhow = "1.0"
-tracing = "0.1"
-tracing-subscriber = "0.3"
-tonic = "0.12"
-prost = "0.13"
-opentelemetry-proto = { version = "0.7", features = ["gen-tonic"] }
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+clap.workspace = true
+uuid.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+tonic.workspace = true
+prost.workspace = true
+opentelemetry-proto.workspace = true
 
 [build-dependencies]
-tonic-build = "0.12"
+tonic-build.workspace = true

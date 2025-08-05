@@ -25,6 +25,7 @@ siphasher = "1.0"
 twox-hash = { version = "2.1", default-features = false, features = ["std"] }
 static_assertions = "1.1"
 duct = "0.13"
+serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 walkdir = "2"
 ruzstd = "0.8"
@@ -33,11 +34,14 @@ hex = "0.4"
 tempfile = "3"
 indexmap = "2.9"
 uuid = { version = "1.0", features = ["v4", "rng"] }
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
 
 # otel-plugin
 prost = "0.13"
 regex = "1.10"
-tokio = { version = "1.45", features = ["rt-multi-thread"] }
+tokio = { version = "1.45", features = ["rt-multi-thread", "process", "io-util"] }
 tokio-stream = "0.1"
 tonic = "0.13"
 tonic-build = "0.13"
