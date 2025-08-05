@@ -15,8 +15,8 @@ ARCHITECTURE="$(uname -m)"
 virtualization_normalize_name() {
   vname="$1"
   case "$vname" in
-  "User-mode Linux") vname="uml" ;;
-  "Windows Subsystem for Linux") vname="wsl" ;;
+    "User-mode Linux") vname="uml" ;;
+    "Windows Subsystem for Linux") vname="wsl" ;;
   esac
 
   echo "$vname" | tr '[:upper:]' '[:lower:]' | sed 's/ /-/g'
@@ -69,7 +69,7 @@ fi
 
 if [ "${CONTAINER}" = "unknown" ]; then
   if [ -f /proc/1/sched ]; then
-    IFS='(, ' read -r process _ < /proc/1/sched
+    IFS='(, ' read -r process _ </proc/1/sched
     if [ "${process}" = "netdata" ]; then
       CONTAINER="container"
       CONT_DETECTION="process"
@@ -77,7 +77,7 @@ if [ "${CONTAINER}" = "unknown" ]; then
   fi
   # ubuntu and debian supply /bin/running-in-container
   # https://www.apt-browse.org/browse/ubuntu/trusty/main/i386/upstart/1.12.1-0ubuntu4/file/bin/running-in-container
-  if /bin/running-in-container > /dev/null 2>&1; then
+  if /bin/running-in-container >/dev/null 2>&1; then
     CONTAINER="container"
     CONT_DETECTION="/bin/running-in-container"
   fi
@@ -134,7 +134,7 @@ elif [ "${KERNEL_NAME}" = "FreeBSD" ]; then
   KERNEL_VERSION=$(uname -K)
 else
   if [ -f "/etc/os-release" ]; then
-    eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" < /etc/os-release | sed 's/^/CONTAINER_/')"
+    eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" </etc/os-release | sed 's/^/CONTAINER_/')"
     CONTAINER_OS_DETECTION="/etc/os-release"
   fi
 
@@ -149,20 +149,20 @@ else
       DISTRIB_ID="unknown"
       DISTRIB_RELEASE="unknown"
       DISTRIB_CODENAME="unknown"
-      eval "$(grep -E "^(DISTRIB_ID|DISTRIB_RELEASE|DISTRIB_CODENAME)=" < /etc/lsb-release)"
+      eval "$(grep -E "^(DISTRIB_ID|DISTRIB_RELEASE|DISTRIB_CODENAME)=" </etc/lsb-release)"
       if [ "${CONTAINER_NAME}" = "unknown" ]; then CONTAINER_NAME="${DISTRIB_ID}"; fi
       if [ "${CONTAINER_VERSION}" = "unknown" ]; then CONTAINER_VERSION="${DISTRIB_RELEASE}"; fi
       if [ "${CONTAINER_ID}" = "unknown" ]; then CONTAINER_ID="${DISTRIB_CODENAME}"; fi
     fi
-    if [ -n "$(command -v lsb_release 2> /dev/null)" ]; then
+    if [ -n "$(command -v lsb_release 2>/dev/null)" ]; then
       if [ "${CONTAINER_OS_DETECTION}" = "unknown" ]; then
         CONTAINER_OS_DETECTION="lsb_release"
       else
         CONTAINER_OS_DETECTION="Mixed"
       fi
-      if [ "${CONTAINER_NAME}" = "unknown" ]; then CONTAINER_NAME="$(lsb_release -is 2> /dev/null)"; fi
-      if [ "${CONTAINER_VERSION}" = "unknown" ]; then CONTAINER_VERSION="$(lsb_release -rs 2> /dev/null)"; fi
-      if [ "${CONTAINER_ID}" = "unknown" ]; then CONTAINER_ID="$(lsb_release -cs 2> /dev/null)"; fi
+      if [ "${CONTAINER_NAME}" = "unknown" ]; then CONTAINER_NAME="$(lsb_release -is 2>/dev/null)"; fi
+      if [ "${CONTAINER_VERSION}" = "unknown" ]; then CONTAINER_VERSION="$(lsb_release -rs 2>/dev/null)"; fi
+      if [ "${CONTAINER_ID}" = "unknown" ]; then CONTAINER_ID="$(lsb_release -cs 2>/dev/null)"; fi
     fi
   fi
 fi
@@ -183,7 +183,7 @@ if [ "${CONTAINER}" = "unknown" ] || [ "${CONTAINER}" = "none" ]; then
 else
   # Otherwise try and use a user-supplied bind-mount into the container to resolve the host details
   if [ -e "/host/etc/os-release" ]; then
-    eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" < /host/etc/os-release | sed 's/^/HOST_/')"
+    eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" </host/etc/os-release | sed 's/^/HOST_/')"
     HOST_OS_DETECTION="/host/etc/os-release"
   fi
   if [ "${HOST_NAME}" = "unknown" ] || [ "${HOST_VERSION}" = "unknown" ] || [ "${HOST_ID}" = "unknown" ]; then
@@ -196,7 +196,7 @@ else
       DISTRIB_ID="unknown"
       DISTRIB_RELEASE="unknown"
       DISTRIB_CODENAME="unknown"
-      eval "$(grep -E "^(DISTRIB_ID|DISTRIB_RELEASE|DISTRIB_CODENAME)=" < /etc/lsb-release)"
+      eval "$(grep -E "^(DISTRIB_ID|DISTRIB_RELEASE|DISTRIB_CODENAME)=" </etc/lsb-release)"
       if [ "${HOST_NAME}" = "unknown" ]; then HOST_NAME="${DISTRIB_ID}"; fi
       if [ "${HOST_VERSION}" = "unknown" ]; then HOST_VERSION="${DISTRIB_RELEASE}"; fi
       if [ "${HOST_ID}" = "unknown" ]; then HOST_ID="${DISTRIB_CODENAME}"; fi
@@ -204,9 +204,9 @@ else
   fi
 fi
 
-if [ -d "/etc/pve" ] && \
-   echo "${KERNEL_VERSION}" | grep -q -- '-pve$' && \
-   command -v pveversion > /dev/null 2>&1; then
+if [ -d "/etc/pve" ] &&
+  echo "${KERNEL_VERSION}" | grep -q -- '-pve$' &&
+  command -v pveversion >/dev/null 2>&1; then
   HOST_NAME="Proxmox VE"
   HOST_ID="proxmox"
   HOST_ID_LIKE="proxmox"
@@ -231,8 +231,8 @@ lscpu_output=""
 dmidecode="$(command -v dmidecode)"
 dmidecode_output=""
 
-if [ -n "${lscpu}" ] && lscpu > /dev/null 2>&1; then
-  lscpu_output="$(LC_NUMERIC=C ${lscpu} 2> /dev/null)"
+if [ -n "${lscpu}" ] && lscpu >/dev/null 2>&1; then
+  lscpu_output="$(LC_NUMERIC=C ${lscpu} 2>/dev/null)"
   CPU_INFO_SOURCE="lscpu"
   LCPU_COUNT="$(echo "${lscpu_output}" | grep "^CPU(s):" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
   CPU_VENDOR="$(echo "${lscpu_output}" | grep "^Vendor ID:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
@@ -248,8 +248,8 @@ if [ -n "${lscpu}" ] && lscpu > /dev/null 2>&1; then
     possible_cpu_freq="$(echo "${lscpu_output}" | grep "^Model name:" | grep -Eo "[0-9\.]+GHz" | grep -o "^[0-9\.]*" | awk '{print int($0*1000)}')"
   fi
   [ -n "$possible_cpu_freq" ] && possible_cpu_freq="${possible_cpu_freq} MHz"
-elif [ -n "${dmidecode}" ] && dmidecode -t processor > /dev/null 2>&1; then
-  dmidecode_output="$(${dmidecode} -t processor 2> /dev/null)"
+elif [ -n "${dmidecode}" ] && dmidecode -t processor >/dev/null 2>&1; then
+  dmidecode_output="$(${dmidecode} -t processor 2>/dev/null)"
   CPU_INFO_SOURCE="dmidecode"
   LCPU_COUNT="$(echo "${dmidecode_output}" | grep -F "Thread Count:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
   CPU_VENDOR="$(echo "${dmidecode_output}" | grep -F "Manufacturer:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
@@ -262,8 +262,8 @@ else
   elif [ "${KERNEL_NAME}" = FreeBSD ]; then
     CPU_INFO_SOURCE="sysctl"
     LCPU_COUNT="$(sysctl -n kern.smp.cpus)"
-    if ! possible_cpu_freq=$(sysctl -n machdep.tsc_freq 2> /dev/null); then
-      possible_cpu_freq=$(sysctl -n hw.model 2> /dev/null | grep -Eo "[0-9\.]+GHz" | grep -o "^[0-9\.]*" | awk '{print int($0*1000)}')
+    if ! possible_cpu_freq=$(sysctl -n machdep.tsc_freq 2>/dev/null); then
+      possible_cpu_freq=$(sysctl -n hw.model 2>/dev/null | grep -Eo "[0-9\.]+GHz" | grep -o "^[0-9\.]*" | awk '{print int($0*1000)}')
       [ -n "$possible_cpu_freq" ] && possible_cpu_freq="${possible_cpu_freq} MHz"
     fi
   elif [ "${KERNEL_NAME}" = Darwin ]; then
@@ -286,7 +286,7 @@ else
       CPU_VENDOR="Apple"
     fi
     echo "${CPU_INFO_SOURCE}" | grep -qv sysctl && CPU_INFO_SOURCE="${CPU_INFO_SOURCE} sysctl"
-  elif uname --version 2> /dev/null | grep -qF 'GNU coreutils'; then
+  elif uname --version 2>/dev/null | grep -qF 'GNU coreutils'; then
     CPU_INFO_SOURCE="${CPU_INFO_SOURCE} uname"
     CPU_MODEL="$(uname -p)"
     CPU_VENDOR="$(uname -i)"
@@ -433,14 +433,14 @@ else
     DISK_DETECTION="sysfs"
     DISK_SIZE="0"
     for disk in /sys/block/*; do
-      if [ -r "${disk}/size" ] \
-        && (echo "${dev_major_whitelist}" | grep -q ":$(cut -f 1 -d ':' "${disk}/dev"):") \
-        && grep -qv 1 "${disk}/removable"; then
+      if [ -r "${disk}/size" ] &&
+        (echo "${dev_major_whitelist}" | grep -q ":$(cut -f 1 -d ':' "${disk}/dev"):") &&
+        grep -qv 1 "${disk}/removable"; then
         size="$(($(cat "${disk}/size") * 512))"
         DISK_SIZE="$((DISK_SIZE + size))"
       fi
     done
-  elif df --version 2> /dev/null | grep -qF "GNU coreutils"; then
+  elif df --version 2>/dev/null | grep -qF "GNU coreutils"; then
     DISK_DETECTION="df"
     DISK_SIZE=$(($(df -x tmpfs -x devtmpfs -x squashfs -l -B1 --output=source,size | tail -n +2 | sort -u -k 1 | awk '{print $2}' | tr '\n' '+' | head -c -1)))
   else
@@ -470,7 +470,7 @@ CLOUD_TYPE="unknown"
 CLOUD_INSTANCE_TYPE="unknown"
 CLOUD_INSTANCE_REGION="unknown"
 
-if [ "${VIRTUALIZATION}" != "none" ] && command -v curl > /dev/null 2>&1; then
+if [ "${VIRTUALIZATION}" != "none" ] && command -v curl >/dev/null 2>&1; then
   # Returned HTTP status codes: GCP is 200, AWS is 200, DO is 404.
   curl --fail -s -m 1 --noproxy "*" http://169.254.169.254 >/dev/null 2>&1
   ret=$?
@@ -509,6 +509,177 @@ if [ "${VIRTUALIZATION}" != "none" ] && command -v curl > /dev/null 2>&1; then
   fi
 fi
 
+# -------------------------------------------------------------------------------------------------
+# Detect the IP address of the interface on the default route
+
+get_default_interface_ip() {
+  DEFAULT_INTERFACE_IP="unknown"
+  DEFAULT_INTERFACE_NAME="unknown"
+  DEFAULT_INTERFACE_DETECTION="none"
+
+  # Optional parameter for IP version: "-4" (default) or "-6"
+  ip_version="${1:--4}"
+
+  # Check if timeout command is available
+  timeout_cmd=""
+  if command -v timeout >/dev/null 2>&1; then
+    timeout_cmd="timeout 2"
+  fi
+
+  # Find default interface based on OS
+  default_if=""
+
+  case "${KERNEL_NAME}" in
+    Linux)
+      # Ultra-safe: Try /proc first (never hangs - just file reading)
+      if [ "${ip_version}" = "-4" ] && [ -r /proc/net/route ]; then
+        # Default route has destination 00000000
+        default_if=$(awk '$2 == "00000000" && $1 != "lo" {print $1; exit}' /proc/net/route)
+        [ -n "${default_if}" ] && DEFAULT_INTERFACE_DETECTION="procfs"
+      elif [ "${ip_version}" = "-6" ] && [ -r /proc/net/ipv6_route ]; then
+        # IPv6 default route - field 10 is the interface
+        # Look for ::/0 route (all zeros with prefix 00) that's not on lo
+        default_if=$(awk '$1 == "00000000000000000000000000000000" && $2 == "00" && $10 != "lo" {print $10; exit}' /proc/net/ipv6_route)
+        [ -n "${default_if}" ] && DEFAULT_INTERFACE_DETECTION="procfs"
+      fi
+
+      # Fallback to ip command if /proc didn't work
+      if [ -z "${default_if}" ] && command -v ip >/dev/null 2>&1; then
+        if [ "${ip_version}" = "-4" ]; then
+          # Extract interface after "dev" keyword
+          default_if=$(${timeout_cmd} ip -o -4 route list default 2>/dev/null | \
+            awk '{for(i=1;i<=NF;i++) if($i=="dev") {print $(i+1); exit}}')
+        else
+          default_if=$(${timeout_cmd} ip -o -6 route list default 2>/dev/null | \
+            awk '{for(i=1;i<=NF;i++) if($i=="dev") {print $(i+1); exit}}')
+        fi
+        [ -n "${default_if}" ] && DEFAULT_INTERFACE_DETECTION="iproute2"
+      fi
+
+      # Last resort: netstat (if available)
+      if [ -z "${default_if}" ] && command -v netstat >/dev/null 2>&1; then
+        if [ "${ip_version}" = "-4" ]; then
+          default_if=$(${timeout_cmd} netstat -rn 2>/dev/null | \
+            awk '$1 == "0.0.0.0" && $2 != "0.0.0.0" {print $NF; exit}')
+        else
+          default_if=$(${timeout_cmd} netstat -rn -A inet6 2>/dev/null | \
+            awk '$1 == "::/0" {print $NF; exit}')
+        fi
+        [ -n "${default_if}" ] && DEFAULT_INTERFACE_DETECTION="netstat"
+      fi
+      ;;
+
+    Darwin)
+      # macOS specific handling
+      if [ "${ip_version}" = "-4" ]; then
+        # Try route first
+        default_if=$(${timeout_cmd} route -n get default 2>/dev/null | \
+          awk '/interface:/ {print $2; exit}')
+        [ -n "${default_if}" ] && DEFAULT_INTERFACE_DETECTION="route"
+
+        # Fallback to netstat
+        if [ -z "${default_if}" ]; then
+          default_if=$(${timeout_cmd} netstat -rnf inet 2>/dev/null | \
+            awk '/^default/ {print $4; exit}')
+          [ -n "${default_if}" ] && DEFAULT_INTERFACE_DETECTION="netstat"
+        fi
+      else
+        # IPv6 - route doesn't work, use netstat
+        # Note: may have multiple defaults (utun interfaces)
+        default_if=$(${timeout_cmd} netstat -rnf inet6 2>/dev/null | \
+          awk '/^default/ && $4 !~ /^utun/ {print $4; exit}')
+        if [ -z "${default_if}" ]; then
+          # If no non-utun default, take first one
+          default_if=$(${timeout_cmd} netstat -rnf inet6 2>/dev/null | \
+            awk '/^default/ {print $4; exit}')
+        fi
+        [ -n "${default_if}" ] && DEFAULT_INTERFACE_DETECTION="netstat"
+      fi
+      ;;
+
+    *BSD)
+      # FreeBSD, OpenBSD, NetBSD
+      inet_flag=""
+      [ "${ip_version}" = "-6" ] && inet_flag="-inet6"
+
+      # route with -n to prevent DNS lookups
+      default_if=$(${timeout_cmd} route -n get ${inet_flag} default 2>/dev/null | \
+        awk '/interface:/ {print $2; exit}')
+      [ -n "${default_if}" ] && DEFAULT_INTERFACE_DETECTION="route"
+
+      # Fallback to netstat
+      if [ -z "${default_if}" ]; then
+        if [ "${ip_version}" = "-4" ]; then
+          default_if=$(${timeout_cmd} netstat -rnf inet 2>/dev/null | \
+            awk '/^default/ {print $4; exit}')
+        else
+          default_if=$(${timeout_cmd} netstat -rnf inet6 2>/dev/null | \
+            awk '/^default/ {print $4; exit}')
+        fi
+        [ -n "${default_if}" ] && DEFAULT_INTERFACE_DETECTION="netstat"
+      fi
+      ;;
+  esac
+
+  # Get IP address from interface
+  if [ -n "${default_if}" ] && [ "${default_if}" != "lo" ]; then
+    # Skip if interface is down (Linux only)
+    if [ "${KERNEL_NAME}" = "Linux" ] && [ -r "/sys/class/net/${default_if}/operstate" ]; then
+      state=$(cat "/sys/class/net/${default_if}/operstate" 2>/dev/null)
+      if [ "${state}" = "down" ]; then
+        return
+      fi
+    fi
+
+    if [ "${ip_version}" = "-4" ]; then
+      # IPv4 handling
+      # Try ip command first on Linux
+      if [ "${KERNEL_NAME}" = "Linux" ] && command -v ip >/dev/null 2>&1; then
+        # With -o flag, inet is field 3, IP is field 4
+        ip_addr=$(${timeout_cmd} ip -o -4 addr show dev "${default_if}" 2>/dev/null | \
+          awk '$3 == "inet" && $0 !~ /secondary/ {gsub(/\/.*/, "", $4); print $4; exit}')
+      fi
+
+      # Fallback to ifconfig (if available)
+      if [ -z "${ip_addr}" ] && command -v ifconfig >/dev/null 2>&1; then
+        ip_addr=$(${timeout_cmd} ifconfig "${default_if}" 2>/dev/null | \
+          awk '/inet / && !/127.0.0.1/ {gsub(/addr:/, "", $2); print $2; exit}')
+      fi
+
+      # Validate IPv4
+      if [ -n "${ip_addr}" ]; then
+        if echo "${ip_addr}" | grep -qE '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$' && \
+           echo "${ip_addr}" | awk -F. '$1<=255 && $2<=255 && $3<=255 && $4<=255 {exit 0} {exit 1}'; then
+          DEFAULT_INTERFACE_IP="${ip_addr}"
+          DEFAULT_INTERFACE_NAME="${default_if}"
+        fi
+      fi
+    else
+      # IPv6 handling
+      if [ "${KERNEL_NAME}" = "Linux" ] && command -v ip >/dev/null 2>&1; then
+        # Get global scope IPv6, not link-local
+        ip_addr=$(${timeout_cmd} ip -o -6 addr show dev "${default_if}" scope global 2>/dev/null | \
+          awk '$3 == "inet6" && $0 !~ /deprecated/ {gsub(/\/.*/, "", $4); print $4; exit}')
+      fi
+
+      if [ -z "${ip_addr}" ] && command -v ifconfig >/dev/null 2>&1; then
+        # Skip fe80:: (link-local) and ::1 (loopback)
+        ip_addr=$(${timeout_cmd} ifconfig "${default_if}" 2>/dev/null | \
+          awk '/inet6 / && !/fe80:/ && !/::1/ {sub(/%.*/, "", $2); print $2; exit}')
+      fi
+
+      # Basic IPv6 validation
+      if [ -n "${ip_addr}" ] && echo "${ip_addr}" | grep -qE '^[0-9a-fA-F:]+$' && \
+         echo "${ip_addr}" | grep -q ':'; then
+        DEFAULT_INTERFACE_IP="${ip_addr}"
+        DEFAULT_INTERFACE_NAME="${default_if}"
+      fi
+    fi
+  fi
+}
+
+get_default_interface_ip -4
+
 echo "NETDATA_CONTAINER_OS_NAME=${CONTAINER_NAME}"
 echo "NETDATA_CONTAINER_OS_ID=${CONTAINER_ID}"
 echo "NETDATA_CONTAINER_OS_ID_LIKE=${CONTAINER_ID_LIKE}"
@@ -542,3 +713,6 @@ echo "NETDATA_SYSTEM_DISK_DETECTION=${DISK_DETECTION}"
 echo "NETDATA_INSTANCE_CLOUD_TYPE=${CLOUD_TYPE}"
 echo "NETDATA_INSTANCE_CLOUD_INSTANCE_TYPE=${CLOUD_INSTANCE_TYPE}"
 echo "NETDATA_INSTANCE_CLOUD_INSTANCE_REGION=${CLOUD_INSTANCE_REGION}"
+echo "NETDATA_SYSTEM_DEFAULT_INTERFACE_NAME=${DEFAULT_INTERFACE_NAME}"
+echo "NETDATA_SYSTEM_DEFAULT_INTERFACE_IP=${DEFAULT_INTERFACE_IP}"
+echo "NETDATA_SYSTEM_DEFAULT_INTERFACE_DETECTION=${DEFAULT_INTERFACE_DETECTION}"
