@@ -1593,42 +1593,6 @@ static void do_mssql_buffer_management(PERF_DATA_BLOCK *pDataBlock, struct mssql
             (collected_number)mi->MSSQLBufferPageLifeExpectancy.current.Data);
         rrdset_done(mi->st_buff_cache_page_life_expectancy);
     }
-
-    /*
-    if (perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLBufferPageReads) &&
-        perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLBufferPageWrites)) {
-        if (!mi->st_buff_page_iops) {
-            snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_bufman_iops", mi->instanceID);
-            netdata_fix_chart_name(id);
-            mi->st_buff_page_iops = rrdset_create_localhost(
-                "mssql",
-                id,
-                NULL,
-                "buffer cache",
-                "mssql.instance_bufman_iops",
-                "Number of pages input and output",
-                "pages/s",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibMSSQL",
-                PRIO_MSSQL_BUFF_MAN_IOPS,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-            mi->rd_buff_page_reads = rrddim_add(mi->st_buff_page_iops, "read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            mi->rd_buff_page_writes =
-                rrddim_add(mi->st_buff_page_iops, "written", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-
-            rrdlabels_add(mi->st_buff_page_iops->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
-        }
-
-        rrddim_set_by_pointer(
-            mi->st_buff_page_iops, mi->rd_buff_page_reads, (collected_number)mi->MSSQLBufferPageReads.current.Data);
-        rrddim_set_by_pointer(
-            mi->st_buff_page_iops, mi->rd_buff_page_writes, (collected_number)mi->MSSQLBufferPageWrites.current.Data);
-
-        rrdset_done(mi->st_buff_page_iops);
-    }
-     */
 }
 
 static void do_mssql_access_methods(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
@@ -2009,6 +1973,53 @@ int dict_mssql_waits_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
 static void do_mssql_waits(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
 {
     dictionary_sorted_walkthrough_read(mi->waits, dict_mssql_waits_charts_cb, mi);
+}
+
+int dict_mssql_buffman_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
+    struct mssql_db_instance *mdi = value;
+    struct mssql_instance *mi = data;
+
+    if (unlikely(!mdi->collect_instance))
+        return 1;
+
+    if (!mdi->st_buff_page_iops) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_bufman_iops", mi->instanceID);
+        netdata_fix_chart_name(id);
+        mdi->st_buff_page_iops = rrdset_create_localhost(
+                "mssql",
+                id,
+                NULL,
+                "buffer cache",
+                "mssql.instance_bufman_iops",
+                "Number of pages input and output",
+                "pages/s",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibMSSQL",
+                PRIO_MSSQL_BUFF_MAN_IOPS,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        mdi->rd_buff_page_reads = rrddim_add(mdi->st_buff_page_iops, "read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        mdi->rd_buff_page_writes =
+                rrddim_add(mdi->st_buff_page_iops, "written", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        rrdlabels_add(mdi->st_buff_page_iops->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+            mdi->st_buff_page_iops, mdi->rd_buff_page_reads, (collected_number)mdi->MSSQLBufferPageReads.current.Data);
+    rrddim_set_by_pointer(
+            mdi->st_buff_page_iops, mdi->rd_buff_page_writes, (collected_number)mdi->MSSQLBufferPageWrites.current.Data);
+
+    rrdset_done(mdi->st_buff_page_iops);
+
+    return 1;
+}
+
+static void do_mssql_bufferman_sql(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
+{
+    dictionary_sorted_walkthrough_read(mi->databases, dict_mssql_buffman_charts_cb, mi);
 }
 
 static void mssql_database_backup_restore_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
@@ -2634,6 +2645,7 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
         do_mssql_databases,
         do_mssql_locks,
         do_mssql_waits,
+        do_mssql_bufferman_sql,
 
         NULL};
 
