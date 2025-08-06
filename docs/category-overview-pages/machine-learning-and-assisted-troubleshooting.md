@@ -31,8 +31,6 @@ Ask questions about your infrastructure like you're talking to a colleague. Get 
 
 [Explore AI Chat →](./chat-with-netdata-mcp)
 
----
-
 ### 2. AI DevOps Copilot
 
 **Available Now** - Transform observability into action with CLI AI assistants
@@ -60,8 +58,6 @@ Combine the power of AI with system automation. CLI-based AI assistants like Cla
 **Access**: Available now with MCP-supported CLI AI tools
 
 [Explore AI DevOps Copilot →](./ai-devops-copilot/ai-devops-copilot)
-
----
 
 ### 3. AI Insights
 
@@ -95,7 +91,6 @@ Transform past data into actionable insights with AI-generated reports. Perfect 
 
 [Explore AI Reports →](./ai-insights)
 
----
 
 ### 4. Anomaly Advisor
 
@@ -123,8 +118,6 @@ Stop guessing what went wrong. The Anomaly Advisor instantly shows you how probl
 **Find it**: Anomalies tab in any Netdata dashboard
 
 [Learn more about Anomaly Advisor →](./anomaly-advisor)
-
----
 
 ### 5. Machine Learning Anomaly Detection
 
@@ -156,6 +149,25 @@ The foundation of Netdata's AI capabilities. Machine learning models run locally
 
 [Explore Machine Learning →](./machine-learning-anomaly-detection)
 
+### 6. AI-Powered Alert Troubleshooting
+
+When an alert fires, you can now use AI to get a detailed troubleshooting report that determines whether the alert requires immediate action or is just noise. The AI examines your alert's history, correlates it with thousands of other metrics across your infrastructure, and provides actionable insights—all within minutes.
+
+**Key capabilities**:
+- **Automated Analysis:** Click "Ask AI" on any alert to generate a comprehensive troubleshooting report
+- **Correlation Discovery:** AI scans thousands of metrics to find what else was behaving abnormally
+- **Root Cause Hypothesis:** Get likely root causes with specific metrics and dimensions that matter most
+- **Noise Reduction:** Quickly identify false positives versus legitimate issues
+
+**How to access**:
+- From the Alerts tab: Click the "Ask AI" button on any alert
+- From the Insights tab: Select "Alert Troubleshooting" and choose an alert
+- From email notifications: Click "Troubleshoot with AI" link
+
+Reports generate in 1-2 minutes and are saved in your Insights tab. All Business plan users get 10 AI troubleshooting sessions per month during trial.
+
+**Access**: Netdata Cloud Business Feature
+
 ## Coming Soon
 
 ### AI Chat with Netdata (Netdata Cloud version)
@@ -171,23 +183,6 @@ Soon, Netdata Cloud will become an MCP server itself. This means you'll be able 
 - No local bridge setup required
 - Team collaboration on AI conversations
 - Access from any device, anywhere
-
----
-
-### AI Alert Assistant
-
-**In Development (Netdata Cloud)** - Real-time AI help when alerts fire
-
-When critical alerts trigger, you'll get instant AI analysis of the situation. The Alert Assistant will identify likely root causes, provide specific troubleshooting steps, and guide you through resolution - all tailored to your specific infrastructure and alert context.
-
-**What to expect**:
-
-- Automatic activation when viewing alerts
-- Root cause analysis with confidence scores
-- Step-by-step remediation guidance
-- Integration with your runbooks and procedures
-
----
 
 ### AI Weekly Digest
 
