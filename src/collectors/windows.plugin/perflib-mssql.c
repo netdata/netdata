@@ -119,6 +119,7 @@ struct mssql_instance {
     RRDSET *st_buff_checkpoint_pages;
     RRDDIM *rd_buff_checkpoint_pages;
 
+    RRDSET *st_access_method_page_splits;
     RRDDIM *rd_access_method_page_splits;
 
     RRDSET *st_sql_errors;
@@ -1984,6 +1985,7 @@ int dict_mssql_buffman_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, voi
         return 1;
 
     if (!mdi->st_buff_page_iops) {
+        char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_bufman_iops", mi->instanceID);
         netdata_fix_chart_name(id);
         mdi->st_buff_page_iops = rrdset_create_localhost(
@@ -1997,7 +1999,7 @@ int dict_mssql_buffman_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, voi
                 PLUGIN_WINDOWS_NAME,
                 "PerflibMSSQL",
                 PRIO_MSSQL_BUFF_MAN_IOPS,
-                update_every,
+                mi->update_every,
                 RRDSET_TYPE_LINE);
 
         mdi->rd_buff_page_reads = rrddim_add(mdi->st_buff_page_iops, "read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
