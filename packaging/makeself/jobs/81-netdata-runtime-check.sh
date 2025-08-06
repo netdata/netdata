@@ -16,7 +16,7 @@ trap dump_log EXIT
 export NETDATA_LIBEXEC_PREFIX="${NETDATA_INSTALL_PATH}/usr/libexec/netdata"
 export NETDATA_SKIP_LIBEXEC_PARTS="freeipmi|xenstat|cups"
 
-case "$(uname -m)" in
+case "${BUILDARCH}" in
     x86_64) ;;
     armv6l) NETDATA_SKIP_LIBEXEC_PARTS="${NETDATA_SKIP_LIBEXEC_PARTS}|ebpf|otel|systemd-journal" ;;
     *) NETDATA_SKIP_LIBEXEC_PARTS="${NETDATA_SKIP_LIBEXEC_PARTS}|ebpf" ;;
