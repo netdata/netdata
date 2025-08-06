@@ -164,7 +164,7 @@ When an alert fires, you can now use AI to get a detailed troubleshooting report
 - From the Insights tab: Select "Alert Troubleshooting" and choose an alert
 - From email notifications: Click "Troubleshoot with AI" link
 
-Reports generate in 1-2 minutes and are saved in your Insights tab. All Business plan users get 10 AI troubleshooting sessions per month during trial.
+Reports are generated in 1-2 minutes and saved in your Insights tab. All Business plan users get 10 AI troubleshooting sessions per month during trial.
 
 **Access**: Netdata Cloud Business Feature
 
