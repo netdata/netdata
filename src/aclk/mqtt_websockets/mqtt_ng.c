@@ -5,7 +5,7 @@
 #endif
 
 #include "libnetdata/libnetdata.h"
-void pulse_aclk_sent_message_acked(usec_t usec, size_t len);
+void pulse_aclk_sent_message_acked(usec_t publish_latency, size_t len);
 
 #include "common_internal.h"
 #include "mqtt_constants.h"
@@ -250,6 +250,8 @@ struct mqtt_ng_client {
 
     size_t max_msg_size;
 };
+
+usec_t publish_latency;
 
 unsigned char pingreq[] = { MQTT_CPT_PINGREQ << 4, 0x00 };
 
@@ -622,6 +624,7 @@ struct mqtt_ng_client *mqtt_ng_init(struct mqtt_ng_init *settings)
     client->msg_callback = settings->msg_callback;
     spinlock_init(&client->pending_packets.spinlock);
     client->pending_packets.JudyL = NULL;
+    __atomic_store_n(&publish_latency, 0, __ATOMIC_RELEASE);
 
     return client;
 }
@@ -1165,7 +1168,9 @@ static int mark_packet_acked(struct mqtt_ng_client *client, uint16_t packet_id)
                 UNLOCK_HDR_BUFFER(&client->main_buffer);
                 return 1;
             }
-            pulse_aclk_sent_message_acked(frag->sent_monotonic_ut, frag->len);
+            usec_t latency = now_monotonic_usec() - frag->sent_monotonic_ut;
+            pulse_aclk_sent_message_acked(latency, frag->len);
+            __atomic_store_n(&publish_latency, latency, __ATOMIC_RELEASE);
             mark_message_for_gc(frag);
 
             size_t used = BUFFER_BYTES_USED(&client->main_buffer.hdr_buffer);
