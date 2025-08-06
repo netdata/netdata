@@ -37,6 +37,7 @@ struct netdata_mssql_conn {
     SQLHSTMT databaseListSTMT;
     SQLHSTMT dataFileSizeSTMT;
     SQLHSTMT dbTransactionSTMT;
+    SQLHSTMT dbInstanceTransactionSTMT;
     SQLHSTMT dbWaitsSTMT;
     SQLHSTMT dbLocksSTMT;
 
@@ -191,6 +192,7 @@ struct mssql_db_instance {
     struct mssql_instance *parent;
 
     bool collecting_data;
+    bool collect_instance;
 
     RRDSET *st_db_data_file_size;
     RRDSET *st_db_active_transactions;
@@ -333,6 +335,60 @@ static ULONGLONG netdata_MSSQL_fill_long_value(SQLHSTMT *stmt, const char *mask,
     return (ULONGLONG)(db_size * MEGA_FACTOR);
 }
 
+void dict_mssql_fill_instance_transactions(struct mssql_db_instance *mdi)
+{
+    char object_name[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
+    long value = 0;
+    SQLLEN col_object_len = 0, col_value_len = 0;
+
+    SQLCHAR query[sizeof(NETDATA_QUERY_TRANSACTIONS_PER_INSTANCE_MASK) + NETDATA_MAX_INSTANCE_OBJECT + 1];
+    snprintfz(
+            (char *)query,
+            sizeof(NETDATA_QUERY_TRANSACTIONS_PER_INSTANCE_MASK) + NETDATA_MAX_INSTANCE_OBJECT,
+            NETDATA_QUERY_TRANSACTIONS_PER_INSTANCE_MASK,
+            mdi->parent->instanceID);
+
+    SQLRETURN ret = SQLExecDirect(mdi->parent->conn->dbInstanceTransactionSTMT, (SQLCHAR *)query, SQL_NTS);
+    if (ret != SQL_SUCCESS) {
+        mdi->collecting_data = false;
+        netdata_MSSQL_error(
+                SQL_HANDLE_STMT, mdi->parent->conn->dbInstanceTransactionSTMT, NETDATA_MSSQL_ODBC_QUERY, mdi->parent->instanceID);
+        goto enditransactions;
+    }
+
+    ret = SQLBindCol(
+            mdi->parent->conn->dbInstanceTransactionSTMT, 1, SQL_C_CHAR, object_name, sizeof(object_name), &col_object_len);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(
+                SQL_HANDLE_STMT, mdi->parent->conn->dbInstanceTransactionSTMT, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
+        goto enditransactions;
+    }
+
+    ret = SQLBindCol(mdi->parent->conn->dbInstanceTransactionSTMT, 2, SQL_C_LONG, &value, sizeof(value), &col_value_len);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(
+                SQL_HANDLE_STMT, mdi->parent->conn->dbInstanceTransactionSTMT, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
+        goto enditransactions;
+    }
+
+    do {
+        ret = SQLFetch(mdi->parent->conn->dbInstanceTransactionSTMT);
+        switch (ret) {
+            case SQL_SUCCESS:
+            case SQL_SUCCESS_WITH_INFO:
+                break;
+            case SQL_NO_DATA:
+            default:
+                goto enditransactions;
+        }
+
+        // We cannot use strcmp, because buffer is filled with spaces instead NULL.
+    } while (true);
+
+    enditransactions:
+    netdata_MSSQL_release_results(mdi->parent->conn->dbInstanceTransactionSTMT);
+}
+
 #define NETDATA_MSSQL_ACTIVE_TRANSACTIONS_METRIC "Active Transactions"
 #define NETDATA_MSSQL_TRANSACTION_PER_SEC_METRIC "Transactions/sec"
 #define NETDATA_MSSQL_WRITE_TRANSACTIONS_METRIC "Write Transactions/sec"
@@ -349,6 +405,9 @@ void dict_mssql_fill_transactions(struct mssql_db_instance *mdi, const char *dbn
     char object_name[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
     long value = 0;
     SQLLEN col_object_len = 0, col_value_len = 0;
+
+    if (mdi->collect_instance)
+        dict_mssql_fill_instance_transactions(mdi);
 
     SQLCHAR query[sizeof(NETDATA_QUERY_TRANSACTIONS_MASK) + 2 * NETDATA_MAX_INSTANCE_OBJECT + 1];
     snprintfz(
@@ -691,6 +750,7 @@ void metdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi)
         goto enddblist;
     }
 
+    int i = 0;
     do {
         ret = SQLFetch(mi->conn->databaseListSTMT);
         if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
@@ -704,6 +764,10 @@ void metdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi)
         mdi->updated = 0;
         if (!mdi->parent) {
             mdi->parent = mi;
+        }
+
+        if (!i) {
+            mdi->collect_instance = true;
         }
     } while (true);
 
@@ -773,6 +837,10 @@ static bool netdata_MSSQL_initialize_conection(struct netdata_mssql_conn *nmc)
             retConn = FALSE;
 
         ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dbTransactionSTMT);
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
+            retConn = FALSE;
+
+        ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dbInstanceTransactionSTMT);
         if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
             retConn = FALSE;
 
@@ -2374,6 +2442,9 @@ static void do_mssql_databases(PERF_DATA_BLOCK *pDataBlock, struct mssql_instanc
         if (!mdi->parent) {
             mdi->parent = mi;
         }
+
+        if (!i)
+            mdi->collect_instance = true;
     }
 
 end_mssql_databases:
