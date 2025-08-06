@@ -109,6 +109,10 @@ modules:
               description: If set, the collector will create a Netdata Virtual Node for this SNMP device, which will appear as a separate Node in Netdata.
               default_value: "true"
               required: false
+            - name: vnode_device_down_threshold
+              description: Number of consecutive failed data collections before marking the device as down.
+              default_value: 3
+              required: false
             - name: vnode.guid
               description: A unique identifier for the Virtual Node. If not set, a GUID will be automatically generated from the device's IP address.
               default_value: ""
