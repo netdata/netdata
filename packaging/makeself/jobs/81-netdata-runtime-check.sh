@@ -18,7 +18,7 @@ export NETDATA_SKIP_LIBEXEC_PARTS="freeipmi|xenstat|cups"
 
 case "$(uname -m)" in
     x86_64) ;;
-    armv6l) NETDATA_SKIP_LIBEXEC_PARTS="${NETDATA_SKIP_LIBEXEC_PARTS}|ebpf|nom|systemd-journal" ;;
+    armv6l) NETDATA_SKIP_LIBEXEC_PARTS="${NETDATA_SKIP_LIBEXEC_PARTS}|ebpf|otel|systemd-journal" ;;
     *) NETDATA_SKIP_LIBEXEC_PARTS="${NETDATA_SKIP_LIBEXEC_PARTS}|ebpf" ;;
 esac
 
