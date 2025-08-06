@@ -110,12 +110,6 @@ struct mssql_instance {
     RRDSET *st_stats_safe_auto;
     RRDDIM *rd_stats_safe_auto;
 
-    RRDSET *st_stats_compilation;
-    RRDDIM *rd_stats_compilation;
-
-    RRDSET *st_stats_recompiles;
-    RRDDIM *rd_stats_recompiles;
-
     RRDSET *st_buff_cache_hits;
     RRDDIM *rd_buff_cache_hits;
 
@@ -125,11 +119,6 @@ struct mssql_instance {
     RRDSET *st_buff_checkpoint_pages;
     RRDDIM *rd_buff_checkpoint_pages;
 
-    RRDSET *st_buff_page_iops;
-    RRDDIM *rd_buff_page_reads;
-    RRDDIM *rd_buff_page_writes;
-
-    RRDSET *st_access_method_page_splits;
     RRDDIM *rd_access_method_page_splits;
 
     RRDSET *st_sql_errors;
@@ -157,8 +146,6 @@ struct mssql_instance {
     COUNTER_DATA MSSQLBufferCacheHits;
     COUNTER_DATA MSSQLBufferCheckpointPages;
     COUNTER_DATA MSSQLBufferPageLifeExpectancy;
-    COUNTER_DATA MSSQLBufferPageReads;
-    COUNTER_DATA MSSQLBufferPageWrites;
     COUNTER_DATA MSSQLBlockedProcesses;
     COUNTER_DATA MSSQLUserConnections;
     COUNTER_DATA MSSQLConnectionMemoryBytes;
@@ -169,8 +156,6 @@ struct mssql_instance {
     COUNTER_DATA MSSQLStatsAutoParameterization;
     COUNTER_DATA MSSQLStatsBatchRequests;
     COUNTER_DATA MSSQLStatSafeAutoParameterization;
-    COUNTER_DATA MSSQLCompilations;
-    COUNTER_DATA MSSQLRecompilations;
 };
 
 struct mssql_lock_instance {
@@ -205,6 +190,11 @@ struct mssql_db_instance {
     RRDSET *st_db_deadlock;
     RRDSET *st_lock_timeouts;
     RRDSET *st_lock_requests;
+    RRDSET *st_buff_page_iops;
+    RRDSET *st_stats_compilation;
+    RRDSET *st_stats_recompiles;
+
+    RRDSET *st_access_method_page_splits;
 
     RRDDIM *rd_db_data_file_size;
     RRDDIM *rd_db_active_transactions;
@@ -217,6 +207,10 @@ struct mssql_db_instance {
     RRDDIM *rd_db_deadlock;
     RRDDIM *rd_lock_timeouts;
     RRDDIM *rd_lock_requests;
+    RRDDIM *rd_buff_page_reads;
+    RRDDIM *rd_buff_page_writes;
+    RRDDIM *rd_stats_compilation;
+    RRDDIM *rd_stats_recompiles;
 
     COUNTER_DATA MSSQLDatabaseDataFileSize;
 
@@ -231,6 +225,12 @@ struct mssql_db_instance {
     COUNTER_DATA MSSQLDatabaseDeadLockSec;
     COUNTER_DATA MSSQLDatabaseLockTimeoutsSec;
     COUNTER_DATA MSSQLDatabaseLockRequestsSec;
+
+    COUNTER_DATA MSSQLBufferPageReads;
+    COUNTER_DATA MSSQLBufferPageWrites;
+
+    COUNTER_DATA MSSQLCompilations;
+    COUNTER_DATA MSSQLRecompilations;
 
     uint32_t updated;
 };
@@ -335,6 +335,11 @@ static ULONGLONG netdata_MSSQL_fill_long_value(SQLHSTMT *stmt, const char *mask,
     return (ULONGLONG)(db_size * MEGA_FACTOR);
 }
 
+#define NETDATA_MSSQL_BUFFER_PAGE_READS_METRIC "Page reads/sec"
+#define NETDATA_MSSQL_BUFFER_PAGE_WRITES_METRIC "Page writes/sec"
+#define NETDATA_MSSQL_STATS_COMPILATIONS_METRIC "SQL Compilations/sec"
+#define NETDATA_MSSQL_STATS_RECOMPILATIONS_METRIC "SQL Re-Compilations/sec"
+
 void dict_mssql_fill_instance_transactions(struct mssql_db_instance *mdi)
 {
     char object_name[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
@@ -383,6 +388,18 @@ void dict_mssql_fill_instance_transactions(struct mssql_db_instance *mdi)
         }
 
         // We cannot use strcmp, because buffer is filled with spaces instead NULL.
+        if (!strncmp(
+                object_name, NETDATA_MSSQL_BUFFER_PAGE_READS_METRIC, sizeof(NETDATA_MSSQL_BUFFER_PAGE_READS_METRIC) - 1))
+            mdi->MSSQLBufferPageReads.current.Data = (ULONGLONG)value;
+        else if (!strncmp(
+                object_name, NETDATA_MSSQL_BUFFER_PAGE_WRITES_METRIC, sizeof(NETDATA_MSSQL_BUFFER_PAGE_WRITES_METRIC) - 1))
+            mdi->MSSQLBufferPageWrites.current.Data = (ULONGLONG)value;
+        else if (!strncmp(
+                object_name, NETDATA_MSSQL_STATS_COMPILATIONS_METRIC, sizeof(NETDATA_MSSQL_STATS_COMPILATIONS_METRIC) - 1))
+            mdi->MSSQLCompilations.current.Data = (ULONGLONG)value;
+        else if (!strncmp(
+                object_name, NETDATA_MSSQL_STATS_RECOMPILATIONS_METRIC, sizeof(NETDATA_MSSQL_STATS_RECOMPILATIONS_METRIC) - 1))
+            mdi->MSSQLRecompilations.current.Data = (ULONGLONG)value;
     } while (true);
 
     enditransactions:
@@ -915,15 +932,11 @@ static inline void initialize_mssql_keys(struct mssql_instance *mi)
     mi->MSSQLStatsAutoParameterization.key = "Auto-Param Attempts/sec";
     mi->MSSQLStatsBatchRequests.key = "Batch Requests/sec";
     mi->MSSQLStatSafeAutoParameterization.key = "Safe Auto-Params/sec";
-    mi->MSSQLCompilations.key = "SQL Compilations/sec";
-    mi->MSSQLRecompilations.key = "SQL Re-Compilations/sec";
 
     // Buffer Management (https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-buffer-manager-object)
     mi->MSSQLBufferCacheHits.key = "Buffer cache hit ratio";
     mi->MSSQLBufferPageLifeExpectancy.key = "Page life expectancy";
     mi->MSSQLBufferCheckpointPages.key = "Checkpoint pages/sec";
-    mi->MSSQLBufferPageReads.key = "Page reads/sec";
-    mi->MSSQLBufferPageWrites.key = "Page writes/sec";
 
     // Access Methods (https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-access-methods-object)
     mi->MSSQLAccessMethodPageSplits.key = "Page Splits/sec";
@@ -1419,6 +1432,7 @@ static void do_mssql_sql_statistics(PERF_DATA_BLOCK *pDataBlock, struct mssql_in
         rrdset_done(mi->st_stats_safe_auto);
     }
 
+    /*
     if (perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLCompilations)) {
         if (!mi->st_stats_compilation) {
             snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_sqlstats_sql_compilations", mi->instanceID);
@@ -1476,6 +1490,7 @@ static void do_mssql_sql_statistics(PERF_DATA_BLOCK *pDataBlock, struct mssql_in
             mi->st_stats_recompiles, mi->rd_stats_recompiles, (collected_number)mi->MSSQLRecompilations.current.Data);
         rrdset_done(mi->st_stats_recompiles);
     }
+     */
 }
 
 static void do_mssql_buffer_management(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
@@ -1579,6 +1594,7 @@ static void do_mssql_buffer_management(PERF_DATA_BLOCK *pDataBlock, struct mssql
         rrdset_done(mi->st_buff_cache_page_life_expectancy);
     }
 
+    /*
     if (perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLBufferPageReads) &&
         perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLBufferPageWrites)) {
         if (!mi->st_buff_page_iops) {
@@ -1612,6 +1628,7 @@ static void do_mssql_buffer_management(PERF_DATA_BLOCK *pDataBlock, struct mssql
 
         rrdset_done(mi->st_buff_page_iops);
     }
+     */
 }
 
 static void do_mssql_access_methods(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
