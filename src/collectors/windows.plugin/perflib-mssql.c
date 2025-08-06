@@ -1332,7 +1332,7 @@ static void do_mssql_general_stats(PERF_DATA_BLOCK *pDataBlock, struct mssql_ins
     }
 }
 
-static void do_mssql_sql_statistics(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
+static void do_mssql_statistics_perflib(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
 {
     char id[RRD_ID_LENGTH_MAX + 1];
 
@@ -1494,7 +1494,7 @@ static void do_mssql_sql_statistics(PERF_DATA_BLOCK *pDataBlock, struct mssql_in
      */
 }
 
-static void do_mssql_buffer_management(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
+static void do_mssql_bufferman_perflib(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
 {
     char id[RRD_ID_LENGTH_MAX + 1];
 
@@ -2637,19 +2637,19 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
     int *update_every = data;
 
     static void (*doMSSQL[])(PERF_DATA_BLOCK *, struct mssql_instance *, int) = {
-        do_mssql_general_stats,
-        do_mssql_errors,
-        do_mssql_memory_mgr,
-        do_mssql_buffer_management,
-        do_mssql_sql_statistics,
-        do_mssql_access_methods,
+            do_mssql_general_stats,
+            do_mssql_errors,
+            do_mssql_memory_mgr,
+            do_mssql_bufferman_perflib,
+            do_mssql_statistics_perflib,
+            do_mssql_access_methods,
 
-        do_mssql_databases,
-        do_mssql_locks,
-        do_mssql_waits,
-        do_mssql_bufferman_sql,
+            do_mssql_databases,
+            do_mssql_locks,
+            do_mssql_waits,
+            do_mssql_bufferman_sql,
 
-        NULL};
+            NULL};
 
     DWORD i;
     PERF_DATA_BLOCK *pDataBlock;
