@@ -92,12 +92,12 @@ static inline size_t aclk_time_histogram_slot(struct aclk_time_histogram *h, use
     return low - 1;
 }
 
-void pulse_aclk_sent_message_acked(usec_t sent_ut, size_t len __maybe_unused) {
-    if(!sent_ut) return;
+void pulse_aclk_sent_message_acked(usec_t publish_latency, size_t len __maybe_unused) {
+    if(!publish_latency) return;
 
-    usec_t usec = now_monotonic_usec() - sent_ut;
+//    usec_t usec = now_monotonic_usec() - publish_latency;
 
-    size_t slot = aclk_time_histogram_slot(&aclk_time_heatmap, usec);
+    size_t slot = aclk_time_histogram_slot(&aclk_time_heatmap, publish_latency);
     internal_fatal(slot >= _countof(aclk_time_heatmap.array), "hey!");
 
     __atomic_add_fetch(&aclk_time_heatmap.array[slot].count, 1, __ATOMIC_RELAXED);

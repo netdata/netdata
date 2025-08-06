@@ -1061,6 +1061,9 @@ static void fill_alert_status_for_host(BUFFER *wb, RRDHOST *host)
         aclk_host_config->snapshot_count);
 }
 
+
+extern usec_t publish_latency;
+
 char *aclk_state(void)
 {
     BUFFER *wb = buffer_create(1024, &netdata_buffers_statistics.buffers_aclk);
@@ -1080,7 +1083,10 @@ char *aclk_state(void)
     else {
         const char *cloud_base_url = cloud_config_url_get();
         char *aclk_proxy = (char *)aclk_get_proxy(NULL, true);
-        buffer_sprintf(wb, "Yes\nClaimed Id: %s\nCloud URL: %s\nACLK Proxy: %s\n", claim_id.str, cloud_base_url ? cloud_base_url : "null", aclk_proxy ? aclk_proxy : "none");
+        usec_t latency = __atomic_load_n(&publish_latency, __ATOMIC_RELAXED);
+        char latency_str[64];
+        duration_snprintf(latency_str, sizeof(latency_str), (int64_t) latency, "us", true);
+        buffer_sprintf(wb, "Yes\nClaimed Id: %s\nCloud URL: %s\nACLK Proxy: %s\nPublish Latency: %s\n", claim_id.str, cloud_base_url ? cloud_base_url : "null", aclk_proxy ? aclk_proxy : "none", latency_str);
     }
 
     buffer_sprintf(wb, "Online: %s\nReconnect count: %d\nBanned By Cloud: %s\n", aclk_online() ? "Yes" : "No", aclk_connection_counter > 0 ? (aclk_connection_counter - 1) : 0, aclk_disable_runtime ? "Yes" : "No");
@@ -1210,6 +1216,10 @@ char *aclk_state_json(void)
     char *aclk_proxy = (char *)aclk_get_proxy(NULL, true);
     tmp = aclk_proxy ? json_object_new_string(aclk_proxy) : NULL;
     json_object_object_add(msg, "aclk_proxy", tmp);
+
+    usec_t latency = __atomic_load_n(&publish_latency, __ATOMIC_RELAXED);
+    tmp =json_object_new_int64((int64_t) latency);
+    json_object_object_add(msg, "publish_latency_us", tmp);
 
     tmp = json_object_new_boolean(aclk_online());
     json_object_object_add(msg, "online", tmp);
