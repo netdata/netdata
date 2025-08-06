@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- feat\(system-info\): add default network interface IP detection [\#20764](https://github.com/netdata/netdata/pull/20764) ([ilyam8](https://github.com/ilyam8))
+- chore\(go.d\): remove patternProperties from config\_schema.json [\#20763](https://github.com/netdata/netdata/pull/20763) ([ilyam8](https://github.com/ilyam8))
+- fix\(go.d/snmp-profile\): fix extends in cradlepoint.yaml [\#20762](https://github.com/netdata/netdata/pull/20762) ([ilyam8](https://github.com/ilyam8))
+- fix\(go.d\): validate custom binary path [\#20761](https://github.com/netdata/netdata/pull/20761) ([ilyam8](https://github.com/ilyam8))
+- Update welcome-to-netdata.md [\#20760](https://github.com/netdata/netdata/pull/20760) ([kanelatechnical](https://github.com/kanelatechnical))
 - chore\(go.d/snmp\): update org to vendor mapping [\#20757](https://github.com/netdata/netdata/pull/20757) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d/snmp\): update hostname to not include IP [\#20756](https://github.com/netdata/netdata/pull/20756) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d/snmp\): add \_clean\_hostname host label [\#20755](https://github.com/netdata/netdata/pull/20755) ([ilyam8](https://github.com/ilyam8))
@@ -437,7 +442,6 @@
 - Let the user override the default stack size [\#20236](https://github.com/netdata/netdata/pull/20236) ([stelfrag](https://github.com/stelfrag))
 - Revert "Revert "fix\(go.d/couchdb\): correct db size charts unit"" [\#20235](https://github.com/netdata/netdata/pull/20235) ([ilyam8](https://github.com/ilyam8))
 - Improve MSSQL \(Part III\) [\#20230](https://github.com/netdata/netdata/pull/20230) ([thiagoftsm](https://github.com/thiagoftsm))
-- Make all threads joinable and join on agent shutdown [\#20228](https://github.com/netdata/netdata/pull/20228) ([stelfrag](https://github.com/stelfrag))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
@@ -464,11 +468,6 @@
 - Revert "fix\(go.d/couchdb\): correct db size charts unit" [\#20234](https://github.com/netdata/netdata/pull/20234) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d/couchdb\): correct db size charts unit [\#20233](https://github.com/netdata/netdata/pull/20233) ([ilyam8](https://github.com/ilyam8))
 - docs: rename DynCfg developer doc to avoid title conflict [\#20232](https://github.com/netdata/netdata/pull/20232) ([ilyam8](https://github.com/ilyam8))
-- status file 28 [\#20229](https://github.com/netdata/netdata/pull/20229) ([ktsaou](https://github.com/ktsaou))
-- Regenerate integrations docs [\#20227](https://github.com/netdata/netdata/pull/20227) ([netdatabot](https://github.com/netdatabot))
-- Fix potential null pointer dereference when accessing journalfile [\#20226](https://github.com/netdata/netdata/pull/20226) ([stelfrag](https://github.com/stelfrag))
-- fix crashes 8 [\#20225](https://github.com/netdata/netdata/pull/20225) ([ktsaou](https://github.com/ktsaou))
-- fix crashes 7 [\#20224](https://github.com/netdata/netdata/pull/20224) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.4.0](https://github.com/netdata/netdata/tree/v2.4.0) (2025-04-14)
 
