@@ -802,18 +802,20 @@ static void remove_packet_from_timeout_monitor_list(struct mqtt_ng_client *clien
     spinlock_unlock(&client->pending_packets.spinlock);
 }
 
+#define PACKET_TIMEOUT_EPOCH (1704067200L)  // Jan 1, 2024 00:00:00 UTC
+
 static void add_packet_to_timeout_monitor_list(struct mqtt_ng_client *client, uint16_t packet_id)
 {
     spinlock_lock(&client->pending_packets.spinlock);
     time_t now = now_realtime_sec();
     // Add it to the JudyL array
-    time_t *Pvalue = (time_t *) JudyLIns(&client->pending_packets.JudyL, (Word_t) packet_id, PJE0);
+    uint32_t *Pvalue = (uint32_t *) JudyLIns(&client->pending_packets.JudyL, (Word_t) packet_id, PJE0);
     if (!Pvalue || Pvalue == PJERR) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Error inserting packet_id (%" PRIu16 ") into JudyL array.", packet_id);
         spinlock_unlock(&client->pending_packets.spinlock);
         return;
     }
-    *Pvalue = now + PACKET_ACK_TIMEOUT_SECS;
+    *Pvalue = (uint32_t) ((now - PACKET_TIMEOUT_EPOCH) + PACKET_ACK_TIMEOUT_SECS);
     spinlock_unlock(&client->pending_packets.spinlock);
 }
 
@@ -1189,12 +1191,12 @@ static void check_packet_monitor_list_for_timeouts(struct mqtt_ng_client *client
 {
     spinlock_lock(&client->pending_packets.spinlock);
     bool first_then_next = true;
-    time_t *Pvalue;
+    uint32_t *Pvalue;
     Word_t packet_id = 0;
     time_t now = now_realtime_sec();
-    while ((Pvalue = (time_t *) JudyLFirstThenNext(client->pending_packets.JudyL, &packet_id, &first_then_next))) {
-        time_t expire_time = *Pvalue;
-        if (now >= expire_time) {
+    while ((Pvalue = (uint32_t *) JudyLFirstThenNext(client->pending_packets.JudyL, &packet_id, &first_then_next))) {
+        uint32_t expire_time_delta = *Pvalue;
+        if (now >= (PACKET_TIMEOUT_EPOCH + expire_time_delta)) {
             spinlock_unlock(&client->pending_packets.spinlock);
             (void) mark_packet_acked(client, (uint16_t) packet_id);
             spinlock_lock(&client->pending_packets.spinlock);
