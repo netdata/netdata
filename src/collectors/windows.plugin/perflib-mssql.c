@@ -1976,14 +1976,8 @@ static void do_mssql_waits(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *m
     dictionary_sorted_walkthrough_read(mi->waits, dict_mssql_waits_charts_cb, mi);
 }
 
-int dict_mssql_buffman_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+void mssql_buffman_iops_chart(struct mssql_db_instance *mdi, struct mssql_instance *mi)
 {
-    struct mssql_db_instance *mdi = value;
-    struct mssql_instance *mi = data;
-
-    if (unlikely(!mdi->collect_instance))
-        return 1;
-
     if (!mdi->st_buff_page_iops) {
         char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_bufman_iops", mi->instanceID);
@@ -2015,6 +2009,17 @@ int dict_mssql_buffman_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, voi
             mdi->st_buff_page_iops, mdi->rd_buff_page_writes, (collected_number)mdi->MSSQLBufferPageWrites.current.Data);
 
     rrdset_done(mdi->st_buff_page_iops);
+}
+
+int dict_mssql_buffman_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
+    struct mssql_db_instance *mdi = value;
+    struct mssql_instance *mi = data;
+
+    if (unlikely(!mdi->collect_instance))
+        return 1;
+
+    mssql_buffman_iops_chart(mdi, mi);
 
     return 1;
 }
