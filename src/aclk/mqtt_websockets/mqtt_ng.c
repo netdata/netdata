@@ -1192,22 +1192,33 @@ static int mark_packet_acked(struct mqtt_ng_client *client, uint16_t packet_id)
     return 1;
 }
 
+#define MAX_TIMED_OUT_PACKETS (1024)
+
 static void check_packet_monitor_list_for_timeouts(struct mqtt_ng_client *client)
 {
+    uint16_t timed_out_packets[MAX_TIMED_OUT_PACKETS];
+    size_t timed_out_count = 0;
+
     spinlock_lock(&client->pending_packets.spinlock);
     bool first_then_next = true;
     uint32_t *Pvalue;
     Word_t packet_id = 0;
     time_t now = now_realtime_sec();
+
     while ((Pvalue = (uint32_t *) JudyLFirstThenNext(client->pending_packets.JudyL, &packet_id, &first_then_next))) {
         uint32_t expire_time_delta = *Pvalue;
         if (now >= (PACKET_TIMEOUT_EPOCH + expire_time_delta)) {
-            spinlock_unlock(&client->pending_packets.spinlock);
-            (void) mark_packet_acked(client, (uint16_t) packet_id);
-            spinlock_lock(&client->pending_packets.spinlock);
+            if (timed_out_count < MAX_TIMED_OUT_PACKETS) {
+                timed_out_packets[timed_out_count++] = (uint16_t) packet_id;
+            }
         }
     }
     spinlock_unlock(&client->pending_packets.spinlock);
+
+    // Process timeouts outside the lock
+    for (size_t i = 0; i < timed_out_count; i++) {
+        mark_packet_acked(client, timed_out_packets[i]);
+    }
 }
 
 #define PUBLISH_SP_SIZE 64
