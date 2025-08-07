@@ -801,8 +801,12 @@ static int optimized_add(struct header_buffer *buf, void *data, size_t data_len,
 static void remove_packet_from_timeout_monitor_list(struct mqtt_ng_client *client, uint16_t packet_id)
 {
     spinlock_lock(&client->pending_packets.spinlock);
-    (void) JudyLDel(&client->pending_packets.JudyL, (Word_t) packet_id, PJE0);
+    int rc = JudyLDel(&client->pending_packets.JudyL, (Word_t) packet_id, PJE0);
     spinlock_unlock(&client->pending_packets.spinlock);
+
+    // rc = 1 if the packer was deleted, so update statistics
+    if (likely(rc))
+        __atomic_fetch_sub(&client->stats.packets_waiting_puback, 1, __ATOMIC_RELAXED);
 }
 
 #define PACKET_TIMEOUT_EPOCH (1704067200L)  // Jan 1, 2024 00:00:00 UTC
@@ -813,13 +817,15 @@ static void add_packet_to_timeout_monitor_list(struct mqtt_ng_client *client, ui
     time_t now = now_realtime_sec();
     // Add it to the JudyL array
     uint32_t *Pvalue = (uint32_t *) JudyLIns(&client->pending_packets.JudyL, (Word_t) packet_id, PJE0);
-    if (!Pvalue || Pvalue == PJERR) {
+    if (Pvalue == PJERR) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Error inserting packet_id (%" PRIu16 ") into JudyL array.", packet_id);
         spinlock_unlock(&client->pending_packets.spinlock);
         return;
     }
     *Pvalue = (uint32_t) ((now - PACKET_TIMEOUT_EPOCH) + PACKET_ACK_TIMEOUT_SECS);
     spinlock_unlock(&client->pending_packets.spinlock);
+
+    __atomic_fetch_add(&client->stats.packets_waiting_puback, 1, __ATOMIC_RELAXED);
 }
 
 #define TRY_GENERATE_MESSAGE(generator_function, ...)                                                                  \
@@ -1194,7 +1200,7 @@ static int mark_packet_acked(struct mqtt_ng_client *client, uint16_t packet_id)
 
 #define MAX_TIMED_OUT_PACKETS (1024)
 
-static void check_packet_monitor_list_for_timeouts(struct mqtt_ng_client *client)
+static bool check_packet_monitor_list_for_timeouts(struct mqtt_ng_client *client)
 {
     uint16_t timed_out_packets[MAX_TIMED_OUT_PACKETS];
     size_t timed_out_count = 0;
@@ -1209,8 +1215,9 @@ static void check_packet_monitor_list_for_timeouts(struct mqtt_ng_client *client
         uint32_t expire_time_delta = *Pvalue;
         if (now >= (PACKET_TIMEOUT_EPOCH + expire_time_delta)) {
             if (timed_out_count < MAX_TIMED_OUT_PACKETS) {
-                timed_out_packets[timed_out_count++] = (uint16_t) packet_id;
-            }
+                timed_out_packets[timed_out_count++] = (uint16_t)packet_id;
+            } else
+                break;
         }
     }
     spinlock_unlock(&client->pending_packets.spinlock);
@@ -1219,6 +1226,8 @@ static void check_packet_monitor_list_for_timeouts(struct mqtt_ng_client *client
     for (size_t i = 0; i < timed_out_count; i++) {
         mark_packet_acked(client, timed_out_packets[i]);
     }
+
+    return (timed_out_count ==  MAX_TIMED_OUT_PACKETS);
 }
 
 #define PUBLISH_SP_SIZE 64
@@ -1936,7 +1945,6 @@ static int parse_data(struct mqtt_ng_client *client)
                     }
                     parser->state = MQTT_PARSE_MQTT_PACKET_DONE;
                     ping_timeout = 0;
-                    check_packet_monitor_list_for_timeouts(client);
                     break;
                 case MQTT_CPT_DISCONNECT:
                     rc = parse_disconnect_varhdr(client);
@@ -2177,6 +2185,8 @@ int handle_incoming_traffic(struct mqtt_ng_client *client)
     return rc;
 }
 
+#define PACKET_TIMEOUT_REPEAT_CHECK (60)
+
 int mqtt_ng_sync(struct mqtt_ng_client *client)
 {
     if (client->client_state == MQTT_STATE_RAW || client->client_state == MQTT_STATE_DISCONNECTED)
@@ -2184,6 +2194,15 @@ int mqtt_ng_sync(struct mqtt_ng_client *client)
     
     if (client->client_state == MQTT_STATE_ERROR)
         return 1;
+
+    // Check for packet timeouts and cleanup
+    static time_t last_maintenance = 0;
+    if (now_realtime_sec() - last_maintenance >= PACKET_TIMEOUT_REPEAT_CHECK) {
+        // if check packet returns true then we did max cleanup, possibly there are more packets to cleanup
+        // so do not update last_maintenance thus forcing check again
+        if (likely(!check_packet_monitor_list_for_timeouts(client)))
+            last_maintenance = now_realtime_sec();
+    }
 
     worker_is_busy(WORKER_ACLK_TRY_SEND_ALL);
 
