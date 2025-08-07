@@ -2,9 +2,9 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use clap::Parser;
 use opentelemetry_proto::tonic::collector::logs::v1::{
-    ExportLogsServiceRequest, logs_service_client::LogsServiceClient,
+    logs_service_client::LogsServiceClient, ExportLogsServiceRequest,
 };
-use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue, any_value};
+use opentelemetry_proto::tonic::common::v1::{any_value, AnyValue, KeyValue};
 use opentelemetry_proto::tonic::logs::v1::{LogRecord, ResourceLogs, ScopeLogs};
 use opentelemetry_proto::tonic::resource::v1::Resource;
 use serde::Deserialize;
@@ -23,7 +23,7 @@ struct Args {
     #[arg(short, long, default_value = "1048576")]
     rate_limit_bytes: u64,
 
-    #[arg(short, long, default_value = "http://127.0.0.1:21213")]
+    #[arg(short, long, default_value = "http://127.0.0.1:4317")]
     otel_endpoint: String,
 
     #[arg(short, long, default_value = "1000")]

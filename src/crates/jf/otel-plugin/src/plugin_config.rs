@@ -12,7 +12,7 @@ use std::time::Duration;
 #[serde(deny_unknown_fields)]
 pub struct EndpointConfig {
     /// gRPC endpoint to listen on
-    #[arg(long = "otel-endpoint", default_value = "0.0.0.0:21213")]
+    #[arg(long = "otel-endpoint", default_value = "127.0.0.1:4317")]
     pub path: String,
 
     /// Path to TLS certificate file (enables TLS when provided)
@@ -31,7 +31,7 @@ pub struct EndpointConfig {
 impl Default for EndpointConfig {
     fn default() -> Self {
         Self {
-            path: String::from("0.0.0.0:21213"),
+            path: String::from("127.0.0.1:4317"),
             tls_cert_path: None,
             tls_key_path: None,
             tls_ca_cert_path: None,

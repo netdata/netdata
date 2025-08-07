@@ -3,7 +3,7 @@
 
 endpoint:
   # gRPC endpoint to listen on for OpenTelemetry data
-  path: "0.0.0.0:21213"
+  path: "127.0.0.1:4317"
 
   # Path to TLS certificate file (enables TLS when provided)
   tls_cert_path: null
