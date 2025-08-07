@@ -165,10 +165,10 @@ include:
 
   - &debian
     distro: debian
-    version: "12"
+    version: "13"
     support_type: Core
     notes: ''
-    base_image: debian:bookworm
+    base_image: debian:trixie
     eol_check: true
     eol_lts: true
     bundle_sentry:
@@ -180,8 +180,20 @@ include:
       apt-get purge -y libjson-c-dev
     packages: &debian_packages
       type: deb
-      repo_distro: debian/bookworm
+      repo_distro: debian/trixie
       builder_rev: v2
+      arches:
+        - amd64
+        - armhf
+        - arm64
+    test:
+      ebpf-core: true
+  - <<: *debian
+    version: "12"
+    base_image: debian:bookworm
+    packages:
+      <<: *debian_packages
+      repo_distro: debian/bookworm
       arches:
         - i386
         - amd64
@@ -195,6 +207,11 @@ include:
     packages:
       <<: *debian_packages
       repo_distro: debian/bullseye
+      arches:
+        - i386
+        - amd64
+        - armhf
+        - arm64
     test:
       ebpf-core: false
 
