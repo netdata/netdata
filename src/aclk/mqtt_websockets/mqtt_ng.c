@@ -804,12 +804,9 @@ static int optimized_add(struct header_buffer *buf, void *data, size_t data_len,
     return 0;
 }
 
-static void remove_packet_from_timeout_monitor_list(struct mqtt_ng_client *client, uint16_t packet_id)
+static void remove_packet_from_timeout_monitor_list_unsafe(struct mqtt_ng_client *client, uint16_t packet_id)
 {
-    spinlock_lock(&client->pending_packets.spinlock);
     int rc = JudyLDel(&client->pending_packets.JudyL, (Word_t) packet_id, PJE0);
-    spinlock_unlock(&client->pending_packets.spinlock);
-
     // rc = 1 if the packer was deleted, so update statistics
     if (likely(rc))
         __atomic_fetch_sub(&client->stats.packets_waiting_puback, 1, __ATOMIC_RELAXED);
@@ -1174,6 +1171,7 @@ static void mark_message_for_gc(struct buffer_fragment *frag)
 static int mark_packet_acked(struct mqtt_ng_client *client, uint16_t packet_id)
 {
     size_t reclaimable = 0;
+    spinlock_lock(&client->pending_packets.spinlock);
     LOCK_HDR_BUFFER(&client->main_buffer);
     struct buffer_fragment *frag = BUFFER_FIRST_FRAG(&client->main_buffer.hdr_buffer);
     while (frag) {
@@ -1181,6 +1179,7 @@ static int mark_packet_acked(struct mqtt_ng_client *client, uint16_t packet_id)
             if (!frag->sent) {
                 nd_log(NDLS_DAEMON, NDLP_ERR, "Received packet_id (%" PRIu16 ") belongs to MQTT packet which was not yet sent!", packet_id);
                 UNLOCK_HDR_BUFFER(&client->main_buffer);
+                spinlock_unlock(&client->pending_packets.spinlock);
                 return 1;
             }
             usec_t latency = now_monotonic_usec() - frag->sent_monotonic_ut;
@@ -1193,7 +1192,8 @@ static int mark_packet_acked(struct mqtt_ng_client *client, uint16_t packet_id)
                 transaction_buffer_garbage_collect(&client->main_buffer);
 
             UNLOCK_HDR_BUFFER(&client->main_buffer);
-            remove_packet_from_timeout_monitor_list(client, packet_id);
+            remove_packet_from_timeout_monitor_list_unsafe(client, packet_id);
+            spinlock_unlock(&client->pending_packets.spinlock);
             return 0;
         }
 
@@ -1204,6 +1204,7 @@ static int mark_packet_acked(struct mqtt_ng_client *client, uint16_t packet_id)
     }
     nd_log(NDLS_DAEMON, NDLP_ERR, "Received packet_id (%" PRIu16 ") is unknown!", packet_id);
     UNLOCK_HDR_BUFFER(&client->main_buffer);
+    spinlock_unlock(&client->pending_packets.spinlock);
     return 1;
 }
 
