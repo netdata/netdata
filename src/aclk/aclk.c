@@ -1089,7 +1089,13 @@ char *aclk_state(void)
         buffer_sprintf(wb, "Yes\nClaimed Id: %s\nCloud URL: %s\nACLK Proxy: %s\nPublish Latency: %s\n", claim_id.str, cloud_base_url ? cloud_base_url : "null", aclk_proxy ? aclk_proxy : "none", latency_str);
     }
 
-    buffer_sprintf(wb, "Online: %s\nReconnect count: %d\nBanned By Cloud: %s\n", aclk_online() ? "Yes" : "No", aclk_connection_counter > 0 ? (aclk_connection_counter - 1) : 0, aclk_disable_runtime ? "Yes" : "No");
+    bool aclk_is_online = aclk_online();
+
+    struct mqtt_wss_stats aclk_stats;
+    if (aclk_is_online)
+        aclk_stats = aclk_statistics();
+
+    buffer_sprintf(wb, "Online: %s\nReconnect count: %d\nBanned By Cloud: %s\n", aclk_is_online ? "Yes" : "No", aclk_connection_counter > 0 ? (aclk_connection_counter - 1) : 0, aclk_disable_runtime ? "Yes" : "No");
     if (last_conn_time_mqtt && ((tmptr = localtime_r(&last_conn_time_mqtt, &tmbuf))) ) {
         char timebuf[26];
         strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
@@ -1111,8 +1117,9 @@ char *aclk_state(void)
         buffer_sprintf(wb, "Next Connection Attempt At: %s\nLast Backoff: %.3f", timebuf, last_backoff_value);
     }
 
-    if (aclk_online()) {
-        buffer_sprintf(wb, "Received Cloud MQTT Messages: %d\nMQTT Messages Confirmed by Remote Broker (PUBACKs): %d", aclk_rcvd_cloud_msgs, aclk_pubacks_per_conn);
+    if (aclk_is_online) {
+        buffer_sprintf(wb, "Received Cloud MQTT Messages: %d\nMQTT Messages Confirmed by Remote Broker (PUBACKs): %d\nPending PUBACKS: %d\n",
+                       aclk_rcvd_cloud_msgs, aclk_pubacks_per_conn, aclk_stats.mqtt.packets_waiting_puback);
 
         RRDHOST *host;
         rrd_rdlock();
@@ -1186,6 +1193,16 @@ static json_object *timestamp_to_json(const time_t *t)
 
 char *aclk_state_json(void)
 {
+
+    bool aclk_is_online = aclk_online();
+
+    struct mqtt_wss_stats aclk_stats;
+
+    if (aclk_is_online)
+        aclk_stats = aclk_statistics();
+    else
+        memset(&aclk_stats, 0, sizeof(aclk_stats));
+
     json_object *tmp, *grp, *msg = json_object_new_object();
 
     tmp = json_object_new_boolean(1);
@@ -1221,7 +1238,7 @@ char *aclk_state_json(void)
     tmp =json_object_new_int64((int64_t) latency);
     json_object_object_add(msg, "publish_latency_us", tmp);
 
-    tmp = json_object_new_boolean(aclk_online());
+    tmp = json_object_new_boolean(aclk_is_online);
     json_object_object_add(msg, "online", tmp);
 
     tmp = json_object_new_string("Protobuf");
@@ -1236,13 +1253,16 @@ char *aclk_state_json(void)
     tmp = json_object_new_int(aclk_pubacks_per_conn);
     json_object_object_add(msg, "received-mqtt-pubacks", tmp);
 
+    tmp = json_object_new_int((int32_t) aclk_stats.mqtt.packets_waiting_puback);
+    json_object_object_add(msg, "pending-mqtt-pubacks", tmp);
+
     tmp = json_object_new_int(aclk_connection_counter > 0 ? (aclk_connection_counter - 1) : 0);
     json_object_object_add(msg, "reconnect-count", tmp);
 
     json_object_object_add(msg, "last-connect-time-utc", timestamp_to_json(&last_conn_time_mqtt));
     json_object_object_add(msg, "last-connect-time-puback-utc", timestamp_to_json(&last_conn_time_appl));
     json_object_object_add(msg, "last-disconnect-time-utc", timestamp_to_json(&last_disconnect_time));
-    json_object_object_add(msg, "next-connection-attempt-utc", !aclk_online() ? timestamp_to_json(&next_connection_attempt) : NULL);
+    json_object_object_add(msg, "next-connection-attempt-utc", !aclk_is_online ? timestamp_to_json(&next_connection_attempt) : NULL);
     tmp = NULL;
     if (!aclk_online() && last_backoff_value)
         tmp = json_object_new_double(last_backoff_value);

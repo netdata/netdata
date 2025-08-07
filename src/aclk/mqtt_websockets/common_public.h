@@ -25,6 +25,7 @@ struct mqtt_ng_stats {
     int tx_messages_queued;
     int tx_messages_sent;
     int rx_messages_rcvd;
+    int packets_waiting_puback;
     size_t tx_buffer_used;
     size_t tx_buffer_free;
     size_t tx_buffer_size;
