@@ -110,9 +110,6 @@ struct mssql_instance {
     RRDSET *st_stats_safe_auto;
     RRDDIM *rd_stats_safe_auto;
 
-    RRDSET *st_buff_cache_hits;
-    RRDDIM *rd_buff_cache_hits;
-
     RRDSET *st_buff_cache_page_life_expectancy;
     RRDDIM *rd_buff_cache_page_life_expectancy;
 
@@ -144,7 +141,6 @@ struct mssql_instance {
     DICTIONARY *waits;
 
     COUNTER_DATA MSSQLAccessMethodPageSplits;
-    COUNTER_DATA MSSQLBufferCacheHits;
     COUNTER_DATA MSSQLBufferCheckpointPages;
     COUNTER_DATA MSSQLBufferPageLifeExpectancy;
     COUNTER_DATA MSSQLBlockedProcesses;
@@ -192,6 +188,8 @@ struct mssql_db_instance {
     RRDSET *st_lock_timeouts;
     RRDSET *st_lock_requests;
     RRDSET *st_buff_page_iops;
+    RRDSET *st_buff_cache_hits;
+
     RRDSET *st_stats_compilation;
     RRDSET *st_stats_recompiles;
 
@@ -210,6 +208,8 @@ struct mssql_db_instance {
     RRDDIM *rd_lock_requests;
     RRDDIM *rd_buff_page_reads;
     RRDDIM *rd_buff_page_writes;
+    RRDDIM *rd_buff_cache_hits;
+
     RRDDIM *rd_stats_compilation;
     RRDDIM *rd_stats_recompiles;
 
@@ -227,8 +227,10 @@ struct mssql_db_instance {
     COUNTER_DATA MSSQLDatabaseLockTimeoutsSec;
     COUNTER_DATA MSSQLDatabaseLockRequestsSec;
 
+    // Buffer Management (https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-buffer-manager-object)
     COUNTER_DATA MSSQLBufferPageReads;
     COUNTER_DATA MSSQLBufferPageWrites;
+    COUNTER_DATA MSSQLBufferCacheHits;
 
     COUNTER_DATA MSSQLCompilations;
     COUNTER_DATA MSSQLRecompilations;
@@ -338,6 +340,8 @@ static ULONGLONG netdata_MSSQL_fill_long_value(SQLHSTMT *stmt, const char *mask,
 
 #define NETDATA_MSSQL_BUFFER_PAGE_READS_METRIC "Page reads/sec"
 #define NETDATA_MSSQL_BUFFER_PAGE_WRITES_METRIC "Page writes/sec"
+#define NETDATA_MSSQL_BUFFER_PAGE_CACHE_METRIC "Buffer cache hit ratio"
+
 #define NETDATA_MSSQL_STATS_COMPILATIONS_METRIC "SQL Compilations/sec"
 #define NETDATA_MSSQL_STATS_RECOMPILATIONS_METRIC "SQL Re-Compilations/sec"
 
@@ -387,6 +391,7 @@ void dict_mssql_fill_instance_transactions(struct mssql_db_instance *mdi)
             default:
                 goto enditransactions;
         }
+#define NETDATA_MSSQL_BUFFER_PAGE_CACHE_METRIC "Buffer cache hit ratio"
 
         // We cannot use strcmp, because buffer is filled with spaces instead NULL.
         if (!strncmp(
@@ -395,6 +400,9 @@ void dict_mssql_fill_instance_transactions(struct mssql_db_instance *mdi)
         else if (!strncmp(
                 object_name, NETDATA_MSSQL_BUFFER_PAGE_WRITES_METRIC, sizeof(NETDATA_MSSQL_BUFFER_PAGE_WRITES_METRIC) - 1))
             mdi->MSSQLBufferPageWrites.current.Data = (ULONGLONG)value;
+        else if (!strncmp(
+                object_name, NETDATA_MSSQL_BUFFER_PAGE_CACHE_METRIC, sizeof(NETDATA_MSSQL_BUFFER_PAGE_CACHE_METRIC) - 1))
+            mdi->MSSQLBufferCacheHits.current.Data = (ULONGLONG)value;
         else if (!strncmp(
                 object_name, NETDATA_MSSQL_STATS_COMPILATIONS_METRIC, sizeof(NETDATA_MSSQL_STATS_COMPILATIONS_METRIC) - 1))
             mdi->MSSQLCompilations.current.Data = (ULONGLONG)value;
@@ -934,8 +942,6 @@ static inline void initialize_mssql_keys(struct mssql_instance *mi)
     mi->MSSQLStatsBatchRequests.key = "Batch Requests/sec";
     mi->MSSQLStatSafeAutoParameterization.key = "Safe Auto-Params/sec";
 
-    // Buffer Management (https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-buffer-manager-object)
-    mi->MSSQLBufferCacheHits.key = "Buffer cache hit ratio";
     mi->MSSQLBufferPageLifeExpectancy.key = "Page life expectancy";
     mi->MSSQLBufferCheckpointPages.key = "Checkpoint pages/sec";
 
@@ -1503,35 +1509,6 @@ static void do_mssql_bufferman_perflib(PERF_DATA_BLOCK *pDataBlock, struct mssql
     if (!pObjectType)
         return;
 
-    if (perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLBufferCacheHits)) {
-        if (!mi->st_buff_cache_hits) {
-            snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_cache_hit_ratio", mi->instanceID);
-            netdata_fix_chart_name(id);
-            mi->st_buff_cache_hits = rrdset_create_localhost(
-                "mssql",
-                id,
-                NULL,
-                "buffer cache",
-                "mssql.instance_cache_hit_ratio",
-                "Buffer Cache hit ratio",
-                "percentage",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibMSSQL",
-                PRIO_MSSQL_BUFF_CACHE_HIT_RATIO,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-            mi->rd_buff_cache_hits =
-                rrddim_add(mi->st_buff_cache_hits, "hit_ratio", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-
-            rrdlabels_add(mi->st_buff_cache_hits->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
-        }
-
-        rrddim_set_by_pointer(
-            mi->st_buff_cache_hits, mi->rd_buff_cache_hits, (collected_number)mi->MSSQLBufferCacheHits.current.Data);
-        rrdset_done(mi->st_buff_cache_hits);
-    }
-
     if (perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLBufferCheckpointPages)) {
         if (!mi->st_buff_checkpoint_pages) {
             snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_bufman_checkpoint_pages", mi->instanceID);
@@ -2009,6 +1986,37 @@ void mssql_buffman_iops_chart(struct mssql_db_instance *mdi, struct mssql_instan
             mdi->st_buff_page_iops, mdi->rd_buff_page_writes, (collected_number)mdi->MSSQLBufferPageWrites.current.Data);
 
     rrdset_done(mdi->st_buff_page_iops);
+}
+
+void mssql_buffman_cache_hit_ratio_chart(struct mssql_db_instance *mdi, struct mssql_instance *mi)
+{
+    if (!mdi->st_buff_cache_hits) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_cache_hit_ratio", mi->instanceID);
+        netdata_fix_chart_name(id);
+        mdi->st_buff_cache_hits = rrdset_create_localhost(
+                "mssql",
+                id,
+                NULL,
+                "buffer cache",
+                "mssql.instance_cache_hit_ratio",
+                "Buffer Cache hit ratio",
+                "percentage",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibMSSQL",
+                PRIO_MSSQL_BUFF_CACHE_HIT_RATIO,
+                mi->update_every,
+                RRDSET_TYPE_LINE);
+
+        mdi->rd_buff_cache_hits =
+                rrddim_add(mdi->st_buff_cache_hits, "hit_ratio", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(mdi->st_buff_cache_hits->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+            mdi->st_buff_cache_hits, mdi->rd_buff_cache_hits, (collected_number)mdi->MSSQLBufferCacheHits.current.Data);
+    rrdset_done(mdi->st_buff_cache_hits);
 }
 
 int dict_mssql_buffman_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
