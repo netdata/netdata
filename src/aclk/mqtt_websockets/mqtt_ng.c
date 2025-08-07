@@ -658,15 +658,21 @@ static void mqtt_ng_destroy_tx_alias_hash(c_rhash hash)
     c_rhash_destroy(hash);
 }
 
+static void destroy_timeout_monitor_list(struct mqtt_ng_client *client)
+{
+    spinlock_lock(&client->pending_packets.spinlock);
+    (void) JudyLFreeArray(&client->pending_packets.JudyL, PJE0);
+    spinlock_unlock(&client->pending_packets.spinlock);
+    __atomic_store_n(&client->stats.packets_waiting_puback, 0, __ATOMIC_RELAXED);
+}
+
 void mqtt_ng_destroy(struct mqtt_ng_client *client)
 {
     transaction_buffer_destroy(&client->main_buffer);
 
     mqtt_ng_destroy_tx_alias_hash(client->tx_topic_aliases.stoi_dict);
     mqtt_ng_destroy_rx_alias_hash(client->rx_aliases);
-    spinlock_lock(&client->pending_packets.spinlock);
-    (void) JudyLFreeArray(&client->pending_packets.JudyL, PJE0);
-    spinlock_unlock(&client->pending_packets.spinlock);
+    destroy_timeout_monitor_list(client);
     freez(client);
 }
 
@@ -1021,6 +1027,9 @@ int mqtt_ng_connect(struct mqtt_ng_client *client,
     if (clean_start)
         buffer_purge(&client->main_buffer.hdr_buffer);
     UNLOCK_HDR_BUFFER(&client->main_buffer);
+
+    if (clean_start)
+        destroy_timeout_monitor_list(client);
 
     spinlock_lock(&client->tx_topic_aliases.spinlock);
     // according to MQTT spec topic aliases should not be persisted
