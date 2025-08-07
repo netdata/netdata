@@ -187,8 +187,6 @@ struct mssql_db_instance {
     RRDSET *st_stats_compilation;
     RRDSET *st_stats_recompiles;
 
-    RRDSET *st_access_method_page_splits;
-
     RRDDIM *rd_db_data_file_size;
     RRDDIM *rd_db_active_transactions;
     RRDDIM *rd_db_backup_restore_operations;
@@ -1441,66 +1439,6 @@ static void do_mssql_statistics_perflib(PERF_DATA_BLOCK *pDataBlock, struct mssq
             (collected_number)mi->MSSQLStatSafeAutoParameterization.current.Data);
         rrdset_done(mi->st_stats_safe_auto);
     }
-
-    /*
-    if (perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLCompilations)) {
-        if (!mi->st_stats_compilation) {
-            snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_sqlstats_sql_compilations", mi->instanceID);
-            netdata_fix_chart_name(id);
-            mi->st_stats_compilation = rrdset_create_localhost(
-                "mssql",
-                id,
-                NULL,
-                "sql activity",
-                "mssql.instance_sqlstats_sql_compilations",
-                "SQL compilations",
-                "compilations/s",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibMSSQL",
-                PRIO_MSSQL_STATS_COMPILATIONS,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-            mi->rd_stats_compilation =
-                rrddim_add(mi->st_stats_compilation, "compilations", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-
-            rrdlabels_add(mi->st_stats_compilation->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
-        }
-
-        rrddim_set_by_pointer(
-            mi->st_stats_compilation, mi->rd_stats_compilation, (collected_number)mi->MSSQLCompilations.current.Data);
-        rrdset_done(mi->st_stats_compilation);
-    }
-
-    if (perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLRecompilations)) {
-        if (!mi->st_stats_recompiles) {
-            snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_sqlstats_sql_recompilations", mi->instanceID);
-            netdata_fix_chart_name(id);
-            mi->st_stats_recompiles = rrdset_create_localhost(
-                "mssql",
-                id,
-                NULL,
-                "sql activity",
-                "mssql.instance_sqlstats_sql_recompilations",
-                "SQL re-compilations",
-                "recompiles/",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibMSSQL",
-                PRIO_MSSQL_STATS_RECOMPILATIONS,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-            mi->rd_stats_recompiles =
-                rrddim_add(mi->st_stats_recompiles, "recompiles", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-
-            rrdlabels_add(mi->st_stats_recompiles->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
-        }
-
-        rrddim_set_by_pointer(
-            mi->st_stats_recompiles, mi->rd_stats_recompiles, (collected_number)mi->MSSQLRecompilations.current.Data);
-        rrdset_done(mi->st_stats_recompiles);
-    }
-     */
 }
 
 static void do_mssql_access_methods(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
@@ -2016,7 +1954,69 @@ void mssql_buffman_page_life_expectancy_chart(struct mssql_db_instance *mdi, str
     rrdset_done(mdi->st_buff_cache_page_life_expectancy);
 }
 
-int dict_mssql_buffman_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+static void netdata_mssql_compilations(struct mssql_db_instance *mdi, struct mssql_instance *mi) {
+    if (!mdi->st_stats_compilation) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_sqlstats_sql_compilations", mi->instanceID);
+        netdata_fix_chart_name(id);
+        mdi->st_stats_compilation = rrdset_create_localhost(
+                "mssql",
+                id,
+                NULL,
+                "sql activity",
+                "mssql.instance_sqlstats_sql_compilations",
+                "SQL compilations",
+                "compilations/s",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibMSSQL",
+                PRIO_MSSQL_STATS_COMPILATIONS,
+                mi->update_every,
+                RRDSET_TYPE_LINE);
+
+        mdi->rd_stats_compilation =
+                rrddim_add(mdi->st_stats_compilation, "compilations", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        rrdlabels_add(mdi->st_stats_compilation->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+            mdi->st_stats_compilation, mdi->rd_stats_compilation,
+            (collected_number) mdi->MSSQLCompilations.current.Data);
+    rrdset_done(mdi->st_stats_compilation);
+}
+
+static void netdata_mssql_recompilations(struct mssql_db_instance *mdi, struct mssql_instance *mi)
+{
+    if (!mdi->st_stats_recompiles) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_sqlstats_sql_recompilations", mi->instanceID);
+        netdata_fix_chart_name(id);
+        mdi->st_stats_recompiles = rrdset_create_localhost(
+                "mssql",
+                id,
+                NULL,
+                "sql activity",
+                "mssql.instance_sqlstats_sql_recompilations",
+                "SQL re-compilations",
+                "recompiles/",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibMSSQL",
+                PRIO_MSSQL_STATS_RECOMPILATIONS,
+                mi->update_every,
+                RRDSET_TYPE_LINE);
+
+        mdi->rd_stats_recompiles =
+                rrddim_add(mdi->st_stats_recompiles, "recompiles", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        rrdlabels_add(mdi->st_stats_recompiles->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+            mdi->st_stats_recompiles, mdi->rd_stats_recompiles, (collected_number)mdi->MSSQLRecompilations.current.Data);
+    rrdset_done(mdi->st_stats_recompiles);
+}
+
+int dict_mssql_buffman_stats_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     struct mssql_db_instance *mdi = value;
     struct mssql_instance *mi = data;
@@ -2028,13 +2028,15 @@ int dict_mssql_buffman_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, voi
     mssql_buffman_cache_hit_ratio_chart(mdi, mi);
     mssql_buffman_checkpoints_pages_chart(mdi, mi);
     mssql_buffman_page_life_expectancy_chart(mdi, mi);
+    netdata_mssql_compilations(mdi, mi);
+    netdata_mssql_recompilations(mdi, mi);
 
     return 1;
 }
 
-static void do_mssql_bufferman_sql(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
+static void do_mssql_bufferman_stats_sql(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
 {
-    dictionary_sorted_walkthrough_read(mi->databases, dict_mssql_buffman_charts_cb, mi);
+    dictionary_sorted_walkthrough_read(mi->databases, dict_mssql_buffman_stats_charts_cb, mi);
 }
 
 static void mssql_database_backup_restore_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
@@ -2659,7 +2661,7 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
             do_mssql_databases,
             do_mssql_locks,
             do_mssql_waits,
-            do_mssql_bufferman_sql,
+            do_mssql_bufferman_stats_sql,
 
             NULL};
 
