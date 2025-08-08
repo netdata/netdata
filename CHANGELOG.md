@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Add Debian 13 to CI and package builds. [\#20776](https://github.com/netdata/netdata/pull/20776) ([Ferroin](https://github.com/Ferroin))
+- Aclk improvements [\#20775](https://github.com/netdata/netdata/pull/20775) ([stelfrag](https://github.com/stelfrag))
+- Fix MSSQL Charts [\#20774](https://github.com/netdata/netdata/pull/20774) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update machine-learning-and-assisted-troubleshooting.md [\#20772](https://github.com/netdata/netdata/pull/20772) ([kanelatechnical](https://github.com/kanelatechnical))
 - Regenerate integrations docs [\#20771](https://github.com/netdata/netdata/pull/20771) ([netdatabot](https://github.com/netdatabot))
 - feat\(go.d/snmp\): add configurable device down threshold for vnodes [\#20770](https://github.com/netdata/netdata/pull/20770) ([ilyam8](https://github.com/ilyam8))
@@ -445,7 +448,6 @@
 - IIS W3SCV W3MP Metrics \(windows.plugin\) [\#20245](https://github.com/netdata/netdata/pull/20245) ([thiagoftsm](https://github.com/thiagoftsm))
 - Model Context Protocol Server \(MCP\) for Netdata Part 1 [\#20244](https://github.com/netdata/netdata/pull/20244) ([ktsaou](https://github.com/ktsaou))
 - Fix build issue on old distros [\#20243](https://github.com/netdata/netdata/pull/20243) ([stelfrag](https://github.com/stelfrag))
-- Session claim id in docker [\#20240](https://github.com/netdata/netdata/pull/20240) ([stelfrag](https://github.com/stelfrag))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
