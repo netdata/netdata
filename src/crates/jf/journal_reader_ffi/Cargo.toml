@@ -2,6 +2,7 @@
 name = "journal_reader_ffi"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 
 [dependencies]
 error = { path = "../error" }
