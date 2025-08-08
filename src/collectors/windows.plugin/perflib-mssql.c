@@ -389,7 +389,6 @@ void dict_mssql_fill_instance_transactions(struct mssql_db_instance *mdi)
             default:
                 goto enditransactions;
         }
-#define NETDATA_MSSQL_BUFFER_PAGE_CACHE_METRIC "Buffer cache hit ratio"
 
         // We cannot use strcmp, because buffer is filled with spaces instead NULL.
         if (!strncmp(
