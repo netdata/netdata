@@ -124,7 +124,7 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
     pub fn fields_enumerate(
         &mut self,
         journal_file: &'a JournalFile<M>,
-    ) -> Result<Option<&ValueGuard<FieldObject<&'a [u8]>>>> {
+    ) -> Result<Option<&ValueGuard<'_, FieldObject<&'a [u8]>>>> {
         self.drop_guards();
 
         if self.field_iterator.is_none() {
@@ -157,7 +157,7 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
     pub fn field_data_enumerate(
         &mut self,
         _: &'a JournalFile<M>,
-    ) -> Result<Option<&ValueGuard<DataObject<&'a [u8]>>>> {
+    ) -> Result<Option<&ValueGuard<'_, DataObject<&'a [u8]>>>> {
         self.drop_guards();
 
         if let Some(iter) = &mut self.field_data_iterator {
@@ -176,7 +176,7 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
     pub fn entry_data_enumerate(
         &mut self,
         journal_file: &'a JournalFile<M>,
-    ) -> Result<Option<&ValueGuard<DataObject<&'a [u8]>>>> {
+    ) -> Result<Option<&ValueGuard<'_, DataObject<&'a [u8]>>>> {
         self.drop_guards();
 
         if self.entry_data_iterator.is_none() {

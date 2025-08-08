@@ -514,23 +514,23 @@ impl<M: MemoryMap> JournalFile<M> {
     pub fn offset_array_ref(
         &self,
         offset: NonZeroU64,
-    ) -> Result<ValueGuard<OffsetArrayObject<&[u8]>>> {
+    ) -> Result<ValueGuard<'_, OffsetArrayObject<&[u8]>>> {
         self.journal_object_ref(offset)
     }
 
-    pub fn field_ref(&self, offset: NonZeroU64) -> Result<ValueGuard<FieldObject<&[u8]>>> {
+    pub fn field_ref(&self, offset: NonZeroU64) -> Result<ValueGuard<'_, FieldObject<&[u8]>>> {
         self.journal_object_ref(offset)
     }
 
-    pub fn entry_ref(&self, offset: NonZeroU64) -> Result<ValueGuard<EntryObject<&[u8]>>> {
+    pub fn entry_ref(&self, offset: NonZeroU64) -> Result<ValueGuard<'_, EntryObject<&[u8]>>> {
         self.journal_object_ref(offset)
     }
 
-    pub fn data_ref(&self, offset: NonZeroU64) -> Result<ValueGuard<DataObject<&[u8]>>> {
+    pub fn data_ref(&self, offset: NonZeroU64) -> Result<ValueGuard<'_, DataObject<&[u8]>>> {
         self.journal_object_ref(offset)
     }
 
-    pub fn tag_ref(&self, offset: NonZeroU64) -> Result<ValueGuard<TagObject<&[u8]>>> {
+    pub fn tag_ref(&self, offset: NonZeroU64) -> Result<ValueGuard<'_, TagObject<&[u8]>>> {
         self.journal_object_ref(offset)
     }
 
@@ -871,7 +871,7 @@ impl<M: MemoryMapMut> JournalFile<M> {
         &self,
         offset: NonZeroU64,
         capacity: Option<NonZeroU64>,
-    ) -> Result<ValueGuard<OffsetArrayObject<&mut [u8]>>> {
+    ) -> Result<ValueGuard<'_, OffsetArrayObject<&mut [u8]>>> {
         let size = capacity.map(|c| {
             let mut size = std::mem::size_of::<OffsetArrayObjectHeader>() as u64;
 
@@ -895,7 +895,7 @@ impl<M: MemoryMapMut> JournalFile<M> {
         &self,
         offset: NonZeroU64,
         size: Option<u64>,
-    ) -> Result<ValueGuard<FieldObject<&mut [u8]>>> {
+    ) -> Result<ValueGuard<'_, FieldObject<&mut [u8]>>> {
         let size = size.map(|n| std::mem::size_of::<FieldObjectHeader>() as u64 + n);
         self.journal_object_mut(ObjectType::Field, offset, size)
     }
@@ -904,7 +904,7 @@ impl<M: MemoryMapMut> JournalFile<M> {
         &self,
         offset: NonZeroU64,
         size: Option<u64>,
-    ) -> Result<ValueGuard<EntryObject<&mut [u8]>>> {
+    ) -> Result<ValueGuard<'_, EntryObject<&mut [u8]>>> {
         let size = size.map(|n| std::mem::size_of::<DataObjectHeader>() as u64 + n);
         self.journal_object_mut(ObjectType::Entry, offset, size)
     }
@@ -913,7 +913,7 @@ impl<M: MemoryMapMut> JournalFile<M> {
         &self,
         offset: NonZeroU64,
         size: Option<u64>,
-    ) -> Result<ValueGuard<DataObject<&mut [u8]>>> {
+    ) -> Result<ValueGuard<'_, DataObject<&mut [u8]>>> {
         let size = size.map(|n| std::mem::size_of::<DataObjectHeader>() as u64 + n);
         self.journal_object_mut(ObjectType::Data, offset, size)
     }
@@ -922,7 +922,7 @@ impl<M: MemoryMapMut> JournalFile<M> {
         &self,
         offset: NonZeroU64,
         new: bool,
-    ) -> Result<ValueGuard<TagObject<&mut [u8]>>> {
+    ) -> Result<ValueGuard<'_, TagObject<&mut [u8]>>> {
         let size = if new {
             Some(std::mem::size_of::<TagObjectHeader>() as u64)
         } else {
