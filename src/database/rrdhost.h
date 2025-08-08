@@ -6,6 +6,7 @@
 #include "libnetdata/libnetdata.h"
 
 #define HOST_LABEL_IS_EPHEMERAL "_is_ephemeral"
+#define NETDATA_VIRTUAL_HOST "Netdata Virtual Host 1.0"
 
 struct stream_thread;
 struct rrdset;
