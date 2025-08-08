@@ -97,7 +97,20 @@ The following alerts are available:
 
 ### Prerequisites
 
-No action required.
+#### UNIX socket access
+
+If you are connecting to Memcached via its UNIX socket, ensure that the `netdata` user
+has permission to access it. You can do this by:
+
+1. Adding the `netdata` user to the `memcache` group.
+   ```bash
+   sudo gpasswd -a netdata memcache
+   ```
+2. Configuring the socket permissions in `/etc/memcached.conf` so the group has access (e.g. `-a 770`).
+
+**Note**: You may need to restart Memcached after making these changes for them to take effect.
+
+
 
 ### Configuration
 
