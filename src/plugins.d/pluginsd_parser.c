@@ -1090,6 +1090,10 @@ static inline PARSER_RC pluginsd_exit(char **words __maybe_unused, size_t num_wo
     return PARSER_RC_STOP;
 }
 
+static inline PARSER_RC pluginsd_plugin_keepalive(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser __maybe_unused) {
+    return PARSER_RC_OK;
+}
+
 static void pluginsd_json_stream_paths(PARSER *parser, void *action_data __maybe_unused) {
     stream_path_set_from_json(parser->user.host, buffer_tostring(parser->defer.response), false);
     buffer_free(parser->defer.response);
@@ -1341,6 +1345,8 @@ ALWAYS_INLINE PARSER_RC parser_execute(PARSER *parser, const PARSER_KEYWORD *key
             return pluginsd_config(words, num_words, parser);
         case PLUGINSD_KEYWORD_ID_TRUST_DURATIONS:
             return pluginsd_trust_durations(words, num_words, parser);
+        case PLUGINSD_KEYWORD_ID_PLUGIN_KEEPALIVE:
+            return pluginsd_plugin_keepalive(words, num_words, parser);
 
         case PLUGINSD_KEYWORD_ID_DYNCFG_ENABLE:
         case PLUGINSD_KEYWORD_ID_DYNCFG_REGISTER_MODULE:

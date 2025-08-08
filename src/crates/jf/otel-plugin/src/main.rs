@@ -21,6 +21,15 @@ use crate::logs_service::NetdataLogsService;
 mod metrics_service;
 use crate::metrics_service::NetdataMetricsService;
 
+async fn send_keepalive_periodically() {
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(60));
+
+    loop {
+        interval.tick().await;
+        println!("PLUGIN_KEEPALIVE");
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let config = PluginConfig::new().context("Failed to initialize plugin configuration")?;
@@ -69,7 +78,7 @@ async fn main() -> Result<()> {
         );
     }
 
-    server_builder
+    let server = server_builder
         .add_service(
             MetricsServiceServer::new(metrics_service)
                 .accept_compressed(tonic::codec::CompressionEncoding::Gzip),
@@ -78,9 +87,18 @@ async fn main() -> Result<()> {
             LogsServiceServer::new(logs_service)
                 .accept_compressed(tonic::codec::CompressionEncoding::Gzip),
         )
-        .serve(addr)
-        .await
-        .with_context(|| format!("Failed to serve gRPC server on {}", addr))?;
+        .serve(addr);
+
+    let keepalive = send_keepalive_periodically();
+
+    tokio::select! {
+        result = server => {
+            result.with_context(|| format!("Failed to serve gRPC server on {}", addr))?;
+        }
+        _ = keepalive => {
+            // This should never complete
+        }
+    }
 
     Ok(())
 }
