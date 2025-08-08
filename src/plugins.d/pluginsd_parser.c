@@ -235,6 +235,7 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
         host->rrdlabels = parser->user.host_define.rrdlabels;
         parser->user.host_define.rrdlabels = NULL;
     }
+    rrdlabels_add(host->rrdlabels, "_is_virtual_node", "true", RRDLABEL_SRC_AUTO);
 
     pluginsd_update_host_ephemerality(host);
     pluginsd_host_define_cleanup(parser);
