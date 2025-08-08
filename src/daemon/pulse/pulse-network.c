@@ -315,6 +315,7 @@ void pulse_network_do(bool extended __maybe_unused) {
         if(extended) {
             static RRDSET *st_aclk_queue_size = NULL;
             static RRDDIM *rd_messages = NULL;
+            static RRDDIM *rd_puback_wait = NULL;
 
             if (unlikely(!st_aclk_queue_size)) {
                 st_aclk_queue_size = rrdset_create_localhost(
@@ -334,9 +335,11 @@ void pulse_network_do(bool extended __maybe_unused) {
                 rrdlabels_add(st_aclk_queue_size->rrdlabels, "endpoint", "aclk", RRDLABEL_SRC_AUTO);
 
                 rd_messages = rrddim_add(st_aclk_queue_size, "messages", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                rd_puback_wait = rrddim_add(st_aclk_queue_size, "puback wait", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
 
             rrddim_set_by_pointer(st_aclk_queue_size, rd_messages, (collected_number)t.mqtt.tx_messages_queued);
+            rrddim_set_by_pointer(st_aclk_queue_size, rd_puback_wait, (collected_number)t.mqtt.packets_waiting_puback);
             rrdset_done(st_aclk_queue_size);
         }
 
