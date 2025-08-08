@@ -6,6 +6,16 @@
 
 **Merged pull requests:**
 
+- Add Debian 13 to CI and package builds. [\#20776](https://github.com/netdata/netdata/pull/20776) ([Ferroin](https://github.com/Ferroin))
+- Aclk improvements [\#20775](https://github.com/netdata/netdata/pull/20775) ([stelfrag](https://github.com/stelfrag))
+- Fix MSSQL Charts [\#20774](https://github.com/netdata/netdata/pull/20774) ([thiagoftsm](https://github.com/thiagoftsm))
+- Update machine-learning-and-assisted-troubleshooting.md [\#20772](https://github.com/netdata/netdata/pull/20772) ([kanelatechnical](https://github.com/kanelatechnical))
+- Regenerate integrations docs [\#20771](https://github.com/netdata/netdata/pull/20771) ([netdatabot](https://github.com/netdatabot))
+- feat\(go.d/snmp\): add configurable device down threshold for vnodes [\#20770](https://github.com/netdata/netdata/pull/20770) ([ilyam8](https://github.com/ilyam8))
+- Add publish latency to the aclk-state command [\#20769](https://github.com/netdata/netdata/pull/20769) ([stelfrag](https://github.com/stelfrag))
+- chore\(go.d/snmp\): add \_net\_default\_iface\_ip host label [\#20768](https://github.com/netdata/netdata/pull/20768) ([ilyam8](https://github.com/ilyam8))
+- Add default iface info to host labels [\#20767](https://github.com/netdata/netdata/pull/20767) ([stelfrag](https://github.com/stelfrag))
+- Fix packet timeout handling [\#20766](https://github.com/netdata/netdata/pull/20766) ([stelfrag](https://github.com/stelfrag))
 - feat\(system-info\): add default network interface IP detection [\#20764](https://github.com/netdata/netdata/pull/20764) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d\): remove patternProperties from config\_schema.json [\#20763](https://github.com/netdata/netdata/pull/20763) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d/snmp-profile\): fix extends in cradlepoint.yaml [\#20762](https://github.com/netdata/netdata/pull/20762) ([ilyam8](https://github.com/ilyam8))
@@ -438,10 +448,6 @@
 - IIS W3SCV W3MP Metrics \(windows.plugin\) [\#20245](https://github.com/netdata/netdata/pull/20245) ([thiagoftsm](https://github.com/thiagoftsm))
 - Model Context Protocol Server \(MCP\) for Netdata Part 1 [\#20244](https://github.com/netdata/netdata/pull/20244) ([ktsaou](https://github.com/ktsaou))
 - Fix build issue on old distros [\#20243](https://github.com/netdata/netdata/pull/20243) ([stelfrag](https://github.com/stelfrag))
-- Session claim id in docker [\#20240](https://github.com/netdata/netdata/pull/20240) ([stelfrag](https://github.com/stelfrag))
-- Let the user override the default stack size [\#20236](https://github.com/netdata/netdata/pull/20236) ([stelfrag](https://github.com/stelfrag))
-- Revert "Revert "fix\(go.d/couchdb\): correct db size charts unit"" [\#20235](https://github.com/netdata/netdata/pull/20235) ([ilyam8](https://github.com/ilyam8))
-- Improve MSSQL \(Part III\) [\#20230](https://github.com/netdata/netdata/pull/20230) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
@@ -462,12 +468,6 @@
 ## [v2.5.0](https://github.com/netdata/netdata/tree/v2.5.0) (2025-05-05)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v2.4.0...v2.5.0)
-
-**Merged pull requests:**
-
-- Revert "fix\(go.d/couchdb\): correct db size charts unit" [\#20234](https://github.com/netdata/netdata/pull/20234) ([ilyam8](https://github.com/ilyam8))
-- fix\(go.d/couchdb\): correct db size charts unit [\#20233](https://github.com/netdata/netdata/pull/20233) ([ilyam8](https://github.com/ilyam8))
-- docs: rename DynCfg developer doc to avoid title conflict [\#20232](https://github.com/netdata/netdata/pull/20232) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.4.0](https://github.com/netdata/netdata/tree/v2.4.0) (2025-04-14)
 

@@ -27,6 +27,13 @@
         "type": "boolean",
         "default": true
       },
+      "vnode_device_down_threshold": {
+        "title": "Device Down Threshold",
+        "description": "Number of consecutive failed data collections before marking the device as down.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 3
+      },
       "vnode": {
         "title": "Configuration",
         "description": "",
@@ -458,6 +465,7 @@
           "title": "Vnode",
           "fields": [
             "create_vnode",
+            "vnode_device_down_threshold",
             "vnode"
           ]
         },
