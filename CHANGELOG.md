@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- docs\(go.d/mysql\): add MariaDB 10.5.9+ SLAVE MONITOR privilege [\#20782](https://github.com/netdata/netdata/pull/20782) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations docs [\#20781](https://github.com/netdata/netdata/pull/20781) ([netdatabot](https://github.com/netdatabot))
+- docs\(go.d/memcached\): add UNIX socket access prerequisite [\#20780](https://github.com/netdata/netdata/pull/20780) ([ilyam8](https://github.com/ilyam8))
 - Add Debian 13 to CI and package builds. [\#20776](https://github.com/netdata/netdata/pull/20776) ([Ferroin](https://github.com/Ferroin))
 - Aclk improvements [\#20775](https://github.com/netdata/netdata/pull/20775) ([stelfrag](https://github.com/stelfrag))
 - Fix MSSQL Charts [\#20774](https://github.com/netdata/netdata/pull/20774) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -445,9 +448,6 @@
 - fix\(go.d/snmp\): use ifDescr for interface name if ifName is empty [\#20248](https://github.com/netdata/netdata/pull/20248) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d/sd/snmp\): fix snmpv3 credentials [\#20247](https://github.com/netdata/netdata/pull/20247) ([ilyam8](https://github.com/ilyam8))
 - SNMP first cisco yaml file pass [\#20246](https://github.com/netdata/netdata/pull/20246) ([Ancairon](https://github.com/Ancairon))
-- IIS W3SCV W3MP Metrics \(windows.plugin\) [\#20245](https://github.com/netdata/netdata/pull/20245) ([thiagoftsm](https://github.com/thiagoftsm))
-- Model Context Protocol Server \(MCP\) for Netdata Part 1 [\#20244](https://github.com/netdata/netdata/pull/20244) ([ktsaou](https://github.com/ktsaou))
-- Fix build issue on old distros [\#20243](https://github.com/netdata/netdata/pull/20243) ([stelfrag](https://github.com/stelfrag))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
