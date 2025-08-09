@@ -36,6 +36,11 @@ LISTEN_SOCKETS api_sockets = {
 		.backlog         = API_LISTEN_BACKLOG
 };
 
+// Return the default port to listen on.
+uint16_t web_server_get_default_port(void) {
+    return api_sockets.default_port;
+}
+
 void debug_sockets() {
 	BUFFER *wb = buffer_create(256 * sizeof(char), NULL);
 	int i;
