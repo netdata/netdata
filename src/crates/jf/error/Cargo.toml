@@ -2,6 +2,7 @@
 name = "error"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 
 [dependencies]
 static_assertions = { workspace = true }

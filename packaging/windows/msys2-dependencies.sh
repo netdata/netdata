@@ -30,7 +30,9 @@ pacman -S --noconfirm --needed \
     msys/libcurl-devel \
     openssl-devel \
     protobuf-devel \
+    mingw-w64-x86_64-rust \
     mingw-w64-x86_64-toolchain \
+    mingw-w64-ucrt-x86_64-rust \
     mingw-w64-ucrt-x86_64-toolchain \
     mingw64/mingw-w64-x86_64-brotli \
     mingw64/mingw-w64-x86_64-go \

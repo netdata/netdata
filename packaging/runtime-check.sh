@@ -63,6 +63,7 @@ plugins.d/local-listeners
 plugins.d/ndsudo
 plugins.d/network-viewer.plugin
 plugins.d/nfacct.plugin
+plugins.d/otel-plugin
 plugins.d/perf.plugin
 plugins.d/python.d.plugin
 plugins.d/slabinfo.plugin

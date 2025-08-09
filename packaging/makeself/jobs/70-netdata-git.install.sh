@@ -29,11 +29,11 @@ export NETDATA_BUILD_DIR
 case "${BUILDARCH}" in
     armv6l)
         export NETDATA_CMAKE_OPTIONS="-DENABLE_LIBBACKTRACE=On"
-        export INSTALLER_ARGS="--disable-plugin-systemd-journal"
+        export INSTALLER_ARGS="--disable-plugin-systemd-journal --disable-plugin-otel"
         ;;
     *)
         export NETDATA_CMAKE_OPTIONS="-DENABLE_LIBBACKTRACE=On"
-        export INSTALLER_ARGS="--enable-plugin-systemd-journal --internal-systemd-journal"
+        export INSTALLER_ARGS="--enable-plugin-systemd-journal --internal-systemd-journal --enable-plugin-otel"
         ;;
 esac
 
@@ -44,7 +44,6 @@ run ./netdata-installer.sh \
   --dont-wait \
   --dont-start-it \
   --disable-exporting-mongodb \
-  --enable-plugin-systemd-journal \
   --dont-scrub-cflags-even-though-it-may-break-things \
   --one-time-build \
   --enable-lto \
