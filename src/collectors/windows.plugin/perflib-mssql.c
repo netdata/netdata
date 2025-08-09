@@ -184,6 +184,7 @@ struct mssql_db_instance {
     RRDSET *st_buff_checkpoint_pages;
     RRDSET *st_buff_cache_page_life_expectancy;
     RRDSET *st_buff_lazy_write;
+    RRDSET *st_buff_page_lookups;
 
     RRDSET *st_stats_compilation;
     RRDSET *st_stats_recompiles;
@@ -205,6 +206,7 @@ struct mssql_db_instance {
     RRDDIM *rd_buff_checkpoint_pages;
     RRDDIM *rd_buff_cache_page_life_expectancy;
     RRDDIM *rd_buff_lazy_write;
+    RRDDIM *rd_buff_page_lookups;
 
     RRDDIM *rd_stats_compilation;
     RRDDIM *rd_stats_recompiles;
@@ -230,6 +232,7 @@ struct mssql_db_instance {
     COUNTER_DATA MSSQLBufferCheckpointPages;
     COUNTER_DATA MSSQLBufferPageLifeExpectancy;
     COUNTER_DATA MSSQLBufferLazyWrite;
+    COUNTER_DATA MSSQLBufferPageLookups;
 
     COUNTER_DATA MSSQLCompilations;
     COUNTER_DATA MSSQLRecompilations;
@@ -343,6 +346,7 @@ static ULONGLONG netdata_MSSQL_fill_long_value(SQLHSTMT *stmt, const char *mask,
 #define NETDATA_MSSQL_BUFFER_CHECKPOINT_METRIC "Checkpoint pages/sec"
 #define NETDATA_MSSQL_BUFFER_PAGE_LIFE_METRIC "Page life expectancy"
 #define NETDATA_MSSQL_BUFFER_LAZY_WRITES_METRIC "Lazy writes/sec"
+#define NETDATA_MSSQL_BUFFER_PAGE_LOOKUPS_METRIC "Page Lookups/sec"
 
 #define NETDATA_MSSQL_STATS_COMPILATIONS_METRIC "SQL Compilations/sec"
 #define NETDATA_MSSQL_STATS_RECOMPILATIONS_METRIC "SQL Re-Compilations/sec"
@@ -413,6 +417,9 @@ void dict_mssql_fill_instance_transactions(struct mssql_db_instance *mdi)
         else if (!strncmp(
                 object_name, NETDATA_MSSQL_BUFFER_LAZY_WRITES_METRIC, sizeof(NETDATA_MSSQL_BUFFER_LAZY_WRITES_METRIC) - 1))
             mdi->MSSQLBufferLazyWrite.current.Data = (ULONGLONG)value;
+        else if (!strncmp(
+                object_name, NETDATA_MSSQL_BUFFER_PAGE_LOOKUPS_METRIC, sizeof(NETDATA_MSSQL_BUFFER_PAGE_LOOKUPS_METRIC) - 1))
+            mdi->MSSQLBufferPageLookups.current.Data = (ULONGLONG)value;
         else if (!strncmp(
                 object_name, NETDATA_MSSQL_STATS_COMPILATIONS_METRIC, sizeof(NETDATA_MSSQL_STATS_COMPILATIONS_METRIC) - 1))
             mdi->MSSQLCompilations.current.Data = (ULONGLONG)value;
@@ -1994,6 +2001,39 @@ void mssql_buffman_lazy_write_chart(struct mssql_db_instance *mdi, struct mssql_
     rrdset_done(mdi->st_buff_lazy_write);
 }
 
+void mssql_buffman_page_lookups_chart(struct mssql_db_instance *mdi, struct mssql_instance *mi) {
+    if (!mdi->st_buff_page_lookups) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_bufman_page_lookups", mi->instanceID);
+        netdata_fix_chart_name(id);
+        mdi->st_buff_page_lookups = rrdset_create_localhost(
+                "mssql",
+                id,
+                NULL,
+                "buffer cache",
+                "mssql.instance_bufman_page_lookups",
+                "Requests to find a page in the buffer pool.",
+                "Page lookups/sec",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibMSSQL",
+                PRIO_MSSQL_BUFF_PAGE_LOOKUPS,
+                mi->update_every,
+                RRDSET_TYPE_LINE);
+
+        mdi->rd_buff_page_lookups = rrddim_add(
+                mdi->st_buff_page_lookups, "lookups", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(
+                mdi->st_buff_page_lookups->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+            mdi->st_buff_page_lookups,
+            mdi->rd_buff_page_lookups,
+            (collected_number) mdi->MSSQLBufferPageLookups.current.Data);
+    rrdset_done(mdi->st_buff_page_lookups);
+}
+
 static void netdata_mssql_compilations(struct mssql_db_instance *mdi, struct mssql_instance *mi) {
     if (!mdi->st_stats_compilation) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -2069,6 +2109,7 @@ int dict_mssql_buffman_stats_charts_cb(const DICTIONARY_ITEM *item __maybe_unuse
     mssql_buffman_checkpoints_pages_chart(mdi, mi);
     mssql_buffman_page_life_expectancy_chart(mdi, mi);
     mssql_buffman_lazy_write_chart(mdi, mi);
+    mssql_buffman_page_lookups_chart(mdi, mi);
 
     netdata_mssql_compilations(mdi, mi);
     netdata_mssql_recompilations(mdi, mi);
