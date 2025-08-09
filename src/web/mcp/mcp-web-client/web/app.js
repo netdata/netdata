@@ -722,6 +722,7 @@ class NetdataMCPChat {
         }
     }
 
+    
     // Migrate old chat data to include token pricing
     migrateTokenPricing(chat) {
         // Initialize structures if not present
@@ -1452,11 +1453,16 @@ class NetdataMCPChat {
         
         section.appendChild(toolMemoryDiv);
         
-        // Cache Control Option (for Anthropic provider)
-        const isAnthropicProvider = chat.config.model && chat.config.model.provider === 'anthropic';
+        // Cache Control Option (for providers that support it)
+        // Get the provider API type to determine cache support
+        const providerType = chat.config.model?.provider;
+        const provider = this.llmProviders.get(chat.llmProviderId);
+        const providerApiType = provider?.availableProviders?.[providerType]?.type || providerType;
+        const supportsCacheControl = providerApiType === 'anthropic';
+        
         const cacheControlDiv = document.createElement('div');
         const cacheControlMode = chat.config.optimisation.cacheControl;
-        const cacheControlDisabled = !isAnthropicProvider;
+        const cacheControlDisabled = !supportsCacheControl;
         cacheControlDiv.style.cssText = `display: flex; align-items: center; gap: 8px; margin-bottom: 8px; ${cacheControlDisabled ? 'opacity: 0.5;' : ''}`;
         
         cacheControlDiv.innerHTML = `
@@ -1472,7 +1478,7 @@ class NetdataMCPChat {
                 <option value="system" ${cacheControlMode === 'system' ? 'selected' : ''}>System</option>
                 <option value="cached" ${cacheControlMode === 'cached' ? 'selected' : ''}>Cached</option>
             </select>
-            ${!isAnthropicProvider ? '<span style="color: var(--text-secondary); font-size: 12px;">Anthropic only</span>' : ''}
+            ${!supportsCacheControl ? '<span style="color: var(--text-secondary); font-size: 12px;">Anthropic only</span>' : ''}
         `;
         
         section.appendChild(cacheControlDiv);
@@ -1816,8 +1822,11 @@ class NetdataMCPChat {
                                 models.push({
                                     id: modelId,
                                     providerId: providerType,
+                                    providerApiType: providerConfig.type || providerType, // API type for this provider
                                     contextWindow: contextWindow || 128000, // Default context
-                                    pricing: pricing || null
+                                    pricing: pricing || null,
+                                    endpoint: typeof model === 'object' ? model.endpoint : undefined,
+                                    supportsTools: typeof model === 'object' ? model.supportsTools : undefined
                                 });
                             }
                         });
@@ -2440,6 +2449,36 @@ class NetdataMCPChat {
         this.autoSave(chatId);
     }
     
+    updateCacheControlUI(chatId) {
+        const chat = this.chats.get(chatId);
+        if (!chat) {
+            console.error(`[updateCacheControlUI] Chat not found for chatId: ${chatId}`);
+            return;
+        }
+        
+        // Get the cache control select element
+        const cacheControlSelect = document.querySelector(`#cacheControl_${chatId}`);
+        if (!cacheControlSelect) {
+            return; // UI not available
+        }
+        
+        // Get the parent div for opacity control
+        const cacheControlDiv = cacheControlSelect.closest('div');
+        if (!cacheControlDiv) {
+            return;
+        }
+        
+        // Determine if cache control is supported for the current model
+        const providerType = chat.config.model?.provider;
+        const provider = this.llmProviders.get(chat.llmProviderId);
+        const providerApiType = provider?.availableProviders?.[providerType]?.type || providerType;
+        const supportsCacheControl = providerApiType === 'anthropic';
+        
+        // Update UI state
+        cacheControlSelect.disabled = !supportsCacheControl;
+        cacheControlDiv.style.opacity = supportsCacheControl ? '1' : '0.5';
+    }
+    
     updateChatModel(chatId, model) {
         const chat = this.chats.get(chatId);
         if (!chat) {
@@ -2468,6 +2507,9 @@ class NetdataMCPChat {
         // Update displays
         this.updateChatHeader(chatId);
         this.updateChatSessions();
+        
+        // Update cache control UI based on new model's provider
+        this.updateCacheControlUI(chatId);
     }
     
     updateToolSummarizationModel(chatId, model) {
@@ -3023,7 +3065,11 @@ class NetdataMCPChat {
             // Create provider instance
             const providerType = chat.config.model.provider;
             const modelName = chat.config.model.id;
-            const provider = createLLMProvider(providerType, proxyProvider.proxyUrl, modelName);
+            
+            // Get the API type from the provider configuration
+            const providerApiType = proxyProvider.availableProviders?.[providerType]?.type || providerType;
+            
+            const provider = createLLMProvider(providerApiType, proxyProvider.proxyUrl, modelName, chat.config.model);
             provider.onLog = (logEntry) => {
                 const prefix = logEntry.direction === 'sent' ? 'llm-request' : 'llm-response';
                 const providerName = providerType.charAt(0).toUpperCase() + providerType.slice(1);
@@ -3181,7 +3227,7 @@ class NetdataMCPChat {
         
         // Track token usage
         if (response.usage) {
-            this.updateTokenUsage(chat.id, response.usage, ChatConfig.getChatModelString(chat) || provider.model);
+            this.updateTokenUsage(chat.id, response.usage, ChatConfig.getChatModelString(chat) || `${provider.type}:${provider.model}`);
         }
         
         // If no tool calls, display response and finish
@@ -3192,7 +3238,7 @@ class NetdataMCPChat {
                 type: 'assistant-metrics', 
                 usage: response.usage, 
                 responseTime: llmResponseTime, 
-                model: ChatConfig.getChatModelString(chat) || provider.model
+                model: ChatConfig.getChatModelString(chat) || `${provider.type}:${provider.model}`
             }, chat.id);
             
             if (response.content) {
@@ -3202,7 +3248,7 @@ class NetdataMCPChat {
                     content: response.content,
                     usage: response.usage || null,
                     responseTime: llmResponseTime || null,
-                    model: provider.model || ChatConfig.getChatModelString(chat),
+                    model: ChatConfig.getChatModelString(chat) || `${provider.type}:${provider.model}`,
                     turn: chat.currentTurn
                 };
                 this.addMessage(chat.id, assistantMsg);
@@ -3217,7 +3263,7 @@ class NetdataMCPChat {
                 
                 // Track cumulative tokens
                 if (response.usage) {
-                    const modelUsed = ChatConfig.getChatModelString(chat) || provider.model;
+                    const modelUsed = ChatConfig.getChatModelString(chat) || `${provider.type}:${provider.model}`;
                     this.addCumulativeTokens(
                         chat.id,
                         modelUsed,
@@ -3247,7 +3293,7 @@ class NetdataMCPChat {
                 content: response.content || '',
                 usage: response.usage || null,
                 responseTime: llmResponseTime || null,
-                model: provider.model || ChatConfig.getChatModelString(chat),
+                model: ChatConfig.getChatModelString(chat) || `${provider.type}:${provider.model}`,
                 turn: chat.currentTurn,
                 cacheControlIndex
             };
@@ -3256,7 +3302,7 @@ class NetdataMCPChat {
             
             // Track cumulative tokens
             if (response.usage) {
-                const modelUsed = ChatConfig.getChatModelString(chat) || provider.model;
+                const modelUsed = ChatConfig.getChatModelString(chat) || `${provider.type}:${provider.model}`;
                 this.addCumulativeTokens(
                     chat.id,
                     modelUsed,
@@ -3272,7 +3318,7 @@ class NetdataMCPChat {
                 type: 'assistant-metrics', 
                 usage: response.usage, 
                 responseTime: llmResponseTime, 
-                model: ChatConfig.getChatModelString(chat) || provider.model
+                model: ChatConfig.getChatModelString(chat) || `${provider.type}:${provider.model}`
             }, chat.id);
             
             if (response.content) {
@@ -3596,7 +3642,10 @@ class NetdataMCPChat {
             const isRateLimitError = error.message && (
                 error.message.includes('Rate limit') || 
                 error.message.includes('429') ||
-                error.message.includes('rate_limit_exceeded')
+                error.message.includes('rate_limit_exceeded') ||
+                error.message.includes('529') ||
+                error.message.includes('overloaded_error') ||
+                error.message.includes('Overloaded')
             );
             
             // Extract retry-after seconds if available (handles multiple formats)
@@ -4198,8 +4247,11 @@ class NetdataMCPChat {
             return;
         }
         
+        // Get the API type from the provider configuration
+        const providerApiType = proxyProvider.availableProviders?.[providerType]?.type || providerType;
+        
         // Create the LLM provider
-        const provider = createLLMProvider(providerType, proxyProvider.proxyUrl, modelName);
+        const provider = createLLMProvider(providerApiType, proxyProvider.proxyUrl, modelName, chat.config.model);
         provider.onLog = (logEntry) => {
             const prefix = logEntry.direction === 'sent' ? 'llm-request' : 'llm-response';
             const providerName = providerType.charAt(0).toUpperCase() + providerType.slice(1);
@@ -4278,7 +4330,14 @@ class NetdataMCPChat {
             }
         } catch (error) {
             // Check for rate limit error
-            const isRateLimitError = error.message.includes('Rate limit') || error.message.includes('429');
+            const isRateLimitError = error.message && (
+                error.message.includes('Rate limit') || 
+                error.message.includes('429') ||
+                error.message.includes('rate_limit_exceeded') ||
+                error.message.includes('529') ||
+                error.message.includes('overloaded_error') ||
+                error.message.includes('Overloaded')
+            );
             const retryMatch = error.message.match(/Please try again in (\d+(?:\.\d+)?)s/);
             const retryAfterSeconds = retryMatch ? parseFloat(retryMatch[1]) : null;
             
@@ -4577,6 +4636,9 @@ class NetdataMCPChat {
         // The chat is now in the correct format in memory
         // It will only be saved when the user actually modifies it
         this.chats.set(chat.id, chat);
+        
+        // Migrate token pricing and fix incomplete model names
+        this.migrateTokenPricing(chat);
     }
     
     async initializeDefaultLLMProvider() {
@@ -6994,8 +7056,8 @@ class NetdataMCPChat {
             // Get chat-specific input
             const chatInput = this.getChatInput(chatId);
             if (!chatInput) {
-                const chat = this.chats.get(chatId);
-                if (!chat || !chat.isSubChat) {
+                const chatData = this.chats.get(chatId);
+                if (!chatData || !chatData.isSubChat) {
                     // Only log error for main chats - sub-chats don't have input elements
                     console.error('[updateSendButton] ERROR: Could not find input for chat', chatId);
                 }
@@ -7148,8 +7210,11 @@ class NetdataMCPChat {
             return;
         }
         
+        // Get the API type from the provider configuration
+        const providerApiType = proxyProvider.availableProviders?.[providerType]?.type || providerType;
+        
         // Create the actual LLM provider instance
-        const provider = window.createLLMProvider(providerType, proxyProvider.proxyUrl, modelName);
+        const provider = window.createLLMProvider(providerApiType, proxyProvider.proxyUrl, modelName, chat.config.model);
         provider.onLog = (logEntry) => {
             const prefix = logEntry.direction === 'sent' ? 'llm-request' : 'llm-response';
             const providerName = providerType.charAt(0).toUpperCase() + providerType.slice(1);
@@ -7266,8 +7331,15 @@ class NetdataMCPChat {
                 // Clean up states
                 this.assistantFailed(chat.id, error);
             } else {
-                // Check for rate limit error (429)
-                const isRateLimitError = error.message.includes('Rate limit') || error.message.includes('429');
+                // Check for rate limit error (429 or 529)
+                const isRateLimitError = error.message && (
+                    error.message.includes('Rate limit') || 
+                    error.message.includes('429') ||
+                    error.message.includes('rate_limit_exceeded') ||
+                    error.message.includes('529') ||
+                    error.message.includes('overloaded_error') ||
+                    error.message.includes('Overloaded')
+                );
                 const retryMatch = error.message.match(/Please try again in (\d+(?:\.\d+)?)s/);
                 const retryAfterSeconds = retryMatch ? parseFloat(retryMatch[1]) : null;
                 
@@ -11483,7 +11555,9 @@ class NetdataMCPChat {
                 if (!providerType || !modelName) {
                     throw new Error('Invalid model configuration in chat');
                 }
-                const p = createLLMProvider(providerType, proxyProvider.proxyUrl, modelName);
+                // Get the API type from the provider configuration
+                const providerApiType = proxyProvider.availableProviders?.[providerType]?.type || providerType;
+                const p = createLLMProvider(providerApiType, proxyProvider.proxyUrl, modelName, chat.config.model);
                 p.onLog = (logEntry) => {
                     const prefix = logEntry.direction === 'sent' ? 'llm-request' : 'llm-response';
                     const providerName = providerType.charAt(0).toUpperCase() + providerType.slice(1);
@@ -11608,12 +11682,12 @@ class NetdataMCPChat {
                     content: response.content,
                     usage: response.usage,
                     responseTime: llmResponseTime,
-                    model: ChatConfig.getChatModelString(chat) || provider.model
+                    model: ChatConfig.getChatModelString(chat) || `${provider.type}:${provider.model}`
                 }, chat.id);
                 
                 // Update context window display
                 const contextTokens = this.calculateContextWindowTokens(chat.id);
-                this.updateContextWindowIndicator(contextTokens, ChatConfig.getChatModelString(chat) || provider.model, chat.id);
+                this.updateContextWindowIndicator(contextTokens, ChatConfig.getChatModelString(chat) || `${provider.type}:${provider.model}`, chat.id);
                 
                 // Update all token displays including cost
                 this.updateAllTokenDisplays(chat.id);
@@ -11682,10 +11756,14 @@ class NetdataMCPChat {
                 throw new Error('Invalid model configuration in chat');
             }
             
+            // Get the API type from the provider configuration
+            const providerApiType = llmProviderConfig.availableProviders?.[providerType]?.type || providerType;
+            
             const provider = window.createLLMProvider(
-                providerType,
+                providerApiType,
                 llmProviderConfig.proxyUrl,
-                modelName
+                modelName,
+                chat.config.model
             );
             provider.onLog = (logEntry) => {
                 const prefix = logEntry.direction === 'sent' ? 'llm-request' : 'llm-response';
