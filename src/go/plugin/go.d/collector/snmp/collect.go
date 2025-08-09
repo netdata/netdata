@@ -9,6 +9,7 @@ import (
 	"maps"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -121,6 +122,12 @@ func (c *Collector) setupVnode(si *snmpsd.SysInfo, deviceMeta map[string]map[str
 		"_vnode_type":           "snmp",
 		"_net_default_iface_ip": c.Hostname,
 		"address":               c.Hostname,
+	}
+
+	if c.UpdateEvery >= 1 && c.VnodeDeviceDownThreshold >= 1 {
+		// Add 2 seconds buffer to account for collection/transmission delays
+		v := c.VnodeDeviceDownThreshold*c.UpdateEvery + 2
+		labels["_node_stale_after_seconds"] = strconv.Itoa(v)
 	}
 
 	maps.Copy(labels, c.Vnode.Labels)

@@ -206,8 +206,7 @@ The following alerts are available:
 
 #### Create netdata user
 
-A user account should have the
-following [permissions](https://dev.mysql.com/doc/refman/8.0/en/privileges-provided.html):
+A user account should have the following [permissions](https://dev.mysql.com/doc/refman/8.0/en/privileges-provided.html):
 
 - [`USAGE`](https://dev.mysql.com/doc/refman/8.0/en/privileges-provided.html#priv_usage)
 - [`REPLICATION CLIENT`](https://dev.mysql.com/doc/refman/8.0/en/privileges-provided.html#priv_replication-client)
@@ -215,14 +214,26 @@ following [permissions](https://dev.mysql.com/doc/refman/8.0/en/privileges-provi
 
 To create the `netdata` user with these permissions, execute the following in the MySQL shell:
 
-```mysql
-CREATE USER 'netdata'@'localhost';
-GRANT USAGE, REPLICATION CLIENT, PROCESS ON *.* TO 'netdata'@'localhost';
-FLUSH PRIVILEGES;
-```
+- **MySQL and MariaDB < 10.5.9**
 
-The `netdata` user will have the ability to connect to the MySQL server on localhost without a password. It will only
-be able to gather statistics without being able to alter or affect operations in any way.
+    ```mysql
+    CREATE USER 'netdata'@'localhost';
+    GRANT USAGE, REPLICATION CLIENT, PROCESS ON *.* TO 'netdata'@'localhost';
+    FLUSH PRIVILEGES;
+    ```
+
+- **MariaDB >= 10.5.9**
+
+    For MariaDB 10.5.9 and later, use the `SLAVE MONITOR` privilege instead of `REPLICATION CLIENT`:
+
+    ```mysql
+    CREATE USER 'netdata'@'localhost';
+    GRANT USAGE, SLAVE MONITOR, PROCESS ON *.* TO 'netdata'@'localhost';
+    FLUSH PRIVILEGES;
+    ```
+
+The `netdata` user will have the ability to connect to the MySQL server on localhost without a password. 
+It will only be able to gather statistics without being able to alter or affect operations in any way.
 
 
 
