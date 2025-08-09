@@ -2021,7 +2021,7 @@ void mssql_buffman_page_lookups_chart(struct mssql_db_instance *mdi, struct mssq
                 RRDSET_TYPE_LINE);
 
         mdi->rd_buff_page_lookups = rrddim_add(
-                mdi->st_buff_page_lookups, "lookups", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                mdi->st_buff_page_lookups, "page_lookups", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
         rrdlabels_add(
                 mdi->st_buff_page_lookups->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
