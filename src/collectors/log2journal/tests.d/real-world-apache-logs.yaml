@@ -1,0 +1,17 @@
+pattern: |
+  (?x)
+  ^(?P<APACHE_REMOTE_ADDR>[^ ]+) \s+ - \s+ (?P<APACHE_REMOTE_USER>[^ ]+) \s+
+  \[(?P<APACHE_TIME_LOCAL>[^\]]+)\] \s+
+  "(?P<MESSAGE>(?P<APACHE_METHOD>[A-Z]+) \s+ (?P<APACHE_URL>[^ ]+) \s+ HTTP/(?P<APACHE_HTTP_VERSION>[^"]+))" \s+
+  (?P<APACHE_STATUS>\d+) \s+
+  (?P<APACHE_BODY_BYTES_SENT>\d+) \s+
+  "(?P<APACHE_HTTP_REFERER>[^"]*)" \s+
+  "(?P<APACHE_HTTP_USER_AGENT>[^"]*)"
+
+prefix: APACHE_
+
+inject:
+  - key: SYSLOG_IDENTIFIER
+    value: apache-access
+  - key: PRIORITY
+    value: 6
