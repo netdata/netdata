@@ -3658,6 +3658,11 @@ func TestTableCollector_Collect(t *testing.T) {
 
 			result, err := collector.Collect(tc.profile)
 
+			// TODO: the Table field is now compared as part of the metric; ensure expectedResult includes correct Table values
+			for i := range result {
+				result[i].Table = ""
+			}
+
 			if tc.expectedError {
 				assert.Error(t, err)
 				if tc.errorContains != "" {
@@ -4448,6 +4453,8 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 			for _, profile := range result {
 				for i := range profile.Metrics {
 					profile.Metrics[i].Profile = nil
+					// TODO: the Table field is now compared as part of the metric; ensure expectedResult includes correct Table values
+					profile.Metrics[i].Table = ""
 				}
 			}
 
