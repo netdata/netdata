@@ -156,3 +156,21 @@ metrics:
           OID: 1.3.6.1.2.1.2.2.1.3
           name: ifType
         mapping_ref: ifType
+
+virtual_metrics:
+  - name: ifTotalTrafficIn
+    sources:
+      - metric: ifHCInOctets
+        table: ifXTable
+    chart_meta:
+      description: Total inbound traffic across all interfaces
+      family: 'Network/Total/Traffic/In'
+      unit: "bit/s"
+  - name: ifTotalTrafficOut
+    sources:
+      - metric: ifHCOutOctets
+        table: ifXTable
+    chart_meta:
+      description: Total outbound traffic across all interfaces
+      family: 'Network/Total/Traffic/Out'
+      unit: "bit/s"

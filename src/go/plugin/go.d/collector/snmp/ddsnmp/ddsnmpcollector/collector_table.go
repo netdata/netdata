@@ -152,6 +152,8 @@ type cacheProcessingContext struct {
 	// Only contains metric columns (not tag columns, which are cached)
 	// Key: full OID (trimmed), Value: current PDU value
 	pdus map[string]gosnmp.SnmpPDU
+
+	tableName string
 }
 
 // walkTablesAsNeeded walks only tables that aren't fully cached
@@ -340,6 +342,7 @@ func (tc *tableCollector) tryCollectFromCache(cfg ddprofiledefinition.MetricsCon
 		cachedOIDs: cachedOIDs,
 		cachedTags: cachedTags,
 		columnOIDs: columnOIDs,
+		tableName:  cfg.Table.Name,
 	}
 
 	metrics, err := tc.collectWithCache(ctx)
@@ -380,9 +383,9 @@ func (tc *tableCollector) organizePDUsByRow(ctx *tableProcessingContext) (rows m
 	for oid := range ctx.columnOIDs {
 		allColumnOIDs = append(allColumnOIDs, oid)
 	}
-	for _, orderedTag := range ctx.orderedTags {
-		if orderedTag.tagType == tagTypeSameTable && orderedTag.config.Symbol.OID != "" {
-			oid := trimOID(orderedTag.config.Symbol.OID)
+	for _, tag := range ctx.orderedTags {
+		if tag.tagType == tagTypeSameTable && tag.config.Symbol.OID != "" {
+			oid := trimOID(tag.config.Symbol.OID)
 			allColumnOIDs = append(allColumnOIDs, oid)
 		}
 	}
@@ -427,6 +430,7 @@ func (tc *tableCollector) processRows(ctx *tableProcessingContext) ([]ddsnmp.Met
 			pdus:       rowPDUs,
 			tags:       make(map[string]string),
 			staticTags: ctx.staticTags,
+			tableName:  ctx.config.Table.Name,
 		}
 		crossTableCtx.rowTags = row.tags
 
@@ -523,7 +527,7 @@ func (tc *tableCollector) buildMetricsFromCache(ctx *cacheProcessingContext) ([]
 				continue
 			}
 
-			metric, err := buildTableMetric(sym, pdu, value, rowTags, staticTags)
+			metric, err := buildTableMetric(sym, pdu, value, rowTags, staticTags, ctx.tableName)
 			if err != nil {
 				errs = append(errs, err)
 				continue
