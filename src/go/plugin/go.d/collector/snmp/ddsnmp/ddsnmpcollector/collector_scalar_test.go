@@ -330,10 +330,10 @@ func TestScalarCollector_Collect(t *testing.T) {
 					Name:       "clusterHealth",
 					Value:      1,
 					MetricType: "gauge",
-					Mappings: map[int64]string{
-						0: "OK",
-						1: "WARNING",
-						2: "CRITICAL",
+					MultiValue: map[string]int64{
+						"OK":       0,
+						"WARNING":  1,
+						"CRITICAL": 0,
 					},
 				},
 			},
@@ -370,12 +370,12 @@ func TestScalarCollector_Collect(t *testing.T) {
 					Name:       "ifOperStatus",
 					Value:      2,
 					MetricType: "gauge",
-					Mappings: map[int64]string{
-						1: "up",
-						2: "down",
-						3: "testing",
-						4: "unknown",
-						5: "dormant",
+					MultiValue: map[string]int64{
+						"up":      0,
+						"down":    1,
+						"testing": 0,
+						"unknown": 0,
+						"dormant": 0,
 					},
 				},
 			},
@@ -411,10 +411,10 @@ func TestScalarCollector_Collect(t *testing.T) {
 					Name:       "fanStatus",
 					Value:      2,
 					MetricType: "gauge",
-					Mappings: map[int64]string{
-						1: "normal",
-						2: "warning",
-						3: "critical",
+					MultiValue: map[string]int64{
+						"normal":   0,
+						"warning":  1,
+						"critical": 0,
 					},
 				},
 			},
@@ -449,11 +449,6 @@ func TestScalarCollector_Collect(t *testing.T) {
 					Name:       "ifAdminStatus",
 					Value:      0, // mapped from 2 -> 0
 					MetricType: "gauge",
-					Mappings: map[int64]string{
-						1: "1",
-						2: "0",
-						3: "0",
-					},
 				},
 			},
 			expectedError: false,
@@ -528,7 +523,7 @@ func TestScalarCollector_Collect(t *testing.T) {
 					Name:       "sysUpTime",
 					Value:      123456,
 					MetricType: "gauge",
-					Mappings:   nil, // No mappings
+					MultiValue: nil, // No mappings
 				},
 			},
 			expectedError: false,
@@ -562,10 +557,10 @@ func TestScalarCollector_Collect(t *testing.T) {
 					Name:       "ifAdminStatus",
 					Value:      1,
 					MetricType: "gauge",
-					Mappings: map[int64]string{
-						1: "up",
-						2: "down",
-						3: "testing",
+					MultiValue: map[string]int64{
+						"up":      1,
+						"down":    0,
+						"testing": 0,
 					},
 				},
 			},
@@ -601,11 +596,11 @@ func TestScalarCollector_Collect(t *testing.T) {
 					Name:       "upsBasicBatteryStatus",
 					Value:      1,
 					MetricType: "gauge",
-					Mappings: map[int64]string{
-						0: "batteryNormal",
-						1: "batteryLow",
-						2: "batteryDepleted",
-						3: "batteryCharging",
+					MultiValue: map[string]int64{
+						"batteryNormal":   0,
+						"batteryLow":      1,
+						"batteryDepleted": 0,
+						"batteryCharging": 0,
 					},
 				},
 			},

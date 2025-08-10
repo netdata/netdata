@@ -28,6 +28,7 @@ type vmetricsSourceKey struct {
 type vmetricsAggregator struct {
 	config      ddprofiledefinition.VirtualMetricConfig
 	sum         int64
+	multiSum    map[string]int64 // For aggregating MultiValue metrics
 	sourceCount int
 	metricType  ddprofiledefinition.ProfileMetricType
 }
@@ -52,7 +53,16 @@ func (p *vmetricsCollector) Collect(profDef *ddprofiledefinition.ProfileDefiniti
 		// Find all aggregators that need this metric
 		if aggrs, found := sourceToAggregators[key]; found {
 			for _, agg := range aggrs {
-				agg.sum += metric.Value
+				if len(metric.MultiValue) > 0 {
+					if agg.multiSum == nil {
+						agg.multiSum = make(map[string]int64)
+					}
+					for state, value := range metric.MultiValue {
+						agg.multiSum[state] += value
+					}
+				} else {
+					agg.sum += metric.Value
+				}
 				agg.sourceCount++
 				if agg.metricType == "" {
 					agg.metricType = metric.MetricType
@@ -72,6 +82,7 @@ func (p *vmetricsCollector) Collect(profDef *ddprofiledefinition.ProfileDefiniti
 		virtualMetrics = append(virtualMetrics, ddsnmp.Metric{
 			Name:        agg.config.Name,
 			Value:       agg.sum,
+			MultiValue:  agg.multiSum,
 			Description: agg.config.ChartMeta.Description,
 			Family:      agg.config.ChartMeta.Family,
 			Unit:        agg.config.ChartMeta.Unit,

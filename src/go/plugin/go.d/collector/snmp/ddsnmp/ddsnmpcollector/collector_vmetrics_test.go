@@ -429,6 +429,209 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 				},
 			},
 		},
+
+		"aggregate MultiValue metrics": {
+			profileDef: &ddprofiledefinition.ProfileDefinition{
+				Metrics: []ddprofiledefinition.MetricsConfig{
+					{
+						Table: ddprofiledefinition.SymbolConfig{
+							OID:  "1.3.6.1.2.1.2.2",
+							Name: "ifTable",
+						},
+						Symbols: []ddprofiledefinition.SymbolConfig{
+							{
+								OID:  "1.3.6.1.2.1.2.2.1.8",
+								Name: "ifOperStatus",
+								Mapping: map[string]string{
+									"1": "up",
+									"2": "down",
+									"3": "testing",
+									"4": "unknown",
+									"5": "dormant",
+								},
+							},
+						},
+					},
+				},
+				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
+					{
+						Name: "ifTotalOperStatus",
+						Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+							{Metric: "ifOperStatus", Table: "ifTable"},
+						},
+						ChartMeta: ddprofiledefinition.ChartMeta{
+							Description: "Total interface operational status",
+							Family:      "Network/Total/Interface/Status",
+							Unit:        "{status}",
+						},
+					},
+				},
+			},
+			collectedMetrics: []ddsnmp.Metric{
+				// Interface 1 - up
+				{
+					Name:    "ifOperStatus",
+					Value:   1,
+					IsTable: true,
+					Table:   "ifTable",
+					MultiValue: map[string]int64{
+						"up":      1,
+						"down":    0,
+						"testing": 0,
+						"unknown": 0,
+						"dormant": 0,
+					},
+					MetricType: ddprofiledefinition.ProfileMetricTypeGauge,
+				},
+				// Interface 2 - down
+				{
+					Name:    "ifOperStatus",
+					Value:   2,
+					IsTable: true,
+					Table:   "ifTable",
+					MultiValue: map[string]int64{
+						"up":      0,
+						"down":    1,
+						"testing": 0,
+						"unknown": 0,
+						"dormant": 0,
+					},
+				},
+				// Interface 3 - up
+				{
+					Name:    "ifOperStatus",
+					Value:   1,
+					IsTable: true,
+					Table:   "ifTable",
+					MultiValue: map[string]int64{
+						"up":      1,
+						"down":    0,
+						"testing": 0,
+						"unknown": 0,
+						"dormant": 0,
+					},
+				},
+				// Interface 4 - testing
+				{
+					Name:    "ifOperStatus",
+					Value:   3,
+					IsTable: true,
+					Table:   "ifTable",
+					MultiValue: map[string]int64{
+						"up":      0,
+						"down":    0,
+						"testing": 1,
+						"unknown": 0,
+						"dormant": 0,
+					},
+				},
+			},
+			expected: []ddsnmp.Metric{
+				{
+					Name:  "ifTotalOperStatus",
+					Value: 0, // Not used for MultiValue
+					MultiValue: map[string]int64{
+						"up":      2, // 2 interfaces up
+						"down":    1, // 1 interface down
+						"testing": 1, // 1 interface testing
+						"unknown": 0,
+						"dormant": 0,
+					},
+					Description: "Total interface operational status",
+					Family:      "Network/Total/Interface/Status",
+					Unit:        "{status}",
+					MetricType:  ddprofiledefinition.ProfileMetricTypeGauge,
+				},
+			},
+		},
+
+		"mixed MultiValue and regular metrics": {
+			profileDef: &ddprofiledefinition.ProfileDefinition{
+				Metrics: []ddprofiledefinition.MetricsConfig{
+					{
+						Table: ddprofiledefinition.SymbolConfig{
+							OID:  "1.3.6.1.2.1.2.2",
+							Name: "ifTable",
+						},
+						Symbols: []ddprofiledefinition.SymbolConfig{
+							{
+								OID:  "1.3.6.1.2.1.2.2.1.10",
+								Name: "ifInOctets",
+							},
+							{
+								OID:  "1.3.6.1.2.1.2.2.1.8",
+								Name: "ifOperStatus",
+								Mapping: map[string]string{
+									"1": "up",
+									"2": "down",
+								},
+							},
+						},
+					},
+				},
+				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
+					{
+						Name: "ifTotalInOctets",
+						Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+							{Metric: "ifInOctets", Table: "ifTable"},
+						},
+						ChartMeta: ddprofiledefinition.ChartMeta{
+							Description: "Total inbound traffic",
+							Family:      "Network/Total/Traffic",
+							Unit:        "bit/s",
+						},
+					},
+					{
+						Name: "ifTotalOperStatus",
+						Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+							{Metric: "ifOperStatus", Table: "ifTable"},
+						},
+						ChartMeta: ddprofiledefinition.ChartMeta{
+							Description: "Total interface status",
+							Family:      "Network/Total/Status",
+							Unit:        "{status}",
+						},
+					},
+				},
+			},
+			collectedMetrics: []ddsnmp.Metric{
+				// Regular metric
+				{Name: "ifInOctets", Value: 1000, IsTable: true, Table: "ifTable"},
+				{Name: "ifInOctets", Value: 2000, IsTable: true, Table: "ifTable"},
+				// MultiValue metric
+				{
+					Name:       "ifOperStatus",
+					Value:      1,
+					IsTable:    true,
+					Table:      "ifTable",
+					MultiValue: map[string]int64{"up": 1, "down": 0},
+				},
+				{
+					Name:       "ifOperStatus",
+					Value:      2,
+					IsTable:    true,
+					Table:      "ifTable",
+					MultiValue: map[string]int64{"up": 0, "down": 1},
+				},
+			},
+			expected: []ddsnmp.Metric{
+				{
+					Name:        "ifTotalInOctets",
+					Value:       3000,
+					Description: "Total inbound traffic",
+					Family:      "Network/Total/Traffic",
+					Unit:        "bit/s",
+				},
+				{
+					Name:        "ifTotalOperStatus",
+					Value:       0,
+					MultiValue:  map[string]int64{"up": 1, "down": 1},
+					Description: "Total interface status",
+					Family:      "Network/Total/Status",
+					Unit:        "{status}",
+				},
+			},
+		},
 	}
 
 	for name, tc := range tests {
