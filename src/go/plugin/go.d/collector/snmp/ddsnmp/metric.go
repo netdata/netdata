@@ -24,6 +24,5 @@ type Metric struct {
 	Value       int64
 	MultiValue  map[string]int64
 
-	Mappings map[int64]string
-	IsTable  bool
+	IsTable bool
 }

@@ -174,3 +174,11 @@ virtual_metrics:
       description: Total outbound traffic across all interfaces
       family: 'Network/Total/Traffic/Out'
       unit: "bit/s"
+  - name: ifTotalOperStatus
+    sources:
+      - metric: ifOperStatus
+        table: ifTable
+    chart_meta:
+      description: Total count of interfaces by operational status
+      family: 'Network/Total/Interface/Status'
+      unit: "{status}"
