@@ -125,6 +125,11 @@ func buildMultiValue(value int64, mappings map[string]string) map[string]int64 {
 		// int→string mapping (e.g., 1→"up", 2→"down")
 		for k, v := range mappings {
 			intKey, _ := strconv.ParseInt(k, 10, 64)
+			// Only set the value if:
+			// 1. We haven't seen this state name before (!ok), OR
+			// 2. The current value matches this key (value == intKey)
+			// This ensures that if multiple keys map to the same state name,
+			// we preserve the "1" (active) value if any key matches
 			if _, ok := multiValue[v]; !ok || value == intKey {
 				multiValue[v] = metrix.Bool(value == intKey)
 			}
