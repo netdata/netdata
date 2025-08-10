@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- fix\(go.d/ddsnmp\): respect metric tag order from profile definition [\#20784](https://github.com/netdata/netdata/pull/20784) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations docs [\#20783](https://github.com/netdata/netdata/pull/20783) ([netdatabot](https://github.com/netdatabot))
 - docs\(go.d/mysql\): add MariaDB 10.5.9+ SLAVE MONITOR privilege [\#20782](https://github.com/netdata/netdata/pull/20782) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#20781](https://github.com/netdata/netdata/pull/20781) ([netdatabot](https://github.com/netdatabot))
 - docs\(go.d/memcached\): add UNIX socket access prerequisite [\#20780](https://github.com/netdata/netdata/pull/20780) ([ilyam8](https://github.com/ilyam8))
@@ -445,9 +447,6 @@
 - Update Netdata README [\#20251](https://github.com/netdata/netdata/pull/20251) ([kanelatechnical](https://github.com/kanelatechnical))
 - Switch to uv threads [\#20250](https://github.com/netdata/netdata/pull/20250) ([stelfrag](https://github.com/stelfrag))
 - fix\(go.d/snmp\): use 32bit counters if 64 aren't available [\#20249](https://github.com/netdata/netdata/pull/20249) ([ilyam8](https://github.com/ilyam8))
-- fix\(go.d/snmp\): use ifDescr for interface name if ifName is empty [\#20248](https://github.com/netdata/netdata/pull/20248) ([ilyam8](https://github.com/ilyam8))
-- fix\(go.d/sd/snmp\): fix snmpv3 credentials [\#20247](https://github.com/netdata/netdata/pull/20247) ([ilyam8](https://github.com/ilyam8))
-- SNMP first cisco yaml file pass [\#20246](https://github.com/netdata/netdata/pull/20246) ([Ancairon](https://github.com/Ancairon))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
