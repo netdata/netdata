@@ -182,4 +182,3 @@ virtual_metrics:
       description: Total count of interfaces by operational status
       family: 'Network/Total/Interface/Status'
       unit: "{status}"
-
