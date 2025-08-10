@@ -25,6 +25,7 @@ type (
 		pdus       map[string]gosnmp.SnmpPDU
 		tags       map[string]string
 		staticTags map[string]string
+		tableName  string
 	}
 	// tableRowProcessingContext contains context needed for processing a row
 	tableRowProcessingContext struct {
@@ -53,7 +54,7 @@ func (p *tableRowProcessor) processRow(row *tableRowData, ctx *tableRowProcessin
 }
 
 func (p *tableRowProcessor) processRowTags(row *tableRowData, ctx *tableRowProcessingContext) error {
-	// Process tags in the order they appear in the profile
+	// Collect tags in the order they appear in the profile
 	for _, orderedTag := range ctx.orderedTags {
 		switch orderedTag.tagType {
 		case tagTypeSameTable:
@@ -166,7 +167,7 @@ func (p *tableRowProcessor) createMetric(sym ddprofiledefinition.SymbolConfig, p
 		return nil, fmt.Errorf("error processing value: %w", err)
 	}
 
-	return buildTableMetric(sym, pdu, value, row.tags, row.staticTags)
+	return buildTableMetric(sym, pdu, value, row.tags, row.staticTags, row.tableName)
 }
 
 type (

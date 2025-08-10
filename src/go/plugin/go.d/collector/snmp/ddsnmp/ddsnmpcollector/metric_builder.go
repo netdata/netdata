@@ -41,8 +41,9 @@ func (mb *metricBuilder) withStaticTags(tags map[string]string) *metricBuilder {
 	return mb
 }
 
-func (mb *metricBuilder) asTableMetric() *metricBuilder {
+func (mb *metricBuilder) asTableMetric(table string) *metricBuilder {
 	mb.metric.IsTable = true
+	mb.metric.Table = table
 	return mb
 }
 
@@ -74,12 +75,12 @@ func buildScalarMetric(cfg ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU,
 	return &metric, nil
 }
 
-func buildTableMetric(cfg ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU, value int64, tags, staticTags map[string]string) (*ddsnmp.Metric, error) {
+func buildTableMetric(cfg ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU, value int64, tags, staticTags map[string]string, tableName string) (*ddsnmp.Metric, error) {
 	metric := newMetricBuilder(cfg.Name, value).
 		withTags(tags).
 		withStaticTags(staticTags).
 		fromSymbol(cfg, pdu).
-		asTableMetric().
+		asTableMetric(tableName).
 		build()
 
 	if cfg.TransformCompiled != nil {
