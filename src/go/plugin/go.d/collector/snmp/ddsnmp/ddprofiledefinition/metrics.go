@@ -81,15 +81,17 @@ type SymbolConfig struct {
 	//   Deprecated types: `counter` (use `rate` instead), percent (use `scale_factor` instead)
 	MetricType ProfileMetricType `yaml:"metric_type,omitempty" json:"metric_type,omitempty"`
 
-	ChartMeta struct {
-		Description string `yaml:"description,omitempty" json:"description,omitempty"`
-		Family      string `yaml:"family,omitempty" json:"family,omitempty"`
-		Unit        string `yaml:"unit,omitempty" json:"unit,omitempty"`
-	} `yaml:"chart_meta,omitempty" json:"chart_meta,omitempty"`
+	ChartMeta ChartMeta `yaml:"chart_meta,omitempty" json:"chart_meta,omitempty"`
 
 	Mapping           map[string]string  `yaml:"mapping,omitempty" json:"mapping,omitempty"`
 	Transform         string             `yaml:"transform,omitempty" json:"transform,omitempty"`
 	TransformCompiled *template.Template `yaml:"-" json:"-"`
+}
+
+type ChartMeta struct {
+	Description string `yaml:"description,omitempty" json:"description,omitempty"`
+	Family      string `yaml:"family,omitempty" json:"family,omitempty"`
+	Unit        string `yaml:"unit,omitempty" json:"unit,omitempty"`
 }
 
 // Clone creates a duplicate of this SymbolConfig
