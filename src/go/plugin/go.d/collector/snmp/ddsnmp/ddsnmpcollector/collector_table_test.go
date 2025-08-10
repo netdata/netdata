@@ -1301,12 +1301,12 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "eth0"},
 					MetricType: "gauge",
 					IsTable:    true,
-					Mappings: map[int64]string{
-						1: "up",
-						2: "down",
-						3: "testing",
-						4: "unknown",
-						5: "dormant",
+					MultiValue: map[string]int64{
+						"up":      1,
+						"down":    0,
+						"testing": 0,
+						"unknown": 0,
+						"dormant": 0,
 					},
 				},
 				{
@@ -1315,12 +1315,12 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "eth1"},
 					MetricType: "gauge",
 					IsTable:    true,
-					Mappings: map[int64]string{
-						1: "up",
-						2: "down",
-						3: "testing",
-						4: "unknown",
-						5: "dormant",
+					MultiValue: map[string]int64{
+						"up":      0,
+						"down":    1,
+						"testing": 0,
+						"unknown": 0,
+						"dormant": 0,
 					},
 				},
 			},
@@ -1376,10 +1376,10 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"fan_name": "Fan1"},
 					MetricType: "gauge",
 					IsTable:    true,
-					Mappings: map[int64]string{
-						1: "normal",
-						2: "warning",
-						3: "critical",
+					MultiValue: map[string]int64{
+						"normal":   1,
+						"warning":  0,
+						"critical": 0,
 					},
 				},
 				{
@@ -1388,10 +1388,10 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"fan_name": "Fan2"},
 					MetricType: "gauge",
 					IsTable:    true,
-					Mappings: map[int64]string{
-						1: "normal",
-						2: "warning",
-						3: "critical",
+					MultiValue: map[string]int64{
+						"normal":   0,
+						"warning":  0,
+						"critical": 1,
 					},
 				},
 			},
@@ -1568,11 +1568,11 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"node_name": "node1"},
 					MetricType: "gauge",
 					IsTable:    true,
-					Mappings: map[int64]string{
-						0: "OK",
-						1: "ATTN",
-						2: "DOWN",
-						3: "INVALID",
+					MultiValue: map[string]int64{
+						"OK":      1,
+						"ATTN":    0,
+						"DOWN":    0,
+						"INVALID": 0,
 					},
 				},
 				{
@@ -1581,11 +1581,11 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"node_name": "node2"},
 					MetricType: "gauge",
 					IsTable:    true,
-					Mappings: map[int64]string{
-						0: "OK",
-						1: "ATTN",
-						2: "DOWN",
-						3: "INVALID",
+					MultiValue: map[string]int64{
+						"OK":      0,
+						"ATTN":    0,
+						"DOWN":    1,
+						"INVALID": 0,
 					},
 				},
 			},
@@ -3302,7 +3302,7 @@ func TestTableCollector_Collect(t *testing.T) {
   {{- setFamily .Metric (get $config "family") -}}
   {{- with get $config "unit" -}}{{- setUnit $.Metric . -}}{{- end -}}
   {{- with get $config "divisor" -}}{{- setValue $.Metric (int64 (div (float64 $.Metric.Value) .)) -}}{{- end -}}
-  {{- with get $config "mapping" -}}{{- setMappings $.Metric . -}}{{- end -}}
+  {{- with get $config "mapping" -}}{{- setMultivalue $.Metric . -}}{{- end -}}
 {{- end -}}
 
 {{- deleteTag .Metric "sensor_type" -}}`,
@@ -3355,16 +3355,16 @@ func TestTableCollector_Collect(t *testing.T) {
 					IsTable:    true,
 				},
 				{
-					Name:   "mtxrHlSensorValue_sensor_status",
-					Value:  1,
-					Tags:   map[string]string{"sensor_name": "psu1-state"},
-					Family: "Health/Status",
-					Mappings: map[int64]string{
-						0: "not_ok",
-						1: "ok",
-					},
+					Name:       "mtxrHlSensorValue_sensor_status",
+					Value:      1,
+					Tags:       map[string]string{"sensor_name": "psu1-state"},
+					Family:     "Health/Status",
 					MetricType: "gauge",
 					IsTable:    true,
+					MultiValue: map[string]int64{
+						"not_ok": 0,
+						"ok":     1,
+					},
 				},
 				{
 					Name:       "mtxrHlSensorValue_voltage",
@@ -3482,7 +3482,7 @@ func TestTableCollector_Collect(t *testing.T) {
 {{- else -}}
   {{- setValue .Metric 0 -}}
 {{- end -}}
-{{- setMappings .Metric (i64map 0 "down" 1 "up") -}}
+{{- setMultivalue .Metric (i64map 0 "down" 1 "up") -}}
 {{- setName .Metric "interface_status" -}}`,
 								},
 							},
@@ -3511,37 +3511,37 @@ func TestTableCollector_Collect(t *testing.T) {
 			},
 			expectedResult: []ddsnmp.Metric{
 				{
-					Name:  "interface_status",
-					Value: 1,
-					Tags:  map[string]string{"interface": "eth0"},
-					Mappings: map[int64]string{
-						0: "down",
-						1: "up",
-					},
+					Name:       "interface_status",
+					Value:      1,
+					Tags:       map[string]string{"interface": "eth0"},
 					MetricType: "gauge",
 					IsTable:    true,
+					MultiValue: map[string]int64{
+						"down": 0,
+						"up":   1,
+					},
 				},
 				{
-					Name:  "interface_status",
-					Value: 0,
-					Tags:  map[string]string{"interface": "eth1"},
-					Mappings: map[int64]string{
-						0: "down",
-						1: "up",
-					},
+					Name:       "interface_status",
+					Value:      0,
+					Tags:       map[string]string{"interface": "eth1"},
 					MetricType: "gauge",
 					IsTable:    true,
+					MultiValue: map[string]int64{
+						"down": 1,
+						"up":   0,
+					},
 				},
 				{
-					Name:  "interface_status",
-					Value: 0,
-					Tags:  map[string]string{"interface": "eth2"},
-					Mappings: map[int64]string{
-						0: "down",
-						1: "up",
-					},
+					Name:       "interface_status",
+					Value:      0,
+					Tags:       map[string]string{"interface": "eth2"},
 					MetricType: "gauge",
 					IsTable:    true,
+					MultiValue: map[string]int64{
+						"down": 1,
+						"up":   0,
+					},
 				},
 			},
 			expectedError: false,
