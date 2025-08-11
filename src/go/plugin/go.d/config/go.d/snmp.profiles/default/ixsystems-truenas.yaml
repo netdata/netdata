@@ -20,7 +20,7 @@ metadata:
       vendor:
         value: "iXsystems"
       type:
-        value: "storage"
+        value: "Storage"
 
 # 1. FREENAS-MIB
 #     https://mibbrowser.online/mibdb_search.php?mib=FREENAS-MIB

@@ -45,10 +45,7 @@
     },
     "required": [
       "address"
-    ],
-    "patternProperties": {
-      "^name$": {}
-    }
+    ]
   },
   "uiSchema": {
     "uiOptions": {

@@ -233,12 +233,9 @@ int handle_old_proto_cmd(const char *msg, size_t msg_len)
     char *str = mallocz(msg_len+1);
     memcpy(str, msg, msg_len);
     str[msg_len] = 0;
-    if (aclk_handle_cloud_cmd_message(str)) {
-        freez(str);
-        return 1;
-    }
+    int rc = aclk_handle_cloud_cmd_message(str);
     freez(str);
-    return 0;
+    return rc;
 }
 
 int create_node_instance_result(const char *msg, size_t msg_len)

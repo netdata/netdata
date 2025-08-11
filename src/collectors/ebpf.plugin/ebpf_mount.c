@@ -265,12 +265,12 @@ static void ebpf_mount_exit(void *pptr)
         return;
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
-        pthread_mutex_lock(&lock);
+        netdata_mutex_lock(&lock);
 
         ebpf_obsolete_mount_global(em);
 
         fflush(stdout);
-        pthread_mutex_unlock(&lock);
+        netdata_mutex_unlock(&lock);
     }
 
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_REMOVE);
@@ -287,10 +287,10 @@ static void ebpf_mount_exit(void *pptr)
         em->probe_links = NULL;
     }
 
-    pthread_mutex_lock(&ebpf_exit_cleanup);
+    netdata_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     ebpf_update_stats(&plugin_statistics, em);
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
+    netdata_mutex_unlock(&ebpf_exit_cleanup);
 }
 
 /*****************************************************************
@@ -381,20 +381,20 @@ static void mount_collector(ebpf_module_t *em)
 
         counter = 0;
         ebpf_mount_read_global_table(maps_per_core);
-        pthread_mutex_lock(&lock);
+        netdata_mutex_lock(&lock);
 
         ebpf_mount_send_data();
 
-        pthread_mutex_unlock(&lock);
+        netdata_mutex_unlock(&lock);
 
-        pthread_mutex_lock(&ebpf_exit_cleanup);
+        netdata_mutex_lock(&ebpf_exit_cleanup);
         if (running_time && !em->running_time)
             running_time = update_every;
         else
             running_time += update_every;
 
         em->running_time = running_time;
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
+        netdata_mutex_unlock(&ebpf_exit_cleanup);
     }
 }
 
@@ -497,7 +497,7 @@ static int ebpf_mount_load_bpf(ebpf_module_t *em)
  *
  * @return It always returns NULL
  */
-void *ebpf_mount_thread(void *ptr)
+void ebpf_mount_thread(void *ptr)
 {
     ebpf_module_t *em = ptr;
     CLEANUP_FUNCTION_REGISTER(ebpf_mount_exit) cleanup_ptr = em;
@@ -521,16 +521,14 @@ void *ebpf_mount_thread(void *ptr)
         algorithms,
         NETDATA_EBPF_MOUNT_SYSCALL);
 
-    pthread_mutex_lock(&lock);
+    netdata_mutex_lock(&lock);
     ebpf_create_mount_charts(em->update_every);
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
-    pthread_mutex_unlock(&lock);
+    netdata_mutex_unlock(&lock);
 
     mount_collector(em);
 
 endmount:
     ebpf_update_disabled_plugin_stats(em);
-
-    return NULL;
 }

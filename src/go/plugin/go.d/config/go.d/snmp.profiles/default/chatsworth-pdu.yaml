@@ -358,7 +358,7 @@ metrics:
       chart_meta:
         description: XY1 branch energy accumulated
         family: 'PowerFlow/Branch/XY1/Energy/Total'
-        unit: "da*W"
+        unit: "daW"
       scale_factor: 0.1
       # This and the following metrics were da*W*s, but because they are accumulated, it should be /s. s/s = 1 so removing the seconds.
 
@@ -370,7 +370,7 @@ metrics:
       chart_meta:
         description: YZ1 branch energy accumulated
         family: 'PowerFlow/Branch/YZ1/Energy/Total'
-        unit: "da*W"
+        unit: "daW"
       scale_factor: 0.1
 
   - MIB: CPI-UNITY-MIB
@@ -381,7 +381,7 @@ metrics:
       chart_meta:
         description: ZX1 branch energy accumulated
         family: 'PowerFlow/Branch/ZX1/Energy/Total'
-        unit: "da*W"
+        unit: "daW"
       scale_factor: 0.1
 
   - MIB: CPI-UNITY-MIB
@@ -392,7 +392,7 @@ metrics:
       chart_meta:
         description: XY2 branch energy accumulated
         family: 'PowerFlow/Branch/XY2/Energy/Total'
-        unit: "da*W"
+        unit: "daW"
       scale_factor: 0.1
 
   - MIB: CPI-UNITY-MIB
@@ -403,7 +403,7 @@ metrics:
       chart_meta:
         description: YZ2 branch energy accumulated
         family: 'PowerFlow/Branch/YZ2/Energy/Total'
-        unit: "da*W"
+        unit: "daW"
       scale_factor: 0.1
 
   - MIB: CPI-UNITY-MIB
@@ -414,7 +414,7 @@ metrics:
       chart_meta:
         description: ZX2 branch energy accumulated
         family: 'PowerFlow/Branch/ZX2/Energy/Total'
-        unit: "da*W"
+        unit: "daW"
       scale_factor: 0.1
 
   ### [Legacy] Outlets
@@ -667,7 +667,7 @@ metrics:
       chart_meta:
         description: Outlet1 receptacle energy accumulated
         family: 'PowerFlow/Outlet/1/Energy/Total'
-        unit: "da*W"
+        unit: "daW"
       scale_factor: 0.1
 
 
@@ -679,7 +679,7 @@ metrics:
       chart_meta:
         description: Outlet2 receptacle energy accumulated
         family: 'PowerFlow/Outlet/2/Energy/Total'
-        unit: "da*W"
+        unit: "daW"
       scale_factor: 0.1
 
   - MIB: CPI-UNITY-MIB
@@ -690,7 +690,7 @@ metrics:
       chart_meta:
         description: Outlet3 receptacle energy accumulated
         family: 'PowerFlow/Outlet/3/Energy/Total'
-        unit: "da*W"
+        unit: "daW"
       scale_factor: 0.1
 
 
@@ -702,7 +702,7 @@ metrics:
       chart_meta:
         description: Outlet4 receptacle energy accumulated
         family: 'PowerFlow/Outlet/4/Energy/Total'
-        unit: "da*W"
+        unit: "daW"
       scale_factor: 0.1
 
 
@@ -714,7 +714,7 @@ metrics:
       chart_meta:
         description: Outlet5 receptacle energy accumulated
         family: 'PowerFlow/Outlet/5/Energy/Total'
-        unit: "da*W"
+        unit: "daW"
       scale_factor: 0.1
 
 
@@ -726,7 +726,7 @@ metrics:
       chart_meta:
         description: Outlet6 receptacle energy accumulated
         family: 'PowerFlow/Outlet/6/Energy/Total'
-        unit: "da*W"
+        unit: "daW"
       scale_factor: 0.1
 
 
@@ -738,7 +738,7 @@ metrics:
       chart_meta:
         description: Outlet7 receptacle energy accumulated
         family: 'PowerFlow/Outlet/7/Energy/Total'
-        unit: "da*W"
+        unit: "daW"
       scale_factor: 0.1
 
 
@@ -750,7 +750,7 @@ metrics:
       chart_meta:
         description: Outlet8 receptacle energy accumulated
         family: 'PowerFlow/Outlet/8/Energy/Total'
-        unit: "da*W"
+        unit: "daW"
       scale_factor: 0.1
 
 
@@ -762,7 +762,7 @@ metrics:
       chart_meta:
         description: Outlet9 receptacle energy accumulated
         family: 'PowerFlow/Outlet/9/Energy/Total'
-        unit: "da*W"
+        unit: "daW"
       scale_factor: 0.1
 
 
@@ -774,7 +774,7 @@ metrics:
       chart_meta:
         description: Outlet10 receptacle energy accumulated
         family: 'PowerFlow/Outlet/10/Energy/Total'
-        unit: "da*W"
+        unit: "daW"
       scale_factor: 0.1
 
 
@@ -786,7 +786,7 @@ metrics:
       chart_meta:
         description: Outlet11 receptacle energy accumulated
         family: 'PowerFlow/Outlet/11/Energy/Total'
-        unit: "da*W"
+        unit: "daW"
       scale_factor: 0.1
 
 
@@ -798,7 +798,7 @@ metrics:
       chart_meta:
         description: Outlet12 receptacle energy accumulated
         family: 'PowerFlow/Outlet/12/Energy/Total'
-        unit: "da*W"
+        unit: "daW"
       scale_factor: 0.1
 
 
@@ -810,7 +810,7 @@ metrics:
       chart_meta:
         description: Outlet13 receptacle energy accumulated
         family: 'PowerFlow/Outlet/13/Energy/Total'
-        unit: "da*W"
+        unit: "daW"
       scale_factor: 0.1
 
   - MIB: CPI-UNITY-MIB
@@ -821,7 +821,7 @@ metrics:
       chart_meta:
         description: Outlet14 receptacle energy accumulated
         family: 'PowerFlow/Outlet/14/Energy/Total'
-        unit: "da*W"
+        unit: "daW"
       scale_factor: 0.1
 
 
@@ -833,7 +833,7 @@ metrics:
       chart_meta:
         description: Outlet15 receptacle energy accumulated
         family: 'PowerFlow/Outlet/15/Energy/Total'
-        unit: "da*W"
+        unit: "daW"
       scale_factor: 0.1
 
 
@@ -845,7 +845,7 @@ metrics:
       chart_meta:
         description: Outlet16 receptacle energy accumulated
         family: 'PowerFlow/Outlet/16/Energy/Total'
-        unit: "da*W"
+        unit: "daW"
       scale_factor: 0.1
 
 
@@ -857,7 +857,7 @@ metrics:
       chart_meta:
         description: Outlet17 receptacle energy accumulated
         family: 'PowerFlow/Outlet/17/Energy/Total'
-        unit: "da*W"
+        unit: "daW"
       scale_factor: 0.1
 
 
@@ -869,7 +869,7 @@ metrics:
       chart_meta:
         description: Outlet18 receptacle energy accumulated
         family: 'PowerFlow/Outlet/18/Energy/Total'
-        unit: "da*W"
+        unit: "daW"
       scale_factor: 0.1
 
 
@@ -881,7 +881,7 @@ metrics:
       chart_meta:
         description: Outlet19 receptacle energy accumulated
         family: 'PowerFlow/Outlet/19/Energy/Total'
-        unit: "da*W"
+        unit: "daW"
       scale_factor: 0.1
 
 
@@ -893,7 +893,7 @@ metrics:
       chart_meta:
         description: Outlet20 receptacle energy accumulated
         family: 'PowerFlow/Outlet/20/Energy/Total'
-        unit: "da*W"
+        unit: "daW"
       scale_factor: 0.1
 
 
@@ -905,7 +905,7 @@ metrics:
       chart_meta:
         description: Outlet21 receptacle energy accumulated
         family: 'PowerFlow/Outlet/21/Energy/Total'
-        unit: "da*W"
+        unit: "daW"
       scale_factor: 0.1
 
 
@@ -917,7 +917,7 @@ metrics:
       chart_meta:
         description: Outlet22 receptacle energy accumulated
         family: 'PowerFlow/Outlet/22/Energy/Total'
-        unit: "da*W"
+        unit: "daW"
       scale_factor: 0.1
 
 
@@ -929,7 +929,7 @@ metrics:
       chart_meta:
         description: Outlet23 receptacle energy accumulated
         family: 'PowerFlow/Outlet/23/Energy/Total'
-        unit: "da*W"
+        unit: "daW"
       scale_factor: 0.1
 
 
@@ -941,7 +941,7 @@ metrics:
       chart_meta:
         description: Outlet24 receptacle energy accumulated
         family: 'PowerFlow/Outlet/24/Energy/Total'
-        unit: "da*W"
+        unit: "daW"
       scale_factor: 0.1
 
 
@@ -1191,15 +1191,15 @@ metrics:
           unit: "VA"
 
         # Get the power factor for the branch.
-      - OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.7
-        name: cpiPduBranchPowerFactor
-        chart_meta:
-          description: Power factor for the branch
-          family: 'PowerFlow/Branch/Factor'
-          unit: "10*2.1"
-        # TODO don't think this helps
+      # - OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.7
+      #   name: cpiPduBranchPowerFactor
+      #   chart_meta:
+      #     description: Power factor for the branch
+      #     family: 'PowerFlow/Branch/Factor'
+      #     unit: "10*2.1"
+      # # TODO don't think this helps
 
-        # Get the alarm status of the branch: noalarm(0), warning(1), alarm(2)
+      # Get the alarm status of the branch: noalarm(0), warning(1), alarm(2)
       - OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.8
         name: cpiPduBranchStatus
         chart_meta:

@@ -1406,7 +1406,7 @@ static inline struct aral_unittest_entry *unittest_aral_malloc(ARAL *ar, bool ma
     return t;
 }
 
-static void *aral_test_thread(void *ptr) {
+static void aral_test_thread(void *ptr) {
     struct aral_unittest_config *auc = ptr;
     ARAL *ar = auc->ar;
     size_t elements = auc->elements;
@@ -1504,8 +1504,6 @@ static void *aral_test_thread(void *ptr) {
     } while(!auc->single_threaded && !__atomic_load_n(&auc->stop, __ATOMIC_RELAXED));
 
     freez(pointers);
-
-    return ptr;
 }
 
 int aral_stress_test(size_t threads, size_t elements, size_t seconds) {

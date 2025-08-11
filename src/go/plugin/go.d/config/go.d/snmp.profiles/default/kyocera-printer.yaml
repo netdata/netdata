@@ -9,9 +9,9 @@ metadata:
   device:
     fields:
       vendor:
-        value: "kyocera"
+        value: "Kyocera"
       type:
-        value: "printer"
+        value: "Printer"
 
 metric_tags:
   - tag: kcprt_general_model_name

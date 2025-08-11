@@ -16,9 +16,6 @@
         "description": "Select Intel GPU ([supported filters](https://manpages.debian.org/testing/intel-gpu-tools/intel_gpu_top.1.en.html#DEVICE_SELECTION)). Use `intel_gpu_top -L` for listing devices. If not set, defaults to first.",
         "type": "string"
       }
-    },
-    "patternProperties": {
-      "^name$": {}
     }
   },
   "uiSchema": {

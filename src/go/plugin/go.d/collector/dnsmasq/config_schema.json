@@ -50,10 +50,7 @@
     "required": [
       "address",
       "protocol"
-    ],
-    "patternProperties": {
-      "^name$": {}
-    }
+    ]
   },
   "uiSchema": {
     "uiOptions": {

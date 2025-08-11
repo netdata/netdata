@@ -654,7 +654,15 @@ static inline int check_capabilities() {
 #endif
 #endif
 
-netdata_mutex_t apps_and_stdout_mutex = NETDATA_MUTEX_INITIALIZER;
+netdata_mutex_t apps_and_stdout_mutex;
+
+static void __attribute__((constructor)) init_mutex(void) {
+    netdata_mutex_init(&apps_and_stdout_mutex);
+}
+
+static void __attribute__((destructor)) destroy_mutex(void) {
+    netdata_mutex_destroy(&apps_and_stdout_mutex);
+}
 
 static bool apps_plugin_exit = false;
 

@@ -62,7 +62,6 @@ typedef enum __attribute__((packed)) {
     BIB_DB_NONE,
     BIB_CONNECTIVITY_ACLK,
     BIB_CONNECTIVITY_HTTPD_STATIC,
-    BIB_CONNECTIVITY_HTTPD_H2O,
     BIB_CONNECTIVITY_WEBRTC,
     BIB_CONNECTIVITY_NATIVE_HTTPS,
     BIB_CONNECTIVITY_TLS_HOST_VERIFY,
@@ -598,14 +597,6 @@ static struct {
                 .analytics = NULL,
                 .print = "static (Netdata internal web server)",
                 .json = "static",
-                .value = NULL,
-        },
-        [BIB_CONNECTIVITY_HTTPD_H2O] = {
-                .category = BIC_CONNECTIVITY,
-                .type = BIT_BOOLEAN,
-                .analytics = NULL,
-                .print = "h2o (web server)",
-                .json = "h2o",
                 .value = NULL,
         },
         [BIB_CONNECTIVITY_WEBRTC] = {
@@ -1247,9 +1238,6 @@ __attribute__((constructor)) void initialize_build_info(void) {
     build_info_set_status(BIB_DB_NONE, true);
 
     build_info_set_status(BIB_CONNECTIVITY_HTTPD_STATIC, true);
-#ifdef ENABLE_H2O
-    build_info_set_status(BIB_CONNECTIVITY_HTTPD_H2O, true);
-#endif
 #ifdef ENABLE_WEBRTC
     build_info_set_status(BIB_CONNECTIVITY_WEBRTC, true);
 #endif

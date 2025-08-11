@@ -138,10 +138,7 @@
     "required": [
       "url",
       "node"
-    ],
-    "patternProperties": {
-      "^name$": {}
-    }
+    ]
   },
   "uiSchema": {
     "ui:flavour": "tabs",

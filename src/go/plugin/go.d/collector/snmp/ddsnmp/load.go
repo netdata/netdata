@@ -17,6 +17,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
 var log = logger.New().With("component", "snmp/ddsnmp")
@@ -125,6 +126,14 @@ func loadProfileWithExtendsMap(filename string, extendsPaths multipath.MultiPath
 
 	if prof.SourceFile == "" {
 		prof.SourceFile, _ = filepath.Abs(filename)
+	}
+
+	// Handle empty profiles - these are profiles where content has been deliberately removed,
+	// but the file itself is preserved. This ensures that when users update, their existing
+	// profile files are overwritten with empty content rather than being left with stale data.
+	if prof.Definition == nil {
+		prof.Definition = &ddprofiledefinition.ProfileDefinition{}
+		return &prof, nil
 	}
 
 	prof.extensionHierarchy = make([]*extensionInfo, 0, len(prof.Definition.Extends))

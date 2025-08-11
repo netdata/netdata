@@ -7,7 +7,16 @@ static char *user_config_dir = CONFIG_DIR;
 static char *stock_config_dir = LIBCONFIG_DIR;
 
 static int update_every = 1;
-netdata_mutex_t stdout_mutex = NETDATA_MUTEX_INITIALIZER;
+
+netdata_mutex_t stdout_mutex;
+
+static void __attribute__((constructor)) init_mutex(void) {
+    netdata_mutex_init(&stdout_mutex);
+}
+
+static void __attribute__((destructor)) destroy_mutex(void) {
+    netdata_mutex_destroy(&stdout_mutex);
+}
 
 static struct debugfs_module {
     const char *name;

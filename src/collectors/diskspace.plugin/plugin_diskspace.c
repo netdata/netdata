@@ -523,7 +523,7 @@ struct slow_worker_data {
     int update_every;
 };
 
-void *diskspace_slow_worker(void *ptr)
+void diskspace_slow_worker(void *ptr)
 {
     struct slow_worker_data *data = (struct slow_worker_data *)ptr;
 
@@ -597,8 +597,6 @@ void *diskspace_slow_worker(void *ptr)
     netdata_mutex_unlock(&slow_mountinfo_mutex);
 
     worker_unregister();
-
-    return NULL;
 }
 
 static void diskspace_main_cleanup(void *ptr) {
@@ -843,7 +841,7 @@ static int diskspace_function_mount_points(BUFFER *wb, const char *function __ma
     return HTTP_RESP_OK;
 }
 
-void *diskspace_main(void *ptr) {
+void diskspace_main(void *ptr) {
     worker_register("DISKSPACE");
     worker_register_job_name(WORKER_JOB_MOUNTINFO, "mountinfo");
     worker_register_job_name(WORKER_JOB_MOUNTPOINT, "mountpoint");
@@ -924,6 +922,4 @@ void *diskspace_main(void *ptr) {
 
     // cleanup
     diskspace_main_cleanup(ptr);
-
-    return NULL;
 }

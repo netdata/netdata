@@ -101,28 +101,10 @@ metrics:
       name: cpqHoCpuUtilTable
     symbols:
       - OID: 1.3.6.1.4.1.232.11.2.3.1.1.2
-        name: cpqHoCpuUtilMin
+        name: cpu.usage # cpqHoCpuUtilMin
         chart_meta:
-          description: Cpu utilization as a percentage of the theoretical maximum during the last minute
-          family: 'System/CPU/Usage/1Min'
-          unit: "%"
-      - OID: 1.3.6.1.4.1.232.11.2.3.1.1.3
-        name: cpqHoCpuUtilFiveMin
-        chart_meta:
-          description: Cpu utilization as a percentage of the theoretical maximum during the last five minutes
-          family: 'System/CPU/Usage/5Min'
-          unit: "%"
-      - OID: 1.3.6.1.4.1.232.11.2.3.1.1.4
-        name: cpqHoCpuUtilThirtyMin
-        chart_meta:
-          description: Cpu utilization as a percentage of the theoretical maximum during the last thirty minutes
-          family: 'System/CPU/Usage/30Min'
-          unit: "%"
-      - OID: 1.3.6.1.4.1.232.11.2.3.1.1.5
-        name: cpqHoCpuUtilHour
-        chart_meta:
-          description: Cpu utilization as a percentage of the theoretical maximum during the last hour
-          family: 'System/CPU/Usage/1Hour'
+          description: The current CPU utilization
+          family: 'System/CPU/Usage'
           unit: "%"
     metric_tags:
       - tag: cpu_unit_index

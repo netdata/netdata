@@ -31,12 +31,13 @@ metrics:
       - OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.7 # cpmCPUTotal1minRev
         name: cpu.usage
         chart_meta:
-          description: The overall CPU busy percentage in the last 1 minute period.
+          description: The current CPU utilization
           family: 'System/CPU/Usage'
           unit: "%"
     metric_tags:
       - tag: cpu_index
         index: 1 # cpmCPUTotalIndex
+
   - MIB: CISCO-FIREPOWER-SM-MIB
     table:
       OID: 1.3.6.1.4.1.9.9.826.1.71.20

@@ -6,6 +6,7 @@
 // Service data
 struct win_service {
     char *service_name;
+    DWORD pid;
 
     RRDSET *st_service_state;
     RRDDIM *rd_service_state_running;
@@ -105,6 +106,7 @@ static BOOL fill_dictionary_with_content()
             continue;
 
         p->ServiceState.current.Data = service->ServiceStatusProcess.dwCurrentState;
+        p->pid = service->ServiceStatusProcess.dwProcessId;
     }
 
     ret = TRUE;
@@ -204,7 +206,7 @@ dict_win_services_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *va
     return 1;
 }
 
-int do_PerflibServices(int update_every, usec_t dt __maybe_unused)
+int do_GetServicesStatus(int update_every, usec_t dt __maybe_unused)
 {
 #define NETDATA_SERVICE_MAX_TRY (5)
     static int limit = 0;

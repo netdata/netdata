@@ -179,19 +179,19 @@ typedef struct ebpf_tracepoint {
 enum ebpf_algorithms_list { NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_INCREMENTAL_IDX };
 
 // Threads
-void *ebpf_process_thread(void *ptr);
-void *ebpf_socket_thread(void *ptr);
+void ebpf_process_thread(void *ptr);
+void ebpf_socket_thread(void *ptr);
 
 // Common variables
-extern pthread_mutex_t lock;
-extern pthread_mutex_t ebpf_exit_cleanup;
+extern netdata_mutex_t lock;
+extern netdata_mutex_t ebpf_exit_cleanup;
 extern int ebpf_nprocs;
 extern int running_on_kernel;
 extern int isrh;
 extern char *ebpf_plugin_dir;
 extern int process_pid_fd;
 
-extern pthread_mutex_t collect_data_mutex;
+extern netdata_mutex_t collect_data_mutex;
 
 // Common functions
 void ebpf_global_labels(
@@ -309,7 +309,7 @@ extern struct config collector_config;
 extern netdata_ebpf_cgroup_shm_t shm_ebpf_cgroup;
 extern int shm_fd_ebpf_cgroup;
 extern sem_t *shm_sem_ebpf_cgroup;
-extern pthread_mutex_t mutex_cgroup_shm;
+extern netdata_mutex_t mutex_cgroup_shm;
 extern size_t ebpf_all_pids_count;
 extern ebpf_plugin_stats_t plugin_statistics;
 #ifdef LIBBPF_MAJOR_VERSION

@@ -23,7 +23,7 @@ typedef struct LOG_FORWARDER {
     bool running;
 } LOG_FORWARDER;
 
-static void *log_forwarder_thread_func(void *arg);
+static void log_forwarder_thread_func(void *arg);
 
 // --------------------------------------------------------------------------------------------------------------------
 // helper functions
@@ -230,7 +230,7 @@ static inline size_t log_forwarder_remove_deleted_unsafe(LOG_FORWARDER *lf) {
     return entries;
 }
 
-static void *log_forwarder_thread_func(void *arg) {
+static void log_forwarder_thread_func(void *arg) {
     LOG_FORWARDER *lf = (LOG_FORWARDER *)arg;
 
     while (1) {
@@ -333,6 +333,4 @@ static void *log_forwarder_thread_func(void *arg) {
     log_forwarder_remove_deleted_unsafe(lf);
     spinlock_unlock(&lf->spinlock);
     close(lf->pipe_fds[PIPE_READ]);
-
-    return NULL;
 }

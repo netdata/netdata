@@ -599,6 +599,7 @@ static void network_interface_init(struct network_interface *d)
 static void network_interface_cleanup(struct network_interface *d)
 {
     rrdvar_chart_variable_release(d->traffic.st, d->traffic.chart_var_speed);
+    d->traffic.chart_var_speed = NULL;
     rrdset_is_obsolete___safe_from_collector_thread(d->packets.st);
     rrdset_is_obsolete___safe_from_collector_thread(d->traffic.st);
     rrdset_is_obsolete___safe_from_collector_thread(d->speed.st);

@@ -8,7 +8,7 @@ metadata:
   device:
     fields:
       vendor:
-        value: "infinera"
+        value: "Infinera"
 
 # https://mibbrowser.online/mibdb_search.php?mib=CORIANT-GROOVE-MIB
 # https://github.com/librenms/librenms/blob/master/mibs/infinera/CORIANT-GROOVE-MIB

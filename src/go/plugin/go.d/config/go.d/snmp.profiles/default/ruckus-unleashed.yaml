@@ -33,10 +33,10 @@ metrics:
   - MIB: RUCKUS-UNLEASHED-SYSTEM-MIB
     symbol:
       name: cpu.usage
-      OID: 1.3.6.1.4.1.25053.1.15.1.1.1.15.13.0
+      OID: 1.3.6.1.4.1.25053.1.15.1.1.1.15.13.0 # ruckusUnleashedSystemStatsCPUUtil
       chart_meta:
         family: 'System/CPU/Usage'
-        description: CPU utilization
+        description: The current CPU utilization
         unit: "%"
   - MIB: RUCKUS-UNLEASHED-SYSTEM-MIB
     symbol:

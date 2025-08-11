@@ -1013,7 +1013,7 @@ static void rrdcontext_main_cleanup(void *pptr) {
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
-void *rrdcontext_main(void *ptr) {
+void rrdcontext_main(void *ptr) {
     CLEANUP_FUNCTION_REGISTER(rrdcontext_main_cleanup) cleanup_ptr = ptr;
 
     worker_register("RRDCONTEXT");
@@ -1094,6 +1094,4 @@ void *rrdcontext_main(void *ptr) {
         worker_set_metric(WORKER_JOB_HUB_QUEUE_SIZE, (NETDATA_DOUBLE)hub_queued_contexts_for_all_hosts);
         worker_set_metric(WORKER_JOB_PP_QUEUE_SIZE, (NETDATA_DOUBLE)pp_queued_contexts_for_all_hosts);
     }
-
-    return NULL;
 }

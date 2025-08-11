@@ -1214,7 +1214,7 @@ static int sensors_collect_data(void) {
 static bool libsensors_running = false;
 static int libsensors_update_every = 1;
 
-void *libsensors_thread(void *ptr __maybe_unused) {
+void libsensors_thread(void *ptr __maybe_unused) {
     int update_every = libsensors_update_every;
 
     FILE *fp = NULL;
@@ -1312,8 +1312,6 @@ cleanup:
 
     dictionary_destroy(sensors_dict);
     sensors_dict = NULL;
-
-    return NULL;
 }
 
 static ND_THREAD *libsensors = NULL;

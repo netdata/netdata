@@ -29,10 +29,7 @@
         "type": "string"
       }
     },
-    "required": [],
-    "patternProperties": {
-      "^name$": {}
-    }
+    "required": []
   },
   "uiSchema": {
     "uiOptions": {

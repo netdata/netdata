@@ -488,6 +488,12 @@ int mqtt_wss_connect(
     char port_str[16];
     snprintf(port_str, sizeof(port_str) -1, "%d", client->port);
 
+    bool proxy_used = (proxy && proxy->proxy_destination != NULL);
+
+    nd_log_daemon(NDLP_INFO, "ACLK: Connecting to %s:%d%s%s",
+                  client->target_host, client->target_port,
+                  proxy_used ? " via proxy " : " (no proxy)", proxy_used ? proxy->proxy_destination : "");
+
     struct timeval timeout = { .tv_sec = 10, .tv_usec = 0 };
     int fd = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, client->host, 0, port_str, &timeout, fallback_ipv4);
     if (fd < 0) {
@@ -582,7 +588,6 @@ int mqtt_wss_connect(
 
     client->mqtt_keepalive = (mqtt_params->keep_alive ? mqtt_params->keep_alive : 400);
 
-    nd_log(NDLS_DAEMON, NDLP_INFO, "Going to connect using internal MQTT 5 implementation");
     struct mqtt_auth_properties auth;
     auth.client_id = (char*)mqtt_params->clientid;
     auth.client_id_free = NULL;
@@ -620,24 +625,6 @@ int mqtt_wss_connect(
     return 0;
 }
 
-#define NSEC_PER_USEC   1000ULL
-#define USEC_PER_SEC    1000000ULL
-#define NSEC_PER_MSEC   1000000ULL
-#define NSEC_PER_SEC    1000000000ULL
-
-static uint64_t boottime_usec(void) {
-    struct timespec ts;
-#if defined(__APPLE__) || defined(__FreeBSD__)
-    if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1) {
-#else
-    if (clock_gettime(CLOCK_BOOTTIME, &ts) == -1) {
-#endif
-        nd_log(NDLS_DAEMON, NDLP_ERR, "clock_gettimte failed");
-        return 0;
-    }
-    return (uint64_t)ts.tv_sec * USEC_PER_SEC + (ts.tv_nsec % NSEC_PER_SEC) / NSEC_PER_USEC;
-}
-
 #define MWS_TIMED_OUT 1
 #define MWS_ERROR 2
 #define MWS_OK 0
@@ -656,10 +643,10 @@ static const char *mqtt_wss_error_tos(int ec)
 
 static int mqtt_wss_service_all(mqtt_wss_client client, int timeout_ms)
 {
-    uint64_t exit_by_us = boottime_usec() + (timeout_ms * NSEC_PER_MSEC);
+    uint64_t exit_by_us = now_boottime_usec() + (timeout_ms * NSEC_PER_MSEC);
     client->poll_fds[POLLFD_SOCKET].events |= POLLOUT; // TODO when entering mwtt_wss_service use out buffer size to arm POLLOUT
     while (rbuf_bytes_available(client->ws_client->buf_write)) {
-        const uint64_t now_us = boottime_usec();
+        const uint64_t now_us = now_boottime_usec();
         if (now_us >= exit_by_us)
             return MWS_TIMED_OUT;
         if (mqtt_wss_service(client, (exit_by_us - now_us) / USEC_PER_SEC))
@@ -767,17 +754,6 @@ static int t_till_next_keepalive_ms(mqtt_wss_client client)
     return timeout_ms;
 }
 
-#ifdef MQTT_WSS_CPUSTATS
-static uint64_t mqtt_wss_now_usec(void) {
-    struct timespec ts;
-    if(clock_gettime(CLOCK_MONOTONIC, &ts) == -1) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "clock_gettime(CLOCK_MONOTONIC, &timespec) failed.");
-        return 0;
-    }
-    return (uint64_t)ts.tv_sec * USEC_PER_SEC + (ts.tv_nsec % NSEC_PER_SEC) / NSEC_PER_USEC;
-}
-#endif
-
 int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
 {
     char *ptr;
@@ -787,7 +763,7 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
 
 #ifdef MQTT_WSS_CPUSTATS
     uint64_t t2;
-    uint64_t t1 = mqtt_wss_now_usec();
+    uint64_t t1 = now_monotonic_usec();
 #endif
 
     // Check user requested TO doesn't interfere with MQTT keep alives
@@ -800,7 +776,7 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
     }
 
 #ifdef MQTT_WSS_CPUSTATS
-    t2 = mqtt_wss_now_usec();
+    t2 = now_monotonic_usec();
     client->stats.time_keepalive += t2 - t1;
 #endif
 
@@ -818,7 +794,7 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
     worker_is_busy(WORKER_ACLK_POLL_OK);
 
 #ifdef MQTT_WSS_CPUSTATS
-    t1 = mqtt_wss_now_usec();
+    t1 = now_monotonic_usec();
 #endif
 
     if (ret == 0) {
@@ -841,7 +817,7 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
     }
 
 #ifdef MQTT_WSS_CPUSTATS
-    t2 = mqtt_wss_now_usec();
+    t2 = now_monotonic_usec();
     client->stats.time_keepalive += t2 - t1;
 #endif
 
@@ -879,7 +855,7 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
     }
 
 #ifdef MQTT_WSS_CPUSTATS
-    t1 = mqtt_wss_now_usec();
+    t1 = now_monotonic_usec();
     client->stats.time_read_socket += t1 - t2;
 #endif
 
@@ -903,7 +879,7 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
     }
 
 #ifdef MQTT_WSS_CPUSTATS
-    t2 = mqtt_wss_now_usec();
+    t2 = now_monotonic_usec();
     client->stats.time_process_websocket += t2 - t1;
 #endif
 
@@ -920,7 +896,7 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
     }
 
 #ifdef MQTT_WSS_CPUSTATS
-    t1 = mqtt_wss_now_usec();
+    t1 = now_monotonic_usec();
     client->stats.time_process_mqtt += t1 - t2;
 #endif
 
@@ -958,7 +934,7 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
         util_clear_pipe(client->write_notif_pipe[PIPE_READ_END]);
 
 #ifdef MQTT_WSS_CPUSTATS
-    t2 = mqtt_wss_now_usec();
+    t2 = now_monotonic_usec();
     client->stats.time_write_socket += t2 - t1;
 #endif
 

@@ -34,7 +34,7 @@ static bool ebpf_ipc_should_stop(void)
     return false;
 }
 
-void *ebpf_socket_thread_ipc(void *ptr)
+void ebpf_socket_thread_ipc(void *ptr)
 {
     (void)ptr;
 
@@ -61,5 +61,4 @@ void *ebpf_socket_thread_ipc(void *ptr)
         ptr,
         0 // We are going to use UDP
     );
-    return NULL;
 }

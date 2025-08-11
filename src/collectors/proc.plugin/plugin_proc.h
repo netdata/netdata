@@ -9,7 +9,7 @@
 #define PLUGIN_PROC_NAME PLUGIN_PROC_CONFIG_NAME ".plugin"
 
 #define THREAD_NETDEV_NAME "P[proc netdev]"
-void *netdev_main(void *ptr_is_null);
+void netdev_main(void *ptr_is_null);
 
 int do_proc_net_wireless(int update_every, usec_t dt);
 int do_proc_diskstats(int update_every, usec_t dt);

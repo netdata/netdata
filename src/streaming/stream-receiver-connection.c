@@ -3,7 +3,6 @@
 #include "stream.h"
 #include "stream-thread.h"
 #include "stream-receiver-internals.h"
-#include "web/server/h2o/http_server.h"
 #include "stream-replication-sender.h"
 
 void svc_rrdhost_obsolete_all_charts(RRDHOST *host);
@@ -273,9 +272,6 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
         // OUR FIRST RESPONSE IS READY!
 
         // web server sockets are non-blocking - set them to blocking mode
-#ifdef ENABLE_H2O
-        unless_h2o_rrdpush(rpt)
-#endif
         {
             // remove the non-blocking flag from the socket
             if(sock_setnonblock(rpt->sock.fd, false) != 0)
@@ -293,31 +289,23 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
         }
 
         netdata_log_debug(D_STREAM, "Initial response to %s: %s", rpt->remote_ip, initial_response);
-#ifdef ENABLE_H2O
-        if (is_h2o_rrdpush(rpt)) {
-            h2o_stream_write(rpt->h2o_ctx, initial_response, strlen(initial_response));
-        } else {
-#endif
-            ssize_t bytes_sent = nd_sock_send_timeout(&rpt->sock, initial_response, strlen(initial_response), 0, 60);
+        ssize_t bytes_sent = nd_sock_send_timeout(&rpt->sock, initial_response, strlen(initial_response), 0, 60);
 
-            if(bytes_sent != (ssize_t)strlen(initial_response)) {
-                internal_error(true, "Cannot send response, got %zd bytes, expecting %zu bytes", bytes_sent, strlen(initial_response));
-                stream_receiver_log_status(
-                    rpt,
-                    "cannot reply back, dropping connection",
-                    STREAM_HANDSHAKE_CONNECT_SEND_TIMEOUT, NDLP_ERR);
-                rrdhost_clear_receiver(rpt, STREAM_HANDSHAKE_DISCONNECT_SOCKET_WRITE_FAILED);
-                return false;
-            }
-#ifdef ENABLE_H2O
+        if(bytes_sent != (ssize_t)strlen(initial_response)) {
+            internal_error(true, "Cannot send response, got %zd bytes, expecting %zu bytes", bytes_sent, strlen(initial_response));
+            stream_receiver_log_status(
+                rpt,
+                "cannot reply back, dropping connection",
+                STREAM_HANDSHAKE_CONNECT_SEND_TIMEOUT, NDLP_ERR);
+            rrdhost_clear_receiver(rpt, STREAM_HANDSHAKE_DISCONNECT_SOCKET_WRITE_FAILED);
+            return false;
         }
-#endif
     }
 
     return true;
 }
 
-int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_string, void *h2o_ctx __maybe_unused) {
+int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_string) {
     pulse_parent_receiver_request();
 
     if(!service_running(ABILITY_STREAMING_CONNECTIONS))
@@ -331,10 +319,6 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
     rpt->hops = 1;
 
     rpt->capabilities = STREAM_CAP_INVALID;
-
-#ifdef ENABLE_H2O
-    rpt->h2o_ctx = h2o_ctx;
-#endif
 
     __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_receivers, sizeof(*rpt), __ATOMIC_RELAXED);
 

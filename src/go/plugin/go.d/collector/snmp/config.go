@@ -9,6 +9,7 @@ type (
 		UpdateEvery                int                    `yaml:"update_every,omitempty" json:"update_every"`
 		Hostname                   string                 `yaml:"hostname" json:"hostname"`
 		CreateVnode                bool                   `yaml:"create_vnode,omitempty" json:"create_vnode"`
+		VnodeDeviceDownThreshold   int                    `yaml:"vnode_device_down_threshold,omitempty" json:"vnode_device_down_threshold"`
 		Vnode                      vnodes.VirtualNode     `yaml:"vnode,omitempty" json:"vnode"`
 		Community                  string                 `yaml:"community,omitempty" json:"community"`
 		User                       User                   `yaml:"user,omitempty" json:"user"`

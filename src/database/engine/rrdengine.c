@@ -773,6 +773,15 @@ struct rrdengine_datafile *get_last_ctx_datafile(struct rrdengine_instance *ctx,
     return get_ctx_datafile_first_or_last(ctx, false, with_lock);
 }
 
+static netdata_mutex_t mutex;
+
+static void __attribute__((constructor)) init_mutex(void) {
+    netdata_mutex_init(&mutex);
+}
+
+static void __attribute__((destructor)) destroy_mutex(void) {
+    netdata_mutex_destroy(&mutex);
+}
 
 static struct rrdengine_datafile *get_datafile_to_write_extent(struct rrdengine_instance *ctx) {
     struct rrdengine_datafile *datafile;
@@ -792,7 +801,7 @@ static struct rrdengine_datafile *get_datafile_to_write_extent(struct rrdengine_
         struct rrdengine_datafile *old_datafile = datafile;
 
         // only 1 datafile creation at a time
-        static netdata_mutex_t mutex = NETDATA_MUTEX_INITIALIZER;
+
         netdata_mutex_lock(&mutex);
 
         // take the latest datafile again - without this, multiple threads may create multiple files
@@ -953,9 +962,6 @@ datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_dat
 
 static void after_extent_write(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* uv_work_req __maybe_unused, int status __maybe_unused)
 {
-    if(completion)
-        completion_mark_complete(completion);
-
     check_and_schedule_db_rotation(ctx);
 }
 
@@ -1010,6 +1016,7 @@ static void *extent_write_tp_worker(
 
 done:
     __atomic_sub_fetch(&ctx->atomic.extents_currently_being_flushed, 1, __ATOMIC_RELAXED);
+    completion_mark_complete(completion);
     worker_is_idle();
     return NULL;
 }
@@ -1517,7 +1524,7 @@ struct mrg_load_thread {
 size_t max_running_threads = 0;
 size_t running_threads = 0;
 
-void *journalfile_v2_populate_retention_to_mrg_worker(void *arg)
+void journalfile_v2_populate_retention_to_mrg_worker(void *arg)
 {
     struct mrg_load_thread *mlt = arg;
     uv_sem_wait(mlt->sem);
@@ -1541,7 +1548,6 @@ void *journalfile_v2_populate_retention_to_mrg_worker(void *arg)
 
     // Signal completion - this needs to be last
     __atomic_store_n(&mlt->finished, true, __ATOMIC_RELEASE);
-    return NULL;
 }
 
 static void after_populate_mrg(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
@@ -2270,7 +2276,7 @@ void rrdeng_calculate_tier_disk_space_percentage(void)
 #define NOT_INDEXING_FILES(ctx)                                                                                        \
     (!__atomic_load_n(&(ctx)->atomic.migration_to_v2_running, __ATOMIC_RELAXED))
 
-void *dbengine_event_loop(void* arg) {
+void dbengine_event_loop(void* arg) {
     sanity_check();
     uv_thread_set_name_np("DBENGINE");
     service_register(NULL, NULL, NULL);
@@ -2507,7 +2513,6 @@ void *dbengine_event_loop(void* arg) {
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "Shutting down dbengine thread");
     (void) uv_loop_close(&main->loop);
     worker_unregister();
-    return NULL;
 }
 
 void dbengine_shutdown()

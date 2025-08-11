@@ -31,7 +31,7 @@ metrics:
       OID: 1.3.6.1.4.1.1588.2.1.1.1.26.1.0
       name: cpu.usage
       chart_meta:
-        description: System's cpu usage
+        description: The current CPU utilization
         family: 'System/CPU/Usage'
         unit: "%"
   - MIB: RESOURCE-MIB

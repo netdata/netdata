@@ -80,7 +80,7 @@ metrics:
         chart_meta:
           description: Fan revolutions per minute
           family: 'Hardware/Fan/Speed'
-          unit: "rpm"
+          unit: "{revolution}/min"
     metric_tags:
       - tag: netgear_readynasos_fan_number
         symbol:

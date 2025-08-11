@@ -53,7 +53,7 @@ struct ml_queue_t {
     ml_queue_stats_t stats;
 
     netdata_mutex_t mutex;
-    pthread_cond_t cond_var;
+    netdata_cond_t cond_var;
     std::atomic<bool> exit;
 };
 

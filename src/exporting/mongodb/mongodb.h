@@ -30,6 +30,6 @@ void mongodb_cleanup(struct instance *instance);
 
 int init_mongodb_instance(struct instance *instance);
 int format_batch_mongodb(struct instance *instance);
-void *mongodb_connector_worker(void *instance_p);
+void mongodb_connector_worker(void *instance_p);
 
 #endif //NETDATA_EXPORTING_MONGODB_H

@@ -75,10 +75,7 @@
     },
     "required": [
       "uri"
-    ],
-    "patternProperties": {
-      "^name$": {}
-    }
+    ]
   },
   "uiSchema": {
     "uiOptions": {

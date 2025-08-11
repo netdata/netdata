@@ -1,5 +1,6 @@
 extends:
   - aruba.yaml
+  - _std-host-resources-mib-feat-base.yaml
 
 metadata:
   device:
@@ -23,27 +24,6 @@ sysobjectid:
   - 1.3.6.1.4.1.47196.4.1.1.1.405
 
 metrics:
-  # - MIB: HOST-RESOURCES-MIB
-  #   symbol:
-  #     name: hrStorageSize
-  #     OID: 1.3.6.1.2.1.25.2.3.1.5.1 # hrStorageSize.1
-  #     description: The size of the storage represented by this entry, in units of hrStorageAllocationUnits.
-  #     unit: "{logical_storage_area}"
-  # - MIB: HOST-RESOURCES-MIB
-  #   symbol:
-  #     name: hrStorageUsed
-  #     OID: 1.3.6.1.2.1.25.2.3.1.6.1 # hrStorageUsed.1
-  #     description: The amount of the storage represented by this entry that is allocated, in units of hrStorageAllocationUnits.
-  #     unit: "{logical_storage_area}"
-  # TODO This is not yet supported by the collector
-  - MIB: HOST-RESOURCES-MIB
-    symbol:
-      name: hrProcessorLoad
-      OID: 1.3.6.1.2.1.25.3.3.1.2.196608 # hrProcessorLoad.196608
-      chart_meta:
-        description: The average, over the last minute, of the percentage of time that this processor was not idle
-        family: 'System/CPU/Usage'
-        unit: "%"
   - MIB: ARUBAWIRED-TEMPSENSOR-MIB
     table:
       OID: 1.3.6.1.4.1.47196.4.1.1.3.11.3.1

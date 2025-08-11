@@ -319,7 +319,7 @@ static void websocket_thread_process_commands(WEBSOCKET_THREAD *wth) {
 }
 
 // Thread main function
-void *websocket_thread(void *ptr) {
+void websocket_thread(void *ptr) {
     WEBSOCKET_THREAD *wth = (WEBSOCKET_THREAD *)ptr;
     wth->tid = gettid_uncached();
 
@@ -521,6 +521,4 @@ void *websocket_thread(void *ptr) {
     spinlock_lock(&wth->spinlock);
     wth->running = false;
     spinlock_unlock(&wth->spinlock);
-
-    return NULL;
 }

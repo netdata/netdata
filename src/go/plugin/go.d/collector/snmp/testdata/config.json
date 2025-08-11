@@ -2,6 +2,7 @@
   "update_every": 123,
   "hostname": "ok",
   "create_vnode": true,
+  "vnode_device_down_threshold": 123,
   "vnode": {
     "name": "ok",
     "guid": "ok",

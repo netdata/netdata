@@ -31,7 +31,7 @@ metrics:
       OID: 1.3.6.1.4.1.13742.3.1.2.0
       chart_meta:
         family: 'System/CPU/Usage'
-        description: CPU usage
+        description: The current CPU utilization
         unit: "%"
 
   - MIB: RemoteKVMDevice-MIB

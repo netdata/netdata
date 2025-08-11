@@ -16,7 +16,15 @@
 #define ND_SD_UNITS_MAX_PARAMS 10
 #define ND_SD_UNITS_DBUS_TYPES "(ssssssouso)"
 
-netdata_mutex_t stdout_mutex = NETDATA_MUTEX_INITIALIZER;
+netdata_mutex_t stdout_mutex;
+
+static void __attribute__((constructor)) init_mutex(void) {
+    netdata_mutex_init(&stdout_mutex);
+}
+
+static void __attribute__((destructor)) destroy_mutex(void) {
+    netdata_mutex_destroy(&stdout_mutex);
+}
 
 // ----------------------------------------------------------------------------
 // copied from systemd: string-table.h

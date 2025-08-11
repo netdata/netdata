@@ -230,6 +230,4 @@ void simple_connector_init(struct instance *instance)
 
         buffer_free(auth_string);
     }
-
-    return;
 }

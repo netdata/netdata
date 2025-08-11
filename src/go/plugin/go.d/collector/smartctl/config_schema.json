@@ -88,9 +88,6 @@
           }
         }
       }
-    },
-    "patternProperties": {
-      "^name$": {}
     }
   },
   "uiSchema": {

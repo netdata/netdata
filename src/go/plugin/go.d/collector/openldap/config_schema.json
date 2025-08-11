@@ -75,10 +75,7 @@
     "required": [
       "url",
       "username"
-    ],
-    "patternProperties": {
-      "^name$": {}
-    }
+    ]
   },
   "uiSchema": {
     "uiOptions": {

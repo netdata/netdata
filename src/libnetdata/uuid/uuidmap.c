@@ -310,7 +310,7 @@ typedef struct thread_stats {
     size_t cycles;
 } THREAD_STATS;
 
-static void *concurrent_test_thread(void *arg) {
+static void concurrent_test_thread(void *arg) {
     THREAD_STATS *stats = arg;
     nd_uuid_t test_uuid = {
         0x12, 0x34, 0x56, 0x78,
@@ -359,8 +359,6 @@ static void *concurrent_test_thread(void *arg) {
 
         stats->cycles++;
     }
-
-    return NULL;
 }
 
 static int uuidmap_concurrent_unittest(void) {

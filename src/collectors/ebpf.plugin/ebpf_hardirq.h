@@ -74,6 +74,6 @@ typedef struct hardirq_static_val {
 #define NETDATA_EBPF_SYSTEM_HARDIRQ_LATENCY_CTX "system.hardirq_latency"
 
 extern struct config hardirq_config;
-void *ebpf_hardirq_thread(void *ptr);
+void ebpf_hardirq_thread(void *ptr);
 
 #endif /* NETDATA_EBPF_HARDIRQ_H */

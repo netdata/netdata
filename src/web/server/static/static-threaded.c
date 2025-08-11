@@ -282,7 +282,7 @@ static bool web_server_should_stop(void) {
     return !service_running(SERVICE_WEB_SERVER);
 }
 
-void *socket_listen_main_static_threaded_worker(void *ptr) {
+void socket_listen_main_static_threaded_worker(void *ptr) {
     worker_private = ptr;
     spinlock_lock(&worker_private->spinlock);
     worker_private->initializing = false;
@@ -315,8 +315,6 @@ void *socket_listen_main_static_threaded_worker(void *ptr) {
                 , ptr // timer_data
                 , worker_private->max_sockets
     );
-
-    return NULL;
 }
 
 
@@ -328,36 +326,6 @@ static void socket_listen_main_static_threaded_cleanup(void *pptr) {
     if(!static_thread) return;
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
-
-//    int i, found = 0;
-//    usec_t max = 2 * USEC_PER_SEC, step = 50000;
-//
-//    // we start from 1, - 0 is self
-//    for(i = 1; i < static_threaded_workers_count; i++) {
-//        if(static_workers_private_data[i].running) {
-//            found++;
-//            netdata_log_info("stopping worker %d", i + 1);
-//            nd_thread_signal_cancel(static_workers_private_data[i].thread);
-//        }
-//        else
-//            netdata_log_info("found stopped worker %d", i + 1);
-//    }
-//
-//    while(found && max > 0) {
-//        max -= step;
-//        netdata_log_info("Waiting %d static web threads to finish...", found);
-//        sleep_usec(step);
-//        found = 0;
-//
-//        // we start from 1, - 0 is self
-//        for(i = 1; i < static_threaded_workers_count; i++) {
-//            if (static_workers_private_data[i].running)
-//                found++;
-//        }
-//    }
-//
-//    if(found)
-//        netdata_log_error("%d static web threads are taking too long to finish. Giving up.", found);
 
     netdata_log_info("closing all web server sockets...");
     listen_sockets_close(&api_sockets);
@@ -380,7 +348,7 @@ static void socket_listen_main_static_threaded_cleanup(void *pptr) {
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
-void *socket_listen_main_static_threaded(void *ptr) {
+void socket_listen_main_static_threaded(void *ptr) {
     CLEANUP_FUNCTION_REGISTER(socket_listen_main_static_threaded_cleanup) cleanup_ptr = ptr;
     web_server_mode = WEB_SERVER_MODE_STATIC_THREADED;
 
@@ -422,6 +390,4 @@ void *socket_listen_main_static_threaded(void *ptr) {
     // and the main one
     static_workers_private_data[0].max_sockets = max_sockets / static_threaded_workers_count;
     socket_listen_main_static_threaded_worker((void *)&static_workers_private_data[0]);
-
-    return NULL;
 }

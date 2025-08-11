@@ -129,10 +129,7 @@
       "url",
       "username",
       "password"
-    ],
-    "patternProperties": {
-      "^name$": {}
-    }
+    ]
   },
   "uiSchema": {
     "uiOptions": {

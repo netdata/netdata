@@ -52,10 +52,7 @@
       "address",
       "port",
       "secret"
-    ],
-    "patternProperties": {
-      "^name$": {}
-    }
+    ]
   },
   "uiSchema": {
     "uiOptions": {

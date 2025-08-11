@@ -1926,7 +1926,7 @@ void free_all_unreferenced_clean_pages(PGC *cache) {
     evict_pages(cache, 0, 0, true, true);
 }
 
-static void *pgc_evict_thread(void *ptr) {
+static void pgc_evict_thread(void *ptr) {
     static usec_t last_malloc_release_ut = 0;
 
     PGC *cache = ptr;
@@ -1968,7 +1968,6 @@ static void *pgc_evict_thread(void *ptr) {
     }
 
     worker_unregister();
-    return NULL;
 }
 
 // ----------------------------------------------------------------------------

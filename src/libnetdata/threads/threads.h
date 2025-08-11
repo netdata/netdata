@@ -47,7 +47,7 @@ struct netdata_static_thread {
     void (*init_routine) (void);
 
     // the threaded worker
-    void *(*start_routine) (void *);
+    void (*start_routine) (void *);
 
     // the environment variable to create
     char *env_name;
@@ -72,7 +72,7 @@ size_t netdata_threads_init(void);
 void netdata_threads_set_stack_size(size_t stacksize);
 void netdata_threads_init_for_external_plugins(size_t stacksize);
 
-ND_THREAD *nd_thread_create(const char *tag, NETDATA_THREAD_OPTIONS options, void *(*start_routine) (void *), void *arg);
+ND_THREAD *nd_thread_create(const char *tag, NETDATA_THREAD_OPTIONS options, void (*start_routine) (void *), void *arg);
 int nd_thread_join(ND_THREAD * nti);
 ND_THREAD *nd_thread_self(void);
 bool nd_thread_is_me(ND_THREAD *nti);

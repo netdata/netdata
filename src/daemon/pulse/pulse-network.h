@@ -16,7 +16,7 @@ void pulse_statsd_sent_bytes(size_t bytes);
 void pulse_stream_received_bytes(size_t bytes);
 void pulse_stream_sent_bytes(size_t bytes);
 
-void pulse_aclk_sent_message_acked(usec_t usec, size_t len);
+void pulse_aclk_sent_message_acked(usec_t publish_latency, size_t len);
 
 #ifdef PULSE_INTERNALS
 void aclk_time_histogram_init(void);

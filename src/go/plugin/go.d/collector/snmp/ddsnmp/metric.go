@@ -20,7 +20,9 @@ type Metric struct {
 	MetricType  ddprofiledefinition.ProfileMetricType
 	StaticTags  map[string]string
 	Tags        map[string]string
-	Mappings    map[int64]string
-	IsTable     bool
+	Table       string
 	Value       int64
+	MultiValue  map[string]int64
+
+	IsTable bool
 }

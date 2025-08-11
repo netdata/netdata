@@ -18,10 +18,7 @@
         "default": "/sys/bus/w1/devices"
       }
     },
-    "required": [],
-    "patternProperties": {
-      "^name$": {}
-    }
+    "required": []
   },
   "uiSchema": {
     "uiOptions": {

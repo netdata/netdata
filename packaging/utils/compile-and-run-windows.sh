@@ -72,7 +72,6 @@ then
       -DUSE_MOLD=Off \
       -DNETDATA_USER="${USER}" \
       -DDEFAULT_FEATURE_STATE=Off \
-      -DENABLE_H2O=Off \
       -DENABLE_ML=On \
       -DENABLE_BUNDLED_JSONC=On \
       -DENABLE_BUNDLED_PROTOBUF=Off \

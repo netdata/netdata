@@ -33,7 +33,7 @@ metrics:
       - OID: 1.3.6.1.2.1.25.3.3.1.2
         name: cpu.usage
         chart_meta:
-          description: The average, over the last minute, of the percentage of time that this processor was not idle.
+          description: The current CPU utilization
           family: 'System/CPU/Usage'
           unit: "%"
     metric_tags:

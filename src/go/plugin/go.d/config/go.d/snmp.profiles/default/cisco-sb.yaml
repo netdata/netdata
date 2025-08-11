@@ -21,6 +21,6 @@ metrics:
       name: cpu.usage
       OID: 1.3.6.1.4.1.9.6.1.101.1.8
       chart_meta:
-        description: Cpu usage percentage
+        description: The current CPU utilization
         family: 'System/CPU/Usage'
         unit: "%"

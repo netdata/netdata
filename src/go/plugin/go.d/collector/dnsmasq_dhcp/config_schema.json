@@ -36,10 +36,7 @@
     "required": [
       "leases_path",
       "conf_path"
-    ],
-    "patternProperties": {
-      "^name$": {}
-    }
+    ]
   },
   "uiSchema": {
     "uiOptions": {

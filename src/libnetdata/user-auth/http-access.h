@@ -89,7 +89,6 @@ typedef enum __attribute__((packed)) {
     HTTP_ACL_API                    = (1 << 1), // from the internal web server (TCP port)
     HTTP_ACL_API_UDP                = (1 << 2), // from the internal web server (UDP port)
     HTTP_ACL_API_UNIX               = (1 << 3), // from the internal web server (UNIX socket)
-    HTTP_ACL_H2O                    = (1 << 4), // from the h2o web server
     HTTP_ACL_ACLK                   = (1 << 5), // from ACLK
     HTTP_ACL_WEBRTC                 = (1 << 6), // from WebRTC
 
@@ -123,7 +122,6 @@ typedef enum __attribute__((packed)) {
       HTTP_ACL_API                                                      \
     | HTTP_ACL_API_UDP                                                  \
     | HTTP_ACL_API_UNIX                                                 \
-    | HTTP_ACL_H2O                                                      \
     | HTTP_ACL_ACLK                                                     \
     | HTTP_ACL_WEBRTC                                                   \
 )

@@ -70,7 +70,7 @@ func (gc *globalTagsCollector) processDynamicTags(metricTags []ddprofiledefiniti
 		return fmt.Errorf("failed to fetch global tag values: %w", err)
 	}
 
-	// Process each tag configuration
+	// Collect each tag configuration
 	var errs []error
 	for _, tagCfg := range metricTags {
 		if tagCfg.Symbol.OID == "" {

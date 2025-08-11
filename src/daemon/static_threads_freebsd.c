@@ -2,8 +2,8 @@
 
 #include "common.h"
 
-void *freebsd_main(void *ptr);
-void *timex_main(void *ptr);
+void freebsd_main(void *ptr);
+void timex_main(void *ptr);
 
 static const struct netdata_static_thread static_threads_freebsd[] = {
     {

@@ -18,7 +18,7 @@ struct backfill_request_data {
 
 typedef bool (*backfill_callback_t)(size_t successful_dims, size_t failed_dims, struct backfill_request_data *brd);
 
-void *backfill_thread(void *ptr);
+void backfill_thread(void *ptr);
 bool backfill_request_add(RRDSET *st, backfill_callback_t cb, struct backfill_request_data *data);
 
 #endif //NETDATA_BACKFILL_H

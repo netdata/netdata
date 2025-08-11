@@ -52,7 +52,7 @@ static void pulse_register_workers(void) {
     worker_register_job_name(WORKER_JOB_MEMORY_EXTENDED, "memory extended");
 }
 
-void *pulse_thread_main(void *ptr) {
+void pulse_thread_main(void *ptr) {
     struct netdata_static_thread *static_thread = ptr;
     pulse_register_workers();
 
@@ -139,14 +139,12 @@ void *pulse_thread_main(void *ptr) {
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
     worker_unregister();
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
-
-    return NULL;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
 // pulse sqlite3 thread
 
-void *pulse_thread_sqlite3_main(void *ptr) {
+void pulse_thread_sqlite3_main(void *ptr) {
     struct netdata_static_thread *static_thread = ptr;
     pulse_register_workers();
 
@@ -182,14 +180,12 @@ void *pulse_thread_sqlite3_main(void *ptr) {
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
     worker_unregister();
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
-
-    return NULL;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
 // pulse workers thread
 
-void *pulse_thread_workers_main(void *ptr) {
+void pulse_thread_workers_main(void *ptr) {
     struct netdata_static_thread *static_thread = ptr;
     pulse_register_workers();
 
@@ -226,14 +222,12 @@ void *pulse_thread_workers_main(void *ptr) {
     pulse_workers_cleanup();
     worker_unregister();
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
-
-    return NULL;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
 // pulse workers thread
 
-void *pulse_thread_memory_extended_main(void *ptr) {
+void pulse_thread_memory_extended_main(void *ptr) {
     struct netdata_static_thread *static_thread = ptr;
     pulse_register_workers();
 
@@ -274,6 +268,4 @@ void *pulse_thread_memory_extended_main(void *ptr) {
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
     worker_unregister();
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
-
-    return NULL;
 }

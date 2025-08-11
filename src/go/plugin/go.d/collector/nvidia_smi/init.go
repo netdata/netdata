@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pathvalidate"
 )
 
 func (c *Collector) initNvidiaSmiExec() (nvidiaSmiBinary, error) {
@@ -18,5 +20,10 @@ func (c *Collector) initNvidiaSmiExec() (nvidiaSmiBinary, error) {
 		binPath = path
 	}
 
-	return newNvidiaSmiBinary(binPath, c.Config, c.Logger)
+	validatedPath, err := pathvalidate.ValidateBinaryPath(binPath)
+	if err != nil {
+		return nil, err
+	}
+
+	return newNvidiaSmiBinary(validatedPath, c.Config, c.Logger)
 }

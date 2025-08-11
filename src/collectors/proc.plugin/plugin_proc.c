@@ -207,7 +207,7 @@ static bool log_proc_module(BUFFER *wb, void *data) {
     return true;
 }
 
-void *proc_main(void *ptr)
+void proc_main(void *ptr)
 {
     CLEANUP_FUNCTION_REGISTER(proc_main_cleanup) cleanup_ptr = ptr;
 
@@ -270,8 +270,6 @@ void *proc_main(void *ptr)
             lgs[LGS_MODULE_ID] = ND_LOG_FIELD_TXT(NDF_MODULE, "proc.plugin");
         }
     }
-
-    return NULL;
 }
 
 int get_numa_node_count(void)

@@ -70,10 +70,7 @@
     },
     "required": [
       "hosts"
-    ],
-    "patternProperties": {
-      "^name$": {}
-    }
+    ]
   },
   "uiSchema": {
     "uiOptions": {

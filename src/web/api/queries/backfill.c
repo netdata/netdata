@@ -152,7 +152,7 @@ static void backfill_dim_work_free(bool successful, struct backfill_dim_work *bd
 
 #define LOG_WARNING_EVERY 10
 
-void *backfill_worker_thread(void *ptr) {
+void backfill_worker_thread(void *ptr) {
     bool main_thread = (ptr == (void *)0x01);
     size_t warning = LOG_WARNING_EVERY;
     bool timeout = false;
@@ -205,13 +205,11 @@ void *backfill_worker_thread(void *ptr) {
     }
 
     worker_unregister();
-
-    return NULL;
 }
 
-void *backfill_thread(void *ptr) {
+void backfill_thread(void *ptr) {
     struct netdata_static_thread *static_thread = ptr;
-    if(!static_thread) return NULL;
+    if(!static_thread) return;
 
     nd_thread_tag_set("BACKFILL[0]");
 
@@ -259,7 +257,5 @@ void *backfill_thread(void *ptr) {
     completion_destroy(&backfill_globals.completion);
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
-
-    return NULL;
 }
 

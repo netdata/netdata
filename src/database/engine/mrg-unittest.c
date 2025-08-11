@@ -16,7 +16,7 @@ struct mrg_stress {
     size_t updates;
 };
 
-static void *mrg_stress(void *ptr) {
+static void mrg_stress(void *ptr) {
     struct mrg_stress *t = ptr;
     MRG *mrg = t->mrg;
 
@@ -48,8 +48,6 @@ static void *mrg_stress(void *ptr) {
             __atomic_add_fetch(&t->updates, 1, __ATOMIC_RELAXED);
         }
     }
-
-    return ptr;
 }
 
 int mrg_unittest(void) {

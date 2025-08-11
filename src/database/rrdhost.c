@@ -7,7 +7,15 @@
 #endif
 
 RRDHOST *localhost = NULL;
-netdata_rwlock_t rrd_rwlock = NETDATA_RWLOCK_INITIALIZER;
+netdata_rwlock_t rrd_rwlock;
+
+static void __attribute__((constructor)) init_lock(void) {
+    netdata_rwlock_init(&rrd_rwlock);
+}
+
+static void __attribute__((destructor)) destroy_lock(void) {
+    netdata_rwlock_destroy(&rrd_rwlock);
+}
 
 RRDHOST *rrdhost_find_by_node_id(const char *node_id) {
 

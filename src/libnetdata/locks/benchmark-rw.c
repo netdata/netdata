@@ -35,8 +35,8 @@ typedef struct {
 
     // Per-thread control
     struct {
-        pthread_cond_t cond;              // Thread start condition
-        pthread_mutex_t cond_mutex;       // Mutex for condition
+        netdata_cond_t cond;              // Thread start condition
+        netdata_mutex_t cond_mutex;       // Mutex for condition
         uint64_t run_flag;               // Thread run control
     } thread_controls[MAX_THREADS];
 } rwlock_control_t;
@@ -49,8 +49,8 @@ typedef enum {
 typedef struct {
     int thread_id;
     thread_type_t type;
-    void *lock;                  // Points to either pthread_rwlock_t or RW_SPINLOCK
-    bool is_spinlock;            // true for RW_SPINLOCK, false for pthread_rwlock_t
+    void *lock;                  // Points to either netdata_rwlock_t or RW_SPINLOCK
+    bool is_spinlock;            // true for RW_SPINLOCK, false for netdata_rwlock_t
     rwlock_control_t *control;
     ND_THREAD *thread;
 } thread_context_t;
@@ -99,14 +99,14 @@ static void release_access(rwlock_control_t *control, thread_type_t type) {
     }
 }
 
-static void wait_for_start(pthread_cond_t *cond, pthread_mutex_t *mutex, uint64_t *flag) {
-    pthread_mutex_lock(mutex);
+static void wait_for_start(netdata_cond_t *cond, netdata_mutex_t *mutex, uint64_t *flag) {
+    netdata_mutex_lock(mutex);
     while (*flag == 0)
-        pthread_cond_wait(cond, mutex);
-    pthread_mutex_unlock(mutex);
+        netdata_cond_wait(cond, mutex);
+    netdata_mutex_unlock(mutex);
 }
 
-static void* benchmark_thread(void *arg) {
+static void benchmark_thread(void *arg) {
     thread_context_t *ctx = (thread_context_t *)arg;
     rwlock_control_t *control = ctx->control;
 
@@ -141,20 +141,20 @@ static void* benchmark_thread(void *arg) {
                 }
             }
             else {
-                pthread_rwlock_t *rwlock = ctx->lock;
+                netdata_rwlock_t *rwlock = ctx->lock;
                 if(ctx->type == THREAD_READER) {
-                    pthread_rwlock_rdlock(rwlock);
+                    netdata_rwlock_rdlock(rwlock);
                     check_access_safety(control, THREAD_READER);
                     control->counter++;
                     release_access(control, THREAD_READER);
-                    pthread_rwlock_unlock(rwlock);
+                    netdata_rwlock_rdunlock(rwlock);
                 }
                 else {
-                    pthread_rwlock_wrlock(rwlock);
+                    netdata_rwlock_wrlock(rwlock);
                     check_access_safety(control, THREAD_WRITER);
                     control->counter++;
                     release_access(control, THREAD_WRITER);
-                    pthread_rwlock_unlock(rwlock);
+                    netdata_rwlock_rdunlock(rwlock);
                 }
             }
             operations++;
@@ -166,8 +166,6 @@ static void* benchmark_thread(void *arg) {
         __atomic_store_n(&control->stats[ctx->thread_id].operations, operations, __ATOMIC_RELEASE);
         __atomic_store_n(&control->stats[ctx->thread_id].ready, 1, __ATOMIC_RELEASE);
     }
-
-    return NULL;
 }
 
 static void print_summary(const summary_stats_t *summary) {
@@ -176,7 +174,7 @@ static void print_summary(const summary_stats_t *summary) {
             "Lock Type", "Readers", "Writers", "Reader Ops/s", "Writer Ops/s");
     fprintf(stderr, "----------------------------------------------------------------------\n");
 
-    const char *lock_names[] = {"pthread_rwlock", "rw_spinlock"};
+    const char *lock_names[] = {"netdata_rwlock", "rw_spinlock"};
 
     for (int config = 0; config < summary->config_count; config++) {
         for (int lock_type = 0; lock_type < 2; lock_type++) {
@@ -267,10 +265,10 @@ static void run_test(const char *name, int readers, int writers,
 
     // Signal threads to start
     for(int i = 0; i < total_threads; i++) {
-        pthread_mutex_lock(&control->thread_controls[i].cond_mutex);
+        netdata_mutex_lock(&control->thread_controls[i].cond_mutex);
         control->thread_controls[i].run_flag = 1;
-        pthread_cond_signal(&control->thread_controls[i].cond);
-        pthread_mutex_unlock(&control->thread_controls[i].cond_mutex);
+        netdata_cond_signal(&control->thread_controls[i].cond);
+        netdata_mutex_unlock(&control->thread_controls[i].cond_mutex);
     }
 
     // Wait for test duration
@@ -291,27 +289,30 @@ static void run_test(const char *name, int readers, int writers,
 }
 
 int rwlocks_stress_test(void) {
-    pthread_rwlock_t pthread_rwlock = PTHREAD_RWLOCK_INITIALIZER;
+    netdata_rwlock_t netdata_rwlock;
+    netdata_rwlock_init(&netdata_rwlock);
+
     RW_SPINLOCK rw_spinlock = RW_SPINLOCK_INITIALIZER;
     summary_stats_t summary = {0};
 
     // Initialize control structures
-    rwlock_control_t pthread_control = { 0 };
+    rwlock_control_t netdata_control = { 0 };
     rwlock_control_t spinlock_control = { 0 };
 
     // Initialize per-thread controls for both locks
     for(int i = 0; i < MAX_THREADS; i++) {
-        pthread_control.thread_controls[i].cond = (pthread_cond_t)PTHREAD_COND_INITIALIZER;
-        pthread_control.thread_controls[i].cond_mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
-        pthread_control.thread_controls[i].run_flag = 0;
+        netdata_cond_init(&netdata_control.thread_controls[i].cond);
+        netdata_mutex_init(&netdata_control.thread_controls[i].cond_mutex);
+        netdata_control.thread_controls[i].run_flag = 0;
 
-        spinlock_control.thread_controls[i].cond = (pthread_cond_t)PTHREAD_COND_INITIALIZER;
-        spinlock_control.thread_controls[i].cond_mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
+        netdata_cond_init(&spinlock_control.thread_controls[i].cond);
+        netdata_mutex_init(&spinlock_control.thread_controls[i].cond_mutex);
+
         spinlock_control.thread_controls[i].run_flag = 0;
     }
 
     // Create thread contexts
-    thread_context_t pthread_contexts[MAX_THREADS];
+    thread_context_t netdata_contexts[MAX_THREADS];
     thread_context_t spinlock_contexts[MAX_THREADS];
 
     fprintf(stderr, "\nStarting RW locks benchmark...\n");
@@ -337,17 +338,17 @@ int rwlocks_stress_test(void) {
         char thr_name[32];
 
         // Initialize pthread contexts
-        pthread_contexts[i] = (thread_context_t){
+        netdata_contexts[i] = (thread_context_t){
             .thread_id = i,
             .type = i % 2 == 0 ? THREAD_READER :THREAD_WRITER,
-            .lock = &pthread_rwlock,
+            .lock = &netdata_rwlock,
             .is_spinlock = false,
-            .control = &pthread_control
+            .control = &netdata_control
         };
 
-        snprintf(thr_name, sizeof(thr_name), "pthread_rw%d", i);
-        pthread_contexts[i].thread =
-            nd_thread_create(thr_name, NETDATA_THREAD_OPTION_DONT_LOG, benchmark_thread, &pthread_contexts[i]);
+        snprintf(thr_name, sizeof(thr_name), "netdata_rw%d", i);
+        netdata_contexts[i].thread =
+            nd_thread_create(thr_name, NETDATA_THREAD_OPTION_DONT_LOG, benchmark_thread, &netdata_contexts[i]);
 
         // Initialize spinlock contexts
         spinlock_contexts[i] = (thread_context_t){
@@ -373,21 +374,21 @@ int rwlocks_stress_test(void) {
 
         // First assign reader threads
         for(int r = 0; r < readers; r++) {
-            pthread_contexts[thread_idx].type = THREAD_READER;
+            netdata_contexts[thread_idx].type = THREAD_READER;
             spinlock_contexts[thread_idx].type = THREAD_READER;
             thread_idx++;
         }
 
         // Then assign writer threads
         for(int w = 0; w < writers; w++) {
-            pthread_contexts[thread_idx].type = THREAD_WRITER;
+            netdata_contexts[thread_idx].type = THREAD_WRITER;
             spinlock_contexts[thread_idx].type = THREAD_WRITER;
             thread_idx++;
         }
 
         char test_name[64];
-        snprintf(test_name, sizeof(test_name), "pthread_rwlock %dR/%dW", readers, writers);
-        run_test(test_name, readers, writers, pthread_contexts, &pthread_control, &summary, i, 0);
+        snprintf(test_name, sizeof(test_name), "netdata_rwlock %dR/%dW", readers, writers);
+        run_test(test_name, readers, writers, netdata_contexts, &netdata_control, &summary, i, 0);
 
         snprintf(test_name, sizeof(test_name), "rw_spinlock %dR/%dW", readers, writers);
         run_test(test_name, readers, writers, spinlock_contexts, &spinlock_control, &summary, i, 1);
@@ -400,34 +401,34 @@ int rwlocks_stress_test(void) {
     fprintf(stderr, "\nStopping threads...\n");
     for(int i = 0; i < MAX_THREADS; i++) {
         // Signal pthread threads
-        pthread_mutex_lock(&pthread_control.thread_controls[i].cond_mutex);
-        pthread_control.thread_controls[i].run_flag = STOP_SIGNAL;
-        pthread_cond_signal(&pthread_control.thread_controls[i].cond);
-        pthread_mutex_unlock(&pthread_control.thread_controls[i].cond_mutex);
+        netdata_mutex_lock(&netdata_control.thread_controls[i].cond_mutex);
+        netdata_control.thread_controls[i].run_flag = STOP_SIGNAL;
+        netdata_cond_signal(&netdata_control.thread_controls[i].cond);
+        netdata_mutex_unlock(&netdata_control.thread_controls[i].cond_mutex);
 
         // Signal spinlock threads
-        pthread_mutex_lock(&spinlock_control.thread_controls[i].cond_mutex);
+        netdata_mutex_lock(&spinlock_control.thread_controls[i].cond_mutex);
         spinlock_control.thread_controls[i].run_flag = STOP_SIGNAL;
-        pthread_cond_signal(&spinlock_control.thread_controls[i].cond);
-        pthread_mutex_unlock(&spinlock_control.thread_controls[i].cond_mutex);
+        netdata_cond_signal(&spinlock_control.thread_controls[i].cond);
+        netdata_mutex_unlock(&spinlock_control.thread_controls[i].cond_mutex);
     }
 
     // Join all threads
     fprintf(stderr, "\nWaiting for threads to exit...\n");
     for(int i = 0; i < MAX_THREADS; i++) {
-        nd_thread_join(pthread_contexts[i].thread);
+        nd_thread_join(netdata_contexts[i].thread);
         nd_thread_join(spinlock_contexts[i].thread);
     }
 
     // Cleanup condition variables and mutexes
     for(int i = 0; i < MAX_THREADS; i++) {
-        pthread_cond_destroy(&pthread_control.thread_controls[i].cond);
-        pthread_mutex_destroy(&pthread_control.thread_controls[i].cond_mutex);
-        pthread_cond_destroy(&spinlock_control.thread_controls[i].cond);
-        pthread_mutex_destroy(&spinlock_control.thread_controls[i].cond_mutex);
+        netdata_cond_destroy(&netdata_control.thread_controls[i].cond);
+        netdata_mutex_destroy(&netdata_control.thread_controls[i].cond_mutex);
+        netdata_cond_destroy(&spinlock_control.thread_controls[i].cond);
+        netdata_mutex_destroy(&spinlock_control.thread_controls[i].cond_mutex);
     }
 
-    pthread_rwlock_destroy(&pthread_rwlock);
+    netdata_rwlock_destroy(&netdata_rwlock);
 
     return 0;
 }

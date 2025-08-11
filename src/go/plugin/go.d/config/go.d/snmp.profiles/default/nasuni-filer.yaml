@@ -10,9 +10,9 @@ metadata:
   device:
     fields:
       vendor:
-        value: "nasuni"
+        value: "Nasuni"
       type:
-        value: "storage"
+        value: "Storage"
 
 metric_tags:
   - tag: filer_identifier

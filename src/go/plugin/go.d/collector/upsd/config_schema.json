@@ -50,9 +50,6 @@
     "required": [
       "address"
     ],
-    "patternProperties": {
-      "^name$": {}
-    },
     "dependencies": {
       "username": [
         "password"

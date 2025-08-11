@@ -6,7 +6,7 @@ metadata:
   device:
     fields:
       vendor:
-        value: "gigamon"
+        value: "Gigamon"
       #      manufacturer:
       #        symbol:
       #          MIB: GIGAMON-SNMP-MIB

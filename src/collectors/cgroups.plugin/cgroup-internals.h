@@ -274,7 +274,7 @@ extern char cgroup_chart_id_prefix[];
 extern char services_chart_id_prefix[];
 extern uv_mutex_t cgroup_root_mutex;
 
-void *cgroup_discovery_worker(void *ptr);
+void cgroup_discovery_worker(void *ptr);
 
 extern bool is_inside_k8s;
 extern long system_page_size;

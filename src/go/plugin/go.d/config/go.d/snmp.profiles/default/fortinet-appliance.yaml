@@ -74,10 +74,10 @@ sysobjectid:
 metrics:
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     symbol:
-      name: cpu.usage
+      name: cpu.usage # fmSysCpuUsage
       OID: 1.3.6.1.4.1.12356.103.2.1.1.0
       chart_meta:
-        description: Current CPU usage
+        description: The current CPU utilization
         family: 'System/CPU/Usage'
         unit: "%"
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
@@ -122,7 +122,7 @@ metrics:
       OID: 1.3.6.1.4.1.12356.103.2.1.6.0
       chart_meta:
         description: Current CPU usage excluded nice processes usage (percentage)
-        family: 'System/CPU/Usage/ExcludeNice'
+        family: 'System/CPU/Usage'
         unit: "%"
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     symbol:

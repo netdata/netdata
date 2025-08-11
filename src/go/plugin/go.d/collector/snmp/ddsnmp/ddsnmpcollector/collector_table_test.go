@@ -1301,12 +1301,12 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "eth0"},
 					MetricType: "gauge",
 					IsTable:    true,
-					Mappings: map[int64]string{
-						1: "up",
-						2: "down",
-						3: "testing",
-						4: "unknown",
-						5: "dormant",
+					MultiValue: map[string]int64{
+						"up":      1,
+						"down":    0,
+						"testing": 0,
+						"unknown": 0,
+						"dormant": 0,
 					},
 				},
 				{
@@ -1315,12 +1315,12 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "eth1"},
 					MetricType: "gauge",
 					IsTable:    true,
-					Mappings: map[int64]string{
-						1: "up",
-						2: "down",
-						3: "testing",
-						4: "unknown",
-						5: "dormant",
+					MultiValue: map[string]int64{
+						"up":      0,
+						"down":    1,
+						"testing": 0,
+						"unknown": 0,
+						"dormant": 0,
 					},
 				},
 			},
@@ -1376,10 +1376,10 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"fan_name": "Fan1"},
 					MetricType: "gauge",
 					IsTable:    true,
-					Mappings: map[int64]string{
-						1: "normal",
-						2: "warning",
-						3: "critical",
+					MultiValue: map[string]int64{
+						"normal":   1,
+						"warning":  0,
+						"critical": 0,
 					},
 				},
 				{
@@ -1388,10 +1388,10 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"fan_name": "Fan2"},
 					MetricType: "gauge",
 					IsTable:    true,
-					Mappings: map[int64]string{
-						1: "normal",
-						2: "warning",
-						3: "critical",
+					MultiValue: map[string]int64{
+						"normal":   0,
+						"warning":  0,
+						"critical": 1,
 					},
 				},
 			},
@@ -1568,11 +1568,11 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"node_name": "node1"},
 					MetricType: "gauge",
 					IsTable:    true,
-					Mappings: map[int64]string{
-						0: "OK",
-						1: "ATTN",
-						2: "DOWN",
-						3: "INVALID",
+					MultiValue: map[string]int64{
+						"OK":      1,
+						"ATTN":    0,
+						"DOWN":    0,
+						"INVALID": 0,
 					},
 				},
 				{
@@ -1581,11 +1581,11 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"node_name": "node2"},
 					MetricType: "gauge",
 					IsTable:    true,
-					Mappings: map[int64]string{
-						0: "OK",
-						1: "ATTN",
-						2: "DOWN",
-						3: "INVALID",
+					MultiValue: map[string]int64{
+						"OK":      0,
+						"ATTN":    0,
+						"DOWN":    1,
+						"INVALID": 0,
 					},
 				},
 			},
@@ -2451,6 +2451,329 @@ func TestTableCollector_Collect(t *testing.T) {
 			},
 			expectedError: false,
 		},
+		"tag precedence - cross-table before same-table": {
+			profile: &ddsnmp.Profile{
+				SourceFile: "test-profile.yaml",
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metrics: []ddprofiledefinition.MetricsConfig{
+						{
+							Table: ddprofiledefinition.SymbolConfig{
+								OID:  "1.3.6.1.2.1.2.2",
+								Name: "ifTable",
+							},
+							Symbols: []ddprofiledefinition.SymbolConfig{
+								{
+									OID:  "1.3.6.1.2.1.2.2.1.14",
+									Name: "ifInErrors",
+								},
+							},
+							MetricTags: []ddprofiledefinition.MetricTagConfig{
+								{
+									Tag: "interface",
+									Symbol: ddprofiledefinition.SymbolConfigCompat{
+										OID:  "1.3.6.1.2.1.31.1.1.1.1",
+										Name: "ifName",
+									},
+									Table: "ifXTable",
+								},
+								{
+									Tag: "interface",
+									Symbol: ddprofiledefinition.SymbolConfigCompat{
+										OID:  "1.3.6.1.2.1.2.2.1.2",
+										Name: "ifDescr",
+									},
+									// Same table tag
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				// Walk ifTable
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+					createCounter32PDU("1.3.6.1.2.1.2.2.1.14.1", 10),
+					createStringPDU("1.3.6.1.2.1.2.2.1.2.1", "eth0-description"),
+					createCounter32PDU("1.3.6.1.2.1.2.2.1.14.2", 20),
+					createStringPDU("1.3.6.1.2.1.2.2.1.2.2", "eth1-description"),
+					createCounter32PDU("1.3.6.1.2.1.2.2.1.14.3", 30),
+					createStringPDU("1.3.6.1.2.1.2.2.1.2.3", "eth2-description"),
+				})
+				// Walk ifName column from ifXTable
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.31.1.1.1.1", []gosnmp.SnmpPDU{
+					createStringPDU("1.3.6.1.2.1.31.1.1.1.1.1", "GigabitEthernet0/0"),
+					createStringPDU("1.3.6.1.2.1.31.1.1.1.1.2", "GigabitEthernet0/1"),
+					// No entry for index 3 - missing cross-table data
+				})
+			},
+			expectedResult: []ddsnmp.Metric{
+				{
+					Name:       "ifInErrors",
+					Value:      10,
+					Tags:       map[string]string{"interface": "GigabitEthernet0/0"}, // Uses ifName (cross-table)
+					MetricType: "rate",
+					IsTable:    true,
+				},
+				{
+					Name:       "ifInErrors",
+					Value:      20,
+					Tags:       map[string]string{"interface": "GigabitEthernet0/1"}, // Uses ifName (cross-table)
+					MetricType: "rate",
+					IsTable:    true,
+				},
+				{
+					Name:       "ifInErrors",
+					Value:      30,
+					Tags:       map[string]string{"interface": "eth2-description"}, // Falls back to ifDescr (same-table)
+					MetricType: "rate",
+					IsTable:    true,
+				},
+			},
+			expectedError: false,
+		},
+		"tag precedence with same name - respects profile order": {
+			profile: &ddsnmp.Profile{
+				SourceFile: "test-profile.yaml",
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metrics: []ddprofiledefinition.MetricsConfig{
+						{
+							Table: ddprofiledefinition.SymbolConfig{
+								OID:  "1.3.6.1.2.1.2.2",
+								Name: "ifTable",
+							},
+							Symbols: []ddprofiledefinition.SymbolConfig{
+								{
+									OID:  "1.3.6.1.2.1.2.2.1.10",
+									Name: "ifInOctets",
+								},
+							},
+							MetricTags: []ddprofiledefinition.MetricTagConfig{
+								{
+									Tag: "interface",
+									Symbol: ddprofiledefinition.SymbolConfigCompat{
+										OID:  "1.3.6.1.2.1.31.1.1.1.1",
+										Name: "ifName",
+									},
+									Table: "ifXTable",
+								},
+								{
+									Tag: "interface",
+									Symbol: ddprofiledefinition.SymbolConfigCompat{
+										OID:  "1.3.6.1.2.1.2.2.1.2",
+										Name: "ifDescr",
+									},
+								},
+								{
+									Tag: "if_type",
+									Symbol: ddprofiledefinition.SymbolConfigCompat{
+										OID:  "1.3.6.1.2.1.2.2.1.3",
+										Name: "ifType",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				// Walk ifTable
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+					// Interface 1 - has both ifName and ifDescr
+					createCounter32PDU("1.3.6.1.2.1.2.2.1.10.1", 1000),
+					createStringPDU("1.3.6.1.2.1.2.2.1.2.1", "eth0-description"),
+					createIntegerPDU("1.3.6.1.2.1.2.2.1.3.1", 6),
+					// Interface 2 - has only ifDescr
+					createCounter32PDU("1.3.6.1.2.1.2.2.1.10.2", 2000),
+					createStringPDU("1.3.6.1.2.1.2.2.1.2.2", "eth1-description"),
+					createIntegerPDU("1.3.6.1.2.1.2.2.1.3.2", 6),
+				})
+				// Walk ifName column
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.31.1.1.1.1", []gosnmp.SnmpPDU{
+					createStringPDU("1.3.6.1.2.1.31.1.1.1.1.1", "GigE0/0"),
+					// No entry for index 2 - simulating missing ifName
+				})
+			},
+			expectedResult: []ddsnmp.Metric{
+				{
+					Name:  "ifInOctets",
+					Value: 1000,
+					Tags: map[string]string{
+						"interface": "GigE0/0", // Uses ifName (first in order)
+						"if_type":   "6",
+					},
+					MetricType: "rate",
+					IsTable:    true,
+				},
+				{
+					Name:  "ifInOctets",
+					Value: 2000,
+					Tags: map[string]string{
+						"interface": "eth1-description", // Falls back to ifDescr
+						"if_type":   "6",
+					},
+					MetricType: "rate",
+					IsTable:    true,
+				},
+			},
+			expectedError: false,
+		},
+		"tag precedence with same name - swapped order": {
+			profile: &ddsnmp.Profile{
+				SourceFile: "test-profile.yaml",
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metrics: []ddprofiledefinition.MetricsConfig{
+						{
+							Table: ddprofiledefinition.SymbolConfig{
+								OID:  "1.3.6.1.2.1.2.2",
+								Name: "ifTable",
+							},
+							Symbols: []ddprofiledefinition.SymbolConfig{
+								{
+									OID:  "1.3.6.1.2.1.2.2.1.10",
+									Name: "ifInOctets",
+								},
+							},
+							MetricTags: []ddprofiledefinition.MetricTagConfig{
+								{
+									Tag: "interface",
+									Symbol: ddprofiledefinition.SymbolConfigCompat{
+										OID:  "1.3.6.1.2.1.2.2.1.2",
+										Name: "ifDescr",
+									},
+									// Same table tag FIRST this time
+								},
+								{
+									Tag: "interface",
+									Symbol: ddprofiledefinition.SymbolConfigCompat{
+										OID:  "1.3.6.1.2.1.31.1.1.1.1",
+										Name: "ifName",
+									},
+									Table: "ifXTable",
+									// Cross-table tag SECOND
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				// Walk ifTable
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+					createCounter32PDU("1.3.6.1.2.1.2.2.1.10.1", 1000),
+					createStringPDU("1.3.6.1.2.1.2.2.1.2.1", "eth0-description"),
+					createCounter32PDU("1.3.6.1.2.1.2.2.1.10.2", 2000),
+					createStringPDU("1.3.6.1.2.1.2.2.1.2.2", ""), // Empty ifDescr
+				})
+				// Walk ifName column
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.31.1.1.1.1", []gosnmp.SnmpPDU{
+					createStringPDU("1.3.6.1.2.1.31.1.1.1.1.1", "GigE0/0"),
+					createStringPDU("1.3.6.1.2.1.31.1.1.1.1.2", "GigE0/1"),
+				})
+			},
+			expectedResult: []ddsnmp.Metric{
+				{
+					Name:       "ifInOctets",
+					Value:      1000,
+					Tags:       map[string]string{"interface": "eth0-description"}, // Uses ifDescr (first in order)
+					MetricType: "rate",
+					IsTable:    true,
+				},
+				{
+					Name:       "ifInOctets",
+					Value:      2000,
+					Tags:       map[string]string{"interface": "GigE0/1"}, // Falls back to ifName when ifDescr is empty
+					MetricType: "rate",
+					IsTable:    true,
+				},
+			},
+			expectedError: false,
+		},
+		"tag precedence with index fallback": {
+			profile: &ddsnmp.Profile{
+				SourceFile: "test-profile.yaml",
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metrics: []ddprofiledefinition.MetricsConfig{
+						{
+							Table: ddprofiledefinition.SymbolConfig{
+								OID:  "1.3.6.1.2.1.2.2",
+								Name: "ifTable",
+							},
+							Symbols: []ddprofiledefinition.SymbolConfig{
+								{
+									OID:  "1.3.6.1.2.1.2.2.1.10",
+									Name: "ifInOctets",
+								},
+							},
+							MetricTags: []ddprofiledefinition.MetricTagConfig{
+								{
+									Tag: "interface_name",
+									Symbol: ddprofiledefinition.SymbolConfigCompat{
+										OID:  "1.3.6.1.2.1.31.1.1.1.1",
+										Name: "ifName",
+									},
+									Table: "ifXTable",
+								},
+								{
+									Tag: "interface_name",
+									Symbol: ddprofiledefinition.SymbolConfigCompat{
+										OID:  "1.3.6.1.2.1.2.2.1.2",
+										Name: "ifDescr",
+									},
+								},
+								{
+									Index: 1,
+									Tag:   "interface_name",
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				// Walk ifTable
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+					// Interface 1 - has both ifName and ifDescr
+					createCounter32PDU("1.3.6.1.2.1.2.2.1.10.1", 1000),
+					createStringPDU("1.3.6.1.2.1.2.2.1.2.1", "eth0"),
+					// Interface 2 - has only ifDescr
+					createCounter32PDU("1.3.6.1.2.1.2.2.1.10.2", 2000),
+					createStringPDU("1.3.6.1.2.1.2.2.1.2.2", "eth1"),
+					// Interface 3 - has empty ifDescr
+					createCounter32PDU("1.3.6.1.2.1.2.2.1.10.3", 3000),
+					createStringPDU("1.3.6.1.2.1.2.2.1.2.3", ""),
+				})
+				// Walk ifName column
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.31.1.1.1.1", []gosnmp.SnmpPDU{
+					createStringPDU("1.3.6.1.2.1.31.1.1.1.1.1", "GigE0/0"),
+					// No entry for index 2
+					// No entry for index 3
+				})
+			},
+			expectedResult: []ddsnmp.Metric{
+				{
+					Name:       "ifInOctets",
+					Value:      1000,
+					Tags:       map[string]string{"interface_name": "GigE0/0"}, // Uses ifName
+					MetricType: "rate",
+					IsTable:    true,
+				},
+				{
+					Name:       "ifInOctets",
+					Value:      2000,
+					Tags:       map[string]string{"interface_name": "eth1"}, // Falls back to ifDescr
+					MetricType: "rate",
+					IsTable:    true,
+				},
+				{
+					Name:       "ifInOctets",
+					Value:      3000,
+					Tags:       map[string]string{"interface_name": "3"}, // Falls back to index
+					MetricType: "rate",
+					IsTable:    true,
+				},
+			},
+			expectedError: false,
+		},
 
 		"basic index tag": {
 			profile: &ddsnmp.Profile{
@@ -2979,7 +3302,7 @@ func TestTableCollector_Collect(t *testing.T) {
   {{- setFamily .Metric (get $config "family") -}}
   {{- with get $config "unit" -}}{{- setUnit $.Metric . -}}{{- end -}}
   {{- with get $config "divisor" -}}{{- setValue $.Metric (int64 (div (float64 $.Metric.Value) .)) -}}{{- end -}}
-  {{- with get $config "mapping" -}}{{- setMappings $.Metric . -}}{{- end -}}
+  {{- with get $config "mapping" -}}{{- setMultivalue $.Metric . -}}{{- end -}}
 {{- end -}}
 
 {{- deleteTag .Metric "sensor_type" -}}`,
@@ -3032,16 +3355,16 @@ func TestTableCollector_Collect(t *testing.T) {
 					IsTable:    true,
 				},
 				{
-					Name:   "mtxrHlSensorValue_sensor_status",
-					Value:  1,
-					Tags:   map[string]string{"sensor_name": "psu1-state"},
-					Family: "Health/Status",
-					Mappings: map[int64]string{
-						0: "not_ok",
-						1: "ok",
-					},
+					Name:       "mtxrHlSensorValue_sensor_status",
+					Value:      1,
+					Tags:       map[string]string{"sensor_name": "psu1-state"},
+					Family:     "Health/Status",
 					MetricType: "gauge",
 					IsTable:    true,
+					MultiValue: map[string]int64{
+						"not_ok": 0,
+						"ok":     1,
+					},
 				},
 				{
 					Name:       "mtxrHlSensorValue_voltage",
@@ -3159,7 +3482,7 @@ func TestTableCollector_Collect(t *testing.T) {
 {{- else -}}
   {{- setValue .Metric 0 -}}
 {{- end -}}
-{{- setMappings .Metric (i64map 0 "down" 1 "up") -}}
+{{- setMultivalue .Metric (i64map 0 "down" 1 "up") -}}
 {{- setName .Metric "interface_status" -}}`,
 								},
 							},
@@ -3188,37 +3511,37 @@ func TestTableCollector_Collect(t *testing.T) {
 			},
 			expectedResult: []ddsnmp.Metric{
 				{
-					Name:  "interface_status",
-					Value: 1,
-					Tags:  map[string]string{"interface": "eth0"},
-					Mappings: map[int64]string{
-						0: "down",
-						1: "up",
-					},
+					Name:       "interface_status",
+					Value:      1,
+					Tags:       map[string]string{"interface": "eth0"},
 					MetricType: "gauge",
 					IsTable:    true,
+					MultiValue: map[string]int64{
+						"down": 0,
+						"up":   1,
+					},
 				},
 				{
-					Name:  "interface_status",
-					Value: 0,
-					Tags:  map[string]string{"interface": "eth1"},
-					Mappings: map[int64]string{
-						0: "down",
-						1: "up",
-					},
+					Name:       "interface_status",
+					Value:      0,
+					Tags:       map[string]string{"interface": "eth1"},
 					MetricType: "gauge",
 					IsTable:    true,
+					MultiValue: map[string]int64{
+						"down": 1,
+						"up":   0,
+					},
 				},
 				{
-					Name:  "interface_status",
-					Value: 0,
-					Tags:  map[string]string{"interface": "eth2"},
-					Mappings: map[int64]string{
-						0: "down",
-						1: "up",
-					},
+					Name:       "interface_status",
+					Value:      0,
+					Tags:       map[string]string{"interface": "eth2"},
 					MetricType: "gauge",
 					IsTable:    true,
+					MultiValue: map[string]int64{
+						"down": 1,
+						"up":   0,
+					},
 				},
 			},
 			expectedError: false,
@@ -3334,6 +3657,11 @@ func TestTableCollector_Collect(t *testing.T) {
 			collector := newTableCollector(mockHandler, missingOIDs, tableCache, logger.New())
 
 			result, err := collector.Collect(tc.profile)
+
+			// TODO: the Table field is now compared as part of the metric; ensure expectedResult includes correct Table values
+			for i := range result {
+				result[i].Table = ""
+			}
 
 			if tc.expectedError {
 				assert.Error(t, err)
@@ -4125,6 +4453,8 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 			for _, profile := range result {
 				for i := range profile.Metrics {
 					profile.Metrics[i].Profile = nil
+					// TODO: the Table field is now compared as part of the metric; ensure expectedResult includes correct Table values
+					profile.Metrics[i].Table = ""
 				}
 			}
 

@@ -196,7 +196,7 @@ struct stats {
 struct instance {
     struct instance_config config;
     void *buffer;
-    void *(*worker)(void *instance_p);
+    void (*worker)(void *instance_p);
     struct stats stats;
 
     int scheduled;
@@ -252,7 +252,7 @@ struct engine {
 
 extern struct instance *prometheus_exporter_instance;
 
-void *exporting_main(void *ptr);
+void exporting_main(void *ptr);
 
 struct engine *read_exporting_config();
 EXPORTING_CONNECTOR_TYPE exporting_select_type(const char *type);
@@ -291,7 +291,7 @@ int exporting_discard_response(BUFFER *buffer, struct instance *instance);
 void simple_connector_receive_response(int *sock, struct instance *instance);
 void simple_connector_send_buffer(
     int *sock, int *failures, struct instance *instance, BUFFER *header, BUFFER *buffer, size_t buffered_metrics);
-void *simple_connector_worker(void *instance_p);
+void simple_connector_worker(void *instance_p);
 
 void create_main_rusage_chart(RRDSET **st_rusage, RRDDIM **rd_user, RRDDIM **rd_system);
 void send_main_rusage(RRDSET *st_rusage, RRDDIM *rd_user, RRDDIM *rd_system);

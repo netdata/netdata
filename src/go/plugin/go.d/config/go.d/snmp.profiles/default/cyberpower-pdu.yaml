@@ -393,7 +393,7 @@ metrics:
         chart_meta:
           description: "Load apparent power consumed on the Rack PDU phase"
           family: 'PowerFlow/Rack/Phase/Power/Apparent'
-          unit: "mkVA"
+          unit: "VA"
       - OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.9
         name: cyberpower.ePDU2PhaseStatusPowerFactor
         chart_meta:
@@ -486,10 +486,11 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.3808.1.1.4.2.1.0
       name: cyberpower.envirTemperature
+      scale_factor: 0.1
       chart_meta:
         description: "Environment temperature"
         family: 'Environment/Temperature/Value'
-        unit: "degF/10"
+        unit: "degF"
   - MIB: CPS-MIB
     symbol:
       OID: 1.3.6.1.4.1.3808.1.1.4.2.6.0

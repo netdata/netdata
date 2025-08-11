@@ -8,7 +8,7 @@ ml_queue_t *ml_queue_init()
     ml_queue_t *q = new ml_queue_t();
 
     netdata_mutex_init(&q->mutex);
-    pthread_cond_init(&q->cond_var, NULL);
+    netdata_cond_init(&q->cond_var);
     q->exit = false;
     return q;
 }
@@ -16,7 +16,7 @@ ml_queue_t *ml_queue_init()
 void ml_queue_destroy(ml_queue_t *q)
 {
     netdata_mutex_destroy(&q->mutex);
-    pthread_cond_destroy(&q->cond_var);
+    netdata_cond_destroy(&q->cond_var);
     delete q;
 }
 
@@ -40,7 +40,7 @@ void ml_queue_push(ml_queue_t *q, const ml_queue_item_t req)
             break;
     }
 
-    pthread_cond_signal(&q->cond_var);
+    netdata_cond_signal(&q->cond_var);
     netdata_mutex_unlock(&q->mutex);
 }
 
@@ -52,7 +52,7 @@ ml_queue_item_t ml_queue_pop(ml_queue_t *q)
     req.type = ML_QUEUE_ITEM_STOP_REQUEST;
 
     while (q->create_model_queue.empty() && q->add_model_queue.empty()) {
-        pthread_cond_wait(&q->cond_var, &q->mutex);
+        netdata_cond_wait(&q->cond_var, &q->mutex);
 
         if (q->exit) {
             netdata_mutex_unlock(&q->mutex);
@@ -93,7 +93,7 @@ void ml_queue_signal(ml_queue_t *q)
 {
     netdata_mutex_lock(&q->mutex);
     q->exit = true;
-    pthread_cond_signal(&q->cond_var);
+    netdata_cond_signal(&q->cond_var);
     netdata_mutex_unlock(&q->mutex);
 }
 

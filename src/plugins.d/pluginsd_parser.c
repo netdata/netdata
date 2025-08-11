@@ -200,7 +200,7 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
         string2str(parser->user.host_define.hostname),
         string2str(parser->user.host_define.hostname),
         parser->user.host_define.machine_guid_str,
-        "Netdata Virtual Host 1.0",
+        NETDATA_VIRTUAL_HOST,
         netdata_configured_timezone,
         netdata_configured_abbrev_timezone,
         netdata_configured_utc_offset,

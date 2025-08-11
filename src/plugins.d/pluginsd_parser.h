@@ -111,10 +111,6 @@ struct parser {
     send_to_plugin_callback_t send_to_plugin_cb;
     void *send_to_plugin_data;
 
-#ifdef ENABLE_H2O
-    void *h2o_ctx;                  // if set we use h2o_stream functions to send data
-#endif
-
     PARSER_USER_OBJECT user;        // User defined structure to hold extra state between calls
 
     struct buffered_reader reader;

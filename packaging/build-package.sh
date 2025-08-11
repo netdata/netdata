@@ -28,7 +28,6 @@ add_cmake_option CMAKE_BUILD_TYPE RelWithDebInfo
 add_cmake_option CMAKE_INSTALL_PREFIX /
 add_cmake_option ENABLE_DASHBOARD on
 add_cmake_option ENABLE_DBENGINE On
-add_cmake_option ENABLE_H2O Off
 add_cmake_option ENABLE_ML On
 
 add_cmake_option ENABLE_PLUGIN_APPS On

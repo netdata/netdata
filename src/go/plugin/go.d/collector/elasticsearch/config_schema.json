@@ -156,10 +156,7 @@
     },
     "required": [
       "url"
-    ],
-    "patternProperties": {
-      "^name$": {}
-    }
+    ]
   },
   "uiSchema": {
     "ui:flavour": "tabs",

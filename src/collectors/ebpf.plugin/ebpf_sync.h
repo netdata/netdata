@@ -48,7 +48,7 @@ enum netdata_sync_charts {
 
 enum netdata_sync_table { NETDATA_SYNC_GLOBAL_TABLE };
 
-void *ebpf_sync_thread(void *ptr);
+void ebpf_sync_thread(void *ptr);
 extern struct config sync_config;
 extern netdata_ebpf_targets_t sync_targets[];
 

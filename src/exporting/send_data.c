@@ -205,7 +205,7 @@ void simple_connector_send_buffer(
  *
  * @param instance_p an instance data structure.
  */
-void *simple_connector_worker(void *instance_p)
+void simple_connector_worker(void *instance_p)
 {
     struct instance *instance = (struct instance*)instance_p;
     struct simple_connector_data *connector_specific_data = instance->connector_specific_data;
@@ -390,6 +390,4 @@ void *simple_connector_worker(void *instance_p)
 #endif
 
     simple_connector_cleanup(instance);
-    
-    return NULL;
 }

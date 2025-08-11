@@ -487,7 +487,7 @@ bool rrdeng_ctx_tier_cap_exceeded(struct rrdengine_instance *ctx);
 int init_rrd_files(struct rrdengine_instance *ctx);
 void finalize_rrd_files(struct rrdengine_instance *ctx);
 bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx);
-void *dbengine_event_loop(void *arg);
+void dbengine_event_loop(void *arg);
 
 typedef void (*enqueue_callback_t)(struct rrdeng_cmd *cmd);
 typedef void (*dequeue_callback_t)(struct rrdeng_cmd *cmd);

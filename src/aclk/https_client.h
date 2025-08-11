@@ -64,10 +64,11 @@ typedef struct {
     void *payload;
     size_t payload_size;
 
-    char *proxy_host;
+    const char *proxy_host;
     int proxy_port;
     const char *proxy_username;
     const char *proxy_password;
+    const char *proxy;
 } https_req_t;
 
 typedef struct {

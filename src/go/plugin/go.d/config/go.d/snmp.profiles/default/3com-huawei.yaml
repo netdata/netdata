@@ -4,21 +4,26 @@ extends:
 sysobjectid:
   - 1.3.6.1.4.1.43.45.1.2.* # 3Com Huawei Products (a3Com.jv-mib.huawei.hwproducts)
 
+# - A3COM-HUAWEI-LswDEVM-MIB
+#   https://mibbrowser.online/mibdb_search.php?mib=A3COM-HUAWEI-LswDEVM-MIB
+#   https://github.com/librenms/librenms/blob/master/mibs/3com/A3COM-HUAWEI-LswDEVM-MIB
+
 metrics:
   - MIB: A3COM-HUAWEI-LswDEVM-MIB
     table:
       name: hwCpuTable # indexes: hwCpuIndex
       OID: 1.3.6.1.4.1.43.45.1.6.1.1
     symbols:
-      - name: hwCpuCostRatePer5Sec
+      - name: cpu.usage # hwCpuCostRatePer1Min
         OID: 1.3.6.1.4.1.43.45.1.6.1.1.1.3
         chart_meta:
-          description: Cpu usage percentage
+          description: The current CPU utilization
           family: 'System/CPU/Usage'
           unit: "%"
     metric_tags:
       - tag: cpu_index
         index: 1
+
   - MIB: A3COM-HUAWEI-LswDEVM-MIB
     table:
       name: hwMemTable # indexes: hwMemModuleIndex

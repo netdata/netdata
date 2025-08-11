@@ -64,57 +64,69 @@ type tableWalkResult struct {
 	config ddprofiledefinition.MetricsConfig
 }
 
-type tableProcessingContext struct {
-	// === Input data (set when context is created) ===
+type (
+	tableProcessingContext struct {
+		// === Input data (set when context is created) ===
 
-	// config is the metric configuration for this table
-	// Contains table OID, symbols to collect, and tag configurations
-	config ddprofiledefinition.MetricsConfig
+		// config is the metric configuration for this table
+		// Contains table OID, symbols to collect, and tag configurations
+		config ddprofiledefinition.MetricsConfig
 
-	// pdus contains all PDUs from walking this specific table
-	// Key: full OID (e.g., "1.3.6.1.2.1.2.2.1.10.1"), Value: SNMP PDU
-	pdus map[string]gosnmp.SnmpPDU
+		// pdus contains all PDUs from walking this specific table
+		// Key: full OID (e.g., "1.3.6.1.2.1.2.2.1.10.1"), Value: SNMP PDU
+		pdus map[string]gosnmp.SnmpPDU
 
-	// walkedData contains PDUs from ALL walked tables in this collection
-	// Used for cross-table tag resolution
-	// Key: table OID → map[full OID]PDU
-	walkedData map[string]map[string]gosnmp.SnmpPDU
+		// walkedData contains PDUs from ALL walked tables in this collection
+		// Used for cross-table tag resolution
+		// Key: table OID → map[full OID]PDU
+		walkedData map[string]map[string]gosnmp.SnmpPDU
 
-	// tableNameToOID maps table names to their OIDs
-	// Used to resolve cross-table references (e.g., "ifXTable" → "1.3.6.1.2.1.31.1.1")
-	tableNameToOID map[string]string
+		// tableNameToOID maps table names to their OIDs
+		// Used to resolve cross-table references (e.g., "ifXTable" → "1.3.6.1.2.1.31.1.1")
+		tableNameToOID map[string]string
 
-	// === Computed during processing (set by various methods) ===
+		// === Computed during processing (set by various methods) ===
 
-	// columnOIDs maps column OIDs to their symbol configurations
-	// Built from config.Symbols, used to identify which columns contain metrics
-	// Key: column OID (e.g., "1.3.6.1.2.1.2.2.1.10"), Value: symbol config
-	columnOIDs map[string]ddprofiledefinition.SymbolConfig
+		// columnOIDs maps column OIDs to their symbol configurations
+		// Built from config.Symbols, used to identify which columns contain metrics
+		// Key: column OID (e.g., "1.3.6.1.2.1.2.2.1.10"), Value: symbol config
+		columnOIDs map[string]ddprofiledefinition.SymbolConfig
 
-	// sameTableTagOIDs maps column OIDs to tag configurations for same-table tags only
-	// Built from config.MetricTags, excludes cross-table tags
-	// Key: column OID → list of tag configs (multiple tags can use same column)
-	sameTableTagOIDs map[string][]ddprofiledefinition.MetricTagConfig
+		// staticTags contains tags that apply to all metrics from this table
+		// Parsed from config.StaticTags (e.g., "source:network")
+		staticTags map[string]string
 
-	// staticTags contains tags that apply to all metrics from this table
-	// Parsed from config.StaticTags (e.g., "source:network")
-	staticTags map[string]string
+		// rows contains PDUs organized by row index
+		// Created by organizePDUsByRow from flat PDU list
+		// Key: row index (e.g., "1", "2.3") → map[column OID]PDU
+		rows map[string]map[string]gosnmp.SnmpPDU
 
-	// rows contains PDUs organized by row index
-	// Created by organizePDUsByRow from flat PDU list
-	// Key: row index (e.g., "1", "2.3") → map[column OID]PDU
-	rows map[string]map[string]gosnmp.SnmpPDU
+		// oidCache stores the mapping of column OID to full OID for each row
+		// Used for caching table structure
+		// Key: row index → map[column OID]full OID
+		oidCache map[string]map[string]string
 
-	// oidCache stores the mapping of column OID to full OID for each row
-	// Used for caching table structure
-	// Key: row index → map[column OID]full OID
-	oidCache map[string]map[string]string
+		// tagCache stores computed tag values for each row
+		// Populated during row processing, used for caching
+		// Key: row index → map[tag name]tag value
+		tagCache map[string]map[string]string
 
-	// tagCache stores computed tag values for each row
-	// Populated during row processing, used for caching
-	// Key: row index → map[tag name]tag value
-	tagCache map[string]map[string]string
-}
+		// orderedTags contains metric tags in profile-defined order to ensure correct
+		// precedence when multiple tags share the same name (first non-empty wins)
+		orderedTags []orderedTagConfig
+	}
+	orderedTagConfig struct {
+		config  ddprofiledefinition.MetricTagConfig
+		tagType tagType
+	}
+	tagType int
+)
+
+const (
+	tagTypeSameTable tagType = iota
+	tagTypeCrossTable
+	tagTypeIndex
+)
 
 type cacheProcessingContext struct {
 	// config is the metric configuration for this table
@@ -140,6 +152,8 @@ type cacheProcessingContext struct {
 	// Only contains metric columns (not tag columns, which are cached)
 	// Key: full OID (trimmed), Value: current PDU value
 	pdus map[string]gosnmp.SnmpPDU
+
+	tableName string
 }
 
 // walkTablesAsNeeded walks only tables that aren't fully cached
@@ -328,6 +342,7 @@ func (tc *tableCollector) tryCollectFromCache(cfg ddprofiledefinition.MetricsCon
 		cachedOIDs: cachedOIDs,
 		cachedTags: cachedTags,
 		columnOIDs: columnOIDs,
+		tableName:  cfg.Table.Name,
 	}
 
 	metrics, err := tc.collectWithCache(ctx)
@@ -343,7 +358,8 @@ func (tc *tableCollector) tryCollectFromCache(cfg ddprofiledefinition.MetricsCon
 // processTableData processes walked table data
 func (tc *tableCollector) processTableData(ctx *tableProcessingContext) ([]ddsnmp.Metric, error) {
 	ctx.columnOIDs = buildColumnOIDs(ctx.config)
-	ctx.sameTableTagOIDs = buildSameTableTagOIDs(ctx.config)
+
+	ctx.orderedTags = buildOrderedTags(ctx.config)
 
 	ctx.rows, ctx.oidCache, ctx.tagCache = tc.organizePDUsByRow(ctx)
 
@@ -362,12 +378,16 @@ func (tc *tableCollector) processTableData(ctx *tableProcessingContext) ([]ddsnm
 // organizePDUsByRow groups PDUs by their row index
 func (tc *tableCollector) organizePDUsByRow(ctx *tableProcessingContext) (rows map[string]map[string]gosnmp.SnmpPDU, oidCache, tagCache map[string]map[string]string) {
 	// Combine all column OIDs
-	allColumnOIDs := make([]string, 0, len(ctx.columnOIDs)+len(ctx.sameTableTagOIDs))
+	allColumnOIDs := make([]string, 0, len(ctx.columnOIDs)+len(ctx.orderedTags))
+
 	for oid := range ctx.columnOIDs {
 		allColumnOIDs = append(allColumnOIDs, oid)
 	}
-	for oid := range ctx.sameTableTagOIDs {
-		allColumnOIDs = append(allColumnOIDs, oid)
+	for _, tag := range ctx.orderedTags {
+		if tag.tagType == tagTypeSameTable && tag.config.Symbol.OID != "" {
+			oid := trimOID(tag.config.Symbol.OID)
+			allColumnOIDs = append(allColumnOIDs, oid)
+		}
 	}
 
 	rows = make(map[string]map[string]gosnmp.SnmpPDU)
@@ -410,14 +430,15 @@ func (tc *tableCollector) processRows(ctx *tableProcessingContext) ([]ddsnmp.Met
 			pdus:       rowPDUs,
 			tags:       make(map[string]string),
 			staticTags: ctx.staticTags,
+			tableName:  ctx.config.Table.Name,
 		}
 		crossTableCtx.rowTags = row.tags
 
 		rowCtx := &tableRowProcessingContext{
-			config:           ctx.config,
-			columnOIDs:       ctx.columnOIDs,
-			sameTableTagOIDs: ctx.sameTableTagOIDs,
-			crossTableCtx:    crossTableCtx,
+			config:        ctx.config,
+			columnOIDs:    ctx.columnOIDs,
+			crossTableCtx: crossTableCtx,
+			orderedTags:   ctx.orderedTags,
 		}
 		rowMetrics, err := tc.rowProcessor.processRow(row, rowCtx)
 		if err != nil {
@@ -506,7 +527,7 @@ func (tc *tableCollector) buildMetricsFromCache(ctx *cacheProcessingContext) ([]
 				continue
 			}
 
-			metric, err := buildTableMetric(sym, pdu, value, rowTags, staticTags)
+			metric, err := buildTableMetric(sym, pdu, value, rowTags, staticTags, ctx.tableName)
 			if err != nil {
 				errs = append(errs, err)
 				continue
@@ -592,17 +613,6 @@ func buildColumnOIDs(cfg ddprofiledefinition.MetricsConfig) map[string]ddprofile
 	return columnOIDs
 }
 
-func buildSameTableTagOIDs(cfg ddprofiledefinition.MetricsConfig) map[string][]ddprofiledefinition.MetricTagConfig {
-	tagColumnOIDs := make(map[string][]ddprofiledefinition.MetricTagConfig)
-	for _, tagCfg := range cfg.MetricTags {
-		if tagCfg.Table == "" || tagCfg.Table == cfg.Table.Name {
-			oid := trimOID(tagCfg.Symbol.OID)
-			tagColumnOIDs[oid] = append(tagColumnOIDs[oid], tagCfg)
-		}
-	}
-	return tagColumnOIDs
-}
-
 func extractTableDependencies(cfg ddprofiledefinition.MetricsConfig, tableNameToOID map[string]string) []string {
 	deps := make(map[string]bool)
 
@@ -623,4 +633,27 @@ func extractTableDependencies(cfg ddprofiledefinition.MetricsConfig, tableNameTo
 	}
 
 	return result
+}
+
+func buildOrderedTags(cfg ddprofiledefinition.MetricsConfig) []orderedTagConfig {
+	var ordered []orderedTagConfig
+
+	for _, tagCfg := range cfg.MetricTags {
+		var tt tagType
+		switch {
+		case tagCfg.Index != 0:
+			tt = tagTypeIndex
+		case tagCfg.Table != "" && tagCfg.Table != cfg.Table.Name:
+			tt = tagTypeCrossTable
+		default:
+			tt = tagTypeSameTable
+		}
+
+		ordered = append(ordered, orderedTagConfig{
+			config:  tagCfg,
+			tagType: tt,
+		})
+	}
+
+	return ordered
 }

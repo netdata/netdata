@@ -6,7 +6,7 @@ metadata:
   device:
     fields:
       vendor:
-        value: "dialogic"
+        value: "Dialogic"
 
 sysobjectid:
   - 1.3.6.1.4.1.3028.6.1.1 # DMG 1000 Series

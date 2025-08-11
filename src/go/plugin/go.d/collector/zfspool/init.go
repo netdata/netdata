@@ -9,6 +9,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pathvalidate"
 )
 
 func (c *Collector) validateConfig() error {
@@ -33,7 +35,12 @@ func (c *Collector) initZPoolCLIExec() (zpoolCli, error) {
 		return nil, err
 	}
 
-	zpoolExec := newZpoolCLIExec(binPath, c.Timeout.Duration())
+	validatedPath, err := pathvalidate.ValidateBinaryPath(binPath)
+	if err != nil {
+		return nil, err
+	}
+
+	zpoolExec := newZpoolCLIExec(validatedPath, c.Timeout.Duration())
 	zpoolExec.Logger = c.Logger
 
 	return zpoolExec, nil

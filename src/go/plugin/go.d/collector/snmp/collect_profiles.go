@@ -8,17 +8,11 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 )
 
 func (c *Collector) collectProfiles(mx map[string]int64) error {
-	if len(c.snmpProfiles) == 0 {
+	if len(c.snmpProfiles) == 0 || c.ddSnmpColl == nil {
 		return nil
-	}
-	if c.ddSnmpColl == nil {
-		c.ddSnmpColl = ddsnmpcollector.New(c.snmpClient, c.snmpProfiles, c.Logger)
-		c.ddSnmpColl.DoTableMetrics = c.EnableProfilesTableMetrics
 	}
 
 	pms, err := c.ddSnmpColl.Collect()
@@ -44,13 +38,13 @@ func (c *Collector) collectProfileScalarMetrics(mx map[string]int64, pms []*ddsn
 				c.addProfileScalarMetricChart(m)
 			}
 
-			if len(m.Mappings) == 0 {
+			if len(m.MultiValue) == 0 {
 				id := fmt.Sprintf("snmp_device_prof_%s", m.Name)
 				mx[id] = m.Value
 			} else {
-				for k, v := range m.Mappings {
-					id := fmt.Sprintf("snmp_device_prof_%s_%s", m.Name, v)
-					mx[id] = metrix.Bool(m.Value == k)
+				for k, v := range m.MultiValue {
+					id := fmt.Sprintf("snmp_device_prof_%s_%s", m.Name, k)
+					mx[id] = v
 				}
 			}
 		}
@@ -75,13 +69,13 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, pms []*ddsnm
 				c.addProfileTableMetricChart(m)
 			}
 
-			if len(m.Mappings) == 0 {
+			if len(m.MultiValue) == 0 {
 				id := fmt.Sprintf("snmp_device_prof_%s", key)
 				mx[id] += m.Value
 			} else {
-				for k, v := range m.Mappings {
-					id := fmt.Sprintf("snmp_device_prof_%s_%s", key, v)
-					mx[id] = metrix.Bool(m.Value == k)
+				for k, v := range m.MultiValue {
+					id := fmt.Sprintf("snmp_device_prof_%s_%s", key, k)
+					mx[id] = v
 				}
 			}
 		}

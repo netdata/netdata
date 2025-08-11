@@ -15,7 +15,7 @@ metadata:
   device:
     fields:
       type:
-        value: "switch"
+        value: "Switch"
 
 # Tagging by column OID is not supported at the moment. Should be a table/columns metric + tags instead.
 # metric_tags:

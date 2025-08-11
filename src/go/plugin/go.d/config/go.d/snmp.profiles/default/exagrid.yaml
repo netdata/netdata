@@ -10,9 +10,9 @@ metadata:
   device:
     fields:
       vendor:
-        value: "exagrid"
+        value: "ExaGrid"
       type:
-        value: "storage"
+        value: "Storage"
 
 # https://mibbrowser.online/mibdb_search.php?mib=EXAGRID-MIB
 # https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/exagrid/EXAGRID-MIB

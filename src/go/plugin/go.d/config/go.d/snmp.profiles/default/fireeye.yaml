@@ -10,7 +10,7 @@ metadata:
   device:
     fields:
       vendor:
-        value: "fireeye"
+        value: "Fireeye"
 
 metric_tags:
   - tag: fe_hardware_model

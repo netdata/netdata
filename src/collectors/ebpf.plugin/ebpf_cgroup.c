@@ -287,7 +287,7 @@ void ebpf_parse_cgroup_shm_data()
         return;
     }
 
-    pthread_mutex_lock(&mutex_cgroup_shm);
+    netdata_mutex_lock(&mutex_cgroup_shm);
     ebpf_remove_cgroup_target_update_list();
 
     ebpf_reset_updated_var();
@@ -302,7 +302,7 @@ void ebpf_parse_cgroup_shm_data()
     send_cgroup_chart = previous != shm_ebpf_cgroup.header->cgroup_root_count;
     previous = shm_ebpf_cgroup.header->cgroup_root_count;
     sem_post(shm_sem_ebpf_cgroup);
-    pthread_mutex_unlock(&mutex_cgroup_shm);
+    netdata_mutex_unlock(&mutex_cgroup_shm);
 #ifdef NETDATA_DEV_MODE
     netdata_log_info(
         "Updating cgroup %d (Previous: %d, Current: %d)",
@@ -376,7 +376,7 @@ void ebpf_create_charts_on_systemd(ebpf_systemd_args_t *chart)
  *
  * @return It always returns NULL.
  */
-void *ebpf_cgroup_integration(void *ptr __maybe_unused)
+void ebpf_cgroup_integration(void *ptr __maybe_unused)
 {
     int counter = NETDATA_EBPF_CGROUP_UPDATE - 1;
     heartbeat_t hb;
@@ -395,6 +395,4 @@ void *ebpf_cgroup_integration(void *ptr __maybe_unused)
                 ebpf_parse_cgroup_shm_data();
         }
     }
-
-    return NULL;
 }
