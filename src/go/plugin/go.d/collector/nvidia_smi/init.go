@@ -20,9 +20,10 @@ func (c *Collector) initNvidiaSmiExec() (nvidiaSmiBinary, error) {
 		binPath = path
 	}
 
-	if err := pathvalidate.ValidateBinaryPath(binPath); err != nil {
+	validatedPath, err := pathvalidate.ValidateBinaryPath(binPath)
+	if err != nil {
 		return nil, err
 	}
 
-	return newNvidiaSmiBinary(binPath, c.Config, c.Logger)
+	return newNvidiaSmiBinary(validatedPath, c.Config, c.Logger)
 }

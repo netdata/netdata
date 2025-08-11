@@ -35,11 +35,12 @@ func (c *Collector) initIwExec() (iwBinary, error) {
 		return nil, err
 	}
 
-	if err := pathvalidate.ValidateBinaryPath(binPath); err != nil {
+	validatedPath, err := pathvalidate.ValidateBinaryPath(binPath)
+	if err != nil {
 		return nil, err
 	}
 
-	iw := newIwExec(binPath, c.Timeout.Duration())
+	iw := newIwExec(validatedPath, c.Timeout.Duration())
 
 	return iw, nil
 }
