@@ -24,6 +24,8 @@
 #define NETDATA_QUERY_CHECK_PERM                                                                                       \
     "SELECT CASE WHEN IS_SRVROLEMEMBER('sysadmin') = 1 OR HAS_PERMS_BY_NAME(null, null, 'VIEW SERVER STATE') = 1 THEN 1 ELSE 0 END AS has_permission;"
 
+#define NETDATA_QUERY_DATABASE_STATUS "SELECT name, state, is_read_only FROM sys.databases;"
+
 // https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-os-wait-stats-transact-sql?view=sql-server-ver16
 #define NETDATA_QUERY_CHECK_WAITS                                                                                      \
     "SELECT                                                                                                            \

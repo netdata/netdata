@@ -40,6 +40,7 @@ struct netdata_mssql_conn {
     SQLHSTMT dbInstanceTransactionSTMT;
     SQLHSTMT dbWaitsSTMT;
     SQLHSTMT dbLocksSTMT;
+    SQLHSTMT dbSQLState;
 
     BOOL is_connected;
 };
@@ -236,6 +237,9 @@ struct mssql_db_instance {
 
     COUNTER_DATA MSSQLCompilations;
     COUNTER_DATA MSSQLRecompilations;
+
+    COUNTER_DATA MSSQLDBIsReadonly;
+    COUNTER_DATA MSSQLDBState;
 
     uint32_t updated;
 };
@@ -766,6 +770,59 @@ endperm:
     return perm;
 }
 
+void metdata_mssql_fill_mssql_status(struct mssql_instance *mi)
+{
+    char dbname[SQLSERVER_MAX_NAME_LENGTH + 1];
+    int readonly = 0;
+    BYTE state = 0;
+    SQLLEN col_data_len = 0;
+
+    static int next_try = NETDATA_MSSQL_NEXT_TRY - 1;
+
+    if (++next_try != NETDATA_MSSQL_NEXT_TRY)
+        return;
+
+    next_try = 0;
+
+    SQLRETURN ret;
+
+    ret = SQLExecDirect(mi->conn->dbSQLState, (SQLCHAR *)NETDATA_QUERY_DATABASE_STATUS, SQL_NTS);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLState, NETDATA_MSSQL_ODBC_QUERY, mi->instanceID);
+        goto enddbstate;
+    }
+
+    ret = SQLBindCol(mi->conn->dbSQLState, 1, SQL_C_TINYINT, &state, sizeof(state), &col_data_len);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLState, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
+        goto enddbstate;
+    }
+
+    ret = SQLBindCol(mi->conn->dbSQLState, 3, SQL_C_BIT, &readonly, sizeof(readonly), &col_data_len);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbWaitsSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
+        goto enddbstate;
+    }
+
+    int i = 0;
+    do {
+        ret = SQLFetch(mi->conn->dbSQLState);
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+            goto enddbstate;
+        }
+
+        struct mssql_db_instance *mdi = dictionary_set(mi->databases, dbname, NULL, sizeof(*mdi));
+        if (!mdi)
+            continue;
+
+        mdi->MSSQLDBState.current.Data = (ULONGLONG)state;
+        mdi->MSSQLDBIsReadonly.current.Data = (ULONGLONG)readonly;
+    } while (true);
+
+enddbstate:
+    netdata_MSSQL_release_results(mi->conn->dbSQLState);
+}
+
 void metdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi)
 {
     char dbname[SQLSERVER_MAX_NAME_LENGTH + 1];
@@ -892,6 +949,10 @@ static bool netdata_MSSQL_initialize_conection(struct netdata_mssql_conn *nmc)
             retConn = FALSE;
 
         ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dbWaitsSTMT);
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
+            retConn = FALSE;
+
+        ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dbSQLState);
         if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
             retConn = FALSE;
     }
@@ -1236,6 +1297,7 @@ int dict_mssql_query_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value,
                 mi->instanceID);
         } else {
             metdata_mssql_fill_dictionary_from_db(mi);
+            metdata_mssql_fill_mssql_status(mi);
             dictionary_sorted_walkthrough_read(mi->databases, dict_mssql_databases_run_queries, NULL);
         }
 
