@@ -6,6 +6,13 @@
 
 **Merged pull requests:**
 
+- feat\(go.d/ddsnmp\): add MultiValue for state metrics and aggregation [\#20787](https://github.com/netdata/netdata/pull/20787) ([ilyam8](https://github.com/ilyam8))
+- feat\(go.d/ddsnmp\): add metric aggregation support for SNMP profiles [\#20786](https://github.com/netdata/netdata/pull/20786) ([ilyam8](https://github.com/ilyam8))
+- fix\(go.d/ddsnmp\): respect metric tag order from profile definition [\#20784](https://github.com/netdata/netdata/pull/20784) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations docs [\#20783](https://github.com/netdata/netdata/pull/20783) ([netdatabot](https://github.com/netdatabot))
+- docs\(go.d/mysql\): add MariaDB 10.5.9+ SLAVE MONITOR privilege [\#20782](https://github.com/netdata/netdata/pull/20782) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations docs [\#20781](https://github.com/netdata/netdata/pull/20781) ([netdatabot](https://github.com/netdatabot))
+- docs\(go.d/memcached\): add UNIX socket access prerequisite [\#20780](https://github.com/netdata/netdata/pull/20780) ([ilyam8](https://github.com/ilyam8))
 - Add Debian 13 to CI and package builds. [\#20776](https://github.com/netdata/netdata/pull/20776) ([Ferroin](https://github.com/Ferroin))
 - Aclk improvements [\#20775](https://github.com/netdata/netdata/pull/20775) ([stelfrag](https://github.com/stelfrag))
 - Fix MSSQL Charts [\#20774](https://github.com/netdata/netdata/pull/20774) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -440,14 +447,6 @@
 - fix obsolete chart cleanup to properly handle vnodes [\#20254](https://github.com/netdata/netdata/pull/20254) ([ilyam8](https://github.com/ilyam8))
 - docs: fix license link and remove GH alerts syntax from FAQ [\#20252](https://github.com/netdata/netdata/pull/20252) ([ilyam8](https://github.com/ilyam8))
 - Update Netdata README [\#20251](https://github.com/netdata/netdata/pull/20251) ([kanelatechnical](https://github.com/kanelatechnical))
-- Switch to uv threads [\#20250](https://github.com/netdata/netdata/pull/20250) ([stelfrag](https://github.com/stelfrag))
-- fix\(go.d/snmp\): use 32bit counters if 64 aren't available [\#20249](https://github.com/netdata/netdata/pull/20249) ([ilyam8](https://github.com/ilyam8))
-- fix\(go.d/snmp\): use ifDescr for interface name if ifName is empty [\#20248](https://github.com/netdata/netdata/pull/20248) ([ilyam8](https://github.com/ilyam8))
-- fix\(go.d/sd/snmp\): fix snmpv3 credentials [\#20247](https://github.com/netdata/netdata/pull/20247) ([ilyam8](https://github.com/ilyam8))
-- SNMP first cisco yaml file pass [\#20246](https://github.com/netdata/netdata/pull/20246) ([Ancairon](https://github.com/Ancairon))
-- IIS W3SCV W3MP Metrics \(windows.plugin\) [\#20245](https://github.com/netdata/netdata/pull/20245) ([thiagoftsm](https://github.com/thiagoftsm))
-- Model Context Protocol Server \(MCP\) for Netdata Part 1 [\#20244](https://github.com/netdata/netdata/pull/20244) ([ktsaou](https://github.com/ktsaou))
-- Fix build issue on old distros [\#20243](https://github.com/netdata/netdata/pull/20243) ([stelfrag](https://github.com/stelfrag))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 

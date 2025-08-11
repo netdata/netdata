@@ -154,6 +154,18 @@ func (p *Profile) mergeMetrics(base *Profile) {
 			}
 		}
 	}
+
+	seenVmetrics := make(map[string]bool)
+
+	for _, m := range p.Definition.VirtualMetrics {
+		seenVmetrics[m.Name] = true
+	}
+	for _, bm := range base.Definition.VirtualMetrics {
+		if !seenVmetrics[bm.Name] {
+			p.Definition.VirtualMetrics = append(p.Definition.VirtualMetrics, bm)
+			seenVmetrics[bm.Name] = true
+		}
+	}
 }
 
 func (p *Profile) mergeMetadata(base *Profile) {
@@ -286,20 +298,34 @@ func deduplicateMetricsAcrossProfiles(profiles []*Profile) {
 	copy(profiles, sortedProfiles)
 
 	seenMetrics := make(map[string]bool)
+	seenVmetrics := make(map[string]bool)
 
 	for _, prof := range profiles {
 		if prof.Definition == nil {
 			continue
 		}
 
-		prof.Definition.Metrics = slices.DeleteFunc(prof.Definition.Metrics, func(metric ddprofiledefinition.MetricsConfig) bool {
-			key := generateMetricKey(metric)
-			if seenMetrics[key] {
-				return true
-			}
-			seenMetrics[key] = true
-			return false
-		})
+		prof.Definition.Metrics = slices.DeleteFunc(
+			prof.Definition.Metrics,
+			func(metric ddprofiledefinition.MetricsConfig) bool {
+				key := generateMetricKey(metric)
+				if seenMetrics[key] {
+					return true
+				}
+				seenMetrics[key] = true
+				return false
+			},
+		)
+		prof.Definition.VirtualMetrics = slices.DeleteFunc(
+			prof.Definition.VirtualMetrics,
+			func(vm ddprofiledefinition.VirtualMetricConfig) bool {
+				if seenVmetrics[vm.Name] {
+					return true
+				}
+				seenVmetrics[vm.Name] = true
+				return false
+			},
+		)
 	}
 }
 

@@ -12,6 +12,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 )
 
 type metricBuilder struct {
@@ -41,8 +42,9 @@ func (mb *metricBuilder) withStaticTags(tags map[string]string) *metricBuilder {
 	return mb
 }
 
-func (mb *metricBuilder) asTableMetric() *metricBuilder {
+func (mb *metricBuilder) asTableMetric(table string) *metricBuilder {
 	mb.metric.IsTable = true
+	mb.metric.Table = table
 	return mb
 }
 
@@ -51,7 +53,7 @@ func (mb *metricBuilder) fromSymbol(sym ddprofiledefinition.SymbolConfig, pdu go
 	mb.metric.Description = sym.ChartMeta.Description
 	mb.metric.Family = sym.ChartMeta.Family
 	mb.metric.MetricType = ternary(sym.MetricType != "", sym.MetricType, getMetricTypeFromPDUType(pdu))
-	mb.metric.Mappings = convMappingToNumeric(sym)
+	mb.metric.MultiValue = buildMultiValue(mb.metric.Value, sym.Mapping)
 	return mb
 }
 
@@ -74,12 +76,12 @@ func buildScalarMetric(cfg ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU,
 	return &metric, nil
 }
 
-func buildTableMetric(cfg ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU, value int64, tags, staticTags map[string]string) (*ddsnmp.Metric, error) {
+func buildTableMetric(cfg ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU, value int64, tags, staticTags map[string]string, tableName string) (*ddsnmp.Metric, error) {
 	metric := newMetricBuilder(cfg.Name, value).
 		withTags(tags).
 		withStaticTags(staticTags).
 		fromSymbol(cfg, pdu).
-		asTableMetric().
+		asTableMetric(tableName).
 		build()
 
 	if cfg.TransformCompiled != nil {
@@ -91,13 +93,25 @@ func buildTableMetric(cfg ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU, 
 	return &metric, nil
 }
 
-func convMappingToNumeric(cfg ddprofiledefinition.SymbolConfig) map[int64]string {
-	if len(cfg.Mapping) == 0 {
+func buildMultiValue(value int64, mappings map[string]string) map[string]int64 {
+	if len(mappings) == 0 {
+		return nil
+	}
+
+	// Check if this is an int→int mapping (value transformation)
+	if isIntToIntMapping := func() bool {
+		for k, v := range mappings {
+			if !isInt(k) || !isInt(v) {
+				return false
+			}
+		}
+		return true
+	}(); isIntToIntMapping {
 		return nil
 	}
 
 	isMappingKeysNumeric := func() bool {
-		for k := range cfg.Mapping {
+		for k := range mappings {
 			if !isInt(k) {
 				return false
 			}
@@ -105,22 +119,33 @@ func convMappingToNumeric(cfg ddprofiledefinition.SymbolConfig) map[int64]string
 		return true
 	}()
 
-	mappings := make(map[int64]string)
+	multiValue := make(map[string]int64)
 
 	if isMappingKeysNumeric {
-		for k, v := range cfg.Mapping {
+		// int→string mapping (e.g., 1→"up", 2→"down")
+		for k, v := range mappings {
 			intKey, _ := strconv.ParseInt(k, 10, 64)
-			mappings[intKey] = v
+			// Only set the value if:
+			// 1. We haven't seen this state name before (!ok), OR
+			// 2. The current value matches this key (value == intKey)
+			// This ensures that if multiple keys map to the same state name,
+			// we preserve the "1" (active) value if any key matches
+			if _, ok := multiValue[v]; !ok || value == intKey {
+				multiValue[v] = metrix.Bool(value == intKey)
+			}
 		}
 	} else {
-		for k, v := range cfg.Mapping {
+		// string→int mapping (e.g., "OK"→"0", "WARNING"→"1", "CRITICAL"→"2")
+		// value has already been converted from string to int by the value processor
+		// We need to find which original string maps to our current value
+		for k, v := range mappings {
 			if intVal, err := strconv.ParseInt(v, 10, 64); err == nil {
-				mappings[intVal] = k
+				multiValue[k] = metrix.Bool(value == intVal)
 			}
 		}
 	}
 
-	return mappings
+	return multiValue
 }
 
 func applyTransform(metric *ddsnmp.Metric, sym ddprofiledefinition.SymbolConfig) error {

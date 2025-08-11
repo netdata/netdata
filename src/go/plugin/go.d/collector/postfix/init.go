@@ -33,11 +33,12 @@ func (c *Collector) initPostqueueExec() (postqueueBinary, error) {
 		return nil, err
 	}
 
-	if err := pathvalidate.ValidateBinaryPath(binPath); err != nil {
+	validatedPath, err := pathvalidate.ValidateBinaryPath(binPath)
+	if err != nil {
 		return nil, err
 	}
 
-	pq := newPostqueueExec(binPath, c.Timeout.Duration())
+	pq := newPostqueueExec(validatedPath, c.Timeout.Duration())
 	pq.Logger = c.Logger
 
 	return pq, nil
