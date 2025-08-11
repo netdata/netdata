@@ -65,7 +65,7 @@ static void build_node_info(RRDHOST *host)
     now_realtime_timeval(&node_info.updated_at);
 
     char *host_version = NULL;
-    if (host != localhost)
+    if (host != localhost && !rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST))
         host_version = stream_receiver_program_version_strdupz(host);
 
     node_info.data.name = rrdhost_hostname(host);
