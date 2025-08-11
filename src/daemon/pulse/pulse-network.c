@@ -93,10 +93,10 @@ static inline size_t aclk_time_histogram_slot(struct aclk_time_histogram *h, use
 }
 
 // Per-iteration PUBACK latency accumulators (microseconds)
-static _Atomic uint64_t aclk_ack_count = 0;
-static _Atomic uint64_t aclk_ack_sum_us = 0;
-static _Atomic uint64_t aclk_ack_min_us = UINT64_MAX;
-static _Atomic uint64_t aclk_ack_max_us = 0;
+static uint64_t aclk_ack_count = 0;
+static uint64_t aclk_ack_sum_us = 0;
+static uint64_t aclk_ack_min_us = UINT64_MAX;
+static uint64_t aclk_ack_max_us = 0;
 
 void pulse_aclk_sent_message_acked(usec_t publish_latency, size_t len __maybe_unused) {
     if(!publish_latency) return;
