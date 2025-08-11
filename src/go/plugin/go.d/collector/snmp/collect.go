@@ -34,7 +34,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 		}
 
 		if c.ddSnmpColl == nil {
-			c.ddSnmpColl = ddsnmpcollector.New(c.snmpClient, c.snmpProfiles, c.Logger)
+			c.ddSnmpColl = ddsnmpcollector.New(c.snmpClient, c.snmpProfiles, c.Logger, si.SysObjectID)
 			c.ddSnmpColl.DoTableMetrics = c.EnableProfilesTableMetrics
 		}
 
