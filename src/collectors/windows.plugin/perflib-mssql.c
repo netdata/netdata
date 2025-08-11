@@ -178,6 +178,7 @@ struct mssql_db_instance {
     RRDSET *st_db_write_transactions;
     RRDSET *st_db_lockwait;
     RRDSET *st_db_deadlock;
+    RRDSET *st_db_readonly;
     RRDSET *st_lock_timeouts;
     RRDSET *st_lock_requests;
     RRDSET *st_buff_page_iops;
@@ -199,6 +200,7 @@ struct mssql_db_instance {
     RRDDIM *rd_db_write_transactions;
     RRDDIM *rd_db_lockwait;
     RRDDIM *rd_db_deadlock;
+    RRDDIM *rd_db_readonly;
     RRDDIM *rd_lock_timeouts;
     RRDDIM *rd_lock_requests;
     RRDDIM *rd_buff_page_reads;
@@ -2431,6 +2433,38 @@ static void mssql_deadlock_chart(struct mssql_db_instance *mdi, const char *db, 
     rrdset_done(mdi->st_db_deadlock);
 }
 
+static void mssql_is_readonly_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
+{
+    if (!mdi->st_db_readonly) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_readonly", db, mdi->parent->instanceID);
+        netdata_fix_chart_name(id);
+        mdi->st_db_readonly = rrdset_create_localhost(
+                "mssql",
+                id,
+                NULL,
+                "locks",
+                "mssql.database_readonly",
+                "Current database write status.",
+                "boolean",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibMSSQL",
+                PRIO_MSSQL_DATABASE_DEADLOCKS_PER_SECOND,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        rrdlabels_add(mdi->st_db_readonly->rrdlabels, "mssql_instance", mdi->parent->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mdi->st_db_readonly->rrdlabels, "database", db, RRDLABEL_SRC_AUTO);
+
+        mdi->rd_db_readonly = rrddim_add(mdi->st_db_readonly, "readonly", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+            mdi->st_db_readonly, mdi->rd_db_readonly, (collected_number)mdi->MSSQLDBIsReadonly.current.Data);
+
+    rrdset_done(mdi->st_db_readonly);
+}
+
 static void mssql_lock_request_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -2580,17 +2614,18 @@ int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, v
     int *update_every = data;
 
     void (*transaction_chart[])(struct mssql_db_instance *, const char *, int) = {
-        mssql_data_file_size_chart,
-        mssql_transactions_chart,
-        mssql_database_backup_restore_chart,
-        mssql_database_log_flushed_chart,
-        mssql_database_log_flushes_chart,
-        mssql_active_transactions_chart,
-        mssql_write_transactions_chart,
-        mssql_lockwait_chart,
-        mssql_deadlock_chart,
-        mssql_lock_timeout_chart,
-        mssql_lock_request_chart,
+            mssql_data_file_size_chart,
+            mssql_transactions_chart,
+            mssql_database_backup_restore_chart,
+            mssql_database_log_flushed_chart,
+            mssql_database_log_flushes_chart,
+            mssql_active_transactions_chart,
+            mssql_write_transactions_chart,
+            mssql_lockwait_chart,
+            mssql_deadlock_chart,
+            mssql_is_readonly_chart,
+            mssql_lock_timeout_chart,
+            mssql_lock_request_chart,
 
         // Last function pointer must be NULL
         NULL};
