@@ -7,9 +7,8 @@
 
 import datetime
 import json
-import urllib.request
-
 import sys
+import urllib.request
 
 URL_BASE = 'https://endoflife.date/api'
 NOW = datetime.date.today()
