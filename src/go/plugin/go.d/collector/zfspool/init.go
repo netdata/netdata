@@ -35,11 +35,12 @@ func (c *Collector) initZPoolCLIExec() (zpoolCli, error) {
 		return nil, err
 	}
 
-	if err := pathvalidate.ValidateBinaryPath(binPath); err != nil {
+	validatedPath, err := pathvalidate.ValidateBinaryPath(binPath)
+	if err != nil {
 		return nil, err
 	}
 
-	zpoolExec := newZpoolCLIExec(binPath, c.Timeout.Duration())
+	zpoolExec := newZpoolCLIExec(validatedPath, c.Timeout.Duration())
 	zpoolExec.Logger = c.Logger
 
 	return zpoolExec, nil
