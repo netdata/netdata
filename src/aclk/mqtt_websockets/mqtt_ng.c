@@ -41,6 +41,8 @@ struct buffer_fragment {
     uint16_t packet_id;
     void (*free_fnc)(void *ptr);
     unsigned char *data;
+    // timestamp (monotonic usec) of when this MQTT packet was enqueued into the transaction buffer (set on HEAD)
+    usec_t enqueued_monotonic_ut;
     usec_t sent_monotonic_ut;
     struct buffer_fragment *next;
 };
@@ -1151,6 +1153,9 @@ int mqtt_ng_generate_publish(struct transaction_buffer *trx_buf,
     if (!qos)
         trx_buf->hdr_buffer.tail_frag->flags |= BUFFER_FRAG_GARBAGE_COLLECT_ON_SEND;
     transaction_buffer_transaction_commit(trx_buf)
+    // mark enqueue time on the HEAD fragment (after commit) so we measure from commit time
+    if (mqtt_msg)
+        mqtt_msg->enqueued_monotonic_ut = now_monotonic_usec();
     return MQTT_NG_MSGGEN_OK;
 fail_rollback:
     transaction_buffer_transaction_rollback(trx_buf, mqtt_msg);
@@ -2262,20 +2267,73 @@ void mqtt_ng_get_stats(struct mqtt_ng_client *client, struct mqtt_ng_stats *stat
 
     stats->tx_bytes_queued = 0;
     stats->tx_buffer_reclaimable = 0;
+    stats->max_puback_wait_us = 0;
+    stats->max_send_queue_wait_us = 0;
+    stats->max_unsent_wait_us = 0;
+    stats->max_partial_wait_us = 0;
 
+    // First pass: compute buffer usage/queued bytes and max send-queue wait time (unsent messages)
     LOCK_HDR_BUFFER(&client->main_buffer);
     stats->tx_buffer_used = BUFFER_BYTES_USED(&client->main_buffer.hdr_buffer);
     stats->tx_buffer_free = BUFFER_BYTES_AVAILABLE(&client->main_buffer.hdr_buffer);
     stats->tx_buffer_size = client->main_buffer.hdr_buffer.size;
     struct buffer_fragment *frag = BUFFER_FIRST_FRAG(&client->main_buffer.hdr_buffer);
+    usec_t now_ut = now_monotonic_usec();
     while (frag) {
         stats->tx_bytes_queued += frag->len - frag->sent;
         if (frag_is_marked_for_gc(frag))
             stats->tx_buffer_reclaimable += FRAG_SIZE_IN_BUFFER(frag);
 
+        // For HEAD fragments that are not fully sent yet (unsent or partially sent),
+        // track max send-queue wait time. Prefer the enqueue timestamp; if missing, fall back to first-send.
+        if ((frag->flags & BUFFER_FRAG_MQTT_PACKET_HEAD) && frag->sent < frag->len) {
+            usec_t base = frag->enqueued_monotonic_ut ? frag->enqueued_monotonic_ut : frag->sent_monotonic_ut;
+            if (base) {
+                usec_t waited = now_ut - base;
+                uint64_t w = (uint64_t)waited;
+                if (frag->sent == 0) {
+                    if (w > stats->max_unsent_wait_us) stats->max_unsent_wait_us = w;
+                } else {
+                    if (w > stats->max_partial_wait_us) stats->max_partial_wait_us = w;
+                }
+                if (w > stats->max_send_queue_wait_us) stats->max_send_queue_wait_us = w;
+            } else {
+                // Throttled debug if enqueue time is missing on an unsent HEAD
+                if (frag->sent == 0) {
+                    static time_t last_warn = 0;
+                    time_t now_s = now_monotonic_sec();
+                    if (now_s - last_warn > 60) {
+                        nd_log(NDLS_DAEMON, NDLP_DEBUG, "ACLK: Missing enqueue timestamp on unsent MQTT packet head");
+                        last_warn = now_s;
+                    }
+                }
+            }
+        }
+
         frag = frag->next;
     }
     UNLOCK_HDR_BUFFER(&client->main_buffer);
+
+    // Second pass: compute max PUBACK wait time by correlating HEAD fragments with pending packet IDs
+    spinlock_lock(&client->pending_packets.spinlock);
+    LOCK_HDR_BUFFER(&client->main_buffer);
+    frag = BUFFER_FIRST_FRAG(&client->main_buffer.hdr_buffer);
+    while (frag) {
+        if ((frag->flags & BUFFER_FRAG_MQTT_PACKET_HEAD) && frag->packet_id) {
+            Pvoid_t *Pvalue = JudyLGet(client->pending_packets.JudyL, (Word_t)frag->packet_id, PJE0);
+            if (Pvalue) {
+                // message is still pending PUBACK
+                if (frag->sent_monotonic_ut) {
+                    usec_t waited = now_ut - frag->sent_monotonic_ut;
+                    if ((uint64_t)waited > stats->max_puback_wait_us)
+                        stats->max_puback_wait_us = (uint64_t)waited;
+                }
+            }
+        }
+        frag = frag->next;
+    }
+    UNLOCK_HDR_BUFFER(&client->main_buffer);
+    spinlock_unlock(&client->pending_packets.spinlock);
 }
 
 int mqtt_ng_set_topic_alias(struct mqtt_ng_client *client, const char *topic)
