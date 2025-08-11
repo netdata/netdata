@@ -28,13 +28,22 @@ use std::ops::{Deref, DerefMut};
 /// their underlying memory might have been repurposed.
 #[derive(Debug)]
 pub struct ValueGuard<'a, T> {
+    offset: NonZeroU64,
     value: T,
     in_use_flag: &'a RefCell<bool>,
 }
 
 impl<'a, T> ValueGuard<'a, T> {
-    pub fn new(value: T, in_use_flag: &'a RefCell<bool>) -> Self {
-        Self { value, in_use_flag }
+    pub fn new(offset: NonZeroU64, value: T, in_use_flag: &'a RefCell<bool>) -> Self {
+        Self {
+            offset,
+            value,
+            in_use_flag,
+        }
+    }
+
+    pub fn offset(&self) -> NonZeroU64 {
+        self.offset
     }
 }
 
@@ -55,5 +64,36 @@ impl<T> DerefMut for ValueGuard<'_, T> {
 impl<T> Drop for ValueGuard<'_, T> {
     fn drop(&mut self) {
         *self.in_use_flag.borrow_mut() = false;
+    }
+}
+
+use crate::{HashableObject, HashableObjectMut};
+use std::num::NonZeroU64;
+
+impl<T: HashableObject> HashableObject for ValueGuard<'_, T> {
+    fn hash(&self) -> u64 {
+        self.value.hash()
+    }
+
+    fn get_payload(&self) -> &[u8] {
+        self.value.get_payload()
+    }
+
+    fn next_hash_offset(&self) -> Option<NonZeroU64> {
+        self.value.next_hash_offset()
+    }
+
+    fn object_type() -> crate::ObjectType {
+        T::object_type()
+    }
+}
+
+impl<T: HashableObjectMut> HashableObjectMut for ValueGuard<'_, T> {
+    fn set_next_hash_offset(&mut self, offset: NonZeroU64) {
+        self.value.set_next_hash_offset(offset);
+    }
+
+    fn set_payload(&mut self, data: &[u8]) {
+        self.value.set_payload(data);
     }
 }

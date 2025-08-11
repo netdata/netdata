@@ -1,0 +1,31 @@
+[package]
+name = "otel-plugin"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+tokio = { workspace = true }
+prost = { workspace = true }
+tonic = { workspace = true, features = ["gzip", "tls-ring"] }
+opentelemetry-proto = { workspace = true, features = ["metrics", "logs"] }
+
+flatten_otel = { path = "../flatten_otel" }
+journal_file = { path = "../journal_file" }
+journal_log = { path = "../journal_log" }
+memmap2 = { workspace = true }
+serde_json = { workspace = true, features = ["preserve_order"] }
+uuid = { version = "1.0", features = ["v4", "rng"] }
+flatten-serde-json = { git = "https://github.com/meilisearch/meilisearch", branch = "main", package = "flatten-serde-json" }
+base64 = "0.21"
+regex = { workspace = true }
+serde_yaml = "0.9.34"
+serde_regex = "1.1.0"
+serde = { version = "1.0.219", features = ["derive"] }
+atty = { workspace = true }
+clap = { workspace = true }
+anyhow = { workspace = true }
+humantime-serde = { workspace = true }
+humantime = { workspace = true }
+bytesize = { workspace = true }
+bytesize-serde = { workspace = true }

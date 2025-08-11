@@ -39,6 +39,7 @@ add_cmake_option ENABLE_PLUGIN_PYTHON On
 add_cmake_option ENABLE_PLUGIN_CHARTS On
 add_cmake_option ENABLE_PLUGIN_LOCAL_LISTENERS On
 add_cmake_option ENABLE_PLUGIN_NFACCT On
+add_cmake_option ENABLE_PLUGIN_OTEL On
 add_cmake_option ENABLE_PLUGIN_PERF On
 add_cmake_option ENABLE_PLUGIN_SLABINFO On
 add_cmake_option ENABLE_PLUGIN_SYSTEMD_JOURNAL On

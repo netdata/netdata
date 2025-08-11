@@ -1068,9 +1068,30 @@ static ALWAYS_INLINE PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size
     return PARSER_RC_OK;
 }
 
+static inline PARSER_RC pluginsd_trust_durations(char **words, size_t num_words, PARSER *parser) {
+    char *value = get_word(words, num_words, 1);
+
+    if (!value || !*value)
+        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_TRUST_DURATIONS, "missing parameter");
+
+    int trusted = str2i(value);
+    if (trusted != 0 && trusted != 1)
+        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_TRUST_DURATIONS, "parameter must be 0 or 1");
+
+    parser->user.trust_durations = trusted;
+
+    netdata_log_debug(D_PLUGINSD, "PLUGINSD: trust durations set to %d", trusted);
+
+    return PARSER_RC_OK;
+}
+
 static inline PARSER_RC pluginsd_exit(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser __maybe_unused) {
     netdata_log_info("PLUGINSD: plugin called EXIT.");
     return PARSER_RC_STOP;
+}
+
+static inline PARSER_RC pluginsd_plugin_keepalive(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser __maybe_unused) {
+    return PARSER_RC_OK;
 }
 
 static void pluginsd_json_stream_paths(PARSER *parser, void *action_data __maybe_unused) {
@@ -1322,6 +1343,10 @@ ALWAYS_INLINE PARSER_RC parser_execute(PARSER *parser, const PARSER_KEYWORD *key
             return pluginsd_exit(words, num_words, parser);
         case PLUGINSD_KEYWORD_ID_CONFIG:
             return pluginsd_config(words, num_words, parser);
+        case PLUGINSD_KEYWORD_ID_TRUST_DURATIONS:
+            return pluginsd_trust_durations(words, num_words, parser);
+        case PLUGINSD_KEYWORD_ID_PLUGIN_KEEPALIVE:
+            return pluginsd_plugin_keepalive(words, num_words, parser);
 
         case PLUGINSD_KEYWORD_ID_DYNCFG_ENABLE:
         case PLUGINSD_KEYWORD_ID_DYNCFG_REGISTER_MODULE:
