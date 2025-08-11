@@ -4,6 +4,7 @@
 #define MQTT_WEBSOCKETS_COMMON_PUBLIC_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 /* free_fnc_t in general (in whatever function or struct it is used)
  * decides how the related data will be handled.
@@ -31,6 +32,13 @@ struct mqtt_ng_stats {
     size_t tx_buffer_size;
     // part of transaction buffer that containes mesages we can free alredy during the garbage colleciton step
     size_t tx_buffer_reclaimable;
+    // maximum time (in microseconds) a QoS1 message is currently waiting for PUBACK
+    uint64_t max_puback_wait_us;
+    // maximum time (in microseconds) a message has been waiting in the send queue without starting transmission
+    uint64_t max_send_queue_wait_us;
+    // split of send-queue wait into unsent and partial (diagnostics)
+    uint64_t max_unsent_wait_us;
+    uint64_t max_partial_wait_us;
 };
 
 #endif /* MQTT_WEBSOCKETS_COMMON_PUBLIC_H */
