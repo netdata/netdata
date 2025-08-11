@@ -330,6 +330,27 @@ set(CPACK_DEBIAN_PLUGIN-NETWORK-VIEWER_PACKAGE_CONTROL_EXTRA
 set(CPACK_DEBIAN_PLUGIN-NETWORK-VIEWER_DEBUGINFO_PACKAGE On)
 
 #
+# nom.plugin
+#
+
+set(CPACK_COMPONENT_PLUGIN-NOM_DEPENDS "netdata")
+set(CPACK_COMPONENT_PLUGIN-NOM_DESCRIPTION
+		"The OpenTelemetry metrics collection plugin for the Netdata Agent
+ This plugin allows the Netdata Agent to collect metrics via OpenTelemetry
+ gRPC protocol, providing integration with modern observability stacks.")
+
+set(CPACK_DEBIAN_PLUGIN-NOM_PACKAGE_NAME "netdata-plugin-nom")
+set(CPACK_DEBIAN_PLUGIN-NOM_PACKAGE_SECTION "net")
+set(CPACK_DEBIAN_PLUGIN-NOM_PACKAGE_CONFLICTS "netdata (<< 1.40)")
+set(CPACK_DEBIAN_PLUGIN-NOM_PACKAGE_PREDEPENDS "adduser")
+
+set(CPACK_DEBIAN_PLUGIN-NOM_PACKAGE_CONTROL_EXTRA
+	  "${PKG_FILES_PATH}/deb/plugin-nom/preinst;"
+	  "${PKG_FILES_PATH}/deb/plugin-nom/postinst")
+
+set(CPACK_DEBIAN_PLUGIN-NOM_DEBUGINFO_PACKAGE Off)
+
+#
 # nfacct.plugin
 #
 
@@ -529,6 +550,9 @@ if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
 endif()
 if(ENABLE_PLUGIN_XENSTAT)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-xenstat")
+endif()
+if(ENABLE_PLUGIN_NOM)
+        list(APPEND CPACK_COMPONENTS_ALL "plugin-nom")
 endif()
 
 include(CPack)
