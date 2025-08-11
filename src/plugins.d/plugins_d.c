@@ -120,7 +120,7 @@ static void pluginsd_worker_thread_handle_error(struct plugind *cd, int worker_r
 #undef SERIAL_FAILURES_THRESHOLD
 
 
-static void *pluginsd_worker_thread(void *arg) {
+static void pluginsd_worker_thread(void *arg) {
     struct plugind *cd = (struct plugind *) arg;
 
     worker_register("PLUGINSD");
@@ -196,7 +196,6 @@ static void *pluginsd_worker_thread(void *arg) {
         spawn_popen_kill(pi, 3 * MSEC_PER_SEC);
 
     worker_unregister();
-    return NULL;
 }
 
 static void pluginsd_main_cleanup(void *pptr) {

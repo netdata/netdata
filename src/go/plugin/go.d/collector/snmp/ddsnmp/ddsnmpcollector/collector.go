@@ -37,6 +37,7 @@ func New(snmpClient gosnmp.Handler, profiles []*ddsnmp.Profile, log *logger.Logg
 	coll.deviceMetadataCollector = newDeviceMetadataCollector(snmpClient, coll.missingOIDs, coll.log)
 	coll.scalarCollector = newScalarCollector(snmpClient, coll.missingOIDs, coll.log)
 	coll.tableCollector = newTableCollector(snmpClient, coll.missingOIDs, coll.tableCache, coll.log)
+	coll.vmetricsCollector = newVirtualMetricsCollector(coll.log)
 
 	return coll
 }
@@ -53,6 +54,7 @@ type (
 		deviceMetadataCollector *deviceMetadataCollector
 		scalarCollector         *scalarCollector
 		tableCollector          *tableCollector
+		vmetricsCollector       *vmetricsCollector
 
 		DoTableMetrics bool
 	}
@@ -64,6 +66,20 @@ type (
 	}
 )
 
+func (c *Collector) CollectDeviceMetadata() (map[string]map[string]string, error) {
+	meta := make(map[string]map[string]string)
+
+	for _, prof := range c.profiles {
+		dm, err := c.deviceMetadataCollector.Collect(prof.profile)
+		if err != nil {
+			return nil, err
+		}
+		meta[prof.profile.SourceFile] = dm
+	}
+
+	return meta, nil
+}
+
 func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 	var metrics []*ddsnmp.ProfileMetrics
 	var errs []error
@@ -73,10 +89,21 @@ func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 	}
 
 	for _, prof := range c.profiles {
-		if ms, err := c.collectProfile(prof); err != nil {
+		pm, err := c.collectProfile(prof)
+		if err != nil {
 			errs = append(errs, err)
-		} else if ms != nil {
-			metrics = append(metrics, ms)
+			continue
+		}
+
+		c.updateProfileMetrics(pm)
+
+		metrics = append(metrics, pm)
+
+		if vmetrics := c.vmetricsCollector.Collect(prof.profile.Definition, pm.Metrics); len(vmetrics) > 0 {
+			for i := range vmetrics {
+				vmetrics[i].Profile = pm
+			}
+			pm.Metrics = append(pm.Metrics, vmetrics...)
 		}
 	}
 
@@ -86,8 +113,6 @@ func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 	if len(errs) > 0 {
 		c.log.Debugf("collecting metrics: %v", errors.Join(errs...))
 	}
-
-	c.updateMetrics(metrics)
 
 	return metrics, nil
 }
@@ -138,22 +163,20 @@ func (c *Collector) collectProfile(ps *profileState) (*ddsnmp.ProfileMetrics, er
 	return pm, nil
 }
 
-func (c *Collector) updateMetrics(pms []*ddsnmp.ProfileMetrics) {
-	for _, pm := range pms {
-		for i := range pm.Metrics {
-			m := &pm.Metrics[i]
-			m.Description = metricMetaReplacer.Replace(m.Description)
-			m.Family = metricMetaReplacer.Replace(m.Family)
-			m.Unit = metricMetaReplacer.Replace(m.Unit)
-			for k, v := range m.Tags {
-				// Remove tags prefixed with "rm:", which are intended for temporary use during transforms
-				// and should not appear in the final exported metric.
-				if strings.HasPrefix(k, "rm:") {
-					delete(m.Tags, k)
-					continue
-				}
-				m.Tags[k] = metricMetaReplacer.Replace(v)
+func (c *Collector) updateProfileMetrics(pm *ddsnmp.ProfileMetrics) {
+	for i := range pm.Metrics {
+		m := &pm.Metrics[i]
+		m.Description = metricMetaReplacer.Replace(m.Description)
+		m.Family = metricMetaReplacer.Replace(m.Family)
+		m.Unit = metricMetaReplacer.Replace(m.Unit)
+		for k, v := range m.Tags {
+			// Remove tags prefixed with "rm:", which are intended for temporary use during transforms
+			// and should not appear in the final exported metric.
+			if strings.HasPrefix(k, "rm:") {
+				delete(m.Tags, k)
+				continue
 			}
+			m.Tags[k] = metricMetaReplacer.Replace(v)
 		}
 	}
 }
@@ -177,26 +200,6 @@ func (c *Collector) snmpGet(oids []string) (map[string]gosnmp.SnmpPDU, error) {
 	}
 
 	return pdus, nil
-}
-
-func processMetricFamily(family, devType, vendor string) string {
-	prefix := strings.TrimPrefix(devType+"/"+vendor, "/")
-	if prefix == "" {
-		return family
-	}
-	if family == "" {
-		return prefix
-	}
-
-	parts := strings.Split(family, "/")
-	parts = slices.DeleteFunc(parts, func(s string) bool {
-		return strings.EqualFold(s, devType) ||
-			strings.EqualFold(s, devType+"s") ||
-			strings.EqualFold(s, devType+"es") ||
-			strings.EqualFold(s, vendor)
-	})
-
-	return strings.TrimSuffix(prefix+"/"+strings.Join(parts, "/"), "/")
 }
 
 var metricMetaReplacer = strings.NewReplacer(

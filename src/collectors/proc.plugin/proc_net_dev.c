@@ -379,7 +379,15 @@ static void netdev_free(struct netdev *d) {
     freez((void *)d);
 }
 
-static netdata_mutex_t netdev_mutex = NETDATA_MUTEX_INITIALIZER;
+static netdata_mutex_t netdev_mutex;
+
+static void __attribute__((constructor)) init_mutex(void) {
+    netdata_mutex_init(&netdev_mutex);
+}
+
+static void __attribute__((destructor)) destroy_mutex(void) {
+    netdata_mutex_destroy(&netdev_mutex);
+}
 
 // ----------------------------------------------------------------------------
 
@@ -1703,7 +1711,7 @@ static void netdev_main_cleanup(void *pptr) {
     worker_unregister();
 }
 
-void *netdev_main(void *ptr_is_null __maybe_unused)
+void netdev_main(void *ptr_is_null __maybe_unused)
 {
     CLEANUP_FUNCTION_REGISTER(netdev_main_cleanup) cleanup_ptr = (void *)0x01;
 
@@ -1738,6 +1746,4 @@ void *netdev_main(void *ptr_is_null __maybe_unused)
             break;
         netdata_mutex_unlock(&netdev_mutex);
     }
-
-    return NULL;
 }

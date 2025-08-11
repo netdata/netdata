@@ -9,7 +9,11 @@ metadata:
   device:
     fields:
       type:
-        value: "switch"
+        value: "Switch"
+
+#  - DLINKSW-ENTITY-EXT-MIB
+#   https://mibbrowser.online/mibdb_search.php?mib=DLINKSW-ENTITY-EXT-MIB
+#   https://github.com/librenms/librenms/blob/master/mibs/dlink/DLINKSW-ENTITY-EXT-MIB
 
 metrics:
   - MIB: DLINKSW-ENTITY-EXT-MIB
@@ -18,22 +22,21 @@ metrics:
       OID: 1.3.6.1.4.1.171.14.5.1.7
     symbols:
       - name: cpu.usage
-        OID: 1.3.6.1.4.1.171.14.5.1.7.1.3 # dEntityExtCpuUtilOneMinute
-        description: Overall CPU busy percentage in the last 1 minute period
-        unit: "%"
+        OID: 1.3.6.1.4.1.171.14.5.1.7.1.3 # dEntityExtCpuUtilFiveSeconds
+        chart_meta:
+          description: The current CPU utilization
+          family: 'System/CPU/Usage'
+          unit: "%"
     metric_tags:
-      - symbol:
+      - tag: dlink_entity_ext_cpu_util_unit_id
+        symbol:
           OID: 1.3.6.1.4.1.171.14.5.1.7.1.1
           name: dEntityExtCpuUtilUnitId
-        tag: dlink_entity_ext_cpu_util_unit_id
-      - symbol:
+      - tag: dlink_entity_ext_cpu_util_cpu_id
+        symbol:
           OID: 1.3.6.1.4.1.171.14.5.1.7.1.2
           name: dEntityExtCpuUtilCpuID
-        tag: cpu
-      - symbol:
-          OID: 1.3.6.1.4.1.171.14.5.1.7.1.2
-          name: dEntityExtCpuUtilCpuID
-        tag: dlink_entity_ext_cpu_util_cpu_id # duplicated for readability
+
   - MIB: DLINKSW-ENTITY-EXT-MIB
     table:
       name: dEntityExtMemoryUtilTable
@@ -41,26 +44,30 @@ metrics:
     symbols:
       - name: memory.total
         OID: 1.3.6.1.4.1.171.14.5.1.4.1.3
-        description: Total memory size of the entry
-        unit: "By"
+        chart_meta:
+          description: Total memory size of the entry
+          family: 'System/Memory/Total'
+          unit: "By"
       - name: memory.used
         OID: 1.3.6.1.4.1.171.14.5.1.4.1.4
-        description: Used memory size of the entry
-        unit: "By"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+        chart_meta:
+          description: Used memory size of the entry
+          family: 'System/Memory/Used'
+          unit: "By"
     metric_tags:
-      - symbol:
+      - tag: mem
+        symbol:
           name: dEntityExtMemUtilUnitId
           OID: 1.3.6.1.4.1.171.14.5.1.4.1.1
-        tag: mem
-      - symbol:
+      - tag: d_entity_ext_mem_util_type
+        symbol:
           name: dEntityExtMemUtilType
           OID: 1.3.6.1.4.1.171.14.5.1.4.1.2
-        tag: d_entity_ext_mem_util_type
         mapping:
           1: dram
           2: flash
           3: nvram
+
   - MIB: DLINKSW-ENTITY-EXT-MIB
     table:
       name: dEntityExtEnvTempTable
@@ -68,57 +75,61 @@ metrics:
     symbols:
       - name: dlink.dEntityExtEnvTempCurrent
         OID: 1.3.6.1.4.1.171.14.5.1.1.1.1.4
-        description: Current measurement of the testpoint
-        unit: "Cel"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          name: dEntityExtEnvTempUnitId
-          OID: 1.3.6.1.4.1.171.14.5.1.1.1.1.1
-        tag: d_entity_ext_env_temp_unit_id
-      - symbol:
-          name: dEntityExtEnvTempIndex
-          OID: 1.3.6.1.4.1.171.14.5.1.1.1.1.2
-        tag: d_entity_ext_env_temp_index
-      - symbol:
-          name: dEntityExtEnvTempDescr
-          OID: 1.3.6.1.4.1.171.14.5.1.1.1.1.3
-        tag: d_entity_ext_env_temp_descr
-      - symbol:
-          OID: 1.3.6.1.4.1.171.14.5.1.1.1.1.7
-          name: dEntityExtEnvTempStatus
-        tag: d_entity_ext_env_temp_status
+        chart_meta:
+          description: Current measurement of the testpoint
+          family: 'Hardware/Sensor/Temperature/Value'
+          unit: "Cel"
+      - OID: 1.3.6.1.4.1.171.14.5.1.1.1.1.7
+        name: dEntityExtEnvTempStatus
+        chart_meta:
+          description: Current status of the testpoint
+          family: 'Hardware/Sensor/Temperature/Status'
+          unit: "{status}"
         mapping:
           1: ok
           2: abnormal
+    metric_tags:
+      - tag: d_entity_ext_env_temp_unit_id
+        symbol:
+          name: dEntityExtEnvTempUnitId
+          OID: 1.3.6.1.4.1.171.14.5.1.1.1.1.1
+      - tag: d_entity_ext_env_temp_index
+        symbol:
+          name: dEntityExtEnvTempIndex
+          OID: 1.3.6.1.4.1.171.14.5.1.1.1.1.2
+      - tag: d_entity_ext_env_temp_descr
+        symbol:
+          name: dEntityExtEnvTempDescr
+          OID: 1.3.6.1.4.1.171.14.5.1.1.1.1.3
+
   - MIB: DLINKSW-ENTITY-EXT-MIB
     table:
       name: dEntityExtEnvFanTable
       OID: 1.3.6.1.4.1.171.14.5.1.1.2
     symbols:
-      - name: dlink.dEntityExtEnvFan
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          name: dEntityExtEnvFanUnitId
-          OID: 1.3.6.1.4.1.171.14.5.1.1.2.1.1
-        tag: d_entity_ext_env_fan_unit_id
-      - symbol:
-          name: dEntityExtEnvFanIndex
-          OID: 1.3.6.1.4.1.171.14.5.1.1.2.1.2
-        tag: d_entity_ext_env_fan_index
-      - symbol:
-          name: dEntityExtEnvFanDescr
-          OID: 1.3.6.1.4.1.171.14.5.1.1.2.1.3
-        tag: d_entity_ext_env_fan_descr
-      - symbol:
-          OID: 1.3.6.1.4.1.171.14.5.1.1.2.1.4
-          name: dEntityExtEnvFanStatus
-        tag: d_entity_ext_env_fan_status
+      - OID: 1.3.6.1.4.1.171.14.5.1.1.2.1.4
+        name: dEntityExtEnvFanStatus
+        chart_meta:
+          description: Current status of the fan
+          family: 'Hardware/Fan/Status'
+          unit: "{status}"
         mapping:
           1: ok
           2: fault
+    metric_tags:
+      - tag: d_entity_ext_env_fan_unit_id
+        symbol:
+          name: dEntityExtEnvFanUnitId
+          OID: 1.3.6.1.4.1.171.14.5.1.1.2.1.1
+      - tag: d_entity_ext_env_fan_index
+        symbol:
+          name: dEntityExtEnvFanIndex
+          OID: 1.3.6.1.4.1.171.14.5.1.1.2.1.2
+      - tag: d_entity_ext_env_fan_descr
+        symbol:
+          name: dEntityExtEnvFanDescr
+          OID: 1.3.6.1.4.1.171.14.5.1.1.2.1.3
+
   - MIB: DLINKSW-ENTITY-EXT-MIB
     table:
       name: dEntityExtEnvPowerTable
@@ -126,72 +137,78 @@ metrics:
     symbols:
       - name: dlink.dEntityExtEnvPowerUsedPower
         OID: 1.3.6.1.4.1.171.14.5.1.1.3.1.4
-        description: Amount of the power that has been allocated
-        unit: "W"
+        chart_meta:
+          description: Amount of the power that has been allocated
+          family: 'Hardware/Power/Usage/Current'
+          unit: "W"
       - name: dlink.dEntityExtEnvPowerMaxPower
         OID: 1.3.6.1.4.1.171.14.5.1.1.3.1.5
-        description: Maximum power which the power module can supply
-        unit: "W"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          name: dEntityExtEnvPowerUnitId
-          OID: 1.3.6.1.4.1.171.14.5.1.1.3.1.1
-        tag: d_entity_ext_env_power_unit_id
-      - symbol:
-          name: dEntityExtEnvPowerIndex
-          OID: 1.3.6.1.4.1.171.14.5.1.1.3.1.2
-        tag: d_entity_ext_env_power_index
-      - symbol:
-          name: dEntityExtEnvPowerDescr
-          OID: 1.3.6.1.4.1.171.14.5.1.1.3.1.3
-        tag: d_entity_ext_env_power_descr
-      - symbol:
-          OID: 1.3.6.1.4.1.171.14.5.1.1.3.1.6
-          name: dEntityExtEnvPowerStatus
-        tag: d_entity_ext_env_power_status
+        chart_meta:
+          description: Maximum power which the power module can supply
+          family: 'Hardware/Power/Capacity/Maximum'
+          unit: "W"
+      - OID: 1.3.6.1.4.1.171.14.5.1.1.3.1.6
+        name: dEntityExtEnvPowerStatus
+        chart_meta:
+          description: Current status of the power
+          family: 'Hardware/Power/Status'
+          unit: "{status}"
         mapping:
           1: in_operation
           2: failed
           3: empty
+    metric_tags:
+      - tag: d_entity_ext_env_power_unit_id
+        symbol:
+          name: dEntityExtEnvPowerUnitId
+          OID: 1.3.6.1.4.1.171.14.5.1.1.3.1.1
+      - tag: d_entity_ext_env_power_index
+        symbol:
+          name: dEntityExtEnvPowerIndex
+          OID: 1.3.6.1.4.1.171.14.5.1.1.3.1.2
+      - tag: d_entity_ext_env_power_descr
+        symbol:
+          name: dEntityExtEnvPowerDescr
+          OID: 1.3.6.1.4.1.171.14.5.1.1.3.1.3
+
   - MIB: DLINKSW-ENTITY-EXT-MIB
     table:
       name: dEntityExtEnvAirFlowTable
       OID: 1.3.6.1.4.1.171.14.5.1.1.4
     symbols:
-      - name: dlink.dEntityExtEnvAirFlow
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+      - OID: 1.3.6.1.4.1.171.14.5.1.1.4.1.2
+        name: dEntityExtEnvAirFlowStatus
+        chart_meta:
+          description: Current status of the air flow
+          family: 'Hardware/Sensor/Airflow/Status'
+          unit: "{status}"
+        mapping:
+          1: ok
+          2: abnormal
     metric_tags:
       - symbol:
           name: dEntityExtEnvAirFlowUnitId
           OID: 1.3.6.1.4.1.171.14.5.1.1.4.1.1
         tag: d_entity_ext_env_air_flow_unit_id
-      - symbol:
-          OID: 1.3.6.1.4.1.171.14.5.1.1.4.1.2
-          name: dEntityExtEnvAirFlowStatus
-        tag: d_entity_ext_env_air_flow_status
-        mapping:
-          1: ok
-          2: abnormal
+
+
   - MIB: DLINKSW-ENTITY-EXT-MIB
     table:
       name: dEntityExtUnitTable
       OID: 1.3.6.1.4.1.171.14.5.1.3
     symbols:
-      - name: dlink.dEntityExtUnit
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          name: dEntityExtUnitIndex
-          OID: 1.3.6.1.4.1.171.14.5.1.3.1.1
-        tag: d_entity_ext_unit_index
-      - symbol:
-          OID: 1.3.6.1.4.1.171.14.5.1.3.1.2
-          name: dEntityExtUnitStatus
-        tag: d_entity_ext_unit_status
+      - OID: 1.3.6.1.4.1.171.14.5.1.3.1.2
+        name: dEntityExtUnitStatus
+        chart_meta:
+          description: Current status of the unit
+          family: 'Hardware/Unit/Status'
+          unit: "{status}"
         mapping:
           1: ok
           2: failed
           3: empty
+    metric_tags:
+      - tag: d_entity_ext_unit_index
+        symbol:
+          name: dEntityExtUnitIndex
+          OID: 1.3.6.1.4.1.171.14.5.1.3.1.1

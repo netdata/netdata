@@ -37,10 +37,10 @@ metrics:
   - MIB: JUNIPER-IVE-MIB
     symbol:
       OID: 1.3.6.1.4.1.12532.10.0
-      name: iveCpuUtil
+      name: cpu.usage # iveCpuUtil
       chart_meta:
-        description: The cpu utilization of the ive system
-        family: 'CPU/Usage'
+        description: The current CPU utilization
+        family: 'System/CPU/Usage'
         unit: "%"
   - MIB: JUNIPER-IVE-MIB
     symbol:
@@ -48,7 +48,7 @@ metrics:
       name: iveMemoryUtil
       chart_meta:
         description: The memory utilization of the ive system
-        family: 'Memory/Usage'
+        family: 'System/Memory/Usage'
         unit: "%"
   - MIB: JUNIPER-IVE-MIB
     symbol:
@@ -56,7 +56,7 @@ metrics:
       name: iveSwapUtil
       chart_meta:
         description: The swap utilization of the ive system
-        family: 'Memory/Swap/Usage'
+        family: 'System/Memory/Swap/Usage'
         unit: "%"
   - MIB: JUNIPER-IVE-MIB
     symbol:
@@ -64,7 +64,7 @@ metrics:
       name: logFullPercent
       chart_meta:
         description: Percentage of log file full
-        family: 'Disk/Log/Usage'
+        family: 'System/Disk/Log/Usage'
         unit: "%"
   - MIB: JUNIPER-IVE-MIB
     symbol:
@@ -72,7 +72,7 @@ metrics:
       name: diskFullPercent
       chart_meta:
         description: Percentage of disk space full
-        family: 'Disk/Usage'
+        family: 'System/Disk/Usage'
         unit: "%"
   - MIB: JUNIPER-IVE-MIB
     symbol:
@@ -80,7 +80,7 @@ metrics:
       name: iveTemperature
       chart_meta:
         description: The Temperature of MAG application blade
-        family: 'System/Temperature/Value'
+        family: 'Hardware/Temperature/Value'
         unit: "Cel"
   - MIB: JUNIPER-IVE-MIB
     symbol:
@@ -88,7 +88,7 @@ metrics:
       name: signedInWebUsers
       chart_meta:
         description: Number of signed-in web users
-        family: 'User/Active/Web'
+        family: 'Network/VPN/User/Active/Web'
         unit: "{user}"
   - MIB: JUNIPER-IVE-MIB
     symbol:
@@ -96,7 +96,7 @@ metrics:
       name: signedInMailUsers
       chart_meta:
         description: Number of signed-in mail users
-        family: 'User/Active/Mail'
+        family: 'Network/VPN/User/Active/Mail'
         unit: "{user}"
   - MIB: JUNIPER-IVE-MIB
     symbol:
@@ -104,7 +104,7 @@ metrics:
       name: iveVPNTunnels
       chart_meta:
         description: The number of concurrent pulse ipsec and nc users
-        family: 'VPN/Tunnel/Active'
+        family: 'Network/VPN/Tunnel/Active'
         unit: "{tunnel}"
   - MIB: JUNIPER-IVE-MIB
     symbol:
@@ -112,7 +112,7 @@ metrics:
       name: iveConcurrentUsers
       chart_meta:
         description: The total number of concurrent user licenses used for the ive node
-        family: 'License/User/Node/Used'
+        family: 'System/License/User/Node/Used'
         unit: "{license}"
   - MIB: JUNIPER-IVE-MIB
     symbol:
@@ -120,7 +120,7 @@ metrics:
       name: clusterConcurrentUsers
       chart_meta:
         description: The total number of concurrent user licenses used for the cluster
-        family: 'License/User/Cluster/Used'
+        family: 'System/License/User/Cluster/Used'
         unit: "{license}"
   - MIB: JUNIPER-IVE-MIB
     symbol:
@@ -128,7 +128,7 @@ metrics:
       name: iveTotalHits
       chart_meta:
         description: The total number of hits to the ive since last reboot
-        family: 'Hit/Total'
+        family: 'Network/VPN/Hit/Total'
         unit: "{hit}/s"
   - MIB: JUNIPER-IVE-MIB
     symbol:
@@ -136,7 +136,7 @@ metrics:
       name: iveFileHits
       chart_meta:
         description: The total number of file hits to the ive since last reboot
-        family: 'Hit/File'
+        family: 'Network/VPN/Hit/File'
         unit: "{hit}/s"
   - MIB: JUNIPER-IVE-MIB
     symbol:
@@ -144,7 +144,7 @@ metrics:
       name: iveWebHits
       chart_meta:
         description: The total number of hits via the web interface since the last reboot
-        family: 'Hit/Web'
+        family: 'Network/VPN/Hit/Web'
         unit: "{hit}/s"
   - MIB: JUNIPER-IVE-MIB
     symbol:
@@ -152,7 +152,7 @@ metrics:
       name: iveAppletHits
       chart_meta:
         description: The total number of applet hits to the ive since last reboot
-        family: 'Hit/Applet'
+        family: 'Network/VPN/Hit/Applet'
         unit: "{hit}/s"
   - MIB: JUNIPER-IVE-MIB
     symbol:
@@ -160,7 +160,7 @@ metrics:
       name: ivetermHits
       chart_meta:
         description: The total number of terminal hits to the ive since last reboot
-        family: 'Hit/Terminal'
+        family: 'Network/VPN/Hit/Terminal'
         unit: "{hit}/s"
   - MIB: JUNIPER-IVE-MIB
     symbol:
@@ -168,7 +168,7 @@ metrics:
       name: iveSAMHits
       chart_meta:
         description: The total number of sam secure application manager hits since last reboot
-        family: 'Hit/SAM'
+        family: 'Network/VPN/Hit/SAM'
         unit: "{hit}/s"
   - MIB: JUNIPER-IVE-MIB
     symbol:
@@ -176,7 +176,7 @@ metrics:
       name: iveNCHits
       chart_meta:
         description: The total number of nc network connect hits since last reboot
-        family: 'Hit/NetworkConnect'
+        family: 'Network/VPN/Hit/NetworkConnect'
         unit: "{hit}/s"
   - MIB: JUNIPER-IVE-MIB
     symbol:
@@ -184,7 +184,7 @@ metrics:
       name: meetingHits
       chart_meta:
         description: The total number of meeting hits since last reboot
-        family: 'Hit/Meeting'
+        family: 'Network/VPN/Hit/Meeting'
         unit: "{hit}/s"
   - MIB: JUNIPER-IVE-MIB
     symbol:
@@ -192,5 +192,5 @@ metrics:
       name: iveSSLConnections
       chart_meta:
         description: Total number of ssl connection
-        family: 'SSL/Connection/Active'
+        family: 'Network/SSL/Connection/Active'
         unit: "{connection}"

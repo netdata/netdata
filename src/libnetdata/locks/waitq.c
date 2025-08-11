@@ -150,7 +150,7 @@ static const char *priority_to_string(WAITQ_PRIORITY p) {
     }
 }
 
-static void *stress_thread(void *arg) {
+static void stress_thread(void *arg) {
     struct thread_args *args = arg;
 
     THREAD_STATS *stats = args->stats;
@@ -172,8 +172,6 @@ static void *stress_thread(void *arg) {
 
         waitq_release(wq);
     }
-
-    return NULL;
 }
 
 static void print_thread_stats(THREAD_STATS *stats, size_t count, usec_t duration) {

@@ -26,7 +26,7 @@ enum ebpf_integration_list {
 
 extern LISTEN_SOCKETS ipc_sockets;
 extern sem_t *shm_mutex_ebpf_integration;
-void *ebpf_socket_thread_ipc(void *ptr);
+void ebpf_socket_thread_ipc(void *ptr);
 void netdata_integration_cleanup_shm();
 
 #endif /* NETDATA_EBPF_SOCKET_IPC_H_ */

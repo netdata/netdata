@@ -2,264 +2,357 @@ extends:
   - _system-base.yaml
   - _std-bgp4-mib.yaml
   - _std-if-mib.yaml
+
 sysobjectid:
   - 1.3.6.1.4.1.119.1.*        # NEC
   - 1.3.6.1.4.1.119.1.84.18    # NEC IX Series IX2207
+
 metadata:
   device:
     fields:
       vendor:
-        value: "nec"
+        value: "NEC"
+
+# 1. PICO-IPSEC-FLOW-MONITOR-MIB
+#    https://jpn.nec.com/univerge/ix/Manual/MIB/PICO-IPSEC-FLOW-MONITOR-MIB.txt
+# 2. PICO-SMI
+#    https://jpn.nec.com/univerge/ix/Manual/MIB/PICO-SMI-MIB.txt
+
 metrics:
   - MIB: PICO-SMI
     symbol:
       name: nec.picoCelsius
       OID: 1.3.6.1.4.1.119.2.3.84.2.1.1.0
-      description: Temperature in Celsius
-      unit: "Cel"
+      chart_meta:
+        description: Indicates the temperature of the equipment inside
+        family: 'Hardware/Temperature/Internal'
+        unit: "Cel"
   - MIB: PICO-SMI
     symbol:
       name: nec.picoFahrenheit
       OID: 1.3.6.1.4.1.119.2.3.84.2.1.2.0
-      description: Temperature in Fahrenheit
-      unit: "degF"
+      chart_meta:
+        description: Indicates the temperature of the equipment inside
+        family: 'Hardware/Temperature/Internal/Fahrenheit'
+        unit: "degF"
   - MIB: PICO-SMI
     symbol:
       name: nec.picoVoltage
       OID: 1.3.6.1.4.1.119.2.3.84.2.2.0
-      description: Voltage level
-      unit: "V"
+      chart_meta:
+        description: Indicates the observed voltage
+        family: 'Hardware/Sensor/Voltage/Value'
+        unit: "mV"
   - MIB: PICO-SMI
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.119.2.3.84.2.5.3.0
-      description: CPU usage percentage
-      unit: "%"
+      chart_meta:
+        description: The current CPU utilization
+        family: 'System/CPU/Usage'
+        unit: "%"
   - MIB: PICO-SMI
     symbol:
       name: memory.usage
       OID: 1.3.6.1.4.1.119.2.3.84.2.6.2.0
-      description: Memory usage percentage
-      unit: "%"
+      chart_meta:
+        description: Memory usage percentage
+        family: 'System/Memory/Usage'
+        unit: "%"
+
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalActiveTunnels
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.1.0
-      description: Number of active IPsec tunnels
-      unit: "{tunnel}"
+      chart_meta:
+        description: Currently active IPsec Phase-1 IKE Tunnels
+        family: 'Network/VPN/IPSec/Phase1/Tunnel/Active'
+        unit: "{tunnel}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalInNotifys
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.6.0
-      description: Number of inbound notifications
-      unit: "{notification}"
+      chart_meta:
+        description: Notifys received by IPsec Phase-1 IKE Tunnels
+        family: 'Network/VPN/IPSec/Phase1/Notification/In'
+        unit: "{notification}/s"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalInP2Exchgs
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.7.0
-      description: Number of inbound phase 2 exchanges
-      unit: "{exchange}"
+      chart_meta:
+        description: IPsec Phase-2 exchanges received by IPsec Phase-1 IKE Tunnels
+        family: 'Network/VPN/IPSec/Phase2/Exchange/In'
+        unit: "{exchange}/s"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalInP2ExchgInvalids
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.8.0
-      description: Number of invalid inbound phase 2 exchanges
-      unit: "{exchange}"
+      chart_meta:
+        description: IPsec Phase-2 exchanges which were received and found to be contain references to unrecognized security parameters
+        family: 'Network/VPN/IPSec/Phase2/Exchange/Invalid/In'
+        unit: "{exchange}/s"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalInP2ExchgRejects
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.9.0
-      description: Number of rejected inbound phase 2 exchanges
-      unit: "{exchange}"
+      chart_meta:
+        description: IPsec Phase-2 exchanges which were received and validated but were rejected by the local policy
+        family: 'Network/VPN/IPSec/Phase2/Exchange/Reject/In'
+        unit: "{exchange}/s"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalInP2SaDelRequests
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.10.0
-      description: Number of inbound phase 2 SA delete requests
-      unit: "{request}"
+      chart_meta:
+        description: IPsec Phase-2 security association delete requests received by IPsec Phase-1 IKE Tunnels
+        family: 'Network/VPN/IPSec/Phase2/SA/DeleteRequest/In'
+        unit: "{request}/s"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalOutNotifys
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.14.0
-      description: Number of outbound notifications
-      unit: "{notification}"
+      chart_meta:
+        description: Notifys sent by IPsec Phase-1 IKE Tunnels
+        family: 'Network/VPN/IPSec/Phase1/Notification/Out'
+        unit: "{notification}/s"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalOutP2Exchgs
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.15.0
-      description: Number of outbound phase 2 exchanges
-      unit: "{exchange}"
+      chart_meta:
+        description: IPsec Phase-2 exchanges which were sent by IPsec Phase-1 IKE Tunnels
+        family: 'Network/VPN/IPSec/Phase2/Exchange/Out'
+        unit: "{exchange}/s"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalOutP2ExchgInvalids
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.16.0
-      description: Number of invalid outbound phase 2 exchanges
-      unit: "{exchange}"
+      chart_meta:
+        description: IPsec Phase-2 exchanges which were sent and were flagged by the peer to contain references to unrecognized security parameters
+        family: 'Network/VPN/IPSec/Phase2/Exchange/Invalid/Out'
+        unit: "{exchange}/s"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalOutP2ExchgRejects
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.17.0
-      description: Number of rejected outbound phase 2 exchanges
-      unit: "{exchange}"
+      chart_meta:
+        description: IPsec Phase-2 exchanges which were sent, validated by the peer but were rejected by the peers policy
+        family: 'Network/VPN/IPSec/Phase2/Exchange/Reject/Out'
+        unit: "{exchange}/s"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalOutP2SaDelRequests
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.18.0
-      description: Number of outbound phase 2 SA delete requests
-      unit: "{request}"
+      chart_meta:
+        description: IPsec Phase-2 SA delete requests sent by IPsec Phase-1 IKE Tunnels
+        family: 'Network/VPN/IPSec/Phase2/SA/DeleteRequest/Out'
+        unit: "{request}/s"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalInitTunnels
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.19.0
-      description: Number of initiated IPsec tunnels
-      unit: "{tunnel}"
+      chart_meta:
+        description: IPSec Phase-1 IKE Tunnels which were locally initiated
+        family: 'Network/VPN/IPSec/Phase1/Tunnel/Initiated'
+        unit: "{tunnel}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalInitTunnelFails
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.20.0
-      description: Number of failed initiated tunnels
-      unit: "{tunnel}"
+      chart_meta:
+        description: IPsec Phase-1 IKE Tunnels which were locally initiated and failed to activate
+        family: 'Network/VPN/IPSec/Phase1/Tunnel/Failure/Initiated'
+        unit: "{tunnel}/s"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalRespTunnelFails
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.21.0
-      description: Number of failed responder tunnels
-      unit: "{tunnel}"
+      chart_meta:
+        description: IPsec Phase-1 IKE Tunnels which were remotely initiated and failed to activate
+        family: 'Network/VPN/IPSec/Phase1/Tunnel/Failure/Responder'
+        unit: "{tunnel}/s"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalAuthFails
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.23.0
-      description: Number of authentication failures
-      unit: "{failure}"
+      chart_meta:
+        description: Authentications which ended in failure by IPsec Phase-1 IKE Tunnels
+        family: 'Network/VPN/IPSec/Phase1/Authentication/Failure'
+        unit: "{failure}/s"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalDecryptFails
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.24.0
-      description: Number of decryption failures
-      unit: "{failure}"
+      chart_meta:
+        description: Decryptions which ended in failure by IPsec Phase-1 IKE Tunnels
+        family: 'Network/VPN/IPSec/Phase1/Decryption/Failure'
+        unit: "{failure}/s"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalHashValidFails
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.25.0
-      description: Number of hash validation failures
-      unit: "{failure}"
+      chart_meta:
+        description: Hash validations which ended in failure by IPsec Phase-1 Tunnels
+        family: 'Network/VPN/IPSec/Phase1/HashValidation/Failure'
+        unit: "{failure}/s"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalRespTunnels
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.27.0
-      description: Number of responder IPsec tunnels
-      unit: "{tunnel}"
+      chart_meta:
+        description: IPsec Phase-1 IKE Tunnels hich were remotely initiated
+        family: 'Network/VPN/IPSec/Phase1/Tunnel/Responder'
+        unit: "{tunnel}/s"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalInP1SaDelRequests
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.30.0
-      description: Number of inbound phase 1 SA delete requests
-      unit: "{request}"
+      chart_meta:
+        description: ISAKMP security association delete requests received by IPsec Phase-1 Tunnels
+        family: 'Network/VPN/IPSec/Phase1/SA/DeleteRequest/In'
+        unit: "{request}/s"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pikeGlobalOutP1SaDelRequests
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.31.0
-      description: Number of outbound phase 1 SA delete requests
-      unit: "{request}"
+      chart_meta:
+        description: ISAKMP security association delete requests sent by IPsec Phase-1 Tunnels
+        family: 'Network/VPN/IPSec/Phase1/SA/DeleteRequest/Out'
+        unit: "{request}/s"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pipSecGlobalActiveTunnels
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.1.0
-      description: Number of active IPsec tunnels
-      unit: "{tunnel}"
+      chart_meta:
+        description: Currently active IPsec Phase-2 Tunnels
+        family: 'Network/VPN/IPSec/Phase2/Tunnel/Active'
+        unit: "{tunnel}"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pipSecGlobalInOctets
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.3.0
-      description: Number of inbound octets
-      unit: "By"
+      chart_meta:
+        description: Data received by IPsec Phase-2 Tunnels
+        family: 'Network/VPN/IPSec/Phase2/Throughput/In'
+        unit: "By/s"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pipSecGlobalInPkts
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.9.0
-      description: Number of inbound packets
-      unit: "{packet}"
+      chart_meta:
+        description: Packets received by IPsec Phase-2 Tunnels
+        family: 'Network/VPN/IPSec/Phase2/Packet/In'
+        unit: "{packet}/s"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pipSecGlobalInDrops
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.10.0
-      description: Number of inbound dropped packets
-      unit: "{packet}"
+      chart_meta:
+        description: Packets dropped during receive processing by IPsec Phase-2 Tunnels
+        family: 'Network/VPN/IPSec/Phase2/Packet/Dropped/In'
+        unit: "{packet}/s"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pipSecGlobalInReplayDrops
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.11.0
-      description: Number of inbound replay dropped packets
-      unit: "{packet}"
+      chart_meta:
+        description: Packets dropped during receive processing due to Anti-Replay processing by IPsec Phase-2 Tunnels
+        family: 'Network/VPN/IPSec/Phase2/Packet/Dropped/Replay'
+        unit: "{packet}/s"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pipSecGlobalInAuths
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.12.0
-      description: Number of inbound authentications
-      unit: "{authentication}"
+      chart_meta:
+        description: Inbound authentications performed by IPsec Phase-2 Tunnels
+        family: 'Network/VPN/IPSec/Phase2/Authentication/In'
+        unit: "{authentication}/s"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pipSecGlobalInAuthFails
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.13.0
-      description: Number of inbound authentication failures
-      unit: "{failure}"
+      chart_meta:
+        description: Inbound authentication which ended in failure by IPsec Phase-2 Tunnels
+        family: 'Network/VPN/IPSec/Phase2/Authentication/Failure/In'
+        unit: "{failure}/s"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pipSecGlobalInDecrypts
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.14.0
-      description: Number of inbound decryptions
-      unit: "{decryption}"
+      chart_meta:
+        description: Inbound decryptions performed by IPsec Phase-2 Tunnels
+        family: 'Network/VPN/IPSec/Phase2/Decryption/In'
+        unit: "{decryption}/s"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pipSecGlobalInDecryptFails
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.15.0
-      description: Number of inbound decryption failures
-      unit: "{failure}"
+      chart_meta:
+        description: Inbound decryptions which ended in failure by IPsec Phase-2 Tunnels
+        family: 'Network/VPN/IPSec/Phase2/Decryption/Failure/In'
+        unit: "{failure}/s"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pipSecGlobalOutOctets
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.16.0
-      description: Number of outbound octets
-      unit: "By"
+      chart_meta:
+        description: Data sent by IPsec Phase-2 Tunnels
+        family: 'Network/VPN/IPSec/Phase2/Throughput/Out'
+        unit: "By/s"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pipSecGlobalOutPkts
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.22.0
-      description: Number of outbound packets
-      unit: "{packet}"
+      chart_meta:
+        description: Packets sent by IPsec Phase-2 Tunnels
+        family: 'Network/VPN/IPSec/Phase2/Packet/Out'
+        unit: "{packet}/s"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pipSecGlobalOutDrops
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.23.0
-      description: Number of outbound dropped packets
-      unit: "{packet}"
+      chart_meta:
+        description: Packets dropped during send processing by IPsec Phase-2 Tunnels
+        family: 'Network/VPN/IPSec/Phase2/Packet/Dropped/Out'
+        unit: "{packet}/s"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pipSecGlobalOutAuths
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.24.0
-      description: Number of outbound authentications
-      unit: "{authentication}"
+      chart_meta:
+        description: Outbound authentications performed by IPsec Phase-2 Tunnels
+        family: 'Network/VPN/IPSec/Phase2/Authentication/Out'
+        unit: "{authentication}/s"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pipSecGlobalOutAuthFails
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.25.0
-      description: Number of outbound authentication failures
-      unit: "{failure}"
+      chart_meta:
+        description: Outbound authentication's which ended in failure by IPsec Phase-2 Tunnels
+        family: 'Network/VPN/IPSec/Phase2/Authentication/Failure/Out'
+        unit: "{failure}/s"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pipSecGlobalOutEncrypts
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.26.0
-      description: Number of outbound encryptions
-      unit: "{encryption}"
+      chart_meta:
+        description: Outbound encryptions performed by IPsec Phase-2 Tunnels
+        family: 'Network/VPN/IPSec/Phase2/Encryption/Out'
+        unit: "{encryption}/s"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pipSecGlobalOutEncryptFails
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.27.0
-      description: Number of outbound encryption failures
-      unit: "{failure}"
+      chart_meta:
+        description: Outbound encryptions which ended in failure by IPsec Phase-2 Tunnels
+        family: 'Network/VPN/IPSec/Phase2/Encryption/Failure/Out'
+        unit: "{failure}/s"
   - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       name: nec.pipSecGlobalNoSaFails
       OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.33.0
-      description: Number of no SA failures
-      unit: "{failure}"
+      chart_meta:
+        description: Non-existent SA in failures which occurred during processing by IPsec Phase-2 Tunnels
+        family: 'Network/VPN/IPSec/Phase2/SA/Failure/NoSA'
+        unit: "{failure}/s"

@@ -26,10 +26,7 @@
     },
     "required": [
       "optical_interfaces"
-    ],
-    "patternProperties": {
-      "^name$": {}
-    }
+    ]
   },
   "uiSchema": {
     "uiOptions": {

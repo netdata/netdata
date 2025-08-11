@@ -4,4 +4,4 @@ metadata:
   device:
     fields:
       vendor:
-        value: "ibm"
+        value: "IBM"

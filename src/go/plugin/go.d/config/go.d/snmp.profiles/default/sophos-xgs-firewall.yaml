@@ -10,20 +10,24 @@ metadata:
   device:
     fields:
       vendor:
-        value: "sophos"
+        value: "Sophos"
       type:
-        value: "firewall"
+        value: "Firewall"
 
 metric_tags:
-  - OID: 1.3.6.1.4.1.2604.5.1.1.2.0
+  - tag: sfos_device_type
+    OID: 1.3.6.1.4.1.2604.5.1.1.2.0
     symbol: sfosDeviceType
-    tag: sfos_device_type
-  - OID: 1.3.6.1.4.1.2604.5.1.1.3.0
+  - tag: sfos_device_fw_version
+    OID: 1.3.6.1.4.1.2604.5.1.1.3.0
     symbol: sfosDeviceFWVersion
-    tag: sfos_device_fw_version
-  - OID: 1.3.6.1.4.1.2604.5.1.1.6.0
+  - tag: sfos_ips_version
+    OID: 1.3.6.1.4.1.2604.5.1.1.6.0
     symbol: sfosIPSVersion
-    tag: sfos_ips_version
+
+# SFOS-FIREWALL-MIB
+# https://mibbrowser.online/mibdb_search.php?mib=SFOS-FIREWALL-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/sophos/SFOS-FIREWALL-MIB
 
 metrics:
   - MIB: SFOS-FIREWALL-MIB
@@ -32,7 +36,7 @@ metrics:
       OID: 1.3.6.1.4.1.2604.5.1.2.5.2.0
       chart_meta:
         description: "Percentage usage of main memory"
-        family: 'Memory/Usage'
+        family: 'System/Memory/Usage'
         unit: "%"
   - MIB: SFOS-FIREWALL-MIB
     symbol:
@@ -41,7 +45,7 @@ metrics:
       scale_factor: 1048576
       chart_meta:
         description: "Memory capacity in MB"
-        family: 'Memory/Total'
+        family: 'System/Memory/Total'
         unit: "By"
   - MIB: SFOS-FIREWALL-MIB
     symbol:
@@ -50,7 +54,7 @@ metrics:
       scale_factor: 1048576
       chart_meta:
         description: "Disk capacity in MB"
-        family: 'Disk/Total'
+        family: 'System/Disk/Total'
         unit: "By"
   - MIB: SFOS-FIREWALL-MIB
     symbol:
@@ -58,7 +62,7 @@ metrics:
       OID: 1.3.6.1.4.1.2604.5.1.2.4.2.0
       chart_meta:
         description: "% Disk usage"
-        family: 'Disk/Usage'
+        family: 'System/Disk/Usage'
         unit: "%"
   - MIB: SFOS-FIREWALL-MIB
     symbol:
@@ -66,7 +70,7 @@ metrics:
       OID: 1.3.6.1.4.1.2604.5.1.2.5.3.0
       chart_meta:
         description: "Swap Capacity in MB"
-        family: 'Memory/Swap/Total'
+        family: 'System/Memory/Swap/Total'
         unit: "MBy"
   - MIB: SFOS-FIREWALL-MIB
     symbol:
@@ -74,7 +78,7 @@ metrics:
       OID: 1.3.6.1.4.1.2604.5.1.2.5.4.0
       chart_meta:
         description: "% usage of swap"
-        family: 'Memory/Swap/Usage'
+        family: 'System/Memory/Swap/Usage'
         unit: "%"
   - MIB: SFOS-FIREWALL-MIB
     symbol:
@@ -82,7 +86,7 @@ metrics:
       OID: 1.3.6.1.4.1.2604.5.1.2.6.0
       chart_meta:
         description: "Display live user count login into captive portal"
-        family: 'User/Portal/Active'
+        family: 'System/User/Portal/Active'
         unit: "{session}"
   - MIB: SFOS-FIREWALL-MIB
     symbol:
@@ -90,7 +94,7 @@ metrics:
       OID: 1.3.6.1.4.1.2604.5.1.2.7.0
       chart_meta:
         description: "Number of HTTP hits"
-        family: 'Protocol/HTTP/Request/Total'
+        family: 'Network/Protocol/HTTP/Request/Total'
         unit: "{request}/s"
   - MIB: SFOS-FIREWALL-MIB
     symbol:
@@ -98,7 +102,7 @@ metrics:
       OID: 1.3.6.1.4.1.2604.5.1.2.8.0
       chart_meta:
         description: "Number of FTP hits"
-        family: 'Protocol/FTP/Request/Total'
+        family: 'Network/Protocol/FTP/Request/Total'
         unit: "{request}/s"
   - MIB: SFOS-FIREWALL-MIB
     symbol:
@@ -106,7 +110,7 @@ metrics:
       OID: 1.3.6.1.4.1.2604.5.1.2.9.1.0
       chart_meta:
         description: "Number of POP3 hits"
-        family: 'Protocol/POP3/Request/Total'
+        family: 'Network/Protocol/POP3/Request/Total'
         unit: "{request}/s"
   - MIB: SFOS-FIREWALL-MIB
     symbol:
@@ -114,7 +118,7 @@ metrics:
       OID: 1.3.6.1.4.1.2604.5.1.2.9.2.0
       chart_meta:
         description: "Number of IMAP hits"
-        family: 'Protocol/IMAP/Request/Total'
+        family: 'Network/Protocol/IMAP/Request/Total'
         unit: "{request}/s"
   - MIB: SFOS-FIREWALL-MIB
     symbol:
@@ -122,7 +126,7 @@ metrics:
       OID: 1.3.6.1.4.1.2604.5.1.2.9.3.0
       chart_meta:
         description: "Number of SMTP hits"
-        family: 'Protocol/SMTP/Request/Total'
+        family: 'Network/Protocol/SMTP/Request/Total'
         unit: "{request}/s"
   - MIB: SFOS-FIREWALL-MIB
     table:
@@ -133,26 +137,28 @@ metrics:
         OID: 1.3.6.1.4.1.2604.5.1.6.1.1.1.1.8
         chart_meta:
           description: "Count of active tunnel"
-          family: 'IPSec/Tunnel/Active'
+          family: 'Network/VPN/IPSec/Tunnel/Active'
           unit: "{tunnel}"
     metric_tags:
+      - tag: sfos_ip_sec_vpn_conn_index
+        index: 1
       - tag: sfos_ip_sec_vpn_conn_name
         symbol:
           name: sfosIPSecVpnConnName
           OID: 1.3.6.1.4.1.2604.5.1.6.1.1.1.1.2
-      - tag: sfos_ip_sec_vpn_conn_des
+      - tag: _sfos_ip_sec_vpn_conn_des
         symbol:
           name: sfosIPSecVpnConnDes
           OID: 1.3.6.1.4.1.2604.5.1.6.1.1.1.1.3
-      - tag: sfos_ip_sec_vpn_policy_name
+      - tag: _sfos_ip_sec_vpn_policy_name
         symbol:
           name: sfosIPSecVpnPolicyName
           OID: 1.3.6.1.4.1.2604.5.1.6.1.1.1.1.4
-      - tag: sfos_ip_sec_vpn_conn_mode
+      - tag: _sfos_ip_sec_vpn_conn_mode
         symbol:
           name: sfosIPSecVpnConnMode
           OID: 1.3.6.1.4.1.2604.5.1.6.1.1.1.1.5
-      - tag: sfos_ip_sec_vpn_conn_type
+      - tag: _sfos_ip_sec_vpn_conn_type
         symbol:
           OID: 1.3.6.1.4.1.2604.5.1.6.1.1.1.1.6
           name: sfosIPSecVpnConnType

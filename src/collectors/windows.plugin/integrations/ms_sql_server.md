@@ -267,13 +267,16 @@ These options allow the collector to connect to your MSSQL instance and collect 
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
+| update every | Data collection frequency. | 10 | no |
 | driver | ODBC driver used to connect to the SQL Server. | SQL Server | no |
+| instance | Instance name | empty | yes |
 | server | Server address or instance name. | empty | yes |
 | address | Alternative to `server`; supports named pipes if the server supports them. | empty | yes |
 | uid | SQL Server user identifier. | empty | yes |
 | pwd | Password for the specified user. | empty | yes |
 | additional instances | Number of additional SQL Server instances to monitor. | 0 | no |
 | windows authentication | Set to yes to use Windows credentials instead of SQL Server authentication. | no | no |
+| express | Set to yes when running SQL Express version. | no | no |
 
 #### Examples
 
@@ -284,9 +287,11 @@ An example configuration with one instance.
 ```yaml
 [plugin:windows:PerflibMSSQL]
    driver = SQL Server
+   instance = Dev
    server = 127.0.0.1\\Dev, 1433
    uid = netdata_user
    pwd = 1ReallyStrongPasswordShouldBeInsertedHere
+   express = no
 
 ```
 ##### Multiple Instances
@@ -297,14 +302,18 @@ An example configuration with two instances.
 [plugin:windows:PerflibMSSQL]
   driver = SQL Server
   server = 127.0.0.1\\Dev, 1433
+  instance = Dev
   uid = netdata_user
   pwd = 1ReallyStrongPasswordShouldBeInsertedHere
   additional instances = 1
+  express = no
 [plugin:windows:PerflibMSSQL1]
   driver = SQL Server
   server = 127.0.0.1\\Production, 1434
+  instance = Production
   uid = netdata_user
   pwd = AnotherReallyStrongPasswordShouldBeInsertedHere2
+  express = no
 
 ```
 

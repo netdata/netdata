@@ -1,20 +1,21 @@
 extends:
   - _std-ucd-mib.yaml
   - netgear.yaml
+
 sysobjectid:
   - 1.3.6.1.4.1.4526.100.16.*
+
 metadata:
   device:
     fields:
       type:
-        value: "storage"
+        value: "Storage"
+
+# READYNASOS-MIB
+# https://www.downloads.netgear.com/files/ReadyNAS/READYNAS-MIB.txt
+# https://github.com/NextDom/plugin-SNMP/blob/master/ressources/READYNAS-MIB.txt
+
 metrics:
-  # scalar string metric is not supported yet
-  # - MIB: READYNASOS-MIB
-  #   symbol:
-  #     OID: 1.3.6.1.4.1.4526.22.1.0
-  #     name: netgear.readynasos.nasMgrSoftwareVersion
-  #     tag: softwareVersion
   - MIB: READYNASOS-MIB
     table:
       OID: 1.3.6.1.4.1.4526.22.3
@@ -22,17 +23,31 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.4526.22.3.1.6
         name: netgear.readynasos.ataError
-        description: Ata error count
-        unit: "{error}"
+        chart_meta:
+          description: Ata error count
+          family: 'Hardware/Disk/Error/ATA'
+          unit: "{error}"
       - OID: 1.3.6.1.4.1.4526.22.3.1.7
         name: netgear.readynasos.diskCapacity
-        description: Disk capacity
-        unit: "By"
+        chart_meta:
+          description: Disk capacity
+          family: 'Hardware/Disk/Capacity'
+          unit: "By"
       - OID: 1.3.6.1.4.1.4526.22.3.1.10
         name: netgear.readynasos.diskTemperature
-        description: Disk temperature
-        unit: "Cel"
-        # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+        chart_meta:
+          description: Disk temperature
+          family: 'Hardware/Disk/Temperature/Value'
+          unit: "Cel"
+      - OID: 1.3.6.1.4.1.4526.22.3.1.9
+        name: netgear.readynasos.diskState
+        chart_meta:
+          description: Current status of the Disk
+          family: 'Hardware/Disk/Status'
+          unit: "{status}"
+        mapping:
+          0: online
+          1: offline
     metric_tags:
       - tag: netgear_readynasos_disk_id
         symbol:
@@ -42,7 +57,7 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.4526.22.3.1.3
           name: netgear.readynasos.diskSlotName
-      - tag: netgear_readynasos_disk_serial
+      - tag: _netgear_readynasos_disk_serial
         symbol:
           OID: 1.3.6.1.4.1.4526.22.3.1.4
           name: netgear.readynasos.diskSerial
@@ -54,14 +69,7 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.4526.22.3.1.8
           name: netgear.readynasos.diskInterface
-      - symbol:
-          OID: 1.3.6.1.4.1.4526.22.3.1.9
-          name: netgear.readynasos.diskState
-        tag: netgear_readynasos_disk_state
-        mapping:
-          0: online
-          1: offline
-          # mapping in the metric description
+
   - MIB: READYNASOS-MIB
     table:
       OID: 1.3.6.1.4.1.4526.22.4
@@ -69,17 +77,20 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.4526.22.4.1.2
         name: netgear.readynasos.fanRPM
-        description: Fan revolutions per minute
-        unit: "1.min"
-      - OID: 1.3.6.1.4.1.4526.22.4.1.3
-        name: netgear.readynasos.fanStatus
-        description: Fan status
-        unit: "TBD"
+        chart_meta:
+          description: Fan revolutions per minute
+          family: 'Hardware/Fan/Speed'
+          unit: "{revolution}/min"
     metric_tags:
+      - tag: netgear_readynasos_fan_number
+        symbol:
+          OID: 1.3.6.1.4.1.4526.22.4.1.1
+          name: netgear.readynasos.fanNumber
       - tag: netgear_readynasos_fan_type
         symbol:
           OID: 1.3.6.1.4.1.4526.22.4.1.4
           name: netgear.readynasos.fanType
+
   - MIB: READYNASOS-MIB
     table:
       OID: 1.3.6.1.4.1.4526.22.5
@@ -87,48 +98,53 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.4526.22.5.1.2
         name: netgear.readynasos.temperatureValue
-        description: Temperature value
-        unit: "Cel"
+        chart_meta:
+          description: Temperature value
+          family: 'Hardware/Sensor/Temperature/Value'
+          unit: "Cel"
       - OID: 1.3.6.1.4.1.4526.22.5.1.4
         name: netgear.readynasos.temperatureMin
-        description: Minimum temperature
-        unit: "Cel"
+        chart_meta:
+          description: Minimum temperature
+          family: 'Hardware/Sensor/Temperature/Min'
+          unit: "Cel"
       - OID: 1.3.6.1.4.1.4526.22.5.1.5
         name: netgear.readynasos.temperatureMax
-        description: Maximum temperature
-        unit: "Cel"
+        chart_meta:
+          description: Maximum temperature
+          family: 'Hardware/Sensor/Temperature/Max'
+          unit: "Cel"
     metric_tags:
+      - tag: netgear_readynasos_temp_index
+        index: 1
       - tag: netgear_readynasos_temperature_type
         symbol:
           OID: 1.3.6.1.4.1.4526.22.5.1.3
           name: netgear.readynasos.temperatureType
+
   - MIB: READYNASOS-MIB
     table:
       OID: 1.3.6.1.4.1.4526.22.7
       name: volumeTable
     symbols:
-      - OID: 1.3.6.1.4.1.4526.22.7.1.3
-        name: netgear.readynasos.volumeRAIDLevel
-        description: Volume RAID level
-        unit: "TBD"
       - OID: 1.3.6.1.4.1.4526.22.7.1.5
         name: netgear.readynasos.volumeSize
-        description: Volume size
-        unit: "By"
+        chart_meta:
+          description: Volume size
+          family: 'Storage/Volume/Space/Size'
+          unit: "By"
       - OID: 1.3.6.1.4.1.4526.22.7.1.6
         name: netgear.readynasos.volumeFreeSpace
-        description: Volume free space
-        unit: "By"
-    metric_tags:
-      - tag: netgear_readynasos_volume_name
-        symbol:
-          OID: 1.3.6.1.4.1.4526.22.7.1.2
-          name: netgear.readynasos.volumeName
-      # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-      - symbol:
-          OID: 1.3.6.1.4.1.4526.22.7.1.4
-          name: netgear.readynasos.volumeStatus
-        tag: netgear_readynasos_volume_status
+        chart_meta:
+          description: Volume free space
+          family: 'Storage/Volume/Space/Free'
+          unit: "By"
+      - OID: 1.3.6.1.4.1.4526.22.7.1.4
+        name: netgear.readynasos.volumeStatus
+        chart_meta:
+          description: Volume severity
+          family: 'Storage/Volume/Status'
+          unit: "{status}"
         mapping:
           1: redundant
           2: unprotected
@@ -136,23 +152,14 @@ metrics:
           4: dead
           5: inactive
           6: unknown
-          # mapping in the metric description
-  - MIB: READYNASOS-MIB
-    table:
-      OID: 1.3.6.1.4.1.4526.22.8
-      name: psuTable
-    symbols:
-      - name: netgear.readynasos.psu
-        constant_value_one: true
-        description: Power supply unit presence
-        unit: "{psu}"
     metric_tags:
-      - tag: netgear_readynasos_psu_desc
+      - tag: netgear_readynasos_volume_index
+        index: 1
+      - tag: netgear_readynasos_volume_name
         symbol:
-          OID: 1.3.6.1.4.1.4526.22.8.1.2
-          name: netgear.readynasos.psuDesc
-      # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-      - symbol:
-          OID: 1.3.6.1.4.1.4526.22.8.1.3
-          name: netgear.readynasos.psuStatus
-        tag: netgear_readynasos_psu_status
+          OID: 1.3.6.1.4.1.4526.22.7.1.2
+          name: netgear.readynasos.volumeName
+      - tag: netgear_readynasos_volume_raid_level
+        symbol:
+          OID: 1.3.6.1.4.1.4526.22.7.1.3
+          name: netgear.readynasos.volumeRAIDLevel

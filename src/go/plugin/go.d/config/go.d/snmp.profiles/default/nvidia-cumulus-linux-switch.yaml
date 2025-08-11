@@ -2,170 +2,238 @@ extends:
   - _std-host-resources-mib-feat-base.yaml
   - _std-ucd-mib.yaml
   - nvidia.yaml
+
 sysobjectid:
   - 1.3.6.1.4.1.40310
+
 metadata:
   device:
     fields:
       type:
-        value: "switch"
+        value: "Switch"
+
+# CUMULUS-RESOURCES-MIB
+# https://mibbrowser.online/mibdb_search.php?mib=CUMULUS-RESOURCES-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/cumulus/CUMULUS-RESOURCES-MIB
+
+# CUMULUS-COUNTERS-MIB
+# https://mibbrowser.online/mibdb_search.php?mib=CUMULUS-COUNTERS-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/cumulus/CUMULUS-COUNTERS-MIB
+
+# CUMULUS-POE-MIB
+# https://mibbrowser.online/mibdb_search.php?mib=CUMULUS-POE-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/cumulus/CUMULUS-POE-MIB
+
 metrics:
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.l3HostTableCurrentEntries
       OID: 1.3.6.1.4.1.40310.1.1.1.0
-      description: The number of L3 Host table entries currently in use
-      unit: "{entry}"
+      chart_meta:
+        description: The number of L3 Host table entries currently in use
+        family: 'Network/Routing/L3/HostTable/Current'
+        unit: "{entry}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.l3HostTableMaxEntries
       OID: 1.3.6.1.4.1.40310.1.1.2.0
-      description: The maximum possible entries in the L3 Host table
-      unit: "{entry}"
+      chart_meta:
+        description: The maximum possible entries in the L3 Host table
+        family: 'Network/Routing/L3/HostTable/Maximum'
+        unit: "{entry}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.l3RoutingTableCurrentEntries
       OID: 1.3.6.1.4.1.40310.1.1.3.0
-      description: The number of L3 Routing table entries currently in use
-      unit: "{entry}"
+      chart_meta:
+        description: The number of L3 Routing table entries currently in use
+        family: 'Network/Routing/L3/RoutingTable/Current'
+        unit: "{entry}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.l3RoutingTableMaxEntries
       OID: 1.3.6.1.4.1.40310.1.1.4.0
-      description: The maximum possible entries in the L3 Routing table
-      unit: "{entry}"
+      chart_meta:
+        description: The maximum possible entries in the L3 Routing table
+        family: 'Network/Routing/L3/RoutingTable/Maximum'
+        unit: "{entry}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.l3NextHopTableCurrentEntries
       OID: 1.3.6.1.4.1.40310.1.1.5.0
-      description: The number of L3 Next Hop table entries currently in use
-      unit: "{entry}"
+      chart_meta:
+        description: The number of L3 Next Hop table entries currently in use
+        family: 'Network/Routing/L3/NextHopTable/Current'
+        unit: "{entry}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.l3NextHopTableMaxEntries
       OID: 1.3.6.1.4.1.40310.1.1.6.0
-      description: The maximum possible entries in the L3 Next Hop table
-      unit: "{entry}"
+      chart_meta:
+        description: The maximum possible entries in the L3 Next Hop table
+        family: 'Network/Routing/L3/NextHopTable/Maximum'
+        unit: "{entry}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.l3EcmpNextHopTableCurrentEntries
       OID: 1.3.6.1.4.1.40310.1.1.9.0
-      description: The number of ECMP Next Hop table entries currently in use
-      unit: "{entry}"
+      chart_meta:
+        description: The number of ECMP Next Hop table entries currently in use
+        family: 'Network/Routing/L3/ECMPNextHopTable/Current'
+        unit: "{entry}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.l3EcmpNextHopTableMaxEntries
       OID: 1.3.6.1.4.1.40310.1.1.10.0
-      description: The maximum possible entries in the ECMP Next Hop table
-      unit: "{entry}"
+      chart_meta:
+        description: The maximum possible entries in the ECMP Next Hop table
+        family: 'Network/Routing/L3/ECMPNextHopTable/Maximum'
+        unit: "{entry}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.ingressAclCurrentEntries
       OID: 1.3.6.1.4.1.40310.1.1.11.0
-      description: TBD
-      unit: "TBD"
+      chart_meta:
+        description: The current number of Ingress entries in the Network Access Control List table
+        family: 'Network/ACL/Ingress/Entry/Current'
+        unit: "{entry}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.ingressAclMaxEntries
       OID: 1.3.6.1.4.1.40310.1.1.12.0
-      description: TBD
-      unit: "TBD"
+      chart_meta:
+        description: The maximum possible Ingress entries in the Network Access Control table
+        family: 'Network/ACL/Ingress/Entry/Maximum'
+        unit: "{entry}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.ingressAclCurrentCounters
       OID: 1.3.6.1.4.1.40310.1.1.13.0
-      description: TBD
-      unit: "TBD"
+      chart_meta:
+        description: The current number of Ingress counters in the Network Access Control List table
+        family: 'Network/ACL/Ingress/Counter/Current'
+        unit: "{counter}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.ingressAclMaxCounters
       OID: 1.3.6.1.4.1.40310.1.1.14.0
-      description: TBD
-      unit: "TBD"
+      chart_meta:
+        description: The maximum possible Ingress counters in the Network Access Control table
+        family: 'Network/ACL/Ingress/Counter/Maximum'
+        unit: "{counter}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.ingressAclCurrentMeters
       OID: 1.3.6.1.4.1.40310.1.1.15.0
-      description: TBD
-      unit: "TBD"
+      chart_meta:
+        description: The current number of Ingress meters in the Network Access Control List table
+        family: 'Network/ACL/Ingress/Meter/Current'
+        unit: "{meter}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.ingressAclMaxMeters
       OID: 1.3.6.1.4.1.40310.1.1.16.0
-      description: TBD
-      unit: "TBD"
+      chart_meta:
+        description: The maximum possible Ingress meters in the Network Access Control table
+        family: 'Network/ACL/Ingress/Meter/Maximum'
+        unit: "{meter}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.ingressAclCurrentSlices
       OID: 1.3.6.1.4.1.40310.1.1.17.0
-      description: TBD
-      unit: "TBD"
+      chart_meta:
+        description: The current number of Ingress slices in the Network Access Control List table
+        family: 'Network/ACL/Ingress/Slice/Current'
+        unit: "{slice}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.ingressAclMaxSlices
       OID: 1.3.6.1.4.1.40310.1.1.18.0
-      description: TBD
-      unit: "TBD"
+      chart_meta:
+        description: The maximum possible Ingress slices in the Network Access Control table
+        family: 'Network/ACL/Ingress/Slice/Maximum'
+        unit: "{slice}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.egressAclCurrentEntries
       OID: 1.3.6.1.4.1.40310.1.1.19.0
-      description: TBD
-      unit: "TBD"
+      chart_meta:
+        description: The current number of Egress entries in the Network Access Control List table
+        family: 'Network/ACL/Egress/Entry/Current'
+        unit: "{entry}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.egressAclMaxEntries
       OID: 1.3.6.1.4.1.40310.1.1.20.0
-      description: TBD
-      unit: "TBD"
+      chart_meta:
+        description: The maximum possible Egress entries in the Network Access Control table
+        family: 'Network/ACL/Egress/Entry/Maximum'
+        unit: "{entry}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.egressAclCurrentCounters
       OID: 1.3.6.1.4.1.40310.1.1.21.0
-      description: TBD
-      unit: "TBD"
+      chart_meta:
+        description: The current number of Egress counters in the Network Access Control List table
+        family: 'Network/ACL/Egress/Counter/Current'
+        unit: "{counter}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.egressAclMaxCounters
       OID: 1.3.6.1.4.1.40310.1.1.22.0
-      description: TBD
-      unit: "TBD"
+      chart_meta:
+        description: The maximum possible Egress counters in the Network Access Control table
+        family: 'Network/ACL/Egress/Counter/Maximum'
+        unit: "{counter}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.egressAclCurrentMeters
       OID: 1.3.6.1.4.1.40310.1.1.23.0
-      description: TBD
-      unit: "TBD"
+      chart_meta:
+        description: The current number of Egress meters in the Network Access Control List table
+        family: 'Network/ACL/Egress/Meter/Current'
+        unit: "{meter}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.egressAclMaxMeters
       OID: 1.3.6.1.4.1.40310.1.1.24.0
-      description: TBD
-      unit: "TBD"
+      chart_meta:
+        description: The maximum possible Egress meters in the Network Access Control table
+        family: 'Network/ACL/Egress/Meter/Maximum'
+        unit: "{meter}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.egressAclCurrentSlices
       OID: 1.3.6.1.4.1.40310.1.1.25.0
-      description: TBD
-      unit: "TBD"
+      chart_meta:
+        description: The current number of Egress slices in the Network Access Control List table
+        family: 'Network/ACL/Egress/Slice/Current'
+        unit: "{slice}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.egressAclMaxSlices
       OID: 1.3.6.1.4.1.40310.1.1.26.0
-      description: TBD
-      unit: "TBD"
+      chart_meta:
+        description: The maximum possible Egress slices in the Network Access Control table
+        family: 'Network/ACL/Egress/Slice/Maximum'
+        unit: "{slice}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.l2MacTableCurrentEntries
       OID: 1.3.6.1.4.1.40310.1.2.1.0
-      description: The number of L2 Mac table entries currently in use
-      unit: "{entry}"
+      chart_meta:
+        description: The number of L2 Mac table entries currently in use
+        family: 'Network/L2/MACTable/Current'
+        unit: "{entry}"
   - MIB: CUMULUS-RESOURCES-MIB
     symbol:
       name: cumulus.l2MacTableMaxEntries
       OID: 1.3.6.1.4.1.40310.1.2.2.0
-      description: The maximum possible entries in the L2 Mac table
-      unit: "{entry}"
+      chart_meta:
+        description: The maximum possible entries in the L2 Mac table
+        family: 'Network/L2/MACTable/Maximum'
+        unit: "{entry}"
+
   - MIB: CUMULUS-COUNTERS-MIB
     table:
       name: discardClCountersTable
@@ -173,29 +241,42 @@ metrics:
     symbols:
       - name: cumulus.clL3v4InDiscards
         OID: 1.3.6.1.4.1.40310.2.1.2.1.2
-        description: Number of inbound IPv4 packets discarded by the routing engine.
-        unit: "{packet}"
+        chart_meta:
+          description: Number of inbound IPv4 packets discarded by the routing engine.
+          family: 'Network/Interface/Discard/IPv4/In'
+          unit: "{packet}/s"
       - name: cumulus.clBufferOverflowDiscards
         OID: 1.3.6.1.4.1.40310.2.1.2.1.3
-        description: Number of inbound packets discarded due to ingress buffer overflow.
-        unit: "{packet}"
+        chart_meta:
+          description: Number of inbound packets discarded due to ingress buffer overflow.
+          family: 'Network/Interface/Discard/BufferOverflow/In'
+          unit: "{packet}/s"
       - name: cumulus.clL3AclDiscards
         OID: 1.3.6.1.4.1.40310.2.1.2.1.4
-        description: Number of inbound IPv4 packets discarded due to ingress ACL table.
-        unit: "{packet}"
+        chart_meta:
+          description: Number of inbound IPv4 packets discarded due to ingress ACL table.
+          family: 'Network/Interface/Discard/ACL/In'
+          unit: "{packet}/s"
       - name: cumulus.clEgressQOverflowDiscards
         OID: 1.3.6.1.4.1.40310.2.1.2.1.6
-        description: Number of packets discarded due to egress queue overflow.
-        unit: "{packet}"
+        chart_meta:
+          description: Number of packets discarded due to egress queue overflow.
+          family: 'Network/Interface/Discard/QueueOverflow/Out'
+          unit: "{packet}/s"
       - name: cumulus.clEgressNonQDiscards
         OID: 1.3.6.1.4.1.40310.2.1.2.1.7
-        description: Total number of packets discarded on egress due to reasons reasons other than queue overflow.
-        unit: "{packet}"
+        chart_meta:
+          description: Total number of packets discarded on egress due to reasons reasons other than queue overflow.
+          family: 'Network/Interface/Discard/NonQueue/Out'
+          unit: "{packet}/s"
     metric_tags:
-      - symbol:
+      - tag: cumulus_cl_port_index
+        index: 1
+      - tag: cumulus_cl_port_name
+        symbol:
           name: cumulus.clPortName
           OID: 1.3.6.1.4.1.40310.2.1.2.1.1
-        tag: cumulus_cl_port_name
+
   - MIB: CUMULUS-COUNTERS-MIB
     table:
       name: interfaceClCountersTable
@@ -203,41 +284,62 @@ metrics:
     symbols:
       - name: cumulus.clIntInOctets
         OID: 1.3.6.1.4.1.40310.2.2.2.1.2
-        description: TBD
-        unit: "By"
+        scale_factor: 8
+        chart_meta:
+          description: The number of input octets on the interface
+          family: 'Network/Interface/Traffic/Total/In'
+          unit: "bit/s"
       - name: cumulus.clIntInUcastPkts
         OID: 1.3.6.1.4.1.40310.2.2.2.1.3
-        description: TBD
-        unit: "{packet}"
+        chart_meta:
+          description: The number of input unicast packets on the interface
+          family: 'Network/Interface/Packet/Unicast/In'
+          unit: "{packet}/s"
       - name: cumulus.clIntInBcastPkts
         OID: 1.3.6.1.4.1.40310.2.2.2.1.4
-        description: TBD
-        unit: "{packet}"
+        chart_meta:
+          description: The number of input broadcast packets on the interface
+          family: 'Network/Interface/Packet/Broadcast/In'
+          unit: "{packet}/s"
       - name: cumulus.clIntInMcastPkts
         OID: 1.3.6.1.4.1.40310.2.2.2.1.5
-        description: TBD
-        unit: "{packet}"
+        chart_meta:
+          description: The number of input multicast packets on the interface
+          family: 'Network/Interface/Packet/Multicast/In'
+          unit: "{packet}/s"
       - name: cumulus.clIntOutOctets
         OID: 1.3.6.1.4.1.40310.2.2.2.1.6
-        description: TBD
-        unit: "By"
+        scale_factor: 8
+        chart_meta:
+          description: The number of output octets on the interface
+          family: 'Network/Interface/Traffic/Total/Out'
+          unit: "bit/s"
       - name: cumulus.clIntOutUcastPkts
         OID: 1.3.6.1.4.1.40310.2.2.2.1.7
-        description: TBD
-        unit: "{packet}"
+        chart_meta:
+          description: The number of output unicast packets on the interface
+          family: 'Network/Interface/Packet/Unicast/Out'
+          unit: "{packet}/s"
       - name: cumulus.clIntOutBcastPkts
         OID: 1.3.6.1.4.1.40310.2.2.2.1.8
-        description: TBD
-        unit: "{packet}"
+        chart_meta:
+          description: The number of output broadcast packets on the interface
+          family: 'Network/Interface/Packet/Broadcast/Out'
+          unit: "{packet}/s"
       - name: cumulus.clIntOutMcastPkts
         OID: 1.3.6.1.4.1.40310.2.2.2.1.9
-        description: TBD
-        unit: "{packet}"
+        chart_meta:
+          description: The number of output multicast packets on the interface
+          family: 'Network/Interface/Packet/Multicast/Out'
+          unit: "{packet}/s"
     metric_tags:
-      - symbol:
+      - tag: cumulus_cl_int_index
+        index: 1
+      - tag: cumulus_cl_int_port_name
+        symbol:
           name: cumulus.clIntPortName
           OID: 1.3.6.1.4.1.40310.2.2.2.1.1
-        tag: cumulus_cl_int_port_name
+
   - MIB: CUMULUS-COUNTERS-MIB
     table:
       name: pfcClCountersTable
@@ -245,102 +347,149 @@ metrics:
     symbols:
       - name: cumulus.clIntInPausePkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.2
-        description: TBD
-        unit: "{packet}"
+        chart_meta:
+          description: The number of ethernet flow control pause packets received on the interface
+          family: 'Network/Interface/FlowControl/Pause/In'
+          unit: "{packet}/s"
       - name: cumulus.clIntOutPausePkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.3
-        description: TBD
-        unit: "{packet}"
+        chart_meta:
+          description: The number of ethernet flow control pause packets transmitted on the interface
+          family: 'Network/Interface/FlowControl/Pause/Out'
+          unit: "{packet}/s"
       - name: cumulus.clIntInPfc0Pkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.4
-        description: TBD
-        unit: "{packet}"
+        chart_meta:
+          description: The number of ethernet priority flow control traffic class 0 packets received on the interface
+          family: 'Network/Interface/FlowControl/PFC/Class0/In'
+          unit: "{packet}/s"
       - name: cumulus.clIntOutPfc0Pkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.5
-        description: TBD
-        unit: "{packet}"
+        chart_meta:
+          description: The number of ethernet priority flow control traffic class 0 packets transmitted on the interface
+          family: 'Network/Interface/FlowControl/PFC/Class0/Out'
+          unit: "{packet}/s"
       - name: cumulus.clIntInPfc1Pkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.6
-        description: TBD
-        unit: "{packet}"
+        chart_meta:
+          description: The number of ethernet priority flow control traffic class 1 packets received on the interface
+          family: 'Network/Interface/FlowControl/PFC/Class1/In'
+          unit: "{packet}/s"
       - name: cumulus.clIntOutPfc1Pkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.7
-        description: TBD
-        unit: "{packet}"
+        chart_meta:
+          description: The number of ethernet priority flow control traffic class 1 packets transmitted on the interface
+          family: 'Network/Interface/FlowControl/PFC/Class1/Out'
+          unit: "{packet}/s"
       - name: cumulus.clIntInPfc2Pkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.8
-        description: TBD
-        unit: "{packet}"
+        chart_meta:
+          description: The number of ethernet priority flow control traffic class 2 packets received on the interface
+          family: 'Network/Interface/FlowControl/PFC/Class2/In'
+          unit: "{packet}/s"
       - name: cumulus.clIntOutPfc2Pkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.9
-        description: TBD
-        unit: "{packet}"
+        chart_meta:
+          description: The number of ethernet priority flow control traffic class 2 packets transmitted on the interface
+          family: 'Network/Interface/FlowControl/PFC/Class2/Out'
+          unit: "{packet}/s"
       - name: cumulus.clIntInPfc3Pkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.10
-        description: TBD
-        unit: "{packet}"
+        chart_meta:
+          description: The number of ethernet priority flow control traffic class 3 packets received on the interface
+          family: 'Network/Interface/FlowControl/PFC/Class3/In'
+          unit: "{packet}/s"
       - name: cumulus.clIntOutPfc3Pkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.11
-        description: TBD
-        unit: "{packet}"
+        chart_meta:
+          description: The number of ethernet priority flow control traffic class 3 packets transmitted on the interface
+          family: 'Network/Interface/FlowControl/PFC/Class3/Out'
+          unit: "{packet}/s"
       - name: cumulus.clIntInPfc4Pkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.12
-        description: TBD
-        unit: "{packet}"
+        chart_meta:
+          description: The number of ethernet priority flow control traffic class 4 packets received on the interface
+          family: 'Network/Interface/FlowControl/PFC/Class4/In'
+          unit: "{packet}/s"
       - name: cumulus.clIntOutPfc4Pkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.13
-        description: TBD
-        unit: "{packet}"
+        chart_meta:
+          description: The number of ethernet priority flow control traffic class 4 packets transmitted on the interface
+          family: 'Network/Interface/FlowControl/PFC/Class4/Out'
+          unit: "{packet}/s"
       - name: cumulus.clIntInPfc5Pkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.14
-        description: TBD
-        unit: "{packet}"
+        chart_meta:
+          description: The number of ethernet priority flow control traffic class 5 packets received on the interface
+          family: 'Network/Interface/FlowControl/PFC/Class5/In'
+          unit: "{packet}/s"
       - name: cumulus.clIntOutPfc5Pkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.15
-        description: TBD
-        unit: "{packet}"
+        chart_meta:
+          description: The number of ethernet priority flow control traffic class 5 packets transmitted on the interface
+          family: 'Network/Interface/FlowControl/PFC/Class5/Out'
+          unit: "{packet}/s"
       - name: cumulus.clIntInPfc6Pkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.16
-        description: TBD
-        unit: "{packet}"
+        chart_meta:
+          description: The number of ethernet priority flow control traffic class 6 packets received on the interface
+          family: 'Network/Interface/FlowControl/PFC/Class6/In'
+          unit: "{packet}/s"
       - name: cumulus.clIntOutPfc6Pkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.17
-        description: TBD
-        unit: "{packet}"
+        chart_meta:
+          description: The number of ethernet priority flow control traffic class 6 packets transmitted on the interface
+          family: 'Network/Interface/FlowControl/PFC/Class6/Out'
+          unit: "{packet}/s"
       - name: cumulus.clIntInPfc7Pkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.18
-        description: TBD
-        unit: "{packet}"
+        chart_meta:
+          description: The number of ethernet priority flow control traffic class 7 packets received on the interface
+          family: 'Network/Interface/FlowControl/PFC/Class7/In'
+          unit: "{packet}/s"
       - name: cumulus.clIntOutPfc7Pkt
         OID: 1.3.6.1.4.1.40310.2.2.3.1.19
-        description: TBD
-        unit: "{packet}"
+        chart_meta:
+          description: The number of ethernet priority flow control traffic class 7 packets transmitted on the interface
+          family: 'Network/Interface/FlowControl/PFC/Class7/Out'
+          unit: "{packet}/s"
     metric_tags:
-      - symbol:
+      - tag: cumulus_cl_int_pfc_index
+        index: 1
+      - tag: cumulus_cl_int_pfc_port_name
+        symbol:
           name: cumulus.clIntPfcPortName
           OID: 1.3.6.1.4.1.40310.2.2.3.1.1
-        tag: cumulus_cl_int_pfc_port_name
+
   - MIB: CUMULUS-POE-MIB
     symbol:
       name: cumulus.poeTotalSystemPower
       OID: 1.3.6.1.4.1.40310.3.1.1.0
-      description: The total power available to the system, shown with 3 decimal place of precision (milliwatts)
-      unit: "mW"
+      chart_meta:
+        description: The total power available to the system
+        family: 'Hardware/PoE/Power/Total'
+        unit: "mW"
   - MIB: CUMULUS-POE-MIB
     symbol:
       name: cumulus.poeTotalUsedPower
       OID: 1.3.6.1.4.1.40310.3.1.2.0
-      description: The total power USED by ports in the system, shown with 3 decimal places of precision (milliwatts)
-      unit: "mW"
+      chart_meta:
+        description: The total power USED by ports in the system
+        family: 'Hardware/PoE/Power/Used'
+        unit: "mW"
   - MIB: CUMULUS-POE-MIB
     symbol:
       name: cumulus.poeTotalAvailablePower
       OID: 1.3.6.1.4.1.40310.3.1.3.0
-      description: The total UNUSED and available power for the system in the common pool for new devices, shown with 3 decimal places of precision (milliwatts)
-      unit: "mW"
+      chart_meta:
+        description: The total UNUSED and available power for the system in the common pool for new devices
+        family: 'Hardware/PoE/Power/Available'
+        unit: "mW"
   - MIB: CUMULUS-POE-MIB
     symbol:
       name: cumulus.poeLastUpdateTime
       OID: 1.3.6.1.4.1.40310.3.1.4.0
-      description: The system uptime timestamp when the objects in this MIB were last updated
-      unit: "s"
+      chart_meta:
+        description: The system uptime timestamp when the objects in this MIB were last updated
+        family: 'Hardware/PoE/UpdateTime'
+        unit: "s"

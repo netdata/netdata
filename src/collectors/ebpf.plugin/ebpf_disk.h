@@ -72,6 +72,6 @@ typedef struct netdata_ebpf_publish_disk {
 
 extern struct config disk_config;
 
-void *ebpf_disk_thread(void *ptr);
+void ebpf_disk_thread(void *ptr);
 
 #endif /* NETDATA_EBPF_DISK_H */

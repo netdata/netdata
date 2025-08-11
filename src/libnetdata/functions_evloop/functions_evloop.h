@@ -153,7 +153,7 @@ static inline void pluginsd_function_progress_to_stdout(const char *transaction,
     fflush(stdout);
 }
 
-static inline void send_newline_and_flush(pthread_mutex_t *mutex) {
+static inline void send_newline_and_flush(netdata_mutex_t *mutex) {
     netdata_mutex_lock(mutex);
     fprintf(stdout, "\n");
     fflush(stdout);

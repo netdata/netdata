@@ -98,10 +98,9 @@ void cancel_main_threads(void) {
 }
 
 #ifdef ENABLE_DBENGINE
-static void *rrdeng_exit_background(void *ptr) {
+static void rrdeng_exit_background(void *ptr) {
     struct rrdengine_instance *ctx = ptr;
     rrdeng_exit(ctx);
-    return NULL;
 }
 
 static void rrdeng_quiesce_all()
@@ -201,10 +200,6 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
         rrdeng_flush_everything_and_wait(false, false, true);
     }
 #endif
-
-    // notify we are exiting
-    //analytics_statistic_t statistic = (analytics_statistic_t) {"EXIT", abnormal?"ERROR":"OK","-"};
-    //analytics_statistic_send(&statistic);
 
     webrtc_close_all_connections();
     watcher_step_complete(WATCHER_STEP_ID_CLOSE_WEBRTC_CONNECTIONS);

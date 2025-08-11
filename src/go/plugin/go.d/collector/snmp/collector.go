@@ -7,6 +7,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/gosnmp/gosnmp"
 
@@ -30,13 +31,20 @@ func init() {
 		Create: func() module.Module { return New() },
 		Config: func() any { return &Config{} },
 	})
+
+	r := strings.NewReplacer("\"", "", "`", "", "\\", "")
+	for k, v := range orgToVendorMap {
+		orgToVendorMap[r.Replace(k)] = v
+	}
 }
 
 func New() *Collector {
 	return &Collector{
 		Config: Config{
-			CreateVnode:    true,
-			EnableProfiles: true,
+			CreateVnode:                true,
+			EnableProfiles:             true,
+			EnableProfilesTableMetrics: true,
+			VnodeDeviceDownThreshold:   3,
 			Options: Options{
 				Port:           161,
 				Retries:        1,

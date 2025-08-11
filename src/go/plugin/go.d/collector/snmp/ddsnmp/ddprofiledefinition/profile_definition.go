@@ -29,6 +29,8 @@ type ProfileDefinition struct {
 	StaticTags   []string          `yaml:"static_tags,omitempty" json:"static_tags,omitempty"`
 	Metrics      []MetricsConfig   `yaml:"metrics,omitempty" json:"metrics,omitempty"`
 
+	VirtualMetrics []VirtualMetricConfig `yaml:"virtual_metrics,omitempty" json:"virtual_metrics,omitempty"`
+
 	// DEPRECATED: Use metadata directly
 	Device DeviceMeta `yaml:"device,omitempty" json:"device,omitempty" jsonschema:"device,omitempty"`
 
@@ -63,14 +65,15 @@ func (p *ProfileDefinition) Clone() *ProfileDefinition {
 		return nil
 	}
 	return &ProfileDefinition{
-		Name:         p.Name,
-		Description:  p.Description,
-		SysObjectIDs: slices.Clone(p.SysObjectIDs),
-		Extends:      slices.Clone(p.Extends),
-		Metadata:     CloneMap(p.Metadata),
-		MetricTags:   CloneSlice(p.MetricTags),
-		StaticTags:   slices.Clone(p.StaticTags),
-		Metrics:      CloneSlice(p.Metrics),
+		Name:           p.Name,
+		Description:    p.Description,
+		SysObjectIDs:   slices.Clone(p.SysObjectIDs),
+		Extends:        slices.Clone(p.Extends),
+		Metadata:       CloneMap(p.Metadata),
+		MetricTags:     CloneSlice(p.MetricTags),
+		StaticTags:     slices.Clone(p.StaticTags),
+		Metrics:        CloneSlice(p.Metrics),
+		VirtualMetrics: CloneSlice(p.VirtualMetrics),
 		Device: DeviceMeta{
 			Vendor: p.Device.Vendor,
 		},

@@ -27,6 +27,13 @@
         "type": "boolean",
         "default": true
       },
+      "vnode_device_down_threshold": {
+        "title": "Device Down Threshold",
+        "description": "Number of consecutive failed data collections before marking the device as down.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 3
+      },
       "vnode": {
         "title": "Configuration",
         "description": "",
@@ -351,9 +358,9 @@
       },
       "enable_profiles_table_metrics": {
         "title": "Enable SNMP Table Metrics",
-        "description": "Enable collection of SNMP table metrics from profiles. Enabling this may **increase collection time and memory usage** for devices with many network interfaces*",
+        "description": "Enable collection of SNMP table metrics from profiles. Enabling this may **increase collection time and memory usage** for devices with many network interfaces*.",
         "type": "boolean",
-        "default": false
+        "default": true
       },
       "disable_legacy_collection": {
         "title": "Disable Legacy SNMP Collection",
@@ -366,10 +373,7 @@
       "hostname",
       "community",
       "options"
-    ],
-    "patternProperties": {
-      "^name$": {}
-    }
+    ]
   },
   "uiSchema": {
     "uiOptions": {
@@ -461,6 +465,7 @@
           "title": "Vnode",
           "fields": [
             "create_vnode",
+            "vnode_device_down_threshold",
             "vnode"
           ]
         },

@@ -493,15 +493,15 @@ static inline int ebpf_socket_load_and_attach(struct socket_bpf *obj, ebpf_modul
  */
 static void ebpf_socket_free(ebpf_module_t *em)
 {
-    pthread_mutex_lock(&ebpf_exit_cleanup);
+    netdata_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_REMOVE);
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
+    netdata_mutex_unlock(&ebpf_exit_cleanup);
 
-    pthread_mutex_lock(&lock);
+    netdata_mutex_lock(&lock);
     collect_pids &= ~(1 << EBPF_MODULE_SOCKET_IDX);
-    pthread_mutex_unlock(&lock);
+    netdata_mutex_unlock(&lock);
 }
 
 /**
@@ -623,7 +623,7 @@ static void ebpf_obsolete_specific_socket_charts(char *type, int update_every);
  */
 static inline void ebpf_obsolete_socket_cgroup_charts(ebpf_module_t *em)
 {
-    pthread_mutex_lock(&mutex_cgroup_shm);
+    netdata_mutex_lock(&mutex_cgroup_shm);
 
     ebpf_cgroup_target_t *ect;
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
@@ -635,7 +635,7 @@ static inline void ebpf_obsolete_socket_cgroup_charts(ebpf_module_t *em)
 
         ebpf_obsolete_specific_socket_charts(ect->name, em->update_every);
     }
-    pthread_mutex_unlock(&mutex_cgroup_shm);
+    netdata_mutex_unlock(&mutex_cgroup_shm);
 }
 
 /**
@@ -650,7 +650,7 @@ void ebpf_socket_obsolete_apps_charts(struct ebpf_module *em)
     int order = 20130;
     struct ebpf_target *w;
     int update_every = em->update_every;
-    pthread_mutex_lock(&collect_data_mutex);
+    netdata_mutex_lock(&collect_data_mutex);
     for (w = apps_groups_root_target; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_SOCKET_IDX))))
             continue;
@@ -755,7 +755,7 @@ void ebpf_socket_obsolete_apps_charts(struct ebpf_module *em)
 
         w->charts_created &= ~(1 << EBPF_MODULE_SOCKET_IDX);
     }
-    pthread_mutex_unlock(&collect_data_mutex);
+    netdata_mutex_unlock(&collect_data_mutex);
 }
 
 /**
@@ -899,7 +899,7 @@ static void ebpf_socket_exit(void *pptr)
         nd_thread_signal_cancel(ebpf_read_socket.thread);
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
-        pthread_mutex_lock(&lock);
+        netdata_mutex_lock(&lock);
 
         if (em->cgroup_charts) {
             ebpf_obsolete_socket_cgroup_charts(em);
@@ -913,7 +913,7 @@ static void ebpf_socket_exit(void *pptr)
 
         ebpf_socket_obsolete_global_charts(em);
 
-        pthread_mutex_unlock(&lock);
+        netdata_mutex_unlock(&lock);
     }
 
     ebpf_socket_free(em);
@@ -1067,7 +1067,7 @@ static void ebpf_socket_send_data(ebpf_module_t *em)
 void ebpf_socket_send_apps_data()
 {
     struct ebpf_target *w;
-    pthread_mutex_lock(&collect_data_mutex);
+    netdata_mutex_lock(&collect_data_mutex);
     for (w = apps_groups_root_target; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_SOCKET_IDX))))
             continue;
@@ -1109,7 +1109,7 @@ void ebpf_socket_send_apps_data()
         write_chart_dimension("calls", (collected_number)values->call_udp_received);
         ebpf_write_end_chart();
     }
-    pthread_mutex_unlock(&collect_data_mutex);
+    netdata_mutex_unlock(&collect_data_mutex);
 }
 
 /*****************************************************************
@@ -1874,7 +1874,7 @@ void ebpf_socket_resume_apps_data()
 {
     struct ebpf_target *w;
 
-    pthread_mutex_lock(&collect_data_mutex);
+    netdata_mutex_lock(&collect_data_mutex);
     for (w = apps_groups_root_target; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_SOCKET_IDX))))
             continue;
@@ -1903,7 +1903,7 @@ void ebpf_socket_resume_apps_data()
             values->call_udp_received = ws->call_udp_received;
         }
     }
-    pthread_mutex_unlock(&collect_data_mutex);
+    netdata_mutex_unlock(&collect_data_mutex);
 }
 
 /**
@@ -1915,7 +1915,7 @@ static void ebpf_update_socket_cgroup()
 {
     ebpf_cgroup_target_t *ect;
 
-    pthread_mutex_lock(&mutex_cgroup_shm);
+    netdata_mutex_lock(&mutex_cgroup_shm);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         struct pid_on_target2 *pids;
         for (pids = ect->pids; pids; pids = pids->next) {
@@ -1940,7 +1940,7 @@ static void ebpf_update_socket_cgroup()
             publish->call_tcp_v6_connection = in->call_tcp_v6_connection;
         }
     }
-    pthread_mutex_unlock(&mutex_cgroup_shm);
+    netdata_mutex_unlock(&mutex_cgroup_shm);
 }
 
 /**
@@ -1952,7 +1952,7 @@ static void ebpf_update_socket_cgroup()
  *
  * @return It always return NULL
  */
-void *ebpf_read_socket_thread(void *ptr)
+void ebpf_read_socket_thread(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
@@ -1962,7 +1962,7 @@ void *ebpf_read_socket_thread(void *ptr)
     int counter = update_every - 1;
     int collect_pid = (em->apps_charts || em->cgroup_charts);
     if (!collect_pid)
-        return NULL;
+        return;
 
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
@@ -1984,8 +1984,6 @@ void *ebpf_read_socket_thread(void *ptr)
 
         counter = 0;
     }
-
-    return NULL;
 }
 
 /**
@@ -2720,7 +2718,7 @@ void ebpf_socket_update_cgroup_algorithm()
 */
 static void ebpf_socket_send_cgroup_data(int update_every)
 {
-    pthread_mutex_lock(&mutex_cgroup_shm);
+    netdata_mutex_lock(&mutex_cgroup_shm);
     ebpf_cgroup_target_t *ect;
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         ebpf_socket_sum_cgroup_pids(&ect->publish_socket, ect->pids);
@@ -2750,7 +2748,7 @@ static void ebpf_socket_send_cgroup_data(int update_every)
         }
     }
 
-    pthread_mutex_unlock(&mutex_cgroup_shm);
+    netdata_mutex_unlock(&mutex_cgroup_shm);
 }
 
 /*****************************************************************
@@ -2792,7 +2790,7 @@ static void socket_collector(ebpf_module_t *em)
             ebpf_socket_read_hash_global_tables(stats, maps_per_core);
         }
 
-        pthread_mutex_lock(&lock);
+        netdata_mutex_lock(&lock);
         if (socket_global_enabled)
             ebpf_socket_send_data(em);
 
@@ -2804,16 +2802,16 @@ static void socket_collector(ebpf_module_t *em)
 
         fflush(stdout);
 
-        pthread_mutex_unlock(&lock);
+        netdata_mutex_unlock(&lock);
 
-        pthread_mutex_lock(&ebpf_exit_cleanup);
+        netdata_mutex_lock(&ebpf_exit_cleanup);
         if (running_time && !em->running_time)
             running_time = update_every;
         else
             running_time += update_every;
 
         em->running_time = running_time;
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
+        netdata_mutex_unlock(&ebpf_exit_cleanup);
     }
 }
 
@@ -2995,7 +2993,7 @@ static int ebpf_socket_load_bpf(ebpf_module_t *em)
  *
  * @return It always return NULL
  */
-void *ebpf_socket_thread(void *ptr)
+void ebpf_socket_thread(void *ptr)
 {
     pids_fd[NETDATA_EBPF_PIDS_SOCKET_IDX] = -1;
     ebpf_module_t *em = (ebpf_module_t *)ptr;
@@ -3004,7 +3002,7 @@ void *ebpf_socket_thread(void *ptr)
 
     if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         collector_error("There is already a thread %s running", em->info.thread_name);
-        return NULL;
+        return;
     }
 
     em->maps = socket_maps;
@@ -3053,17 +3051,16 @@ void *ebpf_socket_thread(void *ptr)
     ebpf_read_socket.thread =
         nd_thread_create(ebpf_read_socket.name, NETDATA_THREAD_OPTION_DEFAULT, ebpf_read_socket_thread, em);
 
-    pthread_mutex_lock(&lock);
+    netdata_mutex_lock(&lock);
     ebpf_socket_create_global_charts(em);
 
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
 
-    pthread_mutex_unlock(&lock);
+    netdata_mutex_unlock(&lock);
 
     socket_collector(em);
 
 endsocket:
     ebpf_update_disabled_plugin_stats(em);
-    return NULL;
 }

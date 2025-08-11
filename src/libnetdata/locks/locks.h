@@ -11,7 +11,7 @@
 // #endif
 
 typedef pthread_mutex_t netdata_mutex_t;
-#define NETDATA_MUTEX_INITIALIZER PTHREAD_MUTEX_INITIALIZER
+typedef pthread_cond_t netdata_cond_t;
 
 #ifdef NETDATA_TRACE_RWLOCKS
 
@@ -58,11 +58,13 @@ typedef struct netdata_rwlock_t {
     pthread_rwlock_t rwlock_t;
 } netdata_rwlock_t;
 
-#define NETDATA_RWLOCK_INITIALIZER { \
-        .rwlock_t = PTHREAD_RWLOCK_INITIALIZER \
-    }
-
 #endif // NETDATA_TRACE_RWLOCKS
+
+int __netdata_cond_init(netdata_cond_t *cond);
+int __netdata_cond_destroy(netdata_cond_t *cond);
+int __netdata_cond_signal(netdata_cond_t *cond);
+int __netdata_cond_wait(netdata_cond_t *cond, netdata_mutex_t *mutex);
+int __netdata_cond_timedwait(netdata_cond_t *cond, netdata_mutex_t *mutex, struct timespec *tp);
 
 int __netdata_mutex_init(netdata_mutex_t *mutex);
 int __netdata_mutex_destroy(netdata_mutex_t *mutex);
@@ -129,5 +131,11 @@ int netdata_rwlock_trywrlock_debug( const char *file, const char *function, cons
 #define netdata_rwlock_trywrlock(rwlock)  __netdata_rwlock_trywrlock(rwlock)
 
 #endif // NETDATA_TRACE_RWLOCKS
+
+#define netdata_cond_init(cond) __netdata_cond_init(cond)
+#define netdata_cond_destroy(cond) __netdata_cond_destroy(cond)
+#define netdata_cond_signal(cond) __netdata_cond_signal(cond)
+#define netdata_cond_wait(cond, mutex) __netdata_cond_wait(cond, mutex)
+#define netdata_cond_timedwait(cond, mutex, tp) __netdata_cond_timedwait(cond, mutex, tp)
 
 #endif //NETDATA_LOCKS_H

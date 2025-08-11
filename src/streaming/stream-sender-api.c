@@ -105,10 +105,11 @@ void stream_sender_start_host(struct rrdhost *host) {
     stream_sender_add_to_connector_queue(host);
 }
 
-void *stream_sender_start_localhost(void *ptr __maybe_unused) {
-    if(!localhost) return NULL;
+void stream_sender_start_localhost(void *ptr __maybe_unused)
+{
+    if (!localhost)
+        return;
     stream_sender_start_host(localhost);
-    return NULL;
 }
 
 // Either the receiver lost the connection or the host is being destroyed.

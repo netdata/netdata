@@ -8,7 +8,10 @@ metadata:
   device:
     fields:
       type:
-        value: "router"
+        value: "Router"
+
+# https://mibbrowser.online/mibdb_search.php?mib=HUAWEI-BGP-VPN-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/huawei/HUAWEI-BGP-VPN-MIB
 
 metrics:
   - MIB: HUAWEI-BGP-VPN-MIB
@@ -20,13 +23,13 @@ metrics:
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.6
         chart_meta:
           description: The counter that records the times the remote BGP peer is correctly connected
-          family: 'Routing/BGP/Peer/Connection/Established/Count'
+          family: 'Network/Routing/BGP/Peer/Connection/Established/Count'
           unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.5
         name: huawei.hwBgpPeerState
         chart_meta:
           description: Current state of the BGP peer connection
-          family: 'Routing/BGP/Peer/Connection/State'
+          family: 'Network/Routing/BGP/Peer/Connection/State'
           unit: "{status}"
         mapping:
           1: idle
@@ -39,7 +42,7 @@ metrics:
         name: huawei.hwBgpPeerUnAvaiReason
         chart_meta:
           description: Reason why the BGP peer is unavailable
-          family: 'Routing/BGP/Peer/Unavailable/Reason'
+          family: 'Network/Routing/BGP/Peer/Unavailable/Reason'
           unit: "{status}"
         mapping:
           1: configuration_lead_peer_down
@@ -70,21 +73,21 @@ metrics:
         metric_type: monotonic_count
         chart_meta:
           description: The number of prefixes received from the remote BGP peer
-          family: 'Routing/BGP/Peer/Prefix/Received/Total'
+          family: 'Network/Routing/BGP/Peer/Prefix/Received/Total'
           unit: "{prefix}"
       - name: huawei.hwBgpPeerPrefixActiveCounter
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.3.1.2
         metric_type: monotonic_count
         chart_meta:
           description: The number of active prefixes received from the remote BGP peer
-          family: 'Routing/BGP/Peer/Prefix/Active/Total'
+          family: 'Network/Routing/BGP/Peer/Prefix/Active/Total'
           unit: "{prefix}"
       - name: huawei.hwBgpPeerPrefixAdvCounter
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.3.1.3
         metric_type: monotonic_count
         chart_meta:
           description: The number of prefixes sent to the remote BGP peer
-          family: 'Routing/BGP/Peer/Prefix/Advertised/Total'
+          family: 'Network/Routing/BGP/Peer/Prefix/Advertised/Total'
           unit: "{prefix}"
     metric_tags:
       - tag: huawei_hw_bgp_peer_vrf_name
@@ -106,73 +109,73 @@ metrics:
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.1
         chart_meta:
           description: The total number of protocol packets received from the remote BGP peer
-          family: 'Routing/BGP/Peer/Message/Total/In'
+          family: 'Network/Routing/BGP/Peer/Message/Total/In'
           unit: "{packet}/s"
       - name: huawei.hwBgpPeerOutTotalMsgCounter
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.2
         chart_meta:
           description: The total number of protocol packets sent to the remote BGP peer
-          family: 'Routing/BGP/Peer/Message/Total/Out'
+          family: 'Network/Routing/BGP/Peer/Message/Total/Out'
           unit: "{packet}/s"
       - name: huawei.hwBgpPeerInOpenMsgCounter
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.3
         chart_meta:
           description: The total number of Open packets received from the remote BGP peer
-          family: 'Routing/BGP/Peer/Message/Open/In'
+          family: 'Network/Routing/BGP/Peer/Message/Open/In'
           unit: "{packet}/s"
       - name: huawei.hwBgpPeerInUpdateMsgCounter
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.4
         chart_meta:
           description: The total number of Update packets received from the remote BGP peer
-          family: 'Routing/BGP/Peer/Message/Update/In'
+          family: 'Network/Routing/BGP/Peer/Message/Update/In'
           unit: "{packet}/s"
       - name: huawei.hwBgpPeerInNotificationMsgCounter
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.5
         chart_meta:
           description: The total number of Notification packets received from the remote BGP peer
-          family: 'Routing/BGP/Peer/Message/Notification/In'
+          family: 'Network/Routing/BGP/Peer/Message/Notification/In'
           unit: "{packet}/s"
       - name: huawei.hwBgpPeerInKeepAliveMsgCounter
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.6
         chart_meta:
           description: The total number of Keepalive packets received from the remote BGP peer
-          family: 'Routing/BGP/Peer/Message/KeepAlive/In'
+          family: 'Network/Routing/BGP/Peer/Message/KeepAlive/In'
           unit: "{packet}/s"
       - name: huawei.hwBgpPeerInRouteFreshMsgCounter
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.7
         chart_meta:
           description: The total number of Route-Refresh packets received from the remote BGP peer
-          family: 'Routing/BGP/Peer/Message/RouteRefresh/In'
+          family: 'Network/Routing/BGP/Peer/Message/RouteRefresh/In'
           unit: "{packet}/s"
       - name: huawei.hwBgpPeerOutOpenMsgCounter
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.8
         chart_meta:
           description: The total number of Open packets sent to the remote BGP peer
-          family: 'Routing/BGP/Peer/Message/Open/Out'
+          family: 'Network/Routing/BGP/Peer/Message/Open/Out'
           unit: "{packet}/s"
       - name: huawei.hwBgpPeerOutUpdateMsgCounter
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.9
         chart_meta:
           description: The total number of Update packets sent to the remote BGP peer
-          family: 'Routing/BGP/Peer/Message/Update/Out'
+          family: 'Network/Routing/BGP/Peer/Message/Update/Out'
           unit: "{packet}/s"
       - name: huawei.hwBgpPeerOutNotificationMsgCounter
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.10
         chart_meta:
           description: The total number of Notification packets sent to the remote BGP peer
-          family: 'Routing/BGP/Peer/Message/Notification/Out'
+          family: 'Network/Routing/BGP/Peer/Message/Notification/Out'
           unit: "{packet}/s"
       - name: huawei.hwBgpPeerOutKeepAliveMsgCounter
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.11
         chart_meta:
           description: The total number of Keepalive packets sent to the remote BGP peer
-          family: 'Routing/BGP/Peer/Message/KeepAlive/Out'
+          family: 'Network/Routing/BGP/Peer/Message/KeepAlive/Out'
           unit: "{packet}/s"
       - name: huawei.hwBgpPeerOutRouteFreshMsgCounter
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.12
         chart_meta:
           description: The total number of Route-Refresh packets sent to the remote BGP peer
-          family: 'Routing/BGP/Peer/Message/RouteRefresh/Out'
+          family: 'Network/Routing/BGP/Peer/Message/RouteRefresh/Out'
           unit: "{packet}/s"
     metric_tags:
       - tag: huawei_hw_bgp_peer_vrf_name

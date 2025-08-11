@@ -143,9 +143,6 @@
         "title": "Method",
         "type": "string"
       }
-    },
-    "patternProperties": {
-      "^name$": {}
     }
   },
   "uiSchema": {

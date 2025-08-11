@@ -7,9 +7,6 @@
 extends:
   - _system-base.yaml
 
-device:
-  vendor: "netapp"
-
 # All netapp products have netappProducts (1.3.6.1.4.1.789.2) OID as parent
 sysobjectid: 1.3.6.1.4.1.789.2.*
 
@@ -17,7 +14,7 @@ metadata:
   device:
     fields:
       vendor:
-        value: "netapp"
+        value: "NetApp"
       serial_number:
         symbol:
           MIB: NETAPP-MIB
@@ -52,6 +49,10 @@ metadata:
           match_value: '$1'
 
 
+# NETAPP-MIB
+# https://mibbrowser.online/mibdb_search.php?mib=NETAPP-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/netapp/NETAPP-MIB
+
 metrics:
   - MIB: NETAPP-MIB
     symbol:
@@ -61,7 +62,7 @@ metrics:
       # The partialFailure(3) status indicates that one of the links in the interconnect hardware is down.
       chart_meta:
         description: The current status of the interconnect
-        family: 'ClusterFailover/Interconnect/Status'
+        family: 'System/ClusterFailover/Interconnect/Status'
         unit: "{status}"
   - MIB: NETAPP-MIB
     symbol:
@@ -73,7 +74,7 @@ metrics:
       # buffer cache age will be very low.
       chart_meta:
         description: Age in minutes of the oldest read-only blocks in the buffer cache
-        family: 'Cache/Buffer/Age'
+        family: 'Storage/Cache/Buffer/Age'
         unit: "min"
   - MIB: NETAPP-MIB
     symbol:
@@ -90,7 +91,7 @@ metrics:
       name: extcache64Hits
       chart_meta:
         description: Number of wafl buffers read from the external cache
-        family: 'Cache/External/Hit/Count'
+        family: 'Storage/Cache/External/Hit'
         unit: "{buffer}/s"
 
   # Snap vaults (https://oidref.com/1.3.6.1.4.1.789.1.19.11.1.15)
@@ -103,32 +104,32 @@ metrics:
         name: svTotalTransMBs
         chart_meta:
           description: Transfer size
-          family: 'SnapVault/Transfer/Throughput/Total'
+          family: 'Storage/SnapVault/Transfer/Throughput'
           unit: "By/s"
         scale_factor: 1048576
       - OID: 1.3.6.1.4.1.789.1.19.11.1.7
         name: svTotalSuccesses
         chart_meta:
           description: Successful transfers
-          family: 'SnapVault/Transfer/Success/Count'
+          family: 'Storage/SnapVault/Transfer/Success'
           unit: "{transfer}/s"
       - OID: 1.3.6.1.4.1.789.1.19.11.1.9
         name: svTotalFailures
         chart_meta:
           description: Failed or aborted transfers
-          family: 'SnapVault/Transfer/Failure/Count'
+          family: 'Storage/SnapVault/Transfer/Failure'
           unit: "{transfer}/s"
       - OID: 1.3.6.1.4.1.789.1.19.11.1.6
         name: svLag
         chart_meta:
           description: Shows how far away the destination is from the source.
-          family: 'SnapVault/Sync/Lag'
+          family: 'Storage/SnapVault/Sync/Lag'
           unit: "cs"
       - OID: 1.3.6.1.4.1.789.1.19.11.1.4
         name: svStatus
         chart_meta:
           description: Current transfer status
-          family: 'SnapVault/Transfer/Status'
+          family: 'Storage/SnapVault/Transfer/Status'
           unit: "{status}"
         mapping:
           1: idle
@@ -142,7 +143,7 @@ metrics:
         name: svState
         chart_meta:
           description: Current state of the SnapVault relationship
-          family: 'SnapVault/Relationship/Status'
+          family: 'Storage/SnapVault/Relationship/Status'
           unit: "{status}"
         mapping:
           1: uninitialized
@@ -177,32 +178,32 @@ metrics:
         name: snapmirrorTotalTransMBs
         chart_meta:
           description: Transfer size
-          family: 'SnapMirror/Transfer/Throughput/Total'
+          family: 'Storage/SnapMirror/Transfer/Throughput'
           unit: "By/s"
         scale_factor: 1048576
       - OID: 1.3.6.1.4.1.789.1.9.20.1.7
         name: snapmirrorTotalSuccesses
         chart_meta:
           description: Successful transfers
-          family: 'SnapMirror/Transfer/Success/Count'
+          family: 'Storage/SnapMirror/Transfer/Success'
           unit: "{transfer}/s"
       - OID: 1.3.6.1.4.1.789.1.9.20.1.9
         name: snapmirrorTotalFailures
         chart_meta:
           description: Failed or aborted transfers
-          family: 'SnapMirror/Transfer/Failure/Count'
+          family: 'Storage/SnapMirror/Transfer/Failure'
           unit: "{transfer}/s"
       - OID: 1.3.6.1.4.1.789.1.9.20.1.6
         name: snapmirrorLag
         chart_meta:
           description: How far behind from the source the destination is
-          family: 'SnapMirror/Sync/Lag'
+          family: 'Storage/SnapMirror/Sync/Lag'
           unit: "cs"
       - OID: 1.3.6.1.4.1.789.1.9.20.1.4
         name: snapmirrorStatus
         chart_meta:
           description: Current transfer status of the SnapMirror
-          family: 'SnapMirror/Transfer/Status'
+          family: 'Storage/SnapMirror/Transfer/Status'
           unit: "{status}"
         mapping:
           1: uninitialized
@@ -215,7 +216,7 @@ metrics:
         name: snapmirrorState
         chart_meta:
           description: Current state of the SnapMirror
-          family: 'SnapMirror/Status'
+          family: 'Storage/SnapMirror/State/Status'
           unit: "{status}"
         mapping:
           1: idle
@@ -249,7 +250,7 @@ metrics:
         name: dfStatus
         chart_meta:
           description: The status of the file system
-          family: 'FileSystem/Status'
+          family: 'System/FileSystem/Status'
           unit: "{status}"
         mapping:
           1: unmounted
@@ -266,7 +267,7 @@ metrics:
         name: dfMirrorStatus
         chart_meta:
           description: The status of the file system
-          family: 'FileSystem/Mirror/Status'
+          family: 'System/FileSystem/Mirror/Status'
           unit: "{status}"
         mapping:
           1: invalid
@@ -283,34 +284,34 @@ metrics:
         name: dfHighTotalKBytes
         chart_meta:
           description: Total capacity for the referenced file system
-          family: 'FileSystem/Space/Total'
+          family: 'System/FileSystem/Space/Total'
           unit: "By"
         scale_factor: 1024
       - OID: 1.3.6.1.4.1.789.1.5.4.1.16
         name: dfHighUsedKBytes
         chart_meta:
           description: The total disk space that is in use on the referenced file system
-          family: 'FileSystem/Space/Used'
+          family: 'System/FileSystem/Space/Used'
           unit: "By"
         scale_factor: 1024
       - OID: 1.3.6.1.4.1.789.1.5.4.1.18
         name: dfHighAvailKBytes
         chart_meta:
           description: Total disk space that is free for use on the referenced file system
-          family: 'FileSystem/Space/Available'
+          family: 'System/FileSystem/Space/Available'
           unit: "By"
         scale_factor: 1024
       - OID: 1.3.6.1.4.1.789.1.5.4.1.7
         name: dfInodesUsed
         chart_meta:
           description: Total number of inodes in use on the referenced file system
-          family: 'FileSystem/Inode/Used'
+          family: 'System/FileSystem/Inode/Used'
           unit: "{inode}"
       - OID: 1.3.6.1.4.1.789.1.5.4.1.8
         name: dfInodesFree
         chart_meta:
           description: Total number of inodes that are available for use on the referenced file system
-          family: 'FileSystem/Inode/Free'
+          family: 'System/FileSystem/Inode/Free'
           unit: "{inode}"
     metric_tags:
       - tag: df_index
@@ -336,70 +337,70 @@ metrics:
         name: if64InOctets
         chart_meta:
           description: The total number of octets received on the interface, including framing characters
-          family: 'Interfaces/Traffic/Total/In'
-          unit: "bits/s"
+          family: 'Network/Interface/Traffic/Total/In'
+          unit: "bit/s"
         scale_factor: 8
       - OID: 1.3.6.1.4.1.789.1.22.1.2.1.31
         name: if64OutOctets
         chart_meta:
           description: The total number of octets transmitted out of the interface, including framing characters
-          family: 'Interfaces/Traffic/Total/Out'
-          unit: "bits/s"
+          family: 'Network/Interface/Traffic/Total/Out'
+          unit: "bit/s"
         scale_factor: 8
       - OID: 1.3.6.1.4.1.789.1.22.1.2.1.26
         name: if64InUcastPkts
         chart_meta:
           description: The number of unicast packets delivered to a higher-layer protocol
-          family: 'Interfaces/Packet/Unicast/In'
-          unit: "packets/s"
+          family: 'Network/Interface/Packet/Unicast/In'
+          unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.789.1.22.1.2.1.32
         name: if64OutUcastPkts
         chart_meta:
           description: The total number of unicast packets requested to be transmitted
-          family: 'Interfaces/Packet/Unicast/Out'
-          unit: "packets/s"
+          family: 'Network/Interface/Packet/Unicast/Out'
+          unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.789.1.22.1.2.1.27
         name: if64InNUcastPkts
         chart_meta:
           description: The number of non-unicast (broadcast/multicast) packets delivered to a higher-layer protocol
-          family: 'Interfaces/Packet/NonUnicast/In'
-          unit: "packets/s"
+          family: 'Network/Interface/Packet/NonUnicast/In'
+          unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.789.1.22.1.2.1.33
         name: if64OutNUcastPkts
         chart_meta:
           description: The total number of non-unicast packets requested to be transmitted
-          family: 'Interfaces/Packet/NonUnicast/Out'
-          unit: "packets/s"
+          family: 'Network/Interface/Packet/NonUnicast/Out'
+          unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.789.1.22.1.2.1.28
         name: if64InDiscards
         chart_meta:
           description: The number of inbound packets discarded even though no errors were detected
-          family: 'Interfaces/Discard/In'
-          unit: "packets/s"
+          family: 'Network/Interface/Packet/Discard/In'
+          unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.789.1.22.1.2.1.34
         name: if64OutDiscards
         chart_meta:
           description: The number of outbound packets discarded even though no errors were detected
-          family: 'Interfaces/Discard/Out'
-          unit: "packets/s"
+          family: 'Network/Interface/Packet/Discard/Out'
+          unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.789.1.22.1.2.1.29
         name: if64InErrors
         chart_meta:
           description: The number of inbound packets containing errors preventing delivery to higher-layer protocol
-          family: 'Interfaces/Error/Total/In'
-          unit: "errors/s"
+          family: 'Network/Interface/Error/Total/In'
+          unit: "{error}/s"
       - OID: 1.3.6.1.4.1.789.1.22.1.2.1.35
         name: if64OutErrors
         chart_meta:
           description: The number of outbound packets that could not be transmitted due to errors
-          family: 'Interfaces/Error/Total/Out'
-          unit: "errors/s"
+          family: 'Network/Interface/Error/Total/Out'
+          unit: "{error}/s"
       - OID: 1.3.6.1.4.1.789.1.22.1.2.1.30
         name: if64InUnknownProtos
         chart_meta:
           description: The number of packets discarded due to unknown or unsupported protocol
-          family: 'Interfaces/Error/UnknownProtocol/In'
-          unit: "packets/s"
+          family: 'Network/Interface/Error/UnknownProtocol'
+          unit: "{packet}/s"
     metric_tags:
       - tag: interface_index
         symbol:

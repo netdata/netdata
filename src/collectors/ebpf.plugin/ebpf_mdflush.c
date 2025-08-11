@@ -156,11 +156,11 @@ static void mdflush_exit(void *pptr)
         return;
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
-        pthread_mutex_lock(&lock);
+        netdata_mutex_lock(&lock);
 
         ebpf_obsolete_mdflush_global(em);
 
-        pthread_mutex_unlock(&lock);
+        netdata_mutex_unlock(&lock);
         fflush(stdout);
     }
 
@@ -172,10 +172,10 @@ static void mdflush_exit(void *pptr)
         em->probe_links = NULL;
     }
 
-    pthread_mutex_lock(&ebpf_exit_cleanup);
+    netdata_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     ebpf_update_stats(&plugin_statistics, em);
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
+    netdata_mutex_unlock(&ebpf_exit_cleanup);
 }
 
 /**
@@ -321,11 +321,11 @@ static void mdflush_collector(ebpf_module_t *em)
     avl_init_lock(&mdflush_pub, mdflush_val_cmp);
 
     // create chart and static dims.
-    pthread_mutex_lock(&lock);
+    netdata_mutex_lock(&lock);
     mdflush_create_charts(update_every);
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
-    pthread_mutex_unlock(&lock);
+    netdata_mutex_unlock(&lock);
 
     // loop and read from published data until ebpf plugin is closed.
     int counter = update_every - 1;
@@ -342,22 +342,22 @@ static void mdflush_collector(ebpf_module_t *em)
 
         counter = 0;
         mdflush_read_count_map(maps_per_core);
-        pthread_mutex_lock(&lock);
+        netdata_mutex_lock(&lock);
         // write dims now for all hitherto discovered devices.
         ebpf_write_begin_chart("mdstat", "mdstat_flush", "");
         avl_traverse_lock(&mdflush_pub, mdflush_write_dims, NULL);
         ebpf_write_end_chart();
 
-        pthread_mutex_unlock(&lock);
+        netdata_mutex_unlock(&lock);
 
-        pthread_mutex_lock(&ebpf_exit_cleanup);
+        netdata_mutex_lock(&ebpf_exit_cleanup);
         if (running_time && !em->running_time)
             running_time = update_every;
         else
             running_time += update_every;
 
         em->running_time = running_time;
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
+        netdata_mutex_unlock(&ebpf_exit_cleanup);
     }
 }
 
@@ -409,7 +409,7 @@ static int ebpf_mdflush_load_bpf(ebpf_module_t *em)
  * @param ptr a `ebpf_module_t *`.
  * @return always NULL.
  */
-void *ebpf_mdflush_thread(void *ptr)
+void ebpf_mdflush_thread(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     CLEANUP_FUNCTION_REGISTER(mdflush_exit) cleanup_ptr = em;
@@ -436,6 +436,4 @@ void *ebpf_mdflush_thread(void *ptr)
 endmdflush:
     freez(md_flush_request);
     ebpf_update_disabled_plugin_stats(em);
-
-    return NULL;
 }

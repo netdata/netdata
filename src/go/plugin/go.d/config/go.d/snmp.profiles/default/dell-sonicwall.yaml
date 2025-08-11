@@ -9,7 +9,7 @@ metadata:
   device:
     fields:
       type:
-        value: "firewall"
+        value: "Firewall"
       serial_number:
         symbol:
           MIB: SONICWALL-COMMON-MIB
@@ -26,21 +26,25 @@ metadata:
           OID: 1.3.6.1.4.1.8741.2.1.1.1.0
           name: snwlSysModel
 
+# -  SONICWALL-FIREWALL-IP-STATISTICS-MIB
+#   https://mibbrowser.online/mibdb_search.php?mib=SONICWALL-FIREWALL-IP-STATISTICS-MIB
+#   https://github.com/librenms/librenms/blob/master/mibs/sonicwall/SONICWALL-FIREWALL-IP-STATISTICS-MIB
+
 metrics:
   - MIB: SONICWALL-FIREWALL-IP-STATISTICS-MIB
     symbol:
-      name: cpu.usage
+      name: cpu.usage #  sonicCurrentCPUUtil
       OID: 1.3.6.1.4.1.8741.1.3.1.3.0
       chart_meta:
-        family: 'CPU/Usage'
-        description: Instantaneous CPU Utilization in percent
+        family: 'System/CPU/Usage'
+        description: The current CPU utilization
         unit: "%"
   - MIB: SONICWALL-FIREWALL-IP-STATISTICS-MIB
     symbol:
       name: memory.usage
       OID: 1.3.6.1.4.1.8741.1.3.1.4.0
       chart_meta:
-        family: 'Memory/Usage'
+        family: 'System/Memory/Usage'
         description: Instantaneous RAM Utilization in percent
         unit: "%"
   - MIB: SONICWALL-FIREWALL-IP-STATISTICS-MIB
@@ -48,7 +52,7 @@ metrics:
       name: sonicMaxConnCacheEntries
       OID: 1.3.6.1.4.1.8741.1.3.1.1.0
       chart_meta:
-        family: 'Connection/Cache/Maximum'
+        family: 'Security/Firewall/Connection/Cache/Maximum'
         description: Maximum number of connection cache entries allowed through the firewall
         unit: "{entry}"
   - MIB: SONICWALL-FIREWALL-IP-STATISTICS-MIB
@@ -56,7 +60,7 @@ metrics:
       name: sonicCurrentConnCacheEntries
       OID: 1.3.6.1.4.1.8741.1.3.1.2.0
       chart_meta:
-        family: 'Connection/Cache/Active'
+        family: 'Security/Firewall/Connection/Cache/Active'
         description: Number of active connection cache entries through the firewall
         unit: "{entry}"
   - MIB: SONICWALL-FIREWALL-IP-STATISTICS-MIB
@@ -64,7 +68,7 @@ metrics:
       name: sonicNatTranslationCount
       OID: 1.3.6.1.4.1.8741.1.3.1.5.0
       chart_meta:
-        family: 'NAT/Translation/Active'
+        family: 'Network/NAT/Translation/Active'
         description: Current number of dynamic NAT translations being performed
         unit: "{translation}"
 
@@ -73,7 +77,7 @@ metrics:
       name: sonicDpiSslConnCountCur
       OID: 1.3.6.1.4.1.8741.1.3.5.1.0
       chart_meta:
-        family: 'DPI/SSL/Connection/Current'
+        family: 'Security/DPI/SSL/Connection/Current'
         description: Current SSL-inspected connections through the firewall
         unit: "{connection}"
   - MIB: SONICWALL-FIREWALL-IP-STATISTICS-MIB
@@ -81,7 +85,7 @@ metrics:
       name: sonicDpiSslConnCountHighWater
       OID: 1.3.6.1.4.1.8741.1.3.5.2.0
       chart_meta:
-        family: 'DPI/SSL/Connection/HighWater'
+        family: 'Security/DPI/SSL/Connection/HighWater'
         description: Highwater SSL-inspected connections through the firewall
         unit: "{connection}"
   - MIB: SONICWALL-FIREWALL-IP-STATISTICS-MIB
@@ -89,7 +93,7 @@ metrics:
       name: sonicDpiSslConnCountMax
       OID: 1.3.6.1.4.1.8741.1.3.5.3.0
       chart_meta:
-        family: 'DPI/SSL/Connection/Maximum'
+        family: 'Security/DPI/SSL/Connection/Maximum'
         description: Maximum SSL-inspected connections through the firewall
         unit: "{connection}"
 
@@ -101,37 +105,37 @@ metrics:
       - name: sonicSAStatEncryptPktCount
         OID: 1.3.6.1.4.1.8741.1.3.2.1.1.1.8
         chart_meta:
-          family: 'IPSec/SA/Packet/Encrypted'
+          family: 'Network/VPN/IPSec/SA/Packet/Encrypted'
           description: Total encrypted packet count for this phase2 SA
-          unit: "{packet/s}"
+          unit: "{packet}/s"
       - name: sonicSAStatEncryptByteCount
         OID: 1.3.6.1.4.1.8741.1.3.2.1.1.1.9
         chart_meta:
-          family: 'IPSec/SA/Data/Encrypted'
+          family: 'Network/VPN/IPSec/SA/Data/Encrypted'
           description: Total encrypted byte count for this phase2 SA
           unit: "By/s"
       - name: sonicSAStatDecryptPktCount
         OID: 1.3.6.1.4.1.8741.1.3.2.1.1.1.10
         chart_meta:
-          family: 'IPSec/SA/Packet/Decrypted'
+          family: 'Network/VPN/IPSec/SA/Packet/Decrypted'
           description: Total decrypted packet count for this phase2 SA
           unit: "{packet}/s"
       - name: sonicSAStatDecryptByteCount
         OID: 1.3.6.1.4.1.8741.1.3.2.1.1.1.11
         chart_meta:
-          family: 'IPSec/SA/Data/Decrypted'
+          family: 'Network/VPN/IPSec/SA/Data/Decrypted'
           description: Total decrypted byte count for this phase2 SA
           unit: "By/s"
       - name: sonicSAStatInFragPktCount
         OID: 1.3.6.1.4.1.8741.1.3.2.1.1.1.12
         chart_meta:
-          family: 'IPSec/SA/Packet/Fragment/In'
+          family: 'Network/VPN/IPSec/SA/Packet/Fragment/In'
           description: Incoming Fragmented packet count for this phase2 SA
           unit: "{packet}/s"
       - name: sonicSAStatOutFragPktCount
         OID: 1.3.6.1.4.1.8741.1.3.2.1.1.1.13
         chart_meta:
-          family: 'IPSec/SA/Packet/Fragment/Out'
+          family: 'Network/IPSec/SA/Packet/Fragment/Out'
           description: Outgoing Fragmented packet count for this phase2 SA
           unit: "{packet}/s"
     metric_tags:

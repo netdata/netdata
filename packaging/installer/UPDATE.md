@@ -12,8 +12,8 @@ The update process can differ based on the installation type:
 
 - Install types starting with `binpkg` or ending with `build` or `static` can be updated using our [kickstart script update method](#update-methods-by-platform).
 - Installs with an installation type of `custom` usually indicate installing a third-party package through the system package manager. To update these installations, you should update the package just like you would any other package on your system.
-- macOS users should check [our update instructions for macOS](#update-methods-by-platform).
-- Manually built installs should check [our update instructions for manual builds](#update-methods-by-platform).
+- macOS users should check out [our update instructions for macOS](#update-methods-by-platform).
+- Manually built installs should check out [our update instructions for manual builds](#update-methods-by-platform).
 
 ## Determine which installation method you used
 
@@ -47,7 +47,6 @@ wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /
 
 If you installed Netdata using an installation prefix, you will need to add an `--install-prefix` option specifying that prefix to make sure it finds the existing installation.
 
-:::
 
 If you see a line starting with `--- Would attempt to update existing installation by running the updater script located at:`, then our [kickstart script update method](#update-methods-by-platform) will work for you.
 

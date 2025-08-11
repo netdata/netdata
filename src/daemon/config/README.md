@@ -1,39 +1,52 @@
 # Daemon Configuration Reference
 
-The Netdata daemon's main configuration file is located at `/INSTALL_PREFIX/netdata/netdata.conf`. While Netdata works effectively with default settings, this file allows you to fine-tune its behavior.
+You can fine-tune your Netdata daemon's behavior using the main configuration file located at `/INSTALL_PREFIX/netdata/netdata.conf`. While Netdata works effectively with default settings, this file allows you to fine-tune its behavior.
+
+:::note
 
 You can view your current configuration, including default values, at `http://IP:19999/netdata.conf`. Access to this URL is [restricted to local IPs by default](/src/web/server/README.md#access-lists).
 
-The configuration file uses an INI-style format with `[SECTION]` headers:
+:::
 
-| Section                                                           | Controls                                                 |
-|-------------------------------------------------------------------|----------------------------------------------------------|
-| [[global]](#global-section-options)                               | [Daemon](/src/daemon/README.md)                          |
-| [[db]](#db-section-options)                                       | [Database](/src/database/README.md)                      |
-| [[directories]](#directories-section-options)                     | Directories used by Netdata                              |
-| [[logs]](#logs-section-options)                                   | Logging                                                  |
-| [[environment variables]](#environment-variables-section-options) | Environment variables                                    |
-| [[sqlite]](#sqlite-section-options)                               | SQLite                                                   |
-| `[ml]`                                                            | [Machine Learning](/src/ml/README.md)                    |
-| [[health]](#health-section-options)                               | [Health monitoring](/src/health/README.md)               |
-| `[web]`                                                           | [Web Server](/src/web/server/README.md)                  |
-| `[registry]`                                                      | [Registry](/src/registry/README.md)                      |
-| `[telemetry]`                                                     | Internal monitoring                                      |
-| `[statsd]`                                                        | [StatsD plugin](/src/collectors/statsd.plugin/README.md) |
-| [`[plugins]`](#plugins-section-options)                           | Data collection Plugins (Collectors)                     |
-| [[plugin:NAME]](#per-plugin-configuration)                        | Individual [Plugins](#per-plugin-configuration)          |
+:::info
 
-> **Note**
->
-> The configuration uses a simple `name = value` format. Netdata tolerates unknown options, marking them with comments when viewing the running configuration through `/netdata.conf`.
+The configuration file uses an INI-style format with `[SECTION]` headers and a simple `name = value` format. Netdata tolerates unknown options, marking them with comments when you view the running configuration through `/netdata.conf`.
 
-## Applying changes
+:::
 
-After `netdata.conf` has been modified, Netdata needs to be [restarted](/docs/netdata-agent/start-stop-restart.md) for changes to apply.
+## Configuration Sections Overview
 
-## Configuration Sections
+Your configuration file contains these main sections:
 
-### `global` section options
+| Section                                                     | Controls                                                 |
+|-------------------------------------------------------------|----------------------------------------------------------|
+| [`[global]`](#configuration-section-details)                | [Daemon](/src/daemon/README.md)                          |
+| [`[db]`](#configuration-section-details)                    | [Database](/src/database/README.md)                      |
+| [`[directories]`](#configuration-section-details)           | Directories used by Netdata                              |
+| [`[logs]`](#configuration-section-details)                  | Logging                                                  |
+| [`[environment variables]`](#configuration-section-details) | Environment variables                                    |
+| [`[sqlite]`](#configuration-section-details)                | SQLite                                                   |
+| `[ml]`                                                      | [Machine Learning](/src/ml/README.md)                    |
+| [`[health]`](#configuration-section-details)                | [Health monitoring](/src/health/README.md)               |
+| `[web]`                                                     | [Web Server](/src/web/server/README.md)                  |
+| `[registry]`                                                | [Registry](/src/registry/README.md)                      |
+| `[telemetry]`                                               | Internal monitoring                                      |
+| `[statsd]`                                                  | [StatsD plugin](/src/collectors/statsd.plugin/README.md) |
+| `[plugins]`                                                 | Data collection Plugins (Collectors)                     |
+| [`[plugin:NAME]`](#per-plugin-configuration)                | Individual [Plugins](#per-plugin-configuration)          |
+
+## Apply Configuration Changes
+
+:::note
+
+After you modify `netdata.conf`, you need to [restart Netdata](/docs/netdata-agent/start-stop-restart.md) for your changes to take effect.
+
+:::
+
+## Configuration Section Details
+
+<details>
+<summary><strong>Global Section Options</strong></summary>
 
 |              setting               |    default     | info                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 |:----------------------------------:|:--------------:|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -49,11 +62,11 @@ After `netdata.conf` has been modified, Netdata needs to be [restarted](/docs/ne
 |         pthread stack size         | auto-detected  |                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 |           crash reports            | `all` or `off` | `all` when anonymous telemetry is enabled, or the agent is claimed or connected to Netdata Cloud (directly or via a Netdata Parent). When it is `all` Netdata reports restarts and crashes. It can also be `crashes` to report only crashes. When it is `off` nothing is reported. Each kind of event is deduplicated and reported at most once per day. [Read more at this blog post](https://www.netdata.cloud/blog/2025-03-06-monitoring-netdata-restarts/). |  
 
-#### Profiles
+**Profiles**:
 
 The profiles are detected in this order:
 
-1. `iot` is used when the system has 1 CPU core and/or less than 1GiB of RAM. It has the highest priority among all the profiles, so that if this is detected, it will be used instead of any of the others.
+1. `iot` is used when the system has 1 CPU core and/or less than 1GiB of RAM. It has the highest priority among all the profiles, so that if this is detected, it will be used instead of the others.
 2. `parent` is detected when `stream.conf` has configuration for receiving data from child nodes and the system is not `iot`.
 3. `child` is detected when `stream.conf` has configuration for sending data to a parent node, does not have configuration for receiving data from other nodes, and the system is not `iot`.
 4. `standalone` is the fallback profile when none of the above are detected.
@@ -71,7 +84,10 @@ The following are the parameters affected by the profile:
 
 A few of these settings can be individually configured in `netdata.conf`, like the libc allocation arenas and machine learning. The rest are automatically set based on the profile.
 
-### `db` section options
+</details>
+
+<details>
+<summary><strong>Database Section Options</strong></summary>
 
 |                    setting                    |            default             | info                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 |:---------------------------------------------:|:------------------------------:|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -90,11 +106,14 @@ A few of these settings can be individually configured in `netdata.conf`, like t
 |          cleanup orphan hosts after           |              `1h`              | How long to wait until automatically removing from the DB a remote Netdata host (child) that is no longer sending data.                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 |              enable zero metrics              |              `no`              | Set to `yes` to show charts when all their metrics are zero.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 
-> ### Info
->
-> The multiplication of all the **enabled** tiers  `dbengine tier N update every iterations` values must be less than `65535`.
+:::info Storage Tiers
+The multiplication of all the **enabled** tiers `dbengine tier N update every iterations` values must be less than `65535`.
+:::
 
-### `directories` section options
+</details>
+
+<details>
+<summary><strong>Directories Section Options</strong></summary>
 
 |       setting       |                              default                               | info                                                                                                                                                                               |
 |:-------------------:|:------------------------------------------------------------------:|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -111,7 +130,10 @@ A few of these settings can be individually configured in `netdata.conf`, like t
 | stock Health config |                 `/usr/lib/netdata/conf.d/health.d`                 | Contains the stock Alert configuration files for each collector                                                                                                                    |
 |      registry       |              `/opt/netdata/var/lib/netdata/registry`               | Contains the [registry](/src/registry/README.md) database and GUID that uniquely identifies each Netdata Agent                                                                     |
 
-### `logs` section options
+</details>
+
+<details>
+<summary><strong>Logs Section Options</strong></summary>
 
 There are additional configuration options for the logs. For more info, see [Netdata Logging](/src/libnetdata/log/README.md).
 
@@ -129,7 +151,10 @@ There are additional configuration options for the logs. For more info, see [Net
 | logs to trigger flood protection |            `1000`             | Number of errors written to the log in `errors flood protection period` sec before flood protection is activated.                                                                                                                                                                     |
 |              level               |            `info`             | Controls which log messages are logged, with error being the most important. Supported values: `info` and `error`.                                                                                                                                                                    |
 
-### `environment variables` section options
+</details>
+
+<details>
+<summary><strong>Environment Variables Section Options</strong></summary>
 
 |  setting   |      default      | info                                                       |
 |:----------:|:-----------------:|:-----------------------------------------------------------|
@@ -137,7 +162,10 @@ There are additional configuration options for the logs. For more info, see [Net
 |    PATH    |  `auto-detected`  | Specifies the directories to be searched to find a command |
 | PYTHONPATH |                   | Used to set a custom python path                           |
 
-### `sqlite` section options
+</details>
+
+<details>
+<summary><strong>SQLite Section Options</strong></summary>
 
 |      setting       |    default    | info                                                                                                                                                                             |
 |:------------------:|:-------------:|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -148,12 +176,14 @@ There are additional configuration options for the logs. For more info, see [Net
 | journal size limit |  `16777216`   | Used to set a new [limit in bytes for the database](https://www.sqlite.org/pragma.html#pragma_journal_size_limit)                                                                |
 |     cache size     |    `-2000`    | Used to [suggest the maximum number of database disk pages](https://www.sqlite.org/pragma.html#pragma_cache_size) that SQLite will hold in memory at once per open database file |
 
-### `health` section options
+</details>
+
+<details>
+<summary><strong>Health Section Options</strong></summary>
 
 This section controls the general behavior of the Health monitoring capabilities of Netdata.
 
-Specific Alerts are configured in per-collector config files under the `health.d` directory. For more info, see [health
-monitoring](/src/health/README.md).
+Specific Alerts are configured in per-collector config files under the `health.d` directory. For more info, see [health monitoring](/src/health/README.md).
 
 [Alert notifications](/src/health/notifications/README.md) are configured in `health_alarm_notify.conf`.
 
@@ -167,11 +197,10 @@ monitoring](/src/health/README.md).
 |          Health log retention          |                       `5d`                       | Specifies the history of Alert events (in seconds) kept in the Agent's sqlite database.                                                                                                                                                                                                               |
 |             enabled alarms             |                        *                         | Defines which Alerts to load from both user and stock directories. This is a [simple pattern](/src/libnetdata/simple_pattern/README.md) list of Alert or template names. Can be used to disable specific Alerts. For example, `enabled alarms =  !oom_kill *` will load all Alerts except `oom_kill`. |
 
-### `web` section options
+</details>
 
-Refer to the [web server documentation](/src/web/server/README.md)
-
-### `plugins` section options
+<details>
+<summary><strong>Plugins Section Options</strong></summary>
 
 In this section you will see be a boolean (`yes`/`no`) option for each plugin (e.g., tc, cgroups, apps, proc etc.). Note that the configuration options in this section for the orchestrator plugins `python.d` and  `charts.d` control **all the modules** written for that orchestrator. For instance, setting `python.d = no` means that all Python modules under `collectors/python.d.plugin` will be disabled.
 
@@ -183,22 +212,29 @@ Additionally, there will be the following options:
 | check for new plugins every |   60    | The time in seconds to check for new plugins in the plugins directory. This allows having other applications dynamically creating plugins for Netdata.                                             |
 |           checks            |  `no`   | This is a debugging plugin for the internal latency                                                                                                                                                |
 
-### `registry` section options
+</details>
 
-To understand what this section is and how it should be configured, refer to the [registry documentation](/src/registry/README.md).
-
-## Per-plugin configuration
+## Per-Plugin Configuration
 
 The configuration options for plugins appear in sections following the pattern `[plugin:NAME]`.
 
-### Internal plugins
+### Internal Plugins
 
 Most internal plugins will provide additional options. Check [Internal Plugins](/src/collectors/README.md) for more information.
 
-Note that by default, Netdata will enable monitoring metrics for disks, memory, and network only when they are not zero. If they are constantly zero, they are ignored. Metrics that will start having values, after Netdata is started, will be detected and charts will be automatically added to the dashboard when refreshed. Use `yes` instead of `auto` in plugin configuration sections to enable these charts permanently. You can also set the `enable zero metrics` option to `yes` in the `[global]` section which enables charts with zero metrics
-for all internal Netdata plugins.
+:::note
 
-### External plugins
+By default, Netdata will enable monitoring metrics for disks, memory, and network only when they are not zero. If they are constantly zero, they are ignored. Metrics that will start having values, after Netdata is started, will be detected and charts will be automatically added to the dashboard when refreshed.
+
+:::
+
+:::tip
+
+Use `yes` instead of `auto` in plugin configuration sections to enable these charts permanently. You can also set the `enable zero metrics` option to `yes` in the `[global]` section which enables charts with zero metrics for all internal Netdata plugins.
+
+:::
+
+### External Plugins
 
 External plugins will have only two options at `netdata.conf`:
 

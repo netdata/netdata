@@ -317,7 +317,7 @@ typedef struct ebpf_module {
 
     // Helpers used with plugin
     struct {
-        void *(*start_routine)(void *);                             // the thread function
+        void (*start_routine)(void *);                              // the thread function
         void (*apps_routine)(struct ebpf_module *em, void *ptr);    // the apps charts
         void (*fnct_routine)(BUFFER *bf, struct ebpf_module *em);   // the function used for exteernal requests
         const char *fcnt_name;                                      // name given to cloud

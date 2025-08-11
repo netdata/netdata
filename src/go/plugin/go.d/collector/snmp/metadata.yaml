@@ -93,9 +93,25 @@ modules:
               description: Target ipv4 address.
               default_value: ""
               required: true
+            - name: enable_profiles
+              description: Enable collection of metrics using SNMP profiles.
+              default_value: "true"
+              required: false
+            - name: enable_profiles_table_metrics
+              description: Enable collection of SNMP table metrics from profiles. Enabling this may **increase collection time and memory usage** for devices with many network interfaces*.
+              default_value: "true"
+              required: false
+            - name: disable_legacy_collection
+              description: Disable the legacy SNMP collection method, forcing the collector to use only SNMP profiles (YAML-based configuration). When enabled, the collector will ignore any non-profile based collection logic.
+              default_value: "false"
+              required: false
             - name: create_vnode
               description: If set, the collector will create a Netdata Virtual Node for this SNMP device, which will appear as a separate Node in Netdata.
               default_value: "true"
+              required: false
+            - name: vnode_device_down_threshold
+              description: Number of consecutive failed data collections before marking the device as down.
+              default_value: 3
               required: false
             - name: vnode.guid
               description: A unique identifier for the Virtual Node. If not set, a GUID will be automatically generated from the device's IP address.

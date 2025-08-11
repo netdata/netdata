@@ -108,7 +108,7 @@ struct pipe_header {
 // Send command to a thread
 bool websocket_thread_send_command(WEBSOCKET_THREAD *wth, uint8_t cmd, uint32_t id) {
     if(!wth || wth->cmd.pipe[PIPE_WRITE] == -1) {
-        netdata_log_error("WEBSOCKET[%zu]: Failed to send command - pipe is not initialized", wth->id);
+        netdata_log_error("WEBSOCKET[%zu]: Failed to send command - pipe is not initialized", wth ? wth->id : 0);
         return false;
     }
 
@@ -137,7 +137,7 @@ bool websocket_thread_send_command(WEBSOCKET_THREAD *wth, uint8_t cmd, uint32_t 
 
 bool websocket_thread_send_broadcast(WEBSOCKET_THREAD *wth, WEBSOCKET_OPCODE opcode, const char *message) {
     if(!wth || wth->cmd.pipe[PIPE_WRITE] == -1) {
-        netdata_log_error("WEBSOCKET[%zu]: Failed to send command - pipe is not initialized", wth->id);
+        netdata_log_error("WEBSOCKET[%zu]: Failed to send command - pipe is not initialized", wth ? wth->id : 0);
         return false;
     }
 
@@ -184,15 +184,15 @@ bool websocket_thread_send_broadcast(WEBSOCKET_THREAD *wth, WEBSOCKET_OPCODE opc
 
 static ssize_t read_pipe_block(int fd, void *buffer, size_t size) {
     char *buf = buffer;
-    size_t total_read = 0;
+    ssize_t total_read = 0;
 
-    while (total_read < size) {
+    while (total_read < (ssize_t) size) {
         ssize_t bytes = read(fd, buf + total_read, size - total_read);
 
         if (bytes < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 // Non-blocking case, return what we've read so far
-                return (ssize_t)total_read;
+                return total_read;
             }
 
             // Real error occurred
@@ -200,12 +200,12 @@ static ssize_t read_pipe_block(int fd, void *buffer, size_t size) {
 
         }
         else if (bytes == 0)
-            return (ssize_t)total_read;
+            return total_read;
 
         total_read += bytes;
     }
 
-    return (ssize_t)total_read;
+    return total_read;
 }
 
 // Process a thread's command pipe
@@ -319,7 +319,7 @@ static void websocket_thread_process_commands(WEBSOCKET_THREAD *wth) {
 }
 
 // Thread main function
-void *websocket_thread(void *ptr) {
+void websocket_thread(void *ptr) {
     WEBSOCKET_THREAD *wth = (WEBSOCKET_THREAD *)ptr;
     wth->tid = gettid_uncached();
 
@@ -521,6 +521,4 @@ void *websocket_thread(void *ptr) {
     spinlock_lock(&wth->spinlock);
     wth->running = false;
     spinlock_unlock(&wth->spinlock);
-
-    return NULL;
 }

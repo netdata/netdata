@@ -42,13 +42,16 @@ sysobjectid:
   - 1.3.6.1.4.1.19746.3.1.36    # EMC dd2500
   - 1.3.6.1.4.1.19746.3.1.37    # EMC dd4200
 
+# -  DATA-DOMAIN-MIB
+#   https://mibbrowser.online/mibdb_search.php?mib=DATA-DOMAIN-MIB
+
 metrics:
   - MIB: HOST-RESOURCES-MIB
     symbol:
       name: memory.total
       OID: 1.3.6.1.2.1.25.2.3.1.5.1
       chart_meta:
-        family: 'Memory/Total'
+        family: 'System/Memory/Total'
         description: Size of the storage represented by this entry in units of hrStorageAllocationUnits
         unit: "By"
   - MIB: HOST-RESOURCES-MIB
@@ -56,7 +59,7 @@ metrics:
       name: memory.used
       OID: 1.3.6.1.2.1.25.2.3.1.6.1
       chart_meta:
-        family: 'Memory/Used'
+        family: 'System/Memory/Used'
         description: Amount of the storage represented by this entry that is allocated in units of hrStorageAllocationUnits
         unit: "By"
   - MIB: HOST-RESOURCES-MIB
@@ -64,7 +67,7 @@ metrics:
       OID: 1.3.6.1.2.1.25.2.3.1.6.6  # hrStorageUsed.6 = Memory buffers
       name: hrMemoryBuffers
       chart_meta:
-        family: 'Memory/Buffers'
+        family: 'System/Memory/Buffers'
         description: Amount of the storage represented by this entry that is allocated in units of hrStorageAllocationUnits
         unit: "By"
   - MIB: HOST-RESOURCES-MIB
@@ -72,7 +75,7 @@ metrics:
       OID: 1.3.6.1.2.1.25.2.3.1.6.7  # hrStorageUsed.7 = Cached memory
       name: hrCachedMemory
       chart_meta:
-        family: 'Memory/Cached'
+        family: 'System/Memory/Cached'
         description: Amount of the storage represented by this entry that is allocated in units of hrStorageAllocationUnits
         unit: "By"
   - MIB: DATA-DOMAIN-MIB
@@ -80,7 +83,7 @@ metrics:
       name: fileSystemStatus
       OID: 1.3.6.1.4.1.19746.1.3.1.1.0
       chart_meta:
-        family: 'FileSystem/Status'
+        family: 'Storage/FileSystem/Status'
         description: Status of the file system
         unit: "{status}"
       mapping:
@@ -96,7 +99,7 @@ metrics:
       name: datadomain.fileSystemVirtualSpace
       OID: 1.3.6.1.4.1.19746.1.3.1.2.0
       chart_meta:
-        family: 'FileSystem/VirtualSpace'
+        family: 'Storage/FileSystem/VirtualSpace'
         description: Amount of uncompressed data that has been backed up by the system
         unit: "By"
 
@@ -108,7 +111,7 @@ metrics:
       - OID: 1.3.6.1.4.1.19746.1.1.1.1.1.1.4
         name: powerModuleStatus
         chart_meta:
-          family: 'PowerModule/Status'
+          family: 'Hardware/Power/Module/Status'
           description: Status of the power module
           unit: "{status}"
         mapping:
@@ -132,7 +135,7 @@ metrics:
       - OID: 1.3.6.1.4.1.19746.1.1.2.1.1.1.6
         name: tempSensorStatus
         chart_meta:
-          family: 'Sensor/Temperature/Status'
+          family: 'Hardware/Sensor/Temperature/Status'
           description: Status of the temperature sensor
           unit: "{status}"
         mapping:
@@ -155,7 +158,7 @@ metrics:
       - OID: 1.3.6.1.4.1.19746.1.1.3.1.1.1.6
         name: fanStatus
         chart_meta:
-          family: 'Fan/Status'
+          family: 'Hardware/Fan/Status'
           description: Status of the fan
           unit: "{status}"
         mapping:
@@ -165,7 +168,7 @@ metrics:
       - OID: 1.3.6.1.4.1.19746.1.1.3.1.1.1.5
         name: fanLevel
         chart_meta:
-          family: 'Fan/Level'
+          family: 'Hardware/Fan/Level'
           description: Speed level of the fan
           unit: "{status}"
         mapping:
@@ -188,34 +191,34 @@ metrics:
         OID: 1.3.6.1.4.1.19746.1.3.2.1.1.4
         scale_factor: 1073741824 # GB => bytes
         chart_meta:
-          family: 'FileSystem/Space/Total'
+          family: 'Storage/FileSystem/Space/Total'
           description: Size of the file system resource in gigabytes
           unit: "By"
       - name: datadomain.fileSystemSpaceUsed
         OID: 1.3.6.1.4.1.19746.1.3.2.1.1.5
         scale_factor: 1073741824 # GB => bytes
         chart_meta:
-          family: 'FileSystem/Space/Used'
+          family: 'Storage/FileSystem/Space/Used'
           description: Amount of used space within the file system resource in gigabytes
           unit: "By"
       - name: datadomain.fileSystemSpaceAvail
         OID: 1.3.6.1.4.1.19746.1.3.2.1.1.6
         scale_factor: 1073741824 # GB => bytes
         chart_meta:
-          family: 'FileSystem/Space/Available'
+          family: 'Storage/FileSystem/Space/Available'
           description: Amount of available space within the file system resource in gigabytes
           unit: "By"
       - name: datadomain.fileSystemPercentUsed
         OID: 1.3.6.1.4.1.19746.1.3.2.1.1.7
         chart_meta:
-          family: 'FileSystem/Space/Usage'
+          family: 'Storage/FileSystem/Space/Usage'
           description: Percentage of used space within the file system resource
           unit: "%"
       - name: datadomain.fileSystemSpaceCleanable
         OID: 1.3.6.1.4.1.19746.1.3.2.1.1.8
         scale_factor: 1073741824 # GB => bytes
         chart_meta:
-          family: 'FileSystem/Space/Cleanable'
+          family: 'Storage/FileSystem/Space/Cleanable'
           description: Amount of file system space that can be cleaned
           unit: "By"
     metric_tags:
@@ -236,49 +239,49 @@ metrics:
       - name: datadomain.fileSystemCompressionStartTime
         OID: 1.3.6.1.4.1.19746.1.3.3.1.1.3
         chart_meta:
-          family: 'FileSystem/Compression/Time/Start'
+          family: 'Storage/FileSystem/Compression/Time/Start'
           description: Start time of file system compression
           unit: "s"
       - name: datadomain.fileSystemCompressionEndTime
         OID: 1.3.6.1.4.1.19746.1.3.3.1.1.4
         chart_meta:
-          family: 'FileSystem/Compression/Time/End'
+          family: 'Storage/FileSystem/Compression/Time/End'
           description: End time of file system compression
           unit: "s"
       - name: datadomain.fileSystemPreCompressionSize
         OID: 1.3.6.1.4.1.19746.1.3.3.1.1.5
         chart_meta:
-          family: 'FileSystem/Compression/Size/Before'
+          family: 'Storage/FileSystem/Compression/Size/Before'
           description: Size of file system before compression
           unit: "By"
       - name: datadomain.fileSystemPostCompressionSize
         OID: 1.3.6.1.4.1.19746.1.3.3.1.1.6
         chart_meta:
-          family: 'FileSystem/Compression/Size/After'
+          family: 'Storage/FileSystem/Compression/Size/After'
           description: Size of file system after compression
           unit: "By"
       - name: datadomain.fileSystemGlobalCompressionFactor
         OID: 1.3.6.1.4.1.19746.1.3.3.1.1.7
         chart_meta:
-          family: 'FileSystem/Compression/Factor/Global'
+          family: 'Storage/FileSystem/Compression/Factor/Global'
           description: Global compression factor of the file system
           unit: "1"
       - name: datadomain.fileSystemLocalCompressionFactor
         OID: 1.3.6.1.4.1.19746.1.3.3.1.1.8
         chart_meta:
-          family: 'FileSystem/Compression/Factor/Local'
+          family: 'Storage/FileSystem/Compression/Factor/Local'
           description: Local compression factor of the file system
           unit: "1"
       - name: datadomain.fileSystemTotalCompressionFactor
         OID: 1.3.6.1.4.1.19746.1.3.3.1.1.9
         chart_meta:
-          family: 'FileSystem/Compression/Factor/Total'
+          family: 'Storage/FileSystem/Compression/Factor/Total'
           description: Total compression factor of the file system
           unit: "1"
       - name: datadomain.fileSystemReductionPercent1
         OID: 1.3.6.1.4.1.19746.1.3.3.1.1.11
         chart_meta:
-          family: 'FileSystem/Compression/Reduction'
+          family: 'Storage/FileSystem/Compression/Reduction'
           description: Percentage reduction of the file system size due to compression
           unit: "%"
     metric_tags:
@@ -292,100 +295,95 @@ metrics:
       name: systemStatsTable
       OID: 1.3.6.1.4.1.19746.1.5.1.1
     symbols:
-      - name: cpu.usage
+      - name: cpu.usage # cpu0PercentageBusy
+        # TODO: need to collect both cpu0PercentageBusy and cpu1PercentageBusy
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.2
         chart_meta:
-          family: 'CPU/Usage'
-          description: CPU 0 percentage busy
-          unit: "%"
-      - name: datadomain.cpuMaxPercentageBusy
-        OID: 1.3.6.1.4.1.19746.1.5.1.1.1.3
-        chart_meta:
-          family: 'CPU/Usage/Maximum'
-          description: CPU 1 percentage busy
+          family: 'System/CPU/Usage'
+          description: The current CPU utilization
           unit: "%"
       - name: datadomain.nfsOpsPerSecond
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.4
         chart_meta:
-          family: 'NFS/Operation/Rate'
+          family: 'Storage/NFS/Operation/Rate'
           description: Number of NFS operations performed per second
           unit: "{operation}/s"
       - name: datadomain.nfsIdlePercentage
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.5
         chart_meta:
-          family: 'NFS/Time/Idle'
+          family: 'Storage/NFS/Time/Idle'
           description: Percentage of time NFS was idle
           unit: "%"
       - name: datadomain.nfsProcPercentage
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.6
         chart_meta:
-          family: 'NFS/Time/Processing'
+          family: 'Storage/NFS/Time/Processing'
           description: Percentage of time NFS was processing
           unit: "%"
       - name: datadomain.nfsSendPercentage
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.7
         chart_meta:
-          family: 'NFS/Time/Send'
+          family: 'Storage/NFS/Time/Send'
           description: Percentage of time NFS was sending requests
           unit: "%"
       - name: datadomain.nfsReceivePercentage
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.8
         chart_meta:
-          family: 'NFS/Time/Receive'
+          family: 'Storage/NFS/Time/Receive'
           description: Percentage of time NFS was receiving requests
           unit: "%"
       - name: datadomain.cifsOpsPerSecond
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.9
         chart_meta:
-          family: 'CIFS/Operation/Rate'
+          family: 'Storage/CIFS/Operation/Rate'
           description: Number of CIFS operations performed per second
           unit: "{operation}/s"
       - name: datadomain.diskReadKBytesPerSecond
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.10
         scale_factor: 1024
         chart_meta:
-          family: 'Disk/Throughput/Read'
+          family: 'System/Disk/Throughput/Read'
           description: Number of kilobytes per second read from disk
           unit: "By/s"
       - name: datadomain.diskWriteKBytesPerSecond
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.11
         scale_factor: 1024
         chart_meta:
-          family: 'Disk/Throughput/Write'
+          family: 'System/Disk/Throughput/Write'
           description: Number of kilobytes per second written to disk
           unit: "By/s"
       - name: datadomain.diskBusyPercentage
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.12
         chart_meta:
-          family: 'Disk/Usage'
+          family: 'System/Disk/Usage'
           description: Percentage of time disks were busy
           unit: "%"
       - name: datadomain.nvramReadKBytesPerSecond
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.13
         scale_factor: 1024
         chart_meta:
-          family: 'NVRAM/Throughput/Read'
+          family: 'Hardware/NVRAM/Throughput/Read'
           description: Number of kilobytes read per second from NVRAM
           unit: "By/s"
       - name: datadomain.nvramWriteKBytesPerSecond
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.14
         scale_factor: 1024
         chart_meta:
-          family: 'NVRAM/Throughput/Write'
+          family: 'Hardware/NVRAM/Throughput/Write'
           description: Number of kilobytes written per second to NVRAM
           unit: "By/s"
       - name: datadomain.replInKBytesPerSecond
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.15
         scale_factor: 1024
         chart_meta:
-          family: 'Replication/Throughput/In'
+          family: 'Storage/Replication/Throughput/In'
           description: Number of kilobytes per second received for replication
           unit: "By/s"
       - name: datadomain.replOutKBytesPerSecond
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.16
         scale_factor: 1024
         chart_meta:
-          family: 'Replication/Throughput/Out'
+          family: 'Storage/Replication/Throughput/Out'
           description: Number of kilobytes per second sent for replication
           unit: "By/s"
     metric_tags:
@@ -402,7 +400,7 @@ metrics:
       - OID: 1.3.6.1.4.1.19746.1.6.1.1.1.8
         name: diskPropState
         chart_meta:
-          family: 'Disk/Status'
+          family: 'Hardware/Disk/Status'
           description: State of the disk
           unit: "{status}"
         mapping:
@@ -452,32 +450,32 @@ metrics:
       - name: datadomain.diskSectorsRead
         OID: 1.3.6.1.4.1.19746.1.6.2.1.1.3
         chart_meta:
-          family: 'Disk/Sector/Read'
+          family: 'System/Disk/Sector/Read'
           description: Number of disk sectors read per second
-          unit: "{disk_sector}/s"
+          unit: "{sector}/s"
       - name: datadomain.diskSectorsWritten
         OID: 1.3.6.1.4.1.19746.1.6.2.1.1.4
         chart_meta:
-          family: 'Disk/Sector/Write'
+          family: 'System/Disk/Sector/Write'
           description: Number of disk sectors written per second
-          unit: "{disk_sector}/s"
+          unit: "{sector}/s"
       - name: datadomain.diskTotalKBytes
         OID: 1.3.6.1.4.1.19746.1.6.2.1.1.5
         scale_factor: 1024
         chart_meta:
-          family: 'Disk/Throughput/Total'
+          family: 'System/Disk/Throughput/Total'
           description: Total number of kilobytes read or written per second
           unit: "By/s"
       - name: datadomain.diskBusy
         OID: 1.3.6.1.4.1.19746.1.6.2.1.1.6
         chart_meta:
-          family: 'Disk/Busy'
+          family: 'System/Disk/Busy'
           description: Percentage of time disk is busy
           unit: "%"
       - OID: 1.3.6.1.4.1.19746.1.6.2.1.1.7
         name: diskPerfState
         chart_meta:
-          family: 'Disk/Performance/Status'
+          family: 'Hardware/Disk/Performance/Status'
           description: Performance state of the disk
           unit: "{status}"
         mapping:

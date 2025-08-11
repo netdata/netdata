@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pathvalidate"
 )
 
 func (c *Collector) validateConfig() error {
@@ -31,7 +33,12 @@ func (c *Collector) initPostqueueExec() (postqueueBinary, error) {
 		return nil, err
 	}
 
-	pq := newPostqueueExec(binPath, c.Timeout.Duration())
+	validatedPath, err := pathvalidate.ValidateBinaryPath(binPath)
+	if err != nil {
+		return nil, err
+	}
+
+	pq := newPostqueueExec(validatedPath, c.Timeout.Duration())
 	pq.Logger = c.Logger
 
 	return pq, nil

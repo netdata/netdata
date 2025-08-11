@@ -56,6 +56,9 @@ README
 TODO.md
 TODO.txt
 
+# vscode extension Continue
+.continue
+
 # related to karma/javascript/node
 /node_modules/
 /coverage/
@@ -197,3 +200,6 @@ packaging/tools/agent-events/go.mod
 packaging/tools/agent-events/go.sum
 
 **/.claude/settings.local.json
+.mcp.json
+.users_cache.json
+.channels_cache_v2.json

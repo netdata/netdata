@@ -174,10 +174,9 @@ private:
     std::vector<RRDDIM *> Dimensions;
 };
 
-static void *subprofile_main(void* Arg) {
+static void subprofile_main(void* Arg) {
     Profiler *P = reinterpret_cast<Profiler *>(Arg);
     P->run();
-    return nullptr;
 }
 
 static void profile_main_cleanup(void *pptr) {

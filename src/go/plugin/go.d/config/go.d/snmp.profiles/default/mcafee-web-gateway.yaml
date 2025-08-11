@@ -1,236 +1,329 @@
 extends:
   - _system-base.yaml
   - _std-if-mib.yaml
+
 sysobjectid:
   - 1.3.6.1.4.1.1230.2.7.1.1
+
 metadata:
   device:
     fields:
       vendor:
-        value: "mcafee"
+        value: "McAfee"
+
+metric_tags:
+  - tag: mcafee_mwg_k_product_name
+    OID: 1.3.6.1.4.1.1230.2.7.1.1.0
+    symbol: kProductName
+  - tag: mcafee_mwg_k_company_name
+    OID: 1.3.6.1.4.1.1230.2.7.1.2.0
+    symbol: kCompanyName
+  - tag: mcafee_mwg_k_product_version
+    OID: 1.3.6.1.4.1.1230.2.7.1.3.0
+    symbol: kProductVersion
+  - tag: mcafee_mwg_k_major_version
+    OID: 1.3.6.1.4.1.1230.2.7.1.4.0
+    symbol: kMajorVersion
+  - tag: mcafee_mwg_k_minor_version
+    OID: 1.3.6.1.4.1.1230.2.7.1.5.0
+    symbol: kMinorVersion
+  - tag: mcafee_mwg_k_micro_version
+    OID: 1.3.6.1.4.1.1230.2.7.1.6.0
+    symbol: kMicroVersion
+  - tag: mcafee_mwg_k_hotfix_version
+    OID: 1.3.6.1.4.1.1230.2.7.1.7.0
+    symbol: kHotfixVersion
+  - tag: mcafee_mwg_k_custom_version
+    OID: 1.3.6.1.4.1.1230.2.7.1.8.0
+    symbol: kCustomVersion
+  - tag: mcafee_mwg_k_revision
+    OID: 1.3.6.1.4.1.1230.2.7.1.9.0
+    symbol: kRevision
+  - tag: mcafee_mwg_k_build_number
+    OID: 1.3.6.1.4.1.1230.2.7.1.10.0
+    symbol: kBuildNumber
+  - tag: mcafee_mwg_p_am_engine_version
+    OID: 1.3.6.1.4.1.1230.2.7.1.20.1.0
+    symbol: pAMEngineVersion
+  - tag: mcafee_mwg_p_mfe_engine_version
+    OID: 1.3.6.1.4.1.1230.2.7.1.20.3.0
+    symbol: pMFEEngineVersion
+  - tag: mcafee_mwg_p_mfedat_version
+    OID: 1.3.6.1.4.1.1230.2.7.1.20.4.0
+    symbol: pMFEDATVersion
+  - tag: mcafee_mwg_p_am_proactive_version
+    OID: 1.3.6.1.4.1.1230.2.7.1.20.5.0
+    symbol: pAMProactiveVersion
+  - tag: mcafee_mwg_p_tsdb_version
+    OID: 1.3.6.1.4.1.1230.2.7.1.20.6.0
+    symbol: pTSDBVersion
+
+# 1. MCAFEE-MWG-MIB
+#    https://mibbrowser.online/mibdb_search.php?mib=MCAFEE-MWG-MIB
+#    https://github.com/librenms/librenms/blob/master/mibs/mcafee/MCAFEE-MWG-MIB
+
 metrics:
   - MIB: MCAFEE-MWG-MIB
     symbol:
-      name: cpu.usage
+      name: cpu.usage # stCPULoad
       OID: 1.3.6.1.4.1.1230.2.7.2.5.1.0
-      description: Current overall CPU usage in percent
-      unit: "%"
+      chart_meta:
+        description: The current CPU utilization
+        family: 'System/CPU/Usage'
+        unit: "%"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: memory.usage
       OID: 1.3.6.1.4.1.1230.2.7.2.5.15.0
-      description: Virtual memory consumption of the main processes divided by RAM + half of SWAP space. Projected to 0-100.
-      unit: "%"
+      chart_meta:
+        description: Virtual memory consumption of the main processes divided by RAM + half of SWAP space. Projected to 0-100.
+        family: 'System/Memory/Usage'
+        unit: "%"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stMalwareDetected
       OID: 1.3.6.1.4.1.1230.2.7.2.1.2.0
-      description: Number of infections detected by the McAfee Gateway Antimalware Engine
-      unit: "{infection}"
-      metric_type: monotonic_count
+      chart_meta:
+        description: Number of infections detected by the McAfee Gateway Antimalware Engine
+        family: 'Security/Malware/Detected'
+        unit: "{infection}/s"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stConnectionsLegitimate
       OID: 1.3.6.1.4.1.1230.2.7.2.1.3.0
-      description: Number of connections that not have been blocked
-      unit: "{connection}"
-      metric_type: monotonic_count
+      chart_meta:
+        description: Number of connections that not have been blocked
+        family: 'Security/Connection/Legitimate'
+        unit: "{connection}/s"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stBlockedByAntiMalware
       OID: 1.3.6.1.4.1.1230.2.7.2.1.4.0
-      description: Number of connections blocked by Anti-Malware
-      unit: "{connection}"
-      metric_type: monotonic_count
+      chart_meta:
+        description: Number of connections blocked by Anti-Malware
+        family: 'Security/Connection/Blocked/AntiMalware'
+        unit: "{connection}/s"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stConnectionsBlocked
       OID: 1.3.6.1.4.1.1230.2.7.2.1.5.0
-      description: Number of blocked connections
-      unit: "{connection}"
-      metric_type: monotonic_count
+      chart_meta:
+        description: Number of blocked connections
+        family: 'Security/Connection/Blocked/Total'
+        unit: "{connection}/s"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stBlockedByMediaFilter
       OID: 1.3.6.1.4.1.1230.2.7.2.1.6.0
-      description: Number of connections that have been blocked by the Media-Type filter
-      unit: "{connection}"
-      metric_type: monotonic_count
+      chart_meta:
+        description: Number of connections that have been blocked by the Media-Type filter
+        family: 'Security/Connection/Blocked/MediaFilter'
+        unit: "{connection}/s"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stBlockedByURLFilter
       OID: 1.3.6.1.4.1.1230.2.7.2.1.7.0
-      description: Number of connection that have been blocked by the URL filter
-      unit: "{connection}"
-      metric_type: monotonic_count
+      chart_meta:
+        description: Number of connection that have been blocked by the URL filter
+        family: 'Security/Connection/Blocked/URLFilter'
+        unit: "{connection}/s"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stMimeType
       OID: 1.3.6.1.4.1.1230.2.7.2.1.8.0
-      description: Number of media types detected by the Media Type filter
-      unit: "{media_type}"
-      metric_type: monotonic_count
+      chart_meta:
+        description: Number of media types detected by the Media Type filter
+        family: 'Security/Filter/MediaType/Detected'
+        unit: "{media_type}/s"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stCategories
       OID: 1.3.6.1.4.1.1230.2.7.2.1.9.0
-      description: Number of categories detected by the URL filter
-      unit: "{category}"
-      metric_type: monotonic_count
+      chart_meta:
+        description: Number of categories detected by the URL filter
+        family: 'Security/Filter/URLCategory/Detected'
+        unit: "{category}/s"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stHttpRequests
       OID: 1.3.6.1.4.1.1230.2.7.2.2.1.0
-      description: Number of HTTP requests
-      unit: "{request}"
-      metric_type: monotonic_count
+      chart_meta:
+        description: Number of HTTP requests
+        family: 'Network/HTTP/Request'
+        unit: "{request}/s"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stHttpTraffic
       OID: 1.3.6.1.4.1.1230.2.7.2.2.2.0
-      description: Number of bytes tranferred between proxy and server(s) using the HTTP protocol
-      unit: "By"
-      metric_type: monotonic_count
+      chart_meta:
+        description: Number of bytes tranferred between proxy and server(s) using the HTTP protocol
+        family: 'Network/HTTP/Throughput/Total'
+        unit: "By/s"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stHttpBytesFromClient
       OID: 1.3.6.1.4.1.1230.2.7.2.2.3.0
-      description: Number of bytes transferred from client to proxy using the HTTP protocol
-      unit: "By"
-      metric_type: monotonic_count
+      chart_meta:
+        description: Number of bytes transferred from client to proxy using the HTTP protocol
+        family: 'Network/HTTP/Throughput/FromClient'
+        unit: "By/s"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stHttpBytesFromServer
       OID: 1.3.6.1.4.1.1230.2.7.2.2.4.0
-      description: Number of bytes transferred from server to proxy using the HTTP protocol
-      unit: "By"
-      metric_type: monotonic_count
+      chart_meta:
+        description: Number of bytes transferred from server to proxy using the HTTP protocol
+        family: 'Network/HTTP/Throughput/FromServer'
+        unit: "By/s"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stHttpBytesToClient
       OID: 1.3.6.1.4.1.1230.2.7.2.2.5.0
-      description: Number of bytes transferred from proxy to client(s) using the HTTP protocol
-      unit: "By"
-      metric_type: monotonic_count
+      chart_meta:
+        description: Number of bytes transferred from proxy to client(s) using the HTTP protocol
+        family: 'Network/HTTP/Throughput/ToClient'
+        unit: "By/s"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stHttpBytesToServer
       OID: 1.3.6.1.4.1.1230.2.7.2.2.6.0
-      description: Number of bytes transferred from proxy to server(s) using the HTTP protocol
-      unit: "By"
-      metric_type: monotonic_count
+      chart_meta:
+        description: Number of bytes transferred from proxy to server(s) using the HTTP protocol
+        family: 'Network/HTTP/Throughput/ToServer'
+        unit: "By/s"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stHttpsRequests
       OID: 1.3.6.1.4.1.1230.2.7.2.3.1.0
-      description: Number of HTTPS requests
-      unit: "{request}"
-      metric_type: monotonic_count
+      chart_meta:
+        description: Number of HTTPS requests
+        family: 'Network/HTTPS/Request'
+        unit: "{request}/s"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stHttpsTraffic
       OID: 1.3.6.1.4.1.1230.2.7.2.3.2.0
-      description: Number of bytes tranferred between proxy and server(s) using the HTTPS protocol
-      unit: "By"
-      metric_type: monotonic_count
+      chart_meta:
+        description: Number of bytes tranferred between proxy and server(s) using the HTTPS protocol
+        family: 'Network/HTTPS/Throughput/Total'
+        unit: "By/s"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stHttpsBytesFromClient
       OID: 1.3.6.1.4.1.1230.2.7.2.3.3.0
-      description: Number of bytes tranferred from client(s) to proxy using the HTTPS protocol
-      unit: "By"
-      metric_type: monotonic_count
+      chart_meta:
+        description: Number of bytes tranferred from client(s) to proxy using the HTTPS protocol
+        family: 'Network/HTTPS/Throughput/FromClient'
+        unit: "By/s"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stHttpsBytesFromServer
       OID: 1.3.6.1.4.1.1230.2.7.2.3.4.0
-      description: Number of bytes tranferred from server(s) to proxy using the HTTPS protocol
-      unit: "By"
-      metric_type: monotonic_count
+      chart_meta:
+        description: Number of bytes tranferred from server(s) to proxy using the HTTPS protocol
+        family: 'Network/HTTPS/Throughput/FromServer'
+        unit: "By/s"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stHttpsBytesToClient
       OID: 1.3.6.1.4.1.1230.2.7.2.3.5.0
-      description: Number of bytes tranferred from proxy to client(s) and proxy using the HTTPS protocol
-      unit: "By"
-      metric_type: monotonic_count
+      chart_meta:
+        description: Number of bytes tranferred from proxy to client(s) and proxy using the HTTPS protocol
+        family: 'Network/HTTPS/Throughput/ToClient'
+        unit: "By/s"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stHttpsBytesToServer
       OID: 1.3.6.1.4.1.1230.2.7.2.3.6.0
-      description: Number of bytes tranferred from proxy to server(s) and proxy using the HTTPS protocol
-      unit: "By"
-      metric_type: monotonic_count
+      chart_meta:
+        description: Number of bytes tranferred from proxy to server(s) and proxy using the HTTPS protocol
+        family: 'Network/HTTPS/Throughput/ToServer'
+        unit: "By/s"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stFtpTraffic
       OID: 1.3.6.1.4.1.1230.2.7.2.4.1.0
-      description: Number of bytes transmitted between proxy and server(s) using the FTP protocol
-      unit: "By"
-      metric_type: monotonic_count
+      chart_meta:
+        description: Number of bytes transmitted between proxy and server(s) using the FTP protocol
+        family: 'Network/FTP/Throughput/Total'
+        unit: "By/s"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stFtpBytesFromClient
       OID: 1.3.6.1.4.1.1230.2.7.2.4.2.0
-      description: Number of bytes tranferred from proxy to client(s) using the FTP protocol
-      unit: "By"
-      metric_type: monotonic_count
+      chart_meta:
+        description: Number of bytes tranferred from proxy to client(s) using the FTP protocol
+        family: 'Network/FTP/Throughput/FromClient'
+        unit: "By/s"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stFtpBytesFromServer
       OID: 1.3.6.1.4.1.1230.2.7.2.4.3.0
-      description: Number of bytes tranferred from server(s) to proxy using the FTP protocol
-      unit: "By"
-      metric_type: monotonic_count
+      chart_meta:
+        description: Number of bytes tranferred from server(s) to proxy using the FTP protocol
+        family: 'Network/FTP/Throughput/FromServer'
+        unit: "By/s"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stFtpBytesToClient
       OID: 1.3.6.1.4.1.1230.2.7.2.4.4.0
-      description: Number of bytes tranferred from proxy to client(s) using the FTP protocol
-      unit: "By"
-      metric_type: monotonic_count
+      chart_meta:
+        description: Number of bytes tranferred from proxy to client(s) using the FTP protocol
+        family: 'Network/FTP/Throughput/ToClient'
+        unit: "By/s"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stFtpBytesToServer
       OID: 1.3.6.1.4.1.1230.2.7.2.4.5.0
-      description: Number of bytes tranferred from proxy to server(s) using the FTP protocol
-      unit: "By"
-      metric_type: monotonic_count
+      chart_meta:
+        description: Number of bytes tranferred from proxy to server(s) using the FTP protocol
+        family: 'Network/FTP/Throughput/ToServer'
+        unit: "By/s"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stClientCount
       OID: 1.3.6.1.4.1.1230.2.7.2.5.2.0
-      description: Currently connected clients
-      unit: "{client}"
       metric_type: monotonic_count
+      chart_meta:
+        description: Currently connected clients
+        family: 'Network/Connection/Client/Active'
+        unit: "{client}"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stConnectedSockets
       OID: 1.3.6.1.4.1.1230.2.7.2.5.3.0
-      description: Number of open network sockets in use by the proxy
-      unit: "{socket}"
       metric_type: monotonic_count
+      chart_meta:
+        description: Number of open network sockets in use by the proxy
+        family: 'Network/Socket/Active'
+        unit: "{socket}"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stResolveHostViaDNS
       OID: 1.3.6.1.4.1.1230.2.7.2.5.6.0
-      description: Time to resolve DNS in ms
-      unit: "ms"
       metric_type: monotonic_count
+      chart_meta:
+        description: Time to resolve DNS in ms
+        family: 'Network/DNS/Resolution/Time'
+        unit: "ms"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stTimeConsumedByRuleEngine
       OID: 1.3.6.1.4.1.1230.2.7.2.5.7.0
-      description: Average time used by the rule engine in ms
-      unit: "ms"
       metric_type: monotonic_count
+      chart_meta:
+        description: Average time used by the rule engine in ms
+        family: 'Security/RuleEngine/Processing/Time'
+        unit: "ms"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stTimeForTransaction
       OID: 1.3.6.1.4.1.1230.2.7.2.5.8.0
-      description: Average time for transaction in ms
-      unit: "ms"
       metric_type: monotonic_count
+      chart_meta:
+        description: Average time for transaction in ms
+        family: 'System/Transaction/Time'
+        unit: "ms"
   - MIB: MCAFEE-MWG-MIB
     table:
       name: stCategoriesTable
@@ -238,57 +331,12 @@ metrics:
     symbols:
       - name: mcafee.mwg.stCategoryCount
         OID: 1.3.6.1.4.1.1230.2.7.2.1.10.1.2
-        metric_type: monotonic_count
-        description: Number of times the URL filter detected this category
-        unit: "{occurrence}"
+        chart_meta:
+          description: Number of times the URL filter detected this category
+          family: 'Security/Filter/URLCategory/Count'
+          unit: "{occurrence}/s"
     metric_tags:
-      - symbol:
+      - tag: mcafee_mwg_st_category_name
+        symbol:
           name: mcafee.mwg.stCategoryName
           OID: 1.3.6.1.4.1.1230.2.7.2.1.10.1.1
-        tag: mcafee_mwg_st_category_name
-metric_tags:
-  - OID: 1.3.6.1.4.1.1230.2.7.1.1.0
-    symbol: kProductName
-    tag: mcafee_mwg_k_product_name
-  - OID: 1.3.6.1.4.1.1230.2.7.1.2.0
-    symbol: kCompanyName
-    tag: mcafee_mwg_k_company_name
-  - OID: 1.3.6.1.4.1.1230.2.7.1.3.0
-    symbol: kProductVersion
-    tag: mcafee_mwg_k_product_version
-  - OID: 1.3.6.1.4.1.1230.2.7.1.4.0
-    symbol: kMajorVersion
-    tag: mcafee_mwg_k_major_version
-  - OID: 1.3.6.1.4.1.1230.2.7.1.5.0
-    symbol: kMinorVersion
-    tag: mcafee_mwg_k_minor_version
-  - OID: 1.3.6.1.4.1.1230.2.7.1.6.0
-    symbol: kMicroVersion
-    tag: mcafee_mwg_k_micro_version
-  - OID: 1.3.6.1.4.1.1230.2.7.1.7.0
-    symbol: kHotfixVersion
-    tag: mcafee_mwg_k_hotfix_version
-  - OID: 1.3.6.1.4.1.1230.2.7.1.8.0
-    symbol: kCustomVersion
-    tag: mcafee_mwg_k_custom_version
-  - OID: 1.3.6.1.4.1.1230.2.7.1.9.0
-    symbol: kRevision
-    tag: mcafee_mwg_k_revision
-  - OID: 1.3.6.1.4.1.1230.2.7.1.10.0
-    symbol: kBuildNumber
-    tag: mcafee_mwg_k_build_number
-  - OID: 1.3.6.1.4.1.1230.2.7.1.20.1.0
-    symbol: pAMEngineVersion
-    tag: mcafee_mwg_p_am_engine_version
-  - OID: 1.3.6.1.4.1.1230.2.7.1.20.3.0
-    symbol: pMFEEngineVersion
-    tag: mcafee_mwg_p_mfe_engine_version
-  - OID: 1.3.6.1.4.1.1230.2.7.1.20.4.0
-    symbol: pMFEDATVersion
-    tag: mcafee_mwg_p_mfedat_version
-  - OID: 1.3.6.1.4.1.1230.2.7.1.20.5.0
-    symbol: pAMProactiveVersion
-    tag: mcafee_mwg_p_am_proactive_version
-  - OID: 1.3.6.1.4.1.1230.2.7.1.20.6.0
-    symbol: pTSDBVersion
-    tag: mcafee_mwg_p_tsdb_version

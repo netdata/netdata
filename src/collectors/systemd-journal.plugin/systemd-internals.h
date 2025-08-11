@@ -138,7 +138,7 @@ void nd_journal_file_update_header(const char *filename, struct nd_journal_file 
 void nd_sd_journal_annotations_init(void);
 void nd_sd_journal_transform_message_id(FACETS *facets, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope, void *data);
 
-void *nd_journal_watcher_main(void *arg);
+void nd_journal_watcher_main(void *arg);
 void nd_journal_watcher_restart(void);
 
 static inline bool parse_journal_field(

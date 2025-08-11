@@ -109,7 +109,13 @@ Once restarted, you should see "netdata" appear in Claude Desktop:
 
 For [Claude Code](https://claude.ai/code), add to your project's root, the file `.mcp.json`, with the contents given above. This file will be automatically detected by Claude Code the next time it starts in that directory.
 
-Once configured correctly, issue the command `/mcp` to your Claude Code. It should show you the available MCP servers, including "netdata".
+Alternatively, you can add it using a Claude CLI command like this:
+
+```bash
+claude mcp add netdata /usr/bin/nd-mcp ws://IP_OF_YOUR_NETDATA:19999/mcp?api_key=YOUR_API_KEY
+```
+
+Once configured correctly, run `claude mcp list` or you can issue the command `/mcp` to your Claude Code. It should show you the available MCP servers, including "netdata".
 
 ### Cursor
 

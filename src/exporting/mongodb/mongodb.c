@@ -276,7 +276,7 @@ void mongodb_cleanup(struct instance *instance)
  *
  * @param instance_p an instance data structure.
  */
-void *mongodb_connector_worker(void *instance_p)
+void mongodb_connector_worker(void *instance_p)
 {
     struct instance *instance = (struct instance *)instance_p;
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -389,5 +389,4 @@ void *mongodb_connector_worker(void *instance_p)
     }
 
     mongodb_cleanup(instance);
-    return NULL;
 }

@@ -11,7 +11,7 @@ metadata:
           OID: 1.3.6.1.4.1.674.10895.3000.1.2.100.4.0
           name: productIdentificationVersion
       type:
-        value: "switch"
+        value: "Switch"
 
 sysobjectid:
   - 1.3.6.1.4.1.674.10895.*       # PowerConnect
@@ -93,22 +93,26 @@ sysobjectid:
   - 1.3.6.1.4.1.674.10895.3114    # PowerConnect N3248P-ON
   - 1.3.6.1.4.1.674.10895.3115    # PowerConnect N1108EP-ON
 
+# -  DNOS-SWITCHING-MIB
+#   https://mibbrowser.online/mibdb_search.php?mib=DNOS-SWITCHING-MIB
+#   https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/dell/DNOS-SWITCHING-MIB
+
 metrics:
   - MIB: DNOS-SWITCHING-MIB
     symbol:
-      name: cpu.usage
+      name: cpu.usage # agentSwitchCpuProcessTotalUtilization
       OID: 1.3.6.1.4.1.674.10895.5000.2.6132.1.1.1.1.4.9.0
       extract_value: 60 Secs.*?(\d+[.]?\d+)
       chart_meta:
-        family: 'CPU/Usage'
-        description: "Cpu usage in percent over 60 seconds"
+        family: 'System/CPU/Usage'
+        description: "The current CPU utilization"
         unit: "%"
   - MIB: DNOS-SWITCHING-MIB
     symbol:
       name: memory.free
       OID: 1.3.6.1.4.1.674.10895.5000.2.6132.1.1.1.1.4.1.0
       chart_meta:
-        family: 'Memory/Free'
+        family: 'System/Memory/Free'
         description: "Amount of free memory"
         unit: "By"
   - MIB: DNOS-SWITCHING-MIB
@@ -116,7 +120,7 @@ metrics:
       name: memory.total
       OID: 1.3.6.1.4.1.674.10895.5000.2.6132.1.1.1.1.4.2.0
       chart_meta:
-        family: 'Memory/Total'
+        family: 'System/Memory/Total'
         description: "Total amount of memory"
         unit: "By"
   - MIB: Dell-Vendor-MIB
@@ -124,7 +128,7 @@ metrics:
       name: productStatusGlobalStatus
       OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.1.0
       chart_meta:
-        family: 'Product/Status/Global'
+        family: 'System/Status/Global'
         description: Global status
         unit: "{status}"
       mapping:
@@ -139,13 +143,13 @@ metrics:
       - name: dell.envMonFanSpeed
         OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.1.1.4
         chart_meta:
-          family: 'Fan/Speed'
+          family: 'Hardware/Fan/Speed'
           description: "Fan speed in revolutions per minute"
-          unit: "rpm"
+          unit: "{revolution}/min"
       - OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.1.1.3
         name: dell.envMonFanState
         chart_meta:
-          family: 'Fan/Status'
+          family: 'Hardware/Fan/Status'
           description: "Fan operational state"
           unit: "{status}"
         mapping:
@@ -171,19 +175,19 @@ metrics:
       - name: dell.envMonSupplyCurrentPower
         OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.2.1.5
         chart_meta:
-          family: 'PowerSupply/Power/Current'
+          family: 'Hardware/Power/Usage/Current'
           description: "Current power consumption"
           unit: "W"
       - name: dell.envMonSupplyAveragePower
         OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.2.1.6
         chart_meta:
-          family: 'PowerSupply/Power/Average'
+          family: 'Hardware/Power/Usage/Average'
           description: "Average power consumption"
           unit: "W"
       - OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.2.1.3
         name: dell.envMonSupplyState
         chart_meta:
-          family: 'PowerSupply/Status'
+          family: 'Hardware/Power/Status'
           description: "Power supply operational state"
           unit: "{status}"
         mapping:

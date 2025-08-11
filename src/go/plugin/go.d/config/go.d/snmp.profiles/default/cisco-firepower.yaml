@@ -31,12 +31,13 @@ metrics:
       - OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.7 # cpmCPUTotal1minRev
         name: cpu.usage
         chart_meta:
-          description: The overall CPU busy percentage in the last 1 minute period.
-          family: 'CPU/Usage'
+          description: The current CPU utilization
+          family: 'System/CPU/Usage'
           unit: "%"
     metric_tags:
       - tag: cpu_index
         index: 1 # cpmCPUTotalIndex
+
   - MIB: CISCO-FIREPOWER-SM-MIB
     table:
       OID: 1.3.6.1.4.1.9.9.826.1.71.20
@@ -46,13 +47,13 @@ metrics:
         name: memory.free
         chart_meta:
           description: Memory free
-          family: 'Memory/Free'
+          family: 'System/Memory/Free'
           unit: "By"
       - OID: 1.3.6.1.4.1.9.9.826.1.71.20.1.23 # cfprSmMonitorMemUsed
         name: memory.used
         chart_meta:
           description: Memory used
-          family: 'Memory/Used'
+          family: 'System/Memory/Used'
           unit: "By"
     metric_tags:
       - tag: mem_index
@@ -66,14 +67,14 @@ metrics:
         name: cfprSmMonitorDataDiskAvailable
         chart_meta:
           description: Data disk available
-          family: 'Disk/Data/Available'
+          family: 'System/Disk/Data/Available'
           unit: "By"
         scale_factor: 1024
       - OID: 1.3.6.1.4.1.9.9.826.1.71.20.1.18
         name: cfprSmMonitorDataDiskTotal
         chart_meta:
           description: Data disk total
-          family: 'Disk/Data/Total'
+          family: 'System/Disk/Data/Total'
           unit: "By"
         scale_factor: 1024
     metric_tags:
@@ -90,7 +91,7 @@ metrics:
         name: cfprEquipmentFanOperState
         chart_meta:
           description: Equipment/Fans
-          family: 'Fan/Operational/Status'
+          family: 'Hardware/Fan/Operational/Status'
           unit: "{status}"
         mapping:
           0: unknown
@@ -137,7 +138,7 @@ metrics:
         name: cfprEquipmentPsuPower
         chart_meta:
           description: Psu power state
-          family: 'PowerSupply/Power/Status'
+          family: 'Hardware/PowerSupply/Power/Status'
           unit: "{status}"
         mapping:
           0: unknown

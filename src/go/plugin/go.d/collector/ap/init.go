@@ -9,6 +9,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pathvalidate"
 )
 
 func (c *Collector) validateConfig() error {
@@ -33,7 +35,12 @@ func (c *Collector) initIwExec() (iwBinary, error) {
 		return nil, err
 	}
 
-	iw := newIwExec(binPath, c.Timeout.Duration())
+	validatedPath, err := pathvalidate.ValidateBinaryPath(binPath)
+	if err != nil {
+		return nil, err
+	}
+
+	iw := newIwExec(validatedPath, c.Timeout.Duration())
 
 	return iw, nil
 }

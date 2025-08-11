@@ -175,7 +175,11 @@ The following options can be defined globally: update_every, autodetection_retry
 | update_every | Data collection frequency. | 10 | no |
 | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
 | hostname | Target ipv4 address. |  | yes |
+| enable_profiles | Enable collection of metrics using SNMP profiles. | true | no |
+| enable_profiles_table_metrics | Enable collection of SNMP table metrics from profiles. Enabling this may **increase collection time and memory usage** for devices with many network interfaces*. | true | no |
+| disable_legacy_collection | Disable the legacy SNMP collection method, forcing the collector to use only SNMP profiles (YAML-based configuration). When enabled, the collector will ignore any non-profile based collection logic. | false | no |
 | create_vnode | If set, the collector will create a Netdata Virtual Node for this SNMP device, which will appear as a separate Node in Netdata. | true | no |
+| vnode_device_down_threshold | Number of consecutive failed data collections before marking the device as down. | 3 | no |
 | vnode.guid | A unique identifier for the Virtual Node. If not set, a GUID will be automatically generated from the device's IP address. |  | no |
 | vnode.hostname | The hostname that will be used for the Virtual Node. If not set, the device's hostname will be used. |  | no |
 | vnode.labels | Additional key-value pairs to associate with the Virtual Node. |  | no |

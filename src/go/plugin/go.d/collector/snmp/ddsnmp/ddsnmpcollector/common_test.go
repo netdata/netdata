@@ -131,7 +131,7 @@ func assertMetricsEqual(t *testing.T, expected, actual []ddsnmp.Metric) {
 		assert.Equal(t, expected[i].Unit, actual[i].Unit, "metric unit")
 		assert.Equal(t, expected[i].Family, actual[i].Family, "metric family")
 		assert.Equal(t, expected[i].Description, actual[i].Description, "metric description")
-		assert.Equal(t, expected[i].Mappings, actual[i].Mappings, "metric mappings")
+		assert.Equal(t, expected[i].MultiValue, actual[i].MultiValue, "metric multi value")
 	}
 }
 

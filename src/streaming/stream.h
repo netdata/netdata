@@ -16,7 +16,7 @@ struct receiver_state;
 #include "stream-parents.h"
 
 // starting and stopping senders
-void *stream_sender_start_localhost(void *ptr);
+void stream_sender_start_localhost(void *ptr);
 void stream_sender_start_host(struct rrdhost *host);
 void stream_sender_signal_to_stop_and_wait(struct rrdhost *host, STREAM_HANDSHAKE reason, bool wait);
 void stream_connector_remove_host(RRDHOST *host);
@@ -33,7 +33,7 @@ bool stream_sender_has_capabilities(struct rrdhost *host, STREAM_CAPABILITIES ca
 // receiver API
 uint32_t stream_receivers_currently_connected(void);
 struct web_client;
-int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_string, void *h2o_ctx);
+int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_string);
 bool receiver_has_capability(struct rrdhost *host, STREAM_CAPABILITIES caps);
 void stream_receiver_free(struct receiver_state *rpt);
 bool stream_receiver_signal_to_stop_and_wait(struct rrdhost *host, STREAM_HANDSHAKE reason);

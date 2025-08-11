@@ -50,7 +50,7 @@ enum netdata_filesystem_localfs_idx {
     NETDATA_FS_LOCALFS_END,
 };
 
-void *ebpf_filesystem_thread(void *ptr);
+void ebpf_filesystem_thread(void *ptr);
 extern struct config fs_config;
 
 #endif /* NETDATA_EBPF_FILESYSTEM_H */

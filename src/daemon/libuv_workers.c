@@ -228,7 +228,7 @@ void push_thread(void *arg) {
     ThreadArgs *args = (ThreadArgs *)arg;
     CmdPool *pool = args->pool;
     for (int i = 0; i < args->total; ++i) {
-        cmd_data_t cmd;
+        cmd_data_t cmd = { 0 };
         snprintf(cmd.data, sizeof(cmd.data), "cmd-%d", i);
         push_cmd(pool, &cmd, true);
     }

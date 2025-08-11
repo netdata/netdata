@@ -3,7 +3,7 @@ extends:
   - tripplite.yaml
 
 sysobjectid:
-  - 1.3.6.1.4.1.850.1.1.3.1  #  tlpHardware.tlpDeviceTypes.tlpUps
+  - 1.3.6.1.4.1.850.1.1.3.1 #  tlpHardware.tlpDeviceTypes.tlpUps
 
 metadata:
   device:
@@ -15,17 +15,20 @@ metric_tags:
   - tag: tl_ups_ident_serial_num
     OID: 1.3.6.1.4.1.850.100.1.1.2.0
     symbol: tlUpsIdentSerialNum
-  - OID: 1.3.6.1.4.1.850.100.1.1.3.0
+  - tag: tl_ups_ident_id
+    OID: 1.3.6.1.4.1.850.100.1.1.3.0
     symbol: tlUpsIdentID
-    tag: tl_ups_ident_id
   - OID: 1.3.6.1.4.1.850.100.1.1.4.0
-    symbol: tlUpsSnmpCardSerialNum
+    symbol: _tlUpsSnmpCardSerialNum
     tag: tl_ups_snmp_card_serial_num
-  - OID: 1.3.6.1.4.1.850.100.1.1.6.0
+  - tag: tl_ups_location
+    OID: 1.3.6.1.4.1.850.100.1.1.6.0
     symbol: tlUpsLocation
-    tag: tl_ups_location
 
+# TRIPPLITE-12X
 # https://mibbrowser.online/mibdb_search.php?mib=TRIPPLITE-12X
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/tripplite/TRIPPLITE-12X
+
 metrics:
   - MIB: TRIPPLITE-12X
     symbol:
@@ -33,13 +36,13 @@ metrics:
       name: tlUpsMainOutletState
       chart_meta:
         description: The current state of the main output of the device
-        family: 'Outlet/Main/Status'
+        family: 'Hardware/Outlet/Main/Status'
         unit: "{status}"
       mapping:
-        unknown: 0
-        off: 1
-        on: 2
-        mixed: 3
+        0: unknown
+        1: off
+        2: on
+        3: mixed
   - MIB: TRIPPLITE-12X
     symbol:
       OID: 1.3.6.1.4.1.850.100.1.13.1.0
@@ -51,10 +54,10 @@ metrics:
   - MIB: TRIPPLITE-12X
     symbol:
       OID: 1.3.6.1.4.1.850.100.1.2.1.0
-      name: tlUpsBatteryAge  # The age of the battery in years.
+      name: tlUpsBatteryAge # The age of the battery in years.
       chart_meta:
         description: The age of the battery in years
-        family: 'Battery/Age/Internal'
+        family: 'Hardware/Battery/Age/Internal'
         unit: "{year}"
   - MIB: TRIPPLITE-12X
     symbol:
@@ -67,10 +70,10 @@ metrics:
   - MIB: TRIPPLITE-12X
     symbol:
       OID: 1.3.6.1.4.1.850.100.1.2.3.0
-      name: tlUpsExternalBatteryAge  # The age of the battery in years.
+      name: tlUpsExternalBatteryAge # The age of the battery in years.
       chart_meta:
         description: The age of external battery in years
-        family: 'Battery/Age/External'
+        family: 'Hardware/Battery/Age/External'
         unit: "{year}"
   - MIB: TRIPPLITE-12X
     symbol:
@@ -78,7 +81,7 @@ metrics:
       name: tlUpsAlarmsPresent
       chart_meta:
         description: The present number of active alarm conditions
-        family: 'Alarm/Active/Count'
+        family: 'System/Alarm/Active/Count'
         unit: "{alarm}"
   #  - MIB: TRIPPLITE-12X
   #    symbol:
@@ -95,7 +98,7 @@ metrics:
       OID: 1.3.6.1.4.1.850.101.1.1.1.0
       name: tlEnvTemperatureC
       chart_meta:
-        description: The ambient temperature (C)
+        description: The ambient temperature
         family: 'Environment/Temperature/Value'
         unit: "Cel"
   - MIB: TRIPPLITE-12X
@@ -103,7 +106,7 @@ metrics:
       OID: 1.3.6.1.4.1.850.101.1.1.2.0
       name: tlEnvTemperatureF
       chart_meta:
-        description: The ambient temperature (F)
+        description: The ambient temperature
         family: 'Environment/Temperature/Value'
         unit: "degF"
   - MIB: TRIPPLITE-12X
@@ -122,7 +125,7 @@ metrics:
       OID: 1.3.6.1.4.1.850.101.1.2.1.0
       name: tlEnvHumidity
       chart_meta:
-        description: The ambient humidity (%)
+        description: The ambient humidity
         family: 'Environment/Humidity/Value'
         unit: "%"
   - MIB: TRIPPLITE-12X
@@ -145,7 +148,7 @@ metrics:
         name: tlUpsInputVoltage
         chart_meta:
           description: The magnitude of the present input voltage
-          family: 'Input/Voltage/Value'
+          family: 'PowerFlow/Input/Voltage/Value'
           unit: "V"
     metric_tags:
       - tag: tl_ups_input_voltage_index
@@ -168,26 +171,26 @@ metrics:
         name: tlUpsOutputCircuitLoadCurrent
         chart_meta:
           description: The magnitude of the present output current
-          family: 'Output/Circuit/Current/Value'
+          family: 'PowerFlow/Output/Circuit/Current/Value'
           unit: "A"
         scale_factor: 0.1
       - OID: 1.3.6.1.4.1.850.100.1.4.7.1.4
         name: tlUpsOutputCircuitVoltage
         chart_meta:
           description: The magnitude of the present circuit voltage
-          family: 'Output/Circuit/Voltage/Value'
+          family: 'PowerFlow/Output/Circuit/Voltage/Value'
           unit: "V"
         scale_factor: 0.1
       - OID: 1.3.6.1.4.1.850.100.1.4.7.1.5
         name: tlUpsOutputCircuitPower
         chart_meta:
           description: The magnitude of the present power in watts
-          family: 'Output/Circuit/Power/Active'
+          family: 'PowerFlow/Output/Circuit/Active'
           unit: "W"
     metric_tags:
       - tag: tl_ups_output_circuit_index
         index: 1
-      - tag: tl_ups_output_circuit_status
+      - tag: _tl_ups_output_circuit_status
         symbol:
           OID: 1.3.6.1.4.1.850.100.1.4.7.1.2
           name: tlUpsOutputCircuitStatus
@@ -203,7 +206,7 @@ metrics:
         name: tlEnvContactStatus
         chart_meta:
           description: The current status of the contact
-          family: 'Environment/Contact/Status'
+          family: 'Hardware/Sensor/Contact/Status'
           unit: "{status}"
         mapping:
           0: normal
@@ -213,7 +216,7 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.850.101.2.1.1.2
           name: tlEnvContactName
-      - tag: tl_env_contact_config
+      - tag: _tl_env_contact_config
         symbol:
           OID: 1.3.6.1.4.1.850.101.2.1.1.4
           name: tlEnvContactConfig
@@ -230,7 +233,7 @@ metrics:
         name: tlUpsOutletGroupState
         chart_meta:
           description: The current state of the outlet group
-          family: 'Outlet/Group/Status'
+          family: 'Hardware/Outlet/Group/Status'
           unit: "{status}"
         mapping:
           0: unknown

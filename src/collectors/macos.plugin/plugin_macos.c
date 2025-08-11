@@ -37,7 +37,7 @@ static void macos_main_cleanup(void *pptr)
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
-void *macos_main(void *ptr)
+void macos_main(void *ptr)
 {
     CLEANUP_FUNCTION_REGISTER(macos_main_cleanup) cleanup_ptr = ptr;
 
@@ -77,6 +77,4 @@ void *macos_main(void *ptr)
                 break;
         }
     }
-
-    return NULL;
 }

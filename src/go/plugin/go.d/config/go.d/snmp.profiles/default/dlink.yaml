@@ -6,5 +6,4 @@ metadata:
   device:
     fields:
       vendor:
-        value: "dlink"
-
+        value: "D-Link"

@@ -9,7 +9,10 @@ metadata:
   device:
     fields:
       type:
-        value: "switch"
+        value: "Switch"
+
+# https://mibbrowser.online/mibdb_search.php?mib=HUAWEI-STACK-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/huawei/HUAWEI-STACK-MIB
 
 metrics:
   - MIB: HUAWEI-STACK-MIB
@@ -21,13 +24,13 @@ metrics:
         OID: 1.3.6.1.4.1.2011.5.25.183.1.20.1.2
         chart_meta:
           description: Stack member's priority
-          family: 'Stack/Member/Priority/Value'
+          family: 'Hardware/Stack/Member/Priority/Value'
           unit: "{priority}"
       - OID: 1.3.6.1.4.1.2011.5.25.183.1.20.1.3
         name: huawei.hwMemberStackRole
         chart_meta:
           description: Current role of the stack member
-          family: 'Stack/Member/Role'
+          family: 'Hardware/Stack/Member/Role/Status'
           unit: "{status}"
         mapping:
           1: master
@@ -57,7 +60,7 @@ metrics:
         name: huawei.hwStackPortStatus
         chart_meta:
           description: Operational status of the stack port
-          family: 'Stack/Port/Status'
+          family: 'Hardware/Stack/Port/Status'
           unit: "{status}"
         mapping:
           1: up

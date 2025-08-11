@@ -3,6 +3,6 @@
 #ifndef NETDATA_DAEMON_SYSTEMD_WATCHER_H
 #define NETDATA_DAEMON_SYSTEMD_WATCHER_H
 
-void *systemd_watcher_thread(void *arg);
+void systemd_watcher_thread(void *arg);
 
 #endif //NETDATA_DAEMON_SYSTEMD_WATCHER_H

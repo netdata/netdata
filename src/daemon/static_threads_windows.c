@@ -2,7 +2,7 @@
 
 #include "common.h"
 
-void *win_plugin_main(void *ptr);
+void win_plugin_main(void *ptr);
 
 static const struct netdata_static_thread static_threads_windows[] = {
     {

@@ -10,107 +10,143 @@ metadata:
   device:
     fields:
       vendor:
-        value: "exagrid"
+        value: "ExaGrid"
       type:
-        value: "storage"
+        value: "Storage"
+
+# https://mibbrowser.online/mibdb_search.php?mib=EXAGRID-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/exagrid/EXAGRID-MIB
 
 metrics:
   - MIB: EXAGRID-MIB
     symbol:
       OID: 1.3.6.1.4.1.14941.4.1.1.0
       name: egLandingSpaceConfiguredWholeGigabytes
-      description: The amount of configured landing space scaled to GigaBytes (10^9) bytes
-      unit: "By"
+      chart_meta:
+        description: The amount of configured landing space scaled to GigaBytes (10^9) bytes
+        family: 'Storage/LandingSpace/Configured/Whole'
+        unit: "By"
   - MIB: EXAGRID-MIB
     symbol:
       OID: 1.3.6.1.4.1.14941.4.1.2.0
       name: egLandingSpaceConfiguredFractionalGigabytes
-      description: The amount of configured landing space below 1 Gigabyte in bytes
-      unit: "By"
+      chart_meta:
+        description: The amount of configured landing space below 1 Gigabyte in bytes
+        family: 'Storage/LandingSpace/Configured/Fractional'
+        unit: "By"
   - MIB: EXAGRID-MIB
     symbol:
       OID: 1.3.6.1.4.1.14941.4.1.3.0
       name: egLandingSpaceAvailableWholeGigabytes
-      description: The amount of available landing space scaled to GigaBytes (10^9) bytes
-      unit: "By"
+      chart_meta:
+        description: The amount of available landing space scaled to GigaBytes (10^9) bytes
+        family: 'Storage/LandingSpace/Available/Whole'
+        unit: "By"
   - MIB: EXAGRID-MIB
     symbol:
       OID: 1.3.6.1.4.1.14941.4.1.4.0
       name: egLandingSpaceAvailableFractionalGigabytes
-      description: The amount of available landing space below 1 Gigabyte in bytes
-      unit: "By"
+      chart_meta:
+        description: The amount of available landing space below 1 Gigabyte in bytes
+        family: 'Storage/LandingSpace/Available/Fractional'
+        unit: "By"
   - MIB: EXAGRID-MIB
     symbol:
       OID: 1.3.6.1.4.1.14941.4.2.1.0
       name: egRetentionSpaceConfiguredWholeGigabytes
-      description: The amount of configured retention space scaled to GigaBytes (10^9) bytes
-      unit: "By"
+      chart_meta:
+        description: The amount of configured retention space scaled to GigaBytes (10^9) bytes
+        family: 'Storage/RetentionSpace/Configured/Whole'
+        unit: "By"
   - MIB: EXAGRID-MIB
     symbol:
       OID: 1.3.6.1.4.1.14941.4.2.2.0
       name: egRetentionSpaceConfiguredFractionalGigabytes
-      description: The amount of configured retention space below 1 Gigabyte in bytes
-      unit: "By"
+      chart_meta:
+        description: The amount of configured retention space below 1 Gigabyte in bytes
+        family: 'Storage/RetentionSpace/Configured/Fractional'
+        unit: "By"
   - MIB: EXAGRID-MIB
     symbol:
       OID: 1.3.6.1.4.1.14941.4.2.3.0
       name: egRetentionSpaceAvailableWholeGigabytes
-      description: The amount of available retention space scaled to GigaBytes (10^9) bytes
-      unit: "By"
+      chart_meta:
+        description: The amount of available retention space scaled to GigaBytes (10^9) bytes
+        family: 'Storage/RetentionSpace/Available/Whole'
+        unit: "By"
   - MIB: EXAGRID-MIB
     symbol:
       OID: 1.3.6.1.4.1.14941.4.2.4.0
       name: egRetentionSpaceAvailableFractionalGigabytes
-      description: The amount of available retention space below 1 Gigabyte in bytes
-      unit: "By"
+      chart_meta:
+        description: The amount of available retention space below 1 Gigabyte in bytes
+        family: 'Storage/RetentionSpace/Available/Fractional'
+        unit: "By"
   - MIB: EXAGRID-MIB
     symbol:
       OID: 1.3.6.1.4.1.14941.4.3.1.0
       name: egBackupDataAvailableWholeGigabytes
-      description: The amount of data available for restore by a backup application scaled to GigaBytes (10^9) bytes
-      unit: "By"
+      chart_meta:
+        description: The amount of data available for restore by a backup application scaled to GigaBytes (10^9) bytes
+        family: 'Storage/BackupData/Available/Whole'
+        unit: "By"
   - MIB: EXAGRID-MIB
     symbol:
       OID: 1.3.6.1.4.1.14941.4.3.2.0
       name: egBackupDataAvailableFractionalGigabytes
-      description: The amount of data available for restore by a backup application below 1 Gigabyte in bytes
-      unit: "By"
+      chart_meta:
+        description: The amount of data available for restore by a backup application below 1 Gigabyte in bytes
+        family: 'Storage/BackupData/Available/Fractional'
+        unit: "By"
   - MIB: EXAGRID-MIB
     symbol:
       OID: 1.3.6.1.4.1.14941.4.3.3.0
       name: egBackupDataSpaceConsumedWholeGigabytes
-      description: The amount of consumed retention space scaled to GigaBytes (10^9) bytes
-      unit: "By"
+      chart_meta:
+        description: The amount of consumed retention space scaled to GigaBytes (10^9) bytes
+        family: 'Storage/BackupData/Consumed/Whole'
+        unit: "By"
   - MIB: EXAGRID-MIB
     symbol:
       OID: 1.3.6.1.4.1.14941.4.3.4.0
       name: egBackupDataSpaceConsumedFractionalGigabytes
-      description: The amount of consumed retention space below 1 Gigabyte in bytes
-      unit: "By"
+      chart_meta:
+        description: The amount of consumed retention space below 1 Gigabyte in bytes
+        family: 'Storage/BackupData/Consumed/Fractional'
+        unit: "By"
   - MIB: EXAGRID-MIB
     symbol:
       OID: 1.3.6.1.4.1.14941.4.4.1.0
       name: egPendingDeduplicationWholeGigabytes
-      description: The amount of data not yet deduplicated scaled to GigaBytes (10^9) bytes
-      unit: "By"
+      chart_meta:
+        description: The amount of data not yet deduplicated scaled to GigaBytes (10^9) bytes
+        family: 'Storage/Deduplication/Pending/Whole'
+        unit: "By"
   - MIB: EXAGRID-MIB
     symbol:
       OID: 1.3.6.1.4.1.14941.4.4.2.0
       name: egPendingDeduplicationFractionalGigabytes
-      description: The amount of data not yet deduplicated below 1 Gigabyte in bytes
-      unit: "By"
+      chart_meta:
+        description: The amount of data not yet deduplicated below 1 Gigabyte in bytes
+        family: 'Storage/Deduplication/Pending/Fractional'
+        unit: "By"
   - MIB: EXAGRID-MIB
     symbol:
       OID: 1.3.6.1.4.1.14941.4.4.3.0
       name: egPendingDeduplicationAge
-      description: The amount of time that data has been available for deduplication, but has not yet been deduplicated
-      unit: "ms"
-  # - MIB: EXAGRID-MIB
-  #   symbol:
-  #     OID: 1.3.6.1.4.1.14941.4.6
-  #     name: exagridServerStatus
-  #     mapping:
-  #       1: no_alarm
-  #       2: warning_alarm
-  #       3: error_alarm
-  #  TODO: Support `constant_value_one` and `metric_tags` for scalar OID metrics
+      chart_meta:
+        description: The amount of time that data has been available for deduplication, but has not yet been deduplicated
+        family: 'Storage/Deduplication/Pending/Age'
+        unit: "ms"
+  - MIB: EXAGRID-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.14941.4.6.1.0
+      name: egServerAlarmState
+      chart_meta:
+        description: Current alarm state of the server
+        family: 'System/Alarm/Status'
+        unit: "{status}"
+      mapping:
+        1: clear
+        2: warning
+        3: error

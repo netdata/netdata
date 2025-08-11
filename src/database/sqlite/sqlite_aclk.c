@@ -172,6 +172,9 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
         host->rrdlabels = sql_load_host_labels((nd_uuid_t *)argv[IDX_HOST_ID]);
         host->stream.snd.status.last_connected = last_connected;
 
+        if (argv[IDX_OS] && strcmp(argv[IDX_OS], NETDATA_VIRTUAL_HOST) == 0)
+            rrdhost_option_set(host, RRDHOST_OPTION_VIRTUAL_HOST);
+
         pulse_host_status(host, 0, 0); // this will detect the receiver status
     }
 
@@ -594,7 +597,7 @@ static void timer_cb(uv_timer_t *handle)
 #define ACLK_JOBS_ARE_RUNNING                                                                                          \
     (config->aclk_queries_running || config->alert_push_running || config->aclk_batch_job_is_running)
 
-static void *aclk_synchronization_event_loop(void *arg)
+static void aclk_synchronization_event_loop(void *arg)
 {
     struct aclk_sync_config_s *config = arg;
     uv_thread_set_name_np("ACLKSYNC");
@@ -915,7 +918,6 @@ static void *aclk_synchronization_event_loop(void *arg)
     worker_unregister();
     service_exits();
     completion_mark_complete(&config->start_stop_complete);
-    return NULL;
 }
 
 static void aclk_initialize_event_loop(void)
@@ -1025,7 +1027,7 @@ void aclk_synchronization_shutdown(void)
     if (!aclk_sync_config.thread)
         return;
 
-    // Send shutdown command, not that the completion is initialized
+    // Send shutdown command, note that the completion is initialized
     // on init and still valid
     aclk_mqtt_client_reset();
 

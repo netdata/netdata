@@ -1163,6 +1163,8 @@ If you don't see the app/service you'd like to monitor in this list:
 
 ### Windows Systems
 
+- [ASP.NET](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/asp.net.md)
+
 - [Active Directory Certificate Service](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/active_directory_certificate_service.md)
 
 - [Active Directory Federation Service](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/active_directory_federation_service.md)

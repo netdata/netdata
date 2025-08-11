@@ -3,14 +3,18 @@ extends:
   - _std-if-mib.yaml
 
 sysobjectid:
-  - 1.3.6.1.4.1.11863.1.*  # TP-Link switch
-  - 1.3.6.1.4.1.11863.5.*  # TP-Link products
+  - 1.3.6.1.4.1.11863.1.* # TP-Link switch
+  - 1.3.6.1.4.1.11863.5.* # TP-Link products
 
 metadata:
   device:
     fields:
       vendor:
         value: "TP-Link"
+
+# TPLINK-SYSMONITOR-MIB
+# https://mibbrowser.online/mibdb_search.php?mib=TPLINK-SYSMONITOR-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/tplink/TPLINK-SYSMONITOR-MIB
 
 metrics:
   - MIB: TPLINK-SYSMONITOR-MIB
@@ -19,14 +23,14 @@ metrics:
       OID: 1.3.6.1.4.1.11863.6.4.1.1.1
     symbols:
       - name: cpu.usage
-        OID: 1.3.6.1.4.1.11863.6.4.1.1.1.1.3
+        OID: 1.3.6.1.4.1.11863.6.4.1.1.1.1.2 # tpSysMonitorCpu5Seconds
         chart_meta:
-          description: CPU utilization in 1 minute
-          family: 'CPU/Usage'
+          description: The current CPU utilization
+          family: 'System/CPU/Usage'
           unit: "%"
     metric_tags:
       - tag: cpu_index
-        index: 1  # tpSysMonitorCpuUnitNumber
+        index: 1 # tpSysMonitorCpuUnitNumber
 
   - MIB: TPLINK-SYSMONITOR-MIB
     table:
@@ -37,8 +41,8 @@ metrics:
         OID: 1.3.6.1.4.1.11863.6.4.1.2.1.1.2
         chart_meta:
           description: Memory utilization
-          family: 'Memory/Usage'
+          family: 'System/Memory/Usage'
           unit: "%"
     metric_tags:
       - tag: mem_index
-        index: 1  # tpSysMonitorMemoryUnitNumber
+        index: 1 # tpSysMonitorMemoryUnitNumber

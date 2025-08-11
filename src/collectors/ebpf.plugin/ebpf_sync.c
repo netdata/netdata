@@ -386,17 +386,17 @@ static void ebpf_sync_exit(void *pptr)
         return;
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
-        pthread_mutex_lock(&lock);
+        netdata_mutex_lock(&lock);
         ebpf_obsolete_sync_global(em);
-        pthread_mutex_unlock(&lock);
+        netdata_mutex_unlock(&lock);
     }
 
     ebpf_sync_cleanup_objects();
 
-    pthread_mutex_lock(&ebpf_exit_cleanup);
+    netdata_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     ebpf_update_stats(&plugin_statistics, em);
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
+    netdata_mutex_unlock(&ebpf_exit_cleanup);
 }
 
 /*****************************************************************
@@ -603,20 +603,20 @@ static void sync_collector(ebpf_module_t *em)
 
         counter = 0;
         ebpf_sync_read_global_table(maps_per_core);
-        pthread_mutex_lock(&lock);
+        netdata_mutex_lock(&lock);
 
         sync_send_data();
 
-        pthread_mutex_unlock(&lock);
+        netdata_mutex_unlock(&lock);
 
-        pthread_mutex_lock(&ebpf_exit_cleanup);
+        netdata_mutex_lock(&ebpf_exit_cleanup);
         if (running_time && !em->running_time)
             running_time = update_every;
         else
             running_time += update_every;
 
         em->running_time = running_time;
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
+        netdata_mutex_unlock(&ebpf_exit_cleanup);
     }
 }
 
@@ -755,7 +755,7 @@ static void ebpf_set_sync_maps()
  *
  * @return It always return NULL
  */
-void *ebpf_sync_thread(void *ptr)
+void ebpf_sync_thread(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
@@ -786,15 +786,13 @@ void *ebpf_sync_thread(void *ptr)
         algorithms,
         NETDATA_SYNC_IDX_END);
 
-    pthread_mutex_lock(&lock);
+    netdata_mutex_lock(&lock);
     ebpf_create_sync_charts(em->update_every);
     ebpf_update_stats(&plugin_statistics, em);
-    pthread_mutex_unlock(&lock);
+    netdata_mutex_unlock(&lock);
 
     sync_collector(em);
 
 endsync:
     ebpf_update_disabled_plugin_stats(em);
-
-    return NULL;
 }

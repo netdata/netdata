@@ -8,7 +8,7 @@ metadata:
   device:
     fields:
       vendor:
-        value: "silverpeak"
+        value: "Silverpeak"
       type:
         value: "SD-WAN"
       serial_number:
@@ -27,6 +27,10 @@ metadata:
           OID: 1.3.6.1.4.1.23867.3.1.1.1.2.0
           name: spsProductModel
 
+# SILVERPEAK-MGMT-MIB
+# https://mibbrowser.online/mibdb_search.php?mib=SILVERPEAK-MGMT-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/silverpeak/SILVERPEAK-MGMT-MIB
+
 metrics:
   - MIB: SILVERPEAK-MGMT-MIB
     symbol:
@@ -34,7 +38,7 @@ metrics:
       name: silverpeak.mgmt.spsActiveAlarmCount
       chart_meta:
         description: The number of active alarm entries in the alarm table
-        family: 'Alarm/Active/Count'
+        family: 'System/Alarm/Active'
         unit: "{alarm}"
 
   - MIB: SILVERPEAK-MGMT-MIB
@@ -46,7 +50,7 @@ metrics:
         name: silverpeak.mgmt.spsActiveAlarmSeverity
         chart_meta:
           description: Severity level of the active alarm
-          family: 'Alarm/Severity/Level'
+          family: 'System/Alarm/Severity'
           unit: "{status}"
         mapping:
           0: info
@@ -62,7 +66,7 @@ metrics:
         name: silverpeak.mgmt.spsActiveAlarmAcked
         chart_meta:
           description: Acknowledgement status of the active alarm
-          family: 'Alarm/Acknowledgement/Status'
+          family: 'System/Alarm/Status/Acknowledged'
           unit: "{status}"
         mapping:
           0: no
@@ -71,7 +75,7 @@ metrics:
         name: silverpeak.mgmt.spsActiveAlarmActive
         chart_meta:
           description: Active status of the alarm
-          family: 'Alarm/Active/Status'
+          family: 'System/Alarm/Status/Active'
           unit: "{status}"
         mapping:
           0: no
@@ -80,7 +84,7 @@ metrics:
         name: silverpeak.mgmt.spsActiveAlarmClearable
         chart_meta:
           description: Whether the alarm can be manually cleared
-          family: 'Alarm/Clearable'
+          family: 'System/Alarm/Status/Clearable'
           unit: "{status}"
         mapping:
           0: no
@@ -89,25 +93,27 @@ metrics:
         name: silverpeak.mgmt.spsActiveAlarmServiceAffect
         chart_meta:
           description: Whether the alarm affects service
-          family: 'Alarm/ServiceImpact'
+          family: 'System/Alarm/Status/ServiceImpact'
           unit: "{status}"
         mapping:
           0: no
           1: yes
     metric_tags:
+      - tag: silverpeak_mgmt_sps_active_alarm_index
+        index: 1
       - tag: silverpeak_mgmt_sps_active_alarm_name
         symbol:
           OID: 1.3.6.1.4.1.23867.3.1.1.2.1.1.4
           name: silverpeak.mgmt.spsActiveAlarmName
-      - tag: silverpeak_mgmt_sps_active_alarm_descr
+      - tag: _silverpeak_mgmt_sps_active_alarm_descr
         symbol:
           OID: 1.3.6.1.4.1.23867.3.1.1.2.1.1.5
           name: silverpeak.mgmt.spsActiveAlarmDescr
-      - tag: silverpeak_mgmt_sps_active_alarm_source
+      - tag: _silverpeak_mgmt_sps_active_alarm_source
         symbol:
           OID: 1.3.6.1.4.1.23867.3.1.1.2.1.1.6
           name: silverpeak.mgmt.spsActiveAlarmSource
-      - tag: silverpeak_mgmt_sps_active_alarm_type
+      - tag: _silverpeak_mgmt_sps_active_alarm_type
         symbol:
           OID: 1.3.6.1.4.1.23867.3.1.1.2.1.1.7
           name: silverpeak.mgmt.spsActiveAlarmType

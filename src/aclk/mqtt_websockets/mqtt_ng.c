@@ -5,13 +5,15 @@
 #endif
 
 #include "libnetdata/libnetdata.h"
-void pulse_aclk_sent_message_acked(usec_t usec, size_t len);
+void pulse_aclk_sent_message_acked(usec_t publish_latency, size_t len);
 
 #include "common_internal.h"
 #include "mqtt_constants.h"
 #include "mqtt_ng.h"
 #include "aclk_mqtt_workers.h"
 
+
+#define PACKET_ACK_TIMEOUT_SECS (60)
 #define SMALL_STRING_DONT_FRAGMENT_LIMIT 128
 
 #define LOCK_HDR_BUFFER(buffer) spinlock_lock(&((buffer)->spinlock))
@@ -238,11 +240,18 @@ struct mqtt_ng_client {
     struct mqtt_ng_stats stats;
     SPINLOCK stats_spinlock;
 
+    struct {
+        SPINLOCK spinlock;
+        Pvoid_t JudyL;
+    } pending_packets;
+
     struct topic_aliases_data tx_topic_aliases;
     c_rhash rx_aliases;
 
     size_t max_msg_size;
 };
+
+usec_t publish_latency;
 
 unsigned char pingreq[] = { MQTT_CPT_PINGREQ << 4, 0x00 };
 
@@ -418,7 +427,7 @@ static void buffer_frag_free_data(struct buffer_fragment *frag)
     }
 }
 
-#define HEADER_BUFFER_SIZE 1024*1024
+#define HEADER_BUFFER_SIZE (1024*1024)
 #define GROWTH_FACTOR 1.25
 
 #define BUFFER_BYTES_USED(buf) ((size_t)((buf)->tail - (buf)->data))
@@ -527,7 +536,7 @@ static int transaction_buffer_grow(struct transaction_buffer *buf, float rate, s
     if (buf->sending_frag != &ping_frag)
         buf->sending_frag = NULL;
 
-    buf->hdr_buffer.size *= rate;
+    buf->hdr_buffer.size = (size_t)((float)buf->hdr_buffer.size * rate);
     if (buf->hdr_buffer.size > max)
         buf->hdr_buffer.size = max;
 
@@ -563,9 +572,11 @@ static void transaction_buffer_destroy(struct transaction_buffer *to_init)
 // Creates transaction
 // saves state of buffer before any operation was done
 // allowing for rollback if things go wrong
-#define transaction_buffer_transaction_start(buf) \
-  { LOCK_HDR_BUFFER(buf); \
-    memcpy(&(buf)->state_backup, &(buf)->hdr_buffer, sizeof((buf)->hdr_buffer)); }
+#define transaction_buffer_transaction_start(buf)                                                                      \
+    {                                                                                                                  \
+        LOCK_HDR_BUFFER(buf);                                                                                          \
+        memcpy(&(buf)->state_backup, &(buf)->hdr_buffer, sizeof((buf)->hdr_buffer));                                   \
+    }
 
 #define transaction_buffer_transaction_commit(buf) UNLOCK_HDR_BUFFER(buf);
 
@@ -611,6 +622,9 @@ struct mqtt_ng_client *mqtt_ng_init(struct mqtt_ng_init *settings)
     client->puback_callback = settings->puback_callback;
     client->connack_callback = settings->connack_callback;
     client->msg_callback = settings->msg_callback;
+    spinlock_init(&client->pending_packets.spinlock);
+    client->pending_packets.JudyL = NULL;
+    __atomic_store_n(&publish_latency, 0, __ATOMIC_RELEASE);
 
     return client;
 }
@@ -644,13 +658,21 @@ static void mqtt_ng_destroy_tx_alias_hash(c_rhash hash)
     c_rhash_destroy(hash);
 }
 
+static void destroy_timeout_monitor_list(struct mqtt_ng_client *client)
+{
+    spinlock_lock(&client->pending_packets.spinlock);
+    (void) JudyLFreeArray(&client->pending_packets.JudyL, PJE0);
+    spinlock_unlock(&client->pending_packets.spinlock);
+    __atomic_store_n(&client->stats.packets_waiting_puback, 0, __ATOMIC_RELAXED);
+}
+
 void mqtt_ng_destroy(struct mqtt_ng_client *client)
 {
     transaction_buffer_destroy(&client->main_buffer);
 
     mqtt_ng_destroy_tx_alias_hash(client->tx_topic_aliases.stoi_dict);
     mqtt_ng_destroy_rx_alias_hash(client->rx_aliases);
-
+    destroy_timeout_monitor_list(client);
     freez(client);
 }
 
@@ -736,9 +758,12 @@ static size_t mqtt_ng_connect_size(struct mqtt_auth_properties *auth,
         frag = buffer_new_frag(buf, (flags)); } \
       if(frag==NULL) { on_fail; }}
 
-#define CHECK_BYTES_AVAILABLE(buf, needed, fail) \
-    { if (BUFFER_BYTES_AVAILABLE(buf) < (size_t)needed) { \
-        fail; } }
+#define CHECK_BYTES_AVAILABLE(buf, needed, fail)                                                                       \
+    {                                                                                                                  \
+        if (BUFFER_BYTES_AVAILABLE(buf) < (size_t)needed) {                                                            \
+            fail;                                                                                                      \
+        }                                                                                                              \
+    }
 
 #define DATA_ADVANCE(buf, bytes, frag) { size_t b = (bytes); (buf)->tail += b; (frag)->len += b; }
 
@@ -746,15 +771,14 @@ static size_t mqtt_ng_connect_size(struct mqtt_auth_properties *auth,
 #define WRITE_POS(frag) (&(frag->data[frag->len]))
 
 // [MQTT-1.5.2] Two Byte Integer
-#define PACK_2B_INT(buffer, integer, frag) { \
-    uint16_t temp = htobe16((integer)); \
-    memcpy(WRITE_POS(frag), &temp, sizeof(uint16_t)); \
-    DATA_ADVANCE(buffer, sizeof(uint16_t), frag); \
-}
-// #define PACK_2B_INT(buffer, integer, frag) { *(uint16_t *)WRITE_POS(frag) = htobe16((integer));
-//             DATA_ADVANCE(buffer, sizeof(uint16_t), frag); }
+#define PACK_2B_INT(buffer, integer, frag)                                                                             \
+    {                                                                                                                  \
+        uint16_t temp = htobe16((integer));                                                                            \
+        memcpy(WRITE_POS(frag), &temp, sizeof(uint16_t));                                                              \
+        DATA_ADVANCE(buffer, sizeof(uint16_t), frag);                                                                  \
+    }
 
-static int _optimized_add(struct header_buffer *buf, void *data, size_t data_len, free_fnc_t data_free_fnc, struct buffer_fragment **frag)
+static int optimized_add(struct header_buffer *buf, void *data, size_t data_len, free_fnc_t data_free_fnc, struct buffer_fragment **frag)
 {
     if (data_len > SMALL_STRING_DONT_FRAGMENT_LIMIT) {
         buffer_frag_flag_t flags = BUFFER_FRAG_DATA_EXTERNAL;
@@ -773,40 +797,69 @@ static int _optimized_add(struct header_buffer *buf, void *data, size_t data_len
     } else if (data_len) {
         // if the data are small dont bother creating new fragments
         // store in buffer directly
-        CHECK_BYTES_AVAILABLE(buf, data_len, return 1);
+        CHECK_BYTES_AVAILABLE(buf, data_len, return 1)
         memcpy(buf->tail, data, data_len);
-        DATA_ADVANCE(buf, data_len, *frag);
+        DATA_ADVANCE(buf, data_len, *frag)
     }
     return 0;
 }
 
+static void remove_packet_from_timeout_monitor_list_unsafe(struct mqtt_ng_client *client, uint16_t packet_id)
+{
+    int rc = JudyLDel(&client->pending_packets.JudyL, (Word_t) packet_id, PJE0);
+    // rc = 1 if the packer was deleted, so update statistics
+    if (likely(rc))
+        __atomic_fetch_sub(&client->stats.packets_waiting_puback, 1, __ATOMIC_RELAXED);
+}
+
+#define PACKET_TIMEOUT_EPOCH (1704067200L)  // Jan 1, 2024 00:00:00 UTC
+
+static void add_packet_to_timeout_monitor_list(struct mqtt_ng_client *client, uint16_t packet_id)
+{
+    spinlock_lock(&client->pending_packets.spinlock);
+    time_t now = now_realtime_sec();
+    // Add it to the JudyL array
+    uint32_t *Pvalue = (uint32_t *) JudyLIns(&client->pending_packets.JudyL, (Word_t) packet_id, PJE0);
+    if (Pvalue == PJERR) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Error inserting packet_id (%" PRIu16 ") into JudyL array.", packet_id);
+        spinlock_unlock(&client->pending_packets.spinlock);
+        return;
+    }
+    *Pvalue = (uint32_t) ((now - PACKET_TIMEOUT_EPOCH) + PACKET_ACK_TIMEOUT_SECS);
+    spinlock_unlock(&client->pending_packets.spinlock);
+
+    __atomic_fetch_add(&client->stats.packets_waiting_puback, 1, __ATOMIC_RELAXED);
+}
+
 #define TRY_GENERATE_MESSAGE(generator_function, ...)                                                                  \
-    int rc = generator_function(&client->main_buffer, ##__VA_ARGS__);                                                  \
-    if (rc == MQTT_NG_MSGGEN_BUFFER_OOM) {                                                                             \
-        LOCK_HDR_BUFFER(&client->main_buffer);                                                                         \
-        transaction_buffer_garbage_collect((&client->main_buffer));                                                    \
-        UNLOCK_HDR_BUFFER(&client->main_buffer);                                                                       \
-        rc = generator_function(&client->main_buffer, ##__VA_ARGS__);                                                  \
-        if (rc == MQTT_NG_MSGGEN_BUFFER_OOM && client->max_mem_bytes) {                                                \
+    ({                                                                                                                 \
+        int _rc = generator_function(&client->main_buffer, ##__VA_ARGS__);                                             \
+        if (_rc == MQTT_NG_MSGGEN_BUFFER_OOM) {                                                                        \
             LOCK_HDR_BUFFER(&client->main_buffer);                                                                     \
-            transaction_buffer_grow((&client->main_buffer), GROWTH_FACTOR, client->max_mem_bytes);                     \
+            transaction_buffer_garbage_collect((&client->main_buffer));                                                \
             UNLOCK_HDR_BUFFER(&client->main_buffer);                                                                   \
-            rc = generator_function(&client->main_buffer, ##__VA_ARGS__);                                              \
+            _rc = generator_function(&client->main_buffer, ##__VA_ARGS__);                                             \
+            if (_rc == MQTT_NG_MSGGEN_BUFFER_OOM && client->max_mem_bytes) {                                           \
+                LOCK_HDR_BUFFER(&client->main_buffer);                                                                 \
+                transaction_buffer_grow((&client->main_buffer), GROWTH_FACTOR, client->max_mem_bytes);                 \
+                UNLOCK_HDR_BUFFER(&client->main_buffer);                                                               \
+                _rc = generator_function(&client->main_buffer, ##__VA_ARGS__);                                         \
+            }                                                                                                          \
+            if (_rc == MQTT_NG_MSGGEN_BUFFER_OOM)                                                                      \
+                nd_log(                                                                                                \
+                    NDLS_DAEMON,                                                                                       \
+                    NDLP_ERR,                                                                                          \
+                    "%s failed to generate message due to insufficient buffer space (line %d)",                        \
+                    __FUNCTION__,                                                                                      \
+                    __LINE__);                                                                                         \
         }                                                                                                              \
-        if (rc == MQTT_NG_MSGGEN_BUFFER_OOM)                                                                           \
-            nd_log(                                                                                                    \
-                NDLS_DAEMON,                                                                                           \
-                NDLP_ERR,                                                                                              \
-                "%s failed to generate message due to insufficient buffer space (line %d)",                            \
-                __FUNCTION__,                                                                                          \
-                __LINE__);                                                                                             \
-    }                                                                                                                  \
-    if (rc == MQTT_NG_MSGGEN_OK) {                                                                                     \
-        spinlock_lock(&client->stats_spinlock);                                                                        \
-        client->stats.tx_messages_queued++;                                                                            \
-        spinlock_unlock(&client->stats_spinlock);                                                                      \
-    }                                                                                                                  \
-    return rc;
+        if (_rc == MQTT_NG_MSGGEN_OK) {                                                                                \
+            spinlock_lock(&client->stats_spinlock);                                                                    \
+            client->stats.tx_messages_queued++;                                                                        \
+            spinlock_unlock(&client->stats_spinlock);                                                                  \
+        }                                                                                                              \
+        _rc;                                                                                                           \
+    })
 
 mqtt_msg_data mqtt_ng_generate_connect(struct transaction_buffer *trx_buf,
                                        struct mqtt_auth_properties *auth,
@@ -849,7 +902,7 @@ mqtt_msg_data mqtt_ng_generate_connect(struct transaction_buffer *trx_buf,
     }
 
     // >> START THE RODEO <<
-    transaction_buffer_transaction_start(trx_buf);
+    transaction_buffer_transaction_start(trx_buf)
 
     // Calculate the resulting message size sans fixed MQTT header
     size_t size = mqtt_ng_connect_size(auth, lwt);
@@ -858,19 +911,19 @@ mqtt_msg_data mqtt_ng_generate_connect(struct transaction_buffer *trx_buf,
     struct buffer_fragment *frag = NULL;
     mqtt_msg_data ret = NULL;
 
-    BUFFER_TRANSACTION_NEW_FRAG(&trx_buf->hdr_buffer, BUFFER_FRAG_MQTT_PACKET_HEAD, frag, goto fail_rollback );
+    BUFFER_TRANSACTION_NEW_FRAG(&trx_buf->hdr_buffer, BUFFER_FRAG_MQTT_PACKET_HEAD, frag, goto fail_rollback)
     ret = frag;
 
     // MQTT Fixed Header
     size_t needed_bytes = 1 /* Packet type */ + MQTT_VARSIZE_INT_BYTES(size) + sizeof(mqtt_protocol_name_frag) + 1 /* CONNECT FLAGS */ + 2 /* keepalive */ + 1 /* Properties TODO now fixed 0*/;
-    CHECK_BYTES_AVAILABLE(&trx_buf->hdr_buffer, needed_bytes, goto fail_rollback);
+    CHECK_BYTES_AVAILABLE(&trx_buf->hdr_buffer, needed_bytes, goto fail_rollback)
 
     *WRITE_POS(frag) = MQTT_CPT_CONNECT << 4;
-    DATA_ADVANCE(&trx_buf->hdr_buffer, 1, frag);
-    DATA_ADVANCE(&trx_buf->hdr_buffer, uint32_to_mqtt_vbi(size, WRITE_POS(frag)), frag);
+    DATA_ADVANCE(&trx_buf->hdr_buffer, 1, frag)
+    DATA_ADVANCE(&trx_buf->hdr_buffer, uint32_to_mqtt_vbi(size, WRITE_POS(frag)), frag)
 
     memcpy(WRITE_POS(frag), mqtt_protocol_name_frag, sizeof(mqtt_protocol_name_frag));
-    DATA_ADVANCE(&trx_buf->hdr_buffer, sizeof(mqtt_protocol_name_frag), frag);
+    DATA_ADVANCE(&trx_buf->hdr_buffer, sizeof(mqtt_protocol_name_frag), frag)
 
     // [MQTT-3.1.2.3] Connect flags
     unsigned char *connect_flags = WRITE_POS(frag);
@@ -890,66 +943,67 @@ mqtt_msg_data mqtt_ng_generate_connect(struct transaction_buffer *trx_buf,
     if (clean_start)
         *connect_flags |= MQTT_CONNECT_FLAG_CLEAN_START;
 
-    DATA_ADVANCE(&trx_buf->hdr_buffer, 1, frag);
+    DATA_ADVANCE(&trx_buf->hdr_buffer, 1, frag)
 
-    PACK_2B_INT(&trx_buf->hdr_buffer, keep_alive, frag);
+    PACK_2B_INT(&trx_buf->hdr_buffer, keep_alive, frag)
 
     // TODO Property Length [MQTT-3.1.3.2.1] temporary fixed to 3 (one property topic alias max)
-    DATA_ADVANCE(&trx_buf->hdr_buffer, uint32_to_mqtt_vbi(3, WRITE_POS(frag)), frag);
+    DATA_ADVANCE(&trx_buf->hdr_buffer, uint32_to_mqtt_vbi(3, WRITE_POS(frag)), frag)
     *WRITE_POS(frag) = MQTT_PROP_TOPIC_ALIAS_MAX;
-    DATA_ADVANCE(&trx_buf->hdr_buffer, 1, frag);
+    DATA_ADVANCE(&trx_buf->hdr_buffer, 1, frag)
 
-    PACK_2B_INT(&trx_buf->hdr_buffer, 65535, frag);
+    PACK_2B_INT(&trx_buf->hdr_buffer, 65535, frag)
 
     // [MQTT-3.1.3.1] Client identifier
-    CHECK_BYTES_AVAILABLE(&trx_buf->hdr_buffer, 2, goto fail_rollback);
-    PACK_2B_INT(&trx_buf->hdr_buffer, strlen(auth->client_id), frag);
-    if (_optimized_add(&trx_buf->hdr_buffer, auth->client_id, strlen(auth->client_id), auth->client_id_free, &frag))
+    CHECK_BYTES_AVAILABLE(&trx_buf->hdr_buffer, 2, goto fail_rollback)
+    PACK_2B_INT(&trx_buf->hdr_buffer, strlen(auth->client_id), frag)
+    if (optimized_add(&trx_buf->hdr_buffer, auth->client_id, strlen(auth->client_id), auth->client_id_free, &frag))
         goto fail_rollback;
 
     if (lwt != NULL) {
         // Will Properties [MQTT-3.1.3.2]
         // TODO for now fixed 0
-        BUFFER_TRANSACTION_NEW_FRAG(&trx_buf->hdr_buffer, 0, frag, goto fail_rollback);
-        CHECK_BYTES_AVAILABLE(&trx_buf->hdr_buffer, 1, goto fail_rollback);
+        BUFFER_TRANSACTION_NEW_FRAG(&trx_buf->hdr_buffer, 0, frag, goto fail_rollback)
+        CHECK_BYTES_AVAILABLE(&trx_buf->hdr_buffer, 1, goto fail_rollback)
         *WRITE_POS(frag) = 0;
-        DATA_ADVANCE(&trx_buf->hdr_buffer, 1, frag);
+        DATA_ADVANCE(&trx_buf->hdr_buffer, 1, frag)
 
         // Will Topic [MQTT-3.1.3.3]
-        CHECK_BYTES_AVAILABLE(&trx_buf->hdr_buffer, 2, goto fail_rollback);
-        PACK_2B_INT(&trx_buf->hdr_buffer, strlen(lwt->will_topic), frag);
-        if (_optimized_add(&trx_buf->hdr_buffer, lwt->will_topic, strlen(lwt->will_topic), lwt->will_topic_free, &frag))
+        CHECK_BYTES_AVAILABLE(&trx_buf->hdr_buffer, 2, goto fail_rollback)
+        PACK_2B_INT(&trx_buf->hdr_buffer, strlen(lwt->will_topic), frag)
+        if (optimized_add(&trx_buf->hdr_buffer, lwt->will_topic, strlen(lwt->will_topic), lwt->will_topic_free, &frag))
             goto fail_rollback;
 
         // Will Payload [MQTT-3.1.3.4]
         if (lwt->will_message_size) {
-            BUFFER_TRANSACTION_NEW_FRAG(&trx_buf->hdr_buffer, 0, frag, goto fail_rollback);
-            CHECK_BYTES_AVAILABLE(&trx_buf->hdr_buffer, 2, goto fail_rollback);
-            PACK_2B_INT(&trx_buf->hdr_buffer, lwt->will_message_size, frag);
-            if (_optimized_add(&trx_buf->hdr_buffer, lwt->will_message, lwt->will_message_size, lwt->will_topic_free, &frag))
+            BUFFER_TRANSACTION_NEW_FRAG(&trx_buf->hdr_buffer, 0, frag, goto fail_rollback)
+            CHECK_BYTES_AVAILABLE(&trx_buf->hdr_buffer, 2, goto fail_rollback)
+            PACK_2B_INT(&trx_buf->hdr_buffer, lwt->will_message_size, frag)
+            if (optimized_add(
+                    &trx_buf->hdr_buffer, lwt->will_message, lwt->will_message_size, lwt->will_topic_free, &frag))
                 goto fail_rollback;
         }
     }
 
     // [MQTT-3.1.3.5]
     if (auth->username) {
-        BUFFER_TRANSACTION_NEW_FRAG(&trx_buf->hdr_buffer, 0, frag, goto fail_rollback);
-        CHECK_BYTES_AVAILABLE(&trx_buf->hdr_buffer, 2, goto fail_rollback);
-        PACK_2B_INT(&trx_buf->hdr_buffer, strlen(auth->username), frag);
-        if (_optimized_add(&trx_buf->hdr_buffer, auth->username, strlen(auth->username), auth->username_free, &frag))
+        BUFFER_TRANSACTION_NEW_FRAG(&trx_buf->hdr_buffer, 0, frag, goto fail_rollback)
+        CHECK_BYTES_AVAILABLE(&trx_buf->hdr_buffer, 2, goto fail_rollback)
+        PACK_2B_INT(&trx_buf->hdr_buffer, strlen(auth->username), frag)
+        if (optimized_add(&trx_buf->hdr_buffer, auth->username, strlen(auth->username), auth->username_free, &frag))
             goto fail_rollback;
     }
 
     // [MQTT-3.1.3.6]
     if (auth->password) {
-        BUFFER_TRANSACTION_NEW_FRAG(&trx_buf->hdr_buffer, 0, frag, goto fail_rollback);
-        CHECK_BYTES_AVAILABLE(&trx_buf->hdr_buffer, 2, goto fail_rollback);
-        PACK_2B_INT(&trx_buf->hdr_buffer, strlen(auth->password), frag);
-        if (_optimized_add(&trx_buf->hdr_buffer, auth->password, strlen(auth->password), auth->password_free, &frag))
+        BUFFER_TRANSACTION_NEW_FRAG(&trx_buf->hdr_buffer, 0, frag, goto fail_rollback)
+        CHECK_BYTES_AVAILABLE(&trx_buf->hdr_buffer, 2, goto fail_rollback)
+        PACK_2B_INT(&trx_buf->hdr_buffer, strlen(auth->password), frag)
+        if (optimized_add(&trx_buf->hdr_buffer, auth->password, strlen(auth->password), auth->password_free, &frag))
             goto fail_rollback;
     }
     trx_buf->hdr_buffer.tail_frag->flags |= BUFFER_FRAG_MQTT_PACKET_TAIL;
-    transaction_buffer_transaction_commit(trx_buf);
+    transaction_buffer_transaction_commit(trx_buf)
     return ret;
 fail_rollback:
     transaction_buffer_transaction_rollback(trx_buf, ret);
@@ -970,6 +1024,9 @@ int mqtt_ng_connect(struct mqtt_ng_client *client,
     if (clean_start)
         buffer_purge(&client->main_buffer.hdr_buffer);
     UNLOCK_HDR_BUFFER(&client->main_buffer);
+
+    if (clean_start)
+        destroy_timeout_monitor_list(client);
 
     spinlock_lock(&client->tx_topic_aliases.spinlock);
     // according to MQTT spec topic aliases should not be persisted
@@ -1035,7 +1092,7 @@ int mqtt_ng_generate_publish(struct transaction_buffer *trx_buf,
                              uint16_t topic_alias)
 {
     // >> START THE RODEO <<
-    transaction_buffer_transaction_start(trx_buf);
+    transaction_buffer_transaction_start(trx_buf)
 
     // Calculate the resulting message size sans fixed MQTT header
     size_t size = mqtt_ng_publish_size(topic, msg_len, topic_alias);
@@ -1044,7 +1101,7 @@ int mqtt_ng_generate_publish(struct transaction_buffer *trx_buf,
     struct buffer_fragment *frag = NULL;
     mqtt_msg_data mqtt_msg = NULL;
 
-    BUFFER_TRANSACTION_NEW_FRAG(&trx_buf->hdr_buffer, BUFFER_FRAG_MQTT_PACKET_HEAD, frag, goto fail_rollback );
+    BUFFER_TRANSACTION_NEW_FRAG(&trx_buf->hdr_buffer, BUFFER_FRAG_MQTT_PACKET_HEAD, frag, goto fail_rollback )
     // in case of QOS 0 we can garbage collect immediatelly after sending
     uint8_t qos = (publish_flags >> 1) & 0x03;
     if (!qos)
@@ -1053,35 +1110,35 @@ int mqtt_ng_generate_publish(struct transaction_buffer *trx_buf,
 
     // MQTT Fixed Header
     size_t needed_bytes = 1 /* Packet type */ + MQTT_VARSIZE_INT_BYTES(size) + size - msg_len;
-    CHECK_BYTES_AVAILABLE(&trx_buf->hdr_buffer, needed_bytes, goto fail_rollback);
+    CHECK_BYTES_AVAILABLE(&trx_buf->hdr_buffer, needed_bytes, goto fail_rollback)
 
     *WRITE_POS(frag) = (MQTT_CPT_PUBLISH << 4) | (publish_flags & 0xF);
-    DATA_ADVANCE(&trx_buf->hdr_buffer, 1, frag);
-    DATA_ADVANCE(&trx_buf->hdr_buffer, uint32_to_mqtt_vbi(size, WRITE_POS(frag)), frag);
+    DATA_ADVANCE(&trx_buf->hdr_buffer, 1, frag)
+    DATA_ADVANCE(&trx_buf->hdr_buffer, uint32_to_mqtt_vbi(size, WRITE_POS(frag)), frag)
 
     // MQTT Variable Header
     // [MQTT-3.3.2.1]
-    PACK_2B_INT(&trx_buf->hdr_buffer, topic == NULL ? 0 : strlen(topic), frag);
+    PACK_2B_INT(&trx_buf->hdr_buffer, topic == NULL ? 0 : strlen(topic), frag)
     if (topic != NULL) {
-        if (_optimized_add(&trx_buf->hdr_buffer, topic, strlen(topic), topic_free, &frag))
+        if (optimized_add(&trx_buf->hdr_buffer, topic, strlen(topic), topic_free, &frag))
             goto fail_rollback;
-        BUFFER_TRANSACTION_NEW_FRAG(&trx_buf->hdr_buffer, 0, frag, goto fail_rollback);
+        BUFFER_TRANSACTION_NEW_FRAG(&trx_buf->hdr_buffer, 0, frag, goto fail_rollback)
     }
 
     // [MQTT-3.3.2.2]
     mqtt_msg->packet_id = get_unused_packet_id();
     *packet_id = mqtt_msg->packet_id;
-    PACK_2B_INT(&trx_buf->hdr_buffer, mqtt_msg->packet_id, frag);
+    PACK_2B_INT(&trx_buf->hdr_buffer, mqtt_msg->packet_id, frag)
 
     // [MQTT-3.3.2.3.1] TODO Property Length for now fixed 0
     *WRITE_POS(frag) = topic_alias ? 3 : 0;
-    DATA_ADVANCE(&trx_buf->hdr_buffer, 1, frag);
+    DATA_ADVANCE(&trx_buf->hdr_buffer, 1, frag)
 
     if(topic_alias) {
         *WRITE_POS(frag) = MQTT_PROP_TOPIC_ALIAS;
-        DATA_ADVANCE(&trx_buf->hdr_buffer, 1, frag);
+        DATA_ADVANCE(&trx_buf->hdr_buffer, 1, frag)
 
-        PACK_2B_INT(&trx_buf->hdr_buffer, topic_alias, frag);
+        PACK_2B_INT(&trx_buf->hdr_buffer, topic_alias, frag)
     }
 
     if( (frag = buffer_new_frag(&trx_buf->hdr_buffer, BUFFER_FRAG_DATA_EXTERNAL)) == NULL )
@@ -1093,11 +1150,94 @@ int mqtt_ng_generate_publish(struct transaction_buffer *trx_buf,
     trx_buf->hdr_buffer.tail_frag->flags |= BUFFER_FRAG_MQTT_PACKET_TAIL;
     if (!qos)
         trx_buf->hdr_buffer.tail_frag->flags |= BUFFER_FRAG_GARBAGE_COLLECT_ON_SEND;
-    transaction_buffer_transaction_commit(trx_buf);
+    transaction_buffer_transaction_commit(trx_buf)
     return MQTT_NG_MSGGEN_OK;
 fail_rollback:
     transaction_buffer_transaction_rollback(trx_buf, mqtt_msg);
     return MQTT_NG_MSGGEN_BUFFER_OOM;
+}
+
+static void mark_message_for_gc(struct buffer_fragment *frag)
+{
+    while (frag) {
+        frag->flags |= BUFFER_FRAG_GARBAGE_COLLECT;
+        buffer_frag_free_data(frag);
+        if (frag->flags & BUFFER_FRAG_MQTT_PACKET_TAIL)
+            return;
+        frag = frag->next;
+    }
+}
+
+static int mark_packet_acked(struct mqtt_ng_client *client, uint16_t packet_id)
+{
+    size_t reclaimable = 0;
+    spinlock_lock(&client->pending_packets.spinlock);
+    LOCK_HDR_BUFFER(&client->main_buffer);
+    struct buffer_fragment *frag = BUFFER_FIRST_FRAG(&client->main_buffer.hdr_buffer);
+    while (frag) {
+        if ( (frag->flags & BUFFER_FRAG_MQTT_PACKET_HEAD) && frag->packet_id == packet_id) {
+            if (!frag->sent) {
+                nd_log(NDLS_DAEMON, NDLP_ERR, "Received packet_id (%" PRIu16 ") belongs to MQTT packet which was not yet sent!", packet_id);
+                UNLOCK_HDR_BUFFER(&client->main_buffer);
+                spinlock_unlock(&client->pending_packets.spinlock);
+                return 1;
+            }
+            usec_t latency = now_monotonic_usec() - frag->sent_monotonic_ut;
+            pulse_aclk_sent_message_acked(latency, frag->len);
+            __atomic_store_n(&publish_latency, latency, __ATOMIC_RELEASE);
+            mark_message_for_gc(frag);
+
+            size_t used = BUFFER_BYTES_USED(&client->main_buffer.hdr_buffer);
+            if (reclaimable >= (used / 4))
+                transaction_buffer_garbage_collect(&client->main_buffer);
+
+            UNLOCK_HDR_BUFFER(&client->main_buffer);
+            remove_packet_from_timeout_monitor_list_unsafe(client, packet_id);
+            spinlock_unlock(&client->pending_packets.spinlock);
+            return 0;
+        }
+
+        if(frag_is_marked_for_gc(frag))
+            reclaimable += FRAG_SIZE_IN_BUFFER(frag);
+
+        frag = frag->next;
+    }
+    nd_log(NDLS_DAEMON, NDLP_ERR, "Received packet_id (%" PRIu16 ") is unknown!", packet_id);
+    UNLOCK_HDR_BUFFER(&client->main_buffer);
+    spinlock_unlock(&client->pending_packets.spinlock);
+    return 1;
+}
+
+#define MAX_TIMED_OUT_PACKETS (1024)
+
+static bool check_packet_monitor_list_for_timeouts(struct mqtt_ng_client *client)
+{
+    uint16_t timed_out_packets[MAX_TIMED_OUT_PACKETS];
+    size_t timed_out_count = 0;
+
+    spinlock_lock(&client->pending_packets.spinlock);
+    bool first_then_next = true;
+    uint32_t *Pvalue;
+    Word_t packet_id = 0;
+    time_t now = now_realtime_sec();
+
+    while ((Pvalue = (uint32_t *) JudyLFirstThenNext(client->pending_packets.JudyL, &packet_id, &first_then_next))) {
+        uint32_t expire_time_delta = *Pvalue;
+        if (now >= (PACKET_TIMEOUT_EPOCH + expire_time_delta)) {
+            if (timed_out_count < MAX_TIMED_OUT_PACKETS) {
+                timed_out_packets[timed_out_count++] = (uint16_t)packet_id;
+            } else
+                break;
+        }
+    }
+    spinlock_unlock(&client->pending_packets.spinlock);
+
+    // Process timeouts outside the lock
+    for (size_t i = 0; i < timed_out_count; i++) {
+        mark_packet_acked(client, timed_out_packets[i]);
+    }
+
+    return (timed_out_count ==  MAX_TIMED_OUT_PACKETS);
 }
 
 #define PUBLISH_SP_SIZE 64
@@ -1133,7 +1273,10 @@ int mqtt_ng_publish(struct mqtt_ng_client *client,
         return MQTT_NG_MSGGEN_MSG_TOO_BIG;
     }
 
-    TRY_GENERATE_MESSAGE(mqtt_ng_generate_publish, topic, topic_free, msg, msg_free, msg_len, publish_flags, packet_id, topic_id);
+    int rc = TRY_GENERATE_MESSAGE(mqtt_ng_generate_publish, topic, topic_free, msg, msg_free, msg_len, publish_flags, packet_id, topic_id);
+    if (rc == MQTT_NG_MSGGEN_OK)
+        add_packet_to_timeout_monitor_list(client, *packet_id);
+    return rc;
 }
 
 static size_t mqtt_ng_subscribe_size(struct mqtt_sub *subs, size_t sub_count)
@@ -1150,7 +1293,7 @@ static size_t mqtt_ng_subscribe_size(struct mqtt_sub *subs, size_t sub_count)
 int mqtt_ng_generate_subscribe(struct transaction_buffer *trx_buf, struct mqtt_sub *subs, size_t sub_count)
 {
     // >> START THE RODEO <<
-    transaction_buffer_transaction_start(trx_buf);
+    transaction_buffer_transaction_start(trx_buf)
 
     // Calculate the resulting message size sans fixed MQTT header
     size_t size = mqtt_ng_subscribe_size(subs, sub_count);
@@ -1159,38 +1302,38 @@ int mqtt_ng_generate_subscribe(struct transaction_buffer *trx_buf, struct mqtt_s
     struct buffer_fragment *frag = NULL;
     mqtt_msg_data ret = NULL;
 
-    BUFFER_TRANSACTION_NEW_FRAG(&trx_buf->hdr_buffer, BUFFER_FRAG_MQTT_PACKET_HEAD, frag, goto fail_rollback);
+    BUFFER_TRANSACTION_NEW_FRAG(&trx_buf->hdr_buffer, BUFFER_FRAG_MQTT_PACKET_HEAD, frag, goto fail_rollback)
     ret = frag;
 
     // MQTT Fixed Header
     size_t needed_bytes = 1 /* Packet type */ + MQTT_VARSIZE_INT_BYTES(size) + 3 /*Packet ID + Property Length*/;
-    CHECK_BYTES_AVAILABLE(&trx_buf->hdr_buffer, needed_bytes, goto fail_rollback);
+    CHECK_BYTES_AVAILABLE(&trx_buf->hdr_buffer, needed_bytes, goto fail_rollback)
 
     *WRITE_POS(frag) = (MQTT_CPT_SUBSCRIBE << 4) | 0x2 /* [MQTT-3.8.1-1] */;
-    DATA_ADVANCE(&trx_buf->hdr_buffer, 1, frag);
-    DATA_ADVANCE(&trx_buf->hdr_buffer, uint32_to_mqtt_vbi(size, WRITE_POS(frag)), frag);
+    DATA_ADVANCE(&trx_buf->hdr_buffer, 1, frag)
+    DATA_ADVANCE(&trx_buf->hdr_buffer, uint32_to_mqtt_vbi(size, WRITE_POS(frag)), frag)
 
     // MQTT Variable Header
     // [MQTT-3.8.2] PacketID
     ret->packet_id = get_unused_packet_id();
-    PACK_2B_INT(&trx_buf->hdr_buffer, ret->packet_id, frag);
+    PACK_2B_INT(&trx_buf->hdr_buffer, ret->packet_id, frag)
 
     // [MQTT-3.8.2.1.1] Property Length // TODO for now fixed 0
     *WRITE_POS(frag) = 0;
-    DATA_ADVANCE(&trx_buf->hdr_buffer, 1, frag);
+    DATA_ADVANCE(&trx_buf->hdr_buffer, 1, frag)
 
     for (size_t i = 0; i < sub_count; i++) {
-        BUFFER_TRANSACTION_NEW_FRAG(&trx_buf->hdr_buffer, 0, frag, goto fail_rollback);
-        PACK_2B_INT(&trx_buf->hdr_buffer, strlen(subs[i].topic), frag);
-        if (_optimized_add(&trx_buf->hdr_buffer, subs[i].topic, strlen(subs[i].topic), subs[i].topic_free, &frag))
+        BUFFER_TRANSACTION_NEW_FRAG(&trx_buf->hdr_buffer, 0, frag, goto fail_rollback)
+        PACK_2B_INT(&trx_buf->hdr_buffer, strlen(subs[i].topic), frag)
+        if (optimized_add(&trx_buf->hdr_buffer, subs[i].topic, strlen(subs[i].topic), subs[i].topic_free, &frag))
             goto fail_rollback;
-        BUFFER_TRANSACTION_NEW_FRAG(&trx_buf->hdr_buffer, 0, frag, goto fail_rollback);
+        BUFFER_TRANSACTION_NEW_FRAG(&trx_buf->hdr_buffer, 0, frag, goto fail_rollback)
         *WRITE_POS(frag) = subs[i].options;
-        DATA_ADVANCE(&trx_buf->hdr_buffer, 1, frag);
+        DATA_ADVANCE(&trx_buf->hdr_buffer, 1, frag)
     }
 
     trx_buf->hdr_buffer.tail_frag->flags |= BUFFER_FRAG_MQTT_PACKET_TAIL;
-    transaction_buffer_transaction_commit(trx_buf);
+    transaction_buffer_transaction_commit(trx_buf)
     return MQTT_NG_MSGGEN_OK;
 fail_rollback:
     transaction_buffer_transaction_rollback(trx_buf, ret);
@@ -1199,13 +1342,13 @@ fail_rollback:
 
 int mqtt_ng_subscribe(struct mqtt_ng_client *client, struct mqtt_sub *subs, size_t sub_count)
 {
-    TRY_GENERATE_MESSAGE(mqtt_ng_generate_subscribe, subs, sub_count);
+    return TRY_GENERATE_MESSAGE(mqtt_ng_generate_subscribe, subs, sub_count);
 }
 
 int mqtt_ng_generate_disconnect(struct transaction_buffer *trx_buf, uint8_t reason_code)
 {
     // >> START THE RODEO <<
-    transaction_buffer_transaction_start(trx_buf);
+    transaction_buffer_transaction_start(trx_buf)
 
     // Calculate the resulting message size sans fixed MQTT header
     size_t size = reason_code ? 1 : 0;
@@ -1214,26 +1357,26 @@ int mqtt_ng_generate_disconnect(struct transaction_buffer *trx_buf, uint8_t reas
     struct buffer_fragment *frag = NULL;
     mqtt_msg_data ret = NULL;
 
-    BUFFER_TRANSACTION_NEW_FRAG(&trx_buf->hdr_buffer, BUFFER_FRAG_MQTT_PACKET_HEAD, frag, goto fail_rollback);
+    BUFFER_TRANSACTION_NEW_FRAG(&trx_buf->hdr_buffer, BUFFER_FRAG_MQTT_PACKET_HEAD, frag, goto fail_rollback)
     ret = frag;
 
     // MQTT Fixed Header
     size_t needed_bytes = 1 /* Packet type */ + MQTT_VARSIZE_INT_BYTES(size) + (reason_code ? 1 : 0);
-    CHECK_BYTES_AVAILABLE(&trx_buf->hdr_buffer, needed_bytes, goto fail_rollback);
+    CHECK_BYTES_AVAILABLE(&trx_buf->hdr_buffer, needed_bytes, goto fail_rollback)
 
     *WRITE_POS(frag) = MQTT_CPT_DISCONNECT << 4;
-    DATA_ADVANCE(&trx_buf->hdr_buffer, 1, frag);
-    DATA_ADVANCE(&trx_buf->hdr_buffer, uint32_to_mqtt_vbi(size, WRITE_POS(frag)), frag);
+    DATA_ADVANCE(&trx_buf->hdr_buffer, 1, frag)
+    DATA_ADVANCE(&trx_buf->hdr_buffer, uint32_to_mqtt_vbi(size, WRITE_POS(frag)), frag)
 
     if (reason_code) {
         // MQTT Variable Header
         // [MQTT-3.14.2.1] PacketID
         *WRITE_POS(frag) = reason_code;
-        DATA_ADVANCE(&trx_buf->hdr_buffer, 1, frag);
+        DATA_ADVANCE(&trx_buf->hdr_buffer, 1, frag)
     }
 
     trx_buf->hdr_buffer.tail_frag->flags |= BUFFER_FRAG_MQTT_PACKET_TAIL;
-    transaction_buffer_transaction_commit(trx_buf);
+    transaction_buffer_transaction_commit(trx_buf)
     return MQTT_NG_MSGGEN_OK;
 fail_rollback:
     transaction_buffer_transaction_rollback(trx_buf, ret);
@@ -1242,13 +1385,13 @@ fail_rollback:
 
 int mqtt_ng_disconnect(struct mqtt_ng_client *client, uint8_t reason_code)
 {
-    TRY_GENERATE_MESSAGE(mqtt_ng_generate_disconnect, reason_code);
+    return TRY_GENERATE_MESSAGE(mqtt_ng_generate_disconnect, reason_code);
 }
 
 static int mqtt_generate_puback(struct transaction_buffer *trx_buf, uint16_t packet_id, uint8_t reason_code)
 {
     // >> START THE RODEO <<
-    transaction_buffer_transaction_start(trx_buf);
+    transaction_buffer_transaction_start(trx_buf)
 
     // Calculate the resulting message size sans fixed MQTT header
     size_t size = 2 /* Packet ID */ + (reason_code ? 1 : 0) /* reason code */;
@@ -1256,28 +1399,28 @@ static int mqtt_generate_puback(struct transaction_buffer *trx_buf, uint16_t pac
     // Start generating the message
     struct buffer_fragment *frag = NULL;
 
-    BUFFER_TRANSACTION_NEW_FRAG(&trx_buf->hdr_buffer, BUFFER_FRAG_MQTT_PACKET_HEAD | BUFFER_FRAG_GARBAGE_COLLECT_ON_SEND, frag, goto fail_rollback);
+    BUFFER_TRANSACTION_NEW_FRAG(&trx_buf->hdr_buffer, BUFFER_FRAG_MQTT_PACKET_HEAD | BUFFER_FRAG_GARBAGE_COLLECT_ON_SEND, frag, goto fail_rollback)
 
     // MQTT Fixed Header
     size_t needed_bytes = 1 /* Packet type */ + MQTT_VARSIZE_INT_BYTES(size) + size;
-    CHECK_BYTES_AVAILABLE(&trx_buf->hdr_buffer, needed_bytes, goto fail_rollback);
+    CHECK_BYTES_AVAILABLE(&trx_buf->hdr_buffer, needed_bytes, goto fail_rollback)
 
     *WRITE_POS(frag) = MQTT_CPT_PUBACK << 4;
-    DATA_ADVANCE(&trx_buf->hdr_buffer, 1, frag);
-    DATA_ADVANCE(&trx_buf->hdr_buffer, uint32_to_mqtt_vbi(size, WRITE_POS(frag)), frag);
+    DATA_ADVANCE(&trx_buf->hdr_buffer, 1, frag)
+    DATA_ADVANCE(&trx_buf->hdr_buffer, uint32_to_mqtt_vbi(size, WRITE_POS(frag)), frag)
 
     // MQTT Variable Header
-    PACK_2B_INT(&trx_buf->hdr_buffer, packet_id, frag);
+    PACK_2B_INT(&trx_buf->hdr_buffer, packet_id, frag)
 
     if (reason_code) {
         // MQTT Variable Header
         // [MQTT-3.14.2.1] PacketID
         *WRITE_POS(frag) = reason_code;
-        DATA_ADVANCE(&trx_buf->hdr_buffer, 1, frag);
+        DATA_ADVANCE(&trx_buf->hdr_buffer, 1, frag)
     }
 
     trx_buf->hdr_buffer.tail_frag->flags |= BUFFER_FRAG_MQTT_PACKET_TAIL;
-    transaction_buffer_transaction_commit(trx_buf);
+    transaction_buffer_transaction_commit(trx_buf)
     return MQTT_NG_MSGGEN_OK;
 fail_rollback:
     transaction_buffer_transaction_rollback(trx_buf, frag);
@@ -1286,7 +1429,7 @@ fail_rollback:
 
 static int mqtt_ng_puback(struct mqtt_ng_client *client, uint16_t packet_id, uint8_t reason_code)
 {
-    TRY_GENERATE_MESSAGE(mqtt_generate_puback, packet_id, reason_code);
+    return TRY_GENERATE_MESSAGE(mqtt_generate_puback, packet_id, reason_code);
 }
 
 int mqtt_ng_ping(struct mqtt_ng_client *client)
@@ -1300,10 +1443,10 @@ int mqtt_ng_ping(struct mqtt_ng_client *client)
 #define MQTT_NG_CLIENT_PARSE_DONE              0x12
 #define MQTT_NG_CLIENT_WANT_WRITE              0x13
 #define MQTT_NG_CLIENT_OK_CALL_AGAIN           0
-#define MQTT_NG_CLIENT_PROTOCOL_ERROR         -1
-#define MQTT_NG_CLIENT_SERVER_RETURNED_ERROR  -2
-#define MQTT_NG_CLIENT_NOT_IMPL_YET           -3
-#define MQTT_NG_CLIENT_INTERNAL_ERROR         -5
+#define MQTT_NG_CLIENT_PROTOCOL_ERROR         (-1)
+#define MQTT_NG_CLIENT_SERVER_RETURNED_ERROR  (-2)
+#define MQTT_NG_CLIENT_NOT_IMPL_YET           (-3)
+#define MQTT_NG_CLIENT_INTERNAL_ERROR         (-5)
 
 #define BUF_READ_CHECK_AT_LEAST(buf, x)                                                                                \
     if (rbuf_bytes_available(buf) < (x))                                                                               \
@@ -1318,7 +1461,7 @@ static int vbi_parser_parse(struct mqtt_vbi_parser_ctx *ctx, rbuf_t data)
         return MQTT_NG_CLIENT_PROTOCOL_ERROR;
     }
     if (!ctx->bytes || ctx->data[ctx->bytes-1] & MQTT_VBI_CONTINUATION_FLAG) {
-        BUF_READ_CHECK_AT_LEAST(data, 1);
+        BUF_READ_CHECK_AT_LEAST(data, 1)
         ctx->bytes++;
         rbuf_pop(data, &ctx->data[ctx->bytes-1], 1);
         if ( ctx->data[ctx->bytes-1] & MQTT_VBI_CONTINUATION_FLAG )
@@ -1429,7 +1572,7 @@ static int parse_properties_array(struct mqtt_properties_parser_ctx *ctx, rbuf_t
             }
             return rc;
         case PROPERTY_CREATE:
-            BUF_READ_CHECK_AT_LEAST(data, 1);
+            BUF_READ_CHECK_AT_LEAST(data, 1)
             struct mqtt_property *prop = callocz(1, sizeof(struct mqtt_property));
             if (ctx->head == NULL) {
                 ctx->head = prop;
@@ -1471,7 +1614,7 @@ static int parse_properties_array(struct mqtt_properties_parser_ctx *ctx, rbuf_t
             }
             break;
         case PROPERTY_TYPE_STR_BIN_LEN:
-            BUF_READ_CHECK_AT_LEAST(data, sizeof(uint16_t));
+            BUF_READ_CHECK_AT_LEAST(data, sizeof(uint16_t))
             rbuf_pop(data, (char*)&ctx->tail->bindata_len, sizeof(uint16_t));
             ctx->tail->bindata_len = be16toh(ctx->tail->bindata_len);
             ctx->bytes_consumed += 2;
@@ -1489,7 +1632,7 @@ static int parse_properties_array(struct mqtt_properties_parser_ctx *ctx, rbuf_t
             }
             break;
         case PROPERTY_TYPE_STR:
-            BUF_READ_CHECK_AT_LEAST(data, ctx->tail->bindata_len);
+            BUF_READ_CHECK_AT_LEAST(data, ctx->tail->bindata_len)
             ctx->tail->data.strings[ctx->str_idx] = mallocz(ctx->tail->bindata_len + 1);
             rbuf_pop(data, ctx->tail->data.strings[ctx->str_idx], ctx->tail->bindata_len);
             ctx->tail->data.strings[ctx->str_idx][ctx->tail->bindata_len] = 0;
@@ -1502,7 +1645,7 @@ static int parse_properties_array(struct mqtt_properties_parser_ctx *ctx, rbuf_t
             ctx->state = PROPERTY_NEXT;
             break;
         case PROPERTY_TYPE_BIN:
-            BUF_READ_CHECK_AT_LEAST(data, ctx->tail->bindata_len);
+            BUF_READ_CHECK_AT_LEAST(data, ctx->tail->bindata_len)
             ctx->tail->data.bindata = mallocz(ctx->tail->bindata_len);
             rbuf_pop(data, ctx->tail->data.bindata, ctx->tail->bindata_len);
             ctx->bytes_consumed += ctx->tail->bindata_len;
@@ -1518,20 +1661,20 @@ static int parse_properties_array(struct mqtt_properties_parser_ctx *ctx, rbuf_t
             }
             return rc;
         case PROPERTY_TYPE_UINT8:
-            BUF_READ_CHECK_AT_LEAST(data, sizeof(uint8_t));
+            BUF_READ_CHECK_AT_LEAST(data, sizeof(uint8_t))
             rbuf_pop(data, (char*)&ctx->tail->data.uint8, sizeof(uint8_t));
             ctx->bytes_consumed += sizeof(uint8_t);
             ctx->state = PROPERTY_NEXT;
             break;
         case PROPERTY_TYPE_UINT32:
-            BUF_READ_CHECK_AT_LEAST(data, sizeof(uint32_t));
+            BUF_READ_CHECK_AT_LEAST(data, sizeof(uint32_t))
             rbuf_pop(data, (char*)&ctx->tail->data.uint32, sizeof(uint32_t));
             ctx->tail->data.uint32 = be32toh(ctx->tail->data.uint32);
             ctx->bytes_consumed += sizeof(uint32_t);
             ctx->state = PROPERTY_NEXT;
             break;
         case PROPERTY_TYPE_UINT16:
-            BUF_READ_CHECK_AT_LEAST(data, sizeof(uint16_t));
+            BUF_READ_CHECK_AT_LEAST(data, sizeof(uint16_t))
             rbuf_pop(data, (char*)&ctx->tail->data.uint16, sizeof(uint16_t));
             ctx->tail->data.uint16 = be16toh(ctx->tail->data.uint16);
             ctx->bytes_consumed += sizeof(uint16_t);
@@ -1552,7 +1695,7 @@ static int parse_connack_varhdr(struct mqtt_ng_client *client)
     struct mqtt_ng_parser *parser = &client->parser;
     switch (parser->varhdr_state) {
         case MQTT_PARSE_VARHDR_INITIAL:
-            BUF_READ_CHECK_AT_LEAST(parser->received_data, 2);
+            BUF_READ_CHECK_AT_LEAST(parser->received_data, 2)
             rbuf_pop(parser->received_data, (char*)&parser->mqtt_packet.connack.flags, 1);
             rbuf_pop(parser->received_data, (char*)&parser->mqtt_packet.connack.reason_code, 1);
             parser->varhdr_state = MQTT_PARSE_VARHDR_PROPS;
@@ -1577,7 +1720,7 @@ static int parse_disconnect_varhdr(struct mqtt_ng_client *client)
                 parser->mqtt_packet.disconnect.reason_code = 0;
                 return MQTT_NG_CLIENT_PARSE_DONE;
             }
-            BUF_READ_CHECK_AT_LEAST(parser->received_data, 1);
+            BUF_READ_CHECK_AT_LEAST(parser->received_data, 1)
             rbuf_pop(parser->received_data, (char*)&parser->mqtt_packet.disconnect.reason_code, 1);
             if (parser->mqtt_fixed_hdr_remaining_length == 1)
                 return MQTT_NG_CLIENT_PARSE_DONE;
@@ -1598,7 +1741,7 @@ static int parse_puback_varhdr(struct mqtt_ng_client *client)
     struct mqtt_ng_parser *parser = &client->parser;
     switch (parser->varhdr_state) {
         case MQTT_PARSE_VARHDR_INITIAL:
-            BUF_READ_CHECK_AT_LEAST(parser->received_data, 2);
+            BUF_READ_CHECK_AT_LEAST(parser->received_data, 2)
             rbuf_pop(parser->received_data, (char*)&parser->mqtt_packet.puback.packet_id, 2);
             parser->mqtt_packet.puback.packet_id = be16toh(parser->mqtt_packet.puback.packet_id);
             if (parser->mqtt_fixed_hdr_remaining_length < 3) {
@@ -1611,7 +1754,7 @@ static int parse_puback_varhdr(struct mqtt_ng_client *client)
             parser->varhdr_state = MQTT_PARSE_VARHDR_OPTIONAL_REASON_CODE;
             /* FALLTHROUGH */
         case MQTT_PARSE_VARHDR_OPTIONAL_REASON_CODE:
-            BUF_READ_CHECK_AT_LEAST(parser->received_data, 1);
+            BUF_READ_CHECK_AT_LEAST(parser->received_data, 1)
             rbuf_pop(parser->received_data, (char*)&parser->mqtt_packet.puback.reason_code, 1);
             // LOL so in CONNACK you have to have 0 byte to
             // signify empty properties list
@@ -1640,7 +1783,7 @@ static int parse_suback_varhdr(struct mqtt_ng_client *client)
     switch (parser->varhdr_state) {
         case MQTT_PARSE_VARHDR_INITIAL:
             suback->reason_codes = NULL;
-            BUF_READ_CHECK_AT_LEAST(parser->received_data, 2);
+            BUF_READ_CHECK_AT_LEAST(parser->received_data, 2)
             rbuf_pop(parser->received_data, (char*)&suback->packet_id, 2);
             suback->packet_id = be16toh(suback->packet_id);
             parser->varhdr_state = MQTT_PARSE_VARHDR_PROPS;
@@ -1682,7 +1825,7 @@ static int parse_publish_varhdr(struct mqtt_ng_client *client)
     struct mqtt_publish *publish = &client->parser.mqtt_packet.publish;
     switch (parser->varhdr_state) {
         case MQTT_PARSE_VARHDR_INITIAL:
-            BUF_READ_CHECK_AT_LEAST(parser->received_data, 2);
+            BUF_READ_CHECK_AT_LEAST(parser->received_data, 2)
             publish->topic = NULL;
             publish->qos = ((parser->mqtt_control_packet_type >> 1) & 0x03);
             rbuf_pop(parser->received_data, (char*)&publish->topic_len, 2);
@@ -1697,7 +1840,7 @@ static int parse_publish_varhdr(struct mqtt_ng_client *client)
             /* FALLTHROUGH */
         case MQTT_PARSE_VARHDR_TOPICNAME:
             // TODO check empty topic can be valid? In which case we have to skip this step
-            BUF_READ_CHECK_AT_LEAST(parser->received_data, publish->topic_len);
+            BUF_READ_CHECK_AT_LEAST(parser->received_data, publish->topic_len)
             rbuf_pop(parser->received_data, publish->topic, publish->topic_len);
             parser->mqtt_parsed_len += publish->topic_len;
             parser->varhdr_state = MQTT_PARSE_VARHDR_POST_TOPICNAME;
@@ -1711,7 +1854,7 @@ static int parse_publish_varhdr(struct mqtt_ng_client *client)
             parser->varhdr_state = MQTT_PARSE_VARHDR_PACKET_ID;
             /* FALLTHROUGH */
         case MQTT_PARSE_VARHDR_PACKET_ID:
-            BUF_READ_CHECK_AT_LEAST(parser->received_data, 2);
+            BUF_READ_CHECK_AT_LEAST(parser->received_data, 2)
             rbuf_pop(parser->received_data, (char*)&publish->packet_id, 2);
             publish->packet_id = be16toh(publish->packet_id);
             parser->varhdr_state = MQTT_PARSE_VARHDR_PROPS;
@@ -1736,7 +1879,7 @@ static int parse_publish_varhdr(struct mqtt_ng_client *client)
                 publish->data = NULL;
                 return MQTT_NG_CLIENT_PARSE_DONE; // 0 length payload is OK [MQTT-3.3.3]
             }
-            BUF_READ_CHECK_AT_LEAST(parser->received_data, publish->data_len);
+            BUF_READ_CHECK_AT_LEAST(parser->received_data, publish->data_len)
 
             publish->data = mallocz(publish->data_len);
             rbuf_pop(parser->received_data, publish->data, publish->data_len);
@@ -1758,7 +1901,7 @@ static int parse_data(struct mqtt_ng_client *client)
     struct mqtt_ng_parser *parser = &client->parser;
     switch(parser->state) {
         case MQTT_PARSE_FIXED_HEADER_PACKET_TYPE:
-            BUF_READ_CHECK_AT_LEAST(parser->received_data, 1);
+            BUF_READ_CHECK_AT_LEAST(parser->received_data, 1)
             rbuf_pop(parser->received_data, (char*)&parser->mqtt_control_packet_type, 1);
             vbi_parser_reset_ctx(&parser->vbi_parser);
             parser->state = MQTT_PARSE_FIXED_HEADER_LEN;
@@ -1924,50 +2067,6 @@ static void try_send_all(struct mqtt_ng_client *client) {
     } while(send_all_message_fragments(client) >= 0);
 }
 
-static void mark_message_for_gc(struct buffer_fragment *frag)
-{
-    while (frag) {
-        frag->flags |= BUFFER_FRAG_GARBAGE_COLLECT;
-        buffer_frag_free_data(frag);
-        if (frag->flags & BUFFER_FRAG_MQTT_PACKET_TAIL)
-            return;
-        frag = frag->next;
-    }
-}
-
-static int mark_packet_acked(struct mqtt_ng_client *client, uint16_t packet_id)
-{
-    size_t reclaimable = 0;
-    LOCK_HDR_BUFFER(&client->main_buffer);
-    struct buffer_fragment *frag = BUFFER_FIRST_FRAG(&client->main_buffer.hdr_buffer);
-    while (frag) {
-        if ( (frag->flags & BUFFER_FRAG_MQTT_PACKET_HEAD) && frag->packet_id == packet_id) {
-            if (!frag->sent) {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "Received packet_id (%" PRIu16 ") belongs to MQTT packet which was not yet sent!", packet_id);
-                UNLOCK_HDR_BUFFER(&client->main_buffer);
-                return 1;
-            }
-            pulse_aclk_sent_message_acked(frag->sent_monotonic_ut, frag->len);
-            mark_message_for_gc(frag);
-
-            size_t used = BUFFER_BYTES_USED(&client->main_buffer.hdr_buffer);
-            if (reclaimable >= (used / 4))
-                transaction_buffer_garbage_collect(&client->main_buffer);
-
-            UNLOCK_HDR_BUFFER(&client->main_buffer);
-            return 0;
-        }
-
-        if(frag_is_marked_for_gc(frag))
-            reclaimable += FRAG_SIZE_IN_BUFFER(frag);
-
-        frag = frag->next;
-    }
-    nd_log(NDLS_DAEMON, NDLP_ERR, "Received packet_id (%" PRIu16 ") is unknown!", packet_id);
-    UNLOCK_HDR_BUFFER(&client->main_buffer);
-    return 1;
-}
-
 int handle_incoming_traffic(struct mqtt_ng_client *client)
 {
     int rc;
@@ -1995,20 +2094,20 @@ int handle_incoming_traffic(struct mqtt_ng_client *client)
             client->connect_msg = NULL;
 
             if (client->client_state != MQTT_STATE_CONNECTING) {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "Received unexpected CONNACK");
+                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Received unexpected CONNACK");
                 client->client_state = MQTT_STATE_ERROR;
                 return MQTT_NG_CLIENT_PROTOCOL_ERROR;
             }
 
             if ((prop = get_property_by_id(client->parser.properties_parser.head, MQTT_PROP_MAX_PKT_SIZE)) != NULL) {
-                nd_log(NDLS_DAEMON, NDLP_INFO, "MQTT server limits message size to %" PRIu32, prop->data.uint32);
+                nd_log(NDLS_DAEMON, NDLP_INFO, "ACLK: MQTT server limits message size to %" PRIu32, prop->data.uint32);
                 client->max_msg_size = prop->data.uint32;
             }
 
             if (client->connack_callback)
                 client->connack_callback(client->user_ctx, client->parser.mqtt_packet.connack.reason_code);
             if (!client->parser.mqtt_packet.connack.reason_code) {
-                nd_log(NDLS_DAEMON, NDLP_INFO, "MQTT Connection Accepted By Server");
+                nd_log(NDLS_DAEMON, NDLP_INFO, "ACLK: MQTT Connection Accepted By Server");
                 client->client_state = MQTT_STATE_CONNECTED;
                 break;
             }
@@ -2096,6 +2195,8 @@ int handle_incoming_traffic(struct mqtt_ng_client *client)
     return rc;
 }
 
+#define PACKET_TIMEOUT_REPEAT_CHECK (60)
+
 int mqtt_ng_sync(struct mqtt_ng_client *client)
 {
     if (client->client_state == MQTT_STATE_RAW || client->client_state == MQTT_STATE_DISCONNECTED)
@@ -2103,6 +2204,15 @@ int mqtt_ng_sync(struct mqtt_ng_client *client)
     
     if (client->client_state == MQTT_STATE_ERROR)
         return 1;
+
+    // Check for packet timeouts and cleanup
+    static time_t last_maintenance = 0;
+    if (now_realtime_sec() - last_maintenance >= PACKET_TIMEOUT_REPEAT_CHECK) {
+        // if check packet returns true then we did max cleanup, possibly there are more packets to cleanup
+        // so do not update last_maintenance thus forcing check again
+        if (likely(!check_packet_monitor_list_for_timeouts(client)))
+            last_maintenance = now_realtime_sec();
+    }
 
     worker_is_busy(WORKER_ACLK_TRY_SEND_ALL);
 

@@ -138,7 +138,7 @@ metrics:
         chart_meta:
           description: Estimate of the interface's current bandwidth
           family: 'Network/Interface/Speed'
-          unit: bit/s
+          unit: "bit/s"
         scale_factor: 1000000 # Megabits => bits
     metric_tags:
       - tag: interface
@@ -156,3 +156,29 @@ metrics:
           OID: 1.3.6.1.2.1.2.2.1.3
           name: ifType
         mapping_ref: ifType
+
+virtual_metrics:
+  - name: ifTotalTrafficIn
+    sources:
+      - metric: ifHCInOctets
+        table: ifXTable
+    chart_meta:
+      description: Total inbound traffic across all interfaces
+      family: 'Network/Total/Traffic/In'
+      unit: "bit/s"
+  - name: ifTotalTrafficOut
+    sources:
+      - metric: ifHCOutOctets
+        table: ifXTable
+    chart_meta:
+      description: Total outbound traffic across all interfaces
+      family: 'Network/Total/Traffic/Out'
+      unit: "bit/s"
+  - name: ifTotalOperStatus
+    sources:
+      - metric: ifOperStatus
+        table: ifTable
+    chart_meta:
+      description: Total count of interfaces by operational status
+      family: 'Network/Total/Interface/Status'
+      unit: "{status}"

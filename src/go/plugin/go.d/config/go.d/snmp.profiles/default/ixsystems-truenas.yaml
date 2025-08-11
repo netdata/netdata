@@ -20,7 +20,11 @@ metadata:
       vendor:
         value: "iXsystems"
       type:
-        value: "storage"
+        value: "Storage"
+
+# 1. FREENAS-MIB
+#     https://mibbrowser.online/mibdb_search.php?mib=FREENAS-MIB
+#     https://github.com/librenms/librenms/blob/master/mibs/ixsystems/FREENAS-MIB
 
 metrics:
   - MIB: FREENAS-MIB
@@ -30,222 +34,284 @@ metrics:
     symbols:
       - name: freenas.zpoolReadBytes
         OID: 1.3.6.1.4.1.50536.1.1.1.1.10
-        description: The bandwidth of all read operations (including metadata), expressed as units per second (averaged since system booted)
-        unit: "By/s"
+        chart_meta:
+          description: The bandwidth of all read operations (including metadata), expressed as units per second (averaged since system booted)
+          family: 'Storage/ZFS/Pool/IO/Throughput/Read'
+          unit: "By/s"
       - name: freenas.zpoolWriteBytes
         OID: 1.3.6.1.4.1.50536.1.1.1.1.11
-        description: The bandwidth of all write operations, expressed as units per second (averaged since system booted).
-        unit: "By/s"
-      - name: freenas.zpoolReadOps1sec
-        OID: 1.3.6.1.4.1.50536.1.1.1.1.12
-        description: The number of read I/O operations sent to the pool or device, including metadata requests (over 1 second interval).
-        unit: "{operation}"
-      - name: freenas.zpoolWriteOps1sec
-        OID: 1.3.6.1.4.1.50536.1.1.1.1.13
-        description: The number of write I/O operations sent to the pool or device (over 1 second interval).
-        unit: "{operation}"
-      - name: freenas.zpoolReadBytes1sec
-        OID: 1.3.6.1.4.1.50536.1.1.1.1.14
-        description: The bandwidth of all read operations (including metadata), expressed as units per second (over 1 second interval)
-        unit: "By/s"
-      - name: freenas.zpoolWriteBytes1sec
-        OID: 1.3.6.1.4.1.50536.1.1.1.1.15
-        description: The bandwidth of all write operations, expressed as units per second (over 1 second interval).
-        unit: "By/s"
-      - name: freenas.zpoolAllocationUnits
-        OID: 1.3.6.1.4.1.50536.1.1.1.1.3
-        description: Allocation units for the pool
-        unit: "By"
+        chart_meta:
+          description: The bandwidth of all write operations, expressed as units per second (averaged since system booted).
+          family: 'Storage/ZFS/Pool/IO/Throughput/Write'
+          unit: "By/s"
       - name: freenas.zpoolSize
         OID: 1.3.6.1.4.1.50536.1.1.1.1.4
-        description: Size of the pool
-        unit: "By"
+        chart_meta:
+          description: Size of the pool
+          family: 'Storage/ZFS/Pool/Space/Size'
+          unit: "By"
       - name: freenas.zpoolUsed
         OID: 1.3.6.1.4.1.50536.1.1.1.1.5
-        description: Used space in the pool
-        unit: "By"
+        chart_meta:
+          description: Used space in the pool
+          family: 'Storage/ZFS/Pool/Space/Used'
+          unit: "By"
       - name: freenas.zpoolAvailable
         OID: 1.3.6.1.4.1.50536.1.1.1.1.6
-        description: Available space in the pool
-        unit: "By"
+        chart_meta:
+          description: Available space in the pool
+          family: 'Storage/ZFS/Pool/Space/Available'
+          unit: "By"
       - name: freenas.zpoolHealth
         OID: 1.3.6.1.4.1.50536.1.1.1.1.7
-        description: The current health of the containing pool, as reported by zpool status.
-        unit: "TBD"
+        chart_meta:
+          description: The current health of the containing pool, as reported by zpool status.
+          family: 'Storage/ZFS/Pool/Health/Status'
+          unit: "{status}"
+        mapping:
+          0: online
+          1: degraded
+          2: faulted
+          3: offline
+          4: unavail
+          5: removed
       - name: freenas.zpoolReadOps
         OID: 1.3.6.1.4.1.50536.1.1.1.1.8
-        description: The number of read I/O operations sent to the pool or device, including metadata requests (averaged since system booted).
-        unit: "{operation}"
+        chart_meta:
+          description: The number of read I/O operations sent to the pool or device, including metadata requests (averaged since system booted).
+          family: 'Storage/ZFS/Pool/IO/Operations/Read'
+          unit: "{operation}/s"
       - name: freenas.zpoolWriteOps
         OID: 1.3.6.1.4.1.50536.1.1.1.1.9
-        description: The number of write I/O operations sent to the pool or device (averaged since system booted).
-        unit: "{operation}"
+        chart_meta:
+          description: The number of write I/O operations sent to the pool or device (averaged since system booted).
+          family: 'Storage/ZFS/Pool/IO/Operations/Write'
+          unit: "{operation}/s"
     metric_tags:
-      - symbol:
+      - tag: freenas_zpool_index
+        symbol:
+          name: freenas.zpoolIndex
+          OID: 1.3.6.1.4.1.50536.1.1.1.1.1
+      - tag: freenas_zpool_descr
+        symbol:
           name: freenas.zpoolDescr
           OID: 1.3.6.1.4.1.50536.1.1.1.1.2
-        tag: freenas_zpool_descr
+
   - MIB: FREENAS-MIB
     table:
       name: datasetTable
       OID: 1.3.6.1.4.1.50536.1.2.1
     symbols:
-      - name: freenas.datasetAllocationUnits
-        OID: 1.3.6.1.4.1.50536.1.2.1.1.3
-        description: Allocation units for the dataset
-        unit: "By"
       - name: freenas.datasetSize
         OID: 1.3.6.1.4.1.50536.1.2.1.1.4
-        description: Size of the dataset
-        unit: "By"
+        chart_meta:
+          description: Size of the dataset
+          family: 'Storage/ZFS/Dataset/Space/Size'
+          unit: "By"
       - name: freenas.datasetUsed
         OID: 1.3.6.1.4.1.50536.1.2.1.1.5
-        description: Used space in the dataset
-        unit: "By"
+        chart_meta:
+          description: Used space in the dataset
+          family: 'Storage/ZFS/Dataset/Space/Used'
+          unit: "By"
       - name: freenas.datasetAvailable
         OID: 1.3.6.1.4.1.50536.1.2.1.1.6
-        description: Available space in the dataset
-        unit: "By"
+        chart_meta:
+          description: Available space in the dataset
+          family: 'Storage/ZFS/Dataset/Space/Available'
+          unit: "By"
     metric_tags:
-      - symbol:
+      - tag: freenas_dataset_index
+        symbol:
+          name: freenas.datasetIndex
+          OID: 1.3.6.1.4.1.50536.1.2.1.1.1
+      - tag: freenas_dataset_descr
+        symbol:
           name: freenas.datasetDescr
           OID: 1.3.6.1.4.1.50536.1.2.1.1.2
-        tag: freenas_dataset_descr
+
   - MIB: FREENAS-MIB
     table:
       name: zvolTable
       OID: 1.3.6.1.4.1.50536.1.3.1
     symbols:
-      - name: freenas.zvolAllocationUnits
-        OID: 1.3.6.1.4.1.50536.1.3.1.1.3
-        description: Allocation units for the zvol
-        unit: "By"
       - name: freenas.zvolSize
         OID: 1.3.6.1.4.1.50536.1.3.1.1.4
-        description: Size of the zvol
-        unit: "By"
+        chart_meta:
+          description: Size of the zvol
+          family: 'Storage/ZFS/Volume/Space/Size'
+          unit: "By"
       - name: freenas.zvolUsed
         OID: 1.3.6.1.4.1.50536.1.3.1.1.5
-        description: Used space in the zvol
-        unit: "By"
+        chart_meta:
+          description: Used space in the zvol
+          family: 'Storage/ZFS/Volume/Space/Used'
+          unit: "By"
       - name: freenas.zvolAvailable
         OID: 1.3.6.1.4.1.50536.1.3.1.1.6
-        description: Available space in the zvol
-        unit: "By"
+        chart_meta:
+          description: Available space in the zvol
+          family: 'Storage/ZFS/Volume/Space/Available'
+          unit: "By"
       - name: freenas.zvolReferenced
         OID: 1.3.6.1.4.1.50536.1.3.1.1.7
-        description: Referenced space in the zvol
-        unit: "By"
+        chart_meta:
+          description: Referenced space in the zvol
+          family: 'Storage/ZFS/Volume/Space/Referenced'
+          unit: "By"
     metric_tags:
-      - symbol:
+      - tag: freenas_zvol_index
+        symbol:
+          name: freenas.zvolIndex
+          OID: 1.3.6.1.4.1.50536.1.3.1.1.1
+      - tag: freenas_zvol_descr
+        symbol:
           name: freenas.zvolDescr
           OID: 1.3.6.1.4.1.50536.1.3.1.1.2
-        tag: freenas_zvol_descr
+
   - MIB: FREENAS-MIB
     symbol:
       name: freenas.zfsArcSize
       OID: 1.3.6.1.4.1.50536.1.4.1.0
-      description: Size of the ARC cache
-      unit: "By"
+      chart_meta:
+        description: Size of the ARC cache
+        family: 'Storage/ZFS/Cache/ARC/Size'
+        unit: "By"
   - MIB: FREENAS-MIB
     symbol:
       name: freenas.zfsArcCacheMissRatio  # zfsArcCacheMissRatio is a string representing a float value
       OID: 1.3.6.1.4.1.50536.1.4.10.0
-      description: Arc cache miss ration percentage
-      unit: "%"
+      chart_meta:
+        description: Arc cache miss ration percentage
+        family: 'Storage/ZFS/Cache/ARC/MissRatio'
+        unit: "%"
   - MIB: FREENAS-MIB
     symbol:
       name: freenas.zfsArcMeta
       OID: 1.3.6.1.4.1.50536.1.4.2.0
-      description: Metadata size in the ARC cache
-      unit: "By"
+      chart_meta:
+        description: Metadata size in the ARC cache
+        family: 'Storage/ZFS/Cache/ARC/Metadata'
+        unit: "By"
   - MIB: FREENAS-MIB
     symbol:
       name: freenas.zfsArcData
       OID: 1.3.6.1.4.1.50536.1.4.3.0
-      description: Data size in the ARC cache
-      unit: "By"
+      chart_meta:
+        description: Data size in the ARC cache
+        family: 'Storage/ZFS/Cache/ARC/Data'
+        unit: "By"
   - MIB: FREENAS-MIB
     symbol:
       name: freenas.zfsArcHits
       OID: 1.3.6.1.4.1.50536.1.4.4.0
-      description: Number of ARC cache hits
-      unit: "{hit}"
+      metric_type: rate
+      chart_meta:
+        description: Number of ARC cache hits
+        family: 'Storage/ZFS/Cache/ARC/Hit'
+        unit: "{hit}/s"
   - MIB: FREENAS-MIB
     symbol:
       name: freenas.zfsArcMisses
       OID: 1.3.6.1.4.1.50536.1.4.5.0
-      description: Number of ARC cache misses
-      unit: "{miss}"
+      metric_type: rate
+      chart_meta:
+        description: Number of ARC cache misses
+        family: 'Storage/ZFS/Cache/ARC/Miss'
+        unit: "{miss}/s"
   - MIB: FREENAS-MIB
     symbol:
       name: freenas.zfsArcC
       OID: 1.3.6.1.4.1.50536.1.4.6.0
-      description: ARC cache target size
-      unit: "By"
+      chart_meta:
+        description: ARC cache target size
+        family: 'Storage/ZFS/Cache/ARC/TargetSize'
+        unit: "By"
   - MIB: FREENAS-MIB
     symbol:
       name: freenas.zfsArcP
       OID: 1.3.6.1.4.1.50536.1.4.7.0
-      description: ARC cache size
-      unit: "By"
+      chart_meta:
+        description: ARC cache size
+        family: 'Storage/ZFS/Cache/ARC/P'
+        unit: "By"
   - MIB: FREENAS-MIB
     symbol:
       name: freenas.zfsArcMissPercent  # zfsArcMissPercent is a string representing a float value
       OID: 1.3.6.1.4.1.50536.1.4.8.0
-      description: Arc miss percentage
-      unit: "%"
+      chart_meta:
+        description: Arc miss percentage
+        family: 'Storage/ZFS/Cache/ARC/MissPercent'
+        unit: "%"
   - MIB: FREENAS-MIB
     symbol:
       name: freenas.zfsArcCacheHitRatio  # zfsArcCacheHitRatio is a string representing a float value
       OID: 1.3.6.1.4.1.50536.1.4.9.0
-      description: Arc cache hit ration percentage
-      unit: "%"
+      chart_meta:
+        description: Arc cache hit ration percentage
+        family: 'Storage/ZFS/Cache/ARC/HitRatio'
+        unit: "%"
   - MIB: FREENAS-MIB
     symbol:
       name: freenas.zfsL2ArcHits
       OID: 1.3.6.1.4.1.50536.1.5.1.0
-      description: Number of L2ARC cache hits
-      unit: "{hit}"
+      chart_meta:
+        description: Number of L2ARC cache hits
+        family: 'Storage/ZFS/Cache/L2ARC/Hit'
+        unit: "{hit}/s"
   - MIB: FREENAS-MIB
     symbol:
       name: freenas.zfsL2ArcMisses
       OID: 1.3.6.1.4.1.50536.1.5.2.0
-      description: Number of L2ARC cache misses
-      unit: "{miss}"
+      chart_meta:
+        description: Number of L2ARC cache misses
+        family: 'Storage/ZFS/Cache/L2ARC/Miss'
+        unit: "{miss}/s"
   - MIB: FREENAS-MIB
     symbol:
       name: freenas.zfsL2ArcRead
       OID: 1.3.6.1.4.1.50536.1.5.3.0
-      description: Number of L2ARC reads
-      unit: "{read}"
+      chart_meta:
+        description: Number of L2ARC reads
+        family: 'Storage/ZFS/Cache/L2ARC/Read'
+        unit: "{read}/s"
   - MIB: FREENAS-MIB
     symbol:
       name: freenas.zfsL2ArcWrite
       OID: 1.3.6.1.4.1.50536.1.5.4.0
-      description: Number of L2ARC writes
-      unit: "{write}"
+      chart_meta:
+        description: Number of L2ARC writes
+        family: 'Storage/ZFS/Cache/L2ARC/Write'
+        unit: "{write}/s"
   - MIB: FREENAS-MIB
     symbol:
       name: freenas.zfsL2ArcSize
       OID: 1.3.6.1.4.1.50536.1.5.5.0
-      description: Size of the L2ARC cache
-      unit: "By"
+      chart_meta:
+        description: Size of the L2ARC cache
+        family: 'Storage/ZFS/Cache/L2ARC/Size'
+        unit: "By"
   - MIB: FREENAS-MIB
     symbol:
       name: freenas.zfsZilstatOps1sec
       OID: 1.3.6.1.4.1.50536.1.6.1.0
-      description: The ops column parsed from the command zilstat 1 1
-      unit: "{operation}"
+      chart_meta:
+        description: The ops column parsed from the command zilstat 1 1
+        family: 'Storage/ZFS/ZIL/Operations/1s'
+        unit: "{operation}/s"
   - MIB: FREENAS-MIB
     symbol:
       name: freenas.zfsZilstatOps5sec
       OID: 1.3.6.1.4.1.50536.1.6.2.0
-      description: The ops column parsed from the command zilstat 5 1
-      unit: "{operation}"
+      chart_meta:
+        description: The ops column parsed from the command zilstat 5 1
+        family: 'Storage/ZFS/ZIL/Operations/5s'
+        unit: "{operation}/s"
   - MIB: FREENAS-MIB
     symbol:
       name: freenas.zfsZilstatOps10sec
       OID: 1.3.6.1.4.1.50536.1.6.3.0
-      description: The ops column parsed from the command zilstat 10 1
-      unit: "{operation}"
+      chart_meta:
+        description: The ops column parsed from the command zilstat 10 1
+        family: 'Storage/ZFS/ZIL/Operations/10s'
+        unit: "{operation}/s"

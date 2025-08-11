@@ -25,13 +25,14 @@ type (
 		pdus       map[string]gosnmp.SnmpPDU
 		tags       map[string]string
 		staticTags map[string]string
+		tableName  string
 	}
 	// tableRowProcessingContext contains context needed for processing a row
 	tableRowProcessingContext struct {
-		config           ddprofiledefinition.MetricsConfig
-		columnOIDs       map[string]ddprofiledefinition.SymbolConfig
-		sameTableTagOIDs map[string][]ddprofiledefinition.MetricTagConfig
-		crossTableCtx    *crossTableContext
+		config        ddprofiledefinition.MetricsConfig
+		columnOIDs    map[string]ddprofiledefinition.SymbolConfig
+		crossTableCtx *crossTableContext
+		orderedTags   []orderedTagConfig
 	}
 )
 
@@ -53,62 +54,51 @@ func (p *tableRowProcessor) processRow(row *tableRowData, ctx *tableRowProcessin
 }
 
 func (p *tableRowProcessor) processRowTags(row *tableRowData, ctx *tableRowProcessingContext) error {
-	p.processSameTableTags(row, ctx.sameTableTagOIDs)
-
-	if ctx.crossTableCtx != nil {
-		p.processCrossTableTags(row, ctx)
+	// Collect tags in the order they appear in the profile
+	for _, orderedTag := range ctx.orderedTags {
+		switch orderedTag.tagType {
+		case tagTypeSameTable:
+			p.processSingleSameTableTag(row, orderedTag.config)
+		case tagTypeCrossTable:
+			if ctx.crossTableCtx != nil {
+				p.processSingleCrossTableTag(row, orderedTag.config, ctx)
+			}
+		case tagTypeIndex:
+			p.processSingleIndexTag(row, orderedTag.config)
+		}
 	}
-
-	p.processIndexBasedTags(row, ctx.config.MetricTags)
 
 	return nil
 }
 
-func (p *tableRowProcessor) processSameTableTags(row *tableRowData, tagColumnOIDs map[string][]ddprofiledefinition.MetricTagConfig) {
-	for columnOID, tagConfigs := range tagColumnOIDs {
-		pdu, ok := row.pdus[columnOID]
-		if !ok {
-			continue
-		}
+func (p *tableRowProcessor) processSingleSameTableTag(row *tableRowData, tagCfg ddprofiledefinition.MetricTagConfig) {
+	columnOID := trimOID(tagCfg.Symbol.OID)
+	pdu, ok := row.pdus[columnOID]
+	if !ok {
+		return
+	}
 
-		ta := tagAdder{tags: row.tags}
-
-		for _, tagCfg := range tagConfigs {
-			if err := p.tagProc.processTag(tagCfg, pdu, ta); err != nil {
-				p.log.Debugf("Error processing tag %s: %v", tagCfg.Tag, err)
-				continue
-			}
-		}
+	ta := tagAdder{tags: row.tags}
+	if err := p.tagProc.processTag(tagCfg, pdu, ta); err != nil {
+		p.log.Debugf("Error processing tag %s: %v", tagCfg.Tag, err)
 	}
 }
 
-func (p *tableRowProcessor) processCrossTableTags(row *tableRowData, ctx *tableRowProcessingContext) {
-	for _, tagCfg := range ctx.config.MetricTags {
-		if !p.crossTableResolver.isCrossTable(tagCfg, ctx.config.Table.Name) {
-			continue
-		}
-
-		if err := p.crossTableResolver.resolveCrossTableTag(tagCfg, row.index, ctx.crossTableCtx); err != nil {
-			p.log.Debugf("Error resolving cross-table tag %s: %v", tagCfg.Tag, err)
-			continue
-		}
+func (p *tableRowProcessor) processSingleCrossTableTag(row *tableRowData, tagCfg ddprofiledefinition.MetricTagConfig, ctx *tableRowProcessingContext) {
+	if err := p.crossTableResolver.resolveCrossTableTag(tagCfg, row.index, ctx.crossTableCtx); err != nil {
+		p.log.Debugf("Error resolving cross-table tag %s: %v", tagCfg.Tag, err)
 	}
 }
 
-func (p *tableRowProcessor) processIndexBasedTags(row *tableRowData, metricTags []ddprofiledefinition.MetricTagConfig) {
-	for _, tagCfg := range metricTags {
-		if tagCfg.Index == 0 {
-			continue
-		}
-
-		tagName, indexValue, ok := p.processIndexTag(tagCfg, row.index)
-		if !ok {
-			p.log.Debugf("Cannot extract position %d from index %s", tagCfg.Index, row.index)
-			continue
-		}
-
-		row.tags[tagName] = indexValue
+func (p *tableRowProcessor) processSingleIndexTag(row *tableRowData, tagCfg ddprofiledefinition.MetricTagConfig) {
+	tagName, indexValue, ok := p.processIndexTag(tagCfg, row.index)
+	if !ok {
+		p.log.Debugf("Cannot extract position %d from index %s", tagCfg.Index, row.index)
+		return
 	}
+
+	ta := tagAdder{tags: row.tags}
+	ta.addTag(tagName, indexValue)
 }
 
 func (p *tableRowProcessor) processIndexTag(cfg ddprofiledefinition.MetricTagConfig, index string) (string, string, bool) {
@@ -177,7 +167,7 @@ func (p *tableRowProcessor) createMetric(sym ddprofiledefinition.SymbolConfig, p
 		return nil, fmt.Errorf("error processing value: %w", err)
 	}
 
-	return buildTableMetric(sym, pdu, value, row.tags, row.staticTags)
+	return buildTableMetric(sym, pdu, value, row.tags, row.staticTags, row.tableName)
 }
 
 type (

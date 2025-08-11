@@ -33,6 +33,6 @@ static inline void EBPF_PLUGIN_FUNCTIONS(const char *NAME, const char *DESC, int
 #define EBPF_FUNCTION_SOCKET_RESET "reset"
 #define EBPF_FUNCTION_SOCKET_INTERFACES "interfaces"
 
-void *ebpf_function_thread(void *ptr);
+void ebpf_function_thread(void *ptr);
 
 #endif

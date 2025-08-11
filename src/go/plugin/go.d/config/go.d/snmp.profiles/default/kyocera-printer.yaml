@@ -2,14 +2,28 @@ extends:
   - _system-base.yaml
   # TODO: Extends _generic-if32.yaml when implemented
   # - _generic-if32.yaml
+
 sysobjectid: 1.3.6.1.4.1.1347.41
+
 metadata:
   device:
     fields:
       vendor:
-        value: "kyocera"
+        value: "Kyocera"
       type:
-        value: "printer"
+        value: "Printer"
+
+metric_tags:
+  - tag: kcprt_general_model_name
+    OID: 1.3.6.1.4.1.1347.43.5.1.1.1.1  # kcprtGeneralModelName.1 (index 1)
+    symbol: kcprtGeneralModelName
+  - tag: kcprt_serial_number
+    OID: 1.3.6.1.4.1.1347.43.5.1.1.28.1  # kcprtSerialNumber.1 (index 1)
+    symbol: kcprtSerialNumber
+
+# 1. KYOCERA-MIB
+#    https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/kyocera/KYOCERA-MIB
+
 metrics:
   - MIB: KYOCERA-MIB
     table:
@@ -18,14 +32,20 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.1347.43.18.2.1.3
         name: kcprtAlertStateCode
-        description: "Alert state code"
-        unit: "TBD"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+        chart_meta:
+          description: "Alert state code"
+          family: 'System/Alert/Code'
+          unit: "{code}"
     metric_tags:
-      - symbol:
+      - tag: kcprt_alert_state_display_index
+        symbol:
+          OID: 1.3.6.1.4.1.1347.43.18.2.1.1
+          name: kcprtAlertStateDisplayIndex
+      - tag: kcprt_alert_state_display
+        symbol:
           OID: 1.3.6.1.4.1.1347.43.18.2.1.2
           name: kcprtAlertStateDisplay
-        tag: kcprt_alert_state_display
+
   - MIB: KYOCERA-MIB
     table:
       OID: 1.3.6.1.4.1.1347.43.20
@@ -33,31 +53,49 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.1347.43.20.1.1.4
         name: kcprtMemoryDeviceTotalSize
-        description: "Total size of the memory device"
-        unit: "By"
+        chart_meta:
+          description: "Total size of the memory device"
+          family: 'System/Memory/Total'
+          unit: "By"
       - OID: 1.3.6.1.4.1.1347.43.20.1.1.5
         name: kcprtMemoryDeviceUsedSize
-        description: "Used size of the memory device"
-        unit: "By"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+        chart_meta:
+          description: "Used size of the memory device"
+          family: 'System/Memory/Used'
+          unit: "By"
+      - OID: 1.3.6.1.4.1.1347.43.20.1.1.6
+        name: kcprtMemoryDeviceStatus
+        chart_meta:
+          description: Current status of this device
+          family: 'System/Memory/Status'
+          unit: "{status}"
+        mapping:
+          0: readyReadWrite
+          1: readyReadOnly
+          2: notAccessible
+          4: lowBattery
     metric_tags:
-      - symbol:
+      - tag: kcprt_memory_device_index
+        symbol:
+          OID: 1.3.6.1.4.1.1347.43.20.1.1.1
+          name: kcprtMemoryDeviceIndex
+      - tag: kcprt_memory_device_location
+        symbol:
           OID: 1.3.6.1.4.1.1347.43.20.1.1.2
           name: kcprtMemoryDeviceLocation
-        tag: kcprt_memory_device_location
         mapping:
-          0: pc_card-a
-          1: pc_card-b
-          2: option_ro_msocket
-          3: resident_font
-          4: download_area
-          5: hard_disk
-          6: memory_card
+          0: pcCard-A
+          1: pcCard-B
+          2: optionROMsocket
+          3: residentFont
+          4: downloadArea
+          5: hardDisk
+          6: memoryCard
           255: others
-      - symbol:
+      - tag: kcprt_memory_device_type
+        symbol:
           OID: 1.3.6.1.4.1.1347.43.20.1.1.3
           name: kcprtMemoryDeviceType
-        tag: kcprt_memory_device_type
         mapping:
           0: rom
           1: flash
@@ -65,19 +103,3 @@ metrics:
           3: dram
           4: strage
           255: others
-      - symbol:
-          OID: 1.3.6.1.4.1.1347.43.20.1.1.6
-          name: kcprtMemoryDeviceStatus
-        tag: kcprt_memory_device_status
-        mapping:
-          0: ready_read_write
-          1: ready_read_only
-          2: not_accessible
-          4: low_battery
-metric_tags:
-  - tag: kcprt_general_model_name
-    OID: 1.3.6.1.4.1.1347.43.5.1.1.1.1  # kcprtGeneralModelName.1 (index 1)
-    symbol: kcprtGeneralModelName
-  - tag: kcprt_serial_number
-    OID: 1.3.6.1.4.1.1347.43.5.1.1.28.1  # kcprtSerialNumber.1 (index 1)
-    symbol: kcprtSerialNumber

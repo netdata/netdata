@@ -165,10 +165,10 @@ include:
 
   - &debian
     distro: debian
-    version: "12"
+    version: "13"
     support_type: Core
     notes: ''
-    base_image: debian:bookworm
+    base_image: debian:trixie
     eol_check: true
     eol_lts: true
     bundle_sentry:
@@ -180,8 +180,20 @@ include:
       apt-get purge -y libjson-c-dev
     packages: &debian_packages
       type: deb
-      repo_distro: debian/bookworm
+      repo_distro: debian/trixie
       builder_rev: v2
+      arches:
+        - amd64
+        - armhf
+        - arm64
+    test:
+      ebpf-core: true
+  - <<: *debian
+    version: "12"
+    base_image: debian:bookworm
+    packages:
+      <<: *debian_packages
+      repo_distro: debian/bookworm
       arches:
         - i386
         - amd64
@@ -195,6 +207,11 @@ include:
     packages:
       <<: *debian_packages
       repo_distro: debian/bullseye
+      arches:
+        - i386
+        - amd64
+        - armhf
+        - arm64
     test:
       ebpf-core: false
 
@@ -223,13 +240,6 @@ include:
       repo_distro: fedora/41
     test:
       ebpf-core: true
-  - <<: *fedora
-    version: "40"
-    packages:
-      <<: *fedora_packages
-      repo_distro: fedora/40
-    test:
-      ebpf-core: true
 
   - &opensuse
     distro: opensuse
@@ -253,7 +263,7 @@ include:
 
   - &oracle
     distro: oraclelinux
-    version: "8"
+    version: "10"
     support_type: Core
     notes: ''
     eol_check: true
@@ -262,18 +272,30 @@ include:
       dnf remove -y json-c-devel
     packages: &oracle_packages
       type: rpm
-      repo_distro: ol/8
+      repo_distro: ol/10
       builder_rev: *def_builder_rev
       arches:
         - x86_64
         - aarch64
     test:
       ebpf-core: true
+      skip-local-build: true
   - <<: *oracle
     version: "9"
     packages:
       <<: *oracle_packages
       repo_distro: ol/9
+    test:
+      ebpf-core: true
+      skip-local-build: false
+  - <<: *oracle
+    version: "8"
+    packages:
+      <<: *oracle_packages
+      repo_distro: ol/8
+    test:
+      ebpf-core: true
+      skip-local-build: false
 
   - &rocky
     distro: rockylinux
@@ -348,11 +370,6 @@ include:
       <<: *ubuntu_packages
       repo_distro: ubuntu/plucky
   - <<: *ubuntu
-    version: "24.10"
-    packages:
-      <<: *ubuntu_packages
-      repo_distro: ubuntu/oracular
-  - <<: *ubuntu
     version: "22.04"
     packages:
       <<: *ubuntu_packages
@@ -385,6 +402,13 @@ legacy: # Info for platforms we used to support and still need to handle package
       repo_distro: fedora/39
     test:
       ebpf-core: true
+  - <<: *fedora
+    version: "40"
+    packages:
+      <<: *fedora_packages
+      repo_distro: fedora/40
+    test:
+      ebpf-core: true
   - <<: *opensuse
     version: "15.4"
     packages:
@@ -407,6 +431,11 @@ legacy: # Info for platforms we used to support and still need to handle package
     packages:
       <<: *ubuntu_packages
       repo_distro: ubuntu/mantic
+  - <<: *ubuntu
+    version: "24.10"
+    packages:
+      <<: *ubuntu_packages
+      repo_distro: ubuntu/oracular
 no_include: # Info for platforms not covered in CI
   - distro: docker
     version: "19.03 or newer"

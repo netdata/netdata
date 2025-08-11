@@ -210,8 +210,6 @@ option(ENABLE_BUNDLED_PROTOBUF "Use a vendored copy of protobuf" False)
 # Experimental features
 option(ENABLE_WEBRTC "Enable WebRTC dashboard communications (experimental)" False)
 mark_as_advanced(ENABLE_WEBRTC)
-option(ENABLE_H2O "Enable H2O web server (experimental)" False)
-mark_as_advanced(ENABLE_H2O)
 
 # Other optional functionality
 option(ENABLE_SENTRY "Build with Sentry Native crash reporting" False)
@@ -1145,92 +1143,10 @@ set(LIBNETDATA_FILES
 list(APPEND LIBNETDATA_FILES ${INICFG_FILES})
 list(APPEND LIBNETDATA_FILES ${CONFIG_FILES})
 
-set(LIBH2O_FILES
-        src/web/server/h2o/libh2o/deps/cloexec/cloexec.c
-        src/web/server/h2o/libh2o/deps/libgkc/gkc.c
-        src/web/server/h2o/libh2o/deps/libyrmcds/close.c
-        src/web/server/h2o/libh2o/deps/libyrmcds/connect.c
-        src/web/server/h2o/libh2o/deps/libyrmcds/recv.c
-        src/web/server/h2o/libh2o/deps/libyrmcds/send.c
-        src/web/server/h2o/libh2o/deps/libyrmcds/send_text.c
-        src/web/server/h2o/libh2o/deps/libyrmcds/socket.c
-        src/web/server/h2o/libh2o/deps/libyrmcds/strerror.c
-        src/web/server/h2o/libh2o/deps/libyrmcds/text_mode.c
-        src/web/server/h2o/libh2o/deps/picohttpparser/picohttpparser.c
-        src/web/server/h2o/libh2o/lib/common/cache.c
-        src/web/server/h2o/libh2o/lib/common/file.c
-        src/web/server/h2o/libh2o/lib/common/filecache.c
-        src/web/server/h2o/libh2o/lib/common/hostinfo.c
-        src/web/server/h2o/libh2o/lib/common/http1client.c
-        src/web/server/h2o/libh2o/lib/common/memcached.c
-        src/web/server/h2o/libh2o/lib/common/memory.c
-        src/web/server/h2o/libh2o/lib/common/multithread.c
-        src/web/server/h2o/libh2o/lib/common/serverutil.c
-        src/web/server/h2o/libh2o/lib/common/socket.c
-        src/web/server/h2o/libh2o/lib/common/socketpool.c
-        src/web/server/h2o/libh2o/lib/common/string.c
-        src/web/server/h2o/libh2o/lib/common/time.c
-        src/web/server/h2o/libh2o/lib/common/timeout.c
-        src/web/server/h2o/libh2o/lib/common/url.c
-        src/web/server/h2o/libh2o/lib/core/config.c
-        src/web/server/h2o/libh2o/lib/core/configurator.c
-        src/web/server/h2o/libh2o/lib/core/context.c
-        src/web/server/h2o/libh2o/lib/core/headers.c
-        src/web/server/h2o/libh2o/lib/core/logconf.c
-        src/web/server/h2o/libh2o/lib/core/proxy.c
-        src/web/server/h2o/libh2o/lib/core/request.c
-        src/web/server/h2o/libh2o/lib/core/token.c
-        src/web/server/h2o/libh2o/lib/core/util.c
-        src/web/server/h2o/libh2o/lib/handler/access_log.c
-        src/web/server/h2o/libh2o/lib/handler/chunked.c
-        src/web/server/h2o/libh2o/lib/handler/compress.c
-        src/web/server/h2o/libh2o/lib/handler/compress/gzip.c
-        src/web/server/h2o/libh2o/lib/handler/errordoc.c
-        src/web/server/h2o/libh2o/lib/handler/expires.c
-        src/web/server/h2o/libh2o/lib/handler/fastcgi.c
-        src/web/server/h2o/libh2o/lib/handler/file.c
-        src/web/server/h2o/libh2o/lib/handler/headers.c
-        src/web/server/h2o/libh2o/lib/handler/mimemap.c
-        src/web/server/h2o/libh2o/lib/handler/proxy.c
-        src/web/server/h2o/libh2o/lib/handler/redirect.c
-        src/web/server/h2o/libh2o/lib/handler/reproxy.c
-        src/web/server/h2o/libh2o/lib/handler/throttle_resp.c
-        src/web/server/h2o/libh2o/lib/handler/status.c
-        src/web/server/h2o/libh2o/lib/handler/headers_util.c
-        src/web/server/h2o/libh2o/lib/handler/status/events.c
-        src/web/server/h2o/libh2o/lib/handler/status/requests.c
-        src/web/server/h2o/libh2o/lib/handler/http2_debug_state.c
-        src/web/server/h2o/libh2o/lib/handler/status/durations.c
-        src/web/server/h2o/libh2o/lib/handler/configurator/access_log.c
-        src/web/server/h2o/libh2o/lib/handler/configurator/compress.c
-        src/web/server/h2o/libh2o/lib/handler/configurator/errordoc.c
-        src/web/server/h2o/libh2o/lib/handler/configurator/expires.c
-        src/web/server/h2o/libh2o/lib/handler/configurator/fastcgi.c
-        src/web/server/h2o/libh2o/lib/handler/configurator/file.c
-        src/web/server/h2o/libh2o/lib/handler/configurator/headers.c
-        src/web/server/h2o/libh2o/lib/handler/configurator/proxy.c
-        src/web/server/h2o/libh2o/lib/handler/configurator/redirect.c
-        src/web/server/h2o/libh2o/lib/handler/configurator/reproxy.c
-        src/web/server/h2o/libh2o/lib/handler/configurator/throttle_resp.c
-        src/web/server/h2o/libh2o/lib/handler/configurator/status.c
-        src/web/server/h2o/libh2o/lib/handler/configurator/http2_debug_state.c
-        src/web/server/h2o/libh2o/lib/handler/configurator/headers_util.c
-        src/web/server/h2o/libh2o/lib/http1.c
-        src/web/server/h2o/libh2o/lib/tunnel.c
-        src/web/server/h2o/libh2o/lib/http2/cache_digests.c
-        src/web/server/h2o/libh2o/lib/http2/casper.c
-        src/web/server/h2o/libh2o/lib/http2/connection.c
-        src/web/server/h2o/libh2o/lib/http2/frame.c
-        src/web/server/h2o/libh2o/lib/http2/hpack.c
-        src/web/server/h2o/libh2o/lib/http2/scheduler.c
-        src/web/server/h2o/libh2o/lib/http2/stream.c
-        src/web/server/h2o/libh2o/lib/http2/http2_debug_state.c
-)
-
 set(DAEMON_FILES
         src/daemon/buildinfo.c
         src/daemon/buildinfo.h
-        src/daemon/h2o-common.c
+        src/daemon/common.c
         src/daemon/common.h
         src/daemon/daemon.c
         src/daemon/daemon.h
@@ -1353,21 +1269,6 @@ set(DAEMON_SYSTEMD_WATCHER_FILES
 
 if(ENABLE_SYSTEMD_DBUS)
         list(APPEND DAEMON_FILES ${DAEMON_SYSTEMD_WATCHER_FILES})
-endif()
-
-set(H2O_FILES
-        src/web/server/h2o/http_server.c
-        src/web/server/h2o/http_server.h
-        src/web/server/h2o/h2o_utils.c
-        src/web/server/h2o/h2o_utils.h
-        src/web/server/h2o/rrdpush.c
-        src/web/server/h2o/streaming.h
-        src/web/server/h2o/connlist.c
-        src/web/server/h2o/connlist.h
-)
-
-if(ENABLE_H2O)
-    list(APPEND DAEMON_FILES ${H2O_FILES})
 endif()
 
 set(API_PLUGIN_FILES
@@ -1823,7 +1724,6 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/stream-sender.c
         src/streaming/stream-replication-sender.c
         src/streaming/stream-replication-sender.h
-        src/streaming/h2o-common.h
         src/streaming/protocol/command-nodeid.c
         src/streaming/protocol/commands.c
         src/streaming/protocol/commands.h
@@ -2045,6 +1945,7 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/GetSystemRAM.c
         src/collectors/windows.plugin/GetSystemCPU.c
         src/collectors/windows.plugin/GetPowerSupply.c
+        src/collectors/windows.plugin/GetServicesStatus.c
         src/collectors/windows.plugin/perflib-adcs.c
         src/collectors/windows.plugin/perflib-adfs.c
         src/collectors/windows.plugin/perflib-rrd.c
@@ -2061,10 +1962,10 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/perflib-memory.c
         src/collectors/windows.plugin/perflib-processes.c
         src/collectors/windows.plugin/perflib-web-service.c
-        src/collectors/windows.plugin/perflib-services.c
         src/collectors/windows.plugin/perflib-hyperv.c
         src/collectors/windows.plugin/perflib-exchange.c
         src/collectors/windows.plugin/perflib-numa.c
+        src/collectors/windows.plugin/perflib-asp.c
 )
 
 set(PROC_PLUGIN_FILES
@@ -2259,41 +2160,6 @@ set(PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES
         src/exporting/prometheus/remote_write/remote_write_request.cc
         src/exporting/prometheus/remote_write/remote_write_request.h
 )
-
-#
-# build h2o
-#
-
-if(ENABLE_H2O)
-        add_library(h2o STATIC ${LIBH2O_FILES})
-
-        target_include_directories(h2o BEFORE PUBLIC
-                "${CMAKE_SOURCE_DIR}/src/web/server/h2o/libh2o/include"
-                "${CMAKE_SOURCE_DIR}/src/web/server/h2o/libh2o/deps/cloexec"
-                "${CMAKE_SOURCE_DIR}/src/web/server/h2o/libh2o/deps/brotli/enc"
-                "${CMAKE_SOURCE_DIR}/src/web/server/h2o/libh2o/deps/golombset"
-                "${CMAKE_SOURCE_DIR}/src/web/server/h2o/libh2o/deps/libgkc"
-                "${CMAKE_SOURCE_DIR}/src/web/server/h2o/libh2o/deps/libyrmcds"
-                "${CMAKE_SOURCE_DIR}/src/web/server/h2o/libh2o/deps/klib"
-                "${CMAKE_SOURCE_DIR}/src/web/server/h2o/libh2o/deps/neverbleed"
-                "${CMAKE_SOURCE_DIR}/src/web/server/h2o/libh2o/deps/picohttpparser"
-                "${CMAKE_SOURCE_DIR}/src/web/server/h2o/libh2o/deps/picotest"
-                "${CMAKE_SOURCE_DIR}/src/web/server/h2o/libh2o/deps/yaml/include"
-                "${CMAKE_SOURCE_DIR}/src/web/server/h2o/libh2o/deps/yoml"
-        )
-
-        target_compile_options(h2o PRIVATE
-                -Wno-all -Wno-extra
-                -Wno-shadow
-                -Wno-deprecated-declarations
-                -Wformat
-        )
-
-        target_compile_options(h2o PUBLIC -DH2O_USE_LIBUV=0)
-        target_link_libraries(h2o PRIVATE PkgConfig::TLS)
-        target_compile_definitions(h2o PRIVATE
-                "$<$<NOT:$<BOOL:${ARCH_SUPPORTS_64BIT_ATOMICS}>>:H2O_NO_64BIT_ATOMICS>")
-endif()
 
 #
 # build libjudy
@@ -2565,8 +2431,7 @@ if(ENABLE_MQTTWEBSOCKETS)
                                                      -DRBUF_CUSTOM_MALLOC
                                                      -DMQTT_WSS_CPUSTATS)
 
-        target_include_directories(mqttwebsockets PUBLIC ${CMAKE_SOURCE_DIR}/aclk/helpers
-                                                         ${CMAKE_SOURCE_DIR}/src/web/server/h2o/libh2o/include)
+        target_include_directories(mqttwebsockets PUBLIC ${CMAKE_SOURCE_DIR}/aclk/helpers)
 
         target_link_libraries(mqttwebsockets PRIVATE libnetdata)
 
@@ -3164,7 +3029,6 @@ endif()
 add_executable(netdata
         ${NETDATA_FILES}
         "${ACLK_FILES}"
-        "$<$<BOOL:${ENABLE_H2O}>:${H2O_FILES}>"
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGODB_EXPORTING_FILES}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES}>"
         "$<$<BOOL:${OS_WINDOWS}>:${NETDATA_RES_FILES}>"
@@ -3201,7 +3065,6 @@ target_link_libraries(netdata PRIVATE
         "$<$<BOOL:${OS_MACOS}>:${IOKIT};${FOUNDATION}>"
         "$<$<BOOL:${ENABLE_SENTRY}>:sentry>"
         "$<$<BOOL:${ENABLE_WEBRTC}>:LibDataChannel::LibDataChannelStatic>"
-        "$<$<BOOL:${ENABLE_H2O}>:h2o>"
         "$<$<BOOL:${CURL_FOUND}>:PkgConfig::CURL>"
         "$<$<BOOL:${OS_WINDOWS}>:odbc32;setupapi>"
 )
@@ -3942,7 +3805,7 @@ endif()
 #
 
 install(CODE "
-        execute_process(COMMAND gzip -c \"${CMAKE_BINARY_DIR}/CMakeCache.txt\"
+        execute_process(COMMAND gzip -nc \"${CMAKE_BINARY_DIR}/CMakeCache.txt\"
                         OUTPUT_FILE \"${BUILD_INFO_CMAKE_CACHE_ARCHIVE_NAME}\"
                         WORKING_DIRECTORY \"${CMAKE_BINARY_DIR}\"
                         RESULT_VARIABLE result)

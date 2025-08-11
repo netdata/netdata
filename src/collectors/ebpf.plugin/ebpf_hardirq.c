@@ -198,11 +198,11 @@ static void hardirq_exit(void *pptr)
         return;
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
-        pthread_mutex_lock(&lock);
+        netdata_mutex_lock(&lock);
 
         ebpf_obsolete_hardirq_global(em);
 
-        pthread_mutex_unlock(&lock);
+        netdata_mutex_unlock(&lock);
         fflush(stdout);
     }
 
@@ -218,10 +218,10 @@ static void hardirq_exit(void *pptr)
         ebpf_disable_tracepoint(&hardirq_tracepoints[i]);
     }
 
-    pthread_mutex_lock(&ebpf_exit_cleanup);
+    netdata_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     ebpf_update_stats(&plugin_statistics, em);
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
+    netdata_mutex_unlock(&ebpf_exit_cleanup);
 }
 
 /*****************************************************************
@@ -508,12 +508,12 @@ static void hardirq_collector(ebpf_module_t *em)
     ebpf_hardirq_aral_init();
 
     // create chart and static dims.
-    pthread_mutex_lock(&lock);
+    netdata_mutex_lock(&lock);
     hardirq_create_charts(em->update_every);
     hardirq_create_static_dims();
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
-    pthread_mutex_unlock(&lock);
+    netdata_mutex_unlock(&lock);
 
     // loop and read from published data until ebpf plugin is closed.
     int update_every = em->update_every;
@@ -533,7 +533,7 @@ static void hardirq_collector(ebpf_module_t *em)
         if (hardirq_reader())
             break;
 
-        pthread_mutex_lock(&lock);
+        netdata_mutex_lock(&lock);
 
         // write dims now for all hitherto discovered IRQs.
         ebpf_write_begin_chart(NETDATA_EBPF_SYSTEM_GROUP, "hardirq_latency", "");
@@ -541,16 +541,16 @@ static void hardirq_collector(ebpf_module_t *em)
         hardirq_write_static_dims();
         ebpf_write_end_chart();
 
-        pthread_mutex_unlock(&lock);
+        netdata_mutex_unlock(&lock);
 
-        pthread_mutex_lock(&ebpf_exit_cleanup);
+        netdata_mutex_lock(&ebpf_exit_cleanup);
         if (running_time && !em->running_time)
             running_time = update_every;
         else
             running_time += update_every;
 
         em->running_time = running_time;
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
+        netdata_mutex_unlock(&ebpf_exit_cleanup);
     }
 }
 
@@ -598,7 +598,7 @@ static int ebpf_hardirq_load_bpf(ebpf_module_t *em)
  * @param ptr a `ebpf_module_t *`.
  * @return always NULL.
  */
-void *ebpf_hardirq_thread(void *ptr)
+void ebpf_hardirq_thread(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
@@ -622,6 +622,4 @@ void *ebpf_hardirq_thread(void *ptr)
 
 endhardirq:
     ebpf_update_disabled_plugin_stats(em);
-
-    return NULL;
 }

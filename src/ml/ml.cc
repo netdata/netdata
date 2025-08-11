@@ -18,7 +18,15 @@
 #define WORKER_TRAIN_FLUSH_MODELS      7
 
 sqlite3 *ml_db = NULL;
-static netdata_mutex_t db_mutex = NETDATA_MUTEX_INITIALIZER;
+static netdata_mutex_t db_mutex;
+
+static void __attribute__((constructor)) init_mutex(void) {
+    netdata_mutex_init(&db_mutex);
+}
+
+static void __attribute__((destructor)) destroy_mutex(void) {
+    netdata_mutex_destroy(&db_mutex);
+}
 
 typedef struct {
     // First/last entry of the dimension in DB when generating the response
@@ -954,8 +962,7 @@ ml_host_detect_once(ml_host_t *host)
     }
 }
 
-void *
-ml_detect_main(void *arg)
+void ml_detect_main(void *arg)
 {
     UNUSED(arg);
 
@@ -1000,8 +1007,6 @@ ml_detect_main(void *arg)
     }
     Cfg.training_stop = true;
     finalize_self_prepared_sql_statements();
-
-    return NULL;
 }
 
 static void ml_flush_pending_models(ml_worker_t *worker) {
@@ -1090,7 +1095,7 @@ static enum ml_worker_result ml_worker_add_existing_model(ml_worker_t *worker, m
     return ML_WORKER_RESULT_OK;
 }
 
-void *ml_train_main(void *arg) {
+void ml_train_main(void *arg) {
     ml_worker_t *worker = (ml_worker_t *) arg;
 
     char worker_name[1024];
@@ -1229,6 +1234,4 @@ void *ml_train_main(void *arg) {
         std::this_thread::sleep_for(std::chrono::microseconds{remaining_ut});
     }
     finalize_self_prepared_sql_statements();
-
-    return NULL;
 }

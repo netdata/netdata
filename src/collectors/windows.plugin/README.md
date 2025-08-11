@@ -32,6 +32,30 @@ To change a setting, remove the comment symbol (`#`) from the beginning of the l
         # PerflibADCS = yes
         # PerflibADFS = yes
         # PerflibExchange = yes
+        # PerflibNUMA = yes
+```
+
+## Update Every per Thread
+
+When the plugin is running, most threads will collect data using Netdata’s default update `every interval`. However,
+to avoid overloading the host, Netdata uses different `update every` intervals for specific threads, as shown below:
+
+| Period (seconds) | Threads                                                                          |
+|------------------|----------------------------------------------------------------------------------|
+| 5                | `PerflibHyperV`, `PerflibThermalZone`                                            |
+| 10               | `PerflibMSSQL`, `PerflibAD`, `PerflibADCS`, `PerflibADFS`, and `PerflibExchange` |
+| 30               | `PerflibServices`                                                                |
+
+To customize the update interval for a specific thread, you can set the update every value within the corresponding
+thread configuration in your `netdata.conf` file. For example, to modify the intervals for the `Object`
+and `HyperV` threads:
+
+```text
+[plugin:windows:PerflibObjects]
+        #update every = 10s
+
+[plugin:windows:PerflibHyperV]
+        #update every = 15s
 ```
 
 ## Microsoft SQL Server Integration
@@ -123,9 +147,11 @@ Add the SQL Server connection details to your `netdata.conf` file:
 [plugin:windows:PerflibMSSQL]
         driver = SQL Server
         server = 127.0.0.1\\Dev, 1433
+        instance = Dev
         #address = [protocol:]Address[,port |\pipe\pipename]
         uid = netdata_user
         pwd = 1ReallyStrongPasswordShouldBeInsertedHere
+        express = no
         # additional instances = 0
         #windows authentication = no
 ```
@@ -136,11 +162,15 @@ Configuration options:
 |--------------------------|------------------------------------------------------------------------------|
 | `driver`                 | ODBC driver used to connect to the SQL Server                                |
 | `server`                 | Server address or instance name                                              |
+| `instance`               | Instance name                                                                |
 | `address`                | Alternative to `server`; supports named pipes if the server supports them    |
 | `uid`                    | SQL Server user identifier                                                   |
 | `pwd`                    | Password for the specified user                                              |
 | `additional instances`   | Number of additional SQL Server instances to monitor                         |
 | `windows authentication` | Set to `yes` to use Windows credentials instead of SQL Server authentication |
+| `express`                | Set to `yes` when running SQL Express version                                |
+
+The `instance` option is required when Netdata pulls data from outside an MSSQL server.
 
 For more information on connection parameters, see the [Microsoft Official Documentation](https://learn.microsoft.com/en-us/sql/relational-databases/native-client/applications/using-connection-string-keywords-with-sql-server-native-client?view=sql-server-ver15&viewFallbackFrom=sql-server-ver16).
 

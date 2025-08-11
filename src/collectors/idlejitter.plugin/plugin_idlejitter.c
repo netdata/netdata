@@ -15,7 +15,7 @@ static void cpuidlejitter_main_cleanup(void *pptr) {
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
-void *cpuidlejitter_main(void *ptr) {
+void cpuidlejitter_main(void *ptr) {
     CLEANUP_FUNCTION_REGISTER(cpuidlejitter_main_cleanup) cleanup_ptr = ptr;
 
     worker_register("IDLEJITTER");
@@ -84,7 +84,5 @@ void *cpuidlejitter_main(void *ptr) {
             rrdset_done(st);
         }
     }
-
-    return NULL;
 }
 
