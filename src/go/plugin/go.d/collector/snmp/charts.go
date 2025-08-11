@@ -347,13 +347,13 @@ func (c *Collector) addProfileScalarMetricChart(m ddsnmp.Metric) {
 		chart.Labels = append(chart.Labels, module.Label{Key: k, Value: v})
 	}
 
-	if len(m.Mappings) > 0 {
+	if len(m.MultiValue) > 0 {
 		seen := make(map[string]bool)
-		for _, v := range m.Mappings {
-			if !seen[v] {
-				seen[v] = true
-				id := fmt.Sprintf("snmp_device_prof_%s_%s", m.Name, v)
-				chart.Dims = append(chart.Dims, &module.Dim{ID: id, Name: v, Algo: module.Absolute})
+		for k := range m.MultiValue {
+			if !seen[k] {
+				seen[k] = true
+				id := fmt.Sprintf("snmp_device_prof_%s_%s", m.Name, k)
+				chart.Dims = append(chart.Dims, &module.Dim{ID: id, Name: k, Algo: module.Absolute})
 			}
 		}
 	} else {
@@ -411,13 +411,13 @@ func (c *Collector) addProfileTableMetricChart(m ddsnmp.Metric) {
 		chart.Labels = append(chart.Labels, module.Label{Key: k, Value: v})
 	}
 
-	if len(m.Mappings) > 0 {
+	if len(m.MultiValue) > 0 {
 		seen := make(map[string]bool)
-		for _, v := range m.Mappings {
-			if !seen[v] {
-				seen[v] = true
-				id := fmt.Sprintf("snmp_device_prof_%s_%s", key, v)
-				chart.Dims = append(chart.Dims, &module.Dim{ID: id, Name: v, Algo: module.Absolute})
+		for k := range m.MultiValue {
+			if !seen[k] {
+				seen[k] = true
+				id := fmt.Sprintf("snmp_device_prof_%s_%s", key, k)
+				chart.Dims = append(chart.Dims, &module.Dim{ID: id, Name: k, Algo: module.Absolute})
 			}
 		}
 	} else {

@@ -16,9 +16,11 @@ trap dump_log EXIT
 export NETDATA_LIBEXEC_PREFIX="${NETDATA_INSTALL_PATH}/usr/libexec/netdata"
 export NETDATA_SKIP_LIBEXEC_PARTS="freeipmi|xenstat|cups"
 
-if [ "$(uname -m)" != "x86_64" ]; then
-    export NETDATA_SKIP_LIBEXEC_PARTS="${NETDATA_SKIP_LIBEXEC_PARTS}|ebpf"
-fi
+case "${BUILDARCH}" in
+    x86_64) ;;
+    armv6l) NETDATA_SKIP_LIBEXEC_PARTS="${NETDATA_SKIP_LIBEXEC_PARTS}|ebpf|otel|systemd-journal" ;;
+    *) NETDATA_SKIP_LIBEXEC_PARTS="${NETDATA_SKIP_LIBEXEC_PARTS}|ebpf" ;;
+esac
 
 "${NETDATA_INSTALL_PATH}/bin/netdata" -D > ./netdata.log 2>&1 &
 

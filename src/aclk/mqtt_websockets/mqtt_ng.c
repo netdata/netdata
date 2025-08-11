@@ -2125,7 +2125,8 @@ int handle_incoming_traffic(struct mqtt_ng_client *client)
 
         case MQTT_CPT_PINGRESP:
             worker_is_busy(WORKER_ACLK_CPT_PINGRESP);
-            pulse_aclk_sent_message_acked(ping_frag.sent_monotonic_ut, ping_frag.len);
+            usec_t latency = now_monotonic_usec() - ping_frag.sent_monotonic_ut;
+            pulse_aclk_sent_message_acked(latency, ping_frag.len);
             break;
 
         case MQTT_CPT_SUBACK:

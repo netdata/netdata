@@ -228,7 +228,7 @@ metrics:
             {{- with get $config "desc" -}}{{- setDesc $.Metric . -}}{{- end -}}
             {{- with get $config "unit" -}}{{- setUnit $.Metric . -}}{{- end -}}
             {{- with get $config "divisor" -}}{{- setValue $.Metric (int64 (div (float64 $.Value) .)) -}}{{- end -}}
-            {{- with get $config "mapping" -}}{{- setMappings $.Metric . -}}{{- end -}}
+            {{- with get $config "mapping" -}}{{- setMultivalue $.Metric . -}}{{- end -}}
           {{- end -}}
     metric_tags:
       - tag: sensor_name
