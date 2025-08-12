@@ -123,7 +123,7 @@ Additionally, enable the [Query Store](https://learn.microsoft.com/en-us/sql/rel
 DECLARE @dbname NVARCHAR(max)
 DECLARE nd_user_cursor CURSOR FOR SELECT name
                                   FROM master.dbo.sysdatabases
-                                  WHERE name NOT IN ('master', 'tempdb')
+                                  WHERE name NOT IN ('master')
 
 OPEN nd_user_cursor
 FETCH NEXT FROM nd_user_cursor INTO @dbname
