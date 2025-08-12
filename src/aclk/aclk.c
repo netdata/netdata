@@ -840,6 +840,8 @@ void aclk_main(void *ptr)
     worker_register_job_name(WORKER_ACLK_SEND_FRAGMENT, "send fragment");
     worker_register_job_name(WORKER_ACLK_MSG_CALLBACK, "msg callback");
     worker_register_job_name(WORKER_ACLK_WAITING_TO_CONNECT, "conn wait");
+    worker_register_job_name(WORKER_ACLK_RECLAIM_MEMORY, "reclaim");
+    worker_register_job_name(WORKER_ACLK_BUFFER_COMPACT, "compact");
 
     ACLK_PROXY_TYPE proxy_type;
     aclk_get_proxy(&proxy_type, false);
