@@ -1187,6 +1187,8 @@ static int mark_packet_acked(struct mqtt_ng_client *client, uint16_t packet_id)
                 spinlock_unlock(&client->pending_packets.spinlock);
                 return 1;
             }
+            // Do not reprocess this packet
+            frag->packet_id = 0;
             usec_t latency = now_monotonic_usec() - frag->sent_monotonic_ut;
             pulse_aclk_sent_message_acked(latency, frag->len);
             __atomic_store_n(&publish_latency, latency, __ATOMIC_RELEASE);
