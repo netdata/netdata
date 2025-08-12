@@ -54,6 +54,24 @@
 const MODEL_DEFINITIONS = {
   // ==================== OPENAI MODELS ====================
   
+  // GPT-5 Series (Latest Models)
+  'gpt-5': { 
+    contextWindow: 128000, 
+    pricing: { input: 1.25, cacheRead: 0.125, output: 10.00 } 
+  },
+  'gpt-5-mini': { 
+    contextWindow: 128000, 
+    pricing: { input: 0.25, cacheRead: 0.025, output: 2.00 } 
+  },
+  'gpt-5-nano': { 
+    contextWindow: 128000, 
+    pricing: { input: 0.05, cacheRead: 0.005, output: 0.40 } 
+  },
+  'gpt-5-chat-latest': { 
+    contextWindow: 128000, 
+    pricing: { input: 1.25, cacheRead: 0.125, output: 10.00 } 
+  },
+  
   // GPT-4o Series
   'gpt-4o': { 
     contextWindow: 128000, 
@@ -81,50 +99,63 @@ const MODEL_DEFINITIONS = {
   },
   'chatgpt-4o-latest': { 
     contextWindow: 128000, 
-    pricing: { input: 5.00, cacheRead: 2.50, output: 15.00 } 
+    pricing: { input: 5.00, cacheRead: 0.00, output: 15.00 }  // Legacy model
   },
   
-  // GPT-4 Turbo Series
+  // GPT-4 Turbo Series (Legacy)
   'gpt-4-turbo': { 
     contextWindow: 128000, 
-    pricing: { input: 10.00, cacheRead: 5.00, output: 30.00 } 
+    pricing: { input: 10.00, cacheRead: 0.00, output: 30.00 } 
   },
   'gpt-4-turbo-preview': { 
     contextWindow: 128000, 
-    pricing: { input: 10.00, cacheRead: 5.00, output: 30.00 } 
+    pricing: { input: 10.00, cacheRead: 0.00, output: 30.00 } 
   },
   'gpt-4-turbo-2024-04-09': { 
     contextWindow: 128000, 
-    pricing: { input: 10.00, cacheRead: 5.00, output: 30.00 } 
+    pricing: { input: 10.00, cacheRead: 0.00, output: 30.00 } 
   },
   'gpt-4-0125-preview': { 
     contextWindow: 128000, 
-    pricing: { input: 10.00, cacheRead: 5.00, output: 30.00 } 
+    pricing: { input: 10.00, cacheRead: 0.00, output: 30.00 } 
   },
   'gpt-4-1106-preview': { 
     contextWindow: 128000, 
-    pricing: { input: 10.00, cacheRead: 5.00, output: 30.00 } 
+    pricing: { input: 10.00, cacheRead: 0.00, output: 30.00 } 
   },
   
-  // GPT-4 Original
+  // GPT-4 Original (Legacy)
   'gpt-4': { 
     contextWindow: 8192, 
-    pricing: { input: 30.00, cacheRead: 15.00, output: 60.00 } 
+    pricing: { input: 30.00, cacheRead: 0.00, output: 60.00 } 
   },
   'gpt-4-0613': { 
     contextWindow: 8192, 
-    pricing: { input: 30.00, cacheRead: 15.00, output: 60.00 } 
+    pricing: { input: 30.00, cacheRead: 0.00, output: 60.00 } 
   },
+  'gpt-4-0314': { 
+    contextWindow: 8192, 
+    pricing: { input: 30.00, cacheRead: 0.00, output: 60.00 } 
+  },
+  // GPT-4-32k models - Legacy (very expensive)
+  // 'gpt-4-32k': { 
+  //   contextWindow: 32768, 
+  //   pricing: { input: 60.00, cacheRead: 0.00, output: 120.00 } 
+  // },
+  // 'gpt-4-32k-0613': { 
+  //   contextWindow: 32768, 
+  //   pricing: { input: 60.00, cacheRead: 0.00, output: 120.00 } 
+  // },
   
-  // GPT-4.5 Series (Being deprecated)
-  'gpt-4.5-preview': { 
-    contextWindow: 128000, 
-    pricing: { input: 75.00, cacheRead: 37.50, output: 150.00 } 
-  },
-  'gpt-4.5-preview-2025-02-27': { 
-    contextWindow: 128000, 
-    pricing: { input: 75.00, cacheRead: 37.50, output: 150.00 } 
-  },
+  // GPT-4.5 Series - DEPRECATED (Not in current pricing)
+  // 'gpt-4.5-preview': { 
+  //   contextWindow: 128000, 
+  //   pricing: { input: 75.00, cacheRead: 37.50, output: 150.00 } 
+  // },
+  // 'gpt-4.5-preview-2025-02-27': { 
+  //   contextWindow: 128000, 
+  //   pricing: { input: 75.00, cacheRead: 37.50, output: 150.00 } 
+  // },
   
   // GPT-4.1 Series (New models with 1M context)
   'gpt-4.1': { 
@@ -155,27 +186,39 @@ const MODEL_DEFINITIONS = {
   // GPT-3.5 Turbo Series
   'gpt-3.5-turbo': { 
     contextWindow: 16384, 
-    pricing: { input: 0.50, cacheRead: 0.25, output: 1.50 } 
+    pricing: { input: 0.50, cacheRead: 0.00, output: 1.50 } 
   },
   'gpt-3.5-turbo-16k': { 
     contextWindow: 16384, 
-    pricing: { input: 3.00, cacheRead: 1.50, output: 4.00 } 
+    pricing: { input: 3.00, cacheRead: 0.00, output: 4.00 }  // Legacy
+  },
+  'gpt-3.5-turbo-16k-0613': { 
+    contextWindow: 16384, 
+    pricing: { input: 3.00, cacheRead: 0.00, output: 4.00 }  // Legacy
   },
   'gpt-3.5-turbo-0125': { 
     contextWindow: 16384, 
-    pricing: { input: 0.50, cacheRead: 0.25, output: 1.50 } 
+    pricing: { input: 0.50, cacheRead: 0.00, output: 1.50 } 
   },
   'gpt-3.5-turbo-1106': { 
     contextWindow: 16384, 
-    pricing: { input: 1.00, cacheRead: 0.50, output: 2.00 } 
+    pricing: { input: 1.00, cacheRead: 0.00, output: 2.00 } 
+  },
+  'gpt-3.5-turbo-0613': { 
+    contextWindow: 4096, 
+    pricing: { input: 1.50, cacheRead: 0.00, output: 2.00 }  // Legacy
+  },
+  'gpt-3.5-turbo-0301': { 
+    contextWindow: 4096, 
+    pricing: { input: 1.50, cacheRead: 0.00, output: 2.00 }  // Legacy
   },
   'gpt-3.5-turbo-instruct': { 
     contextWindow: 4096, 
-    pricing: { input: 1.50, cacheRead: 0.75, output: 2.00 } 
+    pricing: { input: 1.50, cacheRead: 0.00, output: 2.00 } 
   },
   'gpt-3.5-turbo-instruct-0914': { 
     contextWindow: 4096, 
-    pricing: { input: 1.50, cacheRead: 0.75, output: 2.00 } 
+    pricing: { input: 1.50, cacheRead: 0.00, output: 2.00 } 
   },
   
   
@@ -202,7 +245,11 @@ const MODEL_DEFINITIONS = {
   // Legacy Models
   'davinci-002': { 
     contextWindow: 16384, 
-    pricing: { input: 2.00, cacheRead: 1.00, output: 2.00 } 
+    pricing: { input: 2.00, cacheRead: 0.00, output: 2.00 } 
+  },
+  'babbage-002': { 
+    contextWindow: 16384, 
+    pricing: { input: 0.40, cacheRead: 0.00, output: 0.40 } 
   },
   
   // o1 Series (Reasoning Models) - use /v1/responses endpoint, no tool support
@@ -268,6 +315,12 @@ const MODEL_DEFINITIONS = {
     endpoint: 'responses',
     supportsTools: true
   },
+  'o3-deep-research': { 
+    contextWindow: 200000, 
+    pricing: { input: 10.00, cacheRead: 2.50, output: 40.00 },
+    endpoint: 'responses',
+    supportsTools: true
+  },
   'o3-mini': { 
     contextWindow: 200000, 
     pricing: { input: 1.10, cacheRead: 0.55, output: 4.40 },
@@ -302,6 +355,10 @@ const MODEL_DEFINITIONS = {
     contextWindow: 200000, 
     pricing: { input: 1.10, cacheRead: 0.275, output: 4.40 } 
   },
+  'o4-mini-deep-research': { 
+    contextWindow: 200000, 
+    pricing: { input: 2.00, cacheRead: 0.50, output: 8.00 } 
+  },
   
   // Specialized Models
   'codex-mini-latest': { 
@@ -315,6 +372,30 @@ const MODEL_DEFINITIONS = {
   'computer-use-preview-2025-03-11': { 
     contextWindow: 128000, 
     pricing: { input: 3.00, cacheRead: 0.00, output: 12.00 } 
+  },
+  
+  // Audio Models
+  'gpt-4o-audio-preview': { 
+    contextWindow: 128000, 
+    pricing: { input: 2.50, cacheRead: 0.00, output: 10.00 } 
+  },
+  'gpt-4o-realtime-preview': { 
+    contextWindow: 128000, 
+    pricing: { input: 5.00, cacheRead: 2.50, output: 20.00 } 
+  },
+  'gpt-4o-mini-audio-preview': { 
+    contextWindow: 128000, 
+    pricing: { input: 0.15, cacheRead: 0.00, output: 0.60 } 
+  },
+  'gpt-4o-mini-realtime-preview': { 
+    contextWindow: 128000, 
+    pricing: { input: 0.60, cacheRead: 0.30, output: 2.40 } 
+  },
+  
+  // Image Model
+  'gpt-image-1': { 
+    contextWindow: 128000, 
+    pricing: { input: 5.00, cacheRead: 1.25, output: 0.00 } 
   },
   
   // ==================== ANTHROPIC MODELS ====================
@@ -367,23 +448,23 @@ const MODEL_DEFINITIONS = {
   
   // ==================== GOOGLE GEMINI MODELS ====================
   
-  // Gemini 2.0 Series
-  'gemini-2.0-flash': { 
-    contextWindow: 1048576, 
-    pricing: { input: 0.10, output: 0.40 } 
-  },
-  'gemini-2.0-flash-001': { 
-    contextWindow: 1048576, 
-    pricing: { input: 0.10, output: 0.40 } 
-  },
-  'gemini-2.0-flash-lite': { 
-    contextWindow: 1048576, 
-    pricing: { input: 0.075, output: 0.30 } 
-  },
-  'gemini-2.0-flash-lite-001': { 
-    contextWindow: 1048576, 
-    pricing: { input: 0.075, output: 0.30 } 
-  },
+  // Gemini 2.0 Series - DEPRECATED (Not in current pricing)
+  // 'gemini-2.0-flash': { 
+  //   contextWindow: 1048576, 
+  //   pricing: { input: 0.10, output: 0.40 } 
+  // },
+  // 'gemini-2.0-flash-001': { 
+  //   contextWindow: 1048576, 
+  //   pricing: { input: 0.10, output: 0.40 } 
+  // },
+  // 'gemini-2.0-flash-lite': { 
+  //   contextWindow: 1048576, 
+  //   pricing: { input: 0.075, output: 0.30 } 
+  // },
+  // 'gemini-2.0-flash-lite-001': { 
+  //   contextWindow: 1048576, 
+  //   pricing: { input: 0.075, output: 0.30 } 
+  // },
   'gemini-2.0-flash-exp': { 
     contextWindow: 1000000, 
     pricing: { input: 0.00, output: 0.00 } // Free experimental
@@ -397,14 +478,18 @@ const MODEL_DEFINITIONS = {
     pricing: { input: 0.00, output: 0.00 } // Free experimental
   },
   
-  // Gemini 2.5 Series
-  'gemini-2.5-flash-preview': { 
-    contextWindow: 1000000, 
-    pricing: { input: 0.15, output: 0.60 } // Non-thinking output pricing
-  },
-  'gemini-2.5-pro-preview': { 
+  // Gemini 2.5 Series (Latest Models)
+  'gemini-2.5-pro': { 
     contextWindow: 2000000, 
-    pricing: { input: 1.25, output: 10.00 } // For prompts <= 200k tokens
+    pricing: { input: 1.25, output: 10.00 }  // For prompts <= 200k tokens
+  },
+  'gemini-2.5-flash': { 
+    contextWindow: 1000000, 
+    pricing: { input: 0.30, output: 2.50 }  // Text/image/video pricing
+  },
+  'gemini-2.5-flash-lite': { 
+    contextWindow: 1000000, 
+    pricing: { input: 0.10, output: 0.40 }  // Text/image/video pricing
   },
   
   // Gemini 1.5 Series
@@ -432,36 +517,36 @@ const MODEL_DEFINITIONS = {
     contextWindow: 1000000, 
     pricing: { input: 0.075, output: 0.30 } 
   },
-  'gemini-1.5-flash-8b': { 
-    contextWindow: 1000000, 
-    pricing: { input: 0.0375, output: 0.15 } // Pricing for prompts <= 128k
-  },
-  'gemini-1.5-flash-8b-001': { 
-    contextWindow: 1000000, 
-    pricing: { input: 0.0375, output: 0.15 } 
-  },
-  'gemini-1.5-flash-001-tuning': { 
-    contextWindow: 16384, 
-    pricing: { input: 0.00, output: 0.00 } // Free for tuning
-  },
+  // 'gemini-1.5-flash-8b': {  // DEPRECATED - Not in current pricing
+  //   contextWindow: 1000000, 
+  //   pricing: { input: 0.0375, output: 0.15 } // Pricing for prompts <= 128k
+  // },
+  // 'gemini-1.5-flash-8b-001': {  // DEPRECATED - Not in current pricing
+  //   contextWindow: 1000000, 
+  //   pricing: { input: 0.0375, output: 0.15 } 
+  // },
+  // 'gemini-1.5-flash-001-tuning': {  // DEPRECATED - Not in current pricing
+  //   contextWindow: 16384, 
+  //   pricing: { input: 0.00, output: 0.00 } // Free for tuning
+  // },
   
-  // Gemini 1.0 Series
-  'gemini-pro': { 
-    contextWindow: 32760, 
-    pricing: { input: 0.50, output: 1.50 } 
-  },
-  'gemini-pro-vision': { 
-    contextWindow: 32760, 
-    pricing: { input: 0.50, output: 1.50 } 
-  },
-  'gemini-1.0-pro': { 
-    contextWindow: 32760, 
-    pricing: { input: 0.50, output: 1.50 } 
-  },
-  'gemini-1.0-pro-vision-latest': { 
-    contextWindow: 12288, 
-    pricing: { input: 0.50, output: 1.50 } 
-  }
+  // Gemini 1.0 Series - DEPRECATED (Not in current pricing)
+  // 'gemini-pro': { 
+  //   contextWindow: 32760, 
+  //   pricing: { input: 0.50, output: 1.50 } 
+  // },
+  // 'gemini-pro-vision': { 
+  //   contextWindow: 32760, 
+  //   pricing: { input: 0.50, output: 1.50 } 
+  // },
+  // 'gemini-1.0-pro': { 
+  //   contextWindow: 32760, 
+  //   pricing: { input: 0.50, output: 1.50 } 
+  // },
+  // 'gemini-1.0-pro-vision-latest': { 
+  //   contextWindow: 12288, 
+  //   pricing: { input: 0.50, output: 1.50 } 
+  // }
 };
 
 const http = require('http');
