@@ -88,7 +88,11 @@ Metrics:
 | mssql.instance_bufman_iops | read, written | pages/s |
 | mssql.instance_bufman_checkpoint_pages | log | pages/s |
 | mssql.instance_bufman_page_life_expectancy | life_expectancy | seconds |
+| mssql.instance_bufman_lazy_write | lazy_write | Lazy writes/sec |
+| mssql.instance_bufman_page_lookups | page_lookups | Page lookups/sec |
 | mssql.instance_memmgr_server_memory | memory | bytes |
+| mssql.database_readonly | readonly | boolean |
+| mssql.database_state | state | boolean |
 | mssql.instance_memmgr_connection_memory_bytes | memory | bytes |
 | mssql.instance_memmgr_pending_memory_grants | pending | processes |
 | mssql.instance_memmgr_external_benefit_of_memory | benefit | bytes |
@@ -197,7 +201,7 @@ For **each SQL Server** instance you want to monitor, complete the following ste
    DECLARE @dbname NVARCHAR(max)
    DECLARE nd_user_cursor CURSOR FOR SELECT name
                        FROM master.dbo.sysdatabases
-                       WHERE name NOT IN ('master', 'tempdb')
+                       WHERE name NOT IN ('master')
 
    OPEN nd_user_cursor
    FETCH NEXT FROM nd_user_cursor INTO @dbname
