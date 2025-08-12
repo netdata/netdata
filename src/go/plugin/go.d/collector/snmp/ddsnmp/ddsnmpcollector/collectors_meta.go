@@ -325,12 +325,18 @@ func (dc *deviceMetadataCollector) processSymbolValue(cfg ddprofiledefinition.Sy
 		if sm := cfg.ExtractValueCompiled.FindStringSubmatch(val); len(sm) > 1 {
 			val = sm[1]
 		}
+		// Note: If extract_value doesn't match, we still use the original value
+		// This is intentional as extract_value is for extracting a portion of the value
 	}
 
 	if cfg.MatchPatternCompiled != nil {
-		if sm := cfg.MatchPatternCompiled.FindStringSubmatch(val); len(sm) > 0 {
-			val = replaceSubmatches(cfg.MatchValue, sm)
+		sm := cfg.MatchPatternCompiled.FindStringSubmatch(val)
+		if len(sm) == 0 {
+			// Pattern didn't match - return empty string to indicate no match
+			// When match_pattern is specified, we only use the value if it matches
+			return "", nil
 		}
+		val = replaceSubmatches(cfg.MatchValue, sm)
 	}
 
 	if v, ok := cfg.Mapping[val]; ok {
