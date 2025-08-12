@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- Clear packet id when processed from PUBACK [\#20808](https://github.com/netdata/netdata/pull/20808) ([stelfrag](https://github.com/stelfrag))
+- improve\(go.d/zfspool\): add Ubuntu zpool binary path to config [\#20806](https://github.com/netdata/netdata/pull/20806) ([ilyam8](https://github.com/ilyam8))
+- feat\(go.d/snmp\): add SNMP sysObjectID mappings for device identification [\#20805](https://github.com/netdata/netdata/pull/20805) ([ilyam8](https://github.com/ilyam8))
+- build\(deps\): bump github.com/redis/go-redis/v9 from 9.12.0 to 9.12.1 in /src/go [\#20804](https://github.com/netdata/netdata/pull/20804) ([dependabot[bot]](https://github.com/apps/dependabot))
+- feat\(go.d/ddsnmp\): sysobjectid-based metadata override support for SNMP profiles [\#20803](https://github.com/netdata/netdata/pull/20803) ([ilyam8](https://github.com/ilyam8))
 - feat\(aclk\): Add detailed pulse metrics for ACLK telemetry [\#20802](https://github.com/netdata/netdata/pull/20802) ([ktsaou](https://github.com/ktsaou))
 - fix pathvalidate non unix [\#20801](https://github.com/netdata/netdata/pull/20801) ([ilyam8](https://github.com/ilyam8))
 - Fix ping latency calculation [\#20800](https://github.com/netdata/netdata/pull/20800) ([stelfrag](https://github.com/stelfrag))
@@ -443,9 +448,6 @@
 - Switch to poll from epoll [\#20273](https://github.com/netdata/netdata/pull/20273) ([stelfrag](https://github.com/stelfrag))
 - comment metric tags that could be metrics [\#20272](https://github.com/netdata/netdata/pull/20272) ([Ancairon](https://github.com/Ancairon))
 - build\(deps\): bump golang.org/x/net from 0.39.0 to 0.40.0 in /src/go [\#20270](https://github.com/netdata/netdata/pull/20270) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/miekg/dns from 1.1.65 to 1.1.66 in /src/go [\#20268](https://github.com/netdata/netdata/pull/20268) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Update Netdata README with improved structure [\#20265](https://github.com/netdata/netdata/pull/20265) ([kanelatechnical](https://github.com/kanelatechnical))
-- Schedule journal file indexing after database file rotation [\#20264](https://github.com/netdata/netdata/pull/20264) ([stelfrag](https://github.com/stelfrag))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
