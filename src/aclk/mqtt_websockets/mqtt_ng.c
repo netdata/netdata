@@ -486,7 +486,7 @@ static void buffer_rebuild(struct header_buffer *buf)
     } while(frag);
 }
 
-static void buffer_garbage_collect(struct header_buffer *buf)
+static void buffer_garbage_collect(struct header_buffer *buf, bool main_thread)
 {
     struct buffer_fragment *frag = BUFFER_FIRST_FRAG(buf);
     while (frag) {
@@ -515,17 +515,27 @@ static void buffer_garbage_collect(struct header_buffer *buf)
 #endif
 
     memmove(buf->data, frag, buf->tail - (unsigned char *) frag);
+    if (main_thread)
+        worker_is_busy(WORKER_ACLK_BUFFER_COMPACT);
+
     buffer_rebuild(buf);
+
+    if (main_thread)
+        worker_is_idle();
 }
 
-static void transaction_buffer_garbage_collect(struct transaction_buffer *buf)
+static void transaction_buffer_garbage_collect(struct transaction_buffer *buf, bool main_thread)
 {
+    if (main_thread)
+        worker_is_busy(WORKER_ACLK_RECLAIM_MEMORY);
     // Invalidate the cached sending fragment
     // as we will move data around
     if (buf->sending_frag != &ping_frag)
         buf->sending_frag = NULL;
 
-    buffer_garbage_collect(&buf->hdr_buffer);
+    buffer_garbage_collect(&buf->hdr_buffer, main_thread);
+    if (main_thread)
+        worker_is_idle();
 }
 
 static int transaction_buffer_grow(struct transaction_buffer *buf, float rate, size_t max)
@@ -838,7 +848,7 @@ static void add_packet_to_timeout_monitor_list(struct mqtt_ng_client *client, ui
         int _rc = generator_function(&client->main_buffer, ##__VA_ARGS__);                                             \
         if (_rc == MQTT_NG_MSGGEN_BUFFER_OOM) {                                                                        \
             LOCK_HDR_BUFFER(&client->main_buffer);                                                                     \
-            transaction_buffer_garbage_collect((&client->main_buffer));                                                \
+            transaction_buffer_garbage_collect(&client->main_buffer, false);                                           \
             UNLOCK_HDR_BUFFER(&client->main_buffer);                                                                   \
             _rc = generator_function(&client->main_buffer, ##__VA_ARGS__);                                             \
             if (_rc == MQTT_NG_MSGGEN_BUFFER_OOM && client->max_mem_bytes) {                                           \
@@ -1196,7 +1206,7 @@ static int mark_packet_acked(struct mqtt_ng_client *client, uint16_t packet_id)
 
             size_t used = BUFFER_BYTES_USED(&client->main_buffer.hdr_buffer);
             if (reclaimable >= (used / 4))
-                transaction_buffer_garbage_collect(&client->main_buffer);
+                transaction_buffer_garbage_collect(&client->main_buffer, true);
 
             UNLOCK_HDR_BUFFER(&client->main_buffer);
             remove_packet_from_timeout_monitor_list_unsafe(client, packet_id);

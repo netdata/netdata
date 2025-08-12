@@ -38,5 +38,7 @@
 #define WORKER_ACLK_SEND_FRAGMENT               32
 #define WORKER_ACLK_MSG_CALLBACK                33
 #define WORKER_ACLK_WAITING_TO_CONNECT          34
+#define WORKER_ACLK_RECLAIM_MEMORY              35
+#define WORKER_ACLK_BUFFER_COMPACT              36
 
 #endif //NETDATA_ACLK_MQTT_WORKERS_H
