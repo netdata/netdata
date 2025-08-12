@@ -6,6 +6,13 @@
 
 **Merged pull requests:**
 
+- feat\(aclk\): Add detailed pulse metrics for ACLK telemetry [\#20802](https://github.com/netdata/netdata/pull/20802) ([ktsaou](https://github.com/ktsaou))
+- fix pathvalidate non unix [\#20801](https://github.com/netdata/netdata/pull/20801) ([ilyam8](https://github.com/ilyam8))
+- Fix ping latency calculation [\#20800](https://github.com/netdata/netdata/pull/20800) ([stelfrag](https://github.com/stelfrag))
+- fix\(go.d\): resolve potential toctou vulnerability in binary path validation [\#20798](https://github.com/netdata/netdata/pull/20798) ([ilyam8](https://github.com/ilyam8))
+- build\(deps\): bump golang.org/x/net from 0.42.0 to 0.43.0 in /src/go [\#20796](https://github.com/netdata/netdata/pull/20796) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/redis/go-redis/v9 from 9.11.0 to 9.12.0 in /src/go [\#20794](https://github.com/netdata/netdata/pull/20794) ([dependabot[bot]](https://github.com/apps/dependabot))
+- ci: handle boolean values in EOL API responses for newly released distros [\#20792](https://github.com/netdata/netdata/pull/20792) ([ilyam8](https://github.com/ilyam8))
 - feat\(go.d/ddsnmp\): add MultiValue for state metrics and aggregation [\#20787](https://github.com/netdata/netdata/pull/20787) ([ilyam8](https://github.com/ilyam8))
 - feat\(go.d/ddsnmp\): add metric aggregation support for SNMP profiles [\#20786](https://github.com/netdata/netdata/pull/20786) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d/ddsnmp\): respect metric tag order from profile definition [\#20784](https://github.com/netdata/netdata/pull/20784) ([ilyam8](https://github.com/ilyam8))
@@ -13,6 +20,7 @@
 - docs\(go.d/mysql\): add MariaDB 10.5.9+ SLAVE MONITOR privilege [\#20782](https://github.com/netdata/netdata/pull/20782) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#20781](https://github.com/netdata/netdata/pull/20781) ([netdatabot](https://github.com/netdatabot))
 - docs\(go.d/memcached\): add UNIX socket access prerequisite [\#20780](https://github.com/netdata/netdata/pull/20780) ([ilyam8](https://github.com/ilyam8))
+- Virtual node version adjustment [\#20777](https://github.com/netdata/netdata/pull/20777) ([stelfrag](https://github.com/stelfrag))
 - Add Debian 13 to CI and package builds. [\#20776](https://github.com/netdata/netdata/pull/20776) ([Ferroin](https://github.com/Ferroin))
 - Aclk improvements [\#20775](https://github.com/netdata/netdata/pull/20775) ([stelfrag](https://github.com/stelfrag))
 - Fix MSSQL Charts [\#20774](https://github.com/netdata/netdata/pull/20774) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -23,6 +31,7 @@
 - chore\(go.d/snmp\): add \_net\_default\_iface\_ip host label [\#20768](https://github.com/netdata/netdata/pull/20768) ([ilyam8](https://github.com/ilyam8))
 - Add default iface info to host labels [\#20767](https://github.com/netdata/netdata/pull/20767) ([stelfrag](https://github.com/stelfrag))
 - Fix packet timeout handling [\#20766](https://github.com/netdata/netdata/pull/20766) ([stelfrag](https://github.com/stelfrag))
+- Add OpenTelemetry plugin implementation. [\#20765](https://github.com/netdata/netdata/pull/20765) ([vkalintiris](https://github.com/vkalintiris))
 - feat\(system-info\): add default network interface IP detection [\#20764](https://github.com/netdata/netdata/pull/20764) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d\): remove patternProperties from config\_schema.json [\#20763](https://github.com/netdata/netdata/pull/20763) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d/snmp-profile\): fix extends in cradlepoint.yaml [\#20762](https://github.com/netdata/netdata/pull/20762) ([ilyam8](https://github.com/ilyam8))
@@ -437,16 +446,6 @@
 - build\(deps\): bump github.com/miekg/dns from 1.1.65 to 1.1.66 in /src/go [\#20268](https://github.com/netdata/netdata/pull/20268) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Update Netdata README with improved structure [\#20265](https://github.com/netdata/netdata/pull/20265) ([kanelatechnical](https://github.com/kanelatechnical))
 - Schedule journal file indexing after database file rotation [\#20264](https://github.com/netdata/netdata/pull/20264) ([stelfrag](https://github.com/stelfrag))
-- Minor fixes [\#20263](https://github.com/netdata/netdata/pull/20263) ([stelfrag](https://github.com/stelfrag))
-- fix\(go.d/mysql\): fix MariaDB User CPU Time [\#20262](https://github.com/netdata/netdata/pull/20262) ([ilyam8](https://github.com/ilyam8))
-- docs: reword go.d Troubleshooting section for clarity [\#20259](https://github.com/netdata/netdata/pull/20259) ([ilyam8](https://github.com/ilyam8))
-- Clearify the path of `plugins.d/go.d.plugin` in docs [\#20258](https://github.com/netdata/netdata/pull/20258) ([n0099](https://github.com/n0099))
-- Update documentation for native DEB/RPM packages [\#20257](https://github.com/netdata/netdata/pull/20257) ([kanelatechnical](https://github.com/kanelatechnical))
-- fix\(go.d/sd/snmp\): fix snmnpv3 again [\#20256](https://github.com/netdata/netdata/pull/20256) ([ilyam8](https://github.com/ilyam8))
-- chore\(go.d/snmp\): make enable\_profiles configurable \(needed for dev\) [\#20255](https://github.com/netdata/netdata/pull/20255) ([ilyam8](https://github.com/ilyam8))
-- fix obsolete chart cleanup to properly handle vnodes [\#20254](https://github.com/netdata/netdata/pull/20254) ([ilyam8](https://github.com/ilyam8))
-- docs: fix license link and remove GH alerts syntax from FAQ [\#20252](https://github.com/netdata/netdata/pull/20252) ([ilyam8](https://github.com/ilyam8))
-- Update Netdata README [\#20251](https://github.com/netdata/netdata/pull/20251) ([kanelatechnical](https://github.com/kanelatechnical))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
