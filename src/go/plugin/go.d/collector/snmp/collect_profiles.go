@@ -84,6 +84,7 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, pms []*ddsnm
 	for key := range c.seenTableMetrics {
 		if !seen[key] {
 			delete(c.seenTableMetrics, key)
+			c.removeProfileTableMetricChart(key)
 		}
 	}
 }

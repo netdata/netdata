@@ -5,7 +5,6 @@ package snmp
 import (
 	"context"
 	_ "embed"
-	"errors"
 	"fmt"
 
 	"github.com/gosnmp/gosnmp"
@@ -60,9 +59,9 @@ func New() *Collector {
 
 		newSnmpClient: gosnmp.NewHandler,
 
-		checkMaxReps:  true,
-		collectIfMib:  true,
-		netInterfaces: make(map[string]*netInterface),
+		snmpBulkWalkOk: true,
+		netInterfaces:  make(map[string]*netInterface),
+		collectIfMib:   true,
 
 		seenScalarMetrics: make(map[string]bool),
 		seenTableMetrics:  make(map[string]bool),
@@ -85,8 +84,8 @@ type Collector struct {
 	netIfaceFilterByName matcher.Matcher
 	netIfaceFilterByType matcher.Matcher
 
-	checkMaxReps bool
-	collectIfMib bool
+	snmpBulkWalkOk bool
+	collectIfMib   bool // only for tests
 
 	netInterfaces map[string]*netInterface
 
@@ -140,14 +139,17 @@ func (c *Collector) Init(context.Context) error {
 }
 
 func (c *Collector) Check(context.Context) error {
-	mx, err := c.collect()
+	if _, err := snmpsd.GetSysInfo(c.snmpClient); err != nil {
+		return err
+	}
+	ok, err := c.adjustMaxRepetitions()
 	if err != nil {
 		return err
 	}
-
-	if len(mx) == 0 {
-		return errors.New("no metrics collected")
+	if !ok {
+		c.Warningf("SNMP bulk walk disabled: table metrics collection unavailable (device may not support GETBULK or max-repetitions adjustment failed)")
 	}
+	c.snmpBulkWalkOk = ok
 
 	return nil
 }
