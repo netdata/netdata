@@ -409,6 +409,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		profile        *ddsnmp.Profile
 		setupMock      func(m *snmpmock.MockHandler)
+		sysobjectid    string
 		expectedResult map[string]string
 		expectedError  bool
 		errorContains  string
@@ -889,6 +890,329 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 			},
 			expectedError: false,
 		},
+		"sysobjectid metadata override - single match": {
+			profile: &ddsnmp.Profile{
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metadata: ddprofiledefinition.MetadataConfig{
+						"device": ddprofiledefinition.MetadataResourceConfig{
+							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+								"vendor": {
+									Value: "Cisco",
+								},
+								"type": {
+									Value: "Firewall",
+								},
+							},
+						},
+					},
+					SysobjectIDMetadata: []ddprofiledefinition.SysobjectIDMetadataEntryConfig{
+						{
+							SysobjectID: "1.3.6.1.4.1.9.1.669",
+							Metadata: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+								"model": {
+									Value: "ASA5510",
+								},
+								"series": {
+									Value: "ASA5500",
+								},
+							},
+						},
+						{
+							SysobjectID: "1.3.6.1.4.1.9.1.670",
+							Metadata: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+								"model": {
+									Value: "ASA5520",
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock:   func(m *snmpmock.MockHandler) {},
+			sysobjectid: "1.3.6.1.4.1.9.1.669",
+			expectedResult: map[string]string{
+				"vendor": "Cisco",
+				"type":   "Firewall",
+				"model":  "ASA5510",
+				"series": "ASA5500",
+			},
+			expectedError: false,
+		},
+		"sysobjectid metadata override - multiple matches cascade": {
+			profile: &ddsnmp.Profile{
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metadata: ddprofiledefinition.MetadataConfig{
+						"device": ddprofiledefinition.MetadataResourceConfig{
+							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+								"vendor": {
+									Value: "Cisco",
+								},
+							},
+						},
+					},
+					SysobjectIDMetadata: []ddprofiledefinition.SysobjectIDMetadataEntryConfig{
+						{
+							SysobjectID: "1.3.6.1.4.1.9.*", // All Cisco devices
+							Metadata: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+								"platform": {
+									Value: "Enterprise",
+								},
+								"support": {
+									Value: "Premium",
+								},
+							},
+						},
+						{
+							SysobjectID: "1.3.6.1.4.1.9.1.*", // Cisco ASA family
+							Metadata: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+								"type": {
+									Value: "Firewall",
+								},
+								"series": {
+									Value: "ASA",
+								},
+							},
+						},
+						{
+							SysobjectID: "1.3.6.1.4.1.9.1.669", // Specific model
+							Metadata: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+								"model": {
+									Value: "ASA5510",
+								},
+								"series": {
+									Value: "ASA5500", // Override the previous series value
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock:   func(m *snmpmock.MockHandler) {},
+			sysobjectid: "1.3.6.1.4.1.9.1.669",
+			expectedResult: map[string]string{
+				"vendor":   "Cisco",
+				"platform": "Enterprise",
+				"support":  "Premium",
+				"type":     "Firewall",
+				"series":   "ASA5500", // Last match wins
+				"model":    "ASA5510",
+			},
+			expectedError: false,
+		},
+		"sysobjectid metadata with dynamic SNMP values": {
+			profile: &ddsnmp.Profile{
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metadata: ddprofiledefinition.MetadataConfig{
+						"device": ddprofiledefinition.MetadataResourceConfig{
+							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+								"vendor": {
+									Value: "Cisco",
+								},
+							},
+						},
+					},
+					SysobjectIDMetadata: []ddprofiledefinition.SysobjectIDMetadataEntryConfig{
+						{
+							SysobjectID: "1.3.6.1.4.1.9.1.669",
+							Metadata: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+								"model": {
+									Value: "ASA5510",
+								},
+								"firmware": {
+									Symbol: ddprofiledefinition.SymbolConfig{
+										OID:  "1.3.6.1.4.1.9.9.109.1.1.1.1.3.1",
+										Name: "ciscoImageVersion",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Get([]string{"1.3.6.1.4.1.9.9.109.1.1.1.1.3.1"}).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							{
+								Name:  "1.3.6.1.4.1.9.9.109.1.1.1.1.3.1",
+								Type:  gosnmp.OctetString,
+								Value: []byte("9.2(4)"),
+							},
+						},
+					}, nil,
+				)
+			},
+			sysobjectid: "1.3.6.1.4.1.9.1.669",
+			expectedResult: map[string]string{
+				"vendor":   "Cisco",
+				"model":    "ASA5510",
+				"firmware": "9.2(4)",
+			},
+			expectedError: false,
+		},
+		"sysobjectid metadata no match": {
+			profile: &ddsnmp.Profile{
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metadata: ddprofiledefinition.MetadataConfig{
+						"device": ddprofiledefinition.MetadataResourceConfig{
+							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+								"vendor": {
+									Value: "Cisco",
+								},
+								"type": {
+									Value: "Firewall",
+								},
+							},
+						},
+					},
+					SysobjectIDMetadata: []ddprofiledefinition.SysobjectIDMetadataEntryConfig{
+						{
+							SysobjectID: "1.3.6.1.4.1.9.1.669",
+							Metadata: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+								"model": {
+									Value: "ASA5510",
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock:   func(m *snmpmock.MockHandler) {},
+			sysobjectid: "1.3.6.1.4.1.9.1.700",
+			expectedResult: map[string]string{
+				"vendor": "Cisco",
+				"type":   "Firewall",
+				// No model since sysobjectid doesn't match
+			},
+			expectedError: false,
+		},
+		"sysobjectid metadata with invalid regex pattern": {
+			profile: &ddsnmp.Profile{
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metadata: ddprofiledefinition.MetadataConfig{
+						"device": ddprofiledefinition.MetadataResourceConfig{
+							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+								"vendor": {
+									Value: "Cisco",
+								},
+							},
+						},
+					},
+					SysobjectIDMetadata: []ddprofiledefinition.SysobjectIDMetadataEntryConfig{
+						{
+							SysobjectID: "1.3.6.1.4.1.9.1.[invalid", // Invalid regex
+							Metadata: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+								"model": {
+									Value: "ASA5510",
+								},
+							},
+						},
+						{
+							SysobjectID: "1.3.6.1.4.1.9.1.669", // Valid entry
+							Metadata: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+								"series": {
+									Value: "ASA5500",
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock:   func(m *snmpmock.MockHandler) {},
+			sysobjectid: "1.3.6.1.4.1.9.1.669",
+			expectedResult: map[string]string{
+				"vendor": "Cisco",
+				"series": "ASA5500", // Valid entry still processes
+			},
+			expectedError: false,
+		},
+		"sysobjectid metadata overrides base metadata field": {
+			profile: &ddsnmp.Profile{
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metadata: ddprofiledefinition.MetadataConfig{
+						"device": ddprofiledefinition.MetadataResourceConfig{
+							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+								"vendor": {
+									Value: "Generic",
+								},
+								"type": {
+									Value: "Unknown",
+								},
+								"model": {
+									Value: "Generic Model",
+								},
+							},
+						},
+					},
+					SysobjectIDMetadata: []ddprofiledefinition.SysobjectIDMetadataEntryConfig{
+						{
+							SysobjectID: "1.3.6.1.4.1.9.1.669",
+							Metadata: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+								"vendor": {
+									Value: "Cisco Systems", // Override generic vendor
+								},
+								"model": {
+									Value: "ASA5510", // Override generic model
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock:   func(m *snmpmock.MockHandler) {},
+			sysobjectid: "1.3.6.1.4.1.9.1.669",
+			expectedResult: map[string]string{
+				"vendor": "Cisco Systems", // Overridden
+				"type":   "Unknown",       // Not overridden
+				"model":  "ASA5510",       // Overridden
+			},
+			expectedError: false,
+		},
+		"sysobjectid metadata with SNMP fetch error continues": {
+			profile: &ddsnmp.Profile{
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metadata: ddprofiledefinition.MetadataConfig{
+						"device": ddprofiledefinition.MetadataResourceConfig{
+							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+								"vendor": {
+									Value: "Cisco",
+								},
+							},
+						},
+					},
+					SysobjectIDMetadata: []ddprofiledefinition.SysobjectIDMetadataEntryConfig{
+						{
+							SysobjectID: "1.3.6.1.4.1.9.1.669",
+							Metadata: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+								"model": {
+									Value: "ASA5510",
+								},
+								"firmware": {
+									Symbol: ddprofiledefinition.SymbolConfig{
+										OID:  "1.3.6.1.4.1.9.9.109.1.1.1.1.3.1",
+										Name: "ciscoImageVersion",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Get([]string{"1.3.6.1.4.1.9.9.109.1.1.1.1.3.1"}).Return(
+					nil,
+					errors.New("SNMP timeout"),
+				)
+			},
+			sysobjectid: "1.3.6.1.4.1.9.1.669",
+			expectedResult: map[string]string{
+				"vendor": "Cisco",
+				"model":  "ASA5510", // Static value still applied despite SNMP error
+			},
+			expectedError: false, // Should continue with partial data
+		},
 	}
 
 	for name, tc := range tests {
@@ -900,7 +1224,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 			tc.setupMock(mockHandler)
 
 			missingOIDs := make(map[string]bool)
-			collector := newDeviceMetadataCollector(mockHandler, missingOIDs, logger.New())
+			collector := newDeviceMetadataCollector(mockHandler, missingOIDs, logger.New(), tc.sysobjectid)
 
 			result, err := collector.Collect(tc.profile)
 
