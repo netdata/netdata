@@ -1213,6 +1213,226 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 			},
 			expectedError: false, // Should continue with partial data
 		},
+		"os_name with multiple symbols and match_pattern fallback": {
+			profile: &ddsnmp.Profile{
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metadata: ddprofiledefinition.MetadataConfig{
+						"device": ddprofiledefinition.MetadataResourceConfig{
+							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+								"vendor": {
+									Value: "Cisco",
+								},
+								"os_name": {
+									Symbols: []ddprofiledefinition.SymbolConfig{
+										{
+											OID:                  "1.3.6.1.2.1.1.1.0",
+											Name:                 "sysDescr",
+											MatchPatternCompiled: mustCompileRegex(`Cisco Internetwork Operating System Software`),
+											MatchValue:           "IOS",
+										},
+										{
+											OID:                  "1.3.6.1.2.1.1.1.0",
+											Name:                 "sysDescr",
+											MatchPatternCompiled: mustCompileRegex(`Cisco IOS Software`),
+											MatchValue:           "IOS",
+										},
+										{
+											OID:                  "1.3.6.1.2.1.1.1.0",
+											Name:                 "sysDescr",
+											MatchPatternCompiled: mustCompileRegex(`Cisco NX-OS`),
+											MatchValue:           "NXOS",
+										},
+										{
+											OID:                  "1.3.6.1.2.1.1.1.0",
+											Name:                 "sysDescr",
+											MatchPatternCompiled: mustCompileRegex(`Cisco IOS XR`),
+											MatchValue:           "IOSXR",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.1.0"}).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							{
+								Name:  "1.3.6.1.2.1.1.1.0",
+								Type:  gosnmp.OctetString,
+								Value: []byte("Cisco NX-OS(tm) m9100, Software (m9100-s2ek9-mz), Version 4.1(1c), RELEASE SOFTWARE Copyright (c) 2002-2008 by Cisco Systems, Inc. Compiled 11/24/2008 18:00:00"),
+							},
+						},
+					}, nil,
+				)
+			},
+			expectedResult: map[string]string{
+				"vendor":  "Cisco",
+				"os_name": "NXOS", // Should match the third pattern and use its match_value
+			},
+			expectedError: false,
+		},
+		"os_name with multiple symbols - no match fallback": {
+			profile: &ddsnmp.Profile{
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metadata: ddprofiledefinition.MetadataConfig{
+						"device": ddprofiledefinition.MetadataResourceConfig{
+							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+								"vendor": {
+									Value: "Juniper",
+								},
+								"os_name": {
+									Symbols: []ddprofiledefinition.SymbolConfig{
+										{
+											OID:                  "1.3.6.1.2.1.1.1.0",
+											Name:                 "sysDescr",
+											MatchPatternCompiled: mustCompileRegex(`Cisco IOS Software`),
+											MatchValue:           "IOS",
+										},
+										{
+											OID:                  "1.3.6.1.2.1.1.1.0",
+											Name:                 "sysDescr",
+											MatchPatternCompiled: mustCompileRegex(`Cisco NX-OS`),
+											MatchValue:           "NXOS",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.1.0"}).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							{
+								Name:  "1.3.6.1.2.1.1.1.0",
+								Type:  gosnmp.OctetString,
+								Value: []byte("Juniper Networks, Inc. mx960 internet router, kernel JUNOS 12.3R3.4"),
+							},
+						},
+					}, nil,
+				)
+			},
+			expectedResult: map[string]string{
+				"vendor": "Juniper",
+				// os_name should not be set since no patterns match
+			},
+			expectedError: false,
+		},
+		"os_name with single symbol and match_pattern - no match": {
+			profile: &ddsnmp.Profile{
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metadata: ddprofiledefinition.MetadataConfig{
+						"device": ddprofiledefinition.MetadataResourceConfig{
+							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+								"vendor": {
+									Value: "Generic",
+								},
+								"os_name": {
+									Symbol: ddprofiledefinition.SymbolConfig{
+										OID:                  "1.3.6.1.2.1.1.1.0",
+										Name:                 "sysDescr",
+										MatchPatternCompiled: mustCompileRegex(`Cisco IOS Software`),
+										MatchValue:           "IOS",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.1.0"}).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							{
+								Name:  "1.3.6.1.2.1.1.1.0",
+								Type:  gosnmp.OctetString,
+								Value: []byte("Some other device description"),
+							},
+						},
+					}, nil,
+				)
+			},
+			expectedResult: map[string]string{
+				"vendor": "Generic",
+				// os_name should not be set since pattern doesn't match
+			},
+			expectedError: false,
+		},
+		"mixed fields with match_pattern and extract_value": {
+			profile: &ddsnmp.Profile{
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metadata: ddprofiledefinition.MetadataConfig{
+						"device": ddprofiledefinition.MetadataResourceConfig{
+							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+								"vendor": {
+									Value: "Cisco",
+								},
+								"version": {
+									Symbol: ddprofiledefinition.SymbolConfig{
+										OID:                  "1.3.6.1.2.1.1.1.0",
+										Name:                 "sysDescr",
+										ExtractValueCompiled: mustCompileRegex(`Version\s+([a-zA-Z0-9.()\[\]]+)`),
+									},
+								},
+								"model": {
+									Symbol: ddprofiledefinition.SymbolConfig{
+										OID:                  "1.3.6.1.2.1.1.1.0",
+										Name:                 "sysDescr",
+										ExtractValueCompiled: mustCompileRegex(`Software\s+\(([-a-zA-Z0-9_ ]+)\)`),
+									},
+								},
+								"os_name": {
+									Symbols: []ddprofiledefinition.SymbolConfig{
+										{
+											OID:                  "1.3.6.1.2.1.1.1.0",
+											Name:                 "sysDescr",
+											MatchPatternCompiled: mustCompileRegex(`Cisco IOS Software`),
+											MatchValue:           "IOS",
+										},
+										{
+											OID:                  "1.3.6.1.2.1.1.1.0",
+											Name:                 "sysDescr",
+											MatchPatternCompiled: mustCompileRegex(`Cisco IOS XR Software`),
+											MatchValue:           "IOSXR",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.1.0"}).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							{
+								Name:  "1.3.6.1.2.1.1.1.0",
+								Type:  gosnmp.OctetString,
+								Value: []byte("Cisco IOS XR Software (Cisco ASR9K Series), Version 4.2.3[Default] Copyright (c) 2013 by Cisco Systems, Inc."),
+							},
+						},
+					}, nil,
+				)
+			},
+			expectedResult: map[string]string{
+				"vendor":  "Cisco",
+				"version": "4.2.3[Default]",     // Extracted using extract_value
+				"model":   "Cisco ASR9K Series", // Extracted using extract_value
+				"os_name": "IOSXR",              // Matched second pattern
+			},
+			expectedError: false,
+		},
 	}
 
 	for name, tc := range tests {
