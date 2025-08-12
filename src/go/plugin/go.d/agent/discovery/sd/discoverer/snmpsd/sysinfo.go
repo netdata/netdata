@@ -216,7 +216,7 @@ func PduToString(pdu gosnmp.SnmpPDU) (string, error) {
 		}
 		return strings.TrimPrefix(v, "."), nil
 	default:
-		return "", fmt.Errorf("unussported type: '%v'", pdu.Type)
+		return "", fmt.Errorf("unsupported type: '%v'", pdu.Type)
 	}
 }
 
