@@ -242,28 +242,33 @@ static void pluginsd_main_cleanup(void *pptr) {
 }
 
 static bool is_plugin(char *dst, size_t dst_size, const char *filename) {
-    size_t len = strlen(filename);
-
-    const char *suffix;
-    size_t suffix_len;
-
-    suffix = ".plugin";
-    suffix_len = strlen(suffix);
-    if (len > suffix_len &&
-        strcmp(suffix, &filename[len - suffix_len]) == 0) {
-        snprintfz(dst, dst_size, "%.*s", (int)(len - suffix_len), filename);
-        return true;
-    }
-
 #if defined(OS_WINDOWS)
-    suffix = ".plugin.exe";
-    suffix_len = strlen(suffix);
-    if (len > suffix_len &&
-        strcmp(suffix, &filename[len - suffix_len]) == 0) {
-        snprintfz(dst, dst_size, "%.*s", (int)(len - suffix_len), filename);
-        return true;
-    }
+    const char *suffixes[] = {
+        ".plugin.exe",
+        "_plugin.exe",
+        "-plugin.exe",
+        NULL
+    };
+#else
+    const char *suffixes[] = {
+        ".plugin",
+        "_plugin",
+        "-plugin",
+        NULL
+    };
 #endif
+
+    size_t filename_len = strlen(filename);
+
+    for (int i = 0; suffixes[i] != NULL; i++) {
+        size_t suffix_len = strlen(suffixes[i]);
+
+        if (filename_len > suffix_len &&
+            strcmp(suffixes[i], &filename[filename_len - suffix_len]) == 0) {
+            snprintfz(dst, dst_size, "%.*s", (int)(filename_len - suffix_len), filename);
+            return true;
+        }
+    }
 
     return false;
 }

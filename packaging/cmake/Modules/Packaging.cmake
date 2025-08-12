@@ -330,6 +330,28 @@ set(CPACK_DEBIAN_PLUGIN-NETWORK-VIEWER_PACKAGE_CONTROL_EXTRA
 set(CPACK_DEBIAN_PLUGIN-NETWORK-VIEWER_DEBUGINFO_PACKAGE On)
 
 #
+# otel.plugin
+#
+
+set(CPACK_COMPONENT_PLUGIN-OTEL_DEPENDS "netdata")
+set(CPACK_COMPONENT_PLUGIN-OTEL_DESCRIPTION
+		"The OpenTelemetry collection plugin for the Netdata Agent
+ This plugin allows the Netdata Agent to collect metrics and logs via
+ OpenTelemetry gRPC protocol, providing integration with modern observability
+ stacks.")
+
+set(CPACK_DEBIAN_PLUGIN-OTEL_PACKAGE_NAME "netdata-plugin-otel")
+set(CPACK_DEBIAN_PLUGIN-OTEL_PACKAGE_SECTION "net")
+set(CPACK_DEBIAN_PLUGIN-OTEL_PACKAGE_CONFLICTS "netdata (<< 1.40)")
+set(CPACK_DEBIAN_PLUGIN-OTEL_PACKAGE_PREDEPENDS "adduser")
+
+set(CPACK_DEBIAN_PLUGIN-OTEL_PACKAGE_CONTROL_EXTRA
+	  "${PKG_FILES_PATH}/deb/plugin-otel/preinst;"
+	  "${PKG_FILES_PATH}/deb/plugin-otel/postinst")
+
+set(CPACK_DEBIAN_PLUGIN-OTEL_DEBUGINFO_PACKAGE Off)
+
+#
 # nfacct.plugin
 #
 
@@ -529,6 +551,9 @@ if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
 endif()
 if(ENABLE_PLUGIN_XENSTAT)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-xenstat")
+endif()
+if(ENABLE_PLUGIN_OTEL)
+        list(APPEND CPACK_COMPONENTS_ALL "plugin-otel")
 endif()
 
 include(CPack)

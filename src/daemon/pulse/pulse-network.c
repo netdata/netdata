@@ -92,6 +92,12 @@ static inline size_t aclk_time_histogram_slot(struct aclk_time_histogram *h, use
     return low - 1;
 }
 
+// Per-iteration PUBACK latency accumulators (microseconds)
+static uint64_t aclk_ack_count = 0;
+static uint64_t aclk_ack_sum_us = 0;
+static uint64_t aclk_ack_min_us = UINT64_MAX;
+static uint64_t aclk_ack_max_us = 0;
+
 void pulse_aclk_sent_message_acked(usec_t publish_latency, size_t len __maybe_unused) {
     if(!publish_latency) return;
 
@@ -101,6 +107,23 @@ void pulse_aclk_sent_message_acked(usec_t publish_latency, size_t len __maybe_un
     internal_fatal(slot >= _countof(aclk_time_heatmap.array), "hey!");
 
     __atomic_add_fetch(&aclk_time_heatmap.array[slot].count, 1, __ATOMIC_RELAXED);
+
+    // Track per-iteration min/avg/max in microseconds using atomics
+    __atomic_add_fetch(&aclk_ack_count, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&aclk_ack_sum_us, (uint64_t)publish_latency, __ATOMIC_RELAXED);
+
+    // atomic min update
+    uint64_t cur_min = __atomic_load_n(&aclk_ack_min_us, __ATOMIC_RELAXED);
+    while (publish_latency < cur_min &&
+           !__atomic_compare_exchange_n(&aclk_ack_min_us, &cur_min, (uint64_t)publish_latency, true, __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {
+        ;
+    }
+    // atomic max update
+    uint64_t cur_max = __atomic_load_n(&aclk_ack_max_us, __ATOMIC_RELAXED);
+    while (publish_latency > cur_max &&
+           !__atomic_compare_exchange_n(&aclk_ack_max_us, &cur_max, (uint64_t)publish_latency, true, __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {
+        ;
+    }
 }
 
 static void pulse_aclk_time_heatmap(void) {
@@ -372,5 +395,122 @@ void pulse_network_do(bool extended __maybe_unused) {
             rrddim_set_by_pointer(st_aclk_messages, rd_out, (collected_number)t.mqtt.tx_messages_sent);
             rrdset_done(st_aclk_messages);
         }
+
+        if(extended) {
+            // Bytes queued for send
+            static RRDSET *st_aclk_bytes = NULL;
+            static RRDDIM *rd_bytes = NULL;
+            if (unlikely(!st_aclk_bytes)) {
+                st_aclk_bytes = rrdset_create_localhost(
+                    "netdata",
+                    "network_aclk_send_queue_bytes",
+                    NULL,
+                    PULSE_NETWORK_CHART_FAMILY,
+                    "netdata.network_aclk_send_queue_bytes",
+                    "Netdata ACLK Send Queue Bytes",
+                    "bytes",
+                    "netdata",
+                    "pulse",
+                    PULSE_NETWORK_CHART_PRIORITY + 2,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_LINE);
+                rrdlabels_add(st_aclk_bytes->rrdlabels, "endpoint", "aclk", RRDLABEL_SRC_AUTO);
+                rd_bytes = rrddim_add(st_aclk_bytes, "bytes", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            }
+            rrddim_set_by_pointer(st_aclk_bytes, rd_bytes, (collected_number)t.mqtt.tx_bytes_queued);
+            rrdset_done(st_aclk_bytes);
+        }
+
+        if(extended) {
+            // Max wait times for PUBACK and send queue (convert us->s via divisor)
+            static RRDSET *st_aclk_puback_wait = NULL;
+            static RRDDIM *rd_puback_max = NULL;
+            if (unlikely(!st_aclk_puback_wait)) {
+                st_aclk_puback_wait = rrdset_create_localhost(
+                    "netdata",
+                    "network_aclk_puback_wait",
+                    NULL,
+                    PULSE_NETWORK_CHART_FAMILY,
+                    "netdata.network_aclk_puback_wait",
+                    "Netdata ACLK PUBACK Max Wait",
+                    "seconds",
+                    "netdata",
+                    "pulse",
+                    PULSE_NETWORK_CHART_PRIORITY + 3,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_LINE);
+                rrdlabels_add(st_aclk_puback_wait->rrdlabels, "endpoint", "aclk", RRDLABEL_SRC_AUTO);
+                rd_puback_max = rrddim_add(st_aclk_puback_wait, "max", NULL, 1, USEC_PER_SEC, RRD_ALGORITHM_ABSOLUTE);
+            }
+            rrddim_set_by_pointer(st_aclk_puback_wait, rd_puback_max, (collected_number)t.mqtt.max_puback_wait_us);
+            rrdset_done(st_aclk_puback_wait);
+        }
+
+        if(extended) {
+            static RRDSET *st_aclk_send_wait = NULL;
+            static RRDDIM *rd_overall = NULL, *rd_unsent = NULL, *rd_partial = NULL;
+            if (unlikely(!st_aclk_send_wait)) {
+                st_aclk_send_wait = rrdset_create_localhost(
+                    "netdata",
+                    "network_aclk_send_queue_wait",
+                    NULL,
+                    PULSE_NETWORK_CHART_FAMILY,
+                    "netdata.network_aclk_send_queue_wait",
+                    "Netdata ACLK Send Queue Wait (Overall/Unsent/Partial)",
+                    "seconds",
+                    "netdata",
+                    "pulse",
+                    PULSE_NETWORK_CHART_PRIORITY + 3,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_LINE);
+                rrdlabels_add(st_aclk_send_wait->rrdlabels, "endpoint", "aclk", RRDLABEL_SRC_AUTO);
+                rd_overall = rrddim_add(st_aclk_send_wait, "overall", NULL, 1, USEC_PER_SEC, RRD_ALGORITHM_ABSOLUTE);
+                rd_unsent  = rrddim_add(st_aclk_send_wait, "unsent",  NULL, 1, USEC_PER_SEC, RRD_ALGORITHM_ABSOLUTE);
+                rd_partial = rrddim_add(st_aclk_send_wait, "partial", NULL, 1, USEC_PER_SEC, RRD_ALGORITHM_ABSOLUTE);
+            }
+            rrddim_set_by_pointer(st_aclk_send_wait, rd_overall, (collected_number)t.mqtt.max_send_queue_wait_us);
+            rrddim_set_by_pointer(st_aclk_send_wait, rd_unsent,  (collected_number)t.mqtt.max_unsent_wait_us);
+            rrddim_set_by_pointer(st_aclk_send_wait, rd_partial, (collected_number)t.mqtt.max_partial_wait_us);
+            rrdset_done(st_aclk_send_wait);
+        }
+    }
+
+    // Publish PUBACK latency min/avg/max per iteration
+    {
+        static RRDSET *st_stats = NULL;
+        static RRDDIM *rd_min = NULL, *rd_avg = NULL, *rd_max = NULL;
+
+        // pull and reset accumulators
+        uint64_t count = __atomic_exchange_n(&aclk_ack_count, 0, __ATOMIC_RELAXED);
+        uint64_t sum_us = __atomic_exchange_n(&aclk_ack_sum_us, 0, __ATOMIC_RELAXED);
+        uint64_t min_us = __atomic_exchange_n(&aclk_ack_min_us, UINT64_MAX, __ATOMIC_RELAXED);
+        uint64_t max_us = __atomic_exchange_n(&aclk_ack_max_us, 0, __ATOMIC_RELAXED);
+
+        uint64_t avg_us = (count ? (sum_us / count) : 0);
+        if (min_us == UINT64_MAX) min_us = 0;
+
+        if (unlikely(!st_stats)) {
+            st_stats = rrdset_create_localhost(
+                "netdata",
+                "aclk_puback_latency_stats",
+                NULL,
+                PULSE_NETWORK_CHART_FAMILY,
+                "netdata.aclk_puback_latency_stats",
+                "Netdata ACLK PubACK Latency (Min/Avg/Max)",
+                "milliseconds",
+                "netdata",
+                "pulse",
+                PULSE_NETWORK_CHART_PRIORITY + 1,
+                localhost->rrd_update_every,
+                RRDSET_TYPE_LINE);
+            rd_min = rrddim_add(st_stats, "min", NULL, 1, USEC_PER_MS, RRD_ALGORITHM_ABSOLUTE);
+            rd_avg = rrddim_add(st_stats, "avg", NULL, 1, USEC_PER_MS, RRD_ALGORITHM_ABSOLUTE);
+            rd_max = rrddim_add(st_stats, "max", NULL, 1, USEC_PER_MS, RRD_ALGORITHM_ABSOLUTE);
+        }
+
+        rrddim_set_by_pointer(st_stats, rd_min, (collected_number)min_us);
+        rrddim_set_by_pointer(st_stats, rd_avg, (collected_number)avg_us);
+        rrddim_set_by_pointer(st_stats, rd_max, (collected_number)max_us);
+        rrdset_done(st_stats);
     }
 }

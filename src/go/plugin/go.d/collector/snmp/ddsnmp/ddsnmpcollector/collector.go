@@ -18,7 +18,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
-func New(snmpClient gosnmp.Handler, profiles []*ddsnmp.Profile, log *logger.Logger) *Collector {
+func New(snmpClient gosnmp.Handler, profiles []*ddsnmp.Profile, log *logger.Logger, sysobjectid string) *Collector {
 	coll := &Collector{
 		log:         log.With(slog.String("ddsnmp", "collector")),
 		snmpClient:  snmpClient,
@@ -34,7 +34,7 @@ func New(snmpClient gosnmp.Handler, profiles []*ddsnmp.Profile, log *logger.Logg
 	}
 
 	coll.globalTagsCollector = newGlobalTagsCollector(snmpClient, coll.missingOIDs, coll.log)
-	coll.deviceMetadataCollector = newDeviceMetadataCollector(snmpClient, coll.missingOIDs, coll.log)
+	coll.deviceMetadataCollector = newDeviceMetadataCollector(snmpClient, coll.missingOIDs, coll.log, sysobjectid)
 	coll.scalarCollector = newScalarCollector(snmpClient, coll.missingOIDs, coll.log)
 	coll.tableCollector = newTableCollector(snmpClient, coll.missingOIDs, coll.tableCache, coll.log)
 	coll.vmetricsCollector = newVirtualMetricsCollector(coll.log)
@@ -70,11 +70,11 @@ func (c *Collector) CollectDeviceMetadata() (map[string]map[string]string, error
 	meta := make(map[string]map[string]string)
 
 	for _, prof := range c.profiles {
-		dm, err := c.deviceMetadataCollector.Collect(prof.profile)
+		deviceMeta, err := c.deviceMetadataCollector.Collect(prof.profile)
 		if err != nil {
 			return nil, err
 		}
-		meta[prof.profile.SourceFile] = dm
+		meta[prof.profile.SourceFile] = deviceMeta
 	}
 
 	return meta, nil

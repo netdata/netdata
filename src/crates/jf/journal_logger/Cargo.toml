@@ -1,8 +1,0 @@
-[package]
-name = "journal_logger"
-version.workspace = true
-edition.workspace = true
-
-[dependencies]
-duct = { workspace = true }
-serde_json = { workspace = true }

@@ -1,0 +1,10 @@
+[package]
+name = "flatten_otel"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+opentelemetry-proto = { workspace = true, features = ["logs", "metrics", "with-serde"] }
+flatten-serde-json = { git = "https://github.com/meilisearch/meilisearch" }
+serde_json = { workspace = true }

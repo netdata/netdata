@@ -160,6 +160,62 @@ func ValidateEnrichMetadata(metadata MetadataConfig) []string {
 	return errors
 }
 
+func ValidateEnrichSysobjectIDMetadata(entries []SysobjectIDMetadataEntryConfig) []string {
+	var errors []string
+
+	// Track seen sysobjectids to detect duplicates
+	seenOIDs := make(map[string]int) // OID -> first occurrence index
+
+	for i, entry := range entries {
+		// Validate sysobjectid is not empty
+		if entry.SysobjectID == "" {
+			errors = append(errors, fmt.Sprintf("sysobjectid_metadata[%d]: missing sysobjectid", i))
+			continue
+		}
+
+		// Check for duplicate sysobjectids
+		if firstIdx, exists := seenOIDs[entry.SysobjectID]; exists {
+			errors = append(errors, fmt.Sprintf("sysobjectid_metadata[%d]: duplicate sysobjectid %s (first occurrence at index %d)",
+				i, entry.SysobjectID, firstIdx))
+		} else {
+			seenOIDs[entry.SysobjectID] = i
+		}
+
+		// Validate metadata fields
+		for fieldName, field := range entry.Metadata {
+			// Validate the field must have either value or symbol(s)
+			if field.Value == "" && field.Symbol.OID == "" && len(field.Symbols) == 0 {
+				errors = append(errors, fmt.Sprintf("sysobjectid_metadata[%d].%s: must have either value or symbol(s)", i, fieldName))
+			}
+
+			// Can't have both value and symbols
+			if field.Value != "" && (field.Symbol.OID != "" || len(field.Symbols) > 0) {
+				errors = append(errors, fmt.Sprintf("sysobjectid_metadata[%d].%s: cannot have both value and symbol(s)", i, fieldName))
+			}
+
+			// Validate symbols if present
+			for j := range field.Symbols {
+				symbolErrors := validateEnrichSymbol(&field.Symbols[j], MetadataSymbol)
+				for _, err := range symbolErrors {
+					errors = append(errors, fmt.Sprintf("sysobjectid_metadata[%d].%s.symbols[%d]: %s", i, fieldName, j, err))
+				}
+			}
+
+			// Validate single symbol if present
+			if field.Symbol.OID != "" {
+				symbolErrors := validateEnrichSymbol(&field.Symbol, MetadataSymbol)
+				for _, err := range symbolErrors {
+					errors = append(errors, fmt.Sprintf("sysobjectid_metadata[%d].%s.symbol: %s", i, fieldName, err))
+				}
+			}
+
+			entry.Metadata[fieldName] = field
+		}
+	}
+
+	return errors
+}
+
 func validateEnrichSymbol(symbol *SymbolConfig, symbolContext SymbolContext) []string {
 	var errors []string
 	if symbol.Name == "" {

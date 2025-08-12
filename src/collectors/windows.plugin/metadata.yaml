@@ -1835,7 +1835,7 @@ modules:
                  DECLARE @dbname NVARCHAR(max)
                  DECLARE nd_user_cursor CURSOR FOR SELECT name
                                      FROM master.dbo.sysdatabases
-                                     WHERE name NOT IN ('master', 'tempdb')
+                                     WHERE name NOT IN ('master')
 
                  OPEN nd_user_cursor
                  FETCH NEXT FROM nd_user_cursor INTO @dbname
@@ -2050,12 +2050,36 @@ modules:
               chart_type: line
               dimensions:
                 - name: life_expectancy
+            - name: mssql.instance_bufman_lazy_write
+              description: Buffers written by buffer manager's lazy writer
+              unit: Lazy writes/sec
+              chart_type: line
+              dimensions:
+                - name: lazy_write
+            - name: mssql.instance_bufman_page_lookups
+              description: Requests to find a page in the buffer pool.
+              unit: Page lookups/sec
+              chart_type: line
+              dimensions:
+                - name: page_lookups
             - name: mssql.instance_memmgr_server_memory
               description: Memory committed
               unit: bytes
               chart_type: line
               dimensions:
                 - name: memory
+            - name: mssql.database_readonly
+              description: Current database write status.
+              unit: boolean
+              chart_type: line
+              dimensions:
+                - name: readonly
+            - name: mssql.database_state
+              description: Current database state.
+              unit: boolean
+              chart_type: line
+              dimensions:
+                - name: state
             - name: mssql.instance_memmgr_connection_memory_bytes
               description: Amount of dynamic memory to maintain connections
               unit: bytes

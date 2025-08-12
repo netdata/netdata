@@ -7,7 +7,6 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/gosnmp/gosnmp"
 
@@ -31,11 +30,6 @@ func init() {
 		Create: func() module.Module { return New() },
 		Config: func() any { return &Config{} },
 	})
-
-	r := strings.NewReplacer("\"", "", "`", "", "\\", "")
-	for k, v := range orgToVendorMap {
-		orgToVendorMap[r.Replace(k)] = v
-	}
 }
 
 func New() *Collector {

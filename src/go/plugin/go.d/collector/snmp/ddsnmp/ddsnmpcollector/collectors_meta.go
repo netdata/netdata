@@ -10,6 +10,7 @@ import (
 	"github.com/gosnmp/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
@@ -145,13 +146,15 @@ type deviceMetadataCollector struct {
 	snmpClient  gosnmp.Handler
 	missingOIDs map[string]bool
 	log         *logger.Logger
+	sysobjectid string
 }
 
-func newDeviceMetadataCollector(snmpClient gosnmp.Handler, missingOIDs map[string]bool, log *logger.Logger) *deviceMetadataCollector {
+func newDeviceMetadataCollector(snmpClient gosnmp.Handler, missingOIDs map[string]bool, log *logger.Logger, sysobjectid string) *deviceMetadataCollector {
 	return &deviceMetadataCollector{
 		snmpClient:  snmpClient,
 		missingOIDs: missingOIDs,
 		log:         log,
+		sysobjectid: sysobjectid,
 	}
 }
 
@@ -160,25 +163,47 @@ func (dc *deviceMetadataCollector) Collect(prof *ddsnmp.Profile) (map[string]str
 		return nil, nil
 	}
 
+	resName := ddprofiledefinition.MetadataDeviceResource
+	cfg, ok := prof.Definition.Metadata[resName]
+	if !ok {
+		return nil, nil
+	}
+
 	meta := make(map[string]string)
 
-	for resName, cfg := range prof.Definition.Metadata {
-		if !ddprofiledefinition.IsMetadataResourceWithScalarOids(resName) {
+	if err := dc.processMetadataFields(cfg.Fields, meta); err != nil {
+		return ternary(len(meta) > 0, meta, nil), fmt.Errorf("failed to process metadata resource '%s': %w", resName, err)
+	}
+
+	if dc.sysobjectid == "" || len(prof.Definition.SysobjectIDMetadata) == 0 {
+		return meta, nil
+	}
+
+	for i, entry := range prof.Definition.SysobjectIDMetadata {
+		m, err := matcher.NewRegExpMatcher(entry.SysobjectID)
+		if err != nil {
+			dc.log.Warningf("sysobjectid_metadata[%d]: failed to compile regular expression from sysobjectid '%s': %v",
+				i, entry.SysobjectID, err)
 			continue
 		}
-
-		if err := dc.processResource(cfg, meta); err != nil {
-			return ternary(len(meta) > 0, meta, nil), fmt.Errorf("failed to process metadata resource '%s': %w", resName, err)
+		if m.MatchString(dc.sysobjectid) {
+			if err := dc.processMetadataFields(entry.Metadata, meta); err != nil {
+				dc.log.Warningf("sysobjectid_metadata[%d]: failed to process metadata fields for sysobjectid '%s': %v",
+					i, entry.SysobjectID, err)
+				continue
+			}
+			dc.log.Debugf("sysobjectid_metadata[%d]: matched sysobjectid '%s' with device OID '%s', applying metadata overrides",
+				i, entry.SysobjectID, dc.sysobjectid)
 		}
 	}
 
 	return meta, nil
 }
 
-// processResource processes a single metadata resource
-func (dc *deviceMetadataCollector) processResource(cfg ddprofiledefinition.MetadataResourceConfig, metadata map[string]string) error {
+// processMetadataFields processes a single metadata resource
+func (dc *deviceMetadataCollector) processMetadataFields(fields map[string]ddprofiledefinition.MetadataField, metadata map[string]string) error {
 	staticValues := make(map[string]string)
-	oids := dc.collectStaticAndIdentifyOIDs(cfg, staticValues)
+	oids := dc.collectStaticAndIdentifyOIDs(fields, staticValues)
 
 	for k, v := range staticValues {
 		metadata[k] = v
@@ -193,14 +218,14 @@ func (dc *deviceMetadataCollector) processResource(cfg ddprofiledefinition.Metad
 		return fmt.Errorf("failed to fetch metadata values: %w", err)
 	}
 
-	return dc.processDynamicFields(cfg, pdus, metadata)
+	return dc.processDynamicFields(fields, pdus, metadata)
 }
 
 // collectStaticAndIdentifyOIDs collects static values and returns OIDs to fetch
-func (dc *deviceMetadataCollector) collectStaticAndIdentifyOIDs(cfg ddprofiledefinition.MetadataResourceConfig, staticValues map[string]string) []string {
+func (dc *deviceMetadataCollector) collectStaticAndIdentifyOIDs(fields map[string]ddprofiledefinition.MetadataField, staticValues map[string]string) []string {
 	var oids []string
 
-	for name, field := range cfg.Fields {
+	for name, field := range fields {
 		switch {
 		case field.Value != "":
 			staticValues[name] = field.Value
@@ -246,10 +271,10 @@ func (dc *deviceMetadataCollector) fetchMetadataValues(oids []string) (map[strin
 	return pdus, nil
 }
 
-func (dc *deviceMetadataCollector) processDynamicFields(cfg ddprofiledefinition.MetadataResourceConfig, pdus map[string]gosnmp.SnmpPDU, metadata map[string]string) error {
+func (dc *deviceMetadataCollector) processDynamicFields(fields map[string]ddprofiledefinition.MetadataField, pdus map[string]gosnmp.SnmpPDU, metadata map[string]string) error {
 	var errs []error
 
-	for name, field := range cfg.Fields {
+	for name, field := range fields {
 		switch {
 		case field.Symbol.OID != "":
 			// Single symbol

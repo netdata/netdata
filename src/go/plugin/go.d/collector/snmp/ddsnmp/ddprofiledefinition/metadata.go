@@ -73,3 +73,15 @@ func NewMetadataResourceConfig() MetadataResourceConfig {
 func IsMetadataResourceWithScalarOids(resource string) bool {
 	return resource == MetadataDeviceResource
 }
+
+type SysobjectIDMetadataEntryConfig struct {
+	SysobjectID string                 `yaml:"sysobjectid"`
+	Metadata    ListMap[MetadataField] `yaml:"metadata"`
+}
+
+func (e SysobjectIDMetadataEntryConfig) Clone() SysobjectIDMetadataEntryConfig {
+	return SysobjectIDMetadataEntryConfig{
+		SysobjectID: e.SysobjectID,
+		Metadata:    CloneMap(e.Metadata),
+	}
+}

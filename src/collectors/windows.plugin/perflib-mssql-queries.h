@@ -19,10 +19,13 @@
     "SELECT counter_name, cntr_value FROM %s.sys.dm_os_performance_counters WHERE instance_name = '%s' AND counter_name IN ('Active Transactions', 'Transactions/sec', 'Write Transactions/sec', 'Backup/Restore Throughput/sec', 'Log Bytes Flushed/sec', 'Log Flushes/sec', 'Number of Deadlocks/sec', 'Lock Waits/sec', 'Lock Timeouts/sec', 'Lock Requests/sec');"
 
 #define NETDATA_QUERY_TRANSACTIONS_PER_INSTANCE_MASK                                                                                \
-    "SELECT counter_name, cntr_value FROM sys.dm_os_performance_counters WHERE (object_name like '%%Buffer Manager%%' or object_name like '%%SQL Statistics%%') AND counter_name IN ('Page reads/sec', 'Page writes/sec', 'Buffer cache hit ratio', 'Checkpoint pages/sec', 'Page life expectancy', 'SQL Compilations/sec', 'SQL Re-Compilations/sec');"
+    "SELECT counter_name, cntr_value FROM sys.dm_os_performance_counters WHERE (object_name like '%%Buffer Manager%%' or object_name like '%%SQL Statistics%%') AND counter_name IN ('Page reads/sec', 'Page writes/sec', 'Buffer cache hit ratio', 'Checkpoint pages/sec', 'Page life expectancy', 'Lazy writes/sec', 'Page Lookups/sec', 'SQL Compilations/sec', 'SQL Re-Compilations/sec');"
 
 #define NETDATA_QUERY_CHECK_PERM                                                                                       \
     "SELECT CASE WHEN IS_SRVROLEMEMBER('sysadmin') = 1 OR HAS_PERMS_BY_NAME(null, null, 'VIEW SERVER STATE') = 1 THEN 1 ELSE 0 END AS has_permission;"
+
+#define NETDATA_DB_STATES (6)
+#define NETDATA_QUERY_DATABASE_STATUS "SELECT name, state, is_read_only FROM sys.databases;"
 
 // https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-os-wait-stats-transact-sql?view=sql-server-ver16
 #define NETDATA_QUERY_CHECK_WAITS                                                                                      \
