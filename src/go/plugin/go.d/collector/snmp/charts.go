@@ -165,7 +165,7 @@ func (c *Collector) addNetIfaceCharts(iface *netInterface) {
 	charts := netIfaceChartsTmpl.Copy()
 
 	for _, chart := range *charts {
-		chart.ID = fmt.Sprintf(chart.ID, cleanIfaceName(iface.ifName))
+		chart.ID = fmt.Sprintf(chart.ID, cleanMetricName.Replace(iface.ifName))
 		chart.Labels = []module.Label{
 			{Key: "vendor", Value: c.sysInfo.Organization},
 			{Key: "sysName", Value: c.sysInfo.Name},
@@ -184,7 +184,7 @@ func (c *Collector) addNetIfaceCharts(iface *netInterface) {
 }
 
 func (c *Collector) removeNetIfaceCharts(iface *netInterface) {
-	px := fmt.Sprintf("snmp_device_net_iface_%s_", cleanIfaceName(iface.ifName))
+	px := fmt.Sprintf("snmp_device_net_iface_%s_", cleanMetricName.Replace(iface.ifName))
 	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, px) {
 			chart.MarkRemove()
@@ -315,13 +315,12 @@ func (c *Collector) addProfileScalarMetricChart(m ddsnmp.Metric) {
 		return
 	}
 
-	r := strings.NewReplacer(".", "_", " ", "_")
 	chart := &module.Chart{
-		ID:       fmt.Sprintf("snmp_device_prof_%s", r.Replace(m.Name)),
+		ID:       fmt.Sprintf("snmp_device_prof_%s", cleanMetricName.Replace(m.Name)),
 		Title:    m.Description,
 		Units:    m.Unit,
 		Fam:      m.Family,
-		Ctx:      fmt.Sprintf("snmp.device_prof_%s", r.Replace(m.Name)),
+		Ctx:      fmt.Sprintf("snmp.device_prof_%s", cleanMetricName.Replace(m.Name)),
 		Priority: prioProfileChart,
 	}
 	if chart.Title == "" {
@@ -375,13 +374,12 @@ func (c *Collector) addProfileTableMetricChart(m ddsnmp.Metric) {
 
 	key := tableMetricKey(m)
 
-	r := strings.NewReplacer(".", "_", " ", "_")
 	chart := &module.Chart{
-		ID:       fmt.Sprintf("snmp_device_prof_%s", r.Replace(key)),
+		ID:       fmt.Sprintf("snmp_device_prof_%s", cleanMetricName.Replace(key)),
 		Title:    m.Description,
 		Units:    m.Unit,
 		Fam:      m.Family,
-		Ctx:      fmt.Sprintf("snmp.device_prof_%s", r.Replace(m.Name)),
+		Ctx:      fmt.Sprintf("snmp.device_prof_%s", cleanMetricName.Replace(m.Name)),
 		Priority: prioProfileChart,
 	}
 	if chart.Title == "" {
@@ -432,6 +430,14 @@ func (c *Collector) addProfileTableMetricChart(m ddsnmp.Metric) {
 	}
 }
 
+func (c *Collector) removeProfileTableMetricChart(key string) {
+	id := fmt.Sprintf("snmp_device_prof_%s", cleanMetricName.Replace(key))
+	if chart := c.Charts().Get(id); chart != nil {
+		chart.MarkRemove()
+		chart.MarkNotCreated()
+	}
+}
+
 func dimAlgoFromDdSnmpType(m ddsnmp.Metric) module.DimAlgo {
 	switch m.MetricType {
 	case ddprofiledefinition.ProfileMetricTypeGauge,
@@ -443,7 +449,4 @@ func dimAlgoFromDdSnmpType(m ddsnmp.Metric) module.DimAlgo {
 	}
 }
 
-func cleanIfaceName(name string) string {
-	r := strings.NewReplacer(".", "_", " ", "_")
-	return r.Replace(name)
-}
+var cleanMetricName = strings.NewReplacer(".", "_", " ", "_")
