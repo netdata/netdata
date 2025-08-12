@@ -812,7 +812,9 @@ class OpenAIProvider extends LLMProvider {
             
             // Add model and other parameters
             requestBody.model = this.model;
-            requestBody.max_output_tokens = 4096;
+            // Get max tokens from chat config
+            const maxTokens = chat?.config?.model?.params?.maxTokens || 4096;
+            requestBody.max_output_tokens = maxTokens;
             requestBody.stream = false;
             requestBody.store = true;
             
@@ -831,14 +833,25 @@ class OpenAIProvider extends LLMProvider {
         } else {
             // Regular models use standard v1/chat/completions structure
             // Order fields consistently: tools → messages → model
+            const maxTokens = chat?.config?.model?.params?.maxTokens || 4096;
+            
             requestBody = {
                 tools: openaiCompletionsTools.length > 0 ? openaiCompletionsTools : undefined,
                 tool_choice: openaiCompletionsTools.length > 0 ? 'auto' : undefined,
                 messages: openaiMessages,
                 model: this.model,
-                temperature,
-                max_tokens: 4096
+                // All models using /v1/chat/completions now use max_completion_tokens
+                max_completion_tokens: maxTokens
             };
+            
+            // Some models (like GPT-5) only support default temperature
+            // Only add temperature if it's not the default value of 1.0
+            if (temperature !== 1.0) {
+                // For GPT-5, skip temperature parameter entirely if not default
+                if (!this.model.includes('gpt-5')) {
+                    requestBody.temperature = temperature;
+                }
+            }
         }
 
         this.log('sent', JSON.stringify(requestBody, null, 2), { 
@@ -1525,12 +1538,14 @@ class AnthropicProvider extends LLMProvider {
         // Order fields according to Anthropic's cache hierarchy: tools → system → messages → model
         // This ensures efficient caching as tools change least frequently, then system, then messages
         // Model comes after messages so cache can be reused across different models
+        // Get max tokens from chat config
+        const maxTokens = chat?.config?.model?.params?.maxTokens || 4096;
         const requestBody = {
             tools: anthropicTools.length > 0 ? anthropicTools : undefined,
             system,
             messages: anthropicMessages,
             model: this.model,
-            max_tokens: 4096,
+            max_tokens: maxTokens,
             temperature
         };
 
@@ -2045,9 +2060,11 @@ class GoogleProvider extends LLMProvider {
         requestBody.contents = contents;
         
         // Add generation config (includes model info implicitly via this.model in the URL)
+        // Get max tokens from chat config
+        const maxTokens = chat?.config?.model?.params?.maxTokens || 4096;
         requestBody.generationConfig = {
             temperature,
-            maxOutputTokens: 4096
+            maxOutputTokens: maxTokens
         };
 
         this.log('sent', JSON.stringify(requestBody, null, 2), { 
@@ -2568,6 +2585,10 @@ class OllamaProvider extends LLMProvider {
             };
         });
 
+        // Get max tokens and context window from chat config
+        const maxTokens = chat?.config?.model?.params?.maxTokens || 4096;
+        const contextWindow = chat?.config?.model?.params?.contextWindow || this.modelConfig?.contextWindow || 128000;
+
         // Build request body
         const requestBody = {
             model: this.model,
@@ -2575,7 +2596,8 @@ class OllamaProvider extends LLMProvider {
             temperature,
             stream: false,
             options: {
-                num_predict: 4096  // Similar to max_tokens
+                num_predict: maxTokens,  // Use configured max tokens
+                num_ctx: contextWindow   // Add context window configuration
             }
         };
         
@@ -2729,14 +2751,53 @@ class OllamaProvider extends LLMProvider {
             let contentHasToolCalls = false;
             if (data.message && data.message.content) {
                 const content = data.message.content;
-                // Check for various tool call indicators
-                if (content.includes('python_tag') || 
-                    content.includes('"type": "function"') ||
-                    (content.includes('```json') && content.includes('"tool_use"'))) {
-                    console.log('[OllamaProvider] Detected tool calls in content, parsing...', content);
-                    const parsedContent = this.parseToolCallsFromText(content, tools);
-                    contentArray.push(...parsedContent);
-                    contentHasToolCalls = true;
+                
+                // First, check if the entire content is a direct JSON tool call
+                const trimmedContent = content.trim();
+                if (trimmedContent.startsWith('{') && trimmedContent.endsWith('}')) {
+                    try {
+                        const parsed = JSON.parse(trimmedContent);
+                        // Check if it's a direct tool call format
+                        if (parsed.name && typeof parsed.name === 'string' && 
+                            parsed.arguments && typeof parsed.arguments === 'object') {
+                            console.log('[OllamaProvider] Detected direct JSON tool call:', parsed);
+                            // Validate that the tool exists
+                            const toolExists = tools.some(t => 
+                                (t.name === parsed.name) || 
+                                (t.function && t.function.name === parsed.name)
+                            );
+                            
+                            if (toolExists) {
+                                contentArray.push({
+                                    type: 'tool_use',
+                                    id: this.generateId(),
+                                    name: parsed.name,
+                                    input: parsed.arguments
+                                });
+                                contentHasToolCalls = true;
+                            } else {
+                                console.log('[OllamaProvider] Tool not found in available tools:', parsed.name);
+                                // Tool doesn't exist, treat as text
+                                contentArray.push({ type: 'text', text: content });
+                                contentHasToolCalls = true;
+                            }
+                        }
+                    } catch (_e) {
+                        // Not valid JSON, continue with other checks
+                    }
+                }
+                
+                // If not a direct JSON tool call, check for other formats
+                if (!contentHasToolCalls) {
+                    // Check for various tool call indicators
+                    if (content.includes('python_tag') || 
+                        content.includes('"type": "function"') ||
+                        (content.includes('```json') && content.includes('"tool_use"'))) {
+                        console.log('[OllamaProvider] Detected tool calls in content, parsing...', content);
+                        const parsedContent = this.parseToolCallsFromText(content, tools);
+                        contentArray.push(...parsedContent);
+                        contentHasToolCalls = true;
+                    }
                 }
             }
             
@@ -2938,6 +2999,35 @@ class OllamaProvider extends LLMProvider {
      */
     parseToolCallsFromText(text, availableTools) {
         const contentArray = [];
+        
+        // First, check if the entire text is a direct JSON tool call
+        const trimmedText = text.trim();
+        if (trimmedText.startsWith('{') && trimmedText.endsWith('}')) {
+            try {
+                const parsed = JSON.parse(trimmedText);
+                // Check if it's a direct tool call format
+                if (parsed.name && typeof parsed.name === 'string' && 
+                    parsed.arguments && typeof parsed.arguments === 'object') {
+                    // Validate that the tool exists
+                    const toolExists = availableTools.some(t => 
+                        (t.name === parsed.name) || 
+                        (t.function && t.function.name === parsed.name)
+                    );
+                    
+                    if (toolExists) {
+                        contentArray.push({
+                            type: 'tool_use',
+                            id: this.generateId(),
+                            name: parsed.name,
+                            input: parsed.arguments
+                        });
+                        return contentArray;
+                    }
+                }
+            } catch (_e) {
+                // Not valid JSON or not a tool call, continue with pattern matching
+            }
+        }
         
         // Regular expressions for different tool call formats
         const patterns = [

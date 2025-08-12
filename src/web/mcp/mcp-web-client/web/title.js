@@ -11,7 +11,7 @@ import * as SystemMsg from './system-msg.js';
 // Title generation prompt constant
 const TITLE_REQUEST_PROMPT = 
     'Please provide a short, descriptive title (max 50 characters) for this conversation.\n' +
-    'Respond with ONLY the title text, no quotes, no explanation.';
+    'Output ONLY a short title, no thinking tags, no quotes, no explanations.';
 
 /**
  * Generate a title for the chat conversation
@@ -82,13 +82,17 @@ export async function generateChatTitle(chat, mcpConnection, provider, isAutomat
         // Process the title response
         if (response.content) {
             // Store the title response with the 'title' role
+            // Use the full model string from chat config or construct it with provider prefix
+            const fullModelString = ChatConfig.getChatModelString(chat) || 
+                                   (provider.type ? `${provider.type}:${provider.model}` : provider.model);
+            
             if (callbacks.addMessage) {
                 callbacks.addMessage(chat.id, { 
                     role: 'title', 
                     content: response.content,
                     usage: response.usage || null,
                     responseTime: llmResponseTime || null,
-                    model: provider.model || ChatConfig.getChatModelString(chat),
+                    model: fullModelString,
                     timestamp: new Date().toISOString()
                 });
             }
@@ -100,7 +104,7 @@ export async function generateChatTitle(chat, mcpConnection, provider, isAutomat
                     content: response.content,
                     usage: response.usage,
                     responseTime: llmResponseTime,
-                    model: provider.model || ChatConfig.getChatModelString(chat)
+                    model: fullModelString
                 }, chat.id);
             }
             

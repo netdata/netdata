@@ -1290,21 +1290,38 @@ class NetdataMCPChat {
                 </button>
             </div>
             
-            <div style="display: flex; align-items: center; gap: 4px; margin-left: auto;">
-                <label style="font-size: 12px; color: var(--text-secondary);">max output tokens:</label>
-                <select id="maxTokens_${chatId}" 
-                        style="padding: 2px 6px; border: 1px solid var(--border-color); 
-                               border-radius: 4px; background: var(--background-color); 
-                               color: var(--text-primary); font-size: 12px;">
-                    <option value="1024" ${currentMaxTokens === 1024 ? 'selected' : ''}>1k</option>
-                    <option value="2048" ${currentMaxTokens === 2048 ? 'selected' : ''}>2k</option>
-                    <option value="4096" ${currentMaxTokens === 4096 ? 'selected' : ''}>4k</option>
-                    <option value="8192" ${currentMaxTokens === 8192 ? 'selected' : ''}>8k</option>
-                    <option value="16384" ${currentMaxTokens === 16384 ? 'selected' : ''}>16k</option>
-                    <option value="32768" ${currentMaxTokens === 32768 ? 'selected' : ''}>32k</option>
-                    <option value="65536" ${currentMaxTokens === 65536 ? 'selected' : ''}>64k</option>
-                    <option value="131072" ${currentMaxTokens === 131072 ? 'selected' : ''}>128k</option>
-                </select>
+            <div style="display: flex; align-items: center; gap: 8px; margin-left: auto; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 4px;">
+                    <label style="font-size: 12px; color: var(--text-secondary);">max output tokens:</label>
+                    <input type="text" id="maxTokens_${chatId}" 
+                           list="maxTokensList_${chatId}"
+                           value="${currentMaxTokens}"
+                           style="width: 70px; padding: 2px 6px; border: 1px solid var(--border-color); 
+                                  border-radius: 4px; background: var(--background-color); 
+                                  color: var(--text-primary); font-size: 12px;">
+                    <datalist id="maxTokensList_${chatId}">
+                        <option value="1024"></option>
+                        <option value="2048"></option>
+                        <option value="4096"></option>
+                        <option value="8192"></option>
+                        <option value="16384"></option>
+                        <option value="32768"></option>
+                        <option value="65536"></option>
+                        <option value="131072"></option>
+                    </datalist>
+                </div>
+                <div id="contextWindowControl_${chatId}" style="display: ${this.shouldShowContextWindowControl(chat) ? 'flex' : 'none'}; align-items: center; gap: 4px;">
+                    <label style="font-size: 12px; color: var(--text-secondary);">context window:</label>
+                    <input type="text" id="contextWindow_${chatId}" 
+                           list="contextWindowList_${chatId}"
+                           value="${chat.config?.model?.params?.contextWindow || this.getDefaultContextWindow(chat)}"
+                           style="width: 70px; padding: 2px 6px; border: 1px solid var(--border-color); 
+                                  border-radius: 4px; background: var(--background-color); 
+                                  color: var(--text-primary); font-size: 12px;">
+                    <datalist id="contextWindowList_${chatId}">
+                        ${this.getContextWindowDatalistOptions(chat)}
+                    </datalist>
+                </div>
             </div>
         `;
         section.appendChild(chatModelDiv);
@@ -1632,6 +1649,66 @@ class NetdataMCPChat {
             this.updateToolMemoryThreshold(chatId, newForgetAfterConclusions);
         });
         
+        // Max tokens input event listener
+        const maxTokensInput = section.querySelector(`#maxTokens_${chatId}`);
+        if (maxTokensInput) {
+            // Handle both manual input and datalist selection
+            maxTokensInput.addEventListener('change', (e) => {
+                e.stopPropagation();
+                const newMaxTokens = parseInt(e.target.value, 10);
+                if (!isNaN(newMaxTokens) && newMaxTokens > 0) {
+                    chat.config.model.params.maxTokens = newMaxTokens;
+                    this.saveChatConfigSmart(chatId, chat.config);
+                    this.autoSave(chatId);
+                }
+            });
+            // Also handle when user presses Enter
+            maxTokensInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    const newMaxTokens = parseInt(e.target.value, 10);
+                    if (!isNaN(newMaxTokens) && newMaxTokens > 0) {
+                        chat.config.model.params.maxTokens = newMaxTokens;
+                        this.saveChatConfigSmart(chatId, chat.config);
+                        this.autoSave(chatId);
+                    }
+                }
+            });
+        }
+        
+        // Context window input event listener (Ollama only)
+        const contextWindowInput = section.querySelector(`#contextWindow_${chatId}`);
+        if (contextWindowInput) {
+            // Handle both manual input and datalist selection
+            contextWindowInput.addEventListener('change', (e) => {
+                e.stopPropagation();
+                const newContextWindow = parseInt(e.target.value, 10);
+                if (!isNaN(newContextWindow) && newContextWindow > 0) {
+                    chat.config.model.params.contextWindow = newContextWindow;
+                    this.saveChatConfigSmart(chatId, chat.config);
+                    this.autoSave(chatId);
+                    // Update the header immediately
+                    this.updateContextWindowIndicator(chatId);
+                }
+            });
+            // Also handle when user presses Enter
+            contextWindowInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    const newContextWindow = parseInt(e.target.value, 10);
+                    if (!isNaN(newContextWindow) && newContextWindow > 0) {
+                        chat.config.model.params.contextWindow = newContextWindow;
+                        this.saveChatConfigSmart(chatId, chat.config);
+                        this.autoSave(chatId);
+                        // Update the header immediately
+                        this.updateContextWindowIndicator(chatId);
+                    }
+                }
+            });
+        }
+        
         // Cache control dropdown event listener
         const cacheControlSelect = section.querySelector(`#cacheControl_${chatId}`);
         if (cacheControlSelect) {
@@ -1664,6 +1741,140 @@ class NetdataMCPChat {
         if (limit >= 1000000) return `${(limit / 1000000).toFixed(1)}M`;
         if (limit >= 1000) return `${(limit / 1000).toFixed(0)}k`;
         return limit.toString();
+    }
+
+    /**
+     * Check if context window control should be shown for this chat
+     * @param {Object} chat - The chat object
+     * @returns {boolean} True if context window control should be shown
+     */
+    shouldShowContextWindowControl(chat) {
+        if (!chat || !chat.config || !chat.config.model) {
+            return false;
+        }
+        // Show context window control only for Ollama provider
+        const provider = chat.config.model.provider;
+        return provider === 'ollama';
+    }
+
+    /**
+     * Update context window visibility dynamically
+     * @param {string} chatId - Chat ID
+     * @param {Object} chat - The chat object
+     */
+    updateContextWindowVisibility(chatId, chat) {
+        const contextWindowControl = document.querySelector(`#contextWindowControl_${chatId}`);
+        if (contextWindowControl) {
+            const shouldShow = this.shouldShowContextWindowControl(chat);
+            contextWindowControl.style.display = shouldShow ? 'flex' : 'none';
+            
+            // If showing, update the datalist options for the new model
+            if (shouldShow) {
+                const datalist = document.querySelector(`#contextWindowList_${chatId}`);
+                if (datalist) {
+                    datalist.innerHTML = this.getContextWindowDatalistOptions(chat);
+                }
+                // Set default value if not already set
+                const input = document.querySelector(`#contextWindow_${chatId}`);
+                if (input && !chat.config?.model?.params?.contextWindow) {
+                    input.value = this.getDefaultContextWindow(chat);
+                }
+            }
+        }
+    }
+
+    /**
+     * Get default context window for a chat
+     * @param {Object} chat - The chat object
+     * @returns {number} Default context window size
+     */
+    getDefaultContextWindow(chat) {
+        if (!chat || !chat.config || !chat.config.model) {
+            return 128000;
+        }
+        const modelId = chat.config.model.id;
+        return this.modelLimits[modelId] || 128000;
+    }
+
+    /**
+     * Get the effective context window for a chat
+     * @param {Object} chat - The chat object
+     * @returns {number} The effective context window size (user-configured or model limit)
+     */
+    getEffectiveContextWindow(chat) {
+        // If chat has an explicitly configured context window, use it
+        if (chat?.config?.model?.params?.contextWindow) {
+            return chat.config.model.params.contextWindow;
+        }
+        // Otherwise use the model's limit
+        return this.getDefaultContextWindow(chat);
+    }
+
+    /**
+     * Generate context window datalist options
+     * @param {Object} chat - The chat object
+     * @returns {string} HTML string with option elements for datalist
+     */
+    getContextWindowDatalistOptions(chat) {
+        if (!chat || !chat.config || !chat.config.model) {
+            return '<option value="128000"></option>';
+        }
+
+        const modelId = chat.config.model.id;
+        const maxContext = this.modelLimits[modelId] || 128000;
+        
+        // Generate options based on max context window
+        const options = [];
+        const values = [2048, 4096, 8192, 16384, 32768, 65536, 128000, 256000, 512000, 1000000, 2000000];
+        
+        for (const value of values) {
+            if (value <= maxContext) {
+                options.push(`<option value="${value}"></option>`);
+            }
+        }
+        
+        // If max context is not in our list, add it
+        if (!values.includes(maxContext)) {
+            options.push(`<option value="${maxContext}"></option>`);
+        }
+        
+        return options.join('');
+    }
+
+    /**
+     * Generate context window dropdown options
+     * @param {Object} chat - The chat object
+     * @returns {string} HTML string with option elements
+     */
+    getContextWindowOptions(chat) {
+        if (!chat || !chat.config || !chat.config.model) {
+            return '<option value="128000">128k</option>';
+        }
+
+        const modelId = chat.config.model.id;
+        const maxContext = this.modelLimits[modelId] || 128000;
+        const currentContextWindow = chat.config.model.params.contextWindow || maxContext;
+        
+        // Generate options based on max context window
+        const options = [];
+        const values = [2048, 4096, 8192, 16384, 32768, 65536, 128000, 256000, 512000, 1000000, 2000000];
+        
+        for (const value of values) {
+            if (value <= maxContext) {
+                const label = this.formatContextWindow(value);
+                const selected = value === currentContextWindow ? 'selected' : '';
+                options.push(`<option value="${value}" ${selected}>${label}</option>`);
+            }
+        }
+        
+        // If max context is not in our list, add it
+        if (!values.includes(maxContext)) {
+            const label = this.formatContextWindow(maxContext);
+            const selected = maxContext === currentContextWindow ? 'selected' : '';
+            options.push(`<option value="${maxContext}" ${selected}>${label} (max)</option>`);
+        }
+        
+        return options.join('');
     }
     
     /**
@@ -1852,6 +2063,9 @@ class NetdataMCPChat {
             const button = section.querySelector(`#${buttonId}`);
             if (!button) return;
             
+            // Store the full model string with the button for copy/paste operations
+            button.dataset.fullModelString = currentModel || '';
+            
             // Add context menu for copy/paste
             button.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
@@ -1873,7 +2087,8 @@ class NetdataMCPChat {
                 `;
                 
                 const modelName = button.querySelector('.model-name').textContent;
-                const hasModel = modelName && modelName !== 'Select model';
+                const fullModelString = button.dataset.fullModelString;
+                const hasModel = fullModelString && modelName && modelName !== 'Select model';
                 
                 if (hasModel) {
                     const copyItem = document.createElement('div');
@@ -1890,21 +2105,26 @@ class NetdataMCPChat {
                         copyItem.style.background = '';
                     });
                     copyItem.addEventListener('click', () => {
-                        this.copiedModel = modelName;
-                        document.body.removeChild(menu);
+                        // Store the full model string (provider:model format)
+                        this.copiedModel = fullModelString;
+                        this.copiedModelDisplayName = modelName;
+                        if (menu.parentNode) {
+                            document.body.removeChild(menu);
+                        }
                         this.showToast(`Copied model: ${modelName}`, 'success-toast');
                     });
                     menu.appendChild(copyItem);
                 }
                 
-                if (this.copiedModel && this.copiedModel !== modelName) {
+                if (this.copiedModel) {
                     const pasteItem = document.createElement('div');
                     pasteItem.style.cssText = `
                         padding: 6px 12px;
                         cursor: pointer;
                         font-size: 13px;
                     `;
-                    pasteItem.textContent = `Paste "${this.copiedModel}"`;
+                    const displayName = this.copiedModelDisplayName || this.copiedModel;
+                    pasteItem.textContent = `Paste "${displayName}"`;
                     pasteItem.addEventListener('mouseenter', () => {
                         pasteItem.style.background = 'var(--hover-color)';
                     });
@@ -1912,10 +2132,15 @@ class NetdataMCPChat {
                         pasteItem.style.background = '';
                     });
                     pasteItem.addEventListener('click', () => {
-                        button.querySelector('.model-name').textContent = this.copiedModel;
+                        // Update button display and data
+                        button.querySelector('.model-name').textContent = this.copiedModelDisplayName || this.copiedModel;
+                        button.dataset.fullModelString = this.copiedModel;
+                        // Pass the full model string to the callback
                         onSelect(this.copiedModel);
-                        document.body.removeChild(menu);
-                        this.showToast(`Pasted model: ${this.copiedModel}`, 'success-toast');
+                        if (menu.parentNode) {
+                            document.body.removeChild(menu);
+                        }
+                        this.showToast(`Pasted model: ${this.copiedModelDisplayName || this.copiedModel}`, 'success-toast');
                     });
                     menu.appendChild(pasteItem);
                 }
@@ -1935,13 +2160,25 @@ class NetdataMCPChat {
                 
                 // Remove menu on click outside
                 const removeMenu = (evt) => {
+                    // Don't close if clicking inside the menu
                     if (!menu.contains(evt.target)) {
-                        document.body.removeChild(menu);
-                        document.removeEventListener('click', removeMenu);
+                        // Check if menu is still in DOM before removing
+                        if (menu.parentNode) {
+                            document.body.removeChild(menu);
+                        }
+                        // Remove all event listeners
+                        document.removeEventListener('click', removeMenu, true);
+                        document.removeEventListener('mousedown', removeMenu, true);
+                        document.removeEventListener('contextmenu', removeMenu, true);
                     }
                 };
+                
+                // Use setTimeout to avoid immediate closure
                 setTimeout(() => {
-                    document.addEventListener('click', removeMenu);
+                    // Add listeners in capture phase to ensure we catch all clicks
+                    document.addEventListener('click', removeMenu, true);
+                    document.addEventListener('mousedown', removeMenu, true);
+                    document.addEventListener('contextmenu', removeMenu, true);
                 }, 0);
             });
             
@@ -2196,6 +2433,7 @@ class NetdataMCPChat {
                     tr.addEventListener('click', () => {
                         const modelName = ChatConfig.getModelDisplayName(fullModelId);
                         button.querySelector('.model-name').textContent = modelName;
+                        button.dataset.fullModelString = fullModelId;  // Update button's stored model string
                         onSelect(fullModelId);
                         document.body.removeChild(dropdown);
                         button.removeAttribute('data-dropdown-open');
@@ -2492,6 +2730,11 @@ class NetdataMCPChat {
         if (modelConfig) {
             // Preserve existing params
             modelConfig.params = config.model?.params || modelConfig.params;
+            
+            // ALWAYS reset context window to the model's maximum
+            // This ensures correct calculations and predictable behavior
+            modelConfig.params.contextWindow = this.getDefaultContextWindow({config: {model: modelConfig}});
+            
             config.model = modelConfig;
         }
         
@@ -2504,8 +2747,18 @@ class NetdataMCPChat {
         this.saveChatConfigSmart(chatId, config);
         this.autoSave(chatId);
         
+        // Update context window visibility dynamically
+        this.updateContextWindowVisibility(chatId, chat);
+        
+        // Update the context window input field if it exists (for Ollama models)
+        const contextWindowInput = document.querySelector(`#contextWindow_${chatId}`);
+        if (contextWindowInput && modelConfig) {
+            contextWindowInput.value = modelConfig.params.contextWindow;
+        }
+        
         // Update displays
         this.updateChatHeader(chatId);
+        this.updateContextWindowIndicator(chatId); // Update context window immediately
         this.updateChatSessions();
         
         // Update cache control UI based on new model's provider
@@ -2519,13 +2772,27 @@ class NetdataMCPChat {
             return;
         }
         
-        const config = chat.config || ChatConfig.loadChatConfig(chatId);
-        config.optimisation.toolSummarisation.model = ChatConfig.modelConfigFromString(model);
-        
-        chat.config = config;
-        this.recreateMessageOptimizer(chat, config);
-        this.saveChatConfigSmart(chatId, config);
-        this.autoSave(chatId);
+        try {
+            const config = chat.config || ChatConfig.loadChatConfig(chatId);
+            const modelConfig = ChatConfig.modelConfigFromString(model);
+            
+            // Set context window for secondary model (Option 2: inherit from main, capped at model max)
+            if (modelConfig && modelConfig.provider === 'ollama') {
+                const mainContextWindow = config.model?.params?.contextWindow || this.getDefaultContextWindow(chat);
+                const modelMaxContextWindow = this.getDefaultContextWindow({config: {model: modelConfig}});
+                modelConfig.params.contextWindow = Math.min(mainContextWindow, modelMaxContextWindow);
+            }
+            
+            config.optimisation.toolSummarisation.model = modelConfig;
+            
+            chat.config = config;
+            this.recreateMessageOptimizer(chat, config);
+            this.saveChatConfigSmart(chatId, config);
+            this.autoSave(chatId);
+        } catch (error) {
+            console.error(`[updateToolSummarizationModel] Invalid model format for chatId: ${chatId}, model: ${model}`, error);
+            this.showToast(`Invalid model format: ${model}. Expected format: provider:model`, 'error-toast');
+        }
     }
     
     updateAutoSummarizationModel(chatId, model) {
@@ -2535,13 +2802,27 @@ class NetdataMCPChat {
             return;
         }
         
-        const config = chat.config || ChatConfig.loadChatConfig(chatId);
-        config.optimisation.autoSummarisation.model = ChatConfig.modelConfigFromString(model);
-        
-        chat.config = config;
-        this.recreateMessageOptimizer(chat, config);
-        this.saveChatConfigSmart(chatId, config);
-        this.autoSave(chatId);
+        try {
+            const config = chat.config || ChatConfig.loadChatConfig(chatId);
+            const modelConfig = ChatConfig.modelConfigFromString(model);
+            
+            // Set context window for secondary model (Option 2: inherit from main, capped at model max)
+            if (modelConfig && modelConfig.provider === 'ollama') {
+                const mainContextWindow = config.model?.params?.contextWindow || this.getDefaultContextWindow(chat);
+                const modelMaxContextWindow = this.getDefaultContextWindow({config: {model: modelConfig}});
+                modelConfig.params.contextWindow = Math.min(mainContextWindow, modelMaxContextWindow);
+            }
+            
+            config.optimisation.autoSummarisation.model = modelConfig;
+            
+            chat.config = config;
+            this.recreateMessageOptimizer(chat, config);
+            this.saveChatConfigSmart(chatId, config);
+            this.autoSave(chatId);
+        } catch (error) {
+            console.error(`[updateAutoSummarizationModel] Invalid model format for chatId: ${chatId}, model: ${model}`, error);
+            this.showToast(`Invalid model format: ${model}. Expected format: provider:model`, 'error-toast');
+        }
     }
     
     updateTitleGenerationModel(chatId, model) {
@@ -2551,18 +2832,32 @@ class NetdataMCPChat {
             return;
         }
         
-        const config = chat.config || ChatConfig.loadChatConfig(chatId);
-        // Use feature-specific defaults for title generation
-        config.optimisation.titleGeneration.model = ChatConfig.modelConfigFromString(model, {
-            temperature: 0.7,
-            topP: 0.9,
-            maxTokens: 100  // Title generation should use limited tokens
-        });
-        
-        chat.config = config;
-        this.recreateMessageOptimizer(chat, config);
-        this.saveChatConfigSmart(chatId, config);
-        this.autoSave(chatId);
+        try {
+            const config = chat.config || ChatConfig.loadChatConfig(chatId);
+            // Use feature-specific defaults for title generation
+            const modelConfig = ChatConfig.modelConfigFromString(model, {
+                temperature: 0.7,
+                topP: 0.9,
+                maxTokens: 100  // Title generation should use limited tokens
+            });
+            
+            // Set context window for secondary model (Option 2: inherit from main, capped at model max)
+            if (modelConfig && modelConfig.provider === 'ollama') {
+                const mainContextWindow = config.model?.params?.contextWindow || this.getDefaultContextWindow(chat);
+                const modelMaxContextWindow = this.getDefaultContextWindow({config: {model: modelConfig}});
+                modelConfig.params.contextWindow = Math.min(mainContextWindow, modelMaxContextWindow);
+            }
+            
+            config.optimisation.titleGeneration.model = modelConfig;
+            
+            chat.config = config;
+            this.recreateMessageOptimizer(chat, config);
+            this.saveChatConfigSmart(chatId, config);
+            this.autoSave(chatId);
+        } catch (error) {
+            console.error(`[updateTitleGenerationModel] Invalid model format for chatId: ${chatId}, model: ${model}`, error);
+            this.showToast(`Invalid model format: ${model}. Expected format: provider:model`, 'error-toast');
+        }
     }
     
     updateToolThreshold(chatId, threshold) {
@@ -5964,8 +6259,7 @@ class NetdataMCPChat {
             // Only show percentage if chat has been rendered or has token history
             if (chat.hasBeenRendered || tokenHistory.totalTokens > 0) {
                 if (chat.config?.model?.id) {
-                    const modelName = chat.config.model.id;
-                    const limit = this.modelLimits[modelName] || 4096;
+                    const limit = this.getEffectiveContextWindow(chat);
                     contextPercentValue = Math.min(100, Math.round((tokenHistory.totalTokens / limit) * 100));
                     contextPercent = contextPercentValue + '';
                 }
@@ -6137,6 +6431,15 @@ class NetdataMCPChat {
         // Migrate old chat data if needed
         if (!chat.totalTokensPrice || !chat.perModelTokensPrice) {
             this.migrateTokenPricing(chat);
+        }
+        
+        // Ensure chat has context window set (for older chats that may not have it)
+        if (chat.config && chat.config.model && !chat.config.model.params.contextWindow) {
+            // For older chats without context window, set it to the model's default
+            chat.config.model.params.contextWindow = this.getDefaultContextWindow(chat);
+            // Save the updated config
+            ChatConfig.saveChatConfig(chatId, chat.config);
+            // Note: updateContextWindowIndicator will be called by updateChatHeader below
         }
         
         // Initialize token usage history for this chat if it doesn't exist
@@ -6437,12 +6740,8 @@ class NetdataMCPChat {
         
         // Update global toggle UI based on chat's tool inclusion mode
         
-        // Update context window indicator
-        const contextTokens = this.calculateContextWindowTokens(chatId);
-        const model = ChatConfig.getChatModelString(chat) || (provider ? provider.model : null);
-        
         // Always update the context window and cumulative tokens
-        this.updateContextWindowIndicator(contextTokens, model, chatId);
+        this.updateContextWindowIndicator(chatId);
         this.updateCumulativeTokenDisplay(chatId);
         
         // Update all token displays
@@ -10951,11 +11250,8 @@ class NetdataMCPChat {
             cacheReadInputTokens: usage.cacheReadInputTokens || 0
         });
         
-        // Calculate context window based on message type
-        const contextTokens = this.calculateContextWindowTokens(chatId);
-        
         // Update context window indicator
-        this.updateContextWindowIndicator(contextTokens, model, chatId);
+        this.updateContextWindowIndicator(chatId);
         
         // Update all token displays (context window, cumulative tokens, and cost)
         this.updateAllTokenDisplays(chatId);
@@ -10969,7 +11265,7 @@ class NetdataMCPChat {
         });
     }
     
-    updateContextWindowIndicator(totalTokens, model, chatId) {
+    updateContextWindowIndicator(chatId) {
         if (!chatId) {
             console.error('updateContextWindowIndicator called without chatId');
             return;
@@ -10984,11 +11280,18 @@ class NetdataMCPChat {
         const elements = container._elements;
         if (!elements.contextFill || !elements.contextStats) {return;}
         
-        // Extract model name from format "provider:model-name" if needed
-        const modelName = ChatConfig.getModelDisplayName(model);
+        // Get the chat to use effective context window
+        const chat = this.chats.get(chatId);
+        if (!chat) {
+            console.error(`[updateContextWindowIndicator] Chat not found for chatId: ${chatId}`);
+            return;
+        }
         
-        // Get model info
-        const limit = this.modelLimits[modelName] || 4096;
+        // Calculate the current context window tokens
+        const totalTokens = this.calculateContextWindowTokens(chatId);
+        
+        // Use the effective context window (user-configured or model limit)
+        const limit = this.getEffectiveContextWindow(chat);
         const percentUsed = Math.min(totalTokens / limit * 100, 100);
         
         // Update stats - show as "X / Y" or "Xk / Yk"
@@ -11101,8 +11404,7 @@ class NetdataMCPChat {
         // Update context window
         const chat = this.chats.get(chatId);
         if (chat) {
-            const contextTokens = this.calculateContextWindowTokens(chatId);
-            this.updateContextWindowIndicator(contextTokens, ChatConfig.getChatModelString(chat) || 'unknown', chatId);
+            this.updateContextWindowIndicator(chatId);
         }
         
         // Update cumulative tokens
@@ -11665,13 +11967,17 @@ class NetdataMCPChat {
             
             // Process the summary response
             if (response.content) {
+                // Use the full model string from chat config or construct it with provider prefix
+                const fullModelString = ChatConfig.getChatModelString(chat) || 
+                                       (provider.type ? `${provider.type}:${provider.model}` : provider.model);
+                
                 // CRITICAL: Save summary response BEFORE displaying
                 this.addMessage(chat.id, { 
                     role: 'summary', 
                     content: response.content,
                     usage: response.usage || null,
                     responseTime: llmResponseTime || null,
-                    model: provider.model || ChatConfig.getChatModelString(chat),
+                    model: fullModelString,
                     timestamp: new Date().toISOString(),
                     cacheControlIndex // Store the frozen cache position
                 });
@@ -11682,12 +11988,11 @@ class NetdataMCPChat {
                     content: response.content,
                     usage: response.usage,
                     responseTime: llmResponseTime,
-                    model: ChatConfig.getChatModelString(chat) || `${provider.type}:${provider.model}`
+                    model: fullModelString
                 }, chat.id);
                 
                 // Update context window display
-                const contextTokens = this.calculateContextWindowTokens(chat.id);
-                this.updateContextWindowIndicator(contextTokens, ChatConfig.getChatModelString(chat) || `${provider.type}:${provider.model}`, chat.id);
+                this.updateContextWindowIndicator(chat.id);
                 
                 // Update all token displays including cost
                 this.updateAllTokenDisplays(chat.id);
@@ -11910,15 +12215,14 @@ class NetdataMCPChat {
         
         // Calculate current context window usage
         const contextTokens = this.calculateContextWindowTokens(chat.id);
-        const modelString = ChatConfig.getChatModelString(chat);
-        const modelLimit = this.modelLimits[modelString] || 128000; // fallback to 128k
+        const effectiveLimit = this.getEffectiveContextWindow(chat);
         
-        const percentUsed = Math.round((contextTokens / modelLimit) * 100);
+        const percentUsed = Math.round((contextTokens / effectiveLimit) * 100);
         const triggerPercent = chat.config.optimisation.autoSummarisation.triggerPercent || 50;
         
         console.log('[Auto-summarize] Context check', {
             contextTokens,
-            modelLimit,
+            effectiveLimit,
             percentUsed: percentUsed + '%',
             triggerPercent: triggerPercent + '%',
             willTrigger: percentUsed >= triggerPercent
