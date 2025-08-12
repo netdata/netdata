@@ -2068,6 +2068,18 @@ modules:
               chart_type: line
               dimensions:
                 - name: memory
+            - name: mssql.database_readonly
+              description: Current database write status.
+              unit: boolean
+              chart_type: line
+              dimensions:
+                - name: readonly
+            - name: mssql.database_state
+              description: Current database state.
+              unit: boolean
+              chart_type: line
+              dimensions:
+                - name: state
             - name: mssql.instance_memmgr_connection_memory_bytes
               description: Amount of dynamic memory to maintain connections
               unit: bytes
