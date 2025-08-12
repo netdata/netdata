@@ -159,7 +159,7 @@ func TestCollector_Charts(t *testing.T) {
 				if collr.EnableProfiles {
 					setMockClientSysObjectidExpect(m)
 				}
-				setMockClientSysExpect(m)
+				setMockClientSysinfoAndUptimeExpect(m)
 				setMockClientIfMibExpect(m)
 
 				return collr
@@ -190,6 +190,7 @@ func TestCollector_Charts(t *testing.T) {
 			require.NoError(t, collr.Init(context.Background()))
 
 			if test.doCollect {
+				_ = collr.Check(context.Background())
 				_ = collr.Collect(context.Background())
 			}
 
@@ -203,42 +204,13 @@ func TestCollector_Check(t *testing.T) {
 		wantFail    bool
 		prepareSNMP func(m *snmpmock.MockHandler) *Collector
 	}{
-		"success when collecting IF-MIB": {
+		"success when sysinfo collected": {
 			wantFail: false,
 			prepareSNMP: func(m *snmpmock.MockHandler) *Collector {
 				collr := New()
 				collr.Config = prepareV2Config()
-				if collr.EnableProfiles {
-					setMockClientSysObjectidExpect(m)
-				}
-				setMockClientIfMibExpect(m)
 
-				return collr
-			},
-		},
-		"success only custom OIDs supported type": {
-			wantFail: false,
-			prepareSNMP: func(m *snmpmock.MockHandler) *Collector {
-				collr := New()
-				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 3)
-				collr.collectIfMib = false
-
-				if collr.EnableProfiles {
-					setMockClientSysObjectidExpect(m)
-				}
-
-				m.EXPECT().Get(gomock.Any()).Return(&gosnmp.SnmpPacket{
-					Variables: []gosnmp.SnmpPDU{
-						{Value: 10, Type: gosnmp.Counter32},
-						{Value: 20, Type: gosnmp.Counter64},
-						{Value: 30, Type: gosnmp.Gauge32},
-						{Value: 1, Type: gosnmp.Boolean},
-						{Value: 40, Type: gosnmp.Gauge32},
-						{Value: 50, Type: gosnmp.TimeTicks},
-						{Value: 60, Type: gosnmp.Uinteger32},
-						{Value: 70, Type: gosnmp.Integer},
-					},
-				}, nil).Times(1)
+				setMockClientSysInfoExpect(m)
 
 				return collr
 			},
@@ -249,10 +221,7 @@ func TestCollector_Check(t *testing.T) {
 				collr := New()
 				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 3)
 				collr.collectIfMib = false
-				if collr.EnableProfiles {
-					setMockClientSysObjectidExpect(m)
-				}
-				m.EXPECT().Get(gomock.Any()).Return(nil, errors.New("mock Get() error")).Times(1)
+				m.EXPECT().WalkAll(snmpsd.RootOidMibSystem).Return(nil, errors.New("mock Get() error")).Times(1)
 
 				return collr
 			},
@@ -265,7 +234,6 @@ func TestCollector_Check(t *testing.T) {
 			defer cleanup()
 
 			setMockClientInitExpect(mockSNMP)
-			setMockClientSysExpect(mockSNMP)
 
 			collr := test.prepareSNMP(mockSNMP)
 			collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
@@ -299,7 +267,6 @@ func TestCollector_Collect(t *testing.T) {
 				return collr
 			},
 			wantCollected: map[string]int64{
-				//"TestMetric":                                        1,
 				"net_iface_ether1_admin_status_down":                0,
 				"net_iface_ether1_admin_status_testing":             0,
 				"net_iface_ether1_admin_status_up":                  1,
@@ -496,12 +463,14 @@ func TestCollector_Collect(t *testing.T) {
 			defer cleanup()
 
 			setMockClientInitExpect(mockSNMP)
-			setMockClientSysExpect(mockSNMP)
+			setMockClientSysinfoAndUptimeExpect(mockSNMP)
 
 			collr := test.prepareSNMP(mockSNMP)
 			collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
 
 			require.NoError(t, collr.Init(context.Background()))
+
+			_ = collr.Check(context.Background())
 
 			mx := collr.Collect(context.Background())
 
@@ -632,7 +601,7 @@ func setMockClientSysObjectidExpect(m *snmpmock.MockHandler) {
 
 }
 
-func setMockClientSysExpect(m *snmpmock.MockHandler) {
+func setMockClientSysInfoExpect(m *snmpmock.MockHandler) {
 	m.EXPECT().WalkAll(snmpsd.RootOidMibSystem).Return([]gosnmp.SnmpPDU{
 		{Name: snmpsd.OidSysDescr, Value: []uint8("mock sysDescr"), Type: gosnmp.OctetString},
 		{Name: snmpsd.OidSysObject, Value: ".1.3.6.1.4.1.14988.1", Type: gosnmp.ObjectIdentifier},
@@ -640,6 +609,10 @@ func setMockClientSysExpect(m *snmpmock.MockHandler) {
 		{Name: snmpsd.OidSysName, Value: []uint8("mock sysName"), Type: gosnmp.OctetString},
 		{Name: snmpsd.OidSysLocation, Value: []uint8("mock sysLocation"), Type: gosnmp.OctetString},
 	}, nil).MinTimes(1)
+}
+
+func setMockClientSysinfoAndUptimeExpect(m *snmpmock.MockHandler) {
+	setMockClientSysInfoExpect(m)
 
 	m.EXPECT().Get([]string{snmpsd.OidSysUptime}).Return(&gosnmp.SnmpPacket{
 		Variables: []gosnmp.SnmpPDU{
@@ -649,12 +622,6 @@ func setMockClientSysExpect(m *snmpmock.MockHandler) {
 }
 
 func setMockClientIfMibExpect(m *snmpmock.MockHandler) {
-	m.EXPECT().WalkAll(oidIfIndex).Return([]gosnmp.SnmpPDU{
-		{Name: oidIfIndex + ".1", Value: 1, Type: gosnmp.Integer},
-		{Name: oidIfIndex + ".2", Value: 2, Type: gosnmp.Integer},
-		{Name: oidIfIndex + ".17", Value: 17, Type: gosnmp.Integer},
-		{Name: oidIfIndex + ".18", Value: 18, Type: gosnmp.Integer},
-	}, nil).MinTimes(1)
 	m.EXPECT().WalkAll(rootOidIfMibIfTable).Return([]gosnmp.SnmpPDU{
 		{Name: oidIfIndex + ".1", Value: 1, Type: gosnmp.Integer},
 		{Name: oidIfIndex + ".2", Value: 2, Type: gosnmp.Integer},

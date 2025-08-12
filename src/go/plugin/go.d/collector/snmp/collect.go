@@ -35,7 +35,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 
 		if c.ddSnmpColl == nil {
 			c.ddSnmpColl = ddsnmpcollector.New(c.snmpClient, c.snmpProfiles, c.Logger, si.SysObjectID)
-			c.ddSnmpColl.DoTableMetrics = c.EnableProfilesTableMetrics
+			c.ddSnmpColl.DoTableMetrics = c.EnableProfilesTableMetrics && c.snmpBulkWalkOk
 		}
 
 		if c.CreateVnode {
@@ -64,12 +64,11 @@ func (c *Collector) collect() (map[string]int64, error) {
 			return nil, err
 		}
 
-		if c.collectIfMib {
+		if c.snmpBulkWalkOk && c.collectIfMib {
 			if err := c.collectNetworkInterfaces(mx); err != nil {
 				return nil, err
 			}
 		}
-
 		if len(c.customOids) > 0 {
 			if err := c.collectOIDs(mx); err != nil {
 				return nil, err
@@ -187,6 +186,52 @@ func (c *Collector) setupProfiles(sysObjectID string) []*ddsnmp.Profile {
 	c.Infof("device matched %d profile(s): %s (sysObjectID: %s)", len(snmpProfiles), strings.Join(profInfo, ", "), sysObjectID)
 
 	return snmpProfiles
+}
+
+func (c *Collector) adjustMaxRepetitions() (bool, error) {
+	orig := c.Config.Options.MaxRepetitions
+	maxReps := c.Config.Options.MaxRepetitions
+	attempts := 0
+	const maxAttempts = 20 // Prevent infinite loops
+
+	for maxReps > 0 && attempts < maxAttempts {
+		attempts++
+
+		v, err := c.walkAll(snmpsd.RootOidMibSystem)
+		if err != nil {
+			return false, err
+		}
+
+		if len(v) > 0 {
+			//c.Config.Options.MaxRepetitions = maxReps
+			if orig != maxReps {
+				c.Infof("adjusted max_repetitions: %d → %d (took %d attempts)", orig, maxReps, attempts)
+			}
+			return true, nil
+		}
+
+		// Adaptive decrease strategy
+		prevMaxReps := maxReps
+		if maxReps > 50 {
+			maxReps -= 10
+		} else if maxReps > 10 {
+			maxReps -= 5
+		} else if maxReps > 5 {
+			maxReps -= 2
+		} else {
+			maxReps--
+		}
+
+		maxReps = max(0, maxReps) // Ensure non-negative
+
+		c.Debugf("max_repetitions=%d returned no data, trying %d", prevMaxReps, maxReps)
+		c.snmpClient.SetMaxRepetitions(uint32(maxReps))
+	}
+
+	// Restore original value since nothing worked
+	c.snmpClient.SetMaxRepetitions(uint32(orig))
+	c.Debugf("unable to find working max_repetitions value after %d attempts", attempts)
+	return false, nil
 }
 
 func pduToInt(pdu gosnmp.SnmpPDU) (int64, error) {

@@ -3,7 +3,6 @@
 package snmp
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 	"sort"
@@ -21,26 +20,6 @@ const (
 )
 
 func (c *Collector) collectNetworkInterfaces(mx map[string]int64) error {
-	if c.checkMaxReps {
-		ok, err := c.adjustMaxRepetitions()
-		if err != nil {
-			return err
-		}
-
-		c.checkMaxReps = false
-
-		if !ok {
-			c.collectIfMib = false
-
-			if len(c.customOids) == 0 {
-				return errors.New("no IF-MIB data returned")
-			}
-
-			c.Warning("no IF-MIB data returned")
-			return nil
-		}
-	}
-
 	ifMibTable, err := c.walkAll(rootOidIfMibIfTable)
 	if err != nil {
 		return err
@@ -141,7 +120,7 @@ func (c *Collector) collectNetworkInterfaces(mx map[string]int64) error {
 		case oidIfHCOutMulticastPkts:
 			iface.ifHCOutMulticastPkts, err = pduToInt(pdu)
 		case oidIfHCOutBroadcastPkts:
-			iface.ifHCOutMulticastPkts, err = pduToInt(pdu)
+			iface.ifHCOutBroadcastPkts, err = pduToInt(pdu)
 		case oidIfHighSpeed:
 			iface.ifHighSpeed, err = pduToInt(pdu)
 		case oidIfAlias:
@@ -237,36 +216,4 @@ func (c *Collector) collectNetworkInterfaces(mx map[string]int64) error {
 	}
 
 	return nil
-}
-
-func (c *Collector) adjustMaxRepetitions() (bool, error) {
-	orig := c.Config.Options.MaxRepetitions
-	maxReps := c.Config.Options.MaxRepetitions
-
-	for {
-		v, err := c.walkAll(oidIfIndex)
-		if err != nil {
-			return false, err
-		}
-
-		if len(v) > 0 {
-			if orig != maxReps {
-				c.Infof("changed 'max_repetitions' %d => %d", orig, maxReps)
-			}
-			return true, nil
-		}
-
-		if maxReps > 5 {
-			maxReps = max(5, maxReps-5)
-		} else {
-			maxReps--
-		}
-
-		if maxReps <= 0 {
-			return false, nil
-		}
-
-		c.Debugf("no IF-MIB data returned, trying to decrese 'max_repetitions' to %d", maxReps)
-		c.snmpClient.SetMaxRepetitions(uint32(maxReps))
-	}
 }
