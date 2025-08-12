@@ -179,6 +179,7 @@ struct mssql_db_instance {
     RRDSET *st_db_lockwait;
     RRDSET *st_db_deadlock;
     RRDSET *st_db_readonly;
+    RRDSET *st_db_state[NETDATA_DB_STATES];
     RRDSET *st_lock_timeouts;
     RRDSET *st_lock_requests;
     RRDSET *st_buff_page_iops;
@@ -201,6 +202,7 @@ struct mssql_db_instance {
     RRDDIM *rd_db_lockwait;
     RRDDIM *rd_db_deadlock;
     RRDDIM *rd_db_readonly;
+    RRDDIM *rd_db_state[NETDATA_DB_STATES];
     RRDDIM *rd_lock_timeouts;
     RRDDIM *rd_lock_requests;
     RRDDIM *rd_buff_page_reads;
@@ -2456,13 +2458,53 @@ static void mssql_is_readonly_chart(struct mssql_db_instance *mdi, const char *d
         rrdlabels_add(mdi->st_db_readonly->rrdlabels, "mssql_instance", mdi->parent->instanceID, RRDLABEL_SRC_AUTO);
         rrdlabels_add(mdi->st_db_readonly->rrdlabels, "database", db, RRDLABEL_SRC_AUTO);
 
-        mdi->rd_db_readonly = rrddim_add(mdi->st_db_readonly, "readonly", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        mdi->rd_db_readonly = rrddim_add(mdi->st_db_readonly, "readonly", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(
             mdi->st_db_readonly, mdi->rd_db_readonly, (collected_number)mdi->MSSQLDBIsReadonly.current.Data);
 
     rrdset_done(mdi->st_db_readonly);
+}
+
+static void mssql_db_states_chart(struct mssql_db_instance *mdi, const char *db, int update_every, const char *str_state, int idx, collected_number state)
+{
+    if (!mdi->st_db_state[idx]) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_resource_%s_state", db, mdi->parent->instanceID, str_state);
+        netdata_fix_chart_name(id);
+        mdi->st_db_state[idx] = rrdset_create_localhost(
+                "mssql",
+                id,
+                NULL,
+                "locks",
+                "mssql.database_state",
+                "Current database state.",
+                "boolean",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibMSSQL",
+                PRIO_MSSQL_DATABASE_DEADLOCKS_PER_SECOND,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        rrdlabels_add(mdi->st_db_state[idx]->rrdlabels, "mssql_instance", mdi->parent->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mdi->st_db_state[idx]->rrdlabels, "database", db, RRDLABEL_SRC_AUTO);
+
+        mdi->rd_db_state[idx] = rrddim_add(mdi->st_db_state[idx], "state", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(mdi->st_db_state[idx], mdi->rd_db_state[idx], state);
+
+    rrdset_done(mdi->st_db_state[idx]);
+}
+
+static void mssql_db_state_chart_loop(struct mssql_db_instance *mdi, const char *db, int update_every)
+{
+    static const char *state[NETDATA_DB_STATES] = { "ONLINE", "RESTORING", "RECOVERING", "RECOVERY_PENDING", "SUSPECT", "OFFLINE"};
+    collected_number set_value = (mdi->MSSQLDBState.current.Data < 5) ? (collected_number) mdi->MSSQLDBState.current.Data : 5;
+    for (collected_number i; i < NETDATA_DB_STATES; i++) {
+        mssql_db_states_chart(mdi, db, update_every, state[i], i, i == set_value);
+    }
 }
 
 static void mssql_lock_request_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
@@ -2624,6 +2666,7 @@ int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, v
             mssql_lockwait_chart,
             mssql_deadlock_chart,
             mssql_is_readonly_chart,
+            mssql_db_state_chart_loop,
             mssql_lock_timeout_chart,
             mssql_lock_request_chart,
 
