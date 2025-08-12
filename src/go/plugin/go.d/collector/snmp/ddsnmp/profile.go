@@ -203,6 +203,9 @@ func (p *Profile) validate() error {
 	for _, err := range ddprofiledefinition.ValidateEnrichMetadata(p.Definition.Metadata) {
 		errs = append(errs, errors.New(err))
 	}
+	for _, err := range ddprofiledefinition.ValidateEnrichSysobjectIDMetadata(p.Definition.SysobjectIDMetadata) {
+		errs = append(errs, errors.New(err))
+	}
 	for _, err := range ddprofiledefinition.ValidateEnrichMetrics(p.Definition.Metrics) {
 		errs = append(errs, errors.New(err))
 	}

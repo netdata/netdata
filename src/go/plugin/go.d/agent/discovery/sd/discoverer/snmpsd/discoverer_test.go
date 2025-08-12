@@ -276,5 +276,7 @@ func prepareNewTarget(sub subnet, ip string) *target {
 		Location:     mockSysLocation,
 		SysObjectID:  mockSysObject[1:],
 		Organization: "net-snmp",
+		Category:     "Firewall",
+		Model:        "Virtual Service Router",
 	})
 }
