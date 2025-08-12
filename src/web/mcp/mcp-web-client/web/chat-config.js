@@ -123,6 +123,11 @@ export function validateConfig(config) {
                 console.warn('[validateConfig] Invalid maxTokens:', params.maxTokens, '- using default:', validConfig.model.params.maxTokens);
             }
             
+            // Context Window (Ollama specific)
+            if (typeof params.contextWindow === 'number' && params.contextWindow >= 1) {
+                validConfig.model.params.contextWindow = params.contextWindow;
+            }
+            
             // Seed
             if (params.seed && typeof params.seed === 'object') {
                 validConfig.model.params.seed = {
@@ -435,6 +440,12 @@ export function createConfigFromOptions(options = {}) {
     // Update MCP server if provided
     if (options.mcpServerId) {
         config.mcpServer = options.mcpServerId;
+    }
+    
+    // Set initial context window if provided (for Ollama models)
+    // This ensures new chats get a context window value
+    if (options.contextWindow && typeof options.contextWindow === 'number') {
+        config.model.params.contextWindow = options.contextWindow;
     }
     
     // Validate and normalize the final config
