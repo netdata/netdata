@@ -102,9 +102,12 @@ func (p *stringValueProcessor) processValue(sym ddprofiledefinition.SymbolConfig
 	}
 
 	if sym.MatchPatternCompiled != nil {
-		if sm := sym.MatchPatternCompiled.FindStringSubmatch(s); len(sm) > 0 {
-			s = replaceSubmatches(sym.MatchValue, sm)
+		sm := sym.MatchPatternCompiled.FindStringSubmatch(s)
+		if len(sm) == 0 {
+			// Pattern didn't match - cannot extract expected value
+			return 0, fmt.Errorf("match_pattern '%s' did not match value '%s'", sym.MatchPattern, s)
 		}
+		s = replaceSubmatches(sym.MatchValue, sm)
 	}
 
 	if v, ok := sym.Mapping[s]; ok && isInt(v) {
