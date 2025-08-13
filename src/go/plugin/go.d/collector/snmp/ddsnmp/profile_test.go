@@ -59,6 +59,10 @@ func Test_FindProfiles(t *testing.T) {
 			sysObjOId:   "0.1.2.3",
 			wanProfiles: 0,
 		},
+		"Cisco-WLC-5520": {
+			sysObjOId:   "1.3.6.1.4.1.9.1.2170",
+			wanProfiles: 3,
+		},
 	}
 
 	for name, test := range test {

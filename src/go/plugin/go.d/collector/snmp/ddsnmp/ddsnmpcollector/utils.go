@@ -214,7 +214,7 @@ func isInt(s string) bool {
 	return err == nil
 }
 
-func mergeTagsWithEmptyFallback(dest, src map[string]string) {
+func mergeTagsIfAbsent(dest, src map[string]string) {
 	for k, v := range src {
 		if existing, ok := dest[k]; !ok || existing == "" {
 			dest[k] = v

@@ -947,6 +947,9 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 								"vendor": {
 									Value: "Cisco",
 								},
+								"platform": {
+									Value: "Default Platform", // Will be overridden
+								},
 							},
 						},
 					},
@@ -955,7 +958,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 							SysobjectID: "1.3.6.1.4.1.9.*", // All Cisco devices
 							Metadata: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
 								"platform": {
-									Value: "Enterprise",
+									Value: "Enterprise", // Overrides base metadata
 								},
 								"support": {
 									Value: "Premium",
@@ -971,6 +974,9 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 								"series": {
 									Value: "ASA",
 								},
+								"support": {
+									Value: "Standard", // Won't override "Premium" - first wins
+								},
 							},
 						},
 						{
@@ -980,7 +986,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 									Value: "ASA5510",
 								},
 								"series": {
-									Value: "ASA5500", // Override the previous series value
+									Value: "ASA5500", // Won't override "ASA" - first wins
 								},
 							},
 						},
@@ -990,12 +996,12 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 			setupMock:   func(m *snmpmock.MockHandler) {},
 			sysobjectid: "1.3.6.1.4.1.9.1.669",
 			expectedResult: map[string]string{
-				"vendor":   "Cisco",
-				"platform": "Enterprise",
-				"support":  "Premium",
-				"type":     "Firewall",
-				"series":   "ASA5500", // Last match wins
-				"model":    "ASA5510",
+				"vendor":   "Cisco",      // From base metadata (not overridden)
+				"platform": "Enterprise", // From first sysobjectid match (overrides base "Default Platform")
+				"support":  "Premium",    // From first sysobjectid match (second match can't override)
+				"type":     "Firewall",   // From second sysobjectid match
+				"series":   "ASA",        // From second match (third match can't override)
+				"model":    "ASA5510",    // From third sysobjectid match
 			},
 			expectedError: false,
 		},
