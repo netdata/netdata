@@ -47,7 +47,7 @@ static struct proc_module {
      .func = do_GetSensors,
      .rd = NULL,
      .thread = NULL,
-     .cleanup = NULL},
+     .cleanup = do_Sensors_cleanup},
     {.name = "PerflibServices",
      .dim = "PerflibServices",
      .enabled = CONFIG_BOOLEAN_YES,
