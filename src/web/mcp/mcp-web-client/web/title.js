@@ -76,7 +76,24 @@ export async function generateChatTitle(chat, mcpConnection, provider, isAutomat
         // Send request with low temperature for consistent titles
         const temperature = 0.3;
         const llmStartTime = Date.now();
-        const response = await provider.sendMessage(messages, [], temperature, 'all-off', null, null);
+        
+        // Create a minimal chat object with the necessary configuration for the provider
+        // This ensures the provider uses the correct context window for title generation
+        const fakeChat = {
+            config: {
+                model: {
+                    params: {
+                        // Use title generation model's context window if configured, otherwise inherit from parent chat
+                        contextWindow: chat.config?.optimisation?.titleGeneration?.model?.params?.contextWindow || 
+                                      chat.config?.model?.params?.contextWindow,
+                        maxTokens: chat.config?.optimisation?.titleGeneration?.model?.params?.maxTokens || 100
+                    }
+                }
+            },
+            isSubChat: true  // Mark as subchat for logging purposes
+        };
+        
+        const response = await provider.sendMessage(messages, [], temperature, 'all-off', null, fakeChat);
         const llmResponseTime = Date.now() - llmStartTime;
         
         // Process the title response
@@ -205,7 +222,8 @@ export function getTitleGenerationProvider(chat, llmProvider, defaultProvider, c
         const provider = createLLMProvider(
             providerApiType,
             llmProvider.proxyUrl,
-            titleModel.id
+            titleModel.id,
+            llmProvider.availableProviders?.[titleModel.provider]
         );
         provider.onLog = llmProvider.onLog;
         return provider;

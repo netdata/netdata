@@ -124,8 +124,17 @@ export function validateConfig(config) {
             }
             
             // Context Window (Ollama specific)
-            if (typeof params.contextWindow === 'number' && params.contextWindow >= 1) {
-                validConfig.model.params.contextWindow = params.contextWindow;
+            if (params.contextWindow !== undefined) {
+                let cw = params.contextWindow;
+                if (typeof cw === 'string') {
+                    const parsed = parseInt(cw, 10);
+                    if (!isNaN(parsed) && parsed >= 1) {
+                        cw = parsed;
+                    }
+                }
+                if (typeof cw === 'number' && cw >= 1) {
+                    validConfig.model.params.contextWindow = cw;
+                }
             }
             
             // Seed
