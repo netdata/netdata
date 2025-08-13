@@ -201,7 +201,8 @@ struct mssql_db_instance {
     RRDDIM *rd_db_write_transactions;
     RRDDIM *rd_db_lockwait;
     RRDDIM *rd_db_deadlock;
-    RRDDIM *rd_db_readonly;
+    RRDDIM *rd_db_readonly_yes;
+    RRDDIM *rd_db_readonly_no;
     RRDDIM *rd_db_state[NETDATA_DB_STATES];
     RRDDIM *rd_lock_timeouts;
     RRDDIM *rd_lock_requests;
@@ -2448,7 +2449,7 @@ static void mssql_is_readonly_chart(struct mssql_db_instance *mdi, const char *d
                 "locks",
                 "mssql.database_readonly",
                 "Current database write status.",
-                "boolean",
+                "status",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibMSSQL",
                 PRIO_MSSQL_DATABASE_DEADLOCKS_PER_SECOND,
@@ -2458,11 +2459,16 @@ static void mssql_is_readonly_chart(struct mssql_db_instance *mdi, const char *d
         rrdlabels_add(mdi->st_db_readonly->rrdlabels, "mssql_instance", mdi->parent->instanceID, RRDLABEL_SRC_AUTO);
         rrdlabels_add(mdi->st_db_readonly->rrdlabels, "database", db, RRDLABEL_SRC_AUTO);
 
-        mdi->rd_db_readonly = rrddim_add(mdi->st_db_readonly, "readonly", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        mdi->rd_db_readonly_no = rrddim_add(mdi->st_db_readonly, "readonly", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        mdi->rd_db_readonly_yes = rrddim_add(mdi->st_db_readonly, "writable", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(
-            mdi->st_db_readonly, mdi->rd_db_readonly, (collected_number)mdi->MSSQLDBIsReadonly.current.Data);
+            mdi->st_db_readonly, mdi->rd_db_readonly_no, (collected_number)mdi->MSSQLDBIsReadonly.current.Data);
+
+    collected_number opposite = (mdi->MSSQLDBIsReadonly.current.Data) ? 0 : 1;
+    rrddim_set_by_pointer(
+            mdi->st_db_readonly, mdi->rd_db_readonly_yes, (collected_number)opposite);
 
     rrdset_done(mdi->st_db_readonly);
 }

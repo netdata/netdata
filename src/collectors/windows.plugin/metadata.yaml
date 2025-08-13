@@ -2070,9 +2070,10 @@ modules:
                 - name: memory
             - name: mssql.database_readonly
               description: Current database write status.
-              unit: boolean
+              unit: status
               chart_type: line
               dimensions:
+                - name: writable
                 - name: readonly
             - name: mssql.database_state
               description: Current database state.
