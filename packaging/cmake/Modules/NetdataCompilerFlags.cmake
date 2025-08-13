@@ -3,6 +3,7 @@
 
 include(CheckCCompilerFlag)
 include(CheckCXXCompilerFlag)
+include(NetdataUtil)
 
 # Construct a pre-processor safe name
 #
@@ -142,3 +143,13 @@ endforeach()
 
 add_simple_extra_compiler_flag("-Wbuiltin-macro-redefined" "-Wno-builtin-macro-redefined")
 add_simple_extra_compiler_flag("-fexceptions" "-fexceptions")
+
+if(STATIC_BUILD)
+  if(CMAKE_SYSTEM_PROCESSOR STREQUAL "arm" AND CMAKE_SIZEOF_VOID_P EQUAL 32)
+    netdata_detect_libc(LIBC_ID)
+    if(LIBC_ID STREQUAL "musl")
+      # Fix for bad thread-local storage behavior on static musl builds on 32-bit ARM.
+      add_simple_extra_compiler_flag("-ftls-model", "-ftls-model=initial-exec")
+    endif()
+  endif()
+endif()
