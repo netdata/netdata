@@ -961,6 +961,14 @@ class OpenAIProvider extends LLMProvider {
                 throw new Error(error);
             }
             choice = data.choices[0];
+            
+            // Check if the response was truncated due to token limit
+            if (choice.finish_reason === 'length') {
+                const error = 'LLM exhausted token limit - response truncated (finish_reason: length)';
+                console.error('[OpenAIProvider]', error);
+                this.log('error', error, { provider: 'openai', model: this.model, finish_reason: choice.finish_reason });
+                throw new Error(error);
+            }
         }
 
         // Convert OpenAI response to unified content array format
@@ -1033,6 +1041,14 @@ class OpenAIProvider extends LLMProvider {
                     });
                 }
             }
+        }
+
+        // Check for empty response (no content and no tool calls)
+        if (contentArray.length === 0) {
+            const error = 'LLM returned empty response - likely exhausted reasoning token budget';
+            console.error('[OpenAIProvider]', error);
+            this.log('error', error, { provider: 'openai', model: this.model });
+            throw new Error(error);
         }
 
         return {
@@ -1396,7 +1412,7 @@ class OpenAIProvider extends LLMProvider {
             }
             content = parts.join('\n\n');
         } else if (formatted.type === 'json') {
-            content = JSON.stringify(formatted.content, null, 2);
+            content = JSON.stringify(formatted.content);
         } else {
             content = JSON.stringify(result);
         }
@@ -1575,6 +1591,14 @@ class AnthropicProvider extends LLMProvider {
         /** @type {AnthropicResponse} */
         const data = await response.json();
         this.log('received', JSON.stringify(data, null, 2), { provider: 'anthropic' });
+
+        // Check for empty response (no content)
+        if (!data.content || (Array.isArray(data.content) && data.content.length === 0)) {
+            const error = 'LLM returned empty response - likely exhausted reasoning token budget';
+            console.error('[AnthropicProvider]', error);
+            this.log('error', error, { provider: 'anthropic', model: this.model });
+            throw new Error(error);
+        }
 
         // Log the processed response
         const processedResponse = {
@@ -1928,7 +1952,7 @@ class AnthropicProvider extends LLMProvider {
                 }
             }
         } else if (formatted.type === 'json') {
-            content = [{ type: 'text', text: JSON.stringify(formatted.content, null, 2) }];
+            content = [{ type: 'text', text: JSON.stringify(formatted.content) }];
         } else {
             // Fallback
             content = [{ type: 'text', text: JSON.stringify(result) }];
@@ -2150,6 +2174,14 @@ class GoogleProvider extends LLMProvider {
         // Add any remaining text content
         if (textContent) {
             contentArray.push({ type: 'text', text: textContent });
+        }
+
+        // Check for empty response (no content and no tool calls)
+        if (contentArray.length === 0) {
+            const error = 'LLM returned empty response - likely exhausted reasoning token budget';
+            console.error('[GoogleProvider]', error);
+            this.log('error', error, { provider: 'google', model: this.model });
+            throw new Error(error);
         }
 
         // Google returns token counts in usageMetadata
@@ -2518,12 +2550,25 @@ class OllamaProvider extends LLMProvider {
         // Convert tools to Ollama format
         const ollamaTools = tools.map(tool => {
             const injectedTool = this.injectToolMetadata(tool, chat);
+            
+            // Ensure the schema is valid for Ollama
+            const parameters = injectedTool.inputSchema || {};
+            
+            // Some Ollama models have issues with certain schema formats
+            // Ensure we have a valid JSON Schema structure
+            if (!parameters.type) {
+                parameters.type = 'object';
+            }
+            if (!parameters.properties) {
+                parameters.properties = {};
+            }
+            
             return {
                 type: 'function',
                 function: {
                     name: injectedTool.name,
                     description: injectedTool.description,
-                    parameters: injectedTool.inputSchema || {}
+                    parameters
                 }
             };
         });
@@ -2634,10 +2679,18 @@ class OllamaProvider extends LLMProvider {
                 error = { error: response.statusText };
             }
 
-            // Check if the error is about tool support
+            // Check if the error is about tool support or template issues
             const errorMessage = error.error || response.statusText;
-            if (errorMessage.includes('does not support tools') && ollamaTools.length > 0) {
-                console.log('[OllamaProvider] Model does not support tools, falling back to system prompt injection');
+            const isTemplateError = errorMessage.includes('template') && errorMessage.includes('Type') && errorMessage.includes('index');
+            const isToolSupportError = errorMessage.includes('does not support tools');
+            
+            if ((isToolSupportError || isTemplateError) && ollamaTools.length > 0) {
+                if (isTemplateError) {
+                    console.log('[OllamaProvider] Model has template error with tools, falling back to system prompt injection');
+                    console.log('[OllamaProvider] Template error details:', errorMessage);
+                } else {
+                    console.log('[OllamaProvider] Model does not support tools, falling back to system prompt injection');
+                }
 
                 // Retry without tools, injecting them into system prompt instead
                 useToolFallback = true;
@@ -2675,7 +2728,7 @@ class OllamaProvider extends LLMProvider {
                             retryError = { error: response.statusText };
                         }
                         const retryApiError = `Ollama API error (fallback): ${retryError.error || response.statusText}`;
-                        console.error('[OllamaProvider] API error on retry:', retryApiError);
+                        console.error('[OllamaProvider] API error on retry with tool fallback:', retryApiError);
                         throw new Error(retryApiError);
                     }
                 } catch (retryError) {
@@ -2792,8 +2845,8 @@ class OllamaProvider extends LLMProvider {
                 }
             }
 
-            // Add text content if present and we didn't parse tool calls from it
-            if (data.message && data.message.content && !contentHasToolCalls) {
+            // Add text content if present, non-empty, and we didn't parse tool calls from it
+            if (data.message && data.message.content && data.message.content.trim() !== '' && !contentHasToolCalls) {
                 contentArray.push({ type: 'text', text: data.message.content });
             }
 
@@ -2808,6 +2861,14 @@ class OllamaProvider extends LLMProvider {
                     });
                 }
             }
+        }
+
+        // Check for empty response (no content and no tool calls)
+        if (contentArray.length === 0) {
+            const error = 'LLM returned empty response - likely exhausted reasoning token budget';
+            console.error('[OllamaProvider]', error);
+            this.log('error', error, { provider: 'ollama', model: this.model });
+            throw new Error(error);
         }
 
         // Calculate token usage from response metadata
@@ -2925,7 +2986,7 @@ class OllamaProvider extends LLMProvider {
             }
             return parts.join('\n\n');
         } else if (formatted.type === 'json') {
-            return JSON.stringify(formatted.content, null, 2);
+            return JSON.stringify(formatted.content);
         } else {
             return JSON.stringify(result);
         }
@@ -2950,7 +3011,7 @@ class OllamaProvider extends LLMProvider {
         tools.forEach(tool => {
             prompt += `Tool: ${tool.function.name}\n`;
             prompt += `Description: ${tool.function.description}\n`;
-            prompt += `Parameters: ${JSON.stringify(tool.function.parameters, null, 2)}\n\n`;
+            prompt += `Parameters: ${JSON.stringify(tool.function.parameters)}\n\n`;
         });
 
         prompt += '## How to Use Tools\n\n';

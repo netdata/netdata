@@ -11,7 +11,7 @@ import { SafetyChecker, SafetyLimitError, SAFETY_LIMITS } from './safety-limits.
 class NetdataMCPChat {
     constructor() {
         // Log version on startup
-        console.log('🚀 Netdata MCP Web Client v1.0.98');
+        console.log('🚀 Netdata MCP Web Client v1.0.99');
 
         this.mcpServers = new Map(); // Multiple MCP servers
         this.mcpConnections = new Map(); // Active MCP connections
@@ -2779,11 +2779,16 @@ class NetdataMCPChat {
             const config = chat.config || ChatConfig.loadChatConfig(chatId);
             const modelConfig = ChatConfig.modelConfigFromString(model);
 
-            // Set context window for secondary model (Option 2: inherit from main, capped at model max)
+            // Set context window for secondary model (inherit from main, capped at model max)
             if (modelConfig && modelConfig.provider === 'ollama') {
                 const mainContextWindow = config.model?.params?.contextWindow || this.getDefaultContextWindow(chat);
                 const modelMaxContextWindow = this.getDefaultContextWindow({ config: { model: modelConfig } });
                 modelConfig.params.contextWindow = Math.min(mainContextWindow, modelMaxContextWindow);
+            }
+
+            // Propagate max output tokens from main chat to tool summarization model
+            if (config.model?.params?.maxTokens) {
+                modelConfig.params.maxTokens = config.model.params.maxTokens;
             }
 
             config.optimisation.toolSummarisation.model = modelConfig;
@@ -2809,11 +2814,16 @@ class NetdataMCPChat {
             const config = chat.config || ChatConfig.loadChatConfig(chatId);
             const modelConfig = ChatConfig.modelConfigFromString(model);
 
-            // Set context window for secondary model (Option 2: inherit from main, capped at model max)
+            // Set context window for secondary model (inherit from main, capped at model max)
             if (modelConfig && modelConfig.provider === 'ollama') {
                 const mainContextWindow = config.model?.params?.contextWindow || this.getDefaultContextWindow(chat);
                 const modelMaxContextWindow = this.getDefaultContextWindow({ config: { model: modelConfig } });
                 modelConfig.params.contextWindow = Math.min(mainContextWindow, modelMaxContextWindow);
+            }
+
+            // Propagate max output tokens from main chat to auto summarization model
+            if (config.model?.params?.maxTokens) {
+                modelConfig.params.maxTokens = config.model.params.maxTokens;
             }
 
             config.optimisation.autoSummarisation.model = modelConfig;
@@ -2844,12 +2854,14 @@ class NetdataMCPChat {
                 maxTokens: 100  // Title generation should use limited tokens
             });
 
-            // Set context window for secondary model (Option 2: inherit from main, capped at model max)
+            // Set context window for secondary model (inherit from main, capped at model max)
             if (modelConfig && modelConfig.provider === 'ollama') {
                 const mainContextWindow = config.model?.params?.contextWindow || this.getDefaultContextWindow(chat);
                 const modelMaxContextWindow = this.getDefaultContextWindow({ config: { model: modelConfig } });
                 modelConfig.params.contextWindow = Math.min(mainContextWindow, modelMaxContextWindow);
             }
+
+            // Title generation intentionally uses a small maxTokens (100); do not override from main chat
 
             config.optimisation.titleGeneration.model = modelConfig;
 
@@ -5357,10 +5369,34 @@ class NetdataMCPChat {
             if (activeChatId === unsavedChat.id) {
                 // Already in the unsaved chat, just show toast
                 this.showToast('Please use the current chat or save it by sending a message before creating a new one.');
-            } else {
-                // Switch to the unsaved chat instead of creating a new one
-                this.loadChat(unsavedChat.id);
+                return;
             }
+            
+            // Update the unsaved chat's configuration if we have an active chat
+            if (activeChatId && this.chats.has(activeChatId)) {
+                const activeChat = this.chats.get(activeChatId);
+                console.log(`[createNewChatDirectly] Updating unsaved chat configuration from active chat: ${activeChatId}`);
+                
+                // Update configuration
+                unsavedChat.config = JSON.parse(JSON.stringify(activeChat.config));
+                unsavedChat.mcpServerId = activeChat.mcpServerId;
+                unsavedChat.llmProviderId = activeChat.llmProviderId;
+                unsavedChat.model = ChatConfig.modelConfigToString(unsavedChat.config.model);
+                
+                // Recreate message optimizer with new config
+                const optimizerSettings = ChatConfig.getOptimizerSettings(unsavedChat.config, window.createLLMProvider);
+                unsavedChat.messageOptimizer = new MessageOptimizer(optimizerSettings);
+                
+                // Update the chat title to reflect the new configuration
+                const server = this.mcpServers.get(unsavedChat.mcpServerId);
+                const provider = this.llmProviders.get(unsavedChat.llmProviderId);
+                if (server && provider) {
+                    unsavedChat.title = `${server.name} - ${provider.name}`;
+                }
+            }
+            
+            // Switch to the unsaved chat
+            this.loadChat(unsavedChat.id);
             return;
         }
 
@@ -5370,17 +5406,38 @@ class NetdataMCPChat {
             return;
         }
 
-        // Get the last used configuration
-        const config = ChatConfig.getLastConfig();
-        let mcpServerId = config.mcpServer;
-        const llmProviderId = this.llmProviders.keys().next().value; // Always use first available
+        // Get configuration from active chat or use last saved
+        const activeChatId = this.getActiveChatId();
+        let config;
+        let mcpServerId;
+        let llmProviderId;
+        
+        if (activeChatId && this.chats.has(activeChatId)) {
+            // Copy configuration from the active chat
+            const activeChat = this.chats.get(activeChatId);
+            config = JSON.parse(JSON.stringify(activeChat.config));
+            mcpServerId = activeChat.mcpServerId;
+            llmProviderId = activeChat.llmProviderId;
+            console.log(`[createNewChatDirectly] Copying configuration from active chat: ${activeChatId}`);
+        } else {
+            // No active chat, use default configuration
+            config = ChatConfig.getLastConfig();
+            mcpServerId = config.mcpServer;
+            llmProviderId = this.llmProviders.keys().next().value; // Use first available
+            console.log('[createNewChatDirectly] No active chat, using default configuration');
+        }
 
-        // Use defaults if needed
+        // Validate MCP server
         if (!mcpServerId || !this.mcpServers.has(mcpServerId)) {
             // Get first server from sorted list
             const sortedServers = Array.from(this.mcpServers.entries())
                 .sort(([, a], [, b]) => a.name.localeCompare(b.name));
             mcpServerId = sortedServers[0]?.[0];
+        }
+
+        // Validate LLM provider
+        if (!llmProviderId || !this.llmProviders.has(llmProviderId)) {
+            llmProviderId = this.llmProviders.keys().next().value;
         }
 
         // Check if the config has a valid model, otherwise get first available
@@ -9647,6 +9704,17 @@ class NetdataMCPChat {
             }
         }
 
+        // Propagate max output tokens to sub-chat (all providers)
+        try {
+            const parentMax = parentChat.config?.model?.params?.maxTokens;
+            if (typeof parentMax === 'number' && parentMax > 0) {
+                subChatModel.params.maxTokens = parentMax;
+                console.log(`[createSubChatForTool] Propagated maxTokens to sub-chat: ${parentMax}`);
+            }
+        } catch (e) {
+            console.warn('[createSubChatForTool] Failed to propagate maxTokens to sub-chat:', e);
+        }
+
         // Create sub-chat with minimal config - no optimizations
         const subChatOptions = {
             mcpServerId: parentChat.mcpServerId,
@@ -9781,7 +9849,7 @@ class NetdataMCPChat {
         }
 
         userMessage += `\n\nThis is usually done by executing the ${toolCall.name} tool. `;
-        userMessage += `\n\nHere are the arguments I would use:\n\`\`\`json\n${JSON.stringify(cleanedArgs, null, 2)}\n\`\`\``;
+        userMessage += `\n\nHere are the arguments I would use:\n\`\`\`json\n${JSON.stringify(cleanedArgs)}\n\`\`\``;
         userMessage += `\n\nMy assumption that this tool and parameters will provide the desired result, may be wrong. `;
         userMessage += `In that case, come up with your own plan to answer the question.`;
 
