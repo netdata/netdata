@@ -3526,7 +3526,10 @@ class NetdataMCPChat {
         }
         
         // If no tool calls, display response and finish
+        console.log('[processSingleLLMResponse] Response content:', JSON.stringify(response.content, null, 2));
+        console.log('[processSingleLLMResponse] Response content is array:', Array.isArray(response.content));
         const toolsInContent = this.extractToolsFromContent(response.content);
+        console.log('[processSingleLLMResponse] Extracted tools:', toolsInContent);
         if (toolsInContent.length === 0) {
             // Emit metrics event first
             this.processRenderEvent({ 
@@ -6145,8 +6148,11 @@ class NetdataMCPChat {
                 // Show unsaved chats first
                 if (a.isSaved === false && b.isSaved !== false) {return -1;}
                 if (b.isSaved === false && a.isSaved !== false) {return 1;}
-                // Then sort by updated date
-                return new Date(b.updatedAt) - new Date(a.updatedAt);
+                // Then sort by creation date (static order)
+                // Use updatedAt as fallback for older chats without createdAt
+                const aDate = a.createdAt || a.updatedAt;
+                const bDate = b.createdAt || b.updatedAt;
+                return new Date(bDate) - new Date(aDate);
             });
         
         // Separate new/unsaved chats from saved chats

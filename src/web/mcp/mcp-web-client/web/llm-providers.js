@@ -2762,10 +2762,28 @@ class OllamaProvider extends LLMProvider {
                             parsed.arguments && typeof parsed.arguments === 'object') {
                             console.log('[OllamaProvider] Detected direct JSON tool call:', parsed);
                             // Validate that the tool exists
-                            const toolExists = tools.some(t => 
-                                (t.name === parsed.name) || 
-                                (t.function && t.function.name === parsed.name)
-                            );
+                            console.log('[OllamaProvider] Checking tool existence for:', parsed.name);
+                            console.log('[OllamaProvider] Available tools count:', tools.length);
+                            console.log('[OllamaProvider] Available tool names:', tools.map(t => t.name || (t.function && t.function.name)));
+                            console.log('[OllamaProvider] First tool structure:', tools[0]);
+                            const toolExists = tools.some(t => {
+                                const toolName = t.name || (t.function && t.function.name);
+                                if (!toolName) return false;
+                                
+                                // Exact match
+                                if (toolName === parsed.name) return true;
+                                
+                                // Check if the parsed name is part of the tool name (for prefixed tools)
+                                // e.g., "find_correlated_metrics" matches "mcp__netdata__find_correlated_metrics"
+                                if (toolName.endsWith(parsed.name) || toolName.includes(`__${parsed.name}`)) {
+                                    console.log(`[OllamaProvider] Fuzzy match found: "${parsed.name}" matches tool "${toolName}"`);
+                                    // Update the parsed name to use the full tool name
+                                    parsed.name = toolName;
+                                    return true;
+                                }
+                                
+                                return false;
+                            });
                             
                             if (toolExists) {
                                 contentArray.push({
@@ -2790,13 +2808,22 @@ class OllamaProvider extends LLMProvider {
                 // If not a direct JSON tool call, check for other formats
                 if (!contentHasToolCalls) {
                     // Check for various tool call indicators
-                    if (content.includes('python_tag') || 
+                    if (content.includes('<tool_call>') ||
+                        content.includes('python_tag') || 
                         content.includes('"type": "function"') ||
                         (content.includes('```json') && content.includes('"tool_use"'))) {
-                        console.log('[OllamaProvider] Detected tool calls in content, parsing...', content);
+                        console.log('[OllamaProvider] Detected tool calls in content, parsing...');
+                        console.log('[OllamaProvider] Raw content:', content);
                         const parsedContent = this.parseToolCallsFromText(content, tools);
-                        contentArray.push(...parsedContent);
-                        contentHasToolCalls = true;
+                        console.log('[OllamaProvider] Parsed content array length:', parsedContent.length);
+                        console.log('[OllamaProvider] Parsed content:', JSON.stringify(parsedContent, null, 2));
+                        if (parsedContent.length > 0) {
+                            contentArray.push(...parsedContent);
+                            contentHasToolCalls = true;
+                            console.log('[OllamaProvider] Successfully added tool calls to contentArray');
+                        } else {
+                            console.warn('[OllamaProvider] parseToolCallsFromText returned empty array');
+                        }
                     }
                 }
             }
@@ -2828,11 +2855,16 @@ class OllamaProvider extends LLMProvider {
             cacheCreationInputTokens: 0
         };
         
-        return {
+        const response = {
             content: contentArray,
             toolCalls: [],
             usage
         };
+        
+        console.log('[OllamaProvider] Final response content array:', JSON.stringify(contentArray, null, 2));
+        console.log('[OllamaProvider] Response has tool_use blocks:', contentArray.some(block => block.type === 'tool_use'));
+        
+        return response;
     }
 
     /**
@@ -3009,10 +3041,24 @@ class OllamaProvider extends LLMProvider {
                 if (parsed.name && typeof parsed.name === 'string' && 
                     parsed.arguments && typeof parsed.arguments === 'object') {
                     // Validate that the tool exists
-                    const toolExists = availableTools.some(t => 
-                        (t.name === parsed.name) || 
-                        (t.function && t.function.name === parsed.name)
-                    );
+                    const toolExists = availableTools.some(t => {
+                        const toolName = t.name || (t.function && t.function.name);
+                        if (!toolName) return false;
+                        
+                        // Exact match
+                        if (toolName === parsed.name) return true;
+                        
+                        // Check if the parsed name is part of the tool name (for prefixed tools)
+                        // e.g., "find_correlated_metrics" matches "mcp__netdata__find_correlated_metrics"
+                        if (toolName.endsWith(parsed.name) || toolName.includes(`__${parsed.name}`)) {
+                            console.log(`[OllamaProvider.parseToolCallsFromText] Fuzzy match found: "${parsed.name}" matches tool "${toolName}"`);
+                            // Update the parsed name to use the full tool name
+                            parsed.name = toolName;
+                            return true;
+                        }
+                        
+                        return false;
+                    });
                     
                     if (toolExists) {
                         contentArray.push({
@@ -3031,6 +3077,24 @@ class OllamaProvider extends LLMProvider {
         
         // Regular expressions for different tool call formats
         const patterns = [
+            // <tool_call> wrapped format
+            {
+                regex: /<tool_call>\s*(\{[\s\S]*?\})\s*<\/tool_call>/g,
+                parser: (match) => {
+                    try {
+                        const toolCallJson = JSON.parse(match[1]);
+                        if (toolCallJson.name && toolCallJson.arguments) {
+                            return {
+                                name: toolCallJson.name,
+                                input: toolCallJson.arguments
+                            };
+                        }
+                    } catch (e) {
+                        console.log('[OllamaProvider] Failed to parse tool_call JSON:', match[1], e);
+                    }
+                    return null;
+                }
+            },
             // JSON blocks with tool_use format
             {
                 regex: /```json\s*\n?\s*(\{[\s\S]*?"tool_use"[\s\S]*?\})\s*\n?\s*```/g,
@@ -3164,12 +3228,26 @@ class OllamaProvider extends LLMProvider {
             try {
                 const parsed = matchInfo.parser(matchInfo.match, text, matchInfo.index);
                 if (parsed) {
-                    // Validate that the tool exists
-                    const toolName = parsed.name;
-                    const toolExists = availableTools.some(t => 
-                        (t.name === toolName) || 
-                        (t.function && t.function.name === toolName)
-                    );
+                    // Validate that the tool exists with fuzzy matching
+                    let toolName = parsed.name;
+                    const toolExists = availableTools.some(t => {
+                        const availableToolName = t.name || (t.function && t.function.name);
+                        if (!availableToolName) return false;
+                        
+                        // Exact match
+                        if (availableToolName === toolName) return true;
+                        
+                        // Check if the parsed name is part of the tool name (for prefixed tools)
+                        // e.g., "find_correlated_metrics" matches "mcp__netdata__find_correlated_metrics"
+                        if (availableToolName.endsWith(toolName) || availableToolName.includes(`__${toolName}`)) {
+                            console.log(`[OllamaProvider.parseToolCallsFromText] Fuzzy match found: "${toolName}" matches tool "${availableToolName}"`);
+                            // Update to use the full tool name
+                            toolName = availableToolName;
+                            return true;
+                        }
+                        
+                        return false;
+                    });
                     
                     if (toolExists) {
                         contentArray.push({
@@ -3179,6 +3257,7 @@ class OllamaProvider extends LLMProvider {
                             input: parsed.input
                         });
                     } else {
+                        console.log('[OllamaProvider.parseToolCallsFromText] Tool not found:', parsed.name);
                         // Tool doesn't exist, treat as text
                         contentArray.push({ type: 'text', text: matchInfo.match[0] });
                     }
