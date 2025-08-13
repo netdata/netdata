@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- fix\(go.d/ddsnmp\): fix match\_pattern regex behavior in metadata and metric collection [\#20814](https://github.com/netdata/netdata/pull/20814) ([ilyam8](https://github.com/ilyam8))
+- improve\(go.d/snmp\): optimize Check\(\) to avoid heavy collection [\#20813](https://github.com/netdata/netdata/pull/20813) ([ilyam8](https://github.com/ilyam8))
+- Render latency chart if ACLK online [\#20811](https://github.com/netdata/netdata/pull/20811) ([stelfrag](https://github.com/stelfrag))
+- Monitor memory reclamation and buffer compact [\#20810](https://github.com/netdata/netdata/pull/20810) ([stelfrag](https://github.com/stelfrag))
 - Clear packet id when processed from PUBACK [\#20808](https://github.com/netdata/netdata/pull/20808) ([stelfrag](https://github.com/stelfrag))
 - improve\(go.d/zfspool\): add Ubuntu zpool binary path to config [\#20806](https://github.com/netdata/netdata/pull/20806) ([ilyam8](https://github.com/ilyam8))
 - feat\(go.d/snmp\): add SNMP sysObjectID mappings for device identification [\#20805](https://github.com/netdata/netdata/pull/20805) ([ilyam8](https://github.com/ilyam8))
@@ -18,6 +22,7 @@
 - build\(deps\): bump golang.org/x/net from 0.42.0 to 0.43.0 in /src/go [\#20796](https://github.com/netdata/netdata/pull/20796) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/redis/go-redis/v9 from 9.11.0 to 9.12.0 in /src/go [\#20794](https://github.com/netdata/netdata/pull/20794) ([dependabot[bot]](https://github.com/apps/dependabot))
 - ci: handle boolean values in EOL API responses for newly released distros [\#20792](https://github.com/netdata/netdata/pull/20792) ([ilyam8](https://github.com/ilyam8))
+- Add more MSSQL metrics \(windows.plugin\) [\#20788](https://github.com/netdata/netdata/pull/20788) ([thiagoftsm](https://github.com/thiagoftsm))
 - feat\(go.d/ddsnmp\): add MultiValue for state metrics and aggregation [\#20787](https://github.com/netdata/netdata/pull/20787) ([ilyam8](https://github.com/ilyam8))
 - feat\(go.d/ddsnmp\): add metric aggregation support for SNMP profiles [\#20786](https://github.com/netdata/netdata/pull/20786) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d/ddsnmp\): respect metric tag order from profile definition [\#20784](https://github.com/netdata/netdata/pull/20784) ([ilyam8](https://github.com/ilyam8))
@@ -445,9 +450,6 @@
 - docs: update mssql meta [\#20278](https://github.com/netdata/netdata/pull/20278) ([ilyam8](https://github.com/ilyam8))
 - New Windows Metrics \(CPU and Memory\) [\#20277](https://github.com/netdata/netdata/pull/20277) ([thiagoftsm](https://github.com/thiagoftsm))
 - chore\(go.d/snmp\): small cleanup snmp profiles code [\#20274](https://github.com/netdata/netdata/pull/20274) ([ilyam8](https://github.com/ilyam8))
-- Switch to poll from epoll [\#20273](https://github.com/netdata/netdata/pull/20273) ([stelfrag](https://github.com/stelfrag))
-- comment metric tags that could be metrics [\#20272](https://github.com/netdata/netdata/pull/20272) ([Ancairon](https://github.com/Ancairon))
-- build\(deps\): bump golang.org/x/net from 0.39.0 to 0.40.0 in /src/go [\#20270](https://github.com/netdata/netdata/pull/20270) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
