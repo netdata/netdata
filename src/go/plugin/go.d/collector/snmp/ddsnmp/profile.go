@@ -29,56 +29,26 @@ func OidMatches(sysObjId, id string) bool {
 }
 
 // FindProfiles returns profiles matching the given sysObjectID.
-// Profiles are sorted by match specificity: most specific (longest) first,
-// with exact OIDs preferred over patterns of the same length.
+// Profiles are sorted by match specificity: most specific first.
 func FindProfiles(sysObjId string) []*Profile {
 	loadProfiles()
 
-	type match struct {
-		profile *Profile
-		oid     string // matching OID
-	}
-
-	var matches []match
+	matchedOIDs := make(map[*Profile]string)
+	var profiles []*Profile
 
 	for _, prof := range ddProfiles {
 		// Use first matching OID (profile author's responsibility to order them)
 		for _, id := range prof.Definition.SysObjectIDs {
 			if OidMatches(sysObjId, id) {
-				matches = append(matches, match{
-					profile: prof.clone(),
-					oid:     id,
-				})
+				cloned := prof.clone()
+				profiles = append(profiles, cloned)
+				matchedOIDs[cloned] = id
 				break
 			}
 		}
 	}
 
-	// Sort by match specificity
-	slices.SortFunc(matches, func(a, b match) int {
-		// 1. Longer OIDs first (more specific)
-		if diff := len(b.oid) - len(a.oid); diff != 0 {
-			return diff
-		}
-
-		// 2. Same length: exact OIDs before patterns
-		aIsExact := oidOnly.MatchString(a.oid)
-		bIsExact := oidOnly.MatchString(b.oid)
-		if aIsExact != bIsExact {
-			if aIsExact {
-				return -1
-			}
-			return 1
-		}
-
-		// 3. Same type: lexicographic order for stability
-		return strings.Compare(a.oid, b.oid)
-	})
-
-	profiles := make([]*Profile, len(matches))
-	for i, m := range matches {
-		profiles[i] = m.profile
-	}
+	sortProfilesBySpecificity(profiles, matchedOIDs)
 
 	enrichProfiles(profiles)
 	deduplicateMetricsAcrossProfiles(profiles)
@@ -296,6 +266,34 @@ func (p *Profile) removeConstantMetrics() {
 	})
 }
 
+// sortProfilesBySpecificity sorts profiles by their match specificity.
+// More specific profiles (longer OIDs, exact matches) come first.
+// The matchedOIDs map contains the OID that matched for each profile.
+func sortProfilesBySpecificity(profiles []*Profile, matchedOIDs map[*Profile]string) {
+	slices.SortStableFunc(profiles, func(a, b *Profile) int {
+		aOID := matchedOIDs[a]
+		bOID := matchedOIDs[b]
+
+		// 1. Longer OIDs first (more specific)
+		if diff := len(bOID) - len(aOID); diff != 0 {
+			return diff
+		}
+
+		// 2. Same length: exact OIDs before patterns
+		aIsExact := oidOnly.MatchString(aOID)
+		bIsExact := oidOnly.MatchString(bOID)
+		if aIsExact != bIsExact {
+			if aIsExact {
+				return -1
+			}
+			return 1
+		}
+
+		// 3. Same type: lexicographic order for stability
+		return strings.Compare(aOID, bOID)
+	})
+}
+
 func enrichProfiles(profiles []*Profile) {
 	for _, prof := range profiles {
 		if prof.Definition == nil {
@@ -325,38 +323,8 @@ func deduplicateMetricsAcrossProfiles(profiles []*Profile) {
 		return
 	}
 
-	// Create a slice of indices sorted by priority (non-generic first)
-	type indexedProfile struct {
-		idx       int
-		isGeneric bool
-	}
-
-	indexed := make([]indexedProfile, len(profiles))
-	for i, prof := range profiles {
-		indexed[i] = indexedProfile{
-			idx:       i,
-			isGeneric: strings.Contains(strings.ToLower(prof.SourceFile), "generic"),
-		}
-	}
-
-	slices.SortFunc(indexed, func(a, b indexedProfile) int {
-		if a.isGeneric && !b.isGeneric {
-			return 1 // a comes after b
-		}
-		if !a.isGeneric && b.isGeneric {
-			return -1 // a comes before b
-		}
-		// If both are generic or both are non-generic, maintain original order
-		return a.idx - b.idx
-	})
-
-	// Reorder profiles slice according to deduplication priority
-	sortedProfiles := make([]*Profile, len(profiles))
-	for i, ip := range indexed {
-		sortedProfiles[i] = profiles[ip.idx]
-	}
-	copy(profiles, sortedProfiles)
-
+	// Profiles are already sorted by specificity from FindProfiles
+	// Just deduplicate metrics, keeping the first occurrence (most specific)
 	seenMetrics := make(map[string]bool)
 	seenVmetrics := make(map[string]bool)
 
@@ -376,6 +344,7 @@ func deduplicateMetricsAcrossProfiles(profiles []*Profile) {
 				return false
 			},
 		)
+
 		prof.Definition.VirtualMetrics = slices.DeleteFunc(
 			prof.Definition.VirtualMetrics,
 			func(vm ddprofiledefinition.VirtualMetricConfig) bool {

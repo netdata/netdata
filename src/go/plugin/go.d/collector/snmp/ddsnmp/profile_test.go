@@ -145,10 +145,10 @@ func TestDeduplicateMetricsAcrossProfiles(t *testing.T) {
 				},
 			},
 		},
-		"duplicate scalar metrics across profiles": {
+		"duplicate scalar metrics across profiles - first wins": {
 			profiles: []*Profile{
 				{
-					SourceFile: "profile1.yaml",
+					SourceFile: "specific-profile.yaml", // Most specific, comes first
 					Definition: &ddprofiledefinition.ProfileDefinition{
 						Metrics: []ddprofiledefinition.MetricsConfig{
 							{
@@ -161,7 +161,7 @@ func TestDeduplicateMetricsAcrossProfiles(t *testing.T) {
 					},
 				},
 				{
-					SourceFile: "profile2.yaml",
+					SourceFile: "generic-profile.yaml", // Less specific, comes second
 					Definition: &ddprofiledefinition.ProfileDefinition{
 						Metrics: []ddprofiledefinition.MetricsConfig{
 							{
@@ -182,7 +182,7 @@ func TestDeduplicateMetricsAcrossProfiles(t *testing.T) {
 			},
 			expected: []*Profile{
 				{
-					SourceFile: "profile1.yaml",
+					SourceFile: "specific-profile.yaml",
 					Definition: &ddprofiledefinition.ProfileDefinition{
 						Metrics: []ddprofiledefinition.MetricsConfig{
 							{
@@ -195,7 +195,7 @@ func TestDeduplicateMetricsAcrossProfiles(t *testing.T) {
 					},
 				},
 				{
-					SourceFile: "profile2.yaml",
+					SourceFile: "generic-profile.yaml",
 					Definition: &ddprofiledefinition.ProfileDefinition{
 						Metrics: []ddprofiledefinition.MetricsConfig{
 							{
@@ -212,7 +212,7 @@ func TestDeduplicateMetricsAcrossProfiles(t *testing.T) {
 		"duplicate table metrics - exact same symbols": {
 			profiles: []*Profile{
 				{
-					SourceFile: "profile1.yaml",
+					SourceFile: "specific-profile.yaml",
 					Definition: &ddprofiledefinition.ProfileDefinition{
 						Metrics: []ddprofiledefinition.MetricsConfig{
 							{
@@ -244,7 +244,7 @@ func TestDeduplicateMetricsAcrossProfiles(t *testing.T) {
 					},
 				},
 				{
-					SourceFile: "profile2.yaml",
+					SourceFile: "generic-profile.yaml",
 					Definition: &ddprofiledefinition.ProfileDefinition{
 						Metrics: []ddprofiledefinition.MetricsConfig{
 							{
@@ -279,7 +279,7 @@ func TestDeduplicateMetricsAcrossProfiles(t *testing.T) {
 			},
 			expected: []*Profile{
 				{
-					SourceFile: "profile1.yaml",
+					SourceFile: "specific-profile.yaml",
 					Definition: &ddprofiledefinition.ProfileDefinition{
 						Metrics: []ddprofiledefinition.MetricsConfig{
 							{
@@ -311,7 +311,7 @@ func TestDeduplicateMetricsAcrossProfiles(t *testing.T) {
 					},
 				},
 				{
-					SourceFile: "profile2.yaml",
+					SourceFile: "generic-profile.yaml",
 					Definition: &ddprofiledefinition.ProfileDefinition{
 						Metrics: []ddprofiledefinition.MetricsConfig{}, // Empty because it's a duplicate
 					},
@@ -481,10 +481,11 @@ func TestDeduplicateMetricsAcrossProfiles(t *testing.T) {
 				},
 			},
 		},
-		"multiple duplicates across three profiles": {
+		"order matters - specific profiles first": {
+			// Profiles are already sorted by FindProfiles, most specific first
 			profiles: []*Profile{
 				{
-					SourceFile: "generic-device.yaml",
+					SourceFile: "cisco-nexus-9000.yaml", // Most specific
 					Definition: &ddprofiledefinition.ProfileDefinition{
 						Metrics: []ddprofiledefinition.MetricsConfig{
 							{
@@ -494,22 +495,16 @@ func TestDeduplicateMetricsAcrossProfiles(t *testing.T) {
 								},
 							},
 							{
-								Table: ddprofiledefinition.SymbolConfig{
-									OID:  "1.3.6.1.2.1.2.2",
-									Name: "ifTable",
-								},
-								Symbols: []ddprofiledefinition.SymbolConfig{
-									{
-										OID:  "1.3.6.1.2.1.2.2.1.10",
-										Name: "ifInOctets",
-									},
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.9.9.305.1.1.1.0",
+									Name: "cempMemPoolUsed",
 								},
 							},
 						},
 					},
 				},
 				{
-					SourceFile: "vendor-specific.yaml",
+					SourceFile: "cisco-nexus.yaml", // Less specific
 					Definition: &ddprofiledefinition.ProfileDefinition{
 						Metrics: []ddprofiledefinition.MetricsConfig{
 							{
@@ -528,9 +523,15 @@ func TestDeduplicateMetricsAcrossProfiles(t *testing.T) {
 					},
 				},
 				{
-					SourceFile: "extended.yaml",
+					SourceFile: "generic-device.yaml", // Least specific
 					Definition: &ddprofiledefinition.ProfileDefinition{
 						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.1.3.0",
+									Name: "sysUpTime",
+								},
+							},
 							{
 								Table: ddprofiledefinition.SymbolConfig{
 									OID:  "1.3.6.1.2.1.2.2",
@@ -549,7 +550,7 @@ func TestDeduplicateMetricsAcrossProfiles(t *testing.T) {
 			},
 			expected: []*Profile{
 				{
-					SourceFile: "vendor-specific.yaml",
+					SourceFile: "cisco-nexus-9000.yaml",
 					Definition: &ddprofiledefinition.ProfileDefinition{
 						Metrics: []ddprofiledefinition.MetricsConfig{
 							{
@@ -560,6 +561,19 @@ func TestDeduplicateMetricsAcrossProfiles(t *testing.T) {
 							},
 							{
 								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.9.9.305.1.1.1.0",
+									Name: "cempMemPoolUsed",
+								},
+							},
+						},
+					},
+				},
+				{
+					SourceFile: "cisco-nexus.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
 									OID:  "1.3.6.1.4.1.9.9.109.1.1.1.1.7",
 									Name: "cpmCPUTotal5minRev",
 								},
@@ -568,7 +582,7 @@ func TestDeduplicateMetricsAcrossProfiles(t *testing.T) {
 					},
 				},
 				{
-					SourceFile: "extended.yaml",
+					SourceFile: "generic-device.yaml",
 					Definition: &ddprofiledefinition.ProfileDefinition{
 						Metrics: []ddprofiledefinition.MetricsConfig{
 							{
@@ -584,12 +598,6 @@ func TestDeduplicateMetricsAcrossProfiles(t *testing.T) {
 								},
 							},
 						},
-					},
-				},
-				{
-					SourceFile: "generic-device.yaml",
-					Definition: &ddprofiledefinition.ProfileDefinition{
-						Metrics: []ddprofiledefinition.MetricsConfig{}, // All removed as duplicates
 					},
 				},
 			},
@@ -652,175 +660,7 @@ func TestDeduplicateMetricsAcrossProfiles(t *testing.T) {
 				{
 					SourceFile: "profile3.yaml",
 					Definition: &ddprofiledefinition.ProfileDefinition{
-						Metrics: []ddprofiledefinition.MetricsConfig{},
-					},
-				},
-			},
-		},
-		"generic vs non-generic priority": {
-			profiles: []*Profile{
-				{
-					SourceFile: "generic-device.yaml",
-					Definition: &ddprofiledefinition.ProfileDefinition{
-						Metrics: []ddprofiledefinition.MetricsConfig{
-							{
-								Symbol: ddprofiledefinition.SymbolConfig{
-									OID:  "1.3.6.1.2.1.1.3.0",
-									Name: "sysUpTime",
-								},
-							},
-							{
-								Table: ddprofiledefinition.SymbolConfig{
-									OID:  "1.3.6.1.2.1.2.2",
-									Name: "ifTable",
-								},
-								Symbols: []ddprofiledefinition.SymbolConfig{
-									{
-										OID:  "1.3.6.1.2.1.2.2.1.10",
-										Name: "ifInOctets",
-									},
-									{
-										OID:  "1.3.6.1.2.1.2.2.1.16",
-										Name: "ifOutOctets",
-									},
-								},
-							},
-							{
-								Symbol: ddprofiledefinition.SymbolConfig{
-									OID:  "1.3.6.1.2.1.1.1.0",
-									Name: "sysDescr",
-								},
-							},
-						},
-					},
-				},
-				{
-					SourceFile: "mikrotik-router.yaml",
-					Definition: &ddprofiledefinition.ProfileDefinition{
-						Metrics: []ddprofiledefinition.MetricsConfig{
-							{
-								Symbol: ddprofiledefinition.SymbolConfig{
-									OID:  "1.3.6.1.2.1.1.3.0",
-									Name: "sysUpTime",
-								},
-							},
-							{
-								Table: ddprofiledefinition.SymbolConfig{
-									OID:  "1.3.6.1.2.1.2.2",
-									Name: "ifTable",
-								},
-								Symbols: []ddprofiledefinition.SymbolConfig{
-									{
-										OID:  "1.3.6.1.2.1.2.2.1.10",
-										Name: "ifInOctets",
-									},
-									{
-										OID:  "1.3.6.1.2.1.2.2.1.16",
-										Name: "ifOutOctets",
-									},
-								},
-							},
-							{
-								Symbol: ddprofiledefinition.SymbolConfig{
-									OID:  "1.3.6.1.4.1.14988.1.1.1.3.0",
-									Name: "mtxrHlCpuTemperature",
-								},
-							},
-						},
-					},
-				},
-				{
-					SourceFile: "generic-if.yaml",
-					Definition: &ddprofiledefinition.ProfileDefinition{
-						Metrics: []ddprofiledefinition.MetricsConfig{
-							{
-								Symbol: ddprofiledefinition.SymbolConfig{
-									OID:  "1.3.6.1.2.1.1.1.0",
-									Name: "sysDescr",
-								},
-							},
-							{
-								Table: ddprofiledefinition.SymbolConfig{
-									OID:  "1.3.6.1.2.1.31.1.1",
-									Name: "ifXTable",
-								},
-								Symbols: []ddprofiledefinition.SymbolConfig{
-									{
-										OID:  "1.3.6.1.2.1.31.1.1.1.6",
-										Name: "ifHCInOctets",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			expected: []*Profile{
-				{
-					SourceFile: "mikrotik-router.yaml",
-					Definition: &ddprofiledefinition.ProfileDefinition{
-						Metrics: []ddprofiledefinition.MetricsConfig{
-							{
-								Symbol: ddprofiledefinition.SymbolConfig{
-									OID:  "1.3.6.1.2.1.1.3.0",
-									Name: "sysUpTime",
-								},
-							},
-							{
-								Table: ddprofiledefinition.SymbolConfig{
-									OID:  "1.3.6.1.2.1.2.2",
-									Name: "ifTable",
-								},
-								Symbols: []ddprofiledefinition.SymbolConfig{
-									{
-										OID:  "1.3.6.1.2.1.2.2.1.10",
-										Name: "ifInOctets",
-									},
-									{
-										OID:  "1.3.6.1.2.1.2.2.1.16",
-										Name: "ifOutOctets",
-									},
-								},
-							},
-							{
-								Symbol: ddprofiledefinition.SymbolConfig{
-									OID:  "1.3.6.1.4.1.14988.1.1.1.3.0",
-									Name: "mtxrHlCpuTemperature",
-								},
-							},
-						},
-					},
-				},
-				{
-					SourceFile: "generic-device.yaml",
-					Definition: &ddprofiledefinition.ProfileDefinition{
-						Metrics: []ddprofiledefinition.MetricsConfig{
-							{
-								Symbol: ddprofiledefinition.SymbolConfig{
-									OID:  "1.3.6.1.2.1.1.1.0",
-									Name: "sysDescr",
-								},
-							},
-						},
-					},
-				},
-				{
-					SourceFile: "generic-if.yaml",
-					Definition: &ddprofiledefinition.ProfileDefinition{
-						Metrics: []ddprofiledefinition.MetricsConfig{
-							{
-								Table: ddprofiledefinition.SymbolConfig{
-									OID:  "1.3.6.1.2.1.31.1.1",
-									Name: "ifXTable",
-								},
-								Symbols: []ddprofiledefinition.SymbolConfig{
-									{
-										OID:  "1.3.6.1.2.1.31.1.1.1.6",
-										Name: "ifHCInOctets",
-									},
-								},
-							},
-						},
+						Metrics: []ddprofiledefinition.MetricsConfig{}, // Removed as duplicate
 					},
 				},
 			},
@@ -858,6 +698,191 @@ func TestDeduplicateMetricsAcrossProfiles(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestSortProfilesBySpecificity(t *testing.T) {
+	tests := map[string]struct {
+		profiles    []string // Source file names
+		matchedOIDs []string // OIDs in the same order as profiles
+		expected    []string // Expected order of profile source files
+	}{
+		"empty profiles": {
+			profiles:    []string{},
+			matchedOIDs: []string{},
+			expected:    []string{},
+		},
+		"single profile": {
+			profiles:    []string{"cisco.yaml"},
+			matchedOIDs: []string{"1.3.6.1.4.1.9.1.669"},
+			expected:    []string{"cisco.yaml"},
+		},
+		"exact OID vs pattern - same length": {
+			profiles:    []string{"pattern.yaml", "exact.yaml"},
+			matchedOIDs: []string{"1.3.6.1.4.1.9.1.66*", "1.3.6.1.4.1.9.1.669"},
+			expected:    []string{"exact.yaml", "pattern.yaml"},
+		},
+		"longer OID wins": {
+			profiles:    []string{"short.yaml", "long.yaml", "medium.yaml"},
+			matchedOIDs: []string{"1.3.6.1.4.1.9.*", "1.3.6.1.4.1.9.1.669", "1.3.6.1.4.1.9.1.*"},
+			expected:    []string{"long.yaml", "medium.yaml", "short.yaml"},
+		},
+		"complex mix - length, exact, and patterns": {
+			profiles: []string{
+				"generic-wildcard.yaml",
+				"specific-exact.yaml",
+				"specific-pattern.yaml",
+				"mid-exact.yaml",
+				"mid-pattern.yaml",
+			},
+			matchedOIDs: []string{
+				"1.3.6.1.4.1.9.*",
+				"1.3.6.1.4.1.9.1.669",
+				"1.3.6.1.4.1.9.1.66*",
+				"1.3.6.1.4.1.9.1",
+				"1.3.6.1.4.1.9.*",
+			},
+			expected: []string{
+				"specific-exact.yaml",   // Longest + exact
+				"specific-pattern.yaml", // Longest + pattern
+				"mid-exact.yaml",        // Medium + exact
+				"generic-wildcard.yaml", // Short + pattern (first in input order)
+				"mid-pattern.yaml",      // Short + pattern (second in input order)
+			},
+		},
+		"same OID different profiles - stable sort": {
+			profiles:    []string{"profile-b.yaml", "profile-a.yaml", "profile-c.yaml"},
+			matchedOIDs: []string{"1.3.6.1.4.1.9.1.669", "1.3.6.1.4.1.9.1.669", "1.3.6.1.4.1.9.1.669"},
+			expected:    []string{"profile-b.yaml", "profile-a.yaml", "profile-c.yaml"}, // Maintains input order
+		},
+		"regex patterns with special characters": {
+			profiles:    []string{"exact.yaml", "regex-dots.yaml", "regex-plus.yaml", "regex-question.yaml"},
+			matchedOIDs: []string{"1.3.6.1.4.1.9.1.669", "1.3.6.1.4.1.9.1...", "1.3.6.1.4.1.9.1.6+", "1.3.6.1.4.1.9.1.66?"},
+			expected: []string{
+				"exact.yaml",          // Length 21, exact
+				"regex-question.yaml", // Length 20, pattern
+				"regex-dots.yaml",     // Length 19, pattern ("..." < ".6+" lexicographically)
+				"regex-plus.yaml",     // Length 19, pattern
+			},
+		},
+		"all exact OIDs - sort by OID value": {
+			profiles:    []string{"oid-670.yaml", "oid-669.yaml", "oid-671.yaml"},
+			matchedOIDs: []string{"1.3.6.1.4.1.9.1.670", "1.3.6.1.4.1.9.1.669", "1.3.6.1.4.1.9.1.671"},
+			expected:    []string{"oid-669.yaml", "oid-670.yaml", "oid-671.yaml"},
+		},
+		"all patterns - sort by pattern value": {
+			profiles:    []string{"pattern-b.yaml", "pattern-a.yaml", "pattern-c.yaml"},
+			matchedOIDs: []string{"1.3.6.1.4.1.9.1.b*", "1.3.6.1.4.1.9.1.a*", "1.3.6.1.4.1.9.1.c*"},
+			expected:    []string{"pattern-a.yaml", "pattern-b.yaml", "pattern-c.yaml"},
+		},
+		"real-world scenario": {
+			profiles: []string{
+				"generic-device.yaml",
+				"cisco.yaml",
+				"cisco-asa.yaml",
+				"cisco-asa-5510.yaml",
+			},
+			matchedOIDs: []string{
+				"1.3.6.1.4.1.*",
+				"1.3.6.1.4.1.9.*",
+				"1.3.6.1.4.1.9.1.*",
+				"1.3.6.1.4.1.9.1.669",
+			},
+			expected: []string{
+				"cisco-asa-5510.yaml",
+				"cisco-asa.yaml",
+				"cisco.yaml",
+				"generic-device.yaml",
+			},
+		},
+		"mixed vendor OIDs": {
+			profiles: []string{
+				"dell.yaml",
+				"cisco.yaml",
+				"hp.yaml",
+				"generic.yaml",
+			},
+			matchedOIDs: []string{
+				"1.3.6.1.4.1.674.10892.5",
+				"1.3.6.1.4.1.9.1.669",
+				"1.3.6.1.4.1.11.2.3.7.11",
+				"1.3.6.1.4.1.*",
+			},
+			expected: []string{
+				"hp.yaml",      // Longest OID (24 chars)
+				"dell.yaml",    // Second longest (24 chars, but "11" < "674" lexicographically)
+				"cisco.yaml",   // Third longest (21 chars)
+				"generic.yaml", // Shortest (pattern, 13 chars)
+			},
+		},
+		"edge case - empty OID": {
+			profiles:    []string{"profile1.yaml", "profile2.yaml"},
+			matchedOIDs: []string{"", "1.3.6.1.4.1.9.1.669"},
+			expected:    []string{"profile2.yaml", "profile1.yaml"},
+		},
+		"patterns with same prefix": {
+			profiles: []string{
+				"generic.yaml",
+				"specific.yaml",
+				"more-specific.yaml",
+			},
+			matchedOIDs: []string{
+				"1.3.6.1.4.1.9.*",
+				"1.3.6.1.4.1.9.1.*",
+				"1.3.6.1.4.1.9.1.6*",
+			},
+			expected: []string{
+				"more-specific.yaml",
+				"specific.yaml",
+				"generic.yaml",
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			// Create profiles and matchedOIDs map
+			profiles := make([]*Profile, len(tc.profiles))
+			matchedOIDs := make(map[*Profile]string)
+
+			for i, sourceFile := range tc.profiles {
+				profiles[i] = &Profile{SourceFile: sourceFile}
+				if i < len(tc.matchedOIDs) {
+					matchedOIDs[profiles[i]] = tc.matchedOIDs[i]
+				}
+			}
+
+			sortProfilesBySpecificity(profiles, matchedOIDs)
+
+			actual := make([]string, len(profiles))
+			for i, p := range profiles {
+				actual[i] = p.SourceFile
+			}
+
+			assert.Equal(t, tc.expected, actual, "Profile order mismatch")
+		})
+	}
+}
+
+func TestSortProfilesBySpecificity_Stable(t *testing.T) {
+	// Create many profiles with the same OID
+	numProfiles := 100
+	profiles := make([]*Profile, numProfiles)
+	matchedOIDs := make(map[*Profile]string)
+
+	for i := 0; i < numProfiles; i++ {
+		profiles[i] = &Profile{
+			SourceFile: fmt.Sprintf("profile-%03d.yaml", i),
+		}
+		matchedOIDs[profiles[i]] = "1.3.6.1.4.1.9.1.669"
+	}
+
+	sortProfilesBySpecificity(profiles, matchedOIDs)
+
+	// Verify order is preserved (lexicographic due to same OID)
+	for i := 0; i < numProfiles; i++ {
+		expected := fmt.Sprintf("profile-%03d.yaml", i)
+		assert.Equal(t, expected, profiles[i].SourceFile)
 	}
 }
 
