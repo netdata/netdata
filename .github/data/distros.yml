@@ -43,7 +43,6 @@ static_arches:  # Static build architectures
   - aarch64
 docker_arches:  # Docker build archtiectures
   - amd64
-  - i386
   - armv7l
   - arm64
 default_sentry: &default_sentry # Default configuration for Sentry usage
