@@ -144,7 +144,7 @@ endforeach()
 add_simple_extra_compiler_flag("-Wbuiltin-macro-redefined" "-Wno-builtin-macro-redefined")
 add_simple_extra_compiler_flag("-fexceptions" "-fexceptions")
 
-if(CMAKE_SYSTEM_PROCESSOR STREQUAL "arm" AND CMAKE_SIZEOF_VOID_P EQUAL 32)
+if(CMAKE_SYSTEM_PROCESSOR STREQUAL "arm" AND CMAKE_SIZEOF_VOID_P EQUAL 4)
   if(STATIC_BUILD)
     netdata_detect_libc(LIBC_ID)
     if(LIBC_ID STREQUAL "musl")
