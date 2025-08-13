@@ -2077,10 +2077,15 @@ modules:
                 - name: readonly
             - name: mssql.database_state
               description: Current database state.
-              unit: boolean
+              unit: status
               chart_type: line
               dimensions:
-                - name: state
+                - name: online
+                - name: restoring
+                - name: recovering
+                - name: recovering_pending
+                - name: suspect
+                - name: offline
             - name: mssql.instance_memmgr_connection_memory_bytes
               description: Amount of dynamic memory to maintain connections
               unit: bytes
