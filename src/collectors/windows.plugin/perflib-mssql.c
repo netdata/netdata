@@ -2459,8 +2459,8 @@ static void mssql_is_readonly_chart(struct mssql_db_instance *mdi, const char *d
         rrdlabels_add(mdi->st_db_readonly->rrdlabels, "mssql_instance", mdi->parent->instanceID, RRDLABEL_SRC_AUTO);
         rrdlabels_add(mdi->st_db_readonly->rrdlabels, "database", db, RRDLABEL_SRC_AUTO);
 
-        mdi->rd_db_readonly_no = rrddim_add(mdi->st_db_readonly, "readonly", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         mdi->rd_db_readonly_yes = rrddim_add(mdi->st_db_readonly, "writable", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        mdi->rd_db_readonly_no = rrddim_add(mdi->st_db_readonly, "readonly", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(
