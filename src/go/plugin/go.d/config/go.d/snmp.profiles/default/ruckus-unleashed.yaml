@@ -13,7 +13,7 @@ metadata:
   device:
     fields:
       type:
-        value: "WLC"
+        value: "Wireless LAN Controller"
 
 metric_tags:
   - tag: ruckus_unleashed_system_model

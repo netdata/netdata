@@ -13,4 +13,4 @@ metadata:
   device:
     fields:
       type:
-        value: "WLC"
+        value: "Wireless LAN Controller"

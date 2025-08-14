@@ -17,7 +17,7 @@ metadata:
           OID: 1.3.6.1.4.1.14179.1.1.1.4
           name: agentInventorySerialNumber
       type:
-        value: "WLC"
+        value: "Wireless LAN Controller"
       vendor:
         value: "Cisco"
 
@@ -36,6 +36,64 @@ sysobjectid:
   - 1.3.6.1.4.1.9.1.2170 # cisco5520WLC
   - 1.3.6.1.4.1.9.1.2171 # cisco8540Wlc
   - 1.3.6.1.4.1.9.1.2427 # cisco3504WLC
+
+sysobjectid_metadata:
+  - sysobjectid: 1.3.6.1.4.1.9.1.818
+    metadata:
+      model:
+        value: NM-WLC-E
+  - sysobjectid: 1.3.6.1.4.1.9.1.828
+    metadata:
+      model:
+        value: AIR-WLC2106-K9
+  - sysobjectid: 1.3.6.1.4.1.9.1.926
+    metadata:
+      model:
+        value: 520-WLC
+  - sysobjectid: 1.3.6.1.4.1.9.1.1069
+    metadata:
+      model:
+        value: 5500-WLC
+  - sysobjectid: 1.3.6.1.4.1.9.1.1279
+    metadata:
+      model:
+        value: AIR-CT2504-K9
+  - sysobjectid: 1.3.6.1.4.1.9.1.1295
+    metadata:
+      model:
+        value: 7500-WLC
+  - sysobjectid: 1.3.6.1.4.1.9.1.1615
+    metadata:
+      model:
+        value: 8500-WLC
+  - sysobjectid: 1.3.6.1.4.1.9.1.1631
+    metadata:
+      model:
+        value: Virtual-WLC
+  - sysobjectid: 1.3.6.1.4.1.9.1.1645
+    metadata:
+      model:
+        value: 5760-WLC
+  - sysobjectid: 1.3.6.1.4.1.9.1.1926
+    metadata:
+      model:
+        value: WLC-CT5508-K9
+  - sysobjectid: 1.3.6.1.4.1.9.1.1927
+    metadata:
+      model:
+        value: WLC-CT2504-K9
+  - sysobjectid: 1.3.6.1.4.1.9.1.2170
+    metadata:
+      model:
+        value: 5520-WLC
+  - sysobjectid: 1.3.6.1.4.1.9.1.2171
+    metadata:
+      model:
+        value: 8540-WLC
+  - sysobjectid: 1.3.6.1.4.1.9.1.2427
+    metadata:
+      model:
+        value: 3504-WLC
 
 metrics:
   - MIB: AIRESPACE-SWITCHING-MIB
