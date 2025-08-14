@@ -18,8 +18,9 @@ endfunction()
 #
 # If the language flags already match the `match` argument, skip this flag.
 # Otherwise, check for support for `flag` and if support is found, add it to
-# the compiler flags for the run.
-function(add_simple_extra_compiler_flag match flag)
+# the compiler flags for the run. Also sets `result` to TRUE/FALSE
+# depending on whether the flag was added or not.
+function(add_extra_compiler_flag match flag result)
   set(CMAKE_REQUIRED_FLAGS "-Werror")
 
   make_cpp_safe_name("${flag}" flag_name)
@@ -35,37 +36,26 @@ function(add_simple_extra_compiler_flag match flag)
   if(HAVE_C_${flag_name} AND HAVE_CXX_${flag_name})
     add_compile_options("${flag}")
     add_link_options("${flag}")
+    if(DEFINED result)
+      set(${result} TRUE PARENT_SCOPE)
+    endif()
+  elseif(DEFINED result)
+    set(${result} FALSE PARENT_SCOPE)
   endif()
 endfunction()
 
 # Same as add_simple_extra_compiler_flag, but check for a second flag if the
 # first one is unsupported.
-function(add_double_extra_compiler_flag match flag1 flag2)
-  set(CMAKE_REQUIRED_FLAGS "-Werror")
+function(add_double_extra_compiler_flag match flag1 flag2 result)
+  add_extra_compiler_flag("${match}" "${flag1}" flag1_success)
 
-  make_cpp_safe_name("${flag1}" flag1_name)
-  make_cpp_safe_name("${flag2}" flag2_name)
-
-  if(NOT ${CMAKE_C_FLAGS} MATCHES ${match})
-    check_c_compiler_flag("${flag1}" HAVE_C_${flag1_name})
-    if(NOT HAVE_C_${flag1_name})
-      check_c_compiler_flag("${flag2}" HAVE_C_${flag2_name})
+  if(NOT "${flag1_success}")
+    add_extra_compiler_flag("${match}" "${flag2}" flag2_success)
+    if(DEFINED result)
+      set(${result} "${flag2_success}" PARENT_SCOPE)
     endif()
-  endif()
-
-  if(NOT ${CMAKE_CXX_FLAGS} MATCHES ${match})
-    check_cxx_compiler_flag("${flag1}" HAVE_CXX_${flag1_name})
-    if(NOT HAVE_CXX_${flag1_name})
-      check_cxx_compiler_flag("${flag2}" HAVE_CXX_${flag2_name})
-    endif()
-  endif()
-
-  if(HAVE_C_${flag1_name} AND HAVE_CXX_${flag1_name})
-    add_compile_options("${flag1}")
-    add_link_options("${flag1}")
-  elseif(HAVE_C_${flag2_name} AND HAVE_CXX${flag2_name})
-    add_compile_options("${flag2}")
-    add_link_options("${flag2}")
+  elseif(DEFINED result)
+    set(${result} TRUE PARENT_SCOPE)
   endif()
 endfunction()
 
@@ -101,7 +91,7 @@ option(ENABLE_ADDRESS_SANITIZER "Build with address sanitizer enabled" False)
 mark_as_advanced(ENABLE_ADDRESS_SANITIZER)
 
 if(ENABLE_ADDRESS_SANITIZER)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
+  add_required_compiler_flag("-fsanitize=address")
 endif()
 
 if(STATIC_BUILD)
