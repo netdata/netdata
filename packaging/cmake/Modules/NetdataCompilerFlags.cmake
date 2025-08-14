@@ -18,7 +18,7 @@ endfunction()
 #
 # If the language flags already match the `match` argument, skip this flag.
 # Otherwise, check for support for `flag` and if support is found, add it to
-# the compiler flags for the run. Also sets `result` to TRUE/FALSE
+# the compiler flags for the run. Also sets `result` to MATCHED/ADDED/UNSUPPORTED
 # depending on whether the flag was added or not.
 function(add_extra_compiler_flag match flag result)
   set(CMAKE_REQUIRED_FLAGS "-Werror")
@@ -27,20 +27,24 @@ function(add_extra_compiler_flag match flag result)
 
   if(NOT ${CMAKE_C_FLAGS} MATCHES ${match})
     check_c_compiler_flag("${flag}" HAVE_C_${flag_name})
+  else()
+    set(matched_c TRUE)
   endif()
 
   if(NOT ${CMAKE_CXX_FLAGS} MATCHES ${match})
     check_cxx_compiler_flag("${flag}" HAVE_CXX_${flag_name})
+  else()
+    set(matched_cxx TRUE)
   endif()
 
   if(HAVE_C_${flag_name} AND HAVE_CXX_${flag_name})
     add_compile_options("${flag}")
     add_link_options("${flag}")
-    if(DEFINED result)
-      set(${result} TRUE PARENT_SCOPE)
-    endif()
-  elseif(DEFINED result)
-    set(${result} FALSE PARENT_SCOPE)
+    set(${result} ADDED PARENT_SCOPE)
+  elseif(matched_c OR matched_cxx)
+    set(${result} MATCHED PARENT_SCOPE)
+  else()
+    set(${result} UNSUPPORTED PARENT_SCOPE)
   endif()
 endfunction()
 
@@ -49,19 +53,17 @@ endfunction()
 function(add_double_extra_compiler_flag match flag1 flag2 result)
   add_extra_compiler_flag("${match}" "${flag1}" flag1_success)
 
-  if(NOT "${flag1_success}")
+  if(${flag1_success} STREQUAL UNSUPPORTED)
     add_extra_compiler_flag("${match}" "${flag2}" flag2_success)
-    if(DEFINED result)
-      set(${result} "${flag2_success}" PARENT_SCOPE)
-    endif()
-  elseif(DEFINED result)
-    set(${result} TRUE PARENT_SCOPE)
+    set(${result} "${flag2_success}" PARENT_SCOPE)
+  else()
+    set(${result} "${flag1_success}" PARENT_SCOPE)
   endif()
 endfunction()
 
 # Add a required extra compiler flag to C and C++ flags.
 #
-# Similar logic as add_simple_extra_compiler_flag, but ignores existing
+# Similar logic to add_extra_compiler_flag, but ignores existing
 # instances and throws an error if the flag is not supported.
 function(add_required_compiler_flag flag)
   set(CMAKE_REQUIRED_FLAGS "-Werror")
@@ -125,15 +127,15 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_C_FLAGS}")
 add_required_compiler_flag("-fexceptions")
 
 if(NOT ${DISABLE_HARDENING})
-  add_double_extra_compiler_flag("stack-protector" "-fstack-protector-strong" "-fstack-protector")
-  add_double_extra_compiler_flag("_FORTIFY_SOURCE" "-D_FORTIFY_SOURCE=3" "-D_FORTIFY_SOURCE=2")
-  add_simple_extra_compiler_flag("stack-clash-protection" "-fstack-clash-protection")
-  add_simple_extra_compiler_flag("-fcf-protection" "-fcf-protection=full")
-  add_simple_extra_compiler_flag("branch-protection" "-mbranch-protection=standard")
+  add_double_extra_compiler_flag("stack-protector" "-fstack-protector-strong" "-fstack-protector" HAVE_STACK_PROTECTOR)
+  add_double_extra_compiler_flag("_FORTIFY_SOURCE" "-D_FORTIFY_SOURCE=3" "-D_FORTIFY_SOURCE=2" HAVE_FORTIFY_SOURCE)
+  add_extra_compiler_flag("stack-clash-protection" "-fstack-clash-protection" HAVE_STACK_CLASH_PROTECTION)
+  add_extra_compiler_flag("-fcf-protection" "-fcf-protection=full" HAVE_CFI)
+  add_extra_compiler_flag("branch-protection" "-mbranch-protection=standard" HAVE_BRANCH_PROTECTION)
 endif()
 
 foreach(FLAG function-sections data-sections)
-  add_simple_extra_compiler_flag("${FLAG}" "-f${FLAG}")
+  add_extra_compiler_flag("${FLAG}" "-f${FLAG}" HAVE_${FLAG})
 endforeach()
 
-add_simple_extra_compiler_flag("-Wbuiltin-macro-redefined" "-Wno-builtin-macro-redefined")
+add_extra_compiler_flag("-Wbuiltin-macro-redefined" "-Wno-builtin-macro-redefined" HAVE_MACRO)
