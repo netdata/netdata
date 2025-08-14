@@ -538,7 +538,7 @@ void pulse_network_do(bool extended __maybe_unused) {
 
                 rd_aclk_buffer_used = rrddim_add(st_aclk_buffer, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 rd_aclk_buffer_free = rrddim_add(st_aclk_buffer, "free",  NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                rd_aclk_buffer_size = rrddim_add(st_aclk_buffer, "curent limit", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                rd_aclk_buffer_size = rrddim_add(st_aclk_buffer, "current limit", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
 
             rrddim_set_by_pointer(st_aclk_buffer, rd_aclk_buffer_used, (collected_number)t.mqtt.tx_buffer_used);
