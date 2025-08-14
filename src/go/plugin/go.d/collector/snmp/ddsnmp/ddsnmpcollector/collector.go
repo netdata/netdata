@@ -66,15 +66,16 @@ type (
 	}
 )
 
-func (c *Collector) CollectDeviceMetadata() (map[string]map[string]string, error) {
-	meta := make(map[string]map[string]string)
+func (c *Collector) CollectDeviceMetadata() (map[string]string, error) {
+	meta := make(map[string]string)
 
 	for _, prof := range c.profiles {
-		deviceMeta, err := c.deviceMetadataCollector.Collect(prof.profile)
+		profDeviceMeta, err := c.deviceMetadataCollector.Collect(prof.profile)
 		if err != nil {
 			return nil, err
 		}
-		meta[prof.profile.SourceFile] = deviceMeta
+
+		mergeTagsIfAbsent(meta, profDeviceMeta)
 	}
 
 	return meta, nil
