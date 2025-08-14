@@ -499,7 +499,7 @@ void pulse_network_do(bool extended __maybe_unused) {
                     "milliseconds",
                     "netdata",
                     "pulse",
-                    PULSE_NETWORK_CHART_PRIORITY + 1,
+                    PULSE_NETWORK_CHART_PRIORITY + 4,
                     localhost->rrd_update_every,
                     RRDSET_TYPE_LINE);
                 rd_min = rrddim_add(st_stats, "min", NULL, 1, USEC_PER_MS, RRD_ALGORITHM_ABSOLUTE);
@@ -511,6 +511,40 @@ void pulse_network_do(bool extended __maybe_unused) {
             rrddim_set_by_pointer(st_stats, rd_avg, (collected_number)avg_us);
             rrddim_set_by_pointer(st_stats, rd_max, (collected_number)max_us);
             rrdset_done(st_stats);
+        }
+
+        if(extended) {
+            static RRDSET *st_aclk_buffer = NULL;
+            static RRDDIM *rd_aclk_buffer_used = NULL;
+            static RRDDIM *rd_aclk_buffer_free = NULL;
+            static RRDDIM *rd_aclk_buffer_size = NULL;
+
+            if (unlikely(!st_aclk_buffer)) {
+                st_aclk_buffer = rrdset_create_localhost(
+                    "netdata",
+                    "network_aclk_buffer_usage",
+                    NULL,
+                    PULSE_NETWORK_CHART_FAMILY,
+                    "netdata.network_aclk_buffer_usage",
+                    "Netdata ACLK Buffer Usage",
+                    "bytes",
+                    "netdata",
+                    "pulse",
+                    PULSE_NETWORK_CHART_PRIORITY + 5,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_AREA);
+
+                rrdlabels_add(st_aclk_buffer->rrdlabels, "endpoint", "aclk", RRDLABEL_SRC_AUTO);
+
+                rd_aclk_buffer_used = rrddim_add(st_aclk_buffer, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                rd_aclk_buffer_free = rrddim_add(st_aclk_buffer, "free",  NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                rd_aclk_buffer_size = rrddim_add(st_aclk_buffer, "current limit", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            }
+
+            rrddim_set_by_pointer(st_aclk_buffer, rd_aclk_buffer_used, (collected_number)t.mqtt.tx_buffer_used);
+            rrddim_set_by_pointer(st_aclk_buffer, rd_aclk_buffer_free, (collected_number)t.mqtt.tx_buffer_free);
+            rrddim_set_by_pointer(st_aclk_buffer, rd_aclk_buffer_size, (collected_number)t.mqtt.tx_buffer_size);
+            rrdset_done(st_aclk_buffer);
         }
     }
 }
