@@ -20,13 +20,9 @@ include(CMakeDependentOption)
 include(NetdataUtil)
 netdata_fixup_system_processor()
 
-set(STATIC_BUILD FALSE)
-
-if(DEFINED BUILD_SHARED_LIBS)
-  if(NOT BUILD_SHARED_LIBS)
-    set(STATIC_BUILD TRUE)
-  endif()
-endif()
+option(STATIC_BUILD "Use static linking instead of dynamic linking for the build." FALSE)
+mark_as_advanced(STATIC_BUILD)
+set(BUILD_SHARED_LIBS "${STATIC_BUILD}")
 
 if(STATIC_BUILD)
   set(CMAKE_FIND_LIBRARY_PREFIXES "${CMAKE_STATIC_LIBRARY_PREFIX}")

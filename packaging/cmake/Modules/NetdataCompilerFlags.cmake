@@ -95,7 +95,7 @@ if(ENABLE_ADDRESS_SANITIZER)
 endif()
 
 if(STATIC_BUILD)
-  add_simple_extra_compiler_flag("-static" "-static")
+  add_required_compiler_flag("-static")
 
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static")
 endif()
