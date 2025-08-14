@@ -11,7 +11,7 @@ void pulse_aclk_sent_message_acked(usec_t publish_latency, size_t len);
 #include "mqtt_constants.h"
 #include "mqtt_ng.h"
 #include "aclk_mqtt_workers.h"
-
+#include "daemon/config/netdata-conf-profile.h"
 
 #define PACKET_ACK_TIMEOUT_SECS (60)
 #define SMALL_STRING_DONT_FRAGMENT_LIMIT 128
@@ -430,6 +430,9 @@ static void buffer_frag_free_data(struct buffer_fragment *frag)
 }
 
 #define HEADER_BUFFER_SIZE (1024*1024)
+#define HEADER_BUFFER_SIZE_IOT (128*1024)
+#define HEADER_BUFFER_SIZE_STANDALONE (512*1024)
+
 #define GROWTH_FACTOR 1.25
 
 #define BUFFER_BYTES_USED(buf) ((size_t)((buf)->tail - (buf)->data))
@@ -616,7 +619,10 @@ struct mqtt_ng_client *mqtt_ng_init(struct mqtt_ng_init *settings)
 {
     struct mqtt_ng_client *client = callocz(1, sizeof(struct mqtt_ng_client));
 
-    transaction_buffer_init(&client->main_buffer, HEADER_BUFFER_SIZE);
+    size_t buffer_size = netdata_conf_is_iot() ?
+                             HEADER_BUFFER_SIZE_IOT :
+                             (netdata_conf_is_standalone() ? HEADER_BUFFER_SIZE_STANDALONE : HEADER_BUFFER_SIZE);
+    transaction_buffer_init(&client->main_buffer, buffer_size);
 
     client->rx_aliases = RX_ALIASES_INITIALIZE();
 
