@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Add ACLK buffer usage metrics [\#20820](https://github.com/netdata/netdata/pull/20820) ([stelfrag](https://github.com/stelfrag))
+- fix\(go.d/ddsnmp\): correct profile matching, metadata precedence, and OID handling [\#20819](https://github.com/netdata/netdata/pull/20819) ([ilyam8](https://github.com/ilyam8))
 - Fix Charts \(windows.plugin\) [\#20815](https://github.com/netdata/netdata/pull/20815) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix\(go.d/ddsnmp\): fix match\_pattern regex behavior in metadata and metric collection [\#20814](https://github.com/netdata/netdata/pull/20814) ([ilyam8](https://github.com/ilyam8))
 - improve\(go.d/snmp\): optimize Check\(\) to avoid heavy collection [\#20813](https://github.com/netdata/netdata/pull/20813) ([ilyam8](https://github.com/ilyam8))
@@ -450,8 +452,6 @@
 - add "unix://" scheme to DOCKER\_HOST in run.sh [\#20286](https://github.com/netdata/netdata/pull/20286) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#20284](https://github.com/netdata/netdata/pull/20284) ([netdatabot](https://github.com/netdatabot))
 - Improved StatsD documentation [\#20282](https://github.com/netdata/netdata/pull/20282) ([kanelatechnical](https://github.com/kanelatechnical))
-- Improve agent shutdown [\#20280](https://github.com/netdata/netdata/pull/20280) ([stelfrag](https://github.com/stelfrag))
-- Regenerate integrations docs [\#20279](https://github.com/netdata/netdata/pull/20279) ([netdatabot](https://github.com/netdatabot))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
