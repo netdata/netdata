@@ -25,6 +25,9 @@ func init() {
 	if strings.HasSuffix(Name, ".test") {
 		Name = "test"
 	}
+	if Name == "godplugin" {
+		Name = "go.d"
+	}
 
 	fi, err := os.Lstat(path)
 	if err != nil {
