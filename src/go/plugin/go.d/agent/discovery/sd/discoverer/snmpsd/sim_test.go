@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/model"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
 type discoverySim struct {
@@ -172,11 +173,11 @@ const (
 )
 
 func (m *mockSnmpHandler) setExpectSysInfo() {
-	m.EXPECT().WalkAll(RootOidMibSystem).Return([]gosnmp.SnmpPDU{
-		{Name: OidSysDescr, Value: []uint8(mockSysDescr), Type: gosnmp.OctetString},
-		{Name: OidSysObject, Value: mockSysObject, Type: gosnmp.ObjectIdentifier},
-		{Name: OidSysContact, Value: []uint8(mockSysContact), Type: gosnmp.OctetString},
-		{Name: OidSysName, Value: []uint8(mockSysName), Type: gosnmp.OctetString},
-		{Name: OidSysLocation, Value: []uint8(mockSysLocation), Type: gosnmp.OctetString},
+	m.EXPECT().WalkAll(snmputils.RootOidMibSystem).Return([]gosnmp.SnmpPDU{
+		{Name: snmputils.OidSysDescr, Value: []uint8(mockSysDescr), Type: gosnmp.OctetString},
+		{Name: snmputils.OidSysObject, Value: mockSysObject, Type: gosnmp.ObjectIdentifier},
+		{Name: snmputils.OidSysContact, Value: []uint8(mockSysContact), Type: gosnmp.OctetString},
+		{Name: snmputils.OidSysName, Value: []uint8(mockSysName), Type: gosnmp.OctetString},
+		{Name: snmputils.OidSysLocation, Value: []uint8(mockSysLocation), Type: gosnmp.OctetString},
 	}, nil).AnyTimes()
 }

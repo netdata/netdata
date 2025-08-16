@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/discoverer/snmpsd"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 
 	"github.com/gosnmp/gosnmp"
 )
@@ -62,7 +62,7 @@ func (c *Collector) collectNetworkInterfaces(mx map[string]int64) error {
 		case oidIfIndex:
 			iface.ifIndex, err = pduToInt(pdu)
 		case oidIfDescr:
-			iface.ifDescr, err = snmpsd.PduToString(pdu)
+			iface.ifDescr, err = snmputils.PduToString(pdu)
 		case oidIfType:
 			iface.ifType, err = pduToInt(pdu)
 		case oidIfMtu:
@@ -96,7 +96,7 @@ func (c *Collector) collectNetworkInterfaces(mx map[string]int64) error {
 		case oidIfOutErrors:
 			iface.ifOutErrors, err = pduToInt(pdu)
 		case oidIfName:
-			iface.ifName, err = snmpsd.PduToString(pdu)
+			iface.ifName, err = snmputils.PduToString(pdu)
 		case oidIfInMulticastPkts:
 			iface.ifInMulticastPkts, err = pduToInt(pdu)
 		case oidIfInBroadcastPkts:
@@ -124,7 +124,7 @@ func (c *Collector) collectNetworkInterfaces(mx map[string]int64) error {
 		case oidIfHighSpeed:
 			iface.ifHighSpeed, err = pduToInt(pdu)
 		case oidIfAlias:
-			iface.ifAlias, err = snmpsd.PduToString(pdu)
+			iface.ifAlias, err = snmputils.PduToString(pdu)
 		default:
 			continue
 		}

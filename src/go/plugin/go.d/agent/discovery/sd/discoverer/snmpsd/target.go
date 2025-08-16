@@ -9,6 +9,7 @@ import (
 	"github.com/gohugoio/hashstructure"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/model"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
 func targetSource(sub subnet) string { return fmt.Sprintf("discoverer=snmp,network=%s", subKey(sub)) }
@@ -37,7 +38,7 @@ func (g *targetGroup) addTarget(tg model.Target) {
 	g.targets = append(g.targets, tg)
 }
 
-func newTarget(ip string, cred CredentialConfig, si SysInfo) *target {
+func newTarget(ip string, cred CredentialConfig, si snmputils.SysInfo) *target {
 	tg := &target{
 		IPAddress:  ip,
 		Credential: cred,
@@ -55,8 +56,8 @@ type (
 		hash       uint64
 
 		IPAddress  string
-		Credential CredentialConfig `hash:"ignore"`
-		SysInfo    SysInfo          `hash:"ignore"`
+		Credential CredentialConfig  `hash:"ignore"`
+		SysInfo    snmputils.SysInfo `hash:"ignore"`
 	}
 )
 
