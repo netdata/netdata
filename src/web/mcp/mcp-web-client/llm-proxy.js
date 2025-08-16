@@ -54,6 +54,24 @@
 const MODEL_DEFINITIONS = {
   // ==================== OPENAI MODELS ====================
   
+  // GPT-5 Series (Latest Models)
+  'gpt-5': { 
+    contextWindow: 128000, 
+    pricing: { input: 1.25, cacheRead: 0.125, output: 10.00 } 
+  },
+  'gpt-5-mini': { 
+    contextWindow: 128000, 
+    pricing: { input: 0.25, cacheRead: 0.025, output: 2.00 } 
+  },
+  'gpt-5-nano': { 
+    contextWindow: 128000, 
+    pricing: { input: 0.05, cacheRead: 0.005, output: 0.40 } 
+  },
+  'gpt-5-chat-latest': { 
+    contextWindow: 128000, 
+    pricing: { input: 1.25, cacheRead: 0.125, output: 10.00 } 
+  },
+  
   // GPT-4o Series
   'gpt-4o': { 
     contextWindow: 128000, 
@@ -81,50 +99,63 @@ const MODEL_DEFINITIONS = {
   },
   'chatgpt-4o-latest': { 
     contextWindow: 128000, 
-    pricing: { input: 5.00, cacheRead: 2.50, output: 15.00 } 
+    pricing: { input: 5.00, cacheRead: 0.00, output: 15.00 }  // Legacy model
   },
   
-  // GPT-4 Turbo Series
+  // GPT-4 Turbo Series (Legacy)
   'gpt-4-turbo': { 
     contextWindow: 128000, 
-    pricing: { input: 10.00, cacheRead: 5.00, output: 30.00 } 
+    pricing: { input: 10.00, cacheRead: 0.00, output: 30.00 } 
   },
   'gpt-4-turbo-preview': { 
     contextWindow: 128000, 
-    pricing: { input: 10.00, cacheRead: 5.00, output: 30.00 } 
+    pricing: { input: 10.00, cacheRead: 0.00, output: 30.00 } 
   },
   'gpt-4-turbo-2024-04-09': { 
     contextWindow: 128000, 
-    pricing: { input: 10.00, cacheRead: 5.00, output: 30.00 } 
+    pricing: { input: 10.00, cacheRead: 0.00, output: 30.00 } 
   },
   'gpt-4-0125-preview': { 
     contextWindow: 128000, 
-    pricing: { input: 10.00, cacheRead: 5.00, output: 30.00 } 
+    pricing: { input: 10.00, cacheRead: 0.00, output: 30.00 } 
   },
   'gpt-4-1106-preview': { 
     contextWindow: 128000, 
-    pricing: { input: 10.00, cacheRead: 5.00, output: 30.00 } 
+    pricing: { input: 10.00, cacheRead: 0.00, output: 30.00 } 
   },
   
-  // GPT-4 Original
+  // GPT-4 Original (Legacy)
   'gpt-4': { 
     contextWindow: 8192, 
-    pricing: { input: 30.00, cacheRead: 15.00, output: 60.00 } 
+    pricing: { input: 30.00, cacheRead: 0.00, output: 60.00 } 
   },
   'gpt-4-0613': { 
     contextWindow: 8192, 
-    pricing: { input: 30.00, cacheRead: 15.00, output: 60.00 } 
+    pricing: { input: 30.00, cacheRead: 0.00, output: 60.00 } 
   },
+  'gpt-4-0314': { 
+    contextWindow: 8192, 
+    pricing: { input: 30.00, cacheRead: 0.00, output: 60.00 } 
+  },
+  // GPT-4-32k models - Legacy (very expensive)
+  // 'gpt-4-32k': { 
+  //   contextWindow: 32768, 
+  //   pricing: { input: 60.00, cacheRead: 0.00, output: 120.00 } 
+  // },
+  // 'gpt-4-32k-0613': { 
+  //   contextWindow: 32768, 
+  //   pricing: { input: 60.00, cacheRead: 0.00, output: 120.00 } 
+  // },
   
-  // GPT-4.5 Series (Being deprecated)
-  'gpt-4.5-preview': { 
-    contextWindow: 128000, 
-    pricing: { input: 75.00, cacheRead: 37.50, output: 150.00 } 
-  },
-  'gpt-4.5-preview-2025-02-27': { 
-    contextWindow: 128000, 
-    pricing: { input: 75.00, cacheRead: 37.50, output: 150.00 } 
-  },
+  // GPT-4.5 Series - DEPRECATED (Not in current pricing)
+  // 'gpt-4.5-preview': { 
+  //   contextWindow: 128000, 
+  //   pricing: { input: 75.00, cacheRead: 37.50, output: 150.00 } 
+  // },
+  // 'gpt-4.5-preview-2025-02-27': { 
+  //   contextWindow: 128000, 
+  //   pricing: { input: 75.00, cacheRead: 37.50, output: 150.00 } 
+  // },
   
   // GPT-4.1 Series (New models with 1M context)
   'gpt-4.1': { 
@@ -155,27 +186,39 @@ const MODEL_DEFINITIONS = {
   // GPT-3.5 Turbo Series
   'gpt-3.5-turbo': { 
     contextWindow: 16384, 
-    pricing: { input: 0.50, cacheRead: 0.25, output: 1.50 } 
+    pricing: { input: 0.50, cacheRead: 0.00, output: 1.50 } 
   },
   'gpt-3.5-turbo-16k': { 
     contextWindow: 16384, 
-    pricing: { input: 3.00, cacheRead: 1.50, output: 4.00 } 
+    pricing: { input: 3.00, cacheRead: 0.00, output: 4.00 }  // Legacy
+  },
+  'gpt-3.5-turbo-16k-0613': { 
+    contextWindow: 16384, 
+    pricing: { input: 3.00, cacheRead: 0.00, output: 4.00 }  // Legacy
   },
   'gpt-3.5-turbo-0125': { 
     contextWindow: 16384, 
-    pricing: { input: 0.50, cacheRead: 0.25, output: 1.50 } 
+    pricing: { input: 0.50, cacheRead: 0.00, output: 1.50 } 
   },
   'gpt-3.5-turbo-1106': { 
     contextWindow: 16384, 
-    pricing: { input: 1.00, cacheRead: 0.50, output: 2.00 } 
+    pricing: { input: 1.00, cacheRead: 0.00, output: 2.00 } 
+  },
+  'gpt-3.5-turbo-0613': { 
+    contextWindow: 4096, 
+    pricing: { input: 1.50, cacheRead: 0.00, output: 2.00 }  // Legacy
+  },
+  'gpt-3.5-turbo-0301': { 
+    contextWindow: 4096, 
+    pricing: { input: 1.50, cacheRead: 0.00, output: 2.00 }  // Legacy
   },
   'gpt-3.5-turbo-instruct': { 
     contextWindow: 4096, 
-    pricing: { input: 1.50, cacheRead: 0.75, output: 2.00 } 
+    pricing: { input: 1.50, cacheRead: 0.00, output: 2.00 } 
   },
   'gpt-3.5-turbo-instruct-0914': { 
     contextWindow: 4096, 
-    pricing: { input: 1.50, cacheRead: 0.75, output: 2.00 } 
+    pricing: { input: 1.50, cacheRead: 0.00, output: 2.00 } 
   },
   
   
@@ -202,67 +245,105 @@ const MODEL_DEFINITIONS = {
   // Legacy Models
   'davinci-002': { 
     contextWindow: 16384, 
-    pricing: { input: 2.00, cacheRead: 1.00, output: 2.00 } 
+    pricing: { input: 2.00, cacheRead: 0.00, output: 2.00 } 
+  },
+  'babbage-002': { 
+    contextWindow: 16384, 
+    pricing: { input: 0.40, cacheRead: 0.00, output: 0.40 } 
   },
   
-  // o1 Series (Reasoning Models)
+  // o1 Series (Reasoning Models) - use /v1/responses endpoint, no tool support
   'o1': { 
     contextWindow: 200000, 
-    pricing: { input: 15.00, cacheRead: 7.50, output: 60.00 } 
+    pricing: { input: 15.00, cacheRead: 7.50, output: 60.00 },
+    endpoint: 'responses',
+    supportsTools: false
   },
   'o1-2024-12-17': { 
     contextWindow: 200000, 
-    pricing: { input: 15.00, cacheRead: 7.50, output: 60.00 } 
+    pricing: { input: 15.00, cacheRead: 7.50, output: 60.00 },
+    endpoint: 'responses',
+    supportsTools: false
   },
   'o1-preview': { 
     contextWindow: 128000, 
-    pricing: { input: 15.00, cacheRead: 7.50, output: 60.00 } 
+    pricing: { input: 15.00, cacheRead: 7.50, output: 60.00 },
+    endpoint: 'responses',
+    supportsTools: false
   },
   'o1-preview-2024-09-12': { 
     contextWindow: 128000, 
-    pricing: { input: 15.00, cacheRead: 7.50, output: 60.00 } 
+    pricing: { input: 15.00, cacheRead: 7.50, output: 60.00 },
+    endpoint: 'responses',
+    supportsTools: false
   },
   'o1-mini': { 
     contextWindow: 128000, 
-    pricing: { input: 1.10, cacheRead: 0.55, output: 4.40 } 
+    pricing: { input: 1.10, cacheRead: 0.55, output: 4.40 },
+    endpoint: 'responses',
+    supportsTools: false
   },
   'o1-mini-2024-09-12': { 
     contextWindow: 128000, 
-    pricing: { input: 1.10, cacheRead: 0.55, output: 4.40 } 
+    pricing: { input: 1.10, cacheRead: 0.55, output: 4.40 },
+    endpoint: 'responses',
+    supportsTools: false
   },
   'o1-pro': { 
     contextWindow: 200000, 
-    pricing: { input: 150.00, cacheRead: 0.00, output: 600.00 } 
+    pricing: { input: 150.00, cacheRead: 0.00, output: 600.00 },
+    endpoint: 'responses',
+    supportsTools: false
   },
   'o1-pro-2025-03-19': { 
     contextWindow: 200000, 
-    pricing: { input: 150.00, cacheRead: 0.00, output: 600.00 } 
+    pricing: { input: 150.00, cacheRead: 0.00, output: 600.00 },
+    endpoint: 'responses',
+    supportsTools: false
   },
   
-  // o3 Series
+  // o3 Series - use /v1/responses endpoint, with tool support
   'o3': { 
     contextWindow: 200000, 
-    pricing: { input: 2.00, cacheRead: 0.50, output: 8.00 } 
+    pricing: { input: 2.00, cacheRead: 0.50, output: 8.00 },
+    endpoint: 'responses',
+    supportsTools: true
   },
   'o3-2025-04-16': { 
     contextWindow: 200000, 
-    pricing: { input: 2.00, cacheRead: 0.50, output: 8.00 } 
+    pricing: { input: 2.00, cacheRead: 0.50, output: 8.00 },
+    endpoint: 'responses',
+    supportsTools: true
+  },
+  'o3-deep-research': { 
+    contextWindow: 200000, 
+    pricing: { input: 10.00, cacheRead: 2.50, output: 40.00 },
+    endpoint: 'responses',
+    supportsTools: true
   },
   'o3-mini': { 
     contextWindow: 200000, 
-    pricing: { input: 1.10, cacheRead: 0.55, output: 4.40 } 
+    pricing: { input: 1.10, cacheRead: 0.55, output: 4.40 },
+    endpoint: 'responses',
+    supportsTools: true
   },
   'o3-mini-2025-01-31': { 
     contextWindow: 200000, 
-    pricing: { input: 1.10, cacheRead: 0.55, output: 4.40 } 
+    pricing: { input: 1.10, cacheRead: 0.55, output: 4.40 },
+    endpoint: 'responses',
+    supportsTools: true
   },
   'o3-pro': { 
     contextWindow: 200000, 
-    pricing: { input: 20.00, cacheRead: 0.00, output: 80.00 } 
+    pricing: { input: 20.00, cacheRead: 0.00, output: 80.00 },
+    endpoint: 'responses',
+    supportsTools: true
   },
   'o3-pro-2025-06-10': { 
     contextWindow: 200000, 
-    pricing: { input: 20.00, cacheRead: 0.00, output: 80.00 } 
+    pricing: { input: 20.00, cacheRead: 0.00, output: 80.00 },
+    endpoint: 'responses',
+    supportsTools: true
   },
   
   // o4 Series
@@ -273,6 +354,10 @@ const MODEL_DEFINITIONS = {
   'o4-mini-2025-04-16': { 
     contextWindow: 200000, 
     pricing: { input: 1.10, cacheRead: 0.275, output: 4.40 } 
+  },
+  'o4-mini-deep-research': { 
+    contextWindow: 200000, 
+    pricing: { input: 2.00, cacheRead: 0.50, output: 8.00 } 
   },
   
   // Specialized Models
@@ -287,6 +372,30 @@ const MODEL_DEFINITIONS = {
   'computer-use-preview-2025-03-11': { 
     contextWindow: 128000, 
     pricing: { input: 3.00, cacheRead: 0.00, output: 12.00 } 
+  },
+  
+  // Audio Models
+  'gpt-4o-audio-preview': { 
+    contextWindow: 128000, 
+    pricing: { input: 2.50, cacheRead: 0.00, output: 10.00 } 
+  },
+  'gpt-4o-realtime-preview': { 
+    contextWindow: 128000, 
+    pricing: { input: 5.00, cacheRead: 2.50, output: 20.00 } 
+  },
+  'gpt-4o-mini-audio-preview': { 
+    contextWindow: 128000, 
+    pricing: { input: 0.15, cacheRead: 0.00, output: 0.60 } 
+  },
+  'gpt-4o-mini-realtime-preview': { 
+    contextWindow: 128000, 
+    pricing: { input: 0.60, cacheRead: 0.30, output: 2.40 } 
+  },
+  
+  // Image Model
+  'gpt-image-1': { 
+    contextWindow: 128000, 
+    pricing: { input: 5.00, cacheRead: 1.25, output: 0.00 } 
   },
   
   // ==================== ANTHROPIC MODELS ====================
@@ -339,23 +448,23 @@ const MODEL_DEFINITIONS = {
   
   // ==================== GOOGLE GEMINI MODELS ====================
   
-  // Gemini 2.0 Series
-  'gemini-2.0-flash': { 
-    contextWindow: 1048576, 
-    pricing: { input: 0.10, output: 0.40 } 
-  },
-  'gemini-2.0-flash-001': { 
-    contextWindow: 1048576, 
-    pricing: { input: 0.10, output: 0.40 } 
-  },
-  'gemini-2.0-flash-lite': { 
-    contextWindow: 1048576, 
-    pricing: { input: 0.075, output: 0.30 } 
-  },
-  'gemini-2.0-flash-lite-001': { 
-    contextWindow: 1048576, 
-    pricing: { input: 0.075, output: 0.30 } 
-  },
+  // Gemini 2.0 Series - DEPRECATED (Not in current pricing)
+  // 'gemini-2.0-flash': { 
+  //   contextWindow: 1048576, 
+  //   pricing: { input: 0.10, output: 0.40 } 
+  // },
+  // 'gemini-2.0-flash-001': { 
+  //   contextWindow: 1048576, 
+  //   pricing: { input: 0.10, output: 0.40 } 
+  // },
+  // 'gemini-2.0-flash-lite': { 
+  //   contextWindow: 1048576, 
+  //   pricing: { input: 0.075, output: 0.30 } 
+  // },
+  // 'gemini-2.0-flash-lite-001': { 
+  //   contextWindow: 1048576, 
+  //   pricing: { input: 0.075, output: 0.30 } 
+  // },
   'gemini-2.0-flash-exp': { 
     contextWindow: 1000000, 
     pricing: { input: 0.00, output: 0.00 } // Free experimental
@@ -369,14 +478,18 @@ const MODEL_DEFINITIONS = {
     pricing: { input: 0.00, output: 0.00 } // Free experimental
   },
   
-  // Gemini 2.5 Series
-  'gemini-2.5-flash-preview': { 
-    contextWindow: 1000000, 
-    pricing: { input: 0.15, output: 0.60 } // Non-thinking output pricing
-  },
-  'gemini-2.5-pro-preview': { 
+  // Gemini 2.5 Series (Latest Models)
+  'gemini-2.5-pro': { 
     contextWindow: 2000000, 
-    pricing: { input: 1.25, output: 10.00 } // For prompts <= 200k tokens
+    pricing: { input: 1.25, output: 10.00 }  // For prompts <= 200k tokens
+  },
+  'gemini-2.5-flash': { 
+    contextWindow: 1000000, 
+    pricing: { input: 0.30, output: 2.50 }  // Text/image/video pricing
+  },
+  'gemini-2.5-flash-lite': { 
+    contextWindow: 1000000, 
+    pricing: { input: 0.10, output: 0.40 }  // Text/image/video pricing
   },
   
   // Gemini 1.5 Series
@@ -404,36 +517,36 @@ const MODEL_DEFINITIONS = {
     contextWindow: 1000000, 
     pricing: { input: 0.075, output: 0.30 } 
   },
-  'gemini-1.5-flash-8b': { 
-    contextWindow: 1000000, 
-    pricing: { input: 0.0375, output: 0.15 } // Pricing for prompts <= 128k
-  },
-  'gemini-1.5-flash-8b-001': { 
-    contextWindow: 1000000, 
-    pricing: { input: 0.0375, output: 0.15 } 
-  },
-  'gemini-1.5-flash-001-tuning': { 
-    contextWindow: 16384, 
-    pricing: { input: 0.00, output: 0.00 } // Free for tuning
-  },
+  // 'gemini-1.5-flash-8b': {  // DEPRECATED - Not in current pricing
+  //   contextWindow: 1000000, 
+  //   pricing: { input: 0.0375, output: 0.15 } // Pricing for prompts <= 128k
+  // },
+  // 'gemini-1.5-flash-8b-001': {  // DEPRECATED - Not in current pricing
+  //   contextWindow: 1000000, 
+  //   pricing: { input: 0.0375, output: 0.15 } 
+  // },
+  // 'gemini-1.5-flash-001-tuning': {  // DEPRECATED - Not in current pricing
+  //   contextWindow: 16384, 
+  //   pricing: { input: 0.00, output: 0.00 } // Free for tuning
+  // },
   
-  // Gemini 1.0 Series
-  'gemini-pro': { 
-    contextWindow: 32760, 
-    pricing: { input: 0.50, output: 1.50 } 
-  },
-  'gemini-pro-vision': { 
-    contextWindow: 32760, 
-    pricing: { input: 0.50, output: 1.50 } 
-  },
-  'gemini-1.0-pro': { 
-    contextWindow: 32760, 
-    pricing: { input: 0.50, output: 1.50 } 
-  },
-  'gemini-1.0-pro-vision-latest': { 
-    contextWindow: 12288, 
-    pricing: { input: 0.50, output: 1.50 } 
-  }
+  // Gemini 1.0 Series - DEPRECATED (Not in current pricing)
+  // 'gemini-pro': { 
+  //   contextWindow: 32760, 
+  //   pricing: { input: 0.50, output: 1.50 } 
+  // },
+  // 'gemini-pro-vision': { 
+  //   contextWindow: 32760, 
+  //   pricing: { input: 0.50, output: 1.50 } 
+  // },
+  // 'gemini-1.0-pro': { 
+  //   contextWindow: 32760, 
+  //   pricing: { input: 0.50, output: 1.50 } 
+  // },
+  // 'gemini-1.0-pro-vision-latest': { 
+  //   contextWindow: 12288, 
+  //   pricing: { input: 0.50, output: 1.50 } 
+  // }
 };
 
 const http = require('http');
@@ -481,7 +594,9 @@ function generateModelsForProvider(provider) {
       models.push({
         id: modelId,
         contextWindow: definition.contextWindow,
-        pricing: definition.pricing
+        pricing: definition.pricing,
+        endpoint: definition.endpoint || 'completions',
+        supportsTools: definition.supportsTools !== false // Default to true unless explicitly false
       });
     }
   });
@@ -495,15 +610,27 @@ const DEFAULT_CONFIG = {
   providers: {
     openai: {
       apiKey: '',
+      baseUrl: 'https://api.openai.com',
+      type: 'openai',
       models: generateModelsForProvider('openai').slice(0, 7) // Include a subset for initial config
     },
     anthropic: {
       apiKey: '',
+      baseUrl: 'https://api.anthropic.com',
+      type: 'anthropic',
       models: generateModelsForProvider('anthropic')
     },
     google: {
       apiKey: '',
+      baseUrl: 'https://generativelanguage.googleapis.com',
+      type: 'google',
       models: generateModelsForProvider('google').slice(0, 10) // Include a subset for initial config
+    },
+    ollama: {
+      apiKey: '',  // Not used, but kept for config consistency
+      baseUrl: 'http://localhost:11434',
+      type: 'ollama',
+      models: [] // Configure using --update-config --sync --check-availability
     }
   },
   mcpServers: [
@@ -526,6 +653,10 @@ const LLM_PROVIDERS = {
   google: {
     baseUrl: 'https://generativelanguage.googleapis.com',
     authHeader: null // Google uses API key in URL
+  },
+  ollama: {
+    baseUrl: 'http://localhost:11434',
+    authHeader: null // Ollama typically runs locally without authentication
   }
 };
 
@@ -583,7 +714,8 @@ function loadConfig() {
           }
           
           const modelId = model?.id || `index ${index}`;
-          const error = validateModelConfig(provider, model);
+          const providerType = settings.type || provider;
+          const error = validateModelConfig(provider, model, providerType);
           if (error) {
             validationErrors.push(`${provider} model "${modelId}": ${error}`);
           } else {
@@ -611,20 +743,31 @@ function loadConfig() {
     let totalValidModels = 0;
     
     Object.entries(config.providers).forEach(([provider, settings]) => {
-      if (settings.apiKey && settings.apiKey.length > 0) {
+      // Get provider type to determine API key requirements
+      const providerType = settings.type || provider;
+      const requiresApiKey = providerType !== 'ollama';
+      
+      if (!requiresApiKey || (settings.apiKey && settings.apiKey.length > 0)) {
         const validModels = (settings.models || []).filter((model) => {
           if (typeof model === 'string') return false;
-          return !validateModelConfig(provider, model);
+          const modelProviderType = settings.type || provider;
+          return !validateModelConfig(provider, model, modelProviderType);
         });
         
         if (validModels.length > 0) {
           configuredProviders.push(`${provider} (${validModels.length} valid models)`);
           totalValidModels += validModels.length;
+        } else if (provider === 'ollama') {
+          // Ollama with no models configured
+          configuredProviders.push(`${provider} (0 models - use --update-config to discover)`);
         }
       }
     });
     
-    if (configuredProviders.length === 0 || totalValidModels === 0) {
+    // Skip validation if we're updating config or showing models
+    const isUpdatingConfig = process.argv.includes('--update-config');
+    const isShowingModels = process.argv.includes('--show-models');
+    if (!isUpdatingConfig && !isShowingModels && (configuredProviders.length === 0 || totalValidModels === 0)) {
       console.error('\n❌ Error: No valid models configured!');
       console.error('\n📝 Please edit the configuration file and add valid models:');
       console.error(`   ${CONFIG_FILE}`);
@@ -665,10 +808,22 @@ function loadConfig() {
 }
 
 // Validate model configuration
-function validateModelConfig(provider, model) {
+function validateModelConfig(provider, model, providerType = null) {
   // Check if model has required structure
-  if (typeof model !== 'object' || !model.id || !model.contextWindow || !model.pricing) {
-    return `Missing required fields (id, contextWindow, pricing)`;
+  if (typeof model !== 'object' || !model.id || !model.contextWindow) {
+    return `Missing required fields (id, contextWindow)`;
+  }
+  
+  // Determine the provider type (use providerType if provided, otherwise use provider)
+  const type = providerType || provider.toLowerCase();
+  
+  // Ollama models may have null pricing
+  if (type === 'ollama' && model.pricing === null) {
+    return null; // Valid for Ollama
+  }
+  
+  if (!model.pricing) {
+    return `Missing required field: pricing`;
   }
   
   // Validate context window
@@ -817,6 +972,16 @@ function extractTokenUsage(provider, responseData) {
           cacheCreationTokens: 0
         };
       
+      case 'ollama':
+        // Ollama token reporting
+        return {
+          promptTokens: responseData.prompt_eval_count || 0,
+          completionTokens: responseData.eval_count || 0,
+          // Ollama doesn't have cache tokens
+          cachedTokens: 0,
+          cacheCreationTokens: 0
+        };
+      
       default:
         return {
           promptTokens: 0,
@@ -867,16 +1032,22 @@ function calculateCosts(tokens, pricing) {
  * Fetch available models from provider APIs
  * @param {string} provider - The provider name (openai, anthropic, google)
  * @param {string} apiKey - API key for the provider
+ * @param {Object} providerConfig - Provider configuration including baseUrl
  * @returns {Promise<Array|null>} Array of available models or null
  */
-async function fetchAvailableModels(provider, apiKey) {
-  if (!apiKey) return null;
+async function fetchAvailableModels(provider, apiKey, providerConfig = null) {
+  // Get provider type from config or use provider as fallback
+  const providerType = providerConfig?.type || provider;
+  
+  // Ollama doesn't require an API key
+  if (!apiKey && providerType !== 'ollama') return null;
   
   console.log(`   🔍 Fetching available models from ${provider}...`);
   
   try {
-    switch (provider) {
-      case 'openai': {
+    switch (providerType) {
+      case 'openai':
+      case 'openai-responses': {
         const options = {
           hostname: 'api.openai.com',
           port: 443,
@@ -1009,6 +1180,144 @@ async function fetchAvailableModels(provider, apiKey) {
           req.end();
         });
       }
+
+      case 'ollama': {
+        // Ollama doesn't need an API key
+        // First fetch all available models
+        const baseUrl = providerConfig?.baseUrl || LLM_PROVIDERS.ollama.baseUrl;
+        const tagsUrl = new URL('/api/tags', baseUrl);
+        
+        return new Promise((resolve) => {
+          const tagsReq = http.request({
+            hostname: tagsUrl.hostname,
+            port: tagsUrl.port || 80,
+            path: tagsUrl.pathname,
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          }, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', async () => {
+              if (res.statusCode !== 200) {
+                console.log(`   ⚠️  Failed to fetch models from ${provider}: HTTP ${res.statusCode}`);
+                resolve(null);
+                return;
+              }
+              
+              try {
+                const response = JSON.parse(data);
+                const models = [];
+                
+                // For each model, fetch detailed info including context window
+                for (const model of response.models || []) {
+                  try {
+                    const showUrl = new URL('/api/show', baseUrl);
+                    const showData = JSON.stringify({ name: model.name });
+                    
+                    const modelInfo = await new Promise((resolveModel) => {
+                      const showReq = http.request({
+                        hostname: showUrl.hostname,
+                        port: showUrl.port || 80,
+                        path: showUrl.pathname,
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          'Content-Length': Buffer.byteLength(showData)
+                        }
+                      }, (showRes) => {
+                        let showResData = '';
+                        showRes.on('data', chunk => showResData += chunk);
+                        showRes.on('end', () => {
+                          if (showRes.statusCode === 200) {
+                            try {
+                              const info = JSON.parse(showResData);
+                              resolveModel(info);
+                            } catch (e) {
+                              console.log(`   ⚠️  Error parsing model info for ${model.name}: ${e.message}`);
+                              resolveModel(null);
+                            }
+                          } else {
+                            resolveModel(null);
+                          }
+                        });
+                      });
+                      
+                      showReq.on('error', (e) => {
+                        console.log(`   ⚠️  Error fetching model info for ${model.name}: ${e.message}`);
+                        resolveModel(null);
+                      });
+                      
+                      showReq.write(showData);
+                      showReq.end();
+                    });
+                    
+                    if (modelInfo && modelInfo.model_info) {
+                      // Extract context length from the model info
+                      // Ollama uses "num_ctx" for context window size
+                      // The keys are flat strings like "llama.num_ctx" or just "num_ctx"
+                      let contextWindow = 4096; // default
+                      
+                      // Look for num_ctx or any key ending with "num_ctx"
+                      const contextKey = Object.keys(modelInfo.model_info).find(key => 
+                        key.endsWith('.num_ctx') || key === 'num_ctx' || 
+                        key.endsWith('.context_length') || key === 'context_length'
+                      );
+                      
+                      if (contextKey && modelInfo.model_info[contextKey]) {
+                        contextWindow = modelInfo.model_info[contextKey];
+                      }
+                      
+                      // Check for tool support in capabilities
+                      const supportsTools = modelInfo.capabilities && 
+                                          Array.isArray(modelInfo.capabilities) && 
+                                          modelInfo.capabilities.includes('tools');
+                      
+                      models.push({
+                        id: model.name,
+                        contextWindow,
+                        supportsTools,
+                        pricing: null // Ollama models are free (local)
+                      });
+                    } else {
+                      // If we can't get model info, add with default context window
+                      models.push({
+                        id: model.name,
+                        contextWindow: 4096,
+                        supportsTools: false, // default to false if we can't check
+                        pricing: null
+                      });
+                    }
+                  } catch (e) {
+                    console.log(`   ⚠️  Error processing model ${model.name}: ${e.message}`);
+                    // Add model with defaults even if we couldn't get details
+                    models.push({
+                      id: model.name,
+                      contextWindow: 4096,
+                      supportsTools: false, // default to false on error
+                      pricing: null
+                    });
+                  }
+                }
+                
+                console.log(`   ✅ Found ${models.length} available models from ${provider}`);
+                resolve(models);
+              } catch (e) {
+                console.log(`   ⚠️  Error parsing response from ${provider}: ${e.message}`);
+                resolve(null);
+              }
+            });
+          });
+          
+          tagsReq.on('error', (e) => {
+            console.log(`   ⚠️  Error fetching models from ${provider}: ${e.message}`);
+            resolve(null);
+          });
+          
+          tagsReq.end();
+        });
+      }
       
       default:
         console.log(`   ℹ️  Unknown provider ${provider}, skipping model fetch`);
@@ -1050,7 +1359,7 @@ function serveStaticFile(req, res) {
   }
   
   // Normalize the path and remove any directory traversal attempts
-  requestPath = path.normalize(requestPath).replace(/^(\.\.[\/\\])+/, '');
+  requestPath = path.normalize(requestPath).replace(/^(\.\.[\\/\\])+/, '');
   
   // Define the web root directory
   const webRoot = path.join(__dirname, 'web');
@@ -1062,10 +1371,10 @@ function serveStaticFile(req, res) {
   if (req.url !== '/favicon.ico') {  // Skip favicon requests in logs
     console.log(`[${new Date().toISOString()}] 📁 Static file request:`, {
       url: req.url,
-      requestPath: requestPath,
-      __dirname: __dirname,
-      webRoot: webRoot,
-      filePath: filePath,
+      requestPath,
+      __dirname,
+      webRoot,
+      filePath,
       resolvedWebRoot: path.resolve(webRoot),
       startsWith: filePath.startsWith(path.resolve(webRoot))
     });
@@ -1089,8 +1398,8 @@ function serveStaticFile(req, res) {
     }
     
     // Read and serve the file
-    fs.readFile(filePath, (err, content) => {
-      if (err) {
+    fs.readFile(filePath, (readErr, content) => {
+      if (readErr) {
         res.writeHead(500, { 'Content-Type': 'text/plain' });
         res.end('Internal Server Error');
         return;
@@ -1115,7 +1424,7 @@ if (process.argv.includes('--help') || process.argv.includes('-h')) {
   console.log('   node llm-proxy.js [options]');
   console.log('\n🎯 Options:');
   console.log('   --help, -h                   Show this help message');
-  console.log('   --show-models                Display all configured models with their pricing information');
+  console.log('   --show-models                Display all models from all providers with their pricing information');
   console.log('   --update-config              Update the configuration file with latest model definitions');
   console.log('                                while preserving your API keys and custom settings');
   console.log('   --sync                       When used with --update-config, sync configuration with');
@@ -1126,8 +1435,9 @@ if (process.argv.includes('--help') || process.argv.includes('-h')) {
   console.log('   This server provides:');
   console.log('   • A proxy for LLM API calls (OpenAI, Anthropic, Google)');
   console.log('   • A web interface for the MCP (Model Context Protocol) client');
-  console.log('   • Automatic model discovery and context window information');
+  console.log('   • Model configuration and context window information');
   console.log('   • Cost accounting and usage tracking');
+  console.log('   • For Ollama: use --update-config --sync --check-availability to discover models');
   console.log('\n🌐 Endpoints:');
   console.log('   • Web UI:         http://localhost:' + (config.port || 8081) + '/');
   console.log('   • Models API:     http://localhost:' + (config.port || 8081) + '/models');
@@ -1142,13 +1452,14 @@ if (process.argv.includes('--help') || process.argv.includes('-h')) {
 }
 
 if (process.argv.includes('--show-models')) {
-  console.log('\n📊 Configured Models and Pricing Information');
+  console.log('\n📊 All Provider Models and Pricing Information');
   console.log('='.repeat(120));
   
   Object.entries(config.providers).forEach(([provider, providerConfig]) => {
-    if (!providerConfig.apiKey) return;
-    
     console.log(`\n🏢 ${provider.toUpperCase()}`);
+    if (!providerConfig.apiKey) {
+      console.log('   ⚠️  No API key configured');
+    }
     console.log('-'.repeat(120));
     
     if (!providerConfig.models || providerConfig.models.length === 0) {
@@ -1319,6 +1630,35 @@ if (process.argv.includes('--update-config')) {
           // When syncing, use exactly what's in MODEL_DEFINITIONS
           mergedModels = [...allProviderModels];
           console.log(`   ✅ Syncing ${provider} with ${mergedModels.length} models from MODEL_DEFINITIONS`);
+          
+          // IMPORTANT: Preserve user-modified pricing
+          if (existingProvider?.models) {
+            const userPricingMap = new Map();
+            existingProvider.models.forEach(existingModel => {
+              if (typeof existingModel === 'object' && existingModel.pricing) {
+                userPricingMap.set(existingModel.id, existingModel.pricing);
+              }
+            });
+            
+            // Apply user pricing to merged models
+            mergedModels = mergedModels.map(model => {
+              if (userPricingMap.has(model.id)) {
+                console.log(`   💰 Preserving user-modified pricing for ${model.id}`);
+                return { ...model, pricing: userPricingMap.get(model.id) };
+              }
+              return model;
+            });
+            
+            // ALSO preserve custom models not in MODEL_DEFINITIONS
+            existingProvider.models.forEach(existingModel => {
+              const id = typeof existingModel === 'string' ? existingModel : existingModel.id;
+              if (!modelDefsMap.has(id)) {
+                // This is a custom model not in our definitions, preserve it
+                mergedModels.push(existingModel);
+                console.log(`   🌟 Preserving custom API model not in code: ${id}`);
+              }
+            });
+          }
         } else {
           // Normal update: preserve custom models
           mergedModels = [...allProviderModels];
@@ -1336,11 +1676,17 @@ if (process.argv.includes('--update-config')) {
           }
         }
         
-        // If sync is requested and we have an API key, optionally filter by availability
-        if (syncModels && existingProvider?.apiKey && process.argv.includes('--check-availability')) {
-          const availableModels = await fetchAvailableModels(provider, existingProvider.apiKey);
+        // If sync is requested and we have an API key (or it's Ollama), optionally filter by availability
+        const isOllama = provider === 'ollama';
+        if (syncModels && (existingProvider?.apiKey || isOllama) && process.argv.includes('--check-availability')) {
+          const availableModels = await fetchAvailableModels(provider, existingProvider?.apiKey || '', existingProvider);
           
           if (availableModels) {
+            // For Ollama, completely replace the models list with discovered ones
+            if (isOllama) {
+              mergedModels = availableModels;
+              console.log(`   ✅ Discovered ${mergedModels.length} Ollama models from API`);
+            } else {
             // Create a set of available model IDs for faster lookup
             const availableModelIds = new Set(availableModels.map(m => m.id));
             
@@ -1393,6 +1739,7 @@ if (process.argv.includes('--update-config')) {
                 }
               }
             });
+            }
           }
         }
         
@@ -1402,6 +1749,10 @@ if (process.argv.includes('--update-config')) {
             ...defaultProviderConfig,
             // Preserve existing API key if available
             apiKey: existingProvider?.apiKey || '',
+            // Preserve existing baseUrl if available
+            baseUrl: existingProvider?.baseUrl || defaultProviderConfig.baseUrl,
+            // Preserve existing type if available
+            type: existingProvider?.type || defaultProviderConfig.type || provider,
             // Use merged models list
             models: mergedModels
           }
@@ -1502,32 +1853,40 @@ const server = http.createServer(async (req, res) => {
     console.log(`[${new Date().toISOString()}] 🔍 Models API request`);
     const availableProviders = {};
     
-    Object.entries(config.providers).forEach(([provider, providerConfig]) => {
-      if (providerConfig.apiKey && providerConfig.apiKey.length > 0) {
+    // Process each provider
+    await Promise.all(Object.entries(config.providers).map(async ([provider, providerConfig]) => {
+      const providerType = providerConfig.type || provider;
+      const requiresApiKey = providerType !== 'ollama';
+      
+      if (!requiresApiKey || (providerConfig.apiKey && providerConfig.apiKey.length > 0)) {
         availableProviders[provider] = {
+          type: providerConfig.type || provider, // Include the provider type
           models: (providerConfig.models || []).map(model => {
-            // Skip string format models - not supported
-            if (typeof model === 'string') return null;
-            
-            const modelId = model.id;
-            if (!modelId) return null;
-            
-            // Validate model configuration
-            const validationError = validateModelConfig(provider, model);
-            if (validationError) {
-              // Silently skip invalid models (these are typically audio/video models)
-              return null;
-            }
-            
-            return {
-              id: modelId,
-              contextWindow: model.contextWindow,
-              pricing: model.pricing
-            };
-          }).filter(Boolean)
-        };
+              // Skip string format models - not supported
+              if (typeof model === 'string') return null;
+              
+              const modelId = model.id;
+              if (!modelId) return null;
+              
+              // Validate model configuration
+              const modelProviderType = providerConfig.type || provider;
+              const validationError = validateModelConfig(provider, model, modelProviderType);
+              if (validationError) {
+                // Silently skip invalid models (these are typically audio/video models)
+                return null;
+              }
+              
+              return {
+                id: modelId,
+                contextWindow: model.contextWindow,
+                pricing: model.pricing,
+                endpoint: model.endpoint || 'completions',
+                supportsTools: model.supportsTools !== false
+              };
+            }).filter(Boolean)
+          };
       }
-    });
+    }));
 
     res.writeHead(200, {
       'Content-Type': 'application/json',
@@ -1577,43 +1936,54 @@ const server = http.createServer(async (req, res) => {
 
   // Check if provider is configured
   const providerConfig = config.providers[provider.toLowerCase()];
-  if (!providerConfig || !providerConfig.apiKey) {
+  
+  if (!providerConfig) {
     res.writeHead(400, {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': ALLOWED_ORIGINS
     });
-    res.end(JSON.stringify({ error: `Provider '${provider}' is not configured or has no API key` }));
+    res.end(JSON.stringify({ error: `Provider '${provider}' is not configured` }));
     return;
   }
 
-  // Get provider URL configuration
-  const providerUrlConfig = LLM_PROVIDERS[provider.toLowerCase()];
-  if (!providerUrlConfig) {
+  // Get the provider type to determine auth requirements
+  const providerType = providerConfig.type || provider.toLowerCase();
+  
+  // Check if API key is required based on provider type
+  const requiresApiKey = providerType !== 'ollama';
+  
+  if (requiresApiKey && !providerConfig.apiKey) {
     res.writeHead(400, {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': ALLOWED_ORIGINS
     });
-    res.end(JSON.stringify({ error: 'Unknown provider: ' + provider }));
+    res.end(JSON.stringify({ error: `Provider '${provider}' requires an API key` }));
     return;
   }
 
+  // Get provider URL configuration based on type
+  const providerUrlConfig = LLM_PROVIDERS[providerType];
+  
+  // If no hardcoded config exists for this type, use sensible defaults
+  const baseUrl = providerConfig.baseUrl || (providerUrlConfig && providerUrlConfig.baseUrl) || 'https://api.example.com';
+  
   // Build target URL
   let targetUrl;
   
   // Special handling for Google - need to adjust the path format
-  if (provider.toLowerCase() === 'google') {
+  if (providerType === 'google') {
     // Google expects the full path including model name
     const adjustedPath = apiPath.replace('/generateContent', ':generateContent');
-    targetUrl = new URL(providerUrlConfig.baseUrl + adjustedPath);
+    targetUrl = new URL(baseUrl + adjustedPath);
     // Add API key to URL for Google
     targetUrl.searchParams.append('key', providerConfig.apiKey);
   } else {
-    targetUrl = new URL(providerUrlConfig.baseUrl + apiPath);
+    targetUrl = new URL(baseUrl + apiPath);
   }
   
   // Copy query parameters from original request (except Google's key)
   Object.keys(parsedUrl.query).forEach(key => {
-    if (!(provider.toLowerCase() === 'google' && key === 'key')) {
+    if (!(providerType === 'google' && key === 'key')) {
       const value = parsedUrl.query[key];
       // Handle both string and string[] cases
       if (Array.isArray(value)) {
@@ -1632,13 +2002,19 @@ const server = http.createServer(async (req, res) => {
     'User-Agent': 'MCP-LLM-Proxy/1.0'
   };
 
-  // Add authentication headers from config
-  if (providerUrlConfig.authHeader) {
+  // Add authentication headers based on provider type
+  if (providerUrlConfig && providerUrlConfig.authHeader) {
     if (providerUrlConfig.authPrefix) {
       headers[providerUrlConfig.authHeader] = providerUrlConfig.authPrefix + providerConfig.apiKey;
     } else {
       headers[providerUrlConfig.authHeader] = providerConfig.apiKey;
     }
+  } else if (providerType === 'openai' || providerType === 'openai-responses') {
+    // Default OpenAI-style authentication
+    headers.Authorization = 'Bearer ' + providerConfig.apiKey;
+  } else if (providerType === 'anthropic') {
+    // Default Anthropic-style authentication
+    headers['x-api-key'] = providerConfig.apiKey;
   }
 
   // Forward anthropic-version header if present
@@ -1693,7 +2069,7 @@ const server = http.createServer(async (req, res) => {
     }
     
     // For Google, extract model from URL path
-    if (provider.toLowerCase() === 'google' && !requestModel) {
+    if (providerType === 'google' && !requestModel) {
       // Path format: /v1beta/models/gemini-1.5-pro/generateContent
       const pathMatch = apiPath.match(/\/models\/([^/]+)\//);
       if (pathMatch && pathMatch[1]) {
@@ -1717,7 +2093,7 @@ const server = http.createServer(async (req, res) => {
         modelPricing = modelConfig.pricing || null;
         
         // Validate the model configuration
-        const validationError = validateModelConfig(provider.toLowerCase(), modelConfig);
+        const validationError = validateModelConfig(provider.toLowerCase(), modelConfig, providerType);
         if (validationError) {
           console.error(`[${new Date().toISOString()}] ❌ Invalid model configuration for ${requestModel}: ${validationError}`);
           res.writeHead(400, {
@@ -1743,6 +2119,15 @@ const server = http.createServer(async (req, res) => {
         error: `Model ${requestModel} is not configured for ${provider}. Available models must be defined in the configuration file.` 
       }));
       return;
+    }
+    
+    // For Ollama, if model is not in config, create a minimal config
+    if (!modelConfig && providerType === 'ollama') {
+      modelConfig = {
+        id: requestModel,
+        contextWindow: 4096, // Default, actual value would be from auto-discovery
+        pricing: null // Ollama is free (local)
+      };
     }
     
     console.log(`[${new Date().toISOString()}] 🔄 Proxy ${req.method} to ${provider}: ${targetUrl.pathname}${modelInfo}`);
@@ -2010,8 +2395,14 @@ const server = http.createServer(async (req, res) => {
   });
 });
 
-// Start the server
-server.listen(PROXY_PORT, () => {
+// Start the server only if not running config management commands
+const isConfigCommand = process.argv.includes('--update-config') || 
+                       process.argv.includes('--show-models') || 
+                       process.argv.includes('--help') || 
+                       process.argv.includes('-h');
+
+if (!isConfigCommand) {
+  server.listen(PROXY_PORT, () => {
   console.log('\n🚀 Server Started Successfully!');
   console.log('='.repeat(60));
   console.log('\n🌐 Available Services:');
@@ -2043,4 +2434,5 @@ server.listen(PROXY_PORT, () => {
   
   console.log('\n' + '='.repeat(60));
   console.log('Server is ready and waiting for connections...\n');
-});
+  });
+}
