@@ -131,17 +131,42 @@ sysobjectids:
   # Exact OID overrides (create-or-update)
   oid_overrides:
     # https://mibs.observium.org/mib/NET-SNMP-TC/
-    "1.3.6.1.4.1.8072.3.2.7":
-      category: Server
-      model: "NetBSD-box"
     "1.3.6.1.4.1.8072.3.2.8":
       category: Server
-      model: "FreeBSD-box"
+      model: "FreeBSD"
     "1.3.6.1.4.1.8072.3.2.10":
       category: Server
-      model: "Linux-box"
+      model: "Linux"
+    "1.3.6.1.4.1.8072.3.2.16":
+      category: Server
+      model: "macOS"
+
+    "1.3.6.1.4.1.26543.1.7.7":
+      category: Switch
+      model: RackSwitch G8052
+    "1.3.6.1.4.1.6889.1.69.4.3":
+      category: IP Phone
+      model: AVX571040
+    "1.3.6.1.4.1.3955.1.1":
+      category: Firewall
+      model: BEFSX41
+
+    # TODO: Brocade: add all from https://docs.microfocus.com/NOM/2018.05/Content/common/nom_device_support_matrix/DSD_Foundry_JS.html
+    "1.3.6.1.4.1.1991.1.3.55.1.2":
+      category: Router
+      model: MLXe-16
+    "1.3.6.1.4.1.1991.1.3.55.2.2":
+      category: Router
+      model: MLXe-8
+    "1.3.6.1.4.1.1991.1.3.55.3.2":
+      category: Router
+      model: MLXe-4
+    "1.3.6.1.4.1.1991.1.3.55.4.2":
+      category: Router
+      model: MLXe-32
+    "1.3.6.1.4.1.1991.1.3.56.1.3.1.1":
+      category: Switch
+      model: Stackable ICX6610-24F
 
   category_map:
-    "UTM": "Firewall"
-    "L3 Switch": "Switch"
-    "Wireless Controller": "Controller"
+    "Self-contained NAS": "NAS"
