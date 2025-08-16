@@ -10,6 +10,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
 func (d *Discoverer) loadFileStatus() {
@@ -58,8 +60,8 @@ type (
 		ConfigHash        uint64                                  `json:"config_hash"`
 	}
 	discoveredDevice struct {
-		DiscoverTime time.Time `json:"discover_time"`
-		SysInfo      SysInfo   `json:"sysinfo"`
+		DiscoverTime time.Time         `json:"discover_time"`
+		SysInfo      snmputils.SysInfo `json:"sysinfo"`
 	}
 )
 
