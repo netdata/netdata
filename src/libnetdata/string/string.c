@@ -954,7 +954,7 @@ int string_unittest(size_t entries) {
 void string_init(void) {
     for (size_t i = 0; i != STRING_PARTITIONS; i++) {
         rw_spinlock_init(&string_base[i].spinlock);
-        
+
 #ifdef FSANITIZE_ADDRESS
         // Initialize the JudyL pointers array to NULL
         string_base[i].JudyLPointers = NULL;

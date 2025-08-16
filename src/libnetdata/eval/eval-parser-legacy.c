@@ -35,8 +35,8 @@ static bool is_valid_variable_character(const char s) {
 }
 
 // Forward function declarations
-static inline EVAL_NODE *parse_full_expression(const char **string, int *error);
-static inline EVAL_NODE *parse_one_full_operand(const char **string, int *error);
+static inline EVAL_NODE *parse_full_expression(const char **string, EVAL_ERROR *error);
+static inline EVAL_NODE *parse_one_full_operand(const char **string, EVAL_ERROR *error);
 
 // ----------------------------------------------------------------------------
 // parsing expressions
@@ -335,7 +335,7 @@ static EVAL_FUNCTION eval_functions[] = {
 
 // Parse function call
 ALWAYS_INLINE
-static int parse_function(const char **string, unsigned char *op, int *precedence) {
+static int parse_function(const char **string, EVAL_OPERATOR *op, int *precedence) {
     const char *s = *string;
     skip_spaces(&s);
     
@@ -378,7 +378,7 @@ static int parse_if_then_else(const char **string) {
 }
 
 static struct operator_parser {
-    unsigned char id;
+    EVAL_OPERATOR id;
     int (*parse)(const char **);
 } operator_parsers[] = {
         // the order in this list is important!
@@ -414,7 +414,7 @@ static struct operator_parser {
 };
 
 ALWAYS_INLINE
-static unsigned char parse_operator(const char **string, int *precedence) {
+static EVAL_OPERATOR parse_operator(const char **string, int *precedence) {
     skip_spaces(string);
 
     int i;
@@ -431,12 +431,12 @@ static unsigned char parse_operator(const char **string, int *precedence) {
 // the parsing logic
 
 // Forward declarations needed for recursive parsing
-static inline EVAL_NODE *parse_expression(const char **string, int *error, int allow_functions);
+static inline EVAL_NODE *parse_expression(const char **string, EVAL_ERROR *error, int allow_functions);
 static int starts_with_function(const char *s);
 
 // Helper function to parse a function call
-static EVAL_NODE *parse_function_call(const char **string, int *error) {
-    unsigned char op_type;
+static EVAL_NODE *parse_function_call(const char **string, EVAL_ERROR *error) {
+    EVAL_OPERATOR op_type;
     int precedence;
     
     // Parse the function name and opening parenthesis
@@ -530,7 +530,7 @@ static int starts_with_function(const char *s) {
 }
 
 // Helper function to avoid allocations all over the place
-static EVAL_NODE *parse_next_operand_given_its_operator(const char **string, unsigned char operator_type, int *error) {
+static EVAL_NODE *parse_next_operand_given_its_operator(const char **string, EVAL_OPERATOR operator_type, EVAL_ERROR *error) {
     // Save current position to check for function calls
     const char *current_pos = *string;
     skip_spaces(&current_pos);
@@ -568,7 +568,7 @@ static EVAL_NODE *parse_next_operand_given_its_operator(const char **string, uns
 }
 
 // parse a full operand, including its sign or other associative operator (e.g. NOT)
-static EVAL_NODE *parse_one_full_operand(const char **string, int *error) {
+static EVAL_NODE *parse_one_full_operand(const char **string, EVAL_ERROR *error) {
     char variable_buffer[EVAL_MAX_VARIABLE_NAME_LENGTH + 1];
     EVAL_NODE *op1 = NULL;
     NETDATA_DOUBLE number;
@@ -670,9 +670,9 @@ static EVAL_NODE *parse_one_full_operand(const char **string, int *error) {
 
 // parse an operator and the rest of the expression
 // precedence processing is handled here
-static EVAL_NODE *parse_rest_of_expression(const char **string, int *error, EVAL_NODE *op1) {
+static EVAL_NODE *parse_rest_of_expression(const char **string, EVAL_ERROR *error, EVAL_NODE *op1) {
     EVAL_NODE *op2 = NULL;
-    unsigned char operator;
+    EVAL_OPERATOR operator;
     int precedence;
 
     operator = parse_operator(string, &precedence);
@@ -748,7 +748,7 @@ static EVAL_NODE *parse_rest_of_expression(const char **string, int *error, EVAL
 }
 
 // Parse an expression with optional function support
-static inline EVAL_NODE *parse_expression(const char **string, int *error, int allow_functions) {
+static inline EVAL_NODE *parse_expression(const char **string, EVAL_ERROR *error, int allow_functions) {
     // Special handling for functions as arguments
     if (allow_functions) {
         const char *s = *string;
@@ -756,7 +756,7 @@ static inline EVAL_NODE *parse_expression(const char **string, int *error, int a
         
         // Check for unary operators
         if (s[0] == '-' || s[0] == '+' || s[0] == '!') {
-            unsigned char op_type;
+            EVAL_OPERATOR op_type;
             if (s[0] == '-') op_type = EVAL_OPERATOR_SIGN_MINUS;
             else if (s[0] == '+') op_type = EVAL_OPERATOR_SIGN_PLUS;
             else op_type = EVAL_OPERATOR_NOT;
@@ -795,7 +795,7 @@ static inline EVAL_NODE *parse_expression(const char **string, int *error, int a
 }
 
 // high level function to parse an expression or a sub-expression
-static inline EVAL_NODE *parse_full_expression(const char **string, int *error) {
+static inline EVAL_NODE *parse_full_expression(const char **string, EVAL_ERROR *error) {
     EVAL_NODE *op1 = parse_one_full_operand(string, error);
     if(!op1) {
         *error = EVAL_ERROR_MISSING_OPERAND;
@@ -808,12 +808,12 @@ static inline EVAL_NODE *parse_full_expression(const char **string, int *error) 
 // ----------------------------------------------------------------------------
 // public API for parsing
 
-EVAL_EXPRESSION *expression_parse(const char *string, const char **failed_at, int *error) {
+EVAL_EXPRESSION *expression_parse(const char *string, const char **failed_at, EVAL_ERROR *error) {
     if(!string || !*string)
         return NULL;
 
     const char *s = string;
-    int err = EVAL_ERROR_OK;
+    EVAL_ERROR err = EVAL_ERROR_OK;
     EVAL_NODE *op = NULL;
 
 #ifdef USE_RE2C_LEMON_PARSER
@@ -881,6 +881,7 @@ EVAL_EXPRESSION *expression_parse(const char *string, const char **failed_at, in
 
     exp->error_msg = buffer_create(100, NULL);
     exp->nodes = op;
+    exp->local_variables = NULL; // Initialize local variables list
 
     return exp;
 }
