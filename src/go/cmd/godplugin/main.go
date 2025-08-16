@@ -11,8 +11,10 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
+	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/cli"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pluginconfig"
 
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/net/http/httpproxy"
@@ -37,23 +39,22 @@ func main() {
 		return
 	}
 
-	env := newEnvConfig()
-	cfg := newConfig(opts, env)
+	pluginconfig.MustInit(opts)
 
-	if env.logLevel != "" {
-		logger.Level.SetByName(env.logLevel)
+	if lvl := pluginconfig.EnvLogLevel(); lvl != "" {
+		logger.Level.SetByName(lvl)
 	}
 	if opts.Debug {
 		logger.Level.Set(slog.LevelDebug)
 	}
 
 	a := agent.New(agent.Config{
-		Name:                      cfg.name,
-		PluginConfigDir:           cfg.pluginDir,
-		CollectorsConfigDir:       cfg.collectorsDir,
-		ServiceDiscoveryConfigDir: cfg.serviceDiscoveryDir,
-		CollectorsConfigWatchPath: cfg.collectorsWatchPath,
-		VarLibDir:                 cfg.varLibDir,
+		Name:                      executable.Name,
+		PluginConfigDir:           pluginconfig.ConfigDir(),
+		CollectorsConfigDir:       pluginconfig.CollectorsDir(),
+		ServiceDiscoveryConfigDir: pluginconfig.ServiceDiscoveryDir(),
+		CollectorsConfigWatchPath: pluginconfig.CollectorsConfigWatchPaths(),
+		VarLibDir:                 pluginconfig.VarLibDir(),
 		RunModule:                 opts.Module,
 		RunJob:                    opts.Job,
 		MinUpdateEvery:            opts.UpdateEvery,
@@ -66,6 +67,9 @@ func main() {
 
 	proxyCfg := httpproxy.FromEnvironment()
 	a.Infof("env HTTP_PROXY '%s', HTTPS_PROXY '%s'", proxyCfg.HTTPProxy, proxyCfg.HTTPSProxy)
+
+	a.Infof("directories → config: %s | collectors: %s | sd: %s | varlib: %s",
+		a.ConfigDir, a.CollectorsConfDir, a.ServiceDiscoveryConfigDir, a.VarLibDir)
 
 	a.Run()
 }
