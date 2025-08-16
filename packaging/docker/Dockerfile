@@ -2,7 +2,7 @@
 
 # This image contains preinstalled dependencies
 # hadolint ignore=DL3007
-FROM netdata/builder:v2 AS builder
+FROM netdata/builder:v3 AS builder
 
 # One of 'nightly' or 'stable'
 ARG RELEASE_CHANNEL=nightly
@@ -58,7 +58,7 @@ RUN mkdir -p /app/usr/sbin/ \
 #####################################################################
 # This image contains preinstalled dependencies
 # hadolint ignore=DL3007
-FROM netdata/base:v2 AS base
+FROM netdata/base:v3 AS base
 
 ARG BUILD_DATE
 ARG BUILD_VERSION
