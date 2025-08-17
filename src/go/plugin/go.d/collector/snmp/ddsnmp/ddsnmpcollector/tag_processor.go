@@ -12,9 +12,15 @@ type tagAdder struct {
 	tags map[string]string
 }
 
-func (m *tagAdder) addTag(key, value string) {
-	if existing, ok := m.tags[key]; !ok || existing == "" {
-		m.tags[key] = value
+func (ta *tagAdder) addTags(tags map[string]string) {
+	for k, v := range tags {
+		ta.addTag(k, v)
+	}
+}
+
+func (ta *tagAdder) addTag(key, value string) {
+	if existing, ok := ta.tags[key]; !ok || existing == "" {
+		ta.tags[key] = value
 	}
 }
 

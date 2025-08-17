@@ -62,12 +62,12 @@ type (
 		profile        *ddsnmp.Profile
 		initialized    bool
 		globalTags     map[string]string
-		deviceMetadata map[string]string
+		deviceMetadata map[string]ddsnmp.MetaTag
 	}
 )
 
-func (c *Collector) CollectDeviceMetadata() (map[string]string, error) {
-	meta := make(map[string]string)
+func (c *Collector) CollectDeviceMetadata() (map[string]ddsnmp.MetaTag, error) {
+	meta := make(map[string]ddsnmp.MetaTag)
 
 	for _, prof := range c.profiles {
 		profDeviceMeta, err := c.deviceMetadataCollector.Collect(prof.profile)
@@ -75,7 +75,9 @@ func (c *Collector) CollectDeviceMetadata() (map[string]string, error) {
 			return nil, err
 		}
 
-		mergeTagsIfAbsent(meta, profDeviceMeta)
+		for k, v := range profDeviceMeta {
+			mergeMetaTagIfAbsent(meta, k, v)
+		}
 	}
 
 	return meta, nil

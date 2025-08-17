@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/discoverer/snmpsd"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 
 	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
@@ -221,7 +221,7 @@ func TestCollector_Check(t *testing.T) {
 				collr := New()
 				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 3)
 				collr.collectIfMib = false
-				m.EXPECT().WalkAll(snmpsd.RootOidMibSystem).Return(nil, errors.New("mock Get() error")).Times(1)
+				m.EXPECT().WalkAll(snmputils.RootOidMibSystem).Return(nil, errors.New("mock Get() error")).Times(1)
 
 				return collr
 			},
@@ -586,7 +586,7 @@ func setMockClientInitExpect(m *snmpmock.MockHandler) {
 }
 
 func setMockClientSysObjectidExpect(m *snmpmock.MockHandler) {
-	m.EXPECT().Get([]string{snmpsd.OidSysObject}).Return(&gosnmp.SnmpPacket{
+	m.EXPECT().Get([]string{snmputils.OidSysObject}).Return(&gosnmp.SnmpPacket{
 		Variables: []gosnmp.SnmpPDU{
 			{Value: ".1.1.1",
 				Name: ".1.3.6.1.2.1.1.2.0",
@@ -602,19 +602,19 @@ func setMockClientSysObjectidExpect(m *snmpmock.MockHandler) {
 }
 
 func setMockClientSysInfoExpect(m *snmpmock.MockHandler) {
-	m.EXPECT().WalkAll(snmpsd.RootOidMibSystem).Return([]gosnmp.SnmpPDU{
-		{Name: snmpsd.OidSysDescr, Value: []uint8("mock sysDescr"), Type: gosnmp.OctetString},
-		{Name: snmpsd.OidSysObject, Value: ".1.3.6.1.4.1.14988.1", Type: gosnmp.ObjectIdentifier},
-		{Name: snmpsd.OidSysContact, Value: []uint8("mock sysContact"), Type: gosnmp.OctetString},
-		{Name: snmpsd.OidSysName, Value: []uint8("mock sysName"), Type: gosnmp.OctetString},
-		{Name: snmpsd.OidSysLocation, Value: []uint8("mock sysLocation"), Type: gosnmp.OctetString},
+	m.EXPECT().WalkAll(snmputils.RootOidMibSystem).Return([]gosnmp.SnmpPDU{
+		{Name: snmputils.OidSysDescr, Value: []uint8("mock sysDescr"), Type: gosnmp.OctetString},
+		{Name: snmputils.OidSysObject, Value: ".1.3.6.1.4.1.14988.1", Type: gosnmp.ObjectIdentifier},
+		{Name: snmputils.OidSysContact, Value: []uint8("mock sysContact"), Type: gosnmp.OctetString},
+		{Name: snmputils.OidSysName, Value: []uint8("mock sysName"), Type: gosnmp.OctetString},
+		{Name: snmputils.OidSysLocation, Value: []uint8("mock sysLocation"), Type: gosnmp.OctetString},
 	}, nil).MinTimes(1)
 }
 
 func setMockClientSysinfoAndUptimeExpect(m *snmpmock.MockHandler) {
 	setMockClientSysInfoExpect(m)
 
-	m.EXPECT().Get([]string{snmpsd.OidSysUptime}).Return(&gosnmp.SnmpPacket{
+	m.EXPECT().Get([]string{oidSysUptime}).Return(&gosnmp.SnmpPacket{
 		Variables: []gosnmp.SnmpPDU{
 			{Value: uint32(6048), Type: gosnmp.TimeTicks},
 		},
