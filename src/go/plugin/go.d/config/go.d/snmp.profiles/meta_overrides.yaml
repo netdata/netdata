@@ -1,172 +1,5796 @@
 enterprisenumbers:
-  # Map PEN org names -> canonical vendor names
-  # (used to derive vendor from the PEN database, not from sysobjectids.json)
   org_to_vendor:
-    "Alcatel-Lucent TMC (formerly 'Alcatel SOC')": "Alcatel-Lucent"
-    "allied networks GmbH": "Allied"
-    "Allied Data Technologies": "Allied"
-    "Allied Telesis, Inc.": "Allied"
-    "American Power Conversion Corp.": "APC"
-    "Arista Networks, Inc. (formerly 'Arastra, Inc.')": "Arista"
-    "Aruba PEC S.p.A.": "Aruba"
-    "Aruba S.r.l.": "Aruba"
-    "Aruba, a Hewlett Packard Enterprise company": "Aruba"
-    "AVAYA": "Avaya"
-    "Avaya Atlanta Lab": "Avaya"
-    "Avaya Communication": "Avaya"
-    "Barracuda Networks AG (previous was 'phion Information Technologies')": "Barracuda"
-    "Barracuda Networks, Inc.": "Barracuda"
-    "barracuda digitale agentur GmbH": "Barracuda"
-    "Blade Network Technologies, Inc.": "IBM"
-    "Brocade Communication Systems, Inc. (formerly 'Foundry Networks, Inc.')": "Brocade"
-    "Brocade Communication Systems, Inc. (formerly 'Rhapsody Networks Inc.')": "Brocade"
-    "Brocade Communications Systems, Inc.": "Brocade"
-    "Brocade Communications Systems, Inc. (formerly 'McDATA Corp.')": "Brocade"
-    "Brocade Communications Systems, Inc. (formerly 'McDATA Corporation')": "Brocade"
-    "Brocade Communications Systems, Inc. (formerly 'McDATA,Inc')": "Brocade"
-    "Brocade Communications Systems, Inc. (formerly 'NuView Inc.')": "Brocade"
-    "CIENA Corporation (formerly 'ONI Systems Corp.')": "Ciena"
-    "Ciena (formerly 'Akara Inc.')": "Ciena"
-    "Ciena Corporation": "Ciena"
-    "Ciena Corporation (formerly 'Catena Networks')": "Ciena"
-    "Cisco Flex Platform": "Cisco"
-    "Cisco Sera": "Cisco"
-    "Cisco SolutionsLab": "Cisco"
-    "Cisco Sytems, Inc.": "Cisco"
-    "Cisco Systems": "Cisco"
-    "Cisco Systems Inc": "Cisco"
-    "Cisco Systems India Private Limited": "Cisco"
-    "Cisco Systems, Inc.": "Cisco"
-    "Cisco Systems, Inc. (formerly 'Arch Rock Corporation')": "Cisco"
-    "ciscoSystems": "Cisco"
-    "Citrix Systems Inc.": "Citrix"
-    "Dialogic Corporation": "Dialogic"
-    "D-Link Systems, Inc.": "D-Link"
-    "Dell Inc.": "Dell"
-    "Eaton Energy Automation Solutions (EAS) Division": "Eaton"
-    "EATON Wireless": "Eaton"
-    "Ericsson AB": "Ericsson"
-    "Ericsson AB - 4G5G (formerly 'Ellemtel Telecommunication Systems Laboratories')": "Ericsson"
-    "Ericsson AB - Packet Core Networks": "Ericsson"
-    "Ericsson Ahead Communications Systems GmbH": "Ericsson"
-    "Ericsson Communications Ltd.": "Ericsson"
-    "Ericsson Denmark A/S, Telebit Division": "Ericsson"
-    "Ericsson Inc. (formerly 'BelAir Networks')": "Ericsson"
-    "Ericsson Mobile Platforms AB": "Ericsson"
-    "Ericsson Nikola Tesla d.d.": "Ericsson"
-    "Ericsson Research Montreal (LMC)": "Ericsson"
-    "Ericsson Wireless LAN Systems": "Ericsson"
-    "ERICSSON FIBER ACCESS": "Ericsson"
-    "Extreme Networks": "Extreme"
-    "Extreme Networks (formerly 'Ipanema Technologies')": "Extreme"
-    "F5 Labs, Inc.": "F5"
-    "F5 Networks Inc": "F5"
-    "Fortinet, Inc.": "Fortinet"
-    "Fortinet. Inc.": "Fortinet"
-    "Gigamon Systems LLC": "Gigamon"
-    "Hewlett-Packard": "HP"
-    "Hewlett-Packard (Schweiz) GmbH": "HP"
-    "Hewlett-Packard Slovakia": "HP"
-    "Hewlett Packard Enterprise": "HPE"
-    "HUAWEI Technology Co.,Ltd": "Huawei"
-    "Huawei Symantec Technologies Co.,Ltd": "Huawei"
-    "Infinera Corp.": "Infinera"
-    "InfoBlox Inc.": "Infoblox"
-    "Infoblox, WinConnect (formerly 'Ipanto')": "Infoblox"
-    "Juniper Financial Corp.": "Juniper"
-    "Juniper Networks, Inc.": "Juniper"
-    "Juniper Networks/Funk Software": "Juniper"
-    "Juniper Networks/Unisphere": "Juniper"
-    "KYOCERA Corporation": "Kyocera"
-    "Kyocera Communication Systems Co.Ltd": "Kyocera"
-    "McAFee Associates Inc.": "McAfee"
-    "McAfee (formerly 'Secure Computing Corporation')": "McAfee"
-    "McAfee Inc. (formerly 'Network Associates, Inc.')": "McAfee"
-    "McAfee, Inc.  (formerly 'Securify, Inc.')": "McAfee"
-    "McAfee Inc. (formerly 'Reconnex Corporation')": "McAfee"
-    "McAfee, LLC": "McAfee"
-    "Meraki Networks, Inc.": "Meraki"
-    "Nasuni Corporation": "Nasuni"
-    "NEC Corporation": "NEC"
-    "NEC Eluminant Technologies, Inc.": "NEC"
-    "NEC Platforms, Ltd.": "NEC"
-    "NEC Telenetworx,Ltd": "NEC"
-    "NEC COMPUTERS INTERNATIONAL B.V.": "NEC"
-    "NEC informatec systems,ltd.": "NEC"
-    "NEC Electronics Corporation": "NEC"
-    "NEC Unified Solutions": "NEC"
-    "NEC Enterprise Communication Technologies": "NEC"
-    "Network Appliance Corporation": "NetApp"
-    "Nokia (formerly 'Alcatel-Lucent')": "Nokia"
-    "Nokia (formerly 'Novarra, Inc.')": "Nokia"
-    "Nokia Distributed Access": "Nokia"
-    "Nokia Networks (formerly 'Nokia Siemens Networks')": "Nokia"
-    "Nokia Shanghai Bell": "Nokia"
-    "NVIDIA Corporation": "NVIDIA"
-    "PALO ALTO NETWORKS": "Palo Alto"
-    "Palo Alto Research Center, Inc.": "Palo Alto"
-    "Palo Alto Software, Inc.": "Palo Alto"
-    "Ruckus Wireless, Inc.": "Ruckus"
-    "SINETICA": "Panduit"
-    "Sophos Plc": "Sophos"
-    "SVTO Hewlett-Packard": "HP"
-    "Synology Inc.": "Synology"
-    "Tejas Networks": "Tejas"
-    "TP-Link Systems Inc.": "TP-Link"
-    "Ubiquiti Networks, Inc.": "Ubiquiti"
-    "Velocloud Networks, Inc.": "VeloCloud"
-    "Vertiv (formerly 'Emerson Computer Power')": "Vertiv"
-    "Vertiv (formerly 'Emerson Energy Systems')": "Vertiv"
-    "Vertiv Tech Co.,Ltd. (formerly 'Emerson Network Power Co.,Ltd.')": "Vertiv"
-    "Vertiv (formerly 'Geist Manufacturing, Inc')": "Vertiv"
-    "Vertiv Co": "Vertiv"
-    "VMware Inc.": "VMware"
-    "WatchGuard Technologies Inc.": "WatchGuard"
-    "Western Digital Corporation": "Western Digital"
-    "Yokogawa-Hewlett-Packard": "HP"
-    "Zebra Technologies Corporation": "Zebra"
-    "ZyXEL Communications Corp.": "Zyxel"
-
+    Alcatel-Lucent TMC (formerly 'Alcatel SOC'): Alcatel-Lucent
+    allied networks GmbH: Allied
+    Allied Data Technologies: Allied
+    Allied Telesis, Inc.: Allied
+    American Power Conversion Corp.: APC
+    Arista Networks, Inc. (formerly 'Arastra, Inc.'): Arista
+    Aruba PEC S.p.A.: Aruba
+    Aruba S.r.l.: Aruba
+    Aruba, a Hewlett Packard Enterprise company: Aruba
+    AVAYA: Avaya
+    Avaya Atlanta Lab: Avaya
+    Avaya Communication: Avaya
+    Barracuda Networks AG (previous was 'phion Information Technologies'): Barracuda
+    Barracuda Networks, Inc.: Barracuda
+    barracuda digitale agentur GmbH: Barracuda
+    Blade Network Technologies, Inc.: IBM
+    Brocade Communication Systems, Inc. (formerly 'Foundry Networks, Inc.'): Brocade
+    Brocade Communication Systems, Inc. (formerly 'Rhapsody Networks Inc.'): Brocade
+    Brocade Communications Systems, Inc.: Brocade
+    Brocade Communications Systems, Inc. (formerly 'McDATA Corp.'): Brocade
+    Brocade Communications Systems, Inc. (formerly 'McDATA Corporation'): Brocade
+    Brocade Communications Systems, Inc. (formerly 'McDATA,Inc'): Brocade
+    Brocade Communications Systems, Inc. (formerly 'NuView Inc.'): Brocade
+    CIENA Corporation (formerly 'ONI Systems Corp.'): Ciena
+    Ciena (formerly 'Akara Inc.'): Ciena
+    Ciena Corporation: Ciena
+    Ciena Corporation (formerly 'Catena Networks'): Ciena
+    Cisco Flex Platform: Cisco
+    Cisco Sera: Cisco
+    Cisco SolutionsLab: Cisco
+    Cisco Sytems, Inc.: Cisco
+    Cisco Systems: Cisco
+    Cisco Systems Inc: Cisco
+    Cisco Systems India Private Limited: Cisco
+    Cisco Systems, Inc.: Cisco
+    Cisco Systems, Inc. (formerly 'Arch Rock Corporation'): Cisco
+    ciscoSystems: Cisco
+    Citrix Systems Inc.: Citrix
+    Dialogic Corporation: Dialogic
+    D-Link Systems, Inc.: D-Link
+    Dell Inc.: Dell
+    Eaton Energy Automation Solutions (EAS) Division: Eaton
+    EATON Wireless: Eaton
+    Ericsson AB: Ericsson
+    Ericsson AB - 4G5G (formerly 'Ellemtel Telecommunication Systems Laboratories'): Ericsson
+    Ericsson AB - Packet Core Networks: Ericsson
+    Ericsson Ahead Communications Systems GmbH: Ericsson
+    Ericsson Communications Ltd.: Ericsson
+    Ericsson Denmark A/S, Telebit Division: Ericsson
+    Ericsson Inc. (formerly 'BelAir Networks'): Ericsson
+    Ericsson Mobile Platforms AB: Ericsson
+    Ericsson Nikola Tesla d.d.: Ericsson
+    Ericsson Research Montreal (LMC): Ericsson
+    Ericsson Wireless LAN Systems: Ericsson
+    ERICSSON FIBER ACCESS: Ericsson
+    Extreme Networks: Extreme
+    Extreme Networks (formerly 'Ipanema Technologies'): Extreme
+    F5 Labs, Inc.: F5
+    F5 Networks Inc: F5
+    Fortinet, Inc.: Fortinet
+    Fortinet. Inc.: Fortinet
+    Gigamon Systems LLC: Gigamon
+    Hewlett-Packard: HP
+    Hewlett-Packard (Schweiz) GmbH: HP
+    Hewlett-Packard Slovakia: HP
+    Hewlett Packard Enterprise: HPE
+    HUAWEI Technology Co.,Ltd: Huawei
+    Huawei Symantec Technologies Co.,Ltd: Huawei
+    Infinera Corp.: Infinera
+    InfoBlox Inc.: Infoblox
+    Infoblox, WinConnect (formerly 'Ipanto'): Infoblox
+    Juniper Financial Corp.: Juniper
+    Juniper Networks, Inc.: Juniper
+    Juniper Networks/Funk Software: Juniper
+    Juniper Networks/Unisphere: Juniper
+    KYOCERA Corporation: Kyocera
+    Kyocera Communication Systems Co.Ltd: Kyocera
+    McAFee Associates Inc.: McAfee
+    McAfee (formerly 'Secure Computing Corporation'): McAfee
+    McAfee Inc. (formerly 'Network Associates, Inc.'): McAfee
+    McAfee, Inc.  (formerly 'Securify, Inc.'): McAfee
+    McAfee Inc. (formerly 'Reconnex Corporation'): McAfee
+    McAfee, LLC: McAfee
+    Meraki Networks, Inc.: Meraki
+    Nasuni Corporation: Nasuni
+    NEC Corporation: NEC
+    NEC Eluminant Technologies, Inc.: NEC
+    NEC Platforms, Ltd.: NEC
+    NEC Telenetworx,Ltd: NEC
+    NEC COMPUTERS INTERNATIONAL B.V.: NEC
+    NEC informatec systems,ltd.: NEC
+    NEC Electronics Corporation: NEC
+    NEC Unified Solutions: NEC
+    NEC Enterprise Communication Technologies: NEC
+    Network Appliance Corporation: NetApp
+    Nokia (formerly 'Alcatel-Lucent'): Nokia
+    Nokia (formerly 'Novarra, Inc.'): Nokia
+    Nokia Distributed Access: Nokia
+    Nokia Networks (formerly 'Nokia Siemens Networks'): Nokia
+    Nokia Shanghai Bell: Nokia
+    NVIDIA Corporation: NVIDIA
+    PALO ALTO NETWORKS: Palo Alto
+    Palo Alto Research Center, Inc.: Palo Alto
+    Palo Alto Software, Inc.: Palo Alto
+    Ruckus Wireless, Inc.: Ruckus
+    SINETICA: Panduit
+    Sophos Plc: Sophos
+    SVTO Hewlett-Packard: HP
+    Synology Inc.: Synology
+    Tejas Networks: Tejas
+    TP-Link Systems Inc.: TP-Link
+    Ubiquiti Networks, Inc.: Ubiquiti
+    Velocloud Networks, Inc.: VeloCloud
+    Vertiv (formerly 'Emerson Computer Power'): Vertiv
+    Vertiv (formerly 'Emerson Energy Systems'): Vertiv
+    Vertiv Tech Co.,Ltd. (formerly 'Emerson Network Power Co.,Ltd.'): Vertiv
+    Vertiv (formerly 'Geist Manufacturing, Inc'): Vertiv
+    Vertiv Co: Vertiv
+    VMware Inc.: VMware
+    WatchGuard Technologies Inc.: WatchGuard
+    Western Digital Corporation: Western Digital
+    Yokogawa-Hewlett-Packard: HP
+    Zebra Technologies Corporation: Zebra
+    ZyXEL Communications Corp.: Zyxel
 sysobjectids:
-  # Exact OID overrides (create-or-update)
   oid_overrides:
-    # https://mibs.observium.org/mib/NET-SNMP-TC/
-    "1.3.6.1.4.1.8072.3.2.8":
-      category: Server
-      model: "FreeBSD"
-    "1.3.6.1.4.1.8072.3.2.10":
-      category: Server
-      model: "Linux"
-    "1.3.6.1.4.1.8072.3.2.16":
-      category: Server
-      model: "macOS"
-
-    "1.3.6.1.4.1.26543.1.7.7":
-      category: Switch
-      model: RackSwitch G8052
-    "1.3.6.1.4.1.6889.1.69.4.3":
-      category: IP Phone
-      model: AVX571040
-    "1.3.6.1.4.1.3955.1.1":
-      category: Firewall
-      model: BEFSX41
-
-    # TODO: Brocade: add all from https://docs.microfocus.com/NOM/2018.05/Content/common/nom_device_support_matrix/DSD_Foundry_JS.html
-    "1.3.6.1.4.1.1991.1.3.55.1.2":
+    1.3.6.1.4.1.1.2.826.0.1.4616240.1.1.4500:
+      model: MCU4500
+    1.3.6.1.4.1.1.2.826.0.1.4616240.1.1.4501:
+      model: MCU4501
+    1.3.6.1.4.1.1.2.826.0.1.4616240.1.1.4505:
+      model: MCU4505
+    1.3.6.1.4.1.1.2.826.0.1.4616240.1.1.4510:
+      model: MCU4510
+    1.3.6.1.4.1.1.2.826.0.1.4616240.1.1.4515:
+      model: MCU4515
+    1.3.6.1.4.1.1.2.826.0.1.4616240.1.1.4520:
+      model: MCU4520
+    1.3.6.1.4.1.1.2.826.0.1.4616240.1.1.8420:
+      model: MSE8420
+    1.3.6.1.4.1.1.2.826.0.1.4616240.1.1.8510:
+      model: MSE8510
+    1.3.6.1.4.1.1.2.826.0.1.4616240.1.7.8050:
+      model: MSE8050
+    1.3.6.1.4.1.1012.230.1.1.1.11812:
+      model: MNR18-12
+    1.3.6.1.4.1.1012.230.1.1.1.11813:
+      model: MNR18-13
+    1.3.6.1.4.1.1012.230.1.1.1.11815:
+      model: MNR18-15
+    1.3.6.1.4.1.1012.230.1.1.1.11816:
+      model: MNR18-16
+    1.3.6.1.4.1.1012.230.1.1.1.12809:
+      model: MNR28-09
+    1.3.6.1.4.1.1012.230.1.1.1.12810:
+      model: MNR28-10
+    1.3.6.1.4.1.1012.230.1.1.1.12811:
+      model: MNR28-11
+    1.3.6.1.4.1.1012.230.1.1.1.12830:
+      model: MNR28-30
+    1.3.6.1.4.1.1012.230.1.1.1.12831:
+      model: MNR28-31
+    1.3.6.1.4.1.1012.230.1.1.1.12840:
+      model: MNR28-40
+    1.3.6.1.4.1.1012.230.1.1.1.12880:
+      model: MNR28-80
+    1.3.6.1.4.1.1012.230.10.1.10:
+      model: MNE3928P-SI
+    1.3.6.1.4.1.1012.230.10.1.100:
+      model: MNE5624F
+    1.3.6.1.4.1.1012.230.10.1.11:
+      model: MNE3952P-SI
+    1.3.6.1.4.1.1012.230.10.1.12:
+      model: MNE3928TP-SI
+    1.3.6.1.4.1.1012.230.10.1.13:
+      model: MNE3928P-EI
+    1.3.6.1.4.1.1012.230.10.1.14:
+      model: MNE3952P-EI
+    1.3.6.1.4.1.1012.230.10.1.15:
+      model: MNE3928P-PWR-EI
+    1.3.6.1.4.1.1012.230.10.1.16:
+      model: MNE3952P-PWR-EI
+    1.3.6.1.4.1.1012.230.10.1.17:
+      model: MNE3928F-EI
+    1.3.6.1.4.1.1012.230.10.1.20:
+      model: MNR18-33E
+    1.3.6.1.4.1.1012.230.10.1.21:
+      model: MNR18-34E
+    1.3.6.1.4.1.1012.230.10.1.22:
+      model: MNE8508
+    1.3.6.1.4.1.1012.230.10.1.43:
+      model: MNE5624P
+    1.3.6.1.4.1.1012.230.10.1.44:
+      model: MNE5624P-PWR
+    1.3.6.1.4.1.1012.230.10.1.45:
+      model: MNE5648P
+    1.3.6.1.4.1.1012.230.10.1.46:
+      model: MNE5648P-PWR
+    1.3.6.1.4.1.1012.230.10.1.53:
+      model: MNR18-20S
+    1.3.6.1.4.1.1012.230.10.1.7:
+      model: MNE3552F-HI
+    1.3.6.1.4.1.1012.230.10.1.71:
+      model: MNR18-22-24
+    1.3.6.1.4.1.1012.230.10.1.73:
+      model: MNR18-30E
+    1.3.6.1.4.1.1012.230.10.1.74:
+      model: MNR18-31E
+    1.3.6.1.4.1.1012.230.10.1.75:
+      model: MNR18-32E
+    1.3.6.1.4.1.1012.230.10.1.76:
+      model: MNR18-35E
+    1.3.6.1.4.1.1012.230.10.1.80:
+      model: MNE6502
+    1.3.6.1.4.1.1012.230.2.23.19:
+      model: MNE6506
+    1.3.6.1.4.1.1012.230.2.23.30:
+      model: MNE6503
+    1.3.6.1.4.1.1012.230.2.23.31:
+      model: MNE8512
+    1.3.6.1.4.1.1012.230.2.23.32:
+      model: MNE8505
+    1.3.6.1.4.1.1012.230.2.23.33:
+      model: MNE6506R
+    1.3.6.1.4.1.1012.230.2.23.37:
+      model: MNE3552G
+    1.3.6.1.4.1.1012.230.2.23.38:
+      model: MNE3552P
+    1.3.6.1.4.1.1012.230.2.23.39:
+      model: MNE3528G
+    1.3.6.1.4.1.1012.230.2.23.40:
+      model: MNE3528P
+    1.3.6.1.4.1.1012.230.2.23.67:
+      model: MNE3552F-SI
+    1.3.6.1.4.1.1012.230.2.23.68:
+      model: MNE3552F-EI
+    1.3.6.1.4.1.1012.230.2.44:
+      model: MNR46-20
+    1.3.6.1.4.1.1012.230.2.45:
+      model: MNR46-40
+    1.3.6.1.4.1.1012.230.2.46:
+      model: MNR46-80
+    1.3.6.1.4.1.1012.230.2.55:
+      model: MNR18-18
+    1.3.6.1.4.1.1012.230.2.56:
+      model: MNR18-20
+    1.3.6.1.4.1.10418.18.21.24:
+      model: 2162DS
+    1.3.6.1.4.1.10418.3.1.16:
+      model: GCM2
+    1.3.6.1.4.1.10418.3.1.26:
+      model: AV3200
+    1.3.6.1.4.1.10734.1.5.1:
+      model: TippingPoint Core Controller
+    1.3.6.1.4.1.10734.1.9.1:
+      model: TippingPoint S1020F
+    1.3.6.1.4.1.10734.1.9.3:
+      model: TippingPoint S3010F
+    1.3.6.1.4.1.10734.1.9.4:
+      model: TippingPoint S3020F
+    1.3.6.1.4.1.10734.1.9.5:
+      model: TippingPoint S8005F
+    1.3.6.1.4.1.10734.1.9.6:
+      model: TippingPoint S8010F
+    1.3.6.1.4.1.10734.1.9.7:
+      model: TippingPoint S8020F
+    1.3.6.1.4.1.11.2.3.2.3:
+      model: HP800
+    1.3.6.1.4.1.11.2.3.2.6:
+      model: Itanium
+    1.3.6.1.4.1.11.2.3.7.1.1:
+      model: AdvanceStack 10 10
+    1.3.6.1.4.1.11.2.3.7.1.2:
+      model: AdvanceStack Remote Bridge
+    1.3.6.1.4.1.11.2.3.7.1.3:
+      model: AdvanceStack EtherTwist LAN
+    1.3.6.1.4.1.11.2.3.7.11.102:
+      model: DCM Controller (J9445A)
+    1.3.6.1.4.1.11.2.3.7.11.110.1:
+      model: 3500-Fixed 10/100Base-TX/SFP PoE Module
+    1.3.6.1.4.1.11.2.3.7.11.110.2:
+      model: 3500-Fixed 24p 10/100Base-TX PoE Module
+    1.3.6.1.4.1.11.2.3.7.11.112.1:
+      model: 3500-Fixed 10/100Base-TX/SFP Module
+    1.3.6.1.4.1.11.2.3.7.11.112.2:
+      model: 3500-Fixed 24p 10/100Base-TX Module
+    1.3.6.1.4.1.11.2.3.7.11.115.1:
+      model: 3500-Fixed Gig-T/SFP PoE+ Module
+    1.3.6.1.4.1.11.2.3.7.11.115.2:
+      model: 3500-Fixed 24p Gig-T PoE+ Module
+    1.3.6.1.4.1.11.2.3.7.11.117.1:
+      model: 2615-Fixed 8-port 10/100-T + 2-port Gigabit module
+    1.3.6.1.4.1.11.2.3.7.11.118.1:
+      model: 2915-8-port 10/100/1000-T + 2-port Gigabit module
+    1.3.6.1.4.1.11.2.3.7.11.129.1:
+      model: 2620-Fixed 24p 10/100 module
+    1.3.6.1.4.1.11.2.3.7.11.130.1:
+      model: 2620-Fixed 24p PPoEP 10/100 module
+    1.3.6.1.4.1.11.2.3.7.11.132.1:
+      model: 2620-Fixed 48p 10/100 module
+    1.3.6.1.4.1.11.2.3.7.11.133.1:
+      model: 2620-Fixed 48p PoEP 10/100 module
+    1.3.6.1.4.1.11.2.3.7.11.136.1:
+      model: 2530-Fixed 48p PoEP 10/100/1000-T module
+    1.3.6.1.4.1.11.2.3.7.11.137.1:
+      model: 2530-Fixed 24p PoEP 10/100/1000-T module
+    1.3.6.1.4.1.11.2.3.7.11.138.1:
+      model: 2530-Fixed 8p PoEP 10/100/1000-T module
+    1.3.6.1.4.1.11.2.3.7.11.139.1:
+      model: 2530-Fixed 48p 10/100/1000-T module
+    1.3.6.1.4.1.11.2.3.7.11.140.1:
+      model: 2530-Fixed 24p 10/100/1000-T module
+    1.3.6.1.4.1.11.2.3.7.11.141.1:
+      model: 2530-Fixed 8p 10/100/1000-T module
+    1.3.6.1.4.1.11.2.3.7.11.142.1:
+      model: 2530-Fixed 48p PoEP 10/100 module
+    1.3.6.1.4.1.11.2.3.7.11.143.1:
+      model: 2530-Fixed 24p PoEP 10/100 module
+    1.3.6.1.4.1.11.2.3.7.11.144.1:
+      model: 2530-Fixed 8p PoEP 10/100 module
+    1.3.6.1.4.1.11.2.3.7.11.145.1:
+      model: 2530-Fixed 48p 10/100 module
+    1.3.6.1.4.1.11.2.3.7.11.146.1:
+      model: 2530-Fixed 24p 10/100 module
+    1.3.6.1.4.1.11.2.3.7.11.147.1:
+      model: 2530-Fixed 8p 10/100 module
+    1.3.6.1.4.1.11.2.3.7.11.152.1:
+      model: 2920-Fixed 24G module
+    1.3.6.1.4.1.11.2.3.7.11.153.1:
+      model: 2920-Fixed 24G PoE+ module
+    1.3.6.1.4.1.11.2.3.7.11.154.1:
+      model: 2920-Fixed 48G module
+    1.3.6.1.4.1.11.2.3.7.11.155.1:
+      model: 2920-Fixed 8p PoEP Internal PS 10/100 module
+    1.3.6.1.4.1.11.2.3.7.11.155.2:
+      model: 2920-10-GbE 2-port CX4
+    1.3.6.1.4.1.11.2.3.7.11.155.3:
+      model: 2920-10-GbE 2-port SFP+
+    1.3.6.1.4.1.11.2.3.7.11.155.4:
+      model: 2920-10GBASE-T
+    1.3.6.1.4.1.11.2.3.7.11.155.5:
+      model: 2920-2 Port Stacking
+    1.3.6.1.4.1.11.2.3.7.11.156:
+      model: 3800-4G-6SFP+-ONE
+    1.3.6.1.4.1.11.2.3.7.11.157:
+      model: 3800-4G-8SFP+-ONE
+    1.3.6.1.4.1.11.2.3.7.11.158:
+      model: PS1810-8G
+    1.3.6.1.4.1.11.2.3.7.11.159:
+      model: PS1810-24G
+    1.3.6.1.4.1.11.2.3.7.11.160.10:
+      model: 5400R 8-port 1/2.5/5/10GBASE-T PoE+ MACsec v3 zl2 Module
+    1.3.6.1.4.1.11.2.3.7.11.160.11:
+      model: 5400R 2-port 40GbE QSFP+ v3 zl2 Module
+    1.3.6.1.4.1.11.2.3.7.11.160.2:
+      model: 5400R 24-port 10/100/1000BASE-T PoE+ MACsec v3 zl2 Module
+    1.3.6.1.4.1.11.2.3.7.11.160.3:
+      model: 5400R 24-port 10/100/1000BASE-T MACsec v3 zl2 Module
+    1.3.6.1.4.1.11.2.3.7.11.160.4:
+      model: 5400R 24-port 1GbE SFP MACsec v3 zl2 Module
+    1.3.6.1.4.1.11.2.3.7.11.160.5:
+      model: 5400R 12-port 10/100/1000BASE-T PoE+ / 12-port 1GbE SFP MACsec v3 zl2
+        Module
+    1.3.6.1.4.1.11.2.3.7.11.160.6:
+      model: 5400R 20-port 10/100/1000BASE-T PoE+ / 4-port 1G/10GbE SFP+ MACsec v3
+        zl2 Module
+    1.3.6.1.4.1.11.2.3.7.11.160.7:
+      model: 5400R 20-port 10/100/1000BASE-T PoE+ / 4-port 1/2.5/5/10GBASE-T PoE+
+        MACsec v3 zl2 Module
+    1.3.6.1.4.1.11.2.3.7.11.160.8:
+      model: 5400R 20-port 10/100/1000BASE-T PoE+ MACsec / 1-port 40GbE QSFP+ v3 zl2
+        Module
+    1.3.6.1.4.1.11.2.3.7.11.160.9:
+      model: 5400R 8-port 1G/10GbE SFP+ MACsec v3 zl2 Module
+    1.3.6.1.4.1.11.2.3.7.11.162.10:
+      model: M330 Dual Radio 802.11ac (JP) Access Point
+    1.3.6.1.4.1.11.2.3.7.11.162.8:
+      model: M330 Dual Radio 802.11ac (AM) Access Point
+    1.3.6.1.4.1.11.2.3.7.11.162.9:
+      model: M330 Dual Radio 802.11ac (WW) Access Point
+    1.3.6.1.4.1.11.2.3.7.11.163:
+      model: 2530-48G-PoE+-2SFP+
+    1.3.6.1.4.1.11.2.3.7.11.163.1:
+      model: 2530-Fixed 48p PoEP 10/100/1000-T 2SFP+ module
+    1.3.6.1.4.1.11.2.3.7.11.164:
+      model: 2530-24G-PoE+-2SFP+
+    1.3.6.1.4.1.11.2.3.7.11.164.1:
+      model: 2530-Fixed 24p PoEP 10/100/1000-T 2SFP+ module
+    1.3.6.1.4.1.11.2.3.7.11.165:
+      model: 2530-48G-2SFP+ (J9855A)
+    1.3.6.1.4.1.11.2.3.7.11.165.1:
+      model: 2530-Fixed 48p 10/100/1000-T 2SFP+ module
+    1.3.6.1.4.1.11.2.3.7.11.166:
+      model: 2530-24G-2SFP+
+    1.3.6.1.4.1.11.2.3.7.11.166.1:
+      model: 2530-Fixed 24p 10/100/1000-T 2SFP+ module
+    1.3.6.1.4.1.11.2.3.7.11.17.7:
+      model: AC Module
+    1.3.6.1.4.1.11.2.3.7.11.170:
+      model: 1820-8G-PoE+ (65W)
+    1.3.6.1.4.1.11.2.3.7.11.173.1:
+      model: 2530-Fixed 8p PoEP Internal PS 10/100 module
+    1.3.6.1.4.1.11.2.3.7.11.174.1.1:
+      model: Aruba 3810M 24G 1-slot Module
+    1.3.6.1.4.1.11.2.3.7.11.174.2.1:
+      model: Aruba 3810M 48G 1-slot Module
+    1.3.6.1.4.1.11.2.3.7.11.174.3:
+      model: Aruba 3810M 24G PoE+ 1-slot
+    1.3.6.1.4.1.11.2.3.7.11.174.3.1:
+      model: Aruba 3810M 24G PoE+ 1-slot Module
+    1.3.6.1.4.1.11.2.3.7.11.174.4:
+      model: Aruba 3810M 48G PoE+ 1-slot
+    1.3.6.1.4.1.11.2.3.7.11.174.4.1:
+      model: Aruba 3810M 48G PoE+ 1-slot Module
+    1.3.6.1.4.1.11.2.3.7.11.174.5.1:
+      model: Aruba 3810M 16SFP+ 2-slot Module
+    1.3.6.1.4.1.11.2.3.7.11.174.6.1:
+      model: Aruba 3810M 20G 8 HPE Smart Rate PoE+ 1-slot Module
+    1.3.6.1.4.1.11.2.3.7.11.174.7:
+      model: Aruba 3810M 16 HPE Smart Rate PoE+ 2-slot
+    1.3.6.1.4.1.11.2.3.7.11.174.7.1:
+      model: Aruba 3810M 16 HPE Smart Rate PoE+ 2-slot Module
+    1.3.6.1.4.1.11.2.3.7.11.174.8:
+      model: Aruba 3810M 4-port Stacking Module
+    1.3.6.1.4.1.11.2.3.7.11.180.1:
+      model: Aruba 1QSFP+ 40GbE Module
+    1.3.6.1.4.1.11.2.3.7.11.180.2:
+      model: Aruba 2QSFP+ 40GbE Module
+    1.3.6.1.4.1.11.2.3.7.11.180.3:
+      model: Aruba 2 HPE Smart Rate PoE+ Module
+    1.3.6.1.4.1.11.2.3.7.11.180.4:
+      model: Aruba 4 HPE Smart Rate PoE+ Module
+    1.3.6.1.4.1.11.2.3.7.11.180.5:
+      model: Aruba 2SFP+ Module
+    1.3.6.1.4.1.11.2.3.7.11.180.6:
+      model: Aruba 4SFP+ Module
+    1.3.6.1.4.1.11.2.3.7.11.181.1:
+      model: Aruba 2930M 2 port Stacking Module
+    1.3.6.1.4.1.11.2.3.7.11.181.16.1:
+      model: Aruba 2930F-8G-PoE+-2SFP+ Module
+    1.3.6.1.4.1.11.2.3.7.11.181.18.1:
+      model: Aruba 2930F-24G-4SFP+ Module
+    1.3.6.1.4.1.11.2.3.7.11.181.19.1:
+      model: Aruba 2930F-48G-4SFP+ Module
+    1.3.6.1.4.1.11.2.3.7.11.181.2.1:
+      model: Aruba 2930M-24G Module
+    1.3.6.1.4.1.11.2.3.7.11.181.20.1:
+      model: Aruba 2930F-24G-PoE+-4SFP+ Module
+    1.3.6.1.4.1.11.2.3.7.11.181.21.1:
+      model: Aruba 2930F-48G-PoE+-4SFP+ Module
+    1.3.6.1.4.1.11.2.3.7.11.181.22.1:
+      model: Aruba 2930F-24G-4SFP Module
+    1.3.6.1.4.1.11.2.3.7.11.181.23.1:
+      model: Aruba 2930F-48G-4SFP Module
+    1.3.6.1.4.1.11.2.3.7.11.181.24.1:
+      model: Aruba 2930F-24G-PoE+-4SFP Module
+    1.3.6.1.4.1.11.2.3.7.11.181.25:
+      model: Aruba 2930F-48G-PoE+-4SFP
+    1.3.6.1.4.1.11.2.3.7.11.181.25.1:
+      model: Aruba 2930F-48G-PoE+-4SFP Module
+    1.3.6.1.4.1.11.2.3.7.11.181.276:
+      model: Aruba 2930F-24G-PoE+-4SFP+-TAA
+    1.3.6.1.4.1.11.2.3.7.11.181.276.1:
+      model: Aruba 2930F-24G-PoE+-4SFP+-TAA Module
+    1.3.6.1.4.1.11.2.3.7.11.181.277:
+      model: Aruba 2930F-48G-PoE+-4SFP+-TAA
+    1.3.6.1.4.1.11.2.3.7.11.181.277.1:
+      model: Aruba 2930F-48G-PoE+-4SFP+-TAA Module
+    1.3.6.1.4.1.11.2.3.7.11.181.3.1:
+      model: Aruba 2930M-48G Module
+    1.3.6.1.4.1.11.2.3.7.11.181.4.1:
+      model: Aruba 2930M-24G-PoE+ Module
+    1.3.6.1.4.1.11.2.3.7.11.181.5.1:
+      model: Aruba 2930M-48G-PoE+ Module
+    1.3.6.1.4.1.11.2.3.7.11.181.6:
+      model: Aruba 2930M-24SR-PoE+
+    1.3.6.1.4.1.11.2.3.7.11.181.6.1:
+      model: Aruba 2930M-24SR-PoE+ Module
+    1.3.6.1.4.1.11.2.3.7.11.181.9:
+      model: Aruba 2930M-40G-8SR-PoE+
+    1.3.6.1.4.1.11.2.3.7.11.181.9.1:
+      model: Aruba 2930M-40G-8SR-PoE+ Module
+    1.3.6.1.4.1.11.2.3.7.11.182.18.1:
+      model: Aruba 2540-24G-4SFP+ Module
+    1.3.6.1.4.1.11.2.3.7.11.182.19:
+      model: Aruba 2540-48G-4SFP+
+    1.3.6.1.4.1.11.2.3.7.11.182.19.1:
+      model: Aruba 2540-48G-4SFP+ Module
+    1.3.6.1.4.1.11.2.3.7.11.182.20.1:
+      model: Aruba 2540-24G-PoE+-4SFP+ Module
+    1.3.6.1.4.1.11.2.3.7.11.182.21.1:
+      model: Aruba 2540-48G-PoE+-4SFP+ Module
+    1.3.6.1.4.1.11.2.3.7.11.24.11:
+      model: A6713A 16+8-port 10/100T + Gig TX module
+    1.3.6.1.4.1.11.2.3.7.11.25.12:
+      model: A6716A 16+8-port 10/100T + Gig SX module
+    1.3.6.1.4.1.11.2.3.7.11.26.13:
+      model: A6717A 16+8-port 10/100T + Gig LX module
+    1.3.6.1.4.1.11.2.3.7.11.29.1:
+      model: 2650 48-port 10/100-T + 2-port Gig module
+    1.3.6.1.4.1.11.2.3.7.11.30.1:
+      model: 6108 6-port 10/100/1000-TX + 2-port Gig module
+    1.3.6.1.4.1.11.2.3.7.11.34.1:
+      model: 2626 24-port 10/100-T + 2-port Gig module
+    1.3.6.1.4.1.11.2.3.7.11.35.1:
+      model: 2650-PWR 48-port 10/100-T + 2-port Gig module
+    1.3.6.1.4.1.11.2.3.7.11.36.1:
+      model: 2626-PWR 24-port 10/100-T + 2-port Gig module
+    1.3.6.1.4.1.11.2.3.7.11.39:
+      model: Access Controller 720WL (J8153A)
+    1.3.6.1.4.1.11.2.3.7.11.41:
+      model: Integrated Access Manager 760WL (J8155A)
+    1.3.6.1.4.1.11.2.3.7.11.42.1:
+      model: 3400cl-24-port 10/100/1000-T + 4-port Gigabit module
+    1.3.6.1.4.1.11.2.3.7.11.43.1:
+      model: 3400cl-48-port 10/100/1000-T + 4-port Gigabit module
+    1.3.6.1.4.1.11.2.3.7.11.44.1:
+      model: 2650 48-port 10/100-T + 2-port Gig module
+    1.3.6.1.4.1.11.2.3.7.11.45.1:
+      model: 2626 24-port 10/100-T + 2-port Gig module
+    1.3.6.1.4.1.11.2.3.7.11.50.1:
+      model: 5400-24 port Gig-T
+    1.3.6.1.4.1.11.2.3.7.11.50.16:
+      model: 5400-Services zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.17:
+      model: 5400-TMS zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.18:
+      model: 5400-zl Data Center Connection Manager ONE Module
+    1.3.6.1.4.1.11.2.3.7.11.50.19:
+      model: 5400-24-Port 10/100/1000 PoE+ zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.2:
+      model: 5400-24 port Gig-T zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.20:
+      model: 5400-20-Port 10/100/1000 PoE+ with 4-Port SFP zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.21:
+      model: 5400-24-Port 10/100 PoE+ zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.22:
+      model: 5400-4-Port 10-GbE SFP+ zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.23:
+      model: 5400-yl SFP+/CX4 10G Module
+    1.3.6.1.4.1.11.2.3.7.11.50.24:
+      model: 5400-24 port Gig-T PoE+ v2 zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.25:
+      model: 5400-20-Port Gig-T PoE+ / 4-Port SFP v2 zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.26:
+      model: 5400-20-Port Gig-T PoE+ / 2-Port SFP+ zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.27:
+      model: 5400-24-Port SFP v2 zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.28:
+      model: 5400-8-Port 10GbE SFP+ v2 zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.29:
+      model: 5400-8-Port 10Gig-T LH zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.3:
+      model: 5400-Gig-T/SFP zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.30:
+      model: 5400-24-Port 10/100 PoE+ zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.31:
+      model: 5400-20-Port Gig-T / 2-Port 10GbE SFP+ v2 zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.32:
+      model: 5400-20-Port Gig-T / 4-Port SFP v2 zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.33:
+      model: 5400-24-Port Gig-T v2 zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.34:
+      model: 5400-Advanced Services zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.35:
+      model: 5400-Extended Services zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.36:
+      model: 5400-AllianceONE zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.37:
+      model: 5400-12-Port Gig-T PoE+ / 12-Port SFP v2 zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.4:
+      model: 5400-24 port SFP zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.41:
+      model: 5400-MSM775 zl Premium Controller Module/Advanced Services v2 zl Module
+        w/ HDD&SSD
+    1.3.6.1.4.1.11.2.3.7.11.50.5:
+      model: 5400-4 port 10-GbE zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.6:
+      model: 5400-4 port 10G CX4 zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.7:
+      model: 5400-yl Fixed Gig-T/SFP
+    1.3.6.1.4.1.11.2.3.7.11.50.8:
+      model: 5400-yl Fixed 24p Gig-T
+    1.3.6.1.4.1.11.2.3.7.11.50.9:
+      model: 5400-yl X2/CX4 10-GbE Module
+    1.3.6.1.4.1.11.2.3.7.11.52.1:
+      model: 4200-10/100 module
+    1.3.6.1.4.1.11.2.3.7.11.52.10:
+      model: 4200-10-GbE X2 vl module
+    1.3.6.1.4.1.11.2.3.7.11.52.2:
+      model: 4200-10/100/1000 module
+    1.3.6.1.4.1.11.2.3.7.11.52.3:
+      model: 4200-miniGBIC module
+    1.3.6.1.4.1.11.2.3.7.11.52.4:
+      model: 4200-100FX module
+    1.3.6.1.4.1.11.2.3.7.11.52.5:
+      model: 4200-Gig-T vl module
+    1.3.6.1.4.1.11.2.3.7.11.52.6:
+      model: 4200-Gig-T/SFP vl module
+    1.3.6.1.4.1.11.2.3.7.11.55.1:
+      model: 2600-8-PWR 8-port 10/100-T + 1-port Gig module
+    1.3.6.1.4.1.11.2.3.7.11.61.1:
+      model: 2510-Fixed 24-port 10/100-T module
+    1.3.6.1.4.1.11.2.3.7.11.62.1:
+      model: 2510-Fixed 48-port 10/100-T module
+    1.3.6.1.4.1.11.2.3.7.11.63.1:
+      model: 2810-Fixed 24-port 10/100/1000-T module
+    1.3.6.1.4.1.11.2.3.7.11.64.1:
+      model: 2810-Fixed 48-port 10/100/1000-T module
+    1.3.6.1.4.1.11.2.3.7.11.67:
+      model: ProCurve (J9038A)
+    1.3.6.1.4.1.11.2.3.7.11.68.11:
+      model: 2900-yl Fixed Gig-T/SFP
+    1.3.6.1.4.1.11.2.3.7.11.68.12:
+      model: 2900-yl Fixed 24p Gig-T
+    1.3.6.1.4.1.11.2.3.7.11.68.13:
+      model: 2900-yl X2/CX4 10-GbE Module
+    1.3.6.1.4.1.11.2.3.7.11.73:
+      model: Access Controller 800
+    1.3.6.1.4.1.11.2.3.7.11.76.1:
+      model: 2610-Fixed 24-port 10/100-T + 4-port Gigabit module
+    1.3.6.1.4.1.11.2.3.7.11.77.1:
+      model: 2610-Fixed 48-port 10/100-T + 4-port Gigabit module
+    1.3.6.1.4.1.11.2.3.7.11.78.1:
+      model: 2610-Fixed 24-port 10/100-T + 4-port Gigabit module
+    1.3.6.1.4.1.11.2.3.7.11.79.1:
+      model: 2610-Fixed 48-port 10/100-T + 4-port Gigabit module
+    1.3.6.1.4.1.11.2.3.7.11.80.1:
+      model: 2610-Fixed 24-port 10/100-T + 4-port Gigabit module
+    1.3.6.1.4.1.11.2.3.7.11.82.1:
+      model: 2626 24-port 10/100-T + 2-port Gig module
+    1.3.6.1.4.1.11.2.3.7.11.83.1:
+      model: 2650 48-port 10/100-T + 2-port Gig module
+    1.3.6.1.4.1.11.2.3.7.11.84.1:
+      model: 2910al-Fixed 24p Gig-T/SFP module
+    1.3.6.1.4.1.11.2.3.7.11.84.2:
+      model: 2910al-10-GbE 2-port CX4
+    1.3.6.1.4.1.11.2.3.7.11.84.3:
+      model: 2910al-10-GbE 2-port SFP+
+    1.3.6.1.4.1.11.2.3.7.11.84.4:
+      model: 2910al-10-GbE 1-port passive CX4
+    1.3.6.1.4.1.11.2.3.7.11.85.1:
+      model: 2910al-Fixed 48p Gig-T/SFP module
+    1.3.6.1.4.1.11.2.3.7.11.86.1:
+      model: 2910al-Fixed 24p Gig-T/SFP module
+    1.3.6.1.4.1.11.2.3.7.11.87.1:
+      model: 2910al-Fixed 48p Gig-T/SFP module
+    1.3.6.1.4.1.11.2.3.7.11.98.1:
+      model: 6600ml Fixed 4p SFP+ Module
+    1.3.6.1.4.1.11.2.3.7.11.98.2:
+      model: 6600ml Fixed Gig-T/SFP Module
+    1.3.6.1.4.1.11.2.3.7.11.98.3:
+      model: 6600ml Fixed 24 Gig Module
+    1.3.6.1.4.1.11.2.3.7.11.98.4:
+      model: 6600ml Fixed 24 Gig DP Module
+    1.3.6.1.4.1.11.2.3.7.11.98.5:
+      model: 6600ml Fixed 24 Gig Non DP Module
+    1.3.6.1.4.1.11.2.3.7.11.98.6:
+      model: 6600ml Fixed 2 10Gig Module
+    1.3.6.1.4.1.11.2.3.7.15.1.3.1:
+      model: 10500/7500 20G Wired-WLAN module
+    1.3.6.1.4.1.11.2.3.7.15.1.3.10:
+      model: 830-8P-TAA-LSW
+    1.3.6.1.4.1.11.2.3.7.15.1.3.11:
+      model: 870-WCM
+    1.3.6.1.4.1.11.2.3.7.15.1.3.12:
+      model: 870-LSW
+    1.3.6.1.4.1.11.2.3.7.15.1.3.13:
+      model: "850"
+    1.3.6.1.4.1.11.2.3.7.15.1.3.14:
+      model: 870-TAA-WCM
+    1.3.6.1.4.1.11.2.3.7.15.1.3.15:
+      model: 870-TAA-LSW
+    1.3.6.1.4.1.11.2.3.7.15.1.3.16:
+      model: 850-TAA
+    1.3.6.1.4.1.11.2.3.7.15.1.3.17:
+      model: UWWM20
+    1.3.6.1.4.1.11.2.3.7.15.1.3.18:
+      model: UWWM20TAA
+    1.3.6.1.4.1.11.2.3.7.15.1.3.19:
+      model: "870"
+    1.3.6.1.4.1.11.2.3.7.15.1.3.2:
+      model: 830-24P
+    1.3.6.1.4.1.11.2.3.7.15.1.3.20:
+      model: "850"
+    1.3.6.1.4.1.11.2.3.7.15.1.3.21:
+      model: 870-TAA
+    1.3.6.1.4.1.11.2.3.7.15.1.3.22:
+      model: 850-TAA
+    1.3.6.1.4.1.11.2.3.7.15.1.3.24:
+      model: 830-8P-V7
+    1.3.6.1.4.1.11.2.3.7.15.1.3.25:
+      model: 830-24P-V7
+    1.3.6.1.4.1.11.2.3.7.15.1.3.26:
+      model: 830-8P-TAA-V7
+    1.3.6.1.4.1.11.2.3.7.15.1.3.27:
+      model: 830-24P-TAA-V7
+    1.3.6.1.4.1.11.2.3.7.15.1.3.3:
+      model: 830-24P-LSW
+    1.3.6.1.4.1.11.2.3.7.15.1.3.4:
+      model: 830-8P
+    1.3.6.1.4.1.11.2.3.7.15.1.3.5:
+      model: 830-8P-LSW
+    1.3.6.1.4.1.11.2.3.7.15.1.3.6:
+      model: 10500/7500 20G Wired-WLAN module TAA
+    1.3.6.1.4.1.11.2.3.7.15.1.3.7:
+      model: 830-24P-TAA
+    1.3.6.1.4.1.11.2.3.7.15.1.3.8:
+      model: 830-24P-TAA-LSW
+    1.3.6.1.4.1.11.2.3.7.15.1.3.9:
+      model: 830-8P-TAA
+    1.3.6.1.4.1.11.2.3.7.3.9:
+      model: DTC22
+    1.3.6.1.4.1.11.2.3.7.5.1:
+      model: AdvanceStack EtherTwist Hub-12
+    1.3.6.1.4.1.11.2.3.7.5.10:
+      model: AdvanceStack 100VB Hub-15
+    1.3.6.1.4.1.11.2.3.7.5.11:
+      model: AdvanceStack 10Base-T Hub-8U
+    1.3.6.1.4.1.11.2.3.7.5.12:
+      model: AdvanceStack 10Base-T Hub-16U
+    1.3.6.1.4.1.11.2.3.7.5.13:
+      model: AdvanceStack 100VG Hub-7M
+    1.3.6.1.4.1.11.2.3.7.5.14:
+      model: AdvanceStack 100VG Hub-14
+    1.3.6.1.4.1.11.2.3.7.5.18:
+      model: AdvanceStack 100B-TX Hub-12TM
+    1.3.6.1.4.1.11.2.3.7.5.2:
+      model: AdvanceStack Hub
+    1.3.6.1.4.1.11.2.3.7.5.20:
+      model: 10Base-T Hub-12M
+    1.3.6.1.4.1.11.2.3.7.5.21:
+      model: 10Base-T Hub-24M
+    1.3.6.1.4.1.11.2.3.7.5.22:
+      model: 100Base-T Hub-12M
+    1.3.6.1.4.1.11.2.3.7.5.23:
+      model: 100Base-T Hub-24M
+    1.3.6.1.4.1.11.2.3.7.5.3:
+      model: AdvanceStack Fiber-Optic Hub
+    1.3.6.1.4.1.11.2.3.7.5.4:
+      model: AdvanceStack EtherTwist Hub PLUS/48
+    1.3.6.1.4.1.11.2.3.7.5.5:
+      model: AdvanceStack ThinLAN Hub
+    1.3.6.1.4.1.11.2.3.7.5.6:
+      model: AdvanceStack EtherTwist Secure Hub
+    1.3.6.1.4.1.11.2.3.7.5.7:
+      model: AdvanceStack 10Base-T Hub-12
+    1.3.6.1.4.1.11.2.3.7.5.8:
+      model: AdvanceStack 10Base-T Hub-24
+    1.3.6.1.4.1.11.2.3.7.5.9:
+      model: AdvanceStack 10Base-T Hub-48
+    1.3.6.1.4.1.1129.2.3.33.2:
+      model: e-STUDIO255
+    1.3.6.1.4.1.1133.1:
+      model: IPExpress
+    1.3.6.1.4.1.114.1.3.2.1.1:
+      model: CoreBuilder6012
+    1.3.6.1.4.1.114.1.3.2.1.2:
+      model: CoreBuilder6012Chassis
+    1.3.6.1.4.1.114.1.3.2.1.3:
+      model: CoreBuilder6012ESM
+    1.3.6.1.4.1.114.1.3.2.1.4:
+      model: CoreBuilder6012EFSM
+    1.3.6.1.4.1.114.1.3.2.1.5:
+      model: CoreBuilder6012TRSM
+    1.3.6.1.4.1.114.1.3.2.1.6:
+      model: CoreBuilder6012TMM
+    1.3.6.1.4.1.114.1.3.2.1.7:
+      model: CoreBuilder6012FSM
+    1.3.6.1.4.1.114.1.3.2.1.8:
+      model: CoreBuilder6012FESM
+    1.3.6.1.4.1.114.1.3.2.2.1:
+      model: CoreBuilder6004
+    1.3.6.1.4.1.114.1.3.2.2.2:
+      model: CoreBuilder6004Chassis
+    1.3.6.1.4.1.114.1.3.2.2.3:
+      model: CoreBuilder6004ESM
+    1.3.6.1.4.1.114.1.3.2.2.4:
+      model: CoreBuilder6004EFSM
+    1.3.6.1.4.1.114.1.3.2.2.5:
+      model: CoreBuilder6004TRSM
+    1.3.6.1.4.1.114.1.3.2.2.6:
+      model: CoreBuilder6004TMM
+    1.3.6.1.4.1.114.1.3.2.2.7:
+      model: CoreBuilder6004FSM
+    1.3.6.1.4.1.114.1.3.2.2.8:
+      model: CoreBuilder6004FESM
+    1.3.6.1.4.1.114.1.3.2.3.1:
+      model: CoreBuilder6012Ba
+    1.3.6.1.4.1.114.1.3.2.3.2:
+      model: CoreBuilder6012BaChassis
+    1.3.6.1.4.1.114.1.3.2.3.3:
+      model: CoreBuilder6012BaESM
+    1.3.6.1.4.1.114.1.3.2.3.4:
+      model: CoreBuilder6012BaEFSM
+    1.3.6.1.4.1.114.1.3.2.3.5:
+      model: CoreBuilder6012BaTRSM
+    1.3.6.1.4.1.114.1.3.2.3.6:
+      model: CoreBuilder6012BaTMM
+    1.3.6.1.4.1.114.1.3.2.3.7:
+      model: CoreBuilder6012BaFSM
+    1.3.6.1.4.1.114.1.3.2.3.8:
+      model: CoreBuilder6012BaFESM
+    1.3.6.1.4.1.116.4.1.11.2:
+      model: GR2000
+    1.3.6.1.4.1.116.4.1.11.3:
+      model: GR4000
+    1.3.6.1.4.1.116.4.25.1.3:
+      model: GS4000
+    1.3.6.1.4.1.116.4.25.1.4:
+      model: GS3000
+    1.3.6.1.4.1.1182.1.1:
+      model: RT100i
+    1.3.6.1.4.1.11863.1.1.25:
+      model: TL-SG2008
+    1.3.6.1.4.1.119.1.126.2.100:
+      model: PF5468-32QP/QX-S6832QP
+    1.3.6.1.4.1.119.1.126.2.104:
+      model: QX-S5224GT-4X
+    1.3.6.1.4.1.119.1.126.2.105:
+      model: QX-S5248GT-4X
+    1.3.6.1.4.1.119.1.126.2.106:
+      model: QX-S5224GP-4X
+    1.3.6.1.4.1.119.1.126.2.107:
+      model: QX-S5524GT-4X2Q
+    1.3.6.1.4.1.119.1.126.2.108:
+      model: QX-S5548GT-4X2Q
+    1.3.6.1.4.1.119.1.126.2.109:
+      model: QX-S5524GT-4X1C
+    1.3.6.1.4.1.119.1.126.2.110:
+      model: QX-S5548GT-4X1C
+    1.3.6.1.4.1.119.1.126.2.111:
+      model: QX-S5224GT-4X-PW
+    1.3.6.1.4.1.119.1.126.2.112:
+      model: QX-S5248GT-4X-PW
+    1.3.6.1.4.1.119.1.126.2.84:
+      model: PF5453-24GT-2X/QX-S5327P
+    1.3.6.1.4.1.119.1.126.2.92:
+      model: PF5457-48GT-4G2X/QX-S5756P
+    1.3.6.1.4.1.119.1.126.2.95:
+      model: PF5459-48XP-4Q/QX-S5948XP-4Q
+    1.3.6.1.4.1.119.1.126.2.96:
+      model: PF5459-48GT-4X2Q/QX-S5948GT-4X2Q
+    1.3.6.1.4.1.119.1.126.2.97:
+      model: PF5459-48XT-4Q/QX-S5948XT-4Q
+    1.3.6.1.4.1.119.1.86.1:
+      model: "710"
+    1.3.6.1.4.1.119.1.86.2:
+      model: "720"
+    1.3.6.1.4.1.119.1.86.3:
+      model: "730"
+    1.3.6.1.4.1.119.1.86.4:
+      model: "750"
+    1.3.6.1.4.1.119.1.86.5:
+      model: "740"
+    1.3.6.1.4.1.12356.610:
+      model: FortiWiFi 60
+    1.3.6.1.4.1.12356.611:
+      model: FortiWiFi 60A
+    1.3.6.1.4.1.12356.612:
+      model: FortiWiFi 60AM
+    1.3.6.1.4.1.1248.1.1.2.1.3.7.65.76.45.77.51.48.48:
+      model: AL-M300DN
+    1.3.6.1.4.1.1248.1.1.2.1.3.8.65.76.45.67.49.49.48.48:
+      model: AL-C1100
+    1.3.6.1.4.1.1248.1.1.2.1.3.8.65.76.45.67.51.56.48.48:
+      model: AL-C3800
+    1.3.6.1.4.1.1248.1.1.2.1.3.8.65.76.45.67.51.57.48.48:
+      model: AL-C3900
+    1.3.6.1.4.1.1248.1.1.2.1.3.8.65.76.45.77.50.48.48.48:
+      model: AL-M2000
+    1.3.6.1.4.1.1248.1.1.2.1.3.8.65.76.45.77.50.52.48.48:
+      model: AL-M2400
+    1.3.6.1.4.1.1248.1.1.2.1.3.8.65.76.45.77.52.48.48.48:
+      model: AL-M4000
+    1.3.6.1.4.1.12925:
+      model: 3PAR
+    1.3.6.1.4.1.14179.1.1.4.2:
+      model: 2006 Wireless LAN Controller
+    1.3.6.1.4.1.14179.1.1.4.5:
+      model: 4402 4404 Wireless LAN Controller
+    1.3.6.1.4.1.14179.2.2.1.1.22.1:
+      model: 5212 Unified Access Point
+    1.3.6.1.4.1.14179.2.2.1.1.22.10:
+      model: 1500 Unified Access Point
+    1.3.6.1.4.1.14179.2.2.1.1.22.11:
+      model: 1250 Unified Access Point
+    1.3.6.1.4.1.14179.2.2.1.1.22.12:
+      model: 1505 Unified Access Point
+    1.3.6.1.4.1.14179.2.2.1.1.22.13:
+      model: 3201 Unified Access Point
+    1.3.6.1.4.1.14179.2.2.1.1.22.14:
+      model: 1520 Unified Access Point
+    1.3.6.1.4.1.14179.2.2.1.1.22.15:
+      model: 801GN Unified Access Point
+    1.3.6.1.4.1.14179.2.2.1.1.22.16:
+      model: 1140 Unified Access Point
+    1.3.6.1.4.1.14179.2.2.1.1.22.17:
+      model: 801AGN Unified Access Point
+    1.3.6.1.4.1.14179.2.2.1.1.22.18:
+      model: 3500I Unified Access Point
+    1.3.6.1.4.1.14179.2.2.1.1.22.19:
+      model: 3500E Unified Access Point
+    1.3.6.1.4.1.14179.2.2.1.1.22.2:
+      model: 5312 Unified Access Point
+    1.3.6.1.4.1.14179.2.2.1.1.22.20:
+      model: 1260 Unified Access Point
+    1.3.6.1.4.1.14179.2.2.1.1.22.21:
+      model: 1040 Unified Access Point
+    1.3.6.1.4.1.14179.2.2.1.1.22.22:
+      model: 1550 Unified Access Point
+    1.3.6.1.4.1.14179.2.2.1.1.22.23:
+      model: 602I Unified Access Point
+    1.3.6.1.4.1.14179.2.2.1.1.22.24:
+      model: 3500P Unified Access Point
+    1.3.6.1.4.1.14179.2.2.1.1.22.25:
+      model: 802GN Unified Access Point
+    1.3.6.1.4.1.14179.2.2.1.1.22.26:
+      model: 802AGN Unified Access Point
+    1.3.6.1.4.1.14179.2.2.1.1.22.3:
+      model: MIMO Unified Access Point
+    1.3.6.1.4.1.14179.2.2.1.1.22.31:
+      model: 802HAGN Unified Access Point
+    1.3.6.1.4.1.14179.2.2.1.1.22.37:
+      model: 1530I Unified Access Point
+    1.3.6.1.4.1.14179.2.2.1.1.22.38:
+      model: 1530E Unified Access Point
+    1.3.6.1.4.1.14179.2.2.1.1.22.4:
+      model: UNKNOWN Unified Access Point
+    1.3.6.1.4.1.14179.2.2.1.1.22.5:
+      model: 1100 Unified Access Point
+    1.3.6.1.4.1.14179.2.2.1.1.22.6:
+      model: 1130 Unified Access Point
+    1.3.6.1.4.1.14179.2.2.1.1.22.7:
+      model: 1240 Unified Access Point
+    1.3.6.1.4.1.14179.2.2.1.1.22.8:
+      model: 1200 Unified Access Point
+    1.3.6.1.4.1.14179.2.2.1.1.22.9:
+      model: 1310 Unified Access Point
+    1.3.6.1.4.1.1424.1.1:
+      model: Contivity100/400
+    1.3.6.1.4.1.14525.3.1.7:
+      model: MX-200
+    1.3.6.1.4.1.14823.1.2.1:
+      model: 50 Access Point
+    1.3.6.1.4.1.14823.1.2.2:
+      model: 52 Access Point
+    1.3.6.1.4.1.14823.1.2.33:
+      model: reserved4 Access Point
+    1.3.6.1.4.1.14823.1.2.37:
+      model: reserved6 Access Point
+    1.3.6.1.4.1.14823.1.2.39:
+      model: reserved7 Access Point
+    1.3.6.1.4.1.14823.1.2.49:
+      model: reserved8 Access Point
+    1.3.6.1.4.1.14823.1.2.7:
+      model: 2E Access Point
+    1.3.6.1.4.1.14823.1.3.1:
+      model: ZMaster
+    1.3.6.1.4.1.151.1.25:
+      model: "530"
+    1.3.6.1.4.1.151.1.28:
+      model: "5200"
+    1.3.6.1.4.1.1548.130.0:
+      model: "100"
+    1.3.6.1.4.1.1548.134.0:
+      model: "144"
+    1.3.6.1.4.1.1548.2201.0:
+      model: "2201"
+    1.3.6.1.4.1.1548.2210.0:
+      model: "2210"
+    1.3.6.1.4.1.1548.250.0:
+      model: "250"
+    1.3.6.1.4.1.1548.255.0:
+      model: "255"
+    1.3.6.1.4.1.1548.5351.0:
+      model: "5351"
+    1.3.6.1.4.1.1548.5711.0:
+      model: "5711"
+    1.3.6.1.4.1.1548.5851.0:
+      model: "5851"
+    1.3.6.1.4.1.1548.5861.0:
+      model: "5861"
+    1.3.6.1.4.1.1548.7851.0:
+      model: "7851"
+    1.3.6.1.4.1.1588.2.1.1.27:
+      model: Switch
+    1.3.6.1.4.1.16378.71:
+      model: WR44v2
+    1.3.6.1.4.1.16378.81:
+      model: WR11 XT
+    1.3.6.1.4.1.1663.1.1.1.1.24:
+      model: SANbox 5602 FC Switch Qlogic
+    1.3.6.1.4.1.168.2.1.1:
+      model: QuickEther8
+    1.3.6.1.4.1.168.2.1.2:
+      model: QuickEther16
+    1.3.6.1.4.1.168.2.2.1:
+      model: QuickFDDI
+    1.3.6.1.4.1.168.2.2.2:
+      model: QuickFDDI8
+    1.3.6.1.4.1.171.10.102.1:
+      model: DGS-3700
+    1.3.6.1.4.1.171.10.102.2:
+      model: DGS-3700P
+    1.3.6.1.4.1.171.10.105.2:
+      model: DES-3528P
+    1.3.6.1.4.1.171.10.105.3:
+      model: DES-3552
+    1.3.6.1.4.1.171.10.105.4:
+      model: DES-3552P
+    1.3.6.1.4.1.171.10.105.5:
+      model: DES-3528DC
+    1.3.6.1.4.1.171.10.113:
+      model: DES-3200 series
+    1.3.6.1.4.1.171.10.113.1.1:
+      model: DES-3200-10
+    1.3.6.1.4.1.171.10.113.1.2:
+      model: DES-3200-18
+    1.3.6.1.4.1.171.10.113.2.1:
+      model: DES-3200-10
+    1.3.6.1.4.1.171.10.113.3.1:
+      model: DES-3200-18
+    1.3.6.1.4.1.171.10.118.3:
+      model: DGS-3620-28PC
+    1.3.6.1.4.1.171.10.118.4:
+      model: DGS-3620-52T
+    1.3.6.1.4.1.171.10.118.5:
+      model: DGS-3620-52P
+    1.3.6.1.4.1.171.10.118.8:
+      model: DGS-3620-28TC-DC
+    1.3.6.1.4.1.171.10.118.9:
+      model: DGS-3620-28SC-DC
+    1.3.6.1.4.1.171.10.119.4:
+      model: DGS-3420-52T
+    1.3.6.1.4.1.171.10.134.7:
+      model: DGS-1100-24
+    1.3.6.1.4.1.171.10.152.1.1:
+      model: WLAN-EAP
+    1.3.6.1.4.1.171.10.165.2.1:
+      model: DGS-1250-28XMP
+    1.3.6.1.4.1.171.10.20.3.1:
+      model: DSR500
+    1.3.6.1.4.1.171.10.20.3.2:
+      model: DSR500N
+    1.3.6.1.4.1.171.10.20.3.3:
+      model: DSR1000
+    1.3.6.1.4.1.171.10.20.3.4:
+      model: DSR1000N
+    1.3.6.1.4.1.171.10.25.1.1:
+      model: DES-3624
+    1.3.6.1.4.1.171.10.28.1.1:
+      model: DES-6000
+    1.3.6.1.4.1.171.10.30.1:
+      model: DSL500
+    1.3.6.1.4.1.171.10.43.2:
+      model: DGS-3224TGR
+    1.3.6.1.4.1.171.10.6.1:
+      model: DES-2212
+    1.3.6.1.4.1.171.10.60.1:
+      model: DES-1526
+    1.3.6.1.4.1.171.10.60.3:
+      model: DES-2108v1
+    1.3.6.1.4.1.171.10.61:
+      model: DES-2108 series
+    1.3.6.1.4.1.171.10.61.2:
+      model: DES-2108
+    1.3.6.1.4.1.171.10.61.3:
+      model: DES-2108-B1
+    1.3.6.1.4.1.171.10.63.10:
+      model: DES-3016
+    1.3.6.1.4.1.171.10.63.11:
+      model: DES-3028G
+    1.3.6.1.4.1.171.10.63.2:
+      model: DES-3018
+    1.3.6.1.4.1.171.10.63.4:
+      model: DES-3010FL
+    1.3.6.1.4.1.171.10.63.7:
+      model: DES-3028P
+    1.3.6.1.4.1.171.10.63.8:
+      model: DES-3052
+    1.3.6.1.4.1.171.10.69.1:
+      model: DES-3828
+    1.3.6.1.4.1.171.10.69.2:
+      model: DES-3828DC
+    1.3.6.1.4.1.171.10.69.4:
+      model: DES-3852
+    1.3.6.1.4.1.171.10.69.5:
+      model: DES-3852P
+    1.3.6.1.4.1.171.10.70.10:
+      model: DGS-3612
+    1.3.6.1.4.1.171.10.70.8:
+      model: DGS-3627G
+    1.3.6.1.4.1.171.10.70.9:
+      model: DGS-3612G
+    1.3.6.1.4.1.171.10.73:
+      model: DWS series
+    1.3.6.1.4.1.171.10.73.2:
+      model: DWS-3024
+    1.3.6.1.4.1.171.10.73.3:
+      model: DWS-3024L
+    1.3.6.1.4.1.171.10.73.4:
+      model: DWS-3026
+    1.3.6.1.4.1.171.10.73.5:
+      model: DWS-4000
+    1.3.6.1.4.1.171.10.73.5.1:
+      model: DWS-4024
+    1.3.6.1.4.1.171.10.73.5.2:
+      model: DWS-4026
+    1.3.6.1.4.1.171.10.75:
+      model: DES-1210-xx
+    1.3.6.1.4.1.171.10.75.2:
+      model: DES-1228
+    1.3.6.1.4.1.171.10.75.3:
+      model: DES-1228P
+    1.3.6.1.4.1.171.10.76.4:
+      model: DGS-1216T
+    1.3.6.1.4.1.171.10.76.5:
+      model: DGS-1224T
+    1.3.6.1.4.1.171.10.9:
+      model: Hub
+    1.3.6.1.4.1.171.10.9.1:
+      model: DES-5016
+    1.3.6.1.4.1.171.10.9.2:
+      model: DES-5016SwHub
+    1.3.6.1.4.1.171.10.94.2:
+      model: DGS-3124P
+    1.3.6.1.4.1.171.10.94.3:
+      model: DGS-3148
+    1.3.6.1.4.1.171.10.94.4:
+      model: DGS-3148P
+    1.3.6.1.4.1.171.10.94.5:
+      model: DGS-3124TG
+    1.3.6.1.4.1.171.11.124.1:
+      model: DWS-3160-24TC
+    1.3.6.1.4.1.171.30.4.1.2.2:
+      model: DVG-5008S
+    1.3.6.1.4.1.171.41.1:
+      model: DMC-1002
+    1.3.6.1.4.1.175.1.1.1.1.1:
+      model: SUMINET-3500
+    1.3.6.1.4.1.175.1.1.1.1.15:
+      model: SUMINET-3500MX
+    1.3.6.1.4.1.175.1.1.1.1.7:
+      model: SUMINET-3500ME
+    1.3.6.1.4.1.175.1.1.1.1.9:
+      model: SUMINET-3500MT
+    1.3.6.1.4.1.175.1.1.12.1:
+      model: "800"
+    1.3.6.1.4.1.175.1.1.13:
+      model: "1200"
+    1.3.6.1.4.1.18.1:
+      model: WellfleetIP
+    1.3.6.1.4.1.18334.1.1.1.2.1.103.2.1:
+      model: bizhub C554
+    1.3.6.1.4.1.18334.1.1.1.2.1.104.2.1:
+      model: bizhub C454E
+    1.3.6.1.4.1.18334.1.1.1.2.1.104.3.2:
+      model: bizhub C454e
+    1.3.6.1.4.1.18334.1.1.1.2.1.107.2.1:
+      model: bizhub C224
+    1.3.6.1.4.1.18334.1.1.1.2.1.107.3.1:
+      model: bizhub C224
+    1.3.6.1.4.1.18334.1.1.1.2.1.112.3.2:
+      model: bizhub 224e
+    1.3.6.1.4.1.18334.1.1.1.2.1.144.2.1:
+      model: bizhub C458
+    1.3.6.1.4.1.18334.1.1.1.2.1.184.2.1:
+      model: bizhub C3320i
+    1.3.6.1.4.1.18334.1.1.1.2.1.40.4.1:
+      model: bizhub 421
+    1.3.6.1.4.1.18334.1.1.1.2.1.55.1.1:
+      model: "282"
+    1.3.6.1.4.1.18334.1.1.1.2.1.56.2.1:
+      model: "222"
+    1.3.6.1.4.1.18334.1.1.1.2.1.80.3.6:
+      model: bizhub C654e
+    1.3.6.1.4.1.18334.1.1.1.2.1.84.2.1:
+      model: bizhub C284
+    1.3.6.1.4.1.18334.1.2.1.2.1.103.2.5:
+      model: 55C-6E
+    1.3.6.1.4.1.1872.1.8.1.1.1:
+      model: alteon708
+    1.3.6.1.4.1.1872.1.8.1.1.2:
+      model: alteon714
+    1.3.6.1.4.1.1872.1.8.2.1.1:
+      model: alteon308
+    1.3.6.1.4.1.1872.1.8.2.1.2:
+      model: alteon316
+    1.3.6.1.4.1.1872.1.8.2.1.3:
+      model: alteon324
+    1.3.6.1.4.1.1872.1.8.2.1.4:
+      model: alteon332
+    1.3.6.1.4.1.1872.1.8.2.1.5:
+      model: alteon340
+    1.3.6.1.4.1.1916.2.108:
+      model: Sentriant AGSW
+    1.3.6.1.4.1.1916.2.109:
+      model: Sentriant AG200
+    1.3.6.1.4.1.1916.2.115:
+      model: Sentriant NG300
+    1.3.6.1.4.1.1916.2.116:
+      model: Altitude 360
+    1.3.6.1.4.1.1916.2.117:
+      model: Altitude 450
+    1.3.6.1.4.1.1916.2.129:
+      model: nwi-e450a
+    1.3.6.1.4.1.1916.2.130:
+      model: Sentriant PS200v1
+    1.3.6.1.4.1.1916.2.145:
+      model: Altitude 3510
+    1.3.6.1.4.1.1916.2.146:
+      model: Altitude 3550
+    1.3.6.1.4.1.1916.2.148:
+      model: Altitude 4610
+    1.3.6.1.4.1.1916.2.149:
+      model: Altitude 4620
+    1.3.6.1.4.1.1916.2.158:
+      model: Altitude 4700
+    1.3.6.1.4.1.1916.2.169:
+      model: E4G-400
+    1.3.6.1.4.1.1916.2.171:
+      model: E4G-200
+    1.3.6.1.4.1.1916.2.173:
+      model: Summit X440-8p
+    1.3.6.1.4.1.1916.2.174:
+      model: Summit X440-24t
+    1.3.6.1.4.1.1916.2.178:
+      model: Summit X440-24t-10G
+    1.3.6.1.4.1.1916.2.179:
+      model: Summit X440-24p-10G
+    1.3.6.1.4.1.1916.2.181:
+      model: Summit X440-48p-10G
+    1.3.6.1.4.1.1916.2.182:
+      model: AGS 100-24t
+    1.3.6.1.4.1.1916.2.183:
+      model: AGS 150-24p
+    1.3.6.1.4.1.1916.2.186:
+      model: Summit X440-L2-48t
+    1.3.6.1.4.1.1916.2.188:
+      model: Summit X440-24x
+    1.3.6.1.4.1.1916.2.189:
+      model: Summit X440-24x-10g
+    1.3.6.1.4.1.1916.2.190:
+      model: Summit X430-24t
+    1.3.6.1.4.1.1916.2.191:
+      model: Summit X430-48t
+    1.3.6.1.4.1.1916.2.192:
+      model: Summit X440-24tdc
+    1.3.6.1.4.1.1916.2.193:
+      model: Summit X440-48tdc
+    1.3.6.1.4.1.1958.2.5:
+      model: Creek ravlin3300
+    1.3.6.1.4.1.1991.1.3.55.1.2:
       category: Router
       model: MLXe-16
-    "1.3.6.1.4.1.1991.1.3.55.2.2":
+    1.3.6.1.4.1.1991.1.3.55.2.2:
       category: Router
       model: MLXe-8
-    "1.3.6.1.4.1.1991.1.3.55.3.2":
+    1.3.6.1.4.1.1991.1.3.55.3.2:
       category: Router
       model: MLXe-4
-    "1.3.6.1.4.1.1991.1.3.55.4.2":
+    1.3.6.1.4.1.1991.1.3.55.4.2:
       category: Router
       model: MLXe-32
-    "1.3.6.1.4.1.1991.1.3.56.1.3.1.1":
+    1.3.6.1.4.1.1991.1.3.56.1.1.1.1:
+      model: ICX 6610-24 Switch Image
+    1.3.6.1.4.1.1991.1.3.56.1.1.1.2:
+      model: ICX 6610-24 Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.56.1.1.1.3:
+      model: ICX 6610-24 Base Router Image
+    1.3.6.1.4.1.1991.1.3.56.1.1.1.4:
+      model: ICX 6610-24 Premium Router Image
+    1.3.6.1.4.1.1991.1.3.56.1.1.1.5:
+      model: ICX 6610-24 Advanced Router Image
+    1.3.6.1.4.1.1991.1.3.56.1.2.1.1:
+      model: ICX 6610-24 HPOE Switch Image
+    1.3.6.1.4.1.1991.1.3.56.1.2.1.2:
+      model: ICX 6610-24 HPOE Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.56.1.2.1.3:
+      model: ICX 6610-24 HPOE Base Router Image
+    1.3.6.1.4.1.1991.1.3.56.1.2.1.4:
+      model: ICX 6610-24 HPOE Premium Router Image
+    1.3.6.1.4.1.1991.1.3.56.1.2.1.5:
+      model: ICX 6610-24 HPOE Advanced Router Image
+    1.3.6.1.4.1.1991.1.3.56.1.3.1.1:
       category: Switch
       model: Stackable ICX6610-24F
-
+    1.3.6.1.4.1.1991.1.3.56.1.3.1.2:
+      model: ICX 6610-24F Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.56.1.3.1.3:
+      model: ICX 6610-24F Base Router Image
+    1.3.6.1.4.1.1991.1.3.56.1.3.1.4:
+      model: ICX 6610-24F Premium Router Image
+    1.3.6.1.4.1.1991.1.3.56.1.3.1.5:
+      model: ICX 6610-24F Advanced Router Image
+    1.3.6.1.4.1.1991.1.3.56.2.1.1.2:
+      model: ICX 6610-48 Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.56.2.1.1.3:
+      model: ICX 6610-48 Base Router Image
+    1.3.6.1.4.1.1991.1.3.56.2.1.1.4:
+      model: ICX 6610-48 Premium Router Image
+    1.3.6.1.4.1.1991.1.3.56.2.1.1.5:
+      model: ICX 6610-48 Advanced Router Image
+    1.3.6.1.4.1.1991.1.3.56.2.2.1.1:
+      model: ICX 6610-48 HPOE Switch Image
+    1.3.6.1.4.1.1991.1.3.56.2.2.1.2:
+      model: ICX 6610-48 HPOE Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.56.2.2.1.3:
+      model: ICX 6610-48 HPOE Base Router Image
+    1.3.6.1.4.1.1991.1.3.56.2.2.1.4:
+      model: ICX 6610-48 HPOE Premium Router Image
+    1.3.6.1.4.1.1991.1.3.56.2.2.1.5:
+      model: ICX 6610-48 HPOE Advanced Router Image
+    1.3.6.1.4.1.1991.1.3.57.1.1.1.1:
+      model: ICX 6430-24 Switch
+    1.3.6.1.4.1.1991.1.3.57.1.2.1.1:
+      model: ICX 6430-24 HPOE Switch
+    1.3.6.1.4.1.1991.1.3.57.2.1.1.1:
+      model: ICX 6430-48 Switch
+    1.3.6.1.4.1.1991.1.3.57.2.2.1.1:
+      model: ICX 6430-48 HPOE Switch
+    1.3.6.1.4.1.1991.1.3.57.3.1.1.1:
+      model: ICX 6430-C12-PD Switch
+    1.3.6.1.4.1.1991.1.3.58.1.1.1.2:
+      model: ICX 6450-24 Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.58.1.1.1.3:
+      model: ICX 6450-24 Base Router Image
+    1.3.6.1.4.1.1991.1.3.58.1.1.1.4:
+      model: ICX 6450-24 Premium Router Image
+    1.3.6.1.4.1.1991.1.3.58.1.2.1.1:
+      model: ICX 6450-24 HPOE Switch Image
+    1.3.6.1.4.1.1991.1.3.58.1.2.1.2:
+      model: ICX 6450-24 HPOE Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.58.1.2.1.3:
+      model: ICX 6450-24 HPOE Base Router Image
+    1.3.6.1.4.1.1991.1.3.58.1.2.1.4:
+      model: ICX 6450-24 HPOE Premium Router Image
+    1.3.6.1.4.1.1991.1.3.58.2.1.1.1:
+      model: ICX 6450-48 Switch Image
+    1.3.6.1.4.1.1991.1.3.58.2.1.1.2:
+      model: ICX 6450-48 Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.58.2.1.1.3:
+      model: ICX 6450-48 Base Router Image
+    1.3.6.1.4.1.1991.1.3.58.2.1.1.4:
+      model: ICX 6450-48 Premium Router Image
+    1.3.6.1.4.1.1991.1.3.58.2.2.1.1:
+      model: ICX 6450-48 HPOE Switch Image
+    1.3.6.1.4.1.1991.1.3.58.2.2.1.2:
+      model: ICX 6450-48 HPOE Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.58.2.2.1.3:
+      model: ICX 6450-48 HPOE Base Router Image
+    1.3.6.1.4.1.1991.1.3.58.2.2.1.4:
+      model: ICX 6450-48 HPOE Premium Router Image
+    1.3.6.1.4.1.1991.1.3.58.3.1.1.1:
+      model: ICX 6450-C12-PD Switch Image
+    1.3.6.1.4.1.1991.1.3.58.3.1.1.2:
+      model: ICX 6450-C12-PD Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.58.3.1.1.3:
+      model: ICX 6450-C12-PD Base Router Image
+    1.3.6.1.4.1.1991.1.3.58.3.1.1.4:
+      model: ICX 6450-C12-PD Premium Router Image
+    1.3.6.1.4.1.1991.1.3.59.1.1.1.1:
+      model: ICX 6650-64 Switch Image
+    1.3.6.1.4.1.1991.1.3.59.1.1.1.2:
+      model: ICX 6650-64 Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.59.1.1.1.3:
+      model: ICX 6650-64 Base Router Image
+    1.3.6.1.4.1.1991.1.3.6:
+      model: BigIron 4000
+    1.3.6.1.4.1.1991.1.3.60.1.1.1.1:
+      model: ICX 7750-48C Switch Image
+    1.3.6.1.4.1.1991.1.3.60.1.1.1.2:
+      model: ICX 7750-48C Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.60.1.1.1.3:
+      model: ICX 7750-48C Base Router Image
+    1.3.6.1.4.1.1991.1.3.60.2.1.1.1:
+      model: ICX 7750-48F Switch Image
+    1.3.6.1.4.1.1991.1.3.60.2.1.1.2:
+      model: ICX 7750-48F Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.60.2.1.1.3:
+      model: ICX 7750-48F Base Router Image
+    1.3.6.1.4.1.1991.1.3.60.3.1.1.1:
+      model: ICX 7750-26Q Switch Image
+    1.3.6.1.4.1.1991.1.3.60.3.1.1.2:
+      model: ICX 7750-26Q Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.60.3.1.1.3:
+      model: ICX 7750-26Q Base Router Image
+    1.3.6.1.4.1.1991.1.3.61.1.1.1.1:
+      model: ICX 7450-24 Switch Image
+    1.3.6.1.4.1.1991.1.3.61.1.1.1.2:
+      model: ICX 7450-24 Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.61.1.2.1.1:
+      model: ICX 7450-24 HPOE Switch Image
+    1.3.6.1.4.1.1991.1.3.61.1.2.1.2:
+      model: ICX 7450-24 HPOE Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.61.1.2.1.3:
+      model: ICX 7450-24 HPOE Base Router Image
+    1.3.6.1.4.1.1991.1.3.61.2.1.1.1:
+      model: ICX 7450-48 Switch Image
+    1.3.6.1.4.1.1991.1.3.61.2.1.1.2:
+      model: ICX 7450-48 Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.61.2.1.1.3:
+      model: ICX 7450-48 Base Router Image
+    1.3.6.1.4.1.1991.1.3.61.2.2.1.1:
+      model: ICX 7450-48 HPOE Switch Image
+    1.3.6.1.4.1.1991.1.3.61.2.2.1.2:
+      model: ICX 7450-48 HPOE Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.61.2.3.1.1:
+      model: ICX 7450-48F Switch Image
+    1.3.6.1.4.1.1991.1.3.61.2.3.1.2:
+      model: ICX 7450-48F Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.61.2.3.1.3:
+      model: ICX 7450-48F Base Router Image
+    1.3.6.1.4.1.1991.1.3.62.1.1.1.1:
+      model: ICX 7250-24 Switch Image
+    1.3.6.1.4.1.1991.1.3.62.1.1.1.2:
+      model: ICX 7250-24 Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.62.1.1.1.3:
+      model: ICX 7250-24 Base Router Image
+    1.3.6.1.4.1.1991.1.3.62.1.2.1.1:
+      model: ICX 7250-24 HPOE Switch Image
+    1.3.6.1.4.1.1991.1.3.62.1.2.1.2:
+      model: ICX 7250-24 HPOE Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.62.1.3.1.1:
+      model: ICX 7250-24 1G Switch Image
+    1.3.6.1.4.1.1991.1.3.62.1.3.1.2:
+      model: ICX 7250-24 1G Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.62.2.1.1.1:
+      model: ICX 7250-48 Switch Image
+    1.3.6.1.4.1.1991.1.3.62.2.1.1.2:
+      model: ICX 7250-48 Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.62.2.1.1.3:
+      model: ICX 7250-48 Base Router Image
+    1.3.6.1.4.1.1991.1.3.62.2.2.1.1:
+      model: ICX 7250-48 HPOE Switch Image
+    1.3.6.1.4.1.1991.1.3.62.2.2.1.2:
+      model: ICX 7250-48 HPOE Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.62.2.2.1.3:
+      model: ICX 7250-48 HPOE Base Router Image
+    1.3.6.1.4.1.1991.1.3.7:
+      model: BigIron 8000
+    1.3.6.1.4.1.1996.1.2:
+      model: Edge150
+    1.3.6.1.4.1.1996.1.3:
+      model: Edge200
+    1.3.6.1.4.1.2.3.1942:
+      model: 8271 Nways F12
+    1.3.6.1.4.1.2.3.1943:
+      model: 8271 Nways F24
+    1.3.6.1.4.1.2.3.2010:
+      model: 8271 Nways 216
+    1.3.6.1.4.1.2.6.118.2:
+      model: NA
+    1.3.6.1.4.1.2.6.33.2.1:
+      model: "8260"
+    1.3.6.1.4.1.2.6.33.2.2:
+      model: "8285"
+    1.3.6.1.4.1.2.6.33.2.3:
+      model: "8265"
+    1.3.6.1.4.1.2000.3.6:
+      model: LANBIRD
+    1.3.6.1.4.1.2011.10.1.153:
+      model: S2016-HI
+    1.3.6.1.4.1.2011.10.1.154:
+      model: S2403H-HI
+    1.3.6.1.4.1.2011.10.1.156:
+      model: S8508V
+    1.3.6.1.4.1.2011.10.1.157:
+      model: E126
+    1.3.6.1.4.1.2011.10.1.158:
+      model: S3126TP
+    1.3.6.1.4.1.2011.10.1.159:
+      model: E328
+    1.3.6.1.4.1.2011.10.1.160:
+      model: E352
+    1.3.6.1.4.1.2011.10.1.161:
+      model: S3928P-PWR-SI
+    1.3.6.1.4.1.2011.10.1.163:
+      model: S8502
+    1.3.6.1.4.1.2011.10.1.164:
+      model: SR8802
+    1.3.6.1.4.1.2011.10.1.174:
+      model: S6502ME
+    1.3.6.1.4.1.2011.10.1.182:
+      model: DR814
+    1.3.6.1.4.1.2011.10.1.183:
+      model: DR814Q
+    1.3.6.1.4.1.2011.10.1.184:
+      model: WDR854G
+    1.3.6.1.4.1.2011.10.1.185:
+      model: VDR824G
+    1.3.6.1.4.1.2011.10.1.186:
+      model: VDR824
+    1.3.6.1.4.1.2011.10.1.187:
+      model: VDR744
+    1.3.6.1.4.1.2011.10.1.188:
+      model: DR744
+    1.3.6.1.4.1.2011.10.1.192:
+      model: S8505-V5
+    1.3.6.1.4.1.2011.10.1.193:
+      model: S8512-V5
+    1.3.6.1.4.1.2011.10.1.194:
+      model: S8508-V5
+    1.3.6.1.4.1.2011.10.1.195:
+      model: S8508V-V5
+    1.3.6.1.4.1.2011.10.1.196:
+      model: S8502-V5
+    1.3.6.1.4.1.2011.10.1.198:
+      model: S2008TP-EA
+    1.3.6.1.4.1.2011.10.1.199:
+      model: S2016TP-EA
+    1.3.6.1.4.1.2011.10.1.20:
+      model: AR18-33E
+    1.3.6.1.4.1.2011.10.1.200:
+      model: S2403TP-EA
+    1.3.6.1.4.1.2011.10.1.201:
+      model: S2403TP-PWR-EA
+    1.3.6.1.4.1.2011.10.1.202:
+      model: S2008TP-MI
+    1.3.6.1.4.1.2011.10.1.203:
+      model: S2016TP-MI
+    1.3.6.1.4.1.2011.10.1.204:
+      model: S2403TP-MI
+    1.3.6.1.4.1.2011.10.1.205:
+      model: S7802
+    1.3.6.1.4.1.2011.10.1.206:
+      model: S7803
+    1.3.6.1.4.1.2011.10.1.207:
+      model: S7806
+    1.3.6.1.4.1.2011.10.1.208:
+      model: S7806-V
+    1.3.6.1.4.1.2011.10.1.209:
+      model: S7810
+    1.3.6.1.4.1.2011.10.1.21:
+      model: AR18-34E
+    1.3.6.1.4.1.2011.10.1.210:
+      model: S2016TP-PWR-EA
+    1.3.6.1.4.1.2011.10.1.212:
+      model: S3528P-EA
+    1.3.6.1.4.1.2011.10.1.213:
+      model: S3528TP-EA
+    1.3.6.1.4.1.2011.10.1.214:
+      model: S3528F-EA
+    1.3.6.1.4.1.2011.10.1.215:
+      model: S3552F-EA
+    1.3.6.1.4.1.2011.10.1.216:
+      model: Quidway S6902
+    1.3.6.1.4.1.2011.10.1.217:
+      model: Quidway S6903
+    1.3.6.1.4.1.2011.10.1.218:
+      model: Quidway S6906
+    1.3.6.1.4.1.2011.10.1.219:
+      model: Quidway S6906R
+    1.3.6.1.4.1.2011.10.1.220:
+      model: Quidway S3928P-SI-AC/DC
+    1.3.6.1.4.1.2011.10.1.224:
+      model: Quidway AR19-10
+    1.3.6.1.4.1.2011.10.1.225:
+      model: Quidway AR19-13
+    1.3.6.1.4.1.2011.10.1.226:
+      model: Quidway AR19-15
+    1.3.6.1.4.1.2011.10.1.227:
+      model: S3552P-SI
+    1.3.6.1.4.1.2011.10.1.228:
+      model: S3528P-SI
+    1.3.6.1.4.1.2011.10.1.229:
+      model: Quidway S5628C-HI-AC
+    1.3.6.1.4.1.2011.10.1.230:
+      model: Quidway S5628C-HI-DC
+    1.3.6.1.4.1.2011.10.1.231:
+      model: Quidway S5652C-HI-AC
+    1.3.6.1.4.1.2011.10.1.232:
+      model: Quidway S5628F-HI
+    1.3.6.1.4.1.2011.10.1.233:
+      model: Quidway S5628C-PWR-HI
+    1.3.6.1.4.1.2011.10.1.234:
+      model: Quidway S5652C-PWR-HI
+    1.3.6.1.4.1.2011.10.1.237:
+      model: S7803L
+    1.3.6.1.4.1.2011.10.1.238:
+      model: S6503-V5
+    1.3.6.1.4.1.2011.10.1.239:
+      model: S6506-V5
+    1.3.6.1.4.1.2011.10.1.240:
+      model: S6506R-V5
+    1.3.6.1.4.1.2011.10.1.241:
+      model: Quidway AR19-03
+    1.3.6.1.4.1.2011.10.1.242:
+      model: Quidway AR19-05
+    1.3.6.1.4.1.2011.10.1.243:
+      model: Quidway S7806-L
+    1.3.6.1.4.1.2011.10.1.244:
+      model: AR29-11
+    1.3.6.1.4.1.2011.10.1.53:
+      model: AR18-20S
+    1.3.6.1.4.1.2011.10.1.69:
+      model: AR18-22
+    1.3.6.1.4.1.2011.10.1.71:
+      model: AR18-22-24
+    1.3.6.1.4.1.2011.10.1.72:
+      model: AR18-23-1
+    1.3.6.1.4.1.2011.10.1.73:
+      model: AR18-30E
+    1.3.6.1.4.1.2011.10.1.74:
+      model: AR18-31E
+    1.3.6.1.4.1.2011.10.1.76:
+      model: AR18-35E
+    1.3.6.1.4.1.2011.2.208.1:
+      model: NE40E-DPI
+    1.3.6.1.4.1.2011.2.208.2:
+      model: NE80E-DPI
+    1.3.6.1.4.1.2011.2.211.1:
+      model: NE40E-FW
+    1.3.6.1.4.1.2011.2.211.2:
+      model: NE80E-FW
+    1.3.6.1.4.1.2011.2.23.532:
+      model: S2720-28TP-PWR-EI
+    1.3.6.1.4.1.2011.2.23.721:
+      model: S5735-L24P4S-A
+    1.3.6.1.4.1.2011.2.26.1:
+      model: NE16E
+    1.3.6.1.4.1.2011.2.26.2:
+      model: NE08E
+    1.3.6.1.4.1.2011.2.44:
+      model: AR46-20
+    1.3.6.1.4.1.2011.2.45:
+      model: AR46-40
+    1.3.6.1.4.1.2011.2.46:
+      model: AR46-80
+    1.3.6.1.4.1.2011.2.6.2:
+      model: MA5200
+    1.3.6.1.4.1.2011.2.6.2.18:
+      model: MA5200E
+    1.3.6.1.4.1.2011.2.6.2.28.0:
+      model: MA5200F
+    1.3.6.1.4.1.2011.2.6.2.30:
+      model: MA5200G
+    1.3.6.1.4.1.2011.2.6.2.31:
+      model: MA5200G-4
+    1.3.6.1.4.1.2011.2.6.2.32:
+      model: MA5200G-2
+    1.3.6.1.4.1.2011.2.6.5.21:
+      model: MA5100-V100
+    1.3.6.1.4.1.2011.2.6.5.22:
+      model: MA5100-V200
+    1.3.6.1.4.1.2011.2.62.2.3.1:
+      model: NE5000E
+    1.3.6.1.4.1.2011.2.62.2.4.1:
+      model: NE5000E-Multi
+    1.3.6.1.4.1.2011.2.88.2:
+      model: NE20E-8
+    1.3.6.1.4.1.203.1.1:
+      model: Cat1100
+    1.3.6.1.4.1.20301.1.18.15:
+      model: Flex System Fabric CN4093 10Gb Converged Scalable Switch
+    1.3.6.1.4.1.207.1.4.129:
+      model: AT-8000S-48POE
+    1.3.6.1.4.1.207.1.4.165:
+      model: AT-GS950/8
+    1.3.6.1.4.1.207.1.4.199:
+      model: AT-GS950/10PS
+    1.3.6.1.4.1.208.1.88.25:
+      model: ER9100
+    1.3.6.1.4.1.208.1.88.26:
+      model: ER9200
+    1.3.6.1.4.1.21013.1.153:
+      model: XR620
+    1.3.6.1.4.1.21013.1.157:
+      model: XR2436
+    1.3.6.1.4.1.21013.1.188:
+      model: XD4-130
+    1.3.6.1.4.1.21013.1.236:
+      model: XD2-230
+    1.3.6.1.4.1.211.1.127.110.11.2.1:
+      model: SH2300
+    1.3.6.1.4.1.211.1.127.111.1:
+      model: SH3300
+    1.3.6.1.4.1.211.1.127.111.9:
+      model: SH3000 Stack
+    1.3.6.1.4.1.211.1.127.14:
+      model: Remote LinkRelay Series
+    1.3.6.1.4.1.211.1.127.15:
+      model: LinkRelay Series
+    1.3.6.1.4.1.211.1.127.35:
+      model: LR-X2030
+    1.3.6.1.4.1.22.1.1.1:
+      model: FDDI
+    1.3.6.1.4.1.2272.1623064842:
+      model: Accelar8010co
+    1.3.6.1.4.1.2272.210:
+      model: VSP-7254XTQ
+    1.3.6.1.4.1.2272.280887555:
+      model: Accelar8003
+    1.3.6.1.4.1.2272.280887558:
+      model: Accelar8006
+    1.3.6.1.4.1.2272.280887562:
+      model: Accelar8010
+    1.3.6.1.4.1.232.111.1.1:
+      model: SW5422
+    1.3.6.1.4.1.232.134.2.20.2.20:
+      model: 3XDCE02
+    1.3.6.1.4.1.232.160.5.1:
+      model: HP 0x1x8 G3 KVM
+    1.3.6.1.4.1.232.9.4:
+      model: iLO
+    1.3.6.1.4.1.232.9.4.10:
+      model: iLO-P89
+    1.3.6.1.4.1.2356.11.8.602:
+      model: 1781A
+    1.3.6.1.4.1.2356.11.8.603:
+      model: 1781A-3G
+    1.3.6.1.4.1.2356.11.8.604:
+      model: 1781EF
+    1.3.6.1.4.1.2356.11.8.606:
+      model: 1781EW
+    1.3.6.1.4.1.2356.11.8.607:
+      model: 1781AW
+    1.3.6.1.4.1.2356.11.8.608:
+      model: 1781-4G
+    1.3.6.1.4.1.2356.11.8.609:
+      model: 1781VA
+    1.3.6.1.4.1.2356.11.8.610:
+      model: 1781EF+
+    1.3.6.1.4.1.2356.11.8.611:
+      model: 1781VAW
+    1.3.6.1.4.1.2356.11.8.612:
+      model: 1781VA-4G
+    1.3.6.1.4.1.2356.11.8.613:
+      model: 1781A-4G
+    1.3.6.1.4.1.2356.11.8.622:
+      model: 1783VA
+    1.3.6.1.4.1.2385.3.1.107.1.3:
+      model: MX-C301W
+    1.3.6.1.4.1.2385.3.1.123.1.1:
+      model: MX-B350W
+    1.3.6.1.4.1.2385.3.1.90.1.3:
+      model: MX-7040N
+    1.3.6.1.4.1.2385.3.1.95.1.5:
+      model: MX-3640N
+    1.3.6.1.4.1.2385.3.1.98.1.5:
+      model: MX-5140N
+    1.3.6.1.4.1.2385.3.1.99.1.3:
+      model: MX-M465N
+    1.3.6.1.4.1.248.14.10.10:
+      model: MS4128-5
+    1.3.6.1.4.1.248.14.10.120:
+      model: OctopusOS
+    1.3.6.1.4.1.248.14.10.20:
+      model: Eagle
+    1.3.6.1.4.1.248.14.10.200:
+      model: EEM1
+    1.3.6.1.4.1.248.14.10.21:
+      model: RR-EPL TX/TX
+    1.3.6.1.4.1.248.14.10.22:
+      model: Eagle mGuard
+    1.3.6.1.4.1.248.14.10.23:
+      model: Eagle 20
+    1.3.6.1.4.1.248.14.10.3:
+      model: MACH3000
+    1.3.6.1.4.1.248.14.10.30:
+      model: MS20
+    1.3.6.1.4.1.248.14.10.4:
+      model: MS2108-2
+    1.3.6.1.4.1.248.14.10.45:
+      model: Octopus Basic 20
+    1.3.6.1.4.1.248.14.10.5:
+      model: MS3124-4
+    1.3.6.1.4.1.248.14.10.50:
+      model: MACH4002-48-4G
+    1.3.6.1.4.1.248.14.10.60:
+      model: Octopus24M
+    1.3.6.1.4.1.248.14.10.70:
+      model: MACH4002-24G
+    1.3.6.1.4.1.248.14.10.71:
+      model: MACH4002-24G-3X
+    1.3.6.1.4.1.248.14.10.76:
+      model: MACH4002-48G-3X
+    1.3.6.1.4.1.253.258.300.127.1.297.93.1.8.6.1.1:
+      model: Document Centre
+    1.3.6.1.4.1.253.258.300.127.1.297.93.1.8.7.1.1:
+      model: Document Centre
+    1.3.6.1.4.1.253.8.62.1.19.4.21.2:
+      model: Phaser 6180 MFP
+    1.3.6.1.4.1.253.8.62.1.19.6.29.1.2:
+      model: Phaser 3320
+    1.3.6.1.4.1.253.8.62.1.19.6.3.1:
+      model: Phaser 8560DP
+    1.3.6.1.4.1.253.8.62.1.31.1.4.1.2:
+      model: Versant 80 Press
+    1.3.6.1.4.1.25506.1.1000:
+      model: S7003
+    1.3.6.1.4.1.25506.1.1001:
+      model: S7006
+    1.3.6.1.4.1.25506.1.1003:
+      model: WX3510E
+    1.3.6.1.4.1.25506.1.1004:
+      model: WX3540E
+    1.3.6.1.4.1.25506.1.1005:
+      model: SecBladeLSU3FWCEA0
+    1.3.6.1.4.1.25506.1.1006:
+      model: SecBladeLSU1NSCEA0
+    1.3.6.1.4.1.25506.1.1007:
+      model: SecBladeLST1FW3C1
+    1.3.6.1.4.1.25506.1.1008:
+      model: SecBladeLST1NSM2C1
+    1.3.6.1.4.1.25506.1.1009:
+      model: SecBladeLSX1FWCEA1
+    1.3.6.1.4.1.25506.1.1010:
+      model: SecBladeLSX1NSCEA1
+    1.3.6.1.4.1.25506.1.1011:
+      model: WA2620-AGN-C
+    1.3.6.1.4.1.25506.1.1012:
+      model: WA2610-GN
+    1.3.6.1.4.1.25506.1.1013:
+      model: WA2610-GNE
+    1.3.6.1.4.1.25506.1.1014:
+      model: MSR800
+    1.3.6.1.4.1.25506.1.1015:
+      model: MSR800(Wlan)
+    1.3.6.1.4.1.25506.1.1016:
+      model: MSR800-10
+    1.3.6.1.4.1.25506.1.1017:
+      model: MSR800-10(Wlan)
+    1.3.6.1.4.1.25506.1.1018:
+      model: MSR830(WiNet)
+    1.3.6.1.4.1.25506.1.1019:
+      model: MSR830-10(WiNet)
+    1.3.6.1.4.1.25506.1.102:
+      model: ar18-32E
+    1.3.6.1.4.1.25506.1.1020:
+      model: MSR930-10(WiNet)
+    1.3.6.1.4.1.25506.1.1021:
+      model: S9810
+    1.3.6.1.4.1.25506.1.1022:
+      model: FlexNetwork B6300-XLG
+    1.3.6.1.4.1.25506.1.1023:
+      model: FlexNetwork B6300-GXG
+    1.3.6.1.4.1.25506.1.1024:
+      model: MSR900-E
+    1.3.6.1.4.1.25506.1.1025:
+      model: MSR900-E(Wlan)
+    1.3.6.1.4.1.25506.1.1026:
+      model: S5130-28S-EI-D
+    1.3.6.1.4.1.25506.1.1027:
+      model: S5130-52S-EI-D
+    1.3.6.1.4.1.25506.1.1028:
+      model: S5130-28F-EI-D
+    1.3.6.1.4.1.25506.1.1029:
+      model: S5130-28S-HPWR-EI-D
+    1.3.6.1.4.1.25506.1.103:
+      model: ar18-33
+    1.3.6.1.4.1.25506.1.1030:
+      model: S5130-52S-PWR-EI-D
+    1.3.6.1.4.1.25506.1.1031:
+      model: S5130-28S-HPWR-EI
+    1.3.6.1.4.1.25506.1.1032:
+      model: E528-X
+    1.3.6.1.4.1.25506.1.1033:
+      model: E552-X
+    1.3.6.1.4.1.25506.1.1034:
+      model: LSU1WCME0
+    1.3.6.1.4.1.25506.1.1035:
+      model: EWPX1WCME0
+    1.3.6.1.4.1.25506.1.1036:
+      model: SR8810-X-S
+    1.3.6.1.4.1.25506.1.1037:
+      model: SR8806-X-S
+    1.3.6.1.4.1.25506.1.1038:
+      model: SR8803-X-S
+    1.3.6.1.4.1.25506.1.1039:
+      model: SR8802-X-S
+    1.3.6.1.4.1.25506.1.1042:
+      model: RA100
+    1.3.6.1.4.1.25506.1.1043:
+      model: MSR930-LM
+    1.3.6.1.4.1.25506.1.1044:
+      model: MSR930-W-LM
+    1.3.6.1.4.1.25506.1.1045:
+      model: MSR2600-5-L-MC
+    1.3.6.1.4.1.25506.1.1046:
+      model: S5800-32C-EI
+    1.3.6.1.4.1.25506.1.1047:
+      model: S5800-56C-EI
+    1.3.6.1.4.1.25506.1.1048:
+      model: S5800-32C-PWR-EI
+    1.3.6.1.4.1.25506.1.1049:
+      model: S5800-56C-PWR-EI
+    1.3.6.1.4.1.25506.1.105:
+      model: ar18-34
+    1.3.6.1.4.1.25506.1.1050:
+      model: S5800-56C-EI-M
+    1.3.6.1.4.1.25506.1.1051:
+      model: WB521X-E
+    1.3.6.1.4.1.25506.1.1052:
+      model: WB521X-H
+    1.3.6.1.4.1.25506.1.1053:
+      model: WX2540E
+    1.3.6.1.4.1.25506.1.1054:
+      model: WX360
+    1.3.6.1.4.1.25506.1.1055:
+      model: WX361
+    1.3.6.1.4.1.25506.1.1056:
+      model: WA2610E-GNE
+    1.3.6.1.4.1.25506.1.1057:
+      model: SR6603-F
+    1.3.6.1.4.1.25506.1.1058:
+      model: SR6605-F
+    1.3.6.1.4.1.25506.1.1059:
+      model: SR6609-F
+    1.3.6.1.4.1.25506.1.1060:
+      model: S5560-30S-EI
+    1.3.6.1.4.1.25506.1.1061:
+      model: S5560-54S-EI
+    1.3.6.1.4.1.25506.1.1062:
+      model: S5560-30C-EI
+    1.3.6.1.4.1.25506.1.1064:
+      model: S5560-30C-PWR-EI
+    1.3.6.1.4.1.25506.1.1065:
+      model: S5560-54C-PWR-EI
+    1.3.6.1.4.1.25506.1.1066:
+      model: S5560-54QS-EI
+    1.3.6.1.4.1.25506.1.1067:
+      model: RA200
+    1.3.6.1.4.1.25506.1.1068:
+      model: F1000CSI
+    1.3.6.1.4.1.25506.1.1069:
+      model: F100MSI
+    1.3.6.1.4.1.25506.1.1070:
+      model: F100ASI
+    1.3.6.1.4.1.25506.1.1072:
+      model: S6300-42QT
+    1.3.6.1.4.1.25506.1.1073:
+      model: S6300-42QF
+    1.3.6.1.4.1.25506.1.1074:
+      model: S6300-48S
+    1.3.6.1.4.1.25506.1.1075:
+      model: S6300-52QF
+    1.3.6.1.4.1.25506.1.1076:
+      model: FlexNetwork U8300-48G
+    1.3.6.1.4.1.25506.1.1077:
+      model: FlexNetwork U8300-48XLG-U
+    1.3.6.1.4.1.25506.1.1079:
+      model: S5024PV2-EI-PWR
+    1.3.6.1.4.1.25506.1.1080:
+      model: S5110-52P-PWR
+    1.3.6.1.4.1.25506.1.1081:
+      model: S5110-52P-PWR-D
+    1.3.6.1.4.1.25506.1.1082:
+      model: NSC1000
+    1.3.6.1.4.1.25506.1.1083:
+      model: MS4308
+    1.3.6.1.4.1.25506.1.1084:
+      model: MS4308-PWR
+    1.3.6.1.4.1.25506.1.1085:
+      model: S5130-28TP-EI
+    1.3.6.1.4.1.25506.1.1086:
+      model: S5130-52TP-EI
+    1.3.6.1.4.1.25506.1.1087:
+      model: S5130-28TP-PWR-EI
+    1.3.6.1.4.1.25506.1.1088:
+      model: S5130-52TP-PWR-EI
+    1.3.6.1.4.1.25506.1.109:
+      model: ar18-63-1
+    1.3.6.1.4.1.25506.1.1096:
+      model: S5864-F
+    1.3.6.1.4.1.25506.1.1097:
+      model: S5864U-F
+    1.3.6.1.4.1.25506.1.1098:
+      model: S5864T-F
+    1.3.6.1.4.1.25506.1.1099:
+      model: S6348-F
+    1.3.6.1.4.1.25506.1.1100:
+      model: S6348T-F
+    1.3.6.1.4.1.25506.1.1101:
+      model: CR16006-F
+    1.3.6.1.4.1.25506.1.1102:
+      model: CR16010-F
+    1.3.6.1.4.1.25506.1.1103:
+      model: CR16014-F
+    1.3.6.1.4.1.25506.1.1105:
+      model: ICG3000S
+    1.3.6.1.4.1.25506.1.1106:
+      model: S6800-4C
+    1.3.6.1.4.1.25506.1.1108:
+      model: SR8803-F
+    1.3.6.1.4.1.25506.1.1109:
+      model: SR8805-F
+    1.3.6.1.4.1.25506.1.1110:
+      model: SR8808-F
+    1.3.6.1.4.1.25506.1.1111:
+      model: SR8812-F
+    1.3.6.1.4.1.25506.1.1112:
+      model: S12516X-AF
+    1.3.6.1.4.1.25506.1.1113:
+      model: VAC1000
+    1.3.6.1.4.1.25506.1.1114:
+      model: WX8700
+    1.3.6.1.4.1.25506.1.1116:
+      model: S5530C-EI-D
+    1.3.6.1.4.1.25506.1.1117:
+      model: S5554C-EI-D
+    1.3.6.1.4.1.25506.1.1118:
+      model: S5530C-PWR-EI-D
+    1.3.6.1.4.1.25506.1.1119:
+      model: S5554C-PWR-EI-D
+    1.3.6.1.4.1.25506.1.1120:
+      model: S5530F-EI-D
+    1.3.6.1.4.1.25506.1.1121:
+      model: S5130-28S-SI
+    1.3.6.1.4.1.25506.1.1122:
+      model: S5130-52S-SI
+    1.3.6.1.4.1.25506.1.1123:
+      model: S5130-28F-SI
+    1.3.6.1.4.1.25506.1.1124:
+      model: S5560-28S-SI
+    1.3.6.1.4.1.25506.1.1125:
+      model: S5560-52S-SI
+    1.3.6.1.4.1.25506.1.1126:
+      model: S5560-28F-SI
+    1.3.6.1.4.1.25506.1.1127:
+      model: LA4608E
+    1.3.6.1.4.1.25506.1.1128:
+      model: WA4320-ACN
+    1.3.6.1.4.1.25506.1.1129:
+      model: WA4320i-ACN
+    1.3.6.1.4.1.25506.1.113:
+      model: secpathF100-E
+    1.3.6.1.4.1.25506.1.1130:
+      model: WA4320i-X
+    1.3.6.1.4.1.25506.1.1131:
+      model: WA4320-TS
+    1.3.6.1.4.1.25506.1.1132:
+      model: WA4320-TQ
+    1.3.6.1.4.1.25506.1.1133:
+      model: WA4320H-ACN
+    1.3.6.1.4.1.25506.1.1134:
+      model: S10506
+    1.3.6.1.4.1.25506.1.1135:
+      model: S10510
+    1.3.6.1.4.1.25506.1.1136:
+      model: S7606-X
+    1.3.6.1.4.1.25506.1.1137:
+      model: S7610-X
+    1.3.6.1.4.1.25506.1.1138:
+      model: MSR930
+    1.3.6.1.4.1.25506.1.1139:
+      model: MSR930
+    1.3.6.1.4.1.25506.1.114:
+      model: secpathF1000-S
+    1.3.6.1.4.1.25506.1.1145:
+      model: VBRAS1000
+    1.3.6.1.4.1.25506.1.1146:
+      model: VSR1000P
+    1.3.6.1.4.1.25506.1.1147:
+      model: VBRAS1000P
+    1.3.6.1.4.1.25506.1.1149:
+      model: LA3616S-GM
+    1.3.6.1.4.1.25506.1.1150:
+      model: LA3616S-GT
+    1.3.6.1.4.1.25506.1.1151:
+      model: LA3616E-GM
+    1.3.6.1.4.1.25506.1.1154:
+      model: ER2100n
+    1.3.6.1.4.1.25506.1.1155:
+      model: ER2100V2
+    1.3.6.1.4.1.25506.1.1156:
+      model: WX5560H
+    1.3.6.1.4.1.25506.1.1157:
+      model: WX5580H
+    1.3.6.1.4.1.25506.1.1159:
+      model: MSR810-W
+    1.3.6.1.4.1.25506.1.1160:
+      model: ER3260G2
+    1.3.6.1.4.1.25506.1.1161:
+      model: ER5100G2
+    1.3.6.1.4.1.25506.1.1162:
+      model: ER5200G2
+    1.3.6.1.4.1.25506.1.1163:
+      model: ER6300G2
+    1.3.6.1.4.1.25506.1.1164:
+      model: ER8300G2
+    1.3.6.1.4.1.25506.1.1165:
+      model: ER8300G2X
+    1.3.6.1.4.1.25506.1.1166:
+      model: S9904
+    1.3.6.1.4.1.25506.1.1167:
+      model: S9910
+    1.3.6.1.4.1.25506.1.1168:
+      model: SecBladeLSU1ADECEA01
+    1.3.6.1.4.1.25506.1.1169:
+      model: SecBladeLSXM1ADECEA1
+    1.3.6.1.4.1.25506.1.1170:
+      model: S6900-2F
+    1.3.6.1.4.1.25506.1.1171:
+      model: S6900-4F
+    1.3.6.1.4.1.25506.1.1172:
+      model: S6348S-F
+    1.3.6.1.4.1.25506.1.1173:
+      model: S6364-F
+    1.3.6.1.4.1.25506.1.1174:
+      model: S5848-F
+    1.3.6.1.4.1.25506.1.1175:
+      model: S1808G
+    1.3.6.1.4.1.25506.1.1176:
+      model: S1824G
+    1.3.6.1.4.1.25506.1.1177:
+      model: S1848G
+    1.3.6.1.4.1.25506.1.1182:
+      model: WX3510H
+    1.3.6.1.4.1.25506.1.1184:
+      model: WX3540H
+    1.3.6.1.4.1.25506.1.1185:
+      model: WX5540H
+    1.3.6.1.4.1.25506.1.1186:
+      model: LA3608E
+    1.3.6.1.4.1.25506.1.1187:
+      model: LA3608E-DB
+    1.3.6.1.4.1.25506.1.1188:
+      model: S5130-30S-HI
+    1.3.6.1.4.1.25506.1.1189:
+      model: S5130-54S-HI
+    1.3.6.1.4.1.25506.1.1190:
+      model: S5130-30C-HI
+    1.3.6.1.4.1.25506.1.1192:
+      model: S5130-30C-PWR-HI
+    1.3.6.1.4.1.25506.1.1194:
+      model: S5130-54QS-HI
+    1.3.6.1.4.1.25506.1.1195:
+      model: S5130-30F-HI
+    1.3.6.1.4.1.25506.1.1196:
+      model: S12516F-AF
+    1.3.6.1.4.1.25506.1.1197:
+      model: S12508F-AF
+    1.3.6.1.4.1.25506.1.1199:
+      model: S12504F-AF
+    1.3.6.1.4.1.25506.1.1200:
+      model: MS4100-10TP
+    1.3.6.1.4.1.25506.1.1201:
+      model: MS4100-10TP-PWR
+    1.3.6.1.4.1.25506.1.1202:
+      model: MS4100-26TP
+    1.3.6.1.4.1.25506.1.1203:
+      model: MS4100-26TP-PWR
+    1.3.6.1.4.1.25506.1.1204:
+      model: MS4300-52P
+    1.3.6.1.4.1.25506.1.1205:
+      model: MS4300-28P
+    1.3.6.1.4.1.25506.1.1206:
+      model: IE4100-12TP
+    1.3.6.1.4.1.25506.1.1207:
+      model: IE4100-20TP
+    1.3.6.1.4.1.25506.1.1208:
+      model: IE4100-28F
+    1.3.6.1.4.1.25506.1.1209:
+      model: IE4300-28P
+    1.3.6.1.4.1.25506.1.1211:
+      model: MS4320-28S
+    1.3.6.1.4.1.25506.1.1212:
+      model: MS4320-52S
+    1.3.6.1.4.1.25506.1.1213:
+      model: MS4320-28F
+    1.3.6.1.4.1.25506.1.1214:
+      model: MS4320-28S-PWR
+    1.3.6.1.4.1.25506.1.1215:
+      model: MS4520-28TP
+    1.3.6.1.4.1.25506.1.1216:
+      model: MS4520-30F
+    1.3.6.1.4.1.25506.1.1217:
+      model: LA4310
+    1.3.6.1.4.1.25506.1.1218:
+      model: LA4310V
+    1.3.6.1.4.1.25506.1.1219:
+      model: LA4320
+    1.3.6.1.4.1.25506.1.1220:
+      model: LA4320V
+    1.3.6.1.4.1.25506.1.1221:
+      model: WA4320X
+    1.3.6.1.4.1.25506.1.1222:
+      model: LA4320X
+    1.3.6.1.4.1.25506.1.1223:
+      model: SecBlade4NSQM1FWDFG0
+    1.3.6.1.4.1.25506.1.1224:
+      model: WX5510EV7
+    1.3.6.1.4.1.25506.1.1225:
+      model: WX5540EV7
+    1.3.6.1.4.1.25506.1.123:
+      model: vg10-10
+    1.3.6.1.4.1.25506.1.1233:
+      model: WA4320-TQ-V
+    1.3.6.1.4.1.25506.1.1234:
+      model: MSR810-W-DB
+    1.3.6.1.4.1.25506.1.1235:
+      model: MSR810-LM
+    1.3.6.1.4.1.25506.1.1236:
+      model: MSR810-W-LM
+    1.3.6.1.4.1.25506.1.1237:
+      model: S6820-32H
+    1.3.6.1.4.1.25506.1.1238:
+      model: S6820-54HF
+    1.3.6.1.4.1.25506.1.1239:
+      model: MSR5620
+    1.3.6.1.4.1.25506.1.124:
+      model: vg10-11
+    1.3.6.1.4.1.25506.1.1241:
+      model: MSR810-W-WiNet
+    1.3.6.1.4.1.25506.1.1242:
+      model: MSR810-LM-WiNet
+    1.3.6.1.4.1.25506.1.1243:
+      model: RA100AC
+    1.3.6.1.4.1.25506.1.1244:
+      model: MSR3600-28-WiNet
+    1.3.6.1.4.1.25506.1.1245:
+      model: MSR3620-WiNet
+    1.3.6.1.4.1.25506.1.1246:
+      model: S6800-54QT
+    1.3.6.1.4.1.25506.1.1247:
+      model: S12504-S
+    1.3.6.1.4.1.25506.1.1248:
+      model: S12506-S
+    1.3.6.1.4.1.25506.1.1249:
+      model: S12510-S
+    1.3.6.1.4.1.25506.1.125:
+      model: vg10-40
+    1.3.6.1.4.1.25506.1.1250:
+      model: S12508-S
+    1.3.6.1.4.1.25506.1.1251:
+      model: S12512-S
+    1.3.6.1.4.1.25506.1.1252:
+      model: S515024SPWREI
+    1.3.6.1.4.1.25506.1.1253:
+      model: S5150X-16S-EI
+    1.3.6.1.4.1.25506.1.1254:
+      model: S5150X-16S-TEI
+    1.3.6.1.4.1.25506.1.1257:
+      model: UIS M8310-48G
+    1.3.6.1.4.1.25506.1.1258:
+      model: UIS M8320-48XG
+    1.3.6.1.4.1.25506.1.1259:
+      model: UIS M6300-XLG
+    1.3.6.1.4.1.25506.1.126:
+      model: vg10-41
+    1.3.6.1.4.1.25506.1.1260:
+      model: MSR810
+    1.3.6.1.4.1.25506.1.127:
+      model: vg21-08
+    1.3.6.1.4.1.25506.1.1275:
+      model: S5560-34C-EI
+    1.3.6.1.4.1.25506.1.1276:
+      model: S5130-34C-HI
+    1.3.6.1.4.1.25506.1.1277:
+      model: MS4120-26TP
+    1.3.6.1.4.1.25506.1.1278:
+      model: WA4330ACN
+    1.3.6.1.4.1.25506.1.1279:
+      model: MS4320S-28F
+    1.3.6.1.4.1.25506.1.128:
+      model: vg20-16
+    1.3.6.1.4.1.25506.1.1280:
+      model: MS4320S-28P
+    1.3.6.1.4.1.25506.1.1281:
+      model: MS4520-28S
+    1.3.6.1.4.1.25506.1.1282:
+      model: SecBlade3Context
+    1.3.6.1.4.1.25506.1.1283:
+      model: MSR26-30-R
+    1.3.6.1.4.1.25506.1.1284:
+      model: MSR36-10-AC-R
+    1.3.6.1.4.1.25506.1.1285:
+      model: MSR36-20-AC-R
+    1.3.6.1.4.1.25506.1.1286:
+      model: MSR36-40-R
+    1.3.6.1.4.1.25506.1.1287:
+      model: MSR36-60-R
+    1.3.6.1.4.1.25506.1.1288:
+      model: MSR56-60-R
+    1.3.6.1.4.1.25506.1.1289:
+      model: MSR56-80-R
+    1.3.6.1.4.1.25506.1.129:
+      model: vg20-32
+    1.3.6.1.4.1.25506.1.1290:
+      model: MSR930-R
+    1.3.6.1.4.1.25506.1.1291:
+      model: MSR930-W-R
+    1.3.6.1.4.1.25506.1.1292:
+      model: MSR2600-10-R
+    1.3.6.1.4.1.25506.1.1293:
+      model: WX3010EV7
+    1.3.6.1.4.1.25506.1.1294:
+      model: WX3024EV7
+    1.3.6.1.4.1.25506.1.1295:
+      model: WCMX20
+    1.3.6.1.4.1.25506.1.1296:
+      model: S5560-32C-HI
+    1.3.6.1.4.1.25506.1.1297:
+      model: S5560-56C-HI
+    1.3.6.1.4.1.25506.1.1298:
+      model: S5560-56C-PWR-HI
+    1.3.6.1.4.1.25506.1.1299:
+      model: S12502X-AF
+    1.3.6.1.4.1.25506.1.130:
+      model: vg80-20
+    1.3.6.1.4.1.25506.1.1300:
+      model: NS228
+    1.3.6.1.4.1.25506.1.1301:
+      model: NS252
+    1.3.6.1.4.1.25506.1.1302:
+      model: SecBladeFW
+    1.3.6.1.4.1.25506.1.1303:
+      model: SecBladeADE
+    1.3.6.1.4.1.25506.1.1304:
+      model: SecBladeIIILSUM1FWCEAB0
+    1.3.6.1.4.1.25506.1.1305:
+      model: S5130-28PS-EI
+    1.3.6.1.4.1.25506.1.1307:
+      model: S7510E-X
+    1.3.6.1.4.1.25506.1.1308:
+      model: S7504EXS
+    1.3.6.1.4.1.25506.1.1309:
+      model: S7502EXS
+    1.3.6.1.4.1.25506.1.131:
+      model: xe200
+    1.3.6.1.4.1.25506.1.1310:
+      model: WA4320-ACN-PI
+    1.3.6.1.4.1.25506.1.1311:
+      model: WA4320-ACN-SI
+    1.3.6.1.4.1.25506.1.1312:
+      model: NER324
+    1.3.6.1.4.1.25506.1.1313:
+      model: NER214W
+    1.3.6.1.4.1.25506.1.1314:
+      model: WX2540EV7
+    1.3.6.1.4.1.25506.1.1315:
+      model: WX2540H
+    1.3.6.1.4.1.25506.1.1316:
+      model: WX4320-ACN-C
+    1.3.6.1.4.1.25506.1.1317:
+      model: WX4320
+    1.3.6.1.4.1.25506.1.1319:
+      model: UIS M8380-C
+    1.3.6.1.4.1.25506.1.132:
+      model: xe2000
+    1.3.6.1.4.1.25506.1.1320:
+      model: UIS M8380
+    1.3.6.1.4.1.25506.1.1325:
+      model: LSU1WCME0V7
+    1.3.6.1.4.1.25506.1.1326:
+      model: EWPX1WCME0V7
+    1.3.6.1.4.1.25506.1.133:
+      model: xe7200
+    1.3.6.1.4.1.25506.1.1338:
+      model: IE4100-12TP-LI
+    1.3.6.1.4.1.25506.1.1339:
+      model: IE4100-12TP-PWR-LI
+    1.3.6.1.4.1.25506.1.134:
+      model: xe7300
+    1.3.6.1.4.1.25506.1.135:
+      model: xe7500
+    1.3.6.1.4.1.25506.1.136:
+      model: xe7600
+    1.3.6.1.4.1.25506.1.1365:
+      model: CR16004-X
+    1.3.6.1.4.1.25506.1.1366:
+      model: CR16008-X
+    1.3.6.1.4.1.25506.1.1367:
+      model: CR16016-X
+    1.3.6.1.4.1.25506.1.137:
+      model: xe7205
+    1.3.6.1.4.1.25506.1.138:
+      model: xe7305
+    1.3.6.1.4.1.25506.1.139:
+      model: xe7505
+    1.3.6.1.4.1.25506.1.140:
+      model: xe7605
+    1.3.6.1.4.1.25506.1.141:
+      model: neoceanIX1000
+    1.3.6.1.4.1.25506.1.142:
+      model: neoceanEX1000
+    1.3.6.1.4.1.25506.1.143:
+      model: neoceanEX800
+    1.3.6.1.4.1.25506.1.144:
+      model: neoceanIX5000
+    1.3.6.1.4.1.25506.1.145:
+      model: neoceanIV5100
+    1.3.6.1.4.1.25506.1.146:
+      model: neoceanIV5200
+    1.3.6.1.4.1.25506.1.157:
+      model: Vg31-08
+    1.3.6.1.4.1.25506.1.188:
+      model: SR8808-V5
+    1.3.6.1.4.1.25506.1.202:
+      model: vg80-21
+    1.3.6.1.4.1.25506.1.203:
+      model: vg80-80
+    1.3.6.1.4.1.25506.1.222:
+      model: neoceanIX3040
+    1.3.6.1.4.1.25506.1.223:
+      model: neoceanIX3080
+    1.3.6.1.4.1.25506.1.224:
+      model: secpathF100-M
+    1.3.6.1.4.1.25506.1.225:
+      model: neoceanVX1500
+    1.3.6.1.4.1.25506.1.226:
+      model: neoceanIX1520
+    1.3.6.1.4.1.25506.1.227:
+      model: neoceanIX1540
+    1.3.6.1.4.1.25506.1.233:
+      model: neoceanDL1008
+    1.3.6.1.4.1.25506.1.234:
+      model: neoceanDL1008S
+    1.3.6.1.4.1.25506.1.235:
+      model: neoceanDL1012
+    1.3.6.1.4.1.25506.1.237:
+      model: IV5680
+    1.3.6.1.4.1.25506.1.238:
+      model: IV5240
+    1.3.6.1.4.1.25506.1.239:
+      model: F1000-E
+    1.3.6.1.4.1.25506.1.248:
+      model: ec1001
+    1.3.6.1.4.1.25506.1.249:
+      model: ec1001-hf
+    1.3.6.1.4.1.25506.1.250:
+      model: ec1004-hc
+    1.3.6.1.4.1.25506.1.251:
+      model: ec2004-hf
+    1.3.6.1.4.1.25506.1.252:
+      model: dc1001
+    1.3.6.1.4.1.25506.1.253:
+      model: dm8000
+    1.3.6.1.4.1.25506.1.254:
+      model: vm8000
+    1.3.6.1.4.1.25506.1.268:
+      model: dl1000
+    1.3.6.1.4.1.25506.1.269:
+      model: dl1000s
+    1.3.6.1.4.1.25506.1.296:
+      model: wa2220x-agp
+    1.3.6.1.4.1.25506.1.304:
+      model: ec3016-hc
+    1.3.6.1.4.1.25506.1.305:
+      model: dc1001-ff
+    1.3.6.1.4.1.25506.1.306:
+      model: ecr3304-hf
+    1.3.6.1.4.1.25506.1.307:
+      model: ecr3308-hd
+    1.3.6.1.4.1.25506.1.308:
+      model: ecr3316-hc
+    1.3.6.1.4.1.25506.1.309:
+      model: isc3000
+    1.3.6.1.4.1.25506.1.310:
+      model: isc3100
+    1.3.6.1.4.1.25506.1.311:
+      model: vm9000
+    1.3.6.1.4.1.25506.1.312:
+      model: vm5000
+    1.3.6.1.4.1.25506.1.316:
+      model: CS2104B
+    1.3.6.1.4.1.25506.1.317:
+      model: CS2106B
+    1.3.6.1.4.1.25506.1.321:
+      model: neoceanIX3240
+    1.3.6.1.4.1.25506.1.322:
+      model: neoceanIX3620
+    1.3.6.1.4.1.25506.1.323:
+      model: MSA7302
+    1.3.6.1.4.1.25506.1.324:
+      model: MSA7306
+    1.3.6.1.4.1.25506.1.346:
+      model: neoceanVX1540
+    1.3.6.1.4.1.25506.1.349:
+      model: secBlade-LSQ1ACGASC0
+    1.3.6.1.4.1.25506.1.377:
+      model: secBlade-LSQ1LBSC0
+    1.3.6.1.4.1.25506.1.379:
+      model: neoceanIX1560
+    1.3.6.1.4.1.25506.1.380:
+      model: neoceanEX1500S
+    1.3.6.1.4.1.25506.1.381:
+      model: neoceanEX1520S
+    1.3.6.1.4.1.25506.1.382:
+      model: neoceanEX1540S
+    1.3.6.1.4.1.25506.1.383:
+      model: neoceanEX1560S
+    1.3.6.1.4.1.25506.1.412:
+      model: neoceanIX3240E
+    1.3.6.1.4.1.25506.1.413:
+      model: neoceanIX3620E
+    1.3.6.1.4.1.25506.1.414:
+      model: neoceanIX3640E
+    1.3.6.1.4.1.25506.1.452:
+      model: neoceanEX1540
+    1.3.6.1.4.1.25506.1.475:
+      model: neoceanIX3620S
+    1.3.6.1.4.1.25506.1.476:
+      model: neoceanIX3080S
+    1.3.6.1.4.1.25506.1.491:
+      model: EWPXM1WCMC0
+    1.3.6.1.4.1.25506.1.494:
+      model: secpathF1000-S-EI
+    1.3.6.1.4.1.25506.1.502:
+      model: SSM-s5500G
+    1.3.6.1.4.1.25506.1.503:
+      model: SSM-FIC
+    1.3.6.1.4.1.25506.1.504:
+      model: SSM-MIM
+    1.3.6.1.4.1.25506.1.521:
+      model: wx3008wcm
+    1.3.6.1.4.1.25506.1.537:
+      model: ME8000
+    1.3.6.1.4.1.25506.1.538:
+      model: ME8600
+    1.3.6.1.4.1.25506.1.539:
+      model: ME5000
+    1.3.6.1.4.1.25506.1.540:
+      model: MG6060
+    1.3.6.1.4.1.25506.1.541:
+      model: MG6050
+    1.3.6.1.4.1.25506.1.542:
+      model: MG6050S
+    1.3.6.1.4.1.25506.1.543:
+      model: MG9010
+    1.3.6.1.4.1.25506.1.544:
+      model: MG9030
+    1.3.6.1.4.1.25506.1.545:
+      model: MG9060
+    1.3.6.1.4.1.25506.1.546:
+      model: neoceanVX1500-DC
+    1.3.6.1.4.1.25506.1.548:
+      model: SIVX-S3628
+    1.3.6.1.4.1.25506.1.549:
+      model: SIVX-S5528
+    1.3.6.1.4.1.25506.1.550:
+      model: SIVX-VS1500
+    1.3.6.1.4.1.25506.1.551:
+      model: neoceanIX2540
+    1.3.6.1.4.1.25506.1.552:
+      model: neoceanVX2500
+    1.3.6.1.4.1.25506.1.557:
+      model: F1000-E-DC
+    1.3.6.1.4.1.25506.1.559:
+      model: ET824
+    1.3.6.1.4.1.25506.1.560:
+      model: OSM
+    1.3.6.1.4.1.25506.1.561:
+      model: wx5002-v2
+    1.3.6.1.4.1.25506.1.562:
+      model: wx5004-v2
+    1.3.6.1.4.1.25506.1.565:
+      model: secBlade-LST1FW2A1
+    1.3.6.1.4.1.25506.1.566:
+      model: secBlade-LST1LB1A1
+    1.3.6.1.4.1.25506.1.567:
+      model: secBlade-LST1NSM1A1
+    1.3.6.1.4.1.25506.1.568:
+      model: secBlade-EWPX2IAGSC0
+    1.3.6.1.4.1.25506.1.569:
+      model: F1000-A-EI
+    1.3.6.1.4.1.25506.1.570:
+      model: wx6108E
+    1.3.6.1.4.1.25506.1.571:
+      model: wx6112E
+    1.3.6.1.4.1.25506.1.574:
+      model: wa1208e-gp-h20
+    1.3.6.1.4.1.25506.1.578:
+      model: e528
+    1.3.6.1.4.1.25506.1.579:
+      model: e552
+    1.3.6.1.4.1.25506.1.58:
+      model: ar28-10
+    1.3.6.1.4.1.25506.1.595:
+      model: s12504
+    1.3.6.1.4.1.25506.1.596:
+      model: ICG2000B-GT
+    1.3.6.1.4.1.25506.1.597:
+      model: ICG3000B
+    1.3.6.1.4.1.25506.1.598:
+      model: ICG3000S
+    1.3.6.1.4.1.25506.1.599:
+      model: ICG5000B
+    1.3.6.1.4.1.25506.1.600:
+      model: wh2640X-agnp
+    1.3.6.1.4.1.25506.1.601:
+      model: wa2620X-agnp
+    1.3.6.1.4.1.25506.1.606:
+      model: F1000-A-SI
+    1.3.6.1.4.1.25506.1.607:
+      model: F1000-E-SI
+    1.3.6.1.4.1.25506.1.608:
+      model: secBlade-LST1ACG1A1
+    1.3.6.1.4.1.25506.1.610:
+      model: secBlade-SPE-ACG
+    1.3.6.1.4.1.25506.1.611:
+      model: wx6103
+    1.3.6.1.4.1.25506.1.612:
+      model: LSQ1WCMD0
+    1.3.6.1.4.1.25506.1.613:
+      model: EWPX2WCMD0
+    1.3.6.1.4.1.25506.1.614:
+      model: LSR1WCM3A1
+    1.3.6.1.4.1.25506.1.618:
+      model: ET814
+    1.3.6.1.4.1.25506.1.621:
+      model: secBlade-IM-FW-II
+    1.3.6.1.4.1.25506.1.622:
+      model: secBlade-IM-LB
+    1.3.6.1.4.1.25506.1.623:
+      model: secBlade-IM-SSL
+    1.3.6.1.4.1.25506.1.625:
+      model: ER2210C
+    1.3.6.1.4.1.25506.1.626:
+      model: VCX-Connect-100
+    1.3.6.1.4.1.25506.1.627:
+      model: VCX-Connect-200
+    1.3.6.1.4.1.25506.1.628:
+      model: VCX-V7005
+    1.3.6.1.4.1.25506.1.629:
+      model: VCX-V7205
+    1.3.6.1.4.1.25506.1.630:
+      model: VCX-MIM
+    1.3.6.1.4.1.25506.1.631:
+      model: VCX-Connect-MIM-Primary
+    1.3.6.1.4.1.25506.1.632:
+      model: VCX-Connect-MIM-Secondary
+    1.3.6.1.4.1.25506.1.633:
+      model: VCX-V7310
+    1.3.6.1.4.1.25506.1.635:
+      model: secBlade-IM-ACG
+    1.3.6.1.4.1.25506.1.637:
+      model: s10504
+    1.3.6.1.4.1.25506.1.639:
+      model: s10508-V
+    1.3.6.1.4.1.25506.1.640:
+      model: secBlade-SPE-FWM-200
+    1.3.6.1.4.1.25506.1.641:
+      model: secpathF1000-S-AI
+    1.3.6.1.4.1.25506.1.642:
+      model: wx3024e-wcm
+    1.3.6.1.4.1.25506.1.643:
+      model: wx3024e-lsw
+    1.3.6.1.4.1.25506.1.644:
+      model: ER2100
+    1.3.6.1.4.1.25506.1.649:
+      model: cc720E
+    1.3.6.1.4.1.25506.1.656:
+      model: E126B
+    1.3.6.1.4.1.25506.1.66:
+      model: ar28-80
+    1.3.6.1.4.1.25506.1.687:
+      model: MG9050
+    1.3.6.1.4.1.25506.1.689:
+      model: CE3000-32F-EI
+    1.3.6.1.4.1.25506.1.691:
+      model: DC1801FH
+    1.3.6.1.4.1.25506.1.692:
+      model: DC2004FF
+    1.3.6.1.4.1.25506.1.693:
+      model: EC1101HF
+    1.3.6.1.4.1.25506.1.694:
+      model: EC1102HF
+    1.3.6.1.4.1.25506.1.695:
+      model: EC1501HF
+    1.3.6.1.4.1.25506.1.696:
+      model: EC1801HH
+    1.3.6.1.4.1.25506.1.697:
+      model: EC2516HF
+    1.3.6.1.4.1.25506.1.698:
+      model: EC2016HC
+    1.3.6.1.4.1.25506.1.699:
+      model: EC2016HC8CH
+    1.3.6.1.4.1.25506.1.700:
+      model: EC2016HC4CH
+    1.3.6.1.4.1.25506.1.701:
+      model: EC1504HF
+    1.3.6.1.4.1.25506.1.702:
+      model: HIC5421
+    1.3.6.1.4.1.25506.1.704:
+      model: HIC5221H
+    1.3.6.1.4.1.25506.1.705:
+      model: HIC5201H
+    1.3.6.1.4.1.25506.1.706:
+      model: VM8500
+    1.3.6.1.4.1.25506.1.707:
+      model: MS8500
+    1.3.6.1.4.1.25506.1.708:
+      model: DM8500
+    1.3.6.1.4.1.25506.1.709:
+      model: VX500
+    1.3.6.1.4.1.25506.1.710:
+      model: ISC3000E
+    1.3.6.1.4.1.25506.1.711:
+      model: ISC3000S
+    1.3.6.1.4.1.25506.1.712:
+      model: CC700E
+    1.3.6.1.4.1.25506.1.713:
+      model: DC1001FF
+    1.3.6.1.4.1.25506.1.714:
+      model: ECR3316HC
+    1.3.6.1.4.1.25506.1.715:
+      model: ECR3308HD
+    1.3.6.1.4.1.25506.1.716:
+      model: ECR3316HC8CH
+    1.3.6.1.4.1.25506.1.717:
+      model: ECR3316HC4CH
+    1.3.6.1.4.1.25506.1.718:
+      model: ECR3308HD4CH
+    1.3.6.1.4.1.25506.1.719:
+      model: HIC65017L
+    1.3.6.1.4.1.25506.1.720:
+      model: EC2508HF
+    1.3.6.1.4.1.25506.1.723:
+      model: WP3024
+    1.3.6.1.4.1.25506.1.724:
+      model: WP3048
+    1.3.6.1.4.1.25506.1.726:
+      model: E328B
+    1.3.6.1.4.1.25506.1.727:
+      model: E352B
+    1.3.6.1.4.1.25506.1.728:
+      model: E152B
+    1.3.6.1.4.1.25506.1.730:
+      model: WP2008
+    1.3.6.1.4.1.25506.1.731:
+      model: WP2016
+    1.3.6.1.4.1.25506.1.732:
+      model: WP2024
+    1.3.6.1.4.1.25506.1.733:
+      model: WP5024
+    1.3.6.1.4.1.25506.1.734:
+      model: WP5048
+    1.3.6.1.4.1.25506.1.739:
+      model: WA3620iAGN
+    1.3.6.1.4.1.25506.1.74:
+      model: MSR30-40
+    1.3.6.1.4.1.25506.1.740:
+      model: WA3628iAGN
+    1.3.6.1.4.1.25506.1.741:
+      model: WA3610iGN
+    1.3.6.1.4.1.25506.1.742:
+      model: CC750E
+    1.3.6.1.4.1.25506.1.745:
+      model: WA2110GN
+    1.3.6.1.4.1.25506.1.747:
+      model: S10512
+    1.3.6.1.4.1.25506.1.749:
+      model: WA1208EGNP
+    1.3.6.1.4.1.25506.1.750:
+      model: WA2610EGNPH20
+    1.3.6.1.4.1.25506.1.751:
+      model: WA2620iAGN
+    1.3.6.1.4.1.25506.1.752:
+      model: WA2610iGN
+    1.3.6.1.4.1.25506.1.753:
+      model: WA2612
+    1.3.6.1.4.1.25506.1.754:
+      model: WA2620
+    1.3.6.1.4.1.25506.1.755:
+      model: WB524
+    1.3.6.1.4.1.25506.1.756:
+      model: SecBladeLST1FW3A1
+    1.3.6.1.4.1.25506.1.757:
+      model: SecBladeLSU1FWCEA0
+    1.3.6.1.4.1.25506.1.758:
+      model: WX3010eWCM
+    1.3.6.1.4.1.25506.1.759:
+      model: WX3010eLSW
+    1.3.6.1.4.1.25506.1.762:
+      model: SecBladeCRIMNAM1A
+    1.3.6.1.4.1.25506.1.763:
+      model: MSR2630
+    1.3.6.1.4.1.25506.1.764:
+      model: MSR3610AC
+    1.3.6.1.4.1.25506.1.765:
+      model: MSR3610DC
+    1.3.6.1.4.1.25506.1.767:
+      model: MSR3620DC
+    1.3.6.1.4.1.25506.1.768:
+      model: MSR3620POE
+    1.3.6.1.4.1.25506.1.769:
+      model: MSR3640
+    1.3.6.1.4.1.25506.1.770:
+      model: MSR3660
+    1.3.6.1.4.1.25506.1.772:
+      model: MSR5680
+    1.3.6.1.4.1.25506.1.775:
+      model: LSU3WCMD0
+    1.3.6.1.4.1.25506.1.776:
+      model: EWPX3WCMD0
+    1.3.6.1.4.1.25506.1.778:
+      model: WX6103E
+    1.3.6.1.4.1.25506.1.779:
+      model: SecBladeCRIMFW1A
+    1.3.6.1.4.1.25506.1.780:
+      model: HIC66216C
+    1.3.6.1.4.1.25506.1.781:
+      model: HIC66216L
+    1.3.6.1.4.1.25506.1.782:
+      model: HIC3401V
+    1.3.6.1.4.1.25506.1.783:
+      model: HIC3401VIR
+    1.3.6.1.4.1.25506.1.784:
+      model: HIC3421V
+    1.3.6.1.4.1.25506.1.785:
+      model: HIC3421VIR
+    1.3.6.1.4.1.25506.1.786:
+      model: SIC235IR1
+    1.3.6.1.4.1.25506.1.787:
+      model: SIC235IR3
+    1.3.6.1.4.1.25506.1.788:
+      model: SIC335EVIR
+    1.3.6.1.4.1.25506.1.789:
+      model: HIC5511I
+    1.3.6.1.4.1.25506.1.790:
+      model: HIC5521I
+    1.3.6.1.4.1.25506.1.791:
+      model: HIC5551I
+    1.3.6.1.4.1.25506.1.792:
+      model: HIC5421E
+    1.3.6.1.4.1.25506.1.793:
+      model: HIC5401E
+    1.3.6.1.4.1.25506.1.794:
+      model: HIC5421D
+    1.3.6.1.4.1.25506.1.795:
+      model: HIC5401D
+    1.3.6.1.4.1.25506.1.796:
+      model: HIC5621
+    1.3.6.1.4.1.25506.1.797:
+      model: HIC5601
+    1.3.6.1.4.1.25506.1.798:
+      model: HIC6501E
+    1.3.6.1.4.1.25506.1.799:
+      model: HIC6621E
+    1.3.6.1.4.1.25506.1.800:
+      model: SIC635
+    1.3.6.1.4.1.25506.1.801:
+      model: HIC6501IR
+    1.3.6.1.4.1.25506.1.802:
+      model: HIC6621IR
+    1.3.6.1.4.1.25506.1.803:
+      model: SIC635IR
+    1.3.6.1.4.1.25506.1.804:
+      model: EC2508HF4CH
+    1.3.6.1.4.1.25506.1.805:
+      model: EC2516HF8CH
+    1.3.6.1.4.1.25506.1.806:
+      model: ECR3308HF
+    1.3.6.1.4.1.25506.1.807:
+      model: ECR3316HF
+    1.3.6.1.4.1.25506.1.808:
+      model: ISC3500E
+    1.3.6.1.4.1.25506.1.809:
+      model: ISC3500S
+    1.3.6.1.4.1.25506.1.810:
+      model: ECR3304HFE
+    1.3.6.1.4.1.25506.1.811:
+      model: ECR3308HFE
+    1.3.6.1.4.1.25506.1.812:
+      model: ECR3316HFE
+    1.3.6.1.4.1.25506.1.813:
+      model: ISC3600
+    1.3.6.1.4.1.25506.1.814:
+      model: ECR3204HW
+    1.3.6.1.4.1.25506.1.815:
+      model: ECR3208HW
+    1.3.6.1.4.1.25506.1.816:
+      model: ECR3216HW
+    1.3.6.1.4.1.25506.1.817:
+      model: EC2508HW
+    1.3.6.1.4.1.25506.1.818:
+      model: EC2516HW
+    1.3.6.1.4.1.25506.1.819:
+      model: ISC2600
+    1.3.6.1.4.1.25506.1.820:
+      model: DC2808FH
+    1.3.6.1.4.1.25506.1.821:
+      model: CE300034C
+    1.3.6.1.4.1.25506.1.822:
+      model: CE300058C
+    1.3.6.1.4.1.25506.1.838:
+      model: MSR930
+    1.3.6.1.4.1.25506.1.839:
+      model: MSV50
+    1.3.6.1.4.1.25506.1.840:
+      model: MSR930WiNet
+    1.3.6.1.4.1.25506.1.841:
+      model: MSR930GU
+    1.3.6.1.4.1.25506.1.842:
+      model: MSR930sa
+    1.3.6.1.4.1.25506.1.843:
+      model: MSR930GG
+    1.3.6.1.4.1.25506.1.846:
+      model: CC754E
+    1.3.6.1.4.1.25506.1.847:
+      model: WP5008
+    1.3.6.1.4.1.25506.1.848:
+      model: SecBladeCRIMLB1A
+    1.3.6.1.4.1.25506.1.855:
+      model: S12508V7
+    1.3.6.1.4.1.25506.1.857:
+      model: S12504V7
+    1.3.6.1.4.1.25506.1.860:
+      model: WA2610E
+    1.3.6.1.4.1.25506.1.861:
+      model: WA2620E
+    1.3.6.1.4.1.25506.1.862:
+      model: WA2620X
+    1.3.6.1.4.1.25506.1.863:
+      model: WA2610X
+    1.3.6.1.4.1.25506.1.864:
+      model: S58306002
+    1.3.6.1.4.1.25506.1.865:
+      model: S58306004
+    1.3.6.1.4.1.25506.1.868:
+      model: MSR930W
+    1.3.6.1.4.1.25506.1.869:
+      model: MSR930GW
+    1.3.6.1.4.1.25506.1.88:
+      model: ar18-21
+    1.3.6.1.4.1.25506.1.882:
+      model: MSR930GT
+    1.3.6.1.4.1.25506.1.883:
+      model: MSR930GTC
+    1.3.6.1.4.1.25506.1.884:
+      model: MSR930GUC
+    1.3.6.1.4.1.25506.1.888:
+      model: SecBladeLSQ2FWBSCO
+    1.3.6.1.4.1.25506.1.889:
+      model: WA2620AGN
+    1.3.6.1.4.1.25506.1.89:
+      model: ar18-21A
+    1.3.6.1.4.1.25506.1.890:
+      model: VSR
+    1.3.6.1.4.1.25506.1.891:
+      model: VSR1001
+    1.3.6.1.4.1.25506.1.892:
+      model: VSR1004
+    1.3.6.1.4.1.25506.1.893:
+      model: VSR1008
+    1.3.6.1.4.1.25506.1.896:
+      model: MSR930WiNetW
+    1.3.6.1.4.1.25506.1.897:
+      model: WA3628iAGNX
+    1.3.6.1.4.1.25506.1.90:
+      model: ar18-21B
+    1.3.6.1.4.1.25506.1.903:
+      model: WX5540-WCM
+    1.3.6.1.4.1.25506.1.904:
+      model: WX5540-LSW
+    1.3.6.1.4.1.25506.1.905:
+      model: WX5520-WCM
+    1.3.6.1.4.1.25506.1.906:
+      model: WX5520-LSW
+    1.3.6.1.4.1.25506.1.907:
+      model: MSR930-WGT
+    1.3.6.1.4.1.25506.1.908:
+      model: ICG 5000T
+    1.3.6.1.4.1.25506.1.909:
+      model: ICG 6000
+    1.3.6.1.4.1.25506.1.910:
+      model: MSR26-30
+    1.3.6.1.4.1.25506.1.911:
+      model: MSR36-10
+    1.3.6.1.4.1.25506.1.912:
+      model: MSR36-60
+    1.3.6.1.4.1.25506.1.914:
+      model: MSR2600-10
+    1.3.6.1.4.1.25506.1.915:
+      model: MSR2600-17
+    1.3.6.1.4.1.25506.1.916:
+      model: ICG 3000D
+    1.3.6.1.4.1.25506.1.917:
+      model: ICG 3000E
+    1.3.6.1.4.1.25506.1.918:
+      model: SecBladeLSU1ADECEA0
+    1.3.6.1.4.1.25506.1.919:
+      model: SecBladeLST1ADE1A1
+    1.3.6.1.4.1.25506.1.92:
+      model: ar18-22-8
+    1.3.6.1.4.1.25506.1.920:
+      model: SR8804-X
+    1.3.6.1.4.1.25506.1.921:
+      model: SR8808-X
+    1.3.6.1.4.1.25506.1.922:
+      model: SR8812-X
+    1.3.6.1.4.1.25506.1.923:
+      model: CC710E
+    1.3.6.1.4.1.25506.1.924:
+      model: CC712E
+    1.3.6.1.4.1.25506.1.929:
+      model: S2610
+    1.3.6.1.4.1.25506.1.930:
+      model: S2610-PWR
+    1.3.6.1.4.1.25506.1.931:
+      model: S2626
+    1.3.6.1.4.1.25506.1.933:
+      model: S2652
+    1.3.6.1.4.1.25506.1.934:
+      model: Simware7BoxCen
+    1.3.6.1.4.1.25506.1.935:
+      model: Simware7BoxIRF
+    1.3.6.1.4.1.25506.1.936:
+      model: Simware7ChassisDevice
+    1.3.6.1.4.1.25506.1.937:
+      model: VSR1000
+    1.3.6.1.4.1.25506.1.942:
+      model: SecBladeIIINSQM1FWCEA0
+    1.3.6.1.4.1.25506.1.943:
+      model: WB521X
+    1.3.6.1.4.1.25506.1.944:
+      model: WB511X
+    1.3.6.1.4.1.25506.1.945:
+      model: ER3108G
+    1.3.6.1.4.1.25506.1.946:
+      model: ER3108GW
+    1.3.6.1.4.1.25506.1.947:
+      model: S5130-28S-EI
+    1.3.6.1.4.1.25506.1.948:
+      model: S5130-52S-EI
+    1.3.6.1.4.1.25506.1.949:
+      model: S5130-28F-EI
+    1.3.6.1.4.1.25506.1.950:
+      model: S5130-28S-PWR-EI
+    1.3.6.1.4.1.25506.1.952:
+      model: MSR3600-28
+    1.3.6.1.4.1.25506.1.953:
+      model: MSR3600-51
+    1.3.6.1.4.1.25506.1.954:
+      model: WA2612E
+    1.3.6.1.4.1.25506.1.955:
+      model: WA2622
+    1.3.6.1.4.1.25506.1.956:
+      model: S5110-10P
+    1.3.6.1.4.1.25506.1.957:
+      model: S5110-10P-PWR
+    1.3.6.1.4.1.25506.1.959:
+      model: S5110-28P-PWR
+    1.3.6.1.4.1.25506.1.960:
+      model: S5110-52P
+    1.3.6.1.4.1.25506.1.961:
+      model: S5110-10P-D
+    1.3.6.1.4.1.25506.1.962:
+      model: S5110-10P-PWR-D
+    1.3.6.1.4.1.25506.1.963:
+      model: S5110-28P-D
+    1.3.6.1.4.1.25506.1.964:
+      model: S5110-28P-PWR-D
+    1.3.6.1.4.1.25506.1.965:
+      model: S5110-52P-D
+    1.3.6.1.4.1.25506.1.966:
+      model: WX5510
+    1.3.6.1.4.1.25506.1.971:
+      model: LA2608
+    1.3.6.1.4.1.25506.1.977:
+      model: WA2610H-GN
+    1.3.6.1.4.1.25506.1.978:
+      model: WA4620E-ACN
+    1.3.6.1.4.1.25506.1.979:
+      model: WA4620I-ACN
+    1.3.6.1.4.1.25506.1.980:
+      model: EWPX1MAC0
+    1.3.6.1.4.1.25506.1.981:
+      model: CRIMMAC1A
+    1.3.6.1.4.1.25506.1.982:
+      model: SecBladeIIILST1FW3B1
+    1.3.6.1.4.1.25506.1.983:
+      model: WA2620I-AGN-X
+    1.3.6.1.4.1.25506.1.984:
+      model: S3110-10TP-SI
+    1.3.6.1.4.1.25506.1.985:
+      model: S3110-26TP-SI
+    1.3.6.1.4.1.25506.1.986:
+      model: S3110-52TP-SI
+    1.3.6.1.4.1.25506.1.987:
+      model: S5110-10P-SI
+    1.3.6.1.4.1.25506.1.988:
+      model: S5110-28P-SI
+    1.3.6.1.4.1.25506.1.989:
+      model: S5110-52P-SI
+    1.3.6.1.4.1.25506.1.990:
+      model: S3100V2-52TP-WiNet
+    1.3.6.1.4.1.25506.1.991:
+      model: S5120-52P-WiNet
+    1.3.6.1.4.1.25506.1.992:
+      model: S5500-48P-WiNet
+    1.3.6.1.4.1.25506.1.993:
+      model: S5500-28F-WiNet
+    1.3.6.1.4.1.25506.1.994:
+      model: WA2620E-X
+    1.3.6.1.4.1.25506.1.997:
+      model: CC721E
+    1.3.6.1.4.1.25506.1.998:
+      model: S5820V2-52QF-U
+    1.3.6.1.4.1.25506.11.1.108:
+      model: 1250-4DC
+    1.3.6.1.4.1.25506.11.1.109:
+      model: 1250-8DC
+    1.3.6.1.4.1.25506.11.1.110:
+      model: 1251-8DC
+    1.3.6.1.4.1.25506.11.1.112:
+      model: 1251-8AC
+    1.3.6.1.4.1.25506.11.1.117:
+      model: 5830AF-48G-TAA
+    1.3.6.1.4.1.25506.11.1.118:
+      model: 5830AF-96G-TAA
+    1.3.6.1.4.1.25506.11.1.124:
+      model: 1250-4ACV7
+    1.3.6.1.4.1.25506.11.1.125:
+      model: 1250-4DCV7
+    1.3.6.1.4.1.25506.11.1.126:
+      model: 1250-8ACV7
+    1.3.6.1.4.1.25506.11.1.127:
+      model: 1250-8DCV7
+    1.3.6.1.4.1.25506.11.1.128:
+      model: 1251-8ACV7
+    1.3.6.1.4.1.25506.11.1.129:
+      model: 1251-8DCV7
+    1.3.6.1.4.1.25506.11.1.132:
+      model: V1910-8
+    1.3.6.1.4.1.25506.11.1.142:
+      model: Moonshot-45XGc
+    1.3.6.1.4.1.25506.11.1.144:
+      model: 5930-32Q-SFP+
+    1.3.6.1.4.1.25506.11.1.145:
+      model: FF 5930-32QSFP+ TAA
+    1.3.6.1.4.1.25506.11.1.146:
+      model: FF 7904
+    1.3.6.1.4.1.25506.11.1.147:
+      model: 12916-AC
+    1.3.6.1.4.1.25506.11.1.148:
+      model: 12916-DC
+    1.3.6.1.4.1.25506.11.1.149:
+      model: FF 5900CP-48XG-4QSFP+
+    1.3.6.1.4.1.25506.11.1.150:
+      model: 5900CP-48XG-4QSFP+ 8Gb FC B-F
+    1.3.6.1.4.1.25506.11.1.151:
+      model: 6125-XLG-TAA
+    1.3.6.1.4.1.25506.11.1.152:
+      model: 6125-GXG-TAA
+    1.3.6.1.4.1.25506.11.1.153:
+      model: 6125-G-TAA
+    1.3.6.1.4.1.25506.11.1.154:
+      model: 5120-24G-4SFP-XI-2Slot
+    1.3.6.1.4.1.25506.11.1.155:
+      model: 5120-48G-4SFP-XI-2Slot
+    1.3.6.1.4.1.25506.11.1.156:
+      model: 5120-24G-PoE-Plus-4SFP-XI-2Slot
+    1.3.6.1.4.1.25506.11.1.157:
+      model: 5120-48G-PoE-Plus-4SFP-XI-2Slot
+    1.3.6.1.4.1.25506.11.1.158:
+      model: 5120-24G-4SFP-XI-TAA-2Slot
+    1.3.6.1.4.1.25506.11.1.159:
+      model: 5120-48G-4SFP-XI-TAA-2Slot
+    1.3.6.1.4.1.25506.11.1.160:
+      model: 5120-24G-PoE-Plus-4SFP-XI-TAA-2Slot
+    1.3.6.1.4.1.25506.11.1.161:
+      model: 5120-48G-PoE-Plus-4SFP-XI-TAA-2Slot
+    1.3.6.1.4.1.25506.11.1.171:
+      model: FF 5700-40XG-2QSFP+ TAA
+    1.3.6.1.4.1.25506.11.1.173:
+      model: FF 5700-32XGT-8XG-2QSFP+ TAA
+    1.3.6.1.4.1.25506.11.1.175:
+      model: FF 5700-48G-4XG-2QSFP+ TAA
+    1.3.6.1.4.1.25506.11.1.177:
+      model: 1620-8G
+    1.3.6.1.4.1.25506.11.1.178:
+      model: 1620-24G
+    1.3.6.1.4.1.25506.11.1.179:
+      model: 1620-48G
+    1.3.6.1.4.1.25506.11.1.187:
+      model: 5130-24G-PoE+-4SFP+(180W) EI
+    1.3.6.1.4.1.25506.11.1.190:
+      model: 5130-24G-2SFP+-2XGT EI
+    1.3.6.1.4.1.25506.11.1.191:
+      model: 5130-48G-2SFP+-2XGT EI
+    1.3.6.1.4.1.25506.11.1.192:
+      model: 5130-24G-PoE+-2SFP+-2XGT(370W) EI
+    1.3.6.1.4.1.25506.11.1.193:
+      model: 5130-48G-PoE+-2SFP+-2XGT(370W) EI
+    1.3.6.1.4.1.25506.11.1.194:
+      model: 5130-24G-4SFP+ EI TAA-compliant
+    1.3.6.1.4.1.25506.11.1.195:
+      model: 5130-24G-SFP-4SFP+ EI TAA-compliant
+    1.3.6.1.4.1.25506.11.1.196:
+      model: 5130-48G-4SFP+ EI TAA-compliant
+    1.3.6.1.4.1.25506.11.1.197:
+      model: 5130-24G-PoE+-4SFP+(180W) EI TAA-compliant
+    1.3.6.1.4.1.25506.11.1.198:
+      model: 5130-24G-PoE+-4SFP+(370W) EI TAA-compliant
+    1.3.6.1.4.1.25506.11.1.199:
+      model: 5130-48G-PoE+-4SFP+(370W) EI TAA-compliant
+    1.3.6.1.4.1.25506.11.1.200:
+      model: 5130-24G-2SFP+-2XGT EI TAA-compliant
+    1.3.6.1.4.1.25506.11.1.201:
+      model: 5130-48G-2SFP+-2XGT EI TAA-compliant
+    1.3.6.1.4.1.25506.11.1.202:
+      model: 5130-24G-PoE+-2SFP+-2XGT(370W) EI TAA-compliant
+    1.3.6.1.4.1.25506.11.1.203:
+      model: 5130-48G-PoE+-2SFP+-2XGT(370W) EI TAA-compliant
+    1.3.6.1.4.1.25506.11.1.205:
+      model: 5900AF-48G-4XG-2QSFP+ TAA
+    1.3.6.1.4.1.25506.11.1.206:
+      model: 5900AF-48XGT-4QSFP+ TAA
+    1.3.6.1.4.1.25506.11.1.207:
+      model: FF 5900CP-48XG-4QSFP+ TAA
+    1.3.6.1.4.1.25506.11.1.208:
+      model: 5130-24G-4SFP+ EI Brazil
+    1.3.6.1.4.1.25506.11.1.209:
+      model: 5130-48G-4SFP+ EI Brazil
+    1.3.6.1.4.1.25506.11.1.211:
+      model: 5130-48G-PoE+-4SFP+ (370W) EI Brazil
+    1.3.6.1.4.1.25506.11.1.212:
+      model: ThunderBird
+    1.3.6.1.4.1.25506.11.1.214:
+      model: NJ5000-5G-PoE+ Wall jack
+    1.3.6.1.4.1.25506.11.1.220:
+      model: 5510-24G-4SFP+ HI TAA-compliant 1 Interface Slot
+    1.3.6.1.4.1.25506.11.1.221:
+      model: 5510-48G-4SFP+ HI TAA-compliant 1 Interface Slot
+    1.3.6.1.4.1.25506.11.1.222:
+      model: 5510-24G-PoE+-4SFP+ HI TAA-compliant 1 Interface Slot
+    1.3.6.1.4.1.25506.11.1.223:
+      model: 5510-48G-PoE+-4SFP+ HI TAA-compliant 1 Interface Slot
+    1.3.6.1.4.1.25506.11.1.224:
+      model: 5510-24G-SFP-4SFP+ HI TAA-compliant 1 Interface Slot
+    1.3.6.1.4.1.25506.11.1.225:
+      model: FF 12910-AC TAA
+    1.3.6.1.4.1.25506.11.1.226:
+      model: FF 7904 TAA
+    1.3.6.1.4.1.25506.11.1.227:
+      model: FF 7910 TAA
+    1.3.6.1.4.1.25506.11.1.228:
+      model: 6127XLG
+    1.3.6.1.4.1.25506.11.1.229:
+      model: FF 5930-2Slot+2QSFP+Switch
+    1.3.6.1.4.1.25506.11.1.230:
+      model: FF 5930-2Slot+2QSFP+TAA
+    1.3.6.1.4.1.25506.11.1.232:
+      model: FF 5930-4Slot TAA
+    1.3.6.1.4.1.25506.11.1.233:
+      model: 6127XLG-TAA
+    1.3.6.1.4.1.25506.11.1.235:
+      model: FF 12916E TAA
+    1.3.6.1.4.1.25506.11.1.237:
+      model: FF 12908E TAA
+    1.3.6.1.4.1.25506.11.1.238:
+      model: Moonshot-45Gc-R10
+    1.3.6.1.4.1.25506.11.1.239:
+      model: Moonshot-45XGc-R16
+    1.3.6.1.4.1.25506.11.1.240:
+      model: Moonshot-180XGc-R16
+    1.3.6.1.4.1.25506.11.1.241:
+      model: Moonshot-180XGc-R40
+    1.3.6.1.4.1.25506.11.1.243:
+      model: FF 12904E TAA
+    1.3.6.1.4.1.25506.11.1.251:
+      model: 5120-16G SI
+    1.3.6.1.4.1.25506.11.1.252:
+      model: 5120-24G SI
+    1.3.6.1.4.1.25506.11.1.253:
+      model: 5120-24G-PoE+(370W) SI
+    1.3.6.1.4.1.25506.11.1.254:
+      model: 5120-8G-PoE+(65W) SI
+    1.3.6.1.4.1.25506.11.1.256:
+      model: 7502JD242C
+    1.3.6.1.4.1.25506.11.1.258:
+      model: 7506JD239C
+    1.3.6.1.4.1.25506.11.1.259:
+      model: 7510JD238C
+    1.3.6.1.4.1.25506.11.1.261:
+      model: FF 5950 32Q28 TAA
+    1.3.6.1.4.1.25506.11.1.39:
+      model: "9505"
+    1.3.6.1.4.1.25506.11.1.40:
+      model: 9508V
+    1.3.6.1.4.1.25506.11.1.41:
+      model: "9508"
+    1.3.6.1.4.1.25506.11.1.42:
+      model: "9512"
+    1.3.6.1.4.1.25506.11.1.43:
+      model: "12508"
+    1.3.6.1.4.1.25506.11.1.44:
+      model: "12518"
+    1.3.6.1.4.1.25506.11.1.45:
+      model: 12504AC
+    1.3.6.1.4.1.25506.11.1.68:
+      model: A5820X24XGSFPPlusTAA
+    1.3.6.1.4.1.25506.11.1.7:
+      model: A36002POLT
+    1.3.6.1.4.1.25506.11.1.79:
+      model: A5830AF-48G
+    1.3.6.1.4.1.25506.11.1.80:
+      model: A5830AF-96G
+    1.3.6.1.4.1.25506.11.1.90:
+      model: A3600-24-V2EI
+    1.3.6.1.4.1.25506.11.1.94:
+      model: A3600-24-SFP-V2EI
+    1.3.6.1.4.1.25506.11.1.97:
+      model: A3600-24-PoE+-V2SI
+    1.3.6.1.4.1.25506.11.2.1:
+      model: AMSR900
+    1.3.6.1.4.1.25506.11.2.10:
+      model: AMSR2040
+    1.3.6.1.4.1.25506.11.2.100:
+      model: MSR 10038
+    1.3.6.1.4.1.25506.11.2.101:
+      model: MSR 100414
+    1.3.6.1.4.1.25506.11.2.103:
+      model: MSR2004-24
+    1.3.6.1.4.1.25506.11.2.104:
+      model: MSR2004-48
+    1.3.6.1.4.1.25506.11.2.105:
+      model: HSR6602G-TAA
+    1.3.6.1.4.1.25506.11.2.106:
+      model: HSR6602XG-TAA
+    1.3.6.1.4.1.25506.11.2.107:
+      model: MSR1002-4
+    1.3.6.1.4.1.25506.11.2.108:
+      model: NSC1000
+    1.3.6.1.4.1.25506.11.2.109:
+      model: MSR930
+    1.3.6.1.4.1.25506.11.2.11:
+      model: AMSR3010
+    1.3.6.1.4.1.25506.11.2.110:
+      model: MSR935
+    1.3.6.1.4.1.25506.11.2.111:
+      model: MSR2003-TAA
+    1.3.6.1.4.1.25506.11.2.112:
+      model: MSR3024-TAA
+    1.3.6.1.4.1.25506.11.2.113:
+      model: MSR3044-TAA
+    1.3.6.1.4.1.25506.11.2.114:
+      model: MSR935
+    1.3.6.1.4.1.25506.11.2.115:
+      model: MSR933
+    1.3.6.1.4.1.25506.11.2.116:
+      model: MSR931
+    1.3.6.1.4.1.25506.11.2.117:
+      model: MSR1003-8S
+    1.3.6.1.4.1.25506.11.2.118:
+      model: MSR932
+    1.3.6.1.4.1.25506.11.2.119:
+      model: MSR932W
+    1.3.6.1.4.1.25506.11.2.12:
+      model: AMSR3011E
+    1.3.6.1.4.1.25506.11.2.120:
+      model: MSR932WNA
+    1.3.6.1.4.1.25506.11.2.121:
+      model: MSR9328
+    1.3.6.1.4.1.25506.11.2.122:
+      model: MSR9328W
+    1.3.6.1.4.1.25506.11.2.123:
+      model: MSR9328WNA
+    1.3.6.1.4.1.25506.11.2.124:
+      model: VBRAS1000
+    1.3.6.1.4.1.25506.11.2.125:
+      model: HSR6802-E
+    1.3.6.1.4.1.25506.11.2.126:
+      model: HSR6804-E
+    1.3.6.1.4.1.25506.11.2.127:
+      model: HSR6808-E
+    1.3.6.1.4.1.25506.11.2.128:
+      model: MSR930-4G-LTEG
+    1.3.6.1.4.1.25506.11.2.129:
+      model: MSR930-4G-LTEA
+    1.3.6.1.4.1.25506.11.2.13:
+      model: AMSR3011F
+    1.3.6.1.4.1.25506.11.2.130:
+      model: MSR954
+    1.3.6.1.4.1.25506.11.2.131:
+      model: MSR954-W
+    1.3.6.1.4.1.25506.11.2.132:
+      model: MSR954-W-LTE-AM
+    1.3.6.1.4.1.25506.11.2.133:
+      model: MSR954-W-LTE
+    1.3.6.1.4.1.25506.11.2.134:
+      model: MSR958
+    1.3.6.1.4.1.25506.11.2.135:
+      model: MSR958POE
+    1.3.6.1.4.1.25506.11.2.136:
+      model: MSR930B
+    1.3.6.1.4.1.25506.11.2.137:
+      model: MSR930GB
+    1.3.6.1.4.1.25506.11.2.138:
+      model: MSR931B
+    1.3.6.1.4.1.25506.11.2.140:
+      model: MSR931DGB
+    1.3.6.1.4.1.25506.11.2.141:
+      model: MSR935B
+    1.3.6.1.4.1.25506.11.2.143:
+      model: MSR930WNAB
+    1.3.6.1.4.1.25506.11.2.18:
+      model: AMSR5040
+    1.3.6.1.4.1.25506.11.2.19:
+      model: AMSR5060
+    1.3.6.1.4.1.25506.11.2.2:
+      model: AMSR920
+    1.3.6.1.4.1.25506.11.2.20:
+      model: A6602
+    1.3.6.1.4.1.25506.11.2.21:
+      model: A6604
+    1.3.6.1.4.1.25506.11.2.22:
+      model: A6608
+    1.3.6.1.4.1.25506.11.2.23:
+      model: A6616
+    1.3.6.1.4.1.25506.11.2.24:
+      model: AMSR900W
+    1.3.6.1.4.1.25506.11.2.25:
+      model: AMSR900WNA
+    1.3.6.1.4.1.25506.11.2.26:
+      model: AMSR920W
+    1.3.6.1.4.1.25506.11.2.27:
+      model: AMSR920WNA
+    1.3.6.1.4.1.25506.11.2.28:
+      model: AMSR2012W
+    1.3.6.1.4.1.25506.11.2.29:
+      model: AMSR2012TW
+    1.3.6.1.4.1.25506.11.2.3:
+      model: AMSR2010
+    1.3.6.1.4.1.25506.11.2.30:
+      model: AMSR2012TWNA
+    1.3.6.1.4.1.25506.11.2.31:
+      model: AMSR2013W
+    1.3.6.1.4.1.25506.11.2.32:
+      model: AMSR2013WNA
+    1.3.6.1.4.1.25506.11.2.33:
+      model: AMSR2020S
+    1.3.6.1.4.1.25506.11.2.34:
+      model: AMSR2021S
+    1.3.6.1.4.1.25506.11.2.35:
+      model: AMSR2040S
+    1.3.6.1.4.1.25506.11.2.36:
+      model: AMSR3010DC
+    1.3.6.1.4.1.25506.11.2.4:
+      model: AMSR2011
+    1.3.6.1.4.1.25506.11.2.47:
+      model: AMSR5040DC
+    1.3.6.1.4.1.25506.11.2.48:
+      model: AMSR5060DC
+    1.3.6.1.4.1.25506.11.2.49:
+      model: A8805
+    1.3.6.1.4.1.25506.11.2.5:
+      model: AMSR2012
+    1.3.6.1.4.1.25506.11.2.50:
+      model: A8808
+    1.3.6.1.4.1.25506.11.2.51:
+      model: A8812
+    1.3.6.1.4.1.25506.11.2.55:
+      model: MSR2003AC
+    1.3.6.1.4.1.25506.11.2.57:
+      model: MSR3012DC
+    1.3.6.1.4.1.25506.11.2.58:
+      model: MSR3024AC
+    1.3.6.1.4.1.25506.11.2.59:
+      model: MSR3024DC
+    1.3.6.1.4.1.25506.11.2.6:
+      model: AMSR2012T
+    1.3.6.1.4.1.25506.11.2.60:
+      model: MSR3024PoE
+    1.3.6.1.4.1.25506.11.2.62:
+      model: MSR3064
+    1.3.6.1.4.1.25506.11.2.64:
+      model: MSR4080
+    1.3.6.1.4.1.25506.11.2.67:
+      model: HSR6802
+    1.3.6.1.4.1.25506.11.2.68:
+      model: HSR6804
+    1.3.6.1.4.1.25506.11.2.69:
+      model: HSR6808
+    1.3.6.1.4.1.25506.11.2.7:
+      model: AMSR2013
+    1.3.6.1.4.1.25506.11.2.70:
+      model: MSR930
+    1.3.6.1.4.1.25506.11.2.71:
+      model: MSR930G
+    1.3.6.1.4.1.25506.11.2.72:
+      model: MSR931
+    1.3.6.1.4.1.25506.11.2.73:
+      model: MSR931G
+    1.3.6.1.4.1.25506.11.2.75:
+      model: MSR930W
+    1.3.6.1.4.1.25506.11.2.76:
+      model: MSR9304GLTEV
+    1.3.6.1.4.1.25506.11.2.77:
+      model: MSR933
+    1.3.6.1.4.1.25506.11.2.78:
+      model: MSR933G
+    1.3.6.1.4.1.25506.11.2.79:
+      model: MSR935
+    1.3.6.1.4.1.25506.11.2.8:
+      model: AMSR2020
+    1.3.6.1.4.1.25506.11.2.80:
+      model: MSR935W
+    1.3.6.1.4.1.25506.11.2.81:
+      model: MSR935G
+    1.3.6.1.4.1.25506.11.2.82:
+      model: MSR936W
+    1.3.6.1.4.1.25506.11.2.83:
+      model: MSR9304GLTEG
+    1.3.6.1.4.1.25506.11.2.84:
+      model: MSR930LE
+    1.3.6.1.4.1.25506.11.2.85:
+      model: MSR930GLE
+    1.3.6.1.4.1.25506.11.2.86:
+      model: MSR931LE
+    1.3.6.1.4.1.25506.11.2.87:
+      model: MSR931GLE
+    1.3.6.1.4.1.25506.11.2.88:
+      model: MSR931GGLE
+    1.3.6.1.4.1.25506.11.2.89:
+      model: MSR930WLE
+    1.3.6.1.4.1.25506.11.2.9:
+      model: AMSR2021
+    1.3.6.1.4.1.25506.11.2.90:
+      model: MSR933LE
+    1.3.6.1.4.1.25506.11.2.91:
+      model: MSR933GLE
+    1.3.6.1.4.1.25506.11.2.92:
+      model: MSR935LE
+    1.3.6.1.4.1.25506.11.2.93:
+      model: MSR935WLE
+    1.3.6.1.4.1.25506.11.2.94:
+      model: MSR935GLE
+    1.3.6.1.4.1.25506.11.2.95:
+      model: MSR9304GLTEGLE
+    1.3.6.1.4.1.25506.11.2.96:
+      model: VSR
+    1.3.6.1.4.1.25506.11.2.97:
+      model: VSR1001
+    1.3.6.1.4.1.25506.11.2.98:
+      model: VSR1004
+    1.3.6.1.4.1.25506.11.2.99:
+      model: VSR1008
+    1.3.6.1.4.1.25506.11.3.1:
+      model: AWA2610EAGNFAT
+    1.3.6.1.4.1.25506.11.3.10:
+      model: A3000E
+    1.3.6.1.4.1.25506.11.3.11:
+      model: A3000ELSW
+    1.3.6.1.4.1.25506.11.3.12:
+      model: AWA3620AGN
+    1.3.6.1.4.1.25506.11.3.13:
+      model: AWA3622AGN
+    1.3.6.1.4.1.25506.11.3.14:
+      model: AWA3610GN
+    1.3.6.1.4.1.25506.11.3.15:
+      model: AWA2620XAGN
+    1.3.6.1.4.1.25506.11.3.16:
+      model: LSU3WCMD0
+    1.3.6.1.4.1.25506.11.3.17:
+      model: WX3024EWCM
+    1.3.6.1.4.1.25506.11.3.18:
+      model: WX3024ELSW
+    1.3.6.1.4.1.25506.11.3.19:
+      model: WX3010EWCM
+    1.3.6.1.4.1.25506.11.3.2:
+      model: AWA2620EAGNFAT
+    1.3.6.1.4.1.25506.11.3.20:
+      model: WX3010ELSW
+    1.3.6.1.4.1.25506.11.3.21:
+      model: LSU3WCMD0TAA
+    1.3.6.1.4.1.25506.11.3.22:
+      model: WX3024ETAAWCM
+    1.3.6.1.4.1.25506.11.3.23:
+      model: WX3024ETAALSW
+    1.3.6.1.4.1.25506.11.3.24:
+      model: WX3010ETAAWCM
+    1.3.6.1.4.1.25506.11.3.25:
+      model: WX3010ETAALSW
+    1.3.6.1.4.1.25506.11.3.3:
+      model: AWA2620AGNFAT
+    1.3.6.1.4.1.25506.11.3.5:
+      model: A9500LSRM2WCM2A1
+    1.3.6.1.4.1.25506.11.3.8:
+      model: AWX5004EWPXZ65004
+    1.3.6.1.4.1.25506.11.3.9:
+      model: AWX5002EWPXZ75002
+    1.3.6.1.4.1.25506.11.4.1:
+      model: SecBladeIMFWII
+    1.3.6.1.4.1.25506.11.4.10:
+      model: SecBladeLST1FW2A1
+    1.3.6.1.4.1.25506.11.4.11:
+      model: SecBladeLST1LB1A1
+    1.3.6.1.4.1.25506.11.4.12:
+      model: SecBladeLST1NSM1A1
+    1.3.6.1.4.1.25506.11.4.13:
+      model: SecBladeLSWM1FW10
+    1.3.6.1.4.1.25506.11.4.14:
+      model: SecBladeSPEFWM200
+    1.3.6.1.4.1.25506.11.4.15:
+      model: AF5000
+    1.3.6.1.4.1.25506.11.4.16:
+      model: AF1000E
+    1.3.6.1.4.1.25506.11.4.17:
+      model: AU200S
+    1.3.6.1.4.1.25506.11.4.18:
+      model: AU200A
+    1.3.6.1.4.1.25506.11.4.19:
+      model: AF1000SEI
+    1.3.6.1.4.1.25506.11.4.2:
+      model: SecBladeIMSSL
+    1.3.6.1.4.1.25506.11.4.20:
+      model: AF1000AEI
+    1.3.6.1.4.1.25506.11.4.21:
+      model: SecBladeLST1FW3A1
+    1.3.6.1.4.1.25506.11.4.22:
+      model: SecBladeLSU1FWCEA0
+    1.3.6.1.4.1.25506.11.4.23:
+      model: F5000C
+    1.3.6.1.4.1.25506.11.4.24:
+      model: F5000S
+    1.3.6.1.4.1.25506.11.4.25:
+      model: VFW1000
+    1.3.6.1.4.1.25506.11.4.26:
+      model: SecBladeLSX1FWCEA1
+    1.3.6.1.4.1.25506.11.4.27:
+      model: VMSGVLB1000
+    1.3.6.1.4.1.25506.11.4.28:
+      model: SecBlade3Context
+    1.3.6.1.4.1.25506.11.4.3:
+      model: SecBladeIMLB
+    1.3.6.1.4.1.25506.11.4.4:
+      model: SecBladeLSQ1FWBSC0
+    1.3.6.1.4.1.25506.11.4.5:
+      model: SecBladeLSQM1LBC0
+    1.3.6.1.4.1.25506.11.4.6:
+      model: SecBladeLSQ1NSMSC0
+    1.3.6.1.4.1.25506.11.4.7:
+      model: SecBladeLSR1FW2A1
+    1.3.6.1.4.1.25506.11.4.8:
+      model: SecBladeLSR1LB1A1
+    1.3.6.1.4.1.25506.11.4.9:
+      model: SecBladeLSR1NSM1A1
+    1.3.6.1.4.1.25506.3.1.9.4.1065:
+      model: SR07SRPUD3
+    1.3.6.1.4.1.25506.3.1.9.4.1066:
+      model: SR07MPUA3
+    1.3.6.1.4.1.26.2.1:
+      model: LAN
+    1.3.6.1.4.1.2636.1.1.1.2.16:
+      model: IRM
+    1.3.6.1.4.1.2636.1.1.1.4.30:
+      model: EX3200
+    1.3.6.1.4.1.2636.1.1.1.4.31:
+      model: EX4200
+    1.3.6.1.4.1.26543.1.7.7:
+      category: Switch
+      model: RackSwitch G8052
+    1.3.6.1.4.1.27282.3.2.10:
+      model: EdgeSwitch 10X
+    1.3.6.1.4.1.277.1:
+      model: BSTDX9000
+    1.3.6.1.4.1.2773.1.2.1.1:
+      model: RX1400
+    1.3.6.1.4.1.289.2.1.1.1:
+      model: McDataed-1032-5000
+    1.3.6.1.4.1.289.2.1.1.3:
+      model: McDataes-1000
+    1.3.6.1.4.1.29671.2.117:
+      model: Meraki GX20
+    1.3.6.1.4.1.29671.2.200:
+      model: Meraki VM10
+    1.3.6.1.4.1.29671.2.29:
+      model: Meraki MR70
+    1.3.6.1.4.1.2971.7:
+      model: Medialincs
+    1.3.6.1.4.1.298.2.2.1:
+      model: "1012"
+    1.3.6.1.4.1.298.2.2.15:
+      model: 5324MT
+    1.3.6.1.4.1.298.2.2.7:
+      model: "2072"
+    1.3.6.1.4.1.298.2.2.8:
+      model: 1016-IQ
+    1.3.6.1.4.1.298.2.2.9:
+      model: Fast100
+    1.3.6.1.4.1.31218.3.6.0:
+      model: UCP-SV1000
+    1.3.6.1.4.1.3199.1:
+      model: Shasta5000
+    1.3.6.1.4.1.33.1.3:
+      model: Bridge
+    1.3.6.1.4.1.33.8.4.2.4:
+      model: Hub
+    1.3.6.1.4.1.33.8.4.2.5:
+      model: Hub
+    1.3.6.1.4.1.33.8.4.2.6:
+      model: Hub
+    1.3.6.1.4.1.33.8.4.2.7:
+      model: Hub
+    1.3.6.1.4.1.33.8.5.2.10:
+      model: ITouch9000
+    1.3.6.1.4.1.33.8.5.2.11:
+      model: ITouch9000
+    1.3.6.1.4.1.33.8.5.2.7:
+      model: ITouch9000
+    1.3.6.1.4.1.33.8.5.2.8:
+      model: ITouch9000
+    1.3.6.1.4.1.33.8.5.2.9:
+      model: ITouch9000
+    1.3.6.1.4.1.33.8.5.3.7:
+      model: Network3000
+    1.3.6.1.4.1.33.8.5.3.8:
+      model: Network3000
+    1.3.6.1.4.1.33.8.5.3.9:
+      model: Network3000
+    1.3.6.1.4.1.33.8.7.1.2:
+      model: Network9000
+    1.3.6.1.4.1.33.8.7.1.3:
+      model: Network9000
+    1.3.6.1.4.1.33.8.7.1.4:
+      model: Network9000
+    1.3.6.1.4.1.33.8.7.1.5:
+      model: Network9000
+    1.3.6.1.4.1.343.1.1.3.11:
+      model: 330T
+    1.3.6.1.4.1.343.5.1.10:
+      model: 460T
+    1.3.6.1.4.1.35265.1.156:
+      model: MES2408PL
+    1.3.6.1.4.1.35265.1.225:
+      model: MES2324P
+    1.3.6.1.4.1.35265.1.253:
+      model: MES2408CP
+    1.3.6.1.4.1.35265.1.52:
+      model: MES1124M
+    1.3.6.1.4.1.35265.1.92:
+      model: MES2324P-24
+    1.3.6.1.4.1.3572.1.3.1:
+      model: Rustle
+    1.3.6.1.4.1.3572.1.3.11:
+      model: Rustle
+    1.3.6.1.4.1.3572.1.4.4:
+      model: Rustle324M
+    1.3.6.1.4.1.358.4:
+      model: ADC
+    1.3.6.1.4.1.3582.200.2:
+      model: SAS616x
+    1.3.6.1.4.1.36.2.15.11.14.1:
+      model: 900EX
+    1.3.6.1.4.1.36.2.15.11.15.1:
+      model: 900EE
+    1.3.6.1.4.1.36.2.15.11.5.1:
+      model: RouteAbout
+    1.3.6.1.4.1.36.2.15.3.6.10:
+      model: Bridge620
+    1.3.6.1.4.1.36.2.15.5.4.1:
+      model: 900MX
+    1.3.6.1.4.1.36.2.15.9.14.1:
+      model: 900TP
+    1.3.6.1.4.1.36.2.18.10:
+      model: Hub90
+    1.3.6.1.4.1.36.2.18.11:
+      model: Hub900
+    1.3.6.1.4.1.3727.20:
+      model: 100-06
+    1.3.6.1.4.1.37447.3.1:
+      model: Nimble Storage
+    1.3.6.1.4.1.3873.1.14:
+      model: SANbox 5800V
+    1.3.6.1.4.1.3873.1.31:
+      model: StorageWorks MEZ75
+    1.3.6.1.4.1.3955.1.1:
+      category: Firewall
+      model: BEFSX41
+    1.3.6.1.4.1.3955.6.1.2048.1:
+      model: SRW 2048
+    1.3.6.1.4.1.3955.6.9.2024.1:
+      model: SPS 2024
+    1.3.6.1.4.1.40418.7.21:
+      model: SNR-S2985G-8T
+    1.3.6.1.4.1.40418.7.24:
+      model: SNR-S2965-8T
+    1.3.6.1.4.1.40418.7.33:
+      model: SNR-S2965-8T
+    1.3.6.1.4.1.40418.7.368:
+      model: SNR-S2985G-24T-UPS
+    1.3.6.1.4.1.40418.7.42:
+      model: SNR-S2985G-24TC
+    1.3.6.1.4.1.40418.7.43:
+      model: SNR-S2995G-24FX
+    1.3.6.1.4.1.40418.7.44:
+      model: SNR-S2995G-12FX
+    1.3.6.1.4.1.40418.7.46:
+      model: SNR-S2982G-24T
+    1.3.6.1.4.1.40418.7.49:
+      model: SNR-S2995G-48FX
+    1.3.6.1.4.1.40418.7.50:
+      model: SNR-S2995G-48TX
+    1.3.6.1.4.1.40418.7.53:
+      model: SNR-S2990X-24FQ
+    1.3.6.1.4.1.40418.7.61:
+      model: SNR-S2989G-24TX
+    1.3.6.1.4.1.40418.7.63:
+      model: SNR-S2982G-8T
+    1.3.6.1.4.1.41112.1.6:
+      model: UniFi
+    1.3.6.1.4.1.41112.1.7:
+      model: AirVision
+    1.3.6.1.4.1.41112.1.8:
+      model: MFi
+    1.3.6.1.4.1.41112.1.9:
+      model: UniTel
+    1.3.6.1.4.1.42.2.14:
+      model: JavaStationIIep
+    1.3.6.1.4.1.429.2.13:
+      model: ADSL-812
+    1.3.6.1.4.1.429.2.23.1.0.3.64.63:
+      model: CMTScard
+    1.3.6.1.4.1.43.1.12.3.2:
+      model: PathBuilderS600
+    1.3.6.1.4.1.43.1.16.4.3.75:
+      model: S4210 9-Port
+    1.3.6.1.4.1.43.1.16.4.3.76:
+      model: S4210 18-Port
+    1.3.6.1.4.1.43.1.16.4.3.78:
+      model: S4210 PWR 9-Port
+    1.3.6.1.4.1.43.1.16.4.3.79:
+      model: S4210 PWR 18-Port
+    1.3.6.1.4.1.43.1.16.4.3.85:
+      model: S4210G-24
+    1.3.6.1.4.1.43.1.16.4.3.87:
+      model: S4210G-24-PWR
+    1.3.6.1.4.1.43.1.16.4.3.88:
+      model: S4210G-48-PWR
+    1.3.6.1.4.1.43.1.16.4.3.89:
+      model: S4210G-24-NT
+    1.3.6.1.4.1.43.1.16.4.3.90:
+      model: S4210G-48-NT
+    1.3.6.1.4.1.43.1.20.45:
+      model: WX3008
+    1.3.6.1.4.1.43.1.20.46:
+      model: WX3008-LSW
+    1.3.6.1.4.1.43.1.20.49:
+      model: WX5002
+    1.3.6.1.4.1.43.1.20.50:
+      model: WX5004
+    1.3.6.1.4.1.43.1.4.11:
+      model: SW/NBDPE
+    1.3.6.1.4.1.43.1.4.20:
+      model: Spectre Huge
+    1.3.6.1.4.1.43.1.9.13.3.1.1:
+      model: S4007
+    1.3.6.1.4.1.43.1.9.13.3.1.2:
+      model: S4007R
+    1.3.6.1.4.1.43.48.1.1.5:
+      model: VCX-7005
+    1.3.6.1.4.1.437.1.1:
+      model: FastLink
+    1.3.6.1.4.1.437.1.1.2:
+      model: FastLinkseriesG2xx
+    1.3.6.1.4.1.437.1.1.3:
+      model: FastLinkseries2000
+    1.3.6.1.4.1.45.1.16.1.1.1.1:
+      model: Corebuilder 3500
+    1.3.6.1.4.1.45.1.16.2.2.1:
+      model: Superstack 3900
+    1.3.6.1.4.1.45.1.16.2.2.2:
+      model: Superstack 9300
+    1.3.6.1.4.1.45.1.16.2.2.2.1:
+      model: SuperStack 9300
+    1.3.6.1.4.1.45.1.16.4.2.26:
+      model: "6080"
+    1.3.6.1.4.1.45.1.16.4.3.21:
+      model: 4500 26-Port
+    1.3.6.1.4.1.45.1.16.4.3.27:
+      model: 4200G 12-Port
+    1.3.6.1.4.1.45.1.16.4.3.28:
+      model: 4200G 24-Port
+    1.3.6.1.4.1.45.1.3.2:
+      model: SynopticsHub
+    1.3.6.1.4.1.45.1.3.6.1.4.1.1872.1.13.2.2:
+      model: "3416"
+    1.3.6.1.4.1.45.1.3.8:
+      model: S3000Trb
+    1.3.6.1.4.1.45.1.8.32:
+      model: Superstack 9000 SX
+    1.3.6.1.4.1.45.1.8.38:
+      model: SuperStack3 4300
+    1.3.6.1.4.1.45.1.8.57:
+      model: Baseline S2226 Plus
+    1.3.6.1.4.1.45.1.8.58:
+      model: Baseline S2250 Plus
+    1.3.6.1.4.1.45.1.8.59:
+      model: Baseline 2426 PWR Plus
+    1.3.6.1.4.1.45.1.8.60:
+      model: Baseline S2916-SFP Plus
+    1.3.6.1.4.1.45.1.8.61:
+      model: Baseline S2924-SFP Plus
+    1.3.6.1.4.1.45.1.8.62:
+      model: Baseline S2948-SFP Plus
+    1.3.6.1.4.1.45.1.8.63:
+      model: Baseline S2924-PWR Plus
+    1.3.6.1.4.1.45.1.8.71:
+      model: Baseline 2920-SFP Plus
+    1.3.6.1.4.1.45.1.8.72:
+      model: Baseline 2928-SFP Plus
+    1.3.6.1.4.1.45.1.8.73:
+      model: Baseline 2952-SFP Plus
+    1.3.6.1.4.1.45.1.8.74:
+      model: Baseline 2928-PWR Plus
+    1.3.6.1.4.1.45.1.8.75:
+      model: Baseline 2928-HPWR Plus
+    1.3.6.1.4.1.45.1.8.76:
+      model: Baseline S2226
+    1.3.6.1.4.1.45.1.8.77:
+      model: Baseline 2250-SFP Plus
+    1.3.6.1.4.1.45.1.8.78:
+      model: Baseline S2426
+    1.3.6.1.4.1.45.1.9.13.1.2.1:
+      model: Corebuilder 9000
+    1.3.6.1.4.1.45.1.9.13.3.1:
+      model: Corebuilder 9000
+    1.3.6.1.4.1.45.10.27.4.1.2.1:
+      model: SuperStack 1100
+    1.3.6.1.4.1.45.10.27.4.1.2.11:
+      model: SuperStack 4200
+    1.3.6.1.4.1.45.10.27.4.1.2.2:
+      model: SuperStack 3300
+    1.3.6.1.4.1.45.10.27.4.1.2.4:
+      model: SuperStack 4400
+    1.3.6.1.4.1.45.10.27.4.1.2.5:
+      model: SuperStack 4900
+    1.3.6.1.4.1.45.3.22:
+      model: BaystackEthernet
+    1.3.6.1.4.1.45.3.26:
+      model: Baystack100
+    1.3.6.1.4.1.45.3.27:
+      model: BaystackTr
+    1.3.6.1.4.1.45.3.31:
+      model: Baystack150eth
+    1.3.6.1.4.1.45.3.32:
+      model: Baystack303-304
+    1.3.6.1.4.1.45.3.33:
+      model: Baystack200eth
+    1.3.6.1.4.1.45.3.34:
+      model: Baystack250eth
+    1.3.6.1.4.1.45.3.37:
+      model: BaystackICS
+    1.3.6.1.4.1.45.3.37.1:
+      model: BaystackICSNMM
+    1.3.6.1.4.1.45.3.39:
+      model: Baystack670
+    1.3.6.1.4.1.45.3.39.1:
+      model: Baystack670WLAN
+    1.3.6.1.4.1.45.3.41:
+      model: Baystack3580
+    1.3.6.1.4.1.45.3.41.1:
+      model: Baystack3580-16F
+    1.3.6.1.4.1.45.3.42:
+      model: Baystack10
+    1.3.6.1.4.1.45.3.83.4:
+      model: Ethernet Routing Switch 3650GTS-PWR+
+    1.3.6.1.4.1.45.6.1.3.1:
+      model: WLAN
+    1.3.6.1.4.1.4525.100.1.12:
+      model: FSM7250RS
+    1.3.6.1.4.1.4525.100.4.17:
+      model: GS724Tv3
+    1.3.6.1.4.1.4526.100.1.1:
+      model: FSM7328S
+    1.3.6.1.4.1.4526.100.1.10:
+      model: GSM7252PS
+    1.3.6.1.4.1.4526.100.1.11:
+      model: FSM7226RS
+    1.3.6.1.4.1.4526.100.1.13:
+      model: FSM7328SE
+    1.3.6.1.4.1.4526.100.1.14:
+      model: FSM7352SE
+    1.3.6.1.4.1.4526.100.1.15:
+      model: XSM7224S
+    1.3.6.1.4.1.4526.100.1.16:
+      model: M5300-28G-POE
+    1.3.6.1.4.1.4526.100.1.17:
+      model: M5300-52G-POE
+    1.3.6.1.4.1.4526.100.1.18:
+      model: M5300-28G3
+    1.3.6.1.4.1.4526.100.1.19:
+      model: M5300-52G3
+    1.3.6.1.4.1.4526.100.1.20:
+      model: M5300-28GF3
+    1.3.6.1.4.1.4526.100.1.21:
+      model: M5300-28G
+    1.3.6.1.4.1.4526.100.1.22:
+      model: M5300-52G
+    1.3.6.1.4.1.4526.100.1.3:
+      model: GSM7328S
+    1.3.6.1.4.1.4526.100.1.4:
+      model: FSM7352S
+    1.3.6.1.4.1.4526.100.1.5:
+      model: FSM7352PS
+    1.3.6.1.4.1.4526.100.1.7:
+      model: GSM7328FS
+    1.3.6.1.4.1.4526.100.1.8:
+      model: FSM7328PS
+    1.3.6.1.4.1.4526.100.1.9:
+      model: FSM7228PS
+    1.3.6.1.4.1.4526.100.10.1:
+      model: FS728TS
+    1.3.6.1.4.1.4526.100.10.10:
+      model: GS752TPS
+    1.3.6.1.4.1.4526.100.10.2:
+      model: FS752TS
+    1.3.6.1.4.1.4526.100.10.3:
+      model: FS752TPS
+    1.3.6.1.4.1.4526.100.10.4:
+      model: GS724TS
+    1.3.6.1.4.1.4526.100.10.5:
+      model: GS748TS
+    1.3.6.1.4.1.4526.100.10.6:
+      model: GS752TS
+    1.3.6.1.4.1.4526.100.10.7:
+      model: GS728TS
+    1.3.6.1.4.1.4526.100.10.8:
+      model: GS752TSTPS
+    1.3.6.1.4.1.4526.100.10.9:
+      model: GS728TPS
+    1.3.6.1.4.1.4526.100.11.1:
+      model: GSM7224R
+    1.3.6.1.4.1.4526.100.11.10:
+      model: GSM7224P
+    1.3.6.1.4.1.4526.100.11.16:
+      model: M4100-26G
+    1.3.6.1.4.1.4526.100.11.17:
+      model: M4100-50G
+    1.3.6.1.4.1.4526.100.11.18:
+      model: M4100-26-POE
+    1.3.6.1.4.1.4526.100.11.19:
+      model: M4100-26G-POE
+    1.3.6.1.4.1.4526.100.11.2:
+      model: GSM7248R
+    1.3.6.1.4.1.4526.100.11.20:
+      model: M4100-50G-POE+
+    1.3.6.1.4.1.4526.100.11.21:
+      model: M4100-50-POE
+    1.3.6.1.4.1.4526.100.11.22:
+      model: M4100-D12G
+    1.3.6.1.4.1.4526.100.11.23:
+      model: M4100-D10-POE
+    1.3.6.1.4.1.4526.100.11.24:
+      model: M4100-12GF
+    1.3.6.1.4.1.4526.100.11.25:
+      model: M4100-D12G-POE
+    1.3.6.1.4.1.4526.100.11.26:
+      model: M4100-12G-POE
+    1.3.6.1.4.1.4526.100.11.27:
+      model: M4100-24G-POE+
+    1.3.6.1.4.1.4526.100.11.3:
+      model: GSM7224RP
+    1.3.6.1.4.1.4526.100.11.4:
+      model: GSM7248RP
+    1.3.6.1.4.1.4526.100.11.6:
+      model: GSM7248v2
+    1.3.6.1.4.1.4526.100.11.7:
+      model: GSM7212F
+    1.3.6.1.4.1.4526.100.11.8:
+      model: GSM5212P
+    1.3.6.1.4.1.4526.100.11.9:
+      model: GSM7212P
+    1.3.6.1.4.1.4526.100.2.4:
+      model: FSM7226
+    1.3.6.1.4.1.4526.100.3.1:
+      model: GSM7312v2
+    1.3.6.1.4.1.4526.100.3.2:
+      model: GSM7324v2
+    1.3.6.1.4.1.4526.100.3.3:
+      model: XSM7312
+    1.3.6.1.4.1.4526.100.3.4:
+      model: GSM7324P
+    1.3.6.1.4.1.4526.100.3.5:
+      model: GSM7312I
+    1.3.6.1.4.1.4526.100.3.6:
+      model: GSM7324I
+    1.3.6.1.4.1.4526.100.3.7:
+      model: FSM7326PI
+    1.3.6.1.4.1.4526.100.4.10:
+      model: GS724TP
+    1.3.6.1.4.1.4526.100.4.12:
+      model: GS724TR
+    1.3.6.1.4.1.4526.100.4.13:
+      model: GS748TR
+    1.3.6.1.4.1.4526.100.4.16:
+      model: GS716Tv2
+    1.3.6.1.4.1.4526.100.4.2:
+      model: FS726T
+    1.3.6.1.4.1.4526.100.4.4:
+      model: FS750T
+    1.3.6.1.4.1.4526.100.4.5:
+      model: GS724T
+    1.3.6.1.4.1.4526.100.4.6:
+      model: FS726TP
+    1.3.6.1.4.1.4526.100.4.7:
+      model: FS728TP
+    1.3.6.1.4.1.4526.100.4.8:
+      model: GS108T
+    1.3.6.1.4.1.4526.100.4.9:
+      model: GS108TP
+    1.3.6.1.4.1.4526.100.5.3:
+      model: FVG318
+    1.3.6.1.4.1.4526.100.5.4:
+      model: FVS336G
+    1.3.6.1.4.1.4526.100.6.3:
+      model: FWAG114
+    1.3.6.1.4.1.4526.100.6.4:
+      model: FVS124G
+    1.3.6.1.4.1.4526.100.6.5:
+      model: FVS318v3
+    1.3.6.1.4.1.4526.100.6.6:
+      model: DGFV338
+    1.3.6.1.4.1.4526.100.7.1:
+      model: WPN802
+    1.3.6.1.4.1.4526.100.7.2:
+      model: WG312
+    1.3.6.1.4.1.4526.100.7.3:
+      model: WAG312
+    1.3.6.1.4.1.4526.100.8.4:
+      model: WC7600
+    1.3.6.1.4.1.4526.100.9.1:
+      model: GCM9000
+    1.3.6.1.4.1.4881.1.1.10.1.51:
+      model: S3750E-48
+    1.3.6.1.4.1.4881.1.1.10.1.52:
+      model: S3750E-12SFP-GT
+    1.3.6.1.4.1.4881.1.1.10.1.84:
+      model: S5750R-48GT-4SFP
+    1.3.6.1.4.1.4881.1.1.10.1.85:
+      model: S5750P-48GT-4SFP
+    1.3.6.1.4.1.4881.1.1.10.1.86:
+      model: S5750R-24GT-4SFP
+    1.3.6.1.4.1.4881.1.1.10.1.87:
+      model: S5750P-24GT-4SFP
+    1.3.6.1.4.1.4881.1.1.10.1.88:
+      model: S5750-24GT-4SFP
+    1.3.6.1.4.1.4881.1.1.10.1.89:
+      model: S5750S-24GT-4SFP
+    1.3.6.1.4.1.4881.1.1.10.1.92:
+      model: S5750-48GT-4SFP-A
+    1.3.6.1.4.1.4881.1.1.10.1.95:
+      model: nm2x-24esw
+    1.3.6.1.4.1.4881.1.1.10.1.96:
+      model: nm2x-16esw
+    1.3.6.1.4.1.4881.1.2.1.1.24:
+      model: R2724
+    1.3.6.1.4.1.4881.1.2.1.1.36:
+      model: nm2-16esw
+    1.3.6.1.4.1.4881.1.2.1.1.37:
+      model: nm2-24esw
+    1.3.6.1.4.1.4881.1.2.1.1.38:
+      model: nmx-24esw
+    1.3.6.1.4.1.4881.1.2.1.1.39:
+      model: nmx-24esw-l2
+    1.3.6.1.4.1.4881.1.2.1.1.40:
+      model: nmx-24esw-3gel3
+    1.3.6.1.4.1.4881.1.3.1.1.1:
+      model: WGP500
+    1.3.6.1.4.1.4976:
+      model: Arcsight DL380
+    1.3.6.1.4.1.4981.4.1.1.1.2.1.1:
+      model: BSR1000R
+    1.3.6.1.4.1.4981.4.1.2.1.1.1.1:
+      model: BSR64000
+    1.3.6.1.4.1.5.1.1.1.1:
+      model: "4140"
+    1.3.6.1.4.1.52.3.1.11:
+      model: MMAC-3FNB
+    1.3.6.1.4.1.52.3.1.12:
+      model: MMAC-5FNB
+    1.3.6.1.4.1.52.3.1.13:
+      model: MMAC-8FNB
+    1.3.6.1.4.1.52.3.1.14:
+      model: MMAC-M8FNB
+    1.3.6.1.4.1.52.3.1.15:
+      model: TRXI
+    1.3.6.1.4.1.52.3.1.17:
+      model: MMACP14
+    1.3.6.1.4.1.52.3.1.18:
+      model: MMACP6
+    1.3.6.1.4.1.52.3.1.2:
+      model: MMAC-8
+    1.3.6.1.4.1.52.3.1.3:
+      model: MMAC-5
+    1.3.6.1.4.1.52.3.1.4:
+      model: MMAC-3
+    1.3.6.1.4.1.52.3.1.5:
+      model: MiniMMAC
+    1.3.6.1.4.1.52.3.1.6:
+      model: MRXI
+    1.3.6.1.4.1.52.3.1.7:
+      model: MMAC-M3FNB
+    1.3.6.1.4.1.52.3.1.8:
+      model: MMAC-M5FNB
+    1.3.6.1.4.1.52.3.1.9:
+      model: MMAC-M8FNB
+    1.3.6.1.4.1.52.3.2.16:
+      model: THNMIM
+    1.3.6.1.4.1.52.3.2.179:
+      model: TRMM-1
+    1.3.6.1.4.1.52.3.2.185:
+      model: EMME
+    1.3.6.1.4.1.52.3.2.190:
+      model: TRMMIM
+    1.3.6.1.4.1.52.3.2.196674:
+      model: MRXI
+    1.3.6.1.4.1.52.3.2.196675:
+      model: MRXI-2
+    1.3.6.1.4.1.52.3.2.32:
+      model: FDMMIM-24e
+    1.3.6.1.4.1.52.3.2.33:
+      model: FDMMIM-14
+    1.3.6.1.4.1.52.3.2.35:
+      model: FDMMIM
+    1.3.6.1.4.1.52.3.2.39:
+      model: FDMMIM-30
+    1.3.6.1.4.1.52.3.2.40:
+      model: FDCMIM-28
+    1.3.6.1.4.1.52.3.2.41:
+      model: FDCMIM-18
+    1.3.6.1.4.1.52.3.2.42:
+      model: FDCMIM-08
+    1.3.6.1.4.1.52.3.2.43:
+      model: FDCMIM-04
+    1.3.6.1.4.1.52.3.2.44:
+      model: FDCMIM-24
+    1.3.6.1.4.1.52.3.2.45:
+      model: FDCMIM-14
+    1.3.6.1.4.1.52.3.2.46:
+      model: FDCMIM-38
+    1.3.6.1.4.1.52.3.2.47:
+      model: FDCMIM-34
+    1.3.6.1.4.1.52.3.2.48:
+      model: TRMIM-12
+    1.3.6.1.4.1.52.3.2.49:
+      model: TRMIM-10R
+    1.3.6.1.4.1.52.3.2.50:
+      model: TRMIM-22
+    1.3.6.1.4.1.52.3.2.51:
+      model: TRMIM-20R
+    1.3.6.1.4.1.52.3.2.52:
+      model: TRMIM-62A
+    1.3.6.1.4.1.52.3.2.54:
+      model: TRMIM-24A
+    1.3.6.1.4.1.52.3.2.55:
+      model: TRMIM-22A
+    1.3.6.1.4.1.52.3.2.56:
+      model: TRFMIM-28
+    1.3.6.1.4.1.52.3.2.57:
+      model: TRFMIM-22
+    1.3.6.1.4.1.52.3.2.58:
+      model: TRRMIM-A
+    1.3.6.1.4.1.52.3.2.59:
+      model: TRFMIM-26
+    1.3.6.1.4.1.52.3.2.60:
+      model: TRMIM-34A
+    1.3.6.1.4.1.52.3.2.61:
+      model: TRMIM-32A
+    1.3.6.1.4.1.52.3.2.62:
+      model: TRMIM-44A
+    1.3.6.1.4.1.52.3.2.63:
+      model: TRMIM-42A
+    1.3.6.1.4.1.52.3.2.65:
+      model: TPMIM-T1
+    1.3.6.1.4.1.52.3.2.65568:
+      model: MRXI-E93
+    1.3.6.1.4.1.52.3.2.65570:
+      model: MRXI-22
+    1.3.6.1.4.1.52.3.2.65571:
+      model: MRXI-34
+    1.3.6.1.4.1.52.3.2.65572:
+      model: MRXI-38
+    1.3.6.1.4.1.52.3.2.65584:
+      model: MRXI-2E93
+    1.3.6.1.4.1.52.3.2.66:
+      model: TPMIM-T
+    1.3.6.1.4.1.52.3.2.67:
+      model: TPMIM-T3
+    1.3.6.1.4.1.52.3.2.80:
+      model: THNMIM-2
+    1.3.6.1.4.1.52.3.2.96:
+      model: TPMIM-24
+    1.3.6.1.4.1.52.3.2.97:
+      model: TPMIM-22
+    1.3.6.1.4.1.52.3.2.98:
+      model: TPMIM-34
+    1.3.6.1.4.1.52.3.2.99:
+      model: TPMIM-32
+    1.3.6.1.4.1.52.3.9.3.4.12:
+      model: SEHI-26FB
+    1.3.6.1.4.1.52.3.9.3.4.13:
+      model: SEHI-22FB
+    1.3.6.1.4.1.52.3.9.3.4.14:
+      model: SEHI-32
+    1.3.6.1.4.1.52.3.9.3.4.15:
+      model: SEHI-34
+    1.3.6.1.4.1.52.3.9.3.4.16:
+      model: SEH-26C
+    1.3.6.1.4.1.52.3.9.3.4.17:
+      model: SEH-22C
+    1.3.6.1.4.1.52.3.9.3.4.18:
+      model: SEH-26FL
+    1.3.6.1.4.1.52.3.9.3.4.19:
+      model: SEH-22FL
+    1.3.6.1.4.1.52.3.9.3.4.2:
+      model: MicroMMAC-32E
+    1.3.6.1.4.1.52.3.9.3.4.20:
+      model: MicroMMAC-26FL
+    1.3.6.1.4.1.52.3.9.3.4.21:
+      model: MicroMMAC-22FL
+    1.3.6.1.4.1.52.3.9.3.4.22:
+      model: NBR-220
+    1.3.6.1.4.1.52.3.9.3.4.23:
+      model: NBR-420
+    1.3.6.1.4.1.52.3.9.3.4.24:
+      model: SEH-22S
+    1.3.6.1.4.1.52.3.9.3.4.25:
+      model: SEH-32S
+    1.3.6.1.4.1.52.3.9.3.4.26:
+      model: SEH-24S
+    1.3.6.1.4.1.52.3.9.3.4.27:
+      model: SEH-34S
+    1.3.6.1.4.1.52.3.9.3.4.28:
+      model: SEH-26FBS
+    1.3.6.1.4.1.52.3.9.3.4.29:
+      model: SEH-22FBS
+    1.3.6.1.4.1.52.3.9.3.4.30:
+      model: SEH-26CS
+    1.3.6.1.4.1.52.3.9.3.4.31:
+      model: SEH-22CS
+    1.3.6.1.4.1.52.3.9.3.4.32:
+      model: SEH-26FLS
+    1.3.6.1.4.1.52.3.9.3.4.33:
+      model: SEH-22FLS
+    1.3.6.1.4.1.52.3.9.3.4.36:
+      model: SEHI-32S
+    1.3.6.1.4.1.52.3.9.3.4.37:
+      model: SEHI-34S
+    1.3.6.1.4.1.52.3.9.3.4.38:
+      model: MicroMMAC-22ES
+    1.3.6.1.4.1.52.3.9.3.4.39:
+      model: MicroMMAC-32ES
+    1.3.6.1.4.1.52.3.9.3.4.4:
+      model: MicroMMAC-34E
+    1.3.6.1.4.1.52.3.9.3.4.40:
+      model: MicroMMAC-24ES
+    1.3.6.1.4.1.52.3.9.3.4.41:
+      model: MicroMMAC-34ES
+    1.3.6.1.4.1.52.3.9.3.4.42:
+      model: NA
+    1.3.6.1.4.1.52.3.9.3.4.43:
+      model: MicroMMAC-22EUCS
+    1.3.6.1.4.1.52.3.9.3.4.44:
+      model: MicroMMAC-22UCSsSnac
+    1.3.6.1.4.1.52.3.9.3.4.45:
+      model: MicroMMAC-22EUCSSnac
+    1.3.6.1.4.1.52.3.9.3.4.46:
+      model: MicroMMAC-22EBrics
+    1.3.6.1.4.1.52.3.9.3.4.47:
+      model: MicroMMAC-22ESBrics
+    1.3.6.1.4.1.52.3.9.3.4.49:
+      model: ESX-1380
+    1.3.6.1.4.1.52.3.9.3.4.5:
+      model: SEH-22
+    1.3.6.1.4.1.52.3.9.3.4.50:
+      model: SEHI-22FLS
+    1.3.6.1.4.1.52.3.9.3.4.51:
+      model: SEHI-26FLS
+    1.3.6.1.4.1.52.3.9.3.4.52:
+      model: SEHI-22FL
+    1.3.6.1.4.1.52.3.9.3.4.53:
+      model: SEHI-26FL
+    1.3.6.1.4.1.52.3.9.3.4.54:
+      model: SEH100TX-22
+    1.3.6.1.4.1.52.3.9.3.4.55:
+      model: SEHI100TX-22
+    1.3.6.1.4.1.52.3.9.3.4.6:
+      model: SEH-32
+    1.3.6.1.4.1.52.3.9.3.4.7:
+      model: SEH-24
+    1.3.6.1.4.1.52.3.9.3.4.8:
+      model: SEH-34
+    1.3.6.1.4.1.52.3.9.3.4.9:
+      model: NBR-620
+    1.3.6.1.4.1.52.3.9.5.10.136:
+      model: MicroMMAC-24T/44T
+    1.3.6.1.4.1.52.3.9.5.9.136:
+      model: NA
+    1.3.6.1.4.1.52.3.9.5.9.244:
+      model: STHI-42A
+    1.3.6.1.4.1.52.3.9.5.9.248:
+      model: STHI-22A
+    1.3.6.1.4.1.52.3.9.5.9.68:
+      model: NA
+    1.3.6.1.4.1.52.3.9.9.2.3:
+      model: CSX400
+    1.3.6.1.4.1.52.3.9.9.2.7:
+      model: CSX7000
+    1.3.6.1.4.1.52.3.9.9.4.1:
+      model: WanHsimW6
+    1.3.6.1.4.1.52.4.15.1.3.1.2:
+      model: RBT8200
+    1.3.6.1.4.1.52.4.15.1.3.1.3:
+      model: RBT8400
+    1.3.6.1.4.1.529.1.2.10:
+      model: DSL MAX-20
+    1.3.6.1.4.1.529.1.2.6:
+      model: MAX-HPT1
+    1.3.6.1.4.1.529.1.2.7:
+      model: MAX6000
+    1.3.6.1.4.1.529.1.3:
+      model: PipelineBRI
+    1.3.6.1.4.1.529.1.3.11:
+      model: DSL PipeDSL-S
+    1.3.6.1.4.1.529.1.3.16:
+      model: PipelineBRI
+    1.3.6.1.4.1.529.1.3.22:
+      model: DSL PipeADSL-DMT
+    1.3.6.1.4.1.529.1.3.23:
+      model: PipelineBRI
+    1.3.6.1.4.1.529.1.3.24:
+      model: PipelineBRI
+    1.3.6.1.4.1.529.1.3.25:
+      model: DSL PipeDSL-50S
+    1.3.6.1.4.1.529.1.3.26:
+      model: DSL PipeDSL-HS
+    1.3.6.1.4.1.529.1.3.27:
+      model: PipelineBRI
+    1.3.6.1.4.1.529.1.3.6:
+      model: PipelineBRI
+    1.3.6.1.4.1.529.1.3.7:
+      model: Pipeline
+    1.3.6.1.4.1.529.1.3.9:
+      model: Pipeline220T1
+    1.3.6.1.4.1.551.2.1.123:
+      model: WGB350
+    1.3.6.1.4.1.5567.1.1.51:
+      model: XGS9016
+    1.3.6.1.4.1.5567.1.1.52:
+      model: XGS9008
+    1.3.6.1.4.1.559.2.13.7:
+      model: OfficeConnect 531S
+    1.3.6.1.4.1.562.2.1.2:
+      model: Passport160
+    1.3.6.1.4.1.5624.2.1.104:
+      model: I3H252-02
+    1.3.6.1.4.1.5624.2.1.105:
+      model: SNS-TAG-LPA
+    1.3.6.1.4.1.5624.2.1.106:
+      model: SNS-TAG-HPA
+    1.3.6.1.4.1.5624.2.1.107:
+      model: SNS-TAG-BASE
+    1.3.6.1.4.1.5624.2.1.108:
+      model: 7S-NSTAG-01
+    1.3.6.1.4.1.5624.2.1.109:
+      model: SNS-PCC-WBA
+    1.3.6.1.4.1.5624.2.1.110:
+      model: A2H123-24
+    1.3.6.1.4.1.5624.2.1.111:
+      model: B3H123-24FX
+    1.3.6.1.4.1.5624.2.1.112:
+      model: C3H123-24FX
+    1.3.6.1.4.1.5624.2.1.115:
+      model: C3K-2XFP
+    1.3.6.1.4.1.5624.2.1.116:
+      model: SNS-NSS-A
+    1.3.6.1.4.1.5624.2.1.117:
+      model: G3G124-24
+    1.3.6.1.4.1.5624.2.1.121:
+      model: RBT-8500
+    1.3.6.1.4.1.5624.2.1.122:
+      model: Matrix N1-NAC
+    1.3.6.1.4.1.5624.2.1.123:
+      model: 7S-NSNACG-01NPS
+    1.3.6.1.4.1.5624.2.1.124:
+      model: G3G124-24P
+    1.3.6.1.4.1.5624.2.1.125:
+      model: C3K122-24P
+    1.3.6.1.4.1.5624.2.1.126:
+      model: NAC-A-2K
+    1.3.6.1.4.1.5624.2.1.127:
+      model: NAC-A-3K
+    1.3.6.1.4.1.5624.2.1.128:
+      model: SSA-T4068-0252
+    1.3.6.1.4.1.5624.2.1.138:
+      model: B5K125-24
+    1.3.6.1.4.1.5624.2.1.139:
+      model: B5K125-24P2
+    1.3.6.1.4.1.5624.2.1.146:
+      model: C5K125-24
+    1.3.6.1.4.1.5624.2.1.147:
+      model: C5K125-24P2
+    1.3.6.1.4.1.5624.2.1.149:
+      model: C5K125-48P2
+    1.3.6.1.4.1.5624.2.1.151:
+      model: NAC-A-10
+    1.3.6.1.4.1.5624.2.1.152:
+      model: NAC-A-20
+    1.3.6.1.4.1.5624.2.1.153:
+      model: NAC-A-V
+    1.3.6.1.4.1.5624.2.1.154:
+      model: A4H124-24TX
+    1.3.6.1.4.1.5624.2.1.155:
+      model: A4H124-24FX
+    1.3.6.1.4.1.5624.2.1.156:
+      model: A4H124-8F8T
+    1.3.6.1.4.1.5624.2.1.157:
+      model: A4H124-24
+    1.3.6.1.4.1.5624.2.1.158:
+      model: A4H124-24P
+    1.3.6.1.4.1.5624.2.1.159:
+      model: A4H124-48
+    1.3.6.1.4.1.5624.2.1.160:
+      model: A4H124-48P
+    1.3.6.1.4.1.5624.2.1.161:
+      model: A4H254-8F8T
+    1.3.6.1.4.1.5624.2.1.165:
+      model: S-Series SSA
+    1.3.6.1.4.1.5624.2.1.167:
+      model: S-Series Virtual Switch Bonded S4
+    1.3.6.1.4.1.5624.2.1.168:
+      model: S-Series Virtual Switch Bonded S6
+    1.3.6.1.4.1.5624.2.1.169:
+      model: S-Series Virtual Switch Bonded S8
+    1.3.6.1.4.1.5624.2.1.17:
+      model: VG4xDES
+    1.3.6.1.4.1.5624.2.1.170:
+      model: S-Series Virtual Switch Bonded S1
+    1.3.6.1.4.1.5624.2.1.171:
+      model: S-Series S1
+    1.3.6.1.4.1.5624.2.1.172:
+      model: 71K11L4-24
+    1.3.6.1.4.1.5624.2.1.173:
+      model: 71K11L4-48
+    1.3.6.1.4.1.5624.2.1.174:
+      model: 71K91L4-24
+    1.3.6.1.4.1.5624.2.1.175:
+      model: 71K91L4-24
+    1.3.6.1.4.1.5624.2.1.177:
+      model: SSA-T5028-0652
+    1.3.6.1.4.1.5624.2.1.178:
+      model: 08G20G2-08
+    1.3.6.1.4.1.5624.2.1.179:
+      model: 08G20G2-08P
+    1.3.6.1.4.1.5624.2.1.180:
+      model: 08G20G4-24
+    1.3.6.1.4.1.5624.2.1.181:
+      model: 08G20G4-24P
+    1.3.6.1.4.1.5624.2.1.182:
+      model: 08G20G4-08
+    1.3.6.1.4.1.5624.2.1.183:
+      model: 08G20G4-08P
+    1.3.6.1.4.1.5624.2.1.184:
+      model: 08H20G4-24
+    1.3.6.1.4.1.5624.2.1.185:
+      model: 08H20G4-24P
+    1.3.6.1.4.1.5624.2.1.186:
+      model: 08H20G4-48
+    1.3.6.1.4.1.5624.2.1.187:
+      model: 08H20G4-48P
+    1.3.6.1.4.1.5624.2.1.188:
+      model: SSA-T5068-0652
+    1.3.6.1.4.1.5624.2.1.189:
+      model: SSA-G5018-0652
+    1.3.6.1.4.1.5624.2.1.190:
+      model: 71G21K2L2-24P24
+    1.3.6.1.4.1.5624.2.1.191:
+      model: 71G21K2L2-48P
+    1.3.6.1.4.1.5624.2.1.192:
+      model: SSA-T8028-0652
+    1.3.6.1.4.1.5624.2.1.193:
+      model: SSA-G8018-0652
+    1.3.6.1.4.1.5624.2.1.195:
+      model: NS-A-20
+    1.3.6.1.4.1.5624.2.1.196:
+      model: IA-A-20
+    1.3.6.1.4.1.5624.2.1.197:
+      model: IA-V
+    1.3.6.1.4.1.5624.2.1.198:
+      model: IA-A-300
+    1.3.6.1.4.1.5624.2.1.199:
+      model: APP-A-300
+    1.3.6.1.4.1.5624.2.1.200:
+      model: APP-V
+    1.3.6.1.4.1.5624.2.1.205:
+      model: PV-A-300
+    1.3.6.1.4.1.5624.2.1.206:
+      model: PV-V
+    1.3.6.1.4.1.5624.2.1.207:
+      model: 71G11K2L2-48
+    1.3.6.1.4.1.5624.2.1.208:
+      model: PV-FC-180
+    1.3.6.1.4.1.5624.2.1.22:
+      model: VG6
+    1.3.6.1.4.1.5624.2.1.30:
+      model: RBTR2-A
+    1.3.6.1.4.1.5624.2.1.33:
+      model: ANG-2000
+    1.3.6.1.4.1.5624.2.1.38:
+      model: ANG-1102
+    1.3.6.1.4.1.5624.2.1.39:
+      model: ANG-1105
+    1.3.6.1.4.1.5624.2.1.40:
+      model: ANG-3000
+    1.3.6.1.4.1.5624.2.1.41:
+      model: ANG-7000
+    1.3.6.1.4.1.5624.2.1.45:
+      model: XSR-1850
+    1.3.6.1.4.1.5624.2.1.54:
+      model: XSR-1100
+    1.3.6.1.4.1.5624.2.1.55:
+      model: XSR-3020
+    1.3.6.1.4.1.5624.2.1.56:
+      model: XSR-3150
+    1.3.6.1.4.1.5624.2.1.57:
+      model: XSR-3250
+    1.3.6.1.4.1.5624.2.1.58:
+      model: XSR-4100
+    1.3.6.1.4.1.5624.2.1.63:
+      model: RBTR3-A
+    1.3.6.1.4.1.5624.2.1.69:
+      model: DFE Gold
+    1.3.6.1.4.1.5624.2.1.71:
+      model: Dragon IDS Appliance
+    1.3.6.1.4.1.5624.2.1.72:
+      model: XSR-1205
+    1.3.6.1.4.1.5624.2.1.73:
+      model: XSR-1220
+    1.3.6.1.4.1.5624.2.1.74:
+      model: XSR-1225
+    1.3.6.1.4.1.5624.2.1.75:
+      model: XSR-1230
+    1.3.6.1.4.1.5624.2.1.76:
+      model: XSR-1235
+    1.3.6.1.4.1.5624.2.1.77:
+      model: 2G4072-52
+    1.3.6.1.4.1.5624.2.1.78:
+      model: Matrix N5 PoE-Gold
+    1.3.6.1.4.1.5624.2.1.80:
+      model: Matrix X4
+    1.3.6.1.4.1.5624.2.1.82:
+      model: Matrix X16
+    1.3.6.1.4.1.5624.2.1.84:
+      model: Matrix N1-Gold
+    1.3.6.1.4.1.5624.2.1.85:
+      model: RBTSA-US
+    1.3.6.1.4.1.5624.2.1.86:
+      model: RBTSA-non-US
+    1.3.6.1.4.1.5624.2.1.88:
+      model: A2H124-24P
+    1.3.6.1.4.1.5624.2.1.91:
+      model: A2H124-24FX
+    1.3.6.1.4.1.5624.2.1.93:
+      model: NSTAG-GE500-TX
+    1.3.6.1.4.1.5624.2.1.95:
+      model: A2H254-16
+    1.3.6.1.4.1.5624.2.1.97:
+      model: C3G124-24P
+    1.3.6.1.4.1.5624.2.1.99:
+      model: C3G124-48P
+    1.3.6.1.4.1.5624.2.2.221:
+      model: C2G124-36
+    1.3.6.1.4.1.5624.2.2.306:
+      model: V2H124-24FX
+    1.3.6.1.4.1.5624.2.2.315:
+      model: B2G124-48
+    1.3.6.1.4.1.5624.2.2.316:
+      model: B2G124-48P
+    1.3.6.1.4.1.5624.2.2.318:
+      model: B2H124-48P
+    1.3.6.1.4.1.5624.2.2.319:
+      model: B2G124-24P
+    1.3.6.1.4.1.5624.2.2.320:
+      model: B2H124-24
+    1.3.6.1.4.1.5624.2.2.321:
+      model: B2H124-24P
+    1.3.6.1.4.1.5624.2.2.322:
+      model: B2H124-24FX
+    1.3.6.1.4.1.5833.14706:
+      model: NIS-3500-3224PGE
+    1.3.6.1.4.1.6027.1.1.1:
+      model: e1200
+    1.3.6.1.4.1.6027.1.1.2:
+      model: e600
+    1.3.6.1.4.1.604.10.26.1.1:
+      model: S2024/S3025
+    1.3.6.1.4.1.6296.1.2:
+      model: V5124
+    1.3.6.1.4.1.644.2.3:
+      model: InterFlex 55XX
+    1.3.6.1.4.1.6486.800.1.1.2.1.11.1.1:
+      model: OMNI6250-8M
+    1.3.6.1.4.1.6486.800.1.1.2.1.11.1.2:
+      model: OMNI6250-24M
+    1.3.6.1.4.1.6486.800.1.1.2.1.11.1.3:
+      model: OMNI6250-24MD
+    1.3.6.1.4.1.6486.800.1.1.2.1.7.1.42:
+      model: OmniSwitch 6850E-P24
+    1.3.6.1.4.1.6486.801.1.1.2.1.12.1.1:
+      model: OmniSwitch 9900
+    1.3.6.1.4.1.674.10895:
+      model: PowerConnect
+    1.3.6.1.4.1.674.10895.3053:
+      model: N2024
+    1.3.6.1.4.1.674.10895.5032:
+      model: PowerConnect W-IAP109
+    1.3.6.1.4.1.6848.1.3:
+      model: CSeries
+    1.3.6.1.4.1.6876.4.3:
+      model: vCenter
+    1.3.6.1.4.1.6889.1.45.101.1:
+      model: Cajun M8000RLB
+    1.3.6.1.4.1.6889.1.45.101.2:
+      model: Cajun X330W4DS1
+    1.3.6.1.4.1.6889.1.45.11:
+      model: Cajun L3P882S
+    1.3.6.1.4.1.6889.1.45.12:
+      model: Cajun L3P580S
+    1.3.6.1.4.1.6889.1.69.2.1:
+      model: 9620D
+    1.3.6.1.4.1.6889.1.69.2.3:
+      model: 9650B
+    1.3.6.1.4.1.6889.1.69.3.3:
+      model: "1616"
+    1.3.6.1.4.1.6889.1.69.4.3:
+      category: IP Phone
+      model: AVX571040
+    1.3.6.1.4.1.6889.1.69.5.2:
+      model: 9611g
+    1.3.6.1.4.1.7.2.1:
+      model: Gator
+    1.3.6.1.4.1.727.7.1.8801:
+      model: SDM-8801
+    1.3.6.1.4.1.727.7.1.92300:
+      model: SDM-9230
+    1.3.6.1.4.1.727.7.1.9380:
+      model: SDM-9380
+    1.3.6.1.4.1.738.1.5.100.1.1.19:
+      model: T-Metro
+    1.3.6.1.4.1.75.1.1:
+      model: Access1
+    1.3.6.1.4.1.763.1.5621.2.1:
+      model: 56xx
+    1.3.6.1.4.1.763.1.5660.2.1:
+      model: "5660"
+    1.3.6.1.4.1.800.3.1.3:
+      model: OMNI
+    1.3.6.1.4.1.8072.3.2.10:
+      category: Server
+      model: Linux
+    1.3.6.1.4.1.8072.3.2.16:
+      category: Server
+      model: macOS
+    1.3.6.1.4.1.8072.3.2.8:
+      category: Server
+      model: FreeBSD
+    1.3.6.1.4.1.81.17.2.9:
+      model: Visage26Plus
+    1.3.6.1.4.1.841.2.21:
+      model: MP-8100
+    1.3.6.1.4.1.841.2.22:
+      model: MP-8100-CPE
+    1.3.6.1.4.1.8744.1.16:
+      model: MSM313
+    1.3.6.1.4.1.8744.1.20:
+      model: MSM310
+    1.3.6.1.4.1.8744.1.22:
+      model: ClientBridge M110
+    1.3.6.1.4.1.8744.1.23:
+      model: MSM323
+    1.3.6.1.4.1.8744.1.24:
+      model: MSM320
+    1.3.6.1.4.1.8744.1.25:
+      model: MultiService Controllers MSM730
+    1.3.6.1.4.1.8744.1.26:
+      model: ClientBridge M111
+    1.3.6.1.4.1.8744.1.27:
+      model: MultiService Controllers MSM750
+    1.3.6.1.4.1.8744.1.29:
+      model: MSM335
+    1.3.6.1.4.1.8744.1.35:
+      model: MultiService Controllers MSM710
+    1.3.6.1.4.1.8744.1.42:
+      model: MSM317
+    1.3.6.1.4.1.8744.1.43:
+      model: MSM310R
+    1.3.6.1.4.1.8744.1.44:
+      model: MSM320R
+    1.3.6.1.4.1.8744.1.45:
+      model: MSM313R
+    1.3.6.1.4.1.8744.1.46:
+      model: MSM323R
+    1.3.6.1.4.1.8744.1.47:
+      model: MultiService Controllers MSM765
+    1.3.6.1.4.1.8744.1.49:
+      model: MSM318
+    1.3.6.1.4.1.8744.1.51:
+      model: ClientBridge M200
+    1.3.6.1.4.1.8744.1.52:
+      model: MSM460
+    1.3.6.1.4.1.8744.1.54:
+      model: MSM430
+    1.3.6.1.4.1.8744.1.55:
+      model: MSM466
+    1.3.6.1.4.1.8744.1.56:
+      model: MultiService Controllers MSM720
+    1.3.6.1.4.1.8744.1.57:
+      model: M220
+    1.3.6.1.4.1.8744.1.58:
+      model: MSM466R
+    1.3.6.1.4.1.8744.1.59:
+      model: MultiService Controllers MSM775
+    1.3.6.1.4.1.8744.1.64:
+      model: "517"
+    1.3.6.1.4.1.8744.1.65:
+      model: "560"
+    1.3.6.1.4.1.8744.1.66:
+      model: M210
+    1.3.6.1.4.1.8744.1.67:
+      model: MultiService Controllers MSM760B
+    1.3.6.1.4.1.9.1.1003:
+      model: TSPriG2
+    1.3.6.1.4.1.9.1.1028:
+      model: HwicCableD2
+    1.3.6.1.4.1.9.1.1029:
+      model: HwicCableEJ2
+    1.3.6.1.4.1.9.1.1030:
+      model: 1400 series
+    1.3.6.1.4.1.9.1.1031:
+      model: 1430 series
+    1.3.6.1.4.1.9.1.1032:
+      model: NAM Appliance 2204
+    1.3.6.1.4.1.9.1.1106:
+      model: VG250
+    1.3.6.1.4.1.9.1.1107:
+      model: VG226E
+    1.3.6.1.4.1.9.1.1108:
+      model: DsIbm8GfcK9
+    1.3.6.1.4.1.9.1.1109:
+      model: DsHp8GfcK9
+    1.3.6.1.4.1.9.1.1110:
+      model: DsDell8GfcK9
+    1.3.6.1.4.1.9.1.1111:
+      model: Ds-C9148-K9
+    1.3.6.1.4.1.9.1.1112:
+      model: CeVirtualBlade
+    1.3.6.1.4.1.9.1.1113:
+      model: CDScde420
+    1.3.6.1.4.1.9.1.1114:
+      model: CDScde220
+    1.3.6.1.4.1.9.1.1115:
+      model: CDScde110
+    1.3.6.1.4.1.9.1.1126:
+      model: CDScde400
+    1.3.6.1.4.1.9.1.1127:
+      model: SA520K9
+    1.3.6.1.4.1.9.1.1128:
+      model: SA520WK9
+    1.3.6.1.4.1.9.1.1129:
+      model: SA540K9
+    1.3.6.1.4.1.9.1.1143:
+      model: CaManager
+    1.3.6.1.4.1.9.1.1150:
+      model: SM
+    1.3.6.1.4.1.9.1.1151:
+      model: NMEAXP
+    1.3.6.1.4.1.9.1.1152:
+      model: AIMAXP
+    1.3.6.1.4.1.9.1.1153:
+      model: AIM2AXP
+    1.3.6.1.4.1.9.1.1160:
+      model: VS510FXO
+    1.3.6.1.4.1.9.1.1161:
+      model: NmWae900
+    1.3.6.1.4.1.9.1.1162:
+      model: NmWae700
+    1.3.6.1.4.1.9.1.1167:
+      model: CDScde205
+    1.3.6.1.4.1.9.1.1169:
+      model: NamWaasVirtualBlade
+    1.3.6.1.4.1.9.1.1193:
+      model: PwrC1921C1905AC
+    1.3.6.1.4.1.9.1.1218:
+      model: N4KDellEth
+    1.3.6.1.4.1.9.1.1219:
+      model: N4KDellCiscoEth
+    1.3.6.1.4.1.9.1.1221:
+      model: CDScde2202s3
+    1.3.6.1.4.1.9.1.1230:
+      model: NMEAIR
+    1.3.6.1.4.1.9.1.1280:
+      model: ISMAXP
+    1.3.6.1.4.1.9.1.1281:
+      model: SMAXP
+    1.3.6.1.4.1.9.1.1282:
+      model: AxpSmSre900
+    1.3.6.1.4.1.9.1.1283:
+      model: AxpSmSre700
+    1.3.6.1.4.1.9.1.1284:
+      model: AxpIsmSre300
+    1.3.6.1.4.1.9.1.1285:
+      model: CDSISM
+    1.3.6.1.4.1.9.1.1288:
+      model: AxpNme302
+    1.3.6.1.4.1.9.1.1289:
+      model: AxpNme502
+    1.3.6.1.4.1.9.1.1290:
+      model: AxpNme522
+    1.3.6.1.4.1.9.1.1294:
+      model: CDScde250
+    1.3.6.1.4.1.9.1.1296:
+      model: AnmVirtualApp
+    1.3.6.1.4.1.9.1.1297:
+      model: ECDS3100
+    1.3.6.1.4.1.9.1.1298:
+      model: ECDS1100
+    1.3.6.1.4.1.9.1.1314:
+      model: SreSmNam
+    1.3.6.1.4.1.9.1.1321:
+      model: RAIE1783RMSB10T
+    1.3.6.1.4.1.9.1.1322:
+      model: RAIE1783RMSB06T
+    1.3.6.1.4.1.9.1.1332:
+      model: Quad
+    1.3.6.1.4.1.9.1.1337:
+      model: PwrCGR2010PoeAC
+    1.3.6.1.4.1.9.1.1338:
+      model: PwrCGR2010PoeDC
+    1.3.6.1.4.1.9.1.1362:
+      model: Ap802gn
+    1.3.6.1.4.1.9.1.1385:
+      model: 819 Hardened Integrated Services
+    1.3.6.1.4.1.9.1.1386:
+      model: 819 Hardened Integrated Services
+    1.3.6.1.4.1.9.1.1387:
+      model: 819 Hardened Integrated Services
+    1.3.6.1.4.1.9.1.1388:
+      model: 819 Hardened Integrated Services
+    1.3.6.1.4.1.9.1.1406:
+      model: NME
+    1.3.6.1.4.1.9.1.1424:
+      model: Ise3395K9
+    1.3.6.1.4.1.9.1.1425:
+      model: Ise3355K9
+    1.3.6.1.4.1.9.1.1428:
+      model: IPS4345
+    1.3.6.1.4.1.9.1.1429:
+      model: IPS4360
+    1.3.6.1.4.1.9.1.143:
+      model: ProCPA771
+    1.3.6.1.4.1.9.1.1432:
+      model: EcdsVB
+    1.3.6.1.4.1.9.1.1433:
+      model: TsCodecG2
+    1.3.6.1.4.1.9.1.1434:
+      model: TsCodecG2C
+    1.3.6.1.4.1.9.1.1435:
+      model: TSCodecG2RC
+    1.3.6.1.4.1.9.1.1436:
+      model: TSCodecG2R
+    1.3.6.1.4.1.9.1.144:
+      model: ProCPA772
+    1.3.6.1.4.1.9.1.145:
+      model: ProCPA775
+    1.3.6.1.4.1.9.1.1462:
+      model: Xfp10Ger192IrL
+    1.3.6.1.4.1.9.1.1463:
+      model: Xfp10Glr192SrL
+    1.3.6.1.4.1.9.1.1464:
+      model: Xfp10Gzr192LrL
+    1.3.6.1.4.1.9.1.1467:
+      model: CRSFabBP
+    1.3.6.1.4.1.9.1.1478:
+      model: Stratix BMS06T
+    1.3.6.1.4.1.9.1.1480:
+      model: Stratix BMS06SG
+    1.3.6.1.4.1.9.1.1482:
+      model: Stratix BMS06TG
+    1.3.6.1.4.1.9.1.1484:
+      model: Stratix BMS10C
+    1.3.6.1.4.1.9.1.1486:
+      model: Stratix BMS10CG
+    1.3.6.1.4.1.9.1.1490:
+      model: Stratix BMS20C
+    1.3.6.1.4.1.9.1.1514:
+      model: UcsC250
+    1.3.6.1.4.1.9.1.1515:
+      model: UcsC260
+    1.3.6.1.4.1.9.1.1516:
+      model: UcsC460
+    1.3.6.1.4.1.9.1.1527:
+      model: Nam2304
+    1.3.6.1.4.1.9.1.1529:
+      model: Nam3
+    1.3.6.1.4.1.9.1.1536:
+      model: ECDS50IVB
+    1.3.6.1.4.1.9.1.1539:
+      model: flowAgent3000
+    1.3.6.1.4.1.9.1.1540:
+      model: TelePresenceMCU5310
+    1.3.6.1.4.1.9.1.1576:
+      model: 819HWDEK9
+    1.3.6.1.4.1.9.1.1577:
+      model: 819HWDAK9
+    1.3.6.1.4.1.9.1.1583:
+      model: 819GUMK9
+    1.3.6.1.4.1.9.1.1584:
+      model: 819GSMK9
+    1.3.6.1.4.1.9.1.1585:
+      model: 819GVMK9
+    1.3.6.1.4.1.9.1.1586:
+      model: 819GBMK9
+    1.3.6.1.4.1.9.1.1587:
+      model: 819G7AMK9
+    1.3.6.1.4.1.9.1.1588:
+      model: 819G7MK9
+    1.3.6.1.4.1.9.1.1589:
+      model: 819HGUMK9
+    1.3.6.1.4.1.9.1.1590:
+      model: 819HGSMK9
+    1.3.6.1.4.1.9.1.1591:
+      model: 819HGVMK9
+    1.3.6.1.4.1.9.1.1592:
+      model: 819HGBMK9
+    1.3.6.1.4.1.9.1.1593:
+      model: 819HG7AMK9
+    1.3.6.1.4.1.9.1.1594:
+      model: 819HG7MK9
+    1.3.6.1.4.1.9.1.1595:
+      model: CDScde2502s6
+    1.3.6.1.4.1.9.1.1596:
+      model: CDScde2502m0
+    1.3.6.1.4.1.9.1.1597:
+      model: CDScde2502s8
+    1.3.6.1.4.1.9.1.1603:
+      model: MDE10XVB
+    1.3.6.1.4.1.9.1.1607:
+      model: CDScde2502s9
+    1.3.6.1.4.1.9.1.1608:
+      model: CDScde2502s10
+    1.3.6.1.4.1.9.1.1611:
+      model: CDScdeGeneric
+    1.3.6.1.4.1.9.1.1612:
+      model: ASA1000Vsy
+    1.3.6.1.4.1.9.1.1613:
+      model: ASA1000Vsc
+    1.3.6.1.4.1.9.1.1614:
+      model: ASA1000V
+    1.3.6.1.4.1.9.1.1632:
+      model: AIRAP802agn
+    1.3.6.1.4.1.9.1.1633:
+      model: Ap802Hagn
+    1.3.6.1.4.1.9.1.1634:
+      model: E160DP
+    1.3.6.1.4.1.9.1.1635:
+      model: E160D
+    1.3.6.1.4.1.9.1.1636:
+      model: E140DP
+    1.3.6.1.4.1.9.1.1637:
+      model: E140D
+    1.3.6.1.4.1.9.1.1638:
+      model: E140S
+    1.3.6.1.4.1.9.1.1646:
+      model: VSGateway
+    1.3.6.1.4.1.9.1.1648:
+      model: Skyros
+    1.3.6.1.4.1.9.1.1664:
+      model: AIRAP1552
+    1.3.6.1.4.1.9.1.1665:
+      model: AIRAP1553
+    1.3.6.1.4.1.9.1.1667:
+      model: Nexus1010X
+    1.3.6.1.4.1.9.1.1668:
+      model: Nexus1110S
+    1.3.6.1.4.1.9.1.1669:
+      model: Nexus1110X
+    1.3.6.1.4.1.9.1.1670:
+      model: Nexus1110XL
+    1.3.6.1.4.1.9.1.1674:
+      model: HsE300K9
+    1.3.6.1.4.1.9.1.1675:
+      model: 866VAEWEK9
+    1.3.6.1.4.1.9.1.1686:
+      model: CDScde2202s4
+    1.3.6.1.4.1.9.1.1687:
+      model: CDScde4604r1
+    1.3.6.1.4.1.9.1.1712:
+      model: cat3750x48U
+    1.3.6.1.4.1.9.1.1720:
+      model: Iem30004SM
+    1.3.6.1.4.1.9.1.1721:
+      model: Iem30008SM
+    1.3.6.1.4.1.9.1.1722:
+      model: 1783MX04S
+    1.3.6.1.4.1.9.1.1723:
+      model: 1783MX08S
+    1.3.6.1.4.1.9.1.1736:
+      model: RAIE1783BMS12T4E2CGNK
+    1.3.6.1.4.1.9.1.1737:
+      model: Mds9848512K9SM
+    1.3.6.1.4.1.9.1.1738:
+      model: Mds9710SM
+    1.3.6.1.4.1.9.1.1739:
+      model: Mds9710FM
+    1.3.6.1.4.1.9.1.1740:
+      model: Mds9710FCS
+    1.3.6.1.4.1.9.1.1741:
+      model: MDS9250iIFSPS
+    1.3.6.1.4.1.9.1.1742:
+      model: MDS9250iIFSDC
+    1.3.6.1.4.1.9.1.1743:
+      model: MDS9250iIFS
+    1.3.6.1.4.1.9.1.1744:
+      model: Nexus1000VH
+    1.3.6.1.4.1.9.1.1763:
+      model: ME2600X
+    1.3.6.1.4.1.9.1.1764:
+      model: Panini
+    1.3.6.1.4.1.9.1.1796:
+      model: cat45Sup8e
+    1.3.6.1.4.1.9.1.1839:
+      model: IE2000U4STSG
+    1.3.6.1.4.1.9.1.1840:
+      model: IE2000U16TCGP
+    1.3.6.1.4.1.9.1.1846:
+      model: RAIE1783ZMS8TA
+    1.3.6.1.4.1.9.1.1847:
+      model: RAIE1783ZMS16TA
+    1.3.6.1.4.1.9.1.1848:
+      model: RAIE1783ZMS24TA
+    1.3.6.1.4.1.9.1.1849:
+      model: RAIE1783ZMS4T4E2TGP
+    1.3.6.1.4.1.9.1.1850:
+      model: RAIE1783ZMS8T8E2TGP
+    1.3.6.1.4.1.9.1.1862:
+      model: 1783WAP5100xK9
+    1.3.6.1.4.1.9.1.1863:
+      model: CDScde2502s5
+    1.3.6.1.4.1.9.1.1865:
+      model: NXNAM1
+    1.3.6.1.4.1.9.1.1868:
+      model: IE2000U4TG
+    1.3.6.1.4.1.9.1.1869:
+      model: IE2000U4TSG
+    1.3.6.1.4.1.9.1.1872:
+      model: IE2000U16TCGX
+    1.3.6.1.4.1.9.1.1876:
+      model: EsxNAM
+    1.3.6.1.4.1.9.1.1877:
+      model: KvmNAM
+    1.3.6.1.4.1.9.1.1878:
+      model: HyperNAM
+    1.3.6.1.4.1.9.1.1899:
+      model: ME1200
+    1.3.6.1.4.1.9.1.1903:
+      model: VASASy
+    1.3.6.1.4.1.9.1.1904:
+      model: VASASc
+    1.3.6.1.4.1.9.1.1915:
+      model: N9Kc9508
+    1.3.6.1.4.1.9.1.1916:
+      model: WapAP702
+    1.3.6.1.4.1.9.1.1917:
+      model: WapAP2602
+    1.3.6.1.4.1.9.1.1918:
+      model: WapAP1602
+    1.3.6.1.4.1.9.1.1923:
+      model: N9KC93128TX
+    1.3.6.1.4.1.9.1.1930:
+      model: "2514"
+    1.3.6.1.4.1.9.1.1937:
+      model: "3204"
+    1.3.6.1.4.1.9.1.1940:
+      model: "1000"
+    1.3.6.1.4.1.9.1.1941:
+      model: "1003"
+    1.3.6.1.4.1.9.1.1942:
+      model: "2516"
+    1.3.6.1.4.1.9.1.1943:
+      model: "1020"
+    1.3.6.1.4.1.9.1.1944:
+      model: "1004"
+    1.3.6.1.4.1.9.1.1945:
+      model: "7507"
+    1.3.6.1.4.1.9.1.1946:
+      model: "7513"
+    1.3.6.1.4.1.9.1.1947:
+      model: "7506"
+    1.3.6.1.4.1.9.1.1948:
+      model: "7505"
+    1.3.6.1.4.1.9.1.1949:
+      model: "1005"
+    1.3.6.1.4.1.9.1.1950:
+      model: "4700"
+    1.3.6.1.4.1.9.1.1951:
+      model: Pro 1003
+    1.3.6.1.4.1.9.1.1952:
+      model: Pro 1004
+    1.3.6.1.4.1.9.1.1953:
+      model: Pro 1005
+    1.3.6.1.4.1.9.1.1955:
+      model: Pro 2500PCE
+    1.3.6.1.4.1.9.1.1956:
+      model: Pro 2501
+    1.3.6.1.4.1.9.1.1957:
+      model: Pro 2503
+    1.3.6.1.4.1.9.1.1958:
+      model: Pro 2505
+    1.3.6.1.4.1.9.1.1959:
+      model: Pro 2507
+    1.3.6.1.4.1.9.1.1960:
+      model: Pro 2509
+    1.3.6.1.4.1.9.1.1961:
+      model: Pro 2511
+    1.3.6.1.4.1.9.1.1962:
+      model: Pro 2514
+    1.3.6.1.4.1.9.1.1963:
+      model: Pro 2516
+    1.3.6.1.4.1.9.1.1964:
+      model: Pro 2519
+    1.3.6.1.4.1.9.1.1965:
+      model: Pro 2521
+    1.3.6.1.4.1.9.1.1966:
+      model: Pro 4500
+    1.3.6.1.4.1.9.1.1967:
+      model: "2517"
+    1.3.6.1.4.1.9.1.1968:
+      model: "2518"
+    1.3.6.1.4.1.9.1.1969:
+      model: "2519"
+    1.3.6.1.4.1.9.1.1970:
+      model: "2520"
+    1.3.6.1.4.1.9.1.1971:
+      model: "2521"
+    1.3.6.1.4.1.9.1.1972:
+      model: "2522"
+    1.3.6.1.4.1.9.1.1973:
+      model: "2523"
+    1.3.6.1.4.1.9.1.1974:
+      model: "2524"
+    1.3.6.1.4.1.9.1.1975:
+      model: "2525"
+    1.3.6.1.4.1.9.1.2000:
+      model: WRP500
+    1.3.6.1.4.1.9.1.2005:
+      model: IGS
+    1.3.6.1.4.1.9.1.2006:
+      model: "3000"
+    1.3.6.1.4.1.9.1.2007:
+      model: "4000"
+    1.3.6.1.4.1.9.1.2010:
+      model: "2000"
+    1.3.6.1.4.1.9.1.2012:
+      model: "7010"
+    1.3.6.1.4.1.9.1.2013:
+      model: "2500"
+    1.3.6.1.4.1.9.1.2014:
+      model: "4500"
+    1.3.6.1.4.1.9.1.2015:
+      model: "2102"
+    1.3.6.1.4.1.9.1.2016:
+      model: "2202"
+    1.3.6.1.4.1.9.1.2017:
+      model: "2501"
+    1.3.6.1.4.1.9.1.2018:
+      model: "2502"
+    1.3.6.1.4.1.9.1.2019:
+      model: "2503"
+    1.3.6.1.4.1.9.1.2020:
+      model: "2504"
+    1.3.6.1.4.1.9.1.2021:
+      model: "2505"
+    1.3.6.1.4.1.9.1.2022:
+      model: "2506"
+    1.3.6.1.4.1.9.1.2023:
+      model: "2507"
+    1.3.6.1.4.1.9.1.2024:
+      model: "2508"
+    1.3.6.1.4.1.9.1.2025:
+      model: "2509"
+    1.3.6.1.4.1.9.1.2026:
+      model: "2510"
+    1.3.6.1.4.1.9.1.2027:
+      model: "2511"
+    1.3.6.1.4.1.9.1.2028:
+      model: "2512"
+    1.3.6.1.4.1.9.1.2029:
+      model: "2513"
+    1.3.6.1.4.1.9.1.2055:
+      model: C896VAG
+    1.3.6.1.4.1.9.1.2063:
+      model: IOG910WK9
+    1.3.6.1.4.1.9.1.2064:
+      model: IOG910GK9
+    1.3.6.1.4.1.9.1.2065:
+      model: IOG910K9
+    1.3.6.1.4.1.9.1.2076:
+      model: IE40008GS4GE
+    1.3.6.1.4.1.9.1.2094:
+      model: CSE340G32K9
+    1.3.6.1.4.1.9.1.2096:
+      model: SCE10000
+    1.3.6.1.4.1.9.1.2097:
+      model: VirtualSCE
+    1.3.6.1.4.1.9.1.2112:
+      model: Wallander1x1GESKU
+    1.3.6.1.4.1.9.1.2113:
+      model: Wallander2x1GESKU
+    1.3.6.1.4.1.9.1.2147:
+      model: AIRAP1572
+    1.3.6.1.4.1.9.1.2161:
+      model: TSCodecG3
+    1.3.6.1.4.1.9.1.2168:
+      model: RAIE1783ZMS4T4E2TGN
+    1.3.6.1.4.1.9.1.2169:
+      model: RAIE1783ZMS8T8E2TGN
+    1.3.6.1.4.1.9.1.2185:
+      model: CDScde2802s5
+    1.3.6.1.4.1.9.1.2186:
+      model: CDScde2802s10
+    1.3.6.1.4.1.9.1.2187:
+      model: CDScde2802s21
+    1.3.6.1.4.1.9.1.2188:
+      model: CDScde2802h0
+    1.3.6.1.4.1.9.1.2189:
+      model: CDScde2802h13
+    1.3.6.1.4.1.9.1.2190:
+      model: CDScde2802h26
+    1.3.6.1.4.1.9.1.2193:
+      model: Fp7030K9
+    1.3.6.1.4.1.9.1.2194:
+      model: Fp7050K9
+    1.3.6.1.4.1.9.1.2195:
+      model: Fp7110K9
+    1.3.6.1.4.1.9.1.2196:
+      model: Fp7110FiK9
+    1.3.6.1.4.1.9.1.2197:
+      model: Fp7115K9
+    1.3.6.1.4.1.9.1.2198:
+      model: Fp7120K9
+    1.3.6.1.4.1.9.1.2199:
+      model: Fp7120FiK9
+    1.3.6.1.4.1.9.1.2200:
+      model: Fp7125K9
+    1.3.6.1.4.1.9.1.2201:
+      model: Fp8120K9
+    1.3.6.1.4.1.9.1.2202:
+      model: Fp8130K9
+    1.3.6.1.4.1.9.1.2203:
+      model: Fp8140K9
+    1.3.6.1.4.1.9.1.2204:
+      model: Fp8250K9
+    1.3.6.1.4.1.9.1.2205:
+      model: Fp8260K9
+    1.3.6.1.4.1.9.1.2206:
+      model: Fp8270K9
+    1.3.6.1.4.1.9.1.2207:
+      model: Fp8290K9
+    1.3.6.1.4.1.9.1.2208:
+      model: Fp8350K9
+    1.3.6.1.4.1.9.1.2209:
+      model: Fp8360K9
+    1.3.6.1.4.1.9.1.2210:
+      model: Fp8370K9
+    1.3.6.1.4.1.9.1.2211:
+      model: Fp8390K9
+    1.3.6.1.4.1.9.1.2212:
+      model: Fs750K9
+    1.3.6.1.4.1.9.1.2213:
+      model: Fs1500K9
+    1.3.6.1.4.1.9.1.2214:
+      model: Fs3500K9
+    1.3.6.1.4.1.9.1.2215:
+      model: Fs4000K9
+    1.3.6.1.4.1.9.1.2216:
+      model: Amp7150K9
+    1.3.6.1.4.1.9.1.2217:
+      model: Amp8050K9
+    1.3.6.1.4.1.9.1.2218:
+      model: Amp8150K9
+    1.3.6.1.4.1.9.1.2219:
+      model: Amp8350K9
+    1.3.6.1.4.1.9.1.2220:
+      model: Amp8360K9
+    1.3.6.1.4.1.9.1.2221:
+      model: Amp8370K9
+    1.3.6.1.4.1.9.1.2222:
+      model: Amp8390K9
+    1.3.6.1.4.1.9.1.2223:
+      model: FpSsl1500K9
+    1.3.6.1.4.1.9.1.2224:
+      model: FpSsl1500FiK9
+    1.3.6.1.4.1.9.1.2225:
+      model: FpSsl2000K9
+    1.3.6.1.4.1.9.1.2226:
+      model: FpSsl8200K9
+    1.3.6.1.4.1.9.1.2227:
+      model: Fp7010K9
+    1.3.6.1.4.1.9.1.2228:
+      model: Fp7020K9
+    1.3.6.1.4.1.9.1.2231:
+      model: C819GWLTEMNAAK9
+    1.3.6.1.4.1.9.1.2240:
+      model: AIRAPIW3702
+    1.3.6.1.4.1.9.1.2243:
+      model: ASA5506Hsc
+    1.3.6.1.4.1.9.1.2248:
+      model: IR829GWLTEMAAK9
+    1.3.6.1.4.1.9.1.2249:
+      model: PwsX474812X48uE
+    1.3.6.1.4.1.9.1.2254:
+      model: RAISA1783SAD2T2Ssy
+    1.3.6.1.4.1.9.1.2255:
+      model: RAISA1783SAD4T0Ssy
+    1.3.6.1.4.1.9.1.2256:
+      model: ISA30002C2Fsy
+    1.3.6.1.4.1.9.1.2257:
+      model: ISA30004Csy
+    1.3.6.1.4.1.9.1.2258:
+      model: ISA4000sy
+    1.3.6.1.4.1.9.1.2259:
+      model: ISA4000sc
+    1.3.6.1.4.1.9.1.2260:
+      model: RAISA1783SAD2T2Ssc
+    1.3.6.1.4.1.9.1.2261:
+      model: RAISA1783SAD4T0Ssc
+    1.3.6.1.4.1.9.1.2262:
+      model: ISA30002C2Fsc
+    1.3.6.1.4.1.9.1.2263:
+      model: ISA30004Csc
+    1.3.6.1.4.1.9.1.2268:
+      model: ISA30004C
+    1.3.6.1.4.1.9.1.2269:
+      model: RAISA1783SAD4T0S
+    1.3.6.1.4.1.9.1.2270:
+      model: RAISA1783SAD2T2S
+    1.3.6.1.4.1.9.1.2271:
+      model: ISA4000
+    1.3.6.1.4.1.9.1.2272:
+      model: C888EAK9
+    1.3.6.1.4.1.9.1.2282:
+      model: Nam2420
+    1.3.6.1.4.1.9.1.2283:
+      model: Nam2440
+    1.3.6.1.4.1.9.1.2284:
+      model: flowAgent3300
+    1.3.6.1.4.1.9.1.2297:
+      model: ASA5512td
+    1.3.6.1.4.1.9.1.2298:
+      model: ASA5515td
+    1.3.6.1.4.1.9.1.2299:
+      model: ASA5525td
+    1.3.6.1.4.1.9.1.2300:
+      model: ASA5545td
+    1.3.6.1.4.1.9.1.2301:
+      model: ASA5555td
+    1.3.6.1.4.1.9.1.2302:
+      model: ASA5506td
+    1.3.6.1.4.1.9.1.2303:
+      model: ASA5506Wtd
+    1.3.6.1.4.1.9.1.2304:
+      model: ASA5506Htd
+    1.3.6.1.4.1.9.1.2308:
+      model: 899GLTEJPK9
+    1.3.6.1.4.1.9.1.2334:
+      model: VFTD
+    1.3.6.1.4.1.9.1.2340:
+      model: RAIE1783IMS28GNAC
+    1.3.6.1.4.1.9.1.2341:
+      model: RAIE1783IMS28GNDC
+    1.3.6.1.4.1.9.1.2342:
+      model: RAIE1783IMS28GRAC
+    1.3.6.1.4.1.9.1.2343:
+      model: RAIE1783IMS28GRDC
+    1.3.6.1.4.1.9.1.2344:
+      model: QSFP100GCWDM4S
+    1.3.6.1.4.1.9.1.2355:
+      model: 898EAGLTELAK9
+    1.3.6.1.4.1.9.1.2357:
+      model: 819GWLTELACK9
+    1.3.6.1.4.1.9.1.2358:
+      model: 819GWLTELAQK9
+    1.3.6.1.4.1.9.1.2359:
+      model: 819GWLTELANK9
+    1.3.6.1.4.1.9.1.2379:
+      model: 866VAEK9V2
+    1.3.6.1.4.1.9.1.2382:
+      model: 819GLTELAK9
+    1.3.6.1.4.1.9.1.2385:
+      model: StealthWatch2404
+    1.3.6.1.4.1.9.1.2386:
+      model: StealthWatch2420
+    1.3.6.1.4.1.9.1.2387:
+      model: NamApp2404
+    1.3.6.1.4.1.9.1.2393:
+      model: IR829GWLTEGASK9
+    1.3.6.1.4.1.9.1.2394:
+      model: IR829GWLTEGACK9
+    1.3.6.1.4.1.9.1.2397:
+      model: CSP2100
+    1.3.6.1.4.1.9.1.2425:
+      model: IR809G3GGAK9
+    1.3.6.1.4.1.9.1.2426:
+      model: IR809GLTELAK9
+    1.3.6.1.4.1.9.1.2433:
+      model: CXP2270GSR12
+    1.3.6.1.4.1.9.1.307:
+      model: CVA124
+    1.3.6.1.4.1.9.1.329:
+      model: "626"
+    1.3.6.1.4.1.9.1.331:
+      model: "633"
+    1.3.6.1.4.1.9.1.350:
+      model: "8120"
+    1.3.6.1.4.1.9.1.352:
+      model: IDS
+    1.3.6.1.4.1.9.1.360:
+      model: VPS1110
+    1.3.6.1.4.1.9.1.361:
+      model: ContentEngine
+    1.3.6.1.4.1.9.1.371:
+      model: CVA122E
+    1.3.6.1.4.1.9.1.372:
+      model: CVA124E
+    1.3.6.1.4.1.9.1.408:
+      model: Ics7750Ce300
+    1.3.6.1.4.1.9.1.420:
+      model: GP10
+    1.3.6.1.4.1.9.1.421:
+      model: MC21
+    1.3.6.1.4.1.9.1.422:
+      model: SN51
+    1.3.6.1.4.1.9.1.434:
+      model: IE2105
+    1.3.6.1.4.1.9.1.441:
+      model: Osm4oc3PosSmIr
+    1.3.6.1.4.1.9.1.442:
+      model: Osm4oc3PosMmSr
+    1.3.6.1.4.1.9.1.443:
+      model: Osm4oc3PosSmLr
+    1.3.6.1.4.1.9.1.518:
+      model: PrimaryGSSM
+    1.3.6.1.4.1.9.1.519:
+      model: StandbyGSSM
+    1.3.6.1.4.1.9.1.523:
+      model: SCA11000
+    1.3.6.1.4.1.9.1.526:
+      model: SCA211000
+    1.3.6.1.4.1.9.1.555:
+      model: SIMSE
+    1.3.6.1.4.1.9.1.556:
+      model: ESSE
+    1.3.6.1.4.1.9.1.572:
+      model: uMG9820
+    1.3.6.1.4.1.9.1.588:
+      model: MCS7855I
+    1.3.6.1.4.1.9.1.589:
+      model: MCS7865I
+    1.3.6.1.4.1.9.1.593:
+      model: CCM
+    1.3.6.1.4.1.9.1.610:
+      model: SSLCSM
+    1.3.6.1.4.1.9.1.611:
+      model: NetworkRegistrar
+    1.3.6.1.4.1.9.1.631:
+      model: WLSE1030
+    1.3.6.1.4.1.9.1.632:
+      model: HSE1140
+    1.3.6.1.4.1.9.1.635:
+      model: WsSvcadsm1K9
+    1.3.6.1.4.1.9.1.636:
+      model: WsSvcagsm1K9
+    1.3.6.1.4.1.9.1.661:
+      model: FE6326K9
+    1.3.6.1.4.1.9.1.667:
+      model: 3202WMIC
+    1.3.6.1.4.1.9.1.680:
+      model: Fe7326K9
+    1.3.6.1.4.1.9.1.681:
+      model: Fe511K9
+    1.3.6.1.4.1.9.1.682:
+      model: SCEDispatcher
+    1.3.6.1.4.1.9.1.683:
+      model: SCE1000
+    1.3.6.1.4.1.9.1.684:
+      model: SCE2000
+    1.3.6.1.4.1.9.1.687:
+      model: Fe611K9
+    1.3.6.1.4.1.9.1.707:
+      model: EDI
+    1.3.6.1.4.1.9.1.711:
+      model: NMCUEEC
+    1.3.6.1.4.1.9.1.712:
+      model: WLSE1132
+    1.3.6.1.4.1.9.1.723:
+      model: Paldron
+    1.3.6.1.4.1.9.1.740:
+      model: FE2636
+    1.3.6.1.4.1.9.1.750:
+      model: SpaOc48posSfp
+    1.3.6.1.4.1.9.1.751:
+      model: catalyst6kEnhancedGateway
+    1.3.6.1.4.1.9.1.757:
+      model: Wae612K9
+    1.3.6.1.4.1.9.1.760:
+      model: Fe512K9
+    1.3.6.1.4.1.9.1.762:
+      model: Fe612K9
+    1.3.6.1.4.1.9.1.775:
+      model: Jumpgate
+    1.3.6.1.4.1.9.1.800:
+      model: TSPri
+    1.3.6.1.4.1.9.1.801:
+      model: TSSec
+    1.3.6.1.4.1.9.1.802:
+      model: UWIpPhone7921G
+    1.3.6.1.4.1.9.1.803:
+      model: UWIpPhone7920
+    1.3.6.1.4.1.9.1.807:
+      model: IDS4215Virtual
+    1.3.6.1.4.1.9.1.808:
+      model: IDS4235Virtual
+    1.3.6.1.4.1.9.1.809:
+      model: IDS4250Virtual
+    1.3.6.1.4.1.9.1.810:
+      model: IDS4250SXVirtual
+    1.3.6.1.4.1.9.1.811:
+      model: IDS4250XLVirtual
+    1.3.6.1.4.1.9.1.812:
+      model: IDS4240Virtual
+    1.3.6.1.4.1.9.1.813:
+      model: IDS4255Virtual
+    1.3.6.1.4.1.9.1.814:
+      model: IDS4260Virtual
+    1.3.6.1.4.1.9.1.815:
+      model: IDSIDSM2Virtual
+    1.3.6.1.4.1.9.1.818:
+      model: NM-WLC-E
+    1.3.6.1.4.1.9.1.867:
+      model: AIM2CUE
+    1.3.6.1.4.1.9.1.898:
+      model: MCS7816I
+    1.3.6.1.4.1.9.1.899:
+      model: MCS7828I
+    1.3.6.1.4.1.9.1.941:
+      model: VFrameDataCenter
+    1.3.6.1.4.1.9.1.942:
+      model: VQEServer
+    1.3.6.1.4.1.9.1.969:
+      model: VQETools
+    1.3.6.1.4.1.9.1.974:
+      model: VSIntSp
+    1.3.6.1.4.1.9.1.975:
+      model: VSSP
+    1.3.6.1.4.1.9.1.976:
+      model: VSHydecoder
+    1.3.6.1.4.1.9.1.977:
+      model: VSDecoder
+    1.3.6.1.4.1.9.1.978:
+      model: VSEncoder4P
+    1.3.6.1.4.1.9.1.979:
+      model: VSEncoder1P
+    1.3.6.1.4.1.9.1.980:
+      model: SCS1000K9
+    1.3.6.1.4.1.9.1.997:
+      model: VQEIST
+    1.3.6.1.4.1.9.115:
+      model: "2102"
+    1.3.6.1.4.1.9.12:
+      model: Modules
+    1.3.6.1.4.1.9.12.2:
+      model: ProductsMIB
+    1.3.6.1.4.1.9.12.3.1.3.1205:
+      model: Nexus 2248PQ 10GE Fabric Extender
+    1.3.6.1.4.1.9.12.3.1.3.1895:
+      model: MDS 9232U
+    1.3.6.1.4.1.9.12.3.1.3.514:
+      model: MDS 9020
+    1.3.6.1.4.1.9.12.3.1.3.7771:
+      model: Nexus 7018
+    1.3.6.1.4.1.9.12.3.1.3.913:
+      model: Nexus 2232PP 10G Fabric Extender
+    1.3.6.1.4.1.9.12.3.1.3.914:
+      model: Nexus 2248TP GE Fabric Extender
+    1.3.6.1.4.1.9.5.1958:
+      model: WS-C4503
+    1.3.6.1.4.1.9.6.1.32.561.1:
+      model: WAP561
+    1.3.6.1.4.1.9.6.1.72.2010.2:
+      model: SGE 2010
+    1.3.6.1.4.1.9.6.1.73.2000.3:
+      model: SGE 2000P
+    1.3.6.1.4.1.9.6.1.80.24.1:
+      model: SF500-24
+    1.3.6.1.4.1.9.6.1.80.48.1:
+      model: SF500-48
+    1.3.6.1.4.1.9.6.1.80.48.2:
+      model: SF500-48P
+    1.3.6.1.4.1.9.6.1.81.28.2:
+      model: SG500-28P
+    1.3.6.1.4.1.9.6.1.81.5.3.0:
+      model: SG500-52MP
+    1.3.6.1.4.1.9.6.1.83.10.5:
+      model: SG300-10SFP
+    1.3.6.1.4.1.9.6.1.83.28.5:
+      model: SG300-28SFP
+    1.3.6.1.4.1.9.6.1.84.24.2:
+      model: SF220-24P
+    1.3.6.1.4.1.9.6.1.84.26.1:
+      model: SG220-26
+    1.3.6.1.4.1.9.6.1.84.26.2:
+      model: SG220-26P
+    1.3.6.1.4.1.9.6.1.84.28.3:
+      model: SG220-28MP
+    1.3.6.1.4.1.9.6.1.84.28.5:
+      model: SG220-28
+    1.3.6.1.4.1.9.6.1.84.48.2:
+      model: SF220-48P
+    1.3.6.1.4.1.9.6.1.84.50.1:
+      model: SG220-50
+    1.3.6.1.4.1.9.6.1.84.50.2:
+      model: SG220-50P
+    1.3.6.1.4.1.9.6.1.84.52.5:
+      model: SG220-52
+    1.3.6.1.4.1.9.6.1.85.24.1:
+      model: SG500X-24
+    1.3.6.1.4.1.9.6.1.85.24.2:
+      model: SG500X-24P
+    1.3.6.1.4.1.9.6.1.85.48.1:
+      model: SG500X-48
+    1.3.6.1.4.1.9.6.1.85.48.2:
+      model: SG500X-48P
+    1.3.6.1.4.1.9.6.1.88.10.3:
+      model: SG200-10FP
+    1.3.6.1.4.1.9.6.1.88.24.3:
+      model: SF200-24FP
+    1.3.6.1.4.1.9.6.1.88.26.1:
+      model: SG200-26
+    1.3.6.1.4.1.9.6.1.88.26.2:
+      model: SG200-26P
+    1.3.6.1.4.1.9.6.1.88.26.3:
+      model: SG200-26FP
+    1.3.6.1.4.1.9.6.1.88.50.2:
+      model: SG200-50P
+    1.3.6.1.4.1.9.6.1.88.50.3:
+      model: SG200-50FP
+    1.3.6.1.4.1.9.6.1.90.16.9:
+      model: SG550XG-8F8T
+    1.3.6.1.4.1.9.6.1.90.24.8:
+      model: SG550XG-24F
+    1.3.6.1.4.1.9.6.1.90.24.9:
+      model: SG550XG-24T
+    1.3.6.1.4.1.9.6.1.91.24.8:
+      model: SG350XG-24F
+    1.3.6.1.4.1.9.6.1.91.24.9:
+      model: SG350XG-24T
+    1.3.6.1.4.1.9.6.1.91.48.9:
+      model: SG350XG-48T
+    1.3.6.1.4.1.9.6.1.92.24.1:
+      model: SF550X-24
+    1.3.6.1.4.1.9.6.1.92.24.5:
+      model: SF550X-24P
+    1.3.6.1.4.1.9.6.1.92.24.6:
+      model: SF550X-24MP
+    1.3.6.1.4.1.9.6.1.92.48.1:
+      model: SF550X-48
+    1.3.6.1.4.1.9.6.1.92.48.5:
+      model: SF550X-48P
+    1.3.6.1.4.1.9.6.1.92.48.6:
+      model: SF550X-48MP
+    1.3.6.1.4.1.9.6.1.94.24.1:
+      model: SG350X-24
+    1.3.6.1.4.1.9.6.1.94.24.5:
+      model: SG350X-24P
+    1.3.6.1.4.1.9.6.1.94.24.6:
+      model: SG350X-24MP
+    1.3.6.1.4.1.9.6.1.94.48.6:
+      model: SG350X-48MP
+    1.3.6.1.4.1.9.6.1.97.10.5:
+      model: SG250-10P
+    1.3.6.1.4.1.9.6.1.97.18.1:
+      model: SG250-18
+    1.3.6.1.4.1.9.6.1.97.26.1:
+      model: SG250-26
+    1.3.6.1.4.1.9.6.1.97.26.4:
+      model: SG250-26HP
+    1.3.6.1.4.1.94.49:
+      model: M1122
+    1.3.6.1.4.1.964.3.4.1.25:
+      model: Adit
+    1.3.6.1.4.1.97.2.1:
+      model: SXHW
+    1.3.6.1.4.1.97.5.8:
+      model: ELS100-16TX
+    1.3.6.1.4.1.9753.2.12:
+      model: Edgewall-Express
   category_map:
-    "Self-contained NAS": "NAS"
+    Self-contained NAS: NAS
