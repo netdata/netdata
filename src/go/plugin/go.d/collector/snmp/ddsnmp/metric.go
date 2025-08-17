@@ -6,7 +6,7 @@ import (
 
 type ProfileMetrics struct {
 	Source         string
-	DeviceMetadata map[string]string
+	DeviceMetadata map[string]MetaTag
 	Tags           map[string]string
 	Metrics        []Metric
 }
@@ -25,4 +25,9 @@ type Metric struct {
 	MultiValue  map[string]int64
 
 	IsTable bool
+}
+
+type MetaTag struct {
+	Value        string
+	IsExactMatch bool // whether this value is from an exact match context
 }

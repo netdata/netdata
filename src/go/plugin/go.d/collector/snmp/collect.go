@@ -106,7 +106,7 @@ func (c *Collector) walkAll(rootOid string) ([]gosnmp.SnmpPDU, error) {
 	return c.snmpClient.BulkWalkAll(rootOid)
 }
 
-func (c *Collector) setupVnode(si *snmputils.SysInfo, deviceMeta map[string]string) *vnodes.VirtualNode {
+func (c *Collector) setupVnode(si *snmputils.SysInfo, deviceMeta map[string]ddsnmp.MetaTag) *vnodes.VirtualNode {
 	if c.Vnode.GUID == "" {
 		c.Vnode.GUID = uuid.NewSHA1(uuid.NameSpaceDNS, []byte(c.Hostname)).String()
 	}
@@ -131,37 +131,30 @@ func (c *Collector) setupVnode(si *snmputils.SysInfo, deviceMeta map[string]stri
 		labels["_node_stale_after_seconds"] = strconv.Itoa(v)
 	}
 
-	maps.Copy(labels, c.Vnode.Labels)
-	maps.Copy(labels, deviceMeta)
-
-	if _, ok := labels["sys_object_id"]; !ok {
-		labels["sys_object_id"] = si.SysObjectID
+	labels["sys_object_id"] = si.SysObjectID
+	labels["name"] = si.Name
+	labels["description"] = si.Descr
+	labels["contact"] = si.Contact
+	labels["location"] = si.Location
+	if si.Vendor != "" {
+		labels["vendor"] = si.Vendor
+	} else if si.Organization != "" {
+		labels["vendor"] = si.Organization
 	}
-	if _, ok := labels["name"]; !ok {
-		labels["name"] = si.Name
-	}
-	if _, ok := labels["description"]; !ok && si.Descr != "" {
-		labels["description"] = si.Descr
-	}
-	if _, ok := labels["contact"]; !ok && si.Contact != "" {
-		labels["contact"] = si.Contact
-	}
-	if _, ok := labels["location"]; !ok && si.Location != "" {
-		labels["location"] = si.Location
-	}
-	if _, ok := labels["vendor"]; !ok {
-		if si.Vendor != "" {
-			labels["vendor"] = si.Vendor
-		} else if si.Organization != "" {
-			labels["vendor"] = si.Organization
-		}
-	}
-	if _, ok := labels["type"]; !ok && si.Category != "" {
+	if si.Category != "" {
 		labels["type"] = si.Category
 	}
-	if _, ok := labels["model"]; !ok && si.Model != "" {
+	if si.Model != "" {
 		labels["model"] = si.Model
 	}
+
+	for k, val := range deviceMeta {
+		if v, ok := labels[k]; !ok || v == "" || val.IsExactMatch {
+			labels[k] = val.Value
+		}
+	}
+
+	maps.Copy(labels, c.Vnode.Labels)
 
 	return &vnodes.VirtualNode{
 		GUID:     c.Vnode.GUID,
