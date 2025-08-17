@@ -6,38 +6,52 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
+var oidOnly = regexp.MustCompile(`^[0-9]+(\.[0-9]+)*$`)
+
+func OidMatches(sysObjId, id string) bool {
+	if oidOnly.MatchString(id) {
+		return sysObjId == id
+	}
+	re, err := regexp.Compile(id)
+	if err != nil {
+		log.Warningf("invalid regex %q: %v", id, err)
+		return false
+	}
+	return re.MatchString(sysObjId)
+}
+
 // FindProfiles returns profiles matching the given sysObjectID.
-// Profiles are loaded once on the first call and cached globally.
+// Profiles are sorted by match specificity: most specific first.
 func FindProfiles(sysObjId string) []*Profile {
 	loadProfiles()
 
+	matchedOIDs := make(map[*Profile]string)
 	var profiles []*Profile
 
 	for _, prof := range ddProfiles {
+		// Use first matching OID (profile author's responsibility to order them)
 		for _, id := range prof.Definition.SysObjectIDs {
-			m, err := matcher.NewRegExpMatcher(id)
-			if err != nil {
-				log.Warningf("failed to compile regular expression from '%s': %v", id, err)
-				continue
-			}
-			if m.MatchString(sysObjId) {
-				profiles = append(profiles, prof.clone())
+			if OidMatches(sysObjId, id) {
+				cloned := prof.clone()
+				profiles = append(profiles, cloned)
+				matchedOIDs[cloned] = id
 				break
 			}
 		}
 	}
 
+	sortProfilesBySpecificity(profiles, matchedOIDs)
+
 	enrichProfiles(profiles)
 	deduplicateMetricsAcrossProfiles(profiles)
-
 	return profiles
 }
 
@@ -114,11 +128,11 @@ func cloneExtensionHierarchy(extensions []*extensionInfo) []*extensionInfo {
 }
 
 func (p *Profile) merge(base *Profile) {
+	p.mergeMetadata(base)
 	p.mergeMetrics(base)
 	// Append other fields as before (these likely don't need deduplication)
 	p.Definition.MetricTags = append(p.Definition.MetricTags, base.Definition.MetricTags...)
 	p.Definition.StaticTags = append(p.Definition.StaticTags, base.Definition.StaticTags...)
-	p.mergeMetadata(base)
 }
 
 func (p *Profile) mergeMetrics(base *Profile) {
@@ -193,6 +207,19 @@ func (p *Profile) mergeMetadata(base *Profile) {
 
 		p.Definition.Metadata[resName] = targetRes
 	}
+
+	if len(base.Definition.SysobjectIDMetadata) > 0 {
+		existingOIDs := make(map[string]bool)
+		for _, entry := range p.Definition.SysobjectIDMetadata {
+			existingOIDs[entry.SysobjectID] = true
+		}
+
+		for _, baseEntry := range base.Definition.SysobjectIDMetadata {
+			if !existingOIDs[baseEntry.SysobjectID] {
+				p.Definition.SysobjectIDMetadata = append(p.Definition.SysobjectIDMetadata, baseEntry)
+			}
+		}
+	}
 }
 
 func (p *Profile) validate() error {
@@ -239,6 +266,34 @@ func (p *Profile) removeConstantMetrics() {
 	})
 }
 
+// sortProfilesBySpecificity sorts profiles by their match specificity.
+// More specific profiles (longer OIDs, exact matches) come first.
+// The matchedOIDs map contains the OID that matched for each profile.
+func sortProfilesBySpecificity(profiles []*Profile, matchedOIDs map[*Profile]string) {
+	slices.SortStableFunc(profiles, func(a, b *Profile) int {
+		aOID := matchedOIDs[a]
+		bOID := matchedOIDs[b]
+
+		// 1. Longer OIDs first (more specific)
+		if diff := len(bOID) - len(aOID); diff != 0 {
+			return diff
+		}
+
+		// 2. Same length: exact OIDs before patterns
+		aIsExact := oidOnly.MatchString(aOID)
+		bIsExact := oidOnly.MatchString(bOID)
+		if aIsExact != bIsExact {
+			if aIsExact {
+				return -1
+			}
+			return 1
+		}
+
+		// 3. Same type: lexicographic order for stability
+		return strings.Compare(aOID, bOID)
+	})
+}
+
 func enrichProfiles(profiles []*Profile) {
 	for _, prof := range profiles {
 		if prof.Definition == nil {
@@ -268,38 +323,8 @@ func deduplicateMetricsAcrossProfiles(profiles []*Profile) {
 		return
 	}
 
-	// Create a slice of indices sorted by priority (non-generic first)
-	type indexedProfile struct {
-		idx       int
-		isGeneric bool
-	}
-
-	indexed := make([]indexedProfile, len(profiles))
-	for i, prof := range profiles {
-		indexed[i] = indexedProfile{
-			idx:       i,
-			isGeneric: strings.Contains(strings.ToLower(prof.SourceFile), "generic"),
-		}
-	}
-
-	slices.SortFunc(indexed, func(a, b indexedProfile) int {
-		if a.isGeneric && !b.isGeneric {
-			return 1 // a comes after b
-		}
-		if !a.isGeneric && b.isGeneric {
-			return -1 // a comes before b
-		}
-		// If both are generic or both are non-generic, maintain original order
-		return a.idx - b.idx
-	})
-
-	// Reorder profiles slice according to deduplication priority
-	sortedProfiles := make([]*Profile, len(profiles))
-	for i, ip := range indexed {
-		sortedProfiles[i] = profiles[ip.idx]
-	}
-	copy(profiles, sortedProfiles)
-
+	// Profiles are already sorted by specificity from FindProfiles
+	// Just deduplicate metrics, keeping the first occurrence (most specific)
 	seenMetrics := make(map[string]bool)
 	seenVmetrics := make(map[string]bool)
 
@@ -319,6 +344,7 @@ func deduplicateMetricsAcrossProfiles(profiles []*Profile) {
 				return false
 			},
 		)
+
 		prof.Definition.VirtualMetrics = slices.DeleteFunc(
 			prof.Definition.VirtualMetrics,
 			func(vm ddprofiledefinition.VirtualMetricConfig) bool {

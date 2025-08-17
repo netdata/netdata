@@ -104,7 +104,7 @@ func (c *Collector) walkAll(rootOid string) ([]gosnmp.SnmpPDU, error) {
 	return c.snmpClient.BulkWalkAll(rootOid)
 }
 
-func (c *Collector) setupVnode(si *snmpsd.SysInfo, deviceMeta map[string]map[string]string) *vnodes.VirtualNode {
+func (c *Collector) setupVnode(si *snmpsd.SysInfo, deviceMeta map[string]string) *vnodes.VirtualNode {
 	if c.Vnode.GUID == "" {
 		c.Vnode.GUID = uuid.NewSHA1(uuid.NameSpaceDNS, []byte(c.Hostname)).String()
 	}
@@ -130,9 +130,7 @@ func (c *Collector) setupVnode(si *snmpsd.SysInfo, deviceMeta map[string]map[str
 	}
 
 	maps.Copy(labels, c.Vnode.Labels)
-	for _, meta := range deviceMeta {
-		maps.Copy(labels, meta)
-	}
+	maps.Copy(labels, deviceMeta)
 
 	if _, ok := labels["sys_object_id"]; !ok {
 		labels["sys_object_id"] = si.SysObjectID

@@ -10,7 +10,6 @@ import (
 	"github.com/gosnmp/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
@@ -50,7 +49,7 @@ func (gc *globalTagsCollector) Collect(prof *ddsnmp.Profile) (map[string]string,
 }
 
 func (gc *globalTagsCollector) processStaticTags(staticTags []string, globalTags map[string]string) {
-	mergeTagsWithEmptyFallback(globalTags, parseStaticTags(staticTags))
+	mergeTagsIfAbsent(globalTags, parseStaticTags(staticTags))
 }
 
 // processDynamicTags processes tags that require SNMP fetching
@@ -171,30 +170,22 @@ func (dc *deviceMetadataCollector) Collect(prof *ddsnmp.Profile) (map[string]str
 
 	meta := make(map[string]string)
 
+	if dc.sysobjectid != "" {
+		for i, entry := range prof.Definition.SysobjectIDMetadata {
+			if ddsnmp.OidMatches(dc.sysobjectid, entry.SysobjectID) {
+				if err := dc.processMetadataFields(entry.Metadata, meta); err != nil {
+					dc.log.Warningf("sysobjectid_metadata[%d]: failed to process metadata fields for sysobjectid '%s': %v",
+						i, entry.SysobjectID, err)
+					continue
+				}
+				dc.log.Debugf("sysobjectid_metadata[%d]: matched sysobjectid '%s' with device OID '%s', applying metadata overrides",
+					i, entry.SysobjectID, dc.sysobjectid)
+			}
+		}
+	}
+
 	if err := dc.processMetadataFields(cfg.Fields, meta); err != nil {
 		return ternary(len(meta) > 0, meta, nil), fmt.Errorf("failed to process metadata resource '%s': %w", resName, err)
-	}
-
-	if dc.sysobjectid == "" || len(prof.Definition.SysobjectIDMetadata) == 0 {
-		return meta, nil
-	}
-
-	for i, entry := range prof.Definition.SysobjectIDMetadata {
-		m, err := matcher.NewRegExpMatcher(entry.SysobjectID)
-		if err != nil {
-			dc.log.Warningf("sysobjectid_metadata[%d]: failed to compile regular expression from sysobjectid '%s': %v",
-				i, entry.SysobjectID, err)
-			continue
-		}
-		if m.MatchString(dc.sysobjectid) {
-			if err := dc.processMetadataFields(entry.Metadata, meta); err != nil {
-				dc.log.Warningf("sysobjectid_metadata[%d]: failed to process metadata fields for sysobjectid '%s': %v",
-					i, entry.SysobjectID, err)
-				continue
-			}
-			dc.log.Debugf("sysobjectid_metadata[%d]: matched sysobjectid '%s' with device OID '%s', applying metadata overrides",
-				i, entry.SysobjectID, dc.sysobjectid)
-		}
 	}
 
 	return meta, nil
@@ -202,12 +193,7 @@ func (dc *deviceMetadataCollector) Collect(prof *ddsnmp.Profile) (map[string]str
 
 // processMetadataFields processes a single metadata resource
 func (dc *deviceMetadataCollector) processMetadataFields(fields map[string]ddprofiledefinition.MetadataField, metadata map[string]string) error {
-	staticValues := make(map[string]string)
-	oids := dc.collectStaticAndIdentifyOIDs(fields, staticValues)
-
-	for k, v := range staticValues {
-		metadata[k] = v
-	}
+	oids := dc.collectStaticAndIdentifyOIDs(fields, metadata)
 
 	if len(oids) == 0 {
 		return nil
@@ -222,13 +208,13 @@ func (dc *deviceMetadataCollector) processMetadataFields(fields map[string]ddpro
 }
 
 // collectStaticAndIdentifyOIDs collects static values and returns OIDs to fetch
-func (dc *deviceMetadataCollector) collectStaticAndIdentifyOIDs(fields map[string]ddprofiledefinition.MetadataField, staticValues map[string]string) []string {
+func (dc *deviceMetadataCollector) collectStaticAndIdentifyOIDs(fields map[string]ddprofiledefinition.MetadataField, metadata map[string]string) []string {
 	var oids []string
 
 	for name, field := range fields {
 		switch {
 		case field.Value != "":
-			staticValues[name] = field.Value
+			mergeTagsIfAbsent(metadata, map[string]string{name: field.Value})
 		case field.Symbol.OID != "":
 			if !dc.missingOIDs[trimOID(field.Symbol.OID)] {
 				oids = append(oids, field.Symbol.OID)
@@ -284,7 +270,7 @@ func (dc *deviceMetadataCollector) processDynamicFields(fields map[string]ddprof
 				continue
 			}
 			if v != "" {
-				mergeTagsWithEmptyFallback(metadata, map[string]string{name: v})
+				mergeTagsIfAbsent(metadata, map[string]string{name: v})
 			}
 		case len(field.Symbols) > 0:
 			// Multiple symbols - try each until one succeeds
@@ -296,7 +282,7 @@ func (dc *deviceMetadataCollector) processDynamicFields(fields map[string]ddprof
 					continue
 				}
 				if v != "" {
-					mergeTagsWithEmptyFallback(metadata, map[string]string{name: v})
+					mergeTagsIfAbsent(metadata, map[string]string{name: v})
 					break // Use first successful value
 				}
 			}

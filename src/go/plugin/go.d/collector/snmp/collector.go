@@ -38,6 +38,7 @@ func New() *Collector {
 			EnableProfiles:             true,
 			EnableProfilesTableMetrics: true,
 			VnodeDeviceDownThreshold:   3,
+			Community:                  "public",
 			Options: Options{
 				Port:           161,
 				Retries:        1,
