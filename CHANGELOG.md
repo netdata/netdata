@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- refactor\(go.d\): move nd directories to dedicated pluginconfig package [\#20827](https://github.com/netdata/netdata/pull/20827) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): bump k8s.io/client-go from 0.33.3 to 0.33.4 in /src/go [\#20826](https://github.com/netdata/netdata/pull/20826) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Add ACLK buffer usage metrics [\#20820](https://github.com/netdata/netdata/pull/20820) ([stelfrag](https://github.com/stelfrag))
 - fix\(go.d/ddsnmp\): correct profile matching, metadata precedence, and OID handling [\#20819](https://github.com/netdata/netdata/pull/20819) ([ilyam8](https://github.com/ilyam8))
