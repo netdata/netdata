@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 
 	"gopkg.in/yaml.v2"
@@ -60,8 +61,7 @@ func loadOverrides() {
 
 func getOverridesPath() string {
 	if executable.Name == "test" {
-		dir, _ := filepath.Abs("../../../config/go.d/snmp.profiles/meta_overrides.yaml")
-		return dir
+		return overridesPathFromThisFile()
 	}
 	if path := filepath.Join(executable.Directory, "..", "config", executable.Name, "snmp.profiles", "meta_overrides.yaml"); isFileExists(path) {
 		return path
@@ -75,4 +75,33 @@ func isFileExists(path string) bool {
 		return !errors.Is(err, fs.ErrNotExist)
 	}
 	return fi.Mode().IsRegular()
+}
+
+func overridesPathFromThisFile() string {
+	// runtime.Caller(0) returns the absolute path to THIS .go file at build time.
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		return ""
+	}
+	base := filepath.Dir(thisFile)
+
+	// In repo layout:
+	//   netdata/src/go/plugin/go.d/
+	//     ├─ config/go.d/snmp.profiles/meta_overrides.yaml
+	//     ├─ pkg/snmputils/   (likely where this file is)
+	//     └─ agent/discovery/
+	// From either sibling, "../config/go.d/..." is correct.
+	candidates := []string{
+		filepath.Join(base, "..", "config", "go.d", "snmp.profiles", "meta_overrides.yaml"),
+		// In case this file ever moves one level, try going up two:
+		filepath.Join(base, "..", "..", "config", "go.d", "snmp.profiles", "meta_overrides.yaml"),
+	}
+
+	for _, p := range candidates {
+		if isFileExists(p) {
+			abs, _ := filepath.Abs(p)
+			return abs
+		}
+	}
+	return ""
 }

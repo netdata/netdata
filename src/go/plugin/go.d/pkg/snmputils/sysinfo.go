@@ -6,7 +6,6 @@ import (
 	"bufio"
 	"bytes"
 	_ "embed"
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -99,19 +98,15 @@ var valueSanitizer = strings.NewReplacer(
 // updateMetadata enriches a SysInfo struct with metadata based on its SysObjectID.
 // It populates the Organization, Vendor, Category, and Model fields.
 func updateMetadata(si *SysInfo) {
-	// 1. Guard clauses: Validate input early to prevent panics and wasted work.
 	if si == nil || si.SysObjectID == "" {
 		return
 	}
 
-	// 2. Gather all necessary data first.
 	rawOrg := lookupEnterpriseNumber(si.SysObjectID)
-	baseMeta, _ := lookupSysObjectIDMeta(si.SysObjectID)
 
-	// 3. Process the data and determine the final values.
-	finalCategory := baseMeta.Category
-	finalModel := baseMeta.Model
-	finalVendor := ""
+	var finalCategory string
+	var finalModel string
+	var finalVendor string
 
 	if overridesData != nil {
 		// Apply specific OID overrides for category and model.
@@ -135,8 +130,7 @@ func updateMetadata(si *SysInfo) {
 		}
 	}
 
-	// 4. Assign all computed values to the struct in one final, clean step.
-	si.Organization = valueSanitizer.Replace(rawOrg) // Sanitize at the last moment.
+	si.Organization = valueSanitizer.Replace(rawOrg)
 	si.Category = finalCategory
 	si.Model = finalModel
 	si.Vendor = finalVendor
@@ -146,9 +140,6 @@ var (
 	// https://www.iana.org/assignments/enterprise-numbers.txt
 	//go:embed "enterprise-numbers.txt"
 	enterpriseNumberTxt []byte
-	// https://github.com/parthiganesh/snmp-sysObjectID
-	//go:embed "sysObjectIDs.json"
-	sysObjectIDsJson []byte
 
 	enterpriseNumbers = func() map[string]string {
 		if len(enterpriseNumberTxt) == 0 {
@@ -192,17 +183,6 @@ var (
 
 		return mapping
 	}()
-	sysObjectIDs = func() map[string]sysObjectIDMeta {
-		if len(sysObjectIDsJson) == 0 {
-			panic("snmp: sysObjectIDs.json is empty")
-		}
-
-		var ids = map[string]sysObjectIDMeta{}
-		if err := json.Unmarshal(sysObjectIDsJson, &ids); err != nil {
-			panic(fmt.Sprintf("snmp: invalid sysObjectIDs.json: %v", err))
-		}
-		return ids
-	}()
 )
 
 func lookupEnterpriseNumber(sysObject string) string {
@@ -216,16 +196,6 @@ func lookupEnterpriseNumber(sysObject string) string {
 		return ""
 	}
 	return enterpriseNumbers[num]
-}
-
-func lookupSysObjectIDMeta(sysObject string) (sysObjectIDMeta, bool) {
-	meta, ok := sysObjectIDs[sysObject]
-	return meta, ok
-}
-
-type sysObjectIDMeta struct {
-	Category string
-	Model    string
 }
 
 func PduToString(pdu gosnmp.SnmpPDU) (string, error) {
