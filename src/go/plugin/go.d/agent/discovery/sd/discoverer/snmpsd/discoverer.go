@@ -17,6 +17,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/model"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/filepersister"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/iprange"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
 const (
@@ -249,7 +250,7 @@ func (d *Discoverer) probeIPAddress(ctx context.Context, sub subnet, ip string, 
 	tgg.addTarget(tg)
 }
 
-func (d *Discoverer) getSnmpSysInfo(sub subnet, ip string) (*SysInfo, error) {
+func (d *Discoverer) getSnmpSysInfo(sub subnet, ip string) (*snmputils.SysInfo, error) {
 	client, cleanup := d.newSnmpClient()
 	defer cleanup()
 
@@ -264,7 +265,7 @@ func (d *Discoverer) getSnmpSysInfo(sub subnet, ip string) (*SysInfo, error) {
 
 	defer func() { _ = client.Close() }()
 
-	return GetSysInfo(client)
+	return snmputils.GetSysInfo(client)
 }
 
 func send(ctx context.Context, in chan<- []model.TargetGroup, tgg model.TargetGroup) {
