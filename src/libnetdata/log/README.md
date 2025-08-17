@@ -508,51 +508,54 @@ Container logs are automatically collected by the orchestration platform's loggi
 
 ## SIEM Integration
 
-Netdata's structured logging system is designed for seamless integration with Security Information and Event Management (SIEM) platforms. The combination of structured fields, unique message IDs, and multiple output formats makes Netdata logs ideal for security monitoring and compliance.
+Netdata's structured logging system is designed for seamless integration with all major Security Information and Event Management (SIEM) platforms. Logs are emitted in **standards-compliant formats** — systemd-journal, JSON, logfmt, syslog (RFC5424), Windows Event Log (WEL), and Event Tracing for Windows (ETW).  
+
+This guarantees compatibility with SIEMs including (but not limited to):  
+**Splunk, Elastic Security (ELK Stack / OpenSearch), IBM QRadar, Microsoft Sentinel, Wazuh, CrowdStrike Falcon LogScale, Datadog Security Monitoring, Sumo Logic, LogRhythm, Securonix, ArcSight, Graylog, Chronicle SIEM, AlienVault OSSIM, Devo, Exabeam, Rapid7 InsightIDR, McAfee Enterprise Security Manager (ESM), Fortinet FortiSIEM, SolarWinds SEM, AT&T Cybersecurity USM, RSA NetWitness.**
+
+### Supported Log Formats and SIEM Compatibility
+
+| Format / Output             | Description                                                        | Commonly Used By                                                                 |
+| --------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| **systemd-journal**         | Native Linux logging with structured fields, tamper-proof with FSS | Splunk (journald input), Elastic Filebeat/Journalbeat, Wazuh, QRadar, Sentinel   |
+| **ETW (Event Tracing)**     | Rich structured events in Event Viewer (Windows native)            | Splunk UF (Win), Sentinel, QRadar, LogRhythm, ArcSight, Elastic Winlogbeat       |
+| **WEL (Windows Event Log)** | Legacy Windows Event Log array-based fields                        | All Windows SIEM agents (Splunk UF, Sentinel, QRadar, Wazuh, Elastic Winlogbeat) |
+| **JSON**                    | Structured JSON objects with key-value pairs                       | Elastic/Logstash, Splunk (indexed extractions), Datadog, Sumo Logic, Graylog     |
+| **logfmt**                  | Human-readable `key=value` logs                                    | Traditional syslog pipelines, Graylog, SolarWinds SEM, legacy SIEM integrations  |
+| **syslog (RFC5424)**        | Standard syslog protocol                                           | QRadar, ArcSight, LogRhythm, FortiSIEM, AlienVault OSSIM, RSA NetWitness, Devo   |
 
 ### Key Integration Features
 
-1. **Structured Logs** - No parsing required. All events include contextual fields that can be directly mapped to SIEM schemas.
+1. **Structured Logs** – All Netdata events contain contextual fields, no regex parsing required.  
+2. **Message IDs (UUIDs)** – Unique identifiers for alert transitions, service lifecycle events, configuration changes, and network connections. Enables precise rule building without pattern matching.  
+3. **Multiple Output Options** – Select the best integration path for your SIEM: journald (Linux), ETW/WEL (Windows), JSON/logfmt (cross-platform), syslog (legacy).  
+4. **Security-Relevant Events** – Alert transitions, anomalous resource use, configuration changes, service errors, API access attempts.  
+5. **Compliance Support** – Journald Forward Secure Sealing (FSS) and Windows Event Log immutability controls support PCI DSS, ISO 27001, SOC 2, HIPAA, and other frameworks.  
 
-2. **Unique Event Identifiers** - Message IDs (UUIDs) enable precise filtering and correlation across distributed infrastructure.
+### Recommended Outputs
 
-3. **Multiple Output Options** - Choose the best integration method for your SIEM:
-   - **Direct Integration**: Use systemd-journal (Linux) or ETW (Windows) for native collection
-   - **File-Based**: JSON or logfmt files for universal compatibility
-   - **Network**: Syslog for traditional SIEM collectors
+If you want **zero-configuration ingestion**, choose **systemd-journal** on Linux and **ETW** on Windows.  
+JSON/logfmt are universally portable but require custom field mapping inside your SIEM.  
+Syslog is provided for legacy collectors.
 
-4. **Security-Relevant Events** - Health source provides critical security signals:
-   - Alert transitions for threat detection
-   - System resource anomalies
-   - Service lifecycle events
-   - Network connection patterns
+| Platform           | Best Output     | Why                                                                |
+| ------------------ | --------------- | ------------------------------------------------------------------ |
+| **Linux**          | systemd-journal | Zero-config ingestion, structured fields, tamper-proofing with FSS |
+| **Windows**        | ETW             | Structured named fields in Event Viewer, native SIEM support       |
+| **Cross-Platform** | JSON            | Universally portable, works everywhere, requires mapping rules     |
+| **Legacy Unix**    | syslog          | Compatibility with traditional SIEM collectors (RFC5424)           |
 
-5. **Compliance Support** - Full audit trail with:
-   - API access logs with user details
-   - Configuration change events
-   - Alert acknowledgments and notifications
-   - Timestamp precision to microseconds
+### Integration Workflow
 
-### Integration Approach
+1. **Select log format** appropriate to your environment.  
+2. **Enable relevant sources** (`health` for alerts, `access` for audit trails, `daemon` for lifecycle events).  
+3. **Configure SIEM collection**:  
+   - Journald → SIEM agent (Splunk UF, Filebeat, Wazuh agent, QRadar DSM)  
+   - ETW/WEL → Windows Event Forwarding, Winlogbeat, Splunk UF, Sentinel Connector  
+   - JSON/logfmt → Filebeat, Logstash, Fluent Bit, Graylog input, Sumo Logic agent  
+   - Syslog → Direct to SIEM collector (QRadar, ArcSight, LogRhythm, FortiSIEM)  
+4. **Use Message IDs** to build reliable detection rules:  
+   - Alert storms → `9ce0cb58-ab8b-44df-82c4-bf1ad9ee22de`  
+   - Service restarts → startup/shutdown IDs  
+   - Unexpected parent/child connections → connection IDs  
 
-1. **Select Log Format** - Configure Netdata to output in your SIEM's preferred format (typically JSON or journal)
-
-2. **Select Relevant Sources** - Enable only the log sources needed for your security use cases:
-   - `health` for security alerts
-   - `access` for audit trails
-   - `daemon` for service integrity
-
-3. **Configure Collection** - Point your SIEM's log collector to:
-   - systemd journal with namespace `netdata` (Linux)
-   - Event Viewer → Netdata channels (Windows)
-   - JSON log files (Universal)
-
-4. **Map Fields** - Netdata's field names are consistent across formats, making it easy to create SIEM parsing rules
-
-5. **Create Detection Rules** - Use Message IDs and structured fields to build detection patterns for:
-   - Alert storms (potential DDoS)
-   - Service instability (exploitation attempts)
-   - Unusual connection patterns (lateral movement)
-   - Resource exhaustion (cryptomining)
-
-The structured nature of Netdata logs eliminates the need for complex parsing rules, regex patterns, or custom extractors that are typically required when integrating with SIEMs. This reduces implementation time and ensures reliable event correlation across your security infrastructure.
