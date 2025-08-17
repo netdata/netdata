@@ -10,11 +10,11 @@ import (
 	"github.com/gosnmp/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/discoverer/snmpsd"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
 //go:embed "config_schema.json"
@@ -90,7 +90,7 @@ type Collector struct {
 
 	netInterfaces map[string]*netInterface
 
-	sysInfo *snmpsd.SysInfo
+	sysInfo *snmputils.SysInfo
 
 	customOids []string
 
@@ -140,7 +140,7 @@ func (c *Collector) Init(context.Context) error {
 }
 
 func (c *Collector) Check(context.Context) error {
-	if _, err := snmpsd.GetSysInfo(c.snmpClient); err != nil {
+	if _, err := snmputils.GetSysInfo(c.snmpClient); err != nil {
 		return err
 	}
 	ok, err := c.adjustMaxRepetitions()
