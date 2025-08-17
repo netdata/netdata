@@ -5,6 +5,7 @@
 #include "libnetdata/os/windows-wmi/windows-wmi.h"
 
 #include <windows.h>
+#include <wchar.h>
 
 #include <sensorsapi.h>
 #include <sensors.h>
@@ -12,6 +13,8 @@
 
 static ISensorManager *pSensorManager = NULL;
 static ND_THREAD *sensors_thread_update = NULL;
+
+#define NETDATA_WIN_SENSOR_STATES (6)
 
 struct sensor_data {
     bool initialized;
@@ -22,6 +25,9 @@ struct sensor_data {
     const char *model;
 
     SensorState current_state;
+
+    RRDSET *sensor_state;
+    RRDDIM *rd_sensor_state[NETDATA_WIN_SENSOR_STATES];
 };
 
 DICTIONARY *sensors;
@@ -63,6 +69,7 @@ static inline char *netdata_pvar_to_char(HRESULT hr, PROPVARIANT *pv) {
         char value[8192];
         size_t len = wcslen(pv->pwszVal);
         wcstombs(value, pv->pwszVal, len);
+        return strdupz(value);
     }
     return NULL;
 }
@@ -95,7 +102,7 @@ static void netdata_initialize_sensor_dict(struct sensor_data *s, ISensor *pSens
     netdata_fill_sensor_type(s, pSensor);
     netdata_fill_sensor_category(s, pSensor);
     netdata_fill_sensor_name(s, pSensor);
-    netdata_fill_sensor_name(s, pSensor);
+    netdata_fill_sensor_model(s, pSensor);
     netdata_fill_sensor_manufacturer(s, pSensor);
 }
 
@@ -196,6 +203,61 @@ static int initialize(int update_every)
     return 0;
 }
 
+static void mssql_db_states_chart(struct sensor_data *sd, int update_every)
+{
+    if (!sd->sensor_state) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "%s_state", sd->name);
+        netdata_fix_chart_name(id);
+        sd->sensor_state = rrdset_create_localhost(
+                "sensors",
+                id,
+                NULL,
+                "sensors",
+                "system.hw.sensor.state",
+                "Current sensor state.",
+                "status",
+                PLUGIN_WINDOWS_NAME,
+                "GetSensors",
+                70010,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        rrdlabels_add(sd->sensor_state->rrdlabels, "name", sd->name, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(sd->sensor_state->rrdlabels, "manufacturer", sd->manufacturer, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(sd->sensor_state->rrdlabels, "model", sd->model, RRDLABEL_SRC_AUTO);
+
+        sd->rd_sensor_state[0] = rrddim_add(sd->sensor_state, "ready", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        sd->rd_sensor_state[1] = rrddim_add(sd->sensor_state, "not_available", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        sd->rd_sensor_state[2] = rrddim_add(sd->sensor_state, "no_data", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        sd->rd_sensor_state[3] = rrddim_add(sd->sensor_state, "initializing", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        sd->rd_sensor_state[4] = rrddim_add(sd->sensor_state, "access_denied", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        sd->rd_sensor_state[5] = rrddim_add(sd->sensor_state, "error", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+}
+
+static void mssql_sensor_state_chart_loop(struct sensor_data *sd, int update_every)
+{
+    mssql_db_states_chart(sd, update_every);
+    collected_number set_value = (collected_number)sd->current_state;
+    for (collected_number i = 0; i < NETDATA_WIN_SENSOR_STATES; i++) {
+        rrddim_set_by_pointer(sd->sensor_state, sd->rd_sensor_state[i], i == set_value);
+    }
+    rrdset_done(sd->sensor_state);
+}
+
+int dict_sensors_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
+    int *update_every = data;
+    struct sensor_data *sd = value;
+
+    if (unlikely(!sd->name))
+        return 1;
+
+    mssql_sensor_state_chart_loop(sd, *update_every);
+    return 1;
+}
+
 int do_GetSensors(int update_every, usec_t dt __maybe_unused)
 {
     static bool initialized = false;
@@ -206,6 +268,8 @@ int do_GetSensors(int update_every, usec_t dt __maybe_unused)
 
         initialized = true;
     }
+
+    dictionary_sorted_walkthrough_read(sensors, dict_sensors_charts_cb, &update_every);
     return 0;
 }
 
