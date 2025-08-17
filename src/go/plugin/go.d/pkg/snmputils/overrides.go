@@ -60,13 +60,13 @@ func loadOverrides() {
 
 func getOverridesPath() string {
 	if executable.Name == "test" {
-		dir, _ := filepath.Abs("../../../config/go.d/snmp.profiles/overrides.yaml")
+		dir, _ := filepath.Abs("../../../config/go.d/snmp.profiles/meta_overrides.yaml")
 		return dir
 	}
-	if path := filepath.Join(executable.Directory, "..", "config", executable.Name, "snmp.profiles", "overrides.yaml"); isFileExists(path) {
+	if path := filepath.Join(executable.Directory, "..", "config", executable.Name, "snmp.profiles", "meta_overrides.yaml"); isFileExists(path) {
 		return path
 	}
-	return filepath.Join(pluginconfig.CollectorsStockDir(), "snmp.profiles", "overrides.yaml")
+	return filepath.Join(pluginconfig.CollectorsStockDir(), "snmp.profiles", "meta_overrides.yaml")
 }
 
 func isFileExists(path string) bool {

@@ -3767,7 +3767,7 @@ if(ENABLE_PLUGIN_GO)
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/snmp.profiles/default)
 
-    install(FILES src/go/plugin/go.d/config/go.d/snmp.profiles/overrides.yaml
+    install(FILES src/go/plugin/go.d/config/go.d/snmp.profiles/meta_overrides.yaml
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/snmp.profiles)
 
