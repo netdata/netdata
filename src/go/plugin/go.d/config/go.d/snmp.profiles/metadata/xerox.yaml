@@ -1,0 +1,989 @@
+sysobjectids:
+  oid_overrides:
+    1.3.6.1.4.1.253.8.62.1.1.3.1.1:
+      category: Printer
+      model: Doc-Centre 230ST
+    1.3.6.1.4.1.253.8.62.1.1.3.1.2:
+      category: Printer
+      model: Doc-Centre 230ST
+    1.3.6.1.4.1.253.8.62.1.1.3.1.3:
+      category: Printer
+      model: Doc-Centre 230ST
+    1.3.6.1.4.1.253.8.62.1.1.3.1.4:
+      category: Printer
+      model: Doc-Centre 230ST
+    1.3.6.1.4.1.253.8.62.1.1.3.1.5:
+      category: Printer
+      model: Document Center 230ST
+    1.3.6.1.4.1.253.8.62.1.1.3.2.1:
+      category: Printer
+      model: DOCUMENT CENTER 230LPv1
+    1.3.6.1.4.1.253.8.62.1.1.3.2.2:
+      category: Printer
+      model: DOCUMENT CENTER 230LPv2
+    1.3.6.1.4.1.253.8.62.1.1.3.2.3:
+      category: Printer
+      model: DOCUMENT CENTER 230LPv3
+    1.3.6.1.4.1.253.8.62.1.1.3.2.4:
+      category: Printer
+      model: DOCUMENT CENTER 230LPv4
+    1.3.6.1.4.1.253.8.62.1.1.3.2.5:
+      category: Printer
+      model: DOCUMENT CENTER 230LPv5
+    1.3.6.1.4.1.253.8.62.1.1.4.1.1:
+      category: Printer
+      model: Document Center 265ST
+    1.3.6.1.4.1.253.8.62.1.1.4.1.2:
+      category: Printer
+      model: Doc-Center 265ST
+    1.3.6.1.4.1.253.8.62.1.1.4.1.3:
+      category: Printer
+      model: Document Center 265St
+    1.3.6.1.4.1.253.8.62.1.1.4.2.1:
+      category: Printer
+      model: Document Center 265LP
+    1.3.6.1.4.1.253.8.62.1.1.4.2.2:
+      category: Printer
+      model: Doc-Center 265LP
+    1.3.6.1.4.1.253.8.62.1.1.4.2.3:
+      category: Printer
+      model: Doc-Center 265LP
+    1.3.6.1.4.1.253.8.62.1.1.5.1.1:
+      category: Printer
+      model: Document Center 240ST
+    1.3.6.1.4.1.253.8.62.1.1.5.1.2:
+      category: Printer
+      model: Doc-Center 240ST
+    1.3.6.1.4.1.253.8.62.1.1.5.1.3:
+      category: Printer
+      model: Doc-Center 240ST
+    1.3.6.1.4.1.253.8.62.1.1.6.1.1:
+      category: Printer
+      model: Document Centre 332/340 ST
+    1.3.6.1.4.1.253.8.62.1.1.6.1.2:
+      category: Printer
+      model: Document Centre 340ST
+    1.3.6.1.4.1.253.8.62.1.1.6.1.3:
+      category: Printer
+      model: Doc-Centre 340ST
+    1.3.6.1.4.1.253.8.62.1.1.6.2.1:
+      category: Printer
+      model: Doc-Centre 340LP
+    1.3.6.1.4.1.253.8.62.1.1.6.2.2:
+      category: Printer
+      model: Document Centre 340LP
+    1.3.6.1.4.1.253.8.62.1.1.6.2.3:
+      category: Printer
+      model: Doc-Centre 340LP
+    1.3.6.1.4.1.253.8.62.1.1.7.1.1:
+      category: Printer
+      model: Doc-Centre 255ST
+    1.3.6.1.4.1.253.8.62.1.1.7.1.2:
+      category: Printer
+      model: Document Centre 255ST
+    1.3.6.1.4.1.253.8.62.1.1.7.1.3:
+      category: Printer
+      model: Doc-Centre 255ST
+    1.3.6.1.4.1.253.8.62.1.1.7.2.1:
+      category: Printer
+      model: Document Centre 255LP
+    1.3.6.1.4.1.253.8.62.1.1.7.2.2:
+      category: Printer
+      model: Doc-Centre 255LP
+    1.3.6.1.4.1.253.8.62.1.1.7.2.3:
+      category: Printer
+      model: Doc-Centre 255LP
+    1.3.6.1.4.1.253.8.62.1.1.8.1.3:
+      category: Printer
+      model: Document Centre 220/230ST
+    1.3.6.1.4.1.253.8.62.1.1.8.1.4:
+      category: Printer
+      model: Doc-Centre
+    1.3.6.1.4.1.253.8.62.1.1.9.1.1:
+      category: Printer
+      model: Document Centre 332/340ST
+    1.3.6.1.4.1.253.8.62.1.1.9.1.2:
+      category: Printer
+      model: Doc-Centre 332ST
+    1.3.6.1.4.1.253.8.62.1.1.9.1.3:
+      category: Printer
+      model: Document Centre 332ST
+    1.3.6.1.4.1.253.8.62.1.1.9.2.1:
+      category: Printer
+      model: Document Centre 332LP
+    1.3.6.1.4.1.253.8.62.1.1.9.2.2:
+      category: Printer
+      model: Doc-Centre 332LP
+    1.3.6.1.4.1.253.8.62.1.1.9.2.3:
+      category: Printer
+      model: Doc-Centre 332LP
+    1.3.6.1.4.1.253.8.62.1.1.17.1.1:
+      category: Printer
+      model: Doc-Centre 450
+    1.3.6.1.4.1.253.8.62.1.1.17.1.2:
+      category: Printer
+      model: Document Centre 450
+    1.3.6.1.4.1.253.8.62.1.1.17.2.1:
+      category: Printer
+      model: Doc-Centre 460
+    1.3.6.1.4.1.253.8.62.1.1.17.2.2:
+      category: Printer
+      model: Document Centre 460
+    1.3.6.1.4.1.253.8.62.1.1.17.2.3:
+      category: Printer
+      model: DOCUMENT CENTER DC460V3
+    1.3.6.1.4.1.253.8.62.1.1.17.3.1:
+      category: Printer
+      model: Doc-Centre 465
+    1.3.6.1.4.1.253.8.62.1.1.17.3.2:
+      category: Printer
+      model: Document Centre 465
+    1.3.6.1.4.1.253.8.62.1.1.17.4.1:
+      category: Printer
+      model: Doc-Centre 470
+    1.3.6.1.4.1.253.8.62.1.1.17.4.2:
+      category: Printer
+      model: Document Centre 470
+    1.3.6.1.4.1.253.8.62.1.1.17.4.3:
+      category: Printer
+      model: DOCUMENT CENTER DC470V3
+    1.3.6.1.4.1.253.8.62.1.1.17.5.1:
+      category: Printer
+      model: Document Centre 475
+    1.3.6.1.4.1.253.8.62.1.1.17.5.2:
+      category: Printer
+      model: Doc-Centre 475
+    1.3.6.1.4.1.253.8.62.1.1.18.1.1:
+      category: Printer
+      model: Document Centre 495
+    1.3.6.1.4.1.253.8.62.1.1.18.2.1:
+      category: Printer
+      model: Document Centre Centre 4110
+    1.3.6.1.4.1.253.8.62.1.1.19.1.1:
+      category: Printer
+      model: Doc-Centre 420ST
+    1.3.6.1.4.1.253.8.62.1.1.19.1.2:
+      category: Printer
+      model: Doc-Centre 420ST
+    1.3.6.1.4.1.253.8.62.1.1.19.1.3:
+      category: Printer
+      model: Document Centre 420ST
+    1.3.6.1.4.1.253.8.62.1.1.19.2.1:
+      category: Printer
+      model: Doc-Centre
+    1.3.6.1.4.1.253.8.62.1.1.19.2.2:
+      category: Printer
+      model: Doc-Centre
+    1.3.6.1.4.1.253.8.62.1.1.20.1.1:
+      category: Printer
+      model: Document Centre 432ST
+    1.3.6.1.4.1.253.8.62.1.1.20.1.2:
+      category: Printer
+      model: Doc-Centre 432ST
+    1.3.6.1.4.1.253.8.62.1.1.20.1.3:
+      category: Printer
+      model: Doc-Centre 432ST
+    1.3.6.1.4.1.253.8.62.1.1.20.1.4:
+      category: Printer
+      model: Doc-Centre
+    1.3.6.1.4.1.253.8.62.1.1.20.1.5:
+      category: Printer
+      model: Doc-Centre
+    1.3.6.1.4.1.253.8.62.1.1.20.2.1:
+      category: Printer
+      model: Doc-Centre
+    1.3.6.1.4.1.253.8.62.1.1.21.1.1:
+      category: Printer
+      model: Doc-Centre 440ST
+    1.3.6.1.4.1.253.8.62.1.1.21.1.2:
+      category: Printer
+      model: Document Centre 440ST
+    1.3.6.1.4.1.253.8.62.1.1.21.1.3:
+      category: Printer
+      model: Doc-Centre 440ST
+    1.3.6.1.4.1.253.8.62.1.1.22.1.1:
+      category: Printer
+      model: Doc-Centre 230ST
+    1.3.6.1.4.1.253.8.62.1.1.22.1.2:
+      category: Printer
+      model: Document Centre 230ST
+    1.3.6.1.4.1.253.8.62.1.1.22.1.3:
+      category: Printer
+      model: Doc-Centre 230ST
+    1.3.6.1.4.1.253.8.62.1.1.23.1.1:
+      category: Printer
+      model: Doc-Centre 480
+    1.3.6.1.4.1.253.8.62.1.1.23.1.2:
+      category: Printer
+      model: Document Centre 480
+    1.3.6.1.4.1.253.8.62.1.1.23.1.3:
+      category: Printer
+      model: Doc-Centre 480
+    1.3.6.1.4.1.253.8.62.1.1.23.2.1:
+      category: Printer
+      model: Document Centre 485
+    1.3.6.1.4.1.253.8.62.1.1.23.2.2:
+      category: Printer
+      model: Doc-Centre 485
+    1.3.6.1.4.1.253.8.62.1.1.24.1.1:
+      category: Printer
+      model: Document Centre 425ST
+    1.3.6.1.4.1.253.8.62.1.1.27.1:
+      category: Printer
+      model: Doc-Centre
+    1.3.6.1.4.1.253.8.62.1.1.27.1.2:
+      category: Printer
+      model: Document Centre Multi-Function System
+    1.3.6.1.4.1.253.8.62.1.2.1.1.1:
+      category: Printer
+      model: Docuprint 4512
+    1.3.6.1.4.1.253.8.62.1.2.2.1.1:
+      category: Printer
+      model: DocuPrint
+    1.3.6.1.4.1.253.8.62.1.2.2.2.1:
+      category: Printer
+      model: DocuPrint N17
+    1.3.6.1.4.1.253.8.62.1.2.3.1.1:
+      category: Printer
+      model: DocuPrint NC60
+    1.3.6.1.4.1.253.8.62.1.2.3.1.2:
+      category: Printer
+      model: DocuPrint NC60
+    1.3.6.1.4.1.253.8.62.1.2.3.2.1:
+      category: Printer
+      model: DocuPrint NC60
+    1.3.6.1.4.1.253.8.62.1.2.4.1.1:
+      category: Printer
+      model: DocuPrint
+    1.3.6.1.4.1.253.8.62.1.2.5.1.1:
+      category: Printer
+      model: Phaser 3400
+    1.3.6.1.4.1.253.8.62.1.3.2.1.1:
+      category: Printer
+      model: DocuPrint N24/N32
+    1.3.6.1.4.1.253.8.62.1.3.2.1.2:
+      category: Printer
+      model: DocuPrint N24/N32
+    1.3.6.1.4.1.253.8.62.1.3.2.2.1:
+      category: Printer
+      model: DocuPrint N24
+    1.3.6.1.4.1.253.8.62.1.3.2.2.2:
+      category: Printer
+      model: DocuPrint
+    1.3.6.1.4.1.253.8.62.1.3.2.3.1:
+      category: Printer
+      model: DocuPrint N40
+    1.3.6.1.4.1.253.8.62.1.3.2.3.2:
+      category: Printer
+      model: DocuPrint
+    1.3.6.1.4.1.253.8.62.1.3.2.17.1:
+      category: Printer
+      model: DocuPrint N2025
+    1.3.6.1.4.1.253.8.62.1.3.2.17.2:
+      category: Printer
+      model: DocuPrint N2025
+    1.3.6.1.4.1.253.8.62.1.3.2.18.1:
+      category: Printer
+      model: DocuPrint N2125
+    1.3.6.1.4.1.253.8.62.1.3.2.18.2:
+      category: Printer
+      model: DocuPrint N2125
+    1.3.6.1.4.1.253.8.62.1.3.2.19.1:
+      category: Printer
+      model: DocuPrint
+    1.3.6.1.4.1.253.8.62.1.3.2.20.1:
+      category: Printer
+      model: DocuPrint N2825
+    1.3.6.1.4.1.253.8.62.1.3.2.20.2:
+      category: Printer
+      model: DocuPrint N2825
+    1.3.6.1.4.1.253.8.62.1.3.2.21.1:
+      category: Printer
+      model: DocuPrint N3225
+    1.3.6.1.4.1.253.8.62.1.3.2.21.2:
+      category: Printer
+      model: DocuPrint N3225
+    1.3.6.1.4.1.253.8.62.1.3.2.22.1:
+      category: Printer
+      model: DocuPrint N4025
+    1.3.6.1.4.1.253.8.62.1.3.2.22.2:
+      category: Printer
+      model: DocuPrint N4025
+    1.3.6.1.4.1.253.8.62.1.3.2.36.1:
+      category: Printer
+      model: DocuPrint N4525
+    1.3.6.1.4.1.253.8.62.1.3.3.1.1:
+      category: Printer
+      model: DocuPrint NC1235
+    1.3.6.1.4.1.253.8.62.1.3.3.2.1:
+      category: Printer
+      model: Phaser 2135
+    1.3.6.1.4.1.253.8.62.1.4.2.1.1:
+      category: Printer
+      model: Doc-Centre
+    1.3.6.1.4.1.253.8.62.1.4.2.1.2:
+      category: Printer
+      model: Document Centre ColorSeries 50
+    1.3.6.1.4.1.253.8.62.1.5.1.1.1:
+      category: Printer
+      model: DocuTech 6180
+    1.3.6.1.4.1.253.8.62.1.5.20.3.1:
+      category: Printer
+      model: 4110 EPS
+    1.3.6.1.4.1.253.8.62.1.5.21.5.1.1:
+      category: Printer
+      model: Color 550
+    1.3.6.1.4.1.253.8.62.1.5.22.2.1:
+      category: Printer
+      model: 4112 EPS
+    1.3.6.1.4.1.253.8.62.1.5.22.4.1:
+      category: Printer
+      model: 4127 Enterprise Printing System
+    1.3.6.1.4.1.253.8.62.1.5.22.6.1.1:
+      category: Printer
+      model: D110
+    1.3.6.1.4.1.253.8.62.1.17.7.17.1:
+      category: Printer
+      model: DocuColor 242
+    1.3.6.1.4.1.253.8.62.1.17.17.1.1.1:
+      category: Printer
+      model: Color 800 Press
+    1.3.6.1.4.1.253.8.62.1.19.1.4.1:
+      category: Printer
+      model: Phaser 3428
+    1.3.6.1.4.1.253.8.62.1.19.1.9.1:
+      category: Printer
+      model: Phaser 3600
+    1.3.6.1.4.1.253.8.62.1.19.1.24.1.1:
+      category: Printer
+      model: Phaser 4600
+    1.3.6.1.4.1.253.8.62.1.19.1.24.2.1:
+      category: Printer
+      model: Phaser 4600
+    1.3.6.1.4.1.253.8.62.1.19.1.25.1.1:
+      category: Printer
+      model: Phaser 4620
+    1.3.6.1.4.1.253.8.62.1.19.1.30.2.1:
+      category: Printer
+      model: Phaser 3610
+    1.3.6.1.4.1.253.8.62.1.19.2.1.1:
+      category: Printer
+      model: Phaser 4400N
+    1.3.6.1.4.1.253.8.62.1.19.2.1.2:
+      category: Printer
+      model: Phaser 4400DT
+    1.3.6.1.4.1.253.8.62.1.19.2.1.3:
+      category: Printer
+      model: Phaser 4400DT
+    1.3.6.1.4.1.253.8.62.1.19.2.1.4:
+      category: Printer
+      model: Phaser 4400B
+    1.3.6.1.4.1.253.8.62.1.19.2.2.1:
+      category: Printer
+      model: Phaser 4500N
+    1.3.6.1.4.1.253.8.62.1.19.2.3.2:
+      category: Printer
+      model: Phaser 4510N
+    1.3.6.1.4.1.253.8.62.1.19.2.3.3:
+      category: Printer
+      model: Phaser 4510DT
+    1.3.6.1.4.1.253.8.62.1.19.3.2.3:
+      category: Printer
+      model: Phaser 5550DN
+    1.3.6.1.4.1.253.8.62.1.19.3.2.4:
+      category: Printer
+      model: Phaser 5550DT
+    1.3.6.1.4.1.253.8.62.1.19.4.1.1:
+      category: Printer
+      model: Phaser 6200B
+    1.3.6.1.4.1.253.8.62.1.19.4.1.2:
+      category: Printer
+      model: Phaser 6200N
+    1.3.6.1.4.1.253.8.62.1.19.4.1.3:
+      category: Printer
+      model: Phaser 6200 DP
+    1.3.6.1.4.1.253.8.62.1.19.4.1.4:
+      category: Printer
+      model: Phaser 6200 DX
+    1.3.6.1.4.1.253.8.62.1.19.4.2.1:
+      category: Printer
+      model: Phaser 6100DN
+    1.3.6.1.4.1.253.8.62.1.19.4.2.2:
+      category: Printer
+      model: Phaser 6100BD
+    1.3.6.1.4.1.253.8.62.1.19.4.3:
+      category: Printer
+      model: Phaser 6250
+    1.3.6.1.4.1.253.8.62.1.19.4.3.3:
+      category: Printer
+      model: Phaser 6250DP
+    1.3.6.1.4.1.253.8.62.1.19.4.4.3:
+      category: Printer
+      model: Phaser 6300DN
+    1.3.6.1.4.1.253.8.62.1.19.4.8.1:
+      category: Printer
+      model: Phaser 6360N
+    1.3.6.1.4.1.253.8.62.1.19.4.8.2:
+      category: Printer
+      model: Phaser 6360DN
+    1.3.6.1.4.1.253.8.62.1.19.4.8.3:
+      category: Printer
+      model: Phaser 6360DT
+    1.3.6.1.4.1.253.8.62.1.19.4.9.1:
+      category: Printer
+      model: Phaser 6180N
+    1.3.6.1.4.1.253.8.62.1.19.4.20.1:
+      category: Printer
+      model: Phaser 6110MFP
+    1.3.6.1.4.1.253.8.62.1.19.4.21.2:
+      model: Phaser 6180 MFP
+    1.3.6.1.4.1.253.8.62.1.19.4.23.1:
+      category: Printer
+      model: Phaser 6130N
+    1.3.6.1.4.1.253.8.62.1.19.4.25.1.1:
+      category: Printer
+      model: Phaser 6280N
+    1.3.6.1.4.1.253.8.62.1.19.4.30.2.1:
+      category: Printer
+      model: Phaser 6700DN
+    1.3.6.1.4.1.253.8.62.1.19.4.33.2.1:
+      category: Printer
+      model: Phaser 6500DN
+    1.3.6.1.4.1.253.8.62.1.19.4.34.2.1:
+      category: Printer
+      model: WorkCentre 6505DN
+    1.3.6.1.4.1.253.8.62.1.19.4.37.2.1:
+      category: Printer
+      model: Phaser 6600DN
+    1.3.6.1.4.1.253.8.62.1.19.4.40.2.1:
+      category: Printer
+      model: Phaser 6510
+    1.3.6.1.4.1.253.8.62.1.19.5.1.1:
+      category: Printer
+      model: Phaser 7300 DN
+    1.3.6.1.4.1.253.8.62.1.19.5.1.2:
+      category: Printer
+      model: Phaser 7300N
+    1.3.6.1.4.1.253.8.62.1.19.5.1.3:
+      category: Printer
+      model: Phaser 7300DT
+    1.3.6.1.4.1.253.8.62.1.19.5.1.4:
+      category: Printer
+      model: Phaser 7300DX
+    1.3.6.1.4.1.253.8.62.1.19.5.1.5:
+      category: Printer
+      model: Phaser 7300B
+    1.3.6.1.4.1.253.8.62.1.19.5.3.2:
+      category: Printer
+      model: Phaser 7750DN
+    1.3.6.1.4.1.253.8.62.1.19.5.4.2:
+      category: Printer
+      model: Phaser 7760DN
+    1.3.6.1.4.1.253.8.62.1.19.5.5.3:
+      category: Printer
+      model: Phaser 7500DT
+    1.3.6.1.4.1.253.8.62.1.19.5.6.3.1:
+      category: Printer
+      model: Phaser 7800GX
+    1.3.6.1.4.1.253.8.62.1.19.6:
+      category: Printer
+      model: Phaser 8400
+    1.3.6.1.4.1.253.8.62.1.19.6.2.2:
+      category: Printer
+      model: Printer
+    1.3.6.1.4.1.253.8.62.1.19.6.3.1:
+      model: Phaser 8560DP
+    1.3.6.1.4.1.253.8.62.1.19.6.3.2:
+      category: Printer
+      model: Phaser 8850DT
+    1.3.6.1.4.1.253.8.62.1.19.6.9.2:
+      category: Printer
+      model: Phaser 8560DN
+    1.3.6.1.4.1.253.8.62.1.19.6.9.3:
+      category: Printer
+      model: Phaser 8560DT
+    1.3.6.1.4.1.253.8.62.1.19.6.17.1:
+      category: Printer
+      model: Phaser 8860
+    1.3.6.1.4.1.253.8.62.1.19.6.18.1:
+      category: Printer
+      model: Phaser 8860 MFP
+    1.3.6.1.4.1.253.8.62.1.19.6.29.1.2:
+      model: Phaser 3320
+    1.3.6.1.4.1.253.8.62.1.19.6.29.2.2:
+      category: Printer
+      model: Phaser 3320
+    1.3.6.1.4.1.253.8.62.1.19.7.1.1.1:
+      category: Printer
+      model: Phaser 3330
+    1.3.6.1.4.1.253.8.62.1.20.1.2:
+      category: Printer
+      model: WorkCentre Pro
+    1.3.6.1.4.1.253.8.62.1.20.1.2.2:
+      category: Printer
+      model: WorkCentre Pro MFS
+    1.3.6.1.4.1.253.8.62.1.20.1.3.1:
+      category: Printer
+      model: WorkCentre Pro MFS
+    1.3.6.1.4.1.253.8.62.1.20.1.4.2:
+      category: Printer
+      model: WorkCentre Pro MFS
+    1.3.6.1.4.1.253.8.62.1.20.1.6.2:
+      category: Printer
+      model: WorkCentre Pro 65
+    1.3.6.1.4.1.253.8.62.1.20.1.8.2:
+      category: Printer
+      model: WorkCentre Pro MFS
+    1.3.6.1.4.1.253.8.62.1.20.1.19.1:
+      category: Printer
+      model: WorkCentre Pro Multifunction System
+    1.3.6.1.4.1.253.8.62.1.20.1.20.1:
+      category: Printer
+      model: WorkCentre Pro
+    1.3.6.1.4.1.253.8.62.1.20.1.21.1:
+      category: Printer
+      model: WorkCentre Pro C3545
+    1.3.6.1.4.1.253.8.62.1.20.1.24.1:
+      category: Printer
+      model: WorkCentre Pro 265
+    1.3.6.1.4.1.253.8.62.1.20.1.25.1:
+      category: Printer
+      model: WorkCentre Pro
+    1.3.6.1.4.1.253.8.62.1.20.1.26.1:
+      category: Printer
+      model: WorkCentre 265
+    1.3.6.1.4.1.253.8.62.1.20.1.29.1:
+      category: Printer
+      model: WorkCentre 7665 v1
+    1.3.6.1.4.1.253.8.62.1.20.1.31.1:
+      category: Printer
+      model: WorkCentre 4118
+    1.3.6.1.4.1.253.8.62.1.20.2.1:
+      category: Printer
+      model: WorkCentre Pro
+    1.3.6.1.4.1.253.8.62.1.20.2.2:
+      category: Printer
+      model: WorkCentre
+    1.3.6.1.4.1.253.8.62.1.20.2.3:
+      category: Printer
+      model: WorkCentre
+    1.3.6.1.4.1.253.8.62.1.20.2.4:
+      category: Printer
+      model: WorkCentre
+    1.3.6.1.4.1.253.8.62.1.20.2.7:
+      category: Printer
+      model: WorkCentre
+    1.3.6.1.4.1.253.8.62.1.20.2.7.1:
+      category: Printer
+      model: WorkCentre M20i
+    1.3.6.1.4.1.253.8.62.1.20.2.21.1:
+      category: Printer
+      model: WorkCentre M118
+    1.3.6.1.4.1.253.8.62.1.20.2.22.1:
+      category: Printer
+      model: WorkCentre Pro 123
+    1.3.6.1.4.1.253.8.62.1.20.2.25:
+      category: Printer
+      model: WorkCentre
+    1.3.6.1.4.1.253.8.62.1.20.2.31.1:
+      category: Printer
+      model: WorkCentre Pro 238
+    1.3.6.1.4.1.253.8.62.1.20.2.32.1:
+      category: Printer
+      model: WorkCentre 5150
+    1.3.6.1.4.1.253.8.62.1.20.2.33.1:
+      category: Printer
+      model: WorkCentre Pro MFS
+    1.3.6.1.4.1.253.8.62.1.20.2.40.1.2:
+      category: Printer
+      model: WorkCentre 7335
+    1.3.6.1.4.1.253.8.62.1.20.2.41.1.2:
+      category: Printer
+      model: WorkCentre 5150
+    1.3.6.1.4.1.253.8.62.1.20.3.8.1:
+      category: Printer
+      model: WorkCentre 7132
+    1.3.6.1.4.1.253.8.62.1.20.3.9.1:
+      category: Printer
+      model: WorkCentre 7228
+    1.3.6.1.4.1.253.8.62.1.20.3.17.1:
+      category: Printer
+      model: WorkCentre 7235
+    1.3.6.1.4.1.253.8.62.1.20.3.35.1:
+      category: Printer
+      model: WorkCentre 5632 v1
+    1.3.6.1.4.1.253.8.62.1.20.3.35.1.1:
+      category: Printer
+      model: WorkCentre 5632 v1
+    1.3.6.1.4.1.253.8.62.1.20.3.37.1:
+      category: Printer
+      model: WorkCentre 5638 v1 Multifunction System
+    1.3.6.1.4.1.253.8.62.1.20.3.37.1.1:
+      category: Printer
+      model: WorkCentre 5638 v1
+    1.3.6.1.4.1.253.8.62.1.20.3.38.1:
+      category: Printer
+      model: WorkCentre 5645 v1 MFS
+    1.3.6.1.4.1.253.8.62.1.20.3.38.1.1:
+      category: Printer
+      model: WorkCentre 5645 v1 Multifunction System
+    1.3.6.1.4.1.253.8.62.1.20.3.39.1:
+      category: Printer
+      model: WorkCentre 5655
+    1.3.6.1.4.1.253.8.62.1.20.3.39.1.1:
+      category: Printer
+      model: WorkCentre 5655 v1
+    1.3.6.1.4.1.253.8.62.1.20.3.40.1.1:
+      category: Printer
+      model: WorkCentre 5665 v1
+    1.3.6.1.4.1.253.8.62.1.20.3.41.1:
+      category: Printer
+      model: WorkCentre 5675 v1 Multifunction System
+    1.3.6.1.4.1.253.8.62.1.20.4.4.1:
+      category: Printer
+      model: WorkCentre 5222
+    1.3.6.1.4.1.253.8.62.1.20.4.6.1:
+      category: Printer
+      model: WorkCentre 5225
+    1.3.6.1.4.1.253.8.62.1.20.4.9.1.1:
+      category: Printer
+      model: WorkCentre 5687 v1
+    1.3.6.1.4.1.253.8.62.1.20.4.18.1:
+      category: Printer
+      model: WorkCentre 5050
+    1.3.6.1.4.1.253.8.62.1.20.4.19.1:
+      category: Printer
+      model: WorkCentre 7328
+    1.3.6.1.4.1.253.8.62.1.20.4.20.1:
+      category: Printer
+      model: WorkCentre 7335
+    1.3.6.1.4.1.253.8.62.1.20.4.21.1:
+      category: Printer
+      model: WorkCentre 7345
+    1.3.6.1.4.1.253.8.62.1.20.4.22.1:
+      category: Printer
+      model: WorkCentre 7232
+    1.3.6.1.4.1.253.8.62.1.20.4.25.1:
+      category: Printer
+      model: WorkCentre 5020
+    1.3.6.1.4.1.253.8.62.1.20.4.27.1:
+      category: Printer
+      model: Phaser 3635MFP
+    1.3.6.1.4.1.253.8.62.1.20.4.34.1:
+      category: Printer
+      model: WorkCentre 4250
+    1.3.6.1.4.1.253.8.62.1.20.4.35.1:
+      category: Printer
+      model: WorkCentre 4260
+    1.3.6.1.4.1.253.8.62.1.20.4.39.1.1:
+      category: Printer
+      model: Color 550
+    1.3.6.1.4.1.253.8.62.1.20.5.1.1:
+      category: Printer
+      model: WorkCentre 7346
+    1.3.6.1.4.1.253.8.62.1.20.5.2.1:
+      category: Printer
+      model: WorkCentre 7425
+    1.3.6.1.4.1.253.8.62.1.20.5.3.1:
+      category: Printer
+      model: WorkCentre 7428
+    1.3.6.1.4.1.253.8.62.1.20.5.4.1:
+      category: Printer
+      model: WorkCentre 7435
+    1.3.6.1.4.1.253.8.62.1.20.5.5.2.1:
+      category: Printer
+      model: WorkCentre 6400X
+    1.3.6.1.4.1.253.8.62.1.20.5.7.1.2:
+      category: Printer
+      model: Color 560
+    1.3.6.1.4.1.253.8.62.1.20.5.19.1.1:
+      category: Printer
+      model: WorkCentre 7755
+    1.3.6.1.4.1.253.8.62.1.20.5.20.1.1:
+      category: Printer
+      model: WorkCentre 7765 v1 Multifunction System
+    1.3.6.1.4.1.253.8.62.1.20.5.21.1.1:
+      category: Printer
+      model: WorkCentre 7775
+    1.3.6.1.4.1.253.8.62.1.20.5.23.1:
+      category: Printer
+      model: WorkCentre 3220
+    1.3.6.1.4.1.253.8.62.1.20.5.24.2.1:
+      category: Printer
+      model: WorkCentre 3350
+    1.3.6.1.4.1.253.8.62.1.20.5.29.1.1:
+      category: Printer
+      model: WorkCentre 5735
+    1.3.6.1.4.1.253.8.62.1.20.5.31.1.1:
+      category: Printer
+      model: WorkCentre 5745
+    1.3.6.1.4.1.253.8.62.1.20.5.32.1.1:
+      category: Printer
+      model: WorkCentre 5755 v1 Multifunction System
+    1.3.6.1.4.1.253.8.62.1.20.5.33.1.1:
+      category: Printer
+      model: WorkCentre 5765
+    1.3.6.1.4.1.253.8.62.1.20.5.34.1.1:
+      category: Printer
+      model: WorkCentre 5775
+    1.3.6.1.4.1.253.8.62.1.20.5.36.1.1:
+      category: Printer
+      model: WorkCentre 7120
+    1.3.6.1.4.1.253.8.62.1.20.5.37.1.1:
+      category: Printer
+      model: WorkCentre 7525 v1 Multifunction System
+    1.3.6.1.4.1.253.8.62.1.20.5.39.1.1:
+      category: Printer
+      model: WorkCentre 7535 v1
+    1.3.6.1.4.1.253.8.62.1.20.5.40.1.1:
+      category: Printer
+      model: WorkCentre 7545 v1 Multifunction System
+    1.3.6.1.4.1.253.8.62.1.20.5.41.1.1:
+      category: Printer
+      model: WorkCentre 7556 v1 Multifunction System
+    1.3.6.1.4.1.253.8.62.1.20.6.1.1.1:
+      category: Printer
+      model: Color 560
+    1.3.6.1.4.1.253.8.62.1.20.6.3.1.1:
+      category: Printer
+      model: WorkCentre 5325
+    1.3.6.1.4.1.253.8.62.1.20.6.4.1.1:
+      category: Printer
+      model: WorkCentre 5330
+    1.3.6.1.4.1.253.8.62.1.20.6.5.1.1:
+      category: Printer
+      model: WorkCentre 5335
+    1.3.6.1.4.1.253.8.62.1.20.6.6.1.1:
+      category: Printer
+      model: WorkCentre 7125
+    1.3.6.1.4.1.253.8.62.1.20.6.19.1.1:
+      category: Printer
+      model: WorkCentre 5845 v1 Multifunction System
+    1.3.6.1.4.1.253.8.62.1.20.6.20.1.1:
+      category: Printer
+      model: WorkCentre 5855 v1
+    1.3.6.1.4.1.253.8.62.1.20.6.22.1.1:
+      category: Printer
+      model: WorkCentre 5875 v1
+    1.3.6.1.4.1.253.8.62.1.20.6.24.1.1:
+      category: Printer
+      model: WorkCentre 7830 v1 Multifunction System
+    1.3.6.1.4.1.253.8.62.1.20.6.25.1.1:
+      category: Printer
+      model: WorkCentre 7835
+    1.3.6.1.4.1.253.8.62.1.20.6.26.1.1:
+      category: Printer
+      model: WorkCentre 7845 v1 Multifunction System
+    1.3.6.1.4.1.253.8.62.1.20.6.27.1.1:
+      category: Printer
+      model: WorkCentre 7855
+    1.3.6.1.4.1.253.8.62.1.20.6.30.1.1:
+      category: Printer
+      model: WorkCentre 7220 v1
+    1.3.6.1.4.1.253.8.62.1.20.6.33.2.1:
+      category: Printer
+      model: WorkCentre 3325
+    1.3.6.1.4.1.253.8.62.1.20.6.33.2.2:
+      category: Printer
+      model: WorkCentre 3325
+    1.3.6.1.4.1.253.8.62.1.20.6.34.2.1:
+      category: Printer
+      model: WorkCentre 6605DN
+    1.3.6.1.4.1.253.8.62.1.20.6.35.1.1:
+      category: Printer
+      model: WorkCentre 3615
+    1.3.6.1.4.1.253.8.62.1.20.6.41.1.1:
+      category: Printer
+      model: WorkCentre 5945
+    1.3.6.1.4.1.253.8.62.1.20.6.42.1.1:
+      category: Printer
+      model: WorkCentre 5955 v1 Multifunction System
+    1.3.6.1.4.1.253.8.62.1.20.7.2.1.1:
+      category: Printer
+      model: WorkCentre 3655S
+    1.3.6.1.4.1.253.8.62.1.20.7.2.2.1:
+      category: Printer
+      model: WorkCentre 3655X
+    1.3.6.1.4.1.253.8.62.1.20.7.4.1.1:
+      category: Printer
+      model: WorkCentre 6655
+    1.3.6.1.4.1.253.8.62.1.20.7.5.1.1:
+      category: Printer
+      model: WorkCentre 7970
+    1.3.6.1.4.1.253.8.62.1.20.7.6.1.1:
+      category: Printer
+      model: WorkCentre 4265
+    1.3.6.1.4.1.253.8.62.1.20.7.24.1.1:
+      category: Printer
+      model: Color C60
+    1.3.6.1.4.1.253.8.62.1.20.7.25.1.1:
+      category: Printer
+      model: Color C70
+    1.3.6.1.4.1.253.8.62.1.20.7.28.2.1:
+      category: Printer
+      model: WorkCentre 6515
+    1.3.6.1.4.1.253.8.62.1.20.7.30.2.1:
+      category: Printer
+      model: WorkCentre 3345
+    1.3.6.1.4.1.253.8.62.1.20.7.31.1.1:
+      category: Printer
+      model: WorkCentre EC7836
+    1.3.6.1.4.1.253.8.62.1.20.7.32.1.1:
+      category: Printer
+      model: WorkCentre EC7856
+    1.3.6.1.4.1.253.8.62.1.22.1.3.1:
+      category: Printer
+      model: 6204 Wide Format
+    1.3.6.1.4.1.253.8.62.1.22.1.4.1.1:
+      category: Printer
+      model: Wide Format 6279
+    1.3.6.1.4.1.253.8.62.1.22.1.8.1.1:
+      category: Printer
+      model: Wide Format 6604
+    1.3.6.1.4.1.253.8.62.1.22.1.9.1.1:
+      category: Printer
+      model: Wide Format 6605
+    1.3.6.1.4.1.253.8.62.1.23.2.5.1:
+      category: Printer
+      model: Nuvera 120
+    1.3.6.1.4.1.253.8.62.1.23.7.1.1:
+      category: Printer
+      model: Nuvera 288
+    1.3.6.1.4.1.253.8.62.1.24.1.1.1.3:
+      category: Printer
+      model: ColorQube 9201
+    1.3.6.1.4.1.253.8.62.1.24.1.1.2.1:
+      category: Printer
+      model: ColorQube 9201
+    1.3.6.1.4.1.253.8.62.1.24.1.2.2.1:
+      category: Printer
+      model: ColorQube 9202
+    1.3.6.1.4.1.253.8.62.1.24.1.3.2.1:
+      category: Printer
+      model: ColorQube 9203
+    1.3.6.1.4.1.253.8.62.1.24.2.1.2.1:
+      category: Printer
+      model: ColorQube 8570DN
+    1.3.6.1.4.1.253.8.62.1.24.2.1.3.1:
+      category: Printer
+      model: ColorQube 8570DT
+    1.3.6.1.4.1.253.8.62.1.24.2.2.1.1:
+      category: Printer
+      model: ColorQube 8870
+    1.3.6.1.4.1.253.8.62.1.24.3.1.2.1:
+      category: Printer
+      model: ColorQube 8700X
+    1.3.6.1.4.1.253.8.62.1.24.3.2.2.1:
+      category: Printer
+      model: ColorQube 8900X
+    1.3.6.1.4.1.253.8.62.1.24.4.1.1.1:
+      category: Printer
+      model: ColorQube 9301
+    1.3.6.1.4.1.253.8.62.1.24.4.1.1.2:
+      category: Printer
+      model: ColorQube 9301
+    1.3.6.1.4.1.253.8.62.1.24.4.2.1.1:
+      category: Printer
+      model: ColorQube 9302
+    1.3.6.1.4.1.253.8.62.1.24.4.2.1.2:
+      category: Printer
+      model: ColorQube 9302
+    1.3.6.1.4.1.253.8.62.1.24.4.3.1.2:
+      category: Printer
+      model: ColorQube 9303
+    1.3.6.1.4.1.253.8.62.1.30.2.3.3:
+      category: Printer
+      model: 4112
+    1.3.6.1.4.1.253.8.62.1.30.2.8.1.2:
+      category: Printer
+      model: D110
+    1.3.6.1.4.1.253.8.62.1.31.1.2.4.1:
+      category: Printer
+      model: Color C75
+    1.3.6.1.4.1.253.8.62.1.31.1.4.1.2:
+      model: Versant 80 Press
+    1.3.6.1.4.1.253.8.62.1.31.3.2.1.1:
+      category: Printer
+      model: PrimeLink C9070
+    1.3.6.1.4.1.253.8.62.1.31.3.2.2.1:
+      category: Printer
+      model: PrimeLink C9070
+    1.3.6.1.4.1.253.8.62.1.32.2.4.3.1:
+      category: Printer
+      model: PrimeLink B9100
+    1.3.6.1.4.1.253.8.62.1.34.1.2.2.1:
+      category: Printer
+      model: VersaLink B405
+    1.3.6.1.4.1.253.8.62.1.34.2.2.1.1:
+      category: Printer
+      model: VersaLink C7020
+    1.3.6.1.4.1.253.8.62.1.34.2.3.1.1:
+      category: Printer
+      model: VersaLink C7025
+    1.3.6.1.4.1.253.8.62.1.34.2.4.1.1:
+      category: Printer
+      model: VersaLink C7030
+    1.3.6.1.4.1.253.8.62.1.34.3.2.1.1:
+      category: Printer
+      model: VersaLink B7030
+    1.3.6.1.4.1.253.8.62.1.34.4.1.2.1:
+      category: Printer
+      model: VersaLink C400
+    1.3.6.1.4.1.253.8.62.1.34.4.2.2.1:
+      category: Printer
+      model: VersaLink C405
+    1.3.6.1.4.1.253.8.62.1.34.5.2.2.1:
+      category: Printer
+      model: VersaLink C505
+    1.3.6.1.4.1.253.8.62.1.34.6.1.2.1:
+      category: Printer
+      model: VersaLink C600
+    1.3.6.1.4.1.253.8.62.1.34.7.1.1.1:
+      category: Printer
+      model: VersaLink B600
+    1.3.6.1.4.1.253.8.62.1.34.7.2.4.1:
+      category: Printer
+      model: VersaLink B605
+    1.3.6.1.4.1.253.8.62.1.34.7.3.1.1:
+      category: Printer
+      model: VersaLink B610
+    1.3.6.1.4.1.253.8.62.1.35.1.1.1.1:
+      category: Printer
+      model: AltaLink B8045
+    1.3.6.1.4.1.253.8.62.1.35.1.2.1.1:
+      category: Printer
+      model: AltaLink B8055
+    1.3.6.1.4.1.253.8.62.1.35.1.7.1.1:
+      category: Printer
+      model: AltaLink B8155
+    1.3.6.1.4.1.253.8.62.1.35.1.8.1.1:
+      category: Printer
+      model: AltaLink B8170
+    1.3.6.1.4.1.253.8.62.1.35.2.1.1.1:
+      category: Printer
+      model: AltaLink C8030
+    1.3.6.1.4.1.253.8.62.1.35.2.2.1.1:
+      category: Printer
+      model: AltaLink C8035
+    1.3.6.1.4.1.253.8.62.1.35.2.3.1.1:
+      category: Printer
+      model: AltaLink C8045
+    1.3.6.1.4.1.253.8.62.1.35.2.4.1.1:
+      category: Printer
+      model: AltaLink C8055
+    1.3.6.1.4.1.253.8.62.1.35.2.5.1.1:
+      category: Printer
+      model: AltaLink C8070
+    1.3.6.1.4.1.253.8.62.1.35.2.7.1.1:
+      category: Printer
+      model: AltaLink C8135
+    1.3.6.1.4.1.253.8.62.1.35.2.8.1.1:
+      category: Printer
+      model: AltaLink C8145
+    1.3.6.1.4.1.253.8.62.1.35.2.9.1.1:
+      category: Printer
+      model: AltaLink C8155
+    1.3.6.1.4.1.253.258.300.127.1.297.93.1.8.6.1.1:
+      model: Document Centre
+    1.3.6.1.4.1.253.258.300.127.1.297.93.1.8.7.1.1:
+      model: Document Centre

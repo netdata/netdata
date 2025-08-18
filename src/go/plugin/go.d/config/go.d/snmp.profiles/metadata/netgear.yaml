@@ -1,0 +1,270 @@
+sysobjectids:
+  oid_overrides:
+    1.3.6.1.4.1.4526.1.1:
+      category: Switch
+      model: FSM700S
+    1.3.6.1.4.1.4526.1.10:
+      category: Switch
+      model: Netgear FSM726
+    1.3.6.1.4.1.4526.4.2:
+      category: Wireless
+      model: Netgear ProSafe Wireless AccessPoint WG302
+    1.3.6.1.4.1.4526.100.1.1:
+      model: FSM7328S
+    1.3.6.1.4.1.4526.100.1.2:
+      category: Switch
+      model: NetGear fsm7328 Switch
+    1.3.6.1.4.1.4526.100.1.3:
+      model: GSM7328S
+    1.3.6.1.4.1.4526.100.1.4:
+      model: FSM7352S
+    1.3.6.1.4.1.4526.100.1.5:
+      model: FSM7352PS
+    1.3.6.1.4.1.4526.100.1.7:
+      model: GSM7328FS
+    1.3.6.1.4.1.4526.100.1.8:
+      model: FSM7328PS
+    1.3.6.1.4.1.4526.100.1.9:
+      model: FSM7228PS
+    1.3.6.1.4.1.4526.100.1.10:
+      model: GSM7252PS
+    1.3.6.1.4.1.4526.100.1.11:
+      model: FSM7226RS
+    1.3.6.1.4.1.4526.100.1.13:
+      model: FSM7328SE
+    1.3.6.1.4.1.4526.100.1.14:
+      model: FSM7352SE
+    1.3.6.1.4.1.4526.100.1.15:
+      model: XSM7224S
+    1.3.6.1.4.1.4526.100.1.16:
+      model: M5300-28G-POE
+    1.3.6.1.4.1.4526.100.1.17:
+      model: M5300-52G-POE
+    1.3.6.1.4.1.4526.100.1.18:
+      model: M5300-28G3
+    1.3.6.1.4.1.4526.100.1.19:
+      model: M5300-52G3
+    1.3.6.1.4.1.4526.100.1.20:
+      model: M5300-28GF3
+    1.3.6.1.4.1.4526.100.1.21:
+      model: M5300-28G
+    1.3.6.1.4.1.4526.100.1.22:
+      model: M5300-52G
+    1.3.6.1.4.1.4526.100.1.27:
+      category: Layer 3 Switch
+      model: M4300-8X8F
+    1.3.6.1.4.1.4526.100.1.28:
+      category: Layer 3 Switch
+      model: M4300-12X12F
+    1.3.6.1.4.1.4526.100.1.29:
+      category: Layer 3 Switch
+      model: M4300-24X24F
+    1.3.6.1.4.1.4526.100.1.30:
+      category: Layer 3 Switch
+      model: M4300-28G
+    1.3.6.1.4.1.4526.100.2.1:
+      category: Switch
+      model: Netgear GSM7212
+    1.3.6.1.4.1.4526.100.2.2:
+      category: Switch
+      model: Netgear GSM7224 Switch
+    1.3.6.1.4.1.4526.100.2.3:
+      category: Switch
+      model: GSM7212
+    1.3.6.1.4.1.4526.100.2.4:
+      model: FSM7226
+    1.3.6.1.4.1.4526.100.3.1:
+      model: GSM7312v2
+    1.3.6.1.4.1.4526.100.3.2:
+      model: GSM7324v2
+    1.3.6.1.4.1.4526.100.3.3:
+      model: XSM7312
+    1.3.6.1.4.1.4526.100.3.4:
+      model: GSM7324P
+    1.3.6.1.4.1.4526.100.3.5:
+      model: GSM7312I
+    1.3.6.1.4.1.4526.100.3.6:
+      model: GSM7324I
+    1.3.6.1.4.1.4526.100.3.7:
+      model: FSM7326PI
+    1.3.6.1.4.1.4526.100.4.1:
+      category: Switch
+      model: GS748T
+    1.3.6.1.4.1.4526.100.4.2:
+      model: FS726T
+    1.3.6.1.4.1.4526.100.4.3:
+      category: Switch
+      model: Netgear GS716T Gigabit Switch
+    1.3.6.1.4.1.4526.100.4.4:
+      model: FS750T
+    1.3.6.1.4.1.4526.100.4.5:
+      model: GS724T
+    1.3.6.1.4.1.4526.100.4.6:
+      model: FS726TP
+    1.3.6.1.4.1.4526.100.4.7:
+      model: FS728TP
+    1.3.6.1.4.1.4526.100.4.8:
+      model: GS108T
+    1.3.6.1.4.1.4526.100.4.9:
+      model: GS108TP
+    1.3.6.1.4.1.4526.100.4.10:
+      model: GS724TP
+    1.3.6.1.4.1.4526.100.4.11:
+      category: Switch
+      model: GS748TP
+    1.3.6.1.4.1.4526.100.4.12:
+      model: GS724TR
+    1.3.6.1.4.1.4526.100.4.13:
+      model: GS748TR
+    1.3.6.1.4.1.4526.100.4.16:
+      model: GS716Tv2
+    1.3.6.1.4.1.4526.100.4.17:
+      category: Switch
+      model: GS724Tv3
+    1.3.6.1.4.1.4526.100.4.18:
+      category: Switch
+      model: GS108Tv2
+    1.3.6.1.4.1.4526.100.4.19:
+      category: Switch
+      model: GS110TP
+    1.3.6.1.4.1.4526.100.4.20:
+      category: Switch
+      model: FS728TPv2
+    1.3.6.1.4.1.4526.100.4.22:
+      category: Switch
+      model: FS752TP
+    1.3.6.1.4.1.4526.100.4.31:
+      category: Switch
+      model: GS716Tv3
+    1.3.6.1.4.1.4526.100.4.32:
+      category: Layer 3 Switch
+      model: GS724Tv4
+    1.3.6.1.4.1.4526.100.4.33:
+      category: Layer 3 Switch
+      model: GS748Tv5
+    1.3.6.1.4.1.4526.100.4.34:
+      category: Switch
+      model: FS728TLP
+    1.3.6.1.4.1.4526.100.4.48:
+      category: Switch
+      model: GS310TP
+    1.3.6.1.4.1.4526.100.5.1:
+      category: Firewall
+      model: Netgear FVX538
+    1.3.6.1.4.1.4526.100.5.2:
+      category: Router
+      model: Netgear FVS338
+    1.3.6.1.4.1.4526.100.5.3:
+      model: FVG318
+    1.3.6.1.4.1.4526.100.5.4:
+      model: FVS336G
+    1.3.6.1.4.1.4526.100.6.3:
+      model: FWAG114
+    1.3.6.1.4.1.4526.100.6.4:
+      model: FVS124G
+    1.3.6.1.4.1.4526.100.6.5:
+      model: FVS318v3
+    1.3.6.1.4.1.4526.100.6.6:
+      model: DGFV338
+    1.3.6.1.4.1.4526.100.6.11:
+      category: Firewall
+      model: SRX5308
+    1.3.6.1.4.1.4526.100.7.1:
+      model: WPN802
+    1.3.6.1.4.1.4526.100.7.2:
+      model: WG312
+    1.3.6.1.4.1.4526.100.7.3:
+      model: WAG312
+    1.3.6.1.4.1.4526.100.8.4:
+      model: WC7600
+    1.3.6.1.4.1.4526.100.9.1:
+      model: GCM9000
+    1.3.6.1.4.1.4526.100.10.1:
+      model: FS728TS
+    1.3.6.1.4.1.4526.100.10.2:
+      model: FS752TS
+    1.3.6.1.4.1.4526.100.10.3:
+      model: FS752TPS
+    1.3.6.1.4.1.4526.100.10.4:
+      model: GS724TS
+    1.3.6.1.4.1.4526.100.10.5:
+      model: GS748TS
+    1.3.6.1.4.1.4526.100.10.6:
+      model: GS752TS
+    1.3.6.1.4.1.4526.100.10.7:
+      model: GS728TS
+    1.3.6.1.4.1.4526.100.10.8:
+      model: GS752TSTPS
+    1.3.6.1.4.1.4526.100.10.9:
+      model: GS728TPS
+    1.3.6.1.4.1.4526.100.10.10:
+      model: GS752TPS
+    1.3.6.1.4.1.4526.100.10.16:
+      category: Switch
+      model: S3300-28X
+    1.3.6.1.4.1.4526.100.10.18:
+      category: Switch
+      model: S3300-52X
+    1.3.6.1.4.1.4526.100.11.1:
+      model: GSM7224R
+    1.3.6.1.4.1.4526.100.11.2:
+      model: GSM7248R
+    1.3.6.1.4.1.4526.100.11.3:
+      model: GSM7224RP
+    1.3.6.1.4.1.4526.100.11.4:
+      model: GSM7248RP
+    1.3.6.1.4.1.4526.100.11.5:
+      category: Switch
+      model: GSM7224v2
+    1.3.6.1.4.1.4526.100.11.6:
+      model: GSM7248v2
+    1.3.6.1.4.1.4526.100.11.7:
+      model: GSM7212F
+    1.3.6.1.4.1.4526.100.11.8:
+      model: GSM5212P
+    1.3.6.1.4.1.4526.100.11.9:
+      model: GSM7212P
+    1.3.6.1.4.1.4526.100.11.10:
+      model: GSM7224P
+    1.3.6.1.4.1.4526.100.11.16:
+      category: Switch
+      model: M4100-26G
+    1.3.6.1.4.1.4526.100.11.17:
+      category: Switch
+      model: M4100-50G
+    1.3.6.1.4.1.4526.100.11.18:
+      category: Switch
+      model: M4100-26-POE
+    1.3.6.1.4.1.4526.100.11.19:
+      category: Switch
+      model: M4100-26G-POE
+    1.3.6.1.4.1.4526.100.11.20:
+      category: Switch
+      model: M4100-50G-POE+
+    1.3.6.1.4.1.4526.100.11.21:
+      category: Switch
+      model: M4100-50-POE
+    1.3.6.1.4.1.4526.100.11.22:
+      category: Switch
+      model: M4100-D12G
+    1.3.6.1.4.1.4526.100.11.23:
+      category: Switch
+      model: M4100-D10-POE
+    1.3.6.1.4.1.4526.100.11.24:
+      category: Switch
+      model: M4100-12GF
+    1.3.6.1.4.1.4526.100.11.25:
+      category: Switch
+      model: M4100-D12G-POE
+    1.3.6.1.4.1.4526.100.11.26:
+      category: Switch
+      model: M4100-12G-POE
+    1.3.6.1.4.1.4526.100.11.27:
+      category: Switch
+      model: M4100-24G-POE+
+    1.3.6.1.4.1.4526.100.16.1:
+      category: Self-contained NAS
+      model: ReadyNAS
+    1.3.6.1.4.1.4526.100.16.2:
+      category: Self-contained NAS
+      model: ReadyNAS OS 6

@@ -1,0 +1,554 @@
+sysobjectids:
+  oid_overrides:
+    1.3.6.1.4.1.5624.2.1.2:
+      category: Switch
+      model: Matrix 6G306-06 module
+    1.3.6.1.4.1.5624.2.1.3:
+      category: Switch
+      model: Matrix 6H302-48 module
+    1.3.6.1.4.1.5624.2.1.4:
+      category: Switch
+      model: Matrix 6H303-48 module
+    1.3.6.1.4.1.5624.2.1.5:
+      category: Switch
+      model: Matrix 6H352-25 module
+    1.3.6.1.4.1.5624.2.1.6:
+      category: Switch
+      model: Matrix 6H308-24 module
+    1.3.6.1.4.1.5624.2.1.7:
+      category: Switch
+      model: Matrix 6E308-24 module
+    1.3.6.1.4.1.5624.2.1.8:
+      category: Switch
+      model: Matrix E7 Chassis
+    1.3.6.1.4.1.5624.2.1.9:
+      category: Switch
+      model: Vertical Horizon VH-8G
+    1.3.6.1.4.1.5624.2.1.10:
+      category: Switch
+      model: Vertical Horizon VH-4802
+    1.3.6.1.4.1.5624.2.1.11:
+      category: Switch
+      model: Vertical Horizon VH-2402S
+    1.3.6.1.4.1.5624.2.1.13:
+      category: Switch
+      model: Matrix 6H308-48 module
+    1.3.6.1.4.1.5624.2.1.14:
+      category: Switch
+      model: Matrix 6E308-48 module
+    1.3.6.1.4.1.5624.2.1.15:
+      category: Switch
+      model: Matrix 6H202-48 module
+    1.3.6.1.4.1.5624.2.1.16:
+      category: Switch
+      model: 9E531-24
+    1.3.6.1.4.1.5624.2.1.17:
+      model: VG4xDES
+    1.3.6.1.4.1.5624.2.1.18:
+      category: Switch
+      model: Matrix 6H002-48 module
+    1.3.6.1.4.1.5624.2.1.19:
+      category: Switch
+      model: Matrix 6H003-48 module
+    1.3.6.1.4.1.5624.2.1.20:
+      category: Switch
+      model: Matrix E5 5G106-6
+    1.3.6.1.4.1.5624.2.1.21:
+      category: Switch
+      model: Matrix E5 5G102-6
+    1.3.6.1.4.1.5624.2.1.22:
+      model: VG6
+    1.3.6.1.4.1.5624.2.1.23:
+      category: Layer 3 Switch
+      model: X-Pedition ER16
+    1.3.6.1.4.1.5624.2.1.24:
+      category: Switch
+      model: Vertical Horizon 4802
+    1.3.6.1.4.1.5624.2.1.25:
+      category: Switch
+      model: Vertical Horizon VH-8TX1UM
+    1.3.6.1.4.1.5624.2.1.26:
+      category: Switch
+      model: Vertical Horizon VH-2402-L3
+    1.3.6.1.4.1.5624.2.1.27:
+      category: Switch
+      model: Vertical Horizon VH-8G-L3
+    1.3.6.1.4.1.5624.2.1.28:
+      category: Switch
+      model: Matrix E5 5H152-50
+    1.3.6.1.4.1.5624.2.1.29:
+      category: Switch
+      model: Matrix E5 5H153-50
+    1.3.6.1.4.1.5624.2.1.30:
+      model: RBTR2-A
+    1.3.6.1.4.1.5624.2.1.31:
+      category: Switch
+      model: Vertical Horizon VH-8TX1UMF
+    1.3.6.1.4.1.5624.2.1.32:
+      category: Router
+      model: X-Pedition 1805
+    1.3.6.1.4.1.5624.2.1.33:
+      model: ANG-2000
+    1.3.6.1.4.1.5624.2.1.34:
+      category: Switch
+      model: Matrix E1H582-51
+    1.3.6.1.4.1.5624.2.1.35:
+      category: Switch
+      model: Matrix 1G582-09
+    1.3.6.1.4.1.5624.2.1.36:
+      category: Switch
+      model: Matrix 1G694-13
+    1.3.6.1.4.1.5624.2.1.37:
+      category: Switch
+      model: VHxSMGMTxL3 L2/L3 management card
+    1.3.6.1.4.1.5624.2.1.38:
+      model: ANG-1102
+    1.3.6.1.4.1.5624.2.1.39:
+      model: ANG-1105
+    1.3.6.1.4.1.5624.2.1.40:
+      model: ANG-3000
+    1.3.6.1.4.1.5624.2.1.41:
+      model: ANG-7000
+    1.3.6.1.4.1.5624.2.1.42:
+      category: Layer 3 Switch
+      model: X-Pedition 2400
+    1.3.6.1.4.1.5624.2.1.43:
+      category: Switch
+      model: Vertical Horizon VH-8GO2S
+    1.3.6.1.4.1.5624.2.1.44:
+      category: Switch
+      model: Matrix 6G302-06 module
+    1.3.6.1.4.1.5624.2.1.45:
+      model: XSR-1850
+    1.3.6.1.4.1.5624.2.1.46:
+      category: Switch
+      model: ELS100-24TXM
+    1.3.6.1.4.1.5624.2.1.47:
+      category: Switch
+      model: Vertical Horizon VH-2202GT
+    1.3.6.1.4.1.5624.2.1.48:
+      category: Switch
+      model: Matrix C5 System Management Module
+    1.3.6.1.4.1.5624.2.1.49:
+      category: Switch
+      model: Matrix C1 48 Port Switch
+    1.3.6.1.4.1.5624.2.1.50:
+      category: Switch
+      model: Matrix C2 System Management Module
+    1.3.6.1.4.1.5624.2.1.51:
+      category: Switch
+      model: Matrix E7
+    1.3.6.1.4.1.5624.2.1.52:
+      category: Switch
+      model: Matrix N7 Platinum
+    1.3.6.1.4.1.5624.2.1.53:
+      category: Switch
+      model: Matrix N3
+    1.3.6.1.4.1.5624.2.1.54:
+      model: XSR-1100
+    1.3.6.1.4.1.5624.2.1.55:
+      model: XSR-3020
+    1.3.6.1.4.1.5624.2.1.56:
+      model: XSR-3150
+    1.3.6.1.4.1.5624.2.1.57:
+      model: XSR-3250
+    1.3.6.1.4.1.5624.2.1.58:
+      model: XSR-4100
+    1.3.6.1.4.1.5624.2.1.59:
+      category: Switch
+      model: Matrix E1H582-25
+    1.3.6.1.4.1.5624.2.1.60:
+      category: Switch
+      model: 1H587x09
+    1.3.6.1.4.1.5624.2.1.61:
+      category: Switch
+      model: Matrix C1G124
+    1.3.6.1.4.1.5624.2.1.62:
+      category: Switch
+      model: Matrix V2H124-24
+    1.3.6.1.4.1.5624.2.1.63:
+      model: RBTR3-A
+    1.3.6.1.4.1.5624.2.1.64:
+      category: Access Point
+      model: ROAMABOUT AP 3000
+    1.3.6.1.4.1.5624.2.1.65:
+      category: Switch
+      model: Matrix E7
+    1.3.6.1.4.1.5624.2.1.66:
+      category: Switch
+      model: Matrix N7
+    1.3.6.1.4.1.5624.2.1.67:
+      category: Switch
+      model: Matrix N3
+    1.3.6.1.4.1.5624.2.1.68:
+      category: Switch
+      model: V2H124xPOE
+    1.3.6.1.4.1.5624.2.1.69:
+      model: DFE Gold
+    1.3.6.1.4.1.5624.2.1.70:
+      category: Router
+      model: MATRIX N ROUTER
+    1.3.6.1.4.1.5624.2.1.71:
+      model: Dragon IDS Appliance
+    1.3.6.1.4.1.5624.2.1.72:
+      model: XSR-1205
+    1.3.6.1.4.1.5624.2.1.73:
+      model: XSR-1220
+    1.3.6.1.4.1.5624.2.1.74:
+      model: XSR-1225
+    1.3.6.1.4.1.5624.2.1.75:
+      model: XSR-1230
+    1.3.6.1.4.1.5624.2.1.76:
+      model: XSR-1235
+    1.3.6.1.4.1.5624.2.1.77:
+      model: 2G4072-52
+    1.3.6.1.4.1.5624.2.1.78:
+      model: Matrix N5 PoE-Gold
+    1.3.6.1.4.1.5624.2.1.79:
+      category: Switch
+      model: Matrix N5 Platinum
+    1.3.6.1.4.1.5624.2.1.80:
+      model: Matrix X4
+    1.3.6.1.4.1.5624.2.1.81:
+      category: Switch
+      model: Matrix X8
+    1.3.6.1.4.1.5624.2.1.82:
+      model: Matrix X16
+    1.3.6.1.4.1.5624.2.1.83:
+      category: Switch
+      model: N1
+    1.3.6.1.4.1.5624.2.1.84:
+      model: Matrix N1-Gold
+    1.3.6.1.4.1.5624.2.1.85:
+      model: RBTSA-US
+    1.3.6.1.4.1.5624.2.1.86:
+      model: RBTSA-non-US
+    1.3.6.1.4.1.5624.2.1.87:
+      category: Switch
+      model: SecureStack A2H124-24
+    1.3.6.1.4.1.5624.2.1.88:
+      model: A2H124-24P
+    1.3.6.1.4.1.5624.2.1.89:
+      category: Switch
+      model: SecureStack A2H124-48
+    1.3.6.1.4.1.5624.2.1.90:
+      category: Switch
+      model: SecureStack A2H124-48P
+    1.3.6.1.4.1.5624.2.1.91:
+      model: A2H124-24FX
+    1.3.6.1.4.1.5624.2.1.92:
+      category: Access Point
+      model: ROAMABOUT AP 4102
+    1.3.6.1.4.1.5624.2.1.93:
+      model: NSTAG-GE500-TX
+    1.3.6.1.4.1.5624.2.1.95:
+      model: A2H254-16
+    1.3.6.1.4.1.5624.2.1.96:
+      category: Layer 3 Switch
+      model: Matrix C3G124-24
+    1.3.6.1.4.1.5624.2.1.97:
+      model: C3G124-24P
+    1.3.6.1.4.1.5624.2.1.98:
+      category: Layer 3 Switch
+      model: Matrix C3G124-48
+    1.3.6.1.4.1.5624.2.1.99:
+      model: C3G124-48P
+    1.3.6.1.4.1.5624.2.1.100:
+      category: Switch
+      model: B3G124-24
+    1.3.6.1.4.1.5624.2.1.101:
+      category: Switch
+      model: B3G124x24P
+    1.3.6.1.4.1.5624.2.1.102:
+      category: Switch
+      model: B3G124-48
+    1.3.6.1.4.1.5624.2.1.103:
+      category: Switch
+      model: B3G124-48P
+    1.3.6.1.4.1.5624.2.1.104:
+      model: I3H252-02
+    1.3.6.1.4.1.5624.2.1.105:
+      model: SNS-TAG-LPA
+    1.3.6.1.4.1.5624.2.1.106:
+      model: SNS-TAG-HPA
+    1.3.6.1.4.1.5624.2.1.107:
+      model: SNS-TAG-BASE
+    1.3.6.1.4.1.5624.2.1.108:
+      model: 7S-NSTAG-01
+    1.3.6.1.4.1.5624.2.1.109:
+      model: SNS-PCC-WBA
+    1.3.6.1.4.1.5624.2.1.110:
+      model: A2H123-24
+    1.3.6.1.4.1.5624.2.1.111:
+      model: B3H123-24FX
+    1.3.6.1.4.1.5624.2.1.112:
+      model: C3H123-24FX
+    1.3.6.1.4.1.5624.2.1.113:
+      category: Switch
+      model: C3K122x24
+    1.3.6.1.4.1.5624.2.1.114:
+      category: Switch
+      model: C3K172x24
+    1.3.6.1.4.1.5624.2.1.115:
+      model: C3K-2XFP
+    1.3.6.1.4.1.5624.2.1.116:
+      model: SNS-NSS-A
+    1.3.6.1.4.1.5624.2.1.117:
+      model: G3G124-24
+    1.3.6.1.4.1.5624.2.1.118:
+      category: Switch
+      model: G3G170x24
+    1.3.6.1.4.1.5624.2.1.119:
+      category: Switch
+      model: D2G124-12
+    1.3.6.1.4.1.5624.2.1.120:
+      category: Switch
+      model: D2G124-12P
+    1.3.6.1.4.1.5624.2.1.121:
+      model: RBT-8500
+    1.3.6.1.4.1.5624.2.1.122:
+      model: Matrix N1-NAC
+    1.3.6.1.4.1.5624.2.1.123:
+      model: 7S-NSNACG-01NPS
+    1.3.6.1.4.1.5624.2.1.124:
+      model: G3G124-24P
+    1.3.6.1.4.1.5624.2.1.125:
+      model: C3K122-24P
+    1.3.6.1.4.1.5624.2.1.126:
+      model: NAC-A-2K
+    1.3.6.1.4.1.5624.2.1.127:
+      model: NAC-A-3K
+    1.3.6.1.4.1.5624.2.1.128:
+      model: SSA-T4068-0252
+    1.3.6.1.4.1.5624.2.1.129:
+      category: Layer 3 Switch
+      model: SSA-T1068-0652
+    1.3.6.1.4.1.5624.2.1.130:
+      category: Layer 3 Switch
+      model: SSA-G1018-0652
+    1.3.6.1.4.1.5624.2.1.131:
+      category: Switch
+      model: S3 Chassis
+    1.3.6.1.4.1.5624.2.1.132:
+      category: Switch
+      model: S4 Chassis
+    1.3.6.1.4.1.5624.2.1.133:
+      category: Switch
+      model: S8 Chassis
+    1.3.6.1.4.1.5624.2.1.134:
+      category: Layer 3 Switch
+      model: B5G124-24
+    1.3.6.1.4.1.5624.2.1.135:
+      category: Layer 3 Switch
+      model: B5G124-24P2
+    1.3.6.1.4.1.5624.2.1.136:
+      category: Layer 3 Switch
+      model: B5G124-48
+    1.3.6.1.4.1.5624.2.1.137:
+      category: Layer 3 Switch
+      model: B5G124-48P2
+    1.3.6.1.4.1.5624.2.1.138:
+      model: B5K125-24
+    1.3.6.1.4.1.5624.2.1.139:
+      model: B5K125-24P2
+    1.3.6.1.4.1.5624.2.1.140:
+      category: Layer 3 Switch
+      model: B5K125-48
+    1.3.6.1.4.1.5624.2.1.141:
+      category: Layer 3 Switch
+      model: B5K125-48P2
+    1.3.6.1.4.1.5624.2.1.142:
+      category: Switch
+      model: C5G124x24
+    1.3.6.1.4.1.5624.2.1.143:
+      category: Layer 3 Switch
+      model: C5G124-24P2
+    1.3.6.1.4.1.5624.2.1.144:
+      category: Switch
+      model: C5G124x48
+    1.3.6.1.4.1.5624.2.1.145:
+      category: Switch
+      model: C5G124-48P2
+    1.3.6.1.4.1.5624.2.1.146:
+      model: C5K125-24
+    1.3.6.1.4.1.5624.2.1.147:
+      model: C5K125-24P2
+    1.3.6.1.4.1.5624.2.1.148:
+      category: Switch
+      model: C5K125x48
+    1.3.6.1.4.1.5624.2.1.149:
+      model: C5K125-48P2
+    1.3.6.1.4.1.5624.2.1.150:
+      category: Layer 3 Switch
+      model: C5K175-24
+    1.3.6.1.4.1.5624.2.1.151:
+      model: NAC-A-10
+    1.3.6.1.4.1.5624.2.1.152:
+      model: NAC-A-20
+    1.3.6.1.4.1.5624.2.1.153:
+      model: NAC-A-V
+    1.3.6.1.4.1.5624.2.1.154:
+      model: A4H124-24TX
+    1.3.6.1.4.1.5624.2.1.155:
+      model: A4H124-24FX
+    1.3.6.1.4.1.5624.2.1.156:
+      model: A4H124-8F8T
+    1.3.6.1.4.1.5624.2.1.157:
+      model: A4H124-24
+    1.3.6.1.4.1.5624.2.1.158:
+      model: A4H124-24P
+    1.3.6.1.4.1.5624.2.1.159:
+      model: A4H124-48
+    1.3.6.1.4.1.5624.2.1.160:
+      model: A4H124-48P
+    1.3.6.1.4.1.5624.2.1.161:
+      model: A4H254-8F8T
+    1.3.6.1.4.1.5624.2.1.162:
+      category: Switch
+      model: K6 Chassis
+    1.3.6.1.4.1.5624.2.1.163:
+      category: Switch
+      model: K10 Chassis
+    1.3.6.1.4.1.5624.2.1.164:
+      category: Switch
+      model: S6 Chassis
+    1.3.6.1.4.1.5624.2.1.165:
+      model: S-Series SSA
+    1.3.6.1.4.1.5624.2.1.166:
+      category: Switch
+      model: S-SERIES VIRTUAL SWITCH BONDED S3
+    1.3.6.1.4.1.5624.2.1.167:
+      model: S-Series Virtual Switch Bonded S4
+    1.3.6.1.4.1.5624.2.1.168:
+      model: S-Series Virtual Switch Bonded S6
+    1.3.6.1.4.1.5624.2.1.169:
+      model: S-Series Virtual Switch Bonded S8
+    1.3.6.1.4.1.5624.2.1.170:
+      model: S-Series Virtual Switch Bonded S1
+    1.3.6.1.4.1.5624.2.1.171:
+      model: S-Series S1
+    1.3.6.1.4.1.5624.2.1.172:
+      model: 71K11L4-24
+    1.3.6.1.4.1.5624.2.1.173:
+      model: 71K11L4-48
+    1.3.6.1.4.1.5624.2.1.174:
+      model: 71K91L4-24
+    1.3.6.1.4.1.5624.2.1.175:
+      model: 71K91L4-24
+    1.3.6.1.4.1.5624.2.1.176:
+      category: Switch
+      model: S150 Chassis
+    1.3.6.1.4.1.5624.2.1.177:
+      model: SSA-T5028-0652
+    1.3.6.1.4.1.5624.2.1.178:
+      model: 08G20G2-08
+    1.3.6.1.4.1.5624.2.1.179:
+      model: 08G20G2-08P
+    1.3.6.1.4.1.5624.2.1.180:
+      model: 08G20G4-24
+    1.3.6.1.4.1.5624.2.1.181:
+      model: 08G20G4-24P
+    1.3.6.1.4.1.5624.2.1.182:
+      model: 08G20G4-08
+    1.3.6.1.4.1.5624.2.1.183:
+      model: 08G20G4-08P
+    1.3.6.1.4.1.5624.2.1.184:
+      model: 08H20G4-24
+    1.3.6.1.4.1.5624.2.1.185:
+      model: 08H20G4-24P
+    1.3.6.1.4.1.5624.2.1.186:
+      model: 08H20G4-48
+    1.3.6.1.4.1.5624.2.1.187:
+      model: 08H20G4-48P
+    1.3.6.1.4.1.5624.2.1.188:
+      model: SSA-T5068-0652
+    1.3.6.1.4.1.5624.2.1.189:
+      model: SSA-G5018-0652
+    1.3.6.1.4.1.5624.2.1.190:
+      model: 71G21K2L2-24P24
+    1.3.6.1.4.1.5624.2.1.191:
+      model: 71G21K2L2-48P
+    1.3.6.1.4.1.5624.2.1.192:
+      model: SSA-T8028-0652
+    1.3.6.1.4.1.5624.2.1.193:
+      model: SSA-G8018-0652
+    1.3.6.1.4.1.5624.2.1.194:
+      category: Switch
+      model: 7100-SERIES VIRTUAL SWITCH BONDED
+    1.3.6.1.4.1.5624.2.1.195:
+      model: NS-A-20
+    1.3.6.1.4.1.5624.2.1.196:
+      model: IA-A-20
+    1.3.6.1.4.1.5624.2.1.197:
+      model: IA-V
+    1.3.6.1.4.1.5624.2.1.198:
+      model: IA-A-300
+    1.3.6.1.4.1.5624.2.1.199:
+      model: APP-A-300
+    1.3.6.1.4.1.5624.2.1.200:
+      model: APP-V
+    1.3.6.1.4.1.5624.2.1.201:
+      category: Layer 3 Switch
+      model: S1-A Chassis
+    1.3.6.1.4.1.5624.2.1.202:
+      category: Layer 3 Switch
+      model: S3-A Chassis
+    1.3.6.1.4.1.5624.2.1.203:
+      category: Switch
+      model: K-SERIES VIRTUAL SWITCH BONDED K6
+    1.3.6.1.4.1.5624.2.1.204:
+      category: Switch
+      model: K-SERIES VIRTUAL SWITCH BONDED K10
+    1.3.6.1.4.1.5624.2.1.205:
+      model: PV-A-300
+    1.3.6.1.4.1.5624.2.1.206:
+      model: PV-V
+    1.3.6.1.4.1.5624.2.1.207:
+      model: 71G11K2L2-48
+    1.3.6.1.4.1.5624.2.1.208:
+      model: PV-FC-180
+    1.3.6.1.4.1.5624.2.2.220:
+      category: Switch
+      model: Matrix C2H124-48
+    1.3.6.1.4.1.5624.2.2.221:
+      model: C2G124-36
+    1.3.6.1.4.1.5624.2.2.283:
+      category: Switch
+      model: SecureStack Switch C2G124-24
+    1.3.6.1.4.1.5624.2.2.284:
+      category: Switch
+      model: SecureStack Switch C2G124-48
+    1.3.6.1.4.1.5624.2.2.285:
+      category: Switch
+      model: Matrix C2 24 port
+    1.3.6.1.4.1.5624.2.2.286:
+      category: Switch
+      model: Matrix C2 48 port
+    1.3.6.1.4.1.5624.2.2.287:
+      category: Switch
+      model: Matrix C2 48 port
+    1.3.6.1.4.1.5624.2.2.306:
+      model: V2H124-24FX
+    1.3.6.1.4.1.5624.2.2.314:
+      category: Switch
+      model: Matrix A2H123-24
+    1.3.6.1.4.1.5624.2.2.315:
+      model: B2G124-48
+    1.3.6.1.4.1.5624.2.2.316:
+      model: B2G124-48P
+    1.3.6.1.4.1.5624.2.2.317:
+      category: Switch
+      model: Matrix B2H124-48
+    1.3.6.1.4.1.5624.2.2.318:
+      model: B2H124-48P
+    1.3.6.1.4.1.5624.2.2.319:
+      model: B2G124-24P
+    1.3.6.1.4.1.5624.2.2.320:
+      model: B2H124-24
+    1.3.6.1.4.1.5624.2.2.321:
+      model: B2H124-24P
+    1.3.6.1.4.1.5624.2.2.322:
+      model: B2H124-24FX
+    1.3.6.1.4.1.5624.2.2.360:
+      category: Switch
+      model: C2G170-24

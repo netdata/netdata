@@ -1,0 +1,512 @@
+sysobjectids:
+  oid_overrides:
+    1.3.6.1.4.1.641.1:
+      category: Printer
+      model: Dell Laser Printer 1710n
+    1.3.6.1.4.1.641.1.1:
+      category: Printer
+      model: MX910de
+    1.3.6.1.4.1.641.1.71106736:
+      category: Printer
+      model: C524
+    1.3.6.1.4.1.641.1.71106740:
+      category: Printer
+      model: W840
+    1.3.6.1.4.1.641.1.71106741:
+      category: Printer
+      model: C522
+    1.3.6.1.4.1.641.1.71106743:
+      category: Printer
+      model: C920
+    1.3.6.1.4.1.641.1.71106749:
+      category: Printer
+      model: T640
+    1.3.6.1.4.1.641.1.71106750:
+      category: Printer
+      model: T642
+    1.3.6.1.4.1.641.1.71106751:
+      category: Printer
+      model: T644
+    1.3.6.1.4.1.641.1.71106791:
+      category: Printer
+      model: C770
+    1.3.6.1.4.1.641.1.71106798:
+      category: Printer
+      model: E450dn
+    1.3.6.1.4.1.641.1.71106800:
+      category: Printer
+      model: E352dn
+    1.3.6.1.4.1.641.1.71106802:
+      category: Printer
+      model: E250dn
+    1.3.6.1.4.1.641.1.71106810:
+      category: Printer
+      model: C530
+    1.3.6.1.4.1.641.1.71106811:
+      category: Printer
+      model: C532
+    1.3.6.1.4.1.641.1.71106812:
+      category: Printer
+      model: C534
+    1.3.6.1.4.1.641.1.71106823:
+      category: Printer
+      model: C782
+    1.3.6.1.4.1.641.1.71106837:
+      category: Printer
+      model: C935
+    1.3.6.1.4.1.641.1.71106846:
+      category: Printer
+      model: C544
+    1.3.6.1.4.1.641.1.71106847:
+      category: Printer
+      model: C543
+    1.3.6.1.4.1.641.1.71106851:
+      category: Printer
+      model: E260dn
+    1.3.6.1.4.1.641.1.71106853:
+      category: Printer
+      model: E360dn
+    1.3.6.1.4.1.641.1.71106854:
+      category: Printer
+      model: E460dn
+    1.3.6.1.4.1.641.1.71106859:
+      category: Printer
+      model: T650
+    1.3.6.1.4.1.641.1.71106860:
+      category: Printer
+      model: T652
+    1.3.6.1.4.1.641.1.71106861:
+      category: Printer
+      model: T654
+    1.3.6.1.4.1.641.1.71106868:
+      category: Printer
+      model: C734
+    1.3.6.1.4.1.641.1.71106869:
+      category: Printer
+      model: C736
+    1.3.6.1.4.1.641.1.71106873:
+      category: Printer
+      model: C540
+    1.3.6.1.4.1.641.1.71106975:
+      category: Printer
+      model: W850
+    1.3.6.1.4.1.641.1.71107008:
+      category: Printer
+      model: C546
+    1.3.6.1.4.1.641.1.71107009:
+      category: Printer
+      model: E462dtn
+    1.3.6.1.4.1.641.1.71107012:
+      category: Printer
+      model: C792
+    1.3.6.1.4.1.641.1.71107014:
+      category: Printer
+      model: C950
+    1.3.6.1.4.1.641.1.71107025:
+      category: Printer
+      model: C925
+    1.3.6.1.4.1.641.1.71107031:
+      category: Printer
+      model: Pro5500 Series
+    1.3.6.1.4.1.641.1.71107069:
+      category: Printer
+      model: S510 Series
+    1.3.6.1.4.1.641.1.71107106:
+      category: Printer
+      model: C748
+    1.3.6.1.4.1.641.1.71107110:
+      category: Printer
+      model: MS310dn
+    1.3.6.1.4.1.641.1.71107113:
+      category: Printer
+      model: MS811
+    1.3.6.1.4.1.641.1.71107116:
+      category: Printer
+      model: MS410dn
+    1.3.6.1.4.1.641.1.71107117:
+      category: Printer
+      model: MS510dn
+    1.3.6.1.4.1.641.1.71107118:
+      category: Printer
+      model: CS310n
+    1.3.6.1.4.1.641.1.71107122:
+      category: Printer
+      model: CS410dn
+    1.3.6.1.4.1.641.1.71107123:
+      category: Printer
+      model: CS510de
+    1.3.6.1.4.1.641.1.71107126:
+      category: Printer
+      model: MS610de
+    1.3.6.1.4.1.641.1.71107157:
+      category: Printer
+      model: CS720
+    1.3.6.1.4.1.641.1.71107225:
+      category: Printer
+      model: M5163
+    1.3.6.1.4.1.641.2.11152:
+      category: Printer
+      model: X560n
+    1.3.6.1.4.1.641.2.71106751:
+      category: Printer
+      model: T644
+    1.3.6.1.4.1.641.2.71106755:
+      category: Printer
+      model: X852e
+    1.3.6.1.4.1.641.2.71106756:
+      category: Printer
+      model: X854e
+    1.3.6.1.4.1.641.2.71106757:
+      category: Printer
+      model: X644e
+    1.3.6.1.4.1.641.2.71106758:
+      category: Printer
+      model: X646e
+    1.3.6.1.4.1.641.2.71106792:
+      category: Printer
+      model: X642e
+    1.3.6.1.4.1.641.2.71106823:
+      category: Printer
+      model: C782
+    1.3.6.1.4.1.641.2.71106836:
+      category: Printer
+      model: X945e
+    1.3.6.1.4.1.641.2.71106848:
+      category: Printer
+      model: X544
+    1.3.6.1.4.1.641.2.71106856:
+      category: Printer
+      model: X264dn
+    1.3.6.1.4.1.641.2.71106857:
+      category: Printer
+      model: X363dn
+    1.3.6.1.4.1.641.2.71106890:
+      category: Printer
+      model: X734de
+    1.3.6.1.4.1.641.2.71106891:
+      category: Printer
+      model: X738de
+    1.3.6.1.4.1.641.2.71106893:
+      category: Printer
+      model: X654de
+    1.3.6.1.4.1.641.2.71106894:
+      category: Printer
+      model: X658de
+    1.3.6.1.4.1.641.2.71106898:
+      category: Printer
+      model: X204n
+    1.3.6.1.4.1.641.2.71106920:
+      category: Printer
+      model: X463de
+    1.3.6.1.4.1.641.2.71106921:
+      category: Printer
+      model: X464de
+    1.3.6.1.4.1.641.2.71106923:
+      category: Printer
+      model: X364dn
+    1.3.6.1.4.1.641.2.71106971:
+      category: Printer
+      model: X652de
+    1.3.6.1.4.1.641.2.71106972:
+      category: Printer
+      model: X656de
+    1.3.6.1.4.1.641.2.71106977:
+      category: Printer
+      model: X860de
+    1.3.6.1.4.1.641.2.71106978:
+      category: Printer
+      model: X862de
+    1.3.6.1.4.1.641.2.71106979:
+      category: Printer
+      model: X864de
+    1.3.6.1.4.1.641.2.71106998:
+      category: Printer
+      model: X466de
+    1.3.6.1.4.1.641.2.71107004:
+      category: Printer
+      model: T656
+    1.3.6.1.4.1.641.2.71107011:
+      category: Printer
+      model: X546
+    1.3.6.1.4.1.641.2.71107013:
+      category: Printer
+      model: X792
+    1.3.6.1.4.1.641.2.71107023:
+      category: Printer
+      model: X950
+    1.3.6.1.4.1.641.2.71107024:
+      category: Printer
+      model: X925
+    1.3.6.1.4.1.641.2.71107061:
+      category: Printer
+      model: X548
+    1.3.6.1.4.1.641.2.71107107:
+      category: Printer
+      model: X746
+    1.3.6.1.4.1.641.2.71107111:
+      category: Printer
+      model: MX310dn
+    1.3.6.1.4.1.641.2.71107112:
+      category: Printer
+      model: MX611de
+    1.3.6.1.4.1.641.2.71107114:
+      category: Printer
+      model: MX710
+    1.3.6.1.4.1.641.2.71107115:
+      category: Printer
+      model: MX811
+    1.3.6.1.4.1.641.2.71107119:
+      category: Printer
+      model: CX310dn
+    1.3.6.1.4.1.641.2.71107120:
+      category: Printer
+      model: MX410de
+    1.3.6.1.4.1.641.2.71107121:
+      category: Printer
+      model: MX511dhe
+    1.3.6.1.4.1.641.2.71107124:
+      category: Printer
+      model: CX410de
+    1.3.6.1.4.1.641.2.71107125:
+      category: Printer
+      model: CX510de
+    1.3.6.1.4.1.641.2.71107140:
+      category: Printer
+      model: XM5163
+    1.3.6.1.4.1.641.2.71107141:
+      category: Printer
+      model: XM7155
+    1.3.6.1.4.1.641.2.71107142:
+      category: Printer
+      model: XM1145
+    1.3.6.1.4.1.641.2.71107143:
+      category: Printer
+      model: XM3150
+    1.3.6.1.4.1.641.2.71107162:
+      category: Printer
+      model: CX825
+    1.3.6.1.4.1.641.2.71107164:
+      category: Printer
+      model: e-STUDIO 305CS
+    1.3.6.1.4.1.641.2.71107166:
+      category: Printer
+      model: e-STUDIO 385S
+    1.3.6.1.4.1.641.3.672622:
+      category: Printer
+      model: X342n
+    1.3.6.1.4.1.641.3.952056622:
+      category: Printer
+      model: Forms Printer 2580
+    1.3.6.1.4.1.641.3.952056625:
+      category: Printer
+      model: Forms Printer 2591
+    1.3.6.1.4.1.641.51.71106848:
+      category: Printer
+      model: MS521
+    1.3.6.1.4.1.641.51.71107157:
+      category: Printer
+      model: CS725
+    1.3.6.1.4.1.641.51.71107160:
+      category: Printer
+      model: CS820
+    1.3.6.1.4.1.641.51.71107168:
+      category: Printer
+      model: MS823dn
+    1.3.6.1.4.1.641.51.71107174:
+      category: Printer
+      model: C4150
+    1.3.6.1.4.1.641.51.71107186:
+      category: Printer
+      model: MS321dn
+    1.3.6.1.4.1.641.51.71107187:
+      category: Printer
+      model: MS421dn
+    1.3.6.1.4.1.641.51.71107188:
+      category: Printer
+      model: MS521dn
+    1.3.6.1.4.1.641.51.71107189:
+      category: Printer
+      model: MS621dn
+    1.3.6.1.4.1.641.51.71107190:
+      category: Printer
+      model: MS622de
+    1.3.6.1.4.1.641.51.71107206:
+      category: Printer
+      model: CS421dn
+    1.3.6.1.4.1.641.51.71107207:
+      category: Printer
+      model: CS521dn
+    1.3.6.1.4.1.641.51.71107209:
+      category: Printer
+      model: CS622de
+    1.3.6.1.4.1.641.51.71107224:
+      category: Printer
+      model: B2650dw
+    1.3.6.1.4.1.641.51.71107225:
+      category: Printer
+      model: B2546dw
+    1.3.6.1.4.1.641.51.71107226:
+      category: Printer
+      model: B2442dw
+    1.3.6.1.4.1.641.51.71107227:
+      category: Printer
+      model: B2338dw
+    1.3.6.1.4.1.641.51.71107328:
+      category: Printer
+      model: C2425dw
+    1.3.6.1.4.1.641.51.71107329:
+      category: Printer
+      model: C2535dw
+    1.3.6.1.4.1.641.51.71107345:
+      category: Printer
+      model: B2865dw
+    1.3.6.1.4.1.641.51.71107348:
+      category: Printer
+      model: MS725dvn
+    1.3.6.1.4.1.641.51.71107352:
+      category: Printer
+      model: e-STUDIO 528P
+    1.3.6.1.4.1.641.51.71107376:
+      category: Printer
+      model: C3224dw
+    1.3.6.1.4.1.641.51.71107377:
+      category: Printer
+      model: C3326dw
+    1.3.6.1.4.1.641.51.71107390:
+      category: Printer
+      model: Source Technologies ST9820
+    1.3.6.1.4.1.641.51.71107392:
+      category: Printer
+      model: Source Technologies ST9830
+    1.3.6.1.4.1.641.51.71107400:
+      category: Printer
+      model: CS431dw
+    1.3.6.1.4.1.641.51.71107404:
+      category: Printer
+      model: MS431dw
+    1.3.6.1.4.1.641.51.71107461:
+      category: Printer
+      model: CS735de
+    1.3.6.1.4.1.641.51.71107482:
+      category: Printer
+      model: MS531dw
+    1.3.6.1.4.1.641.51.71107483:
+      category: Printer
+      model: MS631dw
+    1.3.6.1.4.1.641.52.71107158:
+      category: Printer
+      model: CX725
+    1.3.6.1.4.1.641.52.71107159:
+      category: Printer
+      model: XC4150
+    1.3.6.1.4.1.641.52.71107162:
+      category: Printer
+      model: CX825
+    1.3.6.1.4.1.641.52.71107169:
+      category: Printer
+      model: MX722adhe
+    1.3.6.1.4.1.641.52.71107170:
+      category: Printer
+      model: CX860
+    1.3.6.1.4.1.641.52.71107182:
+      category: Printer
+      model: MX321adn
+    1.3.6.1.4.1.641.52.71107183:
+      category: Printer
+      model: MX421ade
+    1.3.6.1.4.1.641.52.71107184:
+      category: Printer
+      model: MX521ade
+    1.3.6.1.4.1.641.52.71107185:
+      category: Printer
+      model: MX622ade
+    1.3.6.1.4.1.641.52.71107191:
+      category: Printer
+      model: CX923de
+    1.3.6.1.4.1.641.52.71107195:
+      category: Printer
+      model: XC9235
+    1.3.6.1.4.1.641.52.71107205:
+      category: Printer
+      model: XM3250
+    1.3.6.1.4.1.641.52.71107210:
+      category: Printer
+      model: CX421adn
+    1.3.6.1.4.1.641.52.71107212:
+      category: Printer
+      model: CX522ade
+    1.3.6.1.4.1.641.52.71107213:
+      category: Printer
+      model: CX622ade
+    1.3.6.1.4.1.641.52.71107215:
+      category: Printer
+      model: e-STUDIO 448S
+    1.3.6.1.4.1.641.52.71107220:
+      category: Printer
+      model: MB2650adwe
+    1.3.6.1.4.1.641.52.71107331:
+      category: Printer
+      model: MC2425adw
+    1.3.6.1.4.1.641.52.71107332:
+      category: Printer
+      model: MC2535adwe
+    1.3.6.1.4.1.641.52.71107334:
+      category: Printer
+      model: XM7370
+    1.3.6.1.4.1.641.52.71107337:
+      category: Printer
+      model: CX625adhe
+    1.3.6.1.4.1.641.52.71107342:
+      category: Printer
+      model: MX826adxe
+    1.3.6.1.4.1.641.52.71107359:
+      category: Printer
+      model: MB2236adwe
+    1.3.6.1.4.1.641.52.71107373:
+      category: Printer
+      model: C431 Color MFP
+    1.3.6.1.4.1.641.52.71107380:
+      category: Printer
+      model: MC3224dwe
+    1.3.6.1.4.1.641.52.71107381:
+      category: Printer
+      model: MC3326adwe
+    1.3.6.1.4.1.641.52.71107398:
+      category: Printer
+      model: MX331adn
+    1.3.6.1.4.1.641.52.71107401:
+      category: Printer
+      model: MC3426i
+    1.3.6.1.4.1.641.52.71107402:
+      category: Printer
+      model: CX431adw
+    1.3.6.1.4.1.641.52.71107406:
+      category: Printer
+      model: MX431adw
+    1.3.6.1.4.1.641.52.71107407:
+      category: Printer
+      model: MB3442adw
+    1.3.6.1.4.1.641.52.71107431:
+      category: Printer
+      model: XC4352
+    1.3.6.1.4.1.641.52.71107455:
+      category: Printer
+      model: CX944adxse
+    1.3.6.1.4.1.641.52.71107462:
+      category: Printer
+      model: CX735adse
+    1.3.6.1.4.1.641.52.71107475:
+      category: Printer
+      model: CX635adwe
+    1.3.6.1.4.1.641.52.71107486:
+      category: Printer
+      model: MX632adwe
+    1.3.6.1.4.1.641.52.71107487:
+      category: Printer
+      model: XM3350
+    1.3.6.1.4.1.641.52.71107516:
+      category: Printer
+      model: e-STUDIO479S
+    1.3.6.1.4.1.641.52.71107706:
+      category: Printer
+      model: M C240FW Series

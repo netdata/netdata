@@ -153,3 +153,12 @@ func TestPduToString(t *testing.T) {
 		})
 	}
 }
+
+func TestAllMetadataYAMLsLoadAndMerge(t *testing.T) {
+	dir := getSnmpMetadataDir()
+	require.NotEmpty(t, dir, "metadata dir must resolve in tests")
+
+	agg, err := loadOverridesFromDir(dir)
+	require.NoError(t, err, "every YAML must parse strictly without errors")
+	require.NotNil(t, agg, "aggregate overrides must not be nil")
+}
