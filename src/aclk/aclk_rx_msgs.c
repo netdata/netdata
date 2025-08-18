@@ -15,7 +15,8 @@
 #define ACLK_V_COMPRESSION 2
 
 struct aclk_request {
-    char *type_id;
+    bool has_type;
+    bool is_http;
     char *msg_id;
     char *callback_topic;
     char *payload;
@@ -35,15 +36,16 @@ static int cloud_to_agent_parse(JSON_ENTRY *e)
             break;
         case JSON_STRING:
             if (!strcmp(e->name, "msg-id")) {
-                data->msg_id = strdupz(e->data.string);
+                data->msg_id = e->data.string ? strdupz(e->data.string) : NULL;
                 break;
             }
             if (!strcmp(e->name, "type")) {
-                data->type_id = strdupz(e->data.string);
+                data->has_type = true;
+                data->is_http = (e->data.string && (strcmp(e->data.string, "http") == 0));
                 break;
             }
             if (!strcmp(e->name, "callback-topic")) {
-                data->callback_topic = strdupz(e->data.string);
+                data->callback_topic = e->data.string ? strdupz(e->data.string) : NULL;
                 break;
             }
             if (!strcmp(e->name, "payload")) {
@@ -190,14 +192,14 @@ int aclk_handle_cloud_cmd_message(char *payload)
         goto err_cleanup;
     }
 
-    if (!cloud_to_agent.type_id) {
+    if (!cloud_to_agent.has_type) {
         error_report("Cloud message is missing compulsory key \"type\"");
         goto err_cleanup;
     }
 
     // Originally we were expecting to have multiple types of 'cmd' message,
     // but after the new protocol was designed we will ever only have 'http'
-    if (strcmp(cloud_to_agent.type_id, "http") != 0) {
+    if (!cloud_to_agent.is_http) {
         error_report("Only 'http' cmd message is supported");
         goto err_cleanup;
     }
@@ -205,15 +207,12 @@ int aclk_handle_cloud_cmd_message(char *payload)
     if (likely(!aclk_handle_cloud_http_request_v2(&cloud_to_agent, payload))) {
         // aclk_handle_cloud_request takes ownership of the pointers
         // (to avoid copying) in case of success
-        freez(cloud_to_agent.type_id);
         return 0;
     }
 
 err_cleanup:
     if (cloud_to_agent.payload)
         freez(cloud_to_agent.payload);
-    if (cloud_to_agent.type_id)
-        freez(cloud_to_agent.type_id);
     if (cloud_to_agent.msg_id)
         freez(cloud_to_agent.msg_id);
     if (cloud_to_agent.callback_topic)
