@@ -45740,30 +45740,43 @@ sysobjectids:
     1.3.6.1.4.1.25506.11.1.148:
       model: 12916-DC
     1.3.6.1.4.1.25506.11.1.149:
+      category: Layer 3 Switch
       model: FF 5900CP-48XG-4QSFP+
     1.3.6.1.4.1.25506.11.1.150:
+      category: Layer 3 Switch
       model: 5900CP-48XG-4QSFP+ 8Gb FC B-F
     1.3.6.1.4.1.25506.11.1.151:
+      category: Layer 3 Switch
       model: 6125-XLG-TAA
     1.3.6.1.4.1.25506.11.1.152:
+      category: Layer 3 Switch
       model: 6125-GXG-TAA
     1.3.6.1.4.1.25506.11.1.153:
+      category: Layer 3 Switch
       model: 6125-G-TAA
     1.3.6.1.4.1.25506.11.1.154:
+      category: Switch
       model: 5120-24G-4SFP-XI-2Slot
     1.3.6.1.4.1.25506.11.1.155:
+      category: Switch
       model: 5120-48G-4SFP-XI-2Slot
     1.3.6.1.4.1.25506.11.1.156:
+      category: Switch
       model: 5120-24G-PoE-Plus-4SFP-XI-2Slot
     1.3.6.1.4.1.25506.11.1.157:
+      category: Switch
       model: 5120-48G-PoE-Plus-4SFP-XI-2Slot
     1.3.6.1.4.1.25506.11.1.158:
+      category: Switch
       model: 5120-24G-4SFP-XI-TAA-2Slot
     1.3.6.1.4.1.25506.11.1.159:
+      category: Switch
       model: 5120-48G-4SFP-XI-TAA-2Slot
     1.3.6.1.4.1.25506.11.1.160:
+      category: Switch
       model: 5120-24G-PoE-Plus-4SFP-XI-TAA-2Slot
     1.3.6.1.4.1.25506.11.1.161:
+      category: Switch
       model: 5120-48G-PoE-Plus-4SFP-XI-TAA-2Slot
     1.3.6.1.4.1.25506.11.1.162:
       category: Layer 3 Switch
@@ -45803,15 +45816,19 @@ sysobjectids:
       category: Layer 3 Switch
       model: FlexFabric 5700 32XGT 8XG 2QSFP+ (JG898A)
     1.3.6.1.4.1.25506.11.1.175:
+      category: Switch
       model: FF 5700-48G-4XG-2QSFP+ TAA
     1.3.6.1.4.1.25506.11.1.176:
       category: Layer 3 Switch
       model: FlexFabric 5700-48G-4XG-2QSFP+
     1.3.6.1.4.1.25506.11.1.177:
+      category: Switch
       model: 1620-8G
     1.3.6.1.4.1.25506.11.1.178:
+      category: Switch
       model: 1620-24G
     1.3.6.1.4.1.25506.11.1.179:
+      category: Switch
       model: 1620-48G
     1.3.6.1.4.1.25506.11.1.180:
       category: Layer 3 Switch
@@ -46060,36 +46077,49 @@ sysobjectids:
       category: Layer 3 Switch
       model: FlexNetwork 5140 48G 4SFP+ 1-slot HI Sw (R9L62A)
     1.3.6.1.4.1.25506.11.2.1:
+      category: Router
       model: AMSR900
     1.3.6.1.4.1.25506.11.2.2:
+      category: Router
       model: AMSR920
     1.3.6.1.4.1.25506.11.2.3:
+      category: Router
       model: AMSR2010
     1.3.6.1.4.1.25506.11.2.4:
+      category: Router
       model: AMSR2011
     1.3.6.1.4.1.25506.11.2.5:
+      category: Router
       model: AMSR2012
     1.3.6.1.4.1.25506.11.2.6:
+      category: Router
       model: AMSR2012T
     1.3.6.1.4.1.25506.11.2.7:
+      category: Router
       model: AMSR2013
     1.3.6.1.4.1.25506.11.2.8:
+      category: Router
       model: AMSR2020
     1.3.6.1.4.1.25506.11.2.9:
+      category: Router
       model: AMSR2021
     1.3.6.1.4.1.25506.11.2.10:
+      category: Router
       model: AMSR2040
     1.3.6.1.4.1.25506.11.2.11:
+      category: Router
       model: AMSR3010
     1.3.6.1.4.1.25506.11.2.12:
+      category: Router
       model: AMSR3011E
     1.3.6.1.4.1.25506.11.2.13:
+      category: Router
       model: AMSR3011F
     1.3.6.1.4.1.25506.11.2.14:
       category: Router
       model: MSR30-16
     1.3.6.1.4.1.25506.11.2.15:
-      category: Switch
+      category: Router
       model: A-MSR30-20
     1.3.6.1.4.1.25506.11.2.16:
       category: Router
@@ -46098,42 +46128,61 @@ sysobjectids:
       category: Router
       model: MSR30-60
     1.3.6.1.4.1.25506.11.2.18:
+      category: Router
       model: AMSR5040
     1.3.6.1.4.1.25506.11.2.19:
+      category: Router
       model: AMSR5060
     1.3.6.1.4.1.25506.11.2.20:
+      category: Router
       model: A6602
     1.3.6.1.4.1.25506.11.2.21:
+      category: Router
       model: A6604
     1.3.6.1.4.1.25506.11.2.22:
+      category: Router
       model: A6608
     1.3.6.1.4.1.25506.11.2.23:
+      category: Router
       model: A6616
     1.3.6.1.4.1.25506.11.2.24:
+      category: Router
       model: AMSR900W
     1.3.6.1.4.1.25506.11.2.25:
+      category: Router
       model: AMSR900WNA
     1.3.6.1.4.1.25506.11.2.26:
+      category: Router
       model: AMSR920W
     1.3.6.1.4.1.25506.11.2.27:
+      category: Router
       model: AMSR920WNA
     1.3.6.1.4.1.25506.11.2.28:
+      category: Router
       model: AMSR2012W
     1.3.6.1.4.1.25506.11.2.29:
+      category: Router
       model: AMSR2012TW
     1.3.6.1.4.1.25506.11.2.30:
+      category: Router
       model: AMSR2012TWNA
     1.3.6.1.4.1.25506.11.2.31:
+      category: Router
       model: AMSR2013W
     1.3.6.1.4.1.25506.11.2.32:
+      category: Router
       model: AMSR2013WNA
     1.3.6.1.4.1.25506.11.2.33:
+      category: Router
       model: AMSR2020S
     1.3.6.1.4.1.25506.11.2.34:
+      category: Router
       model: AMSR2021S
     1.3.6.1.4.1.25506.11.2.35:
+      category: Router
       model: AMSR2040S
     1.3.6.1.4.1.25506.11.2.36:
+      category: Router
       model: AMSR3010DC
     1.3.6.1.4.1.25506.11.2.37:
       category: Router
@@ -46166,14 +46215,19 @@ sysobjectids:
       category: Router
       model: MSR30-60-DC
     1.3.6.1.4.1.25506.11.2.47:
+      category: Router
       model: AMSR5040DC
     1.3.6.1.4.1.25506.11.2.48:
+      category: Router
       model: AMSR5060DC
     1.3.6.1.4.1.25506.11.2.49:
+      category: Router
       model: A8805
     1.3.6.1.4.1.25506.11.2.50:
+      category: Router
       model: A8808
     1.3.6.1.4.1.25506.11.2.51:
+      category: Router
       model: A8812
     1.3.6.1.4.1.25506.11.2.52:
       category: Access Point
@@ -46185,27 +46239,34 @@ sysobjectids:
       category: Access Point
       model: AOAPSMIMV2
     1.3.6.1.4.1.25506.11.2.55:
+      category: Router
       model: MSR2003AC
     1.3.6.1.4.1.25506.11.2.56:
       category: Router
       model: FlexNetwork MSR3012-AC (JG409A)
     1.3.6.1.4.1.25506.11.2.57:
+      category: Router
       model: MSR3012DC
     1.3.6.1.4.1.25506.11.2.58:
+      category: Router
       model: MSR3024AC
     1.3.6.1.4.1.25506.11.2.59:
+      category: Router
       model: MSR3024DC
     1.3.6.1.4.1.25506.11.2.60:
+      category: Router
       model: MSR3024PoE
     1.3.6.1.4.1.25506.11.2.61:
       category: Router
       model: FlexNetwork MSR3044 (JG405A)
     1.3.6.1.4.1.25506.11.2.62:
+      category: Router
       model: MSR3064
     1.3.6.1.4.1.25506.11.2.63:
       category: Router
       model: FlexNetwork MSR4060 (JG403A)
     1.3.6.1.4.1.25506.11.2.64:
+      category: Router
       model: MSR4080
     1.3.6.1.4.1.25506.11.2.65:
       category: Router
@@ -46214,170 +46275,247 @@ sysobjectids:
       category: Router
       model: HSR6602-XG (JG354A)
     1.3.6.1.4.1.25506.11.2.67:
+      category: Router
       model: HSR6802
     1.3.6.1.4.1.25506.11.2.68:
+      category: Router
       model: HSR6804
     1.3.6.1.4.1.25506.11.2.69:
+      category: Router
       model: HSR6808
     1.3.6.1.4.1.25506.11.2.70:
+      category: Router
       model: MSR930
     1.3.6.1.4.1.25506.11.2.71:
+      category: Router
       model: MSR930G
     1.3.6.1.4.1.25506.11.2.72:
+      category: Router
       model: MSR931
     1.3.6.1.4.1.25506.11.2.73:
+      category: Router
       model: MSR931G
     1.3.6.1.4.1.25506.11.2.74:
       category: Router
       model: MSR931
     1.3.6.1.4.1.25506.11.2.75:
+      category: Router
       model: MSR930W
     1.3.6.1.4.1.25506.11.2.76:
+      category: Router
       model: MSR9304GLTEV
     1.3.6.1.4.1.25506.11.2.77:
+      category: Router
       model: MSR933
     1.3.6.1.4.1.25506.11.2.78:
+      category: Router
       model: MSR933G
     1.3.6.1.4.1.25506.11.2.79:
+      category: Router
       model: MSR935
     1.3.6.1.4.1.25506.11.2.80:
+      category: Router
       model: MSR935W
     1.3.6.1.4.1.25506.11.2.81:
+      category: Router
       model: MSR935G
     1.3.6.1.4.1.25506.11.2.82:
+      category: Router
       model: MSR936W
     1.3.6.1.4.1.25506.11.2.83:
+      category: Router
       model: MSR9304GLTEG
     1.3.6.1.4.1.25506.11.2.84:
+      category: Router
       model: MSR930LE
     1.3.6.1.4.1.25506.11.2.85:
+      category: Router
       model: MSR930GLE
     1.3.6.1.4.1.25506.11.2.86:
+      category: Router
       model: MSR931LE
     1.3.6.1.4.1.25506.11.2.87:
+      category: Router
       model: MSR931GLE
     1.3.6.1.4.1.25506.11.2.88:
+      category: Router
       model: MSR931GGLE
     1.3.6.1.4.1.25506.11.2.89:
+      category: Router
       model: MSR930WLE
     1.3.6.1.4.1.25506.11.2.90:
+      category: Router
       model: MSR933LE
     1.3.6.1.4.1.25506.11.2.91:
+      category: Router
       model: MSR933GLE
     1.3.6.1.4.1.25506.11.2.92:
+      category: Router
       model: MSR935LE
     1.3.6.1.4.1.25506.11.2.93:
+      category: Router
       model: MSR935WLE
     1.3.6.1.4.1.25506.11.2.94:
+      category: Router
       model: MSR935GLE
     1.3.6.1.4.1.25506.11.2.95:
+      category: Router
       model: MSR9304GLTEGLE
     1.3.6.1.4.1.25506.11.2.96:
+      category: Router
       model: VSR
     1.3.6.1.4.1.25506.11.2.97:
+      category: Router
       model: VSR1001
     1.3.6.1.4.1.25506.11.2.98:
+      category: Router
       model: VSR1004
     1.3.6.1.4.1.25506.11.2.99:
+      category: Router
       model: VSR1008
     1.3.6.1.4.1.25506.11.2.100:
+      category: Router
       model: MSR 10038
     1.3.6.1.4.1.25506.11.2.101:
+      category: Router
       model: MSR 100414
     1.3.6.1.4.1.25506.11.2.102:
       category: Router
       model: VSR1000
     1.3.6.1.4.1.25506.11.2.103:
+      category: Router
       model: MSR2004-24
     1.3.6.1.4.1.25506.11.2.104:
+      category: Router
       model: MSR2004-48
     1.3.6.1.4.1.25506.11.2.105:
+      category: Router
       model: HSR6602G-TAA
     1.3.6.1.4.1.25506.11.2.106:
+      category: Router
       model: HSR6602XG-TAA
     1.3.6.1.4.1.25506.11.2.107:
+      category: Router
       model: MSR1002-4
     1.3.6.1.4.1.25506.11.2.108:
+      category: Router
       model: NSC1000
     1.3.6.1.4.1.25506.11.2.109:
+      category: Router
       model: MSR930
     1.3.6.1.4.1.25506.11.2.110:
+      category: Router
       model: MSR935
     1.3.6.1.4.1.25506.11.2.111:
+      category: Router
       model: MSR2003-TAA
     1.3.6.1.4.1.25506.11.2.112:
+      category: Router
       model: MSR3024-TAA
     1.3.6.1.4.1.25506.11.2.113:
+      category: Router
       model: MSR3044-TAA
     1.3.6.1.4.1.25506.11.2.114:
+      category: Router
       model: MSR935
     1.3.6.1.4.1.25506.11.2.115:
+      category: Router
       model: MSR933
     1.3.6.1.4.1.25506.11.2.116:
+      category: Router
       model: MSR931
     1.3.6.1.4.1.25506.11.2.117:
+      category: Router
       model: MSR1003-8S
     1.3.6.1.4.1.25506.11.2.118:
+      category: Router
       model: MSR932
     1.3.6.1.4.1.25506.11.2.119:
+      category: Router
       model: MSR932W
     1.3.6.1.4.1.25506.11.2.120:
+      category: Router
       model: MSR932WNA
     1.3.6.1.4.1.25506.11.2.121:
+      category: Router
       model: MSR9328
     1.3.6.1.4.1.25506.11.2.122:
+      category: Router
       model: MSR9328W
     1.3.6.1.4.1.25506.11.2.123:
+      category: Router
       model: MSR9328WNA
     1.3.6.1.4.1.25506.11.2.124:
+      category: Router
       model: VBRAS1000
     1.3.6.1.4.1.25506.11.2.125:
+      category: Router
       model: HSR6802-E
     1.3.6.1.4.1.25506.11.2.126:
+      category: Router
       model: HSR6804-E
     1.3.6.1.4.1.25506.11.2.127:
+      category: Router
       model: HSR6808-E
     1.3.6.1.4.1.25506.11.2.128:
+      category: Router
       model: MSR930-4G-LTEG
     1.3.6.1.4.1.25506.11.2.129:
+      category: Router
       model: MSR930-4G-LTEA
     1.3.6.1.4.1.25506.11.2.130:
+      category: Router
       model: MSR954
     1.3.6.1.4.1.25506.11.2.131:
+      category: Router
       model: MSR954-W
     1.3.6.1.4.1.25506.11.2.132:
+      category: Router
       model: MSR954-W-LTE-AM
     1.3.6.1.4.1.25506.11.2.133:
+      category: Router
       model: MSR954-W-LTE
     1.3.6.1.4.1.25506.11.2.134:
+      category: Router
       model: MSR958
     1.3.6.1.4.1.25506.11.2.135:
+      category: Router
       model: MSR958POE
     1.3.6.1.4.1.25506.11.2.136:
+      category: Router
       model: MSR930B
     1.3.6.1.4.1.25506.11.2.137:
+      category: Router
       model: MSR930GB
     1.3.6.1.4.1.25506.11.2.138:
+      category: Router
       model: MSR931B
     1.3.6.1.4.1.25506.11.2.140:
+      category: Router
       model: MSR931DGB
     1.3.6.1.4.1.25506.11.2.141:
+      category: Router
       model: MSR935B
     1.3.6.1.4.1.25506.11.2.143:
+      category: Router
       model: MSR930WNAB
     1.3.6.1.4.1.25506.11.2.144:
       category: Router
       model: MSR954
     1.3.6.1.4.1.25506.11.3.1:
+      category: Wireless
       model: AWA2610EAGNFAT
     1.3.6.1.4.1.25506.11.3.2:
+      category: Wireless
       model: AWA2620EAGNFAT
     1.3.6.1.4.1.25506.11.3.3:
+      category: Wireless
       model: AWA2620AGNFAT
     1.3.6.1.4.1.25506.11.3.4:
       category: Switch
       model: 7500-LSQM-3WC-MB0
     1.3.6.1.4.1.25506.11.3.5:
+      category: Wireless
       model: A9500LSRM2WCM2A1
     1.3.6.1.4.1.25506.11.3.6:
       category: Switch
@@ -46386,99 +46524,145 @@ sysobjectids:
       category: Switch
       model: 5800-LSWM-2WC-M20
     1.3.6.1.4.1.25506.11.3.8:
+      category: Wireless
       model: AWX5004EWPXZ65004
     1.3.6.1.4.1.25506.11.3.9:
+      category: Wireless
       model: AWX5002EWPXZ75002
     1.3.6.1.4.1.25506.11.3.10:
+      category: Wireless
       model: A3000E
     1.3.6.1.4.1.25506.11.3.11:
+      category: Wireless
       model: A3000ELSW
     1.3.6.1.4.1.25506.11.3.12:
+      category: Wireless
       model: AWA3620AGN
     1.3.6.1.4.1.25506.11.3.13:
+      category: Wireless
       model: AWA3622AGN
     1.3.6.1.4.1.25506.11.3.14:
+      category: Wireless
       model: AWA3610GN
     1.3.6.1.4.1.25506.11.3.15:
+      category: Wireless
       model: AWA2620XAGN
     1.3.6.1.4.1.25506.11.3.16:
+      category: Wireless
       model: LSU3WCMD0
     1.3.6.1.4.1.25506.11.3.17:
+      category: Wireless
       model: WX3024EWCM
     1.3.6.1.4.1.25506.11.3.18:
+      category: Wireless
       model: WX3024ELSW
     1.3.6.1.4.1.25506.11.3.19:
+      category: Wireless
       model: WX3010EWCM
     1.3.6.1.4.1.25506.11.3.20:
+      category: Wireless
       model: WX3010ELSW
     1.3.6.1.4.1.25506.11.3.21:
+      category: Wireless
       model: LSU3WCMD0TAA
     1.3.6.1.4.1.25506.11.3.22:
+      category: Wireless
       model: WX3024ETAAWCM
     1.3.6.1.4.1.25506.11.3.23:
+      category: Wireless
       model: WX3024ETAALSW
     1.3.6.1.4.1.25506.11.3.24:
+      category: Wireless
       model: WX3010ETAAWCM
     1.3.6.1.4.1.25506.11.3.25:
+      category: Wireless
       model: WX3010ETAALSW
     1.3.6.1.4.1.25506.11.4:
       category: Firewall
       model: H3C hpSecurity Series
     1.3.6.1.4.1.25506.11.4.1:
+      category: Firewall
       model: SecBladeIMFWII
     1.3.6.1.4.1.25506.11.4.2:
+      category: Firewall
       model: SecBladeIMSSL
     1.3.6.1.4.1.25506.11.4.3:
+      category: Firewall
       model: SecBladeIMLB
     1.3.6.1.4.1.25506.11.4.4:
+      category: Firewall
       model: SecBladeLSQ1FWBSC0
     1.3.6.1.4.1.25506.11.4.5:
+      category: Firewall
       model: SecBladeLSQM1LBC0
     1.3.6.1.4.1.25506.11.4.6:
+      category: Firewall
       model: SecBladeLSQ1NSMSC0
     1.3.6.1.4.1.25506.11.4.7:
+      category: Firewall
       model: SecBladeLSR1FW2A1
     1.3.6.1.4.1.25506.11.4.8:
+      category: Firewall
       model: SecBladeLSR1LB1A1
     1.3.6.1.4.1.25506.11.4.9:
+      category: Firewall
       model: SecBladeLSR1NSM1A1
     1.3.6.1.4.1.25506.11.4.10:
+      category: Firewall
       model: SecBladeLST1FW2A1
     1.3.6.1.4.1.25506.11.4.11:
+      category: Firewall
       model: SecBladeLST1LB1A1
     1.3.6.1.4.1.25506.11.4.12:
+      category: Firewall
       model: SecBladeLST1NSM1A1
     1.3.6.1.4.1.25506.11.4.13:
+      category: Firewall
       model: SecBladeLSWM1FW10
     1.3.6.1.4.1.25506.11.4.14:
+      category: Firewall
       model: SecBladeSPEFWM200
     1.3.6.1.4.1.25506.11.4.15:
+      category: Firewall
       model: AF5000
     1.3.6.1.4.1.25506.11.4.16:
+      category: Firewall
       model: AF1000E
     1.3.6.1.4.1.25506.11.4.17:
+      category: Firewall
       model: AU200S
     1.3.6.1.4.1.25506.11.4.18:
+      category: Firewall
       model: AU200A
     1.3.6.1.4.1.25506.11.4.19:
+      category: Firewall
       model: AF1000SEI
     1.3.6.1.4.1.25506.11.4.20:
+      category: Firewall
       model: AF1000AEI
     1.3.6.1.4.1.25506.11.4.21:
+      category: Firewall
       model: SecBladeLST1FW3A1
     1.3.6.1.4.1.25506.11.4.22:
+      category: Firewall
       model: SecBladeLSU1FWCEA0
     1.3.6.1.4.1.25506.11.4.23:
+      category: Firewall
       model: F5000C
     1.3.6.1.4.1.25506.11.4.24:
+      category: Firewall
       model: F5000S
     1.3.6.1.4.1.25506.11.4.25:
+      category: Firewall
       model: VFW1000
     1.3.6.1.4.1.25506.11.4.26:
+      category: Firewall
       model: SecBladeLSX1FWCEA1
     1.3.6.1.4.1.25506.11.4.27:
+      category: Firewall
       model: VMSGVLB1000
     1.3.6.1.4.1.25506.11.4.28:
+      category: Firewall
       model: SecBlade3Context
     1.3.6.1.4.1.25574.30.50:
       category: Switch
