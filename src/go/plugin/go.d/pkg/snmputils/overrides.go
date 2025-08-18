@@ -88,7 +88,7 @@ func loadOverridesFromDir(dir string) (*overrides, error) {
 		}
 
 		var cur overrides
-		if err := yaml.Unmarshal(bs, &cur); err != nil {
+		if err := yaml.UnmarshalStrict(bs, &cur); err != nil {
 			return err
 		}
 
@@ -104,19 +104,6 @@ func loadOverridesFromDir(dir string) (*overrides, error) {
 	}
 
 	return &agg, nil
-}
-
-func mergeFromFile(dst *overrides, path string) error {
-	bs, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	var cur overrides
-	if err := yaml.UnmarshalStrict(bs, &cur); err != nil {
-		return err
-	}
-	mergeOverrides(dst, &cur)
-	return nil
 }
 
 func mergeOverrides(dst, src *overrides) {
