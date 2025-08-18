@@ -130,8 +130,9 @@ macro(netdata_detect_protobuf)
 
                 if(TARGET protobuf::libprotobuf)
                   get_property(IMPORTED_SET TARGET protobuf::libprotobuf PROPERTY IMPORTED_LOCATION SET)
+                  get_property(ALIASED TARGET protobuf::libprotobuf PROPERTY ALIASED_TARGET)
 
-                  if(NOT IMPORTED_SET)
+                  if(ALIASED STREQUAL "" AND NOT IMPORTED_SET)
                     set_property(TARGET protobuf::libprotobuf PROPERTY IMPORTED_LOCATION "${Protobuf_LIBRARY}")
                   endif()
 
