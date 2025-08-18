@@ -873,11 +873,11 @@ static void add_packet_to_timeout_monitor_list(struct mqtt_ng_client *client, ui
         _rc;                                                                                                           \
     })
 
-mqtt_msg_data mqtt_ng_generate_connect(struct transaction_buffer *trx_buf,
-                                       struct mqtt_auth_properties *auth,
-                                       struct mqtt_lwt_properties *lwt,
-                                       uint8_t clean_start,
-                                       uint16_t keep_alive)
+mqtt_msg_data mqtt_ng_generate_connect(
+    struct transaction_buffer *trx_buf,
+    struct mqtt_auth_properties *auth,
+    struct mqtt_lwt_properties *lwt,
+    uint16_t keep_alive)
 {
     // Sanity Checks First (are given parameters correct and up to MQTT spec)
     if (!auth->client_id) {
@@ -952,8 +952,8 @@ mqtt_msg_data mqtt_ng_generate_connect(struct transaction_buffer *trx_buf,
         if (lwt->will_retain)
             *connect_flags |= MQTT_CONNECT_FLAG_LWT_RETAIN;
     }
-    if (clean_start)
-        *connect_flags |= MQTT_CONNECT_FLAG_CLEAN_START;
+
+    *connect_flags |= MQTT_CONNECT_FLAG_CLEAN_START;
 
     DATA_ADVANCE(&trx_buf->hdr_buffer, 1, frag)
 
@@ -1022,23 +1022,21 @@ fail_rollback:
     return NULL;
 }
 
-int mqtt_ng_connect(struct mqtt_ng_client *client,
-                    struct mqtt_auth_properties *auth,
-                    struct mqtt_lwt_properties *lwt,
-                    uint8_t clean_start,
-                    uint16_t keep_alive)
+int mqtt_ng_connect(
+    struct mqtt_ng_client *client,
+    struct mqtt_auth_properties *auth,
+    struct mqtt_lwt_properties *lwt,
+    uint16_t keep_alive)
 {
     client->client_state = MQTT_STATE_RAW;
     client->parser.state = MQTT_PARSE_FIXED_HEADER_PACKET_TYPE;
 
     LOCK_HDR_BUFFER(&client->main_buffer);
     client->main_buffer.sending_frag = NULL;
-    if (clean_start)
-        buffer_purge(&client->main_buffer.hdr_buffer);
+    buffer_purge(&client->main_buffer.hdr_buffer);
     UNLOCK_HDR_BUFFER(&client->main_buffer);
 
-    if (clean_start)
-        destroy_timeout_monitor_list(client);
+    destroy_timeout_monitor_list(client);
 
     spinlock_lock(&client->tx_topic_aliases.spinlock);
     // according to MQTT spec topic aliases should not be persisted
