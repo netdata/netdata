@@ -1,0 +1,323 @@
+sysobjectids:
+  oid_overrides:
+    1.3.6.1.4.1.141.1.1.0:
+      category: Other
+      model: WAN/Ethernet Probe 6050
+    1.3.6.1.4.1.141.1.1.29:
+      category: Other
+      model: InfiniStream 2900
+    1.3.6.1.4.1.141.1.1.87:
+      category: Other
+      model: "8700"
+    1.3.6.1.4.1.141.1.1.1910:
+      category: Other
+      model: InfiniStream 1910D
+    1.3.6.1.4.1.141.1.1.2211:
+      category: Other
+      model: "2211"
+    1.3.6.1.4.1.141.1.1.2695:
+      category: Other
+      model: InfiniStream 2695
+    1.3.6.1.4.1.141.1.1.2910:
+      category: Other
+      model: InfiniStream 2910
+    1.3.6.1.4.1.141.1.1.2916:
+      category: Other
+      model: InfiniStream 2916
+    1.3.6.1.4.1.141.1.1.2990:
+      category: Other
+      model: InfiniStream 2990
+    1.3.6.1.4.1.141.1.1.2995:
+      category: Other
+      model: InfiniStream 2995
+    1.3.6.1.4.1.141.1.1.3100:
+      category: Other
+      model: 3100LET CDM
+    1.3.6.1.4.1.141.1.1.3200:
+      category: Other
+      model: 3200P2 CDM
+    1.3.6.1.4.1.141.1.1.3210:
+      category: Other
+      model: DEC Packet Probe 3210
+    1.3.6.1.4.1.141.1.1.3220:
+      category: Other
+      model: Packet Probe 3220
+    1.3.6.1.4.1.141.1.1.3300:
+      category: Other
+      model: nGenius Collector 3300
+    1.3.6.1.4.1.141.1.1.4590:
+      category: Other
+      model: InfiniStream 4590
+    1.3.6.1.4.1.141.1.1.4595:
+      category: Other
+      model: InfiniStream 4595
+    1.3.6.1.4.1.141.1.1.4795:
+      category: Other
+      model: InfiniStream 4795
+    1.3.6.1.4.1.141.1.1.4895:
+      category: Other
+      model: InfiniStream 4895
+    1.3.6.1.4.1.141.1.1.4910:
+      category: Other
+      model: 4910 CDM
+    1.3.6.1.4.1.141.1.1.5010:
+      category: Other
+      model: Packet Probe 5010
+    1.3.6.1.4.1.141.1.1.5020:
+      category: Other
+      model: Packet Probe 5020
+    1.3.6.1.4.1.141.1.1.5100:
+      category: Other
+      model: Packet Probe 5100
+    1.3.6.1.4.1.141.1.1.6010:
+      category: Other
+      model: Ethernet Probe 6010
+    1.3.6.1.4.1.141.1.1.6020:
+      category: Other
+      model: Token Ring Probe 6020
+    1.3.6.1.4.1.141.1.1.6030:
+      category: Other
+      model: "6030"
+    1.3.6.1.4.1.141.1.1.6040:
+      category: Other
+      model: "6040"
+    1.3.6.1.4.1.141.1.1.6050:
+      category: Other
+      model: WAN/Ethernet Probe 6050
+    1.3.6.1.4.1.141.1.1.6060:
+      category: Other
+      model: "6060"
+    1.3.6.1.4.1.141.1.1.6070:
+      category: Other
+      model: WAN/Token Ring Probe 6070
+    1.3.6.1.4.1.141.1.1.6910:
+      category: Other
+      model: InfiniStream 6910
+    1.3.6.1.4.1.141.1.1.6980:
+      category: Other
+      model: InfiniStream 6980
+    1.3.6.1.4.1.141.1.1.6990:
+      category: Other
+      model: InfiniStream 6990
+    1.3.6.1.4.1.141.1.1.6995:
+      category: Other
+      model: InfiniStream 6995
+    1.3.6.1.4.1.141.1.1.7101:
+      category: Other
+      model: "7101"
+    1.3.6.1.4.1.141.1.1.7102:
+      category: Other
+      model: FDDI SAS/Ethernet Probe 7102
+    1.3.6.1.4.1.141.1.1.7103:
+      category: Other
+      model: FDDI DAS/Ethernet Probe 7103
+    1.3.6.1.4.1.141.1.1.7200:
+      category: Other
+      model: "7200"
+    1.3.6.1.4.1.141.1.1.7201:
+      category: Other
+      model: "7201"
+    1.3.6.1.4.1.141.1.1.7203:
+      category: Other
+      model: "7203"
+    1.3.6.1.4.1.141.1.1.7211:
+      category: Other
+      model: "7211"
+    1.3.6.1.4.1.141.1.1.7213:
+      category: Other
+      model: "7213"
+    1.3.6.1.4.1.141.1.1.7221:
+      category: Other
+      model: "7221"
+    1.3.6.1.4.1.141.1.1.7223:
+      category: Other
+      model: "7223"
+    1.3.6.1.4.1.141.1.1.7301:
+      category: Other
+      model: Multiport (four port) Ethernet Probe 7301
+    1.3.6.1.4.1.141.1.1.7302:
+      category: Other
+      model: Multiport (eight port) Ethernet Probe 7302
+    1.3.6.1.4.1.141.1.1.7303:
+      category: Other
+      model: "7303"
+    1.3.6.1.4.1.141.1.1.7400:
+      category: Other
+      model: "7400"
+    1.3.6.1.4.1.141.1.1.7401:
+      category: Other
+      model: WAN/Ethernet Probe 7401
+    1.3.6.1.4.1.141.1.1.7500:
+      category: Other
+      model: "7500"
+    1.3.6.1.4.1.141.1.1.7501:
+      category: Other
+      model: "7501"
+    1.3.6.1.4.1.141.1.1.7502:
+      category: Other
+      model: "7502"
+    1.3.6.1.4.1.141.1.1.7503:
+      category: Other
+      model: "7503"
+    1.3.6.1.4.1.141.1.1.7504:
+      category: Other
+      model: "7504"
+    1.3.6.1.4.1.141.1.1.7910:
+      category: Other
+      model: InfiniStream 7910
+    1.3.6.1.4.1.141.1.1.7992:
+      category: Other
+      model: InfiniStream 7992
+    1.3.6.1.4.1.141.1.1.7995:
+      category: Other
+      model: InfiniStream 7995
+    1.3.6.1.4.1.141.1.1.7998:
+      category: Other
+      model: InfiniStream 7998
+    1.3.6.1.4.1.141.1.1.8110:
+      category: Other
+      model: Oc3 ATM/Ethernet Probe 8110
+    1.3.6.1.4.1.141.1.1.8150:
+      category: Other
+      model: ATM/Ethernet Probe 8150
+    1.3.6.1.4.1.141.1.1.8160:
+      category: Other
+      model: "8160"
+    1.3.6.1.4.1.141.1.1.8201:
+      category: Other
+      model: Fast Ethernet Single Interface Probe 8201
+    1.3.6.1.4.1.141.1.1.8203:
+      category: Other
+      model: Fast Ethernet Single Interface Probe 8203
+    1.3.6.1.4.1.141.1.1.8211:
+      category: Other
+      model: Fast Ethernet Full Duplex Single Probe 8211
+    1.3.6.1.4.1.141.1.1.8213:
+      category: Other
+      model: Fast Ethernet Full Duplex Single Probe 8213
+    1.3.6.1.4.1.141.1.1.8221:
+      category: Other
+      model: Fast Ethernet Dual Interface Half Probe 8221
+    1.3.6.1.4.1.141.1.1.8223:
+      category: Other
+      model: Fast Ethernet Dual Interface Half Probe 8223
+    1.3.6.1.4.1.141.1.1.8241:
+      category: Other
+      model: Multiport (four port) Fast Probe 8241
+    1.3.6.1.4.1.141.1.1.8243:
+      category: Other
+      model: Multiport (four port) Fast Probe 8243
+    1.3.6.1.4.1.141.1.1.8281:
+      category: Other
+      model: Fast EtherChannel Probe 8281
+    1.3.6.1.4.1.141.1.1.8283:
+      category: Other
+      model: Fast EtherChannel Probe 8283
+    1.3.6.1.4.1.141.1.1.8400:
+      category: Other
+      model: 8400 NSP
+    1.3.6.1.4.1.141.1.1.8411:
+      category: Other
+      model: "8411"
+    1.3.6.1.4.1.141.1.1.8700:
+      category: Other
+      model: "8700"
+    1.3.6.1.4.1.141.1.1.8702:
+      category: Other
+      model: Multiport (two port) T1/E1 WAN/Ethernet Probe 8702
+    1.3.6.1.4.1.141.1.1.8704:
+      category: Other
+      model: Multiport (four port) T1/E1 WAN/Ethernet Probe 8704
+    1.3.6.1.4.1.141.1.1.8712:
+      category: Other
+      model: Multiport (two port) T1/D WAN/Ethernet Probe 8712
+    1.3.6.1.4.1.141.1.1.8714:
+      category: Other
+      model: Multiport (four port) T1/D WAN/Ethernet Probe 8714
+    1.3.6.1.4.1.141.1.1.8722:
+      category: Other
+      model: Multiport (two port) E1/D WAN/Ethernet Probe 8722
+    1.3.6.1.4.1.141.1.1.8724:
+      category: Other
+      model: Multiport (four port) E1/D WAN/Ethernet Probe 8724
+    1.3.6.1.4.1.141.1.1.8812:
+      category: Other
+      model: Channelized T1 WAN/Ethernet Probe 8812
+    1.3.6.1.4.1.141.1.1.8822:
+      category: Other
+      model: Channelized E1 WAN/Ethernet Probe 8822
+    1.3.6.1.4.1.141.1.1.8911:
+      category: Other
+      model: Gigabit Ethernet 1000Base LX Probe 8911
+    1.3.6.1.4.1.141.1.1.8912:
+      category: Other
+      model: Gigabit Ethernet 1000Base SX Probe 8912
+    1.3.6.1.4.1.141.1.1.9001:
+      category: Other
+      model: "9001"
+    1.3.6.1.4.1.141.1.1.9002:
+      category: Other
+      model: "9002"
+    1.3.6.1.4.1.141.1.1.9003:
+      category: Other
+      model: "9003"
+    1.3.6.1.4.1.141.1.1.9100:
+      category: Other
+      model: "9100"
+    1.3.6.1.4.1.141.1.1.9112:
+      category: Other
+      model: "9112"
+    1.3.6.1.4.1.141.1.1.9150:
+      category: Other
+      model: "9150"
+    1.3.6.1.4.1.141.1.1.9200:
+      category: Other
+      model: "9200"
+    1.3.6.1.4.1.141.1.1.9221:
+      category: Other
+      model: 9221LET
+    1.3.6.1.4.1.141.1.1.9241:
+      category: Other
+      model: "9241"
+    1.3.6.1.4.1.141.1.1.9281:
+      category: Other
+      model: "9281"
+    1.3.6.1.4.1.141.1.1.9300:
+      category: Other
+      model: 9300L-OC3
+    1.3.6.1.4.1.141.1.1.9320:
+      category: Server
+      model: 9320
+    1.3.6.1.4.1.141.1.1.9400:
+      category: Other
+      model: 9400L CDM
+    1.3.6.1.4.1.141.1.1.9795:
+      category: Other
+      model: InfiniStream 9795G
+    1.3.6.1.4.1.141.1.1.9807:
+      category: Other
+      model: InfiniStream 9807
+    1.3.6.1.4.1.141.1.1.9895:
+      category: Other
+      model: InfiniStream 9895
+    1.3.6.1.4.1.141.1.1.9900:
+      category: Other
+      model: "9900"
+    1.3.6.1.4.1.141.1.1.9902:
+      category: Other
+      model: 9902LET CDM
+    1.3.6.1.4.1.141.1.1.9903:
+      category: Server
+      model: 9903RET
+    1.3.6.1.4.1.141.1.1.9905:
+      category: Other
+      model: 9905 RET
+    1.3.6.1.4.1.141.1.1.9912:
+      category: Other
+      model: "9912"
+    1.3.6.1.4.1.141.1.1.9981:
+      category: Server
+      model: 9981PET
+    1.3.6.1.4.1.141.1.1.9982:
+      category: Other
+      model: 9982P2ET

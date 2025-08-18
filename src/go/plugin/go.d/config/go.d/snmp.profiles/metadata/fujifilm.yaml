@@ -1,0 +1,371 @@
+sysobjectids:
+  oid_overrides:
+    1.3.6.1.4.1.297.1.11.9.3.1.7.8.1:
+      category: Printer
+      model: Fuji Xerox DocuPrint
+    1.3.6.1.4.1.297.1.11.93.1.2.3.1.1:
+      category: Printer
+      model: Fuji Xerox DocuPrint
+    1.3.6.1.4.1.297.1.11.93.1.6.1.1:
+      category: Printer
+      model: Fuji Xerox Document Centre
+    1.3.6.1.4.1.297.1.11.93.1.6.3.1:
+      category: Printer
+      model: Fuji Xerox Document Centre
+    1.3.6.1.4.1.297.1.11.93.1.6.6.1.1:
+      category: Printer
+      model: Fuji Xerox Document Centre
+    1.3.6.1.4.1.297.1.11.93.1.6.6.1.2:
+      category: Printer
+      model: Fuji Xerox Document Centre
+    1.3.6.1.4.1.297.1.11.93.1.6.6.2.1:
+      category: Printer
+      model: Fuji Xerox Document Centre
+    1.3.6.1.4.1.297.1.11.93.1.6.6.2.2:
+      category: Printer
+      model: Fuji Xerox Document Centre
+    1.3.6.1.4.1.297.1.11.93.1.6.8.1:
+      category: Printer
+      model: Fuji Xerox Document Centre
+    1.3.6.1.4.1.297.1.11.93.1.6.18.1:
+      category: Printer
+      model: Fuji Xerox Document Centre
+    1.3.6.1.4.1.297.1.11.93.1.6.19.1:
+      category: Printer
+      model: Xerox Document Centre
+    1.3.6.1.4.1.297.1.11.93.1.6.20.1:
+      category: Printer
+      model: Fuji Xerox Document Centre
+    1.3.6.1.4.1.297.1.11.93.1.6.21.1:
+      category: Printer
+      model: Fuji Xerox Document Centre
+    1.3.6.1.4.1.297.1.11.93.1.6.22.1:
+      category: Printer
+      model: Fuji Xerox Document Centre
+    1.3.6.1.4.1.297.1.11.93.1.6.27.1:
+      category: Printer
+      model: Fuji Xerox Document Centre
+    1.3.6.1.4.1.297.1.11.93.1.6.28.1:
+      category: Printer
+      model: Fuji Xerox Document Centre
+    1.3.6.1.4.1.297.1.11.93.1.6.31.1:
+      category: Printer
+      model: Fuji Xerox Document Centre
+    1.3.6.1.4.1.297.1.11.93.1.6.33.1:
+      category: Printer
+      model: Fuji Xerox Document Centre
+    1.3.6.1.4.1.297.1.11.93.1.7.1.3:
+      category: Printer
+      model: Fuji Xerox DocuPrint
+    1.3.6.1.4.1.297.1.11.93.1.7.4.1:
+      category: Printer
+      model: Fuji Xerox DocuPrint
+    1.3.6.1.4.1.297.1.11.93.1.7.8.1:
+      category: Printer
+      model: Fuji Xerox DocuPrint
+    1.3.6.1.4.1.297.1.11.93.1.7.18.1:
+      category: Printer
+      model: Fuji Xerox DocuPrint
+    1.3.6.1.4.1.297.1.11.93.1.7.19.1:
+      category: Printer
+      model: Fuji Xerox DocuPrint
+    1.3.6.1.4.1.297.1.11.93.1.7.21.1:
+      category: Printer
+      model: Fuji Xerox DocuPrint
+    1.3.6.1.4.1.297.1.11.93.1.7.22.1.1:
+      category: Printer
+      model: Xerox DocuPrint
+    1.3.6.1.4.1.297.1.11.93.1.7.23.1:
+      category: Printer
+      model: Fuji Xerox DocuPrint
+    1.3.6.1.4.1.297.1.11.93.1.7.28.1:
+      category: Printer
+      model: Fuji Xerox DocuPrint
+    1.3.6.1.4.1.297.1.11.93.1.7.30.1:
+      category: Printer
+      model: Fuji Xerox DocuPrint
+    1.3.6.1.4.1.297.1.11.93.1.7.31.1:
+      category: Printer
+      model: Fuji Xerox DocuPrint
+    1.3.6.1.4.1.297.1.11.93.1.7.32.1:
+      category: Printer
+      model: Fuji Xerox DocuPrint
+    1.3.6.1.4.1.297.1.11.93.1.7.37.1.1:
+      category: Printer
+      model: Fuji Xerox DocuPrint
+    1.3.6.1.4.1.297.1.11.93.1.7.41.1:
+      category: Printer
+      model: Fuji Xerox DocuPrint
+    1.3.6.1.4.1.297.1.11.93.1.21.1:
+      category: Printer
+      model: Fuji Xerox Document Centre
+    1.3.6.1.4.1.297.1.11.93.1.21.1.1:
+      category: Printer
+      model: Fuji Xerox Document Centre
+    1.3.6.1.4.1.297.1.11.93.1.21.2.1:
+      category: Printer
+      model: Fuji Xerox Document Centre
+    1.3.6.1.4.1.297.1.11.93.1.21.3.1:
+      category: Printer
+      model: Fuji Xerox Document Centre
+    1.3.6.1.4.1.297.1.11.93.1.21.5.1:
+      category: Printer
+      model: Fuji Xerox Document Centre
+    1.3.6.1.4.1.297.1.11.93.1.21.6.1:
+      category: Printer
+      model: Fuji Xerox Document Centre
+    1.3.6.1.4.1.297.1.11.93.1.21.6.2:
+      category: Printer
+      model: Fuji Xerox Document Centre
+    1.3.6.1.4.1.297.1.11.93.1.21.7.1:
+      category: Printer
+      model: Fuji Xerox Document Centre
+    1.3.6.1.4.1.297.1.11.93.1.22.1.1:
+      category: Printer
+      model: Fuji Xerox WorkCentre Pro
+    1.3.6.1.4.1.297.1.11.93.1.22.4.1:
+      category: Printer
+      model: Fuji Xerox WorkCentre
+    1.3.6.1.4.1.297.1.11.93.1.25.1.1:
+      category: Printer
+      model: Xerox Phaser 6201J Color printer
+    1.3.6.1.4.1.297.1.11.93.1.27.3.1.1:
+      category: Printer
+      model: Xerox DocuPrint C2428
+    1.3.6.1.4.1.297.1.11.93.1.27.37.1.1:
+      category: Printer
+      model: Xerox DocuPrint C1100
+    1.3.6.1.4.1.297.1.11.93.1.27.42.1.1:
+      category: Printer
+      model: Xerox DocuPrint C2255
+    1.3.6.1.4.1.297.1.11.93.1.28.2.1.1:
+      category: Printer
+      model: Xerox DocuCentre a285
+    1.3.6.1.4.1.297.1.11.93.1.28.9.1.1:
+      category: Printer
+      model: Xerox DocuPrint C250
+    1.3.6.1.4.1.297.1.11.93.1.28.32.2.2:
+      category: Printer
+      model: Xerox DocuCentre-II C4300
+    1.3.6.1.4.1.297.1.11.93.1.28.34.1.2:
+      category: Printer
+      model: Xerox DocuCentre-II 4000
+    1.3.6.1.4.1.297.1.11.93.1.30.32.2.1:
+      category: Printer
+      model: Xerox ApeosPort-III C4400
+    1.3.6.1.4.1.297.1.11.93.1.32.4.1.1:
+      category: Printer
+      model: Xerox DocuPrint CM305 df
+    1.3.6.1.4.1.297.1.11.93.1.32.7.1.1:
+      category: Printer
+      model: Fuji Xerox DocuPrint CM405 df
+    1.3.6.1.4.1.297.1.11.93.1.32.8.1.1:
+      category: Printer
+      model: Xerox DocuPrint M355 df
+    1.3.6.1.4.1.297.1.11.93.1.32.8.2.1:
+      category: Printer
+      model: Xerox DocuPrint M455 DF
+    1.3.6.1.4.1.297.1.11.93.1.34.39.6.2:
+      category: Printer
+      model: Xerox DocuCentre-IV C3370
+    1.3.6.1.4.1.297.1.11.93.1.34.39.7.2:
+      category: Printer
+      model: Xerox DocuCentre-IV C4470
+    1.3.6.1.4.1.297.1.11.93.1.34.40.2.1:
+      category: Printer
+      model: Xerox DocuCentre-IV C2260
+    1.3.6.1.4.1.297.1.11.93.1.35.8.1.2:
+      category: Printer
+      model: ApeosPort-IV C2270
+    1.3.6.1.4.1.297.1.11.93.1.35.8.6.2:
+      category: Printer
+      model: Xerox ApeosPort-IV C3370
+    1.3.6.1.4.1.297.1.11.93.1.35.8.7.2:
+      category: Printer
+      model: Fuji Xerox ApeosPort-IV C4470
+    1.3.6.1.4.1.297.1.11.93.1.35.8.8.2:
+      category: Printer
+      model: Xerox ApeosPort-IV C5570
+    1.3.6.1.4.1.297.1.11.93.1.35.19.2.1:
+      category: Printer
+      model: Fuji Xerox ApeosPort-IV 4070
+    1.3.6.1.4.1.297.1.11.93.1.35.19.5.2:
+      category: Printer
+      model: Xerox ApeosPort-IV 3070
+    1.3.6.1.4.1.297.1.11.93.1.35.20.2.3:
+      category: Printer
+      model: Fuji Xerox ApeosPort-IV C2275
+    1.3.6.1.4.1.297.1.11.93.1.35.20.3.1:
+      category: Printer
+      model: Xerox ApeosPort-IV C3373
+    1.3.6.1.4.1.297.1.11.93.1.35.20.3.2:
+      category: Printer
+      model: Fuji Xerox ApeosPort-IV C3373
+    1.3.6.1.4.1.297.1.11.93.1.35.20.3.3:
+      category: Printer
+      model: Fuji Xerox ApeosPort-IV C3373
+    1.3.6.1.4.1.297.1.11.93.1.35.20.5.3:
+      category: Printer
+      model: Xerox ApeosPort-IV C3375
+    1.3.6.1.4.1.297.1.11.93.1.35.20.6.3:
+      category: Printer
+      model: Xerox ApeosPort-IV C4475
+    1.3.6.1.4.1.297.1.11.93.1.35.20.7.2:
+      category: Printer
+      model: Fuji Xerox ApeosPort-IV C4475
+    1.3.6.1.4.1.297.1.11.93.1.35.20.9.1:
+      category: Printer
+      model: Xerox ApeosPort-IV C5575
+    1.3.6.1.4.1.297.1.11.93.1.35.22.2.1:
+      category: Printer
+      model: Fuji Xerox ApeosPort-V C2275
+    1.3.6.1.4.1.297.1.11.93.1.35.22.3.1:
+      category: Printer
+      model: Fuji Xerox ApeosPort-V C3373
+    1.3.6.1.4.1.297.1.11.93.1.35.22.5.1:
+      category: Printer
+      model: Fuji Xerox ApeosPort-V C3375
+    1.3.6.1.4.1.297.1.11.93.1.35.22.6.1:
+      category: Printer
+      model: Fuji Xerox ApeosPort-V C4475
+    1.3.6.1.4.1.297.1.11.93.1.35.22.7.1:
+      category: Printer
+      model: Xerox ApeosPort-V C4475
+    1.3.6.1.4.1.297.1.11.93.1.35.24.1.2:
+      category: Printer
+      model: ApeosPort-V C2275 T2
+    1.3.6.1.4.1.297.1.11.93.1.35.24.2.2:
+      category: Printer
+      model: Fuji Xerox ApeosPort-V C2275 T2
+    1.3.6.1.4.1.297.1.11.93.1.35.24.4.2:
+      category: Printer
+      model: Fuji Xerox ApeosPort-V C3375 T2
+    1.3.6.1.4.1.297.1.11.93.1.35.24.7.1:
+      category: Printer
+      model: Fuji Xerox ApeosPort-V C4475 T2
+    1.3.6.1.4.1.297.1.11.93.1.35.24.7.2:
+      category: Printer
+      model: Xerox ApeosPort-V C4475 T2
+    1.3.6.1.4.1.297.1.11.93.1.35.24.9.2:
+      category: Printer
+      model: Xerox ApeosPort-V C5575 T2
+    1.3.6.1.4.1.297.1.11.93.1.35.24.18.2:
+      category: Printer
+      model: Xerox ApeosPort-V C6675 T2
+    1.3.6.1.4.1.297.1.11.93.1.35.31.1.1:
+      category: Printer
+      model: Fuji Xerox ApeosPort-V C2276
+    1.3.6.1.4.1.297.1.11.93.1.35.31.2.1:
+      category: Printer
+      model: Xerox ApeosPort-V C2276
+    1.3.6.1.4.1.297.1.11.93.1.35.31.7.1:
+      category: Printer
+      model: Xerox ApeosPort-V C4476
+    1.3.6.1.4.1.297.1.11.93.1.35.31.9.1:
+      category: Printer
+      model: Fuji Xerox ApeosPort-V C5576
+    1.3.6.1.4.1.297.1.11.93.1.35.34.4.1:
+      category: Printer
+      model: ApeosPort-VI C6671
+    1.3.6.1.4.1.297.1.11.93.1.35.34.4.3:
+      category: Printer
+      model: ApeosPort-VI C6671
+    1.3.6.1.4.1.297.1.11.93.1.35.34.7.1:
+      category: Printer
+      model: Fuji Xerox ApeosPort-VI C4471
+    1.3.6.1.4.1.297.1.11.93.1.35.34.9.1:
+      category: Printer
+      model: Fuji Xerox ApeosPort-VI C3371
+    1.3.6.1.4.1.297.1.11.93.1.36.17.1.1:
+      category: Printer
+      model: Xerox DocuPrint CP405
+    1.3.6.1.4.1.297.1.11.93.1.36.18.1.1:
+      category: Printer
+      model: Fuji Xerox DocuPrint P355 d
+    1.3.6.1.4.1.297.1.11.93.1.37.1.1.1:
+      category: Printer
+      model: Xerox DocuCentre-IV 4070
+    1.3.6.1.4.1.297.1.11.93.1.37.2.4.1:
+      category: Printer
+      model: Xerox DocuCentre-IV 3060
+    1.3.6.1.4.1.297.1.11.93.1.37.3.3.1:
+      category: Printer
+      model: Xerox DocuCentre-IV 6080
+    1.3.6.1.4.1.297.1.11.93.1.37.4.1.2:
+      category: Printer
+      model: Xerox DocuCentre-IV C2275
+    1.3.6.1.4.1.297.1.11.93.1.37.4.3.2:
+      category: Printer
+      model: Xerox DocuCentre-IV C3375
+    1.3.6.1.4.1.297.1.11.93.1.37.4.4.2:
+      category: Printer
+      model: DocuCentre-IV C3375
+    1.3.6.1.4.1.297.1.11.93.1.37.4.4.3:
+      category: Printer
+      model: DocuCentre-IV C3375
+    1.3.6.1.4.1.297.1.11.93.1.37.4.7.3:
+      category: Printer
+      model: Xerox DocuCentre-IV C5575
+    1.3.6.1.4.1.297.1.11.93.1.37.5.1.1:
+      category: Printer
+      model: Xerox DocuCentre-IV C2263
+    1.3.6.1.4.1.297.1.11.93.1.37.5.2.1:
+      category: Printer
+      model: Fuji Xerox DocuCentre-IV C2263
+    1.3.6.1.4.1.297.1.11.93.1.37.5.2.3:
+      category: Printer
+      model: Fuji Xerox DocuCentre-IV C2263
+    1.3.6.1.4.1.297.1.11.93.1.37.5.3.1:
+      category: Printer
+      model: Fuji Xerox DocuCentre-IV C2265
+    1.3.6.1.4.1.297.1.11.93.1.37.5.3.3:
+      category: Printer
+      model: Xerox DocuCentre-IV C2265
+    1.3.6.1.4.1.297.1.11.93.1.37.6.7.1:
+      category: Printer
+      model: Xerox DocuCentre-V C4475
+    1.3.6.1.4.1.297.1.11.93.1.37.8.5.2:
+      category: Printer
+      model: Xerox DocuCentre-V C3375 T2
+    1.3.6.1.4.1.297.1.11.93.1.37.22.3.1:
+      category: Printer
+      model: DocuCentre-V C2265
+    1.3.6.1.4.1.297.1.11.93.1.38.6.1.2:
+      category: Printer
+      model: Xerox DocuPrint C3350
+    1.3.6.1.4.1.297.1.11.93.1.38.7.2.1:
+      category: Printer
+      model: Xerox DocuPrint C5005
+    1.3.6.1.4.1.297.1.11.93.1.38.8.2.1:
+      category: Printer
+      model: Xerox DocuPrint 3100
+    1.3.6.1.4.1.297.1.11.93.1.39.8.2.1:
+      category: Printer
+      model: ApeosPort C2560
+    1.3.6.1.4.1.297.1.11.93.1.39.8.5.1:
+      category: Printer
+      model: ApeosPort C3060
+    1.3.6.1.4.1.297.1.11.93.1.39.8.5.2:
+      category: Printer
+      model: ApeosPort C3060
+    1.3.6.1.4.1.297.1.11.93.1.39.18.8.1:
+      category: Printer
+      model: ApeosPort C4570
+    1.3.6.1.4.1.297.1.11.93.1.39.18.8.2:
+      category: Printer
+      model: ApeosPort C4570
+    1.3.6.1.4.1.297.1.11.93.1.39.18.9.1:
+      category: Printer
+      model: ApeosPort C3570
+    1.3.6.1.4.1.297.1.11.93.1.39.18.9.2:
+      category: Printer
+      model: ApeosPort C3570
+    1.3.6.1.4.1.297.1.11.93.1.42.8.2.1:
+      category: Printer
+      model: Xerox DocuCentre S2010
+    1.3.6.1.4.1.297.1.11.93.2.1.1.4.2:
+      category: Printer
+      model: ApeosPort C6570
+    1.3.6.1.4.1.297.1.11.93.2.1.1.10.6:
+      category: Printer
+      model: Apeos C3570

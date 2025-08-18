@@ -1,0 +1,4124 @@
+sysobjectids:
+  oid_overrides:
+    1.3.6.1.4.1.43.1.1:
+      category: Switch
+      model: terminalServer
+    1.3.6.1.4.1.43.1.1.1:
+      category: Switch
+      model: cs2500
+    1.3.6.1.4.1.43.1.1.1.1:
+      category: Switch
+      model: cs2500to
+    1.3.6.1.4.1.43.1.1.1.2:
+      category: Switch
+      model: cs2500tlo
+    1.3.6.1.4.1.43.1.1.2:
+      category: Switch
+      model: cs2600
+    1.3.6.1.4.1.43.1.1.2.1:
+      category: Switch
+      model: cs2600to
+    1.3.6.1.4.1.43.1.1.2.2:
+      category: Switch
+      model: cs2600tlo
+    1.3.6.1.4.1.43.1.1.3:
+      category: Switch
+      model: cs2000
+    1.3.6.1.4.1.43.1.1.3.1:
+      category: Switch
+      model: cs2000to
+    1.3.6.1.4.1.43.1.1.3.2:
+      category: Switch
+      model: cs2000tlo
+    1.3.6.1.4.1.43.1.1.4:
+      category: Switch
+      model: cs1
+    1.3.6.1.4.1.43.1.1.5:
+      category: Switch
+      model: cs210
+    1.3.6.1.4.1.43.1.1.6:
+      category: Switch
+      model: cs2100
+    1.3.6.1.4.1.43.1.1.6.1:
+      category: Switch
+      model: cs2100to
+    1.3.6.1.4.1.43.1.1.6.2:
+      category: Switch
+      model: cs2100tlo
+    1.3.6.1.4.1.43.1.1.7:
+      category: Switch
+      model: cs3000
+    1.3.6.1.4.1.43.1.1.7.1:
+      category: Switch
+      model: cs3000to
+    1.3.6.1.4.1.43.1.1.7.2:
+      category: Switch
+      model: cs3000tlo
+    1.3.6.1.4.1.43.1.1.8:
+      category: Switch
+      model: cs3100
+    1.3.6.1.4.1.43.1.1.8.1:
+      category: Switch
+      model: cs3100to
+    1.3.6.1.4.1.43.1.1.8.2:
+      category: Switch
+      model: cs3100tlo
+    1.3.6.1.4.1.43.1.1.9:
+      category: Switch
+      model: callisto
+    1.3.6.1.4.1.43.1.1.10:
+      category: Switch
+      model: termServerPlatform
+    1.3.6.1.4.1.43.1.1.10.1:
+      category: Switch
+      model: series1
+    1.3.6.1.4.1.43.1.1.10.2:
+      category: Switch
+      model: series200
+    1.3.6.1.4.1.43.1.1.10.3:
+      category: Switch
+      model: callistoPlatfor
+    1.3.6.1.4.1.43.1.1.10.4:
+      category: Switch
+      model: series2500
+    1.3.6.1.4.1.43.1.1.10.5:
+      category: Switch
+      model: series3000
+    1.3.6.1.4.1.43.1.2:
+      category: Switch
+      model: dedicatedBridgeServer
+    1.3.6.1.4.1.43.1.3:
+      category: Switch
+      model: dedicatedRouteServer
+    1.3.6.1.4.1.43.1.4:
+      category: Switch
+      model: Hub
+    1.3.6.1.4.1.43.1.4.1:
+      category: Switch
+      model: netbuilder1
+    1.3.6.1.4.1.43.1.4.2:
+      category: Switch
+      model: netbuilder2
+    1.3.6.1.4.1.43.1.4.3:
+      category: Switch
+      model: lBridgeECS
+    1.3.6.1.4.1.43.1.4.4:
+      category: Switch
+      model: netbuilderTrRA
+    1.3.6.1.4.1.43.1.4.4.1:
+      category: Switch
+      model: netbuilderTrRAbp
+    1.3.6.1.4.1.43.1.4.4.2:
+      category: Switch
+      model: netbuilderTrRAcp
+    1.3.6.1.4.1.43.1.4.4.3:
+      category: Switch
+      model: netbuilderTrRAxw
+    1.3.6.1.4.1.43.1.4.4.4:
+      category: Switch
+      model: netbuilderTrRAcx
+    1.3.6.1.4.1.43.1.4.4.5:
+      category: Switch
+      model: netbuilderTrRAba
+    1.3.6.1.4.1.43.1.4.4.6:
+      category: Switch
+      model: netbuilderTrRAar
+    1.3.6.1.4.1.43.1.4.4.7:
+      category: Switch
+      model: netbuilderTrRAsn
+    1.3.6.1.4.1.43.1.4.4.8:
+      category: Switch
+      model: netbuilderTrRArb
+    1.3.6.1.4.1.43.1.4.4.9:
+      category: Switch
+      model: netbuilderTrRAff
+    1.3.6.1.4.1.43.1.4.4.10:
+      category: Switch
+      model: netbuidlerTrRAcf
+    1.3.6.1.4.1.43.1.4.4.11:
+      category: Switch
+      model: netbuilderTrRAbx
+    1.3.6.1.4.1.43.1.4.4.12:
+      category: Switch
+      model: netbuilderTrRAappn
+    1.3.6.1.4.1.43.1.4.4.13:
+      category: Switch
+      model: netbuilderTrRAlm
+    1.3.6.1.4.1.43.1.4.4.14:
+      category: Switch
+      model: netbuilderTrRAlt
+    1.3.6.1.4.1.43.1.4.4.15:
+      category: Switch
+      model: netbuilderTrRAwm
+    1.3.6.1.4.1.43.1.4.4.16:
+      category: Switch
+      model: netbuilderTrRAwt
+    1.3.6.1.4.1.43.1.4.4.17:
+      category: Switch
+      model: netbuilderTrRAae
+    1.3.6.1.4.1.43.1.4.4.18:
+      category: Switch
+      model: netbuilderTrRAap
+    1.3.6.1.4.1.43.1.4.4.19:
+      category: Switch
+      model: netbuilderTrRAan
+    1.3.6.1.4.1.43.1.4.4.20:
+      category: Switch
+      model: netbuilderTrRAla
+    1.3.6.1.4.1.43.1.4.4.21:
+      category: Switch
+      model: netbuilderTrRAwa
+    1.3.6.1.4.1.43.1.4.4.22:
+      category: Switch
+      model: netbuilderTrRAaa
+    1.3.6.1.4.1.43.1.4.4.23:
+      category: Switch
+      model: netbuilderTrRAab
+    1.3.6.1.4.1.43.1.4.4.24:
+      category: Switch
+      model: netbuilderTrRAbf
+    1.3.6.1.4.1.43.1.4.5:
+      category: Switch
+      model: brouterPlatform
+    1.3.6.1.4.1.43.1.4.5.1:
+      category: Switch
+      model: nb1
+    1.3.6.1.4.1.43.1.4.5.2:
+      category: Switch
+      model: nb2
+    1.3.6.1.4.1.43.1.4.5.3:
+      category: Switch
+      model: nbroPlatform
+    1.3.6.1.4.1.43.1.4.5.4:
+      category: Switch
+      model: casperPlatform
+    1.3.6.1.4.1.43.1.4.5.5:
+      category: Switch
+      model: spectreIsdnPform
+    1.3.6.1.4.1.43.1.4.5.6:
+      category: Switch
+      model: spectreIITr
+    1.3.6.1.4.1.43.1.4.5.7:
+      category: Switch
+      model: nbroIITrIsdnPform
+    1.3.6.1.4.1.43.1.4.5.8:
+      category: Switch
+      model: nbroIIEthPform
+    1.3.6.1.4.1.43.1.4.5.9:
+      category: Switch
+      model: nbroIIEthIsdnPform
+    1.3.6.1.4.1.43.1.4.5.10:
+      category: Switch
+      model: ocGen
+    1.3.6.1.4.1.43.1.4.5.11:
+      category: Switch
+      model: ocIsdnSt
+    1.3.6.1.4.1.43.1.4.5.12:
+      category: Switch
+      model: ocIsdnU
+    1.3.6.1.4.1.43.1.4.5.13:
+      category: Switch
+      model: ocCsuDsu
+    1.3.6.1.4.1.43.1.4.5.14:
+      category: Switch
+      model: ocWanOnly
+    1.3.6.1.4.1.43.1.4.5.15:
+      category: Switch
+      model: ocT1CsuDsu
+    1.3.6.1.4.1.43.1.4.5.16:
+      category: Switch
+      model: intrepidGen
+    1.3.6.1.4.1.43.1.4.5.17:
+      category: Switch
+      model: intrepidIsdnSt
+    1.3.6.1.4.1.43.1.4.5.18:
+      category: Switch
+      model: intrepidIsdnU
+    1.3.6.1.4.1.43.1.4.5.19:
+      category: Switch
+      model: intrepid56kCsuDsu
+    1.3.6.1.4.1.43.1.4.5.20:
+      category: Switch
+      model: intrepidT1CsuDsu
+    1.3.6.1.4.1.43.1.4.5.21:
+      category: Switch
+      model: oc1x2
+    1.3.6.1.4.1.43.1.4.5.22:
+      category: Switch
+      model: scorePform
+    1.3.6.1.4.1.43.1.4.5.23:
+      category: Switch
+      model: blueridgeGen
+    1.3.6.1.4.1.43.1.4.5.24:
+      category: Switch
+      model: blueridgeIsdnSt
+    1.3.6.1.4.1.43.1.4.5.25:
+      category: Switch
+      model: blueridgeIsdnU
+    1.3.6.1.4.1.43.1.4.5.26:
+      category: Switch
+      model: blueridge56kCsuDsu
+    1.3.6.1.4.1.43.1.4.5.27:
+      category: Switch
+      model: blueridgeT1CsuCsu
+    1.3.6.1.4.1.43.1.4.5.28:
+      category: Switch
+      model: scoreLanToLan
+    1.3.6.1.4.1.43.1.4.5.29:
+      category: Switch
+      model: scoreFlex
+    1.3.6.1.4.1.43.1.4.5.30:
+      category: Switch
+      model: scoreFlexPri
+    1.3.6.1.4.1.43.1.4.5.31:
+      category: Switch
+      model: scoreDualT3
+    1.3.6.1.4.1.43.1.4.5.32:
+      category: Switch
+      model: scoreDualE3
+    1.3.6.1.4.1.43.1.4.5.33:
+      category: Switch
+      model: scoreDualPri
+    1.3.6.1.4.1.43.1.4.5.34:
+      category: Switch
+      model: copperHead
+    1.3.6.1.4.1.43.1.4.5.35:
+      category: Switch
+      model: scoreMMATM
+    1.3.6.1.4.1.43.1.4.5.36:
+      category: Switch
+      model: scoreSMATM
+    1.3.6.1.4.1.43.1.4.5.37:
+      category: Switch
+      model: scoreFlexPri2port
+    1.3.6.1.4.1.43.1.4.5.38:
+      category: Switch
+      model: oc10St
+    1.3.6.1.4.1.43.1.4.5.39:
+      category: Switch
+      model: oc10U
+    1.3.6.1.4.1.43.1.4.5.40:
+      category: Switch
+      model: scorePri4port
+    1.3.6.1.4.1.43.1.4.5.41:
+      category: Switch
+      model: easterST
+    1.3.6.1.4.1.43.1.4.5.42:
+      category: Switch
+      model: easterU
+    1.3.6.1.4.1.43.1.4.6:
+      category: Switch
+      model: netbuilderRem
+    1.3.6.1.4.1.43.1.4.6.1:
+      category: Switch
+      model: netbuilderRemBp
+    1.3.6.1.4.1.43.1.4.6.2:
+      category: Switch
+      model: netbuilderRemCp
+    1.3.6.1.4.1.43.1.4.6.3:
+      category: Switch
+      model: netbuilderRemXw
+    1.3.6.1.4.1.43.1.4.6.4:
+      category: Switch
+      model: netbuilderRemCx
+    1.3.6.1.4.1.43.1.4.6.5:
+      category: Switch
+      model: netbuilderRemBa
+    1.3.6.1.4.1.43.1.4.6.6:
+      category: Switch
+      model: netbuilderRemAr
+    1.3.6.1.4.1.43.1.4.6.7:
+      category: Switch
+      model: netbuilderRemSn
+    1.3.6.1.4.1.43.1.4.6.8:
+      category: Switch
+      model: netbuilderRemRb
+    1.3.6.1.4.1.43.1.4.6.9:
+      category: Switch
+      model: netbuilderRemFf
+    1.3.6.1.4.1.43.1.4.6.10:
+      category: Switch
+      model: netbuilderRemCf
+    1.3.6.1.4.1.43.1.4.6.11:
+      category: Switch
+      model: netbuilderRemBx
+    1.3.6.1.4.1.43.1.4.6.12:
+      category: Switch
+      model: netbuilderRemAppn
+    1.3.6.1.4.1.43.1.4.6.13:
+      category: Switch
+      model: netbuilderRemLm
+    1.3.6.1.4.1.43.1.4.6.14:
+      category: Switch
+      model: netbuilderRemLt
+    1.3.6.1.4.1.43.1.4.6.15:
+      category: Switch
+      model: netbuilderRemWm
+    1.3.6.1.4.1.43.1.4.6.16:
+      category: Switch
+      model: netbuilderRemWt
+    1.3.6.1.4.1.43.1.4.6.17:
+      category: Switch
+      model: netbuilderRemAe
+    1.3.6.1.4.1.43.1.4.6.18:
+      category: Switch
+      model: netbuilderRemAp
+    1.3.6.1.4.1.43.1.4.6.19:
+      category: Switch
+      model: netbuilderRemAn
+    1.3.6.1.4.1.43.1.4.6.20:
+      category: Switch
+      model: netbuilderRemLa
+    1.3.6.1.4.1.43.1.4.6.21:
+      category: Switch
+      model: netbuilderRemWa
+    1.3.6.1.4.1.43.1.4.6.22:
+      category: Switch
+      model: netbuilderRemAa
+    1.3.6.1.4.1.43.1.4.6.23:
+      category: Switch
+      model: netbuilderRemAb
+    1.3.6.1.4.1.43.1.4.6.24:
+      category: Switch
+      model: netbuilderRemBf
+    1.3.6.1.4.1.43.1.4.7:
+      category: Switch
+      model: netbuilderRA
+    1.3.6.1.4.1.43.1.4.7.1:
+      category: Switch
+      model: netbuilderRAbp
+    1.3.6.1.4.1.43.1.4.7.2:
+      category: Switch
+      model: netbuilderRAcp
+    1.3.6.1.4.1.43.1.4.7.3:
+      category: Switch
+      model: netbuilderRAxw
+    1.3.6.1.4.1.43.1.4.7.4:
+      category: Switch
+      model: netbuilderRAcx
+    1.3.6.1.4.1.43.1.4.7.5:
+      category: Switch
+      model: netbuilderRAba
+    1.3.6.1.4.1.43.1.4.7.6:
+      category: Switch
+      model: netbuilderRAar
+    1.3.6.1.4.1.43.1.4.7.7:
+      category: Switch
+      model: netbuilderRAsn
+    1.3.6.1.4.1.43.1.4.7.8:
+      category: Switch
+      model: netbuilderRArb
+    1.3.6.1.4.1.43.1.4.7.9:
+      category: Switch
+      model: netbuilderRAff
+    1.3.6.1.4.1.43.1.4.7.10:
+      category: Switch
+      model: netbuilderRAcf
+    1.3.6.1.4.1.43.1.4.7.11:
+      category: Switch
+      model: netbuilderRAbx
+    1.3.6.1.4.1.43.1.4.7.12:
+      category: Switch
+      model: netbuilderRAappn
+    1.3.6.1.4.1.43.1.4.7.13:
+      category: Switch
+      model: netbuilderRAlm
+    1.3.6.1.4.1.43.1.4.7.14:
+      category: Switch
+      model: netbuilderRAlt
+    1.3.6.1.4.1.43.1.4.7.15:
+      category: Switch
+      model: netbuilderRAwm
+    1.3.6.1.4.1.43.1.4.7.16:
+      category: Switch
+      model: netbuilderRAwt
+    1.3.6.1.4.1.43.1.4.7.17:
+      category: Switch
+      model: netbuilderRAae
+    1.3.6.1.4.1.43.1.4.7.18:
+      category: Switch
+      model: netbuilderRAap
+    1.3.6.1.4.1.43.1.4.7.19:
+      category: Switch
+      model: netbuilderRAan
+    1.3.6.1.4.1.43.1.4.7.20:
+      category: Switch
+      model: netbuilderRAla
+    1.3.6.1.4.1.43.1.4.7.21:
+      category: Switch
+      model: netbuilderRAwa
+    1.3.6.1.4.1.43.1.4.7.22:
+      category: Switch
+      model: netbuilderRAaa
+    1.3.6.1.4.1.43.1.4.7.23:
+      category: Switch
+      model: netbuilderRAab
+    1.3.6.1.4.1.43.1.4.7.24:
+      category: Switch
+      model: netbuilderRAbf
+    1.3.6.1.4.1.43.1.4.8:
+      category: Switch
+      model: netbuilderRC
+    1.3.6.1.4.1.43.1.4.8.1:
+      category: Switch
+      model: netbuilderRCbp
+    1.3.6.1.4.1.43.1.4.8.2:
+      category: Switch
+      model: netbuilderRCcp
+    1.3.6.1.4.1.43.1.4.8.3:
+      category: Switch
+      model: netbuilderRCxw
+    1.3.6.1.4.1.43.1.4.8.4:
+      category: Switch
+      model: netbuilderRCcx
+    1.3.6.1.4.1.43.1.4.8.5:
+      category: Switch
+      model: netbuilderRCba
+    1.3.6.1.4.1.43.1.4.8.6:
+      category: Switch
+      model: netbuilderRCar
+    1.3.6.1.4.1.43.1.4.8.7:
+      category: Switch
+      model: netbuilderRCsn
+    1.3.6.1.4.1.43.1.4.8.8:
+      category: Switch
+      model: netbuilderRCrb
+    1.3.6.1.4.1.43.1.4.8.9:
+      category: Switch
+      model: netbuilderRCff
+    1.3.6.1.4.1.43.1.4.8.10:
+      category: Switch
+      model: netbuilderRCcf
+    1.3.6.1.4.1.43.1.4.8.11:
+      category: Switch
+      model: netbuilderRCbx
+    1.3.6.1.4.1.43.1.4.8.12:
+      category: Switch
+      model: netbuilderRCappn
+    1.3.6.1.4.1.43.1.4.8.13:
+      category: Switch
+      model: netbuilderRClm
+    1.3.6.1.4.1.43.1.4.8.14:
+      category: Switch
+      model: netbuilderRClt
+    1.3.6.1.4.1.43.1.4.8.15:
+      category: Switch
+      model: netbuilderRCwm
+    1.3.6.1.4.1.43.1.4.8.16:
+      category: Switch
+      model: netbuilderRCwt
+    1.3.6.1.4.1.43.1.4.8.17:
+      category: Switch
+      model: netbuilderRCae
+    1.3.6.1.4.1.43.1.4.8.18:
+      category: Switch
+      model: netbuilderRCap
+    1.3.6.1.4.1.43.1.4.8.19:
+      category: Switch
+      model: netbuilderRCan
+    1.3.6.1.4.1.43.1.4.8.20:
+      category: Switch
+      model: netbuilderRCla
+    1.3.6.1.4.1.43.1.4.8.21:
+      category: Switch
+      model: netbuilderRCwa
+    1.3.6.1.4.1.43.1.4.8.22:
+      category: Switch
+      model: netbuilderRCaa
+    1.3.6.1.4.1.43.1.4.8.23:
+      category: Switch
+      model: netbuilderRCab
+    1.3.6.1.4.1.43.1.4.8.24:
+      category: Switch
+      model: netbuilderRCbf
+    1.3.6.1.4.1.43.1.4.9:
+      category: Switch
+      model: netbuilderTrRem
+    1.3.6.1.4.1.43.1.4.9.1:
+      category: Switch
+      model: netbuilderTrRemBp
+    1.3.6.1.4.1.43.1.4.9.2:
+      category: Switch
+      model: netbuilderTrRemCp
+    1.3.6.1.4.1.43.1.4.9.3:
+      category: Switch
+      model: netbuilderTrRemXw
+    1.3.6.1.4.1.43.1.4.9.4:
+      category: Switch
+      model: netbuilderTrRemCx
+    1.3.6.1.4.1.43.1.4.9.5:
+      category: Switch
+      model: netbuilderTrRemBa
+    1.3.6.1.4.1.43.1.4.9.6:
+      category: Switch
+      model: netbuilderTrRemAr
+    1.3.6.1.4.1.43.1.4.9.7:
+      category: Switch
+      model: netbuilderTrRemSn
+    1.3.6.1.4.1.43.1.4.9.8:
+      category: Switch
+      model: netbuilderTrRemRb
+    1.3.6.1.4.1.43.1.4.9.9:
+      category: Switch
+      model: netbuilderTrRemFf
+    1.3.6.1.4.1.43.1.4.9.10:
+      category: Switch
+      model: netbuilderTrRemCf
+    1.3.6.1.4.1.43.1.4.9.11:
+      category: Switch
+      model: netbuilderTrRemBx
+    1.3.6.1.4.1.43.1.4.9.12:
+      category: Switch
+      model: netbuilderTrRemAppn
+    1.3.6.1.4.1.43.1.4.9.13:
+      category: Switch
+      model: netbuilderTrRemLm
+    1.3.6.1.4.1.43.1.4.9.14:
+      category: Switch
+      model: netbuilderTrRemLt
+    1.3.6.1.4.1.43.1.4.9.15:
+      category: Switch
+      model: netbuilderTrRemWm
+    1.3.6.1.4.1.43.1.4.9.16:
+      category: Switch
+      model: netbuilderTrRemWt
+    1.3.6.1.4.1.43.1.4.9.17:
+      category: Switch
+      model: netbuilderTrRemAe
+    1.3.6.1.4.1.43.1.4.9.18:
+      category: Switch
+      model: netbuilderTrRemAp
+    1.3.6.1.4.1.43.1.4.9.19:
+      category: Switch
+      model: netbuilderTrRemAn
+    1.3.6.1.4.1.43.1.4.9.20:
+      category: Switch
+      model: netbuilderTrRemLa
+    1.3.6.1.4.1.43.1.4.9.21:
+      category: Switch
+      model: netbuilderTrRemWa
+    1.3.6.1.4.1.43.1.4.9.22:
+      category: Switch
+      model: netbuilderTrRemAa
+    1.3.6.1.4.1.43.1.4.9.23:
+      category: Switch
+      model: netbuilderTrRemAb
+    1.3.6.1.4.1.43.1.4.9.24:
+      category: Switch
+      model: netbuilderTrRemBf
+    1.3.6.1.4.1.43.1.4.10:
+      category: Switch
+      model: netbuilderTrRC
+    1.3.6.1.4.1.43.1.4.10.1:
+      category: Switch
+      model: netbuilderTrRCbp
+    1.3.6.1.4.1.43.1.4.10.2:
+      category: Switch
+      model: netbuilderTrRCcp
+    1.3.6.1.4.1.43.1.4.10.3:
+      category: Switch
+      model: netbuilderTrRCxw
+    1.3.6.1.4.1.43.1.4.10.4:
+      category: Switch
+      model: netbuilderTrRCcx
+    1.3.6.1.4.1.43.1.4.10.5:
+      category: Switch
+      model: netbuilderTrRCba
+    1.3.6.1.4.1.43.1.4.10.6:
+      category: Switch
+      model: netbuilderTrRCar
+    1.3.6.1.4.1.43.1.4.10.7:
+      category: Switch
+      model: netbuilderTrRCsn
+    1.3.6.1.4.1.43.1.4.10.8:
+      category: Switch
+      model: netbuilderTrRCrb
+    1.3.6.1.4.1.43.1.4.10.9:
+      category: Switch
+      model: netbuilderTrRCff
+    1.3.6.1.4.1.43.1.4.10.10:
+      category: Switch
+      model: netbuilderTrRCcf
+    1.3.6.1.4.1.43.1.4.10.11:
+      category: Switch
+      model: netbuilderTrRCbx
+    1.3.6.1.4.1.43.1.4.10.12:
+      category: Switch
+      model: netbuilderTrRCappn
+    1.3.6.1.4.1.43.1.4.10.13:
+      category: Switch
+      model: netbuilderTrRClm
+    1.3.6.1.4.1.43.1.4.10.14:
+      category: Switch
+      model: netbuilderTrRClt
+    1.3.6.1.4.1.43.1.4.10.15:
+      category: Switch
+      model: netbuilderTrRCwm
+    1.3.6.1.4.1.43.1.4.10.16:
+      category: Switch
+      model: netbuilderTrRCwt
+    1.3.6.1.4.1.43.1.4.10.17:
+      category: Switch
+      model: netbuilderTrRCae
+    1.3.6.1.4.1.43.1.4.10.18:
+      category: Switch
+      model: netbuilderTrRCap
+    1.3.6.1.4.1.43.1.4.10.19:
+      category: Switch
+      model: netbuilderTrRCan
+    1.3.6.1.4.1.43.1.4.10.20:
+      category: Switch
+      model: netbuilderTrRCla
+    1.3.6.1.4.1.43.1.4.10.21:
+      category: Switch
+      model: netbuilderTrRCwa
+    1.3.6.1.4.1.43.1.4.10.22:
+      category: Switch
+      model: netbuilderTrRCaa
+    1.3.6.1.4.1.43.1.4.10.23:
+      category: Switch
+      model: netbuilderTrRCab
+    1.3.6.1.4.1.43.1.4.10.24:
+      category: Switch
+      model: netbuilderTrRCbf
+    1.3.6.1.4.1.43.1.4.11:
+      model: SW/NBDPE
+    1.3.6.1.4.1.43.1.4.11.1:
+      category: Switch
+      model: nb2-4Bp
+    1.3.6.1.4.1.43.1.4.11.2:
+      category: Switch
+      model: nb2-4Cp
+    1.3.6.1.4.1.43.1.4.11.3:
+      category: Switch
+      model: nb2-4Xw
+    1.3.6.1.4.1.43.1.4.11.4:
+      category: Switch
+      model: nb2-4Cx
+    1.3.6.1.4.1.43.1.4.11.5:
+      category: Switch
+      model: nb2-4Ba
+    1.3.6.1.4.1.43.1.4.11.6:
+      category: Switch
+      model: nb2-4Ar
+    1.3.6.1.4.1.43.1.4.11.7:
+      category: Switch
+      model: nb2-4Sn
+    1.3.6.1.4.1.43.1.4.11.8:
+      category: Switch
+      model: nb2-4Rb
+    1.3.6.1.4.1.43.1.4.11.9:
+      category: Switch
+      model: nb2-4Ff
+    1.3.6.1.4.1.43.1.4.11.10:
+      category: Switch
+      model: nb2-4Cf
+    1.3.6.1.4.1.43.1.4.11.11:
+      category: Switch
+      model: nb2-4Bx
+    1.3.6.1.4.1.43.1.4.11.12:
+      category: Switch
+      model: nb2-4Appn
+    1.3.6.1.4.1.43.1.4.11.13:
+      category: Switch
+      model: nb2-4Lm
+    1.3.6.1.4.1.43.1.4.11.14:
+      category: Switch
+      model: nb2-4Lt
+    1.3.6.1.4.1.43.1.4.11.15:
+      category: Switch
+      model: nb2-4Wm
+    1.3.6.1.4.1.43.1.4.11.16:
+      category: Switch
+      model: nb2-4Wt
+    1.3.6.1.4.1.43.1.4.11.17:
+      category: Switch
+      model: nb2-4Ae
+    1.3.6.1.4.1.43.1.4.11.18:
+      category: Switch
+      model: nb2-4Ap
+    1.3.6.1.4.1.43.1.4.11.19:
+      category: Switch
+      model: nb2-4An
+    1.3.6.1.4.1.43.1.4.11.20:
+      category: Switch
+      model: nb2-4La
+    1.3.6.1.4.1.43.1.4.11.21:
+      category: Switch
+      model: nb2-4Wa
+    1.3.6.1.4.1.43.1.4.11.22:
+      category: Switch
+      model: nb2-4Aa
+    1.3.6.1.4.1.43.1.4.11.23:
+      category: Switch
+      model: nb2-4Ab
+    1.3.6.1.4.1.43.1.4.11.24:
+      category: Switch
+      model: nb2-4Bf
+    1.3.6.1.4.1.43.1.4.12:
+      category: Switch
+      model: nb2-8
+    1.3.6.1.4.1.43.1.4.12.1:
+      category: Switch
+      model: nb2-8Bp
+    1.3.6.1.4.1.43.1.4.12.2:
+      category: Switch
+      model: nb2-8Cp
+    1.3.6.1.4.1.43.1.4.12.3:
+      category: Switch
+      model: nb2-8Xw
+    1.3.6.1.4.1.43.1.4.12.4:
+      category: Switch
+      model: nb2-8Cx
+    1.3.6.1.4.1.43.1.4.12.5:
+      category: Switch
+      model: nb2-8Ba
+    1.3.6.1.4.1.43.1.4.12.6:
+      category: Switch
+      model: nb2-8Ar
+    1.3.6.1.4.1.43.1.4.12.7:
+      category: Switch
+      model: nb2-8Sn
+    1.3.6.1.4.1.43.1.4.12.8:
+      category: Switch
+      model: nb2-8Rb
+    1.3.6.1.4.1.43.1.4.12.9:
+      category: Switch
+      model: nb2-8Ff
+    1.3.6.1.4.1.43.1.4.12.10:
+      category: Switch
+      model: nb2-8Cf
+    1.3.6.1.4.1.43.1.4.12.11:
+      category: Switch
+      model: nb2-8Bx
+    1.3.6.1.4.1.43.1.4.12.12:
+      category: Switch
+      model: nb2-8Appn
+    1.3.6.1.4.1.43.1.4.12.13:
+      category: Switch
+      model: nb2-8Lm
+    1.3.6.1.4.1.43.1.4.12.14:
+      category: Switch
+      model: nb2-8Lt
+    1.3.6.1.4.1.43.1.4.12.15:
+      category: Switch
+      model: nb2-8Wm
+    1.3.6.1.4.1.43.1.4.12.16:
+      category: Switch
+      model: nb2-8Wt
+    1.3.6.1.4.1.43.1.4.12.17:
+      category: Switch
+      model: nb2-8Ae
+    1.3.6.1.4.1.43.1.4.12.18:
+      category: Switch
+      model: nb2-8Ap
+    1.3.6.1.4.1.43.1.4.12.19:
+      category: Switch
+      model: nb2-8An
+    1.3.6.1.4.1.43.1.4.12.20:
+      category: Switch
+      model: nb2-8La
+    1.3.6.1.4.1.43.1.4.12.21:
+      category: Switch
+      model: nb2-8Wa
+    1.3.6.1.4.1.43.1.4.12.22:
+      category: Switch
+      model: nb2-8Aa
+    1.3.6.1.4.1.43.1.4.12.23:
+      category: Switch
+      model: nb2-8Ab
+    1.3.6.1.4.1.43.1.4.12.24:
+      category: Switch
+      model: nb2-8Bf
+    1.3.6.1.4.1.43.1.4.13:
+      category: Switch
+      model: nbro
+    1.3.6.1.4.1.43.1.4.13.1:
+      category: Switch
+      model: nbroBp
+    1.3.6.1.4.1.43.1.4.13.2:
+      category: Switch
+      model: nbroCp
+    1.3.6.1.4.1.43.1.4.13.3:
+      category: Switch
+      model: nbroXw
+    1.3.6.1.4.1.43.1.4.13.4:
+      category: Switch
+      model: nbroCx
+    1.3.6.1.4.1.43.1.4.13.5:
+      category: Switch
+      model: nbro201
+    1.3.6.1.4.1.43.1.4.13.6:
+      category: Switch
+      model: nbroAr
+    1.3.6.1.4.1.43.1.4.13.7:
+      category: Switch
+      model: nbroSn
+    1.3.6.1.4.1.43.1.4.13.8:
+      category: Switch
+      model: nbro200
+    1.3.6.1.4.1.43.1.4.13.9:
+      category: Switch
+      model: nbroFf
+    1.3.6.1.4.1.43.1.4.13.10:
+      category: Switch
+      model: nbroCf
+    1.3.6.1.4.1.43.1.4.13.11:
+      category: Switch
+      model: nbroBx
+    1.3.6.1.4.1.43.1.4.13.12:
+      category: Switch
+      model: nbroAppn
+    1.3.6.1.4.1.43.1.4.13.13:
+      category: Switch
+      model: nbroLm
+    1.3.6.1.4.1.43.1.4.13.14:
+      category: Switch
+      model: nbroLt
+    1.3.6.1.4.1.43.1.4.13.15:
+      category: Switch
+      model: nbroWm
+    1.3.6.1.4.1.43.1.4.13.16:
+      category: Switch
+      model: nbroWt
+    1.3.6.1.4.1.43.1.4.13.17:
+      category: Switch
+      model: nbroAe
+    1.3.6.1.4.1.43.1.4.13.18:
+      category: Switch
+      model: nbroAp
+    1.3.6.1.4.1.43.1.4.13.19:
+      category: Switch
+      model: nbroAn
+    1.3.6.1.4.1.43.1.4.13.20:
+      category: Switch
+      model: nbroLa
+    1.3.6.1.4.1.43.1.4.13.21:
+      category: Switch
+      model: nbroWa
+    1.3.6.1.4.1.43.1.4.13.22:
+      category: Switch
+      model: nbro224
+    1.3.6.1.4.1.43.1.4.13.23:
+      category: Switch
+      model: nbroAb
+    1.3.6.1.4.1.43.1.4.13.24:
+      category: Switch
+      model: nbro223
+    1.3.6.1.4.1.43.1.4.14:
+      category: Switch
+      model: brouterBoards
+    1.3.6.1.4.1.43.1.4.14.1:
+      category: Switch
+      model: ethernet
+    1.3.6.1.4.1.43.1.4.14.2:
+      category: Switch
+      model: fddiPhy
+    1.3.6.1.4.1.43.1.4.14.3:
+      category: Switch
+      model: fddiMac
+    1.3.6.1.4.1.43.1.4.14.4:
+      category: Switch
+      model: hss
+    1.3.6.1.4.1.43.1.4.14.5:
+      category: Switch
+      model: tokenRingBrd
+    1.3.6.1.4.1.43.1.4.14.6:
+      category: Switch
+      model: hssG703
+    1.3.6.1.4.1.43.1.4.14.7:
+      category: Switch
+      model: hssRS449
+    1.3.6.1.4.1.43.1.4.14.8:
+      category: Switch
+      model: t3HSSI
+    1.3.6.1.4.1.43.1.4.14.9:
+      category: Switch
+      model: dualEth
+    1.3.6.1.4.1.43.1.4.14.10:
+      category: Switch
+      model: cec
+    1.3.6.1.4.1.43.1.4.14.11:
+      category: Switch
+      model: fddiPhySm
+    1.3.6.1.4.1.43.1.4.14.12:
+      category: Switch
+      model: fddiPhyMmSm
+    1.3.6.1.4.1.43.1.4.14.13:
+      category: Switch
+      model: fddiPhySmMm
+    1.3.6.1.4.1.43.1.4.14.14:
+      category: Switch
+      model: hdwan
+    1.3.6.1.4.1.43.1.4.14.15:
+      category: Switch
+      model: hdwan449
+    1.3.6.1.4.1.43.1.4.14.16:
+      category: Switch
+      model: hdwan232
+    1.3.6.1.4.1.43.1.4.14.18:
+      category: Switch
+      model: trPlus
+    1.3.6.1.4.1.43.1.4.14.19:
+      category: Switch
+      model: macPlus
+    1.3.6.1.4.1.43.1.4.14.20:
+      category: Switch
+      model: cecStar
+    1.3.6.1.4.1.43.1.4.14.21:
+      category: Switch
+      model: isdnBri
+    1.3.6.1.4.1.43.1.4.14.22:
+      category: Switch
+      model: isdnPri
+    1.3.6.1.4.1.43.1.4.14.23:
+      category: Switch
+      model: mpAtm
+    1.3.6.1.4.1.43.1.4.14.24:
+      category: Switch
+      model: hssI431
+    1.3.6.1.4.1.43.1.4.14.25:
+      category: Switch
+      model: mpFddi
+    1.3.6.1.4.1.43.1.4.14.26:
+      category: Switch
+      model: mp6EthFl
+    1.3.6.1.4.1.43.1.4.14.27:
+      category: Switch
+      model: ethV3
+    1.3.6.1.4.1.43.1.4.14.28:
+      category: Switch
+      model: ethV3Fl
+    1.3.6.1.4.1.43.1.4.14.29:
+      category: Switch
+      model: nbroBrd
+    1.3.6.1.4.1.43.1.4.14.30:
+      category: Switch
+      model: mpAtmFiber
+    1.3.6.1.4.1.43.1.4.14.31:
+      category: Switch
+      model: dpe
+    1.3.6.1.4.1.43.1.4.14.32:
+      category: Switch
+      model: flatFddiMm
+    1.3.6.1.4.1.43.1.4.14.33:
+      category: Switch
+      model: flatFddiSs
+    1.3.6.1.4.1.43.1.4.14.34:
+      category: Switch
+      model: flatFddiSm
+    1.3.6.1.4.1.43.1.4.14.35:
+      category: Switch
+      model: flatFddiMs
+    1.3.6.1.4.1.43.1.4.14.36:
+      category: Switch
+      model: mpAtmFiberMm
+    1.3.6.1.4.1.43.1.4.14.37:
+      category: Switch
+      model: nbocBrd
+    1.3.6.1.4.1.43.1.4.14.38:
+      category: Switch
+      model: nbocST
+    1.3.6.1.4.1.43.1.4.14.39:
+      category: Switch
+      model: nbocU
+    1.3.6.1.4.1.43.1.4.14.40:
+      category: Switch
+      model: nboc56kCSU
+    1.3.6.1.4.1.43.1.4.14.41:
+      category: Switch
+      model: nbocT1CSU
+    1.3.6.1.4.1.43.1.4.14.42:
+      category: Switch
+      model: nboc1x1
+    1.3.6.1.4.1.43.1.4.14.43:
+      category: Switch
+      model: nboc2FlexWAN
+    1.3.6.1.4.1.43.1.4.14.44:
+      category: Switch
+      model: intrepidBrd
+    1.3.6.1.4.1.43.1.4.14.45:
+      category: Switch
+      model: intrepidST
+    1.3.6.1.4.1.43.1.4.14.46:
+      category: Switch
+      model: intrepidU
+    1.3.6.1.4.1.43.1.4.14.47:
+      category: Switch
+      model: intrepid56kCSU
+    1.3.6.1.4.1.43.1.4.14.48:
+      category: Switch
+      model: intrepidT1CSU
+    1.3.6.1.4.1.43.1.4.14.49:
+      category: Switch
+      model: mbriSt
+    1.3.6.1.4.1.43.1.4.14.50:
+      category: Switch
+      model: mbriU
+    1.3.6.1.4.1.43.1.4.14.51:
+      category: Switch
+      model: qWan
+    1.3.6.1.4.1.43.1.4.14.52:
+      category: Switch
+      model: dpePlus
+    1.3.6.1.4.1.43.1.4.14.53:
+      category: Switch
+      model: nboc1x2
+    1.3.6.1.4.1.43.1.4.14.54:
+      category: Switch
+      model: scoreCpu
+    1.3.6.1.4.1.43.1.4.14.55:
+      category: Switch
+      model: scoreT1
+    1.3.6.1.4.1.43.1.4.14.56:
+      category: Switch
+      model: scoreT3
+    1.3.6.1.4.1.43.1.4.14.57:
+      category: Switch
+      model: scorePRI
+    1.3.6.1.4.1.43.1.4.14.58:
+      category: Switch
+      model: blueridgeBrd
+    1.3.6.1.4.1.43.1.4.14.59:
+      category: Switch
+      model: blueridgeST
+    1.3.6.1.4.1.43.1.4.14.60:
+      category: Switch
+      model: blueridgeU
+    1.3.6.1.4.1.43.1.4.14.61:
+      category: Switch
+      model: blueridge56kCSU
+    1.3.6.1.4.1.43.1.4.14.62:
+      category: Switch
+      model: blueridgeT1CSU
+    1.3.6.1.4.1.43.1.4.14.63:
+      category: Switch
+      model: scoreE3
+    1.3.6.1.4.1.43.1.4.14.64:
+      category: Switch
+      model: scoreLAN
+    1.3.6.1.4.1.43.1.4.14.65:
+      category: Switch
+      model: copperCPU
+    1.3.6.1.4.1.43.1.4.14.66:
+      category: Switch
+      model: voiceFXS
+    1.3.6.1.4.1.43.1.4.14.67:
+      category: Switch
+      model: voiceFXO
+    1.3.6.1.4.1.43.1.4.14.68:
+      category: Switch
+      model: voiceEaM
+    1.3.6.1.4.1.43.1.4.14.69:
+      category: Switch
+      model: copperST
+    1.3.6.1.4.1.43.1.4.14.70:
+      category: Switch
+      model: copperU
+    1.3.6.1.4.1.43.1.4.14.71:
+      category: Switch
+      model: copper56kCSU
+    1.3.6.1.4.1.43.1.4.14.72:
+      category: Switch
+      model: copperT1CSU
+    1.3.6.1.4.1.43.1.4.14.73:
+      category: Switch
+      model: scoreATMMm
+    1.3.6.1.4.1.43.1.4.14.74:
+      category: Switch
+      model: scoreATMSm
+    1.3.6.1.4.1.43.1.4.14.75:
+      category: Switch
+      model: scoreT1x2
+    1.3.6.1.4.1.43.1.4.14.76:
+      category: Switch
+      model: scorePRIx2
+    1.3.6.1.4.1.43.1.4.14.77:
+      category: Switch
+      model: copperPRI
+    1.3.6.1.4.1.43.1.4.14.78:
+      category: Switch
+      model: copperBRIx4
+    1.3.6.1.4.1.43.1.4.14.79:
+      category: Switch
+      model: copperModem
+    1.3.6.1.4.1.43.1.4.14.80:
+      category: Switch
+      model: copperT1x1
+    1.3.6.1.4.1.43.1.4.15:
+      category: Switch
+      model: netbuilderLocal
+    1.3.6.1.4.1.43.1.4.15.1:
+      category: Switch
+      model: netbuilderLocalBp
+    1.3.6.1.4.1.43.1.4.15.2:
+      category: Switch
+      model: netbuilderLocalCp
+    1.3.6.1.4.1.43.1.4.15.3:
+      category: Switch
+      model: netbuilderLocalXw
+    1.3.6.1.4.1.43.1.4.15.4:
+      category: Switch
+      model: netbuilderLocalCx
+    1.3.6.1.4.1.43.1.4.15.5:
+      category: Switch
+      model: netbuilderLocalBa
+    1.3.6.1.4.1.43.1.4.15.6:
+      category: Switch
+      model: netbuilderLocalAr
+    1.3.6.1.4.1.43.1.4.15.7:
+      category: Switch
+      model: netbuilderLocalSn
+    1.3.6.1.4.1.43.1.4.15.8:
+      category: Switch
+      model: netbuilderLocalRb
+    1.3.6.1.4.1.43.1.4.15.9:
+      category: Switch
+      model: netbuilderLocalFf
+    1.3.6.1.4.1.43.1.4.15.10:
+      category: Switch
+      model: netbuilderLocalCf
+    1.3.6.1.4.1.43.1.4.15.11:
+      category: Switch
+      model: netbuilderLocalBx
+    1.3.6.1.4.1.43.1.4.15.12:
+      category: Switch
+      model: netbuilderLocalAppn
+    1.3.6.1.4.1.43.1.4.15.13:
+      category: Switch
+      model: netbuilderLocalLm
+    1.3.6.1.4.1.43.1.4.15.14:
+      category: Switch
+      model: netbuilderLocalLt
+    1.3.6.1.4.1.43.1.4.15.15:
+      category: Switch
+      model: netbuilderLocalWm
+    1.3.6.1.4.1.43.1.4.15.16:
+      category: Switch
+      model: netbuilderLocalWt
+    1.3.6.1.4.1.43.1.4.15.17:
+      category: Switch
+      model: netbuilderLocalAe
+    1.3.6.1.4.1.43.1.4.15.18:
+      category: Switch
+      model: netbuilderLocalAp
+    1.3.6.1.4.1.43.1.4.15.19:
+      category: Switch
+      model: netbuilderLocalAn
+    1.3.6.1.4.1.43.1.4.15.20:
+      category: Switch
+      model: netbuilderLocalLa
+    1.3.6.1.4.1.43.1.4.15.21:
+      category: Switch
+      model: netbuilderLocalWa
+    1.3.6.1.4.1.43.1.4.15.22:
+      category: Switch
+      model: netbuilderLocalAa
+    1.3.6.1.4.1.43.1.4.15.23:
+      category: Switch
+      model: netbuilderLocalAb
+    1.3.6.1.4.1.43.1.4.15.24:
+      category: Switch
+      model: netbuilderLocalBf
+    1.3.6.1.4.1.43.1.4.16:
+      category: Switch
+      model: netbuilderTrLocal
+    1.3.6.1.4.1.43.1.4.16.1:
+      category: Switch
+      model: netbuilderTrLocalBp
+    1.3.6.1.4.1.43.1.4.16.2:
+      category: Switch
+      model: netbuilderTrLocalCp
+    1.3.6.1.4.1.43.1.4.16.3:
+      category: Switch
+      model: netbuilderTrLocalXw
+    1.3.6.1.4.1.43.1.4.16.4:
+      category: Switch
+      model: netbuilderTrLocalCx
+    1.3.6.1.4.1.43.1.4.16.5:
+      category: Switch
+      model: netbuilderTrLocalBa
+    1.3.6.1.4.1.43.1.4.16.6:
+      category: Switch
+      model: netbuilderTrLocalAr
+    1.3.6.1.4.1.43.1.4.16.7:
+      category: Switch
+      model: netbuilderTrLocalSn
+    1.3.6.1.4.1.43.1.4.16.8:
+      category: Switch
+      model: netbuilderTrLocalRb
+    1.3.6.1.4.1.43.1.4.16.9:
+      category: Switch
+      model: netbuilderTrLocalFf
+    1.3.6.1.4.1.43.1.4.16.10:
+      category: Switch
+      model: netbuilderTrLocalCf
+    1.3.6.1.4.1.43.1.4.16.11:
+      category: Switch
+      model: netbuilderTrLocalBx
+    1.3.6.1.4.1.43.1.4.16.12:
+      category: Switch
+      model: netbuilderTrLocalAppn
+    1.3.6.1.4.1.43.1.4.16.13:
+      category: Switch
+      model: netbuilderTrLocalLm
+    1.3.6.1.4.1.43.1.4.16.14:
+      category: Switch
+      model: netbuilderTrLocalLt
+    1.3.6.1.4.1.43.1.4.16.15:
+      category: Switch
+      model: netbuilderTrLocalWm
+    1.3.6.1.4.1.43.1.4.16.16:
+      category: Switch
+      model: netbuilderTrLocalWt
+    1.3.6.1.4.1.43.1.4.16.17:
+      category: Switch
+      model: netbuilderTrLocalAe
+    1.3.6.1.4.1.43.1.4.16.18:
+      category: Switch
+      model: netbuilderTrLocalAp
+    1.3.6.1.4.1.43.1.4.16.19:
+      category: Switch
+      model: netbuilderTrLocalAn
+    1.3.6.1.4.1.43.1.4.16.20:
+      category: Switch
+      model: netbuilderTrLocalLa
+    1.3.6.1.4.1.43.1.4.16.21:
+      category: Switch
+      model: netbuilderTrLocalWa
+    1.3.6.1.4.1.43.1.4.16.22:
+      category: Switch
+      model: netbuilderTrLocalAa
+    1.3.6.1.4.1.43.1.4.16.23:
+      category: Switch
+      model: netbuilderTrLocalAb
+    1.3.6.1.4.1.43.1.4.16.24:
+      category: Switch
+      model: netbuilderTrLocalBf
+    1.3.6.1.4.1.43.1.4.17:
+      category: Switch
+      model: netbuilderRC1x2
+    1.3.6.1.4.1.43.1.4.17.1:
+      category: Switch
+      model: netbuilderRC1x2bp
+    1.3.6.1.4.1.43.1.4.17.2:
+      category: Switch
+      model: netbuilderRC1x2cp
+    1.3.6.1.4.1.43.1.4.17.3:
+      category: Switch
+      model: netbuilderRC1x2xw
+    1.3.6.1.4.1.43.1.4.17.4:
+      category: Switch
+      model: netbuilderRC1x2cx
+    1.3.6.1.4.1.43.1.4.17.5:
+      category: Switch
+      model: netbuilderRC1x2ba
+    1.3.6.1.4.1.43.1.4.17.6:
+      category: Switch
+      model: netbuilderRC1x2ar
+    1.3.6.1.4.1.43.1.4.17.7:
+      category: Switch
+      model: netbuilderRC1x2sn
+    1.3.6.1.4.1.43.1.4.17.8:
+      category: Switch
+      model: netbuilderRC1x2rb
+    1.3.6.1.4.1.43.1.4.17.9:
+      category: Switch
+      model: netbuilderRC1x2ff
+    1.3.6.1.4.1.43.1.4.17.10:
+      category: Switch
+      model: netbuilderRC1x2cf
+    1.3.6.1.4.1.43.1.4.17.11:
+      category: Switch
+      model: netbuilderRC1x2bx
+    1.3.6.1.4.1.43.1.4.17.12:
+      category: Switch
+      model: netbuilderRC1x2appn
+    1.3.6.1.4.1.43.1.4.17.13:
+      category: Switch
+      model: netbuilderRC1x2lm
+    1.3.6.1.4.1.43.1.4.17.14:
+      category: Switch
+      model: netbuilderRC1x2lt
+    1.3.6.1.4.1.43.1.4.17.15:
+      category: Switch
+      model: netbuilderRC1x2wm
+    1.3.6.1.4.1.43.1.4.17.16:
+      category: Switch
+      model: netbuilderRC1x2wt
+    1.3.6.1.4.1.43.1.4.17.17:
+      category: Switch
+      model: netbuilderRC1x2ae
+    1.3.6.1.4.1.43.1.4.17.18:
+      category: Switch
+      model: netbuilderRC1x2ap
+    1.3.6.1.4.1.43.1.4.17.19:
+      category: Switch
+      model: netbuilderRC1x2an
+    1.3.6.1.4.1.43.1.4.17.20:
+      category: Switch
+      model: netbuilderRC1x2la
+    1.3.6.1.4.1.43.1.4.17.21:
+      category: Switch
+      model: netbuilderRC1x2wa
+    1.3.6.1.4.1.43.1.4.17.22:
+      category: Switch
+      model: netbuilderRC1x2aa
+    1.3.6.1.4.1.43.1.4.17.23:
+      category: Switch
+      model: netbuilderRC1x2ab
+    1.3.6.1.4.1.43.1.4.17.24:
+      category: Switch
+      model: netbuilderRC1x2bf
+    1.3.6.1.4.1.43.1.4.18:
+      category: Switch
+      model: netbuilderTrRC1x2
+    1.3.6.1.4.1.43.1.4.18.1:
+      category: Switch
+      model: netbuilderTrRC1x2bp
+    1.3.6.1.4.1.43.1.4.18.2:
+      category: Switch
+      model: netbuilderTrRC1x2cp
+    1.3.6.1.4.1.43.1.4.18.3:
+      category: Switch
+      model: netbuilderTrRC1x2xw
+    1.3.6.1.4.1.43.1.4.18.4:
+      category: Switch
+      model: netbuilderTrRC1x2cx
+    1.3.6.1.4.1.43.1.4.18.5:
+      category: Switch
+      model: netbuilderTrRC1x2ba
+    1.3.6.1.4.1.43.1.4.18.6:
+      category: Switch
+      model: netbuilderTrRC1x2ar
+    1.3.6.1.4.1.43.1.4.18.7:
+      category: Switch
+      model: netbuilderTrRC1x2sn
+    1.3.6.1.4.1.43.1.4.18.8:
+      category: Switch
+      model: netbuilderTrRC1x2rb
+    1.3.6.1.4.1.43.1.4.18.9:
+      category: Switch
+      model: netbuilderTrRC1x2ff
+    1.3.6.1.4.1.43.1.4.18.10:
+      category: Switch
+      model: netbuilderTrRC1x2cf
+    1.3.6.1.4.1.43.1.4.18.11:
+      category: Switch
+      model: netbuilderTrRC1x2bx
+    1.3.6.1.4.1.43.1.4.18.12:
+      category: Switch
+      model: netbuilderTrRC1x2appn
+    1.3.6.1.4.1.43.1.4.18.13:
+      category: Switch
+      model: netbuilderTrRC1x2lm
+    1.3.6.1.4.1.43.1.4.18.14:
+      category: Switch
+      model: netbuilderTrRC1x2lt
+    1.3.6.1.4.1.43.1.4.18.15:
+      category: Switch
+      model: netbuilderTrRC1x2wm
+    1.3.6.1.4.1.43.1.4.18.16:
+      category: Switch
+      model: netbuilderTrRC1x2wt
+    1.3.6.1.4.1.43.1.4.18.17:
+      category: Switch
+      model: netbuilderTrRC1x2ae
+    1.3.6.1.4.1.43.1.4.18.18:
+      category: Switch
+      model: netbuilderTrRC1x2ap
+    1.3.6.1.4.1.43.1.4.18.19:
+      category: Switch
+      model: netbuilderTrRC1x2an
+    1.3.6.1.4.1.43.1.4.18.20:
+      category: Switch
+      model: netbuilderTrRC1x2la
+    1.3.6.1.4.1.43.1.4.18.21:
+      category: Switch
+      model: netbuilderTrRC1x2wa
+    1.3.6.1.4.1.43.1.4.18.22:
+      category: Switch
+      model: netbuilderTrRC1x2aa
+    1.3.6.1.4.1.43.1.4.18.23:
+      category: Switch
+      model: netbuilderTrRC1x2ab
+    1.3.6.1.4.1.43.1.4.18.24:
+      category: Switch
+      model: netbuilderTrRC1x2bf
+    1.3.6.1.4.1.43.1.4.19:
+      category: Switch
+      model: casper
+    1.3.6.1.4.1.43.1.4.19.1:
+      category: Switch
+      model: nbrolBp
+    1.3.6.1.4.1.43.1.4.19.2:
+      category: Switch
+      model: nbrolCp
+    1.3.6.1.4.1.43.1.4.19.3:
+      category: Switch
+      model: nbrolXw
+    1.3.6.1.4.1.43.1.4.19.4:
+      category: Switch
+      model: nbrol228
+    1.3.6.1.4.1.43.1.4.19.5:
+      category: Switch
+      model: nbrol201
+    1.3.6.1.4.1.43.1.4.19.6:
+      category: Switch
+      model: nbro222
+    1.3.6.1.4.1.43.1.4.19.7:
+      category: Switch
+      model: nbrolSn
+    1.3.6.1.4.1.43.1.4.19.8:
+      category: Switch
+      model: nbrol200
+    1.3.6.1.4.1.43.1.4.19.9:
+      category: Switch
+      model: nbrolFf
+    1.3.6.1.4.1.43.1.4.19.10:
+      category: Switch
+      model: nbro227
+    1.3.6.1.4.1.43.1.4.19.11:
+      category: Switch
+      model: nbro221
+    1.3.6.1.4.1.43.1.4.19.12:
+      category: Switch
+      model: nbrolAppn
+    1.3.6.1.4.1.43.1.4.19.13:
+      category: Switch
+      model: nbrolLm
+    1.3.6.1.4.1.43.1.4.19.14:
+      category: Switch
+      model: nbrolLt
+    1.3.6.1.4.1.43.1.4.19.15:
+      category: Switch
+      model: nbrolWm
+    1.3.6.1.4.1.43.1.4.19.16:
+      category: Switch
+      model: nbrolWt
+    1.3.6.1.4.1.43.1.4.19.17:
+      category: Switch
+      model: nbrolAe
+    1.3.6.1.4.1.43.1.4.19.18:
+      category: Switch
+      model: nbrolAp
+    1.3.6.1.4.1.43.1.4.19.19:
+      category: Switch
+      model: nbrolAn
+    1.3.6.1.4.1.43.1.4.19.20:
+      category: Switch
+      model: nbrolLa
+    1.3.6.1.4.1.43.1.4.19.21:
+      category: Switch
+      model: nbrolWa
+    1.3.6.1.4.1.43.1.4.19.22:
+      category: Switch
+      model: nbrol224
+    1.3.6.1.4.1.43.1.4.19.23:
+      category: Switch
+      model: nbrolAb
+    1.3.6.1.4.1.43.1.4.19.24:
+      category: Switch
+      model: nbrol223
+    1.3.6.1.4.1.43.1.4.20:
+      model: Spectre Huge
+    1.3.6.1.4.1.43.1.4.20.1:
+      category: Switch
+      model: nbrohBp
+    1.3.6.1.4.1.43.1.4.20.2:
+      category: Switch
+      model: nbrohCp
+    1.3.6.1.4.1.43.1.4.20.3:
+      category: Switch
+      model: nbrohXw
+    1.3.6.1.4.1.43.1.4.20.4:
+      category: Switch
+      model: nbro228
+    1.3.6.1.4.1.43.1.4.20.5:
+      category: Switch
+      model: nbroh201
+    1.3.6.1.4.1.43.1.4.20.6:
+      category: Switch
+      model: nbroh222
+    1.3.6.1.4.1.43.1.4.20.7:
+      category: Switch
+      model: nbrohSn
+    1.3.6.1.4.1.43.1.4.20.8:
+      category: Switch
+      model: nbroh200
+    1.3.6.1.4.1.43.1.4.20.9:
+      category: Switch
+      model: nbrohFf
+    1.3.6.1.4.1.43.1.4.20.10:
+      category: Switch
+      model: nbroh227
+    1.3.6.1.4.1.43.1.4.20.11:
+      category: Switch
+      model: nbroh221
+    1.3.6.1.4.1.43.1.4.20.12:
+      category: Switch
+      model: nbrohAppn
+    1.3.6.1.4.1.43.1.4.20.13:
+      category: Switch
+      model: nbrohLm
+    1.3.6.1.4.1.43.1.4.20.14:
+      category: Switch
+      model: nbrohLt
+    1.3.6.1.4.1.43.1.4.20.15:
+      category: Switch
+      model: nbrohWm
+    1.3.6.1.4.1.43.1.4.20.16:
+      category: Switch
+      model: nbrohWt
+    1.3.6.1.4.1.43.1.4.20.17:
+      category: Switch
+      model: nbrohAe
+    1.3.6.1.4.1.43.1.4.20.18:
+      category: Switch
+      model: nbrohAp
+    1.3.6.1.4.1.43.1.4.20.19:
+      category: Switch
+      model: nbrohAn
+    1.3.6.1.4.1.43.1.4.20.20:
+      category: Switch
+      model: nbrohLa
+    1.3.6.1.4.1.43.1.4.20.21:
+      category: Switch
+      model: nbrohWa
+    1.3.6.1.4.1.43.1.4.20.22:
+      category: Switch
+      model: nbroh224
+    1.3.6.1.4.1.43.1.4.20.23:
+      category: Switch
+      model: nbrohAb
+    1.3.6.1.4.1.43.1.4.20.24:
+      category: Switch
+      model: nbroh223
+    1.3.6.1.4.1.43.1.4.21:
+      category: Switch
+      model: spectreIsdn
+    1.3.6.1.4.1.43.1.4.21.1:
+      category: Switch
+      model: nbroiBp
+    1.3.6.1.4.1.43.1.4.21.2:
+      category: Switch
+      model: nbroiCp
+    1.3.6.1.4.1.43.1.4.21.3:
+      category: Switch
+      model: nbroiXw
+    1.3.6.1.4.1.43.1.4.21.4:
+      category: Switch
+      model: nbroiCX
+    1.3.6.1.4.1.43.1.4.21.5:
+      category: Switch
+      model: nbroiBA
+    1.3.6.1.4.1.43.1.4.21.6:
+      category: Switch
+      model: nbro422
+    1.3.6.1.4.1.43.1.4.21.7:
+      category: Switch
+      model: nbroiSn
+    1.3.6.1.4.1.43.1.4.21.8:
+      category: Switch
+      model: nbroi200
+    1.3.6.1.4.1.43.1.4.21.9:
+      category: Switch
+      model: nbroiFf
+    1.3.6.1.4.1.43.1.4.21.10:
+      category: Switch
+      model: nbroil427
+    1.3.6.1.4.1.43.1.4.21.11:
+      category: Switch
+      model: nbro421
+    1.3.6.1.4.1.43.1.4.21.12:
+      category: Switch
+      model: nbroiAppn
+    1.3.6.1.4.1.43.1.4.21.13:
+      category: Switch
+      model: nbroiLm
+    1.3.6.1.4.1.43.1.4.21.14:
+      category: Switch
+      model: nbroiLt
+    1.3.6.1.4.1.43.1.4.21.15:
+      category: Switch
+      model: nbroiWm
+    1.3.6.1.4.1.43.1.4.21.16:
+      category: Switch
+      model: nbroiWt
+    1.3.6.1.4.1.43.1.4.21.17:
+      category: Switch
+      model: nbroiAe
+    1.3.6.1.4.1.43.1.4.21.18:
+      category: Switch
+      model: nbroiAp
+    1.3.6.1.4.1.43.1.4.21.19:
+      category: Switch
+      model: nbroiAn
+    1.3.6.1.4.1.43.1.4.21.20:
+      category: Switch
+      model: nbroiLa
+    1.3.6.1.4.1.43.1.4.21.21:
+      category: Switch
+      model: nbroiWa
+    1.3.6.1.4.1.43.1.4.21.22:
+      category: Switch
+      model: nbroi424
+    1.3.6.1.4.1.43.1.4.21.23:
+      category: Switch
+      model: nbroiAb
+    1.3.6.1.4.1.43.1.4.21.24:
+      category: Switch
+      model: nbroi423
+    1.3.6.1.4.1.43.1.4.22:
+      category: Switch
+      model: nb2-8-4fddi
+    1.3.6.1.4.1.43.1.4.22.1:
+      category: Switch
+      model: nb2-8-4fddiBp
+    1.3.6.1.4.1.43.1.4.22.2:
+      category: Switch
+      model: nb2-8-4fddiCp
+    1.3.6.1.4.1.43.1.4.22.3:
+      category: Switch
+      model: nb2-8-4fddiXw
+    1.3.6.1.4.1.43.1.4.22.4:
+      category: Switch
+      model: nb2-8-4fddiCx
+    1.3.6.1.4.1.43.1.4.22.5:
+      category: Switch
+      model: nb2-8-4fddiBa
+    1.3.6.1.4.1.43.1.4.22.6:
+      category: Switch
+      model: nb2-8-4fddiAr
+    1.3.6.1.4.1.43.1.4.22.7:
+      category: Switch
+      model: nb2-8-4fddiSn
+    1.3.6.1.4.1.43.1.4.22.8:
+      category: Switch
+      model: nb2-8-4fddiRb
+    1.3.6.1.4.1.43.1.4.22.9:
+      category: Switch
+      model: nb2-8-4fddiFf
+    1.3.6.1.4.1.43.1.4.22.10:
+      category: Switch
+      model: nb2-8-4fddiCf
+    1.3.6.1.4.1.43.1.4.22.11:
+      category: Switch
+      model: nb2-8-4fddiBx
+    1.3.6.1.4.1.43.1.4.22.12:
+      category: Switch
+      model: nb2-8-4fddiAppn
+    1.3.6.1.4.1.43.1.4.22.13:
+      category: Switch
+      model: nb2-8-4fddiLm
+    1.3.6.1.4.1.43.1.4.22.14:
+      category: Switch
+      model: nb2-8-4fddiLt
+    1.3.6.1.4.1.43.1.4.22.15:
+      category: Switch
+      model: nb2-8-4fddiWm
+    1.3.6.1.4.1.43.1.4.22.16:
+      category: Switch
+      model: nb2-8-4fddiWt
+    1.3.6.1.4.1.43.1.4.22.17:
+      category: Switch
+      model: nb2-8-4fddiAe
+    1.3.6.1.4.1.43.1.4.22.18:
+      category: Switch
+      model: nb2-8-4fddiAp
+    1.3.6.1.4.1.43.1.4.22.19:
+      category: Switch
+      model: nb2-8-4fddiAn
+    1.3.6.1.4.1.43.1.4.22.20:
+      category: Switch
+      model: nb2-8-4fddiLa
+    1.3.6.1.4.1.43.1.4.22.21:
+      category: Switch
+      model: nb2-8-4fddiWa
+    1.3.6.1.4.1.43.1.4.22.22:
+      category: Switch
+      model: nb2-8-4fddiAa
+    1.3.6.1.4.1.43.1.4.22.23:
+      category: Switch
+      model: nb2-8-4fddiAb
+    1.3.6.1.4.1.43.1.4.22.24:
+      category: Switch
+      model: nb2-8-4fddiBf
+    1.3.6.1.4.1.43.1.4.23:
+      category: Switch
+      model: nb2-8-dualwide
+    1.3.6.1.4.1.43.1.4.23.1:
+      category: Switch
+      model: nb2-8-dualwideBp
+    1.3.6.1.4.1.43.1.4.23.2:
+      category: Switch
+      model: nb2-8-dualwideCp
+    1.3.6.1.4.1.43.1.4.23.3:
+      category: Switch
+      model: nb2-8-dualwideXw
+    1.3.6.1.4.1.43.1.4.23.4:
+      category: Switch
+      model: nb2-8-dualwideCx
+    1.3.6.1.4.1.43.1.4.23.5:
+      category: Switch
+      model: nb2-8-dualwideBa
+    1.3.6.1.4.1.43.1.4.23.6:
+      category: Switch
+      model: nb2-8-dualwideAr
+    1.3.6.1.4.1.43.1.4.23.7:
+      category: Switch
+      model: nb2-8-dualwideSn
+    1.3.6.1.4.1.43.1.4.23.8:
+      category: Switch
+      model: nb2-8-dualwideRb
+    1.3.6.1.4.1.43.1.4.23.9:
+      category: Switch
+      model: nb2-8-dualwideFf
+    1.3.6.1.4.1.43.1.4.23.10:
+      category: Switch
+      model: nb2-8-dualwideCf
+    1.3.6.1.4.1.43.1.4.23.11:
+      category: Switch
+      model: nb2-8-dualwideBx
+    1.3.6.1.4.1.43.1.4.23.12:
+      category: Switch
+      model: nb2-8-dualwideAppn
+    1.3.6.1.4.1.43.1.4.23.13:
+      category: Switch
+      model: nb2-8-dualwideLm
+    1.3.6.1.4.1.43.1.4.23.14:
+      category: Switch
+      model: nb2-8-dualwideLt
+    1.3.6.1.4.1.43.1.4.23.15:
+      category: Switch
+      model: nb2-8-dualwideWm
+    1.3.6.1.4.1.43.1.4.23.16:
+      category: Switch
+      model: nb2-8-dualwideWt
+    1.3.6.1.4.1.43.1.4.23.17:
+      category: Switch
+      model: nb2-8-dualwideAe
+    1.3.6.1.4.1.43.1.4.23.18:
+      category: Switch
+      model: nb2-8-dualwideAp
+    1.3.6.1.4.1.43.1.4.23.19:
+      category: Switch
+      model: nb2-8-dualwideAn
+    1.3.6.1.4.1.43.1.4.23.20:
+      category: Switch
+      model: nb2-8-dualwideLa
+    1.3.6.1.4.1.43.1.4.23.21:
+      category: Switch
+      model: nb2-8-dualwideWa
+    1.3.6.1.4.1.43.1.4.23.22:
+      category: Switch
+      model: nb2-8-dualwideAa
+    1.3.6.1.4.1.43.1.4.23.23:
+      category: Switch
+      model: nb2-8-dualwideAb
+    1.3.6.1.4.1.43.1.4.23.24:
+      category: Switch
+      model: nb2-8-dualwideBf
+    1.3.6.1.4.1.43.1.4.24:
+      category: Switch
+      model: brouterBrdFwVers
+    1.3.6.1.4.1.43.1.4.24.1:
+      category: Switch
+      model: noFw
+    1.3.6.1.4.1.43.1.4.24.2:
+      category: Switch
+      model: cecFw
+    1.3.6.1.4.1.43.1.4.24.3:
+      category: Switch
+      model: hdwanFw
+    1.3.6.1.4.1.43.1.4.24.4:
+      category: Switch
+      model: hdwan232Fw
+    1.3.6.1.4.1.43.1.4.24.5:
+      category: Switch
+      model: hdwan449Fw
+    1.3.6.1.4.1.43.1.4.24.6:
+      category: Switch
+      model: mp6ethFw
+    1.3.6.1.4.1.43.1.4.24.7:
+      category: Switch
+      model: cecStarFw
+    1.3.6.1.4.1.43.1.4.24.8:
+      category: Switch
+      model: mpAtmFw
+    1.3.6.1.4.1.43.1.4.24.9:
+      category: Switch
+      model: mpFddiFw
+    1.3.6.1.4.1.43.1.4.24.10:
+      category: Switch
+      model: mp6EthFlFw
+    1.3.6.1.4.1.43.1.4.24.11:
+      category: Switch
+      model: nbroFw
+    1.3.6.1.4.1.43.1.4.24.12:
+      category: Switch
+      model: nbocFw
+    1.3.6.1.4.1.43.1.4.24.13:
+      category: Switch
+      model: dpeFw
+    1.3.6.1.4.1.43.1.4.24.14:
+      category: Switch
+      model: intrepidFw
+    1.3.6.1.4.1.43.1.4.24.15:
+      category: Switch
+      model: mbriFw
+    1.3.6.1.4.1.43.1.4.24.16:
+      category: Switch
+      model: qwanFw
+    1.3.6.1.4.1.43.1.4.24.17:
+      category: Switch
+      model: scoreFw
+    1.3.6.1.4.1.43.1.4.24.18:
+      category: Switch
+      model: blueridgeFw
+    1.3.6.1.4.1.43.1.4.25:
+      category: Switch
+      model: brouterBrdSwVers
+    1.3.6.1.4.1.43.1.4.25.1:
+      category: Switch
+      model: noSw
+    1.3.6.1.4.1.43.1.4.25.2:
+      category: Switch
+      model: mp6eth
+    1.3.6.1.4.1.43.1.4.26:
+      category: Switch
+      model: spectreIsdnHuge
+    1.3.6.1.4.1.43.1.4.26.1:
+      category: Switch
+      model: nbroihBp
+    1.3.6.1.4.1.43.1.4.26.2:
+      category: Switch
+      model: nbroihCp
+    1.3.6.1.4.1.43.1.4.26.3:
+      category: Switch
+      model: nbroihXw
+    1.3.6.1.4.1.43.1.4.26.4:
+      category: Switch
+      model: nbroihCx
+    1.3.6.1.4.1.43.1.4.26.5:
+      category: Switch
+      model: nbroihBa
+    1.3.6.1.4.1.43.1.4.26.6:
+      category: Switch
+      model: nbroih422
+    1.3.6.1.4.1.43.1.4.26.7:
+      category: Switch
+      model: nbroihSn
+    1.3.6.1.4.1.43.1.4.26.8:
+      category: Switch
+      model: nbroihRb
+    1.3.6.1.4.1.43.1.4.26.9:
+      category: Switch
+      model: nbroihFf
+    1.3.6.1.4.1.43.1.4.26.10:
+      category: Switch
+      model: nbroih427
+    1.3.6.1.4.1.43.1.4.26.11:
+      category: Switch
+      model: nbroih421
+    1.3.6.1.4.1.43.1.4.26.12:
+      category: Switch
+      model: nbroihAppn
+    1.3.6.1.4.1.43.1.4.26.13:
+      category: Switch
+      model: nbroihLm
+    1.3.6.1.4.1.43.1.4.26.14:
+      category: Switch
+      model: nbroihLt
+    1.3.6.1.4.1.43.1.4.26.15:
+      category: Switch
+      model: nbroihWm
+    1.3.6.1.4.1.43.1.4.26.16:
+      category: Switch
+      model: nbroihWt
+    1.3.6.1.4.1.43.1.4.26.17:
+      category: Switch
+      model: nbroihAe
+    1.3.6.1.4.1.43.1.4.26.18:
+      category: Switch
+      model: nbroihAp
+    1.3.6.1.4.1.43.1.4.26.19:
+      category: Switch
+      model: nbroihAn
+    1.3.6.1.4.1.43.1.4.26.20:
+      category: Switch
+      model: nbroihLa
+    1.3.6.1.4.1.43.1.4.26.21:
+      category: Switch
+      model: nbroihWa
+    1.3.6.1.4.1.43.1.4.26.22:
+      category: Switch
+      model: nbroih424
+    1.3.6.1.4.1.43.1.4.26.23:
+      category: Switch
+      model: nbroihAb
+    1.3.6.1.4.1.43.1.4.26.24:
+      category: Switch
+      model: nbroih423
+    1.3.6.1.4.1.43.1.4.27:
+      category: Switch
+      model: nbroTrHuge
+    1.3.6.1.4.1.43.1.4.27.1:
+      category: Switch
+      model: nbroTrlBp
+    1.3.6.1.4.1.43.1.4.27.2:
+      category: Switch
+      model: nbroTrlCp
+    1.3.6.1.4.1.43.1.4.27.3:
+      category: Switch
+      model: nbroTrlXw
+    1.3.6.1.4.1.43.1.4.27.4:
+      category: Switch
+      model: nbroTrlCx
+    1.3.6.1.4.1.43.1.4.27.5:
+      category: Switch
+      model: nbroTrlBa
+    1.3.6.1.4.1.43.1.4.27.6:
+      category: Switch
+      model: nbro322
+    1.3.6.1.4.1.43.1.4.27.7:
+      category: Switch
+      model: nbroTrlSn
+    1.3.6.1.4.1.43.1.4.27.8:
+      category: Switch
+      model: nbroTrlRb
+    1.3.6.1.4.1.43.1.4.27.9:
+      category: Switch
+      model: nbroTrlFf
+    1.3.6.1.4.1.43.1.4.27.10:
+      category: Switch
+      model: nbroTrl327
+    1.3.6.1.4.1.43.1.4.27.11:
+      category: Switch
+      model: nbro321
+    1.3.6.1.4.1.43.1.4.27.12:
+      category: Switch
+      model: nbroTrlAppn
+    1.3.6.1.4.1.43.1.4.27.13:
+      category: Switch
+      model: nbroTrlLm
+    1.3.6.1.4.1.43.1.4.27.14:
+      category: Switch
+      model: nbroTrlLt
+    1.3.6.1.4.1.43.1.4.27.15:
+      category: Switch
+      model: nbroTrlWm
+    1.3.6.1.4.1.43.1.4.27.16:
+      category: Switch
+      model: nbroTrlWt
+    1.3.6.1.4.1.43.1.4.27.17:
+      category: Switch
+      model: nbroTrlAe
+    1.3.6.1.4.1.43.1.4.27.18:
+      category: Switch
+      model: nbroTrlAp
+    1.3.6.1.4.1.43.1.4.27.19:
+      category: Switch
+      model: nbroTrlAn
+    1.3.6.1.4.1.43.1.4.27.20:
+      category: Switch
+      model: nbroTrlLa
+    1.3.6.1.4.1.43.1.4.27.21:
+      category: Switch
+      model: nbroTrlWa
+    1.3.6.1.4.1.43.1.4.27.22:
+      category: Switch
+      model: nbroTrlAa
+    1.3.6.1.4.1.43.1.4.27.23:
+      category: Switch
+      model: nbroTrlAb
+    1.3.6.1.4.1.43.1.4.27.24:
+      category: Switch
+      model: nbroTrl323
+    1.3.6.1.4.1.43.1.4.28:
+      category: Switch
+      model: nbroTrIsdn
+    1.3.6.1.4.1.43.1.4.28.1:
+      category: Switch
+      model: nbroTrIsdnBp
+    1.3.6.1.4.1.43.1.4.28.2:
+      category: Switch
+      model: nbroTrIsdnCp
+    1.3.6.1.4.1.43.1.4.28.3:
+      category: Switch
+      model: nbroTrIsdnXw
+    1.3.6.1.4.1.43.1.4.28.4:
+      category: Switch
+      model: nbroTrIsdnCx
+    1.3.6.1.4.1.43.1.4.28.5:
+      category: Switch
+      model: nbroTrIsdnBa
+    1.3.6.1.4.1.43.1.4.28.6:
+      category: Switch
+      model: nbroTrIsdnAr
+    1.3.6.1.4.1.43.1.4.28.7:
+      category: Switch
+      model: nbroTrIsdnSn
+    1.3.6.1.4.1.43.1.4.28.8:
+      category: Switch
+      model: nbroTrIsdnRb
+    1.3.6.1.4.1.43.1.4.28.9:
+      category: Switch
+      model: nbroTrIsdnFf
+    1.3.6.1.4.1.43.1.4.28.10:
+      category: Switch
+      model: nbro527
+    1.3.6.1.4.1.43.1.4.28.11:
+      category: Switch
+      model: nbroTrIsdnBx
+    1.3.6.1.4.1.43.1.4.28.12:
+      category: Switch
+      model: nbroTrIsdnAppn
+    1.3.6.1.4.1.43.1.4.28.13:
+      category: Switch
+      model: nbroTrIsdnLm
+    1.3.6.1.4.1.43.1.4.28.14:
+      category: Switch
+      model: nbroTrIsdnLt
+    1.3.6.1.4.1.43.1.4.28.15:
+      category: Switch
+      model: nbroTrIsdnWm
+    1.3.6.1.4.1.43.1.4.28.16:
+      category: Switch
+      model: nbroTrIsdnWt
+    1.3.6.1.4.1.43.1.4.28.17:
+      category: Switch
+      model: nbroTrIsdnAe
+    1.3.6.1.4.1.43.1.4.28.18:
+      category: Switch
+      model: nbroTrIsdnAp
+    1.3.6.1.4.1.43.1.4.28.19:
+      category: Switch
+      model: nbroTrIsdnAn
+    1.3.6.1.4.1.43.1.4.28.20:
+      category: Switch
+      model: nbroTrIsdnLa
+    1.3.6.1.4.1.43.1.4.28.21:
+      category: Switch
+      model: nbroTrIsdnWa
+    1.3.6.1.4.1.43.1.4.28.22:
+      category: Switch
+      model: nbroTrIsdnAa
+    1.3.6.1.4.1.43.1.4.28.23:
+      category: Switch
+      model: nbroTrIsdnAb
+    1.3.6.1.4.1.43.1.4.28.24:
+      category: Switch
+      model: nbro523
+    1.3.6.1.4.1.43.1.4.29:
+      category: Switch
+      model: nbroTrNext
+    1.3.6.1.4.1.43.1.4.29.1:
+      category: Switch
+      model: nbroTrhBp
+    1.3.6.1.4.1.43.1.4.29.2:
+      category: Switch
+      model: nbroTrhCp
+    1.3.6.1.4.1.43.1.4.29.3:
+      category: Switch
+      model: nbroTrhXw
+    1.3.6.1.4.1.43.1.4.29.4:
+      category: Switch
+      model: nbroTrhCx
+    1.3.6.1.4.1.43.1.4.29.5:
+      category: Switch
+      model: nbroTrhBa
+    1.3.6.1.4.1.43.1.4.29.6:
+      category: Switch
+      model: nbroTrh322
+    1.3.6.1.4.1.43.1.4.29.7:
+      category: Switch
+      model: nbroTrhSn
+    1.3.6.1.4.1.43.1.4.29.8:
+      category: Switch
+      model: nbroTrhRb
+    1.3.6.1.4.1.43.1.4.29.9:
+      category: Switch
+      model: nbroTrhFf
+    1.3.6.1.4.1.43.1.4.29.10:
+      category: Switch
+      model: nbroTrh327
+    1.3.6.1.4.1.43.1.4.29.11:
+      category: Switch
+      model: nbroTrh321
+    1.3.6.1.4.1.43.1.4.29.12:
+      category: Switch
+      model: nbroTrhAppn
+    1.3.6.1.4.1.43.1.4.29.13:
+      category: Switch
+      model: nbroTrhLm
+    1.3.6.1.4.1.43.1.4.29.14:
+      category: Switch
+      model: nbroTrhLt
+    1.3.6.1.4.1.43.1.4.29.15:
+      category: Switch
+      model: nbroTrhWm
+    1.3.6.1.4.1.43.1.4.29.16:
+      category: Switch
+      model: nbroTrhWt
+    1.3.6.1.4.1.43.1.4.29.17:
+      category: Switch
+      model: nbroTrhAe
+    1.3.6.1.4.1.43.1.4.29.18:
+      category: Switch
+      model: nbroTrhAp
+    1.3.6.1.4.1.43.1.4.29.19:
+      category: Switch
+      model: nbroTrhAn
+    1.3.6.1.4.1.43.1.4.29.20:
+      category: Switch
+      model: nbroTrhLa
+    1.3.6.1.4.1.43.1.4.29.21:
+      category: Switch
+      model: nbroTrhWa
+    1.3.6.1.4.1.43.1.4.29.22:
+      category: Switch
+      model: nbroTrhAa
+    1.3.6.1.4.1.43.1.4.29.23:
+      category: Switch
+      model: nbroTrhAb
+    1.3.6.1.4.1.43.1.4.29.24:
+      category: Switch
+      model: nbroTrh323
+    1.3.6.1.4.1.43.1.4.30:
+      category: Switch
+      model: nbro2Eth
+    1.3.6.1.4.1.43.1.4.31:
+      category: Switch
+      model: nbro2EthIsdn
+    1.3.6.1.4.1.43.1.4.32:
+      category: Switch
+      model: Office Connect
+    1.3.6.1.4.1.43.1.4.32.1:
+      category: Switch
+      model: ocRtrBp
+    1.3.6.1.4.1.43.1.4.32.2:
+      category: Switch
+      model: ocRtrCp
+    1.3.6.1.4.1.43.1.4.32.3:
+      category: Switch
+      model: ocRtrXw
+    1.3.6.1.4.1.43.1.4.32.4:
+      category: Switch
+      model: ocRtrCx
+    1.3.6.1.4.1.43.1.4.32.5:
+      category: Switch
+      model: ocRtrBa
+    1.3.6.1.4.1.43.1.4.32.6:
+      category: Switch
+      model: ocRtrAr
+    1.3.6.1.4.1.43.1.4.32.7:
+      category: Switch
+      model: ocRtrSn
+    1.3.6.1.4.1.43.1.4.32.8:
+      category: Switch
+      model: ocRtrRb
+    1.3.6.1.4.1.43.1.4.32.9:
+      category: Switch
+      model: ocRtrFf
+    1.3.6.1.4.1.43.1.4.32.10:
+      category: Switch
+      model: ocRtrCf
+    1.3.6.1.4.1.43.1.4.32.11:
+      category: Switch
+      model: ocRtrBx
+    1.3.6.1.4.1.43.1.4.32.12:
+      category: Switch
+      model: ocRtrAppn
+    1.3.6.1.4.1.43.1.4.32.13:
+      category: Switch
+      model: ocRtrLm
+    1.3.6.1.4.1.43.1.4.32.14:
+      category: Switch
+      model: ocRtrLt
+    1.3.6.1.4.1.43.1.4.32.15:
+      category: Switch
+      model: ocRtrWm
+    1.3.6.1.4.1.43.1.4.32.16:
+      category: Switch
+      model: ocRtrWt
+    1.3.6.1.4.1.43.1.4.32.17:
+      category: Switch
+      model: ocRtrAe
+    1.3.6.1.4.1.43.1.4.32.18:
+      category: Switch
+      model: ocRtrAp
+    1.3.6.1.4.1.43.1.4.32.19:
+      category: Switch
+      model: ocRtrAn
+    1.3.6.1.4.1.43.1.4.32.20:
+      category: Switch
+      model: ocRtrLa
+    1.3.6.1.4.1.43.1.4.32.21:
+      category: Switch
+      model: ocRtrWa
+    1.3.6.1.4.1.43.1.4.32.22:
+      category: Switch
+      model: ocRtrAa
+    1.3.6.1.4.1.43.1.4.32.23:
+      category: Switch
+      model: ocRtrAb
+    1.3.6.1.4.1.43.1.4.32.24:
+      category: Switch
+      model: ocRtrBf
+    1.3.6.1.4.1.43.1.4.33:
+      category: Switch
+      model: intrepidRtr
+    1.3.6.1.4.1.43.1.4.34:
+      category: Switch
+      model: superStackSwitch1100Router
+    1.3.6.1.4.1.43.1.4.35:
+      category: Switch
+      model: scoreRtr
+    1.3.6.1.4.1.43.1.4.36:
+      category: Switch
+      model: copperRtr
+    1.3.6.1.4.1.43.1.4.37:
+      category: Switch
+      model: easterRtr
+    1.3.6.1.4.1.43.1.4.37.1:
+      category: Switch
+      model: rtr400Hw
+    1.3.6.1.4.1.43.1.4.37.2:
+      category: Switch
+      model: rtr400Hs
+    1.3.6.1.4.1.43.1.5:
+      category: Switch
+      model: genericMSWorkstation
+    1.3.6.1.4.1.43.1.5.1:
+      category: Switch
+      model: deskManProduct
+    1.3.6.1.4.1.43.1.5.1.1:
+      category: Switch
+      model: ethernetSoftHub
+    1.3.6.1.4.1.43.1.5.1.2:
+      category: Switch
+      model: ethernetDTAnode
+    1.3.6.1.4.1.43.1.5.1.3:
+      category: Switch
+      model: tokenRingSoftHub
+    1.3.6.1.4.1.43.1.5.1.4:
+      category: Switch
+      model: tokenRingDTAnode
+    1.3.6.1.4.1.43.1.6:
+      category: Switch
+      model: genericMSServer
+    1.3.6.1.4.1.43.1.7:
+      category: Switch
+      model: genericUnixServer
+    1.3.6.1.4.1.43.1.8.1:
+      category: Switch
+      model: linkBuilder3GH
+    1.3.6.1.4.1.43.1.8.2:
+      category: Switch
+      model: linkBuilder10BTi
+    1.3.6.1.4.1.43.1.8.3:
+      category: Switch
+      model: linkBuilderECS
+    1.3.6.1.4.1.43.1.8.4:
+      category: Switch
+      model: linkBuilderMSH
+    1.3.6.1.4.1.43.1.8.5:
+      category: Hub
+      model: Super Stack 2 Hub10
+    1.3.6.1.4.1.43.1.8.6:
+      category: Hub
+      model: Linkbuilder FDDIHub
+    1.3.6.1.4.1.43.1.8.7:
+      category: Hub
+      model: Linkbuilder FDDIHub
+    1.3.6.1.4.1.43.1.8.8:
+      category: Switch
+      model: linkSwitchFMS
+    1.3.6.1.4.1.43.1.8.9:
+      category: Switch
+      model: linkSwitchMSH
+    1.3.6.1.4.1.43.1.8.10:
+      category: Switch
+      model: linkBuilderFMSLBridge
+    1.3.6.1.4.1.43.1.8.11:
+      category: Switch
+      model: linkBuilderTP8i
+    1.3.6.1.4.1.43.1.8.12:
+      category: Hub
+      model: Linkbuilder MSH
+    1.3.6.1.4.1.43.1.8.13:
+      category: Switch
+      model: linkSwitch1000
+    1.3.6.1.4.1.43.1.8.14:
+      category: Switch
+      model: linkSwitch500
+    1.3.6.1.4.1.43.1.8.15:
+      category: Switch
+      model: linkSwitch2700AU
+    1.3.6.1.4.1.43.1.8.16:
+      category: Switch
+      model: linkSwitch2700Bridge
+    1.3.6.1.4.1.43.1.8.17:
+      category: Bridge/Extender
+      model: Linkbuilder FMS100LBridge
+    1.3.6.1.4.1.43.1.8.18:
+      category: Switch
+      model: linkSwitch2700TliAU
+    1.3.6.1.4.1.43.1.8.19:
+      category: Switch
+      model: linkSwitch2700TliBridge
+    1.3.6.1.4.1.43.1.8.20:
+      category: Hub
+      model: Linkbuilder FMS100Hub
+    1.3.6.1.4.1.43.1.8.21:
+      category: Switch
+      model: officeConnect-Hub8M
+    1.3.6.1.4.1.43.1.8.22:
+      category: Layer 3 Switch
+      model: LinkSwitch 3000
+    1.3.6.1.4.1.43.1.8.23:
+      category: Switch
+      model: mshSwitch
+    1.3.6.1.4.1.43.1.8.24:
+      category: Switch
+      model: linkSwitch2000TR
+    1.3.6.1.4.1.43.1.8.25:
+      category: Switch
+      model: oncoreFastModuleFPA100
+    1.3.6.1.4.1.43.1.8.26:
+      category: Switch
+      model: oncoreFastModuleFPA10
+    1.3.6.1.4.1.43.1.8.27:
+      category: Switch
+      model: oncoreFastModuleFPA10FX
+    1.3.6.1.4.1.43.1.8.28:
+      category: Switch
+      model: oncoreFastModuleBPA
+    1.3.6.1.4.1.43.1.8.29:
+      category: Switch
+      model: 3Com_SuperStackII
+    1.3.6.1.4.1.43.1.8.30:
+      category: Switch
+      model: oncoreFastModuleFPA100TX
+    1.3.6.1.4.1.43.1.8.31:
+      category: Switch
+      model: officeConnect-Switch140M
+    1.3.6.1.4.1.43.1.8.32:
+      category: Switch
+      model: superStackSwitch9000SX
+    1.3.6.1.4.1.43.1.8.33:
+      category: Switch
+      model: coreBuilder9000
+    1.3.6.1.4.1.43.1.8.33.2:
+      category: Switch
+      model: coreBuilder9000-chassis
+    1.3.6.1.4.1.43.1.8.33.2.1:
+      category: Switch
+      model: coreBuilder9000-16slot
+    1.3.6.1.4.1.43.1.8.33.2.2:
+      category: Switch
+      model: coreBuilder9000-7slot
+    1.3.6.1.4.1.43.1.8.33.2.3:
+      category: Switch
+      model: coreBuilder9000-8slot
+    1.3.6.1.4.1.43.1.8.33.2.4:
+      category: Switch
+      model: coreBuilder9000-4slot
+    1.3.6.1.4.1.43.1.8.34:
+      category: Switch
+      model: superStackSwitch3800
+    1.3.6.1.4.1.43.1.8.35:
+      category: Switch
+      model: cb5000TRFastModule
+    1.3.6.1.4.1.43.1.8.36:
+      category: Switch
+      model: superStackSwitch9100
+    1.3.6.1.4.1.43.1.8.37:
+      category: Switch
+      model: superStackSwitchSoyuz
+    1.3.6.1.4.1.43.1.8.38:
+      category: Layer 3 Switch
+      model: SuperStack3 4300
+    1.3.6.1.4.1.43.1.8.39:
+      category: Switch
+      model: superStackSwitch3824
+    1.3.6.1.4.1.43.1.8.40:
+      category: Switch
+      model: superStackSwitch3812
+    1.3.6.1.4.1.43.1.8.41:
+      category: Switch
+      model: 3226
+    1.3.6.1.4.1.43.1.8.42:
+      category: Layer 3 Switch
+      model: Switch 8810
+    1.3.6.1.4.1.43.1.8.43:
+      category: Layer 3 Switch
+      model: Switch 3870
+    1.3.6.1.4.1.43.1.8.44:
+      category: Layer 3 Switch
+      model: Switch 3870
+    1.3.6.1.4.1.43.1.8.45:
+      category: Switch
+      model: switch3848
+    1.3.6.1.4.1.43.1.8.46:
+      category: Switch
+      model: switch3228
+    1.3.6.1.4.1.43.1.8.47:
+      category: Switch
+      model: switch3252
+    1.3.6.1.4.1.43.1.8.48:
+      category: Switch
+      model: switch2226PwrPlus
+    1.3.6.1.4.1.43.1.8.49:
+      category: Switch
+      model: switch2226Plus
+    1.3.6.1.4.1.43.1.8.50:
+      category: Switch
+      model: switch2250Plus
+    1.3.6.1.4.1.43.1.8.51:
+      category: Switch
+      model: switch3870x
+    1.3.6.1.4.1.43.1.8.52:
+      category: Switch
+      model: switch9
+    1.3.6.1.4.1.43.1.8.53:
+      category: Switch
+      model: switch9FX
+    1.3.6.1.4.1.43.1.8.54:
+      category: Switch
+      model: switch2816SfpPlus
+    1.3.6.1.4.1.43.1.8.55:
+      category: Switch
+      model: switch2824
+    1.3.6.1.4.1.43.1.8.56:
+      category: Switch
+      model: switch2848SfpPlus
+    1.3.6.1.4.1.43.1.8.57:
+      category: Layer 3 Switch
+      model: Baseline S2226 Plus
+    1.3.6.1.4.1.43.1.8.58:
+      category: Layer 3 Switch
+      model: Baseline S2250 Plus
+    1.3.6.1.4.1.43.1.8.59:
+      category: Layer 3 Switch
+      model: Baseline 2426 PWR Plus
+    1.3.6.1.4.1.43.1.8.60:
+      category: Layer 3 Switch
+      model: Baseline S2916-SFP Plus
+    1.3.6.1.4.1.43.1.8.61:
+      category: Layer 3 Switch
+      model: Baseline S2924-SFP Plus
+    1.3.6.1.4.1.43.1.8.62:
+      category: Layer 3 Switch
+      model: Baseline S2948-SFP Plus
+    1.3.6.1.4.1.43.1.8.63:
+      category: Layer 3 Switch
+      model: Baseline S2924-PWR Plus
+    1.3.6.1.4.1.43.1.8.64:
+      category: Switch
+      model: officeConnectMngGigPWR10
+    1.3.6.1.4.1.43.1.8.65:
+      category: Switch
+      model: baselinePoESwitch3124
+    1.3.6.1.4.1.43.1.8.66:
+      category: Switch
+      model: baseline2226SFPPlus
+    1.3.6.1.4.1.43.1.8.67:
+      category: Switch
+      model: baseline2426PWRPlus
+    1.3.6.1.4.1.43.1.8.68:
+      category: Switch
+      model: baseline2250SFPPlus
+    1.3.6.1.4.1.43.1.8.69:
+      category: Switch
+      model: officeconnect-Gig8
+    1.3.6.1.4.1.43.1.8.70:
+      category: Switch
+      model: officeconnect-PWR8
+    1.3.6.1.4.1.43.1.8.71:
+      category: Layer 3 Switch
+      model: Baseline 2920-SFP Plus
+    1.3.6.1.4.1.43.1.8.72:
+      category: Layer 3 Switch
+      model: Baseline 2928-SFP Plus
+    1.3.6.1.4.1.43.1.8.73:
+      category: Layer 3 Switch
+      model: Baseline 2952-SFP Plus
+    1.3.6.1.4.1.43.1.8.74:
+      category: Layer 3 Switch
+      model: Baseline 2928-PWR Plus
+    1.3.6.1.4.1.43.1.8.75:
+      category: Layer 3 Switch
+      model: Baseline 2928-HPWR Plus
+    1.3.6.1.4.1.43.1.8.76:
+      category: Layer 3 Switch
+      model: Baseline S2226
+    1.3.6.1.4.1.43.1.8.77:
+      category: Switch
+      model: Baseline 2250-SFP Plus
+    1.3.6.1.4.1.43.1.8.78:
+      category: Layer 3 Switch
+      model: Baseline S2426
+    1.3.6.1.4.1.43.1.9:
+      category: Switch
+      model: cards
+    1.3.6.1.4.1.43.1.9.1:
+      category: Switch
+      model: linkBuilder3GH-cards
+    1.3.6.1.4.1.43.1.9.2:
+      category: Switch
+      model: linkBuilder10BTi-cards
+    1.3.6.1.4.1.43.1.9.2.1:
+      category: Switch
+      model: linkBuilder10BTi-cards-utp
+    1.3.6.1.4.1.43.1.9.2.2:
+      category: Switch
+      model: linkBuilder10BT-cards-utp
+    1.3.6.1.4.1.43.1.9.3:
+      category: Switch
+      model: linkBuilderECS-cards
+    1.3.6.1.4.1.43.1.9.4:
+      category: Switch
+      model: linkBuilderMSH-cards
+    1.3.6.1.4.1.43.1.9.5:
+      category: Switch
+      model: linkBuilderFMS-cards
+    1.3.6.1.4.1.43.1.9.5.1:
+      category: Switch
+      model: linkBuilderFMS-cards-utp
+    1.3.6.1.4.1.43.1.9.5.2:
+      category: Switch
+      model: linkBuilderFMS-cards-coax
+    1.3.6.1.4.1.43.1.9.5.3:
+      category: Switch
+      model: linkBuilderFMS-cards-fiber
+    1.3.6.1.4.1.43.1.9.5.4:
+      category: Switch
+      model: linkBuilderFMS-cards-12fiber
+    1.3.6.1.4.1.43.1.9.5.5:
+      category: Switch
+      model: linkBuilderFMS-cards-24utp
+    1.3.6.1.4.1.43.1.9.6:
+      category: Switch
+      model: linkBuilderFMSII-cards
+    1.3.6.1.4.1.43.1.9.6.1:
+      category: Switch
+      model: linkBuilderFMSII-cards-12tp-rj45
+    1.3.6.1.4.1.43.1.9.6.2:
+      category: Switch
+      model: linkBuilderFMSII-cards-10coax-bnc
+    1.3.6.1.4.1.43.1.9.6.3:
+      category: Switch
+      model: linkBuilderFMSII-cards-6fiber-st
+    1.3.6.1.4.1.43.1.9.6.4:
+      category: Switch
+      model: linkBuilderFMSII-cards-12fiber-st
+    1.3.6.1.4.1.43.1.9.6.5:
+      category: Switch
+      model: linkBuilderFMSII-cards-24tp-rj45
+    1.3.6.1.4.1.43.1.9.6.6:
+      category: Switch
+      model: linkBuilderFMSII-cards-24tp-telco
+    1.3.6.1.4.1.43.1.9.6.7:
+      category: Switch
+      model: superStackHub10-cards-12tp-rj45
+    1.3.6.1.4.1.43.1.9.6.8:
+      category: Switch
+      model: superStackHub10-cards-24tp-rj45
+    1.3.6.1.4.1.43.1.9.6.9:
+      category: Switch
+      model: superStackHub10-cards-6fiber-st
+    1.3.6.1.4.1.43.1.9.6.10:
+      category: Switch
+      model: superStackHub10-cards-24tp-telco
+    1.3.6.1.4.1.43.1.9.7:
+      category: Switch
+      model: a3C512
+    1.3.6.1.4.1.43.1.9.7.1:
+      category: Switch
+      model: a3C512-withBNC-expn-card
+    1.3.6.1.4.1.43.1.9.7.2:
+      category: Switch
+      model: a3C512-withAUI-expn-card
+    1.3.6.1.4.1.43.1.9.7.3:
+      category: Switch
+      model: a3C512-withFOIRL-expn-card
+    1.3.6.1.4.1.43.1.9.8:
+      category: Switch
+      model: linkBuilderTP8i-cards
+    1.3.6.1.4.1.43.1.9.8.1:
+      category: Switch
+      model: linkBuilderTP8i-cards-8tp-rj45
+    1.3.6.1.4.1.43.1.9.9:
+      category: Switch
+      model: linkSwitch1000-cards
+    1.3.6.1.4.1.43.1.9.9.1:
+      category: Switch
+      model: linkSwitch1000-cards-24tp-rj45
+    1.3.6.1.4.1.43.1.9.9.2:
+      category: Switch
+      model: linkSwitch1000-cards-12tp-rj45
+    1.3.6.1.4.1.43.1.9.9.3:
+      category: Switch
+      model: linkSwitch3000-cards-5fiber-sc
+    1.3.6.1.4.1.43.1.9.9.4:
+      category: Switch
+      model: linkSwitch3000-cards-8tp-rj45
+    1.3.6.1.4.1.43.1.9.9.5:
+      category: Switch
+      model: superStackSwitch1000-cards-24tp-rj45
+    1.3.6.1.4.1.43.1.9.9.6:
+      category: Switch
+      model: superStackSwitch1000-cards-12tp-rj45
+    1.3.6.1.4.1.43.1.9.9.7:
+      category: Switch
+      model: superStackSwitch3000-cards-5fiber-sc
+    1.3.6.1.4.1.43.1.9.9.8:
+      category: Switch
+      model: superStackSwitch3000-cards-8tp-rj45
+    1.3.6.1.4.1.43.1.9.9.9:
+      category: Switch
+      model: oncore-cards-5fiber-sc-2tp-rj45-blk
+    1.3.6.1.4.1.43.1.9.9.10:
+      category: Switch
+      model: oncore-cards-24tp-telco-blk
+    1.3.6.1.4.1.43.1.9.9.11:
+      category: Switch
+      model: oncore-cards-24tp-telco-1fiber-sc-blk
+    1.3.6.1.4.1.43.1.9.9.12:
+      category: Switch
+      model: oncore-cards-1fiber-sc-7blk
+    1.3.6.1.4.1.43.1.9.9.13:
+      category: Switch
+      model: superStackSwitch1000-3000-cards-atm
+    1.3.6.1.4.1.43.1.9.9.14:
+      category: Switch
+      model: oncore-cards-2fiber-sc-7blk
+    1.3.6.1.4.1.43.1.9.9.15:
+      category: Switch
+      model: oncore-cards-1fiber-sc-tp-rj45-7blk
+    1.3.6.1.4.1.43.1.9.9.16:
+      category: Switch
+      model: oncore-cards-1fiber-sc-atm-7blk
+    1.3.6.1.4.1.43.1.9.9.17:
+      category: Switch
+      model: superStackDesktopSwitch-24tp-rj45
+    1.3.6.1.4.1.43.1.9.9.18:
+      category: Switch
+      model: linkSwitch3000-cards-12tp-rj45
+    1.3.6.1.4.1.43.1.9.9.19:
+      category: Switch
+      model: superStackSwitch3000-cards-12tp-rj45
+    1.3.6.1.4.1.43.1.9.9.20:
+      category: Switch
+      model: oncore-cards-7tp-rj45-blk
+    1.3.6.1.4.1.43.1.9.9.21:
+      category: Switch
+      model: officeConnect-Switch140M-5tp-rj45
+    1.3.6.1.4.1.43.1.9.9.22:
+      category: Switch
+      model: superStackSwitch3000-cards-12tp-rj45-ten100
+    1.3.6.1.4.1.43.1.9.10:
+      category: Switch
+      model: linkBuilderFMS100-cards
+    1.3.6.1.4.1.43.1.9.10.1:
+      category: Switch
+      model: linkBuilderFMS100-cards-12utp
+    1.3.6.1.4.1.43.1.9.10.2:
+      category: Switch
+      model: linkBuilderFMS100-cards-12T4
+    1.3.6.1.4.1.43.1.9.10.3:
+      category: Switch
+      model: linkBuilderFMS100-cards-24TX
+    1.3.6.1.4.1.43.1.9.10.4:
+      category: Switch
+      model: linkBuilderFMS100-cards-12TX
+    1.3.6.1.4.1.43.1.9.11:
+      category: Switch
+      model: officeConnect-Hub8M-cards
+    1.3.6.1.4.1.43.1.9.11.1:
+      category: Switch
+      model: officeConnect-Hub8M-cards-8tp-rj45
+    1.3.6.1.4.1.43.1.9.12:
+      category: Switch
+      model: linkSwitch2000TR-cards
+    1.3.6.1.4.1.43.1.9.12.1:
+      category: Switch
+      model: linkSwitch2000TR-cards-12tp-rj45
+    1.3.6.1.4.1.43.1.9.13:
+      category: Switch
+      model: coreBuilder9000-cards
+    1.3.6.1.4.1.43.1.9.13.1:
+      category: Switch
+      model: coreBuilder9000-packet-cards
+    1.3.6.1.4.1.43.1.9.13.1.1:
+      category: Switch
+      model: cb9000-layer2-switch-cards
+    1.3.6.1.4.1.43.1.9.13.1.1.1:
+      category: Switch
+      model: cb9000-cards-20-rj45-10T-100T
+    1.3.6.1.4.1.43.1.9.13.1.1.2:
+      category: Layer 3 Switch
+      model: Corebuilder 9000
+    1.3.6.1.4.1.43.1.9.13.1.1.3:
+      category: Switch
+      model: cb9000-cards-36-rj45-10T
+    1.3.6.1.4.1.43.1.9.13.1.1.4:
+      category: Layer 3 Switch
+      model: Corebuilder 9000
+    1.3.6.1.4.1.43.1.9.13.1.1.5:
+      category: Switch
+      model: cb9000-cards-36-telco-10T-100T
+    1.3.6.1.4.1.43.1.9.13.1.1.6:
+      category: Layer 3 Switch
+      model: Corebuilder 9000
+    1.3.6.1.4.1.43.1.9.13.1.1.7:
+      category: Layer 3 Switch
+      model: Corebuilder 9000
+    1.3.6.1.4.1.43.1.9.13.1.1.8:
+      category: Switch
+      model: cb9000-cards-tb-36-rj45-10T-100T
+    1.3.6.1.4.1.43.1.9.13.1.1.9:
+      category: Switch
+      model: cb9000-cards-tb-36-telco-10T-100T
+    1.3.6.1.4.1.43.1.9.13.1.1.10:
+      category: Switch
+      model: cb9000-cards-20-fiber-1000T
+    1.3.6.1.4.1.43.1.9.13.1.1.11:
+      category: Switch
+      model: cb9000-cards-9-fiber-1000LX
+    1.3.6.1.4.1.43.1.9.13.1.1.12:
+      category: Switch
+      model: cb9000-cards-12BT-1000T
+    1.3.6.1.4.1.43.1.9.13.1.2:
+      category: Switch
+      model: cb9000-layer3-switch-cards
+    1.3.6.1.4.1.43.1.9.13.1.2.1:
+      category: Layer 3 Switch
+      model: Corebuilder 9000
+    1.3.6.1.4.1.43.1.9.13.1.2.2:
+      category: Switch
+      model: cb9000-cards-6-fddi
+    1.3.6.1.4.1.43.1.9.13.1.2.3:
+      category: Switch
+      model: cb9000-cards-router
+    1.3.6.1.4.1.43.1.9.13.1.2.4:
+      category: Router
+      model: Corebuilder 9000
+    1.3.6.1.4.1.43.1.9.13.1.2.5:
+      category: Router
+      model: Corebuilder 9000-4
+    1.3.6.1.4.1.43.1.9.13.1.2.6:
+      category: Switch
+      model: cb9000-cards-carrier
+    1.3.6.1.4.1.43.1.9.13.1.2.7:
+      category: Switch
+      model: cb9000-cards-18tx
+    1.3.6.1.4.1.43.1.9.13.1.2.8:
+      category: Switch
+      model: cb9000-cards-18fx
+    1.3.6.1.4.1.43.1.9.13.1.3:
+      category: Switch
+      model: cb9000-layer2-fabric-cards
+    1.3.6.1.4.1.43.1.9.13.1.3.1:
+      category: Switch
+      model: cb9000-cards-fabric-24
+    1.3.6.1.4.1.43.1.9.13.1.3.2:
+      category: Switch
+      model: CoreBuilder
+    1.3.6.1.4.1.43.1.9.13.1.3.3:
+      category: Switch
+      model: cb9000-cards-fabric-6-3
+    1.3.6.1.4.1.43.1.9.13.1.3.4:
+      category: Switch
+      model: cb9000-cards-fabric-36
+    1.3.6.1.4.1.43.1.9.13.1.4:
+      category: Switch
+      model: cb9000-layer1-cards
+    1.3.6.1.4.1.43.1.9.13.1.4.1:
+      category: Switch
+      model: cb9000-cards-2-fiber-1000T
+    1.3.6.1.4.1.43.1.9.13.1.4.2:
+      category: Switch
+      model: cb9000-cards-4-fiber-1000T
+    1.3.6.1.4.1.43.1.9.13.1.4.3:
+      category: Switch
+      model: cb9000-cards-2-fiber-lx-1000T
+    1.3.6.1.4.1.43.1.9.13.1.5:
+      category: Switch
+      model: cb9000-layer2-tb-cards
+    1.3.6.1.4.1.43.1.9.13.1.6:
+      category: Switch
+      model: cb9000-layer3-fabric-cards
+    1.3.6.1.4.1.43.1.9.13.1.6.1:
+      category: Switch
+      model: cb9000-cards-fabric-fba8
+    1.3.6.1.4.1.43.1.9.13.1.6.2:
+      category: Switch
+      model: cb9000-cards-fabric-16
+    1.3.6.1.4.1.43.1.9.13.2:
+      category: Switch
+      model: coreBuilder9000-cell-cards
+    1.3.6.1.4.1.43.1.9.13.2.1:
+      category: Switch
+      model: cb9000-cell-switch-cards
+    1.3.6.1.4.1.43.1.9.13.2.1.1:
+      category: Switch
+      model: cb9000-cell-carrier-cards
+    1.3.6.1.4.1.43.1.9.13.2.1.1.1:
+      category: Switch
+      model: cb9000-cell-modularIfc-2-groups
+    1.3.6.1.4.1.43.1.9.13.2.1.2:
+      category: Switch
+      model: cb9000-cell-daughter-cards
+    1.3.6.1.4.1.43.1.9.13.2.1.2.1:
+      category: Switch
+      model: cb9000-cell-1-OC12-MM
+    1.3.6.1.4.1.43.1.9.13.2.1.2.2:
+      category: Switch
+      model: cb9000-cell-1-OC12-SM
+    1.3.6.1.4.1.43.1.9.13.2.1.2.3:
+      category: Switch
+      model: cb9000-cell-4-OC3-MM
+    1.3.6.1.4.1.43.1.9.13.2.1.2.4:
+      category: Switch
+      model: cb9000-cell-4-OC3-SM
+    1.3.6.1.4.1.43.1.9.13.2.1.2.5:
+      category: Switch
+      model: cb9000-cell-1-OC3-SM-3-OC3-MM
+    1.3.6.1.4.1.43.1.9.13.2.1.2.6:
+      category: Switch
+      model: cb9000-cell-4-OC3-rj45
+    1.3.6.1.4.1.43.1.9.13.2.1.2.7:
+      category: Switch
+      model: cb9000-cell-2-T3-BNC
+    1.3.6.1.4.1.43.1.9.13.2.1.2.8:
+      category: Switch
+      model: cb9000-cell-2-E3-BNC
+    1.3.6.1.4.1.43.1.9.13.2.1.2.9:
+      category: Switch
+      model: cb9000-cell-4-OC3-SM-LR
+    1.3.6.1.4.1.43.1.9.13.2.1.2.10:
+      category: Switch
+      model: cb9000-cell-2-OC3-SM-LR
+    1.3.6.1.4.1.43.1.9.13.2.1.3:
+      category: Switch
+      model: cb9000-cell-integrated-cards
+    1.3.6.1.4.1.43.1.9.13.2.1.3.1:
+      category: Switch
+      model: cb9000-cell-8-T1-IMA-rj48c
+    1.3.6.1.4.1.43.1.9.13.2.1.3.2:
+      category: Switch
+      model: cb9000-cell-8-E1-IMA-rj48c
+    1.3.6.1.4.1.43.1.9.13.2.1.3.3:
+      category: Switch
+      model: cb9000-cell-8-T1-CES-rj48c
+    1.3.6.1.4.1.43.1.9.13.2.1.3.4:
+      category: Switch
+      model: cb9000-cell-8-E1-CES-rj48c
+    1.3.6.1.4.1.43.1.9.13.2.1.4:
+      category: Switch
+      model: cb9000-cell-combined-cards
+    1.3.6.1.4.1.43.1.9.13.2.1.4.1:
+      category: Switch
+      model: cb9000-cellsw-4-fiber-1000T
+    1.3.6.1.4.1.43.1.9.13.2.1.4.2:
+      category: Switch
+      model: cb9000-cellsw-20-rj45-10T-100T
+    1.3.6.1.4.1.43.1.9.13.2.1.4.3:
+      category: Switch
+      model: cb9000-cellsw-36-rj45-10T-100T
+    1.3.6.1.4.1.43.1.9.13.2.1.4.4:
+      category: Switch
+      model: cb9000-cellsw-36-telco-10T-100T
+    1.3.6.1.4.1.43.1.9.13.2.1.4.5:
+      category: Switch
+      model: cb9000-cellsw-40-telco-10T-100T
+    1.3.6.1.4.1.43.1.9.13.2.2:
+      category: Switch
+      model: cb9000-cell-fabric-cards
+    1.3.6.1.4.1.43.1.9.13.2.2.1:
+      category: Switch
+      model: CoreBuilder
+    1.3.6.1.4.1.43.1.9.13.2.2.2:
+      category: Switch
+      model: cb9000-cards-cell-fabric-1-7slot
+    1.3.6.1.4.1.43.1.9.13.3:
+      category: Switch
+      model: coreBuilder9000-mgmt-cards
+    1.3.6.1.4.1.43.1.9.13.3.1:
+      category: Layer 3 Switch
+      model: Corebuilder 9000
+    1.3.6.1.4.1.43.1.9.13.3.1.1:
+      model: S4007
+    1.3.6.1.4.1.43.1.9.13.3.1.2:
+      model: S4007R
+    1.3.6.1.4.1.43.1.9.13.3.2:
+      category: Switch
+      model: cb9000-cards-emec
+    1.3.6.1.4.1.43.1.9.13.3.3:
+      category: Switch
+      model: cb9000-cards-emel
+    1.3.6.1.4.1.43.1.9.13.4:
+      category: Switch
+      model: coreBuilder9000-app-cards
+    1.3.6.1.4.1.43.1.9.13.4.1:
+      category: Switch
+      model: cb9000-app-BIG-ip
+    1.3.6.1.4.1.43.1.9.13.4.2:
+      category: Switch
+      model: cb9000-app-3DNS
+    1.3.6.1.4.1.43.1.9.13.4.3:
+      category: Switch
+      model: cb9000-app-global-site
+    1.3.6.1.4.1.43.1.9.14:
+      category: Switch
+      model: cb5000TRFastModule-cards
+    1.3.6.1.4.1.43.1.9.14.1:
+      category: Switch
+      model: cb5000TRFastModule-card-6508M
+    1.3.6.1.4.1.43.1.9.14.2:
+      category: Switch
+      model: cb5000TRFastModule-card-6508M2
+    1.3.6.1.4.1.43.1.9.14.3:
+      category: Switch
+      model: cb5000TRFastModule-card-atm
+    1.3.6.1.4.1.43.1.9.14.4:
+      category: Switch
+      model: cb5000TRFastModule-card-fddi
+    1.3.6.1.4.1.43.1.9.14.5:
+      category: Switch
+      model: cb5000TRFastModule-card-tif-sc
+    1.3.6.1.4.1.43.1.9.14.6:
+      category: Switch
+      model: cb5000TRFastModule-card-tif-rj45
+    1.3.6.1.4.1.43.1.9.15:
+      category: Switch
+      model: superStack3300-cards
+    1.3.6.1.4.1.43.1.9.15.1:
+      category: Switch
+      model: stanley
+    1.3.6.1.4.1.43.1.9.15.2:
+      category: Switch
+      model: ATM Expansion Module
+    1.3.6.1.4.1.43.1.10:
+      category: Switch
+      model: chipSets
+    1.3.6.1.4.1.43.1.10.1:
+      category: Switch
+      model: valcan
+    1.3.6.1.4.1.43.1.11:
+      category: Switch
+      model: oem
+    1.3.6.1.4.1.43.1.11.1:
+      category: Switch
+      model: linkConv250
+    1.3.6.1.4.1.43.1.11.2:
+      category: Switch
+      model: linkConv251
+    1.3.6.1.4.1.43.1.11.3:
+      category: Switch
+      model: linkConv350
+    1.3.6.1.4.1.43.1.11.4:
+      category: Switch
+      model: linkConv351
+    1.3.6.1.4.1.43.1.12:
+      category: Switch
+      model: atm
+    1.3.6.1.4.1.43.1.12.1:
+      category: Switch
+      model: CoreBuilder
+    1.3.6.1.4.1.43.1.12.2:
+      category: Switch
+      model: cELLplex7000-cards
+    1.3.6.1.4.1.43.1.12.2.1:
+      category: Switch
+      model: cELLplex-7x00cardBridge
+    1.3.6.1.4.1.43.1.12.2.2:
+      category: Switch
+      model: cELLplex-7200card
+    1.3.6.1.4.1.43.1.12.2.3:
+      category: Switch
+      model: cELLplex-7200Fcard
+    1.3.6.1.4.1.43.1.12.2.4:
+      category: Switch
+      model: cELLplex-7400card
+    1.3.6.1.4.1.43.1.12.2.5:
+      category: Switch
+      model: cELLplex-7600card
+    1.3.6.1.4.1.43.1.12.2.6:
+      category: Switch
+      model: cELLplex-7800card
+    1.3.6.1.4.1.43.1.12.2.7:
+      category: Switch
+      model: cELLplex-7900card
+    1.3.6.1.4.1.43.1.12.3:
+      category: Switch
+      model: pathBuilder
+    1.3.6.1.4.1.43.1.12.3.2:
+      model: PathBuilderS600
+    1.3.6.1.4.1.43.1.12.4:
+      category: Switch
+      model: CoreBuilder
+    1.3.6.1.4.1.43.1.12.5:
+      category: Switch
+      model: cb7000Family
+    1.3.6.1.4.1.43.1.12.5.1:
+      category: Switch
+      model: cb7000-fabric-cards
+    1.3.6.1.4.1.43.1.12.5.1.1:
+      category: Switch
+      model: cb7000-fabric-switch
+    1.3.6.1.4.1.43.1.12.5.1.2:
+      category: Switch
+      model: cb7000-fabric-switch-hd
+    1.3.6.1.4.1.43.1.12.5.2:
+      category: Switch
+      model: cb7000-accelerator-cards
+    1.3.6.1.4.1.43.1.12.5.2.1:
+      category: Switch
+      model: cb7000-FastBUS
+    1.3.6.1.4.1.43.1.12.5.2.2:
+      category: Switch
+      model: cb7000-FastBUS-Java
+    1.3.6.1.4.1.43.1.12.5.2.3:
+      category: Switch
+      model: cb7000-FastBUS-7600
+    1.3.6.1.4.1.43.1.12.5.2.4:
+      category: Switch
+      model: cb7000-FastBUS-7600-Java
+    1.3.6.1.4.1.43.1.12.5.3:
+      category: Switch
+      model: cb7000-carrier-cards
+    1.3.6.1.4.1.43.1.12.5.3.1:
+      category: Switch
+      model: cb7000-4-ports-ifc
+    1.3.6.1.4.1.43.1.12.5.3.2:
+      category: Switch
+      model: cb7000-8-ports-ifc
+    1.3.6.1.4.1.43.1.12.5.3.3:
+      category: Switch
+      model: cb7000-OC12-carrier-ifc
+    1.3.6.1.4.1.43.1.12.5.3.4:
+      category: Switch
+      model: cb7000-7200-ifc
+    1.3.6.1.4.1.43.1.12.5.3.5:
+      category: Switch
+      model: cb7000-7200F-ifc
+    1.3.6.1.4.1.43.1.12.5.3.6:
+      category: Switch
+      model: cb7000-7400-ifc
+    1.3.6.1.4.1.43.1.12.5.3.7:
+      category: Switch
+      model: cb7000-7600-ifc
+    1.3.6.1.4.1.43.1.12.5.3.8:
+      category: Switch
+      model: cb7000-7800-ifc
+    1.3.6.1.4.1.43.1.12.5.3.9:
+      category: Switch
+      model: cb7000-7900-ifc
+    1.3.6.1.4.1.43.1.12.5.4:
+      category: Switch
+      model: cb7000-daughter-cards
+    1.3.6.1.4.1.43.1.12.5.4.1:
+      category: Switch
+      model: cb7000-1-OC3-SM
+    1.3.6.1.4.1.43.1.12.5.4.2:
+      category: Switch
+      model: cb7000-1-OC3-MM
+    1.3.6.1.4.1.43.1.12.5.4.3:
+      category: Switch
+      model: cb7000-1-DS3-BNC
+    1.3.6.1.4.1.43.1.12.5.4.4:
+      category: Switch
+      model: cb7000-1-OC3-rj45
+    1.3.6.1.4.1.43.1.12.5.4.5:
+      category: Switch
+      model: cb7000-1-OC12-SM
+    1.3.6.1.4.1.43.1.12.5.4.6:
+      category: Switch
+      model: cb7000-1-OC12-MM
+    1.3.6.1.4.1.43.1.12.5.4.7:
+      category: Switch
+      model: cb7000-12-10T-rj45-in-7200
+    1.3.6.1.4.1.43.1.12.5.4.8:
+      category: Switch
+      model: cb7000-12-fiber-10T-FL-in-7200
+    1.3.6.1.4.1.43.1.12.5.4.9:
+      category: Switch
+      model: cb7000-12-10T-rj21
+    1.3.6.1.4.1.43.1.12.5.4.10:
+      category: Switch
+      model: cb7000-2-fiber-100T
+    1.3.6.1.4.1.43.1.12.5.4.11:
+      category: Switch
+      model: cb7000-2-10T-100T-rj45
+    1.3.6.1.4.1.43.1.12.5.4.12:
+      category: Switch
+      model: cb7000-4-fiber-1000T-in-7800
+    1.3.6.1.4.1.43.1.12.5.4.13:
+      category: Switch
+      model: cb7000-36-10T-100T-rj45-in-7900
+    1.3.6.1.4.1.43.1.12.5.4.14:
+      category: Switch
+      model: cb7000-1-E3-BNC
+    1.3.6.1.4.1.43.1.13:
+      category: Switch
+      model: powerSupplies
+    1.3.6.1.4.1.43.1.13.1:
+      category: Switch
+      model: SuperStack II Advanced RPS
+    1.3.6.1.4.1.43.1.14:
+      category: Switch
+      model: tdm
+    1.3.6.1.4.1.43.1.14.1:
+      category: Switch
+      model: broadbandAccess
+    1.3.6.1.4.1.43.1.15:
+      category: Switch
+      model: cableModems
+    1.3.6.1.4.1.43.1.15.1:
+      category: Switch
+      model: mcnsCmHeadend
+    1.3.6.1.4.1.43.1.15.2:
+      category: Switch
+      model: mcnsExt2WayCm
+    1.3.6.1.4.1.43.1.15.3:
+      category: Switch
+      model: mcnsExtTelcoCm
+    1.3.6.1.4.1.43.1.16:
+      category: Switch
+      model: switches
+    1.3.6.1.4.1.43.1.16.1:
+      category: Switch
+      model: corebuilderProductsIII
+    1.3.6.1.4.1.43.1.16.1.1:
+      category: Switch
+      model: corebuilderModularProducts
+    1.3.6.1.4.1.43.1.16.1.1.1:
+      category: Switch
+      model: cbModular3500Family
+    1.3.6.1.4.1.43.1.16.1.1.1.1:
+      category: Layer 3 Switch
+      model: Corebuilder 3500
+    1.3.6.1.4.1.43.1.16.1.2:
+      category: Switch
+      model: corebuilderSystemProducts
+    1.3.6.1.4.1.43.1.16.1.2.1:
+      category: Switch
+      model: cbSystem9400Family
+    1.3.6.1.4.1.43.1.16.1.2.1.1:
+      category: Layer 3 Switch
+      model: Corebuilder 9400
+    1.3.6.1.4.1.43.1.16.1.3:
+      category: Switch
+      model: corebuilderChassisProducts
+    1.3.6.1.4.1.43.1.16.2:
+      category: Switch
+      model: superstackProducts
+    1.3.6.1.4.1.43.1.16.2.1:
+      category: Switch
+      model: superstackModularProducts
+    1.3.6.1.4.1.43.1.16.2.2:
+      category: Switch
+      model: superstackSystemProducts
+    1.3.6.1.4.1.43.1.16.2.2.1:
+      category: Layer 3 Switch
+      model: Superstack 3900
+    1.3.6.1.4.1.43.1.16.2.2.1.1:
+      category: Layer 3 Switch
+      model: SuperStack II Switch 3900-24
+    1.3.6.1.4.1.43.1.16.2.2.1.2:
+      category: Layer 3 Switch
+      model: SuperStack II Switch 3900-36
+    1.3.6.1.4.1.43.1.16.2.2.2:
+      category: Layer 3 Switch
+      model: Superstack 9300
+    1.3.6.1.4.1.43.1.16.2.2.2.1:
+      category: Switch
+      model: SuperStack II Switch 9300
+    1.3.6.1.4.1.43.1.16.2.2.3:
+      category: Switch
+      model: ssServerLoad Balancers
+    1.3.6.1.4.1.43.1.16.2.2.3.1:
+      category: Switch
+      model: baseLoad Balancer
+    1.3.6.1.4.1.43.1.16.2.2.3.2:
+      category: Switch
+      model: plusLoad Balancer
+    1.3.6.1.4.1.43.1.16.2.3:
+      category: Switch
+      model: superstackChassisProducts
+    1.3.6.1.4.1.43.1.16.3:
+      category: Switch
+      model: minicoreProducts
+    1.3.6.1.4.1.43.1.16.3.1:
+      category: Switch
+      model: miniChassisSwitch4005
+    1.3.6.1.4.1.43.1.16.4:
+      category: Switch
+      model: jvProducts
+    1.3.6.1.4.1.43.1.16.4.1:
+      category: Switch
+      model: coreChassisSwitch7700
+    1.3.6.1.4.1.43.1.16.4.2:
+      category: Switch
+      model: jvRouters
+    1.3.6.1.4.1.43.1.16.4.2.1:
+      category: Switch
+      model: jvWanRouter5009
+    1.3.6.1.4.1.43.1.16.4.2.2:
+      category: Switch
+      model: jvWanRouter5231
+    1.3.6.1.4.1.43.1.16.4.2.3:
+      category: Switch
+      model: jvWanRouter5640
+    1.3.6.1.4.1.43.1.16.4.2.4:
+      category: Switch
+      model: jvWanRouter5680
+    1.3.6.1.4.1.43.1.16.4.2.5:
+      category: Switch
+      model: jvWanRouter3012
+    1.3.6.1.4.1.43.1.16.4.2.6:
+      category: Switch
+      model: jvWanRouter3013
+    1.3.6.1.4.1.43.1.16.4.2.7:
+      category: Switch
+      model: jvWanRouter3014
+    1.3.6.1.4.1.43.1.16.4.2.8:
+      category: Switch
+      model: jvWanRouter3015
+    1.3.6.1.4.1.43.1.16.4.2.9:
+      category: Switch
+      model: jvWanRouter3016
+    1.3.6.1.4.1.43.1.16.4.2.10:
+      category: Switch
+      model: jvWanRouter3018
+    1.3.6.1.4.1.43.1.16.4.2.11:
+      category: Router
+      model: R6040
+    1.3.6.1.4.1.43.1.16.4.2.12:
+      category: Router
+      model: R6080
+    1.3.6.1.4.1.43.1.16.4.2.13:
+      category: Switch
+      model: jvWanRouter3030
+    1.3.6.1.4.1.43.1.16.4.2.14:
+      category: Switch
+      model: jvWanRouter3031
+    1.3.6.1.4.1.43.1.16.4.2.15:
+      category: Switch
+      model: jvWanRouter3032
+    1.3.6.1.4.1.43.1.16.4.2.16:
+      category: Switch
+      model: jvWanRouter3033
+    1.3.6.1.4.1.43.1.16.4.2.17:
+      category: Switch
+      model: jvWanRouter3034
+    1.3.6.1.4.1.43.1.16.4.2.18:
+      category: Switch
+      model: jvRouter3035
+    1.3.6.1.4.1.43.1.16.4.2.19:
+      category: Switch
+      model: jvRouterxxxx
+    1.3.6.1.4.1.43.1.16.4.2.20:
+      category: Switch
+      model: jvRouteryyyy
+    1.3.6.1.4.1.43.1.16.4.2.21:
+      category: Switch
+      model: jvRouter5012
+    1.3.6.1.4.1.43.1.16.4.2.22:
+      category: Switch
+      model: jvRouter5232
+    1.3.6.1.4.1.43.1.16.4.2.23:
+      category: Switch
+      model: jvRouter5642
+    1.3.6.1.4.1.43.1.16.4.2.24:
+      category: Switch
+      model: jvRouter5682
+    1.3.6.1.4.1.43.1.16.4.2.25:
+      category: Router
+      model: R6040-ERPU
+    1.3.6.1.4.1.43.1.16.4.2.26:
+      category: Router
+      model: "6080"
+    1.3.6.1.4.1.43.1.16.4.2.27:
+      category: Switch
+      model: jvRouter3040
+    1.3.6.1.4.1.43.1.16.4.2.28:
+      category: Switch
+      model: jvRouter3041
+    1.3.6.1.4.1.43.1.16.4.2.29:
+      category: Switch
+      model: jvRouter3042
+    1.3.6.1.4.1.43.1.16.4.2.30:
+      category: Switch
+      model: jvRouter3043
+    1.3.6.1.4.1.43.1.16.4.2.31:
+      category: Switch
+      model: jvRouter3040e
+    1.3.6.1.4.1.43.1.16.4.2.32:
+      category: Switch
+      model: jvRouter3041e
+    1.3.6.1.4.1.43.1.16.4.2.33:
+      category: Switch
+      model: jvRouter3036
+    1.3.6.1.4.1.43.1.16.4.2.34:
+      category: Switch
+      model: jvRouter3720
+    1.3.6.1.4.1.43.1.16.4.2.35:
+      category: Switch
+      model: jvRouter3740
+    1.3.6.1.4.1.43.1.16.4.2.36:
+      category: Switch
+      model: jvRouter5701
+    1.3.6.1.4.1.43.1.16.4.2.37:
+      category: Switch
+      model: jvRouter5720
+    1.3.6.1.4.1.43.1.16.4.2.38:
+      category: Switch
+      model: jvRouter5740
+    1.3.6.1.4.1.43.1.16.4.2.39:
+      category: Switch
+      model: jvRouter5760
+    1.3.6.1.4.1.43.1.16.4.2.40:
+      category: Switch
+      model: jvRouter6740
+    1.3.6.1.4.1.43.1.16.4.2.41:
+      category: Switch
+      model: jvRouter6760
+    1.3.6.1.4.1.43.1.16.4.2.42:
+      category: Switch
+      model: jvRouter5720pwr
+    1.3.6.1.4.1.43.1.16.4.2.43:
+      category: Switch
+      model: jvRouter5740pwr
+    1.3.6.1.4.1.43.1.16.4.2.44:
+      category: Switch
+      model: jvRouter5760pwr
+    1.3.6.1.4.1.43.1.16.4.3:
+      category: Switch
+      model: jvSwitches
+    1.3.6.1.4.1.43.1.16.4.3.1:
+      category: Layer 3 Switch
+      model: S7708
+    1.3.6.1.4.1.43.1.16.4.3.2:
+      category: Layer 3 Switch
+      model: S7704
+    1.3.6.1.4.1.43.1.16.4.3.3:
+      category: Switch
+      model: jvSwitch5500-MC6-EI
+    1.3.6.1.4.1.43.1.16.4.3.4:
+      category: Layer 3 Switch
+      model: Switch 8807
+    1.3.6.1.4.1.43.1.16.4.3.5:
+      category: Layer 3 Switch
+      model: Switch 8810
+    1.3.6.1.4.1.43.1.16.4.3.6:
+      category: Layer 3 Switch
+      model: Switch 8814
+    1.3.6.1.4.1.43.1.16.4.3.7:
+      category: Layer 3 Switch
+      model: Switch 5500G-EI
+    1.3.6.1.4.1.43.1.16.4.3.8:
+      category: Layer 3 Switch
+      model: Switch 5500G 48-Port
+    1.3.6.1.4.1.43.1.16.4.3.9:
+      category: Switch
+      model: jvSwitch5500-si-24
+    1.3.6.1.4.1.43.1.16.4.3.10:
+      category: Switch
+      model: jvSwitch5500-si-28t
+    1.3.6.1.4.1.43.1.16.4.3.11:
+      category: Layer 3 Switch
+      model: Switch 5500-SI 28-Port
+    1.3.6.1.4.1.43.1.16.4.3.12:
+      category: Layer 3 Switch
+      model: Switch 5500-52-SI
+    1.3.6.1.4.1.43.1.16.4.3.13:
+      category: Layer 3 Switch
+      model: Switch 5500-28-EI
+    1.3.6.1.4.1.43.1.16.4.3.14:
+      category: Layer 3 Switch
+      model: Switch 5500-EI 52-Port
+    1.3.6.1.4.1.43.1.16.4.3.15:
+      category: Layer 3 Switch
+      model: Switch 5500-EI PWR 28-Port
+    1.3.6.1.4.1.43.1.16.4.3.16:
+      category: Layer 3 Switch
+      model: Switch 5500-52-PWR-EI
+    1.3.6.1.4.1.43.1.16.4.3.17:
+      category: Layer 3 Switch
+      model: Switch 5500-28-FX-EI
+    1.3.6.1.4.1.43.1.16.4.3.18:
+      category: Switch
+      model: 3500G-EI
+    1.3.6.1.4.1.43.1.16.4.3.19:
+      category: Layer 3 Switch
+      model: Switch 7754
+    1.3.6.1.4.1.43.1.16.4.3.20:
+      category: Layer 3 Switch
+      model: Switch 7757
+    1.3.6.1.4.1.43.1.16.4.3.21:
+      category: Layer 3 Switch
+      model: 4500 26-Port
+    1.3.6.1.4.1.43.1.16.4.3.22:
+      category: Switch
+      model: jvSwitch4500-50
+    1.3.6.1.4.1.43.1.16.4.3.23:
+      category: Layer 3 Switch
+      model: Switch 4500-26-PWR
+    1.3.6.1.4.1.43.1.16.4.3.24:
+      category: Layer 3 Switch
+      model: Switch 4500-50-PWR
+    1.3.6.1.4.1.43.1.16.4.3.25:
+      category: Layer 3 Switch
+      model: Switch 7758
+    1.3.6.1.4.1.43.1.16.4.3.26:
+      category: Switch
+      model: jvSwitch8800-poe
+    1.3.6.1.4.1.43.1.16.4.3.27:
+      category: Layer 3 Switch
+      model: 4200G 12-Port
+    1.3.6.1.4.1.43.1.16.4.3.28:
+      category: Layer 3 Switch
+      model: 4200G 24-Port
+    1.3.6.1.4.1.43.1.16.4.3.29:
+      category: Layer 3 Switch
+      model: Switch 4200G-48
+    1.3.6.1.4.1.43.1.16.4.3.30:
+      category: Layer 3 Switch
+      model: Switch 4500G 24-Port
+    1.3.6.1.4.1.43.1.16.4.3.31:
+      category: Layer 3 Switch
+      model: Switch 4500G-48
+    1.3.6.1.4.1.43.1.16.4.3.32:
+      category: Layer 3 Switch
+      model: Switch 4500G-24-PWR
+    1.3.6.1.4.1.43.1.16.4.3.33:
+      category: Layer 3 Switch
+      model: Switch 4500G-48-PWR
+    1.3.6.1.4.1.43.1.16.4.3.34:
+      category: Layer 3 Switch
+      model: Switch 4800G 24-Port
+    1.3.6.1.4.1.43.1.16.4.3.35:
+      category: Layer 3 Switch
+      model: Switch 4800G 48-Port
+    1.3.6.1.4.1.43.1.16.4.3.36:
+      category: Layer 3 Switch
+      model: Switch 4800G PWR 24-Port
+    1.3.6.1.4.1.43.1.16.4.3.37:
+      category: Layer 3 Switch
+      model: Switch 4800G PWR 48-Port
+    1.3.6.1.4.1.43.1.16.4.3.38:
+      category: Layer 3 Switch
+      model: Switch 4800G 24-Port-SFP
+    1.3.6.1.4.1.43.1.16.4.3.39:
+      category: Layer 3 Switch
+      model: Switch 8807-V5
+    1.3.6.1.4.1.43.1.16.4.3.40:
+      category: Layer 3 Switch
+      model: Switch 8810-V5
+    1.3.6.1.4.1.43.1.16.4.3.41:
+      category: Layer 3 Switch
+      model: Switch 8814-V5
+    1.3.6.1.4.1.43.1.16.4.3.42:
+      category: Layer 3 Switch
+      model: Switch 4210 9-Port
+    1.3.6.1.4.1.43.1.16.4.3.43:
+      category: Switch
+      model: jvSwitch4210-18
+    1.3.6.1.4.1.43.1.16.4.3.44:
+      category: Switch
+      model: jvSwitch4210-26
+    1.3.6.1.4.1.43.1.16.4.3.45:
+      category: Layer 3 Switch
+      model: Switch 4210 52-Port
+    1.3.6.1.4.1.43.1.16.4.3.46:
+      category: Switch
+      model: jvSwitch4210-9-pwr
+    1.3.6.1.4.1.43.1.16.4.3.47:
+      category: Switch
+      model: jvSwitch4210-18-pwr
+    1.3.6.1.4.1.43.1.16.4.3.48:
+      category: Switch
+      model: jvSwitch4210-26-pwr
+    1.3.6.1.4.1.43.1.16.4.3.49:
+      category: Layer 3 Switch
+      model: Switch 4200G-24-PWR
+    1.3.6.1.4.1.43.1.16.4.3.50:
+      category: Layer 3 Switch
+      model: Switch 7902E
+    1.3.6.1.4.1.43.1.16.4.3.51:
+      category: Layer 3 Switch
+      model: Switch 7903E
+    1.3.6.1.4.1.43.1.16.4.3.52:
+      category: Layer 3 Switch
+      model: Switch 7906E
+    1.3.6.1.4.1.43.1.16.4.3.53:
+      category: Layer 3 Switch
+      model: Switch 7906EV
+    1.3.6.1.4.1.43.1.16.4.3.54:
+      category: Layer 3 Switch
+      model: Switch 7910E
+    1.3.6.1.4.1.43.1.16.4.3.55:
+      category: Switch
+      model: jvSwitch5800GT48PortFlex
+    1.3.6.1.4.1.43.1.16.4.3.56:
+      category: Switch
+      model: jvSwitch5800XG14PortFlex
+    1.3.6.1.4.1.43.1.16.4.3.57:
+      category: Switch
+      model: jvSwitch5800GTPWR24Port
+    1.3.6.1.4.1.43.1.16.4.3.58:
+      category: Switch
+      model: jvSwitch5800GTPWR48Port
+    1.3.6.1.4.1.43.1.16.4.3.59:
+      category: Switch
+      model: jvSwitch5800GT24PortSFP
+    1.3.6.1.4.1.43.1.16.4.3.60:
+      category: Switch
+      model: jvbaseline2226SFPPlus
+    1.3.6.1.4.1.43.1.16.4.3.61:
+      category: Switch
+      model: jvbaseline2426PWRPlus
+    1.3.6.1.4.1.43.1.16.4.3.62:
+      category: Switch
+      model: jvbaseline2250SFPPlus
+    1.3.6.1.4.1.43.1.16.4.3.63:
+      category: Switch
+      model: jvSwitch9505E
+    1.3.6.1.4.1.43.1.16.4.3.64:
+      category: Switch
+      model: jvSwitch9508E-V
+    1.3.6.1.4.1.43.1.16.4.3.65:
+      category: Switch
+      model: jvSwitch9512E
+    1.3.6.1.4.1.43.1.16.4.3.66:
+      category: Switch
+      model: jvSwitch5800G24Port
+    1.3.6.1.4.1.43.1.16.4.3.67:
+      category: Switch
+      model: jvSwitch5800G48Port
+    1.3.6.1.4.1.43.1.16.4.3.68:
+      category: Switch
+      model: jvSwitch5800GPWR24Port
+    1.3.6.1.4.1.43.1.16.4.3.69:
+      category: Switch
+      model: jvSwitch5800GPWR48Port
+    1.3.6.1.4.1.43.1.16.4.3.70:
+      category: Switch
+      model: jvSwitch5800GT48Flex
+    1.3.6.1.4.1.43.1.16.4.3.71:
+      category: Switch
+      model: jvSwitch5800G24PortSFP
+    1.3.6.1.4.1.43.1.16.4.3.72:
+      category: Switch
+      model: jvSwitch5800XG14PortSFPPlusFlex
+    1.3.6.1.4.1.43.1.16.4.3.73:
+      category: Switch
+      model: jvSwitch5800XG24PortSFPPlusFlex
+    1.3.6.1.4.1.43.1.16.4.3.74:
+      category: Layer 3 Switch
+      model: Switch 7903E-S
+    1.3.6.1.4.1.43.1.16.4.3.75:
+      model: S4210 9-Port
+    1.3.6.1.4.1.43.1.16.4.3.76:
+      model: S4210 18-Port
+    1.3.6.1.4.1.43.1.16.4.3.77:
+      category: Switch
+      model: switch 4210 26-Port
+    1.3.6.1.4.1.43.1.16.4.3.78:
+      model: S4210 PWR 9-Port
+    1.3.6.1.4.1.43.1.16.4.3.79:
+      model: S4210 PWR 18-Port
+    1.3.6.1.4.1.43.1.16.4.3.80:
+      category: Switch
+      model: switch 4210 PWR 26-Port
+    1.3.6.1.4.1.43.1.16.4.3.81:
+      category: Switch
+      model: SWITCH 4200G-24-NTG
+    1.3.6.1.4.1.43.1.16.4.3.82:
+      category: Switch
+      model: SWITCH 4200G-48-NTG
+    1.3.6.1.4.1.43.1.16.4.3.83:
+      category: Layer 3 Switch
+      model: Switch 4510G-24
+    1.3.6.1.4.1.43.1.16.4.3.84:
+      category: Layer 3 Switch
+      model: Switch 4510G-48
+    1.3.6.1.4.1.43.1.16.4.3.85:
+      model: S4210G-24
+    1.3.6.1.4.1.43.1.16.4.3.86:
+      category: Layer 3 Switch
+      model: Switch 4210G 48-Port
+    1.3.6.1.4.1.43.1.16.4.3.87:
+      model: S4210G-24-PWR
+    1.3.6.1.4.1.43.1.16.4.3.88:
+      model: S4210G-48-PWR
+    1.3.6.1.4.1.43.1.16.4.3.89:
+      model: S4210G-24-NT
+    1.3.6.1.4.1.43.1.16.4.3.90:
+      model: S4210G-48-NT
+    1.3.6.1.4.1.43.1.16.4.4:
+      category: Switch
+      model: jvSwitchapplicationmodules
+    1.3.6.1.4.1.43.1.16.4.4.1:
+      category: Switch
+      model: ipsec8800
+    1.3.6.1.4.1.43.1.16.4.4.2:
+      category: Switch
+      model: nam8800
+    1.3.6.1.4.1.43.1.16.4.4.3:
+      category: Switch
+      model: firewall8800
+    1.3.6.1.4.1.43.1.16.4.4.4:
+      category: Switch
+      model: vpls8800
+    1.3.6.1.4.1.43.1.16.4.5:
+      category: Switch
+      model: jvOsns
+    1.3.6.1.4.1.43.1.16.4.5.1:
+      category: Switch
+      model: jvOsn64-5800
+    1.3.6.1.4.1.43.1.16.4.5.2:
+      category: Switch
+      model: jvOsn128-5800
+    1.3.6.1.4.1.43.1.16.4.5.3:
+      category: Switch
+      model: jvOsn64M-5800
+    1.3.6.1.4.1.43.1.16.4.5.4:
+      category: Switch
+      model: jvOsnRouterOsnMIM
+    1.3.6.1.4.1.43.1.16.4.5.5:
+      category: Switch
+      model: jvOsnRouterOsnFIC
+    1.3.6.1.4.1.43.1.16.4.5.6:
+      category: Switch
+      model: jvOsn5500G
+    1.3.6.1.4.1.43.1.17:
+      category: Switch
+      model: voice
+    1.3.6.1.4.1.43.1.17.1:
+      category: Switch
+      model: phones
+    1.3.6.1.4.1.43.1.17.1.1:
+      category: Switch
+      model: basicPhone
+    1.3.6.1.4.1.43.1.17.1.2:
+      category: Switch
+      model: businessPhone
+    1.3.6.1.4.1.43.1.17.1.2.1:
+      category: Switch
+      model: bp3104ProfessionalPhone
+    1.3.6.1.4.1.43.1.17.1.3:
+      category: Switch
+      model: executivePhone
+    1.3.6.1.4.1.43.1.17.1.4:
+      category: Switch
+      model: wirelessPhone
+    1.3.6.1.4.1.43.1.17.2:
+      category: Switch
+      model: gateways
+    1.3.6.1.4.1.43.1.17.3:
+      category: Switch
+      model: callProcessors
+    1.3.6.1.4.1.43.1.17.3.1:
+      category: Switch
+      model: nbx100
+    1.3.6.1.4.1.43.1.17.3.2:
+      category: Switch
+      model: nbx25
+    1.3.6.1.4.1.43.1.17.3.3:
+      category: Switch
+      model: superStackNbxCallProcessor
+    1.3.6.1.4.1.43.1.17.3.3.1:
+      category: Switch
+      model: nbx250
+    1.3.6.1.4.1.43.1.17.3.3.2:
+      category: Switch
+      model: nbx500
+    1.3.6.1.4.1.43.1.17.3.3.3:
+      category: Switch
+      model: nbx750
+    1.3.6.1.4.1.43.1.17.3.4:
+      category: Switch
+      model: officeConnectNbxCallProcessor
+    1.3.6.1.4.1.43.1.17.3.5:
+      category: Switch
+      model: nbxv3000
+    1.3.6.1.4.1.43.1.17.3.6:
+      category: Switch
+      model: nbxv3000Bri
+    1.3.6.1.4.1.43.1.17.3.7:
+      category: Switch
+      model: nbxv3001
+    1.3.6.1.4.1.43.1.17.3.7.1:
+      category: Switch
+      model: nbxv3001R
+    1.3.6.1.4.1.43.1.17.3.7.2:
+      category: Switch
+      model: nbxv3001Ana
+    1.3.6.1.4.1.43.1.17.3.7.3:
+      category: Switch
+      model: nbxv3001Bri
+    1.3.6.1.4.1.43.1.17.3.7.4:
+      category: Switch
+      model: nbxv3001FxoFxsT1
+    1.3.6.1.4.1.43.1.17.3.7.5:
+      category: Switch
+      model: nbxv3001FxoFxsE1
+    1.3.6.1.4.1.43.1.17.3.8:
+      category: Switch
+      model: asteriskAppliance
+    1.3.6.1.4.1.43.1.17.4:
+      category: Switch
+      model: applicationModules
+    1.3.6.1.4.1.43.1.17.4.1:
+      category: Switch
+      model: ipTelecommuterModule
+    1.3.6.1.4.1.43.1.18:
+      category: Switch
+      model: intranetAppliances
+    1.3.6.1.4.1.43.1.18.1:
+      category: Switch
+      model: fireWalls
+    1.3.6.1.4.1.43.1.18.1.1:
+      category: Switch
+      model: superStackFireWall
+    1.3.6.1.4.1.43.1.18.1.2:
+      category: Switch
+      model: secureIX3100-10
+    1.3.6.1.4.1.43.1.18.1.3:
+      category: Switch
+      model: secureIX3100-50
+    1.3.6.1.4.1.43.1.18.1.4:
+      category: Switch
+      model: secureIX3100
+    1.3.6.1.4.1.43.1.18.1.5:
+      category: Switch
+      model: secureIX4100
+    1.3.6.1.4.1.43.1.18.1.6:
+      category: Switch
+      model: secureIX5100
+    1.3.6.1.4.1.43.1.18.3:
+      category: Switch
+      model: servers
+    1.3.6.1.4.1.43.1.18.3.1:
+      category: Switch
+      model: officeConnectStorageServer
+    1.3.6.1.4.1.43.1.18.3.2:
+      category: Switch
+      model: officeConnectInternetServer
+    1.3.6.1.4.1.43.1.18.3.3:
+      category: Switch
+      model: officeConnectEmailServer
+    1.3.6.1.4.1.43.1.18.3.4:
+      category: Switch
+      model: storageServer150
+    1.3.6.1.4.1.43.1.18.4:
+      category: Switch
+      model: accelerators
+    1.3.6.1.4.1.43.1.18.4.1:
+      category: Switch
+      model: sslAccelerator
+    1.3.6.1.4.1.43.1.18.5:
+      category: Switch
+      model: xSeries
+    1.3.6.1.4.1.43.1.18.5.1:
+      category: Switch
+      model: x506
+    1.3.6.1.4.1.43.1.18.5.2:
+      category: Switch
+      model: x525User
+    1.3.6.1.4.1.43.1.18.5.3:
+      category: Switch
+      model: x5Unlimited
+    1.3.6.1.4.1.43.1.19:
+      category: Switch
+      model: xDSL
+    1.3.6.1.4.1.43.1.19.1:
+      category: Switch
+      model: sDSLGateway
+    1.3.6.1.4.1.43.1.19.2:
+      category: Switch
+      model: vDSL
+    1.3.6.1.4.1.43.1.19.2.1:
+      category: Switch
+      model: vCNMultiAccessConcentrator
+    1.3.6.1.4.1.43.1.19.3:
+      category: Switch
+      model: aDSLRouterVoDSLPorts
+    1.3.6.1.4.1.43.1.19.4:
+      category: Switch
+      model: aDSLRouterNoVoDSLPorts
+    1.3.6.1.4.1.43.1.19.5:
+      category: Switch
+      model: gSHDSLRouterVoDSLPorts
+    1.3.6.1.4.1.43.1.19.6:
+      category: Switch
+      model: gSHDSLRouterNoVoDSLPorts
+    1.3.6.1.4.1.43.1.19.7:
+      category: Switch
+      model: cableDSLGateway
+    1.3.6.1.4.1.43.1.19.8:
+      category: Switch
+      model: cableDSLSecureGateway
+    1.3.6.1.4.1.43.1.19.9:
+      category: Switch
+      model: cableWirelessDSLGateway
+    1.3.6.1.4.1.43.1.19.10:
+      category: Switch
+      model: cableWireless54Mbps11gDSLGateway
+    1.3.6.1.4.1.43.1.19.11:
+      category: Switch
+      model: xdslvpnFirewall
+    1.3.6.1.4.1.43.1.19.12:
+      category: Switch
+      model: xdslsecureRouter
+    1.3.6.1.4.1.43.1.19.13:
+      category: Switch
+      model: wireless11gAdslRouter
+    1.3.6.1.4.1.43.1.19.14:
+      category: Switch
+      model: wireless11gAdslFirewallRouterA
+    1.3.6.1.4.1.43.1.19.15:
+      category: Switch
+      model: wireless11gAdslFirewallRouterB
+    1.3.6.1.4.1.43.1.19.16:
+      category: Switch
+      model: wireless11gAdslFirewallRouter108A
+    1.3.6.1.4.1.43.1.19.17:
+      category: Switch
+      model: wireless11gAdslFirewallRouter108B
+    1.3.6.1.4.1.43.1.19.18:
+      category: Switch
+      model: wireless11gCableFirewallRouter54
+    1.3.6.1.4.1.43.1.19.19:
+      category: Switch
+      model: wireless11gCableFirewallRouter108
+    1.3.6.1.4.1.43.1.19.20:
+      category: Switch
+      model: officeconnectgigvpnfirewall
+    1.3.6.1.4.1.43.1.20:
+      category: Switch
+      model: wirelessDevices
+    1.3.6.1.4.1.43.1.20.1:
+      category: Wireless
+      model: 8000 Access Point
+    1.3.6.1.4.1.43.1.20.2:
+      category: Wireless
+      model: 6000 Access Point
+    1.3.6.1.4.1.43.1.20.3:
+      category: Wireless
+      model: 2000 Access Point
+    1.3.6.1.4.1.43.1.20.4:
+      category: Switch
+      model: wLanWrkgrpBridge
+    1.3.6.1.4.1.43.1.20.5:
+      category: Switch
+      model: wLantoLanBridge
+    1.3.6.1.4.1.43.1.20.6:
+      category: Switch
+      model: wLanAP8500
+    1.3.6.1.4.1.43.1.20.7:
+      category: Switch
+      model: wLanAPOfficeConnect11Mbps
+    1.3.6.1.4.1.43.1.20.8:
+      category: Switch
+      model: wLanAP8200
+    1.3.6.1.4.1.43.1.20.9:
+      category: Switch
+      model: wLanAPOfficeConnect54Mbps11g
+    1.3.6.1.4.1.43.1.20.10:
+      category: Switch
+      model: wlanAP8700
+    1.3.6.1.4.1.43.1.20.11:
+      category: Switch
+      model: wlanAP8250
+    1.3.6.1.4.1.43.1.20.12:
+      category: Switch
+      model: wlanAP8750
+    1.3.6.1.4.1.43.1.20.13:
+      category: Switch
+      model: wlanAP7250
+    1.3.6.1.4.1.43.1.20.14:
+      category: Switch
+      model: wlanWXR104
+    1.3.6.1.4.1.43.1.20.15:
+      category: Switch
+      model: wlanWX1206
+    1.3.6.1.4.1.43.1.20.16:
+      category: Switch
+      model: wlanWX4400
+    1.3.6.1.4.1.43.1.20.17:
+      category: Switch
+      model: wlan80211agWBridge
+    1.3.6.1.4.1.43.1.20.18:
+      category: Switch
+      model: wlan11gOutdoorBtoBBridge
+    1.3.6.1.4.1.43.1.20.19:
+      category: Switch
+      model: wlan11gIndoorBtoBBridge
+    1.3.6.1.4.1.43.1.20.20:
+      category: Switch
+      model: wlanAP11gPoE
+    1.3.6.1.4.1.43.1.20.21:
+      category: Switch
+      model: wlanAP8850
+    1.3.6.1.4.1.43.1.20.22:
+      category: Switch
+      model: wlanWX2200
+    1.3.6.1.4.1.43.1.20.23:
+      category: Wireless
+      model: Access point 8760
+    1.3.6.1.4.1.43.1.20.24:
+      category: Switch
+      model: wlanUnifiedGigWirelessPoE24
+    1.3.6.1.4.1.43.1.20.25:
+      category: Switch
+      model: wlanAP7760
+    1.3.6.1.4.1.43.1.20.26:
+      category: Switch
+      model: wlan11agOutdoorBtoBBridge
+    1.3.6.1.4.1.43.1.20.27:
+      category: Switch
+      model: wlanUnifiedGigWirelessPoE8
+    1.3.6.1.4.1.43.1.20.28:
+      category: Switch
+      model: wlanIPS6100
+    1.3.6.1.4.1.43.1.20.29:
+      category: Switch
+      model: wlanWX5500-OSM
+    1.3.6.1.4.1.43.1.20.30:
+      category: Switch
+      model: wlanWLC5002
+    1.3.6.1.4.1.43.1.20.31:
+      category: Switch
+      model: wlanWLC6100-Master
+    1.3.6.1.4.1.43.1.20.32:
+      category: Switch
+      model: wlanWLC6100-Switch
+    1.3.6.1.4.1.43.1.20.33:
+      category: Switch
+      model: wlanAP9550
+    1.3.6.1.4.1.43.1.20.34:
+      category: Switch
+      model: wlanAP9150
+    1.3.6.1.4.1.43.1.20.35:
+      category: Switch
+      model: wlanWLC5024-Wireless
+    1.3.6.1.4.1.43.1.20.36:
+      category: Switch
+      model: wlanWLC5024-Wired
+    1.3.6.1.4.1.43.1.20.37:
+      category: Switch
+      model: wlan7900Blade
+    1.3.6.1.4.1.43.1.20.38:
+      category: Switch
+      model: wlanWLC5010-Wireless
+    1.3.6.1.4.1.43.1.20.39:
+      category: Switch
+      model: wlanWLC5010-Wired
+    1.3.6.1.4.1.43.1.20.40:
+      category: Switch
+      model: wlanWLC5004
+    1.3.6.1.4.1.43.1.20.41:
+      category: Switch
+      model: wlanWLC3024-Wireless
+    1.3.6.1.4.1.43.1.20.42:
+      category: Switch
+      model: wlanWLC3024-Wired
+    1.3.6.1.4.1.43.1.20.43:
+      category: Switch
+      model: wlanWLC3010-Wireless
+    1.3.6.1.4.1.43.1.20.44:
+      category: Switch
+      model: wlanWLC3010-Wired
+    1.3.6.1.4.1.43.1.20.45:
+      model: WX3008
+    1.3.6.1.4.1.43.1.20.46:
+      model: WX3008-LSW
+    1.3.6.1.4.1.43.1.20.47:
+      category: Access Point
+      model: WLAN AP 9552
+    1.3.6.1.4.1.43.1.20.48:
+      category: Access Point
+      model: WLANAP9152
+    1.3.6.1.4.1.43.1.20.49:
+      model: WX5002
+    1.3.6.1.4.1.43.1.20.50:
+      model: WX5004
+    1.3.6.1.4.1.43.1.21:
+      category: Switch
+      model: networkJacks
+    1.3.6.1.4.1.43.1.21.1:
+      category: Switch
+      model: nj200
+    1.3.6.1.4.1.43.1.21.2:
+      category: Switch
+      model: nj205
+    1.3.6.1.4.1.43.1.21.3:
+      category: Switch
+      model: nj220
+    1.3.6.1.4.1.43.1.21.4:
+      category: Switch
+      model: nj225
+    1.3.6.1.4.1.43.1.21.5:
+      category: Switch
+      model: nj225FXSC
+    1.3.6.1.4.1.43.1.21.6:
+      category: Switch
+      model: nj225FXST
+    1.3.6.1.4.1.43.1.21.7:
+      category: Switch
+      model: nj240FXSC
+    1.3.6.1.4.1.43.1.21.8:
+      category: Switch
+      model: nj240FXST
+    1.3.6.1.4.1.43.1.21.9:
+      category: Switch
+      model: nj240FXLC
+    1.3.6.1.4.1.43.1.21.10:
+      category: Switch
+      model: nj1000
+    1.3.6.1.4.1.43.1.21.11:
+      category: Switch
+      model: nj2000
+    1.3.6.1.4.1.43.1.22:
+      category: Switch
+      model: securitySwitches
+    1.3.6.1.4.1.43.1.22.1:
+      category: Switch
+      model: securitySwitch6200
+    1.3.6.1.4.1.43.10.27.4.1:
+      category: Hub
+      model: Super Stack 2 PS40
+    1.3.6.1.4.1.43.10.27.4.1.1.1:
+      category: Hub
+      model: Super Stack 2
+    1.3.6.1.4.1.43.10.27.4.1.2:
+      category: Switch
+      model: SuperStack III
+    1.3.6.1.4.1.43.10.27.4.1.2.1:
+      category: Switch
+      model: 3ComSuperStackII
+    1.3.6.1.4.1.43.10.27.4.1.2.2:
+      category: Switch
+      model: SuperStackII 3000
+    1.3.6.1.4.1.43.10.27.4.1.2.4:
+      category: Layer 3 Switch
+      model: SuperStack 4400
+    1.3.6.1.4.1.43.10.27.4.1.2.5:
+      category: Switch
+      model: SuperStack3
+    1.3.6.1.4.1.43.10.27.4.1.2.10:
+      category: Switch
+      model: switch 40x0
+    1.3.6.1.4.1.43.10.27.4.1.2.11:
+      category: Switch
+      model: 4200 SuperStack-3
+    1.3.6.1.4.1.43.48.1.1.5:
+      category: IP Phone
+      model: VCX-7005

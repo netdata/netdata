@@ -1,0 +1,522 @@
+sysobjectids:
+  oid_overrides:
+    1.3.6.1.4.1.171:
+      category: Switch
+      model: DGS-1100-16
+    1.3.6.1.4.1.171.10.6.1:
+      category: Switch
+      model: DES-2212
+    1.3.6.1.4.1.171.10.7.1:
+      category: Switch
+      model: DES 2218
+    1.3.6.1.4.1.171.10.8.1:
+      category: Hub
+      model: DFE 2624IX
+    1.3.6.1.4.1.171.10.9:
+      model: Hub
+    1.3.6.1.4.1.171.10.9.1:
+      category: Switch
+      model: DES-5016
+    1.3.6.1.4.1.171.10.9.2:
+      category: Switch
+      model: DES-5016SwHub
+    1.3.6.1.4.1.171.10.9.3:
+      category: Switch
+      model: DES 3216
+    1.3.6.1.4.1.171.10.9.4:
+      category: Switch
+      model: DES 3224
+    1.3.6.1.4.1.171.10.9.5:
+      category: Switch
+      model: DES-5200
+    1.3.6.1.4.1.171.10.10.1:
+      category: Printer
+      model: LPV2-TX1
+    1.3.6.1.4.1.171.10.20.3.1:
+      category: Router
+      model: DSR500
+    1.3.6.1.4.1.171.10.20.3.2:
+      category: Router
+      model: DSR500N
+    1.3.6.1.4.1.171.10.20.3.3:
+      category: Router
+      model: DSR1000
+    1.3.6.1.4.1.171.10.20.3.4:
+      category: Router
+      model: DSR1000N
+    1.3.6.1.4.1.171.10.24.1.1:
+      category: Switch
+      model: DES 3225G
+    1.3.6.1.4.1.171.10.25.1.1:
+      model: DES-3624
+    1.3.6.1.4.1.171.10.28.1.1:
+      model: DES-6000
+    1.3.6.1.4.1.171.10.30.1:
+      model: DSL500
+    1.3.6.1.4.1.171.10.32.1.1:
+      category: Layer 3 Switch
+      model: DES 3326
+    1.3.6.1.4.1.171.10.35.1:
+      category: Layer 3 Switch
+      model: DES 3308
+    1.3.6.1.4.1.171.10.36.1.11:
+      category: Switch
+      model: DES 3226
+    1.3.6.1.4.1.171.10.37:
+      category: Access Point
+      model: DWL-AP
+    1.3.6.1.4.1.171.10.37.15:
+      category: Access Point
+      model: DWL-2100AP
+    1.3.6.1.4.1.171.10.37.20:
+      category: Access Point
+      model: DWL-3200AP
+    1.3.6.1.4.1.171.10.37.25:
+      category: Wireless
+      model: DWL 7700AP
+    1.3.6.1.4.1.171.10.37.27:
+      category: Access Point
+      model: DWL-3500AP
+    1.3.6.1.4.1.171.10.37.28:
+      category: Access Point
+      model: DWL-8500AP
+    1.3.6.1.4.1.171.10.37.29:
+      category: Access Point
+      model: DWL-8600AP
+    1.3.6.1.4.1.171.10.37.29.1:
+      category: Wireless
+      model: DWL 8600AP
+    1.3.6.1.4.1.171.10.37.30:
+      category: Wireless
+      model: DWL 3260AP
+    1.3.6.1.4.1.171.10.37.35:
+      category: Wireless
+      model: DAP 2553
+    1.3.6.1.4.1.171.10.37.36:
+      category: Wireless
+      model: DAP 2590
+    1.3.6.1.4.1.171.10.37.37:
+      category: Wireless
+      model: DAP 3520
+    1.3.6.1.4.1.171.10.37.38:
+      category: Wireless
+      model: DAP 1353
+    1.3.6.1.4.1.171.10.37.39:
+      category: Wireless
+      model: DAP 2690
+    1.3.6.1.4.1.171.10.37.41:
+      category: Wireless
+      model: DAP 3690
+    1.3.6.1.4.1.171.10.37.50:
+      category: Access Point
+      model: DAP-2360
+    1.3.6.1.4.1.171.10.37.59:
+      category: Access Point
+      model: DAP-2610
+    1.3.6.1.4.1.171.10.43.1:
+      category: Switch
+      model: DGS 3224TG
+    1.3.6.1.4.1.171.10.43.2:
+      model: DGS-3224TGR
+    1.3.6.1.4.1.171.10.48.1:
+      category: Switch
+      model: DES 3226S
+    1.3.6.1.4.1.171.10.52.1.1:
+      category: Switch
+      model: DES-3250TG
+    1.3.6.1.4.1.171.10.59.4:
+      category: Layer 3 Switch
+      model: DGS-3324Sri
+    1.3.6.1.4.1.171.10.59.5:
+      category: Switch
+      model: DLink DGS 3324SR Series
+    1.3.6.1.4.1.171.10.59.7:
+      category: Switch
+      model: DLink DXS 3326GSR Series
+    1.3.6.1.4.1.171.10.59.8:
+      category: Switch
+      model: DXS 3350SR
+    1.3.6.1.4.1.171.10.60.1:
+      model: DES-1526
+    1.3.6.1.4.1.171.10.60.3:
+      model: DES-2108v1
+    1.3.6.1.4.1.171.10.61:
+      model: DES-2108 series
+    1.3.6.1.4.1.171.10.61.1:
+      category: Switch
+      model: DLink DES 3252
+    1.3.6.1.4.1.171.10.61.2:
+      model: DES-2108
+    1.3.6.1.4.1.171.10.61.3:
+      model: DES-2108-B1
+    1.3.6.1.4.1.171.10.63.1.1:
+      category: Switch
+      model: DES-3010F
+    1.3.6.1.4.1.171.10.63.1.2:
+      category: Switch
+      model: DES-3010G
+    1.3.6.1.4.1.171.10.63.2:
+      model: DES-3018
+    1.3.6.1.4.1.171.10.63.3:
+      category: Switch
+      model: DES-3026
+    1.3.6.1.4.1.171.10.63.4:
+      model: DES-3010FL
+    1.3.6.1.4.1.171.10.63.6:
+      category: Switch
+      model: DES-3028
+    1.3.6.1.4.1.171.10.63.7:
+      model: DES-3028P
+    1.3.6.1.4.1.171.10.63.8:
+      model: DES-3052
+    1.3.6.1.4.1.171.10.63.9:
+      category: Switch
+      model: DES-3052P
+    1.3.6.1.4.1.171.10.63.10:
+      model: DES-3016
+    1.3.6.1.4.1.171.10.63.11:
+      model: DES-3028G
+    1.3.6.1.4.1.171.10.64.1:
+      category: Switch
+      model: DES 3526
+    1.3.6.1.4.1.171.10.64.2:
+      category: Switch
+      model: DES-3550
+    1.3.6.1.4.1.171.10.67.2:
+      category: Switch
+      model: DLink DES 3010PA Series
+    1.3.6.1.4.1.171.10.68.1:
+      category: Switch
+      model: DLink DGS 3024
+    1.3.6.1.4.1.171.10.69.1:
+      model: DES-3828
+    1.3.6.1.4.1.171.10.69.2:
+      model: DES-3828DC
+    1.3.6.1.4.1.171.10.69.3:
+      category: Switch
+      model: DLink DES 3800 series
+    1.3.6.1.4.1.171.10.69.4:
+      model: DES-3852
+    1.3.6.1.4.1.171.10.69.5:
+      model: DES-3852P
+    1.3.6.1.4.1.171.10.70.3:
+      category: Switch
+      model: DLink DGS 3400 Series
+    1.3.6.1.4.1.171.10.70.5:
+      category: Switch
+      model: DLink DGS 3600 Series
+    1.3.6.1.4.1.171.10.70.6:
+      category: Layer 3 Switch
+      model: DES-3627
+    1.3.6.1.4.1.171.10.70.8:
+      model: DGS-3627G
+    1.3.6.1.4.1.171.10.70.9:
+      model: DGS-3612G
+    1.3.6.1.4.1.171.10.70.10:
+      model: DGS-3612
+    1.3.6.1.4.1.171.10.71.3:
+      category: Switch
+      model: DLink DXS 3200 series
+    1.3.6.1.4.1.171.10.73:
+      model: DWS series
+    1.3.6.1.4.1.171.10.73.2:
+      model: DWS-3024
+    1.3.6.1.4.1.171.10.73.3:
+      model: DWS-3024L
+    1.3.6.1.4.1.171.10.73.4:
+      model: DWS-3026
+    1.3.6.1.4.1.171.10.73.5:
+      model: DWS-4000
+    1.3.6.1.4.1.171.10.73.5.1:
+      model: DWS-4024
+    1.3.6.1.4.1.171.10.73.5.2:
+      model: DWS-4026
+    1.3.6.1.4.1.171.10.75:
+      model: DES-1210-xx
+    1.3.6.1.4.1.171.10.75.1:
+      category: Switch
+      model: DLink DES 1226G
+    1.3.6.1.4.1.171.10.75.2:
+      model: DES-1228
+    1.3.6.1.4.1.171.10.75.3:
+      model: DES-1228P
+    1.3.6.1.4.1.171.10.75.4:
+      category: Switch
+      model: DES-1252
+    1.3.6.1.4.1.171.10.75.5:
+      category: Switch
+      model: DES 1210 28 Series
+    1.3.6.1.4.1.171.10.75.5.2:
+      category: Switch
+      model: DES 1210 28 Series
+    1.3.6.1.4.1.171.10.75.6:
+      category: Switch
+      model: DES 1210 28P
+    1.3.6.1.4.1.171.10.75.6.1:
+      category: Switch
+      model: DES 1210 28P
+    1.3.6.1.4.1.171.10.75.7:
+      category: Switch
+      model: DES 1210 52P
+    1.3.6.1.4.1.171.10.75.7.1:
+      category: Switch
+      model: DES 1210 52P
+    1.3.6.1.4.1.171.10.75.13:
+      category: Switch
+      model: DES 1210 08P
+    1.3.6.1.4.1.171.10.75.13.1:
+      category: Switch
+      model: DES 1210 08P
+    1.3.6.1.4.1.171.10.75.13.1.1:
+      category: Switch
+      model: DES 1210 08P
+    1.3.6.1.4.1.171.10.75.14:
+      category: Switch
+      model: DES 1210 08P
+    1.3.6.1.4.1.171.10.75.14.1:
+      category: Switch
+      model: DES 1210 08P
+    1.3.6.1.4.1.171.10.75.14.1.1:
+      category: Switch
+      model: DES 1210 08P
+    1.3.6.1.4.1.171.10.75.15:
+      category: Switch
+      model: DES 1210 28P
+    1.3.6.1.4.1.171.10.75.15.2:
+      category: Switch
+      model: DES 1210 28P
+    1.3.6.1.4.1.171.10.75.15.2.1:
+      category: Switch
+      model: DES 1210 28P
+    1.3.6.1.4.1.171.10.76.2:
+      category: Switch
+      model: DLink DGS 1224T
+    1.3.6.1.4.1.171.10.76.4:
+      model: DGS-1216T
+    1.3.6.1.4.1.171.10.76.5:
+      model: DGS-1224T
+    1.3.6.1.4.1.171.10.76.14:
+      category: Switch
+      model: DGS-1210-20
+    1.3.6.1.4.1.171.10.76.18.1:
+      category: Switch
+      model: DGS 1210 10P
+    1.3.6.1.4.1.171.10.76.21.1:
+      category: Switch
+      model: DGS-1210-28P
+    1.3.6.1.4.1.171.10.76.25:
+      category: Switch
+      model: DGS-1210-48
+    1.3.6.1.4.1.171.10.76.30.2:
+      category: Switch
+      model: DGS 1210 28P
+    1.3.6.1.4.1.171.10.76.37.2:
+      category: Switch
+      model: DGS 1210 52P
+    1.3.6.1.4.1.171.10.94.1:
+      category: Switch
+      model: DGS-3100-24
+    1.3.6.1.4.1.171.10.94.2:
+      model: DGS-3124P
+    1.3.6.1.4.1.171.10.94.3:
+      model: DGS-3148
+    1.3.6.1.4.1.171.10.94.4:
+      model: DGS-3148P
+    1.3.6.1.4.1.171.10.94.5:
+      model: DGS-3124TG
+    1.3.6.1.4.1.171.10.97.1.2:
+      category: Switch
+      model: DES 7210
+    1.3.6.1.4.1.171.10.101.1:
+      category: Switch
+      model: DLink DGS 3200 Series
+    1.3.6.1.4.1.171.10.102.1:
+      model: DGS-3700
+    1.3.6.1.4.1.171.10.102.2:
+      model: DGS-3700P
+    1.3.6.1.4.1.171.10.105.1:
+      category: Switch
+      model: DES-3528
+    1.3.6.1.4.1.171.10.105.2:
+      model: DES-3528P
+    1.3.6.1.4.1.171.10.105.3:
+      model: DES-3552
+    1.3.6.1.4.1.171.10.105.4:
+      model: DES-3552P
+    1.3.6.1.4.1.171.10.105.5:
+      model: DES-3528DC
+    1.3.6.1.4.1.171.10.113:
+      model: DES-3200 series
+    1.3.6.1.4.1.171.10.113.1.1:
+      model: DES-3200-10
+    1.3.6.1.4.1.171.10.113.1.2:
+      model: DES-3200-18
+    1.3.6.1.4.1.171.10.113.2.1:
+      model: DES-3200-10
+    1.3.6.1.4.1.171.10.113.3.1:
+      model: DES-3200-18
+    1.3.6.1.4.1.171.10.114.1.1:
+      category: Layer 3 Switch
+      model: DES-3810-28
+    1.3.6.1.4.1.171.10.117.1.1:
+      category: Switch
+      model: DGS 3120 24TC
+    1.3.6.1.4.1.171.10.117.1.2:
+      category: Switch
+      model: DGS-3120-24PC
+    1.3.6.1.4.1.171.10.117.1.3:
+      category: Switch
+      model: DGS 3120 24SC
+    1.3.6.1.4.1.171.10.117.1.4:
+      category: Switch
+      model: DGS-3120-48TC
+    1.3.6.1.4.1.171.10.117.1.5:
+      category: Switch
+      model: DGS 3120 48PC
+    1.3.6.1.4.1.171.10.117.1.6:
+      category: Switch
+      model: DGS 3120 24SC DC
+    1.3.6.1.4.1.171.10.117.2.1:
+      category: Switch
+      model: DGS 3120 24TC BX
+    1.3.6.1.4.1.171.10.117.3.1:
+      category: Switch
+      model: DGS 3120 24PC BX
+    1.3.6.1.4.1.171.10.117.4.1:
+      category: Switch
+      model: DGS 3120 24SC BX
+    1.3.6.1.4.1.171.10.117.5.1:
+      category: Switch
+      model: DGS 3120 48TC BX
+    1.3.6.1.4.1.171.10.117.6.1:
+      category: Switch
+      model: DGS 3120 48PC BX
+    1.3.6.1.4.1.171.10.117.7.1:
+      category: Switch
+      model: DGS 3120 24SC DC BX
+    1.3.6.1.4.1.171.10.118.1:
+      category: Switch
+      model: DGS 3620 28TC
+    1.3.6.1.4.1.171.10.118.2:
+      category: Switch
+      model: DGS 3620 28SC
+    1.3.6.1.4.1.171.10.118.3:
+      model: DGS-3620-28PC
+    1.3.6.1.4.1.171.10.118.4:
+      model: DGS-3620-52T
+    1.3.6.1.4.1.171.10.118.5:
+      model: DGS-3620-52P
+    1.3.6.1.4.1.171.10.118.8:
+      model: DGS-3620-28TC-DC
+    1.3.6.1.4.1.171.10.118.9:
+      model: DGS-3620-28SC-DC
+    1.3.6.1.4.1.171.10.119.1:
+      category: Switch
+      model: DGS 3420 28TC
+    1.3.6.1.4.1.171.10.119.2:
+      category: Switch
+      model: DGS 3420 28SC
+    1.3.6.1.4.1.171.10.119.4:
+      model: DGS-3420-52T
+    1.3.6.1.4.1.171.10.119.6:
+      category: Switch
+      model: DGS 3420 26SC
+    1.3.6.1.4.1.171.10.120.1:
+      category: Switch
+      model: DGS 6600 Series
+    1.3.6.1.4.1.171.10.120.2:
+      category: Switch
+      model: DGS 6600 Series
+    1.3.6.1.4.1.171.10.127.1:
+      category: Switch
+      model: DXS 3600 32S
+    1.3.6.1.4.1.171.10.127.2:
+      category: Switch
+      model: DXS 3600 16S
+    1.3.6.1.4.1.171.10.129.1.1:
+      category: Wireless
+      model: DWL 3600AP
+    1.3.6.1.4.1.171.10.130.1.1:
+      category: Access Point
+      model: DWL-2600AP
+    1.3.6.1.4.1.171.10.133.1.1:
+      category: Switch
+      model: DGS 3000 10TC
+    1.3.6.1.4.1.171.10.133.5:
+      category: Switch
+      model: DGS 3000 28SC SERIES
+    1.3.6.1.4.1.171.10.133.5.1:
+      category: Switch
+      model: DGS 3000 28SC SERIES
+    1.3.6.1.4.1.171.10.134.7:
+      model: DGS-1100-24
+    1.3.6.1.4.1.171.10.134.20.2:
+      category: Switch
+      model: DGS-1100-08
+    1.3.6.1.4.1.171.10.134.21.2:
+      category: Switch
+      model: DGS-1100-08P
+    1.3.6.1.4.1.171.10.137.1.1:
+      category: Wireless
+      model: DGS
+    1.3.6.1.4.1.171.10.137.2.1:
+      category: Switch
+      model: DGS 1510 28
+    1.3.6.1.4.1.171.10.137.6.1:
+      category: Switch
+      model: DGS 1510 28X
+    1.3.6.1.4.1.171.10.137.8.1:
+      category: Switch
+      model: DGS-1510-52X
+    1.3.6.1.4.1.171.10.152.1.1:
+      model: WLAN-EAP
+    1.3.6.1.4.1.171.10.153.2:
+      category: Switch
+      model: DGS 1210 10MP
+    1.3.6.1.4.1.171.10.153.5.1:
+      category: Switch
+      model: DGS-1210-28
+    1.3.6.1.4.1.171.10.153.8.1:
+      category: Switch
+      model: DGS-1210-28P
+    1.3.6.1.4.1.171.10.153.9.1:
+      category: Switch
+      model: DGS-1210-28MP
+    1.3.6.1.4.1.171.10.153.10.1:
+      category: Switch
+      model: DGS-1210-52MP
+    1.3.6.1.4.1.171.10.165.2.1:
+      model: DGS-1250-28XMP
+    1.3.6.1.4.1.171.10.173.4.1:
+      category: Switch
+      model: DGS-1100-08PV2
+    1.3.6.1.4.1.171.11.10.1:
+      category: Printer
+      model: DP-301P+
+    1.3.6.1.4.1.171.11.124.1:
+      model: DWS-3160-24TC
+    1.3.6.1.4.1.171.20.1.1:
+      category: Firewall
+      model: DFL 210
+    1.3.6.1.4.1.171.20.1.2:
+      category: Firewall
+      model: DFL 800
+    1.3.6.1.4.1.171.20.2.1:
+      category: Firewall
+      model: DFL 260
+    1.3.6.1.4.1.171.20.2.2:
+      category: Firewall
+      model: DFL 860
+    1.3.6.1.4.1.171.20.2.3:
+      category: Firewall
+      model: DFL 1660
+    1.3.6.1.4.1.171.20.2.4:
+      category: Firewall
+      model: DFL 2560
+    1.3.6.1.4.1.171.30.4.1.2.2:
+      model: DVG-5008S
+    1.3.6.1.4.1.171.41.1:
+      model: DMC-1002
+    1.3.6.1.4.1.171.50.1.4.1:
+      category: Self-contained NAS
+      model: DNS-343
