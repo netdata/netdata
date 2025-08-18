@@ -1,0 +1,311 @@
+sysobjectids:
+  oid_overrides:
+    1.3.6.1.4.1.674.8.62.1.19.5.5.2:
+      category: Printer
+      model: 7130cdn
+    1.3.6.1.4.1.674.100.1.1094471968:
+      category: Printer
+      model: LASER PRINTER 5210N
+    1.3.6.1.4.1.674.100.1.1094471969:
+      category: Printer
+      model: Laser 5310n
+    1.3.6.1.4.1.674.100.1.1094472232:
+      category: Printer
+      model: Laser 1720dn
+    1.3.6.1.4.1.674.10892.2:
+      category: Management Controller
+      model: iDRAC 6
+    1.3.6.1.4.1.674.10892.5:
+      category: Management Controller
+      model: iDRAC 7 Modular
+    1.3.6.1.4.1.674.10892.6:
+      category: Management Controller
+      model: PowerEdge MX7000
+    1.3.6.1.4.1.674.10893.2.102:
+      category: Tape Library
+      model: PowerVault TL2000
+    1.3.6.1.4.1.674.10895:
+      model: PowerConnect
+    1.3.6.1.4.1.674.10895.1:
+      category: Switch
+      model: PowerConnect 3024
+    1.3.6.1.4.1.674.10895.3:
+      category: Switch
+      model: PowerConnect 3248
+    1.3.6.1.4.1.674.10895.4:
+      category: Switch
+      model: PowerConnect 5224
+    1.3.6.1.4.1.674.10895.5:
+      category: Switch
+      model: PowerConnect 3048
+    1.3.6.1.4.1.674.10895.1000:
+      category: Switch
+      model: PowerConnect 5212
+    1.3.6.1.4.1.674.10895.3000:
+      category: Switch
+      model: PowerConnect 6024
+    1.3.6.1.4.1.674.10895.3002:
+      category: Switch
+      model: PowerConnect 3324
+    1.3.6.1.4.1.674.10895.3003:
+      category: Switch
+      model: PowerConnect 3348
+    1.3.6.1.4.1.674.10895.3004:
+      category: Switch
+      model: PowerConnect 5324
+    1.3.6.1.4.1.674.10895.3005:
+      category: Switch
+      model: PowerConnect 5316M
+    1.3.6.1.4.1.674.10895.3006:
+      category: Switch
+      model: PowerConnect 3400
+    1.3.6.1.4.1.674.10895.3007:
+      category: Switch
+      model: PowerConnect 3400
+    1.3.6.1.4.1.674.10895.3008:
+      category: Switch
+      model: PowerConnect 3424
+    1.3.6.1.4.1.674.10895.3009:
+      category: Switch
+      model: PowerConnect 3448P
+    1.3.6.1.4.1.674.10895.3010:
+      category: Switch
+      model: PowerConnect 6224
+    1.3.6.1.4.1.674.10895.3011:
+      category: Switch
+      model: PowerConnect 6248
+    1.3.6.1.4.1.674.10895.3013:
+      category: Layer 3 Switch
+      model: PowerConnect 6248P
+    1.3.6.1.4.1.674.10895.3015:
+      category: Switch
+      model: PowerConnect 6220M
+    1.3.6.1.4.1.674.10895.3017:
+      category: Switch
+      model: PowerConnect 3548
+    1.3.6.1.4.1.674.10895.3018:
+      category: Switch
+      model: PowerConnect 3524P
+    1.3.6.1.4.1.674.10895.3020:
+      category: Switch
+      model: PowerConnect 5424
+    1.3.6.1.4.1.674.10895.3021:
+      category: Switch
+      model: PowerConnect 5448
+    1.3.6.1.4.1.674.10895.3022:
+      category: Layer 3 Switch
+      model: PowerConnect M8024
+    1.3.6.1.4.1.674.10895.3024:
+      category: Layer 3 Switch
+      model: PowerConnect 8024F
+    1.3.6.1.4.1.674.10895.3025:
+      category: Switch
+      model: PowerConnect M6348
+    1.3.6.1.4.1.674.10895.3028:
+      category: Switch
+      model: PowerConnect 2824
+    1.3.6.1.4.1.674.10895.3029:
+      category: Switch
+      model: PowerConnect 2848
+    1.3.6.1.4.1.674.10895.3031:
+      category: SANSwitch
+      model: Nexus 5548
+    1.3.6.1.4.1.674.10895.3037:
+      category: Switch
+      model: Dell PowerConnect 7048P
+    1.3.6.1.4.1.674.10895.3041:
+      category: Layer 3 Switch
+      model: PowerConnect M8024-k
+    1.3.6.1.4.1.674.10895.3042:
+      category: Layer 3 Switch
+      model: PowerConnect N4032
+    1.3.6.1.4.1.674.10895.3052:
+      category: Switch
+      model: R1-2401
+    1.3.6.1.4.1.674.10895.3053:
+      model: N2024
+    1.3.6.1.4.1.674.10895.3054:
+      category: Switch
+      model: Dell N2048
+    1.3.6.1.4.1.674.10895.3055:
+      category: Layer 3 Switch
+      model: N2024P
+    1.3.6.1.4.1.674.10895.3056:
+      category: Layer 3 Switch
+      model: N2048P
+    1.3.6.1.4.1.674.10895.3057:
+      category: Layer 3 Switch
+      model: N3024
+    1.3.6.1.4.1.674.10895.3058:
+      category: Switch
+      model: Dell N3048
+    1.3.6.1.4.1.674.10895.3059:
+      category: Layer 3 Switch
+      model: Networking N3024P
+    1.3.6.1.4.1.674.10895.3060:
+      category: Layer 3 Switch
+      model: PowerConnect N3048P
+    1.3.6.1.4.1.674.10895.3063:
+      category: Layer 3 Switch
+      model: Networking N1524
+    1.3.6.1.4.1.674.10895.3065:
+      category: Layer 3 Switch
+      model: Networking N1548
+    1.3.6.1.4.1.674.10895.3066:
+      category: Switch
+      model: Dell EMC N1548P
+    1.3.6.1.4.1.674.10895.3071:
+      category: Layer 3 Switch
+      model: Networking X1026
+    1.3.6.1.4.1.674.10895.3073:
+      category: Layer 3 Switch
+      model: Networking X1052
+    1.3.6.1.4.1.674.10895.3085:
+      category: Layer 3 Switch
+      model: N3048ET-ON
+    1.3.6.1.4.1.674.10895.3088:
+      category: Switch
+      model: Dell EMC N3024ET-ON
+    1.3.6.1.4.1.674.10895.3099:
+      category: Layer 3 Switch
+      model: PowerSwitch N2248X-ON
+    1.3.6.1.4.1.674.10895.5027:
+      category: Wireless
+      model: Dell PowerConnect W-7210
+    1.3.6.1.4.1.674.10895.5032:
+      model: PowerConnect W-IAP109
+    1.3.6.1.4.1.674.10898.1.1.1094472241:
+      category: Printer
+      model: 2330DN LASER PRINTER
+    1.3.6.1.4.1.674.10898.1.1.1094472485:
+      category: Printer
+      model: 2350dn Laser
+    1.3.6.1.4.1.674.10898.1.2.1094472473:
+      category: Printer
+      model: 3335dn Laser MFP
+    1.3.6.1.4.1.674.10898.2.100.10.51.1094473219:
+      category: Printer
+      model: 3130cn Color Laser
+    1.3.6.1.4.1.674.10898.2.100.10.52.1094473225:
+      category: Printer
+      model: 2135cn Multifunction Color Laser Printer
+    1.3.6.1.4.1.674.10898.2.100.10.52.1094473280:
+      category: Printer
+      model: C3765dnf
+    1.3.6.1.4.1.674.10898.2.100.10.52.1094473995:
+      category: Printer
+      model: MFP E514dw
+    1.3.6.1.4.1.674.10898.2.100.10.52.1094473998:
+      category: Printer
+      model: Color MFP H625cdw
+    1.3.6.1.4.1.674.10898.2.100.100.51.1094473267:
+      category: Printer
+      model: B2360dn
+    1.3.6.1.4.1.674.10898.2.100.100.51.1094473269:
+      category: Printer
+      model: B3460DN LASER PRINTER
+    1.3.6.1.4.1.674.10898.2.100.100.52.1094473286:
+      category: Printer
+      model: B3465dnf Laser MFP
+    1.3.6.1.4.1.674.10898.10.1:
+      category: Printer
+      model: 3100cn Laser
+    1.3.6.1.4.1.674.10898.10.51.1094473221:
+      category: Printer
+      model: Color Laser 3110cn
+    1.3.6.1.4.1.674.10898.10.52.1094473223:
+      category: Printer
+      model: MFP Laser 3115cn
+    1.3.6.1.4.1.674.10898.100.1.1094472241:
+      category: Printer
+      model: 2330dn Laser
+    1.3.6.1.4.1.674.10903.200.3.1:
+      category: Other
+      model: 6608 Rack PDU (J523N)
+    1.3.6.1.4.1.674.11000.5000.100.2.1.1:
+      category: Layer 3 Switch
+      model: PowerSwitch MX9116N
+    1.3.6.1.4.1.674.11000.5000.100.2.1.2:
+      category: Layer 3 Switch
+      model: PowerSwitch S4048-ON
+    1.3.6.1.4.1.674.11000.5000.100.2.1.3:
+      category: Layer 3 Switch
+      model: PowerSwitch S4048T-ON
+    1.3.6.1.4.1.674.11000.5000.100.2.1.4:
+      category: Layer 3 Switch
+      model: PowerSwitch S3048-ON
+    1.3.6.1.4.1.674.11000.5000.100.2.1.5:
+      category: Layer 3 Switch
+      model: PowerSwitch S6010-ON
+    1.3.6.1.4.1.674.11000.5000.100.2.1.6:
+      category: Layer 3 Switch
+      model: PowerSwitch S4148F-ON
+    1.3.6.1.4.1.674.11000.5000.100.2.1.7:
+      category: Layer 3 Switch
+      model: PowerSwitch S4128F-ON
+    1.3.6.1.4.1.674.11000.5000.100.2.1.8:
+      category: Layer 3 Switch
+      model: PowerSwitch S4148T-ON
+    1.3.6.1.4.1.674.11000.5000.100.2.1.9:
+      category: Layer 3 Switch
+      model: PowerSwitch S4128T-ON
+    1.3.6.1.4.1.674.11000.5000.100.2.1.10:
+      category: Layer 3 Switch
+      model: PowerSwitch S4148FE-ON
+    1.3.6.1.4.1.674.11000.5000.100.2.1.11:
+      category: Layer 3 Switch
+      model: PowerSwitch S4148U-ON
+    1.3.6.1.4.1.674.11000.5000.100.2.1.12:
+      category: Layer 3 Switch
+      model: PowerSwitch S4200-ON
+    1.3.6.1.4.1.674.11000.5000.100.2.1.13:
+      category: Layer 3 Switch
+      model: PowerSwitch S5148F-ON
+    1.3.6.1.4.1.674.11000.5000.100.2.1.14:
+      category: Layer 3 Switch
+      model: PowerSwitch S4248FB-ON
+    1.3.6.1.4.1.674.11000.5000.100.2.1.15:
+      category: Layer 3 Switch
+      model: PowerSwitch S4248FBL-ON
+    1.3.6.1.4.1.674.11000.5000.100.2.1.16:
+      category: Layer 3 Switch
+      model: PowerSwitch S41212F-ON
+    1.3.6.1.4.1.674.11000.5000.100.2.1.17:
+      category: Layer 3 Switch
+      model: PowerSwitch S41212T-ON
+    1.3.6.1.4.1.674.11000.5000.100.2.1.18:
+      category: Layer 3 Switch
+      model: PowerSwitch S5212F-ON
+    1.3.6.1.4.1.674.11000.5000.100.2.1.19:
+      category: Layer 3 Switch
+      model: PowerSwitch S5224F-ON
+    1.3.6.1.4.1.674.11000.5000.100.2.1.20:
+      category: Layer 3 Switch
+      model: PowerSwitch S5232F-ON
+    1.3.6.1.4.1.674.11000.5000.100.2.1.21:
+      category: Layer 3 Switch
+      model: PowerSwitch S5248F-ON
+    1.3.6.1.4.1.674.11000.5000.100.2.1.22:
+      category: Layer 3 Switch
+      model: PowerSwitch S5296F-ON
+    1.3.6.1.4.1.674.11000.5000.100.2.2.1:
+      category: Layer 3 Switch
+      model: MX5108N-ON
+    1.3.6.1.4.1.674.11000.5000.100.2.2.2:
+      category: Layer 3 Switch
+      model: MX9116N-ON
+    1.3.6.1.4.1.674.11000.5000.100.2.3.1:
+      category: Layer 3 Switch
+      model: PowerSwitch Z9100-ON
+    1.3.6.1.4.1.674.11000.5000.100.2.3.2:
+      category: Layer 3 Switch
+      model: PowerSwitch Z9264F-ON
+    1.3.6.1.4.1.674.11000.5000.100.2.3.3:
+      category: Layer 3 Switch
+      model: PowerSwitch Z9232F-ON
+    1.3.6.1.4.1.674.11000.5000.100.2.3.5:
+      category: Layer 3 Switch
+      model: PowerSwitch Z9432F-ON
+    1.3.6.1.4.1.674.11000.5000.100.2.4.1:
+      category: Layer 3 Switch
+      model: PowerSwitch N3248TE-ON

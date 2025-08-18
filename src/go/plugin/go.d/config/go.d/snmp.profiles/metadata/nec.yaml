@@ -1,0 +1,324 @@
+sysobjectids:
+  oid_overrides:
+    1.3.6.1.4.1.119.1.3.13.1:
+      category: Switch
+      model: NEC Bluefire 5010 ATM Switch / Router
+    1.3.6.1.4.1.119.1.3.13.4:
+      category: Switch
+      model: NEC Bluefire 5003
+    1.3.6.1.4.1.119.1.14.8:
+      category: Switch
+      model: NEC Bluefire 8000 series 2.5G ATM Switch
+    1.3.6.1.4.1.119.1.14.9:
+      category: Switch
+      model: NEC NETNEX8775
+    1.3.6.1.4.1.119.1.14.12:
+      category: Switch
+      model: NEC Bluefire 8000 series 10G ATM Switch
+    1.3.6.1.4.1.119.1.50.2.1.1:
+      category: Switch
+      model: NEC UNIVERGE IP8800 600
+    1.3.6.1.4.1.119.1.50.2.1.1.1:
+      category: Switch
+      model: NEC UNIVERGE IP8800 610
+    1.3.6.1.4.1.119.1.50.2.1.1.2:
+      category: Switch
+      model: NEC UNIVERGE IP8800 620
+    1.3.6.1.4.1.119.1.50.2.1.1.3:
+      category: Switch
+      model: NEC UNIVERGE IP8800 630
+    1.3.6.1.4.1.119.1.50.2.1.1.4:
+      category: Switch
+      model: NEC UNIVERGE IP8800 640
+    1.3.6.1.4.1.119.1.50.2.1.2:
+      category: Switch
+      model: NEC UNIVERGE IP8800 650
+    1.3.6.1.4.1.119.1.50.2.1.9.1:
+      category: Switch
+      model: NEC UNIVERGE IP8800 710
+    1.3.6.1.4.1.119.1.50.2.1.9.2:
+      category: Switch
+      model: NEC UNIVERGE IP8800 720
+    1.3.6.1.4.1.119.1.50.2.1.9.3:
+      category: Switch
+      model: NEC UNIVERGE IP8800 730
+    1.3.6.1.4.1.119.1.50.2.1.9.4:
+      category: Switch
+      model: NEC UNIVERGE IP8800 735
+    1.3.6.1.4.1.119.1.50.2.1.9.5:
+      category: Switch
+      model: NEC UNIVERGE IP8800 740
+    1.3.6.1.4.1.119.1.50.2.1.9.6:
+      category: Switch
+      model: NEC UNIVERGE IP8800 750
+    1.3.6.1.4.1.119.1.64.112.1.201:
+      category: Switch
+      model: HammerOS Version 1.4(N Build 0111)
+    1.3.6.1.4.1.119.1.64.112.2.4:
+      category: Switch
+      model: HammerOS BootLoader
+    1.3.6.1.4.1.119.1.64.112.2.105:
+      category: Switch
+      model: HammerOS 2.1.2 Version 2.1(Build 0059)
+    1.3.6.1.4.1.119.1.76.3:
+      category: Switch
+      model: NEC NEAX2000IPS IP PBX
+    1.3.6.1.4.1.119.1.76.5.2:
+      category: Switch
+      model: NEC BF210/24
+    1.3.6.1.4.1.119.1.84.1:
+      category: Router
+      model: NEC IX 1000 SERIES
+    1.3.6.1.4.1.119.1.84.1.1:
+      category: Router
+      model: NEC IX 1010
+    1.3.6.1.4.1.119.1.84.1.2:
+      category: Router
+      model: NEC IX 1020
+    1.3.6.1.4.1.119.1.84.1.3:
+      category: Router
+      model: NEC IX 1050
+    1.3.6.1.4.1.119.1.84.1.4:
+      category: Router
+      model: NEC IX 1011
+    1.3.6.1.4.1.119.1.84.1.5:
+      category: Router
+      model: NEC IX1035
+    1.3.6.1.4.1.119.1.84.1.6:
+      category: Router
+      model: NEC IX 1035I
+    1.3.6.1.4.1.119.1.84.1.7:
+      category: Router
+      model: NEC IX 1036
+    1.3.6.1.4.1.119.1.84.1.8:
+      category: Router
+      model: NEC IX 1036I
+    1.3.6.1.4.1.119.1.84.2:
+      category: Router
+      model: NEC ix2010-Series
+    1.3.6.1.4.1.119.1.84.2.1:
+      category: Router
+      model: NEC IX2010
+    1.3.6.1.4.1.119.1.84.2.2:
+      category: Router
+      model: NEC IX 2015
+    1.3.6.1.4.1.119.1.84.3:
+      category: Router
+      model: NEC AG500
+    1.3.6.1.4.1.119.1.84.3.1:
+      category: Router
+      model: NEC AG510
+    1.3.6.1.4.1.119.1.84.3.2:
+      category: Router
+      model: NEC AG520
+    1.3.6.1.4.1.119.1.84.3.3:
+      category: Router
+      model: NEC AG530
+    1.3.6.1.4.1.119.1.84.3.4:
+      category: Router
+      model: NEC AG540
+    1.3.6.1.4.1.119.1.84.3.5:
+      category: Router
+      model: NEC AG531
+    1.3.6.1.4.1.119.1.84.4:
+      category: Router
+      model: NEC ix2200-Series
+    1.3.6.1.4.1.119.1.84.5:
+      category: Router
+      model: NEC ix2000-Series
+    1.3.6.1.4.1.119.1.84.5.1:
+      category: Router
+      model: NEC ix2000-Series
+    1.3.6.1.4.1.119.1.84.6:
+      category: Router
+      model: NEC AG400 SERIES
+    1.3.6.1.4.1.119.1.84.7:
+      category: Router
+      model: NEC ix3000-Series
+    1.3.6.1.4.1.119.1.84.7.1:
+      category: Router
+      model: NEC IX3010
+    1.3.6.1.4.1.119.1.84.8:
+      category: Router
+      model: NEC ix2004-Series
+    1.3.6.1.4.1.119.1.84.8.1:
+      category: Router
+      model: NEC ix2004-Series
+    1.3.6.1.4.1.119.1.84.9:
+      category: Router
+      model: NEC AG600
+    1.3.6.1.4.1.119.1.84.9.1:
+      category: Router
+      model: NEC AG610
+    1.3.6.1.4.1.119.1.84.9.2:
+      category: Router
+      model: NEC AG650
+    1.3.6.1.4.1.119.1.84.9.3:
+      category: Router
+      model: NEC AG611
+    1.3.6.1.4.1.119.1.84.9.4:
+      category: Router
+      model: NEC AG651
+    1.3.6.1.4.1.119.1.84.10:
+      category: Router
+      model: NEC ix3100-Series
+    1.3.6.1.4.1.119.1.84.10.1:
+      category: Router
+      model: NEC IX 3110
+    1.3.6.1.4.1.119.1.84.11:
+      category: Router
+      model: NEC ix2005-Series
+    1.3.6.1.4.1.119.1.84.11.1:
+      category: Router
+      model: NEC ix2005-Series
+    1.3.6.1.4.1.119.1.84.12:
+      category: Router
+      model: NEC RTU SERIES
+    1.3.6.1.4.1.119.1.84.12.1:
+      category: Router
+      model: NEC RTU SERIES
+    1.3.6.1.4.1.119.1.84.12.2:
+      category: Router
+      model: NEC RTU B
+    1.3.6.1.4.1.119.1.84.12.3:
+      category: Router
+      model: NEC RTU 2106
+    1.3.6.1.4.1.119.1.84.13:
+      category: Router
+      model: NEC ix2025-Series
+    1.3.6.1.4.1.119.1.84.13.1:
+      category: Router
+      model: NEC ix2025-Series
+    1.3.6.1.4.1.119.1.84.14:
+      category: Router
+      model: NEC ix2105-Series
+    1.3.6.1.4.1.119.1.84.14.1:
+      category: Router
+      model: NEC ix2105-Series
+    1.3.6.1.4.1.119.1.84.16:
+      category: Router
+      model: NEC IX 2215 SERIES
+    1.3.6.1.4.1.119.1.84.16.1:
+      category: Router
+      model: NEC IX 2215 SERIES
+    1.3.6.1.4.1.119.1.84.18:
+      category: Router
+      model: NEC IX 2207 SERIES
+    1.3.6.1.4.1.119.1.84.18.1:
+      category: Router
+      model: NEC IX 2207 SERIES
+    1.3.6.1.4.1.119.1.84.19:
+      category: Router
+      model: NEC HX 2105 SERIES
+    1.3.6.1.4.1.119.1.84.19.1:
+      category: Router
+      model: NEC HX 2105 SERIES
+    1.3.6.1.4.1.119.1.84.20:
+      category: Router
+      model: NEC IX 3015 SERIES
+    1.3.6.1.4.1.119.1.84.20.1:
+      category: Router
+      model: NEC IX 3015 SERIES
+    1.3.6.1.4.1.119.1.84.21:
+      category: Router
+      model: NEC IX 3315 SERIES
+    1.3.6.1.4.1.119.1.84.21.1:
+      category: Router
+      model: NEC IX 3315 SERIES
+    1.3.6.1.4.1.119.1.84.22:
+      category: Router
+      model: NEC IX 2106 SERIES
+    1.3.6.1.4.1.119.1.84.22.1:
+      category: Router
+      model: NEC IX 2106 SERIES
+    1.3.6.1.4.1.119.1.84.23:
+      category: Router
+      model: NEC CGW SERIES
+    1.3.6.1.4.1.119.1.84.24:
+      category: Router
+      model: NEC IX 2216 SERIES
+    1.3.6.1.4.1.119.1.86.1:
+      model: "710"
+    1.3.6.1.4.1.119.1.86.2:
+      model: "720"
+    1.3.6.1.4.1.119.1.86.3:
+      model: "730"
+    1.3.6.1.4.1.119.1.86.4:
+      model: "750"
+    1.3.6.1.4.1.119.1.86.5:
+      model: "740"
+    1.3.6.1.4.1.119.1.126.2.84:
+      model: PF5453-24GT-2X/QX-S5327P
+    1.3.6.1.4.1.119.1.126.2.85:
+      category: Switch
+      model: NEC PF5453-48GT-2XQX-S5351P
+    1.3.6.1.4.1.119.1.126.2.91:
+      category: Switch
+      model: NEC PF5457-24GT-4G2XQX-S5732P
+    1.3.6.1.4.1.119.1.126.2.92:
+      model: PF5457-48GT-4G2X/QX-S5756P
+    1.3.6.1.4.1.119.1.126.2.95:
+      model: PF5459-48XP-4Q/QX-S5948XP-4Q
+    1.3.6.1.4.1.119.1.126.2.96:
+      model: PF5459-48GT-4X2Q/QX-S5948GT-4X2Q
+    1.3.6.1.4.1.119.1.126.2.97:
+      model: PF5459-48XT-4Q/QX-S5948XT-4Q
+    1.3.6.1.4.1.119.1.126.2.100:
+      model: PF5468-32QP/QX-S6832QP
+    1.3.6.1.4.1.119.1.126.2.104:
+      model: QX-S5224GT-4X
+    1.3.6.1.4.1.119.1.126.2.105:
+      model: QX-S5248GT-4X
+    1.3.6.1.4.1.119.1.126.2.106:
+      model: QX-S5224GP-4X
+    1.3.6.1.4.1.119.1.126.2.107:
+      model: QX-S5524GT-4X2Q
+    1.3.6.1.4.1.119.1.126.2.108:
+      model: QX-S5548GT-4X2Q
+    1.3.6.1.4.1.119.1.126.2.109:
+      model: QX-S5524GT-4X1C
+    1.3.6.1.4.1.119.1.126.2.110:
+      model: QX-S5548GT-4X1C
+    1.3.6.1.4.1.119.1.126.2.111:
+      model: QX-S5224GT-4X-PW
+    1.3.6.1.4.1.119.1.126.2.112:
+      model: QX-S5248GT-4X-PW
+    1.3.6.1.4.1.119.1.194:
+      category: Router
+      model: NEC UNIVERGE WA
+    1.3.6.1.4.1.119.1.194.1.1:
+      category: Router
+      model: NEC WA1020
+    1.3.6.1.4.1.119.1.194.2.1:
+      category: Router
+      model: NEC WA2020
+    1.3.6.1.4.1.119.1.194.2.2:
+      category: Router
+      model: NEC WA2021
+    1.3.6.1.4.1.119.1.194.3.1:
+      category: Router
+      model: NEC WA1500
+    1.3.6.1.4.1.119.1.194.4.1:
+      category: Router
+      model: NEC WA2600
+    1.3.6.1.4.1.119.1.203.2.2.41:
+      category: Switch
+      model: NEC PF5200 PF5240F-48T4XW-A
+    1.3.6.1.4.1.119.1.203.2.2.43:
+      category: Switch
+      model: NEC PF5200 PF5248F-2T8XW-A
+    1.3.6.1.4.1.119.1.203.3.1:
+      category: Switch
+      model: NEC PF6800
+    1.3.6.1.4.1.119.2.3.69:
+      category: Bridge/Extender
+      model: Paso NEO Compact
+    1.3.6.1.4.1.119.2.3.69.502:
+      category: Bridge/Extender
+      model: iPASOLINK 100
+    1.3.6.1.4.1.119.2.3.121:
+      category: Switch
+      model: NEC UNIVERGE IP8800R
+    1.3.6.1.4.1.119.2.3.123:
+      category: Server
+      model: NEC NC Series

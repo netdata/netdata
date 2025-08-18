@@ -1,0 +1,404 @@
+sysobjectids:
+  oid_overrides:
+    1.3.6.1.4.1.3375.1.1:
+      category: Layer 3 Switch
+      model: BIG-IP
+    1.3.6.1.4.1.3375.2:
+      category: Layer 3 Switch
+      model: BIG-IP
+    1.3.6.1.4.1.3375.2.1.3.4:
+      category: Layer 3 Switch
+      model: BIG-IP Application Delivery Controller
+    1.3.6.1.4.1.3375.2.1.3.4.1:
+      category: Layer 3 Switch
+      model: BIG-IP Local Traffic Manager 520
+    1.3.6.1.4.1.3375.2.1.3.4.2:
+      category: Layer 3 Switch
+      model: BIG-IP Local Traffic Manager 540
+    1.3.6.1.4.1.3375.2.1.3.4.3:
+      category: Layer 3 Switch
+      model: BIG-IP 1000
+    1.3.6.1.4.1.3375.2.1.3.4.4:
+      category: Layer 3 Switch
+      model: BIG-IP 1500
+    1.3.6.1.4.1.3375.2.1.3.4.5:
+      category: Layer 3 Switch
+      model: BIG-IP 2400
+    1.3.6.1.4.1.3375.2.1.3.4.6:
+      category: Layer 3 Switch
+      model: BIG-IP 3400
+    1.3.6.1.4.1.3375.2.1.3.4.7:
+      category: Layer 3 Switch
+      model: BIG-IP 4100
+    1.3.6.1.4.1.3375.2.1.3.4.8:
+      category: Layer 3 Switch
+      model: BIG-IP 5100
+    1.3.6.1.4.1.3375.2.1.3.4.9:
+      category: Layer 3 Switch
+      model: BIG-IP 5110
+    1.3.6.1.4.1.3375.2.1.3.4.10:
+      category: Layer 3 Switch
+      model: BIG-IP 6400
+    1.3.6.1.4.1.3375.2.1.3.4.11:
+      category: Layer 3 Switch
+      model: BIG-IP 6800
+    1.3.6.1.4.1.3375.2.1.3.4.12:
+      category: Layer 3 Switch
+      model: BIG-IP 8400
+    1.3.6.1.4.1.3375.2.1.3.4.13:
+      category: Layer 3 Switch
+      model: BIG-IP 8800
+    1.3.6.1.4.1.3375.2.1.3.4.14:
+      category: Management
+      model: Enterprise Manager Appliance 3000
+    1.3.6.1.4.1.3375.2.1.3.4.15:
+      category: WAN Accelerator
+      model: WANjet 300
+    1.3.6.1.4.1.3375.2.1.3.4.16:
+      category: WAN Accelerator
+      model: WANjet 400
+    1.3.6.1.4.1.3375.2.1.3.4.17:
+      category: WAN Accelerator
+      model: WANjet 500
+    1.3.6.1.4.1.3375.2.1.3.4.18:
+      category: WAN Accelerator
+      model: WANjet 800
+    1.3.6.1.4.1.3375.2.1.3.4.19:
+      category: Layer 3 Switch
+      model: BIG-IP VIPRION-4
+    1.3.6.1.4.1.3375.2.1.3.4.20:
+      category: Layer 3 Switch
+      model: BIG-IP 1600
+    1.3.6.1.4.1.3375.2.1.3.4.21:
+      category: Layer 3 Switch
+      model: BIG-IP 3600
+    1.3.6.1.4.1.3375.2.1.3.4.22:
+      category: Layer 3 Switch
+      model: BIG-IP 6900
+    1.3.6.1.4.1.3375.2.1.3.4.23:
+      category: Layer 3 Switch
+      model: BIG-IP 8900
+    1.3.6.1.4.1.3375.2.1.3.4.24:
+      category: Layer 3 Switch
+      model: BIG-IP 3900
+    1.3.6.1.4.1.3375.2.1.3.4.25:
+      category: Layer 3 Switch
+      model: BIG-IP 8950
+    1.3.6.1.4.1.3375.2.1.3.4.26:
+      category: Management
+      model: Enterprise Manager Appliance 4000
+    1.3.6.1.4.1.3375.2.1.3.4.27:
+      category: Layer 3 Switch
+      model: BIG-IP 11050
+    1.3.6.1.4.1.3375.2.1.3.4.28:
+      category: Management
+      model: Enterprise Manager Appliance 500
+    1.3.6.1.4.1.3375.2.1.3.4.29:
+      category: Switch
+      model: ARX1000
+    1.3.6.1.4.1.3375.2.1.3.4.30:
+      category: Switch
+      model: ARX2000
+    1.3.6.1.4.1.3375.2.1.3.4.31:
+      category: Switch
+      model: ARX4000
+    1.3.6.1.4.1.3375.2.1.3.4.32:
+      category: Switch
+      model: ARX500
+    1.3.6.1.4.1.3375.2.1.3.4.33:
+      category: Layer 3 Switch
+      model: BIG-IP 3410
+    1.3.6.1.4.1.3375.2.1.3.4.34:
+      category: Layer 3 Switch
+      model: BIG-IP Pb100
+    1.3.6.1.4.1.3375.2.1.3.4.35:
+      category: Layer 3 Switch
+      model: BIG-IP Pb100n
+    1.3.6.1.4.1.3375.2.1.3.4.36:
+      category: Firewall
+      model: BIG-IP SAM 4300
+    1.3.6.1.4.1.3375.2.1.3.4.37:
+      category: Access Server
+      model: FirePass 1200
+    1.3.6.1.4.1.3375.2.1.3.4.38:
+      category: Access Server
+      model: FirePass 4100
+    1.3.6.1.4.1.3375.2.1.3.4.39:
+      category: Access Server
+      model: FirePass 4300
+    1.3.6.1.4.1.3375.2.1.3.4.40:
+      category: WAN Accelerator
+      model: WANjet 200
+    1.3.6.1.4.1.3375.2.1.3.4.41:
+      category: Firewall
+      model: TrafficShield 4100
+    1.3.6.1.4.1.3375.2.1.3.4.42:
+      category: Other
+      model: WebAccelerator 4500
+    1.3.6.1.4.1.3375.2.1.3.4.43:
+      category: Layer 3 Switch
+      model: BIG-IP Virtual Edition
+    1.3.6.1.4.1.3375.2.1.3.4.44:
+      category: Layer 3 Switch
+      model: BIG-IP 11000
+    1.3.6.1.4.1.3375.2.1.3.4.45:
+      category: Layer 3 Switch
+      model: BIG-IP 11050N
+    1.3.6.1.4.1.3375.2.1.3.4.46:
+      category: Layer 3 Switch
+      model: BIG-IP VPR-B2100
+    1.3.6.1.4.1.3375.2.1.3.4.47:
+      category: Layer 3 Switch
+      model: BIG-IP VPR-B4300
+    1.3.6.1.4.1.3375.2.1.3.4.48:
+      category: Layer 3 Switch
+      model: BIG-IP VPR-C2400
+    1.3.6.1.4.1.3375.2.1.3.4.49:
+      category: Switch
+      model: ARX1500
+    1.3.6.1.4.1.3375.2.1.3.4.50:
+      category: Switch
+      model: ARX2500
+    1.3.6.1.4.1.3375.2.1.3.4.51:
+      category: Layer 3 Switch
+      model: BIG-IP 11000F
+    1.3.6.1.4.1.3375.2.1.3.4.52:
+      category: Layer 3 Switch
+      model: BIG-IP 11050F
+    1.3.6.1.4.1.3375.2.1.3.4.53:
+      category: Layer 3 Switch
+      model: BIG-IP 6900F
+    1.3.6.1.4.1.3375.2.1.3.4.54:
+      category: Layer 3 Switch
+      model: BIG-IP 6900N
+    1.3.6.1.4.1.3375.2.1.3.4.55:
+      category: Layer 3 Switch
+      model: BIG-IP 6900S
+    1.3.6.1.4.1.3375.2.1.3.4.56:
+      category: Layer 3 Switch
+      model: BIG-IP 8900F
+    1.3.6.1.4.1.3375.2.1.3.4.57:
+      category: Layer 3 Switch
+      model: BIG-IP 8950S
+    1.3.6.1.4.1.3375.2.1.3.4.58:
+      category: Layer 3 Switch
+      model: BIG-IP Pb200N
+    1.3.6.1.4.1.3375.2.1.3.4.59:
+      category: Layer 3 Switch
+      model: BIG-IP 4000
+    1.3.6.1.4.1.3375.2.1.3.4.60:
+      category: Layer 3 Switch
+      model: BIG-IP 10000
+    1.3.6.1.4.1.3375.2.1.3.4.61:
+      category: Layer 3 Switch
+      model: BIG-IP 2000
+    1.3.6.1.4.1.3375.2.1.3.4.62:
+      category: Layer 3 Switch
+      model: BIG-IP 5000
+    1.3.6.1.4.1.3375.2.1.3.4.63:
+      category: Layer 3 Switch
+      model: BIG-IP 7000
+    1.3.6.1.4.1.3375.2.1.3.4.64:
+      category: Layer 3 Switch
+      model: BIG-IP 800
+    1.3.6.1.4.1.3375.2.1.3.4.65:
+      category: Layer 3 Switch
+      model: BIG-IP ViprionB4300N
+    1.3.6.1.4.1.3375.2.1.3.4.66:
+      category: Layer 3 Switch
+      model: BIG-IP 10000F
+    1.3.6.1.4.1.3375.2.1.3.4.67:
+      category: Layer 3 Switch
+      model: BIG-IP 10000S
+    1.3.6.1.4.1.3375.2.1.3.4.68:
+      category: Layer 3 Switch
+      model: BIG-IP 7000F
+    1.3.6.1.4.1.3375.2.1.3.4.69:
+      category: Layer 3 Switch
+      model: BIG-IP 7000S
+    1.3.6.1.4.1.3375.2.1.3.4.70:
+      category: Layer 3 Switch
+      model: BIG-IP VPR-B2250
+    1.3.6.1.4.1.3375.2.1.3.4.71:
+      category: Layer 3 Switch
+      model: BIG-IP 5050
+    1.3.6.1.4.1.3375.2.1.3.4.72:
+      category: Layer 3 Switch
+      model: BIG-IP 5250
+    1.3.6.1.4.1.3375.2.1.3.4.73:
+      category: Layer 3 Switch
+      model: BIG-IP 4050
+    1.3.6.1.4.1.3375.2.1.3.4.74:
+      category: Layer 3 Switch
+      model: BIG-IP 4250
+    1.3.6.1.4.1.3375.2.1.3.4.75:
+      category: Layer 3 Switch
+      model: BIG-IP 2050
+    1.3.6.1.4.1.3375.2.1.3.4.76:
+      category: Layer 3 Switch
+      model: BIG-IP 2250
+    1.3.6.1.4.1.3375.2.1.3.4.77:
+      category: Layer 3 Switch
+      model: BIG-IP 7050
+    1.3.6.1.4.1.3375.2.1.3.4.78:
+      category: Layer 3 Switch
+      model: BIG-IP 7250
+    1.3.6.1.4.1.3375.2.1.3.4.79:
+      category: Layer 3 Switch
+      model: BIG-IP 10050
+    1.3.6.1.4.1.3375.2.1.3.4.80:
+      category: Layer 3 Switch
+      model: BIG-IP 10250
+    1.3.6.1.4.1.3375.2.1.3.4.81:
+      category: Layer 3 Switch
+      model: BIG-IP 2200
+    1.3.6.1.4.1.3375.2.1.3.4.82:
+      category: Layer 3 Switch
+      model: BIG-IP 4200
+    1.3.6.1.4.1.3375.2.1.3.4.83:
+      category: Layer 3 Switch
+      model: BIG-IP 5200
+    1.3.6.1.4.1.3375.2.1.3.4.84:
+      category: Layer 3 Switch
+      model: BIG-IP 7200
+    1.3.6.1.4.1.3375.2.1.3.4.85:
+      category: Layer 3 Switch
+      model: BIG-IP 7200F
+    1.3.6.1.4.1.3375.2.1.3.4.86:
+      category: Layer 3 Switch
+      model: BIG-IP 7200S
+    1.3.6.1.4.1.3375.2.1.3.4.87:
+      category: Layer 3 Switch
+      model: BIG-IP 10200
+    1.3.6.1.4.1.3375.2.1.3.4.88:
+      category: Layer 3 Switch
+      model: BIG-IP 10200F
+    1.3.6.1.4.1.3375.2.1.3.4.89:
+      category: Layer 3 Switch
+      model: BIG-IP 10200S
+    1.3.6.1.4.1.3375.2.1.3.4.90:
+      category: Management
+      model: BIG-IQ 7000
+    1.3.6.1.4.1.3375.2.1.3.4.91:
+      category: Layer 3 Switch
+      model: BIG-IP 5250F
+    1.3.6.1.4.1.3375.2.1.3.4.92:
+      category: Layer 3 Switch
+      model: BIG-IP 12050
+    1.3.6.1.4.1.3375.2.1.3.4.93:
+      category: Layer 3 Switch
+      model: BIG-IP 10350N
+    1.3.6.1.4.1.3375.2.1.3.4.94:
+      category: Layer 3 Switch
+      model: BIG-IP vCMP Guest
+    1.3.6.1.4.1.3375.2.1.3.4.96:
+      category: Layer 3 Switch
+      model: BIG-IP 7055
+    1.3.6.1.4.1.3375.2.1.3.4.97:
+      category: Layer 3 Switch
+      model: BIG-IP 7255
+    1.3.6.1.4.1.3375.2.1.3.4.98:
+      category: Layer 3 Switch
+      model: BIG-IP 10055
+    1.3.6.1.4.1.3375.2.1.3.4.99:
+      category: Layer 3 Switch
+      model: BIG-IP 10255
+    1.3.6.1.4.1.3375.2.1.3.4.101:
+      category: Layer 3 Switch
+      model: BIG-IP VPR-B2150
+    1.3.6.1.4.1.3375.2.1.3.4.102:
+      category: Layer 3 Switch
+      model: BIG-IP 10350
+    1.3.6.1.4.1.3375.2.1.3.4.103:
+      category: Layer 3 Switch
+      model: BIG-IP 10350v
+    1.3.6.1.4.1.3375.2.1.3.4.104:
+      category: Layer 3 Switch
+      model: BIG-IP i2600
+    1.3.6.1.4.1.3375.2.1.3.4.105:
+      category: Layer 3 Switch
+      model: BIG-IP i2800
+    1.3.6.1.4.1.3375.2.1.3.4.106:
+      category: Layer 3 Switch
+      model: BIG-IP i4600
+    1.3.6.1.4.1.3375.2.1.3.4.107:
+      category: Layer 3 Switch
+      model: BIG-IP i4800
+    1.3.6.1.4.1.3375.2.1.3.4.108:
+      category: Layer 3 Switch
+      model: BIG-IP i5600
+    1.3.6.1.4.1.3375.2.1.3.4.109:
+      category: Layer 3 Switch
+      model: BIG-IP i5800
+    1.3.6.1.4.1.3375.2.1.3.4.110:
+      category: Layer 3 Switch
+      model: BIG-IP i7600
+    1.3.6.1.4.1.3375.2.1.3.4.111:
+      category: Layer 3 Switch
+      model: BIG-IP i7800
+    1.3.6.1.4.1.3375.2.1.3.4.112:
+      category: Layer 3 Switch
+      model: BIG-IP i10600
+    1.3.6.1.4.1.3375.2.1.3.4.113:
+      category: Layer 3 Switch
+      model: BIG-IP i10800
+    1.3.6.1.4.1.3375.2.1.3.4.114:
+      category: Layer 3 Switch
+      model: BIG-IP i12600
+    1.3.6.1.4.1.3375.2.1.3.4.115:
+      category: Layer 3 Switch
+      model: BIG-IP i12800
+    1.3.6.1.4.1.3375.2.1.3.4.116:
+      category: Layer 3 Switch
+      model: BIG-IP i15600
+    1.3.6.1.4.1.3375.2.1.3.4.117:
+      category: Layer 3 Switch
+      model: BIG-IP i15800
+    1.3.6.1.4.1.3375.2.1.3.4.118:
+      category: Management
+      model: BIG-IQ Virtual Edition
+    1.3.6.1.4.1.3375.2.1.3.4.121:
+      category: Layer 3 Switch
+      model: BIG-IP i11600
+    1.3.6.1.4.1.3375.2.1.3.4.122:
+      category: Layer 3 Switch
+      model: BIG-IP i11800
+    1.3.6.1.4.1.3375.2.1.3.4.123:
+      category: Layer 3 Switch
+      model: BIG-IP i11800-DS
+    1.3.6.1.4.1.3375.2.1.3.4.124:
+      category: Layer 3 Switch
+      model: BIG-IP i5820-DF
+    1.3.6.1.4.1.3375.2.1.3.4.125:
+      category: Layer 3 Switch
+      model: BIG-IP i7820-DF
+    1.3.6.1.4.1.3375.2.1.3.4.126:
+      category: Layer 3 Switch
+      model: BIG-IP i850
+    1.3.6.1.4.1.3375.2.1.3.4.127:
+      category: Layer 3 Switch
+      model: BIG-IP i11600-DS
+    1.3.6.1.4.1.3375.2.1.3.4.128:
+      category: Layer 3 Switch
+      model: BIG-IP i11400-DS
+    1.3.6.1.4.1.3375.2.1.3.4.129:
+      category: Layer 3 Switch
+      model: BIG-IP i7600-D
+    1.3.6.1.4.1.3375.2.1.3.4.130:
+      category: Layer 3 Switch
+      model: BIG-IP i7800-D
+    1.3.6.1.4.1.3375.2.1.3.4.131:
+      category: Layer 3 Switch
+      model: BIG-IP i15600-DN
+    1.3.6.1.4.1.3375.2.1.3.4.132:
+      category: Layer 3 Switch
+      model: BIG-IP i15800-DN
+    1.3.6.1.4.1.3375.2.1.3.4.148:
+      category: Layer 3 Switch
+      model: BIG-IP i15820-DF
+    1.3.6.1.4.1.3375.2.1.3.4.149:
+      category: Layer 3 Switch
+      model: BIG-IP i15820-DF (D120)
+    1.3.6.1.4.1.3375.2.1.3.4.1000:
+      category: Layer 3 Switch
+      model: BIG-IP PB200

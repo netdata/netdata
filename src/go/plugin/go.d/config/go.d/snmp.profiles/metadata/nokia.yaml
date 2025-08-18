@@ -1,0 +1,457 @@
+sysobjectids:
+  oid_overrides:
+    1.3.6.1.4.1.6486.64.4200:
+      category: Other
+      model: OXO Connect
+    1.3.6.1.4.1.6486.800.1.1.2.1.1:
+      category: Layer 3 Switch
+      model: OmniSwitch 7000
+    1.3.6.1.4.1.6486.800.1.1.2.1.1.1:
+      category: Layer 3 Switch
+      model: OmniSwitch 7000
+    1.3.6.1.4.1.6486.800.1.1.2.1.1.1.1:
+      category: Layer 3 Switch
+      model: OmniSwitch 7700
+    1.3.6.1.4.1.6486.800.1.1.2.1.1.1.2:
+      category: Layer 3 Switch
+      model: OmniSwitch 7800
+    1.3.6.1.4.1.6486.800.1.1.2.1.1.4.1.1:
+      category: Layer 3 Switch
+      model: OmniSwitch 7700 CMM
+    1.3.6.1.4.1.6486.800.1.1.2.1.1.4.1.1.1:
+      category: Layer 3 Switch
+      model: OmniSwitch 7700PROC CMM
+    1.3.6.1.4.1.6486.800.1.1.2.1.1.4.1.1.2:
+      category: Layer 3 Switch
+      model: OmniSwitch 7700BBUS CMM
+    1.3.6.1.4.1.6486.800.1.1.2.1.1.4.1.2:
+      category: Layer 3 Switch
+      model: OmniSwitch 7800 CMM
+    1.3.6.1.4.1.6486.800.1.1.2.1.1.4.1.2.1:
+      category: Layer 3 Switch
+      model: OmniSwitch 7800PROC CMM
+    1.3.6.1.4.1.6486.800.1.1.2.1.1.4.1.2.2:
+      category: Layer 3 Switch
+      model: OmniSwitch 7800BBUS CMM
+    1.3.6.1.4.1.6486.800.1.1.2.1.1.4.2.1.1:
+      category: Layer 3 Switch
+      model: OmniSwitch 7000C24 ENI
+    1.3.6.1.4.1.6486.800.1.1.2.1.1.4.2.1.2:
+      category: Layer 3 Switch
+      model: OmniSwitch 7000FM12 ENI
+    1.3.6.1.4.1.6486.800.1.1.2.1.1.4.2.1.3:
+      category: Layer 3 Switch
+      model: OmniSwitch 7000PDPS24 ENI
+    1.3.6.1.4.1.6486.800.1.1.2.1.2:
+      category: Layer 3 Switch
+      model: OmniSwitch 8000
+    1.3.6.1.4.1.6486.800.1.1.2.1.2.1:
+      category: Layer 3 Switch
+      model: OmniSwitch 8000
+    1.3.6.1.4.1.6486.800.1.1.2.1.2.1.1:
+      category: Layer 3 Switch
+      model: OmniSwitch 8800
+    1.3.6.1.4.1.6486.800.1.1.2.1.2.4.1.1:
+      category: Layer 3 Switch
+      model: OmniSwitch 8800 CMM
+    1.3.6.1.4.1.6486.800.1.1.2.1.2.4.1.1.1:
+      category: Layer 3 Switch
+      model: OmniSwitch 8800PROC CMM
+    1.3.6.1.4.1.6486.800.1.1.2.1.2.4.1.1.2:
+      category: Layer 3 Switch
+      model: OmniSwitch 8800BBUS CMM
+    1.3.6.1.4.1.6486.800.1.1.2.1.2.4.2.1.1:
+      category: Layer 3 Switch
+      model: OmniSwitch 8000C24 ENI
+    1.3.6.1.4.1.6486.800.1.1.2.1.3:
+      category: Layer 3 Switch
+      model: OmniSwitch 6600
+    1.3.6.1.4.1.6486.800.1.1.2.1.3.1:
+      category: Layer 3 Switch
+      model: OmniSwitch 6600
+    1.3.6.1.4.1.6486.800.1.1.2.1.3.1.1:
+      category: Layer 3 Switch
+      model: OmniSwitch 6600-24
+    1.3.6.1.4.1.6486.800.1.1.2.1.3.1.2:
+      category: Layer 3 Switch
+      model: OmniSwitch 6600-48
+    1.3.6.1.4.1.6486.800.1.1.2.1.3.1.3:
+      category: Layer 3 Switch
+      model: OmniSwitch 6600-U24
+    1.3.6.1.4.1.6486.800.1.1.2.1.3.1.4:
+      category: Layer 3 Switch
+      model: OmniSwitch 6602-24
+    1.3.6.1.4.1.6486.800.1.1.2.1.3.1.5:
+      category: Layer 3 Switch
+      model: OmniSwitch 6602-48
+    1.3.6.1.4.1.6486.800.1.1.2.1.3.1.6:
+      category: Layer 3 Switch
+      model: OmniSwitch 6600-P24
+    1.3.6.1.4.1.6486.800.1.1.2.1.3.1.7:
+      category: Layer 3 Switch
+      model: Alcatel OMNI 6848POE Switch
+    1.3.6.1.4.1.6486.800.1.1.2.1.3.4.1:
+      category: Layer 3 Switch
+      model: OmniSwitch 6600 EXP
+    1.3.6.1.4.1.6486.800.1.1.2.1.4:
+      category: Layer 3 Switch
+      model: OmniAccess 200
+    1.3.6.1.4.1.6486.800.1.1.2.1.4.1:
+      category: Layer 3 Switch
+      model: OmniAccess 200
+    1.3.6.1.4.1.6486.800.1.1.2.1.4.1.1:
+      category: Layer 3 Switch
+      model: OmniAccess 210
+    1.3.6.1.4.1.6486.800.1.1.2.1.4.1.2:
+      category: Layer 3 Switch
+      model: OmniAccess 250
+    1.3.6.1.4.1.6486.800.1.1.2.1.5.1.1:
+      category: Layer 3 Switch
+      model: OmniSwitch 6300
+    1.3.6.1.4.1.6486.800.1.1.2.1.6.1.1:
+      category: Layer 3 Switch
+      model: OmniSwitch 6800-24
+    1.3.6.1.4.1.6486.800.1.1.2.1.6.1.2:
+      category: Layer 3 Switch
+      model: OmniSwitch 6800-48
+    1.3.6.1.4.1.6486.800.1.1.2.1.6.1.3:
+      category: Layer 3 Switch
+      model: OmniSwitch 6800-U24
+    1.3.6.1.4.1.6486.800.1.1.2.1.6.1.4:
+      category: Layer 3 Switch
+      model: OmniSwitch 6824PoE
+    1.3.6.1.4.1.6486.800.1.1.2.1.6.1.5:
+      category: Layer 3 Switch
+      model: OmniSwitch 6848PoE
+    1.3.6.1.4.1.6486.800.1.1.2.1.6.1.6:
+      category: Layer 3 Switch
+      model: OmniSwitch 6800-24L
+    1.3.6.1.4.1.6486.800.1.1.2.1.6.1.7:
+      category: Layer 3 Switch
+      model: OmniSwitch 6800-L48
+    1.3.6.1.4.1.6486.800.1.1.2.1.6.1.8:
+      category: Layer 3 Switch
+      model: OmniSwitch 6824LU
+    1.3.6.1.4.1.6486.800.1.1.2.1.6.1.9:
+      category: Layer 3 Switch
+      model: OmniSwitch 6848LU
+    1.3.6.1.4.1.6486.800.1.1.2.1.6.1.10:
+      category: Layer 3 Switch
+      model: OmniSwitch 6824LPoE
+    1.3.6.1.4.1.6486.800.1.1.2.1.6.1.11:
+      category: Layer 3 Switch
+      model: OmniSwitch 6848LPoE
+    1.3.6.1.4.1.6486.800.1.1.2.1.6.1.12:
+      category: Layer 3 Switch
+      model: OmniSwitch 6824LUPoE
+    1.3.6.1.4.1.6486.800.1.1.2.1.6.1.13:
+      category: Layer 3 Switch
+      model: OmniSwitch 6848LUPoE
+    1.3.6.1.4.1.6486.800.1.1.2.1.7.1.1:
+      category: Layer 3 Switch
+      model: OmniSwitch 6850-24
+    1.3.6.1.4.1.6486.800.1.1.2.1.7.1.2:
+      category: Layer 3 Switch
+      model: OmniSwitch 6850-48
+    1.3.6.1.4.1.6486.800.1.1.2.1.7.1.3:
+      category: Layer 3 Switch
+      model: OmniSwitch 6850-24X
+    1.3.6.1.4.1.6486.800.1.1.2.1.7.1.4:
+      category: Layer 3 Switch
+      model: OmniSwitch 6850-48X
+    1.3.6.1.4.1.6486.800.1.1.2.1.7.1.5:
+      category: Layer 3 Switch
+      model: OmniSwitch 6850-P24
+    1.3.6.1.4.1.6486.800.1.1.2.1.7.1.6:
+      category: Layer 3 Switch
+      model: OmniSwitch 6850-P48
+    1.3.6.1.4.1.6486.800.1.1.2.1.7.1.7:
+      category: Layer 3 Switch
+      model: OmniSwitch 6850-P24X
+    1.3.6.1.4.1.6486.800.1.1.2.1.7.1.8:
+      category: Layer 3 Switch
+      model: OmniSwitch 6850-P48X
+    1.3.6.1.4.1.6486.800.1.1.2.1.7.1.9:
+      category: Layer 3 Switch
+      model: OmniSwitch 6850-U24
+    1.3.6.1.4.1.6486.800.1.1.2.1.7.1.10:
+      category: Layer 3 Switch
+      model: OS6850-U24X
+    1.3.6.1.4.1.6486.800.1.1.2.1.7.1.11:
+      category: Layer 3 Switch
+      model: OmniSwitch 6850-24L
+    1.3.6.1.4.1.6486.800.1.1.2.1.7.1.12:
+      category: Layer 3 Switch
+      model: OS6850-48L
+    1.3.6.1.4.1.6486.800.1.1.2.1.7.1.13:
+      category: Layer 3 Switch
+      model: OmniSwitch 685024XL
+    1.3.6.1.4.1.6486.800.1.1.2.1.7.1.14:
+      category: Layer 3 Switch
+      model: OmniSwitch 685048XL
+    1.3.6.1.4.1.6486.800.1.1.2.1.7.1.15:
+      category: Layer 3 Switch
+      model: OmniSwitch 6850P24L
+    1.3.6.1.4.1.6486.800.1.1.2.1.7.1.16:
+      category: Layer 3 Switch
+      model: Omniswitch 6850-P48L
+    1.3.6.1.4.1.6486.800.1.1.2.1.7.1.17:
+      category: Layer 3 Switch
+      model: OmniSwitch 6850P24XL
+    1.3.6.1.4.1.6486.800.1.1.2.1.7.1.18:
+      category: Layer 3 Switch
+      model: OmniSwitch 6850P48XL
+    1.3.6.1.4.1.6486.800.1.1.2.1.7.1.19:
+      category: Layer 3 Switch
+      model: OmniSwitch 685024LU
+    1.3.6.1.4.1.6486.800.1.1.2.1.7.1.20:
+      category: Layer 3 Switch
+      model: OmniSwitch 685048LU
+    1.3.6.1.4.1.6486.800.1.1.2.1.7.1.21:
+      category: Layer 3 Switch
+      model: OmniSwitch 685024XLU
+    1.3.6.1.4.1.6486.800.1.1.2.1.7.1.22:
+      category: Layer 3 Switch
+      model: OmniSwitch 685048XLU
+    1.3.6.1.4.1.6486.800.1.1.2.1.7.1.23:
+      category: Layer 3 Switch
+      model: OmniSwitch 6850P24LU
+    1.3.6.1.4.1.6486.800.1.1.2.1.7.1.24:
+      category: Layer 3 Switch
+      model: OmniSwitch 6850P48LU
+    1.3.6.1.4.1.6486.800.1.1.2.1.7.1.25:
+      category: Layer 3 Switch
+      model: OmniSwitch 6850P24XLU
+    1.3.6.1.4.1.6486.800.1.1.2.1.7.1.26:
+      category: Layer 3 Switch
+      model: OmniSwitch 6850P48XLU
+    1.3.6.1.4.1.6486.800.1.1.2.1.7.1.42:
+      model: OmniSwitch 6850E-P24
+    1.3.6.1.4.1.6486.800.1.1.2.1.7.1.44:
+      category: Layer 3 Switch
+      model: OmniSwitch 6850E
+    1.3.6.1.4.1.6486.800.1.1.2.1.7.1.45:
+      category: Layer 3 Switch
+      model: OmniSwitch 6850E-48X
+    1.3.6.1.4.1.6486.800.1.1.2.1.7.1.46:
+      category: Layer 3 Switch
+      model: Omniswitch 6850E-24
+    1.3.6.1.4.1.6486.800.1.1.2.1.7.1.47:
+      category: Layer 3 Switch
+      model: Omniswitch 6850E-24X
+    1.3.6.1.4.1.6486.800.1.1.2.1.7.1.48:
+      category: Layer 3 Switch
+      model: OmniSwitch 6850E-U24X
+    1.3.6.1.4.1.6486.800.1.1.2.1.8.1.1:
+      category: Layer 3 Switch
+      model: OmniSwitch 9700
+    1.3.6.1.4.1.6486.800.1.1.2.1.8.1.2:
+      category: Layer 3 Switch
+      model: OmniSwitch 9800
+    1.3.6.1.4.1.6486.800.1.1.2.1.8.1.3:
+      category: Layer 3 Switch
+      model: OmniSwitch 9600
+    1.3.6.1.4.1.6486.800.1.1.2.1.8.1.4:
+      category: Layer 3 Switch
+      model: OmniSwitch 9700E
+    1.3.6.1.4.1.6486.800.1.1.2.1.8.1.5:
+      category: Layer 3 Switch
+      model: OmniSwitch 9800E-CFM
+    1.3.6.1.4.1.6486.800.1.1.2.1.8.1.6:
+      category: Layer 3 Switch
+      model: OmniSwitch 9600E
+    1.3.6.1.4.1.6486.800.1.1.2.1.9.1:
+      category: Layer 3 Switch
+      model: OmniSwitch 6855
+    1.3.6.1.4.1.6486.800.1.1.2.1.9.1.1:
+      category: Layer 3 Switch
+      model: OmniSwitch 685514
+    1.3.6.1.4.1.6486.800.1.1.2.1.9.1.2:
+      category: Layer 3 Switch
+      model: OmniSwitch 6855U10
+    1.3.6.1.4.1.6486.800.1.1.2.1.9.1.3:
+      category: Layer 3 Switch
+      model: OmniSwitch 685524
+    1.3.6.1.4.1.6486.800.1.1.2.1.9.1.4:
+      category: Layer 3 Switch
+      model: OmniSwitch 6855U24
+    1.3.6.1.4.1.6486.800.1.1.2.1.9.1.5:
+      category: Layer 3 Switch
+      model: OmniSwitch 6855U24X
+    1.3.6.1.4.1.6486.800.1.1.2.1.10.1.1:
+      category: Layer 3 Switch
+      model: OmniSwitch 6400-24
+    1.3.6.1.4.1.6486.800.1.1.2.1.10.1.2:
+      category: Layer 3 Switch
+      model: OmniSwitch 6400-P24
+    1.3.6.1.4.1.6486.800.1.1.2.1.10.1.3:
+      category: Layer 3 Switch
+      model: OmniSwitch 6400-U24
+    1.3.6.1.4.1.6486.800.1.1.2.1.10.1.4:
+      category: Layer 3 Switch
+      model: OmniSwitch 6400-DU24
+    1.3.6.1.4.1.6486.800.1.1.2.1.10.1.5:
+      category: Layer 3 Switch
+      model: OmniSwitch 6400-48
+    1.3.6.1.4.1.6486.800.1.1.2.1.10.1.6:
+      category: Layer 3 Switch
+      model: OmniSwitch 6400-P48
+    1.3.6.1.4.1.6486.800.1.1.2.1.11.1.1:
+      model: OMNI6250-8M
+    1.3.6.1.4.1.6486.800.1.1.2.1.11.1.2:
+      model: OMNI6250-24M
+    1.3.6.1.4.1.6486.800.1.1.2.1.11.1.3:
+      model: OMNI6250-24MD
+    1.3.6.1.4.1.6486.800.1.1.2.1.11.2.1:
+      category: Layer 3 Switch
+      model: OmniSwitch 6250-24
+    1.3.6.1.4.1.6486.800.1.1.2.1.11.2.2:
+      category: Layer 3 Switch
+      model: Omniswitch 6250-P24
+    1.3.6.1.4.1.6486.800.1.1.2.1.12.1.1:
+      category: Layer 3 Switch
+      model: OmniSwitch 6450
+    1.3.6.1.4.1.6486.800.1.1.2.1.12.1.2:
+      category: Layer 3 Switch
+      model: OmniSwitch 6450-P10
+    1.3.6.1.4.1.6486.800.1.1.2.1.12.1.3:
+      category: Layer 3 Switch
+      model: OS6450-10L
+    1.3.6.1.4.1.6486.800.1.1.2.1.12.1.4:
+      category: Layer 3 Switch
+      model: Omniswitch 6450-P10L
+    1.3.6.1.4.1.6486.800.1.1.2.1.12.1.5:
+      category: Layer 3 Switch
+      model: Omniswitch 6450-24
+    1.3.6.1.4.1.6486.800.1.1.2.1.12.1.6:
+      category: Layer 3 Switch
+      model: OmniSwitch 6450-P24
+    1.3.6.1.4.1.6486.800.1.1.2.1.12.1.7:
+      category: Layer 3 Switch
+      model: OmniSwitch 6450-U24
+    1.3.6.1.4.1.6486.800.1.1.2.1.12.1.8:
+      category: Layer 3 Switch
+      model: OmniSwitch 6450-48
+    1.3.6.1.4.1.6486.800.1.1.2.1.12.1.9:
+      category: Layer 3 Switch
+      model: Omniswitch 6450-P48
+    1.3.6.1.4.1.6486.800.1.1.2.1.12.1.10:
+      category: Layer 3 Switch
+      model: OmniSwitch 6450-24L
+    1.3.6.1.4.1.6486.800.1.1.2.1.12.1.12:
+      category: Layer 3 Switch
+      model: OmniSwitch 6450-48L
+    1.3.6.1.4.1.6486.800.1.1.2.1.12.1.13:
+      category: Layer 3 Switch
+      model: Omniswitch 6450-P48L
+    1.3.6.1.4.1.6486.800.1.1.2.1.12.1.19:
+      category: Layer 3 Switch
+      model: OmniSwitch 6450-P24X
+    1.3.6.1.4.1.6486.800.1.1.2.1.12.1.20:
+      category: Layer 3 Switch
+      model: OmniSwitch 6450-C48X
+    1.3.6.1.4.1.6486.800.1.1.2.1.12.1.21:
+      category: Layer 3 Switch
+      model: OmniSwitch 6450-P48X
+    1.3.6.1.4.1.6486.800.1.1.2.1.13.1.1:
+      category: Layer 3 Switch
+      model: OmniSwitch 6350C24
+    1.3.6.1.4.1.6486.800.1.1.2.1.13.1.4:
+      category: Layer 3 Switch
+      model: OmniSwitch 6350-P48
+    1.3.6.1.4.1.6486.800.1.1.2.1.13.1.5:
+      category: Layer 3 Switch
+      model: OmniSwitch 6350-10
+    1.3.6.1.4.1.6486.800.1.1.2.2.1.1.1:
+      category: Switch
+      model: OmniSwitch 4012
+    1.3.6.1.4.1.6486.800.1.1.2.2.1.1.2:
+      category: Switch
+      model: OmniSwitch 4024
+    1.3.6.1.4.1.6486.800.1.1.2.2.1.1.3:
+      category: Switch
+      model: OmniSwitch 4102
+    1.3.6.1.4.1.6486.800.1.1.2.2.2.1.1.1:
+      category: Firewall
+      model: OAW-5000
+    1.3.6.1.4.1.6486.800.1.1.2.2.2.1.1.2:
+      category: Firewall
+      model: OAW-4324
+    1.3.6.1.4.1.6486.800.1.1.2.2.2.1.1.3:
+      category: Firewall
+      model: OAW-4308
+    1.3.6.1.4.1.6486.800.1.1.2.2.2.1.1.4:
+      category: Firewall
+      model: OAW-6000*Firewall is the secondary capability of this device.
+    1.3.6.1.4.1.6486.800.1.1.2.2.2.1.1.5:
+      category: Firewall
+      model: OAW-4302
+    1.3.6.1.4.1.6486.800.1.1.2.2.2.1.1.6:
+      category: Layer 3 Switch
+      model: OAW-4504
+    1.3.6.1.4.1.6486.800.1.1.2.2.2.1.1.7:
+      category: Layer 3 Switch
+      model: OAW-4604
+    1.3.6.1.4.1.6486.800.1.1.2.2.2.1.1.8:
+      category: Layer 3 Switch
+      model: OAW-4704
+    1.3.6.1.4.1.6486.800.1.1.2.2.2.1.1.9:
+      category: Firewall
+      model: OAW-4304
+    1.3.6.1.4.1.6486.800.1.1.2.2.2.1.1.10:
+      category: Firewall
+      model: OAW-4306
+    1.3.6.1.4.1.6486.800.1.1.2.2.2.1.1.11:
+      category: Firewall
+      model: OAW-4306G
+    1.3.6.1.4.1.6486.800.1.1.2.2.2.1.1.12:
+      category: Firewall
+      model: OAW-4306GW
+    1.3.6.1.4.1.6486.800.1.1.2.2.4.1.1:
+      category: Switch
+      model: OmniStack LS 6224
+    1.3.6.1.4.1.6486.800.1.1.2.2.4.1.2:
+      category: Switch
+      model: OmniSwitch 6224P
+    1.3.6.1.4.1.6486.800.1.1.2.2.4.1.3:
+      category: Switch
+      model: OmniSwitch 6248
+    1.3.6.1.4.1.6486.800.1.1.2.2.4.1.4:
+      category: Switch
+      model: OmniSwitch 6248P
+    1.3.6.1.4.1.6486.800.1.1.2.2.4.1.5:
+      category: Switch
+      model: OmniSwitch 6224U
+    1.3.6.1.4.1.6486.800.1.1.2.2.4.1.6:
+      category: Switch
+      model: OmniStack LS 6200
+    1.3.6.1.4.1.6486.800.1.1.2.2.4.1.7:
+      category: Switch
+      model: OmniSwitch 6212P
+    1.3.6.1.4.1.6486.801.1.1.2.1.9.1.1:
+      category: Layer 3 Switch
+      model: OmniSwitch 10K
+    1.3.6.1.4.1.6486.801.1.1.2.1.10.1.1:
+      category: Layer 3 Switch
+      model: OmniSwitch 6900-X20
+    1.3.6.1.4.1.6486.801.1.1.2.1.10.1.2:
+      category: Layer 3 Switch
+      model: OS6900-X40
+    1.3.6.1.4.1.6486.801.1.1.2.1.10.1.3:
+      category: Layer 3 Switch
+      model: OmniSwitch 6900-T20
+    1.3.6.1.4.1.6486.801.1.1.2.1.10.1.4:
+      category: Layer 3 Switch
+      model: OmniSwitch 6900
+    1.3.6.1.4.1.6486.801.1.1.2.1.10.1.13:
+      category: Layer 3 Switch
+      model: OmniSwitch 6900-V48C8
+    1.3.6.1.4.1.6486.801.1.1.2.1.11.1.1:
+      category: Layer 3 Switch
+      model: OS6860-24
+    1.3.6.1.4.1.6486.801.1.1.2.1.11.1.9:
+      category: Layer 3 Switch
+      model: OmniSwitch 6860E-U28
+    1.3.6.1.4.1.6486.801.1.1.2.1.12.1.1:
+      model: OmniSwitch 9900
+
