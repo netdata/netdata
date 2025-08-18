@@ -20,7 +20,7 @@ jobs:
           - devel
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         id: checkout
         with:
           submodules: recursive

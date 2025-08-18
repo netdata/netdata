@@ -28,7 +28,7 @@ jobs:
     steps:
       - name: Checkout Agent
         id: checkout-agent
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 1
           submodules: recursive
