@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- chore\(go.d/snmp\): merge sysObjectIDs.json into meta\_overrides.yaml [\#20831](https://github.com/netdata/netdata/pull/20831) ([ilyam8](https://github.com/ilyam8))
+- improve\(go.d/snmp\): add more models to meta\_overrides.yaml [\#20830](https://github.com/netdata/netdata/pull/20830) ([ilyam8](https://github.com/ilyam8))
+- feat\(go.d/snmp\): add YAML overrides for sysobjectids mapping [\#20828](https://github.com/netdata/netdata/pull/20828) ([ilyam8](https://github.com/ilyam8))
 - refactor\(go.d\): move nd directories to dedicated pluginconfig package [\#20827](https://github.com/netdata/netdata/pull/20827) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): bump k8s.io/client-go from 0.33.3 to 0.33.4 in /src/go [\#20826](https://github.com/netdata/netdata/pull/20826) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Add ACLK buffer usage metrics [\#20820](https://github.com/netdata/netdata/pull/20820) ([stelfrag](https://github.com/stelfrag))
@@ -449,9 +452,6 @@
 - docs: Observability centralization points [\#20292](https://github.com/netdata/netdata/pull/20292) ([kanelatechnical](https://github.com/kanelatechnical))
 - Cisco yaml pass [\#20291](https://github.com/netdata/netdata/pull/20291) ([Ancairon](https://github.com/Ancairon))
 - Minor code adjustments [\#20290](https://github.com/netdata/netdata/pull/20290) ([stelfrag](https://github.com/stelfrag))
-- Fix when docker socket group id points to an existing group in container [\#20288](https://github.com/netdata/netdata/pull/20288) ([felipecrs](https://github.com/felipecrs))
-- Model Context Protocol \(MCP\) Part 2 [\#20287](https://github.com/netdata/netdata/pull/20287) ([ktsaou](https://github.com/ktsaou))
-- add "unix://" scheme to DOCKER\_HOST in run.sh [\#20286](https://github.com/netdata/netdata/pull/20286) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
