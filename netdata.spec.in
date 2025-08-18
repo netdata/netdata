@@ -47,6 +47,8 @@ AutoReqProv: yes
 %global _have_ebpf 0
 %endif
 
+%global _original_libdir %{_libdir}
+
 # Mitigate the cross-distro mayhem by strictly defining the libexec destination
 %define _prefix /usr
 %define _sysconfdir /etc
@@ -354,6 +356,7 @@ advanced correlations and fast root cause analysis, native horizontal scalabilit
 	%if 0%{?suse_version}
 	-DUSE_LTO=Off \
 	%endif
+	-DProtobuf_LIBRARY=%{_original_libdir}/libprotobuf.so \
 	%if %{_have_cups}
 	-DENABLE_PLUGIN_CUPS=On \
 	%else

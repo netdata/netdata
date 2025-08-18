@@ -129,20 +129,26 @@ macro(netdata_detect_protobuf)
                 endif()
 
                 if(TARGET protobuf::libprotobuf)
-                        if(NOT Protobuf_PROTOC_EXECUTABLE AND TARGET protobuf::protoc)
-                                set(Protobuf_PROTOC_EXECUTABLE protobuf::protoc)
-                        endif()
+                  get_property(IMPORTED_SET TARGET protobuf::libprotobuf PROPERTY IMPORTED_LOCATION SET)
 
-                        # It is technically possible that this may still not
-                        # be set by this point, so we need to check it and
-                        # fail noisily if it isn't because the build won't
-                        # work without it.
-                        if(NOT Protobuf_PROTOC_EXECUTABLE)
-                                message(FATAL_ERROR "Could not determine the location of the protobuf compiler for the detected version of protobuf.")
-                        endif()
+                  if(NOT IMPORTED_SET)
+                    set_property(TARGET protobuf::libprotobuf PROPERTY IMPORTED_LOCATION "${Protobuf_LIBRARY}")
+                  endif()
 
-                        set(PROTOBUF_PROTOC_EXECUTABLE ${Protobuf_PROTOC_EXECUTABLE})
-                        set(PROTOBUF_LIBRARIES protobuf::libprotobuf)
+                  if(NOT Protobuf_PROTOC_EXECUTABLE AND TARGET protobuf::protoc)
+                    set(Protobuf_PROTOC_EXECUTABLE protobuf::protoc)
+                  endif()
+
+                  # It is technically possible that this may still not
+                  # be set by this point, so we need to check it and
+                  # fail noisily if it isn't because the build won't
+                  # work without it.
+                  if(NOT Protobuf_PROTOC_EXECUTABLE)
+                    message(FATAL_ERROR "Could not determine the location of the protobuf compiler for the detected version of protobuf.")
+                  endif()
+
+                  set(PROTOBUF_PROTOC_EXECUTABLE ${Protobuf_PROTOC_EXECUTABLE})
+                  set(PROTOBUF_LIBRARIES protobuf::libprotobuf)
                 endif()
 
                 set(ENABLE_PROTOBUF True)
