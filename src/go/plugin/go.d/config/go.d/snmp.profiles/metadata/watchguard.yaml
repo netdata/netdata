@@ -1,0 +1,317 @@
+sysobjectids:
+  oid_overrides:
+    1.3.6.1.4.1.3097.1.4:
+      category: Firewall
+      model: FB X SERIES
+    1.3.6.1.4.1.3097.1.4.1:
+      category: Firewall
+      model: fbX500
+    1.3.6.1.4.1.3097.1.4.2:
+      category: Firewall
+      model: fbX550e
+    1.3.6.1.4.1.3097.1.4.3:
+      category: Firewall
+      model: fbX700
+    1.3.6.1.4.1.3097.1.4.4:
+      category: Firewall
+      model: fbX750e
+    1.3.6.1.4.1.3097.1.4.5:
+      category: Firewall
+      model: fbX750e-4
+    1.3.6.1.4.1.3097.1.4.6:
+      category: Firewall
+      model: fbX1000
+    1.3.6.1.4.1.3097.1.4.7:
+      category: Firewall
+      model: fbX1250e
+    1.3.6.1.4.1.3097.1.4.8:
+      category: Firewall
+      model: fbX1250e-4
+    1.3.6.1.4.1.3097.1.4.9:
+      category: Firewall
+      model: fbX2500
+    1.3.6.1.4.1.3097.1.4.10:
+      category: Firewall
+      model: fbX5000
+    1.3.6.1.4.1.3097.1.4.11:
+      category: Firewall
+      model: fbX5500e
+    1.3.6.1.4.1.3097.1.4.12:
+      category: Firewall
+      model: fbX6000
+    1.3.6.1.4.1.3097.1.4.13:
+      category: Firewall
+      model: fbX6500e
+    1.3.6.1.4.1.3097.1.4.14:
+      category: Firewall
+      model: fbX8000
+    1.3.6.1.4.1.3097.1.4.15:
+      category: Firewall
+      model: fbX8500e
+    1.3.6.1.4.1.3097.1.4.16:
+      category: Firewall
+      model: fbX8500e-F
+    1.3.6.1.4.1.3097.1.4.17:
+      category: Firewall
+      model: fbX10e
+    1.3.6.1.4.1.3097.1.4.18:
+      category: Firewall
+      model: fbX10e-W
+    1.3.6.1.4.1.3097.1.4.19:
+      category: Firewall
+      model: fbX20e
+    1.3.6.1.4.1.3097.1.4.20:
+      category: Firewall
+      model: fbX20e-W
+    1.3.6.1.4.1.3097.1.4.21:
+      category: Firewall
+      model: fbX55e
+    1.3.6.1.4.1.3097.1.4.22:
+      category: Firewall
+      model: fbX55e-W
+    1.3.6.1.4.1.3097.1.5:
+      category: Firewall
+      model: XTM SERIES
+    1.3.6.1.4.1.3097.1.5.1:
+      category: Firewall
+      model: xtm1050
+    1.3.6.1.4.1.3097.1.5.2:
+      category: Firewall
+      model: xtm1050-F
+    1.3.6.1.4.1.3097.1.5.3:
+      category: Firewall
+      model: xtm830-F
+    1.3.6.1.4.1.3097.1.5.4:
+      category: Firewall
+      model: xtm830
+    1.3.6.1.4.1.3097.1.5.5:
+      category: Firewall
+      model: xtm820
+    1.3.6.1.4.1.3097.1.5.6:
+      category: Firewall
+      model: xtm810
+    1.3.6.1.4.1.3097.1.5.7:
+      category: Firewall
+      model: xtm530
+    1.3.6.1.4.1.3097.1.5.8:
+      category: Firewall
+      model: xtm520
+    1.3.6.1.4.1.3097.1.5.9:
+      category: Firewall
+      model: xtm510
+    1.3.6.1.4.1.3097.1.5.10:
+      category: Firewall
+      model: XTM505
+    1.3.6.1.4.1.3097.1.5.11:
+      category: Firewall
+      model: xtm23
+    1.3.6.1.4.1.3097.1.5.12:
+      category: Firewall
+      model: xtm22
+    1.3.6.1.4.1.3097.1.5.13:
+      category: Firewall
+      model: xtm21
+    1.3.6.1.4.1.3097.1.5.14:
+      category: Firewall
+      model: xtm23-W
+    1.3.6.1.4.1.3097.1.5.15:
+      category: Firewall
+      model: xtm22-W
+    1.3.6.1.4.1.3097.1.5.16:
+      category: Firewall
+      model: xtm21-W
+    1.3.6.1.4.1.3097.1.5.17:
+      category: Firewall
+      model: xtm2050
+    1.3.6.1.4.1.3097.1.5.18:
+      category: Firewall
+      model: xtm25
+    1.3.6.1.4.1.3097.1.5.19:
+      category: Firewall
+      model: xtm25-W
+    1.3.6.1.4.1.3097.1.5.20:
+      category: Firewall
+      model: xtm26
+    1.3.6.1.4.1.3097.1.5.21:
+      category: Firewall
+      model: xtm26-W
+    1.3.6.1.4.1.3097.1.5.22:
+      category: Firewall
+      model: xtm33
+    1.3.6.1.4.1.3097.1.5.23:
+      category: Firewall
+      model: xtm33-W
+    1.3.6.1.4.1.3097.1.5.24:
+      category: Firewall
+      model: xtm330
+    1.3.6.1.4.1.3097.1.5.25:
+      category: Firewall
+      model: xtm545
+    1.3.6.1.4.1.3097.1.5.26:
+      category: Firewall
+      model: xtm535
+    1.3.6.1.4.1.3097.1.5.27:
+      category: Firewall
+      model: xtm525
+    1.3.6.1.4.1.3097.1.5.28:
+      category: Firewall
+      model: xtm515
+    1.3.6.1.4.1.3097.1.5.29:
+      category: Firewall
+      model: xtm2050A
+    1.3.6.1.4.1.3097.1.5.30:
+      category: Firewall
+      model: xtm850
+    1.3.6.1.4.1.3097.1.5.31:
+      category: Firewall
+      model: xtm860
+    1.3.6.1.4.1.3097.1.5.32:
+      category: Firewall
+      model: xtm870
+    1.3.6.1.4.1.3097.1.5.33:
+      category: Firewall
+      model: xtm870-F
+    1.3.6.1.4.1.3097.1.5.34:
+      category: Firewall
+      model: xtm1520
+    1.3.6.1.4.1.3097.1.5.35:
+      category: Firewall
+      model: xtm1525
+    1.3.6.1.4.1.3097.1.5.36:
+      category: Firewall
+      model: xtm2520
+    1.3.6.1.4.1.3097.1.5.37:
+      category: Firewall
+      model: xtmv-SM
+    1.3.6.1.4.1.3097.1.5.38:
+      category: Firewall
+      model: xtmv-MED
+    1.3.6.1.4.1.3097.1.5.39:
+      category: Firewall
+      model: xtmv-LG
+    1.3.6.1.4.1.3097.1.5.40:
+      category: Firewall
+      model: xtmv-DC
+    1.3.6.1.4.1.3097.1.5.41:
+      category: Firewall
+      model: xtmv-EXP
+    1.3.6.1.4.1.3097.1.5.42:
+      category: Firewall
+      model: xtmv
+    1.3.6.1.4.1.3097.1.5.43:
+      category: Firewall
+      model: xtm1520-RP
+    1.3.6.1.4.1.3097.1.5.44:
+      category: Firewall
+      model: xtm1525-RP
+    1.3.6.1.4.1.3097.1.5.45:
+      category: Firewall
+      model: T10
+    1.3.6.1.4.1.3097.1.5.46:
+      category: Firewall
+      model: M440
+    1.3.6.1.4.1.3097.1.5.47:
+      category: Firewall
+      model: T10 D
+    1.3.6.1.4.1.3097.1.5.48:
+      category: Firewall
+      model: T10 W
+    1.3.6.1.4.1.3097.1.5.49:
+      category: Firewall
+      model: M400
+    1.3.6.1.4.1.3097.1.5.50:
+      category: Firewall
+      model: M500
+    1.3.6.1.4.1.3097.1.5.51:
+      category: Firewall
+      model: M200
+    1.3.6.1.4.1.3097.1.5.52:
+      category: Firewall
+      model: M300
+    1.3.6.1.4.1.3097.1.5.53:
+      category: Firewall
+      model: Firebox T30
+    1.3.6.1.4.1.3097.1.5.54:
+      category: Firewall
+      model: Firebox T30-W
+    1.3.6.1.4.1.3097.1.5.55:
+      category: Firewall
+      model: T50
+    1.3.6.1.4.1.3097.1.5.56:
+      category: Firewall
+      model: T50-W
+    1.3.6.1.4.1.3097.1.5.57:
+      category: Firewall
+      model: M4600
+    1.3.6.1.4.1.3097.1.5.58:
+      category: Firewall
+      model: M5600
+    1.3.6.1.4.1.3097.1.5.59:
+      category: Firewall
+      model: T70
+    1.3.6.1.4.1.3097.1.5.60:
+      category: Firewall
+      model: Firebox V
+    1.3.6.1.4.1.3097.1.5.61:
+      category: Firewall
+      model: FireboxV-MC
+    1.3.6.1.4.1.3097.1.5.62:
+      category: Firewall
+      model: FireboxV-SM
+    1.3.6.1.4.1.3097.1.5.63:
+      category: Firewall
+      model: FireboxV-MED
+    1.3.6.1.4.1.3097.1.5.64:
+      category: Firewall
+      model: FireboxV-LG
+    1.3.6.1.4.1.3097.1.5.65:
+      category: Firewall
+      model: FireboxV-XLG
+    1.3.6.1.4.1.3097.1.5.66:
+      category: Firewall
+      model: M370
+    1.3.6.1.4.1.3097.1.5.67:
+      category: Firewall
+      model: M470
+    1.3.6.1.4.1.3097.1.5.68:
+      category: Firewall
+      model: M570
+    1.3.6.1.4.1.3097.1.5.69:
+      category: Firewall
+      model: M670
+    1.3.6.1.4.1.3097.1.5.70:
+      category: Firewall
+      model: T15
+    1.3.6.1.4.1.3097.1.5.71:
+      category: Firewall
+      model: T15-W
+    1.3.6.1.4.1.3097.1.5.72:
+      category: Firewall
+      model: T35
+    1.3.6.1.4.1.3097.1.5.73:
+      category: Firewall
+      model: T35-W
+    1.3.6.1.4.1.3097.1.5.74:
+      category: Firewall
+      model: T55
+    1.3.6.1.4.1.3097.1.5.75:
+      category: Firewall
+      model: T55-W
+    1.3.6.1.4.1.3097.1.5.76:
+      category: Firewall
+      model: Fireboxcloud
+    1.3.6.1.4.1.3097.1.5.77:
+      category: Firewall
+      model: Fireboxcloud-MC
+    1.3.6.1.4.1.3097.1.5.78:
+      category: Firewall
+      model: Fireboxcloud-SM
+    1.3.6.1.4.1.3097.1.5.79:
+      category: Firewall
+      model: Fireboxcloud-MED
+    1.3.6.1.4.1.3097.1.5.80:
+      category: Firewall
+      model: Fireboxcloud-LG
+    1.3.6.1.4.1.3097.1.5.81:
+      category: Firewall
+      model: Fireboxcloud-XLG

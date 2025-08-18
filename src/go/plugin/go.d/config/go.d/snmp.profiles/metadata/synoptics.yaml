@@ -1,0 +1,641 @@
+sysobjectids:
+  oid_overrides:
+    1.3.6.1.4.1.45.1.3.2:
+      model: SynopticsHub
+    1.3.6.1.4.1.45.1.3.6.1.4.1.1872.1.13.2.2:
+      model: "3416"
+    1.3.6.1.4.1.45.1.3.8:
+      model: S3000Trb
+    1.3.6.1.4.1.45.1.6:
+      category: Switch
+      model: Avaya Switch 4548
+    1.3.6.1.4.1.45.1.8.13:
+      category: Switch
+      model: LINKSWITCH 1000
+    1.3.6.1.4.1.45.1.8.14:
+      category: Switch
+      model: LINKSWITCH 500
+    1.3.6.1.4.1.45.1.8.15:
+      category: Switch
+      model: LINKSWITCH 2700AU
+    1.3.6.1.4.1.45.1.8.16:
+      category: Switch
+      model: LINKSWITCH 2700
+    1.3.6.1.4.1.45.1.8.18:
+      category: Switch
+      model: LINKSWITCH 2700TLIAU
+    1.3.6.1.4.1.45.1.8.19:
+      category: Switch
+      model: LINKSWITCH 2700TLI
+    1.3.6.1.4.1.45.1.8.22:
+      category: Switch
+      model: LINKSWITCH 3000
+    1.3.6.1.4.1.45.1.8.32:
+      model: Superstack 9000 SX
+    1.3.6.1.4.1.45.1.8.38:
+      model: SuperStack3 4300
+    1.3.6.1.4.1.45.1.8.43:
+      category: Switch
+      model: SWITCH 3870
+    1.3.6.1.4.1.45.1.8.44:
+      category: Switch
+      model: SWITCH 3870
+    1.3.6.1.4.1.45.1.8.57:
+      model: Baseline S2226 Plus
+    1.3.6.1.4.1.45.1.8.58:
+      model: Baseline S2250 Plus
+    1.3.6.1.4.1.45.1.8.59:
+      model: Baseline 2426 PWR Plus
+    1.3.6.1.4.1.45.1.8.60:
+      model: Baseline S2916-SFP Plus
+    1.3.6.1.4.1.45.1.8.61:
+      model: Baseline S2924-SFP Plus
+    1.3.6.1.4.1.45.1.8.62:
+      model: Baseline S2948-SFP Plus
+    1.3.6.1.4.1.45.1.8.63:
+      model: Baseline S2924-PWR Plus
+    1.3.6.1.4.1.45.1.8.71:
+      model: Baseline 2920-SFP Plus
+    1.3.6.1.4.1.45.1.8.72:
+      model: Baseline 2928-SFP Plus
+    1.3.6.1.4.1.45.1.8.73:
+      model: Baseline 2952-SFP Plus
+    1.3.6.1.4.1.45.1.8.74:
+      model: Baseline 2928-PWR Plus
+    1.3.6.1.4.1.45.1.8.75:
+      model: Baseline 2928-HPWR Plus
+    1.3.6.1.4.1.45.1.8.76:
+      model: Baseline S2226
+    1.3.6.1.4.1.45.1.8.77:
+      model: Baseline 2250-SFP Plus
+    1.3.6.1.4.1.45.1.8.78:
+      model: Baseline S2426
+    1.3.6.1.4.1.45.1.9.13.1.2.1:
+      model: Corebuilder 9000
+    1.3.6.1.4.1.45.1.9.13.3.1:
+      model: Corebuilder 9000
+    1.3.6.1.4.1.45.1.16.1.1.1.1:
+      model: Corebuilder 3500
+    1.3.6.1.4.1.45.1.16.2.2.1:
+      model: Superstack 3900
+    1.3.6.1.4.1.45.1.16.2.2.1.1:
+      category: Switch
+      model: SUPERSTACK II SWITCH 3900-24
+    1.3.6.1.4.1.45.1.16.2.2.1.2:
+      category: Switch
+      model: SUPERSTACK II SWITCH 3900-36
+    1.3.6.1.4.1.45.1.16.2.2.2:
+      model: Superstack 9300
+    1.3.6.1.4.1.45.1.16.2.2.2.1:
+      model: SuperStack 9300
+    1.3.6.1.4.1.45.1.16.4.2.26:
+      model: "6080"
+    1.3.6.1.4.1.45.1.16.4.3.4:
+      category: Switch
+      model: SWITCH 8807
+    1.3.6.1.4.1.45.1.16.4.3.5:
+      category: Switch
+      model: SWITCH 8810
+    1.3.6.1.4.1.45.1.16.4.3.6:
+      category: Switch
+      model: SWITCH 8814
+    1.3.6.1.4.1.45.1.16.4.3.7:
+      category: Switch
+      model: SWITCH 5500G-EI
+    1.3.6.1.4.1.45.1.16.4.3.8:
+      category: Switch
+      model: SWITCH 5500G 48-PORT
+    1.3.6.1.4.1.45.1.16.4.3.11:
+      category: Switch
+      model: SWITCH 5500-SI 28-PORT
+    1.3.6.1.4.1.45.1.16.4.3.12:
+      category: Switch
+      model: SWITCH 5500-52-SI
+    1.3.6.1.4.1.45.1.16.4.3.13:
+      category: Switch
+      model: SWITCH 5500-28-EI
+    1.3.6.1.4.1.45.1.16.4.3.14:
+      category: Switch
+      model: SWITCH 5500-EI 52-PORT
+    1.3.6.1.4.1.45.1.16.4.3.15:
+      category: Switch
+      model: SWITCH 5500-28-PWR-EI
+    1.3.6.1.4.1.45.1.16.4.3.16:
+      category: Switch
+      model: SWITCH 5500-52-PWR-EI
+    1.3.6.1.4.1.45.1.16.4.3.17:
+      category: Switch
+      model: SWITCH 5500-28-FX-EI
+    1.3.6.1.4.1.45.1.16.4.3.18:
+      category: Switch
+      model: SWITCH 5500G-EI 24-PORT-SFP
+    1.3.6.1.4.1.45.1.16.4.3.19:
+      category: Switch
+      model: SWITCH 7754
+    1.3.6.1.4.1.45.1.16.4.3.20:
+      category: Switch
+      model: SWITCH 7757
+    1.3.6.1.4.1.45.1.16.4.3.21:
+      model: 4500 26-Port
+    1.3.6.1.4.1.45.1.16.4.3.22:
+      category: Switch
+      model: SWITCH 4500 50-PORT
+    1.3.6.1.4.1.45.1.16.4.3.23:
+      category: Switch
+      model: SWITCH 4500-26-PWR
+    1.3.6.1.4.1.45.1.16.4.3.24:
+      category: Switch
+      model: SWITCH 4500-50-PWR
+    1.3.6.1.4.1.45.1.16.4.3.25:
+      category: Switch
+      model: SWITCH WITCH 7758
+    1.3.6.1.4.1.45.1.16.4.3.27:
+      model: 4200G 12-Port
+    1.3.6.1.4.1.45.1.16.4.3.28:
+      model: 4200G 24-Port
+    1.3.6.1.4.1.45.1.16.4.3.29:
+      category: Switch
+      model: SWITCH 4200G-48
+    1.3.6.1.4.1.45.1.16.4.3.30:
+      category: Switch
+      model: SWITCH 4500G 24-PORT
+    1.3.6.1.4.1.45.1.16.4.3.31:
+      category: Switch
+      model: SWITCH 4500G-48
+    1.3.6.1.4.1.45.1.16.4.3.32:
+      category: Switch
+      model: SWITCH 4500G-24-PWR
+    1.3.6.1.4.1.45.1.16.4.3.33:
+      category: Switch
+      model: SWITCH 4500G-48-PWR
+    1.3.6.1.4.1.45.1.16.4.3.34:
+      category: Switch
+      model: SWITCH 4800G 24-PORT
+    1.3.6.1.4.1.45.1.16.4.3.35:
+      category: Switch
+      model: SWITCH 4800G 48-PORT
+    1.3.6.1.4.1.45.1.16.4.3.36:
+      category: Switch
+      model: SWITCH 4800G PWR 24-PORT
+    1.3.6.1.4.1.45.1.16.4.3.37:
+      category: Switch
+      model: SWITCH 4800G PWR 48-PORT
+    1.3.6.1.4.1.45.1.16.4.3.38:
+      category: Switch
+      model: SWITCH 4800G 24-PORT-SFP
+    1.3.6.1.4.1.45.1.16.4.3.39:
+      category: Switch
+      model: SWITCH 8807-V5
+    1.3.6.1.4.1.45.1.16.4.3.40:
+      category: Switch
+      model: SWITCH 8810-V5
+    1.3.6.1.4.1.45.1.16.4.3.41:
+      category: Switch
+      model: SWITCH 8814-V5
+    1.3.6.1.4.1.45.1.16.4.3.42:
+      category: Switch
+      model: SWITCH 4210 9-PORT
+    1.3.6.1.4.1.45.1.16.4.3.43:
+      category: Switch
+      model: SWITCH 4210 18-PORT
+    1.3.6.1.4.1.45.1.16.4.3.44:
+      category: Switch
+      model: SWITCH 4210 26-PORT
+    1.3.6.1.4.1.45.1.16.4.3.45:
+      category: Switch
+      model: SWITCH 4210 52-PORT
+    1.3.6.1.4.1.45.1.16.4.3.46:
+      category: Switch
+      model: SWITCH 4210 9-PORT
+    1.3.6.1.4.1.45.1.16.4.3.47:
+      category: Switch
+      model: SWITCH 4210 18-PORT
+    1.3.6.1.4.1.45.1.16.4.3.48:
+      category: Switch
+      model: SWITCH 4210 26-PORT
+    1.3.6.1.4.1.45.1.16.4.3.49:
+      category: Switch
+      model: SWITCH 4200G-24-PWR
+    1.3.6.1.4.1.45.1.16.4.3.50:
+      category: Switch
+      model: SWITCH 7902E
+    1.3.6.1.4.1.45.1.16.4.3.51:
+      category: Switch
+      model: SWITCH 7903E
+    1.3.6.1.4.1.45.1.16.4.3.52:
+      category: Switch
+      model: SWITCH 7906E
+    1.3.6.1.4.1.45.1.16.4.3.53:
+      category: Switch
+      model: SWITCH 7906EV
+    1.3.6.1.4.1.45.1.16.4.3.54:
+      category: Switch
+      model: SWITCH 7910E
+    1.3.6.1.4.1.45.1.16.4.3.74:
+      category: Switch
+      model: SWITCH 7903E-S
+    1.3.6.1.4.1.45.1.16.4.3.77:
+      category: Switch
+      model: SWITCH 4210 26-PORT
+    1.3.6.1.4.1.45.1.16.4.3.80:
+      category: Switch
+      model: SWITCH 4210 PWR 26-PORT
+    1.3.6.1.4.1.45.1.16.4.3.83:
+      category: Switch
+      model: SWITCH 4510G-24
+    1.3.6.1.4.1.45.1.16.4.3.84:
+      category: Switch
+      model: SWITCH 4510G-48
+    1.3.6.1.4.1.45.3.1:
+      category: Switch
+      model: Bay Ethernet NMM 281XSA
+    1.3.6.1.4.1.45.3.2.1:
+      category: Switch
+      model: Bay Ethernet NMM 331XS
+    1.3.6.1.4.1.45.3.2.2:
+      category: Switch
+      model: Bay Token Ring NNM 351X
+    1.3.6.1.4.1.45.3.2.3:
+      category: Switch
+      model: Bay 3000-FDDI-NMM
+    1.3.6.1.4.1.45.3.3.1:
+      category: Router
+      model: Bay NMM 331XA
+    1.3.6.1.4.1.45.3.3.2:
+      category: Switch
+      model: Bay 3030-trNMM
+    1.3.6.1.4.1.45.3.9.1:
+      category: Switch
+      model: Bay-2715-trNMM
+    1.3.6.1.4.1.45.3.10.1:
+      category: Switch
+      model: Bay 291X-FDDI-NMM
+    1.3.6.1.4.1.45.3.12.1:
+      category: Switch
+      model: Bay 281X-enetNMM
+    1.3.6.1.4.1.45.3.13.1:
+      category: Router
+      model: Bay 5000
+    1.3.6.1.4.1.45.3.13.2:
+      category: Switch
+      model: Bay 5000-tokNMM
+    1.3.6.1.4.1.45.3.13.3:
+      category: Switch
+      model: Bay 5910S
+    1.3.6.1.4.1.45.3.13.5:
+      category: Switch
+      model: Bay 58000
+    1.3.6.1.4.1.45.3.13.6:
+      category: Switch
+      model: Bay 5616A/SA
+    1.3.6.1.4.1.45.3.14.1:
+      category: Switch
+      model: Bay 281XSA-enetNMM
+    1.3.6.1.4.1.45.3.15.1:
+      category: Switch
+      model: Baystack 28115
+    1.3.6.1.4.1.45.3.16.1:
+      category: Switch
+      model: SynOptics NMM 810M
+    1.3.6.1.4.1.45.3.17.1:
+      category: Switch
+      model: Bay 5310A/SA
+    1.3.6.1.4.1.45.3.17.2:
+      category: Switch
+      model: Bay 5510 TokenRing
+    1.3.6.1.4.1.45.3.17.3:
+      category: Switch
+      model: Bay 58000
+    1.3.6.1.4.1.45.3.19.1:
+      category: Switch
+      model: Bay 2715SA TokenRing
+    1.3.6.1.4.1.45.3.21.1:
+      category: Router
+      model: Bay 5000
+    1.3.6.1.4.1.45.3.22:
+      model: BaystackEthernet
+    1.3.6.1.4.1.45.3.22.1:
+      category: Switch
+      model: BayStack Ethernet
+    1.3.6.1.4.1.45.3.26:
+      model: Baystack100
+    1.3.6.1.4.1.45.3.26.1:
+      category: Switch
+      model: BayStack 100
+    1.3.6.1.4.1.45.3.27:
+      model: BaystackTr
+    1.3.6.1.4.1.45.3.27.1:
+      category: Router
+      model: Bay NMM 331XA
+    1.3.6.1.4.1.45.3.28.1:
+      category: Switch
+      model: Baystack 28200
+    1.3.6.1.4.1.45.3.29:
+      category: Switch
+      model: BayStack 302T/F
+    1.3.6.1.4.1.45.3.29.1:
+      category: Switch
+      model: BayStack 302T/F
+    1.3.6.1.4.1.45.3.30:
+      category: Switch
+      model: Baystack 350
+    1.3.6.1.4.1.45.3.30.1:
+      category: Switch
+      model: Baystack 350-F
+    1.3.6.1.4.1.45.3.30.2:
+      category: Switch
+      model: Baystack 350-24T
+    1.3.6.1.4.1.45.3.31:
+      model: Baystack150eth
+    1.3.6.1.4.1.45.3.31.1:
+      category: Router
+      model: Bay Stack 200
+    1.3.6.1.4.1.45.3.32:
+      model: Baystack303-304
+    1.3.6.1.4.1.45.3.32.1:
+      category: Switch
+      model: Baystack 303
+    1.3.6.1.4.1.45.3.32.2:
+      category: Switch
+      model: Baystack 310-24
+    1.3.6.1.4.1.45.3.33:
+      model: Baystack200eth
+    1.3.6.1.4.1.45.3.33.1:
+      category: Router
+      model: Bay Stack 200
+    1.3.6.1.4.1.45.3.34:
+      model: Baystack250eth
+    1.3.6.1.4.1.45.3.34.1:
+      category: Switch
+      model: Bay Stack 250
+    1.3.6.1.4.1.45.3.35:
+      category: Switch
+      model: Baystack 450
+    1.3.6.1.4.1.45.3.35.1:
+      category: Switch
+      model: Bay 450T
+    1.3.6.1.4.1.45.3.36:
+      category: Switch
+      model: Baystack 410
+    1.3.6.1.4.1.45.3.36.1:
+      category: Switch
+      model: Baystack 410
+    1.3.6.1.4.1.45.3.37:
+      model: BaystackICS
+    1.3.6.1.4.1.45.3.37.1:
+      model: BaystackICSNMM
+    1.3.6.1.4.1.45.3.38.1:
+      category: Switch
+      model: Passport 8100
+    1.3.6.1.4.1.45.3.38.2:
+      category: Switch
+      model: Passport 8010
+    1.3.6.1.4.1.45.3.39:
+      model: Baystack670
+    1.3.6.1.4.1.45.3.39.1:
+      model: Baystack670WLAN
+    1.3.6.1.4.1.45.3.40.1:
+      category: Switch
+      model: Nortel Business Policy Switch 2000
+    1.3.6.1.4.1.45.3.41:
+      model: Baystack3580
+    1.3.6.1.4.1.45.3.41.1:
+      model: Baystack3580-16F
+    1.3.6.1.4.1.45.3.42:
+      model: Baystack10
+    1.3.6.1.4.1.45.3.43:
+      category: Switch
+      model: Baystack 420
+    1.3.6.1.4.1.45.3.43.1:
+      category: Switch
+      model: Baystack 420
+    1.3.6.1.4.1.45.3.45:
+      category: Switch
+      model: Baystack 380
+    1.3.6.1.4.1.45.3.45.1:
+      category: Switch
+      model: Baystack 380
+    1.3.6.1.4.1.45.3.46:
+      category: Switch
+      model: Baystack 470
+    1.3.6.1.4.1.45.3.46.1:
+      category: Switch
+      model: Nortel BayStack Switch 470-48T
+    1.3.6.1.4.1.45.3.49:
+      category: Switch
+      model: Baystack 460-24T
+    1.3.6.1.4.1.45.3.49.1:
+      category: Switch
+      model: Nortel Ethernet Switch 460-24T-PWR
+    1.3.6.1.4.1.45.3.51:
+      category: Switch
+      model: Baystack 380-24F
+    1.3.6.1.4.1.45.3.51.1:
+      category: Switch
+      model: Baystack 380
+    1.3.6.1.4.1.45.3.52:
+      category: Switch
+      model: Baystack 5510-24T
+    1.3.6.1.4.1.45.3.52.1:
+      category: Switch
+      model: Nortel Routing Switch 5510-24T
+    1.3.6.1.4.1.45.3.53:
+      category: Switch
+      model: Baystack 5510-28T
+    1.3.6.1.4.1.45.3.53.1:
+      category: Switch
+      model: Nortel Routing Switch 5510-48T
+    1.3.6.1.4.1.45.3.54:
+      category: Switch
+      model: Baystack 470-24T
+    1.3.6.1.4.1.45.3.54.1:
+      category: Switch
+      model: Nortel Ethernet Switch 470-24t
+    1.3.6.1.4.1.45.3.57:
+      category: Switch
+      model: Baystack 425
+    1.3.6.1.4.1.45.3.57.1:
+      category: Switch
+      model: Nortel Ethernet Switch 425-48T
+    1.3.6.1.4.1.45.3.57.2:
+      category: Switch
+      model: Baystack 425
+    1.3.6.1.4.1.45.3.59.1:
+      category: Layer 3 Switch
+      model: Ethernet Routing Switch 5520-24T
+    1.3.6.1.4.1.45.3.59.2:
+      category: Layer 3 Switch
+      model: Ethernet Routing Switch 5520-48T
+    1.3.6.1.4.1.45.3.61.1:
+      category: Switch
+      model: Nortel BayStack Switch 325-24T
+    1.3.6.1.4.1.45.3.61.2:
+      category: Switch
+      model: Baystack 325-24G
+    1.3.6.1.4.1.45.3.63.1:
+      category: Layer 3 Switch
+      model: Ethernet Routing Switch 470-24T-PWR
+    1.3.6.1.4.1.45.3.64.1:
+      category: Switch
+      model: Baystack 470-28T-PWR
+    1.3.6.1.4.1.45.3.65:
+      category: Layer 3 Switch
+      model: Baystack 5530 24TFD
+    1.3.6.1.4.1.45.3.66:
+      category: Layer 3 Switch
+      model: Ethernet Switch 3510-24T
+    1.3.6.1.4.1.45.3.71:
+      category: Switch
+      model: 4500 Ethernet Routing Switch
+    1.3.6.1.4.1.45.3.71.1:
+      category: Layer 3 Switch
+      model: Ethernet Routing Switch 4548GT
+    1.3.6.1.4.1.45.3.71.2:
+      category: Layer 3 Switch
+      model: Ethernet Routing Switch 4548GT-PWR
+    1.3.6.1.4.1.45.3.71.3:
+      category: Layer 3 Switch
+      model: Ethernet Routing Switch 4550T
+    1.3.6.1.4.1.45.3.71.4:
+      category: Layer 3 Switch
+      model: Ethernet Routing Switch 4550T-PWR
+    1.3.6.1.4.1.45.3.71.5:
+      category: Switch
+      model: 4526FX Ethernet Routing Switch
+    1.3.6.1.4.1.45.3.71.6:
+      category: Switch
+      model: 4526GTX-PWR Ethernet Routing Switch
+    1.3.6.1.4.1.45.3.71.7:
+      category: Switch
+      model: 4526GTX Ethernet Routing Switch
+    1.3.6.1.4.1.45.3.71.8:
+      category: Switch
+      model: 4524GT Ethernet Routing Switch
+    1.3.6.1.4.1.45.3.71.9:
+      category: Layer 3 Switch
+      model: Ethernet Routing Switch 4526T-PWR
+    1.3.6.1.4.1.45.3.71.10:
+      category: Switch
+      model: 4526T Ethernet Routing Switch
+    1.3.6.1.4.1.45.3.71.11:
+      category: Layer 3 Switch
+      model: Ethernet Routing Switch 4524GT-PWR
+    1.3.6.1.4.1.45.3.72:
+      category: Switch
+      model: 2500 Series Ethernet Routing Switch
+    1.3.6.1.4.1.45.3.72.1:
+      category: Layer 3 Switch
+      model: Ethernet Routing Switch 2526T
+    1.3.6.1.4.1.45.3.72.2:
+      category: Switch
+      model: 2526T-PWR Ethernet Routing Switch
+    1.3.6.1.4.1.45.3.72.3:
+      category: Switch
+      model: 2550T Ethernet Routing Switch
+    1.3.6.1.4.1.45.3.72.4:
+      category: Switch
+      model: 2550T-PWR Ethernet Routing Switch
+    1.3.6.1.4.1.45.3.74.1:
+      category: Layer 3 Switch
+      model: Ethernet Routing Switch 5698TFD-PWR
+    1.3.6.1.4.1.45.3.74.2:
+      category: Layer 3 Switch
+      model: Ethernet Routing Switch 5698TFD
+    1.3.6.1.4.1.45.3.74.3:
+      category: Switch
+      model: Avaya 5650TD-PWR
+    1.3.6.1.4.1.45.3.74.4:
+      category: Layer 3 Switch
+      model: Ethernet Routing Switch 5650TD
+    1.3.6.1.4.1.45.3.74.5:
+      category: Layer 3 Switch
+      model: Ethernet Routing Switch 5632FD
+    1.3.6.1.4.1.45.3.78.1:
+      category: Layer 3 Switch
+      model: Ethernet Routing Switch 4826GTS-PWR+
+    1.3.6.1.4.1.45.3.78.2:
+      category: Layer 3 Switch
+      model: Ethernet Routing Switch 4850GTS-PWR+
+    1.3.6.1.4.1.45.3.78.3:
+      category: Layer 3 Switch
+      model: 4826GTS
+    1.3.6.1.4.1.45.3.78.4:
+      category: Switch
+      model: Ethernet Routing Switch 4850GTS
+    1.3.6.1.4.1.45.3.79.1:
+      category: Switch
+      model: VSP-7024XLS
+    1.3.6.1.4.1.45.3.80.1:
+      category: Switch
+      model: Nortel BayStack Switch 3500T
+    1.3.6.1.4.1.45.3.80.3:
+      category: Layer 3 Switch
+      model: 3524GT
+    1.3.6.1.4.1.45.3.80.4:
+      category: Layer 3 Switch
+      model: 3524GT-PWR+
+    1.3.6.1.4.1.45.3.80.5:
+      category: Layer 3 Switch
+      model: ERS 3510GT
+    1.3.6.1.4.1.45.3.80.6:
+      category: Layer 3 Switch
+      model: ERS 3510GT-PWR+
+    1.3.6.1.4.1.45.3.81.2:
+      category: Layer 3 Switch
+      model: ERS 5928GTS-PWR+
+    1.3.6.1.4.1.45.3.81.3:
+      category: Layer 3 Switch
+      model: ERS 5952GTS
+    1.3.6.1.4.1.45.3.81.4:
+      category: Layer 3 Switch
+      model: ERS 5952GTS-PWR+
+    1.3.6.1.4.1.45.3.81.5:
+      category: Layer 3 Switch
+      model: ERS 5928GTS-uPWR
+    1.3.6.1.4.1.45.3.81.7:
+      category: Layer 3 Switch
+      model: ERS 59100GTS-PWR+
+    1.3.6.1.4.1.45.3.82.2:
+      category: Layer 3 Switch
+      model: ERS 4926GTS-PWR+
+    1.3.6.1.4.1.45.3.82.3:
+      category: Layer 3 Switch
+      model: ERS 4950GTS
+    1.3.6.1.4.1.45.3.82.4:
+      category: Layer 3 Switch
+      model: ERS 4950GTS-PWR+
+    1.3.6.1.4.1.45.3.83.1:
+      category: Layer 3 Switch
+      model: ERS 3626GTS
+    1.3.6.1.4.1.45.3.83.2:
+      category: Layer 3 Switch
+      model: ERS 3626GTS-PWR+
+    1.3.6.1.4.1.45.3.83.4:
+      model: Ethernet Routing Switch 3650GTS-PWR+
+    1.3.6.1.4.1.45.6.1.3.1:
+      model: WLAN
+    1.3.6.1.4.1.45.6.1.3.1.3:
+      category: Switch
+      model: Nortel WLAN 2380
+    1.3.6.1.4.1.45.6.1.3.1.6:
+      category: Wireless LAN Controller
+      model: Wireless Security Switch 2382
+    1.3.6.1.4.1.45.8.1.1003:
+      category: Access Point
+      model: WAP9133
+    1.3.6.1.4.1.45.8.1.1009:
+      category: Access Point
+      model: WAP9144
+    1.3.6.1.4.1.45.10.27.4.1.2.1:
+      model: SuperStack 1100
+    1.3.6.1.4.1.45.10.27.4.1.2.2:
+      model: SuperStack 3300
+    1.3.6.1.4.1.45.10.27.4.1.2.4:
+      model: SuperStack 4400
+    1.3.6.1.4.1.45.10.27.4.1.2.5:
+      model: SuperStack 4900
+    1.3.6.1.4.1.45.10.27.4.1.2.10:
+      category: Switch
+      model: SWITCH 40X0
+    1.3.6.1.4.1.45.10.27.4.1.2.11:
+      model: SuperStack 4200
