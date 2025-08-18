@@ -240,7 +240,6 @@ struct mqtt_ng_client {
     unsigned int ping_pending:1;
 
     struct mqtt_ng_stats stats;
-    SPINLOCK stats_spinlock;
 
     struct {
         SPINLOCK spinlock;
@@ -620,7 +619,6 @@ struct mqtt_ng_client *mqtt_ng_init(struct mqtt_ng_init *settings)
 
     client->rx_aliases = RX_ALIASES_INITIALIZE();
 
-    spinlock_init(&client->stats_spinlock);
     spinlock_init(&client->tx_topic_aliases.spinlock);
 
     client->tx_topic_aliases.stoi_dict = TX_ALIASES_INITIALIZE();
@@ -866,9 +864,7 @@ static void add_packet_to_timeout_monitor_list(struct mqtt_ng_client *client, ui
                     __LINE__);                                                                                         \
         }                                                                                                              \
         if (_rc == MQTT_NG_MSGGEN_OK) {                                                                                \
-            spinlock_lock(&client->stats_spinlock);                                                                    \
-            client->stats.tx_messages_queued++;                                                                        \
-            spinlock_unlock(&client->stats_spinlock);                                                                  \
+            __atomic_fetch_add(&client->stats.tx_messages_queued, 1, __ATOMIC_RELAXED);                                \
         }                                                                                                              \
         _rc;                                                                                                           \
     })
@@ -1050,19 +1046,13 @@ int mqtt_ng_connect(
     mqtt_ng_destroy_rx_alias_hash(client->rx_aliases);
     client->rx_aliases = RX_ALIASES_INITIALIZE();
 
-    client->connect_msg = mqtt_ng_generate_connect(&client->main_buffer, auth, lwt, clean_start, keep_alive);
+    client->connect_msg = mqtt_ng_generate_connect(&client->main_buffer, auth, lwt, keep_alive);
     if (client->connect_msg == NULL)
         return 1;
 
-    spinlock_lock(&client->stats_spinlock);
-    if (clean_start)
-        client->stats.tx_messages_queued = 1;
-    else
-        client->stats.tx_messages_queued++;
-
-    client->stats.tx_messages_sent = 0;
-    client->stats.rx_messages_rcvd = 0;
-    spinlock_unlock(&client->stats_spinlock);
+     __atomic_store_n(&client->stats.tx_messages_queued, 1, __ATOMIC_RELAXED);
+     __atomic_store_n(&client->stats.tx_messages_sent, 0, __ATOMIC_RELAXED);
+     __atomic_store_n(&client->stats.rx_messages_rcvd, 0, __ATOMIC_RELAXED);
 
     client->client_state = MQTT_STATE_CONNECT_PENDING;
     return 0;
@@ -2054,11 +2044,9 @@ static int send_fragment(struct mqtt_ng_client *client) {
 
     if (frag->flags & BUFFER_FRAG_MQTT_PACKET_TAIL) {
         client->time_of_last_send = time(NULL);
-        spinlock_lock(&client->stats_spinlock);
         if (client->main_buffer.sending_frag != &ping_frag)
-            client->stats.tx_messages_queued--;
-        client->stats.tx_messages_sent++;
-        spinlock_unlock(&client->stats_spinlock);
+            __atomic_fetch_sub(&client->stats.tx_messages_queued, 1, __ATOMIC_RELAXED);
+        __atomic_fetch_add(&client->stats.tx_messages_sent, 1, __ATOMIC_RELAXED);
         client->main_buffer.sending_frag = NULL;
         return 1;
     }
@@ -2093,9 +2081,7 @@ int handle_incoming_traffic(struct mqtt_ng_client *client)
 
     struct mqtt_publish *pub;
     struct mqtt_property *prop;
-    spinlock_lock(&client->stats_spinlock);
-    client->stats.rx_messages_rcvd++;
-    spinlock_unlock(&client->stats_spinlock);
+    __atomic_fetch_add(&client->stats.rx_messages_rcvd, 1, __ATOMIC_RELAXED);
 
     uint8_t ctrl_packet_type = get_control_packet_type(client->parser.mqtt_control_packet_type);
     switch (ctrl_packet_type) {
@@ -2271,9 +2257,10 @@ void mqtt_ng_set_max_mem(struct mqtt_ng_client *client, size_t bytes)
 
 void mqtt_ng_get_stats(struct mqtt_ng_client *client, struct mqtt_ng_stats *stats)
 {
-    spinlock_lock(&client->stats_spinlock);
-    memcpy(stats, &client->stats, sizeof(struct mqtt_ng_stats));
-    spinlock_unlock(&client->stats_spinlock);
+    stats->tx_messages_queued = __atomic_load_n(&client->stats.tx_messages_queued, __ATOMIC_RELAXED);
+    stats->tx_messages_sent = __atomic_load_n(&client->stats.tx_messages_sent, __ATOMIC_RELAXED);
+    stats->rx_messages_rcvd = __atomic_load_n(&client->stats.rx_messages_rcvd, __ATOMIC_RELAXED);
+    stats->packets_waiting_puback = __atomic_load_n(&client->stats.packets_waiting_puback, __ATOMIC_RELAXED);
 
     stats->tx_bytes_queued = 0;
     stats->tx_buffer_reclaimable = 0;
