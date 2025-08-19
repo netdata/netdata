@@ -22,7 +22,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Prepare tools
         id: prepare
         run: |
@@ -67,7 +67,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       # Actually check the EOL date for the platform.
       - name: Check EOL Date
         id: check
