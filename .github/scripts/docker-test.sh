@@ -32,4 +32,5 @@ if ! "${SCRIPT_DIR}/../../packaging/runtime-check.sh"; then
   echo "::group::Netdata container logs"
   docker logs netdata 2>&1
   echo "::endgroup::"
+  exit 1
 fi
