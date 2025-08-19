@@ -172,9 +172,6 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
         host->rrdlabels = sql_load_host_labels((nd_uuid_t *)argv[IDX_HOST_ID]);
         host->stream.snd.status.last_connected = last_connected;
 
-        if (argv[IDX_OS] && strcmp(argv[IDX_OS], NETDATA_VIRTUAL_HOST) == 0)
-            rrdhost_option_set(host, RRDHOST_OPTION_VIRTUAL_HOST);
-
         pulse_host_status(host, 0, 0); // this will detect the receiver status
     }
 
