@@ -18,7 +18,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
           submodules: recursive
@@ -61,7 +61,7 @@ jobs:
       matrix: ${{ steps.get-version.outputs.matrix }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Install dependencies
         run: |
           sudo apt-get update || true
@@ -91,7 +91,7 @@ jobs:
           go-version: ${{ matrix.version }}
       - name: Checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: recursive
       - name: Go mod download
@@ -155,7 +155,7 @@ jobs:
           go-version: ${{ matrix.version }}
       - name: Checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: recursive
       - name: Set GOOS and GOARCH
