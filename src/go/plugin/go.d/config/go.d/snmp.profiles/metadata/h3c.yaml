@@ -1,243 +1,350 @@
 sysobjectids:
   oid_overrides:
     # https://github.com/librenms/librenms/blob/master/mibs/comware/HH3C-PRODUCT-ID-MIB
-    1.3.6.1.4.1.25506.1.*:
-      category: Switch
-    1.3.6.1.4.1.25506.2.*:
-      category: Router
-    1.3.6.1.4.1.25506.3.*:
-      category: Wireless
-    1.3.6.1.4.1.25506.4.*:
-      category: Firewall
     1.3.6.1.4.1.25506.1.1:
+      category: Switch
       model: S5500-28C-EI
     1.3.6.1.4.1.25506.1.2:
+      category: Switch
       model: S5500-52C-EI
     1.3.6.1.4.1.25506.1.3:
+      category: Switch
       model: S5500-28C-PWR-EI
     1.3.6.1.4.1.25506.1.4:
+      category: Switch
       model: S5500-52C-PWR-EI
     1.3.6.1.4.1.25506.1.5:
+      category: Switch
       model: S5500-28F-EI
     1.3.6.1.4.1.25506.1.6:
+      category: Switch
       model: S5500-28C-EI-DC
     1.3.6.1.4.1.25506.1.7:
+      category: Switch
       model: S6100-20Q-SI
     1.3.6.1.4.1.25506.1.8:
+      category: Switch
       model: S5500-28C-SI
     1.3.6.1.4.1.25506.1.9:
+      category: Switch
       model: S5500-52C-SI
     1.3.6.1.4.1.25506.1.10:
+      category: Switch
       model: S5500-28C-PWR-EI
     1.3.6.1.4.1.25506.1.11:
+      category: Switch
       model: S5500-52C-PWR-SI
     1.3.6.1.4.1.25506.1.12:
+      category: Switch
       model: S5510-24P
     1.3.6.1.4.1.25506.1.13:
+      category: Switch
       model: S5510-24F
     1.3.6.1.4.1.25506.1.14:
+      category: Switch
       model: S3610-28P
     1.3.6.1.4.1.25506.1.15:
+      category: Switch
       model: S3610-52P
     1.3.6.1.4.1.25506.1.16:
+      category: Switch
       model: S3610-28TP
     1.3.6.1.4.1.25506.1.17:
+      category: Switch
       model: S3610-28F
     1.3.6.1.4.1.25506.1.18:
-      model: H3C e126
+      category: Switch
+      model: e126
     1.3.6.1.4.1.25506.1.19:
-      model: H3C e328
+      category: Switch
+      model: e328
     1.3.6.1.4.1.25506.1.20:
-      model: H3C e352
+      category: Switch
+      model: e352
     1.3.6.1.4.1.25506.1.21:
+      category: Switch
       model: S3100-8C-SI
     1.3.6.1.4.1.25506.1.22:
+      category: Switch
       model: S3100-16C-SI
     1.3.6.1.4.1.25506.1.23:
+      category: Switch
       model: S3100-26C-SI
     1.3.6.1.4.1.25506.1.24:
+      category: Switch
       model: S3100-8T-SI
     1.3.6.1.4.1.25506.1.25:
+      category: Switch
       model: S3100-16T-SI
     1.3.6.1.4.1.25506.1.26:
+      category: Switch
       model: S3100-26T-SI
     1.3.6.1.4.1.25506.1.27:
+      category: Switch
       model: S3100-26TP-SI
     1.3.6.1.4.1.25506.1.28:
+      category: Switch
       model: S5100-24P-EI
     1.3.6.1.4.1.25506.1.29:
+      category: Switch
       model: S5100-26C-EI
     1.3.6.1.4.1.25506.1.30:
+      category: Switch
       model: S5100-50C-EI
     1.3.6.1.4.1.25506.1.31:
+      category: Switch
       model: S5100-48P-EI
     1.3.6.1.4.1.25506.1.32:
+      category: Switch
       model: S3600-28P-SI
     1.3.6.1.4.1.25506.1.33:
+      category: Switch
       model: S3600-52P-SI
     1.3.6.1.4.1.25506.1.34:
+      category: Switch
       model: S3600-28TP-SI
     1.3.6.1.4.1.25506.1.35:
+      category: Switch
       model: S3600-28P-PWR-SI
     1.3.6.1.4.1.25506.1.36:
+      category: Switch
       model: S3600-52P-PWR-SI
     1.3.6.1.4.1.25506.1.37:
+      category: Switch
       model: S3600-28P-EI
     1.3.6.1.4.1.25506.1.38:
+      category: Switch
       model: S3600-52P-EI
     1.3.6.1.4.1.25506.1.39:
+      category: Switch
       model: S3600-28P-PWR-EI
     1.3.6.1.4.1.25506.1.40:
+      category: Switch
       model: S3600-52P-PWR-EI
     1.3.6.1.4.1.25506.1.41:
+      category: Switch
       model: S3600-28F-EI
     1.3.6.1.4.1.25506.1.42:
+      category: Switch
       model: S5600-26C
     1.3.6.1.4.1.25506.1.43:
+      category: Switch
       model: S5600-50C
     1.3.6.1.4.1.25506.1.44:
+      category: Switch
       model: S5600-26C-PWR
     1.3.6.1.4.1.25506.1.45:
+      category: Switch
       model: S5600-50C-PWR
     1.3.6.1.4.1.25506.1.46:
+      category: Switch
       model: S5600-26F
     1.3.6.1.4.1.25506.1.47:
+      category: Switch
       model: S3600-52G-HI
     1.3.6.1.4.1.25506.1.48:
+      category: Switch
       model: S3600-52P-HI
     1.3.6.1.4.1.25506.1.49:
+      category: Switch
       model: S3600-28G-HI
     1.3.6.1.4.1.25506.1.50:
+      category: Switch
       model: S3600-28P-HI
     1.3.6.1.4.1.25506.1.51:
+      category: Switch
       model: S3600-52M-HI
     1.3.6.1.4.1.25506.1.52:
+      category: Switch
       model: S7502
     1.3.6.1.4.1.25506.1.53:
+      category: Switch
       model: S7503
     1.3.6.1.4.1.25506.1.54:
+      category: Switch
       model: S7506
     1.3.6.1.4.1.25506.1.55:
+      category: Switch
       model: S7506R
     1.3.6.1.4.1.25506.1.57:
-      model: H3C ar28-09
+      category: Router
+      model: ar28-09
     1.3.6.1.4.1.25506.1.58:
+      category: Router
       model: ar28-10
     1.3.6.1.4.1.25506.1.59:
-      model: H3C ar28-11
+      category: Router
+      model: ar28-11
     1.3.6.1.4.1.25506.1.60:
-      model: H3C ar28-12
+      category: Router
+      model: ar28-12
     1.3.6.1.4.1.25506.1.61:
-      model: H3C ar28-13
+      category: Router
+      model: ar28-13
     1.3.6.1.4.1.25506.1.62:
-      model: H3C ar28-14
+      category: Router
+      model: ar28-14
     1.3.6.1.4.1.25506.1.63:
-      model: H3C ar28-30
+      category: Router
+      model: ar28-30
     1.3.6.1.4.1.25506.1.64:
-      model: H3C ar28-31
+      category: Router
+      model: ar28-31
     1.3.6.1.4.1.25506.1.65:
-      model: H3C ar28-40
+      category: Router
+      model: ar28-40
     1.3.6.1.4.1.25506.1.66:
+      category: Router
       model: ar28-80
     1.3.6.1.4.1.25506.1.67:
-      model: H3C ar46-20
+      category: Router
+      model: ar46-20
     1.3.6.1.4.1.25506.1.68:
-      model: H3C ar46-40
+      category: Router
+      model: ar46-40
     1.3.6.1.4.1.25506.1.69:
-      model: H3C ar46-80
+      category: Router
+      model: ar46-80
     1.3.6.1.4.1.25506.1.70:
+      category: Router
       model: MSR20-20
     1.3.6.1.4.1.25506.1.71:
+      category: Router
       model: MSR20-21
     1.3.6.1.4.1.25506.1.72:
+      category: Router
       model: MSR20-40
     1.3.6.1.4.1.25506.1.73:
-      model: H3C msr30-20
+      category: Router
+      model: msr30-20
     1.3.6.1.4.1.25506.1.74:
+      category: Router
       model: MSR30-40
     1.3.6.1.4.1.25506.1.75:
-      model: H3C msr30-60
+      category: Router
+      model: msr30-60
     1.3.6.1.4.1.25506.1.76:
+      category: Router
       model: MSR50-40
     1.3.6.1.4.1.25506.1.77:
+      category: Router
       model: MSR50-60
     1.3.6.1.4.1.25506.1.88:
+      category: Router
       model: ar18-21
     1.3.6.1.4.1.25506.1.89:
+      category: Router
       model: ar18-21A
     1.3.6.1.4.1.25506.1.90:
+      category: Router
       model: ar18-21B
     1.3.6.1.4.1.25506.1.91:
-      model: H3C ar18-22
+      category: Router
+      model: ar18-22
     1.3.6.1.4.1.25506.1.92:
+      category: Router
       model: ar18-22-8
     1.3.6.1.4.1.25506.1.93:
-      model: H3C ar18-22S-8
+      category: Router
+      model: ar18-22S-8
     1.3.6.1.4.1.25506.1.94:
-      model: H3C ar18-22-24
+      category: Router
+      model: ar18-22-24
     1.3.6.1.4.1.25506.1.95:
-      model: H3C ar18-23-1
+      category: Router
+      model: ar18-23-1
     1.3.6.1.4.1.25506.1.96:
-      model: H3C ar18-23S-1
+      category: Router
+      model: ar18-23S-1
     1.3.6.1.4.1.25506.1.98:
-      model: H3C ar18-30E
+      category: Router
+      model: ar18-30E
     1.3.6.1.4.1.25506.1.100:
-      model: H3C ar18-31E
+      category: Router
+      model: ar18-31E
     1.3.6.1.4.1.25506.1.102:
+      category: Router
       model: ar18-32E
     1.3.6.1.4.1.25506.1.103:
+      category: Router
       model: ar18-33
     1.3.6.1.4.1.25506.1.104:
-      model: H3C ar18-33E
+      category: Router
+      model: ar18-33E
     1.3.6.1.4.1.25506.1.105:
+      category: Router
       model: ar18-34
     1.3.6.1.4.1.25506.1.106:
-      model: H3C ar18-34E
+      category: Router
+      model: ar18-34E
     1.3.6.1.4.1.25506.1.108:
-      model: H3C ar18-35E
+      category: Router
+      model: ar18-35E
     1.3.6.1.4.1.25506.1.109:
+      category: Router
       model: ar18-63-1
     1.3.6.1.4.1.25506.1.110:
-      model: H3C hh3c-secpathF100-C
+      category: Firewall
+      model: hh3c-secpathF100-C
     1.3.6.1.4.1.25506.1.111:
-      model: H3C secpathF100-A
+      category: Firewall
+      model: secpathF100-A
     1.3.6.1.4.1.25506.1.112:
-      model: H3C hh3c-secpathF100-S
+      category: Firewall
+      model: hh3c-secpathF100-S
     1.3.6.1.4.1.25506.1.113:
+      category: Firewall
       model: secpathF100-E
     1.3.6.1.4.1.25506.1.114:
+      category: Firewall
       model: secpathF1000-S
     1.3.6.1.4.1.25506.1.115:
-      model: H3C hh3c-secpathF1000-A
+      category: Firewall
+      model: hh3c-secpathF1000-A
     1.3.6.1.4.1.25506.1.116:
-      model: H3C secpathF1800-A
+      category: Firewall
+      model: secpathF1800-A
     1.3.6.1.4.1.25506.1.117:
-      model: H3C secpathV100-S
+      category: Firewall
+      model: secpathV100-S
     1.3.6.1.4.1.25506.1.118:
-      model: H3C hh3c-secpathV1000-A
+      category: Firewall
+      model: hh3c-secpathV1000-A
     1.3.6.1.4.1.25506.1.119:
-      model: H3C secpathF100-AW
+      category: Firewall
+      model: secpathF100-AW
     1.3.6.1.4.1.25506.1.120:
-      model: H3C secpathF1800-S
+      category: Firewall
+      model: secpathF1800-S
     1.3.6.1.4.1.25506.1.121:
-      model: H3C hh3c-secpathF1800-E
+      category: Firewall
+      model: hh3c-secpathF1800-E
     1.3.6.1.4.1.25506.1.122:
-      model: H3C secpoint
+      category: Firewall
+      model: secpoint
     1.3.6.1.4.1.25506.1.123:
+      category: VoIP Gateway
       model: vg10-10
     1.3.6.1.4.1.25506.1.124:
+      category: VoIP Gateway
       model: vg10-11
     1.3.6.1.4.1.25506.1.125:
+      category: VoIP Gateway
       model: vg10-40
     1.3.6.1.4.1.25506.1.126:
+      category: VoIP Gateway
       model: vg10-41
     1.3.6.1.4.1.25506.1.127:
+      category: VoIP Gateway
       model: vg21-08
     1.3.6.1.4.1.25506.1.128:
+      category: VoIP Gateway
       model: vg20-16
     1.3.6.1.4.1.25506.1.129:
+      category: VoIP Gateway
       model: vg20-32
     1.3.6.1.4.1.25506.1.130:
+      category: VoIP Gateway
       model: vg80-20
     1.3.6.1.4.1.25506.1.131:
       model: xe200
@@ -260,722 +367,1073 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.140:
       model: xe7605
     1.3.6.1.4.1.25506.1.141:
+      category: NAS
       model: neoceanIX1000
     1.3.6.1.4.1.25506.1.142:
+      category: NAS
       model: neoceanEX1000
     1.3.6.1.4.1.25506.1.143:
+      category: NAS
       model: neoceanEX800
     1.3.6.1.4.1.25506.1.144:
+      category: NAS
       model: neoceanIX5000
     1.3.6.1.4.1.25506.1.145:
+      category: NAS
       model: neoceanIV5100
     1.3.6.1.4.1.25506.1.146:
+      category: NAS
       model: neoceanIV5200
     1.3.6.1.4.1.25506.1.147:
+      category: Switch
       model: S9502
     1.3.6.1.4.1.25506.1.148:
+      category: Switch
       model: S9505
     1.3.6.1.4.1.25506.1.149:
+      category: Switch
       model: S9508
     1.3.6.1.4.1.25506.1.150:
+      category: Switch
       model: S9508V
     1.3.6.1.4.1.25506.1.151:
+      category: Switch
       model: S9512
     1.3.6.1.4.1.25506.1.152:
-      model: H3C sR8812
+      category: Router
+      model: sR8812
     1.3.6.1.4.1.25506.1.153:
-      model: H3C sR8808
+      category: Router
+      model: sR8808
     1.3.6.1.4.1.25506.1.154:
-      model: H3C sR8805
+      category: Router
+      model: sR8805
     1.3.6.1.4.1.25506.1.155:
-      model: H3C sR8802
+      category: Router
+      model: sR8802
     1.3.6.1.4.1.25506.1.156:
-      model: H3C e126-SI
+      category: Switch
+      model: e126-SI
     1.3.6.1.4.1.25506.1.157:
+      category: VoIP Gateway
       model: Vg31-08
     1.3.6.1.4.1.25506.1.158:
-      model: H3C dr834
+      category: Router
+      model: dr834
     1.3.6.1.4.1.25506.1.159:
+      category: Switch
       model: S7510E
     1.3.6.1.4.1.25506.1.160:
+      category: Switch
       model: S5100-24P-SI
     1.3.6.1.4.1.25506.1.161:
+      category: Switch
       model: S5100-48P-SI
     1.3.6.1.4.1.25506.1.162:
+      category: Switch
       model: S5100-8P-SI
     1.3.6.1.4.1.25506.1.163:
+      category: Switch
       model: S5100-16P-SI
     1.3.6.1.4.1.25506.1.164:
+      category: Switch
       model: S5100-8P-EI
     1.3.6.1.4.1.25506.1.165:
+      category: Switch
       model: S5100-16P-EI
     1.3.6.1.4.1.25506.1.166:
+      category: Switch
       model: S5100-8P-PWR-EI
     1.3.6.1.4.1.25506.1.167:
+      category: Switch
       model: S5100-16P-PWR-EI
     1.3.6.1.4.1.25506.1.168:
+      category: Switch
       model: S5100-26C-PWR-EI
     1.3.6.1.4.1.25506.1.169:
+      category: Switch
       model: S5100-50C-PWR-EI
     1.3.6.1.4.1.25506.1.170:
+      category: Switch
       model: S3108TP-EI
     1.3.6.1.4.1.25506.1.171:
+      category: Switch
       model: S3116TP-EI
     1.3.6.1.4.1.25506.1.172:
+      category: Switch
       model: S3126TP-EI
     1.3.6.1.4.1.25506.1.173:
+      category: Switch
       model: S3108TP-EI-PWR
     1.3.6.1.4.1.25506.1.174:
+      category: Switch
       model: S3116TP-EI-PWR
     1.3.6.1.4.1.25506.1.175:
+      category: Switch
       model: S3126TP-EI-PWR
     1.3.6.1.4.1.25506.1.176:
+      category: Switch
       model: S7502M
     1.3.6.1.4.1.25506.1.177:
+      category: Switch
       model: S5500M-20C
     1.3.6.1.4.1.25506.1.178:
+      category: Switch
       model: S5500M-20F
     1.3.6.1.4.1.25506.1.179:
-      model: H3C bR304plus
+      category: Router
+      model: bR304plus
     1.3.6.1.4.1.25506.1.180:
+      category: Switch
       model: S9505-V5
     1.3.6.1.4.1.25506.1.181:
+      category: Switch
       model: S9512-V5
     1.3.6.1.4.1.25506.1.182:
+      category: Switch
       model: S9508-V5
     1.3.6.1.4.1.25506.1.183:
+      category: Switch
       model: S9508V-V5
     1.3.6.1.4.1.25506.1.184:
+      category: Switch
       model: S9502-V5
     1.3.6.1.4.1.25506.1.185:
-      model: H3C sR8802-V5
+      category: Router
+      model: sR8802-V5
     1.3.6.1.4.1.25506.1.186:
-      model: H3C sR8805-V5
+      category: Router
+      model: sR8805-V5
     1.3.6.1.4.1.25506.1.187:
-      model: H3C sR8812-V5
+      category: Router
+      model: sR8812-V5
     1.3.6.1.4.1.25506.1.188:
       model: SR8808-V5
     1.3.6.1.4.1.25506.1.189:
+      category: Switch
       model: S3100-52P
     1.3.6.1.4.1.25506.1.190:
-      model: H3C e152
+      category: Switch
+      model: e152
     1.3.6.1.4.1.25506.1.191:
+      category: Switch
       model: S2008
     1.3.6.1.4.1.25506.1.192:
+      category: Switch
       model: S2026
     1.3.6.1.4.1.25506.1.193:
+      category: Router
       model: SR6602
     1.3.6.1.4.1.25506.1.194:
+      category: Router
       model: SR6608
     1.3.6.1.4.1.25506.1.195:
+      category: Switch
       model: S3100-8TP-EI
     1.3.6.1.4.1.25506.1.196:
+      category: Switch
       model: S3100-8TP-PWR-EI
     1.3.6.1.4.1.25506.1.197:
+      category: Switch
       model: S3100-16TP-EI
     1.3.6.1.4.1.25506.1.198:
+      category: Switch
       model: S3100-15TP-PWR-EI
     1.3.6.1.4.1.25506.1.199:
+      category: Switch
       model: S3100-26TP-EI
     1.3.6.1.4.1.25506.1.200:
+      category: Switch
       model: S3100-26TP-PWR-EI
     1.3.6.1.4.1.25506.1.201:
+      category: Switch
       model: S7502-V5
     1.3.6.1.4.1.25506.1.202:
+      category: VoIP Gateway
       model: vg80-21
     1.3.6.1.4.1.25506.1.203:
+      category: VoIP Gateway
       model: vg80-80
     1.3.6.1.4.1.25506.1.204:
-      model: H3C wcm-wx5002
+      category: Wireless
+      model: wcm-wx5002
     1.3.6.1.4.1.25506.1.205:
-      model: H3C wcm-wcma
+      category: Wireless
+      model: wcm-wcma
     1.3.6.1.4.1.25506.1.206:
-      model: H3C msr30-10
+      category: Router
+      model: msr30-10
     1.3.6.1.4.1.25506.1.207:
+      category: Switch
       model: S7503E
     1.3.6.1.4.1.25506.1.208:
+      category: Switch
       model: S7503E
     1.3.6.1.4.1.25506.1.209:
+      category: Switch
       model: S7506E
     1.3.6.1.4.1.25506.1.210:
+      category: Switch
       model: S7506E-V
     1.3.6.1.4.1.25506.1.211:
-      model: H3C secBlade-FW
+      category: Firewall
+      model: secBlade-FW
     1.3.6.1.4.1.25506.1.212:
-      model: H3C secBlade-IPSec
+      category: Firewall
+      model: secBlade-IPSec
     1.3.6.1.4.1.25506.1.213:
+      category: Switch
       model: S3100-8TP-SI
     1.3.6.1.4.1.25506.1.214:
+      category: Switch
       model: S3100-16TP-SI
     1.3.6.1.4.1.25506.1.215:
-      model: H3C e126A
+      category: Switch
+      model: e126A
     1.3.6.1.4.1.25506.1.216:
+      category: Switch
       model: S3100-26TP-SI-B
     1.3.6.1.4.1.25506.1.217:
-      model: H3C msr30-16
+      category: Router
+      model: msr30-16
     1.3.6.1.4.1.25506.1.219:
+      category: Switch
       model: S2126-EI
     1.3.6.1.4.1.25506.1.220:
-      model: H3C e150-si
+      category: Switch
+      model: e150-si
     1.3.6.1.4.1.25506.1.221:
-      model: H3C msr30-11
+      category: Router
+      model: msr30-11
     1.3.6.1.4.1.25506.1.222:
+      category: NAS
       model: neoceanIX3040
     1.3.6.1.4.1.25506.1.223:
+      category: NAS
       model: neoceanIX3080
     1.3.6.1.4.1.25506.1.224:
+      category: Firewall
       model: secpathF100-M
     1.3.6.1.4.1.25506.1.225:
+      category: NAS
       model: neoceanVX1500
     1.3.6.1.4.1.25506.1.226:
+      category: NAS
       model: neoceanIX1520
     1.3.6.1.4.1.25506.1.227:
+      category: NAS
       model: neoceanIX1540
     1.3.6.1.4.1.25506.1.228:
-      model: H3C wcm-wx5002-128ap
+      category: Wireless
+      model: wcm-wx5002-128ap
     1.3.6.1.4.1.25506.1.229:
+      category: Router
       model: MSR20-10
     1.3.6.1.4.1.25506.1.230:
+      category: Router
       model: MSR20-11
     1.3.6.1.4.1.25506.1.231:
+      category: Router
       model: MSR20-13
     1.3.6.1.4.1.25506.1.232:
+      category: Router
       model: MSR20-15
     1.3.6.1.4.1.25506.1.233:
+      category: NAS
       model: neoceanDL1008
     1.3.6.1.4.1.25506.1.234:
+      category: NAS
       model: neoceanDL1008S
     1.3.6.1.4.1.25506.1.235:
+      category: NAS
       model: neoceanDL1012
     1.3.6.1.4.1.25506.1.236:
+      category: Switch
       model: S3610-52M
     1.3.6.1.4.1.25506.1.237:
+      category: Firewall
       model: IV5680
     1.3.6.1.4.1.25506.1.238:
+      category: Firewall
       model: IV5240
     1.3.6.1.4.1.25506.1.239:
+      category: Firewall
       model: F1000-E
     1.3.6.1.4.1.25506.1.240:
+      category: Switch
       model: S5024P
     1.3.6.1.4.1.25506.1.241:
+      category: Switch
       model: S5016P
     1.3.6.1.4.1.25506.1.242:
+      category: Firewall
       model: SecBlade Firewall Module LSQ1FWBSC0
     1.3.6.1.4.1.25506.1.243:
+      category: Firewall
       model: LSB1FW2A0
     1.3.6.1.4.1.25506.1.244:
+      category: Switch
       model: S3100-8TP-EI
     1.3.6.1.4.1.25506.1.245:
+      category: Switch
       model: S3100-16TP-EI
     1.3.6.1.4.1.25506.1.246:
+      category: Switch
       model: S3100-26TP-EI
     1.3.6.1.4.1.25506.1.247:
-      model: H3C ET704
+      category: Switch
+      model: ET704
     1.3.6.1.4.1.25506.1.248:
+      category: Video
       model: ec1001
     1.3.6.1.4.1.25506.1.249:
+      category: Video
       model: ec1001-hf
     1.3.6.1.4.1.25506.1.250:
+      category: Video
       model: ec1004-hc
     1.3.6.1.4.1.25506.1.251:
+      category: Video
       model: ec2004-hf
     1.3.6.1.4.1.25506.1.252:
+      category: Video
       model: dc1001
     1.3.6.1.4.1.25506.1.253:
+      category: Video
       model: dm8000
     1.3.6.1.4.1.25506.1.254:
+      category: Video
       model: vm8000
     1.3.6.1.4.1.25506.1.255:
-      model: H3C ms8000
+      category: Switch
+      model: ms8000
     1.3.6.1.4.1.25506.1.256:
+      category: Switch
       model: S3100-52TP
     1.3.6.1.4.1.25506.1.257:
+      category: Router
       model: MSR20-12
     1.3.6.1.4.1.25506.1.258:
+      category: Switch
       model: S1550E
     1.3.6.1.4.1.25506.1.259:
+      category: Switch
       model: S1550
     1.3.6.1.4.1.25506.1.260:
+      category: Switch
       model: S1526-EI
     1.3.6.1.4.1.25506.1.261:
+      category: Router
       model: MSR20-12-T
     1.3.6.1.4.1.25506.1.262:
+      category: Router
       model: MSR20-15-I
     1.3.6.1.4.1.25506.1.263:
+      category: Router
       model: MSR20-15-N
     1.3.6.1.4.1.25506.1.264:
+      category: Switch
       model: WX6103
     1.3.6.1.4.1.25506.1.265:
+      category: Switch
       model: WX6100LSQ
     1.3.6.1.4.1.25506.1.266:
+      category: Switch
       model: WX6100SB
     1.3.6.1.4.1.25506.1.267:
+      category: Switch
       model: WX6100SW
     1.3.6.1.4.1.25506.1.268:
       model: dl1000
     1.3.6.1.4.1.25506.1.269:
       model: dl1000s
     1.3.6.1.4.1.25506.1.270:
-      model: H3C wa1208e-g
+      category: Wireless
+      model: wa1208e-g
     1.3.6.1.4.1.25506.1.271:
-      model: H3C wa1208e-dg
+      category: Wireless
+      model: wa1208e-dg
     1.3.6.1.4.1.25506.1.272:
-      model: H3C wa1208e-ag
+      category: Wireless
+      model: wa1208e-ag
     1.3.6.1.4.1.25506.1.273:
-      model: H3C wa1208e-agp
+      category: Wireless
+      model: wa1208e-agp
     1.3.6.1.4.1.25506.1.274:
+      category: Switch
       model: S7501M-24T
     1.3.6.1.4.1.25506.1.275:
+      category: Switch
       model: S7501M-24TP
     1.3.6.1.4.1.25506.1.276:
+      category: Switch
       model: S7502M
     1.3.6.1.4.1.25506.1.277:
+      category: Switch
       model: S7503M
     1.3.6.1.4.1.25506.1.278:
+      category: Switch
       model: S7506M
     1.3.6.1.4.1.25506.1.279:
+      category: Switch
       model: S7506M-V
     1.3.6.1.4.1.25506.1.280:
+      category: Switch
       model: S7510M
     1.3.6.1.4.1.25506.1.281:
-      model: H3C hh3c-secpathT200
+      category: Firewall
+      model: hh3c-secpathT200
     1.3.6.1.4.1.25506.1.282:
-      model: H3C hh3c-secpathT200E
+      category: Firewall
+      model: hh3c-secpathT200E
     1.3.6.1.4.1.25506.1.283:
-      model: H3C cc600
+      category: Switch
+      model: cc600
     1.3.6.1.4.1.25506.1.284:
-      model: H3C wa1208e-gp
+      category: Wireless
+      model: wa1208e-gp
     1.3.6.1.4.1.25506.1.285:
-      model: H3C wb2321e-agp
+      category: Wireless
+      model: wb2321e-agp
     1.3.6.1.4.1.25506.1.286:
-      model: H3C wh2520e-agp
+      category: Wireless
+      model: wh2520e-agp
     1.3.6.1.4.1.25506.1.287:
-      model: H3C ICG2000
+      category: Firewall
+      model: ICG2000
     1.3.6.1.4.1.25506.1.288:
-      model: H3C ICG3000
+      category: Firewall
+      model: ICG3000
     1.3.6.1.4.1.25506.1.289:
-      model: H3C ICG5000
+      category: Firewall
+      model: ICG5000
     1.3.6.1.4.1.25506.1.290:
+      category: Switch
       model: S5520TP-SI
     1.3.6.1.4.1.25506.1.291:
-      model: H3C wa2210-ag
+      category: Wireless
+      model: wa2210-ag
     1.3.6.1.4.1.25506.1.292:
-      model: H3C wa2220-ag
+      category: Wireless
+      model: wa2220-ag
     1.3.6.1.4.1.25506.1.293:
-      model: H3C wa2220e-ag
+      category: Wireless
+      model: wa2220e-ag
     1.3.6.1.4.1.25506.1.294:
-      model: H3C wa2210x-g
+      category: Wireless
+      model: wa2210x-g
     1.3.6.1.4.1.25506.1.295:
-      model: H3C wa2220x-ag
+      category: Wireless
+      model: wa2220x-ag
     1.3.6.1.4.1.25506.1.296:
+      category: Wireless
       model: wa2220x-agp
     1.3.6.1.4.1.25506.1.297:
+      category: Switch
       model: S3100-52TP-SI
     1.3.6.1.4.1.25506.1.298:
-      model: H3C hh3c-secpathASE5000-E
+      category: Firewall
+      model: hh3c-secpathASE5000-E
     1.3.6.1.4.1.25506.1.299:
-      model: H3C secpathASE5000-S
+      category: Firewall
+      model: secpathASE5000-S
     1.3.6.1.4.1.25506.1.300:
-      model: H3C hh3c-secpathU200-C
+      category: Firewall
+      model: hh3c-secpathU200-C
     1.3.6.1.4.1.25506.1.301:
-      model: H3C secpathU200-S
+      category: Firewall
+      model: secpathU200-S
     1.3.6.1.4.1.25506.1.302:
-      model: H3C secpathU200-A
+      category: Firewall
+      model: secpathU200-A
     1.3.6.1.4.1.25506.1.303:
-      model: H3C hh3c-secpathU200-M
+      category: Firewall
+      model: hh3c-secpathU200-M
     1.3.6.1.4.1.25506.1.304:
+      category: Video
       model: ec3016-hc
     1.3.6.1.4.1.25506.1.305:
+      category: Video
       model: dc1001-ff
     1.3.6.1.4.1.25506.1.306:
+      category: Video
       model: ecr3304-hf
     1.3.6.1.4.1.25506.1.307:
+      category: Video
       model: ecr3308-hd
     1.3.6.1.4.1.25506.1.308:
+      category: Video
       model: ecr3316-hc
     1.3.6.1.4.1.25506.1.309:
+      category: Video
       model: isc3000
     1.3.6.1.4.1.25506.1.310:
+      category: Video
       model: isc3100
     1.3.6.1.4.1.25506.1.311:
+      category: Video
       model: vm9000
     1.3.6.1.4.1.25506.1.312:
+      category: Video
       model: vm5000
     1.3.6.1.4.1.25506.1.313:
-      model: H3C ms9000-vtdu
+      category: Switch
+      model: ms9000-vtdu
     1.3.6.1.4.1.25506.1.314:
-      model: H3C ms9000-nru
+      category: Switch
+      model: ms9000-nru
     1.3.6.1.4.1.25506.1.315:
-      model: H3C ums9005
+      category: Switch
+      model: ums9005
     1.3.6.1.4.1.25506.1.316:
       model: CS2104B
     1.3.6.1.4.1.25506.1.317:
       model: CS2106B
     1.3.6.1.4.1.25506.1.318:
+      category: Switch
       model: S5024E
     1.3.6.1.4.1.25506.1.319:
+      category: Switch
       model: S5048E
     1.3.6.1.4.1.25506.1.320:
-      model: H3C secpathF5000-A
+      category: Firewall
+      model: secpathF5000-A
     1.3.6.1.4.1.25506.1.321:
+      category: NAS
       model: neoceanIX3240
     1.3.6.1.4.1.25506.1.322:
+      category: NAS
       model: neoceanIX3620
     1.3.6.1.4.1.25506.1.323:
       model: MSA7302
     1.3.6.1.4.1.25506.1.324:
       model: MSA7306
     1.3.6.1.4.1.25506.1.325:
+      category: Switch
       model: S7501E
     1.3.6.1.4.1.25506.1.326:
+      category: Switch
       model: S3100-8C-EPON-EI
     1.3.6.1.4.1.25506.1.327:
+      category: Switch
       model: S3100-16C-EPON-EI
     1.3.6.1.4.1.25506.1.328:
+      category: Switch
       model: S3100-26C-EPON-EI
     1.3.6.1.4.1.25506.1.329:
-      model: H3C secBlade-LSQ1AFCBSC0
+      category: Firewall
+      model: secBlade-LSQ1AFCBSC0
     1.3.6.1.4.1.25506.1.330:
-      model: H3C secBlade-LSB1AFC1A0
+      category: Firewall
+      model: secBlade-LSB1AFC1A0
     1.3.6.1.4.1.25506.1.331:
-      model: H3C hh3c-secpathF1000-C
+      category: Firewall
+      model: hh3c-secpathF1000-C
     1.3.6.1.4.1.25506.1.332:
-      model: H3C hh3c-secpathF100-A-SI
+      category: Firewall
+      model: hh3c-secpathF100-A-SI
     1.3.6.1.4.1.25506.1.333:
-      model: H3C hh3c-secpathV100-E
+      category: Firewall
+      model: hh3c-secpathV100-E
     1.3.6.1.4.1.25506.1.334:
+      category: Switch
       model: S5800-32C
     1.3.6.1.4.1.25506.1.335:
+      category: Switch
       model: S5800-56C
     1.3.6.1.4.1.25506.1.336:
+      category: Switch
       model: S5800-32C-PWR
     1.3.6.1.4.1.25506.1.337:
+      category: Switch
       model: S5800-56C-PWR
     1.3.6.1.4.1.25506.1.338:
+      category: Switch
       model: S5800-60C-PWR
     1.3.6.1.4.1.25506.1.339:
+      category: Switch
       model: S5800-32F
     1.3.6.1.4.1.25506.1.340:
+      category: Switch
       model: S5800X-28C
     1.3.6.1.4.1.25506.1.341:
+      category: Switch
       model: S5800X-28S
     1.3.6.1.4.1.25506.1.342:
-      model: H3C cc602
+      category: Switch
+      model: cc602
     1.3.6.1.4.1.25506.1.343:
+      category: Router
       model: CR400
     1.3.6.1.4.1.25506.1.344:
-      model: H3C cc600E
+      category: Switch
+      model: cc600E
     1.3.6.1.4.1.25506.1.345:
-      model: H3C secpathT1000-M
+      category: Firewall
+      model: secpathT1000-M
     1.3.6.1.4.1.25506.1.346:
+      category: NAS
       model: neoceanVX1540
     1.3.6.1.4.1.25506.1.347:
+      category: Router
       model: MSR50-06
     1.3.6.1.4.1.25506.1.348:
-      model: H3C secpathACG2000-M
+      category: Firewall
+      model: secpathACG2000-M
     1.3.6.1.4.1.25506.1.349:
       model: secBlade-LSQ1ACGASC0
     1.3.6.1.4.1.25506.1.350:
-      model: H3C secBlade-LSB1ACG1A0
+      category: Firewall
+      model: secBlade-LSB1ACG1A0
     1.3.6.1.4.1.25506.1.351:
-      model: H3C wx3024wcm
+      category: Wireless
+      model: wx3024wcm
     1.3.6.1.4.1.25506.1.352:
-      model: H3C wx3024lsw
+      category: Wireless
+      model: wx3024lsw
     1.3.6.1.4.1.25506.1.353:
-      model: H3C wx5004
+      category: Wireless
+      model: wx5004
     1.3.6.1.4.1.25506.1.354:
+      category: Router
       model: SR6604
     1.3.6.1.4.1.25506.1.355:
-      model: H3C iag5000-A
+      category: Firewall
+      model: iag5000-A
     1.3.6.1.4.1.25506.1.356:
-      model: H3C secBlade-SPE-FWM
+      category: Firewall
+      model: secBlade-SPE-FWM
     1.3.6.1.4.1.25506.1.357:
-      model: H3C ICG2200
+      category: Firewall
+      model: ICG2200
     1.3.6.1.4.1.25506.1.358:
+      category: Switch
       model: S7602
     1.3.6.1.4.1.25506.1.359:
+      category: Switch
       model: S7603
     1.3.6.1.4.1.25506.1.360:
+      category: Switch
       model: S7606
     1.3.6.1.4.1.25506.1.361:
+      category: Switch
       model: S7606-V
     1.3.6.1.4.1.25506.1.362:
+      category: Switch
       model: S7610
     1.3.6.1.4.1.25506.1.363:
-      model: H3C wa2610e-agn
+      category: Wireless
+      model: wa2610e-agn
     1.3.6.1.4.1.25506.1.364:
-      model: H3C wa2620e-agn
+      category: Wireless
+      model: wa2620e-agn
     1.3.6.1.4.1.25506.1.365:
-      model: H3C wa1208e-g-v5
+      category: Wireless
+      model: wa1208e-g-v5
     1.3.6.1.4.1.25506.1.366:
-      model: H3C wa1208e-dg-v5
+      category: Wireless
+      model: wa1208e-dg-v5
     1.3.6.1.4.1.25506.1.367:
-      model: H3C wa1208e-ag-v5
+      category: Wireless
+      model: wa1208e-ag-v5
     1.3.6.1.4.1.25506.1.368:
-      model: H3C wa1208e-agp-v5
+      category: Wireless
+      model: wa1208e-agp-v5
     1.3.6.1.4.1.25506.1.369:
-      model: H3C wa1208e-gp-v5
+      category: Wireless
+      model: wa1208e-gp-v5
     1.3.6.1.4.1.25506.1.370:
+      category: Switch
       model: S7503E-S
     1.3.6.1.4.1.25506.1.371:
-      model: H3C hh3c-secpathIAG2000-A
+      category: Firewall
+      model: hh3c-secpathIAG2000-A
     1.3.6.1.4.1.25506.1.372:
-      model: H3C hh3c-secpathT1000-A
+      category: Firewall
+      model: hh3c-secpathT1000-A
     1.3.6.1.4.1.25506.1.373:
-      model: H3C hh3c-secpathT1000-S
+      category: Firewall
+      model: hh3c-secpathT1000-S
     1.3.6.1.4.1.25506.1.374:
-      model: H3C secBlade-EWPX1FWA0
+      category: Firewall
+      model: secBlade-EWPX1FWA0
     1.3.6.1.4.1.25506.1.375:
-      model: H3C secBlade-LSQ1NSMSC0
+      category: Firewall
+      model: secBlade-LSQ1NSMSC0
     1.3.6.1.4.1.25506.1.376:
-      model: H3C secBlade-LSQ1AFDBSC0
+      category: Firewall
+      model: secBlade-LSQ1AFDBSC0
     1.3.6.1.4.1.25506.1.377:
+      category: Firewall
       model: secBlade-LSQ1LBSC0
     1.3.6.1.4.1.25506.1.378:
-      model: H3C secBlade-LSB1LB1A0
+      category: Firewall
+      model: secBlade-LSB1LB1A0
     1.3.6.1.4.1.25506.1.379:
+      category: NAS
       model: neoceanIX1560
     1.3.6.1.4.1.25506.1.380:
+      category: NAS
       model: neoceanEX1500S
     1.3.6.1.4.1.25506.1.381:
+      category: NAS
       model: neoceanEX1520S
     1.3.6.1.4.1.25506.1.382:
+      category: NAS
       model: neoceanEX1540S
     1.3.6.1.4.1.25506.1.383:
+      category: NAS
       model: neoceanEX1560S
     1.3.6.1.4.1.25506.1.384:
-      model: H3C ET716
+      category: Switch
+      model: ET716
     1.3.6.1.4.1.25506.1.385:
+      category: Switch
       model: S3600-2P-OLT
     1.3.6.1.4.1.25506.1.386:
-      model: H3C ER3200
+      category: Router
+      model: ER3200
     1.3.6.1.4.1.25506.1.387:
-      model: H3C ER3100
+      category: Router
+      model: ER3100
     1.3.6.1.4.1.25506.1.388:
+      category: Switch
       model: S9505E
     1.3.6.1.4.1.25506.1.389:
+      category: Switch
       model: S9508E-V
     1.3.6.1.4.1.25506.1.390:
+      category: Switch
       model: S9512E
     1.3.6.1.4.1.25506.1.391:
+      category: Switch
       model: S12508
     1.3.6.1.4.1.25506.1.392:
+      category: Switch
       model: S12518
     1.3.6.1.4.1.25506.1.393:
-      model: H3C ET708
+      category: Switch
+      model: ET708
     1.3.6.1.4.1.25506.1.394:
-      model: H3C ET724
+      category: Switch
+      model: ET724
     1.3.6.1.4.1.25506.1.395:
+      category: Switch
       model: S2008TP-EA
     1.3.6.1.4.1.25506.1.396:
+      category: Switch
       model: S2016TP-EA
     1.3.6.1.4.1.25506.1.397:
+      category: Switch
       model: S2403TP-EA
     1.3.6.1.4.1.25506.1.398:
-      model: H3C ICG2000-CT
+      category: Firewall
+      model: ICG2000-CT
     1.3.6.1.4.1.25506.1.400:
+      category: Switch
       model: S3528P-EA
     1.3.6.1.4.1.25506.1.401:
+      category: Switch
       model: S3552P-EA
     1.3.6.1.4.1.25506.1.402:
+      category: Switch
       model: S3552F-EA
     1.3.6.1.4.1.25506.1.403:
+      category: Switch
       model: S3528F-EA
     1.3.6.1.4.1.25506.1.404:
+      category: Switch
       model: S3528TP-EA
     1.3.6.1.4.1.25506.1.405:
-      model: H3C secpathAFD1000-A
+      category: Firewall
+      model: secpathAFD1000-A
     1.3.6.1.4.1.25506.1.406:
-      model: H3C hh3c-secpathF100-C-EI
+      category: Firewall
+      model: hh3c-secpathF100-C-EI
     1.3.6.1.4.1.25506.1.407:
-      model: H3C ER3260
+      category: Router
+      model: ER3260
     1.3.6.1.4.1.25506.1.408:
-      model: H3C ICG800
+      category: Firewall
+      model: ICG800
     1.3.6.1.4.1.25506.1.409:
-      model: H3C ICG800g
+      category: Firewall
+      model: ICG800g
     1.3.6.1.4.1.25506.1.410:
-      model: H3C ICG1000
+      category: Firewall
+      model: ICG1000
     1.3.6.1.4.1.25506.1.411:
-      model: H3C ICG1800
+      category: Firewall
+      model: ICG1800
     1.3.6.1.4.1.25506.1.412:
+      category: NAS
       model: neoceanIX3240E
     1.3.6.1.4.1.25506.1.413:
+      category: NAS
       model: neoceanIX3620E
     1.3.6.1.4.1.25506.1.414:
+      category: NAS
       model: neoceanIX3640E
     1.3.6.1.4.1.25506.1.415:
-      model: H3C secpathACG8800-S3
+      category: Firewall
+      model: secpathACG8800-S3
     1.3.6.1.4.1.25506.1.416:
-      model: H3C hh3c-secpathT5000-S3
+      category: Firewall
+      model: hh3c-secpathT5000-S3
     1.3.6.1.4.1.25506.1.417:
-      model: H3C secpathIAG2000-S
+      category: Firewall
+      model: secpathIAG2000-S
     1.3.6.1.4.1.25506.1.418:
-      model: H3C secpathACG8800-S3-NS21S2MSPB0
+      category: Firewall
+      model: secpathACG8800-S3-NS21S2MSPB0
     1.3.6.1.4.1.25506.1.419:
-      model: H3C secpathT5000-S3-NS11S2MSPB0
+      category: Firewall
+      model: secpathT5000-S3-NS11S2MSPB0
     1.3.6.1.4.1.25506.1.420:
-      model: H3C msr3010
+      category: Router
+      model: msr3010
     1.3.6.1.4.1.25506.1.421:
-      model: H3C msr3011E
+      category: Router
+      model: msr3011E
     1.3.6.1.4.1.25506.1.422:
-      model: H3C msr3011F
+      category: Router
+      model: msr3011F
     1.3.6.1.4.1.25506.1.423:
-      model: H3C hh3c-secpathT200-A
+      category: Firewall
+      model: hh3c-secpathT200-A
     1.3.6.1.4.1.25506.1.424:
-      model: H3C hh3c-secpathT200-M
+      category: Firewall
+      model: hh3c-secpathT200-M
     1.3.6.1.4.1.25506.1.425:
-      model: H3C secpathF100-C2
+      category: Firewall
+      model: secpathF100-C2
     1.3.6.1.4.1.25506.1.426:
+      category: Firewall
       model: DPtech-FW1000-GE-VPN
     1.3.6.1.4.1.25506.1.427:
-      model: H3C DPtech-FW1000-GA
+      category: Firewall
+      model: DPtech-FW1000-GA
     1.3.6.1.4.1.25506.1.428:
-      model: H3C DPtech-FW1000-GS
+      category: Firewall
+      model: DPtech-FW1000-GS
     1.3.6.1.4.1.25506.1.429:
-      model: H3C DPtech-FW1000-ME
+      category: Firewall
+      model: DPtech-FW1000-ME
     1.3.6.1.4.1.25506.1.430:
-      model: H3C DPtech-FW1000-MA
+      category: Firewall
+      model: DPtech-FW1000-MA
     1.3.6.1.4.1.25506.1.431:
-      model: H3C DPtech-FW1000-MM
+      category: Firewall
+      model: DPtech-FW1000-MM
     1.3.6.1.4.1.25506.1.432:
-      model: H3C DPtech-FW1000-MC
+      category: Firewall
+      model: DPtech-FW1000-MC
     1.3.6.1.4.1.25506.1.433:
-      model: H3C DPtech-UTM2000-MA
+      category: Firewall
+      model: DPtech-UTM2000-MA
     1.3.6.1.4.1.25506.1.434:
-      model: H3C DPtech-UTM2000-MM
+      category: Firewall
+      model: DPtech-UTM2000-MM
     1.3.6.1.4.1.25506.1.435:
-      model: H3C DPtech-UTM2000-MS
+      category: Firewall
+      model: DPtech-UTM2000-MS
     1.3.6.1.4.1.25506.1.436:
-      model: H3C DPtech-IPS2000-GM
+      category: Firewall
+      model: DPtech-IPS2000-GM
     1.3.6.1.4.1.25506.1.437:
-      model: H3C DPtech-IPS2000-MM
+      category: Firewall
+      model: DPtech-IPS2000-MM
     1.3.6.1.4.1.25506.1.438:
+      category: Router
       model: SR6616
     1.3.6.1.4.1.25506.1.439:
+      category: Switch
       model: S3620-28TP-EI
     1.3.6.1.4.1.25506.1.440:
+      category: Switch
       model: S3620-28P-EI
     1.3.6.1.4.1.25506.1.441:
+      category: Switch
       model: S3620-52P-EI
     1.3.6.1.4.1.25506.1.442:
+      category: Switch
       model: S3620-28P-PWR-EI
     1.3.6.1.4.1.25506.1.443:
+      category: Switch
       model: S3820-52P-PWR-EI
     1.3.6.1.4.1.25506.1.444:
+      category: Switch
       model: S3620-28F-EI
     1.3.6.1.4.1.25506.1.445:
+      category: Switch
       model: S3620-52M
     1.3.6.1.4.1.25506.1.446:
+      category: Switch
       model: S3620-52M-DC
     1.3.6.1.4.1.25506.1.447:
+      category: Switch
       model: S3620-28C-EI
     1.3.6.1.4.1.25506.1.448:
-      model: H3C wa2210e-ge
+      category: Wireless
+      model: wa2210e-ge
     1.3.6.1.4.1.25506.1.449:
-      model: H3C wa2220x-age
+      category: Wireless
+      model: wa2220x-age
     1.3.6.1.4.1.25506.1.450:
-      model: H3C wa2210x-ge
+      category: Wireless
+      model: wa2210x-ge
     1.3.6.1.4.1.25506.1.451:
-      model: H3C wb2320x-age
+      category: Wireless
+      model: wb2320x-age
     1.3.6.1.4.1.25506.1.452:
+      category: NAS
       model: neoceanEX1540
     1.3.6.1.4.1.25506.1.453:
+      category: Switch
       model: S5810-50S
     1.3.6.1.4.1.25506.1.454:
-      model: H3C SECBLADE-LSQ1IPSSC0
+      category: Firewall
+      model: SECBLADE-LSQ1IPSSC0
     1.3.6.1.4.1.25506.1.455:
-      model: H3C secBlade-LSB1IPS1A0
+      category: Firewall
+      model: secBlade-LSB1IPS1A0
     1.3.6.1.4.1.25506.1.456:
-      model: H3C ER5100
+      category: Router
+      model: ER5100
     1.3.6.1.4.1.25506.1.457:
-      model: H3C ER5200
+      category: Router
+      model: ER5200
     1.3.6.1.4.1.25506.1.458:
-      model: H3C wx3010wcm
+      category: Wireless
+      model: wx3010wcm
     1.3.6.1.4.1.25506.1.459:
-      model: H3C wx3010lsw
+      category: Wireless
+      model: wx3010lsw
     1.3.6.1.4.1.25506.1.460:
-      model: H3C cc652E
+      category: Switch
+      model: cc652E
     1.3.6.1.4.1.25506.1.461:
+      category: Switch
       model: S5120-20P-SI
     1.3.6.1.4.1.25506.1.462:
+      category: Switch
       model: S5120-28P-SI
     1.3.6.1.4.1.25506.1.463:
+      category: Switch
       model: S5120-52P-SI
     1.3.6.1.4.1.25506.1.464:
+      category: Switch
       model: S5120-28P-EI
     1.3.6.1.4.1.25506.1.465:
+      category: Switch
       model: S5120-52P-EI
     1.3.6.1.4.1.25506.1.466:
+      category: Switch
       model: S5120-28P-LPWR-EI
     1.3.6.1.4.1.25506.1.467:
+      category: Switch
       model: S5120-29P-PWR-EI
     1.3.6.1.4.1.25506.1.468:
+      category: Switch
       model: WX6100LSR
     1.3.6.1.4.1.25506.1.469:
+      category: Switch
       model: S7506E
     1.3.6.1.4.1.25506.1.470:
-      model: H3C ICG2000B
+      category: Firewall
+      model: ICG2000B
     1.3.6.1.4.1.25506.1.471:
-      model: H3C ICG2000C
+      category: Firewall
+      model: ICG2000C
     1.3.6.1.4.1.25506.1.472:
+      category: Switch
       model: S1626
     1.3.6.1.4.1.25506.1.473:
+      category: Switch
       model: S1650
     1.3.6.1.4.1.25506.1.474:
+      category: Switch
       model: S1626P
     1.3.6.1.4.1.25506.1.475:
+      category: NAS
       model: neoceanIX3620S
     1.3.6.1.4.1.25506.1.476:
+      category: NAS
       model: neoceanIX3080S
     1.3.6.1.4.1.25506.1.477:
-      model: H3C ER3280g
+      category: Router
+      model: ER3280g
     1.3.6.1.4.1.25506.1.478:
-      model: H3C wa2610-agn
+      category: Wireless
+      model: wa2610-agn
     1.3.6.1.4.1.25506.1.479:
-      model: H3C wa2612-agn
+      category: Wireless
+      model: wa2612-agn
     1.3.6.1.4.1.25506.1.480:
-      model: H3C secpathT200-S
+      category: Firewall
+      model: secpathT200-S
     1.3.6.1.4.1.25506.1.481:
-      model: H3C hh3c-secpathU200-CS
+      category: Firewall
+      model: hh3c-secpathU200-CS
     1.3.6.1.4.1.25506.1.482:
-      model: H3C hh3c-secpathU200-CM
+      category: Firewall
+      model: hh3c-secpathU200-CM
     1.3.6.1.4.1.25506.1.483:
-      model: H3C hh3c-secpathU200-CA
+      category: Firewall
+      model: hh3c-secpathU200-CA
     1.3.6.1.4.1.25506.1.484:
-      model: H3C secBlade-LSR1AFC2A1
+      category: Firewall
+      model: secBlade-LSR1AFC2A1
     1.3.6.1.4.1.25506.1.485:
-      model: H3C secBlade-LSR1FW2A1
+      category: Firewall
+      model: secBlade-LSR1FW2A1
     1.3.6.1.4.1.25506.1.486:
-      model: H3C secBlade-LSR1LB1A1
+      category: Firewall
+      model: secBlade-LSR1LB1A1
     1.3.6.1.4.1.25506.1.487:
-      model: H3C secBlade-LSR1NSM1A1
+      category: Firewall
+      model: secBlade-LSR1NSM1A1
     1.3.6.1.4.1.25506.1.488:
-      model: H3C cc650E
+      category: Switch
+      model: cc650E
     1.3.6.1.4.1.25506.1.489:
-      model: H3C LSWM1WCM10
+      category: Firewall
+      model: LSWM1WCM10
     1.3.6.1.4.1.25506.1.490:
-      model: H3C LSWM1WCM20
+      category: Firewall
+      model: LSWM1WCM20
     1.3.6.1.4.1.25506.1.491:
+      category: Wireless LAN Controller
       model: EWPXM1WCMC0
     1.3.6.1.4.1.25506.1.492:
+      category: Firewall
       model: LSWM1IPS10
     1.3.6.1.4.1.25506.1.493:
+      category: Firewall
       model: LSWM1FW10
     1.3.6.1.4.1.25506.1.494:
+      category: Firewall
       model: secpathF1000-S-EI
     1.3.6.1.4.1.25506.1.495:
-      model: H3C hh3c-secpathF1000-A-EI
+      category: Firewall
+      model: hh3c-secpathF1000-A-EI
     1.3.6.1.4.1.25506.1.496:
+      category: Router
       model: MSR50-06-V5
     1.3.6.1.4.1.25506.1.497:
-      model: H3C secBlade-LSR1ACG1A1
+      category: Firewall
+      model: secBlade-LSR1ACG1A1
     1.3.6.1.4.1.25506.1.498:
-      model: H3C secBlade-LSR1IPS1A1
+      category: Firewall
+      model: secBlade-LSR1IPS1A1
     1.3.6.1.4.1.25506.1.499:
+      category: Switch
       model: S7602S
     1.3.6.1.4.1.25506.1.500:
+      category: Switch
       model: S7603-ES
     1.3.6.1.4.1.25506.1.501:
+      category: Switch
       model: S7606-ES
     1.3.6.1.4.1.25506.1.502:
       model: SSM-s5500G
@@ -984,91 +1442,134 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.504:
       model: SSM-MIM
     1.3.6.1.4.1.25506.1.505:
-      model: H3C ER8300
+      category: Router
+      model: ER8300
     1.3.6.1.4.1.25506.1.506:
-      model: H3C wa2610x-gn
+      category: Wireless
+      model: wa2610x-gn
     1.3.6.1.4.1.25506.1.507:
-      model: H3C wb2360x-an
+      category: Wireless
+      model: wb2360x-an
     1.3.6.1.4.1.25506.1.508:
-      model: H3C wh2530x-dag
+      category: Wireless
+      model: wh2530x-dag
     1.3.6.1.4.1.25506.1.509:
-      model: H3C wa2620-agn
+      category: Wireless
+      model: wa2620-agn
     1.3.6.1.4.1.25506.1.510:
-      model: H3C cc610E
+      category: Switch
+      model: cc610E
     1.3.6.1.4.1.25506.1.511:
-      model: H3C DPtech-FW1000-GT
+      category: Firewall
+      model: DPtech-FW1000-GT
     1.3.6.1.4.1.25506.1.512:
+      category: Switch
       model: S2008TP-EA(SI)
     1.3.6.1.4.1.25506.1.513:
+      category: Switch
       model: S2016TP-EA(SI)
     1.3.6.1.4.1.25506.1.514:
+      category: Switch
       model: S2403TP-EA(SI)
     1.3.6.1.4.1.25506.1.515:
+      category: Switch
       model: S5120-24P-EI
     1.3.6.1.4.1.25506.1.516:
+      category: Switch
       model: S5120-48P-EI
     1.3.6.1.4.1.25506.1.517:
+      category: Switch
       model: S5120-28C-EI
     1.3.6.1.4.1.25506.1.518:
+      category: Switch
       model: S5120-52C-EI
     1.3.6.1.4.1.25506.1.519:
+      category: Switch
       model: S5120-28C-PWR-EI
     1.3.6.1.4.1.25506.1.520:
+      category: Switch
       model: S5120-52C-PWR-EI
     1.3.6.1.4.1.25506.1.521:
+      category: Wireless LAN Controller
       model: wx3008wcm
     1.3.6.1.4.1.25506.1.522:
-      model: H3C wx3008lsw
+      category: Wireless
+      model: wx3008lsw
     1.3.6.1.4.1.25506.1.523:
-      model: H3C msr900
+      category: Router
+      model: msr900
     1.3.6.1.4.1.25506.1.524:
-      model: H3C msr920
+      category: Router
+      model: msr920
     1.3.6.1.4.1.25506.1.525:
-      model: H3C secBlade-LSQ1IAGSC0
+      category: Firewall
+      model: secBlade-LSQ1IAGSC0
     1.3.6.1.4.1.25506.1.526:
-      model: H3C WX7306
+      category: Wireless
+      model: WX7306
     1.3.6.1.4.1.25506.1.527:
-      model: H3C WX7310
+      category: Wireless
+      model: WX7310
     1.3.6.1.4.1.25506.1.528:
-      model: H3C Blade5310
+      category: Switch
+      model: Blade5310
     1.3.6.1.4.1.25506.1.529:
-      model: H3C Blade5512
+      category: Switch
+      model: Blade5512
     1.3.6.1.4.1.25506.1.530:
-      model: H3C Blade5512S
+      category: Switch
+      model: Blade5512S
     1.3.6.1.4.1.25506.1.531:
-      model: H3C Blade5518X
+      category: Switch
+      model: Blade5518X
     1.3.6.1.4.1.25506.1.532:
-      model: H3C wa2610e-gnp
+      category: Wireless
+      model: wa2610e-gnp
     1.3.6.1.4.1.25506.1.533:
+      category: Switch
       model: S3100-26TP-SI-UM
     1.3.6.1.4.1.25506.1.534:
+      category: Switch
       model: S3100-52TP-SI-UM
     1.3.6.1.4.1.25506.1.535:
+      category: Switch
       model: S5500-24P-SI
     1.3.6.1.4.1.25506.1.536:
+      category: Switch
       model: S5500-48P-SI
     1.3.6.1.4.1.25506.1.537:
+      category: Media Exchange
       model: ME8000
     1.3.6.1.4.1.25506.1.538:
+      category: Media Exchange
       model: ME8600
     1.3.6.1.4.1.25506.1.539:
+      category: Media Exchange
       model: ME5000
     1.3.6.1.4.1.25506.1.540:
+      category: Video
       model: MG6060
     1.3.6.1.4.1.25506.1.541:
+      category: Video
       model: MG6050
     1.3.6.1.4.1.25506.1.542:
+      category: Video
       model: MG6050S
     1.3.6.1.4.1.25506.1.543:
+      category: Video
       model: MG9010
     1.3.6.1.4.1.25506.1.544:
+      category: Video
       model: MG9030
     1.3.6.1.4.1.25506.1.545:
+      category: Video
       model: MG9060
     1.3.6.1.4.1.25506.1.546:
+      category: NAS
       model: neoceanVX1500-DC
     1.3.6.1.4.1.25506.1.547:
-      model: H3C cc620E
+      category: Switch
+      model: cc620E
     1.3.6.1.4.1.25506.1.548:
       model: SIVX-S3628
     1.3.6.1.4.1.25506.1.549:
@@ -1076,16 +1577,21 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.550:
       model: SIVX-VS1500
     1.3.6.1.4.1.25506.1.551:
+      category: NAS
       model: neoceanIX2540
     1.3.6.1.4.1.25506.1.552:
+      category: NAS
       model: neoceanVX2500
     1.3.6.1.4.1.25506.1.555:
+      category: Switch
       model: S5120-28P-PWR-SI
     1.3.6.1.4.1.25506.1.556:
+      category: Switch
       model: S5120-28P-HPWR-SI
     1.3.6.1.4.1.25506.1.557:
       model: F1000-E-DC
     1.3.6.1.4.1.25506.1.558:
+      category: Switch
       model: S5028
     1.3.6.1.4.1.25506.1.559:
       model: ET824
@@ -1096,8 +1602,10 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.562:
       model: wx5004-v2
     1.3.6.1.4.1.25506.1.563:
-      model: H3C hh3c-secpathT1000-C
+      category: Firewall
+      model: hh3c-secpathT1000-C
     1.3.6.1.4.1.25506.1.564:
+      category: Firewall
       model: SECBLADE-LST1IPS1A1
     1.3.6.1.4.1.25506.1.565:
       model: secBlade-LST1FW2A1
@@ -1114,50 +1622,70 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.571:
       model: wx6112E
     1.3.6.1.4.1.25506.1.572:
+      category: Switch
       model: S5500-34C-HI
     1.3.6.1.4.1.25506.1.573:
+      category: Switch
       model: S5500-58C-HI
     1.3.6.1.4.1.25506.1.574:
       model: wa1208e-gp-h20
     1.3.6.1.4.1.25506.1.575:
+      category: Switch
       model: S5120-9P-SI
     1.3.6.1.4.1.25506.1.576:
+      category: Switch
       model: S5120-9P-PWR-SI
     1.3.6.1.4.1.25506.1.577:
+      category: Switch
       model: S5120-9P-HPWR-SI
     1.3.6.1.4.1.25506.1.578:
       model: e528
     1.3.6.1.4.1.25506.1.579:
       model: e552
     1.3.6.1.4.1.25506.1.580:
+      category: Switch
       model: S3600v2-28TP-EI
     1.3.6.1.4.1.25506.1.581:
+      category: Switch
       model: S3600v2-52TP-EI
     1.3.6.1.4.1.25506.1.582:
+      category: Switch
       model: S3600v2-28TP-PWR-EI
     1.3.6.1.4.1.25506.1.583:
+      category: Switch
       model: S3600v2-52TP-PWR-EI
     1.3.6.1.4.1.25506.1.584:
+      category: Switch
       model: S3600v2-28F-EI
     1.3.6.1.4.1.25506.1.585:
+      category: Switch
       model: S3600v2-28TP-SI
     1.3.6.1.4.1.25506.1.586:
+      category: Switch
       model: S3600v2-52TP-SI
     1.3.6.1.4.1.25506.1.587:
+      category: Switch
       model: S3600v2-28TP-PWR-SI
     1.3.6.1.4.1.25506.1.588:
+      category: Switch
       model: S3600v2-52TP-PWR-SI
     1.3.6.1.4.1.25506.1.589:
+      category: Switch
       model: S3500V2-28TP-EA
     1.3.6.1.4.1.25506.1.590:
+      category: Switch
       model: S3500V2-52TP-EA
     1.3.6.1.4.1.25506.1.591:
+      category: Switch
       model: S3500V2-28F-EA
     1.3.6.1.4.1.25506.1.592:
+      category: Switch
       model: S3500V2-28TP-SI
     1.3.6.1.4.1.25506.1.593:
+      category: Switch
       model: S3500V2-52TP-SI
     1.3.6.1.4.1.25506.1.594:
+      category: Switch
       model: S9508E
     1.3.6.1.4.1.25506.1.595:
       model: s12504
@@ -1174,12 +1702,16 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.601:
       model: wa2620X-agnp
     1.3.6.1.4.1.25506.1.602:
+      category: Switch
       model: S3100-16TP-PWR-EI-F
     1.3.6.1.4.1.25506.1.603:
+      category: Router
       model: CR16018
     1.3.6.1.4.1.25506.1.604:
+      category: Firewall
       model: CR16008
     1.3.6.1.4.1.25506.1.605:
+      category: Router
       model: CR16004
     1.3.6.1.4.1.25506.1.606:
       model: F1000-A-SI
@@ -1188,6 +1720,7 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.608:
       model: secBlade-LST1ACG1A1
     1.3.6.1.4.1.25506.1.609:
+      category: Firewall
       model: SECBLADE-SPE-IPS
     1.3.6.1.4.1.25506.1.610:
       model: secBlade-SPE-ACG
@@ -1200,14 +1733,18 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.614:
       model: LSR1WCM3A1
     1.3.6.1.4.1.25506.1.615:
+      category: Switch
       model: S5830-52SC
     1.3.6.1.4.1.25506.1.617:
+      category: Switch
       model: S5830-106S
     1.3.6.1.4.1.25506.1.618:
       model: ET814
     1.3.6.1.4.1.25506.1.619:
+      category: Switch
       model: S5120-28P-LI
     1.3.6.1.4.1.25506.1.620:
+      category: Switch
       model: S5120-52P-LI
     1.3.6.1.4.1.25506.1.621:
       model: secBlade-IM-FW-II
@@ -1234,10 +1771,12 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.633:
       model: VCX-V7310
     1.3.6.1.4.1.25506.1.634:
+      category: Firewall
       model: SECBLADE-IM-IPS
     1.3.6.1.4.1.25506.1.635:
       model: secBlade-IM-ACG
     1.3.6.1.4.1.25506.1.636:
+      category: Switch
       model: S7508E-X
     1.3.6.1.4.1.25506.1.637:
       model: s10504
@@ -1257,58 +1796,83 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.644:
       model: ER2100
     1.3.6.1.4.1.25506.1.645:
+      category: Switch
       model: S5820X-34TC
     1.3.6.1.4.1.25506.1.646:
+      category: Switch
       model: S5820X-34SC
     1.3.6.1.4.1.25506.1.647:
+      category: Switch
       model: S5820X-34C
     1.3.6.1.4.1.25506.1.648:
+      category: Switch
       model: S5820X-64SC
     1.3.6.1.4.1.25506.1.649:
       model: cc720E
     1.3.6.1.4.1.25506.1.650:
+      category: Switch
       model: S2126T
     1.3.6.1.4.1.25506.1.651:
+      category: Switch
       model: S5800-54S
     1.3.6.1.4.1.25506.1.652:
+      category: Switch
       model: S5820X-26S
     1.3.6.1.4.1.25506.1.653:
+      category: Switch
       model: S3100V2-8TP-SI
     1.3.6.1.4.1.25506.1.654:
+      category: Switch
       model: S3100V2-16TP-SI
     1.3.6.1.4.1.25506.1.655:
+      category: Switch
       model: S3100V2-26TP-SI
     1.3.6.1.4.1.25506.1.656:
       model: E126B
     1.3.6.1.4.1.25506.1.657:
+      category: Switch
       model: S3100V2-8TP-EI
     1.3.6.1.4.1.25506.1.658:
+      category: Switch
       model: S3100V2-16TP-EI
     1.3.6.1.4.1.25506.1.659:
+      category: Switch
       model: S3100V2-26TP-EI
     1.3.6.1.4.1.25506.1.660:
+      category: Switch
       model: S3100V2-8TP-PWR-EI
     1.3.6.1.4.1.25506.1.661:
+      category: Switch
       model: S3100V2-16TP-PWR-EI
     1.3.6.1.4.1.25506.1.662:
+      category: Switch
       model: S3100V2-26TP-PWR-EI
     1.3.6.1.4.1.25506.1.663:
+      category: Switch
       model: S2008TP-EB
     1.3.6.1.4.1.25506.1.664:
+      category: Switch
       model: S2016TP-EB
     1.3.6.1.4.1.25506.1.665:
+      category: Switch
       model: S2043TP-EB
     1.3.6.1.4.1.25506.1.666:
+      category: Switch
       model: S2008TP-PWR-EB
     1.3.6.1.4.1.25506.1.667:
+      category: Switch
       model: S2016TP-PWR-EB
     1.3.6.1.4.1.25506.1.668:
+      category: Switch
       model: S2403TP-PWR-EB
     1.3.6.1.4.1.25506.1.669:
+      category: Switch
       model: S5800-LSW1FC4P0
     1.3.6.1.4.1.25506.1.670:
+      category: Switch
       model: S2403TP-EA-SI-D
     1.3.6.1.4.1.25506.1.671:
+      category: Switch
       model: S3528P-EA-D
     1.3.6.1.4.1.25506.1.672:
       category: Access Point
@@ -1320,36 +1884,50 @@ sysobjectids:
       category: Access Point
       model: OAPS-MIM-V2
     1.3.6.1.4.1.25506.1.675:
+      category: Switch
       model: S2008TP-PWR-EA
     1.3.6.1.4.1.25506.1.676:
+      category: Switch
       model: S2008TP-PWR-EA-DC
     1.3.6.1.4.1.25506.1.677:
+      category: Switch
       model: S2016TP-PWR-EA
     1.3.6.1.4.1.25506.1.678:
+      category: Switch
       model: S2403TP-PWR-EA
     1.3.6.1.4.1.25506.1.679:
+      category: Switch
       model: S5120-24P-EI-D
     1.3.6.1.4.1.25506.1.680:
+      category: Switch
       model: S5120-24P-PWR-EI-D
     1.3.6.1.4.1.25506.1.681:
+      category: Switch
       model: S5120-48P-EI-D
     1.3.6.1.4.1.25506.1.682:
+      category: Switch
       model: S5024P-EI
     1.3.6.1.4.1.25506.1.683:
+      category: Switch
       model: S5500-28C-EI-D
     1.3.6.1.4.1.25506.1.684:
+      category: Switch
       model: S5500-52C-EI-D
     1.3.6.1.4.1.25506.1.685:
+      category: Switch
       model: S5500-28F-EI-D
     1.3.6.1.4.1.25506.1.686:
+      category: Switch
       model: S5500-28C-EI-DC-D
     1.3.6.1.4.1.25506.1.687:
       model: MG9050
     1.3.6.1.4.1.25506.1.688:
+      category: Switch
       model: S5120-52SC-HI
     1.3.6.1.4.1.25506.1.689:
       model: CE3000-32F-EI
     1.3.6.1.4.1.25506.1.690:
+      category: Switch
       model: S5830X-24S
     1.3.6.1.4.1.25506.1.691:
       model: DC1801FH
@@ -1413,14 +1991,17 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.720:
       model: EC2508HF
     1.3.6.1.4.1.25506.1.721:
+      category: Switch
       model: S3528E-A
     1.3.6.1.4.1.25506.1.722:
+      category: Switch
       model: S3552TP-EA
     1.3.6.1.4.1.25506.1.723:
       model: WP3024
     1.3.6.1.4.1.25506.1.724:
       model: WP3048
     1.3.6.1.4.1.25506.1.725:
+      category: Switch
       model: S3528FP-EA
     1.3.6.1.4.1.25506.1.726:
       model: E328B
@@ -1429,6 +2010,7 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.728:
       model: E152B
     1.3.6.1.4.1.25506.1.729:
+      category: Switch
       model: S3100V2-52TP
     1.3.6.1.4.1.25506.1.730:
       model: WP2008
@@ -1441,12 +2023,16 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.734:
       model: WP5048
     1.3.6.1.4.1.25506.1.735:
+      category: Switch
       model: S2052TPEA
     1.3.6.1.4.1.25506.1.736:
+      category: Switch
       model: S7604X
     1.3.6.1.4.1.25506.1.737:
+      category: Switch
       model: S7608X
     1.3.6.1.4.1.25506.1.738:
+      category: Switch
       model: S7608XV
     1.3.6.1.4.1.25506.1.739:
       model: WA3620iAGN
@@ -1457,16 +2043,20 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.742:
       model: CC750E
     1.3.6.1.4.1.25506.1.743:
+      category: Switch
       model: S5024F-SI
     1.3.6.1.4.1.25506.1.744:
+      category: Switch
       model: S5820V252QF
     1.3.6.1.4.1.25506.1.745:
       model: WA2110GN
     1.3.6.1.4.1.25506.1.746:
+      category: Router
       model: MSR20-10E
     1.3.6.1.4.1.25506.1.747:
       model: S10512
     1.3.6.1.4.1.25506.1.748:
+      category: Switch
       model: S5120-28SC-HI
     1.3.6.1.4.1.25506.1.749:
       model: WA1208EGNP
@@ -1491,8 +2081,10 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.759:
       model: WX3010eLSW
     1.3.6.1.4.1.25506.1.760:
+      category: Router
       model: SR6602-X1
     1.3.6.1.4.1.25506.1.761:
+      category: Router
       model: SR6602-X2
     1.3.6.1.4.1.25506.1.762:
       model: SecBladeCRIMNAM1A
@@ -1503,6 +2095,7 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.765:
       model: MSR3610DC
     1.3.6.1.4.1.25506.1.766:
+      category: Router
       model: MSR36-20
     1.3.6.1.4.1.25506.1.767:
       model: MSR3620DC
@@ -1513,18 +2106,22 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.770:
       model: MSR3660
     1.3.6.1.4.1.25506.1.771:
+      category: Router
       model: MSR56-60
     1.3.6.1.4.1.25506.1.772:
       model: MSR5680
     1.3.6.1.4.1.25506.1.773:
+      category: Switch
       model: S5120-58C-HI
     1.3.6.1.4.1.25506.1.774:
+      category: Switch
       model: S5120-34C-HI
     1.3.6.1.4.1.25506.1.775:
       model: LSU3WCMD0
     1.3.6.1.4.1.25506.1.776:
       model: EWPX3WCMD0
     1.3.6.1.4.1.25506.1.777:
+      category: Switch
       model: S7612X
     1.3.6.1.4.1.25506.1.778:
       model: WX6103E
@@ -1617,34 +2214,49 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.822:
       model: CE300058C
     1.3.6.1.4.1.25506.1.823:
+      category: Router
       model: SR6604-X
     1.3.6.1.4.1.25506.1.824:
+      category: Router
       model: SR6608-X
     1.3.6.1.4.1.25506.1.825:
+      category: Router
       model: SR6616-X
     1.3.6.1.4.1.25506.1.826:
-      model: H3C hh3csecpathF100AG
+      category: Firewall
+      model: hh3csecpathF100AG
     1.3.6.1.4.1.25506.1.827:
-      model: H3C hh3csecpathF100CG
+      category: Firewall
+      model: hh3csecpathF100CG
     1.3.6.1.4.1.25506.1.828:
-      model: H3C hh3csecpathF100EG
+      category: Firewall
+      model: hh3csecpathF100EG
     1.3.6.1.4.1.25506.1.829:
-      model: H3C hh3csecpathF100MG
+      category: Firewall
+      model: hh3csecpathF100MG
     1.3.6.1.4.1.25506.1.830:
-      model: H3C hh3csecpathF100SG
+      category: Firewall
+      model: hh3csecpathF100SG
     1.3.6.1.4.1.25506.1.831:
+      category: Switch
       model: S3100V2-26TP-WiNet
     1.3.6.1.4.1.25506.1.832:
+      category: Switch
       model: S5500-24P-WiNet
     1.3.6.1.4.1.25506.1.833:
+      category: Switch
       model: S5120-28P-Poe-WiNet
     1.3.6.1.4.1.25506.1.834:
+      category: Switch
       model: S5120-28P-WiNet
     1.3.6.1.4.1.25506.1.835:
+      category: Switch
       model: S5500-34C-PWR-HI
     1.3.6.1.4.1.25506.1.836:
+      category: Switch
       model: S5500-58C-PWR-HI
     1.3.6.1.4.1.25506.1.837:
+      category: Switch
       model: S5500-34F-HI
     1.3.6.1.4.1.25506.1.838:
       model: MSR930
@@ -1659,8 +2271,10 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.843:
       model: MSR930GG
     1.3.6.1.4.1.25506.1.844:
+      category: Switch
       model: S5820V2-54QS-GE
     1.3.6.1.4.1.25506.1.845:
+      category: Switch
       model: S5820V2-52Q
     1.3.6.1.4.1.25506.1.846:
       model: CC754E
@@ -1669,27 +2283,36 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.848:
       model: SecBladeCRIMLB1A
     1.3.6.1.4.1.25506.1.849:
+      category: Switch
       model: S5500-34C-HID
     1.3.6.1.4.1.25506.1.850:
+      category: Switch
       model: S5500-58C-HID
     1.3.6.1.4.1.25506.1.851:
+      category: Switch
       model: S9505EV7
     1.3.6.1.4.1.25506.1.852:
+      category: Switch
       model: S9508EV7
     1.3.6.1.4.1.25506.1.853:
+      category: Switch
       model: S9508EVV7
     1.3.6.1.4.1.25506.1.854:
+      category: Switch
       model: S9512EV7
     1.3.6.1.4.1.25506.1.855:
       model: S12508V7
     1.3.6.1.4.1.25506.1.856:
+      category: Switch
       model: S12518V7
     1.3.6.1.4.1.25506.1.857:
       model: S12504V7
     1.3.6.1.4.1.25506.1.858:
-      model: H3C hh3csecpathF100CAI
+      category: Firewall
+      model: hh3csecpathF100CAI
     1.3.6.1.4.1.25506.1.859:
-      model: H3C hh3csecpathL1000A
+      category: Firewall
+      model: hh3csecpathL1000A
     1.3.6.1.4.1.25506.1.860:
       model: WA2610E
     1.3.6.1.4.1.25506.1.861:
@@ -1703,36 +2326,50 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.865:
       model: S58306004
     1.3.6.1.4.1.25506.1.866:
+      category: Firewall
       model: SECBLADELSU1IPSBEA0
     1.3.6.1.4.1.25506.1.867:
+      category: Firewall
       model: SECBLADELST1IPS2A1
     1.3.6.1.4.1.25506.1.868:
       model: MSR930W
     1.3.6.1.4.1.25506.1.869:
       model: MSR930GW
     1.3.6.1.4.1.25506.1.870:
-      model: H3C hh3cSecPathF5000C
+      category: Firewall
+      model: hh3cSecPathF5000C
     1.3.6.1.4.1.25506.1.871:
-      model: H3C hh3cSecPathF5000S
+      category: Firewall
+      model: hh3cSecPathF5000S
     1.3.6.1.4.1.25506.1.872:
+      category: Switch
       model: S12510FDC
     1.3.6.1.4.1.25506.1.873:
+      category: Switch
       model: S12510FAC
     1.3.6.1.4.1.25506.1.874:
+      category: Switch
       model: S12510XDC
     1.3.6.1.4.1.25506.1.875:
+      category: Switch
       model: S12510XAC
     1.3.6.1.4.1.25506.1.876:
+      category: Switch
       model: S12508
     1.3.6.1.4.1.25506.1.877:
+      category: Switch
       model: S12518
     1.3.6.1.4.1.25506.1.878:
+      category: Switch
       model: S12516FDC
     1.3.6.1.4.1.25506.1.879:
+      category: Switch
       model: S12516FAC
     1.3.6.1.4.1.25506.1.880:
+      category: Switch
       model: S12516XDC
     1.3.6.1.4.1.25506.1.881:
+      category: Switch
       model: S12516XAC
     1.3.6.1.4.1.25506.1.882:
       model: MSR930GT
@@ -1741,11 +2378,14 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.884:
       model: MSR930GUC
     1.3.6.1.4.1.25506.1.885:
-      model: H3C hh3csecpathF1000AG
+      category: Firewall
+      model: hh3csecpathF1000AG
     1.3.6.1.4.1.25506.1.886:
-      model: H3C hh3csecpathF1000CG
+      category: Firewall
+      model: hh3csecpathF1000CG
     1.3.6.1.4.1.25506.1.887:
-      model: H3C hh3csecpathF1000SG
+      category: Firewall
+      model: hh3csecpathF1000SG
     1.3.6.1.4.1.25506.1.888:
       model: SecBladeLSQ2FWBSCO
     1.3.6.1.4.1.25506.1.889:
@@ -1759,22 +2399,29 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.893:
       model: VSR1008
     1.3.6.1.4.1.25506.1.894:
+      category: Switch
       model: S5120-S28-PEI
     1.3.6.1.4.1.25506.1.895:
+      category: Switch
       model: S5120-S52-PEI
     1.3.6.1.4.1.25506.1.896:
       model: MSR930WiNetW
     1.3.6.1.4.1.25506.1.897:
       model: WA3628iAGNX
     1.3.6.1.4.1.25506.1.898:
+      category: Switch
       model: S2110
     1.3.6.1.4.1.25506.1.899:
+      category: Switch
       model: S2110-PWR
     1.3.6.1.4.1.25506.1.900:
+      category: Switch
       model: S2126
     1.3.6.1.4.1.25506.1.901:
+      category: Switch
       model: S2126PWR
     1.3.6.1.4.1.25506.1.902:
+      category: Switch
       model: S2152
     1.3.6.1.4.1.25506.1.903:
       model: WX5540-WCM
@@ -1797,6 +2444,7 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.912:
       model: MSR36-60
     1.3.6.1.4.1.25506.1.913:
+      category: Router
       model: MSR26-00
     1.3.6.1.4.1.25506.1.914:
       model: MSR2600-10
@@ -1821,12 +2469,16 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.924:
       model: CC712E
     1.3.6.1.4.1.25506.1.925:
+      category: Switch
       model: S5820V332Q
     1.3.6.1.4.1.25506.1.926:
+      category: Switch
       model: S5008PV2EI
     1.3.6.1.4.1.25506.1.927:
+      category: Switch
       model: S5024PV2EI
     1.3.6.1.4.1.25506.1.928:
+      category: Switch
       model: S5048PV2EI
     1.3.6.1.4.1.25506.1.929:
       model: S2610
@@ -1835,6 +2487,7 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.931:
       model: S2626
     1.3.6.1.4.1.25506.1.932:
+      category: Switch
       model: S2626-PWR
     1.3.6.1.4.1.25506.1.933:
       model: S2652
@@ -1847,13 +2500,17 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.937:
       model: VSR1000
     1.3.6.1.4.1.25506.1.938:
-      model: H3C hh3csecpathM9000
+      category: Firewall
+      model: hh3csecpathM9000
     1.3.6.1.4.1.25506.1.939:
-      model: H3C hh3csecpathM9006
+      category: Firewall
+      model: hh3csecpathM9006
     1.3.6.1.4.1.25506.1.940:
-      model: H3C hh3csecpathM9010
+      category: Firewall
+      model: hh3csecpathM9010
     1.3.6.1.4.1.25506.1.941:
-      model: H3C hh3csecpathM9014
+      category: Firewall
+      model: hh3csecpathM9014
     1.3.6.1.4.1.25506.1.942:
       model: SecBladeIIINSQM1FWCEA0
     1.3.6.1.4.1.25506.1.943:
@@ -1888,6 +2545,7 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.957:
       model: S5110-10P-PWR
     1.3.6.1.4.1.25506.1.958:
+      category: Switch
       model: S5110-28P
     1.3.6.1.4.1.25506.1.959:
       model: S5110-28P-PWR
@@ -1906,24 +2564,33 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.966:
       model: WX5510
     1.3.6.1.4.1.25506.1.967:
+      category: Switch
       model: S550028SCHI
     1.3.6.1.4.1.25506.1.968:
+      category: Switch
       model: S550052SCHI
     1.3.6.1.4.1.25506.1.969:
+      category: Switch
       model: S550028SCHID
     1.3.6.1.4.1.25506.1.970:
+      category: Switch
       model: S550052SCHID
     1.3.6.1.4.1.25506.1.971:
       model: LA2608
     1.3.6.1.4.1.25506.1.972:
+      category: Switch
       model: S311010TP
     1.3.6.1.4.1.25506.1.973:
+      category: Switch
       model: S311010TPPWR
     1.3.6.1.4.1.25506.1.974:
+      category: Switch
       model: S311026TP
     1.3.6.1.4.1.25506.1.975:
+      category: Switch
       model: S311026TPPWR
     1.3.6.1.4.1.25506.1.976:
+      category: Switch
       model: S311052TP
     1.3.6.1.4.1.25506.1.977:
       model: WA2610H-GN
@@ -1962,21 +2629,25 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.994:
       model: WA2620E-X
     1.3.6.1.4.1.25506.1.995:
-      model: H3C hh3csecpathL5000S
+      category: Firewall
+      model: hh3csecpathL5000S
     1.3.6.1.4.1.25506.1.996:
-      model: H3C hh3csecpathL5000C
+      category: Firewall
+      model: hh3csecpathL5000C
     1.3.6.1.4.1.25506.1.997:
       model: CC721E
     1.3.6.1.4.1.25506.1.998:
       model: S5820V2-52QF-U
     1.3.6.1.4.1.25506.1.999:
-      model: H3C hh3csecpathVFW1000
+      category: Firewall
+      model: hh3csecpathVFW1000
     1.3.6.1.4.1.25506.1.1000:
       model: S7003
     1.3.6.1.4.1.25506.1.1001:
       model: S7006
     1.3.6.1.4.1.25506.1.1002:
-      model: H3C hh3csecpathF100CSI
+      category: Firewall
+      model: hh3csecpathF100CSI
     1.3.6.1.4.1.25506.1.1003:
       model: WX3510E
     1.3.6.1.4.1.25506.1.1004:
@@ -2052,9 +2723,11 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.1039:
       model: SR8802-X-S
     1.3.6.1.4.1.25506.1.1040:
-      model: H3C hh3cSecPathF5020
+      category: Firewall
+      model: hh3cSecPathF5020
     1.3.6.1.4.1.25506.1.1041:
-      model: H3C hh3cSecPathF5040
+      category: Firewall
+      model: hh3cSecPathF5040
     1.3.6.1.4.1.25506.1.1042:
       model: RA100
     1.3.6.1.4.1.25506.1.1043:
@@ -2130,6 +2803,7 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.1077:
       model: FlexNetwork U8300-48XLG-U
     1.3.6.1.4.1.25506.1.1078:
+      category: Switch
       model: S5008PV2-EI-PWR
     1.3.6.1.4.1.25506.1.1079:
       model: S5024PV2-EI-PWR
@@ -2152,19 +2826,26 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.1088:
       model: S5130-52TP-PWR-EI
     1.3.6.1.4.1.25506.1.1089:
-      model: H3C hh3csecpathF1020
+      category: Firewall
+      model: hh3csecpathF1020
     1.3.6.1.4.1.25506.1.1090:
-      model: H3C hh3csecpathF1030
+      category: Firewall
+      model: hh3csecpathF1030
     1.3.6.1.4.1.25506.1.1091:
-      model: H3C hh3csecpathF1050
+      category: Firewall
+      model: hh3csecpathF1050
     1.3.6.1.4.1.25506.1.1092:
-      model: H3C hh3csecpathF1060
+      category: Firewall
+      model: hh3csecpathF1060
     1.3.6.1.4.1.25506.1.1093:
-      model: H3C hh3csecpathF1070
+      category: Firewall
+      model: hh3csecpathF1070
     1.3.6.1.4.1.25506.1.1094:
-      model: H3C hh3csecpathF1080
+      category: Firewall
+      model: hh3csecpathF1080
     1.3.6.1.4.1.25506.1.1095:
-      model: H3C hh3csecpathVMSGVLB1000
+      category: Firewall
+      model: hh3csecpathVMSGVLB1000
     1.3.6.1.4.1.25506.1.1096:
       model: S5864-F
     1.3.6.1.4.1.25506.1.1097:
@@ -2182,7 +2863,8 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.1103:
       model: CR16014-F
     1.3.6.1.4.1.25506.1.1104:
-      model: H3C hh3cSecPathM9000Context
+      category: Firewall
+      model: hh3cSecPathM9000Context
     1.3.6.1.4.1.25506.1.1105:
       model: ICG3000S
     1.3.6.1.4.1.25506.1.1106:
@@ -2256,15 +2938,20 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.1139:
       model: MSR930
     1.3.6.1.4.1.25506.1.1140:
-      model: H3C hh3cSecPathACG1000E
+      category: Firewall
+      model: hh3cSecPathACG1000E
     1.3.6.1.4.1.25506.1.1141:
-      model: H3C hh3cSecPathACG1000A
+      category: Firewall
+      model: hh3cSecPathACG1000A
     1.3.6.1.4.1.25506.1.1142:
-      model: H3C hh3cSecPathACG1000M
+      category: Firewall
+      model: hh3cSecPathACG1000M
     1.3.6.1.4.1.25506.1.1143:
-      model: H3C hh3cSecPathACG1000S
+      category: Firewall
+      model: hh3cSecPathACG1000S
     1.3.6.1.4.1.25506.1.1144:
-      model: H3C hh3cSecPathACG1000C
+      category: Firewall
+      model: hh3cSecPathACG1000C
     1.3.6.1.4.1.25506.1.1145:
       model: VBRAS1000
     1.3.6.1.4.1.25506.1.1146:
@@ -2336,13 +3023,17 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.1177:
       model: S1848G
     1.3.6.1.4.1.25506.1.1178:
-      model: H3C hh3cSecPathACG1010
+      category: Firewall
+      model: hh3cSecPathACG1010
     1.3.6.1.4.1.25506.1.1179:
-      model: H3C hh3cSecPathACG1020
+      category: Firewall
+      model: hh3cSecPathACG1020
     1.3.6.1.4.1.25506.1.1180:
-      model: H3C hh3cSecPathACG1030
+      category: Firewall
+      model: hh3cSecPathACG1030
     1.3.6.1.4.1.25506.1.1181:
-      model: H3C hh3cSecPathACG1040
+      category: Firewall
+      model: hh3cSecPathACG1040
     1.3.6.1.4.1.25506.1.1182:
       model: WX3510H
     1.3.6.1.4.1.25506.1.1183:
@@ -2404,6 +3095,7 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.1209:
       model: IE4300-28P
     1.3.6.1.4.1.25506.1.1210:
+      category: Switch
       model: S6800-54QF
     1.3.6.1.4.1.25506.1.1211:
       model: MS4320-28S
@@ -2436,19 +3128,26 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.1225:
       model: WX5540EV7
     1.3.6.1.4.1.25506.1.1226:
-      model: H3C hh3cSecPathL1000E
+      category: Firewall
+      model: hh3cSecPathL1000E
     1.3.6.1.4.1.25506.1.1227:
-      model: H3C hh3cSecPathL1000M
+      category: Firewall
+      model: hh3cSecPathL1000M
     1.3.6.1.4.1.25506.1.1228:
-      model: H3C hh3cSecPathL1000S
+      category: Firewall
+      model: hh3cSecPathL1000S
     1.3.6.1.4.1.25506.1.1229:
-      model: H3C hh3cSecPathF5000Context
+      category: Firewall
+      model: hh3cSecPathF5000Context
     1.3.6.1.4.1.25506.1.1230:
-      model: H3C hh3cSecPathF1000Context
+      category: Firewall
+      model: hh3cSecPathF1000Context
     1.3.6.1.4.1.25506.1.1231:
-      model: H3C hh3cSecPathL5000Context
+      category: Firewall
+      model: hh3cSecPathL5000Context
     1.3.6.1.4.1.25506.1.1232:
-      model: H3C hh3cSecPathL1000Context
+      category: Firewall
+      model: hh3cSecPathL1000Context
     1.3.6.1.4.1.25506.1.1233:
       model: WA4320-TQ-V
     1.3.6.1.4.1.25506.1.1234:
@@ -2464,6 +3163,7 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.1239:
       model: MSR5620
     1.3.6.1.4.1.25506.1.1240:
+      category: Router
       model: MSR3620
     1.3.6.1.4.1.25506.1.1241:
       model: MSR810-W-WiNet
@@ -2494,9 +3194,11 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.1254:
       model: S5150X-16S-TEI
     1.3.6.1.4.1.25506.1.1255:
-      model: H3C hh3cSecPathF100AG2
+      category: Firewall
+      model: hh3cSecPathF100AG2
     1.3.6.1.4.1.25506.1.1256:
-      model: H3C hh3cSecPathF1000CG2
+      category: Firewall
+      model: hh3cSecPathF1000CG2
     1.3.6.1.4.1.25506.1.1257:
       model: UIS M8310-48G
     1.3.6.1.4.1.25506.1.1258:
@@ -2506,33 +3208,47 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.1260:
       model: MSR810
     1.3.6.1.4.1.25506.1.1261:
-      model: H3C hh3cSecPathW2001
+      category: Firewall
+      model: hh3cSecPathW2001
     1.3.6.1.4.1.25506.1.1262:
-      model: H3C hh3cSecPathW2005
+      category: Firewall
+      model: hh3cSecPathW2005
     1.3.6.1.4.1.25506.1.1263:
-      model: H3C hh3cSecPathW2010
+      category: Firewall
+      model: hh3cSecPathW2010
     1.3.6.1.4.1.25506.1.1264:
-      model: H3C hh3cSecPathW2020
+      category: Firewall
+      model: hh3cSecPathW2020
     1.3.6.1.4.1.25506.1.1265:
-      model: H3C hh3cSecPathW2040
+      category: Firewall
+      model: hh3cSecPathW2040
     1.3.6.1.4.1.25506.1.1266:
-      model: H3C hh3cSecPathW2080
+      category: Firewall
+      model: hh3cSecPathW2080
     1.3.6.1.4.1.25506.1.1267:
-      model: H3C hh3cSecPathW2200
+      category: Firewall
+      model: hh3cSecPathW2200
     1.3.6.1.4.1.25506.1.1268:
-      model: H3C hh3cSecPathW1020D
+      category: Firewall
+      model: hh3cSecPathW1020D
     1.3.6.1.4.1.25506.1.1269:
-      model: H3C hh3cSecPathW1040D
+      category: Firewall
+      model: hh3cSecPathW1040D
     1.3.6.1.4.1.25506.1.1270:
-      model: H3C hh3cSecPathW1200D
+      category: Firewall
+      model: hh3cSecPathW1200D
     1.3.6.1.4.1.25506.1.1271:
-      model: H3C hh3cSecPathA2020
+      category: Firewall
+      model: hh3cSecPathA2020
     1.3.6.1.4.1.25506.1.1272:
-      model: H3C hh3cSecPathA2100
+      category: Firewall
+      model: hh3cSecPathA2100
     1.3.6.1.4.1.25506.1.1273:
-      model: H3C hh3cSecPathD2020
+      category: Firewall
+      model: hh3cSecPathD2020
     1.3.6.1.4.1.25506.1.1274:
-      model: H3C hh3cSecPathD2050
+      category: Firewall
+      model: hh3cSecPathD2050
     1.3.6.1.4.1.25506.1.1275:
       model: S5560-34C-EI
     1.3.6.1.4.1.25506.1.1276:
@@ -2642,10 +3358,13 @@ sysobjectids:
     1.3.6.1.4.1.25506.1.1367:
       model: CR16016-X
     1.3.6.1.4.1.25506.1.1380:
+      category: Switch
       model: S5130-28S-WiNet
     1.3.6.1.4.1.25506.1.1417:
+      category: Switch
       model: S6820-56HF
     1.3.6.1.4.1.25506.1.1452:
+      category: Switch
       model: S5120-28P-HPOE-WiNet
     1.3.6.1.4.1.25506.1.1461:
       category: Layer 3 Switch
@@ -2684,6 +3403,7 @@ sysobjectids:
       category: Layer 3 Switch
       model: S7006E
     1.3.6.1.4.1.25506.1.1618:
+      category: Switch
       model: S2626-HPWR
     1.3.6.1.4.1.25506.1.1679:
       category: Layer 3 Switch
@@ -2707,6 +3427,7 @@ sysobjectids:
       category: Layer 3 Switch
       model: S5560S-52S-EI
     1.3.6.1.4.1.25506.1.1826:
+      category: Switch
       model: S9820-64H
     1.3.6.1.4.1.25506.1.1840:
       category: Layer 3 Switch
@@ -2718,10 +3439,13 @@ sysobjectids:
       category: Layer 3 Switch
       model: S6850-56HF
     1.3.6.1.4.1.25506.1.1981:
+      category: Switch
       model: MS4320V2-28F
     1.3.6.1.4.1.25506.1.2064:
+      category: Switch
       model: WAS6124-HPWR
     1.3.6.1.4.1.25506.1.2065:
+      category: Switch
       model: WAS6148-PWR
     1.3.6.1.4.1.25506.1.2268:
       category: Layer 3 Switch
@@ -2736,6 +3460,7 @@ sysobjectids:
       category: Layer 3 Switch
       model: S5130S-52S-PWR-EI-AC
     1.3.6.1.4.1.25506.1.2850:
+      category: Router
       model: MSR3620
     1.3.6.1.4.1.25506.1.2883:
       category: Layer 3 Switch
@@ -2744,11 +3469,20 @@ sysobjectids:
       category: Layer 3 Switch
       model: S5130S-28S-HPWR-EI-AC
     1.3.6.1.4.1.25506.1.3095:
+      category: Switch
       model: US1750-28P-PWR
     1.3.6.1.4.1.25506.3.1.9.4.1065:
       model: SR07SRPUD3
     1.3.6.1.4.1.25506.3.1.9.4.1066:
       model: SR07MPUA3
+    1.3.6.1.4.1.25506.11.1.*:
+      category: Switch
+    1.3.6.1.4.1.25506.11.2.*:
+      category: Router
+    1.3.6.1.4.1.25506.11.3.*:
+      category: Wireless
+    1.3.6.1.4.1.25506.11.4.*:
+      category: Firewall
     1.3.6.1.4.1.25506.11.1.1:
       model: "7502"
     1.3.6.1.4.1.25506.11.1.2:
@@ -3736,7 +4470,7 @@ sysobjectids:
     1.3.6.1.4.1.25506.11.3.25:
       model: WX3010ETAALSW
     1.3.6.1.4.1.25506.11.4:
-      model: H3C hpSecurity Series
+      model: hpSecurity Series
     1.3.6.1.4.1.25506.11.4.1:
       model: SecBladeIMFWII
     1.3.6.1.4.1.25506.11.4.2:
