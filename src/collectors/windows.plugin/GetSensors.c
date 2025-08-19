@@ -101,73 +101,52 @@ static void netdata_clsid_to_char(char *output, const GUID *pguid)
     }
 }
 
+static inline char *netdata_convert_guid_to_string(HRESULT hr, GUID *value) {
+    if (SUCCEEDED(hr)) {
+        char cguid[ADDTIONAL_UUID_STR_LEN];
+        netdata_clsid_to_char(cguid, value);
+        return strdupz(cguid);
+    }
+    return NULL;
+}
+
 static inline void netdata_fill_sensor_type(struct sensor_data *s, ISensor *pSensor)
 {
     GUID type = {0};
-    char cguid[ADDTIONAL_UUID_STR_LEN];
     HRESULT hr = pSensor->lpVtbl->GetType(pSensor, &type);
-    if (SUCCEEDED(hr)) {
-        netdata_clsid_to_char(cguid, &type);
-        s->type = strdupz(cguid);
-    }
+    s->type =  netdata_convert_guid_to_string(hr, &type);
 }
 
 static inline void netdata_fill_sensor_category(struct sensor_data *s, ISensor *pSensor)
 {
     GUID category = {0};
-    char cguid[ADDTIONAL_UUID_STR_LEN];
     HRESULT hr = pSensor->lpVtbl->GetCategory(pSensor, &category);
-    if (SUCCEEDED(hr)) {
-        netdata_clsid_to_char(cguid, &category);
-        s->category = strdupz(cguid);
-    }
+    s->category =  netdata_convert_guid_to_string(hr, &category);
 }
 
-static inline char *netdata_pvar_to_char(HRESULT hr, PROPVARIANT *pv)
+static inline char *netdata_pvar_to_char(const PROPERTYKEY *key, ISensor *pSensor)
 {
-    if (SUCCEEDED(hr) && pv->vt == VT_LPWSTR) {
+    PROPVARIANT pv;
+    PropVariantInit(&pv);
+    HRESULT hr = pSensor->lpVtbl->GetProperty(pSensor, key, &pv);
+    if (SUCCEEDED(hr) && pv.vt == VT_LPWSTR) {
         char value[8192];
-        size_t len = wcslen(pv->pwszVal);
-        wcstombs(value, pv->pwszVal, len);
+        size_t len = wcslen(pv.pwszVal);
+        wcstombs(value, pv.pwszVal, len);
+        PropVariantClear(&pv);
         return strdupz(value);
     }
+    PropVariantClear(&pv);
     return NULL;
-}
-
-static inline void netdata_fill_sensor_name(struct sensor_data *s, ISensor *pSensor)
-{
-    PROPVARIANT pv;
-    PropVariantInit(&pv);
-    HRESULT hr = pSensor->lpVtbl->GetProperty(pSensor, &SENSOR_PROPERTY_FRIENDLY_NAME, &pv);
-    s->name = netdata_pvar_to_char(hr, &pv);
-    PropVariantClear(&pv);
-}
-
-static inline void netdata_fill_sensor_model(struct sensor_data *s, ISensor *pSensor)
-{
-    PROPVARIANT pv;
-    PropVariantInit(&pv);
-    HRESULT hr = pSensor->lpVtbl->GetProperty(pSensor, &SENSOR_PROPERTY_MODEL, &pv);
-    s->model = netdata_pvar_to_char(hr, &pv);
-    PropVariantClear(&pv);
-}
-
-static inline void netdata_fill_sensor_manufacturer(struct sensor_data *s, ISensor *pSensor)
-{
-    PROPVARIANT pv;
-    PropVariantInit(&pv);
-    HRESULT hr = pSensor->lpVtbl->GetProperty(pSensor, &SENSOR_PROPERTY_MANUFACTURER, &pv);
-    s->manufacturer = netdata_pvar_to_char(hr, &pv);
-    PropVariantClear(&pv);
 }
 
 static void netdata_initialize_sensor_dict(struct sensor_data *s, ISensor *pSensor)
 {
     netdata_fill_sensor_type(s, pSensor);
     netdata_fill_sensor_category(s, pSensor);
-    netdata_fill_sensor_name(s, pSensor);
-    netdata_fill_sensor_model(s, pSensor);
-    netdata_fill_sensor_manufacturer(s, pSensor);
+    s->name = netdata_pvar_to_char(&SENSOR_PROPERTY_FRIENDLY_NAME, pSensor);
+    s->model = netdata_pvar_to_char(&SENSOR_PROPERTY_MODEL, pSensor);
+    s->manufacturer = netdata_pvar_to_char(&SENSOR_PROPERTY_MANUFACTURER, pSensor);
 }
 
 static void
@@ -270,7 +249,6 @@ static void netdata_sensors_monitor(void *ptr __maybe_unused)
 {
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);
-    int update_every = UPDATE_EVERY_MIN;
 
     while (service_running(SERVICE_COLLECTORS)) {
         (void)heartbeat_next(&hb);
