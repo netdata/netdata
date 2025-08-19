@@ -140,20 +140,28 @@ sysobjectids:
       model: Huawei switch3025-M
     1.3.6.1.4.1.2011.2.6.2:
       model: MA5200
+      category: Access Equipment
     1.3.6.1.4.1.2011.2.6.2.18:
       model: MA5200E
+      category: Access Equipment
     1.3.6.1.4.1.2011.2.6.2.28.0:
       model: MA5200F
+      category: Access Equipment
     1.3.6.1.4.1.2011.2.6.2.30:
       model: MA5200G
+      category: Access Equipment
     1.3.6.1.4.1.2011.2.6.2.31:
       model: MA5200G-4
+      category: Access Equipment
     1.3.6.1.4.1.2011.2.6.2.32:
       model: MA5200G-2
+      category: Access Equipment
     1.3.6.1.4.1.2011.2.6.5.21:
       model: MA5100-V100
+      category: Access Equipment
     1.3.6.1.4.1.2011.2.6.5.22:
       model: MA5100-V200
+      category: Access Equipment
     1.3.6.1.4.1.2011.2.17:
       category: Router
       model: QuidWay NetEngine NE80
@@ -1164,6 +1172,7 @@ sysobjectids:
       model: S2720-28TP-EI
     1.3.6.1.4.1.2011.2.23.532:
       model: S2720-28TP-PWR-EI
+      category: Switch
     1.3.6.1.4.1.2011.2.23.540:
       category: Switch
       model: S6720-26Q-SI-24S-AC
@@ -1253,6 +1262,7 @@ sysobjectids:
       model: CloudEngine S5735-L12P4S-A
     1.3.6.1.4.1.2011.2.23.721:
       model: S5735-L24P4S-A
+      category: Switch
     1.3.6.1.4.1.2011.2.23.725:
       category: Layer 3 Switch
       model: CloudEngine S5735-L24P4X-A
@@ -1348,8 +1358,10 @@ sysobjectids:
       model: CloudEngine S5735-L48LP4XE-A-V2
     1.3.6.1.4.1.2011.2.26.1:
       model: NE16E
+      category: Router
     1.3.6.1.4.1.2011.2.26.2:
       model: NE08E
+      category: Router
     1.3.6.1.4.1.2011.2.26.3:
       category: Router
       model: Huawei ne05
@@ -1490,10 +1502,13 @@ sysobjectids:
       model: Huawei wlanApWA1006
     1.3.6.1.4.1.2011.2.44:
       model: AR46-20
+      category: Router
     1.3.6.1.4.1.2011.2.45:
       model: AR46-40
+      category: Router
     1.3.6.1.4.1.2011.2.46:
       model: AR46-80
+      category: Router
     1.3.6.1.4.1.2011.2.47:
       category: Router
       model: QuidWay NetEngine NE20-2
@@ -1547,11 +1562,13 @@ sysobjectids:
       model: QuidWay NetEngine NE5000E
     1.3.6.1.4.1.2011.2.62.2.3.1:
       model: NE5000E
+      category: Router
     1.3.6.1.4.1.2011.2.62.2.4:
       category: Router
       model: QuidWay NetEngine NE5000EMulti
     1.3.6.1.4.1.2011.2.62.2.4.1:
       model: NE5000E-Multi
+      category: Router
     1.3.6.1.4.1.2011.2.62.2.5:
       category: Router
       model: QuidWay NetEngine NE40E
@@ -1755,6 +1772,7 @@ sysobjectids:
       model: Huawei ne20E-4
     1.3.6.1.4.1.2011.2.88.2:
       model: NE20E-8
+      category: Router
     1.3.6.1.4.1.2011.2.88.3:
       category: Router
       model: Huawei ne20E-X6
@@ -1922,15 +1940,19 @@ sysobjectids:
       model: Huawei ma5662
     1.3.6.1.4.1.2011.2.208.1:
       model: NE40E-DPI
+      category: Router
     1.3.6.1.4.1.2011.2.208.2:
       model: NE80E-DPI
+      category: Router
     1.3.6.1.4.1.2011.2.208.3:
       category: Server
       model: NE40E80E-DPI SERVER
     1.3.6.1.4.1.2011.2.211.1:
       model: NE40E-FW
+      category: Router
     1.3.6.1.4.1.2011.2.211.2:
       model: NE80E-FW
+      category: Router
     1.3.6.1.4.1.2011.2.213:
       category: Switch
       model: Huawei ma5628
@@ -2857,8 +2879,10 @@ sysobjectids:
       model: H3C ar18-50
     1.3.6.1.4.1.2011.10.1.20:
       model: AR18-33E
+      category: Router
     1.3.6.1.4.1.2011.10.1.21:
       model: AR18-34E
+      category: Router
     1.3.6.1.4.1.2011.10.1.22:
       category: Switch
       model: QuidWay S8508
@@ -2933,6 +2957,7 @@ sysobjectids:
       model: H3C ar18-18V
     1.3.6.1.4.1.2011.10.1.53:
       model: AR18-20S
+      category: Router
     1.3.6.1.4.1.2011.10.1.55:
       category: Router
       model: H3C xe200
@@ -2977,22 +3002,28 @@ sysobjectids:
       model: H3C ar18-21C
     1.3.6.1.4.1.2011.10.1.69:
       model: AR18-22
+      category: Router
     1.3.6.1.4.1.2011.10.1.70:
       category: Router
       model: H3C ar18-22-8
     1.3.6.1.4.1.2011.10.1.71:
       model: AR18-22-24
+      category: Router
     1.3.6.1.4.1.2011.10.1.72:
       model: AR18-23-1
+      category: Router
     1.3.6.1.4.1.2011.10.1.73:
       model: AR18-30E
+      category: Router
     1.3.6.1.4.1.2011.10.1.74:
       model: AR18-31E
+      category: Router
     1.3.6.1.4.1.2011.10.1.75:
       category: Router
       model: H3C ar18-32E
     1.3.6.1.4.1.2011.10.1.76:
       model: AR18-35E
+      category: Router
     1.3.6.1.4.1.2011.10.1.77:
       category: Router
       model: H3C ar18-36E
@@ -3196,132 +3227,196 @@ sysobjectids:
       model: H3C s2008-HI
     1.3.6.1.4.1.2011.10.1.153:
       model: S2016-HI
+      category: Switch
     1.3.6.1.4.1.2011.10.1.154:
       model: S2403H-HI
+      category: Switch
     1.3.6.1.4.1.2011.10.1.156:
       model: S8508V
+      category: Switch
     1.3.6.1.4.1.2011.10.1.157:
       model: E126
+      category: Switch
     1.3.6.1.4.1.2011.10.1.158:
       model: S3126TP
+      category: Switch
     1.3.6.1.4.1.2011.10.1.159:
       model: E328
+      category: Switch
     1.3.6.1.4.1.2011.10.1.160:
       model: E352
+      category: Switch
     1.3.6.1.4.1.2011.10.1.161:
       model: S3928P-PWR-SI
+      category: Switch
     1.3.6.1.4.1.2011.10.1.163:
       model: S8502
+      category: Switch
     1.3.6.1.4.1.2011.10.1.164:
       model: SR8802
+      category: Router
     1.3.6.1.4.1.2011.10.1.174:
       model: S6502ME
+      category: Switch
     1.3.6.1.4.1.2011.10.1.182:
       model: DR814
+      category: Router
     1.3.6.1.4.1.2011.10.1.183:
       model: DR814Q
+      category: Router
     1.3.6.1.4.1.2011.10.1.184:
       model: WDR854G
+      category: Router
     1.3.6.1.4.1.2011.10.1.185:
       model: VDR824G
+      category: Router
     1.3.6.1.4.1.2011.10.1.186:
       model: VDR824
+      category: Router
     1.3.6.1.4.1.2011.10.1.187:
       model: VDR744
+      category: Router
     1.3.6.1.4.1.2011.10.1.188:
       model: DR744
+      category: Router
     1.3.6.1.4.1.2011.10.1.192:
       model: S8505-V5
+      category: Switch
     1.3.6.1.4.1.2011.10.1.193:
       model: S8512-V5
+      category: Switch
     1.3.6.1.4.1.2011.10.1.194:
       model: S8508-V5
+      category: Switch
     1.3.6.1.4.1.2011.10.1.195:
       model: S8508V-V5
+      category: Switch
     1.3.6.1.4.1.2011.10.1.196:
       model: S8502-V5
+      category: Switch
     1.3.6.1.4.1.2011.10.1.198:
       model: S2008TP-EA
+      category: Switch
     1.3.6.1.4.1.2011.10.1.199:
       model: S2016TP-EA
+      category: Switch
     1.3.6.1.4.1.2011.10.1.200:
       model: S2403TP-EA
+      category: Switch
     1.3.6.1.4.1.2011.10.1.201:
       model: S2403TP-PWR-EA
+      category: Switch
     1.3.6.1.4.1.2011.10.1.202:
       model: S2008TP-MI
+      category: Switch
     1.3.6.1.4.1.2011.10.1.203:
       model: S2016TP-MI
+      category: Switch
     1.3.6.1.4.1.2011.10.1.204:
       model: S2403TP-MI
+      category: Switch
     1.3.6.1.4.1.2011.10.1.205:
       model: S7802
+      category: Switch
     1.3.6.1.4.1.2011.10.1.206:
       model: S7803
+      category: Switch
     1.3.6.1.4.1.2011.10.1.207:
       model: S7806
+      category: Switch
     1.3.6.1.4.1.2011.10.1.208:
       model: S7806-V
+      category: Switch
     1.3.6.1.4.1.2011.10.1.209:
       model: S7810
+      category: Switch
     1.3.6.1.4.1.2011.10.1.210:
       model: S2016TP-PWR-EA
+      category: Switch
     1.3.6.1.4.1.2011.10.1.211:
       category: Switch
       model: QuidWay S3552P-EA
     1.3.6.1.4.1.2011.10.1.212:
       model: S3528P-EA
+      category: Switch
     1.3.6.1.4.1.2011.10.1.213:
       model: S3528TP-EA
+      category: Switch
     1.3.6.1.4.1.2011.10.1.214:
       model: S3528F-EA
+      category: Switch
     1.3.6.1.4.1.2011.10.1.215:
       model: S3552F-EA
+      category: Switch
     1.3.6.1.4.1.2011.10.1.216:
       model: Quidway S6902
+      category: Switch
     1.3.6.1.4.1.2011.10.1.217:
       model: Quidway S6903
+      category: Switch
     1.3.6.1.4.1.2011.10.1.218:
       model: Quidway S6906
+      category: Switch
     1.3.6.1.4.1.2011.10.1.219:
       model: Quidway S6906R
+      category: Switch
     1.3.6.1.4.1.2011.10.1.220:
       model: Quidway S3928P-SI-AC/DC
+      category: Switch
     1.3.6.1.4.1.2011.10.1.224:
       model: Quidway AR19-10
+      category: Router
     1.3.6.1.4.1.2011.10.1.225:
       model: Quidway AR19-13
+      category: Router
     1.3.6.1.4.1.2011.10.1.226:
       model: Quidway AR19-15
+      category: Router
     1.3.6.1.4.1.2011.10.1.227:
       model: S3552P-SI
+      category: Switch
     1.3.6.1.4.1.2011.10.1.228:
       model: S3528P-SI
+      category: Switch
     1.3.6.1.4.1.2011.10.1.229:
       model: Quidway S5628C-HI-AC
+      category: Switch
     1.3.6.1.4.1.2011.10.1.230:
       model: Quidway S5628C-HI-DC
+      category: Switch
     1.3.6.1.4.1.2011.10.1.231:
       model: Quidway S5652C-HI-AC
+      category: Switch
     1.3.6.1.4.1.2011.10.1.232:
       model: Quidway S5628F-HI
+      category: Switch
     1.3.6.1.4.1.2011.10.1.233:
       model: Quidway S5628C-PWR-HI
+      category: Switch
     1.3.6.1.4.1.2011.10.1.234:
       model: Quidway S5652C-PWR-HI
+      category: Switch
     1.3.6.1.4.1.2011.10.1.237:
       model: S7803L
+      category: Switch
     1.3.6.1.4.1.2011.10.1.238:
       model: S6503-V5
+      category: Switch
     1.3.6.1.4.1.2011.10.1.239:
       model: S6506-V5
+      category: Switch
     1.3.6.1.4.1.2011.10.1.240:
       model: S6506R-V5
+      category: Switch
     1.3.6.1.4.1.2011.10.1.241:
       model: Quidway AR19-03
+      category: Router
     1.3.6.1.4.1.2011.10.1.242:
       model: Quidway AR19-05
+      category: Router
     1.3.6.1.4.1.2011.10.1.243:
       model: Quidway S7806-L
+      category: Switch
     1.3.6.1.4.1.2011.10.1.244:
       model: AR29-11
+      category: Router
