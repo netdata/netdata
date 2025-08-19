@@ -250,6 +250,7 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
     else
         schedule_node_state_update(host, 100);
 
+    rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE);
     return PARSER_RC_OK;
 }
 
