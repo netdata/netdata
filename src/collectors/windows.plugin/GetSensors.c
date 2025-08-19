@@ -66,6 +66,9 @@ struct sensor_data {
     bool initialized;
     bool first_time;
     bool enabled;
+    enum netdata_win_sensor_monitored sensor_data_type;
+    struct win_sensor_config *config;
+
     const char *type;
     const char *category;
     const char *name;
@@ -77,8 +80,9 @@ struct sensor_data {
     RRDSET *sensor_state;
     RRDDIM *rd_sensor_state[NETDATA_WIN_SENSOR_STATES];
 
-    enum netdata_win_sensor_monitored sensor_data_type;
-    struct win_sensor_config *config;
+    RRDSET *st_sensor_data;
+    RRDDIM *rd_sensor_data;
+
     collected_number current_data_value;
 };
 
@@ -361,6 +365,37 @@ static void mssql_sensor_state_chart_loop(struct sensor_data *sd, int update_eve
     rrdset_done(sd->sensor_state);
 }
 
+static void mssql_sensor_data_chart(struct sensor_data *sd, int update_every)
+{
+    if (!sd->st_sensor_data) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "sensors.%s_input", sd->name);
+        netdata_fix_chart_name(id);
+        sd->st_sensor_data = rrdset_create_localhost(
+                "sensors",
+                id,
+                NULL,
+                sd->config->family,
+                sd->config->context,
+                sd->config->title,
+                sd->config->units,
+                PLUGIN_WINDOWS_NAME,
+                "GetSensors",
+                sd->config->priority,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        rrdlabels_add(sd->st_sensor_data->rrdlabels, "name", sd->name, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(sd->st_sensor_data->rrdlabels, "manufacturer", sd->manufacturer, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(sd->st_sensor_data->rrdlabels, "model", sd->model, RRDLABEL_SRC_AUTO);
+
+        sd->rd_sensor_data = rrddim_add(sd->st_sensor_data, "input", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(sd->st_sensor_data, sd->rd_sensor_data, sd->current_data_value);
+    rrdset_done(sd->st_sensor_data);
+}
+
 int dict_sensors_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     int *update_every = data;
@@ -370,6 +405,12 @@ int dict_sensors_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *val
         return 1;
 
     mssql_sensor_state_chart_loop(sd, *update_every);
+
+    if (unlikely(!sd->enabled))
+        return 1;
+
+    mssql_sensor_data_chart(sd, *update_every);
+
     return 1;
 }
 
