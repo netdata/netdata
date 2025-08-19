@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Revert "Switch to a Debian 13 base for our Docker images." [\#20842](https://github.com/netdata/netdata/pull/20842) ([stelfrag](https://github.com/stelfrag))
 - improve\(go.d/snmp\): update netgear/dlink category in snmp meta [\#20839](https://github.com/netdata/netdata/pull/20839) ([ilyam8](https://github.com/ilyam8))
 - Improve ACLK message parsing [\#20838](https://github.com/netdata/netdata/pull/20838) ([stelfrag](https://github.com/stelfrag))
 - chore\(go.d/snmp\): load & merge per-vendor SNMP metadata overrides [\#20837](https://github.com/netdata/netdata/pull/20837) ([ilyam8](https://github.com/ilyam8))
