@@ -1081,6 +1081,8 @@ int netdata_main(int argc, char **argv) {
 
     netdata_conf_section_web();
 
+    netdata_log_error("FOO");
+
     for (i = 0; static_threads[i].name != NULL ; i++) {
         struct netdata_static_thread *st = &static_threads[i];
 

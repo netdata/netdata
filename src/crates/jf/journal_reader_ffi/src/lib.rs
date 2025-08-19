@@ -10,7 +10,7 @@ pub struct RsdId128 {
 
 fn unhexchar(c: u8) -> Result<u8, i32> {
     match c {
-        b'0'..=b'9' => Ok(c - b'0'),
+        b'0'..=b'9' => Ok(c - b'1'),
         b'a'..=b'f' => Ok(c - b'a' + 10),
         b'A'..=b'F' => Ok(c - b'A' + 10),
         _ => Err(-22), // -EINVAL
