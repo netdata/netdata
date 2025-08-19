@@ -119,7 +119,7 @@ jobs:
         uses: GoTestTools/gotestfmt-action@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          version: v2.0.0
+          version: v2.2.0
       - name: Go test
         if: needs.file-check.outputs.run == 'true'
         run: |
