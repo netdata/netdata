@@ -15,9 +15,57 @@ static ISensorManager *pSensorManager = NULL;
 static ND_THREAD *sensors_thread_update = NULL;
 
 #define NETDATA_WIN_SENSOR_STATES (6)
+#define LINUX_WIN_COMMON_SENSORS (4)
+
+enum netdata_win_sensor_monitored {
+    NETDATA_WIN_SENSOR_CELSIUS,
+    NETDATA_WIN_SENSOR_POWER_WATTS,
+    NETDATA_WIN_SENSOR_CURRENT_AMPS,
+    NETDATA_WIN_SENSOR_RELATIVITY_HUMIDITY
+};
+
+static struct win_sensor_config {
+    const char *title;
+    const char *units;
+    const char *context;
+    const char *family;
+
+    int priority;
+} configs[] = {
+        {
+            .title = "Sensor Temperature",
+            .units = "degrees Celsius",
+            .context = "system.hw.sensor.temperature",
+            .family = "Temperature",
+            .priority = 70000,
+        },
+        {
+            .title = "Sensor Power",
+            .units = "Watts",
+            .context = "system.hw.sensor.power",
+            .family = "Power",
+            .priority = 70006,
+        },
+        {
+            .title = "Sensor Current",
+            .units = "Amperes",
+            .context = "system.hw.sensor.current",
+            .family = "Current",
+            .priority = 70003,
+        },
+        {
+            .title = "Sensor Humidity",
+            .units = "percentage",
+            .context = "system.hw.sensor.humidity",
+            .family = "Humidity",
+            .priority = 70004,
+        }
+};
 
 struct sensor_data {
     bool initialized;
+    bool first_time;
+    bool enabled;
     const char *type;
     const char *category;
     const char *name;
@@ -28,14 +76,19 @@ struct sensor_data {
 
     RRDSET *sensor_state;
     RRDDIM *rd_sensor_state[NETDATA_WIN_SENSOR_STATES];
+
+    enum netdata_win_sensor_monitored sensor_data_type;
+    struct win_sensor_config *config;
+    collected_number current_data_value;
 };
 
 DICTIONARY *sensors;
 
 // Microsoft appends additional data
-#define ADDTIONAL_UUID_STR_LEN (UUID_STR_LEN+8)
+#define ADDTIONAL_UUID_STR_LEN (UUID_STR_LEN + 8)
 
-static void netdata_clsid_to_char(char *output, const GUID *pguid) {
+static void netdata_clsid_to_char(char *output, const GUID *pguid)
+{
     LPWSTR wguid = NULL;
     if (SUCCEEDED(StringFromCLSID(pguid, &wguid)) && wguid) {
         size_t len = wcslen(wguid);
@@ -44,7 +97,8 @@ static void netdata_clsid_to_char(char *output, const GUID *pguid) {
     }
 }
 
-static inline void netdata_fill_sensor_type(struct sensor_data *s, ISensor *pSensor) {
+static inline void netdata_fill_sensor_type(struct sensor_data *s, ISensor *pSensor)
+{
     GUID type = {0};
     char cguid[ADDTIONAL_UUID_STR_LEN];
     HRESULT hr = pSensor->lpVtbl->GetType(pSensor, &type);
@@ -54,7 +108,8 @@ static inline void netdata_fill_sensor_type(struct sensor_data *s, ISensor *pSen
     }
 }
 
-static inline void netdata_fill_sensor_category(struct sensor_data *s, ISensor *pSensor) {
+static inline void netdata_fill_sensor_category(struct sensor_data *s, ISensor *pSensor)
+{
     GUID category = {0};
     char cguid[ADDTIONAL_UUID_STR_LEN];
     HRESULT hr = pSensor->lpVtbl->GetCategory(pSensor, &category);
@@ -64,7 +119,8 @@ static inline void netdata_fill_sensor_category(struct sensor_data *s, ISensor *
     }
 }
 
-static inline char *netdata_pvar_to_char(HRESULT hr, PROPVARIANT *pv) {
+static inline char *netdata_pvar_to_char(HRESULT hr, PROPVARIANT *pv)
+{
     if (SUCCEEDED(hr) && pv->vt == VT_LPWSTR) {
         char value[8192];
         size_t len = wcslen(pv->pwszVal);
@@ -74,7 +130,8 @@ static inline char *netdata_pvar_to_char(HRESULT hr, PROPVARIANT *pv) {
     return NULL;
 }
 
-static inline void netdata_fill_sensor_name(struct sensor_data *s, ISensor *pSensor) {
+static inline void netdata_fill_sensor_name(struct sensor_data *s, ISensor *pSensor)
+{
     PROPVARIANT pv;
     PropVariantInit(&pv);
     HRESULT hr = pSensor->lpVtbl->GetProperty(pSensor, &SENSOR_PROPERTY_FRIENDLY_NAME, &pv);
@@ -82,7 +139,8 @@ static inline void netdata_fill_sensor_name(struct sensor_data *s, ISensor *pSen
     PropVariantClear(&pv);
 }
 
-static inline void netdata_fill_sensor_model(struct sensor_data *s, ISensor *pSensor) {
+static inline void netdata_fill_sensor_model(struct sensor_data *s, ISensor *pSensor)
+{
     PROPVARIANT pv;
     PropVariantInit(&pv);
     HRESULT hr = pSensor->lpVtbl->GetProperty(pSensor, &SENSOR_PROPERTY_MODEL, &pv);
@@ -90,7 +148,8 @@ static inline void netdata_fill_sensor_model(struct sensor_data *s, ISensor *pSe
     PropVariantClear(&pv);
 }
 
-static inline void netdata_fill_sensor_manufacturer(struct sensor_data *s, ISensor *pSensor) {
+static inline void netdata_fill_sensor_manufacturer(struct sensor_data *s, ISensor *pSensor)
+{
     PROPVARIANT pv;
     PropVariantInit(&pv);
     HRESULT hr = pSensor->lpVtbl->GetProperty(pSensor, &SENSOR_PROPERTY_MANUFACTURER, &pv);
@@ -98,7 +157,8 @@ static inline void netdata_fill_sensor_manufacturer(struct sensor_data *s, ISens
     PropVariantClear(&pv);
 }
 
-static void netdata_initialize_sensor_dict(struct sensor_data *s, ISensor *pSensor) {
+static void netdata_initialize_sensor_dict(struct sensor_data *s, ISensor *pSensor)
+{
     netdata_fill_sensor_type(s, pSensor);
     netdata_fill_sensor_category(s, pSensor);
     netdata_fill_sensor_name(s, pSensor);
@@ -106,7 +166,55 @@ static void netdata_initialize_sensor_dict(struct sensor_data *s, ISensor *pSens
     netdata_fill_sensor_manufacturer(s, pSensor);
 }
 
-static void netdata_get_sensors() {
+static void
+try_define_sensor(struct sensor_data *s, ISensor *pSensor, REFPROPERTYKEY key, enum netdata_win_sensor_monitored idx)
+{
+    ISensorDataReport *pReport = NULL;
+    PROPVARIANT pv = {};
+    HRESULT hr;
+
+    hr = pSensor->lpVtbl->GetData(pSensor, &pReport);
+    if (SUCCEEDED(hr) && pReport) {
+        PropVariantInit(&pv);
+        hr = pReport->lpVtbl->GetSensorValue(pReport, key, &pv);
+        if (SUCCEEDED(hr) && (pv.vt == VT_R4 || pv.vt == VT_R8 || pv.vt == VT_UI4)) {
+            switch (pv.vt) {
+                case VT_UI4:
+                    s->current_data_value = (collected_number)(pv.ulVal * 100);
+                    break;
+                case VT_R4:
+                    s->current_data_value = (collected_number)(pv.fltVal * 100.0);
+                    break;
+                case VT_R8:
+                    s->current_data_value = (collected_number)(pv.dblVal * 100.0);
+                    break;
+            }
+            s->sensor_data_type = idx;
+            s->config = &configs[idx];
+            s->enabled = true;
+        }
+        PropVariantClear(&pv);
+        pReport->lpVtbl->Release(pReport);
+    }
+}
+
+static void netdata_sensors_get_data(struct sensor_data *s, ISensor *pSensor)
+{
+    REFPROPERTYKEY keys[LINUX_WIN_COMMON_SENSORS] = {
+        &SENSOR_DATA_TYPE_TEMPERATURE_CELSIUS,
+        &SENSOR_DATA_TYPE_ELECTRICAL_POWER_WATTS,
+        &SENSOR_DATA_TYPE_CURRENT_AMPS,
+        &SENSOR_DATA_TYPE_RELATIVE_HUMIDITY_PERCENT};
+
+    for (int i = 0; i < LINUX_WIN_COMMON_SENSORS; i++) {
+        try_define_sensor(s, pSensor, keys[i], i);
+    }
+
+    s->first_time = false;
+}
+
+static void netdata_get_sensors()
+{
     ISensorCollection *pSensorCollection = NULL;
     HRESULT hr = pSensorManager->lpVtbl->GetSensorsByCategory(pSensorManager, &SENSOR_CATEGORY_ALL, &pSensorCollection);
     if (FAILED(hr)) {
@@ -145,6 +253,9 @@ static void netdata_get_sensors() {
         s->current_state = SENSOR_STATE_MIN;
         (void)pSensor->lpVtbl->GetState(pSensor, &s->current_state);
 
+        if (unlikely(!s->sensor_data_type) && likely(s->first_time))
+            netdata_sensors_get_data(s, pSensor);
+
         pSensor->lpVtbl->Release(pSensor);
     }
 
@@ -158,7 +269,7 @@ static void netdata_sensors_monitor(void *ptr __maybe_unused)
     int update_every = UPDATE_EVERY_MIN;
 
     while (service_running(SERVICE_COLLECTORS)) {
-        (void) heartbeat_next(&hb);
+        (void)heartbeat_next(&hb);
 
         if (unlikely(!service_running(SERVICE_COLLECTORS)))
             break;
@@ -169,7 +280,11 @@ static void netdata_sensors_monitor(void *ptr __maybe_unused)
 
 void dict_sensor_insert(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
-    ;
+    struct sensor_data *sd = value;
+
+    sd->first_time = true;
+    sd->sensor_data_type = 0;
+    sd->config = NULL;
 }
 
 static int initialize(int update_every)
@@ -194,7 +309,7 @@ static int initialize(int update_every)
     }
 
     sensors = dictionary_create_advanced(
-            DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct sensor_data));
+        DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct sensor_data));
     dictionary_register_insert_callback(sensors, dict_sensor_insert, NULL);
 
     sensors_thread_update =
@@ -210,18 +325,18 @@ static void mssql_db_states_chart(struct sensor_data *sd, int update_every)
         snprintfz(id, RRD_ID_LENGTH_MAX, "%s_state", sd->name);
         netdata_fix_chart_name(id);
         sd->sensor_state = rrdset_create_localhost(
-                "sensors",
-                id,
-                NULL,
-                "sensors",
-                "system.hw.sensor.state",
-                "Current sensor state.",
-                "status",
-                PLUGIN_WINDOWS_NAME,
-                "GetSensors",
-                70010,
-                update_every,
-                RRDSET_TYPE_LINE);
+            "sensors",
+            id,
+            NULL,
+            "sensors",
+            "system.hw.sensor.state",
+            "Current sensor state.",
+            "status",
+            PLUGIN_WINDOWS_NAME,
+            "GetSensors",
+            70010,
+            update_every,
+            RRDSET_TYPE_LINE);
 
         rrdlabels_add(sd->sensor_state->rrdlabels, "name", sd->name, RRDLABEL_SRC_AUTO);
         rrdlabels_add(sd->sensor_state->rrdlabels, "manufacturer", sd->manufacturer, RRDLABEL_SRC_AUTO);
@@ -278,9 +393,9 @@ void do_Sensors_cleanup()
     if (nd_thread_join(sensors_thread_update))
         nd_log_daemon(NDLP_ERR, "Failed to join sensors thread update");
 
-   if (pSensorManager) {
-       pSensorManager->lpVtbl->Release(pSensorManager);
+    if (pSensorManager) {
+        pSensorManager->lpVtbl->Release(pSensorManager);
 
-       CoUninitialize();
-   }
+        CoUninitialize();
+    }
 }
