@@ -65,7 +65,10 @@ static void build_node_info(RRDHOST *host)
     now_realtime_timeval(&node_info.updated_at);
 
     char *host_version = NULL;
-    if (host != localhost && !rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST))
+    bool is_virtual_host = (rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST) ||
+                           strcmp(string2str(host->os), NETDATA_VIRTUAL_HOST) == 0);
+
+    if (host != localhost && !is_virtual_host)
         host_version = stream_receiver_program_version_strdupz(host);
 
     node_info.data.name = rrdhost_hostname(host);
@@ -182,8 +185,8 @@ void aclk_check_node_info_and_collectors(void)
 #ifdef REPLICATION_TRACKING
         char replay_counters_txt[1024];
         snprintfz(replay_counters_txt, sizeof(replay_counters_txt),
-                  " - REPLAY WHO RCV { %zu unknown, %zu me, %zu them, %zu finished } - "
-                  "REPLAY WHO SND { %zu unknown, %zu me, %zu them, %zu finished }",
+            " - REPLAY WHO RCV { %zu unknown, %zu me, %zu them, %zu finished } - "
+            "REPLAY WHO SND { %zu unknown, %zu me, %zu them, %zu finished }",
                   replay_counters.rcv[REPLAY_WHO_UNKNOWN], replay_counters.rcv[REPLAY_WHO_ME], replay_counters.rcv[REPLAY_WHO_THEM], replay_counters.rcv[REPLAY_WHO_FINISHED],
                   replay_counters.snd[REPLAY_WHO_UNKNOWN], replay_counters.snd[REPLAY_WHO_ME], replay_counters.snd[REPLAY_WHO_THEM], replay_counters.snd[REPLAY_WHO_FINISHED]
         );
@@ -197,21 +200,21 @@ void aclk_check_node_info_and_collectors(void)
             context_loading_body = string2str(context_loading_host);
             context_loading_post = "')";
         }
-        
+
         const char *replicating_rcv_pre = "", *replicating_rcv_body = "", *replicating_rcv_post = "";
         if(replicating_rcv == 1) {
             replicating_rcv_pre = " (host '";
             replicating_rcv_body = string2str(replicating_rcv_host);
             replicating_rcv_post = "')";
         }
-        
+
         const char *replicating_snd_pre = "", *replicating_snd_body = "", *replicating_snd_post = "";
         if(replicating_snd == 1) {
             replicating_snd_pre = " (host '";
             replicating_snd_body = string2str(replicating_snd_host);
             replicating_snd_post = "')";
         }
-        
+
         const char *context_pp_pre = "", *context_pp_body = "", *context_pp_post = "";
         if(context_pp == 1) {
             context_pp_pre = " (host '";
@@ -221,7 +224,7 @@ void aclk_check_node_info_and_collectors(void)
 
         nd_log_limit_static_global_var(erl, 10, 100 * USEC_PER_MS);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_INFO,
-                     "NODES INFO: %zu nodes loading contexts%s%s%s, %zu receiving replication%s%s%s, %zu sending replication%s%s%s, %zu pending context post processing%s%s%s%s",
+            "NODES INFO: %zu nodes loading contexts%s%s%s, %zu receiving replication%s%s%s, %zu sending replication%s%s%s, %zu pending context post processing%s%s%s%s",
                      context_loading, context_loading_pre, context_loading_body, context_loading_post,
                      replicating_rcv, replicating_rcv_pre, replicating_rcv_body, replicating_rcv_post,
                      replicating_snd, replicating_snd_pre, replicating_snd_body, replicating_snd_post,
