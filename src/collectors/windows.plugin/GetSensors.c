@@ -77,7 +77,7 @@ struct sensor_data {
 
     SensorState current_state;
 
-    RRDSET *sensor_state;
+    RRDSET *st_sensor_state;
     RRDDIM *rd_sensor_state[NETDATA_WIN_SENSOR_STATES];
 
     RRDSET *st_sensor_data;
@@ -324,11 +324,11 @@ static int initialize(int update_every)
 
 static void mssql_db_states_chart(struct sensor_data *sd, int update_every)
 {
-    if (!sd->sensor_state) {
+    if (!sd->st_sensor_state) {
         char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "%s_state", sd->name);
         netdata_fix_chart_name(id);
-        sd->sensor_state = rrdset_create_localhost(
+        sd->st_sensor_state = rrdset_create_localhost(
             "sensors",
             id,
             NULL,
@@ -342,16 +342,16 @@ static void mssql_db_states_chart(struct sensor_data *sd, int update_every)
             update_every,
             RRDSET_TYPE_LINE);
 
-        rrdlabels_add(sd->sensor_state->rrdlabels, "name", sd->name, RRDLABEL_SRC_AUTO);
-        rrdlabels_add(sd->sensor_state->rrdlabels, "manufacturer", sd->manufacturer, RRDLABEL_SRC_AUTO);
-        rrdlabels_add(sd->sensor_state->rrdlabels, "model", sd->model, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(sd->st_sensor_state->rrdlabels, "name", sd->name, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(sd->st_sensor_state->rrdlabels, "manufacturer", sd->manufacturer, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(sd->st_sensor_state->rrdlabels, "model", sd->model, RRDLABEL_SRC_AUTO);
 
-        sd->rd_sensor_state[0] = rrddim_add(sd->sensor_state, "ready", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        sd->rd_sensor_state[1] = rrddim_add(sd->sensor_state, "not_available", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        sd->rd_sensor_state[2] = rrddim_add(sd->sensor_state, "no_data", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        sd->rd_sensor_state[3] = rrddim_add(sd->sensor_state, "initializing", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        sd->rd_sensor_state[4] = rrddim_add(sd->sensor_state, "access_denied", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        sd->rd_sensor_state[5] = rrddim_add(sd->sensor_state, "error", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        sd->rd_sensor_state[0] = rrddim_add(sd->st_sensor_state, "ready", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        sd->rd_sensor_state[1] = rrddim_add(sd->st_sensor_state, "not_available", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        sd->rd_sensor_state[2] = rrddim_add(sd->st_sensor_state, "no_data", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        sd->rd_sensor_state[3] = rrddim_add(sd->st_sensor_state, "initializing", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        sd->rd_sensor_state[4] = rrddim_add(sd->st_sensor_state, "access_denied", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        sd->rd_sensor_state[5] = rrddim_add(sd->st_sensor_state, "error", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 }
 
@@ -360,9 +360,9 @@ static void mssql_sensor_state_chart_loop(struct sensor_data *sd, int update_eve
     mssql_db_states_chart(sd, update_every);
     collected_number set_value = (collected_number)sd->current_state;
     for (collected_number i = 0; i < NETDATA_WIN_SENSOR_STATES; i++) {
-        rrddim_set_by_pointer(sd->sensor_state, sd->rd_sensor_state[i], i == set_value);
+        rrddim_set_by_pointer(sd->st_sensor_state, sd->rd_sensor_state[i], i == set_value);
     }
-    rrdset_done(sd->sensor_state);
+    rrdset_done(sd->st_sensor_state);
 }
 
 static void mssql_sensor_data_chart(struct sensor_data *sd, int update_every)
