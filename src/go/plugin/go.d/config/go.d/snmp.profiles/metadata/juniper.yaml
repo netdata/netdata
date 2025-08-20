@@ -1,5 +1,8 @@
 sysobjectids:
   oid_overrides:
+    1.3.6.1.4.1.1411.102:
+      category: Switch
+      model: EX2500
     1.3.6.1.4.1.2636.1.1.1.1.1:
       category: Router
       model: M40
@@ -900,3 +903,63 @@ sysobjectids:
     1.3.6.1.4.1.2636.3.41.1.1.5.7:
       category: WAN Accelerator
       model: WXC-7800
+    1.3.6.1.4.1.4874.1.1.1.1.1:
+      category: Router
+      model: ERX-1410
+    1.3.6.1.4.1.4874.1.1.1.1.1.1:
+      category: Router
+      model: Juniper ERX1400 Virtual Router
+    1.3.6.1.4.1.4874.1.1.1.1.2:
+      category: Router
+      model: ERX-710
+    1.3.6.1.4.1.4874.1.1.1.1.2.1:
+      category: Router
+      model: Juniper ERX700 Virtual Router
+    1.3.6.1.4.1.4874.1.1.1.1.3:
+      category: Layer 3 Switch
+      model: ERX-1440
+    1.3.6.1.4.1.4874.1.1.1.1.3.1:
+      category: Router
+      model: Juniper ERX1400 Virtual Router
+    1.3.6.1.4.1.4874.1.1.1.1.4:
+      category: Router
+      model: ERX-705
+    1.3.6.1.4.1.4874.1.1.1.1.4.1:
+      category: Router
+      model: Juniper ERX700 Virtual Router
+    1.3.6.1.4.1.4874.1.1.1.1.5:
+      category: Router
+      model: ERX-310
+    1.3.6.1.4.1.4874.1.1.1.1.5.1:
+      category: Router
+      model: Juniper ERX310 Virtual Router
+    1.3.6.1.4.1.4874.1.1.1.2.1.1.1:
+      category: Firewall
+      model: Juniper juniSsx1400
+    1.3.6.1.4.1.4874.1.1.1.2.1.1.2:
+      category: Firewall
+      model: Juniper juniSsx700
+    1.3.6.1.4.1.4874.1.1.1.2.1.1.3:
+      category: Firewall
+      model: Juniper juniSsx1440
+    1.3.6.1.4.1.4874.1.1.1.4:
+      category: Firewall
+      model: Juniper usSrx
+    1.3.6.1.4.1.4874.1.1.1.6.1:
+      category: Layer 3 Switch
+      model: E320
+    1.3.6.1.4.1.4874.1.1.1.6.1.1:
+      category: Router
+      model: Juniper E320 Virtual Router
+    1.3.6.1.4.1.4874.1.1.1.6.2:
+      category: Router
+      model: E120
+    1.3.6.1.4.1.4874.1.1.2.1.1.1:
+      category: Router
+      model: SSX-1400
+    1.3.6.1.4.1.4874.1.1.2.1.1.2:
+      category: Router
+      model: SSX-700
+    1.3.6.1.4.1.4874.1.1.2.1.1.3:
+      category: Router
+      model: SSX-1440

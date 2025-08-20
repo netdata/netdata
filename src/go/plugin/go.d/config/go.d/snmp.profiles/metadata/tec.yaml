@@ -1,0 +1,166 @@
+sysobjectids:
+  oid_overrides:
+    1.3.6.1.4.1.1129.1.2.1:
+      category: Printer
+      model: B-EX4T1-T
+    1.3.6.1.4.1.1129.2.3.24.1:
+      category: Printer
+      model: e-STUDIO167
+    1.3.6.1.4.1.1129.2.3.29.7:
+      category: Printer
+      model: e-STUDIO 4520C
+    1.3.6.1.4.1.1129.2.3.33.2:
+      model: e-STUDIO 255
+    1.3.6.1.4.1.1129.2.3.33.3:
+      category: Printer
+      model: e-STUDIO 305
+    1.3.6.1.4.1.1129.2.3.36.2:
+      category: Printer
+      model: e-STUDIO 6540C Series
+    1.3.6.1.4.1.1129.2.3.37.2:
+      category: Printer
+      model: e-STUDIO 2540C
+    1.3.6.1.4.1.1129.2.3.37.4:
+      category: Printer
+      model: e-STUDIO 3540C Series
+    1.3.6.1.4.1.1129.2.3.40.2:
+      category: Printer
+      model: e-STUDIO256
+    1.3.6.1.4.1.1129.2.3.40.3:
+      category: Printer
+      model: e-STUDIO306
+    1.3.6.1.4.1.1129.2.3.40.4:
+      category: Printer
+      model: e-STUDIO356
+    1.3.6.1.4.1.1129.2.3.40.5:
+      category: Printer
+      model: e-STUDIO 456
+    1.3.6.1.4.1.1129.2.3.41.2:
+      category: Printer
+      model: e-STUDIO656
+    1.3.6.1.4.1.1129.2.3.44.1:
+      category: Printer
+      model: e-STUDIO2050C
+    1.3.6.1.4.1.1129.2.3.44.2:
+      category: Printer
+      model: e-STUDIO 2550C
+    1.3.6.1.4.1.1129.2.3.45.1:
+      category: Printer
+      model: e-STUDIO2555C
+    1.3.6.1.4.1.1129.2.3.45.2:
+      category: Printer
+      model: e-STUDIO3055C
+    1.3.6.1.4.1.1129.2.3.45.3:
+      category: Printer
+      model: e-STUDIO 3555C Series
+    1.3.6.1.4.1.1129.2.3.45.4:
+      category: Printer
+      model: e-STUDIO4555C
+    1.3.6.1.4.1.1129.2.3.45.5:
+      category: Printer
+      model: e-STUDIO5055C
+    1.3.6.1.4.1.1129.2.3.48.1:
+      category: Printer
+      model: e-STUDIO 287CS
+    1.3.6.1.4.1.1129.2.3.48.2:
+      category: Printer
+      model: ES7470 MFP
+    1.3.6.1.4.1.1129.2.3.49.1:
+      category: Printer
+      model: e-STUDIO 477S
+    1.3.6.1.4.1.1129.2.3.51.2:
+      category: Printer
+      model: e-STUDIO 6560C
+    1.3.6.1.4.1.1129.2.3.53.2:
+      category: Printer
+      model: e-STUDIO 257
+    1.3.6.1.4.1.1129.2.3.53.3:
+      category: Printer
+      model: e-STUDIO307
+    1.3.6.1.4.1.1129.2.3.53.4:
+      category: Printer
+      model: e-STUDIO357
+    1.3.6.1.4.1.1129.2.3.54.2:
+      category: Printer
+      model: e-STUDIO657
+    1.3.6.1.4.1.1129.2.3.57.2:
+      category: Printer
+      model: e-STUDIO 2500AC
+    1.3.6.1.4.1.1129.2.3.58.3:
+      category: Printer
+      model: e-STUDIO3005AC
+    1.3.6.1.4.1.1129.2.3.58.4:
+      category: Printer
+      model: e-STUDIO 3505AC
+    1.3.6.1.4.1.1129.2.3.59.3:
+      category: Printer
+      model: e-STUDIO 7506AC
+    1.3.6.1.4.1.1129.2.3.60.1:
+      category: Printer
+      model: e-STUDIO5508A
+    1.3.6.1.4.1.1129.2.3.60.2:
+      category: Printer
+      model: e-STUDIO6508A
+    1.3.6.1.4.1.1129.2.3.61.3:
+      category: Printer
+      model: e-STUDIO 2802AF
+    1.3.6.1.4.1.1129.2.3.64.2:
+      category: Printer
+      model: e-STUDIO 2508A
+    1.3.6.1.4.1.1129.2.3.64.3:
+      category: Printer
+      model: e-STUDIO 3008A
+    1.3.6.1.4.1.1129.2.3.64.5:
+      category: Printer
+      model: e-STUDIO 4508A
+    1.3.6.1.4.1.1129.2.3.65.1:
+      category: Printer
+      model: e-STUDIO 3508LP
+    1.3.6.1.4.1.1129.2.3.66.1:
+      category: Printer
+      model: e-STUDIO 330AC
+    1.3.6.1.4.1.1129.2.3.67.1:
+      category: Printer
+      model: e-STUDIO2010AC
+    1.3.6.1.4.1.1129.2.3.68.3:
+      category: Printer
+      model: e-STUDIO 3015AC
+    1.3.6.1.4.1.1129.2.3.68.4:
+      category: Printer
+      model: e-STUDIO 3515AC
+    1.3.6.1.4.1.1129.2.3.68.5:
+      category: Printer
+      model: e-STUDIO4515AC
+    1.3.6.1.4.1.1129.2.3.68.6:
+      category: Printer
+      model: e-STUDIO 5015AC
+    1.3.6.1.4.1.1129.2.3.69.2:
+      category: Printer
+      model: e-STUDIO 2518A
+    1.3.6.1.4.1.1129.2.3.69.3:
+      category: Printer
+      model: e-STUDIO 3018A
+    1.3.6.1.4.1.1129.2.3.69.5:
+      category: Printer
+      model: e-STUDIO4518A
+    1.3.6.1.4.1.1129.2.3.70.3:
+      category: Printer
+      model: e-STUDIO 7516AC
+    1.3.6.1.4.1.1129.2.3.71.1:
+      category: Printer
+      model: e-STUDIO 5518A
+    1.3.6.1.4.1.1129.2.3.75.2:
+      category: Printer
+      model: e-STUDIO2520AC
+    1.3.6.1.4.1.1129.2.3.76.4:
+      category: Printer
+      model: STUDIO3525AC
+    1.3.6.1.4.1.1129.2.3.76.5:
+      category: Printer
+      model: e-STUDIO4525AC
+    1.3.6.1.4.1.1129.2.3.77.3:
+      category: Printer
+      model: e-STUDIO3528A
+    1.3.6.1.4.1.1129.2.3.79.1:
+      category: Printer
+      model: e-STUDIO 6529A

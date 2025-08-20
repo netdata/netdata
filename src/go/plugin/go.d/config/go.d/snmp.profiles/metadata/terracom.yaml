@@ -1,0 +1,182 @@
+sysobjectids:
+  oid_overrides:
+    1.3.6.1.4.1.3709.1.2.17:
+      category: Switch
+      model: DM3224F2
+    1.3.6.1.4.1.3709.1.2.19:
+      category: Layer 3 Switch
+      model: DM3324F2
+    1.3.6.1.4.1.3709.1.2.31:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.34:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.35:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.36:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.37:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.38:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.39:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.58:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.59:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.60:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.64:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.65:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.67:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.68:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.72:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.82:
+      category: Layer 3 Switch
+      model: DmSwitch 2104G2
+    1.3.6.1.4.1.3709.1.2.83:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.86:
+      category: Layer 3 Switch
+      model: DM4100
+    1.3.6.1.4.1.3709.1.2.87:
+      category: Layer 3 Switch
+      model: DM4100
+    1.3.6.1.4.1.3709.1.2.88:
+      category: Layer 3 Switch
+      model: DM4100
+    1.3.6.1.4.1.3709.1.2.89:
+      category: Layer 3 Switch
+      model: DM4100
+    1.3.6.1.4.1.3709.1.2.90:
+      category: Layer 3 Switch
+      model: DM4100 ETH24GX+4XX+MPLS
+    1.3.6.1.4.1.3709.1.2.91:
+      category: Layer 3 Switch
+      model: DM4100
+    1.3.6.1.4.1.3709.1.2.92:
+      category: Layer 3 Switch
+      model: DM4100
+    1.3.6.1.4.1.3709.1.2.93:
+      category: Layer 3 Switch
+      model: DM4100
+    1.3.6.1.4.1.3709.1.2.94:
+      category: Layer 3 Switch
+      model: DM4100
+    1.3.6.1.4.1.3709.1.2.95:
+      category: Layer 3 Switch
+      model: DM4100
+    1.3.6.1.4.1.3709.1.2.97:
+      category: Layer 3 Switch
+      model: DM4100
+    1.3.6.1.4.1.3709.1.2.98:
+      category: Layer 3 Switch
+      model: DM4100
+    1.3.6.1.4.1.3709.1.2.99:
+      category: Layer 3 Switch
+      model: DM4100
+    1.3.6.1.4.1.3709.1.2.100:
+      category: Layer 3 Switch
+      model: DM4100
+    1.3.6.1.4.1.3709.1.2.101:
+      category: Layer 3 Switch
+      model: DM4100
+    1.3.6.1.4.1.3709.1.2.102:
+      category: Layer 3 Switch
+      model: DM4100
+    1.3.6.1.4.1.3709.1.2.103:
+      category: Layer 3 Switch
+      model: DM4100
+    1.3.6.1.4.1.3709.1.2.104:
+      category: Layer 3 Switch
+      model: DM4100
+    1.3.6.1.4.1.3709.1.2.106:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.107:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.108:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.109:
+      category: Layer 3 Switch
+      model: DM4100
+    1.3.6.1.4.1.3709.1.2.115:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.116:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.117:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.118:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.119:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.120:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.121:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.122:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.124:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.125:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.126:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.127:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.128:
+      category: Layer 3 Switch
+      model: DM4100
+    1.3.6.1.4.1.3709.1.2.130:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.131:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.132:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.133:
+      category: Layer 3 Switch
+      model: DM4000
+    1.3.6.1.4.1.3709.1.2.136:
+      category: Layer 3 Switch
+      model: DM4100
+    1.3.6.1.4.1.3709.3:
+      category: Switch
+      model: DataCom
