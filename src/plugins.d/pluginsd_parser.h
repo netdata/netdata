@@ -95,6 +95,11 @@ typedef struct parser_user_object {
         time_t wall_clock_time;
         bool ml_locked;
     } v2;
+
+    struct {
+        Pvoid_t JudyL;
+    } vnodes;
+
 } PARSER_USER_OBJECT;
 
 typedef void (*parser_deferred_action_t)(struct parser *parser, void *action_data);
