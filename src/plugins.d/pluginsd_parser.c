@@ -1261,7 +1261,9 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
         cd->serial_failures++;
 
     if (parser->user.host != localhost) {
+        nd_log_daemon(NDLP_INFO, "PLUGINSD: Checking virtual status for %s", rrdhost_hostname(parser->user.host));
         if (rrdhost_option_check(parser->user.host, RRDHOST_OPTION_VIRTUAL_HOST)) {
+            nd_log_daemon(NDLP_INFO, "PLUGINSD: Reseting virtual host status for %s", rrdhost_hostname(parser->user.host));
             rrdhost_option_clear(parser->user.host, RRDHOST_OPTION_VIRTUAL_HOST);
             rrdhost_flag_clear(parser->user.host, RRDHOST_FLAG_COLLECTOR_ONLINE);
             schedule_node_state_update(parser->user.host, 1000);
