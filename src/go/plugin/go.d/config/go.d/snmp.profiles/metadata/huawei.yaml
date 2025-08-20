@@ -2,13 +2,13 @@ sysobjectids:
   oid_overrides:
     1.3.6.1.4.1.2011.1.1.1.1:
       category: Router
-      model: Huawei hwrouter
+      model: hwrouter
     1.3.6.1.4.1.2011.1.1.1.2:
       category: Router
       model: QuidWay NetEngine R2611
     1.3.6.1.4.1.2011.1.1.1.100:
       category: Router
-      model: Huawei eudemon
+      model: eudemon
     1.3.6.1.4.1.2011.1.1.1.1600:
       category: Router
       model: QuidWay NetEngine R1600
@@ -83,16 +83,16 @@ sysobjectids:
       model: QuidWay NetEngine R4001
     1.3.6.1.4.1.2011.1.1.1.11812:
       category: Router
-      model: Huawei ar18-12
+      model: ar18-12
     1.3.6.1.4.1.2011.1.1.1.11813:
       category: Router
-      model: Huawei ar18-13
+      model: ar18-13
     1.3.6.1.4.1.2011.1.1.1.11815:
       category: Router
-      model: Huawei ar18-15
+      model: ar18-15
     1.3.6.1.4.1.2011.1.1.1.11816:
       category: Router
-      model: Huawei ar18-16
+      model: ar18-16
     1.3.6.1.4.1.2011.1.1.1.12809:
       category: Router
       model: AR28-09
@@ -128,62 +128,70 @@ sysobjectids:
       model: QuidWay S2403
     1.3.6.1.4.1.2011.2.4.2:
       category: Switch
-      model: Huawei switch3008
+      model: switch3008
     1.3.6.1.4.1.2011.2.4.3:
       category: Switch
-      model: Huawei switch3016
+      model: switch3016
     1.3.6.1.4.1.2011.2.4.4:
       category: Switch
-      model: Huawei switch2024-M
+      model: switch2024-M
     1.3.6.1.4.1.2011.2.4.5:
       category: Switch
-      model: Huawei switch3025-M
+      model: switch3025-M
     1.3.6.1.4.1.2011.2.6.2:
       model: MA5200
+      category: DSLAM
     1.3.6.1.4.1.2011.2.6.2.18:
       model: MA5200E
+      category: DSLAM
     1.3.6.1.4.1.2011.2.6.2.28.0:
       model: MA5200F
+      category: DSLAM
     1.3.6.1.4.1.2011.2.6.2.30:
       model: MA5200G
+      category: DSLAM
     1.3.6.1.4.1.2011.2.6.2.31:
       model: MA5200G-4
+      category: DSLAM
     1.3.6.1.4.1.2011.2.6.2.32:
       model: MA5200G-2
+      category: DSLAM
     1.3.6.1.4.1.2011.2.6.5.21:
       model: MA5100-V100
+      category: DSLAM
     1.3.6.1.4.1.2011.2.6.5.22:
       model: MA5100-V200
+      category: DSLAM
     1.3.6.1.4.1.2011.2.17:
       category: Router
       model: QuidWay NetEngine NE80
     1.3.6.1.4.1.2011.2.22.2:
       category: Router
-      model: Huawei radium8750
+      model: radium8750
     1.3.6.1.4.1.2011.2.22.3:
       category: Router
-      model: Huawei isn8850
+      model: isn8850
     1.3.6.1.4.1.2011.2.22.5:
       category: Router
-      model: Huawei esr8825
+      model: esr8825
     1.3.6.1.4.1.2011.2.22.6:
       category: Router
-      model: Huawei esrV5R3
+      model: esrV5R3
     1.3.6.1.4.1.2011.2.22.7:
       category: Router
-      model: Huawei esrV5R58850
+      model: esrV5R58850
     1.3.6.1.4.1.2011.2.22.8:
       category: Router
-      model: Huawei esrV5R58825
+      model: esrV5R58825
     1.3.6.1.4.1.2011.2.23.1:
       category: Switch
-      model: Huawei lswCommon
+      model: lswCommon
     1.3.6.1.4.1.2011.2.23.11:
       category: Switch
       model: QuidWay S8016
     1.3.6.1.4.1.2011.2.23.11.1:
       category: Switch
-      model: Huawei s8016Common
+      model: s8016Common
     1.3.6.1.4.1.2011.2.23.11.2:
       category: Switch
       model: QuidWay S8016
@@ -327,7 +335,7 @@ sysobjectids:
       model: QuidWay S3026S-SI
     1.3.6.1.4.1.2011.2.23.57:
       category: Switch
-      model: Huawei s8505e
+      model: s8505e
     1.3.6.1.4.1.2011.2.23.67:
       category: Switch
       model: S3552F
@@ -336,13 +344,13 @@ sysobjectids:
       model: S3552F-EI
     1.3.6.1.4.1.2011.2.23.69:
       category: Switch
-      model: Huawei e026
+      model: e026
     1.3.6.1.4.1.2011.2.23.70:
       category: Switch
-      model: Huawei e026-SI
+      model: e026-SI
     1.3.6.1.4.1.2011.2.23.71:
       category: Switch
-      model: Huawei e050
+      model: e050
     1.3.6.1.4.1.2011.2.23.72:
       category: Switch
       model: S2326P-SI
@@ -393,16 +401,16 @@ sysobjectids:
       model: S2309TP-SI/EI
     1.3.6.1.4.1.2011.2.23.88:
       category: Switch
-      model: Huawei s2309TP-EI
+      model: s2309TP-EI
     1.3.6.1.4.1.2011.2.23.89:
       category: Switch
-      model: Huawei s2318TP-SI
+      model: s2318TP-SI
     1.3.6.1.4.1.2011.2.23.90:
       category: Switch
-      model: Huawei s2318TP-EI
+      model: s2318TP-EI
     1.3.6.1.4.1.2011.2.23.91:
       category: Switch
-      model: Huawei s2326TP-SI
+      model: s2326TP-SI
     1.3.6.1.4.1.2011.2.23.92:
       category: Layer 3 Switch
       model: S2326TP-EI
@@ -708,7 +716,7 @@ sysobjectids:
       model: S5710-52C-LI
     1.3.6.1.4.1.2011.2.23.193:
       category: Switch
-      model: Huawei e6000
+      model: e6000
     1.3.6.1.4.1.2011.2.23.194:
       category: Switch
       model: S5710-28C-PWR-EI
@@ -1164,6 +1172,7 @@ sysobjectids:
       model: S2720-28TP-EI
     1.3.6.1.4.1.2011.2.23.532:
       model: S2720-28TP-PWR-EI
+      category: Switch
     1.3.6.1.4.1.2011.2.23.540:
       category: Switch
       model: S6720-26Q-SI-24S-AC
@@ -1253,6 +1262,7 @@ sysobjectids:
       model: CloudEngine S5735-L12P4S-A
     1.3.6.1.4.1.2011.2.23.721:
       model: S5735-L24P4S-A
+      category: Switch
     1.3.6.1.4.1.2011.2.23.725:
       category: Layer 3 Switch
       model: CloudEngine S5735-L24P4X-A
@@ -1348,14 +1358,16 @@ sysobjectids:
       model: CloudEngine S5735-L48LP4XE-A-V2
     1.3.6.1.4.1.2011.2.26.1:
       model: NE16E
+      category: Router
     1.3.6.1.4.1.2011.2.26.2:
       model: NE08E
+      category: Router
     1.3.6.1.4.1.2011.2.26.3:
       category: Router
-      model: Huawei ne05
+      model: ne05
     1.3.6.1.4.1.2011.2.28:
       category: Router
-      model: Huawei umg8900
+      model: umg8900
     1.3.6.1.4.1.2011.2.29:
       category: Router
       model: QuidWay NetEngine NE40-2
@@ -1367,94 +1379,94 @@ sysobjectids:
       model: QuidWay NetEngine NE40-8
     1.3.6.1.4.1.2011.2.33.7:
       category: Router
-      model: Huawei hw8040If
+      model: hw8040If
     1.3.6.1.4.1.2011.2.33.20:
       category: Router
-      model: Huawei aR46-E200
+      model: aR46-E200
     1.3.6.1.4.1.2011.2.39.1:
       category: Wireless
-      model: Huawei wlanApCommon
+      model: wlanApCommon
     1.3.6.1.4.1.2011.2.39.2:
       category: Wireless
-      model: Huawei wlanApWA1003
+      model: wlanApWA1003
     1.3.6.1.4.1.2011.2.39.3:
       category: Wireless
-      model: Huawei wlanApWA1003A
+      model: wlanApWA1003A
     1.3.6.1.4.1.2011.2.39.4:
       category: Wireless
-      model: Huawei wlanApWA1005
+      model: wlanApWA1005
     1.3.6.1.4.1.2011.2.39.5:
       category: Wireless
-      model: Huawei wlanApWA1008
+      model: wlanApWA1008
     1.3.6.1.4.1.2011.2.39.6:
       category: Wireless
-      model: Huawei wlanApWA1208
+      model: wlanApWA1208
     1.3.6.1.4.1.2011.2.39.7:
       category: Wireless
-      model: Huawei wlanApWA1208H
+      model: wlanApWA1208H
     1.3.6.1.4.1.2011.2.39.8:
       category: Wireless
-      model: Huawei wlanApWA1006E
+      model: wlanApWA1006E
     1.3.6.1.4.1.2011.2.39.9:
       category: Wireless
-      model: Huawei wlanBridgeWB2010
+      model: wlanBridgeWB2010
     1.3.6.1.4.1.2011.2.39.10:
       category: Wireless
-      model: Huawei wlanBridgeWB2011
+      model: wlanBridgeWB2011
     1.3.6.1.4.1.2011.2.39.11:
       category: Wireless
-      model: Huawei wa1208E
+      model: wa1208E
     1.3.6.1.4.1.2011.2.39.12:
       category: Wireless
-      model: Huawei wlanAp6010DN
+      model: wlanAp6010DN
     1.3.6.1.4.1.2011.2.39.13:
       category: Wireless
-      model: Huawei wlanAp6010SN
+      model: wlanAp6010SN
     1.3.6.1.4.1.2011.2.39.14:
       category: Wireless
-      model: Huawei wlanAp6510DN-US
+      model: wlanAp6510DN-US
     1.3.6.1.4.1.2011.2.39.15:
       category: Wireless
-      model: Huawei wlanAp6610DN-US
+      model: wlanAp6610DN-US
     1.3.6.1.4.1.2011.2.39.16:
       category: Wireless
-      model: Huawei wlanAp6610DN
+      model: wlanAp6610DN
     1.3.6.1.4.1.2011.2.39.17:
       category: Wireless
-      model: Huawei wlanAp6510DN
+      model: wlanAp6510DN
     1.3.6.1.4.1.2011.2.39.18:
       category: Wireless
-      model: Huawei wlanAp5010DN
+      model: wlanAp5010DN
     1.3.6.1.4.1.2011.2.39.19:
       category: Wireless
-      model: Huawei wlanAp3010DN
+      model: wlanAp3010DN
     1.3.6.1.4.1.2011.2.39.20:
       category: Wireless
-      model: Huawei wlanAp5010SN
+      model: wlanAp5010SN
     1.3.6.1.4.1.2011.2.39.21:
       category: Wireless
-      model: Huawei wlanAp5030DN
+      model: wlanAp5030DN
     1.3.6.1.4.1.2011.2.39.22:
       category: Wireless
-      model: Huawei wlanAp5130DN
+      model: wlanAp5130DN
     1.3.6.1.4.1.2011.2.39.23:
       category: Wireless
-      model: Huawei wlanAp8030DN
+      model: wlanAp8030DN
     1.3.6.1.4.1.2011.2.39.24:
       category: Wireless
-      model: Huawei wlanAp8130DN
+      model: wlanAp8130DN
     1.3.6.1.4.1.2011.2.39.25:
       category: Wireless
-      model: Huawei wlanAp9130DN
+      model: wlanAp9130DN
     1.3.6.1.4.1.2011.2.39.27:
       category: Wireless
-      model: Huawei wlanAt815SN
+      model: wlanAt815SN
     1.3.6.1.4.1.2011.2.39.28:
       category: Wireless
-      model: Huawei wlanAp7110DN
+      model: wlanAp7110DN
     1.3.6.1.4.1.2011.2.39.29:
       category: Wireless
-      model: Huawei wlanAp7110SN
+      model: wlanAp7110SN
     1.3.6.1.4.1.2011.2.39.77:
       category: Access Point
       model: AP7060DN
@@ -1487,13 +1499,16 @@ sysobjectids:
       model: AirEngine 5761R-11
     1.3.6.1.4.1.2011.2.43:
       category: Wireless
-      model: Huawei wlanApWA1006
+      model: wlanApWA1006
     1.3.6.1.4.1.2011.2.44:
       model: AR46-20
+      category: Router
     1.3.6.1.4.1.2011.2.45:
       model: AR46-40
+      category: Router
     1.3.6.1.4.1.2011.2.46:
       model: AR46-80
+      category: Router
     1.3.6.1.4.1.2011.2.47:
       category: Router
       model: QuidWay NetEngine NE20-2
@@ -1505,37 +1520,37 @@ sysobjectids:
       model: QuidWay NetEngine NE20-8
     1.3.6.1.4.1.2011.2.50:
       category: Firewall
-      model: Huawei eudemon200
+      model: eudemon200
     1.3.6.1.4.1.2011.2.51:
       category: Firewall
-      model: Huawei eudemon1000
+      model: eudemon1000
     1.3.6.1.4.1.2011.2.55:
       category: Router
-      model: Huawei ar18-18
+      model: ar18-18
     1.3.6.1.4.1.2011.2.56:
       category: Router
-      model: Huawei ar18-20
+      model: ar18-20
     1.3.6.1.4.1.2011.2.57:
       category: Router
-      model: Huawei ar18-30
+      model: ar18-30
     1.3.6.1.4.1.2011.2.58:
       category: Router
-      model: Huawei ar18-31
+      model: ar18-31
     1.3.6.1.4.1.2011.2.59:
       category: Router
-      model: Huawei ar18-32
+      model: ar18-32
     1.3.6.1.4.1.2011.2.60:
       category: Router
-      model: Huawei ar18-33
+      model: ar18-33
     1.3.6.1.4.1.2011.2.61:
       category: Router
-      model: Huawei ar18-34
+      model: ar18-34
     1.3.6.1.4.1.2011.2.62:
       category: Router
       model: QuidWay NetEngine 5000E
     1.3.6.1.4.1.2011.2.62.2:
       category: Router
-      model: Huawei ne5000SysOid
+      model: ne5000SysOid
     1.3.6.1.4.1.2011.2.62.2.1:
       category: Router
       model: QuidWay NetEngine NE5000oem
@@ -1547,11 +1562,13 @@ sysobjectids:
       model: QuidWay NetEngine NE5000E
     1.3.6.1.4.1.2011.2.62.2.3.1:
       model: NE5000E
+      category: Router
     1.3.6.1.4.1.2011.2.62.2.4:
       category: Router
       model: QuidWay NetEngine NE5000EMulti
     1.3.6.1.4.1.2011.2.62.2.4.1:
       model: NE5000E-Multi
+      category: Router
     1.3.6.1.4.1.2011.2.62.2.5:
       category: Router
       model: QuidWay NetEngine NE40E
@@ -1596,31 +1613,31 @@ sysobjectids:
       model: QuidWay NetEngine NE40E-X16B
     1.3.6.1.4.1.2011.2.62.14:
       category: Router
-      model: Huawei ne40E-X1-M4
+      model: ne40E-X1-M4
     1.3.6.1.4.1.2011.2.62.15:
       category: Router
-      model: Huawei ne40E-X2-M8
+      model: ne40E-X2-M8
     1.3.6.1.4.1.2011.2.62.16:
       category: Router
-      model: Huawei ne40E-X2-M16
+      model: ne40E-X2-M16
     1.3.6.1.4.1.2011.2.62.20:
       category: Router
-      model: Huawei ne40E-M2E
+      model: ne40E-M2E
     1.3.6.1.4.1.2011.2.62.21:
       category: Router
-      model: Huawei ne40E-M2F
+      model: ne40E-M2F
     1.3.6.1.4.1.2011.2.62.31:
       category: Switch
       model: NE40E-F1A-14H24Q
     1.3.6.1.4.1.2011.2.65:
       category: Firewall
-      model: Huawei eudemon2100
+      model: eudemon2100
     1.3.6.1.4.1.2011.2.66:
       category: Firewall
-      model: Huawei eudemon2200
+      model: eudemon2200
     1.3.6.1.4.1.2011.2.77:
       category: Firewall
-      model: Huawei eudemon500
+      model: eudemon500
     1.3.6.1.4.1.2011.2.80:
       category: Layer 3 Switch
       model: SmartAX MA5603T
@@ -1629,147 +1646,148 @@ sysobjectids:
       model: MA5600-V8
     1.3.6.1.4.1.2011.2.83:
       category: Firewall
-      model: Huawei secpath1800F
+      model: secpath1800F
     1.3.6.1.4.1.2011.2.84:
       category: Firewall
-      model: Huawei eudemon2300
+      model: eudemon2300
     1.3.6.1.4.1.2011.2.85:
       category: Switch
-      model: Huawei ma5100V600
+      model: ma5100V600
     1.3.6.1.4.1.2011.2.86:
       category: Switch
-      model: Huawei ma5605
+      model: ma5605
     1.3.6.1.4.1.2011.2.87.1:
       category: Router
-      model: Huawei cX200A
+      model: cX200A
     1.3.6.1.4.1.2011.2.87.2:
       category: Router
-      model: Huawei cX200B
+      model: cX200B
     1.3.6.1.4.1.2011.2.87.3:
       category: Router
-      model: Huawei cX300A
+      model: cX300A
     1.3.6.1.4.1.2011.2.87.4:
       category: Router
-      model: Huawei cX300B
+      model: cX300B
     1.3.6.1.4.1.2011.2.87.5:
       category: Router
-      model: Huawei cX500A
+      model: cX500A
     1.3.6.1.4.1.2011.2.87.6:
       category: Router
-      model: Huawei cX380
+      model: cX380
     1.3.6.1.4.1.2011.2.87.7:
       category: Router
-      model: Huawei cX600-8
+      model: cX600-8
     1.3.6.1.4.1.2011.2.87.8:
       category: Router
-      model: Huawei cX600-16
+      model: cX600-16
     1.3.6.1.4.1.2011.2.87.9:
       category: Router
-      model: Huawei cX200C
+      model: cX200C
     1.3.6.1.4.1.2011.2.87.10:
       category: Router
-      model: Huawei cX200D
+      model: cX200D
     1.3.6.1.4.1.2011.2.87.11:
       category: Router
-      model: Huawei cX200D-EA
+      model: cX200D-EA
     1.3.6.1.4.1.2011.2.87.12:
       category: Router
-      model: Huawei cX200D-MC
+      model: cX200D-MC
     1.3.6.1.4.1.2011.2.87.13:
       category: Router
-      model: Huawei cX600-4
+      model: cX600-4
     1.3.6.1.4.1.2011.2.87.14:
       category: Router
-      model: Huawei cX380-PBT
+      model: cX380-PBT
     1.3.6.1.4.1.2011.2.87.15:
       category: Router
-      model: Huawei cX380-ME
+      model: cX380-ME
     1.3.6.1.4.1.2011.2.87.16:
       category: Router
-      model: Huawei cX200D-EA-MC
+      model: cX200D-EA-MC
     1.3.6.1.4.1.2011.2.87.17:
       category: Router
-      model: Huawei cX600-X3
+      model: cX600-X3
     1.3.6.1.4.1.2011.2.87.18:
       category: Switch
       model: Quidway CX600-X8
     1.3.6.1.4.1.2011.2.87.19:
       category: Router
-      model: Huawei cX600-X16
+      model: cX600-X16
     1.3.6.1.4.1.2011.2.87.20:
       category: Router
-      model: Huawei cX600-X1
+      model: cX600-X1
     1.3.6.1.4.1.2011.2.87.21:
       category: Router
-      model: Huawei cX600-X2
+      model: cX600-X2
     1.3.6.1.4.1.2011.2.87.22:
       category: Router
-      model: Huawei cX600-X1DO
+      model: cX600-X1DO
     1.3.6.1.4.1.2011.2.87.23:
       category: Router
-      model: Huawei cX600-X2DO
+      model: cX600-X2DO
     1.3.6.1.4.1.2011.2.87.24:
       category: Router
-      model: Huawei cX600-X3DO
+      model: cX600-X3DO
     1.3.6.1.4.1.2011.2.87.25:
       category: Router
-      model: Huawei cX600-X8DO
+      model: cX600-X8DO
     1.3.6.1.4.1.2011.2.87.26:
       category: Router
-      model: Huawei cX600-X16DO
+      model: cX600-X16DO
     1.3.6.1.4.1.2011.2.87.27:
       category: Router
-      model: Huawei cX600-X1-M4
+      model: cX600-X1-M4
     1.3.6.1.4.1.2011.2.87.28:
       category: Router
-      model: Huawei cX600-X2-M8
+      model: cX600-X2-M8
     1.3.6.1.4.1.2011.2.87.29:
       category: Router
-      model: Huawei cX600-X2-M16
+      model: cX600-X2-M16
     1.3.6.1.4.1.2011.2.87.30:
       category: Router
-      model: Huawei cX600-M4-DO
+      model: cX600-M4-DO
     1.3.6.1.4.1.2011.2.87.31:
       category: Router
-      model: Huawei cX600-M8-DO
+      model: cX600-M8-DO
     1.3.6.1.4.1.2011.2.87.32:
       category: Router
-      model: Huawei cX600-M16-DO
+      model: cX600-M16-DO
     1.3.6.1.4.1.2011.2.87.33:
       category: Router
-      model: Huawei cX600-X8A
+      model: cX600-X8A
     1.3.6.1.4.1.2011.2.87.34:
       category: Router
-      model: Huawei cX600-X16A
+      model: cX600-X16A
     1.3.6.1.4.1.2011.2.87.35:
       category: Router
-      model: Huawei cX600-M2E
+      model: cX600-M2E
     1.3.6.1.4.1.2011.2.87.36:
       category: Router
-      model: Huawei cX600-M2F
+      model: cX600-M2F
     1.3.6.1.4.1.2011.2.88:
       category: Router
       model: QuidWay NetEngine 20E
     1.3.6.1.4.1.2011.2.88.1:
       category: Router
-      model: Huawei ne20E-4
+      model: ne20E-4
     1.3.6.1.4.1.2011.2.88.2:
       model: NE20E-8
+      category: Router
     1.3.6.1.4.1.2011.2.88.3:
       category: Router
-      model: Huawei ne20E-X6
+      model: ne20E-X6
     1.3.6.1.4.1.2011.2.88.4:
       category: Router
       model: NetEngine20E-S4
     1.3.6.1.4.1.2011.2.88.5:
       category: Router
-      model: Huawei ne20E-S8
+      model: ne20E-S8
     1.3.6.1.4.1.2011.2.88.6:
       category: Router
-      model: Huawei ne20E-S16
+      model: ne20E-S16
     1.3.6.1.4.1.2011.2.88.7:
       category: Router
-      model: Huawei ne20E-S2E
+      model: ne20E-S2E
     1.3.6.1.4.1.2011.2.88.8:
       category: Switch
       model: NE20E-S2F
@@ -1778,88 +1796,88 @@ sysobjectids:
       model: NetEngine20E-S8A
     1.3.6.1.4.1.2011.2.89.1:
       category: Router
-      model: Huawei me60-16
+      model: me60-16
     1.3.6.1.4.1.2011.2.89.3:
       category: Router
-      model: Huawei me60-4
+      model: me60-4
     1.3.6.1.4.1.2011.2.89.4:
       category: Router
-      model: Huawei me60-X3
+      model: me60-X3
     1.3.6.1.4.1.2011.2.89.5:
       category: Router
-      model: Huawei me60-X8
+      model: me60-X8
     1.3.6.1.4.1.2011.2.89.6:
       category: Router
-      model: Huawei me60-X16
+      model: me60-X16
     1.3.6.1.4.1.2011.2.91:
       category: Firewall
       model: IPSAN
     1.3.6.1.4.1.2011.2.109:
       category: Switch
-      model: Huawei ma5606
+      model: ma5606
     1.3.6.1.4.1.2011.2.114:
       category: Firewall
-      model: Huawei eudemonVPN3900
+      model: eudemonVPN3900
     1.3.6.1.4.1.2011.2.116:
       category: Firewall
-      model: Huawei eudemon100E
+      model: eudemon100E
     1.3.6.1.4.1.2011.2.117:
       category: Firewall
-      model: Huawei eudemon200E
+      model: eudemon200E
     1.3.6.1.4.1.2011.2.118:
       category: Firewall
-      model: Huawei eudemon200S
+      model: eudemon200S
     1.3.6.1.4.1.2011.2.123:
       category: Layer 3 Switch
       model: MA5603T
     1.3.6.1.4.1.2011.2.124:
       category: Firewall
-      model: Huawei svn3000
+      model: svn3000
     1.3.6.1.4.1.2011.2.125:
       category: Firewall
-      model: Huawei usg5000
+      model: usg5000
     1.3.6.1.4.1.2011.2.127:
       category: Firewall
-      model: Huawei eudemon200s
+      model: eudemon200s
     1.3.6.1.4.1.2011.2.128:
       category: Switch
-      model: Huawei ma5620E
+      model: ma5620E
     1.3.6.1.4.1.2011.2.129:
       category: Firewall
-      model: Huawei sig1000
+      model: sig1000
     1.3.6.1.4.1.2011.2.130:
       category: Firewall
-      model: Huawei sig9280
+      model: sig9280
     1.3.6.1.4.1.2011.2.131:
       category: Firewall
-      model: Huawei sig2000
+      model: sig2000
     1.3.6.1.4.1.2011.2.132:
       category: Switch
-      model: Huawei ma5626E
+      model: ma5626E
     1.3.6.1.4.1.2011.2.133:
       category: Switch
-      model: Huawei ma5683
+      model: ma5683
     1.3.6.1.4.1.2011.2.134:
       category: Switch
-      model: Huawei ma5620G
+      model: ma5620G
     1.3.6.1.4.1.2011.2.135:
       category: Switch
-      model: Huawei ma5626G
+      model: ma5626G
     1.3.6.1.4.1.2011.2.136:
       category: Switch
-      model: Huawei ma5651G
+      model: ma5651G
     1.3.6.1.4.1.2011.2.137:
       category: Switch
-      model: Huawei ma5651
+      model: ma5651
     1.3.6.1.4.1.2011.2.167:
       category: Switch
-      model: Huawei ma5610
+      model: ma5610
     1.3.6.1.4.1.2011.2.168:
       category: Switch
-      model: Huawei ma5652G
+      model: ma5652G
     1.3.6.1.4.1.2011.2.169:
       category: Switch
-      model: Huawei ma5616
+      model: ma5616
     1.3.6.1.4.1.2011.2.170.1:
       category: Layer 3 Switch
       model: Quidway S9303
@@ -1871,22 +1889,22 @@ sysobjectids:
       model: Quidway S9312
     1.3.6.1.4.1.2011.2.170.4:
       category: Switch
-      model: Huawei vasp
+      model: vasp
     1.3.6.1.4.1.2011.2.170.5:
       category: Switch
-      model: Huawei s9303E
+      model: s9303E
     1.3.6.1.4.1.2011.2.170.6:
       category: Switch
-      model: Huawei s9306E
+      model: s9306E
     1.3.6.1.4.1.2011.2.170.7:
       category: Switch
-      model: Huawei s9312E
+      model: s9312E
     1.3.6.1.4.1.2011.2.172:
       category: Switch
-      model: Huawei ma5603U
+      model: ma5603U
     1.3.6.1.4.1.2011.2.174:
       category: Switch
-      model: Huawei ma5618
+      model: ma5618
     1.3.6.1.4.1.2011.2.175.2:
       category: Firewall
       model: Secospace USG2110-F*Firewall is the secondary capability of this device.
@@ -1895,117 +1913,121 @@ sysobjectids:
       model: USG2110-A-GW-W
     1.3.6.1.4.1.2011.2.177:
       category: Firewall
-      model: Huawei sig9810
+      model: sig9810
     1.3.6.1.4.1.2011.2.178:
       category: Firewall
-      model: Huawei sig9820
+      model: sig9820
     1.3.6.1.4.1.2011.2.184:
       category: Switch
-      model: Huawei ma5612
+      model: ma5612
     1.3.6.1.4.1.2011.2.185:
       category: Switch
-      model: Huawei ma5620
+      model: ma5620
     1.3.6.1.4.1.2011.2.186:
       category: Switch
-      model: Huawei ma5626
+      model: ma5626
     1.3.6.1.4.1.2011.2.189.1:
       category: Firewall
-      model: Huawei usg9110
+      model: usg9110
     1.3.6.1.4.1.2011.2.189.2:
       category: Firewall
-      model: Huawei usg9120
+      model: usg9120
     1.3.6.1.4.1.2011.2.190:
       category: Switch
-      model: Huawei ma5635
+      model: ma5635
     1.3.6.1.4.1.2011.2.195:
       category: Switch
-      model: Huawei ma5662
+      model: ma5662
     1.3.6.1.4.1.2011.2.208.1:
       model: NE40E-DPI
+      category: Router
     1.3.6.1.4.1.2011.2.208.2:
       model: NE80E-DPI
+      category: Router
     1.3.6.1.4.1.2011.2.208.3:
       category: Server
       model: NE40E80E-DPI SERVER
     1.3.6.1.4.1.2011.2.211.1:
       model: NE40E-FW
+      category: Router
     1.3.6.1.4.1.2011.2.211.2:
       model: NE80E-FW
+      category: Router
     1.3.6.1.4.1.2011.2.213:
       category: Switch
-      model: Huawei ma5628
+      model: ma5628
     1.3.6.1.4.1.2011.2.219:
       category: Switch
-      model: Huawei ma5631
+      model: ma5631
     1.3.6.1.4.1.2011.2.220.1:
       category: Router
-      model: Huawei atn980
+      model: atn980
     1.3.6.1.4.1.2011.2.220.2:
       category: Router
-      model: Huawei atn990
+      model: atn990
     1.3.6.1.4.1.2011.2.220.3:
       category: Router
-      model: Huawei atn910
+      model: atn910
     1.3.6.1.4.1.2011.2.220.4:
       category: Router
-      model: Huawei atn950
+      model: atn950
     1.3.6.1.4.1.2011.2.220.5:
       category: Router
-      model: Huawei atn950B
+      model: atn950B
     1.3.6.1.4.1.2011.2.220.6:
       category: Router
-      model: Huawei atn910IAc
+      model: atn910IAc
     1.3.6.1.4.1.2011.2.220.7:
       category: Router
-      model: Huawei atn910IDc
+      model: atn910IDc
     1.3.6.1.4.1.2011.2.220.8:
       category: Router
-      model: Huawei atn910ICAc
+      model: atn910ICAc
     1.3.6.1.4.1.2011.2.220.9:
       category: Router
-      model: Huawei atn910ITcDc
+      model: atn910ITcDc
     1.3.6.1.4.1.2011.2.220.10:
       category: Router
-      model: Huawei atn910IPAc
+      model: atn910IPAc
     1.3.6.1.4.1.2011.2.220.11:
       category: Router
-      model: Huawei atn905Ac
+      model: atn905Ac
     1.3.6.1.4.1.2011.2.220.12:
       category: Router
-      model: Huawei atn905AAc
+      model: atn905AAc
     1.3.6.1.4.1.2011.2.220.13:
       category: Router
-      model: Huawei atn905APAc
+      model: atn905APAc
     1.3.6.1.4.1.2011.2.220.14:
       category: Router
-      model: Huawei atn905-AV-Ac
+      model: atn905-AV-Ac
     1.3.6.1.4.1.2011.2.220.15:
       category: Router
-      model: Huawei atn910B
+      model: atn910B
     1.3.6.1.4.1.2011.2.220.16:
       category: Router
-      model: Huawei atn910I-D-Dc
+      model: atn910I-D-Dc
     1.3.6.1.4.1.2011.2.220.17:
       category: Router
-      model: Huawei atn910I-D-Ac
+      model: atn910I-D-Ac
     1.3.6.1.4.1.2011.2.220.18:
       category: Router
-      model: Huawei atn910I-B-Dc
+      model: atn910I-B-Dc
     1.3.6.1.4.1.2011.2.220.19:
       category: Router
-      model: Huawei atn910I-E-Dc
+      model: atn910I-E-Dc
     1.3.6.1.4.1.2011.2.220.20:
       category: Router
-      model: Huawei atn905V-Ac
+      model: atn905V-Ac
     1.3.6.1.4.1.2011.2.220.21:
       category: Router
-      model: Huawei atn905-Dc
+      model: atn905-Dc
     1.3.6.1.4.1.2011.2.221:
       category: Switch
-      model: Huawei ma5652
+      model: ma5652
     1.3.6.1.4.1.2011.2.222:
       category: Switch
-      model: Huawei ma5622
+      model: ma5622
     1.3.6.1.4.1.2011.2.223.1:
       category: Layer 3 Switch
       model: S7703
@@ -2017,13 +2039,13 @@ sysobjectids:
       model: S7712
     1.3.6.1.4.1.2011.2.224.2:
       category: Router
-      model: Huawei ar1220w
+      model: ar1220w
     1.3.6.1.4.1.2011.2.224.3:
       category: Router
-      model: Huawei ar1240
+      model: ar1240
     1.3.6.1.4.1.2011.2.224.4:
       category: Router
-      model: Huawei ar1240w
+      model: ar1240w
     1.3.6.1.4.1.2011.2.224.5:
       category: Router
       model: AR2220
@@ -2035,256 +2057,256 @@ sysobjectids:
       model: AR3260
     1.3.6.1.4.1.2011.2.224.8:
       category: Router
-      model: Huawei ar1220v
+      model: ar1220v
     1.3.6.1.4.1.2011.2.224.9:
       category: Router
-      model: Huawei ar201
+      model: ar201
     1.3.6.1.4.1.2011.2.224.10:
       category: Router
-      model: Huawei ar206
+      model: ar206
     1.3.6.1.4.1.2011.2.224.11:
       category: Router
-      model: Huawei ar207
+      model: ar207
     1.3.6.1.4.1.2011.2.224.12:
       category: Router
-      model: Huawei ar207v
+      model: ar207v
     1.3.6.1.4.1.2011.2.224.13:
       category: Router
-      model: Huawei ar208e
+      model: ar208e
     1.3.6.1.4.1.2011.2.224.14:
       category: Router
-      model: Huawei ar1220vw
+      model: ar1220vw
     1.3.6.1.4.1.2011.2.224.15:
       category: Router
-      model: Huawei ar1220s
+      model: ar1220s
     1.3.6.1.4.1.2011.2.224.16:
       category: Router
-      model: Huawei ar1220ws
+      model: ar1220ws
     1.3.6.1.4.1.2011.2.224.24:
       category: Router
-      model: Huawei ar207vp
+      model: ar207vp
     1.3.6.1.4.1.2011.2.224.25:
       category: Router
-      model: Huawei ar201s
+      model: ar201s
     1.3.6.1.4.1.2011.2.224.26:
       category: Router
-      model: Huawei ar207s
+      model: ar207s
     1.3.6.1.4.1.2011.2.224.27:
       category: Router
-      model: Huawei ar151
+      model: ar151
     1.3.6.1.4.1.2011.2.224.28:
       category: Router
-      model: Huawei ar157
+      model: ar157
     1.3.6.1.4.1.2011.2.224.29:
       category: Router
-      model: Huawei ar2220s
+      model: ar2220s
     1.3.6.1.4.1.2011.2.224.30:
       category: Router
-      model: Huawei ar1220l
+      model: ar1220l
     1.3.6.1.4.1.2011.2.224.31:
       category: Router
-      model: Huawei ar207g-hspa7
+      model: ar207g-hspa7
     1.3.6.1.4.1.2011.2.224.32:
       category: Router
-      model: Huawei ar156
+      model: ar156
     1.3.6.1.4.1.2011.2.224.33:
       category: Router
-      model: Huawei ar158e
+      model: ar158e
     1.3.6.1.4.1.2011.2.224.34:
       category: Router
-      model: Huawei ar151g-hspa7
+      model: ar151g-hspa7
     1.3.6.1.4.1.2011.2.224.35:
       category: Router
-      model: Huawei ar157g-hspa7
+      model: ar157g-hspa7
     1.3.6.1.4.1.2011.2.224.36:
       category: Router
-      model: Huawei ar151w-p
+      model: ar151w-p
     1.3.6.1.4.1.2011.2.224.37:
       category: Router
-      model: Huawei ar157w
+      model: ar157w
     1.3.6.1.4.1.2011.2.224.38:
       category: Router
-      model: Huawei ar1220d
+      model: ar1220d
     1.3.6.1.4.1.2011.2.224.39:
       category: Router
-      model: Huawei ar157vw
+      model: ar157vw
     1.3.6.1.4.1.2011.2.224.40:
       category: Router
-      model: Huawei ar158evw
+      model: ar158evw
     1.3.6.1.4.1.2011.2.224.41:
       category: Router
-      model: Huawei ar2201-48fe
+      model: ar2201-48fe
     1.3.6.1.4.1.2011.2.224.42:
       category: Router
-      model: Huawei ar2202-48fe
+      model: ar2202-48fe
     1.3.6.1.4.1.2011.2.224.43:
       category: Router
-      model: Huawei ar2220l
+      model: ar2220l
     1.3.6.1.4.1.2011.2.224.44:
       category: Router
-      model: Huawei ar201vw-p
+      model: ar201vw-p
     1.3.6.1.4.1.2011.2.224.45:
       category: Router
-      model: Huawei ar207vw
+      model: ar207vw
     1.3.6.1.4.1.2011.2.224.46:
       category: Router
-      model: Huawei ar2230
+      model: ar2230
     1.3.6.1.4.1.2011.2.224.47:
       category: Router
-      model: Huawei ar2220d
+      model: ar2220d
     1.3.6.1.4.1.2011.2.224.48:
       category: Router
-      model: Huawei ar2204
+      model: ar2204
     1.3.6.1.4.1.2011.2.224.49:
       category: Router
-      model: Huawei usr20-6
+      model: usr20-6
     1.3.6.1.4.1.2011.2.224.50:
       category: Router
-      model: Huawei usr20-8
+      model: usr20-8
     1.3.6.1.4.1.2011.2.224.51:
       category: Router
-      model: Huawei ar531gph
+      model: ar531gph
     1.3.6.1.4.1.2011.2.224.52:
       category: Router
-      model: Huawei ar531gbpdh
+      model: ar531gbpdh
     1.3.6.1.4.1.2011.2.224.53:
       category: Router
-      model: Huawei ar5312ch
+      model: ar5312ch
     1.3.6.1.4.1.2011.2.224.54:
       category: Router
-      model: Huawei ar531f2ch
+      model: ar531f2ch
     1.3.6.1.4.1.2011.2.224.55:
       category: Router
-      model: Huawei ar151gevdo
+      model: ar151gevdo
     1.3.6.1.4.1.2011.2.224.56:
       category: Router
-      model: Huawei ar156i
+      model: ar156i
     1.3.6.1.4.1.2011.2.224.57:
       category: Router
-      model: Huawei ar156iw
+      model: ar156iw
     1.3.6.1.4.1.2011.2.224.58:
       category: Router
-      model: Huawei ar157i
+      model: ar157i
     1.3.6.1.4.1.2011.2.224.59:
       category: Router
-      model: Huawei ar157iw
+      model: ar157iw
     1.3.6.1.4.1.2011.2.224.60:
       category: Router
-      model: Huawei ar168f
+      model: ar168f
     1.3.6.1.4.1.2011.2.224.61:
       category: Router
-      model: Huawei ar168fw
+      model: ar168fw
     1.3.6.1.4.1.2011.2.224.62:
       category: Router
-      model: Huawei ar169f
+      model: ar169f
     1.3.6.1.4.1.2011.2.224.63:
       category: Router
-      model: Huawei ar169w
+      model: ar169w
     1.3.6.1.4.1.2011.2.224.64:
       category: Router
-      model: Huawei ar169fw
+      model: ar169fw
     1.3.6.1.4.1.2011.2.224.65:
       category: Router
-      model: Huawei ar169bf
+      model: ar169bf
     1.3.6.1.4.1.2011.2.224.66:
       category: Router
-      model: Huawei ar169bfw
+      model: ar169bfw
     1.3.6.1.4.1.2011.2.224.67:
       category: Router
-      model: Huawei ar1220f
+      model: ar1220f
     1.3.6.1.4.1.2011.2.224.68:
       category: Router
-      model: Huawei ar1220fw
+      model: ar1220fw
     1.3.6.1.4.1.2011.2.224.69:
       category: Router
-      model: Huawei ar151s
+      model: ar151s
     1.3.6.1.4.1.2011.2.224.70:
       category: Router
-      model: Huawei ar151wps
+      model: ar151wps
     1.3.6.1.4.1.2011.2.224.71:
       category: Router
-      model: Huawei ar151gus
+      model: ar151gus
     1.3.6.1.4.1.2011.2.224.72:
       category: Router
-      model: Huawei ar1220ls
+      model: ar1220ls
     1.3.6.1.4.1.2011.2.224.73:
       category: Router
-      model: Huawei ar2201-48fes
+      model: ar2201-48fes
     1.3.6.1.4.1.2011.2.224.74:
       category: Router
-      model: Huawei ar2204s
+      model: ar2204s
     1.3.6.1.4.1.2011.2.224.75:
       category: Router
-      model: Huawei ar2240s
+      model: ar2240s
     1.3.6.1.4.1.2011.2.224.76:
       category: Router
-      model: Huawei ar159
+      model: ar159
     1.3.6.1.4.1.2011.2.224.77:
       category: Router
-      model: Huawei ar2540h
+      model: ar2540h
     1.3.6.1.4.1.2011.2.224.78:
       category: Router
-      model: Huawei ar3560h
+      model: ar3560h
     1.3.6.1.4.1.2011.2.224.79:
       category: Router
-      model: Huawei ar121s
+      model: ar121s
     1.3.6.1.4.1.2011.2.224.80:
       category: Router
-      model: Huawei ar161fs
+      model: ar161fs
     1.3.6.1.4.1.2011.2.224.81:
       category: Router
-      model: Huawei ar156w
+      model: ar156w
     1.3.6.1.4.1.2011.2.224.82:
       category: Router
-      model: Huawei ar159fw
+      model: ar159fw
     1.3.6.1.4.1.2011.2.224.83:
       category: Router
-      model: Huawei ar161fgw-l
+      model: ar161fgw-l
     1.3.6.1.4.1.2011.2.224.84:
       category: Router
-      model: Huawei ar161fg-l
+      model: ar161fg-l
     1.3.6.1.4.1.2011.2.224.85:
       category: Router
-      model: Huawei ar162f
+      model: ar162f
     1.3.6.1.4.1.2011.2.224.86:
       category: Router
-      model: Huawei ar169fvw
+      model: ar169fvw
     1.3.6.1.4.1.2011.2.224.87:
       category: Router
-      model: Huawei ar161fw-p-m5
+      model: ar161fw-p-m5
     1.3.6.1.4.1.2011.2.224.88:
       category: Router
-      model: Huawei ar511gw-uav2m5
+      model: ar511gw-uav2m5
     1.3.6.1.4.1.2011.2.224.89:
       category: Router
-      model: Huawei ar169gfvw-l
+      model: ar169gfvw-l
     1.3.6.1.4.1.2011.2.224.90:
       category: Router
-      model: Huawei ar531gbp-u-h
+      model: ar531gbp-u-h
     1.3.6.1.4.1.2011.2.224.91:
       category: Router
-      model: Huawei ar531gpe-u-h
+      model: ar531gpe-u-h
     1.3.6.1.4.1.2011.2.224.93:
       category: Router
-      model: Huawei ar531g-u-d-h
+      model: ar531g-u-d-h
     1.3.6.1.4.1.2011.2.224.94:
       category: Router
-      model: Huawei ar511gw-lav2m3
+      model: ar511gw-lav2m3
     1.3.6.1.4.1.2011.2.224.95:
       category: Router
-      model: Huawei ar161a
+      model: ar161a
     1.3.6.1.4.1.2011.2.224.96:
       category: Router
-      model: Huawei ar169a
+      model: ar169a
     1.3.6.1.4.1.2011.2.224.97:
       category: Router
-      model: Huawei ar161ag-l
+      model: ar161ag-l
     1.3.6.1.4.1.2011.2.224.98:
       category: Router
-      model: Huawei ar169agw-i
+      model: ar169agw-i
     1.3.6.1.4.1.2011.2.224.99:
       category: Router
-      model: Huawei ar1220evw
+      model: ar1220evw
     1.3.6.1.4.1.2011.2.224.100:
       category: Router
       model: AR2220E
@@ -2293,49 +2315,49 @@ sysobjectids:
       model: AR3670
     1.3.6.1.4.1.2011.2.224.102:
       category: Router
-      model: Huawei ar3650
+      model: ar3650
     1.3.6.1.4.1.2011.2.224.103:
       category: Router
-      model: Huawei ar2630
+      model: ar2630
     1.3.6.1.4.1.2011.2.224.104:
       category: Router
-      model: Huawei ar2204e
+      model: ar2204e
     1.3.6.1.4.1.2011.2.224.105:
       category: Router
-      model: Huawei ar2220e-l
+      model: ar2220e-l
     1.3.6.1.4.1.2011.2.224.106:
       category: Router
-      model: Huawei ar511gw-l-b3
+      model: ar511gw-l-b3
     1.3.6.1.4.1.2011.2.224.107:
       category: Router
-      model: Huawei ar511gw-lm7
+      model: ar511gw-lm7
     1.3.6.1.4.1.2011.2.224.108:
       category: Router
-      model: Huawei ar513
+      model: ar513
     1.3.6.1.4.1.2011.2.224.109:
       category: Router
-      model: Huawei ar1220f-s
+      model: ar1220f-s
     1.3.6.1.4.1.2011.2.224.110:
       category: Router
-      model: Huawei ar3260-s
+      model: ar3260-s
     1.3.6.1.4.1.2011.2.224.113:
       category: Router
-      model: Huawei ar531gr-u-h
+      model: ar531gr-u-h
     1.3.6.1.4.1.2011.2.224.114:
       category: Router
-      model: Huawei ar550-8fe-d-h
+      model: ar550-8fe-d-h
     1.3.6.1.4.1.2011.2.224.115:
       category: Router
-      model: Huawei ar550-24fe-d-h
+      model: ar550-24fe-d-h
     1.3.6.1.4.1.2011.2.224.116:
       category: Router
-      model: Huawei ar502g
+      model: ar502g
     1.3.6.1.4.1.2011.2.224.117:
       category: Router
-      model: Huawei ar531gp-h
+      model: ar531gp-h
     1.3.6.1.4.1.2011.2.224.118:
       category: Router
-      model: Huawei ar531gb-u-d-h
+      model: ar531gb-u-d-h
     1.3.6.1.4.1.2011.2.224.130:
       category: Router
       model: AR1220E
@@ -2380,37 +2402,37 @@ sysobjectids:
       model: AR6121E
     1.3.6.1.4.1.2011.2.225.1:
       category: Switch
-      model: Huawei s12708
+      model: s12708
     1.3.6.1.4.1.2011.2.225.2:
       category: Switch
-      model: Huawei s12716
+      model: s12716
     1.3.6.1.4.1.2011.2.228:
       category: Switch
-      model: Huawei ma5632
+      model: ma5632
     1.3.6.1.4.1.2011.2.229:
       category: Switch
-      model: Huawei ma5661
+      model: ma5661
     1.3.6.1.4.1.2011.2.232:
       category: Switch
-      model: Huawei ma5669
+      model: ma5669
     1.3.6.1.4.1.2011.2.233:
       category: Switch
-      model: Huawei ma5621a
+      model: ma5621a
     1.3.6.1.4.1.2011.2.234:
       category: Switch
-      model: Huawei ma5623
+      model: ma5623
     1.3.6.1.4.1.2011.2.235:
       category: Management Controller
       model: iBMC
     1.3.6.1.4.1.2011.2.236.1:
       category: Switch
-      model: Huawei s9703
+      model: s9703
     1.3.6.1.4.1.2011.2.236.2:
       category: Switch
-      model: Huawei s9706
+      model: s9706
     1.3.6.1.4.1.2011.2.236.3:
       category: Switch
-      model: Huawei s9712
+      model: s9712
     1.3.6.1.4.1.2011.2.239.1:
       category: Switch
       model: CloudEngine 12804
@@ -2581,19 +2603,19 @@ sysobjectids:
       model: CE8865-4C
     1.3.6.1.4.1.2011.2.240.1:
       category: Wireless
-      model: Huawei acu
+      model: acu
     1.3.6.1.4.1.2011.2.240.2:
       category: Wireless
-      model: Huawei ac6605-lsw
+      model: ac6605-lsw
     1.3.6.1.4.1.2011.2.240.3:
       category: Wireless
-      model: Huawei ac6605-ac
+      model: ac6605-ac
     1.3.6.1.4.1.2011.2.240.4:
       category: Wireless
-      model: Huawei ac6005
+      model: ac6005
     1.3.6.1.4.1.2011.2.240.5:
       category: Wireless
-      model: Huawei ac6005-pwr
+      model: ac6005-pwr
     1.3.6.1.4.1.2011.2.240.6:
       category: Wireless LAN Controller
       model: AC6605-26-PWR
@@ -2608,70 +2630,70 @@ sysobjectids:
       model: AirEngine 9700-M1
     1.3.6.1.4.1.2011.2.244.1:
       category: Router
-      model: Huawei srg1320v
+      model: srg1320v
     1.3.6.1.4.1.2011.2.244.2:
       category: Router
-      model: Huawei srg1320vw
+      model: srg1320vw
     1.3.6.1.4.1.2011.2.244.3:
       category: Router
-      model: Huawei srg2320
+      model: srg2320
     1.3.6.1.4.1.2011.2.244.4:
       category: Router
-      model: Huawei srg3340
+      model: srg3340
     1.3.6.1.4.1.2011.2.244.5:
       category: Router
-      model: Huawei srg3360
+      model: srg3360
     1.3.6.1.4.1.2011.2.244.6:
       category: Router
-      model: Huawei srg303w
+      model: srg303w
     1.3.6.1.4.1.2011.2.244.7:
       category: Router
-      model: Huawei srg303vw
+      model: srg303vw
     1.3.6.1.4.1.2011.2.244.8:
       category: Router
-      model: Huawei srg2320d
+      model: srg2320d
     1.3.6.1.4.1.2011.2.244.9:
       category: Router
-      model: Huawei srg2304
+      model: srg2304
     1.3.6.1.4.1.2011.2.244.10:
       category: Router
-      model: Huawei srg2330
+      model: srg2330
     1.3.6.1.4.1.2011.2.244.11:
       category: Router
-      model: Huawei srg1320
+      model: srg1320
     1.3.6.1.4.1.2011.2.244.12:
       category: Router
-      model: Huawei srg1320w
+      model: srg1320w
     1.3.6.1.4.1.2011.2.244.13:
       category: Router
-      model: Huawei srg2320e
+      model: srg2320e
     1.3.6.1.4.1.2011.2.246:
       category: Switch
-      model: Huawei ma5623a
+      model: ma5623a
     1.3.6.1.4.1.2011.2.248:
       category: Switch
-      model: Huawei ma5608T
+      model: ma5608T
     1.3.6.1.4.1.2011.2.249:
       category: Switch
-      model: Huawei ma5633
+      model: ma5633
     1.3.6.1.4.1.2011.2.260:
       category: Switch
-      model: Huawei ma5898
+      model: ma5898
     1.3.6.1.4.1.2011.2.262:
       category: Switch
-      model: Huawei ma5821
+      model: ma5821
     1.3.6.1.4.1.2011.2.263:
       category: Switch
-      model: Huawei ma5822
+      model: ma5822
     1.3.6.1.4.1.2011.2.266:
       category: Switch
-      model: Huawei ma5818
+      model: ma5818
     1.3.6.1.4.1.2011.2.267:
       category: Switch
-      model: Huawei ma5698
+      model: ma5698
     1.3.6.1.4.1.2011.2.268:
       category: Switch
-      model: Huawei ma5694
+      model: ma5694
     1.3.6.1.4.1.2011.2.271.1:
       category: Layer 3 Switch
       model: CX310 Switch Module
@@ -2698,19 +2720,19 @@ sysobjectids:
       model: CX920 Switch Module
     1.3.6.1.4.1.2011.2.273:
       category: Switch
-      model: Huawei ma5611s
+      model: ma5611s
     1.3.6.1.4.1.2011.2.274:
       category: Switch
-      model: Huawei ma5622A-8
+      model: ma5622A-8
     1.3.6.1.4.1.2011.2.275:
       category: Switch
-      model: Huawei ma5622A-16
+      model: ma5622A-16
     1.3.6.1.4.1.2011.2.279.1:
       category: Switch
-      model: Huawei s12708lsw
+      model: s12708lsw
     1.3.6.1.4.1.2011.2.279.2:
       category: Switch
-      model: Huawei s12712lsw
+      model: s12712lsw
     1.3.6.1.4.1.2011.2.279.3:
       category: Layer 3 Switch
       model: S12704
@@ -2719,37 +2741,37 @@ sysobjectids:
       model: CloudEngine S12700E-4
     1.3.6.1.4.1.2011.2.282.1:
       category: Router
-      model: Huawei ne16ex-8
+      model: ne16ex-8
     1.3.6.1.4.1.2011.2.282.2:
       category: Router
-      model: Huawei ne16ex-6
+      model: ne16ex-6
     1.3.6.1.4.1.2011.2.285:
       category: Switch
-      model: Huawei ma5675m
+      model: ma5675m
     1.3.6.1.4.1.2011.2.286:
       category: Switch
-      model: Huawei ma5675
+      model: ma5675
     1.3.6.1.4.1.2011.2.292.1:
       category: Router
-      model: Huawei osn9800-u16
+      model: osn9800-u16
     1.3.6.1.4.1.2011.2.292.2:
       category: Router
-      model: Huawei osn9800-u32
+      model: osn9800-u32
     1.3.6.1.4.1.2011.2.292.3:
       category: Router
-      model: Huawei osn9800-u64
+      model: osn9800-u64
     1.3.6.1.4.1.2011.2.292.4:
       category: Router
-      model: Huawei osn9600-u16
+      model: osn9600-u16
     1.3.6.1.4.1.2011.2.292.5:
       category: Router
-      model: Huawei osn9600-u32
+      model: osn9600-u32
     1.3.6.1.4.1.2011.2.292.6:
       category: Router
-      model: Huawei osn9600-u64
+      model: osn9600-u64
     1.3.6.1.4.1.2011.2.294:
       category: Switch
-      model: Huawei ma5800
+      model: ma5800
     1.3.6.1.4.1.2011.2.297.5:
       category: Router
       model: NE05E-SG
@@ -2812,7 +2834,7 @@ sysobjectids:
       model: H3C s3026PWR
     1.3.6.1.4.1.2011.10.1.5:
       category: Firewall
-      model: Huawei secpath1000
+      model: secpath1000
     1.3.6.1.4.1.2011.10.1.6:
       category: Router
       model: H3C ar18-35
@@ -2821,7 +2843,7 @@ sysobjectids:
       model: H3C s3552F-HI
     1.3.6.1.4.1.2011.10.1.8:
       category: Firewall
-      model: Huawei secpath10
+      model: secpath10
     1.3.6.1.4.1.2011.10.1.9:
       category: Switch
       model: QuidWay S3924-SI
@@ -2857,44 +2879,46 @@ sysobjectids:
       model: H3C ar18-50
     1.3.6.1.4.1.2011.10.1.20:
       model: AR18-33E
+      category: Router
     1.3.6.1.4.1.2011.10.1.21:
       model: AR18-34E
+      category: Router
     1.3.6.1.4.1.2011.10.1.22:
       category: Switch
       model: QuidWay S8508
     1.3.6.1.4.1.2011.10.1.23:
       category: Firewall
-      model: Huawei secpath100N
+      model: secpath100N
     1.3.6.1.4.1.2011.10.1.24:
       category: Firewall
-      model: Huawei secpath100V
+      model: secpath100V
     1.3.6.1.4.1.2011.10.1.25:
       category: Firewall
-      model: Huawei secpath100F
+      model: secpath100F
     1.3.6.1.4.1.2011.10.1.26:
       category: Firewall
-      model: Huawei secpath1000F
+      model: secpath1000F
     1.3.6.1.4.1.2011.10.1.27:
       category: Firewall
-      model: Huawei secpath500F
+      model: secpath500F
     1.3.6.1.4.1.2011.10.1.28:
       category: Firewall
-      model: Huawei secpath10F
+      model: secpath10F
     1.3.6.1.4.1.2011.10.1.29:
       category: Firewall
-      model: Huawei secpath100FS
+      model: secpath100FS
     1.3.6.1.4.1.2011.10.1.30:
       category: Firewall
-      model: Huawei secpath100FE
+      model: secpath100FE
     1.3.6.1.4.1.2011.10.1.31:
       category: Firewall
-      model: Huawei secpath100FW
+      model: secpath100FW
     1.3.6.1.4.1.2011.10.1.32:
       category: Firewall
-      model: Huawei secpath1800FS
+      model: secpath1800FS
     1.3.6.1.4.1.2011.10.1.33:
       category: Firewall
-      model: Huawei secpath1800FE
+      model: secpath1800FE
     1.3.6.1.4.1.2011.10.1.40:
       category: Router
       model: H3C sr8805
@@ -2933,6 +2957,7 @@ sysobjectids:
       model: H3C ar18-18V
     1.3.6.1.4.1.2011.10.1.53:
       model: AR18-20S
+      category: Router
     1.3.6.1.4.1.2011.10.1.55:
       category: Router
       model: H3C xe200
@@ -2977,22 +3002,28 @@ sysobjectids:
       model: H3C ar18-21C
     1.3.6.1.4.1.2011.10.1.69:
       model: AR18-22
+      category: Router
     1.3.6.1.4.1.2011.10.1.70:
       category: Router
       model: H3C ar18-22-8
     1.3.6.1.4.1.2011.10.1.71:
       model: AR18-22-24
+      category: Router
     1.3.6.1.4.1.2011.10.1.72:
       model: AR18-23-1
+      category: Router
     1.3.6.1.4.1.2011.10.1.73:
       model: AR18-30E
+      category: Router
     1.3.6.1.4.1.2011.10.1.74:
       model: AR18-31E
+      category: Router
     1.3.6.1.4.1.2011.10.1.75:
       category: Router
       model: H3C ar18-32E
     1.3.6.1.4.1.2011.10.1.76:
       model: AR18-35E
+      category: Router
     1.3.6.1.4.1.2011.10.1.77:
       category: Router
       model: H3C ar18-36E
@@ -3043,7 +3074,7 @@ sysobjectids:
       model: H3C ar18-23s-1
     1.3.6.1.4.1.2011.10.1.93:
       category: Firewall
-      model: Huawei secEngineP500
+      model: secEngineP500
     1.3.6.1.4.1.2011.10.1.94:
       category: Switch
       model: QuidWay S2108-SI
@@ -3139,7 +3170,7 @@ sysobjectids:
       model: H3C s2008CP
     1.3.6.1.4.1.2011.10.1.132:
       category: Firewall
-      model: Huawei secBladeFW
+      model: secBladeFW
     1.3.6.1.4.1.2011.10.1.133:
       category: Firewall
       model: H3C secBladeVPN
@@ -3196,132 +3227,196 @@ sysobjectids:
       model: H3C s2008-HI
     1.3.6.1.4.1.2011.10.1.153:
       model: S2016-HI
+      category: Switch
     1.3.6.1.4.1.2011.10.1.154:
       model: S2403H-HI
+      category: Switch
     1.3.6.1.4.1.2011.10.1.156:
       model: S8508V
+      category: Switch
     1.3.6.1.4.1.2011.10.1.157:
       model: E126
+      category: Switch
     1.3.6.1.4.1.2011.10.1.158:
       model: S3126TP
+      category: Switch
     1.3.6.1.4.1.2011.10.1.159:
       model: E328
+      category: Switch
     1.3.6.1.4.1.2011.10.1.160:
       model: E352
+      category: Switch
     1.3.6.1.4.1.2011.10.1.161:
       model: S3928P-PWR-SI
+      category: Switch
     1.3.6.1.4.1.2011.10.1.163:
       model: S8502
+      category: Switch
     1.3.6.1.4.1.2011.10.1.164:
       model: SR8802
+      category: Router
     1.3.6.1.4.1.2011.10.1.174:
       model: S6502ME
+      category: Switch
     1.3.6.1.4.1.2011.10.1.182:
       model: DR814
+      category: Router
     1.3.6.1.4.1.2011.10.1.183:
       model: DR814Q
+      category: Router
     1.3.6.1.4.1.2011.10.1.184:
       model: WDR854G
+      category: Router
     1.3.6.1.4.1.2011.10.1.185:
       model: VDR824G
+      category: Router
     1.3.6.1.4.1.2011.10.1.186:
       model: VDR824
+      category: Router
     1.3.6.1.4.1.2011.10.1.187:
       model: VDR744
+      category: Router
     1.3.6.1.4.1.2011.10.1.188:
       model: DR744
+      category: Router
     1.3.6.1.4.1.2011.10.1.192:
       model: S8505-V5
+      category: Switch
     1.3.6.1.4.1.2011.10.1.193:
       model: S8512-V5
+      category: Switch
     1.3.6.1.4.1.2011.10.1.194:
       model: S8508-V5
+      category: Switch
     1.3.6.1.4.1.2011.10.1.195:
       model: S8508V-V5
+      category: Switch
     1.3.6.1.4.1.2011.10.1.196:
       model: S8502-V5
+      category: Switch
     1.3.6.1.4.1.2011.10.1.198:
       model: S2008TP-EA
+      category: Switch
     1.3.6.1.4.1.2011.10.1.199:
       model: S2016TP-EA
+      category: Switch
     1.3.6.1.4.1.2011.10.1.200:
       model: S2403TP-EA
+      category: Switch
     1.3.6.1.4.1.2011.10.1.201:
       model: S2403TP-PWR-EA
+      category: Switch
     1.3.6.1.4.1.2011.10.1.202:
       model: S2008TP-MI
+      category: Switch
     1.3.6.1.4.1.2011.10.1.203:
       model: S2016TP-MI
+      category: Switch
     1.3.6.1.4.1.2011.10.1.204:
       model: S2403TP-MI
+      category: Switch
     1.3.6.1.4.1.2011.10.1.205:
       model: S7802
+      category: Switch
     1.3.6.1.4.1.2011.10.1.206:
       model: S7803
+      category: Switch
     1.3.6.1.4.1.2011.10.1.207:
       model: S7806
+      category: Switch
     1.3.6.1.4.1.2011.10.1.208:
       model: S7806-V
+      category: Switch
     1.3.6.1.4.1.2011.10.1.209:
       model: S7810
+      category: Switch
     1.3.6.1.4.1.2011.10.1.210:
       model: S2016TP-PWR-EA
+      category: Switch
     1.3.6.1.4.1.2011.10.1.211:
       category: Switch
       model: QuidWay S3552P-EA
     1.3.6.1.4.1.2011.10.1.212:
       model: S3528P-EA
+      category: Switch
     1.3.6.1.4.1.2011.10.1.213:
       model: S3528TP-EA
+      category: Switch
     1.3.6.1.4.1.2011.10.1.214:
       model: S3528F-EA
+      category: Switch
     1.3.6.1.4.1.2011.10.1.215:
       model: S3552F-EA
+      category: Switch
     1.3.6.1.4.1.2011.10.1.216:
       model: Quidway S6902
+      category: Switch
     1.3.6.1.4.1.2011.10.1.217:
       model: Quidway S6903
+      category: Switch
     1.3.6.1.4.1.2011.10.1.218:
       model: Quidway S6906
+      category: Switch
     1.3.6.1.4.1.2011.10.1.219:
       model: Quidway S6906R
+      category: Switch
     1.3.6.1.4.1.2011.10.1.220:
       model: Quidway S3928P-SI-AC/DC
+      category: Switch
     1.3.6.1.4.1.2011.10.1.224:
       model: Quidway AR19-10
+      category: Router
     1.3.6.1.4.1.2011.10.1.225:
       model: Quidway AR19-13
+      category: Router
     1.3.6.1.4.1.2011.10.1.226:
       model: Quidway AR19-15
+      category: Router
     1.3.6.1.4.1.2011.10.1.227:
       model: S3552P-SI
+      category: Switch
     1.3.6.1.4.1.2011.10.1.228:
       model: S3528P-SI
+      category: Switch
     1.3.6.1.4.1.2011.10.1.229:
       model: Quidway S5628C-HI-AC
+      category: Switch
     1.3.6.1.4.1.2011.10.1.230:
       model: Quidway S5628C-HI-DC
+      category: Switch
     1.3.6.1.4.1.2011.10.1.231:
       model: Quidway S5652C-HI-AC
+      category: Switch
     1.3.6.1.4.1.2011.10.1.232:
       model: Quidway S5628F-HI
+      category: Switch
     1.3.6.1.4.1.2011.10.1.233:
       model: Quidway S5628C-PWR-HI
+      category: Switch
     1.3.6.1.4.1.2011.10.1.234:
       model: Quidway S5652C-PWR-HI
+      category: Switch
     1.3.6.1.4.1.2011.10.1.237:
       model: S7803L
+      category: Switch
     1.3.6.1.4.1.2011.10.1.238:
       model: S6503-V5
+      category: Switch
     1.3.6.1.4.1.2011.10.1.239:
       model: S6506-V5
+      category: Switch
     1.3.6.1.4.1.2011.10.1.240:
       model: S6506R-V5
+      category: Switch
     1.3.6.1.4.1.2011.10.1.241:
       model: Quidway AR19-03
+      category: Router
     1.3.6.1.4.1.2011.10.1.242:
       model: Quidway AR19-05
+      category: Router
     1.3.6.1.4.1.2011.10.1.243:
       model: Quidway S7806-L
+      category: Switch
     1.3.6.1.4.1.2011.10.1.244:
       model: AR29-11
+      category: Router
