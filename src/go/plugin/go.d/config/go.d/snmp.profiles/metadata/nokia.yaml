@@ -454,4 +454,171 @@ sysobjectids:
       model: OmniSwitch 6860E-U28
     1.3.6.1.4.1.6486.801.1.1.2.1.12.1.1:
       model: OmniSwitch 9900
-
+    1.3.6.1.4.1.6527.1.3.1:
+      category: Router
+      model: 7750 SR1
+    1.3.6.1.4.1.6527.1.3.2:
+      category: Router
+      model: 7750 SR4
+    1.3.6.1.4.1.6527.1.3.3:
+      category: Router
+      model: SR 7750
+    1.3.6.1.4.1.6527.1.3.4:
+      category: Router
+      model: 7750 SR7
+    1.3.6.1.4.1.6527.1.3.5:
+      category: Router
+      model: 7750 SR6
+    1.3.6.1.4.1.6527.1.3.6:
+      category: Router
+      model: 7750 SRc12
+    1.3.6.1.4.1.6527.1.3.7:
+      category: Router
+      model: 7750 SRc4
+    1.3.6.1.4.1.6527.1.3.8:
+      category: Router
+      model: 7750 SR12e
+    1.3.6.1.4.1.6527.1.3.9:
+      category: Router
+      model: 7750 SR
+    1.3.6.1.4.1.6527.1.3.13:
+      category: Router
+      model: 7750 SR-3e
+    1.3.6.1.4.1.6527.1.3.15:
+      category: Router
+      model: 7750 SR
+    1.3.6.1.4.1.6527.1.3.17:
+      category: Router
+      model: 7750 SR-7s
+    1.3.6.1.4.1.6527.1.3.19:
+      category: Router
+      model: 7750 SR
+    1.3.6.1.4.1.6527.1.3.22:
+      category: Router
+      model: 7250 IXR
+    1.3.6.1.4.1.6527.1.3.24:
+      category: Router
+      model: 7705 SAR-Hmc
+    1.3.6.1.4.1.6527.1.3.25:
+      category: Router
+      model: 7250 IXR-e
+    1.3.6.1.4.1.6527.1.3.27:
+      category: Router
+      model: 7250 IXR
+    1.3.6.1.4.1.6527.1.3.31:
+      category: Router
+      model: 7250 IXR-ec
+    1.3.6.1.4.1.6527.1.3.35:
+      category: Router
+      model: 7750 SR-1-24D
+    1.3.6.1.4.1.6527.1.6.1:
+      category: Layer 3 Switch
+      model: 7450 ESS1
+    1.3.6.1.4.1.6527.1.6.2:
+      category: Layer 3 Switch
+      model: 7450 ESS4
+    1.3.6.1.4.1.6527.1.6.3:
+      category: Layer 3 Switch
+      model: 7450 ESS7
+    1.3.6.1.4.1.6527.1.6.4:
+      category: Layer 3 Switch
+      model: 7450 ESS
+    1.3.6.1.4.1.6527.1.6.5:
+      category: Layer 3 Switch
+      model: 7450 ESS6
+    1.3.6.1.4.1.6527.1.6.6:
+      category: Layer 3 Switch
+      model: 7450 ESS6V
+    1.3.6.1.4.1.6527.1.9.1:
+      category: Router
+      model: 7710SR-c12
+    1.3.6.1.4.1.6527.1.9.2:
+      category: Router
+      model: 7710SR-c4
+    1.3.6.1.4.1.6527.1.12.1:
+      category: Gateway
+      model: 7750MGSR7
+    1.3.6.1.4.1.6527.1.12.2:
+      category: Gateway
+      model: 7750MGSR12
+    1.3.6.1.4.1.6527.1.18.1:
+      category: Layer 3 Switch
+      model: Nuage Networks 7850 VSA
+    1.3.6.1.4.1.6527.1.18.3:
+      category: Management
+      model: Nuage Networks VSC
+    1.3.6.1.4.1.6527.1.18.4:
+      category: Layer 3 Switch
+      model: Nuage Networks 210 WBX
+    1.3.6.1.4.1.6527.1.19.2:
+      category: Router
+      model: VSR
+    1.3.6.1.4.1.6527.1.20.26:
+      category: Router
+      model: 7220 IXR-D2L
+    1.3.6.1.4.1.6527.6.1.1.2.1:
+      category: Router
+      model: 7705SAR-8
+    1.3.6.1.4.1.6527.6.1.1.2.2:
+      category: Router
+      model: Alcatel-Lucent alcatel7705SAR
+    1.3.6.1.4.1.6527.6.1.1.2.4:
+      category: Router
+      model: Alcatel-Lucent alcatel7705SAR
+    1.3.6.1.4.1.6527.6.1.1.2.11:
+      category: Router
+      model: 7705 SAR-H
+    1.3.6.1.4.1.6527.6.1.1.2.12:
+      category: Router
+      model: 7705 SAR-Hc
+    1.3.6.1.4.1.6527.6.1.1.2.24:
+      category: Router
+      model: 7705 SAR-Ax
+    1.3.6.1.4.1.6527.6.2.1.2.1:
+      category: Switch
+      model: 7210 SAS-E
+    1.3.6.1.4.1.6527.6.2.1.2.2.1:
+      category: Switch
+      model: 7210SAS-M
+    1.3.6.1.4.1.6527.6.2.1.2.2.2:
+      category: Switch
+      model: 7210 SAS-M
+    1.3.6.1.4.1.6527.6.2.1.2.2.3:
+      category: Switch
+      model: 7210 SAS-M
+    1.3.6.1.4.1.6527.6.2.1.2.3.1:
+      category: Switch
+      model: 7210 SAS-X 24F 2XFP
+    1.3.6.1.4.1.6527.6.2.1.2.4.2:
+      category: Switch
+      model: 7210 SAS-D
+    1.3.6.1.4.1.6527.6.2.1.2.5.1:
+      category: Switch
+      model: 7210 SAS-T 12F10T 4XFP-1
+    1.3.6.1.4.1.6527.6.2.1.2.5.2:
+      category: Switch
+      model: 7210 SAS-T
+    1.3.6.1.4.1.6527.6.2.1.2.7.2:
+      category: Switch
+      model: 7210 SAS-K 2F2T1C ETR
+    1.3.6.1.4.1.6527.6.2.1.2.8.1:
+      category: Router
+      model: 7210 SAS-Mxp 22F2C 4SFP+
+    1.3.6.1.4.1.6527.6.2.1.2.8.2:
+      category: Router
+      model: 7210 SAS-Mxp 22F2C 4SFP+ ETR
+    1.3.6.1.4.1.6527.6.2.1.2.9.2:
+      category: Switch
+      model: 7210 SAS-Sx 46F2C4SFP+
+    1.3.6.1.4.1.6527.6.2.1.2.9.7:
+      category: Switch
+      model: 7210 SAS-Sx
+    1.3.6.1.4.1.6527.6.2.1.2.9.10:
+      category: Switch
+      model: 7210 SAS-S 48F4SFP+
+    1.3.6.1.4.1.6527.6.2.1.2.9.14:
+      category: Switch
+      model: 7210 SAS-Sx
+    1.3.6.1.4.1.6527.6.2.1.2.9.15:
+      category: Switch
+      model: 7210 SAS-Sx 64SFP+4QSFP28

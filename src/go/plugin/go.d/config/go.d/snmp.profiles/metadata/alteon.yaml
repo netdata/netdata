@@ -1,0 +1,166 @@
+sysobjectids:
+  oid_overrides:
+    1.3.6.1.4.1.1872.1.1:
+      category: Switch
+      model: ACEswitch 110
+    1.3.6.1.4.1.1872.1.2:
+      category: Switch
+      model: ACEdirector 2
+    1.3.6.1.4.1.1872.1.3:
+      category: Switch
+      model: 180
+    1.3.6.1.4.1.1872.1.4:
+      category: Switch
+      model: ACEdirector 2
+    1.3.6.1.4.1.1872.1.5:
+      category: Switch
+      model: 180e
+    1.3.6.1.4.1.1872.1.6:
+      category: Switch
+      model: ACEdirector 3
+    1.3.6.1.4.1.1872.1.7:
+      category: Switch
+      model: Cache Director
+    1.3.6.1.4.1.1872.1.8.1:
+      category: Switch
+      model: Chas Switch
+    1.3.6.1.4.1.1872.1.8.1.1.1:
+      model: alteon708
+    1.3.6.1.4.1.1872.1.8.1.1.2:
+      model: alteon714
+    1.3.6.1.4.1.1872.1.8.2.1.1:
+      model: alteon308
+    1.3.6.1.4.1.1872.1.8.2.1.2:
+      model: alteon316
+    1.3.6.1.4.1.1872.1.8.2.1.3:
+      model: alteon324
+    1.3.6.1.4.1.1872.1.8.2.1.4:
+      model: alteon332
+    1.3.6.1.4.1.1872.1.8.2.1.5:
+      model: alteon340
+    1.3.6.1.4.1.1872.1.9:
+      category: Switch
+      model: 184
+    1.3.6.1.4.1.1872.1.10:
+      category: Switch
+      model: ACEdirector 4
+    1.3.6.1.4.1.1872.1.11.2:
+      category: Load Balancer
+      model: Released Software Fully supportediSD SSL
+    1.3.6.1.4.1.1872.1.13.1.1:
+      category: Layer 3 Switch
+      model: Application Switch 2424
+    1.3.6.1.4.1.1872.1.13.1.2:
+      category: Layer 3 Switch
+      model: '2448'
+    1.3.6.1.4.1.1872.1.13.1.3:
+      category: Layer 3 Switch
+      model: '2224'
+    1.3.6.1.4.1.1872.1.13.1.4:
+      category: Layer 3 Switch
+      model: Application Switch 2424-SSL
+    1.3.6.1.4.1.1872.1.13.1.5:
+      category: Layer 3 Switch
+      model: Application Switch 2208
+    1.3.6.1.4.1.1872.1.13.1.6:
+      category: Layer 3 Switch
+      model: Application Switch 2216
+    1.3.6.1.4.1.1872.1.13.1.7:
+      category: Layer 3 Switch
+      model: Application Switch 2424 E
+    1.3.6.1.4.1.1872.1.13.1.8:
+      category: Layer 3 Switch
+      model: 2424s E5
+    1.3.6.1.4.1.1872.1.13.1.9:
+      category: Layer 3 Switch
+      model: Application Switch 2208 E
+    1.3.6.1.4.1.1872.1.13.1.10:
+      category: Layer 3 Switch
+      model: Application Switch 2216 E
+    1.3.6.1.4.1.1872.1.13.2.1:
+      category: Layer 3 Switch
+      model: Application Switch 3408
+    1.3.6.1.4.1.1872.1.13.2.2:
+      category: Layer 3 Switch
+      model: '3416'
+    1.3.6.1.4.1.1872.1.13.2.3:
+      category: Layer 3 Switch
+      model: Application Switch 3408 E
+    1.3.6.1.4.1.1872.1.13.3.1:
+      category: Layer 3 Switch
+      model: Application Switch 4416
+    1.3.6.1.4.1.1872.1.13.3.2:
+      category: Switch
+      model: Radware-5412
+    1.3.6.1.4.1.1872.1.13.3.2.1:
+      category: Layer 3 Switch
+      model: Application Switch 5412XL
+    1.3.6.1.4.1.1872.1.13.3.2.2:
+      category: Layer 3 Switch
+      model: Application Switch 5412XL
+    1.3.6.1.4.1.1872.1.13.3.3:
+      category: Layer 3 Switch
+      model: Application Switch 4408
+    1.3.6.1.4.1.1872.1.13.3.4:
+      category: Load Balancer
+      model: Application Switch VA
+    1.3.6.1.4.1.1872.1.13.3.5:
+      category: Layer 3 Switch
+      model: Application Switch 5224XL
+    1.3.6.1.4.1.1872.1.13.3.5.1:
+      category: Layer 3 Switch
+      model: Application Switch 5224
+    1.3.6.1.4.1.1872.1.13.3.5.2:
+      category: Layer 3 Switch
+      model: Application Switch 5224XL
+    1.3.6.1.4.1.1872.1.13.3.9.1:
+      category: Layer 3 Switch
+      model: Application Switch 6420XL
+    1.3.6.1.4.1.1872.1.13.3.9.2:
+      category: Layer 3 Switch
+      model: Application Switch 6420XL
+    1.3.6.1.4.1.1872.1.13.3.10:
+      category: Layer 3 Switch
+      model: Application Switch 5208
+    1.3.6.1.4.1.1872.1.13.3.10.1:
+      category: Layer 3 Switch
+      model: Application Switch 5208
+    1.3.6.1.4.1.1872.1.13.3.10.2:
+      category: Layer 3 Switch
+      model: Application Switch 5208
+    1.3.6.1.4.1.1872.1.13.3.11.1:
+      category: Layer 3 Switch
+      model: Application Switch 8420XL
+    1.3.6.1.4.1.1872.1.13.3.11.2:
+      category: Layer 3 Switch
+      model: Application Switch 8420XL
+    1.3.6.1.4.1.1872.1.13.3.12:
+      category: Layer 3 Switch
+      model: Application Switch 6024 S
+    1.3.6.1.4.1.1872.1.13.3.12.1:
+      category: Layer 3 Switch
+      model: Application Switch 6024 S
+    1.3.6.1.4.1.1872.1.13.3.12.2:
+      category: Layer 3 Switch
+      model: Application Switch 6024 S
+    1.3.6.1.4.1.1872.1.13.3.23.2:
+      category: Layer 3 Switch
+      model: Application Switch 7612S
+    1.3.6.1.4.1.1872.1.13.3.24.1:
+      category: Layer 3 Switch
+      model: Application Switch 7100 S
+    1.3.6.1.4.1.1872.1.15:
+      category: Switch
+      model: Chas Switch
+    1.3.6.1.4.1.1872.1.18.1:
+      category: Layer 3 Switch
+      model: Layer2-3GbE Switch Module Copper
+    1.3.6.1.4.1.1872.1.18.2:
+      category: Layer 3 Switch
+      model: Layer2-3GbE Switch Module Fiber
+    1.3.6.1.4.1.1872.2.3.3.1:
+      category: Firewall
+      model: Switched Firewall 5014
+    1.3.6.1.4.1.1872.2.3.3.2:
+      category: Firewall
+      model: Switched Firewall 5114

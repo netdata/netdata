@@ -1,0 +1,182 @@
+sysobjectids:
+  oid_overrides:
+    1.3.6.1.4.1.25461.2.3.1:
+      category: Firewall
+      model: PA-4050
+    1.3.6.1.4.1.25461.2.3.2:
+      category: Firewall
+      model: PA-4020
+    1.3.6.1.4.1.25461.2.3.3:
+      category: Firewall
+      model: PA-2050
+    1.3.6.1.4.1.25461.2.3.4:
+      category: Firewall
+      model: PA-3250
+    1.3.6.1.4.1.25461.2.3.5:
+      category: Firewall
+      model: PA-4060
+    1.3.6.1.4.1.25461.2.3.6:
+      category: Firewall
+      model: PA-500
+    1.3.6.1.4.1.25461.2.3.7:
+      category: Management
+      model: Panorama
+    1.3.6.1.4.1.25461.2.3.8:
+      category: Firewall
+      model: PA-5060
+    1.3.6.1.4.1.25461.2.3.9:
+      category: Firewall
+      model: PA-5050
+    1.3.6.1.4.1.25461.2.3.11:
+      category: Firewall
+      model: PA-5020
+    1.3.6.1.4.1.25461.2.3.12:
+      category: Firewall
+      model: PA-200
+    1.3.6.1.4.1.25461.2.3.17:
+      category: Firewall
+      model: PA-3050
+    1.3.6.1.4.1.25461.2.3.18:
+      category: Firewall
+      model: PA-3020
+    1.3.6.1.4.1.25461.2.3.19:
+      category: Firewall
+      model: PA-3060
+    1.3.6.1.4.1.25461.2.3.20:
+      category: Firewall
+      model: PA3200
+    1.3.6.1.4.1.25461.2.3.21:
+      category: Firewall
+      model: PA-3250
+    1.3.6.1.4.1.25461.2.3.22:
+      category: Firewall
+      model: PA-5260
+    1.3.6.1.4.1.25461.2.3.23:
+      category: Firewall
+      model: PA-5250
+    1.3.6.1.4.1.25461.2.3.24:
+      category: Firewall
+      model: PA-5220
+    1.3.6.1.4.1.25461.2.3.29:
+      category: Firewall
+      model: PA-VM
+    1.3.6.1.4.1.25461.2.3.30:
+      category: Firewall
+      model: M-100
+    1.3.6.1.4.1.25461.2.3.31:
+      category: Firewall
+      model: PA-7050
+    1.3.6.1.4.1.25461.2.3.32:
+      category: Firewall
+      model: Networks panGP-100
+    1.3.6.1.4.1.25461.2.3.33:
+      category: Firewall
+      model: WF-500
+    1.3.6.1.4.1.25461.2.3.34:
+      category: Firewall
+      model: PA-7080
+    1.3.6.1.4.1.25461.2.3.35:
+      category: Firewall
+      model: M-500
+    1.3.6.1.4.1.25461.2.3.36:
+      category: Firewall
+      model: PA-820
+    1.3.6.1.4.1.25461.2.3.37:
+      category: Firewall
+      model: PA-850
+    1.3.6.1.4.1.25461.2.3.38:
+      category: Firewall
+      model: PA-220
+    1.3.6.1.4.1.25461.2.3.39:
+      category: Firewall
+      model: M-600
+    1.3.6.1.4.1.25461.2.3.40:
+      category: Management
+      model: M-200
+    1.3.6.1.4.1.25461.2.3.41:
+      category: Firewall
+      model: PA-220R
+    1.3.6.1.4.1.25461.2.3.42:
+      category: Firewall
+      model: PA-5280
+    1.3.6.1.4.1.25461.2.3.43:
+      category: Firewall
+      model: PA-3220
+    1.3.6.1.4.1.25461.2.3.44:
+      category: Firewall
+      model: PA-3260
+    1.3.6.1.4.1.25461.2.3.53:
+      category: Firewall
+      model: PA-410
+    1.3.6.1.4.1.25461.2.3.54:
+      category: Firewall
+      model: PA-440
+    1.3.6.1.4.1.25461.2.3.55:
+      category: Firewall
+      model: PA-450
+    1.3.6.1.4.1.25461.2.3.56:
+      category: Firewall
+      model: PA-460
+    1.3.6.1.4.1.25461.2.3.57:
+      category: Firewall
+      model: PA-5450
+    1.3.6.1.4.1.25461.2.3.58:
+      category: Management
+      model: M-300
+    1.3.6.1.4.1.25461.2.3.59:
+      category: Management
+      model: M-700
+    1.3.6.1.4.1.25461.2.3.60:
+      category: Firewall
+      model: WF-500-B
+    1.3.6.1.4.1.25461.2.3.61:
+      category: Firewall
+      model: PA-3410
+    1.3.6.1.4.1.25461.2.3.62:
+      category: Firewall
+      model: PA-3420
+    1.3.6.1.4.1.25461.2.3.63:
+      category: Firewall
+      model: PA-3430
+    1.3.6.1.4.1.25461.2.3.64:
+      category: Firewall
+      model: PA-3440
+    1.3.6.1.4.1.25461.2.3.65:
+      category: Firewall
+      model: PA-5410
+    1.3.6.1.4.1.25461.2.3.66:
+      category: Firewall
+      model: PA-5420
+    1.3.6.1.4.1.25461.2.3.67:
+      category: Firewall
+      model: PA-5430
+    1.3.6.1.4.1.25461.2.3.68:
+      category: Firewall
+      model: PA-5440
+    1.3.6.1.4.1.25461.2.3.69:
+      category: Firewall
+      model: PA-1410
+    1.3.6.1.4.1.25461.2.3.70:
+      category: Firewall
+      model: PA-1420
+    1.3.6.1.4.1.25461.2.3.100:
+      category: Firewall
+      model: PA Processing Line Cards
+    1.3.6.1.4.1.25461.2.3.100.1:
+      category: Firewall
+      model: PA7000-SMC
+    1.3.6.1.4.1.25461.2.3.100.2:
+      category: Firewall
+      model: PA7000-LPC
+    1.3.6.1.4.1.25461.2.3.100.3:
+      category: Firewall
+      model: PA7000-20G-NPC
+    1.3.6.1.4.1.25461.2.3.100.4:
+      category: Firewall
+      model: PA7080-SMC
+    1.3.6.1.4.1.25461.2.3.101:
+      category: Firewall
+      model: Networks PA Fans
+    1.3.6.1.4.1.25461.2.3.102:
+      category: Firewall
+      model: PA PowerSupplies
