@@ -1263,7 +1263,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
     if (parser->user.host != localhost) {
         if (rrdhost_option_check(parser->user.host, RRDHOST_OPTION_VIRTUAL_HOST)) {
             rrdhost_option_clear(parser->user.host, RRDHOST_OPTION_VIRTUAL_HOST);
-            rrdhost_flag_clear(host, RRDHOST_FLAG_COLLECTOR_ONLINE);
+            rrdhost_flag_clear(parser->user.host, RRDHOST_FLAG_COLLECTOR_ONLINE);
             schedule_node_state_update(parser->user.host, 1000);
         }
     }
