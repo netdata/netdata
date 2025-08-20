@@ -452,6 +452,9 @@
 #define NETDATA_CHART_PRIO_CGROUPS_SYSTEMD           19000 // many charts
 #define NETDATA_CHART_PRIO_CGROUPS_CONTAINERS        40000 // many charts
 
+// Sensors
+#define NETDATA_CHART_PRIO_SENSORS                   70000 // many charts
+
 // STATSD
 
 #define NETDATA_CHART_PRIO_STATSD_PRIVATE            90000 // many charts
