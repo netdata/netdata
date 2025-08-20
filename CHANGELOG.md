@@ -6,7 +6,14 @@
 
 **Merged pull requests:**
 
+- build\(deps\): bump github.com/vmware/govmomi from 0.51.0 to 0.52.0 in /src/go [\#20852](https://github.com/netdata/netdata/pull/20852) ([dependabot[bot]](https://github.com/apps/dependabot))
+- ci: bump GoTestTools/gotestfmt-action version [\#20850](https://github.com/netdata/netdata/pull/20850) ([ilyam8](https://github.com/ilyam8))
+- Revert "Revert "Switch to a Debian 13 base for our Docker images."" [\#20848](https://github.com/netdata/netdata/pull/20848) ([ilyam8](https://github.com/ilyam8))
+- ci: fix docker-test.sh handling to fail on error [\#20847](https://github.com/netdata/netdata/pull/20847) ([ilyam8](https://github.com/ilyam8))
+- Do not set virtual host flag on agent restart [\#20845](https://github.com/netdata/netdata/pull/20845) ([stelfrag](https://github.com/stelfrag))
+- improve\(go.d/snmp\): update h3c categories in snmp meta [\#20844](https://github.com/netdata/netdata/pull/20844) ([ilyam8](https://github.com/ilyam8))
 - Revert "Switch to a Debian 13 base for our Docker images." [\#20842](https://github.com/netdata/netdata/pull/20842) ([stelfrag](https://github.com/stelfrag))
+- Store virtual host labels [\#20841](https://github.com/netdata/netdata/pull/20841) ([stelfrag](https://github.com/stelfrag))
 - improve\(go.d/snmp\): update netgear/dlink category in snmp meta [\#20839](https://github.com/netdata/netdata/pull/20839) ([ilyam8](https://github.com/ilyam8))
 - Improve ACLK message parsing [\#20838](https://github.com/netdata/netdata/pull/20838) ([stelfrag](https://github.com/stelfrag))
 - chore\(go.d/snmp\): load & merge per-vendor SNMP metadata overrides [\#20837](https://github.com/netdata/netdata/pull/20837) ([ilyam8](https://github.com/ilyam8))
@@ -443,17 +450,6 @@
 - docs: fix netdata-assistant.md [\#20314](https://github.com/netdata/netdata/pull/20314) ([ilyam8](https://github.com/ilyam8))
 - plugins dyncfg is always on localhost [\#20312](https://github.com/netdata/netdata/pull/20312) ([ktsaou](https://github.com/ktsaou))
 - docs: fix tip in streaming readme [\#20310](https://github.com/netdata/netdata/pull/20310) ([ilyam8](https://github.com/ilyam8))
-- Netdata ai [\#20309](https://github.com/netdata/netdata/pull/20309) ([kanelatechnical](https://github.com/kanelatechnical))
-- Improve user transition log messages [\#20308](https://github.com/netdata/netdata/pull/20308) ([ilyam8](https://github.com/ilyam8))
-- Add MSSQL Wait statistics \(windows.plugin\) [\#20307](https://github.com/netdata/netdata/pull/20307) ([thiagoftsm](https://github.com/thiagoftsm))
-- Reduce memory allocations in event loops [\#20306](https://github.com/netdata/netdata/pull/20306) ([stelfrag](https://github.com/stelfrag))
-- fix use after free of streaming current parent [\#20305](https://github.com/netdata/netdata/pull/20305) ([ktsaou](https://github.com/ktsaou))
-- fix heap-use-after-free in plugins.d inflight functions [\#20304](https://github.com/netdata/netdata/pull/20304) ([ktsaou](https://github.com/ktsaou))
-- Improve metasync shutdown [\#20303](https://github.com/netdata/netdata/pull/20303) ([stelfrag](https://github.com/stelfrag))
-- docs: fix `<br>` in streaming [\#20302](https://github.com/netdata/netdata/pull/20302) ([ilyam8](https://github.com/ilyam8))
-- fix\(go.d/snmp\): replace newline control chars with spaces in system info [\#20301](https://github.com/netdata/netdata/pull/20301) ([ilyam8](https://github.com/ilyam8))
-- Updating SOC2 compliance status [\#20300](https://github.com/netdata/netdata/pull/20300) ([shyamvalsan](https://github.com/shyamvalsan))
-- build\(deps\): bump github.com/jackc/pgx/v5 from 5.7.4 to 5.7.5 in /src/go [\#20299](https://github.com/netdata/netdata/pull/20299) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
