@@ -1,5 +1,6 @@
 sysobjectids:
   oid_overrides:
+    # https://github.com/librenms/librenms/blob/master/mibs/cisco/CISCO-PRODUCTS-MIB
     1.3.6.1.4.1.9.1:
       category: Switch
       model: IOSvL215
@@ -20,100 +21,100 @@ sysobjectids:
       model: IGS
     1.3.6.1.4.1.9.1.6:
       category: Router
-      model: '3000'
+      model: "3000"
     1.3.6.1.4.1.9.1.7:
       category: Router
-      model: '4000'
+      model: "4000"
     1.3.6.1.4.1.9.1.8:
       category: Router
-      model: '7000'
+      model: "7000"
     1.3.6.1.4.1.9.1.9:
       category: Router
       model: CS5000
     1.3.6.1.4.1.9.1.10:
       category: Router
-      model: '2000'
+      model: "2000"
     1.3.6.1.4.1.9.1.11:
       category: Switch
       model: AGSplus Lightstream ATM Switch
     1.3.6.1.4.1.9.1.12:
       category: Router
-      model: '7010'
+      model: "7010"
     1.3.6.1.4.1.9.1.13:
       category: Router
-      model: '2500'
+      model: "2500"
     1.3.6.1.4.1.9.1.14:
       category: Router
-      model: '4500'
+      model: "4500"
     1.3.6.1.4.1.9.1.15:
       category: Router
-      model: '2102'
+      model: "2102"
     1.3.6.1.4.1.9.1.16:
       category: Router
-      model: '2202'
+      model: "2202"
     1.3.6.1.4.1.9.1.17:
       category: Router
-      model: '2501'
+      model: "2501"
     1.3.6.1.4.1.9.1.18:
       category: Router
-      model: '2502'
+      model: "2502"
     1.3.6.1.4.1.9.1.19:
       category: Router
-      model: '2503'
+      model: "2503"
     1.3.6.1.4.1.9.1.20:
       category: Router
-      model: '2504'
+      model: "2504"
     1.3.6.1.4.1.9.1.21:
       category: Router
-      model: '2505'
+      model: "2505"
     1.3.6.1.4.1.9.1.22:
       category: Router
-      model: '2506'
+      model: "2506"
     1.3.6.1.4.1.9.1.23:
       category: Router
-      model: '2507'
+      model: "2507"
     1.3.6.1.4.1.9.1.24:
       category: Router
-      model: '2508'
+      model: "2508"
     1.3.6.1.4.1.9.1.25:
       category: Router
-      model: '2509'
+      model: "2509"
     1.3.6.1.4.1.9.1.26:
       category: Router
-      model: '2510'
+      model: "2510"
     1.3.6.1.4.1.9.1.27:
       category: Router
-      model: '2511'
+      model: "2511"
     1.3.6.1.4.1.9.1.28:
       category: Router
-      model: '2512'
+      model: "2512"
     1.3.6.1.4.1.9.1.29:
       category: Router
-      model: '2513'
+      model: "2513"
     1.3.6.1.4.1.9.1.30:
       category: Router
-      model: '2514'
+      model: "2514"
     1.3.6.1.4.1.9.1.31:
       category: Router
-      model: '2515'
+      model: "2515"
     1.3.6.1.4.1.9.1.32:
       category: Router
-      model: '3101'
+      model: "3101"
     1.3.6.1.4.1.9.1.33:
       category: Router
-      model: '3102'
+      model: "3102"
     1.3.6.1.4.1.9.1.34:
       category: Router
-      model: '3103'
+      model: "3103"
     1.3.6.1.4.1.9.1.35:
       category: Router
-      model: '3104'
+      model: "3104"
     1.3.6.1.4.1.9.1.36:
       category: Router
-      model: '3202'
+      model: "3202"
     1.3.6.1.4.1.9.1.37:
       category: Router
-      model: '3204'
+      model: "3204"
     1.3.6.1.4.1.9.1.38:
       category: Router
       model: Access Pro RC Router
@@ -122,37 +123,37 @@ sysobjectids:
       model: Access Pro EC Router
     1.3.6.1.4.1.9.1.40:
       category: Router
-      model: '1000'
+      model: "1000"
     1.3.6.1.4.1.9.1.41:
       category: Router
-      model: '1003'
+      model: "1003"
     1.3.6.1.4.1.9.1.42:
       category: Router
-      model: '2516'
+      model: "2516"
     1.3.6.1.4.1.9.1.43:
       category: Router
-      model: '1020'
+      model: "1020"
     1.3.6.1.4.1.9.1.44:
       category: Router
-      model: '1004'
+      model: "1004"
     1.3.6.1.4.1.9.1.45:
       category: Router
-      model: '7507'
+      model: "7507"
     1.3.6.1.4.1.9.1.46:
       category: Router
-      model: '7513'
+      model: "7513"
     1.3.6.1.4.1.9.1.47:
       category: Router
-      model: '7506'
+      model: "7506"
     1.3.6.1.4.1.9.1.48:
       category: Router
-      model: '7505'
+      model: "7505"
     1.3.6.1.4.1.9.1.49:
       category: Router
-      model: '1005'
+      model: "1005"
     1.3.6.1.4.1.9.1.50:
       category: Router
-      model: '4700'
+      model: "4700"
     1.3.6.1.4.1.9.1.51:
       category: Router
       model: Pro 1003
@@ -203,31 +204,31 @@ sysobjectids:
       model: Pro 4500
     1.3.6.1.4.1.9.1.67:
       category: Router
-      model: '2517'
+      model: "2517"
     1.3.6.1.4.1.9.1.68:
       category: Router
-      model: '2518'
+      model: "2518"
     1.3.6.1.4.1.9.1.69:
       category: Router
-      model: '2519'
+      model: "2519"
     1.3.6.1.4.1.9.1.70:
       category: Router
-      model: '2520'
+      model: "2520"
     1.3.6.1.4.1.9.1.71:
       category: Router
-      model: '2521'
+      model: "2521"
     1.3.6.1.4.1.9.1.72:
       category: Router
-      model: '2522'
+      model: "2522"
     1.3.6.1.4.1.9.1.73:
       category: Router
-      model: '2523'
+      model: "2523"
     1.3.6.1.4.1.9.1.74:
       category: Router
-      model: '2524'
+      model: "2524"
     1.3.6.1.4.1.9.1.75:
       category: Router
-      model: '2525'
+      model: "2525"
     1.3.6.1.4.1.9.1.76:
       category: Router
       model: Pro 751 ISDN Access Router
@@ -302,10 +303,10 @@ sysobjectids:
       model: 762 ISDN Access Router
     1.3.6.1.4.1.9.1.100:
       category: Router
-      model: '763'
+      model: "763"
     1.3.6.1.4.1.9.1.101:
       category: Router
-      model: '764'
+      model: "764"
     1.3.6.1.4.1.9.1.102:
       category: Router
       model: 765 ISDN Access Router
@@ -326,13 +327,13 @@ sysobjectids:
       model: LS1010
     1.3.6.1.4.1.9.1.108:
       category: Router
-      model: '7206'
+      model: "7206"
     1.3.6.1.4.1.9.1.109:
       category: Router
       model: AS5200
     1.3.6.1.4.1.9.1.110:
       category: Router
-      model: '3640'
+      model: "3640"
     1.3.6.1.4.1.9.1.111:
       category: Switch
       model: Catalyst 3500
@@ -341,16 +342,16 @@ sysobjectids:
       model: WSX3011
     1.3.6.1.4.1.9.1.113:
       category: Router
-      model: '1601'
+      model: "1601"
     1.3.6.1.4.1.9.1.114:
       category: Router
-      model: '1602'
+      model: "1602"
     1.3.6.1.4.1.9.1.115:
       category: Router
-      model: '1603'
+      model: "1603"
     1.3.6.1.4.1.9.1.116:
       category: Router
-      model: '1604'
+      model: "1604"
     1.3.6.1.4.1.9.1.117:
       category: Router
       model: Pro 1601
@@ -368,7 +369,7 @@ sysobjectids:
       model: WSX5301
     1.3.6.1.4.1.9.1.122:
       category: Router
-      model: '3620'
+      model: "3620"
     1.3.6.1.4.1.9.1.123:
       category: Router
       model: Pro 3620 Multiservice Branch Office Router
@@ -377,7 +378,7 @@ sysobjectids:
       model: Pro 3640 Multiservice Branch Office Router
     1.3.6.1.4.1.9.1.125:
       category: Router
-      model: '7204'
+      model: "7204"
     1.3.6.1.4.1.9.1.126:
       category: Router
       model: 771 ISDN Access Router
@@ -430,14 +431,13 @@ sysobjectids:
       category: Router
       model: Pro 4700
     1.3.6.1.4.1.9.1.143:
+      category: Router
       model: ProCPA771
-      category: Router
     1.3.6.1.4.1.9.1.144:
-      model: ProCPA772
       category: Router
+      model: ProCPA772
     1.3.6.1.4.1.9.1.145:
       model: ProCPA775
-      category: Router
     1.3.6.1.4.1.9.1.147:
       category: Router
       model: Pro316T
@@ -500,10 +500,10 @@ sysobjectids:
       model: Catalyst 2916 XL
     1.3.6.1.4.1.9.1.172:
       category: Router
-      model: '1605'
+      model: "1605"
     1.3.6.1.4.1.9.1.173:
       category: Router
-      model: '12012'
+      model: "12012"
     1.3.6.1.4.1.9.1.175:
       category: Switch
       model: Catalyst 1912C
@@ -524,10 +524,10 @@ sysobjectids:
       model: 6400 Series
     1.3.6.1.4.1.9.1.181:
       category: Router
-      model: '12004'
+      model: "12004"
     1.3.6.1.4.1.9.1.182:
       category: Router
-      model: '12008'
+      model: "12008"
     1.3.6.1.4.1.9.1.183:
       category: Switch
       model: Catalyst 2924 XL
@@ -536,19 +536,19 @@ sysobjectids:
       model: Catalyst 2924 CXL
     1.3.6.1.4.1.9.1.185:
       category: Router
-      model: '2610'
+      model: "2610"
     1.3.6.1.4.1.9.1.186:
       category: Router
-      model: '2611'
+      model: "2611"
     1.3.6.1.4.1.9.1.187:
       category: Router
-      model: '2612'
+      model: "2612"
     1.3.6.1.4.1.9.1.188:
       category: Router
       model: AS5800
     1.3.6.1.4.1.9.1.189:
       category: Router
-      model: '3640'
+      model: "3640"
     1.3.6.1.4.1.9.1.190:
       category: Switch
       model: Catalyst 8510
@@ -560,10 +560,10 @@ sysobjectids:
       model: Catalyst 6200
     1.3.6.1.4.1.9.1.194:
       category: Router
-      model: '7202'
+      model: "7202"
     1.3.6.1.4.1.9.1.195:
       category: Router
-      model: '2613'
+      model: "2613"
     1.3.6.1.4.1.9.1.196:
       category: Switch
       model: Catalyst 8515CSR (Campus Switching Router)
@@ -578,10 +578,10 @@ sysobjectids:
       model: RPM
     1.3.6.1.4.1.9.1.200:
       category: Router
-      model: '1710'
+      model: "1710"
     1.3.6.1.4.1.9.1.201:
       category: Router
-      model: '1720'
+      model: "1720"
     1.3.6.1.4.1.9.1.202:
       category: Switch
       model: Catalyst 8540msr
@@ -590,19 +590,19 @@ sysobjectids:
       model: Catalyst 8540csr
     1.3.6.1.4.1.9.1.204:
       category: Router
-      model: '7576'
+      model: "7576"
     1.3.6.1.4.1.9.1.205:
       category: Router
-      model: '3660'
+      model: "3660"
     1.3.6.1.4.1.9.1.206:
       category: Router
       model: 1400 Series
     1.3.6.1.4.1.9.1.208:
       category: Router
-      model: '2620'
+      model: "2620"
     1.3.6.1.4.1.9.1.209:
       category: Router
-      model: '2621'
+      model: "2621"
     1.3.6.1.4.1.9.1.210:
       category: Router
       model: uBR 7223
@@ -611,19 +611,19 @@ sysobjectids:
       model: 6400NRP
     1.3.6.1.4.1.9.1.212:
       category: Router
-      model: '801'
+      model: "801"
     1.3.6.1.4.1.9.1.213:
       category: Router
-      model: '802'
+      model: "802"
     1.3.6.1.4.1.9.1.214:
       category: Router
-      model: '803'
+      model: "803"
     1.3.6.1.4.1.9.1.215:
       category: Router
-      model: '804'
+      model: "804"
     1.3.6.1.4.1.9.1.216:
       category: Router
-      model: '1750'
+      model: "1750"
     1.3.6.1.4.1.9.1.217:
       category: Switch
       model: Catalyst 2924 XLv
@@ -707,7 +707,7 @@ sysobjectids:
       model: Local Director
     1.3.6.1.4.1.9.1.245:
       category: Router
-      model: '805'
+      model: "805"
     1.3.6.1.4.1.9.1.246:
       category: Switch
       model: Catalyst 3508 XL
@@ -755,7 +755,7 @@ sysobjectids:
       model: 7120 T3
     1.3.6.1.4.1.9.1.261:
       category: Router
-      model: '7120000'
+      model: "7120000"
     1.3.6.1.4.1.9.1.262:
       category: Router
       model: 7120 At3
@@ -782,16 +782,16 @@ sysobjectids:
       model: 7140 Dual MM3
     1.3.6.1.4.1.9.1.270:
       category: Router
-      model: '827'
+      model: "827"
     1.3.6.1.4.1.9.1.271:
       category: Router
       model: uBR 7246 VXR
     1.3.6.1.4.1.9.1.272:
       category: Router
-      model: '10400'
+      model: "10400"
     1.3.6.1.4.1.9.1.273:
       category: Router
-      model: '12016'
+      model: "12016"
     1.3.6.1.4.1.9.1.274:
       category: Router
       model: AS5400
@@ -824,7 +824,7 @@ sysobjectids:
       model: Catalyst 6509
     1.3.6.1.4.1.9.1.284:
       category: Router
-      model: '827'
+      model: "827"
     1.3.6.1.4.1.9.1.285:
       category: Router
       model: ciscoManagementEngine1100
@@ -893,7 +893,6 @@ sysobjectids:
       model: ciscoCVA122
     1.3.6.1.4.1.9.1.307:
       model: CVA124
-      category: Gateway
     1.3.6.1.4.1.9.1.308:
       category: Router
       model: AS5850
@@ -929,16 +928,16 @@ sysobjectids:
       model: catalyst4kGateway
     1.3.6.1.4.1.9.1.319:
       category: Router
-      model: '2650'
+      model: "2650"
     1.3.6.1.4.1.9.1.320:
       category: Router
-      model: '2651'
+      model: "2651"
     1.3.6.1.4.1.9.1.321:
       category: Router
       model: 826 QuadV
     1.3.6.1.4.1.9.1.322:
       category: Router
-      model: '826'
+      model: "826"
     1.3.6.1.4.1.9.1.323:
       category: Switch
       model: Catalyst 2950-12
@@ -950,7 +949,7 @@ sysobjectids:
       model: Catalyst 2950C-24
     1.3.6.1.4.1.9.1.326:
       category: Router
-      model: '1751'
+      model: "1751"
     1.3.6.1.4.1.9.1.327:
       category: Gateway
       model: IAD 1730-8FXS
@@ -958,14 +957,12 @@ sysobjectids:
       category: Gateway
       model: IAD 1730-16FXS
     1.3.6.1.4.1.9.1.329:
-      model: '626'
-      category: Router
+      model: "626"
     1.3.6.1.4.1.9.1.330:
       category: Router
       model: 627
     1.3.6.1.4.1.9.1.331:
-      model: '633'
-      category: Router
+      model: "633"
     1.3.6.1.4.1.9.1.332:
       category: Router
       model: cisco673
@@ -1016,19 +1013,17 @@ sysobjectids:
       model: uBR 7114E
     1.3.6.1.4.1.9.1.348:
       category: Router
-      model: '12010'
+      model: "12010"
     1.3.6.1.4.1.9.1.349:
       category: Switch
       model: 8110
     1.3.6.1.4.1.9.1.350:
-      model: '8120'
-      category: Other
+      model: "8120"
     1.3.6.1.4.1.9.1.351:
       category: Router
       model: uBR 905
     1.3.6.1.4.1.9.1.352:
       model: IDS
-      category: Other
     1.3.6.1.4.1.9.1.353:
       category: Router
       model: SOHO77
@@ -1051,11 +1046,10 @@ sysobjectids:
       category: Switch
       model: Catalyst 2950T-24
     1.3.6.1.4.1.9.1.360:
+      category: Video
       model: VPS1110
-      category: Other
     1.3.6.1.4.1.9.1.361:
       model: ContentEngine
-      category: Other
     1.3.6.1.4.1.9.1.362:
       category: Router
       model: IAD2420
@@ -1085,10 +1079,8 @@ sysobjectids:
       model: Catalyst 2912XL
     1.3.6.1.4.1.9.1.371:
       model: CVA122E
-      category: Gateway
     1.3.6.1.4.1.9.1.372:
       model: CVA124E
-      category: Gateway
     1.3.6.1.4.1.9.1.373:
       category: Router
       model: URM
@@ -1103,10 +1095,10 @@ sysobjectids:
       model: 7401VXR
     1.3.6.1.4.1.9.1.377:
       category: Router
-      model: '951'
+      model: "951"
     1.3.6.1.4.1.9.1.378:
       category: Router
-      model: '952'
+      model: "952"
     1.3.6.1.4.1.9.1.379:
       category: Wireless
       model: CAP340
@@ -1118,16 +1110,16 @@ sysobjectids:
       model: DPA 7610
     1.3.6.1.4.1.9.1.382:
       category: Router
-      model: '828'
+      model: "828"
     1.3.6.1.4.1.9.1.383:
       category: Router
       model: SOHO78
     1.3.6.1.4.1.9.1.384:
       category: Router
-      model: '806'
+      model: "806"
     1.3.6.1.4.1.9.1.385:
       category: Router
-      model: '12416'
+      model: "12416"
     1.3.6.1.4.1.9.1.386:
       category: Layer 3 Switch
       model: Catalyst 2948G-L3Dc
@@ -1136,7 +1128,7 @@ sysobjectids:
       model: Catalyst 4908G-L3Dc
     1.3.6.1.4.1.9.1.388:
       category: Router
-      model: '12406'
+      model: "12406"
     1.3.6.1.4.1.9.1.389:
       category: Firewall
       model: PIX 506
@@ -1154,16 +1146,16 @@ sysobjectids:
       model: PIX 535
     1.3.6.1.4.1.9.1.394:
       category: Router
-      model: '12410'
+      model: "12410"
     1.3.6.1.4.1.9.1.395:
       category: Router
-      model: '811'
+      model: "811"
     1.3.6.1.4.1.9.1.396:
       category: Router
-      model: '813'
+      model: "813"
     1.3.6.1.4.1.9.1.397:
       category: Router
-      model: '10720'
+      model: "10720"
     1.3.6.1.4.1.9.1.398:
       category: Router
       model: 1900 Series
@@ -1175,10 +1167,10 @@ sysobjectids:
       model: Catalyst 6513
     1.3.6.1.4.1.9.1.401:
       category: Router
-      model: '7603'
+      model: "7603"
     1.3.6.1.4.1.9.1.402:
       category: Router
-      model: '7606'
+      model: "7606"
     1.3.6.1.4.1.9.1.403:
       category: Router
       model: 7401ASR
@@ -1196,7 +1188,6 @@ sysobjectids:
       model: SN5420
     1.3.6.1.4.1.9.1.408:
       model: Ics7750Ce300
-      category: Other
     1.3.6.1.4.1.9.1.409:
       category: Load Balancer
       model: CE-507
@@ -1211,16 +1202,16 @@ sysobjectids:
       model: CE-7320
     1.3.6.1.4.1.9.1.413:
       category: Router
-      model: '2691'
+      model: "2691"
     1.3.6.1.4.1.9.1.414:
       category: Router
-      model: '3725'
+      model: "3725"
     1.3.6.1.4.1.9.1.415:
       category: Router
       model: 3640A
     1.3.6.1.4.1.9.1.416:
       category: Router
-      model: '1760'
+      model: "1760"
     1.3.6.1.4.1.9.1.417:
       category: Firewall
       model: PIX 501
@@ -1231,17 +1222,16 @@ sysobjectids:
       category: Router
       model: 2611M
     1.3.6.1.4.1.9.1.420:
+      category: Network Device
       model: GP10
-      category: Other
     1.3.6.1.4.1.9.1.421:
+      category: Network Device
       model: MC21
-      category: Other
     1.3.6.1.4.1.9.1.422:
       model: SN51
-      category: Other
     1.3.6.1.4.1.9.1.423:
       category: Router
-      model: '12404'
+      model: "12404"
     1.3.6.1.4.1.9.1.424:
       category: Router
       model: 9004
@@ -1271,13 +1261,12 @@ sysobjectids:
       model: CE-560AV
     1.3.6.1.4.1.9.1.434:
       model: IE2105
-      category: Switch
     1.3.6.1.4.1.9.1.435:
       category: Switch
       model: MGX8850Pxm1E
     1.3.6.1.4.1.9.1.436:
       category: Router
-      model: '3745'
+      model: "3745"
     1.3.6.1.4.1.9.1.437:
       category: Router
       model: 10005
@@ -1286,22 +1275,21 @@ sysobjectids:
       model: 10008
     1.3.6.1.4.1.9.1.439:
       category: Router
-      model: '7304'
+      model: "7304"
     1.3.6.1.4.1.9.1.440:
       category: Router
       model: RpmXf
     1.3.6.1.4.1.9.1.441:
+      category: Module
       model: Osm4oc3PosSmIr
-      category: Other
     1.3.6.1.4.1.9.1.442:
+      category: Module
       model: Osm4oc3PosMmSr
-      category: Other
     1.3.6.1.4.1.9.1.443:
       model: Osm4oc3PosSmLr
-      category: Other
     1.3.6.1.4.1.9.1.444:
       category: Router
-      model: '1721'
+      model: "1721"
     1.3.6.1.4.1.9.1.445:
       category: Switch
       model: Catalyst 4000Sup3
@@ -1391,16 +1379,16 @@ sysobjectids:
       model: SN-5428
     1.3.6.1.4.1.9.1.476:
       category: Router
-      model: '7301'
+      model: "7301"
     1.3.6.1.4.1.9.1.477:
       category: Router
-      model: '12816'
+      model: "12816"
     1.3.6.1.4.1.9.1.478:
       category: Router
-      model: '12810'
+      model: "12810"
     1.3.6.1.4.1.9.1.479:
       category: Router
-      model: '3250'
+      model: "3250"
     1.3.6.1.4.1.9.1.480:
       category: Switch
       model: Catalyst 2950-I6Q4L2-M
@@ -1448,19 +1436,19 @@ sysobjectids:
       model: ONS 15327
     1.3.6.1.4.1.9.1.495:
       category: Router
-      model: '837'
+      model: "837"
     1.3.6.1.4.1.9.1.496:
       category: Router
       model: SOHO97
     1.3.6.1.4.1.9.1.497:
       category: Router
-      model: '830'
+      model: "830"
     1.3.6.1.4.1.9.1.498:
       category: Router
       model: SOHO91
     1.3.6.1.4.1.9.1.499:
       category: Router
-      model: '836'
+      model: "836"
     1.3.6.1.4.1.9.1.500:
       category: Router
       model: SOHO96
@@ -1487,7 +1475,7 @@ sysobjectids:
       model: Catalyst 2955S-12
     1.3.6.1.4.1.9.1.509:
       category: Router
-      model: '7609'
+      model: "7609"
     1.3.6.1.4.1.9.1.510:
       category: Switch
       model: Catalyst 6509
@@ -1514,10 +1502,8 @@ sysobjectids:
       model: ACE GSS 4492R
     1.3.6.1.4.1.9.1.518:
       model: PrimaryGSSM
-      category: Load Balancer
     1.3.6.1.4.1.9.1.519:
       model: StandbyGSSM
-      category: Load Balancer
     1.3.6.1.4.1.9.1.520:
       category: Router
       model: 1900 Series
@@ -1529,7 +1515,6 @@ sysobjectids:
       model: FWSM Firewall
     1.3.6.1.4.1.9.1.523:
       model: SCA11000
-      category: Other
     1.3.6.1.4.1.9.1.524:
       category: Router
       model: ciscoCSM
@@ -1538,13 +1523,12 @@ sysobjectids:
       model: Aironet AP 1231G
     1.3.6.1.4.1.9.1.526:
       model: SCA211000
-      category: Other
     1.3.6.1.4.1.9.1.527:
       category: Switch
       model: Catalyst 2970
     1.3.6.1.4.1.9.1.528:
       category: Router
-      model: '7613'
+      model: "7613"
     1.3.6.1.4.1.9.1.529:
       category: Router
       model: ciscoSN54282
@@ -1574,10 +1558,10 @@ sysobjectids:
       model: Catalyst 4510-L3
     1.3.6.1.4.1.9.1.538:
       category: Router
-      model: '1711'
+      model: "1711"
     1.3.6.1.4.1.9.1.539:
       category: Router
-      model: '1712'
+      model: "1712"
     1.3.6.1.4.1.9.1.540:
       category: Switch
       model: Catalyst 2940-8TT
@@ -1586,10 +1570,10 @@ sysobjectids:
       model: Catalyst 2940-8TF
     1.3.6.1.4.1.9.1.543:
       category: Router
-      model: '3825'
+      model: "3825"
     1.3.6.1.4.1.9.1.544:
       category: Router
-      model: '3845'
+      model: "3845"
     1.3.6.1.4.1.9.1.545:
       category: Router
       model: 2430Iad24Fxs
@@ -1607,7 +1591,7 @@ sysobjectids:
       model: IAD 2432-24FXS
     1.3.6.1.4.1.9.1.550:
       category: Router
-      model: '1700'
+      model: "1700"
     1.3.6.1.4.1.9.1.551:
       category: Switch
       model: Catalyst 2950St24LRE997
@@ -1616,16 +1600,15 @@ sysobjectids:
       model: Aironet 350 Series AP
     1.3.6.1.4.1.9.1.553:
       category: Router
-      model: '3220'
+      model: "3220"
     1.3.6.1.4.1.9.1.554:
       category: Switch
       model: Catalyst 6500SslSm
     1.3.6.1.4.1.9.1.555:
+      category: Management
       model: SIMSE
-      category: Other
     1.3.6.1.4.1.9.1.556:
       model: ESSE
-      category: Other
     1.3.6.1.4.1.9.1.557:
       category: Router
       model: Catalyst 6000 Series Module Switch Feature Card
@@ -1655,27 +1638,26 @@ sysobjectids:
       model: Aironet AP 1310
     1.3.6.1.4.1.9.1.566:
       category: Router
-      model: '851'
+      model: "851"
     1.3.6.1.4.1.9.1.567:
       category: Router
       model: 857 ISR
     1.3.6.1.4.1.9.1.568:
       category: Router
-      model: '876'
+      model: "876"
     1.3.6.1.4.1.9.1.569:
       category: Router
-      model: '877'
+      model: "877"
     1.3.6.1.4.1.9.1.570:
       category: Router
-      model: '878'
+      model: "878"
     1.3.6.1.4.1.9.1.571:
       category: Router
-      model: '871'
+      model: "871"
     1.3.6.1.4.1.9.1.572:
       model: uMG9820
-      category: Gateway
     1.3.6.1.4.1.9.1.573:
-      category: Other
+      category: Switch
       model: WS-SVC-CMM
     1.3.6.1.4.1.9.1.574:
       category: Layer 3 Switch
@@ -1685,16 +1667,16 @@ sysobjectids:
       model: Catalyst 4000NAM
     1.3.6.1.4.1.9.1.576:
       category: Router
-      model: '2811'
+      model: "2811"
     1.3.6.1.4.1.9.1.577:
       category: Router
-      model: '2821'
+      model: "2821"
     1.3.6.1.4.1.9.1.578:
       category: Router
-      model: '2851'
+      model: "2851"
     1.3.6.1.4.1.9.1.581:
       category: Router
-      model: '3201'
+      model: "3201"
     1.3.6.1.4.1.9.1.582:
       category: Server
       model: MCS-7815I
@@ -1705,23 +1687,22 @@ sysobjectids:
       category: Server
       model: MCS-7835H
     1.3.6.1.4.1.9.1.585:
-      category: Other
+      category: Server
       model: MCS 7835I
     1.3.6.1.4.1.9.1.586:
-      category: Other
+      category: Server
       model: MCS 7845H
     1.3.6.1.4.1.9.1.587:
       category: Server
       model: MCS-7845I
     1.3.6.1.4.1.9.1.588:
+      category: Server
       model: MCS7855I
-      category: Other
     1.3.6.1.4.1.9.1.589:
       model: MCS7865I
-      category: Other
     1.3.6.1.4.1.9.1.590:
       category: Router
-      model: '12006'
+      model: "12006"
     1.3.6.1.4.1.9.1.591:
       category: Switch
       model: Catalyst 3750G-16TD
@@ -1730,10 +1711,9 @@ sysobjectids:
       model: Gigabit Ethernet Module
     1.3.6.1.4.1.9.1.593:
       model: CCM
-      category: Management
     1.3.6.1.4.1.9.1.594:
       category: Router
-      model: '1718'
+      model: "1718"
     1.3.6.1.4.1.9.1.595:
       category: Load Balancer
       model: CE-511
@@ -1777,11 +1757,10 @@ sysobjectids:
       category: Switch
       model: BMGX8850Pxm1E
     1.3.6.1.4.1.9.1.610:
+      category: Load Balancer
       model: SSLCSM
-      category: Other
     1.3.6.1.4.1.9.1.611:
       model: NetworkRegistrar
-      category: Management
     1.3.6.1.4.1.9.1.612:
       category: Load Balancer
       model: CE-501
@@ -1805,15 +1784,15 @@ sysobjectids:
       model: AIR-AP1131AG-A-K9
     1.3.6.1.4.1.9.1.619:
       category: Router
-      model: '2801'
+      model: "2801"
     1.3.6.1.4.1.9.1.620:
       category: Router
-      model: '1841'
+      model: "1841"
     1.3.6.1.4.1.9.1.621:
       category: Switch
       model: WsSvcMWAM1
     1.3.6.1.4.1.9.1.622:
-      category: Other
+      category: Gateway
       model: Unity Express (NM-CUE)
     1.3.6.1.4.1.9.1.623:
       category: Router
@@ -1841,10 +1820,8 @@ sysobjectids:
       model: WLSE 1130
     1.3.6.1.4.1.9.1.631:
       model: WLSE1030
-      category: Management
     1.3.6.1.4.1.9.1.632:
       model: HSE1140
-      category: Wireless
     1.3.6.1.4.1.9.1.633:
       category: Switch
       model: Catalyst 3560-24TS
@@ -1852,26 +1829,25 @@ sysobjectids:
       category: Switch
       model: Catalyst 3560-48TS
     1.3.6.1.4.1.9.1.635:
+      category: Switch
       model: WsSvcadsm1K9
-      category: Other
     1.3.6.1.4.1.9.1.636:
       model: WsSvcagsm1K9
-      category: Other
     1.3.6.1.4.1.9.1.637:
       category: Switch
       model: ONS 15310
     1.3.6.1.4.1.9.1.638:
       category: Router
-      model: '1801'
+      model: "1801"
     1.3.6.1.4.1.9.1.639:
       category: Router
-      model: '1802'
+      model: "1802"
     1.3.6.1.4.1.9.1.640:
       category: Router
-      model: '1803'
+      model: "1803"
     1.3.6.1.4.1.9.1.641:
       category: Router
-      model: '1811'
+      model: "1811"
     1.3.6.1.4.1.9.1.642:
       category: Router
       model: 1812/1812J
@@ -1919,7 +1895,7 @@ sysobjectids:
       model: Catalyst 6504
     1.3.6.1.4.1.9.1.658:
       category: Router
-      model: '7604'
+      model: "7604"
     1.3.6.1.4.1.9.1.659:
       category: Layer 3 Switch
       model: Catalyst 4948-10GE
@@ -1928,7 +1904,6 @@ sysobjectids:
       model: Gigabit Ethernet Module
     1.3.6.1.4.1.9.1.661:
       model: FE6326K9
-      category: Firewall
     1.3.6.1.4.1.9.1.662:
       category: Firewall
       model: Intrusion Prevention System SSM-10
@@ -1946,7 +1921,6 @@ sysobjectids:
       model: EtherSwitch Module NME-XD-48ES-2S-P
     1.3.6.1.4.1.9.1.667:
       model: 3202WMIC
-      category: Wireless
     1.3.6.1.4.1.9.1.668:
       category: Firewall
       model: AS5400XM
@@ -1985,19 +1959,16 @@ sysobjectids:
       model: AS5350XM
     1.3.6.1.4.1.9.1.680:
       model: Fe7326K9
-      category: Firewall
     1.3.6.1.4.1.9.1.681:
       model: Fe511K9
-      category: Firewall
     1.3.6.1.4.1.9.1.682:
+      category: Content
       model: SCEDispatcher
-      category: Other
     1.3.6.1.4.1.9.1.683:
+      category: Content
       model: SCE1000
-      category: Other
     1.3.6.1.4.1.9.1.684:
       model: SCE2000
-      category: Other
     1.3.6.1.4.1.9.1.685:
       category: Access Point
       model: AIR-AP1242AG-A-K9
@@ -2006,24 +1977,23 @@ sysobjectids:
       model: DSC9120CLK9
     1.3.6.1.4.1.9.1.687:
       model: Fe611K9
-      category: Firewall
     1.3.6.1.4.1.9.1.688:
       category: Switch
       model: Catalyst 3750G-12SFP
     1.3.6.1.4.1.9.1.689:
       category: Router
-      model: '3271'
+      model: "3271"
     1.3.6.1.4.1.9.1.690:
       category: Router
-      model: '3272'
+      model: "3272"
     1.3.6.1.4.1.9.1.691:
       category: Router
-      model: '3241'
+      model: "3241"
     1.3.6.1.4.1.9.1.692:
       category: Router
-      model: '3242'
+      model: "3242"
     1.3.6.1.4.1.9.1.693:
-      category: Other
+      category: Gateway
       model: Unified Customer Voice Portal
     1.3.6.1.4.1.9.1.694:
       category: Switch
@@ -2066,7 +2036,6 @@ sysobjectids:
       model: Catalyst 6000 MSFC2A
     1.3.6.1.4.1.9.1.707:
       model: EDI
-      category: Other
     1.3.6.1.4.1.9.1.708:
       category: Load Balancer
       model: CE-611
@@ -2078,10 +2047,8 @@ sysobjectids:
       model: MeetingPlace Express
     1.3.6.1.4.1.9.1.711:
       model: NMCUEEC
-      category: Management
     1.3.6.1.4.1.9.1.712:
       model: WLSE1132
-      category: Management
     1.3.6.1.4.1.9.1.713:
       category: Switch
       model: ME6340ACA
@@ -2114,7 +2081,6 @@ sysobjectids:
       model: ME 6724
     1.3.6.1.4.1.9.1.723:
       model: Paldron
-      category: Other
     1.3.6.1.4.1.9.1.724:
       category: Switch
       model: Catalyst Express 500-24TT
@@ -2144,7 +2110,7 @@ sysobjectids:
       model: MWR1941DCA
     1.3.6.1.4.1.9.1.733:
       category: Router
-      model: '815'
+      model: "815"
     1.3.6.1.4.1.9.1.734:
       category: Switch
       model: Metro Switch
@@ -2165,7 +2131,6 @@ sysobjectids:
       model: CRS 1Fabric
     1.3.6.1.4.1.9.1.740:
       model: FE2636
-      category: Firewall
     1.3.6.1.4.1.9.1.741:
       category: Firewall
       model: IDS4220
@@ -2182,7 +2147,7 @@ sysobjectids:
       category: Firewall
       model: ASA 5505
     1.3.6.1.4.1.9.1.746:
-      category: Other
+      category: Server
       model: MCS 7825I
     1.3.6.1.4.1.9.1.747:
       category: Switch
@@ -2194,11 +2159,10 @@ sysobjectids:
       category: Switch
       model: Catalyst Blade Switch WS-3030
     1.3.6.1.4.1.9.1.750:
+      category: Module
       model: SpaOc48posSfp
-      category: Other
     1.3.6.1.4.1.9.1.751:
       model: catalyst6kEnhancedGateway
-      category: Gateway
     1.3.6.1.4.1.9.1.752:
       category: Server
       model: WLSE1133
@@ -2216,7 +2180,6 @@ sysobjectids:
       model: NMAONAPS
     1.3.6.1.4.1.9.1.757:
       model: Wae612K9
-      category: Other
     1.3.6.1.4.1.9.1.758:
       category: Access Point
       model: AIR-AP1252AG-A-K9
@@ -2225,13 +2188,11 @@ sysobjectids:
       model: CE-512
     1.3.6.1.4.1.9.1.760:
       model: Fe512K9
-      category: Firewall
     1.3.6.1.4.1.9.1.761:
       category: Load Balancer
       model: CE-612
     1.3.6.1.4.1.9.1.762:
       model: Fe612K9
-      category: Firewall
     1.3.6.1.4.1.9.1.763:
       category: Firewall
       model: ASA 5550
@@ -2270,7 +2231,6 @@ sysobjectids:
       model: ASA 5510
     1.3.6.1.4.1.9.1.775:
       model: Jumpgate
-      category: Gateway
     1.3.6.1.4.1.9.1.776:
       category: WAN Accelerator
       model: WAE-512
@@ -2291,7 +2251,7 @@ sysobjectids:
       model: ME 3400g12CsD
     1.3.6.1.4.1.9.1.782:
       category: Router
-      model: '877'
+      model: "877"
     1.3.6.1.4.1.9.1.783:
       category: Router
       model: 1801M
@@ -2344,17 +2304,16 @@ sysobjectids:
       category: Switch
       model: Catalyst 2960G-8TC
     1.3.6.1.4.1.9.1.800:
+      category: Gateway
       model: TSPri
-      category: Other
     1.3.6.1.4.1.9.1.801:
+      category: Gateway
       model: TSSec
-      category: Other
     1.3.6.1.4.1.9.1.802:
+      category: Gateway
       model: UWIpPhone7921G
-      category: Other
     1.3.6.1.4.1.9.1.803:
       model: UWIpPhone7920
-      category: Other
     1.3.6.1.4.1.9.1.804:
       category: Wireless
       model: Cisco3200Wireless
@@ -2365,32 +2324,31 @@ sysobjectids:
       category: Firewall
       model: IPSVIRTUAL
     1.3.6.1.4.1.9.1.807:
+      category: Security
       model: IDS4215Virtual
-      category: Other
     1.3.6.1.4.1.9.1.808:
+      category: Security
       model: IDS4235Virtual
-      category: Other
     1.3.6.1.4.1.9.1.809:
+      category: Security
       model: IDS4250Virtual
-      category: Other
     1.3.6.1.4.1.9.1.810:
+      category: Security
       model: IDS4250SXVirtual
-      category: Other
     1.3.6.1.4.1.9.1.811:
+      category: Security
       model: IDS4250XLVirtual
-      category: Other
     1.3.6.1.4.1.9.1.812:
+      category: Security
       model: IDS4240Virtual
-      category: Other
     1.3.6.1.4.1.9.1.813:
+      category: Security
       model: IDS4255Virtual
-      category: Other
     1.3.6.1.4.1.9.1.814:
+      category: Security
       model: IDS4260Virtual
-      category: Other
     1.3.6.1.4.1.9.1.815:
       model: IDSIDSM2Virtual
-      category: Other
     1.3.6.1.4.1.9.1.816:
       category: Firewall
       model: IPSSSM20VIRTUAL
@@ -2399,7 +2357,6 @@ sysobjectids:
       model: IPSSSM10VIRTUAL
     1.3.6.1.4.1.9.1.818:
       model: NMWLCE
-      category: Management
     1.3.6.1.4.1.9.1.819:
       category: Wireless
       model: Cisco3205Wireless
@@ -2408,7 +2365,7 @@ sysobjectids:
       model: 5720
     1.3.6.1.4.1.9.1.821:
       category: Router
-      model: '7200'
+      model: "7200"
     1.3.6.1.4.1.9.1.822:
       category: Layer 3 Switch
       model: CRS-1 4/S*Layer 3 Switch is the secondary capability of this device.
@@ -2447,16 +2404,16 @@ sysobjectids:
       model: 5740
     1.3.6.1.4.1.9.1.834:
       category: Router
-      model: '861'
+      model: "861"
     1.3.6.1.4.1.9.1.835:
       category: Router
-      model: '866'
+      model: "866"
     1.3.6.1.4.1.9.1.836:
       category: Router
-      model: '867'
+      model: "867"
     1.3.6.1.4.1.9.1.837:
       category: Router
-      model: '881'
+      model: "881"
     1.3.6.1.4.1.9.1.838:
       category: Router
       model: 881G
@@ -2471,7 +2428,7 @@ sysobjectids:
       model: 881BRST
     1.3.6.1.4.1.9.1.842:
       category: Router
-      model: '886'
+      model: "886"
     1.3.6.1.4.1.9.1.843:
       category: Router
       model: 886G
@@ -2486,7 +2443,7 @@ sysobjectids:
       model: 886SRST
     1.3.6.1.4.1.9.1.847:
       category: Router
-      model: '887'
+      model: "887"
     1.3.6.1.4.1.9.1.848:
       category: Router
       model: 887G
@@ -2501,7 +2458,7 @@ sysobjectids:
       model: 887SRST
     1.3.6.1.4.1.9.1.852:
       category: Router
-      model: '888'
+      model: "888"
     1.3.6.1.4.1.9.1.853:
       category: Router
       model: 888G
@@ -2516,10 +2473,10 @@ sysobjectids:
       model: 888 SRST
     1.3.6.1.4.1.9.1.857:
       category: Router
-      model: '891'
+      model: "891"
     1.3.6.1.4.1.9.1.858:
       category: Router
-      model: '892'
+      model: "892"
     1.3.6.1.4.1.9.1.859:
       category: Router
       model: 885D3
@@ -2542,11 +2499,10 @@ sysobjectids:
       category: Router
       model: 7600Seb
     1.3.6.1.4.1.9.1.866:
-      category: Other
+      category: Gateway
       model: Unity Express (NME-CUE)
     1.3.6.1.4.1.9.1.867:
       model: AIM2CUE
-      category: Other
     1.3.6.1.4.1.9.1.868:
       category: Switch
       model: Catalyst 6509VE
@@ -2638,11 +2594,10 @@ sysobjectids:
       category: Switch
       model: Catalyst Express 520
     1.3.6.1.4.1.9.1.898:
+      category: Server
       model: MCS7816I
-      category: Other
     1.3.6.1.4.1.9.1.899:
       model: MCS7828I
-      category: Other
     1.3.6.1.4.1.9.1.900:
       category: Router
       model: C1840
@@ -2651,16 +2606,16 @@ sysobjectids:
       model: 1880
     1.3.6.1.4.1.9.1.902:
       category: Router
-      model: '1861'
+      model: "1861"
     1.3.6.1.4.1.9.1.903:
       category: Router
-      model: '1861'
+      model: "1861"
     1.3.6.1.4.1.9.1.904:
       category: Router
-      model: '1861'
+      model: "1861"
     1.3.6.1.4.1.9.1.905:
       category: Router
-      model: '1861'
+      model: "1861"
     1.3.6.1.4.1.9.1.906:
       category: Router
       model: ciscoNmeApa
@@ -2767,11 +2722,10 @@ sysobjectids:
       category: Router
       model: 1861-SrstCue4FK9
     1.3.6.1.4.1.9.1.941:
+      category: Media
       model: VFrameDataCenter
-      category: Other
     1.3.6.1.4.1.9.1.942:
       model: VQEServer
-      category: Other
     1.3.6.1.4.1.9.1.943:
       category: Firewall
       model: IPSSSM40Virtual
@@ -2852,7 +2806,6 @@ sysobjectids:
       model: Catalyst 291848TC
     1.3.6.1.4.1.9.1.969:
       model: VQETools
-      category: Other
     1.3.6.1.4.1.9.1.970:
       category: Switch
       model: Catalyst Express 520
@@ -2866,29 +2819,27 @@ sysobjectids:
       category: Switch
       model: Catalyst Express 520
     1.3.6.1.4.1.9.1.974:
+      category: Media
       model: VSIntSp
-      category: Other
     1.3.6.1.4.1.9.1.975:
       model: VSSP
-      category: Other
     1.3.6.1.4.1.9.1.976:
+      category: Video
       model: VSHydecoder
-      category: Other
     1.3.6.1.4.1.9.1.977:
+      category: Video
       model: VSDecoder
-      category: Other
     1.3.6.1.4.1.9.1.978:
+      category: Video
       model: VSEncoder4P
-      category: Other
     1.3.6.1.4.1.9.1.979:
+      category: Video
       model: VSEncoder1P
-      category: Other
     1.3.6.1.4.1.9.1.980:
       model: SCS1000K9
-      category: Other
     1.3.6.1.4.1.9.1.981:
       category: Router
-      model: '1805'
+      model: "1805"
     1.3.6.1.4.1.9.1.982:
       category: Load Balancer
       model: WAE-7341
@@ -2936,7 +2887,6 @@ sysobjectids:
       model: CE-674
     1.3.6.1.4.1.9.1.997:
       model: VQEIST
-      category: Other
     1.3.6.1.4.1.9.1.998:
       category: Access Point
       model: 1160 AP
@@ -2957,7 +2907,6 @@ sysobjectids:
       model: Catalyst 3125X
     1.3.6.1.4.1.9.1.1003:
       model: TSPriG2
-      category: Other
     1.3.6.1.4.1.9.1.1004:
       category: Layer 3 Switch
       model: Catalyst 4928-10GE
@@ -3032,19 +2981,15 @@ sysobjectids:
       model: Catalyst 3750V2-48PS
     1.3.6.1.4.1.9.1.1028:
       model: HwicCableD2
-      category: Other
     1.3.6.1.4.1.9.1.1029:
       model: HwicCableEJ2
-      category: Other
     1.3.6.1.4.1.9.1.1030:
       model: 1400 series
-      category: Router
     1.3.6.1.4.1.9.1.1031:
-      model: 1430 series
       category: Router
+      model: 1430 series
     1.3.6.1.4.1.9.1.1032:
       model: NAM Appliance 2204
-      category: Management
     1.3.6.1.4.1.9.1.1033:
       category: Server
       model: NAMApp2220
@@ -3071,27 +3016,27 @@ sysobjectids:
       model: 887V
     1.3.6.1.4.1.9.1.1041:
       category: Router
-      model: '3945'
+      model: "3945"
     1.3.6.1.4.1.9.1.1042:
       category: Router
-      model: '3925'
+      model: "3925"
     1.3.6.1.4.1.9.1.1043:
       category: Router
-      model: '2951'
+      model: "2951"
     1.3.6.1.4.1.9.1.1044:
       category: Router
-      model: '2921'
+      model: "2921"
     1.3.6.1.4.1.9.1.1045:
       category: Router
-      model: '2911'
+      model: "2911"
     1.3.6.1.4.1.9.1.1046:
       category: Router
-      model: '2901'
+      model: "2901"
     1.3.6.1.4.1.9.1.1047:
       category: Router
-      model: '1941'
+      model: "1941"
     1.3.6.1.4.1.9.1.1048:
-      category: Other
+      category: Switch
       model: SM-ES2-16-P
     1.3.6.1.4.1.9.1.1049:
       category: Switch
@@ -3143,7 +3088,7 @@ sysobjectids:
       model: Esw54048K9
     1.3.6.1.4.1.9.1.1065:
       category: Router
-      model: '1861'
+      model: "1861"
     1.3.6.1.4.1.9.1.1066:
       category: Router
       model: UC520
@@ -3263,37 +3208,35 @@ sysobjectids:
       model: Catalyst 2350-48TD-S
     1.3.6.1.4.1.9.1.1105:
       category: Router
-      model: '887'
+      model: "887"
     1.3.6.1.4.1.9.1.1106:
       model: VG250
-      category: Gateway
     1.3.6.1.4.1.9.1.1107:
-      model: VG226E
       category: Gateway
+      model: VG226E
     1.3.6.1.4.1.9.1.1108:
+      category: Gateway
       model: DsIbm8GfcK9
-      category: SANSwitch
     1.3.6.1.4.1.9.1.1109:
+      category: SANSwitch
       model: DsHp8GfcK9
-      category: SANSwitch
     1.3.6.1.4.1.9.1.1110:
+      category: SANSwitch
       model: DsDell8GfcK9
-      category: SANSwitch
     1.3.6.1.4.1.9.1.1111:
-      model: Ds-C9148-K9
       category: SANSwitch
+      model: Ds-C9148-K9
     1.3.6.1.4.1.9.1.1112:
+      category: SANSwitch
       model: CeVirtualBlade
-      category: Other
     1.3.6.1.4.1.9.1.1113:
+      category: SANSwitch
       model: CDScde420
-      category: Other
     1.3.6.1.4.1.9.1.1114:
+      category: SANSwitch
       model: CDScde220
-      category: Other
     1.3.6.1.4.1.9.1.1115:
       model: CDScde110
-      category: Other
     1.3.6.1.4.1.9.1.1116:
       category: Router
       model: ASR 1002
@@ -3326,16 +3269,13 @@ sysobjectids:
       model: Aironet 3502
     1.3.6.1.4.1.9.1.1126:
       model: CDScde400
-      category: Other
     1.3.6.1.4.1.9.1.1127:
-      model: SA520K9
       category: Firewall
+      model: SA520K9
     1.3.6.1.4.1.9.1.1128:
       model: SA520WK9
-      category: Firewall
     1.3.6.1.4.1.9.1.1129:
       model: SA540K9
-      category: Firewall
     1.3.6.1.4.1.9.1.1130:
       category: Switch
       model: Sps2004B
@@ -3377,7 +3317,6 @@ sysobjectids:
       model: CASERVER
     1.3.6.1.4.1.9.1.1143:
       model: CaManager
-      category: Management
     1.3.6.1.4.1.9.1.1144:
       category: Router
       model: 3925E ISR
@@ -3394,20 +3333,19 @@ sysobjectids:
       category: Switch
       model: Catalyst 2960-48PST-S
     1.3.6.1.4.1.9.1.1149:
-      category: Other
+      category: Network Device
       model: SRE 300 ISM
     1.3.6.1.4.1.9.1.1150:
+      category: Network Device
       model: SM
-      category: Other
     1.3.6.1.4.1.9.1.1151:
+      category: Network Device
       model: NMEAXP
-      category: Other
     1.3.6.1.4.1.9.1.1152:
+      category: Network Device
       model: AIMAXP
-      category: Other
     1.3.6.1.4.1.9.1.1153:
       model: AIM2AXP
-      category: Other
     1.3.6.1.4.1.9.1.1154:
       category: Router
       model: SRP521
@@ -3428,13 +3366,11 @@ sysobjectids:
       model: SRP547
     1.3.6.1.4.1.9.1.1160:
       model: VS510FXO
-      category: Gateway
     1.3.6.1.4.1.9.1.1161:
+      category: Gateway
       model: NmWae900
-      category: Other
     1.3.6.1.4.1.9.1.1162:
       model: NmWae700
-      category: Other
     1.3.6.1.4.1.9.1.1163:
       category: Router
       model: cisco819HGSK9
@@ -3449,13 +3385,11 @@ sysobjectids:
       model: ASR 1013
     1.3.6.1.4.1.9.1.1167:
       model: CDScde205
-      category: Other
     1.3.6.1.4.1.9.1.1168:
       category: Router
       model: Pwr1941AC
     1.3.6.1.4.1.9.1.1169:
       model: NamWaasVirtualBlade
-      category: Management
     1.3.6.1.4.1.9.1.1170:
       category: Switch
       model: Raie1783Rms06t
@@ -3521,13 +3455,12 @@ sysobjectids:
       model: Catalyst 2960X-24TS-L
     1.3.6.1.4.1.9.1.1191:
       category: Firewall
-      model: '1921'
+      model: "1921"
     1.3.6.1.4.1.9.1.1192:
       category: Router
       model: 1905 ISR
     1.3.6.1.4.1.9.1.1193:
       model: PwrC1921C1905AC
-      category: Other
     1.3.6.1.4.1.9.1.1194:
       category: Firewall
       model: ASA 5585-SSP-10
@@ -3583,10 +3516,10 @@ sysobjectids:
       category: Switch
       model: WAAS
     1.3.6.1.4.1.9.1.1212:
-      category: Other
+      category: Network Device
       model: SRE 700 SM
     1.3.6.1.4.1.9.1.1213:
-      category: Other
+      category: Network Device
       model: SRE 900 SM
     1.3.6.1.4.1.9.1.1214:
       category: Switch
@@ -3602,16 +3535,13 @@ sysobjectids:
       model: Nexus C7010
     1.3.6.1.4.1.9.1.1218:
       model: N4KDellEth
-      category: Switch
     1.3.6.1.4.1.9.1.1219:
       model: N4KDellCiscoEth
-      category: Switch
     1.3.6.1.4.1.9.1.1220:
       category: Router
       model: 1941WCK9
     1.3.6.1.4.1.9.1.1221:
       model: CDScde2202s3
-      category: Other
     1.3.6.1.4.1.9.1.1222:
       category: Switch
       model: Catalyst 3750 24 port
@@ -3638,7 +3568,6 @@ sysobjectids:
       model: Catalyst 3560X-48PF
     1.3.6.1.4.1.9.1.1230:
       model: NMEAIR
-      category: Other
     1.3.6.1.4.1.9.1.1231:
       category: Load Balancer
       model: ACE 30-K9
@@ -3787,23 +3716,22 @@ sysobjectids:
       category: Wireless LAN Controller
       model: 2504 Wireless Controller
     1.3.6.1.4.1.9.1.1280:
+      category: Network Device
       model: ISMAXP
-      category: Other
     1.3.6.1.4.1.9.1.1281:
+      category: Network Device
       model: SMAXP
-      category: Other
     1.3.6.1.4.1.9.1.1282:
+      category: Network Device
       model: AxpSmSre900
-      category: Other
     1.3.6.1.4.1.9.1.1283:
+      category: Network Device
       model: AxpSmSre700
-      category: Other
     1.3.6.1.4.1.9.1.1284:
+      category: Network Device
       model: AxpIsmSre300
-      category: Other
     1.3.6.1.4.1.9.1.1285:
       model: CDSISM
-      category: Other
     1.3.6.1.4.1.9.1.1286:
       category: Switch
       model: Catalyst 4507R+E
@@ -3811,14 +3739,13 @@ sysobjectids:
       category: Layer 3 Switch
       model: Catalyst 4510R+E
     1.3.6.1.4.1.9.1.1288:
+      category: Network Device
       model: AxpNme302
-      category: Other
     1.3.6.1.4.1.9.1.1289:
+      category: Network Device
       model: AxpNme502
-      category: Other
     1.3.6.1.4.1.9.1.1290:
       model: AxpNme522
-      category: Other
     1.3.6.1.4.1.9.1.1291:
       category: Load Balancer
       model: ACE 20-K9
@@ -3830,19 +3757,16 @@ sysobjectids:
       model: WiSM2
     1.3.6.1.4.1.9.1.1294:
       model: CDScde250
-      category: Other
     1.3.6.1.4.1.9.1.1295:
       category: Wireless LAN Controller
       model: Flex 7510
     1.3.6.1.4.1.9.1.1296:
       model: AnmVirtualApp
-      category: Management
     1.3.6.1.4.1.9.1.1297:
+      category: Management
       model: ECDS3100
-      category: Other
     1.3.6.1.4.1.9.1.1298:
       model: ECDS1100
-      category: Other
     1.3.6.1.4.1.9.1.1299:
       category: Router
       model: 881G2
@@ -3890,7 +3814,6 @@ sysobjectids:
       model: ASA 5585-X 60007
     1.3.6.1.4.1.9.1.1314:
       model: SreSmNam
-      category: Other
     1.3.6.1.4.1.9.1.1315:
       category: Switch
       model: Catalyst 2960C 8TC
@@ -3911,10 +3834,8 @@ sysobjectids:
       model: IE 3010
     1.3.6.1.4.1.9.1.1321:
       model: RAIE1783RMSB10T
-      category: Switch
     1.3.6.1.4.1.9.1.1322:
       model: RAIE1783RMSB06T
-      category: Switch
     1.3.6.1.4.1.9.1.1323:
       category: Firewall
       model: ASA 5585-X IPS Security Services Processor 10007
@@ -3944,7 +3865,6 @@ sysobjectids:
       model: CRS-16SB
     1.3.6.1.4.1.9.1.1332:
       model: Quad
-      category: Other
     1.3.6.1.4.1.9.1.1334:
       category: Firewall
       model: ASA SM1 K7 SC
@@ -3955,11 +3875,10 @@ sysobjectids:
       category: Firewall
       model: ASA SM1K7
     1.3.6.1.4.1.9.1.1337:
+      category: Network Device
       model: PwrCGR2010PoeAC
-      category: Other
     1.3.6.1.4.1.9.1.1338:
       model: PwrCGR2010PoeDC
-      category: Other
     1.3.6.1.4.1.9.1.1339:
       category: Router
       model: cisco8500WLC
@@ -3985,7 +3904,7 @@ sysobjectids:
       category: Router
       model: GRWIC-D-ES-2S-8PC
     1.3.6.1.4.1.9.1.1348:
-      category: Other
+      category: Gateway
       model: UC Virtual Machine
     1.3.6.1.4.1.9.1.1349:
       category: WAN Accelerator
@@ -4025,7 +3944,6 @@ sysobjectids:
       model: 866VAE
     1.3.6.1.4.1.9.1.1362:
       model: Ap802gn
-      category: Access Point
     1.3.6.1.4.1.9.1.1363:
       category: Access Point
       model: AP802 INTEGRATED ACCESS POINT
@@ -4094,16 +4012,14 @@ sysobjectids:
       model: ciscoOeKWaas
     1.3.6.1.4.1.9.1.1385:
       model: 819 Hardened Integrated Services
-      category: Router
     1.3.6.1.4.1.9.1.1386:
-      model: 819 Hardened Integrated Services
       category: Router
+      model: 819 Hardened Integrated Services
     1.3.6.1.4.1.9.1.1387:
-      model: 819 Hardened Integrated Services
       category: Router
+      model: 819 Hardened Integrated Services
     1.3.6.1.4.1.9.1.1388:
       model: 819 Hardened Integrated Services
-      category: Router
     1.3.6.1.4.1.9.1.1389:
       category: Router
       model: 819HG+7-K9
@@ -4148,7 +4064,6 @@ sysobjectids:
       model: catWsC2960x48tsLL
     1.3.6.1.4.1.9.1.1406:
       model: NME
-      category: Other
     1.3.6.1.4.1.9.1.1407:
       category: Firewall
       model: ASA 5512-X
@@ -4201,35 +4116,32 @@ sysobjectids:
       category: Firewall
       model: Identity Services Engine (ISE-3315-K9)
     1.3.6.1.4.1.9.1.1424:
+      category: Security
       model: Ise3395K9
-      category: Other
     1.3.6.1.4.1.9.1.1425:
       model: Ise3355K9
-      category: Other
     1.3.6.1.4.1.9.1.1426:
       category: Firewall
       model: Identity Services Engine (ISE-VM-K9)
     1.3.6.1.4.1.9.1.1428:
+      category: Security
       model: IPS4345
-      category: Other
     1.3.6.1.4.1.9.1.1429:
+      category: Security
       model: IPS4360
-      category: Other
     1.3.6.1.4.1.9.1.1432:
       model: EcdsVB
-      category: Other
     1.3.6.1.4.1.9.1.1433:
+      category: Video
       model: TsCodecG2
-      category: Other
     1.3.6.1.4.1.9.1.1434:
+      category: Video
       model: TsCodecG2C
-      category: Other
     1.3.6.1.4.1.9.1.1435:
+      category: Video
       model: TSCodecG2RC
-      category: Other
     1.3.6.1.4.1.9.1.1436:
       model: TSCodecG2R
-      category: Other
     1.3.6.1.4.1.9.1.1437:
       category: Firewall
       model: ASA 5585 SSP IPS10 VIRTUAL
@@ -4294,14 +4206,13 @@ sysobjectids:
       category: Router
       model: ASR 5500
     1.3.6.1.4.1.9.1.1462:
+      category: Module
       model: Xfp10Ger192IrL
-      category: Other
     1.3.6.1.4.1.9.1.1463:
+      category: Module
       model: Xfp10Glr192SrL
-      category: Other
     1.3.6.1.4.1.9.1.1464:
       model: Xfp10Gzr192LrL
-      category: Other
     1.3.6.1.4.1.9.1.1465:
       category: Switch
       model: Catalyst 3560C-12PC-S
@@ -4310,7 +4221,6 @@ sysobjectids:
       model: Catalyst 3560C-8PC-S
     1.3.6.1.4.1.9.1.1467:
       model: CRSFabBP
-      category: Other
     1.3.6.1.4.1.9.1.1468:
       category: Layer 3 Switch
       model: IE-2000-4TS-L
@@ -4343,31 +4253,26 @@ sysobjectids:
       model: ROCKWELL STRATIX BMS06T
     1.3.6.1.4.1.9.1.1478:
       model: Stratix BMS06T
-      category: Switch
     1.3.6.1.4.1.9.1.1479:
       category: Switch
       model: ROCKWELL STRATIX BMS06SG
     1.3.6.1.4.1.9.1.1480:
       model: Stratix BMS06SG
-      category: Switch
     1.3.6.1.4.1.9.1.1481:
       category: Switch
       model: ROCKWELL STRATIX BMS06TG
     1.3.6.1.4.1.9.1.1482:
       model: Stratix BMS06TG
-      category: Switch
     1.3.6.1.4.1.9.1.1483:
       category: Switch
       model: ROCKWELL STRATIX BMS10C
     1.3.6.1.4.1.9.1.1484:
       model: Stratix BMS10C
-      category: Switch
     1.3.6.1.4.1.9.1.1485:
       category: Switch
       model: ROCKWELL STRATIX BMS10CG
     1.3.6.1.4.1.9.1.1486:
       model: Stratix BMS10CG
-      category: Switch
     1.3.6.1.4.1.9.1.1487:
       category: Switch
       model: ROCKWELL STRATIX BMS10CGP
@@ -4379,7 +4284,6 @@ sysobjectids:
       model: ROCKWELL STRATIX BMS20C
     1.3.6.1.4.1.9.1.1490:
       model: Stratix BMS20C
-      category: Switch
     1.3.6.1.4.1.9.1.1491:
       category: Switch
       model: ROCKWELL STRATIX BMS20CGL
@@ -4436,13 +4340,11 @@ sysobjectids:
       model: CIMC
     1.3.6.1.4.1.9.1.1514:
       model: UcsC250
-      category: Server
     1.3.6.1.4.1.9.1.1515:
-      model: UcsC260
       category: Server
+      model: UcsC260
     1.3.6.1.4.1.9.1.1516:
       model: UcsC460
-      category: Server
     1.3.6.1.4.1.9.1.1519:
       category: Switch
       model: ROCKWELL STRATIX MS06SA
@@ -4456,10 +4358,10 @@ sysobjectids:
       category: Router
       model: ASR 901
     1.3.6.1.4.1.9.1.1523:
-      category: Other
+      category: Network Device
       model: SRE 910 SM
     1.3.6.1.4.1.9.1.1524:
-      category: Other
+      category: Network Device
       model: SRE 710 SM
     1.3.6.1.4.1.9.1.1525:
       category: Firewall
@@ -4469,13 +4371,11 @@ sysobjectids:
       model: ciscoHyperNAM
     1.3.6.1.4.1.9.1.1527:
       model: Nam2304
-      category: Management
     1.3.6.1.4.1.9.1.1528:
-      category: Other
+      category: Management
       model: Prime NAM 2320 Appliance
     1.3.6.1.4.1.9.1.1529:
       model: Nam3
-      category: Management
     1.3.6.1.4.1.9.1.1530:
       category: Router
       model: 819HG-4G-A-K9
@@ -4484,7 +4384,6 @@ sysobjectids:
       model: 819 Hardened ISR
     1.3.6.1.4.1.9.1.1536:
       model: ECDS50IVB
-      category: Other
     1.3.6.1.4.1.9.1.1537:
       category: Router
       model: CSR 1000V
@@ -4493,12 +4392,10 @@ sysobjectids:
       model: ASR 5000
     1.3.6.1.4.1.9.1.1539:
       model: flowAgent3000
-      category: Management
     1.3.6.1.4.1.9.1.1540:
       model: TelePresenceMCU5310
-      category: Other
     1.3.6.1.4.1.9.1.1541:
-      category: Other
+      category: Video
       model: TelePresence MCU 5320
     1.3.6.1.4.1.9.1.1542:
       category: Router
@@ -4565,10 +4462,8 @@ sysobjectids:
       model: 819HK9
     1.3.6.1.4.1.9.1.1576:
       model: 819HWDEK9
-      category: Router
     1.3.6.1.4.1.9.1.1577:
       model: 819HWDAK9
-      category: Router
     1.3.6.1.4.1.9.1.1578:
       category: Router
       model: ciscoitpPwrRT3211DC
@@ -4586,49 +4481,46 @@ sysobjectids:
       model: ciscoitpAxpSmSre710
     1.3.6.1.4.1.9.1.1583:
       model: 819GUMK9
-      category: Router
     1.3.6.1.4.1.9.1.1584:
+      category: Router
       model: 819GSMK9
-      category: Router
     1.3.6.1.4.1.9.1.1585:
+      category: Router
       model: 819GVMK9
-      category: Router
     1.3.6.1.4.1.9.1.1586:
+      category: Router
       model: 819GBMK9
-      category: Router
     1.3.6.1.4.1.9.1.1587:
+      category: Router
       model: 819G7AMK9
-      category: Router
     1.3.6.1.4.1.9.1.1588:
+      category: Router
       model: 819G7MK9
-      category: Router
     1.3.6.1.4.1.9.1.1589:
+      category: Router
       model: 819HGUMK9
-      category: Router
     1.3.6.1.4.1.9.1.1590:
+      category: Router
       model: 819HGSMK9
-      category: Router
     1.3.6.1.4.1.9.1.1591:
+      category: Router
       model: 819HGVMK9
-      category: Router
     1.3.6.1.4.1.9.1.1592:
+      category: Router
       model: 819HGBMK9
-      category: Router
     1.3.6.1.4.1.9.1.1593:
-      model: 819HG7AMK9
       category: Router
+      model: 819HG7AMK9
     1.3.6.1.4.1.9.1.1594:
       model: 819HG7MK9
-      category: Router
     1.3.6.1.4.1.9.1.1595:
+      category: Content
       model: CDScde2502s6
-      category: Other
     1.3.6.1.4.1.9.1.1596:
+      category: Content
       model: CDScde2502m0
-      category: Other
     1.3.6.1.4.1.9.1.1597:
       model: CDScde2502s8
-      category: Other
     1.3.6.1.4.1.9.1.1600:
       category: Router
       model: 881V
@@ -4640,7 +4532,6 @@ sysobjectids:
       model: 887VA-VW
     1.3.6.1.4.1.9.1.1603:
       model: MDE10XVB
-      category: Other
     1.3.6.1.4.1.9.1.1604:
       category: Router
       model: 5921 EMBEDDED SERVICES ROUTER
@@ -4651,11 +4542,10 @@ sysobjectids:
       category: Layer 3 Switch
       model: Catalyst 4500X-32 SFP+
     1.3.6.1.4.1.9.1.1607:
+      category: Content
       model: CDScde2502s9
-      category: Other
     1.3.6.1.4.1.9.1.1608:
       model: CDScde2502s10
-      category: Other
     1.3.6.1.4.1.9.1.1609:
       category: Router
       model: 5930 EMBEDDED SERVICES ROUTER
@@ -4663,17 +4553,15 @@ sysobjectids:
       category: Firewall
       model: ASA 5585 NM20x1GE
     1.3.6.1.4.1.9.1.1611:
+      category: Content
       model: CDScdeGeneric
-      category: Other
     1.3.6.1.4.1.9.1.1612:
       model: ASA1000Vsy
-      category: Firewall
     1.3.6.1.4.1.9.1.1613:
-      model: ASA1000Vsc
       category: Firewall
+      model: ASA1000Vsc
     1.3.6.1.4.1.9.1.1614:
       model: ASA1000V
-      category: Firewall
     1.3.6.1.4.1.9.1.1615:
       category: Wireless LAN Controller
       model: 8500 Wireless Controller
@@ -4718,22 +4606,21 @@ sysobjectids:
       model: Virtual Wireless Controller
     1.3.6.1.4.1.9.1.1632:
       model: AIRAP802agn
-      category: Access Point
     1.3.6.1.4.1.9.1.1633:
-      model: Ap802Hagn
       category: Access Point
+      model: Ap802Hagn
     1.3.6.1.4.1.9.1.1634:
+      category: Access Point
       model: E160DP
-      category: Router
     1.3.6.1.4.1.9.1.1635:
+      category: Router
       model: E160D
-      category: Router
     1.3.6.1.4.1.9.1.1636:
+      category: Router
       model: E140DP
-      category: Router
     1.3.6.1.4.1.9.1.1637:
-      model: E140D
       category: Router
+      model: E140D
     1.3.6.1.4.1.9.1.1638:
       model: E140S
     1.3.6.1.4.1.9.1.1639:
@@ -5323,7 +5210,7 @@ sysobjectids:
       category: Layer 3 Switch
       model: Nexus 9396PX
     1.3.6.1.4.1.9.1.1930:
-      model: '2514'
+      model: "2514"
     1.3.6.1.4.1.9.1.1931:
       category: Server
       model: UCS EN120S
@@ -5343,7 +5230,7 @@ sysobjectids:
       category: Switch
       model: Catalyst 6880-X
     1.3.6.1.4.1.9.1.1937:
-      model: '3204'
+      model: "3204"
     1.3.6.1.4.1.9.1.1938:
       category: Access Point
       model: Aironet 2702
@@ -5351,27 +5238,27 @@ sysobjectids:
       category: Router
       model: NCS 4016
     1.3.6.1.4.1.9.1.1940:
-      model: '1000'
+      model: "1000"
     1.3.6.1.4.1.9.1.1941:
-      model: '1003'
+      model: "1003"
     1.3.6.1.4.1.9.1.1942:
-      model: '2516'
+      model: "2516"
     1.3.6.1.4.1.9.1.1943:
-      model: '1020'
+      model: "1020"
     1.3.6.1.4.1.9.1.1944:
-      model: '1004'
+      model: "1004"
     1.3.6.1.4.1.9.1.1945:
-      model: '7507'
+      model: "7507"
     1.3.6.1.4.1.9.1.1946:
-      model: '7513'
+      model: "7513"
     1.3.6.1.4.1.9.1.1947:
-      model: '7506'
+      model: "7506"
     1.3.6.1.4.1.9.1.1948:
-      model: '7505'
+      model: "7505"
     1.3.6.1.4.1.9.1.1949:
-      model: '1005'
+      model: "1005"
     1.3.6.1.4.1.9.1.1950:
-      model: '4700'
+      model: "4700"
     1.3.6.1.4.1.9.1.1951:
       model: Pro 1003
     1.3.6.1.4.1.9.1.1952:
@@ -5406,23 +5293,23 @@ sysobjectids:
     1.3.6.1.4.1.9.1.1966:
       model: Pro 4500
     1.3.6.1.4.1.9.1.1967:
-      model: '2517'
+      model: "2517"
     1.3.6.1.4.1.9.1.1968:
-      model: '2518'
+      model: "2518"
     1.3.6.1.4.1.9.1.1969:
-      model: '2519'
+      model: "2519"
     1.3.6.1.4.1.9.1.1970:
-      model: '2520'
+      model: "2520"
     1.3.6.1.4.1.9.1.1971:
-      model: '2521'
+      model: "2521"
     1.3.6.1.4.1.9.1.1972:
-      model: '2522'
+      model: "2522"
     1.3.6.1.4.1.9.1.1973:
-      model: '2523'
+      model: "2523"
     1.3.6.1.4.1.9.1.1974:
-      model: '2524'
+      model: "2524"
     1.3.6.1.4.1.9.1.1975:
-      model: '2525'
+      model: "2525"
     1.3.6.1.4.1.9.1.1976:
       category: Router
       model: PRO 751 ISDN ACCESS ROUTER
@@ -5491,59 +5378,59 @@ sysobjectids:
     1.3.6.1.4.1.9.1.2005:
       model: IGS
     1.3.6.1.4.1.9.1.2006:
-      model: '3000'
+      model: "3000"
     1.3.6.1.4.1.9.1.2007:
-      model: '4000'
+      model: "4000"
     1.3.6.1.4.1.9.1.2008:
       category: Router
       model: 897VAB-K9
     1.3.6.1.4.1.9.1.2010:
-      model: '2000'
+      model: "2000"
     1.3.6.1.4.1.9.1.2011:
       category: Switch
       model: AGSPLUS LIGHTSTREAM ATM SWITCH
     1.3.6.1.4.1.9.1.2012:
-      model: '7010'
+      model: "7010"
     1.3.6.1.4.1.9.1.2013:
-      model: '2500'
+      model: "2500"
     1.3.6.1.4.1.9.1.2014:
-      model: '4500'
+      model: "4500"
     1.3.6.1.4.1.9.1.2015:
-      model: '2102'
+      model: "2102"
     1.3.6.1.4.1.9.1.2016:
-      model: '2202'
+      model: "2202"
     1.3.6.1.4.1.9.1.2017:
-      model: '2501'
+      model: "2501"
     1.3.6.1.4.1.9.1.2018:
-      model: '2502'
+      model: "2502"
     1.3.6.1.4.1.9.1.2019:
-      model: '2503'
+      model: "2503"
     1.3.6.1.4.1.9.1.2020:
-      model: '2504'
+      model: "2504"
     1.3.6.1.4.1.9.1.2021:
-      model: '2505'
+      model: "2505"
     1.3.6.1.4.1.9.1.2022:
-      model: '2506'
+      model: "2506"
     1.3.6.1.4.1.9.1.2023:
-      model: '2507'
+      model: "2507"
     1.3.6.1.4.1.9.1.2024:
-      model: '2508'
+      model: "2508"
     1.3.6.1.4.1.9.1.2025:
-      model: '2509'
+      model: "2509"
     1.3.6.1.4.1.9.1.2026:
-      model: '2510'
+      model: "2510"
     1.3.6.1.4.1.9.1.2027:
-      model: '2511'
+      model: "2511"
     1.3.6.1.4.1.9.1.2028:
-      model: '2512'
+      model: "2512"
     1.3.6.1.4.1.9.1.2029:
-      model: '2513'
+      model: "2513"
     1.3.6.1.4.1.9.1.2045:
       category: Router
       model: 897VAMG-LTE-GA-K9
     1.3.6.1.4.1.9.1.2048:
       category: Router
-      model: "899GLTENA-4G LTE (ATT & CANADA) ROUTER WITH 2\u2026"
+      model: 899GLTENA-4G LTE (ATT & CANADA) ROUTER WITH 2…
     1.3.6.1.4.1.9.1.2050:
       category: Router
       model: 819G-4G-NA-K9
@@ -5665,7 +5552,7 @@ sysobjectids:
     1.3.6.1.4.1.9.1.2094:
       model: CSE340G32K9
     1.3.6.1.4.1.9.1.2095:
-      category: Other
+      category: Application
       model: Edge 340 Series
     1.3.6.1.4.1.9.1.2096:
       model: SCE10000
@@ -5787,10 +5674,10 @@ sysobjectids:
       category: Router
       model: 2911-T INTEGRATED SERVICES ROUTER
     1.3.6.1.4.1.9.1.2139:
-      category: Other
+      category: Security
       model: Secure Network Server 3495
     1.3.6.1.4.1.9.1.2140:
-      category: Other
+      category: Security
       model: Secure Network Server 3415
     1.3.6.1.4.1.9.1.2141:
       category: Router
@@ -6086,7 +5973,7 @@ sysobjectids:
       category: Router
       model: IOS XRv 9000
     1.3.6.1.4.1.9.1.2265:
-      category: Other
+      category: Security
       model: Secure Network Server 3515
     1.3.6.1.4.1.9.1.2266:
       category: Router
@@ -6190,7 +6077,7 @@ sysobjectids:
       category: Firewall
       model: ASA 5516TD
     1.3.6.1.4.1.9.1.2307:
-      category: Other
+      category: Management
       model: Prime Infrastructure
     1.3.6.1.4.1.9.1.2308:
       model: 899GLTEJPK9
@@ -6309,7 +6196,7 @@ sysobjectids:
       category: Router
       model: NCS 5502-SE
     1.3.6.1.4.1.9.1.2352:
-      category: Other
+      category: Gateway
       model: Unified SIP Proxy
     1.3.6.1.4.1.9.1.2355:
       model: 898EAGLTELAK9
@@ -6435,7 +6322,7 @@ sysobjectids:
       category: Firewall
       model: Firepower 2140
     1.3.6.1.4.1.9.1.2408:
-      category: Other
+      category: Application
       model: ISRV
     1.3.6.1.4.1.9.1.2409:
       category: Firewall
@@ -6775,13 +6662,13 @@ sysobjectids:
       model: C1114-8P ROUTER
     1.3.6.1.4.1.9.1.2547:
       category: Router
-      model: "C1114-8PLTEEA ROUTER WITH MULTIMODE EUROPE AN\u2026"
+      model: C1114-8PLTEEA ROUTER WITH MULTIMODE EUROPE AN…
     1.3.6.1.4.1.9.1.2548:
       category: Router
       model: C1115-8P ROUTER
     1.3.6.1.4.1.9.1.2549:
       category: Router
-      model: "C1115-8PLTEEA ROUTER WITH MULTIMODE EUROPE AN\u2026"
+      model: C1115-8PLTEEA ROUTER WITH MULTIMODE EUROPE AN…
     1.3.6.1.4.1.9.1.2550:
       category: Router
       model: C1115-8PM ROUTER WITH VDSL/ADSL
@@ -6916,13 +6803,13 @@ sysobjectids:
       model: IR829M-2LTE-EA-BK9
     1.3.6.1.4.1.9.1.2616:
       category: Router
-      model: '8812'
+      model: "8812"
     1.3.6.1.4.1.9.1.2617:
       category: Router
-      model: '8808'
+      model: "8808"
     1.3.6.1.4.1.9.1.2618:
       category: Router
-      model: '8804'
+      model: "8804"
     1.3.6.1.4.1.9.1.2619:
       category: Router
       model: C1109-2PLTEGB
@@ -7269,13 +7156,13 @@ sysobjectids:
       category: Switch
       model: CATALYST 9300-48S
     1.3.6.1.4.1.9.1.2784:
-      category: Other
+      category: Security
       model: Secure Network Server 3615
     1.3.6.1.4.1.9.1.2785:
-      category: Other
+      category: Security
       model: Secure Network Server 3655
     1.3.6.1.4.1.9.1.2786:
-      category: Other
+      category: Security
       model: Secure Network Server 3695
     1.3.6.1.4.1.9.1.2787:
       category: Router
@@ -7380,7 +7267,7 @@ sysobjectids:
       category: Firewall
       model: Firepower 4112
     1.3.6.1.4.1.9.1.2902:
-      category: Other
+      category: Server
       model: CSP-5228
     1.3.6.1.4.1.9.1.2959:
       category: Switch
@@ -7638,10 +7525,10 @@ sysobjectids:
       category: Layer 3 Switch
       model: Catalyst 1300-48P-4X
     1.3.6.1.4.1.9.1.3271:
-      category: Other
+      category: Security
       model: Secure Network Server 3755
     1.3.6.1.4.1.9.1.3272:
-      category: Other
+      category: Security
       model: Secure Network Server 3795
     1.3.6.1.4.1.9.1.3324:
       category: Wireless LAN Controller
@@ -7656,13 +7543,13 @@ sysobjectids:
       category: Switch
       model: wsx6608t1
     1.3.6.1.4.1.9.5.1.3.1.1.2.223:
-      category: Other
+      category: Management
       model: Network Analysis Module
     1.3.6.1.4.1.9.5.1.3.1.1.2.291:
-      category: Other
+      category: Management
       model: Network Analysis Module
     1.3.6.1.4.1.9.5.1.3.1.1.2.914:
-      category: Other
+      category: Management
       model: Network Analysis Module
     1.3.6.1.4.1.9.5.2:
       category: Switch
@@ -7813,13 +7700,13 @@ sysobjectids:
       model: Catalyst 2980G-A
     1.3.6.1.4.1.9.5.53:
       category: Router
-      model: '7603'
+      model: "7603"
     1.3.6.1.4.1.9.5.54:
       category: Router
-      model: '7606'
+      model: "7606"
     1.3.6.1.4.1.9.5.55:
       category: Router
-      model: '7609'
+      model: "7609"
     1.3.6.1.4.1.9.5.56:
       category: Switch
       model: Catalyst 6503
@@ -7831,7 +7718,7 @@ sysobjectids:
       model: Catalyst 4506
     1.3.6.1.4.1.9.5.60:
       category: Router
-      model: '7613'
+      model: "7613"
     1.3.6.1.4.1.9.5.61:
       category: Switch
       model: Catalyst 6509 NEB
@@ -7840,13 +7727,13 @@ sysobjectids:
       model: Catalyst 2948G-GE-TX
     1.3.6.1.4.1.9.5.63:
       category: Router
-      model: '7604'
+      model: "7604"
     1.3.6.1.4.1.9.5.64:
       category: Switch
       model: Catalyst 6504
     1.3.6.1.4.1.9.5.99:
       category: Router
-      model: '762'
+      model: "762"
     1.3.6.1.4.1.9.5.175:
       category: Switch
       model: Catalyst 1900 Lite Fx
@@ -8298,7 +8185,7 @@ sysobjectids:
       category: Switch
       model: Energywise switch
     1.3.6.1.4.1.9.9.809.1.1.2:
-      category: Other
+      category: Application
       model: WebEx Meetings Server
     1.3.6.1.4.1.9.10.56:
       category: Management
@@ -8604,7 +8491,7 @@ sysobjectids:
       category: Layer 3 Switch
       model: Nexus 9336PQ
     1.3.6.1.4.1.9.12.3.1.3.1585:
-      category: Other
+      category: Application
       model: QvPC-DI
     1.3.6.1.4.1.9.12.3.1.3.1609:
       category: Layer 3 Switch
@@ -8694,7 +8581,7 @@ sysobjectids:
       category: SANSwitch
       model: UCS 6454 Fabric Interconnect
     1.3.6.1.4.1.9.12.3.1.3.1831:
-      category: Other
+      category: Server
       model: CSP 2100 X2
     1.3.6.1.4.1.9.12.3.1.3.1843:
       category: Layer 3 Switch
@@ -8828,13 +8715,13 @@ sysobjectids:
       model: IPS4240-K9
     1.3.6.1.4.1.9.12.3.1.9.8.19:
       category: Switch
-      model: "WS-X45-SUP9-E ( CATALYST 4503-E SWITCH MODUL\u2026"
+      model: WS-X45-SUP9-E ( CATALYST 4503-E SWITCH MODUL…
     1.3.6.1.4.1.9.12.3.1.9.17.39:
       category: Router
       model: MWAM
     1.3.6.1.4.1.9.12.3.1.9.29.175:
       category: Switch
-      model: "CATALYST 6500 SERIES NETWORK ANALYSIS MODULE \u2026"
+      model: CATALYST 6500 SERIES NETWORK ANALYSIS MODULE …
     1.3.6.1.4.1.9.12.3.1.9.72.26:
       category: Switch
       model: NEXUS 56128P SWITCH(CEVN5KC56128PFIXEDMODULE)
@@ -8881,4 +8768,4 @@ sysobjectids:
       category: Router
       model: ASR9K Series
     1.3.6.1.4.1.9.115:
-      model: '2102'
+      model: "2102"
