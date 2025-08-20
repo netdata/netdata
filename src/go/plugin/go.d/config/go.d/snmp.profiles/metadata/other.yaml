@@ -166,28 +166,37 @@ sysobjectids:
       model: GTX 1000
     1.3.6.1.4.1.1.2.826.0.1.4616240.1.1.4500:
       model: MCU4500
+      category: Server
     1.3.6.1.4.1.1.2.826.0.1.4616240.1.1.4501:
       model: MCU4501
+      category: Server
     1.3.6.1.4.1.1.2.826.0.1.4616240.1.1.4505:
       model: MCU4505
+      category: Server
     1.3.6.1.4.1.1.2.826.0.1.4616240.1.1.4510:
       model: MCU4510
+      category: Server
     1.3.6.1.4.1.1.2.826.0.1.4616240.1.1.4515:
       model: MCU4515
+      category: Server
     1.3.6.1.4.1.1.2.826.0.1.4616240.1.1.4520:
       model: MCU4520
+      category: Server
     1.3.6.1.4.1.1.2.826.0.1.4616240.1.1.7010:
       category: Server
       model: CISCOTPSERVER7010
     1.3.6.1.4.1.1.2.826.0.1.4616240.1.1.8420:
       model: MSE8420
+      category: Server
     1.3.6.1.4.1.1.2.826.0.1.4616240.1.1.8510:
       model: MSE8510
+      category: Server
     1.3.6.1.4.1.1.2.826.0.1.4616240.1.1.8710:
       category: Server
       model: CISCOTPSERVERMSE8710
     1.3.6.1.4.1.1.2.826.0.1.4616240.1.7.8050:
       model: MSE8050
+      category: Server
     1.3.6.1.4.1.2:
       category: Server
       model: IBM X
@@ -262,10 +271,13 @@ sysobjectids:
       model: GL408e
     1.3.6.1.4.1.2.3.1942:
       model: 8271 Nways F12
+      category: Switch
     1.3.6.1.4.1.2.3.1943:
       model: 8271 Nways F24
+      category: Switch
     1.3.6.1.4.1.2.3.2010:
       model: 8271 Nways 216
+      category: Switch
     1.3.6.1.4.1.2.6.3:
       category: Switch
       model: BladeCenter Gigabit Ethernet Switch Module
@@ -277,10 +289,13 @@ sysobjectids:
       model: IBM mdl 13 s/n 23t7677
     1.3.6.1.4.1.2.6.33.2.1:
       model: "8260"
+      category: Switch
     1.3.6.1.4.1.2.6.33.2.2:
       model: "8285"
+      category: Switch
     1.3.6.1.4.1.2.6.33.2.3:
       model: "8265"
+      category: Switch
     1.3.6.1.4.1.2.6.46:
       category: Server
       model: IBM Oce digital copier
@@ -316,6 +331,7 @@ sysobjectids:
       model: 8271 Nways 712
     1.3.6.1.4.1.2.6.118.2:
       model: NA
+      category: Network Device
     1.3.6.1.4.1.2.6.118.3:
       category: Switch
       model: Nways 8210
@@ -377,7 +393,8 @@ sysobjectids:
       category: Server
       model: Unix
     1.3.6.1.4.1.5.1.1.1.1:
-      model: "4140"
+      model: '4140'
+      category: Network Device
     1.3.6.1.4.1.5.1.3.1.1.1.2.22:
       category: Switch
       model: Cisco WS-6608
@@ -389,19 +406,22 @@ sysobjectids:
       model: Cisco Catalyst 2600 Switch
     1.3.6.1.4.1.7.2.1:
       model: Gator
+      category: Network Device
     1.3.6.1.4.1.7.3:
       category: UPS
       model: Cayman Gator
     1.3.6.1.4.1.12.7.1.3.0:
-      category: Other
+      category: Radio
       model: LEDR Digital Microwave Radio
     1.3.6.1.4.1.18.1:
       model: WellfleetIP
+      category: Network Device
     1.3.6.1.4.1.18.3:
       category: Router
       model: Access Node (AN)
     1.3.6.1.4.1.22.1.1.1:
       model: FDDI
+      category: Network Device
     1.3.6.1.4.1.23.1:
       category: Server
       model: Novell
@@ -422,6 +442,7 @@ sysobjectids:
       model: UnixWare
     1.3.6.1.4.1.26.2.1:
       model: LAN
+      category: Network Device
     1.3.6.1.4.1.32.1.0:
       category: Server
       model: SCOUnix
@@ -430,6 +451,7 @@ sysobjectids:
       model: SCOUnix
     1.3.6.1.4.1.33.1.3:
       model: Bridge
+      category: Bridge
     1.3.6.1.4.1.33.8.1.4.2:
       category: Server
       model: Xyplex UNIX
@@ -447,47 +469,63 @@ sysobjectids:
       model: Xyplex IN-Reach Manager-Soft-V3.1
     1.3.6.1.4.1.33.8.4.2.4:
       model: Hub
+      category: Hub
     1.3.6.1.4.1.33.8.4.2.5:
       model: Hub
+      category: Hub
     1.3.6.1.4.1.33.8.4.2.6:
       model: Hub
+      category: Hub
     1.3.6.1.4.1.33.8.4.2.7:
       model: Hub
+      category: Hub
     1.3.6.1.4.1.33.8.5.2.7:
       model: ITouch9000
+      category: Network Device
     1.3.6.1.4.1.33.8.5.2.8:
       model: ITouch9000
+      category: Network Device
     1.3.6.1.4.1.33.8.5.2.9:
       model: ITouch9000
+      category: Network Device
     1.3.6.1.4.1.33.8.5.2.10:
       model: ITouch9000
+      category: Network Device
     1.3.6.1.4.1.33.8.5.2.11:
       model: ITouch9000
+      category: Network Device
     1.3.6.1.4.1.33.8.5.3.7:
       model: Network3000
+      category: Network Device
     1.3.6.1.4.1.33.8.5.3.8:
       model: Network3000
+      category: Network Device
     1.3.6.1.4.1.33.8.5.3.9:
       model: Network3000
+      category: Network Device
     1.3.6.1.4.1.33.8.5.3.10:
       category: Router
       model: Xyplex SBK Remote Router
     1.3.6.1.4.1.33.8.7.1.2:
       model: Network9000
+      category: Network Device
     1.3.6.1.4.1.33.8.7.1.3:
       model: Network9000
+      category: Network Device
     1.3.6.1.4.1.33.8.7.1.4:
       model: Network9000
+      category: Network Device
     1.3.6.1.4.1.33.8.7.1.5:
       model: Network9000
+      category: Network Device
     1.3.6.1.4.1.33.8.7.1.6:
       category: Server
       model: XYPLEX RTRTERMSERVER
     1.3.6.1.4.1.33.100.1.2.1.3:
-      category: Other
+      category: Console
       model: LX Console Manager
     1.3.6.1.4.1.33.100.1.2.1.5:
-      category: Other
+      category: Console
       model: LX Remote Presence Manager
     1.3.6.1.4.1.33.100.1.2.1.11:
       category: Other
@@ -512,6 +550,7 @@ sysobjectids:
       model: DEC GIGAswitch
     1.3.6.1.4.1.36.2.15.3.6.10:
       model: Bridge620
+      category: Bridge
     1.3.6.1.4.1.36.2.15.3.7.1:
       category: Switch
       model: DEC switch 900EF
@@ -529,6 +568,7 @@ sysobjectids:
       model: DEC server700-08
     1.3.6.1.4.1.36.2.15.5.4.1:
       model: 900MX
+      category: Hub
     1.3.6.1.4.1.36.2.15.6.4.1:
       category: Server
       model: DEC server90M
@@ -543,18 +583,22 @@ sysobjectids:
       model: DECrepeater 90TS
     1.3.6.1.4.1.36.2.15.9.14.1:
       model: 900TP
+      category: Hub
     1.3.6.1.4.1.36.2.15.10.3.1:
       category: Switch
       model: DEChub 900
     1.3.6.1.4.1.36.2.15.11.5.1:
       model: RouteAbout
+      category: Router
     1.3.6.1.4.1.36.2.15.11.13.1:
       category: Switch
       model: DEC VNswitch900EF-MM
     1.3.6.1.4.1.36.2.15.11.14.1:
       model: 900EX
+      category: Hub
     1.3.6.1.4.1.36.2.15.11.15.1:
       model: 900EE
+      category: Hub
     1.3.6.1.4.1.36.2.15.11.30.1:
       category: Switch
       model: VNSWITCH900GV
@@ -566,8 +610,10 @@ sysobjectids:
       model: ATMSWITCH
     1.3.6.1.4.1.36.2.18.10:
       model: Hub90
+      category: Hub
     1.3.6.1.4.1.36.2.18.11:
       model: Hub900
+      category: Hub
     1.3.6.1.4.1.36.2.18.26:
       category: Server
       model: DECSystem
@@ -588,6 +634,7 @@ sysobjectids:
       model: SUN ss73vnvsm01
     1.3.6.1.4.1.42.2.14:
       model: JavaStationIIep
+      category: Server
     1.3.6.1.4.1.42.2.15:
       category: Server
       model: SUN ss73vnvnc02
@@ -620,111 +667,163 @@ sysobjectids:
       model: Cabletron MINIMMAC
     1.3.6.1.4.1.52.3.1.2:
       model: MMAC-8
+      category: Hub
     1.3.6.1.4.1.52.3.1.3:
       model: MMAC-5
+      category: Hub
     1.3.6.1.4.1.52.3.1.4:
       model: MMAC-3
+      category: Hub
     1.3.6.1.4.1.52.3.1.5:
       model: MiniMMAC
+      category: Hub
     1.3.6.1.4.1.52.3.1.6:
       model: MRXI
+      category: Network Device
     1.3.6.1.4.1.52.3.1.7:
       model: MMAC-M3FNB
+      category: Hub
     1.3.6.1.4.1.52.3.1.8:
       model: MMAC-M5FNB
+      category: Hub
     1.3.6.1.4.1.52.3.1.9:
       model: MMAC-M8FNB
+      category: Hub
     1.3.6.1.4.1.52.3.1.11:
       model: MMAC-3FNB
+      category: Hub
     1.3.6.1.4.1.52.3.1.12:
       model: MMAC-5FNB
+      category: Hub
     1.3.6.1.4.1.52.3.1.13:
       model: MMAC-8FNB
+      category: Hub
     1.3.6.1.4.1.52.3.1.14:
       model: MMAC-M8FNB
+      category: Hub
     1.3.6.1.4.1.52.3.1.15:
       model: TRXI
+      category: Network Device
     1.3.6.1.4.1.52.3.1.17:
       model: MMACP14
+      category: Hub
     1.3.6.1.4.1.52.3.1.18:
       model: MMACP6
+      category: Hub
     1.3.6.1.4.1.52.3.2.16:
       model: THNMIM
+      category: Network Device
     1.3.6.1.4.1.52.3.2.32:
       model: FDMMIM-24e
+      category: Network Device
     1.3.6.1.4.1.52.3.2.33:
       model: FDMMIM-14
+      category: Network Device
     1.3.6.1.4.1.52.3.2.34:
       category: Switch
       model: Cabletron FDDI-Enet
     1.3.6.1.4.1.52.3.2.35:
       model: FDMMIM
+      category: Network Device
     1.3.6.1.4.1.52.3.2.39:
       model: FDMMIM-30
+      category: Network Device
     1.3.6.1.4.1.52.3.2.40:
       model: FDCMIM-28
+      category: Network Device
     1.3.6.1.4.1.52.3.2.41:
       model: FDCMIM-18
+      category: Network Device
     1.3.6.1.4.1.52.3.2.42:
       model: FDCMIM-08
+      category: Network Device
     1.3.6.1.4.1.52.3.2.43:
       model: FDCMIM-04
+      category: Network Device
     1.3.6.1.4.1.52.3.2.44:
       model: FDCMIM-24
+      category: Network Device
     1.3.6.1.4.1.52.3.2.45:
       model: FDCMIM-14
+      category: Network Device
     1.3.6.1.4.1.52.3.2.46:
       model: FDCMIM-38
+      category: Network Device
     1.3.6.1.4.1.52.3.2.47:
       model: FDCMIM-34
+      category: Network Device
     1.3.6.1.4.1.52.3.2.48:
       model: TRMIM-12
+      category: Network Device
     1.3.6.1.4.1.52.3.2.49:
       model: TRMIM-10R
+      category: Network Device
     1.3.6.1.4.1.52.3.2.50:
       model: TRMIM-22
+      category: Network Device
     1.3.6.1.4.1.52.3.2.51:
       model: TRMIM-20R
+      category: Network Device
     1.3.6.1.4.1.52.3.2.52:
       model: TRMIM-62A
+      category: Network Device
     1.3.6.1.4.1.52.3.2.54:
       model: TRMIM-24A
+      category: Network Device
     1.3.6.1.4.1.52.3.2.55:
       model: TRMIM-22A
+      category: Network Device
     1.3.6.1.4.1.52.3.2.56:
       model: TRFMIM-28
+      category: Network Device
     1.3.6.1.4.1.52.3.2.57:
       model: TRFMIM-22
+      category: Network Device
     1.3.6.1.4.1.52.3.2.58:
       model: TRRMIM-A
+      category: Network Device
     1.3.6.1.4.1.52.3.2.59:
       model: TRFMIM-26
+      category: Network Device
     1.3.6.1.4.1.52.3.2.60:
       model: TRMIM-34A
+      category: Network Device
     1.3.6.1.4.1.52.3.2.61:
       model: TRMIM-32A
+      category: Network Device
     1.3.6.1.4.1.52.3.2.62:
       model: TRMIM-44A
+      category: Network Device
     1.3.6.1.4.1.52.3.2.63:
       model: TRMIM-42A
+      category: Network Device
     1.3.6.1.4.1.52.3.2.65:
       model: TPMIM-T1
+      category: Network Device
     1.3.6.1.4.1.52.3.2.66:
       model: TPMIM-T
+      category: Network Device
     1.3.6.1.4.1.52.3.2.67:
       model: TPMIM-T3
+      category: Network Device
     1.3.6.1.4.1.52.3.2.80:
       model: THNMIM-2
+      category: Network Device
     1.3.6.1.4.1.52.3.2.96:
       model: TPMIM-24
+      category: Network Device
     1.3.6.1.4.1.52.3.2.97:
       model: TPMIM-22
+      category: Network Device
     1.3.6.1.4.1.52.3.2.98:
       model: TPMIM-34
+      category: Network Device
     1.3.6.1.4.1.52.3.2.99:
       model: TPMIM-32
+      category: Network Device
     1.3.6.1.4.1.52.3.2.179:
       model: TRMM-1
+      category: Network Device
     1.3.6.1.4.1.52.3.2.180:
       category: Router
       model: Cabletron TRMM-2
@@ -733,6 +832,7 @@ sysobjectids:
       model: Cabletron TRMM-4
     1.3.6.1.4.1.52.3.2.185:
       model: EMME
+      category: Network Device
     1.3.6.1.4.1.52.3.2.186:
       category: Switch
       model: Cabletron ESXMIM
@@ -741,26 +841,34 @@ sysobjectids:
       model: Cabletron TRMM
     1.3.6.1.4.1.52.3.2.190:
       model: TRMMIM
+      category: Network Device
     1.3.6.1.4.1.52.3.2.191:
       category: Switch
       model: Cabletron ESXMIM
     1.3.6.1.4.1.52.3.2.65568:
       model: MRXI-E93
+      category: Network Device
     1.3.6.1.4.1.52.3.2.65569:
       category: Router
       model: Cabletron MRXI
     1.3.6.1.4.1.52.3.2.65570:
       model: MRXI-22
+      category: Network Device
     1.3.6.1.4.1.52.3.2.65571:
       model: MRXI-34
+      category: Network Device
     1.3.6.1.4.1.52.3.2.65572:
       model: MRXI-38
+      category: Network Device
     1.3.6.1.4.1.52.3.2.65584:
       model: MRXI-2E93
+      category: Network Device
     1.3.6.1.4.1.52.3.2.196674:
       model: MRXI
+      category: Network Device
     1.3.6.1.4.1.52.3.2.196675:
       model: MRXI-2
+      category: Network Device
     1.3.6.1.4.1.52.3.9.1.10.1:
       category: Switch
       model: ELS100-24TX
@@ -784,21 +892,28 @@ sysobjectids:
       model: Cabletron MicroMMAC
     1.3.6.1.4.1.52.3.9.3.4.2:
       model: MicroMMAC-32E
+      category: Hub
     1.3.6.1.4.1.52.3.9.3.4.3:
       category: Router
       model: Cabletron MicroMMAC
     1.3.6.1.4.1.52.3.9.3.4.4:
       model: MicroMMAC-34E
+      category: Hub
     1.3.6.1.4.1.52.3.9.3.4.5:
       model: SEH-22
+      category: Network Device
     1.3.6.1.4.1.52.3.9.3.4.6:
       model: SEH-32
+      category: Network Device
     1.3.6.1.4.1.52.3.9.3.4.7:
       model: SEH-24
+      category: Network Device
     1.3.6.1.4.1.52.3.9.3.4.8:
       model: SEH-34
+      category: Network Device
     1.3.6.1.4.1.52.3.9.3.4.9:
       model: NBR-620
+      category: Bridge
     1.3.6.1.4.1.52.3.9.3.4.10:
       category: Router
       model: Cabletron SEHI
@@ -807,48 +922,70 @@ sysobjectids:
       model: Cabletron SEHI
     1.3.6.1.4.1.52.3.9.3.4.12:
       model: SEHI-26FB
+      category: Network Device
     1.3.6.1.4.1.52.3.9.3.4.13:
       model: SEHI-22FB
+      category: Network Device
     1.3.6.1.4.1.52.3.9.3.4.14:
       model: SEHI-32
+      category: Network Device
     1.3.6.1.4.1.52.3.9.3.4.15:
       model: SEHI-34
+      category: Network Device
     1.3.6.1.4.1.52.3.9.3.4.16:
       model: SEH-26C
+      category: Network Device
     1.3.6.1.4.1.52.3.9.3.4.17:
       model: SEH-22C
+      category: Network Device
     1.3.6.1.4.1.52.3.9.3.4.18:
       model: SEH-26FL
+      category: Network Device
     1.3.6.1.4.1.52.3.9.3.4.19:
       model: SEH-22FL
+      category: Network Device
     1.3.6.1.4.1.52.3.9.3.4.20:
       model: MicroMMAC-26FL
+      category: Hub
     1.3.6.1.4.1.52.3.9.3.4.21:
       model: MicroMMAC-22FL
+      category: Hub
     1.3.6.1.4.1.52.3.9.3.4.22:
       model: NBR-220
+      category: Bridge
     1.3.6.1.4.1.52.3.9.3.4.23:
       model: NBR-420
+      category: Bridge
     1.3.6.1.4.1.52.3.9.3.4.24:
       model: SEH-22S
+      category: Network Device
     1.3.6.1.4.1.52.3.9.3.4.25:
       model: SEH-32S
+      category: Network Device
     1.3.6.1.4.1.52.3.9.3.4.26:
       model: SEH-24S
+      category: Network Device
     1.3.6.1.4.1.52.3.9.3.4.27:
       model: SEH-34S
+      category: Network Device
     1.3.6.1.4.1.52.3.9.3.4.28:
       model: SEH-26FBS
+      category: Network Device
     1.3.6.1.4.1.52.3.9.3.4.29:
       model: SEH-22FBS
+      category: Network Device
     1.3.6.1.4.1.52.3.9.3.4.30:
       model: SEH-26CS
+      category: Network Device
     1.3.6.1.4.1.52.3.9.3.4.31:
       model: SEH-22CS
+      category: Network Device
     1.3.6.1.4.1.52.3.9.3.4.32:
       model: SEH-26FLS
+      category: Network Device
     1.3.6.1.4.1.52.3.9.3.4.33:
       model: SEH-22FLS
+      category: Network Device
     1.3.6.1.4.1.52.3.9.3.4.34:
       category: Router
       model: Cabletron SEHI
@@ -857,45 +994,64 @@ sysobjectids:
       model: Cabletron SEHI
     1.3.6.1.4.1.52.3.9.3.4.36:
       model: SEHI-32S
+      category: Network Device
     1.3.6.1.4.1.52.3.9.3.4.37:
       model: SEHI-34S
+      category: Network Device
     1.3.6.1.4.1.52.3.9.3.4.38:
       model: MicroMMAC-22ES
+      category: Hub
     1.3.6.1.4.1.52.3.9.3.4.39:
       model: MicroMMAC-32ES
+      category: Hub
     1.3.6.1.4.1.52.3.9.3.4.40:
       model: MicroMMAC-24ES
+      category: Hub
     1.3.6.1.4.1.52.3.9.3.4.41:
       model: MicroMMAC-34ES
+      category: Hub
     1.3.6.1.4.1.52.3.9.3.4.42:
       model: NA
+      category: Network Device
     1.3.6.1.4.1.52.3.9.3.4.43:
       model: MicroMMAC-22EUCS
+      category: Hub
     1.3.6.1.4.1.52.3.9.3.4.44:
       model: MicroMMAC-22UCSsSnac
+      category: Hub
     1.3.6.1.4.1.52.3.9.3.4.45:
       model: MicroMMAC-22EUCSSnac
+      category: Hub
     1.3.6.1.4.1.52.3.9.3.4.46:
       model: MicroMMAC-22EBrics
+      category: Hub
     1.3.6.1.4.1.52.3.9.3.4.47:
       model: MicroMMAC-22ESBrics
+      category: Hub
     1.3.6.1.4.1.52.3.9.3.4.48:
       category: Switch
       model: Cabletron ESX-1320
     1.3.6.1.4.1.52.3.9.3.4.49:
       model: ESX-1380
+      category: Network Device
     1.3.6.1.4.1.52.3.9.3.4.50:
       model: SEHI-22FLS
+      category: Network Device
     1.3.6.1.4.1.52.3.9.3.4.51:
       model: SEHI-26FLS
+      category: Network Device
     1.3.6.1.4.1.52.3.9.3.4.52:
       model: SEHI-22FL
+      category: Network Device
     1.3.6.1.4.1.52.3.9.3.4.53:
       model: SEHI-26FL
+      category: Network Device
     1.3.6.1.4.1.52.3.9.3.4.54:
       model: SEH100TX-22
+      category: Network Device
     1.3.6.1.4.1.52.3.9.3.4.55:
       model: SEHI100TX-22
+      category: Network Device
     1.3.6.1.4.1.52.3.9.3.4.57:
       category: Switch
       model: 2E42P-27
@@ -922,23 +1078,31 @@ sysobjectids:
       model: Cabletron EMM-E6
     1.3.6.1.4.1.52.3.9.5.9.68:
       model: NA
+      category: Network Device
     1.3.6.1.4.1.52.3.9.5.9.136:
       model: NA
+      category: Network Device
     1.3.6.1.4.1.52.3.9.5.9.244:
       model: STHI-42A
+      category: Network Device
     1.3.6.1.4.1.52.3.9.5.9.248:
       model: STHI-22A
+      category: Network Device
     1.3.6.1.4.1.52.3.9.5.10.68:
       category: Router
       model: Cabletron MMAC-44T
     1.3.6.1.4.1.52.3.9.5.10.136:
       model: MicroMMAC-24T/44T
+      category: Hub
     1.3.6.1.4.1.52.3.9.9.2.3:
       model: CSX400
+      category: Network Device
     1.3.6.1.4.1.52.3.9.9.2.7:
       model: CSX7000
+      category: Network Device
     1.3.6.1.4.1.52.3.9.9.4.1:
       model: WanHsimW6
+      category: Network Device
     1.3.6.1.4.1.52.3.9.13.8:
       category: Switch
       model: 9H532-24
@@ -1088,8 +1252,10 @@ sysobjectids:
       model: Matrix 6C107 module
     1.3.6.1.4.1.52.4.15.1.3.1.2:
       model: RBT8200
+      category: Network Device
     1.3.6.1.4.1.52.4.15.1.3.1.3:
       model: RBT8400
+      category: Network Device
     1.3.6.1.4.1.63.1:
       category: Desktop
       model: Macintosh
@@ -1185,7 +1351,7 @@ sysobjectids:
       category: Server
       model: Radware CT100
     1.3.6.1.4.1.89.1.1.62.16:
-      category: Other
+      category: Security
       model: DefensePro
     1.3.6.1.4.1.89.1.1.62.18:
       category: Layer 3 Switch
@@ -1346,28 +1512,28 @@ sysobjectids:
       category: Server
       model: Allen-Bradley 1756-ENET
     1.3.6.1.4.1.95.1.9:
-      category: Other
+      category: PLC
       model: 1747-L552
     1.3.6.1.4.1.95.1.12:
-      category: Other
+      category: PLC
       model: 1756-ENBT
     1.3.6.1.4.1.95.1.15:
-      category: Other
+      category: PLC
       model: 1769-L3xE
     1.3.6.1.4.1.95.1.17:
-      category: Other
+      category: PLC
       model: 1769-LxxE
     1.3.6.1.4.1.95.1.18:
-      category: Other
+      category: PLC
       model: 1768-ENBT
     1.3.6.1.4.1.95.1.27:
-      category: Other
+      category: PLC
       model: 1756-EN2T/A
     1.3.6.1.4.1.95.1.39:
-      category: Other
+      category: PLC
       model: 1769-L30ER
     1.3.6.1.4.1.95.1.86:
-      category: Other
+      category: PLC
       model: 5069-L320ER/A
     1.3.6.1.4.1.97.2.1:
       model: SXHW
@@ -1413,6 +1579,7 @@ sysobjectids:
       model: CoreBuilder6012EFSM
     1.3.6.1.4.1.114.1.3.2.1.5:
       model: CoreBuilder6012TRSM
+      category: Network Device
     1.3.6.1.4.1.114.1.3.2.1.6:
       model: CoreBuilder6012TMM
     1.3.6.1.4.1.114.1.3.2.1.7:
@@ -1432,6 +1599,7 @@ sysobjectids:
       model: CoreBuilder6004EFSM
     1.3.6.1.4.1.114.1.3.2.2.5:
       model: CoreBuilder6004TRSM
+      category: Network Device
     1.3.6.1.4.1.114.1.3.2.2.6:
       model: CoreBuilder6004TMM
     1.3.6.1.4.1.114.1.3.2.2.7:
@@ -1448,6 +1616,7 @@ sysobjectids:
       model: CoreBuilder6012BaEFSM
     1.3.6.1.4.1.114.1.3.2.3.5:
       model: CoreBuilder6012BaTRSM
+      category: Network Device
     1.3.6.1.4.1.114.1.3.2.3.6:
       model: CoreBuilder6012BaTMM
     1.3.6.1.4.1.114.1.3.2.3.7:
@@ -1598,9 +1767,9 @@ sysobjectids:
       category: Switch
       model: 3COM Access Builder
     1.3.6.1.4.1.151.1.25:
-      model: "530"
+      model: '530'
     1.3.6.1.4.1.151.1.28:
-      model: "5200"
+      model: '5200'
     1.3.6.1.4.1.161.7.10.1:
       category: Router
       model: CDLP CABLE ROUTER REL. 4.1.7
@@ -1661,23 +1830,29 @@ sysobjectids:
       model: QuickEther16
     1.3.6.1.4.1.168.2.2.1:
       model: QuickFDDI
+      category: Network Device
     1.3.6.1.4.1.168.2.2.2:
       model: QuickFDDI8
+      category: Network Device
     1.3.6.1.4.1.169.3.155.1:
       category: Server
       model: 'Tandem NonStop NonStop Kernel System Version: G6'
     1.3.6.1.4.1.175.1.1.1.1.1:
       model: SUMINET-3500
+      category: Network Device
     1.3.6.1.4.1.175.1.1.1.1.7:
       model: SUMINET-3500ME
+      category: Network Device
     1.3.6.1.4.1.175.1.1.1.1.9:
       model: SUMINET-3500MT
+      category: Network Device
     1.3.6.1.4.1.175.1.1.1.1.15:
       model: SUMINET-3500MX
+      category: Network Device
     1.3.6.1.4.1.175.1.1.12.1:
-      model: "800"
+      model: '800'
     1.3.6.1.4.1.175.1.1.13:
-      model: "1200"
+      model: '1200'
     1.3.6.1.4.1.177.11.5.1:
       category: Router
       model: NET VX400
@@ -2080,36 +2255,36 @@ sysobjectids:
     1.3.6.1.4.1.232.134.2.20.2.20:
       model: 3XDCE02
     1.3.6.1.4.1.232.160.1.2:
-      category: Other
+      category: Console
       model: IP Console Switch (3x1x16)
     1.3.6.1.4.1.232.160.1.4:
       category: Switch
       model: HP KVM 4x1x16
     1.3.6.1.4.1.232.160.3.2:
-      category: Other
+      category: Console
       model: Server Console Switch G2 (1x1Ex8)
     1.3.6.1.4.1.232.160.3.4:
-      category: Other
+      category: Console
       model: Server Console Switch G2 (0x2x16)
     1.3.6.1.4.1.232.160.3.6:
-      category: Other
+      category: Console
       model: Server Console Switch G2 (0x2x32)
     1.3.6.1.4.1.232.160.3.8:
-      category: Other
+      category: Console
       model: IP Console Switch G2 (2x1Ex16)
     1.3.6.1.4.1.232.160.3.10:
-      category: Other
+      category: Console
       model: IP Console Switch G2 (4x1Ex32)
     1.3.6.1.4.1.232.160.5.1:
       model: HP 0x1x8 G3 KVM
     1.3.6.1.4.1.232.165.1.2:
-      category: Other
+      category: Module
       model: PDU Management Module
     1.3.6.1.4.1.232.165.3:
       category: UPS
       model: R/T3000 HV INTL UPS
     1.3.6.1.4.1.232.165.7:
-      category: Other
+      category: Power
       model: 8.3kVA 208V 33out NA mPDU (D9N49A)
     1.3.6.1.4.1.232.165.11:
       category: Other
@@ -2353,9 +2528,9 @@ sysobjectids:
       category: Switch
       model: WAVESWITCH9202
     1.3.6.1.4.1.298.2.2.1:
-      model: "1012"
+      model: '1012'
     1.3.6.1.4.1.298.2.2.7:
-      model: "2072"
+      model: '2072'
     1.3.6.1.4.1.298.2.2.8:
       model: 1016-IQ
     1.3.6.1.4.1.298.2.2.9:
@@ -2388,7 +2563,7 @@ sysobjectids:
       model: PN640
     1.3.6.1.4.1.304.2.2.13:
       category: Router
-      model: "655"
+      model: '655'
     1.3.6.1.4.1.304.2.2.18:
       category: Router
       model: R7200T
@@ -2397,7 +2572,7 @@ sysobjectids:
       model: R910
     1.3.6.1.4.1.304.2.2.19.1300:
       category: Router
-      model: "3346"
+      model: '3346'
     1.3.6.1.4.1.304.2.2.19.3100:
       category: Router
       model: R3100
@@ -2409,16 +2584,16 @@ sysobjectids:
       model: Netopia Model 3346N-VGx Router
     1.3.6.1.4.1.304.2.2.19.4541:
       category: Router
-      model: "4541"
+      model: '4541'
     1.3.6.1.4.1.304.2.2.19.4622:
       category: Router
-      model: "4622"
+      model: '4622'
     1.3.6.1.4.1.304.2.2.19.4652:
       category: Router
-      model: "4652"
+      model: '4652'
     1.3.6.1.4.1.304.2.2.19.4686:
       category: Router
-      model: "4686"
+      model: '4686'
     1.3.6.1.4.1.304.2.2.19.5100:
       category: Router
       model: R5100
@@ -2427,13 +2602,13 @@ sysobjectids:
       model: R5131
     1.3.6.1.4.1.304.2.2.19.5220:
       category: Router
-      model: "5220"
+      model: '5220'
     1.3.6.1.4.1.304.2.2.19.5300:
       category: Router
-      model: "5300"
+      model: '5300'
     1.3.6.1.4.1.304.2.2.19.5320:
       category: Router
-      model: "5320"
+      model: '5320'
     1.3.6.1.4.1.304.2.2.19.6100:
       category: Router
       model: R6100
@@ -2576,13 +2751,13 @@ sysobjectids:
       category: UPS
       model: Switched Rack PDU
     1.3.6.1.4.1.318.1.3.4.5.1.3.4.5:
-      category: Other
+      category: Power
       model: Rack PDU (AP7811)
     1.3.6.1.4.1.318.1.3.4.6:
-      category: Other
+      category: Power
       model: Rack PDU (AP8858)
     1.3.6.1.4.1.318.1.3.4.8:
-      category: Other
+      category: Power
       model: Rack PDU (AP7811B)
     1.3.6.1.4.1.318.1.3.5.1:
       category: UPS
@@ -2606,10 +2781,10 @@ sysobjectids:
       category: UPS
       model: APC EMS
     1.3.6.1.4.1.318.1.3.8.2:
-      category: Other
+      category: Sensor
       model: Environmental Management System (AP9320)
     1.3.6.1.4.1.318.1.3.8.3:
-      category: Other
+      category: Sensor
       model: Environmental Monitoring Unit (AP9319)
     1.3.6.1.4.1.318.1.3.8.4:
       category: Other
@@ -2654,7 +2829,7 @@ sysobjectids:
       category: Other
       model: Uniflair LE DXG2 (0N-9582)
     1.3.6.1.4.1.318.1.3.15:
-      category: Other
+      category: Power
       model: InfraStruXure PDU (0M-5103)
     1.3.6.1.4.1.318.1.3.16:
       category: UPS
@@ -2916,7 +3091,7 @@ sysobjectids:
       model: Q3517
     1.3.6.1.4.1.368.1.1.1:
       category: Printer
-      model: "5550"
+      model: '5550'
     1.3.6.1.4.1.388.1.1:
       category: Wireless
       model: Symbol Spectrum24 Access Point
@@ -3017,6 +3192,7 @@ sysobjectids:
       model: 3COM HiPer Access
     1.3.6.1.4.1.429.2.23.1.0.3.64.63:
       model: CMTScard
+      category: Network Device
     1.3.6.1.4.1.437.1.1:
       model: FastLink
     1.3.6.1.4.1.437.1.1.1:
@@ -3226,7 +3402,7 @@ sysobjectids:
       model: APX8100
     1.3.6.1.4.1.534.1:
       category: UPS
-      model: "9330"
+      model: '9330'
     1.3.6.1.4.1.534.1.1.2.0:
       category: UPS
       model: Powerware 9390
@@ -3237,7 +3413,7 @@ sysobjectids:
       category: UPS
       model: Power Xpert Gateway
     1.3.6.1.4.1.534.6.6.7:
-      category: Other
+      category: Power
       model: EPDU
     1.3.6.1.4.1.539.2.7:
       category: Switch
@@ -3334,7 +3510,7 @@ sysobjectids:
       model: BCM400
     1.3.6.1.4.1.562.68.11:
       category: Switch
-      model: "6500"
+      model: '6500'
     1.3.6.1.4.1.562.73.2.2.2.1:
       category: Router
       model: Nortel SR3120
@@ -3439,7 +3615,7 @@ sysobjectids:
       category: Other
       model: DNX-1u
     1.3.6.1.4.1.661:
-      category: Other
+      category: Module
       model: IMC-574I-SFP
     1.3.6.1.4.1.661.8:
       category: Server
@@ -3626,6 +3802,7 @@ sysobjectids:
       model: BATM T5C 24T Routing Switch
     1.3.6.1.4.1.738.1.5.100.1.1.19:
       model: T-Metro
+      category: Network Device
     1.3.6.1.4.1.738.1.5.100.1.1.19.1:
       category: Switch
       model: Alcatel-Lucent Alcatel 7250-SAS
@@ -3641,7 +3818,7 @@ sysobjectids:
     1.3.6.1.4.1.763.1.5621.2.1:
       model: 56xx
     1.3.6.1.4.1.763.1.5660.2.1:
-      model: "5660"
+      model: '5660'
     1.3.6.1.4.1.763.3:
       category: Router
       model: Speedstream 5200
@@ -4572,10 +4749,10 @@ sysobjectids:
       model: TM-T88VI
     1.3.6.1.4.1.1271.1.2.8:
       category: Layer 3 Switch
-      model: "8700"
+      model: '8700'
     1.3.6.1.4.1.1271.1.2.10:
       category: Layer 3 Switch
-      model: "5170"
+      model: '5170'
     1.3.6.1.4.1.1271.3:
       category: Server
       model: WAVESERVER AI
@@ -4602,7 +4779,7 @@ sysobjectids:
       model: 8605 ACCESS SWITCH
     1.3.6.1.4.1.1397.2.29:
       category: Other
-      model: "1150"
+      model: '1150'
     1.3.6.1.4.1.1411.102:
       category: Switch
       model: EX2500
@@ -4624,25 +4801,25 @@ sysobjectids:
       category: Printer
       model: SX-PS-3200P
     1.3.6.1.4.1.1548.130.0:
-      model: "100"
+      model: '100'
     1.3.6.1.4.1.1548.134.0:
-      model: "144"
+      model: '144'
     1.3.6.1.4.1.1548.250.0:
-      model: "250"
+      model: '250'
     1.3.6.1.4.1.1548.255.0:
-      model: "255"
+      model: '255'
     1.3.6.1.4.1.1548.2201.0:
-      model: "2201"
+      model: '2201'
     1.3.6.1.4.1.1548.2210.0:
-      model: "2210"
+      model: '2210'
     1.3.6.1.4.1.1548.5351.0:
-      model: "5351"
+      model: '5351'
     1.3.6.1.4.1.1548.5711.0:
-      model: "5711"
+      model: '5711'
     1.3.6.1.4.1.1548.5851.0:
-      model: "5851"
+      model: '5851'
     1.3.6.1.4.1.1548.5861.0:
-      model: "5861"
+      model: '5861'
     1.3.6.1.4.1.1548.5871.0:
       category: Router
       model: Flowpoint Efficient 5871 IDSL Route
@@ -4650,7 +4827,7 @@ sysobjectids:
       category: Router
       model: Siemens Efficient 5930 DMT Router v6.1.001
     1.3.6.1.4.1.1548.7851.0:
-      model: "7851"
+      model: '7851'
     1.3.6.1.4.1.1550.1:
       category: Server
       model: Nuera F200
@@ -4716,7 +4893,7 @@ sysobjectids:
       model: Connectrix DS-6630B
     1.3.6.1.4.1.1588.2.1.1.2:
       category: SANSwitch
-      model: "2800"
+      model: '2800'
     1.3.6.1.4.1.1588.2.1.1.10:
       category: Switch
       model: Brocade FibreChannelswitch
@@ -4728,6 +4905,7 @@ sysobjectids:
       model: Fibre Channel Switch
     1.3.6.1.4.1.1588.2.1.1.27:
       model: Switch
+      category: Switch
     1.3.6.1.4.1.1588.2.1.1.29:
       category: SANSwitch
       model: Fibre Channel Switch
@@ -4916,7 +5094,7 @@ sysobjectids:
       model: ExtremeSwitching SLX 9540
     1.3.6.1.4.1.1602.4.2:
       category: Printer
-      model: "5300"
+      model: '5300'
     1.3.6.1.4.1.1602.4.3:
       category: Printer
       model: iPF710
@@ -4931,6 +5109,7 @@ sysobjectids:
       model: FIBRE CHANNEL SWITCH
     1.3.6.1.4.1.1663.1.1.1.1.24:
       model: SANbox 5602 FC Switch Qlogic
+      category: Switch
     1.3.6.1.4.1.1663.1.1.1.1.34:
       category: Switch
       model: QLogic FCSM4G
@@ -4944,7 +5123,7 @@ sysobjectids:
       category: Other
       model: Sentry Smart CDU
     1.3.6.1.4.1.1718.4:
-      category: Other
+      category: Power
       model: PRO2 Sentry Switched PDU (C2WG12BM-0AJA2D3)
     1.3.6.1.4.1.1723.2.1.3:
       category: Other
@@ -5118,10 +5297,10 @@ sysobjectids:
       model: Alteon Application Switch 2424
     1.3.6.1.4.1.1872.1.13.1.2:
       category: Layer 3 Switch
-      model: "2448"
+      model: '2448'
     1.3.6.1.4.1.1872.1.13.1.3:
       category: Layer 3 Switch
-      model: "2224"
+      model: '2224'
     1.3.6.1.4.1.1872.1.13.1.4:
       category: Layer 3 Switch
       model: Alteon Application Switch 2424-SSL
@@ -5148,7 +5327,7 @@ sysobjectids:
       model: Alteon Application Switch 3408
     1.3.6.1.4.1.1872.1.13.2.2:
       category: Layer 3 Switch
-      model: "3416"
+      model: '3416'
     1.3.6.1.4.1.1872.1.13.2.3:
       category: Layer 3 Switch
       model: Alteon Application Switch 3408 E
@@ -5289,6 +5468,7 @@ sysobjectids:
       model: Edge200
     1.3.6.1.4.1.2000.3.6:
       model: LANBIRD
+      category: Network Device
     1.3.6.1.4.1.2001.1.1.1.1:
       category: Printer
       model: OkiLAN 8100e
@@ -5891,7 +6071,7 @@ sysobjectids:
       category: Printer
       model: DCP-8085DN
     1.3.6.1.4.1.2440:
-      category: Other
+      category: Security
       model: SOLIDserver DDI
     1.3.6.1.4.1.2467.4.1:
       category: Load Balancer
@@ -6044,7 +6224,7 @@ sysobjectids:
       category: Other
       model: RSM-8R8-1
     1.3.6.1.4.1.2634.3.16:
-      category: Other
+      category: Security
       model: IPS800
     1.3.6.1.4.1.2634.6.4:
       category: Other
@@ -6059,7 +6239,7 @@ sysobjectids:
       category: Switch
       model: Nortel CVX-1800
     1.3.6.1.4.1.2682:
-      category: Other
+      category: Security
       model: NetGuardian
     1.3.6.1.4.1.2684:
       category: Other
@@ -6291,10 +6471,10 @@ sysobjectids:
       model: T2380
     1.3.6.1.4.1.3369.1.1.1.1.3:
       category: Printer
-      model: "2610"
+      model: '2610'
     1.3.6.1.4.1.3369.1.1.1.1.4:
       category: Printer
-      model: "2600"
+      model: '2600'
     1.3.6.1.4.1.3373.1103:
       category: Other
       model: ALFOplus2
@@ -6726,7 +6906,7 @@ sysobjectids:
       category: Switch
       model: FiberHome-S2200ME-PAF
     1.3.6.1.4.1.3808.1.1.3:
-      category: Other
+      category: Power
       model: PDU44005
     1.3.6.1.4.1.3812.1.2.4:
       category: Switch
@@ -6759,7 +6939,7 @@ sysobjectids:
       category: Other
       model: SD-WAN 6100
     1.3.6.1.4.1.3854.1:
-      category: Other
+      category: Sensor
       model: sensorProbe2
     1.3.6.1.4.1.3873.1.7:
       category: SANSwitch
@@ -7480,7 +7660,7 @@ sysobjectids:
       category: Other
       model: TelePresence System Edge 95 MXP
     1.3.6.1.4.1.5596.130.6.4.1:
-      category: Other
+      category: Video
       model: TelePresence Video Communication Server
     1.3.6.1.4.1.5596.150.6.4.1:
       category: Other
@@ -8212,13 +8392,13 @@ sysobjectids:
       model: Avaya IP Phone 4612
     1.3.6.1.4.1.6889.1.69.1.6:
       category: IP Phone
-      model: "4602"
+      model: '4602'
     1.3.6.1.4.1.6889.1.69.1.7:
       category: IP Phone
-      model: "4610"
+      model: '4610'
     1.3.6.1.4.1.6889.1.69.1.12:
       category: IP Phone
-      model: "4622"
+      model: '4622'
     1.3.6.1.4.1.6889.1.69.2.1:
       category: IP Phone
       model: 9620D
@@ -8227,10 +8407,10 @@ sysobjectids:
       model: 9650B
     1.3.6.1.4.1.6889.1.69.3.2:
       category: IP Phone
-      model: "1608"
+      model: '1608'
     1.3.6.1.4.1.6889.1.69.3.3:
       category: IP Phone
-      model: "1616"
+      model: '1616'
     1.3.6.1.4.1.6889.1.69.4.3:
       category: IP Phone
       model: AVX571040
@@ -8714,16 +8894,20 @@ sysobjectids:
       model: MSM310
     1.3.6.1.4.1.8744.1.22:
       model: ClientBridge M110
+      category: Bridge
     1.3.6.1.4.1.8744.1.23:
       model: MSM323
     1.3.6.1.4.1.8744.1.24:
       model: MSM320
     1.3.6.1.4.1.8744.1.25:
       model: MultiService Controllers MSM730
+      category: Network Device
     1.3.6.1.4.1.8744.1.26:
       model: ClientBridge M111
+      category: Bridge
     1.3.6.1.4.1.8744.1.27:
       model: MultiService Controllers MSM750
+      category: Network Device
     1.3.6.1.4.1.8744.1.28:
       category: Access Point
       model: HP COLUBRIS MAP-625
@@ -8731,6 +8915,7 @@ sysobjectids:
       model: MSM335
     1.3.6.1.4.1.8744.1.35:
       model: MultiService Controllers MSM710
+      category: Network Device
     1.3.6.1.4.1.8744.1.41:
       category: Access Point
       model: MSM410
@@ -8746,6 +8931,7 @@ sysobjectids:
       model: MSM323R
     1.3.6.1.4.1.8744.1.47:
       model: MultiService Controllers MSM765
+      category: Network Device
     1.3.6.1.4.1.8744.1.48:
       category: Management Controller
       model: MSM760
@@ -8753,6 +8939,7 @@ sysobjectids:
       model: MSM318
     1.3.6.1.4.1.8744.1.51:
       model: ClientBridge M200
+      category: Bridge
     1.3.6.1.4.1.8744.1.52:
       model: MSM460
     1.3.6.1.4.1.8744.1.54:
@@ -8761,20 +8948,23 @@ sysobjectids:
       model: MSM466
     1.3.6.1.4.1.8744.1.56:
       model: MultiService Controllers MSM720
+      category: Network Device
     1.3.6.1.4.1.8744.1.57:
       model: M220
     1.3.6.1.4.1.8744.1.58:
       model: MSM466R
     1.3.6.1.4.1.8744.1.59:
       model: MultiService Controllers MSM775
+      category: Network Device
     1.3.6.1.4.1.8744.1.64:
-      model: "517"
+      model: '517'
     1.3.6.1.4.1.8744.1.65:
-      model: "560"
+      model: '560'
     1.3.6.1.4.1.8744.1.66:
       model: M210
     1.3.6.1.4.1.8744.1.67:
       model: MultiService Controllers MSM760B
+      category: Network Device
     1.3.6.1.4.1.8744.5.4:
       category: Wireless
       model: Hewlett-Packard HP MSM Colubris
@@ -9160,6 +9350,7 @@ sysobjectids:
       model: TippingPoint SMS H5 XL
     1.3.6.1.4.1.10734.1.5.1:
       model: TippingPoint Core Controller
+      category: Network Device
     1.3.6.1.4.1.10734.1.9.1:
       model: TippingPoint S1020F
     1.3.6.1.4.1.10734.1.9.2:
@@ -9551,6 +9742,7 @@ sysobjectids:
       model: Volktek INS-8648P
     1.3.6.1.4.1.12925:
       model: 3PAR
+      category: Storage
     1.3.6.1.4.1.12925.1:
       category: Storage
       model: 3PAR StoreServ 8440
@@ -9634,6 +9826,7 @@ sysobjectids:
       model: Cisco Aeronet 8540
     1.3.6.1.4.1.14179.1.1.4.2:
       model: 2006 Wireless LAN Controller
+      category: Wireless LAN Controller
     1.3.6.1.4.1.14179.1.1.4.3:
       category: Wireless LAN Controller
       model: 4400 Wireless Controller
@@ -9642,58 +9835,85 @@ sysobjectids:
       model: WiSM 6500-7600
     1.3.6.1.4.1.14179.1.1.4.5:
       model: 4402 4404 Wireless LAN Controller
+      category: Wireless LAN Controller
     1.3.6.1.4.1.14179.2.2.1.1.22.1:
       model: 5212 Unified Access Point
+      category: Access Point
     1.3.6.1.4.1.14179.2.2.1.1.22.2:
       model: 5312 Unified Access Point
+      category: Access Point
     1.3.6.1.4.1.14179.2.2.1.1.22.3:
       model: MIMO Unified Access Point
+      category: Access Point
     1.3.6.1.4.1.14179.2.2.1.1.22.4:
       model: UNKNOWN Unified Access Point
+      category: Access Point
     1.3.6.1.4.1.14179.2.2.1.1.22.5:
       model: 1100 Unified Access Point
+      category: Access Point
     1.3.6.1.4.1.14179.2.2.1.1.22.6:
       model: 1130 Unified Access Point
+      category: Access Point
     1.3.6.1.4.1.14179.2.2.1.1.22.7:
       model: 1240 Unified Access Point
+      category: Access Point
     1.3.6.1.4.1.14179.2.2.1.1.22.8:
       model: 1200 Unified Access Point
+      category: Access Point
     1.3.6.1.4.1.14179.2.2.1.1.22.9:
       model: 1310 Unified Access Point
+      category: Access Point
     1.3.6.1.4.1.14179.2.2.1.1.22.10:
       model: 1500 Unified Access Point
+      category: Access Point
     1.3.6.1.4.1.14179.2.2.1.1.22.11:
       model: 1250 Unified Access Point
+      category: Access Point
     1.3.6.1.4.1.14179.2.2.1.1.22.12:
       model: 1505 Unified Access Point
+      category: Access Point
     1.3.6.1.4.1.14179.2.2.1.1.22.13:
       model: 3201 Unified Access Point
+      category: Access Point
     1.3.6.1.4.1.14179.2.2.1.1.22.14:
       model: 1520 Unified Access Point
+      category: Access Point
     1.3.6.1.4.1.14179.2.2.1.1.22.15:
       model: 801GN Unified Access Point
+      category: Access Point
     1.3.6.1.4.1.14179.2.2.1.1.22.16:
       model: 1140 Unified Access Point
+      category: Access Point
     1.3.6.1.4.1.14179.2.2.1.1.22.17:
       model: 801AGN Unified Access Point
+      category: Access Point
     1.3.6.1.4.1.14179.2.2.1.1.22.18:
       model: 3500I Unified Access Point
+      category: Access Point
     1.3.6.1.4.1.14179.2.2.1.1.22.19:
       model: 3500E Unified Access Point
+      category: Access Point
     1.3.6.1.4.1.14179.2.2.1.1.22.20:
       model: 1260 Unified Access Point
+      category: Access Point
     1.3.6.1.4.1.14179.2.2.1.1.22.21:
       model: 1040 Unified Access Point
+      category: Access Point
     1.3.6.1.4.1.14179.2.2.1.1.22.22:
       model: 1550 Unified Access Point
+      category: Access Point
     1.3.6.1.4.1.14179.2.2.1.1.22.23:
       model: 602I Unified Access Point
+      category: Access Point
     1.3.6.1.4.1.14179.2.2.1.1.22.24:
       model: 3500P Unified Access Point
+      category: Access Point
     1.3.6.1.4.1.14179.2.2.1.1.22.25:
       model: 802GN Unified Access Point
+      category: Access Point
     1.3.6.1.4.1.14179.2.2.1.1.22.26:
       model: 802AGN Unified Access Point
+      category: Access Point
     1.3.6.1.4.1.14179.2.2.1.1.22.27:
       category: Access Point
       model: AIR CAP 3602I
@@ -9708,6 +9928,7 @@ sysobjectids:
       model: AIR AP 2602E
     1.3.6.1.4.1.14179.2.2.1.1.22.31:
       model: 802HAGN Unified Access Point
+      category: Access Point
     1.3.6.1.4.1.14179.2.2.1.1.22.32:
       category: Access Point
       model: AIR AP 1602I
@@ -9725,8 +9946,10 @@ sysobjectids:
       model: AIR CAP 3602P
     1.3.6.1.4.1.14179.2.2.1.1.22.37:
       model: 1530I Unified Access Point
+      category: Access Point
     1.3.6.1.4.1.14179.2.2.1.1.22.38:
       model: 1530E Unified Access Point
+      category: Access Point
     1.3.6.1.4.1.14179.2.2.1.1.22.39:
       category: Access Point
       model: AIR CAP 3702E
@@ -9959,7 +10182,7 @@ sysobjectids:
       category: Other
       model: SteelCentral AppResponse 11
     1.3.6.1.4.1.17373:
-      category: Other
+      category: Power
       model: Monitored ePDU
     1.3.6.1.4.1.17491.1.3.0:
       category: Other
@@ -10022,7 +10245,7 @@ sysobjectids:
       category: Router
       model: EdgewaterNetworks EM4508 Series
     1.3.6.1.4.1.19536.10.1:
-      category: Other
+      category: Power
       model: G5 iPDU 200-240V, 32A, 7.4kVA, 50/60Hz (P32E06M)
     1.3.6.1.4.1.19746.3.1.0:
       category: Management
@@ -10188,6 +10411,7 @@ sysobjectids:
       model: EN4093-10GB-SCALABLE-SWITCH
     1.3.6.1.4.1.20301.1.18.15:
       model: Flex System Fabric CN4093 10Gb Converged Scalable Switch
+      category: Switch
     1.3.6.1.4.1.20301.1.18.17:
       category: Bridge/Extender
       model: Flex System Fabric SI4093 System Interconnect Module
@@ -10444,16 +10668,16 @@ sysobjectids:
       category: Router
       model: XKL dsm
     1.3.6.1.4.1.21239.2:
-      category: Other
+      category: Power
       model: RCM-O rPDU
     1.3.6.1.4.1.21239.5.1:
       category: Other
       model: Watchdog 100
     1.3.6.1.4.1.21239.5.2:
-      category: Other
+      category: Power
       model: IMD rPDU
     1.3.6.1.4.1.21239.42.1.15:
-      category: Other
+      category: Power
       model: RCM-OD rPDU
     1.3.6.1.4.1.21239.42.1.31:
       category: Other
@@ -10462,13 +10686,13 @@ sysobjectids:
       category: Other
       model: Watchdog 100
     1.3.6.1.4.1.21239.42.1.52:
-      category: Other
+      category: Power
       model: IMD rPDU (MG02E4B1-24PF83-3PS6D2C07-S-30066)
     1.3.6.1.4.1.21239.42.1.53:
-      category: Other
+      category: Power
       model: IMD-3 rPDU (MNS3EGB0-24S203-2TL5A0A10-S)
     1.3.6.1.4.1.21239.42.1.55:
-      category: Other
+      category: Power
       model: IMD-5 rPDU (MG03E4A0-12CF13-2PS56B2A10-S-A)
     1.3.6.1.4.1.21317.1.3.3.1:
       category: Other
@@ -10654,10 +10878,10 @@ sysobjectids:
       category: Firewall
       model: xStream 40G
     1.3.6.1.4.1.23128.1000.1.1:
-      category: Other
+      category: Security
       model: Enterprise Security Manager
     1.3.6.1.4.1.23128.1000.3.1:
-      category: Other
+      category: Radio
       model: Event Receiver
     1.3.6.1.4.1.23128.1000.7.1:
       category: Other
@@ -11054,7 +11278,7 @@ sysobjectids:
       model: FXC FXC5218PE
     1.3.6.1.4.1.25597.1:
       category: Firewall
-      model: "2310"
+      model: '2310'
     1.3.6.1.4.1.25651.1.2:
       category: Other
       model: EX-2.4i-16
@@ -11165,6 +11389,7 @@ sysobjectids:
       model: AP230
     1.3.6.1.4.1.27282.3.2.10:
       model: EdgeSwitch 10X
+      category: Switch
     1.3.6.1.4.1.27614:
       category: Gateway
       model: IPBL1-AA/4B2
@@ -11178,7 +11403,7 @@ sysobjectids:
       category: Other
       model: Accesser 3105
     1.3.6.1.4.1.28129.1.5.2:
-      category: Other
+      category: Storage
       model: IBM Cloud Object Storage
     1.3.6.1.4.1.28129.1.5.3:
       category: Other
@@ -11247,10 +11472,10 @@ sysobjectids:
       category: Other
       model: M-1601-D1000C0
     1.3.6.1.4.1.30932.1.1:
-      category: Other
+      category: Power
       model: eConnect PDU (P6-1H0A1-B2A)
     1.3.6.1.4.1.30966:
-      category: Other
+      category: Power
       model: IP-PDU
     1.3.6.1.4.1.31218.3.6.0:
       model: UCP-SV1000
@@ -11414,7 +11639,7 @@ sysobjectids:
       category: Printer
       model: CL-S700Z
     1.3.6.1.4.1.33763.250.255:
-      category: Other
+      category: Video
       model: EcoSense DVR
     1.3.6.1.4.1.34672:
       category: Server
@@ -11430,14 +11655,19 @@ sysobjectids:
       model: Pica8
     1.3.6.1.4.1.35265.1.52:
       model: MES1124M
+      category: Switch
     1.3.6.1.4.1.35265.1.92:
       model: MES2324P-24
+      category: Switch
     1.3.6.1.4.1.35265.1.156:
       model: MES2408PL
+      category: Switch
     1.3.6.1.4.1.35265.1.225:
       model: MES2324P
+      category: Switch
     1.3.6.1.4.1.35265.1.253:
       model: MES2408CP
+      category: Switch
     1.3.6.1.4.1.35874.2.1:
       category: Other
       model: LiveNX Appliance
@@ -11503,6 +11733,7 @@ sysobjectids:
       model: Composable Fabric FM 3032Q
     1.3.6.1.4.1.37447.3.1:
       model: Nimble Storage
+      category: Storage
     1.3.6.1.4.1.37449.1.1.1:
       category: Switch
       model: OpZoon PT-2960-9T
@@ -11654,7 +11885,7 @@ sysobjectids:
       category: Printer
       model: VP700
     1.3.6.1.4.1.38446.1:
-      category: Other
+      category: Power
       model: PDU 200-240V, 32A, 7.4kVA, 50/60Hz (EN6329)
     1.3.6.1.4.1.38692.1.2.3901:
       category: Switch
@@ -11670,30 +11901,43 @@ sysobjectids:
       model: Access Control Device
     1.3.6.1.4.1.40418.7.21:
       model: SNR-S2985G-8T
+      category: Switch
     1.3.6.1.4.1.40418.7.24:
       model: SNR-S2965-8T
+      category: Switch
     1.3.6.1.4.1.40418.7.33:
       model: SNR-S2965-8T
+      category: Switch
     1.3.6.1.4.1.40418.7.42:
       model: SNR-S2985G-24TC
+      category: Switch
     1.3.6.1.4.1.40418.7.43:
       model: SNR-S2995G-24FX
+      category: Switch
     1.3.6.1.4.1.40418.7.44:
       model: SNR-S2995G-12FX
+      category: Switch
     1.3.6.1.4.1.40418.7.46:
       model: SNR-S2982G-24T
+      category: Switch
     1.3.6.1.4.1.40418.7.49:
       model: SNR-S2995G-48FX
+      category: Switch
     1.3.6.1.4.1.40418.7.50:
       model: SNR-S2995G-48TX
+      category: Switch
     1.3.6.1.4.1.40418.7.53:
       model: SNR-S2990X-24FQ
+      category: Switch
     1.3.6.1.4.1.40418.7.61:
       model: SNR-S2989G-24TX
+      category: Switch
     1.3.6.1.4.1.40418.7.63:
       model: SNR-S2982G-8T
+      category: Switch
     1.3.6.1.4.1.40418.7.368:
       model: SNR-S2985G-24T-UPS
+      category: Switch
     1.3.6.1.4.1.40614:
       category: Other
       model: iStars
@@ -11937,7 +12181,7 @@ sysobjectids:
       category: Other
       model: 4248-06XL
     1.3.6.1.4.1.47952:
-      category: Other
+      category: Power
       model: PowerBOX 3Px
     1.3.6.1.4.1.48157.1.1:
       category: Other
@@ -11949,7 +12193,7 @@ sysobjectids:
       category: Other
       model: TV-110
     1.3.6.1.4.1.50001:
-      category: Other
+      category: Video
       model: Video device
     1.3.6.1.4.1.50114.11.1.10.2000:
       category: Router
@@ -11991,7 +12235,7 @@ sysobjectids:
       category: Firewall
       model: Secure Web Gateway WBG-5500-E
     1.3.6.1.4.1.1004849.3.2.10:
-      category: Other
+      category: Video
       model: NVR4216-4KS2
     1.3.6.1.4.10.82.2.145:
       category: Server
