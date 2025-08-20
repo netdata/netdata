@@ -1180,7 +1180,7 @@ modules:
                 - name: input
             - name: system.hw.sensor.humidity
               description: Sensor Humidity
-              unit: "Percentage"
+              unit: "%"
               chart_type: line
               dimensions:
                 - name: input

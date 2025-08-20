@@ -65,7 +65,7 @@ static struct win_sensor_config {
         },
         {
             .title = "Sensor Humidity",
-            .units = "percentage",
+            .units = "%",
             .context = "system.hw.sensor.humidity.input",
             .family = "Humidity",
             .priority = 70004,
