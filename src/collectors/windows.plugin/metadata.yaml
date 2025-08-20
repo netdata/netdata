@@ -1162,31 +1162,31 @@ modules:
           metrics:
             - name: system.hw.sensor.temperature
               description: Sensor Temperature
-              unit: "degrees Celsius"
+              unit: "Cel"
               chart_type: line
               dimensions:
                 - name: input
             - name: system.hw.sensor.power
               description: Sensor Power
-              unit: "Watts"
+              unit: "W"
               chart_type: line
               dimensions:
                 - name: input
             - name: system.hw.sensor.current
               description: Sensor Current
-              unit: "Amperes"
+              unit: "A"
               chart_type: line
               dimensions:
                 - name: input
             - name: system.hw.sensor.humidity
               description: Sensor Humidity
-              unit: "Amperes"
+              unit: "Percentage"
               chart_type: line
               dimensions:
                 - name: input
             - name: system.hw.sensor.lux
-              description: Light Level
-              unit: "lux"
+              description: Ambient light level
+              unit: "lx"
               chart_type: line
               dimensions:
                 - name: input

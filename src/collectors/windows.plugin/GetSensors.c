@@ -44,21 +44,21 @@ static struct win_sensor_config {
 } configs[] = {
         {
             .title = "Sensor Temperature",
-            .units = "degrees Celsius",
+            .units = "Cel",
             .context = "system.hw.sensor.temperature",
             .family = "Temperature",
             .priority = 70000,
         },
         {
             .title = "Sensor Power",
-            .units = "Watts",
+            .units = "W",
             .context = "system.hw.sensor.power",
             .family = "Power",
             .priority = 70006,
         },
         {
             .title = "Sensor Current",
-            .units = "Amperes",
+            .units = "A",
             .context = "system.hw.sensor.current",
             .family = "Current",
             .priority = 70003,
@@ -71,10 +71,10 @@ static struct win_sensor_config {
             .priority = 70004,
         },
         {
-            .title = "Light Level",
-            .units = "lux",
+            .title = "Ambient light level",
+            .units = "lx",
             .context = "system.hw.sensor.lux",
-            .family = "Luminosity",
+            .family = "illuminance",
             .priority = 70010,
         }
 };
