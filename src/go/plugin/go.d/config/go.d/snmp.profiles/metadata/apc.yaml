@@ -1,0 +1,245 @@
+sysobjectids:
+  oid_overrides:
+    1.3.6.1.4.1.318.1:
+      category: UPS
+      model: Smart-UPS 9605
+    1.3.6.1.4.1.318.1.1.4.5:
+      category: PDU
+      model: APC PDU
+    1.3.6.1.4.1.318.1.1.10.2.3.2.1.1:
+      category: UPS
+      model: APC EMS
+    1.3.6.1.4.1.318.1.1.10.2.3.2.1.2:
+      category: UPS
+      model: APC EMS
+    1.3.6.1.4.1.318.1.1.10.2.3.2.1.3:
+      category: UPS
+      model: APC EMS
+    1.3.6.1.4.1.318.1.1.10.2.3.2.1.4:
+      category: UPS
+      model: APC EMS
+    1.3.6.1.4.1.318.1.1.10.2.3.4:
+      category: UPS
+      model: APC EMS
+    1.3.6.1.4.1.318.1.1.10.3:
+      category: UPS
+      model: APC EMS
+    1.3.6.1.4.1.318.1.3.2:
+      category: UPS
+      model: Smart-UPS RT 6000 RM XL
+    1.3.6.1.4.1.318.1.3.2.1:
+      category: UPS
+      model: Smart-UPS 250
+    1.3.6.1.4.1.318.1.3.2.2:
+      category: UPS
+      model: Smart-UPS 400
+    1.3.6.1.4.1.318.1.3.2.3:
+      category: UPS
+      model: Smart-UPS 600
+    1.3.6.1.4.1.318.1.3.2.4:
+      category: UPS
+      model: Smart-UPS 900
+    1.3.6.1.4.1.318.1.3.2.5:
+      category: UPS
+      model: Smart-UPS 1250
+    1.3.6.1.4.1.318.1.3.2.6:
+      category: UPS
+      model: Smart-UPS 2000
+    1.3.6.1.4.1.318.1.3.2.7:
+      category: UPS
+      model: Smart-UPS 750 RM
+    1.3.6.1.4.1.318.1.3.2.8:
+      category: UPS
+      model: Smart-UPS 700
+    1.3.6.1.4.1.318.1.3.2.9:
+      category: UPS
+      model: Smart-UPS 1000
+    1.3.6.1.4.1.318.1.3.2.10:
+      category: UPS
+      model: Smart-UPS 1400
+    1.3.6.1.4.1.318.1.3.2.11:
+      category: UPS
+      model: Smart-UPS 2200
+    1.3.6.1.4.1.318.1.3.2.12:
+      category: UPS
+      model: SMART-UPS 3000 RM XL
+    1.3.6.1.4.1.318.1.3.2.13:
+      category: UPS
+      model: Smart-UPS RT 5000 XL
+    1.3.6.1.4.1.318.1.3.2.14:
+      category: UPS
+      model: Smart-UPS RT 7500 RM XL
+    1.3.6.1.4.1.318.1.3.2.15:
+      category: UPS
+      model: Smart-UPS RT 10000 XL
+    1.3.6.1.4.1.318.1.3.2.16:
+      category: UPS
+      model: Smart-UPS RT 1500 XL
+    1.3.6.1.4.1.318.1.3.2.17:
+      category: UPS
+      model: Smart-UPS RT 3000 XL
+    1.3.6.1.4.1.318.1.3.2.18:
+      category: UPS
+      model: Smart-UPS RT 5000 XL (AP9619)
+    1.3.6.1.4.1.318.1.3.2.19:
+      category: UPS
+      model: Smart-UPS RT 8000 XL
+    1.3.6.1.4.1.318.1.3.3.1:
+      category: UPS
+      model: Matrix-UPS 3000
+    1.3.6.1.4.1.318.1.3.3.2:
+      category: UPS
+      model: Matrix-UPS 5000
+    1.3.6.1.4.1.318.1.3.4.1:
+      category: UPS
+      model: Web/SNMP Management Card
+    1.3.6.1.4.1.318.1.3.4.2:
+      category: UPS
+      model: Web/SNMP Management Card
+    1.3.6.1.4.1.318.1.3.4.4:
+      category: Access Point
+      model: AP9617
+    1.3.6.1.4.1.318.1.3.4.5:
+      category: UPS
+      model: Switched Rack PDU
+    1.3.6.1.4.1.318.1.3.4.5.1.3.4.5:
+      category: Power
+      model: Rack PDU (AP7811)
+    1.3.6.1.4.1.318.1.3.4.6:
+      category: Power
+      model: Rack PDU (AP8858)
+    1.3.6.1.4.1.318.1.3.4.8:
+      category: Power
+      model: Rack PDU (AP7811B)
+    1.3.6.1.4.1.318.1.3.5.1:
+      category: UPS
+      model: Symmetra-UPS 4kVA
+    1.3.6.1.4.1.318.1.3.5.2:
+      category: UPS
+      model: Symmetra-UPS 8kVA
+    1.3.6.1.4.1.318.1.3.5.3:
+      category: UPS
+      model: Symmetra-UPS 12kVA
+    1.3.6.1.4.1.318.1.3.5.4:
+      category: UPS
+      model: Symmetra-UPS 16kVA
+    1.3.6.1.4.1.318.1.3.6:
+      category: UPS
+      model: APC dp100E
+    1.3.6.1.4.1.318.1.3.7:
+      category: Server
+      model: APC AP9619
+    1.3.6.1.4.1.318.1.3.8.1:
+      category: UPS
+      model: APC EMS
+    1.3.6.1.4.1.318.1.3.8.2:
+      category: Sensor
+      model: Environmental Management System (AP9320)
+    1.3.6.1.4.1.318.1.3.8.3:
+      category: Sensor
+      model: Environmental Monitoring Unit (AP9319)
+    1.3.6.1.4.1.318.1.3.8.4:
+      category: Other
+      model: NetBotz Rack Monitor 200 (NBRK0200)
+    1.3.6.1.4.1.318.1.3.8.5:
+      category: Other
+      model: NetBotz 250 (AP9538)
+    1.3.6.1.4.1.318.1.3.11:
+      category: Other
+      model: Automatic Transfer Switch (AP7723)
+    1.3.6.1.4.1.318.1.3.13:
+      category: UPS
+      model: Symmetra UPS 3 Phase
+    1.3.6.1.4.1.318.1.3.13.1:
+      category: UPS
+      model: Symmetra 40K
+    1.3.6.1.4.1.318.1.3.13.3:
+      category: UPS
+      model: Symmetra 80K
+    1.3.6.1.4.1.318.1.3.13.4:
+      category: UPS
+      model: Symmetra 20K
+    1.3.6.1.4.1.318.1.3.14.4:
+      category: Other
+      model: InRow RC (100 Series)
+    1.3.6.1.4.1.318.1.3.14.5:
+      category: Other
+      model: InRow RC (103 Series) (ACRC103)
+    1.3.6.1.4.1.318.1.3.14.6:
+      category: Other
+      model: InRow RP (100 Series) (ACRP)
+    1.3.6.1.4.1.318.1.3.14.6.6:
+      category: Other
+      model: InRow (ACRP102)
+    1.3.6.1.4.1.318.1.3.14.7.7.7.7.7.7.7:
+      category: Other
+      model: InRow RC (ACRP)
+    1.3.6.1.4.1.318.1.3.14.10:
+      category: Other
+      model: InRow ACRC301S (0N-9580)
+    1.3.6.1.4.1.318.1.3.14.19:
+      category: Other
+      model: Uniflair LE DXG2 (0N-9582)
+    1.3.6.1.4.1.318.1.3.15:
+      category: Power
+      model: InfraStruXure PDU (0M-5103)
+    1.3.6.1.4.1.318.1.3.16:
+      category: UPS
+      model: AIS 5000 UPS
+    1.3.6.1.4.1.318.1.3.17:
+      category: UPS
+      model: Smart UPS 3 Phase
+    1.3.6.1.4.1.318.1.3.17.2:
+      category: UPS
+      model: Smart-UPS RT 15000 RM XL
+    1.3.6.1.4.1.318.1.3.17.3:
+      category: UPS
+      model: Smart-UPS VT 20 kVA
+    1.3.6.1.4.1.318.1.3.17.4:
+      category: UPS
+      model: Smart-UPS VT 30 kVA
+    1.3.6.1.4.1.318.1.3.17.5:
+      category: UPS
+      model: Smart-UPS VT 40 kVA
+    1.3.6.1.4.1.318.1.3.22.1:
+      category: Other
+      model: NetBotz Rack Access PX-HID (AP9361)
+    1.3.6.1.4.1.318.1.3.23.1:
+      category: UPS
+      model: Symmetra 48K
+    1.3.6.1.4.1.318.1.3.23.3:
+      category: UPS
+      model: Symmetra PX 250kW (AP9635)
+    1.3.6.1.4.1.318.1.3.23.5:
+      category: UPS
+      model: Symmetra 100K
+    1.3.6.1.4.1.318.1.3.27:
+      category: UPS
+      model: Smart-UPS 1500
+    1.3.6.1.4.1.318.1.3.28.1:
+      category: UPS
+      model: MGE Galaxy 7000 200kVA (AP9635)
+    1.3.6.1.4.1.318.1.3.28.14:
+      category: UPS
+      model: MGE Galaxy 300 10kVA 3:1
+    1.3.6.1.4.1.318.1.3.28.17:
+      category: UPS
+      model: MGE Galaxy 300
+    1.3.6.1.4.1.318.1.3.28.31:
+      category: UPS
+      model: MGE Galaxy 5500 UPS 60kVA
+    1.3.6.1.4.1.318.1.3.28.70:
+      category: UPS
+      model: GVSUPS10KB2F
+    1.3.6.1.4.1.318.1.3.28.75:
+      category: UPS
+      model: GVSUPS40KB4G
+    1.3.6.1.4.1.318.1.3.32:
+      category: Other
+      model: AP4421
+    1.3.6.1.4.1.318.1.3.33.1:
+      category: UPS
+      model: Smart-UPS 2200
+    1.3.6.1.4.1.318.6:
+      category: UPS
+      model: APC UPS

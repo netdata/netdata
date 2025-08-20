@@ -1,0 +1,167 @@
+sysobjectids:
+  oid_overrides:
+    1.3.6.1.4.1.3417.1.1.1:
+      category: Web Caching
+      model: SG1000
+    1.3.6.1.4.1.3417.1.1.2:
+      category: Web Caching
+      model: SG100
+    1.3.6.1.4.1.3417.1.1.3:
+      category: Web Caching
+      model: SG500
+    1.3.6.1.4.1.3417.1.1.4:
+      category: Web Caching
+      model: SG2000
+    1.3.6.1.4.1.3417.1.1.5:
+      category: Web Caching
+      model: SG5000
+    1.3.6.1.4.1.3417.1.1.6:
+      category: Web Caching
+      model: SG500A
+    1.3.6.1.4.1.3417.1.1.7:
+      category: Web Caching
+      model: SG3000
+    1.3.6.1.4.1.3417.1.1.8:
+      category: Web Caching
+      model: SG5x5
+    1.3.6.1.4.1.3417.1.1.9:
+      category: Web Caching
+      model: SG110
+    1.3.6.1.4.1.3417.1.1.10:
+      category: Web Caching
+      model: SG600
+    1.3.6.1.4.1.3417.1.1.11:
+      category: Web Caching
+      model: SGCA6000
+    1.3.6.1.4.1.3417.1.1.12:
+      category: Web Caching
+      model: SG610
+    1.3.6.1.4.1.3417.1.1.13:
+      category: Web Caching
+      model: SG600
+    1.3.6.1.4.1.3417.1.1.14:
+      category: Web Caching
+      model: SG3000s
+    1.3.6.1.4.1.3417.1.1.15:
+      category: Web Caching
+      model: SG5000s
+    1.3.6.1.4.1.3417.1.1.16:
+      category: Web Caching
+      model: SG700
+    1.3.6.1.4.1.3417.1.1.17:
+      category: Web Caching
+      model: SG710
+    1.3.6.1.4.1.3417.1.1.18:
+      category: Web Caching
+      model: SG7000
+    1.3.6.1.4.1.3417.1.1.19:
+      category: Web Caching
+      model: SG611
+    1.3.6.1.4.1.3417.1.1.20:
+      category: Web Caching
+      model: SG800
+    1.3.6.1.4.1.3417.1.1.22:
+      category: Web Caching
+      model: SG400
+    1.3.6.1.4.1.3417.1.1.23:
+      category: Web Caching
+      model: SG8000
+    1.3.6.1.4.1.3417.1.1.24:
+      category: Web Caching
+      model: SG200
+    1.3.6.1.4.1.3417.1.1.25:
+      category: Web Caching
+      model: SG810
+    1.3.6.1.4.1.3417.1.1.26:
+      category: Web Caching
+      model: SG210
+    1.3.6.1.4.1.3417.1.1.27:
+      category: Web Caching
+      model: SG510
+    1.3.6.1.4.1.3417.1.1.28:
+      category: Web Caching
+      model: SG8100
+    1.3.6.1.4.1.3417.1.1.29:
+      category: Web Caching
+      model: SG9000
+    1.3.6.1.4.1.3417.1.1.30:
+      category: Web Caching
+      model: SG Virtual Appliance
+    1.3.6.1.4.1.3417.1.1.31:
+      category: Web Caching
+      model: SG600
+    1.3.6.1.4.1.3417.1.1.32:
+      category: Web Caching
+      model: SG300
+    1.3.6.1.4.1.3417.1.1.34:
+      category: Web Caching
+      model: SG900
+    1.3.6.1.4.1.3417.1.1.36:
+      category: Web Caching
+      model: SG S500
+    1.3.6.1.4.1.3417.1.1.37:
+      category: Web Caching
+      model: SG S400
+    1.3.6.1.4.1.3417.1.1.38:
+      category: Web Caching
+      model: SG-S200
+    1.3.6.1.4.1.3417.1.1.44:
+      category: Web Caching
+      model: Secure Web Gateway VA
+    1.3.6.1.4.1.3417.1.2.0:
+      category: Server
+      model: Blue Coat Director
+    1.3.6.1.4.1.3417.1.2.1:
+      category: Web Caching
+      model: SGME710
+    1.3.6.1.4.1.3417.1.2.2:
+      category: Web Caching
+      model: SGME800
+    1.3.6.1.4.1.3417.1.2.3:
+      category: Web Caching
+      model: SGME810
+    1.3.6.1.4.1.3417.1.3.3:
+      category: Web Caching
+      model: AV810
+    1.3.6.1.4.1.3417.1.3.4:
+      category: Web Caching
+      model: AV510
+    1.3.6.1.4.1.3417.1.3.5:
+      category: Web Caching
+      model: AV1400
+    1.3.6.1.4.1.3417.1.3.6:
+      category: Server
+      model: Blue Coat AV2400
+    1.3.6.1.4.1.3417.1.3.7:
+      category: Web Caching
+      model: AV1200
+    1.3.6.1.4.1.3417.1.4.1:
+      category: Firewall
+      model: CAS S400
+    1.3.6.1.4.1.3417.1.4.2:
+      category: Firewall
+      model: CAS-S500-A1
+    1.3.6.1.4.1.3417.1.4.3:
+      category: Firewall
+      model: CAS S200
+    1.3.6.1.4.1.3417.1.5.1:
+      category: Security
+      model: SV800
+    1.3.6.1.4.1.3417.1.5.2:
+      category: Security
+      model: SV1800
+    1.3.6.1.4.1.3417.1.5.3:
+      category: Security
+      model: SV2800
+    1.3.6.1.4.1.3417.1.5.4:
+      category: Security
+      model: SV3800
+    1.3.6.1.4.1.3417.1.6.1:
+      category: Firewall
+      model: ASG S500
+    1.3.6.1.4.1.3417.1.6.2:
+      category: Firewall
+      model: ASG S400
+    1.3.6.1.4.1.3417.1.6.3:
+      category: Firewall
+      model: ASG S200

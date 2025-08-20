@@ -1,0 +1,221 @@
+sysobjectids:
+  oid_overrides:
+    1.3.6.1.4.1.211.1.19.3.1.1:
+      category: Printer
+      model: XL-9320
+    1.3.6.1.4.1.211.1.21.1.60:
+      category: Storage
+      model: ETERNUS DX60
+    1.3.6.1.4.1.211.1.21.1.100:
+      category: Storage
+      model: ETERNUS DX80 S2
+    1.3.6.1.4.1.211.1.29.2:
+      category: Switch
+      model: FMWBR 201
+    1.3.6.1.4.1.211.1.29.3:
+      category: Switch
+      model: FMWT 54AG
+    1.3.6.1.4.1.211.1.29.4:
+      category: Switch
+      model: FMWT 55AG
+    1.3.6.1.4.1.211.1.29.6:
+      category: Switch
+      model: FMWT 56AG
+    1.3.6.1.4.1.211.1.127.1.13.22.118.20:
+      category: Switch
+      model: SR S224PS1
+    1.3.6.1.4.1.211.1.127.1.13.22.118.21:
+      category: Switch
+      model: SR S208PD1
+    1.3.6.1.4.1.211.1.127.1.13.22.118.22:
+      category: Switch
+      model: SR S224CP1
+    1.3.6.1.4.1.211.1.127.1.13.22.118.23:
+      category: Switch
+      model: SR S248TC1
+    1.3.6.1.4.1.211.1.127.1.13.22.118.31:
+      category: Switch
+      model: SR S316C SERIES
+    1.3.6.1.4.1.211.1.127.1.13.22.118.32:
+      category: Switch
+      model: SR S324TC1
+    1.3.6.1.4.1.211.1.127.1.13.22.118.33:
+      category: Switch
+      model: SR S348TC1
+    1.3.6.1.4.1.211.1.127.1.13.22.118.46:
+      category: Switch
+      model: SR S208TC SERIES
+    1.3.6.1.4.1.211.1.127.1.13.22.118.47:
+      category: Switch
+      model: SR S224TC SERIES
+    1.3.6.1.4.1.211.1.127.1.13.22.118.71:
+      category: Switch
+      model: SR S716C SERIES
+    1.3.6.1.4.1.211.1.127.1.13.22.118.72:
+      category: Switch
+      model: SR S724TC1
+    1.3.6.1.4.1.211.1.127.1.13.22.118.73:
+      category: Switch
+      model: SR S748TC1
+    1.3.6.1.4.1.211.1.127.4:
+      category: Switch
+      model: LH F9 SERIES
+    1.3.6.1.4.1.211.1.127.11.0:
+      category: Switch
+      model: SWITCHING HUB SERIES
+    1.3.6.1.4.1.211.1.127.11.1:
+      category: Switch
+      model: SWITCHING HUB SERIES
+    1.3.6.1.4.1.211.1.127.14:
+      model: Remote LinkRelay Series
+    1.3.6.1.4.1.211.1.127.15:
+      model: LinkRelay Series
+    1.3.6.1.4.1.211.1.127.28:
+      category: Switch
+      model: SB 6400
+    1.3.6.1.4.1.211.1.127.31:
+      category: Switch
+      model: SR 5400
+    1.3.6.1.4.1.211.1.127.33:
+      category: Switch
+      model: SR 8800
+    1.3.6.1.4.1.211.1.127.34:
+      category: Switch
+      model: NETVEHICLE L10/S30
+    1.3.6.1.4.1.211.1.127.35:
+      model: LR-X2030
+    1.3.6.1.4.1.211.1.127.36:
+      category: Switch
+      model: LR V1150T V1150D
+    1.3.6.1.4.1.211.1.127.48.36:
+      category: Router
+      model: SI-R G200
+    1.3.6.1.4.1.211.1.127.50:
+      category: Switch
+      model: SI R3400B
+    1.3.6.1.4.1.211.1.127.65.52:
+      category: Switch
+      model: SR X526R1
+    1.3.6.1.4.1.211.1.127.65.53:
+      category: Switch
+      model: SR X316T1
+    1.3.6.1.4.1.211.1.127.65.54:
+      category: Switch
+      model: SR X324T1
+    1.3.6.1.4.1.211.1.127.65.55:
+      category: Switch
+      model: SR X340TR1
+    1.3.6.1.4.1.211.1.127.72.20:
+      category: Switch
+      model: SR M20AP1
+    1.3.6.1.4.1.211.1.127.110.1.1.5:
+      category: Switch
+      model: SH 2500 SERIES
+    1.3.6.1.4.1.211.1.127.110.1.1.22:
+      category: Switch
+      model: SH 1330TF
+    1.3.6.1.4.1.211.1.127.110.1.1.23:
+      category: Switch
+      model: SH 1610F
+    1.3.6.1.4.1.211.1.127.110.1.1.24:
+      category: Switch
+      model: SH 1630
+    1.3.6.1.4.1.211.1.127.110.1.1.25:
+      category: Switch
+      model: SH 1630TF
+    1.3.6.1.4.1.211.1.127.110.11.2.1:
+      model: SH2300
+    1.3.6.1.4.1.211.1.127.111.1:
+      model: SH3300
+    1.3.6.1.4.1.211.1.127.111.9:
+      model: SH3000 Stack
+    1.3.6.1.4.1.211.1.127.114.1.3.35.1:
+      category: Switch
+      model: SH S3540
+    1.3.6.1.4.1.211.1.127.114.1.3.35.2:
+      category: Switch
+      model: SH 3440
+    1.3.6.1.4.1.211.1.127.115.1.1:
+      category: Switch
+      model: SH 1631
+    1.3.6.1.4.1.211.1.127.115.1.2:
+      category: Switch
+      model: SH 1631TF
+    1.3.6.1.4.1.211.1.127.115.1.3:
+      category: Switch
+      model: SH 1740
+    1.3.6.1.4.1.211.1.127.116.1:
+      category: Switch
+      model: LH1208VCA
+    1.3.6.1.4.1.211.1.127.116.2:
+      category: Switch
+      model: LH1216VCA
+    1.3.6.1.4.1.211.1.127.118.10.1:
+      category: Switch
+      model: SH 1816
+    1.3.6.1.4.1.211.1.127.118.11.1:
+      category: Switch
+      model: SH 1824
+    1.3.6.1.4.1.211.1.127.118.13.1:
+      category: Switch
+      model: SH 1816TF
+    1.3.6.1.4.1.211.1.127.118.14:
+      category: Switch
+      model: SH 1816A
+    1.3.6.1.4.1.211.1.127.118.15:
+      category: Switch
+      model: SH 1824A
+    1.3.6.1.4.1.211.1.127.118.16:
+      category: Switch
+      model: SH 1816B
+    1.3.6.1.4.1.211.1.127.118.17:
+      category: Switch
+      model: SH 1824B
+    1.3.6.1.4.1.211.1.127.118.40:
+      category: Switch
+      model: SH 4124
+    1.3.6.1.4.1.211.1.127.118.41:
+      category: Switch
+      model: SH 4124T
+    1.3.6.1.4.1.211.1.127.118.42:
+      category: Switch
+      model: SH 5124T
+    1.3.6.1.4.1.211.1.127.118.42.10.43.1:
+      category: Switch
+      model: SH 4322G
+    1.3.6.1.4.1.211.1.127.118.43:
+      category: Switch
+      model: SH 4124S
+    1.3.6.1.4.1.211.4.1.3.50.1:
+      category: Server
+      model: IPCOM S2000 S2200
+    1.3.6.1.4.1.211.4.1.3.50.3:
+      category: Server
+      model: IPCOM S1000 S1200 S1400
+    1.3.6.1.4.1.211.4.1.3.50.4:
+      category: Server
+      model: IPCOM S2400
+    1.3.6.1.4.1.211.4.1.3.50.5:
+      category: Server
+      model: IPCOM L1410 STEP2
+    1.3.6.1.4.1.211.4.1.3.50.6:
+      category: Server
+      model: IPCOM L1420 STEP2
+    1.3.6.1.4.1.211.4.1.3.50.8:
+      category: Server
+      model: IPCOM EX1200
+    1.3.6.1.4.1.211.4.1.3.50.9:
+      category: Server
+      model: IPCOM EX2000
+    1.3.6.1.4.1.211.4.1.3.50.10:
+      category: Server
+      model: IPCOM EX2000D
+    1.3.6.1.4.1.211.4.1.3.50.11:
+      category: Server
+      model: IPCOM EX2200
+    1.3.6.1.4.1.211.4.1.3.50.12:
+      category: Server
+      model: IPCOM EX2200D
+    1.3.6.1.4.1.211.4.1.3.50.15:
+      category: Server
+      model: IPCOM EX1100

@@ -1,0 +1,179 @@
+sysobjectids:
+  oid_overrides:
+    1.3.6.1.4.1.2385.3.1.1.1.12:
+      category: Printer
+      model: AR-505/S505
+    1.3.6.1.4.1.2385.3.1.3.1.1:
+      category: Printer
+      model: AR-M350
+    1.3.6.1.4.1.2385.3.1.4.1.5:
+      category: Printer
+      model: AR-275
+    1.3.6.1.4.1.2385.3.1.11.1.8:
+      category: Printer
+      model: AR-M550N
+    1.3.6.1.4.1.2385.3.1.26.1.11:
+      category: Printer
+      model: AR-M351U
+    1.3.6.1.4.1.2385.3.1.26.1.16:
+      category: Printer
+      model: AR-M455N
+    1.3.6.1.4.1.2385.3.1.29.1.2:
+      category: Printer
+      model: Imagistics 4511
+    1.3.6.1.4.1.2385.3.1.32.1.5:
+      category: Printer
+      model: MX-2300N
+    1.3.6.1.4.1.2385.3.1.33.1.4:
+      category: Printer
+      model: MX-3501N
+    1.3.6.1.4.1.2385.3.1.33.1.8:
+      category: Printer
+      model: MX-4501N
+    1.3.6.1.4.1.2385.3.1.52.1.6:
+      category: Printer
+      model: MX-M450N
+    1.3.6.1.4.1.2385.3.1.63.1.5:
+      category: Printer
+      model: MX-2600N
+    1.3.6.1.4.1.2385.3.1.63.1.6:
+      category: Printer
+      model: MX-3100N
+    1.3.6.1.4.1.2385.3.1.64.1.2:
+      category: Printer
+      model: MX-4100N
+    1.3.6.1.4.1.2385.3.1.64.1.8:
+      category: Printer
+      model: MX-5001N
+    1.3.6.1.4.1.2385.3.1.71.1.1:
+      category: Printer
+      model: MX-M283N
+    1.3.6.1.4.1.2385.3.1.71.1.7:
+      category: Printer
+      model: MX-M453N
+    1.3.6.1.4.1.2385.3.1.71.1.16:
+      category: Printer
+      model: MX-M362N
+    1.3.6.1.4.1.2385.3.1.81.1.1:
+      category: Printer
+      model: MX-M623N
+    1.3.6.1.4.1.2385.3.1.82.1.9:
+      category: Printer
+      model: MX-3128UC
+    1.3.6.1.4.1.2385.3.1.83.1.3:
+      category: Printer
+      model: MX-3110N
+    1.3.6.1.4.1.2385.3.1.83.1.5:
+      category: Printer
+      model: MX-3610N
+    1.3.6.1.4.1.2385.3.1.83.1.8:
+      category: Printer
+      model: MX-3118NC
+    1.3.6.1.4.1.2385.3.1.83.1.9:
+      category: Printer
+      model: MX-3618NC
+    1.3.6.1.4.1.2385.3.1.85.1.9:
+      category: Printer
+      model: MX-4112N
+    1.3.6.1.4.1.2385.3.1.86.1.3:
+      category: Printer
+      model: AR-5623NV
+    1.3.6.1.4.1.2385.3.1.90.1.3:
+      model: MX-7040N
+    1.3.6.1.4.1.2385.3.1.91.1.10:
+      category: Printer
+      model: MX-M2608N
+    1.3.6.1.4.1.2385.3.1.92.1.3:
+      category: Printer
+      model: MX-M1204
+    1.3.6.1.4.1.2385.3.1.94.1.1:
+      category: Printer
+      model: MX-2614N
+    1.3.6.1.4.1.2385.3.1.94.1.7:
+      category: Printer
+      model: MX-2314N
+    1.3.6.1.4.1.2385.3.1.94.1.10:
+      category: Printer
+      model: MX-3114FN
+    1.3.6.1.4.1.2385.3.1.95.1.3:
+      category: Printer
+      model: MX-3140N
+    1.3.6.1.4.1.2385.3.1.95.1.5:
+      model: MX-3640N
+    1.3.6.1.4.1.2385.3.1.95.1.9:
+      category: Printer
+      model: MX-3648NC
+    1.3.6.1.4.1.2385.3.1.98.1.5:
+      model: MX-5140N
+    1.3.6.1.4.1.2385.3.1.98.1.10:
+      category: Printer
+      model: MX-5148NC
+    1.3.6.1.4.1.2385.3.1.99.1.3:
+      model: MX-M465N
+    1.3.6.1.4.1.2385.3.1.99.1.5:
+      category: Printer
+      model: MX-M565N
+    1.3.6.1.4.1.2385.3.1.99.1.9:
+      category: Printer
+      model: MX-M5658N
+    1.3.6.1.4.1.2385.3.1.100.1.3:
+      category: Printer
+      model: MX-M754N
+    1.3.6.1.4.1.2385.3.1.102.1.1:
+      category: Printer
+      model: MX-M364N
+    1.3.6.1.4.1.2385.3.1.102.1.8:
+      category: Printer
+      model: MX-M5608N
+    1.3.6.1.4.1.2385.3.1.107.1.3:
+      model: MX-C301W
+    1.3.6.1.4.1.2385.3.1.112.1.1:
+      category: Printer
+      model: MX-3070N
+    1.3.6.1.4.1.2385.3.1.112.1.22:
+      category: Printer
+      model: MX-4070V
+    1.3.6.1.4.1.2385.3.1.113.1.1:
+      category: Printer
+      model: MX-3050N
+    1.3.6.1.4.1.2385.3.1.114.1.2:
+      category: Printer
+      model: MX-M1205
+    1.3.6.1.4.1.2385.3.1.119.1.2:
+      category: Printer
+      model: MX-7580N
+    1.3.6.1.4.1.2385.3.1.121.1.2:
+      category: Printer
+      model: MX-M3550
+    1.3.6.1.4.1.2385.3.1.123.1.1:
+      model: MX-B350W
+    1.3.6.1.4.1.2385.3.1.126.1.3:
+      category: Printer
+      model: SF-S262NV
+    1.3.6.1.4.1.2385.3.1.133.1.3:
+      category: Printer
+      model: MX-4071
+    1.3.6.1.4.1.2385.3.1.133.1.24:
+      category: Printer
+      model: MX-6071S
+    1.3.6.1.4.1.2385.3.1.134.1.1:
+      category: Printer
+      model: MX-2651
+    1.3.6.1.4.1.2385.3.1.134.1.2:
+      category: Printer
+      model: MX-3051
+    1.3.6.1.4.1.2385.3.1.134.1.3:
+      category: Printer
+      model: MX-3551
+    1.3.6.1.4.1.2385.3.1.141.1.2:
+      category: Printer
+      model: MX-M3051
+    1.3.6.1.4.1.2385.3.1.155.1.6:
+      category: Printer
+      model: BP-50C26
+    1.3.6.1.4.1.2385.3.1.155.1.8:
+      category: Printer
+      model: BP-50C36
+    1.3.6.1.4.1.2385.3.1.158.1.4:
+      category: Printer
+      model: MX-M1206
