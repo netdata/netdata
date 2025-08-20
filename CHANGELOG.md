@@ -6,10 +6,21 @@
 
 **Merged pull requests:**
 
+- Revert "Switch to a Debian 13 base for our Docker images." [\#20842](https://github.com/netdata/netdata/pull/20842) ([stelfrag](https://github.com/stelfrag))
+- improve\(go.d/snmp\): update netgear/dlink category in snmp meta [\#20839](https://github.com/netdata/netdata/pull/20839) ([ilyam8](https://github.com/ilyam8))
+- Improve ACLK message parsing [\#20838](https://github.com/netdata/netdata/pull/20838) ([stelfrag](https://github.com/stelfrag))
+- chore\(go.d/snmp\): load & merge per-vendor SNMP metadata overrides [\#20837](https://github.com/netdata/netdata/pull/20837) ([ilyam8](https://github.com/ilyam8))
+- Use atomics for mqtt statistics [\#20836](https://github.com/netdata/netdata/pull/20836) ([stelfrag](https://github.com/stelfrag))
+- chore\(go.d/snmp\): update category of h3c devices in meta\_overrides.yaml [\#20835](https://github.com/netdata/netdata/pull/20835) ([ilyam8](https://github.com/ilyam8))
+- Mqtt adjust buffer size [\#20834](https://github.com/netdata/netdata/pull/20834) ([stelfrag](https://github.com/stelfrag))
+- chore\(go.d/snmp\): merge sysObjectIDs.json into meta\_overrides.yaml [\#20831](https://github.com/netdata/netdata/pull/20831) ([ilyam8](https://github.com/ilyam8))
+- improve\(go.d/snmp\): add more models to meta\_overrides.yaml [\#20830](https://github.com/netdata/netdata/pull/20830) ([ilyam8](https://github.com/ilyam8))
+- feat\(go.d/snmp\): add YAML overrides for sysobjectids mapping [\#20828](https://github.com/netdata/netdata/pull/20828) ([ilyam8](https://github.com/ilyam8))
 - refactor\(go.d\): move nd directories to dedicated pluginconfig package [\#20827](https://github.com/netdata/netdata/pull/20827) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): bump k8s.io/client-go from 0.33.3 to 0.33.4 in /src/go [\#20826](https://github.com/netdata/netdata/pull/20826) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Add ACLK buffer usage metrics [\#20820](https://github.com/netdata/netdata/pull/20820) ([stelfrag](https://github.com/stelfrag))
 - fix\(go.d/ddsnmp\): correct profile matching, metadata precedence, and OID handling [\#20819](https://github.com/netdata/netdata/pull/20819) ([ilyam8](https://github.com/ilyam8))
+- Switch to a Debian 13 base for our Docker images. [\#20816](https://github.com/netdata/netdata/pull/20816) ([Ferroin](https://github.com/Ferroin))
 - Fix Charts \(windows.plugin\) [\#20815](https://github.com/netdata/netdata/pull/20815) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix\(go.d/ddsnmp\): fix match\_pattern regex behavior in metadata and metric collection [\#20814](https://github.com/netdata/netdata/pull/20814) ([ilyam8](https://github.com/ilyam8))
 - improve\(go.d/snmp\): optimize Check\(\) to avoid heavy collection [\#20813](https://github.com/netdata/netdata/pull/20813) ([ilyam8](https://github.com/ilyam8))
@@ -443,15 +454,6 @@
 - fix\(go.d/snmp\): replace newline control chars with spaces in system info [\#20301](https://github.com/netdata/netdata/pull/20301) ([ilyam8](https://github.com/ilyam8))
 - Updating SOC2 compliance status [\#20300](https://github.com/netdata/netdata/pull/20300) ([shyamvalsan](https://github.com/shyamvalsan))
 - build\(deps\): bump github.com/jackc/pgx/v5 from 5.7.4 to 5.7.5 in /src/go [\#20299](https://github.com/netdata/netdata/pull/20299) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/prometheus/common from 0.63.0 to 0.64.0 in /src/go [\#20296](https://github.com/netdata/netdata/pull/20296) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump k8s.io/client-go from 0.33.0 to 0.33.1 in /src/go [\#20295](https://github.com/netdata/netdata/pull/20295) ([dependabot[bot]](https://github.com/apps/dependabot))
-- fix\(go.d\): sanitize vnode labels before creating vnode [\#20293](https://github.com/netdata/netdata/pull/20293) ([ilyam8](https://github.com/ilyam8))
-- docs: Observability centralization points [\#20292](https://github.com/netdata/netdata/pull/20292) ([kanelatechnical](https://github.com/kanelatechnical))
-- Cisco yaml pass [\#20291](https://github.com/netdata/netdata/pull/20291) ([Ancairon](https://github.com/Ancairon))
-- Minor code adjustments [\#20290](https://github.com/netdata/netdata/pull/20290) ([stelfrag](https://github.com/stelfrag))
-- Fix when docker socket group id points to an existing group in container [\#20288](https://github.com/netdata/netdata/pull/20288) ([felipecrs](https://github.com/felipecrs))
-- Model Context Protocol \(MCP\) Part 2 [\#20287](https://github.com/netdata/netdata/pull/20287) ([ktsaou](https://github.com/ktsaou))
-- add "unix://" scheme to DOCKER\_HOST in run.sh [\#20286](https://github.com/netdata/netdata/pull/20286) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 

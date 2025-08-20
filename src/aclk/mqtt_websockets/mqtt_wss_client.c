@@ -605,7 +605,7 @@ int mqtt_wss_connect(
     lwt.will_qos = (int) (mqtt_params->will_flags & MQTT_WSS_PUB_QOSMASK);
     lwt.will_retain = (int) mqtt_params->will_flags & MQTT_WSS_PUB_RETAIN;
 
-    int ret = mqtt_ng_connect(client->mqtt, &auth, mqtt_params->will_msg ? &lwt : NULL, 1, client->mqtt_keepalive);
+    int ret = mqtt_ng_connect(client->mqtt, &auth, mqtt_params->will_msg ? &lwt : NULL, client->mqtt_keepalive);
     if (ret) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Error generating MQTT connect");
         return 1;

@@ -1,0 +1,338 @@
+sysobjectids:
+  oid_overrides:
+    1.3.6.1.4.1.2620.1.1:
+      category: Firewall
+      model: "1600"
+    1.3.6.1.4.1.2620.1.1.25.3.0:
+      category: Firewall
+      model: CheckPoint
+    1.3.6.1.4.1.2620.1.6.123.1.1:
+      category: Firewall
+      model: UTM 1450
+    1.3.6.1.4.1.2620.1.6.123.1.2:
+      category: Firewall
+      model: UTM 11050
+    1.3.6.1.4.1.2620.1.6.123.1.3:
+      category: Firewall
+      model: UTM 12050
+    1.3.6.1.4.1.2620.1.6.123.1.4:
+      category: Firewall
+      model: UTM 1130
+    1.3.6.1.4.1.2620.1.6.123.1.5:
+      category: Firewall
+      model: UTM 1270
+    1.3.6.1.4.1.2620.1.6.123.1.6:
+      category: Firewall
+      model: UTM 1570
+    1.3.6.1.4.1.2620.1.6.123.1.7:
+      category: Firewall
+      model: UTM 11070
+    1.3.6.1.4.1.2620.1.6.123.1.8:
+      category: Firewall
+      model: UTM 12070
+    1.3.6.1.4.1.2620.1.6.123.1.9:
+      category: Firewall
+      model: UTM-1 3070
+    1.3.6.1.4.1.2620.1.6.123.1.10:
+      category: Firewall
+      model: Power-1 5070
+    1.3.6.1.4.1.2620.1.6.123.1.11:
+      category: Firewall
+      model: FIREWALL
+    1.3.6.1.4.1.2620.1.6.123.1.12:
+      category: Firewall
+      model: POWER 111000
+    1.3.6.1.4.1.2620.1.6.123.1.13:
+      category: Firewall
+      model: Smart-1 5
+    1.3.6.1.4.1.2620.1.6.123.1.14:
+      category: Firewall
+      model: SMART 125
+    1.3.6.1.4.1.2620.1.6.123.1.15:
+      category: Firewall
+      model: Smart-1 50
+    1.3.6.1.4.1.2620.1.6.123.1.16:
+      category: Firewall
+      model: Smart-1 150
+    1.3.6.1.4.1.2620.1.6.123.1.17:
+      category: Firewall
+      model: IP 150
+    1.3.6.1.4.1.2620.1.6.123.1.18:
+      category: Firewall
+      model: IP 280
+    1.3.6.1.4.1.2620.1.6.123.1.19:
+      category: Firewall
+      model: IP 290
+    1.3.6.1.4.1.2620.1.6.123.1.20:
+      category: Firewall
+      model: IP 390
+    1.3.6.1.4.1.2620.1.6.123.1.21:
+      category: Firewall
+      model: IP 560
+    1.3.6.1.4.1.2620.1.6.123.1.22:
+      category: Firewall
+      model: IP 690
+    1.3.6.1.4.1.2620.1.6.123.1.23:
+      category: Firewall
+      model: IP 1280
+    1.3.6.1.4.1.2620.1.6.123.1.24:
+      category: Firewall
+      model: IP 2450
+    1.3.6.1.4.1.2620.1.6.123.1.25:
+      category: Firewall
+      model: UNIVERGEUNIFIEDWALL 1000
+    1.3.6.1.4.1.2620.1.6.123.1.26:
+      category: Firewall
+      model: UNIVERGEUNIFIEDWALL 2000
+    1.3.6.1.4.1.2620.1.6.123.1.27:
+      category: Firewall
+      model: UNIVERGEUNIFIEDWALL 4000
+    1.3.6.1.4.1.2620.1.6.123.1.28:
+      category: Firewall
+      model: UNIVERGEUNIFIEDWALL 100
+    1.3.6.1.4.1.2620.1.6.123.1.29:
+      category: Firewall
+      model: DLP 19571
+    1.3.6.1.4.1.2620.1.6.123.1.30:
+      category: Firewall
+      model: DLP 12571
+    1.3.6.1.4.1.2620.1.6.123.1.31:
+      category: Firewall
+      model: IPS 12076
+    1.3.6.1.4.1.2620.1.6.123.1.32:
+      category: Firewall
+      model: IPS 15076
+    1.3.6.1.4.1.2620.1.6.123.1.33:
+      category: Firewall
+      model: IPS 19076
+    1.3.6.1.4.1.2620.1.6.123.1.34:
+      category: Firewall
+      model: "2200"
+    1.3.6.1.4.1.2620.1.6.123.1.35:
+      category: Firewall
+      model: "4200"
+    1.3.6.1.4.1.2620.1.6.123.1.36:
+      category: Firewall
+      model: "4400"
+    1.3.6.1.4.1.2620.1.6.123.1.37:
+      category: Firewall
+      model: "4600"
+    1.3.6.1.4.1.2620.1.6.123.1.38:
+      category: Firewall
+      model: "4800"
+    1.3.6.1.4.1.2620.1.6.123.1.39:
+      category: Firewall
+      model: TE 250
+    1.3.6.1.4.1.2620.1.6.123.1.40:
+      category: Firewall
+      model: "12200"
+    1.3.6.1.4.1.2620.1.6.123.1.41:
+      category: Firewall
+      model: "12400"
+    1.3.6.1.4.1.2620.1.6.123.1.42:
+      category: Firewall
+      model: "12600"
+    1.3.6.1.4.1.2620.1.6.123.1.43:
+      category: Firewall
+      model: TE 1000
+    1.3.6.1.4.1.2620.1.6.123.1.44:
+      category: Firewall
+      model: "13500"
+    1.3.6.1.4.1.2620.1.6.123.1.45:
+      category: Firewall
+      model: "21400"
+    1.3.6.1.4.1.2620.1.6.123.1.46:
+      category: Firewall
+      model: "21600"
+    1.3.6.1.4.1.2620.1.6.123.1.47:
+      category: Firewall
+      model: "21700"
+    1.3.6.1.4.1.2620.1.6.123.1.48:
+      category: Management
+      model: Check Point VMware
+    1.3.6.1.4.1.2620.1.6.123.1.49:
+      category: Firewall
+      model: IPS Software Blade
+    1.3.6.1.4.1.2620.1.6.123.1.50:
+      category: Firewall
+      model: SMART 1205
+    1.3.6.1.4.1.2620.1.6.123.1.51:
+      category: Firewall
+      model: CheckPoint SMART-1 5
+    1.3.6.1.4.1.2620.1.6.123.1.52:
+      category: Firewall
+      model: SMART 1225
+    1.3.6.1.4.1.2620.1.6.123.1.53:
+      category: Firewall
+      model: Smart-1 3050
+    1.3.6.1.4.1.2620.1.6.123.1.54:
+      category: Firewall
+      model: Smart-1 3150
+    1.3.6.1.4.1.2620.1.6.123.1.55:
+      category: Firewall
+      model: "13800"
+    1.3.6.1.4.1.2620.1.6.123.1.56:
+      category: Firewall
+      model: "21800"
+    1.3.6.1.4.1.2620.1.6.123.1.57:
+      category: Firewall
+      model: TE 250X
+    1.3.6.1.4.1.2620.1.6.123.1.58:
+      category: Firewall
+      model: TE 1000X
+    1.3.6.1.4.1.2620.1.6.123.1.59:
+      category: Firewall
+      model: TE 2000X
+    1.3.6.1.4.1.2620.1.6.123.1.60:
+      category: Firewall
+      model: TE 100X
+    1.3.6.1.4.1.2620.1.6.123.1.61:
+      category: Firewall
+      model: "23500"
+    1.3.6.1.4.1.2620.1.6.123.1.62:
+      category: Firewall
+      model: "23800"
+    1.3.6.1.4.1.2620.1.6.123.1.63:
+      category: Firewall
+      model: "15400"
+    1.3.6.1.4.1.2620.1.6.123.1.64:
+      category: Firewall
+      model: "15600"
+    1.3.6.1.4.1.2620.1.6.123.1.65:
+      category: Firewall
+      model: "3200"
+    1.3.6.1.4.1.2620.1.6.123.1.66:
+      category: Firewall
+      model: "5200"
+    1.3.6.1.4.1.2620.1.6.123.1.67:
+      category: Firewall
+      model: "5400"
+    1.3.6.1.4.1.2620.1.6.123.1.68:
+      category: Firewall
+      model: "5600"
+    1.3.6.1.4.1.2620.1.6.123.1.69:
+      category: Firewall
+      model: "5800"
+    1.3.6.1.4.1.2620.1.6.123.1.70:
+      category: Firewall
+      model: "5900"
+    1.3.6.1.4.1.2620.1.6.123.1.71:
+      category: Firewall
+      model: "3100"
+    1.3.6.1.4.1.2620.1.6.123.1.72:
+      category: Firewall
+      model: "5100"
+    1.3.6.1.4.1.2620.1.6.123.1.73:
+      category: Firewall
+      model: Smart-1 1405
+    1.3.6.1.4.1.2620.1.6.123.1.74:
+      category: Firewall
+      model: Smart-1 410
+    1.3.6.1.4.1.2620.1.6.123.1.75:
+      category: Firewall
+      model: Smart-1 5050
+    1.3.6.1.4.1.2620.1.6.123.1.76:
+      category: Firewall
+      model: SMART 525
+    1.3.6.1.4.1.2620.1.6.123.1.77:
+      category: Firewall
+      model: Smart-1 5150
+    1.3.6.1.4.1.2620.1.6.123.1.78:
+      category: Firewall
+      model: "23900"
+    1.3.6.1.4.1.2620.1.6.123.1.79:
+      category: Firewall
+      model: "6500"
+    1.3.6.1.4.1.2620.1.6.123.1.80:
+      category: Firewall
+      model: "6800"
+    1.3.6.1.4.1.2620.1.6.123.1.81:
+      category: Firewall
+      model: "61000"
+    1.3.6.1.4.1.2620.1.6.123.1.82:
+      category: Firewall
+      model: "26000"
+    1.3.6.1.4.1.2620.1.6.123.1.83:
+      category: Firewall
+      model: "41000"
+    1.3.6.1.4.1.2620.1.6.123.1.84:
+      category: Firewall
+      model: "44000"
+    1.3.6.1.4.1.2620.1.6.123.1.85:
+      category: Firewall
+      model: 26000T
+    1.3.6.1.4.1.2620.1.6.123.1.86:
+      category: Firewall
+      model: "3600"
+    1.3.6.1.4.1.2620.1.6.123.1.88:
+      category: Firewall
+      model: "6200"
+    1.3.6.1.4.1.2620.1.6.123.1.89:
+      category: Firewall
+      model: 6200P
+    1.3.6.1.4.1.2620.1.6.123.1.91:
+      category: Firewall
+      model: "9100"
+    1.3.6.1.4.1.2620.1.6.123.1.92:
+      category: Firewall
+      model: "6900"
+    1.3.6.1.4.1.2620.1.6.123.1.93:
+      category: Firewall
+      model: 16600HS
+    1.3.6.1.4.1.2620.1.6.123.1.94:
+      category: Firewall
+      model: 28600HS
+    1.3.6.1.4.1.2620.1.6.123.1.95:
+      category: Firewall
+      model: "6700"
+    1.3.6.1.4.1.2620.1.6.123.1.96:
+      category: Firewall
+      model: "7000"
+    1.3.6.1.4.1.2620.1.6.123.1.97:
+      category: Firewall
+      model: "16200"
+    1.3.6.1.4.1.2620.1.6.123.1.98:
+      category: Firewall
+      model: "28000"
+    1.3.6.1.4.1.2620.1.6.123.1.99:
+      category: Firewall
+      model: "6400"
+    1.3.6.1.4.1.2620.1.6.123.1.100:
+      category: Firewall
+      model: "3800"
+    1.3.6.1.4.1.2620.1.6.123.1.101:
+      category: Firewall
+      model: Smart-1 6000-L
+    1.3.6.1.4.1.2620.1.6.123.1.102:
+      category: Firewall
+      model: 6000-XL
+    1.3.6.1.4.1.2620.1.6.123.1.103:
+      category: Firewall
+      model: Smart-1 600-S
+    1.3.6.1.4.1.2620.1.6.123.1.104:
+      category: Firewall
+      model: Smart-1 600-M
+    1.3.6.1.4.1.2620.1.6.123.1.126:
+      category: Firewall
+      model: "19200"
+    1.3.6.1.4.1.2620.1.6.123.1.131:
+      category: Firewall
+      model: "9200"
+    1.3.6.1.4.1.2620.1.6.123.1.133:
+      category: Firewall
+      model: "9400"
+    1.3.6.1.4.1.2620.1.6.123.1.134:
+      category: Firewall
+      model: "9700"
+    1.3.6.1.4.1.2620.1.6.123.1.2004:
+      category: Firewall
+      model: Quantum Spark 1590 Appliance
+    1.3.6.1.4.1.2620.1.6.123.1.4000:
+      category: Gateway
+      model: Maestro Hyperscale Orchestrator 140
+    1.3.6.1.4.1.2620.1.6.123.1.4002:
+      category: Management
+      model: Maestro Hyperscale Orchestrator 175
+    1.3.6.1.4.1.2620.1.48:
+      category: Firewall
+      model: CheckPoint 40000

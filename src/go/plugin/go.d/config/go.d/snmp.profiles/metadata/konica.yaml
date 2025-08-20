@@ -1,0 +1,1065 @@
+sysobjectids:
+  oid_overrides:
+    1.3.6.1.4.1.18334.1.1.1.1.1.15.1.1:
+      category: Printer
+      model: Bizhub C20P
+    1.3.6.1.4.1.18334.1.1.1.1.1.16.1.1:
+      category: Printer
+      model: Pagepro 5650
+    1.3.6.1.4.1.18334.1.1.1.1.1.17.1.1:
+      category: Printer
+      model: Bizhub 40P
+    1.3.6.1.4.1.18334.1.1.1.1.1.22.1.1:
+      category: Printer
+      model: Magicolor 1650
+    1.3.6.1.4.1.18334.1.1.1.1.1.23.1.1:
+      category: Printer
+      model: Magicolor 1690MF
+    1.3.6.1.4.1.18334.1.1.1.1.1.26.1.1:
+      category: Printer
+      model: Bizhub C35P
+    1.3.6.1.4.1.18334.1.1.1.1.1.28.1.1:
+      category: Printer
+      model: Bizhub 3300P
+    1.3.6.1.4.1.18334.1.1.1.1.1.28.1.2:
+      category: Printer
+      model: bizhub 3301P
+    1.3.6.1.4.1.18334.1.1.1.1.1.29.1.1:
+      category: Printer
+      model: Bizhub 4000P
+    1.3.6.1.4.1.18334.1.1.1.1.1.30.1.1:
+      category: Printer
+      model: Bizhub 4700P
+    1.3.6.1.4.1.18334.1.1.1.1.1.31.1.2:
+      category: Printer
+      model: Bizhub C3100P
+    1.3.6.1.4.1.18334.1.1.1.1.1.32.1.1:
+      category: Printer
+      model: bizhub 4702P
+    1.3.6.1.4.1.18334.1.1.1.1.1.34.1.1:
+      category: Printer
+      model: bizhub 3602P
+    1.3.6.1.4.1.18334.1.1.1.1.1.10007.1.1:
+      category: Printer
+      model: bizhub 4000i
+    1.3.6.1.4.1.18334.1.1.1.2.1.5.3.1:
+      category: Printer
+      model: Minolta Printer
+    1.3.6.1.4.1.18334.1.1.1.2.1.6.1.2:
+      category: Printer
+      model: "350"
+    1.3.6.1.4.1.18334.1.1.1.2.1.6.2.2:
+      category: Printer
+      model: "350"
+    1.3.6.1.4.1.18334.1.1.1.2.1.7.1.2:
+      category: Printer
+      model: "250"
+    1.3.6.1.4.1.18334.1.1.1.2.1.7.2.2:
+      category: Printer
+      model: "250"
+    1.3.6.1.4.1.18334.1.1.1.2.1.8.1.2:
+      category: Printer
+      model: "200"
+    1.3.6.1.4.1.18334.1.1.1.2.1.16.2.1:
+      category: Printer
+      model: Bizhub PRO 1050
+    1.3.6.1.4.1.18334.1.1.1.2.1.25.2.2:
+      category: Printer
+      model: Bizhub C550
+    1.3.6.1.4.1.18334.1.1.1.2.1.25.2.3:
+      category: Printer
+      model: Bizhub C550
+    1.3.6.1.4.1.18334.1.1.1.2.1.25.3.3:
+      category: Printer
+      model: Bizhub C550
+    1.3.6.1.4.1.18334.1.1.1.2.1.26.2.1:
+      category: Printer
+      model: Bizhub C252
+    1.3.6.1.4.1.18334.1.1.1.2.1.27.2.3:
+      category: Printer
+      model: Bizhub C650
+    1.3.6.1.4.1.18334.1.1.1.2.1.28.2.3:
+      category: Printer
+      model: Bizhub C451
+    1.3.6.1.4.1.18334.1.1.1.2.1.28.3.3:
+      category: Printer
+      model: Bizhub C451
+    1.3.6.1.4.1.18334.1.1.1.2.1.29.2.2:
+      category: Printer
+      model: Bizhub C353
+    1.3.6.1.4.1.18334.1.1.1.2.1.29.3.1:
+      category: Printer
+      model: Minolta Bizhub Series
+    1.3.6.1.4.1.18334.1.1.1.2.1.29.3.2:
+      category: Printer
+      model: Bizhub C353
+    1.3.6.1.4.1.18334.1.1.1.2.1.29.6.2:
+      category: Printer
+      model: Bizhub C353P
+    1.3.6.1.4.1.18334.1.1.1.2.1.30.2.2:
+      category: Printer
+      model: Bizhub C253
+    1.3.6.1.4.1.18334.1.1.1.2.1.30.3.2:
+      category: Printer
+      model: Bizhub C253
+    1.3.6.1.4.1.18334.1.1.1.2.1.33.3.1:
+      category: Printer
+      model: Bizhub C200
+    1.3.6.1.4.1.18334.1.1.1.2.1.35.2.2:
+      category: Printer
+      model: Bizhub PRO 1051
+    1.3.6.1.4.1.18334.1.1.1.2.1.38.2.1:
+      category: Printer
+      model: Bizhub 601
+    1.3.6.1.4.1.18334.1.1.1.2.1.38.4.1:
+      category: Printer
+      model: Bizhub 601
+    1.3.6.1.4.1.18334.1.1.1.2.1.38.4.2:
+      category: Printer
+      model: Bizhub 601
+    1.3.6.1.4.1.18334.1.1.1.2.1.39.2.2:
+      category: Printer
+      model: Bizhub 501
+    1.3.6.1.4.1.18334.1.1.1.2.1.39.4.2:
+      category: Printer
+      model: Bizhub 501
+    1.3.6.1.4.1.18334.1.1.1.2.1.40.2.2:
+      category: Printer
+      model: Bizhub 421
+    1.3.6.1.4.1.18334.1.1.1.2.1.40.4.1:
+      model: bizhub 421
+    1.3.6.1.4.1.18334.1.1.1.2.1.41.2.2:
+      category: Printer
+      model: Bizhub 361
+    1.3.6.1.4.1.18334.1.1.1.2.1.41.3.2:
+      category: Printer
+      model: Bizhub 361
+    1.3.6.1.4.1.18334.1.1.1.2.1.41.4.2:
+      category: Printer
+      model: Bizhub 361
+    1.3.6.1.4.1.18334.1.1.1.2.1.43.3.1:
+      category: Printer
+      model: Bizhub C20
+    1.3.6.1.4.1.18334.1.1.1.2.1.44.3.3:
+      category: Printer
+      model: Bizhub C652
+    1.3.6.1.4.1.18334.1.1.1.2.1.45.2.1:
+      category: Printer
+      model: Bizhub C552
+    1.3.6.1.4.1.18334.1.1.1.2.1.45.3.2:
+      category: Printer
+      model: Bizhub C552
+    1.3.6.1.4.1.18334.1.1.1.2.1.45.3.3:
+      category: Printer
+      model: Bizhub C552
+    1.3.6.1.4.1.18334.1.1.1.2.1.48.2.1:
+      category: Printer
+      model: Bizhub C452
+    1.3.6.1.4.1.18334.1.1.1.2.1.48.2.2:
+      category: Printer
+      model: Bizhub C452
+    1.3.6.1.4.1.18334.1.1.1.2.1.48.3.2:
+      category: Printer
+      model: Bizhub C452
+    1.3.6.1.4.1.18334.1.1.1.2.1.49.2.2:
+      category: Printer
+      model: Bizhub C360
+    1.3.6.1.4.1.18334.1.1.1.2.1.49.3.1:
+      category: Printer
+      model: Bizhub C360
+    1.3.6.1.4.1.18334.1.1.1.2.1.49.3.2:
+      category: Printer
+      model: Bizhub C360
+    1.3.6.1.4.1.18334.1.1.1.2.1.50.2.1:
+      category: Printer
+      model: Bizhub C280
+    1.3.6.1.4.1.18334.1.1.1.2.1.50.2.2:
+      category: Printer
+      model: Bizhub C280
+    1.3.6.1.4.1.18334.1.1.1.2.1.50.3.2:
+      category: Printer
+      model: Bizhub C280
+    1.3.6.1.4.1.18334.1.1.1.2.1.51.2.1:
+      category: Printer
+      model: Bizhub C652DS
+    1.3.6.1.4.1.18334.1.1.1.2.1.52.3.1:
+      category: Printer
+      model: Bizhub C552DS
+    1.3.6.1.4.1.18334.1.1.1.2.1.53.2.1:
+      category: Printer
+      model: Bizhub PRO 950
+    1.3.6.1.4.1.18334.1.1.1.2.1.53.2.2:
+      category: Printer
+      model: Bizhub PRO 950
+    1.3.6.1.4.1.18334.1.1.1.2.1.54.1.1:
+      category: Printer
+      model: B362
+    1.3.6.1.4.1.18334.1.1.1.2.1.54.2.1:
+      category: Printer
+      model: "362"
+    1.3.6.1.4.1.18334.1.1.1.2.1.55.1.1:
+      model: "282"
+    1.3.6.1.4.1.18334.1.1.1.2.1.56.1.1:
+      category: Printer
+      model: "222"
+    1.3.6.1.4.1.18334.1.1.1.2.1.56.2.1:
+      model: "222"
+    1.3.6.1.4.1.18334.1.1.1.2.1.57.2.2:
+      category: Printer
+      model: Bizhub C220
+    1.3.6.1.4.1.18334.1.1.1.2.1.57.3.1:
+      category: Printer
+      model: Bizhub C220
+    1.3.6.1.4.1.18334.1.1.1.2.1.57.3.2:
+      category: Printer
+      model: Bizhub C220
+    1.3.6.1.4.1.18334.1.1.1.2.1.58.2.2:
+      category: Printer
+      model: Bizhub C35
+    1.3.6.1.4.1.18334.1.1.1.2.1.63.2.1:
+      category: Printer
+      model: Bizhub 423
+    1.3.6.1.4.1.18334.1.1.1.2.1.63.3.1:
+      category: Printer
+      model: Bizhub 423
+    1.3.6.1.4.1.18334.1.1.1.2.1.64.2.1:
+      category: Printer
+      model: Bizhub 363
+    1.3.6.1.4.1.18334.1.1.1.2.1.64.3.1:
+      category: Printer
+      model: Bizhub 363
+    1.3.6.1.4.1.18334.1.1.1.2.1.65.2.1:
+      category: Printer
+      model: Bizhub 283
+    1.3.6.1.4.1.18334.1.1.1.2.1.65.3.1:
+      category: Printer
+      model: Bizhub 283 laser MFP
+    1.3.6.1.4.1.18334.1.1.1.2.1.66.2.1:
+      category: Printer
+      model: Bizhub 223
+    1.3.6.1.4.1.18334.1.1.1.2.1.70.3.1:
+      category: Printer
+      model: Bizhub 652
+    1.3.6.1.4.1.18334.1.1.1.2.1.72.3.1:
+      category: Printer
+      model: Bizhub 552
+    1.3.6.1.4.1.18334.1.1.1.2.1.78.1.1:
+      category: Printer
+      model: Bizhub C25
+    1.3.6.1.4.1.18334.1.1.1.2.1.79.2.1:
+      category: Printer
+      model: Bizhub C754
+    1.3.6.1.4.1.18334.1.1.1.2.1.79.2.3:
+      category: Printer
+      model: Bizhub C754e
+    1.3.6.1.4.1.18334.1.1.1.2.1.79.2.5:
+      category: Printer
+      model: Bizhub C754e
+    1.3.6.1.4.1.18334.1.1.1.2.1.79.2.6:
+      category: Printer
+      model: bizhub C754e
+    1.3.6.1.4.1.18334.1.1.1.2.1.80.2.3:
+      category: Printer
+      model: Bizhub C654e
+    1.3.6.1.4.1.18334.1.1.1.2.1.80.2.6:
+      category: Printer
+      model: bizhub C654e
+    1.3.6.1.4.1.18334.1.1.1.2.1.80.3.6:
+      model: bizhub C654e
+    1.3.6.1.4.1.18334.1.1.1.2.1.81.3.1:
+      category: Printer
+      model: bizhub C554
+    1.3.6.1.4.1.18334.1.1.1.2.1.82.2.1:
+      category: Printer
+      model: Bizhub C284e
+    1.3.6.1.4.1.18334.1.1.1.2.1.82.3.1:
+      category: Printer
+      model: Bizhub C454
+    1.3.6.1.4.1.18334.1.1.1.2.1.83.2.1:
+      category: Printer
+      model: Bizhub C364
+    1.3.6.1.4.1.18334.1.1.1.2.1.83.3.1:
+      category: Printer
+      model: Bizhub C364
+    1.3.6.1.4.1.18334.1.1.1.2.1.84.2.1:
+      model: bizhub C284
+    1.3.6.1.4.1.18334.1.1.1.2.1.84.3.1:
+      category: Printer
+      model: Bizhub C284
+    1.3.6.1.4.1.18334.1.1.1.2.1.85.2.1:
+      category: Printer
+      model: Bizhub C224
+    1.3.6.1.4.1.18334.1.1.1.2.1.85.3.1:
+      category: Printer
+      model: bizhub C224
+    1.3.6.1.4.1.18334.1.1.1.2.1.86.2.1:
+      category: Printer
+      model: Bizhub 42
+    1.3.6.1.4.1.18334.1.1.1.2.1.87.2.1:
+      category: Printer
+      model: Bizhub 36
+    1.3.6.1.4.1.18334.1.1.1.2.1.88.3.3:
+      category: Printer
+      model: bizhub PRESS 1250P
+    1.3.6.1.4.1.18334.1.1.1.2.1.90.2.2:
+      category: Printer
+      model: Bizhub PRO 951
+    1.3.6.1.4.1.18334.1.1.1.2.1.91.1.1:
+      category: Printer
+      model: bizhub 215
+    1.3.6.1.4.1.18334.1.1.1.2.1.94.4.1:
+      category: Printer
+      model: Bizhub PRESS C1070
+    1.3.6.1.4.1.18334.1.1.1.2.1.101.2.1:
+      category: Printer
+      model: Bizhub 754
+    1.3.6.1.4.1.18334.1.1.1.2.1.101.3.2:
+      category: Printer
+      model: bizhub 754e
+    1.3.6.1.4.1.18334.1.1.1.2.1.102.2.2:
+      category: Printer
+      model: Bizhub 654e
+    1.3.6.1.4.1.18334.1.1.1.2.1.102.2.3:
+      category: Printer
+      model: bizhub 654e
+    1.3.6.1.4.1.18334.1.1.1.2.1.102.3.5:
+      category: Printer
+      model: bizhub 654e
+    1.3.6.1.4.1.18334.1.1.1.2.1.103.2.1:
+      model: bizhub C554
+    1.3.6.1.4.1.18334.1.1.1.2.1.103.2.3:
+      category: Printer
+      model: Bizhub C554e
+    1.3.6.1.4.1.18334.1.1.1.2.1.103.2.5:
+      category: Printer
+      model: bizhub 554e
+    1.3.6.1.4.1.18334.1.1.1.2.1.103.3.2:
+      category: Printer
+      model: Bizhub C554e
+    1.3.6.1.4.1.18334.1.1.1.2.1.103.3.3:
+      category: Printer
+      model: Bizhub C554e
+    1.3.6.1.4.1.18334.1.1.1.2.1.103.3.5:
+      category: Printer
+      model: Bizhub C554e
+    1.3.6.1.4.1.18334.1.1.1.2.1.104.2.1:
+      model: bizhub C454E
+    1.3.6.1.4.1.18334.1.1.1.2.1.104.2.2:
+      category: Printer
+      model: Bizhub C454e
+    1.3.6.1.4.1.18334.1.1.1.2.1.104.2.3:
+      category: Printer
+      model: Bizhub C454e
+    1.3.6.1.4.1.18334.1.1.1.2.1.104.2.5:
+      category: Printer
+      model: Bizhub C454e
+    1.3.6.1.4.1.18334.1.1.1.2.1.104.3.2:
+      model: bizhub C454e
+    1.3.6.1.4.1.18334.1.1.1.2.1.104.3.3:
+      category: Printer
+      model: Bizhub C454e
+    1.3.6.1.4.1.18334.1.1.1.2.1.104.3.5:
+      category: Printer
+      model: Bizhub C454e
+    1.3.6.1.4.1.18334.1.1.1.2.1.105.2.2:
+      category: Printer
+      model: Bizhub C364e
+    1.3.6.1.4.1.18334.1.1.1.2.1.105.2.5:
+      category: Printer
+      model: bizhub C364e
+    1.3.6.1.4.1.18334.1.1.1.2.1.105.3.2:
+      category: Printer
+      model: Bizhub C364e
+    1.3.6.1.4.1.18334.1.1.1.2.1.105.3.3:
+      category: Printer
+      model: Bizhub C364e
+    1.3.6.1.4.1.18334.1.1.1.2.1.105.3.4:
+      category: Printer
+      model: Bizhub C364e
+    1.3.6.1.4.1.18334.1.1.1.2.1.105.3.5:
+      category: Printer
+      model: Bizhub C364e
+    1.3.6.1.4.1.18334.1.1.1.2.1.106.2.1:
+      category: Printer
+      model: bizhub C284e
+    1.3.6.1.4.1.18334.1.1.1.2.1.106.2.2:
+      category: Printer
+      model: Bizhub C284e
+    1.3.6.1.4.1.18334.1.1.1.2.1.106.3.2:
+      category: Printer
+      model: Bizhub C284e
+    1.3.6.1.4.1.18334.1.1.1.2.1.106.3.5:
+      category: Printer
+      model: bizhub C284e
+    1.3.6.1.4.1.18334.1.1.1.2.1.107.2.1:
+      model: bizhub C224
+    1.3.6.1.4.1.18334.1.1.1.2.1.107.2.2:
+      category: Printer
+      model: Bizhub C224e
+    1.3.6.1.4.1.18334.1.1.1.2.1.107.2.5:
+      category: Printer
+      model: bizhub C224e
+    1.3.6.1.4.1.18334.1.1.1.2.1.107.3.1:
+      model: bizhub C224
+    1.3.6.1.4.1.18334.1.1.1.2.1.107.3.3:
+      category: Printer
+      model: bizhub C224e
+    1.3.6.1.4.1.18334.1.1.1.2.1.107.3.5:
+      category: Printer
+      model: bizhub C224e
+    1.3.6.1.4.1.18334.1.1.1.2.1.108.2.1:
+      category: Printer
+      model: Bizhub 554e
+    1.3.6.1.4.1.18334.1.1.1.2.1.108.2.4:
+      category: Printer
+      model: bizhub 554e
+    1.3.6.1.4.1.18334.1.1.1.2.1.109.2.2:
+      category: Printer
+      model: bizhub 454e
+    1.3.6.1.4.1.18334.1.1.1.2.1.109.2.4:
+      category: Printer
+      model: Bizhub 454e
+    1.3.6.1.4.1.18334.1.1.1.2.1.109.3.3:
+      category: Printer
+      model: Bizhub 454e
+    1.3.6.1.4.1.18334.1.1.1.2.1.109.3.4:
+      category: Printer
+      model: Bizhub 454e
+    1.3.6.1.4.1.18334.1.1.1.2.1.110.2.2:
+      category: Printer
+      model: Bizhub 364e
+    1.3.6.1.4.1.18334.1.1.1.2.1.110.3.2:
+      category: Printer
+      model: Bizhub 364e
+    1.3.6.1.4.1.18334.1.1.1.2.1.110.3.3:
+      category: Printer
+      model: Bizhub 364e
+    1.3.6.1.4.1.18334.1.1.1.2.1.111.2.4:
+      category: Printer
+      model: bizhub 284e
+    1.3.6.1.4.1.18334.1.1.1.2.1.112.2.4:
+      category: Printer
+      model: bizhub 224e
+    1.3.6.1.4.1.18334.1.1.1.2.1.112.3.2:
+      model: bizhub 224e
+    1.3.6.1.4.1.18334.1.1.1.2.1.113.2.1:
+      category: Printer
+      model: Bizhub C3850
+    1.3.6.1.4.1.18334.1.1.1.2.1.113.2.2:
+      category: Printer
+      model: Bizhub C3850
+    1.3.6.1.4.1.18334.1.1.1.2.1.113.2.3:
+      category: Printer
+      model: Bizhub C3850
+    1.3.6.1.4.1.18334.1.1.1.2.1.113.2.4:
+      category: Printer
+      model: Bizhub C3850
+    1.3.6.1.4.1.18334.1.1.1.2.1.113.2.5:
+      category: Printer
+      model: Bizhub C3850
+    1.3.6.1.4.1.18334.1.1.1.2.1.114.2.4:
+      category: Printer
+      model: Bizhub C3350
+    1.3.6.1.4.1.18334.1.1.1.2.1.114.2.5:
+      category: Printer
+      model: Bizhub C3350
+    1.3.6.1.4.1.18334.1.1.1.2.1.115.2.1:
+      category: Printer
+      model: Bizhub 4750
+    1.3.6.1.4.1.18334.1.1.1.2.1.115.2.4:
+      category: Printer
+      model: Bizhub 4750
+    1.3.6.1.4.1.18334.1.1.1.2.1.116.2.4:
+      category: Printer
+      model: Bizhub 4050
+    1.3.6.1.4.1.18334.1.1.1.2.1.117.2.2:
+      category: Printer
+      model: Bizhub C3110
+    1.3.6.1.4.1.18334.1.1.1.2.1.122.2.1:
+      category: Printer
+      model: bizhub C3351
+    1.3.6.1.4.1.18334.1.1.1.2.1.122.2.6:
+      category: Printer
+      model: bizhub 367
+    1.3.6.1.4.1.18334.1.1.1.2.1.122.2.11:
+      category: Printer
+      model: bizhub 367
+    1.3.6.1.4.1.18334.1.1.1.2.1.122.3.2:
+      category: Printer
+      model: bizhub 367
+    1.3.6.1.4.1.18334.1.1.1.2.1.122.3.11:
+      category: Printer
+      model: bizhub 367
+    1.3.6.1.4.1.18334.1.1.1.2.1.123.2.1:
+      category: Printer
+      model: bizhub 287
+    1.3.6.1.4.1.18334.1.1.1.2.1.123.2.4:
+      category: Printer
+      model: bizhub 287
+    1.3.6.1.4.1.18334.1.1.1.2.1.123.2.11:
+      category: Printer
+      model: bizhub 287
+    1.3.6.1.4.1.18334.1.1.1.2.1.123.3.5:
+      category: Printer
+      model: bizhub 287
+    1.3.6.1.4.1.18334.1.1.1.2.1.123.3.10:
+      category: Printer
+      model: bizhub 287
+    1.3.6.1.4.1.18334.1.1.1.2.1.123.3.11:
+      category: Printer
+      model: bizhub 287
+    1.3.6.1.4.1.18334.1.1.1.2.1.124.2.1:
+      category: Printer
+      model: bizhub 227
+    1.3.6.1.4.1.18334.1.1.1.2.1.124.2.10:
+      category: Printer
+      model: bizhub 227
+    1.3.6.1.4.1.18334.1.1.1.2.1.124.2.11:
+      category: Printer
+      model: bizhub 227
+    1.3.6.1.4.1.18334.1.1.1.2.1.126.2.5:
+      category: Printer
+      model: Bizhub PRO 1100
+    1.3.6.1.4.1.18334.1.1.1.2.1.126.2.6:
+      category: Printer
+      model: Bizhub PRO 1100
+    1.3.6.1.4.1.18334.1.1.1.2.1.129.2.2:
+      category: Printer
+      model: bizhub C368
+    1.3.6.1.4.1.18334.1.1.1.2.1.129.2.4:
+      category: Printer
+      model: bizhub C368
+    1.3.6.1.4.1.18334.1.1.1.2.1.129.2.5:
+      category: Printer
+      model: bizhub C368
+    1.3.6.1.4.1.18334.1.1.1.2.1.129.2.6:
+      category: Printer
+      model: Bizhub C368
+    1.3.6.1.4.1.18334.1.1.1.2.1.129.2.8:
+      category: Printer
+      model: Bizhub C368
+    1.3.6.1.4.1.18334.1.1.1.2.1.129.2.9:
+      category: Printer
+      model: bizhub C368
+    1.3.6.1.4.1.18334.1.1.1.2.1.129.2.10:
+      category: Printer
+      model: Bizhub C368
+    1.3.6.1.4.1.18334.1.1.1.2.1.129.3.3:
+      category: Printer
+      model: Bizhub C368
+    1.3.6.1.4.1.18334.1.1.1.2.1.129.3.5:
+      category: Printer
+      model: Bizhub C368
+    1.3.6.1.4.1.18334.1.1.1.2.1.129.3.6:
+      category: Printer
+      model: bizhub C368
+    1.3.6.1.4.1.18334.1.1.1.2.1.129.3.7:
+      category: Printer
+      model: Bizhub C368
+    1.3.6.1.4.1.18334.1.1.1.2.1.129.3.8:
+      category: Printer
+      model: Bizhub C368
+    1.3.6.1.4.1.18334.1.1.1.2.1.129.3.9:
+      category: Printer
+      model: Bizhub C368
+    1.3.6.1.4.1.18334.1.1.1.2.1.129.3.10:
+      category: Printer
+      model: Bizhub C368
+    1.3.6.1.4.1.18334.1.1.1.2.1.130.2.1:
+      category: Printer
+      model: Bizhub C308
+    1.3.6.1.4.1.18334.1.1.1.2.1.130.2.2:
+      category: Printer
+      model: bizhub C308
+    1.3.6.1.4.1.18334.1.1.1.2.1.130.2.3:
+      category: Printer
+      model: Bizhub C308
+    1.3.6.1.4.1.18334.1.1.1.2.1.130.2.5:
+      category: Printer
+      model: bizhub C308
+    1.3.6.1.4.1.18334.1.1.1.2.1.130.2.7:
+      category: Printer
+      model: bizhub C308
+    1.3.6.1.4.1.18334.1.1.1.2.1.130.2.8:
+      category: Printer
+      model: bizhub C308
+    1.3.6.1.4.1.18334.1.1.1.2.1.130.2.9:
+      category: Printer
+      model: bizhub C308
+    1.3.6.1.4.1.18334.1.1.1.2.1.130.2.10:
+      category: Printer
+      model: bizhub C308
+    1.3.6.1.4.1.18334.1.1.1.2.1.130.3.9:
+      category: Printer
+      model: bizhub C308
+    1.3.6.1.4.1.18334.1.1.1.2.1.130.3.10:
+      category: Printer
+      model: bizhub C308
+    1.3.6.1.4.1.18334.1.1.1.2.1.131.2.2:
+      category: Printer
+      model: bizhub C258
+    1.3.6.1.4.1.18334.1.1.1.2.1.131.2.3:
+      category: Printer
+      model: bizhub C258
+    1.3.6.1.4.1.18334.1.1.1.2.1.131.2.8:
+      category: Printer
+      model: bizhub C258
+    1.3.6.1.4.1.18334.1.1.1.2.1.131.2.9:
+      category: Printer
+      model: bizhub C258
+    1.3.6.1.4.1.18334.1.1.1.2.1.131.2.10:
+      category: Printer
+      model: bizhub C258
+    1.3.6.1.4.1.18334.1.1.1.2.1.131.3.3:
+      category: Printer
+      model: bizhub C258
+    1.3.6.1.4.1.18334.1.1.1.2.1.131.3.8:
+      category: Printer
+      model: Bizhub C258
+    1.3.6.1.4.1.18334.1.1.1.2.1.131.3.9:
+      category: Printer
+      model: bizhub C258
+    1.3.6.1.4.1.18334.1.1.1.2.1.131.3.10:
+      category: Printer
+      model: bizhub C258
+    1.3.6.1.4.1.18334.1.1.1.2.1.132.2.1:
+      category: Printer
+      model: bizhub C287
+    1.3.6.1.4.1.18334.1.1.1.2.1.132.2.7:
+      category: Printer
+      model: Bizhub C287
+    1.3.6.1.4.1.18334.1.1.1.2.1.132.2.9:
+      category: Printer
+      model: Bizhub C287
+    1.3.6.1.4.1.18334.1.1.1.2.1.133.2.9:
+      category: Printer
+      model: bizhub C227
+    1.3.6.1.4.1.18334.1.1.1.2.1.135.1.1:
+      category: Printer
+      model: bizhub 226
+    1.3.6.1.4.1.18334.1.1.1.2.1.142.2.1:
+      category: Printer
+      model: bizhub C658
+    1.3.6.1.4.1.18334.1.1.1.2.1.142.3.7:
+      category: Printer
+      model: bizhub C658
+    1.3.6.1.4.1.18334.1.1.1.2.1.143.2.5:
+      category: Printer
+      model: Bizhub C558
+    1.3.6.1.4.1.18334.1.1.1.2.1.143.2.6:
+      category: Printer
+      model: bizhub C558
+    1.3.6.1.4.1.18334.1.1.1.2.1.143.3.5:
+      category: Printer
+      model: Bizhub C558
+    1.3.6.1.4.1.18334.1.1.1.2.1.143.3.7:
+      category: Printer
+      model: bizhub C558
+    1.3.6.1.4.1.18334.1.1.1.2.1.144.2.1:
+      model: bizhub C458
+    1.3.6.1.4.1.18334.1.1.1.2.1.144.2.2:
+      category: Printer
+      model: Bizhub C458
+    1.3.6.1.4.1.18334.1.1.1.2.1.144.2.3:
+      category: Printer
+      model: Bizhub C458
+    1.3.6.1.4.1.18334.1.1.1.2.1.144.2.4:
+      category: Printer
+      model: Bizhub C458
+    1.3.6.1.4.1.18334.1.1.1.2.1.144.2.5:
+      category: Printer
+      model: bizhub C458
+    1.3.6.1.4.1.18334.1.1.1.2.1.144.2.6:
+      category: Printer
+      model: bizhub C458
+    1.3.6.1.4.1.18334.1.1.1.2.1.144.2.7:
+      category: Printer
+      model: Bizhub C458
+    1.3.6.1.4.1.18334.1.1.1.2.1.144.3.1:
+      category: Printer
+      model: bizhub C458
+    1.3.6.1.4.1.18334.1.1.1.2.1.144.3.3:
+      category: Printer
+      model: bizhub C458
+    1.3.6.1.4.1.18334.1.1.1.2.1.144.3.7:
+      category: Printer
+      model: bizhub C458
+    1.3.6.1.4.1.18334.1.1.1.2.1.151.2.1:
+      category: Printer
+      model: Bizhub C3351
+    1.3.6.1.4.1.18334.1.1.1.2.1.151.2.2:
+      category: Printer
+      model: Bizhub C3351
+    1.3.6.1.4.1.18334.1.1.1.2.1.151.2.3:
+      category: Printer
+      model: Bizhub C3351
+    1.3.6.1.4.1.18334.1.1.1.2.1.151.2.4:
+      category: Printer
+      model: Bizhub C3351
+    1.3.6.1.4.1.18334.1.1.1.2.1.151.2.5:
+      category: Printer
+      model: Bizhub C3351
+    1.3.6.1.4.1.18334.1.1.1.2.1.151.2.6:
+      category: Printer
+      model: Bizhub C3351
+    1.3.6.1.4.1.18334.1.1.1.2.1.155.2.1:
+      category: Printer
+      model: bizhub C226
+    1.3.6.1.4.1.18334.1.1.1.2.1.158.2.3:
+      category: Printer
+      model: bizhub 558
+    1.3.6.1.4.1.18334.1.1.1.2.1.159.2.2:
+      category: Printer
+      model: Bizhub 458
+    1.3.6.1.4.1.18334.1.1.1.2.1.159.2.3:
+      category: Printer
+      model: bizhub 458
+    1.3.6.1.4.1.18334.1.1.1.2.1.159.3.2:
+      category: Printer
+      model: Bizhub 458
+    1.3.6.1.4.1.18334.1.1.1.2.1.159.3.3:
+      category: Printer
+      model: Bizhub 458
+    1.3.6.1.4.1.18334.1.1.1.2.1.159.3.4:
+      category: Printer
+      model: Bizhub 458
+    1.3.6.1.4.1.18334.1.1.1.2.1.159.3.6:
+      category: Printer
+      model: Bizhub 458
+    1.3.6.1.4.1.18334.1.1.1.2.1.161.2.1:
+      category: Printer
+      model: AccurioPress 6120
+    1.3.6.1.4.1.18334.1.1.1.2.1.162.3.5:
+      category: Printer
+      model: AccurioPress 6136P
+    1.3.6.1.4.1.18334.1.1.1.2.1.166.2.2:
+      category: Printer
+      model: bizhub 558e
+    1.3.6.1.4.1.18334.1.1.1.2.1.166.3.2:
+      category: Printer
+      model: Bizhub 558e
+    1.3.6.1.4.1.18334.1.1.1.2.1.167.2.1:
+      category: Printer
+      model: Bizhub 458e
+    1.3.6.1.4.1.18334.1.1.1.2.1.167.2.2:
+      category: Printer
+      model: bizhub 458e
+    1.3.6.1.4.1.18334.1.1.1.2.1.168.2.1:
+      category: Printer
+      model: bizhub 368e
+    1.3.6.1.4.1.18334.1.1.1.2.1.168.3.1:
+      category: Printer
+      model: Bizhub 368e
+    1.3.6.1.4.1.18334.1.1.1.2.1.168.3.2:
+      category: Printer
+      model: Bizhub 368e
+    1.3.6.1.4.1.18334.1.1.1.2.1.169.2.1:
+      category: Printer
+      model: bizhub 308e
+    1.3.6.1.4.1.18334.1.1.1.2.1.169.2.2:
+      category: Printer
+      model: bizhub C308e
+    1.3.6.1.4.1.18334.1.1.1.2.1.169.3.2:
+      category: Printer
+      model: bizhub 308e
+    1.3.6.1.4.1.18334.1.1.1.2.1.172.2.1:
+      category: Printer
+      model: AccurioPress C3070
+    1.3.6.1.4.1.18334.1.1.1.2.1.173.5.2:
+      category: Printer
+      model: AccurioPrint C3070L
+    1.3.6.1.4.1.18334.1.1.1.2.1.176.2.2:
+      category: Printer
+      model: bizhub C650i
+    1.3.6.1.4.1.18334.1.1.1.2.1.177.2.1:
+      category: Printer
+      model: bizhub C550i
+    1.3.6.1.4.1.18334.1.1.1.2.1.177.3.1:
+      category: Printer
+      model: bizhub C550i
+    1.3.6.1.4.1.18334.1.1.1.2.1.177.3.3:
+      category: Printer
+      model: bizhub C550i
+    1.3.6.1.4.1.18334.1.1.1.2.1.178.2.1:
+      category: Printer
+      model: bizhub C450i
+    1.3.6.1.4.1.18334.1.1.1.2.1.178.2.2:
+      category: Printer
+      model: bizhub C450i
+    1.3.6.1.4.1.18334.1.1.1.2.1.178.2.3:
+      category: Printer
+      model: bizhub C450i
+    1.3.6.1.4.1.18334.1.1.1.2.1.178.3.3:
+      category: Printer
+      model: bizhub C450i
+    1.3.6.1.4.1.18334.1.1.1.2.1.179.2.1:
+      category: Printer
+      model: bizhub C360i
+    1.3.6.1.4.1.18334.1.1.1.2.1.179.2.2:
+      category: Printer
+      model: bizhub C360i
+    1.3.6.1.4.1.18334.1.1.1.2.1.179.2.4:
+      category: Printer
+      model: bizhub C360i
+    1.3.6.1.4.1.18334.1.1.1.2.1.179.3.1:
+      category: Printer
+      model: bizhub C360i
+    1.3.6.1.4.1.18334.1.1.1.2.1.179.3.4:
+      category: Printer
+      model: bizhub C360i
+    1.3.6.1.4.1.18334.1.1.1.2.1.179.3.5:
+      category: Printer
+      model: bizhub C360i
+    1.3.6.1.4.1.18334.1.1.1.2.1.180.2.1:
+      category: Printer
+      model: Bizhub C300i
+    1.3.6.1.4.1.18334.1.1.1.2.1.180.2.2:
+      category: Printer
+      model: bizhub C300i
+    1.3.6.1.4.1.18334.1.1.1.2.1.180.2.4:
+      category: Printer
+      model: bizhub C300i
+    1.3.6.1.4.1.18334.1.1.1.2.1.180.3.1:
+      category: Printer
+      model: bizhub C300i
+    1.3.6.1.4.1.18334.1.1.1.2.1.180.3.4:
+      category: Printer
+      model: bizhub C300i
+    1.3.6.1.4.1.18334.1.1.1.2.1.181.2.1:
+      category: Printer
+      model: bizhub C250i
+    1.3.6.1.4.1.18334.1.1.1.2.1.181.2.2:
+      category: Printer
+      model: bizhub C250i
+    1.3.6.1.4.1.18334.1.1.1.2.1.181.2.4:
+      category: Printer
+      model: bizhub C250i
+    1.3.6.1.4.1.18334.1.1.1.2.1.181.3.1:
+      category: Printer
+      model: bizhub C250i
+    1.3.6.1.4.1.18334.1.1.1.2.1.181.3.2:
+      category: Printer
+      model: bizhub C250i
+    1.3.6.1.4.1.18334.1.1.1.2.1.181.3.4:
+      category: Printer
+      model: bizhub C250i
+    1.3.6.1.4.1.18334.1.1.1.2.1.183.2.1:
+      category: Printer
+      model: bizhub C3350i
+    1.3.6.1.4.1.18334.1.1.1.2.1.183.2.2:
+      category: Printer
+      model: bizhub C3350i
+    1.3.6.1.4.1.18334.1.1.1.2.1.183.2.3:
+      category: Printer
+      model: bizhub C3350i
+    1.3.6.1.4.1.18334.1.1.1.2.1.183.2.4:
+      category: Printer
+      model: bizhub C3350i
+    1.3.6.1.4.1.18334.1.1.1.2.1.183.3.1:
+      category: Printer
+      model: bizhub C3350i
+    1.3.6.1.4.1.18334.1.1.1.2.1.183.3.4:
+      category: Printer
+      model: bizhub C3350i
+    1.3.6.1.4.1.18334.1.1.1.2.1.184.2.1:
+      model: bizhub C3320i
+    1.3.6.1.4.1.18334.1.1.1.2.1.184.2.4:
+      category: Printer
+      model: bizhub C3320i
+    1.3.6.1.4.1.18334.1.1.1.2.1.186.2.1:
+      category: Printer
+      model: bizhub C3300i
+    1.3.6.1.4.1.18334.1.1.1.2.1.186.2.2:
+      category: Printer
+      model: bizhub C3300i
+    1.3.6.1.4.1.18334.1.1.1.2.1.186.2.3:
+      category: Printer
+      model: bizhub C3300i
+    1.3.6.1.4.1.18334.1.1.1.2.1.186.2.4:
+      category: Printer
+      model: bizhub C3300i
+    1.3.6.1.4.1.18334.1.1.1.2.1.196.2.4:
+      category: Printer
+      model: bizhub 226i
+    1.3.6.1.4.1.18334.1.1.1.2.1.208.2.1:
+      category: Printer
+      model: bizhub 550i
+    1.3.6.1.4.1.18334.1.1.1.2.1.208.2.3:
+      category: Printer
+      model: bizhub 550i
+    1.3.6.1.4.1.18334.1.1.1.2.1.209.2.3:
+      category: Printer
+      model: bizhub 450i
+    1.3.6.1.4.1.18334.1.1.1.2.1.210.2.1:
+      category: Printer
+      model: bizhub 360i
+    1.3.6.1.4.1.18334.1.1.1.2.1.210.2.3:
+      category: Printer
+      model: bizhub 360i
+    1.3.6.1.4.1.18334.1.1.1.2.1.210.3.3:
+      category: Printer
+      model: bizhub 360i
+    1.3.6.1.4.1.18334.1.1.1.2.1.211.2.2:
+      category: Printer
+      model: bizhub 300i
+    1.3.6.1.4.1.18334.1.1.1.2.1.211.2.3:
+      category: Printer
+      model: bizhub 300i
+    1.3.6.1.4.1.18334.1.1.1.2.1.212.2.1:
+      category: Printer
+      model: bizhub C750i
+    1.3.6.1.4.1.18334.1.1.1.2.1.212.2.3:
+      category: Printer
+      model: bizhub C750i
+    1.3.6.1.4.1.18334.1.1.1.2.1.212.3.3:
+      category: Printer
+      model: bizhub C750i
+    1.3.6.1.4.1.18334.1.1.1.2.1.213.2.1:
+      category: Printer
+      model: bizhub 750i
+    1.3.6.1.4.1.18334.1.1.1.2.1.213.2.3:
+      category: Printer
+      model: bizhub 750i
+    1.3.6.1.4.1.18334.1.1.1.2.1.213.3.1:
+      category: Printer
+      model: bizhub 750i
+    1.3.6.1.4.1.18334.1.1.1.2.1.213.3.3:
+      category: Printer
+      model: bizhub 750i
+    1.3.6.1.4.1.18334.1.1.1.2.1.215.2.3:
+      category: Printer
+      model: bizhub 4050i
+    1.3.6.1.4.1.18334.1.1.1.2.1.215.3.3:
+      category: Printer
+      model: bizhub 4050i
+    1.3.6.1.4.1.18334.1.1.1.2.1.223.2.3:
+      category: Printer
+      model: bizhub C286i
+    1.3.6.1.4.1.18334.1.1.1.2.1.10001.1.1:
+      category: Printer
+      model: 240f PCL
+    1.3.6.1.4.1.18334.1.1.1.2.1.10002.1.1:
+      category: Printer
+      model: Bizhub 20
+    1.3.6.1.4.1.18334.1.1.1.2.1.10008.1.1:
+      category: Printer
+      model: Bizhub 25e
+    1.3.6.1.4.1.18334.1.1.1.2.1.10009.2.1:
+      category: Printer
+      model: Bizhub 4020
+    1.3.6.1.4.1.18334.1.1.1.2.1.10010.2.1:
+      category: Printer
+      model: Bizhub 3320
+    1.3.6.1.4.1.18334.1.1.1.2.1.10013.2.1:
+      category: Printer
+      model: bizhub 4422
+    1.3.6.1.4.1.18334.1.1.1.2.1.10014.2.1:
+      category: Printer
+      model: bizhub 3622
+    1.3.6.1.4.1.18334.1.1.1.2.1.10018.2.1:
+      category: Printer
+      model: bizhub 4052
+    1.3.6.1.4.1.18334.1.1.1.2.1.10018.2.2:
+      category: Printer
+      model: bizhub 4052
+    1.3.6.1.4.1.18334.1.1.1.2.1.10025.2.1:
+      category: Printer
+      model: bizhub 4020i
+    1.3.6.1.4.1.18334.1.2.1.1.1.10007.1.1:
+      category: Printer
+      model: bizhub 4000i
+    1.3.6.1.4.1.18334.1.2.1.2.1.6.1.2:
+      category: Printer
+      model: Ineo 350
+    1.3.6.1.4.1.18334.1.2.1.2.1.13.2:
+      category: Printer
+      model: Bizhub PRO C6501
+    1.3.6.1.4.1.18334.1.2.1.2.1.46.2.1:
+      category: Printer
+      model: Fiery PRO80 65-55C-KM
+    1.3.6.1.4.1.18334.1.2.1.2.1.49.2.2:
+      category: Printer
+      model: VarioLink 3622c
+    1.3.6.1.4.1.18334.1.2.1.2.1.49.3.2:
+      category: Printer
+      model: Bizhub 36C
+    1.3.6.1.4.1.18334.1.2.1.2.1.63.2.1:
+      category: Printer
+      model: Generic 42BW-4
+    1.3.6.1.4.1.18334.1.2.1.2.1.63.3.1:
+      category: Printer
+      model: Generic 42BW-4
+    1.3.6.1.4.1.18334.1.2.1.2.1.64.3.1:
+      category: Printer
+      model: Generic 36BW-4
+    1.3.6.1.4.1.18334.1.2.1.2.1.103.2.5:
+      model: 55C-6E
+    1.3.6.1.4.1.18334.1.2.1.2.1.105.3.5:
+      category: Printer
+      model: SINDOH D412
+    1.3.6.1.4.1.18334.1.2.1.2.1.106.3.5:
+      category: Printer
+      model: SINDOH D411
+    1.3.6.1.4.1.18334.1.2.1.2.1.107.3.5:
+      category: Printer
+      model: SINDOH D410
+    1.3.6.1.4.1.18334.1.2.1.2.1.110.2.1:
+      category: Printer
+      model: Generic 36BW-5e
+    1.3.6.1.4.1.18334.1.2.1.2.1.111.2.2:
+      category: Printer
+      model: Generic 28BW-5e
+    1.3.6.1.4.1.18334.1.2.1.2.1.113.2.2:
+      category: Printer
+      model: C MF385-1
+    1.3.6.1.4.1.18334.1.2.1.2.1.114.2.5:
+      category: Printer
+      model: C MF335-1
+    1.3.6.1.4.1.18334.1.2.1.2.1.122.2.10:
+      category: Printer
+      model: Generic 36BW-8
+    1.3.6.1.4.1.18334.1.2.1.2.1.122.3.6:
+      category: Printer
+      model: SINDOH N502
+    1.3.6.1.4.1.18334.1.2.1.2.1.122.3.10:
+      category: Printer
+      model: Generic 36BW-8
+    1.3.6.1.4.1.18334.1.2.1.2.1.123.2.2:
+      category: Printer
+      model: Generic 28BW-8
+    1.3.6.1.4.1.18334.1.2.1.2.1.123.2.9:
+      category: Printer
+      model: Generic 28BW-8
+    1.3.6.1.4.1.18334.1.2.1.2.1.123.2.10:
+      category: Printer
+      model: Generic 28BW-8
+    1.3.6.1.4.1.18334.1.2.1.2.1.123.2.11:
+      category: Printer
+      model: Generic 28BW-8
+    1.3.6.1.4.1.18334.1.2.1.2.1.123.3.1:
+      category: Printer
+      model: Sindoh N501
+    1.3.6.1.4.1.18334.1.2.1.2.1.123.3.10:
+      category: Printer
+      model: Sindoh N501
+    1.3.6.1.4.1.18334.1.2.1.2.1.130.2.10:
+      category: Printer
+      model: Aurora ADC 367
+    1.3.6.1.4.1.18334.1.2.1.2.1.130.3.1:
+      category: Printer
+      model: ineo+ 308
+    1.3.6.1.4.1.18334.1.2.1.2.1.143.2.7:
+      category: Printer
+      model: Muratec MFX-C5590
+    1.3.6.1.4.1.18334.1.2.1.2.1.179.3.2:
+      category: Printer
+      model: SINDOH D452
+    1.3.6.1.4.1.18334.1.2.1.2.1.180.3.2:
+      category: Printer
+      model: SINDOH D451
+    1.3.6.1.4.1.18334.1.2.1.2.1.210.2.3:
+      category: Printer
+      model: Generic 36BW-0i
+    1.3.6.1.4.1.18334.1.2.1.2.1.215.2.3:
+      category: Printer
+      model: ineo 4050i
