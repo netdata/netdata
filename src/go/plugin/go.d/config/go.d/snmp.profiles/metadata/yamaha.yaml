@@ -1,0 +1,175 @@
+sysobjectids:
+  oid_overrides:
+    1.3.6.1.4.1.1182.1.1:
+      model: RT100i
+    1.3.6.1.4.1.1182.1.2:
+      category: Router
+      model: RT 100I
+    1.3.6.1.4.1.1182.1.3:
+      category: Router
+      model: RT 200I
+    1.3.6.1.4.1.1182.1.4:
+      category: Router
+      model: RT 80I
+    1.3.6.1.4.1.1182.1.5:
+      category: Router
+      model: RT 102I
+    1.3.6.1.4.1.1182.1.6:
+      category: Router
+      model: RT 103I
+    1.3.6.1.4.1.1182.1.7:
+      category: Router
+      model: RT 140I
+    1.3.6.1.4.1.1182.1.8:
+      category: Router
+      model: RT 140E
+    1.3.6.1.4.1.1182.1.9:
+      category: Router
+      model: RT 140P
+    1.3.6.1.4.1.1182.1.10:
+      category: Router
+      model: RT 140F
+    1.3.6.1.4.1.1182.1.11:
+      category: Router
+      model: RT A50I
+    1.3.6.1.4.1.1182.1.12:
+      category: Router
+      model: RT A52I
+    1.3.6.1.4.1.1182.1.13:
+      category: Router
+      model: RT 300I
+    1.3.6.1.4.1.1182.1.14:
+      category: Router
+      model: RT 52PRO
+    1.3.6.1.4.1.1182.1.15:
+      category: Router
+      model: RT 105I
+    1.3.6.1.4.1.1182.1.16:
+      category: Router
+      model: RT 60W
+    1.3.6.1.4.1.1182.1.17:
+      category: Router
+      model: RT 105E
+    1.3.6.1.4.1.1182.1.18:
+      category: Router
+      model: RT 105P
+    1.3.6.1.4.1.1182.1.19:
+      category: Router
+      model: RT W65B
+    1.3.6.1.4.1.1182.1.20:
+      category: Router
+      model: RT W65I
+    1.3.6.1.4.1.1182.1.21:
+      category: Router
+      model: RT A55I
+    1.3.6.1.4.1.1182.1.22:
+      category: Router
+      model: RT 56V
+    1.3.6.1.4.1.1182.1.23:
+      category: Router
+      model: RTX-1000
+    1.3.6.1.4.1.1182.1.24:
+      category: Router
+      model: RT X2000
+    1.3.6.1.4.1.1182.1.25:
+      category: Router
+      model: RT 57I
+    1.3.6.1.4.1.1182.1.26:
+      category: Router
+      model: RT V700
+    1.3.6.1.4.1.1182.1.27:
+      category: Router
+      model: RT X1500
+    1.3.6.1.4.1.1182.1.28:
+      category: Router
+      model: RTX-1100
+    1.3.6.1.4.1.1182.1.29:
+      category: Router
+      model: RT 250I
+    1.3.6.1.4.1.1182.1.30:
+      category: Router
+      model: YTD 442
+    1.3.6.1.4.1.1182.1.31:
+      category: Router
+      model: RT 107E
+    1.3.6.1.4.1.1182.1.32:
+      category: Router
+      model: RT V01
+    1.3.6.1.4.1.1182.1.33:
+      category: Router
+      model: RT X3000
+    1.3.6.1.4.1.1182.1.34:
+      category: Router
+      model: RT 58I
+    1.3.6.1.4.1.1182.1.35:
+      category: Router
+      model: SRT 100
+    1.3.6.1.4.1.1182.1.37:
+      category: Router
+      model: RTX1200
+    1.3.6.1.4.1.1182.1.38:
+      category: Router
+      model: PJP MC24
+    1.3.6.1.4.1.1182.1.39:
+      category: Router
+      model: RT X800
+    1.3.6.1.4.1.1182.1.40:
+      category: Switch
+      model: NVR500
+    1.3.6.1.4.1.1182.1.41:
+      category: Router
+      model: RTX810
+    1.3.6.1.4.1.1182.1.42:
+      category: Firewall
+      model: FWX120
+    1.3.6.1.4.1.1182.1.43:
+      category: Wireless
+      model: WLX302
+    1.3.6.1.4.1.1182.1.44:
+      category: Router
+      model: RT X5000
+    1.3.6.1.4.1.1182.1.45:
+      category: Router
+      model: RT X3500
+    1.3.6.1.4.1.1182.1.46:
+      category: Router
+      model: RT X1210
+    1.3.6.1.4.1.1182.1.47:
+      category: Switch
+      model: SWX2300
+    1.3.6.1.4.1.1182.1.48:
+      category: Wireless
+      model: WLX202
+    1.3.6.1.4.1.1182.1.49:
+      category: Router
+      model: RT X820
+    1.3.6.1.4.1.1182.1.50:
+      category: Wireless
+      model: WLX402
+    1.3.6.1.4.1.1182.1.51:
+      category: Router
+      model: NVR700W
+    1.3.6.1.4.1.1182.1.52:
+      category: Router
+      model: NVR510
+    1.3.6.1.4.1.1182.1.53:
+      category: Router
+      model: RT X830
+    1.3.6.1.4.1.1182.1.54:
+      category: Router
+      model: YSL V810
+    1.3.6.1.4.1.1182.1.55:
+      category: Switch
+      model: SWX3200
+    1.3.6.1.4.1.1182.1.56:
+      category: Switch
+      model: SWX3100
+    1.3.6.1.4.1.1182.1.57:
+      category: Switch
+      model: SWX2310P
+    1.3.6.1.4.1.1182.1.58:
+      category: Router
+      model: SWR2311P
+    1.3.6.1.4.1.1182.1.59:
+      category: Wireless
+      model: WLX313

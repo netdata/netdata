@@ -1,0 +1,3422 @@
+sysobjectids:
+  oid_overrides:
+    1.3.6.1.4.1.2011.1.1.1.1:
+      category: Router
+      model: hwrouter
+    1.3.6.1.4.1.2011.1.1.1.2:
+      category: Router
+      model: QuidWay NetEngine R2611
+    1.3.6.1.4.1.2011.1.1.1.100:
+      category: Router
+      model: eudemon
+    1.3.6.1.4.1.2011.1.1.1.1600:
+      category: Router
+      model: QuidWay NetEngine R1600
+    1.3.6.1.4.1.2011.1.1.1.1602:
+      category: Router
+      model: QuidWay NetEngine R1602
+    1.3.6.1.4.1.2011.1.1.1.1612:
+      category: Router
+      model: QuidWay NetEngine R1612
+    1.3.6.1.4.1.2011.1.1.1.1613:
+      category: Router
+      model: QuidWay NetEngine R1613
+    1.3.6.1.4.1.2011.1.1.1.1614:
+      category: Router
+      model: QuidWay NetEngine R1614
+    1.3.6.1.4.1.2011.1.1.1.1615:
+      category: Router
+      model: QuidWay NetEngine R1615
+    1.3.6.1.4.1.2011.1.1.1.1760:
+      category: Router
+      model: QuidWay NetEngine R1760
+    1.3.6.1.4.1.2011.1.1.1.1761:
+      category: Router
+      model: QuidWay NetEngine R1760B
+    1.3.6.1.4.1.2011.1.1.1.2501:
+      category: Router
+      model: QuidWay NetEngine R2501
+    1.3.6.1.4.1.2011.1.1.1.2509:
+      category: Router
+      model: QuidWay NetEngine R2509
+    1.3.6.1.4.1.2011.1.1.1.2511:
+      category: Router
+      model: QuidWay NetEngine R2511
+    1.3.6.1.4.1.2011.1.1.1.2601:
+      category: Router
+      model: QuidWay NetEngine R2501E
+    1.3.6.1.4.1.2011.1.1.1.2606:
+      category: Router
+      model: QuidWay NetEngine R4001E
+    1.3.6.1.4.1.2011.1.1.1.2608:
+      category: Router
+      model: QuidWay NetEngine R2509E
+    1.3.6.1.4.1.2011.1.1.1.2609:
+      category: Router
+      model: QuidWay NetEngine R2511E
+    1.3.6.1.4.1.2011.1.1.1.2610:
+      category: Router
+      model: QuidWay NetEngine R2610
+    1.3.6.1.4.1.2011.1.1.1.2611:
+      category: Router
+      model: QuidWay NetEngine R2611
+    1.3.6.1.4.1.2011.1.1.1.2620:
+      category: Router
+      model: QuidWay NetEngine R2620
+    1.3.6.1.4.1.2011.1.1.1.2621:
+      category: Router
+      model: QuidWay NetEngine R2621
+    1.3.6.1.4.1.2011.1.1.1.2630:
+      category: Router
+      model: QuidWay NetEngine R2630E
+    1.3.6.1.4.1.2011.1.1.1.2631:
+      category: Router
+      model: QuidWay NetEngine R2631E
+    1.3.6.1.4.1.2011.1.1.1.3640:
+      category: Router
+      model: QuidWay NetEngine R3640E
+    1.3.6.1.4.1.2011.1.1.1.3680:
+      category: Router
+      model: QuidWay NetEngine R3680E
+    1.3.6.1.4.1.2011.1.1.1.4001:
+      category: Router
+      model: QuidWay NetEngine R4001
+    1.3.6.1.4.1.2011.1.1.1.11812:
+      category: Router
+      model: ar18-12
+    1.3.6.1.4.1.2011.1.1.1.11813:
+      category: Router
+      model: ar18-13
+    1.3.6.1.4.1.2011.1.1.1.11815:
+      category: Router
+      model: ar18-15
+    1.3.6.1.4.1.2011.1.1.1.11816:
+      category: Router
+      model: ar18-16
+    1.3.6.1.4.1.2011.1.1.1.12809:
+      category: Router
+      model: AR28-09
+    1.3.6.1.4.1.2011.1.1.1.12810:
+      category: Firewall
+      model: AR28-10
+    1.3.6.1.4.1.2011.1.1.1.12811:
+      category: Router
+      model: AR28-11-59
+    1.3.6.1.4.1.2011.1.1.1.12830:
+      category: Router
+      model: AR28-30
+    1.3.6.1.4.1.2011.1.1.1.12831:
+      category: Router
+      model: AR28-31
+    1.3.6.1.4.1.2011.1.1.1.12840:
+      category: Router
+      model: AR28-40
+    1.3.6.1.4.1.2011.1.1.1.12880:
+      category: Router
+      model: AR28-80
+    1.3.6.1.4.1.2011.2.1.1.10:
+      category: Router
+      model: QuidWay NetEngine NE40E-X16
+    1.3.6.1.4.1.2011.2.2.1.7508:
+      category: Router
+      model: QuidWay NetEngine 08
+    1.3.6.1.4.1.2011.2.2.1.7516:
+      category: Router
+      model: QuidWay NetEngine R7516
+    1.3.6.1.4.1.2011.2.4.1.0:
+      category: Switch
+      model: QuidWay S2403
+    1.3.6.1.4.1.2011.2.4.2:
+      category: Switch
+      model: switch3008
+    1.3.6.1.4.1.2011.2.4.3:
+      category: Switch
+      model: switch3016
+    1.3.6.1.4.1.2011.2.4.4:
+      category: Switch
+      model: switch2024-M
+    1.3.6.1.4.1.2011.2.4.5:
+      category: Switch
+      model: switch3025-M
+    1.3.6.1.4.1.2011.2.6.2:
+      model: MA5200
+      category: DSLAM
+    1.3.6.1.4.1.2011.2.6.2.18:
+      model: MA5200E
+      category: DSLAM
+    1.3.6.1.4.1.2011.2.6.2.28.0:
+      model: MA5200F
+      category: DSLAM
+    1.3.6.1.4.1.2011.2.6.2.30:
+      model: MA5200G
+      category: DSLAM
+    1.3.6.1.4.1.2011.2.6.2.31:
+      model: MA5200G-4
+      category: DSLAM
+    1.3.6.1.4.1.2011.2.6.2.32:
+      model: MA5200G-2
+      category: DSLAM
+    1.3.6.1.4.1.2011.2.6.5.21:
+      model: MA5100-V100
+      category: DSLAM
+    1.3.6.1.4.1.2011.2.6.5.22:
+      model: MA5100-V200
+      category: DSLAM
+    1.3.6.1.4.1.2011.2.17:
+      category: Router
+      model: QuidWay NetEngine NE80
+    1.3.6.1.4.1.2011.2.22.2:
+      category: Router
+      model: radium8750
+    1.3.6.1.4.1.2011.2.22.3:
+      category: Router
+      model: isn8850
+    1.3.6.1.4.1.2011.2.22.5:
+      category: Router
+      model: esr8825
+    1.3.6.1.4.1.2011.2.22.6:
+      category: Router
+      model: esrV5R3
+    1.3.6.1.4.1.2011.2.22.7:
+      category: Router
+      model: esrV5R58850
+    1.3.6.1.4.1.2011.2.22.8:
+      category: Router
+      model: esrV5R58825
+    1.3.6.1.4.1.2011.2.23.1:
+      category: Switch
+      model: lswCommon
+    1.3.6.1.4.1.2011.2.23.11:
+      category: Switch
+      model: QuidWay S8016
+    1.3.6.1.4.1.2011.2.23.11.1:
+      category: Switch
+      model: s8016Common
+    1.3.6.1.4.1.2011.2.23.11.2:
+      category: Switch
+      model: QuidWay S8016
+    1.3.6.1.4.1.2011.2.23.11.3:
+      category: Switch
+      model: S8016B
+    1.3.6.1.4.1.2011.2.23.12:
+      category: Switch
+      model: QuidWay S3526
+    1.3.6.1.4.1.2011.2.23.13:
+      category: Switch
+      model: QuidWay S3026
+    1.3.6.1.4.1.2011.2.23.14:
+      category: Switch
+      model: QuidWay S3026V
+    1.3.6.1.4.1.2011.2.23.15:
+      category: Switch
+      model: QuidWay S3026V
+    1.3.6.1.4.1.2011.2.23.16:
+      category: Switch
+      model: QuidWay S2016
+    1.3.6.1.4.1.2011.2.23.17:
+      category: Switch
+      model: QuidWay S3526F
+    1.3.6.1.4.1.2011.2.23.18:
+      category: Switch
+      model: QuidWay S5516
+    1.3.6.1.4.1.2011.2.23.19:
+      category: Switch
+      model: QuidWay S6506
+    1.3.6.1.4.1.2011.2.23.20:
+      category: Switch
+      model: QuidWay S3026-FM/FS
+    1.3.6.1.4.1.2011.2.23.21:
+      category: Switch
+      model: QuidWay S3526E
+    1.3.6.1.4.1.2011.2.23.22:
+      category: Switch
+      model: QuidWay S2206
+    1.3.6.1.4.1.2011.2.23.23:
+      category: Switch
+      model: QuidWay S2403H
+    1.3.6.1.4.1.2011.2.23.24:
+      category: Switch
+      model: QuidWay S3026E
+    1.3.6.1.4.1.2011.2.23.25:
+      category: Switch
+      model: QuidWay S3026EFM
+    1.3.6.1.4.1.2011.2.23.26:
+      category: Switch
+      model: QuidWay S3026EFS
+    1.3.6.1.4.1.2011.2.23.27:
+      category: Switch
+      model: QuidWay S3526EFM
+    1.3.6.1.4.1.2011.2.23.28:
+      category: Switch
+      model: QuidWay S3526EFS
+    1.3.6.1.4.1.2011.2.23.29:
+      category: Switch
+      model: QuidWay S3050C
+    1.3.6.1.4.1.2011.2.23.30:
+      category: Switch
+      model: QuidWay S6503
+    1.3.6.1.4.1.2011.2.23.31:
+      category: Switch
+      model: QuidWay S8512
+    1.3.6.1.4.1.2011.2.23.32:
+      category: Switch
+      model: QuidWay S8505
+    1.3.6.1.4.1.2011.2.23.33:
+      category: Switch
+      model: QuidWay S6506R
+    1.3.6.1.4.1.2011.2.23.34:
+      category: Switch
+      model: QuidWay S3026C
+    1.3.6.1.4.1.2011.2.23.35:
+      category: Switch
+      model: QuidWay S3026G
+    1.3.6.1.4.1.2011.2.23.36:
+      category: Switch
+      model: QuidWay S3026T
+    1.3.6.1.4.1.2011.2.23.37:
+      category: Switch
+      model: QuidWay S3552G
+    1.3.6.1.4.1.2011.2.23.38:
+      category: Switch
+      model: QuidWay S3552P
+    1.3.6.1.4.1.2011.2.23.39:
+      category: Switch
+      model: QuidWay S3528G
+    1.3.6.1.4.1.2011.2.23.40:
+      category: Switch
+      model: QuidWay S3528P
+    1.3.6.1.4.1.2011.2.23.41:
+      category: Switch
+      model: QuidWay S3526c
+    1.3.6.1.4.1.2011.2.23.42:
+      category: Switch
+      model: QuidWay S3026C-24-12FS
+    1.3.6.1.4.1.2011.2.23.43:
+      category: Switch
+      model: QuidWay S3026C-24-12FM
+    1.3.6.1.4.1.2011.2.23.44:
+      category: Switch
+      model: QuidWay S3526C-24-12FS
+    1.3.6.1.4.1.2011.2.23.45:
+      category: Switch
+      model: QuidWay S3526C-24-12FM
+    1.3.6.1.4.1.2011.2.23.46:
+      category: Switch
+      model: QuidWay S5012G
+    1.3.6.1.4.1.2011.2.23.47:
+      category: Switch
+      model: QuidWay S5012G-DC
+    1.3.6.1.4.1.2011.2.23.48:
+      category: Switch
+      model: QuidWay S5012T-12-10GBC
+    1.3.6.1.4.1.2011.2.23.49:
+      category: Switch
+      model: QuidWay S5012T-12-10GBC-DC
+    1.3.6.1.4.1.2011.2.23.50:
+      category: Switch
+      model: QuidWay S5024G-24-20TP
+    1.3.6.1.4.1.2011.2.23.51:
+      category: Switch
+      model: QuidWay S5024G-24-20TP-DC
+    1.3.6.1.4.1.2011.2.23.52:
+      category: Switch
+      model: QuidWay S2026Z
+    1.3.6.1.4.1.2011.2.23.53:
+      category: Switch
+      model: QuidWay S2026C
+    1.3.6.1.4.1.2011.2.23.54:
+      category: Switch
+      model: QuidWay S3026G-SI
+    1.3.6.1.4.1.2011.2.23.55:
+      category: Switch
+      model: QuidWay S3026C-SI
+    1.3.6.1.4.1.2011.2.23.56:
+      category: Switch
+      model: QuidWay S3026S-SI
+    1.3.6.1.4.1.2011.2.23.57:
+      category: Switch
+      model: s8505e
+    1.3.6.1.4.1.2011.2.23.67:
+      category: Switch
+      model: S3552F
+    1.3.6.1.4.1.2011.2.23.68:
+      category: Switch
+      model: S3552F-EI
+    1.3.6.1.4.1.2011.2.23.69:
+      category: Switch
+      model: e026
+    1.3.6.1.4.1.2011.2.23.70:
+      category: Switch
+      model: e026-SI
+    1.3.6.1.4.1.2011.2.23.71:
+      category: Switch
+      model: e050
+    1.3.6.1.4.1.2011.2.23.72:
+      category: Switch
+      model: S2326P-SI
+    1.3.6.1.4.1.2011.2.23.73:
+      category: Switch
+      model: S2326P-EI
+    1.3.6.1.4.1.2011.2.23.74:
+      category: Switch
+      model: S2318P-SI
+    1.3.6.1.4.1.2011.2.23.75:
+      category: Switch
+      model: S2318P-EI
+    1.3.6.1.4.1.2011.2.23.76:
+      category: Switch
+      model: S2309P-SI
+    1.3.6.1.4.1.2011.2.23.77:
+      category: Switch
+      model: S2309P-EI
+    1.3.6.1.4.1.2011.2.23.78:
+      category: Switch
+      model: S3352P-SI
+    1.3.6.1.4.1.2011.2.23.79:
+      category: Switch
+      model: S3352P-EI
+    1.3.6.1.4.1.2011.2.23.80:
+      category: Switch
+      model: S3328TP-SI
+    1.3.6.1.4.1.2011.2.23.81:
+      category: Switch
+      model: QuidWay S3328
+    1.3.6.1.4.1.2011.2.23.82:
+      category: Switch
+      model: S3328TP-EI-24S
+    1.3.6.1.4.1.2011.2.23.83:
+      category: Switch
+      model: S3328TP-SI-24S
+    1.3.6.1.4.1.2011.2.23.84:
+      category: Switch
+      model: S3352P-EI-24S
+    1.3.6.1.4.1.2011.2.23.85:
+      category: Switch
+      model: S3352P-EI-48S
+    1.3.6.1.4.1.2011.2.23.86:
+      category: Switch
+      model: S3352P-SI-48S
+    1.3.6.1.4.1.2011.2.23.87:
+      category: Layer 3 Switch
+      model: S2309TP-SI/EI
+    1.3.6.1.4.1.2011.2.23.88:
+      category: Switch
+      model: s2309TP-EI
+    1.3.6.1.4.1.2011.2.23.89:
+      category: Switch
+      model: s2318TP-SI
+    1.3.6.1.4.1.2011.2.23.90:
+      category: Switch
+      model: s2318TP-EI
+    1.3.6.1.4.1.2011.2.23.91:
+      category: Switch
+      model: s2326TP-SI
+    1.3.6.1.4.1.2011.2.23.92:
+      category: Layer 3 Switch
+      model: S2326TP-EI
+    1.3.6.1.4.1.2011.2.23.93:
+      category: Switch
+      model: S2352P-SI
+    1.3.6.1.4.1.2011.2.23.94:
+      category: Switch
+      model: S2352P-EI
+    1.3.6.1.4.1.2011.2.23.95:
+      category: Layer 3 Switch
+      model: S5328C-EI
+    1.3.6.1.4.1.2011.2.23.96:
+      category: Layer 3 Switch
+      model: S5328C-EI-24S
+    1.3.6.1.4.1.2011.2.23.97:
+      category: Switch
+      model: S5352C-EI
+    1.3.6.1.4.1.2011.2.23.98:
+      category: Layer 3 Switch
+      model: Quidway S5324TP-SI
+    1.3.6.1.4.1.2011.2.23.99:
+      category: Switch
+      model: S5348TP-SI
+    1.3.6.1.4.1.2011.2.23.100:
+      category: Switch
+      model: S5324TP-PWR-SI
+    1.3.6.1.4.1.2011.2.23.101:
+      category: Switch
+      model: S5348TP-PWR-SI
+    1.3.6.1.4.1.2011.2.23.102:
+      category: Switch
+      model: S5328C-SI
+    1.3.6.1.4.1.2011.2.23.103:
+      category: Switch
+      model: S5352C-SI
+    1.3.6.1.4.1.2011.2.23.104:
+      category: Switch
+      model: S5328C-PWR-SI
+    1.3.6.1.4.1.2011.2.23.105:
+      category: Switch
+      model: S5352C-PWR-SI
+    1.3.6.1.4.1.2011.2.23.106:
+      category: Switch
+      model: S5328C-PWR-EI
+    1.3.6.1.4.1.2011.2.23.107:
+      category: Switch
+      model: S5352C-PWR-EI
+    1.3.6.1.4.1.2011.2.23.108:
+      category: Switch
+      model: S2309TP-PWR-EI
+    1.3.6.1.4.1.2011.2.23.109:
+      category: Switch
+      model: S2326TP-PWR-EI
+    1.3.6.1.4.1.2011.2.23.110:
+      category: Switch
+      model: S3328TP-PWR-EI
+    1.3.6.1.4.1.2011.2.23.111:
+      category: Switch
+      model: S3352P-PWR-EI
+    1.3.6.1.4.1.2011.2.23.112:
+      category: Switch
+      model: S3328TP-EI-MC
+    1.3.6.1.4.1.2011.2.23.113:
+      category: Switch
+      model: S3318TP-EI-MC
+    1.3.6.1.4.1.2011.2.23.114:
+      category: Switch
+      model: S2700-9TP-EI-AC
+    1.3.6.1.4.1.2011.2.23.115:
+      category: Switch
+      model: S2700-9TP-EI-DC
+    1.3.6.1.4.1.2011.2.23.116:
+      category: Switch
+      model: S2700-18TP-EI-AC
+    1.3.6.1.4.1.2011.2.23.117:
+      category: Switch
+      model: S2700-26TP-EI-AC
+    1.3.6.1.4.1.2011.2.23.118:
+      category: Switch
+      model: S2700-26TP-EI-DC
+    1.3.6.1.4.1.2011.2.23.119:
+      category: Switch
+      model: S2700-52TP-EI-AC
+    1.3.6.1.4.1.2011.2.23.120:
+      category: Switch
+      model: S2700-9TP-SI-AC
+    1.3.6.1.4.1.2011.2.23.121:
+      category: Switch
+      model: S2700-18TP-SI-AC
+    1.3.6.1.4.1.2011.2.23.122:
+      category: Switch
+      model: S2700-26TP-SI-AC
+    1.3.6.1.4.1.2011.2.23.123:
+      category: Switch
+      model: S2700-9TP-PWR-EI
+    1.3.6.1.4.1.2011.2.23.124:
+      category: Switch
+      model: S2700-26TP-PWR-EI
+    1.3.6.1.4.1.2011.2.23.125:
+      category: Switch
+      model: S3700-28TP-EI-AC
+    1.3.6.1.4.1.2011.2.23.126:
+      category: Switch
+      model: S3700-28TP-EI-DC
+    1.3.6.1.4.1.2011.2.23.127:
+      category: Switch
+      model: S3700-28TP-EI-24S-AC
+    1.3.6.1.4.1.2011.2.23.128:
+      category: Switch
+      model: S3700-52TP-EI-AC
+    1.3.6.1.4.1.2011.2.23.129:
+      category: Switch
+      model: S3700-52TP-EI-DC
+    1.3.6.1.4.1.2011.2.23.130:
+      category: Switch
+      model: S3700-52TP-EI-24S-AC
+    1.3.6.1.4.1.2011.2.23.131:
+      category: Switch
+      model: S3700-52TP-EI-24S-DC
+    1.3.6.1.4.1.2011.2.23.132:
+      category: Switch
+      model: S3700-52TP-EI-48S-AC
+    1.3.6.1.4.1.2011.2.23.133:
+      category: Switch
+      model: S3700-52TP-EI-48S-DC
+    1.3.6.1.4.1.2011.2.23.134:
+      category: Switch
+      model: S3700-28TP-SI-AC
+    1.3.6.1.4.1.2011.2.23.135:
+      category: Switch
+      model: S3700-28TP-SI-DC
+    1.3.6.1.4.1.2011.2.23.136:
+      category: Switch
+      model: S3700-52TP-SI-AC
+    1.3.6.1.4.1.2011.2.23.137:
+      category: Switch
+      model: S3700-28TP-PWR-EI
+    1.3.6.1.4.1.2011.2.23.138:
+      category: Switch
+      model: S3700-52TP-PWR-EI
+    1.3.6.1.4.1.2011.2.23.139:
+      category: Switch
+      model: S3700-28TP-EI-MC-AC
+    1.3.6.1.4.1.2011.2.23.140:
+      category: Switch
+      model: S5700-28C-EI
+    1.3.6.1.4.1.2011.2.23.141:
+      category: Switch
+      model: S5700-28C-SI
+    1.3.6.1.4.1.2011.2.23.142:
+      category: Switch
+      model: S5700-28C-EI-24S
+    1.3.6.1.4.1.2011.2.23.143:
+      category: Switch
+      model: S5700-52C-EI
+    1.3.6.1.4.1.2011.2.23.144:
+      category: Switch
+      model: S5700-52C-SI
+    1.3.6.1.4.1.2011.2.23.145:
+      category: Switch
+      model: S5700-24TP-SI-AC
+    1.3.6.1.4.1.2011.2.23.146:
+      category: Switch
+      model: S5700-24TP-SI-DC
+    1.3.6.1.4.1.2011.2.23.147:
+      category: Switch
+      model: S5700-48TP-SI-AC
+    1.3.6.1.4.1.2011.2.23.148:
+      category: Switch
+      model: S5700-48TP-SI-DC
+    1.3.6.1.4.1.2011.2.23.149:
+      category: Layer 3 Switch
+      model: S5700-28C-PWR-EI
+    1.3.6.1.4.1.2011.2.23.150:
+      category: Switch
+      model: S5700-52C-PWR-EI
+    1.3.6.1.4.1.2011.2.23.151:
+      category: Switch
+      model: S5700-24TP-PWR-SI
+    1.3.6.1.4.1.2011.2.23.152:
+      category: Switch
+      model: S5700-48TP-PWR-SI
+    1.3.6.1.4.1.2011.2.23.153:
+      category: Layer 3 Switch
+      model: S6324-EI
+    1.3.6.1.4.1.2011.2.23.154:
+      category: Switch
+      model: S6348C
+    1.3.6.1.4.1.2011.2.23.155:
+      category: Switch
+      model: S5328C-HI
+    1.3.6.1.4.1.2011.2.23.156:
+      category: Switch
+      model: S5328C-HI-24S
+    1.3.6.1.4.1.2011.2.23.157:
+      category: Switch
+      model: S5306TP-SI
+    1.3.6.1.4.1.2011.2.23.158:
+      category: Switch
+      model: S3326C-HI
+    1.3.6.1.4.1.2011.2.23.159:
+      category: Switch
+      model: S5328C-HI-24SA
+    1.3.6.1.4.1.2011.2.23.160:
+      category: Switch
+      model: S6700-24-EI
+    1.3.6.1.4.1.2011.2.23.161:
+      category: Switch
+      model: S6700-48-EI
+    1.3.6.1.4.1.2011.2.23.162:
+      category: Switch
+      model: S1728-GWR-4P
+    1.3.6.1.4.1.2011.2.23.163:
+      category: Switch
+      model: S5700-28P-LI
+    1.3.6.1.4.1.2011.2.23.164:
+      category: Switch
+      model: S5700-28P-PWR-LI-AC
+    1.3.6.1.4.1.2011.2.23.165:
+      category: Switch
+      model: S5700-52P-LI
+    1.3.6.1.4.1.2011.2.23.166:
+      category: Switch
+      model: S5700-52P-PWR-LI-AC
+    1.3.6.1.4.1.2011.2.23.167:
+      category: Switch
+      model: S5700-28X-EI
+    1.3.6.1.4.1.2011.2.23.168:
+      category: Switch
+      model: S5700-52X-EI
+    1.3.6.1.4.1.2011.2.23.169:
+      category: Switch
+      model: S5700-28C-HI
+    1.3.6.1.4.1.2011.2.23.170:
+      category: Switch
+      model: S5700-28C-HI-24S
+    1.3.6.1.4.1.2011.2.23.171:
+      category: Switch
+      model: S5700-6TP-LI-AC
+    1.3.6.1.4.1.2011.2.23.172:
+      category: Switch
+      model: S3700-26C-HI
+    1.3.6.1.4.1.2011.2.23.173:
+      category: Switch
+      model: S5300-28C-PWR-EI
+    1.3.6.1.4.1.2011.2.23.174:
+      category: Switch
+      model: S5300-52C-PWR-EI
+    1.3.6.1.4.1.2011.2.23.175:
+      category: Switch
+      model: S5310-28P-LI
+    1.3.6.1.4.1.2011.2.23.176:
+      category: Switch
+      model: S5310-52P-LI
+    1.3.6.1.4.1.2011.2.23.177:
+      category: Switch
+      model: S5700-28P-LI-DC
+    1.3.6.1.4.1.2011.2.23.178:
+      category: Switch
+      model: S5700-52P-LI-DC
+    1.3.6.1.4.1.2011.2.23.179:
+      category: Switch
+      model: S5310-28P-LI-DC
+    1.3.6.1.4.1.2011.2.23.180:
+      category: Switch
+      model: S5310-52P-LI-DC
+    1.3.6.1.4.1.2011.2.23.181:
+      category: Switch
+      model: S5700S-28P-LI-AC
+    1.3.6.1.4.1.2011.2.23.182:
+      category: Switch
+      model: S5700S-52P-LI-AC
+    1.3.6.1.4.1.2011.2.23.183:
+      category: Switch
+      model: S1700-28GFR-4P-AC
+    1.3.6.1.4.1.2011.2.23.184:
+      category: Switch
+      model: S1700-52GFR-4P-AC
+    1.3.6.1.4.1.2011.2.23.185:
+      category: Switch
+      model: S1700-28FR-2T2P-AC
+    1.3.6.1.4.1.2011.2.23.186:
+      category: Switch
+      model: S1700-52FR-2T2P-AC
+    1.3.6.1.4.1.2011.2.23.187:
+      category: Switch
+      model: S5700-28C-PWR-SI
+    1.3.6.1.4.1.2011.2.23.188:
+      category: Switch
+      model: S5700-52C-PWR-SI
+    1.3.6.1.4.1.2011.2.23.189:
+      category: Switch
+      model: S5710-28C-PWR-LI
+    1.3.6.1.4.1.2011.2.23.190:
+      category: Switch
+      model: S5710-52C-PWR-LI
+    1.3.6.1.4.1.2011.2.23.191:
+      category: Switch
+      model: S5710-28C-LI
+    1.3.6.1.4.1.2011.2.23.192:
+      category: Switch
+      model: S5710-52C-LI
+    1.3.6.1.4.1.2011.2.23.193:
+      category: Switch
+      model: e6000
+    1.3.6.1.4.1.2011.2.23.194:
+      category: Switch
+      model: S5710-28C-PWR-EI
+    1.3.6.1.4.1.2011.2.23.195:
+      category: Switch
+      model: S5710-52C-PWR-EI
+    1.3.6.1.4.1.2011.2.23.196:
+      category: Switch
+      model: S2710-26TP-PWR-SI
+    1.3.6.1.4.1.2011.2.23.197:
+      category: Switch
+      model: S2710-52P-SI-AC
+    1.3.6.1.4.1.2011.2.23.198:
+      category: Switch
+      model: S2710-52P-PWR-SI
+    1.3.6.1.4.1.2011.2.23.199:
+      category: Switch
+      model: S2700-52P-PWR-EI
+    1.3.6.1.4.1.2011.2.23.200:
+      category: Switch
+      model: S3700-52P-PWR-SI
+    1.3.6.1.4.1.2011.2.23.201:
+      category: Switch
+      model: S3700-28TP-PWR-SI
+    1.3.6.1.4.1.2011.2.23.202:
+      category: Switch
+      model: S5710-108C-PWR-HI
+    1.3.6.1.4.1.2011.2.23.203:
+      category: Switch
+      model: S5700-10P-LI-AC
+    1.3.6.1.4.1.2011.2.23.204:
+      category: Switch
+      model: S5700-10P-PWR-LI-AC
+    1.3.6.1.4.1.2011.2.23.205:
+      category: Switch
+      model: S5700-26X-SI-12S-AC
+    1.3.6.1.4.1.2011.2.23.206:
+      category: Switch
+      model: S5700-28X-LI-AC
+    1.3.6.1.4.1.2011.2.23.207:
+      category: Switch
+      model: S5700-28X-LI-DC
+    1.3.6.1.4.1.2011.2.23.208:
+      category: Switch
+      model: S5700-52X-LI-AC
+    1.3.6.1.4.1.2011.2.23.209:
+      category: Switch
+      model: S5700-52X-LI-DC
+    1.3.6.1.4.1.2011.2.23.210:
+      category: Switch
+      model: S5700-28X-PWR-LI-AC
+    1.3.6.1.4.1.2011.2.23.211:
+      category: Switch
+      model: S5700-52X-PWR-LI-AC
+    1.3.6.1.4.1.2011.2.23.212:
+      category: Switch
+      model: S5710-108C-HI-AC
+    1.3.6.1.4.1.2011.2.23.213:
+      category: Switch
+      model: S5300-10P-LI-AC
+    1.3.6.1.4.1.2011.2.23.214:
+      category: Switch
+      model: S5310-28C-EI
+    1.3.6.1.4.1.2011.2.23.215:
+      category: Switch
+      model: S5310-52C-EI
+    1.3.6.1.4.1.2011.2.23.216:
+      category: Switch
+      model: S5300-28X-LI-DC
+    1.3.6.1.4.1.2011.2.23.217:
+      category: Switch
+      model: S5300-28X-LI-AC
+    1.3.6.1.4.1.2011.2.23.218:
+      category: Switch
+      model: S5700-28X-LI-24S-DC
+    1.3.6.1.4.1.2011.2.23.219:
+      category: Switch
+      model: S5300-28X-LI-24S-DC
+    1.3.6.1.4.1.2011.2.23.220:
+      category: Switch
+      model: S5700-28X-LI-24S-AC
+    1.3.6.1.4.1.2011.2.23.221:
+      category: Switch
+      model: S5300-28X-LI-24S-AC
+    1.3.6.1.4.1.2011.2.23.222:
+      category: Switch
+      model: S2751-28TP-PWR-EI-AC
+    1.3.6.1.4.1.2011.2.23.223:
+      category: Switch
+      model: S2350-28TP-EI-AC
+    1.3.6.1.4.1.2011.2.23.224:
+      category: Switch
+      model: S2750-28TP-EI-AC
+    1.3.6.1.4.1.2011.2.23.225:
+      category: Switch
+      model: S2750-28TP-PWR-EI-AC
+    1.3.6.1.4.1.2011.2.23.226:
+      category: Switch
+      model: S2750-20TP-PWR-EI-AC
+    1.3.6.1.4.1.2011.2.23.227:
+      category: Switch
+      model: S2350-28TP-PWR-EI-AC
+    1.3.6.1.4.1.2011.2.23.228:
+      category: Switch
+      model: S2350-20TP-PWR-EI-AC
+    1.3.6.1.4.1.2011.2.23.229:
+      category: Switch
+      model: S2328P-EI-AC
+    1.3.6.1.4.1.2011.2.23.230:
+      category: Switch
+      model: S3300-52P-EI
+    1.3.6.1.4.1.2011.2.23.231:
+      category: Switch
+      model: S1700-10GF-2P-PWR
+    1.3.6.1.4.1.2011.2.23.232:
+      category: Switch
+      model: S1700-28GFR-4P-PWR
+    1.3.6.1.4.1.2011.2.23.233:
+      category: Switch
+      model: S1700-52GFR-4P-PWR
+    1.3.6.1.4.1.2011.2.23.234:
+      category: Switch
+      model: S1700-28FR-2T2P-PWR
+    1.3.6.1.4.1.2011.2.23.235:
+      category: Switch
+      model: S1700-10GF-2P
+    1.3.6.1.4.1.2011.2.23.236:
+      category: Switch
+      model: S1700-24GR
+    1.3.6.1.4.1.2011.2.23.237:
+      category: Switch
+      model: S3700-28TP-EI-24S-DC
+    1.3.6.1.4.1.2011.2.23.238:
+      category: Switch
+      model: S5701-28X-LI-AC
+    1.3.6.1.4.1.2011.2.23.239:
+      category: Switch
+      model: S5701-28X-LI-24S-AC
+    1.3.6.1.4.1.2011.2.23.240:
+      category: Switch
+      model: S5700-28P-LI-BAT
+    1.3.6.1.4.1.2011.2.23.241:
+      category: Switch
+      model: S5700-28P-LI-4AH
+    1.3.6.1.4.1.2011.2.23.242:
+      category: Switch
+      model: S5700-28P-LI-24S-BAT
+    1.3.6.1.4.1.2011.2.23.243:
+      category: Switch
+      model: S5700-28P-LI-24S-4AH
+    1.3.6.1.4.1.2011.2.23.244:
+      category: Switch
+      model: S5300-28P-LI-BAT
+    1.3.6.1.4.1.2011.2.23.245:
+      category: Switch
+      model: S5300-28P-LI-4AH
+    1.3.6.1.4.1.2011.2.23.246:
+      category: Switch
+      model: S5300-28P-LI-24S-BAT
+    1.3.6.1.4.1.2011.2.23.247:
+      category: Switch
+      model: S5300-28P-LI-24S-4AH
+    1.3.6.1.4.1.2011.2.23.248:
+      category: Switch
+      model: S5700-52X-LI-48CS-AC
+    1.3.6.1.4.1.2011.2.23.249:
+      category: Switch
+      model: S5700-52X-LI-48CS-DC
+    1.3.6.1.4.1.2011.2.23.250:
+      category: Switch
+      model: S5300-52X-LI-48CS-AC
+    1.3.6.1.4.1.2011.2.23.251:
+      category: Switch
+      model: S5300-52X-LI-48CS-DC
+    1.3.6.1.4.1.2011.2.23.252:
+      category: Switch
+      model: S5310-108C-PWR-HI
+    1.3.6.1.4.1.2011.2.23.253:
+      category: Switch
+      model: S5300-10P-PWR-LI-AC
+    1.3.6.1.4.1.2011.2.23.254:
+      category: Switch
+      model: S5300-28P-PWR-LI-AC
+    1.3.6.1.4.1.2011.2.23.255:
+      category: Switch
+      model: S5300-52P-PWR-LI-AC
+    1.3.6.1.4.1.2011.2.23.256:
+      category: Switch
+      model: S5300-52X-LI-AC
+    1.3.6.1.4.1.2011.2.23.257:
+      category: Switch
+      model: S5300-52X-LI-DC
+    1.3.6.1.4.1.2011.2.23.258:
+      category: Switch
+      model: S5300-28X-PWR-LI-AC
+    1.3.6.1.4.1.2011.2.23.259:
+      category: Switch
+      model: S5300-52X-PWR-LI-AC
+    1.3.6.1.4.1.2011.2.23.260:
+      category: Switch
+      model: S2350-28TP-EI-DC
+    1.3.6.1.4.1.2011.2.23.261:
+      category: Switch
+      model: S5700-28TP-LI-AC
+    1.3.6.1.4.1.2011.2.23.262:
+      category: Switch
+      model: S5700-28TP-PWR-LI-AC
+    1.3.6.1.4.1.2011.2.23.263:
+      category: Switch
+      model: S5701-28TP-PWR-LI-AC
+    1.3.6.1.4.1.2011.2.23.264:
+      category: Switch
+      model: S5720-56C-HI-AC
+    1.3.6.1.4.1.2011.2.23.265:
+      category: Switch
+      model: S5720-56C-PWR-HI-AC
+    1.3.6.1.4.1.2011.2.23.266:
+      category: Switch
+      model: S5720-32C-HI-24S-AC
+    1.3.6.1.4.1.2011.2.23.267:
+      category: Switch
+      model: S1720-28GFR-4TP
+    1.3.6.1.4.1.2011.2.23.268:
+      category: Switch
+      model: S1720-20GFR-4TP
+    1.3.6.1.4.1.2011.2.23.269:
+      category: Switch
+      model: S2720-28TP-EI-AC
+    1.3.6.1.4.1.2011.2.23.270:
+      category: Switch
+      model: S5720-36C-EI-28S-AC
+    1.3.6.1.4.1.2011.2.23.271:
+      category: Switch
+      model: S5320-36C-EI-28S-AC
+    1.3.6.1.4.1.2011.2.23.272:
+      category: Switch
+      model: S5320-36C-EI-28S-DC
+    1.3.6.1.4.1.2011.2.23.273:
+      category: Switch
+      model: S5720-56C-EI-48S-AC
+    1.3.6.1.4.1.2011.2.23.274:
+      category: Switch
+      model: S5320-56C-EI-48S-AC
+    1.3.6.1.4.1.2011.2.23.275:
+      category: Switch
+      model: S5320-56C-EI-48S-DC
+    1.3.6.1.4.1.2011.2.23.276:
+      category: Switch
+      model: S5720-36C-EI-AC
+    1.3.6.1.4.1.2011.2.23.277:
+      category: Switch
+      model: S5320-36C-EI-AC
+    1.3.6.1.4.1.2011.2.23.278:
+      category: Switch
+      model: S5320-36C-EI-DC
+    1.3.6.1.4.1.2011.2.23.279:
+      category: Switch
+      model: S5720-36PC-EI-AC
+    1.3.6.1.4.1.2011.2.23.280:
+      category: Switch
+      model: S5320-36PC-EI-AC
+    1.3.6.1.4.1.2011.2.23.281:
+      category: Switch
+      model: S5320-36PC-EI-DC
+    1.3.6.1.4.1.2011.2.23.282:
+      category: Switch
+      model: S5720-56C-EI-AC
+    1.3.6.1.4.1.2011.2.23.283:
+      category: Switch
+      model: S5320-56C-EI-AC
+    1.3.6.1.4.1.2011.2.23.284:
+      category: Switch
+      model: S5320-56C-EI-DC
+    1.3.6.1.4.1.2011.2.23.285:
+      category: Switch
+      model: S5720-56PC-EI-AC
+    1.3.6.1.4.1.2011.2.23.286:
+      category: Switch
+      model: S5320-56PC-EI-AC
+    1.3.6.1.4.1.2011.2.23.287:
+      category: Switch
+      model: S5320-56PC-EI-DC
+    1.3.6.1.4.1.2011.2.23.288:
+      category: Switch
+      model: S5720-36C-PWR-EI-AC
+    1.3.6.1.4.1.2011.2.23.289:
+      category: Switch
+      model: S5320-36C-PWR-EI-AC
+    1.3.6.1.4.1.2011.2.23.290:
+      category: Switch
+      model: S5320-36C-PWR-EI-DC
+    1.3.6.1.4.1.2011.2.23.291:
+      category: Layer 3 Switch
+      model: S5720-56C-PWR-EI-AC
+    1.3.6.1.4.1.2011.2.23.292:
+      category: Switch
+      model: S5320-56C-PWR-EI-AC
+    1.3.6.1.4.1.2011.2.23.293:
+      category: Switch
+      model: S5720-56C-PWR-EI-AC1
+    1.3.6.1.4.1.2011.2.23.294:
+      category: Switch
+      model: S5720-32X-EI-24S-AC
+    1.3.6.1.4.1.2011.2.23.295:
+      category: Layer 3 Switch
+      model: S5320-32X-EI-24S
+    1.3.6.1.4.1.2011.2.23.296:
+      category: Switch
+      model: S5320-32X-EI-24S-DC
+    1.3.6.1.4.1.2011.2.23.297:
+      category: Switch
+      model: S5720-50X-EI-46S-AC
+    1.3.6.1.4.1.2011.2.23.298:
+      category: Switch
+      model: S5320-50X-EI-46S-AC
+    1.3.6.1.4.1.2011.2.23.299:
+      category: Switch
+      model: S5320-50X-EI-46S-DC
+    1.3.6.1.4.1.2011.2.23.300:
+      category: Switch
+      model: S5720-32X-EI-AC
+    1.3.6.1.4.1.2011.2.23.301:
+      category: Switch
+      model: S5320-32X-EI-AC
+    1.3.6.1.4.1.2011.2.23.302:
+      category: Switch
+      model: S5320-32X-EI-DC
+    1.3.6.1.4.1.2011.2.23.303:
+      category: Switch
+      model: S5720-32P-EI-AC
+    1.3.6.1.4.1.2011.2.23.304:
+      category: Switch
+      model: S5320-32P-EI-AC
+    1.3.6.1.4.1.2011.2.23.305:
+      category: Switch
+      model: S5320-32P-EI-DC
+    1.3.6.1.4.1.2011.2.23.306:
+      category: Switch
+      model: S5720-52X-EI-AC
+    1.3.6.1.4.1.2011.2.23.307:
+      category: Switch
+      model: S5320-52X-EI-AC
+    1.3.6.1.4.1.2011.2.23.308:
+      category: Switch
+      model: S5320-52X-EI-DC
+    1.3.6.1.4.1.2011.2.23.309:
+      category: Switch
+      model: S5720-52P-EI-AC
+    1.3.6.1.4.1.2011.2.23.310:
+      category: Switch
+      model: S5320-52P-EI-AC
+    1.3.6.1.4.1.2011.2.23.311:
+      category: Switch
+      model: S5320-52P-EI-DC
+    1.3.6.1.4.1.2011.2.23.312:
+      category: Switch
+      model: S5720-50X-EI-AC
+    1.3.6.1.4.1.2011.2.23.313:
+      category: Switch
+      model: S5320-50X-EI-AC
+    1.3.6.1.4.1.2011.2.23.314:
+      category: Switch
+      model: S5320-50X-EI-DC
+    1.3.6.1.4.1.2011.2.23.325:
+      category: Layer 3 Switch
+      model: S5720-28P-SI-AC
+    1.3.6.1.4.1.2011.2.23.327:
+      category: Layer 3 Switch
+      model: S5720-28X-SI-AC
+    1.3.6.1.4.1.2011.2.23.329:
+      category: Layer 3 Switch
+      model: S5720-52P-SI-AC
+    1.3.6.1.4.1.2011.2.23.331:
+      category: Layer 3 Switch
+      model: S5720-52X-SI-AC
+    1.3.6.1.4.1.2011.2.23.332:
+      category: Layer 3 Switch
+      model: S5320-52X-SI-AC
+    1.3.6.1.4.1.2011.2.23.333:
+      category: Layer 3 Switch
+      model: S5720-28X-PWR-SI-AC
+    1.3.6.1.4.1.2011.2.23.334:
+      category: Layer 3 Switch
+      model: S5320-28X-PWR-SI-AC
+    1.3.6.1.4.1.2011.2.23.335:
+      category: Layer 3 Switch
+      model: S5720-52X-PWR-SI-AC
+    1.3.6.1.4.1.2011.2.23.336:
+      category: Layer 3 Switch
+      model: S5720-52X-PWR-SI-ACF
+    1.3.6.1.4.1.2011.2.23.340:
+      category: Layer 3 Switch
+      model: S6720-30C-EI-24S-AC
+    1.3.6.1.4.1.2011.2.23.343:
+      category: Layer 3 Switch
+      model: S6720-54C-EI-48S-AC
+    1.3.6.1.4.1.2011.2.23.394:
+      category: Switch
+      model: S5720-12TP-LI-AC
+    1.3.6.1.4.1.2011.2.23.398:
+      category: Switch
+      model: S5720-12TP-PWR-LI-AC
+    1.3.6.1.4.1.2011.2.23.399:
+      category: Layer 3 Switch
+      model: S5720S-12TP-PWR-LI-AC
+    1.3.6.1.4.1.2011.2.23.406:
+      category: Layer 3 Switch
+      model: S5720-28X-LI-AC
+    1.3.6.1.4.1.2011.2.23.413:
+      category: Layer 3 Switch
+      model: S5720-28P-PWR-LI-AC
+    1.3.6.1.4.1.2011.2.23.414:
+      category: Layer 3 Switch
+      model: S5720S-28P-PWR-LI-AC
+    1.3.6.1.4.1.2011.2.23.417:
+      category: Layer 3 Switch
+      model: S1720-28GWR-PWR-4P
+    1.3.6.1.4.1.2011.2.23.418:
+      category: Layer 3 Switch
+      model: S5720-28X-PWR-LI-AC
+    1.3.6.1.4.1.2011.2.23.425:
+      category: Layer 3 Switch
+      model: S5720-52P-LI-AC
+    1.3.6.1.4.1.2011.2.23.431:
+      category: Layer 3 Switch
+      model: S5720-52X-LI-AC
+    1.3.6.1.4.1.2011.2.23.435:
+      category: Switch
+      model: S1720-52GWR-4P
+    1.3.6.1.4.1.2011.2.23.437:
+      category: Layer 3 Switch
+      model: S5720-52P-PWR-LI-AC
+    1.3.6.1.4.1.2011.2.23.444:
+      category: Layer 3 Switch
+      model: S5720-52X-PWR-LI-AC
+    1.3.6.1.4.1.2011.2.23.462:
+      category: Switch
+      model: S5720-28TP-PWR-LI-AC
+    1.3.6.1.4.1.2011.2.23.464:
+      category: Switch
+      model: S5720-28TP-LI-AC
+    1.3.6.1.4.1.2011.2.23.515:
+      category: Layer 3 Switch
+      model: S5320-28TP-LI-AC
+    1.3.6.1.4.1.2011.2.23.519:
+      category: Layer 3 Switch
+      model: S2720-12TP-EI
+    1.3.6.1.4.1.2011.2.23.524:
+      category: Layer 3 Switch
+      model: S2720-52TP-EI
+    1.3.6.1.4.1.2011.2.23.529:
+      category: Layer 3 Switch
+      model: S2720-28TP-EI
+    1.3.6.1.4.1.2011.2.23.532:
+      model: S2720-28TP-PWR-EI
+      category: Switch
+    1.3.6.1.4.1.2011.2.23.540:
+      category: Switch
+      model: S6720-26Q-SI-24S-AC
+    1.3.6.1.4.1.2011.2.23.542:
+      category: Switch
+      model: S6720S-16X-LI-16S-AC
+    1.3.6.1.4.1.2011.2.23.545:
+      category: Switch
+      model: S6720-32X-LI-32S-AC
+    1.3.6.1.4.1.2011.2.23.547:
+      category: Switch
+      model: S6720-32X-SI-32S-AC
+    1.3.6.1.4.1.2011.2.23.566:
+      category: Layer 3 Switch
+      model: S5730-48C-SI-AC
+    1.3.6.1.4.1.2011.2.23.568:
+      category: Layer 3 Switch
+      model: S5730-48C-PWR-SI-AC
+    1.3.6.1.4.1.2011.2.23.576:
+      category: Switch
+      model: S5720-28P-LI-AC
+    1.3.6.1.4.1.2011.2.23.577:
+      category: Layer 3 Switch
+      model: S5720-28P-PWR-LI-AC
+    1.3.6.1.4.1.2011.2.23.582:
+      category: Layer 3 Switch
+      model: S5720-52P-PWR-LI-AC
+    1.3.6.1.4.1.2011.2.23.603:
+      category: Layer 3 Switch
+      model: S5730-60C-HI
+    1.3.6.1.4.1.2011.2.23.604:
+      category: Layer 3 Switch
+      model: S5730-68C-HI
+    1.3.6.1.4.1.2011.2.23.606:
+      category: Layer 3 Switch
+      model: S5730-68C-PWH-HI
+    1.3.6.1.4.1.2011.2.23.665:
+      category: Switch
+      model: CloudEngine S6730-H48X6C
+    1.3.6.1.4.1.2011.2.23.667:
+      category: Switch
+      model: CloudEngine S6730-H24X6C
+    1.3.6.1.4.1.2011.2.23.668:
+      category: Layer 3 Switch
+      model: CloudEngine S6330-H24X6C
+    1.3.6.1.4.1.2011.2.23.680:
+      category: Layer 3 Switch
+      model: CloudEngine S5731-H24T4XC
+    1.3.6.1.4.1.2011.2.23.681:
+      category: Layer 3 Switch
+      model: CloudEngine 5882-48T4S-B
+    1.3.6.1.4.1.2011.2.23.682:
+      category: Layer 3 Switch
+      model: CloudEngine S5731-H24P4XC
+    1.3.6.1.4.1.2011.2.23.683:
+      category: Switch
+      model: CloudEngine S5731-H48P4XC
+    1.3.6.1.4.1.2011.2.23.687:
+      category: Layer 3 Switch
+      model: CloudEngine S5731-S24T4X
+    1.3.6.1.4.1.2011.2.23.689:
+      category: Layer 3 Switch
+      model: CloudEngine S5331-H24T4XC
+    1.3.6.1.4.1.2011.2.23.690:
+      category: Layer 3 Switch
+      model: CloudEngine S5731-S24P4X
+    1.3.6.1.4.1.2011.2.23.693:
+      category: Layer 3 Switch
+      model: CloudEngine S5731-S48T4X
+    1.3.6.1.4.1.2011.2.23.696:
+      category: Layer 3 Switch
+      model: CloudEngine S5731-S48P4X
+    1.3.6.1.4.1.2011.2.23.704:
+      category: Switch
+      model: S6730S-S24X6Q-A
+    1.3.6.1.4.1.2011.2.23.707:
+      category: Layer 3 Switch
+      model: S5735-L24T4S-A
+    1.3.6.1.4.1.2011.2.23.712:
+      category: Layer 3 Switch
+      model: CloudEngine S5735-L12T4S-A
+    1.3.6.1.4.1.2011.2.23.715:
+      category: Layer 3 Switch
+      model: S5735-L24T4X-A
+    1.3.6.1.4.1.2011.2.23.718:
+      category: Layer 3 Switch
+      model: CloudEngine S5735-L12P4S-A
+    1.3.6.1.4.1.2011.2.23.721:
+      model: S5735-L24P4S-A
+      category: Switch
+    1.3.6.1.4.1.2011.2.23.725:
+      category: Layer 3 Switch
+      model: CloudEngine S5735-L24P4X-A
+    1.3.6.1.4.1.2011.2.23.731:
+      category: Layer 3 Switch
+      model: S5735-S32ST4X
+    1.3.6.1.4.1.2011.2.23.734:
+      category: Layer 3 Switch
+      model: S5735-L48T4S-A
+    1.3.6.1.4.1.2011.2.23.740:
+      category: Layer 3 Switch
+      model: CloudEngine S5735-S24T4X
+    1.3.6.1.4.1.2011.2.23.743:
+      category: Layer 3 Switch
+      model: CloudEngine S5735-S24P4X
+    1.3.6.1.4.1.2011.2.23.745:
+      category: Layer 3 Switch
+      model: CloudEngine S5735-S48T4X
+    1.3.6.1.4.1.2011.2.23.748:
+      category: Layer 3 Switch
+      model: CloudEngine S5735-S48P4X
+    1.3.6.1.4.1.2011.2.23.750:
+      category: Layer 3 Switch
+      model: CloudEngine S5735-L48P4X-A
+    1.3.6.1.4.1.2011.2.23.752:
+      category: Switch
+      model: CloudEngine S5735S-L48P4S-A
+    1.3.6.1.4.1.2011.2.23.756:
+      category: Switch
+      model: CloudEngine S5735-S8P2X-IA200G1
+    1.3.6.1.4.1.2011.2.23.763:
+      category: Switch
+      model: S6730S-H24X6C-A
+    1.3.6.1.4.1.2011.2.23.776:
+      category: Switch
+      model: CloudEngine S5732-H48UM2CC
+    1.3.6.1.4.1.2011.2.23.777:
+      category: Switch
+      model: CloudEngine S5732-H24UM2CC
+    1.3.6.1.4.1.2011.2.23.779:
+      category: Layer 3 Switch
+      model: CloudEngine S5732-H48XUM2CC
+    1.3.6.1.4.1.2011.2.23.798:
+      category: Layer 3 Switch
+      model: CloudEngine S5735S-S48P4X-A
+    1.3.6.1.4.1.2011.2.23.809:
+      category: Layer 3 Switch
+      model: S5736-S24UM4XC
+    1.3.6.1.4.1.2011.2.23.820:
+      category: Layer 3 Switch
+      model: CloudEngine S5736-S48U4XC
+    1.3.6.1.4.1.2011.2.23.823:
+      category: Layer 3 Switch
+      model: CloudEngine S5736-S24S4XC
+    1.3.6.1.4.1.2011.2.23.849:
+      category: Layer 3 Switch
+      model: CloudEngine S5735-L8P4X-A1
+    1.3.6.1.4.1.2011.2.23.860:
+      category: Layer 3 Switch
+      model: CloudEngine S5735-L24T4X-A1
+    1.3.6.1.4.1.2011.2.23.864:
+      category: Layer 3 Switch
+      model: CloudEngine S5735-L24T4S-A1
+    1.3.6.1.4.1.2011.2.23.878:
+      category: Layer 3 Switch
+      model: CloudEngine S5735-L24P4S-A1
+    1.3.6.1.4.1.2011.2.23.889:
+      category: Layer 3 Switch
+      model: CloudEngine S5735-L48T4X-A1
+    1.3.6.1.4.1.2011.2.23.900:
+      category: Layer 3 Switch
+      model: CloudEngine S5735-L48P4X-A1
+    1.3.6.1.4.1.2011.2.23.920:
+      category: Layer 3 Switch
+      model: CloudEngine S6730-H48X6C-V2
+    1.3.6.1.4.1.2011.2.23.1077:
+      category: Layer 3 Switch
+      model: CloudEngine S5735-L-V2
+    1.3.6.1.4.1.2011.2.23.1092:
+      category: Layer 3 Switch
+      model: CloudEngine S5735-S24T4XE-V2
+    1.3.6.1.4.1.2011.2.23.1097:
+      category: Layer 3 Switch
+      model: CloudEngine S5735-L-V2
+    1.3.6.1.4.1.2011.2.23.1101:
+      category: Layer 3 Switch
+      model: CloudEngine S5735-S24P4XE-V2
+    1.3.6.1.4.1.2011.2.23.1108:
+      category: Layer 3 Switch
+      model: CloudEngine S5735-S48T4XE-V2
+    1.3.6.1.4.1.2011.2.23.1111:
+      category: Layer 3 Switch
+      model: CloudEngine S5735-L48LP4XE-A-V2
+    1.3.6.1.4.1.2011.2.26.1:
+      model: NE16E
+      category: Router
+    1.3.6.1.4.1.2011.2.26.2:
+      model: NE08E
+      category: Router
+    1.3.6.1.4.1.2011.2.26.3:
+      category: Router
+      model: ne05
+    1.3.6.1.4.1.2011.2.28:
+      category: Router
+      model: umg8900
+    1.3.6.1.4.1.2011.2.29:
+      category: Router
+      model: QuidWay NetEngine NE40-2
+    1.3.6.1.4.1.2011.2.30:
+      category: Router
+      model: QuidWay NetEngine NE40-4
+    1.3.6.1.4.1.2011.2.31:
+      category: Router
+      model: QuidWay NetEngine NE40-8
+    1.3.6.1.4.1.2011.2.33.7:
+      category: Router
+      model: hw8040If
+    1.3.6.1.4.1.2011.2.33.20:
+      category: Router
+      model: aR46-E200
+    1.3.6.1.4.1.2011.2.39.1:
+      category: Wireless
+      model: wlanApCommon
+    1.3.6.1.4.1.2011.2.39.2:
+      category: Wireless
+      model: wlanApWA1003
+    1.3.6.1.4.1.2011.2.39.3:
+      category: Wireless
+      model: wlanApWA1003A
+    1.3.6.1.4.1.2011.2.39.4:
+      category: Wireless
+      model: wlanApWA1005
+    1.3.6.1.4.1.2011.2.39.5:
+      category: Wireless
+      model: wlanApWA1008
+    1.3.6.1.4.1.2011.2.39.6:
+      category: Wireless
+      model: wlanApWA1208
+    1.3.6.1.4.1.2011.2.39.7:
+      category: Wireless
+      model: wlanApWA1208H
+    1.3.6.1.4.1.2011.2.39.8:
+      category: Wireless
+      model: wlanApWA1006E
+    1.3.6.1.4.1.2011.2.39.9:
+      category: Wireless
+      model: wlanBridgeWB2010
+    1.3.6.1.4.1.2011.2.39.10:
+      category: Wireless
+      model: wlanBridgeWB2011
+    1.3.6.1.4.1.2011.2.39.11:
+      category: Wireless
+      model: wa1208E
+    1.3.6.1.4.1.2011.2.39.12:
+      category: Wireless
+      model: wlanAp6010DN
+    1.3.6.1.4.1.2011.2.39.13:
+      category: Wireless
+      model: wlanAp6010SN
+    1.3.6.1.4.1.2011.2.39.14:
+      category: Wireless
+      model: wlanAp6510DN-US
+    1.3.6.1.4.1.2011.2.39.15:
+      category: Wireless
+      model: wlanAp6610DN-US
+    1.3.6.1.4.1.2011.2.39.16:
+      category: Wireless
+      model: wlanAp6610DN
+    1.3.6.1.4.1.2011.2.39.17:
+      category: Wireless
+      model: wlanAp6510DN
+    1.3.6.1.4.1.2011.2.39.18:
+      category: Wireless
+      model: wlanAp5010DN
+    1.3.6.1.4.1.2011.2.39.19:
+      category: Wireless
+      model: wlanAp3010DN
+    1.3.6.1.4.1.2011.2.39.20:
+      category: Wireless
+      model: wlanAp5010SN
+    1.3.6.1.4.1.2011.2.39.21:
+      category: Wireless
+      model: wlanAp5030DN
+    1.3.6.1.4.1.2011.2.39.22:
+      category: Wireless
+      model: wlanAp5130DN
+    1.3.6.1.4.1.2011.2.39.23:
+      category: Wireless
+      model: wlanAp8030DN
+    1.3.6.1.4.1.2011.2.39.24:
+      category: Wireless
+      model: wlanAp8130DN
+    1.3.6.1.4.1.2011.2.39.25:
+      category: Wireless
+      model: wlanAp9130DN
+    1.3.6.1.4.1.2011.2.39.27:
+      category: Wireless
+      model: wlanAt815SN
+    1.3.6.1.4.1.2011.2.39.28:
+      category: Wireless
+      model: wlanAp7110DN
+    1.3.6.1.4.1.2011.2.39.29:
+      category: Wireless
+      model: wlanAp7110SN
+    1.3.6.1.4.1.2011.2.39.77:
+      category: Access Point
+      model: AP7060DN
+    1.3.6.1.4.1.2011.2.39.92:
+      category: Access Point
+      model: AirEngine 5760-10
+    1.3.6.1.4.1.2011.2.39.99:
+      category: Access Point
+      model: AirEngine 5760-51
+    1.3.6.1.4.1.2011.2.39.105:
+      category: Access Point
+      model: AirEngine 6760R-51E
+    1.3.6.1.4.1.2011.2.39.111:
+      category: Access Point
+      model: AirEngine 6760-X1E
+    1.3.6.1.4.1.2011.2.39.112:
+      category: Access Point
+      model: AirEngine 8760-X1-PRO
+    1.3.6.1.4.1.2011.2.39.115:
+      category: Access Point
+      model: AirEngine 6761-21T
+    1.3.6.1.4.1.2011.2.39.117:
+      category: Access Point
+      model: AirEngine 5761-21
+    1.3.6.1.4.1.2011.2.39.120:
+      category: Access Point
+      model: AirEngine 5761-11
+    1.3.6.1.4.1.2011.2.39.129:
+      category: Access Point
+      model: AirEngine 5761R-11
+    1.3.6.1.4.1.2011.2.43:
+      category: Wireless
+      model: wlanApWA1006
+    1.3.6.1.4.1.2011.2.44:
+      model: AR46-20
+      category: Router
+    1.3.6.1.4.1.2011.2.45:
+      model: AR46-40
+      category: Router
+    1.3.6.1.4.1.2011.2.46:
+      model: AR46-80
+      category: Router
+    1.3.6.1.4.1.2011.2.47:
+      category: Router
+      model: QuidWay NetEngine NE20-2
+    1.3.6.1.4.1.2011.2.48:
+      category: Router
+      model: QuidWay NetEngine NE20-4
+    1.3.6.1.4.1.2011.2.49:
+      category: Router
+      model: QuidWay NetEngine NE20-8
+    1.3.6.1.4.1.2011.2.50:
+      category: Firewall
+      model: eudemon200
+    1.3.6.1.4.1.2011.2.51:
+      category: Firewall
+      model: eudemon1000
+    1.3.6.1.4.1.2011.2.55:
+      category: Router
+      model: ar18-18
+    1.3.6.1.4.1.2011.2.56:
+      category: Router
+      model: ar18-20
+    1.3.6.1.4.1.2011.2.57:
+      category: Router
+      model: ar18-30
+    1.3.6.1.4.1.2011.2.58:
+      category: Router
+      model: ar18-31
+    1.3.6.1.4.1.2011.2.59:
+      category: Router
+      model: ar18-32
+    1.3.6.1.4.1.2011.2.60:
+      category: Router
+      model: ar18-33
+    1.3.6.1.4.1.2011.2.61:
+      category: Router
+      model: ar18-34
+    1.3.6.1.4.1.2011.2.62:
+      category: Router
+      model: QuidWay NetEngine 5000E
+    1.3.6.1.4.1.2011.2.62.2:
+      category: Router
+      model: ne5000SysOid
+    1.3.6.1.4.1.2011.2.62.2.1:
+      category: Router
+      model: QuidWay NetEngine NE5000oem
+    1.3.6.1.4.1.2011.2.62.2.2:
+      category: Router
+      model: QuidWay NetEngine NE80E
+    1.3.6.1.4.1.2011.2.62.2.3:
+      category: Router
+      model: QuidWay NetEngine NE5000E
+    1.3.6.1.4.1.2011.2.62.2.3.1:
+      model: NE5000E
+      category: Router
+    1.3.6.1.4.1.2011.2.62.2.4:
+      category: Router
+      model: QuidWay NetEngine NE5000EMulti
+    1.3.6.1.4.1.2011.2.62.2.4.1:
+      model: NE5000E-Multi
+      category: Router
+    1.3.6.1.4.1.2011.2.62.2.5:
+      category: Router
+      model: QuidWay NetEngine NE40E
+    1.3.6.1.4.1.2011.2.62.2.6:
+      category: Router
+      model: QuidWay NetEngine NE5000E-BTB
+    1.3.6.1.4.1.2011.2.62.2.7:
+      category: Router
+      model: QuidWay NetEngine NE40E-4
+    1.3.6.1.4.1.2011.2.62.2.8:
+      category: Router
+      model: QuidWay NetEngine NE40E-X3
+    1.3.6.1.4.1.2011.2.62.2.9:
+      category: Router
+      model: QuidWay NetEngine NE40E-X8
+    1.3.6.1.4.1.2011.2.62.2.10:
+      category: Router
+      model: QuidWay NetEngine NE40E-X16
+    1.3.6.1.4.1.2011.2.62.2.11:
+      category: Router
+      model: QuidWay NetEngine NE5000E-X16
+    1.3.6.1.4.1.2011.2.62.2.12:
+      category: Router
+      model: QuidWay NetEngine NE40E-X1
+    1.3.6.1.4.1.2011.2.62.2.13:
+      category: Router
+      model: QuidWay NetEngine NE40E-X2
+    1.3.6.1.4.1.2011.2.62.2.17:
+      category: Router
+      model: QuidWay NetEngine NE40E-X16A
+    1.3.6.1.4.1.2011.2.62.2.18:
+      category: Router
+      model: QuidWay NetEngine NE40E-X8A
+    1.3.6.1.4.1.2011.2.62.2.19:
+      category: Router
+      model: QuidWay NetEngine NE5000E-X8A
+    1.3.6.1.4.1.2011.2.62.2.22:
+      category: Router
+      model: QuidWay NetEngine NE40E-X3A
+    1.3.6.1.4.1.2011.2.62.2.27:
+      category: Router
+      model: QuidWay NetEngine NE40E-X16B
+    1.3.6.1.4.1.2011.2.62.14:
+      category: Router
+      model: ne40E-X1-M4
+    1.3.6.1.4.1.2011.2.62.15:
+      category: Router
+      model: ne40E-X2-M8
+    1.3.6.1.4.1.2011.2.62.16:
+      category: Router
+      model: ne40E-X2-M16
+    1.3.6.1.4.1.2011.2.62.20:
+      category: Router
+      model: ne40E-M2E
+    1.3.6.1.4.1.2011.2.62.21:
+      category: Router
+      model: ne40E-M2F
+    1.3.6.1.4.1.2011.2.62.31:
+      category: Switch
+      model: NE40E-F1A-14H24Q
+    1.3.6.1.4.1.2011.2.65:
+      category: Firewall
+      model: eudemon2100
+    1.3.6.1.4.1.2011.2.66:
+      category: Firewall
+      model: eudemon2200
+    1.3.6.1.4.1.2011.2.77:
+      category: Firewall
+      model: eudemon500
+    1.3.6.1.4.1.2011.2.80:
+      category: Layer 3 Switch
+      model: SmartAX MA5603T
+    1.3.6.1.4.1.2011.2.80.8:
+      category: Layer 3 Switch
+      model: MA5600-V8
+    1.3.6.1.4.1.2011.2.83:
+      category: Firewall
+      model: secpath1800F
+    1.3.6.1.4.1.2011.2.84:
+      category: Firewall
+      model: eudemon2300
+    1.3.6.1.4.1.2011.2.85:
+      category: Switch
+      model: ma5100V600
+    1.3.6.1.4.1.2011.2.86:
+      category: Switch
+      model: ma5605
+    1.3.6.1.4.1.2011.2.87.1:
+      category: Router
+      model: cX200A
+    1.3.6.1.4.1.2011.2.87.2:
+      category: Router
+      model: cX200B
+    1.3.6.1.4.1.2011.2.87.3:
+      category: Router
+      model: cX300A
+    1.3.6.1.4.1.2011.2.87.4:
+      category: Router
+      model: cX300B
+    1.3.6.1.4.1.2011.2.87.5:
+      category: Router
+      model: cX500A
+    1.3.6.1.4.1.2011.2.87.6:
+      category: Router
+      model: cX380
+    1.3.6.1.4.1.2011.2.87.7:
+      category: Router
+      model: cX600-8
+    1.3.6.1.4.1.2011.2.87.8:
+      category: Router
+      model: cX600-16
+    1.3.6.1.4.1.2011.2.87.9:
+      category: Router
+      model: cX200C
+    1.3.6.1.4.1.2011.2.87.10:
+      category: Router
+      model: cX200D
+    1.3.6.1.4.1.2011.2.87.11:
+      category: Router
+      model: cX200D-EA
+    1.3.6.1.4.1.2011.2.87.12:
+      category: Router
+      model: cX200D-MC
+    1.3.6.1.4.1.2011.2.87.13:
+      category: Router
+      model: cX600-4
+    1.3.6.1.4.1.2011.2.87.14:
+      category: Router
+      model: cX380-PBT
+    1.3.6.1.4.1.2011.2.87.15:
+      category: Router
+      model: cX380-ME
+    1.3.6.1.4.1.2011.2.87.16:
+      category: Router
+      model: cX200D-EA-MC
+    1.3.6.1.4.1.2011.2.87.17:
+      category: Router
+      model: cX600-X3
+    1.3.6.1.4.1.2011.2.87.18:
+      category: Switch
+      model: Quidway CX600-X8
+    1.3.6.1.4.1.2011.2.87.19:
+      category: Router
+      model: cX600-X16
+    1.3.6.1.4.1.2011.2.87.20:
+      category: Router
+      model: cX600-X1
+    1.3.6.1.4.1.2011.2.87.21:
+      category: Router
+      model: cX600-X2
+    1.3.6.1.4.1.2011.2.87.22:
+      category: Router
+      model: cX600-X1DO
+    1.3.6.1.4.1.2011.2.87.23:
+      category: Router
+      model: cX600-X2DO
+    1.3.6.1.4.1.2011.2.87.24:
+      category: Router
+      model: cX600-X3DO
+    1.3.6.1.4.1.2011.2.87.25:
+      category: Router
+      model: cX600-X8DO
+    1.3.6.1.4.1.2011.2.87.26:
+      category: Router
+      model: cX600-X16DO
+    1.3.6.1.4.1.2011.2.87.27:
+      category: Router
+      model: cX600-X1-M4
+    1.3.6.1.4.1.2011.2.87.28:
+      category: Router
+      model: cX600-X2-M8
+    1.3.6.1.4.1.2011.2.87.29:
+      category: Router
+      model: cX600-X2-M16
+    1.3.6.1.4.1.2011.2.87.30:
+      category: Router
+      model: cX600-M4-DO
+    1.3.6.1.4.1.2011.2.87.31:
+      category: Router
+      model: cX600-M8-DO
+    1.3.6.1.4.1.2011.2.87.32:
+      category: Router
+      model: cX600-M16-DO
+    1.3.6.1.4.1.2011.2.87.33:
+      category: Router
+      model: cX600-X8A
+    1.3.6.1.4.1.2011.2.87.34:
+      category: Router
+      model: cX600-X16A
+    1.3.6.1.4.1.2011.2.87.35:
+      category: Router
+      model: cX600-M2E
+    1.3.6.1.4.1.2011.2.87.36:
+      category: Router
+      model: cX600-M2F
+    1.3.6.1.4.1.2011.2.88:
+      category: Router
+      model: QuidWay NetEngine 20E
+    1.3.6.1.4.1.2011.2.88.1:
+      category: Router
+      model: ne20E-4
+    1.3.6.1.4.1.2011.2.88.2:
+      model: NE20E-8
+      category: Router
+    1.3.6.1.4.1.2011.2.88.3:
+      category: Router
+      model: ne20E-X6
+    1.3.6.1.4.1.2011.2.88.4:
+      category: Router
+      model: NetEngine20E-S4
+    1.3.6.1.4.1.2011.2.88.5:
+      category: Router
+      model: ne20E-S8
+    1.3.6.1.4.1.2011.2.88.6:
+      category: Router
+      model: ne20E-S16
+    1.3.6.1.4.1.2011.2.88.7:
+      category: Router
+      model: ne20E-S2E
+    1.3.6.1.4.1.2011.2.88.8:
+      category: Switch
+      model: NE20E-S2F
+    1.3.6.1.4.1.2011.2.88.9:
+      category: Router
+      model: NetEngine20E-S8A
+    1.3.6.1.4.1.2011.2.89.1:
+      category: Router
+      model: me60-16
+    1.3.6.1.4.1.2011.2.89.3:
+      category: Router
+      model: me60-4
+    1.3.6.1.4.1.2011.2.89.4:
+      category: Router
+      model: me60-X3
+    1.3.6.1.4.1.2011.2.89.5:
+      category: Router
+      model: me60-X8
+    1.3.6.1.4.1.2011.2.89.6:
+      category: Router
+      model: me60-X16
+    1.3.6.1.4.1.2011.2.91:
+      category: Firewall
+      model: IPSAN
+    1.3.6.1.4.1.2011.2.109:
+      category: Switch
+      model: ma5606
+    1.3.6.1.4.1.2011.2.114:
+      category: Firewall
+      model: eudemonVPN3900
+    1.3.6.1.4.1.2011.2.116:
+      category: Firewall
+      model: eudemon100E
+    1.3.6.1.4.1.2011.2.117:
+      category: Firewall
+      model: eudemon200E
+    1.3.6.1.4.1.2011.2.118:
+      category: Firewall
+      model: eudemon200S
+    1.3.6.1.4.1.2011.2.123:
+      category: Layer 3 Switch
+      model: MA5603T
+    1.3.6.1.4.1.2011.2.124:
+      category: Firewall
+      model: svn3000
+    1.3.6.1.4.1.2011.2.125:
+      category: Firewall
+      model: usg5000
+    1.3.6.1.4.1.2011.2.127:
+      category: Firewall
+      model: eudemon200s
+    1.3.6.1.4.1.2011.2.128:
+      category: Switch
+      model: ma5620E
+    1.3.6.1.4.1.2011.2.129:
+      category: Firewall
+      model: sig1000
+    1.3.6.1.4.1.2011.2.130:
+      category: Firewall
+      model: sig9280
+    1.3.6.1.4.1.2011.2.131:
+      category: Firewall
+      model: sig2000
+    1.3.6.1.4.1.2011.2.132:
+      category: Switch
+      model: ma5626E
+    1.3.6.1.4.1.2011.2.133:
+      category: Switch
+      model: ma5683
+    1.3.6.1.4.1.2011.2.134:
+      category: Switch
+      model: ma5620G
+    1.3.6.1.4.1.2011.2.135:
+      category: Switch
+      model: ma5626G
+    1.3.6.1.4.1.2011.2.136:
+      category: Switch
+      model: ma5651G
+    1.3.6.1.4.1.2011.2.137:
+      category: Switch
+      model: ma5651
+    1.3.6.1.4.1.2011.2.167:
+      category: Switch
+      model: ma5610
+    1.3.6.1.4.1.2011.2.168:
+      category: Switch
+      model: ma5652G
+    1.3.6.1.4.1.2011.2.169:
+      category: Switch
+      model: ma5616
+    1.3.6.1.4.1.2011.2.170.1:
+      category: Layer 3 Switch
+      model: Quidway S9303
+    1.3.6.1.4.1.2011.2.170.2:
+      category: Switch
+      model: Quidway S9306
+    1.3.6.1.4.1.2011.2.170.3:
+      category: Layer 3 Switch
+      model: Quidway S9312
+    1.3.6.1.4.1.2011.2.170.4:
+      category: Switch
+      model: vasp
+    1.3.6.1.4.1.2011.2.170.5:
+      category: Switch
+      model: s9303E
+    1.3.6.1.4.1.2011.2.170.6:
+      category: Switch
+      model: s9306E
+    1.3.6.1.4.1.2011.2.170.7:
+      category: Switch
+      model: s9312E
+    1.3.6.1.4.1.2011.2.172:
+      category: Switch
+      model: ma5603U
+    1.3.6.1.4.1.2011.2.174:
+      category: Switch
+      model: ma5618
+    1.3.6.1.4.1.2011.2.175.2:
+      category: Firewall
+      model: Secospace USG2110-F*Firewall is the secondary capability of this device.
+    1.3.6.1.4.1.2011.2.175.5:
+      category: Firewall
+      model: USG2110-A-GW-W
+    1.3.6.1.4.1.2011.2.177:
+      category: Firewall
+      model: sig9810
+    1.3.6.1.4.1.2011.2.178:
+      category: Firewall
+      model: sig9820
+    1.3.6.1.4.1.2011.2.184:
+      category: Switch
+      model: ma5612
+    1.3.6.1.4.1.2011.2.185:
+      category: Switch
+      model: ma5620
+    1.3.6.1.4.1.2011.2.186:
+      category: Switch
+      model: ma5626
+    1.3.6.1.4.1.2011.2.189.1:
+      category: Firewall
+      model: usg9110
+    1.3.6.1.4.1.2011.2.189.2:
+      category: Firewall
+      model: usg9120
+    1.3.6.1.4.1.2011.2.190:
+      category: Switch
+      model: ma5635
+    1.3.6.1.4.1.2011.2.195:
+      category: Switch
+      model: ma5662
+    1.3.6.1.4.1.2011.2.208.1:
+      model: NE40E-DPI
+      category: Router
+    1.3.6.1.4.1.2011.2.208.2:
+      model: NE80E-DPI
+      category: Router
+    1.3.6.1.4.1.2011.2.208.3:
+      category: Server
+      model: NE40E80E-DPI SERVER
+    1.3.6.1.4.1.2011.2.211.1:
+      model: NE40E-FW
+      category: Router
+    1.3.6.1.4.1.2011.2.211.2:
+      model: NE80E-FW
+      category: Router
+    1.3.6.1.4.1.2011.2.213:
+      category: Switch
+      model: ma5628
+    1.3.6.1.4.1.2011.2.219:
+      category: Switch
+      model: ma5631
+    1.3.6.1.4.1.2011.2.220.1:
+      category: Router
+      model: atn980
+    1.3.6.1.4.1.2011.2.220.2:
+      category: Router
+      model: atn990
+    1.3.6.1.4.1.2011.2.220.3:
+      category: Router
+      model: atn910
+    1.3.6.1.4.1.2011.2.220.4:
+      category: Router
+      model: atn950
+    1.3.6.1.4.1.2011.2.220.5:
+      category: Router
+      model: atn950B
+    1.3.6.1.4.1.2011.2.220.6:
+      category: Router
+      model: atn910IAc
+    1.3.6.1.4.1.2011.2.220.7:
+      category: Router
+      model: atn910IDc
+    1.3.6.1.4.1.2011.2.220.8:
+      category: Router
+      model: atn910ICAc
+    1.3.6.1.4.1.2011.2.220.9:
+      category: Router
+      model: atn910ITcDc
+    1.3.6.1.4.1.2011.2.220.10:
+      category: Router
+      model: atn910IPAc
+    1.3.6.1.4.1.2011.2.220.11:
+      category: Router
+      model: atn905Ac
+    1.3.6.1.4.1.2011.2.220.12:
+      category: Router
+      model: atn905AAc
+    1.3.6.1.4.1.2011.2.220.13:
+      category: Router
+      model: atn905APAc
+    1.3.6.1.4.1.2011.2.220.14:
+      category: Router
+      model: atn905-AV-Ac
+    1.3.6.1.4.1.2011.2.220.15:
+      category: Router
+      model: atn910B
+    1.3.6.1.4.1.2011.2.220.16:
+      category: Router
+      model: atn910I-D-Dc
+    1.3.6.1.4.1.2011.2.220.17:
+      category: Router
+      model: atn910I-D-Ac
+    1.3.6.1.4.1.2011.2.220.18:
+      category: Router
+      model: atn910I-B-Dc
+    1.3.6.1.4.1.2011.2.220.19:
+      category: Router
+      model: atn910I-E-Dc
+    1.3.6.1.4.1.2011.2.220.20:
+      category: Router
+      model: atn905V-Ac
+    1.3.6.1.4.1.2011.2.220.21:
+      category: Router
+      model: atn905-Dc
+    1.3.6.1.4.1.2011.2.221:
+      category: Switch
+      model: ma5652
+    1.3.6.1.4.1.2011.2.222:
+      category: Switch
+      model: ma5622
+    1.3.6.1.4.1.2011.2.223.1:
+      category: Layer 3 Switch
+      model: S7703
+    1.3.6.1.4.1.2011.2.223.2:
+      category: Layer 3 Switch
+      model: S7706
+    1.3.6.1.4.1.2011.2.223.3:
+      category: Layer 3 Switch
+      model: S7712
+    1.3.6.1.4.1.2011.2.224.2:
+      category: Router
+      model: ar1220w
+    1.3.6.1.4.1.2011.2.224.3:
+      category: Router
+      model: ar1240
+    1.3.6.1.4.1.2011.2.224.4:
+      category: Router
+      model: ar1240w
+    1.3.6.1.4.1.2011.2.224.5:
+      category: Router
+      model: AR2220
+    1.3.6.1.4.1.2011.2.224.6:
+      category: Router
+      model: AR2240
+    1.3.6.1.4.1.2011.2.224.7:
+      category: Router
+      model: AR3260
+    1.3.6.1.4.1.2011.2.224.8:
+      category: Router
+      model: ar1220v
+    1.3.6.1.4.1.2011.2.224.9:
+      category: Router
+      model: ar201
+    1.3.6.1.4.1.2011.2.224.10:
+      category: Router
+      model: ar206
+    1.3.6.1.4.1.2011.2.224.11:
+      category: Router
+      model: ar207
+    1.3.6.1.4.1.2011.2.224.12:
+      category: Router
+      model: ar207v
+    1.3.6.1.4.1.2011.2.224.13:
+      category: Router
+      model: ar208e
+    1.3.6.1.4.1.2011.2.224.14:
+      category: Router
+      model: ar1220vw
+    1.3.6.1.4.1.2011.2.224.15:
+      category: Router
+      model: ar1220s
+    1.3.6.1.4.1.2011.2.224.16:
+      category: Router
+      model: ar1220ws
+    1.3.6.1.4.1.2011.2.224.24:
+      category: Router
+      model: ar207vp
+    1.3.6.1.4.1.2011.2.224.25:
+      category: Router
+      model: ar201s
+    1.3.6.1.4.1.2011.2.224.26:
+      category: Router
+      model: ar207s
+    1.3.6.1.4.1.2011.2.224.27:
+      category: Router
+      model: ar151
+    1.3.6.1.4.1.2011.2.224.28:
+      category: Router
+      model: ar157
+    1.3.6.1.4.1.2011.2.224.29:
+      category: Router
+      model: ar2220s
+    1.3.6.1.4.1.2011.2.224.30:
+      category: Router
+      model: ar1220l
+    1.3.6.1.4.1.2011.2.224.31:
+      category: Router
+      model: ar207g-hspa7
+    1.3.6.1.4.1.2011.2.224.32:
+      category: Router
+      model: ar156
+    1.3.6.1.4.1.2011.2.224.33:
+      category: Router
+      model: ar158e
+    1.3.6.1.4.1.2011.2.224.34:
+      category: Router
+      model: ar151g-hspa7
+    1.3.6.1.4.1.2011.2.224.35:
+      category: Router
+      model: ar157g-hspa7
+    1.3.6.1.4.1.2011.2.224.36:
+      category: Router
+      model: ar151w-p
+    1.3.6.1.4.1.2011.2.224.37:
+      category: Router
+      model: ar157w
+    1.3.6.1.4.1.2011.2.224.38:
+      category: Router
+      model: ar1220d
+    1.3.6.1.4.1.2011.2.224.39:
+      category: Router
+      model: ar157vw
+    1.3.6.1.4.1.2011.2.224.40:
+      category: Router
+      model: ar158evw
+    1.3.6.1.4.1.2011.2.224.41:
+      category: Router
+      model: ar2201-48fe
+    1.3.6.1.4.1.2011.2.224.42:
+      category: Router
+      model: ar2202-48fe
+    1.3.6.1.4.1.2011.2.224.43:
+      category: Router
+      model: ar2220l
+    1.3.6.1.4.1.2011.2.224.44:
+      category: Router
+      model: ar201vw-p
+    1.3.6.1.4.1.2011.2.224.45:
+      category: Router
+      model: ar207vw
+    1.3.6.1.4.1.2011.2.224.46:
+      category: Router
+      model: ar2230
+    1.3.6.1.4.1.2011.2.224.47:
+      category: Router
+      model: ar2220d
+    1.3.6.1.4.1.2011.2.224.48:
+      category: Router
+      model: ar2204
+    1.3.6.1.4.1.2011.2.224.49:
+      category: Router
+      model: usr20-6
+    1.3.6.1.4.1.2011.2.224.50:
+      category: Router
+      model: usr20-8
+    1.3.6.1.4.1.2011.2.224.51:
+      category: Router
+      model: ar531gph
+    1.3.6.1.4.1.2011.2.224.52:
+      category: Router
+      model: ar531gbpdh
+    1.3.6.1.4.1.2011.2.224.53:
+      category: Router
+      model: ar5312ch
+    1.3.6.1.4.1.2011.2.224.54:
+      category: Router
+      model: ar531f2ch
+    1.3.6.1.4.1.2011.2.224.55:
+      category: Router
+      model: ar151gevdo
+    1.3.6.1.4.1.2011.2.224.56:
+      category: Router
+      model: ar156i
+    1.3.6.1.4.1.2011.2.224.57:
+      category: Router
+      model: ar156iw
+    1.3.6.1.4.1.2011.2.224.58:
+      category: Router
+      model: ar157i
+    1.3.6.1.4.1.2011.2.224.59:
+      category: Router
+      model: ar157iw
+    1.3.6.1.4.1.2011.2.224.60:
+      category: Router
+      model: ar168f
+    1.3.6.1.4.1.2011.2.224.61:
+      category: Router
+      model: ar168fw
+    1.3.6.1.4.1.2011.2.224.62:
+      category: Router
+      model: ar169f
+    1.3.6.1.4.1.2011.2.224.63:
+      category: Router
+      model: ar169w
+    1.3.6.1.4.1.2011.2.224.64:
+      category: Router
+      model: ar169fw
+    1.3.6.1.4.1.2011.2.224.65:
+      category: Router
+      model: ar169bf
+    1.3.6.1.4.1.2011.2.224.66:
+      category: Router
+      model: ar169bfw
+    1.3.6.1.4.1.2011.2.224.67:
+      category: Router
+      model: ar1220f
+    1.3.6.1.4.1.2011.2.224.68:
+      category: Router
+      model: ar1220fw
+    1.3.6.1.4.1.2011.2.224.69:
+      category: Router
+      model: ar151s
+    1.3.6.1.4.1.2011.2.224.70:
+      category: Router
+      model: ar151wps
+    1.3.6.1.4.1.2011.2.224.71:
+      category: Router
+      model: ar151gus
+    1.3.6.1.4.1.2011.2.224.72:
+      category: Router
+      model: ar1220ls
+    1.3.6.1.4.1.2011.2.224.73:
+      category: Router
+      model: ar2201-48fes
+    1.3.6.1.4.1.2011.2.224.74:
+      category: Router
+      model: ar2204s
+    1.3.6.1.4.1.2011.2.224.75:
+      category: Router
+      model: ar2240s
+    1.3.6.1.4.1.2011.2.224.76:
+      category: Router
+      model: ar159
+    1.3.6.1.4.1.2011.2.224.77:
+      category: Router
+      model: ar2540h
+    1.3.6.1.4.1.2011.2.224.78:
+      category: Router
+      model: ar3560h
+    1.3.6.1.4.1.2011.2.224.79:
+      category: Router
+      model: ar121s
+    1.3.6.1.4.1.2011.2.224.80:
+      category: Router
+      model: ar161fs
+    1.3.6.1.4.1.2011.2.224.81:
+      category: Router
+      model: ar156w
+    1.3.6.1.4.1.2011.2.224.82:
+      category: Router
+      model: ar159fw
+    1.3.6.1.4.1.2011.2.224.83:
+      category: Router
+      model: ar161fgw-l
+    1.3.6.1.4.1.2011.2.224.84:
+      category: Router
+      model: ar161fg-l
+    1.3.6.1.4.1.2011.2.224.85:
+      category: Router
+      model: ar162f
+    1.3.6.1.4.1.2011.2.224.86:
+      category: Router
+      model: ar169fvw
+    1.3.6.1.4.1.2011.2.224.87:
+      category: Router
+      model: ar161fw-p-m5
+    1.3.6.1.4.1.2011.2.224.88:
+      category: Router
+      model: ar511gw-uav2m5
+    1.3.6.1.4.1.2011.2.224.89:
+      category: Router
+      model: ar169gfvw-l
+    1.3.6.1.4.1.2011.2.224.90:
+      category: Router
+      model: ar531gbp-u-h
+    1.3.6.1.4.1.2011.2.224.91:
+      category: Router
+      model: ar531gpe-u-h
+    1.3.6.1.4.1.2011.2.224.93:
+      category: Router
+      model: ar531g-u-d-h
+    1.3.6.1.4.1.2011.2.224.94:
+      category: Router
+      model: ar511gw-lav2m3
+    1.3.6.1.4.1.2011.2.224.95:
+      category: Router
+      model: ar161a
+    1.3.6.1.4.1.2011.2.224.96:
+      category: Router
+      model: ar169a
+    1.3.6.1.4.1.2011.2.224.97:
+      category: Router
+      model: ar161ag-l
+    1.3.6.1.4.1.2011.2.224.98:
+      category: Router
+      model: ar169agw-i
+    1.3.6.1.4.1.2011.2.224.99:
+      category: Router
+      model: ar1220evw
+    1.3.6.1.4.1.2011.2.224.100:
+      category: Router
+      model: AR2220E
+    1.3.6.1.4.1.2011.2.224.101:
+      category: Router
+      model: AR3670
+    1.3.6.1.4.1.2011.2.224.102:
+      category: Router
+      model: ar3650
+    1.3.6.1.4.1.2011.2.224.103:
+      category: Router
+      model: ar2630
+    1.3.6.1.4.1.2011.2.224.104:
+      category: Router
+      model: ar2204e
+    1.3.6.1.4.1.2011.2.224.105:
+      category: Router
+      model: ar2220e-l
+    1.3.6.1.4.1.2011.2.224.106:
+      category: Router
+      model: ar511gw-l-b3
+    1.3.6.1.4.1.2011.2.224.107:
+      category: Router
+      model: ar511gw-lm7
+    1.3.6.1.4.1.2011.2.224.108:
+      category: Router
+      model: ar513
+    1.3.6.1.4.1.2011.2.224.109:
+      category: Router
+      model: ar1220f-s
+    1.3.6.1.4.1.2011.2.224.110:
+      category: Router
+      model: ar3260-s
+    1.3.6.1.4.1.2011.2.224.113:
+      category: Router
+      model: ar531gr-u-h
+    1.3.6.1.4.1.2011.2.224.114:
+      category: Router
+      model: ar550-8fe-d-h
+    1.3.6.1.4.1.2011.2.224.115:
+      category: Router
+      model: ar550-24fe-d-h
+    1.3.6.1.4.1.2011.2.224.116:
+      category: Router
+      model: ar502g
+    1.3.6.1.4.1.2011.2.224.117:
+      category: Router
+      model: ar531gp-h
+    1.3.6.1.4.1.2011.2.224.118:
+      category: Router
+      model: ar531gb-u-d-h
+    1.3.6.1.4.1.2011.2.224.130:
+      category: Router
+      model: AR1220E
+    1.3.6.1.4.1.2011.2.224.142:
+      category: Router
+      model: AR161W
+    1.3.6.1.4.1.2011.2.224.147:
+      category: Router
+      model: AR1220C
+    1.3.6.1.4.1.2011.2.224.177:
+      category: Gateway
+      model: AR550C-2C6GE
+    1.3.6.1.4.1.2011.2.224.294:
+      category: Router
+      model: AR6120
+    1.3.6.1.4.1.2011.2.224.299:
+      category: Router
+      model: AR6300
+    1.3.6.1.4.1.2011.2.224.300:
+      category: Router
+      model: AR6280
+    1.3.6.1.4.1.2011.2.224.311:
+      category: Router
+      model: AR6140-16G4XG
+    1.3.6.1.4.1.2011.2.224.317:
+      category: Router
+      model: AR611W
+    1.3.6.1.4.1.2011.2.224.320:
+      category: Router
+      model: AR617VW-LTE4EA
+    1.3.6.1.4.1.2011.2.224.340:
+      category: Router
+      model: AR8140-12G10XG
+    1.3.6.1.4.1.2011.2.224.344:
+      category: Router
+      model: AR502H-5G
+    1.3.6.1.4.1.2011.2.224.346:
+      category: Router
+      model: AR6140E-9G-2AC
+    1.3.6.1.4.1.2011.2.224.347:
+      category: Router
+      model: AR6121E
+    1.3.6.1.4.1.2011.2.225.1:
+      category: Switch
+      model: s12708
+    1.3.6.1.4.1.2011.2.225.2:
+      category: Switch
+      model: s12716
+    1.3.6.1.4.1.2011.2.228:
+      category: Switch
+      model: ma5632
+    1.3.6.1.4.1.2011.2.229:
+      category: Switch
+      model: ma5661
+    1.3.6.1.4.1.2011.2.232:
+      category: Switch
+      model: ma5669
+    1.3.6.1.4.1.2011.2.233:
+      category: Switch
+      model: ma5621a
+    1.3.6.1.4.1.2011.2.234:
+      category: Switch
+      model: ma5623
+    1.3.6.1.4.1.2011.2.235:
+      category: Management Controller
+      model: iBMC
+    1.3.6.1.4.1.2011.2.236.1:
+      category: Switch
+      model: s9703
+    1.3.6.1.4.1.2011.2.236.2:
+      category: Switch
+      model: s9706
+    1.3.6.1.4.1.2011.2.236.3:
+      category: Switch
+      model: s9712
+    1.3.6.1.4.1.2011.2.239.1:
+      category: Switch
+      model: CloudEngine 12804
+    1.3.6.1.4.1.2011.2.239.2:
+      category: Switch
+      model: CE12808
+    1.3.6.1.4.1.2011.2.239.3:
+      category: Switch
+      model: CE12812
+    1.3.6.1.4.1.2011.2.239.4:
+      category: Switch
+      model: CE5850-48T4S2Q-EI
+    1.3.6.1.4.1.2011.2.239.5:
+      category: Switch
+      model: CE6850-52Q-EI-48S
+    1.3.6.1.4.1.2011.2.239.6:
+      category: Switch
+      model: CE6850-52Q-EI-48T
+    1.3.6.1.4.1.2011.2.239.7:
+      category: Switch
+      model: CE5810-24T4S-EI
+    1.3.6.1.4.1.2011.2.239.8:
+      category: Switch
+      model: CE5810-48T4S-EI
+    1.3.6.1.4.1.2011.2.239.9:
+      category: Switch
+      model: CE12816
+    1.3.6.1.4.1.2011.2.239.10:
+      category: Switch
+      model: CE5850-48T4S2Q-HI
+    1.3.6.1.4.1.2011.2.239.11:
+      category: Switch
+      model: CE7850-32Q-EI
+    1.3.6.1.4.1.2011.2.239.12:
+      category: Switch
+      model: CE6810-48S4Q-EI
+    1.3.6.1.4.1.2011.2.239.13:
+      category: Switch
+      model: CE6810-48S4Q-LI
+    1.3.6.1.4.1.2011.2.239.14:
+      category: Switch
+      model: CE6810-48S-LI
+    1.3.6.1.4.1.2011.2.239.15:
+      category: Switch
+      model: CE12804S
+    1.3.6.1.4.1.2011.2.239.16:
+      category: Switch
+      model: CE12808S
+    1.3.6.1.4.1.2011.2.239.17:
+      category: Switch
+      model: CE6850-48S6Q-HI
+    1.3.6.1.4.1.2011.2.239.18:
+      category: Switch
+      model: CE6850U-48S6Q-HI
+    1.3.6.1.4.1.2011.2.239.19:
+      category: Switch
+      model: CE6850-48T6Q-HI
+    1.3.6.1.4.1.2011.2.239.20:
+      category: Switch
+      model: CE6810-32T16S4Q-LI
+    1.3.6.1.4.1.2011.2.239.22:
+      category: Switch
+      model: CE5855-48T4S2Q-EI
+    1.3.6.1.4.1.2011.2.239.23:
+      category: Switch
+      model: CE5855-24T4S2Q-EI
+    1.3.6.1.4.1.2011.2.239.24:
+      category: Switch
+      model: CE6850U-24S2Q-HI
+    1.3.6.1.4.1.2011.2.239.25:
+      category: Switch
+      model: CE6810-24S2Q-LI
+    1.3.6.1.4.1.2011.2.239.26:
+      category: Switch
+      model: CloudEngine 6851-48S6Q-HI
+    1.3.6.1.4.1.2011.2.239.27:
+      category: Switch
+      model: CE8860-4C-EI
+    1.3.6.1.4.1.2011.2.239.29:
+      category: Switch
+      model: CE6855-48S6Q-HI
+    1.3.6.1.4.1.2011.2.239.31:
+      category: Switch
+      model: CE6860-48S8CQ-EI
+    1.3.6.1.4.1.2011.2.239.32:
+      category: Switch
+      model: CE6870-48S6CQ-EI
+    1.3.6.1.4.1.2011.2.239.33:
+      category: Switch
+      model: CE6870-24S6CQ-EI
+    1.3.6.1.4.1.2011.2.239.34:
+      category: Switch
+      model: CE7855-32Q-EI
+    1.3.6.1.4.1.2011.2.239.35:
+      category: Switch
+      model: CE6880-48S4Q2CQ-EI
+    1.3.6.1.4.1.2011.2.239.36:
+      category: Switch
+      model: CE6880-24S4Q2CQ-EI
+    1.3.6.1.4.1.2011.2.239.37:
+      category: Switch
+      model: CE6880-48T4Q2CQ-EI
+    1.3.6.1.4.1.2011.2.239.42:
+      category: Switch
+      model: CE8850-32CQ-EI
+    1.3.6.1.4.1.2011.2.239.44:
+      category: Switch
+      model: CE6870-48T6CQ-EI
+    1.3.6.1.4.1.2011.2.239.46:
+      category: Switch
+      model: CE6856-48S6Q-HI
+    1.3.6.1.4.1.2011.2.239.47:
+      category: Layer 3 Switch
+      model: CE6856-48T6Q-HI
+    1.3.6.1.4.1.2011.2.239.49:
+      category: Switch
+      model: CE6865-48S8CQ-EI
+    1.3.6.1.4.1.2011.2.239.50:
+      category: Switch
+      model: CE8850-64CQ-EI
+    1.3.6.1.4.1.2011.2.239.51:
+      category: Switch
+      model: CloudEngine 8861-4C-EI
+    1.3.6.1.4.1.2011.2.239.58:
+      category: Layer 3 Switch
+      model: CE16804
+    1.3.6.1.4.1.2011.2.239.59:
+      category: Layer 3 Switch
+      model: CE16808
+    1.3.6.1.4.1.2011.2.239.60:
+      category: Layer 3 Switch
+      model: CE16816
+    1.3.6.1.4.1.2011.2.239.65:
+      category: Switch
+      model: CE6863-48S6CQ
+    1.3.6.1.4.1.2011.2.239.66:
+      category: Layer 3 Switch
+      model: CE6881-48S6CQ
+    1.3.6.1.4.1.2011.2.239.68:
+      category: Layer 3 Switch
+      model: CloudEngine 6820-48S6CQ
+    1.3.6.1.4.1.2011.2.239.72:
+      category: Layer 3 Switch
+      model: CE6881E-48S6CQ
+    1.3.6.1.4.1.2011.2.239.73:
+      category: Layer 3 Switch
+      model: CE6881-48T6CQ
+    1.3.6.1.4.1.2011.2.239.75:
+      category: Layer 3 Switch
+      model: CE8851-32CQ8DQ-P
+    1.3.6.1.4.1.2011.2.239.77:
+      category: Layer 3 Switch
+      model: CE6866-48S8CQ-P
+    1.3.6.1.4.1.2011.2.239.93:
+      category: Layer 3 Switch
+      model: CE6863E-48S6CQ
+    1.3.6.1.4.1.2011.2.239.95:
+      category: Layer 3 Switch
+      model: CE6881H-48S6CQ
+    1.3.6.1.4.1.2011.2.239.96:
+      category: Layer 3 Switch
+      model: CE6863H-48S6CQ
+    1.3.6.1.4.1.2011.2.239.110:
+      category: Layer 3 Switch
+      model: CE9860-4C-EI-A
+    1.3.6.1.4.1.2011.2.239.130:
+      category: Layer 3 Switch
+      model: CE8865-4C
+    1.3.6.1.4.1.2011.2.240.1:
+      category: Wireless
+      model: acu
+    1.3.6.1.4.1.2011.2.240.2:
+      category: Wireless
+      model: ac6605-lsw
+    1.3.6.1.4.1.2011.2.240.3:
+      category: Wireless
+      model: ac6605-ac
+    1.3.6.1.4.1.2011.2.240.4:
+      category: Wireless
+      model: ac6005
+    1.3.6.1.4.1.2011.2.240.5:
+      category: Wireless
+      model: ac6005-pwr
+    1.3.6.1.4.1.2011.2.240.6:
+      category: Wireless LAN Controller
+      model: AC6605-26-PWR
+    1.3.6.1.4.1.2011.2.240.7:
+      category: Wireless LAN Controller
+      model: ACU2
+    1.3.6.1.4.1.2011.2.240.17:
+      category: Wireless LAN Controller
+      model: AC6508
+    1.3.6.1.4.1.2011.2.240.24:
+      category: Wireless LAN Controller
+      model: AirEngine 9700-M1
+    1.3.6.1.4.1.2011.2.244.1:
+      category: Router
+      model: srg1320v
+    1.3.6.1.4.1.2011.2.244.2:
+      category: Router
+      model: srg1320vw
+    1.3.6.1.4.1.2011.2.244.3:
+      category: Router
+      model: srg2320
+    1.3.6.1.4.1.2011.2.244.4:
+      category: Router
+      model: srg3340
+    1.3.6.1.4.1.2011.2.244.5:
+      category: Router
+      model: srg3360
+    1.3.6.1.4.1.2011.2.244.6:
+      category: Router
+      model: srg303w
+    1.3.6.1.4.1.2011.2.244.7:
+      category: Router
+      model: srg303vw
+    1.3.6.1.4.1.2011.2.244.8:
+      category: Router
+      model: srg2320d
+    1.3.6.1.4.1.2011.2.244.9:
+      category: Router
+      model: srg2304
+    1.3.6.1.4.1.2011.2.244.10:
+      category: Router
+      model: srg2330
+    1.3.6.1.4.1.2011.2.244.11:
+      category: Router
+      model: srg1320
+    1.3.6.1.4.1.2011.2.244.12:
+      category: Router
+      model: srg1320w
+    1.3.6.1.4.1.2011.2.244.13:
+      category: Router
+      model: srg2320e
+    1.3.6.1.4.1.2011.2.246:
+      category: Switch
+      model: ma5623a
+    1.3.6.1.4.1.2011.2.248:
+      category: Switch
+      model: ma5608T
+    1.3.6.1.4.1.2011.2.249:
+      category: Switch
+      model: ma5633
+    1.3.6.1.4.1.2011.2.260:
+      category: Switch
+      model: ma5898
+    1.3.6.1.4.1.2011.2.262:
+      category: Switch
+      model: ma5821
+    1.3.6.1.4.1.2011.2.263:
+      category: Switch
+      model: ma5822
+    1.3.6.1.4.1.2011.2.266:
+      category: Switch
+      model: ma5818
+    1.3.6.1.4.1.2011.2.267:
+      category: Switch
+      model: ma5698
+    1.3.6.1.4.1.2011.2.268:
+      category: Switch
+      model: ma5694
+    1.3.6.1.4.1.2011.2.271.1:
+      category: Layer 3 Switch
+      model: CX310 Switch Module
+    1.3.6.1.4.1.2011.2.271.2:
+      category: Layer 3 Switch
+      model: CX311 Switch Module
+    1.3.6.1.4.1.2011.2.271.3:
+      category: Layer 3 Switch
+      model: CX312 Switch Module
+    1.3.6.1.4.1.2011.2.271.4:
+      category: Switch
+      model: CX110 Switch Module
+    1.3.6.1.4.1.2011.2.271.8:
+      category: Layer 3 Switch
+      model: CX912 Switch Module
+    1.3.6.1.4.1.2011.2.271.15:
+      category: Layer 3 Switch
+      model: CX710 Switch Module
+    1.3.6.1.4.1.2011.2.271.16:
+      category: Layer 3 Switch
+      model: CX920 Switch Module
+    1.3.6.1.4.1.2011.2.271.17:
+      category: Layer 3 Switch
+      model: CX920 Switch Module
+    1.3.6.1.4.1.2011.2.273:
+      category: Switch
+      model: ma5611s
+    1.3.6.1.4.1.2011.2.274:
+      category: Switch
+      model: ma5622A-8
+    1.3.6.1.4.1.2011.2.275:
+      category: Switch
+      model: ma5622A-16
+    1.3.6.1.4.1.2011.2.279.1:
+      category: Switch
+      model: s12708lsw
+    1.3.6.1.4.1.2011.2.279.2:
+      category: Switch
+      model: s12712lsw
+    1.3.6.1.4.1.2011.2.279.3:
+      category: Layer 3 Switch
+      model: S12704
+    1.3.6.1.4.1.2011.2.279.6:
+      category: Layer 3 Switch
+      model: CloudEngine S12700E-4
+    1.3.6.1.4.1.2011.2.282.1:
+      category: Router
+      model: ne16ex-8
+    1.3.6.1.4.1.2011.2.282.2:
+      category: Router
+      model: ne16ex-6
+    1.3.6.1.4.1.2011.2.285:
+      category: Switch
+      model: ma5675m
+    1.3.6.1.4.1.2011.2.286:
+      category: Switch
+      model: ma5675
+    1.3.6.1.4.1.2011.2.292.1:
+      category: Router
+      model: osn9800-u16
+    1.3.6.1.4.1.2011.2.292.2:
+      category: Router
+      model: osn9800-u32
+    1.3.6.1.4.1.2011.2.292.3:
+      category: Router
+      model: osn9800-u64
+    1.3.6.1.4.1.2011.2.292.4:
+      category: Router
+      model: osn9600-u16
+    1.3.6.1.4.1.2011.2.292.5:
+      category: Router
+      model: osn9600-u32
+    1.3.6.1.4.1.2011.2.292.6:
+      category: Router
+      model: osn9600-u64
+    1.3.6.1.4.1.2011.2.294:
+      category: Switch
+      model: ma5800
+    1.3.6.1.4.1.2011.2.297.5:
+      category: Router
+      model: NE05E-SG
+    1.3.6.1.4.1.2011.2.297.14:
+      category: Router
+      model: QuidWay NetEngine NE05E-SQ
+    1.3.6.1.4.1.2011.2.315.2.2:
+      category: Router
+      model: NetEngine9000
+    1.3.6.1.4.1.2011.2.321.1.149:
+      category: Firewall
+      model: USG6530E
+    1.3.6.1.4.1.2011.2.321.1.284:
+      category: Firewall
+      model: USG6635F
+    1.3.6.1.4.1.2011.2.360.1.5:
+      category: Router
+      model: NetEngine 8000 F1A-8H20Q
+    1.3.6.1.4.1.2011.2.360.1.7:
+      category: Router
+      model: NetEngine 8000 M14
+    1.3.6.1.4.1.2011.2.360.1.9:
+      category: Router
+      model: NetEngine 8000 M8
+    1.3.6.1.4.1.2011.2.360.1.11:
+      category: Router
+      model: NetEngine 8000 M1A
+    1.3.6.1.4.1.2011.2.360.1.13:
+      category: Router
+      model: NetEngine 8000 M6
+    1.3.6.1.4.1.2011.2.360.1.29:
+      category: Router
+      model: NetEngine 8000 M1C
+    1.3.6.1.4.1.2011.6.122.8.11.1:
+      category: Firewall
+      model: Eudemon 8000E
+    1.3.6.1.4.1.2011.6.122.8.19.1:
+      category: Firewall
+      model: AntiDDoS8030
+    1.3.6.1.4.1.2011.6.133.22:
+      category: Firewall
+      model: USG6680
+    1.3.6.1.4.1.2011.6.133.46:
+      category: Firewall
+      model: USG6550
+    1.3.6.1.4.1.2011.6.133.55:
+      category: Firewall
+      model: USG6620
+    1.3.6.1.4.1.2011.10.1.1:
+      category: Switch
+      model: H3C s2008-EI
+    1.3.6.1.4.1.2011.10.1.2:
+      category: Switch
+      model: H3C s2016-EI
+    1.3.6.1.4.1.2011.10.1.3:
+      category: Switch
+      model: Quidway S2403H-EI
+    1.3.6.1.4.1.2011.10.1.4:
+      category: Switch
+      model: H3C s3026PWR
+    1.3.6.1.4.1.2011.10.1.5:
+      category: Firewall
+      model: secpath1000
+    1.3.6.1.4.1.2011.10.1.6:
+      category: Router
+      model: H3C ar18-35
+    1.3.6.1.4.1.2011.10.1.7:
+      category: Switch
+      model: H3C s3552F-HI
+    1.3.6.1.4.1.2011.10.1.8:
+      category: Firewall
+      model: secpath10
+    1.3.6.1.4.1.2011.10.1.9:
+      category: Switch
+      model: QuidWay S3924-SI
+    1.3.6.1.4.1.2011.10.1.10:
+      category: Switch
+      model: QuidWay S3928P-SI
+    1.3.6.1.4.1.2011.10.1.11:
+      category: Switch
+      model: QuidWay S3952P-SI
+    1.3.6.1.4.1.2011.10.1.12:
+      category: Switch
+      model: QuidWay S3928TP-SI
+    1.3.6.1.4.1.2011.10.1.13:
+      category: Switch
+      model: QuidWay S3928P-EI
+    1.3.6.1.4.1.2011.10.1.14:
+      category: Switch
+      model: QuidWay S3952P-EI
+    1.3.6.1.4.1.2011.10.1.15:
+      category: Switch
+      model: QuidWay S3928P-PWR-EI
+    1.3.6.1.4.1.2011.10.1.16:
+      category: Switch
+      model: QuidWay S3952P-PWR-EI
+    1.3.6.1.4.1.2011.10.1.17:
+      category: Switch
+      model: QuidWay S3928F-EI
+    1.3.6.1.4.1.2011.10.1.18:
+      category: Switch
+      model: QuidWay S5600M
+    1.3.6.1.4.1.2011.10.1.19:
+      category: Router
+      model: H3C ar18-50
+    1.3.6.1.4.1.2011.10.1.20:
+      model: AR18-33E
+      category: Router
+    1.3.6.1.4.1.2011.10.1.21:
+      model: AR18-34E
+      category: Router
+    1.3.6.1.4.1.2011.10.1.22:
+      category: Switch
+      model: QuidWay S8508
+    1.3.6.1.4.1.2011.10.1.23:
+      category: Firewall
+      model: secpath100N
+    1.3.6.1.4.1.2011.10.1.24:
+      category: Firewall
+      model: secpath100V
+    1.3.6.1.4.1.2011.10.1.25:
+      category: Firewall
+      model: secpath100F
+    1.3.6.1.4.1.2011.10.1.26:
+      category: Firewall
+      model: secpath1000F
+    1.3.6.1.4.1.2011.10.1.27:
+      category: Firewall
+      model: secpath500F
+    1.3.6.1.4.1.2011.10.1.28:
+      category: Firewall
+      model: secpath10F
+    1.3.6.1.4.1.2011.10.1.29:
+      category: Firewall
+      model: secpath100FS
+    1.3.6.1.4.1.2011.10.1.30:
+      category: Firewall
+      model: secpath100FE
+    1.3.6.1.4.1.2011.10.1.31:
+      category: Firewall
+      model: secpath100FW
+    1.3.6.1.4.1.2011.10.1.32:
+      category: Firewall
+      model: secpath1800FS
+    1.3.6.1.4.1.2011.10.1.33:
+      category: Firewall
+      model: secpath1800FE
+    1.3.6.1.4.1.2011.10.1.40:
+      category: Router
+      model: H3C sr8805
+    1.3.6.1.4.1.2011.10.1.41:
+      category: Router
+      model: H3C sr8808
+    1.3.6.1.4.1.2011.10.1.42:
+      category: Router
+      model: H3C sr8812
+    1.3.6.1.4.1.2011.10.1.43:
+      category: Switch
+      model: QuidWay S5624P
+    1.3.6.1.4.1.2011.10.1.44:
+      category: Switch
+      model: QuidWay S5624P-PWR
+    1.3.6.1.4.1.2011.10.1.45:
+      category: Switch
+      model: QuidWay S5648P
+    1.3.6.1.4.1.2011.10.1.46:
+      category: Switch
+      model: QuidWay S5648P-PWR
+    1.3.6.1.4.1.2011.10.1.47:
+      category: Switch
+      model: QuidWay S2008C
+    1.3.6.1.4.1.2011.10.1.48:
+      category: Switch
+      model: QuidWay S2016C
+    1.3.6.1.4.1.2011.10.1.49:
+      category: Switch
+      model: QuidWay S2024C
+    1.3.6.1.4.1.2011.10.1.50:
+      category: Router
+      model: H3C ar18-13V
+    1.3.6.1.4.1.2011.10.1.51:
+      category: Router
+      model: H3C ar18-18V
+    1.3.6.1.4.1.2011.10.1.53:
+      model: AR18-20S
+      category: Router
+    1.3.6.1.4.1.2011.10.1.55:
+      category: Router
+      model: H3C xe200
+    1.3.6.1.4.1.2011.10.1.56:
+      category: Router
+      model: H3C xe2000
+    1.3.6.1.4.1.2011.10.1.57:
+      category: Switch
+      model: H3C e026T
+    1.3.6.1.4.1.2011.10.1.58:
+      category: Switch
+      model: H3C e008-FE
+    1.3.6.1.4.1.2011.10.1.59:
+      category: Switch
+      model: H3C e017-FE
+    1.3.6.1.4.1.2011.10.1.60:
+      category: Switch
+      model: H3C e026-FE
+    1.3.6.1.4.1.2011.10.1.61:
+      category: Router
+      model: AR28-12
+    1.3.6.1.4.1.2011.10.1.62:
+      category: Router
+      model: AR28-13
+    1.3.6.1.4.1.2011.10.1.63:
+      category: Router
+      model: AR28-14
+    1.3.6.1.4.1.2011.10.1.64:
+      category: Router
+      model: H3C ar18-10
+    1.3.6.1.4.1.2011.10.1.65:
+      category: Router
+      model: H3C ar18-21
+    1.3.6.1.4.1.2011.10.1.66:
+      category: Router
+      model: H3C ar18-21A
+    1.3.6.1.4.1.2011.10.1.67:
+      category: Router
+      model: H3C ar18-21B
+    1.3.6.1.4.1.2011.10.1.68:
+      category: Router
+      model: H3C ar18-21C
+    1.3.6.1.4.1.2011.10.1.69:
+      model: AR18-22
+      category: Router
+    1.3.6.1.4.1.2011.10.1.70:
+      category: Router
+      model: H3C ar18-22-8
+    1.3.6.1.4.1.2011.10.1.71:
+      model: AR18-22-24
+      category: Router
+    1.3.6.1.4.1.2011.10.1.72:
+      model: AR18-23-1
+      category: Router
+    1.3.6.1.4.1.2011.10.1.73:
+      model: AR18-30E
+      category: Router
+    1.3.6.1.4.1.2011.10.1.74:
+      model: AR18-31E
+      category: Router
+    1.3.6.1.4.1.2011.10.1.75:
+      category: Router
+      model: H3C ar18-32E
+    1.3.6.1.4.1.2011.10.1.76:
+      model: AR18-35E
+      category: Router
+    1.3.6.1.4.1.2011.10.1.77:
+      category: Router
+      model: H3C ar18-36E
+    1.3.6.1.4.1.2011.10.1.78:
+      category: Router
+      model: H3C ar18-37E
+    1.3.6.1.4.1.2011.10.1.79:
+      category: Router
+      model: H3C ar18-52
+    1.3.6.1.4.1.2011.10.1.80:
+      category: Switch
+      model: QuidWay S6500
+    1.3.6.1.4.1.2011.10.1.81:
+      category: Switch
+      model: QuidWay S5124P-EI
+    1.3.6.1.4.1.2011.10.1.82:
+      category: Switch
+      model: QuidWay S5126C-EI
+    1.3.6.1.4.1.2011.10.1.83:
+      category: Switch
+      model: QuidWay S5148P-EI
+    1.3.6.1.4.1.2011.10.1.84:
+      category: Switch
+      model: QuidWay S5150C-EI
+    1.3.6.1.4.1.2011.10.1.85:
+      category: Switch
+      model: QuidWay S5116P-SI
+    1.3.6.1.4.1.2011.10.1.86:
+      category: Switch
+      model: QuidWay S5124P-SI
+    1.3.6.1.4.1.2011.10.1.87:
+      category: Switch
+      model: QuidWay S5148P-SI
+    1.3.6.1.4.1.2011.10.1.88:
+      category: Router
+      model: H3C ar4620E
+    1.3.6.1.4.1.2011.10.1.89:
+      category: Router
+      model: H3C ar4640E
+    1.3.6.1.4.1.2011.10.1.90:
+      category: Router
+      model: H3C ar4680E
+    1.3.6.1.4.1.2011.10.1.91:
+      category: Router
+      model: H3C ar18-22s-8
+    1.3.6.1.4.1.2011.10.1.92:
+      category: Router
+      model: H3C ar18-23s-1
+    1.3.6.1.4.1.2011.10.1.93:
+      category: Firewall
+      model: secEngineP500
+    1.3.6.1.4.1.2011.10.1.94:
+      category: Switch
+      model: QuidWay S2108-SI
+    1.3.6.1.4.1.2011.10.1.95:
+      category: Switch
+      model: QuidWay S2116-SI
+    1.3.6.1.4.1.2011.10.1.96:
+      category: Switch
+      model: QuidWay S2126-SI
+    1.3.6.1.4.1.2011.10.1.97:
+      category: Switch
+      model: QuidWay S2108-EI
+    1.3.6.1.4.1.2011.10.1.98:
+      category: Switch
+      model: QuidWay S2116-EI
+    1.3.6.1.4.1.2011.10.1.99:
+      category: Switch
+      model: QuidWay S2126-EI
+    1.3.6.1.4.1.2011.10.1.100:
+      category: Layer 3 Switch
+      model: Quidway S5624F
+    1.3.6.1.4.1.2011.10.1.101:
+      category: Switch
+      model: H3C s3224P
+    1.3.6.1.4.1.2011.10.1.102:
+      category: Switch
+      model: H3C s3226T
+    1.3.6.1.4.1.2011.10.1.103:
+      category: Switch
+      model: H3C s3226P
+    1.3.6.1.4.1.2011.10.1.104:
+      category: Switch
+      model: H3C s3250T
+    1.3.6.1.4.1.2011.10.1.105:
+      category: Switch
+      model: H3C s3250P
+    1.3.6.1.4.1.2011.10.1.106:
+      category: Switch
+      model: H3C s3108T
+    1.3.6.1.4.1.2011.10.1.107:
+      category: Switch
+      model: H3C s3116T
+    1.3.6.1.4.1.2011.10.1.108:
+      category: Switch
+      model: H3C s3126T
+    1.3.6.1.4.1.2011.10.1.109:
+      category: Switch
+      model: H3C s3108C
+    1.3.6.1.4.1.2011.10.1.110:
+      category: Switch
+      model: H3C s3116C
+    1.3.6.1.4.1.2011.10.1.111:
+      category: Switch
+      model: H3C s3126C
+    1.3.6.1.4.1.2011.10.1.112:
+      category: Router
+      model: AR28-12B
+    1.3.6.1.4.1.2011.10.1.113:
+      category: Firewall
+      model: H3C secBladeIDS
+    1.3.6.1.4.1.2011.10.1.114:
+      category: Firewall
+      model: H3C secBladeIPS
+    1.3.6.1.4.1.2011.10.1.115:
+      category: Firewall
+      model: H3C secEngineD500
+    1.3.6.1.4.1.2011.10.1.116:
+      category: Switch
+      model: H3C s3928TP-V6
+    1.3.6.1.4.1.2011.10.1.117:
+      category: Switch
+      model: H3C s3928P-V6
+    1.3.6.1.4.1.2011.10.1.118:
+      category: Switch
+      model: H3C s3952P-V6
+    1.3.6.1.4.1.2011.10.1.119:
+      category: Switch
+      model: H3C s3928F-V6
+    1.3.6.1.4.1.2011.10.1.120:
+      category: Switch
+      model: H3C s5524P
+    1.3.6.1.4.1.2011.10.1.121:
+      category: Switch
+      model: H3C s5524F
+    1.3.6.1.4.1.2011.10.1.122:
+      category: Router
+      model: H3C xE7000
+    1.3.6.1.4.1.2011.10.1.130:
+      category: Switch
+      model: H3C s2008CT
+    1.3.6.1.4.1.2011.10.1.131:
+      category: Switch
+      model: H3C s2008CP
+    1.3.6.1.4.1.2011.10.1.132:
+      category: Firewall
+      model: secBladeFW
+    1.3.6.1.4.1.2011.10.1.133:
+      category: Firewall
+      model: H3C secBladeVPN
+    1.3.6.1.4.1.2011.10.1.134:
+      category: Firewall
+      model: H3C secEngineD200
+    1.3.6.1.4.1.2011.10.1.136:
+      category: Router
+      model: H3C sJW59
+    1.3.6.1.4.1.2011.10.1.138:
+      category: Router
+      model: H3C ar19-61
+    1.3.6.1.4.1.2011.10.1.139:
+      category: Router
+      model: H3C ar19-62
+    1.3.6.1.4.1.2011.10.1.140:
+      category: Router
+      model: H3C ar29-01
+    1.3.6.1.4.1.2011.10.1.141:
+      category: Router
+      model: H3C ar29-21
+    1.3.6.1.4.1.2011.10.1.142:
+      category: Router
+      model: H3C ar29-41
+    1.3.6.1.4.1.2011.10.1.143:
+      category: Router
+      model: H3C ar29-61
+    1.3.6.1.4.1.2011.10.1.144:
+      category: Router
+      model: H3C ar49-45
+    1.3.6.1.4.1.2011.10.1.145:
+      category: Router
+      model: H3C ar49-65
+    1.3.6.1.4.1.2011.10.1.146:
+      category: Switch
+      model: H3C s5112P-EI
+    1.3.6.1.4.1.2011.10.1.147:
+      category: Switch
+      model: H3C s5113C-EI
+    1.3.6.1.4.1.2011.10.1.148:
+      category: Switch
+      model: H3C s5228C
+    1.3.6.1.4.1.2011.10.1.149:
+      category: Switch
+      model: H3C s5252C
+    1.3.6.1.4.1.2011.10.1.150:
+      category: Switch
+      model: H3C s5228C-PWR
+    1.3.6.1.4.1.2011.10.1.151:
+      category: Switch
+      model: H3C s5252C-PWR
+    1.3.6.1.4.1.2011.10.1.152:
+      category: Switch
+      model: H3C s2008-HI
+    1.3.6.1.4.1.2011.10.1.153:
+      model: S2016-HI
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.154:
+      model: S2403H-HI
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.156:
+      model: S8508V
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.157:
+      model: E126
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.158:
+      model: S3126TP
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.159:
+      model: E328
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.160:
+      model: E352
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.161:
+      model: S3928P-PWR-SI
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.163:
+      model: S8502
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.164:
+      model: SR8802
+      category: Router
+    1.3.6.1.4.1.2011.10.1.174:
+      model: S6502ME
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.182:
+      model: DR814
+      category: Router
+    1.3.6.1.4.1.2011.10.1.183:
+      model: DR814Q
+      category: Router
+    1.3.6.1.4.1.2011.10.1.184:
+      model: WDR854G
+      category: Router
+    1.3.6.1.4.1.2011.10.1.185:
+      model: VDR824G
+      category: Router
+    1.3.6.1.4.1.2011.10.1.186:
+      model: VDR824
+      category: Router
+    1.3.6.1.4.1.2011.10.1.187:
+      model: VDR744
+      category: Router
+    1.3.6.1.4.1.2011.10.1.188:
+      model: DR744
+      category: Router
+    1.3.6.1.4.1.2011.10.1.192:
+      model: S8505-V5
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.193:
+      model: S8512-V5
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.194:
+      model: S8508-V5
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.195:
+      model: S8508V-V5
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.196:
+      model: S8502-V5
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.198:
+      model: S2008TP-EA
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.199:
+      model: S2016TP-EA
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.200:
+      model: S2403TP-EA
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.201:
+      model: S2403TP-PWR-EA
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.202:
+      model: S2008TP-MI
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.203:
+      model: S2016TP-MI
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.204:
+      model: S2403TP-MI
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.205:
+      model: S7802
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.206:
+      model: S7803
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.207:
+      model: S7806
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.208:
+      model: S7806-V
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.209:
+      model: S7810
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.210:
+      model: S2016TP-PWR-EA
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.211:
+      category: Switch
+      model: QuidWay S3552P-EA
+    1.3.6.1.4.1.2011.10.1.212:
+      model: S3528P-EA
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.213:
+      model: S3528TP-EA
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.214:
+      model: S3528F-EA
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.215:
+      model: S3552F-EA
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.216:
+      model: Quidway S6902
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.217:
+      model: Quidway S6903
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.218:
+      model: Quidway S6906
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.219:
+      model: Quidway S6906R
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.220:
+      model: Quidway S3928P-SI-AC/DC
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.224:
+      model: Quidway AR19-10
+      category: Router
+    1.3.6.1.4.1.2011.10.1.225:
+      model: Quidway AR19-13
+      category: Router
+    1.3.6.1.4.1.2011.10.1.226:
+      model: Quidway AR19-15
+      category: Router
+    1.3.6.1.4.1.2011.10.1.227:
+      model: S3552P-SI
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.228:
+      model: S3528P-SI
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.229:
+      model: Quidway S5628C-HI-AC
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.230:
+      model: Quidway S5628C-HI-DC
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.231:
+      model: Quidway S5652C-HI-AC
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.232:
+      model: Quidway S5628F-HI
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.233:
+      model: Quidway S5628C-PWR-HI
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.234:
+      model: Quidway S5652C-PWR-HI
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.237:
+      model: S7803L
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.238:
+      model: S6503-V5
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.239:
+      model: S6506-V5
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.240:
+      model: S6506R-V5
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.241:
+      model: Quidway AR19-03
+      category: Router
+    1.3.6.1.4.1.2011.10.1.242:
+      model: Quidway AR19-05
+      category: Router
+    1.3.6.1.4.1.2011.10.1.243:
+      model: Quidway S7806-L
+      category: Switch
+    1.3.6.1.4.1.2011.10.1.244:
+      model: AR29-11
+      category: Router

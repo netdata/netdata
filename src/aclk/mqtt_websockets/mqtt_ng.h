@@ -42,7 +42,6 @@ struct mqtt_auth_properties {
 int mqtt_ng_connect(struct mqtt_ng_client *client,
                     struct mqtt_auth_properties *auth,
                     struct mqtt_lwt_properties *lwt,
-                    uint8_t clean_start,
                     uint16_t keep_alive);
 
 int mqtt_ng_publish(struct mqtt_ng_client *client,

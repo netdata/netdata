@@ -14,132 +14,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
-// globalTagsCollector handles collection of profile-wide tags
-type globalTagsCollector struct {
-	snmpClient  gosnmp.Handler
-	missingOIDs map[string]bool
-	log         *logger.Logger
-	tagProc     *globalTagProcessor
-}
-
-func newGlobalTagsCollector(snmpClient gosnmp.Handler, missingOIDs map[string]bool, log *logger.Logger) *globalTagsCollector {
-	return &globalTagsCollector{
-		snmpClient:  snmpClient,
-		missingOIDs: missingOIDs,
-		log:         log,
-		tagProc:     newGlobalTagProcessor(),
-	}
-}
-
-// Collect gathers all global tags from the profile
-func (gc *globalTagsCollector) Collect(prof *ddsnmp.Profile) (map[string]string, error) {
-	if len(prof.Definition.MetricTags) == 0 && len(prof.Definition.StaticTags) == 0 {
-		return nil, nil
-	}
-
-	tags := make(map[string]string)
-
-	gc.processStaticTags(prof.Definition.StaticTags, tags)
-
-	if err := gc.processDynamicTags(prof.Definition.MetricTags, tags); err != nil {
-		return ternary(len(tags) > 0, tags, nil), err
-	}
-
-	return tags, nil
-}
-
-func (gc *globalTagsCollector) processStaticTags(staticTags []string, globalTags map[string]string) {
-	mergeTagsIfAbsent(globalTags, parseStaticTags(staticTags))
-}
-
-// processDynamicTags processes tags that require SNMP fetching
-func (gc *globalTagsCollector) processDynamicTags(metricTags []ddprofiledefinition.MetricTagConfig, globalTags map[string]string) error {
-	// Identify OIDs to collect
-	oids, missingOIDs := gc.identifyTagOIDs(metricTags)
-
-	if len(missingOIDs) > 0 {
-		gc.log.Debugf("global tags missing OIDs: %v", missingOIDs)
-	}
-
-	if len(oids) == 0 {
-		return nil
-	}
-
-	pdus, err := gc.fetchTagValues(oids)
-	if err != nil {
-		return fmt.Errorf("failed to fetch global tag values: %w", err)
-	}
-
-	// Collect each tag configuration
-	var errs []error
-	for _, tagCfg := range metricTags {
-		if tagCfg.Symbol.OID == "" {
-			continue
-		}
-
-		ta := tagAdder{tags: globalTags}
-
-		if err := gc.tagProc.processTag(tagCfg, pdus, ta); err != nil {
-			errs = append(errs, fmt.Errorf("failed to process tag value for '%s/%s': %w",
-				tagCfg.Tag, tagCfg.Symbol.Name, err))
-			continue
-		}
-	}
-
-	if len(errs) > 0 && len(globalTags) == 0 {
-		return fmt.Errorf("failed to process any global tags: %w", errors.Join(errs...))
-	}
-
-	return nil
-}
-
-func (gc *globalTagsCollector) identifyTagOIDs(metricTags []ddprofiledefinition.MetricTagConfig) ([]string, []string) {
-	var oids []string
-	var missingOIDs []string
-
-	for _, tagCfg := range metricTags {
-		if tagCfg.Symbol.OID == "" {
-			continue
-		}
-
-		oid := trimOID(tagCfg.Symbol.OID)
-		if gc.missingOIDs[oid] {
-			missingOIDs = append(missingOIDs, tagCfg.Symbol.OID)
-			continue
-		}
-
-		oids = append(oids, tagCfg.Symbol.OID)
-	}
-
-	// Sort and deduplicate
-	slices.Sort(oids)
-	oids = slices.Compact(oids)
-
-	return oids, missingOIDs
-}
-
-func (gc *globalTagsCollector) fetchTagValues(oids []string) (map[string]gosnmp.SnmpPDU, error) {
-	pdus := make(map[string]gosnmp.SnmpPDU)
-	maxOids := gc.snmpClient.MaxOids()
-
-	for chunk := range slices.Chunk(oids, maxOids) {
-		result, err := gc.snmpClient.Get(chunk)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, pdu := range result.Variables {
-			if !isPduWithData(pdu) {
-				gc.missingOIDs[trimOID(pdu.Name)] = true
-				continue
-			}
-			pdus[trimOID(pdu.Name)] = pdu
-		}
-	}
-
-	return pdus, nil
-}
-
 // deviceMetadataCollector handles collection of device metadata
 type deviceMetadataCollector struct {
 	snmpClient  gosnmp.Handler
@@ -157,8 +31,8 @@ func newDeviceMetadataCollector(snmpClient gosnmp.Handler, missingOIDs map[strin
 	}
 }
 
-func (dc *deviceMetadataCollector) Collect(prof *ddsnmp.Profile) (map[string]string, error) {
-	if len(prof.Definition.Metadata) == 0 {
+func (dc *deviceMetadataCollector) Collect(prof *ddsnmp.Profile) (map[string]ddsnmp.MetaTag, error) {
+	if len(prof.Definition.Metadata) == 0 && len(prof.Definition.SysobjectIDMetadata) == 0 {
 		return nil, nil
 	}
 
@@ -168,12 +42,12 @@ func (dc *deviceMetadataCollector) Collect(prof *ddsnmp.Profile) (map[string]str
 		return nil, nil
 	}
 
-	meta := make(map[string]string)
+	meta := make(map[string]ddsnmp.MetaTag)
 
 	if dc.sysobjectid != "" {
 		for i, entry := range prof.Definition.SysobjectIDMetadata {
 			if ddsnmp.OidMatches(dc.sysobjectid, entry.SysobjectID) {
-				if err := dc.processMetadataFields(entry.Metadata, meta); err != nil {
+				if err := dc.processMetadataFields(entry.Metadata, meta, dc.sysobjectid == entry.SysobjectID); err != nil {
 					dc.log.Warningf("sysobjectid_metadata[%d]: failed to process metadata fields for sysobjectid '%s': %v",
 						i, entry.SysobjectID, err)
 					continue
@@ -184,7 +58,7 @@ func (dc *deviceMetadataCollector) Collect(prof *ddsnmp.Profile) (map[string]str
 		}
 	}
 
-	if err := dc.processMetadataFields(cfg.Fields, meta); err != nil {
+	if err := dc.processMetadataFields(cfg.Fields, meta, slices.Contains(prof.Definition.Extends, dc.sysobjectid)); err != nil {
 		return ternary(len(meta) > 0, meta, nil), fmt.Errorf("failed to process metadata resource '%s': %w", resName, err)
 	}
 
@@ -192,8 +66,8 @@ func (dc *deviceMetadataCollector) Collect(prof *ddsnmp.Profile) (map[string]str
 }
 
 // processMetadataFields processes a single metadata resource
-func (dc *deviceMetadataCollector) processMetadataFields(fields map[string]ddprofiledefinition.MetadataField, metadata map[string]string) error {
-	oids := dc.collectStaticAndIdentifyOIDs(fields, metadata)
+func (dc *deviceMetadataCollector) processMetadataFields(fields map[string]ddprofiledefinition.MetadataField, metadata map[string]ddsnmp.MetaTag, isExactMatch bool) error {
+	oids := dc.collectStaticAndIdentifyOIDs(fields, metadata, isExactMatch)
 
 	if len(oids) == 0 {
 		return nil
@@ -204,17 +78,17 @@ func (dc *deviceMetadataCollector) processMetadataFields(fields map[string]ddpro
 		return fmt.Errorf("failed to fetch metadata values: %w", err)
 	}
 
-	return dc.processDynamicFields(fields, pdus, metadata)
+	return dc.processDynamicFields(fields, pdus, metadata, isExactMatch)
 }
 
 // collectStaticAndIdentifyOIDs collects static values and returns OIDs to fetch
-func (dc *deviceMetadataCollector) collectStaticAndIdentifyOIDs(fields map[string]ddprofiledefinition.MetadataField, metadata map[string]string) []string {
+func (dc *deviceMetadataCollector) collectStaticAndIdentifyOIDs(fields map[string]ddprofiledefinition.MetadataField, metadata map[string]ddsnmp.MetaTag, isExactMatch bool) []string {
 	var oids []string
 
 	for name, field := range fields {
 		switch {
 		case field.Value != "":
-			mergeTagsIfAbsent(metadata, map[string]string{name: field.Value})
+			mergeMetaTagIfAbsent(metadata, name, ddsnmp.MetaTag{Value: field.Value, IsExactMatch: isExactMatch})
 		case field.Symbol.OID != "":
 			if !dc.missingOIDs[trimOID(field.Symbol.OID)] {
 				oids = append(oids, field.Symbol.OID)
@@ -257,7 +131,7 @@ func (dc *deviceMetadataCollector) fetchMetadataValues(oids []string) (map[strin
 	return pdus, nil
 }
 
-func (dc *deviceMetadataCollector) processDynamicFields(fields map[string]ddprofiledefinition.MetadataField, pdus map[string]gosnmp.SnmpPDU, metadata map[string]string) error {
+func (dc *deviceMetadataCollector) processDynamicFields(fields map[string]ddprofiledefinition.MetadataField, pdus map[string]gosnmp.SnmpPDU, metadata map[string]ddsnmp.MetaTag, isExactMatch bool) error {
 	var errs []error
 
 	for name, field := range fields {
@@ -270,7 +144,7 @@ func (dc *deviceMetadataCollector) processDynamicFields(fields map[string]ddprof
 				continue
 			}
 			if v != "" {
-				mergeTagsIfAbsent(metadata, map[string]string{name: v})
+				mergeMetaTagIfAbsent(metadata, name, ddsnmp.MetaTag{Value: v, IsExactMatch: isExactMatch})
 			}
 		case len(field.Symbols) > 0:
 			// Multiple symbols - try each until one succeeds
@@ -282,7 +156,7 @@ func (dc *deviceMetadataCollector) processDynamicFields(fields map[string]ddprof
 					continue
 				}
 				if v != "" {
-					mergeTagsIfAbsent(metadata, map[string]string{name: v})
+					mergeMetaTagIfAbsent(metadata, name, ddsnmp.MetaTag{Value: v, IsExactMatch: isExactMatch})
 					break // Use first successful value
 				}
 			}

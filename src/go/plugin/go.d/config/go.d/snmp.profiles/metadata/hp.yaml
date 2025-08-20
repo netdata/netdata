@@ -1,0 +1,1441 @@
+sysobjectids:
+  oid_overrides:
+    1.3.6.1.4.1.11.1:
+      category: Printer
+      model: LaserJet 3055
+    1.3.6.1.4.1.11.2.3.2.3:
+      model: HP800
+    1.3.6.1.4.1.11.2.3.2.6:
+      model: Itanium
+    1.3.6.1.4.1.11.2.3.7.1.1:
+      model: AdvanceStack 10 10
+    1.3.6.1.4.1.11.2.3.7.1.2:
+      model: AdvanceStack Remote Bridge
+    1.3.6.1.4.1.11.2.3.7.1.3:
+      model: AdvanceStack EtherTwist LAN
+    1.3.6.1.4.1.11.2.3.7.1.8:
+      category: Switch
+      model: ADVANCESTACK LAN SWITCH-16
+    1.3.6.1.4.1.11.2.3.7.1.9:
+      category: Switch
+      model: ADVANCESTACK SWITCH 100
+    1.3.6.1.4.1.11.2.3.7.1.10:
+      category: Switch
+      model: ADVANCESTACK SWITCH 200
+    1.3.6.1.4.1.11.2.3.7.2.1:
+      category: Router
+      model: ADVANCESTACK ROUTER ER 440
+    1.3.6.1.4.1.11.2.3.7.2.2:
+      category: Router
+      model: ADVANCESTACK ROUTER TR 445
+    1.3.6.1.4.1.11.2.3.7.2.3:
+      category: Router
+      model: ADVANCESTACK ROUTER SR 430
+    1.3.6.1.4.1.11.2.3.7.2.4:
+      category: Router
+      model: ADVANCESTACK ROUTER 240 (ROUTER FR A VERSION)
+    1.3.6.1.4.1.11.2.3.7.2.5:
+      category: Router
+      model: ADVANCESTACK ROUTER 470 (ROUTER LR)
+    1.3.6.1.4.1.11.2.3.7.2.6:
+      category: Router
+      model: ADVANCESTACK ROUTER BR 480
+    1.3.6.1.4.1.11.2.3.7.2.7:
+      category: Router
+      model: ADVANCESTACK ROUTER PR
+    1.3.6.1.4.1.11.2.3.7.2.8:
+      category: Router
+      model: ADVANCESTACK ROUTER 650
+    1.3.6.1.4.1.11.2.3.7.2.8.2:
+      category: Router
+      model: ADVANCESTACK ROUTER 650 ENGINE
+    1.3.6.1.4.1.11.2.3.7.2.8.3:
+      category: Router
+      model: ADVANCESTACK ROUTER 650 PORT 4E
+    1.3.6.1.4.1.11.2.3.7.2.8.4:
+      category: Router
+      model: ADVANCESTACK ROUTER 650 PORT 4S
+    1.3.6.1.4.1.11.2.3.7.2.8.5:
+      category: Router
+      model: ADVANCESTACK ROUTER 650 PORT 4T
+    1.3.6.1.4.1.11.2.3.7.2.8.6:
+      category: Router
+      model: ADVANCESTACK ROUTER 650 PORT 4FDDI
+    1.3.6.1.4.1.11.2.3.7.2.8.7:
+      category: Router
+      model: ADVANCESTACK ROUTER 650 PORT 4100VG
+    1.3.6.1.4.1.11.2.3.7.2.9:
+      category: Router
+      model: ADVANCESTACK ROUTER 230
+    1.3.6.1.4.1.11.2.3.7.2.10:
+      category: Router
+      model: ADVANCESTACK ROUTER 250
+    1.3.6.1.4.1.11.2.3.7.2.11:
+      category: Router
+      model: ADVANCESTACK ROUTER 255
+    1.3.6.1.4.1.11.2.3.7.2.12:
+      category: Router
+      model: ADVANCESTACK ROUTER 210
+    1.3.6.1.4.1.11.2.3.7.3.9:
+      model: DTC22
+    1.3.6.1.4.1.11.2.3.7.5.1:
+      model: AdvanceStack EtherTwist Hub-12
+    1.3.6.1.4.1.11.2.3.7.5.2:
+      model: AdvanceStack Hub
+    1.3.6.1.4.1.11.2.3.7.5.3:
+      model: AdvanceStack Fiber-Optic Hub
+    1.3.6.1.4.1.11.2.3.7.5.4:
+      model: AdvanceStack EtherTwist Hub PLUS/48
+    1.3.6.1.4.1.11.2.3.7.5.5:
+      model: AdvanceStack ThinLAN Hub
+    1.3.6.1.4.1.11.2.3.7.5.6:
+      model: AdvanceStack EtherTwist Secure Hub
+    1.3.6.1.4.1.11.2.3.7.5.7:
+      model: AdvanceStack 10Base-T Hub-12
+    1.3.6.1.4.1.11.2.3.7.5.8:
+      model: AdvanceStack 10Base-T Hub-24
+    1.3.6.1.4.1.11.2.3.7.5.9:
+      model: AdvanceStack 10Base-T Hub-48
+    1.3.6.1.4.1.11.2.3.7.5.10:
+      model: AdvanceStack 100VB Hub-15
+    1.3.6.1.4.1.11.2.3.7.5.11:
+      model: AdvanceStack 10Base-T Hub-8U
+    1.3.6.1.4.1.11.2.3.7.5.12:
+      model: AdvanceStack 10Base-T Hub-16U
+    1.3.6.1.4.1.11.2.3.7.5.13:
+      model: AdvanceStack 100VG Hub-7M
+    1.3.6.1.4.1.11.2.3.7.5.14:
+      model: AdvanceStack 100VG Hub-14
+    1.3.6.1.4.1.11.2.3.7.5.15:
+      category: Switch
+      model: ADVANCESTACK 10BT SWITCHING HUB-12R
+    1.3.6.1.4.1.11.2.3.7.5.16:
+      category: Switch
+      model: ADVANCESTACK 10BT SWITCHING HUB-24R
+    1.3.6.1.4.1.11.2.3.7.5.17:
+      category: Switch
+      model: ADVANCESTACK 10BT SWITCHING HUB-24T
+    1.3.6.1.4.1.11.2.3.7.5.18:
+      model: AdvanceStack 100B-TX Hub-12TM
+    1.3.6.1.4.1.11.2.3.7.5.19:
+      category: Switch
+      model: HPJ3188A
+    1.3.6.1.4.1.11.2.3.7.5.20:
+      model: 10Base-T Hub-12M
+    1.3.6.1.4.1.11.2.3.7.5.21:
+      model: 10Base-T Hub-24M
+    1.3.6.1.4.1.11.2.3.7.5.22:
+      model: 100Base-T Hub-12M
+    1.3.6.1.4.1.11.2.3.7.5.23:
+      model: 100Base-T Hub-24M
+    1.3.6.1.4.1.11.2.3.7.8.2.5:
+      category: Switch
+      model: ADVANCESTACK 10BT SWITCHING
+    1.3.6.1.4.1.11.2.3.7.8.5.1:
+      category: Layer 3 Switch
+      model: AdvStack Hub (J2603A)
+    1.3.6.1.4.1.11.2.3.7.8.5.2:
+      category: Layer 3 Switch
+      model: 3800 48G-PoE+-4SFP+ (J9574A)
+    1.3.6.1.4.1.11.2.3.7.8.5.3:
+      category: Layer 3 Switch
+      model: Aruba 2920-48G Switch (J9728A)
+    1.3.6.1.4.1.11.2.3.7.8.5.4:
+      category: Layer 3 Switch
+      model: Aruba 3810M-40G-8SR (JL076A)
+    1.3.6.1.4.1.11.2.3.7.8.5.5:
+      category: Layer 3 Switch
+      model: Aruba 2930F-24G-4SFP+ (JL253A)
+    1.3.6.1.4.1.11.2.3.7.8.5.6:
+      category: Layer 3 Switch
+      model: 5406R zl2 VSF VC
+    1.3.6.1.4.1.11.2.3.7.8.5.7:
+      category: Layer 3 Switch
+      model: Aruba 2930M-48G-PoE+ (JL322A)
+    1.3.6.1.4.1.11.2.3.7.11:
+      category: Switch
+      model: UNKNOWN SWITCHES
+    1.3.6.1.4.1.11.2.3.7.11.1:
+      category: Layer 3 Switch
+      model: AdvanceStack Switch 2000 J3100B
+    1.3.6.1.4.1.11.2.3.7.11.1.1:
+      category: Layer 3 Switch
+      model: ProCurve Switch Module ET4
+    1.3.6.1.4.1.11.2.3.7.11.1.2:
+      category: Layer 3 Switch
+      model: ProCurve Switch Module VG2
+    1.3.6.1.4.1.11.2.3.7.11.1.3:
+      category: Layer 3 Switch
+      model: ProCurve Switch Module 10FL
+    1.3.6.1.4.1.11.2.3.7.11.1.4:
+      category: Layer 3 Switch
+      model: ProCurve Switch Module FDDI
+    1.3.6.1.4.1.11.2.3.7.11.1.5:
+      category: Layer 3 Switch
+      model: ProCurve Switch Module TX2
+    1.3.6.1.4.1.11.2.3.7.11.2:
+      category: Layer 3 Switch
+      model: Switch 2000
+    1.3.6.1.4.1.11.2.3.7.11.3:
+      category: Layer 3 Switch
+      model: AdvanceStack Switch 800T J3245A
+    1.3.6.1.4.1.11.2.3.7.11.4:
+      category: Layer 3 Switch
+      model: ProCurve 200 (J3299A)
+    1.3.6.1.4.1.11.2.3.7.11.4.1:
+      category: Layer 3 Switch
+      model: ProCurve 208T
+    1.3.6.1.4.1.11.2.3.7.11.4.2:
+      category: Layer 3 Switch
+      model: ProCurve 208T
+    1.3.6.1.4.1.11.2.3.7.11.4.3:
+      category: Layer 3 Switch
+      model: ProCurve 224T
+    1.3.6.1.4.1.11.2.3.7.11.4.4:
+      category: Layer 3 Switch
+      model: ProCurve 224VG
+    1.3.6.1.4.1.11.2.3.7.11.5:
+      category: Layer 3 Switch
+      model: ProCurve 212 (J3298A)
+    1.3.6.1.4.1.11.2.3.7.11.6:
+      category: Switch
+      model: ProCurve 224M
+    1.3.6.1.4.1.11.2.3.7.11.7:
+      category: Switch
+      model: ProCurve 8000M
+    1.3.6.1.4.1.11.2.3.7.11.7.1:
+      category: Layer 3 Switch
+      model: ProCurve Switch Module 100TX8
+    1.3.6.1.4.1.11.2.3.7.11.7.2:
+      category: Layer 3 Switch
+      model: ProCurve Switch Module 100FX4
+    1.3.6.1.4.1.11.2.3.7.11.7.3:
+      category: Layer 3 Switch
+      model: ProCurve Switch Module 10FL4
+    1.3.6.1.4.1.11.2.3.7.11.7.4:
+      category: Layer 3 Switch
+      model: ProCurve Switch Module GigSX
+    1.3.6.1.4.1.11.2.3.7.11.7.5:
+      category: Layer 3 Switch
+      model: ProCurve Switch Module GigLX
+    1.3.6.1.4.1.11.2.3.7.11.7.6:
+      category: Layer 3 Switch
+      model: ProCurve Switch Module TwoGig
+    1.3.6.1.4.1.11.2.3.7.11.7.7:
+      category: Layer 3 Switch
+      model: ProCurve Switch Module GigStk
+    1.3.6.1.4.1.11.2.3.7.11.7.8:
+      category: Layer 3 Switch
+      model: ProCurve Switch Module GigT
+    1.3.6.1.4.1.11.2.3.7.11.8:
+      category: Switch
+      model: ProCurve 1600M
+    1.3.6.1.4.1.11.2.3.7.11.9:
+      category: Switch
+      model: ProCurve 4000M
+    1.3.6.1.4.1.11.2.3.7.11.10:
+      category: Switch
+      model: ProCurve 2400M
+    1.3.6.1.4.1.11.2.3.7.11.11:
+      category: Switch
+      model: ProCurve 2424M
+    1.3.6.1.4.1.11.2.3.7.11.13:
+      category: Layer 3 Switch
+      model: ProCurve 9308
+    1.3.6.1.4.1.11.2.3.7.11.14:
+      category: Layer 3 Switch
+      model: ProCurve 9304
+    1.3.6.1.4.1.11.2.3.7.11.15:
+      category: Layer 3 Switch
+      model: ProCurve 6308m-SX (J4840A)
+    1.3.6.1.4.1.11.2.3.7.11.16:
+      category: Layer 3 Switch
+      model: ProCurve 6208m-SX (J4841A)
+    1.3.6.1.4.1.11.2.3.7.11.17:
+      category: Layer 3 Switch
+      model: ProCurve 5308XL
+    1.3.6.1.4.1.11.2.3.7.11.17.1:
+      category: Layer 3 Switch
+      model: ProCurve Switch Module J4820A
+    1.3.6.1.4.1.11.2.3.7.11.17.2:
+      category: Layer 3 Switch
+      model: ProCurve Switch Module J4821A
+    1.3.6.1.4.1.11.2.3.7.11.17.3:
+      category: Layer 3 Switch
+      model: ProCurve Switch Module J4878A
+    1.3.6.1.4.1.11.2.3.7.11.17.4:
+      category: Layer 3 Switch
+      model: ProCurve Switch Module J4852A
+    1.3.6.1.4.1.11.2.3.7.11.17.5:
+      category: Layer 3 Switch
+      model: ProCurve Switch Module J8161A
+    1.3.6.1.4.1.11.2.3.7.11.17.6:
+      category: Layer 3 Switch
+      model: ProCurve Switch Module J4907A
+    1.3.6.1.4.1.11.2.3.7.11.17.7:
+      model: AC Module
+    1.3.6.1.4.1.11.2.3.7.11.17.8:
+      category: Layer 3 Switch
+      model: ProCurve Switch Module J4820B
+    1.3.6.1.4.1.11.2.3.7.11.17.9:
+      category: Layer 3 Switch
+      model: ProCurve Switch Module J4821B
+    1.3.6.1.4.1.11.2.3.7.11.17.10:
+      category: Layer 3 Switch
+      model: ProCurve Switch Module J4878B
+    1.3.6.1.4.1.11.2.3.7.11.17.11:
+      category: Wireless
+      model: WIRELESS EDGE SERVICES XL MODULE
+    1.3.6.1.4.1.11.2.3.7.11.17.12:
+      category: Wireless
+      model: REDUNDANT WIRELESS SERVICES XL MODULE
+    1.3.6.1.4.1.11.2.3.7.11.18:
+      category: Switch
+      model: ProCurve 2512
+    1.3.6.1.4.1.11.2.3.7.11.18.1:
+      category: Layer 3 Switch
+      model: ProCurve 2512 Module
+    1.3.6.1.4.1.11.2.3.7.11.19:
+      category: Switch
+      model: ProCurve 2524
+    1.3.6.1.4.1.11.2.3.7.11.19.1:
+      category: Layer 3 Switch
+      model: ProCurve 2524 Module
+    1.3.6.1.4.1.11.2.3.7.11.20:
+      category: Layer 3 Switch
+      model: ProCurve 5304XL
+    1.3.6.1.4.1.11.2.3.7.11.21:
+      category: Layer 3 Switch
+      model: ProCurve 3324XL (J4815A)
+    1.3.6.1.4.1.11.2.3.7.11.22:
+      category: Layer 3 Switch
+      model: ProCurve 3124 (J4851A)
+    1.3.6.1.4.1.11.2.3.7.11.23:
+      category: Layer 3 Switch
+      model: ProCurve 4108GL
+    1.3.6.1.4.1.11.2.3.7.11.23.1:
+      category: Layer 3 Switch
+      model: ProCurve Switch Module J4862A
+    1.3.6.1.4.1.11.2.3.7.11.23.2:
+      category: Layer 3 Switch
+      model: ProCurve Switch Module J4863A
+    1.3.6.1.4.1.11.2.3.7.11.23.3:
+      category: Layer 3 Switch
+      model: ProCurve Switch Module J4864A
+    1.3.6.1.4.1.11.2.3.7.11.23.4:
+      category: Layer 3 Switch
+      model: ProCurve Switch Module J4862B
+    1.3.6.1.4.1.11.2.3.7.11.23.5:
+      category: Layer 3 Switch
+      model: ProCurve Switch Module J4893A
+    1.3.6.1.4.1.11.2.3.7.11.23.6:
+      category: Layer 3 Switch
+      model: ProCurve Switch Module J4892A
+    1.3.6.1.4.1.11.2.3.7.11.23.7:
+      category: Layer 3 Switch
+      model: ProCurve Switch Module J4908A
+    1.3.6.1.4.1.11.2.3.7.11.24:
+      category: Layer 3 Switch
+      model: ProCurve Copper GE Blade for BH7800 BladeServer
+    1.3.6.1.4.1.11.2.3.7.11.24.11:
+      model: A6713A 16+8-port 10/100T + Gig TX module
+    1.3.6.1.4.1.11.2.3.7.11.25:
+      category: Layer 3 Switch
+      model: ProCurve SX Fiber Blade for BH7800 BladeServer
+    1.3.6.1.4.1.11.2.3.7.11.25.12:
+      model: A6716A 16+8-port 10/100T + Gig SX module
+    1.3.6.1.4.1.11.2.3.7.11.26:
+      category: Layer 3 Switch
+      model: ProCurve LX Fiber Blade for BH7800 BladeServer
+    1.3.6.1.4.1.11.2.3.7.11.26.13:
+      model: A6717A 16+8-port 10/100T + Gig LX module
+    1.3.6.1.4.1.11.2.3.7.11.27:
+      category: Layer 3 Switch
+      model: ProCurve 4104GL
+    1.3.6.1.4.1.11.2.3.7.11.28:
+      category: Layer 3 Switch
+      model: ProCurve 9315m (J4874A)
+    1.3.6.1.4.1.11.2.3.7.11.29:
+      category: Layer 3 Switch
+      model: ProCurve 2650
+    1.3.6.1.4.1.11.2.3.7.11.29.1:
+      model: 2650 48-port 10/100-T + 2-port Gig module
+    1.3.6.1.4.1.11.2.3.7.11.30:
+      category: Layer 3 Switch
+      model: ProCurve 6108
+    1.3.6.1.4.1.11.2.3.7.11.30.1:
+      model: 6108 6-port 10/100/1000-TX + 2-port Gig module
+    1.3.6.1.4.1.11.2.3.7.11.31:
+      category: Layer 3 Switch
+      model: ProCurve 2824
+    1.3.6.1.4.1.11.2.3.7.11.31.1:
+      category: Layer 3 Switch
+      model: ProCurve Switch Module J4903A
+    1.3.6.1.4.1.11.2.3.7.11.31.2:
+      category: Layer 3 Switch
+      model: ProCurve Switch Module J8434A
+    1.3.6.1.4.1.11.2.3.7.11.31.3:
+      category: Layer 3 Switch
+      model: ProCurve Switch Module J8435A
+    1.3.6.1.4.1.11.2.3.7.11.32:
+      category: Layer 3 Switch
+      model: ProCurve 2848
+    1.3.6.1.4.1.11.2.3.7.11.32.1:
+      category: Layer 3 Switch
+      model: ProCurve Switch Module J4904A
+    1.3.6.1.4.1.11.2.3.7.11.33:
+      category: Layer 3 Switch
+      model: HP Proliant Switch
+    1.3.6.1.4.1.11.2.3.7.11.33.1.1.1:
+      category: Layer 3 Switch
+      model: ProLiant BL p-Class C-GbE2 Interconnect Switch
+    1.3.6.1.4.1.11.2.3.7.11.33.3.1.1:
+      category: Switch
+      model: Gigabit Ethernet Switch Module I6L2
+    1.3.6.1.4.1.11.2.3.7.11.33.4.1.1:
+      category: Layer 3 Switch
+      model: ProLiant C-Class BladeSystem GbE2c Ethernet Blade Switch
+    1.3.6.1.4.1.11.2.3.7.11.33.5.1.1:
+      category: Layer 3 Switch
+      model: ProLiant BL p-Class C-GbE2C Ethernet Blade Switch
+    1.3.6.1.4.1.11.2.3.7.11.34:
+      category: Layer 3 Switch
+      model: ProCurve 2626
+    1.3.6.1.4.1.11.2.3.7.11.34.1:
+      model: 2626 24-port 10/100-T + 2-port Gig module
+    1.3.6.1.4.1.11.2.3.7.11.35:
+      category: Layer 3 Switch
+      model: ProCurve 2650-PWR
+    1.3.6.1.4.1.11.2.3.7.11.35.1:
+      model: 2650-PWR 48-port 10/100-T + 2-port Gig module
+    1.3.6.1.4.1.11.2.3.7.11.36:
+      category: Layer 3 Switch
+      model: ProCurve 2626-PWR
+    1.3.6.1.4.1.11.2.3.7.11.36.1:
+      model: 2626-PWR 24-port 10/100-T + 2-port Gig module
+    1.3.6.1.4.1.11.2.3.7.11.37:
+      category: Access Point
+      model: WIRELESS ACCESS POINT AP420WL (J8130A)
+    1.3.6.1.4.1.11.2.3.7.11.38:
+      category: Access Point
+      model: WIRELESS ACCESS POINT AP520WL (J8133A)
+    1.3.6.1.4.1.11.2.3.7.11.39:
+      model: Access Controller 720WL (J8153A)
+    1.3.6.1.4.1.11.2.3.7.11.40:
+      category: Server
+      model: ACCESS CONTROLLER SERVER 740WL (J8154A)
+    1.3.6.1.4.1.11.2.3.7.11.41:
+      model: Integrated Access Manager 760WL (J8155A)
+    1.3.6.1.4.1.11.2.3.7.11.42:
+      category: Layer 3 Switch
+      model: ProCurve Switch 3400cl-24G
+    1.3.6.1.4.1.11.2.3.7.11.42.1:
+      model: 3400cl-24-port 10/100/1000-T + 4-port Gigabit module
+    1.3.6.1.4.1.11.2.3.7.11.43:
+      category: Layer 3 Switch
+      model: ProCurve Switch 3400cl-48G
+    1.3.6.1.4.1.11.2.3.7.11.43.1:
+      model: 3400cl-48-port 10/100/1000-T + 4-port Gigabit module
+    1.3.6.1.4.1.11.2.3.7.11.44:
+      category: Layer 3 Switch
+      model: ProCurve 2650
+    1.3.6.1.4.1.11.2.3.7.11.44.1:
+      model: 2650 48-port 10/100-T + 2-port Gig module
+    1.3.6.1.4.1.11.2.3.7.11.45:
+      category: Layer 3 Switch
+      model: ProCurve 2626
+    1.3.6.1.4.1.11.2.3.7.11.45.1:
+      model: 2626 24-port 10/100-T + 2-port Gig module
+    1.3.6.1.4.1.11.2.3.7.11.46:
+      category: Layer 3 Switch
+      model: ProCurve 5404yl (J8718A)
+    1.3.6.1.4.1.11.2.3.7.11.47:
+      category: Layer 3 Switch
+      model: ProCurve 5408yl (J8719A)
+    1.3.6.1.4.1.11.2.3.7.11.48:
+      category: Layer 3 Switch
+      model: ProCurve 6400 (J8433A)
+    1.3.6.1.4.1.11.2.3.7.11.49:
+      category: Layer 3 Switch
+      model: ProCurve 6400 (J8474A)
+    1.3.6.1.4.1.11.2.3.7.11.50:
+      category: Layer 3 Switch
+      model: ProCurve 5406zl
+    1.3.6.1.4.1.11.2.3.7.11.50.1:
+      model: 5400-24 port Gig-T
+    1.3.6.1.4.1.11.2.3.7.11.50.2:
+      model: 5400-24 port Gig-T zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.3:
+      model: 5400-Gig-T/SFP zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.4:
+      model: 5400-24 port SFP zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.5:
+      model: 5400-4 port 10-GbE zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.6:
+      model: 5400-4 port 10G CX4 zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.7:
+      model: 5400-yl Fixed Gig-T/SFP
+    1.3.6.1.4.1.11.2.3.7.11.50.8:
+      model: 5400-yl Fixed 24p Gig-T
+    1.3.6.1.4.1.11.2.3.7.11.50.9:
+      model: 5400-yl X2/CX4 10-GbE Module
+    1.3.6.1.4.1.11.2.3.7.11.50.10:
+      category: Switch
+      model: 5400-ZL SWITCH MANAGEMENT MODULE
+    1.3.6.1.4.1.11.2.3.7.11.50.14:
+      category: Wireless
+      model: 5400-WIRELESS SERVICE ZL MODULE
+    1.3.6.1.4.1.11.2.3.7.11.50.15:
+      category: Wireless
+      model: 5400-REDUNDANT WIRELESS SERVICE ZL MODULE
+    1.3.6.1.4.1.11.2.3.7.11.50.16:
+      model: 5400-Services zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.17:
+      model: 5400-TMS zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.18:
+      model: 5400-zl Data Center Connection Manager ONE Module
+    1.3.6.1.4.1.11.2.3.7.11.50.19:
+      model: 5400-24-Port 10/100/1000 PoE+ zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.20:
+      model: 5400-20-Port 10/100/1000 PoE+ with 4-Port SFP zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.21:
+      model: 5400-24-Port 10/100 PoE+ zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.22:
+      model: 5400-4-Port 10-GbE SFP+ zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.23:
+      model: 5400-yl SFP+/CX4 10G Module
+    1.3.6.1.4.1.11.2.3.7.11.50.24:
+      model: 5400-24 port Gig-T PoE+ v2 zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.25:
+      model: 5400-20-Port Gig-T PoE+ / 4-Port SFP v2 zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.26:
+      model: 5400-20-Port Gig-T PoE+ / 2-Port SFP+ zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.27:
+      model: 5400-24-Port SFP v2 zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.28:
+      model: 5400-8-Port 10GbE SFP+ v2 zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.29:
+      model: 5400-8-Port 10Gig-T LH zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.30:
+      model: 5400-24-Port 10/100 PoE+ zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.31:
+      model: 5400-20-Port Gig-T / 2-Port 10GbE SFP+ v2 zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.32:
+      model: 5400-20-Port Gig-T / 4-Port SFP v2 zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.33:
+      model: 5400-24-Port Gig-T v2 zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.34:
+      model: 5400-Advanced Services zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.35:
+      model: 5400-Extended Services zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.36:
+      model: 5400-AllianceONE zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.37:
+      model: 5400-12-Port Gig-T PoE+ / 12-Port SFP v2 zl Module
+    1.3.6.1.4.1.11.2.3.7.11.50.41:
+      model: 5400-MSM775 zl Premium Controller Module/Advanced Services v2 zl Module
+        w/ HDD&SSD
+    1.3.6.1.4.1.11.2.3.7.11.51:
+      category: Layer 3 Switch
+      model: ProCurve 5412zl
+    1.3.6.1.4.1.11.2.3.7.11.52:
+      category: Layer 3 Switch
+      model: ProCurve 4204vl (J8770A)
+    1.3.6.1.4.1.11.2.3.7.11.52.1:
+      model: 4200-10/100 module
+    1.3.6.1.4.1.11.2.3.7.11.52.2:
+      model: 4200-10/100/1000 module
+    1.3.6.1.4.1.11.2.3.7.11.52.3:
+      model: 4200-miniGBIC module
+    1.3.6.1.4.1.11.2.3.7.11.52.4:
+      model: 4200-100FX module
+    1.3.6.1.4.1.11.2.3.7.11.52.5:
+      model: 4200-Gig-T vl module
+    1.3.6.1.4.1.11.2.3.7.11.52.6:
+      model: 4200-Gig-T/SFP vl module
+    1.3.6.1.4.1.11.2.3.7.11.52.10:
+      model: 4200-10-GbE X2 vl module
+    1.3.6.1.4.1.11.2.3.7.11.53:
+      category: Layer 3 Switch
+      model: ProCurve 4208vl (J8773A)
+    1.3.6.1.4.1.11.2.3.7.11.54:
+      category: Layer 3 Switch
+      model: ProCurve 9400 (J8453A)
+    1.3.6.1.4.1.11.2.3.7.11.55:
+      category: Layer 3 Switch
+      model: ProCurve 2608-PWR (J8762A)
+    1.3.6.1.4.1.11.2.3.7.11.55.1:
+      model: 2600-8-PWR 8-port 10/100-T + 1-port Gig module
+    1.3.6.1.4.1.11.2.3.7.11.56:
+      category: Layer 3 Switch
+      model: ProCurve 4202vl-48G (J8771A)
+    1.3.6.1.4.1.11.2.3.7.11.57:
+      category: Switch
+      model: ProCurve 4202vl-72
+    1.3.6.1.4.1.11.2.3.7.11.58:
+      category: Layer 3 Switch
+      model: ProCurve Switch 3500yl-24G
+    1.3.6.1.4.1.11.2.3.7.11.59:
+      category: Layer 3 Switch
+      model: ProCurve Switch 3500yl-48G
+    1.3.6.1.4.1.11.2.3.7.11.60:
+      category: Switch
+      model: ProCurve 6200yl-24G
+    1.3.6.1.4.1.11.2.3.7.11.61:
+      category: Switch
+      model: HP ProCurve 2510-24
+    1.3.6.1.4.1.11.2.3.7.11.61.1:
+      model: 2510-Fixed 24-port 10/100-T module
+    1.3.6.1.4.1.11.2.3.7.11.62:
+      category: Layer 3 Switch
+      model: ProCurve 2510-48 (J9020A)
+    1.3.6.1.4.1.11.2.3.7.11.62.1:
+      model: 2510-Fixed 48-port 10/100-T module
+    1.3.6.1.4.1.11.2.3.7.11.63:
+      category: Layer 3 Switch
+      model: ProCurve 2810-24G
+    1.3.6.1.4.1.11.2.3.7.11.63.1:
+      model: 2810-Fixed 24-port 10/100/1000-T module
+    1.3.6.1.4.1.11.2.3.7.11.64:
+      category: Layer 3 Switch
+      model: ProCurve 2810-48G
+    1.3.6.1.4.1.11.2.3.7.11.64.1:
+      model: 2810-Fixed 48-port 10/100/1000-T module
+    1.3.6.1.4.1.11.2.3.7.11.65:
+      category: Layer 3 Switch
+      model: ProCurve 1800-24G (J9028A)
+    1.3.6.1.4.1.11.2.3.7.11.66:
+      category: Layer 3 Switch
+      model: ProCurve 1800-8G (J9029A)
+    1.3.6.1.4.1.11.2.3.7.11.67:
+      model: ProCurve (J9038A)
+    1.3.6.1.4.1.11.2.3.7.11.68:
+      category: Switch
+      model: ProCurve 2900-48g
+    1.3.6.1.4.1.11.2.3.7.11.68.11:
+      model: 2900-yl Fixed Gig-T/SFP
+    1.3.6.1.4.1.11.2.3.7.11.68.12:
+      model: 2900-yl Fixed 24p Gig-T
+    1.3.6.1.4.1.11.2.3.7.11.68.13:
+      model: 2900-yl X2/CX4 10-GbE Module
+    1.3.6.1.4.1.11.2.3.7.11.69:
+      category: Switch
+      model: HP ProCurve 2900-24G
+    1.3.6.1.4.1.11.2.3.7.11.70:
+      category: Layer 3 Switch
+      model: ProCurve 4202vl-68G
+    1.3.6.1.4.1.11.2.3.7.11.71:
+      category: Layer 3 Switch
+      model: ProCurve 4202vl-68
+    1.3.6.1.4.1.11.2.3.7.11.72:
+      category: Layer 3 Switch
+      model: HP ProCurve 8212zl
+    1.3.6.1.4.1.11.2.3.7.11.72.1:
+      category: Switch
+      model: 8200ZL SWITCH MANAGEMENT MODULE
+    1.3.6.1.4.1.11.2.3.7.11.72.2:
+      category: Switch
+      model: 8200ZL SWITCH FABRIC MODULE
+    1.3.6.1.4.1.11.2.3.7.11.72.3:
+      category: Switch
+      model: 8212ZL SWITCH SYSTEM SUPPORT MODULE
+    1.3.6.1.4.1.11.2.3.7.11.73:
+      model: Access Controller 800
+    1.3.6.1.4.1.11.2.3.7.11.74:
+      category: Switch
+      model: ProCurve 1700-8 (J9079A)
+    1.3.6.1.4.1.11.2.3.7.11.75:
+      category: Layer 3 Switch
+      model: ProCurve 1700-24 (J9080A)
+    1.3.6.1.4.1.11.2.3.7.11.76:
+      category: Layer 3 Switch
+      model: ProCurve 2610-24
+    1.3.6.1.4.1.11.2.3.7.11.76.1:
+      model: 2610-Fixed 24-port 10/100-T + 4-port Gigabit module
+    1.3.6.1.4.1.11.2.3.7.11.77:
+      category: Layer 3 Switch
+      model: ProCurve 2610-48
+    1.3.6.1.4.1.11.2.3.7.11.77.1:
+      model: 2610-Fixed 48-port 10/100-T + 4-port Gigabit module
+    1.3.6.1.4.1.11.2.3.7.11.78:
+      category: Switch
+      model: ProCurve 2610-24-PWR
+    1.3.6.1.4.1.11.2.3.7.11.78.1:
+      model: 2610-Fixed 24-port 10/100-T + 4-port Gigabit module
+    1.3.6.1.4.1.11.2.3.7.11.79:
+      category: Layer 3 Switch
+      model: ProCurve 2610-48-PWR
+    1.3.6.1.4.1.11.2.3.7.11.79.1:
+      model: 2610-Fixed 48-port 10/100-T + 4-port Gigabit module
+    1.3.6.1.4.1.11.2.3.7.11.80:
+      category: Layer 3 Switch
+      model: ProCurve 2610-24/12-PWR (J9086A)
+    1.3.6.1.4.1.11.2.3.7.11.80.1:
+      model: 2610-Fixed 24-port 10/100-T + 4-port Gigabit module
+    1.3.6.1.4.1.11.2.3.7.11.81:
+      category: Switch
+      model: ProCurve 1800-24G-B (J9028B)
+    1.3.6.1.4.1.11.2.3.7.11.82:
+      category: Switch
+      model: ProCurve 2626C
+    1.3.6.1.4.1.11.2.3.7.11.82.1:
+      model: 2626 24-port 10/100-T + 2-port Gig module
+    1.3.6.1.4.1.11.2.3.7.11.83:
+      category: Layer 3 Switch
+      model: ProCurve 2650
+    1.3.6.1.4.1.11.2.3.7.11.83.1:
+      model: 2650 48-port 10/100-T + 2-port Gig module
+    1.3.6.1.4.1.11.2.3.7.11.84:
+      category: Layer 3 Switch
+      model: ProCurve 2910al-24G-PoE (J9146A)
+    1.3.6.1.4.1.11.2.3.7.11.84.1:
+      model: 2910al-Fixed 24p Gig-T/SFP module
+    1.3.6.1.4.1.11.2.3.7.11.84.2:
+      model: 2910al-10-GbE 2-port CX4
+    1.3.6.1.4.1.11.2.3.7.11.84.3:
+      model: 2910al-10-GbE 2-port SFP+
+    1.3.6.1.4.1.11.2.3.7.11.84.4:
+      model: 2910al-10-GbE 1-port passive CX4
+    1.3.6.1.4.1.11.2.3.7.11.85:
+      category: Layer 3 Switch
+      model: ProCurve 2910al-48G-PoE
+    1.3.6.1.4.1.11.2.3.7.11.85.1:
+      model: 2910al-Fixed 48p Gig-T/SFP module
+    1.3.6.1.4.1.11.2.3.7.11.86:
+      category: Switch
+      model: ProCurve 2910al-24G
+    1.3.6.1.4.1.11.2.3.7.11.86.1:
+      model: 2910al-Fixed 24p Gig-T/SFP module
+    1.3.6.1.4.1.11.2.3.7.11.87:
+      category: Switch
+      model: ProCurve 2910al-48G
+    1.3.6.1.4.1.11.2.3.7.11.87.1:
+      model: 2910al-Fixed 48p Gig-T/SFP module
+    1.3.6.1.4.1.11.2.3.7.11.88:
+      category: Switch
+      model: HP ProCurve 2510G-24
+    1.3.6.1.4.1.11.2.3.7.11.89:
+      category: Switch
+      model: ProCurve 2510G-48
+    1.3.6.1.4.1.11.2.3.7.11.90:
+      category: Switch
+      model: HP ProCurve 2510B-24
+    1.3.6.1.4.1.11.2.3.7.11.94:
+      category: Switch
+      model: ProCurve 2520-8-PoE (J9137A)
+    1.3.6.1.4.1.11.2.3.7.11.95:
+      category: Switch
+      model: ProCurve 2520-24-PoE (J9138A)
+    1.3.6.1.4.1.11.2.3.7.11.96:
+      category: Layer 3 Switch
+      model: ProCurve 2520G-8-PoE (J9298A)
+    1.3.6.1.4.1.11.2.3.7.11.97:
+      category: Layer 3 Switch
+      model: ProCurve 2520G-24-PoE (J9299A)
+    1.3.6.1.4.1.11.2.3.7.11.98:
+      category: Layer 3 Switch
+      model: ProCurve 6600ml-24XG (J9265A)
+    1.3.6.1.4.1.11.2.3.7.11.98.1:
+      model: 6600ml Fixed 4p SFP+ Module
+    1.3.6.1.4.1.11.2.3.7.11.98.2:
+      model: 6600ml Fixed Gig-T/SFP Module
+    1.3.6.1.4.1.11.2.3.7.11.98.3:
+      model: 6600ml Fixed 24 Gig Module
+    1.3.6.1.4.1.11.2.3.7.11.98.4:
+      model: 6600ml Fixed 24 Gig DP Module
+    1.3.6.1.4.1.11.2.3.7.11.98.5:
+      model: 6600ml Fixed 24 Gig Non DP Module
+    1.3.6.1.4.1.11.2.3.7.11.98.6:
+      model: 6600ml Fixed 2 10Gig Module
+    1.3.6.1.4.1.11.2.3.7.11.100:
+      category: Layer 3 Switch
+      model: ProCurve 6600ml-24G (J9263A)
+    1.3.6.1.4.1.11.2.3.7.11.101:
+      category: Layer 3 Switch
+      model: ProCurve 6600ml-24G-4XG (J9264A)
+    1.3.6.1.4.1.11.2.3.7.11.102:
+      model: DCM Controller (J9445A)
+    1.3.6.1.4.1.11.2.3.7.11.103:
+      category: Layer 3 Switch
+      model: ProCurve 1810-8G (J9449A)
+    1.3.6.1.4.1.11.2.3.7.11.104:
+      category: Layer 3 Switch
+      model: ProCurve 1810-24G (J9450A)
+    1.3.6.1.4.1.11.2.3.7.11.105:
+      category: Layer 3 Switch
+      model: ProCurve Switch 6600-48G-4XG (J9452A)
+    1.3.6.1.4.1.11.2.3.7.11.106:
+      category: Layer 3 Switch
+      model: ProCurve 6600-48G (J9451A)
+    1.3.6.1.4.1.11.2.3.7.11.107:
+      category: Switch
+      model: ProCurve 6120XG (516733-B21)
+    1.3.6.1.4.1.11.2.3.7.11.108:
+      category: Switch
+      model: ProCurve 6120G/XG (498358-B21)
+    1.3.6.1.4.1.11.2.3.7.11.109:
+      category: Layer 3 Switch
+      model: ProCurve 3500-24-PoE (J9471A)
+    1.3.6.1.4.1.11.2.3.7.11.110:
+      category: Layer 3 Switch
+      model: ProCurve 3500-48-PoE (J9473A)
+    1.3.6.1.4.1.11.2.3.7.11.110.1:
+      model: 3500-Fixed 10/100Base-TX/SFP PoE Module
+    1.3.6.1.4.1.11.2.3.7.11.110.2:
+      model: 3500-Fixed 24p 10/100Base-TX PoE Module
+    1.3.6.1.4.1.11.2.3.7.11.111:
+      category: Layer 3 Switch
+      model: ProCurve 3500-24 (J9470A)
+    1.3.6.1.4.1.11.2.3.7.11.112:
+      category: Layer 3 Switch
+      model: ProCurve 3500-48 (J9472A)
+    1.3.6.1.4.1.11.2.3.7.11.112.1:
+      model: 3500-Fixed 10/100Base-TX/SFP Module
+    1.3.6.1.4.1.11.2.3.7.11.112.2:
+      model: 3500-Fixed 24p 10/100Base-TX Module
+    1.3.6.1.4.1.11.2.3.7.11.113:
+      category: Layer 3 Switch
+      model: ProCurve 8206zl (J9477A)
+    1.3.6.1.4.1.11.2.3.7.11.114:
+      category: Layer 3 Switch
+      model: ProCurve 3500yl-24G-PoE+ (J9310A)
+    1.3.6.1.4.1.11.2.3.7.11.115:
+      category: Layer 3 Switch
+      model: ProCurve 3500yl-48G-PoE+
+    1.3.6.1.4.1.11.2.3.7.11.115.1:
+      model: 3500-Fixed Gig-T/SFP PoE+ Module
+    1.3.6.1.4.1.11.2.3.7.11.115.2:
+      model: 3500-Fixed 24p Gig-T PoE+ Module
+    1.3.6.1.4.1.11.2.3.7.11.117:
+      category: Layer 3 Switch
+      model: ProCurve 2615-8-PoE (J9565A)
+    1.3.6.1.4.1.11.2.3.7.11.117.1:
+      model: 2615-Fixed 8-port 10/100-T + 2-port Gigabit module
+    1.3.6.1.4.1.11.2.3.7.11.118:
+      category: Layer 3 Switch
+      model: ProCurve 2915-8G-PoE
+    1.3.6.1.4.1.11.2.3.7.11.118.1:
+      model: 2915-8-port 10/100/1000-T + 2-port Gigabit module
+    1.3.6.1.4.1.11.2.3.7.11.119:
+      category: Layer 3 Switch
+      model: ProCurve E3800-24G-2SFP+
+    1.3.6.1.4.1.11.2.3.7.11.120:
+      category: Layer 3 Switch
+      model: ProCurve E3800-48G-4SFP+
+    1.3.6.1.4.1.11.2.3.7.11.121:
+      category: Layer 3 Switch
+      model: E3800-24G-2SFP(J9575A)
+    1.3.6.1.4.1.11.2.3.7.11.122:
+      category: Layer 3 Switch
+      model: E3800-48G-4SFP(J9576A)
+    1.3.6.1.4.1.11.2.3.7.11.123:
+      category: Layer 3 Switch
+      model: 3800-24SFP-2SFP+(J9584A)
+    1.3.6.1.4.1.11.2.3.7.11.124:
+      category: Layer 3 Switch
+      model: ProCurve E3800-24G-2XG
+    1.3.6.1.4.1.11.2.3.7.11.125:
+      category: Layer 3 Switch
+      model: ProCurve E3800-48G-4XG
+    1.3.6.1.4.1.11.2.3.7.11.126:
+      category: Layer 3 Switch
+      model: ProCurve E3800-24G-PoE+-2XG
+    1.3.6.1.4.1.11.2.3.7.11.127:
+      category: Layer 3 Switch
+      model: ProCurve E3800-48G-PoE+-4XG
+    1.3.6.1.4.1.11.2.3.7.11.128:
+      category: Layer 3 Switch
+      model: ProCurve E3800
+    1.3.6.1.4.1.11.2.3.7.11.129:
+      category: Layer 3 Switch
+      model: E2620-24(J9623A)
+    1.3.6.1.4.1.11.2.3.7.11.129.1:
+      model: 2620-Fixed 24p 10/100 module
+    1.3.6.1.4.1.11.2.3.7.11.130:
+      category: Layer 3 Switch
+      model: E2620-24-PPoEP(J9624A)
+    1.3.6.1.4.1.11.2.3.7.11.130.1:
+      model: 2620-Fixed 24p PPoEP 10/100 module
+    1.3.6.1.4.1.11.2.3.7.11.131:
+      category: Layer 3 Switch
+      model: 2620-24-PoEP(J9625A)
+    1.3.6.1.4.1.11.2.3.7.11.131.1:
+      category: Layer 3 Switch
+      model: ProCurve 2620-24-PoE+
+    1.3.6.1.4.1.11.2.3.7.11.132:
+      category: Layer 3 Switch
+      model: 2620-48(J9626A)
+    1.3.6.1.4.1.11.2.3.7.11.132.1:
+      model: 2620-Fixed 48p 10/100 module
+    1.3.6.1.4.1.11.2.3.7.11.133:
+      category: Layer 3 Switch
+      model: 2620-48-PoEP(J9627A)
+    1.3.6.1.4.1.11.2.3.7.11.133.1:
+      model: 2620-Fixed 48p PoEP 10/100 module
+    1.3.6.1.4.1.11.2.3.7.11.134:
+      category: Switch
+      model: OfficeConnect 1810 48G (J9660A)
+    1.3.6.1.4.1.11.2.3.7.11.135:
+      category: Layer 3 Switch
+      model: ProCurve 2920-24G-POE+
+    1.3.6.1.4.1.11.2.3.7.11.136:
+      category: Layer 3 Switch
+      model: 2530-48G-PoEP (J9772A)
+    1.3.6.1.4.1.11.2.3.7.11.136.1:
+      model: 2530-Fixed 48p PoEP 10/100/1000-T module
+    1.3.6.1.4.1.11.2.3.7.11.137:
+      category: Layer 3 Switch
+      model: 2530-24G-PoEP (J9773A)
+    1.3.6.1.4.1.11.2.3.7.11.137.1:
+      model: 2530-Fixed 24p PoEP 10/100/1000-T module
+    1.3.6.1.4.1.11.2.3.7.11.138:
+      category: Layer 3 Switch
+      model: 2530-8G-PoEP (J9774A)
+    1.3.6.1.4.1.11.2.3.7.11.138.1:
+      model: 2530-Fixed 8p PoEP 10/100/1000-T module
+    1.3.6.1.4.1.11.2.3.7.11.139:
+      category: Layer 3 Switch
+      model: 2530-48G(J9775A)
+    1.3.6.1.4.1.11.2.3.7.11.139.1:
+      model: 2530-Fixed 48p 10/100/1000-T module
+    1.3.6.1.4.1.11.2.3.7.11.140:
+      category: Switch
+      model: 2530-24G(J9776A)
+    1.3.6.1.4.1.11.2.3.7.11.140.1:
+      model: 2530-Fixed 24p 10/100/1000-T module
+    1.3.6.1.4.1.11.2.3.7.11.141:
+      category: Switch
+      model: 2530-8G(J9777A)
+    1.3.6.1.4.1.11.2.3.7.11.141.1:
+      model: 2530-Fixed 8p 10/100/1000-T module
+    1.3.6.1.4.1.11.2.3.7.11.142:
+      category: Layer 3 Switch
+      model: ProCurve 2530-48-PoE+
+    1.3.6.1.4.1.11.2.3.7.11.142.1:
+      model: 2530-Fixed 48p PoEP 10/100 module
+    1.3.6.1.4.1.11.2.3.7.11.143:
+      category: Switch
+      model: 2530-24-PoEP(J9779A)
+    1.3.6.1.4.1.11.2.3.7.11.143.1:
+      model: 2530-Fixed 24p PoEP 10/100 module
+    1.3.6.1.4.1.11.2.3.7.11.144:
+      category: Switch
+      model: 2530-8-PoEP(J9780A)
+    1.3.6.1.4.1.11.2.3.7.11.144.1:
+      model: 2530-Fixed 8p PoEP 10/100 module
+    1.3.6.1.4.1.11.2.3.7.11.145:
+      category: Switch
+      model: 2530-48 (J9781A)
+    1.3.6.1.4.1.11.2.3.7.11.145.1:
+      model: 2530-Fixed 48p 10/100 module
+    1.3.6.1.4.1.11.2.3.7.11.146:
+      category: Switch
+      model: 2530-24(J9782A)
+    1.3.6.1.4.1.11.2.3.7.11.146.1:
+      model: 2530-Fixed 24p 10/100 module
+    1.3.6.1.4.1.11.2.3.7.11.147:
+      category: Layer 3 Switch
+      model: ProCurve 2530-8
+    1.3.6.1.4.1.11.2.3.7.11.147.1:
+      model: 2530-Fixed 8p 10/100 module
+    1.3.6.1.4.1.11.2.3.7.11.148:
+      category: Layer 3 Switch
+      model: ProCurve 2920-48G
+    1.3.6.1.4.1.11.2.3.7.11.149:
+      category: Layer 3 Switch
+      model: ProCurve 2920-48G-POE+
+    1.3.6.1.4.1.11.2.3.7.11.150:
+      category: Switch
+      model: 1810-8G v2 (J9802A)
+    1.3.6.1.4.1.11.2.3.7.11.151:
+      category: Switch
+      model: 1810-24G v2 (J9803A)
+    1.3.6.1.4.1.11.2.3.7.11.152:
+      category: Layer 3 Switch
+      model: 2920-24G(J9726A)
+    1.3.6.1.4.1.11.2.3.7.11.152.1:
+      model: 2920-Fixed 24G module
+    1.3.6.1.4.1.11.2.3.7.11.153:
+      category: Layer 3 Switch
+      model: 2920-24G-PoE+ (J9727A)
+    1.3.6.1.4.1.11.2.3.7.11.153.1:
+      model: 2920-Fixed 24G PoE+ module
+    1.3.6.1.4.1.11.2.3.7.11.154:
+      category: Layer 3 Switch
+      model: 2920-48G(J9728A)
+    1.3.6.1.4.1.11.2.3.7.11.154.1:
+      model: 2920-Fixed 48G module
+    1.3.6.1.4.1.11.2.3.7.11.155:
+      category: Layer 3 Switch
+      model: 2920-48G-PoE+ (J9729A)
+    1.3.6.1.4.1.11.2.3.7.11.155.1:
+      model: 2920-Fixed 8p PoEP Internal PS 10/100 module
+    1.3.6.1.4.1.11.2.3.7.11.155.2:
+      model: 2920-10-GbE 2-port CX4
+    1.3.6.1.4.1.11.2.3.7.11.155.3:
+      model: 2920-10-GbE 2-port SFP+
+    1.3.6.1.4.1.11.2.3.7.11.155.4:
+      model: 2920-10GBASE-T
+    1.3.6.1.4.1.11.2.3.7.11.155.5:
+      model: 2920-2 Port Stacking
+    1.3.6.1.4.1.11.2.3.7.11.156:
+      model: 3800-4G-6SFP+-ONE
+    1.3.6.1.4.1.11.2.3.7.11.157:
+      model: 3800-4G-8SFP+-ONE
+    1.3.6.1.4.1.11.2.3.7.11.158:
+      model: PS1810-8G
+    1.3.6.1.4.1.11.2.3.7.11.159:
+      model: PS1810-24G
+    1.3.6.1.4.1.11.2.3.7.11.160:
+      category: Layer 3 Switch
+      model: 5406R zl2 (J9850A)
+    1.3.6.1.4.1.11.2.3.7.11.160.1:
+      category: Switch
+      model: 5400R ZL2 SWITCH MANAGEMENT MODULE
+    1.3.6.1.4.1.11.2.3.7.11.160.2:
+      model: 5400R 24-port 10/100/1000BASE-T PoE+ MACsec v3 zl2 Module
+    1.3.6.1.4.1.11.2.3.7.11.160.3:
+      model: 5400R 24-port 10/100/1000BASE-T MACsec v3 zl2 Module
+    1.3.6.1.4.1.11.2.3.7.11.160.4:
+      model: 5400R 24-port 1GbE SFP MACsec v3 zl2 Module
+    1.3.6.1.4.1.11.2.3.7.11.160.5:
+      model: 5400R 12-port 10/100/1000BASE-T PoE+ / 12-port 1GbE SFP MACsec v3 zl2
+        Module
+    1.3.6.1.4.1.11.2.3.7.11.160.6:
+      model: 5400R 20-port 10/100/1000BASE-T PoE+ / 4-port 1G/10GbE SFP+ MACsec v3
+        zl2 Module
+    1.3.6.1.4.1.11.2.3.7.11.160.7:
+      model: 5400R 20-port 10/100/1000BASE-T PoE+ / 4-port 1/2.5/5/10GBASE-T PoE+
+        MACsec v3 zl2 Module
+    1.3.6.1.4.1.11.2.3.7.11.160.8:
+      model: 5400R 20-port 10/100/1000BASE-T PoE+ MACsec / 1-port 40GbE QSFP+ v3 zl2
+        Module
+    1.3.6.1.4.1.11.2.3.7.11.160.9:
+      model: 5400R 8-port 1G/10GbE SFP+ MACsec v3 zl2 Module
+    1.3.6.1.4.1.11.2.3.7.11.160.10:
+      model: 5400R 8-port 1/2.5/5/10GBASE-T PoE+ MACsec v3 zl2 Module
+    1.3.6.1.4.1.11.2.3.7.11.160.11:
+      model: 5400R 2-port 40GbE QSFP+ v3 zl2 Module
+    1.3.6.1.4.1.11.2.3.7.11.161:
+      category: Layer 3 Switch
+      model: 5412R zl2 (J9851A)
+    1.3.6.1.4.1.11.2.3.7.11.162.1:
+      category: Wireless
+      model: 501 WIRELESS CLIENT BRIDGE
+    1.3.6.1.4.1.11.2.3.7.11.162.2:
+      category: Firewall
+      model: R110 WIRELESS 11N VPN AM
+    1.3.6.1.4.1.11.2.3.7.11.162.3:
+      category: Firewall
+      model: R110 WIRELESS 11N VPN WW
+    1.3.6.1.4.1.11.2.3.7.11.162.4:
+      category: Firewall
+      model: R120 WIRELESS 11AC VPN AM
+    1.3.6.1.4.1.11.2.3.7.11.162.5:
+      category: Firewall
+      model: R120 WIRELESS 11AC VPN WW
+    1.3.6.1.4.1.11.2.3.7.11.162.8:
+      model: M330 Dual Radio 802.11ac (AM) Access Point
+    1.3.6.1.4.1.11.2.3.7.11.162.9:
+      model: M330 Dual Radio 802.11ac (WW) Access Point
+    1.3.6.1.4.1.11.2.3.7.11.162.10:
+      model: M330 Dual Radio 802.11ac (JP) Access Point
+    1.3.6.1.4.1.11.2.3.7.11.162.11:
+      category: Firewall
+      model: PS110 WIRELESS 11N VPN AM
+    1.3.6.1.4.1.11.2.3.7.11.162.12:
+      category: Firewall
+      model: PS110 WIRELESS 11N VPN WW
+    1.3.6.1.4.1.11.2.3.7.11.163:
+      model: 2530-48G-PoE+-2SFP+
+    1.3.6.1.4.1.11.2.3.7.11.163.1:
+      model: 2530-Fixed 48p PoEP 10/100/1000-T 2SFP+ module
+    1.3.6.1.4.1.11.2.3.7.11.164:
+      model: 2530-24G-PoE+-2SFP+
+    1.3.6.1.4.1.11.2.3.7.11.164.1:
+      model: 2530-Fixed 24p PoEP 10/100/1000-T 2SFP+ module
+    1.3.6.1.4.1.11.2.3.7.11.165:
+      model: 2530-48G-2SFP+ (J9855A)
+    1.3.6.1.4.1.11.2.3.7.11.165.1:
+      model: 2530-Fixed 48p 10/100/1000-T 2SFP+ module
+    1.3.6.1.4.1.11.2.3.7.11.166:
+      model: 2530-24G-2SFP+
+    1.3.6.1.4.1.11.2.3.7.11.166.1:
+      model: 2530-Fixed 24p 10/100/1000-T 2SFP+ module
+    1.3.6.1.4.1.11.2.3.7.11.167:
+      category: Layer 3 Switch
+      model: OfficeConnect 1820 8G (J9979A)
+    1.3.6.1.4.1.11.2.3.7.11.168:
+      category: Layer 3 Switch
+      model: OfficeConnect 1820 24G (J9980A)
+    1.3.6.1.4.1.11.2.3.7.11.169:
+      category: Switch
+      model: OfficeConnect 1820 48G (J9981A)
+    1.3.6.1.4.1.11.2.3.7.11.170:
+      model: 1820-8G-PoE+ (65W)
+    1.3.6.1.4.1.11.2.3.7.11.171:
+      category: Layer 3 Switch
+      model: OfficeConnect 1820 24G PoE+ (J9983A)
+    1.3.6.1.4.1.11.2.3.7.11.172:
+      category: Layer 3 Switch
+      model: OfficeConnect 1820 48G PoE+ (J9984A)
+    1.3.6.1.4.1.11.2.3.7.11.173:
+      category: Switch
+      model: Aruba 2530-8-PoE+ Internal PS Switch (JL070A)
+    1.3.6.1.4.1.11.2.3.7.11.173.1:
+      model: 2530-Fixed 8p PoEP Internal PS 10/100 module
+    1.3.6.1.4.1.11.2.3.7.11.174.1:
+      category: Layer 3 Switch
+      model: Aruba 3810M 24G 1-slot Switch (JL071A)
+    1.3.6.1.4.1.11.2.3.7.11.174.1.1:
+      model: Aruba 3810M 24G 1-slot Module
+    1.3.6.1.4.1.11.2.3.7.11.174.2:
+      category: Layer 3 Switch
+      model: Aruba 3810M 48G 1-slot Switch (JL072A)
+    1.3.6.1.4.1.11.2.3.7.11.174.2.1:
+      model: Aruba 3810M 48G 1-slot Module
+    1.3.6.1.4.1.11.2.3.7.11.174.3:
+      model: Aruba 3810M 24G PoE+ 1-slot
+    1.3.6.1.4.1.11.2.3.7.11.174.3.1:
+      model: Aruba 3810M 24G PoE+ 1-slot Module
+    1.3.6.1.4.1.11.2.3.7.11.174.4:
+      model: Aruba 3810M 48G PoE+ 1-slot
+    1.3.6.1.4.1.11.2.3.7.11.174.4.1:
+      model: Aruba 3810M 48G PoE+ 1-slot Module
+    1.3.6.1.4.1.11.2.3.7.11.174.5:
+      category: Layer 3 Switch
+      model: Aruba 3810M-16SFP+-2-slot Switch (JL075A)
+    1.3.6.1.4.1.11.2.3.7.11.174.5.1:
+      model: Aruba 3810M 16SFP+ 2-slot Module
+    1.3.6.1.4.1.11.2.3.7.11.174.6:
+      category: Layer 3 Switch
+      model: Aruba 3810M-40G-8SR-PoE+-1-slot Switch (JL076A)
+    1.3.6.1.4.1.11.2.3.7.11.174.6.1:
+      model: Aruba 3810M 20G 8 HPE Smart Rate PoE+ 1-slot Module
+    1.3.6.1.4.1.11.2.3.7.11.174.7:
+      model: Aruba 3810M 16 HPE Smart Rate PoE+ 2-slot
+    1.3.6.1.4.1.11.2.3.7.11.174.7.1:
+      model: Aruba 3810M 16 HPE Smart Rate PoE+ 2-slot Module
+    1.3.6.1.4.1.11.2.3.7.11.174.8:
+      model: Aruba 3810M 4-port Stacking Module
+    1.3.6.1.4.1.11.2.3.7.11.174.9:
+      category: Switch
+      model: ARUBA 3810 SWITCH FAN TRAY
+    1.3.6.1.4.1.11.2.3.7.11.180.1:
+      model: Aruba 1QSFP+ 40GbE Module
+    1.3.6.1.4.1.11.2.3.7.11.180.2:
+      model: Aruba 2QSFP+ 40GbE Module
+    1.3.6.1.4.1.11.2.3.7.11.180.3:
+      model: Aruba 2 HPE Smart Rate PoE+ Module
+    1.3.6.1.4.1.11.2.3.7.11.180.4:
+      model: Aruba 4 HPE Smart Rate PoE+ Module
+    1.3.6.1.4.1.11.2.3.7.11.180.5:
+      model: Aruba 2SFP+ Module
+    1.3.6.1.4.1.11.2.3.7.11.180.6:
+      model: Aruba 4SFP+ Module
+    1.3.6.1.4.1.11.2.3.7.11.181.1:
+      model: Aruba 2930M 2 port Stacking Module
+    1.3.6.1.4.1.11.2.3.7.11.181.2:
+      category: Layer 3 Switch
+      model: Aruba 2930M-24G (JL319A)
+    1.3.6.1.4.1.11.2.3.7.11.181.2.1:
+      model: Aruba 2930M-24G Module
+    1.3.6.1.4.1.11.2.3.7.11.181.3:
+      category: Layer 3 Switch
+      model: Aruba 2930M-48G (JL321A)
+    1.3.6.1.4.1.11.2.3.7.11.181.3.1:
+      model: Aruba 2930M-48G Module
+    1.3.6.1.4.1.11.2.3.7.11.181.4:
+      category: Layer 3 Switch
+      model: Aruba 2930M-24G-PoE+ (JL320A)
+    1.3.6.1.4.1.11.2.3.7.11.181.4.1:
+      model: Aruba 2930M-24G-PoE+ Module
+    1.3.6.1.4.1.11.2.3.7.11.181.5:
+      category: Layer 3 Switch
+      model: Aruba 2930M-48G-PoE+ (JL322A)
+    1.3.6.1.4.1.11.2.3.7.11.181.5.1:
+      model: Aruba 2930M-48G-PoE+ Module
+    1.3.6.1.4.1.11.2.3.7.11.181.6:
+      model: Aruba 2930M-24SR-PoE+
+    1.3.6.1.4.1.11.2.3.7.11.181.6.1:
+      model: Aruba 2930M-24SR-PoE+ Module
+    1.3.6.1.4.1.11.2.3.7.11.181.9:
+      model: Aruba 2930M-40G-8SR-PoE+
+    1.3.6.1.4.1.11.2.3.7.11.181.9.1:
+      model: Aruba 2930M-40G-8SR-PoE+ Module
+    1.3.6.1.4.1.11.2.3.7.11.181.16:
+      category: Layer 3 Switch
+      model: Aruba 2930F-8G-PoE+-2SFP+ (JL258A)
+    1.3.6.1.4.1.11.2.3.7.11.181.16.1:
+      model: Aruba 2930F-8G-PoE+-2SFP+ Module
+    1.3.6.1.4.1.11.2.3.7.11.181.18:
+      category: Layer 3 Switch
+      model: Aruba 2930F-24G-4SFP+ (JL253A)
+    1.3.6.1.4.1.11.2.3.7.11.181.18.1:
+      model: Aruba 2930F-24G-4SFP+ Module
+    1.3.6.1.4.1.11.2.3.7.11.181.19:
+      category: Layer 3 Switch
+      model: Aruba 2930F-48G-4SFP+ (JL254A)
+    1.3.6.1.4.1.11.2.3.7.11.181.19.1:
+      model: Aruba 2930F-48G-4SFP+ Module
+    1.3.6.1.4.1.11.2.3.7.11.181.20:
+      category: Layer 3 Switch
+      model: Aruba 2930F-24G-PoE+-4SFP+ (JL255A)
+    1.3.6.1.4.1.11.2.3.7.11.181.20.1:
+      model: Aruba 2930F-24G-PoE+-4SFP+ Module
+    1.3.6.1.4.1.11.2.3.7.11.181.21:
+      category: Layer 3 Switch
+      model: Aruba 2930F-48G-PoE+-4SFP+ (JL256A)
+    1.3.6.1.4.1.11.2.3.7.11.181.21.1:
+      model: Aruba 2930F-48G-PoE+-4SFP+ Module
+    1.3.6.1.4.1.11.2.3.7.11.181.22:
+      category: Layer 3 Switch
+      model: Aruba 2930F-24G-4SFP (JL259A)
+    1.3.6.1.4.1.11.2.3.7.11.181.22.1:
+      model: Aruba 2930F-24G-4SFP Module
+    1.3.6.1.4.1.11.2.3.7.11.181.23:
+      category: Layer 3 Switch
+      model: Aruba 2930F-48G-4SFP (JL260A)
+    1.3.6.1.4.1.11.2.3.7.11.181.23.1:
+      model: Aruba 2930F-48G-4SFP Module
+    1.3.6.1.4.1.11.2.3.7.11.181.24:
+      category: Layer 3 Switch
+      model: 2930F-24G-PoE+-4SFP (JL261A)
+    1.3.6.1.4.1.11.2.3.7.11.181.24.1:
+      model: Aruba 2930F-24G-PoE+-4SFP Module
+    1.3.6.1.4.1.11.2.3.7.11.181.25:
+      model: Aruba 2930F-48G-PoE+-4SFP
+    1.3.6.1.4.1.11.2.3.7.11.181.25.1:
+      model: Aruba 2930F-48G-PoE+-4SFP Module
+    1.3.6.1.4.1.11.2.3.7.11.181.26:
+      category: Layer 3 Switch
+      model: Aruba 2930F-48G-740W-PoE+-4SFP+ Switch (JL558A)
+    1.3.6.1.4.1.11.2.3.7.11.181.27:
+      category: Layer 3 Switch
+      model: Aruba 2930F-48G-PoE+-4SFP-740W (JL557A)
+    1.3.6.1.4.1.11.2.3.7.11.181.35:
+      category: Layer 3 Switch
+      model: Aruba 2930F-12G-PoE+-2G-2SFP+ (JL693A)
+    1.3.6.1.4.1.11.2.3.7.11.181.276:
+      model: Aruba 2930F-24G-PoE+-4SFP+-TAA
+    1.3.6.1.4.1.11.2.3.7.11.181.276.1:
+      model: Aruba 2930F-24G-PoE+-4SFP+-TAA Module
+    1.3.6.1.4.1.11.2.3.7.11.181.277:
+      model: Aruba 2930F-48G-PoE+-4SFP+-TAA
+    1.3.6.1.4.1.11.2.3.7.11.181.277.1:
+      model: Aruba 2930F-48G-PoE+-4SFP+-TAA Module
+    1.3.6.1.4.1.11.2.3.7.11.182.18:
+      category: Switch
+      model: Aruba 2540-24G-4SFP (JL354A)
+    1.3.6.1.4.1.11.2.3.7.11.182.18.1:
+      model: Aruba 2540-24G-4SFP+ Module
+    1.3.6.1.4.1.11.2.3.7.11.182.19:
+      model: Aruba 2540-48G-4SFP+
+    1.3.6.1.4.1.11.2.3.7.11.182.19.1:
+      model: Aruba 2540-48G-4SFP+ Module
+    1.3.6.1.4.1.11.2.3.7.11.182.20:
+      category: Switch
+      model: Aruba 2540-24G-PoE+-4SFP+ (JL356A)
+    1.3.6.1.4.1.11.2.3.7.11.182.20.1:
+      model: Aruba 2540-24G-PoE+-4SFP+ Module
+    1.3.6.1.4.1.11.2.3.7.11.182.21:
+      category: Switch
+      model: Aruba 2540-48G-PoE+-4SFP+ (JL357A)
+    1.3.6.1.4.1.11.2.3.7.11.182.21.1:
+      model: Aruba 2540-48G-PoE+-4SFP+ Module
+    1.3.6.1.4.1.11.2.3.7.11.183:
+      category: Layer 3 Switch
+      model: OfficeConnect 1920S 8G (JL380A)
+    1.3.6.1.4.1.11.2.3.7.11.184:
+      category: Layer 3 Switch
+      model: OfficeConnect 1920S 24G 2SFP (JL381A)
+    1.3.6.1.4.1.11.2.3.7.11.185:
+      category: Layer 3 Switch
+      model: OfficeConnect 1920S 48G 4SFP (JL382A)
+    1.3.6.1.4.1.11.2.3.7.11.186:
+      category: Layer 3 Switch
+      model: OfficeConnect 1920S 8G PPoE+ (JL383A)
+    1.3.6.1.4.1.11.2.3.7.11.187:
+      category: Layer 3 Switch
+      model: OfficeConnect 1920S 24G 2SFP PPoE+ (JL384A)
+    1.3.6.1.4.1.11.2.3.7.11.188:
+      category: Layer 3 Switch
+      model: OfficeConnect 1920S 24G 2SFP PoE+ (JL385A)
+    1.3.6.1.4.1.11.2.3.7.11.194:
+      category: Switch
+      model: Aruba Instant On 1930 8G 2SFP (JL680A)
+    1.3.6.1.4.1.11.2.3.7.11.195:
+      category: Switch
+      model: Aruba Instant On 1930 8G Class4 PoE 2SFP 124W (JL681A)
+    1.3.6.1.4.1.11.2.3.7.11.196:
+      category: Switch
+      model: Aruba Instant On 1930 24G 4SFP/SFP+ (JL682A)
+    1.3.6.1.4.1.11.2.3.7.11.197:
+      category: Switch
+      model: Aruba Instant On 1930 24G Class4 PoE 4SFP/SFP+ (JL683A)
+    1.3.6.1.4.1.11.2.3.7.11.198:
+      category: Switch
+      model: Aruba Instant On 1930 24G Class4 PoE 4SFP/SFP+ 370W (JL684A)
+    1.3.6.1.4.1.11.2.3.7.11.199:
+      category: Switch
+      model: Aruba Instant On 1930 48G 4SFP/SFP+ (JL685A)
+    1.3.6.1.4.1.11.2.3.7.11.210:
+      category: Switch
+      model: Aruba Instant On 1830 48G 4SFP (JL814A)
+    1.3.6.1.4.1.11.2.3.7.11.214:
+      category: Switch
+      model: Aruba Instant On 1930 48G Class4 PoE 4SFP/SFP+ (JL686B)
+    1.3.6.1.4.1.11.2.3.7.15.1.3.1:
+      model: 10500/7500 20G Wired-WLAN module
+    1.3.6.1.4.1.11.2.3.7.15.1.3.2:
+      model: 830-24P
+    1.3.6.1.4.1.11.2.3.7.15.1.3.3:
+      model: 830-24P-LSW
+    1.3.6.1.4.1.11.2.3.7.15.1.3.4:
+      model: 830-8P
+    1.3.6.1.4.1.11.2.3.7.15.1.3.5:
+      model: 830-8P-LSW
+    1.3.6.1.4.1.11.2.3.7.15.1.3.6:
+      model: 10500/7500 20G Wired-WLAN module TAA
+    1.3.6.1.4.1.11.2.3.7.15.1.3.7:
+      model: 830-24P-TAA
+    1.3.6.1.4.1.11.2.3.7.15.1.3.8:
+      model: 830-24P-TAA-LSW
+    1.3.6.1.4.1.11.2.3.7.15.1.3.9:
+      model: 830-8P-TAA
+    1.3.6.1.4.1.11.2.3.7.15.1.3.10:
+      model: 830-8P-TAA-LSW
+    1.3.6.1.4.1.11.2.3.7.15.1.3.11:
+      model: 870-WCM
+    1.3.6.1.4.1.11.2.3.7.15.1.3.12:
+      model: 870-LSW
+    1.3.6.1.4.1.11.2.3.7.15.1.3.13:
+      model: "850"
+    1.3.6.1.4.1.11.2.3.7.15.1.3.14:
+      model: 870-TAA-WCM
+    1.3.6.1.4.1.11.2.3.7.15.1.3.15:
+      model: 870-TAA-LSW
+    1.3.6.1.4.1.11.2.3.7.15.1.3.16:
+      model: 850-TAA
+    1.3.6.1.4.1.11.2.3.7.15.1.3.17:
+      model: UWWM20
+    1.3.6.1.4.1.11.2.3.7.15.1.3.18:
+      model: UWWM20TAA
+    1.3.6.1.4.1.11.2.3.7.15.1.3.19:
+      model: "870"
+    1.3.6.1.4.1.11.2.3.7.15.1.3.20:
+      model: "850"
+    1.3.6.1.4.1.11.2.3.7.15.1.3.21:
+      model: 870-TAA
+    1.3.6.1.4.1.11.2.3.7.15.1.3.22:
+      model: 850-TAA
+    1.3.6.1.4.1.11.2.3.7.15.1.3.23:
+      category: Access Point
+      model: VAP
+    1.3.6.1.4.1.11.2.3.7.15.1.3.24:
+      model: 830-8P-V7
+    1.3.6.1.4.1.11.2.3.7.15.1.3.25:
+      model: 830-24P-V7
+    1.3.6.1.4.1.11.2.3.7.15.1.3.26:
+      model: 830-8P-TAA-V7
+    1.3.6.1.4.1.11.2.3.7.15.1.3.27:
+      model: 830-24P-TAA-V7
+    1.3.6.1.4.1.11.2.3.9.0:
+      category: Printer
+      model: Jet-Direct Print Server
+    1.3.6.1.4.1.11.2.3.9.1:
+      category: Printer
+      model: LaserJet 4050 Series
+    1.3.6.1.4.1.11.2.3.9.2:
+      category: Printer
+      model: DesignJet 500 (C7770B)
+    1.3.6.1.4.1.11.2.3.9.5:
+      category: Printer
+      model: 9200C Digital Sender
+    1.3.6.1.4.1.11.2.3.9.6:
+      category: Printer
+      model: Jet-Direct Print Server JD86
+    1.3.6.1.4.1.11.2.3.9.134:
+      category: Printer
+      model: Designjet 4500ps
+    1.3.6.1.4.1.11.2.3.10.1:
+      category: Server
+      model: Solaris
+    1.3.6.1.4.1.11.2.3.10.1.1:
+      category: Server
+      model: Solaris
+    1.3.6.1.4.1.11.2.3.10.1.2:
+      category: Server
+      model: Solaris
+    1.3.6.1.4.1.11.2.14.11.6.4.1.1:
+      category: Access Point
+      model: AP420
+    1.3.6.1.4.1.11.2.14.11.6.4.1.2:
+      category: Access Point
+      model: AP530
+    1.3.6.1.4.1.11.2.14.11.6.4.1.3:
+      category: Access Point
+      model: AP10AG
+    1.3.6.1.4.1.11.2.14.11.7.1:
+      category: Router
+      model: ProCurve 7000
+    1.3.6.1.4.1.11.2.14.11.7.1.1:
+      category: Router
+      model: ProCurve 7001dl
+    1.3.6.1.4.1.11.2.14.11.7.1.2:
+      category: Router
+      model: ProCurve 7102dl
+    1.3.6.1.4.1.11.2.14.11.7.1.3:
+      category: Router
+      model: ProCurve 7203dl
+    1.3.6.1.4.1.11.2.14.11.7.1.4:
+      category: Router
+      model: ProCurve 7306dl
+    1.3.6.1.4.1.11.2.14.11.8.1.1:
+      category: Layer 3 Switch
+      model: ProCurve 8116fl
+    1.3.6.1.4.1.11.2.14.11.8.1.2:
+      category: Layer 3 Switch
+      model: ProCurve 8100fl_8108fl
+    1.3.6.1.4.1.11.2.51:
+      category: Storage
+      model: MSA 2050 SAN
+    1.3.6.1.4.1.11.5.7.1.1:
+      category: Blade System
+      model: BladeSystem Server Management card (SMC)
+    1.3.6.1.4.1.11.5.7.1.2:
+      category: Management Controller
+      model: Onboard Administrator
+    1.3.6.1.4.1.11.5.7.3.1:
+      category: Management Controller
+      model: Server Management Card (GSP)
+    1.3.6.1.4.1.11.5.7.3.2:
+      category: Management Controller
+      model: Server Management Processor
+    1.3.6.1.4.1.11.5.7.5.1:
+      category: SANSwitch
+      model: 1/10Gb-F Virtual Connect Ethernet Module
+    1.3.6.1.4.1.11.5.7.5.4:
+      category: SANSwitch
+      model: VC Flex-10/10D Module
+    1.3.6.1.4.1.11.5.7.5.6:
+      category: SANSwitch
+      model: VC FlexFabric-20/40 F8 Module
+    1.3.6.1.4.1.11.10.2.1.3.12:
+      category: Tape Library
+      model: StorageWorks MSL 6030
+    1.3.6.1.4.1.11.10.2.1.3.20:
+      category: Tape Library
+      model: EML 245e Tape Library
+    1.3.6.1.4.1.11.10.2.1.3.25:
+      category: Tape Library
+      model: StoreEver MSL4048 Tape Library
+    1.3.6.1.4.1.11.10.2.1.3.28:
+      category: Tape Library
+      model: StoreEver ESL G3 Tape Library
+    1.3.6.1.4.1.11.10.2.1.3.29:
+      category: Tape Library
+      model: StoreEver MSL6480 Tape Library
+    1.3.6.1.4.1.11.10.3.1.3.27:
+      category: Self-contained NAS
+      model: StoreOnce 5200

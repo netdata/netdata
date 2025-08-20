@@ -1,0 +1,446 @@
+sysobjectids:
+  oid_overrides:
+    1.3.6.1.4.1.4881.1.1.10.1.1:
+      category: Switch
+      model: Start Switch
+    1.3.6.1.4.1.4881.1.1.10.1.2:
+      category: Switch
+      model: RuiJie-S2126GL3
+    1.3.6.1.4.1.4881.1.1.10.1.3:
+      category: Switch
+      model: RuiJie-S2150G
+    1.3.6.1.4.1.4881.1.1.10.1.4:
+      category: Switch
+      model: RuiJie-S2150GL3
+    1.3.6.1.4.1.4881.1.1.10.1.5:
+      category: Switch
+      model: RuiJie-S4909
+    1.3.6.1.4.1.4881.1.1.10.1.6:
+      category: Switch
+      model: RuiJie-S3550-12G
+    1.3.6.1.4.1.4881.1.1.10.1.8:
+      category: Switch
+      model: RuiJie-S3550-24G
+    1.3.6.1.4.1.4881.1.1.10.1.11:
+      category: Switch
+      model: RuiJie-S21-STACKING
+    1.3.6.1.4.1.4881.1.1.10.1.12:
+      category: Switch
+      model: RuiJie-S3550-24
+    1.3.6.1.4.1.4881.1.1.10.1.13:
+      category: Switch
+      model: RuiJie-S3550-48
+    1.3.6.1.4.1.4881.1.1.10.1.15:
+      category: Switch
+      model: RuiJie-S3550-12SFP-GT
+    1.3.6.1.4.1.4881.1.1.10.1.16:
+      category: Switch
+      model: RuiJie-S6806
+    1.3.6.1.4.1.4881.1.1.10.1.17:
+      category: Switch
+      model: RuiJie-S6810
+    1.3.6.1.4.1.4881.1.1.10.1.18:
+      category: Switch
+      model: RuiJie-S2126S
+    1.3.6.1.4.1.4881.1.1.10.1.19:
+      category: Switch
+      model: RuiJie-S2126S-STACKING
+    1.3.6.1.4.1.4881.1.1.10.1.20:
+      category: Switch
+      model: RuiJie-S1908PLUS
+    1.3.6.1.4.1.4881.1.1.10.1.21:
+      category: Switch
+      model: RuiJie-S1916PLUS
+    1.3.6.1.4.1.4881.1.1.10.1.22:
+      category: Switch
+      model: RuiJie-S6506
+    1.3.6.1.4.1.4881.1.1.10.1.23:
+      category: Switch
+      model: RuiJie-S2126S-08
+    1.3.6.1.4.1.4881.1.1.10.1.24:
+      category: Switch
+      model: RuiJie-S2126S-16
+    1.3.6.1.4.1.4881.1.1.10.1.25:
+      category: Switch
+      model: RuiJie-S6806E
+    1.3.6.1.4.1.4881.1.1.10.1.26:
+      category: Switch
+      model: RuiJie-S6810E
+    1.3.6.1.4.1.4881.1.1.10.1.27:
+      category: Switch
+      model: RuiJie-S2026G
+    1.3.6.1.4.1.4881.1.1.10.1.28:
+      category: Switch
+      model: RuiJie-S3750-24
+    1.3.6.1.4.1.4881.1.1.10.1.29:
+      category: Switch
+      model: RuiJie-S3750-48
+    1.3.6.1.4.1.4881.1.1.10.1.30:
+      category: Switch
+      model: RuiJie-S2126
+    1.3.6.1.4.1.4881.1.1.10.1.31:
+      category: Switch
+      model: RuiJie-S2126-STACKING
+    1.3.6.1.4.1.4881.1.1.10.1.32:
+      category: Switch
+      model: RuiJie-S2026F
+    1.3.6.1.4.1.4881.1.1.10.1.33:
+      category: Switch
+      model: RuiJie-S3760-48T4SFP
+    1.3.6.1.4.1.4881.1.1.10.1.34:
+      category: Switch
+      model: RuiJie-S3760-12SFP-GT
+    1.3.6.1.4.1.4881.1.1.10.1.35:
+      category: Switch
+      model: RuiJie-S4009
+    1.3.6.1.4.1.4881.1.1.10.1.36:
+      category: Switch
+      model: RuiJie-S3526
+    1.3.6.1.4.1.4881.1.1.10.1.37:
+      category: Switch
+      model: RuiJie-S3512G
+    1.3.6.1.4.1.4881.1.1.10.1.38:
+      category: Switch
+      model: RuiJie-HCL-12GCS-L3
+    1.3.6.1.4.1.4881.1.1.10.1.39:
+      category: Switch
+      model: RuiJie-HCL-24GS-L3
+    1.3.6.1.4.1.4881.1.1.10.1.40:
+      category: Switch
+      model: RuiJie-HCL-48TMS-2S-S
+    1.3.6.1.4.1.4881.1.1.10.1.41:
+      category: Switch
+      model: RuiJie-S5750-24GT-12SFP
+    1.3.6.1.4.1.4881.1.1.10.1.42:
+      category: Switch
+      model: RuiJie-S5750P-24GT-12SFP
+    1.3.6.1.4.1.4881.1.1.10.1.43:
+      category: Switch
+      model: RuiJie-S8606
+    1.3.6.1.4.1.4881.1.1.10.1.44:
+      category: Switch
+      model: RuiJie-S8610
+    1.3.6.1.4.1.4881.1.1.10.1.45:
+      category: Switch
+      model: RuiJie-S9610
+    1.3.6.1.4.1.4881.1.1.10.1.46:
+      category: Switch
+      model: RuiJie-S9620
+    1.3.6.1.4.1.4881.1.1.10.1.47:
+      category: Switch
+      model: RuiJie-S2924G
+    1.3.6.1.4.1.4881.1.1.10.1.48:
+      category: Switch
+      model: RuiJie-S3760-24
+    1.3.6.1.4.1.4881.1.1.10.1.49:
+      category: Switch
+      model: RuiJie-S3760-48
+    1.3.6.1.4.1.4881.1.1.10.1.50:
+      category: Switch
+      model: RuiJie-S3750E-24
+    1.3.6.1.4.1.4881.1.1.10.1.51:
+      category: Switch
+      model: S3750E-48
+    1.3.6.1.4.1.4881.1.1.10.1.52:
+      category: Switch
+      model: S3750E-12SFP-GT
+    1.3.6.1.4.1.4881.1.1.10.1.53:
+      category: Switch
+      model: RuiJie-S5750S-24GT-12SFP
+    1.3.6.1.4.1.4881.1.1.10.1.54:
+      category: Switch
+      model: RuiJie-S2128G
+    1.3.6.1.4.1.4881.1.1.10.1.55:
+      category: Switch
+      model: RuiJie-S2927XG
+    1.3.6.1.4.1.4881.1.1.10.1.56:
+      category: Switch
+      model: RuiJie-S3512G-Plus
+    1.3.6.1.4.1.4881.1.1.10.1.57:
+      category: Switch
+      model: RuiJie-S7604
+    1.3.6.1.4.1.4881.1.1.10.1.58:
+      category: Switch
+      model: RuiJie-S7606
+    1.3.6.1.4.1.4881.1.1.10.1.59:
+      category: Switch
+      model: RuiJie-S7610
+    1.3.6.1.4.1.4881.1.1.10.1.60:
+      category: Switch
+      model: RuiJie-S5750-24SFP-12GT
+    1.3.6.1.4.1.4881.1.1.10.1.61:
+      category: Switch
+      model: RuiJie-S5750-48GT-4SFP
+    1.3.6.1.4.1.4881.1.1.10.1.62:
+      category: Switch
+      model: RuiJie-S5750S-48GT-4SFP
+    1.3.6.1.4.1.4881.1.1.10.1.63:
+      category: Switch
+      model: RuiJie-S3250-24
+    1.3.6.1.4.1.4881.1.1.10.1.64:
+      category: Switch
+      model: RuiJie-S3250-48
+    1.3.6.1.4.1.4881.1.1.10.1.65:
+      category: Switch
+      model: RuiJie-S2724G
+    1.3.6.1.4.1.4881.1.1.10.1.66:
+      category: Switch
+      model: RuiJie-S2951XG
+    1.3.6.1.4.1.4881.1.1.10.1.67:
+      category: Switch
+      model: RuiJie-S3750-24(UB)
+    1.3.6.1.4.1.4881.1.1.10.1.68:
+      category: Switch
+      model: RuiJie-S3750-24(UB)
+    1.3.6.1.4.1.4881.1.1.10.1.69:
+      category: Switch
+      model: RuiJie-RG-SCG5510
+    1.3.6.1.4.1.4881.1.1.10.1.70:
+      category: Switch
+      model: RuiJie-S2052G
+    1.3.6.1.4.1.4881.1.1.10.1.71:
+      category: Switch
+      model: RuiJie-S2328G
+    1.3.6.1.4.1.4881.1.1.10.1.72:
+      category: Switch
+      model: RuiJie-S8614
+    1.3.6.1.4.1.4881.1.1.10.1.73:
+      category: Switch
+      model: RuiJie-S5650-24GT-4SFP
+    1.3.6.1.4.1.4881.1.1.10.1.74:
+      category: Switch
+      model: RuiJie-S5650-27XG
+    1.3.6.1.4.1.4881.1.1.10.1.75:
+      category: Switch
+      model: RuiJie-S5650-51XG
+    1.3.6.1.4.1.4881.1.1.10.1.76:
+      category: Switch
+      model: RuiJie-S5450-28GT
+    1.3.6.1.4.1.4881.1.1.10.1.77:
+      category: Switch
+      model: RuiJie-S3760E-24
+    1.3.6.1.4.1.4881.1.1.10.1.78:
+      category: Switch
+      model: RuiJie-S3250P-24
+    1.3.6.1.4.1.4881.1.1.10.1.79:
+      category: Switch
+      model: RuiJie-S2928G
+    1.3.6.1.4.1.4881.1.1.10.1.80:
+      category: Switch
+      model: RuiJie-S2952G
+    1.3.6.1.4.1.4881.1.1.10.1.81:
+      category: Switch
+      model: RuiJie-S2028G
+    1.3.6.1.4.1.4881.1.1.10.1.82:
+      category: Switch
+      model: RuiJie-S2528G
+    1.3.6.1.4.1.4881.1.1.10.1.83:
+      category: Switch
+      model: RuiJie-S2552G
+    1.3.6.1.4.1.4881.1.1.10.1.84:
+      category: Layer 3 Switch
+      model: S5750R-48GT-4SFP
+    1.3.6.1.4.1.4881.1.1.10.1.85:
+      category: Layer 3 Switch
+      model: S5750P-48GT-4SFP
+    1.3.6.1.4.1.4881.1.1.10.1.86:
+      category: Layer 3 Switch
+      model: S5750R-24GT-4SFP
+    1.3.6.1.4.1.4881.1.1.10.1.87:
+      category: Layer 3 Switch
+      model: S5750P-24GT-4SFP
+    1.3.6.1.4.1.4881.1.1.10.1.88:
+      category: Layer 3 Switch
+      model: S5750-24GT-4SFP
+    1.3.6.1.4.1.4881.1.1.10.1.89:
+      category: Layer 3 Switch
+      model: S5750S-24GT-4SFP
+    1.3.6.1.4.1.4881.1.1.10.1.92:
+      category: Layer 3 Switch
+      model: S5750-48GT-4SFP-A
+    1.3.6.1.4.1.4881.1.1.10.1.93:
+      category: Layer 3 Switch
+      model: S5750-48GT-4SFP-AP
+    1.3.6.1.4.1.4881.1.1.10.1.94:
+      category: Switch
+      model: RuiJie-S2352G
+    1.3.6.1.4.1.4881.1.1.10.1.95:
+      model: nm2x-24esw
+    1.3.6.1.4.1.4881.1.1.10.1.96:
+      model: nm2x-16esw
+    1.3.6.1.4.1.4881.1.1.10.1.98:
+      category: Switch
+      model: RuiJie-S3760E-24
+    1.3.6.1.4.1.4881.1.1.10.1.100:
+      category: Switch
+      model: S3250E-24
+    1.3.6.1.4.1.4881.1.1.10.1.104:
+      category: Switch
+      model: S3760E-24P
+    1.3.6.1.4.1.4881.1.1.10.1.106:
+      category: Switch
+      model: S2628g-E
+    1.3.6.1.4.1.4881.1.1.10.1.107:
+      category: Switch
+      model: RuiJie-S2652G-E-48
+    1.3.6.1.4.1.4881.1.1.10.1.111:
+      category: Switch
+      model: S5750-24GT/8SFP-E
+    1.3.6.1.4.1.4881.1.1.10.1.118:
+      category: Switch
+      model: S2952G-E
+    1.3.6.1.4.1.4881.1.1.10.1.133:
+      category: Switch
+      model: S12010
+    1.3.6.1.4.1.4881.1.1.10.1.139:
+      category: Switch
+      model: S5750-24SFP
+    1.3.6.1.4.1.4881.1.1.10.1.156:
+      category: Switch
+      model: S2928G-12P
+    1.3.6.1.4.1.4881.1.2.1.1.1:
+      category: Router
+      model: RuiJie-R2620
+    1.3.6.1.4.1.4881.1.2.1.1.2:
+      category: Router
+      model: RuiJie-R2624
+    1.3.6.1.4.1.4881.1.2.1.1.3:
+      category: Router
+      model: RuiJie-R2690
+    1.3.6.1.4.1.4881.1.2.1.1.4:
+      category: Router
+      model: RuiJie-R2692
+    1.3.6.1.4.1.4881.1.2.1.1.5:
+      category: Router
+      model: RuiJie-R3642
+    1.3.6.1.4.1.4881.1.2.1.1.6:
+      category: Router
+      model: RuiJie-R3662
+    1.3.6.1.4.1.4881.1.2.1.1.7:
+      category: Router
+      model: RuiJie-NBR1000
+    1.3.6.1.4.1.4881.1.2.1.1.8:
+      category: Router
+      model: RuiJie-NBR200
+    1.3.6.1.4.1.4881.1.2.1.1.9:
+      category: Router
+      model: RuiJie-SECVPN100
+    1.3.6.1.4.1.4881.1.2.1.1.10:
+      category: Router
+      model: RuiJie-R2632
+    1.3.6.1.4.1.4881.1.2.1.1.11:
+      category: Router
+      model: RuiJie-R1762
+    1.3.6.1.4.1.4881.1.2.1.1.12:
+      category: Router
+      model: RuiJie-RCMS
+    1.3.6.1.4.1.4881.1.2.1.1.13:
+      category: Router
+      model: RuiJie-HCL-R1762
+    1.3.6.1.4.1.4881.1.2.1.1.14:
+      category: Router
+      model: RuiJie-HCL-R2632
+    1.3.6.1.4.1.4881.1.2.1.1.15:
+      category: Router
+      model: RuiJie-HCL-R2692
+    1.3.6.1.4.1.4881.1.2.1.1.16:
+      category: Router
+      model: RuiJie-HCL-R3642
+    1.3.6.1.4.1.4881.1.2.1.1.17:
+      category: Router
+      model: RuiJie-HCL-R3662
+    1.3.6.1.4.1.4881.1.2.1.1.18:
+      category: Router
+      model: RuiJie-HCL-R3740
+    1.3.6.1.4.1.4881.1.2.1.1.19:
+      category: Router
+      model: RuiJie-NBR2000
+    1.3.6.1.4.1.4881.1.2.1.1.20:
+      category: Router
+      model: RuiJie-NBR300
+    1.3.6.1.4.1.4881.1.2.1.1.21:
+      category: Router
+      model: RuiJie-NBR1200
+    1.3.6.1.4.1.4881.1.2.1.1.22:
+      category: Router
+      model: RuiJie-NBR1500
+    1.3.6.1.4.1.4881.1.2.1.1.23:
+      category: Router
+      model: RuiJie-R2716
+    1.3.6.1.4.1.4881.1.2.1.1.24:
+      model: R2724
+    1.3.6.1.4.1.4881.1.2.1.1.25:
+      category: Router
+      model: RuiJie-R3802
+    1.3.6.1.4.1.4881.1.2.1.1.26:
+      category: Router
+      model: RuiJie-R3804
+    1.3.6.1.4.1.4881.1.2.1.1.27:
+      category: Router
+      model: RuiJie-RSR50-20
+    1.3.6.1.4.1.4881.1.2.1.1.28:
+      category: Router
+      model: RuiJie-RSR50-40
+    1.3.6.1.4.1.4881.1.2.1.1.29:
+      category: Router
+      model: RuiJie-RSR50-80
+    1.3.6.1.4.1.4881.1.2.1.1.30:
+      category: Router
+      model: RuiJie-NPE50-20
+    1.3.6.1.4.1.4881.1.2.1.1.31:
+      category: Router
+      model: RuiJie-RSR10-02
+    1.3.6.1.4.1.4881.1.2.1.1.32:
+      category: Router
+      model: RuiJie-RSR10-04
+    1.3.6.1.4.1.4881.1.2.1.1.33:
+      category: Router
+      model: RuiJie-VPN120
+    1.3.6.1.4.1.4881.1.2.1.1.34:
+      category: Router
+      model: RuiJie-NPE80
+    1.3.6.1.4.1.4881.1.2.1.1.35:
+      category: Router
+      model: RuiJie-RSR20-24
+    1.3.6.1.4.1.4881.1.2.1.1.36:
+      model: nm2-16esw
+    1.3.6.1.4.1.4881.1.2.1.1.37:
+      model: nm2-24esw
+    1.3.6.1.4.1.4881.1.2.1.1.38:
+      model: nmx-24esw
+    1.3.6.1.4.1.4881.1.2.1.1.39:
+      model: nmx-24esw-l2
+    1.3.6.1.4.1.4881.1.2.1.1.40:
+      model: nmx-24esw-3gel3
+    1.3.6.1.4.1.4881.1.2.1.1.41:
+      category: Router
+      model: RuiJie-RSR20-14
+    1.3.6.1.4.1.4881.1.2.1.1.42:
+      category: Router
+      model: RuiJie-RSR30-44
+    1.3.6.1.4.1.4881.1.2.1.1.43:
+      category: Router
+      model: RuiJie-R2700
+    1.3.6.1.4.1.4881.1.2.1.1.44:
+      category: Router
+      model: RuiJie-R2700
+    1.3.6.1.4.1.4881.1.2.1.1.45:
+      category: Router
+      model: RuiJie-NPE50-40
+    1.3.6.1.4.1.4881.1.2.1.1.46:
+      category: Router
+      model: RuiJie-RSR20-18
+    1.3.6.1.4.1.4881.1.2.1.1.47:
+      category: Router
+      model: RuiJie-RSR50E-80
+    1.3.6.1.4.1.4881.1.3.1:
+      category: Firewall
+      model: WSTON SpOS
+    1.3.6.1.4.1.4881.1.3.1.1.1:
+      model: WGP500
+    1.3.6.1.4.1.4881.1.3.1.1.21:
+      category: Switch
+      model: WS3302
+    1.3.6.1.4.1.4881.1.5.1.1.3:
+      category: Router
+      model: EG1000M

@@ -1,0 +1,1507 @@
+sysobjectids:
+  oid_overrides:
+    1.3.6.1.4.1.1588.2.1.1:
+      category: Switch
+      model: SWITCH
+    1.3.6.1.4.1.1588.2.1.1.1:
+      category: SANSwitch
+      model: Connectrix ED-24000B
+    1.3.6.1.4.1.1588.2.1.1.1.42:
+      category: SANSwitch
+      model: Connectrix ED-48000B
+    1.3.6.1.4.1.1588.2.1.1.1.55:
+      category: SANSwitch
+      model: Connectrix AP-7600B
+    1.3.6.1.4.1.1588.2.1.1.1.62:
+      category: SANSwitch
+      model: Connectrix ED-DCX-B
+    1.3.6.1.4.1.1588.2.1.1.1.133:
+      category: SANSwitch
+      model: Connectrix DS-6520B
+    1.3.6.1.4.1.1588.2.1.1.1.178:
+      category: SANSwitch
+      model: Connectrix MP-7810B
+    1.3.6.1.4.1.1588.2.1.1.1.183:
+      category: SANSwitch
+      model: G620 Switch
+    1.3.6.1.4.1.1588.2.1.1.1.184:
+      category: SANSwitch
+      model: Connectrix DS-6630B
+    1.3.6.1.4.1.1588.2.1.1.2:
+      category: SANSwitch
+      model: '2800'
+    1.3.6.1.4.1.1588.2.1.1.10:
+      category: Switch
+      model: Brocade FibreChannelswitch
+    1.3.6.1.4.1.1588.2.1.1.18:
+      category: Switch
+      model: Brocade Fibre Channel Switch
+    1.3.6.1.4.1.1588.2.1.1.22:
+      category: SANSwitch
+      model: Fibre Channel Switch
+    1.3.6.1.4.1.1588.2.1.1.27:
+      model: Switch
+      category: Switch
+    1.3.6.1.4.1.1588.2.1.1.29:
+      category: SANSwitch
+      model: Fibre Channel Switch
+    1.3.6.1.4.1.1588.2.1.1.32:
+      category: SANSwitch
+      model: 4100 Switch
+    1.3.6.1.4.1.1588.2.1.1.34:
+      category: SANSwitch
+      model: 200E Switch
+    1.3.6.1.4.1.1588.2.1.1.37:
+      category: SANSwitch
+      model: 4020 Embedded Switch
+    1.3.6.1.4.1.1588.2.1.1.38:
+      category: Access Point
+      model: SILKWORM AP7420
+    1.3.6.1.4.1.1588.2.1.1.42:
+      category: SANSwitch
+      model: 48000 Director Switch
+    1.3.6.1.4.1.1588.2.1.1.43:
+      category: SANSwitch
+      model: 4024 Embedded Switch
+    1.3.6.1.4.1.1588.2.1.1.44:
+      category: Switch
+      model: 4900 FC SWITCH
+    1.3.6.1.4.1.1588.2.1.1.46:
+      category: SANSwitch
+      model: 7500 Switch
+    1.3.6.1.4.1.1588.2.1.1.55:
+      category: Switch
+      model: Fibre Channel Switch
+    1.3.6.1.4.1.1588.2.1.1.58:
+      category: SANSwitch
+      model: 5000 Switch
+    1.3.6.1.4.1.1588.2.1.1.62:
+      category: SANSwitch
+      model: 2499 Model 384
+    1.3.6.1.4.1.1588.2.1.1.64:
+      category: SANSwitch
+      model: 5300 Switch
+    1.3.6.1.4.1.1588.2.1.1.66:
+      category: SANSwitch
+      model: 2498 Model B40
+    1.3.6.1.4.1.1588.2.1.1.67:
+      category: SANSwitch
+      model: Encryption Switch
+    1.3.6.1.4.1.1588.2.1.1.70:
+      category: SANSwitch
+      model: 8Gb 12-port FC Module Switch
+    1.3.6.1.4.1.1588.2.1.1.71:
+      category: SANSwitch
+      model: 2498 Model 24E
+    1.3.6.1.4.1.1588.2.1.1.72:
+      category: SANSwitch
+      model: 5480 Embedded Switch
+    1.3.6.1.4.1.1588.2.1.1.73:
+      category: SANSwitch
+      model: 5470 Embedded Switch
+    1.3.6.1.4.1.1588.2.1.1.76:
+      category: Switch
+      model: 8000 FC SWITCH
+    1.3.6.1.4.1.1588.2.1.1.77:
+      category: SANSwitch
+      model: 2499 Model 192
+    1.3.6.1.4.1.1588.2.1.1.82:
+      category: SANSwitch
+      model: 8Gb 24-Port FC Module Switch
+    1.3.6.1.4.1.1588.2.1.1.83:
+      category: SANSwitch
+      model: Connectrix MP-7800B
+    1.3.6.1.4.1.1588.2.1.1.92:
+      category: Switch
+      model: VA-40 FC SWITCH
+    1.3.6.1.4.1.1588.2.1.1.109:
+      category: SANSwitch
+      model: 6510 Switch
+    1.3.6.1.4.1.1588.2.1.1.117:
+      category: SANSwitch
+      model: FC5022
+    1.3.6.1.4.1.1588.2.1.1.118:
+      category: SANSwitch
+      model: 2498 Model 24G
+    1.3.6.1.4.1.1588.2.1.1.120:
+      category: SANSwitch
+      model: Connectrix ED-DCX8510-8B
+    1.3.6.1.4.1.1588.2.1.1.121:
+      category: SANSwitch
+      model: DCX 8510-4 Backbone Switch
+    1.3.6.1.4.1.1588.2.1.1.129:
+      category: SANSwitch
+      model: 6548 Switch
+    1.3.6.1.4.1.1588.2.1.1.133:
+      category: SANSwitch
+      model: 6520 Switch
+    1.3.6.1.4.1.1588.2.1.1.148:
+      category: SANSwitch
+      model: 7840 Switch
+    1.3.6.1.4.1.1588.2.1.1.158:
+      category: SANSwitch
+      model: Virtual Connect SE 16Gb FC Module
+    1.3.6.1.4.1.1588.2.1.1.162:
+      category: SANSwitch
+      model: 8960 Model F64
+    1.3.6.1.4.1.1588.2.1.1.165:
+      category: SANSwitch
+      model: Connectrix ED-DCX6-4B
+    1.3.6.1.4.1.1588.2.1.1.166:
+      category: SANSwitch
+      model: Connectrix ED-DCX6-8B
+    1.3.6.1.4.1.1588.2.1.1.170:
+      category: SANSwitch
+      model: G610 Switch
+    1.3.6.1.4.1.1588.2.1.1.170.5:
+      category: SANSwitch
+      model: Connectrix DS-6610B
+    1.3.6.1.4.1.1588.2.1.1.173:
+      category: SANSwitch
+      model: G630 Switch
+    1.3.6.1.4.1.1588.2.1.1.177:
+      category: SANSwitch
+      model: 8Gb 24-Port FC Module Switch
+    1.3.6.1.4.1.1588.2.1.1.179:
+      category: SANSwitch
+      model: 8961 Model F74
+    1.3.6.1.4.1.1588.2.1.1.180:
+      category: Layer 3 Switch
+      model: X7-8 Director Switch
+    1.3.6.1.4.1.1588.2.1.1.181:
+      category: SANSwitch
+      model: G720 Switch
+    1.3.6.1.4.1.1588.2.1.1.183:
+      category: SANSwitch
+      model: 8960 Model F65
+    1.3.6.1.4.1.1588.2.1.1.184:
+      category: SANSwitch
+      model: G630 Switch
+    1.3.6.1.4.1.1588.2.1.1.189:
+      category: SANSwitch
+      model: G730 Switch
+    1.3.6.1.4.1.1588.2.1.3:
+      category: SANSwitch
+      model: Dell EMC MXG610s Fibre Channel Switch
+    1.3.6.1.4.1.1588.2.2.1.1.1.1:
+      category: Switch
+      model: Brocade VDX6740-24
+    1.3.6.1.4.1.1588.2.2.1.1.1.2:
+      category: SANSwitch
+      model: VDX 6720-60 Data Center Switch
+    1.3.6.1.4.1.1588.2.2.1.1.1.3:
+      category: Layer 3 Switch
+      model: VDX 6730-32 Data Center Switch
+    1.3.6.1.4.1.1588.2.2.1.1.1.5:
+      category: SANSwitch
+      model: VDX 6710 Data Center Switch
+    1.3.6.1.4.1.1588.2.2.1.1.1.112:
+      category: SANSwitch
+      model: Internal Management Module Switch
+    1.3.6.1.4.1.1588.2.2.1.1.1.131:
+      category: Switch
+      model: Brocade VDX6740
+    1.3.6.1.4.1.1588.3.3.1.131:
+      category: SANSwitch
+      model: VDX 6740-48 Switch
+    1.3.6.1.4.1.1588.3.3.1.137:
+      category: Layer 3 Switch
+      model: VDX 6740T Switch
+    1.3.6.1.4.1.1588.3.3.1.151:
+      category: SANSwitch
+      model: VDX 6740T-56-1G Switch
+    1.3.6.1.4.1.1588.3.3.1.153:
+      category: Layer 3 Switch
+      model: VDX 6940-36Q Switch
+    1.3.6.1.4.1.1588.3.3.1.164:
+      category: Switch
+      model: VDX-SWITCH-6940
+    1.3.6.1.4.1.1588.3.3.1.1000:
+      category: SANSwitch
+      model: VDX 8770 Switch
+    1.3.6.1.4.1.1588.3.3.1.1001:
+      category: Layer 3 Switch
+      model: VDX 8770-8 Switch
+    1.3.6.1.4.1.1588.3.3.1.1002:
+      category: SANSwitch
+      model: VDX 8770S16
+    1.3.6.1.4.1.1588.3.3.1.4000:
+      category: Layer 3 Switch
+      model: ExtremeSwitching SLX 9540
+    1.3.6.1.4.1.1991.1.1:
+      category: Layer 3 Switch
+      model: ServerIron Switch
+    1.3.6.1.4.1.1991.1.2:
+      category: Switch
+      model: NetIron Gigabit Switching Router
+    1.3.6.1.4.1.1991.1.3.1.1:
+      category: Switch
+      model: FastIron Workgroup
+    1.3.6.1.4.1.1991.1.3.1.2:
+      category: Switch
+      model: FastIron Backbone Switch
+    1.3.6.1.4.1.1991.1.3.2.1:
+      category: Layer 3 Switch
+      model: NetIron Router
+    1.3.6.1.4.1.1991.1.3.3.1:
+      category: Layer 3 Switch
+      model: ServerIron Switch
+    1.3.6.1.4.1.1991.1.3.3.2:
+      category: Layer 3 Switch
+      model: ServerIron Switch
+    1.3.6.1.4.1.1991.1.3.3.3:
+      category: Switch
+      model: ServerIron XL with Transparent Cache Switching (TCS)
+    1.3.6.1.4.1.1991.1.3.4.1:
+      category: Switch
+      model: TurboIron Switch
+    1.3.6.1.4.1.1991.1.3.4.2:
+      category: Switch
+      model: TurboIron Router
+    1.3.6.1.4.1.1991.1.3.5.1:
+      category: Switch
+      model: TurboIron/8 Switch
+    1.3.6.1.4.1.1991.1.3.5.2:
+      category: Switch
+      model: TurboIron/8 Router
+    1.3.6.1.4.1.1991.1.3.5.3:
+      category: Load Balancer
+      model: ServerIron 4G-SSL
+    1.3.6.1.4.1.1991.1.3.5.4:
+      category: Switch
+      model: ServerIron 800 Switch
+    1.3.6.1.4.1.1991.1.3.6:
+      model: BigIron 4000
+    1.3.6.1.4.1.1991.1.3.6.1:
+      category: Switch
+      model: BigIron 4000 Switch
+    1.3.6.1.4.1.1991.1.3.6.2:
+      category: Layer 3 Switch
+      model: BigIron 4000 Router
+    1.3.6.1.4.1.1991.1.3.6.3:
+      category: Switch
+      model: BigServerIron 4000
+    1.3.6.1.4.1.1991.1.3.7:
+      model: BigIron 8000
+    1.3.6.1.4.1.1991.1.3.7.1:
+      category: Switch
+      model: BigIron 8000 Switch
+    1.3.6.1.4.1.1991.1.3.7.2:
+      category: Layer 3 Switch
+      model: BigIron 8000 Router
+    1.3.6.1.4.1.1991.1.3.7.3:
+      category: Switch
+      model: BigServerIron 8000
+    1.3.6.1.4.1.1991.1.3.8.1:
+      category: Switch
+      model: FastIron II Switch
+    1.3.6.1.4.1.1991.1.3.8.2:
+      category: Switch
+      model: FastIron II Router
+    1.3.6.1.4.1.1991.1.3.9.1:
+      category: Switch
+      model: FastIron II Plus Switch
+    1.3.6.1.4.1.1991.1.3.9.2:
+      category: Switch
+      model: FastIron II Plus Router
+    1.3.6.1.4.1.1991.1.3.10.1:
+      category: Layer 3 Switch
+      model: NetIron 400 Router
+    1.3.6.1.4.1.1991.1.3.11.1:
+      category: Layer 3 Switch
+      model: NetIron 800 Router
+    1.3.6.1.4.1.1991.1.3.12.1:
+      category: Switch
+      model: FastIron II Gigabit Copper Switch
+    1.3.6.1.4.1.1991.1.3.12.2:
+      category: Switch
+      model: FastIron II Gigabit Copper Router
+    1.3.6.1.4.1.1991.1.3.13.1:
+      category: Switch
+      model: FastIron II Plus Gigabit Copper Switch
+    1.3.6.1.4.1.1991.1.3.13.2:
+      category: Switch
+      model: FastIron II Plus Gigabit Copper Router
+    1.3.6.1.4.1.1991.1.3.14.1:
+      category: Switch
+      model: BigIron 15000 Switch
+    1.3.6.1.4.1.1991.1.3.14.2:
+      category: Layer 3 Switch
+      model: BigIron 15000 Router
+    1.3.6.1.4.1.1991.1.3.14.3:
+      category: Switch
+      model: BigIron 15000 ServerIron
+    1.3.6.1.4.1.1991.1.3.15.1:
+      category: Layer 3 Switch
+      model: NetIron 1500 Router
+    1.3.6.1.4.1.1991.1.3.16.1:
+      category: Switch
+      model: FastIron II Switch
+    1.3.6.1.4.1.1991.1.3.16.2:
+      category: Switch
+      model: FastIron III Router
+    1.3.6.1.4.1.1991.1.3.17.1:
+      category: Switch
+      model: FastIron III Gigabit Copper Switch
+    1.3.6.1.4.1.1991.1.3.17.2:
+      category: Switch
+      model: FastIron III Gigabit Copper Router
+    1.3.6.1.4.1.1991.1.3.18.1:
+      category: Layer 3 Switch
+      model: ServerIron Switch
+    1.3.6.1.4.1.1991.1.3.18.2:
+      category: Layer 3 Switch
+      model: ServerIron GT-E2404CF
+    1.3.6.1.4.1.1991.1.3.19.1:
+      category: Switch
+      model: ServerIron 800 Switch
+    1.3.6.1.4.1.1991.1.3.19.2:
+      category: Switch
+      model: ServerIron 800 Router
+    1.3.6.1.4.1.1991.1.3.20.1:
+      category: Switch
+      model: ServerIron 1500 Switch
+    1.3.6.1.4.1.1991.1.3.20.2:
+      category: Switch
+      model: ServerIron 1500 Router
+    1.3.6.1.4.1.1991.1.3.21.1:
+      category: Switch
+      model: FastIron 4802 Switch
+    1.3.6.1.4.1.1991.1.3.21.2:
+      category: Switch
+      model: Stackable 4802 Router
+    1.3.6.1.4.1.1991.1.3.21.3:
+      category: Switch
+      model: Stackable 4802 ServerIron
+    1.3.6.1.4.1.1991.1.3.22.1:
+      category: Switch
+      model: FastIron 400 Switch
+    1.3.6.1.4.1.1991.1.3.22.2:
+      category: Switch
+      model: FastIron 400 Router
+    1.3.6.1.4.1.1991.1.3.23.1:
+      category: Switch
+      model: FastIron 800 Switch
+    1.3.6.1.4.1.1991.1.3.23.2:
+      category: Switch
+      model: FastIron 800 Router
+    1.3.6.1.4.1.1991.1.3.24.1:
+      category: Switch
+      model: FastIron 1500 Switch
+    1.3.6.1.4.1.1991.1.3.24.2:
+      category: Switch
+      model: FastIron 1500 Router
+    1.3.6.1.4.1.1991.1.3.25.1:
+      category: Switch
+      model: FastIron Edge 2402 Switch
+    1.3.6.1.4.1.1991.1.3.25.2:
+      category: Switch
+      model: FastIron Edge 2402 Switch
+    1.3.6.1.4.1.1991.1.3.26.1:
+      category: Layer 3 Switch
+      model: FES 4802
+    1.3.6.1.4.1.1991.1.3.26.2:
+      category: Layer 3 Switch
+      model: FES 4802
+    1.3.6.1.4.1.1991.1.3.27.1:
+      category: Switch
+      model: FastIron Edge 9604 Switch
+    1.3.6.1.4.1.1991.1.3.27.2:
+      category: Switch
+      model: FastIron 9604 Edge Router
+    1.3.6.1.4.1.1991.1.3.28.1:
+      category: Switch
+      model: FastIron 12GCF Edge Switch (FES)
+    1.3.6.1.4.1.1991.1.3.28.2:
+      category: Layer 3 Switch
+      model: FastIron Edge 12GCF Router
+    1.3.6.1.4.1.1991.1.3.29.1:
+      category: Switch
+      model: FastIron 2402 Edge Switch (FES)
+    1.3.6.1.4.1.1991.1.3.29.2:
+      category: Switch
+      model: FastIron 2402 Edge Router (FES)
+    1.3.6.1.4.1.1991.1.3.30.1:
+      category: Switch
+      model: FastIron Edge 4802-ILP Switch
+    1.3.6.1.4.1.1991.1.3.30.2:
+      category: Switch
+      model: FastIron 2402 Power Over Ethernet (POE) Edge Router (FES)
+    1.3.6.1.4.1.1991.1.3.31.1:
+      category: Switch
+      model: NetIron 4802 Switch
+    1.3.6.1.4.1.1991.1.3.31.2:
+      category: Switch
+      model: NetIron 4802 Router
+    1.3.6.1.4.1.1991.1.3.32.1:
+      category: Switch
+      model: BigIron MG8 Switch
+    1.3.6.1.4.1.1991.1.3.32.2:
+      category: Switch
+      model: BigIron MG8 Router
+    1.3.6.1.4.1.1991.1.3.33.1:
+      category: Switch
+      model: NetIron 40G Switch
+    1.3.6.1.4.1.1991.1.3.33.2:
+      category: Switch
+      model: NetIron 40G Router
+    1.3.6.1.4.1.1991.1.3.34.1.1.1.1:
+      category: Switch
+      model: FastIron X424 Edge Switch (FES)
+    1.3.6.1.4.1.1991.1.3.34.1.1.1.2:
+      category: Switch
+      model: FastIron X424 Edge Router (FES)
+    1.3.6.1.4.1.1991.1.3.34.1.1.2.1:
+      category: Switch
+      model: FastIron X424 Edge Premium Switch (FES)
+    1.3.6.1.4.1.1991.1.3.34.1.1.2.2:
+      category: Layer 3 Switch
+      model: FastIron FESX424R
+    1.3.6.1.4.1.1991.1.3.34.1.2.1.1:
+      category: Switch
+      model: FastIron X424 Plus 1XG Edge Switch (FES)
+    1.3.6.1.4.1.1991.1.3.34.1.2.1.2:
+      category: Switch
+      model: FastIron X424 Plus 1XG Edge Router (FES)
+    1.3.6.1.4.1.1991.1.3.34.1.2.2.1:
+      category: Switch
+      model: FastIron X424 Plus 1XG Premium Edge Switch (FES)
+    1.3.6.1.4.1.1991.1.3.34.1.2.2.2:
+      category: Switch
+      model: FastIron X424 Plus 1XG Premium Edge Router (FES)
+    1.3.6.1.4.1.1991.1.3.34.1.3.1.1:
+      category: Switch
+      model: FastIron X424 Plus 2XG Edge Switch (FES)
+    1.3.6.1.4.1.1991.1.3.34.1.3.1.2:
+      category: Switch
+      model: FastIron X424 Plus 2XG Edge Router (FES)
+    1.3.6.1.4.1.1991.1.3.34.1.3.2.1:
+      category: Switch
+      model: FastIron X424 Plus 2XG Premium Edge Switch (FES)
+    1.3.6.1.4.1.1991.1.3.34.1.3.2.2:
+      category: Switch
+      model: FastIron X424 Plus 2XG Premium Edge Router (FES)
+    1.3.6.1.4.1.1991.1.3.34.2.1.1.1:
+      category: Layer 3 Switch
+      model: FES X448
+    1.3.6.1.4.1.1991.1.3.34.2.1.1.2:
+      category: Switch
+      model: FastIron X448 Edge Router (FES)
+    1.3.6.1.4.1.1991.1.3.34.2.1.2.1:
+      category: Switch
+      model: FastIron X448 Edge Premium Switch (FES)
+    1.3.6.1.4.1.1991.1.3.34.2.1.2.2:
+      category: Layer 3 Switch
+      model: FES X448-PREMIUM
+    1.3.6.1.4.1.1991.1.3.34.2.2.1.1:
+      category: Switch
+      model: FastIron X448 Plus 1XG Edge Switch (FES)
+    1.3.6.1.4.1.1991.1.3.34.2.2.1.2:
+      category: Switch
+      model: FastIron X448 Plus 1XG Edge Router (FES)
+    1.3.6.1.4.1.1991.1.3.34.2.2.2.1:
+      category: Switch
+      model: FastIron X448 Plus 1XG Premium Edge Switch (FES)
+    1.3.6.1.4.1.1991.1.3.34.2.2.2.2:
+      category: Switch
+      model: FastIron X448 Plus 1XG Premium Edge Router (FES)
+    1.3.6.1.4.1.1991.1.3.34.2.3.1.1:
+      category: Switch
+      model: FastIron X448 Plus 2XG Edge Switch (FES)
+    1.3.6.1.4.1.1991.1.3.34.2.3.1.2:
+      category: Switch
+      model: FastIron X448 Plus 2XG Edge Router (FES)
+    1.3.6.1.4.1.1991.1.3.34.2.3.2.1:
+      category: Switch
+      model: FastIron X448 Plus 2XG Premium Edge Switch (FES)
+    1.3.6.1.4.1.1991.1.3.34.2.3.2.2:
+      category: Switch
+      model: FastIron X448 Plus 2XG Premium Edge Router (FES)
+    1.3.6.1.4.1.1991.1.3.34.3.1.1.1:
+      category: Layer 3 Switch
+      model: FES X424HF
+    1.3.6.1.4.1.1991.1.3.34.3.1.1.2:
+      category: Switch
+      model: FastIron X424F Edge Switch Power Supply
+    1.3.6.1.4.1.1991.1.3.34.3.1.2.1:
+      category: Layer 3 Switch
+      model: FES X424 Fiber Prem Switch
+    1.3.6.1.4.1.1991.1.3.34.3.1.2.2:
+      category: Layer 3 Switch
+      model: FES X424 Fiber Prem Router
+    1.3.6.1.4.1.1991.1.3.34.3.2.1.1:
+      category: Layer 3 Switch
+      model: FESX424 Fiber Plus 1XG Switch
+    1.3.6.1.4.1.1991.1.3.34.3.2.1.2:
+      category: Layer 3 Switch
+      model: FES X424 Fiber Plus 1XG Router
+    1.3.6.1.4.1.1991.1.3.34.3.2.2.1:
+      category: Layer 3 Switch
+      model: FES X424 Fiber Plus 1XG Prem Switch
+    1.3.6.1.4.1.1991.1.3.34.3.2.2.2:
+      category: Layer 3 Switch
+      model: FES X424 Fiber Plus 1XG PremRouter
+    1.3.6.1.4.1.1991.1.3.34.3.3.1.1:
+      category: Layer 3 Switch
+      model: FES X424 Fiber Plus 2XG Switch
+    1.3.6.1.4.1.1991.1.3.34.3.3.1.2:
+      category: Layer 3 Switch
+      model: FES X424 Fiber Plus 2XG Router
+    1.3.6.1.4.1.1991.1.3.34.3.3.2.1:
+      category: Layer 3 Switch
+      model: FES X424 Fiber Plus 2XG Prem Switch
+    1.3.6.1.4.1.1991.1.3.34.3.3.2.2:
+      category: Layer 3 Switch
+      model: FES X424 Fiber Plus 2XG Prem Router
+    1.3.6.1.4.1.1991.1.3.34.4.1.1.1:
+      category: Switch
+      model: FESX448FiberSwitch
+    1.3.6.1.4.1.1991.1.3.34.4.1.1.2:
+      category: Switch
+      model: FESX448FiberRouter
+    1.3.6.1.4.1.1991.1.3.34.4.1.2.1:
+      category: Switch
+      model: FESX448FiberPremSwitch
+    1.3.6.1.4.1.1991.1.3.34.4.1.2.2:
+      category: Switch
+      model: FESX448FiberPremRouter
+    1.3.6.1.4.1.1991.1.3.34.4.2.1.1:
+      category: Switch
+      model: FESX448FiberPlus1XGSwitch
+    1.3.6.1.4.1.1991.1.3.34.4.2.1.2:
+      category: Switch
+      model: FESX448FiberPlus1XGRouter
+    1.3.6.1.4.1.1991.1.3.34.4.2.2.1:
+      category: Switch
+      model: FESX448FiberPlus1XGPremSwitch
+    1.3.6.1.4.1.1991.1.3.34.4.2.2.2:
+      category: Switch
+      model: FESX448FiberPlus1XGPremRouter
+    1.3.6.1.4.1.1991.1.3.34.4.3.1.1:
+      category: Switch
+      model: FESX448FiberPlus2XGSwitch
+    1.3.6.1.4.1.1991.1.3.34.4.3.1.2:
+      category: Switch
+      model: FESX448FiberPlus2XGRouter
+    1.3.6.1.4.1.1991.1.3.34.4.3.2.1:
+      category: Switch
+      model: FESX448FiberPlus2XGPremSwitch
+    1.3.6.1.4.1.1991.1.3.34.4.3.2.2:
+      category: Switch
+      model: FESX448FiberPlus2XGPremRouter
+    1.3.6.1.4.1.1991.1.3.34.5.1.1.1:
+      category: Switch
+      model: FESX424POESwitch
+    1.3.6.1.4.1.1991.1.3.34.5.1.1.2:
+      category: Switch
+      model: FESX424POERouter
+    1.3.6.1.4.1.1991.1.3.34.5.1.2.1:
+      category: Switch
+      model: FESX424POEPremSwitch
+    1.3.6.1.4.1.1991.1.3.34.5.1.2.2:
+      category: Switch
+      model: FESX424POEPremRouter
+    1.3.6.1.4.1.1991.1.3.34.5.2.1.1:
+      category: Switch
+      model: FESX424POEPlus1XGSwitch
+    1.3.6.1.4.1.1991.1.3.34.5.2.1.2:
+      category: Switch
+      model: FESX424POEPlus1XGRouter
+    1.3.6.1.4.1.1991.1.3.34.5.2.2.1:
+      category: Switch
+      model: FESX424POEPlus1XGPremSwitch
+    1.3.6.1.4.1.1991.1.3.34.5.2.2.2:
+      category: Switch
+      model: FESX424POEPlus1XGPremRouter
+    1.3.6.1.4.1.1991.1.3.34.5.3.1.1:
+      category: Switch
+      model: FESX424POEPlus2XGSwitch
+    1.3.6.1.4.1.1991.1.3.34.5.3.1.2:
+      category: Switch
+      model: FESX424POEPlus2XGRouter
+    1.3.6.1.4.1.1991.1.3.34.5.3.2.1:
+      category: Switch
+      model: FESX424POEPlus2XGPremSwitch
+    1.3.6.1.4.1.1991.1.3.34.5.3.2.2:
+      category: Switch
+      model: FESX424POEPlus2XGPremRouter
+    1.3.6.1.4.1.1991.1.3.34.6.1.1.1:
+      category: Switch
+      model: FESX624Switch
+    1.3.6.1.4.1.1991.1.3.34.6.1.1.2:
+      category: Switch
+      model: FESX624Router
+    1.3.6.1.4.1.1991.1.3.34.6.1.2.1:
+      category: Switch
+      model: FESX624PremSwitc
+    1.3.6.1.4.1.1991.1.3.34.6.1.2.2:
+      category: Switch
+      model: FESX624PremRouter
+    1.3.6.1.4.1.1991.1.3.34.6.2.1.1:
+      category: Switch
+      model: FESX624Plus1XGSwitch
+    1.3.6.1.4.1.1991.1.3.34.6.2.1.2:
+      category: Switch
+      model: FESX624Plus1XGRouter
+    1.3.6.1.4.1.1991.1.3.34.6.2.2.1:
+      category: Switch
+      model: FESX624Plus1XGPremSwitch
+    1.3.6.1.4.1.1991.1.3.34.6.2.2.2:
+      category: Switch
+      model: FESX624Plus1XGPremRouter
+    1.3.6.1.4.1.1991.1.3.34.6.3.1.1:
+      category: Switch
+      model: FESX624Plus2XGSwitch
+    1.3.6.1.4.1.1991.1.3.34.6.3.1.2:
+      category: Switch
+      model: FESX624Plus2XGRouter
+    1.3.6.1.4.1.1991.1.3.34.6.3.2.1:
+      category: Switch
+      model: FESX624Plus2XGPremSwitch
+    1.3.6.1.4.1.1991.1.3.34.6.3.2.2:
+      category: Switch
+      model: FESX624Plus2XGPremRouter
+    1.3.6.1.4.1.1991.1.3.34.7.1.1.1:
+      category: Switch
+      model: FESX648Switch
+    1.3.6.1.4.1.1991.1.3.34.7.1.1.2:
+      category: Switch
+      model: FESX648Router
+    1.3.6.1.4.1.1991.1.3.34.7.1.2.1:
+      category: Switch
+      model: FESX648PremSwitch
+    1.3.6.1.4.1.1991.1.3.34.7.1.2.2:
+      category: Switch
+      model: FESX648PremRouter
+    1.3.6.1.4.1.1991.1.3.34.7.2.1.1:
+      category: Switch
+      model: FESX648Plus1XGSwitch
+    1.3.6.1.4.1.1991.1.3.34.7.2.1.2:
+      category: Switch
+      model: FESX648Plus1XGRouter
+    1.3.6.1.4.1.1991.1.3.34.7.2.2.1:
+      category: Switch
+      model: FESX648Plus1XGPremSwitch
+    1.3.6.1.4.1.1991.1.3.34.7.2.2.2:
+      category: Switch
+      model: FESX648Plus1XGPremRouter
+    1.3.6.1.4.1.1991.1.3.34.7.3.1.1:
+      category: Switch
+      model: FESX648Plus2XGSwitch
+    1.3.6.1.4.1.1991.1.3.34.7.3.1.2:
+      category: Switch
+      model: FESX648Plus2XGRouter
+    1.3.6.1.4.1.1991.1.3.34.7.3.2.1:
+      category: Switch
+      model: FESX648Plus2XGPremSwitch
+    1.3.6.1.4.1.1991.1.3.34.7.3.2.2:
+      category: Switch
+      model: FESX648Plus2XGPremRouter
+    1.3.6.1.4.1.1991.1.3.34.8.1.1.1:
+      category: Switch
+      model: FESX624FiberSwitch
+    1.3.6.1.4.1.1991.1.3.34.8.1.1.2:
+      category: Switch
+      model: FESX624FiberRouter
+    1.3.6.1.4.1.1991.1.3.34.8.1.2.1:
+      category: Switch
+      model: FESX624FiberPremSwitch
+    1.3.6.1.4.1.1991.1.3.34.8.1.2.2:
+      category: Switch
+      model: FESX624FiberPremRouter
+    1.3.6.1.4.1.1991.1.3.34.8.2.1.1:
+      category: Switch
+      model: FESX624FiberPlus1XGSwitch
+    1.3.6.1.4.1.1991.1.3.34.8.2.1.2:
+      category: Switch
+      model: FESX624FiberPlus1XGRouter
+    1.3.6.1.4.1.1991.1.3.34.8.2.2.1:
+      category: Switch
+      model: FESX624FiberPlus1XGPremSwitch
+    1.3.6.1.4.1.1991.1.3.34.8.2.2.2:
+      category: Switch
+      model: FESX624FiberPlus1XGPremRouter
+    1.3.6.1.4.1.1991.1.3.34.8.3.1.1:
+      category: Switch
+      model: FESX624FiberPlus2XGSwitch
+    1.3.6.1.4.1.1991.1.3.34.8.3.1.2:
+      category: Switch
+      model: FESX624FiberPlus2XGRouter
+    1.3.6.1.4.1.1991.1.3.34.8.3.2.1:
+      category: Switch
+      model: FESX624FiberPlus2XGPremSwitch
+    1.3.6.1.4.1.1991.1.3.34.8.3.2.2:
+      category: Switch
+      model: FESX624FiberPlus2XGPremRouter
+    1.3.6.1.4.1.1991.1.3.34.9.1.1.1:
+      category: Switch
+      model: FESX648FiberSwitch
+    1.3.6.1.4.1.1991.1.3.34.9.1.1.2:
+      category: Switch
+      model: FESX648FiberRouter
+    1.3.6.1.4.1.1991.1.3.34.9.1.2.1:
+      category: Switch
+      model: FESX648FiberPremSwitch
+    1.3.6.1.4.1.1991.1.3.34.9.1.2.2:
+      category: Switch
+      model: FESX648FiberPremRouter
+    1.3.6.1.4.1.1991.1.3.34.9.2.1.1:
+      category: Switch
+      model: FESX648FiberPlus1XGSwitch
+    1.3.6.1.4.1.1991.1.3.34.9.2.1.2:
+      category: Switch
+      model: FESX648FiberPlus1XGRouter
+    1.3.6.1.4.1.1991.1.3.34.9.2.2.1:
+      category: Switch
+      model: FESX648FiberPlus1XGPremSwitch
+    1.3.6.1.4.1.1991.1.3.34.9.2.2.2:
+      category: Switch
+      model: FESX648FiberPlus1XGPremRouter
+    1.3.6.1.4.1.1991.1.3.34.9.3.1.1:
+      category: Switch
+      model: FESX648FiberPlus2XGSwitch
+    1.3.6.1.4.1.1991.1.3.34.9.3.1.2:
+      category: Switch
+      model: FESX648FiberPlus2XGRouter
+    1.3.6.1.4.1.1991.1.3.34.9.3.2.1:
+      category: Switch
+      model: FESX648FiberPlus2XGPremSwitch
+    1.3.6.1.4.1.1991.1.3.34.9.3.2.2:
+      category: Switch
+      model: FESX648FiberPlus2XGPremRoute
+    1.3.6.1.4.1.1991.1.3.34.10.1.1.1:
+      category: Switch
+      model: FESX624POESwitch
+    1.3.6.1.4.1.1991.1.3.34.10.1.1.2:
+      category: Switch
+      model: FESX624POERouter
+    1.3.6.1.4.1.1991.1.3.34.10.1.2.1:
+      category: Switch
+      model: FESX624POEPremSwitch
+    1.3.6.1.4.1.1991.1.3.34.10.1.2.2:
+      category: Switch
+      model: FESX624POEPremRouter
+    1.3.6.1.4.1.1991.1.3.34.10.2.1.1:
+      category: Switch
+      model: FESX624POEPlus1XGSwitch
+    1.3.6.1.4.1.1991.1.3.34.10.2.1.2:
+      category: Switch
+      model: FESX624POEPlus1XGRouter
+    1.3.6.1.4.1.1991.1.3.34.10.2.2.1:
+      category: Switch
+      model: FESX624POEPlus1XGPremSwitch
+    1.3.6.1.4.1.1991.1.3.34.10.2.2.2:
+      category: Switch
+      model: FESX624POEPlus1XGPremRouter
+    1.3.6.1.4.1.1991.1.3.34.10.3.1.1:
+      category: Switch
+      model: FESX624POEPlus2XGSwitch
+    1.3.6.1.4.1.1991.1.3.34.10.3.1.2:
+      category: Switch
+      model: FESX624POEPlus2XGRouter
+    1.3.6.1.4.1.1991.1.3.34.10.3.2.1:
+      category: Switch
+      model: FESX624POEPlus2XGPremSwitch
+    1.3.6.1.4.1.1991.1.3.34.10.3.2.2:
+      category: Switch
+      model: FESX624POEPlus2XGPremRouter
+    1.3.6.1.4.1.1991.1.3.35.1.1.1.1:
+      category: Switch
+      model: FastIron X424 Workgroup Switch (FES)
+    1.3.6.1.4.1.1991.1.3.35.1.1.1.2:
+      category: Switch
+      model: Foundry FastIron Workgroup Edge FWSX424
+    1.3.6.1.4.1.1991.1.3.35.1.2.1.1:
+      category: Switch
+      model: FastIron X424 Plus 1XG Workgroup Switch (FES)
+    1.3.6.1.4.1.1991.1.3.35.1.2.1.2:
+      category: Switch
+      model: FWSX424Plus1XGRouter
+    1.3.6.1.4.1.1991.1.3.35.1.3.1.1:
+      category: Switch
+      model: FastIron X424 Plus 2XG Workgroup Switch (FES)
+    1.3.6.1.4.1.1991.1.3.35.1.3.1.2:
+      category: Switch
+      model: FWSX424Plus2XGRouter
+    1.3.6.1.4.1.1991.1.3.35.2.1.1.1:
+      category: Switch
+      model: FastIron Workgroup X448 Switch
+    1.3.6.1.4.1.1991.1.3.35.2.1.1.2:
+      category: Switch
+      model: Foundry FastIron Workgroup Edge FWSX448
+    1.3.6.1.4.1.1991.1.3.35.2.2.1.1:
+      category: Switch
+      model: FastIron X448 Plus 1XG Workgroup Switch (FES)
+    1.3.6.1.4.1.1991.1.3.35.2.2.1.2:
+      category: Switch
+      model: FWSX448Plus1XGRouter
+    1.3.6.1.4.1.1991.1.3.35.2.3.1.1:
+      category: Switch
+      model: FastIron Workgroup FWSX448-Plus2XG Switch
+    1.3.6.1.4.1.1991.1.3.35.2.3.1.2:
+      category: Switch
+      model: FWSX448Plus2XGRouter
+    1.3.6.1.4.1.1991.1.3.36:
+      category: Switch
+      model: FastIron Super-X1
+    1.3.6.1.4.1.1991.1.3.36.1.1:
+      category: Switch
+      model: FastIron Super-X1 Switch
+    1.3.6.1.4.1.1991.1.3.36.1.2:
+      category: Switch
+      model: FastIron Super-X1 Router
+    1.3.6.1.4.1.1991.1.3.36.1.3:
+      category: Switch
+      model: FastIron Super-X1 Base Layer 3 Switch
+    1.3.6.1.4.1.1991.1.3.36.2.1:
+      category: Switch
+      model: FastIron Super-X Premium Switch
+    1.3.6.1.4.1.1991.1.3.36.2.2:
+      category: Layer 3 Switch
+      model: FastIron SuperX-PREM
+    1.3.6.1.4.1.1991.1.3.36.2.3:
+      category: Switch
+      model: FastIron Super-X Premium Base Layer 3 Switch
+    1.3.6.1.4.1.1991.1.3.36.3.1:
+      category: Switch
+      model: FastIron SX 800 Switch
+    1.3.6.1.4.1.1991.1.3.36.3.2:
+      category: Switch
+      model: Foundry FastIron SuperX800
+    1.3.6.1.4.1.1991.1.3.36.3.3:
+      category: Switch
+      model: FastIron Super-X 800 Switch
+    1.3.6.1.4.1.1991.1.3.36.4.1:
+      category: Switch
+      model: Foundry FastIron SuperX800Prem
+    1.3.6.1.4.1.1991.1.3.36.4.2:
+      category: Switch
+      model: Foundry FastIron SuperX800Prem
+    1.3.6.1.4.1.1991.1.3.36.4.3:
+      category: Switch
+      model: FastIronSuperX800PremBaseL3Switch
+    1.3.6.1.4.1.1991.1.3.36.5.1:
+      category: Switch
+      model: FastIron SX 1600
+    1.3.6.1.4.1.1991.1.3.36.5.2:
+      category: Switch
+      model: Foundry FastIron SuperX1600
+    1.3.6.1.4.1.1991.1.3.36.5.3:
+      category: Switch
+      model: FastIronSuperX1600BaseL3Switch
+    1.3.6.1.4.1.1991.1.3.36.6.1:
+      category: Switch
+      model: Foundry FastIron SuperX1600Prem
+    1.3.6.1.4.1.1991.1.3.36.6.2:
+      category: Switch
+      model: FastIron SX 1600-PREM
+    1.3.6.1.4.1.1991.1.3.36.6.3:
+      category: Switch
+      model: FastIronSuperX1600PremBaseL3Switch
+    1.3.6.1.4.1.1991.1.3.36.7.1:
+      category: Switch
+      model: FastIronSuperXV6Switch
+    1.3.6.1.4.1.1991.1.3.36.7.2:
+      category: Switch
+      model: FastIronSuperXV6Router
+    1.3.6.1.4.1.1991.1.3.36.7.3:
+      category: Switch
+      model: FastIronSuperXV6BaseL3Switch
+    1.3.6.1.4.1.1991.1.3.36.8.1:
+      category: Switch
+      model: FastIronSuperXV6PremSwitch
+    1.3.6.1.4.1.1991.1.3.36.8.2:
+      category: Switch
+      model: FastIronSuperXV6PremRouter
+    1.3.6.1.4.1.1991.1.3.36.8.3:
+      category: Switch
+      model: FastIronSuperXV6PremBaseL3Switch
+    1.3.6.1.4.1.1991.1.3.36.9.1:
+      category: Switch
+      model: FastIronSuperX800V6Switch
+    1.3.6.1.4.1.1991.1.3.36.9.2:
+      category: Switch
+      model: FastIronSuperX800V6Router
+    1.3.6.1.4.1.1991.1.3.36.9.3:
+      category: Switch
+      model: FastIronSuperX800V6BaseL3Switch
+    1.3.6.1.4.1.1991.1.3.36.10.1:
+      category: Switch
+      model: FastIronSuperX800V6PremSwitch
+    1.3.6.1.4.1.1991.1.3.36.10.2:
+      category: Router
+      model: FastIron SuperX800 V6 Prem
+    1.3.6.1.4.1.1991.1.3.36.10.3:
+      category: Switch
+      model: FastIronSuperX800V6PremBaseL3Switch
+    1.3.6.1.4.1.1991.1.3.36.11.1:
+      category: Switch
+      model: FastIronSuperX1600V6Switch
+    1.3.6.1.4.1.1991.1.3.36.11.2:
+      category: Switch
+      model: FastIronSuperX1600V6Router
+    1.3.6.1.4.1.1991.1.3.36.11.3:
+      category: Switch
+      model: FastIronSuperX1600V6BaseL3Switch
+    1.3.6.1.4.1.1991.1.3.36.12.1:
+      category: Switch
+      model: FastIronSuperX1600V6PremSwitch
+    1.3.6.1.4.1.1991.1.3.36.12.2:
+      category: Switch
+      model: FastIronSuperX1600V6PremRouter
+    1.3.6.1.4.1.1991.1.3.36.12.3:
+      category: Switch
+      model: FastIronSuperX1600V6PremBaseL3Switch
+    1.3.6.1.4.1.1991.1.3.37:
+      category: Switch
+      model: BigIron Super-X
+    1.3.6.1.4.1.1991.1.3.37.1.1:
+      category: Switch
+      model: BigIron Super-X Switch
+    1.3.6.1.4.1.1991.1.3.37.1.2:
+      category: Switch
+      model: BigIron Super-X Router
+    1.3.6.1.4.1.1991.1.3.37.1.3:
+      category: Switch
+      model: BigIron Super-X Base Layer 3 Switch
+    1.3.6.1.4.1.1991.1.3.38.1.1:
+      category: Switch
+      model: TurboIronSuperXSwitch
+    1.3.6.1.4.1.1991.1.3.38.1.2:
+      category: Switch
+      model: TurboIronSuperXRouter
+    1.3.6.1.4.1.1991.1.3.38.1.3:
+      category: Switch
+      model: TurboIronSuperXBaseL3Switch
+    1.3.6.1.4.1.1991.1.3.38.2.1:
+      category: Switch
+      model: TurboIronSuperXPremSwitch
+    1.3.6.1.4.1.1991.1.3.38.2.2:
+      category: Switch
+      model: TurboIronSuperXPremRouter
+    1.3.6.1.4.1.1991.1.3.38.2.3:
+      category: Switch
+      model: TurboIronSuperXPremBaseL3Switch
+    1.3.6.1.4.1.1991.1.3.39:
+      category: Switch
+      model: NetIron IMR Switch
+    1.3.6.1.4.1.1991.1.3.39.1:
+      category: Switch
+      model: NetIron IMR 640 Switch
+    1.3.6.1.4.1.1991.1.3.39.1.2:
+      category: Switch
+      model: NIIMRRouter
+    1.3.6.1.4.1.1991.1.3.39.2:
+      category: Switch
+      model: NetIron IMR 640 Router
+    1.3.6.1.4.1.1991.1.3.40.1.1:
+      category: Switch
+      model: BigIron RX16 Switch
+    1.3.6.1.4.1.1991.1.3.40.1.2:
+      category: Layer 3 Switch
+      model: BigIron RX Series Switch
+    1.3.6.1.4.1.1991.1.3.40.2.1:
+      category: Switch
+      model: BigIron RX4 Switch
+    1.3.6.1.4.1.1991.1.3.40.2.2:
+      category: Layer 3 Switch
+      model: BigIron RX8
+    1.3.6.1.4.1.1991.1.3.40.3.1:
+      category: Switch
+      model: BigIron RX4 Switch
+    1.3.6.1.4.1.1991.1.3.40.3.2:
+      category: Switch
+      model: BigIron RX4 Router
+    1.3.6.1.4.1.1991.1.3.40.4.1:
+      category: Switch
+      model: BIRX32Switch
+    1.3.6.1.4.1.1991.1.3.40.4.2:
+      category: Switch
+      model: BIRX32Router
+    1.3.6.1.4.1.1991.1.3.41.1.2:
+      category: Switch
+      model: NIXMR16000Router
+    1.3.6.1.4.1.1991.1.3.41.2.2:
+      category: Switch
+      model: NIXMR8000Router
+    1.3.6.1.4.1.1991.1.3.41.3.2:
+      category: Switch
+      model: NIXMR4000Router
+    1.3.6.1.4.1.1991.1.3.41.4.2:
+      category: Switch
+      model: NIXMR32000Router
+    1.3.6.1.4.1.1991.1.3.42.9.1.1:
+      category: Switch
+      model: SecureIronLS100Switch
+    1.3.6.1.4.1.1991.1.3.42.9.1.2:
+      category: Switch
+      model: SecureIronLS100Router
+    1.3.6.1.4.1.1991.1.3.42.9.2.1:
+      category: Switch
+      model: SecureIronLS300Switch
+    1.3.6.1.4.1.1991.1.3.42.9.2.2:
+      category: Switch
+      model: SecureIronLS300Router
+    1.3.6.1.4.1.1991.1.3.42.10.1.1:
+      category: Switch
+      model: SecureIronTM100Switch
+    1.3.6.1.4.1.1991.1.3.42.10.1.2:
+      category: Switch
+      model: SecureIronTM100Router
+    1.3.6.1.4.1.1991.1.3.42.10.2.1:
+      category: Switch
+      model: SecureIronTM300Switch
+    1.3.6.1.4.1.1991.1.3.42.10.2.2:
+      category: Switch
+      model: SecureIronTM300Router
+    1.3.6.1.4.1.1991.1.3.44.1.1:
+      category: Switch
+      model: NetIron MLX 16000 Switch
+    1.3.6.1.4.1.1991.1.3.44.1.2:
+      category: Router
+      model: NetIron MLX-16
+    1.3.6.1.4.1.1991.1.3.44.2.2:
+      category: Layer 3 Switch
+      model: NetIron MLX 8K Router
+    1.3.6.1.4.1.1991.1.3.44.3.1:
+      category: Switch
+      model: NetIron MLX 4000 Switch
+    1.3.6.1.4.1.1991.1.3.44.3.2:
+      category: Layer 3 Switch
+      model: NetIron MLK 4K Router
+    1.3.6.1.4.1.1991.1.3.44.4.2:
+      category: Router
+      model: NIMLX32
+    1.3.6.1.4.1.1991.1.3.45.1.1.1.1:
+      category: Layer 3 Switch
+      model: FastIron FGS624P
+    1.3.6.1.4.1.1991.1.3.45.1.1.1.2:
+      category: Switch
+      model: Foundry FastIron GS FGS624P
+    1.3.6.1.4.1.1991.1.3.45.1.2.1.1:
+      category: Switch
+      model: FGS624XGPSwitch
+    1.3.6.1.4.1.1991.1.3.45.1.2.1.2:
+      category: Switch
+      model: FGS624XGPRouter
+    1.3.6.1.4.1.1991.1.3.45.1.3.1.1:
+      category: Layer 3 Switch
+      model: FastIron FGS624P-POE
+    1.3.6.1.4.1.1991.1.3.45.1.3.1.2:
+      category: Switch
+      model: Foundry FastIron GS FGS624PPOE
+    1.3.6.1.4.1.1991.1.3.45.1.4.1.1:
+      category: Switch
+      model: FGS624XGPPOESwitch
+    1.3.6.1.4.1.1991.1.3.45.1.4.1.2:
+      category: Switch
+      model: FGS624XGPPOERouter
+    1.3.6.1.4.1.1991.1.3.45.2.1.1.1:
+      category: Switch
+      model: FastIron FGS648P Switch
+    1.3.6.1.4.1.1991.1.3.45.2.1.1.2:
+      category: Switch
+      model: Foundry FastIron GS FGS648P
+    1.3.6.1.4.1.1991.1.3.45.2.2.1.1:
+      category: Switch
+      model: FastIron FGS648P Switch
+    1.3.6.1.4.1.1991.1.3.45.2.2.1.2:
+      category: Router
+      model: FGS 648PPOE
+    1.3.6.1.4.1.1991.1.3.46.1.1.1.1:
+      category: Layer 3 Switch
+      model: FLS 624
+    1.3.6.1.4.1.1991.1.3.46.1.1.1.2:
+      category: Switch
+      model: Foundry FastIron LS FLS624
+    1.3.6.1.4.1.1991.1.3.46.2.1.1.1:
+      category: Layer 3 Switch
+      model: FLS 648
+    1.3.6.1.4.1.1991.1.3.46.2.1.1.2:
+      category: Switch
+      model: Foundry FastIron LS FLS648
+    1.3.6.1.4.1.1991.1.3.47.1.1:
+      category: Switch
+      model: ServerIron 100 Switch
+    1.3.6.1.4.1.1991.1.3.47.1.2:
+      category: Switch
+      model: ServerIron 100 Router
+    1.3.6.1.4.1.1991.1.3.47.2.1:
+      category: Switch
+      model: ServerIron 350 Switch
+    1.3.6.1.4.1.1991.1.3.47.2.2:
+      category: Switch
+      model: ServerIron 350 Router
+    1.3.6.1.4.1.1991.1.3.47.3.1:
+      category: Switch
+      model: ServerIron 450 Switch
+    1.3.6.1.4.1.1991.1.3.47.3.2:
+      category: Switch
+      model: ServerIron 450 Router
+    1.3.6.1.4.1.1991.1.3.47.4.1:
+      category: Switch
+      model: ServerIron 850 Switch
+    1.3.6.1.4.1.1991.1.3.47.4.2:
+      category: Switch
+      model: ServerIron 850 Router
+    1.3.6.1.4.1.1991.1.3.47.5.1:
+      category: Switch
+      model: ServerIron 350 Plus Switch
+    1.3.6.1.4.1.1991.1.3.47.5.2:
+      category: Switch
+      model: ServerIron 350 Plus Router
+    1.3.6.1.4.1.1991.1.3.47.6.1:
+      category: Switch
+      model: ServerIron 450 Plus Switch
+    1.3.6.1.4.1.1991.1.3.47.6.2:
+      category: Switch
+      model: ServerIron 450 Plus Router
+    1.3.6.1.4.1.1991.1.3.47.7.1:
+      category: Switch
+      model: ServerIron 850 Plus Switch
+    1.3.6.1.4.1.1991.1.3.47.7.2:
+      category: Switch
+      model: ServerIron 850 Plus Router
+    1.3.6.1.4.1.1991.1.3.47.8.1:
+      category: Switch
+      model: ServerIronGT C Switch
+    1.3.6.1.4.1.1991.1.3.47.8.2:
+      category: Layer 3 Switch
+      model: ServerIronGT C-Series
+    1.3.6.1.4.1.1991.1.3.47.9.1:
+      category: Switch
+      model: ServerIronGT E Switch
+    1.3.6.1.4.1.1991.1.3.47.9.2:
+      category: Layer 3 Switch
+      model: ServerIronGT E-Series
+    1.3.6.1.4.1.1991.1.3.47.10.1:
+      category: Switch
+      model: ServerIronGT E Plus Switch
+    1.3.6.1.4.1.1991.1.3.47.10.2:
+      category: Switch
+      model: ServerIronGT E Plus Router
+    1.3.6.1.4.1.1991.1.3.47.11.1:
+      category: Switch
+      model: ServerIron4G Switch
+    1.3.6.1.4.1.1991.1.3.47.11.2:
+      category: Switch
+      model: ServerIron4G Router
+    1.3.6.1.4.1.1991.1.3.47.12.1:
+      category: Layer 3 Switch
+      model: ServerIron ADX 1008-1
+    1.3.6.1.4.1.1991.1.3.47.12.2:
+      category: Layer 3 Switch
+      model: ServerIron ADX 1000
+    1.3.6.1.4.1.1991.1.3.47.14.1:
+      category: Layer 3 Switch
+      model: ServerIron ADX 4000
+    1.3.6.1.4.1.1991.1.3.47.14.2:
+      category: Load Balancer
+      model: ServerIron ADX 4000
+    1.3.6.1.4.1.1991.1.3.47.18.1:
+      category: Layer 3 Switch
+      model: ServerIron ADX 10000
+    1.3.6.1.4.1.1991.1.3.47.18.2:
+      category: Load Balancer
+      model: ServerIron ADX 10000
+    1.3.6.1.4.1.1991.1.3.48.1.1:
+      category: Switch
+      model: FastIron GS FGS648P-POE 48 Port Switch
+    1.3.6.1.4.1.1991.1.3.48.2.1:
+      category: Layer 3 Switch
+      model: FCX648S
+    1.3.6.1.4.1.1991.1.3.48.2.3:
+      category: Layer 3 Switch
+      model: FCX648S
+    1.3.6.1.4.1.1991.1.3.48.3.4:
+      category: Layer 3 Switch
+      model: FastIron Stack ICX 6610P
+    1.3.6.1.4.1.1991.1.3.48.3.5:
+      category: Layer 3 Switch
+      model: ICX 6610-48
+    1.3.6.1.4.1.1991.1.3.48.5.1:
+      category: Layer 3 Switch
+      model: ICX 6450-24-HPOE
+    1.3.6.1.4.1.1991.1.3.48.8.1:
+      category: Layer 3 Switch
+      model: ICX 7450
+    1.3.6.1.4.1.1991.1.3.49.1:
+      category: Switch
+      model: NetIron CES 2024F
+    1.3.6.1.4.1.1991.1.3.49.2:
+      category: Switch
+      model: NetIron CES 2024C
+    1.3.6.1.4.1.1991.1.3.49.5:
+      category: Switch
+      model: NetIron CES Switch
+    1.3.6.1.4.1.1991.1.3.51.2:
+      category: Router
+      model: NetIron CER 2024C
+    1.3.6.1.4.1.1991.1.3.52.2.2.1.1:
+      category: Layer 3 Switch
+      model: FastIron WS 624G
+    1.3.6.1.4.1.1991.1.3.52.2.4.1.1:
+      category: Layer 3 Switch
+      model: FastIron WS 648G-POE
+    1.3.6.1.4.1.1991.1.3.53.1.1:
+      category: Layer 3 Switch
+      model: TurboIron-X24 (TI2X24)
+    1.3.6.1.4.1.1991.1.3.53.1.2:
+      category: Switch
+      model: TurboIron-X24
+    1.3.6.1.4.1.1991.1.3.54.1.1.1.1:
+      category: Layer 3 Switch
+      model: FCX 624S
+    1.3.6.1.4.1.1991.1.3.54.1.3.1.1:
+      category: Layer 3 Switch
+      model: FCX 624SF
+    1.3.6.1.4.1.1991.1.3.54.1.4.1.3:
+      category: Layer 3 Switch
+      model: FCX 624
+    1.3.6.1.4.1.1991.1.3.54.2.1.1.1:
+      category: Layer 3 Switch
+      model: FCX 648S
+    1.3.6.1.4.1.1991.1.3.54.2.1.1.3:
+      category: Layer 3 Switch
+      model: FCX 648S
+    1.3.6.1.4.1.1991.1.3.54.2.2.1.1:
+      category: Switch
+      model: Fast Iron Switch FCX 648S-HPOE
+    1.3.6.1.4.1.1991.1.3.54.2.2.1.3:
+      category: Layer 3 Switch
+      model: FCX 648S-HPOE
+    1.3.6.1.4.1.1991.1.3.54.2.4.1.1:
+      category: Layer 3 Switch
+      model: FCX 648
+    1.3.6.1.4.1.1991.1.3.54.2.4.1.3:
+      category: Layer 3 Switch
+      model: FCX 648
+    1.3.6.1.4.1.1991.1.3.55.1.2:
+      category: Router
+      model: MLXe-16 slot
+    1.3.6.1.4.1.1991.1.3.55.2.2:
+      category: Router
+      model: MLXe-8 slot
+    1.3.6.1.4.1.1991.1.3.55.3.2:
+      category: Router
+      model: MLXe-4 slot
+    1.3.6.1.4.1.1991.1.3.55.4.2:
+      category: Router
+      model: MLXe-32 slot
+    1.3.6.1.4.1.1991.1.3.56.1.1.1.1:
+      model: ICX 6610-24 Switch Image
+    1.3.6.1.4.1.1991.1.3.56.1.1.1.2:
+      model: ICX 6610-24 Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.56.1.1.1.3:
+      model: ICX 6610-24 Base Router Image
+    1.3.6.1.4.1.1991.1.3.56.1.1.1.4:
+      model: ICX 6610-24 Premium Router Image
+    1.3.6.1.4.1.1991.1.3.56.1.1.1.5:
+      model: ICX 6610-24 Advanced Router Image
+    1.3.6.1.4.1.1991.1.3.56.1.2.1.1:
+      model: ICX 6610-24 HPOE Switch Image
+    1.3.6.1.4.1.1991.1.3.56.1.2.1.2:
+      model: ICX 6610-24 HPOE Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.56.1.2.1.3:
+      model: ICX 6610-24 HPOE Base Router Image
+    1.3.6.1.4.1.1991.1.3.56.1.2.1.4:
+      model: ICX 6610-24 HPOE Premium Router Image
+    1.3.6.1.4.1.1991.1.3.56.1.2.1.5:
+      model: ICX 6610-24 HPOE Advanced Router Image
+    1.3.6.1.4.1.1991.1.3.56.1.3.1.1:
+      model: ICX 6610-24F Switch Image
+    1.3.6.1.4.1.1991.1.3.56.1.3.1.2:
+      model: ICX 6610-24F Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.56.1.3.1.3:
+      model: ICX 6610-24F Base Router Image
+    1.3.6.1.4.1.1991.1.3.56.1.3.1.4:
+      model: ICX 6610-24F Premium Router Image
+    1.3.6.1.4.1.1991.1.3.56.1.3.1.5:
+      model: ICX 6610-24F Advanced Router Image
+    1.3.6.1.4.1.1991.1.3.56.2.1.1.1:
+      category: Layer 3 Switch
+      model: ICX 6610-48
+    1.3.6.1.4.1.1991.1.3.56.2.1.1.2:
+      model: ICX 6610-48 Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.56.2.1.1.3:
+      model: ICX 6610-48 Base Router Image
+    1.3.6.1.4.1.1991.1.3.56.2.1.1.4:
+      model: ICX 6610-48 Premium Router Image
+    1.3.6.1.4.1.1991.1.3.56.2.1.1.5:
+      model: ICX 6610-48 Advanced Router Image
+    1.3.6.1.4.1.1991.1.3.56.2.2.1.1:
+      model: ICX 6610-48 HPOE Switch Image
+    1.3.6.1.4.1.1991.1.3.56.2.2.1.2:
+      model: ICX 6610-48 HPOE Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.56.2.2.1.3:
+      model: ICX 6610-48 HPOE Base Router Image
+    1.3.6.1.4.1.1991.1.3.56.2.2.1.4:
+      model: ICX 6610-48 HPOE Premium Router Image
+    1.3.6.1.4.1.1991.1.3.56.2.2.1.5:
+      model: ICX 6610-48 HPOE Advanced Router Image
+    1.3.6.1.4.1.1991.1.3.57.1.1.1.1:
+      model: ICX 6430-24 Switch
+    1.3.6.1.4.1.1991.1.3.57.1.2.1.1:
+      model: ICX 6430-24 HPOE Switch
+    1.3.6.1.4.1.1991.1.3.57.2.1.1.1:
+      model: ICX 6430-48 Switch
+    1.3.6.1.4.1.1991.1.3.57.2.2.1.1:
+      model: ICX 6430-48 HPOE Switch
+    1.3.6.1.4.1.1991.1.3.57.3.1.1.1:
+      model: ICX 6430-C12-PD Switch
+    1.3.6.1.4.1.1991.1.3.58.1.1.1.1:
+      category: Layer 3 Switch
+      model: ICX 6450-24
+    1.3.6.1.4.1.1991.1.3.58.1.1.1.2:
+      model: ICX 6450-24 Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.58.1.1.1.3:
+      model: ICX 6450-24 Base Router Image
+    1.3.6.1.4.1.1991.1.3.58.1.1.1.4:
+      model: ICX 6450-24 Premium Router Image
+    1.3.6.1.4.1.1991.1.3.58.1.2.1.1:
+      model: ICX 6450-24 HPOE Switch Image
+    1.3.6.1.4.1.1991.1.3.58.1.2.1.2:
+      model: ICX 6450-24 HPOE Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.58.1.2.1.3:
+      model: ICX 6450-24 HPOE Base Router Image
+    1.3.6.1.4.1.1991.1.3.58.1.2.1.4:
+      model: ICX 6450-24 HPOE Premium Router Image
+    1.3.6.1.4.1.1991.1.3.58.2.1.1.1:
+      model: ICX 6450-48 Switch Image
+    1.3.6.1.4.1.1991.1.3.58.2.1.1.2:
+      model: ICX 6450-48 Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.58.2.1.1.3:
+      model: ICX 6450-48 Base Router Image
+    1.3.6.1.4.1.1991.1.3.58.2.1.1.4:
+      model: ICX 6450-48 Premium Router Image
+    1.3.6.1.4.1.1991.1.3.58.2.2.1.1:
+      model: ICX 6450-48 HPOE Switch Image
+    1.3.6.1.4.1.1991.1.3.58.2.2.1.2:
+      model: ICX 6450-48 HPOE Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.58.2.2.1.3:
+      model: ICX 6450-48 HPOE Base Router Image
+    1.3.6.1.4.1.1991.1.3.58.2.2.1.4:
+      model: ICX 6450-48 HPOE Premium Router Image
+    1.3.6.1.4.1.1991.1.3.58.3.1.1.1:
+      model: ICX 6450-C12-PD Switch Image
+    1.3.6.1.4.1.1991.1.3.58.3.1.1.2:
+      model: ICX 6450-C12-PD Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.58.3.1.1.3:
+      model: ICX 6450-C12-PD Base Router Image
+    1.3.6.1.4.1.1991.1.3.58.3.1.1.4:
+      model: ICX 6450-C12-PD Premium Router Image
+    1.3.6.1.4.1.1991.1.3.59.1.1.1.1:
+      model: ICX 6650-64 Switch Image
+    1.3.6.1.4.1.1991.1.3.59.1.1.1.2:
+      model: ICX 6650-64 Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.59.1.1.1.3:
+      model: ICX 6650-64 Base Router Image
+    1.3.6.1.4.1.1991.1.3.60.1.1.1.1:
+      model: ICX 7750-48C Switch Image
+    1.3.6.1.4.1.1991.1.3.60.1.1.1.2:
+      model: ICX 7750-48C Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.60.1.1.1.3:
+      model: ICX 7750-48C Base Router Image
+    1.3.6.1.4.1.1991.1.3.60.2.1.1.1:
+      model: ICX 7750-48F Switch Image
+    1.3.6.1.4.1.1991.1.3.60.2.1.1.2:
+      model: ICX 7750-48F Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.60.2.1.1.3:
+      model: ICX 7750-48F Base Router Image
+    1.3.6.1.4.1.1991.1.3.60.3.1.1.1:
+      model: ICX 7750-26Q Switch Image
+    1.3.6.1.4.1.1991.1.3.60.3.1.1.2:
+      model: ICX 7750-26Q Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.60.3.1.1.3:
+      model: ICX 7750-26Q Base Router Image
+    1.3.6.1.4.1.1991.1.3.61.1.1.1.1:
+      model: ICX 7450-24 Switch Image
+    1.3.6.1.4.1.1991.1.3.61.1.1.1.2:
+      model: ICX 7450-24 Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.61.1.1.1.3:
+      category: Switch
+      model: ICX7450-24
+    1.3.6.1.4.1.1991.1.3.61.1.2.1.1:
+      model: ICX 7450-24 HPOE Switch Image
+    1.3.6.1.4.1.1991.1.3.61.1.2.1.2:
+      model: ICX 7450-24 HPOE Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.61.1.2.1.3:
+      model: ICX 7450-24 HPOE Base Router Image
+    1.3.6.1.4.1.1991.1.3.61.2.1.1.1:
+      model: ICX 7450-48 Switch Image
+    1.3.6.1.4.1.1991.1.3.61.2.1.1.2:
+      model: ICX 7450-48 Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.61.2.1.1.3:
+      model: ICX 7450-48 Base Router Image
+    1.3.6.1.4.1.1991.1.3.61.2.2.1.1:
+      model: ICX 7450-48 HPOE Switch Image
+    1.3.6.1.4.1.1991.1.3.61.2.2.1.2:
+      model: ICX 7450-48 HPOE Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.61.2.2.1.3:
+      category: Switch
+      model: Foundry ICX7450-48-H3COE
+    1.3.6.1.4.1.1991.1.3.61.2.3.1.1:
+      model: ICX 7450-48F Switch Image
+    1.3.6.1.4.1.1991.1.3.61.2.3.1.2:
+      model: ICX 7450-48F Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.61.2.3.1.3:
+      model: ICX 7450-48F Base Router Image
+    1.3.6.1.4.1.1991.1.3.62.1.1.1.1:
+      model: ICX 7250-24 Switch Image
+    1.3.6.1.4.1.1991.1.3.62.1.1.1.2:
+      model: ICX 7250-24 Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.62.1.1.1.3:
+      model: ICX 7250-24 Base Router Image
+    1.3.6.1.4.1.1991.1.3.62.1.2.1.1:
+      model: ICX 7250-24 HPOE Switch Image
+    1.3.6.1.4.1.1991.1.3.62.1.2.1.2:
+      model: ICX 7250-24 HPOE Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.62.1.2.1.3:
+      category: Switch
+      model: Foundry ICX7250-24-H3COE
+    1.3.6.1.4.1.1991.1.3.62.1.3.1.1:
+      model: ICX 7250-24 1G Switch Image
+    1.3.6.1.4.1.1991.1.3.62.1.3.1.2:
+      model: ICX 7250-24 1G Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.62.2.1.1.1:
+      model: ICX 7250-48 Switch Image
+    1.3.6.1.4.1.1991.1.3.62.2.1.1.2:
+      model: ICX 7250-48 Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.62.2.1.1.3:
+      model: ICX 7250-48 Base Router Image
+    1.3.6.1.4.1.1991.1.3.62.2.2.1.1:
+      model: ICX 7250-48 HPOE Switch Image
+    1.3.6.1.4.1.1991.1.3.62.2.2.1.2:
+      model: ICX 7250-48 HPOE Base Layer 3 Router Image
+    1.3.6.1.4.1.1991.1.3.62.2.2.1.3:
+      model: ICX 7250-48 HPOE Base Router Image
+    1.3.6.1.4.1.1991.1.4.1.1.5.100.1.1.1.1:
+      category: Switch
+      model: EdgeIron 4802F
+    1.3.6.1.4.1.1991.1.5.1.1.4.2.1:
+      category: Switch
+      model: FastIron 2402CF Switch
+    1.3.6.1.4.1.1991.1.5.1.1.4.3.1:
+      category: Switch
+      model: FastIron 4802CF Switch
+    1.3.6.1.4.1.1991.1.5.1.1.4.4.1:
+      category: Switch
+      model: EdgeIron 24G-A
+    1.3.6.1.4.1.1991.1.5.1.1.4.5.1:
+      category: Switch
+      model: EdgeIron 48G
+    1.3.6.1.4.1.1991.1.5.1.1.4.10.1:
+      category: Switch
+      model: EdgeIron 48G1X10G
+    1.3.6.1.4.1.1991.1.6.2.1.1:
+      category: Switch
+      model: Wireless AP
+    1.3.6.1.4.1.1991.1.6.2.1.2:
+      category: Switch
+      model: AP IP150
+    1.3.6.1.4.1.1991.1.7.1.1:
+      category: Switch
+      model: RF Probe
+    1.3.6.1.4.1.1991.1.16.1:
+      category: Switch
+      model: "6910"

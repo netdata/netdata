@@ -16,15 +16,17 @@ import (
 	"github.com/gosnmp/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/discoverer/snmpsd"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
+
+const oidSysUptime = "1.3.6.1.2.1.1.3.0"
 
 func (c *Collector) collect() (map[string]int64, error) {
 	if c.sysInfo == nil {
-		si, err := snmpsd.GetSysInfo(c.snmpClient)
+		si, err := snmputils.GetSysInfo(c.snmpClient)
 		if err != nil {
 			return nil, err
 		}
@@ -80,7 +82,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 }
 
 func (c *Collector) collectSysUptime(mx map[string]int64) error {
-	resp, err := c.snmpClient.Get([]string{snmpsd.OidSysUptime})
+	resp, err := c.snmpClient.Get([]string{oidSysUptime})
 	if err != nil {
 		return err
 	}
@@ -104,7 +106,7 @@ func (c *Collector) walkAll(rootOid string) ([]gosnmp.SnmpPDU, error) {
 	return c.snmpClient.BulkWalkAll(rootOid)
 }
 
-func (c *Collector) setupVnode(si *snmpsd.SysInfo, deviceMeta map[string]string) *vnodes.VirtualNode {
+func (c *Collector) setupVnode(si *snmputils.SysInfo, deviceMeta map[string]ddsnmp.MetaTag) *vnodes.VirtualNode {
 	if c.Vnode.GUID == "" {
 		c.Vnode.GUID = uuid.NewSHA1(uuid.NameSpaceDNS, []byte(c.Hostname)).String()
 	}
@@ -129,37 +131,30 @@ func (c *Collector) setupVnode(si *snmpsd.SysInfo, deviceMeta map[string]string)
 		labels["_node_stale_after_seconds"] = strconv.Itoa(v)
 	}
 
-	maps.Copy(labels, c.Vnode.Labels)
-	maps.Copy(labels, deviceMeta)
-
-	if _, ok := labels["sys_object_id"]; !ok {
-		labels["sys_object_id"] = si.SysObjectID
+	labels["sys_object_id"] = si.SysObjectID
+	labels["name"] = si.Name
+	labels["description"] = si.Descr
+	labels["contact"] = si.Contact
+	labels["location"] = si.Location
+	if si.Vendor != "" {
+		labels["vendor"] = si.Vendor
+	} else if si.Organization != "" {
+		labels["vendor"] = si.Organization
 	}
-	if _, ok := labels["name"]; !ok {
-		labels["name"] = si.Name
-	}
-	if _, ok := labels["description"]; !ok && si.Descr != "" {
-		labels["description"] = si.Descr
-	}
-	if _, ok := labels["contact"]; !ok && si.Contact != "" {
-		labels["contact"] = si.Contact
-	}
-	if _, ok := labels["location"]; !ok && si.Location != "" {
-		labels["location"] = si.Location
-	}
-	if _, ok := labels["vendor"]; !ok {
-		if si.Vendor != "" {
-			labels["vendor"] = si.Vendor
-		} else if si.Organization != "" {
-			labels["vendor"] = si.Organization
-		}
-	}
-	if _, ok := labels["type"]; !ok && si.Category != "" {
+	if si.Category != "" {
 		labels["type"] = si.Category
 	}
-	if _, ok := labels["model"]; !ok && si.Model != "" {
+	if si.Model != "" {
 		labels["model"] = si.Model
 	}
+
+	for k, val := range deviceMeta {
+		if v, ok := labels[k]; !ok || v == "" || val.IsExactMatch {
+			labels[k] = val.Value
+		}
+	}
+
+	maps.Copy(labels, c.Vnode.Labels)
 
 	return &vnodes.VirtualNode{
 		GUID:     c.Vnode.GUID,
@@ -195,7 +190,7 @@ func (c *Collector) adjustMaxRepetitions() (bool, error) {
 	for maxReps > 0 && attempts < maxAttempts {
 		attempts++
 
-		v, err := c.walkAll(snmpsd.RootOidMibSystem)
+		v, err := c.walkAll(snmputils.RootOidMibSystem)
 		if err != nil {
 			return false, err
 		}

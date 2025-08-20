@@ -12,6 +12,7 @@ import (
 
 	"github.com/gosnmp/gosnmp"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
@@ -214,10 +215,8 @@ func isInt(s string) bool {
 	return err == nil
 }
 
-func mergeTagsIfAbsent(dest, src map[string]string) {
-	for k, v := range src {
-		if existing, ok := dest[k]; !ok || existing == "" {
-			dest[k] = v
-		}
+func mergeMetaTagIfAbsent(dest map[string]ddsnmp.MetaTag, key string, tag ddsnmp.MetaTag) {
+	if existing, ok := dest[key]; !ok || existing.Value == "" || (!existing.IsExactMatch && tag.IsExactMatch) {
+		dest[key] = tag
 	}
 }

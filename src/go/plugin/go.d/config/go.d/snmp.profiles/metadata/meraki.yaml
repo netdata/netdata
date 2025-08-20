@@ -1,0 +1,401 @@
+sysobjectids:
+  oid_overrides:
+    1.3.6.1.4.1.29671:
+      category: Wireless
+      model: Meraki
+    1.3.6.1.4.1.29671.1:
+      category: Wireless
+      model: Meraki
+    1.3.6.1.4.1.29671.1.1.4:
+      category: Wireless
+      model: Meraki
+    1.3.6.1.4.1.29671.2.1:
+      category: Access Point
+      model: MINI AP
+    1.3.6.1.4.1.29671.2.2:
+      category: Access Point
+      model: ID2 AP
+    1.3.6.1.4.1.29671.2.3:
+      category: Access Point
+      model: WPG AP
+    1.3.6.1.4.1.29671.2.4:
+      category: Access Point
+      model: OD1 AP
+    1.3.6.1.4.1.29671.2.5:
+      category: Access Point
+      model: OD2 AP
+    1.3.6.1.4.1.29671.2.6:
+      category: Access Point
+      model: OD3 AP
+    1.3.6.1.4.1.29671.2.7:
+      category: Access Point
+      model: MO1 AP
+    1.3.6.1.4.1.29671.2.8:
+      category: Access Point
+      model: SOL AP
+    1.3.6.1.4.1.29671.2.9:
+      category: Access Point
+      model: LR1 AP
+    1.3.6.1.4.1.29671.2.10:
+      category: Access Point
+      model: MR11 AP
+    1.3.6.1.4.1.29671.2.11:
+      category: Access Point
+      model: MR12 AP
+    1.3.6.1.4.1.29671.2.12:
+      category: Access Point
+      model: MR14 AP
+    1.3.6.1.4.1.29671.2.13:
+      category: Access Point
+      model: MR16 AP
+    1.3.6.1.4.1.29671.2.14:
+      category: Access Point
+      model: MR24 AP
+    1.3.6.1.4.1.29671.2.15:
+      category: Access Point
+      model: MR62 AP
+    1.3.6.1.4.1.29671.2.16:
+      category: Access Point
+      model: MR66 AP
+    1.3.6.1.4.1.29671.2.17:
+      category: Access Point
+      model: Meraki MR34
+    1.3.6.1.4.1.29671.2.18:
+      category: Access Point
+      model: Meraki MR18
+    1.3.6.1.4.1.29671.2.19:
+      category: Access Point
+      model: MR26 AP
+    1.3.6.1.4.1.29671.2.20:
+      category: Access Point
+      model: Meraki MR32
+    1.3.6.1.4.1.29671.2.21:
+      category: Access Point
+      model: MR72 AP
+    1.3.6.1.4.1.29671.2.22:
+      category: Access Point
+      model: Meraki MR42
+    1.3.6.1.4.1.29671.2.23:
+      category: Access Point
+      model: Meraki MR52
+    1.3.6.1.4.1.29671.2.24:
+      category: Access Point
+      model: Meraki MR53
+    1.3.6.1.4.1.29671.2.25:
+      category: Access Point
+      model: Meraki MR84
+    1.3.6.1.4.1.29671.2.26:
+      category: Access Point
+      model: MR30H AP
+    1.3.6.1.4.1.29671.2.27:
+      category: Access Point
+      model: Meraki MR33
+    1.3.6.1.4.1.29671.2.28:
+      category: Access Point
+      model: Meraki MR74
+    1.3.6.1.4.1.29671.2.29:
+      model: Meraki MR70
+    1.3.6.1.4.1.29671.2.30:
+      category: Access Point
+      model: Meraki MR45
+    1.3.6.1.4.1.29671.2.31:
+      category: Access Point
+      model: Meraki MR55
+    1.3.6.1.4.1.29671.2.32:
+      category: Access Point
+      model: Meraki MR42E
+    1.3.6.1.4.1.29671.2.37:
+      category: Access Point
+      model: Meraki MR36
+    1.3.6.1.4.1.29671.2.38:
+      category: Access Point
+      model: Meraki MR46
+    1.3.6.1.4.1.29671.2.39:
+      category: Access Point
+      model: Meraki MR46E
+    1.3.6.1.4.1.29671.2.40:
+      category: Access Point
+      model: Meraki MR56
+    1.3.6.1.4.1.29671.2.41:
+      category: Access Point
+      model: Meraki MR36
+    1.3.6.1.4.1.29671.2.42:
+      category: Access Point
+      model: Meraki MR86
+    1.3.6.1.4.1.29671.2.43:
+      category: Access Point
+      model: Meraki MR44
+    1.3.6.1.4.1.29671.2.49:
+      category: Access Point
+      model: Meraki MR57
+    1.3.6.1.4.1.29671.2.51:
+      category: Access Point
+      model: Meraki CW9164I
+    1.3.6.1.4.1.29671.2.52:
+      category: Access Point
+      model: Meraki CW9166D1
+    1.3.6.1.4.1.29671.2.53:
+      category: Access Point
+      model: Meraki CW9166I
+    1.3.6.1.4.1.29671.2.100:
+      category: Firewall
+      model: Cisco Meraki Z1
+    1.3.6.1.4.1.29671.2.101:
+      category: Firewall
+      model: Cisco Meraki MX70
+    1.3.6.1.4.1.29671.2.102:
+      category: Firewall
+      model: Cisco Meraki MX 60-60w-80 Series
+    1.3.6.1.4.1.29671.2.103:
+      category: Firewall
+      model: Cisco Meraki MX90
+    1.3.6.1.4.1.29671.2.104:
+      category: Firewall
+      model: Cisco Meraki MX400
+    1.3.6.1.4.1.29671.2.105:
+      category: Firewall
+      model: Cisco Meraki MX600
+    1.3.6.1.4.1.29671.2.106:
+      category: Firewall
+      model: Meraki MX100
+    1.3.6.1.4.1.29671.2.107:
+      category: Firewall
+      model: Meraki MX64
+    1.3.6.1.4.1.29671.2.108:
+      category: Firewall
+      model: Meraki MX64W
+    1.3.6.1.4.1.29671.2.109:
+      category: Firewall
+      model: Meraki MX84
+    1.3.6.1.4.1.29671.2.110:
+      category: Firewall
+      model: Meraki MX65
+    1.3.6.1.4.1.29671.2.111:
+      category: Firewall
+      model: Meraki MX65W
+    1.3.6.1.4.1.29671.2.112:
+      category: Firewall
+      model: Meraki MX250
+    1.3.6.1.4.1.29671.2.113:
+      category: Firewall
+      model: Cisco Meraki MX450
+    1.3.6.1.4.1.29671.2.116:
+      category: Firewall
+      model: Cisco Meraki Z3
+    1.3.6.1.4.1.29671.2.117:
+      model: Meraki GX20
+    1.3.6.1.4.1.29671.2.118:
+      category: Firewall
+      model: Meraki MX67
+    1.3.6.1.4.1.29671.2.119:
+      category: Firewall
+      model: Cisco Meraki MX67W
+    1.3.6.1.4.1.29671.2.120:
+      category: Firewall
+      model: Cisco Meraki MX67C
+    1.3.6.1.4.1.29671.2.121:
+      category: Firewall
+      model: Meraki MX68
+    1.3.6.1.4.1.29671.2.122:
+      category: Firewall
+      model: Cisco Meraki MX68W
+    1.3.6.1.4.1.29671.2.123:
+      category: Firewall
+      model: Meraki MX68CW
+    1.3.6.1.4.1.29671.2.124:
+      category: Firewall
+      model: Cisco Meraki Z3C
+    1.3.6.1.4.1.29671.2.125:
+      category: Firewall
+      model: Meraki MX85
+    1.3.6.1.4.1.29671.2.126:
+      category: Firewall
+      model: Meraki MX75
+    1.3.6.1.4.1.29671.2.127:
+      category: Firewall
+      model: Meraki MX95
+    1.3.6.1.4.1.29671.2.200:
+      model: Meraki VM10
+    1.3.6.1.4.1.29671.2.300:
+      category: Switch
+      model: Cisco Meraki MS22
+    1.3.6.1.4.1.29671.2.301:
+      category: Switch
+      model: Cisco Meraki MS22P
+    1.3.6.1.4.1.29671.2.302:
+      category: Switch
+      model: Cisco Meraki MS42
+    1.3.6.1.4.1.29671.2.303:
+      category: Switch
+      model: Cisco Meraki MS42P
+    1.3.6.1.4.1.29671.2.304:
+      category: Switch
+      model: Cisco Meraki MS220-8
+    1.3.6.1.4.1.29671.2.305:
+      category: Layer 3 Switch
+      model: Meraki MS220-8P
+    1.3.6.1.4.1.29671.2.306:
+      category: Layer 3 Switch
+      model: Meraki MS220-24
+    1.3.6.1.4.1.29671.2.307:
+      category: Layer 3 Switch
+      model: Meraki MS220-24P
+    1.3.6.1.4.1.29671.2.308:
+      category: Switch
+      model: Cisco Meraki MS220-48
+    1.3.6.1.4.1.29671.2.309:
+      category: Layer 3 Switch
+      model: Meraki MS220-48LP
+    1.3.6.1.4.1.29671.2.310:
+      category: Switch
+      model: Cisco Meraki MS220-48FP
+    1.3.6.1.4.1.29671.2.311:
+      category: Switch
+      model: Cisco Meraki MS320-24
+    1.3.6.1.4.1.29671.2.312:
+      category: Layer 3 Switch
+      model: Meraki MS320-24P
+    1.3.6.1.4.1.29671.2.313:
+      category: Switch
+      model: Cisco Meraki MS320-48
+    1.3.6.1.4.1.29671.2.314:
+      category: Layer 3 Switch
+      model: Meraki MS320-48LP
+    1.3.6.1.4.1.29671.2.315:
+      category: Switch
+      model: Cisco Meraki MS320-48FP
+    1.3.6.1.4.1.29671.2.316:
+      category: Switch
+      model: Cisco Meraki MS420-24
+    1.3.6.1.4.1.29671.2.317:
+      category: Switch
+      model: Cisco Meraki MS420-48
+    1.3.6.1.4.1.29671.2.318:
+      category: Switch
+      model: Cisco Meraki MS350-24
+    1.3.6.1.4.1.29671.2.319:
+      category: Layer 3 Switch
+      model: Meraki MS350-24P
+    1.3.6.1.4.1.29671.2.320:
+      category: Switch
+      model: Cisco Meraki MS350-48
+    1.3.6.1.4.1.29671.2.321:
+      category: Layer 3 Switch
+      model: Meraki MS350-48LP
+    1.3.6.1.4.1.29671.2.322:
+      category: Layer 3 Switch
+      model: Meraki MS350-48FP
+    1.3.6.1.4.1.29671.2.323:
+      category: Layer 3 Switch
+      model: Meraki MS410-16
+    1.3.6.1.4.1.29671.2.324:
+      category: Layer 3 Switch
+      model: Meraki MS410-32
+    1.3.6.1.4.1.29671.2.325:
+      category: Layer 3 Switch
+      model: Meraki MS425-16
+    1.3.6.1.4.1.29671.2.326:
+      category: Layer 3 Switch
+      model: Meraki MS425-32
+    1.3.6.1.4.1.29671.2.327:
+      category: Layer 3 Switch
+      model: Meraki MS350-24X
+    1.3.6.1.4.1.29671.2.328:
+      category: Switch
+      model: Meraki MS225-24
+    1.3.6.1.4.1.29671.2.329:
+      category: Layer 3 Switch
+      model: Meraki MS225-24P
+    1.3.6.1.4.1.29671.2.330:
+      category: Switch
+      model: Cisco Meraki MS225-48
+    1.3.6.1.4.1.29671.2.331:
+      category: Layer 3 Switch
+      model: Meraki MS225-48LP
+    1.3.6.1.4.1.29671.2.332:
+      category: Switch
+      model: Cisco Meraki MS225-48FP
+    1.3.6.1.4.1.29671.2.333:
+      category: Switch
+      model: Cisco Meraki MS250-24
+    1.3.6.1.4.1.29671.2.334:
+      category: Layer 3 Switch
+      model: Meraki MS250-24P
+    1.3.6.1.4.1.29671.2.335:
+      category: Layer 3 Switch
+      model: Meraki MS250-48
+    1.3.6.1.4.1.29671.2.336:
+      category: Layer 3 Switch
+      model: Meraki MS250-48LP
+    1.3.6.1.4.1.29671.2.337:
+      category: Switch
+      model: Cisco Meraki MS250-48FP
+    1.3.6.1.4.1.29671.2.338:
+      category: Switch
+      model: Meraki MS120-8
+    1.3.6.1.4.1.29671.2.339:
+      category: Switch
+      model: Meraki MS120-8LP
+    1.3.6.1.4.1.29671.2.340:
+      category: Switch
+      model: Meraki MS120-8FP
+    1.3.6.1.4.1.29671.2.341:
+      category: Switch
+      model: Cisco Meraki MS120-24
+    1.3.6.1.4.1.29671.2.342:
+      category: Switch
+      model: Meraki MS120-24P
+    1.3.6.1.4.1.29671.2.343:
+      category: Switch
+      model: Cisco Meraki MS120-48
+    1.3.6.1.4.1.29671.2.344:
+      category: Switch
+      model: Meraki MS120-48LP
+    1.3.6.1.4.1.29671.2.345:
+      category: Switch
+      model: Cisco Meraki MS210-24
+    1.3.6.1.4.1.29671.2.346:
+      category: Layer 3 Switch
+      model: Meraki MS210-24P
+    1.3.6.1.4.1.29671.2.347:
+      category: Switch
+      model: Meraki MS210-48
+    1.3.6.1.4.1.29671.2.348:
+      category: Layer 3 Switch
+      model: Meraki MS210-48LP
+    1.3.6.1.4.1.29671.2.349:
+      category: Layer 3 Switch
+      model: Meraki MS210-48FP
+    1.3.6.1.4.1.29671.2.356:
+      category: Switch
+      model: Meraki MS210-48FP
+    1.3.6.1.4.1.29671.2.357:
+      category: Layer 3 Switch
+      model: Meraki MS355-24X
+    1.3.6.1.4.1.29671.2.358:
+      category: Switch
+      model: Cisco Meraki MS355
+    1.3.6.1.4.1.29671.2.359:
+      category: Switch
+      model: Cisco Meraki MS355
+    1.3.6.1.4.1.29671.2.360:
+      category: Switch
+      model: Cisco Meraki MS355
+    1.3.6.1.4.1.29671.2.372:
+      category: Switch
+      model: 1.3.6.1.4.1.29671.2.372
+    1.3.6.1.4.1.29671.2.374:
+      category: Switch
+      model: 1.3.6.1.4.1.29671.2.374
+    1.3.6.1.4.1.29671.2.396:
+      category: Switch
+      model: 1.3.6.1.4.1.29671.2.396
+    1.3.6.1.4.1.29671.2.397:
+      category: Switch
+      model: 1.3.6.1.4.1.29671.2.397
+    1.3.6.1.4.1.29671.2.400:
+      category: Switch
+      model: 1.3.6.1.4.1.29671.2.400
+    1.3.6.1.4.1.29671.2.403:
+      category: Switch
+      model: 1.3.6.1.4.1.29671.2.403

@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/model"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
 func TestNewDiscoverer(t *testing.T) {
@@ -269,14 +270,14 @@ func prepareNewTargetGroup(sub subnet, ips ...string) *targetGroup {
 }
 
 func prepareNewTarget(sub subnet, ip string) *target {
-	return newTarget(ip, sub.credential, SysInfo{
+	return newTarget(ip, sub.credential, snmputils.SysInfo{
 		Descr:        mockSysDescr,
 		Contact:      mockSysContact,
 		Name:         mockSysName,
 		Location:     mockSysLocation,
 		SysObjectID:  mockSysObject[1:],
 		Organization: "net-snmp",
-		Category:     "Firewall",
-		Model:        "Virtual Service Router",
+		Category:     "Server",
+		Model:        "Linux",
 	})
 }

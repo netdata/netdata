@@ -1,0 +1,414 @@
+sysobjectids:
+  oid_overrides:
+    1.3.6.1.4.1.14823.1.1.1:
+      category: Wireless LAN Controller
+      model: "5000"
+    1.3.6.1.4.1.14823.1.1.2:
+      category: Wireless LAN Controller
+      model: "2400"
+    1.3.6.1.4.1.14823.1.1.3:
+      category: Wireless LAN Controller
+      model: "800"
+    1.3.6.1.4.1.14823.1.1.4:
+      category: Wireless LAN Controller
+      model: "6000"
+    1.3.6.1.4.1.14823.1.1.5:
+      category: Wireless LAN Controller
+      model: "2450"
+    1.3.6.1.4.1.14823.1.1.6:
+      category: Wireless LAN Controller
+      model: "850"
+    1.3.6.1.4.1.14823.1.1.7:
+      category: Wireless LAN Controller
+      model: 2400E
+    1.3.6.1.4.1.14823.1.1.8:
+      category: Wireless LAN Controller
+      model: 800E
+    1.3.6.1.4.1.14823.1.1.9:
+      category: Wireless LAN Controller
+      model: "804"
+    1.3.6.1.4.1.14823.1.1.10:
+      category: Wireless LAN Controller
+      model: "200"
+    1.3.6.1.4.1.14823.1.1.11:
+      category: Wireless LAN Controller
+      model: "2424"
+    1.3.6.1.4.1.14823.1.1.13:
+      category: Wireless LAN Controller
+      model: "3200"
+    1.3.6.1.4.1.14823.1.1.14:
+      category: Wireless LAN Controller
+      model: 3200-8
+    1.3.6.1.4.1.14823.1.1.15:
+      category: Wireless LAN Controller
+      model: "3400"
+    1.3.6.1.4.1.14823.1.1.16:
+      category: Wireless LAN Controller
+      model: 3400-32
+    1.3.6.1.4.1.14823.1.1.17:
+      category: Wireless LAN Controller
+      model: "3600"
+    1.3.6.1.4.1.14823.1.1.18:
+      category: Wireless LAN Controller
+      model: 3600-64
+    1.3.6.1.4.1.14823.1.1.19:
+      category: Wireless LAN Controller
+      model: 650-US
+    1.3.6.1.4.1.14823.1.1.20:
+      category: Wireless LAN Controller
+      model: "651"
+    1.3.6.1.4.1.14823.1.1.23:
+      category: Wireless LAN Controller
+      model: "620"
+    1.3.6.1.4.1.14823.1.1.26:
+      category: Layer 3 Switch
+      model: S3500-48P
+    1.3.6.1.4.1.14823.1.1.32:
+      category: Wireless LAN Controller
+      model: "7210"
+    1.3.6.1.4.1.14823.1.1.33:
+      category: Wireless LAN Controller
+      model: "7220"
+    1.3.6.1.4.1.14823.1.1.34:
+      category: Wireless LAN Controller
+      model: "7240"
+    1.3.6.1.4.1.14823.1.1.38:
+      category: Layer 3 Switch
+      model: S1500-12P
+    1.3.6.1.4.1.14823.1.1.39:
+      category: Wireless LAN Controller
+      model: "7005"
+    1.3.6.1.4.1.14823.1.1.40:
+      category: Wireless LAN Controller
+      model: 7010-US
+    1.3.6.1.4.1.14823.1.1.41:
+      category: Wireless LAN Controller
+      model: "7030"
+    1.3.6.1.4.1.14823.1.1.42:
+      category: Wireless LAN Controller
+      model: "7205"
+    1.3.6.1.4.1.14823.1.1.43:
+      category: Wireless LAN Controller
+      model: "7024"
+    1.3.6.1.4.1.14823.1.1.47:
+      category: Wireless LAN Controller
+      model: 7240XM
+    1.3.6.1.4.1.14823.1.1.48:
+      category: Wireless LAN Controller
+      model: "7008"
+    1.3.6.1.4.1.14823.1.1.50:
+      category: Other
+      model: Mobility Master Virtual Appliance
+    1.3.6.1.4.1.14823.1.1.51:
+      category: Wireless LAN Controller
+      model: A7280 Controller
+    1.3.6.1.4.1.14823.1.1.52:
+      category: Wireless LAN Controller
+      model: Mobility Controller Virtual Appliance
+    1.3.6.1.4.1.14823.1.1.53:
+      category: Wireless LAN Controller
+      model: Mobility Master Appliance
+    1.3.6.1.4.1.14823.1.1.54:
+      category: Wireless LAN Controller
+      model: Mobility Master Virtual Appliance
+    1.3.6.1.4.1.14823.1.1.55:
+      category: Wireless LAN Controller
+      model: Mobility Master Virtual Appliance
+    1.3.6.1.4.1.14823.1.1.56:
+      category: Wireless LAN Controller
+      model: Wireless Gateway 9004
+    1.3.6.1.4.1.14823.1.1.57:
+      category: Firewall
+      model: Wireless Gateway 9012
+    1.3.6.1.4.1.14823.1.1.59:
+      category: Firewall
+      model: Wireless Gateway 9240
+    1.3.6.1.4.1.14823.1.1.99:
+      category: Wireless LAN Controller
+      model: 2400-F
+    1.3.6.1.4.1.14823.1.1.9999:
+      category: Wireless LAN Controller
+      model: "6000"
+    1.3.6.1.4.1.14823.1.2.1:
+      model: 50 Access Point
+    1.3.6.1.4.1.14823.1.2.2:
+      model: 52 Access Point
+    1.3.6.1.4.1.14823.1.2.3:
+      category: Access Point
+      model: AP-60
+    1.3.6.1.4.1.14823.1.2.4:
+      category: Wireless
+      model: AP 61
+    1.3.6.1.4.1.14823.1.2.5:
+      category: Switch
+      model: AP70
+    1.3.6.1.4.1.14823.1.2.6:
+      category: Access Point
+      model: AP-61-WJ
+    1.3.6.1.4.1.14823.1.2.7:
+      model: 2E Access Point
+    1.3.6.1.4.1.14823.1.2.8:
+      category: Access Point
+      model: AP-1200
+    1.3.6.1.4.1.14823.1.2.9:
+      category: Access Point
+      model: AP-80S
+    1.3.6.1.4.1.14823.1.2.10:
+      category: Access Point
+      model: AP-80M
+    1.3.6.1.4.1.14823.1.2.11:
+      category: Access Point
+      model: AP-WG102
+    1.3.6.1.4.1.14823.1.2.12:
+      category: Access Point
+      model: AP-40
+    1.3.6.1.4.1.14823.1.2.13:
+      category: Access Point
+      model: AP-41
+    1.3.6.1.4.1.14823.1.2.14:
+      category: Wireless
+      model: AP 65
+    1.3.6.1.4.1.14823.1.2.15:
+      category: Access Point
+      model: AP-MW1700
+    1.3.6.1.4.1.14823.1.2.16:
+      category: Access Point
+      model: AP-DUOWJ
+    1.3.6.1.4.1.14823.1.2.17:
+      category: Access Point
+      model: AP-DUO
+    1.3.6.1.4.1.14823.1.2.18:
+      category: Access Point
+      model: AP-80MB
+    1.3.6.1.4.1.14823.1.2.19:
+      category: Access Point
+      model: AP-80SB
+    1.3.6.1.4.1.14823.1.2.20:
+      category: Access Point
+      model: AP-85
+    1.3.6.1.4.1.14823.1.2.21:
+      category: Access Point
+      model: AP-124
+    1.3.6.1.4.1.14823.1.2.22:
+      category: Access Point
+      model: AP-125
+    1.3.6.1.4.1.14823.1.2.23:
+      category: Access Point
+      model: AP-120
+    1.3.6.1.4.1.14823.1.2.24:
+      category: Access Point
+      model: AP-121
+    1.3.6.1.4.1.14823.1.2.25:
+      category: Access Point
+      model: AP-1250
+    1.3.6.1.4.1.14823.1.2.26:
+      category: Access Point
+      model: AP-120ABG
+    1.3.6.1.4.1.14823.1.2.27:
+      category: Access Point
+      model: AP-121ABG
+    1.3.6.1.4.1.14823.1.2.28:
+      category: Access Point
+      model: AP-124ABG
+    1.3.6.1.4.1.14823.1.2.29:
+      category: Access Point
+      model: AP-125ABG
+    1.3.6.1.4.1.14823.1.2.30:
+      category: Access Point
+      model: RAP-5WN
+    1.3.6.1.4.1.14823.1.2.31:
+      category: Access Point
+      model: RAP-5
+    1.3.6.1.4.1.14823.1.2.32:
+      category: Access Point
+      model: RAP-2WG
+    1.3.6.1.4.1.14823.1.2.33:
+      model: reserved4 Access Point
+    1.3.6.1.4.1.14823.1.2.34:
+      category: Access Point
+      model: IAP-105
+    1.3.6.1.4.1.14823.1.2.35:
+      category: Access Point
+      model: AP-65WB
+    1.3.6.1.4.1.14823.1.2.36:
+      category: Access Point
+      model: AP-651
+    1.3.6.1.4.1.14823.1.2.37:
+      model: reserved6 Access Point
+    1.3.6.1.4.1.14823.1.2.38:
+      category: Access Point
+      model: AP-60P
+    1.3.6.1.4.1.14823.1.2.39:
+      model: reserved7 Access Point
+    1.3.6.1.4.1.14823.1.2.40:
+      category: Access Point
+      model: IAP-92
+    1.3.6.1.4.1.14823.1.2.41:
+      category: Access Point
+      model: IAP-93
+    1.3.6.1.4.1.14823.1.2.42:
+      category: Access Point
+      model: AP-68
+    1.3.6.1.4.1.14823.1.2.43:
+      category: Access Point
+      model: AP-68P
+    1.3.6.1.4.1.14823.1.2.44:
+      category: Access Point
+      model: AP-175P
+    1.3.6.1.4.1.14823.1.2.45:
+      category: Access Point
+      model: AP-175AC
+    1.3.6.1.4.1.14823.1.2.46:
+      category: Access Point
+      model: AP-175DC
+    1.3.6.1.4.1.14823.1.2.47:
+      category: Access Point
+      model: IAP-134
+    1.3.6.1.4.1.14823.1.2.48:
+      category: Access Point
+      model: IAP-135
+    1.3.6.1.4.1.14823.1.2.49:
+      model: reserved8 Access Point
+    1.3.6.1.4.1.14823.1.2.50:
+      category: Access Point
+      model: AP-93H
+    1.3.6.1.4.1.14823.1.2.51:
+      category: Access Point
+      model: RAP-3WN
+    1.3.6.1.4.1.14823.1.2.52:
+      category: Access Point
+      model: RAP-3WNP
+    1.3.6.1.4.1.14823.1.2.53:
+      category: Access Point
+      model: IAP-104
+    1.3.6.1.4.1.14823.1.2.54:
+      category: Access Point
+      model: RAP-155
+    1.3.6.1.4.1.14823.1.2.55:
+      category: Access Point
+      model: RAP-155P
+    1.3.6.1.4.1.14823.1.2.56:
+      category: Access Point
+      model: RAP-108
+    1.3.6.1.4.1.14823.1.2.57:
+      category: Access Point
+      model: RAP-109
+    1.3.6.1.4.1.14823.1.2.58:
+      category: Access Point
+      model: IAP-224
+    1.3.6.1.4.1.14823.1.2.59:
+      category: Access Point
+      model: IAP-225
+    1.3.6.1.4.1.14823.1.2.60:
+      category: Access Point
+      model: IAP-114
+    1.3.6.1.4.1.14823.1.2.61:
+      category: Access Point
+      model: IAP-115
+    1.3.6.1.4.1.14823.1.2.62:
+      category: Access Point
+      model: RAP-109L
+    1.3.6.1.4.1.14823.1.2.63:
+      category: Access Point
+      model: IAP-274
+    1.3.6.1.4.1.14823.1.2.64:
+      category: Access Point
+      model: IAP-275
+    1.3.6.1.4.1.14823.1.2.65:
+      category: Access Point
+      model: AP-214A
+    1.3.6.1.4.1.14823.1.2.66:
+      category: Access Point
+      model: AP-215A
+    1.3.6.1.4.1.14823.1.2.67:
+      category: Access Point
+      model: IAP-204
+    1.3.6.1.4.1.14823.1.2.68:
+      category: Access Point
+      model: IAP-205
+    1.3.6.1.4.1.14823.1.2.69:
+      category: Access Point
+      model: IAP-103
+    1.3.6.1.4.1.14823.1.2.70:
+      category: Access Point
+      model: AP-103H
+    1.3.6.1.4.1.14823.1.2.71:
+      category: Access Point
+      model: IAP Virtual Controller
+    1.3.6.1.4.1.14823.1.2.72:
+      category: Access Point
+      model: AP-277
+    1.3.6.1.4.1.14823.1.2.73:
+      category: Access Point
+      model: IAP-214
+    1.3.6.1.4.1.14823.1.2.74:
+      category: Access Point
+      model: IAP-215
+    1.3.6.1.4.1.14823.1.2.75:
+      category: Access Point
+      model: IAP-228
+    1.3.6.1.4.1.14823.1.2.76:
+      category: Access Point
+      model: IAP-205H
+    1.3.6.1.4.1.14823.1.2.77:
+      category: Access Point
+      model: IAP-324
+    1.3.6.1.4.1.14823.1.2.78:
+      category: Access Point
+      model: IAP-325
+    1.3.6.1.4.1.14823.1.2.79:
+      category: Access Point
+      model: IAP-334
+    1.3.6.1.4.1.14823.1.2.80:
+      category: Access Point
+      model: IAP-335
+    1.3.6.1.4.1.14823.1.2.81:
+      category: Access Point
+      model: IAP-314
+    1.3.6.1.4.1.14823.1.2.82:
+      category: Access Point
+      model: IAP-315
+    1.3.6.1.4.1.14823.1.2.84:
+      category: Access Point
+      model: IAP-207
+    1.3.6.1.4.1.14823.1.2.85:
+      category: Access Point
+      model: IAP-304
+    1.3.6.1.4.1.14823.1.2.86:
+      category: Access Point
+      model: IAP-305
+    1.3.6.1.4.1.14823.1.2.87:
+      category: Access Point
+      model: IAP-303H
+    1.3.6.1.4.1.14823.1.2.88:
+      category: Access Point
+      model: IAP-365
+    1.3.6.1.4.1.14823.1.2.100:
+      category: Access Point
+      model: AP-555
+    1.3.6.1.4.1.14823.1.2.102:
+      category: Access Point
+      model: AP-535
+    1.3.6.1.4.1.14823.1.2.107:
+      category: Access Point
+      model: IAP-515
+    1.3.6.1.4.1.14823.1.2.111:
+      category: Access Point
+      model: AP-505
+    1.3.6.1.4.1.14823.1.2.114:
+      category: Access Point
+      model: AP-575
+    1.3.6.1.4.1.14823.1.2.115:
+      category: Access Point
+      model: AP-577
+    1.3.6.1.4.1.14823.1.2.125:
+      category: Access Point
+      model: AP-635
+    1.3.6.1.4.1.14823.1.2.9999:
+      category: Access Point
+      model: AP-UNDEFINED
+    1.3.6.1.4.1.14823.1.3.1:
+      model: ZMaster
+    1.3.6.1.4.1.14823.1.6.1:
+      category: Access Server
+      model: C2000
