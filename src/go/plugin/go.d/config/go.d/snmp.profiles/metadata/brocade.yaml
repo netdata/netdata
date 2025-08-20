@@ -1,5 +1,233 @@
 sysobjectids:
   oid_overrides:
+    1.3.6.1.4.1.1588.2.1.1:
+      category: Switch
+      model: SWITCH
+    1.3.6.1.4.1.1588.2.1.1.1:
+      category: SANSwitch
+      model: Connectrix ED-24000B
+    1.3.6.1.4.1.1588.2.1.1.1.42:
+      category: SANSwitch
+      model: Connectrix ED-48000B
+    1.3.6.1.4.1.1588.2.1.1.1.55:
+      category: SANSwitch
+      model: Connectrix AP-7600B
+    1.3.6.1.4.1.1588.2.1.1.1.62:
+      category: SANSwitch
+      model: Connectrix ED-DCX-B
+    1.3.6.1.4.1.1588.2.1.1.1.133:
+      category: SANSwitch
+      model: Connectrix DS-6520B
+    1.3.6.1.4.1.1588.2.1.1.1.178:
+      category: SANSwitch
+      model: Connectrix MP-7810B
+    1.3.6.1.4.1.1588.2.1.1.1.183:
+      category: SANSwitch
+      model: G620 Switch
+    1.3.6.1.4.1.1588.2.1.1.1.184:
+      category: SANSwitch
+      model: Connectrix DS-6630B
+    1.3.6.1.4.1.1588.2.1.1.2:
+      category: SANSwitch
+      model: '2800'
+    1.3.6.1.4.1.1588.2.1.1.10:
+      category: Switch
+      model: Brocade FibreChannelswitch
+    1.3.6.1.4.1.1588.2.1.1.18:
+      category: Switch
+      model: Brocade Fibre Channel Switch
+    1.3.6.1.4.1.1588.2.1.1.22:
+      category: SANSwitch
+      model: Fibre Channel Switch
+    1.3.6.1.4.1.1588.2.1.1.27:
+      model: Switch
+      category: Switch
+    1.3.6.1.4.1.1588.2.1.1.29:
+      category: SANSwitch
+      model: Fibre Channel Switch
+    1.3.6.1.4.1.1588.2.1.1.32:
+      category: SANSwitch
+      model: 4100 Switch
+    1.3.6.1.4.1.1588.2.1.1.34:
+      category: SANSwitch
+      model: 200E Switch
+    1.3.6.1.4.1.1588.2.1.1.37:
+      category: SANSwitch
+      model: 4020 Embedded Switch
+    1.3.6.1.4.1.1588.2.1.1.38:
+      category: Access Point
+      model: SILKWORM AP7420
+    1.3.6.1.4.1.1588.2.1.1.42:
+      category: SANSwitch
+      model: 48000 Director Switch
+    1.3.6.1.4.1.1588.2.1.1.43:
+      category: SANSwitch
+      model: 4024 Embedded Switch
+    1.3.6.1.4.1.1588.2.1.1.44:
+      category: Switch
+      model: 4900 FC SWITCH
+    1.3.6.1.4.1.1588.2.1.1.46:
+      category: SANSwitch
+      model: 7500 Switch
+    1.3.6.1.4.1.1588.2.1.1.55:
+      category: Switch
+      model: Fibre Channel Switch
+    1.3.6.1.4.1.1588.2.1.1.58:
+      category: SANSwitch
+      model: 5000 Switch
+    1.3.6.1.4.1.1588.2.1.1.62:
+      category: SANSwitch
+      model: 2499 Model 384
+    1.3.6.1.4.1.1588.2.1.1.64:
+      category: SANSwitch
+      model: 5300 Switch
+    1.3.6.1.4.1.1588.2.1.1.66:
+      category: SANSwitch
+      model: 2498 Model B40
+    1.3.6.1.4.1.1588.2.1.1.67:
+      category: SANSwitch
+      model: Encryption Switch
+    1.3.6.1.4.1.1588.2.1.1.70:
+      category: SANSwitch
+      model: 8Gb 12-port FC Module Switch
+    1.3.6.1.4.1.1588.2.1.1.71:
+      category: SANSwitch
+      model: 2498 Model 24E
+    1.3.6.1.4.1.1588.2.1.1.72:
+      category: SANSwitch
+      model: 5480 Embedded Switch
+    1.3.6.1.4.1.1588.2.1.1.73:
+      category: SANSwitch
+      model: 5470 Embedded Switch
+    1.3.6.1.4.1.1588.2.1.1.76:
+      category: Switch
+      model: 8000 FC SWITCH
+    1.3.6.1.4.1.1588.2.1.1.77:
+      category: SANSwitch
+      model: 2499 Model 192
+    1.3.6.1.4.1.1588.2.1.1.82:
+      category: SANSwitch
+      model: 8Gb 24-Port FC Module Switch
+    1.3.6.1.4.1.1588.2.1.1.83:
+      category: SANSwitch
+      model: Connectrix MP-7800B
+    1.3.6.1.4.1.1588.2.1.1.92:
+      category: Switch
+      model: VA-40 FC SWITCH
+    1.3.6.1.4.1.1588.2.1.1.109:
+      category: SANSwitch
+      model: 6510 Switch
+    1.3.6.1.4.1.1588.2.1.1.117:
+      category: SANSwitch
+      model: FC5022
+    1.3.6.1.4.1.1588.2.1.1.118:
+      category: SANSwitch
+      model: 2498 Model 24G
+    1.3.6.1.4.1.1588.2.1.1.120:
+      category: SANSwitch
+      model: Connectrix ED-DCX8510-8B
+    1.3.6.1.4.1.1588.2.1.1.121:
+      category: SANSwitch
+      model: DCX 8510-4 Backbone Switch
+    1.3.6.1.4.1.1588.2.1.1.129:
+      category: SANSwitch
+      model: 6548 Switch
+    1.3.6.1.4.1.1588.2.1.1.133:
+      category: SANSwitch
+      model: 6520 Switch
+    1.3.6.1.4.1.1588.2.1.1.148:
+      category: SANSwitch
+      model: 7840 Switch
+    1.3.6.1.4.1.1588.2.1.1.158:
+      category: SANSwitch
+      model: Virtual Connect SE 16Gb FC Module
+    1.3.6.1.4.1.1588.2.1.1.162:
+      category: SANSwitch
+      model: 8960 Model F64
+    1.3.6.1.4.1.1588.2.1.1.165:
+      category: SANSwitch
+      model: Connectrix ED-DCX6-4B
+    1.3.6.1.4.1.1588.2.1.1.166:
+      category: SANSwitch
+      model: Connectrix ED-DCX6-8B
+    1.3.6.1.4.1.1588.2.1.1.170:
+      category: SANSwitch
+      model: G610 Switch
+    1.3.6.1.4.1.1588.2.1.1.170.5:
+      category: SANSwitch
+      model: Connectrix DS-6610B
+    1.3.6.1.4.1.1588.2.1.1.173:
+      category: SANSwitch
+      model: G630 Switch
+    1.3.6.1.4.1.1588.2.1.1.177:
+      category: SANSwitch
+      model: 8Gb 24-Port FC Module Switch
+    1.3.6.1.4.1.1588.2.1.1.179:
+      category: SANSwitch
+      model: 8961 Model F74
+    1.3.6.1.4.1.1588.2.1.1.180:
+      category: Layer 3 Switch
+      model: X7-8 Director Switch
+    1.3.6.1.4.1.1588.2.1.1.181:
+      category: SANSwitch
+      model: G720 Switch
+    1.3.6.1.4.1.1588.2.1.1.183:
+      category: SANSwitch
+      model: 8960 Model F65
+    1.3.6.1.4.1.1588.2.1.1.184:
+      category: SANSwitch
+      model: G630 Switch
+    1.3.6.1.4.1.1588.2.1.1.189:
+      category: SANSwitch
+      model: G730 Switch
+    1.3.6.1.4.1.1588.2.1.3:
+      category: SANSwitch
+      model: Dell EMC MXG610s Fibre Channel Switch
+    1.3.6.1.4.1.1588.2.2.1.1.1.1:
+      category: Switch
+      model: Brocade VDX6740-24
+    1.3.6.1.4.1.1588.2.2.1.1.1.2:
+      category: SANSwitch
+      model: VDX 6720-60 Data Center Switch
+    1.3.6.1.4.1.1588.2.2.1.1.1.3:
+      category: Layer 3 Switch
+      model: VDX 6730-32 Data Center Switch
+    1.3.6.1.4.1.1588.2.2.1.1.1.5:
+      category: SANSwitch
+      model: VDX 6710 Data Center Switch
+    1.3.6.1.4.1.1588.2.2.1.1.1.112:
+      category: SANSwitch
+      model: Internal Management Module Switch
+    1.3.6.1.4.1.1588.2.2.1.1.1.131:
+      category: Switch
+      model: Brocade VDX6740
+    1.3.6.1.4.1.1588.3.3.1.131:
+      category: SANSwitch
+      model: VDX 6740-48 Switch
+    1.3.6.1.4.1.1588.3.3.1.137:
+      category: Layer 3 Switch
+      model: VDX 6740T Switch
+    1.3.6.1.4.1.1588.3.3.1.151:
+      category: SANSwitch
+      model: VDX 6740T-56-1G Switch
+    1.3.6.1.4.1.1588.3.3.1.153:
+      category: Layer 3 Switch
+      model: VDX 6940-36Q Switch
+    1.3.6.1.4.1.1588.3.3.1.164:
+      category: Switch
+      model: VDX-SWITCH-6940
+    1.3.6.1.4.1.1588.3.3.1.1000:
+      category: SANSwitch
+      model: VDX 8770 Switch
+    1.3.6.1.4.1.1588.3.3.1.1001:
+      category: Layer 3 Switch
+      model: VDX 8770-8 Switch
+    1.3.6.1.4.1.1588.3.3.1.1002:
+      category: SANSwitch
+      model: VDX 8770S16
+    1.3.6.1.4.1.1588.3.3.1.4000:
+      category: Layer 3 Switch
+      model: ExtremeSwitching SLX 9540
     1.3.6.1.4.1.1991.1.1:
       category: Layer 3 Switch
       model: ServerIron Switch

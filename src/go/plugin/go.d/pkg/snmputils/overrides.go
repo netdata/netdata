@@ -4,6 +4,7 @@ package snmputils
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -89,7 +90,7 @@ func loadOverridesFromDir(dir string) (*overrides, error) {
 
 		var cur overrides
 		if err := yaml.UnmarshalStrict(bs, &cur); err != nil {
-			return err
+			return fmt.Errorf("unmarshalling %s: %v", path, err)
 		}
 
 		loaded++
