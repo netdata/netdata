@@ -251,6 +251,7 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
         schedule_node_state_update(host, 100);
 
     rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE);
+    (void) JudyLIns(&parser->user.vnodes.JudyL, (Word_t) host, PJE0);
     return PARSER_RC_OK;
 }
 
@@ -1260,14 +1261,20 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
     else
         cd->serial_failures++;
 
-    if (parser->user.host != localhost) {
-        nd_log_daemon(NDLP_INFO, "PLUGINSD: Checking virtual status for %s", rrdhost_hostname(parser->user.host));
-        if (rrdhost_option_check(parser->user.host, RRDHOST_OPTION_VIRTUAL_HOST)) {
-            nd_log_daemon(NDLP_INFO, "PLUGINSD: Reseting virtual host status for %s", rrdhost_hostname(parser->user.host));
-            rrdhost_option_clear(parser->user.host, RRDHOST_OPTION_VIRTUAL_HOST);
-            rrdhost_flag_clear(parser->user.host, RRDHOST_FLAG_COLLECTOR_ONLINE);
-            schedule_node_state_update(parser->user.host, 1000);
+    {
+        Word_t Index = 0;
+        bool first_then_next = true;
+        while (JudyLFirstThenNext(parser->user.vnodes.JudyL, &Index, &first_then_next)) {
+            RRDHOST *virtual_host = (RRDHOST *) Index;
+            nd_log_daemon(NDLP_INFO, "PLUGINSD: Checking virtual status for %s", rrdhost_hostname(virtual_host));
+            if (rrdhost_option_check(virtual_host, RRDHOST_OPTION_VIRTUAL_HOST)) {
+                nd_log_daemon(NDLP_INFO, "PLUGINSD: Reseting virtual host status for %s", rrdhost_hostname(virtual_host));
+                rrdhost_option_clear(virtual_host, RRDHOST_OPTION_VIRTUAL_HOST);
+                rrdhost_flag_clear(virtual_host, RRDHOST_FLAG_COLLECTOR_ONLINE);
+                schedule_node_state_update(virtual_host, 1000);
+            }
         }
+        (void) JudyLFreeArray(&parser->user.vnodes.JudyL, PJE0);
     }
 
     // mark all charts of this plugin as obsolete
