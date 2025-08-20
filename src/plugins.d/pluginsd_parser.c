@@ -1260,6 +1260,14 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
     else
         cd->serial_failures++;
 
+    if (parser->user.host != localhost) {
+        if (rrdhost_option_check(parser->user.host, RRDHOST_OPTION_VIRTUAL_HOST)) {
+            rrdhost_option_clear(parser->user.host, RRDHOST_OPTION_VIRTUAL_HOST);
+            rrdhost_flag_clear(host, RRDHOST_FLAG_COLLECTOR_ONLINE);
+            schedule_node_state_update(parser->user.host, 1000);
+        }
+    }
+
     // mark all charts of this plugin as obsolete
     RRDSET *st;
     rrdset_foreach_read(st, localhost) {
