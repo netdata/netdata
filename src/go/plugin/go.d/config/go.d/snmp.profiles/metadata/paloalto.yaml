@@ -1,5 +1,5 @@
-enterprisenumbers:
-  org_to_vendor:
+sysobjectids:
+  oid_overrides:
     1.3.6.1.4.1.25461.2.3.1:
       category: Firewall
       model: PA-4050
