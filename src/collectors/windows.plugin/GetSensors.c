@@ -15,14 +15,24 @@ static ISensorManager *pSensorManager = NULL;
 static ND_THREAD *sensors_thread_update = NULL;
 
 #define NETDATA_WIN_SENSOR_STATES (6)
-#define LINUX_WIN_COMMON_SENSORS (4)
 
 enum netdata_win_sensor_monitored {
     NETDATA_WIN_SENSOR_CELSIUS,
     NETDATA_WIN_SENSOR_POWER_WATTS,
     NETDATA_WIN_SENSOR_CURRENT_AMPS,
-    NETDATA_WIN_SENSOR_RELATIVITY_HUMIDITY
+    NETDATA_WIN_SENSOR_RELATIVITY_HUMIDITY,
+    NETDATA_WIN_SENSOR_LIGHT_LEVEL
 };
+
+REFPROPERTYKEY sensor_keys[] = {
+        &SENSOR_DATA_TYPE_TEMPERATURE_CELSIUS,
+        &SENSOR_DATA_TYPE_ELECTRICAL_POWER_WATTS,
+        &SENSOR_DATA_TYPE_CURRENT_AMPS,
+        &SENSOR_DATA_TYPE_RELATIVE_HUMIDITY_PERCENT,
+        &SENSOR_DATA_TYPE_LIGHT_LEVEL_LUX,
+
+        NULL};
+
 
 static struct win_sensor_config {
     const char *title;
@@ -59,6 +69,13 @@ static struct win_sensor_config {
             .context = "system.hw.sensor.humidity",
             .family = "Humidity",
             .priority = 70004,
+        },
+        {
+            .title = "Light Level",
+            .units = "lux",
+            .context = "system.hw.sensor.lux",
+            .family = "Luminosity",
+            .priority = 70010,
         }
 };
 
@@ -149,13 +166,14 @@ static void netdata_initialize_sensor_dict(struct sensor_data *s, ISensor *pSens
     s->manufacturer = netdata_pvar_to_char(&SENSOR_PROPERTY_MANUFACTURER, pSensor);
 }
 
-static void
-try_define_sensor(struct sensor_data *s, ISensor *pSensor, REFPROPERTYKEY key, enum netdata_win_sensor_monitored idx)
+static int
+netdata_collect_sensor_data(struct sensor_data *s, ISensor *pSensor, REFPROPERTYKEY key)
 {
     ISensorDataReport *pReport = NULL;
     PROPVARIANT pv = {};
     HRESULT hr;
 
+    int defined = 0;
     hr = pSensor->lpVtbl->GetData(pSensor, &pReport);
     if (SUCCEEDED(hr) && pReport) {
         PropVariantInit(&pv);
@@ -172,25 +190,24 @@ try_define_sensor(struct sensor_data *s, ISensor *pSensor, REFPROPERTYKEY key, e
                     s->current_data_value = (collected_number)(pv.dblVal * 100.0);
                     break;
             }
-            s->sensor_data_type = idx;
-            s->config = &configs[idx];
-            s->enabled = true;
+            defined = 1;
         }
         PropVariantClear(&pv);
         pReport->lpVtbl->Release(pReport);
     }
+
+    return defined;
 }
 
 static void netdata_sensors_get_data(struct sensor_data *s, ISensor *pSensor)
 {
-    REFPROPERTYKEY keys[LINUX_WIN_COMMON_SENSORS] = {
-        &SENSOR_DATA_TYPE_TEMPERATURE_CELSIUS,
-        &SENSOR_DATA_TYPE_ELECTRICAL_POWER_WATTS,
-        &SENSOR_DATA_TYPE_CURRENT_AMPS,
-        &SENSOR_DATA_TYPE_RELATIVE_HUMIDITY_PERCENT};
-
-    for (int i = 0; i < LINUX_WIN_COMMON_SENSORS; i++) {
-        try_define_sensor(s, pSensor, keys[i], i);
+    for (int i = 0; sensor_keys[i]; i++) {
+        if (netdata_collect_sensor_data(s, pSensor, sensor_keys[i])) {
+            s->sensor_data_type = i;
+            s->config = &configs[i];
+            s->enabled = true;
+            break;
+        }
     }
 
     s->first_time = false;
@@ -236,8 +253,10 @@ static void netdata_get_sensors()
         s->current_state = SENSOR_STATE_MIN;
         (void)pSensor->lpVtbl->GetState(pSensor, &s->current_state);
 
-        if (unlikely(!s->sensor_data_type) && likely(s->first_time))
+        if (likely(s->first_time))
             netdata_sensors_get_data(s, pSensor);
+        else if (likely(s->enabled))
+            netdata_collect_sensor_data(s, pSensor, sensor_keys[s->sensor_data_type]);
 
         pSensor->lpVtbl->Release(pSensor);
     }
