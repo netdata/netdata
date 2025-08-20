@@ -2175,13 +2175,13 @@ modules:
                 - name: life_expectancy
             - name: mssql.instance_bufman_lazy_write
               description: Buffers written by buffer manager's lazy writer
-              unit: Lazy writes/sec
+              unit: writes/s
               chart_type: line
               dimensions:
                 - name: lazy_write
             - name: mssql.instance_bufman_page_lookups
               description: Requests to find a page in the buffer pool.
-              unit: Page lookups/sec
+              unit: lookups/s
               chart_type: line
               dimensions:
                 - name: page_lookups
