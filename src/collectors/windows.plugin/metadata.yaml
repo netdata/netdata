@@ -3974,4 +3974,3 @@ modules:
               chart_type: line
               dimensions:
                 - name: failure
-
