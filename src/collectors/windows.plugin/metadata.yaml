@@ -1160,37 +1160,37 @@ modules:
             - name: model
               description: The sensor model.
           metrics:
-            - name: system.hw.sensor.temperature
+            - name: system.hw.sensor.temperature.input
               description: Sensor Temperature
               unit: "Cel"
               chart_type: line
               dimensions:
                 - name: input
-            - name: system.hw.sensor.power
+            - name: system.hw.sensor.power.input
               description: Sensor Power
               unit: "W"
               chart_type: line
               dimensions:
                 - name: input
-            - name: system.hw.sensor.current
+            - name: system.hw.sensor.current.input
               description: Sensor Current
               unit: "A"
               chart_type: line
               dimensions:
                 - name: input
-            - name: system.hw.sensor.humidity
+            - name: system.hw.sensor.humidity.input
               description: Sensor Humidity
               unit: "%"
               chart_type: line
               dimensions:
                 - name: input
-            - name: system.hw.sensor.lux
+            - name: system.hw.sensor.lux.input
               description: Ambient light level
               unit: "lx"
               chart_type: line
               dimensions:
                 - name: input
-            - name: system.hw.sensor.state
+            - name: system.hw.sensor.state.input
               description: Current sensor state.
               unit: "status"
               chart_type: line
@@ -2178,13 +2178,13 @@ modules:
               unit: writes/s
               chart_type: line
               dimensions:
-                - name: lazy_write
+                - name: writes
             - name: mssql.instance_bufman_page_lookups
               description: Requests to find a page in the buffer pool.
               unit: lookups/s
               chart_type: line
               dimensions:
-                - name: page_lookups
+                - name: lookups
             - name: mssql.instance_memmgr_server_memory
               description: Memory committed
               unit: bytes
@@ -3974,3 +3974,4 @@ modules:
               chart_type: line
               dimensions:
                 - name: failure
+
