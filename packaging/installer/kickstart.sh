@@ -1505,7 +1505,7 @@ netdata_avail_check() {
       ;;
     centos|fedora|ol|amzn)
       # shellcheck disable=SC2086
-      LC_ALL=C ${pm_cmd} search --nogpgcheck -v netdata | grep -qE 'Repo *: netdata(-edge)?$'
+      LC_ALL=C ${pm_cmd} info --nogpgcheck netdata | grep -qE '^(Repo(sitory)?|From repo) *: *netdata(-edge)?(/.*)?$'
       return $?
       ;;
     opensuse)
