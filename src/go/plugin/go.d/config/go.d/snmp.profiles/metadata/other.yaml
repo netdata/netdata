@@ -411,7 +411,7 @@ sysobjectids:
       category: UPS
       model: Cayman Gator
     1.3.6.1.4.1.12.7.1.3.0:
-      category: Other
+      category: Radio
       model: LEDR Digital Microwave Radio
     1.3.6.1.4.1.18.1:
       model: WellfleetIP
@@ -522,10 +522,10 @@ sysobjectids:
       category: Server
       model: XYPLEX RTRTERMSERVER
     1.3.6.1.4.1.33.100.1.2.1.3:
-      category: Other
+      category: Console
       model: LX Console Manager
     1.3.6.1.4.1.33.100.1.2.1.5:
-      category: Other
+      category: Console
       model: LX Remote Presence Manager
     1.3.6.1.4.1.33.100.1.2.1.11:
       category: Other
@@ -1351,7 +1351,7 @@ sysobjectids:
       category: Server
       model: Radware CT100
     1.3.6.1.4.1.89.1.1.62.16:
-      category: Other
+      category: Security
       model: DefensePro
     1.3.6.1.4.1.89.1.1.62.18:
       category: Layer 3 Switch
@@ -1512,28 +1512,28 @@ sysobjectids:
       category: Server
       model: Allen-Bradley 1756-ENET
     1.3.6.1.4.1.95.1.9:
-      category: Other
+      category: PLC
       model: 1747-L552
     1.3.6.1.4.1.95.1.12:
-      category: Other
+      category: PLC
       model: 1756-ENBT
     1.3.6.1.4.1.95.1.15:
-      category: Other
+      category: PLC
       model: 1769-L3xE
     1.3.6.1.4.1.95.1.17:
-      category: Other
+      category: PLC
       model: 1769-LxxE
     1.3.6.1.4.1.95.1.18:
-      category: Other
+      category: PLC
       model: 1768-ENBT
     1.3.6.1.4.1.95.1.27:
-      category: Other
+      category: PLC
       model: 1756-EN2T/A
     1.3.6.1.4.1.95.1.39:
-      category: Other
+      category: PLC
       model: 1769-L30ER
     1.3.6.1.4.1.95.1.86:
-      category: Other
+      category: PLC
       model: 5069-L320ER/A
     1.3.6.1.4.1.97.2.1:
       model: SXHW
@@ -2255,36 +2255,36 @@ sysobjectids:
     1.3.6.1.4.1.232.134.2.20.2.20:
       model: 3XDCE02
     1.3.6.1.4.1.232.160.1.2:
-      category: Other
+      category: Console
       model: IP Console Switch (3x1x16)
     1.3.6.1.4.1.232.160.1.4:
       category: Switch
       model: HP KVM 4x1x16
     1.3.6.1.4.1.232.160.3.2:
-      category: Other
+      category: Console
       model: Server Console Switch G2 (1x1Ex8)
     1.3.6.1.4.1.232.160.3.4:
-      category: Other
+      category: Console
       model: Server Console Switch G2 (0x2x16)
     1.3.6.1.4.1.232.160.3.6:
-      category: Other
+      category: Console
       model: Server Console Switch G2 (0x2x32)
     1.3.6.1.4.1.232.160.3.8:
-      category: Other
+      category: Console
       model: IP Console Switch G2 (2x1Ex16)
     1.3.6.1.4.1.232.160.3.10:
-      category: Other
+      category: Console
       model: IP Console Switch G2 (4x1Ex32)
     1.3.6.1.4.1.232.160.5.1:
       model: HP 0x1x8 G3 KVM
     1.3.6.1.4.1.232.165.1.2:
-      category: Other
+      category: Module
       model: PDU Management Module
     1.3.6.1.4.1.232.165.3:
       category: UPS
       model: R/T3000 HV INTL UPS
     1.3.6.1.4.1.232.165.7:
-      category: Other
+      category: Power
       model: 8.3kVA 208V 33out NA mPDU (D9N49A)
     1.3.6.1.4.1.232.165.11:
       category: Other
@@ -2751,13 +2751,13 @@ sysobjectids:
       category: UPS
       model: Switched Rack PDU
     1.3.6.1.4.1.318.1.3.4.5.1.3.4.5:
-      category: Other
+      category: Power
       model: Rack PDU (AP7811)
     1.3.6.1.4.1.318.1.3.4.6:
-      category: Other
+      category: Power
       model: Rack PDU (AP8858)
     1.3.6.1.4.1.318.1.3.4.8:
-      category: Other
+      category: Power
       model: Rack PDU (AP7811B)
     1.3.6.1.4.1.318.1.3.5.1:
       category: UPS
@@ -2781,10 +2781,10 @@ sysobjectids:
       category: UPS
       model: APC EMS
     1.3.6.1.4.1.318.1.3.8.2:
-      category: Other
+      category: Sensor
       model: Environmental Management System (AP9320)
     1.3.6.1.4.1.318.1.3.8.3:
-      category: Other
+      category: Sensor
       model: Environmental Monitoring Unit (AP9319)
     1.3.6.1.4.1.318.1.3.8.4:
       category: Other
@@ -2829,7 +2829,7 @@ sysobjectids:
       category: Other
       model: Uniflair LE DXG2 (0N-9582)
     1.3.6.1.4.1.318.1.3.15:
-      category: Other
+      category: Power
       model: InfraStruXure PDU (0M-5103)
     1.3.6.1.4.1.318.1.3.16:
       category: UPS
@@ -3413,7 +3413,7 @@ sysobjectids:
       category: UPS
       model: Power Xpert Gateway
     1.3.6.1.4.1.534.6.6.7:
-      category: Other
+      category: Power
       model: EPDU
     1.3.6.1.4.1.539.2.7:
       category: Switch
@@ -3615,7 +3615,7 @@ sysobjectids:
       category: Other
       model: DNX-1u
     1.3.6.1.4.1.661:
-      category: Other
+      category: Module
       model: IMC-574I-SFP
     1.3.6.1.4.1.661.8:
       category: Server
@@ -5123,7 +5123,7 @@ sysobjectids:
       category: Other
       model: Sentry Smart CDU
     1.3.6.1.4.1.1718.4:
-      category: Other
+      category: Power
       model: PRO2 Sentry Switched PDU (C2WG12BM-0AJA2D3)
     1.3.6.1.4.1.1723.2.1.3:
       category: Other
@@ -6071,7 +6071,7 @@ sysobjectids:
       category: Printer
       model: DCP-8085DN
     1.3.6.1.4.1.2440:
-      category: Other
+      category: Security
       model: SOLIDserver DDI
     1.3.6.1.4.1.2467.4.1:
       category: Load Balancer
@@ -6224,7 +6224,7 @@ sysobjectids:
       category: Other
       model: RSM-8R8-1
     1.3.6.1.4.1.2634.3.16:
-      category: Other
+      category: Security
       model: IPS800
     1.3.6.1.4.1.2634.6.4:
       category: Other
@@ -6239,7 +6239,7 @@ sysobjectids:
       category: Switch
       model: Nortel CVX-1800
     1.3.6.1.4.1.2682:
-      category: Other
+      category: Security
       model: NetGuardian
     1.3.6.1.4.1.2684:
       category: Other
@@ -6906,7 +6906,7 @@ sysobjectids:
       category: Switch
       model: FiberHome-S2200ME-PAF
     1.3.6.1.4.1.3808.1.1.3:
-      category: Other
+      category: Power
       model: PDU44005
     1.3.6.1.4.1.3812.1.2.4:
       category: Switch
@@ -6939,7 +6939,7 @@ sysobjectids:
       category: Other
       model: SD-WAN 6100
     1.3.6.1.4.1.3854.1:
-      category: Other
+      category: Sensor
       model: sensorProbe2
     1.3.6.1.4.1.3873.1.7:
       category: SANSwitch
@@ -7660,7 +7660,7 @@ sysobjectids:
       category: Other
       model: TelePresence System Edge 95 MXP
     1.3.6.1.4.1.5596.130.6.4.1:
-      category: Other
+      category: Video
       model: TelePresence Video Communication Server
     1.3.6.1.4.1.5596.150.6.4.1:
       category: Other
@@ -10182,7 +10182,7 @@ sysobjectids:
       category: Other
       model: SteelCentral AppResponse 11
     1.3.6.1.4.1.17373:
-      category: Other
+      category: Power
       model: Monitored ePDU
     1.3.6.1.4.1.17491.1.3.0:
       category: Other
@@ -10245,7 +10245,7 @@ sysobjectids:
       category: Router
       model: EdgewaterNetworks EM4508 Series
     1.3.6.1.4.1.19536.10.1:
-      category: Other
+      category: Power
       model: G5 iPDU 200-240V, 32A, 7.4kVA, 50/60Hz (P32E06M)
     1.3.6.1.4.1.19746.3.1.0:
       category: Management
@@ -10668,16 +10668,16 @@ sysobjectids:
       category: Router
       model: XKL dsm
     1.3.6.1.4.1.21239.2:
-      category: Other
+      category: Power
       model: RCM-O rPDU
     1.3.6.1.4.1.21239.5.1:
       category: Other
       model: Watchdog 100
     1.3.6.1.4.1.21239.5.2:
-      category: Other
+      category: Power
       model: IMD rPDU
     1.3.6.1.4.1.21239.42.1.15:
-      category: Other
+      category: Power
       model: RCM-OD rPDU
     1.3.6.1.4.1.21239.42.1.31:
       category: Other
@@ -10686,13 +10686,13 @@ sysobjectids:
       category: Other
       model: Watchdog 100
     1.3.6.1.4.1.21239.42.1.52:
-      category: Other
+      category: Power
       model: IMD rPDU (MG02E4B1-24PF83-3PS6D2C07-S-30066)
     1.3.6.1.4.1.21239.42.1.53:
-      category: Other
+      category: Power
       model: IMD-3 rPDU (MNS3EGB0-24S203-2TL5A0A10-S)
     1.3.6.1.4.1.21239.42.1.55:
-      category: Other
+      category: Power
       model: IMD-5 rPDU (MG03E4A0-12CF13-2PS56B2A10-S-A)
     1.3.6.1.4.1.21317.1.3.3.1:
       category: Other
@@ -10878,10 +10878,10 @@ sysobjectids:
       category: Firewall
       model: xStream 40G
     1.3.6.1.4.1.23128.1000.1.1:
-      category: Other
+      category: Security
       model: Enterprise Security Manager
     1.3.6.1.4.1.23128.1000.3.1:
-      category: Other
+      category: Radio
       model: Event Receiver
     1.3.6.1.4.1.23128.1000.7.1:
       category: Other
@@ -11403,7 +11403,7 @@ sysobjectids:
       category: Other
       model: Accesser 3105
     1.3.6.1.4.1.28129.1.5.2:
-      category: Other
+      category: Storage
       model: IBM Cloud Object Storage
     1.3.6.1.4.1.28129.1.5.3:
       category: Other
@@ -11472,10 +11472,10 @@ sysobjectids:
       category: Other
       model: M-1601-D1000C0
     1.3.6.1.4.1.30932.1.1:
-      category: Other
+      category: Power
       model: eConnect PDU (P6-1H0A1-B2A)
     1.3.6.1.4.1.30966:
-      category: Other
+      category: Power
       model: IP-PDU
     1.3.6.1.4.1.31218.3.6.0:
       model: UCP-SV1000
@@ -11639,7 +11639,7 @@ sysobjectids:
       category: Printer
       model: CL-S700Z
     1.3.6.1.4.1.33763.250.255:
-      category: Other
+      category: Video
       model: EcoSense DVR
     1.3.6.1.4.1.34672:
       category: Server
@@ -11885,7 +11885,7 @@ sysobjectids:
       category: Printer
       model: VP700
     1.3.6.1.4.1.38446.1:
-      category: Other
+      category: Power
       model: PDU 200-240V, 32A, 7.4kVA, 50/60Hz (EN6329)
     1.3.6.1.4.1.38692.1.2.3901:
       category: Switch
@@ -12181,7 +12181,7 @@ sysobjectids:
       category: Other
       model: 4248-06XL
     1.3.6.1.4.1.47952:
-      category: Other
+      category: Power
       model: PowerBOX 3Px
     1.3.6.1.4.1.48157.1.1:
       category: Other
@@ -12193,7 +12193,7 @@ sysobjectids:
       category: Other
       model: TV-110
     1.3.6.1.4.1.50001:
-      category: Other
+      category: Video
       model: Video device
     1.3.6.1.4.1.50114.11.1.10.2000:
       category: Router
@@ -12235,7 +12235,7 @@ sysobjectids:
       category: Firewall
       model: Secure Web Gateway WBG-5500-E
     1.3.6.1.4.1.1004849.3.2.10:
-      category: Other
+      category: Video
       model: NVR4216-4KS2
     1.3.6.1.4.10.82.2.145:
       category: Server
