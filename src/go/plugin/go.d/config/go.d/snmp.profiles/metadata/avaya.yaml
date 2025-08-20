@@ -1,0 +1,166 @@
+sysobjectids:
+  oid_overrides:
+    1.3.6.1.4.1.6889.1.2.1.2.2:
+      category: Server
+      model: IP Office 403
+    1.3.6.1.4.1.6889.1.2.1.5.4:
+      category: Server
+      model: IP Office 401
+    1.3.6.1.4.1.6889.1.2.1.10.1:
+      category: Other
+      model: IP Office 500 V2
+    1.3.6.1.4.1.6889.1.5.1:
+      category: Server
+      model: s8500
+    1.3.6.1.4.1.6889.1.8.1.0.1:
+      category: Switch
+      model: PortNetwork
+    1.3.6.1.4.1.6889.1.8.1.0.2:
+      category: Switch
+      model: Carrier
+    1.3.6.1.4.1.6889.1.8.1.0.3:
+      category: Gateway
+      model: G350
+    1.3.6.1.4.1.6889.1.8.1.0.4:
+      category: Gateway
+      model: G700
+    1.3.6.1.4.1.6889.1.8.1.0.5:
+      category: Switch
+      model: Inc. G250 Media Gateway
+    1.3.6.1.4.1.6889.1.8.1.49:
+      category: Gateway
+      model: S8700m Media
+    1.3.6.1.4.1.6889.1.8.1.50:
+      category: Gateway
+      model: S8300 Media
+    1.3.6.1.4.1.6889.1.8.1.51:
+      category: Gateway
+      model: S8700i Media
+    1.3.6.1.4.1.6889.1.8.1.52:
+      category: Gateway
+      model: S8500 Media
+    1.3.6.1.4.1.6889.1.8.1.56:
+      category: Server
+      model: S8400 MEDIA SERVER
+    1.3.6.1.4.1.6889.1.8.1.58:
+      category: Gateway
+      model: Aura Communication Manager
+    1.3.6.1.4.1.6889.1.9:
+      category: Gateway
+      model: G700 Telephony Media Gateway
+    1.3.6.1.4.1.6889.1.27.1.1:
+      category: Other
+      model: Application Enablement Services Server
+    1.3.6.1.4.1.6889.1.35:
+      category: Other
+      model: Aura System Manager
+    1.3.6.1.4.1.6889.1.36:
+      category: Other
+      model: Aura Session Manager
+    1.3.6.1.4.1.6889.1.45.2:
+      category: Layer 3 Switch
+      model: Cajun P580
+    1.3.6.1.4.1.6889.1.45.10:
+      category: Layer 3 Switch
+      model: Cajun P882R
+    1.3.6.1.4.1.6889.1.45.11:
+      model: Cajun L3P882S
+    1.3.6.1.4.1.6889.1.45.12:
+      model: Cajun L3P580S
+    1.3.6.1.4.1.6889.1.45.101.1:
+      model: Cajun M8000RLB
+    1.3.6.1.4.1.6889.1.45.101.2:
+      model: Cajun X330W4DS1
+    1.3.6.1.4.1.6889.1.45.103.1:
+      category: Switch
+      model: P460
+    1.3.6.1.4.1.6889.1.45.103.2:
+      category: Gateway
+      model: G350 Media Gateway
+    1.3.6.1.4.1.6889.1.45.103.4:
+      category: Gateway
+      model: G250 Media Gateway
+    1.3.6.1.4.1.6889.1.45.103.5:
+      category: Switch
+      model: Inc. G250-BRI Media Gateway
+    1.3.6.1.4.1.6889.1.45.103.6:
+      category: Router
+      model: G250-DS1
+    1.3.6.1.4.1.6889.1.45.103.7:
+      category: Switch
+      model: Inc. G250-DCP Media Gateway
+    1.3.6.1.4.1.6889.1.45.103.8:
+      category: Gateway
+      model: G450 Media Gateway
+    1.3.6.1.4.1.6889.1.45.103.41:
+      category: Gateway
+      model: G430 Media Gateway
+    1.3.6.1.4.1.6889.1.45.103.42:
+      category: Gateway
+      model: G860
+    1.3.6.1.4.1.6889.1.58:
+      category: Other
+      model: Aura Media Server
+    1.3.6.1.4.1.6889.1.63:
+      category: Other
+      model: Aura Collaboration Environment
+    1.3.6.1.4.1.6889.1.69.1.1:
+      category: Server
+      model: IP Phone 4624
+    1.3.6.1.4.1.6889.1.69.1.2:
+      category: Server
+      model: IP Phone 4612
+    1.3.6.1.4.1.6889.1.69.1.6:
+      category: IP Phone
+      model: '4602'
+    1.3.6.1.4.1.6889.1.69.1.7:
+      category: IP Phone
+      model: '4610'
+    1.3.6.1.4.1.6889.1.69.1.12:
+      category: IP Phone
+      model: '4622'
+    1.3.6.1.4.1.6889.1.69.2.1:
+      category: IP Phone
+      model: 9620D
+    1.3.6.1.4.1.6889.1.69.2.3:
+      category: IP Phone
+      model: 9650B
+    1.3.6.1.4.1.6889.1.69.3.2:
+      category: IP Phone
+      model: '1608'
+    1.3.6.1.4.1.6889.1.69.3.3:
+      category: IP Phone
+      model: '1616'
+    1.3.6.1.4.1.6889.1.69.4.3:
+      category: IP Phone
+      model: AVX571040
+    1.3.6.1.4.1.6889.1.69.5.2:
+      category: IP Phone
+      model: 9611g
+    1.3.6.1.4.1.6889.1.69.5.4:
+      category: IP Phone
+      model: 9641G
+    1.3.6.1.4.1.6889.1.69.6.0:
+      category: IP Phone
+      model: 9608G
+    1.3.6.1.4.1.6889.1.69.6.1:
+      category: IP Phone
+      model: 9608G
+    1.3.6.1.4.1.6889.1.73.1:
+      category: Other
+      model: Communication Manager SP
+    1.3.6.1.4.1.6889.1.73.2:
+      category: Other
+      model: Communication Manager VE
+    1.3.6.1.4.1.6889.1.77:
+      category: Firewall
+      model: SBCE
+    1.3.6.1.4.1.6889.1.89:
+      category: Other
+      model: Aura Device Services
+    1.3.6.1.4.1.6889.2.17.1:
+      category: Other
+      model: Voice Portal
+    1.3.6.1.4.1.6889.2.42.3.1:
+      category: Other
+      model: Aura Messaging
