@@ -141,6 +141,8 @@ struct rrdhost {
     STRING *program_name;                           // the program name that collects metrics for this host
     STRING *program_version;                        // the program version that collects metrics for this host
 
+    uint32_t node_stale_after_seconds;              // vnode stale timeout
+
     OBJECT_STATE state_id;                          // every time data collection (stream receiver) (dis)connects,
                            // this gets incremented - it is used to detect stale functions,
                            // stale backfilling requests, etc.
