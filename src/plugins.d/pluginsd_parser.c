@@ -164,7 +164,14 @@ static inline PARSER_RC pluginsd_host_dictionary(char **words, size_t num_words,
         return PLUGINSD_DISABLE_PLUGIN(parser, keyword, "host is not defined, send " PLUGINSD_KEYWORD_HOST_DEFINE " before this");
 
     rrdlabels_add(labels, name, value, RRDLABEL_SRC_CONFIG);
-
+    if (strcmp(name, "_node_stale_after_seconds") == 0) {
+        uint32_t seconds = str2u(value);
+        RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_HOST_LABEL);
+        if (host) {
+            host->node_stale_after_seconds = seconds;
+            nd_log_daemon(NDLP_INFO, "Configuring node stale after %u seconds for host \"%s\"", seconds, rrdhost_hostname(host));
+        }
+    }
     return PARSER_RC_OK;
 }
 
@@ -257,11 +264,49 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
     return PARSER_RC_OK;
 }
 
-static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *parser) {
+static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *parser)
+{
+    static time_t last_host_stale_check = 0;
     char *guid = get_word(words, num_words, 1);
 
     if(!guid || !*guid || strcmp(guid, "localhost") == 0) {
         parser->user.host = localhost;
+        // Check if we need to switch any nodes to stale
+        uint32_t min_check_interval = UINT_MAX;
+        time_t now = now_realtime_sec();
+        if (last_host_stale_check < now) {
+            Word_t Index = 0;
+            bool first_then_next = true;
+            uint32_t *Pvalue;
+            while ((Pvalue = (uint32_t *) JudyLFirstThenNext(parser->user.vnodes.JudyL, &Index, &first_then_next))) {
+                RRDHOST *virtual_host = (RRDHOST *) Index;
+                uint32_t stale_after_seconds = virtual_host->node_stale_after_seconds;
+                if (!stale_after_seconds)
+                    continue;
+
+                min_check_interval = MIN(min_check_interval, stale_after_seconds);
+                if (rrdhost_option_check(virtual_host, RRDHOST_OPTION_VIRTUAL_HOST)) {
+                    time_t last_seen = (*Pvalue + VNODE_BASE_EPOCH);
+                    uint32_t seen_seconds_ago = now - last_seen;
+                    nd_log_daemon(
+                        NDLP_INFO,
+                        "Checking if node \"%s\" is stale. Seen %u seconds ago, stale is after %u seconds",
+                        rrdhost_hostname(virtual_host),
+                        seen_seconds_ago,
+                        stale_after_seconds);
+
+                    if (seen_seconds_ago >= stale_after_seconds) {
+                        rrdhost_option_clear(virtual_host, RRDHOST_OPTION_VIRTUAL_HOST);
+                        rrdhost_flag_clear(virtual_host, RRDHOST_FLAG_COLLECTOR_ONLINE);
+                        schedule_node_state_update(virtual_host, 1000);
+                    }
+                }
+            }
+        }
+        if (min_check_interval == UINT_MAX)
+            min_check_interval = 60;
+
+        last_host_stale_check = now_realtime_sec() + min_check_interval;
         return PARSER_RC_OK;
     }
 
@@ -279,6 +324,12 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
     if (Pvalue) {
         uint32_t last_seen = now_realtime_sec() - VNODE_BASE_EPOCH;
         *Pvalue = last_seen;
+        // Check if we need to enable
+        if (!rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST)) {
+            rrdhost_option_set(host, RRDHOST_OPTION_VIRTUAL_HOST);
+            rrdhost_flag_set(host, RRDHOST_FLAG_COLLECTOR_ONLINE);
+            schedule_node_state_update(host, 1000);
+        }
     }
     return PARSER_RC_OK;
 }
