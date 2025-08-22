@@ -362,7 +362,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					MetricType: "rate",
 					IsTable:    true,
 
-					Table:      "ifTable",
+					Table:      "ipSystemStatsTable",
 				},
 				{
 					Name:       "ipSystemStatsHCInReceives",
@@ -371,7 +371,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					MetricType: "rate",
 					IsTable:    true,
 
-					Table:      "ifTable",
+					Table:      "ipSystemStatsTable",
 				},
 				{
 					Name:       "ipSystemStatsHCInReceives",
@@ -380,7 +380,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					MetricType: "rate",
 					IsTable:    true,
 
-					Table:      "ifTable",
+					Table:      "ipSystemStatsTable",
 				},
 			},
 			expectedError: false,
@@ -937,8 +937,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"mac_address": "00:50:56:AB:CD:EF"},
 					MetricType: "rate",
 					IsTable:    true,
-
-					Table:      "ifTable",
+					Table:      "devTable",
 				},
 			},
 			expectedError: false,
@@ -987,7 +986,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					MetricType: "gauge",
 					IsTable:    true,
 
-					Table:      "ifTable",
+					Table:      "ipAddrTable",
 				},
 			},
 			expectedError: false,
@@ -1509,7 +1508,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					MetricType: "gauge",
 					IsTable:    true,
 
-					Table:      "ifTable",
+					Table:      "fanTable",
 				},
 				{
 					Name:       "cempMemPoolFree",
@@ -1638,6 +1637,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"node_name": "node1"},
 					MetricType: "gauge",
 					IsTable:    true,
+					Table:      "nodeTable",
 					MultiValue: map[string]int64{
 						"OK":      1,
 						"ATTN":    0,
@@ -1651,6 +1651,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"node_name": "node2"},
 					MetricType: "gauge",
 					IsTable:    true,
+					Table:      "nodeTable",
 					MultiValue: map[string]int64{
 						"OK":      0,
 						"ATTN":    0,
@@ -2257,7 +2258,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					MetricType: "gauge",
 					IsTable:    true,
 
-					Table:      "ifTable",
+					Table:      "cpiPduBranchTable",
 				},
 			},
 			expectedError: false,
@@ -2332,7 +2333,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					MetricType: "gauge",
 					IsTable:    true,
 
-					Table:      "ifTable",
+					Table:      "customTable",
 				},
 			},
 			expectedError: false,
@@ -2403,7 +2404,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					MetricType: "gauge",
 					IsTable:    true,
 
-					Table:      "ifTable",
+					Table:      "customTable",
 				},
 			},
 			expectedError: false,
@@ -2458,7 +2459,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					MetricType: "gauge",
 					IsTable:    true,
 
-					Table:      "ifTable",
+					Table:      "panEntityFRUModuleTable",
 				},
 				{
 					Name:       "panEntryFRUModulePowerUsed",
@@ -2467,7 +2468,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					MetricType: "gauge",
 					IsTable:    true,
 
-					Table:      "ifTable",
+					Table:      "panEntityFRUModuleTable",
 				},
 			},
 			expectedError: false,
@@ -2540,7 +2541,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					MetricType: "gauge",
 					IsTable:    true,
 
-					Table:      "ifTable",
+					Table:      "panEntityFRUModuleTable",
 				},
 				{
 					Name:  "panEntryFRUModulePowerUsed",
@@ -2552,7 +2553,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					MetricType: "gauge",
 					IsTable:    true,
 
-					Table:      "ifTable",
+					Table:      "panEntityFRUModuleTable",
 				},
 			},
 			expectedError: false,
@@ -2941,7 +2942,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					MetricType: "rate",
 					IsTable:    true,
 
-					Table:      "ifTable",
+					Table:      "ipSystemStatsTable",
 				},
 				{
 					Name:       "ipSystemStatsHCInReceives",
@@ -2950,7 +2951,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					MetricType: "rate",
 					IsTable:    true,
 
-					Table:      "ifTable",
+					Table:      "ipSystemStatsTable",
 				},
 			},
 			expectedError: false,
@@ -3058,7 +3059,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					MetricType: "rate",
 					IsTable:    true,
 
-					Table:      "ifTable",
+					Table:      "ipSystemStatsTable",
 				},
 				{
 					Name:       "ipSystemStatsHCInReceives",
@@ -3067,7 +3068,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					MetricType: "rate",
 					IsTable:    true,
 
-					Table:      "ifTable",
+					Table:      "ipSystemStatsTable",
 				},
 				{
 					Name:       "ipSystemStatsHCInReceives",
@@ -3076,7 +3077,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					MetricType: "rate",
 					IsTable:    true,
 
-					Table:      "ifTable",
+					Table:      "ipSystemStatsTable",
 				},
 			},
 			expectedError: false,
@@ -3241,7 +3242,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					MetricType: "gauge",
 					IsTable:    true,
 
-					Table:      "ifTable",
+					Table:      "customTable",
 				},
 			},
 			expectedError: false,
@@ -3414,7 +3415,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					MetricType: "gauge",
 					IsTable:    true,
 
-					Table:      "ifTable",
+					Table:      "mtxrHlTable",
 				},
 				{
 					Name:       "mtxrHlSensorValue_voltage",
@@ -3424,8 +3425,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Family:     "Health/Power",
 					MetricType: "gauge",
 					IsTable:    true,
-
-					Table:      "ifTable",
+					Table:      "mtxrHlTable",
 				},
 			},
 			expectedError: false,
@@ -3510,7 +3510,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					MetricType: "gauge",
 					IsTable:    true,
 
-					Table:      "ifTable",
+					Table:      "mtxrHlTable",
 				},
 				{
 					Name:       "mtxrHlSensorValue_sensor_status",
@@ -3774,7 +3774,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					MetricType: "gauge",
 					IsTable:    true,
 
-					Table:      "ifTable",
+					Table:      "hrStorageTable",
 				},
 				{
 					Name:       "filesystem_size",
@@ -3784,7 +3784,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					MetricType: "gauge",
 					IsTable:    true,
 
-					Table:      "ifTable",
+					Table:      "hrStorageTable",
 				},
 				{
 					Name:       "memory_size",
@@ -3794,7 +3794,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					MetricType: "gauge",
 					IsTable:    true,
 
-					Table:      "ifTable",
+					Table:      "hrStorageTable",
 				},
 				{
 					Name:       "hrStorageSize",
@@ -3804,7 +3804,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					MetricType: "gauge",
 					IsTable:    true,
 
-					Table:      "ifTable",
+					Table:      "hrStorageTable",
 				},
 			},
 			expectedError: false,
@@ -4466,7 +4466,7 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 							MetricType: "gauge",
 							IsTable:    true,
 
-							Table:      "ifTable",
+							Table:      "panEntityFRUModuleTable",
 						},
 						{
 							Name:       "panEntryFRUModulePowerUsed",
@@ -4475,7 +4475,7 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 							MetricType: "gauge",
 							IsTable:    true,
 
-							Table:      "ifTable",
+							Table:      "panEntityFRUModuleTable",
 						},
 					},
 				},
@@ -4588,7 +4588,7 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 							MetricType: "gauge",
 							IsTable:    true,
 
-							Table:      "ifTable",
+							Table:      "panEntityFRUModuleTable",
 						},
 						{
 							Name:  "panEntryFRUModulePowerUsed",
@@ -4600,7 +4600,7 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 							MetricType: "gauge",
 							IsTable:    true,
 
-							Table:      "ifTable",
+							Table:      "panEntityFRUModuleTable",
 						},
 					},
 				},
