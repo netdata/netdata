@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Rename default port for the OpenTelemetry Collector [\#20868](https://github.com/netdata/netdata/pull/20868) ([ralphm](https://github.com/ralphm))
+- improve\(go.d/snmp\): add more entries in juniper metadata file [\#20867](https://github.com/netdata/netdata/pull/20867) ([ilyam8](https://github.com/ilyam8))
 - Update documentation [\#20865](https://github.com/netdata/netdata/pull/20865) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update documentation \(Windows.plugin\) [\#20864](https://github.com/netdata/netdata/pull/20864) ([thiagoftsm](https://github.com/thiagoftsm))
 - chore\(go.d/snmp\): more vendor-scoped meta yaml files [\#20863](https://github.com/netdata/netdata/pull/20863) ([ilyam8](https://github.com/ilyam8))
@@ -444,10 +446,6 @@
 - Update alerting and notification documentation Agent [\#20329](https://github.com/netdata/netdata/pull/20329) ([kanelatechnical](https://github.com/kanelatechnical))
 - generic-bgp4.yaml [\#20328](https://github.com/netdata/netdata/pull/20328) ([Ancairon](https://github.com/Ancairon))
 - generic-ospf.yaml pass [\#20327](https://github.com/netdata/netdata/pull/20327) ([Ancairon](https://github.com/Ancairon))
-- generic-udp.yaml pass [\#20326](https://github.com/netdata/netdata/pull/20326) ([Ancairon](https://github.com/Ancairon))
-- SOC 2 cloud doc update [\#20325](https://github.com/netdata/netdata/pull/20325) ([kanelatechnical](https://github.com/kanelatechnical))
-- dont init dyncfg for vnode [\#20324](https://github.com/netdata/netdata/pull/20324) ([ilyam8](https://github.com/ilyam8))
-- Code cleanup and improvements [\#20323](https://github.com/netdata/netdata/pull/20323) ([stelfrag](https://github.com/stelfrag))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
