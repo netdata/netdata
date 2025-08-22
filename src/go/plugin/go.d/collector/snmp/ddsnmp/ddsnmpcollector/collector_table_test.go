@@ -72,6 +72,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "eth0"},
 					MetricType: "rate",
 					IsTable:    true,
+					Table:      "ifTable",
 				},
 				{
 					Name:       "ifInOctets",
@@ -79,6 +80,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "eth1"},
 					MetricType: "rate",
 					IsTable:    true,
+					Table:      "ifTable",
 				},
 			},
 			expectedError: false,
@@ -142,6 +144,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "eth0"},
 					MetricType: "rate",
 					IsTable:    true,
+					Table:      "ifTable",
 				},
 				{
 					Name:       "ifOutOctets",
@@ -149,6 +152,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "eth0"},
 					MetricType: "rate",
 					IsTable:    true,
+					Table:      "ifTable",
 				},
 				{
 					Name:       "ifOperStatus",
@@ -156,6 +160,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "eth0"},
 					MetricType: "gauge",
 					IsTable:    true,
+					Table:      "ifTable",
 				},
 				// Row 2
 				{
@@ -164,6 +169,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "eth1"},
 					MetricType: "rate",
 					IsTable:    true,
+					Table:      "ifTable",
 				},
 				{
 					Name:       "ifOutOctets",
@@ -171,6 +177,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "eth1"},
 					MetricType: "rate",
 					IsTable:    true,
+					Table:      "ifTable",
 				},
 				{
 					Name:       "ifOperStatus",
@@ -178,6 +185,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "eth1"},
 					MetricType: "gauge",
 					IsTable:    true,
+					Table:      "ifTable",
 				},
 			},
 			expectedError: false,
@@ -287,6 +295,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "eth0"},
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 			},
 			expectedError: false,
@@ -351,6 +361,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "eth0"},
 					MetricType: "rate",
 					IsTable:    true,
+					Table:      "ifTable",
 				},
 				{
 					Name:       "ipSystemStatsHCInReceives",
@@ -358,6 +369,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       nil,
 					MetricType: "rate",
 					IsTable:    true,
+					Table:      "ipSystemStatsTable",
 				},
 				{
 					Name:       "ipSystemStatsHCInReceives",
@@ -365,6 +377,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       nil,
 					MetricType: "rate",
 					IsTable:    true,
+					Table:      "ipSystemStatsTable",
 				},
 			},
 			expectedError: false,
@@ -425,6 +438,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "eth0"},
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 				{
 					Name:       "ifOutOctets",
@@ -432,6 +447,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "eth0"},
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 				// Row 2 - only ifInOctets
 				{
@@ -440,6 +457,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "eth1"},
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 				// Row 3 - both metrics but no tag
 				{
@@ -448,6 +467,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       nil,
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 				{
 					Name:       "ifOutOctets",
@@ -455,6 +476,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       nil,
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 			},
 			expectedError: false,
@@ -530,6 +553,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       nil,
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 			},
 			expectedError: false,
@@ -593,6 +618,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "lo0", "if_type": "softwareLoopback"},
 					MetricType: "rate",
 					IsTable:    true,
+					Table:      "ifTable",
 				},
 				{
 					Name:       "ifInErrors",
@@ -600,6 +626,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "eth0", "if_type": "ethernetCsmacd"},
 					MetricType: "rate",
 					IsTable:    true,
+					Table:      "ifTable",
 				},
 			},
 			expectedError: false,
@@ -649,6 +676,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "eth0"},
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 				{
 					Name:       "ifInErrors",
@@ -656,6 +685,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "lo0"},
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 			},
 			expectedError: false,
@@ -727,6 +758,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 			},
 			expectedError: false,
@@ -781,6 +814,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "eth0"},
 					MetricType: "rate",
 					IsTable:    true,
+					Table:      "ifTable",
 				},
 			},
 			expectedError: false,
@@ -838,6 +872,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 				{
 					Name:  "ifInOctets",
@@ -849,6 +885,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 			},
 			expectedError: false,
@@ -896,6 +934,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"mac_address": "00:50:56:AB:CD:EF"},
 					MetricType: "rate",
 					IsTable:    true,
+					Table:      "devTable",
 				},
 			},
 			expectedError: false,
@@ -943,6 +982,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"ip_address": "192.168.1.1"},
 					MetricType: "gauge",
 					IsTable:    true,
+
+					Table: "ipAddrTable",
 				},
 			},
 			expectedError: false,
@@ -1005,6 +1046,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "eth0", "if_type": "ethernet"},
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 			},
 			expectedError: false,
@@ -1063,6 +1106,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "tunnel0", "if_type": "131"}, // Raw value when no mapping
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 			},
 			expectedError: false,
@@ -1109,6 +1154,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": ""}, // Empty tag value
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 			},
 			expectedError: false,
@@ -1169,6 +1216,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "eth0"},
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 				{
 					Name:       "ifOutOctets",
@@ -1176,6 +1225,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "eth0"},
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 				// Row 2 - only ifInOctets
 				{
@@ -1184,6 +1235,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "eth1"},
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 				// Row 3 - both metrics but no tag
 				{
@@ -1192,6 +1245,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       nil,
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 				{
 					Name:       "ifOutOctets",
@@ -1199,6 +1254,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       nil,
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 			},
 			expectedError: false,
@@ -1246,6 +1303,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"cpu_id": "1"},
 					MetricType: "gauge",
 					IsTable:    true,
+					Table:      "cpmCPUTotalTable",
 				},
 			},
 			expectedError: false,
@@ -1301,6 +1359,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "eth0"},
 					MetricType: "gauge",
 					IsTable:    true,
+					Table:      "ifTable",
 					MultiValue: map[string]int64{
 						"up":      1,
 						"down":    0,
@@ -1315,6 +1374,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "eth1"},
 					MetricType: "gauge",
 					IsTable:    true,
+					Table:      "ifTable",
 					MultiValue: map[string]int64{
 						"up":      0,
 						"down":    1,
@@ -1376,6 +1436,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"fan_name": "Fan1"},
 					MetricType: "gauge",
 					IsTable:    true,
+					Table:      "fanTable",
 					MultiValue: map[string]int64{
 						"normal":   1,
 						"warning":  0,
@@ -1388,6 +1449,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"fan_name": "Fan2"},
 					MetricType: "gauge",
 					IsTable:    true,
+					Table:      "fanTable",
 					MultiValue: map[string]int64{
 						"normal":   0,
 						"warning":  0,
@@ -1446,6 +1508,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"pool_name": "Processor"},
 					MetricType: "gauge",
 					IsTable:    true,
+					Table:      "cempMemPoolTable",
 				},
 				{
 					Name:       "cempMemPoolFree",
@@ -1453,6 +1516,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"pool_name": "Processor"},
 					MetricType: "gauge",
 					IsTable:    true,
+					Table:      "cempMemPoolTable",
 				},
 			},
 			expectedError: false,
@@ -1507,6 +1571,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"phase": "L1"},
 					MetricType: "gauge",
 					IsTable:    true,
+					Table:      "upsPhaseInputTable",
 				},
 				{
 					Name:       "upsPhaseInputCurrent",
@@ -1514,6 +1579,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"phase": "4"}, // Raw value when no mapping
 					MetricType: "gauge",
 					IsTable:    true,
+					Table:      "upsPhaseInputTable",
 				},
 			},
 			expectedError: false,
@@ -1568,6 +1634,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"node_name": "node1"},
 					MetricType: "gauge",
 					IsTable:    true,
+					Table:      "nodeTable",
 					MultiValue: map[string]int64{
 						"OK":      1,
 						"ATTN":    0,
@@ -1581,6 +1648,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"node_name": "node2"},
 					MetricType: "gauge",
 					IsTable:    true,
+					Table:      "nodeTable",
 					MultiValue: map[string]int64{
 						"OK":      0,
 						"ATTN":    0,
@@ -1639,6 +1707,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"cpu_index": "1"},
 					MetricType: "gauge",
 					IsTable:    true,
+					Table:      "cpmCPULoadTable",
 				},
 				{
 					Name:       "cpmCPULoadAvg5min",
@@ -1646,6 +1715,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"cpu_index": "1"},
 					MetricType: "gauge",
 					IsTable:    true,
+					Table:      "cpmCPULoadTable",
 				},
 			},
 			expectedError: false,
@@ -1687,6 +1757,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       nil,
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 				// ifDescr metric is skipped because string can't be converted to int64
 			},
@@ -1754,6 +1826,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "GigabitEthernet0/0"},
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 				{
 					Name:       "ifInErrors",
@@ -1761,6 +1835,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "GigabitEthernet0/1"},
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 			},
 			expectedError: false,
@@ -1827,6 +1903,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "GigabitEthernet0/0"},
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 				{
 					Name:       "ifInErrors",
@@ -1834,6 +1912,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "GigabitEthernet0/1"},
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 				{
 					Name:       "ifInErrors",
@@ -1841,6 +1921,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       nil, // No cross-table tag found for index 3
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 			},
 			expectedError: false,
@@ -1930,6 +2012,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 			},
 			expectedError: false,
@@ -1994,6 +2078,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface_clean": "GigabitEthernet0"},
 					MetricType: "rate",
 					IsTable:    true,
+					Table:      "ifTable",
 				},
 			},
 			expectedError: false,
@@ -2088,11 +2173,13 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 					MetricType: ddprofiledefinition.ProfileMetricTypeRate,
 					IsTable:    true,
+					Table:      "cieIfInterfaceTable",
 				},
 				{
 					Name:       "ifType",
 					MetricType: "gauge",
 					IsTable:    true,
+					Table:      "ifTable",
 					Tags:       nil,
 					Value:      6,
 				},
@@ -2164,6 +2251,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"pdu_name": "PDU-A1"},
 					MetricType: "gauge",
 					IsTable:    true,
+
+					Table: "cpiPduBranchTable",
 				},
 			},
 			expectedError: false,
@@ -2237,6 +2326,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"device_name": "Device-123"},
 					MetricType: "gauge",
 					IsTable:    true,
+
+					Table: "customTable",
 				},
 			},
 			expectedError: false,
@@ -2306,6 +2397,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       nil, // No tag because index transform failed
 					MetricType: "gauge",
 					IsTable:    true,
+
+					Table: "customTable",
 				},
 			},
 			expectedError: false,
@@ -2359,6 +2452,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"ent_descr": "Power Supply 1"},
 					MetricType: "gauge",
 					IsTable:    true,
+
+					Table: "panEntityFRUModuleTable",
 				},
 				{
 					Name:       "panEntryFRUModulePowerUsed",
@@ -2366,6 +2461,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"ent_descr": "Power Supply 2"},
 					MetricType: "gauge",
 					IsTable:    true,
+
+					Table: "panEntityFRUModuleTable",
 				},
 			},
 			expectedError: false,
@@ -2437,6 +2534,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 					MetricType: "gauge",
 					IsTable:    true,
+
+					Table: "panEntityFRUModuleTable",
 				},
 				{
 					Name:  "panEntryFRUModulePowerUsed",
@@ -2447,6 +2546,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 					MetricType: "gauge",
 					IsTable:    true,
+
+					Table: "panEntityFRUModuleTable",
 				},
 			},
 			expectedError: false,
@@ -2513,6 +2614,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "GigabitEthernet0/0"}, // Uses ifName (cross-table)
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 				{
 					Name:       "ifInErrors",
@@ -2520,6 +2623,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "GigabitEthernet0/1"}, // Uses ifName (cross-table)
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 				{
 					Name:       "ifInErrors",
@@ -2527,6 +2632,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "eth2-description"}, // Falls back to ifDescr (same-table)
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 			},
 			expectedError: false,
@@ -2603,6 +2710,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 				{
 					Name:  "ifInOctets",
@@ -2613,6 +2722,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 			},
 			expectedError: false,
@@ -2677,6 +2788,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "eth0-description"}, // Uses ifDescr (first in order)
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 				{
 					Name:       "ifInOctets",
@@ -2684,6 +2797,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "GigE0/1"}, // Falls back to ifName when ifDescr is empty
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 			},
 			expectedError: false,
@@ -2756,6 +2871,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface_name": "GigE0/0"}, // Uses ifName
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 				{
 					Name:       "ifInOctets",
@@ -2763,6 +2880,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface_name": "eth1"}, // Falls back to ifDescr
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 				{
 					Name:       "ifInOctets",
@@ -2770,6 +2889,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface_name": "3"}, // Falls back to index
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 			},
 			expectedError: false,
@@ -2814,6 +2935,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"ip_version": "1"},
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ipSystemStatsTable",
 				},
 				{
 					Name:       "ipSystemStatsHCInReceives",
@@ -2821,6 +2944,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"ip_version": "2"},
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ipSystemStatsTable",
 				},
 			},
 			expectedError: false,
@@ -2868,6 +2993,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"service_type": "20", "stat_type": "2"},
 					MetricType: "rate",
 					IsTable:    true,
+					Table:      "cfwConnectionStatTable",
 				},
 				{
 					Name:       "cfwConnectionStatValue",
@@ -2875,6 +3001,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"service_type": "21", "stat_type": "3"},
 					MetricType: "rate",
 					IsTable:    true,
+					Table:      "cfwConnectionStatTable",
 				},
 			},
 			expectedError: false,
@@ -2923,6 +3050,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"ip_version": "ipv4"},
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ipSystemStatsTable",
 				},
 				{
 					Name:       "ipSystemStatsHCInReceives",
@@ -2930,6 +3059,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"ip_version": "ipv6"},
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ipSystemStatsTable",
 				},
 				{
 					Name:       "ipSystemStatsHCInReceives",
@@ -2937,6 +3068,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"ip_version": "0"}, // No mapping for 0
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ipSystemStatsTable",
 				},
 			},
 			expectedError: false,
@@ -2984,6 +3117,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface_index": "1"}, // No sub_interface tag
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 				{
 					Name:       "ifInOctets",
@@ -2991,6 +3126,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface_index": "2", "sub_interface": "3"},
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 			},
 			expectedError: false,
@@ -3035,6 +3172,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"index1": "192", "index2": "168"},
 					MetricType: "gauge",
 					IsTable:    true,
+					Table:      "ipMRouteTable",
 				},
 			},
 			expectedError: false,
@@ -3094,6 +3232,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 					MetricType: "gauge",
 					IsTable:    true,
+
+					Table: "customTable",
 				},
 			},
 			expectedError: false,
@@ -3140,6 +3280,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface_index": "1"}, // No invalid_tag
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 			},
 			expectedError: false,
@@ -3186,6 +3328,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface_index": "5"}, // No impossible_tag
 					MetricType: "rate",
 					IsTable:    true,
+
+					Table: "ifTable",
 				},
 			},
 			expectedError: false,
@@ -3261,6 +3405,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Family:     "Health/Temperature",
 					MetricType: "gauge",
 					IsTable:    true,
+
+					Table: "mtxrHlTable",
 				},
 				{
 					Name:       "mtxrHlSensorValue_voltage",
@@ -3270,6 +3416,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Family:     "Health/Power",
 					MetricType: "gauge",
 					IsTable:    true,
+					Table:      "mtxrHlTable",
 				},
 			},
 			expectedError: false,
@@ -3353,6 +3500,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Family:     "Health/Temperature",
 					MetricType: "gauge",
 					IsTable:    true,
+					Table:      "mtxrHlTable",
 				},
 				{
 					Name:       "mtxrHlSensorValue_sensor_status",
@@ -3361,6 +3509,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Family:     "Health/Status",
 					MetricType: "gauge",
 					IsTable:    true,
+					Table:      "mtxrHlTable",
 					MultiValue: map[string]int64{
 						"not_ok": 0,
 						"ok":     1,
@@ -3374,6 +3523,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Family:     "Health/Power",
 					MetricType: "gauge",
 					IsTable:    true,
+					Table:      "mtxrHlTable",
 				},
 			},
 			expectedError: false,
@@ -3439,6 +3589,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Description: "Traffic on eth0 interface",
 					MetricType:  "rate",
 					IsTable:     true,
+
+					Table: "ifTable",
 				},
 				{
 					Name:        "ifInOctets",
@@ -3448,6 +3600,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Description: "Traffic on lo0 interface",
 					MetricType:  "rate",
 					IsTable:     true,
+
+					Table: "ifTable",
 				},
 				{
 					Name:        "ifInOctets",
@@ -3457,6 +3611,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Description: "Traffic on tun0 interface",
 					MetricType:  "rate",
 					IsTable:     true,
+
+					Table: "ifTable",
 				},
 			},
 			expectedError: false,
@@ -3516,6 +3672,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "eth0"},
 					MetricType: "gauge",
 					IsTable:    true,
+					Table:      "ifTable",
 					MultiValue: map[string]int64{
 						"down": 0,
 						"up":   1,
@@ -3527,6 +3684,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "eth1"},
 					MetricType: "gauge",
 					IsTable:    true,
+					Table:      "ifTable",
 					MultiValue: map[string]int64{
 						"down": 1,
 						"up":   0,
@@ -3538,6 +3696,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Tags:       map[string]string{"interface": "eth2"},
 					MetricType: "gauge",
 					IsTable:    true,
+					Table:      "ifTable",
 					MultiValue: map[string]int64{
 						"down": 1,
 						"up":   0,
@@ -3607,6 +3766,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Family:     "Storage/FileSystem",
 					MetricType: "gauge",
 					IsTable:    true,
+
+					Table: "hrStorageTable",
 				},
 				{
 					Name:       "filesystem_size",
@@ -3615,6 +3776,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Family:     "Storage/FileSystem",
 					MetricType: "gauge",
 					IsTable:    true,
+
+					Table: "hrStorageTable",
 				},
 				{
 					Name:       "memory_size",
@@ -3623,6 +3786,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Family:     "Storage/Memory",
 					MetricType: "gauge",
 					IsTable:    true,
+
+					Table: "hrStorageTable",
 				},
 				{
 					Name:       "hrStorageSize",
@@ -3631,6 +3796,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					Family:     "Storage/Other",
 					MetricType: "gauge",
 					IsTable:    true,
+
+					Table: "hrStorageTable",
 				},
 			},
 			expectedError: false,
@@ -3657,11 +3824,6 @@ func TestTableCollector_Collect(t *testing.T) {
 			collector := newTableCollector(mockHandler, missingOIDs, tableCache, logger.New())
 
 			result, err := collector.Collect(tc.profile)
-
-			// TODO: the Table field is now compared as part of the metric; ensure expectedResult includes correct Table values
-			for i := range result {
-				result[i].Table = ""
-			}
 
 			if tc.expectedError {
 				assert.Error(t, err)
@@ -3848,6 +4010,8 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 							Tags:       map[string]string{"interface": "eth0"},
 							MetricType: "rate",
 							IsTable:    true,
+
+							Table: "ifTable",
 						},
 						{
 							Name:       "ifOutOctets",
@@ -3855,6 +4019,8 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 							Tags:       map[string]string{"interface": "eth0"},
 							MetricType: "rate",
 							IsTable:    true,
+
+							Table: "ifTable",
 						},
 						{
 							Name:       "ifInOctets",
@@ -3862,6 +4028,8 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 							Tags:       map[string]string{"interface": "eth1"},
 							MetricType: "rate",
 							IsTable:    true,
+
+							Table: "ifTable",
 						},
 						{
 							Name:       "ifOutOctets",
@@ -3869,6 +4037,8 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 							Tags:       map[string]string{"interface": "eth1"},
 							MetricType: "rate",
 							IsTable:    true,
+
+							Table: "ifTable",
 						},
 					},
 				},
@@ -3982,6 +4152,8 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 							Tags:       map[string]string{"interface": "eth0"},
 							MetricType: "rate",
 							IsTable:    true,
+
+							Table: "ifTable",
 						},
 						{
 							Name:       "ifInOctets",
@@ -3989,6 +4161,8 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 							Tags:       map[string]string{"interface": "eth1"},
 							MetricType: "rate",
 							IsTable:    true,
+
+							Table: "ifTable",
 						},
 					},
 				},
@@ -4150,6 +4324,8 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 							Tags:       map[string]string{"interface": "eth0"},
 							MetricType: "rate",
 							IsTable:    true,
+
+							Table: "ifTable",
 						},
 						{
 							Name:       "ifOutOctets",
@@ -4157,6 +4333,8 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 							Tags:       map[string]string{"interface": "eth0"},
 							MetricType: "rate",
 							IsTable:    true,
+
+							Table: "ifTable",
 						},
 						// From second config
 						{
@@ -4165,6 +4343,8 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 							Tags:       map[string]string{"interface": "eth0"},
 							MetricType: "rate",
 							IsTable:    true,
+
+							Table: "ifTable",
 						},
 						{
 							Name:       "ifOutErrors",
@@ -4172,6 +4352,8 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 							Tags:       map[string]string{"interface": "eth0"},
 							MetricType: "rate",
 							IsTable:    true,
+
+							Table: "ifTable",
 						},
 					},
 				},
@@ -4274,6 +4456,8 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 							Tags:       map[string]string{"ent_descr": "Power Supply 1"},
 							MetricType: "gauge",
 							IsTable:    true,
+
+							Table: "panEntityFRUModuleTable",
 						},
 						{
 							Name:       "panEntryFRUModulePowerUsed",
@@ -4281,6 +4465,8 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 							Tags:       map[string]string{"ent_descr": "Power Supply 2"},
 							MetricType: "gauge",
 							IsTable:    true,
+
+							Table: "panEntityFRUModuleTable",
 						},
 					},
 				},
@@ -4392,6 +4578,8 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 							},
 							MetricType: "gauge",
 							IsTable:    true,
+
+							Table: "panEntityFRUModuleTable",
 						},
 						{
 							Name:  "panEntryFRUModulePowerUsed",
@@ -4402,6 +4590,8 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 							},
 							MetricType: "gauge",
 							IsTable:    true,
+
+							Table: "panEntityFRUModuleTable",
 						},
 					},
 				},
@@ -4453,8 +4643,7 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 			for _, profile := range result {
 				for i := range profile.Metrics {
 					profile.Metrics[i].Profile = nil
-					// TODO: the Table field is now compared as part of the metric; ensure expectedResult includes correct Table values
-					profile.Metrics[i].Table = ""
+
 				}
 			}
 
