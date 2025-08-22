@@ -8,6 +8,8 @@
 #define HOST_LABEL_IS_EPHEMERAL "_is_ephemeral"
 #define NETDATA_VIRTUAL_HOST "Netdata Virtual Host 1.0"
 
+#define IS_VIRTUAL_HOST_OS(host) (strcmp(string2str(host->os), NETDATA_VIRTUAL_HOST) == 0)
+
 struct stream_thread;
 struct rrdset;
 

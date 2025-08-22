@@ -190,6 +190,8 @@ static inline void pluginsd_update_host_ephemerality(RRDHOST *host) {
         rrdlabels_add(host->rrdlabels, HOST_LABEL_IS_EPHEMERAL, value, RRDLABEL_SRC_CONFIG);
 }
 
+#define VNODE_BASE_EPOCH (1704067200L)  // Jan 1, 2024 00:00:00 UTC
+
 static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser) {
     if(!parser->user.host_define.parsing_host)
         return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_HOST_DEFINE_END, "missing initialization, send " PLUGINSD_KEYWORD_HOST_DEFINE " before this");
@@ -273,7 +275,11 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
         return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_HOST, "cannot find a host with this machine guid - have you created it?");
 
     parser->user.host = host;
-
+    uint32_t *Pvalue = (uint32_t *) JudyLGet(parser->user.vnodes.JudyL, (Word_t) host, PJE0);
+    if (Pvalue) {
+        uint32_t last_seen = now_realtime_sec() - VNODE_BASE_EPOCH;
+        *Pvalue = last_seen;
+    }
     return PARSER_RC_OK;
 }
 
