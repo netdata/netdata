@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -18,6 +19,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pluginconfig"
 )
 
 var log = logger.New().With("component", "snmp/ddsnmp")
@@ -168,56 +170,20 @@ func loadProfileWithExtendsMap(filename string, extendsPaths multipath.MultiPath
 
 func getProfilesDirs() multipath.MultiPath {
 	if executable.Name == "test" {
-		dir, _ := filepath.Abs("../../../config/go.d/snmp.profiles/default")
-		return multipath.New(dir)
+		return multipath.New(snmpProfilesDirFromThisFile())
 	}
 
-	var userDir, stockDir string
-
-	if userDir = handleDirOnWin(os.Getenv("NETDATA_USER_CONFIG_DIR")); userDir != "" {
-		if dir := filepath.Join(userDir, "go.d/snmp.profiles"); isDirExists(dir) {
-			userDir = dir
-		}
-	}
-	if stockDir = handleDirOnWin(os.Getenv("NETDATA_STOCK_CONFIG_DIR")); stockDir != "" {
-		if dir := filepath.Join(stockDir, "go.d/snmp.profiles/default"); isDirExists(dir) {
-			stockDir = dir
-		}
-	}
-
-	if userDir != "" || stockDir != "" {
-		return multipath.New(userDir, stockDir)
-	}
-
-	// Development: When running from source (netdata/src/go/plugin/go.d/bin)
-	// Looks for profiles in the local git repository
 	if dir := filepath.Join(executable.Directory, "../config/go.d/snmp.profiles/default"); isDirExists(dir) {
 		return multipath.New(dir)
 	}
 
-	possibleDirs := []string{
-		filepath.Join(executable.Directory, "../../../../etc/netdata/go.d/snmp.profiles"),
-		// User Standard installation paths
-		handleDirOnWin("/etc/netdata/go.d/snmp.profiles"),
-		handleDirOnWin("/opt/netdata/etc/netdata/go.d/snmp.profiles"),
-
-		filepath.Join(executable.Directory, "../../../lib/netdata/conf.d/go.d/snmp.profiles/default"),
-		// Stock standard installation paths
-		handleDirOnWin("/usr/lib/netdata/conf.d/go.d/snmp.profiles/default"),
-		handleDirOnWin("/opt/netdata/usr/lib/netdata/conf.d/go.d/snmp.profiles/default"),
+	var dirs []string
+	for _, dir := range pluginconfig.CollectorsUserDirs() {
+		dirs = append(dirs, filepath.Join(dir, "snmp.profiles"))
 	}
+	dirs = append(dirs, filepath.Join(pluginconfig.CollectorsStockDir(), "snmp.profiles", "default"))
 
-	for _, dir := range possibleDirs {
-		isStock := strings.HasSuffix(filepath.Base(dir), "default")
-		switch {
-		case userDir == "" && !isStock && isDirExists(dir):
-			userDir = dir
-		case stockDir == "" && isStock && isDirExists(dir):
-			stockDir = dir
-		}
-	}
-
-	return multipath.New(userDir, stockDir)
+	return multipath.New(dirs...)
 }
 
 func isDirExists(dir string) bool {
@@ -228,17 +194,23 @@ func isDirExists(dir string) bool {
 	return fi.Mode().IsDir()
 }
 
-func handleDirOnWin(path string) string {
-	base := os.Getenv("NETDATA_CYGWIN_BASE_PATH")
+func snmpProfilesDirFromThisFile() string {
+	// runtime.Caller(0) returns the absolute path to THIS .go file at build time.
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		return ""
+	}
+	base := filepath.Dir(thisFile)
 
-	// TODO: temp workaround for debug mode
-	if base == "" && strings.HasPrefix(executable.Directory, "C:\\msys64") {
-		base = "C:\\msys64"
+	candidates := []string{
+		filepath.Join(base, "..", "..", "..", "config", "go.d", "snmp.profiles", "default"),
 	}
 
-	if base == "" || !strings.HasPrefix(path, "/") {
-		return path
+	for _, p := range candidates {
+		if isDirExists(p) {
+			abs, _ := filepath.Abs(p)
+			return abs
+		}
 	}
-
-	return filepath.Join(base, path)
+	return ""
 }
