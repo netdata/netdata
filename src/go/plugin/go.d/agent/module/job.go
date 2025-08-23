@@ -214,7 +214,7 @@ func (j *Job) Vnode() vnodes.VirtualNode {
 func (j *Job) AutoDetection() (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("panic %v", err)
+			err = fmt.Errorf("panic %v", r)
 			j.panicked = true
 			j.disableAutoDetection()
 
