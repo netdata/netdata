@@ -35,6 +35,7 @@ var (
 func loadProfiles() {
 	loadOnce.Do(func() {
 		profilesPaths := getProfilesDirs()
+		log.Infof("Loading SNMP profiles from %v", profilesPaths)
 		seen := make(map[string]bool)
 
 		for _, dir := range profilesPaths {
