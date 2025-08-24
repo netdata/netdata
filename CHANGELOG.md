@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- improve\(go.d/snmp\): add zyxel snmp meta file [\#20879](https://github.com/netdata/netdata/pull/20879) ([ilyam8](https://github.com/ilyam8))
+- chore\(go.d/ddsnmp\): use plugincofng for loading profiles [\#20878](https://github.com/netdata/netdata/pull/20878) ([ilyam8](https://github.com/ilyam8))
+- build\(deps\): bump github.com/coreos/go-systemd/v22 from 22.5.0 to 22.6.0 in /src/go [\#20874](https://github.com/netdata/netdata/pull/20874) ([dependabot[bot]](https://github.com/apps/dependabot))
 - fix\(go.d\): create vnode internal data\_collection\_status charts in the main context [\#20872](https://github.com/netdata/netdata/pull/20872) ([ilyam8](https://github.com/ilyam8))
 - Fix Table field comparison in SNMP collector table tests [\#20871](https://github.com/netdata/netdata/pull/20871) ([Copilot](https://github.com/apps/copilot-swe-agent))
 - Rename default port for the OpenTelemetry Collector [\#20868](https://github.com/netdata/netdata/pull/20868) ([ralphm](https://github.com/ralphm))
@@ -444,9 +447,6 @@
 - SNMP: \_generic-rtp.yaml [\#20343](https://github.com/netdata/netdata/pull/20343) ([Ancairon](https://github.com/Ancairon))
 - SNMP: \_generic-lldp.yaml [\#20342](https://github.com/netdata/netdata/pull/20342) ([Ancairon](https://github.com/Ancairon))
 - build\(deps\): bump github.com/vmware/govmomi from 0.50.0 to 0.51.0 in /src/go [\#20341](https://github.com/netdata/netdata/pull/20341) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Switch back to epoll from poll [\#20337](https://github.com/netdata/netdata/pull/20337) ([ilyam8](https://github.com/ilyam8))
-- Alerts cloud [\#20334](https://github.com/netdata/netdata/pull/20334) ([kanelatechnical](https://github.com/kanelatechnical))
-- Regenerate integrations docs [\#20332](https://github.com/netdata/netdata/pull/20332) ([netdatabot](https://github.com/netdatabot))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
