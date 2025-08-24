@@ -5,544 +5,544 @@ sysobjectids:
       model: VMG1312-T20B
     1.3.6.1.4.1.890.1.2:
       category: Wireless
-      model: ZyAIR B-1000 Access Point
+      model: ZyAIR B-1000
     1.3.6.1.4.1.890.1.2.6.22:
       category: Router
-      model: Prestige-650R
+      model: Prestige 650R
     1.3.6.1.4.1.890.1.2.6.34:
       category: Router
-      model: Prestige 660R-61C Compact ADSL Router
+      model: Prestige 660R-61C
     1.3.6.1.4.1.890.1.2.6.54:
       category: Router
-      model: Router
+      model: Prestige 650
     1.3.6.1.4.1.890.1.2.7.4:
       category: Router
       model: Prestige 791R
     1.3.6.1.4.1.890.1.2.10.11:
       category: Router
-      model: P2602R
+      model: P-2602R
     1.3.6.1.4.1.890.1.5.5.6:
       category: Switch
-      model: sam1216-22
+      model: SAM1216-22
     1.3.6.1.4.1.890.1.5.5.7:
       category: DSLAM
-      model: ies708-22a-stuc
+      model: IES-708-22A-STUC
     1.3.6.1.4.1.890.1.5.5.8:
       category: DSLAM
-      model: ies708-22a-stur
+      model: IES-708-22A-STUR
     1.3.6.1.4.1.890.1.5.8.2:
       category: Switch
-      model: ees1024af
+      model: EES-1024AF
     1.3.6.1.4.1.890.1.5.8.3:
       category: Switch
-      model: es2008
+      model: ES-2008
     1.3.6.1.4.1.890.1.5.8.4:
       category: Switch
-      model: es2008-gtp
+      model: ES-2008-GTP
     1.3.6.1.4.1.890.1.5.8.5:
       category: Switch
-      model: es2008-sc
+      model: ES-2008-SC
     1.3.6.1.4.1.890.1.5.8.6:
       category: Switch
-      model: es2008-sc30
+      model: ES-2008-SC30
     1.3.6.1.4.1.890.1.5.8.7:
       category: Switch
-      model: es3024
+      model: ES-3024
     1.3.6.1.4.1.890.1.5.8.8:
       category: Switch
-      model: es4024
+      model: ES-4024
     1.3.6.1.4.1.890.1.5.8.9:
       category: Switch
-      model: es2024
+      model: ES-2024
     1.3.6.1.4.1.890.1.5.8.10:
       category: Layer 3 Switch
-      model: gs3012
+      model: GS-3012
     1.3.6.1.4.1.890.1.5.8.11:
       category: Layer 3 Switch
-      model: gs3012f
+      model: GS-3012F
     1.3.6.1.4.1.890.1.5.8.12:
       category: Switch
-      model: es3124
+      model: ES-3124
     1.3.6.1.4.1.890.1.5.8.13:
       category: Layer 3 Switch
-      model: gs4024
+      model: GS-4024
     1.3.6.1.4.1.890.1.5.8.14:
       category: Switch
-      model: es3124pwr
+      model: ES-3124PWR
     1.3.6.1.4.1.890.1.5.8.15:
       category: Layer 3 Switch
-      model: gs2024
+      model: GS-2024
     1.3.6.1.4.1.890.1.5.8.16:
       category: Switch
-      model: es2024a
+      model: ES-2024A
     1.3.6.1.4.1.890.1.5.8.17:
       category: Switch
-      model: es3148
+      model: ES-3148
     1.3.6.1.4.1.890.1.5.8.18:
       category: Switch
-      model: es2108
+      model: ES-2108
     1.3.6.1.4.1.890.1.5.8.19:
       category: Switch
-      model: es2108g
+      model: ES-2108G
     1.3.6.1.4.1.890.1.5.8.20:
       category: Layer 3 Switch
-      model: gs4012f
+      model: GS-4012F
     1.3.6.1.4.1.890.1.5.8.21:
       category: Switch
-      model: es2108pwr
+      model: ES-2108PWR
     1.3.6.1.4.1.890.1.5.8.22:
       category: Switch
-      model: es2108lc
+      model: ES-2108LC
     1.3.6.1.4.1.890.1.5.8.23:
       category: Switch
-      model: es2048
+      model: ES-2048
     1.3.6.1.4.1.890.1.5.8.24:
       category: Switch
-      model: es4124
+      model: ES-4124
     1.3.6.1.4.1.890.1.5.8.26:
       category: Switch
-      model: es3124-4f
+      model: ES-3124-4F
     1.3.6.1.4.1.890.1.5.8.27:
       category: Switch
-      model: es2024pwr
+      model: ES-2024PWR
     1.3.6.1.4.1.890.1.5.8.28:
       category: Switch
-      model: es3724
+      model: ES-3724
     1.3.6.1.4.1.890.1.5.8.29:
       category: Switch
-      model: es2108f
+      model: ES-2108F
     1.3.6.1.4.1.890.1.5.8.30:
       category: Switch
-      model: es2226
+      model: ES-2226
     1.3.6.1.4.1.890.1.5.8.31:
       category: Switch
-      model: es3124f
+      model: ES-3124F
     1.3.6.1.4.1.890.1.5.8.32:
       category: Switch
-      model: es1528
+      model: ES-1528
     1.3.6.1.4.1.890.1.5.8.33:
       category: Switch
-      model: es1552
+      model: ES-1552
     1.3.6.1.4.1.890.1.5.8.34:
       category: Layer 3 Switch
-      model: ms7206
+      model: MS-7206
     1.3.6.1.4.1.890.1.5.8.35:
       category: Layer 3 Switch
-      model: gs2724
+      model: GS-2724
     1.3.6.1.4.1.890.1.5.8.36:
       category: Layer 3 Switch
-      model: gs1524
+      model: GS-1524
     1.3.6.1.4.1.890.1.5.8.37:
       category: Layer 3 Switch
-      model: gs1548
+      model: GS-1548
     1.3.6.1.4.1.890.1.5.8.38:
       category: Switch
-      model: es305
+      model: ES-305
     1.3.6.1.4.1.890.1.5.8.39:
       category: Layer 3 Switch
-      model: xsg4528f
+      model: XGS-4528F
     1.3.6.1.4.1.890.1.5.8.40:
       category: Switch
-      model: es3528
+      model: ES-3528
     1.3.6.1.4.1.890.1.5.8.41:
       category: Switch
-      model: es315
+      model: ES-315
     1.3.6.1.4.1.890.1.5.8.42:
       category: Switch
-      model: es315f
+      model: ES-315F
     1.3.6.1.4.1.890.1.5.8.43:
       category: Layer 3 Switch
-      model: gs2726
+      model: GS-2726
     1.3.6.1.4.1.890.1.5.8.44:
       category: Layer 3 Switch
-      model: gs2750
+      model: GS-2750
     1.3.6.1.4.1.890.1.5.8.45:
       category: Layer 3 Switch
-      model: mes3728
+      model: MES-3728
     1.3.6.1.4.1.890.1.5.8.46:
       category: Layer 3 Switch
-      model: xgs4728f
+      model: XGS-4728F
     1.3.6.1.4.1.890.1.5.8.47:
       category: Layer 3 Switch
-      model: mgs3712
+      model: MGS-3712
     1.3.6.1.4.1.890.1.5.8.48:
       category: Layer 3 Switch
-      model: mgs3712f
+      model: MGS-3712F
     1.3.6.1.4.1.890.1.5.8.49:
       category: Switch
-      model: es2105
+      model: ES-2105
     1.3.6.1.4.1.890.1.5.8.50:
       category: Layer 3 Switch
-      model: gs4012f-ncic
+      model: GS-4012F-NCIC
     1.3.6.1.4.1.890.1.5.8.51:
       category: Layer 3 Switch
-      model: mes3528
+      model: MES-3528
     1.3.6.1.4.1.890.1.5.8.52:
       category: Layer 3 Switch
-      model: xgs2726
+      model: XGS-2726
     1.3.6.1.4.1.890.1.5.8.53:
       category: Layer 3 Switch
-      model: gs2200-48
+      model: GS2200-48
     1.3.6.1.4.1.890.1.5.8.62:
       category: Switch
       model: GS1910-24
     1.3.6.1.4.1.890.1.5.8.66:
       category: Switch
-      model: XGS1910 24x1G
+      model: XGS1910-24
     1.3.6.1.4.1.890.1.5.11.2:
       category: Switch
-      model: aes1024
+      model: AES-1024
     1.3.6.1.4.1.890.1.5.11.3:
       category: Switch
-      model: alc1024-61
+      model: ALC1024-61
     1.3.6.1.4.1.890.1.5.11.4:
       category: Switch
-      model: aam1008-63
+      model: AAM1008-63
     1.3.6.1.4.1.890.1.5.11.5:
       category: Switch
-      model: alc1024-63
+      model: ALC1024-63
     1.3.6.1.4.1.890.1.5.11.6:
       category: Switch
-      model: aam1008-61
+      model: AAM1008-61
     1.3.6.1.4.1.890.1.5.11.7:
       category: Switch
-      model: alc1224-71
+      model: ALC1224-71
     1.3.6.1.4.1.890.1.5.11.9:
       category: DSLAM
-      model: ies1248-71
+      model: IES-1248-71
     1.3.6.1.4.1.890.1.5.11.10:
       category: DSLAM
-      model: ies1248-73
+      model: IES-1248-73
     1.3.6.1.4.1.890.1.5.11.11:
       category: Switch
-      model: aam1212-51
+      model: AAM1212-51
     1.3.6.1.4.1.890.1.5.11.12:
       category: Switch
-      model: aam1212-53
+      model: AAM1212-53
     1.3.6.1.4.1.890.1.5.11.13:
       category: DSLAM
-      model: ies1248-51
+      model: IES-1248-51
     1.3.6.1.4.1.890.1.5.11.14:
       category: DSLAM
-      model: ies1248-53
+      model: IES-1248-53
     1.3.6.1.4.1.890.1.5.11.15:
       category: Switch
-      model: alc1224-51
+      model: ALC1224-51
     1.3.6.1.4.1.890.1.5.11.16:
       category: Switch
-      model: alc1224-53
+      model: ALC1224-53
     1.3.6.1.4.1.890.1.5.11.17:
       category: DSLAM
-      model: ies1248-51v
+      model: IES-1248-51V
     1.3.6.1.4.1.890.1.5.12.2:
       category: Switch
-      model: ves1008
+      model: VES-1008
     1.3.6.1.4.1.890.1.5.12.4:
       category: Switch
-      model: ves1024
+      model: VES-1024
     1.3.6.1.4.1.890.1.5.12.5:
       category: Switch
-      model: vlc1012
+      model: VLC-1012
     1.3.6.1.4.1.890.1.5.12.6:
       category: Switch
-      model: ves1316
+      model: VES-1316
     1.3.6.1.4.1.890.1.5.12.7:
       category: Switch
-      model: ves1416
+      model: VES-1416
     1.3.6.1.4.1.890.1.5.12.8:
       category: Switch
-      model: vlc1124
+      model: VLC-1124
     1.3.6.1.4.1.890.1.5.12.9:
       category: Switch
-      model: ves1124
+      model: VES-1124
     1.3.6.1.4.1.890.1.5.12.10:
       category: Switch
-      model: ves1616f34
+      model: VES-1616F34
     1.3.6.1.4.1.890.1.5.12.11:
       category: Switch
-      model: ves1616f44
+      model: VES-1616F44
     1.3.6.1.4.1.890.1.5.12.12:
       category: Switch
-      model: ves1624f44
+      model: VES-1624F44
     1.3.6.1.4.1.890.1.5.12.13:
       category: Switch
-      model: ves1624fa44
+      model: VES-1624FA44
     1.3.6.1.4.1.890.1.5.12.14:
       category: Switch
-      model: ves1616fa44
+      model: VES-1616FA44
     1.3.6.1.4.1.890.1.5.12.15:
       category: Switch
-      model: ves1616fa34-co4
+      model: VES-1616FA34-CO4
     1.3.6.1.4.1.890.1.5.12.16:
       category: Switch
-      model: ves1616fa35-co4
+      model: VES-1616FA35-CO4
     1.3.6.1.4.1.890.1.5.12.17:
       category: Switch
-      model: ves1608fa34
+      model: VES-1608FA34
     1.3.6.1.4.1.890.1.5.12.18:
       category: Switch
-      model: ves1608fa35
+      model: VES-1608FA35
     1.3.6.1.4.1.890.1.5.12.19:
       category: Switch
-      model: ves1616fa54
+      model: VES-1616FA54
     1.3.6.1.4.1.890.1.5.12.20:
       category: Switch
-      model: ves1624fa54
+      model: VES-1624FA54
     1.3.6.1.4.1.890.1.5.12.21:
       category: Switch
-      model: ves1616fa55
+      model: VES-1616FA55
     1.3.6.1.4.1.890.1.5.12.22:
       category: Switch
-      model: ves1624fa55
+      model: VES-1624FA55
     1.3.6.1.4.1.890.1.5.12.23:
       category: Switch
-      model: ves1624ft
+      model: VES-1624FT
     1.3.6.1.4.1.890.1.5.12.24:
       category: Switch
-      model: ves1624fa34
+      model: VES-1624FA34
     1.3.6.1.4.1.890.1.5.12.25:
       category: Switch
-      model: ves1608fc54
+      model: VES-1608FC54
     1.3.6.1.4.1.890.1.5.12.26:
       category: Switch
-      model: ves1616fc54
+      model: VES-1616FC54
     1.3.6.1.4.1.890.1.5.12.27:
       category: Switch
-      model: ves1624ft54
+      model: VES-1624FT54
     1.3.6.1.4.1.890.1.5.12.28:
       category: Switch
-      model: ves1624ftv54
+      model: VES-1624FTV54
     1.3.6.1.4.1.890.1.5.12.29:
       category: Switch
-      model: ves1616cta54
+      model: VES-1616CTA54
     1.3.6.1.4.1.890.1.5.12.30:
       category: Switch
-      model: ves1624cta54
+      model: VES-1624CTA54
     1.3.6.1.4.1.890.1.5.12.31:
       category: Switch
-      model: ves1608cea54
+      model: VES-1608CEA54
     1.3.6.1.4.1.890.1.5.12.32:
       category: Switch
-      model: ves1616cea54
+      model: VES-1616CEA54
     1.3.6.1.4.1.890.1.5.12.33:
       category: Switch
-      model: ves1616fe55a
+      model: VES-1616FE55A
     1.3.6.1.4.1.890.1.5.12.34:
       category: Switch
-      model: ves1624ft55a
+      model: VES-1624FT55A
     1.3.6.1.4.1.890.1.5.12.35:
       category: Switch
-      model: ves1616fb35
+      model: VES-1616FB35
     1.3.6.1.4.1.890.1.5.12.36:
       category: Switch
-      model: ves1608pe35
+      model: VES-1608PE35
     1.3.6.1.4.1.890.1.5.12.37:
       category: Switch
-      model: ves1616fe53a
+      model: VES-1616FE53A
     1.3.6.1.4.1.890.1.5.12.38:
       category: Switch
-      model: ves1616ft54
+      model: VES-1616FT54
     1.3.6.1.4.1.890.1.5.12.39:
       category: Switch
-      model: ves1616ctb54
+      model: VES-1616CTB54
     1.3.6.1.4.1.890.1.5.12.40:
       category: Switch
-      model: ves1624ctb54
+      model: VES-1624CTB54
     1.3.6.1.4.1.890.1.5.12.41:
       category: Switch
-      model: ves1624ftv55a
+      model: VES-1624FTV55A
     1.3.6.1.4.1.890.1.5.12.42:
       category: Switch
-      model: ves1608fe53a
+      model: VES-1608FE53A
     1.3.6.1.4.1.890.1.5.12.43:
       category: Switch
-      model: ves1608fe57
+      model: VES-1608FE57
     1.3.6.1.4.1.890.1.5.12.44:
       category: Switch
-      model: ves1602fe57
+      model: VES-1602FE57
     1.3.6.1.4.1.890.1.5.12.45:
       category: Switch
-      model: ves1724-58b
+      model: VES-1724-58B
     1.3.6.1.4.1.890.1.5.12.46:
       category: Switch
-      model: ves1724-56
+      model: VES-1724-56
     1.3.6.1.4.1.890.1.5.12.47:
       category: Switch
-      model: ves1724-56fanless
+      model: VES-1724-56FANLESS
     1.3.6.1.4.1.890.1.5.12.48:
       category: Switch
-      model: ves1724-55C
+      model: VES-1724-55C
     1.3.6.1.4.1.890.1.5.12.49:
       category: Switch
-      model: ves1724-58V
+      model: VES-1724-58V
     1.3.6.1.4.1.890.1.5.13.2:
       category: DSLAM
-      model: ies2000
+      model: IES-2000
     1.3.6.1.4.1.890.1.5.13.3:
       category: DSLAM
-      model: ies3000
+      model: IES-3000
     1.3.6.1.4.1.890.1.5.13.5:
       category: DSLAM
-      model: ies5000
+      model: IES-5000
     1.3.6.1.4.1.890.1.5.13.7:
       category: DSLAM
-      model: ies5005
+      model: IES-5005
     1.3.6.1.4.1.890.1.5.13.8:
       category: DSLAM
-      model: ies6000
+      model: IES-6000
     1.3.6.1.4.1.890.1.5.13.9:
       category: DSLAM
-      model: ies5006
+      model: IES-5006
     1.3.6.1.4.1.890.1.5.13.10:
       category: DSLAM
-      model: ies5106
+      model: IES-5106
     1.3.6.1.4.1.890.1.5.13.11:
       category: DSLAM
-      model: ies5112
+      model: IES-5112
     1.3.6.1.4.1.890.1.5.13.12:
       category: DSLAM
-      model: ies4005
+      model: IES-4005
     1.3.6.1.4.1.890.1.5.13.13:
       category: DSLAM
-      model: ies5206
+      model: IES-5206
     1.3.6.1.4.1.890.1.5.13.14:
       category: DSLAM
-      model: ies6100
+      model: IES-6100
     1.3.6.1.4.1.890.1.5.13.15:
       category: DSLAM
-      model: ies4204
+      model: IES-4204
     1.3.6.1.4.1.890.1.5.13.16:
       category: DSLAM
-      model: ies5212
+      model: IES-5212
     1.3.6.1.4.1.890.1.5.13.17:
       category: DSLAM
-      model: ies4105
+      model: IES-4105
     1.3.6.1.4.1.890.1.5.13.18:
       category: DSLAM
-      model: ies6217
+      model: IES-6217
     1.3.6.1.4.1.890.1.5.15.1:
       category: PON
-      model: olt1308
+      model: OLT-1308
     1.3.6.1.4.1.890.1.5.15.2:
       category: PON
-      model: lt20h
+      model: LT-20H
     1.3.6.1.4.1.890.1.5.15.3:
       category: PON
-      model: olt2300-12
+      model: OLT2300-12
     1.3.6.1.4.1.890.1.5.15.4:
       category: PON
-      model: olt1308s22
+      model: OLT1308S22
     1.3.6.1.4.1.890.1.5.15.5:
       category: PON
-      model: olt2300v3
+      model: OLT2300V3
     1.3.6.1.4.1.890.1.5.15.6:
       category: PON
-      model: eonu24240
+      model: EONU24240
     1.3.6.1.4.1.890.1.5.15.7:
       category: PON
-      model: eonu16160
+      model: EONU16160
     1.3.6.1.4.1.890.1.5.15.8:
       category: PON
-      model: eonu2400
+      model: EONU2400
     1.3.6.1.4.1.890.1.5.15.9:
       category: PON
-      model: eonu1600
+      model: EONU1600
     1.3.6.1.4.1.890.1.5.16.2:
       category: VoIP
-      model: vop1224-61
+      model: VOP1224-61
     1.3.6.1.4.1.890.1.5.17.2:
       category: PON
-      model: o-00240v-p
+      model: O-00240V-P
     1.3.6.1.4.1.890.1.5.17.3:
       category: PON
-      model: olt2412
+      model: OLT-2412
     1.3.6.1.4.1.890.1.5.18.2:
       category: Switch
-      model: ges2104
+      model: GES-2104
     1.3.6.1.4.1.890.1.5.18.3:
       category: Switch
-      model: ges1116
+      model: GES-1116
     1.3.6.1.4.1.890.1.6:
       category: Firewall
       model: ZyWALL 35
     1.3.6.1.4.1.890.1.6.2:
       category: Firewall
-      model: zywall1
+      model: ZyWALL 1
     1.3.6.1.4.1.890.1.6.3:
       category: Firewall
-      model: zywall2
+      model: ZyWALL 2
     1.3.6.1.4.1.890.1.6.4:
       category: Firewall
-      model: zywall2w
+      model: ZyWALL 2W
     1.3.6.1.4.1.890.1.6.5:
       category: Firewall
-      model: zywall10
+      model: ZyWALL 10
     1.3.6.1.4.1.890.1.6.6:
       category: Firewall
-      model: zywall10ii
+      model: ZyWALL 10II
     1.3.6.1.4.1.890.1.6.7:
       category: Firewall
-      model: zywall10w
+      model: ZyWALL 10W
     1.3.6.1.4.1.890.1.6.8:
       category: Firewall
-      model: zywall50
+      model: ZyWALL 50
     1.3.6.1.4.1.890.1.6.9:
       category: Firewall
-      model: zywall100
+      model: ZyWALL 100
     1.3.6.1.4.1.890.1.6.10:
       category: Firewall
-      model: zywall200
+      model: ZyWALL 200
     1.3.6.1.4.1.890.1.6.11:
       category: Firewall
-      model: zywallidp10
+      model: ZyWALL IDP 10
     1.3.6.1.4.1.890.1.6.12:
       category: Firewall
-      model: zywall5
+      model: ZyWALL 5
     1.3.6.1.4.1.890.1.6.13:
       category: Firewall
-      model: zywall30w
+      model: ZyWALL 30W
     1.3.6.1.4.1.890.1.6.14:
       category: Firewall
-      model: zywall35
+      model: ZyWALL 35
     1.3.6.1.4.1.890.1.6.15:
       category: Firewall
-      model: zywall70
+      model: ZyWALL 70
     1.3.6.1.4.1.890.1.6.16:
       category: Firewall
-      model: zywall1000
+      model: ZyWALL 1000
     1.3.6.1.4.1.890.1.6.17:
       category: Firewall
-      model: zywallCHT1
+      model: ZyWALL CHT1
     1.3.6.1.4.1.890.1.6.18:
       category: Firewall
-      model: zywallM70
+      model: ZyWALL M70
     1.3.6.1.4.1.890.1.6.19:
       category: Firewall
-      model: zywallP1
+      model: ZyWALL P1
     1.3.6.1.4.1.890.1.6.20:
       category: Firewall
-      model: zywallP2
+      model: ZyWALL P2
     1.3.6.1.4.1.890.1.6.21:
       category: Firewall
-      model: zywallM110
+      model: ZyWALL M110
     1.3.6.1.4.1.890.1.8.2:
       category: Gateway
-      model: vsg1000
+      model: VSG-1000
     1.3.6.1.4.1.890.1.8.3:
       category: Gateway
-      model: vsg1200
+      model: VSG-1200
     1.3.6.1.4.1.890.1.8.4:
       category: Gateway
-      model: vsg1200v2
+      model: VSG-1200V2
     1.3.6.1.4.1.890.1.9:
       category: Wireless
-      model: Zyair G-3000
+      model: ZyAIR G-3000
     1.3.6.1.4.1.890.1.13.1:
       category: Management
-      model: netAtlasEMS
+      model: NetAtlas EMS
     1.3.6.1.4.1.890.1.14.2:
       category: Mobile
-      model: LMT3313
+      model: LMT-3313
     1.3.6.1.4.1.890.1.15:
       category: Firewall
       model: ZyWALL USG 100
