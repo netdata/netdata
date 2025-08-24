@@ -89,6 +89,10 @@ metrics:
           description: Temperature at sensor chip
           family: 'Hardware/OpticalModule/Temperature/Value'
           unit: "Cel"
+        transform: | # Set temperature to 0 when no SFP module present (MikroTik returns ~4294967168 for empty slots)
+          {{- if gt .Metric.Value 4294967000 -}}
+            {{- setValue .Metric 0 -}}
+          {{- end -}}
       - OID: 1.3.6.1.4.1.14988.1.1.19.1.1.10
         name: mtxrOpticalRxPower
         chart_meta:
@@ -146,6 +150,7 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.14988.1.1.19.1.1.2
           name: mtxrOpticalName
+
   - MIB: MIKROTIK-MIB
     table:
       OID: 1.3.6.1.4.1.14988.1.1.15.1
