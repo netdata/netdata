@@ -138,7 +138,7 @@ func (dc *deviceMetadataCollector) processDynamicFields(fields map[string]ddprof
 		switch {
 		case field.Symbol.OID != "":
 			// Single symbol
-			v, err := dc.processSymbolValue(field.Symbol, pdus)
+			v, err := dc.processSymbolValue(field.Symbol, pdus, true)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("failed to process metadata field '%s': %w", name, err))
 				continue
@@ -148,8 +148,8 @@ func (dc *deviceMetadataCollector) processDynamicFields(fields map[string]ddprof
 			}
 		case len(field.Symbols) > 0:
 			// Multiple symbols - try each until one succeeds
-			for _, sym := range field.Symbols {
-				v, err := dc.processSymbolValue(sym, pdus)
+			for i, sym := range field.Symbols {
+				v, err := dc.processSymbolValue(sym, pdus, i == len(field.Symbols)-1)
 				if err != nil {
 					errs = append(errs, fmt.Errorf("failed to process metadata field '%s' symbol '%s': %w",
 						name, sym.Name, err))
@@ -170,7 +170,7 @@ func (dc *deviceMetadataCollector) processDynamicFields(fields map[string]ddprof
 	return nil
 }
 
-func (dc *deviceMetadataCollector) processSymbolValue(cfg ddprofiledefinition.SymbolConfig, pdus map[string]gosnmp.SnmpPDU) (string, error) {
+func (dc *deviceMetadataCollector) processSymbolValue(cfg ddprofiledefinition.SymbolConfig, pdus map[string]gosnmp.SnmpPDU, lastSymbol bool) (string, error) {
 	pdu, ok := pdus[trimOID(cfg.OID)]
 	if !ok {
 		return "", nil
@@ -182,7 +182,10 @@ func (dc *deviceMetadataCollector) processSymbolValue(cfg ddprofiledefinition.Sy
 	}
 
 	if cfg.ExtractValueCompiled != nil {
-		if sm := cfg.ExtractValueCompiled.FindStringSubmatch(val); len(sm) > 1 {
+		sm := cfg.ExtractValueCompiled.FindStringSubmatch(val)
+		if len(sm) == 0 && !lastSymbol {
+			return "", nil
+		} else if len(sm) > 1 {
 			val = sm[1]
 		}
 		// Note: If extract_value doesn't match, we still use the original value
