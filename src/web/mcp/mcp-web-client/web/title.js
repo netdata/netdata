@@ -223,7 +223,8 @@ export function getTitleGenerationProvider(chat, llmProvider, defaultProvider, c
             providerApiType,
             llmProvider.proxyUrl,
             titleModel.id,
-            llmProvider.availableProviders?.[titleModel.provider]
+            llmProvider.availableProviders?.[titleModel.provider],
+            titleModel.provider
         );
         provider.onLog = llmProvider.onLog;
         return provider;

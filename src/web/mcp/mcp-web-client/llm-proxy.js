@@ -547,6 +547,27 @@ const MODEL_DEFINITIONS = {
   //   contextWindow: 12288, 
   //   pricing: { input: 0.50, output: 1.50 } 
   // }
+  
+  // ==================== DEEPSEEK MODELS ====================
+  // DeepSeek uses OpenAI-compatible API with cache support
+  // New pricing starting Sept 5, 2025 at 16:00 UTC
+  
+  'deepseek-chat': {
+    contextWindow: 128000,
+    pricing: { 
+      input: 0.56,      // cache miss
+      cacheRead: 0.07,  // cache hit
+      output: 1.68 
+    }
+  },
+  'deepseek-reasoner': {
+    contextWindow: 128000,
+    pricing: { 
+      input: 0.56,      // cache miss  
+      cacheRead: 0.07,  // cache hit (same for both models)
+      output: 1.68      // same price as deepseek-chat
+    }
+  }
 };
 
 const http = require('http');
@@ -578,7 +599,8 @@ function generateModelsForProvider(provider) {
   const providerPrefixes = {
     openai: ['gpt', 'o1', 'o3', 'o4', 'davinci', 'chatgpt', 'codex', 'computer-use'],
     anthropic: ['claude'],
-    google: ['gemini']
+    google: ['gemini'],
+    deepseek: ['deepseek']
   };
   
   const prefixes = providerPrefixes[provider.toLowerCase()];
@@ -626,6 +648,12 @@ const DEFAULT_CONFIG = {
       type: 'google',
       models: generateModelsForProvider('google').slice(0, 10) // Include a subset for initial config
     },
+    deepseek: {
+      apiKey: '',
+      baseUrl: 'https://api.deepseek.com',
+      type: 'openai', // DeepSeek uses OpenAI-compatible API
+      models: generateModelsForProvider('deepseek')
+    },
     ollama: {
       apiKey: '',  // Not used, but kept for config consistency
       baseUrl: 'http://localhost:11434',
@@ -654,6 +682,11 @@ const LLM_PROVIDERS = {
     baseUrl: 'https://generativelanguage.googleapis.com',
     authHeader: null // Google uses API key in URL
   },
+  deepseek: {
+    baseUrl: 'https://api.deepseek.com',
+    authHeader: 'Authorization',
+    authPrefix: 'Bearer ' // DeepSeek uses OpenAI-compatible auth
+  },
   ollama: {
     baseUrl: 'http://localhost:11434',
     authHeader: null // Ollama typically runs locally without authentication
@@ -676,6 +709,7 @@ function loadConfig() {
     console.log('      - OpenAI: Add your API key starting with "sk-"');
     console.log('      - Anthropic: Add your API key starting with "sk-ant-"');
     console.log('      - Google: Add your API key for Gemini');
+    console.log('      - DeepSeek: Add your API key from api.deepseek.com');
     console.log('   3. (Optional) Add MCP servers to the mcpServers array:');
     console.log('      - id: Unique identifier for the server');
     console.log('      - name: Display name for the server');
@@ -764,10 +798,11 @@ function loadConfig() {
       }
     });
     
-    // Skip validation if we're updating config or showing models
+    // Skip validation if we're updating config, showing models, or showing help
     const isUpdatingConfig = process.argv.includes('--update-config');
     const isShowingModels = process.argv.includes('--show-models');
-    if (!isUpdatingConfig && !isShowingModels && (configuredProviders.length === 0 || totalValidModels === 0)) {
+    const isShowingHelp = process.argv.includes('--help') || process.argv.includes('-h');
+    if (!isUpdatingConfig && !isShowingModels && !isShowingHelp && (configuredProviders.length === 0 || totalValidModels === 0)) {
       console.error('\n❌ Error: No valid models configured!');
       console.error('\n📝 Please edit the configuration file and add valid models:');
       console.error(`   ${CONFIG_FILE}`);
@@ -838,8 +873,8 @@ function validateModelConfig(provider, model, providerType = null) {
   
   const pricing = model.pricing;
   
-  // Check for required pricing fields based on provider
-  switch (provider.toLowerCase()) {
+  // Check for required pricing fields based on provider type
+  switch (type) {
     case 'google':
       // Google requires only input and output
       if (typeof pricing.input !== 'number' || pricing.input < 0) {
@@ -855,7 +890,7 @@ function validateModelConfig(provider, model, providerType = null) {
       break;
       
     case 'openai':
-      // OpenAI requires input, output, and cacheRead
+      // OpenAI and DeepSeek (OpenAI-compatible) require input, output, and cacheRead
       if (typeof pricing.input !== 'number' || pricing.input < 0) {
         return `Invalid pricing.input: must be a number >= 0`;
       }
@@ -1048,15 +1083,37 @@ async function fetchAvailableModels(provider, apiKey, providerConfig = null) {
     switch (providerType) {
       case 'openai':
       case 'openai-responses': {
-        const options = {
-          hostname: 'api.openai.com',
-          port: 443,
-          path: '/v1/models',
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json'
+        // Use provider's base URL from config
+        const baseUrl = providerConfig?.baseUrl || LLM_PROVIDERS[provider]?.baseUrl || 'https://api.openai.com';
+        const modelsUrl = new URL('/v1/models', baseUrl);
+        
+        // Build headers using the same logic as chat endpoints
+        const headers = {
+          'Content-Type': 'application/json'
+        };
+        
+        // Add authentication headers based on provider type (matching chat endpoint logic)
+        const providerUrlConfig = LLM_PROVIDERS[provider];
+        if (providerUrlConfig && providerUrlConfig.authHeader) {
+          if (providerUrlConfig.authPrefix) {
+            headers[providerUrlConfig.authHeader] = providerUrlConfig.authPrefix + apiKey;
+          } else {
+            headers[providerUrlConfig.authHeader] = apiKey;
           }
+        } else if (providerType === 'openai' || providerType === 'openai-responses') {
+          // Default OpenAI-style authentication
+          headers.Authorization = 'Bearer ' + apiKey;
+        } else if (providerType === 'anthropic') {
+          // Default Anthropic-style authentication
+          headers['x-api-key'] = apiKey;
+        }
+        
+        const options = {
+          hostname: modelsUrl.hostname,
+          port: modelsUrl.port || (modelsUrl.protocol === 'https:' ? 443 : 80),
+          path: modelsUrl.pathname,
+          method: 'GET',
+          headers
         };
         
         return new Promise((resolve) => {
@@ -1084,10 +1141,19 @@ async function fetchAvailableModels(provider, apiKey, providerConfig = null) {
                 const response = JSON.parse(data);
                 const models = response.data
                   .filter(model => {
-                    // Filter for chat/completion models
-                    return model.id.includes('gpt') || 
-                           model.id.includes('davinci') ||
-                           model.id.includes('turbo');
+                    // Filter for chat/completion models based on provider
+                    if (provider === 'deepseek') {
+                      // For DeepSeek, include their specific models
+                      return model.id.includes('deepseek');
+                    } else {
+                      // For OpenAI and other OpenAI-compatible providers
+                      return model.id.includes('gpt') || 
+                             model.id.includes('davinci') ||
+                             model.id.includes('turbo') ||
+                             model.id.includes('o1') ||
+                             model.id.includes('o3') ||
+                             model.id.includes('o4');
+                    }
                   })
                   .map(model => ({
                     id: model.id,
@@ -1121,7 +1187,8 @@ async function fetchAvailableModels(provider, apiKey, providerConfig = null) {
       
       case 'google': {
         // Google Gemini models endpoint
-        const targetUrl = new URL('https://generativelanguage.googleapis.com/v1/models');
+        const baseUrl = providerConfig?.baseUrl || LLM_PROVIDERS[provider]?.baseUrl || 'https://generativelanguage.googleapis.com';
+        const targetUrl = new URL('/v1/models', baseUrl);
         targetUrl.searchParams.append('key', apiKey);
         
         const options = {
@@ -1208,98 +1275,103 @@ async function fetchAvailableModels(provider, apiKey, providerConfig = null) {
               
               try {
                 const response = JSON.parse(data);
-                const models = [];
                 
-                // For each model, fetch detailed info including context window
-                for (const model of response.models || []) {
-                  try {
+                // Fetch all model details in parallel
+                const modelPromises = (response.models || []).map(model => {
+                  return new Promise((resolveModel) => {
                     const showUrl = new URL('/api/show', baseUrl);
                     const showData = JSON.stringify({ name: model.name });
                     
-                    const modelInfo = await new Promise((resolveModel) => {
-                      const showReq = http.request({
-                        hostname: showUrl.hostname,
-                        port: showUrl.port || 80,
-                        path: showUrl.pathname,
-                        method: 'POST',
-                        headers: {
-                          'Content-Type': 'application/json',
-                          'Content-Length': Buffer.byteLength(showData)
-                        }
-                      }, (showRes) => {
-                        let showResData = '';
-                        showRes.on('data', chunk => showResData += chunk);
-                        showRes.on('end', () => {
-                          if (showRes.statusCode === 200) {
-                            try {
-                              const info = JSON.parse(showResData);
-                              resolveModel(info);
-                            } catch (e) {
-                              console.log(`   ⚠️  Error parsing model info for ${model.name}: ${e.message}`);
-                              resolveModel(null);
+                    const showReq = http.request({
+                      hostname: showUrl.hostname,
+                      port: showUrl.port || 80,
+                      path: showUrl.pathname,
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Content-Length': Buffer.byteLength(showData)
+                      }
+                    }, (showRes) => {
+                      let showResData = '';
+                      showRes.on('data', chunk => showResData += chunk);
+                      showRes.on('end', () => {
+                        if (showRes.statusCode === 200) {
+                          try {
+                            const info = JSON.parse(showResData);
+                            
+                            if (info && info.model_info) {
+                              // Extract context length from the model info
+                              // Ollama uses "num_ctx" for context window size
+                              // The keys are flat strings like "llama.num_ctx" or just "num_ctx"
+                              let contextWindow = 4096; // default
+                              
+                              // Look for num_ctx or any key ending with "num_ctx"
+                              const contextKey = Object.keys(info.model_info).find(key => 
+                                key.endsWith('.num_ctx') || key === 'num_ctx' || 
+                                key.endsWith('.context_length') || key === 'context_length'
+                              );
+                              
+                              if (contextKey && info.model_info[contextKey]) {
+                                contextWindow = info.model_info[contextKey];
+                              }
+                              
+                              // Check for tool support in capabilities
+                              const supportsTools = info.capabilities && 
+                                                  Array.isArray(info.capabilities) && 
+                                                  info.capabilities.includes('tools');
+                              
+                              resolveModel({
+                                id: model.name,
+                                contextWindow,
+                                supportsTools,
+                                pricing: null // Ollama models are free (local)
+                              });
+                            } else {
+                              // If we can't get model info, add with default context window
+                              resolveModel({
+                                id: model.name,
+                                contextWindow: 4096,
+                                supportsTools: false, // default to false if we can't check
+                                pricing: null
+                              });
                             }
-                          } else {
-                            resolveModel(null);
+                          } catch (e) {
+                            console.log(`   ⚠️  Error parsing model info for ${model.name}: ${e.message}`);
+                            resolveModel({
+                              id: model.name,
+                              contextWindow: 4096,
+                              supportsTools: false,
+                              pricing: null
+                            });
                           }
-                        });
+                        } else {
+                          resolveModel({
+                            id: model.name,
+                            contextWindow: 4096,
+                            supportsTools: false,
+                            pricing: null
+                          });
+                        }
                       });
-                      
-                      showReq.on('error', (e) => {
-                        console.log(`   ⚠️  Error fetching model info for ${model.name}: ${e.message}`);
-                        resolveModel(null);
-                      });
-                      
-                      showReq.write(showData);
-                      showReq.end();
                     });
                     
-                    if (modelInfo && modelInfo.model_info) {
-                      // Extract context length from the model info
-                      // Ollama uses "num_ctx" for context window size
-                      // The keys are flat strings like "llama.num_ctx" or just "num_ctx"
-                      let contextWindow = 4096; // default
-                      
-                      // Look for num_ctx or any key ending with "num_ctx"
-                      const contextKey = Object.keys(modelInfo.model_info).find(key => 
-                        key.endsWith('.num_ctx') || key === 'num_ctx' || 
-                        key.endsWith('.context_length') || key === 'context_length'
-                      );
-                      
-                      if (contextKey && modelInfo.model_info[contextKey]) {
-                        contextWindow = modelInfo.model_info[contextKey];
-                      }
-                      
-                      // Check for tool support in capabilities
-                      const supportsTools = modelInfo.capabilities && 
-                                          Array.isArray(modelInfo.capabilities) && 
-                                          modelInfo.capabilities.includes('tools');
-                      
-                      models.push({
-                        id: model.name,
-                        contextWindow,
-                        supportsTools,
-                        pricing: null // Ollama models are free (local)
-                      });
-                    } else {
-                      // If we can't get model info, add with default context window
-                      models.push({
+                    showReq.on('error', (e) => {
+                      console.log(`   ⚠️  Error fetching model info for ${model.name}: ${e.message}`);
+                      resolveModel({
                         id: model.name,
                         contextWindow: 4096,
-                        supportsTools: false, // default to false if we can't check
+                        supportsTools: false,
                         pricing: null
                       });
-                    }
-                  } catch (e) {
-                    console.log(`   ⚠️  Error processing model ${model.name}: ${e.message}`);
-                    // Add model with defaults even if we couldn't get details
-                    models.push({
-                      id: model.name,
-                      contextWindow: 4096,
-                      supportsTools: false, // default to false on error
-                      pricing: null
                     });
-                  }
-                }
+                    
+                    showReq.write(showData);
+                    showReq.end();
+                  });
+                });
+                
+                // Wait for all model info fetches to complete
+                const models = await Promise.all(modelPromises);
                 
                 console.log(`   ✅ Found ${models.length} available models from ${provider}`);
                 resolve(models);
@@ -1429,6 +1501,8 @@ if (process.argv.includes('--help') || process.argv.includes('-h')) {
   console.log('                                while preserving your API keys and custom settings');
   console.log('   --sync                       When used with --update-config, sync configuration with');
   console.log('                                MODEL_DEFINITIONS from code (optionally filtered by API availability)');
+  console.log('   --sync-prices                When used with --update-config, update prices and settings');
+  console.log('                                for models that exist in both config and code');
   console.log('   --check-availability         When used with --sync and --update-config, filter models by');
   console.log('                                actual availability from provider APIs (requires valid API keys)');
   console.log('\n📖 Description:');
@@ -1451,7 +1525,7 @@ if (process.argv.includes('--help') || process.argv.includes('-h')) {
   process.exit(0);
 }
 
-if (process.argv.includes('--show-models')) {
+if (process.argv.includes('--show-models') || process.argv.includes('--list-models')) {
   console.log('\n📊 All Provider Models and Pricing Information');
   console.log('='.repeat(120));
   
@@ -1592,8 +1666,12 @@ if (process.argv.includes('--update-config')) {
   console.log('   while preserving your API keys and custom settings.\n');
   
   const syncModels = process.argv.includes('--sync');
+  const syncPrices = process.argv.includes('--sync-prices');
   if (syncModels) {
     console.log('   🔄 Will sync configuration with MODEL_DEFINITIONS from code\n');
+  }
+  if (syncPrices) {
+    console.log('   💰 Will update prices for models that exist in both config and code\n');
   }
   
   (async () => {
@@ -1626,7 +1704,38 @@ if (process.argv.includes('--update-config')) {
         
         let mergedModels;
         
-        if (syncModels) {
+        if (syncPrices) {
+          // When syncing prices, only update models that exist in both config and code
+          mergedModels = [];
+          
+          if (existingProvider?.models) {
+            existingProvider.models.forEach(existingModel => {
+              const id = typeof existingModel === 'string' ? existingModel : existingModel.id;
+              
+              if (modelDefsMap.has(id)) {
+                // Model exists in both - update with code pricing and settings
+                const codeModel = modelDefsMap.get(id);
+                mergedModels.push(codeModel);
+                console.log(`   💰 Updated ${id} with latest pricing from code`);
+              } else {
+                // Model only in config - preserve as-is
+                mergedModels.push(existingModel);
+                console.log(`   ✨ Preserved ${id} (not in code)`);
+              }
+            });
+            
+            // Report models in code but not in config
+            allProviderModels.forEach(codeModel => {
+              if (!existingProvider.models.find(m => (typeof m === 'string' ? m : m.id) === codeModel.id)) {
+                console.log(`   ℹ️  ${codeModel.id} exists in code but not in config (skipping)`);
+              }
+            });
+          } else {
+            // No existing models - use defaults from code
+            mergedModels = [...allProviderModels];
+            console.log(`   ✅ No existing ${provider} models - using defaults from code`);
+          }
+        } else if (syncModels) {
           // When syncing, use exactly what's in MODEL_DEFINITIONS
           mergedModels = [...allProviderModels];
           console.log(`   ✅ Syncing ${provider} with ${mergedModels.length} models from MODEL_DEFINITIONS`);
@@ -1678,7 +1787,7 @@ if (process.argv.includes('--update-config')) {
         
         // If sync is requested and we have an API key (or it's Ollama), optionally filter by availability
         const isOllama = provider === 'ollama';
-        if (syncModels && (existingProvider?.apiKey || isOllama) && process.argv.includes('--check-availability')) {
+        if ((syncModels || syncPrices) && (existingProvider?.apiKey || isOllama) && process.argv.includes('--check-availability')) {
           const availableModels = await fetchAvailableModels(provider, existingProvider?.apiKey || '', existingProvider);
           
           if (availableModels) {
@@ -2398,6 +2507,7 @@ const server = http.createServer(async (req, res) => {
 // Start the server only if not running config management commands
 const isConfigCommand = process.argv.includes('--update-config') || 
                        process.argv.includes('--show-models') || 
+                       process.argv.includes('--list-models') ||
                        process.argv.includes('--help') || 
                        process.argv.includes('-h');
 

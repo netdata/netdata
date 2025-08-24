@@ -632,20 +632,21 @@ const MODEL_ENDPOINT_CONFIG = {
  * OpenAI GPT Provider
  */
 class OpenAIProvider extends LLMProvider {
-    constructor(proxyUrl, model = 'gpt-4-turbo-preview') {
+    constructor(proxyUrl, model = 'gpt-4-turbo-preview', providerName = 'openai') {
         super(proxyUrl);
         this.model = model;
         this.type = 'openai';
+        this.providerName = providerName; // The actual provider name for proxy routing
     }
 
     get apiUrl() {
         // Check model-specific endpoint configuration
         const config = MODEL_ENDPOINT_CONFIG[this.model];
         if (config && config.endpoint === 'responses') {
-            return `${this.proxyUrl}/proxy/openai/v1/responses`;
+            return `${this.proxyUrl}/proxy/${this.providerName}/v1/responses`;
         }
         // Default to chat/completions for all other models
-        return `${this.proxyUrl}/proxy/openai/v1/chat/completions`;
+        return `${this.proxyUrl}/proxy/${this.providerName}/v1/chat/completions`;
     }
 
     /**
@@ -3317,8 +3318,9 @@ class OllamaProvider extends LLMProvider {
  * @param {string} proxyUrl - The proxy URL
  * @param {string} modelName - The model name/ID
  * @param {Object} providerConfig - The provider configuration object containing available models
+ * @param {string} actualProviderName - The actual provider name for proxy routing (e.g., 'deepseek')
  */
-function createLLMProvider(providerType, proxyUrl, modelName, providerConfig = null) {
+function createLLMProvider(providerType, proxyUrl, modelName, providerConfig = null, actualProviderName = null) {
     // Look up model metadata if provider config is available
     let modelMetadata = null;
     if (providerConfig?.models) {
@@ -3330,7 +3332,8 @@ function createLLMProvider(providerType, proxyUrl, modelName, providerConfig = n
     switch (providerType) {
         case 'openai':
         case 'openai-responses':
-            return new OpenAIProvider(proxyUrl, modelName);
+            // Use actualProviderName if provided, otherwise default to 'openai'
+            return new OpenAIProvider(proxyUrl, modelName, actualProviderName || 'openai');
         case 'anthropic':
             return new AnthropicProvider(proxyUrl, modelName);
         case 'google':
