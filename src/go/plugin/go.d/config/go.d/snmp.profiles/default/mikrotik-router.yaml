@@ -84,7 +84,7 @@ metrics:
       name: mtxrHlProcessorTemperature
       scale_factor: 0.1
       chart_meta:
-        description: The current CPU utilization
+        description: The current CPU temperature
         family: 'Hardware/CPU/Temperature'
         unit: "Cel"
   - MIB: MIKROTIK-MIB
