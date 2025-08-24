@@ -1,0 +1,259 @@
+sysobjectids:
+  oid_overrides:
+    1.3.6.1.4.1.11863.1.1.3:
+      category: Switch
+      model: TL-SG3424
+    1.3.6.1.4.1.11863.1.1.25:
+      model: TL-SG2008
+    1.3.6.1.4.1.11863.1.1.35:
+      category: Layer 3 Switch
+      model: T1500-28PCT
+    1.3.6.1.4.1.11863.1.1.42:
+      category: Switch
+      model: TL-SL3226P-COMBO-V1
+    1.3.6.1.4.1.11863.1.1.43:
+      category: Switch
+      model: TL-SL3218PE-COMBO-V1
+    1.3.6.1.4.1.11863.1.1.45:
+      category: Switch
+      model: TL-SL3226PE-COMBO-V1
+    1.3.6.1.4.1.11863.1.1.46:
+      category: Switch
+      model: TL-SL3452-COMBO-V1
+    1.3.6.1.4.1.11863.1.1.47:
+      category: Layer 3 Switch
+      model: TL-SG3210-V3
+    1.3.6.1.4.1.11863.1.1.48:
+      category: Layer 3 Switch
+      model: TL-SG3218-V1
+    1.3.6.1.4.1.11863.1.1.49:
+      category: Switch
+      model: TL-SL3226-COMBO-V1
+    1.3.6.1.4.1.11863.1.1.50:
+      category: Switch
+      model: TL-SL3226-V1
+    1.3.6.1.4.1.11863.1.1.51:
+      category: Layer 3 Switch
+      model: TL-SG3452-V1
+    1.3.6.1.4.1.11863.1.1.53:
+      category: Switch
+      model: TL-SL3428-COMBO-V1
+    1.3.6.1.4.1.11863.1.1.54:
+      category: Switch
+      model: TL-SL3218-V1
+    1.3.6.1.4.1.11863.1.1.55:
+      category: Switch
+      model: TL-SL3218-COMBO-V1
+    1.3.6.1.4.1.11863.1.1.56:
+      category: Layer 3 Switch
+      model: TL-SG3226P-V1
+    1.3.6.1.4.1.11863.1.1.57:
+      category: Layer 3 Switch
+      model: TL-SG3226PE-V1
+    1.3.6.1.4.1.11863.1.1.58:
+      category: Layer 3 Switch
+      model: TL-SG3218PE-V1
+    1.3.6.1.4.1.11863.1.1.60:
+      category: Switch
+      model: TL-SL3210-V2
+    1.3.6.1.4.1.11863.1.1.61:
+      category: Switch
+      model: TL-SL3109-V1
+    1.3.6.1.4.1.11863.1.1.62:
+      category: Switch
+      model: TL-SL3210PE-V1
+    1.3.6.1.4.1.11863.1.1.63:
+      category: Layer 3 Switch
+      model: TL-SG3210PE-V1
+    1.3.6.1.4.1.11863.1.2.52:
+      category: Layer 3 Switch
+      model: TL-SG5428-V2
+    1.3.6.1.4.1.11863.1.2.64:
+      category: Layer 3 Switch
+      model: TL-SL5218-COMBO-V1
+    1.3.6.1.4.1.11863.1.2.65:
+      category: Layer 3 Switch
+      model: TL-SL5210-V1
+    1.3.6.1.4.1.11863.1.2.66:
+      category: Layer 3 Switch
+      model: TL-SL5428-COMBO-V1
+    1.3.6.1.4.1.11863.1.2.67:
+      category: Layer 3 Switch
+      model: TL-SG5218-V1
+    1.3.6.1.4.1.11863.1.2.68:
+      category: Layer 3 Switch
+      model: TL-SG5210-V1
+    1.3.6.1.4.1.11863.1.2.71:
+      category: Layer 3 Switch
+      model: TL-SL5452-COMBO-V1
+    1.3.6.1.4.1.11863.1.2.73:
+      category: Layer 3 Switch
+      model: TL-SG5452-V1
+    1.3.6.1.4.1.11863.1.2.75:
+      category: Layer 3 Switch
+      model: TL-SG5820F-V1
+    1.3.6.1.4.1.11863.3.2.10:
+      category: Access Point
+      model: EAP245
+    1.3.6.1.4.1.11863.5.1:
+      category: Switch
+      model: TL-SL5428
+    1.3.6.1.4.1.11863.5.2:
+      category: Switch
+      model: TL-SL3452
+    1.3.6.1.4.1.11863.5.3:
+      category: Layer 3 Switch
+      model: TL-SG3424
+    1.3.6.1.4.1.11863.5.4:
+      category: Layer 3 Switch
+      model: TL-SG3216
+    1.3.6.1.4.1.11863.5.5:
+      category: Layer 3 Switch
+      model: TL-SG3210
+    1.3.6.1.4.1.11863.5.6:
+      category: Switch
+      model: TL-SL3428
+    1.3.6.1.4.1.11863.5.7:
+      category: Layer 3 Switch
+      model: TL-SG5428
+    1.3.6.1.4.1.11863.5.8:
+      category: Layer 3 Switch
+      model: TL-SG3424P
+    1.3.6.1.4.1.11863.5.9:
+      category: Layer 3 Switch
+      model: TL-SG5412F
+    1.3.6.1.4.1.11863.5.10:
+      category: Switch
+      model: T2700-28TCT
+    1.3.6.1.4.1.11863.5.11:
+      category: Switch
+      model: TL-SL2428
+    1.3.6.1.4.1.11863.5.12:
+      category: Switch
+      model: TL-SG2216
+    1.3.6.1.4.1.11863.5.13:
+      category: Switch
+      model: TL-SG2424
+    1.3.6.1.4.1.11863.5.14:
+      category: Layer 3 Switch
+      model: TL-SG5428CN
+    1.3.6.1.4.1.11863.5.15:
+      category: Switch
+      model: TL-SG2452
+    1.3.6.1.4.1.11863.5.16:
+      category: Switch
+      model: TL-SL2218
+    1.3.6.1.4.1.11863.5.17:
+      category: Switch
+      model: TL-SG2424P
+    1.3.6.1.4.1.11863.5.18:
+      category: Switch
+      model: TL-SG2210
+    1.3.6.1.4.1.11863.5.19:
+      category: Switch
+      model: TL-SL2210
+    1.3.6.1.4.1.11863.5.20:
+      category: Layer 3 Switch
+      model: T3700G-28TQ
+    1.3.6.1.4.1.11863.5.21:
+      category: Switch
+      model: TL-SL2226P
+    1.3.6.1.4.1.11863.5.22:
+      category: Switch
+      model: TL-SL2452
+    1.3.6.1.4.1.11863.5.23:
+      category: Switch
+      model: TL-SL2218P
+    1.3.6.1.4.1.11863.5.24:
+      category: Layer 3 Switch
+      model: TL-SG3424-IPV6
+    1.3.6.1.4.1.11863.5.25:
+      category: Switch
+      model: TL-SG2008
+    1.3.6.1.4.1.11863.5.26:
+      category: Switch
+      model: TL-SG2210P
+    1.3.6.1.4.1.11863.5.27:
+      category: Switch
+      model: T2700G-28TQ
+    1.3.6.1.4.1.11863.5.28:
+      category: Switch
+      model: T1600G-28TS
+    1.3.6.1.4.1.11863.5.29:
+      category: Switch
+      model: T1600G-52TS
+    1.3.6.1.4.1.11863.5.30:
+      category: Layer 3 Switch
+      model: T3700G-54TQ
+    1.3.6.1.4.1.11863.5.31:
+      category: Switch
+      model: T1700G-28TQ
+    1.3.6.1.4.1.11863.5.32:
+      category: Switch
+      model: T1700G-52TQ
+    1.3.6.1.4.1.11863.5.33:
+      category: Switch
+      model: T2600G-28TS
+    1.3.6.1.4.1.11863.5.34:
+      category: Switch
+      model: T2600G-52TS
+    1.3.6.1.4.1.11863.5.37:
+      category: Switch
+      model: T1600G-28PS
+    1.3.6.1.4.1.11863.5.38:
+      category: Switch
+      model: T1600G-52PS
+    1.3.6.1.4.1.11863.5.39:
+      category: Switch
+      model: TL-SG2224P
+    1.3.6.1.4.1.11863.5.40:
+      category: Layer 3 Switch
+      model: TL-SG3428
+    1.3.6.1.4.1.11863.5.41:
+      category: Switch
+      model: T1700X-16TS
+    1.3.6.1.4.1.11863.5.44:
+      category: Switch
+      model: T2500-28TC
+    1.3.6.1.4.1.11863.5.59:
+      category: Switch
+      model: T2500G-10TS
+    1.3.6.1.4.1.11863.5.72:
+      category: Switch
+      model: T2600G-18TS
+    1.3.6.1.4.1.11863.5.74:
+      category: Switch
+      model: T2600G-28MPS
+    1.3.6.1.4.1.11863.5.76:
+      category: Switch
+      model: T1500G-8T
+    1.3.6.1.4.1.11863.5.78:
+      category: Switch
+      model: T1500G-10PS
+    1.3.6.1.4.1.11863.5.80:
+      category: Switch
+      model: T1500G-10MPS
+    1.3.6.1.4.1.11863.5.82:
+      category: Switch
+      model: T1500-28TC
+    1.3.6.1.4.1.11863.5.84:
+      category: Switch
+      model: T1500-28PCT
+    1.3.6.1.4.1.11863.5.86:
+      category: Switch
+      model: T1600G-18TS
+    1.3.6.1.4.1.11863.5.88:
+      category: Switch
+      model: T2500G-10MPS
+    1.3.6.1.4.1.11863.5.90:
+      category: Switch
+      model: T2600G-28PS
+    1.3.6.1.4.1.11863.5.92:
+      category: Switch
+      model: T2600G-28SQ
+    1.3.6.1.4.1.11863.5.122:
+      category: Switch
+      model: TL-SG3428
+    1.3.6.1.4.1.11863.5.186:
+      category: Switch
+      model: TL-SG3428MP
