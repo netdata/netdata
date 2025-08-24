@@ -2805,51 +2805,6 @@ sysobjectids:
     1.3.6.1.4.1.868.2.120.0.5.114:
       category: Switch
       model: SISPM1040-384-LRT-B
-    1.3.6.1.4.1.890:
-      category: Gateway
-      model: VMG1312-T20B
-    1.3.6.1.4.1.890.1.2:
-      category: Wireless
-      model: ZyAIR B-1000 Access Point
-    1.3.6.1.4.1.890.1.2.6.22:
-      category: Router
-      model: ZyXEL -Prestige-650R
-    1.3.6.1.4.1.890.1.2.6.34:
-      category: Router
-      model: ZyXEL Prestige 660R-61C Compact ADSL Router
-    1.3.6.1.4.1.890.1.2.6.54:
-      category: Router
-      model: ZyXEL Router
-    1.3.6.1.4.1.890.1.2.7.4:
-      category: Router
-      model: ZyXEL Prestige 791R
-    1.3.6.1.4.1.890.1.2.10.11:
-      category: Router
-      model: ZyXEL P2602R
-    1.3.6.1.4.1.890.1.5.8.27:
-      category: Switch
-      model: ES-2024PWR
-    1.3.6.1.4.1.890.1.5.8.62:
-      category: Switch
-      model: GS1910-24
-    1.3.6.1.4.1.890.1.5.8.66:
-      category: Switch
-      model: XGS1910 24x1G
-    1.3.6.1.4.1.890.1.5.11.6:
-      category: Switch
-      model: ZyXEL IES-1000 AAM1008-61
-    1.3.6.1.4.1.890.1.6:
-      category: Firewall
-      model: ZyWALL 35
-    1.3.6.1.4.1.890.1.9:
-      category: Wireless
-      model: ZyXEL Zyair G-3000
-    1.3.6.1.4.1.890.1.15:
-      category: Firewall
-      model: ZyWALL USG 100
-    1.3.6.1.4.1.890.2.1.6.15:
-      category: Router
-      model: ZyXEL Prestige
     1.3.6.1.4.1.901.1:
       category: Server
       model: ITWatchDogs SuperGoose
@@ -6274,35 +6229,6 @@ sysobjectids:
     1.3.6.1.4.1.11857.1:
       category: Other
       model: NMB 6003
-    1.3.6.1.4.1.11863.1.1.3:
-      category: Switch
-      model: TL-SG3424
-    1.3.6.1.4.1.11863.1.1.25:
-      model: TL-SG2008
-    1.3.6.1.4.1.11863.1.1.35:
-      category: Layer 3 Switch
-      model: T1500-28PCT
-    1.3.6.1.4.1.11863.3.2.10:
-      category: Access Point
-      model: EAP245
-    1.3.6.1.4.1.11863.5.7:
-      category: Switch
-      model: TP-Link TL-SG5428
-    1.3.6.1.4.1.11863.5.29:
-      category: Layer 3 Switch
-      model: T1600G-52TS
-    1.3.6.1.4.1.11863.5.33:
-      category: Layer 3 Switch
-      model: T2600G-28TS
-    1.3.6.1.4.1.11863.5.72:
-      category: Switch
-      model: T2600G-18TS
-    1.3.6.1.4.1.11863.5.122:
-      category: Switch
-      model: TL-SG3428
-    1.3.6.1.4.1.11863.5.186:
-      category: Switch
-      model: TL-SG3428MP
     1.3.6.1.4.1.11898.2.1:
       category: Wireless
       model: Orinoco AP
@@ -6800,12 +6726,6 @@ sysobjectids:
     1.3.6.1.4.1.14941.3.1.20843122:
       category: Storage
       model: EX84-SEC
-    1.3.6.1.4.1.14988.1:
-      category: Router
-      model: RB1200
-    1.3.6.1.4.1.14988.1.1.1:
-      category: Wireless
-      model: Mikrotik wireless AP
     1.3.6.1.4.1.15004.2.1:
       category: Switch
       model: RUGGEDCOM RSG2100

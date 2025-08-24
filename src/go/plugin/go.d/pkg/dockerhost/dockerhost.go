@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	typesContainer "github.com/docker/docker/api/types/container"
 	docker "github.com/docker/docker/client"
@@ -30,7 +31,6 @@ func FromEnv() string {
 
 func Exec(ctx context.Context, container string, cmd string, args ...string) ([]byte, error) {
 	// based on https://github.com/moby/moby/blob/8e610b2b55bfd1bfa9436ab110d311f5e8a74dcb/integration/internal/container/exec.go#L38
-
 	addr := docker.DefaultDockerHost
 	if v := FromEnv(); v != "" {
 		addr = v
@@ -38,9 +38,8 @@ func Exec(ctx context.Context, container string, cmd string, args ...string) ([]
 
 	cli, err := docker.NewClientWithOpts(docker.WithHost(addr))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create docker client: %v", err)
+		return nil, fmt.Errorf("failed to create docker client: %w", err)
 	}
-
 	defer func() { _ = cli.Close() }()
 
 	cli.NegotiateAPIVersion(ctx)
@@ -53,45 +52,49 @@ func Exec(ctx context.Context, container string, cmd string, args ...string) ([]
 
 	createResp, err := cli.ContainerExecCreate(ctx, container, execCreateConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to container exec create ('%s'): %v", container, err)
+		return nil, fmt.Errorf("failed to container exec create (%s): %w", container, err)
 	}
 
 	attachResp, err := cli.ContainerExecAttach(ctx, createResp.ID, typesContainer.ExecAttachOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to container exec attach ('%s'): %v", container, err)
+		return nil, fmt.Errorf("failed to container exec attach (%s): %w", container, err)
 	}
 	defer attachResp.Close()
 
 	var outBuf, errBuf bytes.Buffer
-	done := make(chan error)
-
-	defer close(done)
+	done := make(chan error, 1)
 
 	go func() {
 		_, err := stdcopy.StdCopy(&outBuf, &errBuf, attachResp.Reader)
-		select {
-		case done <- err:
-		case <-ctx.Done():
-		}
+		done <- err
 	}()
 
 	select {
 	case err := <-done:
 		if err != nil {
-			return nil, fmt.Errorf("failed to read response from container ('%s'): %v", container, err)
+			return nil, fmt.Errorf("failed to read response from container (%s): %w", container, err)
 		}
 	case <-ctx.Done():
-		return nil, fmt.Errorf("timed out reading response")
+		// Close connection to interrupt StdCopy
+		attachResp.Close()
+
+		select {
+		case <-done:
+		case <-time.After(150 * time.Millisecond):
+			// Don't wait too long, let it clean up in background
+		}
+
+		return nil, fmt.Errorf("timed out reading response: %w", ctx.Err())
 	}
 
 	inspResp, err := cli.ContainerExecInspect(ctx, createResp.ID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to container exec inspect ('%s'): %v", container, err)
+		return nil, fmt.Errorf("failed to container exec inspect (%s): %w", container, err)
 	}
 
 	if inspResp.ExitCode != 0 {
 		msg := strings.ReplaceAll(errBuf.String(), "\n", " ")
-		return nil, fmt.Errorf("command returned non-zero exit code (%d), error: '%s'", inspResp.ExitCode, msg)
+		return nil, fmt.Errorf("command returned non-zero exit code (%d), error: %q", inspResp.ExitCode, msg)
 	}
 
 	return outBuf.Bytes(), nil
