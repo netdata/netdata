@@ -52,7 +52,7 @@ type jmxResponse struct {
 
 type jmxHelper struct {
 	config Config
-	logger logger.Logger
+	logger *logger.Logger
 
 	cmd     *exec.Cmd
 	stdin   io.WriteCloser
@@ -65,7 +65,7 @@ type jmxHelper struct {
 	running bool
 }
 
-func newJMXHelper(config Config, logger logger.Logger) (*jmxHelper, error) {
+func newJMXHelper(config Config, logger *logger.Logger) (*jmxHelper, error) {
 	return &jmxHelper{
 		config: config,
 		logger: logger,

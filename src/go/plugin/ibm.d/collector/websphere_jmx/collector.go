@@ -305,7 +305,7 @@ func (w *WebSphereJMX) initSelectors() error {
 
 func (w *WebSphereJMX) startJMXHelper(ctx context.Context) error {
 	// Initialize JMX helper
-	helper, err := newJMXHelper(w.Config, *w.Logger)
+	helper, err := newJMXHelper(w.Config, w.Logger)
 	if err != nil {
 		return fmt.Errorf("failed to initialize JMX helper: %w", err)
 	}

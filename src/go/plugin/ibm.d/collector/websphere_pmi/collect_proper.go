@@ -1005,6 +1005,24 @@ func (w *WebSpherePMI) cleanupAbsentInstances() {
 	}
 }
 
+// processStat builds full Path fields for a PMI stat tree.
+// This helper is used by tests to validate path propagation and is a no-op for metrics.
+func (w *WebSpherePMI) processStat(stat *pmiStat, basePath string, _ map[string]int64) {
+	// Compute current node path
+	if basePath == "" {
+		stat.Path = stat.Name
+	} else if stat.Name != "" {
+		stat.Path = basePath + "/" + stat.Name
+	} else {
+		stat.Path = basePath
+	}
+
+	// Recurse to children with updated path
+	for i := range stat.SubStats {
+		w.processStat(&stat.SubStats[i], stat.Path, nil)
+	}
+}
+
 // removeInstanceCharts marks all charts for a specific instance as obsolete
 func (w *WebSpherePMI) removeInstanceCharts(instanceKey string) {
 	// Parse the instance key to determine what type of charts to remove

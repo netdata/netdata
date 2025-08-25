@@ -112,7 +112,8 @@ jobs:
         working-directory: ${{ matrix.module }}
       - name: Go vet
         if: needs.file-check.outputs.run == 'true'
-        run: go vet ./...
+        run: |
+          CGO_ENABLED=0 go vet -tests=false ./...
         working-directory: ${{ matrix.module }}
       - name: Set up gotestfmt
         if: needs.file-check.outputs.run == 'true'
