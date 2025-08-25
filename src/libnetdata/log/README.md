@@ -28,7 +28,7 @@ Each source can be independently configured with different outputs, formats, and
 For each log source, Netdata supports the following output methods:
 
 | Output       | Platform | Description                                    | Use Case                                                         |
-| ------------ | -------- | ---------------------------------------------- | ---------------------------------------------------------------- |
+|--------------|----------|------------------------------------------------|------------------------------------------------------------------|
 | **off**      | All      | Disable this log source                        | Reduce log volume for specific sources                           |
 | **journal**  | Linux    | systemd-journal with full structured fields    | **Recommended for Linux** - Native integration with journald     |
 | **etw**      | Windows  | Event Tracing for Windows with structured data | **Recommended for Windows** - Rich field support in Event Viewer |
@@ -54,7 +54,7 @@ On Windows, the default is `etw` and if that is not available it falls back to `
 Netdata supports multiple log formats to integrate with different systems:
 
 | Format      | Description                                             | Example                                                    | Best For                        |
-| ----------- | ------------------------------------------------------- | ---------------------------------------------------------- | ------------------------------- |
+|-------------|---------------------------------------------------------|------------------------------------------------------------|---------------------------------|
 | **journal** | Native systemd-journal format with all fields preserved | Binary format with 65+ structured fields                   | Linux systems with journald     |
 | **etw**     | Event Tracing for Windows structured format             | Structured events in Windows Event Viewer                  | Windows monitoring and analysis |
 | **wel**     | Windows Event Log format with indexed fields            | String array format in Event Viewer                        | Windows legacy compatibility    |
@@ -68,7 +68,7 @@ The format is automatically selected based on the output destination, but can be
 The LOGFMT, ETW, and WEL formats apply special transformations (annotators) to certain fields for better human readability:
 
 | Field                          | Raw Value               | Transformation                     | Example                                           |
-| ------------------------------ | ----------------------- | ---------------------------------- | ------------------------------------------------- |
+|--------------------------------|-------------------------|------------------------------------|---------------------------------------------------|
 | `time`                         | Unix epoch microseconds | RFC3339 with microsecond precision | `1737302400000000` → `"2025-01-19T16:00:00.000Z"` |
 | `alert_notification_timestamp` | Unix epoch microseconds | RFC3339 with microsecond precision | `1737302400000000` → `"2025-01-19T16:00:00.000Z"` |
 | `level`                        | Priority number (0-7)   | Text representation                | `6` → `info`                                      |
@@ -76,11 +76,13 @@ The LOGFMT, ETW, and WEL formats apply special transformations (annotators) to c
 | `winerror`                     | Windows error code      | Number + error message             | `5` → `5, Access is denied`                       |
 
 **Formats using these transformations:**
+
 - **LOGFMT** - All annotated fields are transformed for readability
 - **ETW** (Event Tracing for Windows) - Uses the same transformations
 - **WEL** (Windows Event Logs) - Uses the same transformations
 
 **Formats NOT using these transformations:**
+
 - **JSON** - Outputs raw values for all fields (no transformations applied)
 
 ## Log levels
@@ -88,7 +90,7 @@ The LOGFMT, ETW, and WEL formats apply special transformations (annotators) to c
 Each time Netdata logs, it assigns a priority to the log. It can be one of this (in order of importance):
 
 | Level     | Description                                                                            |
-| --------- | -------------------------------------------------------------------------------------- |
+|-----------|----------------------------------------------------------------------------------------|
 | emergency | a fatal condition, Netdata will most likely exit immediately after.                    |
 | alert     | a very important issue that may affect how Netdata operates.                           |
 | critical  | a very important issue the user should know which, Netdata thinks it can survive.      |
@@ -136,6 +138,7 @@ source = {FORMAT},level={LEVEL},protection={LOGS}/{PERIOD}@{OUTPUT}
 ```
 
 Where:
+
 - `{FORMAT}` - One of the [log formats](#log-formats) (json, logfmt, etc.)
 - `{LEVEL}` - Minimum [log level](#log-levels) to be logged
 - `{LOGS}` - Number of logs to trigger flood protection for this source
@@ -169,6 +172,7 @@ Netdata includes automatic log rotation support:
 3. **Automatic handling** for journal and ETW outputs (managed by the OS)
 
 Example logrotate configuration:
+
 ```
 /var/log/netdata/*.log {
     daily
@@ -189,7 +193,7 @@ Example logrotate configuration:
 <summary>All fields exposed by Netdata</summary>
 
 |               `journal`                |      `logfmt` and `json`       |             `etw`             | `wel` | Description                                                                                               |
-| :------------------------------------: | :----------------------------: | :---------------------------: | :---: | :-------------------------------------------------------------------------------------------------------- |
+|:--------------------------------------:|:------------------------------:|:-----------------------------:|:-----:|:----------------------------------------------------------------------------------------------------------|
 |      `_SOURCE_REALTIME_TIMESTAMP`      |             `time`             |          `Timestamp`          |   1   | the timestamp of the event (logfmt: RFC3339, json: Unix epoch microseconds)                               |
 |          `SYSLOG_IDENTIFIER`           |             `comm`             |           `Program`           |   2   | the program logging the event                                                                             |
 |            `ND_LOG_SOURCE`             |            `source`            |      `NetdataLogSource`       |   3   | one of the [log sources](#log-sources)                                                                    |
@@ -266,7 +270,7 @@ For `etw` (Event Tracing for Windows), Netdata logs in a structured way, and fie
 Netdata assigns unique UUIDs to specific event types for easy filtering and correlation:
 
 | Message ID                             | Event Type           | Description                                   |
-| -------------------------------------- | -------------------- | --------------------------------------------- |
+|----------------------------------------|----------------------|-----------------------------------------------|
 | `ed4cdb8f-1beb-4ad3-b57c-b3cae2d162fa` | Child Connection     | A Netdata child connects to this parent       |
 | `6e2e3839-0676-4896-8b64-6045dbf28d66` | Parent Connection    | This Netdata connects to a parent             |
 | `9ce0cb58-ab8b-44df-82c4-bf1ad9ee22de` | Alert Transition     | Alert changes state (CLEAR/WARNING/CRITICAL)  |
@@ -326,9 +330,10 @@ journalctl -u netdata --namespace=netdata \
 
 ### Windows: Using Event Viewer to View Netdata Logs
 
-The Netdata service on Windows systems automatically logs events to the Windows Event Viewer. 
+The Netdata service on Windows systems automatically logs events to the Windows Event Viewer.
 
 #### Accessing logs via GUI:
+
 1. Click the **Start** menu
 2. Type **Event Viewer** and select **Run as Administrator**
 3. In the Event Viewer window, expand **Applications and Services Logs**
@@ -337,20 +342,21 @@ The Netdata service on Windows systems automatically logs events to the Windows 
 The Netdata section contains all available log categories [listed above](#log-sources).
 
 #### Accessing logs via PowerShell:
+
 ```powershell
 # Get recent Netdata events
 Get-WinEvent -LogName "Netdata/Health" -MaxEvents 100
 
 # Filter by severity
-Get-WinEvent -FilterHashtable @{LogName="Netdata/Health"; Level=2}  # Errors only
+Get-WinEvent -FilterHashtable @{ LogName = "Netdata/Health"; Level = 2 }  # Errors only
 
 # Export to CSV
 Get-WinEvent -LogName "Netdata/Health" | Export-Csv netdata-logs.csv
 
 # Real-time monitoring
-Get-WinEvent -LogName "Netdata/Health" -MaxEvents 1 | 
-    ForEach-Object { $_ } | 
-    Out-GridView -Title "Netdata Health Events"
+Get-WinEvent -LogName "Netdata/Health" -MaxEvents 1 |
+        ForEach-Object { $_ } |
+        Out-GridView -Title "Netdata Health Events"
 ```
 
 ## Using Event Tracing for Windows (ETW)
@@ -471,46 +477,9 @@ Retention is always defined per Stream.
 - WEL uses a simple string table for fields, and consumers need to map these string fields based on
   their index.
 
-## Container Logging
-
-Netdata provides seamless integration with container orchestration platforms:
-
-### Docker
-```yaml
-# docker-compose.yml
-services:
-  netdata:
-    image: netdata/netdata
-    environment:
-      - NETDATA_LOG_LEVEL=info
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-```
-
-### Kubernetes
-```yaml
-# Configure via ConfigMap
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: netdata-config
-data:
-  netdata.conf: |
-    [logs]
-        daemon = stdout
-        collector = stdout
-        health = stdout
-        access = off  # Reduce volume in containers
-```
-
-Container logs are automatically collected by the orchestration platform's logging infrastructure (Docker logging drivers, Kubernetes log collectors, etc.).
-
 ## SIEM Integration
 
-Netdata's structured logging system is designed for seamless integration with all major Security Information and Event Management (SIEM) platforms. Logs are emitted in **standards-compliant formats** — systemd-journal, JSON, logfmt, syslog (RFC5424), Windows Event Log (WEL), and Event Tracing for Windows (ETW).  
+Netdata's structured logging system is designed for seamless integration with all major Security Information and Event Management (SIEM) platforms. Logs are emitted in **standards-compliant formats** — systemd-journal, JSON, logfmt, syslog (RFC5424), Windows Event Log (WEL), and Event Tracing for Windows (ETW).
 
 This guarantees compatibility with SIEMs including (but not limited to):  
 **Splunk, Elastic Security (ELK Stack / OpenSearch), IBM QRadar, Microsoft Sentinel, Wazuh, CrowdStrike Falcon LogScale, Datadog Security Monitoring, Sumo Logic, LogRhythm, Securonix, ArcSight, Graylog, Chronicle SIEM, AlienVault OSSIM, Devo, Exabeam, Rapid7 InsightIDR, McAfee Enterprise Security Manager (ESM), Fortinet FortiSIEM, SolarWinds SEM, AT&T Cybersecurity USM, RSA NetWitness.**
@@ -518,7 +487,7 @@ This guarantees compatibility with SIEMs including (but not limited to):
 ### Supported Log Formats and SIEM Compatibility
 
 | Format / Output             | Description                                                        | Commonly Used By                                                                 |
-| --------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+|-----------------------------|--------------------------------------------------------------------|----------------------------------------------------------------------------------|
 | **systemd-journal**         | Native Linux logging with structured fields, tamper-proof with FSS | Splunk (journald input), Elastic Filebeat/Journalbeat, Wazuh, QRadar, Sentinel   |
 | **ETW (Event Tracing)**     | Rich structured events in Event Viewer (Windows native)            | Splunk UF (Win), Sentinel, QRadar, LogRhythm, ArcSight, Elastic Winlogbeat       |
 | **WEL (Windows Event Log)** | Legacy Windows Event Log array-based fields                        | All Windows SIEM agents (Splunk UF, Sentinel, QRadar, Wazuh, Elastic Winlogbeat) |
@@ -528,11 +497,11 @@ This guarantees compatibility with SIEMs including (but not limited to):
 
 ### Key Integration Features
 
-1. **Structured Logs** – All Netdata events contain contextual fields, no regex parsing required.  
-2. **Message IDs (UUIDs)** – Unique identifiers for alert transitions, service lifecycle events, configuration changes, and network connections. Enables precise rule building without pattern matching.  
-3. **Multiple Output Options** – Select the best integration path for your SIEM: journald (Linux), ETW/WEL (Windows), JSON/logfmt (cross-platform), syslog (legacy).  
-4. **Security-Relevant Events** – Alert transitions, anomalous resource use, configuration changes, service errors, API access attempts.  
-5. **Compliance Support** – Journald Forward Secure Sealing (FSS) and Windows Event Log immutability controls support PCI DSS, ISO 27001, SOC 2, HIPAA, and other frameworks.  
+1. **Structured Logs** – All Netdata events contain contextual fields, no regex parsing required.
+2. **Message IDs (UUIDs)** – Unique identifiers for alert transitions, service lifecycle events, configuration changes, and network connections. Enables precise rule building without pattern matching.
+3. **Multiple Output Options** – Select the best integration path for your SIEM: journald (Linux), ETW/WEL (Windows), JSON/logfmt (cross-platform), syslog (legacy).
+4. **Security-Relevant Events** – Alert transitions, anomalous resource use, configuration changes, service errors, API access attempts.
+5. **Compliance Support** – Journald Forward Secure Sealing (FSS) and Windows Event Log immutability controls support PCI DSS, ISO 27001, SOC 2, HIPAA, and other frameworks.
 
 ### Recommended Outputs
 
@@ -541,7 +510,7 @@ JSON/logfmt are universally portable but require custom field mapping inside you
 Syslog is provided for legacy collectors.
 
 | Platform           | Best Output     | Why                                                                |
-| ------------------ | --------------- | ------------------------------------------------------------------ |
+|--------------------|-----------------|--------------------------------------------------------------------|
 | **Linux**          | systemd-journal | Zero-config ingestion, structured fields, tamper-proofing with FSS |
 | **Windows**        | ETW             | Structured named fields in Event Viewer, native SIEM support       |
 | **Cross-Platform** | JSON            | Universally portable, works everywhere, requires mapping rules     |
@@ -549,15 +518,14 @@ Syslog is provided for legacy collectors.
 
 ### Integration Workflow
 
-1. **Select log format** appropriate to your environment.  
-2. **Enable relevant sources** (`health` for alerts, `access` for audit trails, `daemon` for lifecycle events).  
-3. **Configure SIEM collection**:  
-   - Journald → SIEM agent (Splunk UF, Filebeat, Wazuh agent, QRadar DSM)  
-   - ETW/WEL → Windows Event Forwarding, Winlogbeat, Splunk UF, Sentinel Connector  
-   - JSON/logfmt → Filebeat, Logstash, Fluent Bit, Graylog input, Sumo Logic agent  
-   - Syslog → Direct to SIEM collector (QRadar, ArcSight, LogRhythm, FortiSIEM)  
-4. **Use Message IDs** to build reliable detection rules:  
-   - Alert storms → `9ce0cb58-ab8b-44df-82c4-bf1ad9ee22de`  
-   - Service restarts → startup/shutdown IDs  
-   - Unexpected parent/child connections → connection IDs  
-
+1. **Select log format** appropriate to your environment.
+2. **Enable relevant sources** (`health` for alerts, `access` for audit trails, `daemon` for lifecycle events).
+3. **Configure SIEM collection**:
+    - Journald → SIEM agent (Splunk UF, Filebeat, Wazuh agent, QRadar DSM)
+    - ETW/WEL → Windows Event Forwarding, Winlogbeat, Splunk UF, Sentinel Connector
+    - JSON/logfmt → Filebeat, Logstash, Fluent Bit, Graylog input, Sumo Logic agent
+    - Syslog → Direct to SIEM collector (QRadar, ArcSight, LogRhythm, FortiSIEM)
+4. **Use Message IDs** to build reliable detection rules:
+    - Alert storms → `9ce0cb58-ab8b-44df-82c4-bf1ad9ee22de`
+    - Service restarts → startup/shutdown IDs
+    - Unexpected parent/child connections → connection IDs  
