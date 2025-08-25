@@ -1,6 +1,8 @@
 # Netdata Logging
 
-This document describes how Netdata generates its own logs, not how Netdata manages and queries logs databases.
+:::note
+This document describes how Netdata generates its own logs
+:::
 
 Netdata provides enterprise-grade structured logging with full observability of all system events. The logging system is designed to be:
 
