@@ -301,11 +301,11 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
                     }
                 }
             }
-        }
-        if (min_check_interval == UINT_MAX)
-            min_check_interval = 60;
+            if (min_check_interval == UINT_MAX)
+                min_check_interval = 60;
 
-        last_host_stale_check = now_realtime_sec() + min_check_interval;
+            last_host_stale_check = now_realtime_sec() + min_check_interval;
+        }
         return PARSER_RC_OK;
     }
 
