@@ -421,23 +421,24 @@ usec_t heartbeat_next(heartbeat_t *hb) {
 }
 
 #if defined(OS_WINDOWS)
-void sleep_usec_with_now(usec_t usec, usec_t started_ut) {
-    if (!started_ut)
-        started_ut = now_realtime_usec();
+void sleep_usec_with_now(usec_t usec, usec_t started_ut __maybe_unused) {
+    if (usec == 0)
+        return;
 
-    usec_t end_ut = started_ut + usec;
-    usec_t remaining_ut = usec;
-
-    while (remaining_ut >= clock_realtime_resolution) {
-        DWORD sleep_ms = (DWORD) (remaining_ut / USEC_PER_MS);
-        Sleep(sleep_ms);
-
-        usec_t now_ut = now_realtime_usec();
-        if (now_ut >= end_ut)
-            break;
-
-        remaining_ut = end_ut - now_ut;
+    // Honor Windows timer granularity by rounding the requested duration
+    // up to the next multiple of the effective clock resolution.
+    usec_t res_ut = clock_realtime_resolution ? clock_realtime_resolution : USEC_PER_MS;
+    usec_t to_sleep_ut = usec;
+    if (res_ut) {
+        to_sleep_ut = ((to_sleep_ut + res_ut - 1) / res_ut) * res_ut; // round up
     }
+
+    // Convert microseconds to milliseconds for Sleep(), rounding up
+    DWORD sleep_ms = (DWORD)((to_sleep_ut + (USEC_PER_MS - 1)) / USEC_PER_MS);
+    if (sleep_ms == 0)
+        sleep_ms = 1; // safety: always sleep at least 1ms
+
+    Sleep(sleep_ms);
 }
 #else
 void sleep_usec_with_now(usec_t usec, usec_t started_ut) {
