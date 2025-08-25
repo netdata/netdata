@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- fix\(go.d/snmp\): handle invalid SFP temperature readings for empty slots [\#20884](https://github.com/netdata/netdata/pull/20884) ([ilyam8](https://github.com/ilyam8))
+- improve\(go.d/snmp\): add MikroTik type and model detection [\#20883](https://github.com/netdata/netdata/pull/20883) ([ilyam8](https://github.com/ilyam8))
+- improve\(go.d/snmp\): update tplink snmp meta [\#20882](https://github.com/netdata/netdata/pull/20882) ([ilyam8](https://github.com/ilyam8))
+- fix\(go.d\): fix goroutine leak and panic risk in Docker exec [\#20881](https://github.com/netdata/netdata/pull/20881) ([ilyam8](https://github.com/ilyam8))
 - improve\(go.d/snmp\): add zyxel snmp meta file [\#20879](https://github.com/netdata/netdata/pull/20879) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d/ddsnmp\): use plugincofng for loading profiles [\#20878](https://github.com/netdata/netdata/pull/20878) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): bump github.com/coreos/go-systemd/v22 from 22.5.0 to 22.6.0 in /src/go [\#20874](https://github.com/netdata/netdata/pull/20874) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -445,8 +449,6 @@
 - Split systemd-journal plugin and add Rust-based journal file reader [\#20345](https://github.com/netdata/netdata/pull/20345) ([vkalintiris](https://github.com/vkalintiris))
 - SNMP: \_generic-sip.yaml [\#20344](https://github.com/netdata/netdata/pull/20344) ([Ancairon](https://github.com/Ancairon))
 - SNMP: \_generic-rtp.yaml [\#20343](https://github.com/netdata/netdata/pull/20343) ([Ancairon](https://github.com/Ancairon))
-- SNMP: \_generic-lldp.yaml [\#20342](https://github.com/netdata/netdata/pull/20342) ([Ancairon](https://github.com/Ancairon))
-- build\(deps\): bump github.com/vmware/govmomi from 0.50.0 to 0.51.0 in /src/go [\#20341](https://github.com/netdata/netdata/pull/20341) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
