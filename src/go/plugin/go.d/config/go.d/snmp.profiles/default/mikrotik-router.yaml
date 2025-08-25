@@ -79,6 +79,15 @@ metric_tags:
 
 metrics:
   - MIB: MIKROTIK-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.14988.1.1.3.11.0
+      name: mtxrHlProcessorTemperature
+      scale_factor: 0.1
+      chart_meta:
+        description: The current CPU temperature
+        family: 'Hardware/CPU/Temperature'
+        unit: "Cel"
+  - MIB: MIKROTIK-MIB
     table:
       OID: 1.3.6.1.4.1.14988.1.1.19.1
       name: mtxrOpticalTable
