@@ -27,36 +27,36 @@ const (
 // Client is the PCF protocol client using IBM library.
 type Client struct {
 	config Config
-	
+
 	// IBM connection management (Connection #1: PCF commands)
-	qmgr       ibmmq.MQQueueManager
-	cmdQueue   ibmmq.MQObject
-	replyQueue ibmmq.MQObject
+	qmgr           ibmmq.MQQueueManager
+	cmdQueue       ibmmq.MQObject
+	replyQueue     ibmmq.MQObject
 	replyQueueName string // Store the actual reply queue name
-	connected  bool
-	protocol   *framework.ProtocolClient
-	
+	connected      bool
+	protocol       *framework.ProtocolClient
+
 	// Job creation timestamp for filtering statistics messages
 	jobCreationTime time.Time
-	
+
 	// Cached static data (refreshed on reconnection)
 	cachedVersion      string
 	cachedEdition      string
 	cachedCommandLevel int32
 	cachedPlatform     int32
-	
+
 	// Cached queue manager configuration intervals (refreshed on reconnection)
-	cachedStatisticsInterval       int32  // STATINT - Statistics interval in seconds (MQIA_STATISTICS_INTERVAL = 131)
-	cachedMonitoringQueue          int32  // Queue monitoring interval in seconds (MQIA_MONITORING_Q = 123)
-	cachedMonitoringChannel        int32  // Channel monitoring interval in seconds (MQIA_MONITORING_CHANNEL = 122)
-	cachedMonitoringAutoClussdr    int32  // Auto-defined cluster sender channel monitoring interval (MQIA_MONITORING_AUTO_CLUSSDR = 124)
-	cachedSysTopicInterval         int32  // $SYS topic publication interval in seconds (configurable, default 10s)
-	
+	cachedStatisticsInterval    int32 // STATINT - Statistics interval in seconds (MQIA_STATISTICS_INTERVAL = 131)
+	cachedMonitoringQueue       int32 // Queue monitoring interval in seconds (MQIA_MONITORING_Q = 123)
+	cachedMonitoringChannel     int32 // Channel monitoring interval in seconds (MQIA_MONITORING_CHANNEL = 122)
+	cachedMonitoringAutoClussdr int32 // Auto-defined cluster sender channel monitoring interval (MQIA_MONITORING_AUTO_CLUSSDR = 124)
+	cachedSysTopicInterval      int32 // $SYS topic publication interval in seconds (configurable, default 10s)
+
 	// Resource monitoring (Connection #2: mqmetric)
 	resourceConfig            *mqmetric.DiscoverConfig
-	resourceMonitoringEnabled bool   // Track if resource monitoring should be enabled
+	resourceMonitoringEnabled bool           // Track if resource monitoring should be enabled
 	resourceStatus            ResourceStatus // Global status: disabled(0), enabled(1), failed(2)
-	metricsReady              bool   // Track if metrics connection is ready
+	metricsReady              bool           // Track if metrics connection is ready
 }
 
 // Config is the configuration for the PCF client.

@@ -20,10 +20,10 @@ type Client struct {
 	activeSlots     map[int]bool
 	nextSlot        int
 	collectionCount int
-	
+
 	// Simulated persistent state (would normally be on the server)
-	serverCounter   int64
-	
+	serverCounter int64
+
 	// Cached static data (refreshed on each connection)
 	cachedVersion string
 	cachedEdition string
@@ -35,12 +35,12 @@ func NewClient() *Client {
 		activeSlots: make(map[int]bool),
 		nextSlot:    10,
 	}
-	
+
 	// Initialize with 10 slots
 	for i := 0; i < 10; i++ {
 		c.activeSlots[i] = true
 	}
-	
+
 	return c
 }
 
@@ -48,11 +48,11 @@ func NewClient() *Client {
 func (c *Client) GetVersion() (string, string, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	if !c.connected {
 		return "", "", fmt.Errorf("not connected")
 	}
-	
+
 	// Return cached version data - this is refreshed only on connection
 	return c.cachedVersion, c.cachedEdition, nil
 }
@@ -62,7 +62,7 @@ func (c *Client) refreshStaticData() {
 	// Simulate version information that might change between connections
 	c.cachedVersion = "2.4.1"
 	c.cachedEdition = "Community"
-	
+
 	// Simulate different editions based on connection time
 	if time.Now().Unix()%3 == 0 {
 		c.cachedEdition = "Enterprise"
@@ -73,19 +73,19 @@ func (c *Client) refreshStaticData() {
 func (c *Client) Connect() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	if c.connected {
 		return fmt.Errorf("already connected")
 	}
-	
+
 	// Simulate connection delay
 	time.Sleep(10 * time.Millisecond)
-	
+
 	c.connected = true
-	
+
 	// Refresh static data on every connection
 	c.refreshStaticData()
-	
+
 	return nil
 }
 
@@ -93,11 +93,11 @@ func (c *Client) Connect() error {
 func (c *Client) Disconnect() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	if !c.connected {
 		return fmt.Errorf("not connected")
 	}
-	
+
 	c.connected = false
 	return nil
 }
@@ -114,18 +114,18 @@ func (c *Client) IsConnected() bool {
 func (c *Client) GetTimestampValue() (int64, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	if !c.connected {
 		return 0, fmt.Errorf("not connected")
 	}
-	
+
 	// Simulate protocol response: timestamp % 60
 	now := time.Now().Unix()
 	value := now % 60
-	
+
 	// Update server-side counter (simulating server state)
 	c.serverCounter += value
-	
+
 	return value, nil
 }
 
@@ -133,11 +133,11 @@ func (c *Client) GetTimestampValue() (int64, error) {
 func (c *Client) GetCounterValue() (int64, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	if !c.connected {
 		return 0, fmt.Errorf("not connected")
 	}
-	
+
 	return c.serverCounter, nil
 }
 
@@ -147,21 +147,21 @@ func (c *Client) GetCounterValue() (int64, error) {
 func (c *Client) ListItems(maxItems int) ([]Item, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	if !c.connected {
 		return nil, fmt.Errorf("not connected")
 	}
-	
+
 	c.collectionCount++
-	
+
 	// Every 5th collection, rotate items
 	if c.collectionCount%5 == 0 && c.collectionCount > 0 {
 		c.rotateItems()
 	}
-	
+
 	// Generate items with random percentages that sum to 100
 	items := c.generateItems(maxItems)
-	
+
 	return items, nil
 }
 
@@ -172,15 +172,15 @@ func (c *Client) rotateItems() {
 	for slot := range c.activeSlots {
 		slotsToRemove = append(slotsToRemove, slot)
 	}
-	
+
 	if len(slotsToRemove) > 0 {
 		// Pick a random slot to remove
 		removeIdx := rand.Intn(len(slotsToRemove))
 		slotToRemove := slotsToRemove[removeIdx]
-		
+
 		// Remove the slot
 		delete(c.activeSlots, slotToRemove)
-		
+
 		// Add a new slot
 		c.activeSlots[c.nextSlot] = true
 		c.nextSlot++
@@ -191,13 +191,13 @@ func (c *Client) rotateItems() {
 func (c *Client) generateItems(maxItems int) []Item {
 	items := make([]Item, 0, len(c.activeSlots))
 	remaining := 100.0
-	
+
 	// Convert active slots to sorted slice for consistent ordering
 	var slots []int
 	for slot := range c.activeSlots {
 		slots = append(slots, slot)
 	}
-	
+
 	// Sort slots
 	for i := 0; i < len(slots)-1; i++ {
 		for j := i + 1; j < len(slots); j++ {
@@ -206,12 +206,12 @@ func (c *Client) generateItems(maxItems int) []Item {
 			}
 		}
 	}
-	
+
 	// Limit to maxItems if specified
 	if maxItems > 0 && len(slots) > maxItems {
 		slots = slots[:maxItems]
 	}
-	
+
 	// Generate random percentages
 	for i, slot := range slots {
 		var value float64
@@ -223,12 +223,12 @@ func (c *Client) generateItems(maxItems int) []Item {
 			// Last item gets the remaining
 			value = remaining
 		}
-		
+
 		items = append(items, Item{
 			Slot:       slot,
 			Percentage: value,
 		})
 	}
-	
+
 	return items
 }

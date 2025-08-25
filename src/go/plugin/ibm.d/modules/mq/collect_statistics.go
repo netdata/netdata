@@ -53,7 +53,7 @@ func (c *Collector) collectQueueStatistics(queueStats []pcf.QueueStatistics) err
 	for _, stat := range queueStats {
 		queueName := stat.Name
 		queueType := "local" // TODO: Convert stat.Type to string
-		
+
 		labels := contexts.QueueStatisticsLabels{
 			Queue: queueName,
 			Type:  queueType,
@@ -76,7 +76,7 @@ func (c *Collector) collectQueueStatistics(queueStats []pcf.QueueStatistics) err
 			})
 			contexts.QueueStatistics.AvgQueueTime.SetUpdateEvery(c.State, labels, c.GetEffectiveStatisticsInterval())
 		}
-		
+
 		// Queue time indicators (short/long period)
 		if stat.QTimeShort.IsCollected() && stat.QTimeLong.IsCollected() {
 			contexts.QueueStatistics.QueueTimeIndicators.Set(c.State, labels, contexts.QueueStatisticsQueueTimeIndicatorsValues{
@@ -135,7 +135,7 @@ func (c *Collector) collectChannelStatistics(channelStats []pcf.ChannelStatistic
 	for _, stat := range channelStats {
 		channelName := stat.Name
 		channelType := "svrconn" // TODO: Convert stat.Type to string
-		
+
 		labels := contexts.ChannelStatisticsLabels{
 			Channel: channelName,
 			Type:    channelType,

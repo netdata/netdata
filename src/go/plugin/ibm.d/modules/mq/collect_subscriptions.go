@@ -6,26 +6,26 @@ package mq
 
 import (
 	"fmt"
-	"strings"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/mq/contexts"
+	"strings"
 )
 
 // collectSubscriptions collects subscription metrics from the queue manager
 func (c *Collector) collectSubscriptions() error {
 	c.Debugf("Collecting subscriptions with selector '%s'", c.Config.SubscriptionSelector)
-	
+
 	// Get list of subscriptions
 	subscriptions, err := c.client.InquireSubscription("")
 	if err != nil {
 		return fmt.Errorf("failed to inquire subscriptions: %w", err)
 	}
-	
+
 	c.Debugf("Found %d subscriptions", len(subscriptions))
-	
+
 	collected := 0
 	excluded := 0
 	failed := 0
-	
+
 	for _, sub := range subscriptions {
 		// Check if subscription should be included based on selector
 		if c.Config.SubscriptionSelector != "" && c.Config.SubscriptionSelector != "*" {
@@ -35,7 +35,7 @@ func (c *Collector) collectSubscriptions() error {
 				continue
 			}
 		}
-		
+
 		// Get subscription status (message count, last message time)
 		status, err := c.client.InquireSubscriptionStatus(sub.Name)
 		if err != nil {
@@ -43,19 +43,19 @@ func (c *Collector) collectSubscriptions() error {
 			failed++
 			continue
 		}
-		
+
 		labels := contexts.SubscriptionLabels{
 			Subscription: sub.Name,
 			Topic:        sub.TopicString,
 		}
-		
+
 		// Message count
 		if status.MessageCount.IsCollected() {
 			contexts.Subscription.MessageCount.Set(c.State, labels, contexts.SubscriptionMessageCountValues{
 				Pending: status.MessageCount.Int64(),
 			})
 		}
-		
+
 		// Last message age (only if we have timestamp)
 		if status.LastMessageDate != "" && status.LastMessageTime != "" {
 			age, err := status.GetSubscriptionAge()
@@ -65,13 +65,13 @@ func (c *Collector) collectSubscriptions() error {
 				})
 			}
 		}
-		
+
 		collected++
 	}
-	
+
 	c.Debugf("Subscription collection complete - discovered:%d excluded:%d collected:%d failed:%d",
 		len(subscriptions), excluded, collected, failed)
-	
+
 	return nil
 }
 
@@ -80,17 +80,17 @@ func matchesPattern(name, pattern string) bool {
 	// Convert wildcard pattern to simple matching
 	// * matches any sequence of characters
 	// ? matches any single character
-	
+
 	// Special cases
 	if pattern == "" || pattern == "*" {
 		return true
 	}
-	
+
 	// Simple wildcard matching
 	pattern = strings.ReplaceAll(pattern, "*", ".*")
 	pattern = strings.ReplaceAll(pattern, "?", ".")
 	pattern = "^" + pattern + "$"
-	
+
 	// For simplicity, use string contains for now
 	// In production, we'd use a proper regex matcher
 	if strings.Contains(pattern, ".*") {
@@ -102,7 +102,7 @@ func matchesPattern(name, pattern string) bool {
 			return strings.HasPrefix(name, prefix) && strings.HasSuffix(name, suffix)
 		}
 	}
-	
+
 	// Exact match
 	return name == strings.Trim(pattern, "^$")
 }

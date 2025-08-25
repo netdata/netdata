@@ -9,63 +9,63 @@ import (
 )
 
 var (
-	prioConnections                       = module.Priority + 1
-	prioLocking                          = module.Priority + 2
-	prioDeadlocks                        = module.Priority + 3
-	prioSorting                          = module.Priority + 4
-	prioRowActivity                      = module.Priority + 5
-	prioBufferpoolHitRatio               = module.Priority + 6
-	prioBufferpoolDetailedHitRatio       = module.Priority + 7
-	prioBufferpoolReads                  = module.Priority + 8
-	prioBufferpoolDataReads              = module.Priority + 9
-	prioBufferpoolIndexReads             = module.Priority + 10
-	prioBufferpoolXDAReads               = module.Priority + 11
-	prioBufferpoolColumnReads            = module.Priority + 12
-	prioLogSpace                         = module.Priority + 13
-	prioLogUtilization                   = module.Priority + 14
-	prioLogIO                            = module.Priority + 15
-	prioLongRunningQueries               = module.Priority + 16
-	prioBackupStatus                     = module.Priority + 17
-	prioBackupAge                        = module.Priority + 18
-	prioServiceHealth                    = module.Priority + 19
-	prioLockDetails                      = module.Priority + 20
-	prioLockWaitTime                     = module.Priority + 21
-	prioDatabaseStatus                   = module.Priority + 100
-	prioDatabaseApplications             = module.Priority + 101
-	prioBufferpoolHitRatioInstance       = module.Priority + 110
+	prioConnections                        = module.Priority + 1
+	prioLocking                            = module.Priority + 2
+	prioDeadlocks                          = module.Priority + 3
+	prioSorting                            = module.Priority + 4
+	prioRowActivity                        = module.Priority + 5
+	prioBufferpoolHitRatio                 = module.Priority + 6
+	prioBufferpoolDetailedHitRatio         = module.Priority + 7
+	prioBufferpoolReads                    = module.Priority + 8
+	prioBufferpoolDataReads                = module.Priority + 9
+	prioBufferpoolIndexReads               = module.Priority + 10
+	prioBufferpoolXDAReads                 = module.Priority + 11
+	prioBufferpoolColumnReads              = module.Priority + 12
+	prioLogSpace                           = module.Priority + 13
+	prioLogUtilization                     = module.Priority + 14
+	prioLogIO                              = module.Priority + 15
+	prioLongRunningQueries                 = module.Priority + 16
+	prioBackupStatus                       = module.Priority + 17
+	prioBackupAge                          = module.Priority + 18
+	prioServiceHealth                      = module.Priority + 19
+	prioLockDetails                        = module.Priority + 20
+	prioLockWaitTime                       = module.Priority + 21
+	prioDatabaseStatus                     = module.Priority + 100
+	prioDatabaseApplications               = module.Priority + 101
+	prioBufferpoolHitRatioInstance         = module.Priority + 110
 	prioBufferpoolDetailedHitRatioInstance = module.Priority + 111
-	prioBufferpoolReadsInstance          = module.Priority + 112
-	prioBufferpoolDataReadsInstance      = module.Priority + 113
-	prioBufferpoolIndexReadsInstance     = module.Priority + 114
-	prioBufferpoolPagesInstance          = module.Priority + 115
-	prioBufferpoolWritesInstance         = module.Priority + 116
-	prioTablespaceUsage                  = module.Priority + 120
-	prioTablespaceSize                   = module.Priority + 121
-	prioTablespaceUsableSize             = module.Priority + 122
-	prioTablespaceState                  = module.Priority + 123
-	prioConnectionState                  = module.Priority + 130
-	prioConnectionActivity               = module.Priority + 131
-	prioConnectionWaitTime               = module.Priority + 132
-	prioConnectionProcessingTime         = module.Priority + 133
-	prioTableSize                        = module.Priority + 140
-	prioTableActivity                    = module.Priority + 141
-	prioIndexUsage                       = module.Priority + 150
-	prioMemoryPoolUsage                  = module.Priority + 160
-	prioMemoryPoolHWM                    = module.Priority + 161
-	prioTableIOScans                     = module.Priority + 170
-	prioTableIORows                      = module.Priority + 171
-	prioTableIOActivity                  = module.Priority + 172
-	prioMemorySetUsage                   = module.Priority + 180
-	prioMemorySetCommitted               = module.Priority + 181
-	prioMemorySetHighWaterMark           = module.Priority + 182
-	prioMemorySetAdditionalCommitted     = module.Priority + 183
-	prioMemorySetPercentUsedHWM          = module.Priority + 184
-	prioPrefetcherPrefetchRatio          = module.Priority + 190
-	prioPrefetcherCleanerRatio           = module.Priority + 191
-	prioPrefetcherPhysicalReads          = module.Priority + 192
-	prioPrefetcherAsyncReads             = module.Priority + 193
-	prioPrefetcherWaitTime               = module.Priority + 194
-	prioPrefetcherUnreadPages            = module.Priority + 195
+	prioBufferpoolReadsInstance            = module.Priority + 112
+	prioBufferpoolDataReadsInstance        = module.Priority + 113
+	prioBufferpoolIndexReadsInstance       = module.Priority + 114
+	prioBufferpoolPagesInstance            = module.Priority + 115
+	prioBufferpoolWritesInstance           = module.Priority + 116
+	prioTablespaceUsage                    = module.Priority + 120
+	prioTablespaceSize                     = module.Priority + 121
+	prioTablespaceUsableSize               = module.Priority + 122
+	prioTablespaceState                    = module.Priority + 123
+	prioConnectionState                    = module.Priority + 130
+	prioConnectionActivity                 = module.Priority + 131
+	prioConnectionWaitTime                 = module.Priority + 132
+	prioConnectionProcessingTime           = module.Priority + 133
+	prioTableSize                          = module.Priority + 140
+	prioTableActivity                      = module.Priority + 141
+	prioIndexUsage                         = module.Priority + 150
+	prioMemoryPoolUsage                    = module.Priority + 160
+	prioMemoryPoolHWM                      = module.Priority + 161
+	prioTableIOScans                       = module.Priority + 170
+	prioTableIORows                        = module.Priority + 171
+	prioTableIOActivity                    = module.Priority + 172
+	prioMemorySetUsage                     = module.Priority + 180
+	prioMemorySetCommitted                 = module.Priority + 181
+	prioMemorySetHighWaterMark             = module.Priority + 182
+	prioMemorySetAdditionalCommitted       = module.Priority + 183
+	prioMemorySetPercentUsedHWM            = module.Priority + 184
+	prioPrefetcherPrefetchRatio            = module.Priority + 190
+	prioPrefetcherCleanerRatio             = module.Priority + 191
+	prioPrefetcherPhysicalReads            = module.Priority + 192
+	prioPrefetcherAsyncReads               = module.Priority + 193
+	prioPrefetcherWaitTime                 = module.Priority + 194
+	prioPrefetcherUnreadPages              = module.Priority + 195
 )
 
 const (
@@ -920,10 +920,10 @@ func (d *DB2) newBufferpoolCharts(bp *bufferpoolMetrics) *module.Charts {
 			{Key: "db2_edition", Value: d.edition},
 			{Key: "db2_version", Value: d.version},
 		}
-		
+
 		// Column dimension is now always included since we use MON_GET_BUFFERPOOL
 		// The values may be zero in Community Edition
-		
+
 		for _, dim := range chart.Dims {
 			dim.ID = fmt.Sprintf(dim.ID, cleanName)
 		}

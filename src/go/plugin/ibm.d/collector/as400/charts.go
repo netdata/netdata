@@ -12,12 +12,12 @@ var (
 		cpuUtilizationChart.Copy(),
 		cpuDetailsChart.Copy(),
 		cpuCapacityChart.Copy(),
-		
+
 		// Job charts
 		totalJobsChart.Copy(),
 		activeJobsByTypeChart.Copy(),
 		jobQueueLengthChart.Copy(),
-		
+
 		// Memory charts
 		mainStorageSizeChart.Copy(),
 		temporaryStorageChart.Copy(),
@@ -26,25 +26,25 @@ var (
 		memoryPoolReservedChart.Copy(),
 		memoryPoolThreadsChart.Copy(),
 		memoryPoolMaxThreadsChart.Copy(),
-		
+
 		// Storage charts
 		systemAspUsageChart.Copy(),
 		systemAspStorageChart.Copy(),
 		totalAuxiliaryStorageChart.Copy(),
-		
+
 		// Thread charts
 		systemThreadsChart.Copy(),
-		
+
 		// Disk aggregate charts
 		diskBusyChart.Copy(),
-		
+
 		// Network charts
 		networkConnectionsChart.Copy(),
 		networkConnectionStatesChart.Copy(),
-		
+
 		// Temporary storage charts
 		tempStorageTotalChart.Copy(),
-		
+
 		// System activity charts
 		systemActivityCPURateChart.Copy(),
 		systemActivityCPUUtilizationChart.Copy(),

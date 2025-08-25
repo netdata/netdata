@@ -1,15 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-
 package pcf
-
 
 import (
 	"strings"
 
 	"github.com/ibm-messaging/mq-golang/v5/ibmmq"
 )
-
 
 // ChannelListResult contains the results of parsing channel list response
 type ChannelListResult struct {
@@ -53,10 +50,10 @@ func (c *Client) parseQueueListResponseFromParams(params []*ibmmq.PCFParameter) 
 
 // QueueListWithTypeResult contains the results of parsing queue list response with type information
 type QueueListWithTypeResult struct {
-	Queues         []QueueInfo           // Successfully retrieved queues with type info
-	ErrorCounts    map[int32]int         // MQ error code -> count
-	ErrorQueues    map[int32][]string    // MQ error code -> queue names that failed
-	InternalErrors int                   // Count of parsing/internal errors
+	Queues         []QueueInfo        // Successfully retrieved queues with type info
+	ErrorCounts    map[int32]int      // MQ error code -> count
+	ErrorQueues    map[int32][]string // MQ error code -> queue names that failed
+	InternalErrors int                // Count of parsing/internal errors
 }
 
 // parseQueueListResponseWithTypeFromParams parses PCF parameters into QueueListWithTypeResult
@@ -81,14 +78,14 @@ func (c *Client) parseQueueListResponseWithTypeFromParams(params []*ibmmq.PCFPar
 					queueInfo := QueueInfo{
 						Name: queueName,
 					}
-					
+
 					// Extract type and configuration attributes
 					if qtype, ok := attrs[ibmmq.MQIA_Q_TYPE]; ok {
 						if qtypeInt, ok := qtype.(int32); ok {
 							queueInfo.Type = qtypeInt
 						}
 					}
-					
+
 					// Set configuration attributes with NotCollected as default
 					queueInfo.InhibitGet = NotCollected
 					queueInfo.InhibitPut = NotCollected
@@ -97,7 +94,7 @@ func (c *Client) parseQueueListResponseWithTypeFromParams(params []*ibmmq.PCFPar
 					queueInfo.TriggerType = NotCollected
 					queueInfo.MaxMsgLength = NotCollected
 					queueInfo.DefPriority = NotCollected
-					
+
 					// Override with actual values if available
 					if val, ok := attrs[ibmmq.MQIA_INHIBIT_GET].(int32); ok {
 						queueInfo.InhibitGet = AttributeValue(val)
@@ -120,7 +117,7 @@ func (c *Client) parseQueueListResponseWithTypeFromParams(params []*ibmmq.PCFPar
 					if val, ok := attrs[ibmmq.MQIA_DEF_PRIORITY].(int32); ok {
 						queueInfo.DefPriority = AttributeValue(val)
 					}
-					
+
 					result.Queues = append(result.Queues, queueInfo)
 				}
 			}
@@ -137,7 +134,6 @@ type TopicListResult struct {
 	ErrorTopics    map[int32][]string // MQ error code -> topic names that failed
 	InternalErrors int                // Count of parsing/internal errors
 }
-
 
 // parseTopicListResponseFromParams parses PCF parameters into TopicListResult
 func (c *Client) parseTopicListResponseFromParams(params []*ibmmq.PCFParameter) *TopicListResult {

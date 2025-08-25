@@ -19,7 +19,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
-	
+
 	// Import database drivers
 	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/pkg/dbdriver"
 )
@@ -65,9 +65,9 @@ func New() *DB2 {
 			BackupHistoryDays: 30,
 
 			// New performance monitoring defaults
-			CollectMemoryMetrics:    true,
-			CollectWaitMetrics:      true,
-			CollectTableIOMetrics:   true,
+			CollectMemoryMetrics:  true,
+			CollectWaitMetrics:    true,
+			CollectTableIOMetrics: true,
 		},
 
 		charts:      baseCharts.Copy(),
@@ -118,9 +118,9 @@ type Config struct {
 	BackupHistoryDays int `yaml:"backup_history_days,omitempty" json:"backup_history_days"`
 
 	// Performance monitoring
-	CollectMemoryMetrics    bool `yaml:"collect_memory_metrics,omitempty" json:"collect_memory_metrics"`
-	CollectWaitMetrics      bool `yaml:"collect_wait_metrics,omitempty" json:"collect_wait_metrics"`
-	CollectTableIOMetrics   bool `yaml:"collect_table_io_metrics,omitempty" json:"collect_table_io_metrics"`
+	CollectMemoryMetrics  bool `yaml:"collect_memory_metrics,omitempty" json:"collect_memory_metrics"`
+	CollectWaitMetrics    bool `yaml:"collect_wait_metrics,omitempty" json:"collect_wait_metrics"`
+	CollectTableIOMetrics bool `yaml:"collect_table_io_metrics,omitempty" json:"collect_table_io_metrics"`
 
 	// Selectors for filtering
 	CollectDatabasesMatching   string `yaml:"collect_databases_matching,omitempty" json:"collect_databases_matching"`
@@ -182,16 +182,16 @@ type DB2 struct {
 	isDB2ForZOS   bool // DB2 for z/OS
 	isDB2Cloud    bool // Db2 on Cloud
 
-	// Memory set instance tracking (Screen 26) 
-	memorySets                  map[string]*memorySetInstanceMetrics
-	currentMemorySetHostName    string
-	currentMemorySetDBName      string
-	currentMemorySetType        string
-	currentMemorySetMember      int64
+	// Memory set instance tracking (Screen 26)
+	memorySets               map[string]*memorySetInstanceMetrics
+	currentMemorySetHostName string
+	currentMemorySetDBName   string
+	currentMemorySetType     string
+	currentMemorySetMember   int64
 
 	// Prefetcher instance tracking (Screen 15)
-	prefetchers              map[string]*prefetcherInstanceMetrics
-	currentBufferPoolName    string
+	prefetchers           map[string]*prefetcherInstanceMetrics
+	currentBufferPoolName string
 }
 
 type serverInfo struct {
@@ -262,7 +262,6 @@ func (d *DB2) Init(ctx context.Context) error {
 		d.indexSelector = m
 	}
 
-
 	return nil
 }
 
@@ -329,12 +328,12 @@ func (d *DB2) initDatabase(ctx context.Context) (*sql.DB, error) {
 		// For now, just try to use ODBC with the DSN as-is
 		// In practice, the DSN would need to be converted from DB2 format to ODBC format
 		odbcDSN := convertDB2DSNToODBC(d.DSN)
-		
+
 		db, err = sql.Open("odbcbridge", odbcDSN)
 		if err != nil {
 			return nil, fmt.Errorf("error opening ODBC bridge connection with converted DSN: %v", err)
 		}
-		
+
 		d.Infof("connected to DB2 using optimized ODBC bridge with converted DSN")
 	}
 
@@ -739,7 +738,7 @@ func (d *DB2) addVersionLabelsToCharts() {
 func (d *DB2) detectColumnOrganizedSupport(ctx context.Context) {
 	// Column-organized tables (BLU Acceleration) were introduced in DB2 10.5
 	// MON_GET_BUFFERPOOL always includes column metrics, even if zero
-	
+
 	if d.edition == "i" {
 		d.Infof("Column-organized tables not available on DB2 for i")
 		return
@@ -766,13 +765,13 @@ func (d *DB2) addColumnOrganizedCharts() {
 		bufferpoolColumnHitRatioChart.Copy(),
 		bufferpoolColumnReadsChart.Copy(),
 	}
-	
+
 	for _, chart := range columnCharts {
 		if err := d.charts.Add(chart); err != nil {
 			d.Warningf("failed to add column-organized chart %s: %v", chart.ID, err)
 		}
 	}
-	
+
 	d.Infof("Added %d column-organized buffer pool charts", len(columnCharts))
 }
 
@@ -796,7 +795,7 @@ func (d *DB2) addMemorySetCharts(setKey string) {
 
 func (d *DB2) removeMemorySetCharts(setKey string) {
 	setIdentifier := strings.ReplaceAll(setKey, ".", "_")
-	
+
 	// Mark all charts for this memory set as obsolete
 	for _, chart := range *d.charts {
 		if strings.Contains(chart.ID, fmt.Sprintf("memory_set_%s", setIdentifier)) {
@@ -804,7 +803,7 @@ func (d *DB2) removeMemorySetCharts(setKey string) {
 			chart.MarkNotCreated()
 		}
 	}
-	
+
 	d.Debugf("removed memory set charts for %s", setKey)
 }
 
@@ -819,7 +818,7 @@ func (d *DB2) addPrefetcherCharts(p *prefetcherInstanceMetrics, bufferPoolName s
 
 func (d *DB2) removePrefetcherCharts(bufferPoolName string) {
 	cleanName := cleanName(bufferPoolName)
-	
+
 	// Mark all charts for this prefetcher as obsolete
 	for _, chart := range *d.charts {
 		if strings.Contains(chart.ID, fmt.Sprintf("prefetcher_%s", cleanName)) {
@@ -827,6 +826,6 @@ func (d *DB2) removePrefetcherCharts(bufferPoolName string) {
 			chart.MarkNotCreated()
 		}
 	}
-	
+
 	d.Debugf("removed prefetcher charts for buffer pool %s", bufferPoolName)
 }

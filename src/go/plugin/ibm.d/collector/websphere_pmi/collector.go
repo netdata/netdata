@@ -148,13 +148,13 @@ type WebSpherePMI struct {
 	// Instance tracking for proper collection
 	collectedInstances map[string]bool
 	seenInstances      map[string]bool
-	
+
 	// TimeStatistic processing
 	timeStatCache map[string]*timeStatCacheEntry
-	
+
 	// AverageStatistic processing
 	avgStatCache map[string]*avgStatCacheEntry
-	
+
 	// Integral weighted average processing
 	integralCache map[string]*integralCacheEntry
 }
@@ -730,7 +730,7 @@ func (w *WebSpherePMI) detectWebSphereVersion(stats *pmiStatsResponse) {
 		w.Debugf("WebSphere version not detected, assuming traditional WAS")
 		w.wasVersion = "unknown"
 	}
-	
+
 	// Always add version labels (even if unknown)
 	w.addVersionLabelsToCharts()
 	w.adjustCollectionBasedOnVersion()
@@ -775,7 +775,7 @@ func (w *WebSpherePMI) adjustCollectionBasedOnVersion() {
 func (w *WebSpherePMI) getVersionLabels() []module.Label {
 	version := w.wasVersion
 	edition := w.wasEdition
-	
+
 	// Provide defaults if not set
 	if version == "" {
 		version = "unknown"
@@ -783,7 +783,7 @@ func (w *WebSpherePMI) getVersionLabels() []module.Label {
 	if edition == "" {
 		edition = "traditional"
 	}
-	
+
 	return []module.Label{
 		{Key: "was_version", Value: version},
 		{Key: "was_edition", Value: edition},

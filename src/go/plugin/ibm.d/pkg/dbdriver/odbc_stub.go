@@ -13,7 +13,7 @@ import (
 func init() {
 	// ODBC driver not enabled in this build (use -tags odbc to enable)
 	Register("odbc", &Driver{
-		Name:         "odbc", 
+		Name:         "odbc",
 		Description:  "ODBC driver (not enabled in this build - rebuild with -tags odbc)",
 		Available:    false,
 		RequiresCGO:  true,
@@ -37,26 +37,26 @@ func BuildODBCDSN(config *ConnectionConfig) string {
 	}
 
 	// Handle AS/400 specific format
-	if config.SystemType == "AS400" || 
-		strings.Contains(driverName, "AS400") || 
+	if config.SystemType == "AS400" ||
+		strings.Contains(driverName, "AS400") ||
 		strings.Contains(driverName, "IBM i") {
 		// AS/400 style ODBC connection
 		dsn := fmt.Sprintf("Driver={%s};System=%s;Uid=%s;Pwd=%s;",
 			driverName, config.Hostname, config.Username, config.Password)
-		
+
 		// AS/400 specific options
 		if config.Database != "" && config.Database != "*SYSBAS" {
 			dsn += fmt.Sprintf("DefaultLibraries=%s;", config.Database)
 		}
-		
+
 		if config.Port != 0 && config.Port != 8471 {
 			dsn += fmt.Sprintf("Port=%d;", config.Port)
 		}
-		
+
 		if config.UseSSL {
 			dsn += "SSL=1;"
 		}
-		
+
 		return dsn
 	}
 

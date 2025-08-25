@@ -17,7 +17,7 @@ var (
 		sqlStatementsChart.Copy(),
 		transactionActivityChart.Copy(),
 		timeSpentChart.Copy(),
-		
+
 		// Existing charts
 		serviceHealthChart.Copy(),
 		connectionsChart.Copy(),
@@ -36,12 +36,12 @@ var (
 		bufferpoolIndexReadsChart.Copy(),
 		bufferpoolXDAReadsChart.Copy(),
 		bufferpoolWritesChart.Copy(),
-		
+
 		// Enhanced logging charts (Screen 18)
 		logOperationsChart.Copy(),
 		logTimingChart.Copy(),
 		logBufferEventsChart.Copy(),
-		
+
 		// Existing log charts
 		logSpaceChart.Copy(),
 		logUtilizationChart.Copy(),
@@ -49,7 +49,7 @@ var (
 		longRunningQueriesChart.Copy(),
 		backupStatusChart.Copy(),
 		backupAgeChart.Copy(),
-		
+
 		// Federation charts (Screen 32)
 		federationConnectionsChart.Copy(),
 		federationOperationsChart.Copy(),
@@ -475,7 +475,7 @@ var (
 		Title:    "SQL Statements",
 		Units:    "statements/s",
 		Fam:      "activity/requests",
-		Ctx:      "db2.sql_statements", 
+		Ctx:      "db2.sql_statements",
 		Priority: module.Priority - 96,
 		Type:     module.Stacked,
 		Dims: module.Dims{
@@ -486,7 +486,7 @@ var (
 
 	transactionActivityChart = module.Chart{
 		ID:       "transaction_activity",
-		Title:    "Transaction Activity", 
+		Title:    "Transaction Activity",
 		Units:    "transactions/s",
 		Fam:      "activity/transactions",
 		Ctx:      "db2.transaction_activity",

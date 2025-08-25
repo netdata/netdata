@@ -19,7 +19,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
-	
+
 	// Import database drivers and connection utilities
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/pkg/dbdriver"
 	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/pkg/dbdriver"
@@ -63,17 +63,17 @@ func New() *AS400 {
 			JobQueueSelector:  "",
 		},
 
-		charts:        baseCharts.Copy(),
-		once:          &sync.Once{},
-		mx:            &metricsData{},
-		disks:         make(map[string]*diskMetrics),
-		subsystems:    make(map[string]*subsystemMetrics),
-		jobQueues:     make(map[string]*jobQueueMetrics),
-		messageQueues: make(map[string]*messageQueueMetrics),
-		tempStorageNamed: make(map[string]*tempStorageMetrics),
-		activeJobs:    make(map[string]*activeJobMetrics),
+		charts:            baseCharts.Copy(),
+		once:              &sync.Once{},
+		mx:                &metricsData{},
+		disks:             make(map[string]*diskMetrics),
+		subsystems:        make(map[string]*subsystemMetrics),
+		jobQueues:         make(map[string]*jobQueueMetrics),
+		messageQueues:     make(map[string]*messageQueueMetrics),
+		tempStorageNamed:  make(map[string]*tempStorageMetrics),
+		activeJobs:        make(map[string]*activeJobMetrics),
 		networkInterfaces: make(map[string]*networkInterfaceMetrics),
-		disabled:      make(map[string]bool),
+		disabled:          make(map[string]bool),
 	}
 }
 
@@ -111,7 +111,6 @@ type Config struct {
 	DiskSelector      string `yaml:"collect_disks_matching,omitempty" json:"collect_disks_matching"`
 	SubsystemSelector string `yaml:"collect_subsystems_matching,omitempty" json:"collect_subsystems_matching"`
 	JobQueueSelector  string `yaml:"collect_job_queues_matching,omitempty" json:"collect_job_queues_matching"`
-
 }
 
 type AS400 struct {
@@ -125,12 +124,12 @@ type AS400 struct {
 	mx   *metricsData
 
 	// Instance tracking
-	disks         map[string]*diskMetrics
-	subsystems    map[string]*subsystemMetrics
-	jobQueues     map[string]*jobQueueMetrics
-	messageQueues map[string]*messageQueueMetrics
-	tempStorageNamed map[string]*tempStorageMetrics
-	activeJobs    map[string]*activeJobMetrics
+	disks             map[string]*diskMetrics
+	subsystems        map[string]*subsystemMetrics
+	jobQueues         map[string]*jobQueueMetrics
+	messageQueues     map[string]*messageQueueMetrics
+	tempStorageNamed  map[string]*tempStorageMetrics
+	activeJobs        map[string]*activeJobMetrics
 	networkInterfaces map[string]*networkInterfaceMetrics
 
 	// Selectors
@@ -139,10 +138,10 @@ type AS400 struct {
 	jobQueueSelector  matcher.Matcher
 
 	// System info for labels
-	systemName          string
-	serialNumber        string
-	model               string
-	technologyRefresh   string // TR level (e.g., "TR1", "TR2", "TR3")
+	systemName        string
+	serialNumber      string
+	model             string
+	technologyRefresh string // TR level (e.g., "TR1", "TR2", "TR3")
 
 	// Resilience tracking
 	disabled       map[string]bool // Track disabled metrics and features
@@ -158,7 +157,7 @@ func (a *AS400) Configuration() any {
 
 func (a *AS400) Init(ctx context.Context) error {
 	a.Debugf("Init called with DSN='%s'", a.DSN)
-	
+
 	// If no DSN provided, try to build one from individual parameters
 	if a.DSN == "" {
 		a.Debugf("no DSN provided, checking individual parameters: hostname='%s', username='%s', password='%s'", a.Hostname, a.Username, a.Password)
@@ -174,7 +173,7 @@ func (a *AS400) Init(ctx context.Context) error {
 				ODBCDriver: a.ODBCDriver,
 				UseSSL:     a.UseSSL,
 			}
-			
+
 			// Use ODBC connection by default for AS/400
 			a.DSN = dbdriver.BuildODBCDSN(config)
 			a.Infof("built DSN from connection parameters for AS/400 system: %s", a.Hostname)
@@ -373,7 +372,7 @@ func isSQLTemporaryError(err error) bool {
 	errStr := strings.ToUpper(err.Error())
 	// Temporary database errors that should not fail the job
 	return strings.Contains(errStr, "SQL0519") || // prepared statement in use
-		strings.Contains(errStr, "SQLCODE=-519")   // alternative format
+		strings.Contains(errStr, "SQLCODE=-519") // alternative format
 }
 
 // collectSingleMetric executes a single-value query and handles errors gracefully
@@ -544,12 +543,12 @@ func (a *AS400) parseIBMiVersion() {
 
 	// Parse version strings like "V7 R3", "V7R3M0", "V7R4M0 L", "7.3", "7.4.0", etc.
 	versionStr := strings.ToUpper(strings.TrimSpace(a.osVersion))
-	
+
 	// Remove any trailing letters/spaces (e.g., "V7R4M0 L" -> "V7R4M0")
 	if idx := strings.IndexAny(versionStr, " L"); idx > 0 {
 		versionStr = versionStr[:idx]
 	}
-	
+
 	// Remove all spaces for parsing
 	versionStr = strings.ReplaceAll(versionStr, " ", "")
 

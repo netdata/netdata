@@ -35,15 +35,15 @@ type Class struct {
 }
 
 type Context struct {
-	Name         string      `yaml:"name"`
-	Context      string      `yaml:"context"`
-	Family       string      `yaml:"family"`
-	Title        string      `yaml:"title"`
-	Units        string      `yaml:"units"`
-	Type         string      `yaml:"type"`
-	Priority     int         `yaml:"priority"`
-	UpdateEvery  int         `yaml:"update_every"`
-	Dimensions   []Dimension `yaml:"dimensions"`
+	Name        string      `yaml:"name"`
+	Context     string      `yaml:"context"`
+	Family      string      `yaml:"family"`
+	Title       string      `yaml:"title"`
+	Units       string      `yaml:"units"`
+	Type        string      `yaml:"type"`
+	Priority    int         `yaml:"priority"`
+	UpdateEvery int         `yaml:"update_every"`
+	Dimensions  []Dimension `yaml:"dimensions"`
 }
 
 type Dimension struct {
@@ -56,16 +56,16 @@ type Dimension struct {
 
 // ConfigField represents a configuration field for schema generation
 type ConfigField struct {
-	Name         string
-	JSONName     string
-	Type         string
-	Required     bool
-	Default      interface{}
-	Description  string
-	Format       string
-	Minimum      *int
-	Maximum      *int
-	Examples     []string
+	Name        string
+	JSONName    string
+	Type        string
+	Required    bool
+	Default     interface{}
+	Description string
+	Format      string
+	Minimum     *int
+	Maximum     *int
+	Examples    []string
 }
 
 func main() {
@@ -487,7 +487,6 @@ modules:
               dimensions:{{range .Dimensions}}
                 - name: {{.Name}}{{end}}{{end}}{{end}}{{end}}
 `
-
 
 const readmeTemplate = `# {{.ModuleInfo.DisplayName}} collector
 

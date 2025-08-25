@@ -21,16 +21,16 @@ func (w *WebSpherePMI) logParsingFailure(parserName, statName string, stat *pmiS
 			missing = append(missing, expected)
 		}
 	}
-	
+
 	if len(missing) == 0 {
 		return
 	}
-	
+
 	// Log detailed failure information
 	w.Errorf("ISSUE: failed to parse %s metrics in stat '%s'", parserName, statName)
 	w.Errorf("  Missing metrics: %v", missing)
 	w.Errorf("  Stat hierarchy: %s", statName)
-	
+
 	// Log available CountStatistics
 	if len(stat.CountStatistics) > 0 {
 		w.Errorf("  Available CountStatistics:")
@@ -38,7 +38,7 @@ func (w *WebSpherePMI) logParsingFailure(parserName, statName string, stat *pmiS
 			w.Errorf("    - %s (count=%s)", cs.Name, cs.Count)
 		}
 	}
-	
+
 	// Log available TimeStatistics
 	if len(stat.TimeStatistics) > 0 {
 		w.Errorf("  Available TimeStatistics:")
@@ -46,7 +46,7 @@ func (w *WebSpherePMI) logParsingFailure(parserName, statName string, stat *pmiS
 			w.Errorf("    - %s (count=%s, total=%s)", ts.Name, ts.Count, ts.TotalTime)
 		}
 	}
-	
+
 	// Log available RangeStatistics
 	if len(stat.RangeStatistics) > 0 {
 		w.Errorf("  Available RangeStatistics:")
@@ -54,7 +54,7 @@ func (w *WebSpherePMI) logParsingFailure(parserName, statName string, stat *pmiS
 			w.Errorf("    - %s (value=%s)", rs.Name, rs.Current)
 		}
 	}
-	
+
 	// Log available BoundedRangeStatistics
 	if len(stat.BoundedRangeStatistics) > 0 {
 		w.Errorf("  Available BoundedRangeStatistics:")
@@ -62,7 +62,7 @@ func (w *WebSpherePMI) logParsingFailure(parserName, statName string, stat *pmiS
 			w.Errorf("    - %s (value=%s)", brs.Name, brs.Current)
 		}
 	}
-	
+
 	// Log available AverageStatistics
 	if len(stat.AverageStatistics) > 0 {
 		w.Errorf("  Available AverageStatistics:")
@@ -70,7 +70,7 @@ func (w *WebSpherePMI) logParsingFailure(parserName, statName string, stat *pmiS
 			w.Errorf("    - %s (count=%s, total=%s)", as.Name, as.Count, as.Total)
 		}
 	}
-	
+
 	// Log available DoubleStatistics
 	if len(stat.DoubleStatistics) > 0 {
 		w.Errorf("  Available DoubleStatistics:")
@@ -78,7 +78,7 @@ func (w *WebSpherePMI) logParsingFailure(parserName, statName string, stat *pmiS
 			w.Errorf("    - %s (double=%s)", ds.Name, ds.Double)
 		}
 	}
-	
+
 	// Log sub-stats if any
 	if len(stat.SubStats) > 0 {
 		w.Errorf("  Available SubStats:")
@@ -91,16 +91,16 @@ func (w *WebSpherePMI) logParsingFailure(parserName, statName string, stat *pmiS
 // parseWebApplicationsContainer handles the Web Applications container
 func (w *WebSpherePMI) parseWebApplicationsContainer(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	instance := fmt.Sprintf("%s.%s", nodeName, serverName)
-	
+
 	// Create charts if not exists
 	w.ensureWebAppContainerCharts(instance, nodeName, serverName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("webapp_container", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
@@ -116,7 +116,7 @@ func (w *WebSpherePMI) parseWebApplicationsContainer(stat *pmiStat, nodeName, se
 			w.collectCountMetric(mx, "webapp_container", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	labels := append([]module.Label{
@@ -124,7 +124,7 @@ func (w *WebSpherePMI) parseWebApplicationsContainer(stat *pmiStat, nodeName, se
 		{Key: "node", Value: nodeName},
 		{Key: "server", Value: serverName},
 	}, w.getVersionLabels()...)
-	
+
 	for i, metric := range timeMetrics {
 		w.processTimeStatisticWithContext(
 			"webapp_container",
@@ -135,28 +135,28 @@ func (w *WebSpherePMI) parseWebApplicationsContainer(stat *pmiStat, nodeName, se
 			100+i*10, // Offset priority after main charts
 		)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
 		// Use collection helper for all range metrics
 		w.collectRangeMetric(mx, "webapp_container", cleanInst, metric)
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		// Use collection helper for all bounded range metrics
 		w.collectBoundedRangeMetric(mx, "webapp_container", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		// Use collection helper for all average metrics
 		w.collectAverageMetric(mx, "webapp_container", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -169,16 +169,16 @@ func (w *WebSpherePMI) parseWebApplicationsContainer(stat *pmiStat, nodeName, se
 func (w *WebSpherePMI) parseWebApplication(stat *pmiStat, nodeName, serverName string, mx map[string]int64, path []string) {
 	appName := stat.Name
 	instance := fmt.Sprintf("%s.%s.%s", nodeName, serverName, appName)
-	
+
 	// Create charts if not exists
 	w.ensureWebAppCharts(instance, nodeName, serverName, appName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("webapp", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
@@ -192,7 +192,7 @@ func (w *WebSpherePMI) parseWebApplication(stat *pmiStat, nodeName, serverName s
 			w.collectCountMetric(mx, "webapp", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	labels := append([]module.Label{
@@ -201,7 +201,7 @@ func (w *WebSpherePMI) parseWebApplication(stat *pmiStat, nodeName, serverName s
 		{Key: "server", Value: serverName},
 		{Key: "application", Value: appName},
 	}, w.getVersionLabels()...)
-	
+
 	for i, metric := range timeMetrics {
 		w.processTimeStatisticWithContext(
 			"webapp",
@@ -212,35 +212,35 @@ func (w *WebSpherePMI) parseWebApplication(stat *pmiStat, nodeName, serverName s
 			100+i*10, // Offset priority after main charts
 		)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
 		// Use collection helper for all range metrics
 		w.collectRangeMetric(mx, "webapp", cleanInst, metric)
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		// Use collection helper for all bounded range metrics
 		w.collectBoundedRangeMetric(mx, "webapp", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		// Use collection helper for all average metrics
 		w.collectAverageMetric(mx, "webapp", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
 		// Use collection helper for all double metrics
 		w.collectDoubleMetric(mx, "webapp", cleanInst, metric)
 	}
-	
+
 	// Process child components (Servlets, Sessions)
 	for _, child := range stat.SubStats {
 		switch child.Name {
@@ -262,16 +262,16 @@ func (w *WebSpherePMI) parseServletsContainer(stat *pmiStat, nodeName, serverNam
 func (w *WebSpherePMI) parseServlet(stat *pmiStat, nodeName, serverName, appName string, mx map[string]int64) {
 	servletName := stat.Name
 	instance := fmt.Sprintf("%s.%s.%s.%s", nodeName, serverName, appName, servletName)
-	
+
 	// Create charts if not exists
 	w.ensureServletCharts(instance, nodeName, serverName, appName, servletName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("servlet", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
@@ -285,7 +285,7 @@ func (w *WebSpherePMI) parseServlet(stat *pmiStat, nodeName, serverName, appName
 			w.collectCountMetric(mx, "servlet", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	labels := append([]module.Label{
@@ -295,7 +295,7 @@ func (w *WebSpherePMI) parseServlet(stat *pmiStat, nodeName, serverName, appName
 		{Key: "application", Value: appName},
 		{Key: "servlet", Value: servletName},
 	}, w.getVersionLabels()...)
-	
+
 	for i, metric := range timeMetrics {
 		// Process all TimeStatistics with the smart processor
 		w.processTimeStatisticWithContext(
@@ -307,7 +307,7 @@ func (w *WebSpherePMI) parseServlet(stat *pmiStat, nodeName, serverName, appName
 			100+i*10, // Offset priority after main charts
 		)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
@@ -319,35 +319,35 @@ func (w *WebSpherePMI) parseServlet(stat *pmiStat, nodeName, serverName, appName
 			w.collectRangeMetric(mx, "servlet", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		// Use collection helper for all bounded range metrics
 		w.collectBoundedRangeMetric(mx, "servlet", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		// Use collection helper for all average metrics
 		w.collectAverageMetric(mx, "servlet", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
 		// Use collection helper for all double metrics
 		w.collectDoubleMetric(mx, "servlet", cleanInst, metric)
 	}
-	
+
 }
 
 // parseSessionManagerContainer handles the Servlet Session Manager
 func (w *WebSpherePMI) parseSessionManagerContainer(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	// Container-level instance (for global session metrics if they exist at this level)
 	instance := fmt.Sprintf("%s.%s", nodeName, serverName)
-	
+
 	// Only process container-level session metrics if there are no children
 	// (indicating this is a direct session manager, not just a container)
 	if len(stat.SubStats) == 0 {
@@ -356,12 +356,12 @@ func (w *WebSpherePMI) parseSessionManagerContainer(stat *pmiStat, nodeName, ser
 	} else {
 		// Process container-level metrics if any exist
 		if len(stat.CountStatistics) > 0 || len(stat.TimeStatistics) > 0 || len(stat.RangeStatistics) > 0 ||
-		   len(stat.BoundedRangeStatistics) > 0 || len(stat.AverageStatistics) > 0 || len(stat.DoubleStatistics) > 0 {
+			len(stat.BoundedRangeStatistics) > 0 || len(stat.AverageStatistics) > 0 || len(stat.DoubleStatistics) > 0 {
 			// Container-level session metrics belong in web/containers family
 			w.parseContainerSessionMetrics(stat, instance, nodeName, serverName, mx)
 		}
 	}
-	
+
 	// Process per-application session managers (children)
 	for _, child := range stat.SubStats {
 		if strings.Contains(child.Name, "#") || strings.Contains(child.Name, ".war") {
@@ -376,13 +376,13 @@ func (w *WebSpherePMI) parseSessionManagerContainer(stat *pmiStat, nodeName, ser
 func (w *WebSpherePMI) parseSessionMetrics(stat *pmiStat, instance, nodeName, serverName, appName string, mx map[string]int64) {
 	// Create charts if not exists
 	w.ensureSessionCharts(instance, nodeName, serverName, appName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("sessions", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
@@ -406,7 +406,7 @@ func (w *WebSpherePMI) parseSessionMetrics(stat *pmiStat, instance, nodeName, se
 			w.collectCountMetric(mx, "sessions", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	labels := append([]module.Label{
@@ -415,7 +415,7 @@ func (w *WebSpherePMI) parseSessionMetrics(stat *pmiStat, instance, nodeName, se
 		{Key: "server", Value: serverName},
 		{Key: "application", Value: appName},
 	}, w.getVersionLabels()...)
-	
+
 	for i, metric := range timeMetrics {
 		// Process all TimeStatistics with the smart processor
 		// Note: SessionObjectSize can appear as both TimeStatistic (app-level) and AverageStatistic (container-level)
@@ -429,7 +429,7 @@ func (w *WebSpherePMI) parseSessionMetrics(stat *pmiStat, instance, nodeName, se
 			100+i*10, // Offset priority after main charts
 		)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
@@ -443,14 +443,14 @@ func (w *WebSpherePMI) parseSessionMetrics(stat *pmiStat, instance, nodeName, se
 			w.collectRangeMetric(mx, "sessions", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		// Use collection helper for all bounded range metrics
 		w.collectBoundedRangeMetric(mx, "sessions", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
@@ -458,7 +458,7 @@ func (w *WebSpherePMI) parseSessionMetrics(stat *pmiStat, instance, nodeName, se
 		// Note: SessionObjectSize at container level is handled in parseContainerSessionMetrics
 		w.collectAverageMetric(mx, "sessions", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -472,32 +472,32 @@ func (w *WebSpherePMI) parseSessionMetrics(stat *pmiStat, instance, nodeName, se
 func (w *WebSpherePMI) parseContainerSessionMetrics(stat *pmiStat, instance, nodeName, serverName string, mx map[string]int64) {
 	// Create charts if not exists
 	w.ensureWebAppContainerSessionCharts(instance, nodeName, serverName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("webapp_container_sessions", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// For container-level session metrics, use webapp_container prefix
 	// This ensures they appear in web/containers family
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
 		// Use collection helper for all count metrics
 		w.collectCountMetric(mx, "webapp_container_sessions", cleanInst, metric)
 	}
-	
+
 	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	labels := append([]module.Label{
 		{Key: "instance", Value: instance},
 		{Key: "node", Value: nodeName},
 		{Key: "server", Value: serverName},
-		{Key: "application", Value: "_container_"},  // Add placeholder for consistency with app-level sessions
+		{Key: "application", Value: "_container_"}, // Add placeholder for consistency with app-level sessions
 	}, w.getVersionLabels()...)
-	
+
 	for i, metric := range timeMetrics {
 		// Process all TimeStatistics with the smart processor
 		w.processTimeStatisticWithContext(
@@ -509,21 +509,21 @@ func (w *WebSpherePMI) parseContainerSessionMetrics(stat *pmiStat, instance, nod
 			3450+i*10, // Priority in web/containers range
 		)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
 		// Use collection helper for all range metrics
 		w.collectRangeMetric(mx, "webapp_container_sessions", cleanInst, metric)
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		// Use collection helper for all bounded range metrics
 		w.collectBoundedRangeMetric(mx, "webapp_container_sessions", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for i, metric := range avgMetrics {
@@ -537,7 +537,7 @@ func (w *WebSpherePMI) parseContainerSessionMetrics(stat *pmiStat, instance, nod
 				metric,
 				mx,
 				10+i*10, // Priority offset
-				"bytes",  // SessionObjectSize is measured in bytes
+				"bytes", // SessionObjectSize is measured in bytes
 			)
 		case "ExternalReadSize":
 			// Use smart processor with context-aware routing for ExternalReadSize
@@ -548,7 +548,7 @@ func (w *WebSpherePMI) parseContainerSessionMetrics(stat *pmiStat, instance, nod
 				metric,
 				mx,
 				20+i*10, // Priority offset
-				"bytes",  // ExternalReadSize is measured in bytes
+				"bytes", // ExternalReadSize is measured in bytes
 			)
 		case "ExternalWriteSize":
 			// Use smart processor with context-aware routing for ExternalWriteSize
@@ -559,14 +559,14 @@ func (w *WebSpherePMI) parseContainerSessionMetrics(stat *pmiStat, instance, nod
 				metric,
 				mx,
 				30+i*10, // Priority offset
-				"bytes",  // ExternalWriteSize is measured in bytes
+				"bytes", // ExternalWriteSize is measured in bytes
 			)
 		default:
 			// Use collection helper for unknown average metrics
 			w.collectAverageMetric(mx, "webapp_container_sessions", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -578,16 +578,16 @@ func (w *WebSpherePMI) parseContainerSessionMetrics(stat *pmiStat, instance, nod
 // parseCacheComponent handles standalone cache components like "Object Cache" and "Counters"
 func (w *WebSpherePMI) parseCacheComponent(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	instance := fmt.Sprintf("%s.%s", nodeName, serverName)
-	
+
 	// Create charts if not exists
 	w.ensureCacheCharts(instance, nodeName, serverName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("cache", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
@@ -617,7 +617,7 @@ func (w *WebSpherePMI) parseCacheComponent(stat *pmiStat, nodeName, serverName s
 			w.collectCountMetric(mx, "cache", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	labels := append([]module.Label{
@@ -625,7 +625,7 @@ func (w *WebSpherePMI) parseCacheComponent(stat *pmiStat, nodeName, serverName s
 		{Key: "node", Value: nodeName},
 		{Key: "server", Value: serverName},
 	}, w.getVersionLabels()...)
-	
+
 	for i, metric := range timeMetrics {
 		w.processTimeStatisticWithContext(
 			"cache",
@@ -636,25 +636,25 @@ func (w *WebSpherePMI) parseCacheComponent(stat *pmiStat, nodeName, serverName s
 			100+i*10, // Offset priority after main charts
 		)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
 		w.collectRangeMetric(mx, "cache", cleanInst, metric)
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		w.collectBoundedRangeMetric(mx, "cache", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		w.collectAverageMetric(mx, "cache", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -665,16 +665,16 @@ func (w *WebSpherePMI) parseCacheComponent(stat *pmiStat, nodeName, serverName s
 // parseDynamicCacheContainer handles Dynamic Cache metrics
 func (w *WebSpherePMI) parseDynamicCacheContainer(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	instance := fmt.Sprintf("%s.%s", nodeName, serverName)
-	
+
 	// Create charts if not exists
 	w.ensureCacheCharts(instance, nodeName, serverName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("cache", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
@@ -700,7 +700,7 @@ func (w *WebSpherePMI) parseDynamicCacheContainer(stat *pmiStat, nodeName, serve
 			w.collectCountMetric(mx, "cache", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	labels := append([]module.Label{
@@ -708,7 +708,7 @@ func (w *WebSpherePMI) parseDynamicCacheContainer(stat *pmiStat, nodeName, serve
 		{Key: "node", Value: nodeName},
 		{Key: "server", Value: serverName},
 	}, w.getVersionLabels()...)
-	
+
 	for i, metric := range timeMetrics {
 		w.processTimeStatisticWithContext(
 			"cache",
@@ -719,35 +719,35 @@ func (w *WebSpherePMI) parseDynamicCacheContainer(stat *pmiStat, nodeName, serve
 			100+i*10, // Offset priority after main charts
 		)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
 		// Use collection helper for all range metrics
 		w.collectRangeMetric(mx, "cache", cleanInst, metric)
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		// Use collection helper for all bounded range metrics
 		w.collectBoundedRangeMetric(mx, "cache", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		// Use collection helper for all average metrics
 		w.collectAverageMetric(mx, "cache", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
 		// Use collection helper for all double metrics
 		w.collectDoubleMetric(mx, "cache", cleanInst, metric)
 	}
-	
+
 	// Process child cache objects
 	for _, child := range stat.SubStats {
 		if strings.HasPrefix(child.Name, "Object:") {
@@ -762,16 +762,16 @@ func (w *WebSpherePMI) parseCacheObject(stat *pmiStat, nodeName, serverName stri
 	// cacheName := strings.TrimPrefix(stat.Name, "Object: ") // Not used - aggregating all cache objects
 	// Use aggregated instance name for NIDL compliance
 	instance := fmt.Sprintf("%s.%s.Object_Cache", nodeName, serverName)
-	
+
 	// Create charts if not exists
 	w.ensureObjectCacheCharts(instance, nodeName, serverName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("object_cache", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Process direct CountStatistics at the top level
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
@@ -785,7 +785,7 @@ func (w *WebSpherePMI) parseCacheObject(stat *pmiStat, nodeName, serverName stri
 			w.collectCountMetric(mx, "object_cache", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	labels := append([]module.Label{
@@ -793,7 +793,7 @@ func (w *WebSpherePMI) parseCacheObject(stat *pmiStat, nodeName, serverName stri
 		{Key: "node", Value: nodeName},
 		{Key: "server", Value: serverName},
 	}, w.getVersionLabels()...)
-	
+
 	for i, metric := range timeMetrics {
 		w.processTimeStatisticWithContext(
 			"object_cache",
@@ -804,27 +804,27 @@ func (w *WebSpherePMI) parseCacheObject(stat *pmiStat, nodeName, serverName stri
 			100+i*10, // Offset priority after main charts
 		)
 	}
-	
+
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
 		w.collectRangeMetric(mx, "object_cache", cleanInst, metric)
 	}
-	
+
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		w.collectBoundedRangeMetric(mx, "object_cache", cleanInst, metric)
 	}
-	
+
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		w.collectAverageMetric(mx, "object_cache", cleanInst, metric)
 	}
-	
+
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
 		w.collectDoubleMetric(mx, "object_cache", cleanInst, metric)
 	}
-	
+
 	// Process "Object Cache" sub-stat for additional metrics
 	for _, child := range stat.SubStats {
 		if child.Name == "Object Cache" {
@@ -833,20 +833,20 @@ func (w *WebSpherePMI) parseCacheObject(stat *pmiStat, nodeName, serverName stri
 			for _, metric := range childCountMetrics {
 				// Skip metrics that are handled elsewhere to avoid duplicates
 				switch metric.Name {
-				case "HitsInMemoryCount", "HitsOnDiskCount", "MissCount", 
-				     "InMemoryAndDiskCacheEntryCount", "RemoteHitCount",
-				     "ClientRequestCount", "DistributedRequestCount",
-				     "ExplicitInvalidationCount", "ExplicitDiskInvalidationCount",
-				     "ExplicitMemoryInvalidationCount", "LocalExplicitInvalidationCount",
-				     "RemoteExplicitInvalidationCount", "LruInvalidationCount",
-				     "TimeoutInvalidationCount", "RemoteCreationCount":
+				case "HitsInMemoryCount", "HitsOnDiskCount", "MissCount",
+					"InMemoryAndDiskCacheEntryCount", "RemoteHitCount",
+					"ClientRequestCount", "DistributedRequestCount",
+					"ExplicitInvalidationCount", "ExplicitDiskInvalidationCount",
+					"ExplicitMemoryInvalidationCount", "LocalExplicitInvalidationCount",
+					"RemoteExplicitInvalidationCount", "LruInvalidationCount",
+					"TimeoutInvalidationCount", "RemoteCreationCount":
 					// These are handled in the Counters sub-stat
 					continue
 				default:
 					w.collectCountMetric(mx, "object_cache", cleanInst, metric)
 				}
 			}
-			
+
 			// Look for "Counters" sub-stat
 			for _, counters := range child.SubStats {
 				if counters.Name == "Counters" {
@@ -890,7 +890,7 @@ func (w *WebSpherePMI) parseCacheObject(stat *pmiStat, nodeName, serverName stri
 							w.collectCountMetric(mx, "object_cache", cleanInst, metric)
 						}
 					}
-					
+
 					// Also process any other statistic types in Counters with smart processor
 					counterTimeMetrics := w.extractTimeStatistics(counters.TimeStatistics)
 					for j, metric := range counterTimeMetrics {
@@ -903,22 +903,22 @@ func (w *WebSpherePMI) parseCacheObject(stat *pmiStat, nodeName, serverName stri
 							200+j*10, // Higher priority offset for counter metrics
 						)
 					}
-					
+
 					counterRangeMetrics := w.extractRangeStatistics(counters.RangeStatistics)
 					for _, metric := range counterRangeMetrics {
 						w.collectRangeMetric(mx, "object_cache", cleanInst, metric)
 					}
-					
+
 					counterBoundedMetrics := w.extractBoundedRangeStatistics(counters.BoundedRangeStatistics)
 					for _, metric := range counterBoundedMetrics {
 						w.collectBoundedRangeMetric(mx, "object_cache", cleanInst, metric)
 					}
-					
+
 					counterAvgMetrics := w.extractAverageStatistics(counters.AverageStatistics)
 					for _, metric := range counterAvgMetrics {
 						w.collectAverageMetric(mx, "object_cache", cleanInst, metric)
 					}
-					
+
 					counterDoubleMetrics := w.extractDoubleStatistics(counters.DoubleStatistics)
 					for _, metric := range counterDoubleMetrics {
 						w.collectDoubleMetric(mx, "object_cache", cleanInst, metric)
@@ -932,16 +932,16 @@ func (w *WebSpherePMI) parseCacheObject(stat *pmiStat, nodeName, serverName stri
 // parseORB handles ORB (Object Request Broker) metrics
 func (w *WebSpherePMI) parseORB(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	instance := fmt.Sprintf("%s.%s", nodeName, serverName)
-	
+
 	// Create charts if not exists
 	w.ensureORBCharts(instance, nodeName, serverName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("orb", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
@@ -953,7 +953,7 @@ func (w *WebSpherePMI) parseORB(stat *pmiStat, nodeName, serverName string, mx m
 			w.collectCountMetric(mx, "orb", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	labels := append([]module.Label{
@@ -961,7 +961,7 @@ func (w *WebSpherePMI) parseORB(stat *pmiStat, nodeName, serverName string, mx m
 		{Key: "node", Value: nodeName},
 		{Key: "server", Value: serverName},
 	}, w.getVersionLabels()...)
-	
+
 	for i, metric := range timeMetrics {
 		// Process all TimeStatistics with the smart processor
 		w.processTimeStatisticWithContext(
@@ -973,7 +973,7 @@ func (w *WebSpherePMI) parseORB(stat *pmiStat, nodeName, serverName string, mx m
 			100+i*10, // Offset priority after main charts
 		)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
@@ -985,21 +985,21 @@ func (w *WebSpherePMI) parseORB(stat *pmiStat, nodeName, serverName string, mx m
 			w.collectRangeMetric(mx, "orb", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		// Use collection helper for all bounded range metrics
 		w.collectBoundedRangeMetric(mx, "orb", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		// Use collection helper for all average metrics
 		w.collectAverageMetric(mx, "orb", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -1019,7 +1019,7 @@ func (w *WebSpherePMI) ensureWebAppCharts(instance, nodeName, serverName, appNam
 	chartKey := fmt.Sprintf("webapp_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		// Create web app charts
 		charts := webAppChartsTmpl.Copy()
 		for _, chart := range *charts {
@@ -1034,7 +1034,7 @@ func (w *WebSpherePMI) ensureWebAppCharts(instance, nodeName, serverName, appNam
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -1045,7 +1045,7 @@ func (w *WebSpherePMI) ensureServletCharts(instance, nodeName, serverName, appNa
 	chartKey := fmt.Sprintf("servlet_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		// Create servlet charts
 		charts := servletChartsTmpl.Copy()
 		for _, chart := range *charts {
@@ -1061,7 +1061,7 @@ func (w *WebSpherePMI) ensureServletCharts(instance, nodeName, serverName, appNa
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -1072,7 +1072,7 @@ func (w *WebSpherePMI) ensureSessionCharts(instance, nodeName, serverName, appNa
 	chartKey := fmt.Sprintf("sessions_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		// Create session charts
 		charts := sessionChartsTmpl.Copy()
 		for _, chart := range *charts {
@@ -1087,7 +1087,7 @@ func (w *WebSpherePMI) ensureSessionCharts(instance, nodeName, serverName, appNa
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -1098,7 +1098,7 @@ func (w *WebSpherePMI) ensureORBCharts(instance, nodeName, serverName string) {
 	chartKey := fmt.Sprintf("orb_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		// Create ORB charts
 		charts := orbChartsTmpl.Copy()
 		for _, chart := range *charts {
@@ -1112,7 +1112,7 @@ func (w *WebSpherePMI) ensureORBCharts(instance, nodeName, serverName string) {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -1123,7 +1123,7 @@ func (w *WebSpherePMI) ensureCacheCharts(instance, nodeName, serverName string) 
 	chartKey := fmt.Sprintf("cache_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		// Create cache charts
 		charts := cacheChartsTmpl.Copy()
 		for _, chart := range *charts {
@@ -1137,7 +1137,7 @@ func (w *WebSpherePMI) ensureCacheCharts(instance, nodeName, serverName string) 
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -1148,7 +1148,7 @@ func (w *WebSpherePMI) ensureCacheObjectCharts(instance, nodeName, serverName, c
 	chartKey := fmt.Sprintf("cache_object_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		// Create cache object charts
 		charts := cacheObjectChartsTmpl.Copy()
 		for _, chart := range *charts {
@@ -1162,7 +1162,7 @@ func (w *WebSpherePMI) ensureCacheObjectCharts(instance, nodeName, serverName, c
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -1173,13 +1173,13 @@ func (w *WebSpherePMI) ensureWebAppContainerCharts(instance, nodeName, serverNam
 	chartKey := fmt.Sprintf("webapp_container_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		// Create webapp container charts
 		charts := webAppContainerChartsTmpl.Copy()
 		family, _ := getContextMetadata("webapp_container")
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
-			chart.Fam = family  // Use correct family from context metadata
+			chart.Fam = family // Use correct family from context metadata
 			chart.Labels = w.createChartLabels(
 				module.Label{Key: "instance", Value: instance},
 				module.Label{Key: "node", Value: nodeName},
@@ -1189,7 +1189,7 @@ func (w *WebSpherePMI) ensureWebAppContainerCharts(instance, nodeName, serverNam
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -1200,7 +1200,7 @@ func (w *WebSpherePMI) ensureObjectPoolCharts(instance, nodeName, serverName, po
 	chartKey := fmt.Sprintf("object_pool_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		// Create object pool charts
 		charts := objectPoolChartsTmpl.Copy()
 		for _, chart := range *charts {
@@ -1214,7 +1214,7 @@ func (w *WebSpherePMI) ensureObjectPoolCharts(instance, nodeName, serverName, po
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -1225,12 +1225,12 @@ func (w *WebSpherePMI) ensureWebAppContainerSessionCharts(instance, nodeName, se
 	chartKey := fmt.Sprintf("webapp_container_sessions_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		cleanInst := w.cleanID(instance)
-		
+
 		// Get correct family for webapp_container_sessions
 		family, _ := getContextMetadata("webapp_container_sessions")
-		
+
 		// Create container active sessions chart
 		chartActive := &module.Chart{
 			ID:       fmt.Sprintf("webapp_container_sessions_%s_active", cleanInst),
@@ -1253,7 +1253,7 @@ func (w *WebSpherePMI) ensureWebAppContainerSessionCharts(instance, nodeName, se
 				{Key: "application", Value: "_container_"},
 			}, w.getVersionLabels()...),
 		}
-		
+
 		// Create container live sessions chart
 		chartLive := &module.Chart{
 			ID:       fmt.Sprintf("webapp_container_sessions_%s_live", cleanInst),
@@ -1276,7 +1276,7 @@ func (w *WebSpherePMI) ensureWebAppContainerSessionCharts(instance, nodeName, se
 				{Key: "application", Value: "_container_"},
 			}, w.getVersionLabels()...),
 		}
-		
+
 		// Create container session lifecycle chart
 		chartLifecycle := &module.Chart{
 			ID:       fmt.Sprintf("webapp_container_sessions_%s_lifecycle", cleanInst),
@@ -1299,7 +1299,7 @@ func (w *WebSpherePMI) ensureWebAppContainerSessionCharts(instance, nodeName, se
 				{Key: "application", Value: "_container_"},
 			}, w.getVersionLabels()...),
 		}
-		
+
 		// Create container session errors chart
 		chartErrors := &module.Chart{
 			ID:       fmt.Sprintf("webapp_container_sessions_%s_errors", cleanInst),
@@ -1321,10 +1321,10 @@ func (w *WebSpherePMI) ensureWebAppContainerSessionCharts(instance, nodeName, se
 				{Key: "application", Value: "_container_"},
 			}, w.getVersionLabels()...),
 		}
-		
+
 		// Note: ExternalReadSize and ExternalWriteSize charts are now created dynamically
 		// by processAverageStatisticWithContext with smart family routing
-		
+
 		// Add charts
 		if err := w.charts.Add(chartActive); err != nil {
 			w.Warning(err)
@@ -1346,7 +1346,7 @@ func (w *WebSpherePMI) ensureObjectCacheCharts(instance, nodeName, serverName st
 	chartKey := fmt.Sprintf("object_cache_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		// Create object cache charts
 		charts := objectCacheChartsTmpl.Copy()
 		for _, chart := range *charts {
@@ -1360,7 +1360,7 @@ func (w *WebSpherePMI) ensureObjectCacheCharts(instance, nodeName, serverName st
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -2159,23 +2159,23 @@ var orbChartsTmpl = module.Charts{
 func (w *WebSpherePMI) parseJCAConnectionPool(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	poolName := stat.Name
 	instance := fmt.Sprintf("%s.%s.%s", nodeName, serverName, poolName)
-	
+
 	// Determine if this is a container-level pool or a specific connection factory
 	isContainer := poolName == "JCA Connection Pools"
 	contextName := "jca_pool"
 	if isContainer {
 		contextName = "jca_container"
 	}
-	
+
 	// Create charts if not exists
 	w.ensureJCAPoolCharts(instance, nodeName, serverName, poolName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen(contextName, instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
@@ -2199,7 +2199,7 @@ func (w *WebSpherePMI) parseJCAConnectionPool(stat *pmiStat, nodeName, serverNam
 			w.collectCountMetric(mx, contextName, cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	labels := append([]module.Label{
@@ -2208,7 +2208,7 @@ func (w *WebSpherePMI) parseJCAConnectionPool(stat *pmiStat, nodeName, serverNam
 		{Key: "server", Value: serverName},
 		{Key: "pool", Value: poolName},
 	}, w.getVersionLabels()...)
-	
+
 	for i, metric := range timeMetrics {
 		// Process all TimeStatistics with the smart processor
 		w.processTimeStatisticWithContext(
@@ -2220,7 +2220,7 @@ func (w *WebSpherePMI) parseJCAConnectionPool(stat *pmiStat, nodeName, serverNam
 			100+i*10, // Offset priority after main charts
 		)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
@@ -2236,7 +2236,7 @@ func (w *WebSpherePMI) parseJCAConnectionPool(stat *pmiStat, nodeName, serverNam
 			w.collectRangeMetric(mx, contextName, cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
@@ -2250,14 +2250,14 @@ func (w *WebSpherePMI) parseJCAConnectionPool(stat *pmiStat, nodeName, serverNam
 			w.collectBoundedRangeMetric(mx, contextName, cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		// Use collection helper for all average metrics
 		w.collectAverageMetric(mx, contextName, cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -2270,16 +2270,16 @@ func (w *WebSpherePMI) parseJCAConnectionPool(stat *pmiStat, nodeName, serverNam
 func (w *WebSpherePMI) parseEnterpriseApplication(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	appName := stat.Name
 	instance := fmt.Sprintf("%s.%s.%s", nodeName, serverName, appName)
-	
+
 	// Create charts if not exists
 	w.ensureEnterpriseAppCharts(instance, nodeName, serverName, appName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("enterprise_app", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
@@ -2293,35 +2293,35 @@ func (w *WebSpherePMI) parseEnterpriseApplication(stat *pmiStat, nodeName, serve
 			w.collectCountMetric(mx, "enterprise_app", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL TimeStatistics
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	for _, metric := range timeMetrics {
 		// Use collection helper for all time metrics
 		w.collectTimeMetric(mx, "enterprise_app", cleanInst, metric)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
 		// Use collection helper for all range metrics
 		w.collectRangeMetric(mx, "enterprise_app", cleanInst, metric)
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		// Use collection helper for all bounded range metrics
 		w.collectBoundedRangeMetric(mx, "enterprise_app", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		// Use collection helper for all average metrics
 		w.collectAverageMetric(mx, "enterprise_app", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -2333,16 +2333,16 @@ func (w *WebSpherePMI) parseEnterpriseApplication(stat *pmiStat, nodeName, serve
 // parseSystemData handles System Data metrics
 func (w *WebSpherePMI) parseSystemData(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	instance := fmt.Sprintf("%s.%s", nodeName, serverName)
-	
+
 	// Create charts if not exists
 	w.ensureSystemDataCharts(instance, nodeName, serverName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("system_data", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
@@ -2356,28 +2356,28 @@ func (w *WebSpherePMI) parseSystemData(stat *pmiStat, nodeName, serverName strin
 			w.collectCountMetric(mx, "system_data", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL TimeStatistics
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	for _, metric := range timeMetrics {
 		// Use collection helper for all time metrics
 		w.collectTimeMetric(mx, "system_data", cleanInst, metric)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
 		// Use collection helper for all range metrics
 		w.collectRangeMetric(mx, "system_data", cleanInst, metric)
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		// Use collection helper for all bounded range metrics
 		w.collectBoundedRangeMetric(mx, "system_data", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	labels := append([]module.Label{
@@ -2385,7 +2385,7 @@ func (w *WebSpherePMI) parseSystemData(stat *pmiStat, nodeName, serverName strin
 		{Key: "node", Value: nodeName},
 		{Key: "server", Value: serverName},
 	}, w.getVersionLabels()...)
-	
+
 	for i, metric := range avgMetrics {
 		switch metric.Name {
 		case "CPUUsageSinceServerStarted":
@@ -2397,15 +2397,15 @@ func (w *WebSpherePMI) parseSystemData(stat *pmiStat, nodeName, serverName strin
 				labels,
 				metric,
 				mx,
-				1800+i*10, // Priority offset
-				"percentage",  // CPUUsageSinceServerStarted is a percentage
+				1800+i*10,    // Priority offset
+				"percentage", // CPUUsageSinceServerStarted is a percentage
 			)
 		default:
 			// For unknown average metrics, use collection helper
 			w.collectAverageMetric(mx, "system_data", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -2417,16 +2417,16 @@ func (w *WebSpherePMI) parseSystemData(stat *pmiStat, nodeName, serverName strin
 // parseWLM handles Work Load Management metrics
 func (w *WebSpherePMI) parseWLM(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	instance := fmt.Sprintf("%s.%s", nodeName, serverName)
-	
+
 	// Create charts if not exists
 	w.ensureWLMCharts(instance, nodeName, serverName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("wlm", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
@@ -2438,35 +2438,35 @@ func (w *WebSpherePMI) parseWLM(stat *pmiStat, nodeName, serverName string, mx m
 			w.collectCountMetric(mx, "wlm", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL TimeStatistics
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	for _, metric := range timeMetrics {
 		// Use collection helper for all time metrics
 		w.collectTimeMetric(mx, "wlm", cleanInst, metric)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
 		// Use collection helper for all range metrics
 		w.collectRangeMetric(mx, "wlm", cleanInst, metric)
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		// Use collection helper for all bounded range metrics
 		w.collectBoundedRangeMetric(mx, "wlm", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		// Use collection helper for all average metrics
 		w.collectAverageMetric(mx, "wlm", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -2478,30 +2478,30 @@ func (w *WebSpherePMI) parseWLM(stat *pmiStat, nodeName, serverName string, mx m
 // parseBeanManager handles Bean Manager metrics
 func (w *WebSpherePMI) parseBeanManager(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	instance := fmt.Sprintf("%s.%s", nodeName, serverName)
-	
+
 	// Create charts if not exists
 	w.ensureBeanManagerCharts(instance, nodeName, serverName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("bean_manager", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
 		// Use collection helper for all count metrics
 		w.collectCountMetric(mx, "bean_manager", cleanInst, metric)
 	}
-	
+
 	// Extract ALL TimeStatistics
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	for _, metric := range timeMetrics {
 		// Use collection helper for all time metrics
 		w.collectTimeMetric(mx, "bean_manager", cleanInst, metric)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
@@ -2513,21 +2513,21 @@ func (w *WebSpherePMI) parseBeanManager(stat *pmiStat, nodeName, serverName stri
 			w.collectRangeMetric(mx, "bean_manager", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		// Use collection helper for all bounded range metrics
 		w.collectBoundedRangeMetric(mx, "bean_manager", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		// Use collection helper for all average metrics
 		w.collectAverageMetric(mx, "bean_manager", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -2539,30 +2539,30 @@ func (w *WebSpherePMI) parseBeanManager(stat *pmiStat, nodeName, serverName stri
 // parseConnectionManager handles Connection Manager metrics
 func (w *WebSpherePMI) parseConnectionManager(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	instance := fmt.Sprintf("%s.%s", nodeName, serverName)
-	
+
 	// Create charts if not exists
 	w.ensureConnectionManagerCharts(instance, nodeName, serverName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("connection_manager", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
 		// Use collection helper for all count metrics
 		w.collectCountMetric(mx, "connection_manager", cleanInst, metric)
 	}
-	
+
 	// Extract ALL TimeStatistics
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	for _, metric := range timeMetrics {
 		// Use collection helper for all time metrics
 		w.collectTimeMetric(mx, "connection_manager", cleanInst, metric)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
@@ -2574,21 +2574,21 @@ func (w *WebSpherePMI) parseConnectionManager(stat *pmiStat, nodeName, serverNam
 			w.collectRangeMetric(mx, "connection_manager", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		// Use collection helper for all bounded range metrics
 		w.collectBoundedRangeMetric(mx, "connection_manager", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		// Use collection helper for all average metrics
 		w.collectAverageMetric(mx, "connection_manager", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -2601,16 +2601,16 @@ func (w *WebSpherePMI) parseConnectionManager(stat *pmiStat, nodeName, serverNam
 func (w *WebSpherePMI) parseJVMSubsystem(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	subsystem := stat.Name
 	instance := fmt.Sprintf("%s.%s.%s", nodeName, serverName, subsystem)
-	
+
 	// Create charts if not exists
 	w.ensureJVMSubsystemCharts(instance, nodeName, serverName, subsystem)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("jvm_subsystem", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
@@ -2647,7 +2647,7 @@ func (w *WebSpherePMI) parseJVMSubsystem(stat *pmiStat, nodeName, serverName str
 			w.collectCountMetric(mx, "jvm_subsystem", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL TimeStatistics
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	for _, metric := range timeMetrics {
@@ -2663,7 +2663,7 @@ func (w *WebSpherePMI) parseJVMSubsystem(stat *pmiStat, nodeName, serverName str
 		}
 		w.collectTimeMetric(mx, prefix, cleanInst, metric)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
@@ -2679,7 +2679,7 @@ func (w *WebSpherePMI) parseJVMSubsystem(stat *pmiStat, nodeName, serverName str
 		}
 		w.collectRangeMetric(mx, prefix, cleanInst, metric)
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
@@ -2695,7 +2695,7 @@ func (w *WebSpherePMI) parseJVMSubsystem(stat *pmiStat, nodeName, serverName str
 		}
 		w.collectBoundedRangeMetric(mx, prefix, cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
@@ -2711,7 +2711,7 @@ func (w *WebSpherePMI) parseJVMSubsystem(stat *pmiStat, nodeName, serverName str
 		}
 		w.collectAverageMetric(mx, prefix, cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -2732,16 +2732,16 @@ func (w *WebSpherePMI) parseJVMSubsystem(stat *pmiStat, nodeName, serverName str
 // parseEJBContainer handles EJB container metrics
 func (w *WebSpherePMI) parseEJBContainer(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	instance := fmt.Sprintf("%s.%s", nodeName, serverName)
-	
+
 	// Create charts if not exists
 	w.ensureEJBContainerCharts(instance, nodeName, serverName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("ejb_container", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
@@ -2753,7 +2753,7 @@ func (w *WebSpherePMI) parseEJBContainer(stat *pmiStat, nodeName, serverName str
 			w.collectCountMetric(mx, "ejb_container", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	labels := append([]module.Label{
@@ -2761,7 +2761,7 @@ func (w *WebSpherePMI) parseEJBContainer(stat *pmiStat, nodeName, serverName str
 		{Key: "node", Value: nodeName},
 		{Key: "server", Value: serverName},
 	}, w.getVersionLabels()...)
-	
+
 	for i, metric := range timeMetrics {
 		w.processTimeStatisticWithContext(
 			"ejb_container",
@@ -2772,28 +2772,28 @@ func (w *WebSpherePMI) parseEJBContainer(stat *pmiStat, nodeName, serverName str
 			100+i*10, // Offset priority after main charts
 		)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
 		// Use collection helper for all range metrics
 		w.collectRangeMetric(mx, "ejb_container", cleanInst, metric)
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		// Use collection helper for all bounded range metrics
 		w.collectBoundedRangeMetric(mx, "ejb_container", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		// Use collection helper for all average metrics
 		w.collectAverageMetric(mx, "ejb_container", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -2806,16 +2806,16 @@ func (w *WebSpherePMI) parseEJBContainer(stat *pmiStat, nodeName, serverName str
 func (w *WebSpherePMI) parseMDB(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	beanName := stat.Name
 	instance := fmt.Sprintf("%s.%s.%s", nodeName, serverName, beanName)
-	
+
 	// Create charts if not exists
 	w.ensureMDBCharts(instance, nodeName, serverName, beanName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("mdb", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
@@ -2829,7 +2829,7 @@ func (w *WebSpherePMI) parseMDB(stat *pmiStat, nodeName, serverName string, mx m
 			w.collectCountMetric(mx, "mdb", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	labels := append([]module.Label{
@@ -2838,7 +2838,7 @@ func (w *WebSpherePMI) parseMDB(stat *pmiStat, nodeName, serverName string, mx m
 		{Key: "server", Value: serverName},
 		{Key: "bean", Value: beanName},
 	}, w.getVersionLabels()...)
-	
+
 	for i, metric := range timeMetrics {
 		w.processTimeStatisticWithContext(
 			"mdb",
@@ -2849,28 +2849,28 @@ func (w *WebSpherePMI) parseMDB(stat *pmiStat, nodeName, serverName string, mx m
 			100+i*10, // Offset priority after main charts
 		)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
 		// Use collection helper for all range metrics
 		w.collectRangeMetric(mx, "mdb", cleanInst, metric)
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		// Use collection helper for all bounded range metrics
 		w.collectBoundedRangeMetric(mx, "mdb", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		// Use collection helper for all average metrics
 		w.collectAverageMetric(mx, "mdb", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -2883,16 +2883,16 @@ func (w *WebSpherePMI) parseMDB(stat *pmiStat, nodeName, serverName string, mx m
 func (w *WebSpherePMI) parseStatefulSessionBean(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	beanName := stat.Name
 	instance := fmt.Sprintf("%s.%s.%s", nodeName, serverName, beanName)
-	
+
 	// Create charts if not exists
 	w.ensureSFSBCharts(instance, nodeName, serverName, beanName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("sfsb", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
@@ -2910,14 +2910,14 @@ func (w *WebSpherePMI) parseStatefulSessionBean(stat *pmiStat, nodeName, serverN
 			w.collectCountMetric(mx, "sfsb", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL TimeStatistics
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	for _, metric := range timeMetrics {
 		// Use collection helper for all time metrics
 		w.collectTimeMetric(mx, "sfsb", cleanInst, metric)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
@@ -2929,21 +2929,21 @@ func (w *WebSpherePMI) parseStatefulSessionBean(stat *pmiStat, nodeName, serverN
 			w.collectRangeMetric(mx, "sfsb", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		// Use collection helper for all bounded range metrics
 		w.collectBoundedRangeMetric(mx, "sfsb", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		// Use collection helper for all average metrics
 		w.collectAverageMetric(mx, "sfsb", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -2956,16 +2956,16 @@ func (w *WebSpherePMI) parseStatefulSessionBean(stat *pmiStat, nodeName, serverN
 func (w *WebSpherePMI) parseStatelessSessionBean(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	beanName := stat.Name
 	instance := fmt.Sprintf("%s.%s.%s", nodeName, serverName, beanName)
-	
+
 	// Create charts if not exists
 	w.ensureSLSBCharts(instance, nodeName, serverName, beanName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("slsb", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
@@ -2981,7 +2981,7 @@ func (w *WebSpherePMI) parseStatelessSessionBean(stat *pmiStat, nodeName, server
 			w.collectCountMetric(mx, "slsb", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	labels := append([]module.Label{
@@ -2990,7 +2990,7 @@ func (w *WebSpherePMI) parseStatelessSessionBean(stat *pmiStat, nodeName, server
 		{Key: "server", Value: serverName},
 		{Key: "bean", Value: beanName},
 	}, w.getVersionLabels()...)
-	
+
 	for i, metric := range timeMetrics {
 		w.processTimeStatisticWithContext(
 			"slsb",
@@ -3001,7 +3001,7 @@ func (w *WebSpherePMI) parseStatelessSessionBean(stat *pmiStat, nodeName, server
 			100+i*10, // Offset priority after main charts
 		)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
@@ -3013,21 +3013,21 @@ func (w *WebSpherePMI) parseStatelessSessionBean(stat *pmiStat, nodeName, server
 			w.collectRangeMetric(mx, "slsb", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		// Use collection helper for all bounded range metrics
 		w.collectBoundedRangeMetric(mx, "slsb", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		// Use collection helper for all average metrics
 		w.collectAverageMetric(mx, "slsb", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -3040,16 +3040,16 @@ func (w *WebSpherePMI) parseStatelessSessionBean(stat *pmiStat, nodeName, server
 func (w *WebSpherePMI) parseEntityBean(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	beanName := stat.Name
 	instance := fmt.Sprintf("%s.%s.%s", nodeName, serverName, beanName)
-	
+
 	// Create charts if not exists
 	w.ensureEntityBeanCharts(instance, nodeName, serverName, beanName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("entity_bean", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
@@ -3071,14 +3071,14 @@ func (w *WebSpherePMI) parseEntityBean(stat *pmiStat, nodeName, serverName strin
 			w.collectCountMetric(mx, "entity_bean", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL TimeStatistics
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	for _, metric := range timeMetrics {
 		// Use collection helper for all time metrics
 		w.collectTimeMetric(mx, "entity_bean", cleanInst, metric)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
@@ -3094,21 +3094,21 @@ func (w *WebSpherePMI) parseEntityBean(stat *pmiStat, nodeName, serverName strin
 			w.collectRangeMetric(mx, "entity_bean", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		// Use collection helper for all bounded range metrics
 		w.collectBoundedRangeMetric(mx, "entity_bean", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		// Use collection helper for all average metrics
 		w.collectAverageMetric(mx, "entity_bean", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -3121,16 +3121,16 @@ func (w *WebSpherePMI) parseEntityBean(stat *pmiStat, nodeName, serverName strin
 func (w *WebSpherePMI) parseIndividualEJB(stat *pmiStat, nodeName, serverName string, mx map[string]int64, path []string) {
 	beanName := stat.Name
 	instance := fmt.Sprintf("%s.%s.%s", nodeName, serverName, beanName)
-	
+
 	// Create charts if not exists
 	w.ensureGenericEJBCharts(instance, nodeName, serverName, beanName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("generic_ejb", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
@@ -3146,7 +3146,7 @@ func (w *WebSpherePMI) parseIndividualEJB(stat *pmiStat, nodeName, serverName st
 			w.collectCountMetric(mx, "generic_ejb", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	labels := append([]module.Label{
@@ -3155,7 +3155,7 @@ func (w *WebSpherePMI) parseIndividualEJB(stat *pmiStat, nodeName, serverName st
 		{Key: "server", Value: serverName},
 		{Key: "bean", Value: beanName},
 	}, w.getVersionLabels()...)
-	
+
 	for _, metric := range timeMetrics {
 		// Use consistent priority offset based on metric name to avoid priority inconsistencies
 		offset := getEJBTimeMetricPriorityOffset(metric.Name)
@@ -3168,7 +3168,7 @@ func (w *WebSpherePMI) parseIndividualEJB(stat *pmiStat, nodeName, serverName st
 			offset,
 		)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
@@ -3182,21 +3182,21 @@ func (w *WebSpherePMI) parseIndividualEJB(stat *pmiStat, nodeName, serverName st
 			w.collectRangeMetric(mx, "generic_ejb", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		// Use collection helper for all bounded range metrics
 		w.collectBoundedRangeMetric(mx, "generic_ejb", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		// Use collection helper for all average metrics
 		w.collectAverageMetric(mx, "generic_ejb", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -3218,19 +3218,19 @@ func (w *WebSpherePMI) parseEJBMethod(stat *pmiStat, nodeName, serverName string
 			}
 		}
 	}
-	
+
 	methodName := stat.Name
 	instance := fmt.Sprintf("%s.%s.%s.%s", nodeName, serverName, ejbName, methodName)
-	
+
 	// Create charts if not exists
 	w.ensureEJBMethodCharts(instance, nodeName, serverName, ejbName, methodName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("ejb_method", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
@@ -3242,7 +3242,7 @@ func (w *WebSpherePMI) parseEJBMethod(stat *pmiStat, nodeName, serverName string
 			w.collectCountMetric(mx, "ejb_method", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	labels := append([]module.Label{
@@ -3252,7 +3252,7 @@ func (w *WebSpherePMI) parseEJBMethod(stat *pmiStat, nodeName, serverName string
 		{Key: "ejb", Value: ejbName},
 		{Key: "method", Value: methodName},
 	}, w.getVersionLabels()...)
-	
+
 	for i, metric := range timeMetrics {
 		w.processTimeStatisticWithContext(
 			"ejb_method", // Use separate context for method metrics
@@ -3263,7 +3263,7 @@ func (w *WebSpherePMI) parseEJBMethod(stat *pmiStat, nodeName, serverName string
 			100+i*10, // Offset priority after main charts
 		)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
@@ -3275,21 +3275,21 @@ func (w *WebSpherePMI) parseEJBMethod(stat *pmiStat, nodeName, serverName string
 			w.collectRangeMetric(mx, "ejb_method", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		// Use collection helper for all bounded range metrics
 		w.collectBoundedRangeMetric(mx, "ejb_method", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		// Use collection helper for all average metrics
 		w.collectAverageMetric(mx, "ejb_method", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -3301,28 +3301,28 @@ func (w *WebSpherePMI) parseEJBMethod(stat *pmiStat, nodeName, serverName string
 // parseGenericStat handles unclassified stats to capture remaining metrics
 func (w *WebSpherePMI) parseGenericStat(stat *pmiStat, nodeName, serverName string, mx map[string]int64, path []string) {
 	// Only parse if it has actual metrics to avoid empty instances
-	if len(stat.CountStatistics) == 0 && len(stat.RangeStatistics) == 0 && 
-	   len(stat.BoundedRangeStatistics) == 0 && len(stat.TimeStatistics) == 0 {
+	if len(stat.CountStatistics) == 0 && len(stat.RangeStatistics) == 0 &&
+		len(stat.BoundedRangeStatistics) == 0 && len(stat.TimeStatistics) == 0 {
 		return
 	}
-	
+
 	statName := stat.Name
 	instance := fmt.Sprintf("%s.%s.%s", nodeName, serverName, statName)
-	
+
 	// Create unique chart ID to avoid conflicts
 	chartKey := fmt.Sprintf("generic_stat_%s", w.cleanID(instance))
-	
+
 	// Check if we already have this chart
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		// Create dynamic charts based on available metrics
 		w.createDynamicGenericChart(instance, nodeName, serverName, statName, stat)
 	}
-	
+
 	// Mark as seen
 	w.markInstanceSeen("generic_stat", instance)
-	
+
 	// Process all available metrics generically
 	for _, cs := range stat.CountStatistics {
 		if val, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
@@ -3330,21 +3330,21 @@ func (w *WebSpherePMI) parseGenericStat(stat *pmiStat, nodeName, serverName stri
 			mx[metricKey] = val
 		}
 	}
-	
+
 	for _, rs := range stat.RangeStatistics {
 		if val, err := strconv.ParseInt(rs.Current, 10, 64); err == nil {
 			metricKey := fmt.Sprintf("generic_stat_%s_%s", w.cleanID(instance), w.cleanID(rs.Name))
 			mx[metricKey] = val
 		}
 	}
-	
+
 	for _, brs := range stat.BoundedRangeStatistics {
 		if val, err := strconv.ParseInt(brs.Current, 10, 64); err == nil {
 			metricKey := fmt.Sprintf("generic_stat_%s_%s", w.cleanID(instance), w.cleanID(brs.Name))
 			mx[metricKey] = val
 		}
 	}
-	
+
 	// NOTE: TimeStatistics are now processed by smart processor (processTimeStatisticWithContext)
 	// in specific parsers. Generic fallback skips TimeStatistics to avoid duplication.
 	// TimeStatistics in generic stats would be extremely rare and likely indicate
@@ -3356,7 +3356,7 @@ func (w *WebSpherePMI) createDynamicGenericChart(instance, nodeName, serverName,
 	// Separate incremental (count) metrics from absolute (gauge) metrics
 	var countDims module.Dims
 	var gaugeDims module.Dims
-	
+
 	// Add CountStatistics dimensions (incremental)
 	for _, cs := range stat.CountStatistics {
 		dimID := fmt.Sprintf("generic_stat_%s_%s", w.cleanID(instance), w.cleanID(cs.Name))
@@ -3366,7 +3366,7 @@ func (w *WebSpherePMI) createDynamicGenericChart(instance, nodeName, serverName,
 			Algo: module.Incremental,
 		})
 	}
-	
+
 	// Add RangeStatistics dimensions (absolute)
 	for _, rs := range stat.RangeStatistics {
 		dimID := fmt.Sprintf("generic_stat_%s_%s", w.cleanID(instance), w.cleanID(rs.Name))
@@ -3375,7 +3375,7 @@ func (w *WebSpherePMI) createDynamicGenericChart(instance, nodeName, serverName,
 			Name: w.cleanID(rs.Name),
 		})
 	}
-	
+
 	// Add BoundedRangeStatistics dimensions (absolute)
 	for _, brs := range stat.BoundedRangeStatistics {
 		dimID := fmt.Sprintf("generic_stat_%s_%s", w.cleanID(instance), w.cleanID(brs.Name))
@@ -3384,12 +3384,12 @@ func (w *WebSpherePMI) createDynamicGenericChart(instance, nodeName, serverName,
 			Name: w.cleanID(brs.Name),
 		})
 	}
-	
+
 	// NOTE: Skip TimeStatistics - they're handled by smart processor in specific parsers
 	// to avoid duplication and ensure consistent 3-chart pattern (rate, current, lifetime)
-	
+
 	// Create separate charts for counters and gauges to comply with Netdata rules
-	
+
 	// Create chart for counters (incremental metrics)
 	if len(countDims) > 0 {
 		chart := &module.Chart{
@@ -3407,19 +3407,19 @@ func (w *WebSpherePMI) createDynamicGenericChart(instance, nodeName, serverName,
 				{Key: "stat", Value: statName},
 			},
 		}
-		
+
 		if err := w.charts.Add(chart); err != nil {
 			w.Warning(err)
 		}
 	}
-	
+
 	// Create chart for gauges (absolute metrics)
 	if len(gaugeDims) > 0 {
 		chart := &module.Chart{
 			ID:       fmt.Sprintf("generic_stat_%s_gauges", w.cleanID(instance)),
 			Title:    fmt.Sprintf("Generic Gauges: %s", statName),
 			Units:    "value",
-			Fam:      "uncategorized", 
+			Fam:      "uncategorized",
 			Ctx:      "websphere_pmi.generic_gauges",
 			Type:     module.Line,
 			Priority: prioMonitoring + 1,
@@ -3430,7 +3430,7 @@ func (w *WebSpherePMI) createDynamicGenericChart(instance, nodeName, serverName,
 				{Key: "stat", Value: statName},
 			},
 		}
-		
+
 		if err := w.charts.Add(chart); err != nil {
 			w.Warning(err)
 		}
@@ -3440,16 +3440,16 @@ func (w *WebSpherePMI) createDynamicGenericChart(instance, nodeName, serverName,
 // parseExtensionRegistryStats handles extension registry statistics
 func (w *WebSpherePMI) parseExtensionRegistryStats(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	instance := fmt.Sprintf("%s.%s", nodeName, serverName)
-	
+
 	// Create charts if not exists
 	w.ensureExtensionRegistryCharts(instance, nodeName, serverName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("extension_registry", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
@@ -3465,31 +3465,31 @@ func (w *WebSpherePMI) parseExtensionRegistryStats(stat *pmiStat, nodeName, serv
 			w.collectCountMetric(mx, "extension_registry", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL TimeStatistics
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	for _, metric := range timeMetrics {
 		w.collectTimeMetric(mx, "extension_registry", cleanInst, metric)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
 		w.collectRangeMetric(mx, "extension_registry", cleanInst, metric)
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		w.collectBoundedRangeMetric(mx, "extension_registry", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		w.collectAverageMetric(mx, "extension_registry", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -3505,16 +3505,16 @@ func (w *WebSpherePMI) parseExtensionRegistryStats(stat *pmiStat, nodeName, serv
 // parseSIBJMSAdapter handles Service Integration Bus JMS Resource Adapter metrics
 func (w *WebSpherePMI) parseSIBJMSAdapter(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	instance := fmt.Sprintf("%s.%s", nodeName, serverName)
-	
+
 	// Create charts if not exists
 	w.ensureSIBJMSAdapterCharts(instance, nodeName, serverName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("sib_jms_adapter", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
@@ -3538,31 +3538,31 @@ func (w *WebSpherePMI) parseSIBJMSAdapter(stat *pmiStat, nodeName, serverName st
 			mx[fmt.Sprintf("sib_jms_%s_%s", cleanInst, w.cleanID(metric.Name))] = metric.Value
 		}
 	}
-	
+
 	// Extract ALL TimeStatistics
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	for _, metric := range timeMetrics {
 		w.collectTimeMetric(mx, "sib_jms", cleanInst, metric)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
 		w.collectRangeMetric(mx, "sib_jms", cleanInst, metric)
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		w.collectBoundedRangeMetric(mx, "sib_jms", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		w.collectAverageMetric(mx, "sib_jms", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -3573,16 +3573,16 @@ func (w *WebSpherePMI) parseSIBJMSAdapter(stat *pmiStat, nodeName, serverName st
 // parseServletsComponent handles standalone Servlets component metrics
 func (w *WebSpherePMI) parseServletsComponent(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	instance := fmt.Sprintf("%s.%s", nodeName, serverName)
-	
+
 	// Create charts if not exists
 	w.ensureServletsComponentCharts(instance, nodeName, serverName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("servlets_component", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
@@ -3596,7 +3596,7 @@ func (w *WebSpherePMI) parseServletsComponent(stat *pmiStat, nodeName, serverNam
 			w.collectCountMetric(mx, "servlets_component", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	labels := append([]module.Label{
@@ -3604,7 +3604,7 @@ func (w *WebSpherePMI) parseServletsComponent(stat *pmiStat, nodeName, serverNam
 		{Key: "node", Value: nodeName},
 		{Key: "server", Value: serverName},
 	}, w.getVersionLabels()...)
-	
+
 	for i, metric := range timeMetrics {
 		w.processTimeStatisticWithContext(
 			"servlets_component",
@@ -3615,7 +3615,7 @@ func (w *WebSpherePMI) parseServletsComponent(stat *pmiStat, nodeName, serverNam
 			100+i*10, // Offset priority after main charts
 		)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
@@ -3627,45 +3627,45 @@ func (w *WebSpherePMI) parseServletsComponent(stat *pmiStat, nodeName, serverNam
 			w.collectRangeMetric(mx, "servlets_component", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		w.collectBoundedRangeMetric(mx, "servlets_component", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		w.collectAverageMetric(mx, "servlets_component", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
 		w.collectDoubleMetric(mx, "servlets_component", cleanInst, metric)
 	}
-	
-	totalExtracted := len(countMetrics) + len(timeMetrics) + len(rangeMetrics) + 
-					 len(boundedMetrics) + len(avgMetrics) + len(doubleMetrics)
-	w.Debugf("ServletsComponent extracted %d total metrics (%d count, %d time, %d range, %d bounded, %d avg, %d double) for instance %s", 
-		totalExtracted, len(countMetrics), len(timeMetrics), len(rangeMetrics), 
+
+	totalExtracted := len(countMetrics) + len(timeMetrics) + len(rangeMetrics) +
+		len(boundedMetrics) + len(avgMetrics) + len(doubleMetrics)
+	w.Debugf("ServletsComponent extracted %d total metrics (%d count, %d time, %d range, %d bounded, %d avg, %d double) for instance %s",
+		totalExtracted, len(countMetrics), len(timeMetrics), len(rangeMetrics),
 		len(boundedMetrics), len(avgMetrics), len(doubleMetrics), instance)
 }
 
 // parseWIMComponent handles WebSphere Identity Manager component metrics
 func (w *WebSpherePMI) parseWIMComponent(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	instance := fmt.Sprintf("%s.%s", nodeName, serverName)
-	
+
 	// Create charts if not exists
 	w.ensureWIMComponentCharts(instance, nodeName, serverName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("wim_component", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
@@ -3679,7 +3679,7 @@ func (w *WebSpherePMI) parseWIMComponent(stat *pmiStat, nodeName, serverName str
 			mx[fmt.Sprintf("wim_%s_%s", cleanInst, w.cleanID(metric.Name))] = metric.Value
 		}
 	}
-	
+
 	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	labels := append([]module.Label{
@@ -3687,7 +3687,7 @@ func (w *WebSpherePMI) parseWIMComponent(stat *pmiStat, nodeName, serverName str
 		{Key: "node", Value: nodeName},
 		{Key: "server", Value: serverName},
 	}, w.getVersionLabels()...)
-	
+
 	for i, metric := range timeMetrics {
 		w.processTimeStatisticWithContext(
 			"wim",
@@ -3698,25 +3698,25 @@ func (w *WebSpherePMI) parseWIMComponent(stat *pmiStat, nodeName, serverName str
 			100+i*10, // Offset priority after main charts
 		)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
 		w.collectRangeMetric(mx, "wim", cleanInst, metric)
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		w.collectBoundedRangeMetric(mx, "wim", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		w.collectAverageMetric(mx, "wim", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -3727,22 +3727,22 @@ func (w *WebSpherePMI) parseWIMComponent(stat *pmiStat, nodeName, serverName str
 // parseWLMTaggedComponentManager handles Workload Management Tagged Component Manager metrics
 func (w *WebSpherePMI) parseWLMTaggedComponentManager(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	instance := fmt.Sprintf("%s.%s", nodeName, serverName)
-	
+
 	// Create charts if not exists
 	w.ensureWLMTaggedComponentManagerCharts(instance, nodeName, serverName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("wlm_tagged_component", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics (none expected)
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
 		w.collectCountMetric(mx, "wlm_tagged", cleanInst, metric)
 	}
-	
+
 	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	labels := append([]module.Label{
@@ -3750,7 +3750,7 @@ func (w *WebSpherePMI) parseWLMTaggedComponentManager(stat *pmiStat, nodeName, s
 		{Key: "node", Value: nodeName},
 		{Key: "server", Value: serverName},
 	}, w.getVersionLabels()...)
-	
+
 	for i, metric := range timeMetrics {
 		w.processTimeStatisticWithContext(
 			"wlm_tagged",
@@ -3761,25 +3761,25 @@ func (w *WebSpherePMI) parseWLMTaggedComponentManager(stat *pmiStat, nodeName, s
 			100+i*10, // Offset priority after main charts
 		)
 	}
-	
+
 	// Extract ALL RangeStatistics (none expected)
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
 		w.collectRangeMetric(mx, "wlm_tagged", cleanInst, metric)
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics (none expected)
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		w.collectBoundedRangeMetric(mx, "wlm_tagged", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics (none expected)
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		w.collectAverageMetric(mx, "wlm_tagged", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics (none expected)
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -3790,16 +3790,16 @@ func (w *WebSpherePMI) parseWLMTaggedComponentManager(stat *pmiStat, nodeName, s
 // parsePMIWebServiceService handles PMI Web Service Service metrics
 func (w *WebSpherePMI) parsePMIWebServiceService(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	instance := fmt.Sprintf("%s.%s", nodeName, serverName)
-	
+
 	// Create charts if not exists
 	w.ensurePMIWebServiceServiceCharts(instance, nodeName, serverName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("pmi_webservice_service", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
@@ -3815,7 +3815,7 @@ func (w *WebSpherePMI) parsePMIWebServiceService(stat *pmiStat, nodeName, server
 			w.collectCountMetric(mx, "pmi_webservice", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	labels := append([]module.Label{
@@ -3823,7 +3823,7 @@ func (w *WebSpherePMI) parsePMIWebServiceService(stat *pmiStat, nodeName, server
 		{Key: "node", Value: nodeName},
 		{Key: "server", Value: serverName},
 	}, w.getVersionLabels()...)
-	
+
 	for i, metric := range timeMetrics {
 		w.processTimeStatisticWithContext(
 			"pmi_webservice",
@@ -3834,19 +3834,19 @@ func (w *WebSpherePMI) parsePMIWebServiceService(stat *pmiStat, nodeName, server
 			100+i*10, // Offset priority after main charts
 		)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
 		w.collectRangeMetric(mx, "pmi_webservice", cleanInst, metric)
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		w.collectBoundedRangeMetric(mx, "pmi_webservice", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for i, metric := range avgMetrics {
@@ -3859,8 +3859,8 @@ func (w *WebSpherePMI) parsePMIWebServiceService(stat *pmiStat, nodeName, server
 				labels,
 				metric,
 				mx,
-				i*10, // Priority offset
-				"bytes",  // SizeService is measured in bytes
+				i*10,    // Priority offset
+				"bytes", // SizeService is measured in bytes
 			)
 		case "RequestSizeService":
 			// Use smart processor for RequestSizeService
@@ -3871,7 +3871,7 @@ func (w *WebSpherePMI) parsePMIWebServiceService(stat *pmiStat, nodeName, server
 				metric,
 				mx,
 				20+i*10, // Priority offset
-				"bytes",  // RequestSizeService is measured in bytes
+				"bytes", // RequestSizeService is measured in bytes
 			)
 		case "ReplySizeService":
 			// Use smart processor for ReplySizeService
@@ -3882,14 +3882,14 @@ func (w *WebSpherePMI) parsePMIWebServiceService(stat *pmiStat, nodeName, server
 				metric,
 				mx,
 				40+i*10, // Priority offset
-				"bytes",  // ReplySizeService is measured in bytes
+				"bytes", // ReplySizeService is measured in bytes
 			)
 		default:
 			// Use collection helper for unknown average metrics
 			w.collectAverageMetric(mx, "pmi_webservice", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -3900,10 +3900,10 @@ func (w *WebSpherePMI) parsePMIWebServiceService(stat *pmiStat, nodeName, server
 // parseTCPChannelDCS handles TCP Channel Data Communication Services metrics
 func (w *WebSpherePMI) parseTCPChannelDCS(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	instance := fmt.Sprintf("%s.%s", nodeName, serverName)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Check if MaxPoolSize is available (version-specific)
 	hasMaxPoolSize := false
 	for _, cs := range stat.CountStatistics {
@@ -3912,13 +3912,13 @@ func (w *WebSpherePMI) parseTCPChannelDCS(stat *pmiStat, nodeName, serverName st
 			break
 		}
 	}
-	
+
 	// Create charts if not exists, with version-specific handling
 	w.ensureTCPChannelDCSCharts(instance, nodeName, serverName, hasMaxPoolSize)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("tcp_channel_dcs", instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
@@ -3936,7 +3936,7 @@ func (w *WebSpherePMI) parseTCPChannelDCS(stat *pmiStat, nodeName, serverName st
 			w.collectCountMetric(mx, "tcp_dcs", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	labels := append([]module.Label{
@@ -3944,7 +3944,7 @@ func (w *WebSpherePMI) parseTCPChannelDCS(stat *pmiStat, nodeName, serverName st
 		{Key: "node", Value: nodeName},
 		{Key: "server", Value: serverName},
 	}, w.getVersionLabels()...)
-	
+
 	for i, metric := range timeMetrics {
 		w.processTimeStatisticWithContext(
 			"tcp_dcs",
@@ -3955,7 +3955,7 @@ func (w *WebSpherePMI) parseTCPChannelDCS(stat *pmiStat, nodeName, serverName st
 			100+i*10, // Offset priority after main charts
 		)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
@@ -3969,7 +3969,7 @@ func (w *WebSpherePMI) parseTCPChannelDCS(stat *pmiStat, nodeName, serverName st
 			w.collectRangeMetric(mx, "tcp_dcs", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
@@ -3987,13 +3987,13 @@ func (w *WebSpherePMI) parseTCPChannelDCS(stat *pmiStat, nodeName, serverName st
 			w.collectBoundedRangeMetric(mx, "tcp_dcs", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		w.collectAverageMetric(mx, "tcp_dcs", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -4008,18 +4008,18 @@ func (w *WebSpherePMI) parseDetailsComponent(stat *pmiStat, nodeName, serverName
 	if len(path) > 1 {
 		parentContext = path[len(path)-2]
 	}
-	
+
 	instance := fmt.Sprintf("%s.%s.%s", nodeName, serverName, parentContext)
-	
+
 	// Create charts if not exists
 	w.ensureDetailsComponentCharts(instance, nodeName, serverName, parentContext)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("details_component", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
@@ -4031,31 +4031,31 @@ func (w *WebSpherePMI) parseDetailsComponent(stat *pmiStat, nodeName, serverName
 			w.collectCountMetric(mx, "details", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL TimeStatistics
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	for _, metric := range timeMetrics {
 		w.collectTimeMetric(mx, "details", cleanInst, metric)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
 		w.collectRangeMetric(mx, "details", cleanInst, metric)
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		w.collectBoundedRangeMetric(mx, "details", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		w.collectAverageMetric(mx, "details", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -4066,16 +4066,16 @@ func (w *WebSpherePMI) parseDetailsComponent(stat *pmiStat, nodeName, serverName
 // parseISCProductDetails handles IBM Support Center Product Details metrics
 func (w *WebSpherePMI) parseISCProductDetails(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	instance := fmt.Sprintf("%s.%s", nodeName, serverName)
-	
+
 	// Create charts if not exists
 	w.ensureISCProductDetailsCharts(instance, nodeName, serverName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("isc_product_details", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
@@ -4089,7 +4089,7 @@ func (w *WebSpherePMI) parseISCProductDetails(stat *pmiStat, nodeName, serverNam
 			w.collectCountMetric(mx, "isc_product", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	labels := append([]module.Label{
@@ -4097,7 +4097,7 @@ func (w *WebSpherePMI) parseISCProductDetails(stat *pmiStat, nodeName, serverNam
 		{Key: "node", Value: nodeName},
 		{Key: "server", Value: serverName},
 	}, w.getVersionLabels()...)
-	
+
 	for i, metric := range timeMetrics {
 		w.processTimeStatisticWithContext(
 			"isc_product",
@@ -4108,25 +4108,25 @@ func (w *WebSpherePMI) parseISCProductDetails(stat *pmiStat, nodeName, serverNam
 			100+i*10, // Offset priority after main charts
 		)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
 		w.collectRangeMetric(mx, "isc_product", cleanInst, metric)
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		w.collectBoundedRangeMetric(mx, "isc_product", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		w.collectAverageMetric(mx, "isc_product", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -4139,7 +4139,7 @@ func (w *WebSpherePMI) ensureExtensionRegistryCharts(instance, nodeName, serverN
 	chartKey := fmt.Sprintf("extension_registry_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		charts := extensionRegistryChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
@@ -4152,7 +4152,7 @@ func (w *WebSpherePMI) ensureExtensionRegistryCharts(instance, nodeName, serverN
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -4164,7 +4164,7 @@ func (w *WebSpherePMI) ensureSIBJMSAdapterCharts(instance, nodeName, serverName 
 	chartKey := fmt.Sprintf("sib_jms_adapter_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		charts := sibJMSAdapterChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
@@ -4177,7 +4177,7 @@ func (w *WebSpherePMI) ensureSIBJMSAdapterCharts(instance, nodeName, serverName 
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -4189,7 +4189,7 @@ func (w *WebSpherePMI) ensureServletsComponentCharts(instance, nodeName, serverN
 	chartKey := fmt.Sprintf("servlets_component_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		charts := servletsComponentChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
@@ -4202,7 +4202,7 @@ func (w *WebSpherePMI) ensureServletsComponentCharts(instance, nodeName, serverN
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -4214,7 +4214,7 @@ func (w *WebSpherePMI) ensureWIMComponentCharts(instance, nodeName, serverName s
 	chartKey := fmt.Sprintf("wim_component_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		charts := wimComponentChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
@@ -4227,7 +4227,7 @@ func (w *WebSpherePMI) ensureWIMComponentCharts(instance, nodeName, serverName s
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -4239,7 +4239,7 @@ func (w *WebSpherePMI) ensureWLMTaggedComponentManagerCharts(instance, nodeName,
 	chartKey := fmt.Sprintf("wlm_tagged_component_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		charts := wlmTaggedComponentChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
@@ -4252,7 +4252,7 @@ func (w *WebSpherePMI) ensureWLMTaggedComponentManagerCharts(instance, nodeName,
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -4264,7 +4264,7 @@ func (w *WebSpherePMI) ensurePMIWebServiceServiceCharts(instance, nodeName, serv
 	chartKey := fmt.Sprintf("pmi_webservice_service_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		charts := pmiWebServiceServiceChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
@@ -4277,7 +4277,7 @@ func (w *WebSpherePMI) ensurePMIWebServiceServiceCharts(instance, nodeName, serv
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -4289,9 +4289,9 @@ func (w *WebSpherePMI) ensureTCPChannelDCSCharts(instance, nodeName, serverName 
 	chartKey := fmt.Sprintf("tcp_channel_dcs_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		charts := tcpChannelDCSChartsTmpl.Copy()
-		
+
 		// Remove pool_limits chart if MaxPoolSize is not available (WebSphere 8.5.5)
 		if !hasMaxPoolSize {
 			// Find and remove the pool_limits chart
@@ -4303,7 +4303,7 @@ func (w *WebSpherePMI) ensureTCPChannelDCSCharts(instance, nodeName, serverName 
 			}
 			charts = &filtered
 		}
-		
+
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
 			chart.Labels = w.createChartLabels(
@@ -4315,7 +4315,7 @@ func (w *WebSpherePMI) ensureTCPChannelDCSCharts(instance, nodeName, serverName 
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -4327,7 +4327,7 @@ func (w *WebSpherePMI) ensureDetailsComponentCharts(instance, nodeName, serverNa
 	chartKey := fmt.Sprintf("details_component_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		charts := detailsComponentChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
@@ -4339,7 +4339,7 @@ func (w *WebSpherePMI) ensureDetailsComponentCharts(instance, nodeName, serverNa
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -4351,7 +4351,7 @@ func (w *WebSpherePMI) ensureISCProductDetailsCharts(instance, nodeName, serverN
 	chartKey := fmt.Sprintf("isc_product_details_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		charts := iscProductDetailsChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
@@ -4364,7 +4364,7 @@ func (w *WebSpherePMI) ensureISCProductDetailsCharts(instance, nodeName, serverN
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -4378,7 +4378,7 @@ func (w *WebSpherePMI) ensureJCAPoolCharts(instance, nodeName, serverName, poolN
 	chartKey := fmt.Sprintf("jca_pool_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		charts := jcaPoolChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
@@ -4391,7 +4391,7 @@ func (w *WebSpherePMI) ensureJCAPoolCharts(instance, nodeName, serverName, poolN
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -4402,7 +4402,7 @@ func (w *WebSpherePMI) ensureEnterpriseAppCharts(instance, nodeName, serverName,
 	chartKey := fmt.Sprintf("enterprise_app_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		charts := enterpriseAppChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
@@ -4416,7 +4416,7 @@ func (w *WebSpherePMI) ensureEnterpriseAppCharts(instance, nodeName, serverName,
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -4427,7 +4427,7 @@ func (w *WebSpherePMI) ensureSystemDataCharts(instance, nodeName, serverName str
 	chartKey := fmt.Sprintf("system_data_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		charts := systemDataChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
@@ -4440,7 +4440,7 @@ func (w *WebSpherePMI) ensureSystemDataCharts(instance, nodeName, serverName str
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -4451,7 +4451,7 @@ func (w *WebSpherePMI) ensureWLMCharts(instance, nodeName, serverName string) {
 	chartKey := fmt.Sprintf("wlm_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		charts := wlmChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
@@ -4464,7 +4464,7 @@ func (w *WebSpherePMI) ensureWLMCharts(instance, nodeName, serverName string) {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -4475,7 +4475,7 @@ func (w *WebSpherePMI) ensureBeanManagerCharts(instance, nodeName, serverName st
 	chartKey := fmt.Sprintf("bean_manager_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		charts := beanManagerChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
@@ -4488,7 +4488,7 @@ func (w *WebSpherePMI) ensureBeanManagerCharts(instance, nodeName, serverName st
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -4499,7 +4499,7 @@ func (w *WebSpherePMI) ensureConnectionManagerCharts(instance, nodeName, serverN
 	chartKey := fmt.Sprintf("connection_manager_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		charts := connectionManagerChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
@@ -4512,7 +4512,7 @@ func (w *WebSpherePMI) ensureConnectionManagerCharts(instance, nodeName, serverN
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -4523,7 +4523,7 @@ func (w *WebSpherePMI) ensureJVMSubsystemCharts(instance, nodeName, serverName, 
 	chartKey := fmt.Sprintf("jvm_subsystem_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		charts := jvmSubsystemChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
@@ -4536,7 +4536,7 @@ func (w *WebSpherePMI) ensureJVMSubsystemCharts(instance, nodeName, serverName, 
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -4547,7 +4547,7 @@ func (w *WebSpherePMI) ensureEJBContainerCharts(instance, nodeName, serverName s
 	chartKey := fmt.Sprintf("ejb_container_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		charts := ejbContainerChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
@@ -4560,7 +4560,7 @@ func (w *WebSpherePMI) ensureEJBContainerCharts(instance, nodeName, serverName s
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -4571,7 +4571,7 @@ func (w *WebSpherePMI) ensureMDBCharts(instance, nodeName, serverName, beanName 
 	chartKey := fmt.Sprintf("mdb_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		charts := mdbChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
@@ -4584,7 +4584,7 @@ func (w *WebSpherePMI) ensureMDBCharts(instance, nodeName, serverName, beanName 
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -4595,7 +4595,7 @@ func (w *WebSpherePMI) ensureSFSBCharts(instance, nodeName, serverName, beanName
 	chartKey := fmt.Sprintf("sfsb_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		charts := sfsbChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
@@ -4608,7 +4608,7 @@ func (w *WebSpherePMI) ensureSFSBCharts(instance, nodeName, serverName, beanName
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -4619,7 +4619,7 @@ func (w *WebSpherePMI) ensureSLSBCharts(instance, nodeName, serverName, beanName
 	chartKey := fmt.Sprintf("slsb_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		charts := slsbChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
@@ -4632,7 +4632,7 @@ func (w *WebSpherePMI) ensureSLSBCharts(instance, nodeName, serverName, beanName
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -4643,7 +4643,7 @@ func (w *WebSpherePMI) ensureEntityBeanCharts(instance, nodeName, serverName, be
 	chartKey := fmt.Sprintf("entity_bean_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		charts := entityBeanChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
@@ -4656,7 +4656,7 @@ func (w *WebSpherePMI) ensureEntityBeanCharts(instance, nodeName, serverName, be
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -4667,7 +4667,7 @@ func (w *WebSpherePMI) ensureGenericEJBCharts(instance, nodeName, serverName, be
 	chartKey := fmt.Sprintf("generic_ejb_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		charts := genericEJBChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
@@ -4680,7 +4680,7 @@ func (w *WebSpherePMI) ensureGenericEJBCharts(instance, nodeName, serverName, be
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -4692,16 +4692,16 @@ func (w *WebSpherePMI) ensureGenericEJBCharts(instance, nodeName, serverName, be
 // parseSecurityAuthentication handles Security Authentication metrics
 func (w *WebSpherePMI) parseSecurityAuthentication(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	instance := fmt.Sprintf("%s.%s", nodeName, serverName)
-	
+
 	// Create charts if not exists
 	w.ensureSecurityAuthCharts(instance, nodeName, serverName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("security_auth", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
@@ -4734,7 +4734,7 @@ func (w *WebSpherePMI) parseSecurityAuthentication(stat *pmiStat, nodeName, serv
 			w.Debugf("Skipping unknown security_auth count metric: %s", metric.Name)
 		}
 	}
-	
+
 	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	labels := append([]module.Label{
@@ -4742,7 +4742,7 @@ func (w *WebSpherePMI) parseSecurityAuthentication(stat *pmiStat, nodeName, serv
 		{Key: "node", Value: nodeName},
 		{Key: "server", Value: serverName},
 	}, w.getVersionLabels()...)
-	
+
 	for i, metric := range timeMetrics {
 		w.processTimeStatisticWithContext(
 			"security_auth",
@@ -4753,28 +4753,28 @@ func (w *WebSpherePMI) parseSecurityAuthentication(stat *pmiStat, nodeName, serv
 			100+i*10, // Offset priority after main charts
 		)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
 		// Use collection helper for all range metrics
 		w.collectRangeMetric(mx, "security_auth", cleanInst, metric)
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		// Use collection helper for all bounded range metrics
 		w.collectBoundedRangeMetric(mx, "security_auth", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		// Use collection helper for all average metrics
 		w.collectAverageMetric(mx, "security_auth", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -4786,23 +4786,23 @@ func (w *WebSpherePMI) parseSecurityAuthentication(stat *pmiStat, nodeName, serv
 // parseSecurityAuthorization handles Security Authorization metrics
 func (w *WebSpherePMI) parseSecurityAuthorization(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	instance := fmt.Sprintf("%s.%s", nodeName, serverName)
-	
+
 	// Create charts if not exists
 	w.ensureSecurityAuthzCharts(instance, nodeName, serverName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("security_authz", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
 		// Use collection helper for all count metrics
 		w.collectCountMetric(mx, "security_authz", cleanInst, metric)
 	}
-	
+
 	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	labels := append([]module.Label{
@@ -4810,7 +4810,7 @@ func (w *WebSpherePMI) parseSecurityAuthorization(stat *pmiStat, nodeName, serve
 		{Key: "node", Value: nodeName},
 		{Key: "server", Value: serverName},
 	}, w.getVersionLabels()...)
-	
+
 	for i, metric := range timeMetrics {
 		w.processTimeStatisticWithContext(
 			"security_authz",
@@ -4821,28 +4821,28 @@ func (w *WebSpherePMI) parseSecurityAuthorization(stat *pmiStat, nodeName, serve
 			100+i*10, // Offset priority after main charts
 		)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
 		// Use collection helper for all range metrics
 		w.collectRangeMetric(mx, "security_authz", cleanInst, metric)
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		// Use collection helper for all bounded range metrics
 		w.collectBoundedRangeMetric(mx, "security_authz", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		// Use collection helper for all average metrics
 		w.collectAverageMetric(mx, "security_authz", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -5015,7 +5015,7 @@ func (w *WebSpherePMI) ensureSecurityAuthCharts(instance, nodeName, serverName s
 	chartKey := fmt.Sprintf("security_auth_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		charts := securityAuthChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
@@ -5028,7 +5028,7 @@ func (w *WebSpherePMI) ensureSecurityAuthCharts(instance, nodeName, serverName s
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -5039,7 +5039,7 @@ func (w *WebSpherePMI) ensureSecurityAuthzCharts(instance, nodeName, serverName 
 	chartKey := fmt.Sprintf("security_authz_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		charts := securityAuthzChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
@@ -5052,7 +5052,7 @@ func (w *WebSpherePMI) ensureSecurityAuthzCharts(instance, nodeName, serverName 
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -5062,50 +5062,50 @@ func (w *WebSpherePMI) ensureSecurityAuthzCharts(instance, nodeName, serverName 
 // parseInterceptorContainer handles Interceptors container metrics
 func (w *WebSpherePMI) parseInterceptorContainer(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	// Check if the container itself has metrics
-	if len(stat.CountStatistics) > 0 || len(stat.TimeStatistics) > 0 || len(stat.RangeStatistics) > 0 || 
-	   len(stat.BoundedRangeStatistics) > 0 || len(stat.AverageStatistics) > 0 || len(stat.DoubleStatistics) > 0 {
+	if len(stat.CountStatistics) > 0 || len(stat.TimeStatistics) > 0 || len(stat.RangeStatistics) > 0 ||
+		len(stat.BoundedRangeStatistics) > 0 || len(stat.AverageStatistics) > 0 || len(stat.DoubleStatistics) > 0 {
 		// Process container-level metrics using universal helpers
 		// instance := fmt.Sprintf("%s.%s", nodeName, serverName)
 		// cleanInst := w.cleanID(instance)
-		
+
 		// Extract all metric types but skip collection for now until charts are created
 		countMetrics := w.extractCountStatistics(stat.CountStatistics)
 		for _, metric := range countMetrics {
 			// w.collectCountMetric(mx, "interceptor_container", cleanInst, metric)
 			w.Debugf("Skipping interceptor_container count metric: %s", metric.Name)
 		}
-		
+
 		timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 		for _, metric := range timeMetrics {
 			// w.collectTimeMetric(mx, "interceptor_container", cleanInst, metric)
 			w.Debugf("Skipping interceptor_container time metric: %s", metric.Name)
 		}
-		
+
 		rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 		for _, metric := range rangeMetrics {
 			// w.collectRangeMetric(mx, "interceptor_container", cleanInst, metric)
 			w.Debugf("Skipping interceptor_container range metric: %s", metric.Name)
 		}
-		
+
 		boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 		for _, metric := range boundedMetrics {
 			// w.collectBoundedRangeMetric(mx, "interceptor_container", cleanInst, metric)
 			w.Debugf("Skipping interceptor_container bounded range metric: %s", metric.Name)
 		}
-		
+
 		avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 		for _, metric := range avgMetrics {
 			// w.collectAverageMetric(mx, "interceptor_container", cleanInst, metric)
 			w.Debugf("Skipping interceptor_container average metric: %s", metric.Name)
 		}
-		
+
 		doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 		for _, metric := range doubleMetrics {
 			// w.collectDoubleMetric(mx, "interceptor_container", cleanInst, metric)
 			w.Debugf("Skipping interceptor_container double metric: %s", metric.Name)
 		}
 	}
-	
+
 	// Process individual interceptors as children
 	for _, interceptor := range stat.SubStats {
 		w.parseIndividualInterceptor(&interceptor, nodeName, serverName, mx)
@@ -5116,23 +5116,23 @@ func (w *WebSpherePMI) parseInterceptorContainer(stat *pmiStat, nodeName, server
 func (w *WebSpherePMI) parseIndividualInterceptor(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	interceptorName := stat.Name
 	instance := fmt.Sprintf("%s.%s.%s", nodeName, serverName, interceptorName)
-	
+
 	// Create charts if not exists
 	w.ensureInterceptorCharts(instance, nodeName, serverName, interceptorName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("interceptor", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
 		// Use collection helper for all count metrics
 		w.collectCountMetric(mx, "interceptor", cleanInst, metric)
 	}
-	
+
 	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	labels := append([]module.Label{
@@ -5141,7 +5141,7 @@ func (w *WebSpherePMI) parseIndividualInterceptor(stat *pmiStat, nodeName, serve
 		{Key: "server", Value: serverName},
 		{Key: "interceptor", Value: interceptorName},
 	}, w.getVersionLabels()...)
-	
+
 	for i, metric := range timeMetrics {
 		w.processTimeStatisticWithContext(
 			"interceptor",
@@ -5152,28 +5152,28 @@ func (w *WebSpherePMI) parseIndividualInterceptor(stat *pmiStat, nodeName, serve
 			100+i*10, // Offset priority after main charts
 		)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
 		// Use collection helper for all range metrics
 		w.collectRangeMetric(mx, "interceptor", cleanInst, metric)
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		// Use collection helper for all bounded range metrics
 		w.collectBoundedRangeMetric(mx, "interceptor", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		// Use collection helper for all average metrics
 		w.collectAverageMetric(mx, "interceptor", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -5182,20 +5182,20 @@ func (w *WebSpherePMI) parseIndividualInterceptor(stat *pmiStat, nodeName, serve
 	}
 }
 
-// parsePortlet handles individual portlet metrics  
+// parsePortlet handles individual portlet metrics
 func (w *WebSpherePMI) parsePortlet(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	portletName := stat.Name
 	instance := fmt.Sprintf("%s.%s.%s", nodeName, serverName, portletName)
-	
+
 	// Create charts if not exists
 	w.ensurePortletCharts(instance, nodeName, serverName, portletName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("portlet", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
@@ -5209,7 +5209,7 @@ func (w *WebSpherePMI) parsePortlet(stat *pmiStat, nodeName, serverName string, 
 			w.collectCountMetric(mx, "portlet", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	labels := append([]module.Label{
@@ -5218,7 +5218,7 @@ func (w *WebSpherePMI) parsePortlet(stat *pmiStat, nodeName, serverName string, 
 		{Key: "server", Value: serverName},
 		{Key: "portlet", Value: portletName},
 	}, w.getVersionLabels()...)
-	
+
 	for i, metric := range timeMetrics {
 		w.processTimeStatisticWithContext(
 			"portlet",
@@ -5229,7 +5229,7 @@ func (w *WebSpherePMI) parsePortlet(stat *pmiStat, nodeName, serverName string, 
 			100+i*10, // Offset priority after main charts
 		)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
@@ -5241,21 +5241,21 @@ func (w *WebSpherePMI) parsePortlet(stat *pmiStat, nodeName, serverName string, 
 			w.collectRangeMetric(mx, "portlet", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		// Use collection helper for all bounded range metrics
 		w.collectBoundedRangeMetric(mx, "portlet", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		// Use collection helper for all average metrics
 		w.collectAverageMetric(mx, "portlet", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -5268,16 +5268,16 @@ func (w *WebSpherePMI) parsePortlet(stat *pmiStat, nodeName, serverName string, 
 func (w *WebSpherePMI) parseWebServiceModule(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	moduleName := stat.Name
 	instance := fmt.Sprintf("%s.%s.%s", nodeName, serverName, moduleName)
-	
+
 	// Create charts if not exists
 	w.ensureWebServiceCharts(instance, nodeName, serverName, moduleName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("web_service", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
@@ -5289,7 +5289,7 @@ func (w *WebSpherePMI) parseWebServiceModule(stat *pmiStat, nodeName, serverName
 			w.collectCountMetric(mx, "web_service", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	labels := append([]module.Label{
@@ -5298,7 +5298,7 @@ func (w *WebSpherePMI) parseWebServiceModule(stat *pmiStat, nodeName, serverName
 		{Key: "server", Value: serverName},
 		{Key: "module", Value: moduleName},
 	}, w.getVersionLabels()...)
-	
+
 	for i, metric := range timeMetrics {
 		w.processTimeStatisticWithContext(
 			"pmi_webservice",
@@ -5309,28 +5309,28 @@ func (w *WebSpherePMI) parseWebServiceModule(stat *pmiStat, nodeName, serverName
 			100+i*10, // Offset priority after main charts
 		)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
 		// Use collection helper for all range metrics
 		w.collectRangeMetric(mx, "web_service", cleanInst, metric)
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		// Use collection helper for all bounded range metrics
 		w.collectBoundedRangeMetric(mx, "web_service", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		// Use collection helper for all average metrics
 		w.collectAverageMetric(mx, "web_service", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -5342,16 +5342,16 @@ func (w *WebSpherePMI) parseWebServiceModule(stat *pmiStat, nodeName, serverName
 // parseURLContainer handles URLs container metrics
 func (w *WebSpherePMI) parseURLContainer(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	instance := fmt.Sprintf("%s.%s", nodeName, serverName)
-	
+
 	// Create charts if not exists
 	w.ensureURLCharts(instance, nodeName, serverName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("urls", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
@@ -5363,7 +5363,7 @@ func (w *WebSpherePMI) parseURLContainer(stat *pmiStat, nodeName, serverName str
 			w.collectCountMetric(mx, "urls", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	labels := append([]module.Label{
@@ -5371,7 +5371,7 @@ func (w *WebSpherePMI) parseURLContainer(stat *pmiStat, nodeName, serverName str
 		{Key: "node", Value: nodeName},
 		{Key: "server", Value: serverName},
 	}, w.getVersionLabels()...)
-	
+
 	for i, metric := range timeMetrics {
 		w.processTimeStatisticWithContext(
 			"urls",
@@ -5382,7 +5382,7 @@ func (w *WebSpherePMI) parseURLContainer(stat *pmiStat, nodeName, serverName str
 			100+i*10, // Offset priority after main charts
 		)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
@@ -5394,21 +5394,21 @@ func (w *WebSpherePMI) parseURLContainer(stat *pmiStat, nodeName, serverName str
 			w.collectRangeMetric(mx, "urls", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		// Use collection helper for all bounded range metrics
 		w.collectBoundedRangeMetric(mx, "urls", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		// Use collection helper for all average metrics
 		w.collectAverageMetric(mx, "urls", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -5421,16 +5421,16 @@ func (w *WebSpherePMI) parseURLContainer(stat *pmiStat, nodeName, serverName str
 func (w *WebSpherePMI) parseServletURL(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	urlPath := stat.Name
 	instance := fmt.Sprintf("%s.%s.%s", nodeName, serverName, urlPath)
-	
+
 	// Create charts if not exists
 	w.ensureServletURLCharts(instance, nodeName, serverName, urlPath)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("servlet_url", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
@@ -5442,7 +5442,7 @@ func (w *WebSpherePMI) parseServletURL(stat *pmiStat, nodeName, serverName strin
 			w.collectCountMetric(mx, "servlet_url", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	labels := append([]module.Label{
@@ -5451,7 +5451,7 @@ func (w *WebSpherePMI) parseServletURL(stat *pmiStat, nodeName, serverName strin
 		{Key: "server", Value: serverName},
 		{Key: "url", Value: urlPath},
 	}, w.getVersionLabels()...)
-	
+
 	for i, metric := range timeMetrics {
 		w.processTimeStatisticWithContext(
 			"servlet_url",
@@ -5462,7 +5462,7 @@ func (w *WebSpherePMI) parseServletURL(stat *pmiStat, nodeName, serverName strin
 			100+i*10, // Offset priority after main charts
 		)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
@@ -5474,21 +5474,21 @@ func (w *WebSpherePMI) parseServletURL(stat *pmiStat, nodeName, serverName strin
 			w.collectRangeMetric(mx, "servlet_url", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		// Use collection helper for all bounded range metrics
 		w.collectBoundedRangeMetric(mx, "servlet_url", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		// Use collection helper for all average metrics
 		w.collectAverageMetric(mx, "servlet_url", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -5500,23 +5500,23 @@ func (w *WebSpherePMI) parseServletURL(stat *pmiStat, nodeName, serverName strin
 // parseHAManager handles HA Manager metrics
 func (w *WebSpherePMI) parseHAManager(stat *pmiStat, nodeName, serverName string, mx map[string]int64) {
 	instance := fmt.Sprintf("%s.%s", nodeName, serverName)
-	
+
 	// Create charts if not exists
 	w.ensureHAManagerCharts(instance, nodeName, serverName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("ha_manager", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
 		// Use collection helper for all count metrics
 		w.collectCountMetric(mx, "ha_manager", cleanInst, metric)
 	}
-	
+
 	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	labels := append([]module.Label{
@@ -5524,7 +5524,7 @@ func (w *WebSpherePMI) parseHAManager(stat *pmiStat, nodeName, serverName string
 		{Key: "node", Value: nodeName},
 		{Key: "server", Value: serverName},
 	}, w.getVersionLabels()...)
-	
+
 	for i, metric := range timeMetrics {
 		w.processTimeStatisticWithContext(
 			"ha_manager",
@@ -5535,7 +5535,7 @@ func (w *WebSpherePMI) parseHAManager(stat *pmiStat, nodeName, serverName string
 			100+i*10, // Offset priority after main charts
 		)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
@@ -5555,7 +5555,7 @@ func (w *WebSpherePMI) parseHAManager(stat *pmiStat, nodeName, serverName string
 			w.collectRangeMetric(mx, "ha_manager", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
@@ -5575,14 +5575,14 @@ func (w *WebSpherePMI) parseHAManager(stat *pmiStat, nodeName, serverName string
 			w.collectBoundedRangeMetric(mx, "ha_manager", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		// Use collection helper for all average metrics
 		w.collectAverageMetric(mx, "ha_manager", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -5597,7 +5597,7 @@ func (w *WebSpherePMI) ensureInterceptorCharts(instance, nodeName, serverName, i
 	chartKey := fmt.Sprintf("interceptor_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		charts := interceptorChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
@@ -5610,7 +5610,7 @@ func (w *WebSpherePMI) ensureInterceptorCharts(instance, nodeName, serverName, i
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -5621,7 +5621,7 @@ func (w *WebSpherePMI) ensurePortletCharts(instance, nodeName, serverName, portl
 	chartKey := fmt.Sprintf("portlet_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		charts := portletChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
@@ -5635,7 +5635,7 @@ func (w *WebSpherePMI) ensurePortletCharts(instance, nodeName, serverName, portl
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -5646,7 +5646,7 @@ func (w *WebSpherePMI) ensureWebServiceCharts(instance, nodeName, serverName, mo
 	chartKey := fmt.Sprintf("web_service_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		charts := webServiceChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
@@ -5659,7 +5659,7 @@ func (w *WebSpherePMI) ensureWebServiceCharts(instance, nodeName, serverName, mo
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -5671,9 +5671,9 @@ func (w *WebSpherePMI) ensureEJBMethodCharts(instance, nodeName, serverName, ejb
 	chartKey := fmt.Sprintf("ejb_method_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		cleanInst := w.cleanID(instance)
-		
+
 		// Call count chart
 		chartCalls := &module.Chart{
 			ID:       fmt.Sprintf("ejb_method_%s_calls", cleanInst),
@@ -5694,7 +5694,7 @@ func (w *WebSpherePMI) ensureEJBMethodCharts(instance, nodeName, serverName, ejb
 				{Key: "method", Value: methodName},
 			}, w.getVersionLabels()...),
 		}
-		
+
 		// Concurrent invocations chart
 		chartConcurrent := &module.Chart{
 			ID:       fmt.Sprintf("ejb_method_%s_concurrent", cleanInst),
@@ -5715,7 +5715,7 @@ func (w *WebSpherePMI) ensureEJBMethodCharts(instance, nodeName, serverName, ejb
 				{Key: "method", Value: methodName},
 			}, w.getVersionLabels()...),
 		}
-		
+
 		// Add charts
 		if err := w.charts.Add(chartCalls, chartConcurrent); err != nil {
 			w.Warning(err)
@@ -5727,7 +5727,7 @@ func (w *WebSpherePMI) ensureURLCharts(instance, nodeName, serverName string) {
 	chartKey := fmt.Sprintf("urls_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		charts := urlChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
@@ -5740,7 +5740,7 @@ func (w *WebSpherePMI) ensureURLCharts(instance, nodeName, serverName string) {
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -5751,7 +5751,7 @@ func (w *WebSpherePMI) ensureServletURLCharts(instance, nodeName, serverName, ur
 	chartKey := fmt.Sprintf("servlet_url_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		charts := servletURLChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
@@ -5765,7 +5765,7 @@ func (w *WebSpherePMI) ensureServletURLCharts(instance, nodeName, serverName, ur
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -5776,7 +5776,7 @@ func (w *WebSpherePMI) ensureHAManagerCharts(instance, nodeName, serverName stri
 	chartKey := fmt.Sprintf("ha_manager_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		charts := haManagerChartsTmpl.Copy()
 		for _, chart := range *charts {
 			chart.ID = fmt.Sprintf(chart.ID, w.cleanID(instance))
@@ -5789,7 +5789,7 @@ func (w *WebSpherePMI) ensureHAManagerCharts(instance, nodeName, serverName stri
 				dim.ID = fmt.Sprintf(dim.ID, w.cleanID(instance))
 			}
 		}
-		
+
 		if err := w.charts.Add(*charts...); err != nil {
 			w.Warning(err)
 		}
@@ -5806,18 +5806,18 @@ func (w *WebSpherePMI) parseObjectCache(stat *pmiStat, nodeName, serverName stri
 		// This function might be called from different contexts
 		parentName = "cache" // Default parent context
 	}
-	
+
 	instance := fmt.Sprintf("%s.%s.%s.%s", nodeName, serverName, parentName, stat.Name)
-	
+
 	// Create charts if not exists
 	w.ensureObjectCacheCharts(instance, nodeName, serverName)
-	
+
 	// Mark as seen
 	w.markInstanceSeen("object_cache", instance)
-	
+
 	// Use universal helpers to extract ALL available metrics
 	cleanInst := w.cleanID(instance)
-	
+
 	// Extract ALL CountStatistics
 	countMetrics := w.extractCountStatistics(stat.CountStatistics)
 	for _, metric := range countMetrics {
@@ -5873,7 +5873,7 @@ func (w *WebSpherePMI) parseObjectCache(stat *pmiStat, nodeName, serverName stri
 			w.collectCountMetric(mx, "object_cache", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL TimeStatistics and process with smart processor
 	timeMetrics := w.extractTimeStatistics(stat.TimeStatistics)
 	labels := append([]module.Label{
@@ -5881,7 +5881,7 @@ func (w *WebSpherePMI) parseObjectCache(stat *pmiStat, nodeName, serverName stri
 		{Key: "node", Value: nodeName},
 		{Key: "server", Value: serverName},
 	}, w.getVersionLabels()...)
-	
+
 	for i, metric := range timeMetrics {
 		w.processTimeStatisticWithContext(
 			"object_cache",
@@ -5892,7 +5892,7 @@ func (w *WebSpherePMI) parseObjectCache(stat *pmiStat, nodeName, serverName stri
 			100+i*10, // Offset priority after main charts
 		)
 	}
-	
+
 	// Extract ALL RangeStatistics
 	rangeMetrics := w.extractRangeStatistics(stat.RangeStatistics)
 	for _, metric := range rangeMetrics {
@@ -5906,21 +5906,21 @@ func (w *WebSpherePMI) parseObjectCache(stat *pmiStat, nodeName, serverName stri
 			w.collectRangeMetric(mx, "object_cache", cleanInst, metric)
 		}
 	}
-	
+
 	// Extract ALL BoundedRangeStatistics
 	boundedMetrics := w.extractBoundedRangeStatistics(stat.BoundedRangeStatistics)
 	for _, metric := range boundedMetrics {
 		// For unknown bounded metrics, use collection helper
 		w.collectBoundedRangeMetric(mx, "object_cache", cleanInst, metric)
 	}
-	
+
 	// Extract ALL AverageStatistics
 	avgMetrics := w.extractAverageStatistics(stat.AverageStatistics)
 	for _, metric := range avgMetrics {
 		// For unknown average metrics, use collection helper
 		w.collectAverageMetric(mx, "object_cache", cleanInst, metric)
 	}
-	
+
 	// Extract ALL DoubleStatistics
 	doubleMetrics := w.extractDoubleStatistics(stat.DoubleStatistics)
 	for _, metric := range doubleMetrics {
@@ -5934,7 +5934,7 @@ func (w *WebSpherePMI) ensureSessionObjectSizeTimeChart(instance, nodeName, serv
 	chartKey := fmt.Sprintf("session_object_size_time_%s", instance)
 	if _, exists := w.collectedInstances[chartKey]; !exists {
 		w.collectedInstances[chartKey] = true
-		
+
 		cleanInst := w.cleanID(instance)
 		chart := &module.Chart{
 			ID:       fmt.Sprintf("sessions_%s_object_size_time", cleanInst),
@@ -5953,7 +5953,7 @@ func (w *WebSpherePMI) ensureSessionObjectSizeTimeChart(instance, nodeName, serv
 				{Key: "application", Value: appName},
 			},
 		}
-		
+
 		if err := w.charts.Add(chart); err != nil {
 			w.Warning(err)
 		}

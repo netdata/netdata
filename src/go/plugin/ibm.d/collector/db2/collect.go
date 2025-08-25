@@ -217,13 +217,13 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 	if len(d.mx.bufferpools) > 0 {
 		d.Debugf("Processing %d bufferpools in mx", len(d.mx.bufferpools))
 	}
-	
+
 	for name, metrics := range d.mx.bufferpools {
 		cleanName := cleanName(name)
 		for k, v := range stm.ToMap(metrics) {
 			mx[fmt.Sprintf("bufferpool_%s_%s", cleanName, k)] = v
 		}
-		
+
 		// Calculate hit ratios for instance charts
 		// Overall hit ratio
 		totalReads := metrics.Hits + metrics.Misses
@@ -234,7 +234,7 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 			// No reads means 100% hit ratio (no misses)
 			mx[fmt.Sprintf("bufferpool_%s_hit_ratio", cleanName)] = 100 * Precision
 		}
-		
+
 		// Data hit ratio
 		dataReads := metrics.DataHits + metrics.DataMisses
 		if dataReads > 0 {
@@ -243,7 +243,7 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 		} else {
 			mx[fmt.Sprintf("bufferpool_%s_data_hit_ratio", cleanName)] = 100 * Precision
 		}
-		
+
 		// Index hit ratio
 		indexReads := metrics.IndexHits + metrics.IndexMisses
 		if indexReads > 0 {
@@ -252,7 +252,7 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 		} else {
 			mx[fmt.Sprintf("bufferpool_%s_index_hit_ratio", cleanName)] = 100 * Precision
 		}
-		
+
 		// XDA hit ratio
 		xdaReads := metrics.XDAHits + metrics.XDAMisses
 		if xdaReads > 0 {
@@ -261,7 +261,7 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 		} else {
 			mx[fmt.Sprintf("bufferpool_%s_xda_hit_ratio", cleanName)] = 100 * Precision
 		}
-		
+
 		// Column hit ratio
 		columnReads := metrics.ColumnHits + metrics.ColumnMisses
 		if columnReads > 0 {
@@ -270,9 +270,9 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 		} else {
 			mx[fmt.Sprintf("bufferpool_%s_column_hit_ratio", cleanName)] = 100 * Precision
 		}
-		
+
 		// Debug
-		d.Debugf("Bufferpool %s: hits=%d, misses=%d, dataHits=%d, dataMisses=%d", 
+		d.Debugf("Bufferpool %s: hits=%d, misses=%d, dataHits=%d, dataMisses=%d",
 			name, metrics.Hits, metrics.Misses, metrics.DataHits, metrics.DataMisses)
 	}
 
@@ -421,12 +421,12 @@ func (d *DB2) collectGlobalMetrics(ctx context.Context) error {
 	if err := d.collectDatabaseOverview(ctx); err != nil {
 		d.Warningf("failed to collect database overview metrics: %v", err)
 	}
-	
+
 	// Enhanced Logging Performance metrics (Screen 18)
 	if err := d.collectLoggingPerformance(ctx); err != nil {
 		d.Warningf("failed to collect enhanced logging performance metrics: %v", err)
 	}
-	
+
 	// Federation metrics (Screen 32) - only if supported
 	if err := d.collectFederationMetrics(ctx); err != nil {
 		// Not logging as warning since federation might not be configured
@@ -658,7 +658,7 @@ func (d *DB2) readRows(rows *sql.Rows, assign func(column, value string, lineEnd
 					d.Debugf("ODBC scan panic recovered: %v", r)
 				}
 			}()
-			
+
 			if err := rows.Scan(valuePtrs...); err != nil {
 				d.Debugf("Row scan error: %v", err)
 				return
@@ -1063,16 +1063,16 @@ func (d *DB2) collectBufferpoolMetricsResilience(ctx context.Context) {
 	// Calculate hits and misses for each type
 	d.mx.BufferpoolDataHits = dataHits
 	d.mx.BufferpoolDataMisses = dataLogical - dataHits
-	
+
 	d.mx.BufferpoolIndexHits = indexHits
 	d.mx.BufferpoolIndexMisses = indexLogical - indexHits
-	
+
 	d.mx.BufferpoolXDAHits = xdaHits
 	d.mx.BufferpoolXDAMisses = xdaLogical - xdaHits
-	
+
 	d.mx.BufferpoolColumnHits = colHits
 	d.mx.BufferpoolColumnMisses = colLogical - colHits
-	
+
 	// If misses are negative, it means prefetch brought more pages than were requested
 	// In this case, set misses to 0 and reduce hits accordingly
 	if d.mx.BufferpoolDataMisses < 0 {
@@ -1091,11 +1091,11 @@ func (d *DB2) collectBufferpoolMetricsResilience(ctx context.Context) {
 		d.mx.BufferpoolColumnHits = colLogical
 		d.mx.BufferpoolColumnMisses = 0
 	}
-	
+
 	// Calculate overall hits and misses
-	d.mx.BufferpoolHits = d.mx.BufferpoolDataHits + d.mx.BufferpoolIndexHits + 
+	d.mx.BufferpoolHits = d.mx.BufferpoolDataHits + d.mx.BufferpoolIndexHits +
 		d.mx.BufferpoolXDAHits + d.mx.BufferpoolColumnHits
-	d.mx.BufferpoolMisses = d.mx.BufferpoolDataMisses + d.mx.BufferpoolIndexMisses + 
+	d.mx.BufferpoolMisses = d.mx.BufferpoolDataMisses + d.mx.BufferpoolIndexMisses +
 		d.mx.BufferpoolXDAMisses + d.mx.BufferpoolColumnMisses
 }
 
@@ -1325,16 +1325,16 @@ func (d *DB2) collectMonGetBufferpoolAggregate(ctx context.Context) error {
 	// Calculate hits and misses for each type
 	d.mx.BufferpoolDataHits = dataHits
 	d.mx.BufferpoolDataMisses = dataLogical - dataHits
-	
+
 	d.mx.BufferpoolIndexHits = indexHits
 	d.mx.BufferpoolIndexMisses = indexLogical - indexHits
-	
+
 	d.mx.BufferpoolXDAHits = xdaHits
 	d.mx.BufferpoolXDAMisses = xdaLogical - xdaHits
-	
+
 	d.mx.BufferpoolColumnHits = colHits
 	d.mx.BufferpoolColumnMisses = colLogical - colHits
-	
+
 	// If misses are negative, it means prefetch brought more pages than were requested
 	// In this case, set misses to 0 and reduce hits accordingly
 	if d.mx.BufferpoolDataMisses < 0 {
@@ -1353,11 +1353,11 @@ func (d *DB2) collectMonGetBufferpoolAggregate(ctx context.Context) error {
 		d.mx.BufferpoolColumnHits = colLogical
 		d.mx.BufferpoolColumnMisses = 0
 	}
-	
+
 	// Calculate overall hits and misses
-	d.mx.BufferpoolHits = d.mx.BufferpoolDataHits + d.mx.BufferpoolIndexHits + 
+	d.mx.BufferpoolHits = d.mx.BufferpoolDataHits + d.mx.BufferpoolIndexHits +
 		d.mx.BufferpoolXDAHits + d.mx.BufferpoolColumnHits
-	d.mx.BufferpoolMisses = d.mx.BufferpoolDataMisses + d.mx.BufferpoolIndexMisses + 
+	d.mx.BufferpoolMisses = d.mx.BufferpoolDataMisses + d.mx.BufferpoolIndexMisses +
 		d.mx.BufferpoolXDAMisses + d.mx.BufferpoolColumnMisses
 
 	return nil
@@ -1394,7 +1394,7 @@ func (d *DB2) collectMonGetTransactionLog(ctx context.Context) error {
 func (d *DB2) collectDatabaseOverview(ctx context.Context) error {
 	// Use simple queries approach (based on dcmtop) for more resilience
 	// Run multiple simple queries instead of one complex query
-	
+
 	// Helper function to run a simple query and handle errors gracefully
 	// It tries the MON_GET query first, then falls back to SNAP query if that fails
 	runSimpleQuery := func(queryMonGet, querySnap string, handler func(column, value string)) {
@@ -1420,7 +1420,7 @@ func (d *DB2) collectDatabaseOverview(ctx context.Context) error {
 			d.Debugf("query failed (will continue): %v", err)
 		}
 	}
-	
+
 	// Database status (current connected database)
 	runSimpleQuery(querySimpleDatabaseStatus, querySnapDatabaseStatus, func(column, value string) {
 		if column == "DATABASE_STATUS" && value == "ACTIVE" {
@@ -1431,17 +1431,17 @@ func (d *DB2) collectDatabaseOverview(ctx context.Context) error {
 			d.mx.DatabaseStatusInactive = 1
 		}
 	})
-	
+
 	// Database count (all databases in the instance)
 	// This will be updated by collectDatabaseInstances()
 	// Initialize to zero here
 	d.mx.DatabaseCountActive = 0
 	d.mx.DatabaseCountInactive = 0
-	
+
 	// CPU metrics
 	// Temporary storage for raw nanosecond values
 	var cpuUserNs, cpuSystemNs, cpuIdleNs, cpuIowaitNs float64
-	
+
 	runSimpleQuery(querySimpleCPUSystem, "", func(column, value string) {
 		switch column {
 		case "CPU_USER_TOTAL":
@@ -1462,7 +1462,7 @@ func (d *DB2) collectDatabaseOverview(ctx context.Context) error {
 			}
 		}
 	})
-	
+
 	// Convert nanoseconds to percentages
 	totalNs := cpuUserNs + cpuSystemNs + cpuIdleNs + cpuIowaitNs
 	if totalNs > 0 {
@@ -1472,7 +1472,7 @@ func (d *DB2) collectDatabaseOverview(ctx context.Context) error {
 		d.mx.CPUIdle = int64((cpuIdleNs / totalNs) * 100 * Precision)
 		d.mx.CPUIowait = int64((cpuIowaitNs / totalNs) * 100 * Precision)
 	}
-	
+
 	// Connection metrics
 	runSimpleQuery(querySimpleConnectionsActive, querySnapConnectionsActive, func(column, value string) {
 		if column == "ACTIVE_CONNECTIONS" {
@@ -1481,7 +1481,7 @@ func (d *DB2) collectDatabaseOverview(ctx context.Context) error {
 			}
 		}
 	})
-	
+
 	runSimpleQuery(querySimpleConnectionsTotal, querySnapConnectionsTotal, func(column, value string) {
 		if column == "TOTAL_CONNECTIONS" {
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -1489,7 +1489,7 @@ func (d *DB2) collectDatabaseOverview(ctx context.Context) error {
 			}
 		}
 	})
-	
+
 	// Memory metrics
 	runSimpleQuery(querySimpleMemoryInstance, "", func(column, value string) {
 		if column == "INSTANCE_MEM_COMMITTED" {
@@ -1498,7 +1498,7 @@ func (d *DB2) collectDatabaseOverview(ctx context.Context) error {
 			}
 		}
 	})
-	
+
 	runSimpleQuery(querySimpleMemoryDatabase, "", func(column, value string) {
 		if column == "DATABASE_MEM_COMMITTED" {
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -1506,7 +1506,7 @@ func (d *DB2) collectDatabaseOverview(ctx context.Context) error {
 			}
 		}
 	})
-	
+
 	runSimpleQuery(querySimpleMemoryBufferpool, "", func(column, value string) {
 		if column == "BUFFERPOOL_MEM_USED" {
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -1514,7 +1514,7 @@ func (d *DB2) collectDatabaseOverview(ctx context.Context) error {
 			}
 		}
 	})
-	
+
 	runSimpleQuery(querySimpleMemorySharedSort, "", func(column, value string) {
 		if column == "SHARED_SORT_MEM_USED" {
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -1522,7 +1522,7 @@ func (d *DB2) collectDatabaseOverview(ctx context.Context) error {
 			}
 		}
 	})
-	
+
 	// Throughput metrics
 	runSimpleQuery(querySimpleTransactions, querySnapTransactions, func(column, value string) {
 		if column == "TRANSACTIONS" {
@@ -1531,7 +1531,7 @@ func (d *DB2) collectDatabaseOverview(ctx context.Context) error {
 			}
 		}
 	})
-	
+
 	runSimpleQuery(querySimpleSelectStmts, querySnapSelectStmts, func(column, value string) {
 		if column == "SELECT_STMTS" {
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -1539,7 +1539,7 @@ func (d *DB2) collectDatabaseOverview(ctx context.Context) error {
 			}
 		}
 	})
-	
+
 	runSimpleQuery(querySimpleUIDStmts, querySnapUIDStmts, func(column, value string) {
 		if column == "UID_STMTS" {
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -1547,7 +1547,7 @@ func (d *DB2) collectDatabaseOverview(ctx context.Context) error {
 			}
 		}
 	})
-	
+
 	runSimpleQuery(querySimpleActivitiesAborted, querySnapActivitiesAborted, func(column, value string) {
 		if column == "ACTIVITIES_ABORTED" {
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -1555,7 +1555,7 @@ func (d *DB2) collectDatabaseOverview(ctx context.Context) error {
 			}
 		}
 	})
-	
+
 	// Time spent metrics
 	runSimpleQuery(querySimpleAvgDirectReadTime, querySnapAvgDirectReadTime, func(column, value string) {
 		if column == "AVG_DIRECT_READ_TIME" {
@@ -1564,7 +1564,7 @@ func (d *DB2) collectDatabaseOverview(ctx context.Context) error {
 			}
 		}
 	})
-	
+
 	runSimpleQuery(querySimpleAvgDirectWriteTime, querySnapAvgDirectWriteTime, func(column, value string) {
 		if column == "AVG_DIRECT_WRITE_TIME" {
 			if v, err := strconv.ParseFloat(value, 64); err == nil {
@@ -1572,7 +1572,7 @@ func (d *DB2) collectDatabaseOverview(ctx context.Context) error {
 			}
 		}
 	})
-	
+
 	runSimpleQuery(querySimpleAvgPoolReadTime, querySnapAvgPoolReadTime, func(column, value string) {
 		if column == "AVG_POOL_READ_TIME" {
 			if v, err := strconv.ParseFloat(value, 64); err == nil {
@@ -1580,7 +1580,7 @@ func (d *DB2) collectDatabaseOverview(ctx context.Context) error {
 			}
 		}
 	})
-	
+
 	runSimpleQuery(querySimpleAvgPoolWriteTime, querySnapAvgPoolWriteTime, func(column, value string) {
 		if column == "AVG_POOL_WRITE_TIME" {
 			if v, err := strconv.ParseFloat(value, 64); err == nil {
@@ -1588,10 +1588,10 @@ func (d *DB2) collectDatabaseOverview(ctx context.Context) error {
 			}
 		}
 	})
-	
+
 	// Additional metrics that were not in the original complex query
 	// but are collected by dcmtop
-	
+
 	// Lock metrics
 	runSimpleQuery(querySimpleLockHeld, querySnapLockHeld, func(column, value string) {
 		if column == "LOCKS_HELD" {
@@ -1600,7 +1600,7 @@ func (d *DB2) collectDatabaseOverview(ctx context.Context) error {
 			}
 		}
 	})
-	
+
 	runSimpleQuery(querySimpleLockWaits, querySnapLockWaits, func(column, value string) {
 		if column == "LOCK_WAITS" {
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -1608,7 +1608,7 @@ func (d *DB2) collectDatabaseOverview(ctx context.Context) error {
 			}
 		}
 	})
-	
+
 	runSimpleQuery(querySimpleLockTimeouts, querySnapLockTimeouts, func(column, value string) {
 		if column == "LOCK_TIMEOUTS" {
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -1616,7 +1616,7 @@ func (d *DB2) collectDatabaseOverview(ctx context.Context) error {
 			}
 		}
 	})
-	
+
 	runSimpleQuery(querySimpleDeadlocks, querySnapDeadlocks, func(column, value string) {
 		if column == "DEADLOCKS" {
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -1624,7 +1624,7 @@ func (d *DB2) collectDatabaseOverview(ctx context.Context) error {
 			}
 		}
 	})
-	
+
 	// Log operations
 	runSimpleQuery(querySimpleLogReads, querySnapLogReads, func(column, value string) {
 		if column == "LOG_READS" {
@@ -1633,7 +1633,7 @@ func (d *DB2) collectDatabaseOverview(ctx context.Context) error {
 			}
 		}
 	})
-	
+
 	runSimpleQuery(querySimpleLogWrites, querySnapLogWrites, func(column, value string) {
 		if column == "LOG_WRITES" {
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -1641,7 +1641,7 @@ func (d *DB2) collectDatabaseOverview(ctx context.Context) error {
 			}
 		}
 	})
-	
+
 	// Sorts
 	runSimpleQuery(querySimpleSorts, querySnapSorts, func(column, value string) {
 		if column == "SORTS" {
@@ -1650,7 +1650,7 @@ func (d *DB2) collectDatabaseOverview(ctx context.Context) error {
 			}
 		}
 	})
-	
+
 	runSimpleQuery(querySimpleSortOverflows, querySnapSortOverflows, func(column, value string) {
 		if column == "SORT_OVERFLOWS" {
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -1658,42 +1658,42 @@ func (d *DB2) collectDatabaseOverview(ctx context.Context) error {
 			}
 		}
 	})
-	
+
 	return nil // Always return nil since we run queries individually and handle errors gracefully
 }
 
 // Enhanced Logging Performance collection (Screen 18)
 func (d *DB2) collectLoggingPerformance(ctx context.Context) error {
 	// Use individual tested queries from dcmtop instead of complex combined queries
-	
+
 	// Collect log commits (from TOTAL_APP_COMMITS)
 	_ = d.collectSingleMetric(ctx, "log_commits", queryLogCommits, func(value string) {
 		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 			d.mx.LogCommits = v
 		}
 	})
-	
+
 	// Collect log rollbacks (from TOTAL_APP_ROLLBACKS)
 	_ = d.collectSingleMetric(ctx, "log_rollbacks", queryLogRollbacks, func(value string) {
 		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 			d.mx.LogRollbacks = v
 		}
 	})
-	
+
 	// Collect log I/O reads (from NUM_LOG_READ_IO)
 	_ = d.collectSingleMetric(ctx, "log_io_reads", queryLoggingReads, func(value string) {
 		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 			d.mx.LogIOReads = v
 		}
 	})
-	
+
 	// Collect log I/O writes (from NUM_LOG_WRITE_IO)
 	_ = d.collectSingleMetric(ctx, "log_io_writes", queryLoggingWrites, func(value string) {
 		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 			d.mx.LogIOWrites = v
 		}
 	})
-	
+
 	return nil
 }
 

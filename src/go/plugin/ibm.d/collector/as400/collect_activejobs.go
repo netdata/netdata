@@ -45,37 +45,37 @@ func (a *AS400) collectActiveJobs(ctx context.Context) error {
 
 	// Query for top active jobs by CPU usage
 	query := fmt.Sprintf(queryTopActiveJobs, a.MaxActiveJobs)
-	
+
 	var currentJobName string
 	err := a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
 		switch column {
 		case "JOB_NAME":
 			currentJobName = value
-			
+
 			job := a.getActiveJobMetrics(currentJobName)
 			job.updated = true
-			
+
 			// Add charts on first encounter
 			if !job.hasCharts {
 				job.hasCharts = true
 				a.addActiveJobCharts(job)
 			}
-			
+
 		case "JOB_STATUS":
 			if currentJobName != "" && a.activeJobs[currentJobName] != nil {
 				a.activeJobs[currentJobName].jobStatus = value
 			}
-			
+
 		case "SUBSYSTEM":
 			if currentJobName != "" && a.activeJobs[currentJobName] != nil {
 				a.activeJobs[currentJobName].subsystem = value
 			}
-			
+
 		case "JOB_TYPE":
 			if currentJobName != "" && a.activeJobs[currentJobName] != nil {
 				a.activeJobs[currentJobName].jobType = value
 			}
-			
+
 		case "ELAPSED_CPU_TIME":
 			if currentJobName != "" && a.activeJobs[currentJobName] != nil {
 				if v, err := strconv.ParseFloat(value, 64); err == nil {
@@ -90,7 +90,7 @@ func (a *AS400) collectActiveJobs(ctx context.Context) error {
 					}
 				}
 			}
-			
+
 		case "ELAPSED_TIME":
 			if currentJobName != "" && a.activeJobs[currentJobName] != nil {
 				if v, err := strconv.ParseFloat(value, 64); err == nil {
@@ -101,7 +101,7 @@ func (a *AS400) collectActiveJobs(ctx context.Context) error {
 					}
 				}
 			}
-			
+
 		case "TEMPORARY_STORAGE":
 			if currentJobName != "" && a.activeJobs[currentJobName] != nil {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -114,7 +114,7 @@ func (a *AS400) collectActiveJobs(ctx context.Context) error {
 					}
 				}
 			}
-			
+
 		case "CPU_PERCENTAGE":
 			if currentJobName != "" && a.activeJobs[currentJobName] != nil {
 				if v, err := strconv.ParseFloat(value, 64); err == nil {
@@ -125,7 +125,7 @@ func (a *AS400) collectActiveJobs(ctx context.Context) error {
 					}
 				}
 			}
-			
+
 		case "ELAPSED_INTERACTIVE_TRANSACTIONS":
 			if currentJobName != "" && a.activeJobs[currentJobName] != nil {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -136,7 +136,7 @@ func (a *AS400) collectActiveJobs(ctx context.Context) error {
 					}
 				}
 			}
-			
+
 		case "ELAPSED_TOTAL_DISK_IO_COUNT":
 			if currentJobName != "" && a.activeJobs[currentJobName] != nil {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -147,7 +147,7 @@ func (a *AS400) collectActiveJobs(ctx context.Context) error {
 					}
 				}
 			}
-			
+
 		case "THREAD_COUNT":
 			if currentJobName != "" && a.activeJobs[currentJobName] != nil {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -158,7 +158,7 @@ func (a *AS400) collectActiveJobs(ctx context.Context) error {
 					}
 				}
 			}
-			
+
 		case "RUN_PRIORITY":
 			if currentJobName != "" && a.activeJobs[currentJobName] != nil {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {

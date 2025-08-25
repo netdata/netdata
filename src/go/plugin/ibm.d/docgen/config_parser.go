@@ -154,7 +154,7 @@ func extractStructTags(tag *ast.BasicLit) (yaml, json string) {
 	}
 
 	tagValue := strings.Trim(tag.Value, "`")
-	
+
 	// Parse yaml tag
 	if yamlStart := strings.Index(tagValue, "yaml:\""); yamlStart >= 0 {
 		yamlPart := tagValue[yamlStart+6:] // Skip 'yaml:"'
@@ -223,7 +223,7 @@ func extractFieldDescription(fieldName string, field *ast.Field, comments []*ast
 			return comment
 		}
 	}
-	
+
 	// If no field comment, try to find comment before the field
 	if field.Doc != nil && len(field.Doc.List) > 0 {
 		// Use the last doc comment line as description
@@ -238,14 +238,14 @@ func extractFieldDescription(fieldName string, field *ast.Field, comments []*ast
 			return comment
 		}
 	}
-	
+
 	// Check for exact matches for framework fields
 	descriptions := map[string]string{
-		"UpdateEvery":      "Data collection frequency in seconds",
-		"Endpoint":         "Connection endpoint URL",
-		"ConnectTimeout":   "Connection timeout in seconds", 
-		"CollectItems":     "Enable collection of item metrics",
-		"MaxItems":         "Maximum number of items to collect",
+		"UpdateEvery":          "Data collection frequency in seconds",
+		"Endpoint":             "Connection endpoint URL",
+		"ConnectTimeout":       "Connection timeout in seconds",
+		"CollectItems":         "Enable collection of item metrics",
+		"MaxItems":             "Maximum number of items to collect",
 		"ObsoletionIterations": "Number of iterations after which charts become obsolete",
 	}
 
@@ -255,7 +255,7 @@ func extractFieldDescription(fieldName string, field *ast.Field, comments []*ast
 
 	// Generate intelligent descriptions based on field patterns
 	fieldLower := strings.ToLower(fieldName)
-	
+
 	// Generic connection-related fields
 	if strings.Contains(fieldLower, "host") {
 		return "Server hostname or IP address"
@@ -269,45 +269,45 @@ func extractFieldDescription(fieldName string, field *ast.Field, comments []*ast
 	if strings.Contains(fieldLower, "password") || strings.Contains(fieldLower, "pass") {
 		return "Password for authentication"
 	}
-	
+
 	// Collection control fields
 	if strings.HasPrefix(fieldLower, "collect") {
 		resource := extractResourceFromFieldName(fieldName)
 		return fmt.Sprintf("Enable collection of %s metrics", resource)
 	}
-	
+
 	// Selector fields
 	if strings.HasSuffix(fieldLower, "selector") {
 		resource := extractResourceFromFieldName(fieldName)
 		return fmt.Sprintf("Pattern to filter %s (wildcards supported)", resource)
 	}
-	
+
 	// Timeout fields
 	if strings.Contains(fieldLower, "timeout") {
 		return "Connection timeout duration in seconds"
 	}
-	
+
 	// SSL/TLS fields
 	if strings.Contains(fieldLower, "ssl") || strings.Contains(fieldLower, "tls") {
 		return "Enable SSL/TLS encrypted connection"
 	}
-	
+
 	// URL/URI fields
 	if strings.Contains(fieldLower, "url") || strings.Contains(fieldLower, "uri") {
 		return "Connection URL or URI"
 	}
-	
+
 	// DSN fields
 	if strings.Contains(fieldLower, "dsn") {
 		return "Data Source Name (DSN) for connection"
 	}
-	
+
 	// Max/limit fields
 	if strings.HasPrefix(fieldLower, "max") {
 		resource := extractResourceFromFieldName(fieldName)
 		return fmt.Sprintf("Maximum number of %s to monitor", resource)
 	}
-	
+
 	// Default to a more descriptive generic description
 	return fmt.Sprintf("%s", camelToWords(fieldName))
 }
@@ -320,11 +320,11 @@ func extractResourceFromFieldName(fieldName string) string {
 	name = strings.TrimPrefix(name, "Max")
 	name = strings.TrimSuffix(name, "Selector")
 	name = strings.TrimSuffix(name, "Config")
-	
+
 	// Convert to lowercase and make plural if needed
 	resource := camelToWords(name)
 	resource = strings.ToLower(resource)
-	
+
 	// Handle some special cases
 	if resource == "system queues" {
 		return "system queues"
@@ -335,7 +335,7 @@ func extractResourceFromFieldName(fieldName string) string {
 	if resource == "reset queue stats" {
 		return "queue statistics (destructive)"
 	}
-	
+
 	return resource
 }
 
@@ -377,19 +377,19 @@ func setFieldDefaults(field *ConfigField) {
 	case "ObsoletionIterations":
 		field.Default = 60
 		field.Minimum = intPtr(1)
-	
+
 	// Generic defaults for common field patterns
 	case "Port":
 		field.Minimum = intPtr(1)
 		field.Maximum = intPtr(65535)
 	}
-	
+
 	// Set format hints for specific field types
 	fieldLower := strings.ToLower(field.Name)
 	if strings.Contains(fieldLower, "password") || strings.Contains(fieldLower, "pass") {
 		field.Format = "password"
 	}
-	
+
 	// TODO: In the future, extract defaults from SetDefaults method in config.go
 	// This would make defaults module-specific rather than hardcoded in framework
 }
@@ -400,23 +400,23 @@ func (g *DocGenerator) parseDefaultsFromInitFile() map[string]interface{} {
 	// Construct path to init.go
 	dir := filepath.Dir(g.ConfigFile)
 	initFile := filepath.Join(dir, "init.go")
-	
+
 	// Check if init.go exists
 	if _, err := os.Stat(initFile); os.IsNotExist(err) {
 		log.Printf("ERROR: init.go not found at %s - defaultConfig() function is required", initFile)
 		return nil
 	}
-	
+
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, initFile, nil, parser.ParseComments)
 	if err != nil {
 		log.Printf("ERROR: Failed to parse init.go: %v", err)
 		return nil
 	}
-	
+
 	defaults := make(map[string]interface{})
 	foundDefaultConfig := false
-	
+
 	// Find the defaultConfig function
 	ast.Inspect(node, func(n ast.Node) bool {
 		switch x := n.(type) {
@@ -446,17 +446,17 @@ func (g *DocGenerator) parseDefaultsFromInitFile() map[string]interface{} {
 		}
 		return true
 	})
-	
+
 	if !foundDefaultConfig {
 		log.Printf("ERROR: defaultConfig() function not found in %s - this function is mandatory", initFile)
 		return nil
 	}
-	
+
 	if len(defaults) == 0 {
 		log.Printf("ERROR: defaultConfig() function found but extracted no default values")
 		return nil
 	}
-	
+
 	log.Printf("Successfully extracted %d default values from defaultConfig()", len(defaults))
 	return defaults
 }

@@ -4,17 +4,17 @@ package as400
 
 // diskMetrics holds metrics for an individual disk
 type diskMetrics struct {
-	unit          string
-	typeField     string // HDD, SSD, etc.
-	model         string
-	busyPercent   int64
-	readRequests  int64
-	writeRequests int64
-	readBytes     int64
-	writeBytes    int64
-	averageTime   int64
-	ssdLifeRemaining int64 // -1 if not SSD
-	ssdPowerOnDays   int64 // -1 if not SSD
+	unit             string
+	typeField        string // HDD, SSD, etc.
+	model            string
+	busyPercent      int64
+	readRequests     int64
+	writeRequests    int64
+	readBytes        int64
+	writeBytes       int64
+	averageTime      int64
+	ssdLifeRemaining int64  // -1 if not SSD
+	ssdPowerOnDays   int64  // -1 if not SSD
 	hardwareStatus   string // Hardware status from SYSDISKSTAT
 	diskModel        string // Disk model from SYSDISKSTAT
 	serialNumber     string // Serial number from SYSDISKSTAT
@@ -77,18 +77,18 @@ type tempStorageMetrics struct {
 
 // activeJobMetrics holds metrics for an individual active job
 type activeJobMetrics struct {
-	jobName                string
-	jobStatus              string
-	subsystem              string
-	jobType                string
-	runPriority            int64
-	elapsedCPUTime         int64  // seconds
-	elapsedTime            int64  // seconds
-	temporaryStorage       int64  // MB
-	cpuPercentage          int64  // percentage * precision
+	jobName                 string
+	jobStatus               string
+	subsystem               string
+	jobType                 string
+	runPriority             int64
+	elapsedCPUTime          int64 // seconds
+	elapsedTime             int64 // seconds
+	temporaryStorage        int64 // MB
+	cpuPercentage           int64 // percentage * precision
 	interactiveTransactions int64
-	diskIO                 int64
-	threadCount            int64
+	diskIO                  int64
+	threadCount             int64
 
 	updated   bool
 	hasCharts bool
@@ -112,13 +112,13 @@ type networkInterfaceMetrics struct {
 func (a *AS400) getDiskMetrics(unit string) *diskMetrics {
 	if _, ok := a.disks[unit]; !ok {
 		a.disks[unit] = &diskMetrics{
-			unit: unit,
-			typeField: "UNKNOWN",        // Default for disk type when not specified
-			ssdLifeRemaining: -1, // Default to -1 (not SSD)
-			ssdPowerOnDays: -1,   // Default to -1 (not SSD)
-			hardwareStatus: "UNKNOWN", // Default for hardware status
-			diskModel: "UNKNOWN",      // Default for disk model
-			serialNumber: "UNKNOWN",   // Default for serial number
+			unit:             unit,
+			typeField:        "UNKNOWN", // Default for disk type when not specified
+			ssdLifeRemaining: -1,        // Default to -1 (not SSD)
+			ssdPowerOnDays:   -1,        // Default to -1 (not SSD)
+			hardwareStatus:   "UNKNOWN", // Default for hardware status
+			diskModel:        "UNKNOWN", // Default for disk model
+			serialNumber:     "UNKNOWN", // Default for serial number
 		}
 	}
 	return a.disks[unit]

@@ -1,4 +1,3 @@
-
 package mq
 
 import (
@@ -10,9 +9,9 @@ import (
 // Collector is the collector type.
 type Collector struct {
 	framework.Collector
-	Config `yaml:",inline" json:",inline"`  // Embed config to receive YAML unmarshal
+	Config `yaml:",inline" json:",inline"` // Embed config to receive YAML unmarshal
 	client *pcf.Client
-	
+
 	// Resolved effective intervals (auto-detected or user-configured)
 	effectiveStatisticsInterval int
 	effectiveSysTopicInterval   int
@@ -95,32 +94,30 @@ func (c *Collector) CollectOnce() error {
 	return nil
 }
 
-
-
 func (c *Collector) collectQueueManagerMetrics() error {
 	metrics, err := c.client.GetQueueManagerStatus()
 	if err != nil {
 		return err
 	}
-	
+
 	contexts.QueueManager.Status.Set(c.State, contexts.EmptyLabels{}, contexts.QueueManagerStatusValues{
 		Status: metrics.Status,
 	})
-	
+
 	// Collect connection count if available
 	if metrics.ConnectionCount.IsCollected() {
 		contexts.QueueManager.ConnectionCount.Set(c.State, contexts.EmptyLabels{}, contexts.QueueManagerConnectionCountValues{
 			Connections: metrics.ConnectionCount.Int64(),
 		})
 	}
-	
+
 	// Collect uptime if available
 	if metrics.Uptime.IsCollected() {
 		contexts.QueueManager.Uptime.Set(c.State, contexts.EmptyLabels{}, contexts.QueueManagerUptimeValues{
 			Uptime: metrics.Uptime.Int64(),
 		})
 	}
-	
+
 	return nil
 }
 

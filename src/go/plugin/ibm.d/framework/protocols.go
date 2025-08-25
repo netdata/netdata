@@ -6,10 +6,10 @@ import (
 
 // ProtocolClient provides automatic instrumentation for protocol operations
 type ProtocolClient struct {
-	name               string
-	metrics            *ProtocolMetrics
-	state              *CollectorState
-	backoff            *ExponentialBackoff
+	name                string
+	metrics             *ProtocolMetrics
+	state               *CollectorState
+	backoff             *ExponentialBackoff
 	connectionIteration int64 // Iteration when this protocol connected
 }
 
@@ -25,7 +25,7 @@ func NewProtocolClient(name string, state *CollectorState) *ProtocolClient {
 
 // GetBackoff returns the exponential backoff for this protocol
 func (p *ProtocolClient) GetBackoff() *ExponentialBackoff {
-	p.backoff.protocol = p  // Set reference for logging
+	p.backoff.protocol = p // Set reference for logging
 	return p.backoff
 }
 
@@ -63,75 +63,75 @@ func (p *ProtocolClient) IsReconnect() bool {
 // Track wraps a protocol operation with automatic metrics collection
 func (p *ProtocolClient) Track(operationName string, fn func() error) error {
 	start := time.Now()
-	
+
 	// Execute the operation
 	err := fn()
-	
+
 	// Track metrics
 	elapsed := time.Since(start).Microseconds()
 	p.metrics.RequestCount++
 	p.metrics.TotalLatency += elapsed
-	
+
 	if elapsed > p.metrics.MaxLatency {
 		p.metrics.MaxLatency = elapsed
 	}
-	
+
 	if err != nil {
 		p.metrics.ErrorCount++
 	}
-	
+
 	return err
 }
 
 // TrackWithSize wraps operations that have request/response sizes
 func (p *ProtocolClient) TrackWithSize(operationName string, requestSize int64, fn func() (int64, error)) error {
 	start := time.Now()
-	
+
 	// Track request size
 	p.metrics.BytesSent += requestSize
-	
+
 	// Execute the operation
 	responseSize, err := fn()
-	
+
 	// Track response size
 	if responseSize > 0 {
 		p.metrics.BytesReceived += responseSize
 	}
-	
+
 	// Track timing
 	elapsed := time.Since(start).Microseconds()
 	p.metrics.RequestCount++
 	p.metrics.TotalLatency += elapsed
-	
+
 	if elapsed > p.metrics.MaxLatency {
 		p.metrics.MaxLatency = elapsed
 	}
-	
+
 	if err != nil {
 		p.metrics.ErrorCount++
 	}
-	
+
 	return err
 }
 
 // GetProtocolMetrics returns current protocol metrics for charting
 func (p *ProtocolClient) GetProtocolMetrics() map[string]int64 {
 	metrics := make(map[string]int64)
-	
+
 	// Operation counts
 	metrics["requests"] = p.metrics.RequestCount
 	metrics["errors"] = p.metrics.ErrorCount
-	
+
 	// Latency metrics
 	if p.metrics.RequestCount > 0 {
 		metrics["avg_latency"] = p.metrics.TotalLatency / p.metrics.RequestCount
 	}
 	metrics["max_latency"] = p.metrics.MaxLatency
-	
+
 	// Size metrics
 	metrics["bytes_sent"] = p.metrics.BytesSent
 	metrics["bytes_received"] = p.metrics.BytesReceived
-	
+
 	return metrics
 }
 
@@ -188,7 +188,7 @@ func (b *ExponentialBackoff) NextInterval() time.Duration {
 		}
 		b.attempt++
 	}()
-	
+
 	// Add jitter (±10%)
 	jitter := time.Duration(float64(b.currentInterval) * 0.1)
 	return b.currentInterval + jitter
@@ -209,17 +209,17 @@ func (b *ExponentialBackoff) ShouldRetry() bool {
 // Retry executes a function with exponential backoff
 func (b *ExponentialBackoff) Retry(fn func() error) error {
 	var lastErr error
-	
+
 	if b.protocol != nil {
-		b.protocol.Debugf("Starting retry sequence with initial interval %v, max interval %v", 
+		b.protocol.Debugf("Starting retry sequence with initial interval %v, max interval %v",
 			b.InitialInterval, b.MaxInterval)
 	}
-	
+
 	for {
 		if b.protocol != nil && b.attempt > 0 {
 			b.protocol.Debugf("Retry attempt #%d (after %d failed attempts)", b.attempt+1, b.attempt)
 		}
-		
+
 		err := fn()
 		if err == nil {
 			if b.protocol != nil && b.attempt > 0 {
@@ -228,9 +228,9 @@ func (b *ExponentialBackoff) Retry(fn func() error) error {
 			b.Reset()
 			return nil
 		}
-		
+
 		lastErr = err
-		
+
 		// If this is a fatal error, don't retry
 		if IsFatal(err) {
 			if b.protocol != nil {
@@ -238,7 +238,7 @@ func (b *ExponentialBackoff) Retry(fn func() error) error {
 			}
 			return err
 		}
-		
+
 		// Check if we should continue retrying
 		if !b.ShouldRetry() {
 			if b.protocol != nil {
@@ -246,11 +246,11 @@ func (b *ExponentialBackoff) Retry(fn func() error) error {
 			}
 			return lastErr
 		}
-		
+
 		// Wait before next attempt
 		interval := b.NextInterval()
 		if b.protocol != nil {
-			b.protocol.Debugf("Waiting %v before retry attempt #%d (error was: %v)", 
+			b.protocol.Debugf("Waiting %v before retry attempt #%d (error was: %v)",
 				interval, b.attempt+1, err)
 		}
 		time.Sleep(interval)

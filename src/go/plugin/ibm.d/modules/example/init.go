@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	
+
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/example/contexts"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/example/dummy"
 )
@@ -17,7 +17,7 @@ func defaultConfig() Config {
 		// Connection defaults
 		Endpoint:       "dummy://localhost",
 		ConnectTimeout: 5,
-		
+
 		// Collection defaults
 		CollectItems: true,
 		MaxItems:     10,
@@ -28,7 +28,7 @@ func defaultConfig() Config {
 func (c *Collector) Init(ctx context.Context) error {
 	// Set this collector as the implementation
 	c.SetImpl(c)
-	
+
 	// Copy framework configuration from module config to framework
 	// Only if user provided values (non-zero)
 	if c.config.ObsoletionIterations != 0 {
@@ -40,26 +40,26 @@ func (c *Collector) Init(ctx context.Context) error {
 	if c.config.CollectionGroups != nil {
 		c.Config.CollectionGroups = c.config.CollectionGroups
 	}
-	
+
 	// Initialize protocol client
 	c.client = dummy.NewClient()
-	
+
 	// Initialize maps
 	c.itemData = make(map[int]*ItemData)
-	
+
 	// Register all contexts from generated code BEFORE base init
 	c.RegisterContexts(contexts.GetAllContexts()...)
-	
+
 	// Initialize base collector (which will create charts)
 	if err := c.Collector.Init(ctx); err != nil {
 		return err
 	}
-	
+
 	// Debug log the complete configuration as JSON
 	if configJSON, err := json.Marshal(c.config); err == nil {
 		c.Debugf("Running with configuration: %s", string(configJSON))
 	}
-	
+
 	return nil
 }
 
@@ -69,13 +69,13 @@ func (c *Collector) Check(ctx context.Context) error {
 	if err := c.client.Connect(); err != nil {
 		return fmt.Errorf("failed to connect: %v", err)
 	}
-	
+
 	// Test fetching a value
 	if _, err := c.client.GetTimestampValue(); err != nil {
 		c.client.Disconnect()
 		return fmt.Errorf("failed to fetch test value: %v", err)
 	}
-	
+
 	// Get version information and set as global labels
 	version, edition, err := c.client.GetVersion()
 	if err == nil {
@@ -84,7 +84,7 @@ func (c *Collector) Check(ctx context.Context) error {
 		c.SetGlobalLabel("endpoint", c.config.Endpoint)
 		c.Infof("Connected to version %s (%s edition) at %s", version, edition, c.config.Endpoint)
 	}
-	
+
 	c.Infof("Example collector check successful")
 	return nil
 }

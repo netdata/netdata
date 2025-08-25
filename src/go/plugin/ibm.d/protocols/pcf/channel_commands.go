@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-
 package pcf
-
 
 import (
 	"fmt"
@@ -258,10 +256,10 @@ func (c *Client) discoverChannelsWithInfo(result *ChannelCollectionResult) ([]Ch
 	}
 
 	result.Stats.Discovery.Success = true
-	
+
 	// Parse channel info including type
 	channelInfos := c.parseChannelInfoFromParams(response)
-	
+
 	successfulItems := int64(len(channelInfos))
 	var invisibleItems int64
 	// TODO: Add error counting when we update parseChannelInfoFromParams
@@ -288,7 +286,7 @@ func (c *Client) discoverChannels(result *ChannelCollectionResult) ([]string, er
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var names []string
 	for _, info := range infos {
 		names = append(names, info.Name)
@@ -305,17 +303,17 @@ func (c *Client) filterChannelsEnhanced(channelInfos []ChannelInfo, selector str
 
 	var channelsToEnrich []ChannelInfo
 	var templateChannelsSkipped int64
-	
+
 	if enrichAll || selector == "*" {
 		for _, info := range channelInfos {
 			// Skip template channels (SYSTEM.DEF.*)
 			if strings.HasPrefix(info.Name, "SYSTEM.DEF.") {
 				templateChannelsSkipped++
-				c.protocol.Debugf("Skipping template channel '%s' (type=%d) - no runtime status available", 
+				c.protocol.Debugf("Skipping template channel '%s' (type=%d) - no runtime status available",
 					info.Name, info.Type)
 				continue
 			}
-			
+
 			if !collectSystem && strings.HasPrefix(info.Name, "SYSTEM.") {
 				result.Stats.Discovery.ExcludedItems++
 				continue
@@ -330,11 +328,11 @@ func (c *Client) filterChannelsEnhanced(channelInfos []ChannelInfo, selector str
 			// Skip template channels (SYSTEM.DEF.*)
 			if strings.HasPrefix(info.Name, "SYSTEM.DEF.") {
 				templateChannelsSkipped++
-				c.protocol.Debugf("Skipping template channel '%s' (type=%d) - no runtime status available", 
+				c.protocol.Debugf("Skipping template channel '%s' (type=%d) - no runtime status available",
 					info.Name, info.Type)
 				continue
 			}
-			
+
 			if !collectSystem && strings.HasPrefix(info.Name, "SYSTEM.") {
 				result.Stats.Discovery.ExcludedItems++
 				continue
@@ -356,10 +354,10 @@ func (c *Client) filterChannelsEnhanced(channelInfos []ChannelInfo, selector str
 		c.protocol.Debugf("Selector '%s' matched %d channels, excluded %d (including system filtering), skipped %d templates",
 			selector, result.Stats.Discovery.IncludedItems, result.Stats.Discovery.ExcludedItems, templateChannelsSkipped)
 	}
-	
+
 	// Update stats to account for template channels
 	result.Stats.Discovery.AvailableItems -= templateChannelsSkipped
-	
+
 	return channelsToEnrich
 }
 
@@ -371,7 +369,7 @@ func (c *Client) filterChannels(channels []string, selector string, collectSyste
 		infos = append(infos, ChannelInfo{Name: name, Type: 0})
 	}
 	filteredInfos := c.filterChannelsEnhanced(infos, selector, collectSystem, maxChannels, result)
-	
+
 	// Convert back to strings
 	var names []string
 	for _, info := range filteredInfos {
@@ -412,7 +410,7 @@ func (c *Client) enrichChannelsWithTypes(channelInfosToEnrich []ChannelInfo, col
 	for _, info := range channelInfosToEnrich {
 		cm := ChannelMetrics{
 			Name:                 info.Name,
-			Type:                 info.Type,  // Set type from discovery
+			Type:                 info.Type, // Set type from discovery
 			BatchSize:            NotCollected,
 			BatchInterval:        NotCollected,
 			DiscInterval:         NotCollected,
@@ -496,7 +494,7 @@ func (c *Client) enrichChannelWithMetrics(cm *ChannelMetrics, result *ChannelCol
 		cm.Connections = metricsData.Connections
 		cm.BuffersUsed = metricsData.BuffersUsed
 		cm.BuffersMax = metricsData.BuffersMax
-		
+
 		// Copy extended status metrics
 		cm.BuffersSent = metricsData.BuffersSent
 		cm.BuffersReceived = metricsData.BuffersReceived

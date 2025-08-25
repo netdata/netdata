@@ -19,4 +19,3 @@ const (
 	QueueTypeRemote  = int32(ibmmq.MQQT_REMOTE)
 	QueueTypeCluster = int32(ibmmq.MQQT_CLUSTER)
 )
-

@@ -12,68 +12,68 @@ const precision = 1000
 // Priority constants for chart ordering
 const (
 	// System (1000-1999) - Most critical for health monitoring
-	prioSystemCPU        = 1000
-	prioSystemMemory     = 1010
-	prioSystemGC         = 1200
-	prioSystemUptime     = 1300
-	prioSystemJVM        = 1000
-	prioSystemData       = 1000
-	prioThreadPools      = 1300
-	
+	prioSystemCPU    = 1000
+	prioSystemMemory = 1010
+	prioSystemGC     = 1200
+	prioSystemUptime = 1300
+	prioSystemJVM    = 1000
+	prioSystemData   = 1000
+	prioThreadPools  = 1300
+
 	// Connectivity (2000-2999) - Critical for application functionality
-	prioJDBCPools        = 2000
-	prioJCAPools         = 2200
-	prioJMSAdapter       = 2300
-	prioSIBMessaging     = 2300
-	prioTCPChannels      = 2600
-	prioConnectionMgr    = 2300
+	prioJDBCPools         = 2000
+	prioJCAPools          = 2200
+	prioJMSAdapter        = 2300
+	prioSIBMessaging      = 2300
+	prioTCPChannels       = 2600
+	prioConnectionMgr     = 2300
 	prioConnectionManager = 2300
-	
+
 	// Web (3000-4999) - Core business logic
-	prioServlets         = 3100
-	prioWebServlets      = 3100  // Alias
-	prioSessions         = 3200
-	prioWebSessions      = 3200  // Alias
-	prioWebContainers    = 3310
-	prioWebApps          = 3300  // Alias
-	prioPortlets         = 3500
-	prioWebPortlets      = 3500  // Alias
-	prioURLs             = 3110
-	
+	prioServlets      = 3100
+	prioWebServlets   = 3100 // Alias
+	prioSessions      = 3200
+	prioWebSessions   = 3200 // Alias
+	prioWebContainers = 3310
+	prioWebApps       = 3300 // Alias
+	prioPortlets      = 3500
+	prioWebPortlets   = 3500 // Alias
+	prioURLs          = 3110
+
 	// Transactions (4000-4999) - Important for data integrity
 	prioTransactionManager = 4000
-	
+
 	// Performance (5000-5999) - Caching and optimization
-	prioObjectPools      = 5100
-	prioDynaCache        = 5200
-	prioCacheManager     = 5200  // Alias for dynamic cache
-	prioObjectCache      = 5300
-	
+	prioObjectPools  = 5100
+	prioDynaCache    = 5200
+	prioCacheManager = 5200 // Alias for dynamic cache
+	prioObjectCache  = 5300
+
 	// Integration (6000-6999) - Web services and integration
-	prioORB              = 6000
-	prioWebServices      = 6100
-	prioMDB              = 6100
-	prioEJBContainer     = 6200
-	prioSLSB             = 6300
-	prioSFSB             = 6400
-	prioEntityBean       = 6500
-	
+	prioORB          = 6000
+	prioWebServices  = 6100
+	prioMDB          = 6100
+	prioEJBContainer = 6200
+	prioSLSB         = 6300
+	prioSFSB         = 6400
+	prioEntityBean   = 6500
+
 	// Security (7000-7999) - Authentication and authorization
-	prioSecurityAuth     = 7000
-	prioSecurityAuthz    = 7100
-	prioSecurity         = 7000
-	prioInterceptors     = 7500
-	prioWLM              = 7500
-	
+	prioSecurityAuth  = 7000
+	prioSecurityAuthz = 7100
+	prioSecurity      = 7000
+	prioInterceptors  = 7500
+	prioWLM           = 7500
+
 	// Availability (8000-8999) - HA and clustering
-	prioHAManager        = 8000
-	prioEnterpriseApps   = 8100
-	
+	prioHAManager      = 8000
+	prioEnterpriseApps = 8100
+
 	// Management (9000-9999) - Monitoring and diagnostics
 	prioExtensionRegistry = 8100
-	prioRegistry         = 8100  // Alias for extension registry
-	prioComponents       = 10100
-	prioMonitoring       = 79000
+	prioRegistry          = 8100 // Alias for extension registry
+	prioComponents        = 10100
+	prioMonitoring        = 79000
 )
 
 // Base charts - required by framework
@@ -120,87 +120,87 @@ var transactionChartsTmpl = module.Charts{
 	// These charts mixed total, count, min, max, and mean in single charts
 	// Now replaced by separate rate, current_latency, and lifetime_latency charts
 	/*
-	{
-		ID:       "transaction_manager_%s_global_times",
-		Title:    "Transaction Manager Global Transaction Times",
-		Units:    "milliseconds/s",
-		Fam:      "transactions/overview",
-		Ctx:      "websphere_pmi.transaction_manager_global_times",
-		Type:     module.Line,
-		Priority: prioTransactionManager + 20,
-		Dims: module.Dims{
-			{ID: "transaction_manager_%s_GlobalTranTime_total", Name: "transaction_time", Algo: module.Incremental},
-			{ID: "transaction_manager_%s_GlobalPrepareTime_total", Name: "prepare_time", Algo: module.Incremental},
-			{ID: "transaction_manager_%s_GlobalCommitTime_total", Name: "commit_time", Algo: module.Incremental},
-			{ID: "transaction_manager_%s_GlobalBeforeCompletionTime_total", Name: "before_completion_time", Algo: module.Incremental},
-			// Hidden dimensions for count, min, max
-			{ID: "transaction_manager_%s_GlobalTranTime_count", Name: "transaction_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "transaction_manager_%s_GlobalTranTime_min", Name: "transaction_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "transaction_manager_%s_GlobalTranTime_max", Name: "transaction_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "transaction_manager_%s_GlobalPrepareTime_count", Name: "prepare_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "transaction_manager_%s_GlobalPrepareTime_min", Name: "prepare_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "transaction_manager_%s_GlobalPrepareTime_max", Name: "prepare_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "transaction_manager_%s_GlobalCommitTime_count", Name: "commit_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "transaction_manager_%s_GlobalCommitTime_min", Name: "commit_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "transaction_manager_%s_GlobalCommitTime_max", Name: "commit_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "transaction_manager_%s_GlobalBeforeCompletionTime_count", Name: "before_completion_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "transaction_manager_%s_GlobalBeforeCompletionTime_min", Name: "before_completion_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "transaction_manager_%s_GlobalBeforeCompletionTime_max", Name: "before_completion_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+		{
+			ID:       "transaction_manager_%s_global_times",
+			Title:    "Transaction Manager Global Transaction Times",
+			Units:    "milliseconds/s",
+			Fam:      "transactions/overview",
+			Ctx:      "websphere_pmi.transaction_manager_global_times",
+			Type:     module.Line,
+			Priority: prioTransactionManager + 20,
+			Dims: module.Dims{
+				{ID: "transaction_manager_%s_GlobalTranTime_total", Name: "transaction_time", Algo: module.Incremental},
+				{ID: "transaction_manager_%s_GlobalPrepareTime_total", Name: "prepare_time", Algo: module.Incremental},
+				{ID: "transaction_manager_%s_GlobalCommitTime_total", Name: "commit_time", Algo: module.Incremental},
+				{ID: "transaction_manager_%s_GlobalBeforeCompletionTime_total", Name: "before_completion_time", Algo: module.Incremental},
+				// Hidden dimensions for count, min, max
+				{ID: "transaction_manager_%s_GlobalTranTime_count", Name: "transaction_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+				{ID: "transaction_manager_%s_GlobalTranTime_min", Name: "transaction_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+				{ID: "transaction_manager_%s_GlobalTranTime_max", Name: "transaction_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+				{ID: "transaction_manager_%s_GlobalPrepareTime_count", Name: "prepare_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+				{ID: "transaction_manager_%s_GlobalPrepareTime_min", Name: "prepare_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+				{ID: "transaction_manager_%s_GlobalPrepareTime_max", Name: "prepare_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+				{ID: "transaction_manager_%s_GlobalCommitTime_count", Name: "commit_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+				{ID: "transaction_manager_%s_GlobalCommitTime_min", Name: "commit_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+				{ID: "transaction_manager_%s_GlobalCommitTime_max", Name: "commit_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+				{ID: "transaction_manager_%s_GlobalBeforeCompletionTime_count", Name: "before_completion_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+				{ID: "transaction_manager_%s_GlobalBeforeCompletionTime_min", Name: "before_completion_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+				{ID: "transaction_manager_%s_GlobalBeforeCompletionTime_max", Name: "before_completion_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+			},
 		},
-	},
-	{
-		ID:       "transaction_manager_%s_local_times",
-		Title:    "Transaction Manager Local Transaction Times",
-		Units:    "milliseconds/s",
-		Fam:      "transactions/overview",
-		Ctx:      "websphere_pmi.transaction_manager_local_times",
-		Type:     module.Line,
-		Priority: prioTransactionManager + 30,
-		Dims: module.Dims{
-			{ID: "transaction_manager_%s_LocalTranTime_total", Name: "transaction_time", Algo: module.Incremental},
-			{ID: "transaction_manager_%s_LocalCommitTime_total", Name: "commit_time", Algo: module.Incremental},
-			{ID: "transaction_manager_%s_LocalBeforeCompletionTime_total", Name: "before_completion_time", Algo: module.Incremental},
-			// Hidden dimensions for count, min, max
-			{ID: "transaction_manager_%s_LocalTranTime_count", Name: "transaction_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "transaction_manager_%s_LocalTranTime_min", Name: "transaction_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "transaction_manager_%s_LocalTranTime_max", Name: "transaction_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "transaction_manager_%s_LocalCommitTime_count", Name: "commit_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "transaction_manager_%s_LocalCommitTime_min", Name: "commit_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "transaction_manager_%s_LocalCommitTime_max", Name: "commit_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "transaction_manager_%s_LocalBeforeCompletionTime_count", Name: "before_completion_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "transaction_manager_%s_LocalBeforeCompletionTime_min", Name: "before_completion_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "transaction_manager_%s_LocalBeforeCompletionTime_max", Name: "before_completion_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+		{
+			ID:       "transaction_manager_%s_local_times",
+			Title:    "Transaction Manager Local Transaction Times",
+			Units:    "milliseconds/s",
+			Fam:      "transactions/overview",
+			Ctx:      "websphere_pmi.transaction_manager_local_times",
+			Type:     module.Line,
+			Priority: prioTransactionManager + 30,
+			Dims: module.Dims{
+				{ID: "transaction_manager_%s_LocalTranTime_total", Name: "transaction_time", Algo: module.Incremental},
+				{ID: "transaction_manager_%s_LocalCommitTime_total", Name: "commit_time", Algo: module.Incremental},
+				{ID: "transaction_manager_%s_LocalBeforeCompletionTime_total", Name: "before_completion_time", Algo: module.Incremental},
+				// Hidden dimensions for count, min, max
+				{ID: "transaction_manager_%s_LocalTranTime_count", Name: "transaction_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+				{ID: "transaction_manager_%s_LocalTranTime_min", Name: "transaction_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+				{ID: "transaction_manager_%s_LocalTranTime_max", Name: "transaction_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+				{ID: "transaction_manager_%s_LocalCommitTime_count", Name: "commit_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+				{ID: "transaction_manager_%s_LocalCommitTime_min", Name: "commit_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+				{ID: "transaction_manager_%s_LocalCommitTime_max", Name: "commit_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+				{ID: "transaction_manager_%s_LocalBeforeCompletionTime_count", Name: "before_completion_count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+				{ID: "transaction_manager_%s_LocalBeforeCompletionTime_min", Name: "before_completion_min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+				{ID: "transaction_manager_%s_LocalBeforeCompletionTime_max", Name: "before_completion_max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+			},
 		},
-	},
-	{
-		ID:       "transaction_manager_%s_global_avg_times",
-		Title:    "Transaction Manager Global Average Times",
-		Units:    "milliseconds",
-		Fam:      "transactions/overview",
-		Ctx:      "websphere_pmi.transaction_manager_global_avg_times",
-		Type:     module.Line,
-		Priority: prioTransactionManager + 40,
-		Dims: module.Dims{
-			{ID: "transaction_manager_%s_GlobalTranTime_mean", Name: "avg_transaction_time", Div: precision},
-			{ID: "transaction_manager_%s_GlobalPrepareTime_mean", Name: "avg_prepare_time", Div: precision},
-			{ID: "transaction_manager_%s_GlobalCommitTime_mean", Name: "avg_commit_time", Div: precision},
-			{ID: "transaction_manager_%s_GlobalBeforeCompletionTime_mean", Name: "avg_before_completion_time", Div: precision},
+		{
+			ID:       "transaction_manager_%s_global_avg_times",
+			Title:    "Transaction Manager Global Average Times",
+			Units:    "milliseconds",
+			Fam:      "transactions/overview",
+			Ctx:      "websphere_pmi.transaction_manager_global_avg_times",
+			Type:     module.Line,
+			Priority: prioTransactionManager + 40,
+			Dims: module.Dims{
+				{ID: "transaction_manager_%s_GlobalTranTime_mean", Name: "avg_transaction_time", Div: precision},
+				{ID: "transaction_manager_%s_GlobalPrepareTime_mean", Name: "avg_prepare_time", Div: precision},
+				{ID: "transaction_manager_%s_GlobalCommitTime_mean", Name: "avg_commit_time", Div: precision},
+				{ID: "transaction_manager_%s_GlobalBeforeCompletionTime_mean", Name: "avg_before_completion_time", Div: precision},
+			},
 		},
-	},
-	{
-		ID:       "transaction_manager_%s_local_avg_times",
-		Title:    "Transaction Manager Local Average Times",
-		Units:    "milliseconds",
-		Fam:      "transactions/overview",
-		Ctx:      "websphere_pmi.transaction_manager_local_avg_times",
-		Type:     module.Line,
-		Priority: prioTransactionManager + 50,
-		Dims: module.Dims{
-			{ID: "transaction_manager_%s_LocalTranTime_mean", Name: "avg_transaction_time", Div: precision},
-			{ID: "transaction_manager_%s_LocalCommitTime_mean", Name: "avg_commit_time", Div: precision},
-			{ID: "transaction_manager_%s_LocalBeforeCompletionTime_mean", Name: "avg_before_completion_time", Div: precision},
+		{
+			ID:       "transaction_manager_%s_local_avg_times",
+			Title:    "Transaction Manager Local Average Times",
+			Units:    "milliseconds",
+			Fam:      "transactions/overview",
+			Ctx:      "websphere_pmi.transaction_manager_local_avg_times",
+			Type:     module.Line,
+			Priority: prioTransactionManager + 50,
+			Dims: module.Dims{
+				{ID: "transaction_manager_%s_LocalTranTime_mean", Name: "avg_transaction_time", Div: precision},
+				{ID: "transaction_manager_%s_LocalCommitTime_mean", Name: "avg_commit_time", Div: precision},
+				{ID: "transaction_manager_%s_LocalBeforeCompletionTime_mean", Name: "avg_before_completion_time", Div: precision},
+			},
 		},
-	},
 	*/
 }
 
@@ -320,34 +320,34 @@ var threadPoolChartsTmpl = module.Charts{
 	},
 	// DEPRECATED: Old ActiveTime charts - replaced by smart processor
 	/*
-	{
-		ID:       "thread_pool_%s_active_time",
-		Title:    "Thread Pool Active Time",
-		Units:    "milliseconds/s",
-		Fam:      "system/threads",
-		Ctx:      "websphere_pmi.thread_pool_active_time",
-		Type:     module.Line,
-		Priority: prioThreadPools + 30,
-		Dims: module.Dims{
-			{ID: "thread_pool_%s_ActiveTime_total", Name: "active_time", Algo: module.Incremental},
-			// Hidden dimensions for count, min, max
-			{ID: "thread_pool_%s_ActiveTime_count", Name: "count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "thread_pool_%s_ActiveTime_min", Name: "min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
-			{ID: "thread_pool_%s_ActiveTime_max", Name: "max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+		{
+			ID:       "thread_pool_%s_active_time",
+			Title:    "Thread Pool Active Time",
+			Units:    "milliseconds/s",
+			Fam:      "system/threads",
+			Ctx:      "websphere_pmi.thread_pool_active_time",
+			Type:     module.Line,
+			Priority: prioThreadPools + 30,
+			Dims: module.Dims{
+				{ID: "thread_pool_%s_ActiveTime_total", Name: "active_time", Algo: module.Incremental},
+				// Hidden dimensions for count, min, max
+				{ID: "thread_pool_%s_ActiveTime_count", Name: "count", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+				{ID: "thread_pool_%s_ActiveTime_min", Name: "min", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+				{ID: "thread_pool_%s_ActiveTime_max", Name: "max", Algo: module.Incremental, DimOpts: module.DimOpts{Hidden: true}},
+			},
 		},
-	},
-	{
-		ID:       "thread_pool_%s_avg_active_time",
-		Title:    "Thread Pool Average Active Time",
-		Units:    "milliseconds",
-		Fam:      "system/threads",
-		Ctx:      "websphere_pmi.thread_pool_avg_active_time",
-		Type:     module.Line,
-		Priority: prioThreadPools + 40,
-		Dims: module.Dims{
-			{ID: "thread_pool_%s_ActiveTime_mean", Name: "avg_active_time", Div: precision},
+		{
+			ID:       "thread_pool_%s_avg_active_time",
+			Title:    "Thread Pool Average Active Time",
+			Units:    "milliseconds",
+			Fam:      "system/threads",
+			Ctx:      "websphere_pmi.thread_pool_avg_active_time",
+			Type:     module.Line,
+			Priority: prioThreadPools + 40,
+			Dims: module.Dims{
+				{ID: "thread_pool_%s_ActiveTime_mean", Name: "avg_active_time", Div: precision},
+			},
 		},
-	},
 	*/
 	{
 		ID:       "thread_pool_%s_percent_used",
@@ -849,8 +849,7 @@ var wimComponentChartsTmpl = module.Charts{
 	},
 }
 
-var wlmTaggedComponentChartsTmpl = module.Charts{
-}
+var wlmTaggedComponentChartsTmpl = module.Charts{}
 
 var pmiWebServiceServiceChartsTmpl = module.Charts{
 	{
@@ -997,4 +996,3 @@ var iscProductDetailsChartsTmpl = module.Charts{
 		},
 	},
 }
-

@@ -24,15 +24,15 @@ type Class struct {
 }
 
 type Context struct {
-	Name            string      `yaml:"name"`
-	Context         string      `yaml:"context"`         // Full context name
-	Family          string      `yaml:"family"`
-	Title           string      `yaml:"title"`
-	Units           string      `yaml:"units"`
-	Type            string      `yaml:"type"`
-	Priority        int         `yaml:"priority"`
-	MinUpdateEvery  int         `yaml:"min_update_every"` // Minimum update interval
-	Dimensions      []Dimension `yaml:"dimensions"`
+	Name           string      `yaml:"name"`
+	Context        string      `yaml:"context"` // Full context name
+	Family         string      `yaml:"family"`
+	Title          string      `yaml:"title"`
+	Units          string      `yaml:"units"`
+	Type           string      `yaml:"type"`
+	Priority       int         `yaml:"priority"`
+	MinUpdateEvery int         `yaml:"min_update_every"` // Minimum update interval
+	Dimensions     []Dimension `yaml:"dimensions"`
 }
 
 type Dimension struct {
@@ -160,10 +160,10 @@ func GetAllContexts() []interface{} {
 
 func main() {
 	var (
-		input   = flag.String("input", "contexts.yaml", "Input YAML file")
-		output  = flag.String("output", "zz_generated_contexts.go", "Output Go file") 
-		pkg     = flag.String("package", "contexts", "Package name")
-		module  = flag.String("module", "", "Module prefix (e.g., as400, db2, mq)")
+		input  = flag.String("input", "contexts.yaml", "Input YAML file")
+		output = flag.String("output", "zz_generated_contexts.go", "Output Go file")
+		pkg    = flag.String("package", "contexts", "Package name")
+		module = flag.String("module", "", "Module prefix (e.g., as400, db2, mq)")
 	)
 	flag.Parse()
 
@@ -195,10 +195,10 @@ func processConfig(config *Config, modulePrefix string) {
 	for className, class := range config.Classes {
 		for i := range class.Contexts {
 			ctx := &class.Contexts[i]
-			
+
 			// Context names should be fully qualified in the YAML file
 			// This allows flexibility to move/inject contexts anywhere
-			
+
 			// Set default algorithm
 			for j := range ctx.Dimensions {
 				dim := &ctx.Dimensions[j]
@@ -215,17 +215,17 @@ func processConfig(config *Config, modulePrefix string) {
 					dim.Precision = 1
 				}
 			}
-			
+
 			// Set default min_update_every
 			if ctx.MinUpdateEvery == 0 {
 				ctx.MinUpdateEvery = 1
 			}
-			
+
 			// Set default priority
 			if ctx.Priority == 0 {
 				ctx.Priority = 70000 // Default priority
 			}
-			
+
 			// Set default chart type
 			if ctx.Type == "" {
 				ctx.Type = "line"

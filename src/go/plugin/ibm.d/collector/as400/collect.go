@@ -24,65 +24,65 @@ func boolPtr(v bool) *bool {
 func isSystemMetric(key string) bool {
 	systemMetrics := map[string]bool{
 		// CPU metrics
-		"cpu_percentage":        true,
-		"configured_cpus":       true,
-		"current_cpu_capacity":  true,
-		
+		"cpu_percentage":       true,
+		"configured_cpus":      true,
+		"current_cpu_capacity": true,
+
 		// Memory metrics
-		"main_storage_size":             true,
-		"current_temporary_storage":     true,
+		"main_storage_size":              true,
+		"current_temporary_storage":      true,
 		"maximum_temporary_storage_used": true,
-		
-		// Job metrics  
+
+		// Job metrics
 		"total_jobs_in_system":       true,
 		"active_jobs_in_system":      true,
 		"interactive_jobs_in_system": true,
 		"batch_jobs_running":         true,
 		"job_queue_length":           true,
-		
+
 		// Storage metrics
-		"system_asp_used":          true,
-		"system_asp_storage":       true,
-		"total_auxiliary_storage":  true,
-		
+		"system_asp_used":         true,
+		"system_asp_storage":      true,
+		"total_auxiliary_storage": true,
+
 		// Thread metrics
 		"active_threads_in_system": true,
 		"threads_per_processor":    true,
-		
+
 		// Memory pool metrics
-		"machine_pool_size":         true,
-		"base_pool_size":           true,
-		"interactive_pool_size":    true,
-		"spool_pool_size":          true,
+		"machine_pool_size":          true,
+		"base_pool_size":             true,
+		"interactive_pool_size":      true,
+		"spool_pool_size":            true,
 		"machine_pool_defined_size":  true,
 		"machine_pool_reserved_size": true,
-		"base_pool_defined_size":    true,
-		"base_pool_reserved_size":   true,
-		"machine_pool_threads":      true,
-		"machine_pool_max_threads":  true,
-		"base_pool_threads":         true,
-		"base_pool_max_threads":     true,
-		
+		"base_pool_defined_size":     true,
+		"base_pool_reserved_size":    true,
+		"machine_pool_threads":       true,
+		"machine_pool_max_threads":   true,
+		"base_pool_threads":          true,
+		"base_pool_max_threads":      true,
+
 		// Network metrics
-		"remote_connections":      true,
-		"total_connections":       true,
-		"listen_connections":      true,
-		"closewait_connections":   true,
-		
+		"remote_connections":    true,
+		"total_connections":     true,
+		"listen_connections":    true,
+		"closewait_connections": true,
+
 		// Temporary storage metrics
 		"temp_storage_current_total": true,
 		"temp_storage_peak_total":    true,
-		
+
 		// Disk aggregate metrics
 		"disk_busy_percentage": true,
-		
+
 		// System activity metrics
 		"system_activity_average_cpu_rate":        true,
 		"system_activity_average_cpu_utilization": true,
 		"system_activity_minimum_cpu_utilization": true,
 		"system_activity_maximum_cpu_utilization": true,
 	}
-	
+
 	return systemMetrics[key]
 }
 
@@ -92,7 +92,7 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 		duration := time.Since(startTime)
 		a.Debugf("collection iteration completed in %v", duration)
 	}()
-	
+
 	if a.db == nil {
 		db, err := a.initDatabase(ctx)
 		if err != nil {
@@ -246,7 +246,7 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 		// Don't add temporary storage metrics to mx - this creates proper gaps
 	}
 
-	// Collect subsystems - optional  
+	// Collect subsystems - optional
 	if a.CollectSubsystemMetrics != nil && *a.CollectSubsystemMetrics {
 		if err := a.collectSubsystems(ctx); err != nil {
 			if isSQLFeatureError(err) {
@@ -307,7 +307,7 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 
 	// Track if system activity collection succeeds
 	systemActivitySuccess := false
-	
+
 	// Collect system activity metrics (requires IBM i 7.3+)
 	if err := a.collectSystemActivity(ctx); err == nil {
 		systemActivitySuccess = true
@@ -329,7 +329,7 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 	for unit, metrics := range a.mx.disks {
 		cleanUnit := cleanName(unit)
 		metricsMap := stm.ToMap(metrics)
-		
+
 		// Manually add SSD metrics only if they have values >= 0 (matches chart creation logic)
 		if metrics.SSDLifeRemaining >= 0 {
 			metricsMap["ssd_life_remaining"] = metrics.SSDLifeRemaining
@@ -337,7 +337,7 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 		if metrics.SSDPowerOnDays >= 0 {
 			metricsMap["ssd_power_on_days"] = metrics.SSDPowerOnDays
 		}
-		
+
 		for k, v := range metricsMap {
 			mx[fmt.Sprintf("disk_%s_%s", cleanUnit, k)] = v
 		}
@@ -559,8 +559,7 @@ func (a *AS400) collectDiskStatus(ctx context.Context) error {
 			}
 		}
 	})
-	
-	
+
 	return err
 }
 
@@ -573,8 +572,7 @@ func (a *AS400) collectJobInfo(ctx context.Context) error {
 			}
 		}
 	})
-	
-	
+
 	return err
 }
 
@@ -912,7 +910,7 @@ func (a *AS400) collectDiskInstances(ctx context.Context) error {
 				}
 			}
 		}
-		
+
 		// After processing all columns for this disk, calculate used_gb if we have the required data
 		if lineEnd && currentUnit != "" {
 			if m, ok := a.mx.disks[currentUnit]; ok {
@@ -1008,7 +1006,7 @@ func (a *AS400) collectTempStorage(ctx context.Context) error {
 							CurrentSize: v,
 						}
 					}
-					
+
 					// Create charts only when we have actual data
 					bucket := a.tempStorageNamed[currentBucket]
 					if !bucket.hasCharts && v > 0 {
@@ -1024,7 +1022,7 @@ func (a *AS400) collectTempStorage(ctx context.Context) error {
 						m.PeakSize = v
 						a.mx.tempStorageNamed[currentBucket] = m
 					}
-					
+
 					// Create charts only when we have actual data
 					bucket := a.tempStorageNamed[currentBucket]
 					if !bucket.hasCharts && v > 0 {
@@ -1075,7 +1073,7 @@ func (a *AS400) collectSubsystems(ctx context.Context) error {
 					}
 				}
 			}
-		// Note: HELD_JOB_COUNT and STORAGE_USED_KB columns removed - they don't exist in SUBSYSTEM_INFO table
+			// Note: HELD_JOB_COUNT and STORAGE_USED_KB columns removed - they don't exist in SUBSYSTEM_INFO table
 		}
 	})
 }
@@ -1109,7 +1107,7 @@ func (a *AS400) collectJobQueues(ctx context.Context) error {
 					}
 				}
 			}
-		// Note: HELD_JOB_COUNT column removed - it doesn't exist in JOB_QUEUE_INFO table
+			// Note: HELD_JOB_COUNT column removed - it doesn't exist in JOB_QUEUE_INFO table
 		}
 	})
 }
@@ -1361,7 +1359,7 @@ func (a *AS400) collectNetworkInterfaces(ctx context.Context) error {
 
 		// Set metrics in the map
 		cleanKey := cleanName(lineDesc)
-		
+
 		// Interface status: 1 if ACTIVE, 0 otherwise
 		statusValue := int64(0)
 		if interfaceStatus == "ACTIVE" {

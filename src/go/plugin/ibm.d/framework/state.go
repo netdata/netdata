@@ -2,10 +2,10 @@ package framework
 
 import (
 	"fmt"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"reflect"
 	"strings"
 	"time"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
 // NewCollectorState creates a new collector state
@@ -26,18 +26,18 @@ func (s *CollectorState) GetInstance(ctx interface{}, labels interface{}) *Insta
 	if contextMeta == nil {
 		return nil
 	}
-	
+
 	// Extract context name
 	contextName := contextMeta.Name
-	
+
 	// Generate instance key
 	var key string
 	var labelMap map[string]string
-	
+
 	if labels != nil {
 		// Always convert to map for storage
 		labelMap = structToMap(labels)
-		
+
 		// Use the InstanceID method if available
 		if labeler, ok := labels.(interface{ InstanceID(string) string }); ok {
 			key = labeler.InstanceID(contextName)
@@ -50,7 +50,7 @@ func (s *CollectorState) GetInstance(ctx interface{}, labels interface{}) *Insta
 		key = contextName
 		labelMap = make(map[string]string)
 	}
-	
+
 	// Get or create instance
 	instance, exists := s.instances[key]
 	if !exists {
@@ -62,7 +62,7 @@ func (s *CollectorState) GetInstance(ctx interface{}, labels interface{}) *Insta
 		}
 		s.instances[key] = instance
 	}
-	
+
 	instance.lastSeen = time.Now()
 	return instance
 }
@@ -89,10 +89,10 @@ func (s *CollectorState) SetUpdateEveryOverrideForGeneratedCode(ctx interface{},
 // Use the type-safe Set() methods on generated context types instead.
 func (s *CollectorState) set(ctx interface{}, labels interface{}, values map[string]int64) {
 	instance := s.GetInstance(ctx, labels)
-	
+
 	// Get context metadata
 	contextMeta := getContextMetadata(ctx)
-	
+
 	// Store each metric value
 	for dimName, rawValue := range values {
 		// Find dimension metadata
@@ -103,13 +103,13 @@ func (s *CollectorState) set(ctx interface{}, labels interface{}, values map[str
 				break
 			}
 		}
-		
+
 		if dim == nil {
 			// Log warning for unknown dimensions to help catch typos and configuration errors
 			s.Warningf("unknown dimension '%s' for context '%s' - dimension will be skipped", dimName, contextMeta.Name)
 			continue
 		}
-		
+
 		// Apply precision FIRST, then unit conversion to avoid integer division precision loss
 		// 1. First apply precision multiplication to preserve accuracy
 		// 2. Then apply unit conversion: (value * mul) / div
@@ -119,7 +119,7 @@ func (s *CollectorState) set(ctx interface{}, labels interface{}, values map[str
 		if dim.Mul != 0 && dim.Div != 0 {
 			finalValue = (precisionValue * int64(dim.Mul)) / int64(dim.Div)
 		}
-		
+
 		s.metrics = append(s.metrics, MetricValue{
 			Instance:  *instance,
 			Dimension: dimName,
@@ -129,7 +129,6 @@ func (s *CollectorState) set(ctx interface{}, labels interface{}, values map[str
 	}
 }
 
-
 // IsTimeFor checks if it's time to collect a specific context
 func (s *CollectorState) IsTimeFor(contextName string) bool {
 	// Get context metadata to find update interval
@@ -137,9 +136,9 @@ func (s *CollectorState) IsTimeFor(contextName string) bool {
 	if interval <= 1 {
 		return true // Collect every iteration
 	}
-	
+
 	// Check if current iteration is a multiple of the interval
-	return s.iteration % int64(interval) == 0
+	return s.iteration%int64(interval) == 0
 }
 
 // TrackError records an error for a specific object
@@ -156,13 +155,13 @@ func (s *CollectorState) ClearErrors() {
 // NextIteration handles obsoletion and clears metrics for next iteration
 func (s *CollectorState) NextIteration(obsoletionTimeout int) {
 	// Note: iteration counter is now incremented in Collect()
-	
+
 	// Clear metrics for next iteration
 	s.metrics = s.metrics[:0]
-	
+
 	// Clear previous obsolete instances list
 	s.obsoleteInstances = s.obsoleteInstances[:0]
-	
+
 	// Check for obsolete instances
 	cutoff := time.Now().Add(-time.Duration(obsoletionTimeout) * time.Second)
 	for key, instance := range s.instances {
@@ -204,30 +203,30 @@ func extractContextName(ctx interface{}) string {
 	if v.Kind() == reflect.Ptr {
 		v = v.Elem()
 	}
-	
+
 	if v.Kind() != reflect.Struct {
 		return ""
 	}
-	
+
 	nameField := v.FieldByName("Name")
 	if nameField.IsValid() && nameField.Kind() == reflect.String {
 		return nameField.String()
 	}
-	
+
 	return ""
 }
 
 func structToMap(labels interface{}) map[string]string {
 	result := make(map[string]string)
-	
+
 	if labels == nil {
 		return result
 	}
-	
+
 	// Use reflection to extract struct fields
 	v := reflect.ValueOf(labels)
 	t := reflect.TypeOf(labels)
-	
+
 	// Handle pointer types
 	if v.Kind() == reflect.Ptr {
 		if v.IsNil() {
@@ -236,25 +235,25 @@ func structToMap(labels interface{}) map[string]string {
 		v = v.Elem()
 		t = t.Elem()
 	}
-	
+
 	// Must be a struct
 	if v.Kind() != reflect.Struct {
 		return result
 	}
-	
+
 	// Extract all exported fields from the struct
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Field(i)
 		fieldType := t.Field(i)
-		
+
 		// Skip unexported fields
 		if !fieldType.IsExported() {
 			continue
 		}
-		
+
 		// Convert field name to lowercase for consistency
 		key := strings.ToLower(fieldType.Name)
-		
+
 		// Convert field value to string
 		var value string
 		switch field.Kind() {
@@ -272,10 +271,10 @@ func structToMap(labels interface{}) map[string]string {
 			// For other types, use fmt.Sprintf as fallback
 			value = fmt.Sprintf("%v", field.Interface())
 		}
-		
+
 		result[key] = value
 	}
-	
+
 	return result
 }
 
@@ -286,7 +285,7 @@ func generateInstanceKeyWithOrder(contextName string, labelKeys []string, labels
 	if len(labelKeys) == 0 || len(labels) == 0 {
 		return contextName
 	}
-	
+
 	// Build label values in the EXACT order specified in context
 	labelValues := make([]string, 0, len(labelKeys))
 	for _, key := range labelKeys {
@@ -294,14 +293,13 @@ func generateInstanceKeyWithOrder(contextName string, labelKeys []string, labels
 			labelValues = append(labelValues, cleanLabelValue(value))
 		}
 	}
-	
+
 	if len(labelValues) > 0 {
 		return contextName + "." + strings.Join(labelValues, "_")
 	}
-	
+
 	return contextName
 }
-
 
 func getContextMetadata(ctx interface{}) *ContextMetadata {
 	// Extract metadata from Context[T] using reflection
@@ -314,14 +312,14 @@ func extractContextMetadata(ctx interface{}) *ContextMetadata {
 	if v.Kind() == reflect.Ptr {
 		v = v.Elem()
 	}
-	
+
 	if v.Kind() != reflect.Struct {
 		return nil
 	}
-	
+
 	// Create metadata object
 	meta := &ContextMetadata{}
-	
+
 	// Extract fields
 	if name := v.FieldByName("Name"); name.IsValid() && name.Kind() == reflect.String {
 		meta.Name = name.String()
@@ -347,7 +345,7 @@ func extractContextMetadata(ctx interface{}) *ContextMetadata {
 	if updateEvery := v.FieldByName("UpdateEvery"); updateEvery.IsValid() && updateEvery.Kind() == reflect.Int {
 		meta.UpdateEvery = int(updateEvery.Int())
 	}
-	
+
 	// Extract LabelKeys slice
 	if labelKeys := v.FieldByName("LabelKeys"); labelKeys.IsValid() && labelKeys.Kind() == reflect.Slice {
 		meta.HasLabels = labelKeys.Len() > 0
@@ -357,7 +355,7 @@ func extractContextMetadata(ctx interface{}) *ContextMetadata {
 			}
 		}
 	}
-	
+
 	// Extract dimensions slice
 	if dims := v.FieldByName("Dimensions"); dims.IsValid() && dims.Kind() == reflect.Slice {
 		for i := 0; i < dims.Len(); i++ {
@@ -386,7 +384,7 @@ func extractContextMetadata(ctx interface{}) *ContextMetadata {
 			}
 		}
 	}
-	
+
 	return meta
 }
 

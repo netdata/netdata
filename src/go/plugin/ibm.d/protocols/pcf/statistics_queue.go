@@ -31,7 +31,7 @@ func (c *Client) GetStatisticsQueue() (*StatisticsCollectionResult, error) {
 
 	c.protocol.Warningf("Statistics queue collection is not yet implemented in the IBM MQ Go library migration")
 	c.protocol.Debugf("GetStatisticsQueue returning empty results - feature needs implementation")
-	
+
 	// Return empty successful result for now
 	result := &StatisticsCollectionResult{
 		Stats: CollectionStats{
@@ -44,13 +44,13 @@ func (c *Client) GetStatisticsQueue() (*StatisticsCollectionResult, error) {
 				UnparsedItems  int64
 				ErrorCounts    map[int32]int
 			}{
-				Success: true,
+				Success:        true,
 				AvailableItems: 0,
 				InvisibleItems: 0,
-				IncludedItems: 0,
-				ExcludedItems: 0,
-				UnparsedItems: 0,
-				ErrorCounts: make(map[int32]int),
+				IncludedItems:  0,
+				ExcludedItems:  0,
+				UnparsedItems:  0,
+				ErrorCounts:    make(map[int32]int),
 			},
 		},
 		Messages: []StatisticsMessage{},
@@ -90,7 +90,7 @@ func (c *Client) parseQueueStatistics(buffer []byte) ([]QueueStatistics, error) 
 
 	var stat QueueStatistics
 	stat.Name = queueName
-	
+
 	// Extract queue type if available
 	if qType, ok := attrs[ibmmq.MQIA_Q_TYPE]; ok {
 		if typeVal, ok := qType.(int32); ok {
@@ -117,7 +117,7 @@ func (c *Client) parseQueueStatistics(buffer []byte) ([]QueueStatistics, error) 
 			stat.AvgQTimePersistent = AttributeValue(arrayVal[1])
 		}
 	}
-	
+
 	// Extract short/long time indicators
 	// Note: These constants appear to be MQIAMO_Q_TIME_AVG/MIN/MAX in some versions
 	// For now, we'll leave these fields unpopulated until we can verify the correct constants
@@ -214,7 +214,7 @@ func (c *Client) parseQueueStatistics(buffer []byte) ([]QueueStatistics, error) 
 			// For now, just mark as collected without conversion
 			// Future: implement proper date string parsing
 			stat.StartDate = AttributeValue(1) // Mark as collected
-			_ = dateStr // Avoid unused variable warning
+			_ = dateStr                        // Avoid unused variable warning
 		}
 	}
 	if val, ok := attrs[ibmmq.MQCAMO_START_TIME]; ok {
@@ -222,13 +222,13 @@ func (c *Client) parseQueueStatistics(buffer []byte) ([]QueueStatistics, error) 
 			// For now, just mark as collected without conversion
 			// Future: implement proper time string parsing
 			stat.StartTime = AttributeValue(1) // Mark as collected
-			_ = timeStr // Avoid unused variable warning
+			_ = timeStr                        // Avoid unused variable warning
 		}
 	}
 
 	stats = append(stats, stat)
-	
-	c.protocol.Debugf("Parsed queue statistics for queue '%s' - min_depth: %v, max_depth: %v", 
+
+	c.protocol.Debugf("Parsed queue statistics for queue '%s' - min_depth: %v, max_depth: %v",
 		stat.Name, stat.MinDepth, stat.MaxDepth)
 
 	return stats, nil
@@ -297,8 +297,8 @@ func (c *Client) parseChannelStatistics(buffer []byte) ([]ChannelStatistics, err
 	}
 
 	stats = append(stats, stat)
-	
-	c.protocol.Debugf("Parsed channel statistics for channel '%s' - messages: %v, bytes: %v", 
+
+	c.protocol.Debugf("Parsed channel statistics for channel '%s' - messages: %v, bytes: %v",
 		stat.Name, stat.Messages, stat.Bytes)
 
 	return stats, nil
@@ -310,10 +310,10 @@ func (c *Client) parseMQIStatistics(buffer []byte) ([]MQIStatistics, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse MQI statistics: %w", err)
 	}
-	
+
 	var mqiStats []MQIStatistics
 	var stat MQIStatistics
-	
+
 	// Extract name (could be queue manager or queue name depending on STATMQI setting)
 	if val, ok := attrs[ibmmq.MQCA_Q_MGR_NAME]; ok {
 		if strVal, ok := val.(string); ok {
@@ -328,7 +328,7 @@ func (c *Client) parseMQIStatistics(buffer []byte) ([]MQIStatistics, error) {
 			}
 		}
 	}
-	
+
 	// Extract MQOPEN operations
 	if val, ok := attrs[ibmmq.MQIAMO_OPENS]; ok {
 		if intVal, ok := val.(int32); ok {
@@ -340,7 +340,7 @@ func (c *Client) parseMQIStatistics(buffer []byte) ([]MQIStatistics, error) {
 			stat.OpensFailed = AttributeValue(intVal)
 		}
 	}
-	
+
 	// Extract MQCLOSE operations
 	if val, ok := attrs[ibmmq.MQIAMO_CLOSES]; ok {
 		if intVal, ok := val.(int32); ok {
@@ -352,7 +352,7 @@ func (c *Client) parseMQIStatistics(buffer []byte) ([]MQIStatistics, error) {
 			stat.ClosesFailed = AttributeValue(intVal)
 		}
 	}
-	
+
 	// Extract MQINQ operations
 	if val, ok := attrs[ibmmq.MQIAMO_INQS]; ok {
 		if intVal, ok := val.(int32); ok {
@@ -364,7 +364,7 @@ func (c *Client) parseMQIStatistics(buffer []byte) ([]MQIStatistics, error) {
 			stat.InqsFailed = AttributeValue(intVal)
 		}
 	}
-	
+
 	// Extract MQSET operations
 	if val, ok := attrs[ibmmq.MQIAMO_SETS]; ok {
 		if intVal, ok := val.(int32); ok {
@@ -376,7 +376,7 @@ func (c *Client) parseMQIStatistics(buffer []byte) ([]MQIStatistics, error) {
 			stat.SetsFailed = AttributeValue(intVal)
 		}
 	}
-	
+
 	// Extract timestamp information
 	var startDate, startTime, endDate, endTime string
 	if val, ok := attrs[ibmmq.MQCAMO_START_DATE]; ok {
@@ -399,7 +399,7 @@ func (c *Client) parseMQIStatistics(buffer []byte) ([]MQIStatistics, error) {
 			endTime = strings.TrimSpace(strVal)
 		}
 	}
-	
+
 	// Convert timestamps to Unix epoch if we have both date and time
 	// MQCAMO_START_DATE/TIME and MQCAMO_END_DATE/TIME are administrative monitoring timestamps (local time)
 	if startDate != "" && startTime != "" {
@@ -414,13 +414,13 @@ func (c *Client) parseMQIStatistics(buffer []byte) ([]MQIStatistics, error) {
 			stat.EndTime = AttributeValue(endTimestamp.Unix())
 		}
 	}
-	
+
 	// Add the statistics entry
 	mqiStats = append(mqiStats, stat)
-	
-	c.protocol.Debugf("Parsed MQI statistics for '%s' - opens: %v (failed: %v), closes: %v (failed: %v), inqs: %v (failed: %v), sets: %v (failed: %v)", 
-		stat.Name, stat.Opens, stat.OpensFailed, stat.Closes, stat.ClosesFailed, 
+
+	c.protocol.Debugf("Parsed MQI statistics for '%s' - opens: %v (failed: %v), closes: %v (failed: %v), inqs: %v (failed: %v), sets: %v (failed: %v)",
+		stat.Name, stat.Opens, stat.OpensFailed, stat.Closes, stat.ClosesFailed,
 		stat.Inqs, stat.InqsFailed, stat.Sets, stat.SetsFailed)
-	
+
 	return mqiStats, nil
 }

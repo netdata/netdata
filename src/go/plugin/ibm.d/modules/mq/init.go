@@ -1,4 +1,3 @@
-
 package mq
 
 import (
@@ -22,38 +21,38 @@ func defaultConfig() Config {
 		Channel:      "SYSTEM.DEF.SVRCONN",
 		User:         "", // No authentication by default
 		Password:     "", // No authentication by default
-		
+
 		// Collection defaults - collect everything by default
-		CollectQueues:           true,
-		CollectChannels:         true,
-		CollectTopics:           true,
-		CollectListeners:        true,
-		CollectSubscriptions:    true,
-		CollectSystemQueues:     true,
-		CollectSystemChannels:   true,
-		CollectSystemTopics:     true,
-		CollectSystemListeners:  true,
-		CollectChannelConfig:    true,
-		CollectQueueConfig:      true,
-		
+		CollectQueues:          true,
+		CollectChannels:        true,
+		CollectTopics:          true,
+		CollectListeners:       true,
+		CollectSubscriptions:   true,
+		CollectSystemQueues:    true,
+		CollectSystemChannels:  true,
+		CollectSystemTopics:    true,
+		CollectSystemListeners: true,
+		CollectChannelConfig:   true,
+		CollectQueueConfig:     true,
+
 		// Only destructive operations are disabled by default
 		CollectResetQueueStats: false,
 		// Statistics queue collection is disabled by default (may not be available on all systems)
 		CollectStatisticsQueue: false,
 		// $SYS topic collection is disabled by default (requires MQ 9.0+)
 		CollectSysTopics: false,
-		
+
 		// Interval defaults
-		StatisticsInterval: 60,  // Default 60s, auto-detected STATINT overwrites if available
-		SysTopicInterval:   10,  // Default 10s per IBM docs, user can override if customized
-		
+		StatisticsInterval: 60, // Default 60s, auto-detected STATINT overwrites if available
+		SysTopicInterval:   10, // Default 10s per IBM docs, user can override if customized
+
 		// Selector defaults - empty means collect nothing (user must explicitly configure)
-		QueueSelector:   "",
-		ChannelSelector: "",
-		TopicSelector:   "",
-		ListenerSelector: "",
+		QueueSelector:        "",
+		ChannelSelector:      "",
+		TopicSelector:        "",
+		ListenerSelector:     "",
 		SubscriptionSelector: "",
-		
+
 		// Cardinality control defaults
 		MaxQueues:    100,
 		MaxChannels:  100,
@@ -65,7 +64,7 @@ func defaultConfig() Config {
 func (c *Collector) Init(ctx context.Context) error {
 	// Set this collector as the implementation
 	c.SetImpl(c)
-	
+
 	// Copy framework configuration from module config to framework
 	// Only if user provided values (non-zero)
 	if c.Config.ObsoletionIterations != 0 {
@@ -86,7 +85,7 @@ func (c *Collector) Init(ctx context.Context) error {
 		return err
 	}
 
-	// Statistics contexts will be configured with appropriate update interval 
+	// Statistics contexts will be configured with appropriate update interval
 	// when they are first collected during statistics collection
 	if c.Config.CollectStatisticsQueue {
 		c.Infof("Statistics collection enabled - interval will be determined during Check()")
@@ -96,7 +95,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	if configJSON, err := json.Marshal(c.Config); err == nil {
 		c.Debugf("Running with configuration: %s", string(configJSON))
 	}
-	
+
 	// Create client
 	c.client = pcf.NewClient(pcf.Config{
 		QueueManager: c.Config.QueueManager,
@@ -115,7 +114,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	} else {
 		c.Infof("Queue selector configured: %s (applied after discovery)", c.Config.QueueSelector)
 	}
-	
+
 	if c.Config.ChannelSelector == "" {
 		c.Infof("Channel selector: empty (no channels will be collected)")
 	} else if c.Config.ChannelSelector == "*" {

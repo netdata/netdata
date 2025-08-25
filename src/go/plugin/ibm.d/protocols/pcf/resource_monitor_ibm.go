@@ -10,12 +10,12 @@ import (
 
 // ResourceMetric represents a single resource metric from IBM mqmetric
 type ResourceMetric struct {
-	Class       string
-	Type        string
-	Element     string
-	Instance    string
-	Value       interface{}
-	MetricName  string
+	Class      string
+	Type       string
+	Element    string
+	Instance   string
+	Value      interface{}
+	MetricName string
 }
 
 // CollectResourceMetrics collects resource metrics using IBM mqmetric library
@@ -81,14 +81,14 @@ type ResourceDiscoveryConfig struct {
 
 // ResourcePublicationsResult contains the result of resource monitoring queries
 type ResourcePublicationsResult struct {
-	Stats             CollectionStats
-	UserCPUPercent    AttributeValue
-	SystemCPUPercent  AttributeValue
-	AvailableMemory   AttributeValue
-	UsedMemory        AttributeValue
-	MemoryUsedMB      AttributeValue
-	LogUsedBytes      AttributeValue
-	LogMaxBytes       AttributeValue
+	Stats            CollectionStats
+	UserCPUPercent   AttributeValue
+	SystemCPUPercent AttributeValue
+	AvailableMemory  AttributeValue
+	UsedMemory       AttributeValue
+	MemoryUsedMB     AttributeValue
+	LogUsedBytes     AttributeValue
+	LogMaxBytes      AttributeValue
 	// Additional resource metrics can be added here as needed
 }
 
@@ -105,12 +105,12 @@ func (c *Client) EnableResourceMonitoring() error {
 	if c.resourceStatus == ResourceStatusFailed {
 		return fmt.Errorf("resource monitoring permanently disabled")
 	}
-	
+
 	if c.resourceStatus == ResourceStatusEnabled {
 		// Already enabled
 		return nil
 	}
-	
+
 	// Initialize the metrics connection (Connection #2)
 	if !c.metricsReady {
 		connConfig := mqmetric.ConnectionConfig{
@@ -122,21 +122,21 @@ func (c *Client) EnableResourceMonitoring() error {
 			ConnName:        fmt.Sprintf("%s(%d)", c.config.Host, c.config.Port),
 			Channel:         c.config.Channel,
 		}
-		
+
 		err := mqmetric.InitConnection(c.config.QueueManager, "NETDATA.REPLY.METRICS", "", &connConfig)
 		if err != nil {
 			c.resourceStatus = ResourceStatusFailed
 			return fmt.Errorf("failed to initialize metrics connection: %w", err)
 		}
-		
+
 		c.metricsReady = true
 	}
-	
+
 	// Set up basic discovery configuration
 	c.resourceConfig = &mqmetric.DiscoverConfig{
 		MetaPrefix: "$SYS/MQ/INFO",
 	}
-	
+
 	c.resourceStatus = ResourceStatusEnabled
 	c.protocol.Debugf("resource monitoring enabled")
 	return nil
@@ -147,13 +147,13 @@ func (c *Client) GetResourcePublications() (*ResourcePublicationsResult, error) 
 	if c.resourceStatus != ResourceStatusEnabled || !c.metricsReady {
 		return nil, fmt.Errorf("resource monitoring not enabled")
 	}
-	
+
 	// Get metrics from IBM mqmetric library
 	metrics, err := c.CollectResourceMetrics()
 	if err != nil {
 		return nil, fmt.Errorf("failed to collect resource metrics: %w", err)
 	}
-	
+
 	// Create result structure
 	result := &ResourcePublicationsResult{
 		Stats: CollectionStats{
@@ -180,7 +180,7 @@ func (c *Client) GetResourcePublications() (*ResourcePublicationsResult, error) 
 		LogUsedBytes:     NotCollected,
 		LogMaxBytes:      NotCollected,
 	}
-	
+
 	// Process specific metrics we care about
 	for key, metric := range metrics {
 		if value, ok := metric.Value.(float64); ok {
@@ -203,7 +203,7 @@ func (c *Client) GetResourcePublications() (*ResourcePublicationsResult, error) 
 		}
 		c.protocol.Debugf("processed resource metric: %s = %v", key, metric.Value)
 	}
-	
+
 	return result, nil
 }
 
@@ -251,6 +251,6 @@ func (c *Client) InitializeResourceDiscovery(config ResourceDiscoveryConfig) err
 
 	c.resourceConfig = discoveryConfig
 	c.protocol.Debugf("resource discovery initialized with queue selector: %s", config.QueueSelector)
-	
+
 	return nil
 }

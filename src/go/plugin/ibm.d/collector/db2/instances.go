@@ -48,10 +48,10 @@ func (d *DB2) collectDatabaseInstances(ctx context.Context) error {
 func (d *DB2) doCollectDatabaseInstances(ctx context.Context, applySelector bool, collectedCount *int) error {
 	// Reset metrics for this collection pass
 	d.mx.databases = make(map[string]databaseInstanceMetrics)
-	
+
 	var currentDB string
 	var currentMetrics databaseInstanceMetrics
-	
+
 	// Reset collectedCount if provided
 	if collectedCount != nil {
 		*collectedCount = 0
@@ -64,7 +64,7 @@ func (d *DB2) doCollectDatabaseInstances(ctx context.Context, applySelector bool
 			if currentDB != "" {
 				d.mx.databases[currentDB] = currentMetrics
 			}
-			
+
 			dbName := strings.TrimSpace(value)
 			if dbName == "" {
 				currentDB = ""
@@ -76,15 +76,15 @@ func (d *DB2) doCollectDatabaseInstances(ctx context.Context, applySelector bool
 				currentDB = ""
 				return // Skip this database
 			}
-            
-            // Increment count if we are counting
-            if collectedCount != nil {
-                *collectedCount++
-            }
+
+			// Increment count if we are counting
+			if collectedCount != nil {
+				*collectedCount++
+			}
 
 			currentDB = dbName
 			currentMetrics = databaseInstanceMetrics{}
-			
+
 			if _, exists := d.databases[dbName]; !exists {
 				d.databases[dbName] = &databaseMetrics{name: dbName}
 				d.addDatabaseCharts(d.databases[dbName])
@@ -102,7 +102,7 @@ func (d *DB2) doCollectDatabaseInstances(ctx context.Context, applySelector bool
 				default:
 					statusValue = -1
 				}
-				
+
 				d.databases[currentDB].status = value
 				currentMetrics.Status = statusValue
 			}
@@ -115,7 +115,7 @@ func (d *DB2) doCollectDatabaseInstances(ctx context.Context, applySelector bool
 				}
 			}
 		}
-		
+
 		// At end of row, save the metrics
 		if lineEnd && currentDB != "" {
 			d.mx.databases[currentDB] = currentMetrics
@@ -392,16 +392,16 @@ func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 			// Calculate hits for each type (hits = logical - physical)
 			metrics.DataHits = metrics.DataLogicalReads - metrics.DataPhysicalReads
 			metrics.DataMisses = metrics.DataPhysicalReads
-			
+
 			metrics.IndexHits = metrics.IndexLogicalReads - metrics.IndexPhysicalReads
 			metrics.IndexMisses = metrics.IndexPhysicalReads
-			
+
 			metrics.XDAHits = metrics.XDALogicalReads - metrics.XDAPhysicalReads
 			metrics.XDAMisses = metrics.XDAPhysicalReads
-			
+
 			metrics.ColumnHits = metrics.ColumnLogicalReads - metrics.ColumnPhysicalReads
 			metrics.ColumnMisses = metrics.ColumnPhysicalReads
-			
+
 			// Ensure hits are not negative (shouldn't happen with MON_GET approach but safety check)
 			if metrics.DataHits < 0 {
 				metrics.DataHits = 0
@@ -648,7 +648,7 @@ func (d *DB2) collectConnectionInstances(ctx context.Context) error {
 func (d *DB2) collectMemorySetInstances(ctx context.Context) error {
 	// Always use MON_GET_MEMORY_SET for memory set metrics
 	query := queryMonGetMemorySet
-	
+
 	d.Debugf("collecting memory set instances using MON_GET_MEMORY_SET")
 
 	// Track seen memory sets for lifecycle management
@@ -681,21 +681,21 @@ func (d *DB2) collectMemorySetInstances(ctx context.Context) error {
 			if d.currentMemorySetType == "" {
 				d.currentMemorySetType = "DATABASE"
 			}
-			
+
 			// Create unique identifier for this memory set
-			setKey := fmt.Sprintf("%s.%s.%s.%d", 
-				d.currentMemorySetHostName, 
-				d.currentMemorySetDBName, 
+			setKey := fmt.Sprintf("%s.%s.%s.%d",
+				d.currentMemorySetHostName,
+				d.currentMemorySetDBName,
 				d.currentMemorySetType,
 				d.currentMemorySetMember)
-			
+
 			seen[setKey] = true
 
 			// Initialize memory set if not seen before
 			if _, exists := d.memorySets[setKey]; !exists {
 				d.memorySets[setKey] = &memorySetInstanceMetrics{
 					hostName: d.currentMemorySetHostName,
-					dbName:   d.currentMemorySetDBName, 
+					dbName:   d.currentMemorySetDBName,
 					setType:  d.currentMemorySetType,
 					member:   d.currentMemorySetMember,
 				}
@@ -717,10 +717,10 @@ func (d *DB2) collectMemorySetInstances(ctx context.Context) error {
 			if memSetType == "" {
 				memSetType = "DATABASE"
 			}
-			
-			setKey := fmt.Sprintf("%s.%s.%s.%d", 
-				d.currentMemorySetHostName, 
-				d.currentMemorySetDBName, 
+
+			setKey := fmt.Sprintf("%s.%s.%s.%d",
+				d.currentMemorySetHostName,
+				d.currentMemorySetDBName,
 				memSetType,
 				d.currentMemorySetMember)
 
@@ -733,7 +733,7 @@ func (d *DB2) collectMemorySetInstances(ctx context.Context) error {
 					member:   d.currentMemorySetMember,
 				}
 			}
-			
+
 			// Update the metrics
 			ms := d.memorySets[setKey]
 			switch column {

@@ -28,12 +28,12 @@ type metricsData struct {
 	TimeAvgPoolWrite        int64 `stm:"time_avg_pool_write"`
 
 	// Enhanced logging metrics (Screen 18)
-	LogCommits           int64 `stm:"log_commits"`
-	LogRollbacks         int64 `stm:"log_rollbacks"`
-	LogBufferFullEvents  int64 `stm:"log_buffer_full_events"`
-	LogAvgCommitTime     int64 `stm:"log_avg_commit_time"`
-	LogAvgReadTime       int64 `stm:"log_avg_read_time"`
-	LogAvgWriteTime      int64 `stm:"log_avg_write_time"`
+	LogCommits          int64 `stm:"log_commits"`
+	LogRollbacks        int64 `stm:"log_rollbacks"`
+	LogBufferFullEvents int64 `stm:"log_buffer_full_events"`
+	LogAvgCommitTime    int64 `stm:"log_avg_commit_time"`
+	LogAvgReadTime      int64 `stm:"log_avg_read_time"`
+	LogAvgWriteTime     int64 `stm:"log_avg_write_time"`
 
 	// Federation metrics (Screen 32)
 	FedConnectionsActive int64 `stm:"fed_connections_active"`
@@ -69,19 +69,19 @@ type metricsData struct {
 	RowsReturned int64 `stm:"rows_returned"`
 
 	// Buffer pool hit/miss metrics for percentage-of-incremental-row
-	BufferpoolHits           int64 `stm:"bufferpool_hits"`
-	BufferpoolMisses         int64 `stm:"bufferpool_misses"`
-	BufferpoolDataHits       int64 `stm:"bufferpool_data_hits"`
-	BufferpoolDataMisses     int64 `stm:"bufferpool_data_misses"`
-	BufferpoolIndexHits      int64 `stm:"bufferpool_index_hits"`
-	BufferpoolIndexMisses    int64 `stm:"bufferpool_index_misses"`
-	BufferpoolXDAHits        int64 `stm:"bufferpool_xda_hits"`
-	BufferpoolXDAMisses      int64 `stm:"bufferpool_xda_misses"`
-	BufferpoolColumnHits     int64 `stm:"bufferpool_column_hits"`
-	BufferpoolColumnMisses   int64 `stm:"bufferpool_column_misses"`
-	BufferpoolLogicalReads   int64 `stm:"bufferpool_logical_reads"`
-	BufferpoolPhysicalReads  int64 `stm:"bufferpool_physical_reads"`
-	BufferpoolTotalReads     int64 // No stm tag - calculated field
+	BufferpoolHits          int64 `stm:"bufferpool_hits"`
+	BufferpoolMisses        int64 `stm:"bufferpool_misses"`
+	BufferpoolDataHits      int64 `stm:"bufferpool_data_hits"`
+	BufferpoolDataMisses    int64 `stm:"bufferpool_data_misses"`
+	BufferpoolIndexHits     int64 `stm:"bufferpool_index_hits"`
+	BufferpoolIndexMisses   int64 `stm:"bufferpool_index_misses"`
+	BufferpoolXDAHits       int64 `stm:"bufferpool_xda_hits"`
+	BufferpoolXDAMisses     int64 `stm:"bufferpool_xda_misses"`
+	BufferpoolColumnHits    int64 `stm:"bufferpool_column_hits"`
+	BufferpoolColumnMisses  int64 `stm:"bufferpool_column_misses"`
+	BufferpoolLogicalReads  int64 `stm:"bufferpool_logical_reads"`
+	BufferpoolPhysicalReads int64 `stm:"bufferpool_physical_reads"`
+	BufferpoolTotalReads    int64 // No stm tag - calculated field
 
 	// Detailed buffer pool read metrics
 	BufferpoolDataLogicalReads    int64 `stm:"bufferpool_data_logical_reads"`
@@ -123,16 +123,16 @@ type metricsData struct {
 	CanConnect     int64 `stm:"can_connect"`
 	DatabaseStatus int64 `stm:"database_status"`
 
-	databases    map[string]databaseInstanceMetrics
-	bufferpools  map[string]bufferpoolInstanceMetrics
-	tablespaces  map[string]tablespaceInstanceMetrics
-	connections  map[string]connectionInstanceMetrics
-	tables       map[string]tableInstanceMetrics
-	indexes      map[string]indexInstanceMetrics
-	memoryPools  map[string]memoryPoolInstanceMetrics
-	tableIOs     map[string]tableIOInstanceMetrics
-	memorySets   map[string]memorySetInstanceMetrics
-	prefetchers  map[string]prefetcherInstanceMetrics
+	databases   map[string]databaseInstanceMetrics
+	bufferpools map[string]bufferpoolInstanceMetrics
+	tablespaces map[string]tablespaceInstanceMetrics
+	connections map[string]connectionInstanceMetrics
+	tables      map[string]tableInstanceMetrics
+	indexes     map[string]indexInstanceMetrics
+	memoryPools map[string]memoryPoolInstanceMetrics
+	tableIOs    map[string]tableIOInstanceMetrics
+	memorySets  map[string]memorySetInstanceMetrics
+	prefetchers map[string]prefetcherInstanceMetrics
 }
 
 type databaseMetrics struct {
@@ -170,7 +170,6 @@ type tableMetrics struct {
 type indexMetrics struct {
 	name string
 }
-
 
 type memoryPoolMetrics struct {
 	poolType string
@@ -247,24 +246,24 @@ type connectionInstanceMetrics struct {
 	RowsRead         int64 `stm:"rows_read"`
 	RowsWritten      int64 `stm:"rows_written"`
 	TotalCPUTime     int64 `stm:"total_cpu_time"`
-	
+
 	// Wait time metrics (DB2 9.7+ LUW with MON_GET_CONNECTION)
 	// TotalWaitTime is not charted but collected for reference
-	TotalWaitTime      int64 // No stm tag - not sent to netdata
-	LockWaitTime       int64 `stm:"lock_wait_time"`
-	LogDiskWaitTime    int64 `stm:"log_disk_wait_time"`
-	LogBufferWaitTime  int64 `stm:"log_buffer_wait_time"`
-	PoolReadTime       int64 `stm:"pool_read_time"`
-	PoolWriteTime      int64 `stm:"pool_write_time"`
-	DirectReadTime     int64 `stm:"direct_read_time"`
-	DirectWriteTime    int64 `stm:"direct_write_time"`
-	FCMRecvWaitTime    int64 `stm:"fcm_recv_wait_time"`
-	FCMSendWaitTime    int64 `stm:"fcm_send_wait_time"`
-	TotalRoutineTime   int64 `stm:"total_routine_time"`
-	TotalCompileTime   int64 `stm:"total_compile_time"`
-	TotalSectionTime   int64 `stm:"total_section_time"`
-	TotalCommitTime    int64 `stm:"total_commit_time"`
-	TotalRollbackTime  int64 `stm:"total_rollback_time"`
+	TotalWaitTime     int64 // No stm tag - not sent to netdata
+	LockWaitTime      int64 `stm:"lock_wait_time"`
+	LogDiskWaitTime   int64 `stm:"log_disk_wait_time"`
+	LogBufferWaitTime int64 `stm:"log_buffer_wait_time"`
+	PoolReadTime      int64 `stm:"pool_read_time"`
+	PoolWriteTime     int64 `stm:"pool_write_time"`
+	DirectReadTime    int64 `stm:"direct_read_time"`
+	DirectWriteTime   int64 `stm:"direct_write_time"`
+	FCMRecvWaitTime   int64 `stm:"fcm_recv_wait_time"`
+	FCMSendWaitTime   int64 `stm:"fcm_send_wait_time"`
+	TotalRoutineTime  int64 `stm:"total_routine_time"`
+	TotalCompileTime  int64 `stm:"total_compile_time"`
+	TotalSectionTime  int64 `stm:"total_section_time"`
+	TotalCommitTime   int64 `stm:"total_commit_time"`
+	TotalRollbackTime int64 `stm:"total_rollback_time"`
 }
 
 type tableInstanceMetrics struct {
@@ -280,7 +279,6 @@ type indexInstanceMetrics struct {
 	IndexScans int64 `stm:"index_scans"`
 	FullScans  int64 `stm:"full_scans"`
 }
-
 
 type memoryPoolInstanceMetrics struct {
 	PoolUsed    int64 `stm:"used"`
@@ -298,17 +296,17 @@ type tableIOInstanceMetrics struct {
 
 type memorySetInstanceMetrics struct {
 	// Screen 26: Instance Memory Sets metrics
-	Used                  int64  `stm:"used"`                    // MEMORY_SET_USED
-	Committed             int64  `stm:"committed"`               // MEMORY_SET_COMMITTED  
-	HighWaterMark         int64  `stm:"high_water_mark"`         // MEMORY_SET_USED_HWM
-	AdditionalCommitted   int64  `stm:"additional_committed"`    // MEMORY_SET_COMMITTED - MEMORY_SET_USED
-	PercentUsedHWM        int64  `stm:"percent_used_hwm"`        // (MEMORY_SET_USED * 100) / MEMORY_SET_USED_HWM
-	
+	Used                int64 `stm:"used"`                 // MEMORY_SET_USED
+	Committed           int64 `stm:"committed"`            // MEMORY_SET_COMMITTED
+	HighWaterMark       int64 `stm:"high_water_mark"`      // MEMORY_SET_USED_HWM
+	AdditionalCommitted int64 `stm:"additional_committed"` // MEMORY_SET_COMMITTED - MEMORY_SET_USED
+	PercentUsedHWM      int64 `stm:"percent_used_hwm"`     // (MEMORY_SET_USED * 100) / MEMORY_SET_USED_HWM
+
 	// Metadata
-	hostName    string
-	dbName      string
-	setType     string
-	member      int64
+	hostName string
+	dbName   string
+	setType  string
+	member   int64
 }
 
 type prefetcherInstanceMetrics struct {

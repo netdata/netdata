@@ -164,7 +164,7 @@ func (c *Client) refreshStaticDataFromPCF() error {
 	if statInt, ok := attrs[ibmmq.MQIA_STATISTICS_INTERVAL]; ok {
 		if interval, ok := statInt.(int32); ok && interval > 0 {
 			c.cachedStatisticsInterval = interval
-			c.protocol.Debugf("QMGR '%s' STATINT detected: %d seconds (MQIA_STATISTICS_INTERVAL=%d)", 
+			c.protocol.Debugf("QMGR '%s' STATINT detected: %d seconds (MQIA_STATISTICS_INTERVAL=%d)",
 				c.config.QueueManager, interval, ibmmq.MQIA_STATISTICS_INTERVAL)
 		}
 	} else {
@@ -175,7 +175,7 @@ func (c *Client) refreshStaticDataFromPCF() error {
 	if queueMonInt, ok := attrs[int32(123)]; ok {
 		if interval, ok := queueMonInt.(int32); ok && interval >= 0 {
 			c.cachedMonitoringQueue = interval
-			c.protocol.Debugf("QMGR '%s' queue monitoring interval detected: %d seconds (MQIA_MONITORING_Q=123)", 
+			c.protocol.Debugf("QMGR '%s' queue monitoring interval detected: %d seconds (MQIA_MONITORING_Q=123)",
 				c.config.QueueManager, interval)
 		}
 	} else {
@@ -186,7 +186,7 @@ func (c *Client) refreshStaticDataFromPCF() error {
 	if channelMonInt, ok := attrs[int32(122)]; ok {
 		if interval, ok := channelMonInt.(int32); ok && interval >= 0 {
 			c.cachedMonitoringChannel = interval
-			c.protocol.Debugf("QMGR '%s' channel monitoring interval detected: %d seconds (MQIA_MONITORING_CHANNEL=122)", 
+			c.protocol.Debugf("QMGR '%s' channel monitoring interval detected: %d seconds (MQIA_MONITORING_CHANNEL=122)",
 				c.config.QueueManager, interval)
 		}
 	} else {
@@ -197,7 +197,7 @@ func (c *Client) refreshStaticDataFromPCF() error {
 	if clussdrMonInt, ok := attrs[int32(124)]; ok {
 		if interval, ok := clussdrMonInt.(int32); ok && interval >= 0 {
 			c.cachedMonitoringAutoClussdr = interval
-			c.protocol.Debugf("QMGR '%s' auto cluster sender channel monitoring interval detected: %d seconds (MQIA_MONITORING_AUTO_CLUSSDR=124)", 
+			c.protocol.Debugf("QMGR '%s' auto cluster sender channel monitoring interval detected: %d seconds (MQIA_MONITORING_AUTO_CLUSSDR=124)",
 				c.config.QueueManager, interval)
 		}
 	} else {
@@ -208,11 +208,11 @@ func (c *Client) refreshStaticDataFromPCF() error {
 	// This interval is typically not exposed as a queue manager attribute but is configurable
 	// The default publication frequency to $SYS/ topics is approximately every 10 seconds
 	c.cachedSysTopicInterval = 10
-	c.protocol.Debugf("QMGR '%s' $SYS topic interval set to default: %d seconds (configurable, see IBM MQ documentation)", 
+	c.protocol.Debugf("QMGR '%s' $SYS topic interval set to default: %d seconds (configurable, see IBM MQ documentation)",
 		c.config.QueueManager, c.cachedSysTopicInterval)
 
 	c.protocol.Debugf("QMGR static data refreshed for queue manager '%s' - version: %s, platform: %s, STATINT: %d, MONQ: %d, MONCH: %d, MONCLS: %d, SYSTOPIC: %d",
-		c.config.QueueManager, c.cachedVersion, c.cachedEdition, c.cachedStatisticsInterval, 
+		c.config.QueueManager, c.cachedVersion, c.cachedEdition, c.cachedStatisticsInterval,
 		c.cachedMonitoringQueue, c.cachedMonitoringChannel, c.cachedMonitoringAutoClussdr, c.cachedSysTopicInterval)
 
 	return nil

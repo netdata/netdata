@@ -56,13 +56,13 @@ const (
 
 	// Individual queries for columns that exist in SYSTEM_STATUS() - for backward compatibility
 	queryConfiguredCPUs = `SELECT CONFIGURED_CPUS FROM TABLE(QSYS2.SYSTEM_STATUS()) X`
-	queryAverageCPU = `SELECT AVERAGE_CPU_UTILIZATION FROM TABLE(QSYS2.SYSTEM_STATUS()) X`
-	querySystemASP = `SELECT SYSTEM_ASP_USED FROM TABLE(QSYS2.SYSTEM_STATUS()) X`
-	queryActiveJobs = `SELECT TOTAL_JOBS_IN_SYSTEM FROM TABLE(QSYS2.SYSTEM_STATUS()) X`
+	queryAverageCPU     = `SELECT AVERAGE_CPU_UTILIZATION FROM TABLE(QSYS2.SYSTEM_STATUS()) X`
+	querySystemASP      = `SELECT SYSTEM_ASP_USED FROM TABLE(QSYS2.SYSTEM_STATUS()) X`
+	queryActiveJobs     = `SELECT TOTAL_JOBS_IN_SYSTEM FROM TABLE(QSYS2.SYSTEM_STATUS()) X`
 
 	// System information queries for labels - only use verified columns
 	querySerialNumber = `SELECT SERIAL_NUMBER FROM TABLE(QSYS2.SYSTEM_STATUS()) X`
-	querySystemModel = `SELECT MACHINE_MODEL FROM TABLE(QSYS2.SYSTEM_STATUS()) X`
+	querySystemModel  = `SELECT MACHINE_MODEL FROM TABLE(QSYS2.SYSTEM_STATUS()) X`
 
 	// Query for IBM i version - use SYSIBMADM.ENV_SYS_INFO which works across IBM i versions
 	queryIBMiVersion = `SELECT OS_NAME, OS_VERSION, OS_RELEASE FROM SYSIBMADM.ENV_SYS_INFO`
@@ -132,7 +132,7 @@ const (
 	`
 
 	// VERIFIED: Subsystem monitoring
-	// Works on both IBM i 7.4 and pub400.com  
+	// Works on both IBM i 7.4 and pub400.com
 	// Note: HELD_JOB_COUNT and STORAGE_USED_KB columns don't exist, removed per AS400.md verification
 	querySubsystems = `
 		SELECT 

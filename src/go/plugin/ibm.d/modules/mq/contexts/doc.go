@@ -1,4 +1,3 @@
-
 // Package contexts provides type-safe metric contexts for the mq collector.
 // DO NOT EDIT zz_generated_contexts.go - it is auto-generated from contexts.yaml
 package contexts

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"time"
-	
+
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 )
 
@@ -21,7 +21,7 @@ type Config struct {
 type Client struct {
 	config  Config
 	metrics *framework.ProtocolClient
-	
+
 	// Mock state
 	connected bool
 	random    *rand.Rand
@@ -79,11 +79,11 @@ func (c *Client) Connect() error {
 	return c.metrics.Track("Connect", func() error {
 		// Simulate connection delay
 		time.Sleep(100 * time.Millisecond)
-		
+
 		if c.config.ConnectionString == "" {
 			return fmt.Errorf("connection string required")
 		}
-		
+
 		c.connected = true
 		return nil
 	})
@@ -98,33 +98,33 @@ func (c *Client) Disconnect() error {
 // GetQueueManagerInfo returns mock queue manager information
 func (c *Client) GetQueueManagerInfo() (*QueueManagerInfo, error) {
 	var info *QueueManagerInfo
-	
+
 	err := c.metrics.Track("GetQueueManagerInfo", func() error {
 		if !c.connected {
 			return fmt.Errorf("not connected")
 		}
-		
+
 		// Mock data
 		info = &QueueManagerInfo{
 			Name:    "DUMMY_QM",
 			Version: "9.3.0.0",
 		}
-		
+
 		return nil
 	})
-	
+
 	return info, err
 }
 
 // ListQueues returns mock queue names
 func (c *Client) ListQueues(pattern string) ([]string, error) {
 	var queues []string
-	
+
 	err := c.metrics.TrackWithSize("ListQueues", 128, func() (int64, error) {
 		if !c.connected {
 			return 0, fmt.Errorf("not connected")
 		}
-		
+
 		// Mock data - simulate various queue types
 		queues = []string{
 			"DEV.QUEUE.1",
@@ -134,23 +134,23 @@ func (c *Client) ListQueues(pattern string) ([]string, error) {
 			"SYSTEM.ADMIN.COMMAND.QUEUE",
 			"SYSTEM.DEFAULT.LOCAL.QUEUE",
 		}
-		
+
 		// Simulate response size
 		return int64(len(queues) * 64), nil
 	})
-	
+
 	return queues, err
 }
 
 // GetQueueDetailsBatch returns mock queue details
 func (c *Client) GetQueueDetailsBatch(names []string) ([]QueueData, error) {
 	var data []QueueData
-	
+
 	err := c.metrics.TrackWithSize("GetQueueDetailsBatch", int64(len(names)*32), func() (int64, error) {
 		if !c.connected {
 			return 0, fmt.Errorf("not connected")
 		}
-		
+
 		// Mock data for each queue
 		for _, name := range names {
 			qtype := "local"
@@ -159,10 +159,10 @@ func (c *Client) GetQueueDetailsBatch(names []string) ([]QueueData, error) {
 			} else if len(name) > 6 && name[:6] == "SYSTEM" {
 				qtype = "local"
 			}
-			
+
 			// Generate random but consistent data
 			base := int64(c.random.Intn(1000))
-			
+
 			data = append(data, QueueData{
 				Name:             name,
 				Type:             qtype,
@@ -177,23 +177,23 @@ func (c *Client) GetQueueDetailsBatch(names []string) ([]QueueData, error) {
 				HasResetStats:    true,
 			})
 		}
-		
+
 		// Simulate response size
 		return int64(len(data) * 256), nil
 	})
-	
+
 	return data, err
 }
 
 // ListChannels returns mock channel names
 func (c *Client) ListChannels(pattern string) ([]string, error) {
 	var channels []string
-	
+
 	err := c.metrics.Track("ListChannels", func() error {
 		if !c.connected {
 			return fmt.Errorf("not connected")
 		}
-		
+
 		// Mock data
 		channels = []string{
 			"SYSTEM.DEF.SVRCONN",
@@ -201,26 +201,26 @@ func (c *Client) ListChannels(pattern string) ([]string, error) {
 			"APP.CHANNEL.1",
 			"APP.CHANNEL.2",
 		}
-		
+
 		return nil
 	})
-	
+
 	return channels, err
 }
 
 // GetChannelData returns mock channel details
 func (c *Client) GetChannelData(name string) (*ChannelData, error) {
 	var data *ChannelData
-	
+
 	err := c.metrics.Track("GetChannelData", func() error {
 		if !c.connected {
 			return fmt.Errorf("not connected")
 		}
-		
+
 		// Mock data
 		statuses := []string{"inactive", "running", "stopped"}
 		statusName := statuses[c.random.Intn(len(statuses))]
-		
+
 		data = &ChannelData{
 			Name:          name,
 			Type:          "SVRCONN",
@@ -231,44 +231,44 @@ func (c *Client) GetChannelData(name string) (*ChannelData, error) {
 			BytesReceived: int64(c.random.Intn(1000000)),
 			BatchCount:    int64(c.random.Intn(1000)),
 		}
-		
+
 		return nil
 	})
-	
+
 	return data, err
 }
 
 // ListTopics returns mock topic names
 func (c *Client) ListTopics(pattern string) ([]string, error) {
 	var topics []string
-	
+
 	err := c.metrics.Track("ListTopics", func() error {
 		if !c.connected {
 			return fmt.Errorf("not connected")
 		}
-		
+
 		// Mock data
 		topics = []string{
 			"Price/Stock/IBM",
 			"Price/Stock/MSFT",
 			"Sports/Football/Results",
 		}
-		
+
 		return nil
 	})
-	
+
 	return topics, err
 }
 
 // GetTopicData returns mock topic details
 func (c *Client) GetTopicData(name string) (*TopicData, error) {
 	var data *TopicData
-	
+
 	err := c.metrics.Track("GetTopicData", func() error {
 		if !c.connected {
 			return fmt.Errorf("not connected")
 		}
-		
+
 		// Mock data
 		data = &TopicData{
 			Name:            name,
@@ -276,9 +276,9 @@ func (c *Client) GetTopicData(name string) (*TopicData, error) {
 			SubscriberCount: int64(c.random.Intn(50)),
 			MessageCount:    int64(c.random.Intn(10000)),
 		}
-		
+
 		return nil
 	})
-	
+
 	return data, err
 }

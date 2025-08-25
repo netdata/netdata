@@ -56,44 +56,44 @@ func init() {
 // Drivers returns available ODBC data sources
 func Drivers() ([]string, error) {
 	var env C.SQLHENV
-	
+
 	// Allocate environment handle
 	if ret := C.simple_alloc_env(&env); ret != C.SQL_SUCCESS {
 		return nil, fmt.Errorf("failed to allocate environment handle")
 	}
 	defer C.simple_free_env(env)
-	
+
 	// Set ODBC version
 	if ret := C.simple_set_version(env); ret != C.SQL_SUCCESS {
 		return nil, fmt.Errorf("failed to set ODBC version")
 	}
-	
+
 	var drivers []string
 	direction := C.SQL_FETCH_FIRST
-	
+
 	for {
 		var dsn [256]C.char
 		var dsnLen C.SQLSMALLINT
 		var desc [256]C.char
 		var descLen C.SQLSMALLINT
-		
-		ret := C.simple_data_sources(env, C.SQLUSMALLINT(direction), 
+
+		ret := C.simple_data_sources(env, C.SQLUSMALLINT(direction),
 			&dsn[0], C.SQLSMALLINT(len(dsn)), &dsnLen,
 			&desc[0], C.SQLSMALLINT(len(desc)), &descLen)
-		
+
 		if ret == C.SQL_NO_DATA {
 			break
 		}
-		
+
 		if ret != C.SQL_SUCCESS {
 			break
 		}
-		
+
 		driverName := C.GoString((*C.char)(unsafe.Pointer(&dsn[0])))
 		drivers = append(drivers, driverName)
 		direction = C.SQL_FETCH_NEXT
 	}
-	
+
 	return drivers, nil
 }
 

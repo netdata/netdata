@@ -2,9 +2,9 @@ package example
 
 import (
 	_ "embed"
-	
-	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 )
 
 //go:embed "config_schema.json"
@@ -19,7 +19,7 @@ func New() *Collector {
 				ObsoletionIterations: 60,
 			},
 		},
-		config: defaultConfig(),  // Initialize with defaults
+		config: defaultConfig(), // Initialize with defaults
 	}
 }
 

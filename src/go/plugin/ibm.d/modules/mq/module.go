@@ -1,4 +1,3 @@
-
 package mq
 
 import (

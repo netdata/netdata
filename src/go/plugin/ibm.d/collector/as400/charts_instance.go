@@ -100,7 +100,6 @@ var (
 		},
 	}
 
-
 	// Subsystem charts
 	subsystemJobsChartTmpl = module.Chart{
 		ID:       "subsystem_%s_jobs",

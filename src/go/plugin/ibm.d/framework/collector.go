@@ -3,21 +3,21 @@ package framework
 import (
 	"context"
 	"fmt"
-	"strings"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"strings"
 )
 
 // Collector is the base type for all framework-based collectors
 type Collector struct {
 	module.Base
-	
-	Config              Config
-	State               *CollectorState
-	registeredContexts  []interface{} // All contexts from generated code
-	contextMap          map[string]interface{}
-	charts              *module.Charts
-	impl                CollectorImpl // The actual collector implementation
-	globalLabels        []module.Label // Job-level labels applied to all charts
+
+	Config             Config
+	State              *CollectorState
+	registeredContexts []interface{} // All contexts from generated code
+	contextMap         map[string]interface{}
+	charts             *module.Charts
+	impl               CollectorImpl  // The actual collector implementation
+	globalLabels       []module.Label // Job-level labels applied to all charts
 }
 
 // Init initializes the collector (go.d framework requirement)
@@ -28,7 +28,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	c.contextMap = make(map[string]interface{})
 	c.charts = &module.Charts{}
 	c.globalLabels = make([]module.Label, 0)
-	
+
 	// Set defaults
 	if c.Config.ObsoletionIterations == 0 {
 		c.Config.ObsoletionIterations = 60
@@ -36,12 +36,12 @@ func (c *Collector) Init(ctx context.Context) error {
 	if c.Config.UpdateEvery == 0 {
 		c.Config.UpdateEvery = 1
 	}
-	
+
 	// Validate configuration
 	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("invalid configuration: %v", err)
 	}
-	
+
 	return nil
 }
 
@@ -61,10 +61,10 @@ func (c *Collector) Charts() *module.Charts {
 func (c *Collector) Collect(ctx context.Context) map[string]int64 {
 	// Increment global iteration counter
 	c.State.iteration++
-	
+
 	// Clear previous iteration errors
 	c.State.ClearErrors()
-	
+
 	// Run collection (implemented by specific collector)
 	var err error
 	if c.impl != nil {
@@ -72,24 +72,24 @@ func (c *Collector) Collect(ctx context.Context) map[string]int64 {
 	} else {
 		err = fmt.Errorf("collector implementation not set")
 	}
-	
+
 	// Handle errors (let the module decide how to handle them)
 	if err != nil {
 		c.Errorf("collection failed: %v", err)
 		// Return whatever metrics we have (partial collection is OK)
 	}
-	
+
 	// Convert collected metrics to go.d format
 	metrics := c.convertMetrics()
-	
+
 	// Advance iteration and handle obsoletion
 	c.State.NextIteration(c.Config.ObsoletionIterations)
-	
+
 	// Handle obsolete instances - mark their charts as obsolete
 	for _, instanceKey := range c.State.GetObsoleteInstances() {
 		c.markChartsObsolete(instanceKey)
 	}
-	
+
 	return metrics
 }
 
@@ -108,32 +108,31 @@ func (c *Collector) SetImpl(impl CollectorImpl) {
 func (c *Collector) validateConfig() error {
 	// Validate update intervals are multiples of base
 	for groupName, interval := range c.Config.CollectionGroups {
-		if interval % c.Config.UpdateEvery != 0 {
+		if interval%c.Config.UpdateEvery != 0 {
 			// Adjust to nearest valid multiple
 			adjusted := ((interval / c.Config.UpdateEvery) + 1) * c.Config.UpdateEvery
 			c.Config.CollectionGroups[groupName] = adjusted
-			c.Infof("adjusted %s interval from %d to %d (must be multiple of %d)", 
+			c.Infof("adjusted %s interval from %d to %d (must be multiple of %d)",
 				groupName, interval, adjusted, c.Config.UpdateEvery)
 		}
 	}
-	
+
 	return nil
 }
-
 
 // convertMetrics converts framework metrics to go.d format
 func (c *Collector) convertMetrics() map[string]int64 {
 	mx := make(map[string]int64)
-	
+
 	// Track seen instances for dynamic chart creation
 	seenInstances := make(map[string]bool)
-	
+
 	// Convert instance metrics
 	for _, metric := range c.State.GetMetrics() {
 		// Track this instance
 		instanceKey := metric.Instance.key
 		seenInstances[instanceKey] = true
-		
+
 		// Check if we need to create charts for this instance
 		if !c.hasChartsForInstance(instanceKey) {
 			// Find the context this instance belongs to
@@ -163,12 +162,12 @@ func (c *Collector) convertMetrics() map[string]int64 {
 				}
 			}
 		}
-		
+
 		// Generate go.d metric key
 		key := c.generateMetricKey(metric)
 		mx[key] = metric.Value
 	}
-	
+
 	// Add protocol observability metrics (if any protocols are registered)
 	// This will be added when protocol observability charts are created
 	// for name, pm := range c.State.protocols {
@@ -182,7 +181,7 @@ func (c *Collector) convertMetrics() map[string]int64 {
 	// 	mx[prefix+"bytes_sent"] = pm.BytesSent
 	// 	mx[prefix+"bytes_received"] = pm.BytesReceived
 	// }
-	
+
 	return mx
 }
 
@@ -213,7 +212,7 @@ func (c *Collector) createChartFromContext(ctx interface{}, instanceID string, i
 	if contextMeta == nil {
 		return nil
 	}
-	
+
 	// Create chart with unique ID for dynamic instances
 	// For labeled contexts, include the instance ID in the chart ID
 	chartID := cleanChartID(instanceID)
@@ -221,9 +220,9 @@ func (c *Collector) createChartFromContext(ctx interface{}, instanceID string, i
 		// For unlabeled contexts, use just the context name
 		chartID = cleanChartID(contextMeta.Name)
 	}
-	
+
 	chart := &module.Chart{
-		ID:       chartID,
+		ID: chartID,
 		// OverID:   instanceID,  // Commented out - let go.d framework handle chart naming
 		Title:    contextMeta.Title,
 		Units:    contextMeta.Units,
@@ -233,7 +232,7 @@ func (c *Collector) createChartFromContext(ctx interface{}, instanceID string, i
 		Priority: contextMeta.Priority,
 		Opts:     module.Opts{},
 	}
-	
+
 	// Set UpdateEvery override if instance has one
 	if instance != nil && instance.UpdateEveryOverride > 0 {
 		chart.UpdateEvery = instance.UpdateEveryOverride
@@ -242,7 +241,7 @@ func (c *Collector) createChartFromContext(ctx interface{}, instanceID string, i
 			chart.SkipGaps = true
 		}
 	}
-	
+
 	// Add dimensions with full dimension IDs
 	for _, dim := range contextMeta.Dimensions {
 		// Use the full dimension ID: {instance_id}.{dimension_name}
@@ -256,10 +255,10 @@ func (c *Collector) createChartFromContext(ctx interface{}, instanceID string, i
 		}
 		chart.AddDim(chartDim)
 	}
-	
+
 	// Apply global labels to the new chart
 	c.applyGlobalLabelsToChart(chart)
-	
+
 	return chart
 }
 
@@ -287,7 +286,7 @@ func (c *Collector) hasChartsForInstance(instanceKey string) bool {
 func (c *Collector) markChartsObsolete(instanceKey string) {
 	// Find charts that belong to this instance
 	chartID := cleanChartID(instanceKey)
-	
+
 	for _, chart := range *c.charts {
 		if chart.ID == chartID && !chart.Obsolete {
 			c.Debugf("Marking chart %s as obsolete for instance %s", chart.ID, instanceKey)
@@ -331,7 +330,7 @@ func (c *Collector) SetGlobalLabel(key, value string) {
 			return
 		}
 	}
-	
+
 	// Add new label
 	c.globalLabels = append(c.globalLabels, module.Label{Key: key, Value: value})
 	c.updateChartsWithGlobalLabels()
@@ -351,7 +350,7 @@ func (c *Collector) updateChartsWithGlobalLabels() {
 	if c.charts == nil {
 		return
 	}
-	
+
 	for _, chart := range *c.charts {
 		// Update existing chart labels
 		c.applyGlobalLabelsToChart(chart)
@@ -365,7 +364,7 @@ func (c *Collector) applyGlobalLabelsToChart(chart *module.Chart) {
 	for i, label := range chart.Labels {
 		existingLabels[label.Key] = i
 	}
-	
+
 	// Apply global labels
 	for _, globalLabel := range c.globalLabels {
 		if idx, exists := existingLabels[globalLabel.Key]; exists {

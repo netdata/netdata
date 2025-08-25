@@ -122,7 +122,7 @@ func (c *Client) getPCFReply(correlId []byte) ([]*ibmmq.PCFParameter, error) {
 		if err != nil {
 			// In multi-message responses, log the error but continue reading
 			c.protocol.Warningf("Error in multi-message response: %v", err)
-			
+
 			// Check if this is the last message even with error
 			if cfh.Control == ibmmq.MQCFC_LAST {
 				c.protocol.Debugf("received last PCF message (with error), total parameters: %d", len(allParams))
@@ -256,7 +256,7 @@ func (c *Client) parseChannelListResponseFromParams(params []*ibmmq.PCFParameter
 func (c *Client) parseChannelInfoFromParams(params []*ibmmq.PCFParameter) []ChannelInfo {
 	var channels []ChannelInfo
 	var currentChannel *ChannelInfo
-	
+
 	// Process parameters - they come in groups per channel
 	for _, param := range params {
 		switch param.Parameter {
@@ -283,12 +283,12 @@ func (c *Client) parseChannelInfoFromParams(params []*ibmmq.PCFParameter) []Chan
 			}
 		}
 	}
-	
+
 	// Don't forget the last channel
 	if currentChannel != nil {
 		channels = append(channels, *currentChannel)
 	}
-	
+
 	return channels
 }
 

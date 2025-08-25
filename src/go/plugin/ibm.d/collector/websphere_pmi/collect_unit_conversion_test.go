@@ -61,11 +61,11 @@ func TestWebSpherePMI_UnitConversions(t *testing.T) {
 			expectedUnit:  "seconds",
 		},
 		{
-			name:          "TimeStatistic remains in milliseconds",
-			xmlFile:       "../../samples.d/traditional-8.5.5.24-pmi-full-port-9284.xml",
-			metricName:    "threadpool_webcontainer_average_active_threads",
-			xmlUnit:       "MILLISECOND",
-			expectedUnit:  "milliseconds",
+			name:         "TimeStatistic remains in milliseconds",
+			xmlFile:      "../../samples.d/traditional-8.5.5.24-pmi-full-port-9284.xml",
+			metricName:   "threadpool_webcontainer_average_active_threads",
+			xmlUnit:      "MILLISECOND",
+			expectedUnit: "milliseconds",
 		},
 	}
 
@@ -105,11 +105,11 @@ func TestWebSpherePMI_UnitConversions(t *testing.T) {
 
 func TestWebSpherePMI_ConvertUnitFunction(t *testing.T) {
 	tests := []struct {
-		name      string
-		value     int64
-		fromUnit  string
-		toUnit    string
-		expected  int64
+		name     string
+		value    int64
+		fromUnit string
+		toUnit   string
+		expected int64
 	}{
 		// Memory conversions
 		{
@@ -185,9 +185,9 @@ func TestWebSpherePMI_ConvertUnitFunction(t *testing.T) {
 
 func TestWebSpherePMI_PrecisionHandling(t *testing.T) {
 	tests := []struct {
-		name     string
-		xmlFile  string
-		metrics  []string
+		name    string
+		xmlFile string
+		metrics []string
 	}{
 		{
 			name:    "Precision in float calculations",
@@ -269,24 +269,24 @@ func TestWebSpherePMI_WeightedAverageWithPrecision(t *testing.T) {
 
 	// Test weighted average calculation with precision
 	key := "test_metric"
-	
+
 	// First call - should return 0 and cache the value
 	result := w.calculateWeightedAverage(key, 1000)
 	assert.Equal(t, int64(0), result, "first call should return 0")
-	
+
 	// Verify value was cached
 	cached, exists := w.integralCache[key]
 	assert.True(t, exists, "value should be cached")
 	assert.Equal(t, int64(1000), cached.Value)
-	
+
 	// Simulate 1 second passing with integral increasing by 500
 	// This represents average value of 500 over 1 second
 	cached.Timestamp = cached.Timestamp - 1 // Move timestamp 1 second back
-	
+
 	result = w.calculateWeightedAverage(key, 1500)
 	// Expected: (1500 - 1000) * precision / 1 = 500 * 1000 = 500000
 	assert.Equal(t, int64(500*precision), result, "weighted average should be 500 * precision")
-	
+
 	// Test counter reset scenario
 	cached.Value = 2000
 	result = w.calculateWeightedAverage(key, 1000) // Value decreased

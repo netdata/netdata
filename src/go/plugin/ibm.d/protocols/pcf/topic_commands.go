@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-
 package pcf
 
 import (
@@ -10,7 +9,6 @@ import (
 
 	"github.com/ibm-messaging/mq-golang/v5/ibmmq"
 )
-
 
 // GetTopicList returns a list of topics.
 func (c *Client) GetTopicList() ([]string, error) {

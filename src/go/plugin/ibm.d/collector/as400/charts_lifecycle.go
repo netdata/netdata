@@ -36,10 +36,10 @@ func (a *AS400) updateDiskChartLabels(unit string) {
 	if !ok {
 		return
 	}
-	
+
 	cleanUnit := cleanName(unit)
 	prefix := fmt.Sprintf("disk_%s_", cleanUnit)
-	
+
 	// Update labels on all charts for this disk
 	for _, chart := range *a.Charts() {
 		if strings.HasPrefix(chart.ID, prefix) {

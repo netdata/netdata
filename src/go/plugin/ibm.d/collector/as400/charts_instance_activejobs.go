@@ -40,7 +40,7 @@ func (a *AS400) newActiveJobCharts(job *activeJobMetrics) *module.Charts {
 
 func (a *AS400) addActiveJobCharts(job *activeJobMetrics) {
 	charts := a.newActiveJobCharts(job)
-	
+
 	if err := a.charts.Add(*charts...); err != nil {
 		a.Warningf("failed to add active job charts for %s: %v", job.jobName, err)
 	}
@@ -48,14 +48,14 @@ func (a *AS400) addActiveJobCharts(job *activeJobMetrics) {
 
 func (a *AS400) removeActiveJobCharts(jobName string) {
 	cleanName := cleanName(jobName)
-	
+
 	// Mark all charts for this job as obsolete
 	for _, chart := range *a.charts {
 		if chart.ID == fmt.Sprintf("activejob_%s_cpu", cleanName) ||
-		   chart.ID == fmt.Sprintf("activejob_%s_resources", cleanName) ||
-		   chart.ID == fmt.Sprintf("activejob_%s_time", cleanName) ||
-		   chart.ID == fmt.Sprintf("activejob_%s_activity", cleanName) ||
-		   chart.ID == fmt.Sprintf("activejob_%s_threads", cleanName) {
+			chart.ID == fmt.Sprintf("activejob_%s_resources", cleanName) ||
+			chart.ID == fmt.Sprintf("activejob_%s_time", cleanName) ||
+			chart.ID == fmt.Sprintf("activejob_%s_activity", cleanName) ||
+			chart.ID == fmt.Sprintf("activejob_%s_threads", cleanName) {
 			if !chart.Obsolete {
 				chart.Obsolete = true
 				chart.MarkNotCreated()

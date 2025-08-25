@@ -39,7 +39,7 @@ func (c *Collector) collectSysTopics() error {
 	// Process CPU metrics
 	if result.UserCPUPercent.IsCollected() || result.SystemCPUPercent.IsCollected() {
 		values := contexts.QueueManagerResourcesCPUUsageValues{}
-		
+
 		if result.UserCPUPercent.IsCollected() {
 			// Convert percentage (0-100) to basis points (0-10000) for precision
 			values.User = result.UserCPUPercent.Int64() * 100
@@ -48,7 +48,7 @@ func (c *Collector) collectSysTopics() error {
 			// Convert percentage (0-100) to basis points (0-10000) for precision
 			values.System = result.SystemCPUPercent.Int64() * 100
 		}
-		
+
 		contexts.QueueManagerResources.CPUUsage.SetUpdateEvery(c.State, contexts.EmptyLabels{}, c.GetEffectiveSysTopicInterval())
 		contexts.QueueManagerResources.CPUUsage.Set(c.State, contexts.EmptyLabels{}, values)
 	}
@@ -67,18 +67,18 @@ func (c *Collector) collectSysTopics() error {
 	if result.LogUsedBytes.IsCollected() && result.LogMaxBytes.IsCollected() {
 		used := result.LogUsedBytes.Int64()
 		max := result.LogMaxBytes.Int64()
-		
+
 		// Calculate utilization percentage if both values are available
 		if max > 0 {
 			// Convert to 0.01% units (basis points) as expected by the context
 			utilPercent := (used * 10000) / max
 			contexts.QueueManagerResources.LogUtilization.SetUpdateEvery(c.State, contexts.EmptyLabels{}, c.GetEffectiveSysTopicInterval())
-			contexts.QueueManagerResources.LogUtilization.Set(c.State, contexts.EmptyLabels{}, 
+			contexts.QueueManagerResources.LogUtilization.Set(c.State, contexts.EmptyLabels{},
 				contexts.QueueManagerResourcesLogUtilizationValues{
 					Used: utilPercent,
 				})
 		}
-		
+
 		// Also set log file size
 		contexts.QueueManagerResources.LogFileSize.SetUpdateEvery(c.State, contexts.EmptyLabels{}, c.GetEffectiveSysTopicInterval())
 		contexts.QueueManagerResources.LogFileSize.Set(c.State, contexts.EmptyLabels{},

@@ -4,9 +4,9 @@
 package contexts
 
 import (
-	"strings"
-	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
+	"strings"
 )
 
 // cleanLabelValue cleans a label value for use in instance/dimension IDs
@@ -34,9 +34,7 @@ func (EmptyLabels) InstanceID(contextName string) string {
 	return contextName
 }
 
-
 // --- Item ---
-
 
 // ItemItemPercentageValues defines the type-safe values for Item.ItemPercentage context
 type ItemItemPercentageValues struct {
@@ -82,8 +80,6 @@ func (c ItemItemCounterContext) SetUpdateEvery(state *framework.CollectorState, 
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // ItemLabels defines the required labels for Item contexts
 type ItemLabels struct {
 	Slot string
@@ -95,63 +91,60 @@ func (l ItemLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Slot)
 }
 
-
 // Item contains all metric contexts for Item
 var Item = struct {
 	ItemPercentage ItemItemPercentageContext
-	ItemCounter ItemItemCounterContext
+	ItemCounter    ItemItemCounterContext
 }{
 	ItemPercentage: ItemItemPercentageContext{
 		Context: framework.Context[ItemLabels]{
-		Name:       "example.item_percentage",
-		Family:     "items",
-		Title:      "Item Percentage",
-		Units:      "percentage",
-		Type:       module.Stacked,
-		Priority:   2000,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "percentage",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "example.item_percentage",
+			Family:      "items",
+			Title:       "Item Percentage",
+			Units:       "percentage",
+			Type:        module.Stacked,
+			Priority:    2000,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "percentage",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"slot",
-		},
+			LabelKeys: []string{
+				"slot",
+			},
 		},
 	},
 	ItemCounter: ItemItemCounterContext{
 		Context: framework.Context[ItemLabels]{
-		Name:       "example.item_counter",
-		Family:     "items",
-		Title:      "Item Counter",
-		Units:      "count/s",
-		Type:       module.Line,
-		Priority:   2001,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "counter",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "example.item_counter",
+			Family:      "items",
+			Title:       "Item Counter",
+			Units:       "count/s",
+			Type:        module.Line,
+			Priority:    2001,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "counter",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"slot",
-		},
+			LabelKeys: []string{
+				"slot",
+			},
 		},
 	},
 }
 
-
 // --- Test ---
-
 
 // TestTestAbsoluteValues defines the type-safe values for Test.TestAbsolute context
 type TestTestAbsoluteValues struct {
@@ -197,61 +190,54 @@ func (c TestTestIncrementalContext) SetUpdateEvery(state *framework.CollectorSta
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, nil, updateEvery)
 }
 
-
-
-
 // Test contains all metric contexts for Test
 var Test = struct {
-	TestAbsolute TestTestAbsoluteContext
+	TestAbsolute    TestTestAbsoluteContext
 	TestIncremental TestTestIncrementalContext
 }{
 	TestAbsolute: TestTestAbsoluteContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "example.test_absolute",
-		Family:     "test",
-		Title:      "Test Absolute Value (timestamp % 60)",
-		Units:      "seconds",
-		Type:       module.Line,
-		Priority:   1000,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "value",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "example.test_absolute",
+			Family:      "test",
+			Title:       "Test Absolute Value (timestamp % 60)",
+			Units:       "seconds",
+			Type:        module.Line,
+			Priority:    1000,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "value",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	TestIncremental: TestTestIncrementalContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "example.test_incremental",
-		Family:     "test",
-		Title:      "Test Incremental Counter",
-		Units:      "count/s",
-		Type:       module.Line,
-		Priority:   1001,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "counter",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "example.test_incremental",
+			Family:      "test",
+			Title:       "Test Incremental Counter",
+			Units:       "count/s",
+			Type:        module.Line,
+			Priority:    1001,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "counter",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 }
-
-
 
 // GetAllContexts returns all contexts for framework registration
 func GetAllContexts() []interface{} {

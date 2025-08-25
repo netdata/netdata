@@ -50,7 +50,6 @@ func (c *Client) GetListenerList() ([]string, error) {
 	return result.Listeners, nil
 }
 
-
 // GetListenerStatus returns runtime status for a specific listener.
 func (c *Client) GetListenerStatus(listenerName string) (*ListenerMetrics, error) {
 	c.protocol.Debugf("Getting status for listener '%s' from queue manager '%s'", listenerName, c.config.QueueManager)
@@ -316,13 +315,13 @@ func (c *Client) GetListeners(collectMetrics bool, maxListeners int, selector st
 	// Log summary
 	c.protocol.Debugf("Listener collection complete - discovered:%d visible:%d included:%d enriched:%d",
 		result.Stats.Discovery.AvailableItems,
-		result.Stats.Discovery.AvailableItems - result.Stats.Discovery.InvisibleItems,
+		result.Stats.Discovery.AvailableItems-result.Stats.Discovery.InvisibleItems,
 		result.Stats.Discovery.IncludedItems,
 		len(result.Listeners))
 
 	// Log field collection summary
 	c.protocol.Debugf("Listener field collection summary: status=%d port=%d backlog=%d ip_address=%d uptime=%d",
-		fieldCounts["status"], fieldCounts["port"], fieldCounts["backlog"], 
+		fieldCounts["status"], fieldCounts["port"], fieldCounts["backlog"],
 		fieldCounts["ip_address"], fieldCounts["uptime"])
 
 	return result, nil

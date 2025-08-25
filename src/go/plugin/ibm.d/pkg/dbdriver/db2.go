@@ -48,20 +48,20 @@ func BuildDB2DSN(config *ConnectionConfig) string {
 		if database == "" {
 			database = "*SYSBAS" // Default AS/400 database
 		}
-		
+
 		dsn := fmt.Sprintf("DATABASE=%s;HOSTNAME=%s;PORT=%d;PROTOCOL=TCPIP;UID=%s;PWD=%s",
 			database, config.Hostname, config.Port, config.Username, config.Password)
-		
+
 		if config.UseSSL {
 			dsn += ";SECURITY=SSL"
 			if config.SSLServerCertPath != "" {
 				dsn += fmt.Sprintf(";SSLServerCertificate=%s", config.SSLServerCertPath)
 			}
 		}
-		
+
 		return dsn
 	}
-	
+
 	// Standard DB2 format
 	dsn := fmt.Sprintf("DATABASE=%s;HOSTNAME=%s;PORT=%d;PROTOCOL=TCPIP;UID=%s;PWD=%s",
 		config.Database, config.Hostname, config.Port, config.Username, config.Password)

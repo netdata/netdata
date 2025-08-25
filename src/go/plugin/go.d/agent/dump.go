@@ -99,13 +99,13 @@ func (da *DumpAnalyzer) UpdateJobStructure(jobName string, charts *module.Charts
 	// Copy current chart structure
 	for _, chart := range *charts {
 		var ca ChartAnalysis
-		
+
 		// Check if we have existing data for this chart
 		if existing, exists := existingCharts[chart.ID]; exists {
 			// Preserve existing chart analysis but update the chart reference
 			ca = *existing
 			ca.Chart = chart
-			
+
 			// Add any new dimensions that weren't tracked before
 			for _, dim := range chart.Dims {
 				if _, tracked := ca.CollectedValues[dim.ID]; !tracked {
@@ -120,7 +120,7 @@ func (da *DumpAnalyzer) UpdateJobStructure(jobName string, charts *module.Charts
 				CollectedValues: make(map[string][]int64),
 				SeenDimensions:  make(map[string]bool),
 			}
-			
+
 			// Initialize dimension tracking
 			for _, dim := range chart.Dims {
 				ca.CollectedValues[dim.ID] = make([]int64, 0)
@@ -214,7 +214,7 @@ func (da *DumpAnalyzer) PrintSummary() {
 	for jobName, job := range da.jobs {
 		for i := range job.Charts {
 			ca := &job.Charts[i]
-			
+
 			ctx := ca.Chart.Ctx
 			if _, exists := contextMap[ctx]; !exists {
 				// Collect unique label keys
@@ -308,7 +308,7 @@ func (da *DumpAnalyzer) PrintSummary() {
 
 	// Sort families by their minimum priority (priority of their lowest-priority context)
 	type familyPriority struct {
-		family string
+		family      string
 		minPriority int
 	}
 	var familyPriorities []familyPriority
@@ -324,7 +324,7 @@ func (da *DumpAnalyzer) PrintSummary() {
 	sort.Slice(familyPriorities, func(i, j int) bool {
 		return familyPriorities[i].minPriority < familyPriorities[j].minPriority
 	})
-	
+
 	var families []string
 	for _, fp := range familyPriorities {
 		families = append(families, fp.family)
@@ -337,7 +337,7 @@ func (da *DumpAnalyzer) PrintSummary() {
 		} else {
 			fmt.Printf("\n├─ family: %s\n", family)
 		}
-		
+
 		// Sort contexts by priority
 		contexts := familyMap[family]
 		sort.Slice(contexts, func(i, j int) bool {
@@ -349,28 +349,28 @@ func (da *DumpAnalyzer) PrintSummary() {
 			contextPrefix := "├──"
 			detailPrefix := "│   ├─"
 			lastDetailPrefix := "│   └─"
-			
+
 			if isLastContext {
 				contextPrefix = "└──"
 				detailPrefix = "    ├─"
 				lastDetailPrefix = "    └─"
 			}
-			
+
 			fmt.Printf("│  %s context: %s, unit: %s, prio: %d, type: %s\n",
 				contextPrefix, cs.context, cs.units, cs.priority, cs.chartType)
 			fmt.Printf("│  %s title: %s\n", detailPrefix, cs.title)
-			
+
 			if len(cs.labelKeys) > 0 {
 				fmt.Printf("│  %s labels: %s\n", detailPrefix, strings.Join(cs.labelKeys, ", "))
 			} else {
 				fmt.Printf("│  %s labels: (none)\n", detailPrefix)
 			}
-			
+
 			fmt.Printf("│  %s dimensions: %s\n", detailPrefix, strings.Join(cs.dimNames, ", "))
 			fmt.Printf("│  %s instances: %d, jobs: %d\n", lastDetailPrefix, cs.instances, len(cs.jobs))
 		}
 	}
-	
+
 	// Add a bottom border for the last family
 	if len(families) > 0 {
 		fmt.Println("└─────────────────────────────────────────────────────────────")
@@ -570,7 +570,7 @@ func (da *DumpAnalyzer) printJobAnalysis(job *JobAnalysis) {
 			}
 		}
 	}
-	
+
 	issueCount := errorCount // Only count real errors for final status
 
 	// Calculate statistics for the summary independently to avoid interfering with tree logic
@@ -579,7 +579,7 @@ func (da *DumpAnalyzer) printJobAnalysis(job *JobAnalysis) {
 	statsInstances := 0
 	statsTimeSeries := 0
 	statsCollectedValues := 0
-	
+
 	// Calculate distinct {context}.{dimension} combinations
 	uniqueContextDimensions := make(map[string]bool)
 
@@ -621,7 +621,7 @@ func (da *DumpAnalyzer) printJobAnalysis(job *JobAnalysis) {
 	if warningCount > 0 {
 		warningText = fmt.Sprintf(", %d warnings", warningCount)
 	}
-	
+
 	if issueCount == 0 && statsTimeSeries == uniqueMetricsInMx {
 		if warningCount > 0 {
 			fmt.Printf("🟢 NO ISSUES FOUND%s, job %s defines: %d families, %d contexts, %d dimensions, %d instances, %d time-series, collects: %d unique metrics\n",
@@ -738,7 +738,7 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 	for _, ca := range charts {
 		chartTypes[ca.Chart.Type.String()]++
 	}
-	
+
 	typeStr := ""
 	typeEmoji := " ✅"
 	if len(chartTypes) == 1 {
@@ -816,16 +816,16 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 
 	// Check multipliers, dividers, and algorithms consistency across all charts for each dimension
 	dimMultDivInfo := make(map[string]map[string][]int) // dimName -> "mul"/"div" -> []values
-	dimAlgoInfo := make(map[string][]string) // dimName -> []algorithms
-	contextAlgorithms := make(map[string]bool) // track all algorithms used in this context
-	
+	dimAlgoInfo := make(map[string][]string)            // dimName -> []algorithms
+	contextAlgorithms := make(map[string]bool)          // track all algorithms used in this context
+
 	for dimName := range allDimNames {
 		dimMultDivInfo[dimName] = map[string][]int{
-			"mul": []int{},
-			"div": []int{},
+			"mul": {},
+			"div": {},
 		}
 		dimAlgoInfo[dimName] = []string{}
-		
+
 		// Collect all multipliers, dividers, and algorithms for this dimension name across charts
 		for _, ca := range charts {
 			for _, dim := range ca.Chart.Dims {
@@ -845,7 +845,7 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 					}
 					dimMultDivInfo[dimName]["mul"] = append(dimMultDivInfo[dimName]["mul"], mul)
 					dimMultDivInfo[dimName]["div"] = append(dimMultDivInfo[dimName]["div"], div)
-					
+
 					// Collect algorithm
 					algo := dim.Algo.String()
 					dimAlgoInfo[dimName] = append(dimAlgoInfo[dimName], algo)
@@ -854,7 +854,7 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 			}
 		}
 	}
-	
+
 	// Check for mixed algorithms in the context
 	if len(contextAlgorithms) > 1 {
 		algoList := []string{}
@@ -864,7 +864,7 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 		sort.Strings(algoList)
 		issues = append(issues, fmt.Sprintf("mixed dimension algorithms (%s)", strings.Join(algoList, ", ")))
 	}
-	
+
 	// Check for rate units with absolute algorithm
 	if len(units) == 1 && len(contextAlgorithms) == 1 {
 		for unit := range units {
@@ -876,17 +876,17 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 			}
 		}
 	}
-	
+
 	// Check for generic units that indicate mixed metric types
 	if len(units) == 1 {
 		for unit := range units {
 			lowerUnit := strings.ToLower(unit)
 			// Check for generic counting units
-			if lowerUnit == "value" || lowerUnit == "values" || 
-			   lowerUnit == "count" || lowerUnit == "counts" ||
-			   lowerUnit == "number" || lowerUnit == "numbers" ||
-			   lowerUnit == "amount" || lowerUnit == "amounts" ||
-			   lowerUnit == "quantity" || lowerUnit == "quantities" {
+			if lowerUnit == "value" || lowerUnit == "values" ||
+				lowerUnit == "count" || lowerUnit == "counts" ||
+				lowerUnit == "number" || lowerUnit == "numbers" ||
+				lowerUnit == "amount" || lowerUnit == "amounts" ||
+				lowerUnit == "quantity" || lowerUnit == "quantities" {
 				issues = append(issues, fmt.Sprintf("WARNING - generic unit '%s' suggests mixed metric types (apples and oranges)", unit))
 			}
 		}
@@ -919,7 +919,7 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 		mulValues := dimMultDivInfo[dimName]["mul"]
 		divValues := dimMultDivInfo[dimName]["div"]
 		algoValues := dimAlgoInfo[dimName]
-		
+
 		// Get unique multipliers, dividers, and algorithms
 		uniqueMuls := make(map[int]bool)
 		uniqueDivs := make(map[int]bool)
@@ -933,17 +933,17 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 		for _, a := range algoValues {
 			uniqueAlgos[a] = true
 		}
-		
+
 		// Format multiplier/divider/algorithm info
 		multDivAlgoStr := ""
 		multDivAlgoEmoji := " ✅"
-		
+
 		// Check consistency
 		if len(uniqueMuls) > 1 || len(uniqueDivs) > 1 || len(uniqueAlgos) > 1 {
 			hasMultDivInconsistency = true
 			multDivAlgoEmoji = " ❌"
 		}
-		
+
 		// Format the multiplier/divider/algorithm string - ALWAYS show them
 		if len(uniqueMuls) == 1 && len(uniqueDivs) == 1 && len(uniqueAlgos) == 1 {
 			var mul, div int
@@ -957,13 +957,13 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 			for a := range uniqueAlgos {
 				algo = a
 			}
-			
+
 			// Always show multiplier, divider, and algorithm
 			multDivAlgoStr = fmt.Sprintf(" ×%d ÷%d %s", mul, div, algo)
 		} else {
 			// Show all variations if inconsistent
 			parts := []string{}
-			
+
 			if len(uniqueMuls) == 1 {
 				var mul int
 				for m := range uniqueMuls {
@@ -977,7 +977,7 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 				}
 				parts = append(parts, fmt.Sprintf("×(%s)", strings.Join(mulStrs, ",")))
 			}
-			
+
 			if len(uniqueDivs) == 1 {
 				var div int
 				for d := range uniqueDivs {
@@ -991,7 +991,7 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 				}
 				parts = append(parts, fmt.Sprintf("÷(%s)", strings.Join(divStrs, ",")))
 			}
-			
+
 			if len(uniqueAlgos) == 1 {
 				var algo string
 				for a := range uniqueAlgos {
@@ -1006,7 +1006,7 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 				sort.Strings(algoStrs)
 				parts = append(parts, fmt.Sprintf("(%s)", strings.Join(algoStrs, ",")))
 			}
-			
+
 			multDivAlgoStr = fmt.Sprintf(" %s", strings.Join(parts, " "))
 		}
 
@@ -1016,13 +1016,13 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 	if hasMissingDims {
 		issues = append(issues, "WARNING - missing dimensions in some charts (natural for heterogeneous instances)")
 	}
-	
+
 	if hasMultDivInconsistency {
 		// Add detailed multiplier/divider inconsistency issues
 		for dimName, info := range dimMultDivInfo {
 			mulValues := info["mul"]
 			divValues := info["div"]
-			
+
 			uniqueMuls := make(map[int]int)
 			uniqueDivs := make(map[int]int)
 			for _, m := range mulValues {
@@ -1031,7 +1031,7 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 			for _, d := range divValues {
 				uniqueDivs[d]++
 			}
-			
+
 			if len(uniqueMuls) > 1 {
 				mulStrs := []string{}
 				for m, count := range uniqueMuls {
@@ -1039,7 +1039,7 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 				}
 				issues = append(issues, fmt.Sprintf("dimension '%s' has inconsistent multipliers: %s", dimName, strings.Join(mulStrs, ", ")))
 			}
-			
+
 			if len(uniqueDivs) > 1 {
 				divStrs := []string{}
 				for d, count := range uniqueDivs {
@@ -1110,7 +1110,7 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 			valueStr := ""
 			if ca.SeenDimensions[dim.ID] && len(ca.CollectedValues[dim.ID]) > 0 {
 				emoji = "✅"
-				
+
 				// Format sample values
 				values := ca.CollectedValues[dim.ID]
 				if len(values) > 5 {
@@ -1144,13 +1144,13 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 			if div == 0 {
 				div = 1
 			}
-			
+
 			// Get algorithm
 			algo := string(dim.Algo)
 			if algo == "" {
 				algo = "absolute"
 			}
-			
+
 			// Always show multiplier, divider and algorithm
 			multDivAlgoStr := fmt.Sprintf(" ×%d ÷%d %s", mul, div, algo)
 
@@ -1289,12 +1289,12 @@ func (da *DumpAnalyzer) analyzeFamilyStructureForJob(job *JobAnalysis, contextIs
 
 	// Group charts by family
 	type familyInfo struct {
-		contexts      map[string][]*ChartAnalysis // context -> charts
-		labelPairs    map[string]int              // "key=value" -> count
+		contexts       map[string][]*ChartAnalysis // context -> charts
+		labelPairs     map[string]int              // "key=value" -> count
 		hasSubfamilies bool
-		subfamilies   map[string]bool
+		subfamilies    map[string]bool
 	}
-	
+
 	families := make(map[string]*familyInfo) // family -> info
 	topLevelFamilies := make(map[string]bool)
 
@@ -1353,7 +1353,7 @@ func (da *DumpAnalyzer) analyzeFamilyStructureForJob(job *JobAnalysis, contextIs
 		if slashCount > 2 {
 			// Add to the first context in this family
 			for ctx := range info.contexts {
-				contextIssues[ctx] = append(contextIssues[ctx], 
+				contextIssues[ctx] = append(contextIssues[ctx],
 					fmt.Sprintf("family '%s' exceeds maximum depth of 3 (has %d slashes); possible cause: over-nested hierarchy; possible fix: flatten to maximum 3 levels", family, slashCount))
 				break
 			}
@@ -1365,27 +1365,27 @@ func (da *DumpAnalyzer) analyzeFamilyStructureForJob(job *JobAnalysis, contextIs
 		if len(info.contexts) < 2 {
 			continue // Skip single-context families
 		}
-		
+
 		// Calculate total charts in this family
 		totalCharts := 0
 		for _, charts := range info.contexts {
 			totalCharts += len(charts)
 		}
-		
+
 		// Find inconsistent label pairs
 		inconsistentPairs := []string{}
-		
+
 		// The base unit is the number of contexts in the family
 		// Each label key-value pair should appear in multiples of this
 		baseUnit := len(info.contexts)
-		
+
 		// Check that each label pair count is a multiple of the base unit
 		for pair, actualCount := range info.labelPairs {
-			if baseUnit > 0 && actualCount % baseUnit != 0 {
+			if baseUnit > 0 && actualCount%baseUnit != 0 {
 				inconsistentPairs = append(inconsistentPairs, fmt.Sprintf("'%s': %d", pair, actualCount))
 			}
 		}
-		
+
 		if len(inconsistentPairs) > 0 {
 			// Limit to first 10 pairs for readability
 			displayPairs := inconsistentPairs
@@ -1393,11 +1393,11 @@ func (da *DumpAnalyzer) analyzeFamilyStructureForJob(job *JobAnalysis, contextIs
 				displayPairs = inconsistentPairs[:10]
 				displayPairs = append(displayPairs, fmt.Sprintf("... and %d more", len(inconsistentPairs)-10))
 			}
-			
+
 			// Add to all contexts in this family
 			for ctx := range info.contexts {
-				contextIssues[ctx] = append(contextIssues[ctx], 
-					fmt.Sprintf("INFO: family '%s' has inconsistent label pairs. Each key-value pair should appear in multiples of %d (the number of contexts), but got: %s; possible cause: not all instances have the same labels; possible fix: ensure all charts in the family have consistent labels or split into separate families", 
+				contextIssues[ctx] = append(contextIssues[ctx],
+					fmt.Sprintf("INFO: family '%s' has inconsistent label pairs. Each key-value pair should appear in multiples of %d (the number of contexts), but got: %s; possible cause: not all instances have the same labels; possible fix: ensure all charts in the family have consistent labels or split into separate families",
 						family, baseUnit, strings.Join(displayPairs, ", ")))
 			}
 		}
@@ -1411,7 +1411,7 @@ func (da *DumpAnalyzer) analyzeFamilyStructureForJob(job *JobAnalysis, contextIs
 				count := len(charts)
 				instanceCounts[count] = append(instanceCounts[count], ctx)
 			}
-			
+
 			if len(instanceCounts) > 1 {
 				details := []string{}
 				for count, contexts := range instanceCounts {
@@ -1419,8 +1419,8 @@ func (da *DumpAnalyzer) analyzeFamilyStructureForJob(job *JobAnalysis, contextIs
 				}
 				// Add to all contexts in this family
 				for ctx := range info.contexts {
-					contextIssues[ctx] = append(contextIssues[ctx], 
-						fmt.Sprintf("INFO: family '%s' has different number of instances per context (%s); possible cause: monitoring different types of objects or missing data collection; possible fix: split into separate families or fix data collection", 
+					contextIssues[ctx] = append(contextIssues[ctx],
+						fmt.Sprintf("INFO: family '%s' has different number of instances per context (%s); possible cause: monitoring different types of objects or missing data collection; possible fix: split into separate families or fix data collection",
 							family, strings.Join(details, "; ")))
 				}
 			}
@@ -1431,7 +1431,7 @@ func (da *DumpAnalyzer) analyzeFamilyStructureForJob(job *JobAnalysis, contextIs
 	for _, ca := range allCharts {
 		ctx := ca.Chart.Ctx
 		if !isSnakeCase(ctx) {
-			contextIssues[ctx] = append(contextIssues[ctx], 
+			contextIssues[ctx] = append(contextIssues[ctx],
 				fmt.Sprintf("context '%s' is not in snake_case format; possible cause: incorrect naming convention; possible fix: use lowercase with underscores (e.g., 'my_metric_name')", ctx))
 		}
 	}
@@ -1441,8 +1441,8 @@ func (da *DumpAnalyzer) analyzeFamilyStructureForJob(job *JobAnalysis, contextIs
 		if len(info.contexts) > 15 {
 			// Add to all contexts in this family
 			for ctx := range info.contexts {
-				contextIssues[ctx] = append(contextIssues[ctx], 
-					fmt.Sprintf("family '%s' has %d contexts (exceeds recommended 15); possible cause: too many metric types in one family; possible fix: split into subfamilies or make some contexts into instances with labels", 
+				contextIssues[ctx] = append(contextIssues[ctx],
+					fmt.Sprintf("family '%s' has %d contexts (exceeds recommended 15); possible cause: too many metric types in one family; possible fix: split into subfamilies or make some contexts into instances with labels",
 						family, len(info.contexts)))
 			}
 		}
@@ -1454,19 +1454,19 @@ func (da *DumpAnalyzer) analyzeFamilyStructureForJob(job *JobAnalysis, contextIs
 		"infrastructure": true,
 		"runtime":        true,
 	}
-	
+
 	for family := range families {
 		// Check only the base family name (before /)
 		baseName := family
 		if idx := strings.Index(family, "/"); idx != -1 {
 			baseName = family[:idx]
 		}
-		
+
 		if genericFamilies[strings.ToLower(baseName)] {
 			// Add to all contexts in this family
 			for ctx := range families[family].contexts {
-				contextIssues[ctx] = append(contextIssues[ctx], 
-					fmt.Sprintf("family '%s' uses generic name '%s'; possible cause: unclear categorization; possible fix: use specific names like 'database', 'webserver', 'messaging', etc.", 
+				contextIssues[ctx] = append(contextIssues[ctx],
+					fmt.Sprintf("family '%s' uses generic name '%s'; possible cause: unclear categorization; possible fix: use specific names like 'database', 'webserver', 'messaging', etc.",
 						family, baseName))
 			}
 		}
@@ -1479,8 +1479,8 @@ func (da *DumpAnalyzer) analyzeFamilyStructureForJob(job *JobAnalysis, contextIs
 			if !strings.Contains(family, "/") {
 				// Add to all contexts in this family
 				for ctx := range info.contexts {
-					contextIssues[ctx] = append(contextIssues[ctx], 
-						fmt.Sprintf("family '%s' has both direct contexts and subfamilies; possible cause: mixed hierarchy; possible fix: move direct contexts to '%s/overview' or similar", 
+					contextIssues[ctx] = append(contextIssues[ctx],
+						fmt.Sprintf("family '%s' has both direct contexts and subfamilies; possible cause: mixed hierarchy; possible fix: move direct contexts to '%s/overview' or similar",
 							family, family))
 				}
 			}
@@ -1494,11 +1494,11 @@ func (da *DumpAnalyzer) analyzeFamilyStructureForJob(job *JobAnalysis, contextIs
 			familyList = append(familyList, f)
 		}
 		sort.Strings(familyList)
-		
+
 		// Add to general issues (first context found)
 		for _, ca := range allCharts {
-			contextIssues[ca.Chart.Ctx] = append(contextIssues[ca.Chart.Ctx], 
-				fmt.Sprintf("found %d top-level families (exceeds recommended 15): %s; possible cause: too many categories; possible fix: consolidate related families or use subfamilies", 
+			contextIssues[ca.Chart.Ctx] = append(contextIssues[ca.Chart.Ctx],
+				fmt.Sprintf("found %d top-level families (exceeds recommended 15): %s; possible cause: too many categories; possible fix: consolidate related families or use subfamilies",
 					len(topLevelFamilies), strings.Join(familyList, ", ")))
 			break // Only add once
 		}
@@ -1509,7 +1509,7 @@ func (da *DumpAnalyzer) analyzeFamilyStructureForJob(job *JobAnalysis, contextIs
 		if !strings.Contains(family, "/") && info.hasSubfamilies {
 			// This is a parent family, check its subfamilies
 			subfamilyCount := len(info.subfamilies)
-			
+
 			// Check for singleton subfamily without siblings
 			if subfamilyCount == 1 {
 				// Get the single subfamily name
@@ -1520,29 +1520,29 @@ func (da *DumpAnalyzer) analyzeFamilyStructureForJob(job *JobAnalysis, contextIs
 				// Add to contexts in the parent family (if any) or the subfamily
 				if len(info.contexts) > 0 {
 					for ctx := range info.contexts {
-						contextIssues[ctx] = append(contextIssues[ctx], 
-							fmt.Sprintf("family '%s' has only one subfamily '%s'; possible cause: incomplete hierarchy; possible fix: either add more subfamilies or flatten the structure", 
+						contextIssues[ctx] = append(contextIssues[ctx],
+							fmt.Sprintf("family '%s' has only one subfamily '%s'; possible cause: incomplete hierarchy; possible fix: either add more subfamilies or flatten the structure",
 								family, singleSubfamily))
 					}
 				} else {
 					// Add to contexts in the single subfamily
 					if subfamilyInfo, exists := families[singleSubfamily]; exists {
 						for ctx := range subfamilyInfo.contexts {
-							contextIssues[ctx] = append(contextIssues[ctx], 
-								fmt.Sprintf("family '%s' has only one subfamily '%s'; possible cause: incomplete hierarchy; possible fix: either add more subfamilies or flatten the structure", 
+							contextIssues[ctx] = append(contextIssues[ctx],
+								fmt.Sprintf("family '%s' has only one subfamily '%s'; possible cause: incomplete hierarchy; possible fix: either add more subfamilies or flatten the structure",
 									family, singleSubfamily))
 						}
 					}
 				}
 			}
-			
+
 			// Check for too many subfamilies
 			if subfamilyCount > 8 {
 				// Add to contexts in the parent family (if any) or all subfamily contexts
 				if len(info.contexts) > 0 {
 					for ctx := range info.contexts {
-						contextIssues[ctx] = append(contextIssues[ctx], 
-							fmt.Sprintf("family '%s' has %d subfamilies (exceeds recommended 8); possible cause: too many subcategories; possible fix: consolidate related subfamilies or create a deeper hierarchy", 
+						contextIssues[ctx] = append(contextIssues[ctx],
+							fmt.Sprintf("family '%s' has %d subfamilies (exceeds recommended 8); possible cause: too many subcategories; possible fix: consolidate related subfamilies or create a deeper hierarchy",
 								family, subfamilyCount))
 					}
 				} else {
@@ -1550,8 +1550,8 @@ func (da *DumpAnalyzer) analyzeFamilyStructureForJob(job *JobAnalysis, contextIs
 					for subfamily := range info.subfamilies {
 						if subfamilyInfo, exists := families[subfamily]; exists {
 							for ctx := range subfamilyInfo.contexts {
-								contextIssues[ctx] = append(contextIssues[ctx], 
-									fmt.Sprintf("family '%s' has %d subfamilies (exceeds recommended 8); possible cause: too many subcategories; possible fix: consolidate related subfamilies or create a deeper hierarchy", 
+								contextIssues[ctx] = append(contextIssues[ctx],
+									fmt.Sprintf("family '%s' has %d subfamilies (exceeds recommended 8); possible cause: too many subcategories; possible fix: consolidate related subfamilies or create a deeper hierarchy",
 										family, subfamilyCount))
 								break // Only add to one context per subfamily
 							}

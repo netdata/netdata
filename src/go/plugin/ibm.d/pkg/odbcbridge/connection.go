@@ -84,7 +84,7 @@ func (c *OptimizedConnection) QueryContext(ctx context.Context, query string) (*
 	defer C.free(unsafe.Pointer(cQuery))
 
 	errorBuf := make([]byte, 1024)
-	
+
 	// Use execute_direct for one-off queries (optimizes for AS400)
 	ret := C.odbc_execute_direct(c.handle, cQuery, (*C.char)(unsafe.Pointer(&errorBuf[0])), C.int(len(errorBuf)))
 
@@ -375,7 +375,7 @@ func convertAssignTyped(dest interface{}, src driver.Value, dataType DataType) e
 			*d = fmt.Sprint(src)
 			return nil
 		}
-		
+
 	case *int64:
 		switch dataType {
 		case TypeInt64:
@@ -394,7 +394,7 @@ func convertAssignTyped(dest interface{}, src driver.Value, dataType DataType) e
 				return nil
 			}
 		}
-		
+
 	case *float64:
 		switch dataType {
 		case TypeDouble:
@@ -413,7 +413,7 @@ func convertAssignTyped(dest interface{}, src driver.Value, dataType DataType) e
 				return nil
 			}
 		}
-		
+
 	case *interface{}:
 		*d = src
 		return nil

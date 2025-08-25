@@ -3,20 +3,20 @@ package framework
 // Batch creates batches from a slice of items
 func Batch[T any](items []T, size int) <-chan []T {
 	ch := make(chan []T)
-	
+
 	go func() {
 		defer close(ch)
-		
+
 		for i := 0; i < len(items); i += size {
 			end := i + size
 			if end > len(items) {
 				end = len(items)
 			}
-			
+
 			ch <- items[i:end]
 		}
 	}()
-	
+
 	return ch
 }
 
@@ -35,10 +35,10 @@ func ParallelBatch[T any](items []T, batchSize int, workers int, fn func([]T) er
 	type result struct {
 		err error
 	}
-	
+
 	work := make(chan []T, workers)
 	results := make(chan result, workers)
-	
+
 	// Start workers
 	for i := 0; i < workers; i++ {
 		go func() {
@@ -47,7 +47,7 @@ func ParallelBatch[T any](items []T, batchSize int, workers int, fn func([]T) er
 			}
 		}()
 	}
-	
+
 	// Send work
 	go func() {
 		for batch := range Batch(items, batchSize) {
@@ -55,7 +55,7 @@ func ParallelBatch[T any](items []T, batchSize int, workers int, fn func([]T) er
 		}
 		close(work)
 	}()
-	
+
 	// Collect results
 	var firstErr error
 	batchCount := (len(items) + batchSize - 1) / batchSize
@@ -65,7 +65,7 @@ func ParallelBatch[T any](items []T, batchSize int, workers int, fn func([]T) er
 			firstErr = res.err
 		}
 	}
-	
+
 	return firstErr
 }
 
