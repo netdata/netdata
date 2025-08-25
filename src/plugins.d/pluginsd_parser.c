@@ -166,11 +166,7 @@ static inline PARSER_RC pluginsd_host_dictionary(char **words, size_t num_words,
     rrdlabels_add(labels, name, value, RRDLABEL_SRC_CONFIG);
     if (strcmp(name, "_node_stale_after_seconds") == 0) {
         uint32_t seconds = str2u(value);
-        RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_HOST_LABEL);
-        if (host) {
-            host->node_stale_after_seconds = seconds;
-            nd_log_daemon(NDLP_INFO, "Configuring node stale after %u seconds for host \"%s\"", seconds, rrdhost_hostname(host));
-        }
+        parser->user.host_define.node_stale_after_seconds = seconds;
     }
     return PARSER_RC_OK;
 }
@@ -261,6 +257,8 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
 
     rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE);
     (void) JudyLIns(&parser->user.vnodes.JudyL, (Word_t) host, PJE0);
+    host->node_stale_after_seconds = parser->user.host_define.node_stale_after_seconds;
+    nd_log_daemon(NDLP_INFO, "Configuring node stale after %u seconds for host \"%s\"", host->node_stale_after_seconds, rrdhost_hostname(host));
     return PARSER_RC_OK;
 }
 
