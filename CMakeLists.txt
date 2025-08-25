@@ -3156,9 +3156,6 @@ if(ENABLE_PLUGIN_GO)
 endif()
 
 #
-<<<<<<< HEAD
-# otel.plugin
-=======
 # Build ibm.d.plugin
 #
 
@@ -3194,8 +3191,9 @@ if(ENABLE_PLUGIN_IBM)
 endif()
 
 #
+# otel.plugin
+#
 # Handle OTel Collector plugin
->>>>>>> 2c6de1b08 (feat(ibm.d): add self-contained plugin with automatic library download)
 #
 if(ENABLE_PLUGIN_OTEL)
     corrosion_install(TARGETS otel-plugin
