@@ -103,7 +103,7 @@ For `wel` these are mapped to `Informational`, `Warning`, `Error`.
 
 ## Logs Configuration
 
-Configuration is done in the `[logs]` section of `netdata.conf`:
+[Configuration](/docs/netdata-agent/configuration/README.md) is done in the `[logs]` section of `netdata.conf`:
 
 ```ini
 [logs]
