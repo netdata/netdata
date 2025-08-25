@@ -258,7 +258,7 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
     rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE);
     (void) JudyLIns(&parser->user.vnodes.JudyL, (Word_t) host, PJE0);
     host->node_stale_after_seconds = parser->user.host_define.node_stale_after_seconds;
-    nd_log_daemon(NDLP_INFO, "Configuring node stale after %u seconds for host \"%s\"", host->node_stale_after_seconds, rrdhost_hostname(host));
+    nd_log_daemon(NDLP_INFO, "VNODE: Configuring node stale after %u seconds for host \"%s\"", host->node_stale_after_seconds, rrdhost_hostname(host));
     return PARSER_RC_OK;
 }
 
@@ -288,7 +288,7 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
                     uint32_t seen_seconds_ago = now - last_seen;
                     nd_log_daemon(
                         NDLP_INFO,
-                        "Checking if node \"%s\" is stale. Seen %u seconds ago, stale is after %u seconds",
+                        "VNODE: Checking if node \"%s\" is stale. Seen %u seconds ago, stale is after %u seconds",
                         rrdhost_hostname(virtual_host),
                         seen_seconds_ago,
                         stale_after_seconds);
@@ -296,6 +296,7 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
                     if (seen_seconds_ago >= stale_after_seconds) {
                         rrdhost_option_clear(virtual_host, RRDHOST_OPTION_VIRTUAL_HOST);
                         rrdhost_flag_clear(virtual_host, RRDHOST_FLAG_COLLECTOR_ONLINE);
+                        nd_log_daemon(NDLP_INFO, "VNODE: Marking node \"%s\" as STALE", rrdhost_hostname(virtual_host));
                         schedule_node_state_update(virtual_host, 1000);
                     }
                 }
@@ -326,6 +327,7 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
         if (!rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST)) {
             rrdhost_option_set(host, RRDHOST_OPTION_VIRTUAL_HOST);
             rrdhost_flag_set(host, RRDHOST_FLAG_COLLECTOR_ONLINE);
+            nd_log_daemon(NDLP_INFO, "VNODE: Re-enabling virtual host \"%s\"", rrdhost_hostname(host));
             schedule_node_state_update(host, 1000);
         }
     }
