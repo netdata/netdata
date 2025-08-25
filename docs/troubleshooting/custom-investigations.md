@@ -20,11 +20,13 @@ The key to powerful investigations is providing context. Think of it like briefi
 #### Example 1: Troubleshooting Service Failures
 
 **Your Request:**
+
 ```
 Why are my checkout-service pods crashing repeatedly?
 ```
 
 **Your Context:**
+
 ```
 - Started after: deployment at 14:00 UTC of version 2.3.1
 - Impact: Customer checkout failures, lost revenue ~$X/hour
@@ -37,11 +39,13 @@ Why are my checkout-service pods crashing repeatedly?
 #### Example 2: Analyzing Deployment Changes
 
 **Your Request:**
+
 ```
 Compare system metrics before and after the recent user-authentication-service deployment.
 ```
 
 **Your Context:**
+
 ```
 - Service: user-authentication-service v2.2.0
 - Deployed: 2025-01-24 09:00 UTC
@@ -53,11 +57,13 @@ Compare system metrics before and after the recent user-authentication-service d
 #### Example 3: Cost Optimization
 
 **Your Request:**
+
 ```
 Identify underutilized nodes for cost optimization.
 ```
 
 **Your Context:**
+
 ```
 - Monthly AWS bill: $12K for compute
 - Environment: Mixed workloads (prod + staging on same cluster)
@@ -70,11 +76,13 @@ Identify underutilized nodes for cost optimization.
 You can create investigations in two ways:
 
 #### From the Insights Tab
+
 1. Navigate to the **Insights** tab
 2. Click **"New Investigation"**
 3. Enter your question and context
 
 #### From Anywhere with "Troubleshoot with AI"
+
 Click the **"Troubleshoot with AI"** button in the top right corner from any screen. This automatically captures your current context—including the specific chart, dashboard, or service you're viewing. Add your question and any extra context, then start the investigation.
 
 [SCREENSHOT FROM FIRST BLOG POST SHOULD BE PLACED HERE - showing the Troubleshoot with AI button]
@@ -97,6 +105,7 @@ Click the **"Troubleshoot with AI"** button in the top right corner from any scr
 ### Access and Availability
 
 This feature is available in preview mode for:
+
 - All Business and Homelab plan users
 - New users get 10 AI investigation sessions per month during their Business plan trial
 - Community users can request access by contacting product@netdata.cloud
@@ -104,6 +113,7 @@ This feature is available in preview mode for:
 ### Coming Soon
 
 We're actively developing:
+
 - Scheduled recurring investigations for regular reports
 - Custom SLO report templates
 - Weekly cost-optimization analyses
