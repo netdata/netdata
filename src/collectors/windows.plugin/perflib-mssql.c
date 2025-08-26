@@ -880,7 +880,7 @@ enddblist:
     netdata_MSSQL_release_results(mi->conn->databaseListSTMT);
 }
 
-static bool netdata_MSSQL_initialize_conection(struct netdata_mssql_conn *nmc)
+static bool netdata_MSSQL_initialize_connection(struct netdata_mssql_conn *nmc)
 {
     SQLRETURN ret;
     if (nmc->netdataSQLEnv == NULL) {
@@ -930,38 +930,55 @@ static bool netdata_MSSQL_initialize_conection(struct netdata_mssql_conn *nmc)
 
     if (retConn) {
         ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->checkPermSTMT);
-        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
             retConn = FALSE;
+            goto endMSSQLInitializationConnection;
+        }
 
         ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->databaseListSTMT);
-        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
             retConn = FALSE;
+            goto endMSSQLInitializationConnection;
+        }
 
         ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dataFileSizeSTMT);
-        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
             retConn = FALSE;
+            goto endMSSQLInitializationConnection;
+        }
 
         ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dbTransactionSTMT);
-        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
             retConn = FALSE;
+            goto endMSSQLInitializationConnection;
+        }
 
         ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dbInstanceTransactionSTMT);
-        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
             retConn = FALSE;
+            goto endMSSQLInitializationConnection;
+        }
 
         ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dbLocksSTMT);
-        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
             retConn = FALSE;
+            goto endMSSQLInitializationConnection;
+        }
 
         ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dbWaitsSTMT);
-        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
             retConn = FALSE;
+            goto endMSSQLInitializationConnection;
+        }
 
         ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dbSQLState);
-        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
             retConn = FALSE;
+            goto endMSSQLInitializationConnection;
+        }
     }
 
+endMSSQLInitializationConnection:
     return retConn;
 }
 
@@ -1225,7 +1242,7 @@ void dict_mssql_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *valu
     mi->conn = netdata_mssql_get_conn_option(instance);
 
     if (mi->conn && mi->conn->connectionString) {
-        mi->conn->is_connected = netdata_MSSQL_initialize_conection(mi->conn);
+        mi->conn->is_connected = netdata_MSSQL_initialize_connection(mi->conn);
         if (mi->conn->is_connected)
             *create_thread = true;
     }
