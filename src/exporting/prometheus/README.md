@@ -15,17 +15,18 @@ Before configuring either method, understand how Netdata structures its exported
 
 Each Netdata chart has several properties common to all its metrics:
 
-| Property | Description |
-|:---------|:------------|
-| `chart_id` | Uniquely identifies a chart |
-| `chart_name` | Human-friendly name for `chart_id`, also unique |
-| `context` | Chart template - all disk I/O charts share the same context, all MySQL request charts share the same context. Used for alert template matching |
-| `family` | Groups charts together as dashboard submenus |
-| `units` | Units for all metrics in the chart |
+| Property     | Description                                                                                                                                    |
+|:-------------|:-----------------------------------------------------------------------------------------------------------------------------------------------|
+| `chart_id`   | Uniquely identifies a chart                                                                                                                    |
+| `chart_name` | Human-friendly name for `chart_id`, also unique                                                                                                |
+| `context`    | Chart template - all disk I/O charts share the same context, all MySQL request charts share the same context. Used for alert template matching |
+| `family`     | Groups charts together as dashboard submenus                                                                                                   |
+| `units`      | Units for all metrics in the chart                                                                                                             |
 
 #### Dimensions
 
 Each Netdata chart contains metrics called `dimensions`. All dimensions in a chart:
+
 - Share the same units of measurement
 - Belong to the same contextual category (e.g., disk bandwidth contains `read` and `write` dimensions)
 
@@ -38,6 +39,7 @@ Netdata sends metrics to Prometheus from 3 data sources:
 Sends metrics exactly as collected without conversion. Prometheus prefers this method, but it requires understanding how to extract meaningful values.
 
 **Metric formats:**
+
 - Standard: `CONTEXT{chart="CHART",family="FAMILY",dimension="DIMENSION"}`
 - Counters: `CONTEXT_total{chart="CHART",family="FAMILY",dimension="DIMENSION"}`
 - Heterogeneous dimensions: `CONTEXT_DIMENSION{chart="CHART",family="FAMILY"}`
@@ -50,7 +52,7 @@ Unlike Prometheus, Netdata allows each dimension to have different algorithms an
 
 #### 2. Average
 
-Uses the Netdata database to send metrics as they appear on the dashboard. All metrics become gauges in their dashboard units. This is the easiest to work with.
+Sends metrics as they appear on the dashboard. All metrics become gauges in their dashboard units. This is the easiest to work with.
 
 **Format:** `CONTEXT_UNITS_average{chart="CHART",family="FAMILY",dimension="DIMENSION"}`
 
@@ -63,6 +65,7 @@ Like `average` but sums values instead of averaging them.
 **Format:** `CONTEXT_UNITS_sum{chart="CHART",family="FAMILY",dimension="DIMENSION"}`
 
 To change the data source, add the `source` parameter to the URL:
+
 ```
 http://your.netdata.ip:19999/api/v1/allmetrics?format=prometheus&source=as-collected
 ```
@@ -76,6 +79,7 @@ Early Netdata versions sent metrics as `CHART_DIMENSION{}`.
 ### Querying Metrics
 
 Test the metrics endpoint in your browser:
+
 ```
 http://your.netdata.ip:19999/api/v1/allmetrics?format=prometheus&help=yes
 ```
@@ -153,7 +157,7 @@ The `format=prometheus` parameter only exports the local host's metrics. For par
 ```yaml
 metrics_path: '/api/v1/allmetrics'
 params:
-  format: [ prometheus_all_hosts ]
+  format: [prometheus_all_hosts]
 honor_labels: true
 ```
 
@@ -172,6 +176,7 @@ To expose them, append `variables=yes` to the URL.
 ### TYPE and HELP
 
 `# TYPE` and `# HELP` lines are suppressed by default to save bandwidth (Prometheus doesn't use them). Re-enable with:
+
 ```
 /api/v1/allmetrics?format=prometheus&types=yes&help=yes
 ```
@@ -187,24 +192,28 @@ When enabled, `# TYPE` and `# HELP` lines repeat for every metric occurrence, vi
 Netdata supports both names and IDs for charts and dimensions. IDs are unique system identifiers; names are human-friendly labels (also unique). Most charts have identical ID and name, but some differ (device-mapper disks, interrupts, QoS classes, statsd synthetic charts).
 
 Control the default in `exporting.conf`:
+
 ```text
 [prometheus:exporter]
 	send names instead of ids = yes | no
 ```
 
 Override via URL:
+
 - `&names=no` for IDs (old behavior)
 - `&names=yes` for names
 
 ### Filtering Metrics Sent to Prometheus
 
 Filter metrics with this setting:
+
 ```text
 [prometheus:exporter]
 	send charts matching = *
 ```
 
 This accepts space-separated [simple patterns](/src/libnetdata/simple_pattern/README.md) to match charts. Pattern rules:
+
 - `*` as wildcard (e.g., `*a*b*c*` is valid)
 - `!` prefix for negative match
 - First match (positive or negative) wins
@@ -213,6 +222,7 @@ This accepts space-separated [simple patterns](/src/libnetdata/simple_pattern/RE
 ### Changing the Prefix of Netdata Metrics
 
 Netdata prefixes all metrics with `netdata_`. Change in `netdata.conf`:
+
 ```text
 [prometheus:exporter]
 	prefix = netdata
@@ -222,11 +232,11 @@ Or append `&prefix=netdata` to the URL.
 
 ### Metric Units
 
-| Source | Unit Behavior | Control |
-|:-------|:--------------|:--------|
-| `average` (default) | Adds units to names (e.g., `_KiB_persec`) | `&hideunits=yes` to hide |
-| `as-collected` | No units in names | N/A |
-| All sources | v1.12+ standardized units | `&oldunits=yes` for pre-v1.12 names |
+| Source              | Unit Behavior                             | Control                             |
+|:--------------------|:------------------------------------------|:------------------------------------|
+| `average` (default) | Adds units to names (e.g., `_KiB_persec`) | `&hideunits=yes` to hide            |
+| `as-collected`      | No units in names                         | N/A                                 |
+| All sources         | v1.12+ standardized units                 | `&oldunits=yes` for pre-v1.12 names |
 
 ### Accuracy of Average and Sum Data Sources
 
@@ -270,7 +280,7 @@ scrape_configs:
     # scheme defaults to 'http'.
 
     static_configs:
-      - targets: [ '0.0.0.0:9090' ]
+      - targets: ['0.0.0.0:9090']
 
   - job_name: 'netdata-scrape'
 
@@ -278,7 +288,7 @@ scrape_configs:
     params:
       # format: prometheus | prometheus_all_hosts
       # You can use `prometheus_all_hosts` if you want Prometheus to set the `instance` to your hostname instead of IP 
-      format: [ prometheus ]
+      format: [prometheus]
       #
       # sources: as-collected | raw | average | sum | volume
       # default is: average
@@ -290,7 +300,7 @@ scrape_configs:
     honor_labels: true
 
     static_configs:
-      - targets: [ '{your.netdata.ip}:19999' ]
+      - targets: ['{your.netdata.ip}:19999']
 ```
 
 Replace `{your.netdata.ip}` with your Netdata host's IP or hostname.

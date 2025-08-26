@@ -12,7 +12,7 @@ Once you understand how to enable a connector, you can apply that knowledge to a
 
 ## Enable the Exporting Engine
 
-Edit `exporting.conf` using `edit-config` from your [Netdata config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory):
+Edit `exporting.conf` using `edit-config` from your [Netdata config directory](/docs/netdata-agent/configuration/README.md#edit-configuration-files):
 
 ```text
 [exporting:global]
@@ -38,7 +38,7 @@ Replace `my_opentsdb_http_instance` with an instance name of your choice, and ch
 
 [Restart your Agent](/docs/netdata-agent/start-stop-restart.md) to initiate exporting to your OpenTSDB database. The Netdata Agent continuously exports metrics collected from the moment it starts. You can expect to see data appear in your OpenTSDB database within seconds of restarting the Agent.
 
-Any further configuration is optional, based on your needs and the configuration of your OpenTSDB database. See the [OpenTSDB connector doc](/src/exporting/opentsdb/README.md) and [exporting engine reference](/src/exporting/README.md#configuration) for details.
+Any further configuration is optional, based on your needs and the configuration of your OpenTSDB database. See the [OpenTSDB connector doc](/src/exporting/opentsdb/README.md) and [exporting engine reference](/src/exporting/README.md#configuration-structure) for details.
 
 </details>
 
@@ -57,6 +57,6 @@ Replace `netdata` with an instance name of your choice, and change the `destinat
 
 [Restart your Agent](/docs/netdata-agent/start-stop-restart.md) to initiate exporting to your Graphite database. The Netdata Agent continuously exports metrics collected from the moment it starts. You can expect to see data appear in your Graphite database within seconds of restarting the Agent.
 
-Any further configuration is optional, based on your needs and the configuration of your Graphite database. See the [Graphite connector doc](/src/exporting/graphite/README.md) and [exporting engine reference](/src/exporting/README.md#configuration) for details.
+Any further configuration is optional, based on your needs and the configuration of your Graphite database. See the [Graphite connector doc](/src/exporting/graphite/README.md) and [exporting engine reference](/src/exporting/README.md#configuration-structure) for details.
 
 </details>

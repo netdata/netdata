@@ -16,43 +16,43 @@ The exporting engine provides these key features:
 
 ## Supported Databases
 
-Netdata exports metrics to the following databases through various [connectors](/src/exporting/README.md#features). Each connector includes documentation with [enabling instructions](/docs/exporting-metrics/enable-an-exporting-connector.md).
+Netdata exports metrics to the following databases through various [connectors](/src/exporting/README.md#supported-connectors). Each connector includes documentation with [enabling instructions](/docs/exporting-metrics/enable-an-exporting-connector.md).
 
-| Database | Supported Connectors |
-|:--------:|:-------------------:|
-| **AppOptics** | [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md) |
-| **AWS Kinesis** | [AWS Kinesis Data Streams](/src/exporting/aws_kinesis/README.md) |
-| **Azure Data Explorer** | [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md) |
-| **Azure Event Hubs** | [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md) |
-| **Blueflood** | [Graphite](/src/exporting/graphite/README.md) |
-| **Chronix** | [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md) |
-| **Cortex** | [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md) |
-| **CrateDB** | [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md) |
-| **ElasticSearch** | [Graphite](/src/exporting/graphite/README.md), [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md) |
-| **Gnocchi** | [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md) |
-| **Google BigQuery** | [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md) |
-| **Google Cloud Pub/Sub** | [Google Cloud Pub/Sub Service](/src/exporting/pubsub/README.md) |
-| **Graphite** | [Graphite](/src/exporting/graphite/README.md), [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md) |
-| **InfluxDB** | [Graphite](/src/exporting/graphite/README.md), [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md) |
-| **IRONdb** | [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md) |
-| **JSON** | [JSON document databases](/src/exporting/json/README.md) |
-| **Kafka** | [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md) |
-| **KairosDB** | [Graphite](/src/exporting/graphite/README.md), [OpenTSDB](/src/exporting/opentsdb/README.md) |
-| **M3DB** | [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md) |
-| **MetricFire** | [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md) |
-| **MongoDB** | [MongoDB](/src/exporting/mongodb/README.md) |
-| **New Relic** | [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md) |
-| **OpenTSDB** | [OpenTSDB](/src/exporting/opentsdb/README.md), [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md) |
-| **PostgreSQL** | [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md) via [PostgreSQL Prometheus Adapter](https://github.com/CrunchyData/postgresql-prometheus-adapter) |
-| **Prometheus** | [Prometheus scraper](/src/exporting/prometheus/README.md) |
-| **TimescaleDB** | [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md), [netdata-timescale-relay](/src/exporting/TIMESCALE.md) |
-| **QuasarDB** | [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md) |
-| **SignalFx** | [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md) |
-| **Splunk** | [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md) |
-| **TiKV** | [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md) |
-| **Thanos** | [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md) |
-| **VictoriaMetrics** | [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md) |
-| **Wavefront** | [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md) |
+|         Database         |                                                                             Supported Connectors                                                                              |
+|:------------------------:|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------:|
+|      **AppOptics**       |                                                  [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md)                                                  |
+|     **AWS Kinesis**      |                                                       [AWS Kinesis Data Streams](/src/exporting/aws_kinesis/README.md)                                                        |
+| **Azure Data Explorer**  |                                                  [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md)                                                  |
+|   **Azure Event Hubs**   |                                                  [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md)                                                  |
+|      **Blueflood**       |                                                                 [Graphite](/src/exporting/graphite/README.md)                                                                 |
+|       **Chronix**        |                                                  [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md)                                                  |
+|        **Cortex**        |                                                  [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md)                                                  |
+|       **CrateDB**        |                                                  [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md)                                                  |
+|    **ElasticSearch**     |                          [Graphite](/src/exporting/graphite/README.md), [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md)                           |
+|       **Gnocchi**        |                                                  [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md)                                                  |
+|   **Google BigQuery**    |                                                  [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md)                                                  |
+| **Google Cloud Pub/Sub** |                                                        [Google Cloud Pub/Sub Service](/src/exporting/pubsub/README.md)                                                        |
+|       **Graphite**       |                          [Graphite](/src/exporting/graphite/README.md), [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md)                           |
+|       **InfluxDB**       |                          [Graphite](/src/exporting/graphite/README.md), [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md)                           |
+|        **IRONdb**        |                                                  [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md)                                                  |
+|         **JSON**         |                                                           [JSON document databases](/src/exporting/json/README.md)                                                            |
+|        **Kafka**         |                                                  [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md)                                                  |
+|       **KairosDB**       |                                         [Graphite](/src/exporting/graphite/README.md), [OpenTSDB](/src/exporting/opentsdb/README.md)                                          |
+|         **M3DB**         |                                                  [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md)                                                  |
+|      **MetricFire**      |                                                  [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md)                                                  |
+|       **MongoDB**        |                                                                  [MongoDB](/src/exporting/mongodb/README.md)                                                                  |
+|      **New Relic**       |                                                  [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md)                                                  |
+|       **OpenTSDB**       |                          [OpenTSDB](/src/exporting/opentsdb/README.md), [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md)                           |
+|      **PostgreSQL**      | [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md) via [PostgreSQL Prometheus Adapter](https://github.com/CrunchyData/postgresql-prometheus-adapter) |
+|      **Prometheus**      |                                                           [Prometheus scraper](/src/exporting/prometheus/README.md)                                                           |
+|     **TimescaleDB**      |                      [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md), [netdata-timescale-relay](/src/exporting/TIMESCALE.md)                      |
+|       **QuasarDB**       |                                                  [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md)                                                  |
+|       **SignalFx**       |                                                  [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md)                                                  |
+|        **Splunk**        |                                                  [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md)                                                  |
+|         **TiKV**         |                                                  [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md)                                                  |
+|        **Thanos**        |                                                  [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md)                                                  |
+|   **VictoriaMetrics**    |                                                  [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md)                                                  |
+|      **Wavefront**       |                                                  [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md)                                                  |
 
 :::tip
 
