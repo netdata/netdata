@@ -2,151 +2,163 @@ sysobjectids:
   oid_overrides:
     1.3.6.1.4.1.207.1.1.8:
       category: Router
-      model: CENTRECOM AR 300
+      model:  CentreCOM-AR300
     1.3.6.1.4.1.207.1.1.11:
       category: Router
-      model: CENTRECOM AR720
+      model:  CentreCOM-AR720
     1.3.6.1.4.1.207.1.1.12:
       category: Router
-      model: CENTRECOM AR300L
+      model:  CentreCOM-AR300L
     1.3.6.1.4.1.207.1.1.13:
       category: Router
-      model: CENTRECOM AR310
+      model:  CentreCOM-AR310
     1.3.6.1.4.1.207.1.1.14:
       category: Router
-      model: CENTRECOM AR300LU
+      model:  CentreCOM-AR300LU
     1.3.6.1.4.1.207.1.1.15:
       category: Router
-      model: CENTRECOM AR300U
+      model:  CentreCOM-AR300U
     1.3.6.1.4.1.207.1.1.16:
       category: Router
-      model: CENTRECOM AR310U
+      model:  CentreCOM-AR310U
     1.3.6.1.4.1.207.1.1.17:
       category: Router
-      model: CENTRECOM AR350
+      model:  CentreCOM-AR350
     1.3.6.1.4.1.207.1.1.18:
       category: Router
-      model: CENTRECOM AR370
+      model:  CentreCOM-AR370
     1.3.6.1.4.1.207.1.1.19:
       category: Router
-      model: CENTRECOM AR330
+      model:  CentreCOM-AR330
     1.3.6.1.4.1.207.1.1.20:
       category: Router
-      model: CENTRECOM AR395
+      model:  CentreCOM-AR395
     1.3.6.1.4.1.207.1.1.21:
       category: Router
-      model: CENTRECOM AR390
+      model:  CentreCOM-AR390
     1.3.6.1.4.1.207.1.1.22:
       category: Router
-      model: CENTRECOM AR370U
+      model:  CentreCOM-AR370U
     1.3.6.1.4.1.207.1.1.23:
       category: Router
-      model: CENTRECOM AR740
+      model:  CentreCOM-AR740
     1.3.6.1.4.1.207.1.1.24:
       category: Router
-      model: CENTRECOM AR140S
+      model:  CentreCOM-AR140S
     1.3.6.1.4.1.207.1.1.25:
       category: Router
-      model: CENTRECOM AR140U
+      model:  CentreCOM-AR140U
     1.3.6.1.4.1.207.1.1.26:
       category: Router
-      model: CENTRECOM AR320
+      model:  CentreCOM-AR320
     1.3.6.1.4.1.207.1.1.27:
       category: Router
-      model: CENTRECOM AR130S
+      model:  CentreCOM-AR130S
     1.3.6.1.4.1.207.1.1.28:
       category: Router
-      model: CENTRECOM AR130U
+      model:  CentreCOM-AR130U
     1.3.6.1.4.1.207.1.1.29:
       category: Router
-      model: CENTRECOM AR160
+      model:  CentreCOM-AR160
     1.3.6.1.4.1.207.1.1.43:
       category: Router
-      model: AT AR740
+      model: AT-AR740-DC
     1.3.6.1.4.1.207.1.1.44:
       category: Router
-      model: CENTRECOM AR120
+      model:  CentreCOM-AR120
     1.3.6.1.4.1.207.1.1.47:
       category: Router
-      model: AT AR410
+      model: AT-AR410
     1.3.6.1.4.1.207.1.1.48:
       category: Router
-      model: AT AR725
+      model: AT-AR725
     1.3.6.1.4.1.207.1.1.49:
       category: Router
-      model: AT AR745
+      model: AT-AR745
     1.3.6.1.4.1.207.1.1.50:
       category: Router
-      model: AT AR410V2
+      model: AT-AR410V2
     1.3.6.1.4.1.207.1.1.51:
       category: Router
-      model: AT AR410V3
+      model: AT-AR410V3
     1.3.6.1.4.1.207.1.1.52:
       category: Router
-      model: AT AR725 ROUTERDC
+      model: AT-AR725-DC
     1.3.6.1.4.1.207.1.1.53:
       category: Router
-      model: AT AR745 ROUTERDC
+      model: AT-AR745-DC
     1.3.6.1.4.1.207.1.1.54:
       category: Router
-      model: AT AR450
+      model: AT-AR450
     1.3.6.1.4.1.207.1.1.55:
       category: Router
-      model: AT AR450 DUAL
+      model: AT-AR450-Dual
     1.3.6.1.4.1.207.1.1.59:
       category: Router
-      model: AT AR440
+      model: AT-AR440
     1.3.6.1.4.1.207.1.1.60:
       category: Router
-      model: AT AR441
+      model: AT-AR441
     1.3.6.1.4.1.207.1.1.61:
       category: Router
-      model: AT AR442
+      model: AT-AR442
     1.3.6.1.4.1.207.1.1.62:
       category: Router
-      model: AT AR443
+      model: AT-AR443
     1.3.6.1.4.1.207.1.1.63:
       category: Router
-      model: AT AR444
+      model: AT-AR444
     1.3.6.1.4.1.207.1.1.64:
       category: Router
-      model: AT AR420
+      model: AT-AR420
+    1.3.6.1.4.1.207.1.1.71:
+      category: Router
+      model: AT-AR415S
+    1.3.6.1.4.1.207.1.1.72:
+      category: Router
+      model: AT-AR415S-DC
     1.3.6.1.4.1.207.1.1.73:
       category: Router
-      model: AT AR550
+      model: AT-AR550
     1.3.6.1.4.1.207.1.1.74:
       category: Router
-      model: AT AR551
+      model: AT-AR551
     1.3.6.1.4.1.207.1.1.75:
       category: Router
-      model: AT AR552
+      model: AT-AR552
     1.3.6.1.4.1.207.1.1.76:
       category: Router
-      model: AT AR550S
+      model: AT-AR550S-DP
     1.3.6.1.4.1.207.1.1.78:
       category: Router
-      model: AT AR570
+      model: AT-AR570
     1.3.6.1.4.1.207.1.1.79:
       category: Router
-      model: AT AR770
+      model: AT-AR770
     1.3.6.1.4.1.207.1.1.80:
       category: Router
-      model: AT AR750S
+      model: AT-AR750S-DP
     1.3.6.1.4.1.207.1.1.81:
       category: Router
-      model: AT AR560S
+      model: AT-AR560S
     1.3.6.1.4.1.207.1.1.82:
       category: Router
-      model: AT AR3050S
+      model: AT-AR3050S
     1.3.6.1.4.1.207.1.1.85:
       category: Router
-      model: AT AR4050S
+      model: AT-AR4050S
     1.3.6.1.4.1.207.1.1.88:
       category: Router
-      model: AT AR2050V
+      model: AT-AR2050V
     1.3.6.1.4.1.207.1.1.89:
       category: Router
-      model: AT AR2010V
+      model: AT-AR2010V
+    1.3.6.1.4.1.207.1.1.90:
+      category: Router
+      model: AT-AR1050V
+    1.3.6.1.4.1.207.1.1.91:
+      category: Router
+      model: AT-AR4050S-5G
     1.3.6.1.4.1.207.1.2.1:
       category: Router
       model: Allied Telesyn AT-3624TR
@@ -279,198 +291,222 @@ sysobjectids:
       model: AT-8100
     1.3.6.1.4.1.207.1.4.181:
       category: Switch
-      model: AT X200GE52T
+      model: AT-x200-GE-52T
     1.3.6.1.4.1.207.1.4.182:
       category: Switch
-      model: AT X200GE28T
+      model: AT-x200-GE-28T
     1.3.6.1.4.1.207.1.4.196:
       category: Switch
-      model: AT X2109GT
+      model: AT-x210-9GT
     1.3.6.1.4.1.207.1.4.197:
       category: Switch
-      model: AT X21016GT
+      model: AT-x210-16GT
     1.3.6.1.4.1.207.1.4.198:
       category: Switch
-      model: AT X21024GT
+      model: AT-x210-24GT
     1.3.6.1.4.1.207.1.4.199:
       model: AT-GS950/10PS
     1.3.6.1.4.1.207.1.4.216:
       category: Switch
-      model: AT X31026FT
+      model: AT-x310-26FT
     1.3.6.1.4.1.207.1.4.217:
       category: Switch
-      model: AT X31050FT
+      model: AT-x310-50FT
     1.3.6.1.4.1.207.1.4.218:
       category: Switch
-      model: AT X31026FP
+      model: AT-x310-26FP
     1.3.6.1.4.1.207.1.4.219:
       category: Switch
-      model: AT X31050FP
+      model: AT-x310-50FP
     1.3.6.1.4.1.207.1.4.220:
       category: Switch
-      model: AT X31026GT
+      model: AT-x310-26GT
     1.3.6.1.4.1.207.1.4.221:
       category: Switch
-      model: AT X31050GT
+      model: AT-x310-50GT
     1.3.6.1.4.1.207.1.4.222:
       category: Switch
-      model: AT X31026GP
+      model: AT-x310-26GP
     1.3.6.1.4.1.207.1.4.223:
       category: Switch
-      model: AT X31050GP
+      model: AT-x310-50GP
     1.3.6.1.4.1.207.1.4.224:
       category: Switch
-      model: AT X23010GT
+      model: AT-x230-10GT
     1.3.6.1.4.1.207.1.4.225:
       category: Switch
-      model: AT X23018GT
+      model: AT-x230-18GT
     1.3.6.1.4.1.207.1.4.226:
       category: Switch
-      model: AT X23028GT
+      model: AT-x230-28GT
     1.3.6.1.4.1.207.1.4.227:
       category: Switch
-      model: AT X23052GT
+      model: AT-x230-52GT
     1.3.6.1.4.1.207.1.4.228:
       category: Switch
-      model: AT X23010GP
+      model: AT-x230-10GP
     1.3.6.1.4.1.207.1.4.229:
       category: Switch
-      model: AT X23018GP
+      model: AT-x230-18GP
     1.3.6.1.4.1.207.1.4.230:
       category: Switch
-      model: AT X23028GP
+      model: AT-x230-28GP
     1.3.6.1.4.1.207.1.4.231:
       category: Switch
-      model: AT X23052GP
+      model: AT-x230-52GP
     1.3.6.1.4.1.207.1.4.232:
       category: Switch
-      model: AT X35010GPT
+      model: AT-x350-10GPT
     1.3.6.1.4.1.207.1.4.253:
       category: Switch
-      model: AT GS924MX
+      model: AT-GS924MX
     1.3.6.1.4.1.207.1.4.254:
       category: Switch
-      model: AT GS924MPX
+      model: AT-GS924MPX
     1.3.6.1.4.1.207.1.4.255:
       category: Switch
-      model: AT GS948MX
+      model: AT-GS948MX
     1.3.6.1.4.1.207.1.4.256:
       category: Switch
-      model: AT GS948MPX
+      model: AT-GS948MPX
     1.3.6.1.4.1.207.1.4.257:
       category: Switch
-      model: AT XS916MXT
+      model: AT-XS916MXT
     1.3.6.1.4.1.207.1.4.258:
       category: Switch
-      model: AT XS916MXS
+      model: AT-XS916MXS
     1.3.6.1.4.1.207.1.4.259:
       category: Switch
-      model: AT XS916MXP
+      model: AT-XS916MXP
     1.3.6.1.4.1.207.1.4.260:
       category: Switch
-      model: AT SH23010GP
+      model: AT-SH230-10GP
     1.3.6.1.4.1.207.1.4.261:
       category: Switch
-      model: AT SH23018GP
+      model: AT-SH230-18GP
     1.3.6.1.4.1.207.1.4.262:
       category: Switch
-      model: AT SH23028GP
+      model: AT-SH230-28GP
     1.3.6.1.4.1.207.1.4.263:
       category: Switch
-      model: AT SH2109GT
+      model: AT-SH210-9GT
     1.3.6.1.4.1.207.1.4.264:
       category: Switch
-      model: AT SH21016GT
+      model: AT-SH210-16GT
     1.3.6.1.4.1.207.1.4.265:
       category: Switch
-      model: AT SH21024GT
+      model: AT-SH210-24GT
     1.3.6.1.4.1.207.1.4.266:
       category: Switch
-      model: AT SH31026FT
+      model: AT-SH310-26FT
     1.3.6.1.4.1.207.1.4.267:
       category: Switch
-      model: AT SH31050FT
+      model: AT-SH310-50FT
     1.3.6.1.4.1.207.1.4.268:
       category: Switch
-      model: AT SH31026FP
+      model: AT-SH310-26FP
     1.3.6.1.4.1.207.1.4.269:
       category: Switch
-      model: AT SH31050FP
+      model: AT-SH310-50FP
     1.3.6.1.4.1.207.1.4.270:
       category: Switch
-      model: AT SH23010GT
+      model: AT-SH230-10GT
     1.3.6.1.4.1.207.1.4.271:
       category: Switch
-      model: AT SH23018GT
+      model: AT-SH230-18GT
     1.3.6.1.4.1.207.1.4.272:
       category: Switch
-      model: AT SH23028GT
+      model: AT-SH230-28GT
     1.3.6.1.4.1.207.1.4.274:
       category: Switch
-      model: AT FS980M9
+      model: AT-FS980M-9
     1.3.6.1.4.1.207.1.4.275:
       category: Switch
-      model: AT FS980M9PS
+      model: AT-FS980M-9PS
     1.3.6.1.4.1.207.1.4.276:
       category: Switch
-      model: AT FS980M18
+      model: AT-FS980M-18
     1.3.6.1.4.1.207.1.4.277:
       category: Switch
-      model: AT FS980M18PS
+      model: AT-FS980M-18PS
     1.3.6.1.4.1.207.1.4.278:
-      category: Layer 3 Switch
-      model: AT-FS980M/28
+      category: Switch
+      model: AT-FS980M-28
     1.3.6.1.4.1.207.1.4.279:
       category: Switch
-      model: AT FS980M28PS
+      model: AT-FS980M-28PS
     1.3.6.1.4.1.207.1.4.280:
       category: Switch
-      model: AT FS980M52
+      model: AT-FS980M-52
     1.3.6.1.4.1.207.1.4.281:
       category: Switch
-      model: AT FS980M52PS
+      model: AT-FS980M-52PS
     1.3.6.1.4.1.207.1.4.282:
       category: Switch
-      model: AT GS910M
+      model: AT-GS910M
     1.3.6.1.4.1.207.1.4.283:
       category: Switch
-      model: AT GS910MP
+      model: AT-GS910MP
     1.3.6.1.4.1.207.1.4.284:
       category: Switch
-      model: AT GS918M
+      model: AT-GS918M
     1.3.6.1.4.1.207.1.4.285:
       category: Switch
-      model: AT GS918MP
+      model: AT-GS918MP
     1.3.6.1.4.1.207.1.4.286:
       category: Switch
-      model: AT GS928M
+      model: AT-GS928M
     1.3.6.1.4.1.207.1.4.287:
       category: Switch
-      model: AT GS928MP
+      model: AT-GS928MP
     1.3.6.1.4.1.207.1.4.288:
       category: Switch
-      model: AT GS952M
+      model: AT-GS952M
     1.3.6.1.4.1.207.1.4.289:
       category: Switch
-      model: AT GS952MP
+      model: AT-GS952MP
+    1.3.6.1.4.1.207.1.4.290:
+      category: Switch
+      model: AT-x220-52GT
+    1.3.6.1.4.1.207.1.4.291:
+      category: Switch
+      model: AT-x220-52GP
+    1.3.6.1.4.1.207.1.4.294:
+      category: Switch
+      model: AT-x220-28GS
+    1.3.6.1.4.1.207.1.4.300:
+      category: Switch
+      model: AT-GS980M-52
+    1.3.6.1.4.1.207.1.4.301:
+      category: Switch
+      model: AT-GS980M-52PS
     1.3.6.1.4.1.207.1.4.312:
       category: Switch
-      model: AT GS970M28PS
+      model: AT-GS970M-28PS
     1.3.6.1.4.1.207.1.4.313:
       category: Switch
-      model: AT GS970M18PS
+      model: AT-GS970M-18PS
     1.3.6.1.4.1.207.1.4.314:
       category: Switch
-      model: AT GS970M10PS
+      model: AT-GS970M-10PS
     1.3.6.1.4.1.207.1.4.315:
       category: Switch
-      model: AT GS970M28
+      model: AT-GS970M-28
     1.3.6.1.4.1.207.1.4.316:
       category: Switch
-      model: AT GS970M18
+      model: AT-GS970M-18
     1.3.6.1.4.1.207.1.4.317:
       category: Switch
-      model: AT GS970M10
+      model: AT-GS970M-10
+    1.3.6.1.4.1.207.1.4.319:
+      category: Switch
+      model: AT-x230L-17GT
+    1.3.6.1.4.1.207.1.4.320:
+      category: Switch
+      model: AT-x230L-26GT
+    1.3.6.1.4.1.207.1.4.322:
+      category: Switch
+      model: AT-FS980M-28DP
     1.3.6.1.4.1.207.1.13.13:
       category: Wireless
       model: AT TQ 2403
@@ -511,287 +547,290 @@ sysobjectids:
       category: Wireless
       model: AT MWS 2533 AP
     1.3.6.1.4.1.207.1.14.1:
-      category: Switch
-      model: AT-RP24
+      category: Layer 3 Switch
+      model: AT-Rapier-24
     1.3.6.1.4.1.207.1.14.2:
-      category: Switch
-      model: AT-RP16fSC
+      category: Layer 3 Switch
+      model: AT-Rapier-16F-SC
     1.3.6.1.4.1.207.1.14.3:
-      category: Switch
-      model: AT-RP16fVF
+      category: Layer 3 Switch
+      model: AT-Rapier-16F-VF
     1.3.6.1.4.1.207.1.14.4:
-      category: Switch
-      model: AT-RP16fMT
+      category: Layer 3 Switch
+      model: AT-Rapier-16F-MT
     1.3.6.1.4.1.207.1.14.5:
-      category: Switch
-      model: AT-RP48
+      category: Layer 3 Switch
+      model: AT-Rapier-48
     1.3.6.1.4.1.207.1.14.6:
-      category: Switch
-      model: AT-RP8t8fSC
+      category: Layer 3 Switch
+      model: AT-Rapier-8T8F-SC
     1.3.6.1.4.1.207.1.14.7:
-      category: Switch
-      model: AT-RP8t8fSCi
+      category: Layer 3 Switch
+      model: AT-Rapier-8T8F-SCi
     1.3.6.1.4.1.207.1.14.8:
-      category: Switch
-      model: AT-RP8t8fMT
+      category: Layer 3 Switch
+      model: AT-Rapier-8T8F-MT
     1.3.6.1.4.1.207.1.14.9:
-      category: Switch
-      model: AT-RP8t8fMTi
+      category: Layer 3 Switch
+      model: AT-Rapier-8T8F-MTi
     1.3.6.1.4.1.207.1.14.10:
-      category: Switch
-      model: AT-RP8fSC
+      category: Layer 3 Switch
+      model: AT-Rapier-8F-SC
     1.3.6.1.4.1.207.1.14.11:
-      category: Switch
-      model: AT-RP8fSCi
+      category: Layer 3 Switch
+      model: AT-Rapier-8F-SCi
     1.3.6.1.4.1.207.1.14.12:
-      category: Switch
-      model: AT-RP8fMT
+      category: Layer 3 Switch
+      model: AT-Rapier-8F-MT
     1.3.6.1.4.1.207.1.14.13:
-      category: Switch
-      model: AT-RP8fMTi
+      category: Layer 3 Switch
+      model: AT-Rapier-8F-MTi
     1.3.6.1.4.1.207.1.14.14:
-      category: Switch
-      model: AT-RP16fMTi
+      category: Layer 3 Switch
+      model: AT-Rapier-16F-MTi
     1.3.6.1.4.1.207.1.14.15:
-      category: Switch
-      model: AT-RPG6
+      category: Layer 3 Switch
+      model: AT-Rapier-G6
     1.3.6.1.4.1.207.1.14.16:
-      category: Switch
-      model: AT-RPG6SX
+      category: Layer 3 Switch
+      model: AT-Rapier-G6-SX
     1.3.6.1.4.1.207.1.14.17:
-      category: Switch
-      model: AT-RPG6LX
+      category: Layer 3 Switch
+      model: AT-Rapier-G6-LX
     1.3.6.1.4.1.207.1.14.18:
-      category: Switch
-      model: AT-RPG6MT
+      category: Layer 3 Switch
+      model: AT-Rapier-G6-MT
     1.3.6.1.4.1.207.1.14.19:
-      category: Switch
-      model: AT-RP16fSCi
+      category: Layer 3 Switch
+      model: AT-Rapier-16F-SCi
     1.3.6.1.4.1.207.1.14.20:
-      category: Switch
-      model: AT-RP24I
+      category: Layer 3 Switch
+      model: AT-Rapier-24i
     1.3.6.1.4.1.207.1.14.21:
-      category: Switch
-      model: AT-RP48i
+      category: Layer 3 Switch
+      model: AT-Rapier-48i
     1.3.6.1.4.1.207.1.14.22:
-      category: Switch
-      model: AT SWITCHBLADE4AC
+      category: Layer 3 Switch
+      model: AT-SwitchBlade-4-AC
     1.3.6.1.4.1.207.1.14.23:
-      category: Switch
-      model: AT SWITCHBLADE4DC
+      category: Layer 3 Switch
+      model: AT-SwitchBlade-4-DC
     1.3.6.1.4.1.207.1.14.24:
-      category: Switch
-      model: AT SWITCHBLADE8AC
+      category: Layer 3 Switch
+      model: AT-SwitchBlade-8-AC
     1.3.6.1.4.1.207.1.14.25:
-      category: Switch
-      model: AT SWITCHBLADE8DC
+      category: Layer 3 Switch
+      model: AT-SwitchBlade-8-DC
     1.3.6.1.4.1.207.1.14.26:
-      category: Switch
+      category: Layer 3 Switch
       model: AT-9816GF
     1.3.6.1.4.1.207.1.14.27:
-      category: Switch
+      category: Layer 3 Switch
       model: AT-9812TF
     1.3.6.1.4.1.207.1.14.28:
-      category: Switch
+      category: Layer 3 Switch
       model: AT-9816GB
     1.3.6.1.4.1.207.1.14.29:
-      category: Switch
+      category: Layer 3 Switch
       model: AT-9812T
     1.3.6.1.4.1.207.1.14.30:
-      category: Switch
+      category: Layer 3 Switch
       model: AT-8724XL
     1.3.6.1.4.1.207.1.14.31:
-      category: Switch
+      category: Layer 3 Switch
       model: AT-8748XL
     1.3.6.1.4.1.207.1.14.32:
-      category: Switch
-      model: AT-8724XLDC
+      category: Layer 3 Switch
+      model: AT-8724XL-DC
     1.3.6.1.4.1.207.1.14.33:
-      category: Switch
-      model: AT-8748XLDC
+      category: Layer 3 Switch
+      model: AT-8748XL-DC
     1.3.6.1.4.1.207.1.14.34:
-      category: Switch
-      model: AT-9816GB_DC
+      category: Layer 3 Switch
+      model: AT-9816GB-DC
     1.3.6.1.4.1.207.1.14.35:
-      category: Switch
-      model: AT-9812T_DC
+      category: Layer 3 Switch
+      model: AT-9812T-DC
     1.3.6.1.4.1.207.1.14.36:
-      category: Switch
+      category: Layer 3 Switch
       model: AT-8824
     1.3.6.1.4.1.207.1.14.37:
-      category: Switch
+      category: Layer 3 Switch
       model: AT-8848
     1.3.6.1.4.1.207.1.14.38:
-      category: Switch
-      model: AT-8824_DC
+      category: Layer 3 Switch
+      model: AT-8824-DC
     1.3.6.1.4.1.207.1.14.39:
-      category: Switch
-      model: AT-8848_DC
+      category: Layer 3 Switch
+      model: AT-8848-DC
     1.3.6.1.4.1.207.1.14.41:
-      category: Switch
-      model: AT-8624XL_80
+      category: Layer 3 Switch
+      model: AT-8624XL80
     1.3.6.1.4.1.207.1.14.42:
-      category: Switch
-      model: AT-8724XL_80
+      category: Layer 3 Switch
+      model: AT-8724XL80
     1.3.6.1.4.1.207.1.14.43:
-      category: Switch
-      model: AT-8748XL_80
+      category: Layer 3 Switch
+      model: AT-8748XL80
     1.3.6.1.4.1.207.1.14.44:
-      category: Switch
+      category: Layer 3 Switch
       model: AT-8948EX
     1.3.6.1.4.1.207.1.14.45:
-      category: Switch
+      category: Layer 3 Switch
       model: AT-8948i
     1.3.6.1.4.1.207.1.14.46:
-      category: Switch
+      category: Layer 3 Switch
       model: AT-8624T2M
     1.3.6.1.4.1.207.1.14.47:
-      category: Switch
-      model: AT-RP24I
+      category: Layer 3 Switch
+      model: AT-Rapier-24i-DC-NEBS
     1.3.6.1.4.1.207.1.14.48:
-      category: Switch
-      model: AT-8724XL
+      category: Layer 3 Switch
+      model: AT-8724XL-DC-NEBS
     1.3.6.1.4.1.207.1.14.49:
-      category: Switch
+      category: Layer 3 Switch
       model: AT-9924T
     1.3.6.1.4.1.207.1.14.50:
-      category: Switch
+      category: Layer 3 Switch
       model: AT-9924SP
     1.3.6.1.4.1.207.1.14.51:
-      category: Switch
-      model: AT-9924T_4SP
+      category: Layer 3 Switch
+      model: AT-9924T-4SP
     1.3.6.1.4.1.207.1.14.53:
-      category: Switch
-      model: AT-9924TEMC
+      category: Layer 3 Switch
+      model: AT-9924T-EMC
     1.3.6.1.4.1.207.1.14.55:
-      category: Switch
+      category: Layer 3 Switch
       model: AT-8724MLB
     1.3.6.1.4.1.207.1.14.56:
-      category: Switch
+      category: Layer 3 Switch
       model: AT-8624POE
     1.3.6.1.4.1.207.1.14.57:
-      category: Switch
+      category: Layer 3 Switch
       model: AT-9924Ts
     1.3.6.1.4.1.207.1.14.58:
-      category: Switch
-      model: AT-9924Ts
+      category: Layer 3 Switch
+      model: AT-86482SP
     1.3.6.1.4.1.207.1.14.59:
-      category: Switch
+      category: Layer 3 Switch
       model: AT-9924Ti
     1.3.6.1.4.1.207.1.14.60:
-      category: Switch
+      category: Layer 3 Switch
       model: AT-9924SPi
     1.3.6.1.4.1.207.1.14.61:
-      category: Switch
+      category: Layer 3 Switch
       model: AT-9924Tsi
     1.3.6.1.4.1.207.1.14.62:
-      category: Switch
+      category: Layer 3 Switch
       model: AT-9924SPsi
     1.3.6.1.4.1.207.1.14.63:
-      category: Switch
-      model: AT-8948i_N
+      category: Layer 3 Switch
+      model: AT-8948iN
     1.3.6.1.4.1.207.1.14.64:
-      category: Switch
-      model: AT-9924Tsi_N
+      category: Layer 3 Switch
+      model: AT-9924TsiN
     1.3.6.1.4.1.207.1.14.65:
-      category: Switch
-      model: AT-Rapier48w
+      category: Layer 3 Switch
+      model: AT-Rapier-48W
     1.3.6.1.4.1.207.1.14.67:
-      category: Switch
-      model: AT-8724SL V2
+      category: Layer 3 Switch
+      model: AT-8724SL-V2
     1.3.6.1.4.1.207.1.14.68:
-      category: Switch
-      model: X900 48FS
+      category: Layer 3 Switch
+      model: AT-x900-48FS
     1.3.6.1.4.1.207.1.14.69:
-      category: Switch
-      model: AT SWITCHBLADEX 908
+      category: Layer 3 Switch
+      model: AT-SwitchBlade-x908
     1.3.6.1.4.1.207.1.14.70:
-      category: Switch
-      model: AT X90012XTS
+      category: Layer 3 Switch
+      model: AT-x900-12XTS
     1.3.6.1.4.1.207.1.14.71:
-      category: Switch
-      model: AT RAPIER48WB
+      category: Layer 3 Switch
+      model: AT-Rapier-48WB
     1.3.6.1.4.1.207.1.14.72:
-      category: Switch
-      model: AT RAPIER48WAC
+      category: Layer 3 Switch
+      model: AT-Rapier-48W-AC
     1.3.6.1.4.1.207.1.14.73:
-      category: Switch
-      model: AT RAPIER48WBAC
+      category: Layer 3 Switch
+      model: AT-Rapier-48WB-AC
     1.3.6.1.4.1.207.1.14.75:
-      category: Switch
-      model: AT X90024XT
+      category: Layer 3 Switch
+      model: AT-x900-24XT
     1.3.6.1.4.1.207.1.14.76:
-      category: Switch
-      model: AT X90024XS
+      category: Layer 3 Switch
+      model: AT-x900-24XS
     1.3.6.1.4.1.207.1.14.77:
-      category: Switch
-      model: AT X90024XTN
+      category: Layer 3 Switch
+      model: AT-x900-24XTN
     1.3.6.1.4.1.207.1.14.80:
-      category: Switch
-      model: AT X60024TS
+      category: Layer 3 Switch
+      model: AT-x600-24Ts
     1.3.6.1.4.1.207.1.14.81:
-      category: Switch
-      model: AT X60024TSXP
+      category: Layer 3 Switch
+      model: AT-x600-24Ts-XP
     1.3.6.1.4.1.207.1.14.82:
-      category: Switch
-      model: AT X60048TS
+      category: Layer 3 Switch
+      model: AT-x600-48Ts
     1.3.6.1.4.1.207.1.14.83:
-      category: Switch
-      model: AT X60048TSXP
+      category: Layer 3 Switch
+      model: AT-x600-48Ts-XP
     1.3.6.1.4.1.207.1.14.84:
-      category: Switch
-      model: AT RAPIER24IBNEBS
+      category: Layer 3 Switch
+      model: AT-Rapier-24ib-NEBS
     1.3.6.1.4.1.207.1.14.85:
-      category: Switch
-      model: AT RAPIER24IBDCNEBS
+      category: Layer 3 Switch
+      model: AT-Rapier-24ib-DC-NEBS
     1.3.6.1.4.1.207.1.14.86:
-      category: Switch
-      model: AT SBX8112
+      category: Layer 3 Switch
+      model: AT-SBx8112
     1.3.6.1.4.1.207.1.14.87:
-      category: Switch
-      model: AT SBX81CFC400
+      category: Layer 3 Switch
+      model: AT-SBx81CFC400
     1.3.6.1.4.1.207.1.14.88:
-      category: Switch
-      model: AT SBX81CFC960
+      category: Layer 3 Switch
+      model: AT-SBx81CFC960
+    1.3.6.1.4.1.207.1.14.89:
+      category: Layer 3 Switch
+      model: AT-SBx81CFC960-V2
     1.3.6.1.4.1.207.1.14.91:
-      category: Switch
-      model: AT X60024TSPOE
+      category: Layer 3 Switch
+      model: AT-x600-24Ts-POE
     1.3.6.1.4.1.207.1.14.92:
-      category: Switch
-      model: AT X60024TSPOEPLUS
+      category: Layer 3 Switch
+      model: AT-x600-24Ts-POE-Plus
     1.3.6.1.4.1.207.1.14.93:
-      category: Switch
-      model: X61048TSXPOEPLUS
+      category: Layer 3 Switch
+      model: AT-x610-48Ts-X-POE-Plus
     1.3.6.1.4.1.207.1.14.94:
       category: Layer 3 Switch
-      model: AT-x610-48Ts-POE+
+      model: AT-x610-48Ts-POE-Plus
     1.3.6.1.4.1.207.1.14.95:
-      category: Switch
-      model: X61024TSXPOEPLUS
+      category: Layer 3 Switch
+      model: AT-x610-24Ts-X-POE-Plus
     1.3.6.1.4.1.207.1.14.96:
-      category: Switch
-      model: X61024TSPOEPLUS
+      category: Layer 3 Switch
+      model: AT-x610-24Ts-POE-Plus
     1.3.6.1.4.1.207.1.14.97:
-      category: Switch
-      model: X61048TSX
+      category: Layer 3 Switch
+      model: AT-x610-48Ts-X
     1.3.6.1.4.1.207.1.14.98:
-      category: Switch
-      model: X61048TS
+      category: Layer 3 Switch
+      model: AT-x610-48Ts
     1.3.6.1.4.1.207.1.14.99:
-      category: Switch
-      model: X61024TSX
+      category: Layer 3 Switch
+      model: AT-x610-24Ts-X
     1.3.6.1.4.1.207.1.14.100:
-      category: Switch
-      model: X61024TS
+      category: Layer 3 Switch
+      model: AT-x610-24Ts
     1.3.6.1.4.1.207.1.14.101:
-      category: Switch
-      model: X61024SPX
+      category: Layer 3 Switch
+      model: AT-x610-24SP-X
     1.3.6.1.4.1.207.1.14.105:
-      category: Switch
-      model: AT RP48XDC
+      category: Layer 3 Switch
+      model: AT-RP48x-DC
     1.3.6.1.4.1.207.1.14.109:
-      category: Switch
-      model: AT X51028GTX
+      category: Layer 3 Switch
+      model: AT-x510-28GTX
     1.3.6.1.4.1.207.1.14.110:
       category: Layer 3 Switch
       model: AT-x510-28GPX
@@ -799,122 +838,224 @@ sysobjectids:
       category: Layer 3 Switch
       model: AT-x510-28GSX
     1.3.6.1.4.1.207.1.14.112:
-      category: Switch
-      model: AT X51052GTX
+      category: Layer 3 Switch
+      model: AT-x510-52GTX
     1.3.6.1.4.1.207.1.14.113:
-      category: Switch
-      model: AT X51052GPX
+      category: Layer 3 Switch
+      model: AT-x510-52GPX
     1.3.6.1.4.1.207.1.14.114:
-      category: Switch
-      model: AT SBX8106
+      category: Layer 3 Switch
+      model: AT-SBx8106
     1.3.6.1.4.1.207.1.14.116:
-      category: Switch
-      model: AT X510DP52GTX
+      category: Layer 3 Switch
+      model: AT-x510DP-52GTX
     1.3.6.1.4.1.207.1.14.117:
-      category: Switch
-      model: AT IX528GPX
+      category: Layer 3 Switch
+      model: AT-IX5-28GPX
     1.3.6.1.4.1.207.1.14.118:
-      category: Switch
-      model: AT X93028GTX
+      category: Layer 3 Switch
+      model: AT-x930-28GTX
     1.3.6.1.4.1.207.1.14.119:
-      category: Switch
-      model: AT X93028GPX
+      category: Layer 3 Switch
+      model: AT-x930-28GPX
     1.3.6.1.4.1.207.1.14.120:
-      category: Switch
-      model: AT X93028GSX
+      category: Layer 3 Switch
+      model: AT-x930-28GSX
     1.3.6.1.4.1.207.1.14.121:
-      category: Switch
-      model: AT X93052GTX
+      category: Layer 3 Switch
+      model: AT-x930-52GTX
     1.3.6.1.4.1.207.1.14.122:
-      category: Switch
-      model: AT X93052GPX
+      category: Layer 3 Switch
+      model: AT-x930-52GPX
     1.3.6.1.4.1.207.1.14.123:
-      category: Switch
-      model: AT DC2552XS
+      category: Layer 3 Switch
+      model: AT-DC2552XS
     1.3.6.1.4.1.207.1.14.124:
-      category: Switch
-      model: AT X51028GSXDC
+      category: Layer 3 Switch
+      model: AT-x510-28GSX-DC
     1.3.6.1.4.1.207.1.14.126:
-      category: Switch
-      model: AT X510DP28GTX
+      category: Layer 3 Switch
+      model: AT-x510DP-28GTX
     1.3.6.1.4.1.207.1.14.127:
-      category: Switch
-      model: AT X510L28GT
+      category: Layer 3 Switch
+      model: AT-x510L-28GT
     1.3.6.1.4.1.207.1.14.128:
-      category: Switch
-      model: AT X510L52GT
+      category: Layer 3 Switch
+      model: AT-x510L-52GT
     1.3.6.1.4.1.207.1.14.129:
-      category: Switch
-      model: AT X510L28GP
+      category: Layer 3 Switch
+      model: AT-x510L-28GP
     1.3.6.1.4.1.207.1.14.130:
-      category: Switch
-      model: AT X510L52GP
+      category: Layer 3 Switch
+      model: AT-x510L-52GP
     1.3.6.1.4.1.207.1.14.131:
-      category: Switch
-      model: AT X51028GTXR
+      category: Layer 3 Switch
+      model: AT-x510-28GTX-R
     1.3.6.1.4.1.207.1.14.132:
-      category: Switch
-      model: AT X51052GTXR
+      category: Layer 3 Switch
+      model: AT-x510-52GTX-R
     1.3.6.1.4.1.207.1.14.133:
-      category: Switch
-      model: AT SH51028GTX
+      category: Layer 3 Switch
+      model: AT-SH510-28GTX
     1.3.6.1.4.1.207.1.14.134:
-      category: Switch
-      model: AT SH51052GTX
+      category: Layer 3 Switch
+      model: AT-SH510-52GTX
     1.3.6.1.4.1.207.1.14.135:
-      category: Switch
-      model: AT SH51028GPX
+      category: Layer 3 Switch
+      model: AT-SH510-28GPX
     1.3.6.1.4.1.207.1.14.136:
-      category: Switch
-      model: AT SH51052GPX
+      category: Layer 3 Switch
+      model: AT-SH510-52GPX
     1.3.6.1.4.1.207.1.14.137:
-      category: Switch
-      model: AT SBX908G2
+      category: Layer 3 Switch
+      model: AT-SBx908-G2
     1.3.6.1.4.1.207.1.14.138:
-      category: Switch
-      model: AT SBX908G3
+      category: Layer 3 Switch
+      model: AT-SBx908-G3
     1.3.6.1.4.1.207.1.14.139:
-      category: Switch
-      model: AT X55018XTQ
+      category: Layer 3 Switch
+      model: AT-x550-18XTQ
     1.3.6.1.4.1.207.1.14.140:
-      category: Switch
-      model: AT X55018XSQ
+      category: Layer 3 Switch
+      model: AT-x550-18XSQ
     1.3.6.1.4.1.207.1.14.141:
-      category: Switch
-      model: AT X55018XSPQM
+      category: Layer 3 Switch
+      model: AT-x550-18XSPQm
     1.3.6.1.4.1.207.1.14.142:
-      category: Switch
-      model: AT SBX81XLEM
-    1.3.6.1.4.1.207.1.24:
-      category: Switch
-      model: INDUSTRIALSWITCH
+      category: Layer 3 Switch
+      model: AT-SBx81XLEM
+    1.3.6.1.4.1.207.1.14.143:
+      category: Layer 3 Switch
+      model: AT-x530-28GTXm
+    1.3.6.1.4.1.207.1.14.144:
+      category: Layer 3 Switch
+      model: AT-x530-28GPXm
+    1.3.6.1.4.1.207.1.14.146:
+      category: Layer 3 Switch
+      model: AT-x530DP-28GHXm
+    1.3.6.1.4.1.207.1.14.147:
+      category: Layer 3 Switch
+      model: AT-x530-52GTXm
+    1.3.6.1.4.1.207.1.14.148:
+      category: Layer 3 Switch
+      model: AT-x530-52GPXm
+    1.3.6.1.4.1.207.1.14.149:
+      category: Layer 3 Switch
+      model: AT-x530DP-52GHXm
+    1.3.6.1.4.1.207.1.14.150:
+      category: Layer 3 Switch
+      model: AT-x950-28XTQm
+    1.3.6.1.4.1.207.1.14.151:
+      category: Layer 3 Switch
+      model: AT-x950-28XSQ
+    1.3.6.1.4.1.207.1.14.152:
+      category: Layer 3 Switch
+      model: AT-x320-10GH
+    1.3.6.1.4.1.207.1.14.153:
+      category: Layer 3 Switch
+      model: AT-x320-11GPT
+    1.3.6.1.4.1.207.1.14.154:
+      category: Layer 3 Switch
+      model: AT-GS980MX-28
+    1.3.6.1.4.1.207.1.14.155:
+      category: Layer 3 Switch
+      model: AT-GS980MX-28PSm
+    1.3.6.1.4.1.207.1.14.156:
+      category: Layer 3 Switch
+      model: AT-GS980MX-52
+    1.3.6.1.4.1.207.1.14.157:
+      category: Layer 3 Switch
+      model: AT-GS980MX-52PSm
+    1.3.6.1.4.1.207.1.14.158:
+      category: Layer 3 Switch
+      model: AT-x530L-28GTX
+    1.3.6.1.4.1.207.1.14.159:
+      category: Layer 3 Switch
+      model: AT-x530L-28GPX
+    1.3.6.1.4.1.207.1.14.160:
+      category: Layer 3 Switch
+      model: AT-x530L-52GTX
+    1.3.6.1.4.1.207.1.14.161:
+      category: Layer 3 Switch
+      model: AT-x530L-52GPX
+    1.3.6.1.4.1.207.1.14.162:
+      category: Layer 3 Switch
+      model: AT-GS980EM-10H
+    1.3.6.1.4.1.207.1.14.163:
+      category: Layer 3 Switch
+      model: AT-GS980EM-11PT
+    1.3.6.1.4.1.207.1.14.164:
+      category: Layer 3 Switch
+      model: AT-x950-52XTQm
+    1.3.6.1.4.1.207.1.14.165:
+      category: Layer 3 Switch
+      model: AT-x950-52XSQ
+    1.3.6.1.4.1.207.1.14.166:
+      category: Layer 3 Switch
+      model: AT-x530L-10GHXm
+    1.3.6.1.4.1.207.1.14.168:
+      category: Layer 3 Switch
+      model: AT-x530-10GHXm
+    1.3.6.1.4.1.207.1.14.169:
+      category: Layer 3 Switch
+      model: AT-x530-18GHXm
+    1.3.6.1.4.1.207.1.14.170:
+      category: Layer 3 Switch
+      model: AT-GS980MX-10HSm
+    1.3.6.1.4.1.207.1.14.172:
+      category: Layer 3 Switch
+      model: AT-SBx81CFC960-V2a
     1.3.6.1.4.1.207.1.24.1:
       category: Switch
-      model: AT IE2006GT
+      model: AT-IE200-6GT
     1.3.6.1.4.1.207.1.24.2:
       category: Switch
-      model: AT IE2006GP
+      model: AT-IE200-6GP
     1.3.6.1.4.1.207.1.24.3:
       category: Switch
-      model: AT IE2006GPW
+      model: AT-IE200-6GP-W
     1.3.6.1.4.1.207.1.24.6:
       category: Switch
-      model: AT IE2006FT
+      model: AT-IE200-6FT
     1.3.6.1.4.1.207.1.24.7:
       category: Switch
-      model: AT IE2006FP
+      model: AT-IE200-6FP
     1.3.6.1.4.1.207.1.24.8:
       category: Switch
-      model: AT IE30012GT
+      model: AT-IE300-12GT
     1.3.6.1.4.1.207.1.24.9:
       category: Switch
-      model: AT IE30012GP
+      model: AT-IE300-12GP
     1.3.6.1.4.1.207.1.24.10:
       category: Switch
-      model: AT IE30012GS
+      model: AT-IE300-12GS
     1.3.6.1.4.1.207.1.24.11:
       category: Switch
-      model: AT IE30020GST
+      model: AT-IE300-20GST
     1.3.6.1.4.1.207.1.24.12:
       category: Switch
-      model: AT IE51028GSX
+      model: AT-IE510-28GSX
+    1.3.6.1.4.1.207.1.24.13:
+      category: Switch
+      model: AT-IE340-12GP
+    1.3.6.1.4.1.207.1.24.14:
+      category: Switch
+      model: AT-IE340L-18GP
+    1.3.6.1.4.1.207.1.24.15:
+      category: Switch
+      model: AT-IE340-12GT
+    1.3.6.1.4.1.207.1.24.16:
+      category: Switch
+      model: AT-IE340-20GP
+    1.3.6.1.4.1.207.1.24.17:
+      category: Switch
+      model: AT-IE210-10GP
+    1.3.6.1.4.1.207.1.24.18:
+      category: Switch
+      model: AT-IE210-18GP
+    1.3.6.1.4.1.207.1.26.1:
+      category: Other
+      model: AT-VAA
+    1.3.6.1.4.1.207.1.26.2:
+      category: Firewall
+      model: AT-vFW
