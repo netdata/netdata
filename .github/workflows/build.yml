@@ -48,10 +48,9 @@ jobs:
             **/*.hh
             **/*.in
             **/*.patch
+            src/crates/
             src/aclk/aclk-schemas/
             src/ml/dlib/
-            src/fluent-bit/
-            src/web/server/h2o/libh2o/
           files_ignore: |
             netdata.spec.in
             src/go/otel-collector/release-config.yaml.in
