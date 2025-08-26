@@ -267,9 +267,9 @@ Focus on clarity and conciseness while maintaining completeness.`;
             return result;
         }
         
-        // For objects/arrays, pretty print
+        // For objects/arrays, stringify without pretty printing
         try {
-            return JSON.stringify(result, null, 2);
+            return JSON.stringify(result);
         } catch (_error) {
             return String(result);
         }
