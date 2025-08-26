@@ -1,110 +1,58 @@
-# Exporting reference
+# Exporting Reference
 
-Welcome to the exporting engine reference guide. This guide contains comprehensive information about enabling,
-configuring, and monitoring Netdata's exporting engine, which allows you to send metrics to external time-series
-databases.
+This reference guide provides comprehensive information about enabling, configuring, and monitoring Netdata's exporting engine for sending metrics to external time-series databases.
 
-For a quick introduction to the exporting engine's features, read our doc on [exporting metrics to time-series
-databases](/docs/exporting-metrics/README.md), or jump in to [enabling a connector](/docs/exporting-metrics/enable-an-exporting-connector.md).
+For a quick introduction, read our [exporting metrics overview](/docs/exporting-metrics/README.md) or start with [enabling a connector](/docs/exporting-metrics/enable-an-exporting-connector.md).
 
-The exporting engine has a modular structure and supports metric exporting via multiple exporting connector instances at
-the same time. You can have different update intervals and filters configured for every exporting connector instance.
+## Core Capabilities
 
-When you enable the exporting engine and a connector, the Netdata Agent exports metrics _beginning from the time you
-restart its process_, not the entire [database of long-term metrics](/src/database/README.md).
+The exporting engine features a modular structure that supports:
+- Multiple connector instances running simultaneously
+- Different update intervals per connector
+- Custom filters per connector instance
+- Metric resampling to reduce database congestion
 
-Since Netdata collects thousands of metrics per server per second, which would easily congest any database server when
-several Netdata servers are sending data to it, Netdata allows sending metrics at a lower frequency, by resampling them.
+:::info
 
-So, although Netdata collects metrics every second, it can send to the external database servers averages or sums every
-X seconds (though, it can send them per second if you need it to).
+When you enable the exporting engine, Netdata exports metrics **starting from the restart time**, not the entire [historical database](/src/database/README.md).
 
-## Features
+:::
 
-### Integration
+## Operation Modes
 
-The exporting engine uses a number of connectors to send Netdata metrics to external time-series databases. See our
-[list of supported databases](/docs/exporting-metrics/README.md#supported-databases) for information on which
-connector to enable and configure for your database of choice.
+Netdata provides three data export modes:
 
-- [**AWS Kinesis Data Streams**](/src/exporting/aws_kinesis/README.md): Metrics are sent to the service in `JSON`
-    format.
-- [**Google Cloud Pub/Sub Service**](/src/exporting/pubsub/README.md): Metrics are sent to the service in `JSON`
-    format.
-- [**Graphite**](/src/exporting/graphite/README.md): A plaintext interface. Metrics are sent to the database server as
-    `prefix.hostname.chart.dimension`. `prefix` is configured below, `hostname` is the hostname of the machine (can
-    also be configured). Learn more in our guide to [export and visualize Netdata metrics in
-    Graphite](/src/exporting/graphite/README.md).
-- [**JSON** document databases](/src/exporting/json/README.md)
-- [**OpenTSDB**](/src/exporting/opentsdb/README.md): Use a plaintext or HTTP interfaces. Metrics are sent to
-    OpenTSDB as `prefix.chart.dimension` with tag `host=hostname`.
-- [**MongoDB**](/src/exporting/mongodb/README.md): Metrics are sent to the database in `JSON` format.
-- [**Prometheus**](/src/exporting/prometheus/README.md): Use an existing Prometheus installation to scrape metrics
-    from node using the Netdata API.
-- [**Prometheus remote write**](/src/exporting/prometheus/remote_write/README.md). A binary snappy-compressed protocol
-    buffer encoding over HTTP. Supports many [storage
-    providers](https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage).
-- [**TimescaleDB**](/src/exporting/TIMESCALE.md): Use a community-built connector that takes JSON streams from a
-    Netdata client and writes them to a TimescaleDB table.
+| Mode | Description | Data Format | Use Case |
+|:----:|:------------|:------------|:---------|
+| **as-collected** | Raw metrics in original units | Counters remain counters, gauges remain gauges | Time-series database experts who need raw data |
+| **average** | Normalized metrics from Netdata database | All metrics sent as gauges in Netdata units | Simplified visualization with Netdata-centric workflows |
+| **sum/volume** | Sum of interpolated values | Aggregated values over the export interval | Long-term trend analysis |
 
-### Chart filtering
+:::tip
 
-Netdata can filter metrics, to send only a subset of the collected metrics. You can use the
-configuration file
+**Choosing the Right Mode**: 
+- Use `as-collected` if you're building monitoring around a time-series database and know how to convert units
+- Use `average` for simpler long-term archiving that matches Netdata's visualization exactly
 
-```text
-[prometheus:exporter]
-    send charts matching = system.*
-```
+:::
 
-or the URL parameter `filter` in the `allmetrics` API call.
+## Supported Connectors
 
-```text
-http://localhost:19999/api/v1/allmetrics?format=shell&filter=system.*
-```
+| Connector | Protocol/Format | Metric Format |
+|:----------|:---------------|:--------------|
+| [AWS Kinesis](/src/exporting/aws_kinesis/README.md) | JSON | Stream-based |
+| [Google Pub/Sub](/src/exporting/pubsub/README.md) | JSON | Message-based |
+| [Graphite](/src/exporting/graphite/README.md) | Plaintext | `prefix.hostname.chart.dimension` |
+| [JSON Databases](/src/exporting/json/README.md) | JSON | Document-based |
+| [OpenTSDB](/src/exporting/opentsdb/README.md) | Plaintext/HTTP | `prefix.chart.dimension` with tags |
+| [MongoDB](/src/exporting/mongodb/README.md) | JSON | Document-based |
+| [Prometheus](/src/exporting/prometheus/README.md) | HTTP scraping | Prometheus exposition format |
+| [Prometheus Remote Write](/src/exporting/prometheus/remote_write/README.md) | Snappy-compressed protobuf | Binary over HTTP |
+| [TimescaleDB](/src/exporting/TIMESCALE.md) | JSON streams | Time-series tables |
 
-### Operation modes
+## Configuration Structure
 
-Netdata supports three modes of operation for all exporting connectors:
-
-- `as-collected` sends to external databases the metrics as they are collected, in the units they are collected.
-    So, counters are sent as counters and gauges are sent as gauges, much like all data collectors do. For example,
-    to calculate CPU utilization in this format, you need to know how to convert kernel ticks to percentage.
-
-- `average` sends to external databases normalized metrics from the Netdata database. In this mode, all metrics
-    are sent as gauges, in the units Netdata uses. This abstracts data collection and simplifies visualization, but
-    you will not be able to copy and paste queries from other sources to convert units. For example, CPU utilization
-    percentage is calculated by Netdata, so Netdata will convert ticks to percentage and send the average percentage
-    to the external database.
-
-- `sum` or `volume`: the sum of the interpolated values shown on the Netdata graphs is sent to the external
-    database. So, if Netdata is configured to send data to the database every 10 seconds, the sum of the 10 values
-    shown on the Netdata charts will be used.
-
-Time-series databases suggest to collect the raw values (`as-collected`). If you plan to invest on building your
-monitoring around a time-series database and you already know (or you will invest in learning) how to convert units
-and normalize the metrics in Grafana or other visualization tools, we suggest to use `as-collected`.
-
-If, on the other hand, you just need long term archiving of Netdata metrics and you plan to mainly work with
-Netdata, we suggest to use `average`. It decouples visualization from data collection, so it will generally be a lot
-simpler. Furthermore, if you use `average`, the charts shown in the external service will match exactly what you
-see in Netdata, which is not necessarily true for the other modes of operation.
-
-### Independent operation
-
-This code is smart enough, not to slow down Netdata, independently of the speed of the external database server.
-
-> ❗ You should keep in mind though that many exporting connector instances can consume a lot of CPU resources if they
-> run their batches at the same time. You can set different update intervals for every exporting connector instance,
-> but even in that case they can occasionally synchronize their batches for a moment.
-
-## Configuration
-
-Here are the configuration blocks for every supported connector. Your current `exporting.conf` file may look a little
-different.
-
-You can configure each connector individually using the available [options](#options). The
-`[graphite:my_graphite_instance]` block contains examples of some of these additional options in action.
+Your `exporting.conf` file contains these configuration blocks:
 
 ```text
 [exporting:global]
@@ -180,136 +128,141 @@ You can configure each connector individually using the available [options](#opt
     destination = localhost:8082
 ```
 
-### Sections
+### Configuration Sections
 
-- `[exporting:global]` is a section where you can set your defaults for all exporting connectors
-- `[prometheus:exporter]` defines settings for Prometheus exporter API queries (e.g.:
-    `http://NODE:19999/api/v1/allmetrics?format=prometheus&help=yes&source=as-collected`).
-- `[<type>:<name>]` keeps settings for a particular exporting connector instance, where:
-- `type` selects the exporting connector type: graphite | opentsdb:telnet | opentsdb:http |
-      prometheus_remote_write | json | kinesis | pubsub | mongodb. For graphite, opentsdb,
-      json, and prometheus_remote_write connectors you can also use `:http` or `:https` modifiers
-      (e.g.: `opentsdb:https`).
-- `name` can be arbitrary instance name you chose.
+| Section | Purpose |
+|:--------|:--------|
+| `[exporting:global]` | Default settings for all connectors |
+| `[prometheus:exporter]` | Prometheus API endpoint settings |
+| `[<type>:<name>]` | Individual connector instance configuration |
 
-### Options
+### Connector Types
 
-Configure individual connectors and override any global settings with the following options.
+Available connector types with optional modifiers:
+- `graphite` | `graphite:http` | `graphite:https`
+- `opentsdb:telnet` | `opentsdb:http` | `opentsdb:https`
+- `prometheus_remote_write` | `prometheus_remote_write:http` | `prometheus_remote_write:https`
+- `json` | `json:http` | `json:https`
+- `kinesis` | `pubsub` | `mongodb`
 
-- `enabled = yes | no`, enables or disables an exporting connector instance
+## Configuration Options
 
-- `destination = host1 host2 host3 ...`, accepts **a space separated list** of hostnames, IPs (IPv4 and IPv6) and
-     ports to connect to. Netdata will use the **first available** to send the metrics.
+### Basic Settings
 
-     The format of each item in this list, is: `[PROTOCOL:]IP[:PORT]`.
+| Option | Values | Description |
+|:-------|:-------|:------------|
+| `enabled` | yes/no | Activates the connector instance |
+| `data source` | as-collected/average/sum | Selects data export mode |
+| `hostname` | string | Hostname for external database (default: `[global].hostname`) |
+| `prefix` | string | Prefix added to all metrics |
+| `update every` | seconds | Export interval with automatic randomization |
 
-     `PROTOCOL` can be `udp` or `tcp`. `tcp` is the default and only supported by the current exporting engine.
+### Connection Settings
 
-     `IP` can be `XX.XX.XX.XX` (IPv4), or `[XX:XX...XX:XX]` (IPv6). For IPv6 you can to enclose the IP in `[]` to
-     separate it from the port.
+| Option | Format | Description |
+|:-------|:-------|:------------|
+| `destination` | space-separated list | Target servers in `[PROTOCOL:]IP[:PORT]` format |
+| `buffer on failures` | iterations | Buffer size when database unavailable |
+| `timeout ms` | milliseconds | Processing timeout (default: `2 * update_every * 1000`) |
 
-     `PORT` can be a number of a service name. If omitted, the default port for the exporting connector will be used
-     (graphite = 2003, opentsdb = 4242).
+#### Destination Examples
 
-     Example IPv4:
-
+IPv4 configuration:
 ```text
-   destination = 10.11.14.2:4242 10.11.14.3:4242 10.11.14.4:4242
+destination = 10.11.14.2:4242 10.11.14.3:4242 10.11.14.4:4242
 ```
 
-   Example IPv6 and IPv4 together:
-
+IPv6 and IPv4 combined:
 ```text
-   destination = [ffff:...:0001]:2003 10.11.12.1:2003
+destination = [ffff:...:0001]:2003 10.11.12.1:2003
 ```
 
-   When multiple servers are defined, Netdata will try the next one when the previous one fails.
+Special destinations:
+- **Kinesis**: AWS region (e.g., `us-east-1`)
+- **MongoDB**: [MongoDB URI](https://docs.mongodb.com/manual/reference/connection-string/)
+- **Pub/Sub**: Service endpoint
 
-   Netdata also ships `nc-exporting.sh`, a script that can be used as a fallback exporting connector to save the
-   metrics to disk and push them to the time-series database when it becomes available again. It can also be used to
-   monitor / trace / debug the metrics Netdata generates.
+### Filtering Options
 
-   For the Kinesis exporting connector `destination` should be set to an AWS region (for example, `us-east-1`).
+| Option | Pattern Format | Description |
+|:-------|:---------------|:------------|
+| `send hosts matching` | space-separated patterns | Filter hosts using `*` wildcard, `!` for negation |
+| `send charts matching` | space-separated patterns | Filter charts by ID/name, `!` for negation |
 
-   For the MongoDB exporting connector `destination` should be set to a
-   [MongoDB URI](https://docs.mongodb.com/manual/reference/connection-string/).
+:::important
 
-   For the Pub/Sub exporting connector `destination` can be set to a specific service endpoint.
+Pattern matching follows first-match logic. Order matters when using negative patterns (`!`).
 
-- `data source = as collected`, or `data source = average`, or `data source = sum`, selects the kind of data that will
-     be sent to the external database.
+Example: `!*child* *db*` matches all `*db*` hosts except those containing `*child*`.
 
-- `hostname = my-name`, is the hostname to be used for sending data to the external database server. By default this
-    is `[global].hostname`.
+:::
 
-- `prefix = Netdata`, is the prefix to add to all metrics.
+### Label Settings
 
-- `update every = 10`, is the number of seconds between sending data to the external database. Netdata will add some
-    randomness to this number, to prevent stressing the external server when many Netdata servers send data to the same
-    database. This randomness does not affect the quality of the data, only the time they are sent.
+| Option | Values | Description |
+|:-------|:-------|:------------|
+| `send names instead of ids` | yes/no | Use human-friendly names vs system IDs |
+| `send configured labels` | yes/no | Include `[host labels]` from `netdata.conf` |
+| `send automatic labels` | yes/no | Include auto-generated labels (`_os_name`, `_architecture`) |
 
-- `buffer on failures = 10`, is the number of iterations (each iteration is `update every` seconds) to buffer data,
-    when the external database server is not available. If the server fails to receive the data after that many
-    failures, data loss on the connector instance is expected (Netdata will also log it).
+## Chart Filtering
 
-- `timeout ms = 20000`, is the timeout in milliseconds to wait for the external database server to process the data.
-    By default this is `2 * update_every * 1000`.
+Filter metrics through two methods:
 
-- `send hosts matching = localhost *` includes one or more space separated patterns, using `*` as wildcard (any number
-    of times within each pattern). The patterns are checked against the hostname (the localhost is always checked as
-    `localhost`), allowing us to filter which hosts will be sent to the external database when this Netdata is a central
-    Netdata aggregating multiple hosts. A pattern starting with `!` gives a negative match. So to match all hosts named
-    `*db*` except hosts containing `*child*`, use `!*child* *db*` (so, the order is important: the first
-    pattern matching the hostname will be used - positive or negative).
+1. **Configuration file**:
+```text
+[prometheus:exporter]
+    send charts matching = system.*
+```
 
-- `send charts matching = *` includes one or more space separated patterns, using `*` as wildcard (any number of times
-    within each pattern). The patterns are checked against both chart id and chart name. A pattern starting with `!`
-    gives a negative match. So to match all charts named `apps.*` except charts ending in `*reads`, use `!*reads
-    apps.*` (so, the order is important: the first pattern matching the chart id or the chart name will be used -
-    positive or negative). There is also a URL parameter `filter` that can be used while querying `allmetrics`. The URL
-    parameter has a higher priority than the configuration option.
+2. **URL parameter**:
+```text
+http://localhost:19999/api/v1/allmetrics?format=shell&filter=system.*
+```
 
-- `send names instead of ids = yes | no` controls the metric names Netdata should send to the external database.
-    Netdata supports names and IDs for charts and dimensions. Usually IDs are unique identifiers as read by the system
-    and names are human friendly labels (also unique). Most charts and metrics have the same ID and name, but in several
-    cases they are different: disks with device-mapper, interrupts, QoS classes, statsd synthetic charts, etc.
+## HTTPS Support
 
-- `send configured labels = yes | no` controls if host labels defined in the `[host labels]` section in `netdata.conf`
-    should be sent to the external database
+For databases without native TLS/SSL support, configure a reverse proxy:
+- [Nginx reverse proxy setup](/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-nginx.md)
 
-- `send automatic labels = yes | no` controls if automatically created labels, like `_os_name` or `_architecture`
-    should be sent to the external database
+## Performance Considerations
 
-## HTTPS
+The exporting engine operates independently to avoid slowing down Netdata. However:
 
-Netdata can send metrics to external databases using the TLS/SSL protocol. Unfortunately, some of
-them does not support encrypted connections, so you will have to configure a reverse proxy to enable
-HTTPS communication between Netdata and an external database. You can set up a reverse proxy with
-[Nginx](/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-nginx.md).
+:::warning
 
-## Exporting engine monitoring
+Multiple connector instances running batches simultaneously can consume significant CPU resources. Configure different update intervals to prevent synchronization.
 
-Netdata creates five charts in the dashboard, under the **Netdata Monitoring** section, to help you monitor the health
-and performance of the exporting engine itself:
+:::
 
-1. **Buffered metrics**, the number of metrics Netdata added to the buffer for dispatching them to the
-    external database server.
+## Monitoring the Exporting Engine
 
-2. **Exporting data size**, the amount of data (in KB) Netdata added the buffer.
+Netdata provides five monitoring charts under **Netdata Monitoring**:
 
-3. **Exporting operations**, the number of operations performed by Netdata.
+| Chart | Monitors |
+|:------|:---------|
+| **Buffered metrics** | Number of metrics added to dispatch buffer |
+| **Exporting data size** | Data volume (KB) added to buffer |
+| **Exporting operations** | Operation count performed |
+| **Exporting thread CPU usage** | CPU resources consumed by exporting thread |
 
-4. **Exporting thread CPU usage**, the CPU resources consumed by the Netdata thread, that is responsible for sending
-    the metrics to the external database server.
+![Exporting engine monitoring](https://cloud.githubusercontent.com/assets/2662304/20463536/eb196084-af3d-11e6-8ee5-ddbd3b4d8449.png)
 
-![image](https://cloud.githubusercontent.com/assets/2662304/20463536/eb196084-af3d-11e6-8ee5-ddbd3b4d8449.png)
+## Built-in Alerts
 
-## Exporting engine alerts
+The exporting engine includes three automatic alerts:
 
-Netdata adds 3 alerts:
+| Alert | Monitors |
+|:------|:---------|
+| `exporting_last_buffering` | Seconds since last successful buffering |
+| `exporting_metrics_sent` | Percentage of successfully sent metrics |
+| `exporting_metrics_lost` | Metrics lost due to repeated failures |
 
-1. `exporting_last_buffering`, number of seconds since the last successful buffering of exported data
-2. `exporting_metrics_sent`, percentage of metrics sent to the external database server
-3. `exporting_metrics_lost`, number of metrics lost due to repeating failures to contact the external database server
+![Exporting alerts](https://cloud.githubusercontent.com/assets/2662304/20463779/a46ed1c2-af43-11e6-91a5-07ca4533cac3.png)
 
-![image](https://cloud.githubusercontent.com/assets/2662304/20463779/a46ed1c2-af43-11e6-91a5-07ca4533cac3.png)
+## Fallback Script
+
+Netdata includes `nc-exporting.sh` for:
+- Saving metrics to disk during database outages
+- Pushing cached metrics when database recovers
+- Monitoring/tracing/debugging metric generation
