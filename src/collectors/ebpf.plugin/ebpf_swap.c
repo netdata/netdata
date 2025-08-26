@@ -55,7 +55,7 @@ netdata_ebpf_targets_t swap_targets[] = {
     {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE},
     {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
-static char *swap_read[] = {"swap_readpage", "swap_read_folio", NULL};
+static char *swap_functions[] = {"swap_readpage", "swap_read_folio", "swap_writepage", "__swap_writepage", NULL};
 
 struct netdata_static_thread ebpf_read_swap = {
     .name = "EBPF_READ_SWAP",
@@ -1154,8 +1154,8 @@ static int ebpf_swap_set_internal_value()
 {
     ebpf_addresses_t address = {.function = NULL, .hash = 0, .addr = 0};
     int i;
-    for (i = 0; swap_read[i]; i++) {
-        address.function = swap_read[i];
+    for (i = 0; swap_functions[i]; i++) {
+        address.function = swap_functions[i];
         ebpf_load_addresses(&address, -1);
         if (address.addr)
             break;
@@ -1166,7 +1166,8 @@ static int ebpf_swap_set_internal_value()
         return -1;
     }
 
-    swap_targets[NETDATA_KEY_SWAP_READPAGE_CALL].name = address.function;
+    int key =  ( i < 2) ? NETDATA_KEY_SWAP_READPAGE_CALL: NETDATA_KEY_SWAP_WRITEPAGE_CALL;
+    swap_targets[key].name = address.function;
 
     return 0;
 }
