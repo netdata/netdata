@@ -32,10 +32,8 @@ function(netdata_bundle_libbpf)
         set(_libbpf_tag 02bdeb7a2c2e7cb2c9cecb125527a9c5a6bbf139) # v1.6.0p_netdata
     endif()
 
-    if(DEFINED BUILD_SHARED_LIBS)
-        if(NOT BUILD_SHARED_LIBS)
-            set(need_static TRUE)
-        endif()
+    if(STATIC_BUILD)
+      set(need_static TRUE)
     endif()
 
     if(NOT need_static)
