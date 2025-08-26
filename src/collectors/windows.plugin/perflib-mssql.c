@@ -929,6 +929,8 @@ static bool netdata_MSSQL_initialize_connection(struct netdata_mssql_conn *nmc)
     }
 
     if (retConn) {
+        SQLSetConnectAttr(nmc->netdataSQLHDBc, SQL_ATTR_AUTOCOMMIT, (SQLPOINTER)SQL_AUTOCOMMIT_ON, 0);
+
         ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->checkPermSTMT);
         if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
             retConn = FALSE;
