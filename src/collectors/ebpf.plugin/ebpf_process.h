@@ -103,6 +103,7 @@ typedef enum netdata_publish_process {
 
 enum ebpf_process_tables { NETDATA_PROCESS_PID_TABLE, NETDATA_PROCESS_GLOBAL_TABLE, NETDATA_PROCESS_CTRL_TABLE };
 
+extern netdata_ebpf_targets_t process_targets[];
 extern struct config process_config;
 
 #endif /* NETDATA_EBPF_PROCESS_H */
