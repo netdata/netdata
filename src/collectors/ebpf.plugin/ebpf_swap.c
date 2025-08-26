@@ -52,7 +52,7 @@ static ebpf_local_maps_t swap_maps[] = {
 
 netdata_ebpf_targets_t swap_targets[] = {
     {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE},
-    {.name = "swap_writepage", .mode = EBPF_LOAD_TRAMPOLINE},
+    {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE},
     {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
 static char *swap_read[] = {"swap_readpage", "swap_read_folio", NULL};
