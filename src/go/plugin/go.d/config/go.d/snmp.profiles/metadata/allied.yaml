@@ -2,70 +2,70 @@ sysobjectids:
   oid_overrides:
     1.3.6.1.4.1.207.1.1.8:
       category: Router
-      model:  CentreCOM-AR300
+      model: CentreCOM-AR300
     1.3.6.1.4.1.207.1.1.11:
       category: Router
-      model:  CentreCOM-AR720
+      model: CentreCOM-AR720
     1.3.6.1.4.1.207.1.1.12:
       category: Router
-      model:  CentreCOM-AR300L
+      model: CentreCOM-AR300L
     1.3.6.1.4.1.207.1.1.13:
       category: Router
-      model:  CentreCOM-AR310
+      model: CentreCOM-AR310
     1.3.6.1.4.1.207.1.1.14:
       category: Router
-      model:  CentreCOM-AR300LU
+      model: CentreCOM-AR300LU
     1.3.6.1.4.1.207.1.1.15:
       category: Router
-      model:  CentreCOM-AR300U
+      model: CentreCOM-AR300U
     1.3.6.1.4.1.207.1.1.16:
       category: Router
-      model:  CentreCOM-AR310U
+      model: CentreCOM-AR310U
     1.3.6.1.4.1.207.1.1.17:
       category: Router
-      model:  CentreCOM-AR350
+      model: CentreCOM-AR350
     1.3.6.1.4.1.207.1.1.18:
       category: Router
-      model:  CentreCOM-AR370
+      model: CentreCOM-AR370
     1.3.6.1.4.1.207.1.1.19:
       category: Router
-      model:  CentreCOM-AR330
+      model: CentreCOM-AR330
     1.3.6.1.4.1.207.1.1.20:
       category: Router
-      model:  CentreCOM-AR395
+      model: CentreCOM-AR395
     1.3.6.1.4.1.207.1.1.21:
       category: Router
-      model:  CentreCOM-AR390
+      model: CentreCOM-AR390
     1.3.6.1.4.1.207.1.1.22:
       category: Router
-      model:  CentreCOM-AR370U
+      model: CentreCOM-AR370U
     1.3.6.1.4.1.207.1.1.23:
       category: Router
-      model:  CentreCOM-AR740
+      model: CentreCOM-AR740
     1.3.6.1.4.1.207.1.1.24:
       category: Router
-      model:  CentreCOM-AR140S
+      model: CentreCOM-AR140S
     1.3.6.1.4.1.207.1.1.25:
       category: Router
-      model:  CentreCOM-AR140U
+      model: CentreCOM-AR140U
     1.3.6.1.4.1.207.1.1.26:
       category: Router
-      model:  CentreCOM-AR320
+      model: CentreCOM-AR320
     1.3.6.1.4.1.207.1.1.27:
       category: Router
-      model:  CentreCOM-AR130S
+      model: CentreCOM-AR130S
     1.3.6.1.4.1.207.1.1.28:
       category: Router
-      model:  CentreCOM-AR130U
+      model: CentreCOM-AR130U
     1.3.6.1.4.1.207.1.1.29:
       category: Router
-      model:  CentreCOM-AR160
+      model: CentreCOM-AR160
     1.3.6.1.4.1.207.1.1.43:
       category: Router
       model: AT-AR740-DC
     1.3.6.1.4.1.207.1.1.44:
       category: Router
-      model:  CentreCOM-AR120
+      model: CentreCOM-AR120
     1.3.6.1.4.1.207.1.1.47:
       category: Router
       model: AT-AR410
