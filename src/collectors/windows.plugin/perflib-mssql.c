@@ -311,9 +311,7 @@ static void netdata_MSSQL_error(uint32_t type, SQLHANDLE handle, enum netdata_ms
 
 static inline void netdata_MSSQL_release_results(SQLHSTMT *stmt)
 {
-    SQLFreeStmt(stmt, SQL_CLOSE);
-    SQLFreeStmt(stmt, SQL_UNBIND);
-    SQLFreeStmt(stmt, SQL_RESET_PARAMS);
+    SQLCloseCursor(stmt);
 }
 
 static ULONGLONG netdata_MSSQL_fill_long_value(SQLHSTMT *stmt, const char *mask, const char *dbname, char *instance)
