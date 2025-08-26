@@ -6,6 +6,14 @@
 
 **Merged pull requests:**
 
+- improve\(go.d/snmp\): update Fortinet meta [\#20888](https://github.com/netdata/netdata/pull/20888) ([ilyam8](https://github.com/ilyam8))
+- Windows: round sleep to clock resolution to prevent sub-ms early-wake logs [\#20887](https://github.com/netdata/netdata/pull/20887) ([ktsaou](https://github.com/ktsaou))
+- build\(deps\): bump github.com/stretchr/testify from 1.10.0 to 1.11.0 in /src/go [\#20886](https://github.com/netdata/netdata/pull/20886) ([dependabot[bot]](https://github.com/apps/dependabot))
+- improve\(go.d/snmp\): add mikrotik mtxrHlProcessorTemperature [\#20885](https://github.com/netdata/netdata/pull/20885) ([ilyam8](https://github.com/ilyam8))
+- fix\(go.d/snmp\): handle invalid SFP temperature readings for empty slots [\#20884](https://github.com/netdata/netdata/pull/20884) ([ilyam8](https://github.com/ilyam8))
+- improve\(go.d/snmp\): add MikroTik type and model detection [\#20883](https://github.com/netdata/netdata/pull/20883) ([ilyam8](https://github.com/ilyam8))
+- improve\(go.d/snmp\): update tplink snmp meta [\#20882](https://github.com/netdata/netdata/pull/20882) ([ilyam8](https://github.com/ilyam8))
+- fix\(go.d\): fix goroutine leak and panic risk in Docker exec [\#20881](https://github.com/netdata/netdata/pull/20881) ([ilyam8](https://github.com/ilyam8))
 - improve\(go.d/snmp\): add zyxel snmp meta file [\#20879](https://github.com/netdata/netdata/pull/20879) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d/ddsnmp\): use plugincofng for loading profiles [\#20878](https://github.com/netdata/netdata/pull/20878) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): bump github.com/coreos/go-systemd/v22 from 22.5.0 to 22.6.0 in /src/go [\#20874](https://github.com/netdata/netdata/pull/20874) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -36,6 +44,7 @@
 - Mqtt adjust buffer size [\#20834](https://github.com/netdata/netdata/pull/20834) ([stelfrag](https://github.com/stelfrag))
 - chore\(go.d/snmp\): merge sysObjectIDs.json into meta\_overrides.yaml [\#20831](https://github.com/netdata/netdata/pull/20831) ([ilyam8](https://github.com/ilyam8))
 - improve\(go.d/snmp\): add more models to meta\_overrides.yaml [\#20830](https://github.com/netdata/netdata/pull/20830) ([ilyam8](https://github.com/ilyam8))
+- updated logging documentation and added natural siem integration [\#20829](https://github.com/netdata/netdata/pull/20829) ([ktsaou](https://github.com/ktsaou))
 - feat\(go.d/snmp\): add YAML overrides for sysobjectids mapping [\#20828](https://github.com/netdata/netdata/pull/20828) ([ilyam8](https://github.com/ilyam8))
 - refactor\(go.d\): move nd directories to dedicated pluginconfig package [\#20827](https://github.com/netdata/netdata/pull/20827) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): bump k8s.io/client-go from 0.33.3 to 0.33.4 in /src/go [\#20826](https://github.com/netdata/netdata/pull/20826) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -86,6 +95,7 @@
 - fix\(go.d/snmp-profile\): fix extends in cradlepoint.yaml [\#20762](https://github.com/netdata/netdata/pull/20762) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d\): validate custom binary path [\#20761](https://github.com/netdata/netdata/pull/20761) ([ilyam8](https://github.com/ilyam8))
 - Update welcome-to-netdata.md [\#20760](https://github.com/netdata/netdata/pull/20760) ([kanelatechnical](https://github.com/kanelatechnical))
+- Troubleshooting: add troubleshoot and custom investigations docs [\#20759](https://github.com/netdata/netdata/pull/20759) ([kanelatechnical](https://github.com/kanelatechnical))
 - chore\(go.d/snmp\): update org to vendor mapping [\#20757](https://github.com/netdata/netdata/pull/20757) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d/snmp\): update hostname to not include IP [\#20756](https://github.com/netdata/netdata/pull/20756) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d/snmp\): add \_clean\_hostname host label [\#20755](https://github.com/netdata/netdata/pull/20755) ([ilyam8](https://github.com/ilyam8))
@@ -439,14 +449,6 @@
 - SNMP: \_generic-ups.yaml [\#20351](https://github.com/netdata/netdata/pull/20351) ([Ancairon](https://github.com/Ancairon))
 - Improve retention calculation after datafile deletion [\#20350](https://github.com/netdata/netdata/pull/20350) ([stelfrag](https://github.com/stelfrag))
 - SNMP: \_generic-ucd.yaml [\#20349](https://github.com/netdata/netdata/pull/20349) ([Ancairon](https://github.com/Ancairon))
-- improvement\(go.d/sd\): better prometheus exporters detection [\#20348](https://github.com/netdata/netdata/pull/20348) ([ilyam8](https://github.com/ilyam8))
-- Updated configuration reference [\#20347](https://github.com/netdata/netdata/pull/20347) ([kanelatechnical](https://github.com/kanelatechnical))
-- fix\(go.d/dyncfg\): fix duplicate potential "name" in userconfig action [\#20346](https://github.com/netdata/netdata/pull/20346) ([ilyam8](https://github.com/ilyam8))
-- Split systemd-journal plugin and add Rust-based journal file reader [\#20345](https://github.com/netdata/netdata/pull/20345) ([vkalintiris](https://github.com/vkalintiris))
-- SNMP: \_generic-sip.yaml [\#20344](https://github.com/netdata/netdata/pull/20344) ([Ancairon](https://github.com/Ancairon))
-- SNMP: \_generic-rtp.yaml [\#20343](https://github.com/netdata/netdata/pull/20343) ([Ancairon](https://github.com/Ancairon))
-- SNMP: \_generic-lldp.yaml [\#20342](https://github.com/netdata/netdata/pull/20342) ([Ancairon](https://github.com/Ancairon))
-- build\(deps\): bump github.com/vmware/govmomi from 0.50.0 to 0.51.0 in /src/go [\#20341](https://github.com/netdata/netdata/pull/20341) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
