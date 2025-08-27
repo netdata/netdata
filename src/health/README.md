@@ -113,7 +113,7 @@ When:
 - Highly available Netdata Parents are used for all nodes, and
 - Netdata Cloud is used (at least for all parents)
 
-We recomment:
+We recommend:
 
 1. Disable health monitoring on all child nodes.
 2. Make sure all parents share the same alert configuration (use a shared git repo, or CI/CD for provisioning)
