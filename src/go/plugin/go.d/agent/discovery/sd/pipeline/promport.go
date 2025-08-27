@@ -370,7 +370,7 @@ var prometheusPortAllocations = map[int]string{
 	9461:  "aws_lambda_read_adapter",
 	9462:  "php_opcache_exporter",
 	9463:  "virgin_media_liberty_global_hub3_exporter",
-	9464:  "opencensus-nodejs_prometheus_exporter",
+	9464:  "otelcol",
 	9465:  "hetzner_cloud_k8s_cloud_controller_manager",
 	9466:  "mqtt_push_gateway",
 	9467:  "nginx-prometheus-shiny-exporter",

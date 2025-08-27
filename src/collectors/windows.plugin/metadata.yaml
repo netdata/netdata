@@ -1080,6 +1080,129 @@ modules:
                 - name: now
   - meta:
       plugin_name: windows.plugin
+      module_name: GetSensors
+      monitored_instance:
+        name: Sensors
+        link: "https://learn.microsoft.com/en-us/windows/win32/sensorsapi/portal"
+        categories:
+          - data-collection.windows-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - Sensors
+        - Windows
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors sensors on Windows systems.
+        method_description: |
+          It uses Sensors API to retrieve available data.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects all of the metrics, no further configuration is required.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          section_name: "[plugin:windows:GetSensors]"
+          name: "netdata.conf"
+          description: "The Netdata main configuration file."
+        options:
+          description: ""
+          folding:
+            title: "Config Option"
+            enabled: false
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+        examples:
+          folding:
+            enabled: false
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: Sensor
+          description: "These metrics refer to Sensors."
+          labels:
+            - name: name
+              description: Sensor friendly name.
+            - name: manufacturer
+              description: The sensor manufacturer.
+            - name: model
+              description: The sensor model.
+          metrics:
+            - name: system.hw.sensor.temperature.input
+              description: Sensor Temperature
+              unit: "Cel"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.power.input
+              description: Sensor Power
+              unit: "W"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.current.input
+              description: Sensor Current
+              unit: "A"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.humidity.input
+              description: Sensor Humidity
+              unit: "%"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.lux.input
+              description: Ambient light level
+              unit: "lx"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.state.input
+              description: Current sensor state.
+              unit: "status"
+              chart_type: line
+              dimensions:
+                - name: ready
+                - name: not_available
+                - name: no_data
+                - name: initializing
+                - name: access_denied
+                - name: error
+  - meta:
+      plugin_name: windows.plugin
       module_name: PerflibWebService
       monitored_instance:
         name: IIS
@@ -2052,16 +2175,16 @@ modules:
                 - name: life_expectancy
             - name: mssql.instance_bufman_lazy_write
               description: Buffers written by buffer manager's lazy writer
-              unit: Lazy writes/sec
+              unit: writes/s
               chart_type: line
               dimensions:
-                - name: lazy_write
+                - name: writes
             - name: mssql.instance_bufman_page_lookups
               description: Requests to find a page in the buffer pool.
-              unit: Page lookups/sec
+              unit: lookups/s
               chart_type: line
               dimensions:
-                - name: page_lookups
+                - name: lookups
             - name: mssql.instance_memmgr_server_memory
               description: Memory committed
               unit: bytes

@@ -3,7 +3,8 @@ extends:
   - _std-if-mib.yaml
 
 sysobjectid:
-  - 1.3.6.1.4.1.14988.1.*
+  - 1.3.6.1.4.1.14988.1.* # Router OS
+  - 1.3.6.1.4.1.14988.2.* # SwOS
 
 metadata:
   device:
@@ -11,7 +12,62 @@ metadata:
       vendor:
         value: "MikroTik"
       type:
-        value: "Router"
+        symbols:
+          - OID: 1.3.6.1.2.1.1.1.0
+            name: sysDescr
+            # RouterOS devices
+            match_pattern: 'RouterOS (CCR.*)'
+            match_value: 'Router'
+          - OID: 1.3.6.1.2.1.1.1.0
+            name: sysDescr
+            match_pattern: 'RouterOS (CRS.*)'
+            match_value: 'Layer 3 Switch'
+          - OID: 1.3.6.1.2.1.1.1.0
+            name: sysDescr
+            match_pattern: 'RouterOS (hAP.*)'
+            match_value: 'Wireless'
+          - OID: 1.3.6.1.2.1.1.1.0
+            name: sysDescr
+            match_pattern: 'RouterOS ([wc]AP.*)'
+            match_value: 'Access Point'
+          - OID: 1.3.6.1.2.1.1.1.0
+            name: sysDescr
+            match_pattern: 'RouterOS (mAP.*)'
+            match_value: 'Access Point'
+          - OID: 1.3.6.1.2.1.1.1.0
+            name: sysDescr
+            match_pattern: 'RouterOS (SXT.*|LHG.*|LDF.*|Disc.*|DynaDish.*|NetBox.*|NetMetal.*|Groove.*|OmniTIK.*|BaseBox.*|Metal.*|SXTsq.*|QRT.*|Audience.*|Cube.*|Wireless Wire.*)'
+            match_value: 'Wireless'
+          - OID: 1.3.6.1.2.1.1.1.0
+            name: sysDescr
+            match_pattern: 'RouterOS CHR'
+            match_value: 'Router'
+          - OID: 1.3.6.1.2.1.1.1.0
+            name: sysDescr
+            match_pattern: 'RouterOS x86'
+            match_value: 'Router'
+          - OID: 1.3.6.1.2.1.1.1.0
+            name: sysDescr
+            match_pattern: 'RouterOS (RB.*)'
+            match_value: 'Router'
+          # SwOS devices - all are switches
+          - OID: 1.3.6.1.2.1.1.1.0
+            name: sysDescr
+            match_pattern: '(.*) SwOS.*'
+            match_value: 'Switch'
+      model:
+        symbols:
+          # RouterOS model extraction
+          - OID: 1.3.6.1.2.1.1.1.0
+            name: sysDescr
+            extract_value: 'RouterOS ([A-Za-z0-9-+]+)'
+          # SwOS model extraction
+          - OID: 1.3.6.1.2.1.1.1.0
+            name: sysDescr
+            extract_value: '([A-Za-z0-9-+]+) SwOS'
+          # MikroTik generic format
+          - OID: 1.3.6.1.2.1.1.1.0
+            name: sysDescr
 
 metric_tags:
   - OID: 1.3.6.1.4.1.14988.1.1.4.1.0
@@ -23,6 +79,15 @@ metric_tags:
 
 metrics:
   - MIB: MIKROTIK-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.14988.1.1.3.11.0
+      name: mtxrHlProcessorTemperature
+      scale_factor: 0.1
+      chart_meta:
+        description: The current CPU temperature
+        family: 'Hardware/CPU/Temperature'
+        unit: "Cel"
+  - MIB: MIKROTIK-MIB
     table:
       OID: 1.3.6.1.4.1.14988.1.1.19.1
       name: mtxrOpticalTable
@@ -33,6 +98,10 @@ metrics:
           description: Temperature at sensor chip
           family: 'Hardware/OpticalModule/Temperature/Value'
           unit: "Cel"
+        transform: | # Set temperature to 0 when no SFP module present (MikroTik returns ~4294967168 for empty slots)
+          {{- if gt .Metric.Value 4294967000 -}}
+            {{- setValue .Metric 0 -}}
+          {{- end -}}
       - OID: 1.3.6.1.4.1.14988.1.1.19.1.1.10
         name: mtxrOpticalRxPower
         chart_meta:
@@ -90,6 +159,7 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.14988.1.1.19.1.1.2
           name: mtxrOpticalName
+
   - MIB: MIKROTIK-MIB
     table:
       OID: 1.3.6.1.4.1.14988.1.1.15.1

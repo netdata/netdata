@@ -2047,7 +2047,7 @@ void mssql_buffman_lazy_write_chart(struct mssql_db_instance *mdi, struct mssql_
                 "buffer cache",
                 "mssql.instance_bufman_lazy_write",
                 "Buffers written by buffer manager's lazy writer",
-                "Lazy writes/sec",
+                "writes/s",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibMSSQL",
                 PRIO_MSSQL_BUFF_LAZY_WRITE,
@@ -2055,7 +2055,7 @@ void mssql_buffman_lazy_write_chart(struct mssql_db_instance *mdi, struct mssql_
                 RRDSET_TYPE_LINE);
 
         mdi->rd_buff_lazy_write = rrddim_add(
-                mdi->st_buff_lazy_write, "lazy_write", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                mdi->st_buff_lazy_write, "writes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
         rrdlabels_add(
                 mdi->st_buff_lazy_write->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
@@ -2080,7 +2080,7 @@ void mssql_buffman_page_lookups_chart(struct mssql_db_instance *mdi, struct mssq
                 "buffer cache",
                 "mssql.instance_bufman_page_lookups",
                 "Requests to find a page in the buffer pool.",
-                "Page lookups/sec",
+                "lookups/s",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibMSSQL",
                 PRIO_MSSQL_BUFF_PAGE_LOOKUPS,
@@ -2088,7 +2088,7 @@ void mssql_buffman_page_lookups_chart(struct mssql_db_instance *mdi, struct mssq
                 RRDSET_TYPE_LINE);
 
         mdi->rd_buff_page_lookups = rrddim_add(
-                mdi->st_buff_page_lookups, "page_lookups", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                mdi->st_buff_page_lookups, "lookups", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
         rrdlabels_add(
                 mdi->st_buff_page_lookups->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);

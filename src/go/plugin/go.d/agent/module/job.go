@@ -214,7 +214,7 @@ func (j *Job) Vnode() vnodes.VirtualNode {
 func (j *Job) AutoDetection() (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("panic %v", err)
+			err = fmt.Errorf("panic %v", r)
 			j.panicked = true
 			j.disableAutoDetection()
 
@@ -316,7 +316,8 @@ func (j *Job) Cleanup() {
 		j.sendVnodeHostInfo()
 		j.vnodeCreated = true
 	}
-	j.api.HOST(j.vnode.GUID)
+
+	j.api.HOST("")
 
 	if j.collectStatusChart.created {
 		j.collectStatusChart.MarkRemove()
@@ -326,6 +327,8 @@ func (j *Job) Cleanup() {
 		j.collectDurationChart.MarkRemove()
 		j.createChart(j.collectDurationChart)
 	}
+
+	j.api.HOST(j.vnode.GUID)
 
 	if j.charts != nil {
 		for _, chart := range *j.charts {
@@ -438,16 +441,6 @@ func (j *Job) processMetrics(metrics map[string]int64, startTime time.Time, sinc
 
 	j.api.HOST(j.vnode.GUID)
 
-	if !j.collectStatusChart.created || createChart {
-		j.collectStatusChart.ID = fmt.Sprintf("%s_%s_data_collection_status", cleanPluginName(j.pluginName), j.FullName())
-		j.createChart(j.collectStatusChart)
-	}
-
-	if !j.collectDurationChart.created || createChart {
-		j.collectDurationChart.ID = fmt.Sprintf("%s_%s_data_collection_duration", cleanPluginName(j.pluginName), j.FullName())
-		j.createChart(j.collectDurationChart)
-	}
-
 	elapsed := int64(durationTo(time.Since(startTime), time.Millisecond))
 
 	var i, updated int
@@ -474,6 +467,18 @@ func (j *Job) processMetrics(metrics map[string]int64, startTime time.Time, sinc
 		}
 	}
 	*j.charts = (*j.charts)[:i]
+
+	j.api.HOST("")
+
+	if !j.collectStatusChart.created || createChart {
+		j.collectStatusChart.ID = fmt.Sprintf("%s_%s_data_collection_status", cleanPluginName(j.pluginName), j.FullName())
+		j.createChart(j.collectStatusChart)
+	}
+
+	if !j.collectDurationChart.created || createChart {
+		j.collectDurationChart.ID = fmt.Sprintf("%s_%s_data_collection_duration", cleanPluginName(j.pluginName), j.FullName())
+		j.createChart(j.collectDurationChart)
+	}
 
 	j.updateChart(
 		j.collectStatusChart,
