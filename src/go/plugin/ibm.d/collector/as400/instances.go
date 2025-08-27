@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+//go:build cgo
+// +build cgo
+
 package as400
 
 // diskMetrics holds metrics for an individual disk

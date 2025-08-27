@@ -1,5 +1,9 @@
 // Package odbcbridge provides an optimized ODBC connection interface using CGO.
 // This version handles AS400-specific issues like negative row counts and proper data types.
+
+//go:build cgo
+// +build cgo
+
 package odbcbridge
 
 /*

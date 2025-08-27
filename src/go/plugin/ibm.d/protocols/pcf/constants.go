@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+//go:build cgo
+// +build cgo
+
 package pcf
 
 import "github.com/ibm-messaging/mq-golang/v5/ibmmq"

@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+//go:build cgo
+// +build cgo
+
 package db2
 
 import (
