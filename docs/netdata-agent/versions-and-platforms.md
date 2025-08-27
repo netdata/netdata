@@ -1,13 +1,3 @@
----
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-agent/versions-and-platforms.md"
-sidebar_label: "Versions & Platforms"
-learn_status: "Published"
-learn_rel_path: "Netdata Agent"
-description: "Present all the supported platform in the Netdata solution"
-sidebar_position: "600010"
-learn_link: "https://learn.netdata.cloud/docs/netdata-agent/versions-&-platforms"
----
-
 # Netdata Agent Versions & Platforms
 
 Netdata is evolving rapidly and new features are added at a constant pace. Therefore, we have a frequent release cadence to deliver all these features to you as soon as possible.
