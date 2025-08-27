@@ -486,7 +486,7 @@ function k8s_get_kubepod_name() {
       container_name="$(get_lbl_val "$labels" container_name)"
       pod_name="$(get_lbl_val "$labels" pod_name)"
 
-      if [[ -n "$pod_name" && "$pod_name" == virt-launcher-* ]]; then
+      if [[ "$pod_name" == virt-launcher-* ]]; then
         case "$container_name" in
           volumerootdisk | guest-console-log)
             info "${fn}: skipping kubevirt helper container '$container_name' in pod '$pod_name'"
