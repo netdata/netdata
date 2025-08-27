@@ -1187,17 +1187,18 @@ static int ebpf_swap_set_internal_value()
     for (i = 0; swap_functions[i]; i++) {
         address.function = swap_functions[i];
         ebpf_load_addresses(&address, -1);
-        if (address.addr)
-            break;
+        if (address.addr) {
+            int key =  (i < 2) ? NETDATA_KEY_SWAP_READPAGE_CALL: NETDATA_KEY_SWAP_WRITEPAGE_CALL;
+            swap_targets[key].name = address.function;
+        }
     }
 
-    if (!address.addr) {
-        netdata_log_error("%s swap.", NETDATA_EBPF_DEFAULT_FNT_NOT_FOUND);
+    if (!swap_targets[NETDATA_KEY_SWAP_READPAGE_CALL].name || !swap_targets[NETDATA_KEY_SWAP_WRITEPAGE_CALL].name) {
+        netdata_log_error("%s (%s, %s) swap.", NETDATA_EBPF_DEFAULT_FNT_NOT_FOUND,
+                          swap_targets[NETDATA_KEY_SWAP_READPAGE_CALL].name,
+                          swap_targets[NETDATA_KEY_SWAP_WRITEPAGE_CALL].name);
         return -1;
     }
-
-    int key =  ( i < 2) ? NETDATA_KEY_SWAP_READPAGE_CALL: NETDATA_KEY_SWAP_WRITEPAGE_CALL;
-    swap_targets[key].name = address.function;
 
     return 0;
 }
