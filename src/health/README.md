@@ -97,7 +97,7 @@ For any given node in the infrastructure, notifications can be configured at 3 l
 
 :::note
 
-When using Netdata Parents and Netdata Cloud, with default settings, you may be receiving multiple email notifications for the same alert transition. The reason is that Netdata Agents are configured to send email notifications by default when an MTA is configured on the systems they run. We recommend disabling email notifications on Netdata Agents and Parents when using Netdata Cloud. To disable email notifications, set `SEND_EMAIL="NO"` in `/etc/netdata/health_alarm_notify.conf`.
+When using Netdata Parents and Netdata Cloud, with default settings, you may be receiving multiple email notifications for the same alert transition. The reason is that Netdata Agents are configured to send email notifications by default when an MTA is configured on the systems they run. We recommend disabling email notifications on Netdata Agents and Parents when using Netdata Cloud. To disable email notifications, set `SEND_EMAIL="NO"` in `/etc/netdata/health_alarm_notify.conf` [using `edit-config`](/docs/netdata-agent/configuration/README.md).
 
 :::
 
