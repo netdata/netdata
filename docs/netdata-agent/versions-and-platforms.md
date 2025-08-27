@@ -29,16 +29,16 @@ We provide binary distribution packages via CI integration for the following pla
 | :-------------------------: | :------------------------: | :-----------------------------------: | :----------: |
 |   **Docker under Linux**    |      19.03 and later       | `x86_64`, `i386`, `ARMv7`, `AArch64`  | docker image |
 |      **Static Builds**      |             -              | `x86_64`, `ARMv6`, `ARMv7`, `AArch64` |   .gz.run    |
-|       **Alma Linux**        |          8.x, 9.x          |          `x86_64`, `AArch64`          |     RPM      |
+|       **Alma Linux**        |       8.x, 9.x, 10.x       |          `x86_64`, `AArch64`          |     RPM      |
 |      **Amazon Linux**       |          2, 2023           |          `x86_64`, `AArch64`          |     RPM      |
 |         **Centos**          |            7.x             |               `x86_64`                |     RPM      |
-|         **Debian**          |      10.x, 11.x, 12.x      | `x86_64`, `i386`, `ARMv7`, `AArch64`  |     DEB      |
+|         **Debian**          |         11.x, 12.x         | `x86_64`, `i386`, `ARMv7`, `AArch64`  |     DEB      |
 |         **Debian**          |            13.x            |     `x86_64`, `ARMv7`, `AArch64`      |     DEB      |
 |         **Fedora**          |           41, 42           |          `x86_64`, `AArch64`          |     RPM      |
 |        **OpenSUSE**         |   Leap 15.6, Tumbleweed    |          `x86_64`, `AArch64`          |     RPM      |
 |      **Oracle Linux**       |       8.x, 9.x, 10.x       |          `x86_64`, `AArch64`          |     RPM      |
 | **Redhat Enterprise Linux** |            7.x             |               `x86_64`                |     RPM      |
-| **Redhat Enterprise Linux** |          8.x, 9.x          |          `x86_64`, `AArch64`          |     RPM      |
+| **Redhat Enterprise Linux** |       8.x, 9.x, 10.x       |          `x86_64`, `AArch64`          |     RPM      |
 |         **Ubuntu**          | 20.04, 22.04, 24.04, 25.04 |     `x86_64`, `ARMv7`, `AArch64`      |     DEB      |
 
 :::important
