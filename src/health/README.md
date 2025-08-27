@@ -12,7 +12,7 @@ Alerts in Netdata are designed to be **component level watchdogs**. They get att
 
 To simplify configuration, Netdata supports alert templates, which are defined once and are applied to all matching components/instances (e.g., all network interfaces, all database instances, all web servers, all containers, all processes, etc). The system supports matching instances by host and instance labels and names, allowing alerts to be defined multiple times under the same name, with different matching criteria.
 
-Netdata alerts have a name, a value, a unit, and a status. This allows them to be easily displayed in the dashboard and sent as notifications, while remaining meaningful and scalable independently of how complex the infrastructure is.
+Netdata alerts have a name, value, unit, and status. This allows them to be easily displayed in the dashboard and sent as notifications, while remaining meaningful and scalable, independently of how complex the infrastructure is.
 
 ### Where Alerts Run
 
