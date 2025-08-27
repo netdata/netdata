@@ -491,6 +491,22 @@ check_symbol_exists(finite "math.h" HAVE_FINITE)
 check_symbol_exists(isfinite "math.h" HAVE_ISFINITE)
 check_symbol_exists(dlsym "dlfcn.h" HAVE_DLSYM)
 
+if(OS_LINUX AND HAVE_SYS_PRCTL_H)
+  check_symbol_exists(PR_CAP_AMBIENT "sys/prctl.h" HAVE_PR_CAP_AMBIENT)
+
+  if(NOT HAVE_PR_CAP_AMBIENT)
+    check_symbol_exists(PR_CAP_AMBIENT "linux/prctl.h" HAVE_PR_CAP_AMBIENT)
+    set(NEED_LINUX_PRCTL_H "${HAVE_PR_CAP_AMBIENT}")
+  else()
+    set(NEED_LINUX_PRCTL_H False)
+  endif()
+else()
+  set(HAVE_PR_CAP_AMBIENT False)
+endif()
+
+check_function_exists(setresuid HAVE_SETRESUID)
+check_function_exists(setresgid HAVE_SETRESGID)
+
 check_function_exists(pthread_getthreadid_np HAVE_PTHREAD_GETTHREADID_NP)
 check_function_exists(pthread_threadid_np HAVE_PTHREAD_THREADID_NP)
 check_function_exists(gettid HAVE_GETTID)
@@ -2470,6 +2486,17 @@ netdata_protoc_generate_cpp("${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas"
 
 list(APPEND ACLK_FILES ${ACLK_PROTO_BUILT_SRCS}
                        ${ACLK_PROTO_BUILT_HDRS})
+
+#
+# nd-run helper program
+#
+
+set(NDRUN_FILES src/collectors/utils/nd-run.c)
+add_executable(nd-run ${NDRUN_FILES})
+target_include_directories(nd-run PUBLIC ${CONFIG_H_DIR})
+install(TARGETS nd-run
+        COMPONENT netdata
+        DESTINATION "${BINDIR}")
 
 #
 # build plugins
