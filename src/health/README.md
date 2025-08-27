@@ -88,12 +88,11 @@ Netdata alerts are configured in 3 layers:
 
 For any given node in the infrastructure, notifications can be configured at 3 levels:
 
-
-| Level              | Evaluates                   | Notifications From | Customization                     | Notifications                                                                                    |
-|--------------------|-----------------------------|--------------------|-----------------------------------|--------------------------------------------------------------------------------------------------|
-| **Netdata Agent**  | Local Metrics               | Netdata Agent      | Edge automation                   | [Agent integrations](/docs/alerts-&-notifications/notifications/agent-dispatched-notifications)  |
-| **Netdata Parent** | Local and Children Metrics  | Netdata Parent     | Edge automation                   | [Agent integrations](/docs/alerts-&-notifications/notifications/agent-dispatched-notifications)  |
-| **Netdata Cloud**  | None - Receives Transitions | Netdata Cloud      | Web-hooks, role based, room based | [Cloud integrations](/docs/alerts-&-notifications/notifications/centralized-cloud-notifications) |
+| Level              | Evaluates                   | Notifications From | Customization                     | Notifications                                                                                                               |
+|--------------------|-----------------------------|--------------------|-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------|
+| **Netdata Agent**  | Local Metrics               | Netdata Agent      | Edge automation                   | [Agent integrations](https://learn.netdata.cloud/docs/alerts-&-notifications/notifications/agent-dispatched-notifications)  |
+| **Netdata Parent** | Local and Children Metrics  | Netdata Parent     | Edge automation                   | [Agent integrations](https://learn.netdata.cloud/docs/alerts-&-notifications/notifications/agent-dispatched-notifications)  |
+| **Netdata Cloud**  | None - Receives Transitions | Netdata Cloud      | Web-hooks, role based, room based | [Cloud integrations](https://learn.netdata.cloud/docs/alerts-&-notifications/notifications/centralized-cloud-notifications) |
 
 :::note
 
@@ -150,7 +149,7 @@ This will allow edge automation to be triggered on child nodes, while still havi
 3. Choose an integration (e.g. Slack, Amazon SNS, Splunk)
 4. Set alert severity filters as needed
 
-[See all supported Cloud integrations](/docs/alerts-&-notifications/notifications/centralized-cloud-notifications)
+[See all supported Cloud integrations](https://learn.netdata.cloud/docs/alerts-&-notifications/notifications/centralized-cloud-notifications)
 
 ## Set Up Alerts via Netdata Agent
 
@@ -174,7 +173,7 @@ This will allow edge automation to be triggered on child nodes, while still havi
    sudo systemctl restart netdata
    ```
 
-[See all Agent-based integrations](/docs/alerts-&-notifications/notifications/agent-dispatched-notifications)
+[See all Agent-based integrations](https://learn.netdata.cloud/docs/alerts-&-notifications/notifications/agent-dispatched-notifications)
 
 ## Alerting Core Concepts
 
@@ -187,11 +186,12 @@ To configure alerts, Netdata supports:
 
 Netdata alerts are more than simple threshold checks. Each alert produces:
 
-- **A value**: Can combine multiple metrics, or other alerts, using time-seris lookups and expressions
+- **A value**: Can combine multiple metrics, or other alerts, using time-series lookups and expressions
 - **A unit**: Makes the alert meaningful (e.g., "seconds", "%", "requests/s")
 - **A name**: Identifies the alert
 
 This design enables sophisticated alerts like:
+
 - `out of disk space time: 450 seconds` - Predicts when disk will be full based on current fill rate
 - `3xx redirects: 12.5 percent` - Calculates redirects as percentage of total responses
 - `response time vs yesterday: 150 %` - Compares current performance to historical baseline
@@ -218,6 +218,7 @@ Alert states transition based on the evaluation results. There are no restrictio
 - **External events** (disconnections, reloads, agent exits)
 
 Key behaviors:
+
 - **Direct transitions**: Alerts can jump directly from CLEAR to CRITICAL (no need to pass through WARNING)
 - **Independent thresholds**: WARNING and CRITICAL conditions are evaluated independently
 - **Recovery from UNDEFINED**: When data becomes available again, alerts return to appropriate state
@@ -271,7 +272,9 @@ calc: $this * 100 / $average_yesterday
 ```
 
 #### 2. Condition Evaluation
+
 After calculating the value, conditions are checked:
+
 ```yaml
 # Simple conditions; 'this' is the calculated value of this alert
 warn: $this > 80
@@ -287,12 +290,15 @@ crit: $this > 90 OR $failures > 5
 ```
 
 #### 3. State Determination
+
 Warning and critical conditions are evaluated independently, with each result mapped as:
+
 - NaN or Inf → UNDEFINED for that condition
 - Non-zero → RAISED for that condition
 - Zero → CLEAR for that condition
 
 Final status is determined by:
+
 - If critical is RAISED → **CRITICAL** (takes precedence)
 - Else if warning is RAISED → **WARNING**
 - Else if either condition is CLEAR → **CLEAR**
@@ -325,10 +331,12 @@ Data Collection         Alert Evaluation
 Netdata implements multiple strategies to prevent alert flapping:
 
 #### 1. Hysteresis in Conditions
+
 ```yaml
 # Different thresholds for raising vs clearing
 warn: ($status < $WARNING) ? ($this > 80) : ($this > 50)
 ```
+
 This means: trigger WARNING when value exceeds 80, but only clear when it drops below 50, preventing flapping between 50-80.
 
 #### 2. Dynamic Notification Delays
@@ -384,25 +392,27 @@ This creates a sophisticated alert that compares current traffic to historical p
 Variables are resolved in the following order (first match wins):
 
 #### 1. Built-in Variables
+
 Available in all expressions (calc, warn, crit):
 
-| Variable            | Description                       | Value/Type              |
-|---------------------|-----------------------------------|-------------------------|
-| `$this`             | Current calculated value          | Result from lookup/calc |
-| `$after`            | Query start timestamp             | Unix timestamp          |
-| `$before`           | Query end timestamp               | Unix timestamp          |
-| `$now`              | Current wall-clock time           | Unix timestamp          |
-| `$last_collected_t` | Last data collection time         | Unix timestamp          |
-| `$update_every`     | Data collection frequency         | Seconds                 |
-| `$status`           | Current alert status code         | -2 to 3                 |
-| `$REMOVED`          | Status constant                   | -2                      |
-| `$UNINITIALIZED`    | Status constant                   | -1                      |
-| `$UNDEFINED`        | Status constant                   | 0                       |
-| `$CLEAR`            | Status constant                   | 1                       |
-| `$WARNING`          | Status constant                   | 2                       |
-| `$CRITICAL`         | Status constant                   | 3                       |
+| Variable            | Description               | Value/Type              |
+|---------------------|---------------------------|-------------------------|
+| `$this`             | Current calculated value  | Result from lookup/calc |
+| `$after`            | Query start timestamp     | Unix timestamp          |
+| `$before`           | Query end timestamp       | Unix timestamp          |
+| `$now`              | Current wall-clock time   | Unix timestamp          |
+| `$last_collected_t` | Last data collection time | Unix timestamp          |
+| `$update_every`     | Data collection frequency | Seconds                 |
+| `$status`           | Current alert status code | -2 to 3                 |
+| `$REMOVED`          | Status constant           | -2                      |
+| `$UNINITIALIZED`    | Status constant           | -1                      |
+| `$UNDEFINED`        | Status constant           | 0                       |
+| `$CLEAR`            | Status constant           | 1                       |
+| `$WARNING`          | Status constant           | 2                       |
+| `$CRITICAL`         | Status constant           | 3                       |
 
 #### 2. Dimension Values from Current Chart
+
 Reference dimensions directly by name:
 
 | Syntax                             | Description                                  | Example                  |
@@ -420,21 +430,27 @@ template: disk_usage_percent
 ```
 
 #### 3. Chart Variables
+
 Custom variables defined at the chart level:
+
 ```yaml
 # If a chart has custom variable 'threshold'
 calc: $used > $threshold
 ```
 
 #### 4. Host Variables
+
 Custom variables defined at the host level:
+
 ```yaml
 # If host has variable 'max_connections'
 warn: $connections > $max_connections * 0.8
 ```
 
 #### 5. Other Alert Values
+
 Reference other alerts by name:
+
 ```yaml
 # Alert 1: Calculate baseline
 template: cpu_baseline
@@ -448,7 +464,9 @@ template: cpu_check
 ```
 
 #### 6. Cross-Context References
+
 Use dot notation to reference dimensions from other contexts or charts:
+
 ```yaml
 # Format: ${context.dimension} or ${chart.dimension}
 template: disk_io_vs_iops
@@ -485,11 +503,13 @@ Result: Uses sda's iops value.
 ### Missing Data and NULL Handling
 
 When evaluating lookups with missing data:
+
 - If **all values are NULL**: `$this` becomes `NaN`
 - If **some values exist**: NULL values are ignored, calculation proceeds
 - If **dimension doesn't exist**: `$this` becomes `NaN`
 
 This ensures alerts can handle:
+
 - Intermittent data collection
 - Dynamic dimensions (appearing/disappearing)
 - Partial outages
@@ -499,23 +519,27 @@ This ensures alerts can handle:
 Alert evaluation frequency is determined by:
 
 1. **With lookup**: Defaults to the lookup window duration
+
    ```yaml
    lookup: average -5m  # Evaluates every 5 minutes by default
    ```
 
 2. **Without lookup**: Must be explicitly set
+
    ```yaml
    every: 10s
    calc: $system + $user
    ```
 
 3. **Custom interval**: Override the default
+
    ```yaml
    lookup: average -1m
    every: 10s  # Check every 10s despite 1m window
    ```
 
 **Important constraints**:
+
 - Cannot evaluate more frequently than data collection
 - High frequency evaluation impacts performance
 - Consider using larger intervals with `unaligned` for efficiency
@@ -594,7 +618,7 @@ You can also get help through our [GitHub repository](https://github.com/netdata
 You can tune alerts to match your environment by adjusting thresholds, writing custom alert conditions, silencing alerts temporarily or permanently, and using statistical functions for smarter alerting.
 
 [Customize alerts](/src/health/REFERENCE.md)
-[Silence or disable alerts](/src/health/REFERENCE.md#disable-or-silence-alerts)
+[Silence or disable alerts](/src/health/REFERENCE.md#how-to-disable-or-silence-alerts)
 </details>
 
 ## Related Documentation
