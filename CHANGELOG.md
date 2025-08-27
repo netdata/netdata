@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Improve exporting documentation clarity and structure [\#20890](https://github.com/netdata/netdata/pull/20890) ([kanelatechnical](https://github.com/kanelatechnical))
+- improve\(go.d/snmp\): update Allied Telesis meta [\#20889](https://github.com/netdata/netdata/pull/20889) ([ilyam8](https://github.com/ilyam8))
 - improve\(go.d/snmp\): update Fortinet meta [\#20888](https://github.com/netdata/netdata/pull/20888) ([ilyam8](https://github.com/ilyam8))
 - Windows: round sleep to clock resolution to prevent sub-ms early-wake logs [\#20887](https://github.com/netdata/netdata/pull/20887) ([ktsaou](https://github.com/ktsaou))
 - build\(deps\): bump github.com/stretchr/testify from 1.10.0 to 1.11.0 in /src/go [\#20886](https://github.com/netdata/netdata/pull/20886) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -447,8 +449,6 @@
 - SNMP: \_cisco-ipsec-flow-monitor.yaml [\#20353](https://github.com/netdata/netdata/pull/20353) ([Ancairon](https://github.com/Ancairon))
 - build\(deps\): update otel dependencies version [\#20352](https://github.com/netdata/netdata/pull/20352) ([ilyam8](https://github.com/ilyam8))
 - SNMP: \_generic-ups.yaml [\#20351](https://github.com/netdata/netdata/pull/20351) ([Ancairon](https://github.com/Ancairon))
-- Improve retention calculation after datafile deletion [\#20350](https://github.com/netdata/netdata/pull/20350) ([stelfrag](https://github.com/stelfrag))
-- SNMP: \_generic-ucd.yaml [\#20349](https://github.com/netdata/netdata/pull/20349) ([Ancairon](https://github.com/Ancairon))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
