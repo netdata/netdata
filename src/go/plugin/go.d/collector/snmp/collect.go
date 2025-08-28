@@ -25,6 +25,17 @@ import (
 const oidSysUptime = "1.3.6.1.2.1.1.3.0"
 
 func (c *Collector) collect() (map[string]int64, error) {
+	if c.snmpClient == nil {
+		snmpClient, err := c.initAndConnectSNMPClient()
+		if err != nil {
+			return nil, err
+		}
+		c.snmpClient = snmpClient
+		if c.ddSnmpColl != nil {
+			c.ddSnmpColl.SetSNMPClient(snmpClient)
+		}
+	}
+
 	if c.sysInfo == nil {
 		si, err := snmputils.GetSysInfo(c.snmpClient)
 		if err != nil {
@@ -97,13 +108,6 @@ func (c *Collector) collectSysUptime(mx map[string]int64) error {
 	mx["uptime"] = v / 100 // the time is in hundredths of a second
 
 	return nil
-}
-
-func (c *Collector) walkAll(rootOid string) ([]gosnmp.SnmpPDU, error) {
-	if c.snmpClient.Version() == gosnmp.Version1 {
-		return c.snmpClient.WalkAll(rootOid)
-	}
-	return c.snmpClient.BulkWalkAll(rootOid)
 }
 
 func (c *Collector) setupVnode(si *snmputils.SysInfo, deviceMeta map[string]ddsnmp.MetaTag) *vnodes.VirtualNode {
@@ -181,7 +185,33 @@ func (c *Collector) setupProfiles(sysObjectID string) []*ddsnmp.Profile {
 	return snmpProfiles
 }
 
-func (c *Collector) adjustMaxRepetitions() (bool, error) {
+func (c *Collector) initAndConnectSNMPClient() (gosnmp.Handler, error) {
+	snmpClient, err := c.initSNMPClient()
+	if err != nil {
+		return nil, fmt.Errorf("init: %w", err)
+	}
+
+	if err := snmpClient.Connect(); err != nil {
+		return nil, fmt.Errorf("connect: %w", err)
+	}
+
+	if c.adjMaxRepetitions != 0 {
+		snmpClient.SetMaxRepetitions(c.adjMaxRepetitions)
+	} else {
+		ok, err := c.adjustMaxRepetitions(snmpClient)
+		if err != nil {
+			return nil, fmt.Errorf("re-adjust max repetitions SNMP client: %w", err)
+		}
+		if !ok {
+			c.Warningf("SNMP bulk walk disabled: table metrics collection unavailable (device may not support GETBULK or max-repetitions adjustment failed)")
+		}
+		c.adjMaxRepetitions = snmpClient.MaxRepetitions()
+		c.snmpBulkWalkOk = ok
+	}
+
+	return snmpClient, nil
+}
+func (c *Collector) adjustMaxRepetitions(snmpClient gosnmp.Handler) (bool, error) {
 	orig := c.Config.Options.MaxRepetitions
 	maxReps := c.Config.Options.MaxRepetitions
 	attempts := 0
@@ -190,7 +220,7 @@ func (c *Collector) adjustMaxRepetitions() (bool, error) {
 	for maxReps > 0 && attempts < maxAttempts {
 		attempts++
 
-		v, err := c.walkAll(snmputils.RootOidMibSystem)
+		v, err := walkAll(snmpClient, snmputils.RootOidMibSystem)
 		if err != nil {
 			return false, err
 		}
@@ -218,13 +248,20 @@ func (c *Collector) adjustMaxRepetitions() (bool, error) {
 		maxReps = max(0, maxReps) // Ensure non-negative
 
 		c.Debugf("max_repetitions=%d returned no data, trying %d", prevMaxReps, maxReps)
-		c.snmpClient.SetMaxRepetitions(uint32(maxReps))
+		snmpClient.SetMaxRepetitions(uint32(maxReps))
 	}
 
 	// Restore original value since nothing worked
-	c.snmpClient.SetMaxRepetitions(uint32(orig))
+	snmpClient.SetMaxRepetitions(uint32(orig))
 	c.Debugf("unable to find working max_repetitions value after %d attempts", attempts)
 	return false, nil
+}
+
+func walkAll(snmpClient gosnmp.Handler, rootOid string) ([]gosnmp.SnmpPDU, error) {
+	if snmpClient.Version() == gosnmp.Version1 {
+		return snmpClient.WalkAll(rootOid)
+	}
+	return snmpClient.BulkWalkAll(rootOid)
 }
 
 func pduToInt(pdu gosnmp.SnmpPDU) (int64, error) {
@@ -232,7 +269,7 @@ func pduToInt(pdu gosnmp.SnmpPDU) (int64, error) {
 	case gosnmp.Counter32, gosnmp.Counter64, gosnmp.Integer, gosnmp.Gauge32, gosnmp.TimeTicks:
 		return gosnmp.ToBigInt(pdu.Value).Int64(), nil
 	default:
-		return 0, fmt.Errorf("unussported type: '%v'", pdu.Type)
+		return 0, fmt.Errorf("unsupported type: '%v'", pdu.Type)
 	}
 }
 
