@@ -418,11 +418,17 @@
           "inline": true
         }
       },
+      "auth_key": {
+        "ui:widget": "password"
+      },
       "priv_proto": {
         "ui:widget": "radio",
         "ui:options": {
           "inline": true
         }
+      },
+      "priv_key": {
+        "ui:widget": "password"
       }
     },
     "charts": {
