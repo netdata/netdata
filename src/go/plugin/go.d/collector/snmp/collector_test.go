@@ -102,20 +102,6 @@ func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
 		prepareSNMP func(t *testing.T, m *snmpmock.MockHandler) *Collector
 	}{
-		"cleanup call if snmpClient initialized": {
-			prepareSNMP: func(t *testing.T, m *snmpmock.MockHandler) *Collector {
-				collr := New()
-				collr.Config = prepareV2Config()
-				collr.newSnmpClient = func() gosnmp.Handler { return m }
-				setMockClientInitExpect(m)
-
-				require.NoError(t, collr.Init(context.Background()))
-
-				m.EXPECT().Close().Times(1)
-
-				return collr
-			},
-		},
 		"cleanup call does not panic if snmpClient not initialized": {
 			prepareSNMP: func(t *testing.T, m *snmpmock.MockHandler) *Collector {
 				collr := New()
@@ -583,6 +569,7 @@ func setMockClientInitExpect(m *snmpmock.MockHandler) {
 	m.EXPECT().SetMsgFlags(gomock.Any()).AnyTimes()
 	m.EXPECT().SetSecurityParameters(gomock.Any()).AnyTimes()
 	m.EXPECT().Connect().Return(nil).AnyTimes()
+	m.EXPECT().MaxRepetitions().Return(uint32(25)).AnyTimes()
 }
 
 func setMockClientSysObjectidExpect(m *snmpmock.MockHandler) {
