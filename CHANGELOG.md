@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- improve\(cgroups\): skip KubeVirt helper containers in virt-launcher pods [\#20896](https://github.com/netdata/netdata/pull/20896) ([ilyam8](https://github.com/ilyam8))
+- improve snmp ubiquiti unifi ap model [\#20895](https://github.com/netdata/netdata/pull/20895) ([ilyam8](https://github.com/ilyam8))
+- Move exporting integrations to their own folder [\#20894](https://github.com/netdata/netdata/pull/20894) ([Ancairon](https://github.com/Ancairon))
 - Improve exporting documentation clarity and structure [\#20890](https://github.com/netdata/netdata/pull/20890) ([kanelatechnical](https://github.com/kanelatechnical))
 - improve\(go.d/snmp\): update Allied Telesis meta [\#20889](https://github.com/netdata/netdata/pull/20889) ([ilyam8](https://github.com/ilyam8))
 - improve\(go.d/snmp\): update Fortinet meta [\#20888](https://github.com/netdata/netdata/pull/20888) ([ilyam8](https://github.com/ilyam8))
@@ -446,9 +449,6 @@
 - Windows updated [\#20358](https://github.com/netdata/netdata/pull/20358) ([kanelatechnical](https://github.com/kanelatechnical))
 - feat\(go.d/dyncfg\): add autodetect\_retry to dyncfg jobs [\#20357](https://github.com/netdata/netdata/pull/20357) ([ilyam8](https://github.com/ilyam8))
 - Improve datafile rotation and indexing [\#20354](https://github.com/netdata/netdata/pull/20354) ([stelfrag](https://github.com/stelfrag))
-- SNMP: \_cisco-ipsec-flow-monitor.yaml [\#20353](https://github.com/netdata/netdata/pull/20353) ([Ancairon](https://github.com/Ancairon))
-- build\(deps\): update otel dependencies version [\#20352](https://github.com/netdata/netdata/pull/20352) ([ilyam8](https://github.com/ilyam8))
-- SNMP: \_generic-ups.yaml [\#20351](https://github.com/netdata/netdata/pull/20351) ([Ancairon](https://github.com/Ancairon))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
