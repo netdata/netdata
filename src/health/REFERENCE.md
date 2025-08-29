@@ -892,7 +892,7 @@ How to write calculations and use variables in your alert definitions. Essential
 |------------|----------------------------------------|---------------------------|
 | Arithmetic | `+`, `-`, `*`, `/`                     | Numeric values            |
 | Comparison | `<`, `==`, `<=`, `<>`, `!=`, `>`, `>=` | `1` (true) or `0` (false) |
-| Logical    | `&&`, `                                |                           |`, `!`, `AND`, `OR`, `NOT` | `1` (true) or `0` (false) |
+| Logical    | `&&`, `||`, `!`, `AND`, `OR`, `NOT`    | `1` (true) or `0` (false) |
 
 **Special Functions:**
 
