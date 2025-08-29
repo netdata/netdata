@@ -30,7 +30,7 @@ find /usr -name go.d.plugin 2>/dev/null
 ```
 :::
 
-## Quick Setup (5 minutes)
+## Quick Setup
 
 ### Step 1: Enable NGINX stub_status
 
