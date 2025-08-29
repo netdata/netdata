@@ -1751,14 +1751,8 @@ void ebpf_process_thread(void *ptr)
     netdata_mutex_lock(&lock);
     ebpf_update_pid_table(&process_maps[0], em);
 
-    if (ebpf_process_load_bpf(em)) {
-        em->enabled = em->global_charts = em->apps_charts = em->cgroup_charts = NETDATA_THREAD_EBPF_STOPPING;
-    }
-
-
     set_local_pointers();
-    em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
-    if (!em->probe_links) {
+    if (ebpf_process_load_bpf(em)) {
         em->enabled = em->global_charts = em->apps_charts = em->cgroup_charts = NETDATA_THREAD_EBPF_STOPPING;
     }
 
