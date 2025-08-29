@@ -1974,6 +1974,11 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/perflib-asp.c
 )
 
+set(WINDOWS_PLUGIN_DRIVER
+        src/collectors/windows.plugin/netdata_win_driver.c
+        src/collectors/windows.plugin/netdata_win_driver.h
+)
+
 set(PROC_PLUGIN_FILES
         src/collectors/proc.plugin/ipc.c
         src/collectors/proc.plugin/plugin_proc.c
@@ -3023,6 +3028,27 @@ if(OS_WINDOWS)
         add_executable(NetdataClaim ${CLAIM_WINDOWS_FILES} ${NETDATA_CLAIM_RES_FILES})
         target_link_libraries(NetdataClaim shell32 gdi32 msftedit)
         target_compile_options(NetdataClaim PUBLIC -mwindows)
+
+        add_library(netdata_driver SHARED ${WINDOWS_PLUGIN_DRIVER})
+        set_target_properties(netdata_driver PROPERTIES SUFFIX ".sys")
+        target_include_directories(netdata_driver PRIVATE BEFORE "/mingw64/include/ddk" "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin")
+        target_compile_options(netdata_driver PRIVATE
+                -Wall
+                -Wextra
+                -Werror
+                -ffreestanding
+                -fno-exceptions
+                -fno-stack-protector
+                -fshort-wchar
+                -mno-red-zone
+        )
+        target_link_options(netdata_driver PRIVATE
+                -Wl,--entry,DriverEntry@8
+                -nostdlib
+                -Wl,--subsystem,native
+                -Wl,--image-base,0x10000
+        )
+        target_link_libraries(netdata_driver kernel32 ntoskrnl)
 endif()
 
 target_compile_options(netdata PRIVATE
