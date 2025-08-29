@@ -25,6 +25,7 @@ int do_GetSystemRAM(int update_every, usec_t dt);
 int do_GetSystemCPU(int update_every, usec_t dt);
 int do_GetPowerSupply(int update_every, usec_t dt);
 int do_GetServicesStatus(int update_every, usec_t dt);
+int do_GetHardwareInfo(int update_every, usec_t dt);
 int do_GetSensors(int update_every, usec_t dt);
 
 // Perflib
