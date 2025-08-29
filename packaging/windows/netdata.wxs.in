@@ -26,6 +26,8 @@
             <Property Id="GPLLICENSE" Value="0" />
             <Property Id="CLOUDUILICENSE" Value="0" />
 
+            <Property Id="NDDRVINST" Secure="yes" />
+
             <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
 
             <!-- Added to handle FilesInUse dialog -->
@@ -250,7 +252,10 @@
             <Publish Dialog="NDWarningDialog" Control="Next" Event="NewDialog" Value="ViewLicenseDlg" />
 
             <Publish Dialog="ViewLicenseDlg" Control="Back" Event="NewDialog" Value="NDWarningDialog" />
-            <Publish Dialog="ViewLicenseDlg" Control="Next" Event="NewDialog" Value="NDConfigDialog" />
+            <Publish Dialog="ViewLicenseDlg" Control="Next" Event="NewDialog" Value="NDComponentSelection" />
+
+            <Publish Dialog="NDComponentSelection" Control="Back" Event="NewDialog" Value="ViewLicenseDlg" />
+            <Publish Dialog="NDComponentSelection" Control="Next" Event="NewDialog" Value="NDConfigDialog" />
 
             <!-- We are hidden for while the directory to install netdata and forcing a default, because it is still necessary adjusts to test claim.conf in different directories -->
 
@@ -260,7 +265,7 @@
             <Publish Dialog="InstallDirDlg" Control="ChangeFolder" Property="_BrowseProperty" Value="[WIXUI_INSTALLDIR]" Order="10" />
             <Publish Dialog="InstallDirDlg" Control="ChangeFolder" Event="SpawnDialog" Value="BrowseDlg" Order="20" / -->
 
-            <Publish Dialog="NDConfigDialog" Control="Back" Event="NewDialog" Value="ViewLicenseDlg" />
+            <Publish Dialog="NDConfigDialog" Control="Back" Event="NewDialog" Value="NDComponentSelection" />
             <Publish Dialog="NDConfigDialog" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" />
 
             <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="NDConfigDialog" Order="1" Condition="NOT Installed OR WixUI_InstallMode = &quot;Change&quot;" />
@@ -366,5 +371,24 @@
                 </Control>
             </Dialog>
         </UI>
+
+        <UI>
+            <Dialog Id="NDComponentSelection" Width="370" Height="270" Title="Netdata Feature">
+                <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="!(loc.LicenseAgreementDlgBannerBitmap)" />
+                <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+                <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+                <Control Id="Description" Type="Text" X="25" Y="23" Width="340" Height="15" Transparent="yes" NoPrefix="yes" Text="Select additional features to install." />
+                <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" Text="Features" />
+
+                <Control Id="NDDriverCBX" Type="CheckBox" X="10" Y="60" Width="290" Height="15" Property="NDDRVINST" CheckBoxValue="1"  Text="Netdata Driver: Hardware Metrics Collection." Disabled="no" />
+
+                <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
+                <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)" />
+                <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+                    <Publish Event="SpawnDialog" Value="CancelDlg" />
+                </Control>
+            </Dialog>
+        </UI>
+
     </Fragment>
 </Wix>
