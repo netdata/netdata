@@ -2,21 +2,21 @@
 
 ## Introduction to Alerting
 
-Netdata's alerting system is a **distributed, real-time health monitoring framework** that evaluates conditions against metrics and executes actions on state transitions. Notifications is one of the actions supported.
+Netdata provides a **distributed, real-time health monitoring framework** that evaluates conditions against your metrics and executes actions on state transitions. You can configure notifications as one of these actions.
 
-Unlike traditional monitoring systems, Netdata evaluates alerts at multiple levels simultaneously, on the edge (Agents), at aggregation points (Parents), and deduplicates in Netdata Cloud, allowing teams to have different levels of alerting at different levels of the infrastructure.
+Unlike traditional monitoring systems, Netdata evaluates alerts simultaneously at multiple levels - on the edge (Agents), at aggregation points (Parents), and deduplicates them in Netdata Cloud. This allows your teams to implement different alerting strategies at different infrastructure levels.
 
-### What is an Alert in Netdata
+### Understanding Alerts in Netdata
 
-Alerts in Netdata are designed to be **component level watchdogs**. They get attached to specific components/instances (e.g., a network interface, a database instance, a web server, a container, a process, etc.) and are evaluated against metrics, at configurable intervals.
+Netdata alerts function as **component-level watchdogs**. You attach them to specific components/instances (network interfaces, database instances, web servers, containers, processes) where they evaluate metrics at configurable intervals.
 
-To simplify configuration, Netdata supports alert templates, which are defined once and are applied to all matching components/instances (e.g., all network interfaces, all database instances, all web servers, all containers, all processes, etc). The system supports matching instances by host and instance labels and names, allowing alerts to be defined multiple times under the same name, with different matching criteria.
+To simplify your configuration, you can define alert templates once and apply them to all matching components. The system matches instances by host labels, instance labels, and names, allowing you to define the same alert multiple times with different matching criteria.
 
-Netdata alerts have a name, value, unit, and status. This allows them to be easily displayed in the dashboard and sent as notifications, while remaining meaningful and scalable, independently of how complex the infrastructure is.
+Each alert provides a name, value, unit, and status - making them easy to display in dashboards and send as meaningful notifications regardless of your infrastructure's complexity.
 
-### Where Alerts Run
+### Where Your Alerts Run
 
-Alerts in Netdata are evaluated at the edge. All Netdata Agents and Parents run alerts on the metrics they process and store (by default this is enabled, users may disable alerting at any level). When metrics are streamed to a Parent, the Parent evaluates its own alerts on those metrics, independently of the child that streams these metrics and the alerts configured on the child. Each Netdata Agent (child, parent, or standalone) has its own alerts configuration and evaluates alerts autonomously and independently of all other Agents. Metrics streaming does not propagate alert configurations or alert transitions to the Parent.
+Your alerts evaluate at the edge. Every Netdata Agent and Parent runs alerts on the metrics it processes and stores (enabled by default, but you can disable alerting at any level). When you stream metrics to a Parent, the Parent evaluates its own alerts on those metrics independently of the child's alerts. Each Agent maintains its own alert configuration and evaluates alerts autonomously. Metric streaming doesn't propagate alert configurations or transitions to Parents.
 
 ```
 ┌─────────┐     Metrics      ┌──────────┐     Metrics      ┌──────────┐
@@ -33,24 +33,22 @@ Alerts in Netdata are evaluated at the edge. All Netdata Agents and Parents run 
 
 ### Alert Actions and Notifications
 
-Notifications in Netdata Agents are **actions** associated with alert status transitions. Netdata Agents can dispatch notifications, or perform other automation actions, such as scaling out a service, restarting a process, rotating logs, etc. Actions are simple shell scripts or executable programs that receive from Netdata all the metadata related to the alert transition and can perform any action required.
+Your Netdata Agents treat notifications as **actions** triggered by alert status transitions. Agents can dispatch notifications or perform automation tasks like scaling services, restarting processes, or rotating logs. Actions are shell scripts or executable programs that receive all alert transition metadata from Netdata.
 
-When Netdata Agents are claimed to Netdata Cloud, they send all their alert configurations and transitions to Netdata Cloud, where they are deduplicated (multiple alert transitions from different Agents for the same host, are merged across the infrastructure). Netdata Cloud triggers notifications centrally via its own integrations (Slack, Microsoft Teams, Amazon SNS, PagerDuty, OpsGenie, etc).
+When you claim Agents to Netdata Cloud, they send their alert configurations and transitions to Cloud, which deduplicates them (merging multiple transitions from different Agents for the same host). Netdata Cloud triggers notifications centrally through its integrations (Slack, Microsoft Teams, Amazon SNS, PagerDuty, OpsGenie).
 
-Netdata Cloud intelligent alert state deduplication:
+Netdata Cloud's intelligent deduplication works by:
+- **Consolidating multiple Agents** reporting the same alert
+- **Prioritizing highest severity**: CRITICAL > WARNING > CLEAR
+- **Creating unique keys**: Alert name + Instance + Node
 
-- **Netdata Cloud deduplicates**: Multiple Agents reporting the same alert are consolidated
-- **Highest severity wins**: CRITICAL > WARNING > CLEAR
-- **Unique key**: Alert name + Instance + Node
+Your Agents and Netdata Cloud trigger actions independently using their own configurations and integrations.
 
-Netdata Agents (standalone, children, parents) and Netdata Cloud trigger actions independently, using their own configuration and integrations.
-
-The design of alerts in Netdata, allows:
-
-1. **Team Independence**: Different teams can run their own Parents with custom alerts
-2. **Edge Intelligence**: Critical alerts can trigger automations directly on nodes
-3. **Scalability**: Alert evaluation distributes naturally with your infrastructure
-4. **Flexibility**: Mix edge, regional, and central alerting strategies
+This design enables you to:
+1. **Maintain team independence**: Different teams run their own Parents with custom alerts
+2. **Implement edge intelligence**: Critical alerts trigger automations directly on nodes
+3. **Scale naturally**: Alert evaluation distributes with your infrastructure
+4. **Mix strategies**: Combine edge, regional, and central alerting
 
 ### Quick Example
 
@@ -69,176 +67,145 @@ SRE Parent:
 
 Netdata Cloud:
   - Receives all alert transitions
-  - Deduplicates all overlapping alerts
+  - Deduplicates overlapping alerts
   - Shows CRITICAL if any instance reports CRITICAL
   - Provides unified view for incident response
 ```
 
-Each level operates independently and autonomously, yet Netdata Cloud provides a coherent, deduplicated view of the entire infrastructure's health, provided that all agents are directly claimed to Netdata Cloud.
+Each level operates independently while Netdata Cloud provides a coherent, deduplicated view of your entire infrastructure's health (when all agents connect directly to Cloud).
 
-## Alerts & Notifications Configuration Management
+## Managing Alert Configuration
 
-Netdata alerts are configured in 3 layers:
+You configure Netdata alerts in 3 layers:
 
-1. **Stock Alerts**: Alert definitions provided by Netdata, usually stored in `/usr/lib/netdata/conf.d/health.d`. These alerts should not be edited directly, as they will be overwritten on Netdata updates. Netdata ships hundreds of alerts to detect common issues and problems for systems and applications, providing an out-of-the-box solution for many use cases.
-2. **User Configured Alerts**: Alert definitions created by users, stored in `/etc/netdata/health.d`.
-3. **Dynamically Configured Alerts, via the UI**: Netdata dashboards allow logged in users with the proper permissions, to edit, add, enable, disable alert configurations. Dynamic configuration allows users to create alerts on any node, via the streaming transport (e.g., the dashboard of the a Parent allows manipulating alerts on any connected Child Agent).
+1. **Stock Alerts**: Netdata provides hundreds of alert definitions in `/usr/lib/netdata/conf.d/health.d` to detect common issues. Don't edit these directly - updates will overwrite your changes.
+2. **Your Custom Alerts**: Create your own definitions in `/etc/netdata/health.d`.
+3. **Dynamic UI Configuration**: Use Netdata dashboards to edit, add, enable, or disable alerts on any node through the streaming transport.
 
-## Actions & Notifications Configuration Management
+## Managing Notification Configuration
 
-For any given node in the infrastructure, notifications can be configured at 3 levels:
+You can configure notifications for any infrastructure node at 3 levels:
 
-| Level              | Evaluates                   | Notifications From | Customization                     | Notifications                                                                                                               |
+| Level              | What It Evaluates           | Where Notifications Come From | Use Case                          | Documentation                                                                                                               |
 |--------------------|-----------------------------|--------------------|-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------|
 | **Netdata Agent**  | Local Metrics               | Netdata Agent      | Edge automation                   | [Agent integrations](https://learn.netdata.cloud/docs/alerts-&-notifications/notifications/agent-dispatched-notifications)  |
 | **Netdata Parent** | Local and Children Metrics  | Netdata Parent     | Edge automation                   | [Agent integrations](https://learn.netdata.cloud/docs/alerts-&-notifications/notifications/agent-dispatched-notifications)  |
-| **Netdata Cloud**  | None - Receives Transitions | Netdata Cloud      | Web-hooks, role based, room based | [Cloud integrations](https://learn.netdata.cloud/docs/alerts-&-notifications/notifications/centralized-cloud-notifications) |
+| **Netdata Cloud**  | Receives Transitions        | Netdata Cloud      | Web-hooks, role/room based | [Cloud integrations](https://learn.netdata.cloud/docs/alerts-&-notifications/notifications/centralized-cloud-notifications) |
 
 :::note
-
-When using Netdata Parents and Netdata Cloud, with default settings, you may be receiving multiple email notifications for the same alert transition. The reason is that Netdata Agents are configured to send email notifications by default when an MTA is configured on the systems they run. We recommend disabling email notifications on Netdata Agents and Parents when using Netdata Cloud. To disable email notifications, set `SEND_EMAIL="NO"` in `/etc/netdata/health_alarm_notify.conf` [using `edit-config`](/docs/netdata-agent/configuration/README.md).
-
+When using Parents and Cloud with default settings, you may receive duplicate email notifications. Agents send emails by default when an MTA exists on their systems. Disable email notifications on Agents and Parents when using Cloud by setting `SEND_EMAIL="NO"` in `/etc/netdata/health_alarm_notify.conf` [using `edit-config`](/docs/netdata-agent/configuration/README.md).
 :::
 
-### Best Practices For Managing Large Deployments
+### Best Practices for Large Deployments
 
-Netdata has been designed to provide maximum flexibility and control over alerting. However, some common use cases have emerged:
+#### Central Alerting Strategy
 
-#### Central Alerting
+When you:
+- Don't need edge automation (no scripts reacting to alerts)
+- Use highly available Parents for all nodes
+- Use Netdata Cloud (at least for Parents)
 
-When:
+Follow these steps:
+1. Disable health monitoring on child nodes
+2. Share the same alert configuration across Parents (use git repo or CI/CD)
+3. Disable Parent notifications (`SEND_EMAIL="NO"` in `/etc/netdata/health_alarm_notify.conf`)
+4. Keep only Cloud notifications
 
-- No edge automation is required (there is no need for running scripts to react on alert transitions), and
-- Highly available Netdata Parents are used for all nodes, and
-- Netdata Cloud is used (at least for all parents)
+This emulates traditional monitoring tools where you configure alerts centrally and dispatch notifications centrally.
 
-We recommend:
+#### Edge Flexible Alerting Strategy
 
-1. Disable health monitoring on all child nodes.
-2. Make sure all parents share the same alert configuration (use a shared git repo, or CI/CD for provisioning)
-3. Disable notifications on Netdata Parents (set `SEND_EMAIL="NO"` in `/etc/netdata/health_alarm_notify.conf`)
-4. Keep notifications only from Netdata Cloud
+When you:
+- Need edge automation (scale out, restart processes)
+- Use Parents
+- Use Cloud for all nodes
 
-This strategy emulates what most users are accustomed to from other monitoring tools, where alerts are configured centrally and notifications are also dispatched centrally:
+Follow these steps:
+- Disable stock alerts on children (`enable stock health configuration` to `no` in `/etc/netdata/netdata.conf` `[health]` section)
+- Configure only automation-required alerts on children
+- Keep stock alerts on Parents but disable notifications (`SEND_EMAIL="NO"`)
+- Keep only Cloud notifications
 
-- Netdata child nodes just collect and dispatch metrics
-- All alerts are evaluated only on Netdata Parents
-- Notifications are sent only from Netdata Cloud
-
-#### Edge Flexible Alerting
-
-When:
-
-- Edge automation is required (e.g., scale out, restart processes, etc), and
-- Netdata Parents are used, and
-- Netdata Cloud is used for all nodes
-
-We recommend:
-
-- Disable stock alerts on Netdata child nodes (set `enable stock health configuration` to `no` in `/etc/netdata/netdata.conf` in `[health]` section)
-- Configure in child nodes only the alerts required for edge automation
-- Keep stock alerts on Netdata Parents but disable their notifications (set `SEND_EMAIL="NO"` in `/etc/netdata/health_alarm_notify.conf`)
-- Keep notifications only from Netdata Cloud
-
-This will allow edge automation to be triggered on child nodes, while still having central control over alerting and deduplicated notifications from Netdata Cloud.
+This enables edge automation on children while maintaining central alerting control and deduplicated Cloud notifications.
 
 ## Set Up Alerts via Netdata Cloud
 
 1. Connect your nodes to [Netdata Cloud](https://app.netdata.cloud/)
-2. In the UI, go to: `Space → Notifications`
-3. Choose an integration (e.g. Slack, Amazon SNS, Splunk)
-4. Set alert severity filters as needed
+2. Navigate to: `Space → Notifications`
+3. Choose your integration (Slack, Amazon SNS, Splunk)
+4. Configure alert severity filters
 
-[See all supported Cloud integrations](https://learn.netdata.cloud/docs/alerts-&-notifications/notifications/centralized-cloud-notifications)
+[View all Cloud integrations](https://learn.netdata.cloud/docs/alerts-&-notifications/notifications/centralized-cloud-notifications)
 
 ## Set Up Alerts via Netdata Agent
 
-1. Open the notification config:
-
+1. Open notification config:
    ```bash
    sudo ./edit-config health_alarm_notify.conf
    ```
 
-2. Enable your preferred method, for example, email:
-
+2. Enable your method (example: email):
    ```ini
    SEND_EMAIL="YES"
    DEFAULT_RECIPIENT_EMAIL="you@example.com"
    ```
 
-3. Ensure your system can send mail (via `sendmail`, SMTP relay, etc.)
-4. Restart the agent:
+3. Verify your system can send mail (sendmail, SMTP relay)
 
+4. Restart the agent:
    ```bash
    sudo systemctl restart netdata
    ```
 
-[See all Agent-based integrations](https://learn.netdata.cloud/docs/alerts-&-notifications/notifications/agent-dispatched-notifications)
+[View all Agent integrations](https://learn.netdata.cloud/docs/alerts-&-notifications/notifications/agent-dispatched-notifications)
 
-## Alerting Core Concepts
+## Core Alerting Concepts
 
-To configure alerts, Netdata supports:
+Netdata supports two alert types:
+- **Alarms**: Attach to specific instances (specific network interface, database instance)
+- **Templates**: Apply to all matching instances (all network interfaces, all databases)
 
-- **Alarms**: Attached to specific instances (e.g., a specific network interface, a specific database instance, a specific web server)
-- **Templates**: Applied to all instances matching a context (e.g., all network interfaces, all database instances, all web servers)
+### Alert Lifecycle and States
 
-### Alert Lifecycle and State Transitions
-
-Netdata alerts are more than simple threshold checks. Each alert produces:
-
-- **A value**: Can combine multiple metrics, or other alerts, using time-series lookups and expressions
-- **A unit**: Makes the alert meaningful (e.g., "seconds", "%", "requests/s")
+Your alerts produce more than threshold checks. Each generates:
+- **A value**: Combines metrics or other alerts using time-series lookups and expressions
+- **A unit**: Makes alerts meaningful ("seconds", "%", "requests/s")
 - **A name**: Identifies the alert
 
-This design enables sophisticated alerts like:
-
-- `out of disk space time: 450 seconds` - Predicts when disk will be full based on current fill rate
-- `3xx redirects: 12.5 percent` - Calculates redirects as percentage of total responses
-- `response time vs yesterday: 150 %` - Compares current performance to historical baseline
+This enables sophisticated alerts like:
+- `out of disk space time: 450 seconds` - Predicts when disk fills based on current rate
+- `3xx redirects: 12.5 percent` - Calculates redirects as percentage of total
+- `response time vs yesterday: 150%` - Compares current to historical baseline
 
 ### Alert States
 
-Every alert exists in one of these states:
+Your alerts exist in one of these states:
 
 | State             | Description                                       | Trigger                                                                  |
 |-------------------|---------------------------------------------------|--------------------------------------------------------------------------|
-| **CLEAR**         | Normal state - conditions exist but not triggered | Warning and critical conditions evaluate to zero                         |
+| **CLEAR**         | Normal - conditions exist but not triggered | Warning and critical conditions evaluate to zero                         |
 | **WARNING**       | Warning threshold exceeded                        | Warning condition evaluates to non-zero                                  |
 | **CRITICAL**      | Critical threshold exceeded                       | Critical condition evaluates to non-zero                                 |
-| **UNDEFINED**     | Cannot evaluate                                   | No conditions defined, or value is NaN/Inf (data gaps, division by zero) |
-| **UNINITIALIZED** | Never evaluated                                   | Alert just created, no evaluation yet performed                          |
+| **UNDEFINED**     | Cannot evaluate                                   | No conditions defined, or value is NaN/Inf                               |
+| **UNINITIALIZED** | Never evaluated                                   | Alert just created                                                      |
 | **REMOVED**       | Alert deleted                                     | Child disconnected, agent exit, or health reload                         |
 
-### State Transitions
-
-Alert states transition based on the evaluation results. There are no restrictions on transitions, an alert can move from any state to any other state based on:
-
-- **The calculated value** (including NaN, Inf, or valid numbers)
-- **The warning and critical conditions** (their evaluation results)
-- **External events** (disconnections, reloads, agent exits)
+Alerts transition freely between states based on:
+- **Calculated value** (including NaN, Inf, or valid numbers)
+- **Warning/critical conditions** (evaluation results)
+- **External events** (disconnections, reloads, exits)
 
 Key behaviors:
-
-- **Direct transitions**: Alerts can jump directly from CLEAR to CRITICAL (no need to pass through WARNING)
-- **Independent thresholds**: WARNING and CRITICAL conditions are evaluated independently
-- **Recovery from UNDEFINED**: When data becomes available again, alerts return to appropriate state
-- **Severity precedence**: If both WARNING and CRITICAL conditions are true, CRITICAL wins
+- Alerts jump directly from CLEAR to CRITICAL (no WARNING required)
+- WARNING and CRITICAL evaluate independently
+- Alerts return to appropriate state when data becomes available
+- CRITICAL takes precedence when both conditions are true
 
 ### Alert Evaluation Process
 
-#### 1. Value Calculation
+#### 1. Calculate Value
 
-Alerts can perform complex calculations:
-
-1. Perform a time-series lookup (e.g., average, sum, min, max, etc)
-2. Apply a calculation, using complex arithmetic expressions and variables
-
-- `lookup` (optional) → Query database for metrics → Result stored in `$this`
-- `calc` (optional) → Calculate using `$this` and other variables → Result overwrites `$this`
-- `warn` condition → Evaluate using final `$this` → Determines WARNING state
-- `crit` condition → Evaluate using final `$this` → Determines CRITICAL state
-
-Although both `lookup` and `calc` are optional, at least one must be defined.
+Your alerts perform complex calculations:
 
 ```
      lookup              calc             warn,crit           status
@@ -249,38 +216,37 @@ Although both `lookup` and `calc` are optional, at least one must be defined.
    └──────────┘       └──────────┘       └──────────┘      └───────────┘
 ```
 
-Examples of value assignments to `$this`:
-
+Examples:
 ```yaml
-# Simple threshold: 'used' is a dimension name and it is resolved to its latest stored value
+# Simple threshold
 calc: $used
-# in other words: $this = the latest value of the dimension 'used'
+# Result: $this = latest value of dimension 'used'
 
-# Time-series lookup: 'used' is a dimension name and we find its average over the last hour
+# Time-series lookup
 lookup: average -1h of used
-# in other words: $this = the average of the dimension 'used' over the last hour
+# Result: $this = average of 'used' over last hour
 
-# Combined calculation: 'used' is a dimension name and it is resolved to its latest stored value
+# Combined calculation
 lookup: average -1h of used
 calc: $this * 100 / $total
-# in other words: $this = the average of the dimension 'used' over the last hour multiplied by 100 divided by the latest value of the dimension 'total'
+# Result: $this = percentage of hourly average vs total
 
-# Comparison to baseline: 'used' is a dimension and '$average_yesterday' is another alert name 
+# Baseline comparison
 lookup: average -1h of used
 calc: $this * 100 / $average_yesterday
-# in other words: $this = the percentage of the average used over the last hour, vs yesterday's average for the same time period
+# Result: $this = percentage vs yesterday's average
 ```
 
-#### 2. Condition Evaluation
+#### 2. Evaluate Conditions
 
-After calculating the value, conditions are checked:
+After calculating, check conditions:
 
 ```yaml
-# Simple conditions; 'this' is the calculated value of this alert
+# Simple conditions
 warn: $this > 80
 crit: $this > 90
 
-# Flapping prevention (different thresholds for raising/clearing)
+# Flapping prevention
 warn: ($status >= $WARNING) ? ($this > 50) : ($this > 80)
 crit: ($status == $CRITICAL) ? ($this > 70) : ($this > 90)
 
@@ -289,26 +255,22 @@ warn: $this > 80 AND $rate > 10
 crit: $this > 90 OR $failures > 5
 ```
 
-#### 3. State Determination
+#### 3. Determine State
 
-Warning and critical conditions are evaluated independently, with each result mapped as:
+Each condition evaluates to:
+- NaN or Inf → UNDEFINED
+- Non-zero → RAISED
+- Zero → CLEAR
 
-- NaN or Inf → UNDEFINED for that condition
-- Non-zero → RAISED for that condition
-- Zero → CLEAR for that condition
+Final status:
+- Critical RAISED → **CRITICAL** (priority)
+- Warning RAISED → **WARNING**
+- Either CLEAR → **CLEAR**
+- Both missing/UNDEFINED → **UNDEFINED**
 
-Final status is determined by:
+### Evaluation Timing
 
-- If critical is RAISED → **CRITICAL** (takes precedence)
-- Else if warning is RAISED → **WARNING**
-- Else if either condition is CLEAR → **CLEAR**
-- Else → **UNDEFINED** (both conditions missing or UNDEFINED)
-
-Note: If `calc` or `lookup` returns NaN/Inf, only conditions that depend on that value become UNDEFINED.
-
-### Evaluation Timing and Independence
-
-Alert evaluation is **independent** from data collection to avoid impacting performance:
+Alert evaluation runs independently from data collection:
 
 ```
 Data Collection         Alert Evaluation
@@ -322,107 +284,87 @@ Data Collection         Alert Evaluation
                         Check conditions
 ```
 
-**Default interval**: if the alert has a `lookup`, it defaults to the query window duration, otherwise it must be set manually
-**Configurable**: Use `every` to set custom evaluation intervals
-**Constrained**: Alerts evaluation frequency cannot be lower (more frequent) than the data collection frequency
+- **Default interval**: Query window duration (with lookup) or manual setting required
+- **Configurable**: Use `every` for custom intervals
+- **Constrained**: Cannot evaluate faster than data collection frequency
 
 ### Anti-Flapping Mechanisms
 
-Netdata implements multiple strategies to prevent alert flapping:
+Netdata prevents alert flapping through:
 
-#### 1. Hysteresis in Conditions
-
+#### 1. Hysteresis
 ```yaml
-# Different thresholds for raising vs clearing
 warn: ($status < $WARNING) ? ($this > 80) : ($this > 50)
 ```
+Triggers at 80, clears at 50, preventing flapping between 50-80.
 
-This means: trigger WARNING when value exceeds 80, but only clear when it drops below 50, preventing flapping between 50-80.
+#### 2. Dynamic Delays
+Alerts transition immediately in dashboards but notifications use exponential backoff.
 
-#### 2. Dynamic Notification Delays
-
-While alerts **transition immediately** in the dashboard, notifications may be delayed with exponential backoff:
-
-- First notification: immediate
-- Subsequent notifications: progressively delayed
-- Prevents notification spam while maintaining real-time visibility
-
-#### 3. Minimum Duration Requirements
-
-Some alerts require conditions to persist:
-
+#### 3. Duration Requirements
 ```yaml
-# Trigger only if condition true for 10 minutes
 lookup: average -10m of used
 warn: $this > 80
 ```
+Requires 10 minutes of data before triggering.
 
-### Multi-Stage Alert Example
+### Multi-Stage Alerts
 
-Netdata allows creating dependent alerts:
+Create dependent alerts:
 
 ```yaml
-# Stage 1: Calculate baseline (no triggers)
+# Stage 1: Baseline
 template: requests_average_yesterday
       on: web_log.requests
   lookup: average -1h at -1d
    every: 10s
-    # No warn/crit - just calculate
 
-# Stage 2: Calculate current (no triggers)  
+# Stage 2: Current
 template: requests_average_now
       on: web_log.requests
   lookup: average -1h
    every: 10s
-    # No warn/crit - just calculate
 
-# Stage 3: Compare and trigger
+# Stage 3: Compare
 template: web_requests_vs_yesterday
       on: web_log.requests
     calc: $requests_average_now * 100 / $requests_average_yesterday
    units: %
-    warn: $this > 150 || $this < 75  # 50% increase or 25% decrease
-    crit: $this > 200 || $this < 50  # 100% increase or 50% decrease
+    warn: $this > 150 || $this < 75
+    crit: $this > 200 || $this < 50
 ```
-
-This creates a sophisticated alert that compares current traffic to historical patterns, triggering only on significant deviations.
 
 ### Available Variables
 
-Variables are resolved in the following order (first match wins):
+Variables resolve in order (first match wins):
 
 #### 1. Built-in Variables
 
-Available in all expressions (calc, warn, crit):
-
-| Variable            | Description               | Value/Type              |
-|---------------------|---------------------------|-------------------------|
+| Variable            | Description               | Value              |
+|---------------------|---------------------------|--------------------|
 | `$this`             | Current calculated value  | Result from lookup/calc |
-| `$after`            | Query start timestamp     | Unix timestamp          |
-| `$before`           | Query end timestamp       | Unix timestamp          |
-| `$now`              | Current wall-clock time   | Unix timestamp          |
-| `$last_collected_t` | Last data collection time | Unix timestamp          |
-| `$update_every`     | Data collection frequency | Seconds                 |
-| `$status`           | Current alert status code | -2 to 3                 |
-| `$REMOVED`          | Status constant           | -2                      |
-| `$UNINITIALIZED`    | Status constant           | -1                      |
-| `$UNDEFINED`        | Status constant           | 0                       |
-| `$CLEAR`            | Status constant           | 1                       |
-| `$WARNING`          | Status constant           | 2                       |
-| `$CRITICAL`         | Status constant           | 3                       |
+| `$after`            | Query start timestamp     | Unix timestamp     |
+| `$before`           | Query end timestamp       | Unix timestamp     |
+| `$now`              | Current time              | Unix timestamp     |
+| `$last_collected_t` | Last collection time      | Unix timestamp     |
+| `$update_every`     | Collection frequency      | Seconds            |
+| `$status`           | Current status code       | -2 to 3            |
+| `$REMOVED`          | Status constant           | -2                 |
+| `$UNINITIALIZED`    | Status constant           | -1                 |
+| `$UNDEFINED`        | Status constant           | 0                  |
+| `$CLEAR`            | Status constant           | 1                  |
+| `$WARNING`          | Status constant           | 2                  |
+| `$CRITICAL`         | Status constant           | 3                  |
 
-#### 2. Dimension Values from Current Chart
+#### 2. Dimension Values
 
-Reference dimensions directly by name:
-
-| Syntax                             | Description                                  | Example                  |
-|------------------------------------|----------------------------------------------|--------------------------|
-| `$dimension_name`                  | Last stored value (normalized, interpolated) | `$used`, `$system`       |
-| `$dimension_name_raw`              | Last collected value (raw value collected)   | `$used_raw`              |
-| `$dimension_name_last_collected_t` | When dimension was collected                 | `$used_last_collected_t` |
+| Syntax                             | Description                      | Example          |
+|------------------------------------|----------------------------------|------------------|
+| `$dimension_name`                  | Last normalized value            | `$used`          |
+| `$dimension_name_raw`              | Last raw collected value         | `$used_raw`      |
+| `$dimension_name_last_collected_t` | Collection timestamp             | `$used_last_collected_t` |
 
 ```yaml
-# On disk.space chart with dimensions 'used' and 'available'
 template: disk_usage_percent
       on: disk.space
     calc: $used * 100 / ($used + $available)
@@ -430,199 +372,108 @@ template: disk_usage_percent
 ```
 
 #### 3. Chart Variables
-
-Custom variables defined at the chart level:
-
 ```yaml
-# If a chart has custom variable 'threshold'
-calc: $used > $threshold
+calc: $used > $threshold  # If chart defines 'threshold'
 ```
 
 #### 4. Host Variables
-
-Custom variables defined at the host level:
-
 ```yaml
-# If host has variable 'max_connections'
-warn: $connections > $max_connections * 0.8
+warn: $connections > $max_connections * 0.8  # If host defines 'max_connections'
 ```
 
-#### 5. Other Alert Values
-
-Reference other alerts by name:
-
+#### 5. Other Alerts
 ```yaml
-# Alert 1: Calculate baseline
+# Alert 1
 template: cpu_baseline
     calc: $system + $user
-   units: %
 
-# Alert 2: Compare to baseline
+# Alert 2
 template: cpu_check
     calc: $system
     warn: $this > $cpu_baseline * 1.5
 ```
 
 #### 6. Cross-Context References
-
-Use dot notation to reference dimensions from other contexts or charts:
-
 ```yaml
-# Format: ${context.dimension} or ${chart.dimension}
 template: disk_io_vs_iops
       on: disk.io
     calc: $reads / ${disk.iops.reads}
    units: bytes per operation
-
-# Can also reference specific instances IDs
-template: compare_to_other_disk
-      on: disk.io
-    calc: $reads / ${disk_sdb.io.reads}
 ```
-
-**Note**: The variable resolution attempts both chart ID and context matching, finding all possible matches and using label scoring to select the best one.
 
 ### Variable Resolution and Label Scoring
 
-When an alert references a variable that could match multiple instances (e.g., multiple disks, network interfaces), Netdata uses **label similarity scoring** to find the best match:
+When alerts reference variables matching multiple instances, Netdata uses label similarity scoring:
 
-1. **Collect Candidates**: Find all variables with matching names
-2. **Score by Labels**: Count common labels between the alert's instance and each candidate
-3. **Select Best Match**: Choose the candidate with the highest label overlap
+1. **Collect candidates** with matching names
+2. **Score by labels** - count common labels
+3. **Select best match** - highest label overlap
 
-Example:
+Example: Alert on `disk.io` (labels: `device=sda`, `mount=/data`) references `${disk.iops.reads}`:
+- `disk.iops` for sda (labels match) → Score: 2
+- `disk.iops` for sdb (no match) → Score: 0
+Result: Uses sda's value
 
-Assume the alert on `disk.io` of the instance with labels `device=sda`, `mount=/data`, references `${disk.iops.reads}`.
-Netdata finds the following candidates:
+### Missing Data Handling
 
-- `disk.iops` instance for sda (labels: `device=sda`, `mount=/data`) → Score: 2
-- `disk.iops` instance for sdb (labels: `device=sdb`, `mount=/backup`) → Score: 0
+During lookups with missing data:
+- **All values NULL**: `$this` becomes `NaN`
+- **Some values exist**: Ignores NULL, continues calculation
+- **Dimension doesn't exist**: `$this` becomes `NaN`
 
-Result: Uses sda's iops value.
-
-### Missing Data and NULL Handling
-
-When evaluating lookups with missing data:
-
-- If **all values are NULL**: `$this` becomes `NaN`
-- If **some values exist**: NULL values are ignored, calculation proceeds
-- If **dimension doesn't exist**: `$this` becomes `NaN`
-
-This ensures alerts can handle:
-
-- Intermittent data collection
-- Dynamic dimensions (appearing/disappearing)
-- Partial outages
+This handles intermittent collection, dynamic dimensions, and partial outages.
 
 ### Evaluation Frequency
 
-Alert evaluation frequency is determined by:
+Determine frequency by:
 
-1. **With lookup**: Defaults to the lookup window duration
-
+1. **With lookup**: Defaults to window duration
    ```yaml
-   lookup: average -5m  # Evaluates every 5 minutes by default
+   lookup: average -5m  # Evaluates every 5 minutes
    ```
 
-2. **Without lookup**: Must be explicitly set
-
+2. **Without lookup**: Set explicitly
    ```yaml
    every: 10s
    calc: $system + $user
    ```
 
-3. **Custom interval**: Override the default
-
+3. **Custom interval**: Override default
    ```yaml
    lookup: average -1m
    every: 10s  # Check every 10s despite 1m window
    ```
 
-**Important constraints**:
+Constraints:
+- Cannot exceed data collection frequency
+- High frequency impacts performance
+- Use larger intervals with `unaligned` for efficiency
 
-- Cannot evaluate more frequently than data collection
-- High frequency evaluation impacts performance
-- Consider using larger intervals with `unaligned` for efficiency
+## Troubleshooting Your Alerts
 
-## Troubleshooting Alerts
+### Netdata Assistant
 
-Netdata provides several tools to help you understand and resolve alert notifications:
+The [Netdata Assistant](https://learn.netdata.cloud/docs/machine-learning-and-anomaly-detection/ai-powered-troubleshooting-assistant) provides AI-powered troubleshooting when alerts trigger:
 
-<details>
-<summary><strong>Netdata Assistant</strong></summary><br/>
+1. Click the alert in your dashboard
+2. Press the Assistant button
+3. Receive customized troubleshooting tips
 
-The [Netdata Assistant](https://learn.netdata.cloud/docs/machine-learning-and-anomaly-detection/ai-powered-troubleshooting-assistant) is an AI-powered feature that guides you through troubleshooting alerts. When an alert triggers, you can:
+The Assistant window follows you through dashboards for easy reference while investigating.
 
-1. Click on the alert in your Netdata Cloud dashboard
-2. Press the Assistant button to open a floating window
-3. Receive customized information and troubleshooting tips specific to that alert
+### Community Resources
 
-```mermaid
-%%{init: {'theme': 'default', 'themeVariables': { 
-  'primaryColor': '#2b2b2b', 
-  'primaryTextColor': '#fff', 
-  'primaryBorderColor': '#7C0000', 
-  'lineColor': '#F8B229', 
-  'secondaryColor': '#006100', 
-  'tertiaryColor': '#333',
-  'fontFamily': 'arial',
-  'fontSize': '16px'
-}}}%%
-flowchart TD
-    A[Alert Detected] -->|Analyze Context| B(Alert Assistant)
-    style A fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
-    style B fill:#ffeb3b,stroke:#555,color:#333,stroke-width:1px,rx:10,ry:10
-    
-    B --> C[Explanation of Alert]
-    B --> D[Possible Causes]
-    B --> E[Troubleshooting Steps]
-    B --> F[Documentation Links]
-    
-    style C fill:#4caf50,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
-    style D fill:#f44336,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
-    style E fill:#4caf50,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
-    style F fill:#4caf50,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
-```
+Visit our [Alerts Troubleshooting space](https://community.netdata.cloud/c/alerts/28) for complex issues. Get help through [GitHub](https://github.com/netdata/netdata) or [Discord](https://discord.gg/kUk3nCmbtx). Share your solutions to help others.
 
-The Assistant window follows you as you navigate through Netdata dashboards, making it easy to reference while investigating the issue.
-</details>
+### Customizing Alerts
 
-<details>
-<summary><strong>Community Resources</strong></summary><br/>
+Tune alerts for your environment by adjusting thresholds, writing custom conditions, silencing alerts, and using statistical functions.
 
-For more complex alert troubleshooting, Netdata maintains a dedicated [Alerts Troubleshooting space](https://community.netdata.cloud/c/alerts/28) in our community forum.
-
-```mermaid
-%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#2b2b2b', 'primaryTextColor': '#fff', 'primaryBorderColor': '#7C0000', 'lineColor': '#F8B229', 'secondaryColor': '#006100', 'tertiaryColor': '#333'}}}%%
-flowchart TD
-    A((Community<br>Forum)) --- B[Ask Questions]
-    A --- C[Share Solutions]
-    A --- D[Suggest Improvements]
-    A --- E[Learn from Others]
-    A --- F[Find Alert Info]
-    
-    style A fill:#ffeb3b,stroke:#555,color:#333,stroke-width:1px,rx:20,ry:20
-    style B fill:#4caf50,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
-    style C fill:#4caf50,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
-    style D fill:#4caf50,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
-    style E fill:#4caf50,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
-    style F fill:#f44336,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
-```
-
-You can also get help through our [GitHub repository](https://github.com/netdata/netdata) or [Discord channel](https://discord.gg/kUk3nCmbtx) if you prefer those platforms. After resolving an issue, consider sharing your experience in the forum to help other users.
-</details>
-
-<details>
-<summary><strong>Customizing Alerts</strong></summary><br/>
-
-You can tune alerts to match your environment by adjusting thresholds, writing custom alert conditions, silencing alerts temporarily or permanently, and using statistical functions for smarter alerting.
-
-[Customize alerts](/src/health/REFERENCE.md)
-[Silence or disable alerts](/src/health/REFERENCE.md#how-to-disable-or-silence-alerts)
-</details>
+- [Customize alerts](/src/health/REFERENCE.md)
+- [Silence or disable alerts](/src/health/REFERENCE.md#how-to-disable-or-silence-alerts)
 
 ## Related Documentation
 
-- [All alert notification methods](/docs/alerts-and-notifications/notifications/README.md)
+- [All notification methods](/docs/alerts-and-notifications/notifications/README.md)
 - [Supported collectors](/src/collectors/COLLECTORS.md)
 - [Full alert reference](/src/health/REFERENCE.md)
