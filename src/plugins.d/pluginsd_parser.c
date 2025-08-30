@@ -256,7 +256,11 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
         schedule_node_state_update(host, 100);
 
     rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE);
-    (void) JudyLIns(&parser->user.vnodes.JudyL, (Word_t) host, PJE0);
+    uint32_t *Pvalue = (uint32_t *) JudyLIns(&parser->user.vnodes.JudyL, (Word_t) host, PJE0);
+    if (Pvalue != PJERR)
+        *Pvalue = (uint32_t) (now_realtime_sec() - VNODE_BASE_EPOCH);
+    else
+        nd_log_daemon(NDLP_ERR, "VNODE: Cannot track virtual host \"%s\" for staleness - JudyLIns error", rrdhost_hostname(host));
     host->node_stale_after_seconds = parser->user.host_define.node_stale_after_seconds;
     nd_log_daemon(NDLP_INFO, "VNODE: Configuring node stale after %u seconds for host \"%s\"", host->node_stale_after_seconds, rrdhost_hostname(host));
     return PARSER_RC_OK;
@@ -285,7 +289,7 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
                 min_check_interval = MIN(min_check_interval, stale_after_seconds);
                 if (rrdhost_option_check(virtual_host, RRDHOST_OPTION_VIRTUAL_HOST)) {
                     time_t last_seen = (*Pvalue + VNODE_BASE_EPOCH);
-                    uint32_t seen_seconds_ago = now - last_seen;
+                    uint32_t seen_seconds_ago = (uint32_t) (now - last_seen);
                     nd_log_daemon(
                         NDLP_INFO,
                         "VNODE: Checking if node \"%s\" is stale. Seen %u seconds ago, stale is after %u seconds",
@@ -321,8 +325,7 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
     parser->user.host = host;
     uint32_t *Pvalue = (uint32_t *) JudyLGet(parser->user.vnodes.JudyL, (Word_t) host, PJE0);
     if (Pvalue) {
-        uint32_t last_seen = now_realtime_sec() - VNODE_BASE_EPOCH;
-        *Pvalue = last_seen;
+        *Pvalue = (uint32_t) (now_realtime_sec() - VNODE_BASE_EPOCH);
         // Check if we need to enable
         if (!rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST)) {
             rrdhost_option_set(host, RRDHOST_OPTION_VIRTUAL_HOST);
