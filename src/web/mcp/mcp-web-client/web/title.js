@@ -11,7 +11,7 @@ import * as SystemMsg from './system-msg.js';
 // Title generation prompt constant
 const TITLE_REQUEST_PROMPT = 
     'Please provide a short, descriptive title (max 50 characters) for this conversation.\n' +
-    'Respond with ONLY the title text, no quotes, no explanation.';
+    'Output ONLY a short title, no thinking tags, no quotes, no explanations.';
 
 /**
  * Generate a title for the chat conversation
@@ -76,19 +76,40 @@ export async function generateChatTitle(chat, mcpConnection, provider, isAutomat
         // Send request with low temperature for consistent titles
         const temperature = 0.3;
         const llmStartTime = Date.now();
-        const response = await provider.sendMessage(messages, [], temperature, 'all-off', null, null);
+        
+        // Create a minimal chat object with the necessary configuration for the provider
+        // This ensures the provider uses the correct context window for title generation
+        const fakeChat = {
+            config: {
+                model: {
+                    params: {
+                        // Use title generation model's context window if configured, otherwise inherit from parent chat
+                        contextWindow: chat.config?.optimisation?.titleGeneration?.model?.params?.contextWindow || 
+                                      chat.config?.model?.params?.contextWindow,
+                        maxTokens: chat.config?.optimisation?.titleGeneration?.model?.params?.maxTokens || 100
+                    }
+                }
+            },
+            isSubChat: true  // Mark as subchat for logging purposes
+        };
+        
+        const response = await provider.sendMessage(messages, [], temperature, 'all-off', null, fakeChat);
         const llmResponseTime = Date.now() - llmStartTime;
         
         // Process the title response
         if (response.content) {
             // Store the title response with the 'title' role
+            // Use the full model string from chat config or construct it with provider prefix
+            const fullModelString = ChatConfig.getChatModelString(chat) || 
+                                   (provider.type ? `${provider.type}:${provider.model}` : provider.model);
+            
             if (callbacks.addMessage) {
                 callbacks.addMessage(chat.id, { 
                     role: 'title', 
                     content: response.content,
                     usage: response.usage || null,
                     responseTime: llmResponseTime || null,
-                    model: provider.model || ChatConfig.getChatModelString(chat),
+                    model: fullModelString,
                     timestamp: new Date().toISOString()
                 });
             }
@@ -100,7 +121,7 @@ export async function generateChatTitle(chat, mcpConnection, provider, isAutomat
                     content: response.content,
                     usage: response.usage,
                     responseTime: llmResponseTime,
-                    model: provider.model || ChatConfig.getChatModelString(chat)
+                    model: fullModelString
                 }, chat.id);
             }
             
@@ -194,10 +215,16 @@ export function getTitleGenerationProvider(chat, llmProvider, defaultProvider, c
     if (chat.config?.optimisation?.titleGeneration?.enabled && 
         chat.config.optimisation.titleGeneration.model) {
         const titleModel = chat.config.optimisation.titleGeneration.model;
+        
+        // Get the API type from the provider configuration
+        const providerApiType = llmProvider.availableProviders?.[titleModel.provider]?.type || titleModel.provider;
+        
         const provider = createLLMProvider(
-            titleModel.provider,
+            providerApiType,
             llmProvider.proxyUrl,
-            titleModel.id
+            titleModel.id,
+            llmProvider.availableProviders?.[titleModel.provider],
+            titleModel.provider
         );
         provider.onLog = llmProvider.onLog;
         return provider;
