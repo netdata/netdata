@@ -1,0 +1,11 @@
+pattern: '(?P<EXPECTED_FIELD>VERY_SPECIFIC_PATTERN_THAT_WONT_MATCH)'
+
+unmatched:
+  key: MESSAGE
+  inject:
+    - key: PRIORITY
+      value: 3
+    - key: SYSLOG_IDENTIFIER
+      value: error-recovery
+    - key: ERROR_TYPE
+      value: unmatched-pattern
