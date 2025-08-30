@@ -7,6 +7,7 @@ export class MCPClientManager {
     processes = new Map();
     servers = new Map();
     trace = false;
+    verbose = false;
     logger = (_msg) => { return; };
     traceLog(message) {
         try {
@@ -16,6 +17,7 @@ export class MCPClientManager {
     }
     constructor(opts) {
         this.trace = opts?.trace === true;
+        this.verbose = opts?.verbose === true;
         if (typeof opts?.logger === 'function')
             this.logger = opts.logger;
     }
@@ -31,6 +33,13 @@ export class MCPClientManager {
     async initializeServer(name, config) {
         const client = new Client({ name: 'ai-agent', version: '1.0.0' }, { capabilities: { tools: {} } });
         let transport;
+        const initStart = Date.now();
+        if (this.verbose) {
+            try {
+                process.stderr.write(`[mcp] initializing ${name}\n`);
+            }
+            catch { }
+        }
         if (this.trace)
             this.traceLog(`connect '${name}' type=${config.type} ${config.command ?? config.url ?? ''}`);
         switch (config.type) {
@@ -92,6 +101,17 @@ export class MCPClientManager {
             }
         }
         catch { }
+        if (this.verbose) {
+            try {
+                const toolNames = tools.map((t) => t.name).join(', ');
+                const schemaChars = tools.reduce((acc, t) => acc + JSON.stringify(t.inputSchema ?? {}).length, 0);
+                const instrChars = (initInstructions?.length ?? 0) + tools.reduce((acc, t) => acc + (t.instructions?.length ?? 0), 0);
+                const hasInstr = (initInstructions?.length ?? 0) > 0 || tools.some((t) => (t.instructions?.length ?? 0) > 0);
+                const latency = Date.now() - initStart;
+                process.stderr.write(`[mcp] initialized ${name}, ${tools.length} tools (${toolNames || '-'})${hasInstr ? ', with instructions' : ', without instructions'} (schema ${schemaChars} chars, instructions ${instrChars} chars), latency ${latency} ms\n`);
+            }
+            catch { }
+        }
         if (this.trace)
             this.traceLog(`ready '${name}' with ${tools.length.toString()} tools`);
         return { name, config, tools, instructions };
@@ -132,6 +152,12 @@ export class MCPClientManager {
         const start = Date.now();
         const argsStr = JSON.stringify(toolCall.parameters);
         const call = async () => {
+            if (this.verbose) {
+                try {
+                    process.stderr.write(`[mcp] req: ${toolCall.id} ${serverName}, ${toolCall.name}\n`);
+                }
+                catch { }
+            }
             if (this.trace)
                 this.traceLog(`callTool '${serverName}': ${toolCall.name}(${JSON.stringify(toolCall.parameters)})`);
             const res = await client.callTool({ name: toolCall.name, arguments: toolCall.parameters });
@@ -151,6 +177,12 @@ export class MCPClientManager {
             const content = resp.content ?? [];
             result = content.map((c) => (c.type === 'text' ? c.text ?? '' : c.type === 'image' ? '[Image]' : `[${c.type}]`)).join('');
             const isError = resp.isError === true;
+            if (this.verbose) {
+                try {
+                    process.stderr.write(`[mcp] res: ${toolCall.id} ${serverName}, ${toolCall.name}, latency ${Date.now() - start} ms, size ${result.length} chars\n`);
+                }
+                catch { }
+            }
             return {
                 toolCallId: toolCall.id,
                 result,
@@ -166,6 +198,12 @@ export class MCPClientManager {
             };
         }
         catch (err) {
+            if (this.verbose) {
+                try {
+                    process.stderr.write(`[mcp] res: ${toolCall.id} ${serverName}, ${toolCall.name}, latency ${Date.now() - start} ms, size 0 chars\n`);
+                }
+                catch { }
+            }
             return {
                 toolCallId: toolCall.id,
                 result: '',

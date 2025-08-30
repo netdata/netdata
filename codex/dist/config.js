@@ -2,16 +2,22 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
-const ProviderConfigSchema = z.object({ apiKey: z.string().optional(), baseUrl: z.string().url().optional() });
+const ProviderConfigSchema = z.object({
+    apiKey: z.string().optional(),
+    baseUrl: z.string().url().optional(),
+    headers: z.record(z.string(), z.string()).optional(),
+    custom: z.record(z.string(), z.unknown()).optional(),
+    mergeStrategy: z.enum(['overlay', 'override', 'deep']).optional(),
+});
 const MCPServerConfigSchema = z.object({
     type: z.enum(['stdio', 'websocket', 'http', 'sse']),
     command: z.string().optional(),
     args: z.array(z.string()).optional(),
     url: z.string().url().optional(),
-    headers: z.record(z.string()).optional(),
-    env: z.record(z.string()).optional(),
+    headers: z.record(z.string(), z.string()).optional(),
+    env: z.record(z.string(), z.string()).optional(),
     enabled: z.boolean().optional(),
-    toolSchemas: z.record(z.any()).optional(),
+    toolSchemas: z.record(z.string(), z.any()).optional(),
 });
 const ConfigurationSchema = z.object({
     providers: z.record(z.string(), ProviderConfigSchema),
@@ -125,7 +131,9 @@ export function loadConfiguration(configPath) {
     }
     const parsed = ConfigurationSchema.safeParse(expandedNormalized);
     if (!parsed.success) {
-        const msgs = parsed.error.errors.map((err) => `  ${err.path.join('.')}: ${err.message}`).join('\n');
+        const msgs = parsed.error.issues
+            .map((issue) => `  ${issue.path.map((p) => String(p)).join('.')}: ${issue.message}`)
+            .join('\n');
         throw new Error(`Configuration validation failed in ${resolved}:\n${msgs}`);
     }
     return parsed.data;

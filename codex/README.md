@@ -17,7 +17,7 @@ Highlights
 - Library performs no I/O; emits via callbacks. CLI writes accounting JSONL if configured.
 
 Providers
-- `openai`, `anthropic`, `google`/`vertex`, `openrouter` (OpenAI-compatible at `https://openrouter.ai/api/v1`), and `ollama` (OpenAI-compatible at `http://localhost:11434/v1`). Configure API keys/base URLs in `.ai-agent.json`.
+- `openai`, `anthropic`, `google`/`vertex`, `openrouter` (Responses API at `https://openrouter.ai/v1`), and `ollama` (OpenAI-compatible at `http://localhost:11434/v1`). Configure API keys/base URLs in `.ai-agent.json`.
 
 Tracing
 - `--trace-llm`: Pretty request/response logging with Authorization redacted; raw SSE after stream completes.

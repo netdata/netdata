@@ -36,6 +36,11 @@ program
   .option('--no-parallel-tool-calls', 'Disable parallel tool calls')
   .option('--max-tool-turns <n>', 'Maximum tool turns (agent loop cap)', '30')
   .action(async (providers: string, models: string, mcpTools: string, systemPrompt: string, userPrompt: string, options: Record<string, unknown>) => {
+    let origLog: typeof console.log | undefined;
+    let origInfo: typeof console.info | undefined;
+    let origWarn: typeof console.warn | undefined;
+    let origError: typeof console.error | undefined;
+    let suppressed = false;
     try {
       if (systemPrompt === '-' && userPrompt === '-') {
         console.error('Error: cannot use stdin ("-") for both system and user prompts');
@@ -78,6 +83,7 @@ program
         topP,
         traceLLM: options.traceLlm === true,
         traceMCP: options.traceMcp === true,
+        verbose: options.verbose === true,
         parallelToolCalls: typeof (options.parallelToolCalls) === 'boolean' ? (options.parallelToolCalls) : undefined,
         maxToolTurns,
       };
@@ -144,6 +150,35 @@ program
         },
       };
 
+      // Suppress noisy provider console logs unless tracing is enabled
+      const suppressAvailableTools = options.verbose === true && options.traceMcp !== true && options.traceLlm !== true;
+      origLog = console.log;
+      origInfo = console.info;
+      origWarn = console.warn;
+      origError = console.error;
+      if (suppressAvailableTools) {
+        console.log = (...args: unknown[]) => {
+          if (args.some((a) => typeof a === 'string' && (a as string).includes('Available tools'))) return;
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+          (origLog as typeof console.log)(...args as []);
+        };
+        console.info = (...args: unknown[]) => {
+          if (args.some((a) => typeof a === 'string' && (a as string).includes('Available tools'))) return;
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+          (origInfo as typeof console.info)(...args as []);
+        };
+        console.warn = (...args: unknown[]) => {
+          if (args.some((a) => typeof a === 'string' && (a as string).includes('Available tools'))) return;
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+          (origWarn as typeof console.warn)(...args as []);
+        };
+        console.error = (...args: unknown[]) => {
+          if (args.some((a) => typeof a === 'string' && (a as string).includes('Available tools'))) return;
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+          (origError as typeof console.error)(...args as []);
+        };
+        suppressed = true;
+      }
       const agent = new AIAgent({ ...agentOptions, callbacks });
       const result = await agent.run(runOptions);
       if (!result.success) {
@@ -170,6 +205,13 @@ program
       else if (msg.includes('argument')) process.exit(4);
       else if (msg.includes('tool')) process.exit(3);
       else process.exit(1);
+    } finally {
+      if (suppressed) {
+        try { if (origLog) console.log = origLog; } catch {}
+        try { if (origInfo) console.info = origInfo; } catch {}
+        try { if (origWarn) console.warn = origWarn; } catch {}
+        try { if (origError) console.error = origError; } catch {}
+      }
     }
   });
 

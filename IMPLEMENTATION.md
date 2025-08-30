@@ -215,3 +215,12 @@ References (code entry points)
 - Agent core: `codex/src/ai-agent.ts` — provider setup, `streamText` orchestration, usage accounting, prompt enhancement, fallback.
 - MCP client: `codex/src/mcp-client.ts` — transport selection, tool discovery, prompt discovery, tool execution, headers/env resolution, cleanup.
 
+---
+
+## OpenRouter implementation
+
+https://www.npmjs.com/package/@openrouter/ai-sdk-provider/v/beta
+
+This is compatible with AI SDK 5. The page examples. Read it.
+
+

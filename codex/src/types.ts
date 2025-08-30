@@ -15,6 +15,7 @@ export interface AIAgentOptions {
   traceMCP?: boolean;
   parallelToolCalls?: boolean;
   maxToolTurns?: number;
+  verbose?: boolean;
 }
 
 export interface AIAgentRunOptions {
@@ -108,6 +109,9 @@ export interface MCPServerConfig {
 export interface ProviderConfig {
   apiKey?: string;
   baseUrl?: string;
+  headers?: Record<string, string>;
+  custom?: Record<string, unknown>;
+  mergeStrategy?: "overlay" | "override" | "deep";
 }
 
 export interface Configuration {

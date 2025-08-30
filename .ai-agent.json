@@ -1,14 +1,76 @@
 {
   "providers": {
+    "openai": {
+      "apiKey": "${OPENAI_API_KEY}",
+      "baseUrl": "https://api.openai.com/v1",
+      "headers": {},
+      "custom": {},
+      "mergeStrategy": "overlay"
+    },
+    "anthropic": {
+      "apiKey": "${ANTHROPIC_API_KEY}",
+      "baseUrl": "https://api.anthropic.com",
+      "headers": {},
+      "custom": {},
+      "mergeStrategy": "overlay"
+    },
+    "google": {
+      "apiKey": "${GOOGLE_API_KEY}",
+      "baseUrl": "https://generativelanguage.googleapis.com",
+      "headers": {},
+      "custom": {},
+      "mergeStrategy": "overlay"
+    },
     "openrouter": {
       "apiKey": "${OPENROUTER_API_KEY}",
-      "baseUrl": "https://openrouter.ai/api/v1"
+      "custom": {
+        "provider": {
+          "allow_fallbacks": true,
+          "data_collection": "deny",
+          "quantizations": ["fp16"],
+          "sort": "price"
+        }
+      },
+      "headers": {},
+      "mergeStrategy": "overlay"
+    },
+    "ollama": {
+      "baseUrl": "http://nova:11434/v1",
+      "custom": {
+        "providerOptions": {
+          "ollama": {
+            "think": false,
+            "options": {
+              "num_ctx": 65536,
+              "num_predict": 4096,
+              "top_k": 0,
+              "min_p": 0,
+              "repeat_last_n": 64,
+              "repeat_penalty": 1.1,
+              "stop": []
+            }
+          }
+        }
+      },
+      "headers": {}
     }
+  },
+  "accounting": {
+    "file": "${HOME}/ai-agent-accounting.jsonl"
+  },
+  "defaults": {
+    "llmTimeout": 30000,
+    "toolTimeout": 10000,
+    "temperature": 0.7,
+    "topP": 1.0,
+    "parallelToolCalls": true,
+    "maxToolTurns": 30
   },
   "mcpServers": {
     "file-ops": {
       "type": "stdio",
-      "command": "/usr/local/bin/file-mcp-server"
+      "command": "/usr/local/bin/file-mcp-server",
+      "enabled": true
     },
     "env-test": {
       "type": "stdio",
@@ -18,7 +80,8 @@
       ],
       "env": {
         "BRAVE_API_KEY": "${BRAVE_API_KEY}"
-      }
+      },
+      "enabled": true
     },
     "brave-search": {
       "type": "stdio",
@@ -29,26 +92,31 @@
       ],
       "env": {
         "BRAVE_API_KEY": "${BRAVE_API_KEY}"
-      }
+      },
+      "enabled": true
     },
     "jina-mcp-server": {
       "type": "sse",
       "url": "https://mcp.jina.ai/sse",
       "headers": {
         "Authorization": "Bearer ${JINA_API_KEY}"
-      }
+      },
+      "enabled": true
     },
     "netdata_costa": {
       "type": "websocket",
-      "url": "ws://localhost:19999/mcp?api_key=b1eb964a-ff57-48f1-b87a-15b01702cdc7"
+      "url": "ws://localhost:19999/mcp?api_key=b1eb964a-ff57-48f1-b87a-15b01702cdc7",
+      "enabled": true
     },
     "netdata_production": {
       "type": "websocket",
-      "url": "ws://10.20.1.126:19999/mcp?api_key=1ddcfc20-0f08-4562-a5e5-f016786f1641"
+      "url": "ws://10.20.1.126:19999/mcp?api_key=1ddcfc20-0f08-4562-a5e5-f016786f1641",
+      "enabled": true
     },
     "netdata_demos": {
       "type": "websocket",
-      "url": "ws://10.20.1.96:19999/mcp?api_key=edfa4484-c721-4973-8ff4-58adc360031d"
+      "url": "ws://10.20.1.96:19999/mcp?api_key=edfa4484-c721-4973-8ff4-58adc360031d",
+      "enabled": true
     },
     "slack": {
       "type": "stdio",
@@ -63,7 +131,8 @@
         "SLACK_MCP_XOXC_TOKEN": "${SLACK_MCP_XOXC_TOKEN}",
         "SLACK_MCP_XOXD_TOKEN": "${SLACK_MCP_XOXD_TOKEN}",
         "SLACK_MCP_ADD_MESSAGE_TOOL": "${SLACK_MCP_ADD_MESSAGE_TOOL}"
-      }
+      },
+      "enabled": true
     },
     "freshdesk-mcp": {
       "type": "stdio",
@@ -74,7 +143,8 @@
       "env": {
         "FRESHDESK_API_KEY": "${FRESHDESK_API_KEY}",
         "FRESHDESK_DOMAIN": "${FRESHDESK_DOMAIN}"
-      }
+      },
+      "enabled": true
     },
     "github": {
       "type": "stdio",
@@ -85,14 +155,16 @@
       ],
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
-      }
+      },
+      "enabled": true
     },
     "context7": {
       "type": "http",
       "url": "https://mcp.context7.com/mcp",
       "headers": {
         "CONTEXT7_API_KEY": "${CONTEXT7_API_KEY}"
-      }
+      },
+      "enabled": true
     },
     "playwright-mcp": {
       "type": "stdio",
@@ -101,7 +173,8 @@
         "-y",
         "playwright-mcp"
       ],
-      "env": {}
+      "env": {},
+      "enabled": true
     },
     "hubspot": {
       "type": "stdio",
@@ -112,14 +185,16 @@
       ],
       "env": {
         "PRIVATE_APP_ACCESS_TOKEN": "${PRIVATE_APP_ACCESS_TOKEN}"
-      }
+      },
+      "enabled": true
     },
     "fireflies": {
       "type": "http",
       "url": "https://api.fireflies.ai/mcp",
       "headers": {
         "Authorization": "Bearer ${FIREFLIES_API_KEY}"
-      }
+      },
+      "enabled": true
     },
     "bigquery": {
       "type": "stdio",
@@ -131,14 +206,16 @@
       ],
       "env": {
         "BIGQUERY_PROJECT": "${BIGQUERY_PROJECT}"
-      }
+      },
+      "enabled": true
     },
     "posthog": {
       "type": "http",
       "url": "https://mcp.posthog.com/mcp",
       "headers": {
         "Authorization": "Bearer ${POSTHOG_API_KEY}"
-      }
+      },
+      "enabled": true
     }
   }
 }

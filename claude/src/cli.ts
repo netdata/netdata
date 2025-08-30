@@ -83,12 +83,12 @@ program
       // MCP tools are optional - can run with no tools for simple LLM chat
 
       // Parse numeric options
-      const llmTimeout = parseInt(options.llmTimeout);
-      const toolTimeout = parseInt(options.toolTimeout);
-      const maxParallelTools = typeof options.maxParallelTools === 'string' ? parseInt(options.maxParallelTools) : undefined;
-      const maxConcurrentTools = typeof options.maxConcurrentTools === 'string' ? parseInt(options.maxConcurrentTools) : undefined;
-      const temperature = parseFloat(options.temperature);
-      const topP = parseFloat(options.topP);
+      const llmTimeout = parseInt(options['llmTimeout'] as string);
+      const toolTimeout = parseInt(options['toolTimeout'] as string);
+      const maxParallelTools = typeof options['maxParallelTools'] === 'string' ? parseInt(options['maxParallelTools']) : undefined;
+      const maxConcurrentTools = typeof options['maxConcurrentTools'] === 'string' ? parseInt(options['maxConcurrentTools']) : undefined;
+      const temperature = parseFloat(options['temperature'] as string);
+      const topP = parseFloat(options['topP'] as string);
 
       // Validate numeric options
       if (isNaN(llmTimeout) || llmTimeout <= 0) {
@@ -117,7 +117,7 @@ program
       }
 
       // Handle parallel tool calls flag
-      const parallelToolCalls = options.parallelToolCalls !== false;
+      const parallelToolCalls = options['parallelToolCalls'] !== false;
 
       // Resolve prompts from files/stdin at CLI level
       const resolvedSystemPrompt = await readPrompt(systemPrompt);
@@ -125,21 +125,21 @@ program
       
       // Load conversation history if specified
       let conversationHistory: ConversationMessage[] | undefined;
-      if (typeof options.load === 'string') {
+      if (typeof options['load'] === 'string') {
         try {
-          const content = fs.readFileSync(options.load, 'utf-8');
+          const content = fs.readFileSync(options['load'], 'utf-8');
           conversationHistory = JSON.parse(content) as ConversationMessage[];
         } catch (error) {
-          console.error(`Failed to load conversation from ${typeof options.load === 'string' ? options.load : 'unknown'}: ${String(error)}`);
+          console.error(`Failed to load conversation from ${options['load']}: ${String(error)}`);
           process.exit(1);
         }
       }
 
       // Load config to get accounting file if not overridden
-      const config = loadConfiguration(options.config);
+      const config = loadConfiguration(options['config'] as string | undefined);
       
       // Set up callbacks for accounting and output
-      const accountingFile = options.accounting ?? config.accounting?.file;
+      const accountingFile = options['accounting'] ?? config.accounting?.file;
       const callbacks: AIAgentCallbacks = {
         onLog: (level, message) => { console.error(`[${level.toUpperCase()}] ${message}`); },
         onOutput: (text) => process.stdout.write(text),
@@ -161,11 +161,9 @@ program
 
       // Create AI Agent options
       const agentOptions: AIAgentOptions = {
-        configPath: options.config,
+        configPath: options['config'] as string | undefined,
         llmTimeout,
         toolTimeout,
-        maxParallelTools,
-        maxConcurrentTools,
         parallelToolCalls,
         temperature,
         topP,
@@ -203,11 +201,11 @@ program
       }
 
       // Save conversation if specified
-      if (typeof options.save === 'string') {
+      if (typeof options['save'] === 'string') {
         try {
-          fs.writeFileSync(options.save, JSON.stringify(result.conversation, null, 2), 'utf-8');
+          fs.writeFileSync(options['save'], JSON.stringify(result.conversation, null, 2), 'utf-8');
         } catch (error) {
-          console.error(`Failed to save conversation to ${typeof options.save === 'string' ? options.save : 'unknown'}: ${String(error)}`);
+          console.error(`Failed to save conversation to ${options['save']}: ${String(error)}`);
           process.exit(1);
         }
       }

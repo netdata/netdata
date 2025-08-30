@@ -1,7 +1,7 @@
 {
   "providers": {
     "openai": { "apiKey": "${OPENAI_API_KEY}", "baseUrl": "https://api.openai.com/v1" },
-    "openrouter": { "apiKey": "${OPENROUTER_API_KEY}", "baseUrl": "https://openrouter.ai/api/v1" },
+    "openrouter": { "apiKey": "${OPENROUTER_API_KEY}", "baseUrl": "https://openrouter.ai/v1" },
     "ollama": { "baseUrl": "http://localhost:11434/v1" }
   },
   "mcpServers": {

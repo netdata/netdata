@@ -209,7 +209,7 @@ export class MCPClientManager {
     };
     
     // Handle legacy servers that return 'parameters' instead of 'inputSchema'
-    const inputSchema = tool.inputSchema ?? (tool as Record<string, unknown>).parameters as JSONSchema7 | undefined;
+    const inputSchema = tool.inputSchema ?? (tool as Record<string, unknown>)['parameters'] as JSONSchema7 | undefined;
     
     const toolInfo: MCPToolInfo = {
       name: tool.name,
