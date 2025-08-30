@@ -3,7 +3,7 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createOpenAI } from '@ai-sdk/openai';
 import { jsonSchema } from '@ai-sdk/provider-utils';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
-import { streamText } from 'ai';
+import { streamText, generateText } from 'ai';
 import { createOllama } from 'ollama-ai-provider-v2';
 
 import type { AccountingEntry, AIAgentCallbacks, AIAgentOptions, AIAgentRunOptions, Configuration, ConversationMessage } from './types.js';
@@ -32,6 +32,7 @@ export class AIAgent {
     parallelToolCalls?: boolean;
     maxToolTurns: number;
     verbose?: boolean;
+    stream?: boolean;
   };
 
   constructor(options: AIAgentOptions = {}) {
@@ -40,13 +41,14 @@ export class AIAgent {
     const defaults = this.config.defaults ?? {};
     this.options = {
       configPath: options.configPath ?? '',
-      llmTimeout: options.llmTimeout ?? defaults.llmTimeout ?? 30000,
-      toolTimeout: options.toolTimeout ?? defaults.toolTimeout ?? 10000,
+      llmTimeout: options.llmTimeout ?? defaults.llmTimeout ?? 120000,
+      toolTimeout: options.toolTimeout ?? defaults.toolTimeout ?? 60000,
       temperature: options.temperature ?? defaults.temperature ?? 0.7,
       topP: options.topP ?? defaults.topP ?? 1.0,
       traceLLM: options.traceLLM ?? false,
       traceMCP: options.traceMCP ?? false,
       verbose: options.verbose ?? false,
+      stream: options.stream ?? (defaults as { stream?: boolean }).stream ?? true,
       parallelToolCalls: options.parallelToolCalls ?? defaults.parallelToolCalls ?? true,
       maxToolTurns: (options as { maxToolTurns?: number }).maxToolTurns ?? (defaults as { maxToolTurns?: number }).maxToolTurns ?? 30,
     };
@@ -159,7 +161,10 @@ export class AIAgent {
     let mcpRequests = 0;
     const mcpPerServer = new Map<string, number>();
 
-    const drainTextStream = async (it: AsyncIterable<string>): Promise<{ sawAny: boolean; totalChars: number }> => {
+    const drainTextStream = async (
+      it: AsyncIterable<string>,
+      onChunk?: (len: number) => void,
+    ): Promise<{ sawAny: boolean; totalChars: number }> => {
       const iterator = it[Symbol.asyncIterator]();
       let sawAny = false;
       let totalChars = 0;
@@ -175,6 +180,7 @@ export class AIAgent {
           sawAny = true;
           lastChar = chunk[chunk.length - 1];
           totalChars += chunk.length;
+          try { onChunk?.(chunk.length); } catch {}
         }
         this.output(chunk);
         await step();
@@ -188,6 +194,8 @@ export class AIAgent {
       const pair = pairs[idx] as { provider: string; model: string };
       const provider = pair.provider;
       const model = pair.model;
+      const attemptStart = Date.now();
+      let lastLLMCallStart = 0;
       try {
         // Lower verbosity: only log provider/model attempts when verbose is enabled
         this.log('debug', `Trying ${provider}/${model}`);
@@ -222,45 +230,88 @@ const runTurn = async (turn: number, msgs: ModelMessage[]): Promise<Conversation
       llmRequests += 1; // count all attempts, even if they fail later
     } catch {}
   }
-  const result = streamText({
-    model: llmProvider(model),
-    messages: msgs,
-    tools: sdkTools as unknown as ToolSet,
-    temperature: this.options.temperature,
-    topP: this.options.topP,
-    providerOptions: providerOptionsDecl,
-    abortSignal: AbortSignal.timeout(this.options.llmTimeout),
-  });
-  const streamInfo = await drainTextStream(result.textStream);
-  const usageData: { inputTokens?: number; outputTokens?: number; totalTokens?: number; cachedTokens?: number } = await result.usage;
-  const inputTokens = usageData.inputTokens ?? 0;
-  const outputTokens = usageData.outputTokens ?? 0;
-  const totalTokens = usageData.totalTokens ?? (inputTokens + outputTokens);
-  const cachedTokens = usageData.cachedTokens;
-  this.callbacks.onAccounting?.({ type: 'llm', timestamp: Date.now(), status: 'ok', latency: Date.now() - iterationStart, provider, model, tokens: { inputTokens, outputTokens, totalTokens, cachedTokens } } as AccountingEntry);
-  if (this.options.verbose === true) {
+  // Determine effective streaming for this provider
+  const providerCfgStream = (() => {
     try {
-      // aggregate totals
-      aggInput += inputTokens;
-      aggOutput += outputTokens;
-      aggCached += cachedTokens ?? 0;
-      aggLLMLatency += (Date.now() - iterationStart);
-    } catch {}
+      const cfgp = this.config.providers[provider] as { custom?: Record<string, unknown> } | undefined;
+      const v = cfgp?.custom?.stream;
+      return typeof v === 'boolean' ? (v as boolean) : undefined;
+    } catch { return undefined; }
+  })();
+  const effectiveStream = typeof providerCfgStream === 'boolean' ? providerCfgStream : (typeof this.options.stream === 'boolean' ? this.options.stream : true);
+
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let cachedTokens: number | undefined = undefined;
+  let turnMessages: ConversationMessage[] = [];
+  if (effectiveStream) {
+    // Inactivity timeout: reset the timer on each streamed chunk
+    const ac = new AbortController();
+    let idleTimer: ReturnType<typeof setTimeout> | undefined;
+    const resetIdle = () => {
+      try { if (idleTimer) clearTimeout(idleTimer); } catch {}
+      idleTimer = setTimeout(() => { try { ac.abort(); } catch {} }, this.options.llmTimeout);
+    };
+    const clearIdle = () => { try { if (idleTimer) { clearTimeout(idleTimer); idleTimer = undefined; } } catch {} };
+    let streamInfo: { sawAny: boolean; totalChars: number } = { sawAny: false, totalChars: 0 };
+    let result: ReturnType<typeof streamText>;
+    try {
+      resetIdle();
+      lastLLMCallStart = Date.now();
+      result = streamText({
+        model: llmProvider(model),
+        messages: msgs,
+        tools: sdkTools as unknown as ToolSet,
+        temperature: this.options.temperature,
+        topP: this.options.topP,
+        providerOptions: providerOptionsDecl,
+        abortSignal: ac.signal,
+      });
+      streamInfo = await drainTextStream(result.textStream, () => resetIdle());
+    } finally {
+      clearIdle();
+    }
+    const usageData: { inputTokens?: number; outputTokens?: number; totalTokens?: number; cachedTokens?: number } = await result.usage;
+    inputTokens = usageData.inputTokens ?? 0;
+    outputTokens = usageData.outputTokens ?? 0;
+    cachedTokens = usageData.cachedTokens;
+    this.callbacks.onAccounting?.({ type: 'llm', timestamp: Date.now(), status: 'ok', latency: Date.now() - iterationStart, provider, model, tokens: { inputTokens, outputTokens, totalTokens: (usageData.totalTokens ?? (inputTokens + outputTokens)), cachedTokens } } as AccountingEntry);
+    if (this.options.verbose === true) { try { aggInput += inputTokens; aggOutput += outputTokens; aggCached += cachedTokens ?? 0; aggLLMLatency += (Date.now() - iterationStart); } catch {} }
+    let resp: Awaited<typeof result.response>;
+    try { resp = await result.response; }
+    catch (err) {
+      const name = err instanceof Error ? err.name : 'Error';
+      const msg = err instanceof Error ? err.message : String(err);
+      const hint = this.options.traceLLM === true ? '' : ' Enable --trace-llm to see raw HTTP/SSE.';
+      const details = `streamed=${streamInfo.sawAny} (${streamInfo.totalChars} chars), tools=${executedTools.length}, tokens in=${inputTokens}, out=${outputTokens}, cached=${cachedTokens ?? 0}.`;
+      throw new Error(`${name}: ${msg}.${hint} Details: ${details}`);
+    }
+    turnMessages = Array.isArray(resp.messages)
+      ? (resp.messages as { role: ConversationMessage['role']; content: unknown }[]).map((m) => ({ role: m.role, content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content), metadata: { provider, model, tokens: { inputTokens, outputTokens, totalTokens: (usageData.totalTokens ?? (inputTokens + outputTokens)) }, timestamp: Date.now() } }))
+      : [];
+  } else {
+    lastLLMCallStart = Date.now();
+    const result = await generateText({
+      model: llmProvider(model),
+      messages: msgs,
+      tools: sdkTools as unknown as ToolSet,
+      temperature: this.options.temperature,
+      topP: this.options.topP,
+      providerOptions: providerOptionsDecl,
+      abortSignal: AbortSignal.timeout(this.options.llmTimeout),
+    });
+    if (typeof result.text === 'string' && result.text.length > 0) this.output(result.text + (result.text.endsWith('\n') ? '' : '\n'));
+    const usageData: { inputTokens?: number; outputTokens?: number; totalTokens?: number; cachedTokens?: number } = (result.usage as any) ?? {};
+    inputTokens = usageData.inputTokens ?? 0;
+    outputTokens = usageData.outputTokens ?? 0;
+    cachedTokens = usageData.cachedTokens;
+    this.callbacks.onAccounting?.({ type: 'llm', timestamp: Date.now(), status: 'ok', latency: Date.now() - iterationStart, provider, model, tokens: { inputTokens, outputTokens, totalTokens: (usageData.totalTokens ?? (inputTokens + outputTokens)), cachedTokens } } as AccountingEntry);
+    if (this.options.verbose === true) { try { aggInput += inputTokens; aggOutput += outputTokens; aggCached += cachedTokens ?? 0; aggLLMLatency += (Date.now() - iterationStart); } catch {} }
+    const resp = (result.response ?? {}) as { messages?: { role: ConversationMessage['role']; content: unknown }[] };
+    turnMessages = Array.isArray(resp.messages)
+      ? (resp.messages as { role: ConversationMessage['role']; content: unknown }[]).map((m) => ({ role: m.role, content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content), metadata: { provider, model, tokens: { inputTokens, outputTokens, totalTokens: (usageData.totalTokens ?? (inputTokens + outputTokens)) }, timestamp: Date.now() } }))
+      : [];
   }
-  let resp: Awaited<typeof result.response>;
-  try {
-    resp = await result.response;
-  } catch (err) {
-    const name = err instanceof Error ? err.name : 'Error';
-    const msg = err instanceof Error ? err.message : String(err);
-    const hint = this.options.traceLLM === true ? '' : ' Enable --trace-llm to see raw HTTP/SSE.';
-    const details = `streamed=${streamInfo.sawAny} (${streamInfo.totalChars} chars), tools=${executedTools.length}, tokens in=${inputTokens}, out=${outputTokens}, cached=${cachedTokens ?? 0}.`;
-    const wrapped = `${name}: ${msg}.${hint} Details: ${details}`;
-    throw new Error(wrapped);
-  }
-  const turnMessages: ConversationMessage[] = Array.isArray(resp.messages)
-    ? (resp.messages as { role: ConversationMessage['role']; content: unknown }[]).map((m) => ({ role: m.role, content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content), metadata: { provider, model, tokens: { inputTokens, outputTokens, totalTokens }, timestamp: Date.now() } }))
-    : [];
   if (this.options.verbose === true) {
     try {
       const latency = Date.now() - iterationStart;
@@ -295,7 +346,8 @@ return { success: true, appendMessages: finalAppend };
         const stackTop = err instanceof Error && typeof err.stack === 'string' ? err.stack.split('\n')[1]?.trim() : undefined;
         const extra = this.options.verbose === true && stackTop ? ` (${stackTop})` : '';
         const advice = this.options.traceLLM === true ? '' : ' Hint: run with --trace-llm to inspect HTTP/SSE.';
-        this.log('warn', `${provider}/${model} failed: [${en}] ${em}${extra}${advice}`);
+        const waitedMs = (() => { try { const now = Date.now(); const base = lastLLMCallStart && lastLLMCallStart > 0 ? lastLLMCallStart : attemptStart; return now - base; } catch { return 0; } })();
+        this.log('warn', `${provider}/${model} failed: [${en}] ${em}${extra} (waited ${waitedMs} ms)${advice}`);
         this.callbacks.onAccounting?.({ type: 'llm', timestamp: Date.now(), status: 'failed', latency: 0, provider, model, tokens: { inputTokens: 0, outputTokens: 0, totalTokens: 0 }, error: em } as AccountingEntry);
         return tryPair(idx + 1);
       }

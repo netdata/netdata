@@ -16,6 +16,7 @@ export interface AIAgentOptions {
   parallelToolCalls?: boolean;
   maxToolTurns?: number;
   verbose?: boolean;
+  stream?: boolean;
 }
 
 export interface AIAgentRunOptions {

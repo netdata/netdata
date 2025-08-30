@@ -33,6 +33,7 @@ const ConfigurationSchema = z.object({
       toolTimeout: z.number().positive().optional(),
       temperature: z.number().min(0).max(2).optional(),
       topP: z.number().min(0).max(1).optional(),
+      stream: z.boolean().optional(),
       parallelToolCalls: z.boolean().optional(),
       maxToolTurns: z.number().int().positive().optional(),
     })

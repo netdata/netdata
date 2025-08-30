@@ -12,8 +12,8 @@ program
     .argument('<mcp-tools>', 'Comma-separated list of MCP tools')
     .argument('<system-prompt>', 'System prompt (string, @filename, or - for stdin)')
     .argument('<user-prompt>', 'User prompt (string, @filename, or - for stdin)')
-    .option('--llm-timeout <ms>', 'Timeout for LLM responses (ms)', '30000')
-    .option('--tool-timeout <ms>', 'Timeout for tool execution (ms)', '10000')
+    .option('--llm-timeout <ms>', 'Timeout for LLM responses (ms)', '120000')
+    .option('--tool-timeout <ms>', 'Timeout for tool execution (ms)', '60000')
     .option('--temperature <n>', 'LLM temperature (0.0-2.0)', '0.7')
     .option('--top-p <n>', 'LLM top-p sampling (0.0-1.0)', '1.0')
     .option('--save <filename>', 'Save conversation to JSON file')
@@ -25,6 +25,8 @@ program
     .option('--quiet', 'Only print errors to stderr')
     .option('--trace-llm', 'Log LLM HTTP requests and responses (redacted)')
     .option('--trace-mcp', 'Log MCP requests, responses, and server stderr')
+    .option('--stream', 'Enable streaming LLM responses')
+    .option('--no-stream', 'Disable streaming; use non-streaming responses')
     .option('--parallel-tool-calls', 'Enable parallel tool calls')
     .option('--no-parallel-tool-calls', 'Disable parallel tool calls')
     .option('--max-tool-turns <n>', 'Maximum tool turns (agent loop cap)', '30')
@@ -87,6 +89,7 @@ program
             traceLLM: options.traceLlm === true,
             traceMCP: options.traceMcp === true,
             verbose: options.verbose === true,
+            stream: typeof (options.stream) === 'boolean' ? options.stream : undefined,
             parallelToolCalls: typeof (options.parallelToolCalls) === 'boolean' ? (options.parallelToolCalls) : undefined,
             maxToolTurns,
         };

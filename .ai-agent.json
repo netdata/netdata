@@ -4,26 +4,27 @@
       "apiKey": "${OPENAI_API_KEY}",
       "baseUrl": "https://api.openai.com/v1",
       "headers": {},
-      "custom": {},
+      "custom": { "stream": true },
       "mergeStrategy": "overlay"
     },
     "anthropic": {
       "apiKey": "${ANTHROPIC_API_KEY}",
       "baseUrl": "https://api.anthropic.com",
       "headers": {},
-      "custom": {},
+      "custom": { "stream": true },
       "mergeStrategy": "overlay"
     },
     "google": {
       "apiKey": "${GOOGLE_API_KEY}",
       "baseUrl": "https://generativelanguage.googleapis.com",
       "headers": {},
-      "custom": {},
+      "custom": { "stream": true },
       "mergeStrategy": "overlay"
     },
     "openrouter": {
       "apiKey": "${OPENROUTER_API_KEY}",
       "custom": {
+        "stream": true,
         "provider": {
           "allow_fallbacks": true,
           "data_collection": "deny",
@@ -37,6 +38,7 @@
     "ollama": {
       "baseUrl": "http://nova:11434/v1",
       "custom": {
+        "stream": true,
         "providerOptions": {
           "ollama": {
             "think": false,
@@ -59,10 +61,11 @@
     "file": "${HOME}/ai-agent-accounting.jsonl"
   },
   "defaults": {
-    "llmTimeout": 30000,
-    "toolTimeout": 10000,
+    "llmTimeout": 120000,
+    "toolTimeout": 60000,
     "temperature": 0.7,
     "topP": 1.0,
+    "stream": true,
     "parallelToolCalls": true,
     "maxToolTurns": 30
   },
