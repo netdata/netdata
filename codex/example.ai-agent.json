@@ -1,0 +1,23 @@
+{
+  "providers": {
+    "openai": { "apiKey": "${OPENAI_API_KEY}", "baseUrl": "https://api.openai.com/v1" },
+    "openrouter": { "apiKey": "${OPENROUTER_API_KEY}", "baseUrl": "https://openrouter.ai/api/v1" },
+    "ollama": { "baseUrl": "http://localhost:11434/v1" }
+  },
+  "mcpServers": {
+    "file-operations": {
+      "type": "stdio",
+      "command": "/usr/local/bin/file-mcp-server",
+      "args": []
+    }
+  },
+  "accounting": { "file": "${HOME}/ai-agent-accounting.jsonl" },
+  "defaults": {
+    "llmTimeout": 30000,
+    "toolTimeout": 10000,
+    "maxParallelTools": null,
+    "maxConcurrentTools": 4,
+    "temperature": 0.7,
+    "topP": 1.0
+  }
+}

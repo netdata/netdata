@@ -1,0 +1,23 @@
+{
+  "providers": {
+    "ollama": {
+      "apiKey": "ollama",
+      "baseUrl": "http://localhost:11434/v1"
+    }
+  },
+  "mcpServers": {
+    "pokemon-mcp": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["../libs/ai/examples/mcp/src/stdio/dist/server.js"],
+      "description": "Pokemon information server with detailed instructions"
+    }
+  },
+  "defaults": {
+    "llmTimeout": 30000,
+    "toolTimeout": 10000,
+    "parallelToolCalls": true,
+    "temperature": 0.7,
+    "topP": 1.0
+  }
+}

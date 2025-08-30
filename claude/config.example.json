@@ -1,0 +1,44 @@
+{
+  "providers": {
+    "openai": {
+      "apiKey": "${OPENAI_API_KEY}",
+      "baseUrl": "https://api.openai.com/v1"
+    },
+    "anthropic": {
+      "apiKey": "${ANTHROPIC_API_KEY}",
+      "baseUrl": "https://api.anthropic.com"
+    },
+    "google": {
+      "apiKey": "${GOOGLE_API_KEY}"
+    },
+    "ollama": {
+      "baseUrl": "http://localhost:11434/v1"
+    }
+  },
+  "mcpServers": {
+    "filesystem": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["/path/to/filesystem-mcp-server.js"]
+    },
+    "database": {
+      "type": "websocket", 
+      "url": "ws://localhost:8080/mcp"
+    },
+    "api-tools": {
+      "type": "sse",
+      "url": "http://localhost:3000/mcp"
+    }
+  },
+  "accounting": {
+    "file": "/tmp/ai-agent-accounting.jsonl"
+  },
+  "defaults": {
+    "llmTimeout": 30000,
+    "toolTimeout": 10000,
+    "maxParallelTools": 5,
+    "maxConcurrentTools": 3,
+    "temperature": 0.7,
+    "topP": 1.0
+  }
+}
