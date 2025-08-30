@@ -62,10 +62,9 @@ jobs:
             packaging/*.sh
             packaging/*.version
             packaging/*.checksums
+            src/crates/
             src/aclk/aclk-schemas/
             src/ml/dlib/
-            src/fluent-bit/
-            src/web/server/h2o/libh2o/
           files_ignore: |
             src/go/otel-collector/release-config.yaml.in
             **/*.md

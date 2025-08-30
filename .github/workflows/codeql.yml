@@ -22,6 +22,7 @@ jobs:
       cpp: ${{ steps.cpp.outputs.run }}
       python: ${{ steps.python.outputs.run }}
       go: ${{ steps.go.outputs.run }}
+      rust: ${{ steps.rust.outputs.run }}
     steps:
       - name: Clone repository
         uses: actions/checkout@v5
@@ -74,6 +75,19 @@ jobs:
             if git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq 'src/go/*\.go' ; then
               echo "run=true" >> "${GITHUB_OUTPUT}"
               echo '::notice::Go code has changed, need to run CodeQL.'
+            else
+              echo "run=false" >> "${GITHUB_OUTPUT}"
+            fi
+          else
+            echo "run=true" >> "${GITHUB_OUTPUT}"
+          fi
+      - name: Check for Rust changes
+        id: rust
+        run: |
+          if [ "${{ steps.always.outputs.run }}" = "false" ]; then
+            if git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq 'src/crates/(*.rs|*Cargo.(toml|lock))' ; then
+              echo "run=true" >> "${GITHUB_OUTPUT}"
+              echo '::notice::Rust code has changed, need to run CodeQL.'
             else
               echo "run=false" >> "${GITHUB_OUTPUT}"
             fi
@@ -160,3 +174,33 @@ jobs:
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:go"
+
+  analyze-rust:
+    name: Analyze Rust
+    runs-on: ubuntu-latest
+    needs: prepare
+    if: needs.prepare.outputs.rust == 'true'
+    strategy:
+      matrix:
+        tree:
+          - src/crates/jf
+    permissions:
+      security-events: write
+    steps:
+      - name: Git clone repository
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: rust
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+        with:
+          working-directory: ${{ matrix.tree }}
+      - name: Run CodeQL
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:rust"
