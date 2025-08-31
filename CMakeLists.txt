@@ -3046,6 +3046,8 @@ if(OS_WINDOWS)
         target_link_libraries(NetdataClaim shell32 gdi32 msftedit)
         target_compile_options(NetdataClaim PUBLIC -mwindows)
 
+        set(NETDATA_DRIVER_FILE "${CMAKE_BINARY_DIR}/msys-netdata_driver.sys")
+
         add_library(netdata_driver SHARED ${WINDOWS_PLUGIN_DRIVER})
         set_target_properties(netdata_driver PROPERTIES SUFFIX ".sys")
         target_include_directories(netdata_driver PRIVATE BEFORE "/mingw64/include/ddk" "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin")
@@ -3066,6 +3068,10 @@ if(OS_WINDOWS)
                 -Wl,--image-base,0x10000
         )
         target_link_libraries(netdata_driver kernel32 ntoskrnl)
+
+        install(FILES "${NETDATA_DRIVER_FILE}"
+                COMPONENT netdata_win_driver
+                DESTINATION "${BINDIR}")
 endif()
 
 target_compile_options(netdata PRIVATE
