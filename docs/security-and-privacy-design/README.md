@@ -148,7 +148,7 @@ You can disable anonymous telemetry:
 
 :::tip
 
-See [installation documentation](https://learn.netdata.cloud/docs/agent/packaging/overview) for detailed opt-out steps.
+See [installation documentation](https://learn.netdata.cloud/docs/netdata-agent/anonymous-telemetry-events#opt-out) for detailed opt-out steps.
 
 :::
 
