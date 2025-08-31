@@ -20,12 +20,12 @@ const (
 )
 
 func (c *Collector) collectNetworkInterfaces(mx map[string]int64) error {
-	ifMibTable, err := c.walkAll(rootOidIfMibIfTable)
+	ifMibTable, err := walkAll(c.snmpClient, rootOidIfMibIfTable)
 	if err != nil {
 		return err
 	}
 
-	ifMibXTable, err := c.walkAll(rootOidIfMibIfXTable)
+	ifMibXTable, err := walkAll(c.snmpClient, rootOidIfMibIfXTable)
 	if err != nil {
 		return err
 	}

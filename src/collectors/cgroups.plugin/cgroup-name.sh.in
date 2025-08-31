@@ -16,14 +16,14 @@ cmd_line="'${0}' $(printf "'%s' " "${@}")"
 PROGRAM_NAME="$(basename "${0}")"
 
 # these should be the same with syslog() priorities
-NDLP_EMERG=0   # system is unusable
-NDLP_ALERT=1   # action must be taken immediately
-NDLP_CRIT=2    # critical conditions
-NDLP_ERR=3     # error conditions
-NDLP_WARN=4    # warning conditions
-NDLP_NOTICE=5  # normal but significant condition
-NDLP_INFO=6    # informational
-NDLP_DEBUG=7   # debug-level messages
+NDLP_EMERG=0  # system is unusable
+NDLP_ALERT=1  # action must be taken immediately
+NDLP_CRIT=2   # critical conditions
+NDLP_ERR=3    # error conditions
+NDLP_WARN=4   # warning conditions
+NDLP_NOTICE=5 # normal but significant condition
+NDLP_INFO=6   # informational
+NDLP_DEBUG=7  # debug-level messages
 
 # the max (numerically) log level we will log
 LOG_LEVEL=$NDLP_INFO
@@ -72,7 +72,7 @@ log() {
 
   [[ -n "$level" && -n "$LOG_LEVEL" && "$level" -gt "$LOG_LEVEL" ]] && return
 
-  systemd-cat-native --log-as-netdata <<EOFLOG
+  systemd-cat-native --log-as-netdata << EOFLOG
 INVOCATION_ID=${NETDATA_INVOCATION_ID}
 SYSLOG_IDENTIFIER=${PROGRAM_NAME}
 PRIORITY=${level}
@@ -110,7 +110,7 @@ debug() {
 
 function parse_docker_like_inspect_output() {
   local output="${1}"
-  eval "$(grep -E "^(NOMAD_NAMESPACE|NOMAD_JOB_NAME|NOMAD_TASK_NAME|NOMAD_SHORT_ALLOC_ID|CONT_NAME|IMAGE_NAME)=" <<<"$output")"
+  eval "$(grep -E "^(NOMAD_NAMESPACE|NOMAD_JOB_NAME|NOMAD_TASK_NAME|NOMAD_SHORT_ALLOC_ID|CONT_NAME|IMAGE_NAME)=" <<< "$output")"
   if [ -n "$NOMAD_NAMESPACE" ] && [ -n "$NOMAD_JOB_NAME" ] && [ -n "$NOMAD_TASK_NAME" ] && [ -n "$NOMAD_SHORT_ALLOC_ID" ]; then
     NAME="${NOMAD_NAMESPACE}-${NOMAD_JOB_NAME}-${NOMAD_TASK_NAME}-${NOMAD_SHORT_ALLOC_ID}"
   else
@@ -122,7 +122,7 @@ function parse_docker_like_inspect_output() {
 
   while IFS= read -r line; do
     if [[ $line == LABEL_netdata.cloud/* ]]; then
-      IFS="=" read -r lname lval <<<"$line"
+      IFS="=" read -r lname lval <<< "$line"
       lname=${lname#LABEL_}
       if [ -n "$LABELS" ]; then
         LABELS="$LABELS,${lname}=\"${lval}\""
@@ -130,7 +130,7 @@ function parse_docker_like_inspect_output() {
         LABELS="${lname}=\"${lval}\""
       fi
     fi
-  done <<<"$output"
+  done <<< "$output"
 }
 
 function docker_like_get_name_command() {
@@ -139,7 +139,7 @@ function docker_like_get_name_command() {
   # shellcheck disable=SC2016
   if OUTPUT="$(${command} inspect --format='{{range .Config.Env}}{{println .}}{{end}}{{range $key, $value := .Config.Labels}}LABEL_{{$key}}={{$value}}{{println}}{{end}}IMAGE_NAME={{.Config.Image}}{{println}}CONT_NAME={{.Name}}' "${id}")" &&
     [ -n "$OUTPUT" ]; then
-      parse_docker_like_inspect_output "$OUTPUT"
+    parse_docker_like_inspect_output "$OUTPUT"
   fi
   return 0
 }
@@ -155,7 +155,7 @@ function docker_like_get_name_api() {
     return 1
   fi
 
-  if ! command -v jq >/dev/null 2>&1; then
+  if ! command -v jq > /dev/null 2>&1; then
     warning "Can't find jq command line tool. jq is required for netdata to retrieve container name using ${host} API, falling back to docker ps"
     return 1
   fi
@@ -248,13 +248,13 @@ function k8s_is_pause_container() {
   [ ! -f "$file" ] && return 1
 
   local procs
-  IFS= read -rd' ' procs 2>/dev/null <"$file"
+  IFS= read -rd' ' procs 2> /dev/null < "$file"
   #shellcheck disable=SC2206
   procs=($procs)
 
   [ "${#procs[@]}" -ne 1 ] && return 1
 
-  IFS= read -r comm 2>/dev/null <"/proc/${procs[0]}/comm"
+  IFS= read -r comm 2> /dev/null < "/proc/${procs[0]}/comm"
 
   [ "$comm" == "pause" ]
   return
@@ -384,12 +384,12 @@ function k8s_get_kubepod_name() {
     [ -f "$tmp_kube_cluster_name" ] &&
     [ -f "$tmp_kube_system_ns_uid_file" ] &&
     [ -f "$tmp_kube_containers_file" ] &&
-    labels=$(grep "$cntr_id" "$tmp_kube_containers_file" 2>/dev/null); then
-    IFS= read -r kube_system_uid 2>/dev/null <"$tmp_kube_system_ns_uid_file"
-    IFS= read -r kube_cluster_name 2>/dev/null <"$tmp_kube_cluster_name"
+    labels=$(grep "$cntr_id" "$tmp_kube_containers_file" 2> /dev/null); then
+    IFS= read -r kube_system_uid 2> /dev/null < "$tmp_kube_system_ns_uid_file"
+    IFS= read -r kube_cluster_name 2> /dev/null < "$tmp_kube_cluster_name"
   else
-    IFS= read -r kube_system_uid 2>/dev/null <"$tmp_kube_system_ns_uid_file"
-    IFS= read -r kube_cluster_name 2>/dev/null <"$tmp_kube_cluster_name"
+    IFS= read -r kube_system_uid 2> /dev/null < "$tmp_kube_system_ns_uid_file"
+    IFS= read -r kube_cluster_name 2> /dev/null < "$tmp_kube_cluster_name"
     [ -z "$kube_cluster_name" ] && ! kube_cluster_name=$(k8s_gcp_get_cluster_name) && kube_cluster_name="unknown"
 
     local kube_system_ns
@@ -397,7 +397,7 @@ function k8s_get_kubepod_name() {
 
     if [ -n "${KUBERNETES_SERVICE_HOST}" ] && [ -n "${KUBERNETES_PORT_443_TCP_PORT}" ]; then
       local token header host url
-      token="$(</var/run/secrets/kubernetes.io/serviceaccount/token)"
+      token="$(< /var/run/secrets/kubernetes.io/serviceaccount/token)"
       header="Authorization: Bearer $token"
       host="$KUBERNETES_SERVICE_HOST:$KUBERNETES_PORT_443_TCP_PORT"
 
@@ -422,7 +422,7 @@ function k8s_get_kubepod_name() {
         warning "${fn}: error on curl '${url}': ${pods}."
         return 1
       fi
-    elif ps -C kubelet >/dev/null 2>&1 && command -v kubectl >/dev/null 2>&1; then
+    elif ps -C kubelet > /dev/null 2>&1 && command -v kubectl > /dev/null 2>&1; then
       if [ -z "$kube_system_uid" ]; then
         if ! kube_system_ns=$(kubectl --kubeconfig="$KUBE_CONFIG" get namespaces kube-system -o json 2>&1); then
           warning "${fn}: error on 'kubectl': ${kube_system_ns}."
@@ -439,7 +439,7 @@ function k8s_get_kubepod_name() {
       return 1
     fi
 
-    if [ -n "$kube_system_ns" ] && ! kube_system_uid=$(jq -r '.metadata.uid' <<<"$kube_system_ns" 2>&1); then
+    if [ -n "$kube_system_ns" ] && ! kube_system_uid=$(jq -r '.metadata.uid' <<< "$kube_system_ns" 2>&1); then
       warning "${fn}: error on 'jq' parse kube_system_ns: ${kube_system_uid}."
     fi
 
@@ -459,14 +459,14 @@ function k8s_get_kubepod_name() {
     jq_filter+='sub("(docker|cri-o|containerd)://";"")' # containerID: docker://a346da9bc0e3eaba6b295f64ac16e02f2190db2cef570835706a9e7a36e2c722
 
     local containers
-    if ! containers=$(jq -r "${jq_filter}" <<<"$pods" 2>&1); then
+    if ! containers=$(jq -r "${jq_filter}" <<< "$pods" 2>&1); then
       warning "${fn}: error on 'jq' parse pods: ${containers}."
       return 1
     fi
 
-    [ -n "$kube_cluster_name" ] && echo "$kube_cluster_name" >"$tmp_kube_cluster_name" 2>/dev/null
-    [ -n "$kube_system_ns" ] && [ -n "$kube_system_uid" ] && echo "$kube_system_uid" >"$tmp_kube_system_ns_uid_file" 2>/dev/null
-    echo "$containers" >"$tmp_kube_containers_file" 2>/dev/null
+    [ -n "$kube_cluster_name" ] && echo "$kube_cluster_name" > "$tmp_kube_cluster_name" 2> /dev/null
+    [ -n "$kube_system_ns" ] && [ -n "$kube_system_uid" ] && echo "$kube_system_uid" > "$tmp_kube_system_ns_uid_file" 2> /dev/null
+    echo "$containers" > "$tmp_kube_containers_file" 2> /dev/null
   fi
 
   local qos_class
@@ -480,6 +480,21 @@ function k8s_get_kubepod_name() {
   # namespace, pod_name, pod_uid, container_name, container_id, node_name
   if [ -n "$cntr_id" ]; then
     if [ -n "$labels" ] || labels=$(grep "$cntr_id" <<< "$containers" 2> /dev/null); then
+
+      # --- skip kubevirt helper containers in virt-launcher pods ---
+      local container_name pod_name
+      container_name="$(get_lbl_val "$labels" container_name)"
+      pod_name="$(get_lbl_val "$labels" pod_name)"
+
+      if [[ "$pod_name" == virt-launcher-* ]]; then
+        case "$container_name" in
+          volumerootdisk | guest-console-log)
+            info "${fn}: skipping kubevirt helper container '$container_name' in pod '$pod_name'"
+            return 3
+            ;;
+        esac
+      fi
+
       labels+=',kind="container"'
       labels+=",qos_class=\"$qos_class\""
       [ -n "$kube_system_uid" ] && [ "$kube_system_uid" != "null" ] && labels+=",cluster_id=\"$kube_system_uid\""
@@ -537,45 +552,45 @@ function k8s_get_name() {
   kubepod_name=$(k8s_get_kubepod_name "$cgroup_path" "$id")
 
   case "$?" in
-  0)
-    kubepod_name="k8s_${kubepod_name}"
+    0)
+      kubepod_name="k8s_${kubepod_name}"
 
-    local name labels
-    name=${kubepod_name%% *}
-    labels=${kubepod_name#* }
+      local name labels
+      name=${kubepod_name%% *}
+      labels=${kubepod_name#* }
 
-    if [ "$name" != "$labels" ]; then
-      info "${fn}: cgroup '${id}' has chart name '${name}', labels '${labels}"
-      NAME="$name"
-      LABELS="$labels"
-    else
-      info "${fn}: cgroup '${id}' has chart name '${NAME}'"
-      NAME="$name"
-    fi
-    EXIT_CODE=$EXIT_SUCCESS
-    ;;
-  1)
-    NAME="k8s_${id}"
-    warning "${fn}: cannot find the name of cgroup with id '${id}'. Setting name to ${NAME} and enabling it."
-    EXIT_CODE=$EXIT_SUCCESS
-    ;;
-  2)
-    NAME="k8s_${id}"
-    warning "${fn}: cannot find the name of cgroup with id '${id}'. Setting name to ${NAME} and asking for retry."
-    EXIT_CODE=$EXIT_RETRY
-    ;;
-  *)
-    NAME="k8s_${id}"
-    warning "${fn}: cannot find the name of cgroup with id '${id}'. Setting name to ${NAME} and disabling it."
-    EXIT_CODE=$EXIT_DISABLE
-    ;;
+      if [ "$name" != "$labels" ]; then
+        info "${fn}: cgroup '${id}' has chart name '${name}', labels '${labels}"
+        NAME="$name"
+        LABELS="$labels"
+      else
+        info "${fn}: cgroup '${id}' has chart name '${NAME}'"
+        NAME="$name"
+      fi
+      EXIT_CODE=$EXIT_SUCCESS
+      ;;
+    1)
+      NAME="k8s_${id}"
+      warning "${fn}: cannot find the name of cgroup with id '${id}'. Setting name to ${NAME} and enabling it."
+      EXIT_CODE=$EXIT_SUCCESS
+      ;;
+    2)
+      NAME="k8s_${id}"
+      warning "${fn}: cannot find the name of cgroup with id '${id}'. Setting name to ${NAME} and asking for retry."
+      EXIT_CODE=$EXIT_RETRY
+      ;;
+    *)
+      NAME="k8s_${id}"
+      warning "${fn}: cannot find the name of cgroup with id '${id}'. Setting name to ${NAME} and disabling it."
+      EXIT_CODE=$EXIT_DISABLE
+      ;;
   esac
 }
 
 function docker_get_name() {
   local id="${1}"
   # See https://github.com/netdata/netdata/pull/13523 for details
-  if command -v snap >/dev/null 2>&1 && snap list docker >/dev/null 2>&1; then
+  if command -v snap > /dev/null 2>&1 && snap list docker > /dev/null 2>&1; then
     docker_like_get_name_api DOCKER_HOST "${id}"
   elif hash docker 2> /dev/null; then
     docker_like_get_name_command docker "${id}"
@@ -629,7 +644,7 @@ function podman_validate_id() {
 
 DOCKER_HOST="${DOCKER_HOST:=unix:///var/run/docker.sock}"
 PODMAN_HOST="${PODMAN_HOST:=unix:///run/podman/podman.sock}"
-CGROUP_PATH="${1}" # the path as it is (e.g. '/docker/efcf4c409')
+CGROUP_PATH="${1}"  # the path as it is (e.g. '/docker/efcf4c409')
 CGROUP="${2//\//_}" # the modified path (e.g. 'docker_efcf4c409')
 EXIT_SUCCESS=0
 EXIT_RETRY=2

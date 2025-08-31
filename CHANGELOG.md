@@ -6,6 +6,19 @@
 
 **Merged pull requests:**
 
+- build\(deps\): bump k8s.io/client-go from 0.33.4 to 0.34.0 in /src/go [\#20908](https://github.com/netdata/netdata/pull/20908) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/stretchr/testify from 1.11.0 to 1.11.1 in /src/go [\#20906](https://github.com/netdata/netdata/pull/20906) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Fix processes function: Add PPID grouping and fix WOps typo [\#20902](https://github.com/netdata/netdata/pull/20902) ([ktsaou](https://github.com/ktsaou))
+- Update demo link formatting in documentation [\#20899](https://github.com/netdata/netdata/pull/20899) ([andrewm4894](https://github.com/andrewm4894))
+- improve\(go.d/snmp\): make snmp v3 auth and priv keys hidden in UI [\#20898](https://github.com/netdata/netdata/pull/20898) ([ilyam8](https://github.com/ilyam8))
+- refactor\(go.d/snmp\): recreate client on SNMPv3 "packet is not authentic" errors [\#20897](https://github.com/netdata/netdata/pull/20897) ([ilyam8](https://github.com/ilyam8))
+- improve\(cgroups\): skip KubeVirt helper containers in virt-launcher pods [\#20896](https://github.com/netdata/netdata/pull/20896) ([ilyam8](https://github.com/ilyam8))
+- improve snmp ubiquiti unifi ap model [\#20895](https://github.com/netdata/netdata/pull/20895) ([ilyam8](https://github.com/ilyam8))
+- Move exporting integrations to their own folder [\#20894](https://github.com/netdata/netdata/pull/20894) ([Ancairon](https://github.com/Ancairon))
+- Fixing Supported Linux Platforms and Versions [\#20893](https://github.com/netdata/netdata/pull/20893) ([BenjaminFosters](https://github.com/BenjaminFosters))
+- improved alerting docs [\#20891](https://github.com/netdata/netdata/pull/20891) ([ktsaou](https://github.com/ktsaou))
+- Improve exporting documentation clarity and structure [\#20890](https://github.com/netdata/netdata/pull/20890) ([kanelatechnical](https://github.com/kanelatechnical))
+- improve\(go.d/snmp\): update Allied Telesis meta [\#20889](https://github.com/netdata/netdata/pull/20889) ([ilyam8](https://github.com/ilyam8))
 - improve\(go.d/snmp\): update Fortinet meta [\#20888](https://github.com/netdata/netdata/pull/20888) ([ilyam8](https://github.com/ilyam8))
 - Windows: round sleep to clock resolution to prevent sub-ms early-wake logs [\#20887](https://github.com/netdata/netdata/pull/20887) ([ktsaou](https://github.com/ktsaou))
 - build\(deps\): bump github.com/stretchr/testify from 1.10.0 to 1.11.0 in /src/go [\#20886](https://github.com/netdata/netdata/pull/20886) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -438,17 +451,6 @@
 - chore\(otel.plugin\): fix building [\#20368](https://github.com/netdata/netdata/pull/20368) ([ilyam8](https://github.com/ilyam8))
 - SNMP: \_fortinet-fortigate-vpn-tunnel.yaml [\#20367](https://github.com/netdata/netdata/pull/20367) ([Ancairon](https://github.com/Ancairon))
 - SNMP: \_fortinet-fortigate-cpu-memory.yaml [\#20366](https://github.com/netdata/netdata/pull/20366) ([Ancairon](https://github.com/Ancairon))
-- SNMP: \_cisco-wlc.yaml [\#20364](https://github.com/netdata/netdata/pull/20364) ([Ancairon](https://github.com/Ancairon))
-- \_cisco-voice.yaml [\#20361](https://github.com/netdata/netdata/pull/20361) ([Ancairon](https://github.com/Ancairon))
-- chore\(go.d\): fix some golangcilint warning [\#20360](https://github.com/netdata/netdata/pull/20360) ([ilyam8](https://github.com/ilyam8))
-- Windows updated [\#20358](https://github.com/netdata/netdata/pull/20358) ([kanelatechnical](https://github.com/kanelatechnical))
-- feat\(go.d/dyncfg\): add autodetect\_retry to dyncfg jobs [\#20357](https://github.com/netdata/netdata/pull/20357) ([ilyam8](https://github.com/ilyam8))
-- Improve datafile rotation and indexing [\#20354](https://github.com/netdata/netdata/pull/20354) ([stelfrag](https://github.com/stelfrag))
-- SNMP: \_cisco-ipsec-flow-monitor.yaml [\#20353](https://github.com/netdata/netdata/pull/20353) ([Ancairon](https://github.com/Ancairon))
-- build\(deps\): update otel dependencies version [\#20352](https://github.com/netdata/netdata/pull/20352) ([ilyam8](https://github.com/ilyam8))
-- SNMP: \_generic-ups.yaml [\#20351](https://github.com/netdata/netdata/pull/20351) ([Ancairon](https://github.com/Ancairon))
-- Improve retention calculation after datafile deletion [\#20350](https://github.com/netdata/netdata/pull/20350) ([stelfrag](https://github.com/stelfrag))
-- SNMP: \_generic-ucd.yaml [\#20349](https://github.com/netdata/netdata/pull/20349) ([Ancairon](https://github.com/Ancairon))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 

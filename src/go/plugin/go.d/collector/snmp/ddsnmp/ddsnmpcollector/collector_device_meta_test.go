@@ -799,10 +799,10 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 			},
 			expectedError: false,
 		},
-		"base metadata exact via Extends": {
+		"base metadata exact via sysObjectIDs": {
 			profile: &ddsnmp.Profile{
 				Definition: &ddprofiledefinition.ProfileDefinition{
-					Extends: []string{"1.3.6.1.4.1.9.1.669"},
+					SysObjectIDs: []string{"1.3.6.1.4.1.9.1.669"},
 					Metadata: ddprofiledefinition.MetadataConfig{
 						"device": {
 							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
@@ -823,10 +823,10 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 			},
 			expectedError: false,
 		},
-		"extends exact + sysobjectid wildcard → base wins overlap": {
+		"sysObjectIDs exact + sysobjectid wildcard → base wins overlap": {
 			profile: &ddsnmp.Profile{
 				Definition: &ddprofiledefinition.ProfileDefinition{
-					Extends: []string{"1.3.6.1.4.1.9.1.669"},
+					SysObjectIDs: []string{"1.3.6.1.4.1.9.1.669"},
 					Metadata: ddprofiledefinition.MetadataConfig{
 						"device": {
 							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
@@ -858,7 +858,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 			},
 			expectedError: false,
 		},
-		"no extends (non-exact) + sysobjectid wildcard → wildcard wins": {
+		"non-exact + sysobjectid wildcard → wildcard wins": {
 			profile: &ddsnmp.Profile{
 				Definition: &ddprofiledefinition.ProfileDefinition{
 					Metadata: ddprofiledefinition.MetadataConfig{
@@ -888,40 +888,6 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				"platform": {Value: "Enterprise-Wildcard", IsExactMatch: false},
 				"series":   {Value: "ASA-Wildcard", IsExactMatch: false},
 				"model":    {Value: "ASA5510", IsExactMatch: false},
-			},
-			expectedError: false,
-		},
-		"extends exact + sysobjectid exact → sysobjectid wins overlap": {
-			profile: &ddsnmp.Profile{
-				Definition: &ddprofiledefinition.ProfileDefinition{
-					Extends: []string{"1.3.6.1.4.1.9.1.669"},
-					Metadata: ddprofiledefinition.MetadataConfig{
-						"device": {
-							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
-								"vendor": {Value: "Cisco-Base"},
-								"model":  {Value: "BaseModel"},
-							},
-						},
-					},
-					SysobjectIDMetadata: []ddprofiledefinition.SysobjectIDMetadataEntryConfig{
-						{
-							SysobjectID: "1.3.6.1.4.1.9.1.669", // exact
-							Metadata: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
-								"vendor": {Value: "Cisco-Exact"},
-								"model":  {Value: "ASA5510"},
-								"series": {Value: "ASA5500"},
-							},
-						},
-					},
-				},
-			},
-			setupMock:   func(m *snmpmock.MockHandler) {},
-			sysobjectid: "1.3.6.1.4.1.9.1.669",
-			expectedResult: map[string]ddsnmp.MetaTag{
-				// sysobjectid exact (written first) holds; base exact does not overwrite exact
-				"vendor": {Value: "Cisco-Exact", IsExactMatch: true},
-				"model":  {Value: "ASA5510", IsExactMatch: true},
-				"series": {Value: "ASA5500", IsExactMatch: true},
 			},
 			expectedError: false,
 		},
