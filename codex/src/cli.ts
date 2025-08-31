@@ -36,6 +36,7 @@ program
   .option('--no-stream', 'Disable streaming; use non-streaming responses')
   .option('--parallel-tool-calls', 'Enable parallel tool calls')
   .option('--no-parallel-tool-calls', 'Disable parallel tool calls')
+  .option('--max-retries <n>', 'Max retry rounds over provider/model list', '3')
   .option('--max-tool-turns <n>', 'Maximum tool turns (agent loop cap)', '30')
   .action(async (providers: string, models: string, mcpTools: string, systemPrompt: string, userPrompt: string, options: Record<string, unknown>) => {
     let origLog: typeof console.log | undefined;
@@ -67,12 +68,15 @@ program
       const topP = typeof topPRaw === 'string' ? Number.parseFloat(topPRaw) : Number(topPRaw);
       const maxToolTurnsRaw = options.maxToolTurns;
       const maxToolTurns = typeof maxToolTurnsRaw === 'string' ? Number.parseInt(maxToolTurnsRaw, 10) : Number(maxToolTurnsRaw);
+      const maxRetriesRaw = options.maxRetries;
+      const maxRetries = typeof maxRetriesRaw === 'string' ? Number.parseInt(maxRetriesRaw, 10) : Number(maxRetriesRaw);
 
       if (!Number.isFinite(llmTimeout) || llmTimeout <= 0) { console.error('Error: --llm-timeout must be positive'); process.exit(4); }
       if (!Number.isFinite(toolTimeout) || toolTimeout <= 0) { console.error('Error: --tool-timeout must be positive'); process.exit(4); }
       if (!Number.isFinite(temperature) || temperature < 0 || temperature > 2) { console.error('Error: --temperature must be between 0 and 2'); process.exit(4); }
       if (!Number.isFinite(topP) || topP < 0 || topP > 1) { console.error('Error: --top-p must be between 0 and 1'); process.exit(4); }
       if (!Number.isFinite(maxToolTurns) || maxToolTurns <= 0) { console.error('Error: --max-tool-turns must be a positive integer'); process.exit(4); }
+      if (!Number.isFinite(maxRetries) || maxRetries <= 0) { console.error('Error: --max-retries must be a positive integer'); process.exit(4); }
 
       const cfgPath = typeof options.config === 'string' && options.config.length > 0 ? options.config : undefined;
       const config = loadConfiguration(cfgPath);
@@ -89,6 +93,7 @@ program
         stream: typeof (options.stream) === 'boolean' ? (options.stream as boolean) : undefined,
         parallelToolCalls: typeof (options.parallelToolCalls) === 'boolean' ? (options.parallelToolCalls) : undefined,
         maxToolTurns,
+        maxRetries,
       };
 
       // Resolve prompts
@@ -161,22 +166,22 @@ program
       origError = console.error;
       if (suppressAvailableTools) {
         console.log = (...args: unknown[]) => {
-          if (args.some((a) => typeof a === 'string' && (a as string).includes('Available tools'))) return;
+          if (args.some((a) => typeof a === 'string' && ((a as string).includes('Available tools') || (a as string).includes('NO TOOLS AVAILABLE')))) return;
           // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
           (origLog as typeof console.log)(...args as []);
         };
         console.info = (...args: unknown[]) => {
-          if (args.some((a) => typeof a === 'string' && (a as string).includes('Available tools'))) return;
+          if (args.some((a) => typeof a === 'string' && ((a as string).includes('Available tools') || (a as string).includes('NO TOOLS AVAILABLE')))) return;
           // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
           (origInfo as typeof console.info)(...args as []);
         };
         console.warn = (...args: unknown[]) => {
-          if (args.some((a) => typeof a === 'string' && (a as string).includes('Available tools'))) return;
+          if (args.some((a) => typeof a === 'string' && ((a as string).includes('Available tools') || (a as string).includes('NO TOOLS AVAILABLE')))) return;
           // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
           (origWarn as typeof console.warn)(...args as []);
         };
         console.error = (...args: unknown[]) => {
-          if (args.some((a) => typeof a === 'string' && (a as string).includes('Available tools'))) return;
+          if (args.some((a) => typeof a === 'string' && ((a as string).includes('Available tools') || (a as string).includes('NO TOOLS AVAILABLE')))) return;
           // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
           (origError as typeof console.error)(...args as []);
         };

@@ -41,7 +41,7 @@
         "stream": true,
         "providerOptions": {
           "ollama": {
-            "think": false,
+            "think": true,
             "options": {
               "num_ctx": 65536,
               "num_predict": 4096,
@@ -98,7 +98,7 @@
       },
       "enabled": true
     },
-    "jina-mcp-server": {
+    "jina-search": {
       "type": "sse",
       "url": "https://mcp.jina.ai/sse",
       "headers": {

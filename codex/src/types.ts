@@ -17,6 +17,7 @@ export interface AIAgentOptions {
   maxToolTurns?: number;
   verbose?: boolean;
   stream?: boolean;
+  maxRetries?: number;
 }
 
 export interface AIAgentRunOptions {

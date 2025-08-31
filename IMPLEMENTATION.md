@@ -223,4 +223,30 @@ https://www.npmjs.com/package/@openrouter/ai-sdk-provider/v/beta
 
 This is compatible with AI SDK 5. The page examples. Read it.
 
+---
+
+## Ollama implementation
+
+Provider
+
+- Uses the community AI SDK 5 provider `ollama-ai-provider-v2` with the native REST API under `/api` (not the OpenAI compatibility layer).
+- Base URL normalization: if a config `baseUrl` ends with `/v1`, it is rewritten to `/api`; if it lacks `/api`, it is appended.
+- Tracing: provider is initialized with `fetch: tracedFetch` so `--trace-llm` logs HTTP requests and SSE headers.
+
+Provider options (per README)
+
+- Per-provider `custom.providerOptions.ollama` maps to the provider’s schema:
+  - `think`: boolean (for thinking-capable models)
+  - `options`: `{ num_ctx, num_predict, temperature, top_p, top_k, min_p, repeat_last_n, repeat_penalty, stop, seed }`
+
+Streaming and timeouts
+
+- Streaming path uses an inactivity timeout: an `AbortController` is armed for `llmTimeout` ms and reset on every streamed chunk. If the stream stalls for `llmTimeout`, the controller aborts.
+- Non-streaming path uses a fixed per-call timeout with `AbortSignal.timeout(llmTimeout)`.
+- The per-provider streaming switch is supported via `providers.ollama.custom.stream` (see README: Stream / No-Stream Options).
+
+Tool-calling
+
+- Full agentic loop: assistant tool_calls and tool messages are preserved and returned to Ollama in the next turn. No synthetic user messages are used for tool results.
+- On the final allowed turn, tools are disabled for the request and a single user message instructs the model to conclude using existing tool outputs.
 

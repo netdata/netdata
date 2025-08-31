@@ -11,7 +11,17 @@ export class AIAgent {
     config;
     mcpClient;
     callbacks;
+    currentTurn = 0;
+    toolSeq = 0;
     options;
+    colorVerbose(text) {
+        // Darker grey for verbose
+        return process.stderr.isTTY ? `\x1b[90m${text}\x1b[0m` : text;
+    }
+    colorThinking(text) {
+        // Lighter grey for thinking
+        return process.stderr.isTTY ? `\x1b[37m${text}\x1b[0m` : text;
+    }
     constructor(options = {}) {
         this.config = loadConfiguration(options.configPath);
         this.callbacks = options.callbacks ?? {};
@@ -28,8 +38,10 @@ export class AIAgent {
             stream: options.stream ?? defaults.stream ?? true,
             parallelToolCalls: options.parallelToolCalls ?? defaults.parallelToolCalls ?? true,
             maxToolTurns: options.maxToolTurns ?? defaults.maxToolTurns ?? 30,
+            maxRetries: options.maxRetries ?? defaults.maxRetries ?? 3,
         };
-        this.mcpClient = new MCPClientManager({ trace: this.options.traceMCP, verbose: this.options.verbose === true, logger: (msg) => { this.log('debug', msg); } });
+        // We handle verbose MCP req/res lines ourselves; keep trace as-is.
+        this.mcpClient = new MCPClientManager({ trace: this.options.traceMCP, verbose: false, logger: (msg) => { this.log('debug', msg); } });
     }
     async run(runOptions) {
         try {
@@ -53,7 +65,7 @@ export class AIAgent {
             const enhancedSystemPrompt = this.enhanceSystemPrompt(systemPrompt, this.mcpClient.getCombinedInstructions());
             if (this.options.verbose === true) {
                 try {
-                    process.stderr.write(`[prompt] created system prompt, size ${enhancedSystemPrompt.length} chars\n`);
+                    process.stderr.write(this.colorVerbose(`[prompt] created system prompt, size ${enhancedSystemPrompt.length} chars\n`));
                 }
                 catch { }
             }
@@ -100,11 +112,42 @@ export class AIAgent {
                         return '';
                     const started = Date.now();
                     const call = { id: `${Date.now().toString()}-${Math.random().toString(36).slice(2)}`, name: t.name, parameters: args };
+                    if (this.options.verbose === true) {
+                        try {
+                            const fmtVal = (v) => {
+                                if (v === null || v === undefined)
+                                    return String(v);
+                                const tpe = typeof v;
+                                if (tpe === 'string') {
+                                    const s = v;
+                                    return s.length > 80 ? s.slice(0, 80) + '…' : s;
+                                }
+                                if (tpe === 'number' || tpe === 'boolean')
+                                    return String(v);
+                                if (Array.isArray(v))
+                                    return `[${v.length}]`;
+                                return '{…}';
+                            };
+                            const entries = Object.entries(args ?? {});
+                            const paramStr = entries.length > 0
+                                ? '(' + entries.map(([k, v]) => `${k}:${fmtVal(v)}`).join(', ') + ')'
+                                : '()';
+                            this.toolSeq += 1;
+                            process.stderr.write(this.colorVerbose(`agent → mcp [${this.currentTurn + 1}.${this.toolSeq}] ${serverName}, ${t.name}${paramStr}\n`));
+                        }
+                        catch { }
+                    }
                     const res = await this.mcpClient.executeTool(serverName, call, this.options.toolTimeout);
                     this.callbacks.onAccounting?.({
                         type: 'tool', timestamp: Date.now(), status: res.success ? 'ok' : 'failed', latency: Date.now() - started,
                         mcpServer: serverName, command: t.name, charactersIn: JSON.stringify(args).length, charactersOut: res.result.length, error: res.error,
                     });
+                    if (this.options.verbose === true) {
+                        try {
+                            process.stderr.write(this.colorVerbose(`agent ← mcp [${this.currentTurn + 1}.${this.toolSeq}] ${serverName}, ${t.name}, latency ${Date.now() - started} ms, size ${res.result.length} chars\n`));
+                        }
+                        catch { }
+                    }
                     if (res.success && res.result.length > 0)
                         executedTools.push({ name: t.name, output: res.result });
                     // Verbose aggregation
@@ -155,16 +198,13 @@ export class AIAgent {
             return { sawAny, totalChars };
         };
         const tryPair = async (idx) => {
-            if (idx >= pairs.length)
-                return { success: false, appendMessages: [], error: 'All providers and models failed' };
             const pair = pairs[idx];
             const provider = pair.provider;
             const model = pair.model;
             const attemptStart = Date.now();
             let lastLLMCallStart = 0;
             try {
-                // Lower verbosity: only log provider/model attempts when verbose is enabled
-                this.log('debug', `Trying ${provider}/${model}`);
+                // Attempt provider/model (debug log removed per request)
                 const llmProvider = this.getLLMProvider(provider);
                 const baseMessages = conversation
                     .filter((m) => m.role === 'system' || m.role === 'user' || m.role === 'assistant')
@@ -192,10 +232,13 @@ export class AIAgent {
                         return [];
                     executedTools.length = 0;
                     const iterationStart = Date.now();
+                    let resLogged = false;
+                    this.currentTurn = turn;
+                    this.toolSeq = 0;
                     if (this.options.verbose === true) {
                         try {
                             const chars = msgs.reduce((acc, m) => acc + (typeof m.content === 'string' ? m.content.length : JSON.stringify(m.content).length), 0);
-                            process.stderr.write(`[llm] req: ${provider}, ${model}, messages ${msgs.length}, ${chars} chars\n`);
+                            process.stderr.write(this.colorVerbose(`agent → llm [${turn + 1}] ${provider}, ${model}, messages ${msgs.length}, ${chars} chars\n`));
                             llmRequests += 1; // count all attempts, even if they fail later
                         }
                         catch { }
@@ -216,6 +259,10 @@ export class AIAgent {
                     let outputTokens = 0;
                     let cachedTokens = undefined;
                     let turnMessages = [];
+                    const isFinalTurn = turn >= (this.options.maxToolTurns - 1);
+                    const msgsForThisCall = isFinalTurn
+                        ? msgs.concat({ role: 'user', content: "You are not allowed to run any more tools. Use the tool responses you have so far to answer my original question. If you failed to find answers for something, please state the areas you couldn't investigate" })
+                        : msgs;
                     if (effectiveStream) {
                         // Inactivity timeout: reset the timer on each streamed chunk
                         const ac = new AbortController();
@@ -231,23 +278,61 @@ export class AIAgent {
                             }
                             catch { } }, this.options.llmTimeout);
                         };
-                        resetIdle();
-                        lastLLMCallStart = Date.now();
-                        const result = streamText({
-                            model: llmProvider(model),
-                            messages: msgs,
-                            tools: sdkTools,
-                            temperature: this.options.temperature,
-                            topP: this.options.topP,
-                            providerOptions: providerOptionsDecl,
-                            abortSignal: ac.signal,
-                        });
-                        const streamInfo = await drainTextStream(result.textStream, () => resetIdle());
-                        try {
-                            if (idleTimer)
+                        const clearIdle = () => { try {
+                            if (idleTimer) {
                                 clearTimeout(idleTimer);
+                                idleTimer = undefined;
+                            }
                         }
-                        catch { }
+                        catch { } };
+                        let streamInfo = { sawAny: false, totalChars: 0 };
+                        let result;
+                        try {
+                            resetIdle();
+                            lastLLMCallStart = Date.now();
+                            const stOpts = {
+                                model: llmProvider(model),
+                                messages: msgsForThisCall,
+                                tools: isFinalTurn ? undefined : sdkTools,
+                                temperature: this.options.temperature,
+                                topP: this.options.topP,
+                                providerOptions: providerOptionsDecl,
+                                abortSignal: ac.signal,
+                            };
+                            const openReasoning = new Set();
+                            stOpts.onChunk = (ev) => {
+                                try {
+                                    const obj = ev;
+                                    const p = obj?.chunk;
+                                    if (p?.type === 'reasoning-start') {
+                                        const id = p.id ?? '0';
+                                        if (!openReasoning.has(id)) {
+                                            openReasoning.add(id);
+                                            const header = `thinking [${turn + 1}]: `;
+                                            process.stderr.write(this.colorThinking(header));
+                                        }
+                                    }
+                                    else if (p?.type === 'reasoning-delta') {
+                                        const seg = (typeof p.text === 'string' ? p.text : (typeof p.delta === 'string' ? p.delta : ''));
+                                        if (seg.length > 0)
+                                            process.stderr.write(this.colorThinking(seg));
+                                    }
+                                    else if (p?.type === 'reasoning-end') {
+                                        const id = p.id ?? '0';
+                                        if (openReasoning.has(id)) {
+                                            openReasoning.delete(id);
+                                            process.stderr.write(this.colorThinking('\n'));
+                                        }
+                                    }
+                                }
+                                catch { }
+                            };
+                            result = streamText(stOpts);
+                            streamInfo = await drainTextStream(result.textStream, () => resetIdle());
+                        }
+                        finally {
+                            clearIdle();
+                        }
                         const usageData = await result.usage;
                         inputTokens = usageData.inputTokens ?? 0;
                         outputTokens = usageData.outputTokens ?? 0;
@@ -273,24 +358,104 @@ export class AIAgent {
                             const details = `streamed=${streamInfo.sawAny} (${streamInfo.totalChars} chars), tools=${executedTools.length}, tokens in=${inputTokens}, out=${outputTokens}, cached=${cachedTokens ?? 0}.`;
                             throw new Error(`${name}: ${msg}.${hint} Details: ${details}`);
                         }
-                        turnMessages = Array.isArray(resp.messages)
-                            ? resp.messages.map((m) => ({ role: m.role, content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content), metadata: { provider, model, tokens: { inputTokens, outputTokens, totalTokens: (usageData.totalTokens ?? (inputTokens + outputTokens)) }, timestamp: Date.now() } }))
-                            : [];
+                        {
+                            const rawUnknown = resp.messages;
+                            const raw = Array.isArray(rawUnknown) ? rawUnknown : [];
+                            turnMessages = raw.map((m) => {
+                                const roleValue = (typeof m.role === 'string' ? m.role : 'assistant');
+                                const contentValue = typeof m.content === 'string' ? m.content : JSON.stringify(m.content);
+                                let tcs;
+                                if (Array.isArray(m.toolCalls)) {
+                                    const arr = m.toolCalls;
+                                    tcs = arr.map((tc) => ({ id: (tc.id ?? tc.toolCallId ?? ''), name: (tc.name ?? tc.function?.name ?? ''), parameters: (tc.arguments ?? tc.function?.arguments ?? {}) }));
+                                }
+                                const toolCallIdVal = typeof m.toolCallId === 'string' ? m.toolCallId : undefined;
+                                return {
+                                    role: roleValue,
+                                    content: contentValue,
+                                    toolCalls: tcs,
+                                    toolCallId: toolCallIdVal,
+                                    metadata: { provider, model, tokens: { inputTokens, outputTokens, totalTokens: (usageData.totalTokens ?? (inputTokens + outputTokens)) }, timestamp: Date.now() }
+                                };
+                            });
+                            const hasToolArtifacts = raw.some((mm) => (mm.role === 'tool') || (Array.isArray(mm.toolCalls) && mm.toolCalls.length > 0));
+                            // Fallback print: if nothing streamed but assistant text exists, print it once
+                            if (!streamInfo.sawAny) {
+                                try {
+                                    const assistantText = turnMessages
+                                        .filter((m) => m.role === 'assistant' && typeof m.content === 'string' && m.content.length > 0)
+                                        .map((m) => m.content)
+                                        .join('\n');
+                                    if (assistantText.length > 0)
+                                        this.output(assistantText + (assistantText.endsWith('\n') ? '' : '\n'));
+                                }
+                                catch { }
+                            }
+                            // Verbose response line for this turn
+                            if (this.options.verbose === true) {
+                                try {
+                                    const latency = Date.now() - iterationStart;
+                                    const size = turnMessages.reduce((acc, m) => acc + m.content.length, 0);
+                                    process.stderr.write(this.colorVerbose(`agent ← llm [${turn + 1}] input ${inputTokens}, output ${outputTokens}, cached ${cachedTokens ?? 0} tokens, tools ${executedTools.length}, latency ${latency} ms, size ${size} chars\n`));
+                                    aggAssistantChars += size;
+                                    aggToolCalls += executedTools.length;
+                                    resLogged = true;
+                                }
+                                catch { }
+                            }
+                            if (hasToolArtifacts && !isFinalTurn) {
+                                const nextMsgs = msgs.concat(raw.map((mm) => {
+                                    const out = { role: mm.role, content: mm.content };
+                                    if (Array.isArray(mm.toolCalls))
+                                        out.toolCalls = mm.toolCalls;
+                                    if (typeof mm.toolCallId === 'string')
+                                        out.toolCallId = mm.toolCallId;
+                                    return out;
+                                }));
+                                return runTurn(turn + 1, nextMsgs);
+                            }
+                            // Detect reasoning-only (no assistant text, no tool calls) in streaming path
+                            {
+                                const hasAssistantText = turnMessages.some((mm) => mm.role === 'assistant' && typeof mm.content === 'string' && mm.content.trim().length > 0);
+                                const reasoningOnly = !hasAssistantText && !hasToolArtifacts && (outputTokens > 0);
+                                if (reasoningOnly) {
+                                    try {
+                                        this.log('warn', `${provider}/${model} produced reasoning-only turn (no assistant text or tool calls)`);
+                                        if (this.options.verbose === true) {
+                                            process.stderr.write(this.colorVerbose(`[llm] note: reasoning-only (no text/toolcalls); outputTokens ${outputTokens}\n`));
+                                        }
+                                    }
+                                    catch { }
+                                }
+                            }
+                        }
                     }
                     else {
                         lastLLMCallStart = Date.now();
-                        const result = await generateText({
+                        const gtOpts = {
                             model: llmProvider(model),
-                            messages: msgs,
-                            tools: sdkTools,
+                            messages: msgsForThisCall,
+                            tools: isFinalTurn ? undefined : sdkTools,
                             temperature: this.options.temperature,
                             topP: this.options.topP,
                             providerOptions: providerOptionsDecl,
                             abortSignal: AbortSignal.timeout(this.options.llmTimeout),
-                        });
+                        };
+                        gtOpts.onStepFinish = (step) => {
+                            try {
+                                const s = step;
+                                if (typeof s.reasoningText === 'string' && s.reasoningText.length > 0) {
+                                    const line = `thinking [${turn + 1}]: ${s.reasoningText}`;
+                                    process.stderr.write(this.colorThinking(line.endsWith('\n') ? line : (line + '\n')));
+                                }
+                            }
+                            catch { }
+                        };
+                        const result = await generateText(gtOpts);
                         if (typeof result.text === 'string' && result.text.length > 0)
                             this.output(result.text + (result.text.endsWith('\n') ? '' : '\n'));
-                        const usageData = result.usage ?? {};
+                        const usageMaybe = result.usage;
+                        const usageData = usageMaybe ?? {};
                         inputTokens = usageData.inputTokens ?? 0;
                         outputTokens = usageData.outputTokens ?? 0;
                         cachedTokens = usageData.cachedTokens;
@@ -304,36 +469,81 @@ export class AIAgent {
                             }
                             catch { }
                         }
-                        const resp = (result.response ?? {});
-                        turnMessages = Array.isArray(resp.messages)
-                            ? resp.messages.map((m) => ({ role: m.role, content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content), metadata: { provider, model, tokens: { inputTokens, outputTokens, totalTokens: (usageData.totalTokens ?? (inputTokens + outputTokens)) }, timestamp: Date.now() } }))
-                            : [];
+                        const respObj = (result.response ?? {});
+                        const raw2 = Array.isArray(respObj.messages) ? respObj.messages : [];
+                        turnMessages = raw2.map((m) => {
+                            const roleValue = (typeof m.role === 'string' ? m.role : 'assistant');
+                            const contentValue = typeof m.content === 'string' ? m.content : JSON.stringify(m.content);
+                            let tcs;
+                            if (Array.isArray(m.toolCalls)) {
+                                const arr = m.toolCalls;
+                                tcs = arr.map((tc) => ({ id: (tc.id ?? tc.toolCallId ?? ''), name: (tc.name ?? tc.function?.name ?? ''), parameters: (tc.arguments ?? tc.function?.arguments ?? {}) }));
+                            }
+                            const toolCallIdVal = typeof m.toolCallId === 'string' ? m.toolCallId : undefined;
+                            return {
+                                role: roleValue,
+                                content: contentValue,
+                                toolCalls: tcs,
+                                toolCallId: toolCallIdVal,
+                                metadata: { provider, model, tokens: { inputTokens, outputTokens, totalTokens: (usageData.totalTokens ?? (inputTokens + outputTokens)) }, timestamp: Date.now() }
+                            };
+                        });
+                        const hasToolArtifacts2 = raw2.some((mm) => (mm.role === 'tool') || (Array.isArray(mm.toolCalls) && mm.toolCalls.length > 0));
+                        // Verbose response line for this turn (non-streaming)
+                        if (this.options.verbose === true) {
+                            try {
+                                const latency = Date.now() - iterationStart;
+                                const size = turnMessages.reduce((acc, m) => acc + m.content.length, 0);
+                                process.stderr.write(this.colorVerbose(`agent ← llm [${turn + 1}] input ${inputTokens}, output ${outputTokens}, cached ${cachedTokens ?? 0} tokens, tools ${executedTools.length}, latency ${latency} ms, size ${size} chars\n`));
+                                aggAssistantChars += size;
+                                aggToolCalls += executedTools.length;
+                                resLogged = true;
+                            }
+                            catch { }
+                        }
+                        if (hasToolArtifacts2 && !isFinalTurn) {
+                            const nextMsgs = msgs.concat(raw2.map((mm) => {
+                                const out = { role: mm.role, content: mm.content };
+                                if (Array.isArray(mm.toolCalls))
+                                    out.toolCalls = mm.toolCalls;
+                                if (typeof mm.toolCallId === 'string')
+                                    out.toolCallId = mm.toolCallId;
+                                return out;
+                            }));
+                            return runTurn(turn + 1, nextMsgs);
+                        }
+                        // Detect reasoning-only (no assistant text, no tool calls) in non-streaming path
+                        {
+                            const hasAssistantText = turnMessages.some((mm) => mm.role === 'assistant' && typeof mm.content === 'string' && mm.content.trim().length > 0);
+                            const reasoningOnly = !hasAssistantText && !hasToolArtifacts2 && (outputTokens > 0);
+                            if (reasoningOnly) {
+                                try {
+                                    this.log('warn', `${provider}/${model} produced reasoning-only turn (no assistant text or tool calls)`);
+                                    if (this.options.verbose === true) {
+                                        process.stderr.write(this.colorVerbose(`[llm] note: reasoning-only (no text/toolcalls); outputTokens ${outputTokens}\n`));
+                                    }
+                                }
+                                catch { }
+                            }
+                        }
                     }
-                    if (this.options.verbose === true) {
+                    if (this.options.verbose === true && !resLogged) {
                         try {
                             const latency = Date.now() - iterationStart;
                             const size = turnMessages.reduce((acc, m) => acc + m.content.length, 0);
-                            process.stderr.write(`[llm] res: input ${inputTokens}, output ${outputTokens}, cached ${cachedTokens ?? 0} tokens, tools ${executedTools.length}, latency ${latency} ms, size ${size} chars\n`);
+                            process.stderr.write(this.colorVerbose(`agent ← llm [${turn + 1}] input ${inputTokens}, output ${outputTokens}, cached ${cachedTokens ?? 0} tokens, tools ${executedTools.length}, latency ${latency} ms, size ${size} chars\n`));
                             aggAssistantChars += size;
                             aggToolCalls += executedTools.length;
                         }
                         catch { }
                     }
-                    // If the model executed tools (tool-first response), continue the turn with tool outputs
-                    if (executedTools.length > 0) {
-                        const toolText = executedTools.map((x) => `- ${x.name}:\n${x.output}`).join('\n\n');
-                        const nextMsgs = msgs.concat({ role: 'user', content: `Using only the following tool results, continue and answer the user's request.\n\nTOOL RESULTS:\n\n${toolText}` });
-                        return runTurn(turn + 1, nextMsgs);
-                    }
+                    // No tool artifacts: return
                     // If there is assistant text, return it; otherwise consider it a failure
                     if (turnMessages.length > 0)
                         return turnMessages;
                     throw new Error('Empty response from model');
                 };
                 const finalAppend = await runTurn(0, currentMessages);
-                if (finalAppend.length === 0) {
-                    return { success: false, appendMessages: [], error: 'Max tool turns exceeded' };
-                }
                 return { success: true, appendMessages: finalAppend };
             }
             catch (err) {
@@ -352,10 +562,27 @@ export class AIAgent {
                 } })();
                 this.log('warn', `${provider}/${model} failed: [${en}] ${em}${extra} (waited ${waitedMs} ms)${advice}`);
                 this.callbacks.onAccounting?.({ type: 'llm', timestamp: Date.now(), status: 'failed', latency: 0, provider, model, tokens: { inputTokens: 0, outputTokens: 0, totalTokens: 0 }, error: em });
-                return tryPair(idx + 1);
+                return { success: false, appendMessages: [], error: em };
             }
         };
-        const outcome = await tryPair(0);
+        // Retry rounds over provider/model pairs
+        let lastError;
+        for (let round = 0; round < this.options.maxRetries; round += 1) {
+            for (let i = 0; i < pairs.length; i += 1) {
+                const res = await tryPair(i);
+                if (res.success) {
+                    if (this.options.verbose === true) {
+                        try {
+                            const mcpSummary = Array.from(mcpPerServer.entries()).map(([srv, cnt]) => `${srv} ${cnt}`).join(', ');
+                            process.stderr.write(`[fin] finally: llm requests ${llmRequests} (tokens: ${aggInput} in, ${aggOutput} out, ${aggCached} cached, tool-calls ${aggToolCalls}, output-size ${aggAssistantChars} chars, latency-sum ${aggLLMLatency} ms), mcp requests ${mcpRequests}${mcpSummary.length > 0 ? ` (${mcpSummary})` : ''}\n`);
+                        }
+                        catch { }
+                    }
+                    return res;
+                }
+                lastError = res.error ?? lastError;
+            }
+        }
         if (this.options.verbose === true) {
             try {
                 const mcpSummary = Array.from(mcpPerServer.entries()).map(([srv, cnt]) => `${srv} ${cnt}`).join(', ');
@@ -363,7 +590,7 @@ export class AIAgent {
             }
             catch { }
         }
-        return outcome;
+        return { success: false, appendMessages: [], error: lastError ?? 'All providers and models failed' };
     }
     getLLMProvider(providerName) {
         const cfg = this.config.providers[providerName];

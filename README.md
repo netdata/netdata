@@ -11,8 +11,25 @@ The AI Agent provides a unified interface to interact with multiple LLM provider
 1. **Configuration**: All settings are stored in a JSON config (default `.ai-agent.json`) including provider API keys and MCP server definitions
 2. **Execution**: Command-line interface accepts providers, models, MCP tools, and prompts (positionals), plus optional flags
 3. **Bootstrap**: Validates config and initializes MCP servers. Initialization is non-fatal: failures are logged and the agent can still proceed to the LLM. Use `--trace-mcp` to inspect initialization details. In `--dry-run`, both MCP spawn and LLM calls are skipped.
-4. **Processing**: Sends requests to LLMs with available tools (schemas), executes tool calls in parallel, and maintains conversation history
+4. **Processing**: Sends requests to LLMs with available tools (schemas). The LLM orchestrates repeated tool calls. The agent preserves assistant tool_calls and tool results in history and loops until completion (see Agentic Behavior)
 5. **Output**: Streams LLM responses to stdout in real time, logs errors to stderr
+
+## Agentic Behavior
+
+- The agent is fully agentic: the LLM decides when to call tools, with repeated invocations across multiple turns.
+- Tool calls are preserved as assistant messages with `tool_calls` (id, name, arguments). Tool results are preserved as `tool` role messages with `tool_call_id`.
+- The next turn always includes all prior assistant/user/tool messages in order, giving the LLM full transparency into requests and responses.
+- A maximum tool-turns cap (`defaults.maxToolTurns`) is enforced. On the final allowed turn, tools are disabled and a single user message is appended instructing the LLM to conclude using existing tool results (see Hardcoded Strings). This guarantees a final answer without an error.
+
+## Hardcoded Strings (LLM-facing)
+
+The application only injects the following LLM-facing strings:
+
+1. `## TOOLS' INSTRUCTIONS`
+2. `## TOOL {name} INSTRUCTIONS` (per tool instructions)
+3. Final-turn message when tools are no longer permitted: "You are not allowed to run any more tools. Use the tool responses you have so far to answer my original question. If you failed to find answers for something, please state the areas you couldn't investigate"
+
+No other hardcoded content is sent to the LLM.
 
 ## Command Line Interface
 
@@ -97,11 +114,12 @@ All string values in the configuration support environment variable expansion us
     "file": "${HOME}/ai-agent-accounting.jsonl"
   },
   "defaults": {
-    "llmTimeout": 30000,
-    "toolTimeout": 10000,
+    "llmTimeout": 120000,
+    "toolTimeout": 60000,
     "temperature": 0.7,
     "topP": 1.0,
-    "parallelToolCalls": true
+    "parallelToolCalls": true,
+    "stream": true
   }
 }
 ```
@@ -115,14 +133,16 @@ All string values in the configuration support environment variable expansion us
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--llm-timeout <ms>` | Timeout for LLM responses | 30000 |
-| `--tool-timeout <ms>` | Timeout for tool execution | 10000 |
+| `--llm-timeout <ms>` | Inactivity timeout per LLM call (resets on each streamed chunk) | 120000 |
+| `--tool-timeout <ms>` | Timeout for tool execution | 60000 |
 | `--trace-llm` | Trace LLM HTTP requests and responses (Authorization redacted) | off |
 | `--trace-mcp` | Trace MCP connect, tools/prompts list, stderr, callTool | off |
 | `--parallel-tool-calls` | Enable parallel tool calls (OpenAI-compatible) | true (default) |
 | `--no-parallel-tool-calls` | Disable parallel tool calls | - |
 | `--temperature <n>` | LLM temperature (0.0-2.0) | 0.7 |
 | `--top-p <n>` | LLM top-p sampling (0.0-1.0) | 1.0 |
+| `--stream` | Force streaming responses | on by default |
+| `--no-stream` | Disable streaming (use non-streaming responses) | - |
 | `--save <filename>` | Save conversation to JSON file | - |
 | `--load <filename>` | Load conversation from JSON file | - |
 | `--config <filename>` | Configuration file path | See resolution order |
@@ -190,6 +210,24 @@ For `stdio` servers, only the environment variables explicitly configured for th
 - If a stream fails mid-response, partial content is discarded from conversation history and a retry may proceed with the next provider/model
 - Tools do not stream (their output is for the LLM, not user)
 - Vercel AI SDK handles tool call detection automatically during streaming
+
+#### Inactivity Timeout (LLM)
+- The `llmTimeout` is an inactivity timeout during streaming: it resets on each received chunk and only aborts if no data arrives for the configured duration.
+- In non-streaming mode, `llmTimeout` is a fixed per-call timeout.
+
+### Verbose Logging (--verbose)
+- For each request/response, prints a single concise line to stderr with key numbers:
+  - `[llm] req: {provider}, {model}, messages N, X chars`
+  - `[llm] res: input A, output B, cached C tokens, tools T, latency L ms, size S chars`
+  - `[mcp] initializing {server}` / `[mcp] initialized {server}, {N} tools (...), latency Z ms`
+  - `[mcp] req: {id} {server}, {tool}` / `[mcp] res: {id} {server}, {tool}, latency X ms, size Y chars`
+  - `[fin] finally: llm requests R (tokens: A in, B out, C cached, tool-calls T, output-size S chars, latency-sum L ms), mcp requests M (serverA X, ...)`
+
+### Stream / No-Stream Options
+- Global default via `defaults.stream` (true/false)
+- Per-provider override: `providers.<name>.custom.stream`
+- CLI override: `--stream` / `--no-stream`
+- Streaming recommended for interactivity; non-streaming can be used for providers or queries sensitive to streaming edge cases.
 
 #### Tracing
 - `--trace-llm`: Logs full request headers/body (Authorization redacted) and pretty JSON responses. For SSE responses, the raw SSE is logged after the stream completes.

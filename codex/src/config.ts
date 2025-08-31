@@ -21,7 +21,7 @@ const MCPServerConfigSchema = z.object({
   headers: z.record(z.string(), z.string()).optional(),
   env: z.record(z.string(), z.string()).optional(),
   enabled: z.boolean().optional(),
-  toolSchemas: z.record(z.string(), z.any()).optional(),
+  toolSchemas: z.record(z.string(), z.unknown()).optional(),
 });
 const ConfigurationSchema = z.object({
   providers: z.record(z.string(), ProviderConfigSchema),
@@ -36,6 +36,7 @@ const ConfigurationSchema = z.object({
       stream: z.boolean().optional(),
       parallelToolCalls: z.boolean().optional(),
       maxToolTurns: z.number().int().positive().optional(),
+      maxRetries: z.number().int().positive().optional(),
     })
     .optional(),
 });

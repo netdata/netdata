@@ -29,6 +29,7 @@ program
     .option('--no-stream', 'Disable streaming; use non-streaming responses')
     .option('--parallel-tool-calls', 'Enable parallel tool calls')
     .option('--no-parallel-tool-calls', 'Disable parallel tool calls')
+    .option('--max-retries <n>', 'Max retry rounds over provider/model list', '3')
     .option('--max-tool-turns <n>', 'Maximum tool turns (agent loop cap)', '30')
     .action(async (providers, models, mcpTools, systemPrompt, userPrompt, options) => {
     let origLog;
@@ -58,6 +59,8 @@ program
         const topP = typeof topPRaw === 'string' ? Number.parseFloat(topPRaw) : Number(topPRaw);
         const maxToolTurnsRaw = options.maxToolTurns;
         const maxToolTurns = typeof maxToolTurnsRaw === 'string' ? Number.parseInt(maxToolTurnsRaw, 10) : Number(maxToolTurnsRaw);
+        const maxRetriesRaw = options.maxRetries;
+        const maxRetries = typeof maxRetriesRaw === 'string' ? Number.parseInt(maxRetriesRaw, 10) : Number(maxRetriesRaw);
         if (!Number.isFinite(llmTimeout) || llmTimeout <= 0) {
             console.error('Error: --llm-timeout must be positive');
             process.exit(4);
@@ -78,6 +81,10 @@ program
             console.error('Error: --max-tool-turns must be a positive integer');
             process.exit(4);
         }
+        if (!Number.isFinite(maxRetries) || maxRetries <= 0) {
+            console.error('Error: --max-retries must be a positive integer');
+            process.exit(4);
+        }
         const cfgPath = typeof options.config === 'string' && options.config.length > 0 ? options.config : undefined;
         const config = loadConfiguration(cfgPath);
         const agentOptions = {
@@ -92,6 +99,7 @@ program
             stream: typeof (options.stream) === 'boolean' ? options.stream : undefined,
             parallelToolCalls: typeof (options.parallelToolCalls) === 'boolean' ? (options.parallelToolCalls) : undefined,
             maxToolTurns,
+            maxRetries,
         };
         // Resolve prompts
         async function readPrompt(value) {
@@ -163,25 +171,25 @@ program
         origError = console.error;
         if (suppressAvailableTools) {
             console.log = (...args) => {
-                if (args.some((a) => typeof a === 'string' && a.includes('Available tools')))
+                if (args.some((a) => typeof a === 'string' && (a.includes('Available tools') || a.includes('NO TOOLS AVAILABLE'))))
                     return;
                 // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
                 origLog(...args);
             };
             console.info = (...args) => {
-                if (args.some((a) => typeof a === 'string' && a.includes('Available tools')))
+                if (args.some((a) => typeof a === 'string' && (a.includes('Available tools') || a.includes('NO TOOLS AVAILABLE'))))
                     return;
                 // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
                 origInfo(...args);
             };
             console.warn = (...args) => {
-                if (args.some((a) => typeof a === 'string' && a.includes('Available tools')))
+                if (args.some((a) => typeof a === 'string' && (a.includes('Available tools') || a.includes('NO TOOLS AVAILABLE'))))
                     return;
                 // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
                 origWarn(...args);
             };
             console.error = (...args) => {
-                if (args.some((a) => typeof a === 'string' && a.includes('Available tools')))
+                if (args.some((a) => typeof a === 'string' && (a.includes('Available tools') || a.includes('NO TOOLS AVAILABLE'))))
                     return;
                 // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
                 origError(...args);
