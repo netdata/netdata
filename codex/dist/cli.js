@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import { Command } from 'commander';
 import { AIAgent } from './ai-agent.js';
 import { loadConfiguration } from './config.js';
@@ -116,8 +117,69 @@ program
                 return fs.readFileSync(value.slice(1), 'utf8');
             return value;
         }
-        const resolvedSystem = await readPrompt(systemPrompt);
-        const resolvedUser = await readPrompt(userPrompt);
+        const resolvedSystemRaw = await readPrompt(systemPrompt);
+        const resolvedUserRaw = await readPrompt(userPrompt);
+        // Prompt variable substitution
+        function pad2(n) { return n < 10 ? `0${n}` : String(n); }
+        function formatRFC3339Local(d) {
+            const y = d.getFullYear();
+            const m = pad2(d.getMonth() + 1);
+            const da = pad2(d.getDate());
+            const hh = pad2(d.getHours());
+            const mm = pad2(d.getMinutes());
+            const ss = pad2(d.getSeconds());
+            const tzMin = -d.getTimezoneOffset();
+            const sign = tzMin >= 0 ? '+' : '-';
+            const abs = Math.abs(tzMin);
+            const tzh = pad2(Math.floor(abs / 60));
+            const tzm = pad2(abs % 60);
+            return `${y}-${m}-${da}T${hh}:${mm}:${ss}${sign}${tzh}:${tzm}`;
+        }
+        function detectTimezone() {
+            try {
+                return Intl.DateTimeFormat().resolvedOptions().timeZone ?? (process.env.TZ ?? 'UTC');
+            }
+            catch {
+                return process.env.TZ ?? 'UTC';
+            }
+        }
+        function detectOS() {
+            try {
+                const content = fs.readFileSync('/etc/os-release', 'utf-8');
+                const match = content.match(/^PRETTY_NAME=\"?([^\"\n]+)\"?/m);
+                if (match && match[1])
+                    return `${match[1]} (kernel ${os.release()})`;
+            }
+            catch { /* ignore */ }
+            return `${os.type()} ${os.release()}`;
+        }
+        function expandPrompt(str, vars) {
+            const replace = (s, re) => s.replace(re, (_m, name) => (name in vars ? vars[name] : _m));
+            let out = str;
+            out = replace(out, /\$\{([A-Z_]+)\}/g);
+            out = replace(out, /\{\{([A-Z_]+)\}\}/g);
+            return out;
+        }
+        const now = new Date();
+        const vars = {
+            DATETIME: formatRFC3339Local(now),
+            DAY: now.toLocaleDateString(undefined, { weekday: 'long' }),
+            TIMEZONE: detectTimezone(),
+            MAX_TURNS: String(maxToolTurns),
+            OS: detectOS(),
+            ARCH: process.arch,
+            KERNEL: `${os.type()} ${os.release()}`,
+            CD: process.cwd(),
+            HOSTNAME: os.hostname(),
+            USER: (() => { try {
+                return os.userInfo().username;
+            }
+            catch {
+                return process.env.USER || process.env.USERNAME || '';
+            } })(),
+        };
+        const resolvedSystem = expandPrompt(resolvedSystemRaw, vars);
+        const resolvedUser = expandPrompt(resolvedUserRaw, vars);
         let conversationHistory = undefined;
         if (typeof options.load === 'string' && options.load.length > 0) {
             try {

@@ -167,6 +167,29 @@ Notes:
   - Record each tool result in message history in the exact order specified by the LLM
 5. **Loop**: Return to step 2 with updated conversation history
 
+## Prompt Variable Substitutions
+
+You can reference environment/system/context variables directly in your system and user prompts. Both `${VAR}` and `{{VAR}}` forms are supported.
+
+Supported variables:
+
+- `DATETIME`: Current local date/time in RFC 3339 with numeric offset, e.g. `2025-08-31T02:05:07+03:00`.
+- `DAY`: Weekday name, e.g. `Monday`.
+- `TIMEZONE`: IANA time zone when available (e.g. `Europe/Athens`), else `TZ` env or `UTC`.
+- `MAX_TURNS`: The configured maximum tool turns for the agent loop.
+- `OS`: Operating system name. On Linux, uses `/etc/os-release` PRETTY_NAME if available (e.g. `Ubuntu 24.04.1 LTS`) and appends kernel (e.g. `(kernel 6.8.0-41-generic)`). Otherwise falls back to `os.type() os.release()`.
+- `ARCH`: CPU architecture, e.g. `x64`, `arm64`.
+- `KERNEL`: Kernel string as `os.type() os.release()`, e.g. `Linux 6.8.0-41-generic`.
+- `CD`: Current working directory (`process.cwd()`).
+- `HOSTNAME`: Host name of the running machine.
+- `USER`: Username of the invoking user (from `os.userInfo()` or `USER`/`USERNAME` env fallback).
+
+Notes:
+
+- Unknown variables are left unchanged in the prompt.
+- Substitutions occur after reading prompts from `@file` or stdin and before appending tools' instructions.
+- `MAX_TOOLS` is intentionally not provided at this time (no app-level cap on tools per turn).
+
 ## Core Requirements
 
 ### Tool Execution Rules
