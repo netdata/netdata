@@ -12,6 +12,8 @@ const ProviderConfigSchema = z.object({
   headers: z.record(z.string(), z.string()).optional(),
   custom: z.record(z.string(), z.unknown()).optional(),
   mergeStrategy: z.enum(['overlay','override','deep']).optional(),
+  type: z.enum(['openai','anthropic','google','openrouter','ollama']).optional(),
+  openaiMode: z.enum(['responses','chat']).optional(),
 });
 const MCPServerConfigSchema = z.object({
   type: z.enum(['stdio', 'websocket', 'http', 'sse']),

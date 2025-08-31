@@ -1,5 +1,11 @@
 {
   "providers": {
+    "vllm": {
+      "type": "openai",
+      "apiKey": "vllm",
+      "baseUrl": "http://nova:8083/v1",
+      "openaiMode": "chat"
+    },
     "openai": {
       "apiKey": "${OPENAI_API_KEY}",
       "baseUrl": "https://api.openai.com/v1",
@@ -24,11 +30,10 @@
     "openrouter": {
       "apiKey": "${OPENROUTER_API_KEY}",
       "custom": {
-        "stream": true,
+        "stream": false,
         "provider": {
           "allow_fallbacks": true,
           "data_collection": "deny",
-          "quantizations": ["fp16"],
           "sort": "price"
         }
       },

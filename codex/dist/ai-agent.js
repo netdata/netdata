@@ -22,6 +22,12 @@ export class AIAgent {
         // Lighter grey for thinking
         return process.stderr.isTTY ? `\x1b[37m${text}\x1b[0m` : text;
     }
+    colorError(text) {
+        return process.stderr.isTTY ? `\x1b[31m${text}\x1b[0m` : text;
+    }
+    colorWarn(text) {
+        return process.stderr.isTTY ? `\x1b[33m${text}\x1b[0m` : text;
+    }
     constructor(options = {}) {
         this.config = loadConfiguration(options.configPath);
         this.callbacks = options.callbacks ?? {};
@@ -41,7 +47,8 @@ export class AIAgent {
             maxRetries: options.maxRetries ?? defaults.maxRetries ?? 3,
         };
         // We handle verbose MCP req/res lines ourselves; keep trace as-is.
-        this.mcpClient = new MCPClientManager({ trace: this.options.traceMCP, verbose: false, logger: (msg) => { this.log('debug', msg); } });
+        // When --verbose is on, surface one-line MCP request logs too
+        this.mcpClient = new MCPClientManager({ trace: this.options.traceMCP, verbose: this.options.verbose, logger: (msg) => { this.log('debug', msg); } });
     }
     async run(runOptions) {
         try {
@@ -60,6 +67,10 @@ export class AIAgent {
             }
             catch (e) {
                 const msg = e instanceof Error ? e.message : String(e);
+                try {
+                    process.stderr.write(this.colorError(`[mcp] error: initialization failed -> ${msg}\n`));
+                }
+                catch { }
                 this.log('warn', `MCP initialization failed and will be skipped: ${msg}`);
             }
             const enhancedSystemPrompt = this.enhanceSystemPrompt(systemPrompt, this.mcpClient.getCombinedInstructions());
@@ -133,7 +144,7 @@ export class AIAgent {
                                 ? '(' + entries.map(([k, v]) => `${k}:${fmtVal(v)}`).join(', ') + ')'
                                 : '()';
                             this.toolSeq += 1;
-                            process.stderr.write(this.colorVerbose(`agent → mcp [${this.currentTurn + 1}.${this.toolSeq}] ${serverName}, ${t.name}${paramStr}\n`));
+                            process.stderr.write(this.colorVerbose(`agent → [mcp] [${this.currentTurn + 1}.${this.toolSeq}] ${serverName}, ${t.name}${paramStr}\n`));
                         }
                         catch { }
                     }
@@ -144,7 +155,7 @@ export class AIAgent {
                     });
                     if (this.options.verbose === true) {
                         try {
-                            process.stderr.write(this.colorVerbose(`agent ← mcp [${this.currentTurn + 1}.${this.toolSeq}] ${serverName}, ${t.name}, latency ${Date.now() - started} ms, size ${res.result.length} chars\n`));
+                            process.stderr.write(this.colorVerbose(`agent ← [mcp] [${this.currentTurn + 1}.${this.toolSeq}] ${serverName}, ${t.name}, latency ${Date.now() - started} ms, size ${res.result.length} chars\n`));
                         }
                         catch { }
                     }
@@ -229,7 +240,7 @@ export class AIAgent {
                 }
                 const runTurn = async (turn, msgs) => {
                     if (turn >= this.options.maxToolTurns)
-                        return [];
+                        return { messages: [], stopReason: 'STOP_GUARD_SHOULD_NOT_REACH_MAX_TURNS' };
                     executedTools.length = 0;
                     const iterationStart = Date.now();
                     let resLogged = false;
@@ -238,7 +249,7 @@ export class AIAgent {
                     if (this.options.verbose === true) {
                         try {
                             const chars = msgs.reduce((acc, m) => acc + (typeof m.content === 'string' ? m.content.length : JSON.stringify(m.content).length), 0);
-                            process.stderr.write(this.colorVerbose(`agent → llm [${turn + 1}] ${provider}, ${model}, messages ${msgs.length}, ${chars} chars\n`));
+                            process.stderr.write(this.colorVerbose(`agent → [llm] [${turn + 1}] ${provider}, ${model}, messages ${msgs.length}, ${chars} chars\n`));
                             llmRequests += 1; // count all attempts, even if they fail later
                         }
                         catch { }
@@ -259,6 +270,7 @@ export class AIAgent {
                     let outputTokens = 0;
                     let cachedTokens = undefined;
                     let turnMessages = [];
+                    let stopReason;
                     const isFinalTurn = turn >= (this.options.maxToolTurns - 1);
                     const msgsForThisCall = isFinalTurn
                         ? msgs.concat({ role: 'user', content: "You are not allowed to run any more tools. Use the tool responses you have so far to answer my original question. If you failed to find answers for something, please state the areas you couldn't investigate" })
@@ -356,6 +368,11 @@ export class AIAgent {
                             const msg = err instanceof Error ? err.message : String(err);
                             const hint = this.options.traceLLM === true ? '' : ' Enable --trace-llm to see raw HTTP/SSE.';
                             const details = `streamed=${streamInfo.sawAny} (${streamInfo.totalChars} chars), tools=${executedTools.length}, tokens in=${inputTokens}, out=${outputTokens}, cached=${cachedTokens ?? 0}.`;
+                            // Unconditional red error line to stderr
+                            try {
+                                process.stderr.write(this.colorError(`agent × [llm] [${turn + 1}] ${provider}, ${model}, error ${name}: ${msg}${hint}\n`));
+                            }
+                            catch { }
                             throw new Error(`${name}: ${msg}.${hint} Details: ${details}`);
                         }
                         {
@@ -396,7 +413,7 @@ export class AIAgent {
                                 try {
                                     const latency = Date.now() - iterationStart;
                                     const size = turnMessages.reduce((acc, m) => acc + m.content.length, 0);
-                                    process.stderr.write(this.colorVerbose(`agent ← llm [${turn + 1}] input ${inputTokens}, output ${outputTokens}, cached ${cachedTokens ?? 0} tokens, tools ${executedTools.length}, latency ${latency} ms, size ${size} chars\n`));
+                                    process.stderr.write(this.colorVerbose(`agent ← [llm] [${turn + 1}] input ${inputTokens}, output ${outputTokens}, cached ${cachedTokens ?? 0} tokens, tools ${executedTools.length}, latency ${latency} ms, size ${size} chars\n`));
                                     aggAssistantChars += size;
                                     aggToolCalls += executedTools.length;
                                     resLogged = true;
@@ -416,7 +433,7 @@ export class AIAgent {
                             }
                             // Detect reasoning-only (no assistant text, no tool calls) in streaming path
                             {
-                                const hasAssistantText = turnMessages.some((mm) => mm.role === 'assistant' && typeof mm.content === 'string' && mm.content.trim().length > 0);
+                                const hasAssistantText = raw.some((mm) => mm.role === 'assistant' && typeof mm.content === 'string' && (mm.content?.trim()?.length ?? 0) > 0);
                                 const reasoningOnly = !hasAssistantText && !hasToolArtifacts && (outputTokens > 0);
                                 if (reasoningOnly) {
                                     try {
@@ -427,6 +444,19 @@ export class AIAgent {
                                     }
                                     catch { }
                                 }
+                                if (!hasAssistantText && !hasToolArtifacts) {
+                                    if (isFinalTurn) {
+                                        stopReason = 'STOP_FINAL_TURN_NO_OUTPUT';
+                                    }
+                                    else {
+                                        try {
+                                            process.stderr.write(this.colorWarn(`agent ↻ [llm] retry STOP_EMPTY_ASSISTANT_NO_TOOLCALLS\n`));
+                                        }
+                                        catch { }
+                                        throw new Error('RETRY_EMPTY_ASSISTANT_NO_TOOLCALLS');
+                                    }
+                                }
+                                // If assistant text present and no tool calls, we will finish below
                             }
                         }
                     }
@@ -494,7 +524,7 @@ export class AIAgent {
                             try {
                                 const latency = Date.now() - iterationStart;
                                 const size = turnMessages.reduce((acc, m) => acc + m.content.length, 0);
-                                process.stderr.write(this.colorVerbose(`agent ← llm [${turn + 1}] input ${inputTokens}, output ${outputTokens}, cached ${cachedTokens ?? 0} tokens, tools ${executedTools.length}, latency ${latency} ms, size ${size} chars\n`));
+                                process.stderr.write(this.colorVerbose(`agent ← [llm] [${turn + 1}] input ${inputTokens}, output ${outputTokens}, cached ${cachedTokens ?? 0} tokens, tools ${executedTools.length}, latency ${latency} ms, size ${size} chars\n`));
                                 aggAssistantChars += size;
                                 aggToolCalls += executedTools.length;
                                 resLogged = true;
@@ -514,7 +544,7 @@ export class AIAgent {
                         }
                         // Detect reasoning-only (no assistant text, no tool calls) in non-streaming path
                         {
-                            const hasAssistantText = turnMessages.some((mm) => mm.role === 'assistant' && typeof mm.content === 'string' && mm.content.trim().length > 0);
+                            const hasAssistantText = raw2.some((mm) => mm.role === 'assistant' && typeof mm.content === 'string' && (mm.content?.trim()?.length ?? 0) > 0);
                             const reasoningOnly = !hasAssistantText && !hasToolArtifacts2 && (outputTokens > 0);
                             if (reasoningOnly) {
                                 try {
@@ -525,13 +555,26 @@ export class AIAgent {
                                 }
                                 catch { }
                             }
+                            if (!hasAssistantText && !hasToolArtifacts2) {
+                                if (isFinalTurn) {
+                                    stopReason = 'STOP_FINAL_TURN_NO_OUTPUT';
+                                }
+                                else {
+                                    try {
+                                        process.stderr.write(this.colorWarn(`agent ↻ [llm] retry STOP_EMPTY_ASSISTANT_NO_TOOLCALLS\n`));
+                                    }
+                                    catch { }
+                                    throw new Error('RETRY_EMPTY_ASSISTANT_NO_TOOLCALLS');
+                                }
+                            }
+                            // If assistant text present and no tool calls, we will finish below
                         }
                     }
                     if (this.options.verbose === true && !resLogged) {
                         try {
                             const latency = Date.now() - iterationStart;
                             const size = turnMessages.reduce((acc, m) => acc + m.content.length, 0);
-                            process.stderr.write(this.colorVerbose(`agent ← llm [${turn + 1}] input ${inputTokens}, output ${outputTokens}, cached ${cachedTokens ?? 0} tokens, tools ${executedTools.length}, latency ${latency} ms, size ${size} chars\n`));
+                            process.stderr.write(this.colorVerbose(`agent ← [llm] [${turn + 1}] input ${inputTokens}, output ${outputTokens}, cached ${cachedTokens ?? 0} tokens, tools ${executedTools.length}, latency ${latency} ms, size ${size} chars\n`));
                             aggAssistantChars += size;
                             aggToolCalls += executedTools.length;
                         }
@@ -539,16 +582,31 @@ export class AIAgent {
                     }
                     // No tool artifacts: return
                     // If there is assistant text, return it; otherwise consider it a failure
-                    if (turnMessages.length > 0)
-                        return turnMessages;
+                    const hasAssistantFinal = turnMessages.some((mm) => mm.role === 'assistant' && typeof mm.content === 'string' && mm.content.trim().length > 0);
+                    if (hasAssistantFinal) {
+                        if (!stopReason)
+                            stopReason = isFinalTurn ? 'STOP_FINAL_TURN_ASSISTANT_ANSWER' : 'STOP_ASSISTANT_FINAL_ANSWER';
+                        return { messages: turnMessages, stopReason };
+                    }
                     throw new Error('Empty response from model');
                 };
                 const finalAppend = await runTurn(0, currentMessages);
-                return { success: true, appendMessages: finalAppend };
+                if (this.options.verbose === true) {
+                    try {
+                        process.stderr.write(this.colorVerbose(`agent ← [llm] stop ${finalAppend.stopReason ?? 'STOP_UNKNOWN'}\n`));
+                    }
+                    catch { }
+                }
+                return { success: true, appendMessages: finalAppend.messages };
             }
             catch (err) {
                 const em = err instanceof Error ? err.message : String(err ?? 'Unknown error');
                 const en = err instanceof Error ? err.name : 'Error';
+                // If retry sentinel, do not print a red error (it's not an error), just account and retry upstream
+                if (em === 'RETRY_EMPTY_ASSISTANT_NO_TOOLCALLS') {
+                    this.callbacks.onAccounting?.({ type: 'llm', timestamp: Date.now(), status: 'failed', latency: 0, provider, model, tokens: { inputTokens: 0, outputTokens: 0, totalTokens: 0 }, error: em });
+                    return { success: false, appendMessages: [], error: em };
+                }
                 const stackTop = err instanceof Error && typeof err.stack === 'string' ? err.stack.split('\n')[1]?.trim() : undefined;
                 const extra = this.options.verbose === true && stackTop ? ` (${stackTop})` : '';
                 const advice = this.options.traceLLM === true ? '' : ' Hint: run with --trace-llm to inspect HTTP/SSE.';
@@ -560,6 +618,11 @@ export class AIAgent {
                 catch {
                     return 0;
                 } })();
+                // Always emit a red, aligned one-liner for failures
+                try {
+                    process.stderr.write(this.colorError(`agent × [llm] [${this.currentTurn + 1}] ${provider}, ${model}, error [${en}] ${em}${extra} (waited ${waitedMs} ms)${advice}\n`));
+                }
+                catch { }
                 this.log('warn', `${provider}/${model} failed: [${en}] ${em}${extra} (waited ${waitedMs} ms)${advice}`);
                 this.callbacks.onAccounting?.({ type: 'llm', timestamp: Date.now(), status: 'failed', latency: 0, provider, model, tokens: { inputTokens: 0, outputTokens: 0, totalTokens: 0 }, error: em });
                 return { success: false, appendMessages: [], error: em };
@@ -586,82 +649,93 @@ export class AIAgent {
         if (this.options.verbose === true) {
             try {
                 const mcpSummary = Array.from(mcpPerServer.entries()).map(([srv, cnt]) => `${srv} ${cnt}`).join(', ');
-                process.stderr.write(`[fin] finally: llm requests ${llmRequests} (tokens: ${aggInput} in, ${aggOutput} out, ${aggCached} cached, tool-calls ${aggToolCalls}, output-size ${aggAssistantChars} chars, latency-sum ${aggLLMLatency} ms), mcp requests ${mcpRequests}${mcpSummary.length > 0 ? ` (${mcpSummary})` : ''}\n`);
+                process.stderr.write(this.colorVerbose(`[fin] finally: llm requests ${llmRequests} (tokens: ${aggInput} in, ${aggOutput} out, ${aggCached} cached, tool-calls ${aggToolCalls}, output-size ${aggAssistantChars} chars, latency-sum ${aggLLMLatency} ms), mcp requests ${mcpRequests}${mcpSummary.length > 0 ? ` (${mcpSummary})` : ''}\n`));
             }
             catch { }
+        }
+        // If we exhausted attempts with the retry sentinel, convert to explicit stop reason and cleaner error message
+        if ((lastError ?? '') === 'RETRY_EMPTY_ASSISTANT_NO_TOOLCALLS') {
+            try {
+                process.stderr.write(this.colorVerbose(`agent ← [llm] stop STOP_EXHAUSTED_EMPTY_ASSISTANT_NO_TOOLCALLS\n`));
+            }
+            catch { }
+            return { success: false, appendMessages: [], error: 'Max attempts exhausted: EMPTY_ASSISTANT_NO_TOOLCALLS' };
         }
         return { success: false, appendMessages: [], error: lastError ?? 'All providers and models failed' };
     }
     getLLMProvider(providerName) {
         const cfg = this.config.providers[providerName];
-        const tracedFetch = this.options.traceLLM === true
-            ? async (input, init) => {
-                let requestInit;
+        const tracedFetch = async (input, init) => {
+            let requestInit;
+            let method = 'GET';
+            let url = '';
+            try {
+                if (typeof input === 'string')
+                    url = input;
+                else if (input instanceof URL)
+                    url = input.toString();
+                else if (typeof input.url === 'string')
+                    url = input.url ?? '';
+                method = init?.method ?? 'GET';
+                const headersObj = (init?.headers ?? {});
+                const entries = typeof headersObj === 'object' && headersObj !== null ? Object.entries(headersObj) : [];
+                const headersSend = entries.reduce((acc, [k, v]) => {
+                    if (typeof v === 'string')
+                        acc[k] = v;
+                    else if (typeof v === 'number' || typeof v === 'boolean')
+                        acc[k] = String(v);
+                    return acc;
+                }, {});
+                if (!('Accept' in headersSend) && !('accept' in headersSend))
+                    headersSend.Accept = 'application/json';
+                if (url.includes('openrouter.ai')) {
+                    const defaultReferer = 'https://ai-agent.local';
+                    const defaultTitle = 'ai-agent-codex';
+                    if (!('HTTP-Referer' in headersSend) && !('http-referer' in headersSend))
+                        headersSend['HTTP-Referer'] = defaultReferer;
+                    if (!('X-OpenRouter-Title' in headersSend) && !('x-openrouter-title' in headersSend))
+                        headersSend['X-OpenRouter-Title'] = defaultTitle;
+                    if (!('X-Title' in headersSend) && !('x-title' in headersSend))
+                        headersSend['X-Title'] = defaultTitle;
+                    if (!('User-Agent' in headersSend) && !('user-agent' in headersSend))
+                        headersSend['User-Agent'] = `${defaultTitle}/1.0`;
+                }
+                requestInit = { ...(init ?? {}), headers: headersSend };
+                const isOpenRouter = typeof url === 'string' && url.includes('openrouter.ai');
+                const cfgAny = cfg;
+                if (isOpenRouter && cfgAny.custom != null && typeof requestInit.body === 'string') {
+                    try {
+                        const bodyObj = JSON.parse(requestInit.body);
+                        const merged = (function mergeCustom(base, custom, strategy) {
+                            const isObj = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
+                            if (strategy === 'override')
+                                return { ...base, ...custom };
+                            if (strategy === 'overlay') {
+                                const out = Object.entries(custom).reduce((acc, [k, v]) => { if (!(k in acc))
+                                    acc[k] = v; return acc; }, { ...base });
+                                return out;
+                            }
+                            const deepMerge = (a, b) => Object.entries(b).reduce((acc, [k, v]) => {
+                                const av = acc[k];
+                                acc[k] = (isObj(av) && isObj(v)) ? deepMerge(av, v) : v;
+                                return acc;
+                            }, { ...a });
+                            return deepMerge(base, custom);
+                        })(bodyObj, cfgAny.custom, cfgAny.mergeStrategy ?? 'overlay');
+                        requestInit.body = JSON.stringify(merged);
+                    }
+                    catch { /* noop */ }
+                }
+            }
+            catch { /* noop */ }
+            // Detailed trace logging (headers/body) when enabled
+            if (this.options.traceLLM === true) {
                 try {
-                    let url;
-                    if (typeof input === 'string')
-                        url = input;
-                    else if (input instanceof URL)
-                        url = input.toString();
-                    else if (typeof input.url === 'string')
-                        url = input.url ?? '';
-                    else
-                        url = '';
-                    const method = init?.method ?? 'GET';
-                    const headersObj = (init?.headers ?? {});
-                    const entries = typeof headersObj === 'object' && headersObj !== null ? Object.entries(headersObj) : [];
-                    const headersSend = entries.reduce((acc, [k, v]) => {
-                        if (typeof v === 'string')
-                            acc[k] = v;
-                        else if (typeof v === 'number' || typeof v === 'boolean')
-                            acc[k] = String(v);
-                        return acc;
-                    }, {});
-                    if (!('Accept' in headersSend) && !('accept' in headersSend))
-                        headersSend.Accept = 'application/json';
-                    if (url.includes('openrouter.ai')) {
-                        const defaultReferer = 'https://ai-agent.local';
-                        const defaultTitle = 'ai-agent-codex';
-                        if (!('HTTP-Referer' in headersSend) && !('http-referer' in headersSend))
-                            headersSend['HTTP-Referer'] = defaultReferer;
-                        if (!('X-OpenRouter-Title' in headersSend) && !('x-openrouter-title' in headersSend))
-                            headersSend['X-OpenRouter-Title'] = defaultTitle;
-                        if (!('X-Title' in headersSend) && !('x-title' in headersSend))
-                            headersSend['X-Title'] = defaultTitle;
-                        if (!('User-Agent' in headersSend) && !('user-agent' in headersSend))
-                            headersSend['User-Agent'] = `${defaultTitle}/1.0`;
-                    }
-                    requestInit = { ...(init ?? {}), headers: headersSend };
-                    const isOpenRouter = typeof url === 'string' && url.includes('openrouter.ai');
-                    const cfgAny = cfg;
-                    if (isOpenRouter && cfgAny.custom != null && typeof requestInit.body === 'string') {
-                        try {
-                            const bodyObj = JSON.parse(requestInit.body);
-                            const merged = (function mergeCustom(base, custom, strategy) {
-                                const isObj = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
-                                if (strategy === 'override')
-                                    return { ...base, ...custom };
-                                if (strategy === 'overlay') {
-                                    const out = Object.entries(custom).reduce((acc, [k, v]) => { if (!(k in acc))
-                                        acc[k] = v; return acc; }, { ...base });
-                                    return out;
-                                }
-                                const deepMerge = (a, b) => Object.entries(b).reduce((acc, [k, v]) => {
-                                    const av = acc[k];
-                                    acc[k] = (isObj(av) && isObj(v)) ? deepMerge(av, v) : v;
-                                    return acc;
-                                }, { ...a });
-                                return deepMerge(base, custom);
-                            })(bodyObj, cfgAny.custom, cfgAny.mergeStrategy ?? 'overlay');
-                            requestInit.body = JSON.stringify(merged);
-                        }
-                        catch { }
-                    }
-                    const headersRaw = Object.fromEntries(Object.entries(headersSend).map(([k, v]) => [k.toLowerCase(), v]));
+                    const headersRaw = Object.fromEntries(Object.entries((requestInit?.headers ?? {})).map(([k, v]) => [k.toLowerCase(), v]));
                     if (Object.prototype.hasOwnProperty.call(headersRaw, 'authorization'))
                         headersRaw.authorization = 'REDACTED';
                     const headersPretty = JSON.stringify(headersRaw, null, 2);
-                    const bodyString = typeof (requestInit.body) === 'string' ? requestInit.body : undefined;
+                    const bodyString = typeof (requestInit?.body) === 'string' ? requestInit.body : undefined;
                     let bodyPretty = bodyString;
                     if (bodyString !== undefined) {
                         try {
@@ -672,7 +746,26 @@ export class AIAgent {
                     this.log('debug', `LLM request: ${method} ${url}\nheaders: ${headersPretty}${bodyPretty !== undefined ? `\nbody: ${bodyPretty}` : ''}`);
                 }
                 catch { /* noop */ }
-                const res = await fetch(input, requestInit ?? init);
+            }
+            let res;
+            try {
+                res = await fetch(input, requestInit ?? init);
+            }
+            catch (e) {
+                const em = e instanceof Error ? e.message : String(e);
+                try {
+                    process.stderr.write(this.colorError(`agent × [llm] http error: ${method} ${url} -> ${em}\n`));
+                }
+                catch { }
+                throw e;
+            }
+            if (!res.ok) {
+                try {
+                    process.stderr.write(this.colorError(`agent × [llm] http error: ${method} ${url} -> ${res.status} ${res.statusText}\n`));
+                }
+                catch { }
+            }
+            if (this.options.traceLLM === true) {
                 try {
                     const ct = res.headers.get('content-type') ?? '';
                     const headersOut = {};
@@ -708,13 +801,24 @@ export class AIAgent {
                     }
                 }
                 catch { /* noop */ }
-                return res;
             }
-            : undefined;
+            return res;
+        };
+        const cfgType = cfg.type;
+        const isOpenAI = providerName === 'openai' || cfgType === 'openai';
+        if (isOpenAI) {
+            const prov = createOpenAI({ apiKey: cfg.apiKey, baseURL: cfg.baseUrl, fetch: tracedFetch });
+            const mode = cfg.openaiMode
+                ?? (typeof cfg.baseUrl === 'string' && cfg.baseUrl.includes('api.openai.com') ? 'responses' : 'chat');
+            if (mode === 'responses') {
+                return (model) => prov.responses(model);
+            }
+            return (model) => prov.chat(model);
+        }
         switch (providerName) {
             case 'openai': {
-                const prov = createOpenAI({ apiKey: cfg.apiKey, baseURL: cfg.baseUrl, fetch: tracedFetch });
-                return (model) => prov.responses(model);
+                // handled above
+                throw new Error('unreachable');
             }
             case 'anthropic': {
                 const prov = createAnthropic({ apiKey: cfg.apiKey, baseURL: cfg.baseUrl, fetch: tracedFetch });

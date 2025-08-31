@@ -114,6 +114,8 @@ export interface ProviderConfig {
   headers?: Record<string, string>;
   custom?: Record<string, unknown>;
   mergeStrategy?: "overlay" | "override" | "deep";
+  type?: 'openai' | 'anthropic' | 'google' | 'openrouter' | 'ollama';
+  openaiMode?: 'responses' | 'chat';
 }
 
 export interface Configuration {

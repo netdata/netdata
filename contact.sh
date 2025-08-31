@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+[ -z "${1}" ] && echo >&2 "Usage: $0 <query>" && exit 1
+
 set -e
 
 # Get the directory where this script resides
@@ -27,6 +29,6 @@ PROVIDERS="openrouter"
 MODELS="openai/gpt-oss-120b"
 
 exec node codex/dist/cli.js "${PROVIDERS}" "${MODELS}" "${TOOLS}" \
-	'@prompts/web-researcher.md' \
-	'I need a comprehensive analysis of what netdata is and what it can do for me.' \
+	'@prompts/contact-intelligence-researcher.md' \
+	"$1" \
 	--config .ai-agent.json --verbose # --trace-llm --trace-mcp

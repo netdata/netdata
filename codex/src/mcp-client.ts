@@ -57,11 +57,18 @@ export class MCPClientManager {
   private traceLog(message: string) {
     try { process.stderr.write(`[mcp] ${message}\n`); } catch {}
   }
+  private colorVerbose(text: string): string {
+    return process.stderr.isTTY ? `\x1b[90m${text}\x1b[0m` : text;
+  }
 
   constructor(opts?: { trace?: boolean; verbose?: boolean; logger?: (msg: string) => void }) {
     this.trace = opts?.trace === true;
     this.verbose = opts?.verbose === true;
     if (typeof opts?.logger === 'function') this.logger = opts.logger;
+  }
+
+  private colorError(text: string): string {
+    return process.stderr.isTTY ? `\x1b[31m${text}\x1b[0m` : text;
   }
 
   async initializeServers(mcpServers: Record<string, MCPServerConfig>): Promise<MCPServer[]> {
@@ -79,7 +86,7 @@ export class MCPClientManager {
 
     let transport: Transport;
     const initStart = Date.now();
-    if (this.verbose) { try { process.stderr.write(`[mcp] initializing ${name}\n`); } catch {} }
+    if (this.verbose) { try { process.stderr.write(this.colorVerbose(`agent → [mcp] connect ${name}\n`)); } catch {} }
     if (this.trace) this.traceLog(`connect '${name}' type=${config.type} ${config.command ?? config.url ?? ''}`);
     switch (config.type) {
       case 'stdio':
@@ -103,13 +110,29 @@ export class MCPClientManager {
         throw new Error('Unsupported transport type');
     }
 
-    { const connTransport: Transport = transport; await client.connect(connTransport); }
+    try {
+      const connTransport: Transport = transport;
+      await client.connect(connTransport);
+    } catch (e) {
+      const em = e instanceof Error ? e.message : String(e);
+      try { process.stderr.write(this.colorError(`agent × [mcp] connect ${name} -> ${em}\n`)); } catch {}
+      throw e;
+    }
     this.clients.set(name, client);
 
     const initInstructions = client.getInstructions() ?? '';
 
+    const toolsStart = Date.now();
+    if (this.verbose) { try { process.stderr.write(this.colorVerbose(`agent → [mcp] tools/list ${name}\n`)); } catch {} }
     if (this.trace) this.traceLog(`request '${name}': tools/list`);
-    const toolsResponse = await client.listTools();
+    let toolsResponse;
+    try {
+      toolsResponse = await client.listTools();
+    } catch (e) {
+      const em = e instanceof Error ? e.message : String(e);
+      try { process.stderr.write(this.colorError(`agent × [mcp] tools/list ${name} -> ${em}\n`)); } catch {}
+      throw e;
+    }
     if (this.trace) this.traceLog(`response '${name}': tools/list -> ${JSON.stringify(toolsResponse, null, 2)}`);
     interface ToolItem { name: string; description?: string; inputSchema?: unknown; parameters?: unknown; instructions?: string }
     const tools: MCPTool[] = (toolsResponse.tools as ToolItem[]).map((t) => ({
@@ -121,8 +144,17 @@ export class MCPClientManager {
 
     let instructions = initInstructions;
     try {
+      const promptsStart = Date.now();
+      if (this.verbose) { try { process.stderr.write(this.colorVerbose(`agent → [mcp] prompts/list ${name}\n`)); } catch {} }
       if (this.trace) this.traceLog(`request '${name}': prompts/list`);
-      const promptsResponse = await client.listPrompts();
+      let promptsResponse;
+      try {
+        promptsResponse = await client.listPrompts();
+      } catch (e) {
+        const em = e instanceof Error ? e.message : String(e);
+      try { process.stderr.write(this.colorError(`agent × [mcp] prompts/list ${name} -> ${em}\n`)); } catch {}
+        throw e;
+      }
       if (this.trace) this.traceLog(`response '${name}': prompts/list -> ${JSON.stringify(promptsResponse, null, 2)}`);
       const pr = promptsResponse as { prompts?: { name: string; description?: string }[] } | undefined;
       const listRaw = pr?.prompts;
@@ -131,7 +163,16 @@ export class MCPClientManager {
         const promptText = list.map((p) => `${p.name}: ${p.description ?? ''}`).join('\n');
         { const hasInstr = instructions.length > 0; instructions = hasInstr ? `${instructions}\n${promptText}` : promptText; }
       }
+      if (this.verbose) { try { process.stderr.write(this.colorVerbose(`agent ← [mcp] prompts/list ${name}, prompts ${list.length}, latency ${Date.now() - promptsStart} ms\n`)); } catch {} }
     } catch {}
+
+    if (this.verbose) {
+      try {
+        const latency = Date.now() - toolsStart;
+        const toolCount = (toolsResponse as { tools?: unknown[] }).tools?.length ?? tools.length;
+        process.stderr.write(this.colorVerbose(`agent ← [mcp] tools/list ${name}, tools ${toolCount}, latency ${latency} ms\n`));
+      } catch {}
+    }
 
     if (this.verbose) {
       try {
@@ -140,7 +181,7 @@ export class MCPClientManager {
         const instrChars = (initInstructions?.length ?? 0) + tools.reduce((acc, t) => acc + (t.instructions?.length ?? 0), 0);
         const hasInstr = (initInstructions?.length ?? 0) > 0 || tools.some((t) => (t.instructions?.length ?? 0) > 0);
         const latency = Date.now() - initStart;
-        process.stderr.write(`[mcp] initialized ${name}, ${tools.length} tools (${toolNames || '-'})${hasInstr ? ', with instructions' : ', without instructions'} (schema ${schemaChars} chars, instructions ${instrChars} chars), latency ${latency} ms\n`);
+        process.stderr.write(this.colorVerbose(`agent ← [mcp] initialized ${name}, ${tools.length} tools (${toolNames || '-'})${hasInstr ? ', with instructions' : ', without instructions'} (schema ${schemaChars} chars, instructions ${instrChars} chars), latency ${latency} ms\n`));
       } catch {}
     }
 
@@ -180,7 +221,6 @@ export class MCPClientManager {
     const start = Date.now();
     const argsStr = JSON.stringify(toolCall.parameters);
     const call = async () => {
-      if (this.verbose) { try { process.stderr.write(`[mcp] req: ${toolCall.id} ${serverName}, ${toolCall.name}\n`); } catch {} }
       if (this.trace) this.traceLog(`callTool '${serverName}': ${toolCall.name}(${JSON.stringify(toolCall.parameters)})`);
       const res = await client.callTool({ name: toolCall.name, arguments: toolCall.parameters });
       if (this.trace) this.traceLog(`result '${serverName}': ${toolCall.name} -> ${JSON.stringify(res, null, 2)}`);
@@ -198,9 +238,10 @@ export class MCPClientManager {
       const content: Block[] = (resp as unknown as { content?: Block[] }).content ?? [];
       result = content.map((c) => (c.type === 'text' ? c.text ?? '' : c.type === 'image' ? '[Image]' : `[${c.type}]`)).join('');
       const isError = (resp as { isError?: boolean }).isError === true;
-      if (this.verbose) {
-        try { process.stderr.write(`[mcp] res: ${toolCall.id} ${serverName}, ${toolCall.name}, latency ${Date.now() - start} ms, size ${result.length} chars\n`); } catch {}
+      if (isError) {
+        try { process.stderr.write(this.colorError(`agent × [mcp] callTool ${serverName} ${toolCall.name} -> tool reported isError` + '\n')); } catch {}
       }
+      // Verbose req/res one-liners for tools are logged by ai-agent to avoid duplication
       return {
         toolCallId: toolCall.id,
         result,
@@ -215,9 +256,8 @@ export class MCPClientManager {
         },
       };
     } catch (err) {
-      if (this.verbose) {
-        try { process.stderr.write(`[mcp] res: ${toolCall.id} ${serverName}, ${toolCall.name}, latency ${Date.now() - start} ms, size 0 chars\n`); } catch {}
-      }
+      // ai-agent logs the outbound call; only emit unconditional red error here
+      try { process.stderr.write(this.colorError(`agent × [mcp] callTool ${serverName} ${toolCall.name} -> ${err instanceof Error ? err.message : String(err)}\n`)); } catch {}
       return {
         toolCallId: toolCall.id,
         result: '',

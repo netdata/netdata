@@ -47,6 +47,12 @@ export class AIAgent {
     // Lighter grey for thinking
     return process.stderr.isTTY ? `\x1b[37m${text}\x1b[0m` : text;
   }
+  private colorError(text: string): string {
+    return process.stderr.isTTY ? `\x1b[31m${text}\x1b[0m` : text;
+  }
+  private colorWarn(text: string): string {
+    return process.stderr.isTTY ? `\x1b[33m${text}\x1b[0m` : text;
+  }
 
   constructor(options: AIAgentOptions = {}) {
     this.config = loadConfiguration(options.configPath);
@@ -67,7 +73,8 @@ export class AIAgent {
       maxRetries: (options as { maxRetries?: number }).maxRetries ?? (defaults as { maxRetries?: number }).maxRetries ?? 3,
     };
     // We handle verbose MCP req/res lines ourselves; keep trace as-is.
-    this.mcpClient = new MCPClientManager({ trace: this.options.traceMCP, verbose: false, logger: (msg) => { this.log('debug', msg); } });
+    // When --verbose is on, surface one-line MCP request logs too
+    this.mcpClient = new MCPClientManager({ trace: this.options.traceMCP, verbose: this.options.verbose, logger: (msg) => { this.log('debug', msg); } });
   }
 
   async run(runOptions: AIAgentRunOptions): Promise<{ conversation: ConversationMessage[]; success: boolean; error?: string }>
@@ -90,6 +97,7 @@ export class AIAgent {
         await this.mcpClient.initializeServers(selected);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
+        try { process.stderr.write(this.colorError(`[mcp] error: initialization failed -> ${msg}\n`)); } catch {}
         this.log('warn', `MCP initialization failed and will be skipped: ${msg}`);
       }
 
@@ -161,7 +169,7 @@ export class AIAgent {
                   ? '(' + entries.map(([k, v]) => `${k}:${fmtVal(v)}`).join(', ') + ')'
                   : '()';
                 this.toolSeq += 1;
-                process.stderr.write(this.colorVerbose(`agent → mcp [${this.currentTurn + 1}.${this.toolSeq}] ${serverName}, ${t.name}${paramStr}\n`));
+                process.stderr.write(this.colorVerbose(`agent → [mcp] [${this.currentTurn + 1}.${this.toolSeq}] ${serverName}, ${t.name}${paramStr}\n`));
               } catch {}
             }
             const res = await this.mcpClient.executeTool(serverName, call, this.options.toolTimeout);
@@ -170,7 +178,7 @@ export class AIAgent {
               mcpServer: serverName, command: t.name, charactersIn: JSON.stringify(args).length, charactersOut: res.result.length, error: res.error,
             } as AccountingEntry);
             if (this.options.verbose === true) {
-              try { process.stderr.write(this.colorVerbose(`agent ← mcp [${this.currentTurn + 1}.${this.toolSeq}] ${serverName}, ${t.name}, latency ${Date.now() - started} ms, size ${res.result.length} chars\n`)); } catch {}
+              try { process.stderr.write(this.colorVerbose(`agent ← [mcp] [${this.currentTurn + 1}.${this.toolSeq}] ${serverName}, ${t.name}, latency ${Date.now() - started} ms, size ${res.result.length} chars\n`)); } catch {}
             }
             if (res.success && res.result.length > 0) executedTools.push({ name: t.name, output: res.result });
             // Verbose aggregation
@@ -256,8 +264,9 @@ if (provider === 'openai' || provider === 'openrouter') {
   } catch { /* ignore */ }
 }
 
-const runTurn = async (turn: number, msgs: ModelMessage[]): Promise<ConversationMessage[]> => {
-  if (turn >= this.options.maxToolTurns) return [];
+type TurnResult = { messages: ConversationMessage[]; stopReason?: string };
+const runTurn = async (turn: number, msgs: ModelMessage[]): Promise<TurnResult> => {
+  if (turn >= this.options.maxToolTurns) return { messages: [], stopReason: 'STOP_GUARD_SHOULD_NOT_REACH_MAX_TURNS' };
   executedTools.length = 0;
   const iterationStart = Date.now();
   let resLogged = false;
@@ -266,7 +275,7 @@ const runTurn = async (turn: number, msgs: ModelMessage[]): Promise<Conversation
   if (this.options.verbose === true) {
     try {
       const chars = msgs.reduce((acc, m) => acc + (typeof m.content === 'string' ? m.content.length : JSON.stringify(m.content).length), 0);
-      process.stderr.write(this.colorVerbose(`agent → llm [${turn + 1}] ${provider}, ${model}, messages ${msgs.length}, ${chars} chars\n`));
+      process.stderr.write(this.colorVerbose(`agent → [llm] [${turn + 1}] ${provider}, ${model}, messages ${msgs.length}, ${chars} chars\n`));
       llmRequests += 1; // count all attempts, even if they fail later
     } catch {}
   }
@@ -284,6 +293,7 @@ const runTurn = async (turn: number, msgs: ModelMessage[]): Promise<Conversation
   let outputTokens = 0;
   let cachedTokens: number | undefined = undefined;
   let turnMessages: ConversationMessage[] = [];
+  let stopReason: string | undefined;
   const isFinalTurn = turn >= (this.options.maxToolTurns - 1);
   const msgsForThisCall: ModelMessage[] = isFinalTurn
     ? msgs.concat({ role: 'user', content: "You are not allowed to run any more tools. Use the tool responses you have so far to answer my original question. If you failed to find answers for something, please state the areas you couldn't investigate" } as ModelMessage)
@@ -353,6 +363,8 @@ const runTurn = async (turn: number, msgs: ModelMessage[]): Promise<Conversation
       const msg = err instanceof Error ? err.message : String(err);
       const hint = this.options.traceLLM === true ? '' : ' Enable --trace-llm to see raw HTTP/SSE.';
       const details = `streamed=${streamInfo.sawAny} (${streamInfo.totalChars} chars), tools=${executedTools.length}, tokens in=${inputTokens}, out=${outputTokens}, cached=${cachedTokens ?? 0}.`;
+      // Unconditional red error line to stderr
+      try { process.stderr.write(this.colorError(`agent × [llm] [${turn + 1}] ${provider}, ${model}, error ${name}: ${msg}${hint}\n`)); } catch {}
       throw new Error(`${name}: ${msg}.${hint} Details: ${details}`);
     }
     {
@@ -395,7 +407,7 @@ const runTurn = async (turn: number, msgs: ModelMessage[]): Promise<Conversation
         try {
           const latency = Date.now() - iterationStart;
           const size = turnMessages.reduce((acc, m) => acc + m.content.length, 0);
-          process.stderr.write(this.colorVerbose(`agent ← llm [${turn + 1}] input ${inputTokens}, output ${outputTokens}, cached ${cachedTokens ?? 0} tokens, tools ${executedTools.length}, latency ${latency} ms, size ${size} chars\n`));
+          process.stderr.write(this.colorVerbose(`agent ← [llm] [${turn + 1}] input ${inputTokens}, output ${outputTokens}, cached ${cachedTokens ?? 0} tokens, tools ${executedTools.length}, latency ${latency} ms, size ${size} chars\n`));
           aggAssistantChars += size;
           aggToolCalls += executedTools.length;
           resLogged = true;
@@ -414,7 +426,7 @@ const runTurn = async (turn: number, msgs: ModelMessage[]): Promise<Conversation
       }
       // Detect reasoning-only (no assistant text, no tool calls) in streaming path
       {
-        const hasAssistantText = turnMessages.some((mm) => mm.role === 'assistant' && typeof mm.content === 'string' && mm.content.trim().length > 0);
+        const hasAssistantText = raw.some((mm) => mm.role === 'assistant' && typeof (mm as { content?: unknown }).content === 'string' && ((mm as { content?: string }).content?.trim()?.length ?? 0) > 0);
         const reasoningOnly = !hasAssistantText && !hasToolArtifacts && (outputTokens > 0);
         if (reasoningOnly) {
           try {
@@ -424,6 +436,15 @@ const runTurn = async (turn: number, msgs: ModelMessage[]): Promise<Conversation
             }
           } catch {}
         }
+        if (!hasAssistantText && !hasToolArtifacts) {
+          if (isFinalTurn) {
+            stopReason = 'STOP_FINAL_TURN_NO_OUTPUT';
+          } else {
+            try { process.stderr.write(this.colorWarn(`agent ↻ [llm] retry STOP_EMPTY_ASSISTANT_NO_TOOLCALLS\n`)); } catch {}
+            throw new Error('RETRY_EMPTY_ASSISTANT_NO_TOOLCALLS');
+          }
+        }
+        // If assistant text present and no tool calls, we will finish below
       }
     }
   } else {
@@ -483,7 +504,7 @@ const runTurn = async (turn: number, msgs: ModelMessage[]): Promise<Conversation
       try {
         const latency = Date.now() - iterationStart;
         const size = turnMessages.reduce((acc, m) => acc + m.content.length, 0);
-        process.stderr.write(this.colorVerbose(`agent ← llm [${turn + 1}] input ${inputTokens}, output ${outputTokens}, cached ${cachedTokens ?? 0} tokens, tools ${executedTools.length}, latency ${latency} ms, size ${size} chars\n`));
+        process.stderr.write(this.colorVerbose(`agent ← [llm] [${turn + 1}] input ${inputTokens}, output ${outputTokens}, cached ${cachedTokens ?? 0} tokens, tools ${executedTools.length}, latency ${latency} ms, size ${size} chars\n`));
         aggAssistantChars += size;
         aggToolCalls += executedTools.length;
         resLogged = true;
@@ -502,23 +523,32 @@ const runTurn = async (turn: number, msgs: ModelMessage[]): Promise<Conversation
     }
     // Detect reasoning-only (no assistant text, no tool calls) in non-streaming path
     {
-      const hasAssistantText = turnMessages.some((mm) => mm.role === 'assistant' && typeof mm.content === 'string' && mm.content.trim().length > 0);
+      const hasAssistantText = raw2.some((mm) => mm.role === 'assistant' && typeof (mm as { content?: unknown }).content === 'string' && ((mm as { content?: string }).content?.trim()?.length ?? 0) > 0);
       const reasoningOnly = !hasAssistantText && !hasToolArtifacts2 && (outputTokens > 0);
       if (reasoningOnly) {
         try {
-        this.log('warn', `${provider}/${model} produced reasoning-only turn (no assistant text or tool calls)`);
-        if (this.options.verbose === true) {
-          process.stderr.write(this.colorVerbose(`[llm] note: reasoning-only (no text/toolcalls); outputTokens ${outputTokens}\n`));
-        }
+          this.log('warn', `${provider}/${model} produced reasoning-only turn (no assistant text or tool calls)`);
+          if (this.options.verbose === true) {
+            process.stderr.write(this.colorVerbose(`[llm] note: reasoning-only (no text/toolcalls); outputTokens ${outputTokens}\n`));
+          }
         } catch {}
       }
+      if (!hasAssistantText && !hasToolArtifacts2) {
+        if (isFinalTurn) {
+          stopReason = 'STOP_FINAL_TURN_NO_OUTPUT';
+        } else {
+          try { process.stderr.write(this.colorWarn(`agent ↻ [llm] retry STOP_EMPTY_ASSISTANT_NO_TOOLCALLS\n`)); } catch {}
+          throw new Error('RETRY_EMPTY_ASSISTANT_NO_TOOLCALLS');
+        }
+      }
+      // If assistant text present and no tool calls, we will finish below
     }
   }
   if (this.options.verbose === true && !resLogged) {
     try {
       const latency = Date.now() - iterationStart;
       const size = turnMessages.reduce((acc, m) => acc + m.content.length, 0);
-      process.stderr.write(this.colorVerbose(`agent ← llm [${turn + 1}] input ${inputTokens}, output ${outputTokens}, cached ${cachedTokens ?? 0} tokens, tools ${executedTools.length}, latency ${latency} ms, size ${size} chars\n`));
+      process.stderr.write(this.colorVerbose(`agent ← [llm] [${turn + 1}] input ${inputTokens}, output ${outputTokens}, cached ${cachedTokens ?? 0} tokens, tools ${executedTools.length}, latency ${latency} ms, size ${size} chars\n`));
       aggAssistantChars += size;
       aggToolCalls += executedTools.length;
     } catch {}
@@ -527,20 +557,34 @@ const runTurn = async (turn: number, msgs: ModelMessage[]): Promise<Conversation
   // No tool artifacts: return
 
   // If there is assistant text, return it; otherwise consider it a failure
-  if (turnMessages.length > 0) return turnMessages;
+  const hasAssistantFinal = turnMessages.some((mm) => mm.role === 'assistant' && typeof mm.content === 'string' && mm.content.trim().length > 0);
+  if (hasAssistantFinal) {
+    if (!stopReason) stopReason = isFinalTurn ? 'STOP_FINAL_TURN_ASSISTANT_ANSWER' : 'STOP_ASSISTANT_FINAL_ANSWER';
+    return { messages: turnMessages, stopReason };
+  }
   throw new Error('Empty response from model');
 };
 const finalAppend = await runTurn(0, currentMessages);
-return { success: true, appendMessages: finalAppend };
+if (this.options.verbose === true) {
+  try { process.stderr.write(this.colorVerbose(`agent ← [llm] stop ${finalAppend.stopReason ?? 'STOP_UNKNOWN'}\n`)); } catch {}
+}
+return { success: true, appendMessages: finalAppend.messages };
 
 
       } catch (err) {
         const em = err instanceof Error ? err.message : String(err ?? 'Unknown error');
         const en = err instanceof Error ? err.name : 'Error';
+        // If retry sentinel, do not print a red error (it's not an error), just account and retry upstream
+        if (em === 'RETRY_EMPTY_ASSISTANT_NO_TOOLCALLS') {
+          this.callbacks.onAccounting?.({ type: 'llm', timestamp: Date.now(), status: 'failed', latency: 0, provider, model, tokens: { inputTokens: 0, outputTokens: 0, totalTokens: 0 }, error: em } as AccountingEntry);
+          return { success: false, appendMessages: [], error: em };
+        }
         const stackTop = err instanceof Error && typeof err.stack === 'string' ? err.stack.split('\n')[1]?.trim() : undefined;
         const extra = this.options.verbose === true && stackTop ? ` (${stackTop})` : '';
         const advice = this.options.traceLLM === true ? '' : ' Hint: run with --trace-llm to inspect HTTP/SSE.';
         const waitedMs = (() => { try { const now = Date.now(); const base = lastLLMCallStart && lastLLMCallStart > 0 ? lastLLMCallStart : attemptStart; return now - base; } catch { return 0; } })();
+        // Always emit a red, aligned one-liner for failures
+        try { process.stderr.write(this.colorError(`agent × [llm] [${this.currentTurn + 1}] ${provider}, ${model}, error [${en}] ${em}${extra} (waited ${waitedMs} ms)${advice}\n`)); } catch {}
         this.log('warn', `${provider}/${model} failed: [${en}] ${em}${extra} (waited ${waitedMs} ms)${advice}`);
         this.callbacks.onAccounting?.({ type: 'llm', timestamp: Date.now(), status: 'failed', latency: 0, provider, model, tokens: { inputTokens: 0, outputTokens: 0, totalTokens: 0 }, error: em } as AccountingEntry);
         return { success: false, appendMessages: [], error: em };
@@ -566,107 +610,136 @@ return { success: true, appendMessages: finalAppend };
     if (this.options.verbose === true) {
       try {
         const mcpSummary = Array.from(mcpPerServer.entries()).map(([srv, cnt]) => `${srv} ${cnt}`).join(', ');
-        process.stderr.write(`[fin] finally: llm requests ${llmRequests} (tokens: ${aggInput} in, ${aggOutput} out, ${aggCached} cached, tool-calls ${aggToolCalls}, output-size ${aggAssistantChars} chars, latency-sum ${aggLLMLatency} ms), mcp requests ${mcpRequests}${mcpSummary.length > 0 ? ` (${mcpSummary})` : ''}\n`);
+        process.stderr.write(this.colorVerbose(`[fin] finally: llm requests ${llmRequests} (tokens: ${aggInput} in, ${aggOutput} out, ${aggCached} cached, tool-calls ${aggToolCalls}, output-size ${aggAssistantChars} chars, latency-sum ${aggLLMLatency} ms), mcp requests ${mcpRequests}${mcpSummary.length > 0 ? ` (${mcpSummary})` : ''}\n`));
       } catch {}
+    }
+    // If we exhausted attempts with the retry sentinel, convert to explicit stop reason and cleaner error message
+    if ((lastError ?? '') === 'RETRY_EMPTY_ASSISTANT_NO_TOOLCALLS') {
+      try { process.stderr.write(this.colorVerbose(`agent ← [llm] stop STOP_EXHAUSTED_EMPTY_ASSISTANT_NO_TOOLCALLS\n`)); } catch {}
+      return { success: false, appendMessages: [], error: 'Max attempts exhausted: EMPTY_ASSISTANT_NO_TOOLCALLS' };
     }
     return { success: false, appendMessages: [], error: lastError ?? 'All providers and models failed' };
   }
 
   private getLLMProvider(providerName: string): (model: string) => LanguageModel {
     const cfg = this.config.providers[providerName];
-    const tracedFetch = this.options.traceLLM === true
-      ? async (input: RequestInfo | URL, init?: RequestInit) => {
-          let requestInit: RequestInit | undefined;
+    const tracedFetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      let requestInit: RequestInit | undefined;
+      let method = 'GET';
+      let url = '';
+      try {
+        if (typeof input === 'string') url = input;
+        else if (input instanceof URL) url = input.toString();
+        else if (typeof (input as { url?: unknown }).url === 'string') url = (input as { url?: string }).url ?? '';
+        method = init?.method ?? 'GET';
+        const headersObj = (init?.headers ?? {}) as unknown;
+        const entries = typeof headersObj === 'object' && headersObj !== null ? Object.entries(headersObj as Record<string, unknown>) : [];
+        const headersSend = entries.reduce<Record<string, string>>((acc, [k, v]) => {
+          if (typeof v === 'string') acc[k] = v;
+          else if (typeof v === 'number' || typeof v === 'boolean') acc[k] = String(v);
+          return acc;
+        }, {});
+        if (!('Accept' in headersSend) && !('accept' in headersSend)) headersSend.Accept = 'application/json';
+        if (url.includes('openrouter.ai')) {
+          const defaultReferer = 'https://ai-agent.local';
+          const defaultTitle = 'ai-agent-codex';
+          if (!('HTTP-Referer' in headersSend) && !('http-referer' in headersSend)) headersSend['HTTP-Referer'] = defaultReferer;
+          if (!('X-OpenRouter-Title' in headersSend) && !('x-openrouter-title' in headersSend)) headersSend['X-OpenRouter-Title'] = defaultTitle;
+          if (!('X-Title' in headersSend) && !('x-title' in headersSend)) headersSend['X-Title'] = defaultTitle;
+          if (!('User-Agent' in headersSend) && !('user-agent' in headersSend)) headersSend['User-Agent'] = `${defaultTitle}/1.0`;
+        }
+        requestInit = { ...(init ?? {}), headers: headersSend };
+        const isOpenRouter = typeof url === 'string' && url.includes('openrouter.ai');
+        const cfgAny = cfg as unknown as { custom?: Record<string, unknown>; mergeStrategy?: 'overlay'|'override'|'deep' };
+        if (isOpenRouter && cfgAny.custom != null && typeof requestInit.body === 'string') {
           try {
-            let url: string;
-            if (typeof input === 'string') url = input;
-            else if (input instanceof URL) url = input.toString();
-            else if (typeof (input as { url?: unknown }).url === 'string') url = (input as { url?: string }).url ?? '';
-            else url = '';
-            const method = init?.method ?? 'GET';
-            const headersObj = (init?.headers ?? {}) as unknown;
-            const entries = typeof headersObj === 'object' && headersObj !== null ? Object.entries(headersObj as Record<string, unknown>) : [];
-            const headersSend = entries.reduce<Record<string, string>>((acc, [k, v]) => {
-              if (typeof v === 'string') acc[k] = v;
-              else if (typeof v === 'number' || typeof v === 'boolean') acc[k] = String(v);
-              return acc;
-            }, {});
-            if (!('Accept' in headersSend) && !('accept' in headersSend)) headersSend.Accept = 'application/json';
-            if (url.includes('openrouter.ai')) {
-              const defaultReferer = 'https://ai-agent.local';
-              const defaultTitle = 'ai-agent-codex';
-              if (!('HTTP-Referer' in headersSend) && !('http-referer' in headersSend)) headersSend['HTTP-Referer'] = defaultReferer;
-              if (!('X-OpenRouter-Title' in headersSend) && !('x-openrouter-title' in headersSend)) headersSend['X-OpenRouter-Title'] = defaultTitle;
-              if (!('X-Title' in headersSend) && !('x-title' in headersSend)) headersSend['X-Title'] = defaultTitle;
-              if (!('User-Agent' in headersSend) && !('user-agent' in headersSend)) headersSend['User-Agent'] = `${defaultTitle}/1.0`;
-            }
-            requestInit = { ...(init ?? {}), headers: headersSend };
-                        const isOpenRouter = typeof url === 'string' && url.includes('openrouter.ai')
-
-            const cfgAny = cfg as unknown as { custom?: Record<string, unknown>; mergeStrategy?: 'overlay'|'override'|'deep' };
-            if (isOpenRouter && cfgAny.custom != null && typeof requestInit.body === 'string') {
-              try {
-                const bodyObj = JSON.parse(requestInit.body) as Record<string, unknown>;
-                const merged = (function mergeCustom(base: Record<string, unknown>, custom: Record<string, unknown>, strategy: 'overlay'|'override'|'deep') {
-                  const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
-                  if (strategy === 'override') return { ...base, ...custom };
-                  if (strategy === 'overlay') {
-                    const out = Object.entries(custom).reduce<Record<string, unknown>>((acc, [k, v]) => { if (!(k in acc)) acc[k] = v; return acc; }, { ...base });
-                    return out;
-                  }
-                  const deepMerge = (a: Record<string, unknown>, b: Record<string, unknown>): Record<string, unknown> =>
-                    Object.entries(b).reduce<Record<string, unknown>>((acc, [k, v]) => {
-                      const av = acc[k];
-                      acc[k] = (isObj(av) && isObj(v)) ? deepMerge(av, v) : v;
-                      return acc;
-                    }, { ...a });
-                  return deepMerge(base, custom);
-                })(bodyObj, cfgAny.custom, cfgAny.mergeStrategy ?? 'overlay');
-                requestInit.body = JSON.stringify(merged);
-              } catch {}
-            }
-
-            const headersRaw: Record<string, string> = Object.fromEntries(
-              Object.entries(headersSend).map(([k, v]) => [k.toLowerCase(), v])
-            );
-            if (Object.prototype.hasOwnProperty.call(headersRaw, 'authorization')) headersRaw.authorization = 'REDACTED';
-            const headersPretty = JSON.stringify(headersRaw, null, 2);
-            const bodyString = typeof (requestInit.body) === 'string' ? requestInit.body : undefined;
-            let bodyPretty = bodyString;
-            if (bodyString !== undefined) { try { bodyPretty = JSON.stringify(JSON.parse(bodyString), null, 2); } catch { /* noop */ } }
-            this.log('debug', `LLM request: ${method} ${url}\nheaders: ${headersPretty}${bodyPretty !== undefined ? `\nbody: ${bodyPretty}` : ''}`);
-          } catch { /* noop */ }
-          const res = await fetch(input, requestInit ?? init);
-          try {
-            const ct = res.headers.get('content-type') ?? '';
-            const headersOut: Record<string, string> = {};
-            res.headers.forEach((v, k) => { headersOut[k.toLowerCase()] = k.toLowerCase() === 'authorization' ? 'REDACTED' : v; });
-            const headersOutPretty = JSON.stringify(headersOut, null, 2);
-            const baseResp = `LLM response: ${res.status.toString()} ${res.statusText}\nheaders: ${headersOutPretty}`;
-            if (ct.includes('application/json')) {
-              const clone = res.clone();
-              let txt = await clone.text();
-              try { txt = JSON.stringify(JSON.parse(txt), null, 2); } catch { /* noop */ }
-              this.log('debug', `${baseResp}\nbody: ${txt}`);
-            } else if (ct.includes('text/event-stream')) {
-              try {
-                const clone = res.clone();
-                try { const raw = await clone.text(); this.log('debug', `${baseResp}\nraw-sse: ${raw}`); } catch { this.log('debug', `${baseResp}\ncontent-type: ${ct}`); }
-              } catch {
-                this.log('debug', `${baseResp}\ncontent-type: ${ct}`);
+            const bodyObj = JSON.parse(requestInit.body) as Record<string, unknown>;
+            const merged = (function mergeCustom(base: Record<string, unknown>, custom: Record<string, unknown>, strategy: 'overlay'|'override'|'deep') {
+              const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+              if (strategy === 'override') return { ...base, ...custom };
+              if (strategy === 'overlay') {
+                const out = Object.entries(custom).reduce<Record<string, unknown>>((acc, [k, v]) => { if (!(k in acc)) acc[k] = v; return acc; }, { ...base });
+                return out;
               }
-            } else {
+              const deepMerge = (a: Record<string, unknown>, b: Record<string, unknown>): Record<string, unknown> =>
+                Object.entries(b).reduce<Record<string, unknown>>((acc, [k, v]) => {
+                  const av = acc[k];
+                  acc[k] = (isObj(av) && isObj(v)) ? deepMerge(av, v) : v;
+                  return acc;
+                }, { ...a });
+              return deepMerge(base, custom);
+            })(bodyObj, cfgAny.custom, cfgAny.mergeStrategy ?? 'overlay');
+            requestInit.body = JSON.stringify(merged);
+          } catch { /* noop */ }
+        }
+      } catch { /* noop */ }
+      // Detailed trace logging (headers/body) when enabled
+      if (this.options.traceLLM === true) {
+        try {
+          const headersRaw: Record<string, string> = Object.fromEntries(
+            Object.entries((requestInit?.headers ?? {}) as Record<string, string>).map(([k, v]) => [k.toLowerCase(), v])
+          );
+          if (Object.prototype.hasOwnProperty.call(headersRaw, 'authorization')) headersRaw.authorization = 'REDACTED';
+          const headersPretty = JSON.stringify(headersRaw, null, 2);
+          const bodyString = typeof (requestInit?.body) === 'string' ? requestInit.body : undefined;
+          let bodyPretty = bodyString;
+          if (bodyString !== undefined) { try { bodyPretty = JSON.stringify(JSON.parse(bodyString), null, 2); } catch { /* noop */ } }
+          this.log('debug', `LLM request: ${method} ${url}\nheaders: ${headersPretty}${bodyPretty !== undefined ? `\nbody: ${bodyPretty}` : ''}`);
+        } catch { /* noop */ }
+      }
+      let res: Response;
+      try {
+        res = await fetch(input, requestInit ?? init);
+      } catch (e) {
+        const em = e instanceof Error ? e.message : String(e);
+        try { process.stderr.write(this.colorError(`agent × [llm] http error: ${method} ${url} -> ${em}\n`)); } catch {}
+        throw e;
+      }
+      if (!res.ok) {
+        try { process.stderr.write(this.colorError(`agent × [llm] http error: ${method} ${url} -> ${res.status} ${res.statusText}\n`)); } catch {}
+      }
+      if (this.options.traceLLM === true) {
+        try {
+          const ct = res.headers.get('content-type') ?? '';
+          const headersOut: Record<string, string> = {};
+          res.headers.forEach((v, k) => { headersOut[k.toLowerCase()] = k.toLowerCase() === 'authorization' ? 'REDACTED' : v; });
+          const headersOutPretty = JSON.stringify(headersOut, null, 2);
+          const baseResp = `LLM response: ${res.status.toString()} ${res.statusText}\nheaders: ${headersOutPretty}`;
+          if (ct.includes('application/json')) {
+            const clone = res.clone();
+            let txt = await clone.text();
+            try { txt = JSON.stringify(JSON.parse(txt), null, 2); } catch { /* noop */ }
+            this.log('debug', `${baseResp}\nbody: ${txt}`);
+          } else if (ct.includes('text/event-stream')) {
+            try {
+              const clone = res.clone();
+              try { const raw = await clone.text(); this.log('debug', `${baseResp}\nraw-sse: ${raw}`); } catch { this.log('debug', `${baseResp}\ncontent-type: ${ct}`); }
+            } catch {
               this.log('debug', `${baseResp}\ncontent-type: ${ct}`);
             }
-          } catch { /* noop */ }
-          return res;
-        }
-      : undefined;
+          } else {
+            this.log('debug', `${baseResp}\ncontent-type: ${ct}`);
+          }
+        } catch { /* noop */ }
+      }
+      return res;
+    };
 
+    const cfgType = (cfg as unknown as { type?: string }).type;
+    const isOpenAI = providerName === 'openai' || cfgType === 'openai';
+    if (isOpenAI) {
+      const prov = createOpenAI({ apiKey: cfg.apiKey, baseURL: cfg.baseUrl, fetch: tracedFetch as typeof fetch });
+      const mode = (cfg as unknown as { openaiMode?: 'responses'|'chat'; baseUrl?: string }).openaiMode
+        ?? (typeof cfg.baseUrl === 'string' && cfg.baseUrl.includes('api.openai.com') ? 'responses' : 'chat');
+      if (mode === 'responses') {
+        return (model: string) => (prov as unknown as { responses: (m: string) => import('ai').LanguageModel }).responses(model);
+      }
+      return (model: string) => (prov as unknown as { chat: (m: string) => import('ai').LanguageModel }).chat(model);
+    }
     switch (providerName) {
       case 'openai': {
-        const prov = createOpenAI({ apiKey: cfg.apiKey, baseURL: cfg.baseUrl, fetch: tracedFetch as typeof fetch });
-        return (model: string) => (prov as unknown as { responses: (m: string) => import('ai').LanguageModel }).responses(model);
+        // handled above
+        throw new Error('unreachable');
       }
       case 'anthropic': {
         const prov = createAnthropic({ apiKey: cfg.apiKey, baseURL: cfg.baseUrl, fetch: tracedFetch as typeof fetch });
