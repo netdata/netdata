@@ -95,7 +95,7 @@ export class AIAgentSession {
   // Static factory method for creating new sessions
   static create(sessionConfig: AIAgentSessionConfig): AIAgentSession {
     // Validate configuration
-    validateProviders(sessionConfig.config, sessionConfig.providers);
+    validateProviders(sessionConfig.config, sessionConfig.targets.map((t) => t.provider));
     validateMCPServers(sessionConfig.config, sessionConfig.tools);
     validatePrompts(sessionConfig.systemPrompt, sessionConfig.userPrompt);
 
@@ -268,9 +268,7 @@ export class AIAgentSession {
 
     const maxTurns = this.sessionConfig.maxTurns ?? 10;
     const maxRetries = this.sessionConfig.maxRetries ?? 3;
-    const pairs = this.sessionConfig.models.flatMap((model) => 
-      this.sessionConfig.providers.map((provider) => ({ provider, model }))
-    );
+    const pairs = this.sessionConfig.targets;
 
     // Turn loop - necessary for control flow with early termination
     // eslint-disable-next-line functional/no-loop-statements
@@ -328,6 +326,7 @@ export class AIAgentSession {
               isFinalTurn, // isFinalTurn
               currentTurn,
               logs,
+              accounting,
               lastShownThinkingHeaderTurn
             );
             
@@ -583,7 +582,7 @@ export class AIAgentSession {
                         (lastError?.includes('timeout') === true) ? 'EXIT-INACTIVITY-TIMEOUT' :
                         'EXIT-NO-LLM-RESPONSE';
         
-        const reason = `No LLM response after ${String(maxRetries)} retries across ${String(pairs.length)} provider/model pairs: ${lastError ?? 'All providers and models failed'}`;
+        const reason = `No LLM response after ${String(maxRetries)} retries across ${String(pairs.length)} provider/model pairs: ${lastError ?? 'All targets failed'}`;
         
         this.logExit(
           exitCode,
@@ -594,7 +593,7 @@ export class AIAgentSession {
         
         return {
           success: false,
-          error: lastError ?? 'All providers and models failed',
+          error: lastError ?? 'All provider/model targets failed',
           conversation,
           logs,
           accounting
@@ -712,6 +711,7 @@ export class AIAgentSession {
     isFinalTurn: boolean,
     currentTurn: number,
     logs: LogEntry[],
+    accounting: AccountingEntry[],
     lastShownThinkingHeaderTurn: number
   ) {
     const availableTools = [...this.mcpClient.getAllTools(), ...this.getInternalTools()];
@@ -735,6 +735,7 @@ export class AIAgentSession {
             mcpServer: 'agent', command: toolName,
             charactersIn: JSON.stringify(parameters).length, charactersOut: 15,
           };
+          accounting.push(accountingEntry);
           this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
           return JSON.stringify({ ok: true, totalNotes: this.internalNotes.length });
         }
@@ -754,6 +755,7 @@ export class AIAgentSession {
             mcpServer: 'agent', command: toolName,
             charactersIn: JSON.stringify(parameters).length, charactersOut: 12,
           };
+          accounting.push(accountingEntry);
           this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
           return JSON.stringify({ ok: true });
         }
@@ -774,7 +776,7 @@ export class AIAgentSession {
           charactersIn: JSON.stringify(parameters).length,
           charactersOut: safeResult.length,
         };
-        
+        accounting.push(accountingEntry);
         this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
         
         return safeResult;
@@ -794,7 +796,7 @@ export class AIAgentSession {
           charactersOut: 0,
           error: errorMsg
         };
-        
+        accounting.push(accountingEntry);
         this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
         
         // Re-throw the error - AI SDK's tool execution system will catch this and convert

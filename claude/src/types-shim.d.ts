@@ -20,4 +20,6 @@ declare module '@openrouter/ai-sdk-provider' {
 declare module 'js-yaml' {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   export function load(str: string, opts?: unknown): any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  export function dump(obj: any, opts?: unknown): string;
 }

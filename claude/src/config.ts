@@ -69,7 +69,7 @@ function expandDeep(obj: unknown, chain: string[] = []): unknown {
   return obj;
 }
 
-function resolveConfigPath(configPath?: string): string {
+export function resolveConfigPath(configPath?: string): string {
   if (typeof configPath === 'string' && configPath.length > 0) {
     if (!fs.existsSync(configPath)) throw new Error(`Configuration file not found: ${configPath}`);
     return configPath;

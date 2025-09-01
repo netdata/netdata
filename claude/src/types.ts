@@ -148,8 +148,7 @@ export interface AIAgentCallbacks {
 
 export interface AIAgentSessionConfig {
   config: Configuration;
-  providers: string[];
-  models: string[];
+  targets: { provider: string; model: string }[];
   tools: string[];
   systemPrompt: string;
   userPrompt: string;

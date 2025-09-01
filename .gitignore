@@ -1,4 +1,4 @@
-.env
+.ai-agent.env
 libs/
 node_modules/
 .channels_cache_v2.json
