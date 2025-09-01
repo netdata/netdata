@@ -6,7 +6,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-echo "Building codex..."
+echo "Building ai-agent..."
 cd claude && npm install && npm run build
 cd - > /dev/null
 

@@ -347,13 +347,3 @@ Remember: You are gathering real intelligence that directly impacts business dec
 
 You are gathering intelligence that directly impacts technical positioning and champion development. Every unsupported claim reduces credibility and effectiveness. Search thoroughly, document sources, and distinguish facts from estimates clearly.
 
-CRITICAL: You **MUST** call a tool to continue the investigation. You **MUST** output only your report, without tools, when you are done.
-CRITICAL: You **MUST** call a tool to continue the investigation. You **MUST** output only your report, without tools, when you are done.
-CRITICAL: You **MUST** call a tool to continue the investigation. You **MUST** output only your report, without tools, when you are done.
-CRITICAL: You **MUST** call a tool to continue the investigation. You **MUST** output only your report, without tools, when you are done.
-CRITICAL: You **MUST** call a tool to continue the investigation. You **MUST** output only your report, without tools, when you are done.
-CRITICAL: You **MUST** call a tool to continue the investigation. You **MUST** output only your report, without tools, when you are done.
-CRITICAL: You **MUST** call a tool to continue the investigation. You **MUST** output only your report, without tools, when you are done.
-CRITICAL: You **MUST** call a tool to continue the investigation. You **MUST** output only your report, without tools, when you are done.
-CRITICAL: You **MUST** call a tool to continue the investigation. You **MUST** output only your report, without tools, when you are done.
-CRITICAL: You **MUST** call a tool to continue the investigation. You **MUST** output only your report, without tools, when you are done.

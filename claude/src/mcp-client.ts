@@ -17,6 +17,8 @@ export class MCPClientManager {
   private onLog?: (entry: LogEntry) => void;
   private currentTurn = 0;
   private currentSubturn = 0;
+  // Map exposed tool name (namespaced) -> { serverName, originalName }
+  private toolNameMap = new Map<string, { serverName: string; originalName: string }>();
 
   constructor(opts?: { 
     trace?: boolean; 
@@ -204,6 +206,13 @@ export class MCPClientManager {
       inputSchema: (t.inputSchema ?? t.parameters ?? {}) as Record<string, unknown>,
       instructions: t.instructions,
     }));
+
+    // Populate exposed name mapping for this server's tools
+    const ns = this.sanitizeNamespace(name);
+    for (const t of tools) {
+      const exposed = `${ns}_${t.name}`;
+      this.toolNameMap.set(exposed, { serverName: name, originalName: t.name });
+    }
 
     // List prompts (optional)
     let instructions = initInstructions;
@@ -459,18 +468,33 @@ export class MCPClientManager {
   }
 
   getAllTools(): MCPTool[] {
-    return Array.from(this.servers.values()).flatMap((s) => s.tools);
+    // Return tools with namespaced (exposed) names for the LLM
+    const out: MCPTool[] = [];
+    for (const [serverName, s] of this.servers.entries()) {
+      const ns = this.sanitizeNamespace(serverName);
+      for (const t of s.tools) {
+        out.push({
+          name: `${ns}_${t.name}`,
+          description: t.description,
+          inputSchema: t.inputSchema,
+          instructions: t.instructions,
+        });
+      }
+    }
+    return out;
   }
 
   getCombinedInstructions(): string {
-    return Array.from(this.servers.values()).flatMap((s) => {
+    return Array.from(this.servers.entries()).flatMap(([serverName, s]) => {
       const arr: string[] = [];
       if (typeof s.instructions === 'string' && s.instructions.length > 0) {
         arr.push(`## TOOL ${s.name} INSTRUCTIONS\n${s.instructions}`);
       }
-      s.tools.forEach((t) => { 
+      const ns = this.sanitizeNamespace(serverName);
+      s.tools.forEach((t) => {
         if (typeof t.instructions === 'string' && t.instructions.length > 0) {
-          arr.push(`## TOOL ${t.name} INSTRUCTIONS\n${t.instructions}`); 
+          const exposed = `${ns}_${t.name}`;
+          arr.push(`## TOOL ${exposed} INSTRUCTIONS\n${t.instructions}`);
         }
       });
       return arr;
@@ -479,17 +503,17 @@ export class MCPClientManager {
 
   // Simple tool executor for AI SDK integration
   async executeToolByName(toolName: string, parameters: Record<string, unknown>): Promise<{ result: string; serverName: string }> {
-    const toolServerMapping = this.getToolServerMapping();
-    const serverName = toolServerMapping.get(toolName);
-    
-    if (serverName === undefined) {
+    const mapping = this.toolNameMap.get(toolName);
+    if (mapping === undefined) {
       throw new Error(`No server found for tool: ${toolName}`);
     }
+    const { serverName, originalName } = mapping;
 
     // Create a temporary tool call - we need an ID for the interface
     const toolCall: ToolCall = {
       id: `temp_${toolName}_${String(Date.now())}`,
-      name: toolName,
+      // Use the ORIGINAL tool name for the MCP server and for logging
+      name: originalName,
       parameters
     };
 
@@ -504,10 +528,12 @@ export class MCPClientManager {
   }
 
   getToolServerMapping(): Map<string, string> {
-    const entries = Array.from(this.servers.entries()).flatMap(([serverName, s]) => 
-      s.tools.map((t) => [t.name, serverName] as const)
-    );
-    return new Map(entries);
+    // Exposed name -> server mapping
+    const m = new Map<string, string>();
+    for (const [exposed, info] of this.toolNameMap.entries()) {
+      m.set(exposed, info.serverName);
+    }
+    return m;
   }
 
   async cleanup(): Promise<void> {
@@ -544,6 +570,7 @@ export class MCPClientManager {
     this.clients.clear();
     this.processes.clear();
     this.servers.clear();
+    this.toolNameMap.clear();
   }
 
   private log(
@@ -570,6 +597,20 @@ export class MCPClientManager {
 
     this.onLog(entry);
   }
+
+  private sanitizeNamespace(name: string): string {
+    return toUnderscore(name);
+  }
+}
+
+// Helpers
+function toUnderscore(s: string): string {
+  // Replace non-alphanumeric with underscore and collapse repeats
+  return s
+    .replace(/[^A-Za-z0-9]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .toLowerCase();
 }
 
 function resolveHeaders(headers?: Record<string, string>): Record<string, string> | undefined {
