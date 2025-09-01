@@ -209,6 +209,7 @@ export class MCPClientManager {
 
     // Populate exposed name mapping for this server's tools
     const ns = this.sanitizeNamespace(name);
+    // eslint-disable-next-line functional/no-loop-statements
     for (const t of tools) {
       const exposed = `${ns}_${t.name}`;
       this.toolNameMap.set(exposed, { serverName: name, originalName: t.name });
@@ -470,8 +471,10 @@ export class MCPClientManager {
   getAllTools(): MCPTool[] {
     // Return tools with namespaced (exposed) names for the LLM
     const out: MCPTool[] = [];
+    // eslint-disable-next-line functional/no-loop-statements
     for (const [serverName, s] of this.servers.entries()) {
       const ns = this.sanitizeNamespace(serverName);
+      // eslint-disable-next-line functional/no-loop-statements
       for (const t of s.tools) {
         out.push({
           name: `${ns}_${t.name}`,
@@ -530,6 +533,7 @@ export class MCPClientManager {
   getToolServerMapping(): Map<string, string> {
     // Exposed name -> server mapping
     const m = new Map<string, string>();
+    // eslint-disable-next-line functional/no-loop-statements
     for (const [exposed, info] of this.toolNameMap.entries()) {
       m.set(exposed, info.serverName);
     }

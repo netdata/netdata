@@ -90,7 +90,8 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     latencyMs: number,
     hasToolCalls: boolean,
     finalAnswer: boolean,
-    response?: string
+    response?: string,
+    extras?: { hasReasoning?: boolean; hasContent?: boolean }
   ): TurnResult {
     return {
       status: { type: 'success', hasToolCalls, finalAnswer },
@@ -98,7 +99,9 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       toolCalls: hasToolCalls ? this.extractToolCalls(messages) : undefined,
       tokens,
       latencyMs,
-      messages
+      messages,
+      hasReasoning: extras?.hasReasoning,
+      hasContent: extras?.hasContent,
     };
   }
 
@@ -282,10 +285,26 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       
       // Check if we have tool result messages (which means tools were executed)
       const hasToolResults = conversationMessages.some(m => m.role === 'tool');
+      // Detect if provider emitted any reasoning parts
+      const hasReasoning = Array.isArray((resp as { messages?: unknown[] }).messages)
+        && ((resp as { messages?: unknown[] }).messages as unknown[]).some((msg) => {
+          const m = msg as { role?: string; content?: unknown };
+          if (m.role !== 'assistant' || !Array.isArray(m.content)) return false;
+          return (m.content as unknown[]).some((p) => (p as { type?: string }).type === this.REASONING_TYPE);
+        });
       
       // Only mark as final if we have text and no new tool calls AND no tool results
       // If we have tool results, we need to continue the conversation for the LLM to process them
       const finalAnswer = hasAssistantText && !hasNewToolCalls && !hasToolResults;
+
+      // Guard: reasoning-only responses (no visible text, no tools) are invalid
+      if (!hasAssistantText && !hasNewToolCalls && !hasToolResults) {
+        if (process.env.DEBUG === 'true') {
+          console.error('[DEBUG] Streaming guard: assistant produced no visible content (reasoning-only). Marking as invalid_response.');
+        }
+        clearIdle();
+        return this.createFailureResult({ type: 'invalid_response', message: 'Assistant returned empty content' }, latencyMs);
+      }
       
       // Debug logging
       if (process.env.DEBUG === 'true') {
@@ -294,7 +313,15 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         console.error(`[DEBUG] response text:`, response);
       }
 
-      return this.createSuccessResult(conversationMessages, tokens, latencyMs, hasNewToolCalls, finalAnswer, response);
+      return this.createSuccessResult(
+        conversationMessages,
+        tokens,
+        latencyMs,
+        hasNewToolCalls,
+        finalAnswer,
+        response,
+        { hasReasoning, hasContent: hasAssistantText }
+      );
     } catch (error) {
       clearIdle();
       return this.createFailureResult(this.mapError(error), Date.now() - startTime);
@@ -379,10 +406,25 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       
       // Check if we have tool result messages (which means tools were executed)
       const hasToolResults = conversationMessages.some(m => m.role === 'tool');
+      // Detect reasoning parts in non-streaming response
+      const hasReasoning = Array.isArray(respObj.messages)
+        && (respObj.messages as unknown[]).some((msg) => {
+          const m = msg as { role?: string; content?: unknown };
+          if (m.role !== 'assistant' || !Array.isArray(m.content)) return false;
+          return (m.content as unknown[]).some((p) => (p as { type?: string }).type === this.REASONING_TYPE);
+        });
       
       // Only mark as final if we have text and no new tool calls AND no tool results
       // If we have tool results, we need to continue the conversation for the LLM to process them
       const finalAnswer = hasAssistantText && !hasNewToolCalls && !hasToolResults;
+
+      // Guard: reasoning-only responses (no visible text, no tools) are invalid
+      if (!hasAssistantText && !hasNewToolCalls && !hasToolResults) {
+        if (process.env.DEBUG === 'true') {
+          console.error('[DEBUG] Non-streaming guard: assistant produced no visible content (reasoning-only). Marking as invalid_response.');
+        }
+        return this.createFailureResult({ type: 'invalid_response', message: 'Assistant returned empty content' }, latencyMs);
+      }
       
       // Always try to extract the actual response text from the assistant message
       // The AI SDK's result.text might be empty when there are tool calls
@@ -446,7 +488,15 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         }
       }
 
-      return this.createSuccessResult(conversationMessages, tokens, latencyMs, hasNewToolCalls, finalAnswer, response);
+      return this.createSuccessResult(
+        conversationMessages,
+        tokens,
+        latencyMs,
+        hasNewToolCalls,
+        finalAnswer,
+        response,
+        { hasReasoning, hasContent: hasAssistantText }
+      );
     } catch (error) {
       return this.createFailureResult(this.mapError(error), Date.now() - startTime);
     }
@@ -553,11 +603,9 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
             textParts.push(part.text);
           }
         } else if (part.type === this.REASONING_TYPE) {
-          // Include reasoning parts in the text content
-          // This ensures assistant messages with reasoning aren't empty
-          if (part.text !== undefined && part.text !== '') {
-            textParts.push(part.text);
-          }
+          // Skip reasoning parts - they should NOT be included in text content
+          // Reasoning is only for thinking/telemetry, not for final answer detection
+          // This prevents the agent from treating reasoning-only responses as final answers
         } else if (part.type === 'tool-call' && part.toolCallId !== undefined && part.toolName !== undefined) {
           // AI SDK embeds tool calls in content
           toolCalls.push({

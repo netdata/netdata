@@ -318,6 +318,11 @@ export class AIAgentSession {
               // Debug logging
               if (this.sessionConfig.verbose === true) {
                 const hasToolResults = turnResult.messages.some((m: ConversationMessage) => m.role === 'tool');
+                const hasContent = turnResult.hasContent ?? (() => {
+                  const lastAssistant = [...turnResult.messages].filter(m => m.role === 'assistant').pop();
+                  return (lastAssistant?.content.trim().length ?? 0) > 0;
+                })();
+                const hasReasoning = turnResult.hasReasoning ?? false;
                 const debugEntry: LogEntry = {
                   timestamp: Date.now(),
                   severity: 'VRB',
@@ -327,7 +332,7 @@ export class AIAgentSession {
                   type: 'llm',
                   remoteIdentifier: 'debug',
                   fatal: false,
-                  message: `Turn result: hasToolCalls=${String(turnResult.status.hasToolCalls)}, hasToolResults=${String(hasToolResults)}, finalAnswer=${String(turnResult.status.finalAnswer)}, response length=${String(turnResult.response?.length ?? 0)}, messages=${String(turnResult.messages.length)}`
+                  message: `Turn result: hasToolCalls=${String(turnResult.status.hasToolCalls)}, hasToolResults=${String(hasToolResults)}, finalAnswer=${String(turnResult.status.finalAnswer)}, hasReasoning=${String(hasReasoning)}, hasContent=${String(hasContent)}, response length=${String(turnResult.response?.length ?? 0)}, messages=${String(turnResult.messages.length)}`
                 };
                 logs.push(debugEntry);
                 this.sessionConfig.callbacks?.onLog?.(debugEntry);
@@ -352,6 +357,25 @@ export class AIAgentSession {
                 if (!turnResult.response.endsWith('\n')) {
                   this.sessionConfig.callbacks?.onOutput?.('\n');
                 }
+              }
+              
+              // Check for reasoning-only responses (empty response but not final answer)
+              if (!turnResult.status.finalAnswer && !turnResult.status.hasToolCalls && 
+                  (turnResult.response === undefined || turnResult.response.trim().length === 0)) {
+                // Log warning about empty response - model might be stuck
+                const warnEntry: LogEntry = {
+                  timestamp: Date.now(),
+                  severity: 'WRN',
+                  turn: currentTurn,
+                  subturn: 0,
+                  direction: 'response',
+                  type: 'llm',
+                  remoteIdentifier: `${provider}:${model}`,
+                  fatal: false,
+                  message: 'Provider returned empty response (possibly reasoning-only). Model may be stuck or need clarification.'
+                };
+                logs.push(warnEntry);
+                this.sessionConfig.callbacks?.onLog?.(warnEntry);
               }
               
               if (turnResult.status.finalAnswer) {

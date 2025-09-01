@@ -91,7 +91,7 @@
       },
       "enabled": true
     },
-    "brave-search": {
+    "brave": {
       "type": "stdio",
       "command": "npx",
       "args": [
@@ -103,7 +103,7 @@
       },
       "enabled": true
     },
-    "jina-search": {
+    "jina": {
       "type": "sse",
       "url": "https://mcp.jina.ai/sse",
       "headers": {
@@ -142,7 +142,7 @@
       },
       "enabled": true
     },
-    "freshdesk-mcp": {
+    "freshdesk": {
       "type": "stdio",
       "command": "uvx",
       "args": [
@@ -174,7 +174,7 @@
       },
       "enabled": true
     },
-    "playwright-mcp": {
+    "playwright": {
       "type": "stdio",
       "command": "npx",
       "args": [

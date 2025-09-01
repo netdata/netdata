@@ -23,6 +23,8 @@ export interface TurnResult {
   tokens?: TokenUsage;
   latencyMs: number;
   messages: ConversationMessage[];
+  hasReasoning?: boolean;
+  hasContent?: boolean;
 }
 
 export type ToolStatus =

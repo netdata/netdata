@@ -16,8 +16,8 @@ set -a
 source .env
 set +a
 
-#TOOLS="brave-search"
-TOOLS="jina-search"
+#TOOLS="brave"
+TOOLS="jina"
 
 #PROVIDERS="ollama"
 #MODELS="gpt-oss:20b"

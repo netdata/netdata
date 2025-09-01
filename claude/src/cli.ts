@@ -259,8 +259,18 @@ function createCallbacks(options: Record<string, unknown>, accountingFile?: stri
   // Helper for direction symbols to save space
   const dirSymbol = (direction: string): string => direction === 'request' ? '→' : '←';
 
+  // Track thinking stream state to ensure proper newlines between logs
+  let thinkingOpen = false;
+  let lastCharWasNewline = true;
+
   return {
     onLog: (entry: LogEntry) => {
+      // Ensure newline separation after thinking stream if needed
+      if (entry.severity !== 'THK' && thinkingOpen && !lastCharWasNewline) {
+        try { process.stderr.write('\n'); } catch {}
+        lastCharWasNewline = true;
+        thinkingOpen = false;
+      }
       // Always show errors and warnings with colors
       if (entry.severity === 'ERR') {
         const formatted = colorize(`[ERR] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}: ${entry.message}`, '\x1b[31m');
@@ -289,8 +299,10 @@ function createCallbacks(options: Record<string, unknown>, accountingFile?: stri
       
       // Show thinking header with light gray color
       if (entry.severity === 'THK') {
-        const formatted = colorize(`[THK] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}: `, '\x1b[90m');
+        const formatted = colorize(`[THK] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}: `, '\x1b[2;37m');
         process.stderr.write(formatted);
+        thinkingOpen = true;
+        lastCharWasNewline = false;
         // The actual thinking text will follow via onThinking
       }
     },
@@ -298,8 +310,12 @@ function createCallbacks(options: Record<string, unknown>, accountingFile?: stri
     onOutput: (text: string) => { process.stdout.write(text); },
     
     onThinking: (text: string) => { 
-      const colored = colorize(text, '\x1b[90m'); // Light gray for thinking
+      const colored = colorize(text, '\x1b[2;37m'); // Light gray (dim white) for thinking
       process.stderr.write(colored);
+      if (text.length > 0) {
+        lastCharWasNewline = text.endsWith('\n');
+        thinkingOpen = true;
+      }
     },
     
     onAccounting: (entry: AccountingEntry) => {

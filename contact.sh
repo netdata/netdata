@@ -16,8 +16,8 @@ set -a
 source .env
 set +a
 
-#TOOLS="brave-search"
-TOOLS="jina-search"
+#TOOLS="brave"
+TOOLS="jina"
 
 #PROVIDERS="ollama"
 #MODELS="gpt-oss:20b"
@@ -31,4 +31,4 @@ MODELS="openai/gpt-oss-120b"
 exec node claude/dist/cli.js "${PROVIDERS}" "${MODELS}" "${TOOLS}" \
 	'@prompts/contact-intelligence-researcher.md' \
 	"$1" \
-	--config .ai-agent.json --verbose --trace-llm --trace-mcp
+	--config .ai-agent.json --verbose # --trace-llm --trace-mcp
