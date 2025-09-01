@@ -17,7 +17,7 @@ source .env
 set +a
 
 #TOOLS="brave"
-TOOLS="jina"
+TOOLS="jina,fetcher"
 
 #PROVIDERS="ollama"
 #MODELS="gpt-oss:20b"
@@ -26,7 +26,7 @@ TOOLS="jina"
 #MODELS="gpt-oss-20b"
 
 PROVIDERS="openrouter"
-MODELS="openai/gpt-oss-120b"
+MODELS="openai/gpt-oss-120b,openai/gpt-oss-20b"
 
 exec node claude/dist/cli.js "${PROVIDERS}" "${MODELS}" "${TOOLS}" \
 	'@prompts/icp-intelligence-researcher.md' \

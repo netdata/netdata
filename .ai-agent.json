@@ -223,6 +223,11 @@
         "Authorization": "Bearer ${POSTHOG_API_KEY}"
       },
       "enabled": true
+    },
+    "fetcher": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "fetcher-mcp"]
     }
   }
 }

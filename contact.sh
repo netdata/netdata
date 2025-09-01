@@ -17,7 +17,8 @@ source .env
 set +a
 
 #TOOLS="brave"
-TOOLS="jina,brave"
+#TOOLS="jina"
+TOOLS="fetcher,brave"
 
 #PROVIDERS="ollama"
 #MODELS="gpt-oss:20b"
@@ -26,9 +27,9 @@ TOOLS="jina,brave"
 #MODELS="gpt-oss-20b"
 
 PROVIDERS="openrouter"
-#MODELS="openai/gpt-oss-120b,openai/gpt-oss-20b"
+MODELS="openai/gpt-oss-120b,openai/gpt-oss-20b"
 #MODELS="anthropic/claude-sonnet-4"
-MODELS="google/gemini-2.0-flash-001"
+#MODELS="google/gemini-2.0-flash-001"
 
 # export DEBUG=true
 exec node claude/dist/cli.js "${PROVIDERS}" "${MODELS}" "${TOOLS}" \
