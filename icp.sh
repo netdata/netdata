@@ -28,7 +28,7 @@ TOOLS="jina-search"
 PROVIDERS="openrouter"
 MODELS="openai/gpt-oss-120b"
 
-exec node codex/dist/cli.js "${PROVIDERS}" "${MODELS}" "${TOOLS}" \
+exec node claude/dist/cli.js "${PROVIDERS}" "${MODELS}" "${TOOLS}" \
 	'@prompts/icp-intelligence-researcher.md' \
 	"$1" \
 	--config .ai-agent.json --verbose # --trace-llm --trace-mcp
