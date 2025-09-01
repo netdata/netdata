@@ -18,12 +18,157 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     if (error === null || error === undefined) return { type: 'invalid_response', message: UNKNOWN_ERROR_MESSAGE };
 
     const err = error as Record<string, unknown>;
-    const message = typeof err.message === 'string' ? err.message : UNKNOWN_ERROR_MESSAGE;
-    const status = typeof err.status === 'number' ? err.status : typeof err.statusCode === 'number' ? err.statusCode : 0;
-    const name = typeof err.name === 'string' ? err.name : 'Error';
+    const firstDefined = (...vals: unknown[]) => vals.find(v => v !== undefined && v !== null);
+    const nested = (obj: unknown, path: string[]): unknown => {
+      // Safe nested property access
+      let cur: unknown = obj;
+      // eslint-disable-next-line functional/no-loop-statements
+      for (const key of path) {
+        if (cur === null || cur === undefined) return undefined;
+        if (typeof cur !== 'object') return undefined;
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+        const rec = cur as Record<string, unknown>;
+        cur = rec[key];
+      }
+      return cur;
+    };
+
+    const asString = (v: unknown): string | undefined => typeof v === 'string' ? v : undefined;
+    // const asNumber = (v: unknown): number | undefined => typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+    const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && v !== undefined && typeof v === 'object';
+
+    // Unwrap common wrapper errors (e.g., RetryError with lastError, nested causes)
+    const unwrap = (e: unknown): Record<string, unknown> => {
+      let cur: unknown = e;
+      // eslint-disable-next-line functional/no-loop-statements
+      for (let i = 0; i < 4; i++) {
+        if (!isRecord(cur)) break;
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+        const rec = cur as Record<string, unknown>;
+        // Prefer lastError if available
+        const last = rec.lastError;
+        if (last !== undefined) { cur = last; continue; }
+        // Else unwrap cause
+        const cause = rec.cause;
+        if (cause !== undefined) { cur = cause; continue; }
+        // Else unwrap errors array last element
+        const errs = rec.errors;
+        if (Array.isArray(errs) && errs.length > 0) { cur = errs[errs.length - 1] as unknown; continue; }
+        break;
+      }
+      return (isRecord(cur) ? cur : (e as Record<string, unknown>));
+    };
+
+    const primary = unwrap(err);
+
+    const status = (firstDefined(primary.statusCode, primary.status, nested(primary, ['response', 'status'])) as number | undefined) ?? 0;
+    const statusTextCandidate = firstDefined(
+      // common locations
+      nested(primary, ['statusText']),
+      nested(primary, ['response', 'statusText'])
+    );
+    const statusTextRaw = typeof statusTextCandidate === 'string' ? statusTextCandidate : undefined;
+    const codeCandidate = firstDefined(
+      nested(primary, ['code']),
+      nested(primary, ['data', 'error', 'status']),
+      nested(primary, ['data', 'error', 'code']),
+      nested(primary, ['response', 'data', 'error', 'code']),
+      nested(primary, ['error', 'code'])
+    );
+    let codeStr = typeof codeCandidate === 'string' ? codeCandidate : (typeof codeCandidate === 'number' ? String(codeCandidate) : undefined);
+    // Try multiple sources for provider error message
+    let providerMessageRaw = firstDefined(
+      // provider/SDK nested error messages
+      nested(primary, ['data', 'error', 'message']),
+      nested(primary, ['response', 'data', 'error', 'message']),
+      nested(primary, ['error', 'message']),
+      nested(primary, ['message'])
+    ) as string | undefined;
+    // Parse responseBody JSON (if present) and override with upstream nested details from error.metadata.raw
+    {
+      const rb = asString((primary as { responseBody?: unknown }).responseBody);
+      if (rb !== undefined && rb.trim().length > 0) {
+        try {
+          const parsed = JSON.parse(rb) as { error?: { message?: string; metadata?: { raw?: string; provider_name?: string }; code?: number | string; status?: string } };
+          // Prefer upstream nested raw error message if available
+          const rawInner = parsed.error?.metadata?.raw;
+          if (typeof rawInner === 'string' && rawInner.trim().length > 0) {
+            try {
+              const inner = JSON.parse(rawInner) as { error?: { message?: string; status?: string } };
+              if (typeof inner.error?.message === 'string') providerMessageRaw = inner.error.message;
+            } catch {
+              // If raw is not JSON, use it verbatim as message
+              providerMessageRaw = rawInner;
+            }
+          }
+          // If still no message, fallback to top-level error.message
+          providerMessageRaw ??= (typeof parsed.error?.message === 'string' ? parsed.error.message : undefined);
+          providerMessageRaw ??= rb;
+        } catch {
+          // keep providerMessageRaw as-is when body isn't JSON
+        }
+      }
+    }
+
+    // Recompute code using responseBody metadata.raw inner status when available
+    if ((codeStr === undefined || /^\d+$/.test(codeStr)) && typeof (primary as { responseBody?: unknown }).responseBody === 'string') {
+      try {
+        const parsed = JSON.parse((primary as { responseBody?: unknown }).responseBody as string) as { error?: { metadata?: { raw?: string } } };
+        const rawInner = parsed.error?.metadata?.raw;
+        if (typeof rawInner === 'string') {
+          try {
+            const inner = JSON.parse(rawInner) as { error?: { status?: string } };
+            const innerStatus = inner.error?.status;
+            if (typeof innerStatus === 'string' && innerStatus.length > 0) {
+              codeStr ??= innerStatus;
+            }
+          } catch { /* ignore */ }
+        }
+      } catch { /* ignore */ }
+    }
+
+    const nameVal = (primary as { name?: unknown }).name;
+    const name = typeof nameVal === 'string' ? nameVal : 'Error';
+
+    const sanitize = (s: string | undefined): string | undefined => {
+      if (typeof s !== 'string') return undefined;
+      // collapse whitespace and newlines; trim and cap length
+      const oneLine = s.replace(/\s+/g, ' ').trim();
+      return oneLine.length > 200 ? `${oneLine.slice(0, 197)}...` : oneLine;
+    };
+    const statusText = sanitize(statusTextRaw);
+    const providerMessage = sanitize(providerMessageRaw) ?? UNKNOWN_ERROR_MESSAGE;
+    const codeText = sanitize(codeStr);
+
+    // Build a concise message with available fields
+    const prefixParts: string[] = [];
+    if (status > 0) prefixParts.push(String(status));
+    if (statusText !== undefined && statusText.length > 0) prefixParts.push(statusText);
+    if (codeText !== undefined && codeText.length > 0) prefixParts.push(`[${codeText}]`);
+    const prefix = prefixParts.join(' ');
+    const composedMessage = prefix.length > 0 ? `${prefix}: ${providerMessage}` : providerMessage;
+
+    if (process.env.DEBUG === 'true') {
+      try {
+        const body = (primary as { responseBody?: unknown }).responseBody;
+        const bodyLen = typeof body === 'string' ? body.length : 0;
+        // eslint-disable-next-line no-console
+        console.error('[DEBUG] mapError:', {
+          name,
+          status,
+          statusText: statusText ?? null,
+          code: codeStr ?? null,
+          hasResponseBody: typeof body === 'string',
+          responseBodyLen: bodyLen,
+          hasErrorData: typeof (primary as { data?: unknown }).data === 'object',
+          messageComposed: composedMessage,
+        });
+      } catch { /* ignore debug errors */ }
+    }
 
     // Rate limit errors
-    if (status === 429 || name.includes('RateLimit') || message.includes('rate limit')) {
+    if (status === 429 || name.includes('RateLimit') || providerMessage.toLowerCase().includes('rate limit')) {
       const RETRY_AFTER_HEADER = 'retry-after';
       const headers = err.headers as Record<string, unknown> | undefined;
       const retryAfter = (typeof headers?.[RETRY_AFTER_HEADER] === 'string' || typeof headers?.[RETRY_AFTER_HEADER] === 'number') 
@@ -34,33 +179,34 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     }
 
     // Authentication errors
-    if (status === 401 || status === 403 || name.includes('Auth') || message.includes('authentication') || message.includes('unauthorized')) {
-      return { type: 'auth_error', message };
+    if (status === 401 || status === 403 || name.includes('Auth') || providerMessage.toLowerCase().includes('authentication') || providerMessage.toLowerCase().includes('unauthorized')) {
+      return { type: 'auth_error', message: composedMessage };
     }
 
     // Quota exceeded
-    if (status === 402 || message.includes('quota') || message.includes('billing') || message.includes('insufficient')) {
-      return { type: 'quota_exceeded', message };
+    if (status === 402 || providerMessage.toLowerCase().includes('quota') || providerMessage.toLowerCase().includes('billing') || providerMessage.toLowerCase().includes('insufficient')) {
+      return { type: 'quota_exceeded', message: composedMessage };
     }
 
     // Model errors
-    if (status === 400 || name.includes('BadRequest') || message.includes('invalid') || message.includes('model')) {
-      const retryable = !message.includes('permanently') && !message.includes('unsupported');
-      return { type: 'model_error', message, retryable };
+    if (status === 400 || name.includes('BadRequest') || providerMessage.toLowerCase().includes('invalid') || providerMessage.toLowerCase().includes('model')) {
+      const lower = providerMessage.toLowerCase();
+      const retryable = !(lower.includes('permanently') || lower.includes('unsupported'));
+      return { type: 'model_error', message: composedMessage, retryable };
     }
 
     // Timeout errors
-    if (name.includes('Timeout') || name.includes('AbortError') || message.includes('timeout') || message.includes('aborted')) {
-      return { type: 'timeout', message };
+    if (name.includes('Timeout') || name.includes('AbortError') || providerMessage.toLowerCase().includes('timeout') || providerMessage.toLowerCase().includes('aborted')) {
+      return { type: 'timeout', message: composedMessage };
     }
 
     // Network errors
-    if (status >= 500 || name.includes('Network') || name.includes('ECONNRESET') || name.includes('ENOTFOUND') || message.includes('network') || message.includes('connection')) {
-      return { type: 'network_error', message, retryable: true };
+    if (status >= 500 || name.includes('Network') || name.includes('ECONNRESET') || name.includes('ENOTFOUND') || providerMessage.toLowerCase().includes('network') || providerMessage.toLowerCase().includes('connection')) {
+      return { type: 'network_error', message: composedMessage, retryable: true };
     }
 
     // Default to model error with retryable flag
-    return { type: 'model_error', message, retryable: true };
+    return { type: 'model_error', message: composedMessage, retryable: true };
   }
 
   protected extractTokenUsage(usage: Record<string, unknown> | undefined): TokenUsage {
@@ -161,8 +307,10 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
   }
 
   // Constants
-  private readonly REASONING_TYPE = 'reasoning';
-  private readonly TOOL_RESULT_TYPE = 'tool-result';
+  private static readonly PART_REASONING = 'reasoning' as const;
+  private static readonly PART_TOOL_RESULT = 'tool_result' as const; // avoid duplicate literal warning
+    private readonly REASONING_TYPE: string = BaseLLMProvider.PART_REASONING.replace('_','-');
+  private readonly TOOL_RESULT_TYPE: string = BaseLLMProvider.PART_TOOL_RESULT.replace('_','-');
   
   // Shared streaming utilities
   protected createTimeoutController(timeoutMs: number): { controller: AbortController; resetIdle: () => void; clearIdle: () => void } {
@@ -251,6 +399,39 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
 
       const usage = await result.usage;
       const resp = await result.response;
+      if (process.env.DEBUG === 'true') {
+        try {
+          const msgs = (resp as { messages?: unknown[] } | undefined)?.messages ?? [];
+          let toolCalls = 0; const callIds: string[] = [];
+          let toolResults = 0; const resIds: string[] = [];
+          // eslint-disable-next-line functional/no-loop-statements
+          for (const msg of msgs) {
+            const m = msg as { role?: string; content?: unknown };
+            if (m.role === 'assistant' && Array.isArray(m.content)) {
+              // eslint-disable-next-line functional/no-loop-statements
+              for (const part of m.content) {
+                const p = part as { type?: string; toolCallId?: string };
+                if (p.type === 'tool-call') {
+                  toolCalls++;
+                  if (typeof p.toolCallId === 'string' && p.toolCallId.length > 0) callIds.push(p.toolCallId);
+                }
+              }
+            } else if (m.role === 'tool' && Array.isArray(m.content)) {
+              // eslint-disable-next-line functional/no-loop-statements
+              for (const part of m.content) {
+                const p = part as { type?: string; toolCallId?: string };
+                if (p.type === 'tool-result') {
+                  toolResults++;
+                  if (typeof p.toolCallId === 'string' && p.toolCallId.length > 0) resIds.push(p.toolCallId);
+                }
+              }
+            }
+          }
+          // eslint-disable-next-line no-console
+          const dbgLabel = 'tool-parity(stream)';
+          console.error(`[DEBUG] ${dbgLabel}:`, { toolCalls, callIds, toolResults, resIds });
+        } catch { /* ignore */ }
+      }
       const tokens = this.extractTokenUsage(usage);
       const latencyMs = Date.now() - startTime;
 
@@ -299,6 +480,14 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       }
       
       const conversationMessages = this.convertResponseMessages(resp.messages, request.provider, request.model, tokens);
+      if (process.env.DEBUG === 'true') {
+        try {
+          const tMsgs = conversationMessages.filter((m) => m.role === 'tool');
+          const ids = tMsgs.map((m) => (m.toolCallId ?? '[none]'));
+          // eslint-disable-next-line no-console
+          console.error('[DEBUG] converted-tool-messages(stream):', { count: tMsgs.length, ids });
+        } catch { /* ignore */ }
+      }
       
       // Find the LAST assistant message to determine if we need more tool calls
       const lastAssistantMessageArr = conversationMessages.filter(m => m.role === 'assistant');
@@ -381,6 +570,39 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       }
 
       const respObj = (result.response as { messages?: unknown[] } | undefined) ?? {};
+      if (process.env.DEBUG === 'true') {
+        try {
+          const msgs = Array.isArray(respObj.messages) ? respObj.messages : [];
+          let toolCalls = 0; const callIds: string[] = [];
+          let toolResults = 0; const resIds: string[] = [];
+          // eslint-disable-next-line functional/no-loop-statements
+          for (const msg of msgs) {
+            const m = msg as { role?: string; content?: unknown };
+            if (m.role === 'assistant' && Array.isArray(m.content)) {
+              // eslint-disable-next-line functional/no-loop-statements
+              for (const part of m.content) {
+                const p = part as { type?: string; toolCallId?: string };
+                if (p.type === 'tool-call') {
+                  toolCalls++;
+                  if (typeof p.toolCallId === 'string' && p.toolCallId.length > 0) callIds.push(p.toolCallId);
+                }
+              }
+            } else if (m.role === 'tool' && Array.isArray(m.content)) {
+              // eslint-disable-next-line functional/no-loop-statements
+              for (const part of m.content) {
+                const p = part as { type?: string; toolCallId?: string };
+                if (p.type === 'tool-result') {
+                  toolResults++;
+                  if (typeof p.toolCallId === 'string' && p.toolCallId.length > 0) resIds.push(p.toolCallId);
+                }
+              }
+            }
+          }
+          // eslint-disable-next-line no-console
+          const dbgLabel = 'tool-parity(nonstream)';
+          console.error(`[DEBUG] ${dbgLabel}:`, { toolCalls, callIds, toolResults, resIds });
+        } catch { /* ignore */ }
+      }
       
       // Extract reasoning from AI SDK's normalized messages (for non-streaming mode)
       // The AI SDK puts reasoning as ReasoningPart in the content array
@@ -417,6 +639,14 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         request.model, 
         tokens
       );
+      if (process.env.DEBUG === 'true') {
+        try {
+          const tMsgs = conversationMessages.filter((m) => m.role === 'tool');
+          const ids = tMsgs.map((m) => (m.toolCallId ?? '[none]'));
+          // eslint-disable-next-line no-console
+          console.error('[DEBUG] converted-tool-messages(nonstream):', { count: tMsgs.length, ids });
+        } catch { /* ignore */ }
+      }
       
       // Find the LAST assistant message to determine if we need more tool calls
       const laArr = conversationMessages.filter(m => m.role === 'assistant');

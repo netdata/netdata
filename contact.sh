@@ -17,7 +17,7 @@ source .env
 set +a
 
 #TOOLS="brave"
-TOOLS="jina,brave,playwright"
+TOOLS="jina,brave"
 
 #PROVIDERS="ollama"
 #MODELS="gpt-oss:20b"
@@ -26,8 +26,11 @@ TOOLS="jina,brave,playwright"
 #MODELS="gpt-oss-20b"
 
 PROVIDERS="openrouter"
-MODELS="openai/gpt-oss-120b"
+#MODELS="openai/gpt-oss-120b,openai/gpt-oss-20b"
+#MODELS="anthropic/claude-sonnet-4"
+MODELS="google/gemini-2.0-flash-001"
 
+# export DEBUG=true
 exec node claude/dist/cli.js "${PROVIDERS}" "${MODELS}" "${TOOLS}" \
 	'@prompts/contact-intelligence-researcher.md' \
 	"$1" \

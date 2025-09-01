@@ -112,6 +112,11 @@ export class LLMClient {
     return async (input: RequestInfo | URL, init?: RequestInit) => {
       let url = '';
       let method = 'GET';
+      // Per-request routing/cost locals to avoid stale shared state
+      let reqActualProvider: string | undefined;
+      let reqActualModel: string | undefined;
+      let reqCostUsd: number | undefined;
+      let reqUpstreamCostUsd: number | undefined;
       
       try {
         if (typeof input === 'string') url = input;
@@ -178,18 +183,18 @@ export class LLMClient {
             const clone = response.clone();
             const raw = await clone.text();
             try {
-              const parsed = JSON.parse(raw) as { provider?: string; model?: string; choices?: { provider?: string; model?: string }[] };
-              const actualProv = parsed.provider ?? parsed.choices?.[0]?.provider;
+              const parsed = JSON.parse(raw) as { provider?: string; model?: string; choices?: { provider?: string; model?: string }[]; error?: { metadata?: { provider_name?: string } } };
+              const actualProv = parsed.provider ?? parsed.choices?.[0]?.provider ?? parsed.error?.metadata?.provider_name;
               const actualModel = parsed.model ?? parsed.choices?.[0]?.model;
-              this.lastActualProvider = typeof actualProv === 'string' && actualProv.length > 0 ? actualProv : undefined;
-              this.lastActualModel = typeof actualModel === 'string' && actualModel.length > 0 ? actualModel : undefined;
+              reqActualProvider = typeof actualProv === 'string' && actualProv.length > 0 ? actualProv : undefined;
+              reqActualModel = typeof actualModel === 'string' && actualModel.length > 0 ? actualModel : undefined;
               // Try to extract usage cost if present
               try {
                 const pr2 = JSON.parse(raw) as { usage?: { cost?: number; cost_details?: { upstream_inference_cost?: number } } };
                 const c = pr2.usage?.cost;
                 const u = pr2.usage?.cost_details?.upstream_inference_cost;
-                this.lastCostUsd = typeof c === 'number' ? c : undefined;
-                this.lastUpstreamCostUsd = typeof u === 'number' ? u : undefined;
+                reqCostUsd = typeof c === 'number' ? c : undefined;
+                reqUpstreamCostUsd = typeof u === 'number' ? u : undefined;
               } catch { /* ignore */ }
             } catch {
               // ignore parse errors
@@ -202,11 +207,9 @@ export class LLMClient {
               // Extract last JSON payload from lines beginning with 'data: '
               const lines = raw.split(/\r?\n/).filter((l) => l.startsWith('data:'));
               // Iterate from end to find a JSON with usage or provider
-              // Walk from the end using a functional style to satisfy lint rules
-              [...lines].reverse().forEach((line) => {
-                if (this.lastCostUsd !== undefined || this.lastActualProvider !== undefined) return undefined;
+              [...lines].reverse().some((line) => {
                 const payload = line.slice(5).trim();
-                if (!payload || payload === '[DONE]') return undefined;
+                if (!payload || payload === '[DONE]') return false;
                 try {
                   const obj = JSON.parse(payload) as {
                     provider?: string;
@@ -214,25 +217,32 @@ export class LLMClient {
                     choices?: { provider?: string; model?: string }[];
                     usage?: { cost?: number; cost_details?: { upstream_inference_cost?: number } };
                   };
-                  const actualProv = obj.provider ?? obj.choices?.[0]?.provider;
-                  const actualModel = obj.model ?? obj.choices?.[0]?.model;
-                  if (typeof actualProv === 'string' && actualProv.length > 0) this.lastActualProvider = actualProv;
-                  if (typeof actualModel === 'string' && actualModel.length > 0) this.lastActualModel = actualModel;
+                  const aProv = obj.provider ?? obj.choices?.[0]?.provider;
+                  const aModel = obj.model ?? obj.choices?.[0]?.model;
+                  if (typeof aProv === 'string' && aProv.length > 0 && reqActualProvider === undefined) reqActualProvider = aProv;
+                  if (typeof aModel === 'string' && aModel.length > 0 && reqActualModel === undefined) reqActualModel = aModel;
                   const c = obj.usage?.cost;
                   const u = obj.usage?.cost_details?.upstream_inference_cost;
-                  if (typeof c === 'number') this.lastCostUsd = c;
-                  if (typeof u === 'number') this.lastUpstreamCostUsd = u;
+                  if (typeof c === 'number' && reqCostUsd === undefined) reqCostUsd = c;
+                  if (typeof u === 'number' && reqUpstreamCostUsd === undefined) reqUpstreamCostUsd = u;
                 } catch { /* skip non-JSON lines */ }
+                return (reqActualProvider !== undefined && reqActualModel !== undefined && reqCostUsd !== undefined);
               });
             } catch { /* ignore SSE parse errors */ }
           } else {
             // Clear for non-openrouter URLs
             if (!url.includes(LLMClient.OPENROUTER_HOST)) {
-              this.lastActualProvider = undefined;
-              this.lastActualModel = undefined;
+              reqActualProvider = undefined;
+              reqActualModel = undefined;
             }
           }
         } catch { /* ignore */ }
+
+        // Commit per-request routing/cost to instance state for retrieval after this call
+        this.lastActualProvider = reqActualProvider;
+        this.lastActualModel = reqActualModel;
+        this.lastCostUsd = reqCostUsd;
+        this.lastUpstreamCostUsd = reqUpstreamCostUsd;
 
         // Log response details when trace is enabled
         if (this.traceLLM) {
@@ -302,11 +312,11 @@ export class LLMClient {
     const isFinalTurn = request.isFinalTurn === true ? ' (final turn)' : '';
     const message = `messages ${String(request.messages.length)}, ${String(totalBytes)} bytes${isFinalTurn}`;
     
-    // Reset routed provider info when not using a router
-    if (request.provider !== 'openrouter') {
-      this.lastActualProvider = undefined;
-      this.lastActualModel = undefined;
-    }
+    // Reset routed provider info at the start of each request to avoid stale attribution
+    this.lastActualProvider = undefined;
+    this.lastActualModel = undefined;
+    this.lastCostUsd = undefined;
+    this.lastUpstreamCostUsd = undefined;
 
     this.log('VRB', 'request', 'llm', `${request.provider}:${request.model}`, message);
   }
@@ -324,10 +334,21 @@ export class LLMClient {
       const cachedTokens = tokens?.cachedTokens ?? 0;
       
       const responseBytes = result.response !== undefined ? new TextEncoder().encode(result.response).length : 0;
+      // Do not include routed provider/model details here; keep log concise up to bytes
       let message = `input ${String(inputTokens)}, output ${String(outputTokens)}, cached ${String(cachedTokens)} tokens, ${String(latencyMs)}ms, ${String(responseBytes)} bytes`;
-      if (request.provider === 'openrouter' && routed.provider !== undefined) {
-        const modelPart = routed.model !== undefined ? `, actualModel ${routed.model}` : '';
-        message += `, actualProvider ${routed.provider}${modelPart}`;
+      // Append cost info (5 decimals) only when non-zero and available (OpenRouter)
+      if (request.provider === 'openrouter') {
+        const costInfo = this.getLastCostInfo();
+        const costParts: string[] = [];
+        if (typeof costInfo.costUsd === 'number' && costInfo.costUsd > 0) {
+          costParts.push(`cost $${costInfo.costUsd.toFixed(5)}`);
+        }
+        if (typeof costInfo.upstreamInferenceCostUsd === 'number' && costInfo.upstreamInferenceCostUsd > 0) {
+          costParts.push(`upstream $${costInfo.upstreamInferenceCostUsd.toFixed(5)}`);
+        }
+        if (costParts.length > 0) {
+          message += `, ${costParts.join(' ')}`;
+        }
       }
       
       this.log('VRB', 'response', 'llm', remoteId, message);

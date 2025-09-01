@@ -54,8 +54,86 @@ export class OpenRouterProvider extends BaseLLMProvider {
   }
 
 
-  protected convertResponseMessages(messages: ResponseMessage[], provider: string, model: string, tokens: { inputTokens?: number; outputTokens?: number; cachedTokens?: number; totalTokens?: number }): ConversationMessage[] {
-    // Use base class helper that handles AI SDK's content array format
-    return messages.map(m => this.parseAISDKMessage(m, provider, model, tokens));
+  protected convertResponseMessages(
+    messages: ResponseMessage[],
+    provider: string,
+    model: string,
+    tokens: { inputTokens?: number; outputTokens?: number; cachedTokens?: number; totalTokens?: number }
+  ): ConversationMessage[] {
+    const out: ConversationMessage[] = [];
+    // eslint-disable-next-line functional/no-loop-statements
+    for (const m of messages) {
+      // Split multiple tool results bundled into a single 'tool' role message
+      if (m.role === 'tool' && Array.isArray(m.content)) {
+        // eslint-disable-next-line functional/no-loop-statements
+        for (const part of m.content) {
+          const p = part as { type?: string; toolCallId?: string; toolName?: string; output?: unknown };
+          if (p.type === 'tool-result' && typeof p.toolCallId === 'string') {
+            // Extract string payload from output (AI SDK wraps as { type, value })
+            let text = '';
+            const outObj = p.output as { type?: string; value?: unknown } | undefined;
+            if (outObj !== undefined) {
+              if (outObj.type === 'text' && typeof outObj.value === 'string') text = outObj.value;
+              else if (outObj.type === 'json') text = JSON.stringify(outObj.value);
+              else if (typeof (outObj as unknown as string) === 'string') text = outObj as unknown as string;
+            }
+            out.push({
+              role: 'tool',
+              content: text,
+              toolCallId: p.toolCallId,
+              metadata: {
+                provider,
+                model,
+                tokens: {
+                  inputTokens: tokens.inputTokens ?? 0,
+                  outputTokens: tokens.outputTokens ?? 0,
+                  cachedTokens: tokens.cachedTokens,
+                  totalTokens: tokens.totalTokens ?? 0,
+                },
+                timestamp: Date.now(),
+              },
+            });
+          }
+        }
+        continue;
+      }
+
+      // Also handle tool-result parts accidentally embedded in assistant content (defensive)
+      if (m.role === 'assistant' && Array.isArray(m.content)) {
+        // eslint-disable-next-line functional/no-loop-statements
+        for (const part of m.content) {
+          const p = part as { type?: string; toolCallId?: string; output?: unknown };
+          if (p.type === 'tool-result' && typeof p.toolCallId === 'string') {
+            let text = '';
+            const outObj = p.output as { type?: string; value?: unknown } | undefined;
+            if (outObj !== undefined) {
+              if (outObj.type === 'text' && typeof outObj.value === 'string') text = outObj.value;
+              else if (outObj.type === 'json') text = JSON.stringify(outObj.value);
+              else if (typeof (outObj as unknown as string) === 'string') text = outObj as unknown as string;
+            }
+            out.push({
+              role: 'tool',
+              content: text,
+              toolCallId: p.toolCallId,
+              metadata: {
+                provider,
+                model,
+                tokens: {
+                  inputTokens: tokens.inputTokens ?? 0,
+                  outputTokens: tokens.outputTokens ?? 0,
+                  cachedTokens: tokens.cachedTokens,
+                  totalTokens: tokens.totalTokens ?? 0,
+                },
+                timestamp: Date.now(),
+              },
+            });
+          }
+        }
+        // Continue to also parse the assistant message normally (to retain toolCalls, etc.)
+      }
+
+      out.push(this.parseAISDKMessage(m, provider, model, tokens));
+    }
+    return out;
   }
 }

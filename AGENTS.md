@@ -1,8 +1,9 @@
 ## YOU MUST READ
 
-- README.md for specifications.
+- SPECS.md for specifications.
 - IMPLEMENTATION.md for AI SDK/ModelContextProtocol implementation.
 - DESIGN.md for the design of the application.
+- README.md for end-user documentation of the application
 
 Directory claude/ contains the current implementation, architected by claude and co-implemented by codex.
 Directory codex/ and codex2/ contain the original and an alternative approach. Do not use them. Obsolete code, only as reference.

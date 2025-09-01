@@ -10,31 +10,30 @@
       "apiKey": "${OPENAI_API_KEY}",
       "baseUrl": "https://api.openai.com/v1",
       "headers": {},
-      "custom": { "stream": true },
+      "custom": {},
       "mergeStrategy": "overlay"
     },
     "anthropic": {
       "apiKey": "${ANTHROPIC_API_KEY}",
       "baseUrl": "https://api.anthropic.com",
       "headers": {},
-      "custom": { "stream": true },
+      "custom": {},
       "mergeStrategy": "overlay"
     },
     "google": {
       "apiKey": "${GOOGLE_API_KEY}",
       "baseUrl": "https://generativelanguage.googleapis.com",
       "headers": {},
-      "custom": { "stream": true },
+      "custom": {},
       "mergeStrategy": "overlay"
     },
     "openrouter": {
       "apiKey": "${OPENROUTER_API_KEY}",
       "custom": {
-        "stream": false,
         "provider": {
           "allow_fallbacks": true,
           "data_collection": "deny",
-          "sort": "price"
+          "sort": "throughput"
         }
       },
       "headers": {},
@@ -70,7 +69,7 @@
     "toolTimeout": 60000,
     "temperature": 0.7,
     "topP": 1.0,
-    "stream": true,
+    "stream": false,
     "parallelToolCalls": true,
     "maxToolTurns": 10
   },

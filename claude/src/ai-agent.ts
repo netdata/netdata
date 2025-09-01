@@ -336,8 +336,9 @@ export class AIAgentSession {
               lastShownThinkingHeaderTurn = currentTurn;
             }
 
-            // Record accounting
-            if (turnResult.tokens !== undefined) {
+            // Record accounting for every attempt (include failed attempts with zeroed tokens if absent)
+            {
+              const tokens = turnResult.tokens ?? { inputTokens: 0, outputTokens: 0, cachedTokens: 0, totalTokens: 0 };
               const accountingEntry: AccountingEntry = {
                 type: 'llm',
                 timestamp: Date.now(),
@@ -349,8 +350,8 @@ export class AIAgentSession {
                 actualModel: provider === 'openrouter' ? this.llmClient.getLastActualRouting().model : undefined,
                 costUsd: provider === 'openrouter' ? this.llmClient.getLastCostInfo().costUsd : undefined,
                 upstreamInferenceCostUsd: provider === 'openrouter' ? this.llmClient.getLastCostInfo().upstreamInferenceCostUsd : undefined,
-                tokens: turnResult.tokens,
-                error: turnResult.status.type !== 'success' ? 
+                tokens,
+                error: turnResult.status.type !== 'success' ?
                   ('message' in turnResult.status ? turnResult.status.message : turnResult.status.type) : undefined
               };
               accounting.push(accountingEntry);
@@ -523,6 +524,10 @@ export class AIAgentSession {
               if (!turnResult.status.finalAnswer && !turnResult.status.hasToolCalls &&
                   (turnResult.response === undefined || turnResult.response.trim().length === 0)) {
                 // Log warning and retry this turn on another provider/model
+                const routed = this.llmClient.getLastActualRouting();
+                const remoteId = (provider === 'openrouter' && routed.provider !== undefined)
+                  ? `${provider}/${routed.provider}:${model}`
+                  : `${provider}:${model}`;
                 const warnEntry: LogEntry = {
                   timestamp: Date.now(),
                   severity: 'WRN',
@@ -530,7 +535,7 @@ export class AIAgentSession {
                   subturn: 0,
                   direction: 'response',
                   type: 'llm',
-                  remoteIdentifier: `${provider}:${model}`,
+                  remoteIdentifier: remoteId,
                   fatal: false,
                   message: 'Empty response without tools; retrying with next provider/model in this turn.'
                 };
@@ -619,67 +624,39 @@ export class AIAgentSession {
   // Compose and emit FIN summary log
   private emitFinalSummary(logs: LogEntry[], accounting: AccountingEntry[]): void {
     try {
-      // Small helpers
-      const percentile = (values: number[], p: number): number => {
-        if (values.length === 0) return 0;
-        const a = [...values].sort((x, y) => x - y);
-        const idx = (a.length - 1) * p;
-        const lo = Math.floor(idx);
-        const hi = Math.ceil(idx);
-        if (lo === hi) return a[lo];
-        const w = idx - lo;
-        return a[lo] * (1 - w) + a[hi] * w;
-      };
-      const pctTriple = (arr: number[]) => ({ p50: Math.round(percentile(arr, 0.5)), p90: Math.round(percentile(arr, 0.9)), p99: Math.round(percentile(arr, 0.99)) });
+      // Small helpers (none needed for condensed FIN logs)
 
-      // Token totals
+      // Token totals and latency
       const llmEntries = accounting.filter((e): e is LLMAccountingEntry => e.type === 'llm');
       const tokIn = llmEntries.reduce((s, e) => s + e.tokens.inputTokens, 0);
       const tokOut = llmEntries.reduce((s, e) => s + e.tokens.outputTokens, 0);
       const tokCached = llmEntries.reduce((s, e) => s + (e.tokens.cachedTokens ?? 0), 0);
       const tokTotal = llmEntries.reduce((s, e) => s + e.tokens.totalTokens, 0);
       const llmLatencies = llmEntries.map((e) => e.latency);
+      const llmLatencySum = llmLatencies.reduce((s, v) => s + v, 0);
+      const llmLatencyAvg = llmEntries.length > 0 ? Math.round(llmLatencySum / llmEntries.length) : 0;
       const totalCost = llmEntries.reduce((s, e) => s + (e.costUsd ?? 0), 0);
       const totalUpstreamCost = llmEntries.reduce((s, e) => s + (e.upstreamInferenceCostUsd ?? 0), 0);
-      const llmPct = pctTriple(llmLatencies);
 
-      // Failures/retries
-      const llmFailures = llmEntries.filter((e) => e.status === 'failed').length + this.llmSyntheticFailures;
-      const toolEntries = accounting.filter((e): e is ToolAccountingEntry => e.type === 'tool');
-      const toolFailures = toolEntries.filter((e) => e.status === 'failed').length;
-      const llmAttempts = this.llmAttempts;
+      // Requests/failures
+      const llmRequests = llmEntries.length;
+      const llmFailures = llmEntries.filter((e) => e.status === 'failed').length;
 
-      // Provider:model combos (configured)
-      const provModelCounts = new Map<string, number>();
+      // Providers/models by configured/actual:model with ok/failed
+      interface PairStats { total: number; ok: number; failed: number }
+      const pairStats = new Map<string, PairStats>();
       llmEntries.forEach((e) => {
-        const key = `${e.provider}:${e.model}`;
-        provModelCounts.set(key, (provModelCounts.get(key) ?? 0) + 1);
+        const key = `${e.provider}/${e.actualProvider ?? 'n/a'}:${e.model}`;
+        const curr = pairStats.get(key) ?? { total: 0, ok: 0, failed: 0 };
+        curr.total += 1;
+        if (e.status === 'failed') curr.failed += 1; else curr.ok += 1;
+        pairStats.set(key, curr);
       });
-      const provModelStr = [...provModelCounts.entries()].map(([k, v]) => `${k} x${String(v)}`).join(', ');
+      const pairsStr = [...pairStats.entries()]
+        .map(([key, s]) => `${String(s.total)}x [${String(s.ok)}+${String(s.failed)}] ${key}`)
+        .join(', ');
 
-      // Actual provider:model combos (routed) and configured/actual pairs
-      const actualCounts = new Map<string, number>();
-      const pairCounts = new Map<string, number>();
-      llmEntries.forEach((e) => {
-        if (e.actualProvider !== undefined) {
-          const key = `${e.actualProvider}:${e.actualModel ?? e.model}`;
-          actualCounts.set(key, (actualCounts.get(key) ?? 0) + 1);
-        }
-        const pairKey = `${e.provider}/${e.actualProvider ?? 'n/a'}:${e.model}`;
-        pairCounts.set(pairKey, (pairCounts.get(pairKey) ?? 0) + 1);
-      });
-      const actualStr = actualCounts.size > 0 ? [...actualCounts.entries()].map(([k, v]) => `${k} x${String(v)}`).join(', ') : 'n/a';
-      const pairStr = pairCounts.size > 0 ? [...pairCounts.entries()].map(([k, v]) => `${k} x${String(v)}`).join(', ') : 'n/a';
-
-      // MCP server:tool combos
-      const toolCounts = new Map<string, number>();
-      toolEntries.forEach((e) => {
-        const key = `${e.mcpServer}:${e.command}`;
-        toolCounts.set(key, (toolCounts.get(key) ?? 0) + 1);
-      });
-      const toolStr = toolCounts.size > 0 ? [...toolCounts.entries()].map(([k, v]) => `${k} x${String(v)}`).join(', ') : 'n/a';
-
-      const msg = `tokens in=${String(tokIn)}, out=${String(tokOut)}, cached=${String(tokCached)}, total=${String(tokTotal)} | attempts=${String(llmAttempts)}, llm_failures=${String(llmFailures)}, tool_failures=${String(toolFailures)} | lat_ms p50=${String(llmPct.p50)}, p90=${String(llmPct.p90)}, p99=${String(llmPct.p99)} | cost_usd=${String(totalCost)}, upstream_usd=${String(totalUpstreamCost)} | providers=${provModelStr} | configured/actual=${pairStr} | actualProviders=${actualStr} | mcp=${toolStr}`;
+      const msg = `requests=${String(llmRequests)} failed=${String(llmFailures)}, tokens in=${String(tokIn)} out=${String(tokOut)} cached=${String(tokCached)} total=${String(tokTotal)}, cost total=$${totalCost.toFixed(5)} upstream=$${totalUpstreamCost.toFixed(5)}, latency sum=${String(llmLatencySum)}ms avg=${String(llmLatencyAvg)}ms, providers/models: ${pairsStr.length > 0 ? pairsStr : 'none'}`;
       const fin: LogEntry = {
         timestamp: Date.now(),
         severity: 'FIN',
@@ -694,110 +671,24 @@ export class AIAgentSession {
       logs.push(fin);
       this.sessionConfig.callbacks?.onLog?.(fin);
 
-      // Detailed LLM breakdown per configured/actual pair with latency percentiles and token totals
-      const byPair = new Map<string, LLMAccountingEntry[]>();
-      llmEntries.forEach((e) => {
-        const key = `${e.provider}/${e.actualProvider ?? 'n/a'}:${e.model}`;
-        const arr = byPair.get(key) ?? [];
-        arr.push(e);
-        byPair.set(key, arr);
-      });
-      if (byPair.size > 0) {
-        const parts = [...byPair.entries()].map(([k, arr]) => {
-          const lat = pctTriple(arr.map((e) => e.latency));
-          const tin = arr.reduce((s, e) => s + e.tokens.inputTokens, 0);
-          const tout = arr.reduce((s, e) => s + e.tokens.outputTokens, 0);
-          const ttot = arr.reduce((s, e) => s + e.tokens.totalTokens, 0);
-          return `${k} calls=${String(arr.length)}, tok_in=${String(tin)}, tok_out=${String(tout)}, tok_total=${String(ttot)}, p50=${String(lat.p50)}, p90=${String(lat.p90)}, p99=${String(lat.p99)}`;
-        }).join(' | ');
-        const finDetail: LogEntry = {
-          timestamp: Date.now(),
-          severity: 'FIN',
-          turn: this.currentTurn,
-          subturn: 0,
-          direction: 'response',
-          type: 'llm',
-          remoteIdentifier: 'llm-breakdown',
-          fatal: false,
-          message: parts,
-        };
-        logs.push(finDetail);
-        this.sessionConfig.callbacks?.onLog?.(finDetail);
-      }
-
-      // Per configured provider breakdown
-      const byConfigured = new Map<string, LLMAccountingEntry[]>();
-      llmEntries.forEach((e) => {
-        const arr = byConfigured.get(e.provider) ?? [];
-        arr.push(e);
-        byConfigured.set(e.provider, arr);
-      });
-      if (byConfigured.size > 0) {
-        const parts = [...byConfigured.entries()].map(([prov, arr]) => {
-          const lat = pctTriple(arr.map((e) => e.latency));
-          const tin = arr.reduce((s, e) => s + e.tokens.inputTokens, 0);
-          const tout = arr.reduce((s, e) => s + e.tokens.outputTokens, 0);
-          const ttot = arr.reduce((s, e) => s + e.tokens.totalTokens, 0);
-          const cost = arr.reduce((s, e) => s + (e.costUsd ?? 0), 0);
-          const up = arr.reduce((s, e) => s + (e.upstreamInferenceCostUsd ?? 0), 0);
-          return `${prov} calls=${String(arr.length)}, tok_in=${String(tin)}, tok_out=${String(tout)}, tok_total=${String(ttot)}, cost_usd=${String(cost)}, upstream_usd=${String(up)}, p50=${String(lat.p50)}, p90=${String(lat.p90)}, p99=${String(lat.p99)}`;
-        }).join(' | ');
-        const finCfg: LogEntry = {
-          timestamp: Date.now(),
-          severity: 'FIN',
-          turn: this.currentTurn,
-          subturn: 0,
-          direction: 'response',
-          type: 'llm',
-          remoteIdentifier: 'llm-configured-providers',
-          fatal: false,
-          message: parts,
-        };
-        logs.push(finCfg);
-        this.sessionConfig.callbacks?.onLog?.(finCfg);
-      }
-
-      // Per actual provider breakdown
-      const byActual = new Map<string, LLMAccountingEntry[]>();
-      llmEntries.forEach((e) => {
-        const ap = e.actualProvider ?? 'n/a';
-        const arr = byActual.get(ap) ?? [];
-        arr.push(e);
-        byActual.set(ap, arr);
-      });
-      if (byActual.size > 0) {
-        const parts = [...byActual.entries()].map(([prov, arr]) => {
-          const lat = pctTriple(arr.map((e) => e.latency));
-          const tin = arr.reduce((s, e) => s + e.tokens.inputTokens, 0);
-          const tout = arr.reduce((s, e) => s + e.tokens.outputTokens, 0);
-          const ttot = arr.reduce((s, e) => s + e.tokens.totalTokens, 0);
-          const cost = arr.reduce((s, e) => s + (e.costUsd ?? 0), 0);
-          const up = arr.reduce((s, e) => s + (e.upstreamInferenceCostUsd ?? 0), 0);
-          return `${prov} calls=${String(arr.length)}, tok_in=${String(tin)}, tok_out=${String(tout)}, tok_total=${String(ttot)}, cost_usd=${String(cost)}, upstream_usd=${String(up)}, p50=${String(lat.p50)}, p90=${String(lat.p90)}, p99=${String(lat.p99)}`;
-        }).join(' | ');
-        const finAct: LogEntry = {
-          timestamp: Date.now(),
-          severity: 'FIN',
-          turn: this.currentTurn,
-          subturn: 0,
-          direction: 'response',
-          type: 'llm',
-          remoteIdentifier: 'llm-actual-providers',
-          fatal: false,
-          message: parts,
-        };
-        logs.push(finAct);
-        this.sessionConfig.callbacks?.onLog?.(finAct);
-      }
-
-      // Additional MCP summary line
+      // MCP summary single line
+      const toolEntries = accounting.filter((e): e is ToolAccountingEntry => e.type === 'tool');
       const totalToolCharsIn = toolEntries.reduce((s, e) => s + e.charactersIn, 0);
       const totalToolCharsOut = toolEntries.reduce((s, e) => s + e.charactersOut, 0);
-      const serverCounts = new Map<string, number>();
+      const mcpRequests = toolEntries.length;
+      const mcpFailures = toolEntries.filter((e) => e.status === 'failed').length;
+      interface ToolStats { total: number; ok: number; failed: number }
+      const byToolStats = new Map<string, ToolStats>();
       toolEntries.forEach((e) => {
-        serverCounts.set(e.mcpServer, (serverCounts.get(e.mcpServer) ?? 0) + 1);
+        const key = `${e.mcpServer}:${e.command}`;
+        const curr = byToolStats.get(key) ?? { total: 0, ok: 0, failed: 0 };
+        curr.total += 1;
+        if (e.status === 'failed') curr.failed += 1; else curr.ok += 1;
+        byToolStats.set(key, curr);
       });
-      const serversStr = [...serverCounts.entries()].map(([k, v]) => `${k} x${String(v)}`).join(', ');
+      const toolPairsStr = [...byToolStats.entries()]
+        .map(([k, s]) => `${String(s.total)}x [${String(s.ok)}+${String(s.failed)}] ${k}`)
+        .join(', ');
       const finMcp: LogEntry = {
         timestamp: Date.now(),
         severity: 'FIN',
@@ -805,43 +696,12 @@ export class AIAgentSession {
         subturn: 0,
         direction: 'response',
         type: 'mcp',
-        remoteIdentifier: 'mcp-summary',
+        remoteIdentifier: 'summary',
         fatal: false,
-        message: `mcp_calls=${String(toolEntries.length)}, mcp_failures=${String(toolFailures)}, bytes_in=${String(totalToolCharsIn)}, bytes_out=${String(totalToolCharsOut)} | servers=${serversStr}`,
+        message: `requests=${String(mcpRequests)}, failed=${String(mcpFailures)}, bytes in=${String(totalToolCharsIn)} out=${String(totalToolCharsOut)}, providers/tools: ${toolPairsStr.length > 0 ? toolPairsStr : 'none'}`,
       };
       logs.push(finMcp);
       this.sessionConfig.callbacks?.onLog?.(finMcp);
-
-      // Detailed MCP breakdown per server:tool with latency percentiles and bytes
-      const byTool = new Map<string, ToolAccountingEntry[]>();
-      toolEntries.forEach((e) => {
-        const key = `${e.mcpServer}:${e.command}`;
-        const arr = byTool.get(key) ?? [];
-        arr.push(e);
-        byTool.set(key, arr);
-      });
-      if (byTool.size > 0) {
-        const parts = [...byTool.entries()].map(([k, arr]) => {
-          const lat = pctTriple(arr.map((e) => e.latency));
-          const bin = arr.reduce((s, e) => s + e.charactersIn, 0);
-          const bout = arr.reduce((s, e) => s + e.charactersOut, 0);
-          const fails = arr.filter((e) => e.status === 'failed').length;
-          return `${k} calls=${String(arr.length)}, failures=${String(fails)}, bytes_in=${String(bin)}, bytes_out=${String(bout)}, p50=${String(lat.p50)}, p90=${String(lat.p90)}, p99=${String(lat.p99)}`;
-        }).join(' | ');
-        const finTool: LogEntry = {
-          timestamp: Date.now(),
-          severity: 'FIN',
-          turn: this.currentTurn,
-          subturn: 0,
-          direction: 'response',
-          type: 'mcp',
-          remoteIdentifier: 'mcp-breakdown',
-          fatal: false,
-          message: parts,
-        };
-        logs.push(finTool);
-        this.sessionConfig.callbacks?.onLog?.(finTool);
-      }
     } catch { /* swallow summary errors */ }
   }
 
@@ -899,6 +759,8 @@ export class AIAgentSession {
         }
 
         const { result, serverName } = await this.mcpClient.executeToolByName(toolName, parameters);
+        // Ensure non-empty tool result so providers that require one response per call don't reject
+        const safeResult = (typeof result === 'string' && result.length === 0) ? ' ' : result;
         const latency = Date.now() - startTime;
         
         // Add tool accounting
@@ -910,12 +772,12 @@ export class AIAgentSession {
           mcpServer: serverName,
           command: toolName,
           charactersIn: JSON.stringify(parameters).length,
-          charactersOut: result.length,
+          charactersOut: safeResult.length,
         };
         
         this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
         
-        return result;
+        return safeResult;
       } catch (error) {
         const latency = Date.now() - startTime;
         const errorMsg = error instanceof Error ? error.message : String(error);
