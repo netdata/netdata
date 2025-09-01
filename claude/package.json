@@ -25,9 +25,9 @@
     "@modelcontextprotocol/sdk": "1.17.4",
     "@openrouter/ai-sdk-provider": "1.1.2",
     "ai": "5.0.28",
-    "ollama-ai-provider-v2": "1.2.1",
     "ajv": "^8.17.1",
     "commander": "14.0.0",
+    "ollama-ai-provider-v2": "1.2.1",
     "ws": "8.18.3",
     "zod": "4.1.5"
   },

@@ -63,18 +63,22 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     return { type: 'model_error', message, retryable: true };
   }
 
-  protected extractTokenUsage(usage: Record<string, unknown>): TokenUsage {
-    const inputTokens = typeof usage.inputTokens === 'number' ? usage.inputTokens 
-      : typeof usage.prompt_tokens === 'number' ? usage.prompt_tokens 
-      : typeof usage.input_tokens === 'number' ? usage.input_tokens : 0;
-    const outputTokens = typeof usage.outputTokens === 'number' ? usage.outputTokens 
-      : typeof usage.completion_tokens === 'number' ? usage.completion_tokens 
-      : typeof usage.output_tokens === 'number' ? usage.output_tokens : 0;
-    const cachedTokens = typeof usage.cachedTokens === 'number' ? usage.cachedTokens 
-      : typeof usage.cached_tokens === 'number' ? usage.cached_tokens 
-      : typeof usage.cache_creation_input_tokens === 'number' ? usage.cache_creation_input_tokens : undefined;
-    const totalTokens = typeof usage.totalTokens === 'number' ? usage.totalTokens 
-      : typeof usage.total_tokens === 'number' ? usage.total_tokens : inputTokens + outputTokens;
+  protected extractTokenUsage(usage: Record<string, unknown> | undefined): TokenUsage {
+    const num = (v: unknown): number => {
+      if (typeof v === 'number' && Number.isFinite(v)) return v;
+      if (typeof v === 'string') {
+        const n = Number(v);
+        return Number.isFinite(n) ? n : 0;
+      }
+      return 0;
+    };
+    const u = usage ?? {} as Record<string, unknown>;
+    const inputTokens = num(u.inputTokens) || num(u.prompt_tokens) || num(u.input_tokens);
+    const outputTokens = num(u.outputTokens) || num(u.completion_tokens) || num(u.output_tokens);
+    const cachedTokensRaw = num(u.cachedTokens) || num(u.cached_tokens) || num(u.cache_creation_input_tokens);
+    const cachedTokens = cachedTokensRaw > 0 ? cachedTokensRaw : undefined;
+    const totalTokensRaw = num(u.totalTokens) || num(u.total_tokens);
+    const totalTokens = totalTokensRaw > 0 ? totalTokensRaw : (inputTokens + outputTokens);
 
     return {
       inputTokens,
@@ -109,6 +113,27 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     return messages
       .filter(m => m.role === 'assistant' && m.toolCalls !== undefined)
       .flatMap(m => m.toolCalls ?? []);
+  }
+
+  // DRY helpers for final-turn behavior across providers
+  protected filterToolsForFinalTurn(tools: MCPTool[], isFinalTurn?: boolean): MCPTool[] {
+    if (isFinalTurn === true) {
+      return tools.filter((t) => t.name === 'agent_final_report');
+    }
+    return tools;
+  }
+
+  protected buildFinalTurnMessages(messages: ModelMessage[], isFinalTurn?: boolean): ModelMessage[] {
+    if (isFinalTurn === true) {
+      const content = [
+        'FINAL TURN: You MUST finish now by calling the tool `agent_final_report` exactly once.',
+        'Do NOT produce assistant text. Assistant text will be ignored.',
+        'Only `agent_final_report` is available; do not attempt any other tools.',
+        'If data is incomplete, set `status` to `partial` or `failure`, and include known gaps in the report.',
+      ].join(' ');
+      return messages.concat({ role: 'user', content } as ModelMessage);
+    }
+    return messages;
   }
 
   protected createFailureResult(status: TurnStatus, latencyMs: number): TurnResult {
@@ -187,7 +212,8 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       const result = streamText({
         model,
         messages,
-        tools: request.isFinalTurn === true ? undefined : tools,
+        tools,
+        toolChoice: 'required',
         temperature: request.temperature,
         topP: request.topP,
         providerOptions: providerOptions as never,
@@ -275,19 +301,22 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       const conversationMessages = this.convertResponseMessages(resp.messages, request.provider, request.model, tokens);
       
       // Find the LAST assistant message to determine if we need more tool calls
-      const lastAssistantMessage = conversationMessages
-        .filter(m => m.role === 'assistant')
-        .pop();
+      const lastAssistantMessageArr = conversationMessages.filter(m => m.role === 'assistant');
+      const lastAssistantMessage = lastAssistantMessageArr.length > 0 ? lastAssistantMessageArr[lastAssistantMessageArr.length - 1] : undefined;
       
-      const hasNewToolCalls = lastAssistantMessage?.toolCalls !== undefined && 
-                              lastAssistantMessage.toolCalls.length > 0;
+      // Only count tool calls that target currently available tools
+      const validToolNames = tools !== undefined ? Object.keys(tools) : [];
+      const normalizeName = (name: string) => name.replace(/^<\|[^|]+\|>/, '').trim();
+      const hasNewToolCalls = lastAssistantMessage?.toolCalls !== undefined &&
+        lastAssistantMessage.toolCalls.filter(tc => validToolNames.includes(normalizeName(tc.name))).length > 0;
       const hasAssistantText = (lastAssistantMessage?.content.trim().length ?? 0) > 0;
       
       // Check if we have tool result messages (which means tools were executed)
       const hasToolResults = conversationMessages.some(m => m.role === 'tool');
       // Detect if provider emitted any reasoning parts
-      const hasReasoning = Array.isArray((resp as { messages?: unknown[] }).messages)
-        && ((resp as { messages?: unknown[] }).messages as unknown[]).some((msg) => {
+      const respAny = resp as { messages?: unknown[] };
+      const respMsgs: unknown[] = Array.isArray(respAny.messages) ? respAny.messages : [];
+      const hasReasoning = respMsgs.some((msg) => {
           const m = msg as { role?: string; content?: unknown };
           if (m.role !== 'assistant' || !Array.isArray(m.content)) return false;
           return (m.content as unknown[]).some((p) => (p as { type?: string }).type === this.REASONING_TYPE);
@@ -297,14 +326,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       // If we have tool results, we need to continue the conversation for the LLM to process them
       const finalAnswer = hasAssistantText && !hasNewToolCalls && !hasToolResults;
 
-      // Guard: reasoning-only responses (no visible text, no tools) are invalid
-      if (!hasAssistantText && !hasNewToolCalls && !hasToolResults) {
-        if (process.env.DEBUG === 'true') {
-          console.error('[DEBUG] Streaming guard: assistant produced no visible content (reasoning-only). Marking as invalid_response.');
-        }
-        clearIdle();
-        return this.createFailureResult({ type: 'invalid_response', message: 'Assistant returned empty content' }, latencyMs);
-      }
+      // Do not error on reasoning-only responses; allow agent loop to decide retries.
       
       // Debug logging
       if (process.env.DEBUG === 'true') {
@@ -340,7 +362,8 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       const result = await generateText({
         model,
         messages,
-        tools: request.isFinalTurn === true ? undefined : tools,
+        tools,
+        toolChoice: 'required',
         temperature: request.temperature,
         topP: request.topP,
         providerOptions: providerOptions as never,
@@ -357,7 +380,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         console.error(`[DEBUG] Non-stream result.response:`, JSON.stringify(result.response, null, 2).substring(0, 500));
       }
 
-      const respObj = result.response as { messages?: unknown[] } | undefined ?? {};
+      const respObj = (result.response as { messages?: unknown[] } | undefined) ?? {};
       
       // Extract reasoning from AI SDK's normalized messages (for non-streaming mode)
       // The AI SDK puts reasoning as ReasoningPart in the content array
@@ -396,19 +419,21 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       );
       
       // Find the LAST assistant message to determine if we need more tool calls
-      const lastAssistantMessage = conversationMessages
-        .filter(m => m.role === 'assistant')
-        .pop();
+      const laArr = conversationMessages.filter(m => m.role === 'assistant');
+      const lastAssistantMessage = laArr.length > 0 ? laArr[laArr.length - 1] : undefined;
       
-      const hasNewToolCalls = lastAssistantMessage?.toolCalls !== undefined && 
-                              lastAssistantMessage.toolCalls.length > 0;
+      // Only count tool calls that target currently available tools
+      const validToolNames = tools !== undefined ? Object.keys(tools) : [];
+      const normalizeName = (name: string) => name.replace(/^<\|[^|]+\|>/, '').trim();
+      const hasNewToolCalls = lastAssistantMessage?.toolCalls !== undefined &&
+        lastAssistantMessage.toolCalls.filter(tc => validToolNames.includes(normalizeName(tc.name))).length > 0;
       const hasAssistantText = (lastAssistantMessage?.content.trim().length ?? 0) > 0;
       
       // Check if we have tool result messages (which means tools were executed)
       const hasToolResults = conversationMessages.some(m => m.role === 'tool');
       // Detect reasoning parts in non-streaming response
       const hasReasoning = Array.isArray(respObj.messages)
-        && (respObj.messages as unknown[]).some((msg) => {
+        && (respObj.messages).some((msg) => {
           const m = msg as { role?: string; content?: unknown };
           if (m.role !== 'assistant' || !Array.isArray(m.content)) return false;
           return (m.content as unknown[]).some((p) => (p as { type?: string }).type === this.REASONING_TYPE);
@@ -418,13 +443,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       // If we have tool results, we need to continue the conversation for the LLM to process them
       const finalAnswer = hasAssistantText && !hasNewToolCalls && !hasToolResults;
 
-      // Guard: reasoning-only responses (no visible text, no tools) are invalid
-      if (!hasAssistantText && !hasNewToolCalls && !hasToolResults) {
-        if (process.env.DEBUG === 'true') {
-          console.error('[DEBUG] Non-streaming guard: assistant produced no visible content (reasoning-only). Marking as invalid_response.');
-        }
-        return this.createFailureResult({ type: 'invalid_response', message: 'Assistant returned empty content' }, latencyMs);
-      }
+      // Do not error on reasoning-only responses; allow agent loop to decide retries.
       
       // Always try to extract the actual response text from the assistant message
       // The AI SDK's result.text might be empty when there are tool calls

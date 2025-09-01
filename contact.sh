@@ -17,7 +17,7 @@ source .env
 set +a
 
 #TOOLS="brave"
-TOOLS="jina"
+TOOLS="jina,brave,playwright"
 
 #PROVIDERS="ollama"
 #MODELS="gpt-oss:20b"

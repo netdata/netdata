@@ -8,11 +8,18 @@ import { OpenAIProvider } from './llm-providers/openai.js';
 import { OpenRouterProvider } from './llm-providers/openrouter.js';
 
 export class LLMClient {
+  private static readonly OPENROUTER_HOST = 'openrouter.ai';
   private providers = new Map<string, BaseLLMProvider>();
   private onLog?: (entry: LogEntry) => void;
   private traceLLM: boolean;
   private currentTurn = 0;
   private currentSubturn = 0;
+  // Tracks actual routed provider/model when using routers like OpenRouter
+  private lastActualProvider?: string;
+  private lastActualModel?: string;
+  // Tracks last reported costs when available (e.g., OpenRouter)
+  private lastCostUsd?: number;
+  private lastUpstreamCostUsd?: number;
 
   constructor(
     providerConfigs: Record<string, ProviderConfig>,
@@ -25,7 +32,8 @@ export class LLMClient {
     this.onLog = options?.onLog;
 
     // Create traced fetch if needed
-    const tracedFetch = this.traceLLM ? this.createTracedFetch() : undefined;
+    // Always wrap fetch so we can capture routing metadata (e.g., OpenRouter actual provider)
+    const tracedFetch = this.createTracedFetch();
 
     // Initialize providers - necessary for side effects
     // eslint-disable-next-line functional/no-loop-statements
@@ -71,6 +79,15 @@ export class LLMClient {
     this.currentSubturn = subturn;
   }
 
+  // Expose last routed provider/model for accounting/logging
+  getLastActualRouting(): { provider?: string; model?: string } {
+    return { provider: this.lastActualProvider, model: this.lastActualModel };
+  }
+
+  getLastCostInfo(): { costUsd?: number; upstreamInferenceCostUsd?: number } {
+    return { costUsd: this.lastCostUsd, upstreamInferenceCostUsd: this.lastUpstreamCostUsd };
+  }
+
   private createProvider(name: string, config: ProviderConfig, tracedFetch?: typeof fetch): BaseLLMProvider {
     const effectiveType = config.type ?? name;
     
@@ -109,7 +126,7 @@ export class LLMClient {
         }
 
         // Add OpenRouter attribution headers if needed
-        if (url.includes('openrouter.ai')) {
+        if (url.includes(LLMClient.OPENROUTER_HOST)) {
           const defaultReferer = 'https://ai-agent.local';
           const defaultTitle = 'ai-agent-claude';
           if (!headers.has('HTTP-Referer')) headers.set('HTTP-Referer', defaultReferer);
@@ -154,7 +171,70 @@ export class LLMClient {
 
         const response = await fetch(input, requestInit);
 
-        // Log response details
+        // Parse routing metadata (OpenRouter actual provider/model) and cost regardless of trace flag
+        try {
+          const contentType = response.headers.get('content-type') ?? '';
+          if (url.includes(LLMClient.OPENROUTER_HOST) && contentType.includes('application/json')) {
+            const clone = response.clone();
+            const raw = await clone.text();
+            try {
+              const parsed = JSON.parse(raw) as { provider?: string; model?: string; choices?: { provider?: string; model?: string }[] };
+              const actualProv = parsed.provider ?? parsed.choices?.[0]?.provider;
+              const actualModel = parsed.model ?? parsed.choices?.[0]?.model;
+              this.lastActualProvider = typeof actualProv === 'string' && actualProv.length > 0 ? actualProv : undefined;
+              this.lastActualModel = typeof actualModel === 'string' && actualModel.length > 0 ? actualModel : undefined;
+              // Try to extract usage cost if present
+              try {
+                const pr2 = JSON.parse(raw) as { usage?: { cost?: number; cost_details?: { upstream_inference_cost?: number } } };
+                const c = pr2.usage?.cost;
+                const u = pr2.usage?.cost_details?.upstream_inference_cost;
+                this.lastCostUsd = typeof c === 'number' ? c : undefined;
+                this.lastUpstreamCostUsd = typeof u === 'number' ? u : undefined;
+              } catch { /* ignore */ }
+            } catch {
+              // ignore parse errors
+            }
+          } else if (url.includes(LLMClient.OPENROUTER_HOST) && contentType.includes('text/event-stream')) {
+            // Streaming: parse SSE for final usage/cost and provider info
+            try {
+              const clone = response.clone();
+              const raw = await clone.text();
+              // Extract last JSON payload from lines beginning with 'data: '
+              const lines = raw.split(/\r?\n/).filter((l) => l.startsWith('data:'));
+              // Iterate from end to find a JSON with usage or provider
+              // Walk from the end using a functional style to satisfy lint rules
+              [...lines].reverse().forEach((line) => {
+                if (this.lastCostUsd !== undefined || this.lastActualProvider !== undefined) return undefined;
+                const payload = line.slice(5).trim();
+                if (!payload || payload === '[DONE]') return undefined;
+                try {
+                  const obj = JSON.parse(payload) as {
+                    provider?: string;
+                    model?: string;
+                    choices?: { provider?: string; model?: string }[];
+                    usage?: { cost?: number; cost_details?: { upstream_inference_cost?: number } };
+                  };
+                  const actualProv = obj.provider ?? obj.choices?.[0]?.provider;
+                  const actualModel = obj.model ?? obj.choices?.[0]?.model;
+                  if (typeof actualProv === 'string' && actualProv.length > 0) this.lastActualProvider = actualProv;
+                  if (typeof actualModel === 'string' && actualModel.length > 0) this.lastActualModel = actualModel;
+                  const c = obj.usage?.cost;
+                  const u = obj.usage?.cost_details?.upstream_inference_cost;
+                  if (typeof c === 'number') this.lastCostUsd = c;
+                  if (typeof u === 'number') this.lastUpstreamCostUsd = u;
+                } catch { /* skip non-JSON lines */ }
+              });
+            } catch { /* ignore SSE parse errors */ }
+          } else {
+            // Clear for non-openrouter URLs
+            if (!url.includes(LLMClient.OPENROUTER_HOST)) {
+              this.lastActualProvider = undefined;
+              this.lastActualModel = undefined;
+            }
+          }
+        } catch { /* ignore */ }
+
+        // Log response details when trace is enabled
         if (this.traceLLM) {
           const respHeaders: Record<string, string> = {};
           response.headers.forEach((value, key) => {
@@ -174,9 +254,9 @@ export class LLMClient {
             }
           });
 
-          const contentType = response.headers.get('content-type') ?? '';
           let traceMessage = `LLM response: ${String(response.status)} ${response.statusText}\nheaders: ${JSON.stringify(respHeaders, null, 2)}`;
 
+          const contentType = response.headers.get('content-type') ?? '';
           if (contentType.includes('application/json')) {
             try {
               const clone = response.clone();
@@ -222,11 +302,20 @@ export class LLMClient {
     const isFinalTurn = request.isFinalTurn === true ? ' (final turn)' : '';
     const message = `messages ${String(request.messages.length)}, ${String(totalBytes)} bytes${isFinalTurn}`;
     
+    // Reset routed provider info when not using a router
+    if (request.provider !== 'openrouter') {
+      this.lastActualProvider = undefined;
+      this.lastActualModel = undefined;
+    }
+
     this.log('VRB', 'request', 'llm', `${request.provider}:${request.model}`, message);
   }
 
   private logResponse(request: TurnRequest, result: TurnResult, latencyMs: number): void {
-    const remoteId = `${request.provider}:${request.model}`;
+    const routed = this.getLastActualRouting();
+    const remoteId = (request.provider === 'openrouter' && routed.provider !== undefined)
+      ? `${request.provider}/${routed.provider}:${request.model}`
+      : `${request.provider}:${request.model}`;
     
     if (result.status.type === 'success') {
       const tokens = result.tokens;
@@ -235,7 +324,11 @@ export class LLMClient {
       const cachedTokens = tokens?.cachedTokens ?? 0;
       
       const responseBytes = result.response !== undefined ? new TextEncoder().encode(result.response).length : 0;
-      const message = `input ${String(inputTokens)}, output ${String(outputTokens)}, cached ${String(cachedTokens)} tokens, ${String(latencyMs)}ms, ${String(responseBytes)} bytes`;
+      let message = `input ${String(inputTokens)}, output ${String(outputTokens)}, cached ${String(cachedTokens)} tokens, ${String(latencyMs)}ms, ${String(responseBytes)} bytes`;
+      if (request.provider === 'openrouter' && routed.provider !== undefined) {
+        const modelPart = routed.model !== undefined ? `, actualModel ${routed.model}` : '';
+        message += `, actualProvider ${routed.provider}${modelPart}`;
+      }
       
       this.log('VRB', 'response', 'llm', remoteId, message);
     } else {

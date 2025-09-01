@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 
 import { Command } from 'commander';
+import * as yaml from 'js-yaml';
 
 import type { AIAgentSessionConfig, LogEntry, AccountingEntry, AIAgentCallbacks, ConversationMessage } from './types.js';
 
@@ -37,7 +38,7 @@ program
   .option('--parallel-tool-calls', 'Enable parallel tool calls')
   .option('--no-parallel-tool-calls', 'Disable parallel tool calls')
   .option('--max-retries <n>', 'Max retry rounds over provider/model list', '3')
-  .option('--max-tool-turns <n>', 'Maximum tool turns (agent loop cap)', '30')
+  .option('--max-tool-turns <n>', 'Maximum tool turns (agent loop cap)', '10')
   .action(async (providers: string, models: string, mcpTools: string, systemPrompt: string, userPrompt: string, options: Record<string, unknown>) => {
     try {
       if (systemPrompt === '-' && userPrompt === '-') {
@@ -54,25 +55,50 @@ program
         process.exit(4);
       }
 
-      // Parse numerical options
-      const llmTimeout = parsePositiveInt(options.llmTimeout, 'llm-timeout');
-      const toolTimeout = parsePositiveInt(options.toolTimeout, 'tool-timeout');
-      const temperature = parseFloat(options.temperature, 'temperature', 0, 2);
-      const topP = parseFloat(options.topP, 'top-p', 0, 1);
-      const maxToolTurns = parsePositiveInt(options.maxToolTurns, 'max-tool-turns');
-      const maxRetries = parsePositiveInt(options.maxRetries, 'max-retries');
-
       const cfgPath = typeof options.config === 'string' && options.config.length > 0 ? options.config : undefined;
       const config = loadConfiguration(cfgPath);
 
-      // Resolve prompts
+      // Resolve numeric options with precedence: explicit flag > config.defaults > hard default
+      const srcMaxToolTurns = program.getOptionValueSource('maxToolTurns');
+      const srcMaxRetries = program.getOptionValueSource('maxRetries');
+      const srcLlmTimeout = program.getOptionValueSource('llmTimeout');
+      const srcToolTimeout = program.getOptionValueSource('toolTimeout');
+      const srcTemperature = program.getOptionValueSource('temperature');
+      const srcTopP = program.getOptionValueSource('topP');
+
+      const maxToolTurns = srcMaxToolTurns === 'cli'
+        ? parsePositiveInt(options.maxToolTurns, 'max-tool-turns')
+        : (config.defaults?.maxToolTurns ?? 10);
+
+      const maxRetries = srcMaxRetries === 'cli'
+        ? parsePositiveInt(options.maxRetries, 'max-retries')
+        : (config.defaults?.maxRetries ?? 3);
+
+      const llmTimeout = srcLlmTimeout === 'cli'
+        ? parsePositiveInt(options.llmTimeout, 'llm-timeout')
+        : (config.defaults?.llmTimeout ?? 120000);
+
+      const toolTimeout = srcToolTimeout === 'cli'
+        ? parsePositiveInt(options.toolTimeout, 'tool-timeout')
+        : (config.defaults?.toolTimeout ?? 60000);
+
+      const temperature = srcTemperature === 'cli'
+        ? parseFloat(options.temperature, 'temperature', 0, 2)
+        : (config.defaults?.temperature ?? 0.7);
+
+      const topP = srcTopP === 'cli'
+        ? parseFloat(options.topP, 'top-p', 0, 1)
+        : (config.defaults?.topP ?? 1.0);
+
+      // Resolve prompts and parse frontmatter for expected output
       const resolvedSystemRaw = await readPrompt(systemPrompt);
       const resolvedUserRaw = await readPrompt(userPrompt);
+      const fm = parseFrontmatter(resolvedSystemRaw) ?? parseFrontmatter(resolvedUserRaw);
 
       // Prompt variable substitution
       const vars = buildPromptVariables(maxToolTurns);
-      const resolvedSystem = expandPrompt(resolvedSystemRaw, vars);
-      const resolvedUser = expandPrompt(resolvedUserRaw, vars);
+      const resolvedSystem = expandPrompt(stripFrontmatter(resolvedSystemRaw), vars);
+      const resolvedUser = expandPrompt(stripFrontmatter(resolvedUserRaw), vars);
 
       // Load conversation history if specified
       let conversationHistory: ConversationMessage[] | undefined = undefined;
@@ -95,6 +121,15 @@ program
       const callbacks = createCallbacks(options, accountingFile);
 
       // Create session configuration
+      // Resolve boolean options with precedence: explicit flag > config.defaults > undefined
+      const effectiveParallelToolCalls = (typeof options.parallelToolCalls === 'boolean')
+        ? options.parallelToolCalls
+        : (config.defaults?.parallelToolCalls ?? false);
+
+      const effectiveStream = (typeof options.stream === 'boolean')
+        ? options.stream
+        : (config.defaults?.stream ?? false);
+
       const sessionConfig: AIAgentSessionConfig = {
         config,
         providers: providerList,
@@ -102,6 +137,7 @@ program
         tools: toolList,
         systemPrompt: resolvedSystem,
         userPrompt: resolvedUser,
+        expectedOutput: fm?.expectedOutput,
         conversationHistory,
         temperature,
         topP,
@@ -109,8 +145,8 @@ program
         maxTurns: maxToolTurns,
         llmTimeout,
         toolTimeout,
-        parallelToolCalls: typeof options.parallelToolCalls === 'boolean' ? options.parallelToolCalls : undefined,
-        stream: typeof options.stream === 'boolean' ? options.stream : undefined,
+        parallelToolCalls: effectiveParallelToolCalls,
+        stream: effectiveStream,
         callbacks,
         traceLLM: options.traceLlm === true,
         traceMCP: options.traceMcp === true,
@@ -249,6 +285,61 @@ function expandPrompt(str: string, vars: Record<string, string>): string {
   return out;
 }
 
+// Frontmatter parsing utilities
+function parseFrontmatter(src: string): { expectedOutput: { format: 'json'|'markdown'|'text'; schema?: Record<string, unknown> } } | undefined {
+  const m = /^---\n([\s\S]*?)\n---\n/.exec(src);
+  if (m === null) return undefined;
+  try {
+    const rawUnknown: unknown = yaml.load(m[1]);
+    if (typeof rawUnknown !== 'object' || rawUnknown === null) return undefined;
+    const docObj = rawUnknown as { output?: { format?: string; schema?: unknown; schemaRef?: string } };
+    if (docObj.output === undefined || typeof docObj.output.format !== 'string') return undefined;
+    const format = docObj.output.format.toLowerCase();
+    if (format !== 'json' && format !== 'markdown' && format !== 'text') return undefined;
+    let schemaObj: Record<string, unknown> | undefined;
+    if (format === 'json') {
+      // Accept inline object, JSON/YAML string, or schemaRef path (local file)
+      const s: unknown = docObj.output.schema;
+      const ref: string | undefined = typeof docObj.output.schemaRef === 'string' ? docObj.output.schemaRef : undefined;
+      schemaObj = loadSchemaValue(s, ref);
+    }
+    const fmt: 'json'|'markdown'|'text' = format === 'json' ? 'json' : (format === 'markdown' ? 'markdown' : 'text');
+    return { expectedOutput: { format: fmt, schema: schemaObj } };
+  } catch {
+    return undefined;
+  }
+}
+
+function loadSchemaValue(v: unknown, schemaRef?: string): Record<string, unknown> | undefined {
+  try {
+    if (v !== null && v !== undefined && typeof v === 'object') return v as Record<string, unknown>;
+    if (typeof v === 'string') {
+      // Try JSON first, then YAML
+      try { return JSON.parse(v) as Record<string, unknown>; } catch { /* ignore */ }
+      try { return yaml.load(v) as Record<string, unknown>; } catch { /* ignore */ }
+    }
+    if (typeof schemaRef === 'string' && schemaRef.length > 0) {
+      try {
+        const path = schemaRef.startsWith('.') ? schemaRef : `./${schemaRef}`;
+        const content = fs.readFileSync(path, 'utf-8');
+        if (/\.json$/i.test(path)) return JSON.parse(content) as Record<string, unknown>;
+        if (/\.(ya?ml)$/i.test(path)) return yaml.load(content) as Record<string, unknown>;
+        // Fallback: attempt JSON then YAML
+        try { return JSON.parse(content) as Record<string, unknown>; } catch { /* ignore */ }
+        return yaml.load(content) as Record<string, unknown>;
+      } catch {
+        return undefined;
+      }
+    }
+  } catch { /* ignore */ }
+  return undefined;
+}
+
+function stripFrontmatter(src: string): string {
+  const m = /^---\n([\s\S]*?)\n---\n/;
+  return src.replace(m, '');
+}
+
 function createCallbacks(options: Record<string, unknown>, accountingFile?: string): AIAgentCallbacks {
 
   // Helper for consistent coloring - MANDATORY in TTY according to DESIGN.md
@@ -263,8 +354,8 @@ function createCallbacks(options: Record<string, unknown>, accountingFile?: stri
   let thinkingOpen = false;
   let lastCharWasNewline = true;
 
-  return {
-    onLog: (entry: LogEntry) => {
+      return {
+        onLog: (entry: LogEntry) => {
       // Ensure newline separation after thinking stream if needed
       if (entry.severity !== 'THK' && thinkingOpen && !lastCharWasNewline) {
         try { process.stderr.write('\n'); } catch {}
@@ -285,6 +376,12 @@ function createCallbacks(options: Record<string, unknown>, accountingFile?: stri
       // Show verbose only with --verbose flag (dark gray)
       if (entry.severity === 'VRB' && options.verbose === true) {
         const formatted = colorize(`[VRB] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}: ${entry.message}`, '\x1b[90m');
+        process.stderr.write(`${formatted}\n`);
+      }
+
+      // Final summary entries
+      if (entry.severity === 'FIN') {
+        const formatted = colorize(`[FIN] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}: ${entry.message}`, '\x1b[36m');
         process.stderr.write(`${formatted}\n`);
       }
       

@@ -1,7 +1,7 @@
 import { createOpenAI } from '@ai-sdk/openai';
 
 import type { TurnRequest, TurnResult, ProviderConfig, ConversationMessage } from '../types.js';
-import type { LanguageModel, ModelMessage } from 'ai';
+import type { LanguageModel } from 'ai';
 
 import { BaseLLMProvider, type ResponseMessage } from './base.js';
 
@@ -32,20 +32,16 @@ export class OpenAIProvider extends BaseLLMProvider {
     
     try {
       const model = this.provider(request.model);
-      const tools = this.convertTools(request.tools, request.toolExecutor);
+      const filteredTools = this.filterToolsForFinalTurn(request.tools, request.isFinalTurn);
+      const tools = this.convertTools(filteredTools, request.toolExecutor);
       const messages = super.convertMessages(request.messages);
       
       // Add final turn message if needed
-      const finalMessages = request.isFinalTurn === true 
-        ? messages.concat({ 
-            role: 'user', 
-            content: "You are not allowed to run any more tools. Use the tool responses you have so far to answer my original question. If you failed to find answers for something, please state the areas you couldn't investigate"
-          } as ModelMessage)
-        : messages;
+      const finalMessages = this.buildFinalTurnMessages(messages, request.isFinalTurn);
 
-      const providerOptions = request.parallelToolCalls !== undefined 
-        ? { openai: { parallelToolCalls: request.parallelToolCalls } }
-        : undefined;
+      const providerOptions = request.parallelToolCalls !== undefined
+        ? { openai: { parallelToolCalls: request.parallelToolCalls, toolChoice: 'required' } }
+        : { openai: { toolChoice: 'required' } };
 
       if (request.stream === true) {
         return await super.executeStreamingTurn(model, finalMessages, tools, request, startTime, providerOptions);

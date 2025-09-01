@@ -16,3 +16,8 @@ declare module '@openrouter/ai-sdk-provider' {
     headers?: Record<string, string>;
   }): OpenRouterProvider;
 }
+
+declare module 'js-yaml' {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  export function load(str: string, opts?: unknown): any;
+}

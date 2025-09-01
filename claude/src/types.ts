@@ -55,7 +55,7 @@ export interface ToolResult {
 // Structured logging interface
 export interface LogEntry {
   timestamp: number;                    // Unix timestamp (ms)
-  severity: 'VRB' | 'WRN' | 'ERR' | 'TRC' | 'THK'; // Log severity level (THK for thinking/reasoning)
+  severity: 'VRB' | 'WRN' | 'ERR' | 'TRC' | 'THK' | 'FIN'; // FIN for end-of-run summary
   turn: number;                         // Sequential turn ID  
   subturn: number;                      // Sequential tool ID within turn
   direction: 'request' | 'response';    // Request or response
@@ -154,6 +154,8 @@ export interface AIAgentSessionConfig {
   systemPrompt: string;
   userPrompt: string;
   conversationHistory?: ConversationMessage[];
+  // Expected output contract parsed from prompt frontmatter
+  expectedOutput?: { format: 'json' | 'markdown' | 'text'; schema?: Record<string, unknown> };
   temperature?: number;
   topP?: number;
   maxRetries?: number;
@@ -190,6 +192,12 @@ export interface LLMAccountingEntry extends BaseAccountingEntry {
   type: 'llm';
   provider: string;
   model: string;
+  // Optional: actual provider used by a router (e.g., OpenRouter -> Fireworks/Cerebras/etc.)
+  actualProvider?: string;
+  actualModel?: string;
+  // Optional: cost as reported by provider (e.g., OpenRouter)
+  costUsd?: number;
+  upstreamInferenceCostUsd?: number;
   tokens: TokenUsage;
   error?: string;
 }

@@ -1,12 +1,6 @@
-import type { 
-  AIAgentSessionConfig, 
-  AIAgentResult, 
-  ConversationMessage, 
-  LogEntry, 
-  AccountingEntry,
-  Configuration,
-  TurnRequest
-} from './types.js';
+import Ajv from 'ajv';
+
+import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, MCPTool, LLMAccountingEntry, ToolAccountingEntry } from './types.js';
 
 // Exit codes according to DESIGN.md
 type ExitCode = 
@@ -39,6 +33,7 @@ type ExitCode =
   | 'EXIT-SIGNAL-RECEIVED'
   | 'EXIT-UNKNOWN';
 
+// empty line between import groups enforced by linter
 import { validateProviders, validateMCPServers, validatePrompts } from './config.js';
 import { LLMClient } from './llm-client.js';
 import { MCPClientManager } from './mcp-client.js';
@@ -56,6 +51,22 @@ export class AIAgentSession {
   private readonly mcpClient: MCPClientManager;
   private readonly llmClient: LLMClient;
   private readonly sessionConfig: AIAgentSessionConfig;
+  private ajv?: Ajv;
+  // Internal housekeeping notes
+  private internalNotes: { text: string; tags?: string[]; ts: number }[] = [];
+  // Finalization state captured via agent_final_report
+  private finalReport?: {
+    status: 'success' | 'failure' | 'partial';
+    format: 'json' | 'markdown' | 'text';
+    content?: string;
+    content_json?: Record<string, unknown>;
+    metadata?: Record<string, unknown>;
+    ts: number;
+  };
+
+  // Counters for summary
+  private llmAttempts = 0;
+  private llmSyntheticFailures = 0;
 
   private constructor(
     config: Configuration,
@@ -255,7 +266,7 @@ export class AIAgentSession {
     // Track the last turn where we showed thinking header
     let lastShownThinkingHeaderTurn = -1;
 
-    const maxTurns = this.sessionConfig.maxTurns ?? 30;
+    const maxTurns = this.sessionConfig.maxTurns ?? 10;
     const maxRetries = this.sessionConfig.maxRetries ?? 3;
     const pairs = this.sessionConfig.models.flatMap((model) => 
       this.sessionConfig.providers.map((provider) => ({ provider, model }))
@@ -269,6 +280,7 @@ export class AIAgentSession {
 
       let lastError: string | undefined;
       let turnSuccessful = false;
+      let finalTurnWarnLogged = false;
 
       // Retry loop over all provider/model pairs - necessary for early termination
       // eslint-disable-next-line functional/no-loop-statements
@@ -278,11 +290,42 @@ export class AIAgentSession {
           const { provider, model } = pairs[pairIndex];
           
           try {
+            // Build per-attempt conversation with optional guidance injection
+            let attemptConversation = [...conversation];
+            // On the last retry within this turn, nudge the model to use tools (not append_notes)
+            if (retry === (maxRetries - 1) && currentTurn < (maxTurns - 1)) {
+              attemptConversation.push({
+                role: 'user',
+                content: 'Reminder: do not end with plain text. Use an available tool (excluding `agent_append_notes`) to make progress. When ready to conclude, call the tool `agent_final_report` to provide the final answer.'
+              });
+            }
+            // Do not inject final-turn user message here to avoid duplication.
+            // Providers append a single, standardized final-turn instruction.
+
+            const isFinalTurn = currentTurn >= maxTurns - 1;
+            if (isFinalTurn && !finalTurnWarnLogged) {
+              const warn: LogEntry = {
+                timestamp: Date.now(),
+                severity: 'WRN',
+                turn: currentTurn,
+                subturn: 0,
+                direction: 'request',
+                type: 'llm',
+                remoteIdentifier: 'agent:final-turn',
+                fatal: false,
+                message: 'Final turn detected: restricting tools to `agent_final_report` and injecting finalization instruction.'
+              };
+              logs.push(warn);
+              this.sessionConfig.callbacks?.onLog?.(warn);
+              finalTurnWarnLogged = true;
+            }
+
+            this.llmAttempts++;
             const turnResult = await this.executeSingleTurn(
-              conversation,
+              attemptConversation,
               provider,
               model,
-              currentTurn >= maxTurns - 1, // isFinalTurn
+              isFinalTurn, // isFinalTurn
               currentTurn,
               logs,
               lastShownThinkingHeaderTurn
@@ -302,6 +345,10 @@ export class AIAgentSession {
                 latency: turnResult.latencyMs,
                 provider,
                 model,
+                actualProvider: provider === 'openrouter' ? this.llmClient.getLastActualRouting().provider : undefined,
+                actualModel: provider === 'openrouter' ? this.llmClient.getLastActualRouting().model : undefined,
+                costUsd: provider === 'openrouter' ? this.llmClient.getLastCostInfo().costUsd : undefined,
+                upstreamInferenceCostUsd: provider === 'openrouter' ? this.llmClient.getLastCostInfo().upstreamInferenceCostUsd : undefined,
                 tokens: turnResult.tokens,
                 error: turnResult.status.type !== 'success' ? 
                   ('message' in turnResult.status ? turnResult.status.message : turnResult.status.type) : undefined
@@ -310,10 +357,116 @@ export class AIAgentSession {
               this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
             }
 
-            // Handle turn result based on status
-            if (turnResult.status.type === 'success') {
-              // Add new messages to conversation
-              conversation.push(...turnResult.messages);
+      // Handle turn result based on status
+      if (turnResult.status.type === 'success') {
+        // Synthetic error: success with content but no tools and no final_report → retry this turn
+        if (this.finalReport === undefined) {
+          const lastAssistant = [...turnResult.messages].filter(m => m.role === 'assistant').pop();
+          const hasTools = (lastAssistant?.toolCalls?.length ?? 0) > 0;
+          const hasText = (lastAssistant?.content.trim().length ?? 0) > 0;
+          if (!hasTools && hasText) {
+            const warnEntry: LogEntry = {
+              timestamp: Date.now(),
+              severity: 'WRN',
+              turn: currentTurn,
+              subturn: 0,
+              direction: 'response',
+              type: 'llm',
+              remoteIdentifier: `${provider}:${model}`,
+              fatal: false,
+              message: 'Synthetic retry: assistant returned content without tool calls and without final_report.'
+            };
+            logs.push(warnEntry);
+            this.sessionConfig.callbacks?.onLog?.(warnEntry);
+            lastError = 'invalid_response: content_without_tools_or_final';
+            // do not append these messages; try next provider/model in same turn
+            continue;
+          }
+        }
+
+        // Add new messages to conversation
+        conversation.push(...turnResult.messages);
+        // Deterministic finalization: if final_report has been set, finish now
+        if (this.finalReport !== undefined) {
+          const fr = this.finalReport;
+          // Print final output according to expected format
+          if (fr.format === 'json') {
+            // Validate JSON against frontmatter schema if available
+            const schema = this.sessionConfig.expectedOutput?.schema;
+            if (schema !== undefined && fr.content_json !== undefined) {
+              try {
+                this.ajv = this.ajv ?? new Ajv({ allErrors: true, strict: false });
+                const validate = this.ajv.compile(schema);
+                const valid = validate(fr.content_json);
+                if (!valid) {
+                  const errs = (validate.errors ?? []).map((e) => {
+                    const path = typeof e.instancePath === 'string' && e.instancePath.length > 0
+                      ? e.instancePath
+                      : (typeof e.schemaPath === 'string' ? e.schemaPath : '');
+                    const msg = typeof e.message === 'string' ? e.message : '';
+                    return `${path} ${msg}`.trim();
+                  }).join('; ');
+                  const warn: LogEntry = {
+                    timestamp: Date.now(),
+                    severity: 'WRN',
+                    turn: currentTurn,
+                    subturn: 0,
+                    direction: 'response',
+                    type: 'llm',
+                    remoteIdentifier: 'agent:ajv',
+                    fatal: false,
+                    message: `final_report JSON does not match schema: ${errs}`
+                  };
+                  logs.push(warn);
+                  this.sessionConfig.callbacks?.onLog?.(warn);
+                }
+              } catch (e) {
+                const warn: LogEntry = {
+                  timestamp: Date.now(),
+                  severity: 'WRN',
+                  turn: currentTurn,
+                  subturn: 0,
+                  direction: 'response',
+                  type: 'llm',
+                  remoteIdentifier: 'agent:ajv',
+                  fatal: false,
+                  message: `AJV validation failed: ${e instanceof Error ? e.message : String(e)}`
+                };
+                logs.push(warn);
+                this.sessionConfig.callbacks?.onLog?.(warn);
+              }
+            }
+            const out = fr.content_json !== undefined ? JSON.stringify(fr.content_json) : (fr.content ?? '');
+            if (out.length > 0) {
+              this.sessionConfig.callbacks?.onOutput?.(out);
+              if (!out.endsWith('\n')) this.sessionConfig.callbacks?.onOutput?.('\n');
+            }
+          } else {
+            const out = fr.content ?? '';
+            if (out.length > 0) {
+              this.sessionConfig.callbacks?.onOutput?.(out);
+              if (!out.endsWith('\n')) this.sessionConfig.callbacks?.onOutput?.('\n');
+            }
+          }
+
+          // Log successful exit
+          this.logExit(
+            'EXIT-FINAL-ANSWER',
+            'Final report received (agent_final_report), session complete',
+            currentTurn,
+            logs
+          );
+
+          // Emit FIN summary log entry
+          this.emitFinalSummary(logs, accounting);
+
+          return {
+            success: true,
+            conversation,
+            logs,
+            accounting
+          };
+        }
               
               // Debug logging
               if (this.sessionConfig.verbose === true) {
@@ -323,6 +476,13 @@ export class AIAgentSession {
                   return (lastAssistant?.content.trim().length ?? 0) > 0;
                 })();
                 const hasReasoning = turnResult.hasReasoning ?? false;
+                const hasToolCallsStr = String(turnResult.status.hasToolCalls);
+                const hasToolResultsStr = String(hasToolResults);
+                const finalAnswerStr = String(turnResult.status.finalAnswer);
+                const hasReasoningStr = String(hasReasoning);
+                const hasContentStr = String(hasContent);
+                const responseLenStr = String(turnResult.response?.length ?? 0);
+                const messagesLenStr = String(turnResult.messages.length);
                 const debugEntry: LogEntry = {
                   timestamp: Date.now(),
                   severity: 'VRB',
@@ -332,7 +492,7 @@ export class AIAgentSession {
                   type: 'llm',
                   remoteIdentifier: 'debug',
                   fatal: false,
-                  message: `Turn result: hasToolCalls=${String(turnResult.status.hasToolCalls)}, hasToolResults=${String(hasToolResults)}, finalAnswer=${String(turnResult.status.finalAnswer)}, hasReasoning=${String(hasReasoning)}, hasContent=${String(hasContent)}, response length=${String(turnResult.response?.length ?? 0)}, messages=${String(turnResult.messages.length)}`
+                  message: `Turn result: hasToolCalls=${hasToolCallsStr}, hasToolResults=${hasToolResultsStr}, finalAnswer=${finalAnswerStr}, hasReasoning=${hasReasoningStr}, hasContent=${hasContentStr}, response length=${responseLenStr}, messages=${messagesLenStr}`
                 };
                 logs.push(debugEntry);
                 this.sessionConfig.callbacks?.onLog?.(debugEntry);
@@ -360,9 +520,9 @@ export class AIAgentSession {
               }
               
               // Check for reasoning-only responses (empty response but not final answer)
-              if (!turnResult.status.finalAnswer && !turnResult.status.hasToolCalls && 
+              if (!turnResult.status.finalAnswer && !turnResult.status.hasToolCalls &&
                   (turnResult.response === undefined || turnResult.response.trim().length === 0)) {
-                // Log warning about empty response - model might be stuck
+                // Log warning and retry this turn on another provider/model
                 const warnEntry: LogEntry = {
                   timestamp: Date.now(),
                   severity: 'WRN',
@@ -372,29 +532,21 @@ export class AIAgentSession {
                   type: 'llm',
                   remoteIdentifier: `${provider}:${model}`,
                   fatal: false,
-                  message: 'Provider returned empty response (possibly reasoning-only). Model may be stuck or need clarification.'
+                  message: 'Empty response without tools; retrying with next provider/model in this turn.'
                 };
                 logs.push(warnEntry);
                 this.sessionConfig.callbacks?.onLog?.(warnEntry);
+                this.llmSyntheticFailures++;
+                lastError = 'invalid_response: empty_without_tools';
+                // do not mark turnSuccessful; continue retry loop
+                continue;
               }
               
               if (turnResult.status.finalAnswer) {
-                // We have a final answer - successful completion
-                
-                // Log successful exit
-                this.logExit(
-                  'EXIT-FINAL-ANSWER',
-                  'Final answer received, session complete',
-                  currentTurn,
-                  logs
-                );
-                
-                return {
-                  success: true,
-                  conversation,
-                  logs,
-                  accounting
-                };
+                // Treat as non-final unless a final_report was provided
+                // Continue to next turn to allow the model to call agent_final_report
+                turnSuccessful = true;
+                break;
               } else {
                 // Continue to next turn (tools already executed if hasToolCalls was true)
                 turnSuccessful = true;
@@ -452,6 +604,8 @@ export class AIAgentSession {
       currentTurn,
       logs
     );
+    // Emit FIN summary even on failure
+    this.emitFinalSummary(logs, accounting);
     
     return {
       success: false,
@@ -460,6 +614,235 @@ export class AIAgentSession {
       logs,
       accounting
     };
+  }
+
+  // Compose and emit FIN summary log
+  private emitFinalSummary(logs: LogEntry[], accounting: AccountingEntry[]): void {
+    try {
+      // Small helpers
+      const percentile = (values: number[], p: number): number => {
+        if (values.length === 0) return 0;
+        const a = [...values].sort((x, y) => x - y);
+        const idx = (a.length - 1) * p;
+        const lo = Math.floor(idx);
+        const hi = Math.ceil(idx);
+        if (lo === hi) return a[lo];
+        const w = idx - lo;
+        return a[lo] * (1 - w) + a[hi] * w;
+      };
+      const pctTriple = (arr: number[]) => ({ p50: Math.round(percentile(arr, 0.5)), p90: Math.round(percentile(arr, 0.9)), p99: Math.round(percentile(arr, 0.99)) });
+
+      // Token totals
+      const llmEntries = accounting.filter((e): e is LLMAccountingEntry => e.type === 'llm');
+      const tokIn = llmEntries.reduce((s, e) => s + e.tokens.inputTokens, 0);
+      const tokOut = llmEntries.reduce((s, e) => s + e.tokens.outputTokens, 0);
+      const tokCached = llmEntries.reduce((s, e) => s + (e.tokens.cachedTokens ?? 0), 0);
+      const tokTotal = llmEntries.reduce((s, e) => s + e.tokens.totalTokens, 0);
+      const llmLatencies = llmEntries.map((e) => e.latency);
+      const totalCost = llmEntries.reduce((s, e) => s + (e.costUsd ?? 0), 0);
+      const totalUpstreamCost = llmEntries.reduce((s, e) => s + (e.upstreamInferenceCostUsd ?? 0), 0);
+      const llmPct = pctTriple(llmLatencies);
+
+      // Failures/retries
+      const llmFailures = llmEntries.filter((e) => e.status === 'failed').length + this.llmSyntheticFailures;
+      const toolEntries = accounting.filter((e): e is ToolAccountingEntry => e.type === 'tool');
+      const toolFailures = toolEntries.filter((e) => e.status === 'failed').length;
+      const llmAttempts = this.llmAttempts;
+
+      // Provider:model combos (configured)
+      const provModelCounts = new Map<string, number>();
+      llmEntries.forEach((e) => {
+        const key = `${e.provider}:${e.model}`;
+        provModelCounts.set(key, (provModelCounts.get(key) ?? 0) + 1);
+      });
+      const provModelStr = [...provModelCounts.entries()].map(([k, v]) => `${k} x${String(v)}`).join(', ');
+
+      // Actual provider:model combos (routed) and configured/actual pairs
+      const actualCounts = new Map<string, number>();
+      const pairCounts = new Map<string, number>();
+      llmEntries.forEach((e) => {
+        if (e.actualProvider !== undefined) {
+          const key = `${e.actualProvider}:${e.actualModel ?? e.model}`;
+          actualCounts.set(key, (actualCounts.get(key) ?? 0) + 1);
+        }
+        const pairKey = `${e.provider}/${e.actualProvider ?? 'n/a'}:${e.model}`;
+        pairCounts.set(pairKey, (pairCounts.get(pairKey) ?? 0) + 1);
+      });
+      const actualStr = actualCounts.size > 0 ? [...actualCounts.entries()].map(([k, v]) => `${k} x${String(v)}`).join(', ') : 'n/a';
+      const pairStr = pairCounts.size > 0 ? [...pairCounts.entries()].map(([k, v]) => `${k} x${String(v)}`).join(', ') : 'n/a';
+
+      // MCP server:tool combos
+      const toolCounts = new Map<string, number>();
+      toolEntries.forEach((e) => {
+        const key = `${e.mcpServer}:${e.command}`;
+        toolCounts.set(key, (toolCounts.get(key) ?? 0) + 1);
+      });
+      const toolStr = toolCounts.size > 0 ? [...toolCounts.entries()].map(([k, v]) => `${k} x${String(v)}`).join(', ') : 'n/a';
+
+      const msg = `tokens in=${String(tokIn)}, out=${String(tokOut)}, cached=${String(tokCached)}, total=${String(tokTotal)} | attempts=${String(llmAttempts)}, llm_failures=${String(llmFailures)}, tool_failures=${String(toolFailures)} | lat_ms p50=${String(llmPct.p50)}, p90=${String(llmPct.p90)}, p99=${String(llmPct.p99)} | cost_usd=${String(totalCost)}, upstream_usd=${String(totalUpstreamCost)} | providers=${provModelStr} | configured/actual=${pairStr} | actualProviders=${actualStr} | mcp=${toolStr}`;
+      const fin: LogEntry = {
+        timestamp: Date.now(),
+        severity: 'FIN',
+        turn: this.currentTurn,
+        subturn: 0,
+        direction: 'response',
+        type: 'llm',
+        remoteIdentifier: 'summary',
+        fatal: false,
+        message: msg,
+      };
+      logs.push(fin);
+      this.sessionConfig.callbacks?.onLog?.(fin);
+
+      // Detailed LLM breakdown per configured/actual pair with latency percentiles and token totals
+      const byPair = new Map<string, LLMAccountingEntry[]>();
+      llmEntries.forEach((e) => {
+        const key = `${e.provider}/${e.actualProvider ?? 'n/a'}:${e.model}`;
+        const arr = byPair.get(key) ?? [];
+        arr.push(e);
+        byPair.set(key, arr);
+      });
+      if (byPair.size > 0) {
+        const parts = [...byPair.entries()].map(([k, arr]) => {
+          const lat = pctTriple(arr.map((e) => e.latency));
+          const tin = arr.reduce((s, e) => s + e.tokens.inputTokens, 0);
+          const tout = arr.reduce((s, e) => s + e.tokens.outputTokens, 0);
+          const ttot = arr.reduce((s, e) => s + e.tokens.totalTokens, 0);
+          return `${k} calls=${String(arr.length)}, tok_in=${String(tin)}, tok_out=${String(tout)}, tok_total=${String(ttot)}, p50=${String(lat.p50)}, p90=${String(lat.p90)}, p99=${String(lat.p99)}`;
+        }).join(' | ');
+        const finDetail: LogEntry = {
+          timestamp: Date.now(),
+          severity: 'FIN',
+          turn: this.currentTurn,
+          subturn: 0,
+          direction: 'response',
+          type: 'llm',
+          remoteIdentifier: 'llm-breakdown',
+          fatal: false,
+          message: parts,
+        };
+        logs.push(finDetail);
+        this.sessionConfig.callbacks?.onLog?.(finDetail);
+      }
+
+      // Per configured provider breakdown
+      const byConfigured = new Map<string, LLMAccountingEntry[]>();
+      llmEntries.forEach((e) => {
+        const arr = byConfigured.get(e.provider) ?? [];
+        arr.push(e);
+        byConfigured.set(e.provider, arr);
+      });
+      if (byConfigured.size > 0) {
+        const parts = [...byConfigured.entries()].map(([prov, arr]) => {
+          const lat = pctTriple(arr.map((e) => e.latency));
+          const tin = arr.reduce((s, e) => s + e.tokens.inputTokens, 0);
+          const tout = arr.reduce((s, e) => s + e.tokens.outputTokens, 0);
+          const ttot = arr.reduce((s, e) => s + e.tokens.totalTokens, 0);
+          const cost = arr.reduce((s, e) => s + (e.costUsd ?? 0), 0);
+          const up = arr.reduce((s, e) => s + (e.upstreamInferenceCostUsd ?? 0), 0);
+          return `${prov} calls=${String(arr.length)}, tok_in=${String(tin)}, tok_out=${String(tout)}, tok_total=${String(ttot)}, cost_usd=${String(cost)}, upstream_usd=${String(up)}, p50=${String(lat.p50)}, p90=${String(lat.p90)}, p99=${String(lat.p99)}`;
+        }).join(' | ');
+        const finCfg: LogEntry = {
+          timestamp: Date.now(),
+          severity: 'FIN',
+          turn: this.currentTurn,
+          subturn: 0,
+          direction: 'response',
+          type: 'llm',
+          remoteIdentifier: 'llm-configured-providers',
+          fatal: false,
+          message: parts,
+        };
+        logs.push(finCfg);
+        this.sessionConfig.callbacks?.onLog?.(finCfg);
+      }
+
+      // Per actual provider breakdown
+      const byActual = new Map<string, LLMAccountingEntry[]>();
+      llmEntries.forEach((e) => {
+        const ap = e.actualProvider ?? 'n/a';
+        const arr = byActual.get(ap) ?? [];
+        arr.push(e);
+        byActual.set(ap, arr);
+      });
+      if (byActual.size > 0) {
+        const parts = [...byActual.entries()].map(([prov, arr]) => {
+          const lat = pctTriple(arr.map((e) => e.latency));
+          const tin = arr.reduce((s, e) => s + e.tokens.inputTokens, 0);
+          const tout = arr.reduce((s, e) => s + e.tokens.outputTokens, 0);
+          const ttot = arr.reduce((s, e) => s + e.tokens.totalTokens, 0);
+          const cost = arr.reduce((s, e) => s + (e.costUsd ?? 0), 0);
+          const up = arr.reduce((s, e) => s + (e.upstreamInferenceCostUsd ?? 0), 0);
+          return `${prov} calls=${String(arr.length)}, tok_in=${String(tin)}, tok_out=${String(tout)}, tok_total=${String(ttot)}, cost_usd=${String(cost)}, upstream_usd=${String(up)}, p50=${String(lat.p50)}, p90=${String(lat.p90)}, p99=${String(lat.p99)}`;
+        }).join(' | ');
+        const finAct: LogEntry = {
+          timestamp: Date.now(),
+          severity: 'FIN',
+          turn: this.currentTurn,
+          subturn: 0,
+          direction: 'response',
+          type: 'llm',
+          remoteIdentifier: 'llm-actual-providers',
+          fatal: false,
+          message: parts,
+        };
+        logs.push(finAct);
+        this.sessionConfig.callbacks?.onLog?.(finAct);
+      }
+
+      // Additional MCP summary line
+      const totalToolCharsIn = toolEntries.reduce((s, e) => s + e.charactersIn, 0);
+      const totalToolCharsOut = toolEntries.reduce((s, e) => s + e.charactersOut, 0);
+      const serverCounts = new Map<string, number>();
+      toolEntries.forEach((e) => {
+        serverCounts.set(e.mcpServer, (serverCounts.get(e.mcpServer) ?? 0) + 1);
+      });
+      const serversStr = [...serverCounts.entries()].map(([k, v]) => `${k} x${String(v)}`).join(', ');
+      const finMcp: LogEntry = {
+        timestamp: Date.now(),
+        severity: 'FIN',
+        turn: this.currentTurn,
+        subturn: 0,
+        direction: 'response',
+        type: 'mcp',
+        remoteIdentifier: 'mcp-summary',
+        fatal: false,
+        message: `mcp_calls=${String(toolEntries.length)}, mcp_failures=${String(toolFailures)}, bytes_in=${String(totalToolCharsIn)}, bytes_out=${String(totalToolCharsOut)} | servers=${serversStr}`,
+      };
+      logs.push(finMcp);
+      this.sessionConfig.callbacks?.onLog?.(finMcp);
+
+      // Detailed MCP breakdown per server:tool with latency percentiles and bytes
+      const byTool = new Map<string, ToolAccountingEntry[]>();
+      toolEntries.forEach((e) => {
+        const key = `${e.mcpServer}:${e.command}`;
+        const arr = byTool.get(key) ?? [];
+        arr.push(e);
+        byTool.set(key, arr);
+      });
+      if (byTool.size > 0) {
+        const parts = [...byTool.entries()].map(([k, arr]) => {
+          const lat = pctTriple(arr.map((e) => e.latency));
+          const bin = arr.reduce((s, e) => s + e.charactersIn, 0);
+          const bout = arr.reduce((s, e) => s + e.charactersOut, 0);
+          const fails = arr.filter((e) => e.status === 'failed').length;
+          return `${k} calls=${String(arr.length)}, failures=${String(fails)}, bytes_in=${String(bin)}, bytes_out=${String(bout)}, p50=${String(lat.p50)}, p90=${String(lat.p90)}, p99=${String(lat.p99)}`;
+        }).join(' | ');
+        const finTool: LogEntry = {
+          timestamp: Date.now(),
+          severity: 'FIN',
+          turn: this.currentTurn,
+          subturn: 0,
+          direction: 'response',
+          type: 'mcp',
+          remoteIdentifier: 'mcp-breakdown',
+          fatal: false,
+          message: parts,
+        };
+        logs.push(finTool);
+        this.sessionConfig.callbacks?.onLog?.(finTool);
+      }
+    } catch { /* swallow summary errors */ }
   }
 
   private async executeSingleTurn(
@@ -471,7 +854,7 @@ export class AIAgentSession {
     logs: LogEntry[],
     lastShownThinkingHeaderTurn: number
   ) {
-    const availableTools = this.mcpClient.getAllTools();
+    const availableTools = [...this.mcpClient.getAllTools(), ...this.getInternalTools()];
     
     // Track if we've shown thinking for this turn
     let shownThinking = false;
@@ -480,6 +863,41 @@ export class AIAgentSession {
     const toolExecutor = async (toolName: string, parameters: Record<string, unknown>): Promise<string> => {
       const startTime = Date.now();
       try {
+        // Intercept internal tools (agent_*)
+        if (toolName === 'agent_append_notes') {
+          const textParam = (parameters as { text?: unknown }).text;
+          const text = typeof textParam === 'string' ? textParam : textParam === undefined ? '' : JSON.stringify(textParam);
+          const tags = Array.isArray((parameters as { tags?: unknown }).tags) ? (parameters as { tags?: string[] }).tags : undefined;
+          if (text.trim().length > 0) this.internalNotes.push({ text, tags, ts: Date.now() });
+          const latency = Date.now() - startTime;
+          const accountingEntry: AccountingEntry = {
+            type: 'tool', timestamp: startTime, status: 'ok', latency,
+            mcpServer: 'agent', command: toolName,
+            charactersIn: JSON.stringify(parameters).length, charactersOut: 15,
+          };
+          this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
+          return JSON.stringify({ ok: true, totalNotes: this.internalNotes.length });
+        }
+        if (toolName === 'agent_final_report') {
+          const p = parameters;
+          const statusParam = p.status;
+          const formatParam = p.format;
+          const status = (typeof statusParam === 'string' ? statusParam : 'success') as 'success' | 'failure' | 'partial';
+          const format = (typeof formatParam === 'string' ? formatParam : 'markdown') as 'json' | 'markdown' | 'text';
+          const content = typeof p.content === 'string' ? p.content : undefined;
+          const content_json = (p.content_json !== null && p.content_json !== undefined && typeof p.content_json === 'object') ? (p.content_json as Record<string, unknown>) : undefined;
+          const metadata = (p.metadata !== null && p.metadata !== undefined && typeof p.metadata === 'object') ? (p.metadata as Record<string, unknown>) : undefined;
+          this.finalReport = { status, format, content, content_json, metadata, ts: Date.now() };
+          const latency = Date.now() - startTime;
+          const accountingEntry: AccountingEntry = {
+            type: 'tool', timestamp: startTime, status: 'ok', latency,
+            mcpServer: 'agent', command: toolName,
+            charactersIn: JSON.stringify(parameters).length, charactersOut: 12,
+          };
+          this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
+          return JSON.stringify({ ok: true });
+        }
+
         const { result, serverName } = await this.mcpClient.executeToolByName(toolName, parameters);
         const latency = Date.now() - startTime;
         
@@ -572,8 +990,11 @@ export class AIAgentSession {
   }
 
   private enhanceSystemPrompt(systemPrompt: string, mcpInstructions: string): string {
-    if (mcpInstructions.trim().length === 0) return systemPrompt;
-    return `${systemPrompt}\n\n## TOOLS' INSTRUCTIONS\n\n${mcpInstructions}`;
+    const internal = this.buildInternalToolsInstructions();
+    const blocks: string[] = [systemPrompt];
+    if (mcpInstructions.trim().length > 0) blocks.push(`## TOOLS' INSTRUCTIONS\n\n${mcpInstructions}`);
+    if (internal.trim().length > 0) blocks.push(`## INTERNAL TOOLS\n\n${internal}`);
+    return blocks.join('\n\n');
   }
 
   // Immutable retry method - returns new session
@@ -591,6 +1012,113 @@ export class AIAgentSession {
       this.llmClient, // reuse LLM client
       this.sessionConfig
     );
+  }
+
+  // Build internal tools list dynamically based on expected output
+  private getInternalTools(): MCPTool[] {
+    const tools: MCPTool[] = [
+      {
+        name: 'agent_append_notes',
+        description: 'Housekeeping notes. Use sparingly for brief interim findings.',
+        inputSchema: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['text'],
+          properties: {
+            text: { type: 'string', minLength: 1 },
+            tags: { type: 'array', items: { type: 'string' } },
+          },
+        },
+      },
+    ];
+
+    const exp = this.sessionConfig.expectedOutput;
+    const common = {
+      status: { enum: ['success', 'failure', 'partial'] },
+      metadata: { type: 'object' },
+    } as Record<string, unknown>;
+
+    if (exp?.format === 'json') {
+      tools.push({
+        name: 'agent_final_report',
+        description: 'Finalize the task with a JSON report matching the required schema.',
+        inputSchema: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['status', 'format', 'content_json'],
+          properties: {
+            status: common.status,
+            format: { const: 'json' },
+            content_json: (exp.schema ?? { type: 'object' }),
+            metadata: common.metadata,
+          },
+        },
+      });
+    } else if (exp?.format === 'text') {
+      tools.push({
+        name: 'agent_final_report',
+        description: 'Finalize the task with a complete plain-text report.',
+        inputSchema: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['status', 'format', 'content'],
+          properties: {
+            status: common.status,
+            format: { const: 'text' },
+            content: { type: 'string', minLength: 1 },
+            metadata: common.metadata,
+          },
+        },
+      });
+    } else {
+      // default to markdown when unspecified
+      tools.push({
+        name: 'agent_final_report',
+        description: 'Finalize the task with a complete Markdown report.',
+        inputSchema: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['status', 'format', 'content'],
+          properties: {
+            status: common.status,
+            format: { const: 'markdown' },
+            content: { type: 'string', minLength: 1 },
+            metadata: common.metadata,
+          },
+        },
+      });
+    }
+    return tools;
+  }
+
+  private buildInternalToolsInstructions(): string {
+    const exp = this.sessionConfig.expectedOutput;
+    const lines: string[] = [];
+    const FINISH_ONLY = '- Finish ONLY by calling `agent_final_report` exactly once.';
+    const ARGS = '- Arguments:';
+    const STATUS_LINE = '  - `status`: one of `success`, `failure`, `partial`.';
+    lines.push('- Use tool `agent_append_notes` sparingly for brief housekeeping notes; it is not graded and does not count as progress.');
+    if (exp?.format === 'json') {
+      lines.push(FINISH_ONLY);
+      lines.push(ARGS);
+      lines.push(STATUS_LINE);
+      lines.push('  - `format`: "json".');
+      lines.push('  - `content_json`: MUST match the required JSON Schema exactly.');
+    } else if (exp?.format === 'text') {
+      lines.push(FINISH_ONLY);
+      lines.push(ARGS);
+      lines.push(STATUS_LINE);
+      lines.push('  - `format`: "text".');
+      lines.push('  - `content`: complete plain text (no Markdown).');
+    } else {
+      lines.push(FINISH_ONLY);
+      lines.push(ARGS);
+      lines.push(STATUS_LINE);
+      lines.push('  - `format`: "markdown".');
+      lines.push('  - `content`: complete Markdown deliverable.');
+    }
+    lines.push('- Do NOT end with plain text. The session ends only after `agent_final_report`.');
+    return lines.join('\n');
   }
 }
 
