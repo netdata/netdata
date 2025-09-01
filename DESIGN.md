@@ -299,6 +299,100 @@ for turn in 0..maxTurns:
 - Error message indicates specific failure reason
 - All progress preserved in returned session
 
+## Output and Thinking Display Requirements
+
+### Output Stream Handling
+The agent MUST properly display both content output and thinking/reasoning streams from LLMs:
+
+#### Standard Output (stdout)
+- **Content**: All LLM response/content text
+- **Formatting**: No color formatting applied
+- **Streaming mode**: Real-time display via `onOutput` callback as chunks arrive
+- **Non-streaming mode**: Complete response displayed after turn completion
+
+#### Standard Error (stderr)  
+- **Content**: All LLM thinking/reasoning text
+- **Formatting**: Light gray color (`\x1b[90m`)
+- **Streaming mode**: Real-time display via `onThinking` callback as chunks arrive
+- **Provider support**: Only with providers supporting reasoning (e.g., OpenAI o1, Anthropic Claude)
+
+#### Implementation Details
+1. **Streaming Response Handling**:
+   - Text chunks are passed to callbacks immediately as they arrive
+   - `onChunk(chunk, 'content')` → `onOutput(chunk)` → stdout
+   - `onChunk(chunk, 'thinking')` → `onThinking(chunk)` → stderr (gray)
+
+2. **Non-Streaming Response Handling**:
+   - Complete response buffered during execution
+   - Output displayed via `onOutput` callback after turn completion
+   - Only if response contains actual content (not just tool calls)
+
+3. **Tool Execution Context**:
+   - Tool execution happens WITHIN turns (via AI SDK)
+   - Responses after tool use should still be displayed
+   - Final answer detection must check LAST assistant message only
+   - Don't exit prematurely when tools are involved
+
+## Agent Exit Tracking Requirements
+
+### CRITICAL: Verbose Exit Logging
+**Every agent exit MUST include clear verbose logging with unique exit codes for debugging:**
+
+#### Exit Code Categories and Requirements
+
+1. **SUCCESS**: Normal completion
+   - `EXIT-FINAL-ANSWER`: Final answer received from LLM
+   - `EXIT-MAX-TURNS-WITH-RESPONSE`: Max turns reached with final response
+   - `EXIT-USER-STOP`: User-initiated stop signal
+
+2. **LLM FAILURES**: LLM-related terminations
+   - `EXIT-NO-LLM-RESPONSE`: No response from LLM after all retries
+   - `EXIT-EMPTY-RESPONSE`: Invalid/empty response from all providers
+   - `EXIT-AUTH-FAILURE`: All providers failed with auth errors
+   - `EXIT-QUOTA-EXCEEDED`: All providers hit quota limits
+   - `EXIT-MODEL-ERROR`: Persistent model errors across all providers
+
+3. **TOOL FAILURES**: MCP/Tool-related terminations
+   - `EXIT-TOOL-FAILURE`: Critical tool execution failure
+   - `EXIT-MCP-CONNECTION-LOST`: MCP server connection lost
+   - `EXIT-TOOL-NOT-AVAILABLE`: Required tool not available
+   - `EXIT-TOOL-TIMEOUT`: Tool timeout exceeded max threshold
+
+4. **CONFIGURATION**: Config/setup issues
+   - `EXIT-NO-PROVIDERS`: No valid providers configured
+   - `EXIT-INVALID-MODEL`: Invalid model configuration
+   - `EXIT-MCP-INIT-FAILED`: MCP server initialization failed
+
+5. **TIMEOUT/LIMITS**: Resource limits
+   - `EXIT-INACTIVITY-TIMEOUT`: Inactivity timeout reached
+   - `EXIT-MAX-RETRIES`: Max retries exhausted
+   - `EXIT-TOKEN-LIMIT`: Token limit exceeded
+   - `EXIT-MAX-TURNS-NO-RESPONSE`: Max turns reached without response
+
+6. **UNEXPECTED**: Unexpected terminations
+   - `EXIT-UNCAUGHT-EXCEPTION`: Uncaught exception
+   - `EXIT-SIGNAL-RECEIVED`: Process signal received
+   - `EXIT-UNKNOWN`: Unknown termination reason
+
+#### Exit Logging Format
+```typescript
+// Verbose mode MUST log exit with:
+[VRB] ← [X.X] agent {EXIT-CODE}: {detailed_reason} (fatal=true)
+
+// Example outputs:
+[VRB] ← [5.0] agent EXIT-FINAL-ANSWER: Final answer received, session complete (fatal=true)
+[VRB] ← [3.0] agent EXIT-NO-LLM-RESPONSE: No LLM response after 3 retries across 2 providers (fatal=true)
+[VRB] ← [10.0] agent EXIT-MAX-TURNS-NO-RESPONSE: Max turns (10) reached without final response (fatal=true)
+[VRB] ← [2.0] agent EXIT-INACTIVITY-TIMEOUT: Inactivity timeout after 300000ms waiting for LLM (fatal=true)
+```
+
+#### Implementation Requirements
+1. **Every exit path** in the code MUST have a unique exit code
+2. **Verbose logging** MUST include the exit code and detailed reason
+3. **Exit location** should be traceable from the code (file:line)
+4. **Fatal flag** MUST be set to true for all exit logs
+5. **Session state** should be preserved up to the exit point
+
 ## Implementation Notes
 
 ### Component Boundaries and Responsibilities

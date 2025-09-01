@@ -53,7 +53,7 @@ export interface ToolResult {
 // Structured logging interface
 export interface LogEntry {
   timestamp: number;                    // Unix timestamp (ms)
-  severity: 'VRB' | 'WRN' | 'ERR' | 'TRC'; // Log severity level
+  severity: 'VRB' | 'WRN' | 'ERR' | 'TRC' | 'THK'; // Log severity level (THK for thinking/reasoning)
   turn: number;                         // Sequential turn ID  
   subturn: number;                      // Sequential tool ID within turn
   direction: 'request' | 'response';    // Request or response

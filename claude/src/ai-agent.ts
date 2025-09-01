@@ -8,6 +8,37 @@ import type {
   TurnRequest
 } from './types.js';
 
+// Exit codes according to DESIGN.md
+type ExitCode = 
+  // SUCCESS
+  | 'EXIT-FINAL-ANSWER'
+  | 'EXIT-MAX-TURNS-WITH-RESPONSE'
+  | 'EXIT-USER-STOP'
+  // LLM FAILURES
+  | 'EXIT-NO-LLM-RESPONSE'
+  | 'EXIT-EMPTY-RESPONSE'
+  | 'EXIT-AUTH-FAILURE'
+  | 'EXIT-QUOTA-EXCEEDED'
+  | 'EXIT-MODEL-ERROR'
+  // TOOL FAILURES
+  | 'EXIT-TOOL-FAILURE'
+  | 'EXIT-MCP-CONNECTION-LOST'
+  | 'EXIT-TOOL-NOT-AVAILABLE'
+  | 'EXIT-TOOL-TIMEOUT'
+  // CONFIGURATION
+  | 'EXIT-NO-PROVIDERS'
+  | 'EXIT-INVALID-MODEL'
+  | 'EXIT-MCP-INIT-FAILED'
+  // TIMEOUT/LIMITS
+  | 'EXIT-INACTIVITY-TIMEOUT'
+  | 'EXIT-MAX-RETRIES'
+  | 'EXIT-TOKEN-LIMIT'
+  | 'EXIT-MAX-TURNS-NO-RESPONSE'
+  // UNEXPECTED
+  | 'EXIT-UNCAUGHT-EXCEPTION'
+  | 'EXIT-SIGNAL-RECEIVED'
+  | 'EXIT-UNKNOWN';
+
 import { validateProviders, validateMCPServers, validatePrompts } from './config.js';
 import { LLMClient } from './llm-client.js';
 import { MCPClientManager } from './mcp-client.js';
@@ -59,7 +90,7 @@ export class AIAgentSession {
 
     // Create session-owned MCP client
     const mcpClient = new MCPClientManager({ 
-      trace: sessionConfig.traceMCP, 
+      trace: sessionConfig.traceMCP === true, 
       verbose: sessionConfig.verbose,
       onLog: sessionConfig.callbacks?.onLog 
     });
@@ -82,6 +113,28 @@ export class AIAgentSession {
       llmClient,
       sessionConfig
     );
+  }
+
+  // Helper method to log exit with proper format
+  private logExit(
+    exitCode: ExitCode,
+    reason: string,
+    turn: number,
+    logs: LogEntry[]
+  ): void {
+    const logEntry: LogEntry = {
+      timestamp: Date.now(),
+      severity: 'VRB',
+      turn,
+      subturn: 0,
+      direction: 'response',
+      type: 'llm',
+      remoteIdentifier: `agent:${exitCode}`,
+      fatal: true,
+      message: `${exitCode}: ${reason} (fatal=true)`
+    };
+    logs.push(logEntry);
+    this.sessionConfig.callbacks?.onLog?.(logEntry);
   }
 
   // Main execution method - returns immutable result
@@ -167,6 +220,14 @@ export class AIAgentSession {
       };
       currentLogs.push(logEntry);
       this.sessionConfig.callbacks?.onLog?.(logEntry);
+      
+      // Log exit for uncaught exception
+      this.logExit(
+        'EXIT-UNCAUGHT-EXCEPTION',
+        `Uncaught exception: ${message}`,
+        currentTurn,
+        currentLogs
+      );
 
       return {
         success: false,
@@ -190,6 +251,9 @@ export class AIAgentSession {
     let logs = [...initialLogs];
     let accounting = [...initialAccounting];
     let currentTurn = startTurn;
+    
+    // Track the last turn where we showed thinking header
+    let lastShownThinkingHeaderTurn = -1;
 
     const maxTurns = this.sessionConfig.maxTurns ?? 30;
     const maxRetries = this.sessionConfig.maxRetries ?? 3;
@@ -218,8 +282,16 @@ export class AIAgentSession {
               conversation,
               provider,
               model,
-              currentTurn >= maxTurns - 1 // isFinalTurn
+              currentTurn >= maxTurns - 1, // isFinalTurn
+              currentTurn,
+              logs,
+              lastShownThinkingHeaderTurn
             );
+            
+            // Update tracking if thinking was shown
+            if (turnResult.shownThinking) {
+              lastShownThinkingHeaderTurn = currentTurn;
+            }
 
             // Record accounting
             if (turnResult.tokens !== undefined) {
@@ -243,13 +315,56 @@ export class AIAgentSession {
               // Add new messages to conversation
               conversation.push(...turnResult.messages);
               
+              // Debug logging
+              if (this.sessionConfig.verbose === true) {
+                const hasToolResults = turnResult.messages.some((m: ConversationMessage) => m.role === 'tool');
+                const debugEntry: LogEntry = {
+                  timestamp: Date.now(),
+                  severity: 'VRB',
+                  turn: currentTurn,
+                  subturn: 0,
+                  direction: 'response',
+                  type: 'llm',
+                  remoteIdentifier: 'debug',
+                  fatal: false,
+                  message: `Turn result: hasToolCalls=${String(turnResult.status.hasToolCalls)}, hasToolResults=${String(hasToolResults)}, finalAnswer=${String(turnResult.status.finalAnswer)}, response length=${String(turnResult.response?.length ?? 0)}, messages=${String(turnResult.messages.length)}`
+                };
+                logs.push(debugEntry);
+                this.sessionConfig.callbacks?.onLog?.(debugEntry);
+                
+                // Debug: show the actual messages content
+                if (process.env.DEBUG === 'true') {
+                  // eslint-disable-next-line functional/no-loop-statements
+                  for (const msg of turnResult.messages) {
+                    console.error(`[DEBUG] Message role=${msg.role}, content length=${String(msg.content.length)}, hasToolCalls=${String(msg.toolCalls !== undefined)}`);
+                    if (msg.content.length > 0) {
+                      console.error(`[DEBUG] Content: ${msg.content.substring(0, 200)}`);
+                    }
+                  }
+                }
+              }
+              
+              // Output response text if we have any (even with tool calls)
+              // Only in non-streaming mode (streaming already called onOutput per chunk)
+              if (this.sessionConfig.stream !== true && turnResult.response !== undefined && turnResult.response.length > 0) {
+                this.sessionConfig.callbacks?.onOutput?.(turnResult.response);
+                // Add newline if response doesn't end with one
+                if (!turnResult.response.endsWith('\n')) {
+                  this.sessionConfig.callbacks?.onOutput?.('\n');
+                }
+              }
+              
               if (turnResult.status.finalAnswer) {
                 // We have a final answer - successful completion
                 
-                // Only output response text in non-streaming mode (streaming already called onOutput per chunk)
-                if (this.sessionConfig.stream !== true && turnResult.response !== undefined && turnResult.response.length > 0) {
-                  this.sessionConfig.callbacks?.onOutput?.(turnResult.response);
-                }
+                // Log successful exit
+                this.logExit(
+                  'EXIT-FINAL-ANSWER',
+                  'Final answer received, session complete',
+                  currentTurn,
+                  logs
+                );
+                
                 return {
                   success: true,
                   conversation,
@@ -282,6 +397,20 @@ export class AIAgentSession {
 
       if (!turnSuccessful) {
         // All attempts failed for this turn
+        const exitCode = (lastError?.includes('auth') === true) ? 'EXIT-AUTH-FAILURE' :
+                        (lastError?.includes('quota') === true) ? 'EXIT-QUOTA-EXCEEDED' :
+                        (lastError?.includes('timeout') === true) ? 'EXIT-INACTIVITY-TIMEOUT' :
+                        'EXIT-NO-LLM-RESPONSE';
+        
+        const reason = `No LLM response after ${String(maxRetries)} retries across ${String(pairs.length)} provider/model pairs: ${lastError ?? 'All providers and models failed'}`;
+        
+        this.logExit(
+          exitCode,
+          reason,
+          currentTurn,
+          logs
+        );
+        
         return {
           success: false,
           error: lastError ?? 'All providers and models failed',
@@ -293,6 +422,13 @@ export class AIAgentSession {
     }
 
     // Max turns exceeded
+    this.logExit(
+      'EXIT-MAX-TURNS-NO-RESPONSE',
+      `Max turns (${String(maxTurns)}) reached without final response`,
+      currentTurn,
+      logs
+    );
+    
     return {
       success: false,
       error: 'Max tool turns exceeded',
@@ -306,9 +442,15 @@ export class AIAgentSession {
     conversation: ConversationMessage[],
     provider: string,
     model: string,
-    isFinalTurn: boolean
+    isFinalTurn: boolean,
+    currentTurn: number,
+    logs: LogEntry[],
+    lastShownThinkingHeaderTurn: number
   ) {
     const availableTools = this.mcpClient.getAllTools();
+    
+    // Track if we've shown thinking for this turn
+    let shownThinking = false;
     
     // Create tool executor function that delegates to MCP client with accounting
     const toolExecutor = async (toolName: string, parameters: Record<string, unknown>): Promise<string> => {
@@ -374,13 +516,35 @@ export class AIAgentSession {
       onChunk: (chunk: string, type: 'content' | 'thinking') => {
         if (type === 'content' && this.sessionConfig.callbacks?.onOutput !== undefined) {
           this.sessionConfig.callbacks.onOutput(chunk);
-        } else if (type === 'thinking' && this.sessionConfig.callbacks?.onThinking !== undefined) {
-          this.sessionConfig.callbacks.onThinking(chunk);
+        } else if (type === 'thinking') {
+          // Check if we need to show the thinking header for this turn
+          if (lastShownThinkingHeaderTurn !== currentTurn) {
+            // Show the THK header (without the chunk content)
+            const thinkingHeader: LogEntry = {
+              timestamp: Date.now(),
+              severity: 'THK',
+              turn: currentTurn,
+              subturn: 0,
+              direction: 'response',
+              type: 'llm',
+              remoteIdentifier: 'thinking',
+              fatal: false,
+              message: ''  // Header only, no content
+            };
+            logs.push(thinkingHeader);
+            this.sessionConfig.callbacks?.onLog?.(thinkingHeader);
+            shownThinking = true;
+            // Update tracking to prevent duplicate headers
+            lastShownThinkingHeaderTurn = currentTurn;
+          }
+          // Always stream the thinking text (including the first chunk)
+          this.sessionConfig.callbacks?.onThinking?.(chunk);
         }
       }
     };
 
-    return await this.llmClient.executeTurn(request);
+    const result = await this.llmClient.executeTurn(request);
+    return { ...result, shownThinking };
   }
 
   private enhanceSystemPrompt(systemPrompt: string, mcpInstructions: string): string {

@@ -3,7 +3,7 @@ import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import type { TurnRequest, TurnResult, ProviderConfig, ConversationMessage } from '../types.js';
 import type { LanguageModel, ModelMessage } from 'ai';
 
-import { BaseLLMProvider } from './base.js';
+import { BaseLLMProvider, type ResponseMessage } from './base.js';
 
 export class OpenRouterProvider extends BaseLLMProvider {
   name = 'openrouter';
@@ -33,7 +33,7 @@ export class OpenRouterProvider extends BaseLLMProvider {
     try {
       const model = this.provider(request.model);
       const tools = this.convertTools(request.tools, request.toolExecutor);
-      const messages = this.convertMessages(request.messages);
+      const messages = super.convertMessages(request.messages);
       
       // Add final turn message if needed
       const finalMessages = request.isFinalTurn === true 
@@ -57,47 +57,9 @@ export class OpenRouterProvider extends BaseLLMProvider {
     }
   }
 
-  private convertMessages(messages: ConversationMessage[]): ModelMessage[] {
-    return messages
-      .filter(m => m.role === 'system' || m.role === 'user' || m.role === 'assistant')
-      .map(m => ({
-        role: m.role as 'system' | 'user' | 'assistant',
-        content: m.content,
-        toolCalls: m.toolCalls
-      })) as ModelMessage[];
-  }
 
-  protected convertResponseMessages(messages: {
-    role?: string;
-    content?: string | { type?: string; text?: string }[];
-    toolCalls?: {
-      id?: string;
-      name?: string;
-      arguments?: unknown;
-      function?: { name?: string; arguments?: unknown };
-      toolCallId?: string;
-    }[];
-  }[], provider: string, model: string, tokens: { inputTokens?: number; outputTokens?: number; cachedTokens?: number; totalTokens?: number }): ConversationMessage[] {
-    return messages.map(m => ({
-      role: (m.role ?? 'assistant') as ConversationMessage['role'],
-      content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
-      toolCalls: Array.isArray(m.toolCalls) ? m.toolCalls.map(tc => ({
-        id: tc.id ?? tc.toolCallId ?? '',
-        name: tc.name ?? tc.function?.name ?? '',
-        parameters: (tc.arguments ?? tc.function?.arguments ?? {}) as Record<string, unknown>
-      })) : undefined,
-      toolCallId: 'toolCallId' in m ? (m as { toolCallId?: string }).toolCallId : undefined,
-      metadata: {
-        provider,
-        model,
-        tokens: {
-          inputTokens: tokens.inputTokens ?? 0,
-          outputTokens: tokens.outputTokens ?? 0,
-          cachedTokens: tokens.cachedTokens,
-          totalTokens: tokens.totalTokens ?? 0
-        },
-        timestamp: Date.now()
-      }
-    }));
+  protected convertResponseMessages(messages: ResponseMessage[], provider: string, model: string, tokens: { inputTokens?: number; outputTokens?: number; cachedTokens?: number; totalTokens?: number }): ConversationMessage[] {
+    // Use base class helper that handles AI SDK's content array format
+    return messages.map(m => this.parseAISDKMessage(m, provider, model, tokens));
   }
 }

@@ -27,3 +27,4 @@ YOU ARE NOT ALLOWED TO READ THIS FILE.
 READING THIS FILE MEANS WE NEED TO INVALIDATE ALL KEYS AND CREATE NEW ONES.
 THIS IS TREMENDOUS AMOUNT OF WORK. NEVER READ .env FILE.
 - This is code you just created, which I will spend a tone of time testing, which according to eslint has 500 issues. You expect me to find these 500 issues by hand? It will be weeks for me, probably an hour for you. Fix them all. No questions. No pushback. No workarounds. Fix your code, or I will just throw it away.
+- after ever change we ensure the application builds and that eslint reports zero warnings and zero errors, without exceptions.

@@ -53,6 +53,24 @@ export class MCPClientManager {
     return servers;
   }
 
+  private redactAuthHeader(headers: Record<string, string>): Record<string, string> {
+    const safeHeaders = { ...headers };
+    if (safeHeaders.Authorization) {
+      const auth = safeHeaders.Authorization;
+      if (auth.startsWith('Bearer ')) {
+        const token = auth.substring(7);
+        if (token.length > 8) {
+          safeHeaders.Authorization = `Bearer ${token.substring(0, 4)}...REDACTED...${token.substring(token.length - 4)}`;
+        } else {
+          safeHeaders.Authorization = `Bearer [SHORT_TOKEN]`;
+        }
+      } else {
+        safeHeaders.Authorization = '[REDACTED]';
+      }
+    }
+    return safeHeaders;
+  }
+
   private async initializeServer(name: string, config: MCPServerConfig): Promise<MCPServer> {
     const client = new Client({ name: 'ai-agent', version: '1.0.0' }, { capabilities: { tools: {} } });
 
@@ -66,19 +84,80 @@ export class MCPClientManager {
         case 'stdio':
           transport = this.createStdioTransport(name, config);
           break;
-        case 'websocket':
-          transport = await createWebSocketTransport(config.url ?? '', resolveHeaders(config.headers));
+        case 'websocket': {
+          if (config.url == null || config.url.length === 0) throw new Error(`WebSocket MCP server '${name}' requires a 'url'`);
+          const resolvedHeaders = resolveHeaders(config.headers);
+          
+          // Log WebSocket connection details for tracing
+          if (this.trace) {
+            if (resolvedHeaders !== undefined) {
+              const safeHeaders = this.redactAuthHeader(resolvedHeaders);
+              this.log('TRC', 'request', 'mcp', `${name}:websocket-connect`, 
+                `WebSocket URL: ${config.url}, Headers: ${JSON.stringify(safeHeaders)}`);
+            } else {
+              this.log('TRC', 'request', 'mcp', `${name}:websocket-connect`, 
+                `WebSocket URL: ${config.url}, Headers: none`);
+            }
+          }
+          
+          transport = await createWebSocketTransport(config.url, resolvedHeaders);
           break;
+        }
         case 'http': {
           if (config.url == null || config.url.length === 0) throw new Error(`HTTP MCP server '${name}' requires a 'url'`);
           const { StreamableHTTPClientTransport } = await import('@modelcontextprotocol/sdk/client/streamableHttp.js');
-          const reqInit: RequestInit = { headers: resolveHeaders(config.headers) as HeadersInit };
+          const resolvedHeaders = resolveHeaders(config.headers);
+          
+          // Log HTTP connection details for tracing
+          if (this.trace) {
+            if (resolvedHeaders !== undefined) {
+              const safeHeaders = this.redactAuthHeader(resolvedHeaders);
+              this.log('TRC', 'request', 'mcp', `${name}:http-connect`, 
+                `HTTP URL: ${config.url}, Headers: ${JSON.stringify(safeHeaders)}`);
+            } else {
+              this.log('TRC', 'request', 'mcp', `${name}:http-connect`, 
+                `HTTP URL: ${config.url}, Headers: none`);
+            }
+          }
+          
+          const reqInit: RequestInit = { headers: resolvedHeaders as HeadersInit };
           transport = new StreamableHTTPClientTransport(new URL(config.url), { requestInit: reqInit });
           break;
         }
         case 'sse':
           if (config.url == null || config.url.length === 0) throw new Error(`SSE MCP server '${name}' requires a 'url'`);
-          transport = new SSEClientTransport(new URL(config.url), resolveHeaders(config.headers));
+          const resolvedHeaders = resolveHeaders(config.headers);
+          
+          // Log the SSE connection details for tracing
+          if (this.trace) {
+            if (resolvedHeaders !== undefined) {
+              const safeHeaders = this.redactAuthHeader(resolvedHeaders);
+              this.log('TRC', 'request', 'mcp', `${name}:sse-connect`, 
+                `SSE URL: ${config.url}, Headers: ${JSON.stringify(safeHeaders)}`);
+            } else {
+              this.log('TRC', 'request', 'mcp', `${name}:sse-connect`, 
+                `SSE URL: ${config.url}, Headers: none (WARNING: No Authorization header!)`);
+            }
+          }
+          
+          // SSEClientTransport needs a custom fetch to include headers for EventSource
+          // The requestInit headers are only used for POST requests, not the EventSource connection
+          const customFetch: typeof fetch = async (input, init) => {
+            // Merge our headers with any headers from init
+            const headers = new Headers(init?.headers);
+            if (resolvedHeaders !== undefined) {
+              Object.entries(resolvedHeaders).forEach(([key, value]) => {
+                headers.set(key, value);
+              });
+            }
+            return fetch(input, { ...init, headers });
+          };
+          
+          transport = new SSEClientTransport(new URL(config.url), {
+            eventSourceInit: { fetch: customFetch },
+            requestInit: { headers: resolvedHeaders },
+            fetch: customFetch
+          });
           break;
         default:
           throw new Error('Unsupported transport type');

@@ -128,6 +128,7 @@ program
 
       if (!result.success) {
         console.error(`Error: ${result.error ?? ''}`);
+        // Exit logs are already emitted by the agent itself via callbacks
         if ((result.error ?? '').includes('Configuration')) process.exit(1);
         else if ((result.error ?? '').includes('Max tool turns exceeded')) process.exit(5);
         else if ((result.error ?? '').includes('tool')) process.exit(3);
@@ -144,10 +145,19 @@ program
         }
       }
 
+      // Successful completion - agent already logged EXIT-FINAL-ANSWER or similar
       process.exit(0);
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Unknown error';
       console.error(`Fatal error: ${msg}`);
+      // Agent should have already logged exit via callbacks, but log here if it didn't
+      if (options.verbose === true && !msg.includes('EXIT-')) {
+        const colorize = (text: string, colorCode: string): string => {
+          return process.stderr.isTTY ? `${colorCode}${text}\x1b[0m` : text;
+        };
+        const formatted = colorize(`[VRB] ← [0.0] agent EXIT-UNKNOWN: Unexpected error in CLI: ${msg} (fatal=true)`, '\x1b[90m');
+        process.stderr.write(`${formatted}\n`);
+      }
       if (msg.includes('config')) process.exit(1);
       else if (msg.includes('argument')) process.exit(4);
       else if (msg.includes('tool')) process.exit(3);
@@ -276,12 +286,19 @@ function createCallbacks(options: Record<string, unknown>, accountingFile?: stri
           process.stderr.write(`${formatted}\n`);
         }
       }
+      
+      // Show thinking header with light gray color
+      if (entry.severity === 'THK') {
+        const formatted = colorize(`[THK] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}: `, '\x1b[90m');
+        process.stderr.write(formatted);
+        // The actual thinking text will follow via onThinking
+      }
     },
     
     onOutput: (text: string) => { process.stdout.write(text); },
     
     onThinking: (text: string) => { 
-      const colored = colorize(text, '\x1b[90m'); // Dark gray for thinking
+      const colored = colorize(text, '\x1b[90m'); // Light gray for thinking
       process.stderr.write(colored);
     },
     

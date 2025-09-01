@@ -123,7 +123,20 @@ export class LLMClient {
         if (this.traceLLM) {
           const headerObj: Record<string, string> = {};
           headers.forEach((value, key) => {
-            headerObj[key.toLowerCase()] = key.toLowerCase() === 'authorization' ? 'REDACTED' : value;
+            if (key.toLowerCase() === 'authorization') {
+              if (value.startsWith('Bearer ')) {
+                const token = value.substring(7);
+                if (token.length > 8) {
+                  headerObj[key.toLowerCase()] = `Bearer ${token.substring(0, 4)}...REDACTED...${token.substring(token.length - 4)}`;
+                } else {
+                  headerObj[key.toLowerCase()] = `Bearer [SHORT_TOKEN]`;
+                }
+              } else {
+                headerObj[key.toLowerCase()] = '[REDACTED]';
+              }
+            } else {
+              headerObj[key.toLowerCase()] = value;
+            }
           });
 
           let bodyPretty = '';
@@ -145,7 +158,20 @@ export class LLMClient {
         if (this.traceLLM) {
           const respHeaders: Record<string, string> = {};
           response.headers.forEach((value, key) => {
-            respHeaders[key.toLowerCase()] = key.toLowerCase() === 'authorization' ? 'REDACTED' : value;
+            if (key.toLowerCase() === 'authorization') {
+              if (value.startsWith('Bearer ')) {
+                const token = value.substring(7);
+                if (token.length > 8) {
+                  respHeaders[key.toLowerCase()] = `Bearer ${token.substring(0, 4)}...REDACTED...${token.substring(token.length - 4)}`;
+                } else {
+                  respHeaders[key.toLowerCase()] = `Bearer [SHORT_TOKEN]`;
+                }
+              } else {
+                respHeaders[key.toLowerCase()] = '[REDACTED]';
+              }
+            } else {
+              respHeaders[key.toLowerCase()] = value;
+            }
           });
 
           const contentType = response.headers.get('content-type') ?? '';
