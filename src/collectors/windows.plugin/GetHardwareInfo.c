@@ -24,7 +24,7 @@ static void netdata_unload_driver()
 int netdata_load_driver()
 {
     const char *srv_name = "NetdataDriver";
-    const char* drv_path = "C:\\windows\\System32\\msys-netdata_driver.sys";
+    const char* drv_path = "C:\\windows\\System32\\netdata_driver.sys";
 
     scm = OpenSCManager(
             NULL,

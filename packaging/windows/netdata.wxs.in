@@ -112,6 +112,7 @@
                     <Exclude Files="C:\msys64\opt\netdata\usr\bin\netdata.exe" />
                     <Exclude Files="C:\msys64\opt\netdata\usr\bin\wevt_netdata_manifest.xml" />
                     <Exclude Files="C:\msys64\opt\netdata\usr\bin\wevt_netdata.dll" />
+                    <Exclude Files="C:\msys64\opt\netdata\usr\bin\netdata_driver.sys" />
                 </Files>
             </ComponentGroup>
 
@@ -185,7 +186,7 @@
 
             <!-- Install netdata driver file -->
             <ComponentGroup Id="NetdataDriver" Directory="System64Folder">
-                <File Id="NetdataDrv" Name="netdata_driver.sys" Source="C:\msys64\opt\netdata\usr\bin\msys-netdata_driver.sys">
+                <File Id="NetdataDrv" Name="netdata_driver.sys" Source="C:\msys64\opt\netdata\usr\bin\netdata_driver.sys">
                 </File>
             </ComponentGroup>
 
