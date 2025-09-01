@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Update link for opt-out section [\#20909](https://github.com/netdata/netdata/pull/20909) ([gatesry](https://github.com/gatesry))
 - build\(deps\): bump k8s.io/client-go from 0.33.4 to 0.34.0 in /src/go [\#20908](https://github.com/netdata/netdata/pull/20908) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/stretchr/testify from 1.11.0 to 1.11.1 in /src/go [\#20906](https://github.com/netdata/netdata/pull/20906) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Fix processes function: Add PPID grouping and fix WOps typo [\#20902](https://github.com/netdata/netdata/pull/20902) ([ktsaou](https://github.com/ktsaou))
@@ -450,7 +451,6 @@
 - SNMP: fortinet-appliance.yaml [\#20369](https://github.com/netdata/netdata/pull/20369) ([Ancairon](https://github.com/Ancairon))
 - chore\(otel.plugin\): fix building [\#20368](https://github.com/netdata/netdata/pull/20368) ([ilyam8](https://github.com/ilyam8))
 - SNMP: \_fortinet-fortigate-vpn-tunnel.yaml [\#20367](https://github.com/netdata/netdata/pull/20367) ([Ancairon](https://github.com/Ancairon))
-- SNMP: \_fortinet-fortigate-cpu-memory.yaml [\#20366](https://github.com/netdata/netdata/pull/20366) ([Ancairon](https://github.com/Ancairon))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
