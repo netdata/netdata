@@ -1,422 +1,504 @@
-/**
- * MCP Client Layer - Production Implementation
- * Handles MCP server connections, tool discovery, and execution according to IMPLEMENTATION.md
- */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
-import type { MCPServerConfig } from './types.js';
-import type { JSONSchema7 } from 'json-schema';
+import type { MCPServerConfig, MCPTool, MCPServer, ToolCall, ToolResult, ToolStatus, LogEntry } from './types.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import type { ChildProcess } from 'node:child_process';
 
 import { createWebSocketTransport } from './websocket-transport.js';
 
-export interface MCPToolInfo {
-  name: string;
-  title?: string;
-  description?: string;
-  inputSchema: JSONSchema7;
-  outputSchema?: JSONSchema7;
-  annotations?: Record<string, unknown>;
-  serverName: string;
-}
-
-export interface MCPPromptInfo {
-  name: string;
-  description?: string;
-  arguments?: {
-    name: string;
-    description?: string;
-    required?: boolean;
-  }[];
-  serverName: string;
-}
-
-export interface MCPToolResult {
-  content: { type: string; text?: string; [key: string]: unknown }[];
-  structuredContent?: unknown;
-  isError?: boolean;
-}
-
 export class MCPClientManager {
   private clients = new Map<string, Client>();
-  private tools = new Map<string, MCPToolInfo>();
-  private prompts = new Map<string, MCPPromptInfo>();
-  private serverInstructions = new Map<string, string>();
-  private toolTimeout: number;
+  private processes = new Map<string, ChildProcess>();
+  private servers = new Map<string, MCPServer>();
+  private trace = false;
+  private verbose = false;
+  private onLog?: (entry: LogEntry) => void;
+  private currentTurn = 0;
+  private currentSubturn = 0;
 
-  constructor(toolTimeout = 10000) {
-    this.toolTimeout = toolTimeout;
+  constructor(opts?: { 
+    trace?: boolean; 
+    verbose?: boolean; 
+    onLog?: (entry: LogEntry) => void;
+  }) {
+    this.trace = opts?.trace === true;
+    this.verbose = opts?.verbose === true;
+    this.onLog = opts?.onLog;
   }
 
-  /**
-   * Initialize MCP servers according to configuration
-   */
-  async initializeServers(servers: Record<string, MCPServerConfig>): Promise<void> {
-    const initPromises = Object.entries(servers)
-      .filter(([_, config]) => config.enabled !== false)
-      .map(([name, config]) => this.initializeServer(name, config));
-
-    await Promise.all(initPromises);
+  setTurn(turn: number, subturn = 0): void {
+    this.currentTurn = turn;
+    this.currentSubturn = subturn;
   }
 
-  /**
-   * Initialize a single MCP server
-   */
-  private async initializeServer(serverName: string, config: MCPServerConfig): Promise<void> {
-    try {
-      // Create transport based on server type
-      const transport = await this.createTransport(config);
-      
-      // Create MCP client with proper capabilities
-      const client = new Client(
-        { 
-          name: "ai-agent", 
-          version: "1.0.0",
-          title: "AI Agent Production Client"
-        },
-        { 
-          capabilities: { 
-            tools: {},
-            prompts: {} // Enable prompts capability
-          } 
-        }
-      );
-
-      // Connect to server
-      await client.connect(transport as Parameters<typeof client.connect>[0]);
-      this.clients.set(serverName, client);
-
-      // Get server instructions if available
-      const instructions = 'getInstructions' in client && typeof client.getInstructions === 'function' ? client.getInstructions() : undefined;
-      if (typeof instructions === 'string' && instructions.trim() !== '') {
-        this.serverInstructions.set(serverName, instructions);
-        console.error(`[mcp] Retrieved instructions from server '${serverName}'`);
-      }
-
-      // Discover tools
-      const toolsResult = await client.listTools();
-      this.processToolsRecursively(toolsResult.tools, 0, serverName);
-
-      // Discover prompts (optional capability)
+  async initializeServers(mcpServers: Record<string, MCPServerConfig>): Promise<MCPServer[]> {
+    const entries = Object.entries(mcpServers);
+    const servers: MCPServer[] = [];
+    
+    // eslint-disable-next-line functional/no-loop-statements
+    for (const [name, config] of entries) {
       try {
-        const promptsResult = await client.listPrompts();
-        this.processPromptsRecursively(promptsResult.prompts, 0, serverName);
+        const server = await this.initializeServer(name, config);
+        this.servers.set(name, server);
+        servers.push(server);
       } catch (error) {
-        // Prompts are optional - server may not support them
-        console.error(`[mcp] Server '${serverName}' does not support prompts: ${String(error)}`);
+        // Log error but continue with other servers
+        const message = error instanceof Error ? error.message : String(error);
+        this.log('ERR', 'response', 'mcp', `${name}:init`, `initialization failed: ${message}`, true);
       }
-
-      console.error(`[mcp] Initialized server '${serverName}' with ${String(toolsResult.tools.length)} tools`);
-
-    } catch (error) {
-      throw new Error(`Failed to initialize MCP server '${serverName}': ${String(error)}`);
     }
+    
+    return servers;
   }
 
-  /**
-   * Create transport based on configuration with proper environment resolution
-   */
-  private async createTransport(config: MCPServerConfig): Promise<unknown> {
-    const resolvedHeaders = this.resolveEnvironmentVariables(config.headers ?? {});
-    const resolvedEnv = this.resolveEnvironmentVariables(config.env ?? {});
+  private async initializeServer(name: string, config: MCPServerConfig): Promise<MCPServer> {
+    const client = new Client({ name: 'ai-agent', version: '1.0.0' }, { capabilities: { tools: {} } });
 
-    switch (config.type) {
-      case 'stdio':
-        if (typeof config.command !== 'string' || config.command.trim() === '') {
-          throw new Error('Command is required for stdio transport');
+    let transport: Transport;
+    const initStart = Date.now();
+    
+    this.log('VRB', 'request', 'mcp', `${name}:connect`, `type=${config.type} ${config.command ?? config.url ?? ''}`);
+    
+    try {
+      switch (config.type) {
+        case 'stdio':
+          transport = this.createStdioTransport(name, config);
+          break;
+        case 'websocket':
+          transport = await createWebSocketTransport(config.url ?? '', resolveHeaders(config.headers));
+          break;
+        case 'http': {
+          if (config.url == null || config.url.length === 0) throw new Error(`HTTP MCP server '${name}' requires a 'url'`);
+          const { StreamableHTTPClientTransport } = await import('@modelcontextprotocol/sdk/client/streamableHttp.js');
+          const reqInit: RequestInit = { headers: resolveHeaders(config.headers) as HeadersInit };
+          transport = new StreamableHTTPClientTransport(new URL(config.url), { requestInit: reqInit });
+          break;
         }
-        return new StdioClientTransport({
-          command: config.command,
-          args: config.args ?? [],
-          env: resolvedEnv,
-          stderr: 'pipe' // Capture stderr for logging
+        case 'sse':
+          if (config.url == null || config.url.length === 0) throw new Error(`SSE MCP server '${name}' requires a 'url'`);
+          transport = new SSEClientTransport(new URL(config.url), resolveHeaders(config.headers));
+          break;
+        default:
+          throw new Error('Unsupported transport type');
+      }
+
+      await client.connect(transport);
+      this.clients.set(name, client);
+
+      const connectLatency = Date.now() - initStart;
+      this.log('VRB', 'response', 'mcp', `${name}:connect`, `connected in ${String(connectLatency)}ms`);
+
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      this.log('ERR', 'response', 'mcp', `${name}:connect`, message, true);
+      throw e;
+    }
+
+    // Get server instructions
+    const initInstructions = client.getInstructions() ?? '';
+
+    // List tools
+    const toolsStart = Date.now();
+    this.log('VRB', 'request', 'mcp', `${name}:tools/list`, 'requesting tools');
+    
+    let toolsResponse;
+    try {
+      toolsResponse = await client.listTools();
+      const toolsLatency = Date.now() - toolsStart;
+      this.log('VRB', 'response', 'mcp', `${name}:tools/list`, `${String(toolsResponse.tools.length)} tools in ${String(toolsLatency)}ms`);
+      
+      if (this.trace) {
+        this.log('TRC', 'response', 'mcp', `${name}:tools/list`, JSON.stringify(toolsResponse, null, 2));
+      }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      this.log('ERR', 'response', 'mcp', `${name}:tools/list`, message, true);
+      throw e;
+    }
+
+    interface ToolItem { name: string; description?: string; inputSchema?: unknown; parameters?: unknown; instructions?: string }
+    const tools: MCPTool[] = (toolsResponse.tools as ToolItem[]).map((t) => ({
+      name: t.name,
+      description: t.description ?? '',
+      inputSchema: (t.inputSchema ?? t.parameters ?? {}) as Record<string, unknown>,
+      instructions: t.instructions,
+    }));
+
+    // List prompts (optional)
+    let instructions = initInstructions;
+    try {
+      const promptsStart = Date.now();
+      this.log('VRB', 'request', 'mcp', `${name}:prompts/list`, 'requesting prompts');
+      
+      let promptsResponse;
+      try {
+        promptsResponse = await client.listPrompts();
+        const promptsLatency = Date.now() - promptsStart;
+        
+        const pr = promptsResponse as { prompts?: { name: string; description?: string }[] } | undefined;
+        const list = Array.isArray(pr?.prompts) ? pr.prompts : [];
+        
+        this.log('VRB', 'response', 'mcp', `${name}:prompts/list`, `${String(list.length)} prompts in ${String(promptsLatency)}ms`);
+        
+        if (this.trace) {
+          this.log('TRC', 'response', 'mcp', `${name}:prompts/list`, JSON.stringify(promptsResponse, null, 2));
+        }
+
+        if (list.length > 0) {
+          const promptText = list.map((p) => `${p.name}: ${p.description ?? ''}`).join('\n');
+          instructions = instructions.length > 0 ? `${instructions}\n${promptText}` : promptText;
+        }
+      } catch (e) {
+        // Prompts are optional, log as warning but continue
+        const message = e instanceof Error ? e.message : String(e);
+        this.log('WRN', 'response', 'mcp', `${name}:prompts/list`, `failed: ${message}`);
+      }
+    } catch {
+      // Ignore prompts errors completely
+    }
+
+    const totalLatency = Date.now() - initStart;
+    const toolNames = tools.map(t => t.name).join(', ');
+    const hasInstructions = instructions.length > 0;
+    this.log('VRB', 'response', 'mcp', `${name}:init`, 
+      `${String(tools.length)} tools (${toolNames || '-'})${hasInstructions ? ', with instructions' : ''}, ${String(totalLatency)}ms total`);
+
+    if (this.trace) {
+      this.log('TRC', 'response', 'mcp', `${name}:init`, `ready with ${String(tools.length)} tools`);
+    }
+    
+    return { name, config, tools, instructions };
+  }
+
+  private createStdioTransport(name: string, config: MCPServerConfig): StdioClientTransport {
+    if (typeof config.command !== 'string' || config.command.length === 0) {
+      throw new Error(`Stdio MCP server '${name}' requires a string 'command'`);
+    }
+
+    const configured = config.env ?? {};
+    const effectiveEnv: Record<string, string> = {};
+    Object.entries(configured).forEach(([k, v]) => {
+      const resolved = v.replace(/\$\{([^}]+)\}/g, (_m: string, varName: string) => 
+        (process.env as Record<string, string | undefined>)[varName] ?? '');
+      if (resolved.length > 0) effectiveEnv[k] = resolved;
+    });
+
+    const transport = new StdioClientTransport({
+      command: config.command,
+      args: config.args ?? [],
+      env: effectiveEnv,
+      stderr: 'pipe',
+    });
+
+    // Handle stderr logging
+    try {
+      if (transport.stderr != null) {
+        transport.stderr.on('data', (d: Buffer) => {
+          const line = d.toString('utf8').trimEnd();
+          if (this.trace) {
+            this.log('TRC', 'request', 'mcp', `${name}:stderr`, line);
+          }
         });
+      }
+    } catch {
+      // Ignore stderr setup errors
+    }
+    
+    return transport;
+  }
 
-      case 'websocket':
-        if (typeof config.url !== 'string' || config.url.trim() === '') {
-          throw new Error('URL is required for websocket transport');
+  async executeTool(serverName: string, toolCall: ToolCall, timeoutMs?: number): Promise<ToolResult> {
+    const client = this.clients.get(serverName);
+    if (client == null) {
+      return {
+        toolCallId: toolCall.id,
+        status: { type: 'mcp_server_error', serverName, message: `MCP server '${serverName}' not initialized` },
+        result: '',
+        latencyMs: 0,
+        metadata: {
+          latency: 0,
+          charactersIn: 0,
+          charactersOut: 0,
+          mcpServer: serverName,
+          command: toolCall.name,
         }
-        return await createWebSocketTransport(config.url, resolvedHeaders);
-
-      case 'http':
-        if (typeof config.url !== 'string' || config.url.trim() === '') {
-          throw new Error('URL is required for http transport');
-        }
-        return new StreamableHTTPClientTransport(
-          new URL(config.url),
-          { requestInit: { headers: resolvedHeaders } }
-        );
-
-      case 'sse':
-        if (typeof config.url !== 'string' || config.url.trim() === '') {
-          throw new Error('URL is required for sse transport');
-        }
-        return new SSEClientTransport(
-          new URL(config.url),
-          resolvedHeaders
-        );
-
-      default:
-        throw new Error(`Unsupported transport type: ${String(config.type)}`);
+      };
     }
-  }
 
-  /**
-   * Resolve ${VAR} placeholders in configuration values
-   * Per spec: expand for all strings except under mcpServers.*.env|headers where preserved for server process
-   */
-  private resolveEnvironmentVariables(obj: Record<string, string>): Record<string, string> {
-    const resolved: Record<string, string> = {};
+    const start = Date.now();
+    const argsStr = JSON.stringify(toolCall.parameters);
     
-    this.processEnvironmentVariablesRecursively(Object.entries(obj), 0, resolved);
-    
-    return resolved;
-  }
-
-  /**
-   * Process tools recursively to avoid for-of loops
-   */
-  private processToolsRecursively(tools: unknown[], index: number, serverName: string): void {
-    if (index >= tools.length) {
-      return;
-    }
-    
-    const tool = tools[index] as {
-      name: string;
-      title?: string;
-      description?: string;
-      inputSchema?: JSONSchema7;
-      outputSchema?: JSONSchema7;
-      annotations?: Record<string, unknown>;
+    // Format parameters for logging
+    const fmtVal = (v: unknown): string => {
+      if (v === null || v === undefined) return String(v);
+      const type = typeof v;
+      if (type === 'string') {
+        const s = v as string;
+        return s.length > 80 ? s.slice(0, 80) + '…' : s;
+      }
+      if (type === 'number') return (v as number).toString();
+      if (type === 'boolean') return (v as boolean).toString();
+      if (Array.isArray(v)) return `[${String(v.length)}]`;
+      return '{…}';
     };
-    
-    // Handle legacy servers that return 'parameters' instead of 'inputSchema'
-    const inputSchema = tool.inputSchema ?? (tool as Record<string, unknown>)['parameters'] as JSONSchema7 | undefined;
-    
-    const toolInfo: MCPToolInfo = {
-      name: tool.name,
-      title: tool.title,
-      description: tool.description,
-      inputSchema: inputSchema ?? { type: 'object', properties: {} },
-      outputSchema: tool.outputSchema,
-      annotations: tool.annotations,
-      serverName,
+
+    const entries = Object.entries(toolCall.parameters);
+    const paramStr = entries.length > 0
+      ? '(' + entries.map(([k, v]) => `${k}:${fmtVal(v)}`).join(', ') + ')'
+      : '()';
+
+    this.log('VRB', 'request', 'mcp', `${serverName}:${toolCall.name}`, `${toolCall.name}${paramStr}`);
+
+    if (this.trace) {
+      this.log('TRC', 'request', 'mcp', `${serverName}:${toolCall.name}`, 
+        `callTool ${JSON.stringify({ name: toolCall.name, arguments: toolCall.parameters })}`);
+    }
+
+    const callWithTimeout = async () => {
+      if (typeof timeoutMs !== 'number' || timeoutMs <= 0) {
+        return await client.callTool({ name: toolCall.name, arguments: toolCall.parameters });
+      }
+      
+      const timeoutPromise = new Promise((_resolve, reject) => {
+        setTimeout(() => { reject(new Error('Tool execution timed out')); }, timeoutMs);
+      });
+      
+      const callPromise = client.callTool({ name: toolCall.name, arguments: toolCall.parameters });
+      return await Promise.race([callPromise, timeoutPromise]);
     };
-    
-    this.tools.set(tool.name, toolInfo);
-    this.processToolsRecursively(tools, index + 1, serverName);
-  }
-
-  /**
-   * Process prompts recursively to avoid for-of loops
-   */
-  private processPromptsRecursively(prompts: unknown[], index: number, serverName: string): void {
-    if (index >= prompts.length) {
-      return;
-    }
-    
-    const prompt = prompts[index] as {
-      name: string;
-      description?: string;
-      arguments?: {
-        name: string;
-        description?: string;
-        required?: boolean;
-      }[];
-    };
-    
-    const promptInfo: MCPPromptInfo = {
-      name: prompt.name,
-      description: prompt.description,
-      arguments: prompt.arguments,
-      serverName,
-    };
-    
-    this.prompts.set(prompt.name, promptInfo);
-    this.processPromptsRecursively(prompts, index + 1, serverName);
-  }
-
-  /**
-   * Process environment variables recursively to avoid for-of loops
-   */
-  private processEnvironmentVariablesRecursively(
-    entries: [string, string][],
-    index: number,
-    resolved: Record<string, string>
-  ): void {
-    if (index >= entries.length) {
-      return;
-    }
-    
-    const [key, value] = entries[index] ?? ['', ''];
-    const resolvedValue = value.replace(/\$\{([^}]+)\}/g, (_, varName) => {
-      return process.env[varName as string] ?? '';
-    });
-    
-    // Omit empty values per spec
-    if (resolvedValue.trim() !== '') {
-      resolved[key] = resolvedValue;
-    }
-    
-    this.processEnvironmentVariablesRecursively(entries, index + 1, resolved);
-  }
-
-  /**
-   * Process server instructions recursively to avoid for-of loops
-   */
-  private processServerInstructionsRecursively(
-    entries: [string, string][],
-    index: number,
-    instructions: string[]
-  ): void {
-    if (index >= entries.length) {
-      return;
-    }
-    
-    const [serverName, serverInstruction] = entries[index] ?? ['', ''];
-    instructions.push(`## TOOL ${serverName.toUpperCase()} INSTRUCTIONS\n\n${serverInstruction}`);
-    this.processServerInstructionsRecursively(entries, index + 1, instructions);
-  }
-
-  /**
-   * Process prompt instructions recursively to avoid for-of loops
-   */
-  private processPromptInstructionsRecursively(
-    entries: [string, MCPPromptInfo][],
-    index: number,
-    instructions: string[]
-  ): void {
-    if (index >= entries.length) {
-      return;
-    }
-    
-    const [, promptInfo] = entries[index] ?? ['', { name: '', serverName: '' }];
-    if (promptInfo.description !== undefined && promptInfo.description.trim() !== '') {
-      instructions.push(`## TOOL ${promptInfo.name.toUpperCase()} INSTRUCTIONS\n\n${promptInfo.description}`);
-    }
-    this.processPromptInstructionsRecursively(entries, index + 1, instructions);
-  }
-
-  /**
-   * Execute MCP tool with timeout and proper error handling
-   */
-  async callTool(toolName: string, args: Record<string, unknown>): Promise<MCPToolResult> {
-    const toolInfo = this.tools.get(toolName);
-    if (toolInfo === undefined) {
-      throw new Error(`Tool '${toolName}' not found`);
-    }
-
-    const client = this.clients.get(toolInfo.serverName);
-    if (client === undefined) {
-      throw new Error(`Client for server '${toolInfo.serverName}' not found`);
-    }
-
-    // Implement per-tool timeout as specified
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => { reject(new Error('Tool execution timed out')); }, this.toolTimeout);
-    });
 
     try {
-      const result = await Promise.race([
-        client.callTool({ name: toolName, arguments: args }),
-        timeoutPromise
-      ]) as {
-        content?: { type: string; text?: string; [key: string]: unknown }[];
-        structuredContent?: unknown;
-        isError?: boolean;
-      };
-
-      // Return structured result matching spec
-      return {
-        content: (result.content ?? []) as { type: string; text?: string; [key: string]: unknown }[],
-        structuredContent: result.structuredContent,
-        isError: result.isError === true
-      };
-
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error(`[mcp] Tool '${toolName}' failed: ${errorMessage}`);
+      const resp = await callWithTimeout();
+      const latencyMs = Date.now() - start;
       
-      // Return error as failed tool result per spec - don't throw
+      let result = '';
+      interface Block { type: string; text?: string }
+      const content: Block[] = (resp as { content?: Block[] }).content ?? [];
+      result = content.map((c) => {
+        if (c.type === 'text') return c.text ?? '';
+        if (c.type === 'image') return '[Image]';
+        return `[${c.type}]`;
+      }).join('');
+
+      const isError = (resp as { isError?: boolean }).isError === true;
+      const status: ToolStatus = isError 
+        ? { type: 'execution_error', toolName: toolCall.name, message: 'Tool execution failed' }
+        : { type: 'success' };
+
+      this.log('VRB', 'response', 'mcp', `${serverName}:${toolCall.name}`, 
+        `${String(latencyMs)}ms, ${String(result.length)} chars${isError ? ' (error)' : ''}`);
+
+      if (this.trace) {
+        this.log('TRC', 'response', 'mcp', `${serverName}:${toolCall.name}`, 
+          JSON.stringify(resp, null, 2));
+      }
+
       return {
-        content: [{ type: 'text', text: `Tool execution failed: ${errorMessage}` }],
-        isError: true
+        toolCallId: toolCall.id,
+        status,
+        result,
+        latencyMs,
+        metadata: {
+          latency: latencyMs,
+          charactersIn: argsStr.length,
+          charactersOut: result.length,
+          mcpServer: serverName,
+          command: toolCall.name,
+        },
+      };
+    } catch (err) {
+      const latencyMs = Date.now() - start;
+      const message = err instanceof Error ? err.message : String(err);
+      
+      let status: ToolStatus;
+      if (message.includes('timed out')) {
+        status = { type: 'timeout', toolName: toolCall.name, timeoutMs: timeoutMs ?? 0 };
+      } else if (message.includes('not found')) {
+        status = { type: 'tool_not_found', toolName: toolCall.name, serverName };
+      } else if (message.includes('invalid') || message.includes('parameters')) {
+        status = { type: 'invalid_parameters', toolName: toolCall.name, message };
+      } else if (message.includes('connection')) {
+        status = { type: 'connection_error', serverName, message };
+      } else {
+        status = { type: 'execution_error', toolName: toolCall.name, message };
+      }
+
+      this.log('ERR', 'response', 'mcp', `${serverName}:${toolCall.name}`, 
+        `error: ${message} (${String(latencyMs)}ms)`, false);
+
+      return {
+        toolCallId: toolCall.id,
+        status,
+        result: '',
+        latencyMs,
+        metadata: {
+          latency: latencyMs,
+          charactersIn: argsStr.length,
+          charactersOut: 0,
+          mcpServer: serverName,
+          command: toolCall.name,
+        },
       };
     }
   }
 
-  /**
-   * Get all discovered tools
-   */
-  getTools(): Map<string, MCPToolInfo> {
-    return new Map(this.tools);
+  async executeTools(
+    toolCalls: { serverName: string; toolCall: ToolCall }[],
+    maxConcurrent?: number | null,
+    timeoutMs?: number,
+  ): Promise<ToolResult[]> {
+    if (typeof maxConcurrent === 'number' && maxConcurrent > 0) {
+      return this.executeWithConcurrency(toolCalls, maxConcurrent, timeoutMs);
+    }
+    return Promise.all(toolCalls.map(({ serverName, toolCall }) => 
+      this.executeTool(serverName, toolCall, timeoutMs)
+    ));
   }
 
-  /**
-   * Get all discovered prompts  
-   */
-  getPrompts(): Map<string, MCPPromptInfo> {
-    return new Map(this.prompts);
+  private async executeWithConcurrency(
+    toolCalls: { serverName: string; toolCall: ToolCall }[],
+    maxConcurrent: number,
+    timeoutMs?: number,
+  ): Promise<ToolResult[]> {
+    const results: ToolResult[] = new Array<ToolResult>(toolCalls.length);
+    let cursor = 0;
+    
+    const runWorker = async (): Promise<void> => {
+      const i = cursor;
+      cursor += 1;
+      if (i >= toolCalls.length) return;
+      const { serverName, toolCall } = toolCalls[i];
+      results[i] = await this.executeTool(serverName, toolCall, timeoutMs);
+      await runWorker();
+    };
+
+    const workers = Array.from({ length: Math.min(maxConcurrent, toolCalls.length) }, () => runWorker());
+    await Promise.all(workers);
+    return results;
   }
 
-  /**
-   * Build combined instructions string for system prompt according to spec format
-   */
-  buildInstructions(): string {
-    const instructions: string[] = [];
-
-    // Add server instructions with proper headers
-    this.processServerInstructionsRecursively(
-      Array.from(this.serverInstructions.entries()), 
-      0, 
-      instructions
-    );
-
-    // Add prompt descriptions as additional instructions  
-    this.processPromptInstructionsRecursively(
-      Array.from(this.prompts.entries()),
-      0,
-      instructions
-    );
-
-    return instructions.join('\n\n');
+  getAllTools(): MCPTool[] {
+    return Array.from(this.servers.values()).flatMap((s) => s.tools);
   }
 
-  /**
-   * Clean shutdown of all MCP clients
-   */
-  async cleanup(): Promise<void> {
-    const closePromises = Array.from(this.clients.entries()).map(async ([name, client]) => {
-      try {
-        await client.close();
-        console.error(`[mcp] Closed client: ${name}`);
-      } catch (error) {
-        console.error(`[mcp] Error closing client ${name}: ${String(error)}`);
+  getCombinedInstructions(): string {
+    return Array.from(this.servers.values()).flatMap((s) => {
+      const arr: string[] = [];
+      if (typeof s.instructions === 'string' && s.instructions.length > 0) {
+        arr.push(`## TOOL ${s.name} INSTRUCTIONS\n${s.instructions}`);
       }
-    });
-
-    await Promise.all(closePromises);
-    this.clients.clear();
-    this.tools.clear();
-    this.prompts.clear();
-    this.serverInstructions.clear();
+      s.tools.forEach((t) => { 
+        if (typeof t.instructions === 'string' && t.instructions.length > 0) {
+          arr.push(`## TOOL ${t.name} INSTRUCTIONS\n${t.instructions}`); 
+        }
+      });
+      return arr;
+    }).join('\n\n');
   }
+
+  // Simple tool executor for AI SDK integration
+  async executeToolByName(toolName: string, parameters: Record<string, unknown>): Promise<{ result: string; serverName: string }> {
+    const toolServerMapping = this.getToolServerMapping();
+    const serverName = toolServerMapping.get(toolName);
+    
+    if (serverName === undefined) {
+      throw new Error(`No server found for tool: ${toolName}`);
+    }
+
+    // Create a temporary tool call - we need an ID for the interface
+    const toolCall: ToolCall = {
+      id: `temp_${toolName}_${String(Date.now())}`,
+      name: toolName,
+      parameters
+    };
+
+    const result = await this.executeTool(serverName, toolCall);
+    
+    if (result.status.type !== 'success') {
+      const errorMsg = 'message' in result.status ? result.status.message : result.status.type;
+      throw new Error(`Tool execution failed: ${errorMsg}`);
+    }
+    
+    return { result: result.result, serverName };
+  }
+
+  getToolServerMapping(): Map<string, string> {
+    const entries = Array.from(this.servers.entries()).flatMap(([serverName, s]) => 
+      s.tools.map((t) => [t.name, serverName] as const)
+    );
+    return new Map(entries);
+  }
+
+  async cleanup(): Promise<void> {
+    await Promise.all(Array.from(this.clients.values()).map(async (c) => { 
+      try { await c.close(); } catch { /* noop */ } 
+    }));
+    
+    await Promise.all(Array.from(this.processes.values()).map((proc) => 
+      new Promise<void>((resolve) => {
+        try {
+          if (proc.killed || proc.exitCode !== null) {
+            resolve();
+            return;
+          }
+          
+          const timeout = setTimeout(() => {
+            if (!proc.killed && proc.exitCode === null) {
+              try { proc.kill('SIGKILL'); } catch { /* noop */ }
+            }
+          }, 2000);
+          
+          proc.once('exit', () => {
+            clearTimeout(timeout);
+            resolve();
+          });
+          
+          proc.kill('SIGTERM');
+        } catch {
+          resolve();
+        }
+      })
+    ));
+    
+    this.clients.clear();
+    this.processes.clear();
+    this.servers.clear();
+  }
+
+  private log(
+    severity: LogEntry['severity'],
+    direction: LogEntry['direction'],
+    type: LogEntry['type'],
+    remoteIdentifier: string,
+    message: string,
+    fatal = false
+  ): void {
+    if (this.onLog === undefined) return;
+
+    const entry: LogEntry = {
+      timestamp: Date.now(),
+      severity,
+      turn: this.currentTurn,
+      subturn: this.currentSubturn,
+      direction,
+      type,
+      remoteIdentifier,
+      fatal,
+      message
+    };
+
+    this.onLog(entry);
+  }
+}
+
+function resolveHeaders(headers?: Record<string, string>): Record<string, string> | undefined {
+  if (headers === undefined) return headers;
+  return Object.entries(headers).reduce<Record<string, string>>((acc, [k, v]) => {
+    const resolved = v.replace(/\$\{([^}]+)\}/g, (_m: string, name: string) => 
+      (process.env as Record<string, string | undefined>)[name] ?? '');
+    if (resolved.length > 0) acc[k] = resolved;
+    return acc;
+  }, {});
 }

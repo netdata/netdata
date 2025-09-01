@@ -19,7 +19,6 @@ const tsProject = ['./tsconfig.json'];
 const IGNORE_GLOBS = ['**/node_modules/**', '**/dist/**'];
 
 export default [
-  // Overrides for scripts
   {
     files: ['**/scripts/**'],
     rules: { 'no-console': 'off' },
@@ -109,7 +108,6 @@ export default [
       'perfectionist/sort-imports': ['error', { type: 'natural', order: 'asc', groups: ['builtin','external','type','internal','parent','sibling','index','object'] }],
     },
   },
-  // Place config override last so it wins over JS override rules
   {
     files: ['eslint.config.mjs'],
     rules: {
@@ -121,3 +119,4 @@ export default [
   },
   { ignores: ['**/node_modules/**', '**/dist/**'] },
 ];
+

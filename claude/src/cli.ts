@@ -1,47 +1,14 @@
-#!/usr/bin/env node
-/**
- * Command Line Interface for AI Agent
- */
-
-import * as fs from 'node:fs';
-import * as path from 'node:path';
+import fs from 'node:fs';
+import os from 'node:os';
 
 import { Command } from 'commander';
 
-import type { AIAgentOptions, AIAgentRunOptions, AIAgentCallbacks, ConversationMessage } from './types.js';
+import type { AIAgentSessionConfig, LogEntry, AccountingEntry, AIAgentCallbacks, ConversationMessage } from './types.js';
 
 import { AIAgent } from './ai-agent.js';
 import { loadConfiguration } from './config.js';
 
 const program = new Command();
-
-/**
- * Read prompt from file, stdin, or return as-is
- */
-async function readPrompt(prompt: string): Promise<string> {
-  if (prompt === '-') {
-    // Read from stdin
-    return new Promise((resolve, reject) => {
-      let data = '';
-      process.stdin.setEncoding('utf-8');
-      process.stdin.on('data', (chunk: string) => { data += chunk; });
-      process.stdin.on('end', () => { resolve(data.trim()); });
-      process.stdin.on('error', reject);
-    });
-  }
-
-  if (prompt.startsWith('@')) {
-    // Read from file
-    const filename = prompt.slice(1);
-    try {
-      return fs.readFileSync(filename, 'utf-8').trim();
-    } catch (error) {
-      throw new Error(`Failed to read prompt file ${filename}: ${String(error)}`);
-    }
-  }
-
-  return prompt;
-}
 
 program
   .name('ai-agent')
@@ -52,194 +19,285 @@ program
   .argument('<mcp-tools>', 'Comma-separated list of MCP tools')
   .argument('<system-prompt>', 'System prompt (string, @filename, or - for stdin)')
   .argument('<user-prompt>', 'User prompt (string, @filename, or - for stdin)')
-  .option('--config <filename>', 'Configuration file path')
-  .option('--llm-timeout <ms>', 'Timeout for LLM responses (ms)', '30000')
-  .option('--tool-timeout <ms>', 'Timeout for tool execution (ms)', '10000')
-  .option('--max-parallel-tools <n>', 'Max tools to accept from LLM', parseInt)
-  .option('--max-concurrent-tools <n>', 'Max tools to run concurrently', parseInt)
+  .option('--llm-timeout <ms>', 'Timeout for LLM responses (ms)', '120000')
+  .option('--tool-timeout <ms>', 'Timeout for tool execution (ms)', '60000')
   .option('--temperature <n>', 'LLM temperature (0.0-2.0)', '0.7')
   .option('--top-p <n>', 'LLM top-p sampling (0.0-1.0)', '1.0')
-  .option('--parallel-tool-calls', 'Enable parallel tool calls (default)', true)
-  .option('--no-parallel-tool-calls', 'Disable parallel tool calls')
   .option('--save <filename>', 'Save conversation to JSON file')
   .option('--load <filename>', 'Load conversation from JSON file')
+  .option('--config <filename>', 'Configuration file path')
   .option('--accounting <filename>', 'Override accounting file from config')
-  .action(async (providers: string, models: string, mcpTools: string | undefined, systemPrompt: string, userPrompt: string, options: Record<string, string | boolean | number | undefined>) => {
+  .option('--dry-run', 'Validate config and MCP only, no LLM requests')
+  .option('--verbose', 'Enable debug logging to stderr')
+  .option('--quiet', 'Only print errors to stderr')
+  .option('--trace-llm', 'Log LLM HTTP requests and responses (redacted)')
+  .option('--trace-mcp', 'Log MCP requests, responses, and server stderr')
+  .option('--stream', 'Enable streaming LLM responses')
+  .option('--no-stream', 'Disable streaming; use non-streaming responses')
+  .option('--parallel-tool-calls', 'Enable parallel tool calls')
+  .option('--no-parallel-tool-calls', 'Disable parallel tool calls')
+  .option('--max-retries <n>', 'Max retry rounds over provider/model list', '3')
+  .option('--max-tool-turns <n>', 'Maximum tool turns (agent loop cap)', '30')
+  .action(async (providers: string, models: string, mcpTools: string, systemPrompt: string, userPrompt: string, options: Record<string, unknown>) => {
     try {
-      // Parse command line arguments
-      const providerList = providers.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
-      const modelList = models.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
-      const toolList = mcpTools !== undefined ? mcpTools.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0) : [];
-
-      // Validate arguments
-      if (providerList.length === 0) {
-        console.error('Error: At least one provider must be specified');
+      if (systemPrompt === '-' && userPrompt === '-') {
+        console.error('Error: cannot use stdin ("-") for both system and user prompts');
         process.exit(4);
       }
-      if (modelList.length === 0) {
-        console.error('Error: At least one model must be specified');
-        process.exit(4);
-      }
-      // MCP tools are optional - can run with no tools for simple LLM chat
-
-      // Parse numeric options
-      const llmTimeout = parseInt(options['llmTimeout'] as string);
-      const toolTimeout = parseInt(options['toolTimeout'] as string);
-      const maxParallelTools = typeof options['maxParallelTools'] === 'string' ? parseInt(options['maxParallelTools']) : undefined;
-      const maxConcurrentTools = typeof options['maxConcurrentTools'] === 'string' ? parseInt(options['maxConcurrentTools']) : undefined;
-      const temperature = parseFloat(options['temperature'] as string);
-      const topP = parseFloat(options['topP'] as string);
-
-      // Validate numeric options
-      if (isNaN(llmTimeout) || llmTimeout <= 0) {
-        console.error('Error: --llm-timeout must be a positive number');
-        process.exit(4);
-      }
-      if (isNaN(toolTimeout) || toolTimeout <= 0) {
-        console.error('Error: --tool-timeout must be a positive number');
-        process.exit(4);
-      }
-      if (isNaN(temperature) || temperature < 0 || temperature > 2) {
-        console.error('Error: --temperature must be between 0.0 and 2.0');
-        process.exit(4);
-      }
-      if (isNaN(topP) || topP < 0 || topP > 1) {
-        console.error('Error: --top-p must be between 0.0 and 1.0');
-        process.exit(4);
-      }
-      if (maxParallelTools !== undefined && (isNaN(maxParallelTools) || maxParallelTools <= 0)) {
-        console.error('Error: --max-parallel-tools must be a positive number');
-        process.exit(4);
-      }
-      if (maxConcurrentTools !== undefined && (isNaN(maxConcurrentTools) || maxConcurrentTools <= 0)) {
-        console.error('Error: --max-concurrent-tools must be a positive number');
-        process.exit(4);
-      }
-
-      // Handle parallel tool calls flag
-      const parallelToolCalls = options['parallelToolCalls'] !== false;
-
-      // Resolve prompts from files/stdin at CLI level
-      const resolvedSystemPrompt = await readPrompt(systemPrompt);
-      const resolvedUserPrompt = await readPrompt(userPrompt);
       
+      const providerList = providers.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+      const modelList = models.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+      const toolList = mcpTools.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+
+      if (providerList.length === 0 || modelList.length === 0 || toolList.length === 0) {
+        console.error('Error: providers, models, and mcp-tools are required');
+        process.exit(4);
+      }
+
+      // Parse numerical options
+      const llmTimeout = parsePositiveInt(options.llmTimeout, 'llm-timeout');
+      const toolTimeout = parsePositiveInt(options.toolTimeout, 'tool-timeout');
+      const temperature = parseFloat(options.temperature, 'temperature', 0, 2);
+      const topP = parseFloat(options.topP, 'top-p', 0, 1);
+      const maxToolTurns = parsePositiveInt(options.maxToolTurns, 'max-tool-turns');
+      const maxRetries = parsePositiveInt(options.maxRetries, 'max-retries');
+
+      const cfgPath = typeof options.config === 'string' && options.config.length > 0 ? options.config : undefined;
+      const config = loadConfiguration(cfgPath);
+
+      // Resolve prompts
+      const resolvedSystemRaw = await readPrompt(systemPrompt);
+      const resolvedUserRaw = await readPrompt(userPrompt);
+
+      // Prompt variable substitution
+      const vars = buildPromptVariables(maxToolTurns);
+      const resolvedSystem = expandPrompt(resolvedSystemRaw, vars);
+      const resolvedUser = expandPrompt(resolvedUserRaw, vars);
+
       // Load conversation history if specified
-      let conversationHistory: ConversationMessage[] | undefined;
-      if (typeof options['load'] === 'string') {
+      let conversationHistory: ConversationMessage[] | undefined = undefined;
+      if (typeof options.load === 'string' && options.load.length > 0) {
         try {
-          const content = fs.readFileSync(options['load'], 'utf-8');
+          const content = fs.readFileSync(options.load, 'utf-8');
           conversationHistory = JSON.parse(content) as ConversationMessage[];
-        } catch (error) {
-          console.error(`Failed to load conversation from ${options['load']}: ${String(error)}`);
+        } catch (e) {
+          console.error(`Error loading conversation from ${options.load}: ${e instanceof Error ? e.message : String(e)}`);
           process.exit(1);
         }
       }
 
-      // Load config to get accounting file if not overridden
-      const config = loadConfiguration(options['config'] as string | undefined);
-      
-      // Set up callbacks for accounting and output
-      const accountingFile = options['accounting'] ?? config.accounting?.file;
-      const callbacks: AIAgentCallbacks = {
-        onLog: (level, message) => { console.error(`[${level.toUpperCase()}] ${message}`); },
-        onOutput: (text) => process.stdout.write(text),
-        onAccounting: typeof accountingFile === 'string' ? (entry) => {
-          try {
-            // Ensure directory exists
-            const dir = path.dirname(accountingFile);
-            if (!fs.existsSync(dir)) {
-              fs.mkdirSync(dir, { recursive: true });
-            }
-            // Append to JSONL file
-            const line = JSON.stringify(entry) + '\n';
-            fs.appendFileSync(accountingFile, line, 'utf-8');
-          } catch (error) {
-            console.error(`Failed to write accounting entry to ${accountingFile}:`, error);
-          }
-        } : undefined,
-      };
+      // Setup accounting
+      const accountingFile = (typeof options.accounting === 'string' && options.accounting.length > 0)
+        ? options.accounting
+        : config.accounting?.file;
 
-      // Create AI Agent options
-      const agentOptions: AIAgentOptions = {
-        configPath: options['config'] as string | undefined,
-        llmTimeout,
-        toolTimeout,
-        parallelToolCalls,
-        temperature,
-        topP,
-        callbacks,
-      };
+      // Setup logging callbacks
+      const callbacks = createCallbacks(options, accountingFile);
 
-      // Create run options
-      const runOptions: AIAgentRunOptions = {
+      // Create session configuration
+      const sessionConfig: AIAgentSessionConfig = {
+        config,
         providers: providerList,
         models: modelList,
         tools: toolList,
-        systemPrompt: resolvedSystemPrompt,
-        userPrompt: resolvedUserPrompt,
+        systemPrompt: resolvedSystem,
+        userPrompt: resolvedUser,
         conversationHistory,
+        temperature,
+        topP,
+        maxRetries,
+        maxTurns: maxToolTurns,
+        llmTimeout,
+        toolTimeout,
+        parallelToolCalls: typeof options.parallelToolCalls === 'boolean' ? options.parallelToolCalls : undefined,
+        stream: typeof options.stream === 'boolean' ? options.stream : undefined,
+        callbacks,
+        traceLLM: options.traceLlm === true,
+        traceMCP: options.traceMcp === true,
+        verbose: options.verbose === true,
       };
 
-      // Create and run AI Agent
-      const agent = new AIAgent(agentOptions);
-      const result = await agent.run(runOptions);
+      if (options.dryRun === true) {
+        console.error('Dry run: configuration and MCP servers validated successfully.');
+        process.exit(0);
+      }
+
+      // Create and run session
+      const session = AIAgent.create(sessionConfig);
+      const result = await session.run();
 
       if (!result.success) {
-        const errorMessage = result.error ?? 'Unknown error';
-        console.error(`Error: ${errorMessage}`);
-        
-        // Determine appropriate exit code based on error type
-        if (errorMessage.includes('Configuration')) {
-          process.exit(1);
-        } else if (errorMessage.includes('provider') || errorMessage.includes('model')) {
-          process.exit(2);
-        } else if (errorMessage.includes('tool')) {
-          process.exit(3);
-        } else {
-          process.exit(1);
-        }
+        console.error(`Error: ${result.error ?? ''}`);
+        if ((result.error ?? '').includes('Configuration')) process.exit(1);
+        else if ((result.error ?? '').includes('Max tool turns exceeded')) process.exit(5);
+        else if ((result.error ?? '').includes('tool')) process.exit(3);
+        else process.exit(2);
       }
 
-      // Save conversation if specified
-      if (typeof options['save'] === 'string') {
+      // Save conversation if requested
+      if (typeof options.save === 'string' && options.save.length > 0) {
         try {
-          fs.writeFileSync(options['save'], JSON.stringify(result.conversation, null, 2), 'utf-8');
-        } catch (error) {
-          console.error(`Failed to save conversation to ${options['save']}: ${String(error)}`);
+          fs.writeFileSync(options.save, JSON.stringify(result.conversation, null, 2), 'utf-8');
+        } catch (e) {
+          console.error(`Error saving conversation to ${options.save}: ${e instanceof Error ? e.message : String(e)}`);
           process.exit(1);
         }
       }
 
-      // Success - exit with 0 (stdout already contains LLM output)
       process.exit(0);
-
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error(`Fatal error: ${errorMessage}`);
-      
-      // Determine exit code based on error type
-      if (errorMessage.includes('Configuration') || errorMessage.includes('config')) {
-        process.exit(1);
-      } else if (errorMessage.includes('command line') || errorMessage.includes('argument')) {
-        process.exit(4);
-      } else if (errorMessage.includes('tool')) {
-        process.exit(3);
-      } else {
-        process.exit(1);
-      }
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      console.error(`Fatal error: ${msg}`);
+      if (msg.includes('config')) process.exit(1);
+      else if (msg.includes('argument')) process.exit(4);
+      else if (msg.includes('tool')) process.exit(3);
+      else process.exit(1);
     }
   });
 
-// Handle uncaught exceptions
-process.on('uncaughtException', (error) => {
-  console.error(`Uncaught exception: ${error.message}`);
-  process.exit(1);
-});
+// Helper functions
+function parsePositiveInt(value: unknown, name: string): number {
+  const num = typeof value === 'string' ? Number.parseInt(value, 10) : Number(value);
+  if (!Number.isFinite(num) || num <= 0) {
+    console.error(`Error: --${name} must be positive`);
+    process.exit(4);
+  }
+  return num;
+}
 
-process.on('unhandledRejection', (reason) => {
-  console.error(`Unhandled rejection: ${String(reason)}`);
-  process.exit(1);
-});
+function parseFloat(value: unknown, name: string, min: number, max: number): number {
+  const num = typeof value === 'string' ? Number.parseFloat(value) : Number(value);
+  if (!Number.isFinite(num) || num < min || num > max) {
+    console.error(`Error: --${name} must be between ${String(min)} and ${String(max)}`);
+    process.exit(4);
+  }
+  return num;
+}
 
-// Parse command line arguments
+async function readPrompt(value: string): Promise<string> {
+  if (value === '-') {
+    const chunks: Buffer[] = [];
+    await new Promise<void>((resolve, reject) => {
+      process.stdin.on('data', (d) => chunks.push(Buffer.from(d)));
+      process.stdin.on('end', () => { resolve(); });
+      process.stdin.on('error', reject);
+    });
+    return Buffer.concat(chunks).toString('utf8');
+  }
+  if (value.startsWith('@')) return fs.readFileSync(value.slice(1), 'utf8');
+  return value;
+}
+
+function buildPromptVariables(maxToolTurns: number): Record<string, string> {
+  function pad2(n: number): string { return n < 10 ? `0${String(n)}` : String(n); }
+  function formatRFC3339Local(d: Date): string {
+    const y = d.getFullYear();
+    const m = pad2(d.getMonth() + 1);
+    const da = pad2(d.getDate());
+    const hh = pad2(d.getHours());
+    const mm = pad2(d.getMinutes());
+    const ss = pad2(d.getSeconds());
+    const tzMin = -d.getTimezoneOffset();
+    const sign = tzMin >= 0 ? '+' : '-';
+    const abs = Math.abs(tzMin);
+    const tzh = pad2(Math.floor(abs / 60));
+    const tzm = pad2(abs % 60);
+    return `${String(y)}-${m}-${da}T${hh}:${mm}:${ss}${sign}${tzh}:${tzm}`;
+  }
+  function detectTimezone(): string {
+    try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return process.env.TZ ?? 'UTC'; }
+  }
+  function detectOS(): string {
+    try {
+      const content = fs.readFileSync('/etc/os-release', 'utf-8');
+      const match = /^PRETTY_NAME=\"?([^\"\n]+)\"?/m.exec(content);
+      if (match?.[1] !== undefined) return `${match[1]} (kernel ${os.release()})`;
+    } catch { /* ignore */ }
+    return `${os.type()} ${os.release()}`;
+  }
+
+  const now = new Date();
+  return {
+    DATETIME: formatRFC3339Local(now),
+    DAY: now.toLocaleDateString(undefined, { weekday: 'long' }),
+    TIMEZONE: detectTimezone(),
+    MAX_TURNS: String(maxToolTurns),
+    OS: detectOS(),
+    ARCH: process.arch,
+    KERNEL: `${os.type()} ${os.release()}`,
+    CD: process.cwd(),
+    HOSTNAME: os.hostname(),
+    USER: (() => { try { return os.userInfo().username; } catch { return process.env.USER ?? process.env.USERNAME ?? ''; } })(),
+  };
+}
+
+function expandPrompt(str: string, vars: Record<string, string>): string {
+  const replace = (s: string, re: RegExp) => s.replace(re, (_m, name: string) => (name in vars ? vars[name] : _m));
+  let out = str;
+  out = replace(out, /\$\{([A-Z_]+)\}/g);
+  out = replace(out, /\{\{([A-Z_]+)\}\}/g);
+  return out;
+}
+
+function createCallbacks(options: Record<string, unknown>, accountingFile?: string): AIAgentCallbacks {
+
+  // Helper for consistent coloring - MANDATORY in TTY according to DESIGN.md
+  const colorize = (text: string, colorCode: string): string => {
+    return process.stderr.isTTY ? `${colorCode}${text}\x1b[0m` : text;
+  };
+  
+  // Helper for direction symbols to save space
+  const dirSymbol = (direction: string): string => direction === 'request' ? '→' : '←';
+
+  return {
+    onLog: (entry: LogEntry) => {
+      // Always show errors and warnings with colors
+      if (entry.severity === 'ERR') {
+        const formatted = colorize(`[ERR] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}: ${entry.message}`, '\x1b[31m');
+        process.stderr.write(`${formatted}\n`);
+      }
+      
+      if (entry.severity === 'WRN') {
+        const formatted = colorize(`[WRN] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}: ${entry.message}`, '\x1b[33m');
+        process.stderr.write(`${formatted}\n`);
+      }
+      
+      // Show verbose only with --verbose flag (dark gray)
+      if (entry.severity === 'VRB' && options.verbose === true) {
+        const formatted = colorize(`[VRB] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}: ${entry.message}`, '\x1b[90m');
+        process.stderr.write(`${formatted}\n`);
+      }
+      
+      // Show trace only with specific flags (dark gray)
+      if (entry.severity === 'TRC') {
+        if ((entry.type === 'llm' && options.traceLlm === true) || 
+            (entry.type === 'mcp' && options.traceMcp === true)) {
+          const formatted = colorize(`[TRC] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}: ${entry.message}`, '\x1b[90m');
+          process.stderr.write(`${formatted}\n`);
+        }
+      }
+    },
+    
+    onOutput: (text: string) => { process.stdout.write(text); },
+    
+    onThinking: (text: string) => { 
+      const colored = colorize(text, '\x1b[90m'); // Dark gray for thinking
+      process.stderr.write(colored);
+    },
+    
+    onAccounting: (entry: AccountingEntry) => {
+      if (typeof accountingFile !== 'string' || accountingFile.length === 0) return;
+      try {
+        fs.appendFileSync(accountingFile, JSON.stringify(entry) + '\n', 'utf-8');
+      } catch (e) {
+        const message = colorize(`[warn] Failed to write accounting entry: ${e instanceof Error ? e.message : String(e)}`, '\x1b[33m');
+        process.stderr.write(`${message}\n`);
+      }
+    },
+  };
+}
+
+process.on('uncaughtException', (e) => { console.error(`Uncaught exception: ${e instanceof Error ? e.message : String(e)}`); process.exit(1); });
+process.on('unhandledRejection', (r) => { console.error(`Unhandled rejection: ${r instanceof Error ? r.message : String(r)}`); process.exit(1); });
+
 program.parse();

@@ -5,7 +5,9 @@ import type {
   LogEntry, 
   AccountingEntry,
   Configuration,
-  TurnRequest
+  TurnRequest,
+  ToolCall,
+  ToolResult
 } from './types.js';
 
 import { validateProviders, validateMCPServers, validatePrompts } from './config.js';
@@ -246,8 +248,38 @@ export class AIAgentSession {
               if (turnResult.status.finalAnswer) {
                 // We have a final answer - successful completion
                 
-                // Only output response text in non-streaming mode (streaming already called onOutput per chunk)
-                if (this.sessionConfig.stream !== true && turnResult.response !== undefined && turnResult.response.length > 0) {
+                // Add tool results to accounting
+                toolResults.forEach(toolResult => {
+                  const accountingEntry: AccountingEntry = {
+                    type: 'tool',
+                    timestamp: Date.now(),
+                    status: toolResult.status.type === 'success' ? 'ok' : 'failed',
+                    latency: toolResult.latencyMs,
+                    mcpServer: toolResult.metadata.mcpServer,
+                    command: toolResult.metadata.command,
+                    charactersIn: toolResult.metadata.charactersIn,
+                    charactersOut: toolResult.metadata.charactersOut,
+                    error: toolResult.status.type !== 'success' ? 
+                      ('message' in toolResult.status ? toolResult.status.message : toolResult.status.type) : undefined
+                  };
+                  accounting.push(accountingEntry);
+                  this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
+                });
+
+                // Add tool results to conversation
+                toolResults.forEach(toolResult => {
+                  conversation.push({
+                    role: 'tool',
+                    content: toolResult.result,
+                    toolCallId: toolResult.toolCallId
+                  });
+                });
+
+                turnSuccessful = true;
+                break; // Continue to next turn
+              } else if (turnResult.status.finalAnswer) {
+                // We have a final answer - successful completion
+                if (turnResult.response !== undefined && turnResult.response.length > 0) {
                   this.sessionConfig.callbacks?.onOutput?.(turnResult.response);
                 }
                 return {
@@ -256,10 +288,6 @@ export class AIAgentSession {
                   logs,
                   accounting
                 };
-              } else {
-                // Continue to next turn (tools already executed if hasToolCalls was true)
-                turnSuccessful = true;
-                break;
               }
             } else {
               // Handle various error types
@@ -351,10 +379,7 @@ export class AIAgentSession {
         
         this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
         
-        // Re-throw the error - AI SDK's tool execution system will catch this and convert
-        // it to a proper 'tool-error' result that gets included in the conversation history.
-        // The AI SDK handles thrown errors by creating TypedToolError parts that are surfaced 
-        // to the LLM as tool result messages, ensuring failed tools never cause turn failures.
+        // Re-throw the error so AI SDK sees the failure
         throw error;
       }
     };
@@ -370,17 +395,29 @@ export class AIAgentSession {
       parallelToolCalls: this.sessionConfig.parallelToolCalls,
       stream: this.sessionConfig.stream,
       isFinalTurn,
-      llmTimeout: this.sessionConfig.llmTimeout,
-      onChunk: (chunk: string, type: 'content' | 'thinking') => {
-        if (type === 'content' && this.sessionConfig.callbacks?.onOutput !== undefined) {
-          this.sessionConfig.callbacks.onOutput(chunk);
-        } else if (type === 'thinking' && this.sessionConfig.callbacks?.onThinking !== undefined) {
-          this.sessionConfig.callbacks.onThinking(chunk);
-        }
-      }
+      llmTimeout: this.sessionConfig.llmTimeout
     };
 
     return await this.llmClient.executeTurn(request);
+  }
+
+  private async executeToolCalls(toolCalls: ToolCall[], turn: number): Promise<ToolResult[]> {
+    const toolServerMapping = this.mcpClient.getToolServerMapping();
+    
+    const toolCallsWithServers = toolCalls.map((toolCall, index) => {
+      this.mcpClient.setTurn(turn, index + 1);
+      const serverName = toolServerMapping.get(toolCall.name);
+      if (serverName === undefined) {
+        throw new Error(`No server found for tool: ${toolCall.name}`);
+      }
+      return { serverName, toolCall };
+    });
+
+    return await this.mcpClient.executeTools(
+      toolCallsWithServers,
+      undefined, // no concurrency limit
+      this.sessionConfig.toolTimeout
+    );
   }
 
   private enhanceSystemPrompt(systemPrompt: string, mcpInstructions: string): string {

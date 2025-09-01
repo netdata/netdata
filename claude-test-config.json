@@ -1,0 +1,13 @@
+{
+  "providers": {
+    "ollama": {
+      "type": "ollama",
+      "baseUrl": "http://nova:11434"
+    }
+  },
+  "mcpServers": {},
+  "defaults": {
+    "temperature": 0.7,
+    "stream": true
+  }
+}

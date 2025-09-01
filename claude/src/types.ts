@@ -1,32 +1,73 @@
-export interface AIAgentCallbacks {
-  onLog?: (level: 'debug' | 'info' | 'warn' | 'error', message: string) => void;
-  onOutput?: (text: string) => void;
-  onAccounting?: (entry: AccountingEntry) => void;
+// Core status interfaces for clear decision making
+export type TurnStatus = 
+  | { type: 'success'; hasToolCalls: boolean; finalAnswer: boolean }
+  | { type: 'rate_limit'; retryAfterMs?: number }
+  | { type: 'auth_error'; message: string }
+  | { type: 'model_error'; message: string; retryable: boolean }
+  | { type: 'network_error'; message: string; retryable: boolean }
+  | { type: 'timeout'; message: string }
+  | { type: 'invalid_response'; message: string }
+  | { type: 'quota_exceeded'; message: string };
+
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cachedTokens?: number;
+  totalTokens: number;
 }
 
-export interface AIAgentOptions {
-  configPath?: string;
-  llmTimeout?: number;
-  toolTimeout?: number;
-  temperature?: number;
-  topP?: number;
-  callbacks?: AIAgentCallbacks;
-  traceLLM?: boolean;
-  traceMCP?: boolean;
-  parallelToolCalls?: boolean;
-  maxToolTurns?: number;
+export interface TurnResult {
+  status: TurnStatus;
+  response?: string;
+  toolCalls?: ToolCall[];
+  tokens?: TokenUsage;
+  latencyMs: number;
+  messages: ConversationMessage[];
 }
 
-export interface AIAgentRunOptions {
-  providers: string[];
-  models: string[];
-  tools: string[];
-  systemPrompt: string;
-  userPrompt: string;
-  conversationHistory?: ConversationMessage[];
-  saveConversation?: string;
-  loadConversation?: string;
-  dryRun?: boolean;
+export type ToolStatus =
+  | { type: 'success' }
+  | { type: 'mcp_server_error'; serverName: string; message: string }
+  | { type: 'tool_not_found'; toolName: string; serverName: string }
+  | { type: 'invalid_parameters'; toolName: string; message: string }
+  | { type: 'execution_error'; toolName: string; message: string }
+  | { type: 'timeout'; toolName: string; timeoutMs: number }
+  | { type: 'connection_error'; serverName: string; message: string };
+
+export interface ToolMetadata {
+  latency: number;
+  charactersIn: number;
+  charactersOut: number;
+  mcpServer: string;
+  command: string;
+}
+
+export interface ToolResult {
+  toolCallId: string;
+  status: ToolStatus;
+  result: string;
+  latencyMs: number;
+  metadata: ToolMetadata;
+}
+
+// Structured logging interface
+export interface LogEntry {
+  timestamp: number;                    // Unix timestamp (ms)
+  severity: 'VRB' | 'WRN' | 'ERR' | 'TRC'; // Log severity level
+  turn: number;                         // Sequential turn ID  
+  subturn: number;                      // Sequential tool ID within turn
+  direction: 'request' | 'response';    // Request or response
+  type: 'llm' | 'mcp';                 // Operation type
+  remoteIdentifier: string;             // 'provider:model' or 'mcp-server:tool-name'
+  fatal: boolean;                       // True if this caused agent to stop
+  message: string;                      // Human readable message
+}
+
+// Core data structures
+export interface ToolCall {
+  id: string;
+  name: string;
+  parameters: Record<string, unknown>;
 }
 
 export interface ConversationMessage {
@@ -42,33 +83,99 @@ export interface ConversationMessage {
   };
 }
 
-export interface ToolCall {
-  id: string;
-  name: string;
-  parameters: Record<string, unknown>;
+// MCP configuration
+export interface MCPServerConfig {
+  type: 'stdio' | 'websocket' | 'http' | 'sse';
+  command?: string;
+  args?: string[];
+  url?: string;
+  headers?: Record<string, string>;
+  env?: Record<string, string>;
+  enabled?: boolean;
+  toolSchemas?: Record<string, unknown>;
 }
 
-export interface ToolResult {
-  toolCallId: string;
-  result: string;
-  success: boolean;
-  error?: string;
-  metadata?: {
-    latency: number;
-    charactersIn: number;
-    charactersOut: number;
-    mcpServer: string;
-    command: string;
+export interface MCPTool {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+  instructions?: string;
+}
+
+export interface MCPServer {
+  name: string;
+  config: MCPServerConfig;
+  tools: MCPTool[];
+  instructions: string;
+}
+
+// Provider configuration
+export interface ProviderConfig {
+  apiKey?: string;
+  baseUrl?: string;
+  headers?: Record<string, string>;
+  custom?: Record<string, unknown>;
+  mergeStrategy?: "overlay" | "override" | "deep";
+  type?: 'openai' | 'anthropic' | 'google' | 'openrouter' | 'ollama';
+  openaiMode?: 'responses' | 'chat';
+}
+
+export interface Configuration {
+  providers: Record<string, ProviderConfig>;
+  mcpServers: Record<string, MCPServerConfig>;
+  accounting?: { file: string };
+  defaults?: {
+    llmTimeout?: number;
+    toolTimeout?: number;
+    temperature?: number;
+    topP?: number;
+    parallelToolCalls?: boolean;
+    maxToolTurns?: number;
+    stream?: boolean;
+    maxRetries?: number;
   };
 }
 
-export interface TokenUsage {
-  inputTokens: number;
-  outputTokens: number;
-  cachedTokens?: number;
-  totalTokens: number;
+// Session configuration and callbacks
+export interface AIAgentCallbacks {
+  onLog?: (entry: LogEntry) => void;
+  onOutput?: (text: string) => void;
+  onThinking?: (text: string) => void;
+  onAccounting?: (entry: AccountingEntry) => void;
 }
 
+export interface AIAgentSessionConfig {
+  config: Configuration;
+  providers: string[];
+  models: string[];
+  tools: string[];
+  systemPrompt: string;
+  userPrompt: string;
+  conversationHistory?: ConversationMessage[];
+  temperature?: number;
+  topP?: number;
+  maxRetries?: number;
+  maxTurns?: number;
+  llmTimeout?: number;
+  toolTimeout?: number;
+  parallelToolCalls?: boolean;
+  stream?: boolean;
+  callbacks?: AIAgentCallbacks;
+  traceLLM?: boolean;
+  traceMCP?: boolean;
+  verbose?: boolean;
+}
+
+// Session result
+export interface AIAgentResult {
+  success: boolean;
+  error?: string;
+  conversation: ConversationMessage[];
+  logs: LogEntry[];
+  accounting: AccountingEntry[];
+}
+
+// Accounting system
 export type AccountingEntry = LLMAccountingEntry | ToolAccountingEntry;
 
 export interface BaseAccountingEntry {
@@ -94,35 +201,55 @@ export interface ToolAccountingEntry extends BaseAccountingEntry {
   error?: string;
 }
 
-export interface MCPServerConfig {
-  type: 'stdio' | 'websocket' | 'http' | 'sse';
-  command?: string;
-  args?: string[];
-  url?: string;
-  headers?: Record<string, string>;
-  env?: Record<string, string>;
-  enabled?: boolean;
-  toolSchemas?: Record<string, unknown>;
+// Tool executor function type
+export type ToolExecutor = (toolName: string, parameters: Record<string, unknown>) => Promise<string>;
+
+// LLM interfaces
+export interface TurnRequest {
+  messages: ConversationMessage[];
+  provider: string;
+  model: string;
+  tools: MCPTool[];
+  toolExecutor: ToolExecutor;
+  temperature?: number;
+  topP?: number;
+  parallelToolCalls?: boolean;
+  stream?: boolean;
+  isFinalTurn?: boolean;
+  llmTimeout?: number;
+  onChunk?: (chunk: string, type: 'content' | 'thinking') => void;
 }
 
-export interface ProviderConfig {
-  apiKey?: string;
-  baseUrl?: string;
-  headers?: Record<string, string>;
-  custom?: Record<string, unknown>;
-  mergeStrategy?: "overlay" | "override" | "deep";
+export interface LLMProvider {
+  name: string;
+  executeTurn: (request: TurnRequest) => Promise<TurnResult>;
 }
 
-export interface Configuration {
-  providers: Record<string, ProviderConfig>;
-  mcpServers: Record<string, MCPServerConfig>;
-  accounting?: { file: string };
-  defaults?: {
-    llmTimeout?: number;
-    toolTimeout?: number;
-    temperature?: number;
-    topP?: number;
-    parallelToolCalls?: boolean;
+// CLI types for backward compatibility
+export interface AIAgentOptions {
+  configPath?: string;
+  llmTimeout?: number;
+  toolTimeout?: number;
+  temperature?: number;
+  topP?: number;
+  callbacks?: AIAgentCallbacks;
+  traceLLM?: boolean;
+  traceMCP?: boolean;
+  parallelToolCalls?: boolean;
   maxToolTurns?: number;
-  };
+  verbose?: boolean;
+  stream?: boolean;
+  maxRetries?: number;
+}
+
+export interface AIAgentRunOptions {
+  providers: string[];
+  models: string[];
+  tools: string[];
+  systemPrompt: string;
+  userPrompt: string;
+  conversationHistory?: ConversationMessage[];
+  saveConversation?: string;
+  loadConversation?: string;
+  dryRun?: boolean;
 }
