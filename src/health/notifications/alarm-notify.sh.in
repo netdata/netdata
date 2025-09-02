@@ -34,7 +34,6 @@
 #  - Opsgenie by @thiaoftsm #9858
 #  - Gotify by @coffeegrind123
 #  - ntfy.sh by @Dim-P
-#  - SIGNL4 by @rons4
 #shellcheck source=/dev/null disable=SC2086,SC2154
 
 # -----------------------------------------------------------------------------
@@ -267,7 +266,6 @@ prowl
 pushbullet
 pushover
 rocketchat
-signl4
 slack
 sms
 syslog
@@ -3797,6 +3795,11 @@ send_ilert
 SENT_ILERT=$?
 
 # -----------------------------------------------------------------------------
+# send messages to signl4
+send_signl4
+SENT_SIGNL4=$?
+
+# -----------------------------------------------------------------------------
 # let netdata know
 for state in "${SENT_EMAIL}" \
   "${SENT_PUSHOVER}" \
@@ -3827,7 +3830,8 @@ for state in "${SENT_EMAIL}" \
   "${SENT_OPSGENIE}" \
   "${SENT_GOTIFY}" \
   "${SENT_NTFY}" \
-  "${SENT_ILERT}"; do
+  "${SENT_ILERT}" \
+  "${SENT_SIGNL4}"; do
   if [ "${state}" -eq 0 ]; then
     # we sent something
     exit 0
