@@ -31,9 +31,9 @@ You can change your plan, billing frequency, or committed nodes at any time. For
 
 :::note
 
- - Changes like downgrades or cancellations keep notification configurations active for 24 hours. After that, any methods not supported by the new plan are disabled.
- - Changes may restrict user access in your Space. Review role availability under [each plan](https://netdata.cloud/pricing).
- - Any credits are valid until the end of the following year.
+- Changes like downgrades or cancellations keep notification configurations active for 24 hours. After that, any methods not supported by the new plan are disabled.
+- Changes may restrict user access in your Space. Review role availability under [each plan](https://netdata.cloud/pricing).
+- Any credits are valid until the end of the following year.
 
 :::
 
@@ -73,45 +73,69 @@ Please refer to the [Netdata Cloud Pricing](https://netdata.cloud/pricing) page 
 
 :::note
 
- Checkout is performed directly if there's an active plan.
+Checkout is performed directly if there's an active plan.
 
 :::
 
 ## FAQ
 
-<details><summary><strong>What Payment Methods are Accepted?</strong></summary>
+<details>
+<summary>What Payment Methods are Accepted?</summary>
+
 Netdata accepts most major Credit/Debit Cards and Bank payments through Stripe and AWS, with more options coming soon.
+
 </details>
 
-<details><summary><strong>What Happens if a Renewal Payment Fails?</strong></summary>
+<details>
+<summary>What Happens if a Renewal Payment Fails?</summary>
+
 If payment fails, attempts will be made weekly for 15 days. After three unsuccessful attempts, your Space will switch to the Community plan. Notification methods not supported by the Community plan will be disabled after 24 hours.
+
 When a plan is downgraded to Community due to payment failures, we do not automatically revert to the previous plan when payment succeeds. The amount you paid is available as credit. To restore your paid plan, manually change your plan back to your previous subscription (Homelab, Business, etc.), and this credit balance will be applied.
+
 </details>
 
-<details><summary><strong>Which Currencies Do You Support?</strong></summary>
+<details>
+<summary>Which Currencies Do You Support?</summary>
+
 Currently, we accept US Dollars (USD). Plans to accept Euros (EUR) are in the works but without a set timeline.
+
 </details>
 
-<details><summary><strong>Can I Get a Refund?</strong></summary>
+<details>
+<summary>Can I Get a Refund?</summary>
+
 Refunds are available if you cancel your subscription within 14 days of purchase. Request a refund via billing@netdata.cloud.
+
 </details>
 
-<details><summary><strong>How Do I Cancel My Paid Plan?</strong></summary>
+<details>
+<summary>How Do I Cancel My Paid Plan?</summary>
+
 Cancel your plan anytime from the Plan & Billing section by selecting 'Cancel Plan' or switching to the Community plan.
+
 </details>
 
-<details><summary><strong>How Can I Access My Invoices/Receipts?</strong></summary>
+<details>
+<summary>How Can I Access My Invoices/Receipts?</summary>
+
 Find all your invoicing history under Billing Options & Invoices in the Plan & Billing section.
+
 </details>
 
-<details><summary><strong>Why Do I See Two Separate Invoices?</strong></summary>
+<details>
+<summary>Why Do I See Two Separate Invoices?</summary>
+
 Two invoices are generated per plan purchase or renewal:
 
 One for recurring fees of the chosen plan.
 Another for monthly "On-Demand - Usage" based on actual usage.
 
 </details>
-<details><summary><strong>How is the Total Before Tax Value Calculated on Plan Changes?</strong></summary>
+
+<details>
+<summary>How is the Total Before Tax Value Calculated on Plan Changes?</summary>
+
 The total before tax is calculated by:
 
 Calculating the residual value from unused time on your current plan.
