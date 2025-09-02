@@ -6,6 +6,7 @@ import type { MCPServerConfig, MCPTool, MCPServer, ToolCall, ToolResult, ToolSta
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { ChildProcess } from 'node:child_process';
 
+import { formatToolRequestCompact } from './utils.js';
 import { createWebSocketTransport } from './websocket-transport.js';
 
 export class MCPClientManager {
@@ -19,15 +20,21 @@ export class MCPClientManager {
   private currentSubturn = 0;
   // Map exposed tool name (namespaced) -> { serverName, originalName }
   private toolNameMap = new Map<string, { serverName: string; originalName: string }>();
+  // Optional cap for tool response payload size (bytes). If exceeded, inject a tool error.
+  private maxToolResponseBytes?: number;
+  // Counter: number of times tool response size cap was exceeded
+  private sizeCapHits = 0;
 
   constructor(opts?: { 
     trace?: boolean; 
     verbose?: boolean; 
     onLog?: (entry: LogEntry) => void;
+    maxToolResponseBytes?: number;
   }) {
     this.trace = opts?.trace === true;
     this.verbose = opts?.verbose === true;
     this.onLog = opts?.onLog;
+    this.maxToolResponseBytes = opts?.maxToolResponseBytes;
   }
 
   setTurn(turn: number, subturn = 0): void {
@@ -319,26 +326,8 @@ export class MCPClientManager {
     const start = Date.now();
     const argsStr = JSON.stringify(toolCall.parameters);
     
-    // Format parameters for logging
-    const fmtVal = (v: unknown): string => {
-      if (v === null || v === undefined) return String(v);
-      const type = typeof v;
-      if (type === 'string') {
-        const s = v as string;
-        return s.length > 80 ? s.slice(0, 80) + '…' : s;
-      }
-      if (type === 'number') return (v as number).toString();
-      if (type === 'boolean') return (v as boolean).toString();
-      if (Array.isArray(v)) return `[${String(v.length)}]`;
-      return '{…}';
-    };
-
-    const entries = Object.entries(toolCall.parameters);
-    const paramStr = entries.length > 0
-      ? '(' + entries.map(([k, v]) => `${k}:${fmtVal(v)}`).join(', ') + ')'
-      : '()';
-
-    this.log('VRB', 'request', 'mcp', `${serverName}:${toolCall.name}`, `${toolCall.name}${paramStr}`);
+    const compactReq = formatToolRequestCompact(toolCall.name, toolCall.parameters);
+    this.log('VRB', 'request', 'mcp', `${serverName}:${toolCall.name}`, compactReq);
 
     if (this.trace) {
       this.log('TRC', 'request', 'mcp', `${serverName}:${toolCall.name}`, 
@@ -372,6 +361,38 @@ export class MCPClientManager {
       }).join('');
 
       const isError = (resp as { isError?: boolean }).isError === true;
+
+      // Enforce response size cap if configured (truncate instead of reject)
+      if (!isError && typeof this.maxToolResponseBytes === 'number' && this.maxToolResponseBytes > 0) {
+        const sizeBytes = Buffer.byteLength(result, 'utf8');
+        if (sizeBytes > this.maxToolResponseBytes) {
+          // Mirror the VRB request formatting (name + summarized parameters)
+          const requestInfo = compactReq;
+          const limit = this.maxToolResponseBytes;
+          const warnMsg = `${requestInfo} → response exceeded max size: ${String(sizeBytes)} bytes > limit ${String(limit)} bytes (truncated)`;
+          this.log('WRN', 'response', 'mcp', `${serverName}:${toolCall.name}`, warnMsg);
+          this.sizeCapHits += 1;
+
+          // Prepare injected prefix message
+          const prefix = `[TRUNCATED] Original size ${String(sizeBytes)} bytes; truncated to ${String(limit)} bytes.\n\n`;
+          const enc = new TextEncoder();
+          const dec = new TextDecoder('utf-8', { fatal: false });
+          const prefixBytes = enc.encode(prefix);
+          if (prefixBytes.byteLength >= limit) {
+            // Edge case: prefix alone exceeds limit → return prefix trimmed to limit
+            const slice = prefixBytes.subarray(0, limit);
+            const truncated = dec.decode(slice);
+            result = truncated;
+          } else {
+            // Compute remaining budget for original content
+            const budget = limit - prefixBytes.byteLength;
+            const resBytes = enc.encode(result);
+            const contentSlice = resBytes.subarray(0, Math.min(budget, resBytes.byteLength));
+            const truncated = dec.decode(contentSlice);
+            result = prefix + truncated;
+          }
+        }
+      }
       const status: ToolStatus = isError 
         ? { type: 'execution_error', toolName: toolCall.name, message: 'Tool execution failed' }
         : { type: 'success' };
@@ -605,6 +626,8 @@ export class MCPClientManager {
   private sanitizeNamespace(name: string): string {
     return toUnderscore(name);
   }
+
+  getSizeCapHits(): number { return this.sizeCapHits; }
 }
 
 // Helpers

@@ -9,6 +9,7 @@ import type { AIAgentSessionConfig, LogEntry, AccountingEntry, AIAgentCallbacks,
 
 import { AIAgent } from './ai-agent.js';
 import { loadConfiguration, resolveConfigPath } from './config.js';
+import { formatAgentResultHumanReadable } from './utils.js';
 
 interface FrontmatterOptions {
   llms?: string | string[];
@@ -29,6 +30,7 @@ interface FrontmatterOptions {
   toolTimeout?: number;
   temperature?: number;
   topP?: number;
+  toolResponseMaxBytes?: number;
 }
 
 const program = new Command();
@@ -105,6 +107,7 @@ function buildResolvedDefaultsHelp(): string {
     const toolTimeout = readNum('toolTimeout', 'toolTimeout', 60000);
     const maxRetries = readNum('maxRetries', 'maxRetries', 3);
     const maxToolTurns = readNum('maxToolTurns', 'maxToolTurns', 10);
+    const toolResponseMaxBytes = readNum('toolResponseMaxBytes', 'toolResponseMaxBytes', 12288);
     const stream = readBool('stream', 'stream', false);
     const parallelToolCalls = readBool('parallelToolCalls', 'parallelToolCalls', false);
 
@@ -139,6 +142,7 @@ function buildResolvedDefaultsHelp(): string {
     fmTemplate.topP = topP;
     fmTemplate.llmTimeout = llmTimeout;
     fmTemplate.toolTimeout = toolTimeout;
+    fmTemplate.toolResponseMaxBytes = toolResponseMaxBytes;
     fmTemplate.maxRetries = maxRetries;
     fmTemplate.maxToolTurns = maxToolTurns;
     fmTemplate.stream = stream;
@@ -208,6 +212,7 @@ program
   .option('--mcp-tools <list>', ALIAS_FOR_TOOLS)
   .option('--llm-timeout <ms>', 'Timeout for LLM responses (ms)', '120000')
   .option('--tool-timeout <ms>', 'Timeout for tool execution (ms)', '60000')
+  .option('--tool-response-max-bytes <n>', 'Maximum MCP tool response size (bytes)', '12288')
   .option('--temperature <n>', 'LLM temperature (0.0-2.0)', '0.7')
   .option('--top-p <n>', 'LLM top-p sampling (0.0-1.0)', '1.0')
   .option('--save <filename>', 'Save conversation to JSON file')
@@ -249,6 +254,7 @@ program
       const srcToolTimeout = program.getOptionValueSource('toolTimeout');
       const srcTemperature = program.getOptionValueSource('temperature');
       const srcTopP = program.getOptionValueSource('topP');
+      const srcToolResponseMaxBytes = program.getOptionValueSource('toolResponseMaxBytes');
 
       const fmOptions: FrontmatterOptions | undefined = fm?.options;
 
@@ -267,6 +273,10 @@ program
       const toolTimeout = srcToolTimeout === 'cli'
         ? parsePositiveInt(options.toolTimeout, 'tool-timeout')
         : (() => { const n = readFmNumber(fmOptions, 'toolTimeout'); if (n !== undefined) { if (!(n > 0)) { console.error('Error: frontmatter toolTimeout must be positive'); process.exit(4);} return Math.trunc(n); } return (0 + ((): number => { try { const p = resolveConfigPath(cfgPath); const j = JSON.parse(fs.readFileSync(p, 'utf-8')) as { defaults?: Record<string, unknown> }; const v = j.defaults?.toolTimeout; return typeof v === 'number' ? v : 60000; } catch { return 60000; } })()); })();
+
+      const toolResponseMaxBytes = srcToolResponseMaxBytes === 'cli'
+        ? parsePositiveInt(options.toolResponseMaxBytes, 'tool-response-max-bytes')
+        : (() => { const n = readFmNumber(fmOptions, 'toolResponseMaxBytes'); if (n !== undefined) { if (!(n > 0)) { console.error('Error: frontmatter toolResponseMaxBytes must be positive'); process.exit(4);} return Math.trunc(n); } return (0 + ((): number => { try { const p = resolveConfigPath(cfgPath); const j = JSON.parse(fs.readFileSync(p, 'utf-8')) as { defaults?: Record<string, unknown> }; const v = j.defaults?.toolResponseMaxBytes; return typeof v === 'number' ? v : 12288; } catch { return 12288; } })()); })();
 
       const temperature = srcTemperature === 'cli'
         ? parseFloat(options.temperature, 'temperature', 0, 2)
@@ -437,6 +447,7 @@ program
         maxTurns: maxToolTurns,
         llmTimeout,
         toolTimeout,
+        toolResponseMaxBytes,
         parallelToolCalls: effectiveParallelToolCalls,
         stream: effectiveStream,
         callbacks,
@@ -454,8 +465,18 @@ program
       const session = AIAgent.create(sessionConfig);
       const result = await session.run();
 
+      // Always print only the formatted human-readable output to stdout
+      try {
+        const out = formatAgentResultHumanReadable(result);
+        process.stdout.write(out);
+        if (!out.endsWith('\n')) process.stdout.write('\n');
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error(`Formatting error: ${msg}`);
+      }
+
       if (!result.success) {
-        console.error(`Error: ${result.error ?? ''}`);
+        if (options.verbose === true) console.error(`Error: ${result.error ?? ''}`);
         // Exit logs are already emitted by the agent itself via callbacks
         if ((result.error ?? '').includes('Configuration')) process.exit(1);
         else if ((result.error ?? '').includes('Max tool turns exceeded')) process.exit(5);
@@ -644,6 +665,7 @@ function parseFrontmatter(src: string): { expectedOutput?: { format: 'json'|'mar
     if (typeof raw.maxRetries === 'number') options.maxRetries = raw.maxRetries;
     if (typeof raw.llmTimeout === 'number') options.llmTimeout = raw.llmTimeout;
     if (typeof raw.toolTimeout === 'number') options.toolTimeout = raw.toolTimeout;
+    if (typeof raw.toolResponseMaxBytes === 'number') options.toolResponseMaxBytes = raw.toolResponseMaxBytes;
     if (typeof raw.temperature === 'number') options.temperature = raw.temperature;
     if (typeof raw.topP === 'number') options.topP = raw.topP;
     if (typeof raw.description === 'string') description = raw.description;
@@ -787,7 +809,12 @@ function createCallbacks(options: Record<string, unknown>, accountingFile?: stri
       }
     },
     
-    onOutput: (text: string) => { process.stdout.write(text); },
+    onOutput: (text: string) => {
+      // Only mirror streamed output to stderr when verbose; keep stdout clean
+      if (options.verbose === true) {
+        try { process.stderr.write(text); } catch {}
+      }
+    },
     
     onThinking: (text: string) => { 
       const colored = colorize(text, '\x1b[2;37m'); // Light gray (dim white) for thinking

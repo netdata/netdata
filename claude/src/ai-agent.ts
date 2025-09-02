@@ -103,7 +103,8 @@ export class AIAgentSession {
     const mcpClient = new MCPClientManager({ 
       trace: sessionConfig.traceMCP === true, 
       verbose: sessionConfig.verbose,
-      onLog: sessionConfig.callbacks?.onLog 
+      onLog: sessionConfig.callbacks?.onLog,
+      maxToolResponseBytes: sessionConfig.toolResponseMaxBytes
     });
 
     // Create session-owned LLM client
@@ -213,7 +214,8 @@ export class AIAgentSession {
         error: result.error,
         conversation: result.conversation,
         logs: result.logs,
-        accounting: result.accounting
+        accounting: result.accounting,
+        finalReport: result.finalReport,
       };
 
     } catch (error) {
@@ -240,6 +242,8 @@ export class AIAgentSession {
         currentLogs
       );
 
+      // Emit FIN summary even on failure
+      this.emitFinalSummary(currentLogs, currentAccounting);
       return {
         success: false,
         error: message,
@@ -267,7 +271,7 @@ export class AIAgentSession {
     let lastShownThinkingHeaderTurn = -1;
 
     const maxTurns = this.sessionConfig.maxTurns ?? 10;
-    const maxRetries = this.sessionConfig.maxRetries ?? 3;
+    const maxRetries = this.sessionConfig.maxRetries ?? 3; // GLOBAL attempts cap per turn
     const pairs = this.sessionConfig.targets;
 
     // Turn loop - necessary for control flow with early termination
@@ -280,18 +284,20 @@ export class AIAgentSession {
       let turnSuccessful = false;
       let finalTurnWarnLogged = false;
 
-      // Retry loop over all provider/model pairs - necessary for early termination
+      // Global attempts across all provider/model pairs for this turn
+      let attempts = 0;
+      let pairCursor = 0;
       // eslint-disable-next-line functional/no-loop-statements
-      for (let retry = 0; retry < maxRetries && !turnSuccessful; retry++) {
-        // eslint-disable-next-line functional/no-loop-statements
-        for (let pairIndex = 0; pairIndex < pairs.length && !turnSuccessful; pairIndex++) {
-          const { provider, model } = pairs[pairIndex];
+      while (attempts < maxRetries && !turnSuccessful) {
+        const pair = pairs[pairCursor % pairs.length];
+        pairCursor += 1;
+        const { provider, model } = pair;
           
           try {
             // Build per-attempt conversation with optional guidance injection
             let attemptConversation = [...conversation];
-            // On the last retry within this turn, nudge the model to use tools (not append_notes)
-            if (retry === (maxRetries - 1) && currentTurn < (maxTurns - 1)) {
+            // On the last allowed attempt within this turn, nudge the model to use tools (not append_notes)
+            if ((attempts === maxRetries - 1) && currentTurn < (maxTurns - 1)) {
               attemptConversation.push({
                 role: 'user',
                 content: 'Reminder: do not end with plain text. Use an available tool (excluding `agent_append_notes`) to make progress. When ready to conclude, call the tool `agent_final_report` to provide the final answer.'
@@ -319,6 +325,7 @@ export class AIAgentSession {
             }
 
             this.llmAttempts++;
+            attempts += 1;
             const turnResult = await this.executeSingleTurn(
               attemptConversation,
               provider,
@@ -389,7 +396,7 @@ export class AIAgentSession {
         // Deterministic finalization: if final_report has been set, finish now
         if (this.finalReport !== undefined) {
           const fr = this.finalReport;
-          // Print final output according to expected format
+          // Validate final JSON against schema if provided (no output to onOutput here)
           if (fr.format === 'json') {
             // Validate JSON against frontmatter schema if available
             const schema = this.sessionConfig.expectedOutput?.schema;
@@ -436,17 +443,8 @@ export class AIAgentSession {
                 this.sessionConfig.callbacks?.onLog?.(warn);
               }
             }
-            const out = fr.content_json !== undefined ? JSON.stringify(fr.content_json) : (fr.content ?? '');
-            if (out.length > 0) {
-              this.sessionConfig.callbacks?.onOutput?.(out);
-              if (!out.endsWith('\n')) this.sessionConfig.callbacks?.onOutput?.('\n');
-            }
           } else {
-            const out = fr.content ?? '';
-            if (out.length > 0) {
-              this.sessionConfig.callbacks?.onOutput?.(out);
-              if (!out.endsWith('\n')) this.sessionConfig.callbacks?.onOutput?.('\n');
-            }
+            // For markdown/text, no onOutput; CLI will print via formatter
           }
 
           // Log successful exit
@@ -464,7 +462,8 @@ export class AIAgentSession {
             success: true,
             conversation,
             logs,
-            accounting
+            accounting,
+            finalReport: fr
           };
         }
               
@@ -570,9 +569,21 @@ export class AIAgentSession {
             }
           } catch (error) {
             lastError = error instanceof Error ? error.message : String(error);
+            // Ensure accounting entry even if an unexpected error occurred before turnResult
+            const accountingEntry: AccountingEntry = {
+              type: 'llm',
+              timestamp: Date.now(),
+              status: 'failed',
+              latency: 0,
+              provider,
+              model,
+              tokens: { inputTokens: 0, outputTokens: 0, cachedTokens: 0, totalTokens: 0 },
+              error: lastError,
+            };
+            accounting.push(accountingEntry);
+            this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
             continue;
           }
-        }
       }
 
       if (!turnSuccessful) {
@@ -590,7 +601,8 @@ export class AIAgentSession {
           currentTurn,
           logs
         );
-        
+        // Emit FIN summary even on failure
+        this.emitFinalSummary(logs, accounting);
         return {
           success: false,
           error: lastError ?? 'All provider/model targets failed',
@@ -688,6 +700,9 @@ export class AIAgentSession {
       const toolPairsStr = [...byToolStats.entries()]
         .map(([k, s]) => `${String(s.total)}x [${String(s.ok)}+${String(s.failed)}] ${k}`)
         .join(', ');
+      const sizeCaps = typeof (this.mcpClient as unknown as { getSizeCapHits?: () => number }).getSizeCapHits === 'function'
+        ? (this.mcpClient as unknown as { getSizeCapHits: () => number }).getSizeCapHits()
+        : 0;
       const finMcp: LogEntry = {
         timestamp: Date.now(),
         severity: 'FIN',
@@ -697,7 +712,7 @@ export class AIAgentSession {
         type: 'mcp',
         remoteIdentifier: 'summary',
         fatal: false,
-        message: `requests=${String(mcpRequests)}, failed=${String(mcpFailures)}, bytes in=${String(totalToolCharsIn)} out=${String(totalToolCharsOut)}, providers/tools: ${toolPairsStr.length > 0 ? toolPairsStr : 'none'}`,
+        message: `requests=${String(mcpRequests)}, failed=${String(mcpFailures)}, capped=${String(sizeCaps)}, bytes in=${String(totalToolCharsIn)} out=${String(totalToolCharsOut)}, providers/tools: ${toolPairsStr.length > 0 ? toolPairsStr : 'none'}`,
       };
       logs.push(finMcp);
       this.sessionConfig.callbacks?.onLog?.(finMcp);

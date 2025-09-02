@@ -201,6 +201,19 @@ Notes:
 - **Performance Tracking**: Include latency and request/response size accounting for each tool execution
 <!-- Tool limits are now handled by the provider/SDK; no app-level limit option. -->
 
+#### Tool Response Size Cap
+- A configurable maximum size (bytes) is enforced for MCP tool responses.
+- If a tool returns content larger than the limit, the agent truncates the response and injects a prefix message:
+  - Injected prefix (counts toward the limit):
+    `[TRUNCATED] Original size {actual} bytes; truncated to {limit} bytes.`
+  - The remaining budget is filled with the beginning of the original response, so the top part is preserved.
+- A warning is logged with request details, actual size, and limit.
+- Configuration surfaces (highest precedence first):
+  - CLI: `--tool-response-max-bytes <n>`
+  - Frontmatter: `toolResponseMaxBytes: <number>`
+  - Config defaults: `.ai-agent.json` → `defaults.toolResponseMaxBytes`
+- Default when unspecified: `12288` (12 KB).
+
 ### Provider Fallback
 - Models are tried sequentially on failure (model-first), and for each model all providers are attempted in order
 - Each model/provider attempt receives the **exact same request** without modifications

@@ -4,6 +4,7 @@
 - docs/IMPLEMENTATION.md for AI SDK/ModelContextProtocol implementation.
 - docs/DESIGN.md for the design of the application.
 - docs/MULTI-AGENT.md for the recursive multi-agent design.
+- docs/docs/AI-AGENT-INTERNAL-API.md current status of the ai-agent internal agent API.
 - README.md for end-user documentation of the application.
 
 Directory claude/ contains the current implementation, architected by claude and co-implemented by codex.

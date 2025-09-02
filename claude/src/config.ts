@@ -41,6 +41,7 @@ const ConfigurationSchema = z.object({
       parallelToolCalls: z.boolean().optional(),
       maxToolTurns: z.number().int().positive().optional(),
       maxRetries: z.number().int().positive().optional(),
+      toolResponseMaxBytes: z.number().int().positive().optional(),
     })
     .optional(),
 });

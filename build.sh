@@ -13,6 +13,9 @@ if [ ! -d "claude/node_modules" ]; then
 fi
 (cd claude && npm run build)
 
+echo "[build] Linting Claude implementation (ESLint)"
+(cd claude && npm run lint)
+
 # Create a lightweight launcher at repo root: ./ai-agent
 LAUNCHER="$SCRIPT_DIR/ai-agent"
 cat > "$LAUNCHER" <<'EOF'

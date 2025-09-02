@@ -135,6 +135,8 @@ export interface Configuration {
     maxToolTurns?: number;
     stream?: boolean;
     maxRetries?: number;
+    // Maximum allowed MCP tool response size in bytes. If exceeded, a tool error is injected.
+    toolResponseMaxBytes?: number;
   };
 }
 
@@ -167,6 +169,8 @@ export interface AIAgentSessionConfig {
   traceLLM?: boolean;
   traceMCP?: boolean;
   verbose?: boolean;
+  // Enforced cap for MCP tool response size (bytes)
+  toolResponseMaxBytes?: number;
 }
 
 // Session result
@@ -176,6 +180,15 @@ export interface AIAgentResult {
   conversation: ConversationMessage[];
   logs: LogEntry[];
   accounting: AccountingEntry[];
+  // Isolated final report returned by the model via agent_final_report, when available
+  finalReport?: {
+    status: 'success' | 'failure' | 'partial';
+    format: 'json' | 'markdown' | 'text';
+    content?: string;
+    content_json?: Record<string, unknown>;
+    metadata?: Record<string, unknown>;
+    ts: number;
+  };
 }
 
 // Accounting system
