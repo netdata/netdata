@@ -2589,8 +2589,8 @@ send_signl4() {
     "value" : "${value_string}",
     "image_url": "${image}",
     "src" : "${src}",
-    "X-S4-ExternalID": "${unique_id}"
-    "X-S4-Status": "${signl4_status}",
+    "X-S4-ExternalID" : "${unique_id}",
+    "X-S4-Status" : "${signl4_status}",
     "X-S4-SourceSystem" : "Netdata"
   }
 EOF
