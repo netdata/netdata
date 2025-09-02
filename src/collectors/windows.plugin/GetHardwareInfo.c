@@ -101,6 +101,7 @@ int netdata_load_driver()
                 return -1;
             }
         } else {
+            CloseServiceHandle(scm);
             nd_log(
                     NDLS_COLLECTORS,
                     NDLP_ERR,
@@ -167,6 +168,7 @@ int do_GetHardwareInfo(int update_every, usec_t dt __maybe_unused)
 
     return 0;
 }
+
 void do_GetHardwareInfo_cleanup()
 {
     netdata_unload_hardware();
