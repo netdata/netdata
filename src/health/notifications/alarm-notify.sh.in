@@ -2583,7 +2583,7 @@ send_signl4() {
     "duration" : "${duration_txt}",
     "host" : "${host}",
     "info" : "${info}",
-    "severity": ${status},
+    "severity": "${status}",
     "total_critical" : "${total_critical}",
     "total_warnings" : "${total_warnings}",
     "value" : "${value_string}",
