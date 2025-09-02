@@ -135,6 +135,12 @@ func (d *directories) initUserRoots(opts *cli.Option, env envData, execDir strin
 		return
 	}
 
+	relDir := safePathClean(filepath.Join(execDir, "..", "..", "..", "..", "etc", "netdata"))
+	if isDirExists(relDir) {
+		d.userConfigDirs = multipath.New(relDir)
+		return
+	}
+
 	// 3) Fallback if empty
 	for _, dir := range []string{
 		handleDirOnWin(env.cygwinBase, "/etc/netdata", execDir),
@@ -146,13 +152,19 @@ func (d *directories) initUserRoots(opts *cli.Option, env envData, execDir strin
 		}
 	}
 
-	d.userConfigDirs = multipath.New(filepath.Join(execDir, "..", "..", "..", "..", "etc", "netdata"))
+	d.userConfigDirs = multipath.New(relDir)
 }
 
 // Build step 2: initialize single "stock" root: env, common locations, build-relative fallback.
 func (d *directories) initStockRoot(env envData, execDir string) {
 	if stock := safePathClean(env.stockDir); stock != "" {
 		d.stockConfigDir = stock
+		return
+	}
+
+	relDir := safePathClean(filepath.Join(execDir, "..", "..", "..", "..", "usr", "lib", "netdata", "conf.d"))
+	if isDirExists(relDir) {
+		d.stockConfigDir = relDir
 		return
 	}
 
@@ -166,7 +178,7 @@ func (d *directories) initStockRoot(env envData, execDir string) {
 		}
 	}
 
-	d.stockConfigDir = filepath.Join(execDir, "..", "..", "..", "..", "usr", "lib", "netdata", "conf.d")
+	d.stockConfigDir = relDir
 }
 
 // Build step 3: derive collectors dirs from roots.
