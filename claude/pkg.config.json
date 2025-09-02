@@ -1,0 +1,17 @@
+{
+  "name": "ai-agent",
+  "main": "dist/cli.js",
+  "targets": [
+    "node18-linux-x64"
+  ],
+  "outputPath": "../ai-agent",
+  "compress": "GZip",
+  "scripts": [
+    "dist/**/*.js",
+    "node_modules/**/*.js"
+  ],
+  "assets": [
+    "package.json",
+    "node_modules/**/*"
+  ]
+}
