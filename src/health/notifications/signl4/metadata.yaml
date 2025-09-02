@@ -1,0 +1,55 @@
+# yamllint disable rule:line-length
+---
+- id: "notify-signl4"
+  meta:
+    name: "SIGNL4"
+    link: "https://www.signl4.com/"
+    categories:
+      - notify.agent
+    icon_filename: "signl4.svg"
+  keywords:
+    - signl4
+  overview:
+    notification_description: |
+      SIGNL4 offers critical alerting, incident response and service dispatching for operating critical infrastructure. It alerts you persistently via app push, SMS text, voice calls, and email including tracking, escalation, on-call duty scheduling and collaboration.
+      You can send notifications to SIGNL4 using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
+    notification_limitations: ""
+  setup:
+    prerequisites:
+      list:
+        - title: ""
+          description: |
+            - An inbound webhook in SIGNL4
+            - Access to the terminal where Netdata Agent is running
+    configuration:
+      file:
+        name: "health_alarm_notify.conf"
+      options:
+        description: "The following options can be defined for this notification"
+        folding:
+          title: "Config Options"
+          enabled: true
+        list:
+          - name: "SEND_SIGNL4"
+            default_value: 'YES'
+            description: "Set `SEND_SIGNL4` to YES"
+            required: true
+          - name: 'SIGNL4_WEBHOOK_URL'
+            default_value: ''
+            description: "set `SIGNL4_WEBHOOK_URL` to your SIGNL4 webhook URL."
+            required: true
+      examples:
+        folding:
+          enabled: true
+          title: ''
+        list:
+          - name: 'Basic Configuration'
+            folding:
+              enabled: false
+            description: ''
+            config: |
+              SEND_SIGNL4="YES"
+              SIGNL4_WEBHOOK_URL="https://connect.signl4.com/webhook/xxxxxxxx"
+  troubleshooting:
+    problems:
+      list: []
