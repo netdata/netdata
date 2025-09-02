@@ -2577,7 +2577,7 @@ send_signl4() {
     "title" : "${name}",
     "message" : "${status_message}",
     "alert_url" : "${goto_url}",
-    "alarm_id" : ${alarm_id},
+    "alarm_id" : "${alarm_id}",
     "chart" : "${chart}",
     "date" : "${when}",
     "duration" : "${duration_txt}",
