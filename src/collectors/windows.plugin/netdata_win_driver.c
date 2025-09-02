@@ -6,21 +6,15 @@
 #define MSR_DEVICE_NAME L"\\Device\\NDDrv"
 #define MSR_DOSLINK_NAME L"\\DosDevices\\NDDrv"
 
-#define IOCTL_MSR_READ   CTL_CODE(FILE_DEVICE_UNKNOWN, 0x800, METHOD_BUFFERED, FILE_ANY_ACCESS)
-#define IOCTL_MSR_THERM  CTL_CODE(FILE_DEVICE_UNKNOWN, 0x801, METHOD_BUFFERED, FILE_ANY_ACCESS)
+#define IOCTL_READ_MSR CTL_CODE(FILE_DEVICE_UNKNOWN, 0x800, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
 // Payloads
-typedef struct _MSR_READ_INPUT {
-    ULONG Reg;           // MSR index to read (e.g., 0x19C)
-} MSR_READ_INPUT, *PMSR_READ_INPUT;
-
-typedef struct _MSR_READ_OUTPUT {
-    ULONGLONG Value;     // Raw 64-bit MSR value
-} MSR_READ_OUTPUT, *PMSR_READ_OUTPUT;
-
-typedef struct _MSR_THERM_OUTPUT {
-    ULONG DeltaToTjMax;  // From IA32_THERM_STATUS[22:16]
-} MSR_THERM_OUTPUT, *PMSR_THERM_OUTPUT;
+typedef struct _MSR_REQUEST {
+    ULONG Msr;
+    ULONG CpuIndex;
+    ULONG low;
+    ULONG high;
+} MSR_REQUEST, *PMSR_REQUEST;
 
 DRIVER_UNLOAD     NetdataMsrUnload;
 DRIVER_DISPATCH   NetdataMsrCreateClose;
@@ -60,37 +54,26 @@ NTSTATUS NetdataMsrDeviceControl(_In_ PDEVICE_OBJECT DeviceObject, _Inout_ PIRP 
     UNREFERENCED_PARAMETER(DeviceObject);
     PIO_STACK_LOCATION irpSp = IoGetCurrentIrpStackLocation(Irp);
 
-    NTSTATUS status = STATUS_INVALID_DEVICE_REQUEST;
-    ULONG_PTR info = 0;
+    NTSTATUS status = STATUS_SUCCESS;
 
-    if (irpSp->Parameters.DeviceIoControl.IoControlCode == IOCTL_MSR_READ) {
-        // Buffered I/O: both input and output are in SystemBuffer
-        if (irpSp->Parameters.DeviceIoControl.InputBufferLength  < sizeof(MSR_READ_INPUT) ||
-            irpSp->Parameters.DeviceIoControl.OutputBufferLength < sizeof(MSR_READ_OUTPUT)) {
-            status = STATUS_BUFFER_TOO_SMALL;
-        } else {
-            PMSR_READ_INPUT in  = (PMSR_READ_INPUT)Irp->AssociatedIrp.SystemBuffer;
-            PMSR_READ_OUTPUT out = (PMSR_READ_OUTPUT)Irp->AssociatedIrp.SystemBuffer;
+    if (irpSp->Parameters.DeviceIoControl.IoControlCode == IOCTL_READ_MSR) {
+        PMSR_REQUEST req = (PMSR_REQUEST)Irp->AssociatedIrp.SystemBuffer;
 
-            out->Value = __readmsr(in->Reg);
-            info = sizeof(MSR_READ_OUTPUT);
-        }
+        KAFFINITY cpuMask = 1ull << req->CpuIndex;
+
+        KAFFINITY oldMask = KeSetSystemAffinityThreadEx(cpuMask);
+
+        ULONGLONG value = __readmsr(req->Msr);
+
+        KeRevertToUserAffinityThreadEx(oldMask);
+
+        req->low = (ULONG)(value & 0xFFFFFFFF);
+        req->high = (ULONG)(value >> 32);
+
+        Irp->IoStatus.Information = sizeof(MSR_REQUEST);
+    } else {
+        status = STATUS_INVALID_DEVICE_REQUEST;
     }
-    else if (irpSp->Parameters.DeviceIoControl.IoControlCode == IOCTL_MSR_THERM) {
-        if (irpSp->Parameters.DeviceIoControl.OutputBufferLength < sizeof(MSR_THERM_OUTPUT)) {
-            status = STATUS_BUFFER_TOO_SMALL;
-        } else {
-            PMSR_THERM_OUTPUT out = (PMSR_THERM_OUTPUT)Irp->AssociatedIrp.SystemBuffer;
-            ULONGLONG val = __readmsr(MSR_IA32_THERM_STATUS);
-            // IA32_THERM_STATUS bits [22:16] = Digital Readout = Delta to TjMax
-            out->DeltaToTjMax = (ULONG)((val >> 16) & 0x7F);
-            info = sizeof(MSR_THERM_OUTPUT);
-        }
-    }
-
-    Irp->IoStatus.Status = status;
-    Irp->IoStatus.Information = info;
-    IoCompleteRequest(Irp, IO_NO_INCREMENT);
     return status;
 }
 
@@ -99,9 +82,7 @@ NTSTATUS DriverEntry(_In_ PDRIVER_OBJECT DriverObject, _In_ PUNICODE_STRING Regi
     UNREFERENCED_PARAMETER(RegistryPath);
 
     PDEVICE_OBJECT deviceObject = NULL;
-    NTSTATUS status;
-
-    status = IoCreateDevice(
+    NTSTATUS status = IoCreateDevice(
         DriverObject,
         0,                      // no device extension
         &g_DeviceName,
@@ -113,9 +94,6 @@ NTSTATUS DriverEntry(_In_ PDRIVER_OBJECT DriverObject, _In_ PUNICODE_STRING Regi
     if (!NT_SUCCESS(status)) {
         return status;
     }
-
-    // Use buffered I/O for simple IOCTL marshaling
-    deviceObject->Flags |= DO_BUFFERED_IO;
 
     status = IoCreateSymbolicLink(&g_DosLinkName, &g_DeviceName);
     if (!NT_SUCCESS(status)) {
