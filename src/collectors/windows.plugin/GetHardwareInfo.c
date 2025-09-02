@@ -8,6 +8,17 @@
 static HANDLE msr_h = INVALID_HANDLE_VALUE;
 static const char *srv_name = "NetdataDriver";
 
+struct cpu_data {
+    RRDSET *st_cpu_temp;
+    RRDDIM *rd_cpu_temp;
+
+    collected_number cpu_temp;
+};
+
+DICTIONARY *cpu_options;
+struct cpu_data *cpus;
+size_t ncpus;
+
 static void netdata_unload_driver()
 {
     SC_HANDLE scm = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
@@ -151,6 +162,9 @@ static int initialize(int update_every)
     if (netdata_open_device()) {
         return -1;
     }
+
+    ncpus = os_get_system_cpus();
+    cpus = callocz(ncpus, sizeof(struct cpu_data));
 
     return 0;
 }
