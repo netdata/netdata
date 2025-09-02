@@ -49,6 +49,7 @@ int do_PerflibASP(int update_every, usec_t dt __maybe_unused);
 
 // Cleanup
 void do_PerflibMSSQL_cleanup();
+void do_GetHardwareInfo_cleanup();
 void do_Sensors_cleanup();
 
 enum PERFLIB_PRIO {

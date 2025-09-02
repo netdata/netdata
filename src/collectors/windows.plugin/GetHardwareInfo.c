@@ -6,27 +6,59 @@
 #include "netdata_win_driver.h"
 
 static HANDLE msr_h = INVALID_HANDLE_VALUE;
-static SC_HANDLE scm = NULL;
-static SC_HANDLE service = NULL;
+static const char *srv_name = "NetdataDriver";
 
 static void netdata_unload_driver()
 {
-    if (scm)
+    SC_HANDLE scm = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
+    if (scm == NULL) {
+        nd_log(
+                NDLS_COLLECTORS,
+                NDLP_ERR,
+                "Cannot open Service Manager. GetLastError= %lu \n", GetLastError());
+        return;
+    }
+
+    SC_HANDLE service = OpenService(scm, srv_name, SERVICE_STOP | SERVICE_QUERY_STATUS | DELETE);
+    if (service == NULL) {
+        nd_log(
+                NDLS_COLLECTORS,
+                NDLP_ERR,
+                "Cannot open the service. GetLastError= %lu \n", GetLastError());
         CloseServiceHandle(scm);
+        return;
+    }
 
-    if (service)
-        CloseServiceHandle(service);
+    SERVICE_STATUS_PROCESS ss_status;
+    if (ControlService(service, SERVICE_CONTROL_STOP, (LPSERVICE_STATUS)&ss_status) == 0) {
+        nd_log(
+                NDLS_COLLECTORS,
+                NDLP_ERR,
+                "Cannot stop the service. GetLastError= %lu \n", GetLastError());
+    }
 
+    if (!DeleteService(service)) {
+        nd_log(
+                NDLS_COLLECTORS,
+                NDLP_ERR,
+                "Cannot delete the service. GetLastError= %lu \n", GetLastError());
+    }
+
+    CloseServiceHandle(service);
+    CloseServiceHandle(scm);
+}
+
+static void netdata_unload_hardware()
+{
+    netdata_unload_driver();
     if (msr_h != INVALID_HANDLE_VALUE)
         CloseHandle(msr_h);
 }
 
 int netdata_load_driver()
 {
-    const char *srv_name = "NetdataDriver";
-    const char* drv_path = "C:\\windows\\System32\\netdata_driver.sys";
-
-    scm = OpenSCManager(
+    const char *drv_path = "C:\\Windows\\System32\\netdata_driver.sys";
+    SC_HANDLE scm = OpenSCManager(
             NULL,
             NULL,
             SC_MANAGER_ALL_ACCESS
@@ -41,7 +73,7 @@ int netdata_load_driver()
     }
 
     // Create the service entry for the driver
-    service = CreateService(
+    SC_HANDLE service = CreateService(
             scm,
             srv_name,
             srv_name,
@@ -89,6 +121,9 @@ int netdata_load_driver()
         return -1;
     }
 
+    CloseServiceHandle(service);
+    CloseServiceHandle(scm);
+
     return 0;
 }
 
@@ -131,4 +166,8 @@ int do_GetHardwareInfo(int update_every, usec_t dt __maybe_unused)
     }
 
     return 0;
+}
+void do_GetHardwareInfo_cleanup()
+{
+    netdata_unload_hardware();
 }
