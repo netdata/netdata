@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/cli"
@@ -126,8 +127,10 @@ func (d *directories) initUserRoots(opts *cli.Option, env envData, execDir strin
 	}
 
 	// 2) NETDATA_USER_CONFIG_DIR
-	if env.userDir != "" {
-		roots = append(roots, safePathClean(env.userDir))
+	if buildinfo.UserConfigDir != "" {
+		roots = append(roots, safePathClean(buildinfo.UserConfigDir))
+	} else if dir := safePathClean(env.userDir); dir != "" {
+		roots = append(roots, dir)
 	}
 
 	if len(roots) != 0 {
@@ -157,6 +160,10 @@ func (d *directories) initUserRoots(opts *cli.Option, env envData, execDir strin
 
 // Build step 2: initialize single "stock" root: env, common locations, build-relative fallback.
 func (d *directories) initStockRoot(env envData, execDir string) {
+	if buildinfo.StockConfigDir != "" {
+		d.stockConfigDir = safePathClean(buildinfo.StockConfigDir)
+		return
+	}
 	if stock := safePathClean(env.stockDir); stock != "" {
 		d.stockConfigDir = stock
 		return
