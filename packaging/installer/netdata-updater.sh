@@ -561,7 +561,7 @@ _safe_download() {
   checked=0
 
   if echo "${url}" | grep -Eq "^file:///"; then
-    run cp "${url#file://}" "${dest}" || return 1
+    cp "${url#file://}" "${dest}" || return 1
     return 0
   fi
 
