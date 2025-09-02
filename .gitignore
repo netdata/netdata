@@ -3,3 +3,5 @@ libs/
 node_modules/
 .channels_cache_v2.json
 .users_cache.json
+
+ai-agent
