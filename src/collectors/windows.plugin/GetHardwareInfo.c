@@ -143,11 +143,11 @@ int netdata_open_device()
 
 static int initialize(int update_every)
 {
-    if (netdata_open_device()) {
+    if (netdata_load_driver()) {
         return -1;
     }
 
-    if (netdata_load_driver()) {
+    if (netdata_open_device()) {
         return -1;
     }
 
@@ -158,7 +158,7 @@ int do_GetHardwareInfo(int update_every, usec_t dt __maybe_unused)
 {
     static bool initialized = false;
     if (unlikely(!initialized)) {
-        if (likely(initialize(update_every))) {
+        if (initialize(update_every)) {
             return -1;
         }
 
