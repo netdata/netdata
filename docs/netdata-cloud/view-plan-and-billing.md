@@ -6,7 +6,7 @@ For more info visit the [Netdata Cloud Pricing](https://netdata.cloud/pricing) p
 
 ## Plans
 
-Plans define the features and customization options available within a Space. Different Spaces can have different plans, giving you flexibility based on your needs.
+Plans define the features and customization options available within Space. Different Spaces can have different plans, giving you flexibility based on your needs.
 
 Netdata Cloud plans (excluding Community) involve:
 
