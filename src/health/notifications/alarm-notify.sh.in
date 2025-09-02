@@ -34,6 +34,7 @@
 #  - Opsgenie by @thiaoftsm #9858
 #  - Gotify by @coffeegrind123
 #  - ntfy.sh by @Dim-P
+#  - SIGNL4 by @rons4
 #shellcheck source=/dev/null disable=SC2086,SC2154
 
 # -----------------------------------------------------------------------------
@@ -266,6 +267,7 @@ prowl
 pushbullet
 pushover
 rocketchat
+signl4
 slack
 sms
 syslog
@@ -503,6 +505,9 @@ GOTIFY_APP_TOKEN=
 
 # opsgenie configs
 OPSGENIE_API_KEY=
+
+# signl4 configs
+SIGNL4_WEBHOOK_URL=
 
 # load the stock and user configuration files
 # these will overwrite the variables above
@@ -780,6 +785,9 @@ fi
 # check ilert
 [ -z "${ILERT_ALERT_SOURCE_URL}" ] && SEND_ILERT="NO"
 
+# check signl4
+[ -z "${SIGNL4_WEBHOOK_URL}" ] && SEND_SIGNL4="NO"
+
 # -----------------------------------------------------------------------------
 # check the availability of targets
 
@@ -811,7 +819,8 @@ check_supported_targets() {
     [ "${SEND_OPSGENIE}" = "YES" ] ||
     [ "${SEND_GOTIFY}" = "YES" ] ||
     [ "${SEND_NTFY}" = "YES" ] ||
-    [ "${SEND_ILERT}" = "YES" ]; then
+    [ "${SEND_ILERT}" = "YES" ] ||
+    [ "${SEND_SIGNL4}" = "YES" ]; then
     # if we need curl, check for the curl command
     if [ -z "${curl}" ]; then
       curl="$(command -v curl 2>/dev/null)"
@@ -843,6 +852,7 @@ check_supported_targets() {
       SEND_GOTIFY="NO"
       SEND_NTFY="NO"
       SEND_ILERT="NO"
+      SEND_SIGNL4="NO"
     fi
   fi
 
@@ -1000,7 +1010,8 @@ for method in "${SEND_EMAIL}" \
   "${SEND_OPSGENIE}" \
   "${SEND_GOTIFY}" \
   "${SEND_NTFY}" \
-  "${SEND_ILERT}" ; do
+  "${SEND_ILERT}" \
+  "${SEND_SIGNL4}" ; do
 
   if [ "${method}" == "YES" ]; then
     proceed=1
@@ -2547,6 +2558,51 @@ EOF
     info "sent ilert event for ${notification_description}"
   else
     error "failed to send ilert event for ${notification_description}, with HTTP response status code ${httpcode}."
+    return 1
+  fi
+
+  return 0
+}
+
+# -----------------------------------------------------------------------------
+# signl4 sender
+
+send_signl4() {
+  local payload httpcode signl4_status
+  [ "${SEND_SIGNL4}" != "YES" ] && return 1
+
+  signl4_status="new"
+  if [ "${status}" = "CLEAR" ]; then signl4_status="resolved"; fi
+
+  payload=$(cat <<EOF
+  {
+    "title" : "${name}",
+    "message" : "${status_message}",
+    "alert_url" : "${goto_url}",
+    "alarm_id" : ${alarm_id},
+    "chart" : "${chart}",
+    "date" : "${when}",
+    "duration" : "${duration_txt}",
+    "host" : "${host}",
+    "info" : "${info}",
+    "severity": ${status},
+    "total_critical" : "${total_critical}",
+    "total_warnings" : "${total_warnings}",
+    "value" : "${value_string}",
+    "image_url": "${image}",
+    "src" : "${src}",
+    "X-S4-ExternalID": "${unique_id}"
+    "X-S4-Status": "${signl4_status}",
+    "X-S4-SourceSystem" : "Netdata"
+  }
+EOF
+)
+
+  httpcode=$(docurl -X POST -H "Content-Type: application/json" -d "${payload}" "${SIGNL4_WEBHOOK_URL}")
+  if [ "${httpcode}" = "200" ] || [ "${httpcode}" = "201" ] || [ "${httpcode}" = "202" ]; then
+    info "sent signl4 event for ${notification_description}"
+  else
+    error "failed to send signl4 event for ${notification_description}, with HTTP response status code ${httpcode}."
     return 1
   fi
 

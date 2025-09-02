@@ -760,3 +760,41 @@
             - Notifications: The notifications which you want to be notified
           - **Integration configuration**
             - Alert Source API key: The key you copied in the ilert configuration step.
+
+- id: "notify-cloud-signl4"
+  meta:
+    name: "SIGNL4"
+    link: "https://www.signl4.com/"
+    categories:
+      - notify.cloud
+    icon_filename: "signl4.svg"
+  keywords:
+    - signl4
+  setup:
+    description: |
+      ### Prerequisites
+
+      - A Netdata Cloud account
+      - Access to the Space as an **Admin**
+      - The Space needs to be on a paid plan
+      - You need to have permissions on ilert to add new Alert sources.
+
+      ### SIGNL4 Configuration
+
+      1. Obtain your SIGNL4 webhook URL:
+          - In the SIGNL4 web portal go to Integrations -> Installed -> Inbound Webhook
+          - Copy the URL including team or integration secret
+
+      ### Netdata Configuration
+
+      1. Click on the **Space settings** cog (located above your profile icon)
+      2. Click on the **Alerts & Notifications** tab
+      3. Click on the **+ Add configuration** button
+      4. Add the SIGNL4 Integration
+      5. A modal will be presented to you to enter the required details to enable the integration:
+          - **Notification settings**
+            - Configuration name (optional): A name for your configuration in order to easily refer to it
+            - Rooms: A list of Rooms for which you want to be notified
+            - Notifications: The notifications which you want to be notified
+          - **Integration configuration**
+            - SIGNL4 Webhook URL: The webhook UDL you copied in the SIGNL4 configuration step.
