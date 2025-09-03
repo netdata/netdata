@@ -1,6 +1,6 @@
 import Ajv from 'ajv';
 
-import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, MCPTool, LLMAccountingEntry, ToolAccountingEntry } from './types.js';
+import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, MCPTool, LLMAccountingEntry, ToolAccountingEntry, MCPServerConfig } from './types.js';
 
 // Exit codes according to DESIGN.md
 type ExitCode = 
@@ -162,8 +162,10 @@ export class AIAgentSession {
       // Initialize MCP servers (non-fatal if they fail)
       try {
         const selected = Object.fromEntries(
-          this.sessionConfig.tools.map((t) => [t, this.sessionConfig.config.mcpServers[t]])
-        );
+          this.sessionConfig.tools
+            .map((t) => [t, this.sessionConfig.config.mcpServers[t] as unknown])
+            .filter(([, cfg]) => cfg !== undefined)
+        ) as Record<string, MCPServerConfig>;
         await this.mcpClient.initializeServers(selected);
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
@@ -836,6 +838,11 @@ export class AIAgentSession {
           return JSON.stringify({ ok: true });
         }
 
+        // Batch execution internal tool
+        if (effectiveToolName === 'agent_batch') {
+          return await this.executeBatchCalls(parameters, currentTurn, startTime, logs, accounting, toolName);
+        }
+
         // Warn and fail fast if the tool is unknown (not internal and not from any MCP server)
         {
           const isInternal = (effectiveToolName === 'agent_append_notes' || effectiveToolName === 'agent_final_report');
@@ -957,6 +964,130 @@ export class AIAgentSession {
     return blocks.join('\n\n');
   }
 
+  // Extracted batch execution for readability
+  private async executeBatchCalls(
+    parameters: Record<string, unknown>,
+    currentTurn: number,
+    startTime: number,
+    _logs: LogEntry[],
+    accounting: AccountingEntry[],
+    toolName: string
+  ): Promise<string> {
+    interface BatchCall { id: string; tool: string; args: Record<string, unknown> }
+    interface BatchInput { calls: BatchCall[] }
+
+    const isPlainObject = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
+    const asString = (v: unknown): string | undefined => typeof v === 'string' ? v : undefined;
+    const asId = (v: unknown): string | undefined => (typeof v === 'string') ? v : (typeof v === 'number' && Number.isFinite(v) ? String(v) : undefined);
+
+    const bi: BatchInput | undefined = (() => {
+      if (!isPlainObject(parameters)) return undefined;
+      const p: Record<string, unknown> = parameters;
+      const callsRaw = p.calls;
+      if (!Array.isArray(callsRaw)) return undefined;
+      const calls: BatchCall[] = callsRaw.map((cUnknown) => {
+        const c = isPlainObject(cUnknown) ? cUnknown : {};
+        const id = asId(c.id) ?? '';
+        const tool = asString(c.tool) ?? '';
+        const args = (isPlainObject(c.args) ? c.args : {});
+        return { id, tool, args };
+      });
+      return { calls };
+    })();
+
+    if (bi === undefined || bi.calls.some((c) => c.id.length === 0 || c.tool.length === 0)) {
+      const latency = Date.now() - startTime;
+      const accountingEntry: AccountingEntry = {
+        type: 'tool', timestamp: startTime, status: 'failed', latency,
+        mcpServer: 'agent', command: toolName,
+        charactersIn: JSON.stringify(parameters).length, charactersOut: 0,
+        error: 'invalid_batch_input'
+      };
+      accounting.push(accountingEntry);
+      this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
+      return JSON.stringify({ ok: false, error: { code: 'INVALID_INPUT', message: 'calls[] requires id, tool, args' } });
+    }
+
+    // Prepare AJV for schema validation of per-call args
+    const ajv = this.ajv ?? new Ajv({ allErrors: true, strict: false });
+    this.ajv = ajv;
+
+    interface ResultItem {
+      id: string;
+      tool: string;
+      ok: boolean;
+      elapsedMs: number;
+      output?: unknown;
+      error?: { code: string; message: string; schemaExcerpt?: Record<string, unknown> };
+    }
+
+    const byId = new Map<string, BatchCall>();
+    bi.calls.forEach((c) => { byId.set(c.id, c); });
+
+    // Execute all calls in parallel
+    const results = new Map<string, ResultItem>();
+    const runAll = async (): Promise<void> => {
+      const runOne = async (id: string): Promise<void> => {
+        const c = byId.get(id);
+        if (c === undefined) {
+          results.set(id, { id, tool: '', ok: false, elapsedMs: 0, error: { code: 'NOT_FOUND', message: 'Call not found' } });
+          return;
+        }
+        const callStart = Date.now();
+        // Validate args against real schema when available
+        try {
+          const resolved = this.mcpClient.resolveExposedTool(c.tool);
+          const schema = resolved !== undefined ? this.mcpClient.getToolSchema(resolved.serverName, resolved.originalName) : undefined;
+          if (schema !== undefined) {
+            const validate = ajv.compile(schema);
+            const valid = validate(c.args);
+            if (!valid) {
+              const errs = (validate.errors ?? []).map((e) => {
+                const path = typeof e.instancePath === 'string' ? e.instancePath : '';
+                const msg = typeof e.message === 'string' ? e.message : '';
+                return `${path} ${msg}`.trim();
+              }).join('; ');
+              results.set(id, { id, tool: c.tool, ok: false, elapsedMs: Date.now() - callStart,
+                error: { code: 'SCHEMA_VALIDATION', message: errs, schemaExcerpt: schema } });
+              return;
+            }
+          }
+        } catch (e) {
+          results.set(id, { id, tool: c.tool, ok: false, elapsedMs: Date.now() - callStart,
+            error: { code: 'VALIDATION_INIT', message: e instanceof Error ? e.message : String(e) } });
+          return;
+        }
+
+        // Execute the tool using exposed name
+        try {
+          const out = await this.mcpClient.executeToolByName(c.tool, c.args);
+          const elapsedMs = Date.now() - callStart;
+          results.set(id, { id, tool: c.tool, ok: true, elapsedMs, output: out.result });
+        } catch (err: unknown) {
+          const elapsedMs = Date.now() - callStart;
+          const msg = ((): string => {
+            if (err instanceof Error && typeof err.message === 'string') return err.message;
+            try { return JSON.stringify(err); } catch { return String(err); }
+          })();
+          results.set(id, { id, tool: c.tool, ok: false, elapsedMs, error: { code: 'EXECUTION_ERROR', message: msg } });
+        }
+      };
+      await Promise.all([...byId.keys()].map(async (id) => { await runOne(id); }));
+    };
+
+    await runAll();
+    const latency = Date.now() - startTime;
+    const response = { results: bi.calls.map((c) => results.get(c.id)) };
+    const accountingEntry: AccountingEntry = {
+      type: 'tool', timestamp: startTime, status: 'ok', latency,
+      mcpServer: 'agent', command: toolName,
+      charactersIn: JSON.stringify(parameters).length, charactersOut: JSON.stringify(response).length,
+    };
+    accounting.push(accountingEntry);
+    this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
+    return JSON.stringify(response);
+  }
+
   // Immutable retry method - returns new session
   retry(): AIAgentSession {
     // Create new session with same configuration but advanced state
@@ -991,6 +1122,35 @@ export class AIAgentSession {
         },
       },
     ];
+
+    // Optional batch tool (exposed as agent_batch) toggled by listing 'batch' in tools
+    const wantsBatch = this.sessionConfig.tools.includes('batch');
+    if (wantsBatch) {
+      tools.push({
+        name: 'agent_batch',
+        description: 'Execute multiple tools in one call (always parallel). Use exposed tool names.',
+        inputSchema: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['calls'],
+          properties: {
+            calls: {
+              type: 'array',
+              items: {
+                type: 'object',
+                additionalProperties: true,
+                required: ['id', 'tool', 'args'],
+                properties: {
+                  id: { oneOf: [ { type: 'string', minLength: 1 }, { type: 'number' } ] },
+                  tool: { type: 'string', minLength: 1, description: 'Exposed tool name (e.g., brave_brave_web_search)' },
+                  args: { type: 'object', additionalProperties: true }
+                }
+              }
+            }
+          }
+        }
+      });
+    }
 
     const exp = this.sessionConfig.expectedOutput;
     const common = {
@@ -1078,6 +1238,61 @@ export class AIAgentSession {
       lines.push('  - `content`: complete Markdown deliverable.');
     }
     lines.push('- Do NOT end with plain text. The session ends only after `agent_final_report`.');
+
+    // If user enabled batch tool, add concise usage guidance with a compact example
+    if (this.sessionConfig.tools.includes('batch')) {
+      lines.push('');
+      lines.push('- Use tool `agent_batch` to call multiple tools in one go.');
+      lines.push('  - `calls[]`: items with `id`, `tool` (exposed name), `args`.');
+      lines.push('  - Execution is always parallel.');
+      lines.push('  - Keep `args` minimal; they are validated server-side against real schemas.');
+      lines.push('  - Examples (brave + jina + fetcher):');
+      lines.push('    1) Sequential batch (no deps): 2x Jina searches, 2x Brave searches, 2x Fetcher fetches');
+      lines.push('    {');
+      lines.push('      "calls": [');
+      lines.push('        { "id": 1, "tool": "jina_jina_search_web",');
+      lines.push('          "args": { "query": "Netdata real-time monitoring features", "num": 10 } },');
+      lines.push('');
+      lines.push('        { "id": 2, "tool": "jina_jina_search_arxiv",');
+      lines.push('          "args": { "query": "eBPF monitoring 2024", "num": 20 } },');
+      lines.push('');
+      lines.push('        { "id": 3, "tool": "brave_brave_web_search",');
+      lines.push('          "args": { "query": "Netdata Cloud pricing", "count": 8, "offset": 0 } },');
+      lines.push('');
+      lines.push('        { "id": 4, "tool": "brave_brave_local_search",');
+      lines.push('          "args": { "query": "coffee near Athens", "count": 5 } },');
+      lines.push('');
+      lines.push('        { "id": 5, "tool": "fetcher_fetch_url",');
+      lines.push('          "args": { "url": "https://www.netdata.cloud" } },');
+      lines.push('');
+      lines.push('        { "id": 6, "tool": "fetcher_fetch_url",');
+      lines.push('          "args": { "url": "https://learn.netdata.cloud/" } }');
+      lines.push('      ]');
+      lines.push('    }');
+      lines.push('');
+      lines.push('    2) Parallel batch (same tools)');
+      lines.push('    {');
+      lines.push('      "calls": [');
+      lines.push('        { "id": 1, "tool": "jina_jina_search_web",');
+      lines.push('          "args": { "query": "Netdata vs Prometheus 2024", "num": 10 } },');
+      lines.push('');
+      lines.push('        { "id": 2, "tool": "jina_jina_search_arxiv",');
+      lines.push('          "args": { "query": "time-series anomaly detection streaming", "num": 15 } },');
+      lines.push('');
+      lines.push('        { "id": 3, "tool": "brave_brave_web_search",');
+      lines.push('          "args": { "query": "Netdata agent install Ubuntu", "count": 10 } },');
+      lines.push('');
+      lines.push('        { "id": 4, "tool": "brave_brave_local_search",');
+      lines.push('          "args": { "query": "devops meetups near Athens", "count": 5 } },');
+      lines.push('');
+      lines.push('        { "id": 5, "tool": "fetcher_fetch_url",');
+      lines.push('          "args": { "url": "https://github.com/netdata/netdata" } },');
+      lines.push('');
+      lines.push('        { "id": 6, "tool": "fetcher_fetch_url",');
+      lines.push('          "args": { "url": "https://community.netdata.cloud/" } }');
+      lines.push('      ]');
+      lines.push('    }');
+    }
     return lines.join('\n');
   }
 }

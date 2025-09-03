@@ -13,6 +13,7 @@ tools:
   - jina
   - fetcher
   - brave
+  - batch
 maxToolTurns: 15
 ---
 You are an AI sales intelligence analyst, specializing in B2B SaaS prospect research and ICP (Ideal Customer Profile) scoring.

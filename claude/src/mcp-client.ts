@@ -551,6 +551,22 @@ export class MCPClientManager {
     return out;
   }
 
+  // Retrieve the JSON schema for a given server and original tool name
+  // Returns undefined if the server or tool is unknown.
+  getToolSchema(serverName: string, toolName: string): Record<string, unknown> | undefined {
+    const server = this.servers.get(serverName);
+    if (server === undefined) return undefined;
+    const tool = server.tools.find((t) => t.name === toolName);
+    return tool?.inputSchema;
+  }
+
+  // Resolve an exposed tool name (e.g., brave_brave_web_search) to its server and original tool name
+  resolveExposedTool(exposedName: string): { serverName: string; originalName: string } | undefined {
+    const m = this.toolNameMap.get(exposedName);
+    if (m === undefined) return undefined;
+    return { serverName: m.serverName, originalName: m.originalName };
+  }
+
   getCombinedInstructions(): string {
     return Array.from(this.servers.entries()).flatMap(([serverName, s]) => {
       const arr: string[] = [];

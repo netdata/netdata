@@ -151,7 +151,11 @@ export function validateProviders(config: Configuration, providers: string[]): v
 }
 
 export function validateMCPServers(config: Configuration, mcpServers: string[]): void {
-  const missing = mcpServers.filter((s) => !(s in config.mcpServers));
+  // Allow special virtual tool selectors that aren't MCP servers
+  const virtuals = new Set<string>(['batch']);
+  const missing = mcpServers
+    .filter((s) => !virtuals.has(s))
+    .filter((s) => !(s in config.mcpServers));
   if (missing.length > 0) throw new Error(`Unknown MCP servers: ${missing.join(', ')}`);
 }
 

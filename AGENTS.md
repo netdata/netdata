@@ -76,3 +76,58 @@ These rules help generate code that passes `npm run lint` and `npm run build` on
 - Before finishing a change:
   - Run `npm run lint` and `npm run build` locally.
   - If a lint rule keeps firing, rework the code to satisfy it rather than adding exceptions.
+
+## Crush-Specific Context
+
+### Build Commands
+- Build: `cd claude && npm run build` (TypeScript → dist)
+- Lint: `cd claude && npm run lint` (ESLint with --max-warnings 0)
+- Full build script: `./build.sh` (builds + lints + creates launcher)
+
+### Test Commands
+- No dedicated test framework configured
+- For manual testing use: `cd claude && npm run start`
+- Test models: Use ollama on host 'nova' with model 'gpt-oss:20b'
+
+### Code Style Guidelines
+
+#### TypeScript
+- Target: ES2022, strict mode enabled
+- Use `Record<string, unknown>` for generic objects, avoid `any`
+- Prefer `unknown` for untyped values, narrow with type guards
+- Avoid unnecessary assertions (`as any` unallowed)
+
+#### Naming Conventions
+- kebab-case for filenames
+- camelCase for variables/types
+- PascalCase for classes/interfaces
+- Detailed, descriptive type names preferred
+
+#### Imports
+- Use type imports where possible: `import type { Foo } from 'bar'`
+- Import order: builtin → external → type → internal → parent → sibling → index → object
+- Alphabetize within groups, natural sort
+- Remove unused imports (linting enforced)
+
+#### Error Handling
+- Map external errors to internal types without `any`
+- Use union types for status/error handling
+- Prefer nullish coalescing (`??`) over truthy checks when appropriate
+- Explicit `typeof` checks for `unknown` values
+
+#### Functional Programming
+- Prefer map/reduce/filter over loops
+- Add targeted ESLint disable for loop statements when necessary
+- `// eslint-disable-next-line functional/no-loop-statements` with comment
+
+#### Other Rules
+- No default exports
+- Remove unused vars (rename to `_param` if needed)
+- Prefer dot notation over brackets
+- No duplicate strings (warns after threshold)
+- Node protocol usage required for imports
+
+#### Quality Standards
+- Lint must pass with zero warnings/errors
+- Build must succeed before commits
+- Read docs/SPECS.md, docs/IMPLEMENTATION.md, docs/DESIGN.md for context
