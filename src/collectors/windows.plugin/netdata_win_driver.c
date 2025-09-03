@@ -6,12 +6,12 @@
 #define MSR_DEVICE_NAME L"\\Device\\NDDrv"
 #define MSR_DOSLINK_NAME L"\\DosDevices\\NDDrv"
 
-#define IOCTL_READ_MSR CTL_CODE(FILE_DEVICE_UNKNOWN, 0x800, METHOD_BUFFERED, FILE_ANY_ACCESS)
+#define IOCTL_MSR_READ CTL_CODE(FILE_DEVICE_UNKNOWN, 0x800, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
 // Payloads
 typedef struct _MSR_REQUEST {
-    ULONG Msr;
-    ULONG CpuIndex;
+    ULONG msr;
+    ULONG cpu;
     ULONG low;
     ULONG high;
 } MSR_REQUEST, *PMSR_REQUEST;
@@ -56,14 +56,14 @@ NTSTATUS NetdataMsrDeviceControl(_In_ PDEVICE_OBJECT DeviceObject, _Inout_ PIRP 
 
     NTSTATUS status = STATUS_SUCCESS;
 
-    if (irpSp->Parameters.DeviceIoControl.IoControlCode == IOCTL_READ_MSR) {
+    if (irpSp->Parameters.DeviceIoControl.IoControlCode == IOCTL_MSR_READ) {
         PMSR_REQUEST req = (PMSR_REQUEST)Irp->AssociatedIrp.SystemBuffer;
 
-        KAFFINITY cpuMask = 1ull << req->CpuIndex;
+        KAFFINITY cpuMask = 1ull << req->cpu;
 
         KAFFINITY oldMask = KeSetSystemAffinityThreadEx(cpuMask);
 
-        ULONGLONG value = __readmsr(req->Msr);
+        ULONGLONG value = __readmsr(req->msr);
 
         KeRevertToUserAffinityThreadEx(oldMask);
 

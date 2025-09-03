@@ -12,20 +12,13 @@
 
 // IOCTLs
 #define IOCTL_MSR_READ   CTL_CODE(FILE_DEVICE_UNKNOWN, 0x800, METHOD_BUFFERED, FILE_ANY_ACCESS)
-#define IOCTL_MSR_THERM  CTL_CODE(FILE_DEVICE_UNKNOWN, 0x801, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
-// Payloads
-typedef struct _MSR_READ_INPUT {
-    ULONG Reg;           // MSR index to read (e.g., 0x19C)
-} MSR_READ_INPUT, *PMSR_READ_INPUT;
-
-typedef struct _MSR_READ_OUTPUT {
-    ULONGLONG Value;     // Raw 64-bit MSR value
-} MSR_READ_OUTPUT, *PMSR_READ_OUTPUT;
-
-typedef struct _MSR_THERM_OUTPUT {
-    ULONG DeltaToTjMax;  // From IA32_THERM_STATUS[22:16]
-} MSR_THERM_OUTPUT, *PMSR_THERM_OUTPUT;
+typedef struct {
+    uint32_t msr;
+    uint32_t cpu;
+    uint32_t low;
+    uint32_t high;
+} MSR_REQUEST;
 
 #endif // OS_WINDOWS
 
