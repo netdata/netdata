@@ -76,7 +76,7 @@ modules:
                    server {
                        listen 127.0.0.1:80;
                        server_name localhost 127.0.0.1;
-              
+
                        location = /stub_status {
                            stub_status;        # exposes NGINX counters
                            access_log off;     # keep logs clean
