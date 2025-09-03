@@ -8,7 +8,6 @@
 static const char *srv_name = "NetdataDriver";
 
 struct cpu_data {
-    RRDSET *st_cpu_temp;
     RRDDIM *rd_cpu_temp;
 
     collected_number cpu_temp;
@@ -160,7 +159,7 @@ static int initialize(int update_every)
     return 0;
 }
 
-void netdata_collect_sensor_chart(int update_every)
+void netdata_collect_cpu_chart()
 {
     HANDLE device = netdata_open_device();
     if (device == INVALID_HANDLE_VALUE) {
@@ -183,6 +182,43 @@ void netdata_collect_sensor_chart(int update_every)
     CloseHandle(device);
 }
 
+static RRDSET *netdata_publish_cpu_chart(int update_every)
+{
+    static RRDSET *st_cpu_temp = NULL;
+    if (!st_cpu_temp) {
+        st_cpu_temp = rrdset_create_localhost(
+                "cpu",
+                "temperature",
+                NULL,
+                "temperature",
+                "cpu.temperature",
+                "Core temperature",
+                "Celcius",
+                PLUGIN_WINDOWS_NAME,
+                "GetHardwareInfo",
+                NETDATA_CHART_PRIO_CPU_TEMPERATURE,
+                update_every,
+                RRDSET_TYPE_LINE);
+    }
+
+    return st_cpu_temp;
+}
+
+static void netdata_loop_cpu_chart(int update_every)
+{
+    RRDSET *chart = netdata_publish_cpu_chart(update_every);
+    for (size_t i = 0; i < ncpus; i++) {
+        struct cpu_data *lcpu = &cpus[i];
+        if (!lcpu->rd_cpu_temp) {
+            char id[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(id, RRD_ID_LENGTH_MAX, "cpu%lu.temp", i);
+            lcpu->rd_cpu_temp = rrddim_add(chart, id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+        rrddim_set_by_pointer(chart, lcpu->rd_cpu_temp, lcpu->cpu_temp);
+    }
+        rrdset_done(chart);
+}
+
 int do_GetHardwareInfo(int update_every, usec_t dt __maybe_unused)
 {
     static bool initialized = false;
@@ -194,7 +230,9 @@ int do_GetHardwareInfo(int update_every, usec_t dt __maybe_unused)
         initialized = true;
     }
 
-    netdata_collect_sensor_chart(update_every);
+    netdata_collect_cpu_chart();
+
+    netdata_loop_cpu_chart(update_every);
 
     return 0;
 }
