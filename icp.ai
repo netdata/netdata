@@ -6,8 +6,11 @@ description: |
 usage: |
   company name or contact email to reseach information for
 llms:
-  - openrouter/openai/gpt-oss-120b
+  - anthropic/claude-sonnet-4-20250514
+  - google/gemini-2.5-pro
   - openai/gpt-5
+#  - openrouter/openai/gpt-oss-120b
+#  - openai/gpt-5
 #  - ollama/hf.co/unsloth/gpt-oss-20b-GGUF:F16
 tools:
   - jina
