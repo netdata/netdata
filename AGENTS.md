@@ -77,7 +77,7 @@ These rules help generate code that passes `npm run lint` and `npm run build` on
   - Run `npm run lint` and `npm run build` locally.
   - If a lint rule keeps firing, rework the code to satisfy it rather than adding exceptions.
 
-## Crush-Specific Context
+## Specific Context
 
 ### Build Commands
 - Build: `cd claude && npm run build` (TypeScript → dist)
