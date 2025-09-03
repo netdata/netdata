@@ -405,7 +405,9 @@ export class AIAgentSession {
             // Emit WRN for unknown tool calls that the AI SDK could not execute (name not in ToolSet)
             try {
               const mapping = this.mcpClient.getToolServerMapping();
-      const internal = new Set<string>(['agent__append_notes', 'agent__final_report']);
+              // Internal tools always available; include optional batch tool if enabled for this session
+              const internal = new Set<string>(['agent__append_notes', 'agent__final_report']);
+              if (this.sessionConfig.tools.includes('batch')) internal.add('agent__batch');
               const normalizeTool = (n: string) => n.replace(/^<\|[^|]+\|>/, '').trim();
               const lastAssistant = turnResult.messages.filter((m) => m.role === 'assistant');
               const assistantMsg = lastAssistant.length > 0 ? lastAssistant[lastAssistant.length - 1] : undefined;
@@ -894,8 +896,8 @@ export class AIAgentSession {
           return JSON.stringify({ ok: true });
         }
 
-        // Batch execution internal tool
-        if (effectiveToolName === 'agent__batch') {
+        // Batch execution internal tool (only if enabled in session tools)
+        if (effectiveToolName === 'agent__batch' && this.sessionConfig.tools.includes('batch')) {
           return await this.executeBatchCalls(parameters, currentTurn, startTime, logs, accounting, toolName);
         }
 

@@ -6,8 +6,8 @@ description: |
 usage: |
   company name OR company domain OR contact email
 llms:
-#  - anthropic/claude-3-haiku-20240307
-  - openrouter/deepseek/deepseek-chat-v3.1
+  - anthropic/claude-3-haiku-20240307
+#  - openrouter/deepseek/deepseek-chat-v3.1
 #  - openrouter/openai/gpt-oss-120b
 #  - openrouter/openai/gpt-oss-20b
 #  - openai/gpt-5
