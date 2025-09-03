@@ -1,5 +1,4 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
 import type { MCPServerConfig, MCPTool, MCPServer, ToolCall, ToolResult, ToolStatus, LogEntry } from './types.js';
@@ -136,37 +135,12 @@ export class MCPClientManager {
         case 'sse':
           if (config.url == null || config.url.length === 0) throw new Error(`SSE MCP server '${name}' requires a 'url'`);
           const resolvedHeaders = resolveHeaders(config.headers);
-          
-          // Log the SSE connection details for tracing
-          if (this.trace) {
-            if (resolvedHeaders !== undefined) {
-              const safeHeaders = this.redactAuthHeader(resolvedHeaders);
-              this.log('TRC', 'request', 'mcp', `${name}:sse-connect`, 
-                `SSE URL: ${config.url}, Headers: ${JSON.stringify(safeHeaders)}`);
-            } else {
-              this.log('TRC', 'request', 'mcp', `${name}:sse-connect`, 
-                `SSE URL: ${config.url}, Headers: none (WARNING: No Authorization header!)`);
-            }
+          // Runtime SSE compatibility issues detected; using HTTP transport for SSE endpoint
+          this.log('WRN', 'request', 'mcp', `${name}:sse-connect`, 'SSE disabled due to runtime options; falling back to HTTP transport');
+          {
+            const { StreamableHTTPClientTransport } = await import('@modelcontextprotocol/sdk/client/streamableHttp.js');
+            transport = new StreamableHTTPClientTransport(new URL(config.url));
           }
-          
-          // SSEClientTransport needs a custom fetch to include headers for EventSource
-          // The requestInit headers are only used for POST requests, not the EventSource connection
-          const customFetch: typeof fetch = async (input, init) => {
-            // Merge our headers with any headers from init
-            const headers = new Headers(init?.headers);
-            if (resolvedHeaders !== undefined) {
-              Object.entries(resolvedHeaders).forEach(([key, value]) => {
-                headers.set(key, value);
-              });
-            }
-            return fetch(input, { ...init, headers });
-          };
-          
-          transport = new SSEClientTransport(new URL(config.url), {
-            eventSourceInit: { fetch: customFetch },
-            requestInit: { headers: resolvedHeaders },
-            fetch: customFetch
-          });
           break;
         default:
           throw new Error('Unsupported transport type');

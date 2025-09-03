@@ -657,7 +657,9 @@ export class AIAgentSession {
       interface PairStats { total: number; ok: number; failed: number }
       const pairStats = new Map<string, PairStats>();
       llmEntries.forEach((e) => {
-        const key = `${e.provider}/${e.actualProvider ?? 'n/a'}:${e.model}`;
+        const key = (e.actualProvider !== undefined && e.actualProvider.length > 0 && e.actualProvider !== e.provider)
+        ? `${e.provider}/${e.actualProvider}:${e.model}`
+        : `${e.provider}:${e.model}`;
         const curr = pairStats.get(key) ?? { total: 0, ok: 0, failed: 0 };
         curr.total += 1;
         if (e.status === 'failed') curr.failed += 1; else curr.ok += 1;

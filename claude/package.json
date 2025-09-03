@@ -19,6 +19,7 @@
     "node": ">=20"
   },
   "dependencies": {
+    "js-yaml": "^4.1.0",
     "@ai-sdk/anthropic": "2.0.9",
     "@ai-sdk/google": "2.0.11",
     "@ai-sdk/openai": "2.0.23",
