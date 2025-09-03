@@ -175,7 +175,7 @@ export function resolveDefaults(layers: ConfigLayer[]): NonNullable<Configuratio
   return out;
 }
 
-export function resolveAccounting(layers: ConfigLayer[]): Configuration['accounting'] {
+export function resolveAccounting(layers: ConfigLayer[], _opts?: ResolverOptions): Configuration['accounting'] {
   const found = layers.find((layer) => {
     const j = layer.json as { accounting?: { file?: string } } | undefined;
     return typeof j?.accounting?.file === 'string';
@@ -183,7 +183,11 @@ export function resolveAccounting(layers: ConfigLayer[]): Configuration['account
   if (found === undefined) return undefined;
   const j = found.json as { accounting?: { file?: string } } | undefined;
   const acc = j?.accounting;
-  return acc !== undefined && typeof acc.file === 'string' ? { file: acc.file } : undefined;
+  if (acc === undefined || typeof acc.file !== 'string') return undefined;
+  const env = found.env ?? {};
+  const vars = (name: string): string | undefined => (env[name] ?? process.env[name]);
+  const expandedFile = expandPlaceholders(acc.file, (name: string) => vars(name)) as string;
+  return { file: expandedFile };
 }
 
 export function buildUnifiedConfiguration(
@@ -204,7 +208,7 @@ export function buildUnifiedConfiguration(
   });
 
   const defaults = resolveDefaults(layers);
-  const accounting = resolveAccounting(layers);
+  const accounting = resolveAccounting(layers, opts);
 
   return { providers, mcpServers, defaults, accounting } as Configuration;
 }

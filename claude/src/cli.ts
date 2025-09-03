@@ -229,6 +229,7 @@ program
   .option('--no-parallel-tool-calls', 'Disable parallel tool calls')
   .option('--max-retries <n>', 'Max retry rounds over provider/model list', '3')
   .option('--max-tool-turns <n>', 'Maximum tool turns (agent loop cap)', '10')
+  .option('--mcp-init-concurrency <n>', 'Max concurrent MCP server initializations', undefined)
   .action(async (systemPrompt: string, userPrompt: string, options: Record<string, unknown>) => {
     try {
       if (systemPrompt === '-' && userPrompt === '-') {
@@ -412,6 +413,7 @@ program
         traceLLM: effectiveTraceLLM,
         traceMCP: effectiveTraceMCP,
         verbose: effectiveVerbose,
+        mcpInitConcurrency: (typeof options.mcpInitConcurrency === 'string' && options.mcpInitConcurrency.length>0) ? (Number(options.mcpInitConcurrency) || undefined) : config.defaults?.mcpInitConcurrency,
       };
 
       if (options.dryRun === true) {

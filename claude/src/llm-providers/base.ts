@@ -272,10 +272,19 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
   protected buildFinalTurnMessages(messages: ModelMessage[], isFinalTurn?: boolean): ModelMessage[] {
     if (isFinalTurn === true) {
       const content = [
-        'FINAL TURN: You MUST finish now by calling the tool `agent_final_report` exactly once.',
-        'Do NOT produce assistant text. Assistant text will be ignored.',
-        'Only `agent_final_report` is available; do not attempt any other tools.',
-        'If data is incomplete, set `status` to `partial` or `failure`, and include known gaps in the report.',
+        '**CRITICAL**: You cannot collect more data!\n',
+        '\n',
+        'You must call the tool `agent_final_report` with your report.\n',
+        '\n',
+        'Review the collected data, check your instructions, and call the tool `agent_final_report` with your final report:\n',
+        '\n',
+        '- If the data is completely irrelevant or missing, set `status` to `failure` and describe the situation.\n',
+        '- If the data is severealy incomplete, set `status` to `partial` and describe what you found.\n',
+        '- If the data is rich, set `status` to `success` and provide a detailed report.\n',
+        '\n',
+        'Follow your instructions carefully, think hard, ensure your final report is accurate.\n',
+        '\n',
+        'Provide now your report by calling the tool `agent_final_report`.'
       ].join(' ');
       return messages.concat({ role: 'user', content } as ModelMessage);
     }
@@ -309,8 +318,10 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
   // Constants
   private static readonly PART_REASONING = 'reasoning' as const;
   private static readonly PART_TOOL_RESULT = 'tool_result' as const; // avoid duplicate literal warning
-    private readonly REASONING_TYPE: string = BaseLLMProvider.PART_REASONING.replace('_','-');
+  private static readonly PART_TOOL_ERROR = 'tool_error' as const; // error variant from AI SDK
+  private readonly REASONING_TYPE: string = BaseLLMProvider.PART_REASONING.replace('_','-');
   private readonly TOOL_RESULT_TYPE: string = BaseLLMProvider.PART_TOOL_RESULT.replace('_','-');
+  private readonly TOOL_ERROR_TYPE: string = BaseLLMProvider.PART_TOOL_ERROR.replace('_','-');
   
   // Shared streaming utilities
   protected createTimeoutController(timeoutMs: number): { controller: AbortController; resetIdle: () => void; clearIdle: () => void } {
@@ -404,30 +415,27 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
           const msgs = (resp as { messages?: unknown[] } | undefined)?.messages ?? [];
           let toolCalls = 0; const callIds: string[] = [];
           let toolResults = 0; const resIds: string[] = [];
-          // eslint-disable-next-line functional/no-loop-statements
-          for (const msg of msgs) {
+          msgs.forEach((msg) => {
             const m = msg as { role?: string; content?: unknown };
             if (m.role === 'assistant' && Array.isArray(m.content)) {
-              // eslint-disable-next-line functional/no-loop-statements
-              for (const part of m.content) {
+              (m.content as unknown[]).forEach((part) => {
                 const p = part as { type?: string; toolCallId?: string };
                 if (p.type === 'tool-call') {
                   toolCalls++;
                   if (typeof p.toolCallId === 'string' && p.toolCallId.length > 0) callIds.push(p.toolCallId);
                 }
-              }
+              });
             } else if (m.role === 'tool' && Array.isArray(m.content)) {
-              // eslint-disable-next-line functional/no-loop-statements
-              for (const part of m.content) {
+              (m.content as unknown[]).forEach((part) => {
                 const p = part as { type?: string; toolCallId?: string };
-                if (p.type === 'tool-result') {
+                const t = (p.type ?? '').replace('_','-');
+                if (t === this.TOOL_RESULT_TYPE || t === this.TOOL_ERROR_TYPE) {
                   toolResults++;
                   if (typeof p.toolCallId === 'string' && p.toolCallId.length > 0) resIds.push(p.toolCallId);
                 }
-              }
+              });
             }
-          }
-          // eslint-disable-next-line no-console
+          });
           const dbgLabel = 'tool-parity(stream)';
           console.error(`[DEBUG] ${dbgLabel}:`, { toolCalls, callIds, toolResults, resIds });
         } catch { /* ignore */ }
@@ -451,7 +459,8 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
             let hasEmittedText = false;
             
             // eslint-disable-next-line functional/no-loop-statements
-            for (const part of m.content) {
+            // eslint-disable-next-line functional/no-loop-statements
+        for (const part of m.content) {
               const p = part as { type?: string; text?: string };
               
               // Emit reasoning if we haven't streamed it yet
@@ -489,19 +498,23 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         } catch { /* ignore */ }
       }
       
-      // Find the LAST assistant message to determine if we need more tool calls
+      // Find the LAST assistant message
       const lastAssistantMessageArr = conversationMessages.filter(m => m.role === 'assistant');
       const lastAssistantMessage = lastAssistantMessageArr.length > 0 ? lastAssistantMessageArr[lastAssistantMessageArr.length - 1] : undefined;
-      
+
+      // Detect final report request strictly by tool name, after normalization
+      const normalizeName = (name: string) => name.replace(/^<\|[^|]+\|>/, '').trim();
+      const finalReportRequested = lastAssistantMessage?.toolCalls?.some(tc => normalizeName(tc.name) === 'agent_final_report') === true;
+
       // Only count tool calls that target currently available tools
       const validToolNames = tools !== undefined ? Object.keys(tools) : [];
-      const normalizeName = (name: string) => name.replace(/^<\|[^|]+\|>/, '').trim();
       const hasNewToolCalls = lastAssistantMessage?.toolCalls !== undefined &&
         lastAssistantMessage.toolCalls.filter(tc => validToolNames.includes(normalizeName(tc.name))).length > 0;
       const hasAssistantText = (lastAssistantMessage?.content.trim().length ?? 0) > 0;
-      
+
       // Check if we have tool result messages (which means tools were executed)
       const hasToolResults = conversationMessages.some(m => m.role === 'tool');
+      
       // Detect if provider emitted any reasoning parts
       const respAny = resp as { messages?: unknown[] };
       const respMsgs: unknown[] = Array.isArray(respAny.messages) ? respAny.messages : [];
@@ -511,9 +524,8 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
           return (m.content as unknown[]).some((p) => (p as { type?: string }).type === this.REASONING_TYPE);
         });
       
-      // Only mark as final if we have text and no new tool calls AND no tool results
-      // If we have tool results, we need to continue the conversation for the LLM to process them
-      const finalAnswer = hasAssistantText && !hasNewToolCalls && !hasToolResults;
+      // FINAL ANSWER POLICY: only when agent_final_report tool is requested (normalized), regardless of other conditions
+      const finalAnswer = finalReportRequested;
 
       // Do not error on reasoning-only responses; allow agent loop to decide retries.
       
@@ -575,35 +587,32 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
           const msgs = Array.isArray(respObj.messages) ? respObj.messages : [];
           let toolCalls = 0; const callIds: string[] = [];
           let toolResults = 0; const resIds: string[] = [];
-          // eslint-disable-next-line functional/no-loop-statements
-          for (const msg of msgs) {
+          msgs.forEach((msg) => {
             const m = msg as { role?: string; content?: unknown };
             if (m.role === 'assistant' && Array.isArray(m.content)) {
-              // eslint-disable-next-line functional/no-loop-statements
-              for (const part of m.content) {
+              (m.content as unknown[]).forEach((part) => {
                 const p = part as { type?: string; toolCallId?: string };
                 if (p.type === 'tool-call') {
                   toolCalls++;
                   if (typeof p.toolCallId === 'string' && p.toolCallId.length > 0) callIds.push(p.toolCallId);
                 }
-              }
+              });
             } else if (m.role === 'tool' && Array.isArray(m.content)) {
-              // eslint-disable-next-line functional/no-loop-statements
-              for (const part of m.content) {
+              (m.content as unknown[]).forEach((part) => {
                 const p = part as { type?: string; toolCallId?: string };
-                if (p.type === 'tool-result') {
+                const t = (p.type ?? '').replace('_','-');
+                if (t === this.TOOL_RESULT_TYPE || t === this.TOOL_ERROR_TYPE) {
                   toolResults++;
                   if (typeof p.toolCallId === 'string' && p.toolCallId.length > 0) resIds.push(p.toolCallId);
                 }
-              }
+              });
             }
-          }
-          // eslint-disable-next-line no-console
+          });
           const dbgLabel = 'tool-parity(nonstream)';
           console.error(`[DEBUG] ${dbgLabel}:`, { toolCalls, callIds, toolResults, resIds });
         } catch { /* ignore */ }
       }
-      
+
       // Extract reasoning from AI SDK's normalized messages (for non-streaming mode)
       // The AI SDK puts reasoning as ReasoningPart in the content array
       if (request.onChunk !== undefined && Array.isArray(respObj.messages)) {
@@ -612,7 +621,8 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
           const m = msg as { role?: string; content?: unknown };
           if (m.role === 'assistant' && Array.isArray(m.content)) {
             // eslint-disable-next-line functional/no-loop-statements
-            for (const part of m.content) {
+            // eslint-disable-next-line functional/no-loop-statements
+        for (const part of m.content) {
               const p = part as { type?: string; text?: string };
               // Handle reasoning parts from AI SDK format
               if (p.type === this.REASONING_TYPE && p.text !== undefined && p.text.length > 0) {
@@ -657,10 +667,9 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       const normalizeName = (name: string) => name.replace(/^<\|[^|]+\|>/, '').trim();
       const hasNewToolCalls = lastAssistantMessage?.toolCalls !== undefined &&
         lastAssistantMessage.toolCalls.filter(tc => validToolNames.includes(normalizeName(tc.name))).length > 0;
+      const finalReportRequested = lastAssistantMessage?.toolCalls?.some(tc => normalizeName(tc.name) === 'agent_final_report') === true;
       const hasAssistantText = (lastAssistantMessage?.content.trim().length ?? 0) > 0;
-      
-      // Check if we have tool result messages (which means tools were executed)
-      const hasToolResults = conversationMessages.some(m => m.role === 'tool');
+
       // Detect reasoning parts in non-streaming response
       const hasReasoning = Array.isArray(respObj.messages)
         && (respObj.messages).some((msg) => {
@@ -669,9 +678,8 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
           return (m.content as unknown[]).some((p) => (p as { type?: string }).type === this.REASONING_TYPE);
         });
       
-      // Only mark as final if we have text and no new tool calls AND no tool results
-      // If we have tool results, we need to continue the conversation for the LLM to process them
-      const finalAnswer = hasAssistantText && !hasNewToolCalls && !hasToolResults;
+      // FINAL ANSWER POLICY: only when agent_final_report tool is requested (normalized), regardless of other conditions
+      const finalAnswer = finalReportRequested;
 
       // Do not error on reasoning-only responses; allow agent loop to decide retries.
       
@@ -709,7 +717,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
               // eslint-disable-next-line functional/no-loop-statements
               for (const part of allParts) {
                 const p = part as { type?: string; text?: string; output?: { value?: string } };
-                if (p.type === this.TOOL_RESULT_TYPE && p.output?.value !== undefined) {
+                if ((((p.type ?? '').replace('_','-')) === this.TOOL_RESULT_TYPE || ((p.type ?? '').replace('_','-')) === this.TOOL_ERROR_TYPE) && p.output?.value !== undefined) {
                   messages.push(p.output.value);
                 } else if (p.type !== this.REASONING_TYPE && p.text !== undefined) {
                   messages.push(p.text);
@@ -758,6 +766,97 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     model: string, 
     tokens: TokenUsage
   ): ConversationMessage[];
+
+  /**
+   * Generic converter that preserves ALL tool results, even when providers bundle
+   * multiple tool-result parts into a single message. Providers can call this
+   * to avoid duplicating splitting logic.
+   */
+  protected convertResponseMessagesGeneric(
+    messages: ResponseMessage[],
+    provider: string,
+    model: string,
+    tokens: TokenUsage
+  ): ConversationMessage[] {
+    const out: ConversationMessage[] = [];
+    // eslint-disable-next-line functional/no-loop-statements
+    for (const m of messages) {
+      if (m.role === 'tool' && Array.isArray(m.content)) {
+        // eslint-disable-next-line functional/no-loop-statements
+        for (const part of m.content) {
+          const p = part as { type?: string; toolCallId?: string; toolName?: string; output?: unknown };
+          {
+            const t = (p.type ?? '').replace('_','-');
+            if ((t === this.TOOL_RESULT_TYPE || t === this.TOOL_ERROR_TYPE) && typeof p.toolCallId === 'string') {
+            let text = '';
+            const outObj = p.output as { type?: string; value?: unknown } | undefined;
+            if (outObj !== undefined) {
+              if (outObj.type === 'text' && typeof outObj.value === 'string') text = outObj.value;
+              else if (outObj.type === 'json') text = JSON.stringify(outObj.value);
+              else if (typeof (outObj as unknown as string) === 'string') text = outObj as unknown as string;
+            }
+            out.push({
+              role: 'tool',
+              content: text,
+              toolCallId: p.toolCallId,
+              metadata: {
+                provider,
+                model,
+                tokens: {
+                  inputTokens: tokens.inputTokens,
+                  outputTokens: tokens.outputTokens,
+                  cachedTokens: tokens.cachedTokens,
+                  totalTokens: tokens.totalTokens,
+                },
+                timestamp: Date.now(),
+              },
+            });
+          }
+          }
+        }
+        continue;
+      }
+
+      if (m.role === 'assistant' && Array.isArray(m.content)) {
+        // eslint-disable-next-line functional/no-loop-statements
+        for (const part of m.content) {
+          const p = part as { type?: string; toolCallId?: string; output?: unknown };
+          {
+            const t = (p.type ?? '').replace('_','-');
+            if ((t === this.TOOL_RESULT_TYPE || t === this.TOOL_ERROR_TYPE) && typeof p.toolCallId === 'string') {
+            let text = '';
+            const outObj = p.output as { type?: string; value?: unknown } | undefined;
+            if (outObj !== undefined) {
+              if (outObj.type === 'text' && typeof outObj.value === 'string') text = outObj.value;
+              else if (outObj.type === 'json') text = JSON.stringify(outObj.value);
+              else if (typeof (outObj as unknown as string) === 'string') text = outObj as unknown as string;
+            }
+            out.push({
+              role: 'tool',
+              content: text,
+              toolCallId: p.toolCallId,
+              metadata: {
+                provider,
+                model,
+                tokens: {
+                  inputTokens: tokens.inputTokens,
+                  outputTokens: tokens.outputTokens,
+                  cachedTokens: tokens.cachedTokens,
+                  totalTokens: tokens.totalTokens,
+                },
+                timestamp: Date.now(),
+              },
+            });
+          }
+          }
+        }
+      }
+
+      out.push(this.parseAISDKMessage(m, provider, model, tokens));
+    }
+    return out;
+  }
+
   
   /**
    * Convert conversation messages to AI SDK format
@@ -777,6 +876,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     }
 
     const modelMessages: ModelMessage[] = [];
+    // eslint-disable-next-line functional/no-loop-statements
     // eslint-disable-next-line functional/no-loop-statements
     for (const m of messages) {
       if (m.role === 'system') {
@@ -841,12 +941,15 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     let textContent = '';
     let toolCallId: string | undefined;
     
+
+    const normalizeToolName = (name: string): string => name.replace(/^<\|[^|]+\|>/, '').trim();
     if (Array.isArray(m.content)) {
       const textParts: string[] = [];
       const toolCalls: { id: string; name: string; parameters: Record<string, unknown> }[] = [];
       
       // eslint-disable-next-line functional/no-loop-statements
-      for (const part of m.content) {
+      // eslint-disable-next-line functional/no-loop-statements
+        for (const part of m.content) {
         if (part.type === 'text' || part.type === undefined) {
           if (part.text !== undefined && part.text !== '') {
             textParts.push(part.text);
@@ -859,7 +962,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
           // AI SDK embeds tool calls in content
           toolCalls.push({
             id: part.toolCallId,
-            name: part.toolName,
+            name: normalizeToolName(typeof part.toolName === "string" ? part.toolName : ""),
             parameters: (part.input ?? {}) as Record<string, unknown>
           });
         } else if (part.type === this.TOOL_RESULT_TYPE && part.toolCallId !== undefined) {

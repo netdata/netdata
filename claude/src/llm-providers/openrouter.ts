@@ -39,9 +39,16 @@ export class OpenRouterProvider extends BaseLLMProvider {
       // Add final turn message if needed
       const finalMessages = this.buildFinalTurnMessages(messages, request.isFinalTurn);
 
-      const providerOptions = request.parallelToolCalls !== undefined
-        ? { openai: { parallelToolCalls: request.parallelToolCalls, toolChoice: 'required' }, openrouter: { usage: { include: true } } }
-        : { openai: { toolChoice: 'required' }, openrouter: { usage: { include: true } } };
+      const openaiOpts: { toolChoice: 'required'; parallelToolCalls?: boolean } = { toolChoice: 'required' };
+      if (request.parallelToolCalls !== undefined) openaiOpts.parallelToolCalls = request.parallelToolCalls;
+      const baseProviderOptions: Record<string, unknown> = { openrouter: { usage: { include: true } }, openai: openaiOpts };
+      const customProviderOptions = this.getProviderOptions();
+      let providerOptions: Record<string, unknown> = this.deepMerge(baseProviderOptions, customProviderOptions);
+      const routerProv = this.getRouterProviderConfig();
+      // Merge router provider preferences into openrouter settings
+      const ex = providerOptions.openrouter
+      const curr = (ex !== null && ex !== undefined && typeof ex === 'object' && !Array.isArray(ex)) ? (ex as Record<string, unknown>) : {};
+      providerOptions.openrouter = { ...curr, provider: routerProv };
 
       if (request.stream === true) {
         return await super.executeStreamingTurn(model, finalMessages, tools, request, startTime, providerOptions);
@@ -136,4 +143,51 @@ export class OpenRouterProvider extends BaseLLMProvider {
     }
     return out;
   }
+
+  private isPlainObject(val: unknown): val is Record<string, unknown> {
+    return val !== null && val !== undefined && typeof val === "object" && !Array.isArray(val);
+  }
+
+  // Read per-provider providerOptions from config.custom
+  private getRouterProviderConfig(): Record<string, unknown> {
+    try {
+      const raw = this.config.custom;
+      if (this.isPlainObject(raw)) {
+        const v = (raw as { provider?: unknown }).provider;
+        if (this.isPlainObject(v)) return v;
+      }
+    } catch { /* ignore */ }
+    return {};
+  }
+  
+
+  // Read per-provider providerOptions from config.custom
+  private getProviderOptions(): Record<string, unknown> {
+    try {
+      const raw = this.config.custom;
+      if (this.isPlainObject(raw)) {
+        const v = (raw as { providerOptions?: unknown }).providerOptions;
+        if (this.isPlainObject(v)) return v;
+      }
+      return {};
+    } catch {
+      return {};
+    }
+  }
+
+  // Lightweight deep merge for plain objects
+  private deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
+    const out: Record<string, unknown> = { ...target };
+    // eslint-disable-next-line functional/no-loop-statements
+    for (const [k, v] of Object.entries(source)) {
+      const tv = out[k];
+      if (this.isPlainObject(v) && this.isPlainObject(tv)) {
+        out[k] = this.deepMerge(tv, v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
 }

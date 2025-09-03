@@ -47,6 +47,6 @@ export class AnthropicProvider extends BaseLLMProvider {
 
   protected convertResponseMessages(messages: ResponseMessage[], provider: string, model: string, tokens: TokenUsage): ConversationMessage[] {
     // Use base class helper that handles AI SDK's content array format
-    return messages.map(m => this.parseAISDKMessage(m, provider, model, tokens));
+    return this.convertResponseMessagesGeneric(messages, provider, model, tokens);
   }
 }

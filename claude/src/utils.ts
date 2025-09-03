@@ -14,6 +14,9 @@ function bytesPreview(s: string, maxBytes: number): string {
   return decoded.replace(/[\r\n]+/g, ' ').trim();
 }
 
+function ensureTrailingNewline(s: string): string { return s.endsWith('\n') ? s : (s + '\n'); }
+
+
 
 interface ToolCallSummary {
   request: string; // compact request line e.g., toolName(k:v, a:[3])
@@ -132,18 +135,18 @@ export function formatAgentResultHumanReadable(result: AIAgentResult): string {
 
   // 2) Success but no final output
   if (result.success) {
-    return [
+    return ensureTrailingNewline([
       'AGENT COMPLETED WITHOUT OUTPUT',
       '',
       'The agent was able to complete successfully, but it did not generate any output.',
       '',
       description,
-    ].join('\n');
+    ].join('\n'));
   }
 
   // 3) Failure with reason
   const reason = typeof result.error === 'string' && result.error.length > 0 ? result.error : 'Unknown error';
-  return [
+  return ensureTrailingNewline([
     'AGENT FAILED',
     '',
     'The agent was unable to complete. The exact reason of failure is:',
@@ -151,7 +154,7 @@ export function formatAgentResultHumanReadable(result: AIAgentResult): string {
     reason,
     '',
     description,
-  ].join('\n');
+  ].join('\n'));
 }
 
 // Compact tool request formatter usable across codepaths
