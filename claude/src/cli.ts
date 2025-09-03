@@ -1,13 +1,15 @@
 import fs from 'node:fs';
 import os from 'node:os';
+import path from 'node:path';
 
 import { Command } from 'commander';
 import * as yaml from 'js-yaml';
 
-import type { AIAgentSessionConfig, LogEntry, AccountingEntry, AIAgentCallbacks, ConversationMessage } from './types.js';
+import type { LogEntry, AccountingEntry, AIAgentCallbacks, ConversationMessage } from './types.js';
 
-import { AIAgent } from './ai-agent.js';
-import { discoverLayers, resolveDefaults, buildUnifiedConfiguration } from './config-resolver.js';
+import { loadAgentFromContent } from './agent-loader.js';
+import { discoverLayers, resolveDefaults } from './config-resolver.js';
+import { parseFrontmatter, stripFrontmatter, parseList, parsePairs } from './frontmatter.js';
 import { formatAgentResultHumanReadable } from './utils.js';
 
 interface FrontmatterOptions {
@@ -179,7 +181,8 @@ function buildResolvedDefaultsHelp(): string {
     lines.push('');
     lines.push('Frontmatter Template:');
     lines.push('---');
-    const yamlText = yaml.dump(fmTemplate, { lineWidth: 120 });
+    const dumpedUnknown = (yaml as unknown as { dump: (o: unknown, opts?: Record<string, unknown>) => unknown }).dump(fmTemplate, { lineWidth: 120 });
+    const yamlText = typeof dumpedUnknown === 'string' ? dumpedUnknown : JSON.stringify(dumpedUnknown);
     lines.push(yamlText.trimEnd());
     lines.push('---');
     // Also show prompt/config locations for context
@@ -245,54 +248,14 @@ program
       // Resolve prompts and parse frontmatter for expected output and options
       const resolvedSystemRaw = await readPrompt(systemPrompt);
       const resolvedUserRaw = await readPrompt(userPrompt);
-      const fm = parseFrontmatter(resolvedSystemRaw) ?? parseFrontmatter(resolvedUserRaw);
-
-      // Resolve numeric options with precedence: CLI > FM > config.defaults > hard default
-      const srcMaxToolTurns = program.getOptionValueSource('maxToolTurns');
-      const srcMaxRetries = program.getOptionValueSource('maxRetries');
-      const srcLlmTimeout = program.getOptionValueSource('llmTimeout');
-      const srcToolTimeout = program.getOptionValueSource('toolTimeout');
-      const srcTemperature = program.getOptionValueSource('temperature');
-      const srcTopP = program.getOptionValueSource('topP');
-      const srcToolResponseMaxBytes = program.getOptionValueSource('toolResponseMaxBytes');
+      const sysBaseDir = (() => { try { return (systemPrompt !== '-' && fs.existsSync(systemPrompt) && fs.statSync(systemPrompt).isFile()) ? path.dirname(systemPrompt) : undefined; } catch { return undefined; } })();
+      const usrBaseDir = (() => { try { return (userPrompt !== '-' && fs.existsSync(userPrompt) && fs.statSync(userPrompt).isFile()) ? path.dirname(userPrompt) : undefined; } catch { return undefined; } })();
+      const fmSys = parseFrontmatter(resolvedSystemRaw, { baseDir: sysBaseDir });
+      const fmUsr = parseFrontmatter(resolvedUserRaw, { baseDir: usrBaseDir });
+      const fm = fmSys ?? fmUsr;
 
       const fmOptions: FrontmatterOptions | undefined = fm?.options;
-
-      const layersForDefaults = discoverLayers({ configPath: cfgPath });
-      const configDefaultsFromLayers = resolveDefaults(layersForDefaults) as Record<string, unknown>;
-
-      const maxToolTurns = srcMaxToolTurns === 'cli'
-        ? parsePositiveInt(options.maxToolTurns, 'max-tool-turns')
-        : (() => { const n = readFmNumber(fmOptions, 'maxToolTurns'); if (n !== undefined) { if (!(n > 0)) { console.error('Error: frontmatter maxToolTurns must be positive'); process.exit(4);} return Math.trunc(n); } { const v = configDefaultsFromLayers.maxToolTurns as number | undefined; return (typeof v === 'number' && Number.isFinite(v)) ? Math.trunc(v) : 10; } })();
-
-      const maxRetries = srcMaxRetries === 'cli'
-        ? parsePositiveInt(options.maxRetries, 'max-retries')
-        : (() => { const n = readFmNumber(fmOptions, 'maxRetries'); if (n !== undefined) { if (!(n > 0)) { console.error('Error: frontmatter maxRetries must be positive'); process.exit(4);} return Math.trunc(n); } { const v = configDefaultsFromLayers.maxRetries as number | undefined; return (typeof v === 'number' && Number.isFinite(v)) ? Math.trunc(v) : 3; } })();
-
-      const llmTimeout = srcLlmTimeout === 'cli'
-        ? parsePositiveInt(options.llmTimeout, 'llm-timeout')
-        : (() => { const n = readFmNumber(fmOptions, 'llmTimeout'); if (n !== undefined) { if (!(n > 0)) { console.error('Error: frontmatter llmTimeout must be positive'); process.exit(4);} return Math.trunc(n); } { const v = configDefaultsFromLayers.llmTimeout as number | undefined; return (typeof v === 'number' && Number.isFinite(v)) ? Math.trunc(v) : 120000; } })();
-
-      const toolTimeout = srcToolTimeout === 'cli'
-        ? parsePositiveInt(options.toolTimeout, 'tool-timeout')
-        : (() => { const n = readFmNumber(fmOptions, 'toolTimeout'); if (n !== undefined) { if (!(n > 0)) { console.error('Error: frontmatter toolTimeout must be positive'); process.exit(4);} return Math.trunc(n); } { const v = configDefaultsFromLayers.toolTimeout as number | undefined; return (typeof v === 'number' && Number.isFinite(v)) ? Math.trunc(v) : 60000; } })();
-
-      const toolResponseMaxBytes = srcToolResponseMaxBytes === 'cli'
-        ? parsePositiveInt(options.toolResponseMaxBytes, 'tool-response-max-bytes')
-        : (() => { const n = readFmNumber(fmOptions, 'toolResponseMaxBytes'); if (n !== undefined) { if (!(n > 0)) { console.error('Error: frontmatter toolResponseMaxBytes must be positive'); process.exit(4);} return Math.trunc(n); } { const v = configDefaultsFromLayers.toolResponseMaxBytes as number | undefined; return (typeof v === 'number' && Number.isFinite(v)) ? Math.trunc(v) : 12288; } })();
-
-      const temperature = srcTemperature === 'cli'
-        ? parseFloat(options.temperature, 'temperature', 0, 2)
-        : (() => { const n = readFmNumber(fmOptions, 'temperature'); if (n !== undefined) { if (!(n >= 0 && n <= 2)) { console.error('Error: frontmatter temperature must be between 0 and 2'); process.exit(4);} return n; } { const v = configDefaultsFromLayers.temperature as number | undefined; return (typeof v === 'number') ? v : 0.7; } })();
-
-      const topP = srcTopP === 'cli'
-        ? parseFloat(options.topP, 'top-p', 0, 1)
-        : (() => { const n = readFmNumber(fmOptions, 'topP'); if (n !== undefined) { if (!(n >= 0 && n <= 1)) { console.error('Error: frontmatter topP must be between 0 and 1'); process.exit(4);} return n; } { const v = configDefaultsFromLayers.topP as number | undefined; return (typeof v === 'number') ? v : 1.0; } })();
-
-      // Prompt variable substitution
-      const vars = buildPromptVariables(maxToolTurns);
-      const resolvedSystem = expandPrompt(stripFrontmatter(resolvedSystemRaw), vars);
-      const resolvedUser = expandPrompt(stripFrontmatter(resolvedUserRaw), vars);
+      // Removed local resolution of runtime knobs; agent-loader owns precedence
 
       // Determine effective targets and tools (CLI > FM)
       const cliTargetsRaw: string | undefined =
@@ -345,11 +308,44 @@ program
         }
       } catch { /* ignore */ }
 
-      
-            // Build unified configuration via layered resolver
-      const layers = discoverLayers({ configPath: cfgPath });
-      const needProviders = Array.from(new Set(targets.map((t) => t.provider)));
-      const config = buildUnifiedConfiguration({ providers: needProviders, mcpServers: toolList }, layers, { verbose: options.verbose === true, log: (msg) => { try { if (options.verbose === true) process.stderr.write((process.stderr.isTTY ? "\x1b[90m" : "") + "[VRB] → [0.0] llm agent:config: " + msg + "\n" + (process.stderr.isTTY ? "\x1b[0m" : "")); } catch {} } });
+      // Build unified configuration via agent-loader (single path)
+      const fmSource = (fmSys !== undefined) ? resolvedSystemRaw : resolvedUserRaw;
+      const fmBaseDir = (fmSys !== undefined) ? sysBaseDir : usrBaseDir;
+      // Only override numeric options if explicitly provided via CLI (avoid overriding frontmatter with Commander defaults)
+      const optSrc = (name: string): 'cli' | 'default' | 'env' | 'implied' | undefined => {
+        try {
+          return program.getOptionValueSource(name) as 'cli' | 'default' | 'env' | 'implied' | undefined;
+        } catch {
+          return undefined;
+        }
+      };
+
+      const loaded = loadAgentFromContent('cli-main', fmSource, {
+        configPath: cfgPath,
+        verbose: options.verbose === true,
+        targets,
+        tools: toolList,
+        baseDir: fmBaseDir,
+        // CLI overrides take precedence
+        temperature: optSrc('temperature') === 'cli' ? Number(options.temperature) : undefined,
+        topP: optSrc('topP') === 'cli' ? Number(options.topP) : undefined,
+        llmTimeout: optSrc('llmTimeout') === 'cli' ? Number(options.llmTimeout) : undefined,
+        toolTimeout: optSrc('toolTimeout') === 'cli' ? Number(options.toolTimeout) : undefined,
+        maxRetries: optSrc('maxRetries') === 'cli' ? Number(options.maxRetries) : undefined,
+        maxToolTurns: optSrc('maxToolTurns') === 'cli' ? Number(options.maxToolTurns) : undefined,
+        toolResponseMaxBytes: optSrc('toolResponseMaxBytes') === 'cli' ? Number(options.toolResponseMaxBytes) : undefined,
+        parallelToolCalls: typeof options.parallelToolCalls === 'boolean' ? options.parallelToolCalls : undefined,
+        stream: typeof options.stream === 'boolean' ? options.stream : undefined,
+        traceLLM: options.traceLlm === true ? true : undefined,
+        traceMCP: options.traceMcp === true ? true : undefined,
+        mcpInitConcurrency: (typeof options.mcpInitConcurrency === 'string' && options.mcpInitConcurrency.length>0) ? Number(options.mcpInitConcurrency) : undefined,
+      });
+
+      // Prompt variable substitution using loader-effective max tool turns
+      const vars = buildPromptVariables(loaded.effective.maxToolTurns);
+      const resolvedSystem = expandPrompt(stripFrontmatter(resolvedSystemRaw), vars);
+      const resolvedUser = expandPrompt(stripFrontmatter(resolvedUserRaw), vars);
+
 // Load conversation history if specified
       let conversationHistory: ConversationMessage[] | undefined = undefined;
       const effLoad = (typeof options.load === 'string' && options.load.length > 0)
@@ -370,60 +366,21 @@ program
       const accountingFile = (typeof options.accounting === 'string' && options.accounting.length > 0)
         ? options.accounting
         : (fmOptions !== undefined && typeof fmOptions.accounting === 'string') ? fmOptions.accounting
-        : config.accounting?.file;
+        : loaded.accountingFile ?? loaded.config.accounting?.file;
 
-      // Setup logging callbacks
-      // Resolve additional booleans with precedence CLI > FM > config.defaults
-      const effectiveParallelToolCalls = (typeof options.parallelToolCalls === 'boolean')
-        ? options.parallelToolCalls
-        : (fmOptions !== undefined && typeof fmOptions.parallelToolCalls === 'boolean')
-          ? fmOptions.parallelToolCalls
-          : (config.defaults?.parallelToolCalls ?? false);
-
-      const effectiveStream = (typeof options.stream === 'boolean')
-        ? options.stream
-        : (fmOptions !== undefined && typeof fmOptions.stream === 'boolean')
-          ? fmOptions.stream
-          : (config.defaults?.stream ?? false);
-
+      // Setup logging callbacks (trace/verbose still taken from CLI/FM above)
       const effectiveTraceLLM = options.traceLlm === true ? true : (fmOptions !== undefined && typeof fmOptions.traceLLM === 'boolean' ? fmOptions.traceLLM : false);
       const effectiveTraceMCP = options.traceMcp === true ? true : (fmOptions !== undefined && typeof fmOptions.traceMCP === 'boolean' ? fmOptions.traceMCP : false);
       const effectiveVerbose = options.verbose === true ? true : (fmOptions !== undefined && typeof fmOptions.verbose === 'boolean' ? fmOptions.verbose : false);
-
       const callbacks = createCallbacks({ traceLlm: effectiveTraceLLM, traceMcp: effectiveTraceMCP, verbose: effectiveVerbose }, accountingFile);
-
-      const sessionConfig: AIAgentSessionConfig = {
-        config,
-        targets,
-        tools: toolList,
-        systemPrompt: resolvedSystem,
-        userPrompt: resolvedUser,
-        expectedOutput: fm?.expectedOutput,
-        conversationHistory,
-        temperature,
-        topP,
-        maxRetries,
-        maxTurns: maxToolTurns,
-        llmTimeout,
-        toolTimeout,
-        toolResponseMaxBytes,
-        parallelToolCalls: effectiveParallelToolCalls,
-        stream: effectiveStream,
-        callbacks,
-        traceLLM: effectiveTraceLLM,
-        traceMCP: effectiveTraceMCP,
-        verbose: effectiveVerbose,
-        mcpInitConcurrency: (typeof options.mcpInitConcurrency === 'string' && options.mcpInitConcurrency.length>0) ? (Number(options.mcpInitConcurrency) || undefined) : config.defaults?.mcpInitConcurrency,
-      };
 
       if (options.dryRun === true) {
         console.error('Dry run: configuration and MCP servers validated successfully.');
         process.exit(0);
       }
 
-      // Create and run session
-      const session = AIAgent.create(sessionConfig);
-      const result = await session.run();
+      // Create and run session via unified loader
+      const result = await loaded.run(resolvedSystem, resolvedUser, { history: conversationHistory, callbacks });
 
       // Always print only the formatted human-readable output to stdout
       try {
@@ -479,23 +436,10 @@ program
   });
 
 // Helper functions
-function parsePositiveInt(value: unknown, name: string): number {
-  const num = typeof value === 'string' ? Number.parseInt(value, 10) : Number(value);
-  if (!Number.isFinite(num) || num <= 0) {
-    console.error(`Error: --${name} must be positive`);
-    process.exit(4);
-  }
-  return num;
-}
+// parsePositiveInt helper removed from run path; not needed
 
-function parseFloat(value: unknown, name: string, min: number, max: number): number {
-  const num = typeof value === 'string' ? Number.parseFloat(value) : Number(value);
-  if (!Number.isFinite(num) || num < min || num > max) {
-    console.error(`Error: --${name} must be between ${String(min)} and ${String(max)}`);
-    process.exit(4);
-  }
-  return num;
-}
+// kept for help-text parity; no longer used in run path
+// parseFloat helper removed from run path; not needed
 
 async function readPrompt(value: string): Promise<string> {
   if (value === '-') {
@@ -583,127 +527,7 @@ function expandPrompt(str: string, vars: Record<string, string>): string {
   return out;
 }
 
-// Frontmatter parsing utilities
-function parseFrontmatter(src: string): { expectedOutput?: { format: 'json'|'markdown'|'text'; schema?: Record<string, unknown> }, options?: FrontmatterOptions, description?: string, usage?: string } | undefined {
-  const m = /^---\n([\s\S]*?)\n---\n/.exec(src);
-  if (m === null) return undefined;
-  try {
-    const rawUnknown: unknown = yaml.load(m[1]);
-    if (typeof rawUnknown !== 'object' || rawUnknown === null) return undefined;
-    const docObj = rawUnknown as { output?: { format?: string; schema?: unknown; schemaRef?: string } } & Record<string, unknown>;
-    let expectedOutput: { format: 'json'|'markdown'|'text'; schema?: Record<string, unknown> } | undefined;
-    let description: string | undefined;
-    let usage: string | undefined;
-    if (docObj.output !== undefined && typeof docObj.output.format === 'string') {
-      const format = docObj.output.format.toLowerCase();
-      if (format === 'json' || format === 'markdown' || format === 'text') {
-        let schemaObj: Record<string, unknown> | undefined;
-        if (format === 'json') {
-          const s: unknown = docObj.output.schema;
-          const refVal: unknown = (docObj.output as { schemaRef?: unknown }).schemaRef;
-          const ref: string | undefined = typeof refVal === 'string' ? refVal : undefined;
-          schemaObj = loadSchemaValue(s, ref);
-        }
-        const fmt: 'json'|'markdown'|'text' = format === 'json' ? 'json' : (format === 'markdown' ? 'markdown' : 'text');
-        expectedOutput = { format: fmt, schema: schemaObj };
-      }
-    }
-    const raw = rawUnknown as Record<string, unknown>;
-    const options: FrontmatterOptions = {};
-    if (typeof raw.llms === 'string' || Array.isArray(raw.llms)) options.llms = raw.llms as (string | string[]);
-    if (typeof raw.targets === 'string' || Array.isArray(raw.targets)) options.targets = raw.targets as (string | string[]);
-    if (typeof raw.tools === 'string' || Array.isArray(raw.tools)) options.tools = raw.tools as (string | string[]);
-    if (typeof raw.load === 'string') options.load = raw.load;
-    if (typeof raw.accounting === 'string') options.accounting = raw.accounting;
-    if (typeof raw.parallelToolCalls === 'boolean') options.parallelToolCalls = raw.parallelToolCalls;
-    if (typeof raw.stream === 'boolean') options.stream = raw.stream;
-    if (typeof raw.traceLLM === 'boolean') options.traceLLM = raw.traceLLM;
-    if (typeof raw.traceMCP === 'boolean') options.traceMCP = raw.traceMCP;
-    if (typeof raw.verbose === 'boolean') options.verbose = raw.verbose;
-    if (typeof raw.save === 'string') options.save = raw.save;
-    if (typeof raw.maxToolTurns === 'number') options.maxToolTurns = raw.maxToolTurns;
-    if (typeof raw.maxRetries === 'number') options.maxRetries = raw.maxRetries;
-    if (typeof raw.llmTimeout === 'number') options.llmTimeout = raw.llmTimeout;
-    if (typeof raw.toolTimeout === 'number') options.toolTimeout = raw.toolTimeout;
-    if (typeof raw.toolResponseMaxBytes === 'number') options.toolResponseMaxBytes = raw.toolResponseMaxBytes;
-    if (typeof raw.temperature === 'number') options.temperature = raw.temperature;
-    if (typeof raw.topP === 'number') options.topP = raw.topP;
-    if (typeof raw.description === 'string') description = raw.description;
-    if (typeof raw.usage === 'string') usage = raw.usage;
-    return { expectedOutput, options, description, usage };
-  } catch {
-    return undefined;
-  }
-}
-
-function loadSchemaValue(v: unknown, schemaRef?: string): Record<string, unknown> | undefined {
-  try {
-    if (v !== null && v !== undefined && typeof v === 'object') return v as Record<string, unknown>;
-    if (typeof v === 'string') {
-      // Try JSON first, then YAML
-      try { return JSON.parse(v) as Record<string, unknown>; } catch { /* ignore */ }
-      try { return yaml.load(v) as Record<string, unknown>; } catch { /* ignore */ }
-    }
-    if (typeof schemaRef === 'string' && schemaRef.length > 0) {
-      try {
-        const path = schemaRef.startsWith('.') ? schemaRef : `./${schemaRef}`;
-        const content = fs.readFileSync(path, 'utf-8');
-        if (/\.json$/i.test(path)) return JSON.parse(content) as Record<string, unknown>;
-        if (/\.(ya?ml)$/i.test(path)) return yaml.load(content) as Record<string, unknown>;
-        // Fallback: attempt JSON then YAML
-        try { return JSON.parse(content) as Record<string, unknown>; } catch { /* ignore */ }
-        return yaml.load(content) as Record<string, unknown>;
-      } catch {
-        return undefined;
-      }
-    }
-  } catch { /* ignore */ }
-  return undefined;
-}
-
-function stripFrontmatter(src: string): string {
-  const m = /^---\n([\s\S]*?)\n---\n/;
-  return src.replace(m, '');
-}
-
-function readFmNumber(opts: FrontmatterOptions | undefined, key: keyof FrontmatterOptions): number | undefined {
-  if (opts === undefined) return undefined;
-  const v = opts[key];
-  if (v === undefined) return undefined;
-  const n = Number(v);
-  if (!Number.isFinite(n)) {
-    console.error(`Error: frontmatter ${key} must be a number`);
-    process.exit(4);
-  }
-  return n;
-}
-
-function parseList(value: unknown): string[] {
-  if (Array.isArray(value)) return value.map((s) => (typeof s === 'string' ? s : String(s))).map((s) => s.trim()).filter((s) => s.length > 0);
-  if (typeof value === 'string') return value.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
-  return [];
-}
-
-function parsePairs(value: unknown): { provider: string; model: string }[] {
-  const arr = Array.isArray(value) ? value.map((v) => (typeof v === 'string' ? v : String(v))) : (typeof value === 'string' ? value.split(',') : []);
-  return arr
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0)
-    .map((token) => {
-      const slash = token.indexOf('/');
-      if (slash <= 0 || slash >= token.length - 1) {
-        console.error(`Error: invalid provider/model pair '${token}'. Expected format provider/model.`);
-        process.exit(4);
-      }
-      const provider = token.slice(0, slash).trim();
-      const model = token.slice(slash + 1).trim();
-      if (provider.length === 0 || model.length === 0) {
-        console.error(`Error: invalid provider/model pair '${token}'.`);
-        process.exit(4);
-      }
-      return { provider, model };
-    });
-}
+// Frontmatter helpers are imported from frontmatter.ts
 
 function createCallbacks(options: Record<string, unknown>, accountingFile?: string): AIAgentCallbacks {
 

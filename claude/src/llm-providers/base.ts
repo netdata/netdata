@@ -264,7 +264,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
   // DRY helpers for final-turn behavior across providers
   protected filterToolsForFinalTurn(tools: MCPTool[], isFinalTurn?: boolean): MCPTool[] {
     if (isFinalTurn === true) {
-      return tools.filter((t) => t.name === 'agent_final_report');
+      return tools.filter((t) => t.name === 'agent__final_report');
     }
     return tools;
   }
@@ -274,9 +274,9 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       const content = [
         '**CRITICAL**: You cannot collect more data!\n',
         '\n',
-        'You must call the tool `agent_final_report` with your report.\n',
+        'You must call the tool `agent__final_report` with your report.\n',
         '\n',
-        'Review the collected data, check your instructions, and call the tool `agent_final_report` with your final report:\n',
+        'Review the collected data, check your instructions, and call the tool `agent__final_report` with your final report:\n',
         '\n',
         '- If the data is completely irrelevant or missing, set `status` to `failure` and describe the situation.\n',
         '- If the data is severealy incomplete, set `status` to `partial` and describe what you found.\n',
@@ -284,7 +284,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         '\n',
         'Follow your instructions carefully, think hard, ensure your final report is accurate.\n',
         '\n',
-        'Provide now your report by calling the tool `agent_final_report`.'
+        'Provide now your report by calling the tool `agent__final_report`.'
       ].join(' ');
       return messages.concat({ role: 'user', content } as ModelMessage);
     }
@@ -504,7 +504,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
 
       // Detect final report request strictly by tool name, after normalization
       const normalizeName = (name: string) => name.replace(/^<\|[^|]+\|>/, '').trim();
-      const finalReportRequested = lastAssistantMessage?.toolCalls?.some(tc => normalizeName(tc.name) === 'agent_final_report') === true;
+      const finalReportRequested = lastAssistantMessage?.toolCalls?.some(tc => normalizeName(tc.name) === 'agent__final_report') === true;
 
       // Only count tool calls that target currently available tools
       const validToolNames = tools !== undefined ? Object.keys(tools) : [];
@@ -667,7 +667,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       const normalizeName = (name: string) => name.replace(/^<\|[^|]+\|>/, '').trim();
       const hasNewToolCalls = lastAssistantMessage?.toolCalls !== undefined &&
         lastAssistantMessage.toolCalls.filter(tc => validToolNames.includes(normalizeName(tc.name))).length > 0;
-      const finalReportRequested = lastAssistantMessage?.toolCalls?.some(tc => normalizeName(tc.name) === 'agent_final_report') === true;
+      const finalReportRequested = lastAssistantMessage?.toolCalls?.some(tc => normalizeName(tc.name) === 'agent__final_report') === true;
       const hasAssistantText = (lastAssistantMessage?.content.trim().length ?? 0) > 0;
 
       // Detect reasoning parts in non-streaming response

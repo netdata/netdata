@@ -106,7 +106,7 @@ export class MCPClientManager {
           break;
         case 'websocket': {
           if (config.url == null || config.url.length === 0) throw new Error(`WebSocket MCP server '${name}' requires a 'url'`);
-          const resolvedHeaders = resolveHeaders(config.headers);
+          const resolvedHeaders = config.headers;
           
           // Log WebSocket connection details for tracing
           if (this.trace) {
@@ -126,7 +126,7 @@ export class MCPClientManager {
         case 'http': {
           if (config.url == null || config.url.length === 0) throw new Error(`HTTP MCP server '${name}' requires a 'url'`);
           const { StreamableHTTPClientTransport } = await import('@modelcontextprotocol/sdk/client/streamableHttp.js');
-          const resolvedHeaders = resolveHeaders(config.headers);
+          const resolvedHeaders = config.headers;
           
           // Log HTTP connection details for tracing
           if (this.trace) {
@@ -147,7 +147,7 @@ export class MCPClientManager {
         
         case 'sse':
           if (config.url == null || config.url.length === 0) throw new Error(`SSE MCP server '${name}' requires a 'url'`);
-          const resolvedHeaders = resolveHeaders(config.headers);
+          const resolvedHeaders = config.headers;
           
           // Log the SSE connection details for tracing
           if (this.trace) {
@@ -231,7 +231,7 @@ export class MCPClientManager {
     const ns = this.sanitizeNamespace(name);
     // eslint-disable-next-line functional/no-loop-statements, @typescript-eslint/no-unnecessary-condition
     for (const t of tools) {
-      const exposed = `${ns}_${t.name}`;
+      const exposed = `${ns}__${t.name}`;
       this.toolNameMap.set(exposed, { serverName: name, originalName: t.name });
     }
 
@@ -286,13 +286,8 @@ export class MCPClientManager {
       throw new Error(`Stdio MCP server '${name}' requires a string 'command'`);
     }
 
-    const configured = config.env ?? {};
-    const effectiveEnv: Record<string, string> = {};
-    Object.entries(configured).forEach(([k, v]) => {
-      const resolved = v.replace(/\$\{([^}]+)\}/g, (_m: string, varName: string) => 
-        (process.env as Record<string, string | undefined>)[varName] ?? '');
-      if (resolved.length > 0) effectiveEnv[k] = resolved;
-    });
+    // Use environment as provided by the unified configuration (already resolved by config-resolver)
+    const effectiveEnv: Record<string, string> = { ...(config.env ?? {}) };
 
     const transport = new StdioClientTransport({
       command: config.command,
@@ -541,7 +536,7 @@ export class MCPClientManager {
       // eslint-disable-next-line functional/no-loop-statements, @typescript-eslint/no-unnecessary-condition
       for (const t of s.tools) {
         out.push({
-          name: `${ns}_${t.name}`,
+          name: `${ns}__${t.name}`,
           description: t.description,
           inputSchema: t.inputSchema,
           instructions: t.instructions,
@@ -560,7 +555,7 @@ export class MCPClientManager {
     return tool?.inputSchema;
   }
 
-  // Resolve an exposed tool name (e.g., brave_brave_web_search) to its server and original tool name
+  // Resolve an exposed tool name (e.g., brave__brave_web_search) to its server and original tool name
   resolveExposedTool(exposedName: string): { serverName: string; originalName: string } | undefined {
     const m = this.toolNameMap.get(exposedName);
     if (m === undefined) return undefined;
@@ -576,7 +571,7 @@ export class MCPClientManager {
       const ns = this.sanitizeNamespace(serverName);
       s.tools.forEach((t) => {
         if (typeof t.instructions === 'string' && t.instructions.length > 0) {
-          const exposed = `${ns}_${t.name}`;
+          const exposed = `${ns}__${t.name}`;
           arr.push(`## TOOL ${exposed} INSTRUCTIONS\n${t.instructions}`);
         }
       });
@@ -697,14 +692,4 @@ function toUnderscore(s: string): string {
     .replace(/_+/g, '_')
     .replace(/^_+|_+$/g, '')
     .toLowerCase();
-}
-
-function resolveHeaders(headers?: Record<string, string>): Record<string, string> | undefined {
-  if (headers === undefined) return headers;
-  return Object.entries(headers).reduce<Record<string, string>>((acc, [k, v]) => {
-    const resolved = v.replace(/\$\{([^}]+)\}/g, (_m: string, name: string) => 
-      (process.env as Record<string, string | undefined>)[name] ?? '');
-    if (resolved.length > 0) acc[k] = resolved;
-    return acc;
-  }, {});
 }

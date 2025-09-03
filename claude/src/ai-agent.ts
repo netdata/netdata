@@ -55,7 +55,7 @@ export class AIAgentSession {
   private ajv?: Ajv;
   // Internal housekeeping notes
   private internalNotes: { text: string; tags?: string[]; ts: number }[] = [];
-  // Finalization state captured via agent_final_report
+  // Finalization state captured via agent__final_report
   private finalReport?: {
     status: 'success' | 'failure' | 'partial';
     format: 'json' | 'markdown' | 'text';
@@ -159,6 +159,62 @@ export class AIAgentSession {
     let currentTurn = this.currentTurn;
 
     try {
+      // Verbose: emit settings summary at start (without prompts)
+      if (this.sessionConfig.verbose === true) {
+        const summarizeConfig = () => {
+          const prov = Object.entries(this.config.providers).map(([name, p]) => ({
+            name,
+            type: p.type,
+            baseUrl: p.baseUrl,
+            hasApiKey: typeof p.apiKey === 'string' && p.apiKey.length > 0,
+            headerKeys: p.headers !== undefined ? Object.keys(p.headers) : [],
+          }));
+          const srvs = Object.entries(this.config.mcpServers).map(([name, s]) => ({
+            name,
+            type: s.type,
+            url: s.url,
+            command: s.command,
+            argsCount: Array.isArray(s.args) ? s.args.length : 0,
+            headerKeys: s.headers !== undefined ? Object.keys(s.headers) : [],
+            envKeys: s.env !== undefined ? Object.keys(s.env) : [],
+            enabled: s.enabled !== false,
+          }));
+          return { providers: prov, mcpServers: srvs, accountingFile: this.config.accounting?.file };
+        };
+        const summarizeSession = () => ({
+          targets: this.sessionConfig.targets,
+          tools: this.sessionConfig.tools,
+          expectedOutput: this.sessionConfig.expectedOutput?.format,
+          temperature: this.sessionConfig.temperature,
+          topP: this.sessionConfig.topP,
+          llmTimeout: this.sessionConfig.llmTimeout,
+          toolTimeout: this.sessionConfig.toolTimeout,
+          maxRetries: this.sessionConfig.maxRetries,
+          maxTurns: this.sessionConfig.maxTurns,
+          stream: this.sessionConfig.stream,
+          parallelToolCalls: this.sessionConfig.parallelToolCalls,
+          traceLLM: this.sessionConfig.traceLLM,
+          traceMCP: this.sessionConfig.traceMCP,
+          verbose: this.sessionConfig.verbose,
+          toolResponseMaxBytes: this.sessionConfig.toolResponseMaxBytes,
+          mcpInitConcurrency: this.sessionConfig.mcpInitConcurrency,
+          conversationHistoryLength: Array.isArray(this.sessionConfig.conversationHistory) ? this.sessionConfig.conversationHistory.length : 0,
+        });
+        const settings = { config: summarizeConfig(), session: summarizeSession() };
+        const entry: LogEntry = {
+          timestamp: Date.now(),
+          severity: 'VRB',
+          turn: currentTurn,
+          subturn: 0,
+          direction: 'request',
+          type: 'llm',
+          remoteIdentifier: 'agent:settings',
+          fatal: false,
+          message: JSON.stringify(settings),
+        };
+        currentLogs.push(entry);
+        this.sessionConfig.callbacks?.onLog?.(entry);
+      }
       // Initialize MCP servers (non-fatal if they fail)
       try {
         const selected = Object.fromEntries(
@@ -304,7 +360,7 @@ export class AIAgentSession {
             if ((attempts === maxRetries - 1) && currentTurn < (maxTurns - 1)) {
               attemptConversation.push({
                 role: 'user',
-                content: 'Reminder: do not end with plain text. Use an available tool (excluding `agent_append_notes`) to make progress. When ready to conclude, call the tool `agent_final_report` to provide the final answer.'
+                content: 'Reminder: do not end with plain text. Use an available tool (excluding `agent__append_notes`) to make progress. When ready to conclude, call the tool `agent__final_report` to provide the final answer.'
               });
             }
             // Do not inject final-turn user message here to avoid duplication.
@@ -321,7 +377,7 @@ export class AIAgentSession {
                 type: 'llm',
                 remoteIdentifier: 'agent:final-turn',
                 fatal: false,
-                message: 'Final turn detected: restricting tools to `agent_final_report` and injecting finalization instruction.'
+              message: 'Final turn detected: restricting tools to `agent__final_report` and injecting finalization instruction.'
               };
               logs.push(warn);
               this.sessionConfig.callbacks?.onLog?.(warn);
@@ -349,7 +405,7 @@ export class AIAgentSession {
             // Emit WRN for unknown tool calls that the AI SDK could not execute (name not in ToolSet)
             try {
               const mapping = this.mcpClient.getToolServerMapping();
-              const internal = new Set<string>(['agent_append_notes', 'agent_final_report']);
+      const internal = new Set<string>(['agent__append_notes', 'agent__final_report']);
               const normalizeTool = (n: string) => n.replace(/^<\|[^|]+\|>/, '').trim();
               const lastAssistant = turnResult.messages.filter((m) => m.role === 'assistant');
               const assistantMsg = lastAssistant.length > 0 ? lastAssistant[lastAssistant.length - 1] : undefined;
@@ -484,7 +540,7 @@ export class AIAgentSession {
           // Log successful exit
           this.logExit(
             'EXIT-FINAL-ANSWER',
-            'Final report received (agent_final_report), session complete',
+            'Final report received (agent__final_report), session complete',
             currentTurn,
             logs
           );
@@ -581,7 +637,7 @@ export class AIAgentSession {
               
               if (turnResult.status.finalAnswer) {
                 // Treat as non-final unless a final_report was provided
-                // Continue to next turn to allow the model to call agent_final_report
+                // Continue to next turn to allow the model to call agent__final_report
                 turnSuccessful = true;
                 break;
               } else {
@@ -802,7 +858,7 @@ export class AIAgentSession {
       const startTime = Date.now();
       try {
         // Intercept internal tools (agent_*)
-        if (effectiveToolName === 'agent_append_notes') {
+        if (effectiveToolName === 'agent__append_notes') {
           const textParam = (parameters as { text?: unknown }).text;
           const text = typeof textParam === 'string' ? textParam : textParam === undefined ? '' : JSON.stringify(textParam);
           const tags = Array.isArray((parameters as { tags?: unknown }).tags) ? (parameters as { tags?: string[] }).tags : undefined;
@@ -817,7 +873,7 @@ export class AIAgentSession {
           this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
           return JSON.stringify({ ok: true, totalNotes: this.internalNotes.length });
         }
-        if (effectiveToolName === 'agent_final_report') {
+        if (effectiveToolName === 'agent__final_report') {
           const p = parameters;
           const statusParam = p.status;
           const formatParam = p.format;
@@ -839,13 +895,13 @@ export class AIAgentSession {
         }
 
         // Batch execution internal tool
-        if (effectiveToolName === 'agent_batch') {
+        if (effectiveToolName === 'agent__batch') {
           return await this.executeBatchCalls(parameters, currentTurn, startTime, logs, accounting, toolName);
         }
 
         // Warn and fail fast if the tool is unknown (not internal and not from any MCP server)
         {
-          const isInternal = (effectiveToolName === 'agent_append_notes' || effectiveToolName === 'agent_final_report');
+          const isInternal = (effectiveToolName === 'agent__append_notes' || effectiveToolName === 'agent__final_report');
           const mapping = this.mcpClient.getToolServerMapping();
           if (!isInternal && !mapping.has(effectiveToolName)) {
             const req = formatToolRequestCompact(toolName, parameters);
@@ -1109,7 +1165,7 @@ export class AIAgentSession {
   private getInternalTools(): MCPTool[] {
     const tools: MCPTool[] = [
       {
-        name: 'agent_append_notes',
+        name: 'agent__append_notes',
         description: 'Housekeeping notes. Use sparingly for brief interim findings.',
         inputSchema: {
           type: 'object',
@@ -1123,11 +1179,11 @@ export class AIAgentSession {
       },
     ];
 
-    // Optional batch tool (exposed as agent_batch) toggled by listing 'batch' in tools
+    // Optional batch tool (exposed as agent__batch) toggled by listing 'batch' in tools
     const wantsBatch = this.sessionConfig.tools.includes('batch');
     if (wantsBatch) {
       tools.push({
-        name: 'agent_batch',
+        name: 'agent__batch',
         description: 'Execute multiple tools in one call (always parallel). Use exposed tool names.',
         inputSchema: {
           type: 'object',
@@ -1142,7 +1198,7 @@ export class AIAgentSession {
                 required: ['id', 'tool', 'args'],
                 properties: {
                   id: { oneOf: [ { type: 'string', minLength: 1 }, { type: 'number' } ] },
-                  tool: { type: 'string', minLength: 1, description: 'Exposed tool name (e.g., brave_brave_web_search)' },
+                  tool: { type: 'string', minLength: 1, description: 'Exposed tool name (e.g., brave__brave_web_search)' },
                   args: { type: 'object', additionalProperties: true }
                 }
               }
@@ -1160,7 +1216,7 @@ export class AIAgentSession {
 
     if (exp?.format === 'json') {
       tools.push({
-        name: 'agent_final_report',
+        name: 'agent__final_report',
         description: 'Finalize the task with a JSON report matching the required schema.',
         inputSchema: {
           type: 'object',
@@ -1176,7 +1232,7 @@ export class AIAgentSession {
       });
     } else if (exp?.format === 'text') {
       tools.push({
-        name: 'agent_final_report',
+        name: 'agent__final_report',
         description: 'Finalize the task with a complete plain-text report.',
         inputSchema: {
           type: 'object',
@@ -1193,7 +1249,7 @@ export class AIAgentSession {
     } else {
       // default to markdown when unspecified
       tools.push({
-        name: 'agent_final_report',
+        name: 'agent__final_report',
         description: 'Finalize the task with a complete Markdown report.',
         inputSchema: {
           type: 'object',
@@ -1214,10 +1270,10 @@ export class AIAgentSession {
   private buildInternalToolsInstructions(): string {
     const exp = this.sessionConfig.expectedOutput;
     const lines: string[] = [];
-    const FINISH_ONLY = '- Finish ONLY by calling `agent_final_report` exactly once.';
+    const FINISH_ONLY = '- Finish ONLY by calling `agent__final_report` exactly once.';
     const ARGS = '- Arguments:';
     const STATUS_LINE = '  - `status`: one of `success`, `failure`, `partial`.';
-    lines.push('- Use tool `agent_append_notes` sparingly for brief housekeeping notes; it is not graded and does not count as progress.');
+    lines.push('- Use tool `agent__append_notes` sparingly for brief housekeeping notes; it is not graded and does not count as progress.');
     if (exp?.format === 'json') {
       lines.push(FINISH_ONLY);
       lines.push(ARGS);
@@ -1237,12 +1293,12 @@ export class AIAgentSession {
       lines.push('  - `format`: "markdown".');
       lines.push('  - `content`: complete Markdown deliverable.');
     }
-    lines.push('- Do NOT end with plain text. The session ends only after `agent_final_report`.');
+    lines.push('- Do NOT end with plain text. The session ends only after `agent__final_report`.');
 
     // If user enabled batch tool, add concise usage guidance with a compact example
     if (this.sessionConfig.tools.includes('batch')) {
       lines.push('');
-      lines.push('- Use tool `agent_batch` to call multiple tools in one go.');
+      lines.push('- Use tool `agent__batch` to call multiple tools in one go.');
       lines.push('  - `calls[]`: items with `id`, `tool` (exposed name), `args`.');
       lines.push('  - Execution is always parallel.');
       lines.push('  - Keep `args` minimal; they are validated server-side against real schemas.');
@@ -1250,22 +1306,22 @@ export class AIAgentSession {
       lines.push('    1) Sequential batch (no deps): 2x Jina searches, 2x Brave searches, 2x Fetcher fetches');
       lines.push('    {');
       lines.push('      "calls": [');
-      lines.push('        { "id": 1, "tool": "jina_jina_search_web",');
+      lines.push('        { "id": 1, "tool": "jina__jina_search_web",');
       lines.push('          "args": { "query": "Netdata real-time monitoring features", "num": 10 } },');
       lines.push('');
-      lines.push('        { "id": 2, "tool": "jina_jina_search_arxiv",');
+      lines.push('        { "id": 2, "tool": "jina__jina_search_arxiv",');
       lines.push('          "args": { "query": "eBPF monitoring 2024", "num": 20 } },');
       lines.push('');
-      lines.push('        { "id": 3, "tool": "brave_brave_web_search",');
+      lines.push('        { "id": 3, "tool": "brave__brave_web_search",');
       lines.push('          "args": { "query": "Netdata Cloud pricing", "count": 8, "offset": 0 } },');
       lines.push('');
-      lines.push('        { "id": 4, "tool": "brave_brave_local_search",');
+      lines.push('        { "id": 4, "tool": "brave__brave_local_search",');
       lines.push('          "args": { "query": "coffee near Athens", "count": 5 } },');
       lines.push('');
-      lines.push('        { "id": 5, "tool": "fetcher_fetch_url",');
+      lines.push('        { "id": 5, "tool": "fetcher__fetch_url",');
       lines.push('          "args": { "url": "https://www.netdata.cloud" } },');
       lines.push('');
-      lines.push('        { "id": 6, "tool": "fetcher_fetch_url",');
+      lines.push('        { "id": 6, "tool": "fetcher__fetch_url",');
       lines.push('          "args": { "url": "https://learn.netdata.cloud/" } }');
       lines.push('      ]');
       lines.push('    }');
@@ -1273,22 +1329,22 @@ export class AIAgentSession {
       lines.push('    2) Parallel batch (same tools)');
       lines.push('    {');
       lines.push('      "calls": [');
-      lines.push('        { "id": 1, "tool": "jina_jina_search_web",');
+      lines.push('        { "id": 1, "tool": "jina__jina_search_web",');
       lines.push('          "args": { "query": "Netdata vs Prometheus 2024", "num": 10 } },');
       lines.push('');
-      lines.push('        { "id": 2, "tool": "jina_jina_search_arxiv",');
+      lines.push('        { "id": 2, "tool": "jina__jina_search_arxiv",');
       lines.push('          "args": { "query": "time-series anomaly detection streaming", "num": 15 } },');
       lines.push('');
-      lines.push('        { "id": 3, "tool": "brave_brave_web_search",');
+      lines.push('        { "id": 3, "tool": "brave__brave_web_search",');
       lines.push('          "args": { "query": "Netdata agent install Ubuntu", "count": 10 } },');
       lines.push('');
-      lines.push('        { "id": 4, "tool": "brave_brave_local_search",');
+      lines.push('        { "id": 4, "tool": "brave__brave_local_search",');
       lines.push('          "args": { "query": "devops meetups near Athens", "count": 5 } },');
       lines.push('');
-      lines.push('        { "id": 5, "tool": "fetcher_fetch_url",');
+      lines.push('        { "id": 5, "tool": "fetcher__fetch_url",');
       lines.push('          "args": { "url": "https://github.com/netdata/netdata" } },');
       lines.push('');
-      lines.push('        { "id": 6, "tool": "fetcher_fetch_url",');
+      lines.push('        { "id": 6, "tool": "fetcher__fetch_url",');
       lines.push('          "args": { "url": "https://community.netdata.cloud/" } }');
       lines.push('      ]');
       lines.push('    }');

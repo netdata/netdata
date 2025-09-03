@@ -2,7 +2,7 @@
 export { AIAgent, AIAgentSession } from './ai-agent.js';
 export { LLMClient } from './llm-client.js';
 export { MCPClientManager } from './mcp-client.js';
-export { loadConfiguration } from './config.js';
+// Legacy path removed: prefer config-resolver + agent-loader
 
 // Type exports
 export type {

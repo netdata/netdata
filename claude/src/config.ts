@@ -42,6 +42,7 @@ const ConfigurationSchema = z.object({
       maxToolTurns: z.number().int().positive().optional(),
       maxRetries: z.number().int().positive().optional(),
       toolResponseMaxBytes: z.number().int().positive().optional(),
+      mcpInitConcurrency: z.number().int().positive().optional(),
     })
     .optional(),
 });

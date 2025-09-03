@@ -159,7 +159,16 @@ export function resolveMCPServer(id: string, layers: ConfigLayer[], opts?: Resol
 export function resolveDefaults(layers: ConfigLayer[]): NonNullable<Configuration['defaults']> {
   const out: NonNullable<Configuration['defaults']> = {};
   const keys = [
-    'llmTimeout','toolTimeout','temperature','topP','stream','parallelToolCalls','maxToolTurns','maxRetries','toolResponseMaxBytes'
+    'llmTimeout',
+    'toolTimeout',
+    'temperature',
+    'topP',
+    'stream',
+    'parallelToolCalls',
+    'maxToolTurns',
+    'maxRetries',
+    'toolResponseMaxBytes',
+    'mcpInitConcurrency'
   ] as const;
   keys.forEach((k) => {
     const found = layers.find((layer) => {
