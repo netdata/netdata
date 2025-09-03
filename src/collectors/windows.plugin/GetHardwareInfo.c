@@ -5,7 +5,6 @@
 
 #include "netdata_win_driver.h"
 
-static HANDLE msr_h = INVALID_HANDLE_VALUE;
 static const char *srv_name = "NetdataDriver";
 
 struct cpu_data {
@@ -15,7 +14,6 @@ struct cpu_data {
     collected_number cpu_temp;
 };
 
-DICTIONARY *cpu_options;
 struct cpu_data *cpus;
 size_t ncpus;
 
@@ -62,8 +60,6 @@ static void netdata_unload_driver()
 static void netdata_unload_hardware()
 {
     netdata_unload_driver();
-    if (msr_h != INVALID_HANDLE_VALUE)
-        CloseHandle(msr_h);
 }
 
 int netdata_load_driver()
@@ -139,18 +135,17 @@ int netdata_load_driver()
     return 0;
 }
 
-int netdata_open_device()
+static inline HANDLE netdata_open_device()
 {
-    msr_h = CreateFileA(MSR_USER_PATH, GENERIC_READ | GENERIC_WRITE, 0,
+    HANDLE msr_h = CreateFileA(MSR_USER_PATH, GENERIC_READ | GENERIC_WRITE, 0,
                         NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (msr_h == INVALID_HANDLE_VALUE) {
         nd_log(
                 NDLS_COLLECTORS,
                 NDLP_ERR,
                 "Cannot open device. GetLastError= %lu \n", GetLastError());
-        return -1;
     }
-    return 0;
+    return msr_h;
 }
 
 static int initialize(int update_every)
@@ -159,14 +154,33 @@ static int initialize(int update_every)
         return -1;
     }
 
-    if (netdata_open_device()) {
-        return -1;
-    }
-
     ncpus = os_get_system_cpus();
     cpus = callocz(ncpus, sizeof(struct cpu_data));
 
     return 0;
+}
+
+void netdata_collect_sensor_chart(int update_every)
+{
+    HANDLE device = netdata_open_device();
+    if (device == INVALID_HANDLE_VALUE) {
+        return;
+    }
+
+    const uint32_t MSR_THERM_STATUS = 0x19C;
+    const int TJMAX = 100;
+    DWORD bytes;
+
+    for (size_t cpu = 0; cpu < ncpus; cpu++) {
+        MSR_REQUEST req = { MSR_THERM_STATUS, (uint32_t)cpu, 0, 0 };
+
+        if (DeviceIoControl(device, IOCTL_MSR_READ, &req, sizeof(req), &req, sizeof(req), &bytes, NULL)) {
+            int digital_readout = (req.low >> 16) & 0x7F;  // bits [22:16]
+            cpus[cpu].cpu_temp = (collected_number)(TJMAX - digital_readout);
+        }
+    }
+
+    CloseHandle(device);
 }
 
 int do_GetHardwareInfo(int update_every, usec_t dt __maybe_unused)
@@ -179,6 +193,8 @@ int do_GetHardwareInfo(int update_every, usec_t dt __maybe_unused)
 
         initialized = true;
     }
+
+    netdata_collect_sensor_chart(update_every);
 
     return 0;
 }
