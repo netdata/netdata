@@ -64,6 +64,44 @@ modules:
           - title: Enable status support
             description: |
               Configure [ngx_http_stub_status_module](https://nginx.org/en/docs/http/ngx_http_stub_status_module.html).
+
+              1. Add a status location
+
+                 Create a small server/location that only listens on localhost and exposes `/stub_status`:
+
+                 **For local monitoring (default):**
+
+                 ```nginx
+                   # /etc/nginx/conf.d/stub_status.conf
+                   server {
+                       listen 127.0.0.1:80;
+                       server_name localhost 127.0.0.1;
+              
+                       location = /stub_status {
+                           stub_status;        # exposes NGINX counters
+                           access_log off;     # keep logs clean
+                           allow 127.0.0.1;    # only local access
+                           deny all;
+                       }
+                   }
+                 ```
+
+                  **For remote monitoring:**
+                  - Change `listen` to bind to an accessible interface (e.g., `listen 80;`)
+                  - Replace `allow 127.0.0.1;` with your Netdata collector's IP address
+                  - Keep `deny all;` to block other IPs
+
+              2. Reload NGINX and restart Netdata
+
+                 ```bash
+                 nginx -t
+                 # if OK:
+                 systemctl reload nginx    # or: nginx -s reload
+
+                 systemctl restart netdata
+                 ```
+
+                 After restart, Netdata will auto-detect the endpoint and begin collecting NGINX metrics.
       configuration:
         file:
           name: go.d/nginx.conf
