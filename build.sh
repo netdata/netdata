@@ -16,27 +16,28 @@ fi
 echo "[build] Linting Claude implementation (ESLint)"
 (cd claude && npm run lint)
 
-echo "[build] Creating standalone binary with pkg"
-# Install pkg if not already installed
-if ! command -v pkg &> /dev/null; then
-  echo "[build] Installing pkg globally..."
-  npm install -g pkg
-fi
+# Create a lightweight launcher at repo root: ./ai-agent
+LAUNCHER="$SCRIPT_DIR/ai-agent"
+cat > "$LAUNCHER" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Install esbuild if not in node_modules
-if [ ! -d "claude/node_modules/esbuild" ]; then
-  (cd claude && npm install --save-dev esbuild)
-fi
+# Resolve this script to its realpath (follow symlinks) to locate repo root
+SOURCE="$0"
+while [ -L "$SOURCE" ]; do
+  DIR="$([[ "$SOURCE" = /* ]] && dirname "$SOURCE" || cd -P "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 
-# Build the binary
-(cd claude && node build-binary.js)
-
-BINARY="$SCRIPT_DIR/ai-agent"
-echo "[build] Binary created at $BINARY ($(du -h "$BINARY" | cut -f1))"
+exec node "$DIR/claude/dist/cli.js" "$@"
+EOF
+chmod +x "$LAUNCHER"
 
 # Ensure global symlink in /usr/local/bin using sudo (always)
 TARGET_LINK="/usr/local/bin/ai-agent"
-echo "[build] Installing symlink with sudo: $TARGET_LINK -> $BINARY"
-sudo ln -sf "$BINARY" "$TARGET_LINK"
+echo "[build] Installing symlink with sudo: $TARGET_LINK -> $LAUNCHER"
+sudo ln -sf "$LAUNCHER" "$TARGET_LINK"
 
 echo "[build] OK -> ai-agent installed at $TARGET_LINK"

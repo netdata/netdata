@@ -71,7 +71,8 @@
     "topP": 1.0,
     "stream": false,
     "parallelToolCalls": true,
-    "maxToolTurns": 10
+    "maxToolTurns": 10,
+    "mcpInitConcurrency": 10
   },
   "mcpServers": {
     "file-ops": {

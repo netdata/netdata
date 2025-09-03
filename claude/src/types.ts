@@ -137,6 +137,7 @@ export interface Configuration {
     maxRetries?: number;
     // Maximum allowed MCP tool response size in bytes. If exceeded, a tool error is injected.
     toolResponseMaxBytes?: number;
+    mcpInitConcurrency?: number;
   };
 }
 
@@ -171,6 +172,8 @@ export interface AIAgentSessionConfig {
   verbose?: boolean;
   // Enforced cap for MCP tool response size (bytes)
   toolResponseMaxBytes?: number;
+  // Preferred MCP init concurrency override for this session
+  mcpInitConcurrency?: number;
 }
 
 // Session result

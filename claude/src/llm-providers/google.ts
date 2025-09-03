@@ -1,6 +1,6 @@
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 
-import type { TurnRequest, TurnResult, ProviderConfig, ConversationMessage } from '../types.js';
+import type { TurnRequest, TurnResult, ProviderConfig, ConversationMessage, TokenUsage } from '../types.js';
 import type { LanguageModel } from 'ai';
 
 import { BaseLLMProvider, type ResponseMessage } from './base.js';
@@ -45,8 +45,8 @@ export class GoogleProvider extends BaseLLMProvider {
   }
 
 
-  protected convertResponseMessages(messages: ResponseMessage[], provider: string, model: string, tokens: { inputTokens?: number; outputTokens?: number; cachedTokens?: number; totalTokens?: number }): ConversationMessage[] {
+  protected convertResponseMessages(messages: ResponseMessage[], provider: string, model: string, tokens: TokenUsage): ConversationMessage[] {
     // Use base class helper that handles AI SDK's content array format
-    return messages.map(m => this.parseAISDKMessage(m, provider, model, tokens));
+    return this.convertResponseMessagesGeneric(messages, provider, model, tokens);
   }
 }

@@ -1,6 +1,5 @@
 import fs from 'node:fs';
 import os from 'node:os';
-import path from 'node:path';
 
 import { Command } from 'commander';
 import * as yaml from 'js-yaml';
@@ -8,7 +7,7 @@ import * as yaml from 'js-yaml';
 import type { AIAgentSessionConfig, LogEntry, AccountingEntry, AIAgentCallbacks, ConversationMessage } from './types.js';
 
 import { AIAgent } from './ai-agent.js';
-import { loadConfiguration, resolveConfigPath } from './config.js';
+import { discoverLayers, resolveDefaults, buildUnifiedConfiguration } from './config-resolver.js';
 import { formatAgentResultHumanReadable } from './utils.js';
 
 interface FrontmatterOptions {
@@ -74,13 +73,13 @@ function buildResolvedDefaultsHelp(): string {
       }
     }
 
-    // Load configuration (best effort)
+    // Load configuration defaults (best effort) via layered resolver
     let configPath: string | undefined = undefined;
     let configDefaults: Record<string, unknown> = {};
     try {
-      const cfg = loadConfiguration(undefined);
-      configDefaults = cfg.defaults ?? {};
-      configPath = '.ai-agent.json'; // resolved by loader; exact path not returned, print standard name
+      const layers = discoverLayers({ configPath: undefined });
+      configDefaults = resolveDefaults(layers) as Record<string, unknown>;
+      configPath = '(layered)';
     } catch {
       // ignore
     }
@@ -230,6 +229,7 @@ program
   .option('--no-parallel-tool-calls', 'Disable parallel tool calls')
   .option('--max-retries <n>', 'Max retry rounds over provider/model list', '3')
   .option('--max-tool-turns <n>', 'Maximum tool turns (agent loop cap)', '10')
+  .option('--mcp-init-concurrency <n>', 'Max concurrent MCP server initializations', undefined)
   .action(async (systemPrompt: string, userPrompt: string, options: Record<string, unknown>) => {
     try {
       if (systemPrompt === '-' && userPrompt === '-') {
@@ -258,33 +258,36 @@ program
 
       const fmOptions: FrontmatterOptions | undefined = fm?.options;
 
+      const layersForDefaults = discoverLayers({ configPath: cfgPath });
+      const configDefaultsFromLayers = resolveDefaults(layersForDefaults) as Record<string, unknown>;
+
       const maxToolTurns = srcMaxToolTurns === 'cli'
         ? parsePositiveInt(options.maxToolTurns, 'max-tool-turns')
-        : (() => { const n = readFmNumber(fmOptions, 'maxToolTurns'); if (n !== undefined) { if (!(n > 0)) { console.error('Error: frontmatter maxToolTurns must be positive'); process.exit(4);} return Math.trunc(n); } return (0 + ((): number => { try { const p = resolveConfigPath(cfgPath); const j = JSON.parse(fs.readFileSync(p, 'utf-8')) as { defaults?: Record<string, unknown> }; const v = j.defaults?.maxToolTurns; return typeof v === 'number' ? v : 10; } catch { return 10; } })()); })();
+        : (() => { const n = readFmNumber(fmOptions, 'maxToolTurns'); if (n !== undefined) { if (!(n > 0)) { console.error('Error: frontmatter maxToolTurns must be positive'); process.exit(4);} return Math.trunc(n); } { const v = configDefaultsFromLayers.maxToolTurns as number | undefined; return (typeof v === 'number' && Number.isFinite(v)) ? Math.trunc(v) : 10; } })();
 
       const maxRetries = srcMaxRetries === 'cli'
         ? parsePositiveInt(options.maxRetries, 'max-retries')
-        : (() => { const n = readFmNumber(fmOptions, 'maxRetries'); if (n !== undefined) { if (!(n > 0)) { console.error('Error: frontmatter maxRetries must be positive'); process.exit(4);} return Math.trunc(n); } return (0 + ((): number => { try { const p = resolveConfigPath(cfgPath); const j = JSON.parse(fs.readFileSync(p, 'utf-8')) as { defaults?: Record<string, unknown> }; const v = j.defaults?.maxRetries; return typeof v === 'number' ? v : 3; } catch { return 3; } })()); })();
+        : (() => { const n = readFmNumber(fmOptions, 'maxRetries'); if (n !== undefined) { if (!(n > 0)) { console.error('Error: frontmatter maxRetries must be positive'); process.exit(4);} return Math.trunc(n); } { const v = configDefaultsFromLayers.maxRetries as number | undefined; return (typeof v === 'number' && Number.isFinite(v)) ? Math.trunc(v) : 3; } })();
 
       const llmTimeout = srcLlmTimeout === 'cli'
         ? parsePositiveInt(options.llmTimeout, 'llm-timeout')
-        : (() => { const n = readFmNumber(fmOptions, 'llmTimeout'); if (n !== undefined) { if (!(n > 0)) { console.error('Error: frontmatter llmTimeout must be positive'); process.exit(4);} return Math.trunc(n); } return (0 + ((): number => { try { const p = resolveConfigPath(cfgPath); const j = JSON.parse(fs.readFileSync(p, 'utf-8')) as { defaults?: Record<string, unknown> }; const v = j.defaults?.llmTimeout; return typeof v === 'number' ? v : 120000; } catch { return 120000; } })()); })();
+        : (() => { const n = readFmNumber(fmOptions, 'llmTimeout'); if (n !== undefined) { if (!(n > 0)) { console.error('Error: frontmatter llmTimeout must be positive'); process.exit(4);} return Math.trunc(n); } { const v = configDefaultsFromLayers.llmTimeout as number | undefined; return (typeof v === 'number' && Number.isFinite(v)) ? Math.trunc(v) : 120000; } })();
 
       const toolTimeout = srcToolTimeout === 'cli'
         ? parsePositiveInt(options.toolTimeout, 'tool-timeout')
-        : (() => { const n = readFmNumber(fmOptions, 'toolTimeout'); if (n !== undefined) { if (!(n > 0)) { console.error('Error: frontmatter toolTimeout must be positive'); process.exit(4);} return Math.trunc(n); } return (0 + ((): number => { try { const p = resolveConfigPath(cfgPath); const j = JSON.parse(fs.readFileSync(p, 'utf-8')) as { defaults?: Record<string, unknown> }; const v = j.defaults?.toolTimeout; return typeof v === 'number' ? v : 60000; } catch { return 60000; } })()); })();
+        : (() => { const n = readFmNumber(fmOptions, 'toolTimeout'); if (n !== undefined) { if (!(n > 0)) { console.error('Error: frontmatter toolTimeout must be positive'); process.exit(4);} return Math.trunc(n); } { const v = configDefaultsFromLayers.toolTimeout as number | undefined; return (typeof v === 'number' && Number.isFinite(v)) ? Math.trunc(v) : 60000; } })();
 
       const toolResponseMaxBytes = srcToolResponseMaxBytes === 'cli'
         ? parsePositiveInt(options.toolResponseMaxBytes, 'tool-response-max-bytes')
-        : (() => { const n = readFmNumber(fmOptions, 'toolResponseMaxBytes'); if (n !== undefined) { if (!(n > 0)) { console.error('Error: frontmatter toolResponseMaxBytes must be positive'); process.exit(4);} return Math.trunc(n); } return (0 + ((): number => { try { const p = resolveConfigPath(cfgPath); const j = JSON.parse(fs.readFileSync(p, 'utf-8')) as { defaults?: Record<string, unknown> }; const v = j.defaults?.toolResponseMaxBytes; return typeof v === 'number' ? v : 12288; } catch { return 12288; } })()); })();
+        : (() => { const n = readFmNumber(fmOptions, 'toolResponseMaxBytes'); if (n !== undefined) { if (!(n > 0)) { console.error('Error: frontmatter toolResponseMaxBytes must be positive'); process.exit(4);} return Math.trunc(n); } { const v = configDefaultsFromLayers.toolResponseMaxBytes as number | undefined; return (typeof v === 'number' && Number.isFinite(v)) ? Math.trunc(v) : 12288; } })();
 
       const temperature = srcTemperature === 'cli'
         ? parseFloat(options.temperature, 'temperature', 0, 2)
-        : (() => { const n = readFmNumber(fmOptions, 'temperature'); if (n !== undefined) { if (!(n >= 0 && n <= 2)) { console.error('Error: frontmatter temperature must be between 0 and 2'); process.exit(4);} return n; } return (0 + ((): number => { try { const p = resolveConfigPath(cfgPath); const j = JSON.parse(fs.readFileSync(p, 'utf-8')) as { defaults?: Record<string, unknown> }; const v = j.defaults?.temperature; return typeof v === 'number' ? v : 0.7; } catch { return 0.7; } })()); })();
+        : (() => { const n = readFmNumber(fmOptions, 'temperature'); if (n !== undefined) { if (!(n >= 0 && n <= 2)) { console.error('Error: frontmatter temperature must be between 0 and 2'); process.exit(4);} return n; } { const v = configDefaultsFromLayers.temperature as number | undefined; return (typeof v === 'number') ? v : 0.7; } })();
 
       const topP = srcTopP === 'cli'
         ? parseFloat(options.topP, 'top-p', 0, 1)
-        : (() => { const n = readFmNumber(fmOptions, 'topP'); if (n !== undefined) { if (!(n >= 0 && n <= 1)) { console.error('Error: frontmatter topP must be between 0 and 1'); process.exit(4);} return n; } return (0 + ((): number => { try { const p = resolveConfigPath(cfgPath); const j = JSON.parse(fs.readFileSync(p, 'utf-8')) as { defaults?: Record<string, unknown> }; const v = j.defaults?.topP; return typeof v === 'number' ? v : 1.0; } catch { return 1.0; } })()); })();
+        : (() => { const n = readFmNumber(fmOptions, 'topP'); if (n !== undefined) { if (!(n >= 0 && n <= 1)) { console.error('Error: frontmatter topP must be between 0 and 1'); process.exit(4);} return n; } { const v = configDefaultsFromLayers.topP as number | undefined; return (typeof v === 'number') ? v : 1.0; } })();
 
       // Prompt variable substitution
       const vars = buildPromptVariables(maxToolTurns);
@@ -329,69 +332,25 @@ program
         process.exit(4);
       }
 
-      // Inject missing env vars from sidecar .ai-agent.env for required providers and tools
-      const cfgResolved = resolveConfigPath(cfgPath);
-      let rawCfg: { providers?: Record<string, unknown>; mcpServers?: Record<string, unknown> } = {};
-      try { rawCfg = JSON.parse(fs.readFileSync(cfgResolved, 'utf-8')) as typeof rawCfg; } catch (e) {
-        console.error(`Error: Failed to read/parse configuration file at ${cfgResolved}: ${e instanceof Error ? e.message : String(e)}`);
-        process.exit(1);
-      }
-      const needProviders = Array.from(new Set(targets.map((t) => t.provider)));
-      const needServers = toolList;
-      const unresolved = new Set<string>();
-      const scan = (val: unknown): void => {
-        if (typeof val === 'string') {
-          const matches = Array.from(val.matchAll(/\$\{([^}]+)\}/g));
-          matches.forEach((mm) => {
-            const name = mm[1];
-            if (process.env[name] === undefined) unresolved.add(name);
+      // Probe layered config locations (verbose only)
+      try {
+        const layers = discoverLayers({ configPath: cfgPath });
+        if (options.verbose === true) {
+                    layers.forEach((ly) => {
+            const jExists = fs.existsSync(ly.jsonPath);
+            const eExists = fs.existsSync(ly.envPath);
+            const msg = `[VRB] → [0.0] llm agent:config: probing ${ly.origin}: json=${ly.jsonPath} ${jExists ? '(found)' : '(missing)'} env=${ly.envPath} ${eExists ? '(found)' : '(missing)'}\n`;
+            try { process.stderr.write(process.stderr.isTTY ? `\x1b[90m${msg}\x1b[0m` : msg); } catch { }
           });
-        } else if (Array.isArray(val)) { val.forEach(scan); }
-        else if (val !== null && typeof val === 'object') { Object.values(val).forEach((x) => { scan(x); }); }
-      };
-      const providersObj: Record<string, unknown> | undefined = rawCfg.providers;
-      if (providersObj !== undefined) {
-        needProviders.forEach((p) => { const v = providersObj[p]; if (v !== undefined && typeof v === 'object') scan(v); });
-      }
-      const serversObj: Record<string, unknown> | undefined = rawCfg.mcpServers;
-      if (serversObj !== undefined) {
-        needServers.forEach((s) => { const v = serversObj[s]; if (v !== undefined && typeof v === 'object') scan(v); });
-      }
-      if (unresolved.size > 0) {
-        const envPath = path.join(path.dirname(cfgResolved), '.ai-agent.env');
-        const envMap: Record<string, string> = {};
-        if (fs.existsSync(envPath)) {
-          try {
-            fs.readFileSync(envPath, 'utf-8').split(/\r?\n/).forEach((line) => {
-              const t = line.trim();
-              if (t.length === 0) return; if (t.startsWith('#')) return;
-              const eq = t.indexOf('='); if (eq <= 0) return;
-              const key = t.slice(0, eq).trim(); let val = t.slice(eq + 1).trim();
-              if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) val = val.slice(1, -1);
-              if (key.length > 0) envMap[key] = val;
-            });
-          } catch (e) {
-            console.error(`Error: Failed to read .ai-agent.env at ${envPath}: ${e instanceof Error ? e.message : String(e)}`);
-            process.exit(1);
-          }
         }
-        Array.from(unresolved).forEach((name) => {
-          const ev = envMap[name];
-          if (process.env[name] === undefined && typeof ev === 'string') {
-            process.env[name] = ev;
-          }
-        });
-        const still = Array.from(unresolved).filter((n) => { const v = process.env[n]; return v === undefined; });
-        if (still.length > 0) {
-          console.error(`Error: Missing required environment variables: ${still.join(', ')}. Define them in your shell or in ${path.join(path.dirname(cfgResolved), '.ai-agent.env')}`);
-          process.exit(1);
-        }
-      }
+      } catch { /* ignore */ }
 
-      // Load full configuration (now that env is hydrated)
-      const config = loadConfiguration(cfgPath);
-
-      // Load conversation history if specified
+      
+            // Build unified configuration via layered resolver
+      const layers = discoverLayers({ configPath: cfgPath });
+      const needProviders = Array.from(new Set(targets.map((t) => t.provider)));
+      const config = buildUnifiedConfiguration({ providers: needProviders, mcpServers: toolList }, layers, { verbose: options.verbose === true, log: (msg) => { try { if (options.verbose === true) process.stderr.write((process.stderr.isTTY ? "\x1b[90m" : "") + "[VRB] → [0.0] llm agent:config: " + msg + "\n" + (process.stderr.isTTY ? "\x1b[0m" : "")); } catch {} } });
+// Load conversation history if specified
       let conversationHistory: ConversationMessage[] | undefined = undefined;
       const effLoad = (typeof options.load === 'string' && options.load.length > 0)
         ? options.load
@@ -454,6 +413,7 @@ program
         traceLLM: effectiveTraceLLM,
         traceMCP: effectiveTraceMCP,
         verbose: effectiveVerbose,
+        mcpInitConcurrency: (typeof options.mcpInitConcurrency === 'string' && options.mcpInitConcurrency.length>0) ? (Number(options.mcpInitConcurrency) || undefined) : config.defaults?.mcpInitConcurrency,
       };
 
       if (options.dryRun === true) {

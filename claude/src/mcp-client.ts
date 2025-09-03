@@ -24,17 +24,20 @@ export class MCPClientManager {
   private maxToolResponseBytes?: number;
   // Counter: number of times tool response size cap was exceeded
   private sizeCapHits = 0;
+  private maxConcurrentInit = 4;
 
   constructor(opts?: { 
     trace?: boolean; 
     verbose?: boolean; 
     onLog?: (entry: LogEntry) => void;
     maxToolResponseBytes?: number;
+    maxConcurrentInit?: number;
   }) {
     this.trace = opts?.trace === true;
     this.verbose = opts?.verbose === true;
     this.onLog = opts?.onLog;
     this.maxToolResponseBytes = opts?.maxToolResponseBytes;
+    if (typeof opts?.maxConcurrentInit === "number" && opts.maxConcurrentInit > 0) this.maxConcurrentInit = opts.maxConcurrentInit;
   }
 
   setTurn(turn: number, subturn = 0): void {
@@ -44,22 +47,30 @@ export class MCPClientManager {
 
   async initializeServers(mcpServers: Record<string, MCPServerConfig>): Promise<MCPServer[]> {
     const entries = Object.entries(mcpServers);
-    const servers: MCPServer[] = [];
-    
-    // eslint-disable-next-line functional/no-loop-statements
-    for (const [name, config] of entries) {
-      try {
-        const server = await this.initializeServer(name, config);
-        this.servers.set(name, server);
-        servers.push(server);
-      } catch (error) {
-        // Log error but continue with other servers
-        const message = error instanceof Error ? error.message : String(error);
-        this.log('ERR', 'response', 'mcp', `${name}:init`, `initialization failed: ${message}`, true);
+    const results: MCPServer[] = [];
+    const limit = Math.min(this.maxConcurrentInit, Math.max(entries.length, 1));
+
+    let cursor = 0;
+    const worker = async (): Promise<void> => {
+      // eslint-disable-next-line functional/no-loop-statements, @typescript-eslint/no-unnecessary-condition
+      while (true) {
+        const idx = cursor++;
+        if (idx >= entries.length) break;
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+        const [name, config] = entries[idx] as [string, MCPServerConfig];
+        try {
+          const server = await this.initializeServer(name, config);
+          this.servers.set(name, server);
+          results.push(server);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          this.log('ERR', 'response', 'mcp', `${name}:init`, `initialization failed: ${message}`, true);
+        }
       }
-    }
-    
-    return servers;
+    };
+
+    await Promise.all(Array.from({ length: limit }).map(async () => { await worker(); }));
+    return results;
   }
 
   private redactAuthHeader(headers: Record<string, string>): Record<string, string> {
@@ -133,6 +144,7 @@ export class MCPClientManager {
           transport = new StreamableHTTPClientTransport(new URL(config.url), { requestInit: reqInit });
           break;
         }
+        
         case 'sse':
           if (config.url == null || config.url.length === 0) throw new Error(`SSE MCP server '${name}' requires a 'url'`);
           const resolvedHeaders = resolveHeaders(config.headers);
@@ -145,7 +157,7 @@ export class MCPClientManager {
                 `SSE URL: ${config.url}, Headers: ${JSON.stringify(safeHeaders)}`);
             } else {
               this.log('TRC', 'request', 'mcp', `${name}:sse-connect`, 
-                `SSE URL: ${config.url}, Headers: none (WARNING: No Authorization header!)`);
+                `SSE URL: ${config.url}, Headers: none`);
             }
           }
           
@@ -164,10 +176,11 @@ export class MCPClientManager {
           
           transport = new SSEClientTransport(new URL(config.url), {
             eventSourceInit: { fetch: customFetch },
-            requestInit: { headers: resolvedHeaders },
+            requestInit: { headers: resolvedHeaders as HeadersInit },
             fetch: customFetch
           });
           break;
+
         default:
           throw new Error('Unsupported transport type');
       }
@@ -216,7 +229,7 @@ export class MCPClientManager {
 
     // Populate exposed name mapping for this server's tools
     const ns = this.sanitizeNamespace(name);
-    // eslint-disable-next-line functional/no-loop-statements
+    // eslint-disable-next-line functional/no-loop-statements, @typescript-eslint/no-unnecessary-condition
     for (const t of tools) {
       const exposed = `${ns}_${t.name}`;
       this.toolNameMap.set(exposed, { serverName: name, originalName: t.name });
@@ -324,26 +337,56 @@ export class MCPClientManager {
     }
 
     const start = Date.now();
-    const argsStr = JSON.stringify(toolCall.parameters);
+
+    // Sanitize parameters: drop null/undefined so optional strings don't validate as null
+    const sanitize = (val: unknown): unknown => {
+      if (val === null || val === undefined) return undefined;
+      if (Array.isArray(val)) {
+        const arr = (val as unknown[]).map((v) => sanitize(v)).filter((v) => v !== undefined);
+        return arr;
+      }
+      if (typeof val === 'object') {
+        const obj = val as Record<string, unknown>;
+        const out = Object.entries(obj).reduce<Record<string, unknown>>((acc, [k, v]) => {
+          const sv = sanitize(v);
+          if (sv !== undefined) acc[k] = sv as unknown;
+          return acc;
+        }, {});
+        return out;
+      }
+      return val;
+    };
+    const originalParams = toolCall.parameters;
+    const sanitizedParams = sanitize(originalParams) as Record<string, unknown>;
+    const argsStr = JSON.stringify(sanitizedParams);
+    // replaced by sanitized argsStr
     
-    const compactReq = formatToolRequestCompact(toolCall.name, toolCall.parameters);
+    const compactReq = formatToolRequestCompact(toolCall.name, sanitizedParams);
     this.log('VRB', 'request', 'mcp', `${serverName}:${toolCall.name}`, compactReq);
+
+    try {
+      const before = JSON.stringify(originalParams);
+      if (before !== argsStr) {
+        this.log('WRN', 'request', 'mcp', `${serverName}:${toolCall.name}`, 'sanitized null/undefined fields from arguments');
+      }
+    } catch { /* ignore */ }
+
 
     if (this.trace) {
       this.log('TRC', 'request', 'mcp', `${serverName}:${toolCall.name}`, 
-        `callTool ${JSON.stringify({ name: toolCall.name, arguments: toolCall.parameters })}`);
+        `callTool ${JSON.stringify({ name: toolCall.name, arguments: sanitizedParams })}`);
     }
 
     const callWithTimeout = async () => {
       if (typeof timeoutMs !== 'number' || timeoutMs <= 0) {
-        return await client.callTool({ name: toolCall.name, arguments: toolCall.parameters });
+        return await client.callTool({ name: toolCall.name, arguments: sanitizedParams });
       }
       
       const timeoutPromise = new Promise((_resolve, reject) => {
         setTimeout(() => { reject(new Error('Tool execution timed out')); }, timeoutMs);
       });
       
-      const callPromise = client.callTool({ name: toolCall.name, arguments: toolCall.parameters });
+      const callPromise = client.callTool({ name: toolCall.name, arguments: sanitizedParams });
       return await Promise.race([callPromise, timeoutPromise]);
     };
 
@@ -492,10 +535,10 @@ export class MCPClientManager {
   getAllTools(): MCPTool[] {
     // Return tools with namespaced (exposed) names for the LLM
     const out: MCPTool[] = [];
-    // eslint-disable-next-line functional/no-loop-statements
+    // eslint-disable-next-line functional/no-loop-statements, @typescript-eslint/no-unnecessary-condition
     for (const [serverName, s] of this.servers.entries()) {
       const ns = this.sanitizeNamespace(serverName);
-      // eslint-disable-next-line functional/no-loop-statements
+      // eslint-disable-next-line functional/no-loop-statements, @typescript-eslint/no-unnecessary-condition
       for (const t of s.tools) {
         out.push({
           name: `${ns}_${t.name}`,
@@ -554,7 +597,7 @@ export class MCPClientManager {
   getToolServerMapping(): Map<string, string> {
     // Exposed name -> server mapping
     const m = new Map<string, string>();
-    // eslint-disable-next-line functional/no-loop-statements
+    // eslint-disable-next-line functional/no-loop-statements, @typescript-eslint/no-unnecessary-condition
     for (const [exposed, info] of this.toolNameMap.entries()) {
       m.set(exposed, info.serverName);
     }

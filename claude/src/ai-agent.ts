@@ -37,6 +37,7 @@ type ExitCode =
 import { validateProviders, validateMCPServers, validatePrompts } from './config.js';
 import { LLMClient } from './llm-client.js';
 import { MCPClientManager } from './mcp-client.js';
+import { formatToolRequestCompact } from './utils.js';
 
 // Immutable session class according to DESIGN.md
 export class AIAgentSession {
@@ -104,7 +105,8 @@ export class AIAgentSession {
       trace: sessionConfig.traceMCP === true, 
       verbose: sessionConfig.verbose,
       onLog: sessionConfig.callbacks?.onLog,
-      maxToolResponseBytes: sessionConfig.toolResponseMaxBytes
+      maxToolResponseBytes: sessionConfig.toolResponseMaxBytes,
+      maxConcurrentInit: sessionConfig.config.defaults?.mcpInitConcurrency ?? sessionConfig.mcpInitConcurrency ?? Number.MAX_SAFE_INTEGER
     });
 
     // Create session-owned LLM client
@@ -342,6 +344,36 @@ export class AIAgentSession {
               lastShownThinkingHeaderTurn = currentTurn;
             }
 
+            // Emit WRN for unknown tool calls that the AI SDK could not execute (name not in ToolSet)
+            try {
+              const mapping = this.mcpClient.getToolServerMapping();
+              const internal = new Set<string>(['agent_append_notes', 'agent_final_report']);
+              const normalizeTool = (n: string) => n.replace(/^<\|[^|]+\|>/, '').trim();
+              const lastAssistant = turnResult.messages.filter((m) => m.role === 'assistant');
+              const assistantMsg = lastAssistant.length > 0 ? lastAssistant[lastAssistant.length - 1] : undefined;
+              if (assistantMsg?.toolCalls !== undefined && assistantMsg.toolCalls.length > 0) {
+                (assistantMsg.toolCalls).forEach((tc) => {
+                  const n = normalizeTool(tc.name);
+                  if (!internal.has(n) && !mapping.has(n)) {
+                    const req = formatToolRequestCompact(n, tc.parameters);
+                    const warn: LogEntry = {
+                      timestamp: Date.now(),
+                      severity: 'WRN',
+                      turn: currentTurn,
+                      subturn: 0,
+                      direction: 'response',
+                      type: 'llm',
+                      remoteIdentifier: 'assistant:tool',
+                      fatal: false,
+                      message: `Unknown tool requested (not executed): ${req}`
+                    };
+                    logs.push(warn);
+                    this.sessionConfig.callbacks?.onLog?.(warn);
+                  }
+                });
+              }
+            } catch { /* ignore unknown-tool warning errors */ }
+
             // Record accounting for every attempt (include failed attempts with zeroed tokens if absent)
             {
               const tokens = turnResult.tokens ?? { inputTokens: 0, outputTokens: 0, cachedTokens: 0, totalTokens: 0 };
@@ -551,7 +583,30 @@ export class AIAgentSession {
                 turnSuccessful = true;
                 break;
               } else {
-                // Continue to next turn (tools already executed if hasToolCalls was true)
+                // If this is the final turn and we still don't have a final answer,
+                // retry within this turn across provider/model pairs up to maxRetries.
+                if (isFinalTurn) {
+                  const routed = this.llmClient.getLastActualRouting();
+                  const remoteId = (provider === 'openrouter' && routed.provider !== undefined)
+                    ? `${provider}/${routed.provider}:${model}`
+                    : `${provider}:${model}`;
+                  const warnEntry: LogEntry = {
+                    timestamp: Date.now(),
+                    severity: 'WRN',
+                    turn: currentTurn,
+                    subturn: 0,
+                    direction: 'response',
+                    type: 'llm',
+                    remoteIdentifier: remoteId,
+                    fatal: false,
+                    message: 'Final turn did not produce final_report; retrying with next provider/model in this turn.'
+                  };
+                  logs.push(warnEntry);
+                  this.sessionConfig.callbacks?.onLog?.(warnEntry);
+                  // Continue attempts loop (do not mark successful)
+                  continue;
+                }
+                // Non-final turns: proceed to next turn; tools already executed if present
                 turnSuccessful = true;
                 break;
               }
@@ -657,7 +712,9 @@ export class AIAgentSession {
       interface PairStats { total: number; ok: number; failed: number }
       const pairStats = new Map<string, PairStats>();
       llmEntries.forEach((e) => {
-        const key = `${e.provider}/${e.actualProvider ?? 'n/a'}:${e.model}`;
+        const key = (e.actualProvider !== undefined && e.actualProvider.length > 0 && e.actualProvider !== e.provider)
+        ? `${e.provider}/${e.actualProvider}:${e.model}`
+        : `${e.provider}:${e.model}`;
         const curr = pairStats.get(key) ?? { total: 0, ok: 0, failed: 0 };
         curr.total += 1;
         if (e.status === 'failed') curr.failed += 1; else curr.ok += 1;
@@ -736,10 +793,14 @@ export class AIAgentSession {
     
     // Create tool executor function that delegates to MCP client with accounting
     const toolExecutor = async (toolName: string, parameters: Record<string, unknown>): Promise<string> => {
+
+      // Normalize tool name to strip router/provider wrappers like <|constrain|>
+      const normalizeToolName = (n: string): string => n.replace(/<\|[^|]+\|>/g, '').trim();
+      const effectiveToolName = normalizeToolName(toolName);
       const startTime = Date.now();
       try {
         // Intercept internal tools (agent_*)
-        if (toolName === 'agent_append_notes') {
+        if (effectiveToolName === 'agent_append_notes') {
           const textParam = (parameters as { text?: unknown }).text;
           const text = typeof textParam === 'string' ? textParam : textParam === undefined ? '' : JSON.stringify(textParam);
           const tags = Array.isArray((parameters as { tags?: unknown }).tags) ? (parameters as { tags?: string[] }).tags : undefined;
@@ -754,7 +815,7 @@ export class AIAgentSession {
           this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
           return JSON.stringify({ ok: true, totalNotes: this.internalNotes.length });
         }
-        if (toolName === 'agent_final_report') {
+        if (effectiveToolName === 'agent_final_report') {
           const p = parameters;
           const statusParam = p.status;
           const formatParam = p.format;
@@ -775,7 +836,30 @@ export class AIAgentSession {
           return JSON.stringify({ ok: true });
         }
 
-        const { result, serverName } = await this.mcpClient.executeToolByName(toolName, parameters);
+        // Warn and fail fast if the tool is unknown (not internal and not from any MCP server)
+        {
+          const isInternal = (effectiveToolName === 'agent_append_notes' || effectiveToolName === 'agent_final_report');
+          const mapping = this.mcpClient.getToolServerMapping();
+          if (!isInternal && !mapping.has(effectiveToolName)) {
+            const req = formatToolRequestCompact(toolName, parameters);
+            const warn: LogEntry = {
+              timestamp: Date.now(),
+              severity: 'WRN',
+              turn: currentTurn,
+              subturn: 0,
+              direction: 'response',
+              type: 'llm',
+              remoteIdentifier: 'assistant:tool',
+              fatal: false,
+              message: `Unknown tool requested: ${req}`
+            };
+            logs.push(warn);
+            this.sessionConfig.callbacks?.onLog?.(warn);
+            throw new Error(`No server found for tool: ${effectiveToolName}`);
+          }
+        }
+
+        const { result, serverName } = await this.mcpClient.executeToolByName(effectiveToolName, parameters);
         // Ensure non-empty tool result so providers that require one response per call don't reject
         const safeResult = (typeof result === 'string' && result.length === 0) ? ' ' : result;
         const latency = Date.now() - startTime;
@@ -814,10 +898,7 @@ export class AIAgentSession {
         accounting.push(accountingEntry);
         this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
         
-        // Re-throw the error - AI SDK's tool execution system will catch this and convert
-        // it to a proper 'tool-error' result that gets included in the conversation history.
-        // The AI SDK handles thrown errors by creating TypedToolError parts that are surfaced 
-        // to the LLM as tool result messages, ensuring failed tools never cause turn failures.
+        // Re-throw to let AI SDK create a tool-error part so the LLM sees structured failure
         throw error;
       }
     };
