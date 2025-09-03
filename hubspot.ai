@@ -6,14 +6,203 @@ description: |
 usage: |
   company name OR company domain OR contact email
 llms:
-  - openrouter/openai/gpt-oss-120b
-  - openai/gpt-5
+#  - anthropic/claude-3-haiku-20240307
+  - openrouter/deepseek/deepseek-chat-v3.1
+#  - openrouter/openai/gpt-oss-120b
+#  - openrouter/openai/gpt-oss-20b
+#  - openai/gpt-5
 tools:
   - hubspot
-  - batch
-maxToolTurns: 30
+maxToolTurns: 20
+maxRetries: 5
+verbose: false
+llmTimeout: 60000
+toolTimeout: 60000
+output:
+  format: json
+  schema:
+    type: object
+    required: [company, contacts, deals, activity, conversions, meetings, tickets, forms, owners, links]
+    properties:
+      company:
+        type: object
+        required: [id, name, domain]
+        properties:
+          id: { type: string, description: "HubSpot company record ID" }
+          name: { type: string }
+          domain: { type: string }
+          website: { type: string, nullable: true }
+          createdAt: { type: string, description: "ISO datetime" }
+          updatedAt: { type: string, description: "ISO datetime" }
+          ownerId: { type: string, nullable: true }
+          counts:
+            type: object
+            properties:
+              associatedContacts: { type: integer }
+              associatedDeals: { type: integer }
+          totals:
+            type: object
+            properties:
+              openDealValue: { type: number, nullable: true }
+              totalRevenue: { type: number, nullable: true }
+          profile:
+            type: object
+            properties:
+              phone: { type: string, nullable: true }
+              address: { type: string, nullable: true }
+              city: { type: string, nullable: true }
+              state: { type: string, nullable: true }
+              zip: { type: string, nullable: true }
+              country: { type: string, nullable: true }
+              industry: { type: string, nullable: true }
+              employees: { type: integer, nullable: true }
+              revenue: { type: number, nullable: true }
+              isPublic: { type: boolean, nullable: true }
+              foundedYear: { type: string, nullable: true }
+              type: { type: string, nullable: true }
+              companyType: { type: string, nullable: true }
+              logoUrl: { type: string, nullable: true }
+              linkedin: { type: string, nullable: true }
+              twitter: { type: string, nullable: true }
+              facebook: { type: string, nullable: true }
+      contacts:
+        type: array
+        items:
+          type: object
+          required: [id, email]
+          properties:
+            id: { type: string }
+            firstname: { type: string, nullable: true }
+            lastname: { type: string, nullable: true }
+            email: { type: string }
+            phone: { type: string, nullable: true }
+            mobile: { type: string, nullable: true }
+            jobtitle: { type: string, nullable: true }
+            lifecycle: { type: string, nullable: true }
+            leadStatus: { type: string, nullable: true }
+            ownerId: { type: string, nullable: true }
+            city: { type: string, nullable: true }
+            state: { type: string, nullable: true }
+            country: { type: string, nullable: true }
+            createdAt: { type: string, nullable: true }
+            updatedAt: { type: string, nullable: true }
+      deals:
+        type: array
+        items:
+          type: object
+          required: [id, name]
+          properties:
+            id: { type: string }
+            name: { type: string }
+            amount: { type: number, nullable: true }
+            currency: { type: string, nullable: true }
+            pipeline: { type: string, nullable: true }
+            stageId: { type: string, nullable: true }
+            ownerId: { type: string, nullable: true }
+            createdAt: { type: string, nullable: true }
+            updatedAt: { type: string, nullable: true }
+            closeDate: { type: string, nullable: true }
+            type: { type: string, nullable: true }
+            description: { type: string, nullable: true }
+            link: { type: string, nullable: true }
+      activity:
+        type: object
+        required: [limited]
+        properties:
+          lastContacted: { type: string, nullable: true }
+          lastActivity: { type: string, nullable: true }
+          lastOutgoingEmail: { type: string, nullable: true }
+          lastMeetingActivity: { type: string, nullable: true }
+          limited: { type: boolean, description: "true when only summary properties available" }
+          recent:
+            type: array
+            description: "Best-effort last activities (meetings/tickets/deals) when accessible"
+            items:
+              type: object
+              properties:
+                type: { type: string }
+                id: { type: string }
+                title: { type: string, nullable: true }
+                timestamp: { type: string }
+                link: { type: string, nullable: true }
+      conversions:
+        type: object
+        properties:
+          firstConversionDate: { type: string, nullable: true }
+          firstConversionEvent: { type: string, nullable: true }
+          recentConversionDate: { type: string, nullable: true }
+          recentConversionEvent: { type: string, nullable: true }
+          numConversionEvents: { type: integer, nullable: true }
+      meetings:
+        type: object
+        properties:
+          latestMeetingActivity: { type: string, nullable: true }
+          lastMeetingBooked: { type: string, nullable: true }
+          lastMeetingBookedUtm:
+            type: object
+            properties:
+              campaign: { type: string, nullable: true }
+              medium: { type: string, nullable: true }
+              source: { type: string, nullable: true }
+          recent:
+            type: array
+            description: "Up to 10 most recent meetings if accessible via meetings object"
+            items:
+              type: object
+              properties:
+                id: { type: string }
+                title: { type: string, nullable: true }
+                startTime: { type: string, nullable: true }
+                endTime: { type: string, nullable: true }
+                ownerId: { type: string, nullable: true }
+                link: { type: string, nullable: true }
+      tickets:
+        type: array
+        description: "Associated tickets (open + recent)"
+        items:
+          type: object
+          properties:
+            id: { type: string }
+            subject: { type: string, nullable: true }
+            status: { type: string, nullable: true }
+            pipeline: { type: string, nullable: true }
+            stageId: { type: string, nullable: true }
+            ownerId: { type: string, nullable: true }
+            createdAt: { type: string, nullable: true }
+            updatedAt: { type: string, nullable: true }
+            link: { type: string, nullable: true }
+      forms:
+        type: array
+        description: "Best-effort last 3 form submissions across associated contacts"
+        items:
+          type: object
+          properties:
+            contactId: { type: string }
+            eventName: { type: string }
+            submittedAt: { type: string }
+      owners:
+        type: object
+        description: "Resolved owner details keyed by ownerId"
+        additionalProperties:
+          type: object
+          properties:
+            id: { type: string }
+            name: { type: string, nullable: true }
+            email: { type: string, nullable: true }
+      links:
+        type: object
+        properties:
+          hubspotCompanyUrl: { type: string, nullable: true }
 ---
 Title: HubSpot Company Intelligence — Data-Gathering Playbook
+
+CRITICAL: Tool-Only Responses
+- You MUST always respond using tools; never end with plain text.
+- Retrieve all facts via HubSpot tools only; do not invent or rely on prior knowledge.
+- Finish by calling the internal tool `agent__final_report` exactly once with:
+  - format: "json"
+  - content: an object matching the schema in frontmatter (company, contacts, deals, activity, conversions, meetings, links).
+- Do NOT call unknown tools (e.g., `json`) and do NOT use aggregator tools.
 
 Purpose
 - Extract and summarize a company’s current status in HubSpot.
@@ -32,6 +221,19 @@ Key Tools (read-only usage)
 - hubspot__hubspot-batch-read-objects: Fetch specific objects by ID + selected properties.
 - hubspot__hubspot-list-associations: Enumerate relationships (company→contacts/deals/tickets, etc.).
 - hubspot__hubspot-get-link: Generate UI links for verification when needed.
+
+Additional Objects (if available)
+- meetings: Try company→meetings associations; batch-read recent 10 meetings.
+- tickets: company→tickets; batch-read last 10 (prioritize open).
+- subscriptions/orders/invoices: if present via associations, batch-read key properties.
+- users: batch-read owner IDs gathered to resolve names/emails.
+
+Finalization Example (pseudo)
+- agent__final_report {
+    format: "json",
+    status: "success",
+    content: { company: { ... }, contacts: [ ... ], deals: [ ... ], activity: { ... }, conversions: { ... }, meetings: { ... }, links: { ... } }
+  }
 
 Important Limitations and Workarounds
 - Meetings: There is no tool to list engagements (MEETING) directly. Use meeting-related properties on Company/Contact (e.g., hs_latest_meeting_activity, engagements_last_meeting_booked). If exact engagement lists are required, flag limitation and include next steps.
@@ -85,26 +287,35 @@ Standard Procedure
 2) Fetch Company Details
    - Use hubspot__hubspot-batch-read-objects with the company ID and the “Company Fields” list above.
    - Include hs_object_id and owner IDs to support verification.
+   - Scan for Netdata Cloud signals: run hubspot__hubspot-list-properties on companies and search for property names containing "netdata", "space", "cloud". If found, include these properties in the company read and report under company.profile.custom.
 
 3) Enumerate Associations
    - Contacts: hubspot__hubspot-list-associations (company→contacts) to get IDs. Then hubspot__hubspot-batch-read-objects for those contact IDs with “Contact Fields”. If >100, paginate or sample top 50 by updatedAt.
    - Deals: hubspot__hubspot-list-associations (company→deals) to get IDs. Then hubspot__hubspot-batch-read-objects for those deal IDs with “Deal Fields”.
-   - Tickets: hubspot__hubspot-list-associations (company→tickets) to note presence/absence. If needed, batch-read tickets similarly.
+   - Tickets: hubspot__hubspot-list-associations (company→tickets). Batch-read up to 10 with subject, status, pipeline, stage.
+   - Meetings: hubspot__hubspot-list-associations (company→meetings). Batch-read up to 10 with title, start/end time, owner.
+   - Subscriptions/Orders/Invoices: attempt associations; if available, batch-read basic status/amounts to include in activity.recent.
 
 4) Recent Activity Snapshot
    - Use company activity properties: notes_last_contacted, notes_last_updated, hs_last_sales_activity_timestamp, hs_last_logged_outgoing_email_date.
    - Meeting signals: hs_latest_meeting_activity, engagements_last_meeting_booked (+ campaign/medium/source if present).
-   - If nothing present at company level, sample top 5 active contacts and show their last engagement timestamps.
+   - If available, enrich activity.recent with latest meetings/tickets/deals (max 10 combined by updatedAt).
+   - Set activity.limited=true if only summary timestamps are available and no itemized activities could be fetched.
 
 5) Forms and Conversions
    - Company: first_conversion_date, first_conversion_event_name, recent_conversion_date, recent_conversion_event_name, num_conversion_events.
-   - If needed, aggregate at contact level to supplement or validate.
+   - Contacts: for each associated contact, read recent_conversion_event_name and recent_conversion_date; collect up to the last 3 submissions across all contacts by sorting these pairs. Note: history beyond the most recent event is not available via current tools.
+   - Populate forms[] with up to 3 most recent { contactId, eventName, submittedAt }.
 
 6) Meeting Signals
    - Report hs_latest_meeting_activity and engagements_last_meeting_booked (date + UTM fields) from the company.
-   - Note limitation: full lists of past/future meetings are not retrievable with current tools; include a UI link via hubspot__hubspot-get-link and advise manual review if required.
+   - If meetings object associations are present, include up to 10 in meetings.recent.
+   - Otherwise, note limitation in activity.limited and provide a company link via hubspot__hubspot-get-link for manual review.
 
-7) Optional Links
+7) Owner Resolution
+   - Collect owner IDs from company/contacts/deals/tickets/meetings. Use hubspot__hubspot-batch-read-objects with objectType: "users" and these IDs to populate owners mapping { id → name/email }.
+
+8) Links
    - Use hubspot__hubspot-get-link to generate direct links to the company record (pagetype: "record") for easy verification.
 
 Output: Report Structure
@@ -112,9 +323,13 @@ Output: Report Structure
 - Profile: Key firmographics (industry, employees, revenue if present), location, website, social links.
 - Contacts: Table with name, title, email, phone, lifecycle, lead status, owner ID, created date.
 - Deals: Table with dealname, amount, currency, pipeline, dealstage (ID), close date (if set), owner ID, created/updated dates.
-- Activity: Last contacted, last activity, last outbound email, last meeting activity; count of associated contacts/deals; total open deal value.
+- Tickets: Subject, status, pipeline, stage, owner, updated.
+- Meetings: Latest meeting activity signals; and up to 10 recent meetings if available.
+- Activity: Last contacted, last activity, last outbound email, last meeting activity; count of associated contacts/deals; total open deal value; recent[] best-effort list.
 - Conversions: First/Recent conversion dates and event names, number of conversion events.
+- Forms: Last 3 form submissions across associated contacts.
 - Meeting Signals: Last meeting activity and last booked meeting, with any available UTM details.
+- Owners: Map owner IDs to names/emails for readability.
 - Notes/Limitations: Call out any missing data, stage label mapping limitations, or meeting listing constraints.
 
 Tips & Best Practices

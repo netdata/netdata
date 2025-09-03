@@ -15,7 +15,7 @@
     },
     "anthropic": {
       "apiKey": "${ANTHROPIC_API_KEY}",
-      "baseUrl": "https://api.anthropic.com",
+      "baseUrl": "https://api.anthropic.com/v1",
       "headers": {},
       "custom": {},
       "mergeStrategy": "overlay"

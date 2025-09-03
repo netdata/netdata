@@ -13,10 +13,10 @@ export class AnthropicProvider extends BaseLLMProvider {
   constructor(config: ProviderConfig, tracedFetch?: typeof fetch) {
     super();
     this.config = config;
-    const prov = createAnthropic({ 
-      apiKey: config.apiKey, 
-      baseURL: config.baseUrl, 
-      fetch: tracedFetch 
+    const prov = createAnthropic({
+      apiKey: config.apiKey,
+      baseURL: config.baseUrl,
+      fetch: tracedFetch
     });
     
     this.provider = (model: string) => prov(model);

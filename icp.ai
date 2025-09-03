@@ -25,7 +25,7 @@ Use web search tools for all factual claims. Do not rely on training data. Do no
 When multiple search providers are available, combine them. Different search providers utilize different indexes for searching the web and combining them provides best results.
 When searching, you can run up to 5 tools in parallel.
 
-**CRITICAL**: You MUST always respond with tools, including your final report. To search the web use the tools of the search providers. To provide your report use the `agent_final_report` tool.
+**CRITICAL**: You MUST always respond with tools, including your final report. To search the web use the tools of the search providers. To provide your report use the `agent__final_report` tool.
 
 Current Date and Time: ${DATETIME}, ${DAY}
 
@@ -207,7 +207,7 @@ Team Characteristics:
 
 ## OUTPUT STRUCTURE
 
-Use the `agent_final_report` tool to provide a comprehensive narrative report with:
+Use the `agent__final_report` tool to provide a comprehensive narrative report with:
 
 1. **Executive Summary**
    - Company overview (what they do, market position)
