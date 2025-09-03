@@ -4,11 +4,9 @@ package confgroup
 
 import (
 	"fmt"
-	"net/url"
 	"regexp"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/hostinfo"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 
 	"github.com/gohugoio/hashstructure"
@@ -117,11 +115,7 @@ func (c Config) ApplyDefaults(def Default) {
 	if c.Name() == "" {
 		c.Set("name", c.Module())
 	} else {
-		c.Set("name", cleanName(jobNameResolveHostname(c.Name())))
-	}
-
-	if v, ok := c.Get("url").(string); ok {
-		c.Set("url", urlResolveHostname(v))
+		c.Set("name", cleanName(c.Name()))
 	}
 }
 
@@ -148,31 +142,4 @@ func firstPositive(value int, others ...int) int {
 		return value
 	}
 	return firstPositive(others[0], others[1:]...)
-}
-
-func urlResolveHostname(rawURL string) string {
-	if hostinfo.Hostname == "" || !strings.Contains(rawURL, "hostname") {
-		return rawURL
-	}
-
-	u, err := url.Parse(rawURL)
-	if err != nil || (u.Hostname() != "hostname" && !strings.Contains(u.Hostname(), "hostname.")) {
-		return rawURL
-	}
-
-	u.Host = strings.Replace(u.Host, "hostname", hostinfo.Hostname, 1)
-
-	return u.String()
-}
-
-func jobNameResolveHostname(name string) string {
-	if hostinfo.Hostname == "" || !strings.Contains(name, "hostname") {
-		return name
-	}
-
-	if name != "hostname" && !strings.HasPrefix(name, "hostname.") && !strings.HasPrefix(name, "hostname_") {
-		return name
-	}
-
-	return strings.Replace(name, "hostname", hostinfo.Hostname, 1)
 }
