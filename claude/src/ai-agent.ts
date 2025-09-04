@@ -1,3 +1,5 @@
+import crypto from 'node:crypto';
+
 import Ajv from 'ajv';
 
 import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, MCPTool, LLMAccountingEntry, ToolAccountingEntry, MCPServerConfig } from './types.js';
@@ -37,6 +39,7 @@ type ExitCode =
 import { validateProviders, validateMCPServers, validatePrompts } from './config.js';
 import { LLMClient } from './llm-client.js';
 import { MCPClientManager } from './mcp-client.js';
+import { SubAgentRegistry } from './subagent-registry.js';
 import { formatToolRequestCompact } from './utils.js';
 
 // Immutable session class according to DESIGN.md
@@ -55,6 +58,11 @@ export class AIAgentSession {
   private ajv?: Ajv;
   // Internal housekeeping notes
   private internalNotes: { text: string; tags?: string[]; ts: number }[] = [];
+  private readonly subAgents?: SubAgentRegistry;
+  private readonly txnId: string;
+  private readonly originTxnId?: string;
+  private readonly parentTxnId?: string;
+  private readonly callPath?: string;
   // Finalization state captured via agent__final_report
   private finalReport?: {
     status: 'success' | 'failure' | 'partial';
@@ -91,6 +99,17 @@ export class AIAgentSession {
     this.mcpClient = mcpClient;
     this.llmClient = llmClient;
     this.sessionConfig = sessionConfig;
+    // Initialize sub-agents registry if provided
+    if (Array.isArray(sessionConfig.subAgentPaths) && sessionConfig.subAgentPaths.length > 0) {
+      const reg = new SubAgentRegistry();
+      reg.load(sessionConfig.subAgentPaths);
+      this.subAgents = reg;
+    }
+    // Tracing context
+    this.txnId = sessionConfig.trace?.selfId ?? crypto.randomUUID();
+    this.originTxnId = sessionConfig.trace?.originId ?? this.txnId;
+    this.parentTxnId = sessionConfig.trace?.parentId;
+    this.callPath = sessionConfig.trace?.callPath ?? sessionConfig.agentId;
   }
 
   // Static factory method for creating new sessions
@@ -100,23 +119,49 @@ export class AIAgentSession {
     validateMCPServers(sessionConfig.config, sessionConfig.tools);
     validatePrompts(sessionConfig.systemPrompt, sessionConfig.userPrompt);
 
+    // Generate a unique span id (self) for this session and enrich trace context
+    const sessionTxnId = crypto.randomUUID();
+    const enrichedSessionConfig: AIAgentSessionConfig = {
+      ...sessionConfig,
+      trace: {
+        selfId: sessionTxnId,
+        originId: sessionConfig.trace?.originId ?? sessionTxnId,
+        parentId: sessionConfig.trace?.parentId,
+        callPath: sessionConfig.trace?.callPath ?? sessionConfig.agentId,
+      },
+    };
+
+    // Wrap onLog to inject trace fields
+    const wrapLog = (fn?: (entry: LogEntry) => void) => (entry: LogEntry): void => {
+      if (fn === undefined) return;
+      const enriched: LogEntry = {
+        ...entry,
+        agentId: enrichedSessionConfig.agentId,
+        callPath: enrichedSessionConfig.trace?.callPath ?? enrichedSessionConfig.agentId,
+        txnId: enrichedSessionConfig.trace?.selfId,
+        parentTxnId: enrichedSessionConfig.trace?.parentId,
+        originTxnId: enrichedSessionConfig.trace?.originId,
+      };
+      fn(enriched);
+    };
+
     // Create session-owned MCP client
     const mcpClient = new MCPClientManager({ 
-      trace: sessionConfig.traceMCP === true, 
-      verbose: sessionConfig.verbose,
-      onLog: sessionConfig.callbacks?.onLog,
-      maxToolResponseBytes: sessionConfig.toolResponseMaxBytes,
-      maxConcurrentInit: sessionConfig.config.defaults?.mcpInitConcurrency ?? sessionConfig.mcpInitConcurrency ?? Number.MAX_SAFE_INTEGER
+      trace: enrichedSessionConfig.traceMCP === true, 
+      verbose: enrichedSessionConfig.verbose,
+      onLog: wrapLog(enrichedSessionConfig.callbacks?.onLog),
+      maxToolResponseBytes: enrichedSessionConfig.toolResponseMaxBytes,
+      maxConcurrentInit: enrichedSessionConfig.config.defaults?.mcpInitConcurrency ?? enrichedSessionConfig.mcpInitConcurrency ?? Number.MAX_SAFE_INTEGER
     });
 
     // Create session-owned LLM client
-    const llmClient = new LLMClient(sessionConfig.config.providers, {
-      traceLLM: sessionConfig.traceLLM,
-      onLog: sessionConfig.callbacks?.onLog
+    const llmClient = new LLMClient(enrichedSessionConfig.config.providers, {
+      traceLLM: enrichedSessionConfig.traceLLM,
+      onLog: wrapLog(enrichedSessionConfig.callbacks?.onLog)
     });
 
     return new AIAgentSession(
-      sessionConfig.config,
+      enrichedSessionConfig.config,
       [], // empty conversation
       [], // empty logs  
       [], // empty accounting
@@ -125,7 +170,7 @@ export class AIAgentSession {
       0, // start at turn 0
       mcpClient,
       llmClient,
-      sessionConfig
+      enrichedSessionConfig
     );
   }
 
@@ -145,10 +190,28 @@ export class AIAgentSession {
       type: 'llm',
       remoteIdentifier: `agent:${exitCode}`,
       fatal: true,
-      message: `${exitCode}: ${reason} (fatal=true)`
+      message: `${exitCode}: ${reason} (fatal=true)`,
+      agentId: this.sessionConfig.agentId,
+      callPath: this.callPath,
+      txnId: this.txnId,
+      parentTxnId: this.parentTxnId,
+      originTxnId: this.originTxnId
     };
-    logs.push(logEntry);
-    this.sessionConfig.callbacks?.onLog?.(logEntry);
+    this.addLog(logs, logEntry);
+  }
+
+  // Centralized helper to ensure all logs carry trace fields
+  private addLog(logs: LogEntry[], entry: LogEntry): void {
+    const enriched: LogEntry = {
+      agentId: this.sessionConfig.agentId,
+      callPath: this.callPath,
+      txnId: this.txnId,
+      parentTxnId: this.parentTxnId,
+      originTxnId: this.originTxnId,
+      ...entry,
+    };
+    logs.push(enriched);
+    this.sessionConfig.callbacks?.onLog?.(enriched);
   }
 
   // Main execution method - returns immutable result
@@ -212,8 +275,7 @@ export class AIAgentSession {
           fatal: false,
           message: JSON.stringify(settings),
         };
-        currentLogs.push(entry);
-        this.sessionConfig.callbacks?.onLog?.(entry);
+        this.addLog(currentLogs, entry);
       }
       // Initialize MCP servers (non-fatal if they fail)
       try {
@@ -236,9 +298,26 @@ export class AIAgentSession {
           fatal: false,
           message: `MCP initialization failed and will be skipped: ${message}`
         };
-        currentLogs.push(logEntry);
-        this.sessionConfig.callbacks?.onLog?.(logEntry);
+        this.addLog(currentLogs, logEntry);
       }
+
+      // Startup banner: list resolved MCP tools and sub-agent tools (exposed names)
+      try {
+        const mcpToolNames = this.mcpClient.getAllTools().map((t) => t.name);
+        const subAgentTools = (this.subAgents?.getTools() ?? []).map((t) => t.name);
+        const banner: LogEntry = {
+          timestamp: Date.now(),
+          severity: 'VRB',
+          turn: 0,
+          subturn: 0,
+          direction: 'response',
+          type: 'llm',
+          remoteIdentifier: 'agent:tools',
+          fatal: false,
+          message: `tools: mcp=${String(mcpToolNames.length)} [${mcpToolNames.join(', ')}]; subagents=${String(subAgentTools.length)} [${subAgentTools.join(', ')}]`
+        };
+        this.addLog(currentLogs, banner);
+      } catch { /* ignore banner errors */ }
 
       // Build enhanced system prompt with tool instructions
       const toolInstructions = this.mcpClient.getCombinedInstructions();
@@ -291,8 +370,7 @@ export class AIAgentSession {
         fatal: true,
         message: `AI Agent failed: ${message}`
       };
-      currentLogs.push(logEntry);
-      this.sessionConfig.callbacks?.onLog?.(logEntry);
+      this.addLog(currentLogs, logEntry);
       
       // Log exit for uncaught exception
       this.logExit(
@@ -377,10 +455,9 @@ export class AIAgentSession {
                 type: 'llm',
                 remoteIdentifier: 'agent:final-turn',
                 fatal: false,
-              message: 'Final turn detected: restricting tools to `agent__final_report` and injecting finalization instruction.'
+                message: 'Final turn detected: restricting tools to `agent__final_report` and injecting finalization instruction.'
               };
-              logs.push(warn);
-              this.sessionConfig.callbacks?.onLog?.(warn);
+              this.addLog(logs, warn);
               finalTurnWarnLogged = true;
             }
 
@@ -427,8 +504,7 @@ export class AIAgentSession {
                       fatal: false,
                       message: `Unknown tool requested (not executed): ${req}`
                     };
-                    logs.push(warn);
-                    this.sessionConfig.callbacks?.onLog?.(warn);
+                    this.addLog(logs, warn);
                   }
                 });
               }
@@ -450,7 +526,12 @@ export class AIAgentSession {
                 upstreamInferenceCostUsd: provider === 'openrouter' ? this.llmClient.getLastCostInfo().upstreamInferenceCostUsd : undefined,
                 tokens,
                 error: turnResult.status.type !== 'success' ?
-                  ('message' in turnResult.status ? turnResult.status.message : turnResult.status.type) : undefined
+                  ('message' in turnResult.status ? turnResult.status.message : turnResult.status.type) : undefined,
+                agentId: this.sessionConfig.agentId,
+                callPath: this.callPath,
+                txnId: this.txnId,
+                parentTxnId: this.parentTxnId,
+                originTxnId: this.originTxnId
               };
               accounting.push(accountingEntry);
               this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
@@ -475,8 +556,7 @@ export class AIAgentSession {
               fatal: false,
               message: 'Synthetic retry: assistant returned content without tool calls and without final_report.'
             };
-            logs.push(warnEntry);
-            this.sessionConfig.callbacks?.onLog?.(warnEntry);
+            this.addLog(logs, warnEntry);
             lastError = 'invalid_response: content_without_tools_or_final';
             // do not append these messages; try next provider/model in same turn
             continue;
@@ -516,8 +596,7 @@ export class AIAgentSession {
                     fatal: false,
                     message: `final_report JSON does not match schema: ${errs}`
                   };
-                  logs.push(warn);
-                  this.sessionConfig.callbacks?.onLog?.(warn);
+                  this.addLog(logs, warn);
                 }
               } catch (e) {
                 const warn: LogEntry = {
@@ -531,8 +610,7 @@ export class AIAgentSession {
                   fatal: false,
                   message: `AJV validation failed: ${e instanceof Error ? e.message : String(e)}`
                 };
-                logs.push(warn);
-                this.sessionConfig.callbacks?.onLog?.(warn);
+                this.addLog(logs, warn);
               }
             }
           } else {
@@ -585,8 +663,7 @@ export class AIAgentSession {
                   fatal: false,
                   message: `Turn result: hasToolCalls=${hasToolCallsStr}, hasToolResults=${hasToolResultsStr}, finalAnswer=${finalAnswerStr}, hasReasoning=${hasReasoningStr}, hasContent=${hasContentStr}, response length=${responseLenStr}, messages=${messagesLenStr}`
                 };
-                logs.push(debugEntry);
-                this.sessionConfig.callbacks?.onLog?.(debugEntry);
+                this.addLog(logs, debugEntry);
                 
                 // Debug: show the actual messages content
                 if (process.env.DEBUG === 'true') {
@@ -629,8 +706,7 @@ export class AIAgentSession {
                   fatal: false,
                   message: 'Empty response without tools; retrying with next provider/model in this turn.'
                 };
-                logs.push(warnEntry);
-                this.sessionConfig.callbacks?.onLog?.(warnEntry);
+                this.addLog(logs, warnEntry);
                 this.llmSyntheticFailures++;
                 lastError = 'invalid_response: empty_without_tools';
                 // do not mark turnSuccessful; continue retry loop
@@ -661,8 +737,7 @@ export class AIAgentSession {
                     fatal: false,
                     message: 'Final turn did not produce final_report; retrying with next provider/model in this turn.'
                   };
-                  logs.push(warnEntry);
-                  this.sessionConfig.callbacks?.onLog?.(warnEntry);
+                  this.addLog(logs, warnEntry);
                   // Continue attempts loop (do not mark successful)
                   continue;
                 }
@@ -694,6 +769,7 @@ export class AIAgentSession {
               model,
               tokens: { inputTokens: 0, outputTokens: 0, cachedTokens: 0, totalTokens: 0 },
               error: lastError,
+              agentId: this.sessionConfig.agentId, callPath: this.callPath, txnId: this.txnId, parentTxnId: this.parentTxnId, originTxnId: this.originTxnId
             };
             accounting.push(accountingEntry);
             this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
@@ -796,8 +872,7 @@ export class AIAgentSession {
         fatal: false,
         message: msg,
       };
-      logs.push(fin);
-      this.sessionConfig.callbacks?.onLog?.(fin);
+      this.addLog(logs, fin);
 
       // MCP summary single line
       const toolEntries = accounting.filter((e): e is ToolAccountingEntry => e.type === 'tool');
@@ -831,8 +906,7 @@ export class AIAgentSession {
         fatal: false,
         message: `requests=${String(mcpRequests)}, failed=${String(mcpFailures)}, capped=${String(sizeCaps)}, bytes in=${String(totalToolCharsIn)} out=${String(totalToolCharsOut)}, providers/tools: ${toolPairsStr.length > 0 ? toolPairsStr : 'none'}`,
       };
-      logs.push(finMcp);
-      this.sessionConfig.callbacks?.onLog?.(finMcp);
+      this.addLog(logs, finMcp);
     } catch { /* swallow summary errors */ }
   }
 
@@ -846,7 +920,7 @@ export class AIAgentSession {
     accounting: AccountingEntry[],
     lastShownThinkingHeaderTurn: number
   ) {
-    const availableTools = [...this.mcpClient.getAllTools(), ...this.getInternalTools()];
+    const availableTools = [...this.mcpClient.getAllTools(), ...(this.subAgents?.getTools() ?? []), ...this.getInternalTools()];
     
     // Track if we've shown thinking for this turn
     let shownThinking = false;
@@ -870,6 +944,7 @@ export class AIAgentSession {
             type: 'tool', timestamp: startTime, status: 'ok', latency,
             mcpServer: 'agent', command: toolName,
             charactersIn: JSON.stringify(parameters).length, charactersOut: 15,
+            agentId: this.sessionConfig.agentId, callPath: this.callPath, txnId: this.txnId, parentTxnId: this.parentTxnId, originTxnId: this.originTxnId
           };
           accounting.push(accountingEntry);
           this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
@@ -890,6 +965,7 @@ export class AIAgentSession {
             type: 'tool', timestamp: startTime, status: 'ok', latency,
             mcpServer: 'agent', command: toolName,
             charactersIn: JSON.stringify(parameters).length, charactersOut: 12,
+            agentId: this.sessionConfig.agentId, callPath: this.callPath, txnId: this.txnId, parentTxnId: this.parentTxnId, originTxnId: this.originTxnId
           };
           accounting.push(accountingEntry);
           this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
@@ -901,11 +977,47 @@ export class AIAgentSession {
           return await this.executeBatchCalls(parameters, currentTurn, startTime, logs, accounting, toolName);
         }
 
+        // Sub-agent execution
+        if (this.subAgents?.hasTool(effectiveToolName) === true) {
+          try {
+            const exec = await this.subAgents.execute(effectiveToolName, parameters, { config: this.sessionConfig.config, callbacks: this.sessionConfig.callbacks, trace: { originId: this.originTxnId, parentId: this.txnId, callPath: `${this.callPath ?? ''}->${effectiveToolName}` } });
+            const latency = Date.now() - startTime;
+            const accountingEntry: AccountingEntry = {
+              type: 'tool', timestamp: startTime, status: 'ok', latency,
+              mcpServer: 'subagent', command: effectiveToolName,
+              charactersIn: JSON.stringify(parameters).length, charactersOut: exec.result.length,
+              agentId: this.sessionConfig.agentId, callPath: this.callPath, txnId: this.txnId, parentTxnId: this.parentTxnId, originTxnId: this.originTxnId
+            };
+            accounting.push(accountingEntry);
+            this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
+            // Merge child accounting into parent
+            exec.accounting.forEach((a) => {
+              accounting.push(a);
+              this.sessionConfig.callbacks?.onAccounting?.(a);
+            });
+            return exec.result;
+          } catch (e) {
+            const latency = Date.now() - startTime;
+            const msg = e instanceof Error ? e.message : String(e);
+            const accountingEntry: AccountingEntry = {
+              type: 'tool', timestamp: startTime, status: 'failed', latency,
+              mcpServer: 'subagent', command: effectiveToolName,
+              charactersIn: JSON.stringify(parameters).length, charactersOut: 0,
+              error: msg,
+              agentId: this.sessionConfig.agentId, callPath: this.callPath, txnId: this.txnId, parentTxnId: this.parentTxnId, originTxnId: this.originTxnId
+            };
+            accounting.push(accountingEntry);
+            this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
+            throw e;
+          }
+        }
+
         // Warn and fail fast if the tool is unknown (not internal and not from any MCP server)
         {
           const isInternal = (effectiveToolName === 'agent__append_notes' || effectiveToolName === 'agent__final_report');
           const mapping = this.mcpClient.getToolServerMapping();
-          if (!isInternal && !mapping.has(effectiveToolName)) {
+          const isSub = this.subAgents?.hasTool(effectiveToolName) === true;
+          if (!isInternal && !isSub && !mapping.has(effectiveToolName)) {
             const req = formatToolRequestCompact(toolName, parameters);
             const warn: LogEntry = {
               timestamp: Date.now(),
@@ -918,8 +1030,7 @@ export class AIAgentSession {
               fatal: false,
               message: `Unknown tool requested: ${req}`
             };
-            logs.push(warn);
-            this.sessionConfig.callbacks?.onLog?.(warn);
+            this.addLog(logs, warn);
             throw new Error(`No server found for tool: ${effectiveToolName}`);
           }
         }
@@ -939,6 +1050,7 @@ export class AIAgentSession {
           command: toolName,
           charactersIn: JSON.stringify(parameters).length,
           charactersOut: safeResult.length,
+          agentId: this.sessionConfig.agentId, callPath: this.callPath, txnId: this.txnId, parentTxnId: this.parentTxnId, originTxnId: this.originTxnId
         };
         accounting.push(accountingEntry);
         this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
@@ -958,7 +1070,8 @@ export class AIAgentSession {
           command: toolName,
           charactersIn: JSON.stringify(parameters).length,
           charactersOut: 0,
-          error: errorMsg
+          error: errorMsg,
+          agentId: this.sessionConfig.agentId, callPath: this.callPath, txnId: this.txnId, parentTxnId: this.parentTxnId, originTxnId: this.originTxnId
         };
         accounting.push(accountingEntry);
         this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
@@ -998,8 +1111,7 @@ export class AIAgentSession {
               fatal: false,
               message: ''  // Header only, no content
             };
-            logs.push(thinkingHeader);
-            this.sessionConfig.callbacks?.onLog?.(thinkingHeader);
+            this.addLog(logs, thinkingHeader);
             shownThinking = true;
             // Update tracking to prevent duplicate headers
             lastShownThinkingHeaderTurn = currentTurn;
@@ -1059,7 +1171,8 @@ export class AIAgentSession {
         type: 'tool', timestamp: startTime, status: 'failed', latency,
         mcpServer: 'agent', command: toolName,
         charactersIn: JSON.stringify(parameters).length, charactersOut: 0,
-        error: 'invalid_batch_input'
+        error: 'invalid_batch_input',
+        agentId: this.sessionConfig.agentId, callPath: this.callPath, txnId: this.txnId, parentTxnId: this.parentTxnId, originTxnId: this.originTxnId
       };
       accounting.push(accountingEntry);
       this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
@@ -1140,6 +1253,7 @@ export class AIAgentSession {
       type: 'tool', timestamp: startTime, status: 'ok', latency,
       mcpServer: 'agent', command: toolName,
       charactersIn: JSON.stringify(parameters).length, charactersOut: JSON.stringify(response).length,
+      agentId: this.sessionConfig.agentId, callPath: this.callPath, txnId: this.txnId, parentTxnId: this.parentTxnId, originTxnId: this.originTxnId
     };
     accounting.push(accountingEntry);
     this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);

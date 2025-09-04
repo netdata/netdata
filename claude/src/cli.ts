@@ -9,7 +9,7 @@ import type { LogEntry, AccountingEntry, AIAgentCallbacks, ConversationMessage }
 
 import { loadAgentFromContent } from './agent-loader.js';
 import { discoverLayers, resolveDefaults } from './config-resolver.js';
-import { parseFrontmatter, stripFrontmatter, parseList, parsePairs } from './frontmatter.js';
+import { parseFrontmatter, stripFrontmatter, parseList, parsePairs, buildFrontmatterTemplate } from './frontmatter.js';
 import { formatAgentResultHumanReadable } from './utils.js';
 
 interface FrontmatterOptions {
@@ -56,6 +56,8 @@ function buildResolvedDefaultsHelp(): string {
     // Read frontmatter from promptPath (if present)
     let fmOptions: FrontmatterOptions | undefined = undefined;
     let fmDesc = '';
+    let fmDescOnly = '';
+    let fmUsage = '';
     if (promptPath !== undefined) {
       let content = fs.readFileSync(promptPath, 'utf8');
       if (content.startsWith('#!')) {
@@ -64,12 +66,13 @@ function buildResolvedDefaultsHelp(): string {
       }
       const fm = parseFrontmatter(content);
       if (fm?.options !== undefined) fmOptions = fm.options;
-      if (typeof fm?.description === 'string') fmDesc = fm.description.trim();
+      if (typeof fm?.description === 'string') { fmDesc = fm.description.trim(); fmDescOnly = fmDesc; }
       const fmUse = fm?.usage;
       if (typeof fmUse === 'string' && fmUse.trim().length > 0) {
+        fmUsage = fmUse.trim();
         const inv = typeof candidate === 'string' && candidate.length > 0 ? candidate : 'ai-agent';
         // Add usage headline before defaults
-        const usageLine = `Usage: ${inv} "${fmUse.trim()}"`;
+        const usageLine = `Usage: ${inv} "${fmUsage}"`;
         // Temporarily stash in description prefix for printing
         fmDesc = (fmDesc.length > 0 ? `${fmDesc}\n` : '') + usageLine;
       }
@@ -114,50 +117,15 @@ function buildResolvedDefaultsHelp(): string {
 
     const inv = (typeof candidate === 'string' && candidate.length > 0) ? candidate : 'ai-agent';
     const usageText = (() => {
-      if (fmOptions !== undefined && typeof fmOptions.usage === 'string') {
-        const u = fmOptions.usage.trim();
-        if (u.length > 0) return `${inv} "${u}"`;
-      }
+      if (fmUsage.length > 0) return `${inv} "${fmUsage}"`;
       return `${inv} "<user prompt>"`;
     })();
 
-    // Build a frontmatter template object mirroring accepted keys exactly
-    const toArray = (v: unknown): string[] => {
-      if (Array.isArray(v)) return v.map((x) => String(x));
-      if (typeof v === 'string') return v.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
-      return [];
-    };
-    const llmsKey: 'llms' | 'targets' = (fmOptions !== undefined && (Object.prototype.hasOwnProperty.call(fmOptions, 'llms'))) ? 'llms'
-      : ((fmOptions !== undefined && (Object.prototype.hasOwnProperty.call(fmOptions, 'targets'))) ? 'targets' : 'llms');
-    const llmsVal: string[] = (fmOptions !== undefined && llmsKey === 'llms') ? toArray(fmOptions.llms)
-      : (fmOptions !== undefined && llmsKey === 'targets') ? toArray(fmOptions.targets)
-      : [];
-    const toolsVal: string[] = (fmOptions !== undefined) ? toArray(fmOptions.tools) : [];
-
-    const fmTemplate: Record<string, unknown> = {};
-    fmTemplate.description = fmDesc;
-    fmTemplate.usage = (fmOptions !== undefined && typeof fmOptions.usage === 'string') ? fmOptions.usage : '';
-    fmTemplate[llmsKey] = llmsVal;
-    fmTemplate.tools = toolsVal;
-    fmTemplate.temperature = temperature;
-    fmTemplate.topP = topP;
-    fmTemplate.llmTimeout = llmTimeout;
-    fmTemplate.toolTimeout = toolTimeout;
-    fmTemplate.toolResponseMaxBytes = toolResponseMaxBytes;
-    fmTemplate.maxRetries = maxRetries;
-    fmTemplate.maxToolTurns = maxToolTurns;
-    fmTemplate.stream = stream;
-    fmTemplate.parallelToolCalls = parallelToolCalls;
     const traceLLM = readBool('traceLLM', 'traceLLM', false);
     const traceMCP = readBool('traceMCP', 'traceMCP', false);
     const verbose = readBool('verbose', 'verbose', false);
-    fmTemplate.traceLLM = traceLLM;
-    fmTemplate.traceMCP = traceMCP;
-    fmTemplate.verbose = verbose;
-    fmTemplate.accounting = (fmOptions !== undefined && typeof fmOptions.accounting === 'string') ? fmOptions.accounting : '';
-    fmTemplate.save = (fmOptions !== undefined && typeof fmOptions.save === 'string') ? fmOptions.save : '';
-    fmTemplate.load = (fmOptions !== undefined && typeof fmOptions.load === 'string') ? fmOptions.load : '';
     // Include output if present in frontmatter
+    let outputBlock: { format: 'json'|'markdown'|'text'; schema?: Record<string, unknown> } | undefined;
     try {
       const contentForOutput = promptPath !== undefined ? fs.readFileSync(promptPath, 'utf8') : undefined;
       if (contentForOutput !== undefined) {
@@ -167,10 +135,38 @@ function buildResolvedDefaultsHelp(): string {
         if (parsed?.expectedOutput !== undefined) {
           const out: Record<string, unknown> = { format: parsed.expectedOutput.format };
           if (parsed.expectedOutput.schema !== undefined) out.schema = parsed.expectedOutput.schema;
-          fmTemplate.output = out;
+          outputBlock = out as { format: 'json'|'markdown'|'text'; schema?: Record<string, unknown> };
         }
       }
     } catch { /* ignore */ }
+
+    const fmTemplate = buildFrontmatterTemplate({
+      fmOptions,
+      description: fmDescOnly,
+      usage: (fmUsage.length > 0 ? fmUsage : '<user prompt>'),
+      numbers: {
+        temperature,
+        topP,
+        llmTimeout,
+        toolTimeout,
+        toolResponseMaxBytes,
+        maxRetries,
+        maxToolTurns,
+      },
+      booleans: {
+        stream,
+        parallelToolCalls,
+        traceLLM,
+        traceMCP,
+        verbose,
+      },
+      strings: {
+        accounting: (fmOptions !== undefined && typeof fmOptions.accounting === 'string') ? fmOptions.accounting : '',
+        save: (fmOptions !== undefined && typeof fmOptions.save === 'string') ? fmOptions.save : '',
+        load: (fmOptions !== undefined && typeof fmOptions.load === 'string') ? fmOptions.load : '',
+      },
+      output: outputBlock,
+    });
 
     const lines: string[] = [];
     lines.push('DESCRIPTION');
@@ -212,6 +208,7 @@ program
   .option('--mcp <list>', ALIAS_FOR_TOOLS)
   .option('--mcp-tool <list>', ALIAS_FOR_TOOLS)
   .option('--mcp-tools <list>', ALIAS_FOR_TOOLS)
+  .option('--agents <list>', 'Comma-separated list of sub-agent .ai files (relative or absolute)')
   .option('--llm-timeout <ms>', 'Timeout for LLM responses (ms)', '120000')
   .option('--tool-timeout <ms>', 'Timeout for tool execution (ms)', '60000')
   .option('--tool-response-max-bytes <n>', 'Maximum MCP tool response size (bytes)', '12288')
@@ -272,6 +269,16 @@ program
         : (typeof options.mcpTools === 'string' && options.mcpTools.length > 0) ? options.mcpTools
         : undefined;
 
+      const isPlainObject = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
+      const hasKey = <K extends string>(obj: Record<string, unknown>, key: K): obj is Record<K, unknown> => Object.prototype.hasOwnProperty.call(obj, key);
+      const cliAgentsRaw: string | undefined = ((): string | undefined => {
+        if (isPlainObject(options) && hasKey(options, 'agents')) {
+          const raw = options.agents;
+          return (typeof raw === 'string' && raw.length > 0) ? raw : undefined;
+        }
+        return undefined;
+      })();
+
       // fmOptions already computed above
       const fmTargetsRaw = (fmOptions !== undefined && typeof fmOptions.llms === 'string') ? fmOptions.llms
         : (fmOptions !== undefined && typeof fmOptions.targets === 'string') ? fmOptions.targets
@@ -282,18 +289,28 @@ program
       const fmToolsRaw = (fmOptions !== undefined && typeof fmOptions.tools === 'string') ? fmOptions.tools
         : (fmOptions !== undefined && Array.isArray(fmOptions.tools)) ? fmOptions.tools.join(',')
         : undefined;
+      const fmAgentsRaw = ((): string | undefined => {
+        if (fmOptions !== undefined) {
+          const fmAny = fmOptions as Record<string, unknown>;
+          const a = fmAny.agents;
+          if (typeof a === 'string' && a.length > 0) return a;
+          if (Array.isArray(a)) return (a as unknown[]).map((x) => String(x)).join(',');
+        }
+        return undefined;
+      })();
 
       const targets = parsePairs(cliTargetsRaw ?? fmTargetsRaw);
       const toolList = parseList(cliToolsRaw ?? fmToolsRaw);
+      const agentsList = parseList(cliAgentsRaw ?? fmAgentsRaw);
 
       if (targets.length === 0) {
         console.error('Error: No provider/model targets specified. Use --targets or frontmatter llms/targets.');
         process.exit(4);
       }
-      if (toolList.length === 0) {
-        console.error('Error: No MCP tools specified. Use --tools or frontmatter tools.');
-        process.exit(4);
-      }
+      // Allow LLM-only runs (no tools/agents). Tool availability rules are enforced later:
+      // - MCP tools missing from config: fatal at validation
+      // - MCP tools failing at runtime: continue without them
+      // - Agents missing: load throws early (fatal)
 
       // Probe layered config locations (verbose only)
       try {
@@ -325,6 +342,7 @@ program
         verbose: options.verbose === true,
         targets,
         tools: toolList,
+        agents: agentsList,
         baseDir: fmBaseDir,
         // CLI overrides take precedence
         temperature: optSrc('temperature') === 'cli' ? Number(options.temperature) : undefined,
@@ -552,25 +570,31 @@ function createCallbacks(options: Record<string, unknown>, accountingFile?: stri
         thinkingOpen = false;
       }
       // Always show errors and warnings with colors
+      const agentLabel = (() => {
+        if (typeof entry.agentId === 'string' && entry.agentId.length > 0) {
+          try { return ` (agent: ${path.basename(entry.agentId)})`; } catch { return ` (agent: ${entry.agentId})`; }
+        }
+        return '';
+      })();
       if (entry.severity === 'ERR') {
-        const formatted = colorize(`[ERR] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}: ${entry.message}`, '\x1b[31m');
+        const formatted = colorize(`[ERR] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}${agentLabel}: ${entry.message}`, '\x1b[31m');
         process.stderr.write(`${formatted}\n`);
       }
       
       if (entry.severity === 'WRN') {
-        const formatted = colorize(`[WRN] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}: ${entry.message}`, '\x1b[33m');
+        const formatted = colorize(`[WRN] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}${agentLabel}: ${entry.message}`, '\x1b[33m');
         process.stderr.write(`${formatted}\n`);
       }
       
       // Show verbose only with --verbose flag (dark gray)
       if (entry.severity === 'VRB' && options.verbose === true) {
-        const formatted = colorize(`[VRB] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}: ${entry.message}`, '\x1b[90m');
+        const formatted = colorize(`[VRB] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}${agentLabel}: ${entry.message}`, '\x1b[90m');
         process.stderr.write(`${formatted}\n`);
       }
 
       // Final summary entries
       if (entry.severity === 'FIN') {
-        const formatted = colorize(`[FIN] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}: ${entry.message}`, '\x1b[36m');
+        const formatted = colorize(`[FIN] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}${agentLabel}: ${entry.message}`, '\x1b[36m');
         process.stderr.write(`${formatted}\n`);
       }
       
@@ -578,14 +602,14 @@ function createCallbacks(options: Record<string, unknown>, accountingFile?: stri
       if (entry.severity === 'TRC') {
         if ((entry.type === 'llm' && options.traceLlm === true) || 
             (entry.type === 'mcp' && options.traceMcp === true)) {
-          const formatted = colorize(`[TRC] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}: ${entry.message}`, '\x1b[90m');
+          const formatted = colorize(`[TRC] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}${agentLabel}: ${entry.message}`, '\x1b[90m');
           process.stderr.write(`${formatted}\n`);
         }
       }
       
       // Show thinking header with light gray color
       if (entry.severity === 'THK') {
-        const formatted = colorize(`[THK] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}: `, '\x1b[2;37m');
+        const formatted = colorize(`[THK] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}${agentLabel}: `, '\x1b[2;37m');
         process.stderr.write(formatted);
         thinkingOpen = true;
         lastCharWasNewline = false;

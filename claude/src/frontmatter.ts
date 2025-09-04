@@ -7,6 +7,7 @@ export interface FrontmatterOptions {
   llms?: string | string[];
   targets?: string | string[];
   tools?: string | string[];
+  agents?: string | string[];
   load?: string;
   accounting?: string;
   usage?: string;
@@ -25,14 +26,30 @@ export interface FrontmatterOptions {
   toolResponseMaxBytes?: number;
 }
 
-export function parseFrontmatter(src: string, opts?: { baseDir?: string }): { expectedOutput?: { format: 'json'|'markdown'|'text'; schema?: Record<string, unknown> }, options?: FrontmatterOptions, description?: string, usage?: string } | undefined {
+export function parseFrontmatter(
+  src: string,
+  opts?: { baseDir?: string }
+): {
+  expectedOutput?: { format: 'json'|'markdown'|'text'; schema?: Record<string, unknown> },
+  inputSpec?: { format: 'text' | 'json'; schema?: Record<string, unknown> },
+  toolName?: string,
+  options?: FrontmatterOptions,
+  description?: string,
+  usage?: string
+} | undefined {
   const m = /^---\n([\s\S]*?)\n---\n/.exec(src);
   if (m === null) return undefined;
   try {
     const rawUnknown: unknown = yaml.load(m[1]);
     if (typeof rawUnknown !== 'object' || rawUnknown === null) return undefined;
-    const docObj = rawUnknown as { output?: { format?: string; schema?: unknown; schemaRef?: string } } & Record<string, unknown>;
+    const docObj = rawUnknown as {
+      output?: { format?: string; schema?: unknown; schemaRef?: string };
+      input?: { format?: string; schema?: unknown; schemaRef?: string };
+      toolName?: unknown;
+    } & Record<string, unknown>;
     let expectedOutput: { format: 'json'|'markdown'|'text'; schema?: Record<string, unknown> } | undefined;
+    let inputSpec: { format: 'text'|'json'; schema?: Record<string, unknown> } | undefined;
+    let toolName: string | undefined;
     let description: string | undefined;
     let usage: string | undefined;
     if (docObj.output !== undefined && typeof docObj.output.format === 'string') {
@@ -50,10 +67,28 @@ export function parseFrontmatter(src: string, opts?: { baseDir?: string }): { ex
       }
     }
     const raw = rawUnknown as Record<string, unknown>;
+    // Parse input spec for sub-agent tools
+    if (docObj.input !== undefined && typeof docObj.input.format === 'string') {
+      const fmt = docObj.input.format.toLowerCase();
+      if (fmt === 'text' || fmt === 'json') {
+        let schemaObj: Record<string, unknown> | undefined;
+        if (fmt === 'json') {
+          const s: unknown = docObj.input.schema;
+          const refVal: unknown = (docObj.input as { schemaRef?: unknown }).schemaRef;
+          const ref: string | undefined = typeof refVal === 'string' ? refVal : undefined;
+          schemaObj = loadSchemaValue(s, ref, opts?.baseDir);
+        }
+        inputSpec = { format: fmt, schema: schemaObj };
+      }
+    }
+    if (typeof docObj.toolName === 'string' && docObj.toolName.trim().length > 0) {
+      toolName = docObj.toolName.trim();
+    }
     const options: FrontmatterOptions = {};
     if (typeof raw.llms === 'string' || Array.isArray(raw.llms)) options.llms = raw.llms as (string | string[]);
     if (typeof raw.targets === 'string' || Array.isArray(raw.targets)) options.targets = raw.targets as (string | string[]);
     if (typeof raw.tools === 'string' || Array.isArray(raw.tools)) options.tools = raw.tools as (string | string[]);
+    if (typeof raw.agents === 'string' || Array.isArray(raw.agents)) options.agents = raw.agents as (string | string[]);
     if (typeof raw.load === 'string') options.load = raw.load;
     if (typeof raw.accounting === 'string') options.accounting = raw.accounting;
     if (typeof raw.parallelToolCalls === 'boolean') options.parallelToolCalls = raw.parallelToolCalls;
@@ -71,7 +106,7 @@ export function parseFrontmatter(src: string, opts?: { baseDir?: string }): { ex
     if (typeof raw.topP === 'number') options.topP = raw.topP;
     if (typeof raw.description === 'string') description = raw.description;
     if (typeof raw.usage === 'string') usage = raw.usage;
-    return { expectedOutput, options, description, usage };
+    return { expectedOutput, inputSpec, toolName, options, description, usage };
   } catch {
     return undefined;
   }
@@ -137,4 +172,69 @@ export function parsePairs(value: unknown): { provider: string; model: string }[
       }
       return { provider, model };
     });
+}
+
+// Build a YAML-ready frontmatter template object, kept in sync with FrontmatterOptions keys
+export function buildFrontmatterTemplate(args: {
+  fmOptions?: FrontmatterOptions;
+  description: string;
+  usage: string;
+  numbers: {
+    temperature: number;
+    topP: number;
+    llmTimeout: number;
+    toolTimeout: number;
+    toolResponseMaxBytes: number;
+    maxRetries: number;
+    maxToolTurns: number;
+  };
+  booleans: {
+    stream: boolean;
+    parallelToolCalls: boolean;
+    traceLLM: boolean;
+    traceMCP: boolean;
+    verbose: boolean;
+  };
+  strings: {
+    accounting?: string;
+    save?: string;
+    load?: string;
+  };
+  output?: { format: 'json'|'markdown'|'text'; schema?: Record<string, unknown> };
+}): Record<string, unknown> {
+  const toArray = (v: unknown): string[] => {
+    if (Array.isArray(v)) return v.map((x) => String(x));
+    if (typeof v === 'string') return v.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+    return [];
+  };
+
+  const fm = args.fmOptions;
+  const llmsKey: 'llms' | 'targets' = (fm !== undefined && (Object.prototype.hasOwnProperty.call(fm, 'llms'))) ? 'llms'
+    : ((fm !== undefined && (Object.prototype.hasOwnProperty.call(fm, 'targets'))) ? 'targets' : 'llms');
+  const llmsVal: string[] = (fm !== undefined && llmsKey === 'llms') ? toArray(fm.llms)
+    : (fm !== undefined && llmsKey === 'targets') ? toArray(fm.targets)
+    : [];
+  const toolsVal: string[] = (fm !== undefined) ? toArray(fm.tools) : [];
+  const agentsVal: string[] = (fm !== undefined) ? toArray(fm.agents) : [];
+
+  const tpl: Record<string, unknown> = {};
+  tpl.description = args.description;
+  tpl.usage = args.usage;
+  tpl[llmsKey] = llmsVal;
+  tpl.tools = toolsVal;
+  // Always include agents so users see the key in the template
+  tpl.agents = agentsVal.length > 0 ? agentsVal : [];
+  tpl.temperature = args.numbers.temperature;
+  tpl.topP = args.numbers.topP;
+  tpl.llmTimeout = args.numbers.llmTimeout;
+  tpl.toolTimeout = args.numbers.toolTimeout;
+  tpl.toolResponseMaxBytes = args.numbers.toolResponseMaxBytes;
+  tpl.maxRetries = args.numbers.maxRetries;
+  tpl.maxToolTurns = args.numbers.maxToolTurns;
+  // Exclude runtime/CLI-wide toggles from frontmatter template to avoid confusion
+  // (traceLLM, traceMCP, verbose, accounting, save, load, stream)
+  // Keep parallelToolCalls as it influences agent tool behavior.
+  tpl.parallelToolCalls = args.booleans.parallelToolCalls;
+  if (args.output !== undefined) tpl.output = args.output;
+  return tpl;
 }

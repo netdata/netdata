@@ -63,6 +63,12 @@ export interface LogEntry {
   remoteIdentifier: string;             // 'provider:model' or 'mcp-server:tool-name'
   fatal: boolean;                       // True if this caused agent to stop
   message: string;                      // Human readable message
+  // Optional tracing fields (multi-agent)
+  agentId?: string;
+  callPath?: string;
+  txnId?: string;
+  parentTxnId?: string;
+  originTxnId?: string;
 }
 
 // Core data structures
@@ -153,6 +159,10 @@ export interface AIAgentSessionConfig {
   config: Configuration;
   targets: { provider: string; model: string }[];
   tools: string[];
+  // Optional sub-agent prompt file paths (relative or absolute)
+  subAgentPaths?: string[];
+  // Agent identity (prompt path or synthetic id)
+  agentId?: string;
   systemPrompt: string;
   userPrompt: string;
   conversationHistory?: ConversationMessage[];
@@ -174,6 +184,8 @@ export interface AIAgentSessionConfig {
   toolResponseMaxBytes?: number;
   // Preferred MCP init concurrency override for this session
   mcpInitConcurrency?: number;
+  // Trace context propagation
+  trace?: { selfId?: string; originId?: string; parentId?: string; callPath?: string };
 }
 
 // Session result
@@ -201,6 +213,12 @@ export interface BaseAccountingEntry {
   timestamp: number;
   status: 'ok' | 'failed';
   latency: number;
+  // Optional tracing fields (multi-agent)
+  agentId?: string;
+  callPath?: string;
+  txnId?: string;
+  parentTxnId?: string;
+  originTxnId?: string;
 }
 
 export interface LLMAccountingEntry extends BaseAccountingEntry {

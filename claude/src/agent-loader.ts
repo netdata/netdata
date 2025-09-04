@@ -36,7 +36,7 @@ export interface LoadedAgent {
   run: (
     systemPrompt: string,
     userPrompt: string,
-    opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks }
+    opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace'] }
   ) => Promise<AIAgentResult>;
 }
 
@@ -58,6 +58,7 @@ export interface LoadAgentOptions {
   verbose?: boolean;
   targets?: { provider: string; model: string }[];
   tools?: string[];
+  agents?: string[];
   // Optional overrides (CLI precedence) for runtime knobs
   stream?: boolean;
   parallelToolCalls?: boolean;
@@ -106,10 +107,13 @@ export function loadAgent(aiPath: string, registry?: AgentRegistry, options?: Lo
   // Determine needed targets/tools: CLI/opts > frontmatter
   const fmTargets = parsePairs((fm?.options?.llms ?? fm?.options?.targets));
   const fmTools = parseList(fm?.options?.tools);
+  const fmAgents = parseList(fm?.options?.agents);
   const optTargets = options?.targets;
   const selectedTargets = Array.isArray(optTargets) && optTargets.length > 0 ? optTargets : fmTargets;
   const optTools = options?.tools;
   const selectedTools = Array.isArray(optTools) && optTools.length > 0 ? optTools : fmTools;
+  const effAgents = Array.isArray(options?.agents) && options.agents.length > 0 ? options.agents : fmAgents;
+  const selectedAgents = effAgents.map((rel) => path.resolve(path.dirname(aiPath), rel));
   const needProviders = Array.from(new Set(selectedTargets.map((t) => t.provider)));
 
   const layers = discoverLayers({ configPath: options?.configPath });
@@ -164,6 +168,7 @@ export function loadAgent(aiPath: string, registry?: AgentRegistry, options?: Lo
     return config.accounting?.file;
   })();
 
+  const agentName = path.basename(id).replace(/\.[^.]+$/, '');
   const loaded: LoadedAgent = {
     id,
     promptPath: id,
@@ -190,16 +195,19 @@ export function loadAgent(aiPath: string, registry?: AgentRegistry, options?: Lo
       mcpInitConcurrency: eff.mcpInitConcurrency,
     },
     subTools: [],
-    run: async (systemPrompt: string, userPrompt: string, opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks }): Promise<AIAgentResult> => {
+    run: async (systemPrompt: string, userPrompt: string, opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace'] }): Promise<AIAgentResult> => {
       const sessionConfig: AIAgentSessionConfig = {
         config,
         targets: selectedTargets,
         tools: selectedTools,
+        agentId: agentName,
+        subAgentPaths: selectedAgents,
         systemPrompt,
         userPrompt,
         conversationHistory: opts?.history,
         expectedOutput: fm?.expectedOutput,
         callbacks: opts?.callbacks,
+        trace: opts?.trace,
         temperature: eff.temperature,
         topP: eff.topP,
         maxRetries: eff.maxRetries,
@@ -230,10 +238,13 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
   const fm = parseFrontmatter(content, { baseDir: options?.baseDir });
   const fmTargets = parsePairs((fm?.options?.llms ?? fm?.options?.targets));
   const fmTools = parseList(fm?.options?.tools);
+  const fmAgents = parseList(fm?.options?.agents);
   const optTargets2 = options?.targets;
   const selectedTargets = Array.isArray(optTargets2) && optTargets2.length > 0 ? optTargets2 : fmTargets;
   const optTools2 = options?.tools;
   const selectedTools = Array.isArray(optTools2) && optTools2.length > 0 ? optTools2 : fmTools;
+  const effAgents2 = Array.isArray(options?.agents) && options.agents.length > 0 ? options.agents : fmAgents;
+  const selectedAgents = effAgents2.map((rel) => path.resolve(options?.baseDir ?? process.cwd(), rel));
   const needProviders = Array.from(new Set(selectedTargets.map((t) => t.provider)));
 
   const layers = discoverLayers({ configPath: options?.configPath });
@@ -314,16 +325,19 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
       verbose: eff.verbose,
       mcpInitConcurrency: eff.mcpInitConcurrency,
     },
-    run: async (systemPrompt: string, userPrompt: string, opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks }): Promise<AIAgentResult> => {
+    run: async (systemPrompt: string, userPrompt: string, opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace'] }): Promise<AIAgentResult> => {
       const sessionConfig: AIAgentSessionConfig = {
         config,
         targets: selectedTargets,
         tools: selectedTools,
+        agentId: path.basename(id).replace(/\.[^.]+$/, ''),
+        subAgentPaths: selectedAgents,
         systemPrompt,
         userPrompt,
         conversationHistory: opts?.history,
         expectedOutput: fm?.expectedOutput,
         callbacks: opts?.callbacks,
+        trace: opts?.trace,
         temperature: eff.temperature,
         topP: eff.topP,
         maxRetries: eff.maxRetries,
