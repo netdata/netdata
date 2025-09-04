@@ -6,6 +6,13 @@
 
 **Merged pull requests:**
 
+- chore\(go.d\): remove unused resolve hostname functionality [\#20922](https://github.com/netdata/netdata/pull/20922) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations docs [\#20916](https://github.com/netdata/netdata/pull/20916) ([netdatabot](https://github.com/netdatabot))
+- fix\(netdata-updater\): resolve "run: command not found" error in offline install [\#20915](https://github.com/netdata/netdata/pull/20915) ([ilyam8](https://github.com/ilyam8))
+- chore\(go.d\): add build-time configuration directory paths [\#20913](https://github.com/netdata/netdata/pull/20913) ([ilyam8](https://github.com/ilyam8))
+- fix\(go.d\): try rel path before checking well-known path for user and stock dirs [\#20912](https://github.com/netdata/netdata/pull/20912) ([ilyam8](https://github.com/ilyam8))
+- SIGNL4 Alert Notification [\#20911](https://github.com/netdata/netdata/pull/20911) ([rons4](https://github.com/rons4))
+- Update view-plan-and-billing.md [\#20910](https://github.com/netdata/netdata/pull/20910) ([kanelatechnical](https://github.com/kanelatechnical))
 - Update link for opt-out section [\#20909](https://github.com/netdata/netdata/pull/20909) ([gatesry](https://github.com/gatesry))
 - build\(deps\): bump k8s.io/client-go from 0.33.4 to 0.34.0 in /src/go [\#20908](https://github.com/netdata/netdata/pull/20908) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/stretchr/testify from 1.11.0 to 1.11.1 in /src/go [\#20906](https://github.com/netdata/netdata/pull/20906) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -442,15 +449,6 @@
 - test\(go.d/oracledb\): fix test [\#20378](https://github.com/netdata/netdata/pull/20378) ([ilyam8](https://github.com/ilyam8))
 - SNMP: fortinet-fortiswitch.yaml [\#20377](https://github.com/netdata/netdata/pull/20377) ([Ancairon](https://github.com/Ancairon))
 - chore\(otel.plugin\): add more receivers/exporter [\#20376](https://github.com/netdata/netdata/pull/20376) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations docs [\#20375](https://github.com/netdata/netdata/pull/20375) ([netdatabot](https://github.com/netdatabot))
-- SNMP: fortinet-fortigate.yaml and remove un-needed profile [\#20374](https://github.com/netdata/netdata/pull/20374) ([Ancairon](https://github.com/Ancairon))
-- fix\(go.d/oracledb\): correct tablespace usage calculation for all types [\#20373](https://github.com/netdata/netdata/pull/20373) ([ilyam8](https://github.com/ilyam8))
-- build\(deps\): bump github.com/redis/go-redis/v9 from 9.8.0 to 9.9.0 in /src/go [\#20372](https://github.com/netdata/netdata/pull/20372) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/docker/docker from 28.1.1+incompatible to 28.2.1+incompatible in /src/go [\#20371](https://github.com/netdata/netdata/pull/20371) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/lmittmann/tint from 1.1.0 to 1.1.1 in /src/go [\#20370](https://github.com/netdata/netdata/pull/20370) ([dependabot[bot]](https://github.com/apps/dependabot))
-- SNMP: fortinet-appliance.yaml [\#20369](https://github.com/netdata/netdata/pull/20369) ([Ancairon](https://github.com/Ancairon))
-- chore\(otel.plugin\): fix building [\#20368](https://github.com/netdata/netdata/pull/20368) ([ilyam8](https://github.com/ilyam8))
-- SNMP: \_fortinet-fortigate-vpn-tunnel.yaml [\#20367](https://github.com/netdata/netdata/pull/20367) ([Ancairon](https://github.com/Ancairon))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
