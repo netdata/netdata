@@ -74,7 +74,7 @@ Agents will continue collecting data locally but will lose their cloud connectio
 <details>
 <summary><strong>How long does deletion take?</strong></summary>
 
-Account deletion is immediate. Your data will be purged from Netdata's systems according to their data retention policies.
+Account deletion is immediate. Your data will be purged from Netdata's systems in accordance with their data retention policies.
 
 </details>
 
