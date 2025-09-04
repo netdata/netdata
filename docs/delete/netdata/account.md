@@ -42,7 +42,7 @@ You have two options:
 Before deleting your account, consider:
 
 - **Data loss**: All monitoring configurations, custom dashboards, alert settings, and historical data will be permanently lost
-- **Connected Nodes**: Any nodes connected to your account will need to be reconfigured with a new account
+- **Connected nodes**: Any nodes connected to your account will need to be reconfigured with a new account
 - **Team access**: If you're part of a team workspace, ensure you've transferred any necessary permissions or data
 - **No recovery**: There is no grace period or recovery option once deletion is confirmed
 
