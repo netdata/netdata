@@ -9,11 +9,13 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cmd"
 )
 
 type nvidiaSmiBinary interface {
@@ -52,18 +54,7 @@ type nvidiaSmiExec struct {
 }
 
 func (e *nvidiaSmiExec) queryGPUInfo() ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, e.binPath, "-q", "-x")
-
-	e.Debugf("executing '%s'", cmd)
-	bs, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("error on '%s': %v", cmd, err)
-	}
-
-	return bs, nil
+	return cmd.RunUnprivileged(e.Logger, e.timeout, e.binPath, "-q", "-x")
 }
 
 func (e *nvidiaSmiExec) stop() error { return nil }
@@ -102,7 +93,8 @@ func (e *nvidiaSmiLoopExec) run() error {
 		secs = e.updateEvery
 	}
 
-	cmd := exec.Command(e.binPath, "-q", "-x", "-l", strconv.Itoa(secs))
+	ndrunPath := filepath.Join(buildinfo.NetdataBinDir, "nd-run")
+	cmd := exec.Command(ndrunPath, e.binPath, "-q", "-x", "-l", strconv.Itoa(secs))
 
 	e.Debugf("executing '%s'", cmd)
 
