@@ -313,7 +313,7 @@ export class MCPClientManager {
     return transport;
   }
 
-  async executeTool(serverName: string, toolCall: ToolCall, timeoutMs?: number): Promise<ToolResult> {
+  async executeTool(serverName: string, toolCall: ToolCall, timeoutMs?: number, slot?: number): Promise<ToolResult> {
     const client = this.clients.get(serverName);
     if (client == null) {
       return {
@@ -357,7 +357,8 @@ export class MCPClientManager {
     // replaced by sanitized argsStr
     
     const compactReq = formatToolRequestCompact(toolCall.name, sanitizedParams);
-    this.log('VRB', 'request', 'mcp', `${serverName}:${toolCall.name}`, compactReq);
+    const reqMsg = slot !== undefined ? `slot=${String(slot)} ${compactReq}` : compactReq;
+    this.log('VRB', 'request', 'mcp', `${serverName}:${toolCall.name}`, reqMsg);
 
     try {
       const before = JSON.stringify(originalParams);
@@ -374,7 +375,7 @@ export class MCPClientManager {
 
     const callWithTimeout = async () => {
       if (typeof timeoutMs !== 'number' || timeoutMs <= 0) {
-        return await client.callTool({ name: toolCall.name, arguments: sanitizedParams });
+      return await client.callTool({ name: toolCall.name, arguments: sanitizedParams });
       }
       
       const timeoutPromise = new Promise((_resolve, reject) => {
@@ -435,8 +436,9 @@ export class MCPClientManager {
         ? { type: 'execution_error', toolName: toolCall.name, message: 'Tool execution failed' }
         : { type: 'success' };
 
+      const slotPrefix = slot !== undefined ? `slot=${String(slot)} ` : '';
       this.log('VRB', 'response', 'mcp', `${serverName}:${toolCall.name}`, 
-        `${String(latencyMs)}ms, ${String(result.length)} chars${isError ? ' (error)' : ''}`);
+        `${slotPrefix}${String(latencyMs)}ms, ${String(result.length)} chars${isError ? ' (error)' : ''}`);
 
       if (this.trace) {
         this.log('TRC', 'response', 'mcp', `${serverName}:${toolCall.name}`, 
@@ -473,8 +475,9 @@ export class MCPClientManager {
         status = { type: 'execution_error', toolName: toolCall.name, message };
       }
 
+      const slotPrefixErr = slot !== undefined ? `slot=${String(slot)} ` : '';
       this.log('ERR', 'response', 'mcp', `${serverName}:${toolCall.name}`, 
-        `error: ${message} (${String(latencyMs)}ms)`, false);
+        `${slotPrefixErr}error: ${message} (${String(latencyMs)}ms)`, false);
 
       return {
         toolCallId: toolCall.id,
@@ -580,7 +583,7 @@ export class MCPClientManager {
   }
 
   // Simple tool executor for AI SDK integration
-  async executeToolByName(toolName: string, parameters: Record<string, unknown>): Promise<{ result: string; serverName: string }> {
+  async executeToolByName(toolName: string, parameters: Record<string, unknown>, opts?: { slot?: number }): Promise<{ result: string; serverName: string }> {
     const mapping = this.toolNameMap.get(toolName);
     if (mapping === undefined) {
       throw new Error(`No server found for tool: ${toolName}`);
@@ -595,7 +598,7 @@ export class MCPClientManager {
       parameters
     };
 
-    const result = await this.executeTool(serverName, toolCall);
+    const result = await this.executeTool(serverName, toolCall, undefined, opts?.slot);
     
     if (result.status.type !== 'success') {
       const errorMsg = 'message' in result.status ? result.status.message : result.status.type;

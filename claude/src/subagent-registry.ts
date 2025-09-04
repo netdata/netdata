@@ -57,7 +57,13 @@ export class SubAgentRegistry {
       throw new Error(`Recursion detected while loading sub-agent: ${id}`);
     }
     const content = fs.readFileSync(id, 'utf-8');
-    const fm = parseFrontmatter(content, { baseDir: path.dirname(id) });
+    let fm;
+    try {
+      fm = parseFrontmatter(content, { baseDir: path.dirname(id) });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(`Sub-agent '${id}' frontmatter error: ${msg}`);
+    }
     // Refuse to load without description (usage is optional)
     if (fm === undefined || typeof fm.description !== 'string' || fm.description.trim().length === 0) {
       throw new Error(`Sub-agent '${id}' missing 'description' in frontmatter`);
@@ -131,11 +137,11 @@ export class SubAgentRegistry {
   async execute(
     exposedToolName: string,
     parameters: Record<string, unknown>,
-    parentSession: Pick<AIAgentSessionConfig, 'config' | 'callbacks'> & {
+    parentSession: Pick<AIAgentSessionConfig, 'config' | 'callbacks' | 'stream' | 'traceLLM' | 'traceMCP' | 'verbose' | 'temperature' | 'topP' | 'llmTimeout' | 'toolTimeout' | 'maxRetries' | 'maxTurns' | 'toolResponseMaxBytes' | 'parallelToolCalls' | 'targets'> & {
       // extra trace/metadata for child
       trace?: { originId?: string; parentId?: string; callPath?: string };
     }
-  ): Promise<{ result: string; child: ChildInfo; accounting: readonly AccountingEntry[] }> {
+  ): Promise<{ result: string; child: ChildInfo; accounting: readonly AccountingEntry[]; conversation: ConversationMessage[]; trace?: { originId?: string; parentId?: string; selfId?: string; callPath?: string } }> {
     const name = exposedToolName.startsWith('agent__') ? exposedToolName.slice('agent__'.length) : exposedToolName;
     const info = this.children.get(name);
     if (info === undefined) throw new Error(`Unknown sub-agent: ${exposedToolName}`);
@@ -173,7 +179,36 @@ export class SubAgentRegistry {
     let result: AIAgentResult;
     try {
       process.chdir(path.dirname(info.promptPath));
-      const loaded = loadAgent(info.promptPath, undefined, { configPath: undefined, verbose: parentSession.callbacks !== undefined });
+      // Decide targets inheritance: only when child has no models in frontmatter
+      let inheritTargets: { provider: string; model: string }[] | undefined = undefined;
+      try {
+        const raw = fs.readFileSync(info.promptPath, 'utf-8');
+        const fm2 = parseFrontmatter(raw, { baseDir: path.dirname(info.promptPath) });
+        const models = (fm2?.options as { models?: unknown } | undefined)?.models;
+        const hasModels = (Array.isArray(models) && models.length > 0) || typeof models === 'string';
+        inheritTargets = hasModels ? undefined : parentSession.targets;
+      } catch { /* ignore */ }
+
+      const loaded = loadAgent(info.promptPath, undefined, {
+        configPath: undefined,
+        verbose: parentSession.verbose ?? (parentSession.callbacks !== undefined),
+        targets: inheritTargets,
+        // All models overrides (propagate globally)
+        stream: parentSession.stream,
+        traceLLM: parentSession.traceLLM,
+        traceMCP: parentSession.traceMCP,
+        // Master defaults for sub-agents (apply only when undefined)
+        defaultsForUndefined: {
+          temperature: parentSession.temperature,
+          topP: parentSession.topP,
+          llmTimeout: parentSession.llmTimeout,
+          toolTimeout: parentSession.toolTimeout,
+          maxRetries: parentSession.maxRetries,
+          maxToolTurns: parentSession.maxTurns,
+          toolResponseMaxBytes: parentSession.toolResponseMaxBytes,
+          parallelToolCalls: parentSession.parallelToolCalls,
+        },
+      });
 
       // Build callbacks wrapper to prefix child logs
       const orig = parentSession.callbacks;
@@ -209,6 +244,11 @@ export class SubAgentRegistry {
       out = last?.content ?? '';
     }
 
-    return { result: out, child: info, accounting: result.accounting };
+    const convo: ConversationMessage[] = result.conversation;
+    const acct: AccountingEntry[] = result.accounting;
+    const firstAcct = result.accounting.find((a) => typeof a.txnId === "string" || typeof a.originTxnId === "string" || typeof a.parentTxnId === "string" || typeof a.callPath === "string");
+    const trace: { originId?: string; parentId?: string; selfId?: string; callPath?: string } = { originId: firstAcct?.originTxnId, parentId: firstAcct?.parentTxnId, selfId: firstAcct?.txnId, callPath: firstAcct?.callPath };
+    const payload: { result: string; child: ChildInfo; accounting: readonly AccountingEntry[]; conversation: ConversationMessage[]; trace?: { originId?: string; parentId?: string; selfId?: string; callPath?: string } } = { result: out, child: info, accounting: acct, conversation: convo, trace };
+    return payload;
   }
 }

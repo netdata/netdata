@@ -2,41 +2,76 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { Command } from 'commander';
+import { Command, Option } from 'commander';
 import * as yaml from 'js-yaml';
 
+import type { FrontmatterOptions } from './frontmatter.js';
 import type { LogEntry, AccountingEntry, AIAgentCallbacks, ConversationMessage } from './types.js';
+import type { CommanderError } from 'commander';
 
 import { loadAgentFromContent } from './agent-loader.js';
 import { discoverLayers, resolveDefaults } from './config-resolver.js';
 import { parseFrontmatter, stripFrontmatter, parseList, parsePairs, buildFrontmatterTemplate } from './frontmatter.js';
+import { getOptionsByGroup, formatCliNames, OPTIONS_REGISTRY } from './options-registry.js';
 import { formatAgentResultHumanReadable } from './utils.js';
 
-interface FrontmatterOptions {
-  llms?: string | string[];
-  targets?: string | string[];
-  tools?: string | string[];
-  load?: string;
-  accounting?: string;
-  usage?: string;
-  parallelToolCalls?: boolean;
-  stream?: boolean;
-  traceLLM?: boolean;
-  traceMCP?: boolean;
-  verbose?: boolean;
-  save?: string;
-  maxToolTurns?: number;
-  maxRetries?: number;
-  llmTimeout?: number;
-  toolTimeout?: number;
-  temperature?: number;
-  topP?: number;
-  toolResponseMaxBytes?: number;
+// FrontmatterOptions is sourced from frontmatter.ts (single definition)
+
+// Centralized exit path to guarantee a single, reasoned exit
+let hasExited = false;
+function exitWith(code: number, reason: string, tag = 'EXIT-CLI'): never {
+  try {
+    // Always print a final, standardized fatal/summary line
+    const msg = `[VRB] ← [0.0] agent ${tag}: ${reason} (fatal=true)`;
+    // Use stderr for control lines
+    process.stderr.write(`${msg}\n`);
+  } catch { /* ignore */ }
+  // Ensure we exit only once
+  if (!hasExited) {
+    hasExited = true;
+    // eslint-disable-next-line n/no-process-exit
+    process.exit(code);
+  }
+  // TypeScript: inform this never returns
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+  throw new Error('unreachable');
 }
 
 const program = new Command();
-const ALIAS_FOR_TARGETS = 'Alias for --targets';
-const ALIAS_FOR_TOOLS = 'Alias for --tools';
+// Force commander to route exits through our single exit path
+program.exitOverride((err: CommanderError) => {
+  const code = err.exitCode;
+  const msg = err.message;
+  exitWith(code, `commander: ${msg}`, 'EXIT-COMMANDER');
+});
+function addOptionsFromRegistry(prog: Command): void {
+  // Dynamically add options from the registry to avoid duplication
+  // For booleans with negation, add each name separately; for others, combine names.
+  const placeholderFor = (key: string, type: string): string => {
+    if (type === 'boolean') return '';
+    if (key.endsWith('Timeout')) return ' <ms>';
+    if (key.endsWith('Bytes')) return ' <n>';
+    if (key === 'maxRetries' || key === 'maxToolTurns' || key === 'maxConcurrentTools' || key === 'topP' || key === 'temperature') return ' <n>';
+    if (key === 'models' || key === 'tools' || key === 'agents') return ' <list>';
+    if (key === 'config' || key === 'accounting' || key === 'save' || key === 'load') return ' <filename>';
+    return ' <value>';
+  };
+  OPTIONS_REGISTRY.forEach((def) => {
+    const names = def.cli?.names ?? [];
+    if (names.length === 0) return;
+    if (def.type === 'boolean') {
+      // Add each flag separately (handles --no-*)
+      names.forEach((n) => {
+        prog.option(n, def.description);
+      });
+    } else {
+      const first = names[0] + placeholderFor(def.key, def.type);
+      const rest = names.slice(1);
+      const combined = [first, ...rest].join(', ');
+      prog.addOption(new Option(combined, def.description));
+    }
+  });
+}
 
 // Build a Resolved Defaults section using frontmatter + config (if available)
 function buildResolvedDefaultsHelp(): string {
@@ -79,12 +114,10 @@ function buildResolvedDefaultsHelp(): string {
     }
 
     // Load configuration defaults (best effort) via layered resolver
-    let configPath: string | undefined = undefined;
     let configDefaults: Record<string, unknown> = {};
     try {
       const layers = discoverLayers({ configPath: undefined });
       configDefaults = resolveDefaults(layers) as Record<string, unknown>;
-      configPath = '(layered)';
     } catch {
       // ignore
     }
@@ -105,15 +138,19 @@ function buildResolvedDefaultsHelp(): string {
       return fallback;
     };
 
-    const temperature = readNum('temperature', 'temperature', 0.7);
-    const topP = readNum('topP', 'topP', 1.0);
-    const llmTimeout = readNum('llmTimeout', 'llmTimeout', 120000);
-    const toolTimeout = readNum('toolTimeout', 'toolTimeout', 60000);
-    const maxRetries = readNum('maxRetries', 'maxRetries', 3);
-    const maxToolTurns = readNum('maxToolTurns', 'maxToolTurns', 10);
-    const toolResponseMaxBytes = readNum('toolResponseMaxBytes', 'toolResponseMaxBytes', 12288);
-    const stream = readBool('stream', 'stream', false);
-    const parallelToolCalls = readBool('parallelToolCalls', 'parallelToolCalls', false);
+    const defaultOf = (key: string): number | boolean => {
+      const def = OPTIONS_REGISTRY.find((o) => o.key === key)?.default;
+      return (typeof def === 'number' || typeof def === 'boolean') ? def : 0;
+    };
+    const temperature = readNum('temperature', 'temperature', defaultOf('temperature') as number);
+    const topP = readNum('topP', 'topP', defaultOf('topP') as number);
+    const llmTimeout = readNum('llmTimeout', 'llmTimeout', defaultOf('llmTimeout') as number);
+    const toolTimeout = readNum('toolTimeout', 'toolTimeout', defaultOf('toolTimeout') as number);
+    const maxRetries = readNum('maxRetries', 'maxRetries', defaultOf('maxRetries') as number);
+    const maxToolTurns = readNum('maxToolTurns', 'maxToolTurns', defaultOf('maxToolTurns') as number);
+    const toolResponseMaxBytes = readNum('toolResponseMaxBytes', 'toolResponseMaxBytes', defaultOf('toolResponseMaxBytes') as number);
+    const maxConcurrentTools = readNum('maxConcurrentTools', 'maxConcurrentTools', defaultOf('maxConcurrentTools') as number);
+    const parallelToolCalls = readBool('parallelToolCalls', 'parallelToolCalls', defaultOf('parallelToolCalls') as boolean);
 
     const inv = (typeof candidate === 'string' && candidate.length > 0) ? candidate : 'ai-agent';
     const usageText = (() => {
@@ -121,9 +158,7 @@ function buildResolvedDefaultsHelp(): string {
       return `${inv} "<user prompt>"`;
     })();
 
-    const traceLLM = readBool('traceLLM', 'traceLLM', false);
-    const traceMCP = readBool('traceMCP', 'traceMCP', false);
-    const verbose = readBool('verbose', 'verbose', false);
+    // runtime toggles are CLI-only and not shown in template
     // Include output if present in frontmatter
     let outputBlock: { format: 'json'|'markdown'|'text'; schema?: Record<string, unknown> } | undefined;
     try {
@@ -152,19 +187,16 @@ function buildResolvedDefaultsHelp(): string {
         toolResponseMaxBytes,
         maxRetries,
         maxToolTurns,
+        maxConcurrentTools,
       },
       booleans: {
-        stream,
+        stream: false,
         parallelToolCalls,
-        traceLLM,
-        traceMCP,
-        verbose,
+        traceLLM: false,
+        traceMCP: false,
+        verbose: false,
       },
-      strings: {
-        accounting: (fmOptions !== undefined && typeof fmOptions.accounting === 'string') ? fmOptions.accounting : '',
-        save: (fmOptions !== undefined && typeof fmOptions.save === 'string') ? fmOptions.save : '',
-        load: (fmOptions !== undefined && typeof fmOptions.load === 'string') ? fmOptions.load : '',
-      },
+      strings: {},
       output: outputBlock,
     });
 
@@ -183,8 +215,16 @@ function buildResolvedDefaultsHelp(): string {
     lines.push('---');
     // Also show prompt/config locations for context
     if (promptPath !== undefined) lines.push('', `Prompt: ${promptPath}`);
-    if (configPath !== undefined) lines.push(`Config: ${configPath}`);
-    lines.push('');
+    try {
+      const layers = discoverLayers({ configPath: undefined });
+      lines.push('Config Files Resolution Order:');
+      layers.forEach((ly, idx) => {
+        const jExists = fs.existsSync(ly.jsonPath);
+        const eExists = fs.existsSync(ly.envPath);
+        lines.push(` ${String(idx + 1)}. ${ly.jsonPath} ${jExists ? '(found)' : '(missing)'} | ${ly.envPath} ${eExists ? '(found)' : '(missing)'}`);
+      });
+      lines.push('');
+    } catch { /* ignore */ }
     return `\n${lines.join('\n')}\n`;
   } catch {
     return '';
@@ -194,47 +234,45 @@ function buildResolvedDefaultsHelp(): string {
 // Inject description and resolved defaults before the standard help
 program.addHelpText('before', buildResolvedDefaultsHelp);
 
+// Grouped CLI options legend for clarity
+program.addHelpText('after', () => {
+  const byGroup = getOptionsByGroup();
+  const order = ['Master Agent Overrides', 'Master Defaults', 'All Models Overrides', 'Global Controls'];
+  const makeTitle = (group: string): string => (
+    group === 'Master Defaults' ? `${group} (used by sub-agents when unset)`
+    : group === 'Master Agent Overrides' ? `${group} (strict)`
+    : group === 'Global Controls' ? 'Global Application Controls'
+    : group
+  );
+  const body = order
+    .map((group) => {
+      const list = byGroup.get(group);
+      if (list === undefined || list.length === 0) return undefined;
+      const lines = [makeTitle(group)];
+      list
+        .filter((opt) => opt.cli?.showInHelp === true)
+        .map((opt) => formatCliNames(opt))
+        .filter((s) => typeof s === 'string' && s.length > 0)
+        .forEach((s) => lines.push(`  ${s}`));
+      lines.push('');
+      return lines.join('\n');
+    })
+    .filter((s): s is string => typeof s === 'string');
+  return `\n${['', ...body].join('\n')}`;
+});
+
 program
   .name('ai-agent')
   .description('Universal LLM Tool Calling Interface with MCP support')
   .version('1.0.0')
   .argument('<system-prompt>', 'System prompt (string, @filename, or - for stdin)')
   .argument('<user-prompt>', 'User prompt (string, @filename, or - for stdin)')
-  .option('--targets <list>', 'Comma-separated provider/model pairs (e.g., openai/gpt-4o,ollama/gpt-oss:20b)')
-  .option('--llms <list>', ALIAS_FOR_TARGETS)
-  .option('--provider-models <list>', ALIAS_FOR_TARGETS)
-  .option('--tools <list>', 'Comma-separated list of MCP tools')
-  .option('--tool <list>', ALIAS_FOR_TOOLS)
-  .option('--mcp <list>', ALIAS_FOR_TOOLS)
-  .option('--mcp-tool <list>', ALIAS_FOR_TOOLS)
-  .option('--mcp-tools <list>', ALIAS_FOR_TOOLS)
-  .option('--agents <list>', 'Comma-separated list of sub-agent .ai files (relative or absolute)')
-  .option('--llm-timeout <ms>', 'Timeout for LLM responses (ms)', '120000')
-  .option('--tool-timeout <ms>', 'Timeout for tool execution (ms)', '60000')
-  .option('--tool-response-max-bytes <n>', 'Maximum MCP tool response size (bytes)', '12288')
-  .option('--temperature <n>', 'LLM temperature (0.0-2.0)', '0.7')
-  .option('--top-p <n>', 'LLM top-p sampling (0.0-1.0)', '1.0')
-  .option('--save <filename>', 'Save conversation to JSON file')
-  .option('--load <filename>', 'Load conversation from JSON file')
-  .option('--config <filename>', 'Configuration file path')
-  .option('--accounting <filename>', 'Override accounting file from config')
-  .option('--dry-run', 'Validate config and MCP only, no LLM requests')
-  .option('--verbose', 'Enable debug logging to stderr')
-  .option('--quiet', 'Only print errors to stderr')
-  .option('--trace-llm', 'Log LLM HTTP requests and responses (redacted)')
-  .option('--trace-mcp', 'Log MCP requests, responses, and server stderr')
-  .option('--stream', 'Enable streaming LLM responses')
-  .option('--no-stream', 'Disable streaming; use non-streaming responses')
-  .option('--parallel-tool-calls', 'Enable parallel tool calls')
-  .option('--no-parallel-tool-calls', 'Disable parallel tool calls')
-  .option('--max-retries <n>', 'Max retry rounds over provider/model list', '3')
-  .option('--max-tool-turns <n>', 'Maximum tool turns (agent loop cap)', '10')
-  .option('--mcp-init-concurrency <n>', 'Max concurrent MCP server initializations', undefined)
+  .option('--save-all <dir>', 'Save all agent and sub-agent conversations to directory')
+  .hook('preAction', () => { /* placeholder to ensure options added first */ })
   .action(async (systemPrompt: string, userPrompt: string, options: Record<string, unknown>) => {
     try {
       if (systemPrompt === '-' && userPrompt === '-') {
-        console.error('Error: cannot use stdin ("-") for both system and user prompts');
-        process.exit(4);
+        exitWith(4, 'invalid arguments: cannot use stdin for both system and user prompts', 'EXIT-INVALID-ARGS');
       }
       
 
@@ -255,11 +293,7 @@ program
       // Removed local resolution of runtime knobs; agent-loader owns precedence
 
       // Determine effective targets and tools (CLI > FM)
-      const cliTargetsRaw: string | undefined =
-        (typeof options.targets === 'string' && options.targets.length > 0) ? options.targets
-        : (typeof options.llms === 'string' && options.llms.length > 0) ? options.llms
-        : (typeof options.providerModels === 'string' && options.providerModels.length > 0) ? options.providerModels
-        : undefined;
+      const cliTargetsRaw: string | undefined = (typeof options.models === 'string' && options.models.length > 0) ? options.models : undefined;
 
       const cliToolsRaw: string | undefined =
         (typeof options.tools === 'string' && options.tools.length > 0) ? options.tools
@@ -280,10 +314,8 @@ program
       })();
 
       // fmOptions already computed above
-      const fmTargetsRaw = (fmOptions !== undefined && typeof fmOptions.llms === 'string') ? fmOptions.llms
-        : (fmOptions !== undefined && typeof fmOptions.targets === 'string') ? fmOptions.targets
-        : (fmOptions !== undefined && Array.isArray(fmOptions.llms)) ? fmOptions.llms.join(',')
-        : (fmOptions !== undefined && Array.isArray(fmOptions.targets)) ? fmOptions.targets.join(',')
+      const fmTargetsRaw = (fmOptions !== undefined && typeof fmOptions.models === 'string') ? fmOptions.models
+        : (fmOptions !== undefined && Array.isArray(fmOptions.models)) ? fmOptions.models.join(',')
         : undefined;
 
       const fmToolsRaw = (fmOptions !== undefined && typeof fmOptions.tools === 'string') ? fmOptions.tools
@@ -304,7 +336,7 @@ program
       const agentsList = parseList(cliAgentsRaw ?? fmAgentsRaw);
 
       if (targets.length === 0) {
-        console.error('Error: No provider/model targets specified. Use --targets or frontmatter llms/targets.');
+        console.error('Error: No provider/model targets specified. Use --models or frontmatter models.');
         process.exit(4);
       }
       // Allow LLM-only runs (no tools/agents). Tool availability rules are enforced later:
@@ -337,7 +369,15 @@ program
         }
       };
 
-      const loaded = loadAgentFromContent('cli-main', fmSource, {
+      // Derive agent id: from prompt filename when available, else 'cli-main'
+      const fileAgentId = ((): string => {
+        const isFile = (p: string): boolean => { try { return p !== '-' && fs.existsSync(p) && fs.statSync(p).isFile(); } catch { return false; } };
+        if (isFile(systemPrompt)) return systemPrompt;
+        if (isFile(userPrompt)) return userPrompt;
+        return 'cli-main';
+      })();
+
+      const loaded = loadAgentFromContent(fileAgentId, fmSource, {
         configPath: cfgPath,
         verbose: options.verbose === true,
         targets,
@@ -346,12 +386,19 @@ program
         baseDir: fmBaseDir,
         // CLI overrides take precedence
         temperature: optSrc('temperature') === 'cli' ? Number(options.temperature) : undefined,
-        topP: optSrc('topP') === 'cli' ? Number(options.topP) : undefined,
-        llmTimeout: optSrc('llmTimeout') === 'cli' ? Number(options.llmTimeout) : undefined,
-        toolTimeout: optSrc('toolTimeout') === 'cli' ? Number(options.toolTimeout) : undefined,
+        topP: (optSrc('topP') === 'cli' || optSrc('top-p') === 'cli') ? Number(options.topP ?? options['top-p']) : undefined,
+        llmTimeout: (optSrc('llmTimeoutMs') === 'cli' || optSrc('llm-timeout-ms') === 'cli') ? Number(options.llmTimeoutMs ?? options['llm-timeout-ms']) : undefined,
+        toolTimeout: (optSrc('toolTimeoutMs') === 'cli' || optSrc('tool-timeout-ms') === 'cli') ? Number(options.toolTimeoutMs ?? options['tool-timeout-ms']) : undefined,
         maxRetries: optSrc('maxRetries') === 'cli' ? Number(options.maxRetries) : undefined,
         maxToolTurns: optSrc('maxToolTurns') === 'cli' ? Number(options.maxToolTurns) : undefined,
-        toolResponseMaxBytes: optSrc('toolResponseMaxBytes') === 'cli' ? Number(options.toolResponseMaxBytes) : undefined,
+        toolResponseMaxBytes: (optSrc('toolResponseMaxBytes') === 'cli' || optSrc('tool-response-max-bytes') === 'cli') ? Number(options.toolResponseMaxBytes ?? options['tool-response-max-bytes']) : undefined,
+        maxConcurrentTools: (optSrc('maxConcurrentTools') === 'cli' || optSrc('max-concurrent-tools') === 'cli')
+          ? (() => {
+              const o = options as Record<string, unknown> & { maxConcurrentTools?: unknown };
+              const v = o.maxConcurrentTools ?? o['max-concurrent-tools'];
+              return Number(v);
+            })()
+          : undefined,
         parallelToolCalls: typeof options.parallelToolCalls === 'boolean' ? options.parallelToolCalls : undefined,
         stream: typeof options.stream === 'boolean' ? options.stream : undefined,
         traceLLM: options.traceLlm === true ? true : undefined,
@@ -366,35 +413,30 @@ program
 
 // Load conversation history if specified
       let conversationHistory: ConversationMessage[] | undefined = undefined;
-      const effLoad = (typeof options.load === 'string' && options.load.length > 0)
-        ? options.load
-        : (fmOptions !== undefined && typeof fmOptions.load === 'string') ? fmOptions.load
-        : undefined;
+      const effLoad = (typeof options.load === 'string' && options.load.length > 0) ? options.load : undefined;
       if (typeof effLoad === 'string' && effLoad.length > 0) {
         try {
           const content = fs.readFileSync(effLoad, 'utf-8');
           conversationHistory = JSON.parse(content) as ConversationMessage[];
         } catch (e) {
-          console.error(`Error loading conversation from ${effLoad}: ${e instanceof Error ? e.message : String(e)}`);
-          process.exit(1);
+          const msg = e instanceof Error ? e.message : String(e);
+          exitWith(1, `failed to load conversation from ${effLoad}: ${msg}`, 'EXIT-CONVERSATION-LOAD');
         }
       }
 
       // Setup accounting
       const accountingFile = (typeof options.accounting === 'string' && options.accounting.length > 0)
         ? options.accounting
-        : (fmOptions !== undefined && typeof fmOptions.accounting === 'string') ? fmOptions.accounting
         : loaded.accountingFile ?? loaded.config.accounting?.file;
 
-      // Setup logging callbacks (trace/verbose still taken from CLI/FM above)
-      const effectiveTraceLLM = options.traceLlm === true ? true : (fmOptions !== undefined && typeof fmOptions.traceLLM === 'boolean' ? fmOptions.traceLLM : false);
-      const effectiveTraceMCP = options.traceMcp === true ? true : (fmOptions !== undefined && typeof fmOptions.traceMCP === 'boolean' ? fmOptions.traceMCP : false);
-      const effectiveVerbose = options.verbose === true ? true : (fmOptions !== undefined && typeof fmOptions.verbose === 'boolean' ? fmOptions.verbose : false);
+      // Setup logging callbacks (CLI-only)
+      const effectiveTraceLLM = options.traceLlm === true;
+      const effectiveTraceMCP = options.traceMcp === true;
+      const effectiveVerbose = options.verbose === true;
       const callbacks = createCallbacks({ traceLlm: effectiveTraceLLM, traceMcp: effectiveTraceMCP, verbose: effectiveVerbose }, accountingFile);
 
       if (options.dryRun === true) {
-        console.error('Dry run: configuration and MCP servers validated successfully.');
-        process.exit(0);
+        exitWith(0, 'dry run complete: configuration and MCP servers validated', 'EXIT-DRY-RUN');
       }
 
       // Create and run session via unified loader
@@ -411,47 +453,73 @@ program
       }
 
       if (!result.success) {
-        if (options.verbose === true) console.error(`Error: ${result.error ?? ''}`);
-        // Exit logs are already emitted by the agent itself via callbacks
-        if ((result.error ?? '').includes('Configuration')) process.exit(1);
-        else if ((result.error ?? '').includes('Max tool turns exceeded')) process.exit(5);
-        else if ((result.error ?? '').includes('tool')) process.exit(3);
-        else process.exit(2);
+        const err = result.error ?? '';
+        const code = err.includes('Configuration') ? 1
+          : err.includes('Max tool turns exceeded') ? 5
+          : err.includes('tool') ? 3
+          : 2;
+        exitWith(code, `agent failure: ${err || 'unknown error'}`, 'EXIT-AGENT-FAILURE');
       }
 
-      // Save conversation if requested (CLI > FM)
-      const effSave = (typeof options.save === 'string' && options.save.length > 0)
-        ? options.save
-        : (fmOptions !== undefined && typeof fmOptions.save === 'string') ? fmOptions.save
-        : undefined;
+      // Save conversation if requested (CLI-only)
+      const effSave = (typeof options.save === 'string' && options.save.length > 0) ? options.save : undefined;
       if (typeof effSave === 'string' && effSave.length > 0) {
         try {
           fs.writeFileSync(effSave, JSON.stringify(result.conversation, null, 2), 'utf-8');
         } catch (e) {
-          console.error(`Error saving conversation to ${effSave}: ${e instanceof Error ? e.message : String(e)}`);
-          process.exit(1);
+          const msg = e instanceof Error ? e.message : String(e);
+          exitWith(1, `failed to save conversation to ${effSave}: ${msg}`, 'EXIT-SAVE-CONVERSATION');
+        }
+      }
+
+      // Save all conversations if requested (master + sub-agents)
+      const saveAllDir = (typeof options.saveAll === 'string' && options.saveAll.length > 0) ? options.saveAll : undefined;
+      if (typeof saveAllDir === 'string' && saveAllDir.length > 0) {
+        try {
+          fs.mkdirSync(saveAllDir, { recursive: true });
+          // Derive origin dir name from first accounting entry with originTxnId or fallback
+          const origin = ((): string => {
+            const a = result.accounting.find((x) => typeof x.originTxnId === 'string' && x.originTxnId.length > 0);
+            return a?.originTxnId ?? 'origin';
+          })();
+          const originDir = path.join(saveAllDir, origin);
+          fs.mkdirSync(originDir, { recursive: true });
+          // Save master conversation
+          const masterName = 'master';
+          const masterSelf = ((): string => {
+            const a = result.accounting.find((x) => typeof x.txnId === 'string' && x.txnId.length > 0);
+            return a?.txnId ?? 'self';
+          })();
+          const masterFile = path.join(originDir, `${masterSelf}__${masterName}.json`);
+          fs.writeFileSync(masterFile, JSON.stringify(result.conversation, null, 2), 'utf-8');
+          // Save each child
+          (result.childConversations ?? []).forEach((c, idx) => {
+            const agent = (c.agentId ?? c.toolName);
+            const selfId = c.trace?.selfId ?? String(idx + 1);
+            const fname = `${selfId}__${agent}.json`;
+            const fpath = path.join(originDir, fname);
+            fs.writeFileSync(fpath, JSON.stringify(c.conversation, null, 2), 'utf-8');
+          });
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          exitWith(1, `failed to save conversations to ${saveAllDir}: ${msg}`, 'EXIT-SAVE-ALL');
         }
       }
 
       // Successful completion - agent already logged EXIT-FINAL-ANSWER or similar
-      process.exit(0);
+      exitWith(0, 'success', 'EXIT-SUCCESS');
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Unknown error';
-      console.error(`Fatal error: ${msg}`);
-      // Agent should have already logged exit via callbacks, but log here if it didn't
-      if (options.verbose === true && !msg.includes('EXIT-')) {
-        const colorize = (text: string, colorCode: string): string => {
-          return process.stderr.isTTY ? `${colorCode}${text}\x1b[0m` : text;
-        };
-        const formatted = colorize(`[VRB] ← [0.0] agent EXIT-UNKNOWN: Unexpected error in CLI: ${msg} (fatal=true)`, '\x1b[90m');
-        process.stderr.write(`${formatted}\n`);
-      }
-      if (msg.includes('config')) process.exit(1);
-      else if (msg.includes('argument')) process.exit(4);
-      else if (msg.includes('tool')) process.exit(3);
-      else process.exit(1);
+      const code = msg.includes('config') ? 1
+        : msg.includes('argument') ? 4
+        : msg.includes('tool') ? 3
+        : 1;
+      exitWith(code, `fatal error in CLI: ${msg}`, 'EXIT-UNKNOWN');
     }
   });
+
+// Add CLI options from the registry after base command is declared
+addOptionsFromRegistry(program);
 
 // Helper functions
 // parsePositiveInt helper removed from run path; not needed
@@ -570,31 +638,37 @@ function createCallbacks(options: Record<string, unknown>, accountingFile?: stri
         thinkingOpen = false;
       }
       // Always show errors and warnings with colors
-      const agentLabel = (() => {
+      const agentPrefix = (() => {
         if (typeof entry.agentId === 'string' && entry.agentId.length > 0) {
-          try { return ` (agent: ${path.basename(entry.agentId)})`; } catch { return ` (agent: ${entry.agentId})`; }
+          try { return `${path.basename(entry.agentId)} `; } catch { return `${entry.agentId} `; }
         }
         return '';
       })();
       if (entry.severity === 'ERR') {
-        const formatted = colorize(`[ERR] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}${agentLabel}: ${entry.message}`, '\x1b[31m');
+        const formatted = colorize(`${agentPrefix}[ERR] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}: ${entry.message}`, '\x1b[31m');
         process.stderr.write(`${formatted}\n`);
       }
       
       if (entry.severity === 'WRN') {
-        const formatted = colorize(`[WRN] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}${agentLabel}: ${entry.message}`, '\x1b[33m');
+        const formatted = colorize(`${agentPrefix}[WRN] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}: ${entry.message}`, '\x1b[33m');
         process.stderr.write(`${formatted}\n`);
       }
       
       // Show verbose only with --verbose flag (dark gray)
       if (entry.severity === 'VRB' && options.verbose === true) {
-        const formatted = colorize(`[VRB] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}${agentLabel}: ${entry.message}`, '\x1b[90m');
+        const body = (() => {
+          if (entry.remoteIdentifier === 'agent') {
+            return `agent ${entry.message}`; // special formatting for agent tool logs
+          }
+          return `${entry.type} ${entry.remoteIdentifier}: ${entry.message}`;
+        })();
+        const formatted = colorize(`${agentPrefix}[VRB] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${body}`, '\x1b[90m');
         process.stderr.write(`${formatted}\n`);
       }
 
       // Final summary entries
       if (entry.severity === 'FIN') {
-        const formatted = colorize(`[FIN] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}${agentLabel}: ${entry.message}`, '\x1b[36m');
+        const formatted = colorize(`${agentPrefix}[FIN] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}: ${entry.message}`, '\x1b[36m');
         process.stderr.write(`${formatted}\n`);
       }
       
@@ -602,14 +676,14 @@ function createCallbacks(options: Record<string, unknown>, accountingFile?: stri
       if (entry.severity === 'TRC') {
         if ((entry.type === 'llm' && options.traceLlm === true) || 
             (entry.type === 'mcp' && options.traceMcp === true)) {
-          const formatted = colorize(`[TRC] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}${agentLabel}: ${entry.message}`, '\x1b[90m');
+          const formatted = colorize(`${agentPrefix}[TRC] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}: ${entry.message}`, '\x1b[90m');
           process.stderr.write(`${formatted}\n`);
         }
       }
       
       // Show thinking header with light gray color
       if (entry.severity === 'THK') {
-        const formatted = colorize(`[THK] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}${agentLabel}: `, '\x1b[2;37m');
+        const formatted = colorize(`${agentPrefix}[THK] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}: `, '\x1b[2;37m');
         process.stderr.write(formatted);
         thinkingOpen = true;
         lastCharWasNewline = false;
@@ -645,7 +719,13 @@ function createCallbacks(options: Record<string, unknown>, accountingFile?: stri
   };
 }
 
-process.on('uncaughtException', (e) => { console.error(`Uncaught exception: ${e instanceof Error ? e.message : String(e)}`); process.exit(1); });
-process.on('unhandledRejection', (r) => { console.error(`Unhandled rejection: ${r instanceof Error ? r.message : String(r)}`); process.exit(1); });
+process.on('uncaughtException', (e) => {
+  const msg = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+  exitWith(1, `uncaught exception: ${msg}`, 'EXIT-UNCAUGHT-EXCEPTION');
+});
+process.on('unhandledRejection', (r) => {
+  const msg = r instanceof Error ? `${r.name}: ${r.message}` : String(r);
+  exitWith(1, `unhandled rejection: ${msg}`, 'EXIT-UNHANDLED-REJECTION');
+});
 
 program.parse();

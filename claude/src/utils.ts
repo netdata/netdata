@@ -121,12 +121,12 @@ export function formatAgentResultHumanReadable(result: AIAgentResult): string {
     if (fr.format === 'json' && fr.content_json !== undefined) {
       let body = '';
       try { body = JSON.stringify(fr.content_json, null, 2); } catch { body = '[invalid json]'; }
-      const description = buildWhatWasDone(result);
-      return `${body}\n\n${description}`;
+      // Successful + non-empty: return only the final report (no appended activity section)
+      return body;
     }
     if (typeof fr.content === 'string' && fr.content.trim().length > 0) {
-      const description = buildWhatWasDone(result);
-      return `${fr.content}\n\n${description}`;
+      // Successful + non-empty: return only the final report (no appended activity section)
+      return fr.content;
     }
   }
 

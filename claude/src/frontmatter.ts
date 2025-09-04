@@ -3,22 +3,17 @@ import path from 'node:path';
 
 import * as yaml from 'js-yaml';
 
+import { getFrontmatterAllowedKeys } from './options-registry.js';
+
 export interface FrontmatterOptions {
-  llms?: string | string[];
-  targets?: string | string[];
+  models?: string | string[];
   tools?: string | string[];
   agents?: string | string[];
-  load?: string;
-  accounting?: string;
   usage?: string;
   parallelToolCalls?: boolean;
-  stream?: boolean;
-  traceLLM?: boolean;
-  traceMCP?: boolean;
-  verbose?: boolean;
-  save?: string;
   maxToolTurns?: number;
   maxRetries?: number;
+  maxConcurrentTools?: number;
   llmTimeout?: number;
   toolTimeout?: number;
   temperature?: number;
@@ -28,7 +23,7 @@ export interface FrontmatterOptions {
 
 export function parseFrontmatter(
   src: string,
-  opts?: { baseDir?: string }
+  opts?: { baseDir?: string; strict?: boolean }
 ): {
   expectedOutput?: { format: 'json'|'markdown'|'text'; schema?: Record<string, unknown> },
   inputSpec?: { format: 'text' | 'json'; schema?: Record<string, unknown> },
@@ -37,7 +32,13 @@ export function parseFrontmatter(
   description?: string,
   usage?: string
 } | undefined {
-  const m = /^---\n([\s\S]*?)\n---\n/.exec(src);
+  // Allow a shebang on the first line (e.g., "#!/usr/bin/env ai-agent")
+  let text = src;
+  if (text.startsWith('#!')) {
+    const nl = text.indexOf('\n');
+    text = nl >= 0 ? text.slice(nl + 1) : '';
+  }
+  const m = /^---\n([\s\S]*?)\n---\n/.exec(text);
   if (m === null) return undefined;
   try {
     const rawUnknown: unknown = yaml.load(m[1]);
@@ -67,6 +68,26 @@ export function parseFrontmatter(
       }
     }
     const raw = rawUnknown as Record<string, unknown>;
+    // Strict validation of allowed top-level keys (driven by the options registry)
+    if (opts?.strict !== false) {
+      const fmAllowed = getFrontmatterAllowedKeys();
+      const allowedTopLevel = new Set([
+        'description', 'usage', 'output', 'input', 'toolName',
+        ...fmAllowed,
+      ]);
+      const unknownKeys = Object.keys(raw).filter((k) => !allowedTopLevel.has(k));
+      if (unknownKeys.length > 0) {
+        const bad = unknownKeys.join(', ');
+        throw new Error(`Unsupported frontmatter key(s): ${bad}. Remove these or move them to CLI/config. See README for valid keys.`);
+      }
+      // Explicitly reject runtime/app-global keys to guide users
+      const forbidden = ['traceLLM','traceMCP','verbose','accounting','save','load','stream','targets'];
+      const presentForbidden = forbidden.filter((k) => Object.prototype.hasOwnProperty.call(raw, k));
+      if (presentForbidden.length > 0) {
+        const bad = presentForbidden.join(', ');
+        throw new Error(`Invalid frontmatter key(s): ${bad}. These are runtime application options; use CLI flags instead.`);
+      }
+    }
     // Parse input spec for sub-agent tools
     if (docObj.input !== undefined && typeof docObj.input.format === 'string') {
       const fmt = docObj.input.format.toLowerCase();
@@ -85,20 +106,13 @@ export function parseFrontmatter(
       toolName = docObj.toolName.trim();
     }
     const options: FrontmatterOptions = {};
-    if (typeof raw.llms === 'string' || Array.isArray(raw.llms)) options.llms = raw.llms as (string | string[]);
-    if (typeof raw.targets === 'string' || Array.isArray(raw.targets)) options.targets = raw.targets as (string | string[]);
+    if (typeof raw.models === 'string' || Array.isArray(raw.models)) options.models = raw.models as (string | string[]);
     if (typeof raw.tools === 'string' || Array.isArray(raw.tools)) options.tools = raw.tools as (string | string[]);
     if (typeof raw.agents === 'string' || Array.isArray(raw.agents)) options.agents = raw.agents as (string | string[]);
-    if (typeof raw.load === 'string') options.load = raw.load;
-    if (typeof raw.accounting === 'string') options.accounting = raw.accounting;
     if (typeof raw.parallelToolCalls === 'boolean') options.parallelToolCalls = raw.parallelToolCalls;
-    if (typeof raw.stream === 'boolean') options.stream = raw.stream;
-    if (typeof raw.traceLLM === 'boolean') options.traceLLM = raw.traceLLM;
-    if (typeof raw.traceMCP === 'boolean') options.traceMCP = raw.traceMCP;
-    if (typeof raw.verbose === 'boolean') options.verbose = raw.verbose;
-    if (typeof raw.save === 'string') options.save = raw.save;
     if (typeof raw.maxToolTurns === 'number') options.maxToolTurns = raw.maxToolTurns;
     if (typeof raw.maxRetries === 'number') options.maxRetries = raw.maxRetries;
+    if (typeof raw.maxConcurrentTools === 'number') options.maxConcurrentTools = raw.maxConcurrentTools;
     if (typeof raw.llmTimeout === 'number') options.llmTimeout = raw.llmTimeout;
     if (typeof raw.toolTimeout === 'number') options.toolTimeout = raw.toolTimeout;
     if (typeof raw.toolResponseMaxBytes === 'number') options.toolResponseMaxBytes = raw.toolResponseMaxBytes;
@@ -107,7 +121,11 @@ export function parseFrontmatter(
     if (typeof raw.description === 'string') description = raw.description;
     if (typeof raw.usage === 'string') usage = raw.usage;
     return { expectedOutput, inputSpec, toolName, options, description, usage };
-  } catch {
+  } catch (e) {
+    if (opts?.strict !== false) {
+      if (e instanceof Error) throw e;
+      throw new Error(String(e));
+    }
     return undefined;
   }
 }
@@ -131,7 +149,9 @@ export function loadSchemaValue(v: unknown, schemaRef?: string, baseDir?: string
         return undefined;
       }
     }
-  } catch { /* ignore */ }
+  } catch {
+    return undefined;
+  }
   return undefined;
 }
 
@@ -187,6 +207,7 @@ export function buildFrontmatterTemplate(args: {
     toolResponseMaxBytes: number;
     maxRetries: number;
     maxToolTurns: number;
+    maxConcurrentTools: number;
   };
   booleans: {
     stream: boolean;
@@ -209,31 +230,33 @@ export function buildFrontmatterTemplate(args: {
   };
 
   const fm = args.fmOptions;
-  const llmsKey: 'llms' | 'targets' = (fm !== undefined && (Object.prototype.hasOwnProperty.call(fm, 'llms'))) ? 'llms'
-    : ((fm !== undefined && (Object.prototype.hasOwnProperty.call(fm, 'targets'))) ? 'targets' : 'llms');
-  const llmsVal: string[] = (fm !== undefined && llmsKey === 'llms') ? toArray(fm.llms)
-    : (fm !== undefined && llmsKey === 'targets') ? toArray(fm.targets)
-    : [];
+  const llmsVal: string[] = (fm !== undefined) ? toArray(fm.models) : [];
   const toolsVal: string[] = (fm !== undefined) ? toArray(fm.tools) : [];
   const agentsVal: string[] = (fm !== undefined) ? toArray(fm.agents) : [];
 
   const tpl: Record<string, unknown> = {};
   tpl.description = args.description;
   tpl.usage = args.usage;
-  tpl[llmsKey] = llmsVal;
+  tpl.models = llmsVal;
   tpl.tools = toolsVal;
   // Always include agents so users see the key in the template
   tpl.agents = agentsVal.length > 0 ? agentsVal : [];
-  tpl.temperature = args.numbers.temperature;
-  tpl.topP = args.numbers.topP;
-  tpl.llmTimeout = args.numbers.llmTimeout;
-  tpl.toolTimeout = args.numbers.toolTimeout;
-  tpl.toolResponseMaxBytes = args.numbers.toolResponseMaxBytes;
-  tpl.maxRetries = args.numbers.maxRetries;
-  tpl.maxToolTurns = args.numbers.maxToolTurns;
-  // Exclude runtime/CLI-wide toggles from frontmatter template to avoid confusion
-  // (traceLLM, traceMCP, verbose, accounting, save, load, stream)
-  // Keep parallelToolCalls as it influences agent tool behavior.
+  // Populate fm-allowed options using the registry
+  // We keep existing resolved numbers from args to preserve current effective defaults
+  const numericDefaults: Record<string, number> = {
+    temperature: args.numbers.temperature,
+    topP: args.numbers.topP,
+    llmTimeout: args.numbers.llmTimeout,
+    toolTimeout: args.numbers.toolTimeout,
+    toolResponseMaxBytes: args.numbers.toolResponseMaxBytes,
+    maxRetries: args.numbers.maxRetries,
+    maxToolTurns: args.numbers.maxToolTurns,
+    maxConcurrentTools: args.numbers.maxConcurrentTools,
+  };
+  Object.entries(numericDefaults).forEach(([k, v]) => { tpl[k] = v; });
+  // Allow frontmatter to override specific numeric defaults if present
+  if (typeof (fm?.maxConcurrentTools) === 'number') tpl.maxConcurrentTools = fm.maxConcurrentTools;
+  // Keep parallelToolCalls as it influences agent tool behavior and is fm-allowed
   tpl.parallelToolCalls = args.booleans.parallelToolCalls;
   if (args.output !== undefined) tpl.output = args.output;
   return tpl;

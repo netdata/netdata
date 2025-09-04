@@ -35,6 +35,14 @@ You should not expect me to find issues by hand, when there are obvious issues i
 It will be weeks for me, probably an hour for you.
 Fix them all. No questions. No pushback. No workarounds.
 
+## CODE ORGANIZATION
+
+1. Try to keep source code files small and separated based on concerns.
+2. Try to keep functions small and separated based on concerns.
+
+We want a simple and easy to manage application. Always keep code well organized, in small manageable entities, with logical separation.
+
+Each function should have ONLY ONE PURPOSE, do ONLY ONE WORK.
 
 ## Linting and TypeScript Guidelines (to reduce churn)
 

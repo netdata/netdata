@@ -16,7 +16,10 @@
     "file-operations": {
       "type": "stdio",
       "command": "/usr/local/bin/file-mcp-server",
-      "args": ["--root", "/tmp"]
+      "args": [
+        "--root",
+        "/tmp"
+      ]
     },
     "netdata-tools": {
       "type": "websocket",
@@ -39,9 +42,14 @@
   "defaults": {
     "llmTimeout": 30000,
     "toolTimeout": 10000,
-    "maxParallelTools": null,
     "maxConcurrentTools": 5,
     "temperature": 0.7,
-    "topP": 1.0
+    "topP": 1.0,
+    "stream": false,
+    "parallelToolCalls": false,
+    "maxToolTurns": 10,
+    "maxRetries": 3,
+    "toolResponseMaxBytes": 12288,
+    "mcpInitConcurrency": 5
   }
 }

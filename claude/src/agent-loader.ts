@@ -6,6 +6,8 @@ import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, Configurati
 import { AIAgent as Agent } from './ai-agent.js';
 import { buildUnifiedConfiguration, discoverLayers, resolveDefaults } from './config-resolver.js';
 import { parseFrontmatter, parseList, parsePairs } from './frontmatter.js';
+import { resolveEffectiveOptions } from './options-resolver.js';
+import { buildEffectiveOptionsSchema } from './options-schema.js';
 
 export interface LoadedAgent {
   id: string; // canonical path (or synthetic when no file)
@@ -27,6 +29,7 @@ export interface LoadedAgent {
     toolResponseMaxBytes: number;
     stream: boolean;
     parallelToolCalls: boolean;
+    maxConcurrentTools: number;
     traceLLM: boolean;
     traceMCP: boolean;
     verbose: boolean;
@@ -64,6 +67,7 @@ export interface LoadAgentOptions {
   parallelToolCalls?: boolean;
   maxRetries?: number;
   maxToolTurns?: number;
+  maxConcurrentTools?: number;
   llmTimeout?: number;
   toolTimeout?: number;
   temperature?: number;
@@ -72,6 +76,18 @@ export interface LoadAgentOptions {
   mcpInitConcurrency?: number;
   traceLLM?: boolean;
   traceMCP?: boolean;
+  // Defaults applied only when frontmatter/config do not specify (for sub-agents)
+  defaultsForUndefined?: {
+    temperature?: number;
+    topP?: number;
+    llmTimeout?: number;
+    toolTimeout?: number;
+    maxRetries?: number;
+    maxToolTurns?: number;
+  maxConcurrentTools?: number;
+    toolResponseMaxBytes?: number;
+    parallelToolCalls?: boolean;
+  };
 }
 
 function containsPlaceholder(val: unknown): boolean {
@@ -105,11 +121,11 @@ export function loadAgent(aiPath: string, registry?: AgentRegistry, options?: Lo
   const fm = parseFrontmatter(content, { baseDir: path.dirname(aiPath) });
 
   // Determine needed targets/tools: CLI/opts > frontmatter
-  const fmTargets = parsePairs((fm?.options?.llms ?? fm?.options?.targets));
+  const fmModels = parsePairs(fm?.options?.models);
   const fmTools = parseList(fm?.options?.tools);
   const fmAgents = parseList(fm?.options?.agents);
   const optTargets = options?.targets;
-  const selectedTargets = Array.isArray(optTargets) && optTargets.length > 0 ? optTargets : fmTargets;
+  const selectedTargets = Array.isArray(optTargets) && optTargets.length > 0 ? optTargets : fmModels;
   const optTools = options?.tools;
   const selectedTools = Array.isArray(optTools) && optTools.length > 0 ? optTools : fmTools;
   const effAgents = Array.isArray(options?.agents) && options.agents.length > 0 ? options.agents : fmAgents;
@@ -121,52 +137,39 @@ export function loadAgent(aiPath: string, registry?: AgentRegistry, options?: Lo
   const dfl = resolveDefaults(layers);
   validateNoPlaceholders(config);
 
-  const readNum = (ovr: number | undefined, fmv: unknown, dkey: keyof NonNullable<Configuration['defaults']>, fallback: number): number => {
-    if (typeof ovr === 'number' && Number.isFinite(ovr)) return ovr;
-    const n = Number(fmv);
-    if (Number.isFinite(n)) return n;
-    const dv = dfl[dkey];
-    if (typeof dv === 'number' && Number.isFinite(dv)) return dv;
-    return fallback;
-  };
-  const readBool = (ovr: boolean | undefined, fmv: unknown, dkey: keyof NonNullable<Configuration['defaults']>, fallback: boolean): boolean => {
-    if (typeof ovr === 'boolean') return ovr;
-    if (typeof fmv === 'boolean') return fmv;
-    const dv = dfl[dkey];
-    if (typeof dv === 'boolean') return dv;
-    return fallback;
-  };
+  const eff = resolveEffectiveOptions({
+    cli: {
+      stream: options?.stream,
+      parallelToolCalls: options?.parallelToolCalls,
+      maxRetries: options?.maxRetries,
+      maxToolTurns: options?.maxToolTurns,
+      maxConcurrentTools: options?.maxConcurrentTools,
+      llmTimeout: options?.llmTimeout,
+      toolTimeout: options?.toolTimeout,
+      temperature: options?.temperature,
+      topP: options?.topP,
+      toolResponseMaxBytes: options?.toolResponseMaxBytes,
+      mcpInitConcurrency: options?.mcpInitConcurrency,
+      traceLLM: options?.traceLLM,
+      traceMCP: options?.traceMCP,
+      verbose: options?.verbose,
+    },
+    fm: fm?.options,
+    configDefaults: dfl,
+    defaultsForUndefined: options?.defaultsForUndefined,
+  });
 
-  const fmOpts = fm?.options;
-  const fmTraceLLM = (fmOpts !== undefined && typeof fmOpts.traceLLM === 'boolean') ? fmOpts.traceLLM : undefined;
-  const fmTraceMCP = (fmOpts !== undefined && typeof fmOpts.traceMCP === 'boolean') ? fmOpts.traceMCP : undefined;
-  const fmVerbose = (fmOpts !== undefined && typeof fmOpts.verbose === 'boolean') ? fmOpts.verbose : undefined;
+  // Validate effective options against schema derived from registry
+  {
+    const schema = buildEffectiveOptionsSchema();
+    const parsed = schema.safeParse(eff);
+    if (!parsed.success) {
+      const msgs = parsed.error.issues.map((i) => `- ${i.path.join('.')}: ${i.message}`).join('\n');
+      throw new Error(`Effective options validation failed:\n${msgs}`);
+    }
+  }
 
-  const eff = {
-    temperature: readNum(options?.temperature, fmOpts?.temperature, 'temperature', 0.7),
-    topP: readNum(options?.topP, fmOpts?.topP, 'topP', 1.0),
-    llmTimeout: readNum(options?.llmTimeout, fmOpts?.llmTimeout, 'llmTimeout', 120000),
-    toolTimeout: readNum(options?.toolTimeout, fmOpts?.toolTimeout, 'toolTimeout', 60000),
-    maxRetries: readNum(options?.maxRetries, fmOpts?.maxRetries, 'maxRetries', 3),
-    maxToolTurns: readNum(options?.maxToolTurns, fmOpts?.maxToolTurns, 'maxToolTurns', 10),
-    toolResponseMaxBytes: readNum(options?.toolResponseMaxBytes, fmOpts?.toolResponseMaxBytes, 'toolResponseMaxBytes', 12288),
-    stream: readBool(options?.stream, fmOpts?.stream, 'stream', false),
-    parallelToolCalls: readBool(options?.parallelToolCalls, fmOpts?.parallelToolCalls, 'parallelToolCalls', false),
-    traceLLM: typeof options?.traceLLM === 'boolean' ? options.traceLLM : (fmTraceLLM ?? false),
-    traceMCP: typeof options?.traceMCP === 'boolean' ? options.traceMCP : (fmTraceMCP ?? false),
-    verbose: (options?.verbose === true) || (fmVerbose === true),
-    mcpInitConcurrency: ((): number | undefined => {
-      if (typeof options?.mcpInitConcurrency === 'number' && Number.isFinite(options.mcpInitConcurrency)) return Math.trunc(options.mcpInitConcurrency);
-      const dv = config.defaults?.mcpInitConcurrency;
-      if (typeof dv === 'number' && Number.isFinite(dv)) return Math.trunc(dv);
-      return undefined;
-    })()
-  };
-
-  const accountingFile: string | undefined = ((): string | undefined => {
-    if (fmOpts !== undefined && typeof fmOpts.accounting === 'string' && fmOpts.accounting.length > 0) return fmOpts.accounting;
-    return config.accounting?.file;
-  })();
+  const accountingFile: string | undefined = config.accounting?.file;
 
   const agentName = path.basename(id).replace(/\.[^.]+$/, '');
   const loaded: LoadedAgent = {
@@ -189,6 +192,7 @@ export function loadAgent(aiPath: string, registry?: AgentRegistry, options?: Lo
       toolResponseMaxBytes: eff.toolResponseMaxBytes,
       stream: eff.stream,
       parallelToolCalls: eff.parallelToolCalls,
+      maxConcurrentTools: eff.maxConcurrentTools,
       traceLLM: eff.traceLLM,
       traceMCP: eff.traceMCP,
       verbose: eff.verbose,
@@ -236,11 +240,11 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
   if (cached !== undefined) return cached;
 
   const fm = parseFrontmatter(content, { baseDir: options?.baseDir });
-  const fmTargets = parsePairs((fm?.options?.llms ?? fm?.options?.targets));
+  const fmModels = parsePairs(fm?.options?.models);
   const fmTools = parseList(fm?.options?.tools);
   const fmAgents = parseList(fm?.options?.agents);
   const optTargets2 = options?.targets;
-  const selectedTargets = Array.isArray(optTargets2) && optTargets2.length > 0 ? optTargets2 : fmTargets;
+  const selectedTargets = Array.isArray(optTargets2) && optTargets2.length > 0 ? optTargets2 : fmModels;
   const optTools2 = options?.tools;
   const selectedTools = Array.isArray(optTools2) && optTools2.length > 0 ? optTools2 : fmTools;
   const effAgents2 = Array.isArray(options?.agents) && options.agents.length > 0 ? options.agents : fmAgents;
@@ -252,52 +256,39 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
   const dfl = resolveDefaults(layers);
   validateNoPlaceholders(config);
 
-  const readNum = (ovr: number | undefined, fmv: unknown, dkey: keyof NonNullable<Configuration['defaults']>, fallback: number): number => {
-    if (typeof ovr === 'number' && Number.isFinite(ovr)) return ovr;
-    const n = Number(fmv);
-    if (Number.isFinite(n)) return n;
-    const dv = dfl[dkey];
-    if (typeof dv === 'number' && Number.isFinite(dv)) return dv;
-    return fallback;
-  };
-  const readBool = (ovr: boolean | undefined, fmv: unknown, dkey: keyof NonNullable<Configuration['defaults']>, fallback: boolean): boolean => {
-    if (typeof ovr === 'boolean') return ovr;
-    if (typeof fmv === 'boolean') return fmv;
-    const dv = dfl[dkey];
-    if (typeof dv === 'boolean') return dv;
-    return fallback;
-  };
+  const eff = resolveEffectiveOptions({
+    cli: {
+      stream: options?.stream,
+      parallelToolCalls: options?.parallelToolCalls,
+      maxRetries: options?.maxRetries,
+      maxToolTurns: options?.maxToolTurns,
+      maxConcurrentTools: options?.maxConcurrentTools,
+      llmTimeout: options?.llmTimeout,
+      toolTimeout: options?.toolTimeout,
+      temperature: options?.temperature,
+      topP: options?.topP,
+      toolResponseMaxBytes: options?.toolResponseMaxBytes,
+      mcpInitConcurrency: options?.mcpInitConcurrency,
+      traceLLM: options?.traceLLM,
+      traceMCP: options?.traceMCP,
+      verbose: options?.verbose,
+    },
+    fm: fm?.options,
+    configDefaults: dfl,
+    defaultsForUndefined: options?.defaultsForUndefined,
+  });
 
-  const fmOpts2 = fm?.options;
-  const fmTraceLLM2 = (fmOpts2 !== undefined && typeof fmOpts2.traceLLM === 'boolean') ? fmOpts2.traceLLM : undefined;
-  const fmTraceMCP2 = (fmOpts2 !== undefined && typeof fmOpts2.traceMCP === 'boolean') ? fmOpts2.traceMCP : undefined;
-  const fmVerbose2 = (fmOpts2 !== undefined && typeof fmOpts2.verbose === 'boolean') ? fmOpts2.verbose : undefined;
+  // Validate effective options against schema derived from registry
+  {
+    const schema = buildEffectiveOptionsSchema();
+    const parsed = schema.safeParse(eff);
+    if (!parsed.success) {
+      const msgs = parsed.error.issues.map((i) => `- ${i.path.join('.')}: ${i.message}`).join('\n');
+      throw new Error(`Effective options validation failed:\n${msgs}`);
+    }
+  }
 
-  const eff = {
-    temperature: readNum(options?.temperature, fmOpts2?.temperature, 'temperature', 0.7),
-    topP: readNum(options?.topP, fmOpts2?.topP, 'topP', 1.0),
-    llmTimeout: readNum(options?.llmTimeout, fmOpts2?.llmTimeout, 'llmTimeout', 120000),
-    toolTimeout: readNum(options?.toolTimeout, fmOpts2?.toolTimeout, 'toolTimeout', 60000),
-    maxRetries: readNum(options?.maxRetries, fmOpts2?.maxRetries, 'maxRetries', 3),
-    maxToolTurns: readNum(options?.maxToolTurns, fmOpts2?.maxToolTurns, 'maxToolTurns', 10),
-    toolResponseMaxBytes: readNum(options?.toolResponseMaxBytes, fmOpts2?.toolResponseMaxBytes, 'toolResponseMaxBytes', 12288),
-    stream: readBool(options?.stream, fmOpts2?.stream, 'stream', false),
-    parallelToolCalls: readBool(options?.parallelToolCalls, fmOpts2?.parallelToolCalls, 'parallelToolCalls', false),
-    traceLLM: typeof options?.traceLLM === 'boolean' ? options.traceLLM : (fmTraceLLM2 ?? false),
-    traceMCP: typeof options?.traceMCP === 'boolean' ? options.traceMCP : (fmTraceMCP2 ?? false),
-    verbose: (options?.verbose === true) || (fmVerbose2 === true),
-    mcpInitConcurrency: ((): number | undefined => {
-      if (typeof options?.mcpInitConcurrency === 'number' && Number.isFinite(options.mcpInitConcurrency)) return Math.trunc(options.mcpInitConcurrency);
-      const dv = config.defaults?.mcpInitConcurrency;
-      if (typeof dv === 'number' && Number.isFinite(dv)) return Math.trunc(dv);
-      return undefined;
-    })()
-  };
-
-  const accountingFile: string | undefined = ((): string | undefined => {
-    if (fmOpts2 !== undefined && typeof fmOpts2.accounting === 'string' && fmOpts2.accounting.length > 0) return fmOpts2.accounting;
-    return config.accounting?.file;
-  })();
+  const accountingFile: string | undefined = config.accounting?.file;
 
   const loaded: LoadedAgent = {
     id,
@@ -320,6 +311,7 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
       toolResponseMaxBytes: eff.toolResponseMaxBytes,
       stream: eff.stream,
       parallelToolCalls: eff.parallelToolCalls,
+      maxConcurrentTools: eff.maxConcurrentTools,
       traceLLM: eff.traceLLM,
       traceMCP: eff.traceMCP,
       verbose: eff.verbose,

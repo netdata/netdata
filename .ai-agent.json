@@ -72,7 +72,10 @@
     "stream": false,
     "parallelToolCalls": true,
     "maxToolTurns": 10,
-    "mcpInitConcurrency": 10
+    "mcpInitConcurrency": 10,
+    "maxConcurrentTools": 3,
+    "maxRetries": 3,
+    "toolResponseMaxBytes": 12288
   },
   "mcpServers": {
     "file-ops": {
@@ -228,7 +231,10 @@
     "fetcher": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "fetcher-mcp"]
+      "args": [
+        "-y",
+        "fetcher-mcp"
+      ]
     }
   }
 }

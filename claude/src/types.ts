@@ -144,6 +144,7 @@ export interface Configuration {
     // Maximum allowed MCP tool response size in bytes. If exceeded, a tool error is injected.
     toolResponseMaxBytes?: number;
     mcpInitConcurrency?: number;
+    maxConcurrentTools?: number;
   };
 }
 
@@ -176,6 +177,7 @@ export interface AIAgentSessionConfig {
   toolTimeout?: number;
   parallelToolCalls?: boolean;
   stream?: boolean;
+  maxConcurrentTools?: number;
   callbacks?: AIAgentCallbacks;
   traceLLM?: boolean;
   traceMCP?: boolean;
@@ -195,6 +197,14 @@ export interface AIAgentResult {
   conversation: ConversationMessage[];
   logs: LogEntry[];
   accounting: AccountingEntry[];
+  // Conversations of executed sub-agents (when available)
+  childConversations?: {
+    agentId?: string;
+    toolName: string;
+    promptPath: string;
+    trace?: { originId?: string; parentId?: string; selfId?: string; callPath?: string };
+    conversation: ConversationMessage[];
+  }[];
   // Isolated final report returned by the model via agent_final_report, when available
   finalReport?: {
     status: 'success' | 'failure' | 'partial';
@@ -258,6 +268,7 @@ export interface TurnRequest {
   topP?: number;
   parallelToolCalls?: boolean;
   stream?: boolean;
+  maxConcurrentTools?: number;
   isFinalTurn?: boolean;
   llmTimeout?: number;
   onChunk?: (chunk: string, type: 'content' | 'thinking') => void;

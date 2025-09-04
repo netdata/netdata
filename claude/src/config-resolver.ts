@@ -166,6 +166,7 @@ export function resolveDefaults(layers: ConfigLayer[]): NonNullable<Configuratio
     'stream',
     'parallelToolCalls',
     'maxToolTurns',
+    'maxConcurrentTools',
     'maxRetries',
     'toolResponseMaxBytes',
     'mcpInitConcurrency'
