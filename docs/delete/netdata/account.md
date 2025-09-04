@@ -67,7 +67,7 @@ No. Account deletion is permanent and cannot be reversed under any circumstances
 <details>
 <summary><strong>What happens to my connected agents?</strong></summary>
 
-Agents will continue collecting data locally but will lose their cloud connection. You'll need to reclaim them with a new account if desired.
+Agents will continue collecting data locally, but will lose their connection to the Cloud. You'll need to reclaim them with a new account if necessary.
 
 </details>
 
