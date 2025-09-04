@@ -81,7 +81,7 @@ Account deletion is immediate. Your data will be purged from Netdata's systems i
 <details>
 <summary><strong>Will my historical data be saved anywhere?</strong></summary>
 
-No. All historical data stored in Netdata Cloud will be permanently deleted. Local data on your agents will remain but won't be accessible through the Cloud interface.
+No. All historical data stored in Netdata Cloud will be permanently deleted. Local data on your agents will remain, but won't be accessible through the Cloud interface.
 
 </details>
 
