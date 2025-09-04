@@ -11,6 +11,8 @@ export interface CLIOverrides {
   toolTimeout?: number;
   temperature?: number;
   topP?: number;
+  maxOutputTokens?: number;
+  repeatPenalty?: number;
   toolResponseMaxBytes?: number;
   mcpInitConcurrency?: number;
   traceLLM?: boolean;
@@ -21,6 +23,8 @@ export interface CLIOverrides {
 export interface DefaultsForUndefined {
   temperature?: number;
   topP?: number;
+  maxOutputTokens?: number;
+  repeatPenalty?: number;
   llmTimeout?: number;
   toolTimeout?: number;
   maxRetries?: number;
@@ -33,6 +37,8 @@ export interface DefaultsForUndefined {
 export interface ResolvedEffectiveOptions {
   temperature: number;
   topP: number;
+  maxOutputTokens: number | undefined;
+  repeatPenalty: number | undefined;
   llmTimeout: number;
   toolTimeout: number;
   maxRetries: number;
@@ -85,6 +91,14 @@ export function resolveEffectiveOptions(args: {
   const out: ResolvedEffectiveOptions = {
     temperature: readNum('temperature', fm?.temperature, 0.7),
     topP: readNum('topP', fm?.topP, 1.0),
+    maxOutputTokens: ((): number | undefined => {
+      const v = readNum('maxOutputTokens', (fm as { maxOutputTokens?: number } | undefined)?.maxOutputTokens, 4096);
+      return Number.isNaN(v) ? undefined : Math.trunc(v);
+    })(),
+    repeatPenalty: ((): number | undefined => {
+      const v = readNum('repeatPenalty', (fm as { repeatPenalty?: number } | undefined)?.repeatPenalty, 1.1);
+      return Number.isNaN(v) ? undefined : v;
+    })(),
     llmTimeout: readNum('llmTimeout', fm?.llmTimeout, 120000),
     toolTimeout: readNum('toolTimeout', fm?.toolTimeout, 60000),
     maxRetries: readNum('maxRetries', fm?.maxRetries, 3),

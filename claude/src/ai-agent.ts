@@ -1211,6 +1211,8 @@ export class AIAgentSession {
       toolExecutor,
       temperature: this.sessionConfig.temperature,
       topP: this.sessionConfig.topP,
+      maxOutputTokens: this.sessionConfig.maxOutputTokens,
+      repeatPenalty: this.sessionConfig.repeatPenalty,
       parallelToolCalls: this.sessionConfig.parallelToolCalls,
       stream: this.sessionConfig.stream,
       isFinalTurn,
@@ -1272,6 +1274,11 @@ export class AIAgentSession {
     const asString = (v: unknown): string | undefined => typeof v === 'string' ? v : undefined;
     const asId = (v: unknown): string | undefined => (typeof v === 'string') ? v : (typeof v === 'number' && Number.isFinite(v) ? String(v) : undefined);
 
+    // Shared constants for batch logging
+    const BATCH_REMOTE_ID = 'agent:batch' as const;
+    const RESP_DIR = 'response' as const;
+    const LLM_TYPE = 'llm' as const;
+
     const bi: BatchInput | undefined = (() => {
       if (!isPlainObject(parameters)) return undefined;
       const p: Record<string, unknown> = parameters;
@@ -1288,6 +1295,11 @@ export class AIAgentSession {
     })();
 
     if (bi === undefined || bi.calls.some((c) => c.id.length === 0 || c.tool.length === 0)) {
+      // Warn once for invalid batch input
+      try {
+        const warn: LogEntry = { timestamp: Date.now(), severity: 'WRN', turn: currentTurn, subturn: 0, direction: RESP_DIR, type: LLM_TYPE, remoteIdentifier: BATCH_REMOTE_ID, fatal: false, message: 'Invalid batch input: each call requires id, tool, args' };
+        this.addLog(logs, warn);
+      } catch { /* ignore logging errors */ }
       const latency = Date.now() - startTime;
       const accountingEntry: AccountingEntry = {
         type: 'tool', timestamp: startTime, status: 'failed', latency,
@@ -1345,9 +1357,16 @@ export class AIAgentSession {
       const workers: Promise<void>[] = [];
       let subturn = 0;
       const runOne = async (id: string): Promise<void> => {
+        const BATCH_ID = BATCH_REMOTE_ID;
+        const RESP = RESP_DIR;
+        const LLM = LLM_TYPE;
         const c = byId.get(id);
         if (c === undefined) {
           results.set(id, { id, tool: '', ok: false, elapsedMs: 0, error: { code: 'NOT_FOUND', message: 'Call not found' } });
+          try {
+            const warn: LogEntry = { timestamp: Date.now(), severity: 'WRN', turn: currentTurn, subturn, direction: RESP, type: LLM, remoteIdentifier: BATCH_ID, fatal: false, message: `Call '${id}' not found` };
+            this.addLog(logs, warn);
+          } catch { /* ignore */ }
           return;
         }
         // Acquire a tool slot for this inner call and advance subturn
@@ -1370,11 +1389,22 @@ export class AIAgentSession {
                 return `${path} ${msg}`.trim();
               }).join('; ');
               results.set(id, { id, tool: c.tool, ok: false, elapsedMs: Date.now() - callStart, error: { code: 'SCHEMA_VALIDATION', message: errs, schemaExcerpt: schema } });
+              try {
+                const warn: LogEntry = { timestamp: Date.now(), severity: 'WRN', turn: currentTurn, subturn, direction: RESP, type: LLM, remoteIdentifier: BATCH_ID, fatal: false, message: `Schema validation failed for ${c.tool} (id=${id}): ${errs}` };
+                this.addLog(logs, warn);
+              } catch { /* ignore */ }
+              this.releaseToolSlot();
               return;
             }
           }
         } catch (e) {
           results.set(id, { id, tool: c.tool, ok: false, elapsedMs: Date.now() - callStart, error: { code: 'VALIDATION_INIT', message: e instanceof Error ? e.message : String(e) } });
+          try {
+            const msg = e instanceof Error ? e.message : String(e);
+            const warn: LogEntry = { timestamp: Date.now(), severity: 'WRN', turn: currentTurn, subturn, direction: RESP, type: LLM, remoteIdentifier: BATCH_ID, fatal: false, message: `Validation init error for ${c.tool} (id=${id}): ${msg}` };
+            this.addLog(logs, warn);
+          } catch { /* ignore */ }
+          this.releaseToolSlot();
           return;
         }
         // Disallow only reserved internal tools in batch (allow sub‑agents)
@@ -1383,6 +1413,11 @@ export class AIAgentSession {
           // Block housekeeping/finalization tools from batch to prevent recursion/termination inside batch
           if (internalName === 'append_notes' || internalName === 'final_report' || internalName === 'batch') {
             results.set(id, { id, tool: c.tool, ok: false, elapsedMs: 0, error: { code: 'INTERNAL_NOT_ALLOWED', message: 'Internal tools are not allowed in batch' } });
+            try {
+              const warn: LogEntry = { timestamp: Date.now(), severity: 'WRN', turn: currentTurn, subturn, direction: RESP, type: LLM, remoteIdentifier: BATCH_ID, fatal: false, message: `Internal tool not allowed in batch: ${c.tool} (id=${id})` };
+              this.addLog(logs, warn);
+            } catch { /* ignore */ }
+            this.releaseToolSlot();
             return;
           }
         }
@@ -1399,6 +1434,10 @@ export class AIAgentSession {
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           results.set(id, { id, tool: c.tool, ok: false, elapsedMs: Date.now() - callStart, error: { code: 'EXECUTION_ERROR', message: msg } });
+          try {
+            const warn: LogEntry = { timestamp: Date.now(), severity: 'WRN', turn: currentTurn, subturn, direction: RESP, type: LLM, remoteIdentifier: BATCH_ID, fatal: false, message: `Execution error for ${c.tool} (id=${id}): ${msg}` };
+            this.addLog(logs, warn);
+          } catch { /* ignore */ }
         } finally {
           this.releaseToolSlot();
         }
@@ -1495,7 +1534,7 @@ export class AIAgentSession {
 
     const exp = this.sessionConfig.expectedOutput;
     const common = {
-      status: { enum: ['success', 'failure', 'partial'] },
+      status: { type: 'string', enum: ['success', 'failure', 'partial'] },
       metadata: { type: 'object' },
     } as Record<string, unknown>;
 
@@ -1509,7 +1548,7 @@ export class AIAgentSession {
           required: ['status', 'format', 'content_json'],
           properties: {
             status: common.status,
-            format: { const: 'json' },
+            format: { type: 'string', const: 'json' },
             content_json: (exp.schema ?? { type: 'object' }),
             metadata: common.metadata,
           },
@@ -1525,7 +1564,7 @@ export class AIAgentSession {
           required: ['status', 'format', 'content'],
           properties: {
             status: common.status,
-            format: { const: 'text' },
+            format: { type: 'string', const: 'text' },
             content: { type: 'string', minLength: 1 },
             metadata: common.metadata,
           },
@@ -1542,7 +1581,7 @@ export class AIAgentSession {
           required: ['status', 'format', 'content'],
           properties: {
             status: common.status,
-            format: { const: 'markdown' },
+            format: { type: 'string', const: 'markdown' },
             content: { type: 'string', minLength: 1 },
             metadata: common.metadata,
           },

@@ -171,6 +171,8 @@ export interface AIAgentSessionConfig {
   expectedOutput?: { format: 'json' | 'markdown' | 'text'; schema?: Record<string, unknown> };
   temperature?: number;
   topP?: number;
+  maxOutputTokens?: number;
+  repeatPenalty?: number;
   maxRetries?: number;
   maxTurns?: number;
   llmTimeout?: number;
@@ -266,6 +268,8 @@ export interface TurnRequest {
   toolExecutor: ToolExecutor;
   temperature?: number;
   topP?: number;
+  maxOutputTokens?: number;
+  repeatPenalty?: number;
   parallelToolCalls?: boolean;
   stream?: boolean;
   maxConcurrentTools?: number;

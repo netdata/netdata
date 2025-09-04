@@ -201,6 +201,8 @@ export class SubAgentRegistry {
         defaultsForUndefined: {
           temperature: parentSession.temperature,
           topP: parentSession.topP,
+          maxOutputTokens: (parentSession as { maxOutputTokens?: number }).maxOutputTokens,
+          repeatPenalty: (parentSession as { repeatPenalty?: number }).repeatPenalty,
           llmTimeout: parentSession.llmTimeout,
           toolTimeout: parentSession.toolTimeout,
           maxRetries: parentSession.maxRetries,

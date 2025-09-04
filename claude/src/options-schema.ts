@@ -6,6 +6,8 @@ import { OPTIONS_REGISTRY } from './options-registry.js';
 const EFFECTIVE_KEYS = [
   'temperature',
   'topP',
+  'maxOutputTokens',
+  'repeatPenalty',
   'llmTimeout',
   'toolTimeout',
   'maxRetries',

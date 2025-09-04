@@ -22,6 +22,8 @@ export interface LoadedAgent {
   effective: {
     temperature: number;
     topP: number;
+    maxOutputTokens?: number;
+    repeatPenalty?: number;
     llmTimeout: number;
     toolTimeout: number;
     maxRetries: number;
@@ -80,6 +82,8 @@ export interface LoadAgentOptions {
   defaultsForUndefined?: {
     temperature?: number;
     topP?: number;
+    maxOutputTokens?: number;
+    repeatPenalty?: number;
     llmTimeout?: number;
     toolTimeout?: number;
     maxRetries?: number;
@@ -182,9 +186,11 @@ export function loadAgent(aiPath: string, registry?: AgentRegistry, options?: Lo
     targets: selectedTargets,
     tools: selectedTools,
     accountingFile,
-    effective: {
+  effective: {
       temperature: eff.temperature,
       topP: eff.topP,
+      maxOutputTokens: eff.maxOutputTokens,
+      repeatPenalty: eff.repeatPenalty,
       llmTimeout: eff.llmTimeout,
       toolTimeout: eff.toolTimeout,
       maxRetries: eff.maxRetries,
@@ -214,6 +220,8 @@ export function loadAgent(aiPath: string, registry?: AgentRegistry, options?: Lo
         trace: opts?.trace,
         temperature: eff.temperature,
         topP: eff.topP,
+        maxOutputTokens: eff.maxOutputTokens,
+        repeatPenalty: eff.repeatPenalty,
         maxRetries: eff.maxRetries,
         maxTurns: eff.maxToolTurns,
         llmTimeout: eff.llmTimeout,

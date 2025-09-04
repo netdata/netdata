@@ -34,10 +34,18 @@ export class GoogleProvider extends BaseLLMProvider {
       // Add final turn message if needed
       const finalMessages = this.buildFinalTurnMessages(messages, request.isFinalTurn);
 
+      const providerOptions = (() => {
+        const base: Record<string, unknown> = { google: {} };
+        const g = (base.google as Record<string, unknown>);
+        if (typeof request.maxOutputTokens === 'number' && Number.isFinite(request.maxOutputTokens)) g.maxOutputTokens = Math.trunc(request.maxOutputTokens);
+        if (typeof request.repeatPenalty === 'number' && Number.isFinite(request.repeatPenalty)) g.frequencyPenalty = request.repeatPenalty;
+        return base;
+      })();
+
       if (request.stream === true) {
-        return await super.executeStreamingTurn(model, finalMessages, tools, request, startTime);
+        return await super.executeStreamingTurn(model, finalMessages, tools, request, startTime, providerOptions);
       } else {
-        return await super.executeNonStreamingTurn(model, finalMessages, tools, request, startTime);
+        return await super.executeNonStreamingTurn(model, finalMessages, tools, request, startTime, providerOptions);
       }
     } catch (error) {
       return this.createFailureResult(this.mapError(error), Date.now() - startTime);

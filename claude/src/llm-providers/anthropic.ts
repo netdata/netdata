@@ -34,10 +34,18 @@ export class AnthropicProvider extends BaseLLMProvider {
       // Add final turn message if needed
       const finalMessages = this.buildFinalTurnMessages(messages, request.isFinalTurn);
 
+      const providerOptions = (() => {
+        const base: Record<string, unknown> = { anthropic: {} };
+        const a = (base.anthropic as Record<string, unknown>);
+        if (typeof request.maxOutputTokens === 'number' && Number.isFinite(request.maxOutputTokens)) a.maxTokens = Math.trunc(request.maxOutputTokens);
+        // Anthropic has no generic repeat penalty; ignore if provided
+        return base;
+      })();
+
       if (request.stream === true) {
-        return await super.executeStreamingTurn(model, finalMessages, tools, request, startTime);
+        return await super.executeStreamingTurn(model, finalMessages, tools, request, startTime, providerOptions);
       } else {
-        return await super.executeNonStreamingTurn(model, finalMessages, tools, request, startTime);
+        return await super.executeNonStreamingTurn(model, finalMessages, tools, request, startTime, providerOptions);
       }
     } catch (error) {
       return this.createFailureResult(this.mapError(error), Date.now() - startTime);

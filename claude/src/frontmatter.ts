@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import * as yaml from 'js-yaml';
 
-import { getFrontmatterAllowedKeys } from './options-registry.js';
+import { getFrontmatterAllowedKeys, OPTIONS_REGISTRY } from './options-registry.js';
 
 export interface FrontmatterOptions {
   models?: string | string[];
@@ -18,6 +18,8 @@ export interface FrontmatterOptions {
   toolTimeout?: number;
   temperature?: number;
   topP?: number;
+  maxOutputTokens?: number;
+  repeatPenalty?: number;
   toolResponseMaxBytes?: number;
 }
 
@@ -116,6 +118,8 @@ export function parseFrontmatter(
     if (typeof raw.llmTimeout === 'number') options.llmTimeout = raw.llmTimeout;
     if (typeof raw.toolTimeout === 'number') options.toolTimeout = raw.toolTimeout;
     if (typeof raw.toolResponseMaxBytes === 'number') options.toolResponseMaxBytes = raw.toolResponseMaxBytes;
+    if (typeof raw.maxOutputTokens === 'number') options.maxOutputTokens = raw.maxOutputTokens;
+    if (typeof raw.repeatPenalty === 'number') options.repeatPenalty = raw.repeatPenalty;
     if (typeof raw.temperature === 'number') options.temperature = raw.temperature;
     if (typeof raw.topP === 'number') options.topP = raw.topP;
     if (typeof raw.description === 'string') description = raw.description;
@@ -199,28 +203,10 @@ export function buildFrontmatterTemplate(args: {
   fmOptions?: FrontmatterOptions;
   description: string;
   usage: string;
-  numbers: {
-    temperature: number;
-    topP: number;
-    llmTimeout: number;
-    toolTimeout: number;
-    toolResponseMaxBytes: number;
-    maxRetries: number;
-    maxToolTurns: number;
-    maxConcurrentTools: number;
-  };
-  booleans: {
-    stream: boolean;
-    parallelToolCalls: boolean;
-    traceLLM: boolean;
-    traceMCP: boolean;
-    verbose: boolean;
-  };
-  strings: {
-    accounting?: string;
-    save?: string;
-    load?: string;
-  };
+  // Deprecated granular defaults kept for backward compatibility; ignored for dynamic template
+  numbers?: Record<string, number>;
+  booleans?: Record<string, boolean>;
+  strings?: Record<string, string | undefined>;
   output?: { format: 'json'|'markdown'|'text'; schema?: Record<string, unknown> };
 }): Record<string, unknown> {
   const toArray = (v: unknown): string[] => {
@@ -237,27 +223,43 @@ export function buildFrontmatterTemplate(args: {
   const tpl: Record<string, unknown> = {};
   tpl.description = args.description;
   tpl.usage = args.usage;
+  // Always include list keys
   tpl.models = llmsVal;
   tpl.tools = toolsVal;
-  // Always include agents so users see the key in the template
   tpl.agents = agentsVal.length > 0 ? agentsVal : [];
-  // Populate fm-allowed options using the registry
-  // We keep existing resolved numbers from args to preserve current effective defaults
-  const numericDefaults: Record<string, number> = {
-    temperature: args.numbers.temperature,
-    topP: args.numbers.topP,
-    llmTimeout: args.numbers.llmTimeout,
-    toolTimeout: args.numbers.toolTimeout,
-    toolResponseMaxBytes: args.numbers.toolResponseMaxBytes,
-    maxRetries: args.numbers.maxRetries,
-    maxToolTurns: args.numbers.maxToolTurns,
-    maxConcurrentTools: args.numbers.maxConcurrentTools,
-  };
-  Object.entries(numericDefaults).forEach(([k, v]) => { tpl[k] = v; });
-  // Allow frontmatter to override specific numeric defaults if present
-  if (typeof (fm?.maxConcurrentTools) === 'number') tpl.maxConcurrentTools = fm.maxConcurrentTools;
-  // Keep parallelToolCalls as it influences agent tool behavior and is fm-allowed
-  tpl.parallelToolCalls = args.booleans.parallelToolCalls;
+
+  // Dynamically include ALL fm-allowed options from the OPTIONS_REGISTRY
+  const fmAllowed = OPTIONS_REGISTRY.filter((o) => o.fm?.allowed === true);
+  fmAllowed.forEach((opt) => {
+    const key = opt.fm?.key ?? opt.key;
+    // Avoid re-setting models/tools/agents already handled above
+    if (key === 'models' || key === 'tools' || key === 'agents') return;
+    const fmVal = (fm as Record<string, unknown> | undefined)?.[key];
+    let val: unknown = undefined;
+    switch (opt.type) {
+      case 'number': {
+        if (typeof fmVal === 'number' && Number.isFinite(fmVal)) val = fmVal;
+        else if (typeof opt.default === 'number') val = opt.default;
+        else val = 0;
+        break;
+      }
+      case 'boolean': {
+        if (typeof fmVal === 'boolean') val = fmVal; else if (typeof opt.default === 'boolean') val = opt.default; else val = false;
+        break;
+      }
+      case 'string': {
+        if (typeof fmVal === 'string') val = fmVal; else if (typeof opt.default === 'string') val = opt.default; else val = '';
+        break;
+      }
+      case 'string[]': {
+        if (Array.isArray(fmVal)) val = toArray(fmVal); else if (Array.isArray(opt.default)) val = opt.default; else val = [];
+        break;
+      }
+      default:
+        val = fmVal ?? (opt.default as unknown);
+    }
+    tpl[key] = val;
+  });
   if (args.output !== undefined) tpl.output = args.output;
   return tpl;
 }

@@ -50,8 +50,22 @@ export class OllamaProvider extends BaseLLMProvider {
       // Add final turn message if needed
       const finalMessages = this.buildFinalTurnMessages(messages, request.isFinalTurn);
 
-      // Get provider options from config
-      const providerOptions = this.getProviderOptions();
+      // Get provider options from config and overlay dynamic knobs
+      let providerOptions = this.getProviderOptions() as Record<string, unknown> | undefined;
+      try {
+        const dyn: Record<string, unknown> = {};
+        if (typeof request.maxOutputTokens === 'number' && Number.isFinite(request.maxOutputTokens)) {
+          const existing = (dyn.ollama as { options?: Record<string, unknown> } | undefined)?.options ?? {};
+          dyn.ollama = { options: { ...existing, num_predict: Math.trunc(request.maxOutputTokens) } } as Record<string, unknown>;
+        }
+        if (typeof request.repeatPenalty === 'number' && Number.isFinite(request.repeatPenalty)) {
+          const existing = (dyn.ollama as { options?: Record<string, unknown> } | undefined)?.options ?? {};
+          dyn.ollama = { options: { ...existing, repeat_penalty: request.repeatPenalty } } as Record<string, unknown>;
+        }
+        if (Object.keys(dyn).length > 0) {
+          providerOptions = { ...(providerOptions ?? {}), ...dyn };
+        }
+      } catch { /* ignore */ }
 
       if (request.stream === true) {
         return await super.executeStreamingTurn(model, finalMessages, tools, request, startTime, providerOptions);

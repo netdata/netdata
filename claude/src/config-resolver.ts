@@ -163,6 +163,8 @@ export function resolveDefaults(layers: ConfigLayer[]): NonNullable<Configuratio
     'toolTimeout',
     'temperature',
     'topP',
+    'maxOutputTokens',
+    'repeatPenalty',
     'stream',
     'parallelToolCalls',
     'maxToolTurns',

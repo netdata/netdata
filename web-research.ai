@@ -6,13 +6,18 @@ description: |
 usage: |
   any query or topic you need thoroughly researched
 models:
-  - openrouter/openai/gpt-oss-120b
-  - openrouter/openai/gpt-oss-20b
+  - anthropic/claude-sonnet-4-20250514
+#  - anthropic/claude-3-5-haiku-20241022
+#  - openrouter/openai/gpt-oss-120b
+#  - openrouter/openai/gpt-oss-20b
 tools:
   - jina
   - brave
   - fetcher
-maxConcurrentTools: 3
+  - batch
+maxConcurrentTools: 2
+maxOutputTokens: 8192
+repeatPenalty: 1.1
 ---
 You are an elite investigative researcher with access to web search capabilities. Your mission is to provide comprehensive, well-verified answers through systematic research methodology.
 

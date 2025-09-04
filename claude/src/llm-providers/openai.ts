@@ -39,9 +39,14 @@ export class OpenAIProvider extends BaseLLMProvider {
       // Add final turn message if needed
       const finalMessages = this.buildFinalTurnMessages(messages, request.isFinalTurn);
 
-      const providerOptions = request.parallelToolCalls !== undefined
-        ? { openai: { parallelToolCalls: request.parallelToolCalls, toolChoice: 'required' } }
-        : { openai: { toolChoice: 'required' } };
+      const providerOptions = (() => {
+        const base: Record<string, unknown> = { openai: { toolChoice: 'required' } };
+        const o = (base.openai as Record<string, unknown>);
+        if (request.parallelToolCalls !== undefined) o.parallelToolCalls = request.parallelToolCalls;
+        if (typeof request.maxOutputTokens === 'number' && Number.isFinite(request.maxOutputTokens)) o.maxTokens = Math.trunc(request.maxOutputTokens);
+        if (typeof request.repeatPenalty === 'number' && Number.isFinite(request.repeatPenalty)) o.frequencyPenalty = request.repeatPenalty;
+        return base;
+      })();
 
       if (request.stream === true) {
         return await super.executeStreamingTurn(model, finalMessages, tools, request, startTime, providerOptions);
