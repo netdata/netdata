@@ -36,5 +36,6 @@ typedef void (*instance_labels_cb_t)(RRDSET *st, void *data);
 #include "disk-svctm.h"
 #include "disk-avgsz.h"
 #include "power-supply.h"
+#include "cpu-temperature.h"
 
 #endif //NETDATA_COMMON_CONTEXTS_H
