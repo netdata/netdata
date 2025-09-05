@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations docs [\#20925](https://github.com/netdata/netdata/pull/20925) ([netdatabot](https://github.com/netdatabot))
+- docs\(go.d/nginx\): improve prerequisites for NGINX collector [\#20924](https://github.com/netdata/netdata/pull/20924) ([ilyam8](https://github.com/ilyam8))
+- fix\(go.d/weblog\): remove path pattern validation in dyncfg [\#20923](https://github.com/netdata/netdata/pull/20923) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d\): remove unused resolve hostname functionality [\#20922](https://github.com/netdata/netdata/pull/20922) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#20916](https://github.com/netdata/netdata/pull/20916) ([netdatabot](https://github.com/netdatabot))
 - fix\(netdata-updater\): resolve "run: command not found" error in offline install [\#20915](https://github.com/netdata/netdata/pull/20915) ([ilyam8](https://github.com/ilyam8))
@@ -446,9 +449,6 @@
 - SNMP: aruba-clearpass.yaml [\#20382](https://github.com/netdata/netdata/pull/20382) ([Ancairon](https://github.com/Ancairon))
 - SNMP: \_aruba-switch-cpu-memory.yaml [\#20381](https://github.com/netdata/netdata/pull/20381) ([Ancairon](https://github.com/Ancairon))
 - Update documentation [\#20380](https://github.com/netdata/netdata/pull/20380) ([thiagoftsm](https://github.com/thiagoftsm))
-- test\(go.d/oracledb\): fix test [\#20378](https://github.com/netdata/netdata/pull/20378) ([ilyam8](https://github.com/ilyam8))
-- SNMP: fortinet-fortiswitch.yaml [\#20377](https://github.com/netdata/netdata/pull/20377) ([Ancairon](https://github.com/Ancairon))
-- chore\(otel.plugin\): add more receivers/exporter [\#20376](https://github.com/netdata/netdata/pull/20376) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
