@@ -27,6 +27,33 @@ const MCPServerConfigSchema = z.object({
   toolSchemas: z.record(z.string(), z.unknown()).optional(),
 });
 
+const SlackConfigSchema = z.object({
+  enabled: z.boolean().optional(),
+  mentions: z.boolean().optional(),
+  dms: z.boolean().optional(),
+  updateIntervalMs: z.number().int().positive().optional(),
+  historyLimit: z.number().int().positive().optional(),
+  historyCharsCap: z.number().int().positive().optional(),
+  botToken: z.string().optional(),
+  appToken: z.string().optional(),
+});
+
+const ApiConfigSchema = z.object({
+  enabled: z.boolean().optional(),
+  port: z.number().int().positive().optional(),
+  bearerKeys: z.array(z.string()).optional(),
+});
+
+const OutputFormatEnum = z.enum(['markdown','markdown+mermaid','slack','tty','pipe','json','sub-agent']);
+
+const FormatsConfigSchema = z.object({
+  cli: OutputFormatEnum.optional(),
+  slack: OutputFormatEnum.optional(),
+  api: OutputFormatEnum.optional(),
+  web: OutputFormatEnum.optional(),
+  subAgent: OutputFormatEnum.optional(),
+}).partial();
+
 const ConfigurationSchema = z.object({
   providers: z.record(z.string(), ProviderConfigSchema),
   mcpServers: z.record(z.string(), MCPServerConfigSchema),
@@ -43,8 +70,12 @@ const ConfigurationSchema = z.object({
       maxRetries: z.number().int().positive().optional(),
       toolResponseMaxBytes: z.number().int().positive().optional(),
       mcpInitConcurrency: z.number().int().positive().optional(),
+      outputFormat: OutputFormatEnum.optional(),
+      formats: FormatsConfigSchema.optional(),
     })
     .optional(),
+  slack: SlackConfigSchema.optional(),
+  api: ApiConfigSchema.optional(),
 });
 
 function hasMcpServers(x: unknown): x is { mcpServers: Record<string, unknown> } {

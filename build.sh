@@ -16,6 +16,9 @@ fi
 echo "[build] Linting Claude implementation (ESLint)"
 (cd claude && npm run lint)
 
+# Build Server headend
+echo "[build] Single project: server headend included in Claude build"
+
 # Create a lightweight launcher at repo root: ./ai-agent
 LAUNCHER="$SCRIPT_DIR/ai-agent"
 cat > "$LAUNCHER" <<'EOF'

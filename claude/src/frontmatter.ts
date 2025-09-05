@@ -164,6 +164,16 @@ export function stripFrontmatter(src: string): string {
   return src.replace(m, '');
 }
 
+// Extract the body of a prompt file, removing shebang and YAML frontmatter if present
+export function extractBodyWithoutFrontmatter(src: string): string {
+  let text = src;
+  if (text.startsWith('#!')) {
+    const nl = text.indexOf('\n');
+    text = nl >= 0 ? text.slice(nl + 1) : '';
+  }
+  return stripFrontmatter(text);
+}
+
 export function readFmNumber(opts: FrontmatterOptions | undefined, key: keyof FrontmatterOptions): number | undefined {
   if (opts === undefined) return undefined;
   const v = opts[key];

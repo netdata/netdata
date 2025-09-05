@@ -11,7 +11,9 @@ import type { CommanderError } from 'commander';
 
 import { loadAgentFromContent } from './agent-loader.js';
 import { discoverLayers, resolveDefaults } from './config-resolver.js';
+import { describeFormat, resolveFormatIdForCli } from './formats.js';
 import { parseFrontmatter, stripFrontmatter, parseList, parsePairs, buildFrontmatterTemplate } from './frontmatter.js';
+import { resolveIncludes } from './include-resolver.js';
 import { getOptionsByGroup, formatCliNames, OPTIONS_REGISTRY } from './options-registry.js';
 import { formatAgentResultHumanReadable } from './utils.js';
 
@@ -265,6 +267,43 @@ program
   .name('ai-agent')
   .description('Universal LLM Tool Calling Interface with MCP support')
   .version('1.0.0')
+  .hook('preSubcommand', () => { /* placeholder */ });
+
+program
+  .command('server')
+  .description('Start the server headend (Slack + REST API)')
+  .argument('<agentPath>', 'Path to the .ai file to serve')
+  .option('--slack', 'Enable Slack headend (Socket Mode)')
+  .option('--no-slack', 'Disable Slack headend')
+  .option('--api', 'Enable REST API headend')
+  .option('--no-api', 'Disable REST API headend')
+  .option('--trace-llm', 'Trace LLM requests/responses (server mode)')
+  .option('--trace-mcp', 'Trace MCP requests/responses (server mode)')
+  .action(async (agentPath: string, opts: Record<string, unknown>) => {
+    try {
+      const mod = await import('./server/index.js');
+      const enableSlack = opts.slack === true ? true : (opts.slack === false ? false : undefined);
+      const enableApi = opts.api === true ? true : (opts.api === false ? false : undefined);
+      // Merge root (global) flags with subcommand flags so users can pass --verbose/--trace-llm either before or after 'server'
+      const rootOptsObj = typeof program.opts === 'function' ? program.opts() : {};
+      const rootOpts: Record<string, unknown> = rootOptsObj as Record<string, unknown>;
+      const verbose = (opts as { verbose?: boolean }).verbose === true || (rootOpts.verbose === true);
+      const traceLlm = (opts as { traceLlm?: boolean }).traceLlm === true || (rootOpts.traceLlm === true);
+      const traceMcp = (opts as { traceMcp?: boolean }).traceMcp === true || (rootOpts.traceMcp === true);
+      await (mod.startServer as (p: string, o?: { enableSlack?: boolean; enableApi?: boolean; verbose?: boolean; traceLlm?: boolean; traceMcp?: boolean }) => Promise<void>)(agentPath, {
+        enableSlack,
+        enableApi,
+        verbose,
+        traceLlm,
+        traceMcp,
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      exitWith(1, `failed to start server: ${msg}`, 'EXIT-SERVER-START');
+    }
+  });
+
+program
   .argument('<system-prompt>', 'System prompt (string, @filename, or - for stdin)')
   .argument('<user-prompt>', 'User prompt (string, @filename, or - for stdin)')
   .option('--save-all <dir>', 'Save all agent and sub-agent conversations to directory')
@@ -281,10 +320,12 @@ program
       // (moved) numeric options will be resolved after reading prompts/frontmatter
 
       // Resolve prompts and parse frontmatter for expected output and options
-      const resolvedSystemRaw = await readPrompt(systemPrompt);
-      const resolvedUserRaw = await readPrompt(userPrompt);
+      let resolvedSystemRaw = await readPrompt(systemPrompt);
+      let resolvedUserRaw = await readPrompt(userPrompt);
       const sysBaseDir = (() => { try { return (systemPrompt !== '-' && fs.existsSync(systemPrompt) && fs.statSync(systemPrompt).isFile()) ? path.dirname(systemPrompt) : undefined; } catch { return undefined; } })();
       const usrBaseDir = (() => { try { return (userPrompt !== '-' && fs.existsSync(userPrompt) && fs.statSync(userPrompt).isFile()) ? path.dirname(userPrompt) : undefined; } catch { return undefined; } })();
+      resolvedSystemRaw = resolveIncludes(resolvedSystemRaw, sysBaseDir);
+      resolvedUserRaw = resolveIncludes(resolvedUserRaw, usrBaseDir);
       const fmSys = parseFrontmatter(resolvedSystemRaw, { baseDir: sysBaseDir });
       const fmUsr = parseFrontmatter(resolvedUserRaw, { baseDir: usrBaseDir });
       const fm = fmSys ?? fmUsr;
@@ -407,7 +448,12 @@ program
       });
 
       // Prompt variable substitution using loader-effective max tool turns
+      const expectedJson = fm?.expectedOutput?.format === 'json';
+      const fmtRaw: unknown = (() => { const rec: Record<string, unknown> = options; return Object.prototype.hasOwnProperty.call(rec, 'format') ? (rec as { format?: unknown }).format : undefined; })();
+      const fmtOpt = typeof fmtRaw === 'string' && fmtRaw.length > 0 ? fmtRaw : undefined;
+      const chosenFormatId = resolveFormatIdForCli(fmtOpt, expectedJson, process.stdout.isTTY ? true : false);
       const vars = buildPromptVariables(loaded.effective.maxToolTurns);
+      vars.FORMAT = describeFormat(chosenFormatId);
       const resolvedSystem = expandPrompt(stripFrontmatter(resolvedSystemRaw), vars);
       const resolvedUser = expandPrompt(stripFrontmatter(resolvedUserRaw), vars);
 
@@ -440,7 +486,7 @@ program
       }
 
       // Create and run session via unified loader
-      const result = await loaded.run(resolvedSystem, resolvedUser, { history: conversationHistory, callbacks });
+      const result = await loaded.run(resolvedSystem, resolvedUser, { history: conversationHistory, callbacks, renderTarget: 'cli', outputFormat: chosenFormatId });
 
       // Always print only the formatted human-readable output to stdout
       try {

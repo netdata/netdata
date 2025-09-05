@@ -96,9 +96,9 @@ export function discoverLayers(opts?: { configPath?: string }): ConfigLayer[] {
   return layers;
 }
 
-function expandPlaceholders(obj: unknown, vars: (name: string) => string | undefined): unknown {
+function expandPlaceholders(obj: unknown, vars: (name: string) => string): unknown {
   if (typeof obj === 'string') {
-    return obj.replace(/\$\{([^}]+)\}/g, (_m: string, name: string) => vars(name) ?? '');
+    return obj.replace(/\$\{([^}]+)\}/g, (_m: string, name: string) => vars(name));
   }
   if (Array.isArray(obj)) return obj.map((v) => expandPlaceholders(v, vars));
   if (obj !== null && typeof obj === 'object') {
@@ -111,14 +111,11 @@ function expandPlaceholders(obj: unknown, vars: (name: string) => string | undef
   return obj;
 }
 
-function logWarn(opts: ResolverOptions | undefined, msg: string): void {
-  if (opts?.verbose === true) opts.log?.(`[resolver] ${msg}`);
-}
-function buildMissingVarMsg(scope: 'provider'|'mcp', id: string, origin: LayerOrigin, name: string): string {
-  return `missing env var '${name}' for ${scope} '${id}' at ${origin}; falling back to empty`;
+function buildMissingVarError(scope: 'provider'|'mcp'|'defaults'|'accounting', id: string, origin: LayerOrigin, name: string): Error {
+  return new Error(`Unresolved variable \${${name}} for ${scope} '${id}' at ${origin}. Define it in ${origin === '--config' ? 'the specified config path' : '.ai-agent.env or environment'}.`);
 }
 
-export function resolveProvider(id: string, layers: ConfigLayer[], opts?: ResolverOptions): ProviderConfig | undefined {
+export function resolveProvider(id: string, layers: ConfigLayer[], _opts?: ResolverOptions): ProviderConfig | undefined {
   const found = layers.find((layer) => {
     const provs = layer.json?.providers as Record<string, unknown> | undefined;
     return provs !== undefined && Object.prototype.hasOwnProperty.call(provs, id);
@@ -128,16 +125,16 @@ export function resolveProvider(id: string, layers: ConfigLayer[], opts?: Resolv
   const provs = j?.providers ?? {};
   const obj = provs[id] as Record<string, unknown>;
   const env = found.env ?? {};
-  const vars = (name: string): string | undefined => (env[name] ?? process.env[name]);
   const expanded = expandPlaceholders(obj, (name: string) => {
-    const v = vars(name);
-    if (v === undefined) logWarn(opts, buildMissingVarMsg('provider', id, found.origin, name));
+    const envVal = Object.prototype.hasOwnProperty.call(env, name) ? env[name] : undefined;
+    const v = envVal ?? process.env[name];
+    if (v === undefined) throw buildMissingVarError('provider', id, found.origin, name);
     return v;
   }) as ProviderConfig;
   return expanded;
 }
 
-export function resolveMCPServer(id: string, layers: ConfigLayer[], opts?: ResolverOptions): MCPServerConfig | undefined {
+export function resolveMCPServer(id: string, layers: ConfigLayer[], _opts?: ResolverOptions): MCPServerConfig | undefined {
   const found = layers.find((layer) => {
     const srvs = layer.json?.mcpServers as Record<string, unknown> | undefined;
     return srvs !== undefined && Object.prototype.hasOwnProperty.call(srvs, id);
@@ -147,10 +144,10 @@ export function resolveMCPServer(id: string, layers: ConfigLayer[], opts?: Resol
   const srvs = j?.mcpServers ?? {};
   const obj = srvs[id] as Record<string, unknown>;
   const env = found.env ?? {};
-  const vars = (name: string): string | undefined => (env[name] ?? process.env[name]);
   const expanded = expandPlaceholders(obj, (name: string) => {
-    const v = vars(name);
-    if (v === undefined) logWarn(opts, buildMissingVarMsg('mcp', id, found.origin, name));
+    const envVal = Object.prototype.hasOwnProperty.call(env, name) ? env[name] : undefined;
+    const v = envVal ?? process.env[name];
+    if (v === undefined) throw buildMissingVarError('mcp', id, found.origin, name);
     return v;
   }) as MCPServerConfig;
   return expanded;
@@ -197,8 +194,12 @@ export function resolveAccounting(layers: ConfigLayer[], _opts?: ResolverOptions
   const acc = j?.accounting;
   if (acc === undefined || typeof acc.file !== 'string') return undefined;
   const env = found.env ?? {};
-  const vars = (name: string): string | undefined => (env[name] ?? process.env[name]);
-  const expandedFile = expandPlaceholders(acc.file, (name: string) => vars(name)) as string;
+  const expandedFile = expandPlaceholders(acc.file, (name: string) => {
+    const envVal = Object.prototype.hasOwnProperty.call(env, name) ? env[name] : undefined;
+    const v = envVal ?? process.env[name];
+    if (v === undefined) throw buildMissingVarError('accounting', 'file', found.origin, name);
+    return v;
+  }) as string;
   return { file: expandedFile };
 }
 

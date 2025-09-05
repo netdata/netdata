@@ -1,0 +1,50 @@
+{
+  "_comment": "Import this manifest at https://api.slack.com/apps → Create New App → From an app manifest",
+  "display_information": {
+    "name": "AI Agent Bot",
+    "description": "AI agent that responds to mentions and DMs with LLM + tools",
+    "background_color": "#2b6cb0"
+  },
+  "features": {
+    "bot_user": {
+      "display_name": "ai-agent",
+      "always_online": true
+    },
+    "app_home": {
+      "home_tab_enabled": true,
+      "messages_tab_enabled": true,
+      "messages_tab_read_only_enabled": false
+    }
+  },
+  "oauth_config": {
+    "scopes": {
+      "bot": [
+        "app_mentions:read",
+        "chat:write",
+        "channels:read",
+        "channels:history",
+        "im:history",
+        "im:write",
+        "mpim:history",
+        "groups:history",
+        "users:read",
+        "users:read.email"
+      ]
+    }
+  },
+  "settings": {
+    "event_subscriptions": {
+      "request_url": "",
+      "bot_events": [
+        "app_mention",
+        "message.im"
+      ]
+    },
+    "interactivity": {
+      "is_enabled": false
+    },
+    "org_deploy_enabled": false,
+    "socket_mode_enabled": true,
+    "token_rotation_enabled": false
+  }
+}

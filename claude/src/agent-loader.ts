@@ -1,17 +1,22 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+// keep type imports grouped at top
+import type { OutputFormatId } from './formats.js';
 import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, Configuration, ConversationMessage } from './types.js';
+// no runtime format validation here; caller must pass a valid OutputFormatId
 
 import { AIAgent as Agent } from './ai-agent.js';
 import { buildUnifiedConfiguration, discoverLayers, resolveDefaults } from './config-resolver.js';
-import { parseFrontmatter, parseList, parsePairs } from './frontmatter.js';
+import { parseFrontmatter, parseList, parsePairs, extractBodyWithoutFrontmatter } from './frontmatter.js';
+import { resolveIncludes } from './include-resolver.js';
 import { resolveEffectiveOptions } from './options-resolver.js';
 import { buildEffectiveOptionsSchema } from './options-schema.js';
 
 export interface LoadedAgent {
   id: string; // canonical path (or synthetic when no file)
   promptPath: string;
+  systemTemplate: string;
   description?: string;
   usage?: string;
   expectedOutput?: { format: 'json' | 'markdown' | 'text'; schema?: Record<string, unknown> };
@@ -41,7 +46,7 @@ export interface LoadedAgent {
   run: (
     systemPrompt: string,
     userPrompt: string,
-    opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace'] }
+    opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent'; outputFormat: OutputFormatId }
   ) => Promise<AIAgentResult>;
 }
 
@@ -121,8 +126,10 @@ export function loadAgent(aiPath: string, registry?: AgentRegistry, options?: Lo
   const cached = reg.get(id);
   if (cached !== undefined) return cached;
 
-  const content = readFileText(aiPath);
+  const baseDir = path.dirname(aiPath);
+  const content = resolveIncludes(readFileText(aiPath), baseDir);
   const fm = parseFrontmatter(content, { baseDir: path.dirname(aiPath) });
+  const systemTemplate = extractBodyWithoutFrontmatter(content);
 
   // Determine needed targets/tools: CLI/opts > frontmatter
   const fmModels = parsePairs(fm?.options?.models);
@@ -179,6 +186,7 @@ export function loadAgent(aiPath: string, registry?: AgentRegistry, options?: Lo
   const loaded: LoadedAgent = {
     id,
     promptPath: id,
+    systemTemplate,
     description: fm?.description,
     usage: fm?.usage,
     expectedOutput: fm?.expectedOutput,
@@ -205,7 +213,9 @@ export function loadAgent(aiPath: string, registry?: AgentRegistry, options?: Lo
       mcpInitConcurrency: eff.mcpInitConcurrency,
     },
     subTools: [],
-    run: async (systemPrompt: string, userPrompt: string, opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace'] }): Promise<AIAgentResult> => {
+    run: async (systemPrompt: string, userPrompt: string, opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent'; outputFormat: OutputFormatId }): Promise<AIAgentResult> => {
+      const o = (opts ?? {}) as { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli'|'slack'|'api'|'web'|'sub-agent'; outputFormat?: OutputFormatId };
+      if (o.outputFormat === undefined) throw new Error('outputFormat is required');
       const sessionConfig: AIAgentSessionConfig = {
         config,
         targets: selectedTargets,
@@ -214,10 +224,12 @@ export function loadAgent(aiPath: string, registry?: AgentRegistry, options?: Lo
         subAgentPaths: selectedAgents,
         systemPrompt,
         userPrompt,
-        conversationHistory: opts?.history,
+        outputFormat: o.outputFormat,
+        renderTarget: o.renderTarget,
+        conversationHistory: o.history,
         expectedOutput: fm?.expectedOutput,
-        callbacks: opts?.callbacks,
-        trace: opts?.trace,
+        callbacks: o.callbacks,
+        trace: o.trace,
         temperature: eff.temperature,
         topP: eff.topP,
         maxOutputTokens: eff.maxOutputTokens,
@@ -247,7 +259,9 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
   const cached = reg.get(id);
   if (cached !== undefined) return cached;
 
-  const fm = parseFrontmatter(content, { baseDir: options?.baseDir });
+  const contentWithIncludes = resolveIncludes(content, options?.baseDir);
+  const fm = parseFrontmatter(contentWithIncludes, { baseDir: options?.baseDir });
+  const systemTemplate = extractBodyWithoutFrontmatter(contentWithIncludes);
   const fmModels = parsePairs(fm?.options?.models);
   const fmTools = parseList(fm?.options?.tools);
   const fmAgents = parseList(fm?.options?.agents);
@@ -301,6 +315,7 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
   const loaded: LoadedAgent = {
     id,
     promptPath: id,
+    systemTemplate,
     description: fm?.description,
     usage: fm?.usage,
     expectedOutput: fm?.expectedOutput,
@@ -325,7 +340,9 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
       verbose: eff.verbose,
       mcpInitConcurrency: eff.mcpInitConcurrency,
     },
-    run: async (systemPrompt: string, userPrompt: string, opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace'] }): Promise<AIAgentResult> => {
+    run: async (systemPrompt: string, userPrompt: string, opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent'; outputFormat: OutputFormatId }): Promise<AIAgentResult> => {
+      const o = (opts ?? {}) as { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli'|'slack'|'api'|'web'|'sub-agent'; outputFormat?: OutputFormatId };
+      if (o.outputFormat === undefined) throw new Error('outputFormat is required');
       const sessionConfig: AIAgentSessionConfig = {
         config,
         targets: selectedTargets,
@@ -334,10 +351,12 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
         subAgentPaths: selectedAgents,
         systemPrompt,
         userPrompt,
-        conversationHistory: opts?.history,
+        outputFormat: o.outputFormat,
+        renderTarget: o.renderTarget,
+        conversationHistory: o.history,
         expectedOutput: fm?.expectedOutput,
-        callbacks: opts?.callbacks,
-        trace: opts?.trace,
+        callbacks: o.callbacks,
+        trace: o.trace,
         temperature: eff.temperature,
         topP: eff.topP,
         maxRetries: eff.maxRetries,

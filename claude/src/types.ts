@@ -145,6 +145,30 @@ export interface Configuration {
     toolResponseMaxBytes?: number;
     mcpInitConcurrency?: number;
     maxConcurrentTools?: number;
+    outputFormat?: 'markdown' | 'markdown+mermaid' | 'slack' | 'tty' | 'pipe' | 'json' | 'sub-agent';
+    formats?: {
+      cli?: 'markdown' | 'markdown+mermaid' | 'slack' | 'tty' | 'pipe' | 'json' | 'sub-agent';
+      slack?: 'markdown' | 'markdown+mermaid' | 'slack' | 'tty' | 'pipe' | 'json' | 'sub-agent';
+      api?: 'markdown' | 'markdown+mermaid' | 'slack' | 'tty' | 'pipe' | 'json' | 'sub-agent';
+      web?: 'markdown' | 'markdown+mermaid' | 'slack' | 'tty' | 'pipe' | 'json' | 'sub-agent';
+      subAgent?: 'markdown' | 'markdown+mermaid' | 'slack' | 'tty' | 'pipe' | 'json' | 'sub-agent';
+    };
+  };
+  // Server headend configuration (optional)
+  slack?: {
+    enabled?: boolean;
+    mentions?: boolean; // handle app_mention in channels
+    dms?: boolean;      // handle message.im in DMs
+    updateIntervalMs?: number; // throttled progress update interval
+    historyLimit?: number;     // messages to prefetch
+    historyCharsCap?: number;  // cap for prefetched context (characters)
+    botToken?: string;         // ${SLACK_BOT_TOKEN}
+    appToken?: string;         // ${SLACK_APP_TOKEN} (Socket Mode)
+  };
+  api?: {
+    enabled?: boolean;
+    port?: number;             // ${PORT}
+    bearerKeys?: string[];     // e.g., ["${API_BEARER_TOKEN}"] or multiple
   };
 }
 
@@ -166,6 +190,10 @@ export interface AIAgentSessionConfig {
   agentId?: string;
   systemPrompt: string;
   userPrompt: string;
+  // Resolved output format for this session (must be provided by caller)
+  outputFormat: OutputFormatId;
+  // Optional rendering target for diagnostics
+  renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent';
   conversationHistory?: ConversationMessage[];
   // Expected output contract parsed from prompt frontmatter
   expectedOutput?: { format: 'json' | 'markdown' | 'text'; schema?: Record<string, unknown> };
@@ -210,9 +238,11 @@ export interface AIAgentResult {
   // Isolated final report returned by the model via agent_final_report, when available
   finalReport?: {
     status: 'success' | 'failure' | 'partial';
-    format: 'json' | 'markdown' | 'text';
+    // Allow all known output formats plus legacy 'text'
+    format: 'json' | 'markdown' | 'markdown+mermaid' | 'slack' | 'tty' | 'pipe' | 'sub-agent' | 'text';
     content?: string;
     content_json?: Record<string, unknown>;
+    // Optional provider-specific extras (e.g., Slack Block Kit messages)
     metadata?: Record<string, unknown>;
     ts: number;
   };
@@ -311,3 +341,4 @@ export interface AIAgentRunOptions {
   loadConversation?: string;
   dryRun?: boolean;
 }
+import type { OutputFormatId } from './formats.js';

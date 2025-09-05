@@ -1,7 +1,10 @@
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
 
 import Ajv from 'ajv';
 
+import type { OutputFormatId } from './formats.js';
 import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, MCPTool, LLMAccountingEntry, ToolAccountingEntry, MCPServerConfig } from './types.js';
 
 // Exit codes according to DESIGN.md
@@ -67,10 +70,13 @@ export class AIAgentSession {
   private readonly originTxnId?: string;
   private readonly parentTxnId?: string;
   private readonly callPath?: string;
+  private resolvedFormat?: OutputFormatId;
+  private resolvedFormatDescription?: string;
   // Finalization state captured via agent__final_report
   private finalReport?: {
     status: 'success' | 'failure' | 'partial';
-    format: 'json' | 'markdown' | 'text';
+    // Allow all known output formats plus legacy 'text'
+    format: 'json' | 'markdown' | 'markdown+mermaid' | 'slack' | 'tty' | 'pipe' | 'sub-agent' | 'text';
     content?: string;
     content_json?: Record<string, unknown>;
     metadata?: Record<string, unknown>;
@@ -349,10 +355,71 @@ export class AIAgentSession {
         this.addLog(currentLogs, banner);
       } catch { /* ignore banner errors */ }
 
+      // Build prompt variables and expand placeholders in prompts
+      const buildPromptVars = (): Record<string, string> => {
+        const pad2 = (n: number): string => (n < 10 ? `0${String(n)}` : String(n));
+        const formatRFC3339Local = (d: Date): string => {
+          const y = d.getFullYear();
+          const m = pad2(d.getMonth() + 1);
+          const da = pad2(d.getDate());
+          const hh = pad2(d.getHours());
+          const mm = pad2(d.getMinutes());
+          const ss = pad2(d.getSeconds());
+          const tzMin = -d.getTimezoneOffset();
+          const sign = tzMin >= 0 ? '+' : '-';
+          const abs = Math.abs(tzMin);
+          const tzh = pad2(Math.floor(abs / 60));
+          const tzm = pad2(abs % 60);
+          return `${String(y)}-${m}-${da}T${hh}:${mm}:${ss}${sign}${tzh}:${tzm}`;
+        };
+        const detectTimezone = (): string => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return process.env.TZ ?? 'UTC'; } };
+        const detectOS = (): string => {
+          try {
+            const contentOs = fs.readFileSync('/etc/os-release', 'utf-8');
+            const match = /^PRETTY_NAME=\"?([^\"\n]+)\"?/m.exec(contentOs);
+            if (match?.[1] !== undefined) return `${match[1]} (kernel ${os.release()})`;
+          } catch { /* ignore */ }
+          return `${os.type()} ${os.release()}`;
+        };
+        const now = new Date();
+        return {
+          DATETIME: formatRFC3339Local(now),
+          DAY: now.toLocaleDateString(undefined, { weekday: 'long' }),
+          TIMEZONE: detectTimezone(),
+          MAX_TURNS: String(this.sessionConfig.maxTurns ?? 10),
+          OS: detectOS(),
+          ARCH: process.arch,
+          KERNEL: `${os.type()} ${os.release()}`,
+          CD: process.cwd(),
+          HOSTNAME: os.hostname(),
+          USER: (() => { try { return os.userInfo().username; } catch { return process.env.USER ?? process.env.USERNAME ?? ''; } })(),
+        };
+      };
+      const expandPrompt = (str: string, vars: Record<string, string>): string => {
+        const replace = (s: string, re: RegExp) => s.replace(re, (_m, name: string) => (name in vars ? vars[name] : _m));
+        let out = str;
+        out = replace(out, /\$\{([A-Z_]+)\}/g);
+        out = replace(out, /\{\{([A-Z_]+)\}\}/g);
+        return out;
+      };
+
+      // Resolve FORMAT centrally from configuration (with sane fallback)
+      const { describeFormat } = await import('./formats.js');
+      const resolvedFmt: OutputFormatId = this.sessionConfig.outputFormat;
+      const fmtDesc = describeFormat(resolvedFmt);
+      this.resolvedFormat = resolvedFmt;
+      this.resolvedFormatDescription = fmtDesc;
+
+      // Apply ${FORMAT} replacement first, then expand variables
+      const withFormat = this.sessionConfig.systemPrompt.replace(/\$\{FORMAT\}|\{\{FORMAT\}\}/g, fmtDesc);
+      const vars = buildPromptVars();
+      const systemExpanded = expandPrompt(withFormat, vars);
+      const userExpanded = expandPrompt(this.sessionConfig.userPrompt, vars);
+
       // Build enhanced system prompt with tool instructions
       const toolInstructions = this.mcpClient.getCombinedInstructions();
       const enhancedSystemPrompt = this.enhanceSystemPrompt(
-        this.sessionConfig.systemPrompt, 
+        systemExpanded, 
         toolInstructions
       );
 
@@ -368,7 +435,7 @@ export class AIAgentSession {
       } else {
         currentConversation.push({ role: 'system', content: enhancedSystemPrompt });
       }
-      currentConversation.push({ role: 'user', content: this.sessionConfig.userPrompt });
+      currentConversation.push({ role: 'user', content: userExpanded });
 
       // Main agent loop with retry logic
       const result = await this.executeAgentLoop(
@@ -1030,10 +1097,28 @@ export class AIAgentSession {
           const statusParam = p.status;
           const formatParam = p.format;
           const status = (typeof statusParam === 'string' ? statusParam : 'success') as 'success' | 'failure' | 'partial';
-          const format = (typeof formatParam === 'string' ? formatParam : 'markdown') as 'json' | 'markdown' | 'text';
+          const format = (typeof formatParam === 'string' ? formatParam : 'markdown') as 'json' | 'markdown' | 'markdown+mermaid' | 'slack' | 'tty' | 'pipe' | 'sub-agent' | 'text';
           const content = typeof p.content === 'string' ? p.content : undefined;
-          const content_json = (p.content_json !== null && p.content_json !== undefined && typeof p.content_json === 'object') ? (p.content_json as Record<string, unknown>) : undefined;
-          const metadata = (p.metadata !== null && p.metadata !== undefined && typeof p.metadata === 'object') ? (p.metadata as Record<string, unknown>) : undefined;
+          const isPlainObject = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
+          const content_json = isPlainObject(p.content_json) ? p.content_json : undefined;
+          // Attach Slack messages (if provided) into metadata.slack.messages for server-side rendering
+          let metadata: Record<string, unknown> | undefined = isPlainObject(p.metadata) ? p.metadata : undefined;
+          const maybeMessages = p.messages;
+          if (Array.isArray(maybeMessages)) {
+            const raw = maybeMessages;
+            const msgs = raw.filter(isPlainObject);
+            const getProp = (o: Record<string, unknown> | undefined, k: string): unknown => (o !== undefined && Object.prototype.hasOwnProperty.call(o, k)) ? (o[k]) : undefined;
+            const slackMeta = getProp(metadata, 'slack');
+            const prevSlack = isPlainObject(slackMeta) ? slackMeta : {};
+            metadata = { ...(metadata ?? {}), slack: { ...prevSlack, messages: msgs } };
+          }
+          // Strict Slack enforcement: require messages when format is slack
+          if (format === 'slack') {
+            if (!Array.isArray(maybeMessages) || maybeMessages.length === 0) {
+              this.releaseToolSlot();
+              throw new Error('Slack final_report must provide `messages` (Block Kit). Do not use `content`.');
+            }
+          }
           this.finalReport = { status, format, content, content_json, metadata, ts: Date.now() };
           const latency = Date.now() - startTime;
           const accountingEntry: AccountingEntry = {
@@ -1537,56 +1622,163 @@ export class AIAgentSession {
       status: { type: 'string', enum: ['success', 'failure', 'partial'] },
       metadata: { type: 'object' },
     } as Record<string, unknown>;
-
-    if (exp?.format === 'json') {
-      tools.push({
-        name: 'agent__final_report',
-        description: 'Finalize the task with a JSON report matching the required schema.',
-        inputSchema: {
-          type: 'object',
-          additionalProperties: false,
-          required: ['status', 'format', 'content_json'],
-          properties: {
-            status: common.status,
-            format: { type: 'string', const: 'json' },
-            content_json: (exp.schema ?? { type: 'object' }),
-            metadata: common.metadata,
+    const rf: OutputFormatId = this.sessionConfig.outputFormat;
+    if ((exp?.format === 'json') && rf !== 'json') {
+      const rfStr = rf as string;
+      throw new Error(`Output format mismatch: expectedOutput.format=json but session outputFormat=${rfStr}`);
+    }
+    if ((exp?.format === 'json') || rf === 'json') {
+      {
+        const descStr = (typeof this.resolvedFormatDescription === 'string' && this.resolvedFormatDescription.length > 0) ? ` ${this.resolvedFormatDescription}` : '';
+        tools.push({
+          name: 'agent__final_report',
+          description: (`Finalize the task with a JSON report.` + descStr).trim(),
+          inputSchema: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['status', 'format', 'content_json'],
+            properties: {
+              status: common.status,
+              format: { type: 'string', const: 'json', description: this.resolvedFormatDescription },
+              content_json: (exp?.schema ?? { type: 'object' }),
+              metadata: common.metadata,
+            },
           },
-        },
-      });
-    } else if (exp?.format === 'text') {
-      tools.push({
-        name: 'agent__final_report',
-        description: 'Finalize the task with a complete plain-text report.',
-        inputSchema: {
-          type: 'object',
-          additionalProperties: false,
-          required: ['status', 'format', 'content'],
-          properties: {
-            status: common.status,
-            format: { type: 'string', const: 'text' },
-            content: { type: 'string', minLength: 1 },
-            metadata: common.metadata,
-          },
-        },
-      });
+        });
+      }
     } else {
-      // default to markdown when unspecified
-      tools.push({
-        name: 'agent__final_report',
-        description: 'Finalize the task with a complete Markdown report.',
-        inputSchema: {
-          type: 'object',
-          additionalProperties: false,
-          required: ['status', 'format', 'content'],
-          properties: {
-            status: common.status,
-            format: { type: 'string', const: 'markdown' },
-            content: { type: 'string', minLength: 1 },
-            metadata: common.metadata,
-          },
-        },
-      });
+      // Non-JSON: expose resolved format id and description; content is string
+      const id = this.sessionConfig.outputFormat as string;
+      const desc = this.resolvedFormatDescription;
+      {
+        const suffix = (typeof desc === 'string' && desc.length > 0) ? ` ${desc}` : '';
+        // Specialize Slack schema and instructions to support Block Kit messages array
+        if (id === 'slack') {
+          const S_TYPE_MRKDWN = '\\"type\\": \\"mrkdwn\\"';
+          const S_TYPE_SECTION = '\\"type\\": \\"section\\"';
+          const slackInstructions = (
+            'Use Slack\'s block kit like this:\n\n'
+            + '"messages": [\n'
+            + '  {\n'
+            + '    "blocks": [\n'
+            + '      {\n'
+            + '        "type": "header",\n'
+            + '        "text": {\n'
+            + '          "type": "plain_text",\n'
+            + '          "text": "Claude\'s Analysis: Acme Corp"\n'
+            + '        }\n'
+            + '      },\n'
+            + '      {\n'
+            + '        "type": "context",\n'
+            + '        "elements": [\n'
+            + '          {\n'
+            + `            ${S_TYPE_MRKDWN},\n`
+            + '            "text": "Generated: 2025-01-05 | Domain: acme.com"\n'
+            + '          }\n'
+            + '        ]\n'
+            + '      },\n'
+            + '      { "type": "divider" },\n'
+            + '      {\n'
+            + `        ${S_TYPE_SECTION},\n`
+            + '        "text": { "type": "mrkdwn", "text": "*🏢 Company Profile*" }\n'
+            + '      },\n'
+            + '      {\n'
+            + `        ${S_TYPE_SECTION},\n`
+            + '        "text": {\n'
+            + `          ${S_TYPE_MRKDWN},\n`
+            + '          "text": "• *Industry:* B2B SaaS\\n• *Employees:* 500-1000\\n• *Revenue:* $50M ARR\\n• *Funding:* Series C ($75M)"\n'
+            + '        }\n'
+            + '      },\n'
+            + '      { "type": "divider" },\n'
+            + '      {\n'
+            + `        ${S_TYPE_SECTION},\n`
+            + '        "text": { "type": "mrkdwn", "text": "*📊 Netdata Usage*" }\n'
+            + '      },\n'
+            + '      {\n'
+            + `        ${S_TYPE_SECTION},\n`
+            + '        "text": {\n'
+            + `          ${S_TYPE_MRKDWN},\n`
+            + '          "text": "```\\nSpace: acme-production\\nNodes: 247 connected (7d)\\nUsers: 12 active\\nLast Activity: 2 hours ago\\n```"\n'
+            + '        }\n'
+            + '      }\n'
+            + '    ]\n'
+            + '  },\n'
+            + '  {\n'
+            + '    "blocks": [ /* next message blocks */ ]\n'
+            + '  }\n'
+            + ']\n\n'
+            + 'Maximum text length per block: 3000 bytes, maximum number of blocks per message: 50.\n\n'
+            + 'mrkdwn format:\n'
+            + '- *bold* → bold\n'
+            + '- _italic_ → italic\n'
+            + '- ~strikethrough~ → strikethrough\n'
+            + '- `inline code`\n'
+            + '- ```code block```\n'
+            + '- > quoted text (at line start)\n'
+            + '- <https://example.com|Link Text> → clickable links\n'
+            + '- Lists: Use •, -, or numbers (no nesting)\n\n'
+            + 'NOT Supported:\n'
+            + '- ❌ Tables\n'
+            + '- ❌ Headers (#, ##)\n'
+            + '- ❌ Horizontal rules (---)\n'
+            + '- ❌ Nested lists\n'
+            + '- ❌ Image embedding\n'
+            + '- ❌ HTML tags'
+          );
+          tools.push({
+            name: 'agent__final_report',
+            description: (
+              'Finalize the task with a Slack report. ' + suffix
+              + '\nREQUIREMENT: Provide `messages` with Block Kit only. Do NOT provide plain `content`.\n\n'
+              + slackInstructions
+            ).trim(),
+            inputSchema: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['status', 'format', 'messages'],
+              properties: {
+                status: common.status,
+                format: { type: 'string', const: id, description: desc },
+                // Block Kit messages for multi-message output
+                messages: {
+                  type: 'array',
+                  minItems: 1,
+                  items: {
+                    type: 'object',
+                    additionalProperties: true,
+                    properties: {
+                      blocks: {
+                        type: 'array',
+                        minItems: 1,
+                        maxItems: 50,
+                        items: { type: 'object', additionalProperties: true }
+                      }
+                    }
+                  }
+                },
+                metadata: common.metadata,
+              },
+              // Enforce messages only
+            },
+          });
+        } else {
+          tools.push({
+            name: 'agent__final_report',
+            description: ('Finalize the task with a ' + id + ' report.' + suffix).trim(),
+            inputSchema: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['status', 'format', 'content'],
+              properties: {
+                status: common.status,
+                format: { type: 'string', const: id, description: desc },
+                content: { type: 'string', minLength: 1, description: desc },
+                metadata: common.metadata,
+              },
+            },
+          });
+        }
+      }
     }
     return tools;
   }
@@ -1598,24 +1790,22 @@ export class AIAgentSession {
     const ARGS = '- Arguments:';
     const STATUS_LINE = '  - `status`: one of `success`, `failure`, `partial`.';
     lines.push('- Use tool `agent__append_notes` sparingly for brief housekeeping notes; it is not graded and does not count as progress.');
-    if (exp?.format === 'json') {
+    const rf2: OutputFormatId = this.sessionConfig.outputFormat;
+    const rdesc = this.resolvedFormatDescription;
+    if ((exp?.format === 'json') || rf2 === 'json') {
       lines.push(FINISH_ONLY);
       lines.push(ARGS);
       lines.push(STATUS_LINE);
       lines.push('  - `format`: "json".');
       lines.push('  - `content_json`: MUST match the required JSON Schema exactly.');
-    } else if (exp?.format === 'text') {
-      lines.push(FINISH_ONLY);
-      lines.push(ARGS);
-      lines.push(STATUS_LINE);
-      lines.push('  - `format`: "text".');
-      lines.push('  - `content`: complete plain text (no Markdown).');
     } else {
       lines.push(FINISH_ONLY);
       lines.push(ARGS);
       lines.push(STATUS_LINE);
-      lines.push('  - `format`: "markdown".');
-      lines.push('  - `content`: complete Markdown deliverable.');
+      const id2 = this.sessionConfig.outputFormat as string;
+      const descLine = (typeof rdesc === 'string' && rdesc.length > 0) ? ` ${rdesc}` : '';
+      lines.push('  - `format`: "' + id2 + '".' + descLine);
+      lines.push('  - `content`: complete deliverable.');
     }
     lines.push('- Do NOT end with plain text. The session ends only after `agent__final_report`.');
 

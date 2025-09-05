@@ -24,7 +24,7 @@ interface ChildInfo {
   inputFormat: 'text' | 'json';
   inputSchema?: Record<string, unknown>;
   promptPath: string; // canonical path
-  systemPrompt: string; // stripped frontmatter contents
+  systemTemplate: string; // stripped frontmatter contents (unexpanded, no FORMAT replacement)
   // A loader-produced runner will be resolved lazily when executed
 }
 
@@ -94,7 +94,8 @@ export class SubAgentRegistry {
     // Determine input format/schema
     const inputFmt = fm.inputSpec?.format ?? 'text';
     const inputSchema = fm.inputSpec?.schema;
-    const systemPrompt = stripFrontmatter(content);
+    // Keep template unmodified; ai-agent will centrally handle ${FORMAT} and variables
+    const systemTemplate = stripFrontmatter(content);
     const info: ChildInfo = {
       toolName,
       description: fm.description,
@@ -102,7 +103,7 @@ export class SubAgentRegistry {
       inputFormat: inputFmt,
       inputSchema,
       promptPath: id,
-      systemPrompt,
+      systemTemplate,
     };
     this.children.set(toolName, info);
   }
@@ -229,7 +230,7 @@ export class SubAgentRegistry {
       const history: ConversationMessage[] | undefined = undefined;
       // Ensure child gets a fresh selfId (span id)
       const childTrace = { selfId: crypto.randomUUID(), originId: parentSession.trace?.originId, parentId: parentSession.trace?.parentId, callPath: parentSession.trace?.callPath };
-      result = await loaded.run(info.systemPrompt, userPrompt, { history, callbacks: cb, trace: childTrace });
+      result = await loaded.run(info.systemTemplate, userPrompt, { history, callbacks: cb, trace: childTrace, renderTarget: 'sub-agent', outputFormat: 'sub-agent' });
     } finally {
       try { process.chdir(prevCwd); } catch { /* ignore */ }
     }

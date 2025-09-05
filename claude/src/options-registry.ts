@@ -239,6 +239,15 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
     scope: 'allAgents',
     groups: [G_ALL_MODELS],
   }),
+  strDef({
+    key: 'format',
+    default: '',
+    description: 'Output format hint (markdown, markdown+mermaid, slack, tty, pipe, json, sub-agent)',
+    cli: { names: ['--format'], showInHelp: true },
+    fm: { allowed: false },
+    scope: 'allAgents',
+    groups: [G_ALL_MODELS],
+  }),
 
   // Global Application Controls
   boolDef({
