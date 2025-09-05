@@ -5,6 +5,19 @@
 
 #ifdef OS_WINDOWS
 
+static void netdata_windows_ip(struct rrdhost_system_info *systemInfo)
+{
+    (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_DEFAULT_INTERFACE_DETECTION", "WINAPI");
+
+    char *ptr = netdata_win_local_interface();
+    if (ptr)
+        (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_DEFAULT_INTERFACE_NAME", ptr);
+
+    ptr = netdata_win_local_ip();
+    if (ptr)
+        (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_DEFAULT_INTERFACE_IP", ptr);
+}
+
 // Hardware
 static char *netdata_windows_arch(DWORD value)
 {

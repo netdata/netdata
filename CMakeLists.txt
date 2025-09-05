@@ -1165,6 +1165,7 @@ set(DAEMON_FILES
         src/daemon/main.h
         src/daemon/environment.c
         src/daemon/win_system-info.c
+        src/daemon/win_system-info_ip.c
         src/daemon/win_system-info.h
         src/daemon/signal-handler.c
         src/daemon/signal-handler.h
