@@ -16,8 +16,8 @@ static inline RRDSET *common_cpu_temperature(int update_every) {
                 "cpu.temperature",
                 "Core temperature",
                 "Celcius",
-                , _COMMON_PLUGIN_NAME
-                , _COMMON_PLUGIN_MODULE_NAME
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
                 NETDATA_CHART_PRIO_CPU_TEMPERATURE,
                 update_every,
                 RRDSET_TYPE_LINE);
