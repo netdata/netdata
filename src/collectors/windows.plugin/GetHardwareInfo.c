@@ -182,31 +182,9 @@ void netdata_collect_cpu_chart()
     CloseHandle(device);
 }
 
-static RRDSET *netdata_publish_cpu_chart(int update_every)
-{
-    static RRDSET *st_cpu_temp = NULL;
-    if (!st_cpu_temp) {
-        st_cpu_temp = rrdset_create_localhost(
-                "cpu",
-                "temperature",
-                NULL,
-                "temperature",
-                "cpu.temperature",
-                "Core temperature",
-                "Celcius",
-                PLUGIN_WINDOWS_NAME,
-                "GetHardwareInfo",
-                NETDATA_CHART_PRIO_CPU_TEMPERATURE,
-                update_every,
-                RRDSET_TYPE_LINE);
-    }
-
-    return st_cpu_temp;
-}
-
 static void netdata_loop_cpu_chart(int update_every)
 {
-    RRDSET *chart = netdata_publish_cpu_chart(update_every);
+    RRDSET *chart = common_cpu_temperature(update_every);
     for (size_t i = 0; i < ncpus; i++) {
         struct cpu_data *lcpu = &cpus[i];
         if (!lcpu->rd_cpu_temp) {

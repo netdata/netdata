@@ -458,7 +458,6 @@ int do_dev_cpu_temperature(int update_every, usec_t dt) {
         }
     }
 
-    static RRDSET *st;
     static RRDDIM **rd_pcpu_temperature;
 
     if (unlikely(number_of_cpus != old_number_of_cpus)) {
@@ -467,22 +466,7 @@ int do_dev_cpu_temperature(int update_every, usec_t dt) {
             memset(&rd_pcpu_temperature[old_number_of_cpus], 0, sizeof(RRDDIM *) * (number_of_cpus - old_number_of_cpus));
     }
 
-    if (unlikely(!st)) {
-        st = rrdset_create_localhost(
-                "cpu",
-                "temperature",
-                NULL,
-                "temperature",
-                "cpu.temperature",
-                "Core temperature",
-                "Celsius",
-                "freebsd.plugin",
-                "dev.cpu.temperature",
-                NETDATA_CHART_PRIO_CPU_TEMPERATURE,
-                update_every,
-                RRDSET_TYPE_LINE
-        );
-    }
+    RRDSET *st = common_cpu_temperature(update_every) ;
 
     for (i = 0; i < number_of_cpus; i++) {
         if (unlikely(!rd_pcpu_temperature[i])) {
