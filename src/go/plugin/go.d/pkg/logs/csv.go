@@ -183,7 +183,7 @@ func checkCSVFormatField(name string) (newName string, offset int, valid bool) {
 func parseCSVDelimiter(s string) (rune, error) {
 	if isNumber(s) {
 		d, err := strconv.ParseInt(s, 10, 32)
-		if err != nil {
+		if err != nil || d < 0 {
 			return 0, fmt.Errorf("invalid CSV delimiter: %v", err)
 		}
 		return rune(d), nil
