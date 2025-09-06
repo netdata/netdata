@@ -47,7 +47,7 @@ export async function startServer(agentPath: string, options?: { enableSlack?: b
     let isTrc = false;
     if (entry.severity === 'TRC') {
       if (entry.type === 'llm' && options?.traceLlm === true) isTrc = true;
-      if (entry.type === 'mcp' && options?.traceMcp === true) isTrc = true;
+      if (entry.type === 'tool' && options?.traceMcp === true) isTrc = true;
     }
     const shouldLog = isErr || isWrn || isVrb || isTrc;
     if (!shouldLog) return;
@@ -107,7 +107,7 @@ export async function startServer(agentPath: string, options?: { enableSlack?: b
     return (expandStrict(rawVal, envVars, name) as Record<string, unknown>) ?? {};
   };
   const apiResolved = resolveSection('api') as { enabled?: boolean; port?: number; bearerKeys?: string[] };
-  const slackResolved = resolveSection('slack') as { enabled?: boolean; mentions?: boolean; dms?: boolean; updateIntervalMs?: number; historyLimit?: number; historyCharsCap?: number; botToken?: string; appToken?: string };
+  const slackResolved = resolveSection('slack') as { enabled?: boolean; mentions?: boolean; dms?: boolean; updateIntervalMs?: number; historyLimit?: number; historyCharsCap?: number; botToken?: string; appToken?: string; openerTone?: 'random' | 'cheerful' | 'formal' | 'busy' };
 
   const apiCfg = apiResolved ?? (config.api ?? {});
   const wantApi = options?.enableApi ?? (apiCfg.enabled !== false);
@@ -137,6 +137,7 @@ export async function startServer(agentPath: string, options?: { enableSlack?: b
       enableMentions: slackCfg.mentions ?? true,
       enableDMs: slackCfg.dms ?? true,
       systemPrompt: slackSystem,
+      openerTone: slackCfg.openerTone ?? 'random',
       verbose: options?.verbose === true
     });
     await slackApp.start();

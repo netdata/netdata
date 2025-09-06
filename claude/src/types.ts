@@ -12,7 +12,11 @@ export type TurnStatus =
 export interface TokenUsage {
   inputTokens: number;
   outputTokens: number;
+  // Back-compat aggregate (keep for summaries); equals cacheReadInputTokens when available
   cachedTokens?: number;
+  // Provider-specific cache splits when available
+  cacheReadInputTokens?: number;
+  cacheWriteInputTokens?: number;
   totalTokens: number;
 }
 
@@ -59,7 +63,9 @@ export interface LogEntry {
   turn: number;                         // Sequential turn ID  
   subturn: number;                      // Sequential tool ID within turn
   direction: 'request' | 'response';    // Request or response
-  type: 'llm' | 'mcp';                 // Operation type
+  type: 'llm' | 'tool';                 // Operation type (llm = model-side, tool = any tool-side)
+  // Optional precise tool kind for 'tool' logs.
+  toolKind?: 'mcp' | 'rest' | 'agent' | 'command';
   remoteIdentifier: string;             // 'provider:model' or 'mcp-server:tool-name'
   fatal: boolean;                       // True if this caused agent to stop
   message: string;                      // Human readable message
@@ -69,6 +75,12 @@ export interface LogEntry {
   txnId?: string;
   parentTxnId?: string;
   originTxnId?: string;
+  // Optional planning fields for richer live status in UIs (Slack/web)
+  // Enriched on existing log events (no new event types):
+  // - max_turns: declared maximum number of turns for this agent session
+  // - max_subturns: number of tool calls requested by the LLM for the current turn (when known)
+  'max_turns'?: number;
+  'max_subturns'?: number;
 }
 
 // Core data structures
@@ -131,7 +143,20 @@ export interface ProviderConfig {
 export interface Configuration {
   providers: Record<string, ProviderConfig>;
   mcpServers: Record<string, MCPServerConfig>;
+  // Optional REST tools registry (manifest-driven)
+  restTools?: Record<string, RestToolConfig>;
   accounting?: { file: string };
+  // Optional pricing table by provider/model. Prices are per "unit" tokens (1k or 1m).
+  pricing?: Record<string, Record<string, {
+    unit?: 'per_1k' | 'per_1m';
+    currency?: 'USD';
+    // Base token rates
+    prompt?: number;        // input
+    completion?: number;    // output
+    // Cache-specific when available
+    cacheRead?: number;     // cached input
+    cacheWrite?: number;    // cache creation input
+  }>>;
   defaults?: {
     llmTimeout?: number;
     toolTimeout?: number;
@@ -164,11 +189,36 @@ export interface Configuration {
     historyCharsCap?: number;  // cap for prefetched context (characters)
     botToken?: string;         // ${SLACK_BOT_TOKEN}
     appToken?: string;         // ${SLACK_APP_TOKEN} (Socket Mode)
+    openerTone?: 'random' | 'cheerful' | 'formal' | 'busy';
   };
   api?: {
     enabled?: boolean;
     port?: number;             // ${PORT}
     bearerKeys?: string[];     // e.g., ["${API_BEARER_TOKEN}"] or multiple
+  };
+}
+
+// REST tool configuration (minimal phase 1)
+export interface RestToolConfig {
+  description: string;
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+  url: string;
+  headers?: Record<string, string>;
+  // JSON Schema for arguments (Ajv-compatible)
+  argsSchema: Record<string, unknown>;
+  // Templated JSON body for POST/PUT/PATCH (substitute ${args.*})
+  bodyTemplate?: Record<string, unknown>;
+  // Optional streaming config for SSE/JSON-lines
+  streaming?: {
+    mode: 'json-stream';
+    linePrefix?: string; // e.g., 'data:'
+    discriminatorField: string; // e.g., 'type'
+    doneValue: string;         // e.g., 'done'
+    answerField?: string;      // e.g., 'answer'
+    tokenValue?: string;       // e.g., 'token'
+    tokenField?: string;       // e.g., 'content'
+    timeoutMs?: number;
+    maxBytes?: number;
   };
 }
 

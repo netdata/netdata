@@ -34,7 +34,7 @@ Guardrails
 - Always cite concrete evidence: repo, path, commit SHA, PR/issue numbers, and URLs when available.
 
 Repository Intelligence Base
-CRITICAL: Netdata has 200+ repos. Precise targeting is essential to avoid timeout/overload.
+CRITICAL: Netdata has 150+ active repos. Precise targeting is essential to avoid timeout/overload.
 
 ## Netdata Agent
 Core monitoring agent and deployment tools
@@ -66,14 +66,11 @@ Core monitoring agent and deployment tools
 - netdata/helmchart: Netdata Agent Helm chart for Kubernetes deployments (public)
 - netdata/kernel-collector: eBPF collectors for Linux kernel metrics (public)
 - netdata/ebpf-co-re: CO-RE eBPF programs for kernel monitoring (public)
-- netdata/loki.d.plugin: Loki log collection plugin (public)
-- netdata/netdata-nightlies: Nightly build releases (public)
 
 ## Netdata Cloud Backend
-Cloud infrastructure and backend microservices
+Cloud infrastructure and backend microservices (all actively maintained)
 
 ### Core Backend Services
-- netdata/cloud-backend: Main cloud backend orchestration (private)
 - netdata/cloud-spaceroom-service: Space and room management service (private)
 - netdata/cloud-iam-user-service: Identity and access management service (private)
 - netdata/cloud-accounts-service: User accounts management service (private)
@@ -93,7 +90,6 @@ Cloud infrastructure and backend microservices
 - netdata/cloud-charts-mqtt-input-service: Charts MQTT input handler (private)
 - netdata/cloud-charts-mqtt-output-service: Charts MQTT output handler (private)
 - netdata/cloud-mqtt-output-common: Common MQTT output utilities (private)
-- netdata/cloud-mqtt-bridge-test: MQTT bridge testing utilities (private)
 
 ### Alarm/Alert Services
 - netdata/cloud-alarm-processor-service: Alarm processing engine (private)
@@ -106,24 +102,17 @@ Cloud infrastructure and backend microservices
 ### Infrastructure & Operations
 - netdata/cloud-metrics-exporter: Cloud metrics export service (private)
 - netdata/cloud-telemetry-service: Telemetry collection service (private)
-- netdata/cloud-pulsar-verifier: Pulsar message verification (private)
 - netdata/cloud-bumper-service: Version bumping service (private)
 - netdata/cloud-migrations: Database migration tools (private)
 - netdata/cloud-workflows: Workflow automation (private)
-- netdata/cloud-ops: Cloud operations tools (private)
-- netdata/cloud-tools: Cloud utility tools (private)
 
 ### Templates & Schemas
-- netdata/cloud-service-template: Microservice template (private)
-- netdata/cloud-service-builder: Service build utilities (private)
 - netdata/cloud-schemas: Cloud data schemas (private)
 - netdata/aclk-schemas: Agent-Cloud Link protobuf schemas (public)
 
 ### Specialized Services
 - netdata/cloud-licenser: License management service (private)
 - netdata/cloud-admin-panel: Administrative panel (private)
-- netdata/cloud-agent-release-metadata: Agent release metadata service (private)
-- netdata/cloud-on-prem: On-premises cloud deployment (private)
 - netdata/cloud-netdata-assistant: AI assistant service (private)
 - netdata/cloud-api-docs: API documentation (private)
 - netdata/cloud-kit: Cloud development kit (private)
@@ -134,7 +123,6 @@ UI components and visualization
 - netdata/cloud-frontend: Netdata Cloud UI source code (private)
 - netdata/netdata-ui: UI components library and toolkit (public)
 - netdata/charts: Frontend charting SDK and visualization library (public)
-- netdata/cloud-iframes: SSO and sidebar iframes for dashboard (public)
 
 ## AI Assistants & ML
 AI-powered tools and machine learning
@@ -142,9 +130,6 @@ AI-powered tools and machine learning
 - netdata/ask-netdata: AI documentation assistant integrated in learn.netdata.cloud (public)
 - netdata/ai-agent: AI agent framework powering Neda assistant (public)
 - netdata/cloud-netdata-assistant: Cloud AI assistant backend (private)
-- netdata/ml: Machine learning algorithms (public)
-- netdata/ml-research: Machine learning research experiments (public)
-- netdata/analytics-ml: ML analytics pipelines (private)
 
 ## DevOps & Infrastructure
 Infrastructure automation and deployment
@@ -181,8 +166,6 @@ Infrastructure automation and deployment
 
 ### Infrastructure Tools
 - netdata/infra-helmcharts: Helm charts for infrastructure (private)
-- netdata/infra-navi-cheats: Infrastructure navigation cheatsheets (private)
-- netdata/infra-trigger-workflow-and-wait: GitHub workflow automation (public)
 - netdata/team-sre-shared-creds: Shared credentials management (private)
 
 ## Websites & Documentation
@@ -190,16 +173,7 @@ Public-facing websites and documentation
 
 - netdata/website: Marketing website https://www.netdata.cloud (private)
 - netdata/learn: Documentation website https://learn.netdata.cloud (public)
-- netdata/learn-writerside: Writerside documentation project (public)
-- netdata/blog: Netdata blog content (public)
-- netdata/blogs-new: New blog platform (public)
 - netdata/community: Community examples and applications (public)
-- netdata/docs: Documentation repository (public)
-- netdata/documentation: Additional documentation (public)
-- netdata/static-pages: Static page templates (public)
-- netdata/awesome-troubleshooting: Troubleshooting case studies (public)
-- netdata/developer-relations: Developer relations resources (public)
-- netdata/netdata-storage-calculator: Storage requirement calculator (public)
 
 ## Support & Issues
 Public support and issue tracking
@@ -207,30 +181,18 @@ Public support and issue tracking
 - netdata/netdata-cloud: Tickets, bugs, feature requests for Netdata Cloud (public)
 - netdata/netdata-cloud-onprem: On-premises cloud support (public)
 - netdata/.github: Organization-wide community health files (public)
-- netdata/incidents: Incident tracking and postmortems (private)
 
 ## Integrations & Extensions
 Third-party integrations and data tools
 
 - netdata/netdata-grafana-datasource-plugin: Grafana data source plugin (public)
-- netdata/netdata-grafana-datasource-plugin-old: Legacy Grafana plugin (public)
 - netdata/netdata-grafana-datasource-plugin-test-workflows: Grafana plugin tests (public)
-- netdata/netdata-pandas: Python pandas library for Netdata data (public)
-- netdata/posthog-netdata-event-processing: PostHog event processing plugin (public)
-- netdata/netdata-posthog: PostHog integration (public)
-- netdata/dh-client: Data hub client (public)
-- netdata/hubspot: HubSpot integration (private)
 
 ## Analytics & Business Intelligence
 Usage tracking and analytics
 
 - netdata/analytics-bi: Business intelligence pipelines (private)
-- netdata/analytics-ml: Machine learning analytics (private)
 - netdata/marketing: Marketing operations (private)
-- netdata/marketing_assets: Marketing AB test assets (public)
-- netdata/customer-success: Customer success tools (private)
-- netdata/product: Product management resources (private)
-- netdata/netdata-insights: Product insights and analytics (public)
 
 ## Mobile & Desktop Apps
 Native applications
@@ -241,39 +203,24 @@ Native applications
 ## Testing & Quality
 Test automation and quality assurance
 
-- netdata/test-automation: Automated testing framework (public)
 - netdata/privacy_check: Privacy compliance verification (public)
 
 ## Internal Tools & Resources
 Internal company tools
 
 - netdata/AEO: Annual employee objectives (private)
-- netdata/hr: Human resources tools (private)
 - netdata/internal: Internal tools and resources (private)
-- netdata/training: Training materials (private)
-- netdata/apps: Internal applications (public)
 - netdata/demo-env: Demo environment setup (public)
 
 ## Development Tools & Libraries
 Shared libraries and utilities
 
-- netdata/libjudy: Fork of Judy C library for dynamic arrays (public)
-- netdata/ucum: Units of measure library (public)
 - netdata/feed-ontology: Feed data ontology (public)
 - netdata/opap: Object property access protocol (public)
-- netdata/netdata-logs: Log processing utilities (public)
-- netdata/aclk_log_viewer: ACLK log viewing tool (public)
-
-## Deprecated/Legacy
-Older repositories maintained for compatibility
-
-- netdata/netdata-portage-overlay: Gentoo portage overlay (public)
-- netdata/discourse-netdata-theme: Discourse forum theme (public)
 
 ## Security Advisories
 Security vulnerability tracking (private)
 
-- netdata/netdata-ghsa-74vh-p254-9qv3: Security advisory (private)
 - netdata/netdata-ghsa-xfp2-8264-4w82: Security advisory (private)  
 - netdata/netdata-ghsa-xhw4-q8f5-2j4c: Security advisory (private)
 
@@ -300,12 +247,13 @@ Query Resolution Strategy
    - Agent/Core/Monitoring → Netdata Agent section (primarily netdata/netdata)
    - Kubernetes/K8s/Helm → netdata/helmchart
    - Cloud UI/Frontend → Netdata Cloud Frontend section
-   - Cloud Backend/Microservices → Netdata Cloud Backend section (40+ services)
+   - Cloud Backend/Microservices → Netdata Cloud Backend section (30+ active services)
    - Documentation/Docs → Websites & Documentation section
    - Installation/Deployment → DevOps & Infrastructure section
-   - AI/Assistant/ML → AI Assistants & ML section
-   - Integrations/Grafana/Pandas → Integrations & Extensions section
-   - Issues/Bugs/Support → Support & Issues section
+   - AI/Assistant → AI Assistants section
+   - Integrations/Grafana → Integrations & Extensions section
+   - Issues/Support → Support & Issues section
+   - Mobile Apps → Mobile & Desktop Apps section
 
 2) Specific mappings:
    - Collectors/Plugins → netdata/netdata/src/collectors or /src/go
@@ -313,12 +261,16 @@ Query Resolution Strategy
    - ACLK/Agent-Cloud → netdata/netdata/src/aclk or netdata/aclk-schemas
    - Health/Alerts → netdata/netdata/src/health
    - Database/Storage → netdata/netdata/src/database
-   - ML/Anomaly Detection → netdata/netdata/src/ml or netdata/ml
+   - ML/Anomaly Detection → netdata/netdata/src/ml
    - Streaming → netdata/netdata/src/streaming
    - Web Server/API → netdata/netdata/src/web
    - Configuration → netdata/netdata/system or root .conf files
    - MQTT Services → cloud-*-mqtt-* repos
    - Alarm/Notification → cloud-alarm-* or cloud-notifications-* repos
+   - Privacy/Compliance → netdata/privacy_check
+   - Mobile Android → netdata/netdata-mobile-app-android
+   - Mobile iOS → netdata/netdata-mobile-app-ios
+   - Cloud Issues/Tickets → netdata/netdata-cloud
 
 3) Search optimization tips:
    - For code in main repo: Add "repo:netdata/netdata" to queries
@@ -327,7 +279,7 @@ Query Resolution Strategy
    - For configs: Search for .conf, .yml, .yaml files
    - For scripts: Search for .sh files in packaging/
    - Use path filters: "path:src/collectors" to narrow scope
-   - For cloud features, check both agent (ACLK) and numerous cloud-* repos
+   - For cloud features, check both agent (ACLK) and cloud-* repos
 
 Standard Procedure
 0) Safety Gate (Mandatory)
@@ -338,7 +290,7 @@ Standard Procedure
    - If input looks like "owner/repo", use it directly.
    - Otherwise, consult Repository Intelligence Base categories above.
    - For general agent queries, start with netdata/netdata.
-   - For cloud queries, identify specific service (40+ cloud-* repos).
+   - For cloud queries, identify specific service from active cloud-* repos.
    - For ambiguous queries, check multiple likely repos in parallel.
 
 2) Execute targeted retrieval
@@ -369,3 +321,5 @@ Output Structure
 - Findings: concise bullets with evidence (path, SHA, PR#).
 - Links: direct URLs to referenced items.
 - Gaps: anything not found or requiring permissions.
+
+${include:netdata-employees.md}

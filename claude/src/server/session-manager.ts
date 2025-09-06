@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 
-import type { AIAgentCallbacks, AIAgentResult, ConversationMessage, LogEntry } from '../types.js';
+import type { AIAgentCallbacks, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry } from '../types.js';
 import type { RunKey, RunMeta } from './types.js';
 
 interface Callbacks { onTreeUpdate?: (runId: string) => void; onLog?: (entry: LogEntry) => void; }
@@ -9,6 +9,8 @@ export class SessionManager {
   private readonly runs = new Map<string, RunMeta>();
   private readonly results = new Map<string, AIAgentResult>();
   private readonly outputs = new Map<string, string>();
+  private readonly logs = new Map<string, LogEntry[]>();
+  private readonly accounting = new Map<string, AccountingEntry[]>();
   private readonly callbacks: Callbacks;
   private readonly runner: (systemPrompt: string, userPrompt: string, opts: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; renderTarget?: 'slack' | 'api' | 'web'; outputFormat?: string }) => Promise<AIAgentResult>;
 
@@ -29,8 +31,27 @@ export class SessionManager {
     return this.outputs.get(runId);
   }
 
+  public getLogs(runId: string): LogEntry[] {
+    return this.logs.get(runId) ?? [];
+  }
+
+  public getAccounting(runId: string): AccountingEntry[] {
+    return this.accounting.get(runId) ?? [];
+  }
+
   public listActiveRuns(): RunMeta[] {
     return Array.from(this.runs.values()).filter((r) => r.status === 'running');
+  }
+
+  public cancelRun(runId: string, reason?: string): void {
+    const meta = this.runs.get(runId);
+    if (meta) {
+      meta.status = 'canceled';
+      meta.error = reason ?? 'canceled';
+      meta.updatedAt = Date.now();
+      this.runs.set(runId, meta);
+      this.callbacks.onTreeUpdate?.(runId);
+    }
   }
 
   public startRun(key: RunKey, systemPrompt: string, userPrompt: string, history?: ConversationMessage[]): string {
@@ -59,12 +80,22 @@ export class SessionManager {
                 m.updatedAt = Date.now();
                 this.runs.set(runId, m);
               }
+              const arr = this.logs.get(runId) ?? [];
+              arr.push(entry);
+              this.logs.set(runId, arr);
               this.callbacks.onLog?.(entry);
               this.callbacks.onTreeUpdate?.(runId);
             },
             onOutput: (t: string) => {
               outputBuf.push(t);
               this.outputs.set(runId, outputBuf.join(''));
+              this.callbacks.onTreeUpdate?.(runId);
+            },
+            onAccounting: (a: AccountingEntry) => {
+              const arr = this.accounting.get(runId) ?? [];
+              arr.push(a);
+              this.accounting.set(runId, arr);
+              this.callbacks.onTreeUpdate?.(runId);
             }
           }
         });

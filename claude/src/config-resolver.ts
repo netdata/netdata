@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import type { Configuration, MCPServerConfig, ProviderConfig } from './types.js';
+import type { Configuration, MCPServerConfig, ProviderConfig, RestToolConfig } from './types.js';
 
 type LayerOrigin = '--config' | 'cwd' | 'binary' | 'home' | 'system';
 
@@ -203,6 +203,17 @@ export function resolveAccounting(layers: ConfigLayer[], _opts?: ResolverOptions
   return { file: expandedFile };
 }
 
+export function resolvePricing(layers: ConfigLayer[]): Configuration['pricing'] {
+  const found = layers.find((layer) => {
+    const j = layer.json as { pricing?: Record<string, unknown> } | undefined;
+    return j?.pricing !== undefined;
+  });
+  if (found === undefined) return undefined;
+  const j = found.json as { pricing?: Record<string, unknown> } | undefined;
+  const pr = j?.pricing as Configuration['pricing'];
+  return pr;
+}
+
 export function buildUnifiedConfiguration(
   needs: { providers: string[]; mcpServers: string[] },
   layers: ConfigLayer[],
@@ -210,6 +221,7 @@ export function buildUnifiedConfiguration(
 ): Configuration {
   const providers: Record<string, ProviderConfig> = {};
   const mcpServers: Record<string, MCPServerConfig> = {};
+  const restTools: Record<string, RestToolConfig> = {};
 
   needs.providers.forEach((p) => {
     const conf = resolveProvider(p, layers, opts);
@@ -220,8 +232,29 @@ export function buildUnifiedConfiguration(
     if (conf !== undefined) mcpServers[s] = conf;
   });
 
+  // Merge restTools from highest-priority layer that contains them; last file wins by key
+  layers.forEach((layer) => {
+    const j = layer.json as { restTools?: Record<string, unknown> } | undefined;
+    const tools = j?.restTools;
+    if (tools !== undefined) {
+      const env = layer.env ?? {};
+      Object.entries(tools).forEach(([name, raw]) => {
+        const expanded = expandPlaceholders(raw, (varName: string) => {
+          // Preserve runtime arg placeholders like ${args.foo}
+          if (varName.startsWith('args.')) return `\${${varName}}`;
+          const envVal = Object.prototype.hasOwnProperty.call(env, varName) ? env[varName] : undefined;
+          const v = envVal ?? process.env[varName];
+          if (v === undefined) throw buildMissingVarError('defaults', name, layer.origin, varName);
+          return v;
+        }) as RestToolConfig;
+        restTools[name] = expanded;
+      });
+    }
+  });
+
   const defaults = resolveDefaults(layers);
   const accounting = resolveAccounting(layers, opts);
+  const pricing = resolvePricing(layers);
 
-  return { providers, mcpServers, defaults, accounting } as Configuration;
+  return { providers, mcpServers, restTools, defaults, accounting, pricing } as Configuration;
 }

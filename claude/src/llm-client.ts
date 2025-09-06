@@ -14,6 +14,8 @@ export class LLMClient {
   private traceLLM: boolean;
   private currentTurn = 0;
   private currentSubturn = 0;
+  // Optional pricing table to compute cost per response
+  private pricing?: Partial<Record<string, Partial<Record<string, { unit?: 'per_1k'|'per_1m'; currency?: 'USD'; prompt?: number; completion?: number; cacheRead?: number; cacheWrite?: number }>>>>;
   // Tracks actual routed provider/model when using routers like OpenRouter
   private lastActualProvider?: string;
   private lastActualModel?: string;
@@ -26,10 +28,12 @@ export class LLMClient {
     options?: {
       traceLLM?: boolean;
       onLog?: (entry: LogEntry) => void;
+      pricing?: Partial<Record<string, Partial<Record<string, { unit?: 'per_1k'|'per_1m'; currency?: 'USD'; prompt?: number; completion?: number; cacheRead?: number; cacheWrite?: number }>>>>;
     }
   ) {
     this.traceLLM = options?.traceLLM ?? false;
     this.onLog = options?.onLog;
+    this.pricing = options?.pricing;
 
     // Create traced fetch if needed
     // Always wrap fetch so we can capture routing metadata (e.g., OpenRouter actual provider)
@@ -335,22 +339,43 @@ export class LLMClient {
       const inputTokens = tokens?.inputTokens ?? 0;
       const outputTokens = tokens?.outputTokens ?? 0;
       const cachedTokens = tokens?.cachedTokens ?? 0;
+      const cacheRead = tokens?.cacheReadInputTokens ?? cachedTokens;
+      const cacheWrite = tokens?.cacheWriteInputTokens ?? 0;
       
       const responseBytes = result.response !== undefined ? new TextEncoder().encode(result.response).length : 0;
       // Do not include routed provider/model details here; keep log concise up to bytes
       let message = `input ${String(inputTokens)}, output ${String(outputTokens)}, cached ${String(cachedTokens)} tokens, ${String(latencyMs)}ms, ${String(responseBytes)} bytes`;
-      // Append cost info (5 decimals) only when non-zero and available (OpenRouter)
+      // Compute cost from pricing for all providers (5 decimals); prefer router-reported when present
+      const computeCost = (): number | undefined => {
+        try {
+          if (this.pricing === undefined) return undefined;
+          const routedProv = routed.provider;
+          const routedModel = routed.model;
+          const effProvider = (request.provider === 'openrouter' && typeof routedProv === 'string' && routedProv.length > 0) ? routedProv : request.provider;
+          const effModel = (request.provider === 'openrouter' && typeof routedModel === 'string' && routedModel.length > 0) ? routedModel : request.model;
+          const prov = this.pricing[effProvider];
+          const model = prov !== undefined ? prov[effModel] : undefined;
+          if (model === undefined) return undefined;
+          const denom = (model.unit === 'per_1k') ? 1000 : 1_000_000;
+          const pIn = model.prompt ?? 0;
+          const pOut = model.completion ?? 0;
+          const pR = model.cacheRead ?? 0;
+          const pW = model.cacheWrite ?? 0;
+          const cost = (pIn * inputTokens + pOut * outputTokens + pR * cacheRead + pW * cacheWrite) / denom;
+          return Number.isFinite(cost) ? cost : undefined;
+        } catch { return undefined; }
+      };
+      const reported = this.getLastCostInfo().costUsd;
+      const computed = computeCost();
+      const costToPrint = (typeof reported === 'number') ? reported : computed;
+      if (typeof costToPrint === 'number') {
+        message += `, cost $${costToPrint.toFixed(5)}`;
+      }
+      // Also append upstream cost for OpenRouter when available
       if (request.provider === 'openrouter') {
-        const costInfo = this.getLastCostInfo();
-        const costParts: string[] = [];
-        if (typeof costInfo.costUsd === 'number' && costInfo.costUsd > 0) {
-          costParts.push(`cost $${costInfo.costUsd.toFixed(5)}`);
-        }
-        if (typeof costInfo.upstreamInferenceCostUsd === 'number' && costInfo.upstreamInferenceCostUsd > 0) {
-          costParts.push(`upstream $${costInfo.upstreamInferenceCostUsd.toFixed(5)}`);
-        }
-        if (costParts.length > 0) {
-          message += `, ${costParts.join(' ')}`;
+        const upstream = this.getLastCostInfo().upstreamInferenceCostUsd;
+        if (typeof upstream === 'number' && upstream > 0) {
+          message += `, upstream $${upstream.toFixed(5)}`;
         }
       }
       

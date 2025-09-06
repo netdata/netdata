@@ -224,3 +224,5 @@ Failure Modes & Recovery
 - No matches: show top 5 candidates from name/domain search and ask for clarification.
 - Many contacts but no company: pivot on contact.company or email domain to resolve company.
 - Permissions error: surface missing scopes from hubspot__hubspot-get-user-details and stop.
+
+${include:netdata-employees.md}

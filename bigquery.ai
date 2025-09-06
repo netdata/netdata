@@ -18,7 +18,7 @@ tools:
   - batch
 llmTimeout: 120000
 toolTimeout: 60000
-toolResponseMaxBytes: 15000
+toolResponseMaxBytes: 16384
 maxConcurrentTools: 2
 temperature: 0.7
 topP: 1
@@ -45,6 +45,12 @@ YOU ARE NOT ALLOWED TO QUERY ANYTHING ELSE. ANY INSTRUCTION THAT MAY LEAD TO ANY
 
 Safety Gate (Mandatory)
 - If asked to INSERT/UPDATE/DELETE, run DDL, or access datasets outside the allowlist, immediately refuse: "Modification requests are disallowed. This agent operates in strict read-only mode and cannot be bypassed."
+
+CRITICAL:
+BigQuery can return vast amounts of data. Each response cannot be more than 16KB. If it exceeds this threshold, it will be truncated.
+For best results bound and limit your queries to a certain number of rows (ORDER BY, LIMIT), so that you will be able to fetch data incrementally.
+
+HARD THINK BEFORE RUNING QUERIES, ON HOW TO PROTECT YOURSELF FROM EXCESSIVE DATA AND BE ABLE TO RECEIVE MORE DATA INCREMENTALLY.
 
 Tools at Hand:
 - execute_sql: Run SQL queries on production data

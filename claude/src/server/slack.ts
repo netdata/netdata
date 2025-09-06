@@ -1,5 +1,6 @@
 import type { ConversationMessage, AIAgentResult } from '../types.js';
 import { SessionManager } from './session-manager.js';
+import { buildSnapshot, formatSlackStatus, buildStatusBlocks } from './status-aggregator.js';
 
 type SlackClient = any;
 
@@ -13,6 +14,7 @@ interface SlackHeadendOptions {
   enableDMs?: boolean;
   systemPrompt: string;
   verbose?: boolean;
+  openerTone?: 'random' | 'cheerful' | 'formal' | 'busy';
 }
 
 const stripBotMention = (text: string, botUserId: string): string => text.replace(new RegExp(`<@${botUserId}>`, 'g'), '').trim();
@@ -137,7 +139,176 @@ async function fetchContext(client: SlackClient, event: any, limit: number, char
   return [{ role: 'user', content: contextBlob } satisfies ConversationMessage];
 }
 
-const buildSlackList = (title: string, bodyLines: string[]): string => [`*${title}*`, ...bodyLines.map((l) => `- ${l}`)].join('\n');
+  const openers: string[] = [
+    'Sure {name}, starting…',
+    'Of course {name}, I\'m on it…',
+    'Starting now, {name} — sit tight…',
+    'Absolutely {name}, working on it…',
+    'On it, {name}!',
+    'Right away, {name}…',
+    'Got it, {name}. Investigating…',
+    'Happy to help, {name} — starting…',
+    'Let\'s do this, {name}!',
+    'Working on your request, {name}…',
+    'All set, {name} — I\'m on it.',
+    'Getting into it, {name}…',
+    'Thanks {name}, I\'ll take it from here…',
+    'Consider it done, {name} (working)…',
+    'Kicking off now, {name}…',
+    'Jumping in, {name}…',
+    'On the case, {name}…',
+    'You\'ve got it, {name} — I\'m on it.',
+    'Cool, {name}. Starting now…',
+    'Great question, {name} — I\'m diving in.',
+    'Alright {name}, rolling up my sleeves…',
+    'Let me handle this, {name}…',
+    'Copy that, {name}. Getting started…',
+    'Absolutely, {name}. I\'ll check it out…',
+    'Working through it now, {name}…',
+    'Understood, {name}. I\'m on it…',
+    'Thanks for the ping, {name} — starting…',
+    'Roger that, {name}. Working…',
+    'Right on, {name} — looking into it…',
+    'No problem, {name}. I\'m on the job…',
+    'I\'m on it right now, {name}…',
+    'Getting right to it, {name}…',
+    'Let me dig into this, {name}…',
+    'Spinning this up for you, {name}…',
+    'I\'ll drive this, {name} — starting…',
+    'Yes, {name}. I\'m heading in…',
+    'Heading in now, {name}…',
+    'Let\'s get this done, {name}…',
+    'Kicking the tires on this, {name}…',
+    'Loading context, {name} — starting…',
+    'Great catch, {name}. Investigating…',
+    'Awesome, {name}. I\'m on it…',
+    'Cool cool, {name} — getting started…',
+    'Sweet, {name}. Let me check…',
+    'Nice one, {name}. I\'m digging in…',
+    'Right away {name} — checking details…',
+    'Give me a sec, {name} — starting…',
+    'Thanks {name}, I\'ll run this down…',
+    'Let me trace this, {name}…',
+    'I\'ll take a look, {name}…',
+    'Beginning now, {name}…',
+    'Marching forward, {name}…',
+    'Focusing on this, {name}…',
+    'Zooming in, {name}…',
+    'Zeroing in, {name}…',
+    'Booting up analysis, {name}…',
+    'Deploying tools, {name}…',
+    'Queueing the checks, {name}…',
+    'Collecting signals, {name}…',
+    'Sweeping logs, {name}…',
+    'Pulling threads, {name}…',
+    'Chasing this down, {name}…',
+    'Lining things up, {name}…',
+    'I\'m on standby, {name} — working…',
+    'Starting the run, {name}…',
+    'Gathering context, {name}…',
+    'Syncing details, {name}…',
+    'Checking assumptions, {name}…',
+    'Cross-referencing data, {name}…',
+    'Crunching this, {name}…',
+    'Coordinating sub-agents, {name}…',
+    'Kicking off sub-agents, {name}…',
+    'Fanning out the tasks, {name}…',
+    'Spooling tasks, {name}…',
+    'Spinning workers, {name}…',
+    'Hopping on it, {name}…',
+    'Moving on it now, {name}…',
+    'Making it happen, {name}…',
+    'Taking charge, {name}…',
+    'Tackling this now, {name}…',
+    'Digging into logs, {name}…',
+    'Checking metrics, {name}…',
+    'Fetching details, {name}…',
+    'Verifying inputs, {name}…',
+    'Validating assumptions, {name}…',
+    'Triaging this, {name}…',
+    'Opening a trail, {name}…',
+    'Slicing the problem, {name}…',
+    'Breaking it down, {name}…',
+    'Charting next steps, {name}…',
+    'Plotting a path, {name}…',
+    'Routing tasks, {name}…',
+    'Staging tools, {name}…',
+    'Priming context, {name}…',
+    'Starting the engines, {name}…',
+    'Kicking the flow, {name}…',
+    'Warming up, {name}…',
+    'Firing up the analysis, {name}…',
+    'Launching checks, {name}…',
+    'Engaging, {name}…',
+    'Affirmative, {name}. Working…',
+    'Acknowledged, {name}. Starting…',
+    'Confirmed, {name}. I\'m on it…',
+    'Proceeding, {name}…',
+    'Initiating, {name}…',
+    'Executing, {name}…',
+    'Advancing, {name}…',
+    'Investigating now, {name}…',
+    'Let me sort this, {name}…',
+    'Let me verify, {name}…',
+    'Let me confirm, {name}…',
+    'Let me reconcile this, {name}…',
+    'I\'ll reconcile the data, {name}…',
+    'I\'ll bring this together, {name}…',
+    'I\'ll assemble the pieces, {name}…',
+    'I\'ll stitch this up, {name}…',
+    'Let\'s crack this, {name}…',
+    'Onwards, {name}…',
+    'Here we go, {name}…',
+    'We\'re rolling, {name}…',
+    'We\'re live, {name}…',
+    'Up and running, {name}…',
+    'Full steam, {name}…',
+    'All systems go, {name}…',
+    'Focusing now, {name}…',
+    'Heads down, {name}…',
+    'Let me focus this, {name}…',
+    'I\'ll tune this, {name}…',
+    'I\'ll optimize this, {name}…',
+    'I\'ll streamline this, {name}…',
+    'I\'ll simplify this, {name}…',
+    'I\'ll harden this, {name}…',
+    'I\'ll shore this up, {name}…',
+    'I\'ll dig deeper, {name}…',
+    'Time to analyze, {name}…',
+    'Time to check, {name}…',
+    'Time to run this down, {name}…',
+    'I\'m energized, {name} — let\'s go!',
+    'Excited to help, {name} — starting…',
+    'Happy to jump in, {name}…',
+    'Busy but ready, {name} — on it…',
+    'Quite a challenge, {name}. I\'m in…',
+    'Challenge accepted, {name} — starting…',
+    'Nice puzzle, {name}. Working…',
+    'Great timing, {name}. I\'m on it…'
+  ];
+  const formalOpeners = [
+    'Acknowledged, {name}. Initiating now…', 'Understood, {name}. Beginning analysis…', 'Confirmed, {name}. Proceeding…',
+    'Certainly, {name}. I will start now…', 'Very well, {name}. Working…', 'Thank you, {name}. I will handle it…'
+  ];
+  const cheerfulOpeners = [
+    'Awesome, {name}! Getting started…', 'Great idea, {name}! On it…', 'Let\'s go, {name}! Starting…', 'You got it, {name}! Working…'
+  ];
+  const busyOpeners = [
+    'On it now, {name}…', 'Jumping right in, {name}…', 'Quick turnaround, {name} — starting…', 'Let me run this down, {name}…'
+  ];
+  const pickFrom = (arr: string[], name: string): string => arr[Math.floor(Math.random() * arr.length)].replace('{name}', name);
+  const pickOpener = (name: string, tone: 'random' | 'cheerful' | 'formal' | 'busy' = 'random'): string => {
+    if (tone === 'cheerful') return pickFrom(cheerfulOpeners.concat(openers), name);
+    if (tone === 'formal') return pickFrom(formalOpeners.concat(openers), name);
+    if (tone === 'busy') return pickFrom(busyOpeners.concat(openers), name);
+    // random: mix all
+    const pool = openers.concat(formalOpeners, cheerfulOpeners, busyOpeners);
+    return pickFrom(pool, name);
+  };
+  const firstNameFrom = (label: string): string => {
+    const parts = label.trim().split(/\s+/);
+    return parts.length > 0 && parts[0].length > 0 ? parts[0] : label || 'there';
+  };
 
 export function initSlackHeadend(options: SlackHeadendOptions): void {
   const { sessionManager, app, historyLimit = 30, historyCharsCap = 8000, updateIntervalMs = 2000, enableMentions = true, enableDMs = true, systemPrompt, verbose = false } = options;
@@ -149,7 +320,7 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
   const closed = new Set<string>();
   // Removed upload fallback; model must output Block Kit messages
 
-  const scheduleUpdate = (client: any, channel: string, ts: string, render: () => string): void => {
+  const scheduleUpdate = (client: any, channel: string, ts: string, render: () => { text: string; blocks: any[] } | string): void => {
         const key = `${channel}:${ts}`; // used for lastUpdate timestamping
     if (closed.has(key) || updating.has(key)) return;
     const doUpdate = async (): Promise<void> => {
@@ -162,12 +333,22 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
         return;
       }
       try {
-        const text = render();
-        await client.chat.update({ channel, ts, text });
+        const rendered = render();
+        if (typeof rendered === 'string') {
+          await client.chat.update({ channel, ts, text: rendered });
+        } else {
+          const { text, blocks } = rendered;
+          if (Array.isArray(blocks) && blocks.length > 0) {
+            await client.chat.update({ channel, ts, text, blocks });
+          } else {
+            await client.chat.update({ channel, ts, text });
+          }
+        }
         lastUpdate.set(key, Date.now());
       } catch (e) {
         try {
-          const text = render();
+          const rendered = render();
+          const text = typeof rendered === 'string' ? rendered : rendered.text;
           const bytes = byteLength(text);
           const chars = text.length;
           const msg = (e as Error).message ?? String(e);
@@ -219,10 +400,30 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
           const blocks = blocksRaw.slice(0, MAX_BLOCKS);
           await client.chat.postMessage({ channel, thread_ts: ts, text: fallback, blocks });
         }
+        // Post tiny stats footer as a separate small message (context)
+        try {
+          const logs = sessionManager.getLogs(runId);
+          const acc = sessionManager.getAccounting(runId);
+          const snap = buildSnapshot(logs, acc, Date.now());
+          const agentsCount = new Set(snap.lines.map((l) => l.agentId)).size;
+          const fmtK = (n: number): string => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
+          const footer = `tokens →:${fmtK(snap.totals.tokensIn)} ←:${fmtK(snap.totals.tokensOut)} c→:${fmtK(snap.totals.tokensCacheRead)} c←:${fmtK(snap.totals.tokensCacheWrite)} | cost: $${(snap.totals.costUsd ?? 0).toFixed(2)} | tools ${snap.totals.toolsRun} | agents ${agentsCount}`;
+          await client.chat.postMessage({ channel, thread_ts: ts, text: footer, blocks: [ { type: 'context', elements: [ { type: 'mrkdwn', text: footer } ] } ] });
+        } catch (e3) { elog(`stats footer post failed: ${(e3 as Error).message}`); }
       } else {
         // No splitting/truncation. Post as-is; if Slack rejects, error handler below will present a minimal fallback.
         vlog('posting to slack (raw text, no splitting)');
         await client.chat.update({ channel, ts, text: finalText });
+        // Post tiny stats footer as a separate small message (context)
+        try {
+          const logs = sessionManager.getLogs(runId);
+          const acc = sessionManager.getAccounting(runId);
+          const snap = buildSnapshot(logs, acc, Date.now());
+          const agentsCount = new Set(snap.lines.map((l) => l.agentId)).size;
+          const fmtK = (n: number): string => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
+          const footer = `tokens →:${fmtK(snap.totals.tokensIn)} ←:${fmtK(snap.totals.tokensOut)} c→:${fmtK(snap.totals.tokensCacheRead)} c←:${fmtK(snap.totals.tokensCacheWrite)} | cost: $${(snap.totals.costUsd ?? 0).toFixed(2)} | tools ${snap.totals.toolsRun} | agents ${agentsCount}`;
+          await client.chat.postMessage({ channel, thread_ts: ts, text: footer, blocks: [ { type: 'context', elements: [ { type: 'mrkdwn', text: footer } ] } ] });
+        } catch (e3) { elog(`stats footer post failed: ${(e3 as Error).message}`); }
       }
     } catch (e) {
       const errMsg = (e as Error).message;
@@ -247,13 +448,17 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
     const text = (kind === 'mention' && context?.botUserId) ? stripBotMention(textRaw, String(context.botUserId)) : textRaw;
     if (!text) return;
     const threadTs = event.thread_ts ?? event.ts;
-    const initial = await client.chat.postMessage({ channel, thread_ts: threadTs, text: '🤖 Processing your request…' });
+    // Personalized opener
+    const who = typeof event.user === 'string' && event.user.length > 0 ? event.user : undefined;
+    const nameLabel = who ? await getUserLabel(client, who) : 'there';
+    const fname = firstNameFrom(nameLabel);
+    const initial = await client.chat.postMessage({ channel, thread_ts: threadTs, text: pickOpener(fname, options.openerTone ?? 'random') });
     const liveTs = String(initial.ts ?? threadTs);
     vlog('querying slack to get the last messages');
     const history = await fetchContext(client, event, historyLimit, historyCharsCap);
     // Build the formal user request wrapper
-    const who = typeof event.user === 'string' && event.user.length > 0 ? event.user : undefined;
-    const whoLabel = who ? await getUserLabel(client, who) : 'unknown';
+    const who2 = typeof event.user === 'string' && event.user.length > 0 ? event.user : undefined;
+    const whoLabel = who2 ? await getUserLabel(client, who2) : 'unknown';
     const when = fmtTs(event.ts) || 'unknown time';
     const userPrompt = [
       '## SLACK USER REQUEST TO ACT ON IT',
@@ -264,15 +469,25 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
     ].join('\n');
     vlog('calling agent');
     const runId = options.sessionManager.startRun({ source: 'slack', teamId: context?.teamId, channelId: channel, threadTsOrSessionId: threadTs }, systemPrompt, userPrompt, history);
-    const render = (): string => {
-      const meta = sessionManager.getRun(runId);
-      const out = sessionManager.getOutput(runId) ?? '';
-      const title = `ai-agent (${meta?.status ?? 'running'})`;
-      const body: string[] = [];
-      if (meta?.status === 'running') body.push('⏳ working…');
-      if (out) body.push(`Response preview: ${truncate(out, 800)}`);
-      if (meta?.error) body.push(`Error: ${meta.error}`);
-      return buildSlackList(title, body);
+    // Update the opener message to include a Cancel button
+    try {
+      await client.chat.update({
+        channel,
+        ts: liveTs,
+        text: pickOpener(fname, options.openerTone ?? 'random'),
+        blocks: [
+          { type: 'section', text: { type: 'mrkdwn', text: pickOpener(fname, options.openerTone ?? 'random') } },
+          { type: 'actions', elements: [ { type: 'button', text: { type: 'plain_text', text: 'Cancel' }, style: 'danger', action_id: 'cancel_run', value: runId } ] }
+        ]
+      });
+    } catch { /* ignore update issues */ }
+    const render = (): { text: string; blocks: any[] } => {
+      const logs = sessionManager.getLogs(runId);
+      const acc = sessionManager.getAccounting(runId);
+      const snap = buildSnapshot(logs, acc, Date.now());
+      const text = formatSlackStatus(snap);
+      const blocks = buildStatusBlocks(snap);
+      return { text, blocks };
     };
     scheduleUpdate(client, channel, liveTs, render);
     const poll = setInterval(async () => {
@@ -290,5 +505,23 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
     if (!event?.channel_type || event.channel_type !== 'im') return;
     if (!event.text || !event.user || event.bot_id) return;
     await handleEvent('dm', args);
+  });
+
+  // Cancel button handler
+  app.action('cancel_run', async (args: any) => {
+    try {
+      const body = args?.body ?? {};
+      const channel = body.channel?.id ?? body.container?.channel_id;
+      const ts = body.message?.ts ?? body.container?.message_ts;
+      const runId = body.actions?.[0]?.value as string | undefined;
+      if (!channel || !ts || !runId) return;
+      // Mark run as canceled (best-effort)
+      options.sessionManager.cancelRun?.(runId, 'Canceled by user');
+      // Update message
+      await args.client.chat.update({ channel, ts, text: '⛔ Canceled by user.' });
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('cancel_run failed', e);
+    }
   });
 }

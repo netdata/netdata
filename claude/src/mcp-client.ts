@@ -64,7 +64,7 @@ export class MCPClientManager {
           results.push(server);
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-          this.log('ERR', 'response', 'mcp', `${name}:init`, `initialization failed: ${message}`, true);
+      this.log('ERR', 'response', 'tool', `${name}:init`, `initialization failed: ${message}`, true);
         }
       }
     };
@@ -97,7 +97,7 @@ export class MCPClientManager {
     let transport: Transport;
     const initStart = Date.now();
     
-    this.log('VRB', 'request', 'mcp', `${name}:connect`, `type=${config.type} ${config.command ?? config.url ?? ''}`);
+    this.log('VRB', 'request', 'tool', `${name}:connect`, `type=${config.type} ${config.command ?? config.url ?? ''}`);
     
     try {
       switch (config.type) {
@@ -112,10 +112,10 @@ export class MCPClientManager {
           if (this.trace) {
             if (resolvedHeaders !== undefined) {
               const safeHeaders = this.redactAuthHeader(resolvedHeaders);
-              this.log('TRC', 'request', 'mcp', `${name}:websocket-connect`, 
+              this.log('TRC', 'request', 'tool', `${name}:websocket-connect`, 
                 `WebSocket URL: ${config.url}, Headers: ${JSON.stringify(safeHeaders)}`);
             } else {
-              this.log('TRC', 'request', 'mcp', `${name}:websocket-connect`, 
+              this.log('TRC', 'request', 'tool', `${name}:websocket-connect`, 
                 `WebSocket URL: ${config.url}, Headers: none`);
             }
           }
@@ -132,10 +132,10 @@ export class MCPClientManager {
           if (this.trace) {
             if (resolvedHeaders !== undefined) {
               const safeHeaders = this.redactAuthHeader(resolvedHeaders);
-              this.log('TRC', 'request', 'mcp', `${name}:http-connect`, 
+              this.log('TRC', 'request', 'tool', `${name}:http-connect`, 
                 `HTTP URL: ${config.url}, Headers: ${JSON.stringify(safeHeaders)}`);
             } else {
-              this.log('TRC', 'request', 'mcp', `${name}:http-connect`, 
+              this.log('TRC', 'request', 'tool', `${name}:http-connect`, 
                 `HTTP URL: ${config.url}, Headers: none`);
             }
           }
@@ -153,10 +153,10 @@ export class MCPClientManager {
           if (this.trace) {
             if (resolvedHeaders !== undefined) {
               const safeHeaders = this.redactAuthHeader(resolvedHeaders);
-              this.log('TRC', 'request', 'mcp', `${name}:sse-connect`, 
+              this.log('TRC', 'request', 'tool', `${name}:sse-connect`, 
                 `SSE URL: ${config.url}, Headers: ${JSON.stringify(safeHeaders)}`);
             } else {
-              this.log('TRC', 'request', 'mcp', `${name}:sse-connect`, 
+              this.log('TRC', 'request', 'tool', `${name}:sse-connect`, 
                 `SSE URL: ${config.url}, Headers: none`);
             }
           }
@@ -189,11 +189,11 @@ export class MCPClientManager {
       this.clients.set(name, client);
 
       const connectLatency = Date.now() - initStart;
-      this.log('VRB', 'response', 'mcp', `${name}:connect`, `connected in ${String(connectLatency)}ms`);
+      this.log('VRB', 'response', 'tool', `${name}:connect`, `connected in ${String(connectLatency)}ms`);
 
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
-      this.log('ERR', 'response', 'mcp', `${name}:connect`, message, true);
+      this.log('ERR', 'response', 'tool', `${name}:connect`, message, true);
       throw e;
     }
 
@@ -202,20 +202,20 @@ export class MCPClientManager {
 
     // List tools
     const toolsStart = Date.now();
-    this.log('VRB', 'request', 'mcp', `${name}:tools/list`, 'requesting tools');
+    this.log('VRB', 'request', 'tool', `${name}:tools/list`, 'requesting tools');
     
     let toolsResponse;
     try {
       toolsResponse = await client.listTools();
       const toolsLatency = Date.now() - toolsStart;
-      this.log('VRB', 'response', 'mcp', `${name}:tools/list`, `${String(toolsResponse.tools.length)} tools in ${String(toolsLatency)}ms`);
+      this.log('VRB', 'response', 'tool', `${name}:tools/list`, `${String(toolsResponse.tools.length)} tools in ${String(toolsLatency)}ms`);
       
       if (this.trace) {
-        this.log('TRC', 'response', 'mcp', `${name}:tools/list`, JSON.stringify(toolsResponse, null, 2));
+        this.log('TRC', 'response', 'tool', `${name}:tools/list`, JSON.stringify(toolsResponse, null, 2));
       }
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
-      this.log('ERR', 'response', 'mcp', `${name}:tools/list`, message, true);
+      this.log('ERR', 'response', 'tool', `${name}:tools/list`, message, true);
       throw e;
     }
 
@@ -239,7 +239,7 @@ export class MCPClientManager {
     let instructions = initInstructions;
     try {
       const promptsStart = Date.now();
-      this.log('VRB', 'request', 'mcp', `${name}:prompts/list`, 'requesting prompts');
+      this.log('VRB', 'request', 'tool', `${name}:prompts/list`, 'requesting prompts');
       
       let promptsResponse;
       try {
@@ -249,10 +249,10 @@ export class MCPClientManager {
         const pr = promptsResponse as { prompts?: { name: string; description?: string }[] } | undefined;
         const list = Array.isArray(pr?.prompts) ? pr.prompts : [];
         
-        this.log('VRB', 'response', 'mcp', `${name}:prompts/list`, `${String(list.length)} prompts in ${String(promptsLatency)}ms`);
+        this.log('VRB', 'response', 'tool', `${name}:prompts/list`, `${String(list.length)} prompts in ${String(promptsLatency)}ms`);
         
         if (this.trace) {
-          this.log('TRC', 'response', 'mcp', `${name}:prompts/list`, JSON.stringify(promptsResponse, null, 2));
+        this.log('TRC', 'response', 'tool', `${name}:prompts/list`, JSON.stringify(promptsResponse, null, 2));
         }
 
         if (list.length > 0) {
@@ -262,7 +262,7 @@ export class MCPClientManager {
       } catch (e) {
         // Prompts are optional, log as warning but continue
         const message = e instanceof Error ? e.message : String(e);
-        this.log('WRN', 'response', 'mcp', `${name}:prompts/list`, `failed: ${message}`);
+        this.log('WRN', 'response', 'tool', `${name}:prompts/list`, `failed: ${message}`);
       }
     } catch {
       // Ignore prompts errors completely
@@ -271,11 +271,11 @@ export class MCPClientManager {
     const totalLatency = Date.now() - initStart;
     const toolNames = tools.map(t => t.name).join(', ');
     const hasInstructions = instructions.length > 0;
-    this.log('VRB', 'response', 'mcp', `${name}:init`, 
+    this.log('VRB', 'response', 'tool', `${name}:init`, 
       `${String(tools.length)} tools (${toolNames || '-'})${hasInstructions ? ', with instructions' : ''}, ${String(totalLatency)}ms total`);
 
     if (this.trace) {
-      this.log('TRC', 'response', 'mcp', `${name}:init`, `ready with ${String(tools.length)} tools`);
+      this.log('TRC', 'response', 'tool', `${name}:init`, `ready with ${String(tools.length)} tools`);
     }
     
     return { name, config, tools, instructions };
@@ -302,7 +302,7 @@ export class MCPClientManager {
         transport.stderr.on('data', (d: Buffer) => {
           const line = d.toString('utf8').trimEnd();
           if (this.trace) {
-            this.log('TRC', 'request', 'mcp', `${name}:stderr`, line);
+            this.log('TRC', 'request', 'tool', `${name}:stderr`, line);
           }
         });
       }
@@ -358,18 +358,18 @@ export class MCPClientManager {
     
     const compactReq = formatToolRequestCompact(toolCall.name, sanitizedParams);
     const reqMsg = slot !== undefined ? `slot=${String(slot)} ${compactReq}` : compactReq;
-    this.log('VRB', 'request', 'mcp', `${serverName}:${toolCall.name}`, reqMsg);
+    this.log('VRB', 'request', 'tool', `${serverName}:${toolCall.name}`, reqMsg);
 
     try {
       const before = JSON.stringify(originalParams);
       if (before !== argsStr) {
-        this.log('WRN', 'request', 'mcp', `${serverName}:${toolCall.name}`, 'sanitized null/undefined fields from arguments');
+        this.log('WRN', 'request', 'tool', `${serverName}:${toolCall.name}`, 'sanitized null/undefined fields from arguments');
       }
     } catch { /* ignore */ }
 
 
     if (this.trace) {
-      this.log('TRC', 'request', 'mcp', `${serverName}:${toolCall.name}`, 
+      this.log('TRC', 'request', 'tool', `${serverName}:${toolCall.name}`, 
         `callTool ${JSON.stringify({ name: toolCall.name, arguments: sanitizedParams })}`);
     }
 
@@ -409,7 +409,7 @@ export class MCPClientManager {
           const requestInfo = compactReq;
           const limit = this.maxToolResponseBytes;
           const warnMsg = `${requestInfo} → response exceeded max size: ${String(sizeBytes)} bytes > limit ${String(limit)} bytes (truncated)`;
-          this.log('WRN', 'response', 'mcp', `${serverName}:${toolCall.name}`, warnMsg);
+          this.log('WRN', 'response', 'tool', `${serverName}:${toolCall.name}`, warnMsg);
           this.sizeCapHits += 1;
 
           // Prepare injected prefix message
@@ -437,11 +437,11 @@ export class MCPClientManager {
         : { type: 'success' };
 
       const slotPrefix = slot !== undefined ? `slot=${String(slot)} ` : '';
-      this.log('VRB', 'response', 'mcp', `${serverName}:${toolCall.name}`, 
+      this.log('VRB', 'response', 'tool', `${serverName}:${toolCall.name}`, 
         `${slotPrefix}${String(latencyMs)}ms, ${String(result.length)} chars${isError ? ' (error)' : ''}`);
 
       if (this.trace) {
-        this.log('TRC', 'response', 'mcp', `${serverName}:${toolCall.name}`, 
+        this.log('TRC', 'response', 'tool', `${serverName}:${toolCall.name}`, 
           JSON.stringify(resp, null, 2));
       }
 
@@ -476,7 +476,7 @@ export class MCPClientManager {
       }
 
       const slotPrefixErr = slot !== undefined ? `slot=${String(slot)} ` : '';
-      this.log('ERR', 'response', 'mcp', `${serverName}:${toolCall.name}`, 
+      this.log('ERR', 'response', 'tool', `${serverName}:${toolCall.name}`, 
         `${slotPrefixErr}error: ${message} (${String(latencyMs)}ms)`, false);
 
       return {
@@ -583,7 +583,11 @@ export class MCPClientManager {
   }
 
   // Simple tool executor for AI SDK integration
-  async executeToolByName(toolName: string, parameters: Record<string, unknown>, opts?: { slot?: number }): Promise<{ result: string; serverName: string }> {
+  async executeToolByName(
+    toolName: string,
+    parameters: Record<string, unknown>,
+    opts?: { slot?: number; timeoutMs?: number }
+  ): Promise<{ result: string; serverName: string }> {
     const mapping = this.toolNameMap.get(toolName);
     if (mapping === undefined) {
       throw new Error(`No server found for tool: ${toolName}`);
@@ -598,7 +602,7 @@ export class MCPClientManager {
       parameters
     };
 
-    const result = await this.executeTool(serverName, toolCall, undefined, opts?.slot);
+    const result = await this.executeTool(serverName, toolCall, opts?.timeoutMs, opts?.slot);
     
     if (result.status.type !== 'success') {
       const errorMsg = 'message' in result.status ? result.status.message : result.status.type;

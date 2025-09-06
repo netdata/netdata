@@ -73,6 +73,11 @@
 - Slack: @antigoni (U09875TS1AA)
 - HubSpot: 82086066
 
+**Nefeli** - Marketing
+- nefeli@netdata.cloud
+- Slack: @nefeli (U05BTG5DKKR)
+- HubSpot: 68876785
+
 ### Human Resources
 
 **Sofia Efraimidou** - Head of HR
@@ -156,7 +161,7 @@
 - HubSpot: 26867325
 - https://github.com/M4itee
 
-**Austin Hemmelgarn** - Senior Site Reliability / DevOps Engineer
+**Austin Hemmelgarn** - Senior Site Reliability / DevOps Engineer (Agent)
 - austin@netdata.cloud
 - Slack: @austin (UCCCDA3PC)
 - https://github.com/Ferroin
@@ -168,17 +173,10 @@
 
 ### Documentation
 
-**Christina Kanellakopoulou** - Jr. Technical Writer
+**Kanela Kanellakopoulou** - Technical Writer
 - kanela@netdata.cloud
 - Slack: @kanela (U08JMT7S5LY)
 - https://github.com/kanelatechnical
-
-### Additional Team Members
-
-**Nefeli** - Team Member
-- nefeli@netdata.cloud
-- Slack: @nefeli (U05BTG5DKKR)
-- HubSpot: 68876785
 
 ### External Partners & Consultants
 

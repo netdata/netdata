@@ -218,11 +218,19 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       }
       return 0;
     };
-    const u = usage ?? {} as Record<string, unknown>;
-    const inputTokens = num(u.inputTokens) || num(u.prompt_tokens) || num(u.input_tokens);
-    const outputTokens = num(u.outputTokens) || num(u.completion_tokens) || num(u.output_tokens);
-    const cachedTokensRaw = num(u.cachedTokens) || num(u.cached_tokens) || num(u.cache_creation_input_tokens);
-    const cachedTokens = cachedTokensRaw > 0 ? cachedTokensRaw : undefined;
+    const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object';
+    const u: Record<string, unknown> = isRecord(usage) ? usage : {};
+    const get = (key: string): unknown => (Object.prototype.hasOwnProperty.call(u, key) ? u[key] : undefined);
+    const inputTokens = num(get('inputTokens')) || num(get('prompt_tokens')) || num(get('input_tokens'));
+    const outputTokens = num(get('outputTokens')) || num(get('completion_tokens')) || num(get('output_tokens'));
+    // Cache reads reported by multiple providers in different fields:
+    // - OpenAI: prompt_tokens_details.cached_tokens or input_tokens_details.cached_tokens (AI SDK normalizes to usage.cachedInputTokens)
+    // - Anthropic: cache_read_input_tokens (AI SDK normalizes to usage.cachedInputTokens)
+    // - Google: usageMetadata.cachedContentTokenCount (AI SDK normalizes to usage.cachedInputTokens)
+    const cachedReadRaw = num(get('cachedInputTokens')) || num(get('cached_tokens'));
+    const cacheReadInputTokens = cachedReadRaw > 0 ? cachedReadRaw : undefined;
+    // Back-compat aggregate cachedTokens equals read tokens when available
+    const cachedTokens = cacheReadInputTokens;
     const totalTokensRaw = num(u.totalTokens) || num(u.total_tokens);
     const totalTokens = totalTokensRaw > 0 ? totalTokensRaw : (inputTokens + outputTokens);
 
@@ -230,6 +238,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       inputTokens,
       outputTokens,
       cachedTokens: cachedTokens !== undefined && cachedTokens > 0 ? cachedTokens : undefined,
+      cacheReadInputTokens,
       totalTokens
     };
   }
@@ -373,6 +382,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         messages,
         tools,
         toolChoice: 'required',
+        maxOutputTokens: request.maxOutputTokens,
         temperature: request.temperature,
         topP: request.topP,
         providerOptions: providerOptions as never,
@@ -441,6 +451,29 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         } catch { /* ignore */ }
       }
       const tokens = this.extractTokenUsage(usage);
+      // Try to enrich with provider metadata (e.g., Anthropic cacheCreationInputTokens)
+      try {
+        const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object';
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/dot-notation
+        const provMeta = isObj(resp) && isObj((resp as Record<string, unknown>).providerMetadata)
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/dot-notation
+          ? ((resp as Record<string, unknown>).providerMetadata as Record<string, unknown>)
+          : undefined;
+        let w: unknown = undefined;
+        if (isObj(provMeta)) {
+          const pm: Record<string, unknown> = provMeta;
+          const a = pm.anthropic;
+          if (isObj(a)) {
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+            w = (a as { cacheCreationInputTokens?: unknown }).cacheCreationInputTokens;
+          }
+        }
+        // const anthropic = isObj(provMeta) && isObj(provMeta.anthropic) ? (provMeta.anthropic as Record<string, unknown>) : undefined;
+        // const w = anthropic !== undefined ? anthropic.cacheCreationInputTokens : undefined;
+        if (typeof w === 'number' && Number.isFinite(w)) {
+          tokens.cacheWriteInputTokens = Math.trunc(w);
+        }
+      } catch { /* ignore metadata errors */ }
       const latencyMs = Date.now() - startTime;
 
       // Debug: log the raw response structure
@@ -565,6 +598,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         messages,
         tools,
         toolChoice: 'required',
+        maxOutputTokens: request.maxOutputTokens,
         temperature: request.temperature,
         topP: request.topP,
         providerOptions: providerOptions as never,
@@ -581,7 +615,24 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         console.error(`[DEBUG] Non-stream result.response:`, JSON.stringify(result.response, null, 2).substring(0, 500));
       }
 
-      const respObj = (result.response as { messages?: unknown[] } | undefined) ?? {};
+      const respObj = (result.response as { messages?: unknown[]; providerMetadata?: Record<string, unknown> } | undefined) ?? {};
+      // Enrich with provider metadata (e.g., Anthropic cacheCreationInputTokens)
+      try {
+        const provMeta = respObj.providerMetadata;
+        const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object';
+        let w: unknown = undefined;
+        if (isObj(provMeta)) {
+          const pm: Record<string, unknown> = provMeta;
+          const a = pm.anthropic;
+          if (isObj(a)) {
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+            w = (a as { cacheCreationInputTokens?: unknown }).cacheCreationInputTokens;
+          }
+        }
+        if (typeof w === 'number' && Number.isFinite(w)) {
+          tokens.cacheWriteInputTokens = Math.trunc(w);
+        }
+      } catch { /* ignore */ }
       if (process.env.DEBUG === 'true') {
         try {
           const msgs = Array.isArray(respObj.messages) ? respObj.messages : [];

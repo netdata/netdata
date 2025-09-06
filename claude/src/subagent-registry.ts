@@ -129,6 +129,10 @@ export class SubAgentRegistry {
     });
   }
 
+  public getPromptPaths(): string[] {
+    return Array.from(this.children.values()).map((c) => c.promptPath);
+  }
+
   hasTool(exposedToolName: string): boolean {
     const name = exposedToolName.startsWith('agent__') ? exposedToolName.slice('agent__'.length) : exposedToolName;
     return this.children.has(name);

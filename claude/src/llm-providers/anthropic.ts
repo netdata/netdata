@@ -30,6 +30,15 @@ export class AnthropicProvider extends BaseLLMProvider {
       const filteredTools = this.filterToolsForFinalTurn(request.tools, request.isFinalTurn);
       const tools = this.convertTools(filteredTools, request.toolExecutor);
       const messages = super.convertMessages(request.messages);
+      // Inject cache control on system prompt to encourage caching of system content
+      // AI SDK maps message.providerOptions.anthropic.cacheControl to cache_control on Anthropic messages
+      // eslint-disable-next-line functional/no-loop-statements
+      for (const m of messages as unknown as ({ role: string; providerOptions?: Record<string, unknown> }[])) {
+        if (m.role === 'system') {
+          m.providerOptions = { ...(m.providerOptions ?? {}), anthropic: { cacheControl: { type: 'ephemeral' } } };
+          break;
+        }
+      }
       
       // Add final turn message if needed
       const finalMessages = this.buildFinalTurnMessages(messages, request.isFinalTurn);

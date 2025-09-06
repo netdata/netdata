@@ -10,6 +10,7 @@ models:
   - google/gemini-2.5-pro
   - openai/gpt-5
 tools:
+  - ask-netdata
   - batch
 agents:
   - company.ai
@@ -22,8 +23,9 @@ agents:
   - posthog.ai
   - github.ai
   - freshdesk.ai
+  - executive.ai
 llmTimeout: 180000
-toolTimeout: 180000
+toolTimeout: 600000
 toolResponseMaxBytes: 40000
 maxConcurrentTools: 10
 temperature: 0.7
@@ -235,7 +237,51 @@ Expected Output: ticket snapshot (status/priority/assignee) and a short quote fr
 Scope: Searches on the internet for anything
 Operation: performs excessive web searches to gather the information requested, it can also fetch, summarize or extract information from URLs
 Input: anything you want to be found
-Output: what it found
+Expected Output: what it found
+
+### executive
+Scope: Analyze business data to identify ARR, MRR, subscriptions added, churned, products used, migrations, billing info
+Operation: analyzes production data the same way the the Netdata Executive Dashboard does, to identify business performance
+Input: Anything related to business performance
+Output: metrics and related data for the question asked
+
+**Example 1**
+Input: analyze overall churn over the last 90 days and how it has affected the company's ARR
+Expected Output: a report about explaining in detail churn and ARR progress over the last 90 days
+
+**Example 2**
+Input: find the top 3 (by ARR) customers that churned over the last 90 days
+Expected Output: the top 3 customers churned over the last 3 days
+
+**Example 3**
+Input: find the top 3 (by ARR) customers that subscribed to paid Business subscriptions over the last 90 days
+Expected Output: the top 3 business subscription customers over the last 3 days
+
+IMPORTANT: Billing in Netdata is per Netdata Cloud space, not per user or email address.
+The executive sub-agent has access to aggregated data (counts and sums) and detailed data (per space), but these are different datasets.
+If you want it to report specific customer names or spaces IDs, you have to ask for it.
+
+IMPORTANT: The executive subagent can be used for identifying specific customers or spaces that match some criteria,
+which you can then feed to other sub-agents to find users, nodes, user-activities, etc.
+
+### ask-netdata
+Scope: Answers questions based on Netdata's documentation.
+Operation: This is a remote AI assistant with RAG access to Netdata's documentation.
+Input: Any question about Netdata features.
+Output: What it found in the documentation about the given question
+
+You can use this feature when making suggestions, when you don't know if netdata supports something or not.
+Keep in mind however that documentation is not always up to date.
+So, if you believe the requested feature most likely is there, proceed with your suggestion, but mention that there is no documentation about it.
+
+Prefer using ask-netdata for documentation questions instead of the other tools.
+(github can also help in documentation, but it significantly slower - ask-netdata is optimized to provide fast answers from documentation).
+
+When you need a link to the answer, you can provide:
+
+https://learn.netdata.cloud/docs/ask-netdata?q=How+Netdata+will+help+me+optimize+my+SRE+team%3F
+
+(replace the string after `?q=` with a properly escaped string of the question.
 
 ## Sythesizing Sub-Agent Reports
 
@@ -428,6 +474,8 @@ This consultative selling methodology increases close rates by actively improvin
 - **CEO Mindset**: Approach each opportunity thinking about revenue growth, profit growth, and expense reduction
 - **Validation-Based**: No progression without formal validation plans and commitments
 - **Accurate Forecasting**: Odds based on customer commitments, not salesperson optimism
+
+${include:netdata-employees.md}
 
 ## Tone and language
 

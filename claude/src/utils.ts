@@ -189,3 +189,27 @@ export function formatProviderModel(provider?: string, model?: string, actualPro
   }
   return `${prov}:${mdl}`;
 }
+
+// Truncate a UTF-8 string to a max byte length with a standard prefix.
+// Mirrors the truncation semantics used by MCP client so behavior stays consistent.
+export function truncateUtf8WithNotice(s: string, limitBytes: number, originalSizeBytes?: number): string {
+  if (limitBytes <= 0) return '';
+  const size = typeof originalSizeBytes === 'number' && Number.isFinite(originalSizeBytes)
+    ? Math.max(0, Math.trunc(originalSizeBytes))
+    : Buffer.byteLength(s, 'utf8');
+  if (size <= limitBytes) return s;
+
+  const prefix = `[TRUNCATED] Original size ${String(size)} bytes; truncated to ${String(limitBytes)} bytes.\n\n`;
+  const enc = new TextEncoder();
+  const dec = new TextDecoder('utf-8', { fatal: false });
+  const prefixBytes = enc.encode(prefix);
+  if (prefixBytes.byteLength >= limitBytes) {
+    const slice = prefixBytes.subarray(0, limitBytes);
+    return dec.decode(slice);
+  }
+  const budget = limitBytes - prefixBytes.byteLength;
+  const resBytes = enc.encode(s);
+  const contentSlice = resBytes.subarray(0, Math.min(budget, resBytes.byteLength));
+  const truncated = dec.decode(contentSlice);
+  return prefix + truncated;
+}

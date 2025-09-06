@@ -58,6 +58,22 @@ const ConfigurationSchema = z.object({
   providers: z.record(z.string(), ProviderConfigSchema),
   mcpServers: z.record(z.string(), MCPServerConfigSchema),
   accounting: z.object({ file: z.string() }).optional(),
+  pricing: z
+    .record(
+      z.string(), // provider
+      z.record(
+        z.string(), // model
+        z.object({
+          unit: z.enum(['per_1k','per_1m']).optional(),
+          currency: z.literal('USD').optional(),
+          prompt: z.number().nonnegative().optional(),
+          completion: z.number().nonnegative().optional(),
+          cacheRead: z.number().nonnegative().optional(),
+          cacheWrite: z.number().nonnegative().optional(),
+        })
+      )
+    )
+    .optional(),
   defaults: z
     .object({
       llmTimeout: z.number().positive().optional(),
@@ -185,8 +201,10 @@ export function validateProviders(config: Configuration, providers: string[]): v
 export function validateMCPServers(config: Configuration, mcpServers: string[]): void {
   // Allow special virtual tool selectors that aren't MCP servers
   const virtuals = new Set<string>(['batch']);
+  const rest = new Set<string>(Object.keys(config.restTools ?? {}));
   const missing = mcpServers
     .filter((s) => !virtuals.has(s))
+    .filter((s) => !rest.has(s))
     .filter((s) => !(s in config.mcpServers));
   if (missing.length > 0) throw new Error(`Unknown MCP servers: ${missing.join(', ')}`);
 }

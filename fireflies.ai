@@ -66,3 +66,5 @@ Red Flags:
 - "No budget"
 
 Output: Evidence-based assessment with quotes, not opinions. If unsure, say so.
+
+${include:netdata-employees.md}

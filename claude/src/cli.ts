@@ -490,7 +490,19 @@ program
 
       // Always print only the formatted human-readable output to stdout
       try {
-        const out = formatAgentResultHumanReadable(result);
+        let out = formatAgentResultHumanReadable(result);
+        // If rendering to TTY, normalize simplified color hints like "[33m" to real ANSI ESC sequences
+        if (chosenFormatId === 'tty') {
+          const normalizeAnsi = (s: string): string => {
+            let t = s;
+            // Convert literal \x1b[ or \u001b[ sequences to real ESC + [
+            t = t.replace(/\\x1b\[/gi, '\x1b[');
+            t = t.replace(/\\u001b\[/gi, '\x1b[');
+            // Do NOT convert bare "[33m" style sequences; show them as-is per request
+            return t;
+          };
+          out = normalizeAnsi(out);
+        }
         process.stdout.write(out);
         if (!out.endsWith('\n')) process.stdout.write('\n');
       } catch (e) {
@@ -721,7 +733,7 @@ function createCallbacks(options: Record<string, unknown>, accountingFile?: stri
       // Show trace only with specific flags (dark gray)
       if (entry.severity === 'TRC') {
         if ((entry.type === 'llm' && options.traceLlm === true) || 
-            (entry.type === 'mcp' && options.traceMcp === true)) {
+            (entry.type === 'tool' && options.traceMcp === true)) {
           const formatted = colorize(`${agentPrefix}[TRC] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}: ${entry.message}`, '\x1b[90m');
           process.stderr.write(`${formatted}\n`);
         }

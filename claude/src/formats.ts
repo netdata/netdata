@@ -9,7 +9,7 @@ export const OUTPUT_FORMATS: Record<OutputFormatId, OutputFormat> = {
   markdown: { id: 'markdown', description: 'markdown' },
   'markdown+mermaid': { id: 'markdown+mermaid', description: 'markdown with mermaid charts' },
   slack: { id: 'slack', description: 'Format your report in Slack mrkdwn, not GitHub markdown. Your report MUST comply with Slack message formatting and limits and be visually appealing.' },
-  tty: { id: 'tty', description: 'fixed-width monospaced terminal, with ANSI colors, use ASCII-art for tables and diagrams - no markdown' },
+  tty: { id: 'tty', description: 'fixed-width monospaced terminal, with ANSI colors, use ASCII-art for tables and diagrams (do not create unecessary boxes that wrap the content, let it breath) - no markdown. When adding ANSI colors, emit literal \\x1b[...m codes (e.g., \\x1b[33m for yellow) instead of raw ESC characters.' },
   pipe: { id: 'pipe', description: 'plain text' },
   json: { id: 'json', description: 'json' },
   'sub-agent': { id: 'sub-agent', description: 'agent to agent communication, use optimal format' },
