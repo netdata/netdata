@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"slices"
 )
 
 type (
@@ -31,7 +32,7 @@ func NewRegExpParser(config RegExpConfig, in io.Reader) (*RegExpParser, error) {
 		return nil, fmt.Errorf("compile: %w", err)
 	}
 
-	if pattern.NumSubexp() == 0 {
+	if hasNamed := slices.ContainsFunc(pattern.SubexpNames(), func(s string) bool { return s != "" }); !hasNamed {
 		return nil, errors.New("pattern has no named subgroups")
 	}
 

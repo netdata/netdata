@@ -186,6 +186,9 @@ func parseCSVDelimiter(s string) (rune, error) {
 		if err != nil {
 			return 0, fmt.Errorf("invalid CSV delimiter: %v", err)
 		}
+		if d < 0 {
+			return 0, errors.New("invalid CSV delimiter: must be a non-negative integer")
+		}
 		return rune(d), nil
 	}
 	if len(s) != 1 {
