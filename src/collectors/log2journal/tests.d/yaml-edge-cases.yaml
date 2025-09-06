@@ -1,0 +1,37 @@
+---
+# YAML edge cases that might parse differently
+# Tests ambiguous constructs, type coercion, boolean/numeric interpretation
+
+pattern: "(?P<test_type>\\w+): (?P<value>.*)"
+
+inject:
+  - key: YAML_BOOL_TRUE
+    value: true  # boolean true
+  - key: YAML_BOOL_FALSE
+    value: false # boolean false
+  - key: YAML_STRING_BOOL
+    value: "true"  # string "true"
+  - key: YAML_NUMBER
+    value: 123
+  - key: YAML_STRING_NUMBER
+    value: "123"
+  - key: YAML_FLOAT
+    value: 123.45
+  - key: YAML_SCIENTIFIC
+    value: 1.23e+4
+  - key: YAML_NULL
+    value: null
+  - key: YAML_STRING_NULL
+    value: "null"
+  - key: YAML_EMPTY
+    value: ""
+  - key: YAML_SPACES
+    value: "   "
+
+filename:
+  key: FILENAME
+
+rewrite:
+  - key: MESSAGE
+    value: 'Type coercion test: ${value}'
+    inject: yes
