@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- build\(deps\): bump github.com/prometheus/common from 0.65.0 to 0.66.1 in /src/go [\#20930](https://github.com/netdata/netdata/pull/20930) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/docker/docker from 28.3.3+incompatible to 28.4.0+incompatible in /src/go [\#20929](https://github.com/netdata/netdata/pull/20929) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/redis/go-redis/v9 from 9.12.1 to 9.13.0 in /src/go [\#20928](https://github.com/netdata/netdata/pull/20928) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Regenerate integrations docs [\#20925](https://github.com/netdata/netdata/pull/20925) ([netdatabot](https://github.com/netdatabot))
 - docs\(go.d/nginx\): improve prerequisites for NGINX collector [\#20924](https://github.com/netdata/netdata/pull/20924) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d/weblog\): remove path pattern validation in dyncfg [\#20923](https://github.com/netdata/netdata/pull/20923) ([ilyam8](https://github.com/ilyam8))
@@ -446,9 +449,6 @@
 - SNMP: aruba-switch.yaml [\#20385](https://github.com/netdata/netdata/pull/20385) ([Ancairon](https://github.com/Ancairon))
 - Improve DynCfg documentation [\#20384](https://github.com/netdata/netdata/pull/20384) ([kanelatechnical](https://github.com/kanelatechnical))
 - SNMP: aruba-cx-switch.yaml [\#20383](https://github.com/netdata/netdata/pull/20383) ([Ancairon](https://github.com/Ancairon))
-- SNMP: aruba-clearpass.yaml [\#20382](https://github.com/netdata/netdata/pull/20382) ([Ancairon](https://github.com/Ancairon))
-- SNMP: \_aruba-switch-cpu-memory.yaml [\#20381](https://github.com/netdata/netdata/pull/20381) ([Ancairon](https://github.com/Ancairon))
-- Update documentation [\#20380](https://github.com/netdata/netdata/pull/20380) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
