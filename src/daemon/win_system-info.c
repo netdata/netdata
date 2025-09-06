@@ -399,5 +399,6 @@ void netdata_windows_get_system_info(struct rrdhost_system_info *systemInfo)
     netdata_windows_get_mem(systemInfo);
     netdata_windows_get_total_disk_size(systemInfo);
     netdata_windows_install_type(systemInfo);
+    netdata_windows_ip(systemInfo);
 }
 #endif
