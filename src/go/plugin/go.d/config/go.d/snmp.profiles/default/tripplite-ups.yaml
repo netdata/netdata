@@ -118,8 +118,8 @@ metrics:
         family: 'Environment/Temperature/Alarm/Status'
         unit: "{status}"
       mapping:
-        true: 1
-        false: 2
+        "true": 1
+        "false": 2
   - MIB: TRIPPLITE-12X
     symbol:
       OID: 1.3.6.1.4.1.850.101.1.2.1.0
@@ -137,8 +137,8 @@ metrics:
         family: 'Environment/Humidity/Alarm/Status'
         unit: "{status}"
       mapping:
-        true: 1
-        false: 2
+        "true": 1
+        "false": 2
   - MIB: TRIPPLITE-12X
     table:
       OID: 1.3.6.1.4.1.850.100.1.3.2

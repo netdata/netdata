@@ -122,9 +122,13 @@ func loadProfileWithExtendsMap(filename string, extendsPaths multipath.MultiPath
 		return nil, err
 	}
 
-	var prof Profile
-	if err := yaml.Unmarshal(content, &prof.Definition); err != nil {
+	var def ddprofiledefinition.ProfileDefinition
+	if err := yaml.Unmarshal(content, &def); err != nil {
 		return nil, err
+	}
+
+	prof := Profile{
+		Definition: &def,
 	}
 
 	if prof.SourceFile == "" {

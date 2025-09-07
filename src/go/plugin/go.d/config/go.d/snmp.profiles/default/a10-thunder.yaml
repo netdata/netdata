@@ -328,13 +328,13 @@ metrics:
           description: Fan status
           unit: "{status}"
         mapping:
-          0: failed
-          4: ok_fixed_high
-          5: ok_low_med
-          6: ok_med_med
-          7: ok_med_high
-          -2: not_ready
-          -1: unknown
+          "0": failed
+          "4": ok_fixed_high
+          "5": ok_low_med
+          "6": ok_med_med
+          "7": ok_med_high
+          "-2": not_ready
+          "-1": unknown
     metric_tags:
       - symbol:
           name: axFanName

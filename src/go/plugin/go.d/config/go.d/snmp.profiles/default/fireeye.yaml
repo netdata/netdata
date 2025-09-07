@@ -33,8 +33,8 @@ metrics:
         family: 'System/License/Status'
         unit: "{status}"
       mapping:
-        true: 1
-        false: 2
+        "true": 1
+        "false": 2
   - MIB: FE-FIREEYE-MIB
     symbol:
       OID: 1.3.6.1.4.1.25597.11.1.1.6.0
@@ -44,8 +44,8 @@ metrics:
         family: 'Hardware/Temperature/Status'
         unit: "{status}"
       mapping:
-        true: 1
-        false: 2
+        "true": 1
+        "false": 2
   - MIB: FE-FIREEYE-MIB
     symbol:
       OID: 1.3.6.1.4.1.25597.11.2.1.2.0
@@ -55,8 +55,8 @@ metrics:
         family: 'Hardware/RAID/Status'
         unit: "{status}"
       mapping:
-        true: 1
-        false: 2
+        "true": 1
+        "false": 2
   - MIB: FE-FIREEYE-MIB
     table:
       OID: 1.3.6.1.4.1.25597.11.2.1.3
@@ -86,8 +86,8 @@ metrics:
         family: 'Hardware/Power/Status'
         unit: "{status}"
       mapping:
-        true: 1
-        false: 2
+        "true": 1
+        "false": 2
   - MIB: FE-FIREEYE-MIB
     symbol:
       OID: 1.3.6.1.4.1.25597.11.4.1.2.0
@@ -97,8 +97,8 @@ metrics:
         family: 'Hardware/Fan/Status'
         unit: "{status}"
       mapping:
-        true: 1
-        false: 2
+        "true": 1
+        "false": 2
   - MIB: FE-FIREEYE-MIB
     symbol:
       OID: 1.3.6.1.4.1.25597.13.1.1.0
