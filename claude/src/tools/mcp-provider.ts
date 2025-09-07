@@ -57,6 +57,10 @@ export class MCPProvider extends ToolProvider {
     this.initialized = true;
   }
 
+  async warmup(): Promise<void> {
+    await this.ensureInitialized();
+  }
+
   private async initializeServer(name: string, config: MCPServerConfig): Promise<MCPServer> {
     const client = new Client(
       { name: 'ai-agent', version: '1.0.0' },

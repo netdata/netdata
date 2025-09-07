@@ -4,6 +4,7 @@ import path from 'node:path';
 
 import Ajv from 'ajv';
 
+import type { SessionNode } from './session-tree.js';
 import type {
   AIAgentCallbacks,
   AIAgentResult,
@@ -146,7 +147,7 @@ export class SubAgentRegistry {
       // extra trace/metadata for child
       trace?: { originId?: string; parentId?: string; callPath?: string };
     }
-  ): Promise<{ result: string; child: ChildInfo; accounting: readonly AccountingEntry[]; conversation: ConversationMessage[]; trace?: { originId?: string; parentId?: string; selfId?: string; callPath?: string } }> {
+  ): Promise<{ result: string; child: ChildInfo; accounting: readonly AccountingEntry[]; conversation: ConversationMessage[]; trace?: { originId?: string; parentId?: string; selfId?: string; callPath?: string }, opTree?: SessionNode }> {
     const name = exposedToolName.startsWith('agent__') ? exposedToolName.slice('agent__'.length) : exposedToolName;
     const info = this.children.get(name);
     if (info === undefined) throw new Error(`Unknown sub-agent: ${exposedToolName}`);
@@ -256,7 +257,7 @@ export class SubAgentRegistry {
     const acct: AccountingEntry[] = result.accounting;
     const firstAcct = result.accounting.find((a) => typeof a.txnId === "string" || typeof a.originTxnId === "string" || typeof a.parentTxnId === "string" || typeof a.callPath === "string");
     const trace: { originId?: string; parentId?: string; selfId?: string; callPath?: string } = { originId: firstAcct?.originTxnId, parentId: firstAcct?.parentTxnId, selfId: firstAcct?.txnId, callPath: firstAcct?.callPath };
-    const payload: { result: string; child: ChildInfo; accounting: readonly AccountingEntry[]; conversation: ConversationMessage[]; trace?: { originId?: string; parentId?: string; selfId?: string; callPath?: string } } = { result: out, child: info, accounting: acct, conversation: convo, trace };
+    const payload: { result: string; child: ChildInfo; accounting: readonly AccountingEntry[]; conversation: ConversationMessage[]; trace?: { originId?: string; parentId?: string; selfId?: string; callPath?: string }, opTree?: SessionNode } = { result: out, child: info, accounting: acct, conversation: convo, trace, opTree: (result as { opTree?: SessionNode }).opTree };
     return payload;
   }
 }

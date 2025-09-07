@@ -14,7 +14,7 @@ llmTimeout: 120000
 toolTimeout: 60000
 toolResponseMaxBytes: 20000
 maxConcurrentTools: 3
-temperature: 0.7
+temperature: 0.3
 topP: 1
 maxOutputTokens: 16384
 repeatPenalty: 1.1
@@ -212,7 +212,6 @@ Test automation and quality assurance
 ## Internal Tools & Resources
 Internal company tools
 
-- netdata/AEO: Annual employee objectives (private)
 - netdata/internal: Internal tools and resources (private)
 - netdata/demo-env: Demo environment setup (public)
 
@@ -283,7 +282,7 @@ Query Resolution Strategy
    - For configs: Search for .conf, .yml, .yaml files
    - For scripts: Search for .sh files in packaging/
    - Use path filters: "path:src/collectors" to narrow scope
-   - For cloud features, check both agent (ACLK) and cloud-* repos
+   - For cloud features, check both agent and cloud-* repos
 
 Standard Procedure
 0) Safety Gate (Mandatory)

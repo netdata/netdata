@@ -6,6 +6,7 @@ import path from 'node:path';
 import Ajv from 'ajv';
 
 import type { OutputFormatId } from './formats.js';
+import type { SessionNode } from './session-tree.js';
 import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, MCPTool, LLMAccountingEntry, ToolAccountingEntry, RestToolConfig } from './types.js';
 
 // Exit codes according to DESIGN.md
@@ -42,10 +43,12 @@ type ExitCode =
 // empty line between import groups enforced by linter
 import { validateProviders, validateMCPServers, validatePrompts } from './config.js';
 import { ExecutionTree } from './execution-tree.js';
-import { parseFrontmatter, parsePairs } from './frontmatter.js';
+import { parseFrontmatter, parsePairs, extractBodyWithoutFrontmatter } from './frontmatter.js';
 import { LLMClient } from './llm-client.js';
 import { buildPromptVars, applyFormat, expandVars } from './prompt-builder.js';
+import { SessionTreeBuilder } from './session-tree.js';
 import { SubAgentRegistry } from './subagent-registry.js';
+import { AgentProvider } from './tools/agent-provider.js';
 import { InternalToolProvider } from './tools/internal-provider.js';
 import { MCPProvider } from './tools/mcp-provider.js';
 import { RestProvider } from './tools/rest-provider.js';
@@ -78,6 +81,7 @@ export class AIAgentSession {
   private readonly callPath?: string;
   private readonly tree: ExecutionTree;
   private readonly toolsOrchestrator?: ToolsOrchestrator;
+  private readonly opTree: SessionTreeBuilder;
   // Per-turn planned subturns (tool call count) discovered when LLM yields toolCalls
   private plannedSubturns: Map<number, number> = new Map<number, number>();
   private resolvedFormat?: OutputFormatId;
@@ -86,7 +90,7 @@ export class AIAgentSession {
   private finalReport?: {
     status: 'success' | 'failure' | 'partial';
     // Allow all known output formats plus legacy 'text'
-    format: 'json' | 'markdown' | 'markdown+mermaid' | 'slack' | 'tty' | 'pipe' | 'sub-agent' | 'text';
+    format: 'json' | 'markdown' | 'markdown+mermaid' | 'slack-block-kit' | 'tty' | 'pipe' | 'sub-agent' | 'text';
     content?: string;
     content_json?: Record<string, unknown>;
     metadata?: Record<string, unknown>;
@@ -140,6 +144,8 @@ export class AIAgentSession {
       { sessionId: this.txnId, agentId: sessionConfig.agentId, callPath: this.callPath, maxTurns: sessionConfig.maxTurns },
       { onLog: sessionConfig.callbacks?.onLog, onAccounting: sessionConfig.callbacks?.onAccounting }
     );
+    // Hierarchical operation tree (Option C)
+    this.opTree = new SessionTreeBuilder({ traceId: this.txnId, agentId: sessionConfig.agentId, callPath: this.callPath });
 
     // Tools orchestrator (MCP + REST + Internal + Subagents)
     const orch = new ToolsOrchestrator(this.tree, {
@@ -147,7 +153,7 @@ export class AIAgentSession {
       toolResponseMaxBytes: sessionConfig.toolResponseMaxBytes,
       maxConcurrentTools: sessionConfig.maxConcurrentTools,
       parallelToolCalls: sessionConfig.parallelToolCalls,
-    });
+    }, this.opTree, (tree) => { try { this.sessionConfig.callbacks?.onOpTree?.(tree); } catch { /* ignore */ } });
     orch.register(new MCPProvider('mcp', sessionConfig.config.mcpServers, { trace: sessionConfig.traceMCP, verbose: sessionConfig.verbose, requestTimeoutMs: sessionConfig.toolTimeout }));
     // Build selected REST tools by frontmatter selection
     if (this.sessionConfig.config.restTools !== undefined) {
@@ -166,7 +172,7 @@ export class AIAgentSession {
         enableBatch,
         expectedJsonSchema,
         appendNotes: (text: string, tags?: string[]) => { if (text.trim().length > 0) this.internalNotes.push({ text, tags, ts: Date.now() }); },
-        setFinalReport: (p) => { this.finalReport = { status: p.status, format: p.format as 'json'|'markdown'|'markdown+mermaid'|'slack'|'tty'|'pipe'|'sub-agent'|'text', content: p.content, content_json: p.content_json, metadata: p.metadata, ts: Date.now() }; },
+        setFinalReport: (p) => { this.finalReport = { status: p.status, format: p.format as 'json'|'markdown'|'markdown+mermaid'|'slack-block-kit'|'tty'|'pipe'|'sub-agent'|'text', content: p.content, content_json: p.content_json, metadata: p.metadata, ts: Date.now() }; },
         orchestrator: orch,
         toolTimeoutMs: sessionConfig.toolTimeout
       });
@@ -195,14 +201,13 @@ export class AIAgentSession {
         });
         // Keep child conversation list for save-all
         this.childConversations.push({ agentId: exec.child.toolName, toolName: exec.child.toolName, promptPath: exec.child.promptPath, conversation: exec.conversation, trace: exec.trace });
-        return { result: exec.result, childAccounting: exec.accounting };
+        return { result: exec.result, childAccounting: exec.accounting, childOpTree: exec.opTree };
       };
-      // Dynamically import AgentProvider without awaiting in constructor
-      void (async () => {
-        const { AgentProvider } = await import('./tools/agent-provider.js');
-        orch.register(new AgentProvider('subagent', subAgents, execFn));
-      })();
+      // Register AgentProvider synchronously so sub-agent tools are known before first turn
+      orch.register(new AgentProvider('subagent', subAgents, execFn));
     }
+    // Populate mapping now (before warmup) so hasTool() sees all registered providers
+    void orch.listTools();
     this.toolsOrchestrator = orch;
   }
 
@@ -384,6 +389,9 @@ export class AIAgentSession {
     try {
       // Start execution session in the tree
       try { this.tree.startSession(); } catch { /* ignore */ }
+      // Warmup providers (ensures MCP tools/instructions are available) and refresh mapping
+      try { await this.toolsOrchestrator?.warmup(); } catch { /* ignore warmup errors */ }
+
       // Verbose: emit settings summary at start (without prompts)
       if (this.sessionConfig.verbose === true) {
         const summarizeConfig = () => {
@@ -528,7 +536,9 @@ export class AIAgentSession {
       this.resolvedFormatDescription = fmtDesc;
 
       // Apply ${FORMAT} replacement first, then expand variables
-      const withFormat = applyFormat(this.sessionConfig.systemPrompt, fmtDesc);
+      // Safety: strip any shebang/frontmatter from system prompt to avoid leaking YAML to the LLM
+      const sysBody = extractBodyWithoutFrontmatter(this.sessionConfig.systemPrompt);
+      const withFormat = applyFormat(sysBody, fmtDesc);
       const vars = { ...buildPromptVars(), MAX_TURNS: String(this.sessionConfig.maxTurns ?? 10) };
       const systemExpanded = expandVars(withFormat, vars);
       const userExpanded = expandVars(this.sessionConfig.userPrompt, vars);
@@ -568,9 +578,12 @@ export class AIAgentSession {
         finalReport: result.finalReport,
         // Provide ASCII tree for downstream consumers (CLI may choose to print)
         treeAscii: (() => { try { return this.tree.renderAscii(); } catch { return undefined; } })(),
+        opTreeAscii: (() => { try { return this.opTree.renderAscii(); } catch { return undefined; } })(),
+        opTree: (() => { try { return this.opTree.getSession(); } catch { return undefined; } })(),
       } as AIAgentResult;
 
       try { this.tree.endSession(result.success, result.error); } catch { /* ignore */ }
+      try { this.opTree.endSession(result.success, result.error); } catch { /* ignore */ }
       return resultShape;
 
     } catch (error) {
@@ -606,6 +619,7 @@ export class AIAgentSession {
         accounting: currentAccounting
       } as AIAgentResult;
       try { this.tree.endSession(false, message); } catch { /* ignore */ }
+      try { this.opTree.endSession(false, message); } catch { /* ignore */ }
       return failShape;
     } finally {
       await this.toolsOrchestrator?.cleanup();
@@ -634,6 +648,7 @@ export class AIAgentSession {
     // Turn 0 is initialization; action turns are 1..maxTurns
     // eslint-disable-next-line functional/no-loop-statements
     for (currentTurn = 1; currentTurn <= maxTurns; currentTurn++) {
+      try { this.opTree.beginTurn(currentTurn, {}); this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession()); } catch { /* ignore */ }
       // Orchestrator receives ctx turn/subturn per call; no MCP client turn management
       this.llmClient.setTurn(currentTurn, 0);
 
@@ -682,6 +697,8 @@ export class AIAgentSession {
 
             this.llmAttempts++;
             attempts += 1;
+            // Begin hierarchical LLM operation (Option C)
+            const llmOpId = (() => { try { return this.opTree.beginOp(currentTurn, 'llm', { provider, model, isFinalTurn }); } catch { return undefined; } })();
             const turnResult = await this.executeSingleTurn(
               attemptConversation,
               provider,
@@ -777,7 +794,17 @@ export class AIAgentSession {
               accounting.push(accountingEntry);
               try { this.tree.recordAccounting(accountingEntry); } catch { /* ignore */ }
               this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
+              try {
+                if (llmOpId !== undefined) this.opTree.appendAccounting(llmOpId, accountingEntry);
+              } catch { /* ignore */ }
             }
+            // Close hierarchical LLM op
+            try {
+              if (llmOpId !== undefined) {
+                this.opTree.endOp(llmOpId, (turnResult.status.type === 'success') ? 'ok' : 'failed', { latency: turnResult.latencyMs });
+                this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession());
+              }
+            } catch { /* ignore */ }
 
       // Handle turn result based on status
       if (turnResult.status.type === 'success') {
@@ -1066,6 +1093,11 @@ export class AIAgentSession {
           childConversations: this.childConversations
         };
       }
+      try {
+        // no-op; placeholder to pair beginTurn with an endTurn finally
+      } finally {
+        try { this.opTree.endTurn(currentTurn, {}); this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession()); } catch { /* ignore */ }
+      }
     }
 
     // Max turns exceeded
@@ -1207,8 +1239,10 @@ export class AIAgentSession {
     lastShownThinkingHeaderTurn: number
   ) {
     const turnSpanId = this.tree.startSpan('llm_turn', 'llm', { provider, model, turn: currentTurn });
+    // Expose provider tools plus session-specific internal tools (overrides schemas, same names)
     const availableTools = [
-      ...(this.toolsOrchestrator?.listTools() ?? [])
+      ...(this.toolsOrchestrator?.listTools() ?? []),
+      ...this.getInternalTools()
     ];
     
     // Track if we've shown thinking for this turn
@@ -1243,11 +1277,23 @@ export class AIAgentSession {
       try {
         // Internal tools are handled by InternalToolProvider via orchestrator
 
-        // Sub-agent execution
+        // Sub-agent execution (wrap in hierarchical 'session' op for live tree)
         if (this.subAgents?.hasTool(effectiveToolName) === true) {
+          let sessionOpId: string | undefined;
           try {
             const subName = effectiveToolName.startsWith('agent__') ? effectiveToolName.slice('agent__'.length) : effectiveToolName;
             this.addLog(logs, { timestamp: Date.now(), severity: 'VRB', turn: currentTurn, subturn: subturnCounter, direction: 'request', type: 'llm', remoteIdentifier: 'agent', fatal: false, message: `${subName}(${previewParams(parameters)}) <<< subagent ${subName}` });
+            // Begin 'session' op for sub-agent and attach a placeholder child session for live visibility
+            sessionOpId = (() => { try { return this.opTree.beginOp(currentTurn, 'session', { name: subName, provider: 'subagent' }); } catch { return undefined; } })();
+            try {
+              if (sessionOpId !== undefined) {
+                const parent = this.opTree.getSession();
+                const base = (typeof parent.callPath === 'string' && parent.callPath.length > 0) ? parent.callPath : (this.callPath ?? this.sessionConfig.agentId);
+                const stub: SessionNode = { id: `${Date.now().toString(36)}-stub`, traceId: typeof parent.traceId === 'string' ? parent.traceId : undefined, agentId: subName, callPath: `${String(base)}->${subName}`, startedAt: Date.now(), turns: [] };
+                this.opTree.attachChildSession(sessionOpId, stub);
+                this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession());
+              }
+            } catch { /* ignore */ }
             const subExec = this.subAgents.execute(effectiveToolName, parameters, {
               config: this.sessionConfig.config,
               callbacks: this.sessionConfig.callbacks,
@@ -1282,6 +1328,17 @@ export class AIAgentSession {
             accounting.push(accountingEntry);
             try { this.tree.recordAccounting(accountingEntry); } catch { /* ignore */ }
             this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
+            // End hierarchical 'session' op and attach child op tree if available
+            try {
+              if (sessionOpId !== undefined) {
+                const maybeTree = (exec as { opTree?: SessionNode | undefined }).opTree;
+                if (maybeTree !== undefined) {
+                  this.opTree.attachChildSession(sessionOpId, maybeTree);
+                }
+                this.opTree.endOp(sessionOpId, 'ok', { latency });
+                this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession());
+              }
+            } catch { /* ignore */ }
             // Merge child accounting into parent
             exec.accounting.forEach((a) => {
               accounting.push(a);
@@ -1317,7 +1374,13 @@ export class AIAgentSession {
             accounting.push(accountingEntry);
             try { this.tree.recordAccounting(accountingEntry); } catch { /* ignore */ }
             this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
-            throw e;
+            try {
+              if (typeof sessionOpId === 'string') {
+                this.opTree.endOp(sessionOpId, 'failed', { latency });
+                this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession());
+              }
+            } catch { /* ignore */ }
+            throw new Error(msg);
           }
         }
 
@@ -1606,7 +1669,7 @@ export class AIAgentSession {
       {
         const suffix = (typeof desc === 'string' && desc.length > 0) ? ` ${desc}` : '';
         // Specialize Slack schema and instructions to support Block Kit messages array
-        if (id === 'slack') {
+        if (id === 'slack' || id === 'slack-block-kit') {
           const S_TYPE_MRKDWN = '\\"type\\": \\"mrkdwn\\"';
           const S_TYPE_SECTION = '\\"type\\": \\"section\\"';
           const slackInstructions = (
@@ -1618,7 +1681,7 @@ export class AIAgentSession {
             + '        "type": "header",\n'
             + '        "text": {\n'
             + '          "type": "plain_text",\n'
-            + '          "text": "Claude\'s Analysis: Acme Corp"\n'
+            + '          "text": "Company Intelligence: Acme Corp"\n'
             + '        }\n'
             + '      },\n'
             + '      {\n'
@@ -1660,7 +1723,7 @@ export class AIAgentSession {
             + '    "blocks": [ /* next message blocks */ ]\n'
             + '  }\n'
             + ']\n\n'
-            + 'Maximum text length per block: 3000 bytes, maximum number of blocks per message: 50.\n\n'
+            + 'Split long output into multiple messages. You can post up to 20 messages, each message having up to 50 blocks, each block having up to 2000 characters.\n\n'
             + 'mrkdwn format:\n'
             + '- *bold* → bold\n'
             + '- _italic_ → italic\n'
@@ -1682,7 +1745,7 @@ export class AIAgentSession {
             name: 'agent__final_report',
             description: (
               'Finalize the task with a Slack report. ' + suffix
-              + '\nREQUIREMENT: Provide `messages` with Block Kit only. Do NOT provide plain `content`.\n\n'
+              + '\nREQUIREMENT: Provide up to 20 `messages` with Block Kit + mrkdwn only. Do NOT provide plain `content`. Do NOT use GitHub markdown.\n\n'
               + slackInstructions
             ).trim(),
             inputSchema: {
@@ -1691,20 +1754,100 @@ export class AIAgentSession {
               required: ['status', 'format', 'messages'],
               properties: {
                 status: common.status,
-                format: { type: 'string', const: id, description: desc },
+                format: { type: 'string', const: 'slack-block-kit', description: desc },
                 // Block Kit messages for multi-message output
                 messages: {
                   type: 'array',
                   minItems: 1,
+                  maxItems: 20,
                   items: {
                     type: 'object',
                     additionalProperties: true,
+                    required: ['blocks'],
                     properties: {
                       blocks: {
                         type: 'array',
                         minItems: 1,
                         maxItems: 50,
-                        items: { type: 'object', additionalProperties: true }
+                        items: {
+                          oneOf: [
+                            {
+                              type: 'object',
+                              additionalProperties: true,
+                              required: ['type', 'text'],
+                              properties: {
+                                type: { const: 'section' },
+                                text: {
+                                  type: 'object',
+                                  additionalProperties: true,
+                                  required: ['type', 'text'],
+                                  properties: {
+                                    type: { const: 'mrkdwn' },
+                                    text: { type: 'string', minLength: 1, maxLength: 2900 }
+                                  }
+                                },
+                                fields: {
+                                  type: 'array',
+                                  maxItems: 10,
+                                  items: {
+                                    type: 'object',
+                                    additionalProperties: true,
+                                    required: ['type', 'text'],
+                                    properties: {
+                                      type: { const: 'mrkdwn' },
+                                      text: { type: 'string', minLength: 1, maxLength: 2000 }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              type: 'object',
+                              additionalProperties: true,
+                              required: ['type', 'text'],
+                              properties: {
+                                type: { const: 'header' },
+                                text: {
+                                  type: 'object',
+                                  additionalProperties: true,
+                                  required: ['type', 'text'],
+                                  properties: {
+                                    type: { const: 'plain_text' },
+                                    text: { type: 'string', minLength: 1, maxLength: 150 }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              type: 'object',
+                              additionalProperties: true,
+                              required: ['type'],
+                              properties: { type: { const: 'divider' } }
+                            },
+                            {
+                              type: 'object',
+                              additionalProperties: true,
+                              required: ['type', 'elements'],
+                              properties: {
+                                type: { const: 'context' },
+                                elements: {
+                                  type: 'array',
+                                  minItems: 1,
+                                  maxItems: 10,
+                                  items: {
+                                    type: 'object',
+                                    additionalProperties: true,
+                                    required: ['type', 'text'],
+                                    properties: {
+                                      type: { const: 'mrkdwn' },
+                                      text: { type: 'string', minLength: 1, maxLength: 2000 }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        }
                       }
                     }
                   }
@@ -1758,7 +1901,12 @@ export class AIAgentSession {
       const id2 = this.sessionConfig.outputFormat as string;
       const descLine = (typeof rdesc === 'string' && rdesc.length > 0) ? ` ${rdesc}` : '';
       lines.push('  - `format`: "' + id2 + '".' + descLine);
-      lines.push('  - `content`: complete deliverable.');
+      if (id2 === 'slack') {
+        lines.push('  - `messages`: array of Slack Block Kit messages (no plain `content`).');
+        lines.push('    • Max 50 blocks per message; mrkdwn per section ≤ 2800 chars.');
+      } else {
+        lines.push('  - `content`: complete deliverable.');
+      }
     }
     lines.push('- Do NOT end with plain text. The session ends only after `agent__final_report`.');
 

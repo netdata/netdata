@@ -9,6 +9,7 @@ type ExecFn = (name: string, args: Record<string, unknown>) => Promise<{
   // Optional extras for parent to inspect/record
   childAccounting?: readonly unknown[];
   childConversation?: unknown;
+  childOpTree?: unknown;
 }>;
 
 export class AgentProvider extends ToolProvider {
@@ -22,6 +23,6 @@ export class AgentProvider extends ToolProvider {
     const start = Date.now();
     const out = await this.execFn(name, args);
     const latency = Date.now() - start;
-    return { ok: true, result: out.result, latencyMs: latency, kind: this.kind, providerId: this.id, extras: { childAccounting: out.childAccounting, childConversation: out.childConversation } };
+    return { ok: true, result: out.result, latencyMs: latency, kind: this.kind, providerId: this.id, extras: { childAccounting: out.childAccounting, childConversation: out.childConversation, childOpTree: out.childOpTree } };
   }
 }

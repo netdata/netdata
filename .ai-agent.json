@@ -293,6 +293,15 @@
         "-y",
         "fetcher-mcp"
       ]
+    },
+    "filesystem": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/home/costa/src/netdata"
+      ]
     }
   },
   "slack": {

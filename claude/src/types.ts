@@ -171,13 +171,13 @@ export interface Configuration {
     toolResponseMaxBytes?: number;
     mcpInitConcurrency?: number;
     maxConcurrentTools?: number;
-    outputFormat?: 'markdown' | 'markdown+mermaid' | 'slack' | 'tty' | 'pipe' | 'json' | 'sub-agent';
+    outputFormat?: 'markdown' | 'markdown+mermaid' | 'slack-block-kit' | 'tty' | 'pipe' | 'json' | 'sub-agent';
     formats?: {
-      cli?: 'markdown' | 'markdown+mermaid' | 'slack' | 'tty' | 'pipe' | 'json' | 'sub-agent';
-      slack?: 'markdown' | 'markdown+mermaid' | 'slack' | 'tty' | 'pipe' | 'json' | 'sub-agent';
-      api?: 'markdown' | 'markdown+mermaid' | 'slack' | 'tty' | 'pipe' | 'json' | 'sub-agent';
-      web?: 'markdown' | 'markdown+mermaid' | 'slack' | 'tty' | 'pipe' | 'json' | 'sub-agent';
-      subAgent?: 'markdown' | 'markdown+mermaid' | 'slack' | 'tty' | 'pipe' | 'json' | 'sub-agent';
+      cli?: 'markdown' | 'markdown+mermaid' | 'slack-block-kit' | 'tty' | 'pipe' | 'json' | 'sub-agent';
+      slack?: 'markdown' | 'markdown+mermaid' | 'slack-block-kit' | 'tty' | 'pipe' | 'json' | 'sub-agent';
+      api?: 'markdown' | 'markdown+mermaid' | 'slack-block-kit' | 'tty' | 'pipe' | 'json' | 'sub-agent';
+      web?: 'markdown' | 'markdown+mermaid' | 'slack-block-kit' | 'tty' | 'pipe' | 'json' | 'sub-agent';
+      subAgent?: 'markdown' | 'markdown+mermaid' | 'slack-block-kit' | 'tty' | 'pipe' | 'json' | 'sub-agent';
     };
   };
   // Server headend configuration (optional)
@@ -229,6 +229,8 @@ export interface AIAgentCallbacks {
   onOutput?: (text: string) => void;
   onThinking?: (text: string) => void;
   onAccounting?: (entry: AccountingEntry) => void;
+  // Live snapshot of the hierarchical operation tree (Option C)
+  onOpTree?: (tree: unknown) => void;
 }
 
 export interface AIAgentSessionConfig {
@@ -281,6 +283,10 @@ export interface AIAgentResult {
   accounting: AccountingEntry[];
   // Optional ASCII representation of the internal execution tree (when requested by CLI)
   treeAscii?: string;
+  // Optional ASCII representation of the new hierarchical operation tree (Option C)
+  opTreeAscii?: string;
+  // Optional hierarchical operation tree structure (Option C)
+  opTree?: SessionNode;
   // Conversations of executed sub-agents (when available)
   childConversations?: {
     agentId?: string;
@@ -293,7 +299,7 @@ export interface AIAgentResult {
   finalReport?: {
     status: 'success' | 'failure' | 'partial';
     // Allow all known output formats plus legacy 'text'
-    format: 'json' | 'markdown' | 'markdown+mermaid' | 'slack' | 'tty' | 'pipe' | 'sub-agent' | 'text';
+    format: 'json' | 'markdown' | 'markdown+mermaid' | 'slack-block-kit' | 'tty' | 'pipe' | 'sub-agent' | 'text';
     content?: string;
     content_json?: Record<string, unknown>;
     // Optional provider-specific extras (e.g., Slack Block Kit messages)
@@ -396,3 +402,4 @@ export interface AIAgentRunOptions {
   dryRun?: boolean;
 }
 import type { OutputFormatId } from './formats.js';
+import type { SessionNode } from './session-tree.js';

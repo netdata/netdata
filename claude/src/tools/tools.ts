@@ -1,4 +1,5 @@
 import type { ExecutionTree } from '../execution-tree.js';
+import type { SessionTreeBuilder, SessionNode } from '../session-tree.js';
 import type { MCPTool, LogEntry, AccountingEntry } from '../types.js';
 import type { ToolExecuteOptions, ToolExecuteResult, ToolKind, ToolProvider, ToolExecutionContext } from './types.js';
 
@@ -17,12 +18,21 @@ export class ToolsOrchestrator {
 
   constructor(
     private readonly tree: ExecutionTree,
-    private readonly opts: { toolTimeout?: number; toolResponseMaxBytes?: number; maxConcurrentTools?: number; parallelToolCalls?: boolean }
+    private readonly opts: { toolTimeout?: number; toolResponseMaxBytes?: number; maxConcurrentTools?: number; parallelToolCalls?: boolean },
+    private readonly opTree?: SessionTreeBuilder,
+    private readonly onOpTreeSnapshot?: (tree: SessionNode) => void
   ) {}
 
   register(provider: ToolProvider): void {
     this.providers.push(provider);
     // Populate mapping lazily on list to avoid stale entries
+  }
+
+  // Warmup providers that require async initialization (e.g., MCP) and refresh tool mapping
+  async warmup(): Promise<void> {
+    await Promise.all(this.providers.map(async (p) => { try { await p.warmup(); } catch { /* ignore */ } }));
+    // Refresh mapping now that providers are warmed
+    this.listTools();
   }
 
   listTools(): MCPTool[] {
@@ -40,7 +50,13 @@ export class ToolsOrchestrator {
   private resolveName(name: string): string {
     if (this.mapping.has(name)) return name;
     const alias = this.aliases.get(name);
-    return (alias !== undefined && this.mapping.has(alias)) ? alias : name;
+    if (alias !== undefined && this.mapping.has(alias)) return alias;
+    // Heuristics: try common prefixes for sub-agents and REST tools when the model omits them
+    const tryAgent = `agent__${name}`;
+    if (this.mapping.has(tryAgent)) return tryAgent;
+    const tryRest = `rest__${name}`;
+    if (this.mapping.has(tryRest)) return tryRest;
+    return name;
   }
 
   hasTool(name: string): boolean {
@@ -74,6 +90,31 @@ export class ToolsOrchestrator {
     const provider = entry.provider;
     const kind = entry.kind;
     const spanId = this.tree.startSpan(effective, 'tool', { kind, provider: provider.id, turn: ctx.turn, subturn: ctx.subturn });
+    // Begin hierarchical op (Option C). For sub-agents, use 'session' to represent the child.
+    const opKind = (kind === 'agent') ? 'session' : 'tool';
+    const opId = (() => {
+      try { return this.opTree?.beginOp(ctx.turn, opKind, { name: effective, provider: provider.id, kind }); } catch { return undefined; }
+    })();
+    // For sub-agent session ops, attach a placeholder child session immediately so live views can show it
+    try {
+      if (opKind === 'session' && this.opTree !== undefined && opId !== undefined) {
+        const parentSession = this.opTree.getSession();
+        const childName = effective.startsWith('agent__') ? effective.slice('agent__'.length) : effective;
+        const childCallPathBase = (typeof parentSession.callPath === 'string' && parentSession.callPath.length > 0)
+          ? parentSession.callPath
+          : (typeof parentSession.agentId === 'string' ? parentSession.agentId : 'agent');
+        const stub: SessionNode = {
+          id: `${Date.now().toString(36)}-stub`,
+          traceId: parentSession.traceId,
+          agentId: childName,
+          callPath: `${childCallPathBase}->${childName}`,
+          startedAt: Date.now(),
+          turns: [],
+        };
+        this.opTree.attachChildSession(opId, stub);
+        if (typeof this.onOpTreeSnapshot === 'function') this.onOpTreeSnapshot(this.opTree.getSession());
+      }
+    } catch { /* ignore */ }
     const requestMsg = formatToolRequestCompact(effective, args);
     // Log request
     const reqLog: LogEntry = {
@@ -106,11 +147,60 @@ export class ToolsOrchestrator {
       }
     };
 
+    // Normalize arguments for known tools to reduce model fragility
+    const normalizeArgs = (toolName: string, a: Record<string, unknown>): Record<string, unknown> => {
+      // GitHub MCP 'search_code' expects 'q' (string). Models often provide separate fields.
+      if (toolName === 'github__search_code') {
+        const getStr = (obj: unknown, k: string): string | undefined => {
+          if (obj !== null && typeof obj === 'object') {
+            const v = (obj as Record<string, unknown>)[k];
+            if (typeof v === 'string') {
+              const t = v.trim();
+              return t.length > 0 ? t : undefined;
+            }
+          }
+          return undefined;
+        };
+        const existing = getStr(a, 'q');
+        if (typeof existing === 'string') return a;
+        const parts: string[] = [];
+        const query = getStr(a, 'query');
+        const repo = getStr(a, 'repo');
+        const path = getStr(a, 'path');
+        const languageRaw = getStr(a, 'language');
+        if (typeof query === 'string' && query.length > 0) parts.push(query);
+        if (typeof repo === 'string' && repo.length > 0) parts.push(`repo:${repo}`);
+        if (typeof path === 'string' && path.length > 0) parts.push(`path:${path}`);
+        // Normalize languages; GitHub doesn't accept 'jsx' as a language qualifier. Use extension:jsx/tsx instead.
+        if (typeof languageRaw === 'string' && languageRaw.length > 0) {
+          const norm = languageRaw.replace(/\s+OR\s+/gi, ',').replace(/\|/g, ',');
+          const toks = norm.split(/[,\s]+/).map((t) => t.trim()).filter((t) => t.length > 0);
+          const langSet = new Set<string>();
+          const extSet = new Set<string>();
+          const mapSyn = (s: string): string => (s === 'js' ? 'javascript' : s === 'ts' ? 'typescript' : s);
+          toks.forEach((t) => {
+            const low = mapSyn(t.toLowerCase());
+            if (low === 'jsx') { extSet.add('jsx'); return; }
+            if (low === 'tsx') { extSet.add('tsx'); return; }
+            // keep recognized languages; drop obviously invalid ones
+            langSet.add(low);
+          });
+          langSet.forEach((l) => { parts.push(`language:${l}`); });
+          extSet.forEach((e) => { parts.push(`extension:${e}`); });
+        }
+        const q = parts.join(' ').trim();
+        if (q.length > 0) return { ...a, q };
+        return a;
+      }
+      return a;
+    };
+
     let exec: ToolExecuteResult | undefined;
     let errorMessage: string | undefined;
     try {
+      const preparedArgs = normalizeArgs(effective, args);
       exec = await withTimeout(
-        provider.execute(name, args, { ...opts, timeoutMs: opts?.timeoutMs ?? this.opts.toolTimeout }),
+        provider.execute(effective, preparedArgs, { ...opts, timeoutMs: opts?.timeoutMs ?? this.opts.toolTimeout }),
         this.opts.toolTimeout
       );
     } catch (e) {
@@ -145,6 +235,12 @@ export class ToolsOrchestrator {
       };
       this.tree.recordAccounting(acc);
       this.tree.endSpan(spanId, 'failed', { error: msg });
+      try {
+        if (opId !== undefined) {
+          this.opTree?.appendLog(opId, reqLog);
+          this.opTree?.endOp(opId, 'failed', { latency, error: msg });
+        }
+      } catch { /* ignore */ }
       this.releaseSlot();
       throw new Error(msg);
     }
@@ -208,6 +304,27 @@ export class ToolsOrchestrator {
       childAcc.forEach((a) => { if (isAccountingEntry(a)) { try { this.tree.recordAccounting(a); } catch { /* ignore */ } } });
     }
     this.tree.endSpan(spanId, 'ok', { latency, size: result.length });
+    try {
+      if (opId !== undefined) {
+        this.opTree?.appendLog(opId, reqLog);
+        this.opTree?.appendLog(opId, resLog);
+        // Attach child session tree when provider is 'agent'
+        try {
+          if (opKind === 'session') {
+            const maybe = (safeExec.extras as { childOpTree?: SessionNode } | undefined)?.childOpTree;
+            if (maybe !== undefined) {
+              this.opTree?.attachChildSession(opId, maybe);
+            }
+          }
+        } catch { /* ignore child attach errors */ }
+        this.opTree?.endOp(opId, 'ok', { latency, size: result.length });
+        try {
+          if (typeof this.onOpTreeSnapshot === 'function' && this.opTree !== undefined) {
+            this.onOpTreeSnapshot(this.opTree.getSession());
+          }
+        } catch { /* ignore */ }
+      }
+    } catch { /* ignore */ }
     if (!bypass) this.releaseSlot();
     return { result, providerLabel, latency };
   }

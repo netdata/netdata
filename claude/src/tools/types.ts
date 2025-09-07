@@ -27,6 +27,8 @@ export abstract class ToolProvider {
   abstract listTools(): MCPTool[];
   abstract hasTool(name: string): boolean;
   abstract execute(name: string, args: Record<string, unknown>, opts?: ToolExecuteOptions): Promise<ToolExecuteResult>;
+  // Optional warmup hook for providers that need async initialization (e.g., MCP)
+  async warmup(): Promise<void> { /* default no-op */ }
 }
 
 export interface ToolExecutionContext {

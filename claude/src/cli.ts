@@ -5,6 +5,9 @@ import path from 'node:path';
 import { Command, Option } from 'commander';
 import * as yaml from 'js-yaml';
 
+// Keep import order: builtins, external, type, internal
+// (moved below to maintain import order)
+
 import type { FrontmatterOptions } from './frontmatter.js';
 import type { LogEntry, AccountingEntry, AIAgentCallbacks, ConversationMessage } from './types.js';
 import type { CommanderError } from 'commander';
@@ -14,6 +17,7 @@ import { discoverLayers, resolveDefaults } from './config-resolver.js';
 import { describeFormat, resolveFormatIdForCli } from './formats.js';
 import { parseFrontmatter, stripFrontmatter, parseList, parsePairs, buildFrontmatterTemplate } from './frontmatter.js';
 import { resolveIncludes } from './include-resolver.js';
+import { makeTTYLogCallbacks } from './log-sink-tty.js';
 import { getOptionsByGroup, formatCliNames, OPTIONS_REGISTRY } from './options-registry.js';
 import { formatAgentResultHumanReadable } from './utils.js';
 
@@ -569,9 +573,14 @@ program
         }
       }
 
-      // Successful completion - optionally print execution tree
-      if (options.showTree === true && typeof result.treeAscii === 'string' && result.treeAscii.length > 0) {
-        try { process.stderr.write(`\n=== Execution Tree ===\n${result.treeAscii}\n`); } catch { /* ignore */ }
+      // Successful completion - optionally print execution trees
+      if (options.showTree === true) {
+        if (typeof result.opTreeAscii === 'string' && result.opTreeAscii.length > 0) {
+          try { process.stderr.write(`\n=== Operation Tree ===\n${result.opTreeAscii}\n`); } catch { /* ignore */ }
+        }
+        if (typeof result.treeAscii === 'string' && result.treeAscii.length > 0) {
+          try { process.stderr.write(`\n=== Execution Tree ===\n${result.treeAscii}\n`); } catch { /* ignore */ }
+        }
       }
       // Agent already logged EXIT-FINAL-ANSWER or similar
       exitWith(0, 'success', 'EXIT-SUCCESS');
@@ -696,61 +705,29 @@ function createCallbacks(options: Record<string, unknown>, accountingFile?: stri
   let thinkingOpen = false;
   let lastCharWasNewline = true;
 
+      const ttyLog = makeTTYLogCallbacks({ color: true, verbose: options.verbose === true, traceLlm: options.traceLlm === true, traceMcp: options.traceMcp === true });
       return {
         onLog: (entry: LogEntry) => {
-      // Ensure newline separation after thinking stream if needed
-      if (entry.severity !== 'THK' && thinkingOpen && !lastCharWasNewline) {
-        try { process.stderr.write('\n'); } catch {}
-        lastCharWasNewline = true;
-        thinkingOpen = false;
-      }
-      // Always show errors and warnings with colors
-      const agentPrefix = (() => {
-        if (typeof entry.agentId === 'string' && entry.agentId.length > 0) {
-          try { return `${path.basename(entry.agentId)} `; } catch { return `${entry.agentId} `; }
-        }
-        return '';
-      })();
-      if (entry.severity === 'ERR') {
-        const formatted = colorize(`${agentPrefix}[ERR] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}: ${entry.message}`, '\x1b[31m');
-        process.stderr.write(`${formatted}\n`);
-      }
-      
-      if (entry.severity === 'WRN') {
-        const formatted = colorize(`${agentPrefix}[WRN] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}: ${entry.message}`, '\x1b[33m');
-        process.stderr.write(`${formatted}\n`);
-      }
-      
-      // Show verbose only with --verbose flag (dark gray)
-      if (entry.severity === 'VRB' && options.verbose === true) {
-        const body = (() => {
-          if (entry.remoteIdentifier === 'agent') {
-            return `agent ${entry.message}`; // special formatting for agent tool logs
+          // Ensure newline separation after thinking stream if needed
+          if (entry.severity !== 'THK' && thinkingOpen && !lastCharWasNewline) {
+            try { process.stderr.write('\n'); } catch {}
+            lastCharWasNewline = true;
+            thinkingOpen = false;
           }
-          return `${entry.type} ${entry.remoteIdentifier}: ${entry.message}`;
-        })();
-        const formatted = colorize(`${agentPrefix}[VRB] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${body}`, '\x1b[90m');
-        process.stderr.write(`${formatted}\n`);
-      }
-
-      // Final summary entries
-      if (entry.severity === 'FIN') {
-        const formatted = colorize(`${agentPrefix}[FIN] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}: ${entry.message}`, '\x1b[36m');
-        process.stderr.write(`${formatted}\n`);
-      }
-      
-      // Show trace only with specific flags (dark gray)
-      if (entry.severity === 'TRC') {
-        if ((entry.type === 'llm' && options.traceLlm === true) || 
-            (entry.type === 'tool' && options.traceMcp === true)) {
-          const formatted = colorize(`${agentPrefix}[TRC] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}: ${entry.message}`, '\x1b[90m');
-          process.stderr.write(`${formatted}\n`);
-        }
-      }
+      // Delegate all non-THK logs to the shared TTY sink
+      ttyLog.onLog?.(entry);
       
       // Show thinking header with light gray color
       if (entry.severity === 'THK') {
-        const formatted = colorize(`${agentPrefix}[THK] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${entry.remoteIdentifier}: `, '\x1b[2;37m');
+        const agentPrefix = (() => {
+          const a = entry.agentId;
+          if (typeof a === 'string' && a.length > 0) {
+            try { return `${path.basename(a)} `; } catch { return `${a} `; }
+          }
+          return '';
+        })();
+        const rid = (() => { const v = entry.remoteIdentifier; return (typeof v === 'string' && v.length > 0) ? v : 'unknown'; })();
+        const formatted = colorize(`${agentPrefix}[THK] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${rid}: `, '\x1b[2;37m');
         process.stderr.write(formatted);
         thinkingOpen = true;
         lastCharWasNewline = false;

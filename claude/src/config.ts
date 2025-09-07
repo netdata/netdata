@@ -44,7 +44,7 @@ const ApiConfigSchema = z.object({
   bearerKeys: z.array(z.string()).optional(),
 });
 
-const OutputFormatEnum = z.enum(['markdown','markdown+mermaid','slack','tty','pipe','json','sub-agent']);
+const OutputFormatEnum = z.enum(['markdown','markdown+mermaid','slack-block-kit','tty','pipe','json','sub-agent']);
 
 const FormatsConfigSchema = z.object({
   cli: OutputFormatEnum.optional(),

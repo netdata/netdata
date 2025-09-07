@@ -11,6 +11,7 @@ export class SessionManager {
   private readonly outputs = new Map<string, string>();
   private readonly logs = new Map<string, LogEntry[]>();
   private readonly accounting = new Map<string, AccountingEntry[]>();
+  private readonly opTrees = new Map<string, unknown>();
   private readonly callbacks: Callbacks;
   private readonly runner: (systemPrompt: string, userPrompt: string, opts: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; renderTarget?: 'slack' | 'api' | 'web'; outputFormat?: string }) => Promise<AIAgentResult>;
 
@@ -37,6 +38,9 @@ export class SessionManager {
 
   public getAccounting(runId: string): AccountingEntry[] {
     return this.accounting.get(runId) ?? [];
+  }
+  public getOpTree(runId: string): unknown | undefined {
+    return this.opTrees.get(runId);
   }
 
   public listActiveRuns(): RunMeta[] {
@@ -74,7 +78,7 @@ export class SessionManager {
           history,
           renderTarget: key.source,
           callbacks: {
-            onLog: (entry: LogEntry) => {
+          onLog: (entry: LogEntry) => {
               const m = this.runs.get(runId);
               if (m) {
                 m.updatedAt = Date.now();
@@ -84,13 +88,17 @@ export class SessionManager {
               arr.push(entry);
               this.logs.set(runId, arr);
               this.callbacks.onLog?.(entry);
-              this.callbacks.onTreeUpdate?.(runId);
-            },
-            onOutput: (t: string) => {
-              outputBuf.push(t);
-              this.outputs.set(runId, outputBuf.join(''));
-              this.callbacks.onTreeUpdate?.(runId);
-            },
+            this.callbacks.onTreeUpdate?.(runId);
+          },
+          onOpTree: (tree) => {
+            this.opTrees.set(runId, tree);
+            this.callbacks.onTreeUpdate?.(runId);
+          },
+          onOutput: (t: string) => {
+            outputBuf.push(t);
+            this.outputs.set(runId, outputBuf.join(''));
+            this.callbacks.onTreeUpdate?.(runId);
+          },
             onAccounting: (a: AccountingEntry) => {
               const arr = this.accounting.get(runId) ?? [];
               arr.push(a);

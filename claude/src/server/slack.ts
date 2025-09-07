@@ -1,6 +1,6 @@
 import type { ConversationMessage, AIAgentResult } from '../types.js';
 import { SessionManager } from './session-manager.js';
-import { buildSnapshot, formatSlackStatus, buildStatusBlocks } from './status-aggregator.js';
+import { buildSnapshot, buildSnapshotFromOpTree, formatSlackStatus, buildStatusBlocks } from './status-aggregator.js';
 
 type SlackClient = any;
 
@@ -65,7 +65,7 @@ function byteLength(text: string): number { return Buffer.byteLength(text, 'utf8
 function extractSlackMessages(result: AIAgentResult | undefined): { blocks?: unknown[] }[] | undefined {
   if (!result?.finalReport) return undefined;
   const fr = result.finalReport;
-  if (fr.format !== 'slack') return undefined;
+  if (fr.format !== 'slack-block-kit') return undefined;
   const meta = fr.metadata;
   if (!meta || typeof meta !== 'object') return undefined;
   const slack = (meta as Record<string, unknown>).slack;
@@ -312,8 +312,8 @@ async function fetchContext(client: SlackClient, event: any, limit: number, char
 
 export function initSlackHeadend(options: SlackHeadendOptions): void {
   const { sessionManager, app, historyLimit = 30, historyCharsCap = 8000, updateIntervalMs = 2000, enableMentions = true, enableDMs = true, systemPrompt, verbose = false } = options;
-  const vlog = (msg: string): void => { if (verbose) { try { process.stderr.write(`[VRB] ← [0.0] server slack: ${msg}\n`); } catch { /* ignore */ } } };
-  const elog = (msg: string): void => { try { process.stderr.write(`[ERR] ← [0.0] server slack: ${msg}\n`); } catch { /* ignore */ } };
+  const vlog = (msg: string): void => { if (verbose) { try { process.stderr.write(`[SRV] ← [0.0] server slack: ${msg}\n`); } catch { /* ignore */ } } };
+  const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0] server slack: ${msg}\n`); } catch { /* ignore */ } };
 
   const updating = new Map<string, NodeJS.Timeout>();
   const lastUpdate = new Map<string, number>();
@@ -390,14 +390,37 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
         const first = slackMessages[0];
         const rest = slackMessages.slice(1);
         const firstBlocksRaw = Array.isArray(first.blocks) ? first.blocks : [];
-        const firstBlocks = firstBlocksRaw.slice(0, MAX_BLOCKS);
+        const repairBlocks = (blocks: any[]): any[] => {
+          const out: any[] = [];
+          for (const b of blocks) {
+            if (!b || typeof b !== 'object') continue;
+            if (b.type === 'section') {
+              const fields = Array.isArray(b.fields) ? b.fields : undefined;
+              const textObj = (b.text && typeof b.text === 'object') ? b.text : undefined;
+              const t = typeof textObj?.text === 'string' ? textObj.text : undefined;
+              if ((t === undefined || t.length === 0) && Array.isArray(fields) && fields.length > 0) {
+                const nb: any = { type: 'section', fields };
+                out.push(nb);
+                continue;
+              }
+            }
+            out.push(b);
+          }
+          return out;
+        };
+        const firstBlocks = repairBlocks(firstBlocksRaw.slice(0, MAX_BLOCKS));
         const fallback = 'Report posted as Block Kit messages.';
         vlog('posting to slack (blocks, multi-message)');
-        await client.chat.update({ channel, ts, text: fallback, blocks: firstBlocks });
+        try {
+          await client.chat.update({ channel, ts, text: fallback, blocks: firstBlocks });
+        } catch {
+          const eb = repairBlocks(firstBlocks);
+          await client.chat.update({ channel, ts, text: fallback, blocks: eb });
+        }
         // eslint-disable-next-line functional/no-loop-statements
         for (const m of rest) {
           const blocksRaw = Array.isArray(m.blocks) ? m.blocks : [];
-          const blocks = blocksRaw.slice(0, MAX_BLOCKS);
+          const blocks = repairBlocks(blocksRaw.slice(0, MAX_BLOCKS));
           await client.chat.postMessage({ channel, thread_ts: ts, text: fallback, blocks });
         }
         // Post tiny stats footer as a separate small message (context)
@@ -405,9 +428,33 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
           const logs = sessionManager.getLogs(runId);
           const acc = sessionManager.getAccounting(runId);
           const snap = buildSnapshot(logs, acc, Date.now());
-          const agentsCount = new Set(snap.lines.map((l) => l.agentId)).size;
+          // Prefer opTree-based counts when available
+          const result2 = sessionManager.getResult(runId);
           const fmtK = (n: number): string => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
-          const footer = `tokens →:${fmtK(snap.totals.tokensIn)} ←:${fmtK(snap.totals.tokensOut)} c→:${fmtK(snap.totals.tokensCacheRead)} c←:${fmtK(snap.totals.tokensCacheWrite)} | cost: $${(snap.totals.costUsd ?? 0).toFixed(2)} | tools ${snap.totals.toolsRun} | agents ${agentsCount}`;
+          const countFromOpTree = (node: any | undefined): { tools: number; sessions: number } => {
+            if (!node || typeof node !== 'object') return { tools: 0, sessions: 0 };
+            let tools = 0; let sessions = 1; // count this session
+            const turns = Array.isArray(node.turns) ? node.turns : [];
+            for (const t of turns) {
+              const ops = Array.isArray(t.ops) ? t.ops : [];
+              for (const o of ops) {
+                if (o?.kind === 'tool') tools += 1;
+                if (o?.kind === 'session' && o.childSession) {
+                  const rec = countFromOpTree(o.childSession);
+                  tools += rec.tools;
+                  sessions += rec.sessions;
+                }
+              }
+            }
+            return { tools, sessions };
+          };
+          const agCounts = (() => {
+            const ot = (result2 as { opTree?: unknown })?.opTree;
+            if (!ot) return { tools: snap.totals.toolsRun, sessions: new Set(snap.lines.map((l) => l.agentId)).size };
+            const c = countFromOpTree(ot);
+            return { tools: c.tools, sessions: c.sessions };
+          })();
+          const footer = `tokens →:${fmtK(snap.totals.tokensIn)} ←:${fmtK(snap.totals.tokensOut)} c→:${fmtK(snap.totals.tokensCacheRead)} c←:${fmtK(snap.totals.tokensCacheWrite)} | cost: $${(snap.totals.costUsd ?? 0).toFixed(2)} | tools ${agCounts.tools} | agents ${agCounts.sessions}`;
           await client.chat.postMessage({ channel, thread_ts: ts, text: footer, blocks: [ { type: 'context', elements: [ { type: 'mrkdwn', text: footer } ] } ] });
         } catch (e3) { elog(`stats footer post failed: ${(e3 as Error).message}`); }
       } else {
@@ -419,9 +466,32 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
           const logs = sessionManager.getLogs(runId);
           const acc = sessionManager.getAccounting(runId);
           const snap = buildSnapshot(logs, acc, Date.now());
-          const agentsCount = new Set(snap.lines.map((l) => l.agentId)).size;
+          const result2 = sessionManager.getResult(runId);
           const fmtK = (n: number): string => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
-          const footer = `tokens →:${fmtK(snap.totals.tokensIn)} ←:${fmtK(snap.totals.tokensOut)} c→:${fmtK(snap.totals.tokensCacheRead)} c←:${fmtK(snap.totals.tokensCacheWrite)} | cost: $${(snap.totals.costUsd ?? 0).toFixed(2)} | tools ${snap.totals.toolsRun} | agents ${agentsCount}`;
+          const countFromOpTree = (node: any | undefined): { tools: number; sessions: number } => {
+            if (!node || typeof node !== 'object') return { tools: 0, sessions: 0 };
+            let tools = 0; let sessions = 1;
+            const turns = Array.isArray(node.turns) ? node.turns : [];
+            for (const t of turns) {
+              const ops = Array.isArray(t.ops) ? t.ops : [];
+              for (const o of ops) {
+                if (o?.kind === 'tool') tools += 1;
+                if (o?.kind === 'session' && o.childSession) {
+                  const rec = countFromOpTree(o.childSession);
+                  tools += rec.tools;
+                  sessions += rec.sessions;
+                }
+              }
+            }
+            return { tools, sessions };
+          };
+          const agCounts = (() => {
+            const ot = (result2 as { opTree?: unknown })?.opTree;
+            if (!ot) return { tools: snap.totals.toolsRun, sessions: new Set(snap.lines.map((l) => l.agentId)).size };
+            const c = countFromOpTree(ot);
+            return { tools: c.tools, sessions: c.sessions };
+          })();
+          const footer = `tokens →:${fmtK(snap.totals.tokensIn)} ←:${fmtK(snap.totals.tokensOut)} c→:${fmtK(snap.totals.tokensCacheRead)} c←:${fmtK(snap.totals.tokensCacheWrite)} | cost: $${(snap.totals.costUsd ?? 0).toFixed(2)} | tools ${agCounts.tools} | agents ${agCounts.sessions}`;
           await client.chat.postMessage({ channel, thread_ts: ts, text: footer, blocks: [ { type: 'context', elements: [ { type: 'mrkdwn', text: footer } ] } ] });
         } catch (e3) { elog(`stats footer post failed: ${(e3 as Error).message}`); }
       }
@@ -429,9 +499,22 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
       const errMsg = (e as Error).message;
       const bytes = byteLength(finalText);
       const chars = finalText.length;
-      elog(`chat.update failed: ${errMsg} (size: ${String(chars)} chars, ${String(bytes)} bytes)`);
-      // Try to post a minimal fallback status so users aren't confused
-      const fallback = `response has been generated but failed to be posted: ${errMsg}`;
+      const data = ((e as unknown as { data?: unknown })?.data);
+      const dataStr = (() => { try { return data !== undefined ? JSON.stringify(data) : ''; } catch { return ''; } })();
+      // Collect diagnostics about slack messages if available
+      let diag = '';
+      try {
+        const result2 = sessionManager.getResult(runId);
+        const slackMessages = extractSlackMessages(result2) ?? [];
+        const blocksCount = slackMessages.reduce((s, m) => s + ((Array.isArray(m.blocks) ? m.blocks.length : 0)), 0);
+        let maxMrkdwn = 0;
+        slackMessages.forEach((m) => { const bl = Array.isArray(m.blocks) ? m.blocks : []; bl.forEach((b: any) => { const t = b?.text?.text; if (typeof t === 'string') maxMrkdwn = Math.max(maxMrkdwn, t.length); }); });
+        diag = ` blocks=${String(blocksCount)} max_section_len=${String(maxMrkdwn)}`;
+      } catch { /* ignore */ }
+      const full = `Slack post failed: ${errMsg}${diag}\nDetails: ${dataStr}`;
+      elog(`chat.update failed: ${errMsg} (size: ${String(chars)} chars, ${String(bytes)} bytes) details=${dataStr.substring(0, 400)}`);
+      // Try to post a detailed fallback so users can report it
+      const fallback = full.substring(0, 2800);
       try {
         await client.chat.update({ channel, ts, text: fallback });
       } catch (e2) {
@@ -482,11 +565,18 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
       });
     } catch { /* ignore update issues */ }
     const render = (): { text: string; blocks: any[] } => {
-      const logs = sessionManager.getLogs(runId);
-      const acc = sessionManager.getAccounting(runId);
-      const snap = buildSnapshot(logs, acc, Date.now());
+      const now = Date.now();
+      const maybeTree = sessionManager.getOpTree(runId);
+      const snap = (() => {
+        try {
+          if (maybeTree && typeof maybeTree === 'object') return buildSnapshotFromOpTree(maybeTree as any, now);
+        } catch { /* ignore */ }
+        const logs = sessionManager.getLogs(runId);
+        const acc = sessionManager.getAccounting(runId);
+        return buildSnapshot(logs, acc, now);
+      })();
       const text = formatSlackStatus(snap);
-      const blocks = buildStatusBlocks(snap);
+      const blocks = buildStatusBlocks(snap, (maybeTree as any)?.agentId, (maybeTree as any)?.startedAt);
       return { text, blocks };
     };
     scheduleUpdate(client, channel, liveTs, render);

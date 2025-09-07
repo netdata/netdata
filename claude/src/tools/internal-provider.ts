@@ -47,7 +47,7 @@ export class InternalToolProvider extends ToolProvider {
           required: ['status', 'format'],
           properties: {
             status: { type: 'string', enum: ['success', 'failure', 'partial'] },
-            format: { type: 'string', enum: ['json', 'markdown', 'markdown+mermaid', 'slack', 'tty', 'pipe', 'sub-agent', 'text'] },
+            format: { type: 'string', enum: ['json', 'markdown', 'markdown+mermaid', 'slack-block-kit', 'tty', 'pipe', 'sub-agent', 'text'] },
             content: { type: 'string' },
             content_json: { type: 'object' },
             metadata: { type: 'object' },
@@ -105,7 +105,7 @@ export class InternalToolProvider extends ToolProvider {
       const metadata = (args.metadata !== null && typeof args.metadata === 'object' && !Array.isArray(args.metadata)) ? (args.metadata as Record<string, unknown>) : undefined;
       const messages = Array.isArray(args.messages) ? args.messages : undefined;
       // Enforce required payload per format
-      if (format === 'slack') {
+      if (format === 'slack-block-kit') {
         // Accept either structured messages or a plain content fallback, then normalize to metadata.slack.messages
         const normalizedMessages: unknown[] = (() => {
           if (Array.isArray(messages) && messages.length > 0) {
@@ -117,7 +117,89 @@ export class InternalToolProvider extends ToolProvider {
           }
           return [];
         })();
-        if (normalizedMessages.length === 0) throw new Error('final_report(slack) requires `messages` or non-empty `content`.');
+        if (normalizedMessages.length === 0) throw new Error('final_report(slack-block-kit) requires `messages` or non-empty `content`.');
+        // Auto-repair to prevent slack_invalid_blocks loops
+        const repairedMessages: unknown[] = (() => {
+          const clamp = (s: unknown, max: number): string => {
+            const t = typeof s === 'string' ? s : (typeof s === 'number' || typeof s === 'boolean') ? String(s) : '';
+            return t.length <= max ? t : `${t.slice(0, Math.max(0, max - 1))}…`;
+          };
+          const toMrkdwn = (v: unknown, max: number) => ({ type: 'mrkdwn', text: clamp(v, max) });
+          const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
+          const asArr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+          const coerceBlock = (b: unknown): Record<string, unknown> | undefined => {
+            const blk = isObj(b) ? b : {};
+            const bb = blk as { type?: unknown; text?: unknown; elements?: unknown; fields?: unknown };
+            const typ: string = (typeof bb.type === 'string') ? bb.type : '';
+            if (typ === 'divider') return { type: 'divider' };
+            if (typ === 'header') {
+              const raw = isObj(bb.text) ? (bb.text as { text?: unknown }).text : bb.text;
+              return { type: 'header', text: { type: 'plain_text', text: clamp(raw, 150) } };
+            }
+            if (typ === 'context') {
+              const elems = asArr(bb.elements).map((e) => toMrkdwn(isObj(e) ? (e as { text?: unknown }).text : e, 2000)).slice(0, 10);
+              if (elems.length === 0) return undefined;
+              return { type: 'context', elements: elems };
+            }
+            // default to section
+            const textObj = isObj(bb.text) ? (bb.text as { text?: unknown }) : undefined;
+            const rawText = (textObj?.text !== undefined ? textObj.text : bb.text);
+            const fields = asArr(bb.fields).map((f) => toMrkdwn(isObj(f) ? (f as { text?: unknown }).text : f, 2000)).slice(0, 10);
+            const out: Record<string, unknown> = { type: 'section' };
+            const t = clamp(rawText, 2900);
+            if (t.length > 0) (out).text = { type: 'mrkdwn', text: t } as unknown;
+            if (fields.length > 0) out.fields = fields;
+            if ((out as { text?: unknown; fields?: unknown }).text === undefined && out.fields === undefined) return undefined;
+            return out;
+          };
+          const coerceMsg = (m: unknown): Record<string, unknown> | undefined => {
+            const msg = isObj(m) ? m : {};
+            const mm = msg as { blocks?: unknown };
+            const blocks = asArr(mm.blocks)
+              .map(coerceBlock)
+              .filter((x): x is Record<string, unknown> => x !== undefined)
+              .slice(0, 50);
+            if (blocks.length === 0) return undefined;
+            return { blocks };
+          };
+          return asArr(normalizedMessages).map(coerceMsg).filter((x): x is Record<string, unknown> => x !== undefined).slice(0, 20);
+        })();
+        // Validate Slack constraints: blocks<=50, mrkdwn<=2900 (section), header<=150, context<=2000
+        const slackSchema: Record<string, unknown> = {
+          type: 'array', minItems: 1, maxItems: 20,
+          items: {
+            type: 'object', additionalProperties: true, required: ['blocks'],
+            properties: {
+              blocks: {
+                type: 'array', minItems: 1, maxItems: 50,
+                items: {
+                  oneOf: [
+                    { type: 'object', additionalProperties: true, required: ['type','text'], properties: { type: { const: 'section' }, text: { type: 'object', additionalProperties: true, required: ['type','text'], properties: { type: { const: 'mrkdwn' }, text: { type: 'string', maxLength: 2900 } } }, fields: { type: 'array', maxItems: 10, items: { type: 'object', additionalProperties: true, required: ['type','text'], properties: { type: { const: 'mrkdwn' }, text: { type: 'string', maxLength: 2000 } } } } } },
+                    { type: 'object', additionalProperties: true, required: ['type','fields'], properties: { type: { const: 'section' }, fields: { type: 'array', maxItems: 10, items: { type: 'object', additionalProperties: true, required: ['type','text'], properties: { type: { const: 'mrkdwn' }, text: { type: 'string', maxLength: 2000 } } } } } },
+                    { type: 'object', additionalProperties: true, required: ['type'], properties: { type: { const: 'divider' } } },
+                    { type: 'object', additionalProperties: true, required: ['type','text'], properties: { type: { const: 'header' }, text: { type: 'object', additionalProperties: true, required: ['type','text'], properties: { type: { const: 'plain_text' }, text: { type: 'string', maxLength: 150 } } } } },
+                    { type: 'object', additionalProperties: true, required: ['type','elements'], properties: { type: { const: 'context' }, elements: { type: 'array', minItems: 1, maxItems: 10, items: { type: 'object', additionalProperties: true, required: ['type','text'], properties: { type: { const: 'mrkdwn' }, text: { type: 'string', maxLength: 2000 } } } } } }
+                  ]
+                }
+              }
+            }
+          }
+        };
+        try {
+          const validate = this.ajv.compile(slackSchema);
+          let ok = validate(repairedMessages);
+          let finalMsgs: unknown[] = repairedMessages;
+          if (!ok) { ok = validate(normalizedMessages); finalMsgs = normalizedMessages; }
+          if (!ok) {
+            const errs = (validate.errors ?? []).map((e) => `${e.instancePath} ${e.message ?? ''}`.trim()).join('; ');
+            throw new Error(`slack_invalid_blocks: ${errs}`);
+          }
+          // Use the successfully validated set for downstream metadata
+          normalizedMessages.splice(0, normalizedMessages.length, ...finalMsgs);
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          throw new Error(msg);
+        }
         const metaBase: Record<string, unknown> = (metadata ?? {});
         const slackVal = (metaBase as Record<string, unknown> & { slack?: unknown }).slack;
         const slackExisting: Record<string, unknown> = (slackVal !== undefined && slackVal !== null && typeof slackVal === 'object' && !Array.isArray(slackVal)) ? (slackVal as Record<string, unknown>) : {};

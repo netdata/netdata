@@ -253,7 +253,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   strDef({
     key: 'format',
     default: '',
-    description: 'Output format hint (markdown, markdown+mermaid, slack, tty, pipe, json, sub-agent)',
+    description: 'Output format hint (markdown, markdown+mermaid, slack-block-kit, tty, pipe, json, sub-agent)',
     cli: { names: ['--format'], showInHelp: true },
     fm: { allowed: false },
     scope: 'allAgents',

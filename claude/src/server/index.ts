@@ -5,6 +5,7 @@ import { loadConfiguration } from '../config.js';
 import { discoverLayers } from '../config-resolver.js';
 import { buildApiRouter } from './api.js';
 import { SessionManager } from './session-manager.js';
+import { formatLog } from '../log-formatter.js';
 import { initSlackHeadend } from './slack.js';
 import { loadAgent } from '../agent-loader.js';
 // No FORMAT resolution here; handled centrally in ai-agent using configuration
@@ -40,27 +41,8 @@ export async function startServer(agentPath: string, options?: { enableSlack?: b
   };
 
   const logSink = (entry: any) => {
-    // Always log ERR and WRN to stderr; VRB only when verbose; TRC only when trace flags enabled
-    const isErr = entry.severity === 'ERR';
-    const isWrn = entry.severity === 'WRN';
-    const isVrb = entry.severity === 'VRB' && options?.verbose === true;
-    let isTrc = false;
-    if (entry.severity === 'TRC') {
-      if (entry.type === 'llm' && options?.traceLlm === true) isTrc = true;
-      if (entry.type === 'tool' && options?.traceMcp === true) isTrc = true;
-    }
-    const shouldLog = isErr || isWrn || isVrb || isTrc;
-    if (!shouldLog) return;
-    const dir = entry.direction === 'request' ? '→' : '←';
-    const remote = ((): string => {
-      const v = entry.remoteIdentifier;
-      if (v === null || v === undefined) return 'unknown';
-      const s = String(v);
-      return s.length > 0 ? s : 'unknown';
-    })();
-    const body = entry.type === 'agent' ? `agent ${entry.message}` : `${entry.type} ${remote}: ${entry.message}`;
-    const line = `[${entry.severity}] ${dir} [${entry.turn}.${entry.subturn}] ${body}`;
-    try { process.stderr.write(`${line}\n`); } catch { /* ignore */ }
+    const line = formatLog(entry, { color: true, verbose: options?.verbose === true, traceLlm: options?.traceLlm === true, traceMcp: options?.traceMcp === true });
+    if (line.length > 0) { try { process.stderr.write(`${line}\n`); } catch { /* ignore */ } }
   };
 
   const sessions = new SessionManager(runner, { onLog: logSink });
@@ -74,7 +56,7 @@ export async function startServer(agentPath: string, options?: { enableSlack?: b
     const stack = err instanceof Error && typeof err.stack === 'string' ? err.stack : undefined;
     const method = req?.method; const url = req?.originalUrl ?? req?.url; const ip = req?.ip;
     const bodyLen = (() => { try { return typeof req?.rawBody === 'string' ? Buffer.byteLength(req.rawBody, 'utf8') : JSON.stringify(req?.body ?? {}).length; } catch { return 0; } })();
-    const line = `[ERR] ← [0.0] server api: ${method} ${url} from ${String(ip)} failed: ${message}${stack ? `\n${stack}` : ''} (bodySize=${String(bodyLen)} bytes)`;
+    const line = `[SRV] ← [0.0] server api: ${method} ${url} from ${String(ip)} failed: ${message}${stack ? `\n${stack}` : ''} (bodySize=${String(bodyLen)} bytes)`;
     try { process.stderr.write(`${line}\n`); } catch { /* ignore */ }
     try { res.status(500).json({ error: 'internal_error', message }); } catch { /* ignore */ }
   };
@@ -141,17 +123,14 @@ export async function startServer(agentPath: string, options?: { enableSlack?: b
       verbose: options?.verbose === true
     });
     await slackApp.start();
-    // eslint-disable-next-line no-console
-    console.log('⚡ Slack headend connected (Socket Mode).');
+    try { process.stderr.write(`[SRV] ← [0.0] server slack: ⚡ Slack headend connected (Socket Mode).\n`); } catch { /* ignore */ }
   } else {
-    // eslint-disable-next-line no-console
-    console.log('Slack headend not started (missing SLACK_BOT_TOKEN or SLACK_APP_TOKEN).');
+    try { process.stderr.write(`[SRV] ← [0.0] server slack: Slack headend not started (missing SLACK_BOT_TOKEN or SLACK_APP_TOKEN).\n`); } catch { /* ignore */ }
   }
 
   const port = apiCfg.port ?? 8080;
   app.listen(port, () => {
-    // eslint-disable-next-line no-console
-    console.log(`Server listening on http://localhost:${String(port)}`);
+    try { process.stderr.write(`[SRV] ← [0.0] server api: Server listening on http://localhost:${String(port)}\n`); } catch { /* ignore */ }
   });
   // Register error handler last
   // eslint-disable-next-line @typescript-eslint/no-misused-promises
