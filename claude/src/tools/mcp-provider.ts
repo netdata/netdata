@@ -1,0 +1,230 @@
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+
+import type { MCPServerConfig, MCPTool, MCPServer } from '../types.js';
+import type { ToolExecuteOptions, ToolExecuteResult } from './types.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import type { ChildProcess } from 'node:child_process';
+
+import { createWebSocketTransport } from '../websocket-transport.js';
+
+import { ToolProvider } from './types.js';
+
+export class MCPProvider extends ToolProvider {
+  readonly kind = 'mcp' as const;
+  private readonly serversConfig: Record<string, MCPServerConfig>;
+  private clients = new Map<string, Client>();
+  private servers = new Map<string, MCPServer>();
+  private processes = new Map<string, ChildProcess>();
+  private toolNameMap = new Map<string, { serverName: string; originalName: string }>();
+  private initialized = false;
+  private trace = false;
+  private verbose = false;
+  private requestTimeoutMs?: number;
+
+  constructor(public readonly id: string, servers: Record<string, MCPServerConfig>, opts?: { trace?: boolean; verbose?: boolean; requestTimeoutMs?: number }) {
+    super();
+    this.serversConfig = servers;
+    this.trace = opts?.trace === true;
+    this.verbose = opts?.verbose === true;
+    this.requestTimeoutMs = ((): number | undefined => {
+      const v = opts?.requestTimeoutMs;
+      return typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.trunc(v) : undefined;
+    })();
+  }
+
+  private sanitizeNamespace(name: string): string {
+    return name
+      .replace(/[^A-Za-z0-9]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .toLowerCase();
+  }
+
+  private async ensureInitialized(): Promise<void> {
+    if (this.initialized) return;
+    const entries = Object.entries(this.serversConfig);
+    // eslint-disable-next-line functional/no-loop-statements
+    for (const [name, config] of entries) {
+      try {
+        const server = await this.initializeServer(name, config);
+        this.servers.set(name, server);
+      } catch {
+        // ignore init errors per server (tools will be absent)
+      }
+    }
+    this.initialized = true;
+  }
+
+  private async initializeServer(name: string, config: MCPServerConfig): Promise<MCPServer> {
+    const client = new Client(
+      { name: 'ai-agent', version: '1.0.0' },
+      // Pass extended options if supported by SDK; unknown keys are ignored gracefully
+      { capabilities: { tools: {} }, ...(this.requestTimeoutMs !== undefined ? { requestTimeoutMs: this.requestTimeoutMs } : {}) } as unknown as Record<string, unknown>
+    );
+    let transport: Transport;
+    switch (config.type) {
+      case 'stdio':
+        transport = this.createStdioTransport(name, config);
+        break;
+      case 'websocket': {
+        if (config.url == null || config.url.length === 0) throw new Error(`WebSocket MCP server '${name}' requires a 'url'`);
+        transport = await createWebSocketTransport(config.url, config.headers);
+        break;
+      }
+      case 'http': {
+        if (config.url == null || config.url.length === 0) throw new Error(`HTTP MCP server '${name}' requires a 'url'`);
+        const { StreamableHTTPClientTransport } = await import('@modelcontextprotocol/sdk/client/streamableHttp.js');
+        const reqInit: RequestInit = { headers: (config.headers ?? {}) as HeadersInit };
+        transport = new StreamableHTTPClientTransport(new URL(config.url), { requestInit: reqInit });
+        break;
+      }
+      case 'sse': {
+        if (config.url == null || config.url.length === 0) throw new Error(`SSE MCP server '${name}' requires a 'url'`);
+        const resolvedHeaders = config.headers ?? {};
+        const customFetch: typeof fetch = async (input, init) => {
+          const headers = new Headers(init?.headers);
+          Object.entries(resolvedHeaders).forEach(([k, v]) => { headers.set(k, v); });
+          return fetch(input, { ...init, headers });
+        };
+        transport = new SSEClientTransport(new URL(config.url), { eventSourceInit: { fetch: customFetch }, requestInit: { headers: resolvedHeaders as HeadersInit }, fetch: customFetch });
+        break;
+      }
+      default:
+        throw new Error('Unsupported transport type');
+    }
+    await client.connect(transport);
+    this.clients.set(name, client);
+
+    const initInstructions = client.getInstructions() ?? '';
+    const toolsResponse = await client.listTools();
+    interface ToolItem { name: string; description?: string; inputSchema?: unknown; parameters?: unknown; instructions?: string }
+    const tools: MCPTool[] = (toolsResponse.tools as ToolItem[]).map((t) => ({
+      name: t.name,
+      description: t.description ?? '',
+      inputSchema: (t.inputSchema ?? t.parameters ?? {}) as Record<string, unknown>,
+      instructions: t.instructions,
+    }));
+    const ns = this.sanitizeNamespace(name);
+    tools.forEach((t) => { this.toolNameMap.set(`${ns}__${t.name}`, { serverName: name, originalName: t.name }); });
+
+    // Optional prompts
+    let instructions = initInstructions;
+    try {
+      const pr = await client.listPrompts();
+      const arr = (pr as { prompts?: { name: string; description?: string }[] } | undefined)?.prompts;
+      const list = Array.isArray(arr) ? arr : [];
+      if (list.length > 0) {
+        const promptText = list.map((p) => `${p.name}: ${p.description ?? ''}`).join('\n');
+        instructions = instructions.length > 0 ? `${instructions}\n${promptText}` : promptText;
+      }
+    } catch { /* prompts optional */ }
+
+    this.servers.set(name, { name, config, tools, instructions });
+    return { name, config, tools, instructions };
+  }
+
+  private createStdioTransport(name: string, config: MCPServerConfig): StdioClientTransport {
+    if (typeof config.command !== 'string' || config.command.length === 0) {
+      throw new Error(`Stdio MCP server '${name}' requires a string 'command'`);
+    }
+    const env: Record<string, string> = { ...(config.env ?? {}) };
+    const transport = new StdioClientTransport({ command: config.command, args: config.args ?? [], env, stderr: 'pipe' });
+    try {
+      if (transport.stderr != null) {
+        transport.stderr.on('data', () => { /* ignore */ });
+      }
+    } catch { /* ignore */ }
+    return transport;
+  }
+
+  listTools(): MCPTool[] {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (!this.initialized) { void this.ensureInitialized(); }
+    const out: MCPTool[] = [];
+    this.servers.forEach((s, serverName) => {
+      const ns = this.sanitizeNamespace(serverName);
+      s.tools.forEach((t) => {
+        out.push({ name: `${ns}__${t.name}`, description: t.description, inputSchema: t.inputSchema, instructions: t.instructions });
+      });
+    });
+    return out;
+  }
+
+  hasTool(name: string): boolean {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (!this.initialized) { void this.ensureInitialized(); }
+    return this.toolNameMap.has(name);
+  }
+
+  async execute(name: string, args: Record<string, unknown>, _opts?: ToolExecuteOptions): Promise<ToolExecuteResult> {
+    await this.ensureInitialized();
+    const mapping = this.toolNameMap.get(name);
+    if (mapping === undefined) throw new Error(`No server found for tool: ${name}`);
+    const { serverName, originalName } = mapping;
+    const client = this.clients.get(serverName);
+    if (client === undefined) throw new Error(`MCP server not ready: ${serverName}`);
+    const start = Date.now();
+    // Use official SDK signature: client.callTool({ name, arguments })
+    const requestOptions = ((): Record<string, unknown> => {
+      const t = _opts?.timeoutMs;
+      const has = typeof t === 'number' && Number.isFinite(t) && t > 0;
+      return has ? { timeout: Math.trunc(t), resetTimeoutOnProgress: true, maxTotalTimeout: Math.trunc(t) } : {};
+    })();
+    // Pass per-call timeout options so we don't hit the SDK's 60s default
+    const res = await client.callTool({ name: originalName, arguments: args }, undefined as unknown as never, requestOptions as never);
+    const latency = Date.now() - start;
+    // Try to normalize the result to a string for downstream handling
+    const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
+    const text = (() => {
+      let content: unknown;
+      if (isRecord(res) && Object.prototype.hasOwnProperty.call(res, 'content')) {
+        content = (res as Record<string, unknown>).content;
+      }
+      if (typeof content === 'string') return content;
+      if (Array.isArray(content)) {
+        const texts = (content as unknown[])
+          .map((p) => (isRecord(p) && typeof p.text === 'string' ? p.text : undefined))
+          .filter((t): t is string => typeof t === 'string');
+        if (texts.length > 0) return texts.join('');
+      }
+      try { return JSON.stringify(res); } catch { return ''; }
+    })();
+    return { ok: true, result: text, latencyMs: latency, kind: this.kind, providerId: serverName };
+  }
+
+  getCombinedInstructions(): string {
+    const parts: string[] = [];
+    this.servers.forEach((s, serverName) => {
+      if (typeof s.instructions === 'string' && s.instructions.length > 0) {
+        parts.push(`## TOOL ${s.name} INSTRUCTIONS\n${s.instructions}`);
+      }
+      const ns = this.sanitizeNamespace(serverName);
+      s.tools.forEach((t) => {
+        if (typeof t.instructions === 'string' && t.instructions.length > 0) {
+          const exposed = `${ns}__${t.name}`;
+          parts.push(`## TOOL ${exposed} INSTRUCTIONS\n${t.instructions}`);
+        }
+      });
+    });
+    return parts.join('\n\n');
+  }
+
+  async cleanup(): Promise<void> {
+    await Promise.all(Array.from(this.clients.values()).map(async (c) => { try { await c.close(); } catch { /* ignore */ } }));
+    await Promise.all(Array.from(this.processes.values()).map((proc) => new Promise<void>((resolve) => {
+      try {
+        if (proc.killed || proc.exitCode !== null) { resolve(); return; }
+        const timeout = setTimeout(() => { try { if (!proc.killed && proc.exitCode === null) proc.kill('SIGKILL'); } catch { } }, 2000);
+        proc.once('exit', () => { clearTimeout(timeout); resolve(); });
+        proc.kill('SIGTERM');
+      } catch { resolve(); }
+    })));
+    this.clients.clear();
+    this.processes.clear();
+    this.servers.clear();
+    this.toolNameMap.clear();
+    this.initialized = false;
+  }
+}

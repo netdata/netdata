@@ -307,6 +307,7 @@ program
   .argument('<system-prompt>', 'System prompt (string, @filename, or - for stdin)')
   .argument('<user-prompt>', 'User prompt (string, @filename, or - for stdin)')
   .option('--save-all <dir>', 'Save all agent and sub-agent conversations to directory')
+  .option('--show-tree', 'Dump the full execution tree (ASCII) at the end')
   .hook('preAction', () => { /* placeholder to ensure options added first */ })
   .action(async (systemPrompt: string, userPrompt: string, options: Record<string, unknown>) => {
     try {
@@ -516,6 +517,10 @@ program
           : err.includes('Max tool turns exceeded') ? 5
           : err.includes('tool') ? 3
           : 2;
+        // If requested, dump execution tree before exiting
+        if (options.showTree === true && typeof result.treeAscii === 'string' && result.treeAscii.length > 0) {
+          try { process.stderr.write(`\n=== Execution Tree ===\n${result.treeAscii}\n`); } catch { /* ignore */ }
+        }
         exitWith(code, `agent failure: ${err || 'unknown error'}`, 'EXIT-AGENT-FAILURE');
       }
 
@@ -564,7 +569,11 @@ program
         }
       }
 
-      // Successful completion - agent already logged EXIT-FINAL-ANSWER or similar
+      // Successful completion - optionally print execution tree
+      if (options.showTree === true && typeof result.treeAscii === 'string' && result.treeAscii.length > 0) {
+        try { process.stderr.write(`\n=== Execution Tree ===\n${result.treeAscii}\n`); } catch { /* ignore */ }
+      }
+      // Agent already logged EXIT-FINAL-ANSWER or similar
       exitWith(0, 'success', 'EXIT-SUCCESS');
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Unknown error';

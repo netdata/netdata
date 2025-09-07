@@ -33,6 +33,7 @@ export interface LoadedAgent {
     toolTimeout: number;
     maxRetries: number;
     maxToolTurns: number;
+    maxToolCallsPerTurn: number;
     toolResponseMaxBytes: number;
     stream: boolean;
     parallelToolCalls: boolean;
@@ -96,6 +97,7 @@ export interface LoadAgentOptions {
   maxConcurrentTools?: number;
     toolResponseMaxBytes?: number;
     parallelToolCalls?: boolean;
+    maxToolCallsPerTurn?: number;
   };
 }
 
@@ -203,6 +205,7 @@ export function loadAgent(aiPath: string, registry?: AgentRegistry, options?: Lo
       toolTimeout: eff.toolTimeout,
       maxRetries: eff.maxRetries,
       maxToolTurns: eff.maxToolTurns,
+      maxToolCallsPerTurn: eff.maxToolCallsPerTurn,
       toolResponseMaxBytes: eff.toolResponseMaxBytes,
       stream: eff.stream,
       parallelToolCalls: eff.parallelToolCalls,
@@ -236,6 +239,7 @@ export function loadAgent(aiPath: string, registry?: AgentRegistry, options?: Lo
         repeatPenalty: eff.repeatPenalty,
         maxRetries: eff.maxRetries,
         maxTurns: eff.maxToolTurns,
+        maxToolCallsPerTurn: eff.maxToolCallsPerTurn,
         llmTimeout: eff.llmTimeout,
         toolTimeout: eff.toolTimeout,
         parallelToolCalls: eff.parallelToolCalls,
@@ -327,10 +331,13 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
     effective: {
       temperature: eff.temperature,
       topP: eff.topP,
+      maxOutputTokens: eff.maxOutputTokens,
+      repeatPenalty: eff.repeatPenalty,
       llmTimeout: eff.llmTimeout,
       toolTimeout: eff.toolTimeout,
       maxRetries: eff.maxRetries,
       maxToolTurns: eff.maxToolTurns,
+      maxToolCallsPerTurn: eff.maxToolCallsPerTurn,
       toolResponseMaxBytes: eff.toolResponseMaxBytes,
       stream: eff.stream,
       parallelToolCalls: eff.parallelToolCalls,
@@ -361,6 +368,7 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
         topP: eff.topP,
         maxRetries: eff.maxRetries,
         maxTurns: eff.maxToolTurns,
+        maxToolCallsPerTurn: eff.maxToolCallsPerTurn,
         llmTimeout: eff.llmTimeout,
         toolTimeout: eff.toolTimeout,
         parallelToolCalls: eff.parallelToolCalls,

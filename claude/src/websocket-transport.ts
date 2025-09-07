@@ -5,9 +5,10 @@ import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 
 export class WebSocketTransport implements Transport {
   private ws: WebSocket;
-  private messageHandlers = new Set<(message: JSONRPCMessage) => void>();
-  private closeHandlers = new Set<() => void>();
-  private errorHandlers = new Set<(error: Error) => void>();
+  // MCP Client expects these optional properties to be assigned directly
+  onmessage?: (message: JSONRPCMessage) => void;
+  onclose?: () => void;
+  onerror?: (error: Error) => void;
 
   constructor(private url: string, private headers?: Record<string, string>) {
     this.ws = new WebSocket(url, { headers });
@@ -22,20 +23,17 @@ export class WebSocketTransport implements Transport {
         else if (Buffer.isBuffer(data)) text = data.toString('utf8');
         else if (Array.isArray(data)) text = Buffer.concat(data).toString('utf8');
         const message = JSON.parse(text) as JSONRPCMessage;
-        this.messageHandlers.forEach((handler) => { handler(message); });
+        this.onmessage?.(message);
       } catch (error) {
         const err = new Error(`Failed to parse WebSocket message: ${error instanceof Error ? error.message : String(error)}`);
-        this.errorHandlers.forEach((handler) => { handler(err); });
+        this.onerror?.(err);
       }
     });
 
-    this.ws.on('close', () => {
-      this.closeHandlers.forEach((handler) => { handler(); });
-    });
-
+    this.ws.on('close', () => { this.onclose?.(); });
     this.ws.on('error', (error) => {
       const err = new Error(`WebSocket error: ${error instanceof Error ? error.message : String(error)}`);
-      this.errorHandlers.forEach((handler) => { handler(err); });
+      this.onerror?.(err);
     });
   }
 
@@ -78,16 +76,6 @@ export class WebSocketTransport implements Transport {
         }
       }, 5000);
     });
-  }
-
-  onMessage(handler: (message: JSONRPCMessage) => void): void {
-    this.messageHandlers.add(handler);
-  }
-  onClose(handler: () => void): void {
-    this.closeHandlers.add(handler);
-  }
-  onError(handler: (error: Error) => void): void {
-    this.errorHandlers.add(handler);
   }
 }
 

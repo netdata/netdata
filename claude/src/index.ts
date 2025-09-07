@@ -1,7 +1,6 @@
 // Main library exports for programmatic use
 export { AIAgent, AIAgentSession } from './ai-agent.js';
 export { LLMClient } from './llm-client.js';
-export { MCPClientManager } from './mcp-client.js';
 // Legacy path removed: prefer config-resolver + agent-loader
 
 // Type exports

@@ -6,6 +6,7 @@ export interface CLIOverrides {
   parallelToolCalls?: boolean;
   maxRetries?: number;
   maxToolTurns?: number;
+  maxToolCallsPerTurn?: number;
   maxConcurrentTools?: number;
   llmTimeout?: number;
   toolTimeout?: number;
@@ -29,6 +30,7 @@ export interface DefaultsForUndefined {
   toolTimeout?: number;
   maxRetries?: number;
   maxToolTurns?: number;
+  maxToolCallsPerTurn?: number;
   maxConcurrentTools?: number;
   toolResponseMaxBytes?: number;
   parallelToolCalls?: boolean;
@@ -43,6 +45,7 @@ export interface ResolvedEffectiveOptions {
   toolTimeout: number;
   maxRetries: number;
   maxToolTurns: number;
+  maxToolCallsPerTurn: number;
   toolResponseMaxBytes: number;
   stream: boolean;
   parallelToolCalls: boolean;
@@ -103,6 +106,7 @@ export function resolveEffectiveOptions(args: {
     toolTimeout: readNum('toolTimeout', fm?.toolTimeout, 60000),
     maxRetries: readNum('maxRetries', fm?.maxRetries, 3),
     maxToolTurns: readNum('maxToolTurns', fm?.maxToolTurns, 10),
+    maxToolCallsPerTurn: readNum('maxToolCallsPerTurn', (fm as { maxToolCallsPerTurn?: number } | undefined)?.maxToolCallsPerTurn, 10),
     toolResponseMaxBytes: readNum('toolResponseMaxBytes', fm?.toolResponseMaxBytes, 12288),
     stream: ((): boolean => {
       if (typeof cli?.stream === 'boolean') return cli.stream;

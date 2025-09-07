@@ -20,7 +20,7 @@ llmTimeout: 120000
 toolTimeout: 60000
 toolResponseMaxBytes: 16384
 maxConcurrentTools: 2
-temperature: 0.7
+temperature: 0.3
 topP: 1
 maxOutputTokens: 16384
 repeatPenalty: 1.1
@@ -28,8 +28,9 @@ maxRetries: 5
 maxToolTurns: 50
 parallelToolCalls: true
 ---
-
 Your Mission: Query production data to validate infrastructure claims and identify expansion opportunities.
+
+${include:tone-and-language.md}
 
 Output Format: ${FORMAT}
 Current Date and Time: ${DATETIME}, ${DAY}

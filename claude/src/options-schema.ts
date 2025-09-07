@@ -12,6 +12,7 @@ const EFFECTIVE_KEYS = [
   'toolTimeout',
   'maxRetries',
   'maxToolTurns',
+  'maxToolCallsPerTurn',
   'toolResponseMaxBytes',
   'stream',
   'parallelToolCalls',

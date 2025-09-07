@@ -1,12 +1,12 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
-import os from 'node:os';
+// import os from 'node:os';
 import path from 'node:path';
 
 import Ajv from 'ajv';
 
 import type { OutputFormatId } from './formats.js';
-import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, MCPTool, LLMAccountingEntry, ToolAccountingEntry, MCPServerConfig, RestToolConfig } from './types.js';
+import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, MCPTool, LLMAccountingEntry, ToolAccountingEntry, RestToolConfig } from './types.js';
 
 // Exit codes according to DESIGN.md
 type ExitCode = 
@@ -41,11 +41,15 @@ type ExitCode =
 
 // empty line between import groups enforced by linter
 import { validateProviders, validateMCPServers, validatePrompts } from './config.js';
+import { ExecutionTree } from './execution-tree.js';
 import { parseFrontmatter, parsePairs } from './frontmatter.js';
 import { LLMClient } from './llm-client.js';
-import { MCPClientManager } from './mcp-client.js';
-import { RestToolManager } from './rest-tools.js';
+import { buildPromptVars, applyFormat, expandVars } from './prompt-builder.js';
 import { SubAgentRegistry } from './subagent-registry.js';
+import { InternalToolProvider } from './tools/internal-provider.js';
+import { MCPProvider } from './tools/mcp-provider.js';
+import { RestProvider } from './tools/rest-provider.js';
+import { ToolsOrchestrator } from './tools/tools.js';
 import { formatToolRequestCompact, truncateUtf8WithNotice } from './utils.js';
 
 // Immutable session class according to DESIGN.md
@@ -61,7 +65,6 @@ export class AIAgentSession {
   readonly error?: string;
   readonly currentTurn: number;
   
-  private readonly mcpClient: MCPClientManager;
   private readonly llmClient: LLMClient;
   private readonly sessionConfig: AIAgentSessionConfig;
   private ajv?: Ajv;
@@ -69,11 +72,12 @@ export class AIAgentSession {
   private internalNotes: { text: string; tags?: string[]; ts: number }[] = [];
   private childConversations: { agentId?: string; toolName: string; promptPath: string; conversation: ConversationMessage[]; trace?: { originId?: string; parentId?: string; selfId?: string; callPath?: string } }[] = [];
   private readonly subAgents?: SubAgentRegistry;
-  private readonly restTools?: RestToolManager;
   private readonly txnId: string;
   private readonly originTxnId?: string;
   private readonly parentTxnId?: string;
   private readonly callPath?: string;
+  private readonly tree: ExecutionTree;
+  private readonly toolsOrchestrator?: ToolsOrchestrator;
   // Per-turn planned subturns (tool call count) discovered when LLM yields toolCalls
   private plannedSubturns: Map<number, number> = new Map<number, number>();
   private resolvedFormat?: OutputFormatId;
@@ -106,7 +110,6 @@ export class AIAgentSession {
     success: boolean,
     error: string | undefined,
     currentTurn: number,
-    mcpClient: MCPClientManager,
     llmClient: LLMClient,
     sessionConfig: AIAgentSessionConfig
   ) {
@@ -117,7 +120,6 @@ export class AIAgentSession {
     this.success = success;
     this.error = error;
     this.currentTurn = currentTurn;
-    this.mcpClient = mcpClient;
     this.llmClient = llmClient;
     this.sessionConfig = sessionConfig;
     // Initialize sub-agents registry if provided
@@ -126,25 +128,82 @@ export class AIAgentSession {
       reg.load(sessionConfig.subAgentPaths);
       this.subAgents = reg;
     }
-    // Initialize REST tools registry with only the tools selected for this agent/session
-    if (sessionConfig.config.restTools !== undefined) {
-      const selected: Record<string, RestToolConfig> = {};
-      const available = sessionConfig.config.restTools;
-      const list = Array.isArray(sessionConfig.tools) ? sessionConfig.tools : [];
-      list.forEach((name) => {
-        if (Object.prototype.hasOwnProperty.call(available, name)) {
-          selected[name] = available[name];
-        }
-      });
-      if (Object.keys(selected).length > 0) {
-        this.restTools = new RestToolManager(selected);
-      }
-    }
+    // REST tools handled by RestProvider; no local registry here
     // Tracing context
     this.txnId = sessionConfig.trace?.selfId ?? crypto.randomUUID();
     this.originTxnId = sessionConfig.trace?.originId ?? this.txnId;
     this.parentTxnId = sessionConfig.trace?.parentId;
     this.callPath = sessionConfig.trace?.callPath ?? sessionConfig.agentId;
+
+    // Central execution tree (source of truth for logs/accounting)
+    this.tree = new ExecutionTree(
+      { sessionId: this.txnId, agentId: sessionConfig.agentId, callPath: this.callPath, maxTurns: sessionConfig.maxTurns },
+      { onLog: sessionConfig.callbacks?.onLog, onAccounting: sessionConfig.callbacks?.onAccounting }
+    );
+
+    // Tools orchestrator (MCP + REST + Internal + Subagents)
+    const orch = new ToolsOrchestrator(this.tree, {
+      toolTimeout: sessionConfig.toolTimeout,
+      toolResponseMaxBytes: sessionConfig.toolResponseMaxBytes,
+      maxConcurrentTools: sessionConfig.maxConcurrentTools,
+      parallelToolCalls: sessionConfig.parallelToolCalls,
+    });
+    orch.register(new MCPProvider('mcp', sessionConfig.config.mcpServers, { trace: sessionConfig.traceMCP, verbose: sessionConfig.verbose, requestTimeoutMs: sessionConfig.toolTimeout }));
+    // Build selected REST tools by frontmatter selection
+    if (this.sessionConfig.config.restTools !== undefined) {
+      const selected: Record<string, RestToolConfig> = {};
+      const available = this.sessionConfig.config.restTools;
+      const list = Array.isArray(this.sessionConfig.tools) ? this.sessionConfig.tools : [];
+      list.forEach((name) => { if (Object.prototype.hasOwnProperty.call(available, name)) selected[name] = available[name]; });
+      if (Object.keys(selected).length > 0) orch.register(new RestProvider('rest', selected));
+    }
+    // Internal tools provider
+    {
+      const enableBatch = this.sessionConfig.tools.includes('batch');
+      const eo = this.sessionConfig.expectedOutput;
+      const expectedJsonSchema = (eo !== undefined && eo.format === 'json') ? eo.schema : undefined;
+      const internalProvider = new InternalToolProvider('agent', {
+        enableBatch,
+        expectedJsonSchema,
+        appendNotes: (text: string, tags?: string[]) => { if (text.trim().length > 0) this.internalNotes.push({ text, tags, ts: Date.now() }); },
+        setFinalReport: (p) => { this.finalReport = { status: p.status, format: p.format as 'json'|'markdown'|'markdown+mermaid'|'slack'|'tty'|'pipe'|'sub-agent'|'text', content: p.content, content_json: p.content_json, metadata: p.metadata, ts: Date.now() }; },
+        orchestrator: orch,
+        toolTimeoutMs: sessionConfig.toolTimeout
+      });
+      orch.register(internalProvider);
+    }
+    if (this.subAgents !== undefined) {
+      const subAgents = this.subAgents;
+      const execFn = async (name: string, args: Record<string, unknown>) => {
+        const exec = await subAgents.execute(name, args, {
+          config: this.sessionConfig.config,
+          callbacks: this.sessionConfig.callbacks,
+          targets: this.sessionConfig.targets,
+          stream: this.sessionConfig.stream,
+          traceLLM: this.sessionConfig.traceLLM,
+          traceMCP: this.sessionConfig.traceMCP,
+          verbose: this.sessionConfig.verbose,
+          temperature: this.sessionConfig.temperature,
+          topP: this.sessionConfig.topP,
+          llmTimeout: this.sessionConfig.llmTimeout,
+          toolTimeout: this.sessionConfig.toolTimeout,
+          maxRetries: this.sessionConfig.maxRetries,
+          maxTurns: this.sessionConfig.maxTurns,
+          toolResponseMaxBytes: this.sessionConfig.toolResponseMaxBytes,
+          parallelToolCalls: this.sessionConfig.parallelToolCalls,
+          trace: { originId: this.originTxnId, parentId: this.txnId, callPath: `${this.callPath ?? ''}->${name}` }
+        });
+        // Keep child conversation list for save-all
+        this.childConversations.push({ agentId: exec.child.toolName, toolName: exec.child.toolName, promptPath: exec.child.promptPath, conversation: exec.conversation, trace: exec.trace });
+        return { result: exec.result, childAccounting: exec.accounting };
+      };
+      // Dynamically import AgentProvider without awaiting in constructor
+      void (async () => {
+        const { AgentProvider } = await import('./tools/agent-provider.js');
+        orch.register(new AgentProvider('subagent', subAgents, execFn));
+      })();
+    }
+    this.toolsOrchestrator = orch;
   }
 
   // Static factory method for creating new sessions
@@ -171,9 +230,10 @@ export class AIAgentSession {
       enrichedSessionConfig.maxConcurrentTools = 3;
     }
 
-    // Wrap onLog to inject trace fields
-    const wrapLog = (fn?: (entry: LogEntry) => void) => (entry: LogEntry): void => {
-      if (fn === undefined) return;
+    // External log relay placeholder; bound after session instantiation to tree
+    let externalLogRelay: (entry: LogEntry) => void = (e: LogEntry) => { void e; };
+    // Wrap onLog to inject trace fields and route only through the execution tree (which fans out to callbacks)
+    const wrapLog = (_fn?: (entry: LogEntry) => void) => (entry: LogEntry): void => {
       const enriched: LogEntry = {
         ...entry,
         agentId: enrichedSessionConfig.agentId,
@@ -182,18 +242,10 @@ export class AIAgentSession {
         parentTxnId: enrichedSessionConfig.trace?.parentId,
         originTxnId: enrichedSessionConfig.trace?.originId,
       };
-      fn(enriched);
+      try { externalLogRelay(enriched); } catch { /* ignore tree relay errors */ }
     };
 
     // Create session-owned MCP client
-    const mcpClient = new MCPClientManager({ 
-      trace: enrichedSessionConfig.traceMCP === true, 
-      verbose: enrichedSessionConfig.verbose,
-      onLog: wrapLog(enrichedSessionConfig.callbacks?.onLog),
-      // Centralize response capping in AIAgentSession (uniform across transports)
-      maxConcurrentInit: enrichedSessionConfig.config.defaults?.mcpInitConcurrency ?? enrichedSessionConfig.mcpInitConcurrency ?? Number.MAX_SAFE_INTEGER
-    });
-
     // Create session-owned LLM client
     const llmClient = new LLMClient(enrichedSessionConfig.config.providers, {
       traceLLM: enrichedSessionConfig.traceLLM,
@@ -201,7 +253,7 @@ export class AIAgentSession {
       pricing: enrichedSessionConfig.config.pricing
     });
 
-    return new AIAgentSession(
+    const sess = new AIAgentSession(
       enrichedSessionConfig.config,
       [], // empty conversation
       [], // empty logs  
@@ -209,10 +261,12 @@ export class AIAgentSession {
       false, // not successful yet
       undefined, // no error yet
       0, // start at turn 0
-      mcpClient,
       llmClient,
       enrichedSessionConfig
     );
+    // Bind external log relay to session's execution tree
+    externalLogRelay = (e: LogEntry) => { try { sess.recordExternalLog(e); } catch { /* noop */ } };
+    return sess;
   }
 
   // Helper method to log exit with proper format
@@ -256,7 +310,19 @@ export class AIAgentSession {
       ...entry,
     };
     logs.push(enriched);
-    this.sessionConfig.callbacks?.onLog?.(enriched);
+    try { this.tree.recordLog(enriched); } catch { /* ignore tree errors */ }
+    // Do not call callbacks directly here; ExecutionTree handles fan-out.
+  }
+
+  // Relay for logs originating outside AIAgentSession (LLM/MCP internals)
+  recordExternalLog(entry: LogEntry): void {
+    try { this.tree.recordLog(entry); } catch { /* ignore */ }
+  }
+
+  // Optional: expose a snapshot for progress UIs or web monitoring
+  getExecutionSnapshot(): { logs: number; accounting: number } {
+    const snap = this.tree.getSnapshot();
+    return { logs: snap.counters.logs, accounting: snap.counters.accounting };
   }
 
   // Enforce a hard timeout around a promise (centralized tool timeout)
@@ -316,6 +382,8 @@ export class AIAgentSession {
     let currentTurn = this.currentTurn;
 
     try {
+      // Start execution session in the tree
+      try { this.tree.startSession(); } catch { /* ignore */ }
       // Verbose: emit settings summary at start (without prompts)
       if (this.sessionConfig.verbose === true) {
         const summarizeConfig = () => {
@@ -388,35 +456,15 @@ export class AIAgentSession {
         };
         this.addLog(currentLogs, concEntry);
       }
-      // Initialize MCP servers (non-fatal if they fail)
-      try {
-        const selected = Object.fromEntries(
-          this.sessionConfig.tools
-            .map((t) => [t, this.sessionConfig.config.mcpServers[t] as unknown])
-            .filter(([, cfg]) => cfg !== undefined)
-        ) as Record<string, MCPServerConfig>;
-        await this.mcpClient.initializeServers(selected);
-      } catch (e) {
-        const message = e instanceof Error ? e.message : String(e);
-        const logEntry: LogEntry = {
-          timestamp: Date.now(),
-          severity: 'WRN',
-          turn: 0,
-          subturn: 0,
-          direction: 'response',
-          type: 'tool',
-          remoteIdentifier: 'init',
-          fatal: false,
-          message: `MCP initialization failed and will be skipped: ${message}`
-        };
-        this.addLog(currentLogs, logEntry);
-      }
+      // MCP servers initialize lazily via provider; no explicit init here
 
       // Startup banner: list resolved MCP tools, REST tools, and sub-agent tools (exposed names)
       try {
-        const mcpToolNames = this.mcpClient.getAllTools().map((t) => t.name);
-        const restToolNames = (this.restTools?.getAllTools() ?? []).map((t) => t.name);
-        const subAgentTools = (this.subAgents?.getTools() ?? []).map((t) => t.name);
+        const allTools = this.toolsOrchestrator?.listTools() ?? [];
+        const names = allTools.map((t) => t.name);
+        const restToolNames = names.filter((n) => n.startsWith('rest__'));
+        const subAgentTools = names.filter((n) => n.startsWith('agent__'));
+        const mcpToolNames = names.filter((n) => !n.startsWith('rest__') && !n.startsWith('agent__'));
         const banner: LogEntry = {
           timestamp: Date.now(),
           severity: 'VRB',
@@ -472,54 +520,6 @@ export class AIAgentSession {
         }
       } catch { /* ignore pricing check errors */ }
 
-      // Build prompt variables and expand placeholders in prompts
-      const buildPromptVars = (): Record<string, string> => {
-        const pad2 = (n: number): string => (n < 10 ? `0${String(n)}` : String(n));
-        const formatRFC3339Local = (d: Date): string => {
-          const y = d.getFullYear();
-          const m = pad2(d.getMonth() + 1);
-          const da = pad2(d.getDate());
-          const hh = pad2(d.getHours());
-          const mm = pad2(d.getMinutes());
-          const ss = pad2(d.getSeconds());
-          const tzMin = -d.getTimezoneOffset();
-          const sign = tzMin >= 0 ? '+' : '-';
-          const abs = Math.abs(tzMin);
-          const tzh = pad2(Math.floor(abs / 60));
-          const tzm = pad2(abs % 60);
-          return `${String(y)}-${m}-${da}T${hh}:${mm}:${ss}${sign}${tzh}:${tzm}`;
-        };
-        const detectTimezone = (): string => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return process.env.TZ ?? 'UTC'; } };
-        const detectOS = (): string => {
-          try {
-            const contentOs = fs.readFileSync('/etc/os-release', 'utf-8');
-            const match = /^PRETTY_NAME=\"?([^\"\n]+)\"?/m.exec(contentOs);
-            if (match?.[1] !== undefined) return `${match[1]} (kernel ${os.release()})`;
-          } catch { /* ignore */ }
-          return `${os.type()} ${os.release()}`;
-        };
-        const now = new Date();
-        return {
-          DATETIME: formatRFC3339Local(now),
-          DAY: now.toLocaleDateString(undefined, { weekday: 'long' }),
-          TIMEZONE: detectTimezone(),
-          MAX_TURNS: String(this.sessionConfig.maxTurns ?? 10),
-          OS: detectOS(),
-          ARCH: process.arch,
-          KERNEL: `${os.type()} ${os.release()}`,
-          CD: process.cwd(),
-          HOSTNAME: os.hostname(),
-          USER: (() => { try { return os.userInfo().username; } catch { return process.env.USER ?? process.env.USERNAME ?? ''; } })(),
-        };
-      };
-      const expandPrompt = (str: string, vars: Record<string, string>): string => {
-        const replace = (s: string, re: RegExp) => s.replace(re, (_m, name: string) => (name in vars ? vars[name] : _m));
-        let out = str;
-        out = replace(out, /\$\{([A-Z_]+)\}/g);
-        out = replace(out, /\{\{([A-Z_]+)\}\}/g);
-        return out;
-      };
-
       // Resolve FORMAT centrally from configuration (with sane fallback)
       const { describeFormat } = await import('./formats.js');
       const resolvedFmt: OutputFormatId = this.sessionConfig.outputFormat;
@@ -528,17 +528,14 @@ export class AIAgentSession {
       this.resolvedFormatDescription = fmtDesc;
 
       // Apply ${FORMAT} replacement first, then expand variables
-      const withFormat = this.sessionConfig.systemPrompt.replace(/\$\{FORMAT\}|\{\{FORMAT\}\}/g, fmtDesc);
-      const vars = buildPromptVars();
-      const systemExpanded = expandPrompt(withFormat, vars);
-      const userExpanded = expandPrompt(this.sessionConfig.userPrompt, vars);
+      const withFormat = applyFormat(this.sessionConfig.systemPrompt, fmtDesc);
+      const vars = { ...buildPromptVars(), MAX_TURNS: String(this.sessionConfig.maxTurns ?? 10) };
+      const systemExpanded = expandVars(withFormat, vars);
+      const userExpanded = expandVars(this.sessionConfig.userPrompt, vars);
 
       // Build enhanced system prompt with tool instructions
-      const toolInstructions = this.mcpClient.getCombinedInstructions();
-      const enhancedSystemPrompt = this.enhanceSystemPrompt(
-        systemExpanded, 
-        toolInstructions
-      );
+      const toolInstructions = this.toolsOrchestrator?.getMCPInstructions() ?? '';
+      const enhancedSystemPrompt = this.enhanceSystemPrompt(systemExpanded, toolInstructions);
 
       // Initialize conversation
       if (this.sessionConfig.conversationHistory !== undefined && this.sessionConfig.conversationHistory.length > 0) {
@@ -562,14 +559,19 @@ export class AIAgentSession {
         currentTurn
       );
 
-      return {
+      const resultShape = {
         success: result.success,
         error: result.error,
         conversation: result.conversation,
         logs: result.logs,
         accounting: result.accounting,
         finalReport: result.finalReport,
-      };
+        // Provide ASCII tree for downstream consumers (CLI may choose to print)
+        treeAscii: (() => { try { return this.tree.renderAscii(); } catch { return undefined; } })(),
+      } as AIAgentResult;
+
+      try { this.tree.endSession(result.success, result.error); } catch { /* ignore */ }
+      return resultShape;
 
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -596,15 +598,17 @@ export class AIAgentSession {
 
       // Emit FIN summary even on failure
       this.emitFinalSummary(currentLogs, currentAccounting);
-      return {
+      const failShape = {
         success: false,
         error: message,
         conversation: currentConversation,
         logs: currentLogs,
         accounting: currentAccounting
-      };
+      } as AIAgentResult;
+      try { this.tree.endSession(false, message); } catch { /* ignore */ }
+      return failShape;
     } finally {
-      await this.mcpClient.cleanup();
+      await this.toolsOrchestrator?.cleanup();
     }
   }
 
@@ -630,7 +634,7 @@ export class AIAgentSession {
     // Turn 0 is initialization; action turns are 1..maxTurns
     // eslint-disable-next-line functional/no-loop-statements
     for (currentTurn = 1; currentTurn <= maxTurns; currentTurn++) {
-      this.mcpClient.setTurn(currentTurn, 0);
+      // Orchestrator receives ctx turn/subturn per call; no MCP client turn management
       this.llmClient.setTurn(currentTurn, 0);
 
       let lastError: string | undefined;
@@ -696,12 +700,7 @@ export class AIAgentSession {
 
             // Emit WRN for unknown tool calls that the AI SDK could not execute (name not in ToolSet)
             try {
-              const mapping = this.mcpClient.getToolServerMapping();
-              // Also consider sub-agent and REST tools as known for this warning check
-              const subAgentTools = (this.subAgents?.getTools() ?? []).map((t) => t.name);
-              const subAgentSet = new Set(subAgentTools);
-              const restToolNames = (this.restTools?.getAllTools() ?? []).map((t) => t.name);
-              const restSet = new Set(restToolNames);
+              // Consider only internal tool set as always known
               // Internal tools always available; include optional batch tool if enabled for this session
               const internal = new Set<string>(['agent__append_notes', 'agent__final_report']);
               if (this.sessionConfig.tools.includes('batch')) internal.add('agent__batch');
@@ -711,7 +710,8 @@ export class AIAgentSession {
               if (assistantMsg?.toolCalls !== undefined && assistantMsg.toolCalls.length > 0) {
                 (assistantMsg.toolCalls).forEach((tc) => {
                   const n = normalizeTool(tc.name);
-                  if (!internal.has(n) && !mapping.has(n) && !subAgentSet.has(n) && !restSet.has(n)) {
+                  const known = (this.toolsOrchestrator?.hasTool(n) ?? false) || internal.has(n);
+                  if (!known) {
                     const req = formatToolRequestCompact(n, tc.parameters);
                     const warn: LogEntry = {
                       timestamp: Date.now(),
@@ -775,6 +775,7 @@ export class AIAgentSession {
                 originTxnId: this.originTxnId
               };
               accounting.push(accountingEntry);
+              try { this.tree.recordAccounting(accountingEntry); } catch { /* ignore */ }
               this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
             }
 
@@ -803,6 +804,8 @@ export class AIAgentSession {
             continue;
           }
         }
+
+        // (removed misplaced orchestrator path; correct handling is below in toolExecutor)
 
         // Add new messages to conversation
         conversation.push(...turnResult.messages);
@@ -928,15 +931,9 @@ export class AIAgentSession {
                     const name = (typeof tc.name === 'string' ? tc.name : '').trim();
                     if (name.length === 0) return acc;
                     if (name === 'agent__append_notes' || name === 'agent__final_report' || name === 'agent__batch') return acc;
-                    // Sub-agent tools are namespaced as agent__<name>, exclude them
-                    if (this.subAgents?.hasTool(name) === true) return acc;
-                    // Consider MCP tools resolvable via MCP client
-                    try {
-                      const resolved = this.mcpClient.resolveExposedTool(name);
-                      return (resolved !== undefined) ? acc + 1 : acc;
-                    } catch {
-                      return acc;
-                    }
+                    // Count only known tools (non-internal) present in orchestrator
+                    const isKnown = this.toolsOrchestrator?.hasTool(name) ?? false;
+                    return isKnown ? acc + 1 : acc;
                   }, 0);
                   this.plannedSubturns.set(currentTurn, count);
                 }
@@ -1037,6 +1034,7 @@ export class AIAgentSession {
               agentId: this.sessionConfig.agentId, callPath: this.callPath, txnId: this.txnId, parentTxnId: this.parentTxnId, originTxnId: this.originTxnId
             };
             accounting.push(accountingEntry);
+            try { this.tree.recordAccounting(accountingEntry); } catch { /* ignore */ }
             this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
             continue;
           }
@@ -1160,10 +1158,7 @@ export class AIAgentSession {
       const toolPairsStr = [...byToolStats.entries()]
         .map(([k, s]) => `${String(s.total)}x [${String(s.ok)}+${String(s.failed)}] ${k}`)
         .join(', ');
-      const sizeCapsMcp = typeof (this.mcpClient as unknown as { getSizeCapHits?: () => number }).getSizeCapHits === 'function'
-        ? (this.mcpClient as unknown as { getSizeCapHits: () => number }).getSizeCapHits()
-        : 0;
-      const sizeCaps = sizeCapsMcp + this.centralSizeCapHits;
+      const sizeCaps = this.centralSizeCapHits;
       const finMcp: LogEntry = {
         timestamp: Date.now(),
         severity: 'FIN',
@@ -1211,11 +1206,9 @@ export class AIAgentSession {
     accounting: AccountingEntry[],
     lastShownThinkingHeaderTurn: number
   ) {
+    const turnSpanId = this.tree.startSpan('llm_turn', 'llm', { provider, model, turn: currentTurn });
     const availableTools = [
-      ...this.mcpClient.getAllTools(),
-      ...(this.subAgents?.getTools() ?? []),
-      ...((this.restTools?.getAllTools()) ?? []),
-      ...this.getInternalTools()
+      ...(this.toolsOrchestrator?.listTools() ?? [])
     ];
     
     // Track if we've shown thinking for this turn
@@ -1223,10 +1216,17 @@ export class AIAgentSession {
     
     // Create tool executor function that delegates to MCP client with accounting
     let subturnCounter = 0;
+    const maxToolCallsPerTurn = Math.max(1, this.sessionConfig.maxToolCallsPerTurn ?? 10);
     const toolExecutor = async (toolName: string, parameters: Record<string, unknown>): Promise<string> => {
       // Advance subturn for each tool call within this turn
       subturnCounter += 1;
-      try { this.mcpClient.setTurn(currentTurn, subturnCounter); } catch { /* ignore */ }
+      if (subturnCounter > maxToolCallsPerTurn) {
+        const msg = `Tool calls per turn exceeded: limit=${String(maxToolCallsPerTurn)}. Switch strategy: avoid further tool calls this turn; either summarize progress or call agent__final_report to conclude.`;
+        const warn: LogEntry = { timestamp: Date.now(), severity: 'WRN', turn: currentTurn, subturn: subturnCounter, direction: 'response', type: 'tool', remoteIdentifier: 'agent:limits', fatal: false, message: msg };
+        this.addLog(logs, warn);
+        throw new Error('tool_calls_per_turn_limit_exceeded');
+      }
+      // Orchestrator receives ctx turn/subturn per call
 
       const singleLine = (s: string, max = 200): string => {
         const one = s.replace(/[\r\n]+/g, ' ').trim();
@@ -1240,89 +1240,8 @@ export class AIAgentSession {
       const normalizeToolName = (n: string): string => n.replace(/<\|[^|]+\|>/g, '').trim();
       const effectiveToolName = normalizeToolName(toolName);
       const startTime = Date.now();
-      const acquiredSlot = await this.acquireToolSlot();
       try {
-        // Intercept internal tools (agent_*)
-        if (effectiveToolName === 'agent__append_notes') {
-          this.addLog(logs, { timestamp: Date.now(), severity: 'VRB', turn: currentTurn, subturn: subturnCounter, direction: 'request', type: 'llm', remoteIdentifier: 'agent', fatal: false, message: `append_notes(${previewParams(parameters)}) <<< internal` });
-          const textParam = (parameters as { text?: unknown }).text;
-          const text = typeof textParam === 'string' ? textParam : textParam === undefined ? '' : JSON.stringify(textParam);
-          const tags = Array.isArray((parameters as { tags?: unknown }).tags) ? (parameters as { tags?: string[] }).tags : undefined;
-          if (text.trim().length > 0) this.internalNotes.push({ text, tags, ts: Date.now() });
-          const latency = Date.now() - startTime;
-          const accountingEntry: AccountingEntry = {
-            type: 'tool', timestamp: startTime, status: 'ok', latency,
-            mcpServer: 'agent', command: toolName,
-            charactersIn: JSON.stringify(parameters).length, charactersOut: 15,
-            agentId: this.sessionConfig.agentId, callPath: this.callPath, txnId: this.txnId, parentTxnId: this.parentTxnId, originTxnId: this.originTxnId
-          };
-          accounting.push(accountingEntry);
-          this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
-          this.releaseToolSlot();
-          return JSON.stringify({ ok: true, totalNotes: this.internalNotes.length });
-        }
-        if (effectiveToolName === 'agent__final_report') {
-          this.addLog(logs, { timestamp: Date.now(), severity: 'VRB', turn: currentTurn, subturn: subturnCounter, direction: 'request', type: 'llm', remoteIdentifier: 'agent', fatal: false, message: `final_report(${previewParams(parameters)}) <<< internal` });
-          const p = parameters;
-          const statusParam = p.status;
-          const formatParam = p.format;
-          const status = (typeof statusParam === 'string' ? statusParam : 'success') as 'success' | 'failure' | 'partial';
-          const format = (typeof formatParam === 'string' ? formatParam : 'markdown') as 'json' | 'markdown' | 'markdown+mermaid' | 'slack' | 'tty' | 'pipe' | 'sub-agent' | 'text';
-          const content = typeof p.content === 'string' ? p.content : undefined;
-          const isPlainObject = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
-          const content_json = isPlainObject(p.content_json) ? p.content_json : undefined;
-          // Attach Slack messages (if provided) into metadata.slack.messages for server-side rendering
-          let metadata: Record<string, unknown> | undefined = isPlainObject(p.metadata) ? p.metadata : undefined;
-          const maybeMessages = p.messages;
-          if (Array.isArray(maybeMessages)) {
-            const raw = maybeMessages;
-            const msgs = raw.filter(isPlainObject);
-            const getProp = (o: Record<string, unknown> | undefined, k: string): unknown => (o !== undefined && Object.prototype.hasOwnProperty.call(o, k)) ? (o[k]) : undefined;
-            const slackMeta = getProp(metadata, 'slack');
-            const prevSlack = isPlainObject(slackMeta) ? slackMeta : {};
-            metadata = { ...(metadata ?? {}), slack: { ...prevSlack, messages: msgs } };
-          }
-          // Enforce required payload per format
-          if (format === 'slack') {
-            if (!Array.isArray(maybeMessages) || maybeMessages.length === 0) {
-              this.releaseToolSlot();
-              throw new Error('final_report(slack) requires `messages` (Block Kit).');
-            }
-          } else if (format === 'json') {
-            if (!isPlainObject(content_json)) {
-              this.releaseToolSlot();
-              throw new Error('final_report(json) requires `content_json` (object).');
-            }
-          } else {
-            if (typeof content !== 'string' || content.trim().length === 0) {
-              this.releaseToolSlot();
-              throw new Error(`final_report(${format}) requires non-empty content.`);
-            }
-          }
-          this.finalReport = { status, format, content, content_json, metadata, ts: Date.now() };
-          const latency = Date.now() - startTime;
-          const accountingEntry: AccountingEntry = {
-            type: 'tool', timestamp: startTime, status: 'ok', latency,
-            mcpServer: 'agent', command: toolName,
-            charactersIn: JSON.stringify(parameters).length, charactersOut: 12,
-            agentId: this.sessionConfig.agentId, callPath: this.callPath, txnId: this.txnId, parentTxnId: this.parentTxnId, originTxnId: this.originTxnId
-          };
-          accounting.push(accountingEntry);
-          this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
-          this.releaseToolSlot();
-          return JSON.stringify({ ok: true });
-        }
-
-        // Batch execution internal tool (only if enabled in session tools)
-        if (effectiveToolName === 'agent__batch' && this.sessionConfig.tools.includes('batch')) {
-          // Outer batch call should not hold a slot; free it and let inner calls acquire slots fairly
-          this.releaseToolSlot();
-          const out = await this.withTimeout(
-            this.executeBatchCalls(parameters, currentTurn, startTime, logs, accounting, toolName),
-            this.sessionConfig.toolTimeout
-          );
-          return out;
-        }
+        // Internal tools are handled by InternalToolProvider via orchestrator
 
         // Sub-agent execution
         if (this.subAgents?.hasTool(effectiveToolName) === true) {
@@ -1361,13 +1280,14 @@ export class AIAgentSession {
               agentId: this.sessionConfig.agentId, callPath: this.callPath, txnId: this.txnId, parentTxnId: this.parentTxnId, originTxnId: this.originTxnId
             };
             accounting.push(accountingEntry);
+            try { this.tree.recordAccounting(accountingEntry); } catch { /* ignore */ }
             this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
             // Merge child accounting into parent
             exec.accounting.forEach((a) => {
               accounting.push(a);
+              try { this.tree.recordAccounting(a); } catch { /* ignore */ }
               this.sessionConfig.callbacks?.onAccounting?.(a);
             });
-            this.releaseToolSlot();
             return capped;
           } catch (e) {
             const latency = Date.now() - startTime;
@@ -1395,97 +1315,30 @@ export class AIAgentSession {
               agentId: this.sessionConfig.agentId, callPath: this.callPath, txnId: this.txnId, parentTxnId: this.parentTxnId, originTxnId: this.originTxnId
             };
             accounting.push(accountingEntry);
+            try { this.tree.recordAccounting(accountingEntry); } catch { /* ignore */ }
             this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
-            this.releaseToolSlot();
             throw e;
           }
         }
 
-        // Warn and fail fast if the tool is unknown (not internal, sub-agent, REST, or from any MCP server)
+        // Orchestrator-managed execution for MCP + REST
+        if (this.toolsOrchestrator?.hasTool(effectiveToolName) === true) {
+          const managed = await this.toolsOrchestrator.executeWithManagement(
+            effectiveToolName,
+            parameters,
+            { turn: currentTurn, subturn: subturnCounter },
+            { timeoutMs: this.sessionConfig.toolTimeout, bypassConcurrency: effectiveToolName === 'agent__batch' }
+          );
+          return managed.result;
+        }
+
+        // Unknown tool after all paths
         {
-          const isInternal = (effectiveToolName === 'agent__append_notes' || effectiveToolName === 'agent__final_report');
-          const mapping = this.mcpClient.getToolServerMapping();
-          const isSub = this.subAgents?.hasTool(effectiveToolName) === true;
-          const isRest = this.restTools?.hasTool(effectiveToolName) === true;
-          if (!isInternal && !isSub && !isRest && !mapping.has(effectiveToolName)) {
-            const req = formatToolRequestCompact(toolName, parameters);
-            const warn: LogEntry = {
-              timestamp: Date.now(),
-              severity: 'WRN',
-              turn: currentTurn,
-              subturn: 0,
-              direction: 'response',
-              type: 'llm',
-              remoteIdentifier: 'assistant:tool',
-              fatal: false,
-              message: `Unknown tool requested: ${req}`
-            };
-            this.addLog(logs, warn);
-            this.releaseToolSlot();
-            throw new Error(`No server found for tool: ${effectiveToolName}`);
-          }
+          const req = formatToolRequestCompact(toolName, parameters);
+          const warn: LogEntry = { timestamp: Date.now(), severity: 'WRN', turn: currentTurn, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'assistant:tool', fatal: false, message: `Unknown tool requested: ${req}` };
+          this.addLog(logs, warn);
+          throw new Error(`No server found for tool: ${effectiveToolName}`);
         }
-
-        // REST tool execution
-        if (this.restTools?.hasTool(effectiveToolName) === true) {
-          try {
-            this.addLog(logs, { timestamp: Date.now(), severity: 'VRB', turn: currentTurn, subturn: subturnCounter, direction: 'request', type: 'tool', toolKind: 'rest', remoteIdentifier: `rest:${effectiveToolName}`, fatal: false, message: formatToolRequestCompact(toolName, parameters) });
-            const execP = this.restTools.execute(effectiveToolName, parameters);
-            const raw = await this.withTimeout(execP, this.sessionConfig.toolTimeout);
-            const capped = this.applyToolResponseCap(raw, this.sessionConfig.toolResponseMaxBytes, logs, { server: 'rest', tool: toolName, turn: currentTurn, subturn: subturnCounter });
-            const latency = Date.now() - startTime;
-            const accountingEntry: AccountingEntry = {
-              type: 'tool', timestamp: startTime, status: 'ok', latency,
-              mcpServer: 'rest', command: toolName,
-              charactersIn: JSON.stringify(parameters).length, charactersOut: capped.length,
-              agentId: this.sessionConfig.agentId, callPath: this.callPath, txnId: this.txnId, parentTxnId: this.parentTxnId, originTxnId: this.originTxnId
-            };
-            accounting.push(accountingEntry);
-            this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
-            this.releaseToolSlot();
-            return capped;
-          } catch (e) {
-            const latency = Date.now() - startTime;
-            const msg = e instanceof Error ? e.message : String(e);
-            try {
-              const errLog: LogEntry = { timestamp: Date.now(), severity: 'ERR', turn: currentTurn, subturn: subturnCounter, direction: 'response', type: 'tool', toolKind: 'rest', remoteIdentifier: `rest:${effectiveToolName}`, fatal: false, message: `error ${toolName}: ${msg}` };
-              this.addLog(logs, errLog);
-            } catch { /* ignore logging errors */ }
-            const accountingEntry: AccountingEntry = { type: 'tool', timestamp: startTime, status: 'failed', latency, mcpServer: 'rest', command: toolName, charactersIn: JSON.stringify(parameters).length, charactersOut: 0, error: msg, agentId: this.sessionConfig.agentId, callPath: this.callPath, txnId: this.txnId, parentTxnId: this.parentTxnId, originTxnId: this.originTxnId };
-            accounting.push(accountingEntry);
-            this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
-            this.releaseToolSlot();
-            throw e;
-          }
-        }
-
-        const { result, serverName } = await this.mcpClient.executeToolByName(
-          effectiveToolName,
-          parameters,
-          { slot: acquiredSlot, timeoutMs: this.sessionConfig.toolTimeout }
-        );
-        // Ensure non-empty tool result so providers that require one response per call don't reject
-        const safeResult = (typeof result === 'string' && result.length === 0) ? ' ' : result;
-        const capped = this.applyToolResponseCap(safeResult, this.sessionConfig.toolResponseMaxBytes, logs, { server: serverName, tool: toolName, turn: currentTurn, subturn: subturnCounter });
-        const latency = Date.now() - startTime;
-        
-        // Add tool accounting
-        const accountingEntry: AccountingEntry = {
-          type: 'tool',
-          timestamp: startTime,
-          status: 'ok',
-          latency,
-          mcpServer: serverName,
-          command: toolName,
-          charactersIn: JSON.stringify(parameters).length,
-          charactersOut: capped.length,
-          agentId: this.sessionConfig.agentId, callPath: this.callPath, txnId: this.txnId, parentTxnId: this.parentTxnId, originTxnId: this.originTxnId
-        };
-        accounting.push(accountingEntry);
-        this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
-        
-        this.releaseToolSlot();
-        return capped;
       } catch (error) {
         const latency = Date.now() - startTime;
         const errorMsg = error instanceof Error ? error.message : String(error);
@@ -1504,6 +1357,7 @@ export class AIAgentSession {
           agentId: this.sessionConfig.agentId, callPath: this.callPath, txnId: this.txnId, parentTxnId: this.parentTxnId, originTxnId: this.originTxnId
         };
         accounting.push(accountingEntry);
+        try { this.tree.recordAccounting(accountingEntry); } catch { /* ignore */ }
         this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
         
         // Re-throw to let AI SDK create a tool-error part so the LLM sees structured failure
@@ -1555,8 +1409,15 @@ export class AIAgentSession {
       }
     };
 
-    const result = await this.llmClient.executeTurn(request);
-    return { ...result, shownThinking };
+    try {
+      const result = await this.llmClient.executeTurn(request);
+      this.tree.endSpan(turnSpanId, result.status.type === 'success' ? 'ok' : 'failed', { latency: result.latencyMs, status: result.status.type });
+      return { ...result, shownThinking };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      this.tree.endSpan(turnSpanId, 'failed', { error: msg });
+      throw e;
+    }
   }
 
   private enhanceSystemPrompt(systemPrompt: string, mcpInstructions: string): string {
@@ -1622,161 +1483,27 @@ export class AIAgentSession {
       return JSON.stringify({ ok: false, error: { code: 'INVALID_INPUT', message: 'calls[] requires id, tool, args' } });
     }
 
-    // Emit a concise batch start line for visibility
-    try {
-      const cap0 = Math.max(1, this.sessionConfig.maxConcurrentTools ?? 1);
-      const eff0 = (this.sessionConfig.parallelToolCalls === false) ? 1 : cap0;
-      const info: LogEntry = {
-        timestamp: Date.now(),
-        severity: 'VRB',
-        turn: currentTurn,
-        subturn: 0,
-        direction: 'request',
-        type: 'llm',
-        remoteIdentifier: 'agent:batch',
-        fatal: false,
-        message: `starting batch: calls=${String(bi.calls.length)} cap=${String(eff0)}`,
-      };
-      this.addLog(logs, info);
-    } catch { /* ignore batch log errors */ }
-
-    // Prepare AJV for schema validation of per-call args
-    const ajv = this.ajv ?? new Ajv({ allErrors: true, strict: false });
-    this.ajv = ajv;
-
-    interface ResultItem {
-      id: string;
-      tool: string;
-      ok: boolean;
-      elapsedMs: number;
-      output?: unknown;
-      error?: { code: string; message: string; schemaExcerpt?: Record<string, unknown> };
-    }
-
-    const byId = new Map<string, BatchCall>();
-    bi.calls.forEach((c) => { byId.set(c.id, c); });
-
-    // Execute all calls in parallel
-    const results = new Map<string, ResultItem>();
-    const runAll = async (): Promise<void> => {
-      const ids = [...byId.keys()];
-      const cap = Math.max(1, this.sessionConfig.maxConcurrentTools ?? 1);
-      const effectiveCap = (this.sessionConfig.parallelToolCalls === false) ? 1 : cap;
-      let idx = 0
-      const workers: Promise<void>[] = [];
-      let subturn = 0;
-      const runOne = async (id: string): Promise<void> => {
-        const BATCH_ID = BATCH_REMOTE_ID;
-        const RESP = RESP_DIR;
-        const LLM = LLM_TYPE;
-        const c = byId.get(id);
-        if (c === undefined) {
-          results.set(id, { id, tool: '', ok: false, elapsedMs: 0, error: { code: 'NOT_FOUND', message: 'Call not found' } });
-          try {
-            const warn: LogEntry = { timestamp: Date.now(), severity: 'WRN', turn: currentTurn, subturn, direction: RESP, type: LLM, remoteIdentifier: BATCH_ID, fatal: false, message: `Call '${id}' not found` };
-            this.addLog(logs, warn);
-          } catch { /* ignore */ }
-          return;
+    // Batch execution: orchestrator-only inner calls; record a span for the batch
+    const batchSpan = this.tree.startSpan('agent_batch', 'tool', { count: bi.calls.length, turn: currentTurn });
+    const results = await Promise.all(bi.calls.map(async (c) => {
+      const t0 = Date.now();
+      if (c.tool === 'agent__append_notes' || c.tool === 'agent__final_report' || c.tool === 'agent__batch') {
+        return { id: c.id, tool: c.tool, ok: false, elapsedMs: 0, error: { code: 'INTERNAL_NOT_ALLOWED', message: 'Internal tools are not allowed in batch' } };
+      }
+      try {
+        if (!(this.toolsOrchestrator?.hasTool(c.tool) ?? false)) {
+          return { id: c.id, tool: c.tool, ok: false, elapsedMs: 0, error: { code: 'UNKNOWN_TOOL', message: `Unknown tool: ${c.tool}` } };
         }
-        // Acquire a tool slot for this inner call and advance subturn
-        const slot = await this.acquireToolSlot();
-        // Advance subturn for each inner call
-        subturn += 1;
-        try { this.mcpClient.setTurn(currentTurn, subturn); } catch { /* ignore */ }
-        const callStart = Date.now();
-        // Validate args against real schema when available
-        try {
-          const resolved = this.mcpClient.resolveExposedTool(c.tool);
-          const schema = resolved !== undefined ? this.mcpClient.getToolSchema(resolved.serverName, resolved.originalName) : undefined;
-          if (schema !== undefined) {
-            const validate = ajv.compile(schema);
-            const valid = validate(c.args);
-            if (!valid) {
-              const errs = (validate.errors ?? []).map((e) => {
-                const path = typeof e.instancePath === 'string' ? e.instancePath : '';
-                const msg = typeof e.message === 'string' ? e.message : '';
-                return `${path} ${msg}`.trim();
-              }).join('; ');
-              results.set(id, { id, tool: c.tool, ok: false, elapsedMs: Date.now() - callStart, error: { code: 'SCHEMA_VALIDATION', message: errs, schemaExcerpt: schema } });
-              try {
-                const warn: LogEntry = { timestamp: Date.now(), severity: 'WRN', turn: currentTurn, subturn, direction: RESP, type: LLM, remoteIdentifier: BATCH_ID, fatal: false, message: `Schema validation failed for ${c.tool} (id=${id}): ${errs}` };
-                this.addLog(logs, warn);
-              } catch { /* ignore */ }
-              this.releaseToolSlot();
-              return;
-            }
-          }
-        } catch (e) {
-          results.set(id, { id, tool: c.tool, ok: false, elapsedMs: Date.now() - callStart, error: { code: 'VALIDATION_INIT', message: e instanceof Error ? e.message : String(e) } });
-          try {
-            const msg = e instanceof Error ? e.message : String(e);
-            const warn: LogEntry = { timestamp: Date.now(), severity: 'WRN', turn: currentTurn, subturn, direction: RESP, type: LLM, remoteIdentifier: BATCH_ID, fatal: false, message: `Validation init error for ${c.tool} (id=${id}): ${msg}` };
-            this.addLog(logs, warn);
-          } catch { /* ignore */ }
-          this.releaseToolSlot();
-          return;
-        }
-        // Disallow only reserved internal tools in batch (allow sub‑agents)
-        if (c.tool.startsWith('agent__')) {
-          const internalName = c.tool.slice('agent__'.length);
-          // Block housekeeping/finalization tools from batch to prevent recursion/termination inside batch
-          if (internalName === 'append_notes' || internalName === 'final_report' || internalName === 'batch') {
-            results.set(id, { id, tool: c.tool, ok: false, elapsedMs: 0, error: { code: 'INTERNAL_NOT_ALLOWED', message: 'Internal tools are not allowed in batch' } });
-            try {
-              const warn: LogEntry = { timestamp: Date.now(), severity: 'WRN', turn: currentTurn, subturn, direction: RESP, type: LLM, remoteIdentifier: BATCH_ID, fatal: false, message: `Internal tool not allowed in batch: ${c.tool} (id=${id})` };
-              this.addLog(logs, warn);
-            } catch { /* ignore */ }
-            this.releaseToolSlot();
-            return;
-          }
-        }
-        // Execute via sub-agent or MCP path
-        try {
-          if (this.subAgents?.hasTool(c.tool) === true) {
-            const subExec = this.subAgents.execute(c.tool, c.args, { config: this.sessionConfig.config, callbacks: this.sessionConfig.callbacks, targets: this.sessionConfig.targets, trace: { originId: this.originTxnId, parentId: this.txnId, callPath: `${this.callPath ?? ''}->${c.tool}` } });
-            const exec = await this.withTimeout(subExec, this.sessionConfig.toolTimeout);
-            results.set(id, { id, tool: c.tool, ok: true, elapsedMs: Date.now() - callStart, output: exec.result });
-            exec.accounting.forEach((a) => { accounting.push(a); this.sessionConfig.callbacks?.onAccounting?.(a); });
-          } else {
-            const out = await this.mcpClient.executeToolByName(c.tool, c.args, { slot, timeoutMs: this.sessionConfig.toolTimeout });
-            results.set(id, { id, tool: c.tool, ok: true, elapsedMs: Date.now() - callStart, output: out.result });
-          }
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          results.set(id, { id, tool: c.tool, ok: false, elapsedMs: Date.now() - callStart, error: { code: 'EXECUTION_ERROR', message: msg } });
-          try {
-            const warn: LogEntry = { timestamp: Date.now(), severity: 'WRN', turn: currentTurn, subturn, direction: RESP, type: LLM, remoteIdentifier: BATCH_ID, fatal: false, message: `Execution error for ${c.tool} (id=${id}): ${msg}` };
-            this.addLog(logs, warn);
-          } catch { /* ignore */ }
-        } finally {
-          this.releaseToolSlot();
-        }
-      };
-      const launch = async () => {
-        // eslint-disable-next-line functional/no-loop-statements
-        while (idx < ids.length) {
-          const id = ids[idx++];
-          await runOne(id);
-        }
-      };
-      // eslint-disable-next-line functional/no-loop-statements
-      for (let i = 0; i < effectiveCap; i++) workers.push(launch());
-      await Promise.all(workers);
-    };
-
-    await runAll();
-    const latency = Date.now() - startTime;
-    const response = { results: bi.calls.map((c) => results.get(c.id)) };
-    let payload = JSON.stringify(response);
-    payload = this.applyToolResponseCap(payload, this.sessionConfig.toolResponseMaxBytes, logs, { server: 'agent', tool: toolName, turn: currentTurn, subturn: 0 });
-    const accountingEntry: AccountingEntry = {
-      type: 'tool', timestamp: startTime, status: 'ok', latency,
-      mcpServer: 'agent', command: toolName,
-      charactersIn: JSON.stringify(parameters).length, charactersOut: payload.length,
-      agentId: this.sessionConfig.agentId, callPath: this.callPath, txnId: this.txnId, parentTxnId: this.parentTxnId, originTxnId: this.originTxnId
-    };
-    accounting.push(accountingEntry);
-    this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
+        const orchestrator = (this.toolsOrchestrator as unknown) as { executeWithManagement: (t: string, a: Record<string, unknown>, ctx: { turn: number; subturn: number }, opts?: { timeoutMs?: number }) => Promise<{ result: string; latency: number }> };
+        const managed = await orchestrator.executeWithManagement(c.tool, c.args, { turn: currentTurn, subturn: 0 }, { timeoutMs: this.sessionConfig.toolTimeout });
+        return { id: c.id, tool: c.tool, ok: true, elapsedMs: managed.latency, output: managed.result };
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        return { id: c.id, tool: c.tool, ok: false, elapsedMs: Date.now() - t0, error: { code: 'EXECUTION_ERROR', message: msg } };
+      }
+    }));
+    const payload = this.applyToolResponseCap(JSON.stringify({ results }), this.sessionConfig.toolResponseMaxBytes, logs, { server: 'agent', tool: toolName, turn: currentTurn, subturn: 0 });
+    this.tree.endSpan(batchSpan, 'ok', { results: results.length });
     return payload;
   }
 
@@ -1791,7 +1518,6 @@ export class AIAgentSession {
       false, // reset success
       undefined, // reset error
       this.currentTurn,
-      this.mcpClient, // reuse MCP client
       this.llmClient, // reuse LLM client
       this.sessionConfig
     );

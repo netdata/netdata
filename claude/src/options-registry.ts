@@ -187,6 +187,17 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
     groups: [G_MASTER_DEFAULTS],
     numeric: { min: 1, integer: true },
   }),
+  numDef({
+    key: 'maxToolCallsPerTurn',
+    default: 10,
+    description: 'Maximum tool calls allowed within a single LLM turn',
+    cli: { names: ['--max-tool-calls-per-turn'], showInHelp: true },
+    fm: { allowed: true, key: 'maxToolCallsPerTurn' },
+    config: { path: 'defaults.maxToolCallsPerTurn' },
+    scope: 'masterDefault',
+    groups: [G_MASTER_DEFAULTS],
+    numeric: { min: 1, integer: true },
+  }),
   boolDef({
     key: 'parallelToolCalls',
     description: 'Allow LLM to plan multiple tool calls per turn',

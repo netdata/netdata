@@ -212,6 +212,7 @@ export class SubAgentRegistry {
           toolTimeout: parentSession.toolTimeout,
           maxRetries: parentSession.maxRetries,
           maxToolTurns: parentSession.maxTurns,
+          maxToolCallsPerTurn: (parentSession as { maxToolCallsPerTurn?: number }).maxToolCallsPerTurn,
           toolResponseMaxBytes: parentSession.toolResponseMaxBytes,
           parallelToolCalls: parentSession.parallelToolCalls,
         },

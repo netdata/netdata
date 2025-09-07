@@ -164,6 +164,7 @@ export interface Configuration {
     topP?: number;
     parallelToolCalls?: boolean;
     maxToolTurns?: number;
+    maxToolCallsPerTurn?: number;
     stream?: boolean;
     maxRetries?: number;
     // Maximum allowed MCP tool response size in bytes. If exceeded, a tool error is injected.
@@ -253,6 +254,7 @@ export interface AIAgentSessionConfig {
   repeatPenalty?: number;
   maxRetries?: number;
   maxTurns?: number;
+  maxToolCallsPerTurn?: number;
   llmTimeout?: number;
   toolTimeout?: number;
   parallelToolCalls?: boolean;
@@ -277,6 +279,8 @@ export interface AIAgentResult {
   conversation: ConversationMessage[];
   logs: LogEntry[];
   accounting: AccountingEntry[];
+  // Optional ASCII representation of the internal execution tree (when requested by CLI)
+  treeAscii?: string;
   // Conversations of executed sub-agents (when available)
   childConversations?: {
     agentId?: string;
