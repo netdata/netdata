@@ -9,8 +9,8 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 
+	"github.com/goccy/go-yaml"
 	"github.com/gohugoio/hashstructure"
-	"gopkg.in/yaml.v2"
 )
 
 const (

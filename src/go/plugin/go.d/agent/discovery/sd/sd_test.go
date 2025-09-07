@@ -7,7 +7,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/pipeline"
 
-	"gopkg.in/yaml.v2"
+	"github.com/goccy/go-yaml"
 )
 
 func TestServiceDiscovery_Run(t *testing.T) {

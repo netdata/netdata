@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/goccy/go-yaml"
 	"github.com/google/uuid"
-	"gopkg.in/yaml.v2"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"

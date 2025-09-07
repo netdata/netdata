@@ -7,9 +7,9 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/model"
 
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v2"
 )
 
 func TestTargetClassificator_classify(t *testing.T) {

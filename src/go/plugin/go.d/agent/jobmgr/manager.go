@@ -22,8 +22,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 
+	"github.com/goccy/go-yaml"
 	"github.com/mattn/go-isatty"
-	"gopkg.in/yaml.v2"
 )
 
 var isTerminal = isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsTerminal(os.Stdin.Fd())

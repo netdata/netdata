@@ -7,6 +7,8 @@ import (
 	"crypto/x509"
 	"fmt"
 	"os"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 )
 
 // TLSConfig represents the standard client TLS configuration.
@@ -21,7 +23,7 @@ type TLSConfig struct {
 	TLSKey string `yaml:"tls_key,omitempty" json:"tls_key"`
 
 	// InsecureSkipVerify controls whether a client verifies the server's certificate chain and host name.
-	InsecureSkipVerify bool `yaml:"tls_skip_verify,omitempty" json:"tls_skip_verify"`
+	InsecureSkipVerify confopt.FlexBool `yaml:"tls_skip_verify,omitempty" json:"tls_skip_verify"`
 }
 
 // NewTLSConfig creates a tls.Config, may be nil without an error if TLS is not configured.
@@ -31,7 +33,7 @@ func NewTLSConfig(cfg TLSConfig) (*tls.Config, error) {
 	}
 
 	tlsConfig := &tls.Config{
-		InsecureSkipVerify: cfg.InsecureSkipVerify,
+		InsecureSkipVerify: bool(cfg.InsecureSkipVerify),
 		Renegotiation:      tls.RenegotiateNever,
 	}
 

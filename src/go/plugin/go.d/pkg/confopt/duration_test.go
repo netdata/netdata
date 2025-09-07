@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"gopkg.in/yaml.v2"
+	"github.com/goccy/go-yaml"
 )
 
 func TestParseDuration(t *testing.T) {
@@ -95,7 +95,7 @@ func TestDuration_MarshalYAML(t *testing.T) {
 		d    Duration
 		want string
 	}{
-		"1 second":    {d: Duration(time.Second), want: "1"},
+		"1 second":    {d: Duration(time.Second), want: "1.0"},
 		"1.5 seconds": {d: Duration(time.Second + time.Millisecond*500), want: "1.5"},
 	}
 

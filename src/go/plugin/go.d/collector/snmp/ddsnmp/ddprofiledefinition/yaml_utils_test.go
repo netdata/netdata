@@ -8,7 +8,7 @@ package ddprofiledefinition
 import (
 	"testing"
 
-	"gopkg.in/yaml.v2"
+	"github.com/goccy/go-yaml"
 
 	"github.com/stretchr/testify/assert"
 )

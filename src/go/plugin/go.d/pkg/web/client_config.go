@@ -30,7 +30,7 @@ type ClientConfig struct {
 
 	// NotFollowRedirect specifies the policy for handling redirects.
 	// Default (zero value) is std http package default policy (stop after 10 consecutive requests).
-	NotFollowRedirect bool `yaml:"not_follow_redirects,omitempty" json:"not_follow_redirects"`
+	NotFollowRedirect confopt.FlexBool `yaml:"not_follow_redirects,omitempty" json:"not_follow_redirects"`
 
 	// ProxyURL specifies the URL of the proxy to use. An empty string means use the environment variables
 	// HTTP_PROXY, HTTPS_PROXY and NO_PROXY (or the lowercase versions thereof) to get the URL.
@@ -39,7 +39,7 @@ type ClientConfig struct {
 	// TLSConfig specifies the TLS configuration.
 	tlscfg.TLSConfig `yaml:",inline" json:""`
 
-	ForceHTTP2 bool `yaml:"force_http2,omitempty" json:"force_http2"`
+	ForceHTTP2 confopt.FlexBool `yaml:"force_http2,omitempty" json:"force_http2"`
 }
 
 // NewHTTPClient returns a new *http.Client given a ClientConfig configuration and an error if any.
@@ -59,7 +59,7 @@ func NewHTTPClient(cfg ClientConfig) (*http.Client, error) {
 	client := &http.Client{
 		Timeout:       cfg.Timeout.Duration(),
 		Transport:     transport,
-		CheckRedirect: redirectFunc(cfg.NotFollowRedirect),
+		CheckRedirect: redirectFunc(bool(cfg.NotFollowRedirect)),
 	}
 
 	return client, nil

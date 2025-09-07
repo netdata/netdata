@@ -12,7 +12,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/model"
 
-	"gopkg.in/yaml.v2"
+	"github.com/goccy/go-yaml"
 )
 
 func newConfigComposer(cfg []ComposeRuleConfig) (*configComposer, error) {

@@ -9,7 +9,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
 
-	"gopkg.in/yaml.v2"
+	"github.com/goccy/go-yaml"
 )
 
 type format int

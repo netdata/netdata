@@ -14,7 +14,7 @@ import (
 	"time"
 	"unicode"
 
-	"gopkg.in/yaml.v2"
+	"github.com/goccy/go-yaml"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"

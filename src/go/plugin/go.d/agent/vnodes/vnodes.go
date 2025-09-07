@@ -13,8 +13,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/goccy/go-yaml"
 	"github.com/google/uuid"
-	"gopkg.in/yaml.v2"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 )

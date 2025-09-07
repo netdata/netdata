@@ -3,6 +3,7 @@
 package snmputils
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -12,7 +13,7 @@ import (
 	"strings"
 	"sync"
 
-	"gopkg.in/yaml.v2"
+	"github.com/goccy/go-yaml"
 
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pluginconfig"
@@ -89,7 +90,7 @@ func loadOverridesFromDir(dir string) (*overrides, error) {
 		}
 
 		var cur overrides
-		if err := yaml.UnmarshalStrict(bs, &cur); err != nil {
+		if err := yaml.NewDecoder(bytes.NewReader(bs), yaml.Strict()).Decode(&cur); err != nil {
 			return fmt.Errorf("unmarshalling %s: %v", path, err)
 		}
 

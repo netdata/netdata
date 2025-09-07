@@ -20,6 +20,7 @@ require (
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-ldap/ldap/v3 v3.4.11
 	github.com/go-sql-driver/mysql v1.9.3
+	github.com/goccy/go-yaml v1.18.0
 	github.com/godbus/dbus/v5 v5.1.0
 	github.com/gofrs/flock v0.12.1
 	github.com/gohugoio/hashstructure v0.5.0
@@ -56,7 +57,6 @@ require (
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20220504211119-3d4a969bb56b
 	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/rethinkdb/rethinkdb-go.v6 v6.2.2
-	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.34.0
 	k8s.io/apimachinery v0.34.0
 	k8s.io/client-go v0.34.0
