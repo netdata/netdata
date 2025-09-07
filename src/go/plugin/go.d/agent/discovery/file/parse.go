@@ -106,7 +106,7 @@ func cfgFormat(bs []byte) format {
 	}
 
 	type (
-		static = map[any]any
+		static = map[string]any
 		sd     = []any
 	)
 	switch data.(type) {

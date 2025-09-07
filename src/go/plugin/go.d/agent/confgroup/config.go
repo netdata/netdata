@@ -42,7 +42,9 @@ func (c Config) HashIncludeMap(_ string, k, _ any) (bool, error) {
 }
 
 func (c Config) Set(key string, value any) Config { c[key] = value; return c }
-func (c Config) Get(key string) any               { return c[key] }
+func (c Config) Get(key string) any {
+	return normalizeInt(c[key])
+}
 
 func (c Config) Name() string            { v, _ := c.Get(keyName).(string); return v }
 func (c Config) Module() string          { v, _ := c.Get(keyModule).(string); return v }
@@ -142,4 +144,16 @@ func firstPositive(value int, others ...int) int {
 		return value
 	}
 	return firstPositive(others[0], others[1:]...)
+}
+
+// normalizeInt converts uint64/int64/int to int for consistency
+func normalizeInt(v any) any {
+	switch val := v.(type) {
+	case uint64:
+		return int(val)
+	case int64:
+		return int(val)
+	default:
+		return v
+	}
 }

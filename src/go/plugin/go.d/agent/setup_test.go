@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 
 	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
@@ -22,7 +23,7 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 			wantCfg: config{
 				Enabled:    true,
 				DefaultRun: true,
-				Modules: map[string]bool{
+				Modules: map[string]confopt.FlexBool{
 					"module1": true,
 					"module2": true,
 				},
@@ -33,7 +34,7 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 			wantCfg: config{
 				Enabled:    true,
 				DefaultRun: true,
-				Modules: map[string]bool{
+				Modules: map[string]confopt.FlexBool{
 					"module1": true,
 					"module2": true,
 				},
@@ -65,7 +66,7 @@ func TestAgent_loadConfig(t *testing.T) {
 				Enabled:    true,
 				DefaultRun: true,
 				MaxProcs:   1,
-				Modules: map[string]bool{
+				Modules: map[string]confopt.FlexBool{
 					"module1": true,
 					"module2": true,
 				},
@@ -82,6 +83,7 @@ func TestAgent_loadConfig(t *testing.T) {
 			},
 			wantCfg: defaultConfig(),
 		},
+		// https://github.com/goccy/go-yaml/issues/752
 		"empty config file": {
 			agent: Agent{
 				Name:      "agent-empty",
@@ -118,7 +120,7 @@ func TestAgent_loadEnabledModules(t *testing.T) {
 				},
 			},
 			cfg: config{
-				Modules: map[string]bool{"module1": true},
+				Modules: map[string]confopt.FlexBool{"module1": true},
 			},
 			wantModules: module.Registry{
 				"module1": module.Creator{Defaults: module.Defaults{Disabled: true}},
@@ -139,7 +141,7 @@ func TestAgent_loadEnabledModules(t *testing.T) {
 				},
 			},
 			cfg: config{
-				Modules:    map[string]bool{"module1": true},
+				Modules:    map[string]confopt.FlexBool{"module1": true},
 				DefaultRun: true,
 			},
 			wantModules: module.Registry{
@@ -162,7 +164,7 @@ func TestAgent_loadEnabledModules(t *testing.T) {
 				},
 			},
 			cfg: config{
-				Modules: map[string]bool{"module1": true},
+				Modules: map[string]confopt.FlexBool{"module1": true},
 			},
 			wantModules: module.Registry{
 				"module1": module.Creator{},

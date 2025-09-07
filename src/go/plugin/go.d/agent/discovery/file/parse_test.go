@@ -14,7 +14,7 @@ import (
 
 func TestParse(t *testing.T) {
 	const (
-		jobDef = 11
+		jobDef = uint64(11)
 		cfgDef = 22
 		modDef = 33
 	)

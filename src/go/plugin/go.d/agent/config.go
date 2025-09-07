@@ -6,6 +6,8 @@ import (
 	"fmt"
 
 	"github.com/goccy/go-yaml"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 )
 
 func defaultConfig() config {
@@ -18,10 +20,10 @@ func defaultConfig() config {
 }
 
 type config struct {
-	Enabled    bool            `yaml:"enabled"`
-	DefaultRun bool            `yaml:"default_run"`
-	MaxProcs   int             `yaml:"max_procs"`
-	Modules    map[string]bool `yaml:"modules"`
+	Enabled    confopt.FlexBool            `yaml:"enabled"`
+	DefaultRun confopt.FlexBool            `yaml:"default_run"`
+	MaxProcs   int                         `yaml:"max_procs"`
+	Modules    map[string]confopt.FlexBool `yaml:"modules"`
 }
 
 func (c *config) String() string {
@@ -39,12 +41,12 @@ func (c *config) isImplicitlyEnabled(moduleName string) bool {
 
 func (c *config) isEnabled(moduleName string, explicit bool) bool {
 	if enabled, ok := c.Modules[moduleName]; ok {
-		return enabled
+		return bool(enabled)
 	}
 	if explicit {
 		return false
 	}
-	return c.DefaultRun
+	return bool(c.DefaultRun)
 }
 
 func (c *config) UnmarshalYAML(unmarshal func(any) error) error {
@@ -63,14 +65,14 @@ func (c *config) UnmarshalYAML(unmarshal func(any) error) error {
 		case "enabled", "default_run", "max_procs", "modules":
 			continue
 		}
-		var b bool
+		var b confopt.FlexBool
 		if in, err := yaml.Marshal(value); err != nil || yaml.Unmarshal(in, &b) != nil {
 			continue
 		}
 		if c.Modules == nil {
-			c.Modules = make(map[string]bool)
+			c.Modules = make(map[string]confopt.FlexBool)
 		}
-		c.Modules[key] = b
+		c.Modules[key] = confopt.FlexBool(b)
 	}
 	return nil
 }

@@ -3,6 +3,7 @@
 package agent
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -42,6 +43,7 @@ func (a *Agent) loadPluginConfig() config {
 		a.Warningf("couldn't load config '%s': %v, will use defaults", path, err)
 		return defaultConfig()
 	}
+	fmt.Println("HERE")
 	a.Info("config successfully loaded")
 	return cfg
 }
