@@ -146,6 +146,20 @@ Expect Output: CRM information for the company Ellusium
 Input: what is on hubspot about john.smith@google.com?
 Expected Output: CRM information for the contact John Smith from Google
 
+**Example 3**
+Input: give me a list of users who signed up in the last 24h and declared they intend to use Netdata for Work
+Expected Output: The list of users who signed up in the last 24h and declared they plan to use Netdata for Work
+
+**Example 4**
+Input: give me the emails of this who submitted a sales contact-us form in the last week
+Expected Output: The list users who submitted their any sales contact-us form in the last week
+
+**Example 5**
+Input: give me all partner application forms submitted over in the last month
+Expected Output: The list partner application forms submitted in the last week
+
+IMPORTANT: hubspot has live data, they are updated in real-time
+
 ### fireflies
 Scope: analyzes Fireflies meeting transcripts to identify pain points, infrastructure scale, decision-makers, and map customer commitments to SEE sales stages (10-100%) for deal qualification and probability assessment.
 Input: A company name or domain name, or contact email, together with some time-period, or even a specific meeting id
@@ -189,6 +203,12 @@ Expected Output: an analysis on the web page on learn.netdata.cloud John Smith o
 **Example 3**
 Input: find the complete on-boarding/sign-up flow of john.smith@google.com
 Expected Output: the complete timeline of accesses to our websites, prior and after the use signed up
+
+**Example 5**
+Input: find how many users have clicked the "TROUBLESHOOT" button over the last 30d and also provide the tab they were viewing when they clicked it
+Expected Output: The total number of users who clicked that button over the last 30d, with a break down per tab
+
+IMPORTANT: posthog has live data, they are updated in real-time
 
 ### github
 Scope: explore Netdata’s GitHub repositories (code, PRs, issues, actions status, commit history) to answer engineering questions with hard evidence.
