@@ -613,6 +613,7 @@ func TestManager_Run_Dyncfg_Userconfig(t *testing.T) {
 	tests := map[string]struct {
 		createSim func() *runSim
 	}{
+		// https://github.com/goccy/go-yaml/issues/752
 		"[userconfig] existing": {
 			createSim: func() *runSim {
 				cfg := prepareDyncfgCfg("success", "test")

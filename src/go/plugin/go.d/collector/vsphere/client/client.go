@@ -50,7 +50,7 @@ func newSoapClient(config Config) (*soap.Client, error) {
 		return nil, err
 	}
 	soapURL.User = url.UserPassword(config.User, config.Password)
-	soapClient := soap.NewClient(soapURL, config.TLSConfig.InsecureSkipVerify)
+	soapClient := soap.NewClient(soapURL, config.TLSConfig.InsecureSkipVerify.Bool())
 
 	tlsConfig, err := tlscfg.NewTLSConfig(config.TLSConfig)
 	if err != nil {

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -271,7 +272,7 @@ func TestCollector_Collect(t *testing.T) {
 	}
 }
 
-func prepareNTPdWithMock(m *mockClient, collectPeers bool) *Collector {
+func prepareNTPdWithMock(m *mockClient, collectPeers confopt.FlexBool) *Collector {
 	collr := New()
 	collr.CollectPeers = collectPeers
 	if m == nil {

@@ -53,7 +53,7 @@ type Config struct {
 	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every"`
 	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
 	web.HTTPConfig     `yaml:",inline" json:""`
-	CollectQueues      bool `yaml:"collect_queues_metrics" json:"collect_queues_metrics"`
+	CollectQueues      confopt.FlexBool `yaml:"collect_queues_metrics" json:"collect_queues_metrics"`
 }
 
 type Collector struct {

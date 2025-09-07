@@ -52,8 +52,8 @@ type Config struct {
 	Address            string           `yaml:"address" json:"address"`
 	ConfPath           string           `yaml:"conf_path,omitempty" json:"conf_path"`
 	Timeout            confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	Cumulative         bool             `yaml:"cumulative_stats" json:"cumulative_stats"`
-	UseTLS             bool             `yaml:"use_tls,omitempty" json:"use_tls"`
+	Cumulative         confopt.FlexBool `yaml:"cumulative_stats" json:"cumulative_stats"`
+	UseTLS             confopt.FlexBool `yaml:"use_tls,omitempty" json:"use_tls"`
 	tlscfg.TLSConfig   `yaml:",inline" json:""`
 }
 
@@ -84,7 +84,7 @@ func (c *Collector) Init(context.Context) error {
 		return fmt.Errorf("creating client: %v", err)
 	}
 
-	c.charts = charts(c.Cumulative)
+	c.charts = charts(c.Cumulative.Bool())
 
 	c.Debugf("using address: %s, cumulative: %v, use_tls: %v, timeout: %s", c.Address, c.Cumulative, c.UseTLS, c.Timeout)
 	if c.UseTLS {

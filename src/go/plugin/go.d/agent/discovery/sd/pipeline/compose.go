@@ -94,7 +94,7 @@ func (c *configComposer) parseTemplateData(bs []byte) ([]confgroup.Config, error
 	}
 
 	type (
-		single = map[any]any
+		single = map[string]any
 		multi  = []any
 	)
 

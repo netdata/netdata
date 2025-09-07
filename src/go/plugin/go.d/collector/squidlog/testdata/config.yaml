@@ -5,7 +5,7 @@ log_type: "ok"
 csv_config:
   fields_per_record: 123
   delimiter: "ok"
-  trim_leading_space: yes
+  trim_leading_space: true
   format: "ok"
 ltsv_config:
   field_delimiter: "ok"

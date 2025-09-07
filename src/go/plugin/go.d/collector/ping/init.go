@@ -28,7 +28,7 @@ func (c *Collector) initProber() (prober, error) {
 	}
 
 	conf := pingProberConfig{
-		privileged: c.Privileged,
+		privileged: c.Privileged.Bool(),
 		packets:    c.SendPackets,
 		ifaceName:  c.Interface,
 		interval:   c.Interval.Duration(),

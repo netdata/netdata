@@ -19,5 +19,5 @@ tls_cert: "ok"
 tls_key: "ok"
 tls_skip_verify: true
 force_http2: true
-pinapi: no
-repoapi: no
+pinapi: false
+repoapi: false

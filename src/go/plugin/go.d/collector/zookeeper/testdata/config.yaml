@@ -3,7 +3,7 @@ update_every: 123
 autodetection_retry: 123
 address: "ok"
 timeout: 123.123
-use_tls: yes
+use_tls: true
 tls_ca: "ok"
 tls_cert: "ok"
 tls_key: "ok"

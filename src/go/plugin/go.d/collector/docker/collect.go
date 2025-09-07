@@ -114,7 +114,7 @@ func (c *Collector) collectContainers(mx map[string]int64) error {
 			containers, err := c.client.ContainerList(ctx, typesContainer.ListOptions{
 				All:     true,
 				Filters: filters.NewArgs(filters.KeyValuePair{Key: "health", Value: status}),
-				Size:    c.CollectContainerSize,
+				Size:    c.CollectContainerSize.Bool(),
 			})
 			if err != nil {
 				return err

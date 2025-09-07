@@ -52,9 +52,9 @@ type (
 		Exclude []string `yaml:"exclude,omitempty" json:"exclude"`
 	}
 	dirsConfig struct {
-		Include        []string `yaml:"include" json:"include"`
-		Exclude        []string `yaml:"exclude,omitempty" json:"exclude"`
-		CollectDirSize bool     `yaml:"collect_dir_size" json:"collect_dir_size"`
+		Include        []string         `yaml:"include" json:"include"`
+		Exclude        []string         `yaml:"exclude,omitempty" json:"exclude"`
+		CollectDirSize confopt.FlexBool `yaml:"collect_dir_size" json:"collect_dir_size"`
 	}
 )
 

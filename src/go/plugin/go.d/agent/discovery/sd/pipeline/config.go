@@ -11,13 +11,14 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/discoverer/k8ssd"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/discoverer/netlistensd"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/discoverer/snmpsd"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 )
 
 type Config struct {
 	Source         string             `yaml:"-"`
 	ConfigDefaults confgroup.Registry `yaml:"-"`
 
-	Disabled bool                 `yaml:"disabled"`
+	Disabled confopt.FlexBool     `yaml:"disabled"`
 	Name     string               `yaml:"name"`
 	Discover []DiscoveryConfig    `yaml:"discover"`
 	Classify []ClassifyRuleConfig `yaml:"classify"`

@@ -45,7 +45,7 @@ type Config struct {
 	AutoDetectionRetry int              `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
 	Address            string           `yaml:"address" json:"address"`
 	Timeout            confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	CollectPeers       bool             `yaml:"collect_peers" json:"collect_peers"`
+	CollectPeers       confopt.FlexBool `yaml:"collect_peers" json:"collect_peers"`
 }
 
 type Collector struct {

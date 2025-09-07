@@ -50,7 +50,7 @@ func (c *Collector) initHeaderMatch() ([]headerMatch, error) {
 		}
 
 		hm := headerMatch{
-			exclude:    v.Exclude,
+			exclude:    v.Exclude.Bool(),
 			key:        v.Key,
 			valMatcher: nil,
 		}

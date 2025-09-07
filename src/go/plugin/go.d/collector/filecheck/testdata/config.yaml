@@ -10,4 +10,4 @@ dirs:
     - "ok"
   exclude:
     - "ok"
-  collect_dir_size: yes
+  collect_dir_size: true

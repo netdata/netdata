@@ -56,9 +56,9 @@ type (
 		HeaderMatch      []headerMatchConfig `yaml:"header_match,omitempty" json:"header_match"`
 	}
 	headerMatchConfig struct {
-		Exclude bool   `yaml:"exclude" json:"exclude"`
-		Key     string `yaml:"key" json:"key"`
-		Value   string `yaml:"value" json:"value"`
+		Exclude confopt.FlexBool `yaml:"exclude" json:"exclude"`
+		Key     string           `yaml:"key" json:"key"`
+		Value   string           `yaml:"value" json:"value"`
 	}
 )
 

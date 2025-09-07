@@ -12,6 +12,10 @@ import (
 // but marshals as a strict boolean.
 type FlexBool bool
 
+func (b FlexBool) Bool() bool {
+	return bool(b)
+}
+
 // UnmarshalYAML allows accepting yes/no, on/off, 1/0, etc.
 // Compatible with github.com/goccy/go-yaml (YAML 1.2).
 func (b *FlexBool) UnmarshalYAML(unmarshal func(any) error) error {
@@ -61,9 +65,7 @@ func parseBoolString(s string) (bool, bool) {
 	case "false", "f", "no", "n", "off", "0":
 		return false, true
 	default:
-		if bv, err := strconv.ParseBool(v); err == nil {
-			return bv, true
-		}
-		return false, false
+		bv, err := strconv.ParseBool(v)
+		return bv, err == nil
 	}
 }

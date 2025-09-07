@@ -3,7 +3,6 @@
 package agent
 
 import (
-	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -39,11 +38,12 @@ func (a *Agent) loadPluginConfig() config {
 	a.Infof("found '%s", path)
 
 	cfg := defaultConfig()
+
 	if err := loadYAML(&cfg, path); err != nil {
 		a.Warningf("couldn't load config '%s': %v, will use defaults", path, err)
 		return defaultConfig()
 	}
-	fmt.Println("HERE")
+
 	a.Info("config successfully loaded")
 	return cfg
 }

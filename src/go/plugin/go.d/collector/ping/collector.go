@@ -48,7 +48,7 @@ type Config struct {
 	UpdateEvery int              `yaml:"update_every,omitempty" json:"update_every"`
 	Hosts       []string         `yaml:"hosts" json:"hosts"`
 	Network     string           `yaml:"network,omitempty" json:"network"`
-	Privileged  bool             `yaml:"privileged" json:"privileged"`
+	Privileged  confopt.FlexBool `yaml:"privileged" json:"privileged"`
 	SendPackets int              `yaml:"packets,omitempty" json:"packets"`
 	Interval    confopt.Duration `yaml:"interval,omitempty" json:"interval"`
 	Interface   string           `yaml:"interface,omitempty" json:"interface"`

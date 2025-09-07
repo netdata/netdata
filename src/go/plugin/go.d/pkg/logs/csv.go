@@ -10,13 +10,15 @@ import (
 	"io"
 	"strconv"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 )
 
 type (
 	CSVConfig struct {
 		FieldsPerRecord  int                              `yaml:"fields_per_record,omitempty" json:"fields_per_record"`
 		Delimiter        string                           `yaml:"delimiter,omitempty" json:"delimiter"`
-		TrimLeadingSpace bool                             `yaml:"trim_leading_space,omitempty" json:"trim_leading_space"`
+		TrimLeadingSpace confopt.FlexBool                 `yaml:"trim_leading_space,omitempty" json:"trim_leading_space"`
 		Format           string                           `yaml:"format,omitempty" json:"format"`
 		CheckField       func(string) (string, int, bool) `yaml:"-" json:"-"`
 	}
@@ -98,7 +100,7 @@ func newCSVReader(in io.Reader, config CSVConfig) *csv.Reader {
 			r.Comma = d
 		}
 	}
-	r.TrimLeadingSpace = config.TrimLeadingSpace
+	r.TrimLeadingSpace = config.TrimLeadingSpace.Bool()
 	r.FieldsPerRecord = config.FieldsPerRecord
 	r.ReuseRecord = true
 	return r
@@ -111,7 +113,7 @@ func newCSVFormat(config CSVConfig) (*csvFormat, error) {
 			r.Comma = d
 		}
 	}
-	r.TrimLeadingSpace = config.TrimLeadingSpace
+	r.TrimLeadingSpace = config.TrimLeadingSpace.Bool()
 
 	record, err := r.Read()
 	if err != nil {

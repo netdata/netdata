@@ -48,8 +48,8 @@ type Config struct {
 	UpdateEvery      int              `yaml:"update_every,omitempty" json:"update_every"`
 	Source           string           `yaml:"source" json:"source"`
 	Timeout          confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	CheckFullChain   bool             `yaml:"check_full_chain" json:"check_full_chain"`
-	CheckRevocation  bool             `yaml:"check_revocation_status" json:"check_revocation_status"`
+	CheckFullChain   confopt.FlexBool `yaml:"check_full_chain" json:"check_full_chain"`
+	CheckRevocation  confopt.FlexBool `yaml:"check_revocation_status" json:"check_revocation_status"`
 	tlscfg.TLSConfig `yaml:",inline" json:""`
 }
 

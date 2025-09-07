@@ -4,8 +4,8 @@ autodetection_retry: 123
 address: "ok"
 conf_path: "ok"
 timeout: 123.123
-cumulative_stats: yes
-use_tls: yes
+cumulative_stats: true
+use_tls: true
 tls_ca: "ok"
 tls_cert: "ok"
 tls_key: "ok"

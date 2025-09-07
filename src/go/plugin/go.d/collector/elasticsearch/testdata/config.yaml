@@ -19,8 +19,8 @@ tls_cert: "ok"
 tls_key: "ok"
 tls_skip_verify: true
 force_http2: true
-cluster_mode: yes
-collect_node_stats: yes
-collect_cluster_health: yes
-collect_cluster_stats: yes
-collect_indices_stats: yes
+cluster_mode: true
+collect_node_stats: true
+collect_cluster_health: true
+collect_cluster_stats: true
+collect_indices_stats: true

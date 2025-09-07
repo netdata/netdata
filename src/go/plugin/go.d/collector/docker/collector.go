@@ -56,7 +56,7 @@ type Config struct {
 	Address              string           `yaml:"address" json:"address"`
 	Timeout              confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 	ContainerSelector    string           `yaml:"container_selector,omitempty" json:"container_selector"`
-	CollectContainerSize bool             `yaml:"collect_container_size" json:"collect_container_size"`
+	CollectContainerSize confopt.FlexBool `yaml:"collect_container_size" json:"collect_container_size"`
 }
 
 type (

@@ -8,6 +8,7 @@ import (
 	"net"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/unbound/config"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/socket"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/tlscfg"
 )
@@ -41,13 +42,13 @@ func (c *Collector) initConfig() (enabled bool) {
 
 func (c *Collector) applyConfig(cfg *config.UnboundConfig) {
 	c.Infof("applying configuration: %s", cfg)
-	if cumulative, ok := cfg.Cumulative(); ok && cumulative != c.Cumulative {
+	if cumulative, ok := cfg.Cumulative(); ok && cumulative != c.Cumulative.Bool() {
 		c.Debugf("changing 'cumulative_stats': %v => %v", c.Cumulative, cumulative)
-		c.Cumulative = cumulative
+		c.Cumulative = confopt.FlexBool(cumulative)
 	}
-	if useCert, ok := cfg.ControlUseCert(); ok && useCert != c.UseTLS {
+	if useCert, ok := cfg.ControlUseCert(); ok && useCert != c.UseTLS.Bool() {
 		c.Debugf("changing 'use_tls': %v => %v", c.UseTLS, useCert)
-		c.UseTLS = useCert
+		c.UseTLS = confopt.FlexBool(useCert)
 	}
 	if keyFile, ok := cfg.ControlKeyFile(); ok && keyFile != c.TLSKey {
 		c.Debugf("changing 'tls_key': '%s' => '%s'", c.TLSKey, keyFile)
@@ -73,7 +74,7 @@ func (c *Collector) applyConfig(cfg *config.UnboundConfig) {
 
 func (c *Collector) initClient() (err error) {
 	var tlsCfg *tls.Config
-	useTLS := !socket.IsUnixSocket(c.Address) && c.UseTLS
+	useTLS := !socket.IsUnixSocket(c.Address) && c.UseTLS.Bool()
 
 	if useTLS && (c.TLSConfig.TLSCert == "" || c.TLSConfig.TLSKey == "") {
 		return errors.New("'tls_cert' or 'tls_key' is missing")

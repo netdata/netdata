@@ -435,7 +435,7 @@ func (c *Collector) updateCharts() {
 	}
 
 	if !c.extChartsCreated {
-		charts := extendedCharts(c.Cumulative)
+		charts := extendedCharts(c.Cumulative.Bool())
 		if err := c.Charts().Add(*charts...); err != nil {
 			c.Warningf("add extended charts: %v", err)
 		}
@@ -469,7 +469,7 @@ func (c *Collector) updateCharts() {
 }
 
 func (c *Collector) addThreadCharts(thread string) {
-	charts := threadCharts(thread, c.Cumulative)
+	charts := threadCharts(thread, c.Cumulative.Bool())
 	if err := c.Charts().Add(*charts...); err != nil {
 		c.Warningf("add '%s' charts: %v", thread, err)
 	}

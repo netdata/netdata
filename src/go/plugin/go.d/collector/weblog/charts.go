@@ -688,7 +688,7 @@ func (c *Collector) createCharts(line *logLine) error {
 		}
 	}
 	if line.hasRespCode() {
-		if err := addRespCodesCharts(charts, c.GroupRespCodes); err != nil {
+		if err := addRespCodesCharts(charts, c.GroupRespCodes.Bool()); err != nil {
 			return err
 		}
 	}

@@ -62,11 +62,11 @@ type Config struct {
 	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every"`
 	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
 	web.HTTPConfig     `yaml:",inline" json:""`
-	ClusterMode        bool `yaml:"cluster_mode" json:"cluster_mode"`
-	DoNodeStats        bool `yaml:"collect_node_stats" json:"collect_node_stats"`
-	DoClusterHealth    bool `yaml:"collect_cluster_health" json:"collect_cluster_health"`
-	DoClusterStats     bool `yaml:"collect_cluster_stats" json:"collect_cluster_stats"`
-	DoIndicesStats     bool `yaml:"collect_indices_stats" json:"collect_indices_stats"`
+	ClusterMode        confopt.FlexBool `yaml:"cluster_mode" json:"cluster_mode"`
+	DoNodeStats        confopt.FlexBool `yaml:"collect_node_stats" json:"collect_node_stats"`
+	DoClusterHealth    confopt.FlexBool `yaml:"collect_cluster_health" json:"collect_cluster_health"`
+	DoClusterStats     confopt.FlexBool `yaml:"collect_cluster_stats" json:"collect_cluster_stats"`
+	DoIndicesStats     confopt.FlexBool `yaml:"collect_indices_stats" json:"collect_indices_stats"`
 }
 
 type Collector struct {

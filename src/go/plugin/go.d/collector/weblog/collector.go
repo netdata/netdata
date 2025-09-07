@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/logs"
 )
 
@@ -57,7 +58,7 @@ type (
 		CustomTimeFields    []customTimeField    `yaml:"custom_time_fields,omitempty" json:"custom_time_fields"`
 		CustomNumericFields []customNumericField `yaml:"custom_numeric_fields,omitempty" json:"custom_numeric_fields"`
 		Histogram           []float64            `yaml:"histogram,omitempty" json:"histogram"`
-		GroupRespCodes      bool                 `yaml:"group_response_codes" json:"group_response_codes"`
+		GroupRespCodes      confopt.FlexBool     `yaml:"group_response_codes" json:"group_response_codes"`
 	}
 	userPattern struct {
 		Name  string `yaml:"name" json:"name"`

@@ -23,6 +23,6 @@ status_accepted:
 response_match: "ok"
 cookie_file: "ok"
 header_match:
-  - exclude: yes
+  - exclude: true
     key: "ok"
     value: "ok"

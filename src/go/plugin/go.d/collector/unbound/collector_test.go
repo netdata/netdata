@@ -281,7 +281,7 @@ func testCharts(t *testing.T, collr *Collector, mx map[string]int64) {
 
 func ensureChartsCreatedForEveryThread(t *testing.T, u *Collector) {
 	for thread := range u.cache.threads {
-		for _, chart := range *threadCharts(thread, u.Cumulative) {
+		for _, chart := range *threadCharts(thread, u.Cumulative.Bool()) {
 			assert.Truef(t, u.Charts().Has(chart.ID), "chart '%s' is not created for '%s' thread", chart.ID, thread)
 		}
 	}
@@ -291,7 +291,7 @@ func ensureExtendedChartsCreated(t *testing.T, u *Collector) {
 	if len(u.cache.answerRCode) == 0 {
 		return
 	}
-	for _, chart := range *extendedCharts(u.Cumulative) {
+	for _, chart := range *extendedCharts(u.Cumulative.Bool()) {
 		assert.Truef(t, u.Charts().Has(chart.ID), "chart '%s' is not added", chart.ID)
 	}
 
