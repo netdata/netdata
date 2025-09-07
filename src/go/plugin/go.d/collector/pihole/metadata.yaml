@@ -152,7 +152,7 @@ modules:
                 jobs:
                   - name: local
                     url: https://203.0.113.11
-                    tls_skip_verify: yes
+                    tls_skip_verify: true
                     password: bT4@zK1wVr
             - name: Multi-instance
               description: |

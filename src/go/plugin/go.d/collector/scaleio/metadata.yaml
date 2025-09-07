@@ -136,7 +136,7 @@ modules:
                     url: https://127.0.0.1
                     username: admin
                     password: password
-                    tls_skip_verify: yes  # self-signed certificate
+                    tls_skip_verify: true  # self-signed certificate
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
@@ -148,13 +148,13 @@ modules:
                     url: https://127.0.0.1
                     username: admin
                     password: password
-                    tls_skip_verify: yes  # self-signed certificate
+                    tls_skip_verify: true  # self-signed certificate
                 
                   - name: remote
                     url: https://203.0.113.10
                     username: admin
                     password: password
-                    tls_skip_verify: yes
+                    tls_skip_verify: true
     troubleshooting:
       problems:
         list: []

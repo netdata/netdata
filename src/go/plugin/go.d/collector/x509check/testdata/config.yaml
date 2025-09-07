@@ -5,6 +5,6 @@ timeout: 123.123
 tls_ca: "ok"
 tls_cert: "ok"
 tls_key: "ok"
-tls_skip_verify: yes
+tls_skip_verify: true
 check_full_chain: yes
 check_revocation_status: yes

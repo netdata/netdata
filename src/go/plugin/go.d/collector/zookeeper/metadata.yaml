@@ -114,7 +114,7 @@ modules:
                   - name: local
                     address: 127.0.0.1:2181
                     use_tls: yes
-                    tls_skip_verify: yes
+                    tls_skip_verify: true
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.

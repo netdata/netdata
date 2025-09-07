@@ -142,7 +142,7 @@ modules:
                 jobs:
                   - name: local
                     url: https://localhost:9600
-                    tls_skip_verify: yes
+                    tls_skip_verify: true
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.

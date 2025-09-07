@@ -13,10 +13,10 @@ proxy_url: "ok"
 proxy_username: "ok"
 proxy_password: "ok"
 timeout: 123.123
-not_follow_redirects: yes
+not_follow_redirects: true
 tls_ca: "ok"
 tls_cert: "ok"
 tls_key: "ok"
-tls_skip_verify: yes
+tls_skip_verify: true
 acl_token: "ok"
-force_http2: yes
+force_http2: true

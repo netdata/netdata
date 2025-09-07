@@ -216,7 +216,7 @@ modules:
                 jobs:
                   - name: local
                     url: https://127.0.0.1:9090/metrics
-                    tls_skip_verify: yes
+                    tls_skip_verify: true
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.

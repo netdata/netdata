@@ -141,7 +141,7 @@ modules:
                 jobs:
                   - name: local
                     url: http://127.0.0.1:10250/metrics
-                    tls_skip_verify: yes
+                    tls_skip_verify: true
     troubleshooting:
       problems:
         list: []

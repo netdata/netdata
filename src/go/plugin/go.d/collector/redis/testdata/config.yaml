@@ -9,4 +9,4 @@ ping_samples: 123
 tls_ca: "ok"
 tls_cert: "ok"
 tls_key: "ok"
-tls_skip_verify: yes
+tls_skip_verify: true
