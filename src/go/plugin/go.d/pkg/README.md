@@ -1,5 +1,6 @@
 # Helper Packages
 
+- if you need to run an external command, please use [`cmd`](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/cmd).
 - if you need IP ranges consider to
   use [`iprange`](/src/go/plugin/go.d/pkg/iprange).
 - if you parse an application log files, then [`log`](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/logs) is
