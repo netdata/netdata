@@ -983,6 +983,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/setenv.h
         src/libnetdata/os/strndup.c
         src/libnetdata/os/strndup.h
+        src/libnetdata/os/windows-api/windows_api.c
+        src/libnetdata/os/windows-api/windows_api.h
         src/libnetdata/os/windows-wmi/windows-wmi.c
         src/libnetdata/os/windows-wmi/windows-wmi.h
         src/libnetdata/os/windows-wmi/windows-wmi-GetDiskDriveInfo.c
@@ -1165,7 +1167,6 @@ set(DAEMON_FILES
         src/daemon/main.h
         src/daemon/environment.c
         src/daemon/win_system-info.c
-        src/daemon/win_system-info_ip.c
         src/daemon/win_system-info.h
         src/daemon/signal-handler.c
         src/daemon/signal-handler.h
@@ -2217,7 +2218,7 @@ target_link_libraries(libnetdata PUBLIC
         "$<$<BOOL:${ENABLE_MIMALLOC}>:mimalloc-static>"
         "$<$<NOT:$<BOOL:${HAVE_BUILTIN_ATOMICS}>>:atomic>"
         "$<$<OR:$<BOOL:${OS_LINUX}>,$<BOOL:${OS_FREEBSD}>>:pthread;rt>"
-        "$<$<BOOL:${OS_WINDOWS}>:kernel32;advapi32;winmm;rpcrt4;wevtapi;ole32;oleaut32;wbemuuid;sensorsapi>"
+        "$<$<BOOL:${OS_WINDOWS}>:kernel32;advapi32;winmm;rpcrt4;wevtapi;ole32;oleaut32;wbemuuid;sensorsapi;iphlpapi>"
         "$<$<BOOL:${LINK_LIBM}>:m>"
         "${SYSTEMD_LDFLAGS}")
 

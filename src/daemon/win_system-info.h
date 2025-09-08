@@ -16,9 +16,6 @@
 #include "versionhelpers.h"
 
 void netdata_windows_get_system_info(struct rrdhost_system_info *system_info);
-
-char *netdata_win_local_interface();
-char *netdata_win_local_ip();
 #endif
 
 #endif // _NETDATA_WIN_SYSTEM_INFO_H_

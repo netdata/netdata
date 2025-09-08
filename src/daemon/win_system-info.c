@@ -2,6 +2,7 @@
 
 #include "win_system-info.h"
 #include "database/rrdhost-system-info.h"
+#include "libnetdata/os/windows-api/windows_api.h"
 
 #ifdef OS_WINDOWS
 

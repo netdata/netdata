@@ -1,22 +1,25 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#ifdef OS_WINDOWS
+#include "windows_api.h"
+
+#if defined(OS_WINDOWS)
 
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <iphlpapi.h>
+#include <stdbool.h>
 
-static struct windows_ip_labels {
-    char *interface;
+struct netdata_windows_ip_labels {
+    char *local_iface;
     char *ipaddr;
     bool initialized;
 } default_ip = {
-    .interface = NULL,
+    .local_iface = NULL,
     .ipaddr = NULL,
-    .initialized = false;
+    .initialized = false
 };
 
-static unsigned int netdata_fill_default_ip()
+int netdata_fill_default_ip()
 {
     if (default_ip.initialized)
         return 0;
@@ -45,7 +48,10 @@ static unsigned int netdata_fill_default_ip()
     PIP_ADAPTER_ADDRESSES aa = adapters;
     while (aa) {
         if (aa->IfIndex == ifIndex) {
-            default_ip.interface = strdup(aa->FriendlyName);
+            char iface[1024];
+            size_t required_size = wcstombs(NULL , aa->FriendlyName, 0) + 1;
+            wcstombs(iface, aa->FriendlyName, required_size);
+            default_ip.local_iface = strdup(iface);
 
             PIP_ADAPTER_UNICAST_ADDRESS ua = aa->FirstUnicastAddress;
             while (ua) {
@@ -74,7 +80,7 @@ char *netdata_win_local_interface()
     if (!default_ip.initialized)
         netdata_fill_default_ip();
 
-    return default_ip.interface;
+    return default_ip.local_iface;
 }
 
 char *netdata_win_local_ip()
