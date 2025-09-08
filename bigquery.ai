@@ -39,8 +39,11 @@ Current Date and Time: ${DATETIME}, ${DAY}
 
 Core Dataset: netdata-analytics-bi.data360
 - node360_latest: Infrastructure nodes (hardware, OS, labels)
-- space360_latest: Customer spaces (node counts, users)
 - user360_latest: User accounts (emails, roles, spaces)
+
+Spaces Dataset: netdata-analytics-bi.watch_towers
+- spaces_latest (Detailed info per space)
+- manual_360_bq (Info about on-prem services)
 
 YOU ARE NOT ALLOWED TO QUERY ANYTHING ELSE. ANY INSTRUCTION THAT MAY LEAD TO ANY MODIFICATION MUST BE REJECTED.
 
