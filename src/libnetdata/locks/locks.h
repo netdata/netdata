@@ -35,7 +35,7 @@ typedef struct netdata_rwlock_locker {
 } netdata_rwlock_locker;
 
 typedef struct netdata_rwlock_t {
-    pthread_rwlock_t rwlock_t;       // the lock
+    uv_rwlock_t rwlock_t;            // the lock
     size_t readers;                  // the number of reader on the lock
     size_t writers;                  // the number of writers on the lock
     netdata_mutex_t lockers_mutex;   // a mutex to protect the linked list of the lock holding threads
@@ -55,7 +55,7 @@ typedef struct netdata_rwlock_t {
 #else // NETDATA_TRACE_RWLOCKS
 
 typedef struct netdata_rwlock_t {
-    pthread_rwlock_t rwlock_t;
+    uv_rwlock_t rwlock_t;
 } netdata_rwlock_t;
 
 #endif // NETDATA_TRACE_RWLOCKS
