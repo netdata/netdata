@@ -40,6 +40,7 @@ extern size_t ebpf_hash_table_pids_count;
 #include "hardirq.skel.h"
 #include "mdflush.skel.h"
 #include "mount.skel.h"
+#include "process.skel.h"
 #include "shm.skel.h"
 #include "sync.skel.h"
 #include "socket.skel.h"
@@ -57,6 +58,7 @@ extern struct shm_bpf *shm_bpf_obj;
 extern struct socket_bpf *socket_bpf_obj;
 extern struct swap_bpf *bpf_obj;
 extern struct vfs_bpf *vfs_bpf_obj;
+extern struct process_bpf *process_bpf_obj;
 #endif
 
 typedef struct netdata_syscall_stat {
