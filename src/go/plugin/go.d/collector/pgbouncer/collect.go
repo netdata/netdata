@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/blang/semver/v4"
-	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/stdlib"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/stdlib"
 )
 
 // 'SHOW STATS;' response was changed significantly in v1.8.0
@@ -264,7 +264,7 @@ func (c *Collector) openConnection() error {
 	if err != nil {
 		return err
 	}
-	cfg.PreferSimpleProtocol = true
+	cfg.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
 
 	db, err := sql.Open("pgx", stdlib.RegisterConnConfig(cfg))
 	if err != nil {
@@ -272,7 +272,9 @@ func (c *Collector) openConnection() error {
 	}
 
 	db.SetMaxOpenConns(1)
-	db.SetMaxIdleConns(1)
+	// Disable connection reuse so pgx stdlib won't run ResetSession (which sends "-- ping")
+	// PgBouncer admin console does not support the PostgreSQL ping protocol
+	db.SetMaxIdleConns(0)
 	db.SetConnMaxLifetime(10 * time.Minute)
 
 	c.db = db
