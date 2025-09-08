@@ -24,7 +24,9 @@ import (
 // This invokes the command and logs a debug message that the command
 // is being executed, and then returns the exec.Cmd object for the command.
 func CommandUnprivileged(ctx context.Context, logger *logger.Logger, arg ...string) *exec.Cmd {
-	cmd := exec.CommandContext(ctx, arg[0], arg[1:]...)
+	ndrunPath := filepath.Join(buildinfo.NetdataBinDir, "nd-run")
+
+	cmd := exec.CommandContext(ctx, ndrunPath, arg...)
 	if logger != nil {
 		logger.Debugf("executing '%s'", cmd)
 	}
@@ -32,7 +34,8 @@ func CommandUnprivileged(ctx context.Context, logger *logger.Logger, arg ...stri
 	return cmd
 }
 
-// RunUnprivileged runs a command without additional privielges.
+// RunUnprivileged runs a command without any inherited privileges via
+// the nd-run helper.
 //
 // logger is a Logger instance to use to log the command to be executed.
 // timeout indicates the timeout for the command. arg is a list of the
