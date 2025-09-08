@@ -977,7 +977,7 @@ void function_processes(const char *transaction, char *function,
             buffer_json_member_add_array(wb, "columns");
             {
                 buffer_json_add_array_item_string(wb, "ROps");
-                buffer_json_add_array_item_string(wb, "WCalls");
+                buffer_json_add_array_item_string(wb, "WOps");
             }
             buffer_json_array_close(wb);
         }
@@ -1097,6 +1097,19 @@ void function_processes(const char *transaction, char *function,
             {
                 buffer_json_add_array_item_string(wb, "Category");
                 buffer_json_add_array_item_string(wb, "PPID");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // group by PPID
+        buffer_json_member_add_object(wb, "PPID");
+        {
+            buffer_json_member_add_string(wb, "name", "Process Tree by Parent PID");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "PPID");
+                buffer_json_add_array_item_string(wb, "PID");
             }
             buffer_json_array_close(wb);
         }
