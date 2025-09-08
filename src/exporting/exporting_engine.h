@@ -312,7 +312,7 @@ static inline void disable_instance(struct instance *instance)
 {
     instance->disabled = 1;
     instance->scheduled = 0;
-    uv_mutex_unlock(&instance->mutex);
+    netdata_mutex_unlock(&instance->mutex);
     netdata_log_error("EXPORTING: Instance %s disabled", instance->config.name);
 }
 
