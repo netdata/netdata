@@ -123,6 +123,20 @@ export function validateConfig(config) {
                 console.warn('[validateConfig] Invalid maxTokens:', params.maxTokens, '- using default:', validConfig.model.params.maxTokens);
             }
             
+            // Context Window (Ollama specific)
+            if (params.contextWindow !== undefined) {
+                let cw = params.contextWindow;
+                if (typeof cw === 'string') {
+                    const parsed = parseInt(cw, 10);
+                    if (!isNaN(parsed) && parsed >= 1) {
+                        cw = parsed;
+                    }
+                }
+                if (typeof cw === 'number' && cw >= 1) {
+                    validConfig.model.params.contextWindow = cw;
+                }
+            }
+            
             // Seed
             if (params.seed && typeof params.seed === 'object') {
                 validConfig.model.params.seed = {
@@ -437,6 +451,12 @@ export function createConfigFromOptions(options = {}) {
         config.mcpServer = options.mcpServerId;
     }
     
+    // Set initial context window if provided (for Ollama models)
+    // This ensures new chats get a context window value
+    if (options.contextWindow && typeof options.contextWindow === 'number') {
+        config.model.params.contextWindow = options.contextWindow;
+    }
+    
     // Validate and normalize the final config
     return validateConfig(config);
 }
@@ -464,8 +484,11 @@ export function getModelDisplayName(modelString) {
     
     // If it's a string with provider:model format
     if (typeof modelString === 'string' && modelString.includes(':')) {
-        const parts = modelString.split(':');
-        return parts.slice(1).join(':');
+        // Split only on the first colon to handle models like "ollama:llama3.3:latest"
+        const colonIndex = modelString.indexOf(':');
+        if (colonIndex !== -1) {
+            return modelString.substring(colonIndex + 1);
+        }
     }
     
     // Otherwise return as-is

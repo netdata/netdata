@@ -14,8 +14,7 @@
         "title": "Log file",
         "description": "The file path to the Webserver log file.",
         "type": "string",
-        "default": "/var/log/nginx/access.log",
-        "pattern": "^$|^/"
+        "default": "/var/log/nginx/access.log"
       },
       "exclude_path": {
         "title": "Exclude path",

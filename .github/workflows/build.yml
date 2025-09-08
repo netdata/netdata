@@ -365,7 +365,7 @@ jobs:
       - name: Set Up Go
         id: golang
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: "^1.24"
       - name: Set Up Dependencies
@@ -807,7 +807,7 @@ jobs:
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
       - name: Init python environment for publish release metadata
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         id: init-python
         with:
           python-version: "3.12"

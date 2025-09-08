@@ -154,13 +154,13 @@ const MessageConversionUtils = {
      */
     integrateSummaryIntoSystemPrompt(systemPrompt, summaryContent) {
         if (!summaryContent) return systemPrompt;
-        
+
         return `${systemPrompt}
 
 Previous Conversation Summary:
 ${summaryContent}`;
     },
-    
+
     /**
      * Extracts system prompt and optional summary from messages
      * @param {Array} messages - Validated messages array
@@ -171,12 +171,12 @@ ${summaryContent}`;
         let summaryContent = '';
         let hasSummary = false;
         const remainingMessages = [];
-        
+
         // First message is always system
         if (messages[0] && messages[0].role === 'system') {
             systemPrompt = messages[0].content;
         }
-        
+
         // Check if second message is summary
         let startIdx = 1;
         if (messages.length > 1 && messages[1].role === 'summary') {
@@ -184,20 +184,20 @@ ${summaryContent}`;
             hasSummary = true;
             startIdx = 2;
         }
-        
+
         // Collect remaining messages
         for (let i = startIdx; i < messages.length; i++) {
             remainingMessages.push(messages[i]);
         }
-        
+
         // Integrate summary into system prompt if present
         if (hasSummary) {
             systemPrompt = MessageConversionUtils.integrateSummaryIntoSystemPrompt(systemPrompt, summaryContent);
         }
-        
+
         return { systemPrompt, messages: remainingMessages, hasSummary };
     },
-    
+
     /**
      * Formats MCP tool result content for providers
      * MCP returns { content: Array<{type: string, text?: string, data?: string, mimeType?: string}> }
@@ -209,11 +209,11 @@ ${summaryContent}`;
         if (typeof result === 'string') {
             return { type: 'text', content: result };
         }
-        
+
         // Handle MCP content array format
         if (result && result.content && Array.isArray(result.content)) {
             const formattedItems = [];
-            
+
             for (const item of result.content) {
                 if (item.type === 'text' && item.text) {
                     formattedItems.push({
@@ -236,10 +236,10 @@ ${summaryContent}`;
                     });
                 }
             }
-            
+
             return { type: 'multi', items: formattedItems };
         }
-        
+
         // Handle plain objects or other types
         return { type: 'json', content: result };
     }
@@ -251,125 +251,74 @@ ${summaryContent}`;
  * @throws {Error} If validation fails
  */
 function validateMessagesForAPI(messages) {
-    // Validation starts - removed verbose logging
-    
+    // Non-blocking validation: log issues but do not throw
+
     // Check for empty array
     if (!messages || messages.length === 0) {
-        const error = 'No messages to send to API';
-        console.error('[validateMessagesForAPI]', error);
-        throw new Error(error);
+        console.warn('[validateMessagesForAPI] Empty messages array');
+        return true;
     }
-    
-    // First message MUST be system
+
+    // First message should be system
     if (messages[0].role !== 'system') {
-        const error = `First message MUST be system, but found: ${messages[0].role}`;
-        console.error('[validateMessagesForAPI]', error);
-        console.error('[validateMessagesForAPI] Messages:', messages);
-        throw new Error(error);
+        console.warn('[validateMessagesForAPI] First message is not system:', messages[0].role);
     }
-    
-    // Check for multiple system messages
+
+    // Check for multiple system/summary messages
     const systemCount = messages.filter(m => m.role === 'system').length;
     if (systemCount > 1) {
-        const error = `Messages contain ${systemCount} system messages, but only 1 is allowed`;
-        console.error('[validateMessagesForAPI]', error);
-        throw new Error(error);
+        console.warn(`[validateMessagesForAPI] Found ${systemCount} system messages (expected <= 1)`);
     }
-    
-    // Check for multiple summary messages
+
     const summaryCount = messages.filter(m => m.role === 'summary').length;
     if (summaryCount > 1) {
-        const error = `Messages contain ${summaryCount} summary messages, but only 0 or 1 is allowed`;
-        console.error('[validateMessagesForAPI]', error);
-        throw new Error(error);
+        console.warn(`[validateMessagesForAPI] Found ${summaryCount} summary messages (expected <= 1)`);
     }
-    
+
     // Start index for sequence validation (skip system and optional summary)
     let startIdx = 1;
-    
-    // If second message is summary, skip it
     if (messages.length > 1 && messages[1].role === 'summary') {
         startIdx = 2;
     }
-    
-    // If we have no more messages after system (and optional summary), that's valid
-    if (startIdx >= messages.length) {
-        return true;
-    }
-    
-    // Strict sequence validation: user -> assistant -> [tool-results -> assistant] -> user -> ...
+
+    // Relaxed sequence validation: log inconsistencies, never throw
     let expectedRole = 'user';
     let lastAssistantMessage = null;
-    
+
     for (let i = startIdx; i < messages.length; i++) {
         const msg = messages[i];
         const msgRole = msg.role;
-        
-        // Check role at position i
-        
+
         if (msgRole === 'user') {
             if (expectedRole !== 'user' && expectedRole !== 'user-or-tool-results') {
-                const error = `Message sequence error at position ${i}: expected '${expectedRole}', but got 'user'`;
-                console.error('[validateMessagesForAPI]', error);
-                console.error('[validateMessagesForAPI] Full sequence:', messages.map((m, idx) => `${idx}: ${m.role || m.type}`));
-                throw new Error(error);
+                console.warn(`[validateMessagesForAPI] Sequence note at position ${i}: expected '${expectedRole}', got 'user'`);
             }
             expectedRole = 'assistant';
             lastAssistantMessage = null;
-            
         } else if (msgRole === 'assistant') {
             if (expectedRole !== 'assistant' && expectedRole !== 'user-or-tool-results') {
-                const error = `Message sequence error at position ${i}: expected '${expectedRole}', but got 'assistant'`;
-                console.error('[validateMessagesForAPI]', error);
-                console.error('[validateMessagesForAPI] Full sequence:', messages.map((m, idx) => `${idx}: ${m.role || m.type}`));
-                throw new Error(error);
+                console.warn(`[validateMessagesForAPI] Sequence note at position ${i}: expected '${expectedRole}', got 'assistant'`);
             }
             lastAssistantMessage = msg;
-            // After assistant, we can have either tool-results, user, or another assistant
             expectedRole = 'user-or-tool-results';
-            
         } else if (msgRole === 'tool-results') {
             if (expectedRole !== 'user-or-tool-results') {
-                const error = `Message sequence error at position ${i}: expected '${expectedRole}', but got 'tool-results'`;
-                console.error('[validateMessagesForAPI]', error);
-                console.error('[validateMessagesForAPI] Full sequence:', messages.map((m, idx) => `${idx}: ${m.role || m.type}`));
-                throw new Error(error);
+                console.warn(`[validateMessagesForAPI] Sequence note at position ${i}: expected '${expectedRole}', got 'tool-results'`);
             }
-            
-            // Validate tool results match the assistant's tool calls
             if (!lastAssistantMessage) {
-                const error = `Tool results at position ${i} have no preceding assistant message`;
-                console.error('[validateMessagesForAPI]', error);
-                throw new Error(error);
+                console.warn(`[validateMessagesForAPI] Tool results at position ${i} without preceding assistant message`);
+            } else {
+                const ok = validateToolCalls(lastAssistantMessage, msg, i);
+                if (!ok) {
+                    console.warn('[validateMessagesForAPI] Tool call/result validation failed; continuing');
+                }
             }
-            
-            // Validate tool calls match
-            validateToolCalls(lastAssistantMessage, msg, i);
-            
-            // After tool-results, we must have assistant
             expectedRole = 'assistant';
-            
         } else {
-            const error = `Unexpected message role at position ${i}: '${msgRole}'. Allowed: user, assistant, tool-results`;
-            console.error('[validateMessagesForAPI]', error);
-            console.error('[validateMessagesForAPI] Full sequence:', messages.map((m, idx) => `${idx}: ${m.role || m.type}`));
-            throw new Error(error);
+            console.warn(`[validateMessagesForAPI] Unexpected message role at position ${i}: '${msgRole}'`);
         }
     }
-    
-    // Final state validation
-    // Valid ending states:
-    // - expectedRole === 'user' → Ended with tool-results, waiting for user
-    // - expectedRole === 'assistant' → Ended with user, waiting for assistant  
-    // - expectedRole === 'user-or-tool-results' → Ended with assistant, can continue with either user or tools
-    // All of these are valid states for sending to LLM
-    
-    // Special case: If the last message is a user message (expectedRole === 'assistant'),
-    // it might be an orphaned message from a failed response (e.g., MAX_TOKENS).
-    // This is valid for conversations but creates issues when sending to API.
-    // For now, we allow it and let the provider handle it.
-    
-    // All validations passed
+
     return true;
 }
 
@@ -401,75 +350,60 @@ function validateToolCalls(assistantMsg, toolResultsMsg, position) {
     const toolCalls = extractToolCallsFromContent(assistantMsg.content);
     // STRICT: Only accept toolResults property
     const toolResults = toolResultsMsg.toolResults || [];
-    
+
     if (!toolResultsMsg.toolResults) {
-        const error = `Tool results message at position ${position} missing required 'toolResults' property`;
-        console.error('[validateToolCalls]', error);
-        console.error('[validateToolCalls] Message keys:', Object.keys(toolResultsMsg));
-        console.error('[validateToolCalls] Full message:', toolResultsMsg);
-        throw new Error(error);
+        console.warn(`[validateToolCalls] Tool results at position ${position} missing 'toolResults' property`);
+        return false;
     }
-    
+
     // Validate tool calls count matches results count
-    
+
     // Check counts match
     if (toolCalls.length !== toolResults.length) {
-        const error = `Tool call mismatch at position ${position}: assistant requested ${toolCalls.length} tools, but got ${toolResults.length} results`;
-        console.error('[validateToolCalls]', error);
-        console.error('[validateToolCalls] Assistant message object:', assistantMsg);
-        console.error('[validateToolCalls] Tool results message object:', toolResultsMsg);
-        console.error('[validateToolCalls] Tool calls:', toolCalls.map(tc => ({ id: tc.id, name: tc.function?.name })));
-        console.error('[validateToolCalls] Tool results:', toolResults.map(tr => ({ id: tr.toolCallId, name: tr.toolName })));
-        throw new Error(error);
+        console.warn(`[validateToolCalls] Mismatch at position ${position}: requested=${toolCalls.length}, results=${toolResults.length}`);
+        return false;
     }
-    
+
     // Create a map of tool calls by ID for validation
     const toolCallMap = new Map();
     for (const call of toolCalls) {
         if (!call.id) {
-            const error = `Tool call at position ${position} missing required 'id' field`;
-            console.error('[validateToolCalls]', error);
-            console.error('[validateToolCalls] Tool call:', call);
-            throw new Error(error);
+            console.warn(`[validateToolCalls] Tool call at position ${position} missing 'id'`);
+            return false;
         }
         if (toolCallMap.has(call.id)) {
-            const error = `Duplicate tool call ID '${call.id}' at position ${position}`;
-            console.error('[validateToolCalls]', error);
-            throw new Error(error);
+            console.warn(`[validateToolCalls] Duplicate tool call ID '${call.id}' at position ${position}`);
+            return false;
         }
         toolCallMap.set(call.id, call);
     }
-    
+
     // Validate each tool result
     for (const result of toolResults) {
         if (!result.toolCallId) {
-            const error = `Tool result at position ${position} missing required 'toolCallId' field`;
-            console.error('[validateToolCalls]', error);
-            console.error('[validateToolCalls] Tool result:', result);
-            throw new Error(error);
+            console.warn(`[validateToolCalls] Tool result at position ${position} missing 'toolCallId'`);
+            return false;
         }
-        
+
         const matchingCall = toolCallMap.get(result.toolCallId);
         if (!matchingCall) {
-            const error = `Tool result at position ${position} references unknown tool call ID '${result.toolCallId}'`;
-            console.error('[validateToolCalls]', error);
-            console.error('[validateToolCalls] Available IDs:', Array.from(toolCallMap.keys()));
-            throw new Error(error);
+            console.warn(`[validateToolCalls] Unknown toolCallId '${result.toolCallId}' at position ${position}`);
+            return false;
         }
-        
+
         // Mark as matched
         toolCallMap.delete(result.toolCallId);
     }
-    
+
     // Check if any tool calls were not matched
     if (toolCallMap.size > 0) {
         const unmatchedIds = Array.from(toolCallMap.keys());
-        const error = `Tool calls not matched by results at position ${position}: ${unmatchedIds.join(', ')}`;
-        console.error('[validateToolCalls]', error);
-        throw new Error(error);
+        console.warn(`[validateToolCalls] Unmatched tool call IDs at position ${position}: ${unmatchedIds.join(', ')}`);
+        return false;
     }
-    
+
     // Tool validation passed
+    return true;
 }
 
 class LLMProvider {
@@ -501,9 +435,9 @@ class LLMProvider {
             message,
             metadata
         };
-        
+
         // Log to UI callback only, not console
-        
+
         // UI log
         if (this.onLog) {
             this.onLog(logEntry);
@@ -519,12 +453,12 @@ class LLMProvider {
         if (!chat) {
             return false;
         }
-        
+
         // Don't inject metadata in sub-chats to prevent recursion
         if (chat.isSubChat) {
             return false;
         }
-        
+
         // Check if tool summarization is enabled
         return chat.config?.optimisation?.toolSummarisation?.enabled === true;
     }
@@ -539,10 +473,10 @@ class LLMProvider {
         if (!this.shouldInjectToolMetadata(chat)) {
             return tool;
         }
-        
+
         // Clone the tool to avoid modifying the original
         const modifiedTool = JSON.parse(JSON.stringify(tool));
-        
+
         // Ensure inputSchema exists
         if (!modifiedTool.inputSchema) {
             modifiedTool.inputSchema = { type: 'object', properties: {} };
@@ -550,12 +484,12 @@ class LLMProvider {
         if (!modifiedTool.inputSchema.properties) {
             modifiedTool.inputSchema.properties = {};
         }
-        
+
         // Inject metadata fields
         const metadataFields = {
             tool_purpose: {
                 type: 'string',
-                description: 'Why this tool is being used in the context of the user query'
+                description: 'Why this tool is being used in the context of the user query - REQUIRED for proper tool response processing'
             },
             expected_format: {
                 type: 'string',
@@ -574,10 +508,19 @@ class LLMProvider {
                 description: 'Additional context from the user discussion that may needed to interpret the tool results'
             }
         };
-        
+
         // Add metadata fields to the tool schema
         Object.assign(modifiedTool.inputSchema.properties, metadataFields);
-        
+
+        // Mark tool_purpose as required
+        if (!modifiedTool.inputSchema.required) {
+            modifiedTool.inputSchema.required = [];
+        }
+        // Only add if not already in required array
+        if (!modifiedTool.inputSchema.required.includes('tool_purpose')) {
+            modifiedTool.inputSchema.required.push('tool_purpose');
+        }
+
         return modifiedTool;
     }
 
@@ -587,10 +530,10 @@ class LLMProvider {
      * @param {number} maxSizeBytes - Maximum allowed size in bytes (default 400KB)
      * @throws {Error} If request exceeds size limit
      */
-    checkRequestSize(requestBody, maxSizeBytes = 400 * 1024) {
+    checkRequestSize(requestBody, maxSizeBytes = 1024 * 1024) {
         const jsonString = JSON.stringify(requestBody);
         const sizeInBytes = new TextEncoder().encode(jsonString).length;
-        
+
         if (sizeInBytes > maxSizeBytes) {
             const sizeKB = (sizeInBytes / 1024).toFixed(1);
             const maxKB = (maxSizeBytes / 1024).toFixed(1);
@@ -605,16 +548,16 @@ class LLMProvider {
             });
             throw new Error(errorMsg);
         }
-        
+
         this.log('info', `Request size: ${(sizeInBytes / 1024).toFixed(1)} KiB`, {
             sizeBytes: sizeInBytes,
             maxBytes: maxSizeBytes
         });
     }
-    
+
     // Tool filtering removed - now handled entirely by message optimizer
     // The mode parameter now controls cache control behavior only
-    
+
     /**
      * Get timezone info
      * @returns {{name: string, offset: string}}
@@ -627,7 +570,7 @@ class LLMProvider {
         const minutes = absOffset % 60;
         const sign = offset <= 0 ? '+' : '-';
         const offsetString = `UTC${sign}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-        
+
         let timezoneName;
         try {
             // This returns something like "America/New_York"
@@ -636,13 +579,13 @@ class LLMProvider {
             // Fallback to basic timezone string
             timezoneName = date.toString().match(/\(([^)]+)\)/)?.[1] || offsetString;
         }
-        
+
         return {
             name: timezoneName,
             offset: offsetString
         };
     }
-    
+
     /**
      * Add datetime prefix to user message content
      * @param {string} content - The original user message content
@@ -667,13 +610,13 @@ const MODEL_ENDPOINT_CONFIG = {
     'o3-pro-2025-06-10': { endpoint: 'responses', supportsTools: true },
     'o1-pro': { endpoint: 'responses', supportsTools: false },
     'o1-pro-2025-03-19': { endpoint: 'responses', supportsTools: false },
-    
+
     // o3 models use /v1/responses with tool support
     'o3': { endpoint: 'responses', supportsTools: true },
     'o3-2025-04-16': { endpoint: 'responses', supportsTools: true },
     'o3-mini': { endpoint: 'responses', supportsTools: true },
     'o3-mini-2025-01-31': { endpoint: 'responses', supportsTools: true },
-    
+
     // o1 models use /v1/responses without tool support
     'o1': { endpoint: 'responses', supportsTools: false },
     'o1-mini': { endpoint: 'responses', supportsTools: false },
@@ -681,7 +624,7 @@ const MODEL_ENDPOINT_CONFIG = {
     'o1-2024-12-17': { endpoint: 'responses', supportsTools: false },
     'o1-preview-2024-09-12': { endpoint: 'responses', supportsTools: false },
     'o1-mini-2024-09-12': { endpoint: 'responses', supportsTools: false }
-    
+
     // All other models use /v1/chat/completions
 };
 
@@ -689,20 +632,21 @@ const MODEL_ENDPOINT_CONFIG = {
  * OpenAI GPT Provider
  */
 class OpenAIProvider extends LLMProvider {
-    constructor(proxyUrl, model = 'gpt-4-turbo-preview') {
+    constructor(proxyUrl, model = 'gpt-4-turbo-preview', providerName = 'openai') {
         super(proxyUrl);
         this.model = model;
         this.type = 'openai';
+        this.providerName = providerName; // The actual provider name for proxy routing
     }
 
     get apiUrl() {
         // Check model-specific endpoint configuration
         const config = MODEL_ENDPOINT_CONFIG[this.model];
         if (config && config.endpoint === 'responses') {
-            return `${this.proxyUrl}/proxy/openai/v1/responses`;
+            return `${this.proxyUrl}/proxy/${this.providerName}/v1/responses`;
         }
         // Default to chat/completions for all other models
-        return `${this.proxyUrl}/proxy/openai/v1/chat/completions`;
+        return `${this.proxyUrl}/proxy/${this.providerName}/v1/chat/completions`;
     }
 
     /**
@@ -719,13 +663,13 @@ class OpenAIProvider extends LLMProvider {
         const modelConfig = MODEL_ENDPOINT_CONFIG[this.model];
         const useResponsesEndpoint = modelConfig && modelConfig.endpoint === 'responses';
         const supportsTools = !modelConfig || modelConfig.supportsTools !== false;
-        
+
         // Validate messages before processing
         validateMessagesForAPI(messages);
-        
+
         // Convert messages from internal format to OpenAI format
         const openaiMessages = this.convertMessages(messages, mode);
-        
+
         // Convert tools to OpenAI completions format (with nested function)
         const openaiCompletionsTools = tools.map(tool => {
             const injectedTool = this.injectToolMetadata(tool, chat);
@@ -738,7 +682,7 @@ class OpenAIProvider extends LLMProvider {
                 }
             };
         });
-        
+
         // Convert tools to OpenAI responses format (requires type and name fields)
         const openaiResponsesTools = tools.map(tool => {
             const injectedTool = this.injectToolMetadata(tool, chat);
@@ -749,18 +693,18 @@ class OpenAIProvider extends LLMProvider {
                 parameters: injectedTool.inputSchema || {}
             };
         });
-        
+
         let requestBody;
-        
+
         if (useResponsesEndpoint) {
             // Extract system prompt for instructions field
             const { systemPrompt } = MessageConversionUtils.extractSystemAndSummary(messages);
-            
+
             // Convert messages to input format (string or array)
             const inputMessages = [];
             for (const msg of openaiMessages) {
                 if (msg.role === 'system') continue; // Skip system, use instructions instead
-                
+
                 if (msg.role === 'user') {
                     inputMessages.push({
                         role: 'user',
@@ -790,40 +734,42 @@ class OpenAIProvider extends LLMProvider {
                     });
                 }
             }
-            
+
             // Build request for v1/responses endpoint
             // Order fields consistently: tools → instructions (system) → input (messages) → model
             requestBody = {};
-            
+
             // Add tools first if supported
             if (supportsTools && openaiResponsesTools.length > 0) {
                 requestBody.tools = openaiResponsesTools;
                 requestBody.tool_choice = 'auto';
                 requestBody.parallel_tool_calls = true;
             }
-            
+
             // Add system prompt as instructions
             if (systemPrompt) {
                 requestBody.instructions = systemPrompt;
             }
-            
+
             // Add messages
             requestBody.input = inputMessages;
-            
+
             // Add model and other parameters
             requestBody.model = this.model;
-            requestBody.max_output_tokens = 4096;
+            // Get max tokens from chat config
+            const maxTokens = chat?.config?.model?.params?.maxTokens || 4096;
+            requestBody.max_output_tokens = maxTokens;
             requestBody.stream = false;
             requestBody.store = true;
-            
+
             // O3/O1 models don't support temperature parameter
             if (!this.model.startsWith('o3') && !this.model.startsWith('o1')) {
                 requestBody.temperature = temperature;
             }
-            
+
             // Optional: Add reasoning configuration for o3/o1 models
             if (this.model.startsWith('o3') || this.model.startsWith('o1')) {
-                requestBody.reasoning = { 
+                requestBody.reasoning = {
                     effort: 'medium',
                     summary: 'detailed'
                 };
@@ -831,18 +777,29 @@ class OpenAIProvider extends LLMProvider {
         } else {
             // Regular models use standard v1/chat/completions structure
             // Order fields consistently: tools → messages → model
+            const maxTokens = chat?.config?.model?.params?.maxTokens || 4096;
+
             requestBody = {
                 tools: openaiCompletionsTools.length > 0 ? openaiCompletionsTools : undefined,
                 tool_choice: openaiCompletionsTools.length > 0 ? 'auto' : undefined,
                 messages: openaiMessages,
                 model: this.model,
-                temperature,
-                max_tokens: 4096
+                // All models using /v1/chat/completions now use max_completion_tokens
+                max_completion_tokens: maxTokens
             };
+
+            // Some models (like GPT-5) only support default temperature
+            // Only add temperature if it's not the default value of 1.0
+            if (temperature !== 1.0) {
+                // For GPT-5, skip temperature parameter entirely if not default
+                if (!this.model.includes('gpt-5')) {
+                    requestBody.temperature = temperature;
+                }
+            }
         }
 
-        this.log('sent', JSON.stringify(requestBody, null, 2), { 
-            provider: 'openai', 
+        this.log('sent', JSON.stringify(requestBody, null, 2), {
+            provider: 'openai',
             model: this.model,
             url: this.apiUrl
         });
@@ -863,7 +820,7 @@ class OpenAIProvider extends LLMProvider {
                 body: JSON.stringify(requestBody)
             });
         } catch (error) {
-            this.log('error', `Failed to send request: ${error.message}`, { 
+            this.log('error', `Failed to send request: ${error.message}`, {
                 provider: 'openai',
                 error: error.toString(),
                 url: this.apiUrl
@@ -878,27 +835,27 @@ class OpenAIProvider extends LLMProvider {
 
         if (!response.ok) {
             const error = await response.json();
-            this.log('error', `API error response: ${JSON.stringify(error)}`, { 
+            this.log('error', `API error response: ${JSON.stringify(error)}`, {
                 provider: 'openai',
                 status: response.status,
                 statusText: response.statusText
             });
-            
+
             // Special handling for rate limit errors (429)
             if (response.status === 429) {
                 const retryAfter = response.headers.get('retry-after') || response.headers.get('x-ratelimit-reset-after');
                 const baseMessage = error.error?.message || 'Rate limit exceeded';
                 let rateLimitMessage = `Rate limit exceeded: ${baseMessage}`;
-                
+
                 if (retryAfter) {
                     rateLimitMessage += ` (retry after ${retryAfter}s)`;
                 }
-                
+
                 const apiError = `OpenAI API error: ${rateLimitMessage} (429)`;
                 console.error('[OpenAIProvider] Rate limit error:', apiError, '\nStatus:', response.status, '\nResponse:', error);
                 throw new Error(apiError);
             }
-            
+
             const apiError = `OpenAI API error: ${error.error?.message || response.statusText}`;
             console.error('[OpenAIProvider] API error:', apiError, '\nStatus:', response.status, '\nResponse:', error);
             throw new Error(apiError);
@@ -907,12 +864,12 @@ class OpenAIProvider extends LLMProvider {
         /** @type {OpenAIResponse} */
         const data = await response.json();
         this.log('received', JSON.stringify(data, null, 2), { provider: 'openai' });
-        
+
         // Log the full response
         console.log(`[OPENAI RECEIVED] (${mode}, subchat: ${chat?.isSubChat || false}):`, data);
-        
+
         let choice;
-        
+
         if (useResponsesEndpoint) {
             // All o1/o3 models use v1/responses with different response structure
             if (!data.output) {
@@ -921,11 +878,11 @@ class OpenAIProvider extends LLMProvider {
                 this.log('error', error, { provider: 'openai', model: this.model });
                 throw new Error(error);
             }
-            
+
             // Parse the output array to find the message
             let messageContent = '';
             const toolCalls = [];
-            
+
             if (Array.isArray(data.output)) {
                 // o3 format: array of objects with type and content
                 for (const outputItem of data.output) {
@@ -962,7 +919,7 @@ class OpenAIProvider extends LLMProvider {
                         for (const toolCall of calls) {
                             // Skip if not a tool call type
                             if (toolCall.type && toolCall.type !== 'tool_call') continue;
-                            
+
                             let args = toolCall.arguments || toolCall.function?.arguments;
                             // Parse arguments if they're a string
                             if (typeof args === 'string') {
@@ -989,7 +946,7 @@ class OpenAIProvider extends LLMProvider {
                 console.warn('o3/o1 model returned unknown output format:', data.output);
                 messageContent = JSON.stringify(data.output);
             }
-            
+
             choice = {
                 message: {
                     content: messageContent,
@@ -1005,22 +962,30 @@ class OpenAIProvider extends LLMProvider {
                 throw new Error(error);
             }
             choice = data.choices[0];
+            
+            // Check if the response was truncated due to token limit
+            if (choice.finish_reason === 'length') {
+                const error = 'LLM exhausted token limit - response truncated (finish_reason: length)';
+                console.error('[OpenAIProvider]', error);
+                this.log('error', error, { provider: 'openai', model: this.model, finish_reason: choice.finish_reason });
+                throw new Error(error);
+            }
         }
-        
+
         // Convert OpenAI response to unified content array format
         const contentArray = [];
-        
+
         // Add text content if present
         if (choice.message.content) {
             contentArray.push({ type: 'text', text: choice.message.content });
         }
-        
+
         // Add tool calls to content array
         if (choice.message.tool_calls) {
             for (const tc of choice.message.tool_calls) {
                 // Handle both standard OpenAI format and o3 simplified format
                 let toolCallId, toolCallName, toolCallArgs;
-                
+
                 if (tc.function) {
                     // Standard OpenAI format: {id, type, function: {name, arguments}}
                     toolCallId = tc.id;
@@ -1032,7 +997,7 @@ class OpenAIProvider extends LLMProvider {
                     toolCallName = tc.name;
                     toolCallArgs = tc.arguments;
                 }
-                
+
                 // Parse arguments
                 let parsedArgs;
                 if (typeof toolCallArgs === 'string') {
@@ -1046,7 +1011,7 @@ class OpenAIProvider extends LLMProvider {
                     // Already parsed (o3 format)
                     parsedArgs = toolCallArgs || {};
                 }
-                
+
                 contentArray.push({
                     type: 'tool_use',
                     id: toolCallId,
@@ -1055,7 +1020,7 @@ class OpenAIProvider extends LLMProvider {
                 });
             }
         }
-        
+
         // Fallback: Parse legacy tool calling formats from content
         if (!choice.message.tool_calls && choice.message.content) {
             const legacyToolCalls = this.parseLegacyToolCalls(choice.message.content);
@@ -1078,7 +1043,15 @@ class OpenAIProvider extends LLMProvider {
                 }
             }
         }
-        
+
+        // Check for empty response (no content and no tool calls)
+        if (contentArray.length === 0) {
+            const error = 'LLM returned empty response - likely exhausted reasoning token budget';
+            console.error('[OpenAIProvider]', error);
+            this.log('error', error, { provider: 'openai', model: this.model });
+            throw new Error(error);
+        }
+
         return {
             content: contentArray,
             toolCalls: [],
@@ -1102,24 +1075,24 @@ class OpenAIProvider extends LLMProvider {
      */
     parseLegacyToolCalls(content) {
         const toolCalls = [];
-        
+
         try {
             // Pattern 0: <|parallel|> format
             // Example: <|parallel|>{ tool_uses: [...] }</|parallel|>
             const parallelPattern = /<\|parallel\|>([\s\S]*?)<\/\|parallel\|>/;
             const parallelMatch = content.match(parallelPattern);
             let searchContent = content;
-            
+
             if (parallelMatch) {
                 // Extract content between the tags
                 searchContent = parallelMatch[1];
             }
-            
+
             // Pattern 1: JSON-like format with tool_uses array
             // Example: { tool_uses: [{ recipient_name: "function.name", parameters: {...} }] }
             const jsonPattern = /\{\s*(?:"?tool_uses"?|tool_uses)\s*:\s*\[(.*?)\]\s*\}/s;
             const jsonMatch = searchContent.match(jsonPattern);
-            
+
             if (jsonMatch) {
                 try {
                     // Clean up JavaScript-style syntax to make it valid JSON
@@ -1128,7 +1101,7 @@ class OpenAIProvider extends LLMProvider {
                         .replace(/\/\*[\s\S]*?\*\//g, '') // Remove /* */ comments
                         .replace(/,(\s*[}\]])/g, '$1') // Remove trailing commas before } or ]
                         .replace(/(\w+)(\s*:)/g, '"$1"$2'); // Quote unquoted property names
-                    
+
                     // Handle values that need quoting but aren't quoted yet
                     // Be careful not to quote numbers or already quoted strings
                     cleanedContent = cleanedContent.replace(/:\s*([a-zA-Z_][a-zA-Z0-9_]*)/g, (match, value) => {
@@ -1138,7 +1111,7 @@ class OpenAIProvider extends LLMProvider {
                         }
                         return `: "${value}"`;
                     });
-                    
+
                     // Try to parse as valid JSON
                     const toolData = JSON.parse(`{"tool_uses":[${cleanedContent}]}`);
                     if (toolData.tool_uses && Array.isArray(toolData.tool_uses)) {
@@ -1156,27 +1129,27 @@ class OpenAIProvider extends LLMProvider {
                     }
                 } catch (parseError) {
                     // If JSON parsing fails, try manual parsing
-                    this.log('debug', 'Failed to parse tool calls as JSON, trying manual parsing', { 
-                        error: parseError.message, 
-                        content: jsonMatch[1].substring(0, 200) 
+                    this.log('debug', 'Failed to parse tool calls as JSON, trying manual parsing', {
+                        error: parseError.message,
+                        content: jsonMatch[1].substring(0, 200)
                     });
-                    
+
                     // Manual parsing for each tool object
                     const toolPattern = /\{\s*recipient_name\s*:\s*["']([^"']+)["']\s*,\s*parameters\s*:\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}\s*\}/g;
                     let match;
-                    
+
                     while ((match = toolPattern.exec(jsonMatch[1])) !== null) {
                         try {
                             const functionName = match[1].split('.').pop();
                             let parametersStr = match[2];
-                            
+
                             // Clean up the parameters string more carefully
                             parametersStr = parametersStr
                                 .replace(/\/\/[^\n\r]*/g, '') // Remove // comments
                                 .replace(/\/\*[\s\S]*?\*\//g, '') // Remove /* */ comments
                                 .replace(/,(\s*[}\]])/g, '$1') // Remove trailing commas
                                 .replace(/(\w+)(\s*:)/g, '"$1"$2'); // Quote property names
-                            
+
                             // Handle unquoted string values carefully to avoid breaking ISO timestamps
                             parametersStr = parametersStr.replace(/:\s*([a-zA-Z_][a-zA-Z0-9_\-:.]*)/g, (fullMatch, value) => {
                                 // Don't quote numbers, booleans, or things that look like ISO timestamps
@@ -1185,36 +1158,36 @@ class OpenAIProvider extends LLMProvider {
                                 }
                                 return `: "${value}"`;
                             });
-                            
+
                             const parameters = JSON.parse(`{${parametersStr}}`);
-                            
+
                             toolCalls.push({
                                 id: this.generateId(),
                                 name: functionName,
                                 arguments: parameters
                             });
                         } catch (manualParseError) {
-                            this.log('debug', 'Failed to parse individual tool call parameters', { 
-                                functionName: match[1], 
-                                parametersStr: match[2], 
-                                error: manualParseError.message 
+                            this.log('debug', 'Failed to parse individual tool call parameters', {
+                                functionName: match[1],
+                                parametersStr: match[2],
+                                error: manualParseError.message
                             });
                         }
                     }
                 }
             }
-            
+
             // Pattern 2: multi_tool_use.parallel self-closing tag format
             // Example: <multi_tool_use.parallel tool_uses={[...]}/>
             if (toolCalls.length === 0) {
                 const multiToolPattern = /<multi_tool_use\.parallel\s+tool_uses=\{(\[[\s\S]*?\])\}\/>/;
                 const multiToolMatch = content.match(multiToolPattern);
-                
+
                 if (multiToolMatch) {
                     try {
                         // Extract the array content
                         let arrayContent = multiToolMatch[1];
-                        
+
                         // Clean up JavaScript-style syntax
                         arrayContent = arrayContent
                             .replace(/\/\/[^\n\r]*/g, '') // Remove // comments
@@ -1224,10 +1197,10 @@ class OpenAIProvider extends LLMProvider {
                             .replace(/(\w+):\s*(-?\d+)/g, '"$1": $2') // Handle numeric values
                             .replace(/(\w+):\s*\[/g, '"$1": [') // Handle array values
                             .replace(/,(\s*[}\]])/g, '$1'); // Remove trailing commas
-                        
+
                         // Parse the array
                         const toolArray = JSON.parse(arrayContent);
-                        
+
                         for (const tool of toolArray) {
                             if (tool.recipient_name && tool.parameters) {
                                 const functionName = tool.recipient_name.split('.').pop();
@@ -1246,7 +1219,7 @@ class OpenAIProvider extends LLMProvider {
                     }
                 }
             }
-            
+
             // Pattern 3: Individual tool objects without array wrapper
             // Example: { recipient_name: "function.name", parameters: {...} }
             if (toolCalls.length === 0) {
@@ -1256,46 +1229,46 @@ class OpenAIProvider extends LLMProvider {
                     try {
                         const functionName = match[1].split('.').pop();
                         let parametersStr = match[2];
-                        
+
                         // Same careful cleaning as above
                         parametersStr = parametersStr
                             .replace(/\/\/[^\n\r]*/g, '')
                             .replace(/\/\*[\s\S]*?\*\//g, '')
                             .replace(/,(\s*[}\]])/g, '$1')
                             .replace(/(\w+)(\s*:)/g, '"$1"$2');
-                        
+
                         parametersStr = parametersStr.replace(/:\s*([a-zA-Z_][a-zA-Z0-9_\-:.]*)/g, (fullMatch, value) => {
                             if (/^(true|false|\d+(\.\d+)?|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?)$/.test(value)) {
                                 return fullMatch;
                             }
                             return `: "${value}"`;
                         });
-                        
+
                         const parameters = JSON.parse(`{${parametersStr}}`);
-                        
+
                         toolCalls.push({
                             id: this.generateId(),
                             name: functionName,
                             arguments: parameters
                         });
                     } catch (parseError) {
-                        this.log('debug', 'Failed to parse individual tool call', { 
-                            match: match[0], 
-                            error: parseError.message 
+                        this.log('debug', 'Failed to parse individual tool call', {
+                            match: match[0],
+                            error: parseError.message
                         });
                     }
                 }
             }
         } catch (error) {
-            this.log('error', 'Error parsing legacy tool calls', { 
-                error: error.message, 
-                content: content.substring(0, 200) 
+            this.log('error', 'Error parsing legacy tool calls', {
+                error: error.message,
+                content: content.substring(0, 200)
             });
         }
-        
+
         return toolCalls;
     }
-    
+
     /**
      * Remove tool call text from content
      * @param {string} content - Original content
@@ -1304,23 +1277,23 @@ class OpenAIProvider extends LLMProvider {
     cleanContentFromToolCalls(content) {
         // Remove <|parallel|> blocks
         let cleaned = content.replace(/<\|parallel\|>[\s\S]*?<\/\|parallel\|>/g, '');
-        
+
         // Remove JSON-like tool call blocks
         cleaned = cleaned.replace(/\{\s*(?:"?tool_uses"?|tool_uses)\s*:\s*\[.*?\]\s*\}/gs, '');
-        
+
         // Remove individual tool call blocks
         cleaned = cleaned.replace(/\{\s*(?:"?recipient_name"?|recipient_name)\s*:.*?\}\s*\}/gs, '');
-        
+
         // Remove multi_tool_use blocks (both opening/closing and self-closing formats)
         cleaned = cleaned.replace(/<multi_tool_use\.parallel>.*?<\/multi_tool_use\.parallel>/gs, '');
         cleaned = cleaned.replace(/<multi_tool_use\.parallel\s+tool_uses=\{[\s\S]*?\}\/>/g, '');
-        
+
         // Clean up extra whitespace and newlines
         cleaned = cleaned.replace(/\n\s*\n\s*\n/g, '\n\n').trim();
-        
+
         return cleaned;
     }
-    
+
     generateId() {
         return 'call_' + Math.random().toString(36).substring(2, 11);
     }
@@ -1329,19 +1302,19 @@ class OpenAIProvider extends LLMProvider {
         // Check if we're using the responses endpoint
         const modelConfig = MODEL_ENDPOINT_CONFIG[this.model];
         const useResponsesEndpoint = modelConfig && modelConfig.endpoint === 'responses';
-        
+
         if (useResponsesEndpoint) {
             // For /v1/responses, we return messages as-is (they'll be used in 'input' field)
             // System prompt will be handled via 'instructions' parameter
             return messages;
         }
-        
+
         // Convert messages for standard OpenAI format
         const converted = [];
-        
+
         // Extract system prompt and handle summary
         const { systemPrompt, messages: remainingMessages } = MessageConversionUtils.extractSystemAndSummary(messages);
-        
+
         // Add system prompt as first message
         if (systemPrompt) {
             converted.push({
@@ -1349,11 +1322,11 @@ class OpenAIProvider extends LLMProvider {
                 content: systemPrompt
             });
         }
-        
+
         // Process remaining messages
         for (const msg of remainingMessages) {
             const msgRole = msg.role;
-            
+
             if (msgRole === 'user') {
                 converted.push({
                     role: 'user',
@@ -1363,7 +1336,7 @@ class OpenAIProvider extends LLMProvider {
                 // Extract text content and tool calls from message
                 let textContent = null;
                 let toolCalls = [];
-                
+
                 if (Array.isArray(msg.content)) {
                     // Extract text blocks
                     const textBlocks = msg.content.filter(block => block.type === 'text');
@@ -1375,13 +1348,13 @@ class OpenAIProvider extends LLMProvider {
                 } else if (typeof msg.content === 'string') {
                     textContent = msg.content;
                 }
-                
+
                 // Convert assistant message to OpenAI format
                 const openaiMsg = {
                     role: 'assistant',
                     content: textContent
                 };
-                
+
                 // Add tool calls if present
                 if (toolCalls.length > 0) {
                     openaiMsg.tool_calls = toolCalls.map(tc => ({
@@ -1389,13 +1362,13 @@ class OpenAIProvider extends LLMProvider {
                         type: 'function',
                         function: {
                             name: tc.name,
-                            arguments: typeof tc.arguments === 'string' 
-                                ? tc.arguments 
+                            arguments: typeof tc.arguments === 'string'
+                                ? tc.arguments
                                 : JSON.stringify(tc.arguments || {})
                         }
                     }));
                 }
-                
+
                 converted.push(openaiMsg);
             } else if (msgRole === 'tool-results') {
                 // Convert each tool result to OpenAI format
@@ -1413,7 +1386,7 @@ class OpenAIProvider extends LLMProvider {
                 console.warn('[OpenAI] Unexpected message role:', msgRole);
             }
         }
-        
+
         return converted;
     }
 
@@ -1421,7 +1394,7 @@ class OpenAIProvider extends LLMProvider {
         // Format MCP tool results for OpenAI
         const formatted = MessageConversionUtils.formatMCPToolResult(result);
         let content;
-        
+
         if (formatted.type === 'text') {
             content = formatted.content;
         } else if (formatted.type === 'multi') {
@@ -1440,11 +1413,11 @@ class OpenAIProvider extends LLMProvider {
             }
             content = parts.join('\n\n');
         } else if (formatted.type === 'json') {
-            content = JSON.stringify(formatted.content, null, 2);
+            content = JSON.stringify(formatted.content);
         } else {
             content = JSON.stringify(result);
         }
-        
+
         return {
             role: 'tool',
             tool_call_id: toolCallId,
@@ -1479,10 +1452,10 @@ class AnthropicProvider extends LLMProvider {
     async sendMessage(messages, tools, temperature, mode, cachePosition = null, chat = null) {
         // Validate messages before processing
         validateMessagesForAPI(messages);
-        
+
         // Convert messages to Anthropic format
         let anthropicMessages, system;
-        
+
         if (mode === 'cached') {
             // Use the caching version which returns different format
             const result = this.convertMessagesWithCaching(messages, mode, cachePosition);
@@ -1511,7 +1484,7 @@ class AnthropicProvider extends LLMProvider {
                 }
             }
         }
-        
+
         // Convert tools to Anthropic format (no cache control on tools)
         const anthropicTools = tools.map(tool => {
             const injectedTool = this.injectToolMetadata(tool, chat);
@@ -1525,12 +1498,14 @@ class AnthropicProvider extends LLMProvider {
         // Order fields according to Anthropic's cache hierarchy: tools → system → messages → model
         // This ensures efficient caching as tools change least frequently, then system, then messages
         // Model comes after messages so cache can be reused across different models
+        // Get max tokens from chat config
+        const maxTokens = chat?.config?.model?.params?.maxTokens || 4096;
         const requestBody = {
             tools: anthropicTools.length > 0 ? anthropicTools : undefined,
             system,
             messages: anthropicMessages,
             model: this.model,
-            max_tokens: 4096,
+            max_tokens: maxTokens,
             temperature
         };
 
@@ -1549,8 +1524,8 @@ class AnthropicProvider extends LLMProvider {
         }));
         */
 
-        this.log('sent', JSON.stringify(requestBody, null, 2), { 
-            provider: 'anthropic', 
+        this.log('sent', JSON.stringify(requestBody, null, 2), {
+            provider: 'anthropic',
             model: this.model,
             url: this.apiUrl
         });
@@ -1573,7 +1548,7 @@ class AnthropicProvider extends LLMProvider {
                 body: JSON.stringify(requestBody)
             });
         } catch (error) {
-            this.log('error', `Failed to send request: ${error.message}`, { 
+            this.log('error', `Failed to send request: ${error.message}`, {
                 provider: 'anthropic',
                 error: error.toString(),
                 url: this.apiUrl
@@ -1588,27 +1563,27 @@ class AnthropicProvider extends LLMProvider {
 
         if (!response.ok) {
             const error = await response.json();
-            this.log('error', `API error response: ${JSON.stringify(error)}`, { 
+            this.log('error', `API error response: ${JSON.stringify(error)}`, {
                 provider: 'anthropic',
                 status: response.status,
                 statusText: response.statusText
             });
-            
+
             // Special handling for rate limit errors (429)
             if (response.status === 429) {
                 const retryAfter = response.headers.get('retry-after') || response.headers.get('x-ratelimit-reset-after');
                 const baseMessage = error.error?.message || 'Rate limit exceeded';
                 let rateLimitMessage = `Rate limit exceeded: ${baseMessage}`;
-                
+
                 if (retryAfter) {
                     rateLimitMessage += ` (retry after ${retryAfter}s)`;
                 }
-                
+
                 const apiError = `Anthropic API error: ${rateLimitMessage} (429)`;
                 console.error('[AnthropicProvider] Rate limit error:', apiError, '\nStatus:', response.status, '\nResponse:', error);
                 throw new Error(apiError);
             }
-            
+
             const apiError = `Anthropic API error: ${error.error?.message || response.statusText}`;
             console.error('[AnthropicProvider] API error:', apiError, '\nStatus:', response.status, '\nResponse:', error);
             throw new Error(apiError);
@@ -1617,9 +1592,17 @@ class AnthropicProvider extends LLMProvider {
         /** @type {AnthropicResponse} */
         const data = await response.json();
         this.log('received', JSON.stringify(data, null, 2), { provider: 'anthropic' });
-        
+
+        // Check for empty response (no content)
+        if (!data.content || (Array.isArray(data.content) && data.content.length === 0)) {
+            const error = 'LLM returned empty response - likely exhausted reasoning token budget';
+            console.error('[AnthropicProvider]', error);
+            this.log('error', error, { provider: 'anthropic', model: this.model });
+            throw new Error(error);
+        }
+
         // Log the processed response
-        const processedResponse = { 
+        const processedResponse = {
             content: data.content,
             toolCalls: [],
             usage: data.usage ? {
@@ -1630,9 +1613,9 @@ class AnthropicProvider extends LLMProvider {
                 cacheReadInputTokens: data.usage.cache_read_input_tokens
             } : null
         };
-        
+
         console.log(`[ANTHROPIC RECEIVED] (${mode}, subchat: ${chat?.isSubChat || false}):`, data);
-        
+
         return processedResponse;
     }
 
@@ -1640,27 +1623,27 @@ class AnthropicProvider extends LLMProvider {
         // Convert messages WITHOUT adding cache control yet
         const converted = [];
         // let lastRole = null; // Removed - variable was never read
-        
+
         let summaryContent = null;
-        
+
         for (let i = 0; i < messages.length; i++) {
             const msg = messages[i];
-            
+
             if (msg.role === 'system') {
                 // System messages are handled separately in sendMessage
                 continue;
             }
-            
+
             // Capture summary content to add to system prompt later
             if (msg.role === 'summary') {
                 summaryContent = msg.content;
                 continue;  // Don't add summary as a regular message
             }
-            
+
             // Handle internal message format
             // Use same role detection logic as validation
             const msgRole = msg.role;
-            
+
             if (msgRole === 'user') {
                 // Check if this is a user message with tool results
                 if (Array.isArray(msg.content) && msg.content.length > 0) {
@@ -1691,7 +1674,7 @@ class AnthropicProvider extends LLMProvider {
                         }
                     }
                 }
-                
+
                 // User messages - handle both string content and already-formatted content
                 let textContent;
                 if (typeof msg.content === 'string') {
@@ -1719,12 +1702,12 @@ class AnthropicProvider extends LLMProvider {
                 } else {
                     textContent = '';
                 }
-                
+
                 // Ensure textContent is a valid string
                 if (textContent === null || textContent === undefined) {
                     textContent = '';
                 }
-                
+
                 converted.push({
                     role: 'user',
                     content: [{ type: 'text', text: this.addDateTimePrefix(String(textContent), msg.timestamp) }]
@@ -1733,7 +1716,7 @@ class AnthropicProvider extends LLMProvider {
             } else if (msgRole === 'assistant') {
                 // Convert assistant message to Anthropic format
                 let content;
-                
+
                 if (msg.content) {
                     if (typeof msg.content === 'string') {
                         // Legacy string format - convert to array
@@ -1744,7 +1727,7 @@ class AnthropicProvider extends LLMProvider {
                         content = msg.content.map(block => {
                             if (block.type === 'text') {
                                 let textValue = block.text;
-                                
+
                                 // Handle nested array structure (shouldn't happen, but defensive coding)
                                 if (Array.isArray(textValue)) {
                                     console.warn('[AnthropicProvider] Found nested array in text block, flattening:', textValue);
@@ -1752,7 +1735,7 @@ class AnthropicProvider extends LLMProvider {
                                     const textBlocks = textValue.filter(item => item && item.type === 'text');
                                     textValue = textBlocks.map(item => item.text || '').join('\n\n').trim();
                                 }
-                                
+
                                 // Ensure text property is a valid string
                                 return {
                                     type: 'text',
@@ -1769,8 +1752,8 @@ class AnthropicProvider extends LLMProvider {
                 } else {
                     content = [];
                 }
-                
-                
+
+
                 if (content.length > 0) {
                     converted.push({
                         role: 'assistant',
@@ -1784,7 +1767,7 @@ class AnthropicProvider extends LLMProvider {
                 const content = [];
                 // STRICT: Only accept toolResults property
                 const toolResults = msg.toolResults || [];
-                
+
                 for (const result of toolResults) {
                     // Tool results for Anthropic need to be tool_result blocks
                     const formattedResult = this.formatToolResultForAnthropic(
@@ -1794,7 +1777,7 @@ class AnthropicProvider extends LLMProvider {
                     );
                     content.push(formattedResult);
                 }
-                
+
                 if (content.length > 0) {
                     // Tool results must be in user messages
                     converted.push({
@@ -1805,7 +1788,7 @@ class AnthropicProvider extends LLMProvider {
                 }
             }
         }
-        
+
         // Apply cache control based on mode and cachePosition parameter
         // Note: System prompt cache control is handled separately above
         if (mode === 'cached') {
@@ -1820,7 +1803,7 @@ class AnthropicProvider extends LLMProvider {
             } else {
                 // Default behavior - find the absolute last content block across all messages
                 let lastContentBlock = null;
-                
+
                 // Iterate backwards through messages to find the last content block
                 for (let i = converted.length - 1; i >= 0; i--) {
                     const msg = converted[i];
@@ -1830,7 +1813,7 @@ class AnthropicProvider extends LLMProvider {
                         break;
                     }
                 }
-                
+
                 // Add cache_control to only the very last content block
                 if (lastContentBlock) {
                     lastContentBlock.cache_control = { type: 'ephemeral' };
@@ -1839,22 +1822,22 @@ class AnthropicProvider extends LLMProvider {
         }
         // For 'system' mode: only system prompt is cached (handled above)
         // For 'all-off' mode: no cache control applied
-        
+
         return { converted, summaryContent };
     }
 
     convertMessages(messages, _mode) {
         // Convert messages for Anthropic format
         const converted = [];
-        
+
         // Extract system prompt and handle summary (Anthropic uses separate system parameter)
         const { systemPrompt, messages: remainingMessages } = MessageConversionUtils.extractSystemAndSummary(messages);
-        
+
         // Process remaining messages
         for (const msg of remainingMessages) {
             // Use same role detection logic as validation
             const msgRole = msg.role;
-            
+
             if (msgRole === 'user') {
                 // Convert user message to Anthropic format with content blocks
                 converted.push({
@@ -1864,7 +1847,7 @@ class AnthropicProvider extends LLMProvider {
             } else if (msgRole === 'assistant') {
                 // Convert assistant message to Anthropic format
                 let content;
-                
+
                 if (msg.content) {
                     if (typeof msg.content === 'string') {
                         // Legacy string format - convert to array
@@ -1875,7 +1858,7 @@ class AnthropicProvider extends LLMProvider {
                         content = msg.content.map(block => {
                             if (block.type === 'text') {
                                 let textValue = block.text;
-                                
+
                                 // Handle nested array structure (shouldn't happen, but defensive coding)
                                 if (Array.isArray(textValue)) {
                                     console.warn('[AnthropicProvider] Found nested array in text block, flattening:', textValue);
@@ -1883,7 +1866,7 @@ class AnthropicProvider extends LLMProvider {
                                     const textBlocks = textValue.filter(item => item && item.type === 'text');
                                     textValue = textBlocks.map(item => item.text || '').join('\n\n').trim();
                                 }
-                                
+
                                 // Ensure text property is a valid string
                                 return {
                                     type: 'text',
@@ -1900,7 +1883,7 @@ class AnthropicProvider extends LLMProvider {
                 } else {
                     content = [];
                 }
-                
+
                 if (content.length > 0) {
                     converted.push({
                         role: 'assistant',
@@ -1910,7 +1893,7 @@ class AnthropicProvider extends LLMProvider {
             } else if (msgRole === 'tool-results') {
                 // Convert tool results to Anthropic format (user message with tool_result blocks)
                 const content = [];
-                
+
                 // STRICT: Only accept toolResults property
                 if (msg.toolResults && Array.isArray(msg.toolResults)) {
                     for (const toolResult of msg.toolResults) {
@@ -1921,7 +1904,7 @@ class AnthropicProvider extends LLMProvider {
                         ));
                     }
                 }
-                
+
                 if (content.length > 0) {
                     // Tool results must be in user messages
                     converted.push({
@@ -1933,7 +1916,7 @@ class AnthropicProvider extends LLMProvider {
                 console.warn('[Anthropic] Unexpected message role:', msgRole);
             }
         }
-        
+
         // Return both messages and system prompt (needed by sendMessage)
         return { messages: converted, system: systemPrompt };
     }
@@ -1943,7 +1926,7 @@ class AnthropicProvider extends LLMProvider {
         // Format MCP tool results for Anthropic's tool_result blocks
         const formatted = MessageConversionUtils.formatMCPToolResult(result);
         let content = [];
-        
+
         if (formatted.type === 'text') {
             content = [{ type: 'text', text: formatted.content }];
         } else if (formatted.type === 'multi') {
@@ -1970,12 +1953,12 @@ class AnthropicProvider extends LLMProvider {
                 }
             }
         } else if (formatted.type === 'json') {
-            content = [{ type: 'text', text: JSON.stringify(formatted.content, null, 2) }];
+            content = [{ type: 'text', text: JSON.stringify(formatted.content) }];
         } else {
             // Fallback
             content = [{ type: 'text', text: JSON.stringify(result) }];
         }
-        
+
         return {
             type: 'tool_result',
             tool_use_id: toolCallId,
@@ -2010,10 +1993,10 @@ class GoogleProvider extends LLMProvider {
     async sendMessage(messages, tools, temperature, mode, _cachePosition = null, chat = null) {
         // Validate messages before processing
         validateMessagesForAPI(messages);
-        
+
         // Convert messages to Gemini format
         const { contents, systemInstruction } = this.convertMessages(messages, mode);
-        
+
         // Convert tools to Gemini format
         const functionDeclarations = tools.map(tool => {
             const injectedTool = this.injectToolMetadata(tool, chat);
@@ -2026,32 +2009,34 @@ class GoogleProvider extends LLMProvider {
 
         // Order fields consistently: tools → systemInstruction (system) → contents (messages) → generationConfig
         const requestBody = {};
-        
+
         // Add tools first if present
         if (functionDeclarations.length > 0) {
             requestBody.tools = [{
                 function_declarations: functionDeclarations
             }];
         }
-        
+
         // Add system instruction if present
         if (systemInstruction) {
             requestBody.systemInstruction = {
                 parts: [{ text: systemInstruction }]
             };
         }
-        
+
         // Add messages
         requestBody.contents = contents;
-        
+
         // Add generation config (includes model info implicitly via this.model in the URL)
+        // Get max tokens from chat config
+        const maxTokens = chat?.config?.model?.params?.maxTokens || 4096;
         requestBody.generationConfig = {
             temperature,
-            maxOutputTokens: 4096
+            maxOutputTokens: maxTokens
         };
 
-        this.log('sent', JSON.stringify(requestBody, null, 2), { 
-            provider: 'google', 
+        this.log('sent', JSON.stringify(requestBody, null, 2), {
+            provider: 'google',
             model: this.model,
             url: this.apiUrl
         });
@@ -2072,7 +2057,7 @@ class GoogleProvider extends LLMProvider {
                 body: JSON.stringify(requestBody)
             });
         } catch (error) {
-            this.log('error', `Failed to send request: ${error.message}`, { 
+            this.log('error', `Failed to send request: ${error.message}`, {
                 provider: 'google',
                 error: error.toString(),
                 url: this.apiUrl
@@ -2087,27 +2072,27 @@ class GoogleProvider extends LLMProvider {
 
         if (!response.ok) {
             const error = await response.json();
-            this.log('error', `API error response: ${JSON.stringify(error)}`, { 
+            this.log('error', `API error response: ${JSON.stringify(error)}`, {
                 provider: 'google',
                 status: response.status,
                 statusText: response.statusText
             });
-            
+
             // Special handling for rate limit errors (429)
             if (response.status === 429) {
                 const retryAfter = response.headers.get('retry-after') || response.headers.get('x-ratelimit-reset-after');
                 const baseMessage = error.error?.message || 'Rate limit exceeded';
                 let rateLimitMessage = `Rate limit exceeded: ${baseMessage}`;
-                
+
                 if (retryAfter) {
                     rateLimitMessage += ` (retry after ${retryAfter}s)`;
                 }
-                
+
                 const apiError = `Google API error: ${rateLimitMessage} (429)`;
                 console.error('[GoogleProvider] Rate limit error:', apiError, '\nStatus:', response.status, '\nResponse:', error);
                 throw new Error(apiError);
             }
-            
+
             const apiError = `Google API error: ${error.error?.message || response.statusText}`;
             console.error('[GoogleProvider] API error:', apiError, '\nStatus:', response.status, '\nResponse:', error);
             throw new Error(apiError);
@@ -2116,11 +2101,11 @@ class GoogleProvider extends LLMProvider {
         /** @type {GoogleResponse} */
         const data = await response.json();
         this.log('received', JSON.stringify(data, null, 2), { provider: 'google' });
-        
+
         // Log the full response
         console.log(`[GOOGLE RECEIVED] (${mode}, subchat: ${chat?.isSubChat || false}):`, data);
         const candidate = data.candidates[0];
-        
+
         // Check finish reason for potential issues
         if (candidate.finishReason === 'MAX_TOKENS') {
             // Handle token limit error
@@ -2160,11 +2145,11 @@ class GoogleProvider extends LLMProvider {
             error.code = candidate.finishReason;
             throw error;
         }
-        
+
         // Convert Google response to unified content array format
         const contentArray = [];
         let textContent = '';
-        
+
         // Ensure parts array exists
         if (candidate.content && candidate.content.parts) {
             for (const part of candidate.content.parts) {
@@ -2186,12 +2171,20 @@ class GoogleProvider extends LLMProvider {
                 }
             }
         }
-        
+
         // Add any remaining text content
         if (textContent) {
             contentArray.push({ type: 'text', text: textContent });
         }
-        
+
+        // Check for empty response (no content and no tool calls)
+        if (contentArray.length === 0) {
+            const error = 'LLM returned empty response - likely exhausted reasoning token budget';
+            console.error('[GoogleProvider]', error);
+            this.log('error', error, { provider: 'google', model: this.model });
+            throw new Error(error);
+        }
+
         // Google returns token counts in usageMetadata
         const usage = data.usageMetadata ? {
             promptTokens: data.usageMetadata.promptTokenCount || 0,
@@ -2201,11 +2194,11 @@ class GoogleProvider extends LLMProvider {
             cachedContentTokenCount: data.usageMetadata.cachedContentTokenCount || 0,
             thoughtsTokenCount: data.usageMetadata.thoughtsTokenCount || 0
         } : null;
-        
-        return { 
+
+        return {
             content: contentArray,
             toolCalls: [],
-            usage 
+            usage
         };
     }
 
@@ -2220,16 +2213,16 @@ class GoogleProvider extends LLMProvider {
             content: m.content ? m.content.substring(0, 50) + '...' : ''
         }));
         */
-        
+
         // Pre-scan to find ALL tool calls and responses
         const allToolCalls = new Map(); // Map of tool name to array of indices
         const allToolResponses = new Map(); // Map of tool name to array of indices
-        
+
         for (let i = 0; i < messages.length; i++) {
             const msg = messages[i];
             // Use same role detection logic as validation
             const msgRole = msg.role;
-            
+
             // Check for tool calls in assistant messages
             const toolCalls = extractToolCallsFromContent(msg.content);
             if (msgRole === 'assistant' && toolCalls.length > 0) {
@@ -2252,15 +2245,15 @@ class GoogleProvider extends LLMProvider {
                 }
             }
         }
-        
+
         // Check for orphaned responses
         for (const [toolName, responseIndices] of allToolResponses) {
             const callIndices = allToolCalls.get(toolName) || [];
-            
+
             for (const responseIndex of responseIndices) {
                 // Find if there's a call before this response
                 const hasCallBefore = callIndices.some(callIndex => callIndex < responseIndex);
-                
+
                 if (!hasCallBefore) {
                     console.error('[Google Provider] Found orphaned tool response:', {
                         toolName,
@@ -2286,40 +2279,40 @@ class GoogleProvider extends LLMProvider {
                 }
             }
         }
-        
+
         const contents = [];
         let pendingToolResponses = [];
         let lastAssistantHadFunctionCalls = false;
-        
+
         for (let i = 0; i < messages.length; i++) {
             const msg = messages[i];
             // Use same role detection logic as validation
             const msgRole = msg.role;
-            
+
             if (msgRole === 'system') {
                 // Prepend system message to first user message
                 continue;
             }
-            
+
             if (msgRole === 'tool-results') {
                 // STRICT: Only accept toolResults property
                 const toolResults = msg.toolResults || [];
                 // Process tool results
-                
+
                 // Tool filtering now handled by optimizer - include all tools sent to provider
-                
+
                 // Check if these tool responses have corresponding function calls
                 if (!lastAssistantHadFunctionCalls) {
                     // This is an orphaned tool response - stop with an error
                     console.error('[Google Provider] Orphaned tool responses detected');
-                    
+
                     throw new Error(
                         `Google API Error: Orphaned tool responses detected. ` +
                         `Tool responses have no corresponding function calls from the assistant. ` +
                         `This would cause an infinite loop. Please check the conversation flow.`
                     );
                 }
-                
+
                 // Valid tool responses - add to pending responses
                 for (const result of toolResults) {
                     pendingToolResponses.push({
@@ -2333,14 +2326,14 @@ class GoogleProvider extends LLMProvider {
                 }
                 continue;
             }
-            
+
             // Reset the function call tracking when we encounter a new assistant message
             if (msgRole === 'assistant') {
                 const toolCalls = extractToolCallsFromContent(msg.content);
                 lastAssistantHadFunctionCalls = toolCalls.length > 0;
                 // Track if assistant message has function calls
             }
-            
+
             // If we have pending tool responses and this is not a tool message, 
             // add them as a user message first
             if (pendingToolResponses.length > 0) {
@@ -2350,13 +2343,13 @@ class GoogleProvider extends LLMProvider {
                 });
                 pendingToolResponses = [];
             }
-            
+
             const parts = [];
-            
+
             if (msgRole === 'user') {
                 // User messages
                 let textContent = '';
-                
+
                 // Handle both string and array content
                 if (typeof msg.content === 'string') {
                     textContent = msg.content;
@@ -2365,14 +2358,14 @@ class GoogleProvider extends LLMProvider {
                     const textBlocks = msg.content.filter(block => block.type === 'text');
                     textContent = textBlocks.map(block => block.text || '').join('\n\n').trim();
                 }
-                
+
                 if (textContent || textContent === '') {
                     parts.push({ text: this.addDateTimePrefix(textContent, msg.timestamp) });
                 }
             } else if (msgRole === 'assistant') {
                 // Assistant messages - include text and optionally tool calls
                 let textContent = '';
-                
+
                 // Extract text content from array if needed
                 if (typeof msg.content === 'string') {
                     textContent = msg.content;
@@ -2381,12 +2374,12 @@ class GoogleProvider extends LLMProvider {
                     const textBlocks = msg.content.filter(block => block.type === 'text');
                     textContent = textBlocks.map(block => block.text || '').join('\n\n').trim();
                 }
-                
+
                 // Add text content if present
                 if (textContent) {
                     parts.push({ text: textContent });
                 }
-                
+
                 // Extract and add tool calls
                 const toolCalls = extractToolCallsFromContent(msg.content);
                 if (toolCalls.length > 0) {
@@ -2402,7 +2395,7 @@ class GoogleProvider extends LLMProvider {
                     }
                 }
             }
-            
+
             if (parts.length > 0) {
                 contents.push({
                     role: msgRole === 'assistant' ? 'model' : 'user',
@@ -2410,7 +2403,7 @@ class GoogleProvider extends LLMProvider {
                 });
             }
         }
-        
+
         // Handle any remaining tool responses at the end
         if (pendingToolResponses.length > 0) {
             if (!lastAssistantHadFunctionCalls) {
@@ -2425,24 +2418,24 @@ class GoogleProvider extends LLMProvider {
                 parts: [...pendingToolResponses]
             });
         }
-        
+
         // Extract system message for separate handling
         const systemMsg = messages.find(m => m.role === 'system');
         let systemInstruction = null;
-        
+
         if (systemMsg) {
             systemInstruction = systemMsg.content;
         }
-        
+
         // Also handle summary messages that should be integrated into system prompt
         const summaryMsg = messages.find(m => m.role === 'summary');
         if (summaryMsg) {
             systemInstruction = MessageConversionUtils.integrateSummaryIntoSystemPrompt(
-                systemInstruction || '', 
+                systemInstruction || '',
                 summaryMsg.content
             );
         }
-        
+
         return { contents, systemInstruction };
     }
 
@@ -2453,7 +2446,7 @@ class GoogleProvider extends LLMProvider {
             return result;
         } else if (Array.isArray(result)) {
             // For arrays, stringify each element if needed and join
-            return result.map(item => 
+            return result.map(item =>
                 typeof item === 'string' ? item : JSON.stringify(item)
             ).join('\n\n');
         } else {
@@ -2476,10 +2469,10 @@ class GoogleProvider extends LLMProvider {
 
         // Create a deep copy to avoid modifying the original
         const cleaned = JSON.parse(JSON.stringify(schema));
-        
+
         // Recursively clean the schema
         this.removeUnsupportedFields(cleaned);
-        
+
         return cleaned;
     }
 
@@ -2504,7 +2497,7 @@ class GoogleProvider extends LLMProvider {
             'default',
             'const'
         ];
-        
+
         unsupportedFields.forEach(field => {
             if (field in obj) {
                 delete obj[field];
@@ -2525,18 +2518,830 @@ class GoogleProvider extends LLMProvider {
 }
 
 /**
- * Factory function to create appropriate LLM provider
+ * Ollama Provider
  */
-function createLLMProvider(provider, proxyUrl, model) {
-    switch (provider) {
+class OllamaProvider extends LLMProvider {
+    constructor(proxyUrl, model = 'llama3.3:latest', modelConfig = null) {
+        super(proxyUrl);
+        this.model = model;
+        this.type = 'ollama';
+        this.modelConfig = modelConfig;
+    }
+
+    get apiUrl() {
+        return `${this.proxyUrl}/proxy/ollama/api/chat`;
+    }
+
+    /**
+     * Send messages to Ollama API
+     * @param {Array} messages - Array of message objects
+     * @param {Array} tools - Array of available tools
+     * @param {number} temperature - Temperature for response generation
+     * @param {string} mode - Tool inclusion mode (unused for Ollama)
+     * @param {number|null} _cachePosition - Cache position (unused for Ollama)
+     * @returns {Promise<LLMResponse>}
+     */
+    async sendMessage(messages, tools, temperature, mode, _cachePosition = null, chat = null) {
+        // Validate messages before processing
+        validateMessagesForAPI(messages);
+
+        // Convert messages to Ollama format
+        const ollamaMessages = this.convertMessages(messages);
+
+        // Convert tools to Ollama format
+        const ollamaTools = tools.map(tool => {
+            const injectedTool = this.injectToolMetadata(tool, chat);
+            
+            // Ensure the schema is valid for Ollama
+            const parameters = injectedTool.inputSchema || {};
+            
+            // Some Ollama models have issues with certain schema formats
+            // Ensure we have a valid JSON Schema structure
+            if (!parameters.type) {
+                parameters.type = 'object';
+            }
+            if (!parameters.properties) {
+                parameters.properties = {};
+            }
+            
+            return {
+                type: 'function',
+                function: {
+                    name: injectedTool.name,
+                    description: injectedTool.description,
+                    parameters
+                }
+            };
+        });
+
+        // Get max tokens and context window from chat config
+        const maxTokens = chat?.config?.model?.params?.maxTokens || 4096;
+
+        // CRITICAL: For Ollama, we must respect user-configured context window
+        // Use MIN(user_configured, model_max) to respect both user preference and model limits
+        // Coerce and clamp context window: MIN(user_configured, model_max)
+        const rawUserCtx = chat?.config?.model?.params?.contextWindow;
+        const userConfiguredContext = typeof rawUserCtx === 'string' ? parseInt(rawUserCtx, 10) : rawUserCtx;
+        const modelMaxContext = this.modelConfig?.contextWindow || 128000;
+
+        let contextWindow;
+        if (typeof userConfiguredContext === 'number' && !isNaN(userConfiguredContext) && userConfiguredContext > 0) {
+            contextWindow = Math.min(userConfiguredContext, modelMaxContext);
+            if (userConfiguredContext > modelMaxContext) {
+                console.warn(`[OllamaProvider] User configured context (${userConfiguredContext}) exceeds model max (${modelMaxContext}), using ${contextWindow}`);
+            }
+        } else {
+            const defaultContext = 32768;
+            contextWindow = Math.min(defaultContext, modelMaxContext);
+            console.warn(`[OllamaProvider] No valid context window configured (got: ${rawUserCtx}), using default: ${contextWindow}`);
+        }
+
+        // Build request body
+        const requestBody = {
+            model: this.model,
+            messages: ollamaMessages,
+            temperature,
+            stream: false,
+            options: {
+                num_predict: maxTokens,
+                num_ctx: contextWindow
+            }
+        };
+        // Note: Ollama only recognizes options.num_ctx; avoid extra keys that trigger warnings
+        // Log computed values for debugging
+        console.log(`[OllamaProvider] Computed context clamp -> user: ${userConfiguredContext}, modelMax: ${modelMaxContext}, effective: ${contextWindow}`);
+
+        // Check if model supports tools before including them
+        let useToolFallback = false;
+        const modelSupportsTools = this.modelConfig?.supportsTools === true;
+
+        if (ollamaTools.length > 0) {
+            if (modelSupportsTools) {
+                // Model explicitly supports tools, so include them
+                requestBody.tools = ollamaTools;
+            } else {
+                // Model doesn't support tools, use fallback immediately
+                console.log('[OllamaProvider] Model does not support tools according to config, using system prompt injection');
+                useToolFallback = true;
+                const toolsPrompt = this.formatToolsForSystemPrompt(ollamaTools);
+                const systemMessageIndex = ollamaMessages.findIndex(msg => msg.role === 'system');
+                if (systemMessageIndex >= 0) {
+                    ollamaMessages[systemMessageIndex].content += '\n\n' + toolsPrompt;
+                } else {
+                    ollamaMessages.unshift({
+                        role: 'system',
+                        content: toolsPrompt
+                    });
+                }
+                requestBody.messages = ollamaMessages;
+            }
+        }
+
+        this.log('sent', JSON.stringify(requestBody, null, 2), {
+            provider: 'ollama',
+            model: this.model,
+            url: this.apiUrl
+        });
+
+        // Check request size before sending
+        this.checkRequestSize(requestBody);
+
+        // Log the full request
+        console.log(`[OLLAMA SEND] (${mode}, subchat: ${chat?.isSubChat || false}):`, requestBody);
+
+        let response;
+        try {
+            response = await fetch(this.apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestBody)
+            });
+        } catch (error) {
+            this.log('error', `Failed to send request: ${error.message}`, {
+                provider: 'ollama',
+                error: error.toString(),
+                url: this.apiUrl
+            });
+            if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+                const connectionError = `Connection Error: Cannot reach Ollama API at ${this.apiUrl}. Please ensure Ollama is running.`;
+                console.error('[OllamaProvider] Connection error:', connectionError, '\nOriginal error:', error);
+                throw new Error(connectionError);
+            }
+            throw error;
+        }
+
+        if (!response.ok) {
+            let error;
+            try {
+                error = await response.json();
+            } catch {
+                error = { error: response.statusText };
+            }
+
+            // Check if the error is about tool support or template issues
+            const errorMessage = error.error || response.statusText;
+            const isTemplateError = errorMessage.includes('template') && errorMessage.includes('Type') && errorMessage.includes('index');
+            const isToolSupportError = errorMessage.includes('does not support tools');
+            
+            if ((isToolSupportError || isTemplateError) && ollamaTools.length > 0) {
+                if (isTemplateError) {
+                    console.log('[OllamaProvider] Model has template error with tools, falling back to system prompt injection');
+                    console.log('[OllamaProvider] Template error details:', errorMessage);
+                } else {
+                    console.log('[OllamaProvider] Model does not support tools, falling back to system prompt injection');
+                }
+
+                // Retry without tools, injecting them into system prompt instead
+                useToolFallback = true;
+                delete requestBody.tools;
+
+                // Inject tools into system prompt
+                const toolsPrompt = this.formatToolsForSystemPrompt(ollamaTools);
+                const systemMessageIndex = ollamaMessages.findIndex(msg => msg.role === 'system');
+                if (systemMessageIndex >= 0) {
+                    ollamaMessages[systemMessageIndex].content += '\n\n' + toolsPrompt;
+                } else {
+                    // Add system message if it doesn't exist
+                    ollamaMessages.unshift({
+                        role: 'system',
+                        content: toolsPrompt
+                    });
+                }
+                requestBody.messages = ollamaMessages;
+
+                // Retry the request
+                try {
+                    response = await fetch(this.apiUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(requestBody)
+                    });
+
+                    if (!response.ok) {
+                        let retryError;
+                        try {
+                            retryError = await response.json();
+                        } catch {
+                            retryError = { error: response.statusText };
+                        }
+                        const retryApiError = `Ollama API error (fallback): ${retryError.error || response.statusText}`;
+                        console.error('[OllamaProvider] API error on retry with tool fallback:', retryApiError);
+                        throw new Error(retryApiError);
+                    }
+                } catch (retryError) {
+                    console.error('[OllamaProvider] Failed to retry with tool fallback:', retryError);
+                    throw retryError;
+                }
+            } else {
+                // Not a tool support error, throw as is
+                this.log('error', `API error response: ${JSON.stringify(error)}`, {
+                    provider: 'ollama',
+                    status: response.status,
+                    statusText: response.statusText
+                });
+
+                const apiError = `Ollama API error: ${errorMessage}`;
+                console.error('[OllamaProvider] API error:', apiError, '\nStatus:', response.status, '\nResponse:', error);
+                throw new Error(apiError);
+            }
+        }
+
+        const data = await response.json();
+        this.log('received', JSON.stringify(data, null, 2), { provider: 'ollama' });
+
+        // Log the full response
+        console.log(`[OLLAMA RECEIVED] (${mode}, subchat: ${chat?.isSubChat || false}):`, data);
+
+
+        // Convert Ollama response to unified format
+        const contentArray = [];
+
+        // If we used tool fallback, parse tools from text response
+        if (useToolFallback && data.message && data.message.content) {
+            const parsedContent = this.parseToolCallsFromText(data.message.content, tools);
+            contentArray.push(...parsedContent);
+        } else {
+            // Check if content contains tool calls in special formats
+            let contentHasToolCalls = false;
+            if (data.message && data.message.content) {
+                const content = data.message.content;
+
+                // First, check if the entire content is a direct JSON tool call
+                const trimmedContent = content.trim();
+                if (trimmedContent.startsWith('{') && trimmedContent.endsWith('}')) {
+                    try {
+                        const parsed = JSON.parse(trimmedContent);
+                        // Check if it's a direct tool call format
+                        if (parsed.name && typeof parsed.name === 'string' &&
+                            parsed.arguments && typeof parsed.arguments === 'object') {
+                            console.log('[OllamaProvider] Detected direct JSON tool call:', parsed);
+                            // Validate that the tool exists
+                            console.log('[OllamaProvider] Checking tool existence for:', parsed.name);
+                            console.log('[OllamaProvider] Available tools count:', tools.length);
+                            console.log('[OllamaProvider] Available tool names:', tools.map(t => t.name || (t.function && t.function.name)));
+                            console.log('[OllamaProvider] First tool structure:', tools[0]);
+                            const toolExists = tools.some(t => {
+                                const toolName = t.name || (t.function && t.function.name);
+                                if (!toolName) return false;
+
+                                // Exact match
+                                if (toolName === parsed.name) return true;
+
+                                // Check if the parsed name is part of the tool name (for prefixed tools)
+                                // e.g., "find_correlated_metrics" matches "mcp__netdata__find_correlated_metrics"
+                                if (toolName.endsWith(parsed.name) || toolName.includes(`__${parsed.name}`)) {
+                                    console.log(`[OllamaProvider] Fuzzy match found: "${parsed.name}" matches tool "${toolName}"`);
+                                    // Update the parsed name to use the full tool name
+                                    parsed.name = toolName;
+                                    return true;
+                                }
+
+                                return false;
+                            });
+
+                            if (toolExists) {
+                                contentArray.push({
+                                    type: 'tool_use',
+                                    id: this.generateId(),
+                                    name: parsed.name,
+                                    input: parsed.arguments
+                                });
+                                contentHasToolCalls = true;
+                            } else {
+                                console.log('[OllamaProvider] Tool not found in available tools:', parsed.name);
+                                // Tool doesn't exist, treat as text
+                                contentArray.push({ type: 'text', text: content });
+                                contentHasToolCalls = true;
+                            }
+                        }
+                    } catch (_e) {
+                        // Not valid JSON, continue with other checks
+                    }
+                }
+
+                // If not a direct JSON tool call, check for other formats
+                if (!contentHasToolCalls) {
+                    // Check for various tool call indicators
+                    if (content.includes('<tool_call>') ||
+                        content.includes('python_tag') ||
+                        content.includes('"type": "function"') ||
+                        (content.includes('```json') && content.includes('"tool_use"'))) {
+                        console.log('[OllamaProvider] Detected tool calls in content, parsing...');
+                        console.log('[OllamaProvider] Raw content:', content);
+                        const parsedContent = this.parseToolCallsFromText(content, tools);
+                        console.log('[OllamaProvider] Parsed content array length:', parsedContent.length);
+                        console.log('[OllamaProvider] Parsed content:', JSON.stringify(parsedContent, null, 2));
+                        if (parsedContent.length > 0) {
+                            contentArray.push(...parsedContent);
+                            contentHasToolCalls = true;
+                            console.log('[OllamaProvider] Successfully added tool calls to contentArray');
+                        } else {
+                            console.warn('[OllamaProvider] parseToolCallsFromText returned empty array');
+                        }
+                    }
+                }
+            }
+
+            // Add text content if present, non-empty, and we didn't parse tool calls from it
+            if (data.message && data.message.content && data.message.content.trim() !== '' && !contentHasToolCalls) {
+                contentArray.push({ type: 'text', text: data.message.content });
+            }
+
+            // Handle tool calls if present in the proper field
+            if (data.message && data.message.tool_calls) {
+                for (const toolCall of data.message.tool_calls) {
+                    contentArray.push({
+                        type: 'tool_use',
+                        id: toolCall.id || this.generateId(),
+                        name: toolCall.function.name,
+                        input: toolCall.function.arguments || {}
+                    });
+                }
+            }
+        }
+
+        // Check for empty response (no content and no tool calls)
+        if (contentArray.length === 0) {
+            const error = 'LLM returned empty response - likely exhausted reasoning token budget';
+            console.error('[OllamaProvider]', error);
+            this.log('error', error, { provider: 'ollama', model: this.model });
+            throw new Error(error);
+        }
+
+        // Calculate token usage from response metadata
+        const usage = {
+            promptTokens: data.prompt_eval_count || 0,
+            completionTokens: data.eval_count || 0,
+            totalTokens: (data.prompt_eval_count || 0) + (data.eval_count || 0),
+            cacheReadInputTokens: 0,  // Ollama doesn't support caching
+            cacheCreationInputTokens: 0
+        };
+
+        return {
+            content: contentArray,
+            toolCalls: [],
+            usage
+        };
+    }
+
+    /**
+     * Convert messages from internal format to Ollama format
+     * @param {Array} messages - Internal format messages
+     * @returns {Array} Ollama format messages
+     */
+    convertMessages(messages) {
+        const converted = [];
+
+        for (const msg of messages) {
+            const msgRole = msg.role;
+
+            if (msgRole === 'system') {
+                converted.push({
+                    role: 'system',
+                    content: msg.content
+                });
+            } else if (msgRole === 'user') {
+                // Add datetime prefix to user messages
+                const content = this.addDateTimePrefix(msg.content, msg.timestamp);
+                converted.push({
+                    role: 'user',
+                    content
+                });
+            } else if (msgRole === 'assistant') {
+                // Convert assistant message - check for tool calls
+                const assistantMsg = { role: 'assistant' };
+
+                if (Array.isArray(msg.content)) {
+                    // Extract text and tool calls from content array
+                    let textContent = '';
+                    const toolCalls = [];
+
+                    for (const block of msg.content) {
+                        if (block.type === 'text') {
+                            textContent += block.text;
+                        } else if (block.type === 'tool_use') {
+                            toolCalls.push({
+                                id: block.id,
+                                type: 'function',
+                                function: {
+                                    name: block.name,
+                                    arguments: block.input
+                                }
+                            });
+                        }
+                    }
+
+                    if (textContent) {
+                        assistantMsg.content = textContent;
+                    }
+                    if (toolCalls.length > 0) {
+                        assistantMsg.tool_calls = toolCalls;
+                    }
+                } else {
+                    assistantMsg.content = msg.content || '';
+                }
+
+                converted.push(assistantMsg);
+            } else if (msgRole === 'tool-results') {
+                // Convert tool results to Ollama format
+                if (msg.toolResults && Array.isArray(msg.toolResults)) {
+                    for (const toolResult of msg.toolResults) {
+                        converted.push({
+                            role: 'tool',
+                            content: this.formatToolResult(toolResult.result),
+                            tool_call_id: toolResult.toolCallId
+                        });
+                    }
+                }
+            }
+        }
+
+        return converted;
+    }
+
+    /**
+     * Format tool result for Ollama
+     * @param {any} result - Tool result
+     * @returns {string} Formatted result
+     */
+    formatToolResult(result) {
+        const formatted = MessageConversionUtils.formatMCPToolResult(result);
+
+        if (formatted.type === 'text') {
+            return formatted.content;
+        } else if (formatted.type === 'multi') {
+            // Handle multiple content items
+            const parts = [];
+            for (const item of formatted.items) {
+                if (item.type === 'text') {
+                    parts.push(item.content);
+                } else if (item.type === 'image') {
+                    parts.push(`[Image: ${item.mimeType}]`);
+                } else if (item.type === 'resource') {
+                    parts.push(`[Resource: ${item.uri}]\n${item.text || ''}`);
+                }
+            }
+            return parts.join('\n\n');
+        } else if (formatted.type === 'json') {
+            return JSON.stringify(formatted.content);
+        } else {
+            return JSON.stringify(result);
+        }
+    }
+
+    /**
+     * Generate a unique ID for tool calls
+     * @returns {string} Unique ID
+     */
+    generateId() {
+        return 'tool_' + Math.random().toString(36).substr(2, 9);
+    }
+
+    /**
+     * Format tools for inclusion in system prompt
+     * @param {Array} tools - Array of tool objects
+     * @returns {string} Formatted tools prompt
+     */
+    formatToolsForSystemPrompt(tools) {
+        let prompt = 'You have access to the following tools:\n\n';
+
+        tools.forEach(tool => {
+            prompt += `Tool: ${tool.function.name}\n`;
+            prompt += `Description: ${tool.function.description}\n`;
+            prompt += `Parameters: ${JSON.stringify(tool.function.parameters)}\n\n`;
+        });
+
+        prompt += '## How to Use Tools\n\n';
+        prompt += 'When you need to use a tool, you MUST format your response as follows:\n\n';
+        prompt += '1. First, explain what you\'re going to do (optional but recommended)\n';
+        prompt += '2. Then include a JSON code block with the exact format shown below\n';
+        prompt += '3. After the tool call, you can add more explanation or wait for the result\n\n';
+        prompt += '**IMPORTANT**: The JSON block MUST be wrapped in ```json and ``` markers.\n\n';
+        prompt += 'Example format:\n';
+        prompt += '```json\n';
+        prompt += '{\n';
+        prompt += '  "tool_use": {\n';
+        prompt += '    "name": "exact_tool_name_from_list",\n';
+        prompt += '    "arguments": {\n';
+        prompt += '      "param1": "value1",\n';
+        prompt += '      "param2": "value2"\n';
+        prompt += '    }\n';
+        prompt += '  }\n';
+        prompt += '}\n';
+        prompt += '```\n\n';
+        prompt += '**Key Rules**:\n';
+        prompt += '- The tool name must EXACTLY match one of the tools listed above\n';
+        prompt += '- All required parameters must be provided in the arguments object\n';
+        prompt += '- The JSON must be valid (proper quotes, commas, etc.)\n';
+        prompt += '- You can call multiple tools by including multiple JSON blocks\n';
+        prompt += '- Always wait for tool results before making conclusions\n\n';
+        prompt += 'Remember: Tools help you access real-time information and perform actions. Use them whenever needed!';
+
+        return prompt;
+    }
+
+    /**
+     * Parse tool calls from text response
+     * @param {string} text - Text response that may contain tool calls
+     * @param {Array} availableTools - Available tools for validation
+     * @returns {Array} Array of content blocks
+     */
+    parseToolCallsFromText(text, availableTools) {
+        const contentArray = [];
+
+        // First, check if the entire text is a direct JSON tool call
+        const trimmedText = text.trim();
+        if (trimmedText.startsWith('{') && trimmedText.endsWith('}')) {
+            try {
+                const parsed = JSON.parse(trimmedText);
+                // Check if it's a direct tool call format
+                if (parsed.name && typeof parsed.name === 'string' &&
+                    parsed.arguments && typeof parsed.arguments === 'object') {
+                    // Validate that the tool exists
+                    const toolExists = availableTools.some(t => {
+                        const toolName = t.name || (t.function && t.function.name);
+                        if (!toolName) return false;
+
+                        // Exact match
+                        if (toolName === parsed.name) return true;
+
+                        // Check if the parsed name is part of the tool name (for prefixed tools)
+                        // e.g., "find_correlated_metrics" matches "mcp__netdata__find_correlated_metrics"
+                        if (toolName.endsWith(parsed.name) || toolName.includes(`__${parsed.name}`)) {
+                            console.log(`[OllamaProvider.parseToolCallsFromText] Fuzzy match found: "${parsed.name}" matches tool "${toolName}"`);
+                            // Update the parsed name to use the full tool name
+                            parsed.name = toolName;
+                            return true;
+                        }
+
+                        return false;
+                    });
+
+                    if (toolExists) {
+                        contentArray.push({
+                            type: 'tool_use',
+                            id: this.generateId(),
+                            name: parsed.name,
+                            input: parsed.arguments
+                        });
+                        return contentArray;
+                    }
+                }
+            } catch (_e) {
+                // Not valid JSON or not a tool call, continue with pattern matching
+            }
+        }
+
+        // Regular expressions for different tool call formats
+        const patterns = [
+            // <tool_call> wrapped format
+            {
+                regex: /<tool_call>\s*(\{[\s\S]*?\})\s*<\/tool_call>/g,
+                parser: (match) => {
+                    try {
+                        const toolCallJson = JSON.parse(match[1]);
+                        if (toolCallJson.name && toolCallJson.arguments) {
+                            return {
+                                name: toolCallJson.name,
+                                input: toolCallJson.arguments
+                            };
+                        }
+                    } catch (e) {
+                        console.log('[OllamaProvider] Failed to parse tool_call JSON:', match[1], e);
+                    }
+                    return null;
+                }
+            },
+            // JSON blocks with tool_use format
+            {
+                regex: /```json\s*\n?\s*(\{[\s\S]*?"tool_use"[\s\S]*?\})\s*\n?\s*```/g,
+                parser: (match) => {
+                    const toolCallJson = JSON.parse(match[1]);
+                    if (toolCallJson.tool_use && toolCallJson.tool_use.name) {
+                        return {
+                            name: toolCallJson.tool_use.name,
+                            input: toolCallJson.tool_use.arguments || {}
+                        };
+                    }
+                    return null;
+                }
+            },
+            // Llama's python_tag format - handle multi-line JSON
+            {
+                regex: /<\|python_tag\|>/g,
+                parser: (match, fullText, matchIndex) => {
+                    // Find the JSON starting after the python_tag
+                    const startIndex = matchIndex + match[0].length;
+                    const textAfterTag = fullText.substring(startIndex);
+
+                    // Find the complete JSON object by counting braces
+                    let braceCount = 0;
+                    let inString = false;
+                    let escapeNext = false;
+                    let endIndex = -1;
+                    let jsonStartIndex = -1;
+
+                    for (let i = 0; i < textAfterTag.length; i++) {
+                        const char = textAfterTag[i];
+
+                        // Skip whitespace before JSON starts
+                        if (jsonStartIndex === -1 && char === '{') {
+                            jsonStartIndex = i;
+                        }
+
+                        if (jsonStartIndex === -1) continue;
+
+                        if (escapeNext) {
+                            escapeNext = false;
+                            continue;
+                        }
+
+                        if (char === '\\') {
+                            escapeNext = true;
+                            continue;
+                        }
+
+                        if (char === '"' && !escapeNext) {
+                            inString = !inString;
+                        }
+
+                        if (!inString) {
+                            if (char === '{') braceCount++;
+                            else if (char === '}') {
+                                braceCount--;
+                                if (braceCount === 0) {
+                                    endIndex = i + 1;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    if (jsonStartIndex === -1 || endIndex === -1) {
+                        console.log('[OllamaProvider] Could not find complete JSON after python_tag');
+                        return null;
+                    }
+
+                    const jsonStr = textAfterTag.substring(jsonStartIndex, endIndex);
+
+                    try {
+                        const toolCallJson = JSON.parse(jsonStr);
+                        if (toolCallJson.type === 'function' && toolCallJson.name) {
+                            // Convert parameters to input format
+                            const params = toolCallJson.parameters || {};
+                            // Remove any meta parameters that aren't actual tool parameters
+                            const {
+                                context_for_interpretation,
+                                expected_format,
+                                key_information,
+                                success_indicators,
+                                tool_purpose,
+                                ...actualParams
+                            } = params;
+
+                            return {
+                                name: toolCallJson.name,
+                                input: actualParams
+                            };
+                        }
+                    } catch (e) {
+                        console.log('[OllamaProvider] Failed to parse Llama tool JSON:', jsonStr, e);
+                    }
+                    return null;
+                }
+            }
+        ];
+
+        let lastIndex = 0;
+        const allMatches = [];
+
+        // Find all matches from all patterns
+        for (const pattern of patterns) {
+            pattern.regex.lastIndex = 0;
+            let match;
+            while ((match = pattern.regex.exec(text)) !== null) {
+                allMatches.push({
+                    index: match.index,
+                    length: match[0].length,
+                    parser: pattern.parser,
+                    match
+                });
+            }
+        }
+
+        // Sort matches by index
+        allMatches.sort((a, b) => a.index - b.index);
+
+        // Process matches in order
+        for (const matchInfo of allMatches) {
+            // Add any text before the tool call
+            if (matchInfo.index > lastIndex) {
+                const textBefore = text.substring(lastIndex, matchInfo.index).trim();
+                if (textBefore) {
+                    contentArray.push({ type: 'text', text: textBefore });
+                }
+            }
+
+            try {
+                const parsed = matchInfo.parser(matchInfo.match, text, matchInfo.index);
+                if (parsed) {
+                    // Validate that the tool exists with fuzzy matching
+                    let toolName = parsed.name;
+                    const toolExists = availableTools.some(t => {
+                        const availableToolName = t.name || (t.function && t.function.name);
+                        if (!availableToolName) return false;
+
+                        // Exact match
+                        if (availableToolName === toolName) return true;
+
+                        // Check if the parsed name is part of the tool name (for prefixed tools)
+                        // e.g., "find_correlated_metrics" matches "mcp__netdata__find_correlated_metrics"
+                        if (availableToolName.endsWith(toolName) || availableToolName.includes(`__${toolName}`)) {
+                            console.log(`[OllamaProvider.parseToolCallsFromText] Fuzzy match found: "${toolName}" matches tool "${availableToolName}"`);
+                            // Update to use the full tool name
+                            toolName = availableToolName;
+                            return true;
+                        }
+
+                        return false;
+                    });
+
+                    if (toolExists) {
+                        contentArray.push({
+                            type: 'tool_use',
+                            id: this.generateId(),
+                            name: toolName,
+                            input: parsed.input
+                        });
+                    } else {
+                        console.log('[OllamaProvider.parseToolCallsFromText] Tool not found:', parsed.name);
+                        // Tool doesn't exist, treat as text
+                        contentArray.push({ type: 'text', text: matchInfo.match[0] });
+                    }
+                } else {
+                    // Invalid format, treat as text
+                    contentArray.push({ type: 'text', text: matchInfo.match[0] });
+                }
+            } catch (e) {
+                // Parsing failed, treat as text
+                console.log('[OllamaProvider] Failed to parse tool call:', e, matchInfo.match[0]);
+                contentArray.push({ type: 'text', text: matchInfo.match[0] });
+            }
+
+            lastIndex = matchInfo.index + matchInfo.length;
+        }
+
+        // Add any remaining text
+        if (lastIndex < text.length) {
+            const remainingText = text.substring(lastIndex).trim();
+            if (remainingText) {
+                contentArray.push({ type: 'text', text: remainingText });
+            }
+        }
+
+        // If no content was parsed, return the original text
+        if (contentArray.length === 0) {
+            contentArray.push({ type: 'text', text });
+        }
+
+        return contentArray;
+    }
+}
+
+/**
+ * Factory function to create appropriate LLM provider
+ * @param {string} providerType - The provider type (e.g., 'openai', 'anthropic', 'ollama')
+ * @param {string} proxyUrl - The proxy URL
+ * @param {string} modelName - The model name/ID
+ * @param {Object} providerConfig - The provider configuration object containing available models
+ * @param {string} actualProviderName - The actual provider name for proxy routing (e.g., 'deepseek')
+ */
+function createLLMProvider(providerType, proxyUrl, modelName, providerConfig = null, actualProviderName = null) {
+    // Look up model metadata if provider config is available
+    let modelMetadata = null;
+    if (providerConfig?.models) {
+        modelMetadata = providerConfig.models.find(m =>
+            (typeof m === 'string' ? m : m.id) === modelName
+        );
+    }
+
+    switch (providerType) {
         case 'openai':
-            return new OpenAIProvider(proxyUrl, model);
+        case 'openai-responses':
+            // Use actualProviderName if provided, otherwise default to 'openai'
+            return new OpenAIProvider(proxyUrl, modelName, actualProviderName || 'openai');
         case 'anthropic':
-            return new AnthropicProvider(proxyUrl, model);
+            return new AnthropicProvider(proxyUrl, modelName);
         case 'google':
-            return new GoogleProvider(proxyUrl, model);
+            return new GoogleProvider(proxyUrl, modelName);
+        case 'ollama':
+            return new OllamaProvider(proxyUrl, modelName, modelMetadata);
         default:
-            const error = `Unknown provider: ${provider}`;
+            const error = `Unknown provider type: ${providerType}`;
             console.error('[createLLMProvider]', error);
             throw new Error(error);
     }

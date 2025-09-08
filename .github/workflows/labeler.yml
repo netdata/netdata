@@ -14,7 +14,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/labeler@v5
+      - uses: actions/labeler@v6
         if: github.repository == 'netdata/netdata'
         with:
           repo-token: "${{ secrets.GITHUB_TOKEN }}"
