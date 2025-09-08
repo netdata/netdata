@@ -69,6 +69,8 @@ export interface LogEntry {
   remoteIdentifier: string;             // 'provider:model' or 'mcp-server:tool-name'
   fatal: boolean;                       // True if this caused agent to stop
   message: string;                      // Human readable message
+  // Optional emphasis hint for TTY renderers (bold in same severity color)
+  bold?: boolean;
   // Optional tracing fields (multi-agent)
   agentId?: string;
   callPath?: string;
@@ -145,6 +147,8 @@ export interface Configuration {
   mcpServers: Record<string, MCPServerConfig>;
   // Optional REST tools registry (manifest-driven)
   restTools?: Record<string, RestToolConfig>;
+  // Optional OpenAPI specs to auto-generate REST tools
+  openapiSpecs?: Record<string, OpenAPISpecConfig>;
   accounting?: { file: string };
   // Optional pricing table by provider/model. Prices are per "unit" tokens (1k or 1m).
   pricing?: Record<string, Record<string, {
@@ -208,7 +212,7 @@ export interface RestToolConfig {
   // JSON Schema for arguments (Ajv-compatible)
   argsSchema: Record<string, unknown>;
   // Templated JSON body for POST/PUT/PATCH (substitute ${args.*})
-  bodyTemplate?: Record<string, unknown>;
+  bodyTemplate?: unknown;
   // Optional streaming config for SSE/JSON-lines
   streaming?: {
     mode: 'json-stream';
@@ -221,6 +225,19 @@ export interface RestToolConfig {
     timeoutMs?: number;
     maxBytes?: number;
   };
+}
+
+// OpenAPI spec registration in config
+export interface OpenAPISpecConfig {
+  // Path or URL to the OpenAPI document (YAML or JSON)
+  spec: string;
+  // Optional override when the spec does not have servers[] or you want to change it
+  baseUrl?: string;
+  // Default headers applied to every tool generated (supports ${VAR} expansion)
+  headers?: Record<string, string>;
+  // Optional filters
+  includeMethods?: ('get'|'post'|'put'|'patch'|'delete')[];
+  tagFilter?: string[];
 }
 
 // Session configuration and callbacks
@@ -272,6 +289,10 @@ export interface AIAgentSessionConfig {
   mcpInitConcurrency?: number;
   // Trace context propagation
   trace?: { selfId?: string; originId?: string; parentId?: string; callPath?: string };
+  // External cancellation signal to abort the session immediately
+  abortSignal?: AbortSignal;
+  // Graceful stop reference toggled by headend (no abort); agent should avoid starting new work
+  stopRef?: { stopping: boolean };
 }
 
 // Session result
@@ -365,6 +386,8 @@ export interface TurnRequest {
   maxConcurrentTools?: number;
   isFinalTurn?: boolean;
   llmTimeout?: number;
+  // External cancellation signal to immediately abort LLM calls
+  abortSignal?: AbortSignal;
   onChunk?: (chunk: string, type: 'content' | 'thinking') => void;
 }
 

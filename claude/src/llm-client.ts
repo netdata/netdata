@@ -22,6 +22,8 @@ export class LLMClient {
   // Tracks last reported costs when available (e.g., OpenRouter)
   private lastCostUsd?: number;
   private lastUpstreamCostUsd?: number;
+  // Tracks last parsed cache creation input tokens from upstream (e.g., Anthropic raw JSON)
+  private lastCacheWriteInputTokens?: number;
 
   constructor(
     providerConfigs: Record<string, ProviderConfig>,
@@ -58,6 +60,19 @@ export class LLMClient {
     const startTime = Date.now();
     try {
       const result = await provider.executeTurn(request);
+      // Enrich tokens with cache write info parsed at HTTP layer when providers/SDKs omit it
+      try {
+        if (result.status.type === 'success') {
+          const extraW = this.lastCacheWriteInputTokens;
+          if (typeof extraW === 'number' && extraW > 0) {
+            if (result.tokens === undefined) {
+              result.tokens = { inputTokens: 0, outputTokens: 0, totalTokens: 0, cacheWriteInputTokens: extraW };
+            } else if (result.tokens.cacheWriteInputTokens === undefined || result.tokens.cacheWriteInputTokens === 0) {
+              result.tokens.cacheWriteInputTokens = extraW;
+            }
+          }
+        }
+      } catch { /* ignore enrichment errors */ }
       
       // Log response
       this.logResponse(request, result, Date.now() - startTime);
@@ -121,6 +136,7 @@ export class LLMClient {
       let reqActualModel: string | undefined;
       let reqCostUsd: number | undefined;
       let reqUpstreamCostUsd: number | undefined;
+      let reqCacheWriteInputTokens: number | undefined;
       
       try {
         if (typeof input === 'string') url = input;
@@ -241,6 +257,36 @@ export class LLMClient {
               reqActualProvider = undefined;
               reqActualModel = undefined;
             }
+            // For generic JSON responses, try to extract provider-agnostic usage signals we care about (e.g., Anthropic cache creation tokens)
+            if (contentType.includes('application/json')) {
+              try {
+                const clone = response.clone();
+                const raw = await clone.text();
+                const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object';
+                const parsedUnknown: unknown = JSON.parse(raw);
+                const parsedObj = isRecord(parsedUnknown) ? parsedUnknown : undefined;
+                // eslint-disable-next-line @typescript-eslint/dot-notation
+                const usageVal = parsedObj !== undefined ? parsedObj['usage'] : undefined;
+                const u: Record<string, unknown> = isRecord(usageVal) ? usageVal : {};
+                const asNum = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) && v > 0) ? v : undefined;
+                const getNested = (obj: Record<string, unknown>, k: string): unknown => (Object.prototype.hasOwnProperty.call(obj, k) ? obj[k] : undefined);
+                // Try common variants
+                let w: unknown = getNested(u, 'cacheWriteInputTokens')
+                  ?? getNested(u, 'cacheCreationInputTokens')
+                  ?? getNested(u, 'cache_creation_input_tokens')
+                  ?? getNested(u, 'cache_write_input_tokens');
+                if (w === undefined) {
+                  const cc = getNested(u, 'cacheCreation');
+                  if (isRecord(cc)) { w = cc.ephemeral_5m_input_tokens; }
+                }
+                if (w === undefined) {
+                  const cc2 = getNested(u, 'cache_creation');
+                  if (isRecord(cc2)) { w = cc2.ephemeral_5m_input_tokens; }
+                }
+                const n = asNum(w);
+                if (typeof n === 'number') reqCacheWriteInputTokens = n;
+              } catch { /* ignore */ }
+            }
           }
         } catch { /* ignore */ }
 
@@ -249,6 +295,7 @@ export class LLMClient {
         this.lastActualModel = reqActualModel;
         this.lastCostUsd = reqCostUsd;
         this.lastUpstreamCostUsd = reqUpstreamCostUsd;
+        this.lastCacheWriteInputTokens = reqCacheWriteInputTokens;
 
         // Log response details when trace is enabled
         if (this.traceLLM) {
@@ -324,6 +371,7 @@ export class LLMClient {
     this.lastActualModel = undefined;
     this.lastCostUsd = undefined;
     this.lastUpstreamCostUsd = undefined;
+    this.lastCacheWriteInputTokens = undefined;
 
     this.log('VRB', 'request', 'llm', `${request.provider}:${request.model}`, message);
   }
@@ -344,7 +392,7 @@ export class LLMClient {
       
       const responseBytes = result.response !== undefined ? new TextEncoder().encode(result.response).length : 0;
       // Do not include routed provider/model details here; keep log concise up to bytes
-      let message = `input ${String(inputTokens)}, output ${String(outputTokens)}, cached ${String(cachedTokens)} tokens, ${String(latencyMs)}ms, ${String(responseBytes)} bytes`;
+      let message = `input ${String(inputTokens)}, output ${String(outputTokens)}, cacheR ${String(cacheRead)}, cacheW ${String(cacheWrite)}, cached ${String(cachedTokens)} tokens, ${String(latencyMs)}ms, ${String(responseBytes)} bytes`;
       // Compute cost from pricing for all providers (5 decimals); prefer router-reported when present
       const computeCost = (): number | undefined => {
         try {

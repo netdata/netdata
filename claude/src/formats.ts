@@ -13,8 +13,11 @@ export const OUTPUT_FORMATS: Record<OutputFormatId, OutputFormat> = {
     'Allowed blocks: header (plain_text ≤150), divider, section (mrkdwn ≤2000), context (mrkdwn ≤2000, ≤10), fields (≤10, mrkdwn ≤2000).',
     'Do not use markdown headers (#, ##), tables, HTML, or images.'
   ].join(' ') },
-  tty: { id: 'tty', description: 'fixed-width monospaced terminal, with ANSI colors, use ASCII-art for tables and diagrams (do not create unecessary boxes that wrap the content, let it breath) - no markdown. When adding ANSI colors, emit literal \\x1b[...m codes (e.g., \\x1b[33m for yellow) instead of raw ESC characters.' },
+  tty: { id: 'tty', description: 'Fixed-width monospaced terminal, with ANSI colors, and ASCII-art for tables and diagrams. No markdown. ' +
+     'When adding ANSI colors, emit literal \\x1b[...m codes (e.g., \\x1b[33m for yellow) instead of raw ESC characters. ' +
+     'IMPORTANT: Do not create unecessary boxes that wrap the content, let it breathe - on tables than need vertical alignment remember that the ANSI colors do not count in the width. Do not wrap long lines - let them wrap naturally depending on terminal size.' },
   pipe: { id: 'pipe', description: 'plain text' },
+  
   json: { id: 'json', description: 'json' },
   'sub-agent': { id: 'sub-agent', description: 'agent to agent communication, use optimal format' },
 };

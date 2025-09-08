@@ -258,8 +258,17 @@ export function buildStatusBlocks(summary: SnapshotSummary, rootAgentId?: string
     })
     .filter((v): v is string => typeof v === 'string' && v.length > 0);
 
-  const body = items.length > 0 ? items.join('\n') : '- idle';
-  blocks.push({ type: 'section', text: { type: 'mrkdwn', text: body } });
+  // Split into multiple sections to avoid Slack collapsing large sections ("Show more")
+  if (items.length === 0) {
+    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: '- idle' } });
+  } else {
+    const CHUNK = 4; // keep sections small to avoid collapse
+    for (let i = 0; i < items.length; i += CHUNK) {
+      // eslint-disable-next-line functional/no-loop-statements
+      const chunk = items.slice(i, i + CHUNK).join('\n');
+      blocks.push({ type: 'section', text: { type: 'mrkdwn', text: chunk } });
+    }
+  }
 
   blocks.push({ type: 'divider' });
 

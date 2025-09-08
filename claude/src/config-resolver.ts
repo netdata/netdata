@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import type { Configuration, MCPServerConfig, ProviderConfig, RestToolConfig } from './types.js';
+import type { Configuration, MCPServerConfig, ProviderConfig, RestToolConfig, OpenAPISpecConfig } from './types.js';
 
 type LayerOrigin = '--config' | 'cwd' | 'binary' | 'home' | 'system';
 
@@ -222,6 +222,7 @@ export function buildUnifiedConfiguration(
   const providers: Record<string, ProviderConfig> = {};
   const mcpServers: Record<string, MCPServerConfig> = {};
   const restTools: Record<string, RestToolConfig> = {};
+  const openapiSpecs: Record<string, OpenAPISpecConfig> = {};
 
   needs.providers.forEach((p) => {
     const conf = resolveProvider(p, layers, opts);
@@ -252,9 +253,27 @@ export function buildUnifiedConfiguration(
     }
   });
 
+  // Merge openapiSpecs similarly; last file wins by key
+  layers.forEach((layer) => {
+    const j = layer.json as { openapiSpecs?: Record<string, unknown> } | undefined;
+    const specs = j?.openapiSpecs;
+    if (specs !== undefined) {
+      const env = layer.env ?? {};
+      Object.entries(specs).forEach(([name, raw]) => {
+        const expanded = expandPlaceholders(raw, (varName: string) => {
+          const envVal = Object.prototype.hasOwnProperty.call(env, varName) ? env[varName] : undefined;
+          const v = envVal ?? process.env[varName];
+          if (v === undefined) return '';
+          return v;
+        }) as OpenAPISpecConfig;
+        openapiSpecs[name] = expanded;
+      });
+    }
+  });
+
   const defaults = resolveDefaults(layers);
   const accounting = resolveAccounting(layers, opts);
   const pricing = resolvePricing(layers);
 
-  return { providers, mcpServers, restTools, defaults, accounting, pricing } as Configuration;
+  return { providers, mcpServers, restTools, openapiSpecs, defaults, accounting, pricing } as Configuration;
 }

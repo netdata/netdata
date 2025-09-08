@@ -37,7 +37,8 @@ export async function startServer(agentPath: string, options?: { enableSlack?: b
     } else {
       outputFormat = expectedJson ? 'json' : 'markdown';
     }
-    return loaded.run(sys, user, { ...opts, outputFormat });
+    // Allow extra headend-specific fields (e.g., abortSignal) without narrowing here
+    return loaded.run(sys, user, ({ ...opts, outputFormat } as any));
   };
 
   const logSink = (entry: any) => {

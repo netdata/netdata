@@ -70,6 +70,9 @@ export class AIAgentSession {
   
   private readonly llmClient: LLMClient;
   private readonly sessionConfig: AIAgentSessionConfig;
+  private readonly abortSignal?: AbortSignal;
+  private canceled = false;
+  private readonly stopRef?: { stopping: boolean };
   private ajv?: Ajv;
   // Internal housekeeping notes
   private internalNotes: { text: string; tags?: string[]; ts: number }[] = [];
@@ -86,6 +89,8 @@ export class AIAgentSession {
   private plannedSubturns: Map<number, number> = new Map<number, number>();
   private resolvedFormat?: OutputFormatId;
   private resolvedFormatDescription?: string;
+  private resolvedUserPrompt?: string;
+  private masterLlmStartLogged = false;
   // Finalization state captured via agent__final_report
   private finalReport?: {
     status: 'success' | 'failure' | 'partial';
@@ -126,6 +131,14 @@ export class AIAgentSession {
     this.currentTurn = currentTurn;
     this.llmClient = llmClient;
     this.sessionConfig = sessionConfig;
+    this.abortSignal = sessionConfig.abortSignal;
+    this.stopRef = sessionConfig.stopRef;
+    try {
+      if (this.abortSignal !== undefined) {
+        if (this.abortSignal.aborted) this.canceled = true;
+        else this.abortSignal.addEventListener('abort', () => { this.canceled = true; try { this.toolsOrchestrator?.cancel(); } catch { /* ignore */ } }, { once: true });
+      }
+    } catch { /* ignore */ }
     // Initialize sub-agents registry if provided
     if (Array.isArray(sessionConfig.subAgentPaths) && sessionConfig.subAgentPaths.length > 0) {
       const reg = new SubAgentRegistry();
@@ -542,6 +555,28 @@ export class AIAgentSession {
       const vars = { ...buildPromptVars(), MAX_TURNS: String(this.sessionConfig.maxTurns ?? 10) };
       const systemExpanded = expandVars(withFormat, vars);
       const userExpanded = expandVars(this.sessionConfig.userPrompt, vars);
+      this.resolvedUserPrompt = userExpanded;
+
+      // Startup VRB: show callPath (or agentId) and the user prompt
+      try {
+        const ctx: string = (typeof this.callPath === 'string' && this.callPath.length > 0)
+          ? this.callPath
+          : (this.sessionConfig.agentId ?? 'agent');
+        const entry: LogEntry = {
+          timestamp: Date.now(),
+          severity: 'VRB',
+          turn: 0,
+          subturn: 0,
+          direction: 'request',
+          type: 'llm',
+          remoteIdentifier: 'agent:start',
+          fatal: false,
+          // Bold hint honored by TTY sinks; same VRB color
+          bold: true,
+          message: `${ctx}: ${userExpanded}`,
+        };
+        this.addLog(currentLogs, entry);
+      } catch { /* ignore startup log errors */ }
 
       // Build enhanced system prompt with tool instructions
       const toolInstructions = this.toolsOrchestrator?.getMCPInstructions() ?? '';
@@ -648,6 +683,20 @@ export class AIAgentSession {
     // Turn 0 is initialization; action turns are 1..maxTurns
     // eslint-disable-next-line functional/no-loop-statements
     for (currentTurn = 1; currentTurn <= maxTurns; currentTurn++) {
+      if (this.canceled) {
+        const errMsg = 'canceled';
+        this.emitFinalSummary(logs, accounting);
+        try { this.tree.endSession(false, errMsg); } catch { /* ignore */ }
+        try { this.opTree.endSession(false, errMsg); } catch { /* ignore */ }
+        return { success: false, error: errMsg, conversation, logs, accounting };
+      }
+      if (this.stopRef?.stopping === true) {
+        // Graceful stop: do not start further turns
+        this.emitFinalSummary(logs, accounting);
+        try { this.tree.endSession(true); } catch { /* ignore */ }
+        try { this.opTree.endSession(true); } catch { /* ignore */ }
+        return { success: true, conversation, logs, accounting } as AIAgentResult;
+      }
       try { this.opTree.beginTurn(currentTurn, {}); this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession()); } catch { /* ignore */ }
       // Orchestrator receives ctx turn/subturn per call; no MCP client turn management
       this.llmClient.setTurn(currentTurn, 0);
@@ -661,6 +710,27 @@ export class AIAgentSession {
       let pairCursor = 0;
       // eslint-disable-next-line functional/no-loop-statements
       while (attempts < maxRetries && !turnSuccessful) {
+        // Emit the same startup verbose line also when the master LLM runs (once per session)
+        if (!this.masterLlmStartLogged && this.parentTxnId === undefined) {
+          try {
+            const ctx: string = (typeof this.callPath === 'string' && this.callPath.length > 0) ? this.callPath : (this.sessionConfig.agentId ?? 'agent');
+            const promptText: string = typeof this.resolvedUserPrompt === 'string' ? this.resolvedUserPrompt : '';
+            const entry: LogEntry = {
+              timestamp: Date.now(),
+              severity: 'VRB',
+              turn: currentTurn,
+              subturn: 0,
+              direction: 'request',
+              type: 'llm',
+              remoteIdentifier: 'agent:start',
+              fatal: false,
+              bold: true,
+              message: `${ctx}: ${promptText}`,
+            };
+            this.addLog(logs, entry);
+          } catch { /* ignore log errors */ }
+          this.masterLlmStartLogged = true;
+        }
         const pair = pairs[pairCursor % pairs.length];
         pairCursor += 1;
         const { provider, model } = pair;
@@ -750,6 +820,13 @@ export class AIAgentSession {
             // Record accounting for every attempt (include failed attempts with zeroed tokens if absent)
             {
               const tokens = turnResult.tokens ?? { inputTokens: 0, outputTokens: 0, cachedTokens: 0, totalTokens: 0 };
+              // Normalize totalTokens to include cache read/write for accounting consistency
+              try {
+                const r = tokens.cacheReadInputTokens ?? tokens.cachedTokens ?? 0;
+                const w = tokens.cacheWriteInputTokens ?? 0;
+                const totalWithCache = tokens.inputTokens + tokens.outputTokens + r + w;
+                if (Number.isFinite(totalWithCache)) tokens.totalTokens = totalWithCache;
+              } catch { /* keep provider totalTokens if something goes wrong */ }
               // Compute cost from pricing table when available (prefer provider-reported when using routers like OpenRouter)
               const computeCost = (): { costUsd?: number } => {
                 try {
@@ -1131,7 +1208,8 @@ export class AIAgentSession {
       const tokOut = llmEntries.reduce((s, e) => s + e.tokens.outputTokens, 0);
       const tokCacheRead = llmEntries.reduce((s, e) => s + (e.tokens.cacheReadInputTokens ?? e.tokens.cachedTokens ?? 0), 0);
       const tokCacheWrite = llmEntries.reduce((s, e) => s + (e.tokens.cacheWriteInputTokens ?? 0), 0);
-      const tokTotal = llmEntries.reduce((s, e) => s + e.tokens.totalTokens, 0);
+      // Total should include all four components: input + output + cacheR + cacheW
+      const tokTotal = tokIn + tokOut + tokCacheRead + tokCacheWrite;
       const llmLatencies = llmEntries.map((e) => e.latency);
       const llmLatencySum = llmLatencies.reduce((s, v) => s + v, 0);
       const llmLatencyAvg = llmEntries.length > 0 ? Math.round(llmLatencySum / llmEntries.length) : 0;
@@ -1252,6 +1330,8 @@ export class AIAgentSession {
     let subturnCounter = 0;
     const maxToolCallsPerTurn = Math.max(1, this.sessionConfig.maxToolCallsPerTurn ?? 10);
     const toolExecutor = async (toolName: string, parameters: Record<string, unknown>): Promise<string> => {
+      if (this.stopRef?.stopping === true) throw new Error('stop_requested');
+      if (this.canceled) throw new Error('canceled');
       // Advance subturn for each tool call within this turn
       subturnCounter += 1;
       if (subturnCounter > maxToolCallsPerTurn) {
@@ -1443,6 +1523,7 @@ export class AIAgentSession {
       stream: this.sessionConfig.stream,
       isFinalTurn,
       llmTimeout: this.sessionConfig.llmTimeout,
+      abortSignal: this.abortSignal,
       onChunk: (chunk: string, type: 'content' | 'thinking') => {
         if (type === 'content' && this.sessionConfig.callbacks?.onOutput !== undefined) {
           this.sessionConfig.callbacks.onOutput(chunk);

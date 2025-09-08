@@ -117,6 +117,16 @@
       }
     }
   },
+  "openapiSpecs": {
+    "encharge": {
+      "spec": "https://encharge-app-resources.s3.amazonaws.com/merged.yaml",
+      "baseUrl": "https://api.encharge.io/v1",
+      "headers": {
+        "Authorization": "Bearer ${ENCHARGE_API_KEY}"
+      },
+      "includeMethods": ["get"]
+    }
+  },
   "accounting": {
     "file": "${HOME}/ai-agent-accounting.jsonl"
   },

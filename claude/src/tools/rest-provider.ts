@@ -52,14 +52,20 @@ export class RestProvider extends ToolProvider {
     }
 
     const method = cfg.method.toUpperCase();
-    const url = cfg.url;
-    const headers = new Headers(cfg.headers ?? {});
+    const url = this.substituteUrl(cfg.url, args);
+    // Apply header templating from args
+    const headers = new Headers();
+    const rawHeaders = cfg.headers ?? {};
+    Object.entries(rawHeaders).forEach(([k, v]) => {
+      const vv = typeof v === 'string' ? this.substituteString(v, args) : String(v);
+      headers.set(k, vv);
+    });
 
     // Prepare body if templated
     let body: string | undefined;
     if (cfg.bodyTemplate !== undefined) {
-      const resolved = this.substitute(cfg.bodyTemplate, args);
-      body = JSON.stringify(resolved);
+      const built = this.buildBody(cfg.bodyTemplate as unknown, args);
+      body = built;
       if (!headers.has('content-type')) headers.set('content-type', 'application/json');
     }
 
@@ -161,6 +167,40 @@ export class RestProvider extends ToolProvider {
       return out;
     }
     return template;
+  }
+
+  private substituteString(template: string, args: Record<string, unknown>): string {
+    return template.replace(/\$\{args\.([^}]+)\}/g, (_m, name: string) => {
+      const has = Object.prototype.hasOwnProperty.call(args, name);
+      const v = has ? args[name] : undefined;
+      return typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' ? String(v) : '';
+    });
+  }
+
+  private substituteUrl(template: string, args: Record<string, unknown>): string {
+    return template.replace(/\$\{args\.([^}]+)\}/g, (_m, name: string) => {
+      const has = Object.prototype.hasOwnProperty.call(args, name);
+      const v = has ? args[name] : undefined;
+      const s = (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') ? String(v) : '';
+      try { return encodeURIComponent(s); } catch { return s; }
+    });
+  }
+
+  private buildBody(template: unknown, args: Record<string, unknown>): string {
+    if (typeof template === 'string') {
+      // If the template is a single placeholder like ${args.body}, pass the raw value
+      const m = /^\$\{args\.([^}]+)\}$/.exec(template);
+      if (m !== null) {
+        const key = m[1];
+        const hasKey = Object.prototype.hasOwnProperty.call(args, key);
+        const v = hasKey ? args[key] : undefined;
+        return JSON.stringify(v);
+      }
+      const substituted = this.substituteString(template, args);
+      return substituted;
+    }
+    const resolved = this.substitute(template, args);
+    return JSON.stringify(resolved);
   }
 
   private exposedName(name: string): string { return `rest__${name}`; }

@@ -12,10 +12,12 @@ export class SessionManager {
   private readonly logs = new Map<string, LogEntry[]>();
   private readonly accounting = new Map<string, AccountingEntry[]>();
   private readonly opTrees = new Map<string, unknown>();
+  private readonly aborters = new Map<string, AbortController>();
+  private readonly stopRefs = new Map<string, { stopping: boolean }>();
   private readonly callbacks: Callbacks;
-  private readonly runner: (systemPrompt: string, userPrompt: string, opts: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; renderTarget?: 'slack' | 'api' | 'web'; outputFormat?: string }) => Promise<AIAgentResult>;
+  private readonly runner: (systemPrompt: string, userPrompt: string, opts: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; renderTarget?: 'slack' | 'api' | 'web'; outputFormat?: string; abortSignal?: AbortSignal; stopRef?: { stopping: boolean } }) => Promise<AIAgentResult>;
 
-  public constructor(runner: (systemPrompt: string, userPrompt: string, opts: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; renderTarget?: 'slack' | 'api' | 'web'; outputFormat?: string }) => Promise<AIAgentResult>, callbacks: Callbacks = {}) {
+  public constructor(runner: (systemPrompt: string, userPrompt: string, opts: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; renderTarget?: 'slack' | 'api' | 'web'; outputFormat?: string; abortSignal?: AbortSignal }) => Promise<AIAgentResult>, callbacks: Callbacks = {}) {
     this.runner = runner;
     this.callbacks = callbacks;
   }
@@ -54,12 +56,28 @@ export class SessionManager {
       meta.error = reason ?? 'canceled';
       meta.updatedAt = Date.now();
       this.runs.set(runId, meta);
+      try { this.aborters.get(runId)?.abort(); } catch { /* ignore */ }
+      this.callbacks.onTreeUpdate?.(runId);
+    }
+  }
+
+  public stopRun(runId: string, reason?: string): void {
+    const meta = this.runs.get(runId);
+    if (meta && meta.status === 'running') {
+      meta.status = 'stopping';
+      meta.error = reason ?? 'stopping';
+      meta.updatedAt = Date.now();
+      this.runs.set(runId, meta);
+      const ref = this.stopRefs.get(runId);
+      if (ref) ref.stopping = true;
       this.callbacks.onTreeUpdate?.(runId);
     }
   }
 
   public startRun(key: RunKey, systemPrompt: string, userPrompt: string, history?: ConversationMessage[]): string {
     const runId = crypto.randomUUID();
+    const aborter = new AbortController();
+    const stopRef = { stopping: false };
     const meta: RunMeta = {
       runId,
       key,
@@ -77,6 +95,8 @@ export class SessionManager {
         const result = await this.runner(systemPrompt, userPrompt, {
           history,
           renderTarget: key.source,
+          abortSignal: aborter.signal,
+          stopRef,
           callbacks: {
           onLog: (entry: LogEntry) => {
               const m = this.runs.get(runId);
@@ -127,6 +147,8 @@ export class SessionManager {
         this.callbacks.onTreeUpdate?.(runId);
       }
     })();
+    this.aborters.set(runId, aborter);
+    this.stopRefs.set(runId, stopRef);
 
     return runId;
   }

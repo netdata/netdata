@@ -14,7 +14,7 @@ export interface RunMeta {
   key: RunKey;
   startedAt: number;
   updatedAt: number;
-  status: 'running' | 'succeeded' | 'failed' | 'canceled';
+  status: 'running' | 'stopping' | 'succeeded' | 'failed' | 'canceled';
   error?: string;
   model?: string;
 }
@@ -32,4 +32,3 @@ export interface SimpleAskResponseBody {
   text?: string;
   error?: string;
 }
-

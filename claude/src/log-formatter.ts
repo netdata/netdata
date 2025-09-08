@@ -46,13 +46,17 @@ export function formatLog(entry: LogEntry, opts: LogFormatOptions = {}): string 
   })();
 
   const raw = `${agentPrefix}[${entry.severity}] ${dir} [${turn}] ${base}`;
-  // Color by severity
+  // Color by severity (support bold hint on VRB)
   switch (entry.severity) {
     case 'ERR': return ansi(useColor, '\x1b[31m', raw); // red
     case 'WRN': return ansi(useColor, '\x1b[33m', raw); // yellow
     case 'FIN': return ansi(useColor, '\x1b[36m', raw); // cyan
     case 'TRC': return ansi(useColor, '\x1b[90m', raw); // gray
-    case 'VRB': return ansi(useColor, '\x1b[90m', raw); // gray
+    case 'VRB': {
+      const bold = (entry as { bold?: boolean }).bold === true;
+      const code = bold ? '\x1b[1;90m' : '\x1b[90m';
+      return ansi(useColor, code, raw); // gray (bold when requested)
+    }
     case 'THK': return ansi(useColor, '\x1b[2;37m', raw); // dim white
     default: return raw;
   }

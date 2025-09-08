@@ -3,7 +3,7 @@ import path from 'node:path';
 
 // keep type imports grouped at top
 import type { OutputFormatId } from './formats.js';
-import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, Configuration, ConversationMessage } from './types.js';
+import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, Configuration, ConversationMessage, OpenAPISpecConfig } from './types.js';
 // no runtime format validation here; caller must pass a valid OutputFormatId
 
 import { AIAgent as Agent } from './ai-agent.js';
@@ -12,6 +12,7 @@ import { parseFrontmatter, parseList, parsePairs, extractBodyWithoutFrontmatter 
 import { resolveIncludes } from './include-resolver.js';
 import { resolveEffectiveOptions } from './options-resolver.js';
 import { buildEffectiveOptionsSchema } from './options-schema.js';
+import { openApiToRestTools, parseOpenAPISpec } from './tools/openapi-importer.js';
 
 export interface LoadedAgent {
   id: string; // canonical path (or synthetic when no file)
@@ -47,7 +48,7 @@ export interface LoadedAgent {
   run: (
     systemPrompt: string,
     userPrompt: string,
-    opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent'; outputFormat: OutputFormatId }
+    opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent'; outputFormat: OutputFormatId; abortSignal?: AbortSignal }
   ) => Promise<AIAgentResult>;
 }
 
@@ -149,6 +150,14 @@ export function loadAgent(aiPath: string, registry?: AgentRegistry, options?: Lo
   const config = buildUnifiedConfiguration({ providers: needProviders, mcpServers: selectedTools }, layers, { verbose: options?.verbose });
   const dfl = resolveDefaults(layers);
   validateNoPlaceholders(config);
+  // Merge env files to enable ${VAR} expansion for OpenAPI defaults
+  const mergedEnv: Record<string, string> = {};
+  layers.forEach((ly) => {
+    const e = ly.env ?? {};
+    Object.keys(e).forEach((k) => { mergedEnv[k] = e[k]; });
+  });
+  Object.keys(process.env).forEach((k) => { const v = process.env[k]; if (typeof v === 'string') mergedEnv[k] = v; });
+  const expandVars = (s: string): string => s.replace(/\$\{([^}]+)\}/g, (_m, name: string) => mergedEnv[name] ?? '');
 
   const eff = resolveEffectiveOptions({
     cli: {
@@ -216,13 +225,85 @@ export function loadAgent(aiPath: string, registry?: AgentRegistry, options?: Lo
       mcpInitConcurrency: eff.mcpInitConcurrency,
     },
     subTools: [],
-    run: async (systemPrompt: string, userPrompt: string, opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent'; outputFormat: OutputFormatId }): Promise<AIAgentResult> => {
-      const o = (opts ?? {}) as { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli'|'slack'|'api'|'web'|'sub-agent'; outputFormat?: OutputFormatId };
+    run: async (systemPrompt: string, userPrompt: string, opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent'; outputFormat: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean } }): Promise<AIAgentResult> => {
+      const o = (opts ?? {}) as { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli'|'slack'|'api'|'web'|'sub-agent'; outputFormat?: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean } };
       if (o.outputFormat === undefined) throw new Error('outputFormat is required');
+      // Support dynamic OpenAPI tool import via config.openapiSpecs and tool selector: openapi:<path-or-url>
+      let dynamicConfig = config;
+      let dynamicTools = [...selectedTools];
+      // 1) From config.openapiSpecs (no manual work required)
+      const openapiSpecs = (dynamicConfig as unknown as { openapiSpecs?: Record<string, OpenAPISpecConfig> }).openapiSpecs;
+      if (openapiSpecs !== undefined) {
+        const entries = Object.entries(openapiSpecs);
+        // eslint-disable-next-line functional/no-loop-statements
+        for (const [name, specCfg] of entries) {
+          try {
+            const loc = specCfg.spec;
+            let text: string;
+            if (loc.startsWith('http://') || loc.startsWith('https://')) {
+              const res = await fetch(loc);
+              if (!res.ok) throw new Error(`HTTP ${String(res.status)}`);
+              text = await res.text();
+            } else {
+              const p = path.isAbsolute(loc) ? loc : path.resolve(baseDir, loc);
+              text = readFileText(p);
+            }
+            const spec = parseOpenAPISpec(text);
+            const toolsMap = openApiToRestTools(spec, { toolNamePrefix: name, baseUrlOverride: specCfg.baseUrl, includeMethods: specCfg.includeMethods, tagFilter: specCfg.tagFilter });
+            // Merge default headers (with ${VAR} expansion)
+            const defaultHeadersRaw = specCfg.headers ?? {};
+            const defaultHeaders: Record<string, string> = {};
+            Object.entries(defaultHeadersRaw).forEach(([k, v]) => { defaultHeaders[k] = expandVars(v); });
+            Object.values(toolsMap).forEach((t) => {
+              const merged = { ...(defaultHeaders), ...(t.headers ?? {}) };
+              t.headers = Object.keys(merged).length > 0 ? merged : undefined;
+            });
+            const mergedRest = { ...(dynamicConfig.restTools ?? {}), ...toolsMap };
+            dynamicConfig = { ...dynamicConfig, restTools: mergedRest };
+            // Auto-enable all generated tools without requiring manual selection
+            dynamicTools = dynamicTools.concat(Object.keys(toolsMap));
+          } catch (e) {
+            throw new Error(`Failed to import OpenAPI spec '${name}': ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+      }
+
+      // 2) From per-run selector list
+      const openapiSelectors = selectedTools.filter((t) => typeof t === 'string' && t.startsWith('openapi:'));
+      if (openapiSelectors.length > 0) {
+        // eslint-disable-next-line functional/no-loop-statements
+        for (const sel of openapiSelectors) {
+          const specLoc = sel.slice('openapi:'.length);
+          try {
+            let text: string | undefined;
+            if (specLoc.startsWith('http://') || specLoc.startsWith('https://')) {
+              // Fetch at runtime
+              const res = await fetch(specLoc);
+              if (!res.ok) throw new Error(`HTTP ${String(res.status)}`);
+              text = await res.text();
+            } else {
+              const p = path.isAbsolute(specLoc) ? specLoc : path.resolve(baseDir, specLoc);
+              text = readFileText(p);
+            }
+            const spec = parseOpenAPISpec(text);
+            // Derive a stable prefix from source
+            const nameHint = specLoc.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').toLowerCase();
+            const prefix = nameHint.length > 0 ? nameHint : 'openapi';
+            const toolsMap = openApiToRestTools(spec, { toolNamePrefix: prefix });
+            const mergedRest = { ...(dynamicConfig.restTools ?? {}), ...toolsMap };
+            dynamicConfig = { ...dynamicConfig, restTools: mergedRest };
+            // Add imported tools to selection (by their keys)
+            dynamicTools = dynamicTools.filter((t) => t !== sel).concat(Object.keys(toolsMap));
+          } catch (e) {
+            throw new Error(`Failed to import OpenAPI spec '${specLoc}': ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+      }
+
       const sessionConfig: AIAgentSessionConfig = {
-        config,
+        config: dynamicConfig,
         targets: selectedTargets,
-        tools: selectedTools,
+        tools: dynamicTools,
         agentId: agentName,
         subAgentPaths: selectedAgents,
         systemPrompt,
@@ -233,6 +314,9 @@ export function loadAgent(aiPath: string, registry?: AgentRegistry, options?: Lo
         expectedOutput: fm?.expectedOutput,
         callbacks: o.callbacks,
         trace: o.trace,
+        stopRef: o.stopRef,
+        // Propagate headend abort signal if present
+        abortSignal: (opts as unknown as { abortSignal?: AbortSignal } | undefined)?.abortSignal,
         temperature: eff.temperature,
         topP: eff.topP,
         maxOutputTokens: eff.maxOutputTokens,
@@ -350,10 +434,41 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
     run: async (systemPrompt: string, userPrompt: string, opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent'; outputFormat: OutputFormatId }): Promise<AIAgentResult> => {
       const o = (opts ?? {}) as { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli'|'slack'|'api'|'web'|'sub-agent'; outputFormat?: OutputFormatId };
       if (o.outputFormat === undefined) throw new Error('outputFormat is required');
+      // Support dynamic OpenAPI tool import via tool selector: openapi:<path-or-url>
+      let dynamicConfig = config;
+      let dynamicTools = [...selectedTools];
+      const openapiSelectors = selectedTools.filter((t) => typeof t === 'string' && t.startsWith('openapi:'));
+      if (openapiSelectors.length > 0) {
+        // eslint-disable-next-line functional/no-loop-statements
+        for (const sel of openapiSelectors) {
+          const specLoc = sel.slice('openapi:'.length);
+          try {
+            let text: string | undefined;
+            if (specLoc.startsWith('http://') || specLoc.startsWith('https://')) {
+              const res = await fetch(specLoc);
+              if (!res.ok) throw new Error(`HTTP ${String(res.status)}`);
+              text = await res.text();
+            } else {
+              const p = path.isAbsolute(specLoc) ? specLoc : path.resolve(options?.baseDir ?? process.cwd(), specLoc);
+              text = readFileText(p);
+            }
+            const spec = parseOpenAPISpec(text);
+            const nameHint = specLoc.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').toLowerCase();
+            const prefix = nameHint.length > 0 ? nameHint : 'openapi';
+            const toolsMap = openApiToRestTools(spec, { toolNamePrefix: prefix });
+            const mergedRest = { ...(dynamicConfig.restTools ?? {}), ...toolsMap };
+            dynamicConfig = { ...dynamicConfig, restTools: mergedRest };
+            dynamicTools = dynamicTools.filter((t) => t !== sel).concat(Object.keys(toolsMap));
+          } catch (e) {
+            throw new Error(`Failed to import OpenAPI spec '${specLoc}': ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+      }
+
       const sessionConfig: AIAgentSessionConfig = {
-        config,
+        config: dynamicConfig,
         targets: selectedTargets,
-        tools: selectedTools,
+        tools: dynamicTools,
         agentId: path.basename(id).replace(/\.[^.]+$/, ''),
         subAgentPaths: selectedAgents,
         systemPrompt,

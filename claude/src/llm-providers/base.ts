@@ -219,6 +219,17 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       return 0;
     };
     const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object';
+    const getNestedNum = (obj: Record<string, unknown>, path: string[]): number => {
+      // Safe nested lookup for numeric fields; returns 0 if not found or not numeric
+      let cur: unknown = obj;
+      // eslint-disable-next-line functional/no-loop-statements
+      for (const key of path) {
+        if (cur === null || cur === undefined || typeof cur !== 'object') return 0;
+        const rec = cur as Record<string, unknown>;
+        cur = rec[key];
+      }
+      return typeof cur === 'number' && Number.isFinite(cur) ? cur : (typeof cur === 'string' && Number.isFinite(Number(cur)) ? Number(cur) : 0);
+    };
     const u: Record<string, unknown> = isRecord(usage) ? usage : {};
     const get = (key: string): unknown => (Object.prototype.hasOwnProperty.call(u, key) ? u[key] : undefined);
     const inputTokens = num(get('inputTokens')) || num(get('prompt_tokens')) || num(get('input_tokens'));
@@ -231,6 +242,30 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     const cacheReadInputTokens = cachedReadRaw > 0 ? cachedReadRaw : undefined;
     // Back-compat aggregate cachedTokens equals read tokens when available
     const cachedTokens = cacheReadInputTokens;
+    // Some providers (Anthropic via AI SDK) may also report cache creation tokens on the usage object
+    // Try multiple possible keys to keep things robust across SDK versions
+    // Try multiple sources for cache write tokens (provider/SDK variants)
+    let cacheWriteRaw =
+      num(get('cacheWriteInputTokens'))
+      || num(get('cacheCreationInputTokens'))
+      // Anthropic API may expose snake_case creation field
+      || num(get('cache_creation_input_tokens'))
+      // Some providers/SDKs may report a generic write field
+      || num(get('cache_write_input_tokens'));
+    if (cacheWriteRaw === 0) {
+      // Look into nested token details often used by OpenAI/AI SDK
+      const nestedCandidates: string[][] = [
+        ['promptTokensDetails', 'cacheCreationTokens'],
+        ['prompt_tokens_details', 'cache_creation_tokens'],
+        ['inputTokensDetails', 'cacheCreationTokens'],
+        ['input_tokens_details', 'cache_creation_tokens'],
+      ];
+      const found = nestedCandidates
+        .map((p) => getNestedNum(u, p))
+        .find((v) => v > 0);
+      if (typeof found === 'number' && found > 0) cacheWriteRaw = found;
+    }
+    const cacheWriteInputTokens = cacheWriteRaw > 0 ? cacheWriteRaw : undefined;
     const totalTokensRaw = num(u.totalTokens) || num(u.total_tokens);
     const totalTokens = totalTokensRaw > 0 ? totalTokensRaw : (inputTokens + outputTokens);
 
@@ -239,6 +274,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       outputTokens,
       cachedTokens: cachedTokens !== undefined && cachedTokens > 0 ? cachedTokens : undefined,
       cacheReadInputTokens,
+      cacheWriteInputTokens,
       totalTokens
     };
   }
@@ -373,6 +409,16 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     providerOptions?: unknown
   ): Promise<TurnResult> {
     const { controller, resetIdle, clearIdle } = this.createTimeoutController(request.llmTimeout ?? 120000);
+    try {
+      if (request.abortSignal !== undefined) {
+        if (request.abortSignal.aborted) { controller.abort(); }
+        else {
+          // Tie external abort to our controller
+          const onAbort = () => { try { controller.abort(); } catch { /* ignore */ } };
+          request.abortSignal.addEventListener('abort', onAbort, { once: true });
+        }
+      }
+    } catch { /* ignore */ }
     
     try {
       resetIdle();
@@ -451,7 +497,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         } catch { /* ignore */ }
       }
       const tokens = this.extractTokenUsage(usage);
-      // Try to enrich with provider metadata (e.g., Anthropic cacheCreationInputTokens)
+      // Try to enrich with provider metadata (e.g., Anthropic cache creation tokens)
       try {
         const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object';
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/dot-notation
@@ -464,8 +510,20 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
           const pm: Record<string, unknown> = provMeta;
           const a = pm.anthropic;
           if (isObj(a)) {
-            // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-            w = (a as { cacheCreationInputTokens?: unknown }).cacheCreationInputTokens;
+            const ar: Record<string, unknown> = a;
+            let cand: unknown = ar.cacheCreationInputTokens
+              ?? ar.cache_creation_input_tokens
+              ?? ar.cacheCreationTokens
+              ?? ar.cache_creation_tokens;
+            if (cand === undefined) {
+              const cc = ar.cacheCreation;
+              if (isObj(cc)) { cand = cc.ephemeral_5m_input_tokens; }
+            }
+            if (cand === undefined) {
+              const cc2 = ar.cache_creation;
+              if (isObj(cc2)) { cand = cc2.ephemeral_5m_input_tokens; }
+            }
+            w = cand;
           }
         }
         // const anthropic = isObj(provMeta) && isObj(provMeta.anthropic) ? (provMeta.anthropic as Record<string, unknown>) : undefined;
@@ -593,6 +651,17 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     providerOptions?: unknown
   ): Promise<TurnResult> {
     try {
+      // Combine external abort signal with a timeout controller
+      const { controller } = this.createTimeoutController(request.llmTimeout ?? 120000);
+      try {
+        if (request.abortSignal !== undefined) {
+          if (request.abortSignal.aborted) { controller.abort(); }
+          else {
+            const onAbort = () => { try { controller.abort(); } catch { /* ignore */ } };
+            request.abortSignal.addEventListener('abort', onAbort, { once: true });
+          }
+        }
+      } catch { /* ignore */ }
       const result = await generateText({
         model,
         messages,
@@ -602,7 +671,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         temperature: request.temperature,
         topP: request.topP,
         providerOptions: providerOptions as never,
-        abortSignal: AbortSignal.timeout(request.llmTimeout ?? 120000),
+        abortSignal: controller.signal,
       });
 
       const tokens = this.extractTokenUsage(result.usage);
@@ -616,7 +685,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       }
 
       const respObj = (result.response as { messages?: unknown[]; providerMetadata?: Record<string, unknown> } | undefined) ?? {};
-      // Enrich with provider metadata (e.g., Anthropic cacheCreationInputTokens)
+      // Enrich with provider metadata (e.g., Anthropic cache creation tokens)
       try {
         const provMeta = respObj.providerMetadata;
         const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object';
@@ -625,8 +694,20 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
           const pm: Record<string, unknown> = provMeta;
           const a = pm.anthropic;
           if (isObj(a)) {
-            // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-            w = (a as { cacheCreationInputTokens?: unknown }).cacheCreationInputTokens;
+            const ar: Record<string, unknown> = a;
+            let cand: unknown = ar.cacheCreationInputTokens
+              ?? ar.cache_creation_input_tokens
+              ?? ar.cacheCreationTokens
+              ?? ar.cache_creation_tokens;
+            if (cand === undefined) {
+              const cc = ar.cacheCreation;
+              if (isObj(cc)) { cand = cc.ephemeral_5m_input_tokens; }
+            }
+            if (cand === undefined) {
+              const cc2 = ar.cache_creation;
+              if (isObj(cc2)) { cand = cc2.ephemeral_5m_input_tokens; }
+            }
+            w = cand;
           }
         }
         if (typeof w === 'number' && Number.isFinite(w)) {

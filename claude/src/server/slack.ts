@@ -320,7 +320,7 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
   const closed = new Set<string>();
   // Removed upload fallback; model must output Block Kit messages
 
-  const scheduleUpdate = (client: any, channel: string, ts: string, render: () => { text: string; blocks: any[] } | string): void => {
+  const scheduleUpdate = (client: any, channel: string, ts: string, render: () => { text: string; blocks: any[] } | string, prefixBlocks?: any[]): void => {
         const key = `${channel}:${ts}`; // used for lastUpdate timestamping
     if (closed.has(key) || updating.has(key)) return;
     const doUpdate = async (): Promise<void> => {
@@ -339,7 +339,8 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
         } else {
           const { text, blocks } = rendered;
           if (Array.isArray(blocks) && blocks.length > 0) {
-            await client.chat.update({ channel, ts, text, blocks });
+            const mergedBlocks = Array.isArray(prefixBlocks) && prefixBlocks.length > 0 ? [...prefixBlocks, ...blocks] : blocks;
+            await client.chat.update({ channel, ts, text, blocks: mergedBlocks });
           } else {
             await client.chat.update({ channel, ts, text });
           }
@@ -553,14 +554,19 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
     vlog('calling agent');
     const runId = options.sessionManager.startRun({ source: 'slack', teamId: context?.teamId, channelId: channel, threadTsOrSessionId: threadTs }, systemPrompt, userPrompt, history);
     // Update the opener message to include a Cancel button
+    // Persist a cancel actions block for the life of this progress message
+    const openerText = pickOpener(fname, options.openerTone ?? 'random');
+    const cancelActions = { type: 'actions', elements: [
+      { type: 'button', text: { type: 'plain_text', text: 'Stop' }, action_id: 'stop_run', value: runId },
+      { type: 'button', text: { type: 'plain_text', text: 'Abort' }, style: 'danger', action_id: 'cancel_run', value: runId }
+    ] } as const;
     try {
       await client.chat.update({
         channel,
         ts: liveTs,
-        text: pickOpener(fname, options.openerTone ?? 'random'),
+        text: openerText,
         blocks: [
-          { type: 'section', text: { type: 'mrkdwn', text: pickOpener(fname, options.openerTone ?? 'random') } },
-          { type: 'actions', elements: [ { type: 'button', text: { type: 'plain_text', text: 'Cancel' }, style: 'danger', action_id: 'cancel_run', value: runId } ] }
+          { type: 'section', text: { type: 'mrkdwn', text: openerText } }
         ]
       });
     } catch { /* ignore update issues */ }
@@ -577,12 +583,27 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
       })();
       const text = formatSlackStatus(snap);
       const blocks = buildStatusBlocks(snap, (maybeTree as any)?.agentId, (maybeTree as any)?.startedAt);
+      // Insert Cancel button below the agent list and above the footer context
+      // Heuristic: place before the last 'context' block (footer) if present
+      try {
+        // Remove any existing cancel actions to avoid duplicates
+        for (let i = blocks.length - 1; i >= 0; i--) {
+          const b = blocks[i];
+          if (b && b.type === 'actions') { blocks.splice(i, 1); }
+        }
+        const footerIdx = (() => {
+          for (let i = blocks.length - 1; i >= 0; i--) { if (blocks[i]?.type === 'context') return i; }
+          return -1;
+        })();
+        const insertIdx = footerIdx >= 0 ? footerIdx : blocks.length;
+        blocks.splice(insertIdx, 0, cancelActions);
+      } catch { /* ignore block surgery errors */ }
       return { text, blocks };
     };
     scheduleUpdate(client, channel, liveTs, render);
     const poll = setInterval(async () => {
       const meta = sessionManager.getRun(runId);
-      if (!meta || meta.status === 'running') { scheduleUpdate(client, channel, liveTs, render); return; }
+      if (!meta || meta.status === 'running' || meta.status === 'stopping') { scheduleUpdate(client, channel, liveTs, render); return; }
       clearInterval(poll);
       await finalizeAndPost(client, channel, liveTs, runId, { error: meta.error });
     }, updateIntervalMs);
@@ -608,10 +629,26 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
       // Mark run as canceled (best-effort)
       options.sessionManager.cancelRun?.(runId, 'Canceled by user');
       // Update message
-      await args.client.chat.update({ channel, ts, text: '⛔ Canceled by user.' });
+      await args.client.chat.update({ channel, ts, text: '⛔ Aborting…' });
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error('cancel_run failed', e);
+    }
+  });
+
+  // Stop (graceful) button handler
+  app.action('stop_run', async (args: any) => {
+    try {
+      const body = args?.body ?? {};
+      const channel = body.channel?.id ?? body.container?.channel_id;
+      const ts = body.message?.ts ?? body.container?.message_ts;
+      const runId = body.actions?.[0]?.value as string | undefined;
+      if (!channel || !ts || !runId) return;
+      options.sessionManager.stopRun?.(runId, 'Stopping by user');
+      await args.client.chat.update({ channel, ts, text: '🛑 Stopping…' });
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('stop_run failed', e);
     }
   });
 }

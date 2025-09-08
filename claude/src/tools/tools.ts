@@ -15,6 +15,7 @@ export class ToolsOrchestrator {
   ]);
   private slotsInUse = 0;
   private waiters: (() => void)[] = [];
+  private canceled = false;
 
   constructor(
     private readonly tree: ExecutionTree,
@@ -30,12 +31,14 @@ export class ToolsOrchestrator {
 
   // Warmup providers that require async initialization (e.g., MCP) and refresh tool mapping
   async warmup(): Promise<void> {
+    if (this.canceled) return;
     await Promise.all(this.providers.map(async (p) => { try { await p.warmup(); } catch { /* ignore */ } }));
     // Refresh mapping now that providers are warmed
     this.listTools();
   }
 
   listTools(): MCPTool[] {
+    if (this.canceled) return [];
     const tools = this.providers.flatMap((p) => p.listTools());
     // Refresh mapping every time we list
     this.mapping.clear();
@@ -60,12 +63,14 @@ export class ToolsOrchestrator {
   }
 
   hasTool(name: string): boolean {
+    if (this.canceled) return false;
     if (this.mapping.size === 0) this.listTools();
     const effective = this.resolveName(name);
     return this.mapping.has(effective);
   }
 
   async execute(name: string, args: Record<string, unknown>, opts?: ToolExecuteOptions): Promise<ToolExecuteResult> {
+    if (this.canceled) throw new Error('canceled');
     if (this.mapping.size === 0) this.listTools();
     const effective = this.resolveName(name);
     const entry = this.mapping.get(effective);
@@ -80,6 +85,7 @@ export class ToolsOrchestrator {
     ctx: ToolExecutionContext,
     opts?: ToolExecuteOptions
   ): Promise<{ result: string; providerLabel: string; latency: number }>{
+    if (this.canceled) throw new Error('canceled');
     const bypass = opts?.bypassConcurrency === true;
     if (!bypass) await this.acquireSlot();
     if (this.mapping.size === 0) { this.listTools(); }
@@ -90,8 +96,10 @@ export class ToolsOrchestrator {
     const provider = entry.provider;
     const kind = entry.kind;
     const spanId = this.tree.startSpan(effective, 'tool', { kind, provider: provider.id, turn: ctx.turn, subturn: ctx.subturn });
-    // Begin hierarchical op (Option C). For sub-agents, use 'session' to represent the child.
-    const opKind = (kind === 'agent') ? 'session' : 'tool';
+    // Begin hierarchical op (Option C).
+    // Only treat actual sub-agents as child 'session' ops (provider.id === 'subagent').
+    // Internal agent-scoped tools (provider.id === 'agent') should remain regular 'tool' ops to avoid ghost sessions.
+    const opKind = (kind === 'agent' && provider.id === 'subagent') ? 'session' : 'tool';
     const opId = (() => {
       try { return this.opTree?.beginOp(ctx.turn, opKind, { name: effective, provider: provider.id, kind }); } catch { return undefined; }
     })();
@@ -332,11 +340,12 @@ export class ToolsOrchestrator {
   private async acquireSlot(): Promise<void> {
     const cap = Math.max(1, this.opts.maxConcurrentTools ?? 1);
     const effectiveCap = (this.opts.parallelToolCalls === false) ? 1 : cap;
+    if (this.canceled) throw new Error('canceled');
     if (this.slotsInUse < effectiveCap) {
       this.slotsInUse += 1;
       return;
     }
-    await new Promise<void>((resolve) => { this.waiters.push(resolve); });
+    await new Promise<void>((resolve, reject) => { this.waiters.push(() => { if (this.canceled) reject(new Error('canceled')); else resolve(); }); });
     this.slotsInUse += 1;
   }
 
@@ -362,6 +371,9 @@ export class ToolsOrchestrator {
   }
 
   async cleanup(): Promise<void> {
+    this.canceled = true;
+    // release all waiters
+    try { this.waiters.splice(0).forEach((w) => { try { w(); } catch { /* ignore */ } }); } catch { /* ignore */ }
     // eslint-disable-next-line functional/no-loop-statements
     for (const p of this.providers) {
       const maybe = p as unknown as { cleanup?: () => Promise<void> };
@@ -369,5 +381,13 @@ export class ToolsOrchestrator {
         try { await maybe.cleanup(); } catch { /* ignore */ }
       }
     }
+  }
+
+  // Explicit cancel entrypoint to abort queue and tear down providers
+  cancel(): void {
+    this.canceled = true;
+    try { this.waiters.splice(0).forEach((w) => { try { w(); } catch { /* ignore */ } }); } catch { /* ignore */ }
+    // Best-effort async cleanup; do not await here to avoid blocking callers
+    void this.cleanup();
   }
 }
