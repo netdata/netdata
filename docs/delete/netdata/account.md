@@ -16,7 +16,7 @@ Navigate to the Netdata UI and locate your **user profile icon** in the bottom-l
 
 From the profile menu, click on **"Settings"** to access your account settings page.
 
-![settings](https://github.com/netdata/docs-images/blob/master/netdata-cloud/account-management/delete-account/profile-menu-settings.png)
+![settings](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/netdata-cloud/account-management/delete-account/profile-menu-settings.png)
 
 ### Step 3: Locate the Delete Account Option
 
@@ -26,7 +26,7 @@ Once in the Settings page, your profile information will appear in a pop-up wind
 
 Click on **"Delete account"**. A confirmation dialog will appear with the following warning:
 
-![delete dialog](https://github.com/netdata/docs-images/blob/master/netdata-cloud/account-management/delete-account/delete-confirmation-dialog.png)
+![delete dialog](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/netdata-cloud/account-management/delete-account/delete-confirmation-dialog.png)
 
 ### Step 5: Final Confirmation
 
