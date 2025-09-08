@@ -295,16 +295,8 @@ static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
             }
 
             // wait for 10ms, and loop again...
-            struct timespec tp;
-            clock_gettime(CLOCK_REALTIME, &tp);
-            tp.tv_nsec += 10 * NSEC_PER_MSEC;
-            if(tp.tv_nsec > (long)(1 * NSEC_PER_SEC)) {
-                tp.tv_sec++;
-                tp.tv_nsec -= 1 * NSEC_PER_SEC;
-            }
-
             // the mutex is unlocked within cond_timedwait()
-            rc = netdata_cond_timedwait(&tmp->cond, &tmp->mutex, &tp);
+            rc = netdata_cond_timedwait(&tmp->cond, &tmp->mutex, 10 * NSEC_PER_MSEC);
             // the mutex is again ours
 
             if(rc == ETIMEDOUT) {

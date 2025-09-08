@@ -73,9 +73,9 @@ static command_info_t command_info_array[] = {
 };
 
 /* Mutexes for commands of type CMD_TYPE_ORTHOGONAL */
-static uv_mutex_t command_lock_array[CMD_TOTAL_COMMANDS];
+static netdata_mutex_t command_lock_array[CMD_TOTAL_COMMANDS];
 /* Commands of type CMD_TYPE_EXCLUSIVE are writers */
-static uv_rwlock_t exclusive_rwlock;
+static netdata_rwlock_t exclusive_rwlock;
 /*
  * Locking order:
  * 1. exclusive_rwlock
@@ -485,20 +485,20 @@ static void cmd_lock_exclusive(unsigned index)
 {
     (void)index;
 
-    uv_rwlock_wrlock(&exclusive_rwlock);
+    netdata_rwlock_wrlock(&exclusive_rwlock);
 }
 
 static void cmd_lock_orthogonal(unsigned index)
 {
-    uv_rwlock_rdlock(&exclusive_rwlock);
-    uv_mutex_lock(&command_lock_array[index]);
+    netdata_rwlock_rdlock(&exclusive_rwlock);
+    netdata_mutex_lock(&command_lock_array[index]);
 }
 
 static void cmd_lock_idempotent(unsigned index)
 {
     (void)index;
 
-    uv_rwlock_rdlock(&exclusive_rwlock);
+    netdata_rwlock_rdlock(&exclusive_rwlock);
 }
 
 static void cmd_lock_high_priority(unsigned index)
@@ -510,20 +510,20 @@ static void cmd_unlock_exclusive(unsigned index)
 {
     (void)index;
 
-    uv_rwlock_wrunlock(&exclusive_rwlock);
+    netdata_rwlock_wrunlock(&exclusive_rwlock);
 }
 
 static void cmd_unlock_orthogonal(unsigned index)
 {
-    uv_rwlock_rdunlock(&exclusive_rwlock);
-    uv_mutex_unlock(&command_lock_array[index]);
+    netdata_rwlock_rdunlock(&exclusive_rwlock);
+    netdata_mutex_unlock(&command_lock_array[index]);
 }
 
 static void cmd_unlock_idempotent(unsigned index)
 {
     (void)index;
 
-    uv_rwlock_rdunlock(&exclusive_rwlock);
+    netdata_rwlock_rdunlock(&exclusive_rwlock);
 }
 
 static void cmd_unlock_high_priority(unsigned index)
@@ -856,9 +856,9 @@ void commands_init(void)
 
     netdata_log_info("Initializing command server.");
     for (i = 0 ; i < CMD_TOTAL_COMMANDS ; ++i) {
-        fatal_assert(0 == uv_mutex_init(&command_lock_array[i]));
+        fatal_assert(0 == netdata_mutex_init(&command_lock_array[i]));
     }
-    fatal_assert(0 == uv_rwlock_init(&exclusive_rwlock));
+    fatal_assert(0 == netdata_rwlock_init(&exclusive_rwlock));
 
     completion_init(&completion);
     error = uv_thread_create(&thread, command_thread, NULL);
@@ -899,9 +899,9 @@ void commands_exit(void)
     fatal_assert(0 == uv_thread_join(&thread));
 
     for (i = 0 ; i < CMD_TOTAL_COMMANDS ; ++i) {
-        uv_mutex_destroy(&command_lock_array[i]);
+        netdata_mutex_destroy(&command_lock_array[i]);
     }
-    uv_rwlock_destroy(&exclusive_rwlock);
+    netdata_rwlock_destroy(&exclusive_rwlock);
     netdata_log_info("Command server has stopped.");
     command_server_initialized = 0;
 }

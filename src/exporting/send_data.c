@@ -231,16 +231,16 @@ void simple_connector_worker(void *instance_p)
         if (instance->data_is_ready)
             send_stats = 1;
 
-        uv_mutex_lock(&instance->mutex);
+        netdata_mutex_lock(&instance->mutex);
         if (!connector_specific_data->first_buffer->used || failures) {
             while (!instance->data_is_ready)
-                uv_cond_wait(&instance->cond_var, &instance->mutex);
+                netdata_cond_wait(&instance->cond_var, &instance->mutex);
             instance->data_is_ready = 0;
             send_stats = 1;
         }
 
         if (unlikely(instance->engine->exit)) {
-            uv_mutex_unlock(&instance->mutex);
+            netdata_mutex_unlock(&instance->mutex);
             break;
         }
 
@@ -272,7 +272,7 @@ void simple_connector_worker(void *instance_p)
             buffered_metrics = connector_specific_data->buffered_metrics;
         }
 
-        uv_mutex_unlock(&instance->mutex);
+        netdata_mutex_unlock(&instance->mutex);
 
         // ------------------------------------------------------------------------
         // if we are connected, receive a response, without blocking
@@ -354,7 +354,7 @@ void simple_connector_worker(void *instance_p)
             break;
 
         if (send_stats) {
-            uv_mutex_lock(&instance->mutex);
+            netdata_mutex_lock(&instance->mutex);
 
             stats->buffered_metrics = connector_specific_data->total_buffered_metrics;
 
@@ -376,7 +376,7 @@ void simple_connector_worker(void *instance_p)
             stats->lost_metrics =
             stats->lost_bytes = 0;
 
-            uv_mutex_unlock(&instance->mutex);
+            netdata_mutex_unlock(&instance->mutex);
         }
 
 #ifdef UNIT_TESTING

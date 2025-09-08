@@ -56,7 +56,7 @@ struct rrdengine_datafile {
     unsigned fileno;
     uv_file file;
     uint64_t pos;
-    uv_rwlock_t extent_rwlock;
+    netdata_rwlock_t extent_rwlock;
     struct rrdengine_instance *ctx;
     struct rrdengine_journalfile *journalfile;
 

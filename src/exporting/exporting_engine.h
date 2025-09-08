@@ -210,8 +210,8 @@ struct instance {
     time_t before;
 
     ND_THREAD *thread;
-    uv_mutex_t mutex;
-    uv_cond_t cond_var;
+    netdata_mutex_t mutex;
+    netdata_cond_t cond_var;
     int data_is_ready;
 
     int (*start_batch_formatting)(struct instance *instance);

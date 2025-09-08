@@ -106,9 +106,9 @@ int init_prometheus_remote_write_instance(struct instance *instance)
 
     instance->buffer = (void *)buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
 
-    if (uv_mutex_init(&instance->mutex))
+    if (netdata_mutex_init(&instance->mutex))
         return 1;
-    if (uv_cond_init(&instance->cond_var))
+    if (netdata_cond_init(&instance->cond_var))
         return 1;
 
     struct simple_connector_data *simple_connector_data = callocz(1, sizeof(struct simple_connector_data));

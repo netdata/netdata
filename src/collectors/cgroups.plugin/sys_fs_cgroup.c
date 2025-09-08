@@ -54,7 +54,7 @@ uint32_t throttled_usec_hash = 0;
 
 // *** WARNING *** The fields are not thread safe. Take care of safe usage.
 struct cgroup *cgroup_root = NULL;
-uv_mutex_t cgroup_root_mutex;
+netdata_mutex_t cgroup_root_mutex;
 
 struct cgroups_systemd_config_setting cgroups_systemd_options[] = {
         { .name = "legacy",  .setting = SYSTEMD_CGROUP_LEGACY  },
@@ -1335,9 +1335,9 @@ static void cgroup_main_cleanup(void *pptr) {
     if (!__atomic_load_n(&discovery_thread.exited, __ATOMIC_RELAXED)) {
         collector_info("waiting for discovery thread to finish...");
         while (!__atomic_load_n(&discovery_thread.exited, __ATOMIC_RELAXED) && max > 0) {
-            uv_mutex_lock(&discovery_thread.mutex);
-            uv_cond_signal(&discovery_thread.cond_var);
-            uv_mutex_unlock(&discovery_thread.mutex);
+            netdata_mutex_lock(&discovery_thread.mutex);
+            netdata_cond_signal(&discovery_thread.cond_var);
+            netdata_mutex_unlock(&discovery_thread.mutex);
             max -= step;
             sleep_usec(step);
         }
@@ -1381,7 +1381,7 @@ void cgroups_main(void *ptr) {
 
     cgroup_read_host_total_ram();
 
-    if (uv_mutex_init(&cgroup_root_mutex)) {
+    if (netdata_mutex_init(&cgroup_root_mutex)) {
         collector_error("CGROUP: cannot initialize mutex for the main cgroup list");
         return;
     }
@@ -1392,11 +1392,11 @@ void cgroups_main(void *ptr) {
 
     discovery_thread.exited = 0;
 
-    if (uv_mutex_init(&discovery_thread.mutex)) {
+    if (netdata_mutex_init(&discovery_thread.mutex)) {
         collector_error("CGROUP: cannot initialize mutex for discovery thread");
         return;
     }
-    if (uv_cond_init(&discovery_thread.cond_var)) {
+    if (netdata_cond_init(&discovery_thread.cond_var)) {
         collector_error("CGROUP: cannot initialize conditional variable for discovery thread");
         return;
     }
@@ -1434,21 +1434,21 @@ void cgroups_main(void *ptr) {
 
         find_dt += hb_dt;
         if (unlikely(find_dt >= find_every || (!is_inside_k8s && cgroups_check))) {
-            uv_mutex_lock(&discovery_thread.mutex);
-            uv_cond_signal(&discovery_thread.cond_var);
-            uv_mutex_unlock(&discovery_thread.mutex);
+            netdata_mutex_lock(&discovery_thread.mutex);
+            netdata_cond_signal(&discovery_thread.cond_var);
+            netdata_mutex_unlock(&discovery_thread.mutex);
             find_dt = 0;
             cgroups_check = 0;
         }
 
         worker_is_busy(WORKER_CGROUPS_LOCK);
-        uv_mutex_lock(&cgroup_root_mutex);
+        netdata_mutex_lock(&cgroup_root_mutex);
 
         worker_is_busy(WORKER_CGROUPS_READ);
         read_all_discovered_cgroups(cgroup_root);
 
         if (unlikely(!service_running(SERVICE_COLLECTORS))) {
-            uv_mutex_unlock(&cgroup_root_mutex);
+            netdata_mutex_unlock(&cgroup_root_mutex);
             break;
         }
 
@@ -1458,11 +1458,11 @@ void cgroups_main(void *ptr) {
         update_cgroup_systemd_services_charts();
 
         if (unlikely(!service_running(SERVICE_COLLECTORS))) {
-           uv_mutex_unlock(&cgroup_root_mutex);
+            netdata_mutex_unlock(&cgroup_root_mutex);
            break;
         }
 
         worker_is_idle();
-        uv_mutex_unlock(&cgroup_root_mutex);
+        netdata_mutex_unlock(&cgroup_root_mutex);
     }
 }
