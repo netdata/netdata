@@ -13,6 +13,25 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 )
 
+// CommandUnprivileged runs a command without any extra privileges and
+// returns the exec.Cmd instance.
+//
+// ctx is a context.Context to use to run the command. logger is a Logger
+// instance to use to log the command to be executed.  timeout indicates
+// the timeout for the command. arg is a list of the command arguments,
+// with the first string in the slice being the command to run.
+//
+// This invokes the command and logs a debug message that the command
+// is being executed, and then returns the exec.Cmd object for the command.
+func CommandUnprivileged(ctx context.Context, logger *logger.Logger, arg ...string) *exec.Cmd {
+	cmd := exec.CommandContext(ctx, arg[0], arg[1:]...)
+	if logger != nil {
+		logger.Debugf("executing '%s'", cmd)
+	}
+
+	return cmd
+}
+
 // RunUnprivileged runs a command without additional privielges.
 //
 // logger is a Logger instance to use to log the command to be executed.
@@ -27,10 +46,7 @@ func RunUnprivileged(logger *logger.Logger, timeout time.Duration, arg ...string
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, arg[0], arg[1:]...)
-	if logger != nil {
-		logger.Debugf("executing '%s'", cmd)
-	}
+	cmd := CommandUnprivileged(ctx, logger, arg...)
 
 	bs, err := cmd.Output()
 	if err != nil {
@@ -38,6 +54,26 @@ func RunUnprivileged(logger *logger.Logger, timeout time.Duration, arg ...string
 	}
 
 	return bs, nil
+}
+
+// CommandNDSudo runs a command via the ndsudo helper and returns the exec.Cmd instance.
+//
+// ctx is a context.Context to use to run the command. logger is a Logger
+// instance to use to log the command to be executed.  timeout indicates
+// the timeout for the command. arg is a list of the command arguments,
+// with the first string in the slice being the command to run.
+//
+// This invokes the command and logs a debug message that the command
+// is being executed, and then returns the exec.Cmd object for the command.
+func CommandNDSudo(ctx context.Context, logger *logger.Logger, arg ...string) *exec.Cmd {
+	ndsudoPath := filepath.Join(buildinfo.NetdataBinDir, "ndsudo")
+
+	cmd := exec.CommandContext(ctx, ndsudoPath, arg...)
+	if logger != nil {
+		logger.Debugf("executing '%s'", cmd)
+	}
+
+	return cmd
 }
 
 // RunNDSudo runs a command via the ndsudo helper.
@@ -52,14 +88,11 @@ func RunUnprivileged(logger *logger.Logger, timeout time.Duration, arg ...string
 // the command invocation, then returns the command output.
 //
 // The command to be run must also be properly handled by ndsudo.
-func RunNDSudo(logger *logger.Logger, timeout time.Duration, args ...string) ([]byte, error) {
+func RunNDSudo(logger *logger.Logger, timeout time.Duration, arg ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	ndsudoPath := filepath.Join(buildinfo.NetdataBinDir, "ndsudo")
-
-	cmd := exec.CommandContext(ctx, ndsudoPath, args...)
-	logger.Debugf("executing '%s'", cmd)
+	cmd := CommandNDSudo(ctx, logger, arg...)
 
 	bs, err := cmd.Output()
 	if err != nil {
