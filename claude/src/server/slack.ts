@@ -575,7 +575,18 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
       const maybeTree = sessionManager.getOpTree(runId);
       const snap = (() => {
         try {
-          if (maybeTree && typeof maybeTree === 'object') return buildSnapshotFromOpTree(maybeTree as any, now);
+          if (maybeTree && typeof maybeTree === 'object') {
+            // Prefer structural lines from opTree for hierarchy and elapsed, but overlay live totals from accounting
+            const base = buildSnapshotFromOpTree(maybeTree as any, now);
+            try {
+              const logs = sessionManager.getLogs(runId);
+              const acc = sessionManager.getAccounting(runId);
+              const live = buildSnapshot(logs, acc, now);
+              // Overlay totals (tokens, cost, toolsRun) with live values for up-to-date progress
+              base.totals = live.totals;
+            } catch { /* ignore overlay issues */ }
+            return base;
+          }
         } catch { /* ignore */ }
         const logs = sessionManager.getLogs(runId);
         const acc = sessionManager.getAccounting(runId);

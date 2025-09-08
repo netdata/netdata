@@ -4,6 +4,7 @@ import path from 'node:path';
 
 import Ajv from 'ajv';
 
+import type { LoadedAgent } from './agent-loader.js';
 import type { SessionNode } from './session-tree.js';
 import type {
   AIAgentCallbacks,
@@ -14,8 +15,8 @@ import type {
   MCPTool,
 } from './types.js';
 
-import { loadAgent } from './agent-loader.js';
-import { parseFrontmatter, stripFrontmatter } from './frontmatter.js';
+import { loadAgentFromContent } from './agent-loader.js';
+import { parseFrontmatter, stripFrontmatter, parsePairs } from './frontmatter.js';
 import { isReservedAgentName } from './internal-tools.js';
 
 interface ChildInfo {
@@ -27,6 +28,7 @@ interface ChildInfo {
   promptPath: string; // canonical path
   systemTemplate: string; // stripped frontmatter contents (unexpanded, no FORMAT replacement)
   // A loader-produced runner will be resolved lazily when executed
+  loaded?: LoadedAgent; // Static snapshot runner (no hot-reload within a session)
 }
 
 function canonical(p: string): string {
@@ -97,6 +99,16 @@ export class SubAgentRegistry {
     const inputSchema = fm.inputSpec?.schema;
     // Keep template unmodified; ai-agent will centrally handle ${FORMAT} and variables
     const systemTemplate = stripFrontmatter(content);
+    // Enforce models presence in frontmatter; sub-agents must declare their own targets
+    try {
+      const models = parsePairs((fm.options as { models?: unknown } | undefined)?.models);
+      if (!Array.isArray(models) || models.length === 0) {
+        throw new Error('missing models');
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(`Sub-agent '${id}' missing or invalid models: ${msg}`);
+    }
     const info: ChildInfo = {
       toolName,
       description: fm.description,
@@ -106,6 +118,16 @@ export class SubAgentRegistry {
       promptPath: id,
       systemTemplate,
     };
+    // Build a static snapshot runner now (no dynamic reload during session)
+    try {
+      const loaded = loadAgentFromContent(id, content, { baseDir: path.dirname(id) });
+      info.loaded = loaded;
+      // Prefer the fully resolved system template from the snapshot (includes resolved statically)
+      info.systemTemplate = loaded.systemTemplate;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(`Failed to load sub-agent '${id}' at registry time: ${msg}`);
+    }
     this.children.set(toolName, info);
   }
 
@@ -181,44 +203,10 @@ export class SubAgentRegistry {
 
     // Load child agent with layered configuration using the file path
     // CD to agent directory for proper layered config resolution
-    const prevCwd = process.cwd();
     let result: AIAgentResult;
     try {
-      process.chdir(path.dirname(info.promptPath));
-      // Decide targets inheritance: only when child has no models in frontmatter
-      let inheritTargets: { provider: string; model: string }[] | undefined = undefined;
-      try {
-        const raw = fs.readFileSync(info.promptPath, 'utf-8');
-        const fm2 = parseFrontmatter(raw, { baseDir: path.dirname(info.promptPath) });
-        const models = (fm2?.options as { models?: unknown } | undefined)?.models;
-        const hasModels = (Array.isArray(models) && models.length > 0) || typeof models === 'string';
-        inheritTargets = hasModels ? undefined : parentSession.targets;
-      } catch { /* ignore */ }
-
-      const loaded = loadAgent(info.promptPath, undefined, {
-        configPath: undefined,
-        verbose: parentSession.verbose ?? (parentSession.callbacks !== undefined),
-        targets: inheritTargets,
-        // All models overrides (propagate globally)
-        stream: parentSession.stream,
-        traceLLM: parentSession.traceLLM,
-        traceMCP: parentSession.traceMCP,
-        // Master defaults for sub-agents (apply only when undefined)
-        defaultsForUndefined: {
-          temperature: parentSession.temperature,
-          topP: parentSession.topP,
-          maxOutputTokens: (parentSession as { maxOutputTokens?: number }).maxOutputTokens,
-          repeatPenalty: (parentSession as { repeatPenalty?: number }).repeatPenalty,
-          llmTimeout: parentSession.llmTimeout,
-          toolTimeout: parentSession.toolTimeout,
-          maxRetries: parentSession.maxRetries,
-          maxToolTurns: parentSession.maxTurns,
-          maxToolCallsPerTurn: (parentSession as { maxToolCallsPerTurn?: number }).maxToolCallsPerTurn,
-          toolResponseMaxBytes: parentSession.toolResponseMaxBytes,
-          parallelToolCalls: parentSession.parallelToolCalls,
-        },
-      });
-
+      const loaded = info.loaded;
+      if (loaded === undefined) throw new Error('sub-agent snapshot not available');
       // Build callbacks wrapper to prefix child logs
       const orig = parentSession.callbacks;
       const childPrefix = `child:${info.toolName}`;
@@ -236,9 +224,9 @@ export class SubAgentRegistry {
       const history: ConversationMessage[] | undefined = undefined;
       // Ensure child gets a fresh selfId (span id)
       const childTrace = { selfId: crypto.randomUUID(), originId: parentSession.trace?.originId, parentId: parentSession.trace?.parentId, callPath: parentSession.trace?.callPath };
-      result = await loaded.run(info.systemTemplate, userPrompt, { history, callbacks: cb, trace: childTrace, renderTarget: 'sub-agent', outputFormat: 'sub-agent' });
+      result = await loaded.run(loaded.systemTemplate, userPrompt, { history, callbacks: cb, trace: childTrace, renderTarget: 'sub-agent', outputFormat: 'sub-agent' });
     } finally {
-      try { process.chdir(prevCwd); } catch { /* ignore */ }
+      // no chdir in static mode
     }
 
     // Prefer JSON content when available

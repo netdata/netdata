@@ -80,7 +80,7 @@ function buildTurnSummaries(result: AIAgentResult): TurnSummary[] {
         const toolMsg = seg.tools.find((t) => t.toolCallId === callId);
         const output = toolMsg?.content ?? '';
         const outputBytes = bytesLen(output);
-        const outputPreview = bytesPreview(output, 80);
+        const outputPreview = bytesPreview(output, 160);
         const request = formatToolRequestCompact(tc.name, tc.parameters);
         turn.toolCalls.push({ request, outputPreview, outputBytes });
       });
@@ -165,7 +165,7 @@ export function formatToolRequestCompact(name: string, parameters: Record<string
     const t = typeof v;
     if (t === 'string') {
       const s = (v as string).replace(/[\r\n]+/g, ' ').trim();
-      return s.length > 80 ? `${s.slice(0, 80)}…` : s;
+      return s.length > 160 ? `${s.slice(0, 160)}…` : s;
     }
     if (t === 'number') return (v as number).toString();
     if (t === 'bigint') return (v as bigint).toString();

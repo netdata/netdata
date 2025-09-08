@@ -91,6 +91,7 @@ export class AIAgentSession {
   private resolvedFormatDescription?: string;
   private resolvedUserPrompt?: string;
   private masterLlmStartLogged = false;
+  private sessionTitle?: { title: string; emoji?: string; ts: number };
   // Finalization state captured via agent__final_report
   private finalReport?: {
     status: 'success' | 'failure' | 'partial';
@@ -184,7 +185,49 @@ export class AIAgentSession {
       const internalProvider = new InternalToolProvider('agent', {
         enableBatch,
         expectedJsonSchema,
-        appendNotes: (text: string, tags?: string[]) => { if (text.trim().length > 0) this.internalNotes.push({ text, tags, ts: Date.now() }); },
+        appendNotes: (text: string, tags?: string[]) => {
+          const t = text.trim();
+          if (t.length > 0) {
+            const ts = Date.now();
+            this.internalNotes.push({ text: t, tags, ts });
+            // Log note in VRB, bold, without truncation
+            const noteMsg = (() => {
+              const tagStr = Array.isArray(tags) && tags.length > 0 ? ` [${tags.join(', ')}]` : '';
+              return `${t}${tagStr}`;
+            })();
+            const entry: LogEntry = {
+              timestamp: ts,
+              severity: 'VRB',
+              turn: this.currentTurn,
+              subturn: 0,
+              direction: 'response',
+              type: 'tool',
+              remoteIdentifier: 'agent:note',
+              fatal: false,
+              bold: true,
+              message: noteMsg,
+            };
+            this.addLog(this.logs, entry);
+          }
+        },
+        setTitle: (title: string, emoji?: string) => {
+          const clean = title.trim();
+          if (clean.length === 0) return;
+          this.sessionTitle = { title: clean, emoji, ts: Date.now() };
+          const entry: LogEntry = {
+            timestamp: Date.now(),
+            severity: 'VRB',
+            turn: this.currentTurn,
+            subturn: 0,
+            direction: 'response',
+            type: 'tool',
+            remoteIdentifier: 'agent:title',
+            fatal: false,
+            bold: true,
+            message: (typeof emoji === 'string' && emoji.length > 0) ? `${emoji} ${clean}` : clean,
+          };
+          this.addLog(this.logs, entry);
+        },
         setFinalReport: (p) => { this.finalReport = { status: p.status, format: p.format as 'json'|'markdown'|'markdown+mermaid'|'slack-block-kit'|'tty'|'pipe'|'sub-agent'|'text', content: p.content, content_json: p.content_json, metadata: p.metadata, ts: Date.now() }; },
         orchestrator: orch,
         toolTimeoutMs: sessionConfig.toolTimeout
@@ -557,25 +600,26 @@ export class AIAgentSession {
       const userExpanded = expandVars(this.sessionConfig.userPrompt, vars);
       this.resolvedUserPrompt = userExpanded;
 
-      // Startup VRB: show callPath (or agentId) and the user prompt
+      // Startup VRB for sub-agents only (avoid duplicate master logs)
       try {
-        const ctx: string = (typeof this.callPath === 'string' && this.callPath.length > 0)
-          ? this.callPath
-          : (this.sessionConfig.agentId ?? 'agent');
-        const entry: LogEntry = {
-          timestamp: Date.now(),
-          severity: 'VRB',
-          turn: 0,
-          subturn: 0,
-          direction: 'request',
-          type: 'llm',
-          remoteIdentifier: 'agent:start',
-          fatal: false,
-          // Bold hint honored by TTY sinks; same VRB color
-          bold: true,
-          message: `${ctx}: ${userExpanded}`,
-        };
-        this.addLog(currentLogs, entry);
+        if (this.parentTxnId !== undefined) {
+          const ctx: string = (typeof this.callPath === 'string' && this.callPath.length > 0)
+            ? this.callPath
+            : (this.sessionConfig.agentId ?? 'agent');
+          const entry: LogEntry = {
+            timestamp: Date.now(),
+            severity: 'VRB',
+            turn: 0,
+            subturn: 0,
+            direction: 'request',
+            type: 'llm',
+            remoteIdentifier: 'agent:start',
+            fatal: false,
+            bold: true,
+            message: `${ctx}: ${userExpanded}`,
+          };
+          this.addLog(currentLogs, entry);
+        }
       } catch { /* ignore startup log errors */ }
 
       // Build enhanced system prompt with tool instructions
@@ -1342,7 +1386,7 @@ export class AIAgentSession {
       }
       // Orchestrator receives ctx turn/subturn per call
 
-      const singleLine = (s: string, max = 200): string => {
+      const singleLine = (s: string, max = 400): string => {
         const one = s.replace(/[\r\n]+/g, ' ').trim();
         return one.length > max ? `${one.slice(0, max - 1)}…` : one;
       };
@@ -1357,112 +1401,7 @@ export class AIAgentSession {
       try {
         // Internal tools are handled by InternalToolProvider via orchestrator
 
-        // Sub-agent execution (wrap in hierarchical 'session' op for live tree)
-        if (this.subAgents?.hasTool(effectiveToolName) === true) {
-          let sessionOpId: string | undefined;
-          try {
-            const subName = effectiveToolName.startsWith('agent__') ? effectiveToolName.slice('agent__'.length) : effectiveToolName;
-            this.addLog(logs, { timestamp: Date.now(), severity: 'VRB', turn: currentTurn, subturn: subturnCounter, direction: 'request', type: 'llm', remoteIdentifier: 'agent', fatal: false, message: `${subName}(${previewParams(parameters)}) <<< subagent ${subName}` });
-            // Begin 'session' op for sub-agent and attach a placeholder child session for live visibility
-            sessionOpId = (() => { try { return this.opTree.beginOp(currentTurn, 'session', { name: subName, provider: 'subagent' }); } catch { return undefined; } })();
-            try {
-              if (sessionOpId !== undefined) {
-                const parent = this.opTree.getSession();
-                const base = (typeof parent.callPath === 'string' && parent.callPath.length > 0) ? parent.callPath : (this.callPath ?? this.sessionConfig.agentId);
-                const stub: SessionNode = { id: `${Date.now().toString(36)}-stub`, traceId: typeof parent.traceId === 'string' ? parent.traceId : undefined, agentId: subName, callPath: `${String(base)}->${subName}`, startedAt: Date.now(), turns: [] };
-                this.opTree.attachChildSession(sessionOpId, stub);
-                this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession());
-              }
-            } catch { /* ignore */ }
-            const subExec = this.subAgents.execute(effectiveToolName, parameters, {
-              config: this.sessionConfig.config,
-              callbacks: this.sessionConfig.callbacks,
-              targets: this.sessionConfig.targets,
-              // propagate all-model overrides
-              stream: this.sessionConfig.stream,
-              traceLLM: this.sessionConfig.traceLLM,
-              traceMCP: this.sessionConfig.traceMCP,
-              verbose: this.sessionConfig.verbose,
-              // provide master defaults for sub-agents (used only if child undefined)
-              temperature: this.sessionConfig.temperature,
-              topP: this.sessionConfig.topP,
-              llmTimeout: this.sessionConfig.llmTimeout,
-              toolTimeout: this.sessionConfig.toolTimeout,
-              maxRetries: this.sessionConfig.maxRetries,
-              maxTurns: this.sessionConfig.maxTurns,
-              toolResponseMaxBytes: this.sessionConfig.toolResponseMaxBytes,
-              parallelToolCalls: this.sessionConfig.parallelToolCalls,
-              trace: { originId: this.originTxnId, parentId: this.txnId, callPath: `${this.callPath ?? ''}->${effectiveToolName}` }
-            });
-            const exec = await this.withTimeout(subExec, this.sessionConfig.toolTimeout);
-            // Collect child conversation for save-all support
-            this.childConversations.push({ agentId: exec.child.toolName, toolName: exec.child.toolName, promptPath: exec.child.promptPath, conversation: exec.conversation, trace: exec.trace });
-            const latency = Date.now() - startTime;
-            const capped = this.applyToolResponseCap(exec.result, this.sessionConfig.toolResponseMaxBytes, logs, { server: 'subagent', tool: effectiveToolName, turn: currentTurn, subturn: subturnCounter });
-            const accountingEntry: AccountingEntry = {
-              type: 'tool', timestamp: startTime, status: 'ok', latency,
-              mcpServer: 'subagent', command: effectiveToolName,
-              charactersIn: JSON.stringify(parameters).length, charactersOut: capped.length,
-              agentId: this.sessionConfig.agentId, callPath: this.callPath, txnId: this.txnId, parentTxnId: this.parentTxnId, originTxnId: this.originTxnId
-            };
-            accounting.push(accountingEntry);
-            try { this.tree.recordAccounting(accountingEntry); } catch { /* ignore */ }
-            this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
-            // End hierarchical 'session' op and attach child op tree if available
-            try {
-              if (sessionOpId !== undefined) {
-                const maybeTree = (exec as { opTree?: SessionNode | undefined }).opTree;
-                if (maybeTree !== undefined) {
-                  this.opTree.attachChildSession(sessionOpId, maybeTree);
-                }
-                this.opTree.endOp(sessionOpId, 'ok', { latency });
-                this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession());
-              }
-            } catch { /* ignore */ }
-            // Merge child accounting into parent
-            exec.accounting.forEach((a) => {
-              accounting.push(a);
-              try { this.tree.recordAccounting(a); } catch { /* ignore */ }
-              this.sessionConfig.callbacks?.onAccounting?.(a);
-            });
-            return capped;
-          } catch (e) {
-            const latency = Date.now() - startTime;
-            const msg = e instanceof Error ? e.message : String(e);
-            // Verbose error breadcrumb for sub-agent failures
-            try {
-              const errLog: LogEntry = {
-                timestamp: Date.now(),
-                severity: 'ERR',
-                turn: currentTurn,
-                subturn: subturnCounter,
-                direction: 'response',
-                type: 'llm',
-                remoteIdentifier: 'subagent:execute',
-                fatal: false,
-                message: `error ${effectiveToolName}: ${msg}`,
-              };
-              this.addLog(logs, errLog);
-            } catch { /* ignore logging errors */ }
-            const accountingEntry: AccountingEntry = {
-              type: 'tool', timestamp: startTime, status: 'failed', latency,
-              mcpServer: 'subagent', command: effectiveToolName,
-              charactersIn: JSON.stringify(parameters).length, charactersOut: 0,
-              error: msg,
-              agentId: this.sessionConfig.agentId, callPath: this.callPath, txnId: this.txnId, parentTxnId: this.parentTxnId, originTxnId: this.originTxnId
-            };
-            accounting.push(accountingEntry);
-            try { this.tree.recordAccounting(accountingEntry); } catch { /* ignore */ }
-            this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
-            try {
-              if (typeof sessionOpId === 'string') {
-                this.opTree.endOp(sessionOpId, 'failed', { latency });
-                this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession());
-              }
-            } catch { /* ignore */ }
-            throw new Error(msg);
-          }
-        }
+        // Sub-agent execution is handled by the orchestrator (AgentProvider)
 
         // Orchestrator-managed execution for MCP + REST
         if (this.toolsOrchestrator?.hasTool(effectiveToolName) === true) {
@@ -1672,7 +1611,7 @@ export class AIAgentSession {
     const tools: MCPTool[] = [
       {
         name: 'agent__append_notes',
-        description: 'Housekeeping notes. Use sparingly for brief interim findings.',
+        description: 'Side notes for operators. Use sparingly to record brief interim findings, assumptions, blockers, or caveats. Notes are appended to metadata and shown separately in the UI; they are NOT graded and should NOT be duplicated in final content.',
         inputSchema: {
           type: 'object',
           additionalProperties: false,
@@ -1682,6 +1621,19 @@ export class AIAgentSession {
             tags: { type: 'array', items: { type: 'string' } },
           },
         },
+      },
+      {
+        name: 'agent__set_title',
+        description: 'Set a short working title for the session, without emojis. The title will not be included in the final content.',
+        inputSchema: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['title'],
+          properties: {
+            title: { type: 'string', minLength: 1 },
+            emoji: { type: 'string' }
+          }
+        }
       },
     ];
 

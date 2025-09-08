@@ -374,7 +374,7 @@ SELECT
   END as dashboard_type,
   count(DISTINCT distinct_id) as unique_sessions,
   count(*) as total_events,
-  count(DISTINCT date(timestamp)) as active_days
+  count(DISTINCT toDate(timestamp)) as active_days
 FROM events
 WHERE properties.event_source IN ('cloud', 'cloud_agent', 'unknown')
   AND timestamp >= now() - INTERVAL 30 DAY
@@ -889,7 +889,7 @@ WITH all_person_ids AS (
     AND person_id IS NOT NULL
 )
 SELECT 
-  date(timestamp) as day,
+  toDate(timestamp) as day,
   extract(properties.$current_url, '^https?://([^/]+)') as domain,
   distinct_id,
   person_id,

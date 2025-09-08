@@ -17,6 +17,7 @@ export class InternalToolProvider extends ToolProvider {
       expectedJsonSchema?: Record<string, unknown>;
       // Callbacks into session
       appendNotes: (text: string, tags?: string[]) => void;
+      setTitle: (title: string, emoji?: string) => void;
       setFinalReport: (payload: { status: 'success'|'failure'|'partial'; format: string; content?: string; content_json?: Record<string, unknown>; metadata?: Record<string, unknown>; messages?: unknown[] }) => void;
       orchestrator: ToolsOrchestrator;
       toolTimeoutMs?: number;
@@ -27,7 +28,7 @@ export class InternalToolProvider extends ToolProvider {
     const tools: MCPTool[] = [
       {
         name: 'agent__append_notes',
-        description: 'Housekeeping notes. Use sparingly for brief interim findings.',
+        description: 'Side notes for operators. Use sparingly to record brief interim findings, assumptions, blockers, or caveats. Notes are appended to metadata and shown separately in the UI; they are NOT graded and should NOT be duplicated in final content.',
         inputSchema: {
           type: 'object',
           additionalProperties: false,
@@ -37,6 +38,19 @@ export class InternalToolProvider extends ToolProvider {
             tags: { type: 'array', items: { type: 'string' } },
           },
         },
+      },
+      {
+        name: 'agent__set_title',
+        description: 'Set a short working title for the session. The title is used for progress displays (e.g., Slack) and logs; it will not be included in the final content.',
+        inputSchema: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['title'],
+          properties: {
+            title: { type: 'string', minLength: 1 },
+            emoji: { type: 'string' }
+          }
+        }
       },
       {
         name: 'agent__final_report',
@@ -86,7 +100,7 @@ export class InternalToolProvider extends ToolProvider {
   }
 
   hasTool(name: string): boolean {
-    return name === 'agent__append_notes' || name === 'agent__final_report' || (this.opts.enableBatch && name === 'agent__batch');
+    return name === 'agent__append_notes' || name === 'agent__set_title' || name === 'agent__final_report' || (this.opts.enableBatch && name === 'agent__batch');
   }
 
   async execute(name: string, args: Record<string, unknown>, _opts?: ToolExecuteOptions): Promise<ToolExecuteResult> {
@@ -95,6 +109,12 @@ export class InternalToolProvider extends ToolProvider {
       const text = typeof (args.text) === 'string' ? args.text : '';
       const tags = Array.isArray(args.tags) ? (args.tags as unknown[]).filter((t): t is string => typeof t === 'string') : undefined;
       if (text.trim().length > 0) this.opts.appendNotes(text, tags);
+      return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, providerId: this.id };
+    }
+    if (name === 'agent__set_title') {
+      const title = typeof (args.title) === 'string' ? args.title.trim() : '';
+      const emoji = typeof (args.emoji) === 'string' ? args.emoji.trim() : undefined;
+      if (title.length > 0) this.opts.setTitle(title, emoji);
       return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, providerId: this.id };
     }
     if (name === 'agent__final_report') {

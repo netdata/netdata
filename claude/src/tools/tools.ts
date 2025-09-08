@@ -73,8 +73,20 @@ export class ToolsOrchestrator {
     if (this.canceled) throw new Error('canceled');
     if (this.mapping.size === 0) this.listTools();
     const effective = this.resolveName(name);
-    const entry = this.mapping.get(effective);
-    if (entry === undefined) throw new Error(`Unknown tool: ${name}`);
+    let entry = this.mapping.get(effective);
+    if (entry === undefined) {
+      // Ensure mapping is fully refreshed before failing (all providers/sub-agents loaded)
+      this.listTools();
+      const effective2 = this.resolveName(name);
+      entry = this.mapping.get(effective2);
+    }
+    if (entry === undefined) {
+      // Fail fast for sub-agent names that are not part of the static registry snapshot
+      if (name.startsWith('agent__') || effective.startsWith('agent__')) {
+        throw new Error(`unknown_subagent_tool: '${name}' is not registered in this session's agent registry`);
+      }
+      throw new Error(`Unknown tool: ${name}`);
+    }
     return await entry.provider.execute(effective, args, opts);
   }
 
@@ -207,10 +219,16 @@ export class ToolsOrchestrator {
     let errorMessage: string | undefined;
     try {
       const preparedArgs = normalizeArgs(effective, args);
-      exec = await withTimeout(
-        provider.execute(effective, preparedArgs, { ...opts, timeoutMs: opts?.timeoutMs ?? this.opts.toolTimeout }),
-        this.opts.toolTimeout
-      );
+      // Do not apply parent-level withTimeout to sub-agents; they manage their own timing
+      const isSubAgent = (kind === 'agent' && provider.id === 'subagent');
+      if (isSubAgent) {
+        exec = await provider.execute(effective, preparedArgs, { ...opts, timeoutMs: undefined });
+      } else {
+        exec = await withTimeout(
+          provider.execute(effective, preparedArgs, { ...opts, timeoutMs: opts?.timeoutMs ?? this.opts.toolTimeout }),
+          this.opts.toolTimeout
+        );
+      }
     } catch (e) {
       errorMessage = e instanceof Error ? e.message : String(e);
     }
@@ -299,18 +317,11 @@ export class ToolsOrchestrator {
       mcpServer: providerLabel, command: name, charactersIn, charactersOut: result.length,
     };
     this.tree.recordAccounting(accOk);
-    // Optional: record child accounting when provided by provider (e.g., subagents)
-    const extras = (safeExec.extras ?? {});
-    const hasChildAcc = (val: unknown): val is { childAccounting?: unknown } => (val !== null && typeof val === 'object');
-    const childAcc = hasChildAcc(extras) ? extras.childAccounting : undefined;
-    if (Array.isArray(childAcc)) {
-      const isAccountingEntry = (val: unknown): val is AccountingEntry => {
-        if (val === null || typeof val !== 'object') return false;
-        const obj = val as Record<string, unknown>;
-        return typeof obj.type === 'string' && typeof obj.timestamp === 'number';
-      };
-      childAcc.forEach((a) => { if (isAccountingEntry(a)) { try { this.tree.recordAccounting(a); } catch { /* ignore */ } } });
-    }
+    // Optional: child accounting (from sub-agents)
+    // Do NOT forward child accounting to the parent execution tree here.
+    // Sub-agents already emit their own onAccounting callbacks (wired to the same SessionManager),
+    // and their full accounting is attached to the opTree via attachChildSession above.
+    // Re-injecting entries here would double-count tokens/cost in Slack progress at finish.
     this.tree.endSpan(spanId, 'ok', { latency, size: result.length });
     try {
       if (opId !== undefined) {
