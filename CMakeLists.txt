@@ -983,8 +983,6 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/setenv.h
         src/libnetdata/os/strndup.c
         src/libnetdata/os/strndup.h
-        src/libnetdata/os/windows-api/windows_api.c
-        src/libnetdata/os/windows-api/windows_api.h
         src/libnetdata/os/windows-wmi/windows-wmi.c
         src/libnetdata/os/windows-wmi/windows-wmi.h
         src/libnetdata/os/windows-wmi/windows-wmi-GetDiskDriveInfo.c
@@ -1146,6 +1144,15 @@ set(LIBNETDATA_FILES
         src/libnetdata/signals/signal-code.c
         src/libnetdata/signals/signal-code.h
 )
+
+if(OS_WINDOWS)
+    set(LIBNETDATA_WIN_FILES
+            src/libnetdata/os/windows-api/windows_api.c
+            src/libnetdata/os/windows-api/windows_api.h
+    )
+
+    list(APPEND LIBNETDATA_FILES ${LIBNETDATA_WIN_FILES})
+endif()
 
 list(APPEND LIBNETDATA_FILES ${INICFG_FILES})
 list(APPEND LIBNETDATA_FILES ${CONFIG_FILES})

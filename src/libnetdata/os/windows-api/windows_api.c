@@ -2,8 +2,6 @@
 
 #include "windows_api.h"
 
-#if defined(OS_WINDOWS)
-
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <iphlpapi.h>
@@ -90,6 +88,3 @@ char *netdata_win_local_ip()
 
     return default_ip.ipaddr;
 }
-
-#endif
-
