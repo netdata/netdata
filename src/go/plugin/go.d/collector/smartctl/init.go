@@ -43,10 +43,10 @@ func (c *Collector) initDeviceSelector() (matcher.Matcher, error) {
 }
 
 func (c *Collector) initSmartctlCli() (smartctlCli, error) {
-	if runtime.GOOS == "linux" {
-		return c.initNdsudoSmartctlCli()
+	if runtime.GOOS == "windows" {
+		return c.initDirectSmartctlCli()
 	}
-	return c.initDirectSmartctlCli()
+	return c.initNdsudoSmartctlCli()
 }
 
 func (c *Collector) initNdsudoSmartctlCli() (smartctlCli, error) {
