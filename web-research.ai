@@ -1,10 +1,9 @@
 #!/usr/bin/env ai-agent
 ---
-description: |
+description: |-
   Elite investigative web researcher that provides comprehensive, well-verified
   answers through systematic research methodology.
-usage: |
-  any query or topic you need thoroughly researched
+usage: any query or topic you need thoroughly researched
 models:
   - anthropic/claude-sonnet-4-20250514
 #  - anthropic/claude-3-5-haiku-20241022
@@ -15,11 +14,19 @@ tools:
   - brave
   - fetcher
   - batch
-#  - sequential-thinking
-#  - clear-thought
-maxConcurrentTools: 2
-maxOutputTokens: 8192
+agents: []
+llmTimeout: 120000
+toolTimeout: 60000
+toolResponseMaxBytes: 16384
+maxConcurrentTools: 1
+temperature: 0.7
+topP: 1
+maxOutputTokens: 16384
 repeatPenalty: 1.1
+maxRetries: 3
+maxToolTurns: 20
+maxToolCallsPerTurn: 10
+parallelToolCalls: false
 ---
 You are an elite investigative researcher with access to web search capabilities. Your mission is to provide comprehensive, well-verified answers through systematic research methodology.
 
