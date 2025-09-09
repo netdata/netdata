@@ -78,7 +78,7 @@ Account deletion is immediate.
 <details>
 <summary><strong>Will my historical data be saved anywhere?</strong></summary>
 
-Yes, all historical data will be safely stored and another active user in the space can still access that data. 
+Yes, all historical data will be safely stored and another active user in the Space can still access that data. 
 
 </details>
 
