@@ -159,7 +159,10 @@ export function loadAgent(aiPath: string, registry?: AgentRegistry, options?: Lo
     if (toolName.includes(':')) return;
     // Skip internal tools (batch, append_notes, final_report)
     if (isReservedAgentName(toolName)) return;
-    if (!Object.prototype.hasOwnProperty.call(config.mcpServers, toolName)) {
+    // Check both MCP servers and REST tools
+    const inMcpServers = Object.prototype.hasOwnProperty.call(config.mcpServers, toolName);
+    const inRestTools = config.restTools !== undefined && Object.prototype.hasOwnProperty.call(config.restTools, toolName);
+    if (!inMcpServers && !inRestTools) {
       missingTools.push(toolName);
     }
   });
@@ -391,7 +394,10 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
     if (toolName.includes(':')) return;
     // Skip internal tools (batch, append_notes, final_report)
     if (isReservedAgentName(toolName)) return;
-    if (!Object.prototype.hasOwnProperty.call(config.mcpServers, toolName)) {
+    // Check both MCP servers and REST tools
+    const inMcpServers = Object.prototype.hasOwnProperty.call(config.mcpServers, toolName);
+    const inRestTools = config.restTools !== undefined && Object.prototype.hasOwnProperty.call(config.restTools, toolName);
+    if (!inMcpServers && !inRestTools) {
       missingTools.push(toolName);
     }
   });
