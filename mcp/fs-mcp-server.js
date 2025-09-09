@@ -468,6 +468,7 @@ function handleMessage(msg) {
     return;
   }
   if (method === 'notifications/initialized') { return; }
+  if (method === 'notifications/cancelled') { return; }  // Silently ignore cancellation notifications
   if (method === 'prompts/list') { respond(id, { prompts: [] }); return; }
   if (method === 'prompts/get') { respond(id, { prompt: null }); return; }
   if (method === 'resources/list') { respond(id, { resources: [] }); return; }

@@ -943,7 +943,6 @@ export class AIAgentSession {
               };
               accounting.push(accountingEntry);
               try { this.tree.recordAccounting(accountingEntry); } catch { /* ignore */ }
-              this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
               try {
                 if (llmOpId !== undefined) this.opTree.appendAccounting(llmOpId, accountingEntry);
               } catch { /* ignore */ }
@@ -1464,7 +1463,7 @@ export class AIAgentSession {
         };
         accounting.push(accountingEntry);
         try { this.tree.recordAccounting(accountingEntry); } catch { /* ignore */ }
-        this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
+        // accounting callback is invoked via execution tree
         
         // Re-throw to let AI SDK create a tool-error part so the LLM sees structured failure
         this.releaseToolSlot();
@@ -1736,7 +1735,7 @@ export class AIAgentSession {
             + '  }\n'
             + ']\n\n'
             + 'Split long output into multiple messages. You can post up to 20 messages, each message having up to 50 blocks, each block having up to 2000 characters.\n\n'
-            + 'mrkdwn format:\n'
+            + 'Slack mrkdwn format instructions:\n'
             + '- *bold* → bold\n'
             + '- _italic_ → italic\n'
             + '- ~strikethrough~ → strikethrough\n'
@@ -1745,7 +1744,7 @@ export class AIAgentSession {
             + '- > quoted text (at line start)\n'
             + '- <https://example.com|Link Text> → clickable links\n'
             + '- Lists: Use •, -, or numbers (no nesting)\n\n'
-            + 'NOT Supported:\n'
+            + 'GitHub markdown is NOT Supported:\n'
             + '- ❌ Tables\n'
             + '- ❌ Headers (#, ##)\n'
             + '- ❌ Horizontal rules (---)\n'

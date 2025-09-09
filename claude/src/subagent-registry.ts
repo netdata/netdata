@@ -217,7 +217,10 @@ export class SubAgentRegistry {
       const cb: AIAgentCallbacks | undefined = orig === undefined ? undefined : {
         onLog: (e) => {
           const cloned = { ...e };
-          cloned.remoteIdentifier = `${childPrefix}:${e.remoteIdentifier}`;
+          // Preserve 'agent:title' identifier exactly so aggregators can detect titles per agent
+          if (e.remoteIdentifier !== 'agent:title') {
+            cloned.remoteIdentifier = `${childPrefix}:${e.remoteIdentifier}`;
+          }
           orig.onLog?.(cloned);
         },
         onOutput: (t) => { orig.onOutput?.(t); },
@@ -227,7 +230,10 @@ export class SubAgentRegistry {
 
       const history: ConversationMessage[] | undefined = undefined;
       // Ensure child gets a fresh selfId (span id)
-      const childTrace = { selfId: crypto.randomUUID(), originId: parentSession.trace?.originId, parentId: parentSession.trace?.parentId, callPath: parentSession.trace?.callPath };
+      // Extend callPath with the child tool name so live status shows hierarchy correctly
+      const basePath = parentSession.trace?.callPath;
+      const callPath = (typeof basePath === 'string' && basePath.length > 0) ? `${basePath}->${info.toolName}` : info.toolName;
+      const childTrace = { selfId: crypto.randomUUID(), originId: parentSession.trace?.originId, parentId: parentSession.trace?.parentId, callPath };
       result = await loaded.run(loaded.systemTemplate, userPrompt, {
         history,
         callbacks: cb,

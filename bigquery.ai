@@ -84,6 +84,65 @@ ENTITY CHEAT SHEET (Current → Historical → Notes)
 - Forecast/targets → `watch_towers.arr_forecast`, `watch_towers.new_arr_forecast` → n/a
   - Notes: Target series for variance/pacing analyses.
 
+BUSINESS KPI DEFINITIONS (authoritative)
+- Realized ARR (discounted):
+  - Definition: metrics_daily business_arr_discount + homelab_arr_discount + ai_credits_space_revenue, plus cumulative on‑prem spikes from watch_towers.manual_360_bq.
+  - Cumulative spikes: SUM(spike_value) OVER (ORDER BY date ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW).
+- ARR Target/Forecast:
+  - Definition: watch_towers.new_arr_forecast joined to a daily date grid.
+- MRR (portfolio context):
+  - Definition: Use ARR components divided by 12 when MRR is requested at portfolio level; for space-level MRR, use Watch Towers fields (bm_mrr).
+- Subscriptions (total):
+  - Definition: MAX(metric_value) where metric_name IN ('subscriptions_total','total_business_subscriptions') from metrics_daily.
+- Subscriptions (new):
+  - Definition: MAX(metric_value) where metric_name IN ('new_subs','new_business_subs') from metrics_daily.
+- Subscriptions (churned):
+  - Definition: MAX(metric_value) where metric_name IN ('churn_subs','churn_business_subs') from metrics_daily.
+- Paid nodes (business):
+  - Definition: MAX('paid_nodes_business_annual') + MAX('paid_nodes_business_monthly') per run_date from metrics_daily.
+- Trials total:
+  - Definition: MAX('trials_total') from metrics_daily.
+- Trials 6+ nodes estimate:
+  - Definition: MAX('trial_6_or_more_nodes_reachable_sum') * 2 * 12 from metrics_daily.
+- AI bundles breakdown:
+  - Definition: MAX(metric_value) for metric_name IN ('Bundle625.00','Bundle300.00','Bundle1100.00','Bundle2000.00') from metrics_daily.
+- AI credits space count:
+  - Definition: MAX('ai_credits_space_count') from metrics_daily.
+- Ending trials (node sum by expiry date):
+  - Definition: From watch_towers.spaces_asat_YYYYMMDD, group by DATE(ax_trial_ends_at) and SUM(ae_reachable_nodes).
+
+TIME HANDLING RULES (consistent with portfolio dashboards)
+- Date anchor: Use timestamp(date(run_date)) to anchor to UTC midnight for daily series.
+- Bounds: Always restrict metrics_daily to run_date < CURRENT_DATE(). Honor from/to when provided.
+- Date grid: Build daily grid via GENERATE_DATE_ARRAY(start, end) and LEFT JOIN metrics; prevents missing dates.
+- Deltas: Use LAG(value, 7|30|90) OVER (ORDER BY date) for change KPIs.
+- Freshness: Expose latest available run_date; if stale, mention lag. Watch Towers and metrics_daily refresh roughly every 4 hours.
+
+SPACES_ASAT SNAPSHOT USAGE (day-specific snapshot)
+- Query a specific day’s snapshot using EXECUTE IMMEDIATE with _TABLE_SUFFIX:
+  - _TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', DATE('${__to:date}') - 1) to refer to “yesterday” relative to the requested to-date, or adapt to parameterized to-date.
+- Typical composition buckets within a daily snapshot:
+  - Plan classes: ce_plan_class IN ('Business','Homelab','Community') and LIKE 'Business_%'/'Homelab_%' for price‑point sub-classes.
+  - Trial vs non-trial: ax_trial_ends_at IS NOT NULL (trial), IS NULL (non-trial: paid/community).
+  - Node activity in snapshot: ae_reachable_nodes for “today’s” active nodes within that day’s snapshot.
+
+KPI TEMPLATE PATTERNS (indicative, parameterized; no full SQL dumps)
+- ARR trend (discounted, realized):
+  - Build daily grid → aggregate metrics_daily for business_arr_discount, homelab_arr_discount, ai_credits_space_revenue → LEFT JOIN on‑prem spikes from manual_360_bq (timestamp(date(start_date)) as date; sum annual_price per date) → SELECT realized = discounted + cumulative_spikes; optionally LEFT JOIN new_arr_forecast for targets.
+- Subscriptions/new/churn/paid nodes:
+  - Aggregate metrics_daily by run_date; take MAX() per metric_name set; optionally compute 7/30/90 deltas via LAG.
+- Trials and AI:
+  - Aggregate metrics_daily keys for trials_total, trial_6_or_more_nodes_reachable_sum, ai_credits_space_count, and Bundle*.00 per run_date.
+- Ending trials by date:
+  - EXECUTE IMMEDIATE over watch_towers.spaces_asat_YYYYMMDD for requested day, GROUP BY DATE(ax_trial_ends_at), SUM(ae_reachable_nodes).
+
+APPENDIX: metrics_daily keys (canonical)
+- ARR: 'arr_business_discount', 'arr_homelab_discount', 'ai_credits_space_revenue'
+- Subscriptions: 'subscriptions_total', 'total_business_subscriptions', 'new_subs', 'new_business_subs', 'churn_subs', 'churn_business_subs'
+- Paid nodes: 'paid_nodes_business_annual', 'paid_nodes_business_monthly'
+- Trials: 'trials_total', 'trial_6_or_more_nodes_reachable_sum'
+- AI: 'ai_credits_space_count', 'Bundle625.00', 'Bundle300.00', 'Bundle1100.00', 'Bundle2000.00'
+
 REPLICATED SOURCE TABLES — QUICK REFERENCE (app_db_replication)
 
 CRITICAL CONTEXT: "Node Count" Means Three Metrics Together

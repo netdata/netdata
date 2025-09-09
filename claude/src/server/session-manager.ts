@@ -15,6 +15,7 @@ export class SessionManager {
   private readonly aborters = new Map<string, AbortController>();
   private readonly stopRefs = new Map<string, { stopping: boolean }>();
   private readonly callbacks: Callbacks;
+  private readonly treeUpdateListeners = new Set<(runId: string) => void>();
   private readonly runner: (systemPrompt: string, userPrompt: string, opts: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; renderTarget?: 'slack' | 'api' | 'web'; outputFormat?: string; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string }) => Promise<AIAgentResult>;
 
   public constructor(runner: (systemPrompt: string, userPrompt: string, opts: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; renderTarget?: 'slack' | 'api' | 'web'; outputFormat?: string; abortSignal?: AbortSignal; initialTitle?: string }) => Promise<AIAgentResult>, callbacks: Callbacks = {}) {
@@ -45,6 +46,12 @@ export class SessionManager {
     return this.opTrees.get(runId);
   }
 
+  // Subscribe to tree updates (opTree/logs/accounting). Returns an unsubscribe function.
+  public onTreeUpdate(cb: (runId: string) => void): () => void {
+    this.treeUpdateListeners.add(cb);
+    return () => { this.treeUpdateListeners.delete(cb); };
+  }
+
   public listActiveRuns(): RunMeta[] {
     return Array.from(this.runs.values()).filter((r) => r.status === 'running');
   }
@@ -58,6 +65,7 @@ export class SessionManager {
       this.runs.set(runId, meta);
       try { this.aborters.get(runId)?.abort(); } catch { /* ignore */ }
       this.callbacks.onTreeUpdate?.(runId);
+      for (const fn of this.treeUpdateListeners) { try { fn(runId); } catch { /* ignore */ } }
     }
   }
 
@@ -71,6 +79,7 @@ export class SessionManager {
       const ref = this.stopRefs.get(runId);
       if (ref) ref.stopping = true;
       this.callbacks.onTreeUpdate?.(runId);
+      for (const fn of this.treeUpdateListeners) { try { fn(runId); } catch { /* ignore */ } }
     }
   }
 
@@ -125,6 +134,7 @@ export class SessionManager {
               arr.push(a);
               this.accounting.set(runId, arr);
               this.callbacks.onTreeUpdate?.(runId);
+              for (const fn of this.treeUpdateListeners) { try { fn(runId); } catch { /* ignore */ } }
             }
           }
         });
@@ -144,6 +154,7 @@ export class SessionManager {
           this.runs.set(runId, m);
         }
         this.callbacks.onTreeUpdate?.(runId);
+        for (const fn of this.treeUpdateListeners) { try { fn(runId); } catch { /* ignore */ } }
       } catch (err: unknown) {
         const m = this.runs.get(runId);
         if (m) {
@@ -153,6 +164,7 @@ export class SessionManager {
           this.runs.set(runId, m);
         }
         this.callbacks.onTreeUpdate?.(runId);
+        for (const fn of this.treeUpdateListeners) { try { fn(runId); } catch { /* ignore */ } }
       }
     })();
     this.aborters.set(runId, aborter);

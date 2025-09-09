@@ -6,12 +6,13 @@ description: |
 usage: |
   question about source code, CI/CD, automations
 models:
+#  - anthropic/claude-3-5-haiku-20241022
   - anthropic/claude-sonnet-4-20250514
 tools:
   - filesystem
   - batch
 llmTimeout: 120000
-toolTimeout: 30000
+toolTimeout: 120000
 toolResponseMaxBytes: 8192
 maxConcurrentTools: 10
 temperature: 0.2

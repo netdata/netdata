@@ -245,9 +245,13 @@ export function buildStatusBlocks(summary: SnapshotSummary, rootAgentId?: string
     return arr.length > 0 ? Math.max(...arr) : 0;
   })();
 
-  // Title
-  const title = `Working... (${String(elapsed)}s)`;
-  blocks.push({ type: 'header', text: { type: 'plain_text', text: title } });
+  // Title: prefer master agent session title if available; otherwise "Working..."
+  const mm = Math.floor(elapsed / 60);
+  const ss = elapsed % 60;
+  const elapsedClock = `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+  const master = typeof rootAgentId === 'string' ? summary.lines.find((l) => l.agentId === rootAgentId) : undefined;
+  const headerTitle = (typeof master?.title === 'string' && master.title.trim().length > 0) ? master.title.trim() : 'Working...';
+  blocks.push({ type: 'header', text: { type: 'plain_text', text: headerTitle } });
   blocks.push({ type: 'divider' });
 
   
@@ -264,10 +268,16 @@ export function buildStatusBlocks(summary: SnapshotSummary, rootAgentId?: string
   const entries = ordered
     .map((l) => {
       if (typeof rootAgentId === 'string' && l.agentId === rootAgentId) return undefined; // drop master
-      const cp = typeof l.callPath === 'string' && l.callPath.length > 0 ? l.callPath : l.agentId;
-      const shown = (prefix && cp.startsWith(prefix)) ? cp.slice(prefix.length) : cp;
+      const cpRaw = typeof l.callPath === 'string' && l.callPath.length > 0 ? l.callPath : l.agentId;
+      const cpNorm = cpRaw.replace(/→/g, '->');
+      const startsWithPrefix = typeof prefix === 'string' && (cpNorm.startsWith(prefix));
+      const shownPath = startsWithPrefix ? cpNorm.slice(prefix.length) : cpNorm;
+      // Show only the final segment (child agent name), strip 'agent__' prefix if present
+      const segments = shownPath.split('->').filter((s) => s.length > 0);
+      const last = segments.length > 0 ? segments[segments.length - 1] : shownPath;
+      const shownName = last.startsWith('agent__') ? last.slice('agent__'.length) : last;
       const secs = l.elapsedSec ?? 0;
-      const line1 = `*${shown}* — ${asClock(secs)}`;
+      const line1 = `*${shownName}* — ${asClock(secs)}`;
       const title = typeof l.title === 'string' && l.title.length > 0 ? l.title : undefined;
       const text = title ? `${line1}
 ${title}` : line1;
@@ -276,7 +286,7 @@ ${title}` : line1;
     .filter((v): v is any => v !== undefined);
 
   if (entries.length === 0) {
-    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: '- No sub-agents' } });
+    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: 'Thinking... 🤔' } });
   } else {
     entries.forEach((b) => { blocks.push(b); });
   }
@@ -286,7 +296,7 @@ ${title}` : line1;
 
   // Footer stats (smallest font)
   const agentsCount = summary.lines.length;
-  const footer = `tokens →:${fmtK(summary.totals.tokensIn)} ←:${fmtK(summary.totals.tokensOut)} c→:${fmtK(summary.totals.tokensCacheRead)} c←:${fmtK(summary.totals.tokensCacheWrite)} | cost: $${(summary.totals.costUsd ?? 0).toFixed(2)} | tools ${summary.totals.toolsRun} | agents ${agentsCount}`;
+  const footer = `${elapsedClock} tokens →:${fmtK(summary.totals.tokensIn)} ←:${fmtK(summary.totals.tokensOut)} c→:${fmtK(summary.totals.tokensCacheRead)} c←:${fmtK(summary.totals.tokensCacheWrite)} | cost: $${(summary.totals.costUsd ?? 0).toFixed(2)} | tools ${summary.totals.toolsRun} | agents ${agentsCount}`;
   blocks.push({ type: 'context', elements: [ { type: 'mrkdwn', text: footer } ] });
   return blocks;
 }

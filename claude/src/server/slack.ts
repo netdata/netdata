@@ -435,6 +435,12 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
           const snap = buildSnapshot(logs, acc, Date.now());
           // Prefer opTree-based counts when available
           const result2 = sessionManager.getResult(runId);
+          const opTree = sessionManager.getOpTree(runId) as any | undefined;
+          const startedAt = (opTree && typeof opTree.startedAt === 'number') ? opTree.startedAt : (snap.runStartedAt ?? Date.now());
+          const elapsedSec = Math.max(0, Math.round((Date.now() - startedAt) / 1000));
+          const mm = Math.floor(elapsedSec / 60);
+          const ss = elapsedSec % 60;
+          const elapsedClock = `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
           const fmtK = (n: number): string => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
           const countFromOpTree = (node: any | undefined): { tools: number; sessions: number } => {
             if (!node || typeof node !== 'object') return { tools: 0, sessions: 0 };
@@ -459,7 +465,7 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
             const c = countFromOpTree(ot);
             return { tools: c.tools, sessions: c.sessions };
           })();
-          const footer = `tokens →:${fmtK(snap.totals.tokensIn)} ←:${fmtK(snap.totals.tokensOut)} c→:${fmtK(snap.totals.tokensCacheRead)} c←:${fmtK(snap.totals.tokensCacheWrite)} | cost: $${(snap.totals.costUsd ?? 0).toFixed(2)} | tools ${agCounts.tools} | agents ${agCounts.sessions}`;
+          const footer = `${elapsedClock} tokens →:${fmtK(snap.totals.tokensIn)} ←:${fmtK(snap.totals.tokensOut)} c→:${fmtK(snap.totals.tokensCacheRead)} c←:${fmtK(snap.totals.tokensCacheWrite)} | cost: $${(snap.totals.costUsd ?? 0).toFixed(2)} | tools ${agCounts.tools} | agents ${agCounts.sessions}`;
           await client.chat.postMessage({ channel, thread_ts: ts, text: footer, blocks: [ { type: 'context', elements: [ { type: 'mrkdwn', text: footer } ] } ] });
         } catch (e3) { elog(`stats footer post failed: ${(e3 as Error).message}`); }
       } else {
@@ -472,6 +478,12 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
           const acc = sessionManager.getAccounting(runId);
           const snap = buildSnapshot(logs, acc, Date.now());
           const result2 = sessionManager.getResult(runId);
+          const opTree = sessionManager.getOpTree(runId) as any | undefined;
+          const startedAt = (opTree && typeof opTree.startedAt === 'number') ? opTree.startedAt : (snap.runStartedAt ?? Date.now());
+          const elapsedSec = Math.max(0, Math.round((Date.now() - startedAt) / 1000));
+          const mm = Math.floor(elapsedSec / 60);
+          const ss = elapsedSec % 60;
+          const elapsedClock = `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
           const fmtK = (n: number): string => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
           const countFromOpTree = (node: any | undefined): { tools: number; sessions: number } => {
             if (!node || typeof node !== 'object') return { tools: 0, sessions: 0 };
@@ -496,7 +508,7 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
             const c = countFromOpTree(ot);
             return { tools: c.tools, sessions: c.sessions };
           })();
-          const footer = `tokens →:${fmtK(snap.totals.tokensIn)} ←:${fmtK(snap.totals.tokensOut)} c→:${fmtK(snap.totals.tokensCacheRead)} c←:${fmtK(snap.totals.tokensCacheWrite)} | cost: $${(snap.totals.costUsd ?? 0).toFixed(2)} | tools ${agCounts.tools} | agents ${agCounts.sessions}`;
+          const footer = `${elapsedClock} tokens →:${fmtK(snap.totals.tokensIn)} ←:${fmtK(snap.totals.tokensOut)} c→:${fmtK(snap.totals.tokensCacheRead)} c←:${fmtK(snap.totals.tokensCacheWrite)} | cost: $${(snap.totals.costUsd ?? 0).toFixed(2)} | tools ${agCounts.tools} | agents ${agCounts.sessions}`;
           await client.chat.postMessage({ channel, thread_ts: ts, text: footer, blocks: [ { type: 'context', elements: [ { type: 'mrkdwn', text: footer } ] } ] });
         } catch (e3) { elog(`stats footer post failed: ${(e3 as Error).message}`); }
       }
@@ -556,12 +568,7 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
       ''
     ].join('\n');
     vlog('calling agent');
-    const initialTitle = (() => {
-      try {
-        const firstLine = (userPrompt ?? '').split('\n')[0] ?? '';
-        return firstLine.trim();
-      } catch { return undefined; }
-    })();
+    const initialTitle = undefined;
     const runId = options.sessionManager.startRun({ source: 'slack', teamId: context?.teamId, channelId: channel, threadTsOrSessionId: threadTs }, systemPrompt, userPrompt, history, { initialTitle });
     // Update the opener message to include a Cancel button
     // Persist a cancel actions block for the life of this progress message
@@ -603,6 +610,14 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
               const byAgentTitle = new Map<string, string>();
               live.lines.forEach((ln: any) => { if (ln.title) byAgentTitle.set(ln.agentId, ln.title); });
               (base.lines as any[]).forEach((ln: any) => { const t = byAgentTitle.get(ln.agentId); if (t) ln.title = t; });
+              // Heuristic fallback: if opTree shows only the master agent, try to merge in lines inferred from logs
+              if ((Array.isArray(base.lines) ? base.lines.length : 0) <= 1 && Array.isArray(live.lines) && live.lines.length > 0) {
+                const seen = new Set<string>((base.lines as any[]).map((l: any) => `${String(l.agentId)}|${String(l.callPath ?? '')}`));
+                live.lines.forEach((l: any) => {
+                  const key = `${String(l.agentId)}|${String(l.callPath ?? '')}`;
+                  if (!seen.has(key)) (base.lines as any[]).push(l);
+                });
+              }
             } catch { /* ignore overlay issues */ }
             return base;
           }
@@ -634,10 +649,18 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
       return { text, blocks };
     };
     scheduleUpdate(client, channel, liveTs, render);
+    // Event-driven refresh on tree updates for this run
+    let unsubscribe: (() => void) | undefined;
+    try {
+      unsubscribe = sessionManager.onTreeUpdate((id: string) => {
+        if (id === runId) scheduleUpdate(client, channel, liveTs, render);
+      });
+    } catch { /* ignore */ }
     const poll = setInterval(async () => {
       const meta = sessionManager.getRun(runId);
       if (!meta || meta.status === 'running' || meta.status === 'stopping') { scheduleUpdate(client, channel, liveTs, render); return; }
       clearInterval(poll);
+      try { unsubscribe?.(); } catch { /* ignore */ }
       await finalizeAndPost(client, channel, liveTs, runId, { error: meta.error });
     }, updateIntervalMs);
   };
