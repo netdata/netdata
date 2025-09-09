@@ -41,7 +41,7 @@ You have two options:
 
 Before deleting your account, consider:
 
-- **Team access**: If you're part of a team space, ensure you've transferred any necessary permissions
+- **Team access**: If you're part of a team Space, ensure you've transferred any necessary permissions
 - **No recovery**: There is no grace period or recovery option once deletion is confirmed
 
 ## Alternative Options
