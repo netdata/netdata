@@ -197,6 +197,7 @@ cmake_dependent_option(ENABLE_PLUGIN_SLABINFO "Enable Linux kernel SLAB allocato
 cmake_dependent_option(ENABLE_PLUGIN_SYSTEMD_JOURNAL "Enable systemd journal log collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_SYSTEMD_UNITS "Enable systemd units information collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_XENSTAT "Enable Xen domain monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
+cmake_dependent_option(ENABLE_PLUGIN_DEV "Enable collection from /dev" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 
 # Metrics exporters
 option(ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE "Enable exporting to Prometheus via remote write API" ${DEFAULT_FEATURE_STATE})
@@ -2030,11 +2031,6 @@ set(PROC_PLUGIN_FILES
         src/collectors/proc.plugin/sys_class_drm.c
 )
 
-set(DEV_PLUGIN_FILES
-        src/collectors/dev.plugin/plugin_dev.c
-        src/collectors/dev.plugin/plugin_dev.h
-)
-
 set(TC_PLUGIN_FILES
         src/collectors/tc.plugin/plugin_tc.c
 )
@@ -2064,7 +2060,6 @@ if(OS_LINUX)
                 ${CGROUPS_PLUGIN_FILES}
                 ${DISKSPACE_PLUGIN_FILES}
                 ${PROC_PLUGIN_FILES}
-                ${DEV_PLUGIN_FILES}
                 ${TC_PLUGIN_FILES}
                 ${TIMEX_PLUGIN_FILES}
                 ${INTERNAL_COLLECTORS_FILES}
@@ -2571,6 +2566,28 @@ if(ENABLE_PLUGIN_APPS)
                 ${PKG_FILES_PATH}/copyright
                 COMPONENT plugin-apps
                 DESTINATION usr/share/doc/netdata-plugin-apps)
+    endif()
+endif()
+
+if(ENABLE_PLUGIN_DEV)
+    set(DEV_PLUGIN_FILES
+            src/collectors/dev.plugin/plugin_dev.c
+            src/collectors/dev.plugin/plugin_dev.h
+    )
+
+    add_executable(dev.plugin ${DEV_PLUGIN_FILES})
+
+    target_link_libraries(dev.plugin libnetdata)
+
+    install(TARGETS dev.plugin
+            COMPONENT plugin-apps
+            DESTINATION usr/libexec/netdata/plugins.d)
+
+    if(BUILD_FOR_PACKAGING)
+        install(FILES
+                ${PKG_FILES_PATH}/copyright
+                COMPONENT plugin-dev
+                DESTINATION usr/share/doc/netdata-plugin-dev)
     endif()
 endif()
 

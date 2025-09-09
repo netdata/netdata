@@ -2,9 +2,13 @@
 
 #include "plugin_dev.h"
 
+#include "libnetdata/required_dummies.h"
+
 #define _COMMON_PLUGIN_NAME "dev.plugin"
 #define _COMMON_PLUGIN_MODULE_NAME "dev"
 #include "../common-contexts/common-contexts.h"
+
+int update_every = 1;
 
 #define NETDATA_MSR_THERM_STATUS 0x19C
 #define NETDATA_MSR_TEMPERATURE_TARGET 0x1A2
@@ -39,43 +43,49 @@ static collected_number netadata_read_cpu_temp(int cpu)
     return (tjmax - temp_offset);
 }
 
-static void dev_main_cleanup(void *pptr)
-{
-    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
-    if(!static_thread) return;
-
-    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
-
-    worker_unregister();
-
-    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
-}
-
 static bool is_msr_enabled() {
     return (netdata_dev_read_msr(0, NETDATA_MSR_THERM_STATUS));
 }
 
-void dev_main(void *ptr)
+static void dev_parse_args(int argc, char **argv) {
+    int i, freq = 0;
+
+    for (i = 1; i < argc; i++) {
+        if (!freq) {
+            int n = (int) str2l(argv[i]);
+            if (n > 0) {
+                freq = n;
+                continue;
+            }
+        }
+    }
+
+    if(freq > 0) update_every = freq;
+}
+
+int main(int argc, char **argv)
 {
-    CLEANUP_FUNCTION_REGISTER(dev_main_cleanup) cleanup_ptr = ptr;
+    nd_log_initialize_for_external_plugins(PLUGIN_DEV_NAME);
+    netdata_threads_init_for_external_plugins(0);
 
     if (!is_msr_enabled())
-        return;
+        return 1;
 
-    worker_register("DEV");
+    dev_parse_args(argc, argv);
 
-    rrd_collector_started();
+    /*
     int number_of_cpus = (int)os_get_system_cpus();
     RRDDIM **rd_pcpu_temperature = callocz(sizeof(RRDDIM *), number_of_cpus);
+     */
 
     heartbeat_t hb;
-    int update_every = localhost->rrd_update_every * USEC_PER_SEC;
-    heartbeat_init(&hb, (usec_t )update_every);
+    int local_update_every = update_every * USEC_PER_SEC;
+    heartbeat_init(&hb, (usec_t )local_update_every);
 
-    while(service_running(SERVICE_COLLECTORS)) {
-        worker_is_idle();
+    for (; !dev_plugin_stop();) {
         (void)heartbeat_next(&hb);
 
+        /*
         if(unlikely(!service_running(SERVICE_COLLECTORS)))
             break;
 
@@ -91,5 +101,8 @@ void dev_main(void *ptr)
             rrddim_set_by_pointer(st, rd_pcpu_temperature[i], temperature);
         }
         rrdset_done(st);
+         */
     }
+
+    return 0;
 }

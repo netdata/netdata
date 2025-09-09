@@ -4,7 +4,6 @@
 
 void cgroups_main(void *ptr);
 void proc_main(void *ptr);
-void dev_main(void *ptr);
 void diskspace_main(void *ptr);
 void tc_main(void *ptr);
 void timex_main(void *ptr);
@@ -54,15 +53,6 @@ static const struct netdata_static_thread static_threads_linux[] = {
         .thread = NULL,
         .init_routine = NULL,
         .start_routine = timex_main
-    },
-    {
-            .name = "P[dev]",
-            .config_section = CONFIG_SECTION_PLUGINS,
-            .config_name = "dev",
-            .enabled = 1,
-            .thread = NULL,
-            .init_routine = NULL,
-            .start_routine = dev_main
     },
 
     // terminator
