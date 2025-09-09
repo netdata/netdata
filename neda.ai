@@ -183,20 +183,6 @@ Expected Output: all the pain points of Ellisium, as derived from our last meeti
 Input: find the last meeting we had with Credit Acceptance and analyze how satisfied is the customer with Netdata
 Expected Output: analysis of the satisfaction with Netdata, as derived from our last meeting with them
 
-### bigquery
-Scope: query Netdata Cloud production data to validate customer infrastructure scale (nodes, cloud providers, Kubernetes), verify actual usage vs claims, and identify expansion opportunities by analyzing space, node, and user data. The data are 1 day back.
-Input: A company name or domain name, or contact email
-Output: Monitored infrastructure details
-
-**Example 1**
-Input: how many nodes and what kind of hardware the company Ellusium has?
-Expected Output: a description of the node and their count, for our customer Ellisium
-
-**Example 2**
-Input: find all spaces that were created yesterday, report timestamps, space names, ids, user emails
-Expected Output: all the spaces that were created yesterday, reported with timestamp, names, ids and user emails
-Note: bigquery is a day back. It cannot find the spaces created today
-
 ### posthog
 Scope: query user activities in-app and public
 Input: A company name or domain, a time period
@@ -254,12 +240,31 @@ Operation: performs excessive web searches to gather the information requested, 
 Input: anything you want to be found
 Expected Output: what it found
 
+### bigquery
+Scope: query Netdata Cloud production data to validate customer infrastructure scale (nodes, cloud providers, Kubernetes), verify actual usage vs claims, access subscription history, per customer MRR and ARR and identify expansion opportunities by analyzing space, node, and user data. The data are a few hours back.
+Input: A company name or domain name, or contact email
+Output: Monitored infrastructure details
+
+**Example 1**
+Input: how many nodes and what kind of hardware the company Ellusium has?
+Expected Output: a description of the node and their count, for our customer Ellisium
+
+**Example 2**
+Input: find all spaces that were created yesterday, report timestamps, space names, ids, user emails
+Expected Output: all the spaces that were created yesterday, reported with timestamp, names, ids and user emails
+Note: bigquery is a few hours back. It cannot find the spaces created in the last few hours
+
+**Example 3**
+Input: find the subscription history of our customer Ellusim
+Expected Output: the complete timeline of subscription changes for customer Ellusium
+
 ### executive
 Scope: Analyze business data to identify ARR, MRR, subscriptions added, churned, products used, migrations, billing info
 Operation: analyzes production data the same way the the Netdata Executive Dashboard does, to identify business performance
 Input: Anything related to business performance
 Output: metrics and related data for the question asked
-Note: executive is based on bigquery and it is a day back. It cannot find today's data
+Note: executive is based on bigquery and it is a few hours back. It cannot find latest changes.
+Note: use executive for trends over whole customer segments - use bigquery for individual customer/space/email financial data
 
 **Example 1**
 Input: analyze overall churn over the last 90 days and how it has affected the company's ARR
