@@ -273,6 +273,9 @@ program
   .version('1.0.0')
   .hook('preSubcommand', () => { /* placeholder */ });
 
+// Global flag: suppress fatal exits in server mode
+let __RUNNING_SERVER = false;
+
 program
   .command('server')
   .description('Start the server headend (Slack + REST API)')
@@ -285,6 +288,7 @@ program
   .option('--trace-mcp', 'Trace MCP requests/responses (server mode)')
   .action(async (agentPath: string, opts: Record<string, unknown>) => {
     try {
+      __RUNNING_SERVER = true;
       const mod = await import('./server/index.js');
       const enableSlack = opts.slack === true ? true : (opts.slack === false ? false : undefined);
       const enableApi = opts.api === true ? true : (opts.api === false ? false : undefined);
@@ -765,10 +769,23 @@ function createCallbacks(options: Record<string, unknown>, accountingFile?: stri
 
 process.on('uncaughtException', (e) => {
   const msg = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+  if (__RUNNING_SERVER) {
+    const warn = `[warn] uncaught exception (continuing): ${msg}`;
+    try { process.stderr.write(`${warn}
+`); } catch {}
+    return;
+  }
   exitWith(1, `uncaught exception: ${msg}`, 'EXIT-UNCAUGHT-EXCEPTION');
 });
 process.on('unhandledRejection', (r) => {
   const msg = r instanceof Error ? `${r.name}: ${r.message}` : String(r);
+  if (__RUNNING_SERVER) {
+    // Slack Socket Mode often emits transient disconnects; do not crash server
+    const warn = `[warn] unhandled rejection (continuing): ${msg}`;
+    try { process.stderr.write(`${warn}
+`); } catch {}
+    return;
+  }
   exitWith(1, `unhandled rejection: ${msg}`, 'EXIT-UNHANDLED-REJECTION');
 });
 

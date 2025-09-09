@@ -11,6 +11,7 @@ export interface AgentStatusLine {
   maxSubturns?: number;
   elapsedSec?: number;
   progressPct?: number;
+  title?: string;
 }
 
 export interface SnapshotSummary {
@@ -34,6 +35,7 @@ export function buildSnapshot(logs: LogEntry[], accounting: AccountingEntry[], n
   interface TurnState { planned?: number; executed?: number; lastType?: 'llm'|'tool'; firstTs?: number; finished?: boolean }
   const perAgentTurns = new Map<string, Map<number, TurnState>>();
   const agentMeta = new Map<string, { callPath?: string; maxTurns?: number; origin?: string; firstSeenTs?: number; toolCount?: number }>();
+  const agentTitles = new Map<string, string>();
 
   for (const le of logs) {
     const agentId = le.agentId ?? 'agent';
@@ -62,6 +64,9 @@ export function buildSnapshot(logs: LogEntry[], accounting: AccountingEntry[], n
     // Count tool logs per agent
     if (le.type === 'tool') meta.toolCount = (meta.toolCount ?? 0) + 1;
     agentMeta.set(agentId, meta);
+    if (le.remoteIdentifier === 'agent:title' && typeof le.message === 'string' && le.message.length > 0) {
+      agentTitles.set(agentId, le.message);
+    }
   }
 
   const lines: AgentStatusLine[] = [];
@@ -70,6 +75,8 @@ export function buildSnapshot(logs: LogEntry[], accounting: AccountingEntry[], n
     const st = tmap.get(latestTurn) ?? {};
     const meta = agentMeta.get(agentId) ?? {};
     const l: AgentStatusLine = { agentId, callPath: meta.callPath, maxTurns: meta.maxTurns, turn: latestTurn, status: 'Thinking' };
+    const t = agentTitles.get(agentId);
+    if (typeof t === 'string' && t.length > 0) l.title = t;
     const stableStart = typeof meta.firstSeenTs === 'number' ? meta.firstSeenTs : st.firstTs;
     if (typeof stableStart === 'number') l.elapsedSec = Math.max(0, Math.round((nowTs - stableStart) / 1000));
     const planned = st.planned ?? 0;
@@ -243,34 +250,39 @@ export function buildStatusBlocks(summary: SnapshotSummary, rootAgentId?: string
   blocks.push({ type: 'header', text: { type: 'plain_text', text: title } });
   blocks.push({ type: 'divider' });
 
+  
   // Build running agents list (exclude finished and root master)
   const running = summary.lines.filter((l) => l.status !== 'Finished');
   const prefix = (typeof rootAgentId === 'string' && rootAgentId.length > 0) ? `${rootAgentId}->` : undefined;
+  const asClock = (n: number): string => {
+    const mm = Math.floor(n / 60);
+    const ss = n % 60;
+    return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+  };
   // Oldest first ⇒ larger elapsedSec first
   const ordered = running.sort((a, b) => (b.elapsedSec ?? 0) - (a.elapsedSec ?? 0));
-  const items = ordered
+  const entries = ordered
     .map((l) => {
-      const cp = typeof l.callPath === 'string' && l.callPath.length > 0 ? l.callPath : l.agentId;
       if (typeof rootAgentId === 'string' && l.agentId === rootAgentId) return undefined; // drop master
+      const cp = typeof l.callPath === 'string' && l.callPath.length > 0 ? l.callPath : l.agentId;
       const shown = (prefix && cp.startsWith(prefix)) ? cp.slice(prefix.length) : cp;
       const secs = l.elapsedSec ?? 0;
-      return `- ${shown} (${String(secs)}s)`;
+      const line1 = `*${shown}* — ${asClock(secs)}`;
+      const title = typeof l.title === 'string' && l.title.length > 0 ? l.title : undefined;
+      const text = title ? `${line1}
+${title}` : line1;
+      return { type: 'section', text: { type: 'mrkdwn', text } };
     })
-    .filter((v): v is string => typeof v === 'string' && v.length > 0);
+    .filter((v): v is any => v !== undefined);
 
-  // Split into multiple sections to avoid Slack collapsing large sections ("Show more")
-  if (items.length === 0) {
+  if (entries.length === 0) {
     blocks.push({ type: 'section', text: { type: 'mrkdwn', text: '- idle' } });
   } else {
-    const CHUNK = 4; // keep sections small to avoid collapse
-    for (let i = 0; i < items.length; i += CHUNK) {
-      // eslint-disable-next-line functional/no-loop-statements
-      const chunk = items.slice(i, i + CHUNK).join('\n');
-      blocks.push({ type: 'section', text: { type: 'mrkdwn', text: chunk } });
-    }
+    entries.forEach((b) => { blocks.push(b); });
   }
 
   blocks.push({ type: 'divider' });
+
 
   // Footer stats (smallest font)
   const agentsCount = summary.lines.length;

@@ -6,7 +6,6 @@ import path from 'node:path';
 import Ajv from 'ajv';
 
 import type { OutputFormatId } from './formats.js';
-import type { SessionNode } from './session-tree.js';
 import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, MCPTool, LLMAccountingEntry, ToolAccountingEntry, RestToolConfig } from './types.js';
 
 // Exit codes according to DESIGN.md
@@ -142,7 +141,7 @@ export class AIAgentSession {
     } catch { /* ignore */ }
     // Initialize sub-agents registry if provided
     if (Array.isArray(sessionConfig.subAgentPaths) && sessionConfig.subAgentPaths.length > 0) {
-      const reg = new SubAgentRegistry();
+      const reg = new SubAgentRegistry(undefined, [], { traceLLM: sessionConfig.traceLLM, traceMCP: sessionConfig.traceMCP, verbose: sessionConfig.verbose });
       reg.load(sessionConfig.subAgentPaths);
       this.subAgents = reg;
     }
@@ -167,8 +166,9 @@ export class AIAgentSession {
       toolResponseMaxBytes: sessionConfig.toolResponseMaxBytes,
       maxConcurrentTools: sessionConfig.maxConcurrentTools,
       parallelToolCalls: sessionConfig.parallelToolCalls,
+      traceTools: sessionConfig.traceMCP === true,
     }, this.opTree, (tree) => { try { this.sessionConfig.callbacks?.onOpTree?.(tree); } catch { /* ignore */ } });
-    orch.register(new MCPProvider('mcp', sessionConfig.config.mcpServers, { trace: sessionConfig.traceMCP, verbose: sessionConfig.verbose, requestTimeoutMs: sessionConfig.toolTimeout }));
+    orch.register(new MCPProvider('mcp', sessionConfig.config.mcpServers, { trace: sessionConfig.traceMCP, verbose: sessionConfig.verbose, requestTimeoutMs: sessionConfig.toolTimeout, onLog: (e) => { try { this.addLog(this.logs, e); } catch { /* ignore */ } } }));
     // Build selected REST tools by frontmatter selection
     if (this.sessionConfig.config.restTools !== undefined) {
       const selected: Record<string, RestToolConfig> = {};
@@ -265,6 +265,28 @@ export class AIAgentSession {
     // Populate mapping now (before warmup) so hasTool() sees all registered providers
     void orch.listTools();
     this.toolsOrchestrator = orch;
+
+
+    // Apply an initial session title without consuming a tool turn (side-channel)
+    try {
+      const t = typeof sessionConfig.initialTitle === 'string' ? sessionConfig.initialTitle.trim() : '';
+      if (t.length > 0) {
+        this.sessionTitle = { title: t, ts: Date.now() };
+        const entry: LogEntry = {
+          timestamp: Date.now(),
+          severity: 'VRB',
+          turn: this.currentTurn,
+          subturn: 0,
+          direction: 'response',
+          type: 'tool',
+          remoteIdentifier: 'agent:title',
+          fatal: false,
+          bold: true,
+          message: t,
+        };
+        this.addLog(this.logs, entry);
+      }
+    } catch { /* ignore initialTitle issues */ }
   }
 
   // Static factory method for creating new sessions
@@ -1366,6 +1388,7 @@ export class AIAgentSession {
       ...(this.toolsOrchestrator?.listTools() ?? []),
       ...this.getInternalTools()
     ];
+
     
     // Track if we've shown thinking for this turn
     let shownThinking = false;
@@ -1386,13 +1409,7 @@ export class AIAgentSession {
       }
       // Orchestrator receives ctx turn/subturn per call
 
-      const singleLine = (s: string, max = 400): string => {
-        const one = s.replace(/[\r\n]+/g, ' ').trim();
-        return one.length > max ? `${one.slice(0, max - 1)}…` : one;
-      };
-      const previewParams = (obj: Record<string, unknown>): string => {
-        try { return singleLine(JSON.stringify(obj)); } catch { return '[unserializable]'; }
-      };
+      // (no local preview helpers needed)
 
       // Normalize tool name to strip router/provider wrappers like <|constrain|>
       const normalizeToolName = (n: string): string => n.replace(/<\|[^|]+\|>/g, '').trim();
@@ -1621,56 +1638,11 @@ export class AIAgentSession {
             tags: { type: 'array', items: { type: 'string' } },
           },
         },
-      },
-      {
-        name: 'agent__set_title',
-        description: 'Set a short working title for the session, without emojis. The title will not be included in the final content.',
-        inputSchema: {
-          type: 'object',
-          additionalProperties: false,
-          required: ['title'],
-          properties: {
-            title: { type: 'string', minLength: 1 },
-            emoji: { type: 'string' }
-          }
-        }
-      },
+      }
     ];
 
-    // Optional batch tool (exposed as agent__batch) toggled by listing 'batch' in tools
-    const wantsBatch = this.sessionConfig.tools.includes('batch');
-    if (wantsBatch) {
-      tools.push({
-        name: 'agent__batch',
-        description: 'Execute multiple tools in one call (always parallel). Use exposed tool names.',
-        inputSchema: {
-          type: 'object',
-          additionalProperties: false,
-          required: ['calls'],
-          properties: {
-            calls: {
-              type: 'array',
-              items: {
-                type: 'object',
-                additionalProperties: true,
-                required: ['id', 'tool', 'args'],
-                properties: {
-                  id: { oneOf: [ { type: 'string', minLength: 1 }, { type: 'number' } ] },
-                  tool: { type: 'string', minLength: 1, description: 'Exposed tool name (e.g., brave__brave_web_search)' },
-                  args: { type: 'object', additionalProperties: true }
-                }
-              }
-            }
-          }
-        }
-      });
-    }
-
     const exp = this.sessionConfig.expectedOutput;
-    const common = {
-      status: { type: 'string', enum: ['success', 'failure', 'partial'] },
-      metadata: { type: 'object' },
-    } as Record<string, unknown>;
+    const common = { status: { type: 'string', enum: ['success','failure','partial'] }, metadata: { type: 'object' } } as Record<string, unknown>;
     const rf: OutputFormatId = this.sessionConfig.outputFormat;
     if ((exp?.format === 'json') && rf !== 'json') {
       const rfStr = rf as string;

@@ -11,9 +11,9 @@ tools:
   - filesystem
   - batch
 llmTimeout: 120000
-toolTimeout: 60000
-toolResponseMaxBytes: 32768
-maxConcurrentTools: 5
+toolTimeout: 30000
+toolResponseMaxBytes: 8192
+maxConcurrentTools: 10
 temperature: 0.2
 topP: 1
 maxOutputTokens: 16384

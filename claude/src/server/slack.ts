@@ -552,7 +552,13 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
       ''
     ].join('\n');
     vlog('calling agent');
-    const runId = options.sessionManager.startRun({ source: 'slack', teamId: context?.teamId, channelId: channel, threadTsOrSessionId: threadTs }, systemPrompt, userPrompt, history);
+    const initialTitle = (() => {
+      try {
+        const firstLine = (userPrompt ?? '').split('\n')[0] ?? '';
+        return firstLine.trim();
+      } catch { return undefined; }
+    })();
+    const runId = options.sessionManager.startRun({ source: 'slack', teamId: context?.teamId, channelId: channel, threadTsOrSessionId: threadTs }, systemPrompt, userPrompt, history, { initialTitle });
     // Update the opener message to include a Cancel button
     // Persist a cancel actions block for the life of this progress message
     const openerText = pickOpener(fname, options.openerTone ?? 'random');
@@ -584,6 +590,10 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
               const live = buildSnapshot(logs, acc, now);
               // Overlay totals (tokens, cost, toolsRun) with live values for up-to-date progress
               base.totals = live.totals;
+              // Overlay titles per agent from live logs
+              const byAgentTitle = new Map<string, string>();
+              live.lines.forEach((ln: any) => { if (ln.title) byAgentTitle.set(ln.agentId, ln.title); });
+              (base.lines as any[]).forEach((ln: any) => { const t = byAgentTitle.get(ln.agentId); if (t) ln.title = t; });
             } catch { /* ignore overlay issues */ }
             return base;
           }

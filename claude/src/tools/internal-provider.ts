@@ -40,19 +40,6 @@ export class InternalToolProvider extends ToolProvider {
         },
       },
       {
-        name: 'agent__set_title',
-        description: 'Set a short working title for the session. The title is used for progress displays (e.g., Slack) and logs; it will not be included in the final content.',
-        inputSchema: {
-          type: 'object',
-          additionalProperties: false,
-          required: ['title'],
-          properties: {
-            title: { type: 'string', minLength: 1 },
-            emoji: { type: 'string' }
-          }
-        }
-      },
-      {
         name: 'agent__final_report',
         description: 'Finish the session by returning the final answer.',
         inputSchema: {
@@ -100,7 +87,7 @@ export class InternalToolProvider extends ToolProvider {
   }
 
   hasTool(name: string): boolean {
-    return name === 'agent__append_notes' || name === 'agent__set_title' || name === 'agent__final_report' || (this.opts.enableBatch && name === 'agent__batch');
+    return name === 'agent__append_notes' || name === 'agent__final_report' || (this.opts.enableBatch && name === 'agent__batch');
   }
 
   async execute(name: string, args: Record<string, unknown>, _opts?: ToolExecuteOptions): Promise<ToolExecuteResult> {
@@ -111,13 +98,7 @@ export class InternalToolProvider extends ToolProvider {
       if (text.trim().length > 0) this.opts.appendNotes(text, tags);
       return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, providerId: this.id };
     }
-    if (name === 'agent__set_title') {
-      const title = typeof (args.title) === 'string' ? args.title.trim() : '';
-      const emoji = typeof (args.emoji) === 'string' ? args.emoji.trim() : undefined;
-      if (title.length > 0) this.opts.setTitle(title, emoji);
-      return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, providerId: this.id };
-    }
-    if (name === 'agent__final_report') {
+if (name === 'agent__final_report') {
       const status = (typeof args.status === 'string' ? args.status : 'success') as 'success'|'failure'|'partial';
       const format = (typeof args.format === 'string' ? args.format : 'markdown');
       const content = typeof args.content === 'string' ? args.content : undefined;

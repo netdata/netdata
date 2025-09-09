@@ -48,7 +48,7 @@ export interface LoadedAgent {
   run: (
     systemPrompt: string,
     userPrompt: string,
-    opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent'; outputFormat: OutputFormatId; abortSignal?: AbortSignal }
+    opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent'; outputFormat: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string }
   ) => Promise<AIAgentResult>;
 }
 
@@ -226,7 +226,7 @@ export function loadAgent(aiPath: string, registry?: AgentRegistry, options?: Lo
     },
     subTools: [],
     run: async (systemPrompt: string, userPrompt: string, opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent'; outputFormat: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean } }): Promise<AIAgentResult> => {
-      const o = (opts ?? {}) as { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli'|'slack'|'api'|'web'|'sub-agent'; outputFormat?: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean } };
+      const o = (opts ?? {}) as { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli'|'slack'|'api'|'web'|'sub-agent'; outputFormat?: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string };
       if (o.outputFormat === undefined) throw new Error('outputFormat is required');
       // Support dynamic OpenAPI tool import via config.openapiSpecs and tool selector: openapi:<path-or-url>
       let dynamicConfig = config;
@@ -314,7 +314,9 @@ export function loadAgent(aiPath: string, registry?: AgentRegistry, options?: Lo
         expectedOutput: fm?.expectedOutput,
         callbacks: o.callbacks,
         trace: o.trace,
+        initialTitle: o.initialTitle,
         stopRef: o.stopRef,
+        initialTitle: o.initialTitle,
         // Propagate headend abort signal if present
         abortSignal: (opts as unknown as { abortSignal?: AbortSignal } | undefined)?.abortSignal,
         temperature: eff.temperature,
@@ -431,8 +433,8 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
       verbose: eff.verbose,
       mcpInitConcurrency: eff.mcpInitConcurrency,
     },
-    run: async (systemPrompt: string, userPrompt: string, opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent'; outputFormat: OutputFormatId }): Promise<AIAgentResult> => {
-      const o = (opts ?? {}) as { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli'|'slack'|'api'|'web'|'sub-agent'; outputFormat?: OutputFormatId };
+    run: async (systemPrompt: string, userPrompt: string, opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent'; outputFormat: OutputFormatId; initialTitle?: string }): Promise<AIAgentResult> => {
+      const o = (opts ?? {}) as { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli'|'slack'|'api'|'web'|'sub-agent'; outputFormat?: OutputFormatId; initialTitle?: string };
       if (o.outputFormat === undefined) throw new Error('outputFormat is required');
       // Support dynamic OpenAPI tool import via tool selector: openapi:<path-or-url>
       let dynamicConfig = config;
@@ -479,6 +481,7 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
         expectedOutput: fm?.expectedOutput,
         callbacks: o.callbacks,
         trace: o.trace,
+        initialTitle: o.initialTitle,
         temperature: eff.temperature,
         topP: eff.topP,
         maxRetries: eff.maxRetries,

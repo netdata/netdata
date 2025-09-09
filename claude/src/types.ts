@@ -283,6 +283,8 @@ export interface AIAgentSessionConfig {
   traceLLM?: boolean;
   traceMCP?: boolean;
   verbose?: boolean;
+  // Optional pre-set session title (does not consume a tool turn)
+  initialTitle?: string;
   // Enforced cap for MCP tool response size (bytes)
   toolResponseMaxBytes?: number;
   // Preferred MCP init concurrency override for this session
@@ -409,6 +411,8 @@ export interface AIAgentOptions {
   parallelToolCalls?: boolean;
   maxToolTurns?: number;
   verbose?: boolean;
+  // Optional pre-set session title (does not consume a tool turn)
+  initialTitle?: string;
   stream?: boolean;
   maxRetries?: number;
 }

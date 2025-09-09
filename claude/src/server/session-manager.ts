@@ -74,7 +74,7 @@ export class SessionManager {
     }
   }
 
-  public startRun(key: RunKey, systemPrompt: string, userPrompt: string, history?: ConversationMessage[]): string {
+  public startRun(key: RunKey, systemPrompt: string, userPrompt: string, history?: ConversationMessage[], opts?: { initialTitle?: string }): string {
     const runId = crypto.randomUUID();
     const aborter = new AbortController();
     const stopRef = { stopping: false };
@@ -97,6 +97,7 @@ export class SessionManager {
           renderTarget: key.source,
           abortSignal: aborter.signal,
           stopRef,
+          initialTitle: opts?.initialTitle,
           callbacks: {
           onLog: (entry: LogEntry) => {
               const m = this.runs.get(runId);

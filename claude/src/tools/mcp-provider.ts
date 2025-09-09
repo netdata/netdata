@@ -1,14 +1,16 @@
+/* eslint-disable import/order */
+/* eslint-disable perfectionist/sort-imports */
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
-import type { MCPServerConfig, MCPTool, MCPServer } from '../types.js';
-import type { ToolExecuteOptions, ToolExecuteResult } from './types.js';
-import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { ChildProcess } from 'node:child_process';
 
-import { createWebSocketTransport } from '../websocket-transport.js';
+import type { MCPServerConfig, MCPTool, MCPServer, LogEntry } from '../types.js';
+import type { ToolExecuteOptions, ToolExecuteResult } from './types.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 
+import { createWebSocketTransport } from '../websocket-transport.js';
 import { ToolProvider } from './types.js';
 
 export class MCPProvider extends ToolProvider {
@@ -19,11 +21,13 @@ export class MCPProvider extends ToolProvider {
   private processes = new Map<string, ChildProcess>();
   private toolNameMap = new Map<string, { serverName: string; originalName: string }>();
   private initialized = false;
+  private initializationPromise?: Promise<void>;
   private trace = false;
   private verbose = false;
   private requestTimeoutMs?: number;
+  private onLog?: (entry: LogEntry) => void;
 
-  constructor(public readonly id: string, servers: Record<string, MCPServerConfig>, opts?: { trace?: boolean; verbose?: boolean; requestTimeoutMs?: number }) {
+  constructor(public readonly id: string, servers: Record<string, MCPServerConfig>, opts?: { trace?: boolean; verbose?: boolean; requestTimeoutMs?: number; onLog?: (entry: LogEntry) => void }) {
     super();
     this.serversConfig = servers;
     this.trace = opts?.trace === true;
@@ -32,6 +36,7 @@ export class MCPProvider extends ToolProvider {
       const v = opts?.requestTimeoutMs;
       return typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.trunc(v) : undefined;
     })();
+    this.onLog = opts?.onLog;
   }
 
   private sanitizeNamespace(name: string): string {
@@ -44,13 +49,30 @@ export class MCPProvider extends ToolProvider {
 
   private async ensureInitialized(): Promise<void> {
     if (this.initialized) return;
+    
+    // If initialization is already in progress, wait for it
+    if (this.initializationPromise !== undefined) {
+      await this.initializationPromise;
+      return;
+    }
+    
+    // Start initialization and store the promise to prevent concurrent attempts
+    this.initializationPromise = this.doInitialize();
+    await this.initializationPromise;
+  }
+  
+  private async doInitialize(): Promise<void> {
     const entries = Object.entries(this.serversConfig);
     // eslint-disable-next-line functional/no-loop-statements
     for (const [name, config] of entries) {
       try {
+        this.log('TRC', `initializing '${name}' (${config.type})`, `mcp:${name}`);
         const server = await this.initializeServer(name, config);
         this.servers.set(name, server);
-      } catch {
+        this.log('TRC', `initialized '${name}' with ${String(server.tools.length)} tools`, `mcp:${name}`);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        this.log('ERR', `failed to initialize '${name}': ${msg}`, `mcp:${name}`, false)
         // ignore init errors per server (tools will be absent)
       }
     }
@@ -98,10 +120,21 @@ export class MCPProvider extends ToolProvider {
       default:
         throw new Error('Unsupported transport type');
     }
-    await client.connect(transport);
+    try {
+      await client.connect(transport);
+      this.log('TRC', `connected to '${name}'`, `mcp:${name}`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      this.log('ERR', `connect failed for '${name}': ${msg}`, `mcp:${name}`);
+      throw e;
+    }
     this.clients.set(name, client);
 
     const initInstructions = client.getInstructions() ?? '';
+    if (this.trace) {
+      const len = initInstructions.length;
+      this.log('TRC', `instructions length for '${name}': ${String(len)}`, `mcp:${name}`);
+    }
     const toolsResponse = await client.listTools();
     interface ToolItem { name: string; description?: string; inputSchema?: unknown; parameters?: unknown; instructions?: string }
     const tools: MCPTool[] = (toolsResponse.tools as ToolItem[]).map((t) => ({
@@ -110,6 +143,10 @@ export class MCPProvider extends ToolProvider {
       inputSchema: (t.inputSchema ?? t.parameters ?? {}) as Record<string, unknown>,
       instructions: t.instructions,
     }));
+    if (this.trace) {
+      const names = tools.map((t) => t.name).join(', ');
+      this.log('TRC', `listTools('${name}') -> ${String(tools.length)} tools [${names}]`, `mcp:${name}`);
+    }
     const ns = this.sanitizeNamespace(name);
     tools.forEach((t) => { this.toolNameMap.set(`${ns}__${t.name}`, { serverName: name, originalName: t.name }); });
 
@@ -123,7 +160,12 @@ export class MCPProvider extends ToolProvider {
         const promptText = list.map((p) => `${p.name}: ${p.description ?? ''}`).join('\n');
         instructions = instructions.length > 0 ? `${instructions}\n${promptText}` : promptText;
       }
-    } catch { /* prompts optional */ }
+    } catch (e) {
+      if (this.trace) {
+        const msg = e instanceof Error ? e.message : String(e);
+        this.log('WRN', `listPrompts failed for '${name}': ${msg}`, `mcp:${name}`);
+      }
+      /* prompts optional */ }
 
     this.servers.set(name, { name, config, tools, instructions });
     return { name, config, tools, instructions };
@@ -137,10 +179,22 @@ export class MCPProvider extends ToolProvider {
     const transport = new StdioClientTransport({ command: config.command, args: config.args ?? [], env, stderr: 'pipe' });
     try {
       if (transport.stderr != null) {
-        transport.stderr.on('data', () => { /* ignore */ });
+        transport.stderr.on('data', (chunk: Buffer) => {
+          try {
+            const s = chunk.toString('utf8');
+            this.log('ERR', `stderr '${name}': ${s.trim()}`, `mcp:${name}`);
+          } catch { /* ignore */ }
+        });
       }
     } catch { /* ignore */ }
     return transport;
+  }
+
+  private log(severity: 'VRB' | 'WRN' | 'ERR' | 'TRC', message: string, remoteIdentifier: string, fatal = false): void {
+    const entry: LogEntry = {
+      timestamp: Date.now(), severity, turn: 0, subturn: 0, direction: 'response', type: 'tool', toolKind: 'mcp', remoteIdentifier, fatal, message,
+    };
+    try { this.onLog?.(entry); } catch { /* ignore */ }
   }
 
   listTools(): MCPTool[] {
@@ -195,7 +249,9 @@ export class MCPProvider extends ToolProvider {
       }
       try { return JSON.stringify(res); } catch { return ''; }
     })();
-    return { ok: true, result: text, latencyMs: latency, kind: this.kind, providerId: serverName };
+    const rawJson = (() => { try { return JSON.stringify(res, null, 2); } catch { return undefined; } })();
+    const rawReq = (() => { try { return JSON.stringify(args, null, 2); } catch { return undefined; } })();
+    return { ok: true, result: text, latencyMs: latency, kind: this.kind, providerId: serverName, extras: { rawResponse: rawJson, rawRequest: rawReq } };
   }
 
   getCombinedInstructions(): string {

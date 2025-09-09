@@ -6,6 +6,12 @@
       "baseUrl": "http://nova:8083/v1",
       "openaiMode": "chat"
     },
+    "llama.cpp": {
+      "type": "openai",
+      "apiKey": "localkey",
+      "baseUrl": "http://nova:8234/v1",
+      "openaiMode": "chat"
+    },
     "openai": {
       "apiKey": "${OPENAI_API_KEY}",
       "baseUrl": "https://api.openai.com/v1",
@@ -306,10 +312,9 @@
     },
     "filesystem": {
       "type": "stdio",
-      "command": "npx",
+      "command": "node",
       "args": [
-        "-y",
-        "@modelcontextprotocol/server-filesystem",
+        "mcp/fs-mcp-server.js",
         "/home/costa/src/netdata"
       ]
     }

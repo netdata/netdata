@@ -45,8 +45,11 @@ function sanitizeToolName(name: string): string {
 
 export class SubAgentRegistry {
   private readonly children = new Map<string, ChildInfo>(); // toolName -> info
+  private readonly opts: { traceLLM?: boolean; traceMCP?: boolean; verbose?: boolean };
 
-  constructor(private readonly baseDir?: string, private readonly ancestors: string[] = []) {}
+  constructor(private readonly baseDir?: string, private readonly ancestors: string[] = [], opts?: { traceLLM?: boolean; traceMCP?: boolean; verbose?: boolean }) {
+    this.opts = opts ?? {};
+  }
 
   load(paths: string[]): void {
     paths.forEach((p) => { this.loadOne(p); });
@@ -120,7 +123,7 @@ export class SubAgentRegistry {
     };
     // Build a static snapshot runner now (no dynamic reload during session)
     try {
-      const loaded = loadAgentFromContent(id, content, { baseDir: path.dirname(id) });
+      const loaded = loadAgentFromContent(id, content, { baseDir: path.dirname(id), traceLLM: this.opts.traceLLM, traceMCP: this.opts.traceMCP, verbose: this.opts.verbose });
       info.loaded = loaded;
       // Prefer the fully resolved system template from the snapshot (includes resolved statically)
       info.systemTemplate = loaded.systemTemplate;
@@ -133,16 +136,13 @@ export class SubAgentRegistry {
 
   getTools(): MCPTool[] {
     return Array.from(this.children.values()).map((c) => {
-      const inputSchema = ((): Record<string, unknown> => {
-        if (c.inputFormat === 'json') return (c.inputSchema ?? { type: 'object' });
-        return {
-          type: 'object',
-          additionalProperties: false,
-          required: ['input'],
-          properties: {
-            input: { type: 'string', minLength: 1, description: (typeof c.usage === 'string' && c.usage.length > 0) ? c.usage : 'User prompt for the sub-agent' },
-          },
-        } as Record<string, unknown>;
+      const inputSchema = (() => {
+        const reasonProp = { type: 'string', minLength: 1, description: '3-7 words about the reason of running this tool' };
+        if (c.inputFormat === 'json') {
+          const base = (c.inputSchema ?? { type: 'object' });
+          return { allOf: [ base, { type: 'object', required: ['reason'], properties: { reason: reasonProp } } ] };
+        }
+        return { type: 'object', additionalProperties: false, required: ['input', 'reason'], properties: { input: { type: 'string', minLength: 1, description: (typeof c.usage === 'string' && c.usage.length > 0) ? c.usage : 'User prompt for the sub-agent' }, reason: reasonProp } };
       })();
       return {
         name: `agent__${c.toolName}`,
@@ -175,7 +175,7 @@ export class SubAgentRegistry {
     if (info === undefined) throw new Error(`Unknown sub-agent: ${exposedToolName}`);
 
     // Validate and build user prompt from parameters
-    const userPrompt: string = ((): string => {
+    const userPrompt: string = (() => {
       if (info.inputFormat === 'json') {
         // Validate JSON params when schema provided
         if (info.inputSchema !== undefined) {
@@ -194,12 +194,13 @@ export class SubAgentRegistry {
         }
         try { return JSON.stringify(parameters); } catch { return '[unserializable-parameters]'; }
       }
-      const v = (parameters as { input?: unknown }).input;
+      const v = (parameters as { input?: unknown; reason?: unknown }).input;
       if (typeof v !== 'string' || v.length === 0) {
         throw new Error('invalid_parameters: input (string) is required');
       }
       return v;
     })();
+    const reason: string | undefined = (() => { const r = (parameters as { reason?: unknown }).reason; return typeof r === 'string' ? r : undefined; })();
 
     // Load child agent with layered configuration using the file path
     // CD to agent directory for proper layered config resolution
@@ -224,7 +225,7 @@ export class SubAgentRegistry {
       const history: ConversationMessage[] | undefined = undefined;
       // Ensure child gets a fresh selfId (span id)
       const childTrace = { selfId: crypto.randomUUID(), originId: parentSession.trace?.originId, parentId: parentSession.trace?.parentId, callPath: parentSession.trace?.callPath };
-      result = await loaded.run(loaded.systemTemplate, userPrompt, { history, callbacks: cb, trace: childTrace, renderTarget: 'sub-agent', outputFormat: 'sub-agent' });
+      result = await loaded.run(loaded.systemTemplate, userPrompt, { history, callbacks: cb, trace: childTrace, renderTarget: 'sub-agent', outputFormat: 'sub-agent', initialTitle: reason });
     } finally {
       // no chdir in static mode
     }

@@ -19,7 +19,7 @@ export class ToolsOrchestrator {
 
   constructor(
     private readonly tree: ExecutionTree,
-    private readonly opts: { toolTimeout?: number; toolResponseMaxBytes?: number; maxConcurrentTools?: number; parallelToolCalls?: boolean },
+    private readonly opts: { toolTimeout?: number; toolResponseMaxBytes?: number; maxConcurrentTools?: number; parallelToolCalls?: boolean; traceTools?: boolean },
     private readonly opTree?: SessionTreeBuilder,
     private readonly onOpTreeSnapshot?: (tree: SessionNode) => void
   ) {}
@@ -136,7 +136,7 @@ export class ToolsOrchestrator {
       }
     } catch { /* ignore */ }
     const requestMsg = formatToolRequestCompact(effective, args);
-    // Log request
+    // Log request (compact)
     const reqLog: LogEntry = {
       timestamp: Date.now(),
       severity: 'VRB',
@@ -150,6 +150,23 @@ export class ToolsOrchestrator {
       message: requestMsg,
     };
     this.tree.recordLog(reqLog);
+    // Optional full request trace (args JSON)
+    if (this.opts.traceTools === true) {
+      const fullArgs = (() => { try { return JSON.stringify(args, null, 2); } catch { return '[unserializable-args]'; } })();
+      const traceReq: LogEntry = {
+        timestamp: Date.now(),
+        severity: 'TRC',
+        turn: ctx.turn,
+        subturn: ctx.subturn,
+        direction: 'request',
+        type: 'tool',
+        toolKind: kind,
+        remoteIdentifier: `trace:${kind}:${provider.id}`,
+        fatal: false,
+        message: `REQUEST ${effective}\n${fullArgs}`,
+      };
+      this.tree.recordLog(traceReq);
+    }
 
     const start = Date.now();
     const withTimeout = async <T>(p: Promise<T>, timeoutMs?: number): Promise<T> => {
@@ -242,6 +259,21 @@ export class ToolsOrchestrator {
     })();
     if (isFailed) {
       const msg = (exec?.error ?? errorMessage ?? 'execution_failed');
+      if (this.opts.traceTools === true) {
+        const traceErr: LogEntry = {
+          timestamp: Date.now(),
+          severity: 'TRC',
+          turn: ctx.turn,
+          subturn: ctx.subturn,
+          direction: 'response',
+          type: 'tool',
+          toolKind: kind,
+          remoteIdentifier: `trace:${kind}:${provider.id}`,
+          fatal: false,
+          message: `ERROR ${effective}\n${msg}`,
+        };
+        this.tree.recordLog(traceErr);
+      }
       const errLog: LogEntry = {
         timestamp: Date.now(),
         severity: 'ERR',
@@ -273,6 +305,31 @@ export class ToolsOrchestrator {
 
     const safeExec = (() => { if (exec === undefined) { throw new Error('unexpected_undefined_execution_result'); } return exec; })();
     const raw = typeof safeExec.result === 'string' ? safeExec.result : '';
+    // Optional full response trace (raw, before truncation)
+    if (this.opts.traceTools === true) {
+      // Prefer provider-supplied raw payload when available
+      const rawPayload = (() => {
+        const extra = safeExec.extras;
+        if (extra !== undefined && typeof extra === 'object') {
+          const rp = (extra as { rawResponse?: unknown }).rawResponse;
+          if (typeof rp === 'string' && rp.length > 0) return rp;
+        }
+        return raw;
+      })();
+      const traceRes: LogEntry = {
+        timestamp: Date.now(),
+        severity: 'TRC',
+        turn: ctx.turn,
+        subturn: ctx.subturn,
+        direction: 'response',
+        type: 'tool',
+        toolKind: kind,
+        remoteIdentifier: `trace:${kind}:${provider.id}`,
+        fatal: false,
+        message: `RESPONSE ${effective}\n${rawPayload}`,
+      };
+      this.tree.recordLog(traceRes);
+    }
     const sizeBytes = Buffer.byteLength(raw, 'utf8');
     const limit = this.opts.toolResponseMaxBytes;
     const providerLabel = kind === 'mcp' ? safeExec.providerId : kind; // 'rest' or server name
