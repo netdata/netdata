@@ -85,7 +85,7 @@ Yes, all historical data will be safely stored and another active user in the Sp
 <details>
 <summary><strong>Can someone else in my space prevent my account deletion?</strong></summary>
 
-No. Account deletion is a personal action that only you can initiate and complete. Other space members cannot prevent or reverse your account deletion.
+No. Account deletion is a personal action that only you can initiate and complete. Other Space members cannot prevent or reverse your account deletion.
 
 </details>
 
