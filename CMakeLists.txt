@@ -2030,6 +2030,11 @@ set(PROC_PLUGIN_FILES
         src/collectors/proc.plugin/sys_class_drm.c
 )
 
+set(DEV_PLUGIN_FILES
+        src/collectors/dev.plugin/plugin_dev.c
+        src/collectors/dev.plugin/plugin_dev.h
+)
+
 set(TC_PLUGIN_FILES
         src/collectors/tc.plugin/plugin_tc.c
 )
@@ -2059,6 +2064,7 @@ if(OS_LINUX)
                 ${CGROUPS_PLUGIN_FILES}
                 ${DISKSPACE_PLUGIN_FILES}
                 ${PROC_PLUGIN_FILES}
+                ${DEV_PLUGIN_FILES}
                 ${TC_PLUGIN_FILES}
                 ${TIMEX_PLUGIN_FILES}
                 ${INTERNAL_COLLECTORS_FILES}
