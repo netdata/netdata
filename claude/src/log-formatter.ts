@@ -2,7 +2,7 @@ import path from 'node:path';
 
 import type { LogEntry } from './types.js';
 
-export interface LogFormatOptions {
+interface LogFormatOptions {
   color?: boolean;
   verbose?: boolean;
   traceLlm?: boolean;

@@ -10,6 +10,7 @@ import { AIAgent as Agent } from './ai-agent.js';
 import { buildUnifiedConfiguration, discoverLayers, resolveDefaults } from './config-resolver.js';
 import { parseFrontmatter, parseList, parsePairs, extractBodyWithoutFrontmatter } from './frontmatter.js';
 import { resolveIncludes } from './include-resolver.js';
+import { isReservedAgentName } from './internal-tools.js';
 import { resolveEffectiveOptions } from './options-resolver.js';
 import { buildEffectiveOptionsSchema } from './options-schema.js';
 import { openApiToRestTools, parseOpenAPISpec } from './tools/openapi-importer.js';
@@ -65,7 +66,7 @@ function canonical(p: string): string {
 
 function readFileText(p: string): string { return fs.readFileSync(p, 'utf-8'); }
 
-export interface LoadAgentOptions {
+interface LoadAgentOptions {
   configPath?: string;
   verbose?: boolean;
   targets?: { provider: string; model: string }[];
@@ -150,6 +151,22 @@ export function loadAgent(aiPath: string, registry?: AgentRegistry, options?: Lo
   const config = buildUnifiedConfiguration({ providers: needProviders, mcpServers: selectedTools }, layers, { verbose: options?.verbose });
   const dfl = resolveDefaults(layers);
   validateNoPlaceholders(config);
+  
+  // Validate that all requested MCP tools exist in configuration
+  const missingTools: string[] = [];
+  selectedTools.forEach((toolName) => {
+    // Skip special selectors like openapi:*, rest:*, agent:*
+    if (toolName.includes(':')) return;
+    // Skip internal tools (batch, append_notes, final_report)
+    if (isReservedAgentName(toolName)) return;
+    if (!Object.prototype.hasOwnProperty.call(config.mcpServers, toolName)) {
+      missingTools.push(toolName);
+    }
+  });
+  if (missingTools.length > 0) {
+    throw new Error(`Requested MCP tools not found in configuration: ${missingTools.join(', ')}. Check tool names in frontmatter or CLI arguments.`);
+  }
+  
   // Merge env files to enable ${VAR} expansion for OpenAPI defaults
   const mergedEnv: Record<string, string> = {};
   layers.forEach((ly) => {
@@ -366,6 +383,21 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
   const config = buildUnifiedConfiguration({ providers: needProviders, mcpServers: selectedTools }, layers, { verbose: options?.verbose });
   const dfl = resolveDefaults(layers);
   validateNoPlaceholders(config);
+  
+  // Validate that all requested MCP tools exist in configuration
+  const missingTools: string[] = [];
+  selectedTools.forEach((toolName) => {
+    // Skip special selectors like openapi:*, rest:*, agent:*
+    if (toolName.includes(':')) return;
+    // Skip internal tools (batch, append_notes, final_report)
+    if (isReservedAgentName(toolName)) return;
+    if (!Object.prototype.hasOwnProperty.call(config.mcpServers, toolName)) {
+      missingTools.push(toolName);
+    }
+  });
+  if (missingTools.length > 0) {
+    throw new Error(`Requested MCP tools not found in configuration: ${missingTools.join(', ')}. Check tool names in frontmatter or CLI arguments.`);
+  }
 
   const eff = resolveEffectiveOptions({
     cli: {

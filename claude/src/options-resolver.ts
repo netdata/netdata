@@ -1,7 +1,7 @@
 import type { FrontmatterOptions } from './frontmatter.js';
 import type { Configuration } from './types.js';
 
-export interface CLIOverrides {
+interface CLIOverrides {
   stream?: boolean;
   parallelToolCalls?: boolean;
   maxRetries?: number;
@@ -21,7 +21,7 @@ export interface CLIOverrides {
   verbose?: boolean;
 }
 
-export interface DefaultsForUndefined {
+interface DefaultsForUndefined {
   temperature?: number;
   topP?: number;
   maxOutputTokens?: number;
@@ -36,7 +36,7 @@ export interface DefaultsForUndefined {
   parallelToolCalls?: boolean;
 }
 
-export interface ResolvedEffectiveOptions {
+interface ResolvedEffectiveOptions {
   temperature: number;
   topP: number;
   maxOutputTokens: number | undefined;

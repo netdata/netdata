@@ -136,7 +136,7 @@ export function parseFrontmatter(
   }
 }
 
-export function loadSchemaValue(v: unknown, schemaRef?: string, baseDir?: string): Record<string, unknown> | undefined {
+function loadSchemaValue(v: unknown, schemaRef?: string, baseDir?: string): Record<string, unknown> | undefined {
   try {
     if (v !== null && v !== undefined && typeof v === 'object') return v as Record<string, unknown>;
     if (typeof v === 'string') {
@@ -176,14 +176,6 @@ export function extractBodyWithoutFrontmatter(src: string): string {
   return stripFrontmatter(text);
 }
 
-export function readFmNumber(opts: FrontmatterOptions | undefined, key: keyof FrontmatterOptions): number | undefined {
-  if (opts === undefined) return undefined;
-  const v = opts[key];
-  if (v === undefined) return undefined;
-  const n = Number(v);
-  if (!Number.isFinite(n)) return undefined;
-  return n;
-}
 
 export function parseList(value: unknown): string[] {
   if (Array.isArray(value)) return value.map((s) => (typeof s === 'string' ? s : String(s))).map((s) => s.trim()).filter((s) => s.length > 0);

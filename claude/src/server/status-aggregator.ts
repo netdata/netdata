@@ -1,7 +1,7 @@
 import type { AccountingEntry, LogEntry } from '../types.js';
 import type { SessionNode } from '../session-tree.js';
 
-export interface AgentStatusLine {
+interface AgentStatusLine {
   agentId: string;
   callPath?: string;
   status: 'Working' | 'Thinking' | 'Finished' | 'Failed';
@@ -14,7 +14,7 @@ export interface AgentStatusLine {
   title?: string;
 }
 
-export interface SnapshotSummary {
+interface SnapshotSummary {
   lines: AgentStatusLine[];
   totals: {
     tokensIn: number;

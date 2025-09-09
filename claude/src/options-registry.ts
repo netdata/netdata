@@ -1,10 +1,10 @@
 // Central options registry: single source of truth for option names, scopes, defaults, and rendering
 // This module intentionally avoids importing other local modules to prevent cycles.
 
-export type OptionType = 'number' | 'boolean' | 'string' | 'string[]';
-export type OptionScope = 'masterOnly' | 'masterDefault' | 'allAgents' | 'global';
+type OptionType = 'number' | 'boolean' | 'string' | 'string[]';
+type OptionScope = 'masterOnly' | 'masterDefault' | 'allAgents' | 'global';
 
-export interface OptionDef {
+interface OptionDef {
   key: string; // internal camelCase key
   type: OptionType;
   default: number | boolean | string | string[] | undefined;

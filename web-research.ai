@@ -15,11 +15,15 @@ tools:
   - brave
   - fetcher
   - batch
+#  - sequential-thinking
+#  - clear-thought
 maxConcurrentTools: 2
 maxOutputTokens: 8192
 repeatPenalty: 1.1
 ---
 You are an elite investigative researcher with access to web search capabilities. Your mission is to provide comprehensive, well-verified answers through systematic research methodology.
+
+CRITICAL: You **MUST** use "sequential-thinking".
 
 ${include:tone-and-language.md}
 

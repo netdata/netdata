@@ -92,7 +92,7 @@ function buildTurnSummaries(result: AIAgentResult): TurnSummary[] {
   return turns;
 }
 
-export function buildWhatWasDone(result: AIAgentResult): string {
+function buildWhatWasDone(result: AIAgentResult): string {
   const turns = buildTurnSummaries(result);
   const lines: string[] = [];
   lines.push('Here is what the agent managed to do:');
@@ -181,7 +181,7 @@ export function formatToolRequestCompact(name: string, parameters: Record<string
 }
 
 // Standardized provider/model display: configured/actual:model
-export function formatProviderModel(provider?: string, model?: string, actualProvider?: string): string {
+function formatProviderModel(provider?: string, model?: string, actualProvider?: string): string {
   const prov = provider ?? 'unknown';
   const mdl = model ?? 'unknown';
   if (actualProvider !== undefined && actualProvider.length > 0 && actualProvider !== prov) {

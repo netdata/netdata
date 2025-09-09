@@ -1,8 +1,8 @@
 import type { AccountingEntry, LogEntry } from './types.js';
 
-export type OperationKind = 'llm' | 'tool' | 'session';
+type OperationKind = 'llm' | 'tool' | 'session';
 
-export interface OperationNode {
+interface OperationNode {
   opId: string;
   kind: OperationKind;
   startedAt: number;
@@ -15,7 +15,7 @@ export interface OperationNode {
   childSession?: SessionNode;
 }
 
-export interface TurnNode {
+interface TurnNode {
   id: string;
   index: number; // 1-based
   startedAt: number;

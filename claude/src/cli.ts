@@ -9,7 +9,7 @@ import * as yaml from 'js-yaml';
 // (moved below to maintain import order)
 
 import type { FrontmatterOptions } from './frontmatter.js';
-import type { LogEntry, AccountingEntry, AIAgentCallbacks, ConversationMessage } from './types.js';
+import type { LogEntry, AccountingEntry, AIAgentCallbacks, ConversationMessage, Configuration } from './types.js';
 import type { CommanderError } from 'commander';
 
 import { loadAgentFromContent } from './agent-loader.js';
@@ -120,10 +120,10 @@ function buildResolvedDefaultsHelp(): string {
     }
 
     // Load configuration defaults (best effort) via layered resolver
-    let configDefaults: Record<string, unknown> = {};
+    let configDefaults: NonNullable<Configuration['defaults']> = {};
     try {
       const layers = discoverLayers({ configPath: undefined });
-      configDefaults = resolveDefaults(layers) as Record<string, unknown>;
+      configDefaults = resolveDefaults(layers);
     } catch {
       // ignore
     }
@@ -132,14 +132,14 @@ function buildResolvedDefaultsHelp(): string {
     const readNum = (key: keyof FrontmatterOptions, ckey: string, fallback: number): number => {
       const fmv = fmOptions !== undefined ? (fmOptions[key] as unknown) : undefined;
       if (typeof fmv === 'number' && Number.isFinite(fmv)) return fmv;
-      const cv = configDefaults[ckey];
+      const cv = (configDefaults as Record<string, unknown>)[ckey];
       if (typeof cv === 'number' && Number.isFinite(cv)) return cv;
       return fallback;
     };
     const readBool = (key: keyof FrontmatterOptions, ckey: string, fallback: boolean): boolean => {
       const fmv = fmOptions !== undefined ? (fmOptions[key] as unknown) : undefined;
       if (typeof fmv === 'boolean') return fmv;
-      const cv = configDefaults[ckey];
+      const cv = (configDefaults as Record<string, unknown>)[ckey];
       if (typeof cv === 'boolean') return cv;
       return fallback;
     };

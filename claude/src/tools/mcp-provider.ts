@@ -18,6 +18,7 @@ export class MCPProvider extends ToolProvider {
   private readonly serversConfig: Record<string, MCPServerConfig>;
   private clients = new Map<string, Client>();
   private servers = new Map<string, MCPServer>();
+  private failedServers = new Set<string>();
   private processes = new Map<string, ChildProcess>();
   private toolNameMap = new Map<string, { serverName: string; originalName: string }>();
   private initialized = false;
@@ -63,6 +64,7 @@ export class MCPProvider extends ToolProvider {
   
   private async doInitialize(): Promise<void> {
     const entries = Object.entries(this.serversConfig);
+    const failedServers: string[] = [];
     // eslint-disable-next-line functional/no-loop-statements
     for (const [name, config] of entries) {
       try {
@@ -72,10 +74,17 @@ export class MCPProvider extends ToolProvider {
         this.log('TRC', `initialized '${name}' with ${String(server.tools.length)} tools`, `mcp:${name}`);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        this.log('ERR', `failed to initialize '${name}': ${msg}`, `mcp:${name}`, false)
-        // ignore init errors per server (tools will be absent)
+        this.log('ERR', `failed to initialize '${name}': ${msg}`, `mcp:${name}`, true);
+        this.failedServers.add(name);
+        failedServers.push(`${name} (${msg})`);
       }
     }
+    
+    // Fail fast if any servers failed to initialize
+    if (failedServers.length > 0) {
+      throw new Error(`Failed to initialize MCP servers: ${failedServers.join(', ')}`);
+    }
+    
     this.initialized = true;
   }
 

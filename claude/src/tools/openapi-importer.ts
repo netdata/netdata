@@ -18,7 +18,7 @@ function normalizePathToName(path: string): string {
 
 function methodList(): readonly string[] { return ['get','post','put','patch','delete'] as const; }
 
-export interface OpenAPIImportOptions {
+interface OpenAPIImportOptions {
   baseUrlOverride?: string;
   toolNamePrefix?: string;
   includeMethods?: ('get'|'post'|'put'|'patch'|'delete')[];
@@ -150,14 +150,3 @@ export function openApiToRestTools(specIn: string | UnknownRecord, opts?: OpenAP
   return out;
 }
 
-export async function openApiFromUrlToRestTools(url: string, opts?: OpenAPIImportOptions): Promise<Record<string, RestToolConfig>> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Failed to fetch OpenAPI spec: HTTP ${String(res.status)}`);
-  const text = await res.text();
-  return openApiToRestTools(text, { ...(opts ?? {}), baseUrlOverride: opts?.baseUrlOverride ?? extractBaseFromUrl(text) });
-}
-
-function extractBaseFromUrl(_specText: string): string | undefined {
-  // No-op in this minimal version; base is read from spec.servers when present
-  return undefined;
-}

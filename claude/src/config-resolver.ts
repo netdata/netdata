@@ -5,7 +5,7 @@ import type { Configuration, MCPServerConfig, ProviderConfig, RestToolConfig, Op
 
 type LayerOrigin = '--config' | 'cwd' | 'binary' | 'home' | 'system';
 
-export interface ConfigLayer {
+interface ConfigLayer {
   origin: LayerOrigin;
   jsonPath: string; // may not exist
   envPath: string;  // may not exist
@@ -13,7 +13,7 @@ export interface ConfigLayer {
   env?: Record<string, string>;
 }
 
-export interface ResolverOptions {
+interface ResolverOptions {
   verbose?: boolean;
   log?: (msg: string) => void;
 }
@@ -115,7 +115,7 @@ function buildMissingVarError(scope: 'provider'|'mcp'|'defaults'|'accounting', i
   return new Error(`Unresolved variable \${${name}} for ${scope} '${id}' at ${origin}. Define it in ${origin === '--config' ? 'the specified config path' : '.ai-agent.env or environment'}.`);
 }
 
-export function resolveProvider(id: string, layers: ConfigLayer[], _opts?: ResolverOptions): ProviderConfig | undefined {
+function resolveProvider(id: string, layers: ConfigLayer[], _opts?: ResolverOptions): ProviderConfig | undefined {
   const found = layers.find((layer) => {
     const provs = layer.json?.providers as Record<string, unknown> | undefined;
     return provs !== undefined && Object.prototype.hasOwnProperty.call(provs, id);
@@ -134,7 +134,7 @@ export function resolveProvider(id: string, layers: ConfigLayer[], _opts?: Resol
   return expanded;
 }
 
-export function resolveMCPServer(id: string, layers: ConfigLayer[], _opts?: ResolverOptions): MCPServerConfig | undefined {
+function resolveMCPServer(id: string, layers: ConfigLayer[], _opts?: ResolverOptions): MCPServerConfig | undefined {
   const found = layers.find((layer) => {
     const srvs = layer.json?.mcpServers as Record<string, unknown> | undefined;
     return srvs !== undefined && Object.prototype.hasOwnProperty.call(srvs, id);
@@ -184,7 +184,7 @@ export function resolveDefaults(layers: ConfigLayer[]): NonNullable<Configuratio
   return out;
 }
 
-export function resolveAccounting(layers: ConfigLayer[], _opts?: ResolverOptions): Configuration['accounting'] {
+function resolveAccounting(layers: ConfigLayer[], _opts?: ResolverOptions): Configuration['accounting'] {
   const found = layers.find((layer) => {
     const j = layer.json as { accounting?: { file?: string } } | undefined;
     return typeof j?.accounting?.file === 'string';
@@ -203,7 +203,7 @@ export function resolveAccounting(layers: ConfigLayer[], _opts?: ResolverOptions
   return { file: expandedFile };
 }
 
-export function resolvePricing(layers: ConfigLayer[]): Configuration['pricing'] {
+function resolvePricing(layers: ConfigLayer[]): Configuration['pricing'] {
   const found = layers.find((layer) => {
     const j = layer.json as { pricing?: Record<string, unknown> } | undefined;
     return j?.pricing !== undefined;

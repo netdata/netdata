@@ -19,27 +19,28 @@
     "node": ">=20"
   },
   "dependencies": {
-    "js-yaml": "^4.1.0",
     "@ai-sdk/anthropic": "2.0.9",
     "@ai-sdk/google": "2.0.11",
     "@ai-sdk/openai": "2.0.23",
+    "@ai-sdk/provider-utils": "^3.0.8",
     "@modelcontextprotocol/sdk": "1.17.4",
     "@openrouter/ai-sdk-provider": "1.1.2",
+    "@slack/bolt": "^3.22.0",
     "ai": "5.0.28",
     "ajv": "^8.17.1",
     "commander": "14.0.0",
+    "express": "^4.19.2",
+    "js-yaml": "^4.1.0",
     "ollama-ai-provider-v2": "1.2.1",
     "ws": "8.18.3",
-    "zod": "4.1.5",
-    "@slack/bolt": "^3.22.0",
-    "express": "^4.19.2"
+    "zod": "4.1.5"
   },
   "devDependencies": {
+    "@types/express": "^4.17.21",
     "@types/node": "^20.10.0",
     "@types/ws": "^8.5.12",
     "@typescript-eslint/eslint-plugin": "^8.4.0",
     "@typescript-eslint/parser": "^8.4.0",
-    "esbuild": "^0.25.9",
     "eslint": "^8.57.0",
     "eslint-plugin-deprecation": "^2.0.0",
     "eslint-plugin-eslint-comments": "^3.2.0",
@@ -53,9 +54,8 @@
     "eslint-plugin-regexp": "^2.6.0",
     "eslint-plugin-security": "^2.1.1",
     "eslint-plugin-sonarjs": "^0.25.1",
-    "eslint-plugin-total-functions": "^7.0.1",
     "eslint-plugin-unicorn": "^54.0.0",
-    "typescript": "~5.6.3",
-    "@types/express": "^4.17.21"
+    "knip": "^5.63.1",
+    "typescript": "~5.6.3"
   }
 }

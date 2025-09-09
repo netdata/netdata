@@ -302,6 +302,29 @@
       },
       "enabled": true
     },
+    "sequential-thinking": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ],
+      "enabled": true
+    },
+    "clear-thought": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@smithery/cli@latest",
+        "run",
+        "@waldzellai/clear-thought",
+        "--key",
+        "ca07e887-6b42-4dbe-b9eb-865a9b49098a",
+        "--profile",
+        "cool-locust-uy2Zhe"
+      ]
+    },
     "fetcher": {
       "type": "stdio",
       "command": "npx",

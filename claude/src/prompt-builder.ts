@@ -35,7 +35,3 @@ export function expandVars(text: string, vars: Record<string, string>): string {
   return out;
 }
 
-export function mergeToolInstructions(system: string, mcpInstructions: string): string {
-  if (mcpInstructions.trim().length === 0) return system;
-  return `${system}\n\n${mcpInstructions}`;
-}

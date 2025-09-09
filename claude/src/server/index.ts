@@ -27,11 +27,9 @@ export async function startServer(agentPath: string, options?: { enableSlack?: b
     const expectedJson = loaded.expectedOutput?.format === 'json';
     let outputFormat: string;
     if (opts?.renderTarget === 'slack') {
-      const mod = await import('../formats.js');
-      outputFormat = mod.resolveFormatIdForSlack(expectedJson);
+      outputFormat = expectedJson ? 'json' : 'slack-block-kit';
     } else if (opts?.renderTarget === 'api') {
-      const mod = await import('../formats.js');
-      outputFormat = mod.resolveFormatIdForApi(undefined, expectedJson);
+      outputFormat = expectedJson ? 'json' : 'markdown';
     } else if (opts?.renderTarget === 'web') {
       outputFormat = expectedJson ? 'json' : 'markdown';
     } else {

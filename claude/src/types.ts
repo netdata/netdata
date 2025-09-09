@@ -40,7 +40,7 @@ export type ToolStatus =
   | { type: 'timeout'; toolName: string; timeoutMs: number }
   | { type: 'connection_error'; serverName: string; message: string };
 
-export interface ToolMetadata {
+interface ToolMetadata {
   latency: number;
   charactersIn: number;
   charactersOut: number;
@@ -334,7 +334,7 @@ export interface AIAgentResult {
 // Accounting system
 export type AccountingEntry = LLMAccountingEntry | ToolAccountingEntry;
 
-export interface BaseAccountingEntry {
+interface BaseAccountingEntry {
   timestamp: number;
   status: 'ok' | 'failed';
   latency: number;
@@ -370,7 +370,7 @@ export interface ToolAccountingEntry extends BaseAccountingEntry {
 }
 
 // Tool executor function type
-export type ToolExecutor = (toolName: string, parameters: Record<string, unknown>) => Promise<string>;
+type ToolExecutor = (toolName: string, parameters: Record<string, unknown>) => Promise<string>;
 
 // LLM interfaces
 export interface TurnRequest {

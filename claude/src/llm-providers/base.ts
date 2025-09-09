@@ -4,7 +4,7 @@ import { generateText, streamText } from 'ai';
 import type { ConversationMessage, MCPTool, TokenUsage, TurnRequest, TurnResult, TurnStatus } from '../types.js';
 import type { LanguageModel, ModelMessage, StreamTextResult, ToolSet } from 'ai';
 
-export interface LLMProviderInterface {
+interface LLMProviderInterface {
   name: string;
   executeTurn: (request: TurnRequest) => Promise<TurnResult>;
 }
@@ -357,7 +357,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
           }
         }
       ])
-    ) as ToolSet;
+    ) as unknown as ToolSet;
   }
 
   // Constants

@@ -65,12 +65,5 @@ export function resolveIncludes(raw: string, baseDir?: string, maxDepth = 8): st
   return out;
 }
 
-export function hasInclude(raw: string): boolean {
-  return /\$\{include:[^}]+\}/.test(raw) || /\{\{include:[^}]+\}\}/.test(raw);
-}
 
-export function mergeVars(base: Record<string, string>, extra: Record<string, string>): Record<string, string> {
-  return { ...base, ...extra };
-}
 
-export interface IncludeResolverOptions { baseDir?: string; maxDepth?: number }

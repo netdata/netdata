@@ -1,11 +1,11 @@
 export type OutputFormatId = 'markdown' | 'markdown+mermaid' | 'slack-block-kit' | 'tty' | 'pipe' | 'json' | 'sub-agent';
 
-export interface OutputFormat {
+interface OutputFormat {
   id: OutputFormatId;
   description: string;
 }
 
-export const OUTPUT_FORMATS: Record<OutputFormatId, OutputFormat> = {
+const OUTPUT_FORMATS: Record<OutputFormatId, OutputFormat> = {
   markdown: { id: 'markdown', description: 'markdown' },
   'markdown+mermaid': { id: 'markdown+mermaid', description: 'markdown with mermaid charts' },
   'slack-block-kit': { id: 'slack-block-kit', description: [
@@ -32,12 +32,3 @@ export function resolveFormatIdForCli(override: string | undefined, expectedJson
   return isTTY ? 'tty' : 'pipe';
 }
 
-export function resolveFormatIdForSlack(expectedJson: boolean): OutputFormatId {
-  return expectedJson ? 'json' : 'slack-block-kit';
-}
-
-export function resolveFormatIdForApi(override: string | undefined, expectedJson: boolean): OutputFormatId {
-  if (expectedJson) return 'json';
-  if (typeof override === 'string' && override in OUTPUT_FORMATS) return override as OutputFormatId;
-  return 'markdown';
-}
