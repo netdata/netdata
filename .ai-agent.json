@@ -302,6 +302,14 @@
       },
       "enabled": true
     },
+    "stripe": {
+      "type": "http",
+      "url": "https://mcp.stripe.com",
+      "headers": {
+        "Authorization": "Bearer ${STRIPE_SECRET_KEY}"
+      },
+      "enabled": true
+    },
     "sequential-thinking": {
       "type": "stdio",
       "command": "npx",
@@ -323,7 +331,8 @@
         "ca07e887-6b42-4dbe-b9eb-865a9b49098a",
         "--profile",
         "cool-locust-uy2Zhe"
-      ]
+      ],
+      "enabled": true
     },
     "fetcher": {
       "type": "stdio",
@@ -331,7 +340,8 @@
       "args": [
         "-y",
         "fetcher-mcp"
-      ]
+      ],
+      "enabled": true
     },
     "filesystem": {
       "type": "stdio",
@@ -339,7 +349,8 @@
       "args": [
         "mcp/fs-mcp-server.js",
         "/home/costa/src/netdata"
-      ]
+      ],
+      "enabled": true
     }
   },
   "slack": {

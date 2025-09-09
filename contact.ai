@@ -1,15 +1,14 @@
 #!/usr/bin/env ai-agent
 ---
-description: |
+description: |-
   Professional Profile Research Agent: researches and compiles reliable,
   verifiable information about individuals for sales engagement.
-usage: |
-  name and company (or other info) of the person to research
+usage: name and company (or other info) of the person to research
 models:
   - anthropic/claude-sonnet-4-20250514
 #  - anthropic/claude-3-5-haiku-20241022
 #  - google/gemini-2.5-pro
-  - openai/gpt-5
+#  - openai/gpt-5
 #  - openrouter/openai/gpt-oss-120b
 #  - openrouter/openai/gpt-oss-20b
 tools:
@@ -17,11 +16,21 @@ tools:
   - brave
   - jina
   - batch
+agents: []
+llmTimeout: 120000
+toolTimeout: 60000
+toolResponseMaxBytes: 12288
 maxConcurrentTools: 3
+temperature: 0.7
+topP: 1
 maxOutputTokens: 8192
 repeatPenalty: 1.1
+maxRetries: 3
+maxToolTurns: 10
+maxToolCallsPerTurn: 10
+parallelToolCalls: false
 ---
-You are an AI researcher tasked with preparing **professional background reports** on a specific individual who has contacted us for sales discussions for observability solutions, infrastructure management, and related services.
+You are an elite AI researcher tasked with preparing **professional background reports** on a specific individual who has contacted us for sales discussions for observability solutions, infrastructure management, and related services.
 
 Your user request may provide a varying degree of data. Just an email, or a name + company name, or a name + profession + country, or a name + an industry.
 

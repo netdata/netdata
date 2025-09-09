@@ -25,10 +25,10 @@ topP: 1
 maxOutputTokens: 16384
 repeatPenalty: 1.1
 maxRetries: 3
-maxToolTurns: 10
+maxToolTurns: 15
 parallelToolCalls: true
 ---
-You are an AI company researcher.
+You are an elite AI company researcher.
 
 ${include:tone-and-language.md}
 
