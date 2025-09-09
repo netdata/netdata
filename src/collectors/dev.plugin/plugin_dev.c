@@ -2,6 +2,10 @@
 
 #include "plugin_dev.h"
 
+#define _COMMON_PLUGIN_NAME "dev.plugin"
+#define _COMMON_PLUGIN_MODULE_NAME "dev"
+#include "../common-contexts/common-contexts.h"
+
 #define NETDATA_MSR_THERM_STATUS 0x19C
 #define NETDATA_MSR_TEMPERATURE_TARGET 0x1A2
 
@@ -23,6 +27,16 @@ static uint64_t netdata_dev_read_msr(int cpu, unsigned int reg) {
 
     close(fd);
     return data;
+}
+
+static collected_number netadata_read_cpu_temp(int cpu)
+{
+    uint64_t therm_status = netdata_dev_read_msr(cpu, NETDATA_MSR_THERM_STATUS);
+    uint64_t temp_target  = netdata_dev_read_msr(cpu, NETDATA_MSR_TEMPERATURE_TARGET);
+
+    collected_number tjmax = (temp_target >> 16) & 0xFF; // TJMax value
+    collected_number temp_offset = (therm_status >> 16) & 0x7F; // delta from TJMax
+    return (tjmax - temp_offset);
 }
 
 static void dev_main_cleanup(void *pptr)
@@ -51,16 +65,31 @@ void dev_main(void *ptr)
     worker_register("DEV");
 
     rrd_collector_started();
+    int number_of_cpus = (int)os_get_system_cpus();
+    RRDDIM **rd_pcpu_temperature = callocz(sizeof(RRDDIM *), number_of_cpus);
 
     heartbeat_t hb;
-    heartbeat_init(&hb, localhost->rrd_update_every * USEC_PER_SEC);
+    int update_every = localhost->rrd_update_every * USEC_PER_SEC;
+    heartbeat_init(&hb, (usec_t )update_every);
 
     while(service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
-        usec_t hb_dt = heartbeat_next(&hb);
+        (void)heartbeat_next(&hb);
 
         if(unlikely(!service_running(SERVICE_COLLECTORS)))
             break;
+
+        RRDSET *st = common_cpu_temperature(update_every) ;
+        for (int i = 0; i < number_of_cpus; i++) {
+            if (unlikely(!rd_pcpu_temperature[i])) {
+                char char_rd[64];
+                sprintf(char_rd, "cpu%d.temp", i);
+                rd_pcpu_temperature[i] = rrddim_add(st, char_rd, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            }
+
+            collected_number temperature = netadata_read_cpu_temp(i);
+            rrddim_set_by_pointer(st, rd_pcpu_temperature[i], temperature);
+        }
+        rrdset_done(st);
     }
 }
-
