@@ -8,7 +8,9 @@
 #include "config.h"
 
 #if defined(HAVE_PR_CAP_AMBIENT)
+#if defined(NEED_LINUX_PRCTL_H)
 #include <linux/prctl.h>
+#endif
 #include <sys/prctl.h>
 #endif
 

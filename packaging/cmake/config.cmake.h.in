@@ -73,6 +73,7 @@
 #cmakedefine HAVE_SETENV
 #cmakedefine HAVE_DLSYM
 #cmakedefine HAVE_PR_CAP_AMBIENT
+#cmakedefine NEED_LINUX_PRCTL_H
 
 #cmakedefine HAVE_LIBCURL
 #cmakedefine HAVE_LIBICONV
