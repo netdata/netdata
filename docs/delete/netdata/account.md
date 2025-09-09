@@ -50,7 +50,7 @@ Before deleting your account, consider these alternatives:
 
 1. **Pause Monitoring** - Temporarily disable monitoring without losing configurations
 2. **Sign Out** - Simply sign out if you need a break from the platform
-3. **Contact Support** - Reach out to [Netdata support](https://www.netdata.cloud/contact/) if you're experiencing resolvable issues
+3. **Contact Support** - Reach out to [Netdata support](https://www.netdata.cloud/support/) if you're experiencing resolvable issues
 4. **Disable Notifications** - Turn off alerts if they're overwhelming
 
 ## FAQ
