@@ -15,7 +15,7 @@ tools:
   - bigquery
   - batch
 llmTimeout: 120000
-toolTimeout: 60000
+toolTimeout: 120000
 toolResponseMaxBytes: 15000
 maxConcurrentTools: 2
 temperature: 0.7
