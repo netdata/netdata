@@ -15,9 +15,9 @@ export class SessionManager {
   private readonly aborters = new Map<string, AbortController>();
   private readonly stopRefs = new Map<string, { stopping: boolean }>();
   private readonly callbacks: Callbacks;
-  private readonly runner: (systemPrompt: string, userPrompt: string, opts: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; renderTarget?: 'slack' | 'api' | 'web'; outputFormat?: string; abortSignal?: AbortSignal; stopRef?: { stopping: boolean } }) => Promise<AIAgentResult>;
+  private readonly runner: (systemPrompt: string, userPrompt: string, opts: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; renderTarget?: 'slack' | 'api' | 'web'; outputFormat?: string; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string }) => Promise<AIAgentResult>;
 
-  public constructor(runner: (systemPrompt: string, userPrompt: string, opts: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; renderTarget?: 'slack' | 'api' | 'web'; outputFormat?: string; abortSignal?: AbortSignal }) => Promise<AIAgentResult>, callbacks: Callbacks = {}) {
+  public constructor(runner: (systemPrompt: string, userPrompt: string, opts: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; renderTarget?: 'slack' | 'api' | 'web'; outputFormat?: string; abortSignal?: AbortSignal; initialTitle?: string }) => Promise<AIAgentResult>, callbacks: Callbacks = {}) {
     this.runner = runner;
     this.callbacks = callbacks;
   }

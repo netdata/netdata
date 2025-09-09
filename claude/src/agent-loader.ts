@@ -314,7 +314,6 @@ export function loadAgent(aiPath: string, registry?: AgentRegistry, options?: Lo
         expectedOutput: fm?.expectedOutput,
         callbacks: o.callbacks,
         trace: o.trace,
-        initialTitle: o.initialTitle,
         stopRef: o.stopRef,
         initialTitle: o.initialTitle,
         // Propagate headend abort signal if present
