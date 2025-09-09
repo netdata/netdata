@@ -975,17 +975,16 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: System
-          description: "These metrics refer to the entire system."
+        - name: global
+          description: "This metric show latest CPU temperature."
           labels: []
           metrics:
             - name: cpu.temperature
               description: Core temperature
-              unit: "operations/s"
-              chart_type: stacked
+              unit: "Celcius"
+              chart_type: line
               dimensions:
-                - name: read
-                - name: write
+                - name: a dimension per core
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibThermalZone
