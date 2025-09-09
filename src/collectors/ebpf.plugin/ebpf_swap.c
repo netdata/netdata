@@ -52,10 +52,11 @@ static ebpf_local_maps_t swap_maps[] = {
 
 netdata_ebpf_targets_t swap_targets[] = {
     {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE},
-    {.name = "swap_writepage", .mode = EBPF_LOAD_TRAMPOLINE},
+    {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE},
     {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
-static char *swap_read[] = {"swap_readpage", "swap_read_folio", NULL};
+#define NETDATA_SWAP_KEY_WRITE_START (2)
+static char *swap_functions[] = {"swap_readpage", "swap_read_folio", "swap_writepage", "__swap_writepage", NULL};
 
 struct netdata_static_thread ebpf_read_swap = {
     .name = "EBPF_READ_SWAP",
@@ -80,6 +81,7 @@ static void ebpf_swap_disable_probe(struct swap_bpf *obj)
     bpf_program__set_autoload(obj->progs.netdata_swap_readpage_probe, false);
     bpf_program__set_autoload(obj->progs.netdata_swap_read_folio_probe, false);
     bpf_program__set_autoload(obj->progs.netdata_swap_writepage_probe, false);
+    bpf_program__set_autoload(obj->progs.netdata___swap_writepage_probe, false);
 }
 
 /**
@@ -91,10 +93,20 @@ static void ebpf_swap_disable_probe(struct swap_bpf *obj)
  */
 static inline void ebpf_swap_disable_specific_probe(struct swap_bpf *obj)
 {
-    if (!strcmp(swap_targets[NETDATA_KEY_SWAP_READPAGE_CALL].name, swap_read[NETDATA_KEY_SWAP_READPAGE_CALL])) {
+    if (!strcmp(swap_targets[NETDATA_KEY_SWAP_READPAGE_CALL].name, swap_functions[NETDATA_KEY_SWAP_READPAGE_CALL])) {
         bpf_program__set_autoload(obj->progs.netdata_swap_read_folio_probe, false);
+        bpf_program__set_autoload(obj->progs.netdata_swap_readpage_probe, true);
     } else {
+        bpf_program__set_autoload(obj->progs.netdata_swap_read_folio_probe, true);
         bpf_program__set_autoload(obj->progs.netdata_swap_readpage_probe, false);
+    }
+
+    if (!strcmp(swap_targets[NETDATA_KEY_SWAP_WRITEPAGE_CALL].name, swap_functions[NETDATA_SWAP_KEY_WRITE_START])) {
+        bpf_program__set_autoload(obj->progs.netdata_swap_writepage_probe, true);
+        bpf_program__set_autoload(obj->progs.netdata___swap_writepage_probe, false);
+    } else {
+        bpf_program__set_autoload(obj->progs.netdata_swap_writepage_probe, false);
+        bpf_program__set_autoload(obj->progs.netdata___swap_writepage_probe, true);
     }
 }
 
@@ -110,6 +122,7 @@ static void ebpf_swap_disable_trampoline(struct swap_bpf *obj)
     bpf_program__set_autoload(obj->progs.netdata_swap_readpage_fentry, false);
     bpf_program__set_autoload(obj->progs.netdata_swap_read_folio_fentry, false);
     bpf_program__set_autoload(obj->progs.netdata_swap_writepage_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata___swap_writepage_fentry, false);
 }
 
 /**
@@ -121,10 +134,20 @@ static void ebpf_swap_disable_trampoline(struct swap_bpf *obj)
  */
 static inline void ebpf_swap_disable_specific_trampoline(struct swap_bpf *obj)
 {
-    if (!strcmp(swap_targets[NETDATA_KEY_SWAP_READPAGE_CALL].name, swap_read[NETDATA_KEY_SWAP_READPAGE_CALL])) {
+    if (!strcmp(swap_targets[NETDATA_KEY_SWAP_READPAGE_CALL].name, swap_functions[NETDATA_KEY_SWAP_READPAGE_CALL])) {
         bpf_program__set_autoload(obj->progs.netdata_swap_read_folio_fentry, false);
+        bpf_program__set_autoload(obj->progs.netdata_swap_readpage_fentry, true);
     } else {
+        bpf_program__set_autoload(obj->progs.netdata_swap_read_folio_fentry, true);
         bpf_program__set_autoload(obj->progs.netdata_swap_readpage_fentry, false);
+    }
+
+    if (!strcmp(swap_targets[NETDATA_KEY_SWAP_WRITEPAGE_CALL].name, swap_functions[NETDATA_SWAP_KEY_WRITE_START])) {
+        bpf_program__set_autoload(obj->progs.netdata_swap_writepage_fentry, true);
+        bpf_program__set_autoload(obj->progs.netdata___swap_writepage_fentry, false);
+    } else {
+        bpf_program__set_autoload(obj->progs.netdata_swap_writepage_fentry, false);
+        bpf_program__set_autoload(obj->progs.netdata___swap_writepage_fentry, true);
     }
 }
 
@@ -156,7 +179,7 @@ static void ebpf_swap_set_trampoline_target(struct swap_bpf *obj)
 static int ebpf_swap_attach_kprobe(struct swap_bpf *obj)
 {
     int ret;
-    if (!strcmp(swap_targets[NETDATA_KEY_SWAP_READPAGE_CALL].name, swap_read[NETDATA_KEY_SWAP_READPAGE_CALL])) {
+    if (!strcmp(swap_targets[NETDATA_KEY_SWAP_READPAGE_CALL].name, swap_functions[NETDATA_KEY_SWAP_READPAGE_CALL])) {
         obj->links.netdata_swap_readpage_probe = bpf_program__attach_kprobe(
             obj->progs.netdata_swap_readpage_probe, false, swap_targets[NETDATA_KEY_SWAP_READPAGE_CALL].name);
         ret = libbpf_get_error(obj->links.netdata_swap_readpage_probe);
@@ -168,9 +191,16 @@ static int ebpf_swap_attach_kprobe(struct swap_bpf *obj)
     if (ret)
         return -1;
 
-    obj->links.netdata_swap_writepage_probe = bpf_program__attach_kprobe(
-        obj->progs.netdata_swap_writepage_probe, false, swap_targets[NETDATA_KEY_SWAP_WRITEPAGE_CALL].name);
-    ret = libbpf_get_error(obj->links.netdata_swap_writepage_probe);
+    if (!strcmp(swap_targets[NETDATA_KEY_SWAP_WRITEPAGE_CALL].name, swap_functions[NETDATA_SWAP_KEY_WRITE_START])) {
+        obj->links.netdata_swap_writepage_probe = bpf_program__attach_kprobe(
+            obj->progs.netdata_swap_writepage_probe, false, swap_targets[NETDATA_KEY_SWAP_WRITEPAGE_CALL].name);
+        ret = libbpf_get_error(obj->links.netdata_swap_writepage_probe);
+    } else {
+        obj->links.netdata___swap_writepage_probe = bpf_program__attach_kprobe(
+            obj->progs.netdata___swap_writepage_probe, false, swap_targets[NETDATA_KEY_SWAP_WRITEPAGE_CALL].name);
+        ret = libbpf_get_error(obj->links.netdata___swap_writepage_probe);
+    }
+
     if (ret)
         return -1;
 
@@ -1154,19 +1184,22 @@ static int ebpf_swap_set_internal_value()
 {
     ebpf_addresses_t address = {.function = NULL, .hash = 0, .addr = 0};
     int i;
-    for (i = 0; swap_read[i]; i++) {
-        address.function = swap_read[i];
+    for (i = 0; swap_functions[i]; i++) {
+        address.function = swap_functions[i];
         ebpf_load_addresses(&address, -1);
-        if (address.addr)
-            break;
+        if (address.addr) {
+            int key =  (i < 2) ? NETDATA_KEY_SWAP_READPAGE_CALL: NETDATA_KEY_SWAP_WRITEPAGE_CALL;
+            swap_targets[key].name = address.function;
+            address.addr = 0;
+        }
     }
 
-    if (!address.addr) {
-        netdata_log_error("%s swap.", NETDATA_EBPF_DEFAULT_FNT_NOT_FOUND);
+    if (!swap_targets[NETDATA_KEY_SWAP_READPAGE_CALL].name || !swap_targets[NETDATA_KEY_SWAP_WRITEPAGE_CALL].name) {
+        netdata_log_error("%s (%s, %s) swap.", NETDATA_EBPF_DEFAULT_FNT_NOT_FOUND,
+                          swap_targets[NETDATA_KEY_SWAP_READPAGE_CALL].name,
+                          swap_targets[NETDATA_KEY_SWAP_WRITEPAGE_CALL].name);
         return -1;
     }
-
-    swap_targets[NETDATA_KEY_SWAP_READPAGE_CALL].name = address.function;
 
     return 0;
 }

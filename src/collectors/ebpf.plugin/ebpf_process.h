@@ -101,8 +101,17 @@ typedef enum netdata_publish_process {
     NETDATA_KEY_PUBLISH_PROCESS_END
 } netdata_publish_process_t;
 
+enum netdata_core_process {
+    PROCESS_RELEASE_TASK_NAME,
+    PROCESS_SYS_CLONE,
+    PROCESS_SYS_CLONE3,
+    PROCESS_SYS_FORK,
+    PROCESS_KERNEL_CLONE,
+};
+
 enum ebpf_process_tables { NETDATA_PROCESS_PID_TABLE, NETDATA_PROCESS_GLOBAL_TABLE, NETDATA_PROCESS_CTRL_TABLE };
 
+extern netdata_ebpf_targets_t process_targets[];
 extern struct config process_config;
 
 #endif /* NETDATA_EBPF_PROCESS_H */

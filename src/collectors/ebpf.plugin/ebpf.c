@@ -67,7 +67,7 @@ ebpf_module_t ebpf_modules[] = {
      .kernels =
          NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_10 | NETDATA_V5_14,
      .load = EBPF_LOAD_LEGACY,
-     .targets = NULL,
+     .targets = process_targets,
      .probe_links = NULL,
      .objects = NULL,
      .thread = NULL,
@@ -833,6 +833,7 @@ struct shm_bpf *shm_bpf_obj = NULL;
 struct socket_bpf *socket_bpf_obj = NULL;
 struct swap_bpf *bpf_obj = NULL;
 struct vfs_bpf *vfs_bpf_obj = NULL;
+struct process_bpf *process_bpf_obj = NULL;
 #else
 void *default_btf = NULL;
 #endif
