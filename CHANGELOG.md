@@ -6,9 +6,13 @@
 
 **Merged pull requests:**
 
+- Update account.md [\#20940](https://github.com/netdata/netdata/pull/20940) ([Ancairon](https://github.com/Ancairon))
+- build\(deps\): bump golang.org/x/text from 0.28.0 to 0.29.0 in /src/go [\#20937](https://github.com/netdata/netdata/pull/20937) ([dependabot[bot]](https://github.com/apps/dependabot))
+- chore\(go.d/pkgs/logs\): validation fixes, resource safety, and cleanup [\#20931](https://github.com/netdata/netdata/pull/20931) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): bump github.com/prometheus/common from 0.65.0 to 0.66.1 in /src/go [\#20930](https://github.com/netdata/netdata/pull/20930) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/docker/docker from 28.3.3+incompatible to 28.4.0+incompatible in /src/go [\#20929](https://github.com/netdata/netdata/pull/20929) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/redis/go-redis/v9 from 9.12.1 to 9.13.0 in /src/go [\#20928](https://github.com/netdata/netdata/pull/20928) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Add documentation for account deletion process [\#20927](https://github.com/netdata/netdata/pull/20927) ([kanelatechnical](https://github.com/kanelatechnical))
 - Regenerate integrations docs [\#20925](https://github.com/netdata/netdata/pull/20925) ([netdatabot](https://github.com/netdatabot))
 - docs\(go.d/nginx\): improve prerequisites for NGINX collector [\#20924](https://github.com/netdata/netdata/pull/20924) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d/weblog\): remove path pattern validation in dyncfg [\#20923](https://github.com/netdata/netdata/pull/20923) ([ilyam8](https://github.com/ilyam8))
@@ -43,6 +47,7 @@
 - fix\(go.d\): fix goroutine leak and panic risk in Docker exec [\#20881](https://github.com/netdata/netdata/pull/20881) ([ilyam8](https://github.com/ilyam8))
 - improve\(go.d/snmp\): add zyxel snmp meta file [\#20879](https://github.com/netdata/netdata/pull/20879) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d/ddsnmp\): use plugincofng for loading profiles [\#20878](https://github.com/netdata/netdata/pull/20878) ([ilyam8](https://github.com/ilyam8))
+- Update libbpf to 1.6.2 [\#20875](https://github.com/netdata/netdata/pull/20875) ([thiagoftsm](https://github.com/thiagoftsm))
 - build\(deps\): bump github.com/coreos/go-systemd/v22 from 22.5.0 to 22.6.0 in /src/go [\#20874](https://github.com/netdata/netdata/pull/20874) ([dependabot[bot]](https://github.com/apps/dependabot))
 - fix\(go.d\): create vnode internal data\_collection\_status charts in the main context [\#20872](https://github.com/netdata/netdata/pull/20872) ([ilyam8](https://github.com/ilyam8))
 - Fix Table field comparison in SNMP collector table tests [\#20871](https://github.com/netdata/netdata/pull/20871) ([Copilot](https://github.com/apps/copilot-swe-agent))
@@ -97,6 +102,7 @@
 - build\(deps\): bump golang.org/x/net from 0.42.0 to 0.43.0 in /src/go [\#20796](https://github.com/netdata/netdata/pull/20796) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/redis/go-redis/v9 from 9.11.0 to 9.12.0 in /src/go [\#20794](https://github.com/netdata/netdata/pull/20794) ([dependabot[bot]](https://github.com/apps/dependabot))
 - ci: handle boolean values in EOL API responses for newly released distros [\#20792](https://github.com/netdata/netdata/pull/20792) ([ilyam8](https://github.com/ilyam8))
+- Update sqlite to version 3.50.4 [\#20791](https://github.com/netdata/netdata/pull/20791) ([stelfrag](https://github.com/stelfrag))
 - Add more MSSQL metrics \(windows.plugin\) [\#20788](https://github.com/netdata/netdata/pull/20788) ([thiagoftsm](https://github.com/thiagoftsm))
 - feat\(go.d/ddsnmp\): add MultiValue for state metrics and aggregation [\#20787](https://github.com/netdata/netdata/pull/20787) ([ilyam8](https://github.com/ilyam8))
 - feat\(go.d/ddsnmp\): add metric aggregation support for SNMP profiles [\#20786](https://github.com/netdata/netdata/pull/20786) ([ilyam8](https://github.com/ilyam8))
@@ -139,6 +145,7 @@
 - Remove redundant defines [\#20744](https://github.com/netdata/netdata/pull/20744) ([stelfrag](https://github.com/stelfrag))
 - streaming routing documentation [\#20743](https://github.com/netdata/netdata/pull/20743) ([ktsaou](https://github.com/ktsaou))
 - docs: remove customize.md [\#20742](https://github.com/netdata/netdata/pull/20742) ([ilyam8](https://github.com/ilyam8))
+- MCP WEB CHAT: add ollama, deepseek support [\#20741](https://github.com/netdata/netdata/pull/20741) ([ktsaou](https://github.com/ktsaou))
 - Fix SNDR thread startup [\#20740](https://github.com/netdata/netdata/pull/20740) ([stelfrag](https://github.com/stelfrag))
 - build\(deps\): bump github.com/docker/docker from 28.3.2+incompatible to 28.3.3+incompatible in /src/go [\#20739](https://github.com/netdata/netdata/pull/20739) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Use netdata mutex cond and lock [\#20737](https://github.com/netdata/netdata/pull/20737) ([stelfrag](https://github.com/stelfrag))
@@ -441,14 +448,6 @@
 - docs\(go.d\): add example how to debug a specific job [\#20399](https://github.com/netdata/netdata/pull/20399) ([ilyam8](https://github.com/ilyam8))
 - Maintenance: update restart, backup, uninstall, and restore docs [\#20398](https://github.com/netdata/netdata/pull/20398) ([kanelatechnical](https://github.com/kanelatechnical))
 - feat\(go.d\): allow to debug a specific job [\#20394](https://github.com/netdata/netdata/pull/20394) ([ilyam8](https://github.com/ilyam8))
-- improvement\(go.d/httpcheck\): add resp validation debug logging [\#20392](https://github.com/netdata/netdata/pull/20392) ([ilyam8](https://github.com/ilyam8))
-- SNMP: palo-alto.yaml [\#20391](https://github.com/netdata/netdata/pull/20391) ([Ancairon](https://github.com/Ancairon))
-- SNMP: aruba-wireless-controller.yaml [\#20389](https://github.com/netdata/netdata/pull/20389) ([Ancairon](https://github.com/Ancairon))
-- build\(deps\): bump github.com/docker/docker from 28.2.1+incompatible to 28.2.2+incompatible in /src/go [\#20387](https://github.com/netdata/netdata/pull/20387) ([dependabot[bot]](https://github.com/apps/dependabot))
-- apps.plugin documentation and grouping matches improvements [\#20386](https://github.com/netdata/netdata/pull/20386) ([ktsaou](https://github.com/ktsaou))
-- SNMP: aruba-switch.yaml [\#20385](https://github.com/netdata/netdata/pull/20385) ([Ancairon](https://github.com/Ancairon))
-- Improve DynCfg documentation [\#20384](https://github.com/netdata/netdata/pull/20384) ([kanelatechnical](https://github.com/kanelatechnical))
-- SNMP: aruba-cx-switch.yaml [\#20383](https://github.com/netdata/netdata/pull/20383) ([Ancairon](https://github.com/Ancairon))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
