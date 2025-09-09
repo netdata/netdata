@@ -140,10 +140,10 @@ static void exporting_main_cleanup(void *pptr)
         if (!instance->exited) {
             netdata_log_info("EXPORTING: signaling worker '%s' to stop...", instance->config.name);
             // Lock the mutex before signaling the condition variable
-            uv_mutex_lock(&instance->mutex);
+            netdata_mutex_lock(&instance->mutex);
             instance->data_is_ready = 1;
-            uv_cond_signal(&instance->cond_var);
-            uv_mutex_unlock(&instance->mutex);
+            netdata_cond_signal(&instance->cond_var);
+            netdata_mutex_unlock(&instance->mutex);
         }
         else
             netdata_log_info("EXPORTING: found worker '%s' already stopped", instance->config.name);

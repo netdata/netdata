@@ -290,24 +290,16 @@ static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
             usec_t now_mono_ut = now_monotonic_usec();
             usec_t stop_mono_ut = __atomic_load_n(&r->stop_monotonic_ut, __ATOMIC_RELAXED) + RRDFUNCTIONS_TIMEOUT_EXTENSION_UT;
             if(now_mono_ut > stop_mono_ut) {
-                rc = ETIMEDOUT;
+                rc = UV_ETIMEDOUT;
                 break;
             }
 
             // wait for 10ms, and loop again...
-            struct timespec tp;
-            clock_gettime(CLOCK_REALTIME, &tp);
-            tp.tv_nsec += 10 * NSEC_PER_MSEC;
-            if(tp.tv_nsec > (long)(1 * NSEC_PER_SEC)) {
-                tp.tv_sec++;
-                tp.tv_nsec -= 1 * NSEC_PER_SEC;
-            }
-
             // the mutex is unlocked within cond_timedwait()
-            rc = netdata_cond_timedwait(&tmp->cond, &tmp->mutex, &tp);
+            rc = netdata_cond_timedwait(&tmp->cond, &tmp->mutex, 10 * NSEC_PER_MSEC);
             // the mutex is again ours
 
-            if(rc == ETIMEDOUT) {
+            if(rc == UV_ETIMEDOUT) {
                 // 10ms have passed
 
                 rc = 0;
@@ -339,7 +331,7 @@ static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
             tmp->free_with_signal = false;
             we_should_free = true;
         }
-        else if (rc == ETIMEDOUT || cancelled) {
+        else if (rc == UV_ETIMEDOUT || cancelled) {
             // timeout
             // we will go away and let the callback free the structure
 

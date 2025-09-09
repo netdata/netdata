@@ -168,7 +168,7 @@ void start_batch_formatting(struct engine *engine)
 {
     for (struct instance *instance = engine->instance_root; instance; instance = instance->next) {
         if (instance->scheduled) {
-            uv_mutex_lock(&instance->mutex);
+            netdata_mutex_lock(&instance->mutex);
             if (instance->start_batch_formatting && instance->start_batch_formatting(instance) != 0) {
                 netdata_log_error("EXPORTING: cannot start batch formatting for %s", instance->config.name);
                 disable_instance(instance);
@@ -317,8 +317,8 @@ void end_batch_formatting(struct engine *engine)
                 continue;
             }
             instance->data_is_ready = 1;
-            uv_cond_signal(&instance->cond_var);
-            uv_mutex_unlock(&instance->mutex);
+            netdata_cond_signal(&instance->cond_var);
+            netdata_mutex_unlock(&instance->mutex);
 
             instance->scheduled = 0;
             instance->after = instance->before;

@@ -3,13 +3,13 @@
 
 void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile)
 {
-    uv_rwlock_wrlock(&ctx->datafiles.rwlock);
+    netdata_rwlock_wrlock(&ctx->datafiles.rwlock);
     Pvoid_t *Pvalue = JudyLIns(&ctx->datafiles.JudyL, (Word_t ) datafile->fileno, PJE0);
     if(!Pvalue || Pvalue == PJERR)
         fatal("DBENGINE: cannot insert datafile %u of tier %d into the datafiles list",
               datafile->fileno, ctx->config.tier);
     *Pvalue = datafile;
-    uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
+    netdata_rwlock_wrunlock(&ctx->datafiles.rwlock);
 }
 
 void datafile_list_delete_unsafe(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile)
@@ -26,7 +26,7 @@ static struct rrdengine_datafile *datafile_alloc_and_init(struct rrdengine_insta
 
     datafile->tier = tier;
     datafile->fileno = fileno;
-    fatal_assert(0 == uv_rwlock_init(&datafile->extent_rwlock));
+    fatal_assert(0 == netdata_rwlock_init(&datafile->extent_rwlock));
     datafile->ctx = ctx;
     datafile->magic1 = datafile->magic2 = DATAFILE_MAGIC;
 
@@ -656,13 +656,13 @@ void finalize_data_files(struct rrdengine_instance *ctx)
         logged = false;
         bool available = false;
         do {
-            uv_rwlock_wrlock(&ctx->datafiles.rwlock);
+            netdata_rwlock_wrlock(&ctx->datafiles.rwlock);
             spinlock_lock(&datafile->writers.spinlock);
             available = (datafile->writers.running || datafile->writers.flushed_to_open_running) ? false : true;
 
             if(!available) {
                 spinlock_unlock(&datafile->writers.spinlock);
-                uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
+                netdata_rwlock_wrunlock(&ctx->datafiles.rwlock);
                 if(!logged) {
                     netdata_log_info("Waiting for writers to data file %u of tier %d to finish...", datafile->fileno, ctx->config.tier);
                     logged = true;
@@ -675,7 +675,7 @@ void finalize_data_files(struct rrdengine_instance *ctx)
         close_data_file(datafile);
         datafile_list_delete_unsafe(ctx, datafile);
         spinlock_unlock(&datafile->writers.spinlock);
-        uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
+        netdata_rwlock_wrunlock(&ctx->datafiles.rwlock);
 
         // Clean up EPDL_EXTENT structures
         cleanup_datafile_epdl_structures(datafile);

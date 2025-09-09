@@ -22,67 +22,53 @@
 // mutex
 
 ALWAYS_INLINE int __netdata_cond_init(netdata_cond_t *cond) {
-    int ret = pthread_cond_init(cond, NULL);
+    int ret = uv_cond_init(cond);
     if(unlikely(ret != 0))
         netdata_log_error("COND: failed to initialize (code %d).", ret);
     return ret;
 }
 
-ALWAYS_INLINE int __netdata_cond_destroy(netdata_cond_t *cond) {
-    int ret = pthread_cond_destroy(cond);
-    if(unlikely(ret != 0))
-        netdata_log_error("COND: failed to destroy (code %d).", ret);
-    return ret;
+ALWAYS_INLINE void __netdata_cond_destroy(netdata_cond_t *cond) {
+    uv_cond_destroy(cond);
 }
 
-ALWAYS_INLINE int __netdata_cond_signal(netdata_cond_t *cond) {
-    int ret = pthread_cond_signal(cond);
-    if(unlikely(ret != 0))
-        netdata_log_error("COND: failed to signal (code %d).", ret);
-    return ret;
+ALWAYS_INLINE void __netdata_cond_signal(netdata_cond_t *cond) {
+    uv_cond_signal(cond);
 }
 
-ALWAYS_INLINE int __netdata_cond_wait(netdata_cond_t *cond, netdata_mutex_t *mutex)
+ALWAYS_INLINE void __netdata_cond_broadcast(netdata_cond_t *cond) {
+    uv_cond_broadcast(cond);
+}
+
+ALWAYS_INLINE void __netdata_cond_wait(netdata_cond_t *cond, netdata_mutex_t *mutex)
 {
-    int ret = pthread_cond_wait(cond, mutex);
-    if (unlikely(ret != 0))
-        netdata_log_error("COND: failed to signal (code %d).", ret);
-    return ret;
+    uv_cond_wait(cond, mutex);
 }
 
-ALWAYS_INLINE int __netdata_cond_timedwait(netdata_cond_t *cond, netdata_mutex_t *mutex, struct timespec *tp)
+ALWAYS_INLINE int __netdata_cond_timedwait(netdata_cond_t *cond, netdata_mutex_t *mutex, uint64_t timeout_ns)
 {
-    int ret = pthread_cond_timedwait(cond, mutex, tp);
+    int ret = uv_cond_timedwait(cond, mutex, timeout_ns);
     return ret;
 }
 
 ALWAYS_INLINE int __netdata_mutex_init(netdata_mutex_t *mutex) {
-    int ret = pthread_mutex_init(mutex, NULL);
+    int ret = uv_mutex_init(mutex);
     if(unlikely(ret != 0))
         netdata_log_error("MUTEX_LOCK: failed to initialize (code %d).", ret);
     return ret;
 }
 
-ALWAYS_INLINE int __netdata_mutex_destroy(netdata_mutex_t *mutex) {
-    int ret = pthread_mutex_destroy(mutex);
-    if(unlikely(ret != 0))
-        netdata_log_error("MUTEX_LOCK: failed to destroy (code %d).", ret);
-    return ret;
+ALWAYS_INLINE void __netdata_mutex_destroy(netdata_mutex_t *mutex) {
+    uv_mutex_destroy(mutex);
 }
 
-ALWAYS_INLINE int __netdata_mutex_lock(netdata_mutex_t *mutex) {
-    int ret = pthread_mutex_lock(mutex);
-    if(unlikely(ret != 0)) {
-        netdata_log_error("MUTEX_LOCK: failed to get lock (code %d)", ret);
-    }
-    else
-        nd_thread_mutex_locked();
-
-    return ret;
+ALWAYS_INLINE void __netdata_mutex_lock(netdata_mutex_t *mutex) {
+    uv_mutex_lock(mutex);
+    nd_thread_mutex_locked();
 }
 
 ALWAYS_INLINE int __netdata_mutex_trylock(netdata_mutex_t *mutex) {
-    int ret = pthread_mutex_trylock(mutex);
+    int ret = uv_mutex_trylock(mutex);
     if(ret != 0)
         ;
     else
@@ -91,14 +77,9 @@ ALWAYS_INLINE int __netdata_mutex_trylock(netdata_mutex_t *mutex) {
     return ret;
 }
 
-ALWAYS_INLINE int __netdata_mutex_unlock(netdata_mutex_t *mutex) {
-    int ret = pthread_mutex_unlock(mutex);
-    if(unlikely(ret != 0))
-        netdata_log_error("MUTEX_LOCK: failed to unlock (code %d).", ret);
-    else
-        nd_thread_mutex_unlocked();
-
-    return ret;
+ALWAYS_INLINE void __netdata_mutex_unlock(netdata_mutex_t *mutex) {
+    uv_mutex_unlock(mutex);
+    nd_thread_mutex_unlocked();
 }
 
 #ifdef NETDATA_TRACE_RWLOCKS
@@ -181,62 +162,39 @@ int netdata_mutex_unlock_debug(const char *file __maybe_unused, const char *func
 // ----------------------------------------------------------------------------
 // rwlock
 
-ALWAYS_INLINE int __netdata_rwlock_destroy(netdata_rwlock_t *rwlock) {
-    int ret = pthread_rwlock_destroy(&rwlock->rwlock_t);
-    if(unlikely(ret != 0))
-        netdata_log_error("RW_LOCK: failed to destroy lock (code %d)", ret);
-    return ret;
+ALWAYS_INLINE void __netdata_rwlock_destroy(netdata_rwlock_t *rwlock) {
+    uv_rwlock_destroy(&rwlock->rwlock_t);
 }
 
 ALWAYS_INLINE int __netdata_rwlock_init(netdata_rwlock_t *rwlock) {
-    int ret = pthread_rwlock_init(&rwlock->rwlock_t, NULL);
+    int ret = uv_rwlock_init(&rwlock->rwlock_t);
     if(unlikely(ret != 0))
         netdata_log_error("RW_LOCK: failed to initialize lock (code %d)", ret);
     return ret;
 }
 
-ALWAYS_INLINE int __netdata_rwlock_rdlock(netdata_rwlock_t *rwlock) {
-    int ret = pthread_rwlock_rdlock(&rwlock->rwlock_t);
-    if(unlikely(ret != 0))
-        netdata_log_error("RW_LOCK: failed to obtain read lock (code %d)", ret);
-    else
-        nd_thread_rwlock_read_locked();
-
-    return ret;
+ALWAYS_INLINE void __netdata_rwlock_rdlock(netdata_rwlock_t *rwlock) {
+    uv_rwlock_rdlock(&rwlock->rwlock_t);
+    nd_thread_rwlock_read_locked();
 }
 
-ALWAYS_INLINE int __netdata_rwlock_wrlock(netdata_rwlock_t *rwlock) {
-    int ret = pthread_rwlock_wrlock(&rwlock->rwlock_t);
-    if(unlikely(ret != 0))
-        netdata_log_error("RW_LOCK: failed to obtain write lock (code %d)", ret);
-    else
-        nd_thread_rwlock_write_locked();
-
-    return ret;
+ALWAYS_INLINE void __netdata_rwlock_wrlock(netdata_rwlock_t *rwlock) {
+    uv_rwlock_wrlock(&rwlock->rwlock_t);
+    nd_thread_rwlock_write_locked();
 }
 
-ALWAYS_INLINE int __netdata_rwlock_rdunlock(netdata_rwlock_t *rwlock) {
-    int ret = pthread_rwlock_unlock(&rwlock->rwlock_t);
-    if(unlikely(ret != 0))
-        netdata_log_error("RW_LOCK: failed to release lock (code %d)", ret);
-    else
-        nd_thread_rwlock_read_unlocked();
-
-    return ret;
+ALWAYS_INLINE void __netdata_rwlock_rdunlock(netdata_rwlock_t *rwlock) {
+    uv_rwlock_rdunlock(&rwlock->rwlock_t);
+    nd_thread_rwlock_read_unlocked();
 }
 
-ALWAYS_INLINE int __netdata_rwlock_wrunlock(netdata_rwlock_t *rwlock) {
-    int ret = pthread_rwlock_unlock(&rwlock->rwlock_t);
-    if(unlikely(ret != 0))
-        netdata_log_error("RW_LOCK: failed to release lock (code %d)", ret);
-    else
-        nd_thread_rwlock_write_unlocked();
-
-    return ret;
+ALWAYS_INLINE void __netdata_rwlock_wrunlock(netdata_rwlock_t *rwlock) {
+    uv_rwlock_wrunlock(&rwlock->rwlock_t);
+    nd_thread_rwlock_write_unlocked();
 }
 
 ALWAYS_INLINE int __netdata_rwlock_tryrdlock(netdata_rwlock_t *rwlock) {
-    int ret = pthread_rwlock_tryrdlock(&rwlock->rwlock_t);
+    int ret = uv_rwlock_tryrdlock(&rwlock->rwlock_t);
     if(ret != 0)
         ;
     else
@@ -246,7 +204,7 @@ ALWAYS_INLINE int __netdata_rwlock_tryrdlock(netdata_rwlock_t *rwlock) {
 }
 
 ALWAYS_INLINE int __netdata_rwlock_trywrlock(netdata_rwlock_t *rwlock) {
-    int ret = pthread_rwlock_trywrlock(&rwlock->rwlock_t);
+    int ret = uv_rwlock_trywrlock(&rwlock->rwlock_t);
     if(ret != 0)
         ;
     else

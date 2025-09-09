@@ -50,9 +50,9 @@ int init_opentsdb_telnet_instance(struct instance *instance)
 
     simple_connector_init(instance);
 
-    if (uv_mutex_init(&instance->mutex))
+    if (netdata_mutex_init(&instance->mutex))
         return 1;
-    if (uv_cond_init(&instance->cond_var))
+    if (netdata_cond_init(&instance->cond_var))
         return 1;
 
     return 0;
@@ -104,9 +104,9 @@ int init_opentsdb_http_instance(struct instance *instance)
 
     simple_connector_init(instance);
 
-    if (uv_mutex_init(&instance->mutex))
+    if (netdata_mutex_init(&instance->mutex))
         return 1;
-    if (uv_cond_init(&instance->cond_var))
+    if (netdata_cond_init(&instance->cond_var))
         return 1;
 
     return 0;
