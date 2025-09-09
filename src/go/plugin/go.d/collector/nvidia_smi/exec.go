@@ -5,9 +5,7 @@ package nvidia_smi
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"errors"
-	"fmt"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -15,6 +13,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cmd"
 )
 

@@ -58,7 +58,7 @@ func (e *ndsudoSmartctlCli) execute(args ...string) (*gjson.Result, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
 	defer cancel()
 
-	command := cmd.CommandNDSudo(ctx, e.Logger, e.timeout, args...)
+	command := cmd.CommandNDSudo(ctx, e.Logger, args...)
 
 	bs, err := command.Output()
 	if err != nil {
