@@ -6,6 +6,7 @@ on:
       - master
     paths:
       - "**.mdx?"
+      - "docs/.map/map.csv"
       - "packaging/installer/kickstart.sh"
 concurrency:
   group: learn-trigger-${{ github.ref }}
