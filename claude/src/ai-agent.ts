@@ -134,10 +134,14 @@ export class AIAgentSession {
     this.abortSignal = sessionConfig.abortSignal;
     this.stopRef = sessionConfig.stopRef;
     try {
-      if (this.abortSignal !== undefined) {
-        if (this.abortSignal.aborted) this.canceled = true;
-        else this.abortSignal.addEventListener('abort', () => { this.canceled = true; try { this.toolsOrchestrator?.cancel(); } catch { /* ignore */ } }, { once: true });
+    if (this.abortSignal !== undefined) {
+      if (this.abortSignal.aborted) {
+        this.canceled = true;
+        try { this.toolsOrchestrator?.cancel(); } catch { /* ignore */ }
+      } else {
+        this.abortSignal.addEventListener('abort', () => { this.canceled = true; try { this.toolsOrchestrator?.cancel(); } catch { /* ignore */ } }, { once: true });
       }
+    }
     } catch { /* ignore */ }
     // Initialize sub-agents registry if provided
     if (Array.isArray(sessionConfig.subAgentPaths) && sessionConfig.subAgentPaths.length > 0) {
@@ -253,6 +257,9 @@ export class AIAgentSession {
           maxTurns: this.sessionConfig.maxTurns,
           toolResponseMaxBytes: this.sessionConfig.toolResponseMaxBytes,
           parallelToolCalls: this.sessionConfig.parallelToolCalls,
+          // propagate control signals so children can stop/abort
+          abortSignal: this.abortSignal,
+          stopRef: this.stopRef,
           trace: { originId: this.originTxnId, parentId: this.txnId, callPath: `${this.callPath ?? ''}->${name}` }
         });
         // Keep child conversation list for save-all

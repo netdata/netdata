@@ -131,8 +131,15 @@ export class SessionManager {
         this.results.set(runId, result);
         const m = this.runs.get(runId);
         if (m) {
-          m.status = result.success ? 'succeeded' : 'failed';
-          m.error = result.success ? undefined : result.error ?? 'unknown error';
+          const wasStopping = (m.status === 'stopping') || (this.stopRefs.get(runId)?.stopping === true);
+          if (result.success) {
+            m.status = 'succeeded';
+            // Preserve user intent: if run was in stopping mode, mark reason for UI
+            m.error = wasStopping ? 'stopped' : undefined;
+          } else {
+            m.status = 'failed';
+            m.error = result.error ?? 'unknown error';
+          }
           m.updatedAt = Date.now();
           this.runs.set(runId, m);
         }

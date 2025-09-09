@@ -19,6 +19,7 @@ interface SlackHeadendOptions {
 
 const stripBotMention = (text: string, botUserId: string): string => text.replace(new RegExp(`<@${botUserId}>`, 'g'), '').trim();
 const truncate = (s: string, max: number): string => (s.length <= max ? s : `${s.slice(0, max)}…`);
+const STOPPING_TEXT = '🛑 Stopping…';
 const fmtTs = (ts: unknown): string => {
   if (typeof ts !== 'string' && typeof ts !== 'number') return '';
   const n = typeof ts === 'string' ? Number.parseFloat(ts) : ts;
@@ -384,7 +385,10 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
     const result = sessionManager.getResult(runId);
     const slackMessages = extractSlackMessages(result);
     let finalText = extractFinalText(runId);
-    if (!finalText && !slackMessages) finalText = meta.error ? `❌ ${meta.error}` : '✅ Done';
+    if (!finalText && !slackMessages) {
+      if (meta.error === 'stopped') finalText = '🛑 Stopped';
+      else finalText = meta.error ? `❌ ${meta.error}` : '✅ Done';
+    }
     try {
       if (slackMessages && slackMessages.length > 0) {
         // Render first message via update, rest as thread replies
@@ -577,6 +581,11 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
       });
     } catch { /* ignore update issues */ }
     const render = (): { text: string; blocks: any[] } => {
+      const meta = sessionManager.getRun(runId);
+      if (meta && meta.status === 'stopping') {
+        // Suppress progress details while stopping
+        return { text: STOPPING_TEXT, blocks: [ { type: 'section', text: { type: 'mrkdwn', text: STOPPING_TEXT } } ] } as any;
+      }
       const now = Date.now();
       const maybeTree = sessionManager.getOpTree(runId);
       const snap = (() => {
@@ -604,7 +613,7 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
       })();
       const text = formatSlackStatus(snap);
       const blocks = buildStatusBlocks(snap, (maybeTree as any)?.agentId, (maybeTree as any)?.startedAt);
-      // Insert Cancel button below the agent list and above the footer context
+      // Insert Cancel/Stop buttons below the agent list and above the footer context (only while running)
       // Heuristic: place before the last 'context' block (footer) if present
       try {
         // Remove any existing cancel actions to avoid duplicates
@@ -612,12 +621,15 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
           const b = blocks[i];
           if (b && b.type === 'actions') { blocks.splice(i, 1); }
         }
-        const footerIdx = (() => {
-          for (let i = blocks.length - 1; i >= 0; i--) { if (blocks[i]?.type === 'context') return i; }
-          return -1;
-        })();
-        const insertIdx = footerIdx >= 0 ? footerIdx : blocks.length;
-        blocks.splice(insertIdx, 0, cancelActions);
+        const m2 = sessionManager.getRun(runId);
+        if (m2 && m2.status === 'running') {
+          const footerIdx = (() => {
+            for (let i = blocks.length - 1; i >= 0; i--) { if (blocks[i]?.type === 'context') return i; }
+            return -1;
+          })();
+          const insertIdx = footerIdx >= 0 ? footerIdx : blocks.length;
+          blocks.splice(insertIdx, 0, cancelActions);
+        }
       } catch { /* ignore block surgery errors */ }
       return { text, blocks };
     };
@@ -666,7 +678,7 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
       const runId = body.actions?.[0]?.value as string | undefined;
       if (!channel || !ts || !runId) return;
       options.sessionManager.stopRun?.(runId, 'Stopping by user');
-      await args.client.chat.update({ channel, ts, text: '🛑 Stopping…' });
+      await args.client.chat.update({ channel, ts, text: STOPPING_TEXT });
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error('stop_run failed', e);

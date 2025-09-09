@@ -168,6 +168,9 @@ export class SubAgentRegistry {
     parentSession: Pick<AIAgentSessionConfig, 'config' | 'callbacks' | 'stream' | 'traceLLM' | 'traceMCP' | 'verbose' | 'temperature' | 'topP' | 'llmTimeout' | 'toolTimeout' | 'maxRetries' | 'maxTurns' | 'toolResponseMaxBytes' | 'parallelToolCalls' | 'targets'> & {
       // extra trace/metadata for child
       trace?: { originId?: string; parentId?: string; callPath?: string };
+      // control signals to propagate
+      abortSignal?: AbortSignal;
+      stopRef?: { stopping: boolean };
     }
   ): Promise<{ result: string; child: ChildInfo; accounting: readonly AccountingEntry[]; conversation: ConversationMessage[]; trace?: { originId?: string; parentId?: string; selfId?: string; callPath?: string }, opTree?: SessionNode }> {
     const name = exposedToolName.startsWith('agent__') ? exposedToolName.slice('agent__'.length) : exposedToolName;
@@ -225,7 +228,17 @@ export class SubAgentRegistry {
       const history: ConversationMessage[] | undefined = undefined;
       // Ensure child gets a fresh selfId (span id)
       const childTrace = { selfId: crypto.randomUUID(), originId: parentSession.trace?.originId, parentId: parentSession.trace?.parentId, callPath: parentSession.trace?.callPath };
-      result = await loaded.run(loaded.systemTemplate, userPrompt, { history, callbacks: cb, trace: childTrace, renderTarget: 'sub-agent', outputFormat: 'sub-agent', initialTitle: reason });
+      result = await loaded.run(loaded.systemTemplate, userPrompt, {
+        history,
+        callbacks: cb,
+        trace: childTrace,
+        renderTarget: 'sub-agent',
+        outputFormat: 'sub-agent',
+        initialTitle: reason,
+        // propagate control signals from parent session
+        abortSignal: parentSession.abortSignal,
+        stopRef: parentSession.stopRef
+      });
     } finally {
       // no chdir in static mode
     }

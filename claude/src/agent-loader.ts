@@ -432,8 +432,8 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
       verbose: eff.verbose,
       mcpInitConcurrency: eff.mcpInitConcurrency,
     },
-    run: async (systemPrompt: string, userPrompt: string, opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent'; outputFormat: OutputFormatId; initialTitle?: string }): Promise<AIAgentResult> => {
-      const o = (opts ?? {}) as { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli'|'slack'|'api'|'web'|'sub-agent'; outputFormat?: OutputFormatId; initialTitle?: string };
+    run: async (systemPrompt: string, userPrompt: string, opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent'; outputFormat: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string }): Promise<AIAgentResult> => {
+      const o = (opts ?? {}) as { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli'|'slack'|'api'|'web'|'sub-agent'; outputFormat?: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string };
       if (o.outputFormat === undefined) throw new Error('outputFormat is required');
       // Support dynamic OpenAPI tool import via tool selector: openapi:<path-or-url>
       let dynamicConfig = config;
@@ -481,6 +481,9 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
         callbacks: o.callbacks,
         trace: o.trace,
         initialTitle: o.initialTitle,
+        // Propagate control signals to child sessions
+        abortSignal: o.abortSignal,
+        stopRef: o.stopRef,
         temperature: eff.temperature,
         topP: eff.topP,
         maxRetries: eff.maxRetries,

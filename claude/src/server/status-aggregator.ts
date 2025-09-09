@@ -276,7 +276,7 @@ ${title}` : line1;
     .filter((v): v is any => v !== undefined);
 
   if (entries.length === 0) {
-    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: '- idle' } });
+    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: '- No sub-agents' } });
   } else {
     entries.forEach((b) => { blocks.push(b); });
   }
