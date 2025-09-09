@@ -1684,7 +1684,7 @@ export class AIAgentSession {
           const S_TYPE_MRKDWN = '\\"type\\": \\"mrkdwn\\"';
           const S_TYPE_SECTION = '\\"type\\": \\"section\\"';
           const slackInstructions = (
-            'Use Slack\'s block kit like this:\n\n'
+            'Use Slack\'s block kit with Slack mrkdwn (not GitHub markdown) like this:\n\n'
             + '"messages": [\n'
             + '  {\n'
             + '    "blocks": [\n'
@@ -1692,7 +1692,7 @@ export class AIAgentSession {
             + '        "type": "header",\n'
             + '        "text": {\n'
             + '          "type": "plain_text",\n'
-            + '          "text": "Company Intelligence: Acme Corp"\n'
+            + '          "text": "Company Intelligence: *Acme Corp*"\n'
             + '        }\n'
             + '      },\n'
             + '      {\n'
@@ -1713,7 +1713,7 @@ export class AIAgentSession {
             + `        ${S_TYPE_SECTION},\n`
             + '        "text": {\n'
             + `          ${S_TYPE_MRKDWN},\n`
-            + '          "text": "• *Industry:* B2B SaaS\\n• *Employees:* 500-1000\\n• *Revenue:* $50M ARR\\n• *Funding:* Series C ($75M)"\n'
+            + '          "text": "• Industry: *B2B SaaS*\\n• Employees: *500-1000*\\n• Revenue: *$50M ARR*\\n• Funding: *Series C ($75M)*"\n'
             + '        }\n'
             + '      },\n'
             + '      { "type": "divider" },\n'
@@ -1725,7 +1725,7 @@ export class AIAgentSession {
             + `        ${S_TYPE_SECTION},\n`
             + '        "text": {\n'
             + `          ${S_TYPE_MRKDWN},\n`
-            + '          "text": "```\\nSpace: acme-production\\nNodes: 247 connected (7d)\\nUsers: 12 active\\nLast Activity: 2 hours ago\\n```"\n'
+            + '          "text": "```\\nSpace: *Acme Corp*\\nReachable Nodes: *247*\\nUsers: *12*\\nLast Activity: *today*\\n```"\n'
             + '        }\n'
             + '      }\n'
             + '    ]\n'
@@ -1734,8 +1734,8 @@ export class AIAgentSession {
             + '    "blocks": [ /* next message blocks */ ]\n'
             + '  }\n'
             + ']\n\n'
-            + 'Split long output into multiple messages. You can post up to 20 messages, each message having up to 50 blocks, each block having up to 2000 characters.\n\n'
-            + 'Slack mrkdwn format instructions:\n'
+            + 'Split long output into multiple messages. You can post up to 20 messages, each message having up to 50 blocks, each block having up to 2000 characters in Slack mrkdwn (not GitHub markdown).\n\n'
+            + 'Slack mrkdwn format:\n'
             + '- *bold* → bold\n'
             + '- _italic_ → italic\n'
             + '- ~strikethrough~ → strikethrough\n'
@@ -1744,13 +1744,13 @@ export class AIAgentSession {
             + '- > quoted text (at line start)\n'
             + '- <https://example.com|Link Text> → clickable links\n'
             + '- Lists: Use •, -, or numbers (no nesting)\n\n'
-            + 'GitHub markdown is NOT Supported:\n'
-            + '- ❌ Tables\n'
-            + '- ❌ Headers (#, ##)\n'
-            + '- ❌ Horizontal rules (---)\n'
-            + '- ❌ Nested lists\n'
-            + '- ❌ Image embedding\n'
-            + '- ❌ HTML tags'
+            + 'GitHub markdown is *NOT* supported:\n'
+            + '- No Tables\n'
+            + '- No Headers (#, ##)\n'
+            + '- No Horizontal rules (---)\n'
+            + '- No Nested lists\n'
+            + '- No Image embedding\n'
+            + '- No HTML tags'
           );
           tools.push({
             name: 'agent__final_report',
