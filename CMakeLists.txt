@@ -512,7 +512,7 @@ check_symbol_exists(finite "math.h" HAVE_FINITE)
 check_symbol_exists(isfinite "math.h" HAVE_ISFINITE)
 check_symbol_exists(dlsym "dlfcn.h" HAVE_DLSYM)
 
-if(OS_LINUX)
+if(OS_LINUX AND HAVE_SYS_PRCTL_H)
   check_symbol_exists(PR_CAP_AMBIENT "sys/prctl.h" HAVE_PR_CAP_AMBIENT)
 
   if(NOT HAVE_PR_CAP_AMBIENT)
