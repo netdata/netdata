@@ -2,7 +2,7 @@
 
 :::note
 
-Account deletion is permanent and cannot be undone. All your data, configurations, and settings will be permanently removed. If you wish to use Netdata again in the future, you'll need to create a new account and reconfigure everything from scratch.
+Account deletion is permanent and cannot be undone. All user preferences will be lost.
 
 :::
 
@@ -41,9 +41,7 @@ You have two options:
 
 Before deleting your account, consider:
 
-- **Data loss**: All monitoring configurations, custom dashboards, alert settings, and historical data will be permanently lost
-- **Connected nodes**: Any nodes connected to your account will need to be reconfigured with a new account
-- **Team access**: If you're part of a team workspace, ensure you've transferred any necessary permissions or data
+- **Team access**: If you're part of a team Space, ensure you've transferred any necessary permissions
 - **No recovery**: There is no grace period or recovery option once deletion is confirmed
 
 ## Alternative Options
@@ -52,7 +50,7 @@ Before deleting your account, consider these alternatives:
 
 1. **Pause Monitoring** - Temporarily disable monitoring without losing configurations
 2. **Sign Out** - Simply sign out if you need a break from the platform
-3. **Contact Support** - Reach out to [Netdata support](https://www.netdata.cloud/contact/) if you're experiencing resolvable issues
+3. **Contact Support** - Reach out to [Netdata support](https://www.netdata.cloud/support/) if you're experiencing resolvable issues
 4. **Disable Notifications** - Turn off alerts if they're overwhelming
 
 ## FAQ
@@ -67,33 +65,32 @@ No. Account deletion is permanent and cannot be reversed under any circumstances
 <details>
 <summary><strong>What happens to my connected agents?</strong></summary>
 
-Agents will continue collecting data locally, but will lose their connection to the Cloud. You'll need to reclaim them with a new account if necessary.
-
+Agents will continue collecting data locally, but will lose their connection to deleted account.
 </details>
 
 <details>
 <summary><strong>How long does deletion take?</strong></summary>
 
-Account deletion is immediate. Your data will be purged from Netdata's systems in accordance with their data retention policies.
+Account deletion is immediate.
 
 </details>
 
 <details>
 <summary><strong>Will my historical data be saved anywhere?</strong></summary>
 
-No. All historical data stored in Netdata Cloud will be permanently deleted. Local data on your agents will remain, but won't be accessible through the Cloud interface.
+Yes, all historical data will be safely stored and another active user in the Space can still access that data. 
 
 </details>
 
 <details>
-<summary><strong>Can someone else in my workspace prevent my account deletion?</strong></summary>
+<summary><strong>Can someone else in my Space prevent my account deletion?</strong></summary>
 
-No. Account deletion is a personal action that only you can initiate and complete. Other workspace members cannot prevent or reverse your account deletion.
+No. Account deletion is a personal action that only you can initiate and complete. Other Space members cannot prevent or reverse your account deletion.
 
 </details>
 
 :::note
 
-Once you confirm deletion, your account and all associated data will be immediately and permanently removed from Netdata's systems. There is no undo button or recovery process.
+Once you confirm deletion, there is no undo button or recovery process.
 
 :::
