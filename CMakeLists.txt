@@ -1145,6 +1145,15 @@ set(LIBNETDATA_FILES
         src/libnetdata/signals/signal-code.h
 )
 
+if(OS_WINDOWS)
+    set(LIBNETDATA_WIN_FILES
+            src/libnetdata/os/windows-api/windows_api.c
+            src/libnetdata/os/windows-api/windows_api.h
+    )
+
+    list(APPEND LIBNETDATA_FILES ${LIBNETDATA_WIN_FILES})
+endif()
+
 list(APPEND LIBNETDATA_FILES ${INICFG_FILES})
 list(APPEND LIBNETDATA_FILES ${CONFIG_FILES})
 
@@ -2216,7 +2225,7 @@ target_link_libraries(libnetdata PUBLIC
         "$<$<BOOL:${ENABLE_MIMALLOC}>:mimalloc-static>"
         "$<$<NOT:$<BOOL:${HAVE_BUILTIN_ATOMICS}>>:atomic>"
         "$<$<OR:$<BOOL:${OS_LINUX}>,$<BOOL:${OS_FREEBSD}>>:pthread;rt>"
-        "$<$<BOOL:${OS_WINDOWS}>:kernel32;advapi32;winmm;rpcrt4;wevtapi;ole32;oleaut32;wbemuuid;sensorsapi>"
+        "$<$<BOOL:${OS_WINDOWS}>:kernel32;advapi32;winmm;rpcrt4;wevtapi;ole32;oleaut32;wbemuuid;sensorsapi;iphlpapi>"
         "$<$<BOOL:${LINK_LIBM}>:m>"
         "${SYSTEMD_LDFLAGS}")
 
