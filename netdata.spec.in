@@ -218,6 +218,7 @@ Requires: %{name}-dashboard
 Requires: %{name}-plugin-ebpf = %{version}
 %endif
 Requires: %{name}-plugin-apps = %{version}
+Requires: %{name}-plugin-dev = %{version}
 Requires: %{name}-plugin-pythond = %{version}
 Requires: %{name}-plugin-go = %{version}
 Requires: %{name}-plugin-debugfs = %{version}
@@ -886,6 +887,20 @@ fi
 %caps(cap_dac_read_search,cap_sys_ptrace=ep) %{_libexecdir}/%{name}/plugins.d/apps.plugin
 %defattr(0644,root,netdata,0755)
 %{_libdir}/%{name}/conf.d/apps_groups.conf
+
+%package plugin-dev
+Summary: The dev metrics collection plugin for the Netdata Agent
+Group: Applications/System
+Requires: %{name} = %{version}
+Conflicts: %{name} < %{version}
+
+%description plugin-dev
+ This plugin allows the Netdata Agent to collect metrics from dev directory.
+
+%pre plugin-dev
+
+%files plugin-dev
+%defattr(4750,root,netdata,4750)
 
 %package plugin-slabinfo
 Summary: The slabinfo metrics collector for the Netdata Agent
