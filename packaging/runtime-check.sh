@@ -56,6 +56,7 @@ plugins.d/charts.d.plugin
 plugins.d/cups.plugin
 plugins.d/debugfs.plugin
 plugins.d/ebpf.plugin
+plugins.d/dev.plugin
 plugins.d/freeipmi.plugin
 plugins.d/go.d.plugin
 plugins.d/ioping.plugin
