@@ -31,6 +31,7 @@ add_cmake_option ENABLE_DBENGINE On
 add_cmake_option ENABLE_ML On
 
 add_cmake_option ENABLE_PLUGIN_APPS On
+add_cmake_option ENABLE_PLUGIN_DEV On
 add_cmake_option ENABLE_PLUGIN_CGROUP_NETWORK On
 add_cmake_option ENABLE_PLUGIN_DEBUGFS On
 add_cmake_option ENABLE_PLUGIN_FREEIPMI On

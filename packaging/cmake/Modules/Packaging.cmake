@@ -579,5 +579,8 @@ endif()
 if(ENABLE_PLUGIN_OTEL)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-otel")
 endif()
+if(ENABLE_PLUGIN_DEV)
+        list(APPEND CPACK_COMPONENTS_ALL "plugin-dev")
+endif()
 
 include(CPack)

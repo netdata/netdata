@@ -139,6 +139,7 @@
 
 #cmakedefine ENABLE_PLUGIN_DEBUGFS
 #cmakedefine ENABLE_PLUGIN_APPS
+#cmakedefine ENABLE_PLUGIN_DEV
 #cmakedefine ENABLE_PLUGIN_FREEIPMI
 #cmakedefine ENABLE_PLUGIN_NFACCT
 #cmakedefine ENABLE_PLUGIN_XENSTAT
