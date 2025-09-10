@@ -13,6 +13,10 @@ int update_every = 1;
 #define NETDATA_MSR_THERM_STATUS 0x19C
 #define NETDATA_MSR_TEMPERATURE_TARGET 0x1A2
 
+struct dev_cpu_temp {
+    char *dimension;
+} *local_cpus;
+
 static uint64_t netdata_dev_read_msr(int cpu, unsigned int reg) {
     char msr_file_name[FILENAME_MAX + 1];
     int fd;
@@ -63,6 +67,23 @@ static void dev_parse_args(int argc, char **argv) {
     if(freq > 0) update_every = freq;
 }
 
+static inline void dev_cpu_chart(int number_of_cpus)
+{
+    printf(
+            "CHART cpu.temperature '' 'Core temperature' 'Celsius' 'temperature' 'cpu.temperature' 'line' %d %d '' '%s' 'dev.cpu.temperature'\n",
+            NETDATA_CHART_PRIO_CPU_TEMPERATURE,
+            update_every,
+            _COMMON_PLUGIN_NAME);
+
+    for (int i = 0; i < number_of_cpus; i++) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "cpu%d.temp", i);
+        local_cpus[i].dimension = strdupz(id);
+        printf("DIMENSION %s '' absolute 1 1\n", id);
+    }
+    fflush(stdout);
+}
+
 int main(int argc, char **argv)
 {
     nd_log_initialize_for_external_plugins(PLUGIN_DEV_NAME);
@@ -73,35 +94,24 @@ int main(int argc, char **argv)
 
     dev_parse_args(argc, argv);
 
-    /*
     int number_of_cpus = (int)os_get_system_cpus();
-    RRDDIM **rd_pcpu_temperature = callocz(sizeof(RRDDIM *), number_of_cpus);
-     */
+    local_cpus = callocz(sizeof(struct dev_cpu_temp), number_of_cpus);
 
     heartbeat_t hb;
     int local_update_every = update_every * USEC_PER_SEC;
     heartbeat_init(&hb, (usec_t )local_update_every);
 
+    dev_cpu_chart(number_of_cpus);
     for (; !dev_plugin_stop();) {
         (void)heartbeat_next(&hb);
 
-        /*
-        if(unlikely(!service_running(SERVICE_COLLECTORS)))
-            break;
-
-        RRDSET *st = common_cpu_temperature(update_every) ;
+        printf("BEGIN cpu.temperature\n");
         for (int i = 0; i < number_of_cpus; i++) {
-            if (unlikely(!rd_pcpu_temperature[i])) {
-                char char_rd[64];
-                sprintf(char_rd, "cpu%d.temp", i);
-                rd_pcpu_temperature[i] = rrddim_add(st, char_rd, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            }
-
             collected_number temperature = netadata_read_cpu_temp(i);
-            rrddim_set_by_pointer(st, rd_pcpu_temperature[i], temperature);
+            printf("SET %s %lld\n", local_cpus[i].dimension, temperature);
         }
-        rrdset_done(st);
-         */
+        printf("END\n");
+        fflush(stdout);
     }
 
     return 0;
