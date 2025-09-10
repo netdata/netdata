@@ -102,6 +102,10 @@ if(ENABLE_PLUGIN_EBPF)
         list(APPEND _main_deps "netdata-plugin-ebpf")
 endif()
 
+if(ENABLE_PLUGIN_DEV)
+        list(APPEND _main_deps "netdata-plugin-dev")
+endif()
+
 list(JOIN _main_deps ", " CPACK_DEBIAN_NETDATA_PACKAGE_DEPENDS)
 
 set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
@@ -153,6 +157,26 @@ set(CPACK_DEBIAN_PLUGIN-APPS_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-apps/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-APPS_DEBUGINFO_PACKAGE On)
+
+#
+# dev.plugin
+#
+
+set(CPACK_COMPONENT_PLUGIN-DEV_DEPENDS "netdata")
+set(CPACK_COMPONENT_PLUGIN-DEV_DESCRIPTION
+		"The dev collector plugin for the Netdata Agent
+ This plugin allows the Netdata Agent to collect data from
+ /dev.")
+
+set(CPACK_DEBIAN_PLUGIN-DEV_PACKAGE_NAME "netdata-plugin-dev")
+set(CPACK_DEBIAN_PLUGIN-DEV_PACKAGE_SECTION "net")
+set(CPACK_DEBIAN_PLUGIN-DEV_PACKAGE_CONFLICTS "netdata (<< 1.40)")
+
+set(CPACK_DEBIAN_PLUGIN-DEV_PACKAGE_CONTROL_EXTRA
+	  "${PKG_FILES_PATH}/deb/plugin-dev/preinst;"
+	  "${PKG_FILES_PATH}/deb/plugin-dev/postinst")
+
+set(CPACK_DEBIAN_PLUGIN-DEV_DEBUGINFO_PACKAGE On)
 
 #
 # charts.d.plugin

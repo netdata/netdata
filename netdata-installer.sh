@@ -202,6 +202,7 @@ USAGE: ${PROGRAM} [options]
   --nightly-channel          Use most recent nightly updates instead of GitHub releases.
                              This results in more frequent updates.
   --disable-ebpf             Disable eBPF Kernel plugin. Default: enabled.
+  --disable-dev              Disable dev plugin. Default: enabled.
   --force-legacy-cxx         Force usage of an older C++ standard to allow building on older systems. This will usually be autodetected.
   --enable-plugin-freeipmi   Enable the FreeIPMI plugin. Default: enable it when libipmimonitoring is available.
   --disable-plugin-freeipmi  Explicitly disable the FreeIPMI plugin.
@@ -327,6 +328,8 @@ while [ -n "${1}" ]; do
     "--disable-telemetry") NETDATA_DISABLE_TELEMETRY=1 ;;
     "--enable-ebpf") ENABLE_EBPF=1 ;;
     "--disable-ebpf") ENABLE_EBPF=0 ;;
+    "--enable-dev") ENABLE_DEV=1 ;;
+    "--disable-dev") ENABLE_DEV=0 ;;
     "--skip-available-ram-check") SKIP_RAM_CHECK=1 ;;
     "--one-time-build")
       # XXX: No longer supported
@@ -907,6 +910,11 @@ if [ "$(id -u)" -eq 0 ]; then
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf.plugin" ]; then
     run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf.plugin"
     run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf.plugin"
+  fi
+
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/dev.plugin" ]; then
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/dev.plugin"
+    run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/dev.plugin"
   fi
 
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network" ]; then
