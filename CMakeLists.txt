@@ -218,7 +218,7 @@ mark_as_advanced(ENABLE_SENTRY)
 option(BUILD_FOR_PACKAGING "Include component files for native packages" False)
 mark_as_advanced(BUILD_FOR_PACKAGING)
 
-cmake_dependent_option(ENABLE_LIBBACKTRACE "Use libbacktrace for stack traces in log output" True "OS_LINUX OR OS_WINDOWS OR OS_FREEBSD" False)
+cmake_dependent_option(ENABLE_LIBBACKTRACE "Use libbacktrace for stack traces in log output" True "OS_LINUX OR OS_WINDOWS" False)
 mark_as_advanced(ENABLE_LIBBACKTRACE)
 cmake_dependent_option(ENABLE_LIBUNWIND "Use libunwind for stack traces in log output" False "NOT ENABLE_LIBBACKTRACE" False)
 mark_as_advanced(ENABLE_LIBUNWIND)
