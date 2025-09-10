@@ -1659,7 +1659,7 @@ export class AIAgentSession {
         const descStr = (typeof this.resolvedFormatDescription === 'string' && this.resolvedFormatDescription.length > 0) ? ` ${this.resolvedFormatDescription}` : '';
         tools.push({
           name: 'agent__final_report',
-          description: (`Finalize the task with a JSON report.` + descStr).trim(),
+          description: (`You MUST use agent__final_report to provide your final response to the user, and complete this task. Use the exact JSON expected.` + descStr).trim(),
           inputSchema: {
             type: 'object',
             additionalProperties: false,
@@ -1755,7 +1755,7 @@ export class AIAgentSession {
           tools.push({
             name: 'agent__final_report',
             description: (
-              'Finalize the task with a Slack report. ' + suffix
+              'You MUST use agent__final_report to provide your final response to the user request. Use Slack mrkdwn (not GitHub markdown). ' + suffix
               + '\nREQUIREMENT: Provide up to 20 `messages` with Block Kit + mrkdwn only. Do NOT provide plain `content`. Do NOT use GitHub markdown.\n\n'
               + slackInstructions
             ).trim(),

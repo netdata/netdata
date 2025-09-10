@@ -1,5 +1,6 @@
 .ai-agent.env
-.gsc-client-secrets.json
+
+dist/
 
 tmp/
 node_modules/

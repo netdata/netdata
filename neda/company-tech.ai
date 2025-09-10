@@ -15,7 +15,6 @@ tools:
   - fetcher
   - brave
   - batch
-  - sequential-thinking
 llmTimeout: 120000
 toolTimeout: 60000
 toolResponseMaxBytes: 25000
@@ -137,7 +136,6 @@ When you estimate something you **MUST** mark it as '[ESTIMATED]' and you **MUST
 
 **CRITICAL**: PROVIDE ALL THE INFORMATION YOU DISCOVERED WITH MARKDOWN LINKS FOR ALL FACTS.
 
-You MUST use sequential-thinking.
 
 Current Date and Time: ${DATETIME}, ${DAY}
 Provide your report in: ${FORMAT}

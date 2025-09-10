@@ -1,18 +1,34 @@
 [Unit]
-Description=Neda AI Agent Server
+Description=Neda AI CRM Agent
 After=network.target
 
 [Service]
 Type=simple
-User=costa
-Group=costa
-WorkingDirectory=/home/costa/src/ai-agent.git/neda
-ExecStart=/home/costa/src/ai-agent.git/ai-agent server ./neda.ai --slack --api --verbose
+User=neda
+Group=neda
+WorkingDirectory=/opt/neda
+
+# Environment
+Environment="PATH=/usr/local/bin:/usr/bin:/bin:/opt/neda/google-cloud-sdk/bin:/opt/neda/bin"
+Environment="HOME=/opt/neda"
+Environment="NODE_ENV=production"
+
+# Execute
+ExecStart=/opt/neda/bin/neda server ./neda.ai --slack --api --verbose
+
+# Restart policy
 Restart=always
 RestartSec=10
+
+# Logging
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=neda
+LogNamespace=neda
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
 
 [Install]
 WantedBy=multi-user.target

@@ -94,9 +94,9 @@ One simple format (`.ai` files) works as standalone agents, sub-agents, master o
 - **Flexible Deployment**:
   - [x] CLI for development and automation
   - [x] Library for embedding in applications
-  - [ ] Slack bot mode (coming soon)
-  - [ ] Web UI mode (coming soon)
-  - [ ] REST API server (coming soon)
+  - [x] Slack bot mode
+  - [ ] Web UI mode (experimental)
+  - [x] REST API server
 
 ### 🏗️ **Advanced Architecture**
 - [x] **Session Management**: Complete session isolation with immutable state transitions
@@ -119,15 +119,15 @@ One simple format (`.ai` files) works as standalone agents, sub-agents, master o
 ### Installation
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/ai-agent.git
-cd ai-agent/claude
+git clone https://github.com/netdata/ai-agent.git
+cd ai-agent
 
 # Install dependencies and build
 npm install
 npm run build
 
-# Create the launcher
-./build.sh
+# Or install everything to /opt/ai-agent
+sudo ./build-and-install.sh
 ```
 
 ### Configuration System
@@ -282,13 +282,12 @@ Run the multi-agent system:
 
 ## Documentation
 
-- [Getting Started Guide](docs/GETTING_STARTED.md)
-- [Configuration Reference](docs/CONFIGURATION.md)
-- [Writing Agents](docs/WRITING_AGENTS.md)
-- [Multi-Agent Patterns](docs/MULTI_AGENT.md)
-- [MCP Integration](docs/MCP_INTEGRATION.md)
-- [API Reference](docs/API.md)
-- [Architecture](docs/ARCHITECTURE.md)
+- Specs (SPECS): docs/SPECS.md
+- Implementation details: docs/IMPLEMENTATION.md
+- Design overview: docs/DESIGN.md
+- Multi-agent patterns: docs/MULTI-AGENT.md
+- Internal API: docs/AI-AGENT-INTERNAL-API.md
+- Slack bot notes: docs/SLACK-BOT.md
 
 ## Why AI Agent?
 
@@ -313,6 +312,6 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## Support
 
-- GitHub Issues: [Report bugs or request features](https://github.com/your-org/ai-agent/issues)
-- Discussions: [Ask questions and share ideas](https://github.com/your-org/ai-agent/discussions)
-- Documentation: [Full documentation](https://docs.ai-agent.dev)
+- GitHub Issues: https://github.com/netdata/ai-agent/issues
+- Discussions: https://github.com/netdata/ai-agent/discussions
+- Documentation: docs/ (see the list above)

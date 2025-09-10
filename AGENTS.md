@@ -7,8 +7,7 @@
 - docs/docs/AI-AGENT-INTERNAL-API.md current status of the ai-agent internal agent API.
 - README.md for end-user documentation of the application.
 
-Directory claude/ contains the current implementation, architected by claude and co-implemented by codex.
-Directory codex/ and codex2/ contain the original and an alternative approach. Do not use them. Obsolete code, only as reference.
+The application source code is in the root directory (src/, package.json, etc).
 
 ## TESTING MODELS
 
@@ -17,7 +16,7 @@ Use it with model 'gpt-oss:20b'
 
 ## TESTING SCRIPT
 
-Script ./run.sh provides a working example for using the application (codex's implementation)
+Script ./run.sh provides a working example for using the application
 
 ## SECURITY AND PRIVACY
 
@@ -88,13 +87,13 @@ These rules help generate code that passes `npm run lint` and `npm run build` on
 ## Specific Context
 
 ### Build Commands
-- Build: `cd claude && npm run build` (TypeScript → dist)
-- Lint: `cd claude && npm run lint` (ESLint with --max-warnings 0)
-- Full build script: `./build.sh` (builds + lints + creates launcher)
+- Build: `npm run build` (TypeScript → dist)
+- Lint: `npm run lint` (ESLint with --max-warnings 0)
+- Full build script: `./build-and-install.sh` (builds + lints + installs to /opt/ai-agent)
 
 ### Test Commands
 - No dedicated test framework configured
-- For manual testing use: `cd claude && npm run start`
+- For manual testing use: `npm run start`
 - Test models: Use ollama on host 'nova' with model 'gpt-oss:20b'
 
 ### Code Style Guidelines

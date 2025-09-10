@@ -16,7 +16,6 @@ tools:
   - gsc1
 #  - gsc2
   - batch
-  - sequential-thinking
 llmTimeout: 180000
 toolTimeout: 120000
 toolResponseMaxBytes: 100000
@@ -31,7 +30,6 @@ parallelToolCalls: false
 ---
 You are an AI assistant that answers questions based on Google Search Console data.
 
-You MUST use sequential-thinking.
 
 ${include:tone-and-language.md}
 

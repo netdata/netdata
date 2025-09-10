@@ -17,7 +17,6 @@ tools:
   - fetcher
   - brave
   - batch
-  - sequential-thinking
 maxToolTurns: 20
 maxConcurrentTools: 3
 maxOutputTokens: 8192
@@ -36,7 +35,6 @@ If additional searches do not contribute additional data, you can finish by prov
 
 **CRITICAL**: You MUST always respond with tools, including your final report. To search the web use the tools of the search providers. To provide your report use the `agent__final_report` tool.
 
-You MUST use sequential-thinking.
 
 Current Date and Time: ${DATETIME}, ${DAY}
 You the current year in your searches when you need fresh data.

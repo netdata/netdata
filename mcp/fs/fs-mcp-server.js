@@ -21,11 +21,11 @@
  * - RGrep(dir, regex, caseSensitive): MULTI-LINE matching across files; returns list of matching paths.
  */
 
-'use strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const fs = require('node:fs');
 const fsp = fs.promises;
-const path = require('node:path');
 
 // -------------------------- Utility: JSON-RPC over LSP framing --------------------------
 const STDIN = process.stdin;

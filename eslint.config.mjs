@@ -16,9 +16,11 @@ import unicorn from 'eslint-plugin-unicorn';
 
 const tsProject = ['./tsconfig.json'];
 
-const IGNORE_GLOBS = ['**/node_modules/**', '**/dist/**'];
+const IGNORE_GLOBS = ['**/node_modules/**', '**/dist/**', '**/mcp/**', '**/tmp/**', '**/.venv/**'];
 
 export default [
+  // Global ignores - must be first
+  { ignores: IGNORE_GLOBS },
   // Overrides for scripts
   {
     files: ['**/scripts/**'],
@@ -144,5 +146,4 @@ export default [
       'sonarjs/no-duplicate-string': 'off',
     },
   },
-  { ignores: ['**/node_modules/**', '**/dist/**'] },
 ];

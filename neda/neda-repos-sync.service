@@ -1,0 +1,21 @@
+[Unit]
+Description=Sync Netdata repositories for Neda
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=neda
+Group=neda
+WorkingDirectory=/opt/neda/netdata-repos
+ExecStart=/opt/neda/bin/sync-netdata-repos.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=neda-repos-sync
+LogNamespace=neda
+
+TimeoutStartSec=30min
+TimeoutStopSec=5min
+
+[Install]
+WantedBy=multi-user.target

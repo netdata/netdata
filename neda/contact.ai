@@ -16,7 +16,6 @@ tools:
   - brave
   - jina
   - batch
-  - sequential-thinking
 agents: []
 llmTimeout: 120000
 toolTimeout: 60000
@@ -91,7 +90,6 @@ Although your task is to provide a complete professional profile for the individ
 
 ${include:tone-and-language.md}
 
-You MUST use sequential-thinking.
 
 Current Date and Time: ${DATETIME}, ${DAY}
 Provide your report in this format: ${FORMAT}

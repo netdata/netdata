@@ -15,7 +15,6 @@ tools:
   - fetcher
   - brave
   - batch
-  - sequential-thinking
 agents: []
 llmTimeout: 120000
 toolTimeout: 60000
@@ -106,7 +105,6 @@ All your claims MUST have a related markdown link.
 
 ---
 
-You MUST use sequential-thinking.
 
 Current Date and Time: ${DATETIME}, ${DAY}
 Provide your report in: ${FORMAT}

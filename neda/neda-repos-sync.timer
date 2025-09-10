@@ -1,0 +1,11 @@
+[Unit]
+Description=Sync Netdata repositories every 6 hours
+Requires=neda-repos-sync.service
+
+[Timer]
+OnCalendar=*-*-* 00,06,12,18:00:00
+OnBootSec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

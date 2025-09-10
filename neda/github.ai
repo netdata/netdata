@@ -10,7 +10,6 @@ models:
 tools:
   - github
   - batch
-  - sequential-thinking
 llmTimeout: 120000
 toolTimeout: 60000
 toolResponseMaxBytes: 20000
@@ -31,7 +30,6 @@ ${include:tone-and-language.md}
 
 ---
 
-You MUST use sequential-thinking.
 
 Output format: ${FORMAT}
 Current Date and Time: ${DATETIME}, ${DAY}

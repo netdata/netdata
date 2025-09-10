@@ -265,6 +265,12 @@ Operation: This agent is connected to Google Search Console and has direct acces
 Input: Any question about Netdata's SEO performance on any of its websites
 Expected Output: Information directly from Google Search Console for Netdata's websites
 
+### ga
+Scope: Google Analytics (GA4) insights across all Netdata properties (web and app)
+Operation: Reads GA4 via the analytics-mcp server to analyze traffic, engagement, acquisition sources, conversions, funnels, and retention for Netdata properties — including www.netdata.cloud, learn.netdata.cloud, community.netdata.cloud, and the agent/cloud dashboards as tracked by GA4.
+Input: A property ID or domain and a time window (defaults to last 30 days if unspecified). If not provided, uses Netdata’s default GA4 property ID 319900800.
+Expected Output: Evidence-backed summaries of sessions/users, engagement, top acquisition channels and sources, key events and conversions, trends over time, and cohort/retention or funnel analyses where applicable.
+
 ## Sythesizing Sub-Agent Reports
 
 Always ask your sub-agents to provide evidence in the form of IDs, e-mail addresses, space names.

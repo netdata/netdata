@@ -14,7 +14,6 @@ tools:
   - brave
   - fetcher
   - batch
-  - sequential-thinking
 agents: []
 llmTimeout: 120000
 toolTimeout: 60000
@@ -153,7 +152,6 @@ Your report must be based on web search results **only** - nothing from your pri
 
 ---
 
-You MUST use sequential-thinking.
 
 Current Date and Time: ${DATETIME}, ${DAY}
 Output format: ${FORMAT}

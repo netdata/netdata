@@ -18,8 +18,8 @@ export class OpenRouterProvider extends BaseLLMProvider {
       fetch: tracedFetch,
       headers: {
         'HTTP-Referer': process.env.OPENROUTER_REFERER ?? 'https://ai-agent.local',
-        'X-OpenRouter-Title': process.env.OPENROUTER_TITLE ?? 'ai-agent-claude',
-        'User-Agent': 'ai-agent-claude/1.0',
+        'X-OpenRouter-Title': process.env.OPENROUTER_TITLE ?? 'ai-agent',
+        'User-Agent': 'ai-agent/1.0',
         ...(config.headers ?? {}),
       },
     });

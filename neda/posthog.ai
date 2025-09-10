@@ -15,7 +15,6 @@ models:
 tools:
   - posthog-query
   - batch
-  - sequential-thinking
 llmTimeout: 180000
 toolTimeout: 60000
 toolResponseMaxBytes: 65536
@@ -34,7 +33,6 @@ ${include:tone-and-language.md}
 
 ---
 
-You MUST use sequential-thinking.
 
 Output Format: ${FORMAT}
 Current Date and Time: ${DATETIME}, ${DAY}

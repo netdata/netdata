@@ -32,7 +32,7 @@ Architecture
     - `new StdioClientTransport({ command, args, env, stderr?: 'pipe'|'inherit' })`
     - `new SSEClientTransport(new URL(url), headers?)`
     - `new StreamableHTTPClientTransport(new URL(url), { requestInit: { headers } })`
-    - Custom websocket via helper that wraps `WebSocket` (see `codex/src/websocket-transport.ts`).
+    - Custom websocket via helper that wraps `WebSocket`.
   - Lifecycle:
     - `await client.connect(transport)`
     - `await client.close()`
@@ -211,9 +211,9 @@ Notes for future improvements
 
 References (code entry points)
 
-- CLI: `codex/src/cli.ts` — argument parsing, prompt resolution, accounting sink, and agent execution.
-- Agent core: `codex/src/ai-agent.ts` — provider setup, `streamText` orchestration, usage accounting, prompt enhancement, fallback.
-- MCP client: `codex/src/mcp-client.ts` — transport selection, tool discovery, prompt discovery, tool execution, headers/env resolution, cleanup.
+- CLI: `src/cli.ts` — argument parsing, prompt resolution, accounting sink, and agent execution.
+- Agent core: `src/ai-agent.ts` — provider setup, `streamText` orchestration, usage accounting, prompt enhancement, fallback.
+- MCP client: `src/mcp-client.ts` — transport selection, tool discovery, prompt discovery, tool execution, headers/env resolution, cleanup.
 
 ---
 

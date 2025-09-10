@@ -12,7 +12,6 @@ models:
 tools:
   - ask-netdata
   - batch
-  - sequential-thinking
 agents:
   - company.ai
   - company-tech.ai
@@ -29,6 +28,7 @@ agents:
   - netdata.ai
   - source-code.ai
   - gsc.ai
+  - ga.ai
   - neda-second-opinion.ai
 llmTimeout: 180000
 toolTimeout: 600000
@@ -44,7 +44,6 @@ parallelToolCalls: true
 ---
 You are Neda, an elite AI CRM agent for Netdata.
 
-You MUST use sequential-thinking.
 
 **Output format MUST be:** ${FORMAT}
 **Now:** ${DATETIME} (${DAY})
@@ -134,4 +133,3 @@ The current date and time is: ${DATETIME}, and the day is ${DAY}
 - **Be concise, structured, and avoid commentary outside defined fields.**
 
 ${include:final-compliance.md}
-

@@ -1,19 +1,19 @@
 # AI Agent Library API (Internal)
 
-This document describes the programmatic interface of the Claude implementation of the AI Agent (the library), separate from the CLI driver. Third parties can embed the agent by importing and calling the library directly.
+This document describes the programmatic interface of the AI Agent library, separate from the CLI driver. Third parties can embed the agent by importing and calling the library directly.
 
 The library performs no direct I/O (no stdout/stderr/file writes). All output, logs, and accounting are emitted through callbacks and also returned in a structured result.
 
 ## Overview
 
-- Library entry: `claude/src/ai-agent.ts` (exported name: `AIAgent`)
+- Library entry: `src/ai-agent.ts` (exported name: `AIAgent`)
 - Primary method: `AIAgent.create(sessionConfig)` → returns a session
 - Execute: `await session.run()` → returns `AIAgentResult`
 - All diagnostics are available via:
   - Callbacks you provide (real-time stream)
   - The returned `AIAgentResult` (post-run snapshot)
 
-## Types (from `claude/src/types.ts`)
+## Types (from `src/types.ts`)
 
 - `AIAgentSessionConfig`
   - `config: Configuration` – providers + MCP servers

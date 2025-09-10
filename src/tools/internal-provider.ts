@@ -41,7 +41,7 @@ export class InternalToolProvider extends ToolProvider {
       },
       {
         name: 'agent__final_report',
-        description: 'Finish the session by returning the final answer.',
+        description: 'You MUST use agent__final_report to provide your final response to the user request.',
         inputSchema: {
           type: 'object',
           additionalProperties: true,

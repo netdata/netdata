@@ -1,0 +1,32 @@
+# This .gitignore is for the source repository (neda/ directory)
+# It excludes sensitive files that shouldn't be in the main repo
+
+# Exclude ALL hidden files except .ai-agent.json
+.*
+!.ai-agent.json
+!.gitignore
+
+# Credential files - NEVER commit these to source
+.ai-agent.env
+bigquery-service-account.json
+gsc-service-account.json
+*.pem
+*.key
+
+# Cache and runtime files
+*.log
+*.pid
+*.tmp
+*.cache
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# System files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~

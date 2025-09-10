@@ -15,7 +15,6 @@ models:
 tools:
   - stripe
   - batch
-  - sequential-thinking
 llmTimeout: 180000
 toolTimeout: 60000
 toolResponseMaxBytes: 100000
@@ -48,7 +47,6 @@ Your goal is to use Stripe tools to retrieve billing data about companies, conta
 
 ---
 
-You MUST use sequential-thinking.
 
 Output Format: ${FORMAT}
 Current Date and Time: ${DATETIME}, ${DAY}

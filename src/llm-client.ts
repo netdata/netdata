@@ -153,7 +153,7 @@ export class LLMClient {
         // Add OpenRouter attribution headers if needed
         if (url.includes(LLMClient.OPENROUTER_HOST)) {
           const defaultReferer = 'https://ai-agent.local';
-          const defaultTitle = 'ai-agent-claude';
+          const defaultTitle = 'ai-agent';
           if (!headers.has('HTTP-Referer')) headers.set('HTTP-Referer', defaultReferer);
           if (!headers.has('X-OpenRouter-Title')) headers.set('X-OpenRouter-Title', defaultTitle);
           if (!headers.has('User-Agent')) headers.set('User-Agent', `${defaultTitle}/1.0`);

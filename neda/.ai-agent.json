@@ -134,7 +134,7 @@
     }
   },
   "accounting": {
-    "file": "/home/costa/ai-agent-accounting.jsonl"
+    "file": "/opt/neda/logs/accounting.jsonl"
   },
   "defaults": {
     "llmTimeout": 120000,
@@ -157,23 +157,14 @@
       "command": "/usr/local/bin/file-mcp-server",
       "enabled": true
     },
-    "env-test": {
-      "type": "stdio",
-      "command": "node",
-      "args": [
-        "codex/tools/env-test-server.mjs"
-      ],
-      "env": {
-        "BRAVE_API_KEY": "${BRAVE_API_KEY}"
-      },
-      "enabled": true
-    },
     "brave": {
       "type": "stdio",
       "command": "npx",
       "args": [
         "-y",
-        "@modelcontextprotocol/server-brave-search"
+        "@brave/brave-search-mcp-server",
+        "--transport",
+        "stdio"
       ],
       "env": {
         "BRAVE_API_KEY": "${BRAVE_API_KEY}"
@@ -283,13 +274,14 @@
     },
     "bigquery": {
       "type": "stdio",
-      "command": "/home/costa/.local/bin/toolbox",
+      "command": "/opt/neda/bin/toolbox",
       "args": [
         "--prebuilt",
         "bigquery",
         "--stdio"
       ],
       "env": {
+        "GOOGLE_APPLICATION_CREDENTIALS": "${BIGQUERY_CREDENTIALS}",
         "BIGQUERY_PROJECT": "${BIGQUERY_PROJECT}"
       },
       "enabled": true
@@ -347,19 +339,19 @@
       "type": "stdio",
       "command": "node",
       "args": [
-        "mcp/fs/fs-mcp-server.js",
+        "/opt/ai-agent/mcp/fs/fs-mcp-server.js",
         "${NETDATA_REPOS_DIR}"
       ],
       "enabled": true
     },
     "gsc1": {
       "type": "stdio",
-      "command": "/home/costa/src/ai-agent.git/mcp/mcp-gsc/.venv/bin/python",
+      "command": "/opt/neda/mcp/mcp-gsc/.venv/bin/python",
       "args": [
-        "/home/costa/src/ai-agent.git/mcp/mcp-gsc/gsc_server.py"
+        "/opt/neda/mcp/mcp-gsc/gsc_server.py"
       ],
       "env": {
-        "GSC_CREDENTIALS_PATH": "${GSC_OAUTH_CLIENT_SECRETS_FILE}",
+        "GSC_CREDENTIALS_PATH": "${GSC_CREDENTIALS}",
         "GSC_SKIP_OAUTH": "true"
       },
       "enabled": true
@@ -369,7 +361,20 @@
       "command": "npx",
       "args": ["-y", "mcp-server-gsc"],
       "env": {
-        "GOOGLE_APPLICATION_CREDENTIALS": "${GSC_OAUTH_CLIENT_SECRETS_FILE}"
+        "GOOGLE_APPLICATION_CREDENTIALS": "${GSC_CREDENTIALS}"
+      },
+      "enabled": true
+    },
+    "analytics-mcp": {
+      "type": "stdio",
+      "command": "pipx",
+      "args": [
+        "run",
+        "analytics-mcp"
+      ],
+      "env": {
+        "GOOGLE_APPLICATION_CREDENTIALS": "${GA_CREDENTIALS}",
+        "GOOGLE_PROJECT_ID": "${GA_PROJECT_ID}"
       },
       "enabled": true
     }

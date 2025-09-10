@@ -9,10 +9,8 @@ models:
 #  - anthropic/claude-3-5-haiku-20241022
   - anthropic/claude-sonnet-4-20250514
 tools:
-#  - sequential-thinking
   - filesystem
   - batch
-  - sequential-thinking
 llmTimeout: 120000
 toolTimeout: 120000
 toolResponseMaxBytes: 8192
@@ -33,7 +31,6 @@ ${include:tone-and-language.md}
 
 ---
 
-You MUST use sequential-thinking.
 
 Output format: ${FORMAT}
 Current Date and Time: ${DATETIME}, ${DAY}

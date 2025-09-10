@@ -385,9 +385,16 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
     const result = sessionManager.getResult(runId);
     const slackMessages = extractSlackMessages(result);
     let finalText = extractFinalText(runId);
-    if (!finalText && !slackMessages) {
+    // Fix: Check for both falsy AND empty array cases
+    const hasSlackMessages = slackMessages && slackMessages.length > 0;
+    if (!finalText && !hasSlackMessages) {
       if (meta.error === 'stopped') finalText = '🛑 Stopped';
       else finalText = meta.error ? `❌ ${meta.error}` : '✅ Done';
+    }
+    // Additional check: Ensure we have something to post
+    if (!finalText && !hasSlackMessages) {
+      elog('Warning: No content to post (both finalText and slackMessages are empty)');
+      finalText = '⚠️ No response content was generated. Please check the logs for details.';
     }
     try {
       if (slackMessages && slackMessages.length > 0) {
@@ -418,7 +425,8 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
         vlog('posting to slack (blocks, multi-message)');
         try {
           await client.chat.update({ channel, ts, text: fallback, blocks: firstBlocks });
-        } catch {
+        } catch (e1) {
+          elog(`First block update attempt failed: ${(e1 as Error).message}`);
           const eb = repairBlocks(firstBlocks);
           await client.chat.update({ channel, ts, text: fallback, blocks: eb });
         }
@@ -471,7 +479,8 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
       } else {
         // No splitting/truncation. Post as-is; if Slack rejects, error handler below will present a minimal fallback.
         vlog('posting to slack (raw text, no splitting)');
-        await client.chat.update({ channel, ts, text: finalText });
+        // Fix: Clear any existing blocks when posting plain text to ensure visibility
+        await client.chat.update({ channel, ts, text: finalText, blocks: [] });
         // Post tiny stats footer as a separate small message (context)
         try {
           const logs = sessionManager.getLogs(runId);

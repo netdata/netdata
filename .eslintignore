@@ -1,2 +1,7 @@
 src/config-resolver.ts
 src/agent-loader.ts
+mcp/
+node_modules/
+dist/
+tmp/
+.venv/
