@@ -62,6 +62,12 @@ export function resolveIncludes(raw: string, baseDir?: string, maxDepth = 8): st
     out = next;
     depth++;
   }
+  
+  // Check if we still have unresolved includes after reaching max depth
+  if (depth >= maxDepth && (re1.test(out) || re2.test(out))) {
+    throw new Error(`Maximum include depth (${String(maxDepth)}) exceeded - possible circular reference or deeply nested includes`);
+  }
+  
   return out;
 }
 

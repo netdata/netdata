@@ -1,7 +1,10 @@
 .ai-agent.env
-libs/
+.gsc-client-secrets.json
+
+tmp/
 node_modules/
 .channels_cache_v2.json
 .users_cache.json
 
-ai-agent
+.venv
+mcp/mcp-gsc/

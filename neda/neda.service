@@ -1,0 +1,18 @@
+[Unit]
+Description=Neda AI Agent Server
+After=network.target
+
+[Service]
+Type=simple
+User=costa
+Group=costa
+WorkingDirectory=/home/costa/src/ai-agent.git/neda
+ExecStart=/home/costa/src/ai-agent.git/ai-agent server ./neda.ai --slack --api --verbose
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=neda
+
+[Install]
+WantedBy=multi-user.target
