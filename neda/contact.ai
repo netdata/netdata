@@ -15,6 +15,7 @@ tools:
   - fetcher
   - brave
   - jina
+  - cloudflare-browser
   - batch
 agents: []
 llmTimeout: 120000

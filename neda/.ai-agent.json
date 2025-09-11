@@ -377,6 +377,30 @@
         "GOOGLE_PROJECT_ID": "${GA_PROJECT_ID}"
       },
       "enabled": true
+    },
+    "cloudflare-browser": {
+      "type": "sse",
+      "url": "https://browser.mcp.cloudflare.com/sse",
+      "headers": {
+        "Authorization": "Bearer ${CLOUDFLARE_API_KEY}"
+      },
+      "enabled": true
+    },
+    "cloudflare-radar": {
+      "type": "sse",
+      "url": "https://radar.mcp.cloudflare.com/sse",
+      "headers": {
+        "Authorization": "Bearer ${CLOUDFLARE_API_KEY}"
+      },
+      "enabled": true
+    },
+    "cloudflare-graphql": {
+      "type": "sse",
+      "url": "https://graphql.mcp.cloudflare.com/sse",
+      "headers": {
+        "Authorization": "Bearer ${CLOUDFLARE_API_KEY}"
+      },
+      "enabled": true
     }
   },
   "slack": {

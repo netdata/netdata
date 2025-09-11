@@ -95,6 +95,7 @@ su neda -c 'cd /opt/neda && ai-agent server ./neda.ai --slack --api --verbose'
 - `jina` - Web content extraction and parsing
 - `fetcher` - URL content fetching
 - `brave` - Web search engine
+- `cloudflare-browser` - Web page rendering and screenshots
 
 **Example Usage**:
 ```
@@ -127,6 +128,7 @@ Output: Technology stack, infrastructure details, engineering structure and part
 - `fetcher` - URL content fetching
 - `brave` - Web search engine
 - `jina` - Web content extraction
+- `cloudflare-browser` - Web page rendering and screenshots
 
 **Example Usage**:
 ```
@@ -144,6 +146,7 @@ Output: Public professional profile of Costa Tsaousis, founder and CEO of Netdat
 - `jina` - Web content extraction
 - `brave` - Web search engine
 - `fetcher` - URL content fetching
+- `cloudflare-browser` - Web page rendering and screenshots
 
 **Example Usage**:
 ```
@@ -431,6 +434,62 @@ su neda -c '/opt/neda/web-research.ai "extract content from https://example.com"
 ```bash
 # Test fetcher using web-research agent
 su neda -c '/opt/neda/web-research.ai "today's news on observability? Use DuckDuckGo" --verbose --tools fetcher'
+```
+
+---
+
+#### cloudflare-browser
+**Type**: MCP Server (SSE)
+**Purpose**: Fetch web pages, convert to markdown, take screenshots
+**Required Environment Variables**:
+```bash
+CLOUDFLARE_API_KEY=<your-cloudflare-api-key>
+```
+**Setup**: 
+- Create API token at https://dash.cloudflare.com/profile/api-tokens
+- Required permissions:
+  - Account → Account Settings:Read
+  - Browser Rendering → Browser Rendering:Edit (Note: Write/Edit permission is required, not just Read)
+**Testing**: 
+```bash
+# Test cloudflare-browser using web-research agent
+su neda -c '/opt/neda/web-research.ai "get screenshot of https://example.com" --verbose --tools cloudflare-browser'
+```
+
+---
+
+#### cloudflare-radar
+**Type**: MCP Server (SSE)
+**Purpose**: Global Internet traffic insights, trends, URL scans
+**Required Environment Variables**:
+```bash
+CLOUDFLARE_API_KEY=<your-cloudflare-api-key>
+```
+**Setup**: 
+- Uses same API token as cloudflare-browser
+- Provides internet traffic analytics and security insights
+**Testing**: 
+```bash
+# Test cloudflare-radar via ai-agent
+ai-agent prompt "get internet traffic trends for the last week" --tools cloudflare-radar
+```
+
+---
+
+#### cloudflare-graphql
+**Type**: MCP Server (SSE)
+**Purpose**: Analytics data using Cloudflare's GraphQL API
+**Required Environment Variables**:
+```bash
+CLOUDFLARE_API_KEY=<your-cloudflare-api-key>
+```
+**Setup**: 
+- Uses same API token as cloudflare-browser
+- Access to Cloudflare analytics and performance data
+**Testing**: 
+```bash
+# Test cloudflare-graphql via ai-agent
+ai-agent prompt "get analytics data for my zones" --tools cloudflare-graphql
 ```
 
 ---
