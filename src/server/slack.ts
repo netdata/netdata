@@ -410,13 +410,37 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
               const fields = Array.isArray(b.fields) ? b.fields : undefined;
               const textObj = (b.text && typeof b.text === 'object') ? b.text : undefined;
               const t = typeof textObj?.text === 'string' ? textObj.text : undefined;
-              if ((t === undefined || t.length === 0) && Array.isArray(fields) && fields.length > 0) {
-                const nb: any = { type: 'section', fields };
-                out.push(nb);
-                continue;
+              
+              // Fix: Validate and repair fields to ensure no empty text
+              if (Array.isArray(fields) && fields.length > 0) {
+                const validFields = fields.filter((f: any) => {
+                  if (!f || typeof f !== 'object') return false;
+                  const fieldText = typeof f.text === 'string' ? f.text : 
+                                   (f.text && typeof f.text === 'object' && typeof f.text.text === 'string' ? f.text.text : undefined);
+                  return fieldText && fieldText.length > 0;
+                });
+                
+                // If we have valid fields but no text, create section with fields only
+                if (validFields.length > 0 && (t === undefined || t.length === 0)) {
+                  const nb: any = { type: 'section', fields: validFields };
+                  out.push(nb);
+                  continue;
+                }
+                // If we have text and valid fields, use both
+                if (validFields.length > 0 && t && t.length > 0) {
+                  const nb: any = { type: 'section', text: textObj, fields: validFields };
+                  out.push(nb);
+                  continue;
+                }
               }
+              
+              // If no valid fields, only add block if it has text
+              if (t && t.length > 0) {
+                out.push(b);
+              }
+            } else {
+              out.push(b);
             }
-            out.push(b);
           }
           return out;
         };
