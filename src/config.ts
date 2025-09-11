@@ -17,7 +17,7 @@ const ProviderConfigSchema = z.object({
 });
 
 const MCPServerConfigSchema = z.object({
-  type: z.enum(['stdio', 'websocket', 'http', 'sse']),
+  type: z.enum(['stdio', 'websocket', 'http', 'sse']).optional(),
   command: z.string().optional(),
   args: z.array(z.string()).optional(),
   url: z.string().optional(),
@@ -167,6 +167,17 @@ export function loadConfiguration(configPath?: string): Configuration {
         else if (typeVal === 'remote') {
           const url = typeof s.url === 'string' ? s.url : '';
           out.type = url.includes('/sse') ? 'sse' : 'http';
+        }
+        // Infer type if not specified
+        if (out.type === undefined) {
+          const url = s.url;
+          if (typeof url === 'string' && url.length > 0) {
+            // If URL is provided, infer HTTP or SSE transport
+            out.type = url.includes('/sse') ? 'sse' : 'http';
+          } else {
+            // Default to stdio for local servers without URL
+            out.type = 'stdio';
+          }
         }
         // command array normalization
         const cmd = s.command ;

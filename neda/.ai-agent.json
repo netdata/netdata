@@ -377,6 +377,18 @@
         "GOOGLE_PROJECT_ID": "${GA_PROJECT_ID}"
       },
       "enabled": true
+    },
+    "ahrefs": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@ahrefs/mcp"
+      ],
+      "env": {
+        "API_KEY": "${AHREFS_API_KEY}"
+      },
+      "enabled": true
     }
   },
   "slack": {
