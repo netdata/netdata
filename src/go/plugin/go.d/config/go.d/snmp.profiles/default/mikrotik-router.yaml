@@ -220,40 +220,6 @@ metrics:
       - tag: cpu_index
         index: 1
 
-  # Storage hrStorageTable (https://www.net-snmp.org/docs/mibs/host.html#hrStorageTable)
-  - MIB: HOST-RESOURCES-MIB
-    table:
-      OID: 1.3.6.1.2.1.25.2.3
-      name: hrStorageTable
-    symbols:
-      - OID: 1.3.6.1.2.1.25.2.3.1.5
-        name: memory.total
-        chart_meta:
-          unit: "By"
-        transform: |
-          {{- transformHrStorage .Metric -}}
-      - OID: 1.3.6.1.2.1.25.2.3.1.6
-        name: memory.used
-        chart_meta:
-          unit: "By"
-        transform: |
-          {{- transformHrStorage .Metric -}}
-    metric_tags:
-      - tag: mem_index
-        index: 1
-      - tag: _mem_desc
-        symbol:
-          OID: 1.3.6.1.2.1.25.2.3.1.3
-          name: hrStorageDescr
-      - tag: rm:storage_type # Needed for transformation
-        symbol:
-          OID: 1.3.6.1.2.1.25.2.3.1.2
-          name: hrStorageType
-      - tag: rm:storage_alloc_unit # Needed for transformation
-        symbol:
-          OID: 1.3.6.1.2.1.25.2.3.1.4
-          name: hrStorageAllocationUnits
-
   # Table metrics - Extended health monitoring (multi-sensor support)
   - MIB: MIKROTIK-MIB
     table:
