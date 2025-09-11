@@ -1,7 +1,7 @@
 # - UCD-SNMP-MIB
 #   https://mibbrowser.online/mibdb_search.php?mib=UCD-SNMP-MIB
 #   https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/net-snmp/UCD-SNMP-MIB
-# - UCD-SNMP-MIB
+# - UCD-DISKIO-MIB
 #   https://mibbrowser.online/mibdb_search.php?mib=UCD-DISKIO-MIB
 #   https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/net-snmp/UCD-DISKIO-MIB
 
@@ -14,7 +14,7 @@ metrics:
         family: 'System/LoadAverage/1Min'
         description: 1 minute load average
         unit: "{load_average}"
-      scale_factor: 0.1
+      scale_factor: 0.01
   - MIB: UCD-SNMP-MIB
     symbol:
       name: ucd.cpuLoad5m
@@ -23,7 +23,7 @@ metrics:
         family: 'System/LoadAverage/5Min'
         description: 5 minute load average
         unit: "{load_average}"
-      scale_factor: 0.1
+      scale_factor: 0.01
   - MIB: UCD-SNMP-MIB
     symbol:
       name: ucd.cpuLoad15m
@@ -32,7 +32,7 @@ metrics:
         family: 'System/LoadAverage/15Min'
         description: 15 minute load average
         unit: "{load_average}"
-      scale_factor: 0.1
+      scale_factor: 0.01
   - MIB: UCD-SNMP-MIB
     symbol:
       name: ucd.memoryTotal
@@ -216,7 +216,7 @@ metrics:
       - name: ucd.diskIONWrittenX
         OID: 1.3.6.1.4.1.2021.13.15.1.1.13
         chart_meta:
-          family: 'System/Disk/Traffic/Write'
+          family: 'System/Disk/IO/Write'
           description: The number of bytes written to this device since boot
           unit: "By/s"
     metric_tags:
@@ -230,7 +230,7 @@ metrics:
       name: ucd.ssIORawSent
       OID: 1.3.6.1.4.1.2021.11.57.0
       chart_meta:
-        family: 'System/Disk/Total/Throughput/Write'
+        family: 'System/Disk/Total/IO/Write'
         description: Amount of data written to disk or other block device
         unit: "By/s"
       scale_factor: 512
@@ -240,7 +240,7 @@ metrics:
       name: ucd.ssIORawReceived
       OID: 1.3.6.1.4.1.2021.11.58.0
       chart_meta:
-        family: 'System/Disk/Total/Throughput/Read'
+        family: 'System/Disk/Total/IO/Read'
         description: Amount of data read from disk or other block device
         unit: "By/s"
       scale_factor: 512
@@ -283,7 +283,10 @@ metrics:
         unit: "By/s"
       scale_factor: 512
 
-## TODO: not useful as separate metrics/charts
+## TODO: These metrics (e.g., ucd.ssCpuUser, ucd.ssCpuSystem, etc.) represent CPU usage breakdowns (user, system, idle, etc.).
+## Typically more useful when visualized together in a single composite CPU usage chart, rather than as separate metrics/charts.
+## Displaying them separately can be confusing and less informative for users.
+## Next steps: Consider combining these metrics into a single composite CPU usage chart.
 #  - MIB: UCD-SNMP-MIB
 #    symbol:
 #      name: ucd.ssCpuUser
