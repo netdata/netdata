@@ -7,7 +7,7 @@ Neda is an AI-powered assistant integrated with Slack that provides access to in
 ## Architecture
 
 - **Host Agent**: Main orchestrator (neda.ai) that manages conversations and coordinates sub-agents
-- **Sub-Agents**: 18 specialized agents with focused capabilities and tool access
+- **Sub-Agents**: 20 specialized agents with focused capabilities and tool access
 - **MCP Tools**: Model Context Protocol servers that provide specific functionalities
 - **REST Tools**: Direct API integrations for specific services
 
@@ -347,7 +347,7 @@ Output: Current operational status report
 ---
 
 
-### Google Analytics
+### Web & Traffic Analytics Agents
 
 #### ga
 **Purpose**: Google Analytics (GA4) traffic, engagement, acquisition, conversions, funnels, and retention
@@ -356,6 +356,17 @@ Output: Current operational status report
 **Testing**:
 ```bash
 su neda -c '/opt/neda/ga.ai "traffic trends for www.netdata.cloud last 30 days" --verbose'
+```
+
+---
+
+#### cloudflare
+**Purpose**: Cloudflare Analytics - website traffic, performance, security events, AI bot analysis, and usage patterns with detailed hostname breakdowns
+**Status**: Implemented
+**Tools**: `cloudflare-graphql` (SSE), `cloudflare-radar` (SSE)
+**Testing**:
+```bash
+su neda -c '/opt/neda/cloudflare.ai "analyze AI bot traffic on learn.netdata.cloud" --verbose'
 ```
 
 ---

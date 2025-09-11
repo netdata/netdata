@@ -189,6 +189,20 @@ Note: bigquery is a few hours back. It cannot find the spaces created in the las
 Input: find the subscription history of our customer Ellusim
 Expected Output: the complete timeline of subscription changes for customer Ellusium
 
+### cloudflare
+Scope: analyze Cloudflare analytics for Netdata's web properties - traffic patterns, performance metrics, security events, bot activity, and usage statistics with detailed hostname breakdowns
+Operation: queries Cloudflare GraphQL API and Radar for comprehensive web analytics, grouping traffic by service categories (Dashboard, API, Documentation, etc.)
+Input: Query about traffic, performance, security, or specific analysis like AI bot crawling
+Output: Detailed analytics report with metrics, trends, and insights
+
+**Example 1**
+Input: analyze AI bot traffic on learn.netdata.cloud for the last 24 hours
+Expected Output: comprehensive report of AI/LLM bots (ChatGPT, Claude, etc.) crawling the documentation site with request counts, patterns, and geographic distribution
+
+**Example 2**
+Input: show traffic statistics for all netdata.cloud properties for last 7 days
+Expected Output: breakdown of traffic by service category (Dashboard, API, Packages, Documentation, etc.) with request counts, percentages, and trends
+
 ### executive
 Scope: Analyze business data to identify ARR, MRR, subscriptions added, churned, products used, migrations, billing info
 Operation: analyzes production data the same way the the Netdata Executive Dashboard does, to identify business performance

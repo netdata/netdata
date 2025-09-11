@@ -103,6 +103,19 @@ run chown -R "$NEDA_USER:$NEDA_GROUP" "$NEDA_HOME"
 # COPY ALL NEDA FILES
 # ============================================================================
 
+# If git repo exists, check for and commit any manual changes before updating
+if [ -d "$NEDA_HOME/.git" ]; then
+    # Check if there are any uncommitted changes
+    if ! sudo -u "$NEDA_USER" git -C "$NEDA_HOME" diff --quiet || \
+       ! sudo -u "$NEDA_USER" git -C "$NEDA_HOME" diff --cached --quiet || \
+       [ -n "$(sudo -u "$NEDA_USER" git -C "$NEDA_HOME" ls-files --others --exclude-standard)" ]; then
+        log_info "Saving manual changes before update..."
+        run sudo -u "$NEDA_USER" git -C "$NEDA_HOME" add -A
+        run sudo -u "$NEDA_USER" git -C "$NEDA_HOME" commit -m "Manual changes before update $(date +%Y-%m-%d_%H:%M:%S)"
+        log_info "Manual changes committed. You can rollback with: git -C $NEDA_HOME checkout HEAD~1"
+    fi
+fi
+
 log_info "Copying entire neda directory contents..."
 
 # Copy everything from neda/ to /opt/neda/
@@ -306,19 +319,29 @@ run chown -R "$NEDA_USER:$NEDA_GROUP" "$NEDA_HOME"
 
 log_info "Initializing local git repository for configuration management..."
 
-# Initialize git repo as neda user
-run sudo -u "$NEDA_USER" git -C "$NEDA_HOME" init
-
-# Configure git for neda user
-run sudo -u "$NEDA_USER" git -C "$NEDA_HOME" config user.name "Neda Setup"
-run sudo -u "$NEDA_USER" git -C "$NEDA_HOME" config user.email "neda@localhost"
-
-# Initial commit with all configuration
-run sudo -u "$NEDA_USER" git -C "$NEDA_HOME" add -A
-run sudo -u "$NEDA_USER" git -C "$NEDA_HOME" commit -m "Initial Neda installation" || \
-    log_warn "Nothing to commit (this is normal for reinstalls)"
-
-log_info "Git repository initialized. Future updates can be tracked with commits."
+# Check if git repo already exists
+if [ ! -d "$NEDA_HOME/.git" ]; then
+    # Initialize git repo as neda user
+    run sudo -u "$NEDA_USER" git -C "$NEDA_HOME" init
+    
+    # Configure git for neda user
+    run sudo -u "$NEDA_USER" git -C "$NEDA_HOME" config user.name "Neda Setup"
+    run sudo -u "$NEDA_USER" git -C "$NEDA_HOME" config user.email "neda@localhost"
+    
+    # Initial commit with all configuration
+    run sudo -u "$NEDA_USER" git -C "$NEDA_HOME" add -A
+    run sudo -u "$NEDA_USER" git -C "$NEDA_HOME" commit -m "Initial Neda installation" || \
+        log_warn "Nothing to commit (this is normal for reinstalls)"
+    
+    log_info "Git repository initialized. Future updates can be tracked with commits."
+else
+    log_info "Git repository already exists at $NEDA_HOME/.git"
+    
+    # Still commit any changes from the update
+    run sudo -u "$NEDA_USER" git -C "$NEDA_HOME" add -A
+    run sudo -u "$NEDA_USER" git -C "$NEDA_HOME" commit -m "Neda update $(date +%Y-%m-%d_%H:%M:%S)" || \
+        log_warn "Nothing to commit (no changes detected)"
+fi
 
 # Ensure logs directory is writable
 run chmod 755 "$NEDA_HOME/logs"

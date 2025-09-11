@@ -10,4 +10,4 @@ while [ -L "$SOURCE" ]; do
 done
 DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 
-exec node "$DIR/claude/dist/cli.js" "$@"
+exec node "$DIR/dist/cli.js" "$@"
