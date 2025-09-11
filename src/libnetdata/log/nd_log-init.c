@@ -136,7 +136,9 @@ void nd_log_initialize_for_external_plugins(const char *name) {
 
     //    nd_log(NDLS_COLLECTORS, NDLP_NOTICE, "FINAL_LOG_METHOD: %s", nd_log_id2method(method));
 
+#if defined(HAVE_LIBBACKTRACE)
     stacktrace_init();
+#endif
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -266,7 +268,9 @@ void nd_log_initialize(void) {
     for(size_t i = 0 ; i < _NDLS_MAX ; i++)
         nd_log_open(&nd_log.sources[i], i);
 
+#if defined(HAVE_LIBBACKTRACE)
     stacktrace_init();
+#endif
 }
 
 void nd_log_reopen_log_files(bool log) {
@@ -288,8 +292,10 @@ void nd_log_reopen_log_files_for_spawn_server(const char *name) {
     nd_log.fatal_final_cb = NULL;
 
     gettid_uncached();
+#if defined(HAVE_LIBBACKTRACE)
     stacktrace_flush();
     stacktrace_forked();
+#endif
 
     if(nd_log.syslog.initialized) {
         closelog();
