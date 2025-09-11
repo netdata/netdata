@@ -265,12 +265,6 @@ Operation: This agent is connected to Google Search Console and has direct acces
 Input: Any question about Netdata's SEO performance on any of its websites
 Expected Output: Information directly from Google Search Console for Netdata's websites
 
-### ahrefs
-Scope: Ahrefs SEO intelligence including backlinks, keywords, competitors, and comprehensive SEO metrics
-Operation: Connects to Ahrefs API to analyze backlink profiles, keyword opportunities, competitive landscape, organic traffic estimates, and content performance for any domain or URL
-Input: A domain/URL to analyze and optionally the type of analysis needed (backlinks, keywords, competitors, content analysis, etc.)
-Expected Output: Comprehensive SEO insights including domain/URL ratings, backlink profiles with referring domains, keyword rankings and opportunities, competitive analysis, traffic estimates, and actionable SEO recommendations
-
 ### ga
 Scope: Google Analytics (GA4) insights across all Netdata properties (web and app)
 Operation: Reads GA4 via the analytics-mcp server to analyze traffic, engagement, acquisition sources, conversions, funnels, and retention for Netdata properties — including www.netdata.cloud, learn.netdata.cloud, community.netdata.cloud, and the agent/cloud dashboards as tracked by GA4.
