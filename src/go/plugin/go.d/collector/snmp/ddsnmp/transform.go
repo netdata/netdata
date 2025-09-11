@@ -271,6 +271,55 @@ func newMetricTransformFuncMap() template.FuncMap {
 
 			return ""
 		},
+		"transformHrStorage": func(m *Metric) string {
+			// hrStorageType → friendly name/family
+			// https://oidref.com/1.3.6.1.2.1.25.2.1
+			typeMap := map[string]map[string]string{
+				"1.3.6.1.2.1.25.2.1.1":  {"key": "other", "family": "System/Memory/Other", "desc": "Unclassified storage area"},
+				"1.3.6.1.2.1.25.2.1.2":  {"key": "ram", "family": "System/Memory/RAM", "desc": "Physical system memory"},
+				"1.3.6.1.2.1.25.2.1.3":  {"key": "virtual_memory", "family": "System/Memory/Swap", "desc": "Virtual memory space"},
+				"1.3.6.1.2.1.25.2.1.4":  {"key": "fixed_disk", "family": "System/Storage/Disk", "desc": "Fixed disk storage"},
+				"1.3.6.1.2.1.25.2.1.5":  {"key": "removable_disk", "family": "System/Storage/Removable", "desc": "Removable disk storage"},
+				"1.3.6.1.2.1.25.2.1.6":  {"key": "floppy", "family": "System/Storage/Removable", "desc": "Floppy disk storage"},
+				"1.3.6.1.2.1.25.2.1.7":  {"key": "cdrom", "family": "System/Storage/Removable", "desc": "CD-ROM storage"},
+				"1.3.6.1.2.1.25.2.1.8":  {"key": "ram_disk", "family": "System/Storage/RAMDisk", "desc": "RAM-based storage"},
+				"1.3.6.1.2.1.25.2.1.9":  {"key": "flash", "family": "System/Storage/Flash", "desc": "Flash-based storage"},
+				"1.3.6.1.2.1.25.2.1.10": {"key": "network_disk", "family": "System/Storage/NetworkDisk", "desc": "Network-mounted storage"},
+			}
+
+			storageTypeOID := m.Tags["rm:storage_type"]
+			allocUnit, _ := strconv.ParseInt(m.Tags["rm:storage_alloc_unit"], 10, 64)
+
+			if storageTypeOID == "" || allocUnit <= 0 || m.Value < 0 {
+				return ""
+			}
+
+			tconf, ok := typeMap[storageTypeOID]
+			if !ok {
+				tconf = map[string]string{"key": "unknown", "family": "System/Storage/Unknown", "desc": "Unknown storage type"}
+			}
+
+			bytesVal := m.Value * allocUnit // to bytes
+			baseKey := tconf["key"]
+			fam := tconf["family"]
+			desc := tconf["desc"]
+
+			switch m.Name {
+			case "hrStorageSize":
+				m.Family = fam + "/Total"
+				m.Description = desc + " - Total"
+			case "hrStorageUsed":
+				m.Family = fam + "/Used"
+				m.Description = desc + " - Used"
+			default:
+				return ""
+			}
+
+			m.Name = m.Name + "_" + baseKey
+			m.Value = bytesVal
+
+			return ""
+		},
 	}
 
 	for name, fn := range extra {
