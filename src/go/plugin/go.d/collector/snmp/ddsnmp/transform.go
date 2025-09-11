@@ -275,7 +275,7 @@ func newMetricTransformFuncMap() template.FuncMap {
 			// hrStorageType → friendly name/family
 			// https://oidref.com/1.3.6.1.2.1.25.2.1
 			typeMap := map[string]map[string]string{
-				"1.3.6.1.2.1.25.2.1.1":  {"key": "other", "family": "System/Memory/Other", "desc": "Unclassified storage area"},
+				"1.3.6.1.2.1.25.2.1.1":  {"key": "other", "family": "System/Memory/Other", "desc": "Other memory"},
 				"1.3.6.1.2.1.25.2.1.2":  {"key": "ram", "family": "System/Memory/RAM", "desc": "Physical system memory"},
 				"1.3.6.1.2.1.25.2.1.3":  {"key": "virtual_memory", "family": "System/Memory/Swap", "desc": "Virtual memory space"},
 				"1.3.6.1.2.1.25.2.1.4":  {"key": "fixed_disk", "family": "System/Storage/Disk", "desc": "Fixed disk storage"},
