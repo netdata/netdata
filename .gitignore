@@ -9,3 +9,5 @@ node_modules/
 
 .venv
 mcp/mcp-gsc/
+
+install-keys.sh
