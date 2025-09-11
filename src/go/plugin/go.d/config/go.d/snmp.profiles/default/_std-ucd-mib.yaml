@@ -268,7 +268,7 @@ metrics:
       name: ucd.ssRawSwapIn
       OID: 1.3.6.1.4.1.2021.11.62.0
       chart_meta:
-        family: 'System/Memory/Swap/Throughput/In'
+        family: 'System/Memory/Swap/IO/In'
         description: Amount of memory swapped in from disk
         unit: "By/s"
       scale_factor: 512
@@ -278,7 +278,7 @@ metrics:
       name: ucd.ssRawSwapOut
       OID: 1.3.6.1.4.1.2021.11.63.0
       chart_meta:
-        family: 'System/Memory/Swap/Throughput/Out'
+        family: 'System/Memory/Swap/IO/Out'
         description: Amount of memory swapped out to disk
         unit: "By/s"
       scale_factor: 512
