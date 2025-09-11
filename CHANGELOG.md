@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- fix\(health/rocketchat\): add missing "Content-Type: application/json" header [\#20954](https://github.com/netdata/netdata/pull/20954) ([ilyam8](https://github.com/ilyam8))
+- move whole category and fix leftovers [\#20951](https://github.com/netdata/netdata/pull/20951) ([Ancairon](https://github.com/Ancairon))
 - build\(deps\): bump github.com/jackc/pgx/v5 from 5.7.5 to 5.7.6 in /src/go [\#20950](https://github.com/netdata/netdata/pull/20950) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump golang.org/x/net from 0.43.0 to 0.44.0 in /src/go [\#20949](https://github.com/netdata/netdata/pull/20949) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Fix use after free in metric registry [\#20947](https://github.com/netdata/netdata/pull/20947) ([stelfrag](https://github.com/stelfrag))
@@ -447,9 +449,6 @@
 - improvement\(go.d\): add ddsnmp profile collector \(scalar only\) [\#20415](https://github.com/netdata/netdata/pull/20415) ([ilyam8](https://github.com/ilyam8))
 - SNMP: juniper-pulse-secure.yaml [\#20413](https://github.com/netdata/netdata/pull/20413) ([Ancairon](https://github.com/Ancairon))
 - Improve metrics centralization points documentation [\#20412](https://github.com/netdata/netdata/pull/20412) ([kanelatechnical](https://github.com/kanelatechnical))
-- SNMP: \_juniper-virtualchassis.yaml [\#20410](https://github.com/netdata/netdata/pull/20410) ([Ancairon](https://github.com/Ancairon))
-- SNMP: \_juniper-userfirewall.yaml [\#20409](https://github.com/netdata/netdata/pull/20409) ([Ancairon](https://github.com/Ancairon))
-- SNMP: \_juniper-scu.yaml [\#20408](https://github.com/netdata/netdata/pull/20408) ([Ancairon](https://github.com/Ancairon))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
