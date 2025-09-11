@@ -428,7 +428,9 @@ int become_daemon(int dont_fork, const char *user) {
         // the child
         gettid_uncached();
         nd_initialize_signals(false);
+#ifdef HAVE_LIBBACKTRACE
         stacktrace_flush();
+#endif
 
         // become session leader
         if (setsid() < 0) {
@@ -451,7 +453,9 @@ int become_daemon(int dont_fork, const char *user) {
         // the child
         gettid_uncached();
         nd_initialize_signals(false);
+#ifdef HAVE_LIBBACKTRACE
         stacktrace_flush();
+#endif
     }
 
     // generate our pid file
