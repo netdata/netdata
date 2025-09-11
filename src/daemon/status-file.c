@@ -707,7 +707,9 @@ static void daemon_status_file_migrate_once(void) {
         session_status.reliability++;
     }
 
+#ifdef HAVE_LIBBACKTRACE
     safecpy(session_status.stack_traces, stacktrace_backend());
+#endif
 
     fill_dmi_info(&session_status);
 
@@ -1492,8 +1494,8 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
         }
     }
 
-    bool safe_to_get_stack_trace = reason != EXIT_REASON_SIGABRT || stacktrace_capture_is_async_signal_safe();
 #ifdef HAVE_LIBBACKTRACE
+    bool safe_to_get_stack_trace = reason != EXIT_REASON_SIGABRT || stacktrace_capture_is_async_signal_safe();
     bool get_stack_trace = stacktrace_available() && safe_to_get_stack_trace && stack_trace_is_empty(&session_status);
 
     // save it
@@ -1503,11 +1505,11 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
         if (!stacktrace_available())
             set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "no stack trace backend available");
         else
-#endif
             set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "not safe to get a stack trace for this signal using this backend");
 
         daemon_status_file_save(static_save_buffer, &session_status, false);
     }
+#endif
 
     return duplicate;
 }
