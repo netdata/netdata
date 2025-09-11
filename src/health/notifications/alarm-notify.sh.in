@@ -1823,7 +1823,7 @@ send_rocketchat() {
 EOF
     )"
 
-    httpcode=$(docurl -X POST --data-urlencode "payload=${payload}" "${webhook}")
+    httpcode=$(docurl -X POST -H "Content-Type: application/json" --data "${payload}" "${webhook}")
     if [ "${httpcode}" = "200" ]; then
       info "sent rocketchat notification to '${channel}' for ${notification_description}"
       sent=$((sent + 1))

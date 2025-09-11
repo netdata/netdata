@@ -10,8 +10,8 @@
 // #define SPINLOCK_IMPL_WITH_MUTEX
 // #endif
 
-typedef pthread_mutex_t netdata_mutex_t;
-typedef pthread_cond_t netdata_cond_t;
+typedef uv_mutex_t netdata_mutex_t;
+typedef uv_cond_t netdata_cond_t;
 
 #ifdef NETDATA_TRACE_RWLOCKS
 
@@ -35,7 +35,7 @@ typedef struct netdata_rwlock_locker {
 } netdata_rwlock_locker;
 
 typedef struct netdata_rwlock_t {
-    pthread_rwlock_t rwlock_t;       // the lock
+    uv_rwlock_t rwlock_t;            // the lock
     size_t readers;                  // the number of reader on the lock
     size_t writers;                  // the number of writers on the lock
     netdata_mutex_t lockers_mutex;   // a mutex to protect the linked list of the lock holding threads
@@ -55,31 +55,32 @@ typedef struct netdata_rwlock_t {
 #else // NETDATA_TRACE_RWLOCKS
 
 typedef struct netdata_rwlock_t {
-    pthread_rwlock_t rwlock_t;
+    uv_rwlock_t rwlock_t;
 } netdata_rwlock_t;
 
 #endif // NETDATA_TRACE_RWLOCKS
 
 int __netdata_cond_init(netdata_cond_t *cond);
-int __netdata_cond_destroy(netdata_cond_t *cond);
-int __netdata_cond_signal(netdata_cond_t *cond);
-int __netdata_cond_wait(netdata_cond_t *cond, netdata_mutex_t *mutex);
-int __netdata_cond_timedwait(netdata_cond_t *cond, netdata_mutex_t *mutex, struct timespec *tp);
+void __netdata_cond_destroy(netdata_cond_t *cond);
+void __netdata_cond_signal(netdata_cond_t *cond);
+void __netdata_cond_wait(netdata_cond_t *cond, netdata_mutex_t *mutex);
+int __netdata_cond_timedwait(netdata_cond_t *cond, netdata_mutex_t *mutex, uint64_t timeout_ns);
 
 int __netdata_mutex_init(netdata_mutex_t *mutex);
-int __netdata_mutex_destroy(netdata_mutex_t *mutex);
-int __netdata_mutex_lock(netdata_mutex_t *mutex);
+void __netdata_mutex_destroy(netdata_mutex_t *mutex);
+void __netdata_mutex_lock(netdata_mutex_t *mutex);
 int __netdata_mutex_trylock(netdata_mutex_t *mutex);
-int __netdata_mutex_unlock(netdata_mutex_t *mutex);
+void __netdata_mutex_unlock(netdata_mutex_t *mutex);
 
-int __netdata_rwlock_destroy(netdata_rwlock_t *rwlock);
+void __netdata_rwlock_destroy(netdata_rwlock_t *rwlock);
 int __netdata_rwlock_init(netdata_rwlock_t *rwlock);
-int __netdata_rwlock_rdlock(netdata_rwlock_t *rwlock);
-int __netdata_rwlock_wrlock(netdata_rwlock_t *rwlock);
-int __netdata_rwlock_rdunlock(netdata_rwlock_t *rwlock);
-int __netdata_rwlock_wrunlock(netdata_rwlock_t *rwlock);
+void __netdata_rwlock_rdlock(netdata_rwlock_t *rwlock);
+void __netdata_rwlock_wrlock(netdata_rwlock_t *rwlock);
+void __netdata_rwlock_rdunlock(netdata_rwlock_t *rwlock);
+void __netdata_rwlock_wrunlock(netdata_rwlock_t *rwlock);
 int __netdata_rwlock_tryrdlock(netdata_rwlock_t *rwlock);
 int __netdata_rwlock_trywrlock(netdata_rwlock_t *rwlock);
+void __netdata_cond_broadcast(netdata_cond_t *cond);
 
 #ifdef NETDATA_TRACE_RWLOCKS
 
@@ -135,6 +136,7 @@ int netdata_rwlock_trywrlock_debug( const char *file, const char *function, cons
 #define netdata_cond_init(cond) __netdata_cond_init(cond)
 #define netdata_cond_destroy(cond) __netdata_cond_destroy(cond)
 #define netdata_cond_signal(cond) __netdata_cond_signal(cond)
+#define netdata_cond_broadcast(cond) __netdata_cond_broadcast(cond)
 #define netdata_cond_wait(cond, mutex) __netdata_cond_wait(cond, mutex)
 #define netdata_cond_timedwait(cond, mutex, tp) __netdata_cond_timedwait(cond, mutex, tp)
 

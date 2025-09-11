@@ -14,6 +14,7 @@ struct metric {
 
     REFCOUNT refcount;
     uint8_t partition;
+    bool deleted;
 
     uint32_t latest_update_every_s; // the latest data collection frequency
 
@@ -198,8 +199,9 @@ static void acquired_for_deletion_metric_delete(MRG *mrg, METRIC *metric) {
     MRG_STATS_DELETED_METRIC(mrg, partition, metric->section);
 
     mrg_index_write_unlock(mrg, partition);
-    uuidmap_free(metric->uuid);
-    aral_freez(mrg->index[partition].aral, metric);
+
+    __atomic_store_n(&metric->deleted, true, __ATOMIC_RELEASE);
+
     mrg_stats_judy_mem(mrg, partition, JudyAllocThreadPulseGetAndReset());
 }
 
@@ -208,6 +210,11 @@ static bool metric_acquire(MRG *mrg, METRIC *metric) {
     REFCOUNT rc = refcount_acquire_advanced(&metric->refcount);
     if(!REFCOUNT_ACQUIRED(rc))
         return false;
+
+    if (__atomic_load_n(&metric->deleted, __ATOMIC_ACQUIRE)) {
+        refcount_release(&metric->refcount);
+        return false;
+    }
 
     size_t partition = metric->partition;
 
@@ -223,21 +230,23 @@ ALWAYS_INLINE
 static bool metric_release(MRG *mrg, METRIC *metric) {
     size_t partition = metric->partition;
 
-    REFCOUNT refcount = refcount_release(&metric->refcount);
-
-    if(!refcount && !acquired_metric_has_retention(mrg, metric) && refcount_acquire_for_deletion(&metric->refcount))
-        refcount = REFCOUNT_DELETED;
-
-    if(refcount == 0 || refcount == REFCOUNT_DELETED) {
-        __atomic_sub_fetch(&mrg->index[partition].stats.entries_acquired, 1, __ATOMIC_RELAXED);
-
-        if(refcount == REFCOUNT_DELETED)
-            acquired_for_deletion_metric_delete(mrg, metric);
+    if (refcount_release(&metric->refcount) == 0) {
+        // we are the last user
+        bool already_deleted = __atomic_load_n(&metric->deleted, __ATOMIC_ACQUIRE);
+        if (already_deleted || !acquired_metric_has_retention(mrg, metric)) {
+            if (!already_deleted) {
+                 acquired_for_deletion_metric_delete(mrg, metric);
+            }
+            uuidmap_free(metric->uuid);
+            aral_freez(mrg->index[partition].aral, metric);
+            __atomic_sub_fetch(&mrg->index[partition].stats.entries_acquired, 1, __ATOMIC_RELAXED);
+            __atomic_sub_fetch(&mrg->index[partition].stats.current_references, 1, __ATOMIC_RELAXED);
+            return true;
+        }
     }
 
     __atomic_sub_fetch(&mrg->index[partition].stats.current_references, 1, __ATOMIC_RELAXED);
-
-    return refcount == REFCOUNT_DELETED;
+    return false;
 }
 
 ALWAYS_INLINE
@@ -293,6 +302,7 @@ static METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
     metric->latest_time_s_clean = MAX(0, entry->last_time_s);
     metric->latest_time_s_hot = 0;
     metric->latest_update_every_s = entry->latest_update_every_s;
+    metric->deleted = false;
 #ifdef NETDATA_INTERNAL_CHECKS
     metric->writer = 0;
 #endif

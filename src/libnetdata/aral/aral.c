@@ -851,7 +851,7 @@ static ALWAYS_INLINE void *aral_get_free_slot___no_lock_required(ARAL *ar, ARAL_
     aral_page_available_lock(ar, page);
 
     while(!page->available.list) {
-        uint32_t bitmap = __atomic_load_n(&page->incoming_partition_bitmap, __ATOMIC_RELAXED);
+        uint32_t bitmap = __atomic_load_n(&page->incoming_partition_bitmap, __ATOMIC_ACQUIRE);
         if (!bitmap)
             fatal("ARAL: bitmap of incoming free elements cannot be empty at this point");
 
@@ -868,7 +868,7 @@ static ALWAYS_INLINE void *aral_get_free_slot___no_lock_required(ARAL *ar, ARAL_
             if (aral_page_incoming_trylock(ar, page, partition)) {
                 page->available.list = page->incoming[partition].list;
                 page->incoming[partition].list = NULL;
-                __atomic_fetch_and(&page->incoming_partition_bitmap, ~(1U << partition), __ATOMIC_RELAXED);
+                __atomic_fetch_and(&page->incoming_partition_bitmap, ~(1U << partition), __ATOMIC_RELEASE);
                 aral_page_incoming_unlock(ar, page, partition);
                 break;
             }
@@ -903,7 +903,7 @@ static inline void aral_add_free_slot___no_lock_required(ARAL *ar, ARAL_PAGE *pa
             if (aral_page_incoming_trylock(ar, page, partition)) {
                 fr->next = page->incoming[partition].list;
                 page->incoming[partition].list = fr;
-                __atomic_fetch_or(&page->incoming_partition_bitmap, 1U << partition, __ATOMIC_RELAXED);
+                __atomic_fetch_or(&page->incoming_partition_bitmap, 1U << partition, __ATOMIC_RELEASE);
                 aral_page_incoming_unlock(ar, page, partition);
                 return;
             }

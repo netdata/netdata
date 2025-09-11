@@ -1271,7 +1271,7 @@ static inline void discovery_find_all_cgroups() {
     discovery_update_filenames_all_cgroups();
 
     worker_is_busy(WORKER_DISCOVERY_LOCK);
-    uv_mutex_lock(&cgroup_root_mutex);
+    netdata_mutex_lock(&cgroup_root_mutex);
 
     worker_is_busy(WORKER_DISCOVERY_CLEANUP);
     discovery_cleanup_all_cgroups();
@@ -1279,7 +1279,7 @@ static inline void discovery_find_all_cgroups() {
     worker_is_busy(WORKER_DISCOVERY_COPY);
     discovery_copy_discovered_cgroups_to_reader();
 
-    uv_mutex_unlock(&cgroup_root_mutex);
+    netdata_mutex_unlock(&cgroup_root_mutex);
 
     worker_is_busy(WORKER_DISCOVERY_SHARE);
     discovery_share_cgroups_with_ebpf();
@@ -1318,9 +1318,9 @@ void cgroup_discovery_worker(void *ptr)
     while (service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
 
-        uv_mutex_lock(&discovery_thread.mutex);
-        uv_cond_wait(&discovery_thread.cond_var, &discovery_thread.mutex);
-        uv_mutex_unlock(&discovery_thread.mutex);
+        netdata_mutex_lock(&discovery_thread.mutex);
+        netdata_cond_wait(&discovery_thread.cond_var, &discovery_thread.mutex);
+        netdata_mutex_unlock(&discovery_thread.mutex);
 
         if (unlikely(!service_running(SERVICE_COLLECTORS)))
             break;
@@ -1329,13 +1329,13 @@ void cgroup_discovery_worker(void *ptr)
     }
 
     // free all cgroups
-    uv_mutex_lock(&cgroup_root_mutex);
+    netdata_mutex_lock(&cgroup_root_mutex);
     while(cgroup_root) {
         struct cgroup *cg = cgroup_root;
         cgroup_root = cg->next;
         cgroup_free(cg);
     }
-    uv_mutex_unlock(&cgroup_root_mutex);
+    netdata_mutex_unlock(&cgroup_root_mutex);
 
     collector_info("discovery thread stopped");
     cgroup_cleanup_ebpf_integration();

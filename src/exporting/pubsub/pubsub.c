@@ -35,8 +35,8 @@ int init_pubsub_instance(struct instance *instance)
         netdata_log_error("EXPORTING: cannot create buffer for Pub/Sub exporting connector instance %s", instance->config.name);
         return 1;
     }
-    uv_mutex_init(&instance->mutex);
-    uv_cond_init(&instance->cond_var);
+    netdata_mutex_init(&instance->mutex);
+    netdata_cond_init(&instance->cond_var);
 
     struct pubsub_specific_data *connector_specific_data = callocz(1, sizeof(struct pubsub_specific_data));
     instance->connector_specific_data = (void *)connector_specific_data;
@@ -103,14 +103,14 @@ void *pubsub_connector_worker(void *instance_p)
         struct stats *stats = &instance->stats;
         char error_message[ERROR_LINE_MAX + 1] = "";
 
-        uv_mutex_lock(&instance->mutex);
+        netdata_mutex_lock(&instance->mutex);
         while (!instance->data_is_ready)
-            uv_cond_wait(&instance->cond_var, &instance->mutex);
+            netdata_cond_wait(&instance->cond_var, &instance->mutex);
         instance->data_is_ready = 0;
 
 
         if (unlikely(instance->engine->exit)) {
-            uv_mutex_unlock(&instance->mutex);
+            netdata_mutex_unlock(&instance->mutex);
             break;
         }
 
@@ -184,7 +184,7 @@ void *pubsub_connector_worker(void *instance_p)
         buffer_flush(buffer);
         stats->buffered_metrics = 0;
 
-        uv_mutex_unlock(&instance->mutex);
+        netdata_mutex_unlock(&instance->mutex);
 
 #ifdef UNIT_TESTING
         return;

@@ -124,8 +124,8 @@ typedef struct {
     int tail;
     int count;
 
-    uv_mutex_t lock;
-    uv_cond_t not_full;
+    netdata_mutex_t lock;
+    netdata_cond_t not_full;
 } CmdPool;
 
 

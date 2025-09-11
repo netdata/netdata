@@ -57,23 +57,15 @@ metrics:
       - OID: 1.3.6.1.2.1.25.2.3.1.5
         name: hrStorageSize
         chart_meta:
-          description: Total size of the storage area
-          family: 'System/Storage/Total'
           unit: "By"
         transform: |
-          {{- $unit := index .Metric.Tags "rm:storage_alloc_unit" | default "1024" -}}
-          {{- $factor := int64 $unit -}}
-          {{- setValue .Metric (mul .Metric.Value $factor) -}}
+          {{- transformHrStorage .Metric -}}
       - OID: 1.3.6.1.2.1.25.2.3.1.6
         name: hrStorageUsed
         chart_meta:
-          description: Amount of storage used
-          family: 'System/Storage/Used'
           unit: "By"
         transform: |
-          {{- $unit := index .Metric.Tags "rm:storage_alloc_unit" | default "1024" -}}
-          {{- $factor := int64 $unit -}}
-          {{- setValue .Metric (mul .Metric.Value $factor) -}}
+          {{- transformHrStorage .Metric -}}
     metric_tags:
       - tag: storage_index
         index: 1
@@ -81,6 +73,10 @@ metrics:
         symbol:
           OID: 1.3.6.1.2.1.25.2.3.1.3
           name: hrDeviceDescr
+      - tag: rm:storage_type # Needed for transformation
+        symbol:
+          OID: 1.3.6.1.2.1.25.2.3.1.2
+          name: hrStorageType
       - tag: rm:storage_alloc_unit # Needed for transformation
         symbol:
           OID: 1.3.6.1.2.1.25.2.3.1.4

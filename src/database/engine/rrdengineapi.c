@@ -44,7 +44,7 @@ size_t page_type_size[256] = {
 
 static inline void initialize_single_ctx(struct rrdengine_instance *ctx) {
     memset(ctx, 0, sizeof(*ctx));
-    uv_rwlock_init(&ctx->datafiles.rwlock);
+    netdata_rwlock_init(&ctx->datafiles.rwlock);
     rw_spinlock_init(&ctx->njfv2idx.spinlock);
 }
 
@@ -1348,14 +1348,14 @@ static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_S
 RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
     RRDENG_SIZE_STATS stats = { 0 };
 
-    uv_rwlock_rdlock(&ctx->datafiles.rwlock);
+    netdata_rwlock_rdlock(&ctx->datafiles.rwlock);
     struct rrdengine_datafile *df = NULL;
 
     while ((df = get_next_datafile(df, ctx, true))) {
         stats.datafiles++;
         populate_v2_statistics(df, &stats);
     }
-    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
+    netdata_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
     stats.currently_collected_metrics = __atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED);
 
