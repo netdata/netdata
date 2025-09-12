@@ -8,33 +8,6 @@
 metrics:
   - MIB: UCD-SNMP-MIB
     symbol:
-      name: ucd.cpuLoad1m
-      OID: 1.3.6.1.4.1.2021.10.1.5.1
-      chart_meta:
-        family: 'System/LoadAverage/1Min'
-        description: 1 minute load average
-        unit: "{load_average}"
-      scale_factor: 0.01
-  - MIB: UCD-SNMP-MIB
-    symbol:
-      name: ucd.cpuLoad5m
-      OID: 1.3.6.1.4.1.2021.10.1.5.2
-      chart_meta:
-        family: 'System/LoadAverage/5Min'
-        description: 5 minute load average
-        unit: "{load_average}"
-      scale_factor: 0.01
-  - MIB: UCD-SNMP-MIB
-    symbol:
-      name: ucd.cpuLoad15m
-      OID: 1.3.6.1.4.1.2021.10.1.5.3
-      chart_meta:
-        family: 'System/LoadAverage/15Min'
-        description: 15 minute load average
-        unit: "{load_average}"
-      scale_factor: 0.01
-  - MIB: UCD-SNMP-MIB
-    symbol:
       name: ucd.memoryTotal
       OID: 1.3.6.1.4.1.2021.4.5.0
       chart_meta:
@@ -285,6 +258,22 @@ metrics:
 
   - MIB: UCD-SNMP-MIB
     symbol:
+      name: _ucd.cpuLoad1m
+      OID: 1.3.6.1.4.1.2021.10.1.5.1
+      scale_factor: 0.01
+  - MIB: UCD-SNMP-MIB
+    symbol:
+      name: _ucd.cpuLoad5m
+      OID: 1.3.6.1.4.1.2021.10.1.5.2
+      scale_factor: 0.01
+  - MIB: UCD-SNMP-MIB
+    symbol:
+      name: _ucd.cpuLoad15m
+      OID: 1.3.6.1.4.1.2021.10.1.5.3
+      scale_factor: 0.01
+
+  - MIB: UCD-SNMP-MIB
+    symbol:
       name: _ucd.ssCpuRawUser
       OID: 1.3.6.1.4.1.2021.11.50.0
   - MIB: UCD-SNMP-MIB
@@ -356,3 +345,16 @@ virtual_metrics:
         as: guest
       - metric: _ucd.ssCpuRawGuestNice
         as: guest_nice
+
+  - name: ucd.cpuLoad
+    chart_meta:
+      description: Load average
+      family: "System/LoadAverage"
+      unit: "{load_average}"
+    sources:
+      - metric: _ucd.cpuLoad1m
+        as: "1m"
+      - metric: _ucd.cpuLoad5m
+        as: "5m"
+      - metric: _ucd.cpuLoad15m
+        as: "15m"
