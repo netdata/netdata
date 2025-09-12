@@ -319,7 +319,7 @@ static int initialize(int update_every)
     return 0;
 }
 
-static void mssql_db_states_chart(struct sensor_data *sd, int update_every)
+static void sensors_states_chart(struct sensor_data *sd, int update_every)
 {
     if (!sd->st_sensor_state) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -352,9 +352,9 @@ static void mssql_db_states_chart(struct sensor_data *sd, int update_every)
     }
 }
 
-static void mssql_sensor_state_chart_loop(struct sensor_data *sd, int update_every)
+static void sensors_state_chart_loop(struct sensor_data *sd, int update_every)
 {
-    mssql_db_states_chart(sd, update_every);
+    sensors_states_chart(sd, update_every);
     collected_number set_value = (collected_number)sd->current_state;
     for (collected_number i = 0; i < NETDATA_WIN_SENSOR_STATES; i++) {
         rrddim_set_by_pointer(sd->st_sensor_state, sd->rd_sensor_state[i], i == set_value);
@@ -362,7 +362,7 @@ static void mssql_sensor_state_chart_loop(struct sensor_data *sd, int update_eve
     rrdset_done(sd->st_sensor_state);
 }
 
-static void mssql_sensor_data_chart(struct sensor_data *sd, int update_every)
+static void sensors_data_chart(struct sensor_data *sd, int update_every)
 {
     if (!sd->st_sensor_data) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -401,12 +401,12 @@ int dict_sensors_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *val
     if (unlikely(!sd->name))
         return 1;
 
-    mssql_sensor_state_chart_loop(sd, *update_every);
+    sensors_state_chart_loop(sd, *update_every);
 
     if (unlikely(!sd->enabled))
         return 1;
 
-    mssql_sensor_data_chart(sd, *update_every);
+    sensors_data_chart(sd, *update_every);
 
     return 1;
 }
