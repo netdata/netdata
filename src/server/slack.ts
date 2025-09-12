@@ -316,23 +316,22 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
   const vlog = (msg: string): void => { if (verbose) { try { process.stderr.write(`[SRV] ← [0.0] server slack: ${msg}\n`); } catch { /* ignore */ } } };
   const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0] server slack: ${msg}\n`); } catch { /* ignore */ } };
 
+  // Tracks any pending delayed update timeouts per message (channel:ts)
   const updating = new Map<string, NodeJS.Timeout>();
+  // Tracks the timestamp of the last successful update per message (channel:ts)
   const lastUpdate = new Map<string, number>();
+  // Guards against concurrent in-flight updates per message (channel:ts)
+  const inFlight = new Set<string>();
   const closed = new Set<string>();
   // Removed upload fallback; model must output Block Kit messages
 
   const scheduleUpdate = (client: any, channel: string, ts: string, render: () => { text: string; blocks: any[] } | string, prefixBlocks?: any[]): void => {
-        const key = `${channel}:${ts}`; // used for lastUpdate timestamping
-    if (closed.has(key) || updating.has(key)) return;
-    const doUpdate = async (): Promise<void> => {
-      updating.delete(key);
-      if (closed.has(key)) return;
-      const now = Date.now();
-      const last = lastUpdate.get(key) ?? 0;
-      if (now - last < updateIntervalMs) {
-        updating.set(key, setTimeout(() => { void doUpdate(); }, updateIntervalMs));
-        return;
-      }
+    const key = `${channel}:${ts}`; // used for lastUpdate timestamping
+    if (closed.has(key)) return;
+
+    const runUpdate = async (): Promise<void> => {
+      if (inFlight.has(key) || closed.has(key)) return;
+      inFlight.add(key);
       try {
         const rendered = render();
         if (typeof rendered === 'string') {
@@ -358,9 +357,30 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
         } catch {
           elog(`chat.update failed: ${(e as Error).message}`);
         }
+      } finally {
+        inFlight.delete(key);
       }
     };
-    updating.set(key, setTimeout(() => { void doUpdate(); }, updateIntervalMs));
+
+    const now = Date.now();
+    const last = lastUpdate.get(key) ?? 0;
+    const remaining = Math.max(0, updateIntervalMs - (now - last));
+
+    // If there is already a scheduled delayed update, let it fire; avoid double-scheduling
+    if (updating.has(key)) return;
+
+    if (remaining <= 0) {
+      // Due now: perform update immediately (no extra timer)
+      void runUpdate();
+      return;
+    }
+
+    // Not yet due: schedule a single timeout for the remaining wait
+    const t = setTimeout(() => {
+      updating.delete(key);
+      void runUpdate();
+    }, remaining);
+    updating.set(key, t);
   };
 
   const extractFinalText = (runId: string): string => {
