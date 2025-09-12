@@ -899,8 +899,14 @@ Conflicts: %{name} < %{version}
 
 %pre plugin-dev
 
+if ! getent group %{name} > /dev/null; then
+  groupadd --system %{name}
+fi
+
 %files plugin-dev
 %defattr(4750,root,netdata,4750)
+# CAP_DAC_READ_SEARCH needed to access the files the plugin reads to collect data.
+%caps(cap_dac_read_search=ep) %{_libexecdir}/%{name}/plugins.d/dev.plugin
 
 %package plugin-slabinfo
 Summary: The slabinfo metrics collector for the Netdata Agent
