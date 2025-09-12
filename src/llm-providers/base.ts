@@ -841,16 +841,37 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
               // No text parts found - this could mean tool errors occurred
               // In this case, construct a response from available information
               const allParts = content.filter((part: unknown) => {
-                const p = part as { type?: string; text?: string; output?: { value?: string } };
-                return p.text !== undefined || p.output?.value !== undefined;
+                const p = part as { type?: string; text?: string; output?: { value?: string }; error?: unknown; content?: unknown };
+                const normalizedType = (p.type ?? '').replace('_','-');
+                return p.text !== undefined || 
+                       p.output?.value !== undefined || 
+                       (normalizedType === this.TOOL_ERROR_TYPE) ||
+                       p.error !== undefined ||
+                       p.content !== undefined;
               });
               
               const messages: string[] = [];
               // eslint-disable-next-line functional/no-loop-statements
               for (const part of allParts) {
-                const p = part as { type?: string; text?: string; output?: { value?: string } };
-                if ((((p.type ?? '').replace('_','-')) === this.TOOL_RESULT_TYPE || ((p.type ?? '').replace('_','-')) === this.TOOL_ERROR_TYPE) && p.output?.value !== undefined) {
+                const p = part as { type?: string; text?: string; output?: { value?: string }; error?: unknown; content?: unknown };
+                const normalizedType = (p.type ?? '').replace('_','-');
+                
+                if (normalizedType === this.TOOL_RESULT_TYPE && p.output?.value !== undefined) {
                   messages.push(p.output.value);
+                } else if (normalizedType === this.TOOL_ERROR_TYPE) {
+                  // Handle tool errors - they may have different structures
+                  let errorMsg = 'Tool execution failed';
+                  if (typeof p.error === 'string') {
+                    errorMsg = p.error;
+                  } else if (typeof p.error === 'object' && p.error !== null) {
+                    const e = p.error as { message?: string; error?: string };
+                    errorMsg = e.message ?? e.error ?? JSON.stringify(p.error);
+                  } else if (typeof p.content === 'string') {
+                    errorMsg = p.content;
+                  } else if (p.output?.value !== undefined) {
+                    errorMsg = p.output.value;
+                  }
+                  messages.push(`Tool error: ${errorMsg}`);
                 } else if (p.type !== this.REASONING_TYPE && p.text !== undefined) {
                   messages.push(p.text);
                 }
@@ -916,17 +937,33 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       if (m.role === 'tool' && Array.isArray(m.content)) {
         // eslint-disable-next-line functional/no-loop-statements
         for (const part of m.content) {
-          const p = part as { type?: string; toolCallId?: string; toolName?: string; output?: unknown };
+          const p = part as { type?: string; toolCallId?: string; toolName?: string; output?: unknown; error?: unknown };
           {
             const t = (p.type ?? '').replace('_','-');
             if ((t === this.TOOL_RESULT_TYPE || t === this.TOOL_ERROR_TYPE) && typeof p.toolCallId === 'string') {
             let text = '';
-            const outObj = p.output as { type?: string; value?: unknown } | undefined;
-            if (outObj !== undefined) {
-              if (outObj.type === 'text' && typeof outObj.value === 'string') text = outObj.value;
-              else if (outObj.type === 'json') text = JSON.stringify(outObj.value);
-              else if (typeof (outObj as unknown as string) === 'string') text = outObj as unknown as string;
+            
+            // Handle tool errors
+            if (t === this.TOOL_ERROR_TYPE && p.error !== undefined) {
+              if (typeof p.error === 'string') {
+                text = `Tool error: ${p.error}`;
+              } else if (typeof p.error === 'object' && p.error !== null) {
+                const e = p.error as { message?: string; error?: string };
+                text = `Tool error: ${e.message ?? e.error ?? JSON.stringify(p.error)}`;
+              } else {
+                text = `Tool error: ${JSON.stringify(p.error)}`;
+              }
+            } 
+            // Handle tool results
+            else {
+              const outObj = p.output as { type?: string; value?: unknown } | undefined;
+              if (outObj !== undefined) {
+                if (outObj.type === 'text' && typeof outObj.value === 'string') text = outObj.value;
+                else if (outObj.type === 'json') text = JSON.stringify(outObj.value);
+                else if (typeof (outObj as unknown as string) === 'string') text = outObj as unknown as string;
+              }
             }
+            
             out.push({
               role: 'tool',
               content: text,
@@ -952,17 +989,33 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       if (m.role === 'assistant' && Array.isArray(m.content)) {
         // eslint-disable-next-line functional/no-loop-statements
         for (const part of m.content) {
-          const p = part as { type?: string; toolCallId?: string; output?: unknown };
+          const p = part as { type?: string; toolCallId?: string; output?: unknown; error?: unknown };
           {
             const t = (p.type ?? '').replace('_','-');
             if ((t === this.TOOL_RESULT_TYPE || t === this.TOOL_ERROR_TYPE) && typeof p.toolCallId === 'string') {
             let text = '';
-            const outObj = p.output as { type?: string; value?: unknown } | undefined;
-            if (outObj !== undefined) {
-              if (outObj.type === 'text' && typeof outObj.value === 'string') text = outObj.value;
-              else if (outObj.type === 'json') text = JSON.stringify(outObj.value);
-              else if (typeof (outObj as unknown as string) === 'string') text = outObj as unknown as string;
+            
+            // Handle tool errors
+            if (t === this.TOOL_ERROR_TYPE && p.error !== undefined) {
+              if (typeof p.error === 'string') {
+                text = `Tool error: ${p.error}`;
+              } else if (typeof p.error === 'object' && p.error !== null) {
+                const e = p.error as { message?: string; error?: string };
+                text = `Tool error: ${e.message ?? e.error ?? JSON.stringify(p.error)}`;
+              } else {
+                text = `Tool error: ${JSON.stringify(p.error)}`;
+              }
+            } 
+            // Handle tool results
+            else {
+              const outObj = p.output as { type?: string; value?: unknown } | undefined;
+              if (outObj !== undefined) {
+                if (outObj.type === 'text' && typeof outObj.value === 'string') text = outObj.value;
+                else if (outObj.type === 'json') text = JSON.stringify(outObj.value);
+                else if (typeof (outObj as unknown as string) === 'string') text = outObj as unknown as string;
+              }
             }
+            
             out.push({
               role: 'tool',
               content: text,

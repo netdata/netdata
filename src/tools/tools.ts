@@ -239,10 +239,10 @@ export class ToolsOrchestrator {
       // Do not apply parent-level withTimeout to sub-agents; they manage their own timing
       const isSubAgent = (kind === 'agent' && provider.id === 'subagent');
       if (isSubAgent) {
-        exec = await provider.execute(effective, preparedArgs, { ...opts, timeoutMs: undefined });
+        exec = await provider.execute(effective, preparedArgs, { ...opts, timeoutMs: undefined, trace: this.opts.traceTools });
       } else {
         exec = await withTimeout(
-          provider.execute(effective, preparedArgs, { ...opts, timeoutMs: opts?.timeoutMs ?? this.opts.toolTimeout }),
+          provider.execute(effective, preparedArgs, { ...opts, timeoutMs: opts?.timeoutMs ?? this.opts.toolTimeout, trace: this.opts.traceTools }),
           this.opts.toolTimeout
         );
       }

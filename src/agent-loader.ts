@@ -248,28 +248,82 @@ export function loadAgent(aiPath: string, registry?: AgentRegistry, options?: Lo
     run: async (systemPrompt: string, userPrompt: string, opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent'; outputFormat: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean } }): Promise<AIAgentResult> => {
       const o = (opts ?? {}) as { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli'|'slack'|'api'|'web'|'sub-agent'; outputFormat?: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string };
       if (o.outputFormat === undefined) throw new Error('outputFormat is required');
-      // Support dynamic OpenAPI tool import via config.openapiSpecs and tool selector: openapi:<path-or-url>
+      // Support dynamic OpenAPI tool import from config.openapiSpecs
+      // PR-002: Only load OpenAPI tools if agent explicitly selects the provider
       let dynamicConfig = config;
       let dynamicTools = [...selectedTools];
-      // 1) From config.openapiSpecs (no manual work required)
+      
+      // Check if agent has selected any OpenAPI providers (format: "openapi:provider_name")
+      const selectedOpenAPIProviders = new Set<string>();
+      selectedTools.forEach(toolName => {
+        if (typeof toolName === 'string' && toolName.startsWith('openapi:')) {
+          const providerName = toolName.slice(8); // Remove 'openapi:' prefix
+          selectedOpenAPIProviders.add(providerName);
+        }
+      });
+      
+      // Load OpenAPI specs from config (these should be local files, not URLs - PR-001)
       const openapiSpecs = (dynamicConfig as unknown as { openapiSpecs?: Record<string, OpenAPISpecConfig> }).openapiSpecs;
-      if (openapiSpecs !== undefined) {
+      if (o.callbacks?.onLog !== undefined && openapiSpecs !== undefined) {
+        o.callbacks.onLog({
+          timestamp: Date.now(),
+          severity: 'VRB',
+          turn: 0,
+          subturn: 0,
+          direction: 'request',
+          type: 'tool',
+          remoteIdentifier: 'openapi',
+          fatal: false,
+          message: `Found OpenAPI specs in config: ${JSON.stringify(Object.keys(openapiSpecs))}, selected providers: ${JSON.stringify(Array.from(selectedOpenAPIProviders))}`
+        });
+      }
+      if (openapiSpecs !== undefined && selectedOpenAPIProviders.size > 0) {
+        // Find the config file path to resolve relative paths
+        const configLayer = layers.find(l => {
+          const json = l.json;
+          return json !== undefined && typeof json === 'object' && 'openapiSpecs' in json;
+        });
+        const configDir = configLayer !== undefined ? path.dirname(configLayer.jsonPath) : baseDir;
+        
         const entries = Object.entries(openapiSpecs);
         // eslint-disable-next-line functional/no-loop-statements
         for (const [name, specCfg] of entries) {
+          // PR-002: Only load tools for explicitly selected providers
+          if (!selectedOpenAPIProviders.has(name)) {
+            continue;
+          }
+          
           try {
             const loc = specCfg.spec;
             let text: string;
+            // PR-001: Only support local files, not URLs
             if (loc.startsWith('http://') || loc.startsWith('https://')) {
-              const res = await fetch(loc);
-              if (!res.ok) throw new Error(`HTTP ${String(res.status)}`);
-              text = await res.text();
+              throw new Error('Remote OpenAPI specs violate PR-001. Use local cached files instead.');
             } else {
-              const p = path.isAbsolute(loc) ? loc : path.resolve(baseDir, loc);
+              // Resolve relative paths relative to the config file location
+              const p = path.isAbsolute(loc) ? loc : path.resolve(configDir, loc);
+              if (o.callbacks?.onLog !== undefined) {
+                o.callbacks.onLog({
+                  timestamp: Date.now(),
+                  severity: 'VRB',
+                  turn: 0,
+                  subturn: 0,
+                  direction: 'request',
+                  type: 'tool',
+                  remoteIdentifier: `openapi:${name}`,
+                  fatal: false,
+                  message: `Loading OpenAPI spec from: ${p} (loc=${loc}, configDir=${configDir})`
+                });
+              }
               text = readFileText(p);
             }
             const spec = parseOpenAPISpec(text);
-            const toolsMap = openApiToRestTools(spec, { toolNamePrefix: name, baseUrlOverride: specCfg.baseUrl, includeMethods: specCfg.includeMethods, tagFilter: specCfg.tagFilter });
+            const toolsMap = openApiToRestTools(spec, { 
+              toolNamePrefix: name, 
+              baseUrlOverride: specCfg.baseUrl, 
+              includeMethods: specCfg.includeMethods, 
+              tagFilter: specCfg.tagFilter 
+            });
             // Merge default headers (with ${VAR} expansion)
             const defaultHeadersRaw = specCfg.headers ?? {};
             const defaultHeaders: Record<string, string> = {};
@@ -280,42 +334,25 @@ export function loadAgent(aiPath: string, registry?: AgentRegistry, options?: Lo
             });
             const mergedRest = { ...(dynamicConfig.restTools ?? {}), ...toolsMap };
             dynamicConfig = { ...dynamicConfig, restTools: mergedRest };
-            // Auto-enable all generated tools without requiring manual selection
-            dynamicTools = dynamicTools.concat(Object.keys(toolsMap));
+            // Add the generated tools (but not the openapi:provider selector itself)
+            const newTools = Object.keys(toolsMap);
+            dynamicTools = dynamicTools.filter(t => t !== `openapi:${name}`).concat(newTools);
+            
+            if (o.callbacks?.onLog !== undefined) {
+              o.callbacks.onLog({
+                timestamp: Date.now(),
+                severity: 'VRB',
+                turn: 0,
+                subturn: 0,
+                direction: 'response',
+                type: 'tool',
+                remoteIdentifier: `openapi:${name}`,
+                fatal: false,
+                message: `Loaded ${String(newTools.length)} tools from OpenAPI provider: ${name}`
+              });
+            }
           } catch (e) {
             throw new Error(`Failed to import OpenAPI spec '${name}': ${e instanceof Error ? e.message : String(e)}`);
-          }
-        }
-      }
-
-      // 2) From per-run selector list
-      const openapiSelectors = selectedTools.filter((t) => typeof t === 'string' && t.startsWith('openapi:'));
-      if (openapiSelectors.length > 0) {
-        // eslint-disable-next-line functional/no-loop-statements
-        for (const sel of openapiSelectors) {
-          const specLoc = sel.slice('openapi:'.length);
-          try {
-            let text: string | undefined;
-            if (specLoc.startsWith('http://') || specLoc.startsWith('https://')) {
-              // Fetch at runtime
-              const res = await fetch(specLoc);
-              if (!res.ok) throw new Error(`HTTP ${String(res.status)}`);
-              text = await res.text();
-            } else {
-              const p = path.isAbsolute(specLoc) ? specLoc : path.resolve(baseDir, specLoc);
-              text = readFileText(p);
-            }
-            const spec = parseOpenAPISpec(text);
-            // Derive a stable prefix from source
-            const nameHint = specLoc.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').toLowerCase();
-            const prefix = nameHint.length > 0 ? nameHint : 'openapi';
-            const toolsMap = openApiToRestTools(spec, { toolNamePrefix: prefix });
-            const mergedRest = { ...(dynamicConfig.restTools ?? {}), ...toolsMap };
-            dynamicConfig = { ...dynamicConfig, restTools: mergedRest };
-            // Add imported tools to selection (by their keys)
-            dynamicTools = dynamicTools.filter((t) => t !== sel).concat(Object.keys(toolsMap));
-          } catch (e) {
-            throw new Error(`Failed to import OpenAPI spec '${specLoc}': ${e instanceof Error ? e.message : String(e)}`);
           }
         }
       }
@@ -473,33 +510,82 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
     run: async (systemPrompt: string, userPrompt: string, opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent'; outputFormat: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string }): Promise<AIAgentResult> => {
       const o = (opts ?? {}) as { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli'|'slack'|'api'|'web'|'sub-agent'; outputFormat?: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string };
       if (o.outputFormat === undefined) throw new Error('outputFormat is required');
-      // Support dynamic OpenAPI tool import via tool selector: openapi:<path-or-url>
+      
+      // Support dynamic OpenAPI tool import from config.openapiSpecs
+      // PR-002: Only load OpenAPI tools if agent explicitly selects the provider
       let dynamicConfig = config;
       let dynamicTools = [...selectedTools];
-      const openapiSelectors = selectedTools.filter((t) => typeof t === 'string' && t.startsWith('openapi:'));
-      if (openapiSelectors.length > 0) {
+      
+      // Helper for expanding ${VAR} in strings
+      const expandVars = (s: string): string => {
+        // For loadAgentFromContent, we need to get env from layers
+        const layers = discoverLayers({ configPath: options?.configPath });
+        const mergedEnv: Record<string, string> = {};
+        layers.forEach(l => { if (l.env !== undefined) Object.assign(mergedEnv, l.env); });
+        return s.replace(/\$\{([^}]+)\}/g, (_m, name: string) => mergedEnv[name] ?? '');
+      };
+      
+      // Check if agent has selected any OpenAPI providers (format: "openapi:provider_name")
+      const selectedOpenAPIProviders = new Set<string>();
+      selectedTools.forEach(toolName => {
+        if (typeof toolName === 'string' && toolName.startsWith('openapi:')) {
+          const providerName = toolName.slice(8); // Remove 'openapi:' prefix
+          selectedOpenAPIProviders.add(providerName);
+        }
+      });
+      
+      // Load OpenAPI specs from config (these should be local files, not URLs - PR-001)
+      const openapiSpecs = (dynamicConfig as unknown as { openapiSpecs?: Record<string, OpenAPISpecConfig> }).openapiSpecs;
+      if (openapiSpecs !== undefined && selectedOpenAPIProviders.size > 0) {
+        // For loadAgentFromContent, we need to find config from layers
+        const layers = discoverLayers({ configPath: options?.configPath });
+        const configLayer = layers.find(l => {
+          const json = l.json;
+          return json !== undefined && typeof json === 'object' && 'openapiSpecs' in json;
+        });
+        const configDir = configLayer !== undefined ? path.dirname(configLayer.jsonPath) : (options?.baseDir ?? process.cwd());
+        
+        const entries = Object.entries(openapiSpecs);
         // eslint-disable-next-line functional/no-loop-statements
-        for (const sel of openapiSelectors) {
-          const specLoc = sel.slice('openapi:'.length);
+        for (const [name, specCfg] of entries) {
+          // PR-002: Only load tools for explicitly selected providers
+          if (!selectedOpenAPIProviders.has(name)) {
+            continue;
+          }
+          
           try {
-            let text: string | undefined;
-            if (specLoc.startsWith('http://') || specLoc.startsWith('https://')) {
-              const res = await fetch(specLoc);
-              if (!res.ok) throw new Error(`HTTP ${String(res.status)}`);
-              text = await res.text();
+            const loc = specCfg.spec;
+            let text: string;
+            // PR-001: Only support local files, not URLs
+            if (loc.startsWith('http://') || loc.startsWith('https://')) {
+              throw new Error('Remote OpenAPI specs violate PR-001. Use local cached files instead.');
             } else {
-              const p = path.isAbsolute(specLoc) ? specLoc : path.resolve(options?.baseDir ?? process.cwd(), specLoc);
+              // Resolve relative paths relative to the config file location
+              const p = path.isAbsolute(loc) ? loc : path.resolve(configDir, loc);
               text = readFileText(p);
             }
             const spec = parseOpenAPISpec(text);
-            const nameHint = specLoc.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').toLowerCase();
-            const prefix = nameHint.length > 0 ? nameHint : 'openapi';
-            const toolsMap = openApiToRestTools(spec, { toolNamePrefix: prefix });
+            const toolsMap = openApiToRestTools(spec, { 
+              toolNamePrefix: name, 
+              baseUrlOverride: specCfg.baseUrl, 
+              includeMethods: specCfg.includeMethods, 
+              tagFilter: specCfg.tagFilter 
+            });
+            // Merge default headers (with ${VAR} expansion)
+            const defaultHeadersRaw = specCfg.headers ?? {};
+            const defaultHeaders: Record<string, string> = {};
+            Object.entries(defaultHeadersRaw).forEach(([k, v]) => { defaultHeaders[k] = expandVars(v); });
+            Object.values(toolsMap).forEach((t) => {
+              const merged = { ...(defaultHeaders), ...(t.headers ?? {}) };
+              t.headers = Object.keys(merged).length > 0 ? merged : undefined;
+            });
             const mergedRest = { ...(dynamicConfig.restTools ?? {}), ...toolsMap };
             dynamicConfig = { ...dynamicConfig, restTools: mergedRest };
-            dynamicTools = dynamicTools.filter((t) => t !== sel).concat(Object.keys(toolsMap));
+            // Add the generated tools (but not the openapi:provider selector itself)
+            const newTools = Object.keys(toolsMap);
+            dynamicTools = dynamicTools.filter(t => t !== `openapi:${name}`).concat(newTools);
           } catch (e) {
-            throw new Error(`Failed to import OpenAPI spec '${specLoc}': ${e instanceof Error ? e.message : String(e)}`);
+            throw new Error(`Failed to import OpenAPI spec '${name}': ${e instanceof Error ? e.message : String(e)}`);
           }
         }
       }

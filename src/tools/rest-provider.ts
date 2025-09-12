@@ -10,6 +10,52 @@ export class RestProvider extends ToolProvider {
   private readonly tools = new Map<string, RestToolConfig>();
   private readonly ajv = new Ajv({ allErrors: true, strict: false });
 
+  /**
+   * Serialize a value into query parameter format supporting nested structures
+   * e.g., { email: 'test@example.com' } => 'email=test%40example.com'
+   * e.g., [{ email: 'test@example.com' }] => '[0][email]=test%40example.com'
+   */
+  private serializeQueryParam(key: string, value: unknown, prefix = ''): string[] {
+    const fullKey = prefix.length > 0 ? `${prefix}[${key}]` : key;
+
+    if (value === null || value === undefined) {
+      return [];
+    }
+
+    if (Array.isArray(value)) {
+      const params: string[] = [];
+      value.forEach((item, index) => {
+        if (this.isPlainObject(item)) {
+          // For array of objects, serialize each object's properties
+          Object.entries(item).forEach(([k, v]) => {
+            params.push(...this.serializeQueryParam(k, v, `${fullKey}[${String(index)}]`));
+          });
+        } else {
+          // For array of primitives
+          const itemStr = typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean' ? String(item) : '';
+          params.push(`${fullKey}[${String(index)}]=${encodeURIComponent(itemStr)}`);
+        }
+      });
+      return params;
+    }
+
+    if (this.isPlainObject(value)) {
+      const params: string[] = [];
+      Object.entries(value).forEach(([k, v]) => {
+        params.push(...this.serializeQueryParam(k, v, fullKey));
+      });
+      return params;
+    }
+
+    // Primitive value
+    const valueStr = typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' ? String(value) : '';
+    return [`${fullKey}=${encodeURIComponent(valueStr)}`];
+  }
+
+  private isPlainObject(val: unknown): val is Record<string, unknown> {
+    return val !== null && typeof val === 'object' && !Array.isArray(val);
+  }
+
   constructor(public readonly id: string, config?: Record<string, RestToolConfig>) { 
     super();
     if (config !== undefined) {
@@ -27,7 +73,7 @@ export class RestProvider extends ToolProvider {
 
   hasTool(exposed: string): boolean { return this.tools.has(this.internalName(exposed)); }
 
-  async execute(exposed: string, args: Record<string, unknown>, _opts?: ToolExecuteOptions): Promise<ToolExecuteResult> {
+  async execute(exposed: string, args: Record<string, unknown>, opts?: ToolExecuteOptions): Promise<ToolExecuteResult> {
     const start = Date.now();
     const id = this.internalName(exposed);
     const cfg = this.tools.get(id);
@@ -52,7 +98,39 @@ export class RestProvider extends ToolProvider {
     }
 
     const method = cfg.method.toUpperCase();
-    const url = this.substituteUrl(cfg.url, args);
+    let url = this.substituteUrl(cfg.url, args);
+    
+    // Handle complex query parameters if marked
+    const hasComplexQueryParams = (cfg as { hasComplexQueryParams?: boolean }).hasComplexQueryParams;
+    const queryParamNames = (cfg as { queryParamNames?: string[] }).queryParamNames;
+    
+    if (hasComplexQueryParams === true && Array.isArray(queryParamNames)) {
+      // Extract query params from args that should be serialized in complex format
+      const queryParams: string[] = [];
+      
+      queryParamNames.forEach((paramName) => {
+        if (Object.prototype.hasOwnProperty.call(args, paramName)) {
+          let value = args[paramName];
+          
+          // Special case: if value is a plain object (not an array), wrap it in an array
+          // This handles cases like Encharge API where objects need array notation
+          if (this.isPlainObject(value)) {
+            value = [value];
+          }
+          
+          // Serialize this parameter with complex support
+          const serialized = this.serializeQueryParam(paramName, value);
+          queryParams.push(...serialized);
+        }
+      });
+      
+      if (queryParams.length > 0) {
+        // Add query params to URL
+        const separator = url.includes('?') ? '&' : '?';
+        url = `${url}${separator}${queryParams.join('&')}`;
+      }
+    }
+    
     // Apply header templating from args
     const headers = new Headers();
     const rawHeaders = cfg.headers ?? {};
@@ -61,18 +139,46 @@ export class RestProvider extends ToolProvider {
       headers.set(k, vv);
     });
 
+    // Log the exact API call being made for debugging or tracing
+    const shouldTrace = opts?.trace === true || process.env.DEBUG_REST_CALLS === 'true' || process.env.TRACE_REST === 'true';
+    if (shouldTrace) {
+      const headersObj: Record<string, string> = {};
+      headers.forEach((value, key) => {
+        // Redact sensitive headers
+        if (key.toLowerCase() === 'authorization' || key.toLowerCase() === 'x-api-key') {
+          headersObj[key] = value.substring(0, 30) + '...[REDACTED]';
+        } else {
+          headersObj[key] = value;
+        }
+      });
+      
+      console.error(`[TRC] REST API ${exposed}`);
+      console.error(`  Method: ${method}`);
+      console.error(`  URL: ${url}`);
+      console.error(`  Headers: ${JSON.stringify(headersObj, null, 2)}`);
+    }
+
     // Prepare body if templated
     let body: string | undefined;
     if (cfg.bodyTemplate !== undefined) {
       const built = this.buildBody(cfg.bodyTemplate as unknown, args);
       body = built;
       if (!headers.has('content-type')) headers.set('content-type', 'application/json');
+      
+      // Log request body if present  
+      if (shouldTrace) {
+        let bodyPreview = body;
+        if (body.length > 500) {
+          bodyPreview = body.substring(0, 500) + '...[TRUNCATED]';
+        }
+        console.error(`  Body: ${bodyPreview}`);
+      }
     }
 
     // Respect per-call timeout when provided
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const timeoutMs = _opts?.timeoutMs;
+    const timeoutMs = opts?.timeoutMs;
     if (typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0) {
       timer = setTimeout(() => { try { controller.abort(); } catch { /* ignore */ } }, Math.trunc(timeoutMs));
     }
@@ -81,25 +187,37 @@ export class RestProvider extends ToolProvider {
     if (body !== undefined) requestInit.body = body;
 
     let result = '';
+    let errorMsg: string | undefined;
     try {
       if (cfg.streaming?.mode === 'json-stream') {
         const res = await fetch(url, requestInit);
         if (!res.ok || res.body === null) {
           const text = await this.safeText(res);
-          throw new Error(`HTTP ${String(res.status)}: ${text}`);
+          errorMsg = `HTTP ${String(res.status)}: ${text}`;
+        } else {
+          result = await this.consumeJsonStream(res, cfg, controller.signal);
         }
-        result = await this.consumeJsonStream(res, cfg, controller.signal);
       } else {
         const res = await fetch(url, requestInit);
         const text = await res.text();
-        if (!res.ok) throw new Error(`HTTP ${String(res.status)}: ${text}`);
-        result = text;
+        if (!res.ok) {
+          errorMsg = `HTTP ${String(res.status)}: ${text}`;
+        } else {
+          result = text;
+        }
       }
+    } catch (e) {
+      errorMsg = e instanceof Error ? e.message : String(e);
     } finally {
       try { if (timer !== undefined) clearTimeout(timer); } catch { /* ignore */ }
     }
 
     const latency = Date.now() - start;
+    
+    if (errorMsg !== undefined) {
+      return { ok: false, error: errorMsg, latencyMs: latency, kind: this.kind, providerId: this.id };
+    }
+    
     return { ok: true, result, latencyMs: latency, kind: this.kind, providerId: this.id };
   }
 

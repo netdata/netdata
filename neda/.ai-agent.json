@@ -125,12 +125,11 @@
   },
   "openapiSpecs": {
     "encharge": {
-      "spec": "https://encharge-app-resources.s3.amazonaws.com/merged.yaml",
+      "spec": "./encharge-openapi.yaml",
       "baseUrl": "https://api.encharge.io/v1",
       "headers": {
-        "Authorization": "Bearer ${ENCHARGE_API_KEY}"
-      },
-      "includeMethods": ["get"]
+        "X-Encharge-Token": "${ENCHARGE_API_KEY}"
+      }
     }
   },
   "accounting": {

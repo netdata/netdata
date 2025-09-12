@@ -138,3 +138,15 @@ These rules help generate code that passes `npm run lint` and `npm run build` on
 - Lint must pass with zero warnings/errors
 - Build must succeed before commits
 - Read docs/SPECS.md, docs/IMPLEMENTATION.md, docs/DESIGN.md for context
+
+# PRINCIPLES
+
+PR-001:
+ai-agent MUST load all configuration at load-time.
+ai-agent MUST NOT depend on any file or external service for retreiving configuration at runtime.
+
+PR-002:
+There are no permanent tools available to all agents, except `append_note` and `final_report`.
+Per agent tools are subject to its configuration (frontmatter, command-line).
+
+

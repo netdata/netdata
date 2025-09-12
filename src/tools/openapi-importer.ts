@@ -35,6 +35,25 @@ export function parseOpenAPISpec(input: string | UnknownRecord): UnknownRecord {
   return input;
 }
 
+/**
+ * Resolve a $ref reference in the OpenAPI spec
+ */
+function resolveRef(spec: UnknownRecord, ref: string): unknown {
+  // $ref format: "#/components/parameters/PeopleQuery"
+  if (!ref.startsWith('#/')) return undefined;
+  
+  const parts = ref.slice(2).split('/');
+  let current: unknown = spec;
+  
+  // eslint-disable-next-line functional/no-loop-statements
+  for (const part of parts) {
+    if (!isRecord(current)) return undefined;
+    current = current[part];
+  }
+  
+  return current;
+}
+
 export function openApiToRestTools(specIn: string | UnknownRecord, opts?: OpenAPIImportOptions): Record<string, RestToolConfig> {
   const spec = parseOpenAPISpec(specIn);
   const out: Record<string, RestToolConfig> = {};
@@ -70,7 +89,26 @@ export function openApiToRestTools(specIn: string | UnknownRecord, opts?: OpenAP
       // Parameters: collect from path + op level
       const pathParamsA: unknown[] = Array.isArray(val.parameters as unknown[]) ? (val.parameters as unknown[]) : [];
       const opParamsA: unknown[] = Array.isArray(op.parameters as unknown[]) ? (op.parameters as unknown[]) : [];
-      const allParams = [...pathParamsA, ...opParamsA].filter(isRecord);
+      
+      // Resolve $ref parameters
+      const resolvedParams: UnknownRecord[] = [];
+      [...pathParamsA, ...opParamsA].forEach((param) => {
+        if (isRecord(param)) {
+          const refObj = param as Record<string, unknown>;
+          const ref = '$ref' in refObj ? asString(refObj.$ref) : undefined;
+          if (ref !== undefined) {
+            // Resolve the reference
+            const resolved = resolveRef(spec, ref);
+            if (isRecord(resolved)) {
+              resolvedParams.push(resolved);
+            }
+          } else {
+            resolvedParams.push(param);
+          }
+        }
+      });
+      
+      const allParams = resolvedParams;
       const pathParams = allParams.filter((prm) => prm.in === 'path');
       const queryParams = allParams.filter((prm) => prm.in === 'query');
       const headerParams = allParams.filter((prm) => prm.in === 'header');
@@ -90,11 +128,32 @@ export function openApiToRestTools(specIn: string | UnknownRecord, opts?: OpenAP
       });
 
       // Query params (include required only to avoid empty ?x=)
+      // Check if any query param has complex schema (object/array)
+      let hasComplexQueryParams = false;
       queryParams.forEach((prm) => {
         const nm = asString(prm.name) ?? '';
         if (nm.length === 0) return;
         const required = Boolean(prm.required);
-        const schRaw = isRecord(prm.schema) ? prm.schema : undefined;
+        let schRaw = isRecord(prm.schema) ? prm.schema : undefined;
+        
+        // Resolve schema $ref if present
+        if (schRaw !== undefined && isRecord(schRaw)) {
+          const schemaRefObj = schRaw as Record<string, unknown>;
+          const schemaRef = '$ref' in schemaRefObj ? asString(schemaRefObj.$ref) : undefined;
+          if (schemaRef !== undefined) {
+            const resolvedSchema = resolveRef(spec, schemaRef);
+            if (isRecord(resolvedSchema)) {
+              schRaw = resolvedSchema;
+            }
+          }
+        }
+        
+        // Check if this is a complex parameter (object or array)
+        const schemaType = schRaw?.type;
+        if (schemaType === 'object' || schemaType === 'array') {
+          hasComplexQueryParams = true;
+        }
+        
         props[nm] = schRaw ?? { type: 'string' };
         if (required) req.push(nm);
       });
@@ -142,6 +201,19 @@ export function openApiToRestTools(specIn: string | UnknownRecord, opts?: OpenAP
         headers: Object.keys(headers).length > 0 ? headers : undefined,
         argsSchema,
       };
+      
+      // Mark tools with complex query params for special handling
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (hasComplexQueryParams) {
+        (tool as { hasComplexQueryParams?: boolean }).hasComplexQueryParams = true;
+        
+        // Store the query param names for runtime processing
+        const queryParamNames = queryParams
+          .map((prm) => asString(prm.name))
+          .filter((nm): nm is string => nm !== undefined && nm.length > 0);
+        (tool as { queryParamNames?: string[] }).queryParamNames = queryParamNames;
+      }
+      
       if (hasBodyTemplate) (tool as { bodyTemplate?: unknown }).bodyTemplate = bodyTemplate;
       out[name] = tool;
     });

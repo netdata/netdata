@@ -8,6 +8,8 @@ export interface ToolExecuteOptions {
   // When true, do not acquire/release a concurrency slot in the orchestrator
   // Useful for control-plane tools like agent__batch to avoid deadlocks.
   bypassConcurrency?: boolean;
+  // When true, provider should emit detailed trace logs
+  trace?: boolean;
 }
 
 export interface ToolExecuteResult {
