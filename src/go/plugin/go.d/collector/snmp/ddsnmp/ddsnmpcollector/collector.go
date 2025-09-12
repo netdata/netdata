@@ -104,6 +104,8 @@ func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 			for i := range vmetrics {
 				vmetrics[i].Profile = pm
 			}
+
+			pm.Metrics = slices.DeleteFunc(pm.Metrics, func(m ddsnmp.Metric) bool { return strings.HasPrefix(m.Name, "_") })
 			pm.Metrics = append(pm.Metrics, vmetrics...)
 		}
 	}
