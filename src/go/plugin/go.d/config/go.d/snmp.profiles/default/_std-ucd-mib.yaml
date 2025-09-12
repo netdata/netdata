@@ -287,57 +287,46 @@ metrics:
     symbol:
       name: _ucd.ssCpuRawUser
       OID: 1.3.6.1.4.1.2021.11.50.0
-      scale_factor: 0.01
   - MIB: UCD-SNMP-MIB
     symbol:
       name: _ucd.ssCpuRawNice
       OID: 1.3.6.1.4.1.2021.11.51.0
-      scale_factor: 0.01
   - MIB: UCD-SNMP-MIB
     symbol:
       name: _ucd.ssCpuRawSystem
       OID: 1.3.6.1.4.1.2021.11.52.0
-      scale_factor: 0.01
   - MIB: UCD-SNMP-MIB
     symbol:
       name: _ucd.ssCpuRawIdle
       OID: 1.3.6.1.4.1.2021.11.53.0
-      scale_factor: 0.01
   - MIB: UCD-SNMP-MIB
     symbol:
       name: _ucd.ssCpuRawWait
       OID: 1.3.6.1.4.1.2021.11.54.0
-      scale_factor: 0.01
   - MIB: UCD-SNMP-MIB
     symbol:
       name: _ucd.ssCpuRawKernel
       OID: 1.3.6.1.4.1.2021.11.55.0
-      scale_factor: 0.01
   - MIB: UCD-SNMP-MIB
     symbol:
       name: _ucd.ssCpuRawInterrupt
       OID: 1.3.6.1.4.1.2021.11.56.0
-      scale_factor: 0.01
   - MIB: UCD-SNMP-MIB
     symbol:
       name: _ucd.ssCpuRawSoftIRQ
       OID: 1.3.6.1.4.1.2021.11.61.0
-      scale_factor: 0.01
   - MIB: UCD-SNMP-MIB
     symbol:
       name: _ucd.ssCpuRawSteal
       OID: 1.3.6.1.4.1.2021.11.64.0
-      scale_factor: 0.01
   - MIB: UCD-SNMP-MIB
     symbol:
       name: _ucd.ssCpuRawGuest
       OID: 1.3.6.1.4.1.2021.11.65.0
-      scale_factor: 0.01
   - MIB: UCD-SNMP-MIB
     symbol:
       name: _ucd.ssCpuRawGuestNice
       OID: 1.3.6.1.4.1.2021.11.66.0
-      scale_factor: 0.01
 
 virtual_metrics:
   - name: ucd.cpu_usage
