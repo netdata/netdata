@@ -221,12 +221,17 @@ sync_repo() {
         cd "$repo_path"
         
         # Fetch with depth=1 to get only latest
-        if ! timeout 30 git fetch --depth=1 origin 2>/dev/null; then
-            warn "    Could not fetch $repo_name, trying to re-clone..."
+        local fetch_error
+        fetch_error=$(timeout 30 git fetch --depth=1 origin 2>&1)
+        if [ $? -ne 0 ]; then
+            warn "    Could not fetch $repo_name: ${fetch_error}"
+            warn "    Trying to re-clone..."
             cd "$REPOS_DIR"
             rm -rf "$repo_path"
-            if ! git clone --depth=1 "$clone_url" "$repo_name" 2>/dev/null; then
-                error "    Failed to clone $repo_name"
+            local clone_error
+            clone_error=$(git clone --depth=1 "$clone_url" "$repo_name" 2>&1)
+            if [ $? -ne 0 ]; then
+                error "    Failed to clone $repo_name: ${clone_error}"
                 return 1
             fi
         else
@@ -238,8 +243,10 @@ sync_repo() {
         fi
     else
         cd "$REPOS_DIR"
-        if ! git clone --depth=1 "$clone_url" "$repo_name" 2>/dev/null; then
-            error "    Failed to clone $repo_name"
+        local clone_error
+        clone_error=$(git clone --depth=1 "$clone_url" "$repo_name" 2>&1)
+        if [ $? -ne 0 ]; then
+            error "    Failed to clone $repo_name: ${clone_error}"
             return 1
         fi
     fi
