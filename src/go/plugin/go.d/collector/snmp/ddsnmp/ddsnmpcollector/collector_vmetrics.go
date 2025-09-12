@@ -121,6 +121,7 @@ func (p *vmetricsCollector) Collect(profDef *ddprofiledefinition.ProfileDefiniti
 			Description: agg.config.ChartMeta.Description,
 			Family:      agg.config.ChartMeta.Family,
 			Unit:        agg.config.ChartMeta.Unit,
+			ChartType:   agg.config.ChartMeta.Type,
 			MetricType:  agg.metricType,
 		}
 
