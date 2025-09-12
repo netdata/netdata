@@ -632,6 +632,150 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 				},
 			},
 		},
+
+		"composite with as (two table sources)": {
+			profileDef: &ddprofiledefinition.ProfileDefinition{
+				Metrics: []ddprofiledefinition.MetricsConfig{
+					{
+						Table: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.2.1.31.1.1", Name: "ifXTable"},
+						Symbols: []ddprofiledefinition.SymbolConfig{
+							{OID: "1.3.6.1.2.1.31.1.1.1.6", Name: "ifHCInOctets"},
+							{OID: "1.3.6.1.2.1.31.1.1.1.10", Name: "ifHCOutOctets"},
+						},
+					},
+				},
+				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
+					{
+						Name: "ifTotalTraffic",
+						Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+							{Metric: "ifHCInOctets", Table: "ifXTable", As: "in"},
+							{Metric: "ifHCOutOctets", Table: "ifXTable", As: "out"},
+						},
+						ChartMeta: ddprofiledefinition.ChartMeta{
+							Description: "Total traffic by direction",
+							Family:      "Network/Total/Traffic",
+							Unit:        "bit/s",
+						},
+					},
+				},
+			},
+			collectedMetrics: []ddsnmp.Metric{
+				{Name: "ifHCInOctets", Value: 1000, IsTable: true, Table: "ifXTable"},
+				{Name: "ifHCInOctets", Value: 2000, IsTable: true, Table: "ifXTable"},
+				{Name: "ifHCOutOctets", Value: 500, IsTable: true, Table: "ifXTable"},
+				{Name: "ifHCOutOctets", Value: 1500, IsTable: true, Table: "ifXTable"},
+			},
+			expected: []ddsnmp.Metric{
+				{
+					Name:        "ifTotalTraffic",
+					MultiValue:  map[string]int64{"in": 3000, "out": 2000},
+					Description: "Total traffic by direction",
+					Family:      "Network/Total/Traffic",
+					Unit:        "bit/s",
+				},
+			},
+		},
+
+		"composite with as (missing one source)": {
+			profileDef: &ddprofiledefinition.ProfileDefinition{
+				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
+					{
+						Name: "ifTotalTraffic",
+						Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+							{Metric: "ifHCInOctets", Table: "ifXTable", As: "in"},
+							{Metric: "ifHCOutOctets", Table: "ifXTable", As: "out"},
+						},
+					},
+				},
+			},
+			collectedMetrics: []ddsnmp.Metric{
+				// Only IN is present
+				{Name: "ifHCInOctets", Value: 1000, IsTable: true, Table: "ifXTable"},
+				{Name: "ifHCInOctets", Value: 2000, IsTable: true, Table: "ifXTable"},
+			},
+			expected: []ddsnmp.Metric{
+				{
+					Name:       "ifTotalTraffic",
+					MultiValue: map[string]int64{"in": 3000}, // "out" omitted
+				},
+			},
+		},
+
+		"composite with duplicate 'as' merges values": {
+			profileDef: &ddprofiledefinition.ProfileDefinition{
+				Metrics: []ddprofiledefinition.MetricsConfig{
+					{
+						Table: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.2.1.2.2", Name: "ifTable"},
+						Symbols: []ddprofiledefinition.SymbolConfig{
+							{OID: "1.3.6.1.2.1.2.2.1.10", Name: "ifInOctets"},
+						},
+					},
+					{
+						Table: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.2.1.31.1.1", Name: "ifXTable"},
+						Symbols: []ddprofiledefinition.SymbolConfig{
+							{OID: "1.3.6.1.2.1.31.1.1.1.6", Name: "ifHCInOctets"},
+						},
+					},
+				},
+				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
+					{
+						Name: "ifTotalInbound",
+						Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+							{Metric: "ifInOctets", Table: "ifTable", As: "in"},
+							{Metric: "ifHCInOctets", Table: "ifXTable", As: "in"}, // same 'as'
+						},
+						ChartMeta: ddprofiledefinition.ChartMeta{
+							Description: "Inbound traffic from two tables merged",
+						},
+					},
+				},
+			},
+			collectedMetrics: []ddsnmp.Metric{
+				{Name: "ifInOctets", Value: 100, IsTable: true, Table: "ifTable"},
+				{Name: "ifInOctets", Value: 200, IsTable: true, Table: "ifTable"},
+				{Name: "ifHCInOctets", Value: 1000, IsTable: true, Table: "ifXTable"},
+				{Name: "ifHCInOctets", Value: 2000, IsTable: true, Table: "ifXTable"},
+			},
+			expected: []ddsnmp.Metric{
+				{
+					Name:        "ifTotalInbound",
+					MultiValue:  map[string]int64{"in": 3300}, // 100+200+1000+2000
+					Description: "Inbound traffic from two tables merged",
+				},
+			},
+		},
+
+		"composite with scalar sources (CPU)": {
+			profileDef: &ddprofiledefinition.ProfileDefinition{
+				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
+					{
+						Name: "cpu_usage",
+						Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+							{Metric: "ucd.ssCpuUser", Table: "", As: "user"},
+							{Metric: "ucd.ssCpuSystem", Table: "", As: "system"},
+						},
+						ChartMeta: ddprofiledefinition.ChartMeta{
+							Description: "CPU usage breakdown",
+							Family:      "System/CPU/Usage",
+							Unit:        "%",
+						},
+					},
+				},
+			},
+			collectedMetrics: []ddsnmp.Metric{
+				{Name: "ucd.ssCpuUser", Value: 12, IsTable: false, Table: ""},
+				{Name: "ucd.ssCpuSystem", Value: 5, IsTable: false, Table: ""},
+			},
+			expected: []ddsnmp.Metric{
+				{
+					Name:        "cpu_usage",
+					MultiValue:  map[string]int64{"user": 12, "system": 5},
+					Description: "CPU usage breakdown",
+					Family:      "System/CPU/Usage",
+					Unit:        "%",
+				},
+			},
+		},
 	}
 
 	for name, tc := range tests {

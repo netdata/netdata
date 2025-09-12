@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- improve\(go.d/snmp\): add net-snmp.yaml profile [\#20959](https://github.com/netdata/netdata/pull/20959) ([ilyam8](https://github.com/ilyam8))
+- chore\(go.d/snmp\): remove hrStorageTable from mikrotik-router.yaml [\#20958](https://github.com/netdata/netdata/pull/20958) ([ilyam8](https://github.com/ilyam8))
+- improve\(go.d/snmp\): add transform for Host-Resources-MIB storage metrics [\#20957](https://github.com/netdata/netdata/pull/20957) ([ilyam8](https://github.com/ilyam8))
+- Ensure memory ordering when updating partition list and the bitmap [\#20956](https://github.com/netdata/netdata/pull/20956) ([stelfrag](https://github.com/stelfrag))
+- Fix FreeBSD \(Part II\) [\#20955](https://github.com/netdata/netdata/pull/20955) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix\(health/rocketchat\): add missing "Content-Type: application/json" header [\#20954](https://github.com/netdata/netdata/pull/20954) ([ilyam8](https://github.com/ilyam8))
 - move whole category and fix leftovers [\#20951](https://github.com/netdata/netdata/pull/20951) ([Ancairon](https://github.com/Ancairon))
 - build\(deps\): bump github.com/jackc/pgx/v5 from 5.7.5 to 5.7.6 in /src/go [\#20950](https://github.com/netdata/netdata/pull/20950) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -445,10 +450,6 @@
 - SNMP: apc\_ups.yaml [\#20419](https://github.com/netdata/netdata/pull/20419) ([Ancairon](https://github.com/Ancairon))
 - update\_installer: Update remove instruction [\#20418](https://github.com/netdata/netdata/pull/20418) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix typo. [\#20417](https://github.com/netdata/netdata/pull/20417) ([de-authority](https://github.com/de-authority))
-- Fix context updates [\#20416](https://github.com/netdata/netdata/pull/20416) ([stelfrag](https://github.com/stelfrag))
-- improvement\(go.d\): add ddsnmp profile collector \(scalar only\) [\#20415](https://github.com/netdata/netdata/pull/20415) ([ilyam8](https://github.com/ilyam8))
-- SNMP: juniper-pulse-secure.yaml [\#20413](https://github.com/netdata/netdata/pull/20413) ([Ancairon](https://github.com/Ancairon))
-- Improve metrics centralization points documentation [\#20412](https://github.com/netdata/netdata/pull/20412) ([kanelatechnical](https://github.com/kanelatechnical))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 

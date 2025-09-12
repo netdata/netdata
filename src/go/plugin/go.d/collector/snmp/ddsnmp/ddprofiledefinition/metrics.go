@@ -92,6 +92,7 @@ type ChartMeta struct {
 	Description string `yaml:"description,omitempty" json:"description,omitempty"`
 	Family      string `yaml:"family,omitempty" json:"family,omitempty"`
 	Unit        string `yaml:"unit,omitempty" json:"unit,omitempty"`
+	Type        string `yaml:"type,omitempty" json:"type,omitempty"`
 }
 
 // Clone creates a duplicate of this SymbolConfig

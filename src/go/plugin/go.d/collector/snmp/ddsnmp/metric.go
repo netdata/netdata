@@ -17,6 +17,7 @@ type Metric struct {
 	Description string
 	Family      string
 	Unit        string
+	ChartType   string
 	MetricType  ddprofiledefinition.ProfileMetricType
 	StaticTags  map[string]string
 	Tags        map[string]string

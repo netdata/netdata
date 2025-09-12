@@ -8,33 +8,6 @@
 metrics:
   - MIB: UCD-SNMP-MIB
     symbol:
-      name: ucd.cpuLoad1m
-      OID: 1.3.6.1.4.1.2021.10.1.5.1
-      chart_meta:
-        family: 'System/LoadAverage/1Min'
-        description: 1 minute load average
-        unit: "{load_average}"
-      scale_factor: 0.01
-  - MIB: UCD-SNMP-MIB
-    symbol:
-      name: ucd.cpuLoad5m
-      OID: 1.3.6.1.4.1.2021.10.1.5.2
-      chart_meta:
-        family: 'System/LoadAverage/5Min'
-        description: 5 minute load average
-        unit: "{load_average}"
-      scale_factor: 0.01
-  - MIB: UCD-SNMP-MIB
-    symbol:
-      name: ucd.cpuLoad15m
-      OID: 1.3.6.1.4.1.2021.10.1.5.3
-      chart_meta:
-        family: 'System/LoadAverage/15Min'
-        description: 15 minute load average
-        unit: "{load_average}"
-      scale_factor: 0.01
-  - MIB: UCD-SNMP-MIB
-    symbol:
       name: ucd.memoryTotal
       OID: 1.3.6.1.4.1.2021.4.5.0
       chart_meta:
@@ -283,87 +256,105 @@ metrics:
         unit: "By/s"
       scale_factor: 512
 
-## TODO: These metrics (e.g., ucd.ssCpuUser, ucd.ssCpuSystem, etc.) represent CPU usage breakdowns (user, system, idle, etc.).
-## Typically more useful when visualized together in a single composite CPU usage chart, rather than as separate metrics/charts.
-## Displaying them separately can be confusing and less informative for users.
-## Next steps: Consider combining these metrics into a single composite CPU usage chart.
-#  - MIB: UCD-SNMP-MIB
-#    symbol:
-#      name: ucd.ssCpuUser
-#      OID: 1.3.6.1.4.1.2021.11.9.0
-#      chart_meta:
-#        family: 'System/CPU/Usage/User'
-#        description: The percentage of CPU time spent processing user-level code, calculated over the last minute
-#        unit: "%"
-#  - MIB: UCD-SNMP-MIB
-#    symbol:
-#      name: ucd.ssCpuSystem
-#      OID: 1.3.6.1.4.1.2021.11.10.0
-#      chart_meta:
-#        family: 'System/CPU/Usage/System'
-#        description: The percentage of CPU time spent processing system-level code, calculated over the last minute
-#        unit: "%"
-#  - MIB: UCD-SNMP-MIB
-#    symbol:
-#      name: ucd.ssCpuIdle
-#      OID: 1.3.6.1.4.1.2021.11.11.0
-#      chart_meta:
-#        family: 'System/CPU/Usage/Idle'
-#        description: The percentage of processor time spent idle, calculated over the last minute
-#        unit: "%"
-#  - MIB: UCD-SNMP-MIB
-#    symbol:
-#      name: ucd.ssCpuRawUser
-#      OID: 1.3.6.1.4.1.2021.11.50.0
-#      chart_meta:
-#        family: 'System/CPU/Time/User'
-#        description: The number of ticks spent processing user-level code
-#        unit: "{tick}/s"
-#  - MIB: UCD-SNMP-MIB
-#    symbol:
-#      name: ucd.ssCpuRawNice
-#      OID: 1.3.6.1.4.1.2021.11.51.0
-#      chart_meta:
-#        family: 'System/CPU/Time/Nice'
-#        description: The number of ticks spent processing reduced-priority code
-#        unit: "{tick}/s"
-#  - MIB: UCD-SNMP-MIB
-#    symbol:
-#      name: ucd.ssCpuRawSystem
-#      OID: 1.3.6.1.4.1.2021.11.52.0
-#      chart_meta:
-#        family: 'System/CPU/Time/System'
-#        description: The number of ticks spent processing system-level code
-#        unit: "{tick}/s"
-#  - MIB: UCD-SNMP-MIB
-#    symbol:
-#      name: ucd.ssCpuRawIdle
-#      OID: 1.3.6.1.4.1.2021.11.53.0
-#      chart_meta:
-#        family: 'System/CPU/Time/Idle'
-#        description: The number of ticks spent idle
-#        unit: "{tick}/s"
-#  - MIB: UCD-SNMP-MIB
-#    symbol:
-#      name: ucd.ssCpuRawWait
-#      OID: 1.3.6.1.4.1.2021.11.54.0
-#      chart_meta:
-#        family: 'System/CPU/Time/IOWait'
-#        description: The number of ticks spent waiting for IO
-#        unit: "{tick}/s"
-#  - MIB: UCD-SNMP-MIB
-#    symbol:
-#      name: ucd.ssCpuRawKernel
-#      OID: 1.3.6.1.4.1.2021.11.55.0
-#      chart_meta:
-#        family: 'System/CPU/Time/Kernel'
-#        description: The number of ticks spent processing kernel-level code
-#        unit: "{tick}/s"
-#  - MIB: UCD-SNMP-MIB
-#    symbol:
-#      name: ucd.ssCpuRawInterrupt
-#      OID: 1.3.6.1.4.1.2021.11.56.0
-#      chart_meta:
-#        family: 'System/CPU/Time/Interrupt'
-#        description: The number of ticks spent processing hardware interrupts
-#        unit: "{tick}/s"
+  - MIB: UCD-SNMP-MIB
+    symbol:
+      name: _ucd.cpuLoad1m
+      OID: 1.3.6.1.4.1.2021.10.1.5.1
+      scale_factor: 0.01
+  - MIB: UCD-SNMP-MIB
+    symbol:
+      name: _ucd.cpuLoad5m
+      OID: 1.3.6.1.4.1.2021.10.1.5.2
+      scale_factor: 0.01
+  - MIB: UCD-SNMP-MIB
+    symbol:
+      name: _ucd.cpuLoad15m
+      OID: 1.3.6.1.4.1.2021.10.1.5.3
+      scale_factor: 0.01
+
+  - MIB: UCD-SNMP-MIB
+    symbol:
+      name: _ucd.ssCpuRawUser
+      OID: 1.3.6.1.4.1.2021.11.50.0
+  - MIB: UCD-SNMP-MIB
+    symbol:
+      name: _ucd.ssCpuRawNice
+      OID: 1.3.6.1.4.1.2021.11.51.0
+  - MIB: UCD-SNMP-MIB
+    symbol:
+      name: _ucd.ssCpuRawSystem
+      OID: 1.3.6.1.4.1.2021.11.52.0
+  - MIB: UCD-SNMP-MIB
+    symbol:
+      name: _ucd.ssCpuRawIdle
+      OID: 1.3.6.1.4.1.2021.11.53.0
+  - MIB: UCD-SNMP-MIB
+    symbol:
+      name: _ucd.ssCpuRawWait
+      OID: 1.3.6.1.4.1.2021.11.54.0
+  - MIB: UCD-SNMP-MIB
+    symbol:
+      name: _ucd.ssCpuRawKernel
+      OID: 1.3.6.1.4.1.2021.11.55.0
+  - MIB: UCD-SNMP-MIB
+    symbol:
+      name: _ucd.ssCpuRawInterrupt
+      OID: 1.3.6.1.4.1.2021.11.56.0
+  - MIB: UCD-SNMP-MIB
+    symbol:
+      name: _ucd.ssCpuRawSoftIRQ
+      OID: 1.3.6.1.4.1.2021.11.61.0
+  - MIB: UCD-SNMP-MIB
+    symbol:
+      name: _ucd.ssCpuRawSteal
+      OID: 1.3.6.1.4.1.2021.11.64.0
+  - MIB: UCD-SNMP-MIB
+    symbol:
+      name: _ucd.ssCpuRawGuest
+      OID: 1.3.6.1.4.1.2021.11.65.0
+  - MIB: UCD-SNMP-MIB
+    symbol:
+      name: _ucd.ssCpuRawGuestNice
+      OID: 1.3.6.1.4.1.2021.11.66.0
+
+virtual_metrics:
+  - name: ucd.cpu_usage
+    chart_meta:
+      description: CPU usage breakdown
+      family: "System/CPU/Usage"
+      unit: "%"
+      type: stacked
+    sources:
+      - metric: _ucd.ssCpuRawUser
+        as: user
+      - metric: _ucd.ssCpuRawNice
+        as: nice
+      - metric: _ucd.ssCpuRawSystem
+        as: system
+      - metric: _ucd.ssCpuRawKernel
+        as: kernel
+      - metric: _ucd.ssCpuRawWait
+        as: iowait
+      - metric: _ucd.ssCpuRawInterrupt
+        as: irq
+      - metric: _ucd.ssCpuRawSoftIRQ
+        as: softirq
+      - metric: _ucd.ssCpuRawSteal
+        as: steal
+      - metric: _ucd.ssCpuRawGuest
+        as: guest
+      - metric: _ucd.ssCpuRawGuestNice
+        as: guest_nice
+
+  - name: ucd.cpuLoad
+    chart_meta:
+      description: Load average
+      family: "System/LoadAverage"
+      unit: "{load_average}"
+    sources:
+      - metric: _ucd.cpuLoad1m
+        as: "1m"
+      - metric: _ucd.cpuLoad5m
+        as: "5m"
+      - metric: _ucd.cpuLoad15m
+        as: "15m"
