@@ -21,4 +21,5 @@ func (vm VirtualMetricConfig) Clone() VirtualMetricConfig {
 type VirtualMetricSourceConfig struct {
 	Metric string `yaml:"metric"`
 	Table  string `yaml:"table"` // Required for now
+	As     string `yaml:"as"`    // dimension name for composite charts
 }
