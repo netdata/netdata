@@ -12,8 +12,6 @@ models:
 tools:
   - ask-netdata
   - batch
-  - cloudflare-graphql
-  - cloudflare-radar
 agents:
   - company.ai
   - company-tech.ai
