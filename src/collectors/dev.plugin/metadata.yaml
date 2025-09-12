@@ -28,7 +28,8 @@ modules:
         description: ""
       default_behavior:
         auto_detection:
-          description: ""
+          description: |
+            On some Linux distributions, you must manually load the MSR driver to make this metric available.
         limits:
           description: ""
         performance_impact:
