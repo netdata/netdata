@@ -6,12 +6,12 @@ package nvme
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cmd"
 )
 
 type nvmeDeviceList struct {
@@ -149,7 +149,7 @@ type nvmeCLIExec struct {
 }
 
 func (n *nvmeCLIExec) list() (*nvmeDeviceList, error) {
-	bs, err := n.execute("nvme-list")
+	bs, err := cmd.RunNDSudo(nil, n.timeout, "nvme-list")
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +163,7 @@ func (n *nvmeCLIExec) list() (*nvmeDeviceList, error) {
 }
 
 func (n *nvmeCLIExec) smartLog(devicePath string) (*nvmeDeviceSmartLog, error) {
-	bs, err := n.execute("nvme-smart-log", "--device", devicePath)
+	bs, err := cmd.RunNDSudo(nil, n.timeout, "nvme-smart-log", "--device", devicePath)
 	if err != nil {
 		return nil, err
 	}
@@ -174,11 +174,4 @@ func (n *nvmeCLIExec) smartLog(devicePath string) (*nvmeDeviceSmartLog, error) {
 	}
 
 	return &v, nil
-}
-
-func (n *nvmeCLIExec) execute(arg ...string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), n.timeout)
-	defer cancel()
-
-	return exec.CommandContext(ctx, n.ndsudoPath, arg...).Output()
 }

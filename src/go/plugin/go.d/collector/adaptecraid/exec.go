@@ -5,12 +5,10 @@
 package adaptecraid
 
 import (
-	"context"
-	"fmt"
-	"os/exec"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cmd"
 )
 
 type arcconfCli interface {
@@ -34,24 +32,9 @@ type arcconfCliExec struct {
 }
 
 func (e *arcconfCliExec) logicalDevicesInfo() ([]byte, error) {
-	return e.execute("arcconf-ld-info")
+	return cmd.RunNDSudo(e.Logger, e.timeout, "arcconf-ld-info")
 }
 
 func (e *arcconfCliExec) physicalDevicesInfo() ([]byte, error) {
-	return e.execute("arcconf-pd-info")
-}
-
-func (e *arcconfCliExec) execute(args ...string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, e.ndsudoPath, args...)
-	e.Debugf("executing '%s'", cmd)
-
-	bs, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("error on '%s': %v", cmd, err)
-	}
-
-	return bs, nil
+	return cmd.RunNDSudo(e.Logger, e.timeout, "arcconf-pd-info")
 }

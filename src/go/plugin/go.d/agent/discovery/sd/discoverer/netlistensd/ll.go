@@ -4,13 +4,12 @@ package netlistensd
 
 import (
 	"context"
-	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cmd"
 )
 
 type localListeners interface {
@@ -38,12 +37,10 @@ type localListenersExec struct {
 }
 
 func (e *localListenersExec) discover(ctx context.Context) ([]byte, error) {
-	execCtx, cancel := context.WithTimeout(ctx, e.timeout)
-	defer cancel()
-
 	// TCPv4/6 and UPDv4 sockets in LISTEN state
 	// https://github.com/netdata/netdata/blob/master/src/collectors/utils/local_listeners.c
 	args := []string{
+		e.binPath,
 		"no-udp6",
 		"no-local",
 		"no-inbound",
@@ -51,12 +48,5 @@ func (e *localListenersExec) discover(ctx context.Context) ([]byte, error) {
 		"no-namespaces",
 	}
 
-	cmd := exec.CommandContext(execCtx, e.binPath, args...)
-
-	bs, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("error on executing '%s': %v", cmd, err)
-	}
-
-	return bs, nil
+	return cmd.RunUnprivileged(nil, e.timeout, args...)
 }
