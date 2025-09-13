@@ -4,6 +4,8 @@ package ddsnmpcollector
 
 import (
 	"slices"
+	"sort"
+	"strings"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -20,102 +22,168 @@ func newVirtualMetricsCollector(log *logger.Logger) *vmetricsCollector {
 	}
 }
 
+func (p *vmetricsCollector) Collect(profDef *ddprofiledefinition.ProfileDefinition, collected []ddsnmp.Metric) []ddsnmp.Metric {
+	if len(profDef.VirtualMetrics) == 0 {
+		return nil
+	}
+	lookup, aggrs := p.buildAggregators(profDef)
+	p.accumulate(lookup, collected)
+	return p.emit(aggrs)
+}
+
+func (p *vmetricsCollector) accumulate(lookup map[vmetricsSourceKey][]vmetricsSink, collected []ddsnmp.Metric) {
+	for _, m := range collected {
+		sinks, ok := lookup[vmetricsSourceKey{metricName: m.Name, tableName: m.Table}]
+		if !ok {
+			continue
+		}
+
+		v, mv := vmCollapseMetricValue(m)
+
+		for _, sink := range sinks {
+			agg := sink.agg
+			if agg == nil {
+				continue
+			}
+
+			if agg.metricType == "" {
+				agg.metricType = m.MetricType
+			}
+
+			agg.accumulate(sink, v, mv, m.Tags)
+		}
+	}
+}
+
+func (p *vmetricsCollector) emit(aggrs []*vmetricsAggregator) []ddsnmp.Metric {
+	// small pre-alloc: 1 total or ~groups count; start conservative
+	out := make([]ddsnmp.Metric, 0, len(aggrs))
+	for _, agg := range aggrs {
+		if agg.sourceCount == 0 {
+			p.log.Debugf("no source metrics found for virtual metric '%s'", agg.config.Name)
+			continue
+		}
+		agg.emitInto(&out)
+	}
+	return out
+}
+
 type (
+	// vmetricsAggregator holds accumulation state for a virtual metric
+	vmetricsAggregator struct {
+		config     ddprofiledefinition.VirtualMetricConfig
+		metricType ddprofiledefinition.ProfileMetricType
+
+		// --- grouping controls ---
+		grouped    bool     // len(GroupBy) > 0
+		perRow     bool     // GroupBy == ["*"]
+		groupBy    []string // explicit labels (nil for perRow/none)
+		groupTable string   // v1: sources must share same table
+		perGroup   map[string]*vmetricsGroupBucket
+
+		// --- dimensions (composite) ---
+		dims vmetricsDimSpec
+
+		// --- non-grouped accumulators (existing behavior) ---
+		perDim      map[string]int64 // composite total (dim -> sum)
+		sum         int64            // single-source total
+		multiSum    map[string]int64 // merged base MultiValue
+		sourceCount int
+
+		keyBuf strings.Builder
+	}
+
 	// vmetricsSourceKey identifies a metric source
 	vmetricsSourceKey struct {
 		metricName string
 		tableName  string
 	}
-	// which aggregator to feed and under which dimension name
+
+	// sink binding; dimIdx == -1 for non-composite
 	vmetricsSink struct {
-		agg *vmetricsAggregator
-		dim string // empty == non-composite (single-source behavior)
+		agg    *vmetricsAggregator
+		dimIdx int16
 	}
-	// vmetricsAggregator holds accumulation state for a virtual metric
-	vmetricsAggregator struct {
-		config      ddprofiledefinition.VirtualMetricConfig
-		sum         int64
-		multiSum    map[string]int64 // for aggregating MultiValue metrics
-		perDim      map[string]int64 // per-source accumulation when composite
-		sourceCount int
-		metricType  ddprofiledefinition.ProfileMetricType
+
+	// precomputed dimension spec (avoids per-sample string lookups)
+	vmetricsDimSpec struct {
+		names     []string
+		idxByName map[string]int // build-time only
+		count     int
+	}
+
+	// per-group accumulator (emitted as one table row)
+	vmetricsGroupBucket struct {
+		vals     []int64 // len == dims.count when composite
+		seen     []bool
+		sum      int64             // single-source grouped case
+		emitTags map[string]string // explicit group_by: tiny map; per-row "*": pointer to source Tags
 	}
 )
 
-func (p *vmetricsCollector) Collect(profDef *ddprofiledefinition.ProfileDefinition, collectedMetrics []ddsnmp.Metric) []ddsnmp.Metric {
-	if len(profDef.VirtualMetrics) == 0 {
-		return nil
+func (agg *vmetricsAggregator) accumulate(sink vmetricsSink, v int64, mv map[string]int64, tags map[string]string) {
+	if agg.grouped {
+		agg.accumulateGrouped(sink, v, tags)
+	} else {
+		agg.accumulateTotal(sink, v, mv)
 	}
+	agg.sourceCount++
+}
 
-	sourceToAggregators, aggregators := p.buildAggregators(profDef)
-
-	for _, metric := range collectedMetrics {
-		key := vmetricsSourceKey{
-			metricName: metric.Name,
-			tableName:  metric.Table,
-		}
-
-		sinks, found := sourceToAggregators[key]
-		if !found {
-			continue
-		}
-
-		for _, sink := range sinks {
-			if sink.agg == nil {
-				continue
-			}
-
-			agg := sink.agg
-
-			// If sink.dim != "" => composite path (this VM has multiple sources)
-			if sink.dim != "" {
-				// We need a single number per source (dimension).
-				// If the incoming base metric is MultiValue, collapse it to a total; else use Value.
-				var v int64
-				if len(metric.MultiValue) > 0 {
-					for _, mv := range metric.MultiValue {
-						v += mv
-					}
-				} else {
-					v = metric.Value
-				}
-
-				if agg.perDim == nil {
-					agg.perDim = make(map[string]int64)
-				}
-				agg.perDim[sink.dim] += v
-			} else {
-				// Non-composite (single-source) => keep existing behavior:
-				if len(metric.MultiValue) > 0 {
-					if agg.multiSum == nil {
-						agg.multiSum = make(map[string]int64)
-					}
-					for state, value := range metric.MultiValue {
-						agg.multiSum[state] += value
-					}
-				} else {
-					agg.sum += metric.Value
-				}
-			}
-
-			agg.sourceCount++
-			if agg.metricType == "" {
-				agg.metricType = metric.MetricType
-			} else if agg.metricType != metric.MetricType {
-				p.log.Debugf("virtual metric %q mixes MetricType (%s vs %s); using %s",
-					agg.config.Name, agg.metricType, metric.MetricType, agg.metricType)
-			}
-		}
+func (agg *vmetricsAggregator) accumulateGrouped(sink vmetricsSink, v int64, tags map[string]string) {
+	gkey, ok := vmBuildGroupKey(tags, agg)
+	if !ok {
+		return
 	}
-
-	// Build virtual metrics from aggregators
-	var virtualMetrics []ddsnmp.Metric
-	for _, agg := range aggregators {
-		if agg.sourceCount == 0 {
-			p.log.Debugf("no source metrics found for virtual metric '%s'", agg.config.Name)
-			continue
+	b := agg.perGroup[gkey]
+	if b == nil {
+		b = &vmetricsGroupBucket{emitTags: vmBuildEmitTags(tags, agg)}
+		if agg.dims.count > 0 {
+			b.vals = make([]int64, agg.dims.count)
+			b.seen = make([]bool, agg.dims.count)
 		}
+		agg.perGroup[gkey] = b
+	}
+	if sink.dimIdx >= 0 {
+		b.vals[sink.dimIdx] += v
+		b.seen[sink.dimIdx] = true
+	} else {
+		b.sum += v
+	}
+}
 
+func (agg *vmetricsAggregator) accumulateTotal(sink vmetricsSink, v int64, mv map[string]int64) {
+	if sink.dimIdx >= 0 {
+		if agg.perDim == nil {
+			agg.perDim = make(map[string]int64, agg.dims.count)
+		}
+		name := agg.dims.names[sink.dimIdx]
+		agg.perDim[name] += v
+		return
+	}
+	// Single-source path: preserve MultiValue if provided
+	if mv != nil {
+		if agg.multiSum == nil {
+			agg.multiSum = make(map[string]int64, len(mv))
+		}
+		for k, x := range mv {
+			agg.multiSum[k] += x
+		}
+		return
+	}
+	agg.sum += v
+}
+
+func (agg *vmetricsAggregator) emitInto(out *[]ddsnmp.Metric) {
+	if agg.grouped {
+		agg.emitGrouped(out)
+	} else {
+		agg.emitTotal(out)
+	}
+}
+
+func (agg *vmetricsAggregator) emitGrouped(out *[]ddsnmp.Metric) {
+	for _, b := range agg.perGroup {
 		vm := ddsnmp.Metric{
 			Name:        agg.config.Name,
 			Description: agg.config.ChartMeta.Description,
@@ -123,69 +191,131 @@ func (p *vmetricsCollector) Collect(profDef *ddprofiledefinition.ProfileDefiniti
 			Unit:        agg.config.ChartMeta.Unit,
 			ChartType:   agg.config.ChartMeta.Type,
 			MetricType:  agg.metricType,
+			IsTable:     true,
+			Table:       agg.groupTable,
+			Tags:        b.emitTags,
 		}
-
-		switch {
-		case len(agg.perDim) > 0:
-			// Composite output: one metric with MultiValue where keys are dimension names (sources)
-			vm.MultiValue = agg.perDim
-		case len(agg.multiSum) > 0:
-			// Single-source whose base metric was MultiValue
-			vm.MultiValue = agg.multiSum
-		default:
-			// Single-source
-			vm.Value = agg.sum
+		if agg.dims.count > 0 {
+			mv := make(map[string]int64, agg.dims.count)
+			for i, dn := range agg.dims.names {
+				if b.seen[i] {
+					mv[dn] = b.vals[i]
+				}
+			}
+			vm.MultiValue = mv
+		} else {
+			vm.Value = b.sum
 		}
-		virtualMetrics = append(virtualMetrics, vm)
+		*out = append(*out, vm)
 	}
+}
 
-	return virtualMetrics
+func (agg *vmetricsAggregator) emitTotal(out *[]ddsnmp.Metric) {
+	vm := ddsnmp.Metric{
+		Name:        agg.config.Name,
+		Description: agg.config.ChartMeta.Description,
+		Family:      agg.config.ChartMeta.Family,
+		Unit:        agg.config.ChartMeta.Unit,
+		ChartType:   agg.config.ChartMeta.Type,
+		MetricType:  agg.metricType,
+	}
+	switch {
+	case len(agg.perDim) > 0:
+		vm.MultiValue = agg.perDim
+	case len(agg.multiSum) > 0:
+		vm.MultiValue = agg.multiSum
+	default:
+		vm.Value = agg.sum
+	}
+	*out = append(*out, vm)
 }
 
 func (p *vmetricsCollector) buildAggregators(profDef *ddprofiledefinition.ProfileDefinition) (map[vmetricsSourceKey][]vmetricsSink, []*vmetricsAggregator) {
-	sourceToAggregators := make(map[vmetricsSourceKey][]vmetricsSink)
+	sourceToSinks := make(map[vmetricsSourceKey][]vmetricsSink)
 	aggregators := make([]*vmetricsAggregator, 0, len(profDef.VirtualMetrics))
 
 	existingNames := p.getDefinedMetricNames(profDef.Metrics)
 
-	for _, config := range profDef.VirtualMetrics {
-		if existingNames[config.Name] {
-			p.log.Warningf("virtual metric '%s' conflicts with existing metric, skipping", config.Name)
+	for _, cfg := range profDef.VirtualMetrics {
+		if existingNames[cfg.Name] {
+			p.log.Warningf("virtual metric '%s' conflicts with existing metric, skipping", cfg.Name)
 			continue
 		}
 
-		agg := &vmetricsAggregator{config: config}
-		aggregators = append(aggregators, agg)
+		agg := &vmetricsAggregator{config: cfg}
 
-		isComposite := len(config.Sources) > 1 &&
-			slices.ContainsFunc(config.Sources, func(s ddprofiledefinition.VirtualMetricSourceConfig) bool {
+		// --- grouping detection / validation ---
+		if len(cfg.GroupBy) > 0 {
+			agg.grouped = true
+			agg.perRow = slices.Contains(cfg.GroupBy, "*")
+			if !agg.perRow {
+				agg.groupBy = cfg.GroupBy
+			}
+
+			// require all sources from the same table
+			var table string
+			same := true
+			for i, s := range cfg.Sources {
+				if i == 0 {
+					table = s.Table
+				} else if s.Table != table {
+					same = false
+					break
+				}
+			}
+			if !same || table == "" {
+				p.log.Warningf("virtual metric '%s' uses group_by but sources span tables or have no table; skipping (no joins yet)", cfg.Name)
+				continue
+			}
+			agg.groupTable = table
+			agg.perGroup = make(map[string]*vmetricsGroupBucket, 64)
+		}
+
+		// --- composite dims? (multiple sources and at least one 'as') ---
+		isComposite := len(cfg.Sources) > 1 &&
+			slices.ContainsFunc(cfg.Sources, func(s ddprofiledefinition.VirtualMetricSourceConfig) bool {
 				return s.As != ""
 			})
 
-		// Register this aggregator for each source it needs
-		for _, source := range config.Sources {
-			key := vmetricsSourceKey{
-				metricName: source.Metric,
-				tableName:  source.Table,
+		if isComposite {
+			agg.dims.idxByName = make(map[string]int, len(cfg.Sources))
+			agg.dims.names = make([]string, 0, len(cfg.Sources))
+			for _, s := range cfg.Sources {
+				name := ternary(s.As != "", s.As, s.Metric)
+				if _, dup := agg.dims.idxByName[name]; !dup {
+					agg.dims.idxByName[name] = len(agg.dims.names)
+					agg.dims.names = append(agg.dims.names, name)
+				}
 			}
+			agg.dims.count = len(agg.dims.names)
+		}
 
-			var dim string
+		// register sinks
+		for _, src := range cfg.Sources {
+			key := vmetricsSourceKey{metricName: src.Metric, tableName: src.Table}
+
+			dimIdx := int16(-1)
 			if isComposite {
-				dim = ternary(source.As != "", source.As, source.Metric)
+				name := ternary(src.As != "", src.As, src.Metric)
+				if idx, ok := agg.dims.idxByName[name]; ok {
+					dimIdx = int16(idx)
+				}
 			}
 
-			sourceToAggregators[key] = append(sourceToAggregators[key], vmetricsSink{
-				agg: agg,
-				dim: dim,
+			sourceToSinks[key] = append(sourceToSinks[key], vmetricsSink{
+				agg:    agg,
+				dimIdx: dimIdx,
 			})
 		}
+
+		aggregators = append(aggregators, agg)
 	}
 
-	return sourceToAggregators, aggregators
+	return sourceToSinks, aggregators
 }
 
 func (p *vmetricsCollector) getDefinedMetricNames(profMetrics []ddprofiledefinition.MetricsConfig) map[string]bool {
-	names := make(map[string]bool)
+	names := make(map[string]bool, len(profMetrics))
 	for _, m := range profMetrics {
 		switch {
 		case m.IsScalar():
@@ -197,4 +327,85 @@ func (p *vmetricsCollector) getDefinedMetricNames(profMetrics []ddprofiledefinit
 		}
 	}
 	return names
+}
+
+// vmBuildGroupKey returns a stable group key.
+func vmBuildGroupKey(tags map[string]string, agg *vmetricsAggregator) (string, bool) {
+	if !agg.grouped {
+		return "", false
+	}
+
+	const (
+		groupKeySep = '\x1F' // ASCII Unit Separator: safe delimiter between label values/pairs
+		kvSep       = '='    // used only in per-row fallback "k=v"
+	)
+
+	if agg.perRow {
+		if len(tags) == 0 {
+			return "", false
+		}
+		keys := make([]string, 0, len(tags))
+		for k := range tags {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		agg.keyBuf.Reset()
+		for i, k := range keys {
+			if i > 0 {
+				agg.keyBuf.WriteByte(groupKeySep)
+			}
+			agg.keyBuf.WriteString(k)
+			agg.keyBuf.WriteByte(kvSep)
+			agg.keyBuf.WriteString(tags[k])
+		}
+		return agg.keyBuf.String(), true
+	}
+
+	switch len(agg.groupBy) {
+	case 0:
+		return "", false
+	case 1:
+		v := tags[agg.groupBy[0]]
+		return v, v != ""
+	default:
+		var sb strings.Builder
+		for i, l := range agg.groupBy {
+			v := tags[l]
+			if v == "" {
+				return "", false
+			}
+			if i > 0 {
+				sb.WriteByte(groupKeySep)
+			}
+			sb.WriteString(v)
+		}
+		return sb.String(), true
+	}
+}
+
+// vmBuildEmitTags captures labels to emit for a group (called once per new group)
+func vmBuildEmitTags(tags map[string]string, agg *vmetricsAggregator) map[string]string {
+	if agg.perRow {
+		// per-row: reuse pointer; we never mutate it here
+		return tags
+	}
+	out := make(map[string]string, len(agg.groupBy))
+	for _, l := range agg.groupBy {
+		if v := tags[l]; v != "" {
+			out[l] = v
+		}
+	}
+	return out
+}
+
+// vmCollapseMetricValue a metric to an int64 quickly; return mv if present for merge path
+func vmCollapseMetricValue(m ddsnmp.Metric) (v int64, mv map[string]int64) {
+	if len(m.MultiValue) == 0 {
+		return m.Value, nil
+	}
+	var sum int64
+	for _, x := range m.MultiValue {
+		sum += x
+	}
+	return sum, m.MultiValue
 }
