@@ -76,9 +76,9 @@ type (
 
 		// --- grouping controls ---
 		grouped    bool     // len(GroupBy) > 0
-		perRow     bool     // GroupBy == ["*"]
-		groupBy    []string // explicit labels (nil for perRow/none)
-		groupTable string   // v1: sources must share same table
+		perRow     bool     // from cfg.PerRow
+		groupBy    []string // when perRow==true, groupBy are used as row-key hints
+		groupTable string   // sources must share the same table
 		perGroup   map[string]*vmetricsGroupBucket
 
 		// --- dimensions (composite) ---
@@ -244,14 +244,9 @@ func (p *vmetricsCollector) buildAggregators(profDef *ddprofiledefinition.Profil
 
 		agg := &vmetricsAggregator{config: cfg}
 
-		// --- grouping detection / validation ---
-		if len(cfg.GroupBy) > 0 {
-			agg.grouped = true
-			agg.perRow = slices.Contains(cfg.GroupBy, "*")
-			if !agg.perRow {
-				agg.groupBy = cfg.GroupBy
-			}
+		agg.grouped = cfg.PerRow || len(cfg.GroupBy) > 0
 
+		if agg.grouped {
 			// require all sources from the same table
 			var table string
 			same := true
@@ -267,6 +262,9 @@ func (p *vmetricsCollector) buildAggregators(profDef *ddprofiledefinition.Profil
 				p.log.Warningf("virtual metric '%s' uses group_by but sources span tables or have no table; skipping (no joins yet)", cfg.Name)
 				continue
 			}
+
+			agg.perRow = cfg.PerRow
+			agg.groupBy = cfg.GroupBy
 			agg.groupTable = table
 			agg.perGroup = make(map[string]*vmetricsGroupBucket, 64)
 		}
@@ -344,6 +342,26 @@ func vmBuildGroupKey(tags map[string]string, agg *vmetricsAggregator) (string, b
 		if len(tags) == 0 {
 			return "", false
 		}
+
+		if len(agg.groupBy) > 0 {
+			agg.keyBuf.Reset()
+			for i, l := range agg.groupBy {
+				v := tags[l]
+				if v == "" {
+					// missing hint
+					agg.keyBuf.Reset()
+					goto perRowFallback
+				}
+				if i > 0 {
+					agg.keyBuf.WriteByte(groupKeySep)
+				}
+				agg.keyBuf.WriteString(v)
+			}
+			return agg.keyBuf.String(), true
+		}
+
+	perRowFallback:
+		// Fallback: stable key from all tags (sorted k=v)
 		keys := make([]string, 0, len(tags))
 		for k := range tags {
 			keys = append(keys, k)
