@@ -32,11 +32,6 @@ modules:
           Additionally, it collects overall device uptime.
 
           It is compatible with all SNMP versions (v1, v2c, and v3) and uses the [gosnmp](https://github.com/gosnmp/gosnmp) package.
-          
-          **For advanced users**:
-
-          - You can manually specify custom OIDs (Object Identifiers) to retrieve specific data points beyond the default metrics.
-          - However, defining custom charts with dimensions for these OIDs requires manual configuration.
         method_description: ""
       supported_platforms:
         include: []
@@ -220,62 +215,6 @@ modules:
             - name: user.priv_key
               description: Privacy protocol pass phrase.
               default_value: ""
-              required: false
-            - name: charts
-              description: List of charts.
-              default_value: "[]"
-              required: true
-            - name: charts.id
-              description: Chart ID. Used to uniquely identify the chart.
-              default_value: ""
-              required: true
-            - name: charts.title
-              description: Chart title.
-              default_value: "Untitled chart"
-              required: false
-            - name: charts.units
-              description: Chart units.
-              default_value: num
-              required: false
-            - name: charts.family
-              description: Chart family.
-              default_value: charts.id
-              required: false
-            - name: charts.type
-              description: Chart type (line, area, stacked).
-              default_value: line
-              required: false
-            - name: charts.priority
-              description: Chart priority.
-              default_value: 70000
-              required: false
-            - name: charts.multiply_range
-              description: Used when you need to define many charts using incremental OIDs.
-              default_value: "[]"
-              required: false
-            - name: charts.dimensions
-              description: List of chart dimensions.
-              default_value: "[]"
-              required: true
-            - name: charts.dimensions.oid
-              description: Collected metric OID.
-              default_value: ""
-              required: true
-            - name: charts.dimensions.name
-              description: Dimension name.
-              default_value: ""
-              required: true
-            - name: charts.dimensions.algorithm
-              description: Dimension algorithm (absolute, incremental).
-              default_value: absolute
-              required: false
-            - name: charts.dimensions.multiplier
-              description: Collected value multiplier, applied to convert it properly to units.
-              default_value: 1
-              required: false
-            - name: charts.dimensions.divisor
-              description: Collected value divisor, applied to convert it properly to units.
-              default_value: 1
               required: false
         examples:
           folding:
