@@ -244,11 +244,9 @@ func (p *vmetricsCollector) buildAggregators(profDef *ddprofiledefinition.Profil
 
 		agg := &vmetricsAggregator{config: cfg}
 
-		// --- grouping detection / validation ---
-		if agg.grouped = cfg.PerRow || len(cfg.GroupBy) > 0; agg.grouped {
-			agg.perRow = cfg.PerRow
-			agg.groupBy = cfg.GroupBy
+		agg.grouped = cfg.PerRow || len(cfg.GroupBy) > 0
 
+		if agg.grouped {
 			// require all sources from the same table
 			var table string
 			same := true
@@ -264,6 +262,9 @@ func (p *vmetricsCollector) buildAggregators(profDef *ddprofiledefinition.Profil
 				p.log.Warningf("virtual metric '%s' uses group_by but sources span tables or have no table; skipping (no joins yet)", cfg.Name)
 				continue
 			}
+
+			agg.perRow = cfg.PerRow
+			agg.groupBy = cfg.GroupBy
 			agg.groupTable = table
 			agg.perGroup = make(map[string]*vmetricsGroupBucket, 64)
 		}
