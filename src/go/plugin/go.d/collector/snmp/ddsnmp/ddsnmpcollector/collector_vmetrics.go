@@ -368,18 +368,18 @@ func vmBuildGroupKey(tags map[string]string, agg *vmetricsAggregator) (string, b
 		v := tags[agg.groupBy[0]]
 		return v, v != ""
 	default:
-		var sb strings.Builder
+		agg.keyBuf.Reset()
 		for i, l := range agg.groupBy {
 			v := tags[l]
 			if v == "" {
 				return "", false
 			}
 			if i > 0 {
-				sb.WriteByte(groupKeySep)
+				agg.keyBuf.WriteByte(groupKeySep)
 			}
-			sb.WriteString(v)
+			agg.keyBuf.WriteString(v)
 		}
-		return sb.String(), true
+		return agg.keyBuf.String(), true
 	}
 }
 
