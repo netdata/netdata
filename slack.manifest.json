@@ -10,6 +10,23 @@
       "display_name": "ai-agent",
       "always_online": true
     },
+    "shortcuts": [
+      {
+        "name": "Ask Neda",
+        "type": "message",
+        "callback_id": "ask_neda",
+        "description": "Ask Neda about this message"
+      }
+    ],
+    "slash_commands": [
+      {
+        "command": "/neda",
+        "url": "https://YOUR_PUBLIC_URL/slack/commands",
+        "description": "Ask Neda",
+        "usage_hint": "<prompt>",
+        "should_escape": false
+      }
+    ],
     "app_home": {
       "home_tab_enabled": true,
       "messages_tab_enabled": true,
@@ -28,7 +45,8 @@
         "mpim:history",
         "groups:history",
         "users:read",
-        "users:read.email"
+        "users:read.email",
+        "commands"
       ]
     }
   },
@@ -37,7 +55,9 @@
       "request_url": "",
       "bot_events": [
         "app_mention",
-        "message.im"
+        "message.im",
+        "message.channels",
+        "message.groups"
       ]
     },
     "interactivity": {

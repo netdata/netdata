@@ -410,7 +410,32 @@
     "historyLimit": 50,
     "historyCharsCap": 25000,
     "botToken": "${SLACK_BOT_TOKEN}",
-    "appToken": "${SLACK_APP_TOKEN}"
+    "appToken": "${SLACK_APP_TOKEN}",
+    "routing": {
+      "default": {
+        "agent": "neda.ai",
+        "engage": ["mentions", "dms"],
+        "contextPolicy": { "channelPost": "selfOnly" }
+      },
+      "rules": [
+        {
+          "channels": ["#support"],
+          "agent": "neda.ai",
+          "engage": ["channel-posts"],
+          "promptTemplates": {
+            "channelPost": "Neda, analyze this support ticket, try to find the root cause, provide workaround if required/possible, an appropriate answer to the customer, instructions to solve the bug/issue in the codebase and mention the relevant code owners so that they will be notified"
+          }
+        },
+        {
+          "channels": ["#contact-us"],
+          "agent": "neda.ai",
+          "engage": ["channel-posts"],
+          "promptTemplates": {
+            "channelPost": "Neda, they have just posted this contact form. Please provide online intelligence about who they are (company, company-tech and person), find their exact path on posthog (focus on pre and post form submission events, check for learn and ask-netdata URLs on posthog), check hubspot and fireflies for past engagements and encharge if they were in our mailing lists before this form submission (they may have been added now). It is important to investigate how they found us (agent users, search terms, ai-assistants, etc)."
+          }
+        }
+      ]
+    }
   },
   "api": {
     "enabled": true,

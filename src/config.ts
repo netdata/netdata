@@ -27,6 +27,46 @@ const MCPServerConfigSchema = z.object({
   toolSchemas: z.record(z.string(), z.unknown()).optional(),
 });
 
+const EngageEnum = z.enum(['mentions','channel-posts','dms']);
+
+const SlackRoutingDefaultSchema = z.object({
+  agent: z.string(),
+  engage: z.array(EngageEnum).optional(),
+  promptTemplates: z.object({
+    mention: z.string().optional(),
+    dm: z.string().optional(),
+    channelPost: z.string().optional(),
+  }).partial().optional(),
+  contextPolicy: z.object({
+    channelPost: z.enum(['selfOnly','previousOnly','selfAndPrevious']).optional(),
+  }).partial().optional(),
+}).partial();
+
+const SlackRoutingRuleSchema = z.object({
+  channels: z.array(z.string()),
+  agent: z.string(),
+  engage: z.array(EngageEnum).optional(),
+  promptTemplates: z.object({
+    mention: z.string().optional(),
+    dm: z.string().optional(),
+    channelPost: z.string().optional(),
+  }).partial().optional(),
+  contextPolicy: z.object({
+    channelPost: z.enum(['selfOnly','previousOnly','selfAndPrevious']).optional(),
+  }).partial().optional(),
+});
+
+const SlackRoutingDenySchema = z.object({
+  channels: z.array(z.string()),
+  engage: z.array(EngageEnum).optional(),
+});
+
+const SlackRoutingSchema = z.object({
+  default: SlackRoutingDefaultSchema.optional(),
+  rules: z.array(SlackRoutingRuleSchema).optional(),
+  deny: z.array(SlackRoutingDenySchema).optional(),
+}).partial();
+
 const SlackConfigSchema = z.object({
   enabled: z.boolean().optional(),
   mentions: z.boolean().optional(),
@@ -36,6 +76,8 @@ const SlackConfigSchema = z.object({
   historyCharsCap: z.number().int().positive().optional(),
   botToken: z.string().optional(),
   appToken: z.string().optional(),
+  signingSecret: z.string().optional(),
+  routing: SlackRoutingSchema.optional(),
 });
 
 const ApiConfigSchema = z.object({

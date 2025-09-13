@@ -195,6 +195,39 @@ export interface Configuration {
     botToken?: string;         // ${SLACK_BOT_TOKEN}
     appToken?: string;         // ${SLACK_APP_TOKEN} (Socket Mode)
     openerTone?: 'random' | 'cheerful' | 'formal' | 'busy';
+    signingSecret?: string;    // ${SLACK_SIGNING_SECRET} for slash commands
+    // Optional per-channel routing rules
+    routing?: {
+      default?: {
+        agent: string; // path to .ai file
+        engage?: ('mentions' | 'channel-posts' | 'dms')[];
+        promptTemplates?: Partial<{
+          mention: string;
+          dm: string;
+          channelPost: string; // template for channel-posts
+        }>;
+        contextPolicy?: Partial<{
+          channelPost: 'selfOnly' | 'previousOnly' | 'selfAndPrevious';
+        }>;
+      };
+      rules?: {
+        channels: string[]; // accepts #name, C/G ids, supports wildcards (*, ?)
+        agent: string; // path to .ai file
+        engage?: ('mentions' | 'channel-posts' | 'dms')[];
+        promptTemplates?: Partial<{
+          mention: string;
+          dm: string;
+          channelPost: string;
+        }>;
+        contextPolicy?: Partial<{
+          channelPost: 'selfOnly' | 'previousOnly' | 'selfAndPrevious';
+        }>;
+      }[];
+      deny?: {
+        channels: string[];
+        engage?: ('mentions' | 'channel-posts' | 'dms')[];
+      }[];
+    };
   };
   api?: {
     enabled?: boolean;

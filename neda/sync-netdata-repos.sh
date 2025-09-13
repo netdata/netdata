@@ -80,6 +80,7 @@ EXCLUDED_REPOS=(
     "tmp-test-github-oidc" # GitHub OIDC test
     "demo_for_the_main" # Demo repository
     "corrosion"        # Corrosion
+    "analytics-ml"
 )
 
 # Colors for output
@@ -196,8 +197,8 @@ get_all_repos() {
             break
         fi
         
-        # Output repo info directly as we fetch it
-        echo "$response" | jq -r '.[] | "\(.name)|\(.clone_url)|\(.private)"'
+        # Output only non-archived repos
+        echo "$response" | jq -r '.[] | select(.archived == false) | "\(.name)|\(.clone_url)|\(.private)"'
         
         ((page++))
     done

@@ -15,6 +15,7 @@ interface SlackHeadendOptions {
   systemPrompt: string;
   verbose?: boolean;
   openerTone?: 'random' | 'cheerful' | 'formal' | 'busy';
+  resolveRoute?: (args: { kind: 'mentions'|'channel-posts'|'dms'; channelId: string; channelName?: string }) => Promise<{ sessions: SessionManager; systemPrompt: string; promptTemplates?: { mention?: string; dm?: string; channelPost?: string }; contextPolicy?: { channelPost?: 'selfOnly'|'previousOnly'|'selfAndPrevious' } } | undefined>;
 }
 
 const stripBotMention = (text: string, botUserId: string): string => text.replace(new RegExp(`<@${botUserId}>`, 'g'), '').trim();
@@ -27,6 +28,7 @@ const fmtTs = (ts: unknown): string => {
   try { return new Date(Math.round(n * 1000)).toLocaleString(); } catch { return '';
   }
 };
+const UNKNOWN_TIME = 'unknown time';
 
 // Global user label cache
 const userLabelCache = new Map<string, string>();
@@ -91,7 +93,7 @@ async function fetchContext(client: SlackClient, event: any, limit: number, char
   interface SlimMsg { ts?: string; user?: string; text?: string; bot_id?: string; username?: string; bot_profile?: { name?: string } }
   const acc: string[] = [];
   const emit = (ts: string | undefined, userLabel: string, text: string): boolean => {
-    const when = fmtTs(ts) || 'unknown time';
+    const when = fmtTs(ts) || UNKNOWN_TIME;
     const chunk = [`### ${when}, user ${userLabel} said:`, text, ''].join('\n');
     const next = acc.concat(chunk).join('\n');
     if (next.length > charsCap) return false;
@@ -311,6 +313,44 @@ async function fetchContext(client: SlackClient, event: any, limit: number, char
     return parts.length > 0 && parts[0].length > 0 ? parts[0] : label || 'there';
   };
 
+  // Default channel-post template used when no per-channel template provided
+  const DEFAULT_CHANNEL_POST_TEMPLATE = [
+    'You are responding to a channel post.',
+    'Channel: {channel.name} ({channel.id})',
+    'User: {user.label} ({user.id})',
+    'Time: {ts}',
+    'Message: {text}',
+    '',
+    'Constraints:',
+    '1) Be accurate.',
+    '2) Do not reveal internal data unless explicitly allowed for this channel persona.',
+    '3) Prefer short, direct answers.',
+  ].join('\n');
+
+  // Channel name cache and resolver
+  const channelNameCache = new Map<string, string>();
+  const getChannelName = async (client: SlackClient, channelId: string): Promise<string | undefined> => {
+    if (channelNameCache.has(channelId)) return channelNameCache.get(channelId);
+    try {
+      const info = await client.conversations.info({ channel: channelId });
+      const name = info?.channel?.name as string | undefined;
+      if (typeof name === 'string' && name.length > 0) channelNameCache.set(channelId, name);
+      return name;
+    } catch {
+      return undefined;
+    }
+  };
+
+  const getPermalink = async (client: SlackClient, channelId: string, ts: string): Promise<string | undefined> => {
+    try {
+      const r = await client.chat.getPermalink({ channel: channelId, message_ts: ts });
+      const link = r?.permalink;
+      return typeof link === 'string' && link.length > 0 ? link : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+
 export function initSlackHeadend(options: SlackHeadendOptions): void {
   const { sessionManager, app, historyLimit = 30, historyCharsCap = 8000, updateIntervalMs = 2000, enableMentions = true, enableDMs = true, systemPrompt, verbose = false } = options;
   const vlog = (msg: string): void => { if (verbose) { try { process.stderr.write(`[SRV] ← [0.0] server slack: ${msg}\n`); } catch { /* ignore */ } } };
@@ -323,6 +363,7 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
   // Guards against concurrent in-flight updates per message (channel:ts)
   const inFlight = new Set<string>();
   const closed = new Set<string>();
+  const runIdToSession = new Map<string, SessionManager>();
   // Removed upload fallback; model must output Block Kit messages
 
   const scheduleUpdate = (client: any, channel: string, ts: string, render: () => { text: string; blocks: any[] } | string, prefixBlocks?: any[]): void => {
@@ -383,9 +424,9 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
     updating.set(key, t);
   };
 
-  const extractFinalText = (runId: string): string => {
-    const result = sessionManager.getResult(runId);
-    let finalText = sessionManager.getOutput(runId) ?? '';
+  const extractFinalText = (sm: SessionManager, runId: string): string => {
+    const result = sm.getResult(runId);
+    let finalText = sm.getOutput(runId) ?? '';
     if (!finalText && result?.finalReport) {
       const fr = result.finalReport;
       finalText = fr.format === 'json' ? JSON.stringify(fr.content_json ?? {}, null, 2) : (fr.content ?? '');
@@ -397,14 +438,14 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
     return finalText;
   };
 
-  const finalizeAndPost = async (client: any, channel: string, ts: string, runId: string, meta: { error?: string }): Promise<void> => {
+  const finalizeAndPost = async (sm: SessionManager, client: any, channel: string, ts: string, runId: string, meta: { error?: string }): Promise<void> => {
     const key = `${channel}:${ts}`;
     closed.add(key);
     const pending = updating.get(key); if (pending) { clearTimeout(pending); updating.delete(key); }
     vlog('agent responded');
-    const result = sessionManager.getResult(runId);
+    const result = sm.getResult(runId);
     const slackMessages = extractSlackMessages(result);
-    let finalText = extractFinalText(runId);
+    let finalText = extractFinalText(sm, runId);
     // Fix: Check for both falsy AND empty array cases
     const hasSlackMessages = slackMessages && slackMessages.length > 0;
     if (!finalText && !hasSlackMessages) {
@@ -482,12 +523,12 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
         }
         // Post tiny stats footer as a separate small message (context)
         try {
-          const logs = sessionManager.getLogs(runId);
-          const acc = sessionManager.getAccounting(runId);
+          const logs = sm.getLogs(runId);
+          const acc = sm.getAccounting(runId);
           const snap = buildSnapshot(logs, acc, Date.now());
           // Prefer opTree-based counts when available
-          const result2 = sessionManager.getResult(runId);
-          const opTree = sessionManager.getOpTree(runId) as any | undefined;
+          const result2 = sm.getResult(runId);
+          const opTree = sm.getOpTree(runId) as any | undefined;
           const startedAt = (opTree && typeof opTree.startedAt === 'number') ? opTree.startedAt : (snap.runStartedAt ?? Date.now());
           const elapsedSec = Math.max(0, Math.round((Date.now() - startedAt) / 1000));
           const mm = Math.floor(elapsedSec / 60);
@@ -593,7 +634,9 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
     }
   };
 
-  const handleEvent = async (kind: 'mention'|'dm', args: any): Promise<void> => {
+  const KIND_CHANNEL_POST = 'channel-post' as const;
+  const ROUTE_KIND_CHANNEL_POSTS = 'channel-posts' as const;
+  const handleEvent = async (kind: 'mention'|'dm'|typeof KIND_CHANNEL_POST, args: any): Promise<void> => {
     const { event, client, context } = args;
     const channel = event.channel;
     vlog(`request received (${kind}) channel=${channel} ts=${event.ts}`);
@@ -605,24 +648,54 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
     const who = typeof event.user === 'string' && event.user.length > 0 ? event.user : undefined;
     const nameLabel = who ? await getUserLabel(client, who) : 'there';
     const fname = firstNameFrom(nameLabel);
+    // Resolve routing (mentions|dms|channel-posts)
+    const routeKind = kind === 'mention' ? 'mentions' : (kind === 'dm' ? 'dms' : ROUTE_KIND_CHANNEL_POSTS);
+    const chName = await getChannelName(client, channel);
+    const permalink = await getPermalink(client, channel, String(event.ts ?? ''));
+    const resolved = options.resolveRoute ? await options.resolveRoute({ kind: routeKind, channelId: channel, channelName: chName }) : undefined;
+    const NO_ROUTE_MSG = 'no matching routing rule for channel-post; ignoring';
+    if (routeKind === ROUTE_KIND_CHANNEL_POSTS && options.resolveRoute && !resolved) {
+      vlog(NO_ROUTE_MSG);
+      return;
+    }
     const initial = await client.chat.postMessage({ channel, thread_ts: threadTs, text: pickOpener(fname, options.openerTone ?? 'random') });
     const liveTs = String(initial.ts ?? threadTs);
-    vlog('querying slack to get the last messages');
-    const history = await fetchContext(client, event, historyLimit, historyCharsCap);
-    // Build the formal user request wrapper
+    const activeSessions = resolved?.sessions ?? sessionManager;
+    const activeSystem = resolved?.systemPrompt ?? systemPrompt;
+    // Build history and user prompt per kind
+    const history = (kind === KIND_CHANNEL_POST) ? [] : await fetchContext(client, event, historyLimit, historyCharsCap);
+    // Build the formal user request wrapper (mentions/dm default)
     const who2 = typeof event.user === 'string' && event.user.length > 0 ? event.user : undefined;
     const whoLabel = who2 ? await getUserLabel(client, who2) : 'unknown';
-    const when = fmtTs(event.ts) || 'unknown time';
-    const userPrompt = [
+    const when = fmtTs(event.ts) || UNKNOWN_TIME;
+    const defaultUserPrompt = [
       '## SLACK USER REQUEST TO ACT ON IT',
       '',
       `### ${when}, user ${whoLabel}, asked you:`,
       text,
       ''
     ].join('\n');
+    const defaultChannelPostTpl = DEFAULT_CHANNEL_POST_TEMPLATE;
+    const UNKNOWN = 'unknown';
+    const renderTemplate = (tpl: string): string => tpl
+      .replace(/{channel\.name}/g, (chName ?? UNKNOWN))
+      .replace(/{channel\.id}/g, channel)
+      .replace(/{user\.id}/g, (who ?? UNKNOWN))
+      .replace(/{user\.label}/g, whoLabel)
+      .replace(/{ts}/g, when)
+      .replace(/{text}/g, text)
+      .replace(/{message\.url}/g, (permalink ?? ''));
+    const userPrompt = (kind === KIND_CHANNEL_POST)
+      ? renderTemplate(resolved?.promptTemplates?.channelPost ?? defaultChannelPostTpl)
+      : (() => {
+        if (kind === 'mention' && resolved?.promptTemplates?.mention) return renderTemplate(resolved.promptTemplates.mention);
+        if (kind === 'dm' && resolved?.promptTemplates?.dm) return renderTemplate(resolved.promptTemplates.dm);
+        return defaultUserPrompt;
+      })();
     vlog('calling agent');
     const initialTitle = undefined;
-    const runId = options.sessionManager.startRun({ source: 'slack', teamId: context?.teamId, channelId: channel, threadTsOrSessionId: threadTs }, systemPrompt, userPrompt, history, { initialTitle });
+    const runId = activeSessions.startRun({ source: 'slack', teamId: context?.teamId, channelId: channel, threadTsOrSessionId: threadTs }, activeSystem, userPrompt, history, { initialTitle });
+    runIdToSession.set(runId, activeSessions);
     // Update the opener message to include a Cancel button
     // Persist a cancel actions block for the life of this progress message
     const openerText = pickOpener(fname, options.openerTone ?? 'random');
@@ -641,22 +714,22 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
       });
     } catch { /* ignore update issues */ }
     const render = (): { text: string; blocks: any[] } => {
-      const meta = sessionManager.getRun(runId);
+      const meta = activeSessions.getRun(runId);
       if (meta && meta.status === 'stopping') {
         // Suppress progress details while stopping
         return { text: STOPPING_TEXT, blocks: [ { type: 'section', text: { type: 'mrkdwn', text: STOPPING_TEXT } } ] } as any;
       }
       const now = Date.now();
-      const maybeTree = sessionManager.getOpTree(runId);
-      const snap = (() => {
-        try {
-          if (maybeTree && typeof maybeTree === 'object') {
-            // Prefer structural lines from opTree for hierarchy and elapsed, but overlay live totals from accounting
-            const base = buildSnapshotFromOpTree(maybeTree as any, now);
+          const maybeTree = activeSessions.getOpTree(runId);
+          const snap = (() => {
             try {
-              const logs = sessionManager.getLogs(runId);
-              const acc = sessionManager.getAccounting(runId);
-              const live = buildSnapshot(logs, acc, now);
+              if (maybeTree && typeof maybeTree === 'object') {
+                // Prefer structural lines from opTree for hierarchy and elapsed, but overlay live totals from accounting
+                const base = buildSnapshotFromOpTree(maybeTree as any, now);
+                try {
+              const logs = activeSessions.getLogs(runId);
+              const acc = activeSessions.getAccounting(runId);
+                  const live = buildSnapshot(logs, acc, now);
               // Overlay totals (tokens, cost, toolsRun) with live values for up-to-date progress
               base.totals = live.totals;
               // Overlay titles per agent from live logs
@@ -675,8 +748,8 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
             return base;
           }
         } catch { /* ignore */ }
-        const logs = sessionManager.getLogs(runId);
-        const acc = sessionManager.getAccounting(runId);
+        const logs = activeSessions.getLogs(runId);
+        const acc = activeSessions.getAccounting(runId);
         return buildSnapshot(logs, acc, now);
       })();
       const text = formatSlackStatus(snap);
@@ -710,11 +783,11 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
       });
     } catch { /* ignore */ }
     const poll = setInterval(async () => {
-      const meta = sessionManager.getRun(runId);
+      const meta = activeSessions.getRun(runId);
       if (!meta || meta.status === 'running' || meta.status === 'stopping') { scheduleUpdate(client, channel, liveTs, render); return; }
       clearInterval(poll);
       try { unsubscribe?.(); } catch { /* ignore */ }
-      await finalizeAndPost(client, channel, liveTs, runId, { error: meta.error });
+      await finalizeAndPost(activeSessions, client, channel, liveTs, runId, { error: meta.error });
     }, updateIntervalMs);
   };
 
@@ -727,6 +800,137 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
     await handleEvent('dm', args);
   });
 
+  // Channel/group posts (non-mentions). Requires message.channels/message.groups in manifest.
+  app.event('message', async (args: any) => {
+    const { event } = args;
+    const ct = event?.channel_type;
+    if (ct !== 'channel' && ct !== 'group') return;
+    if (event?.bot_id) return; // ignore bot messages
+    if (event?.subtype) return; // ignore message_changed, etc.
+    if (typeof event?.text !== 'string' || event.text.length === 0) return;
+    await handleEvent(KIND_CHANNEL_POST, args);
+  });
+
+  // Helper: check bot membership for channel
+  const isBotMember = async (client: SlackClient, channelId: string): Promise<boolean> => {
+    try {
+      const info = await client.conversations.info({ channel: channelId });
+      const ch = info?.channel as { is_member?: boolean } | undefined;
+      return ch?.is_member === true;
+    } catch {
+      return false;
+    }
+  };
+
+  // Message shortcut: Ask Neda — routes like channel-post with self-only context
+  app.shortcut('ask_neda', async (args: any) => {
+    const { ack, body, client } = args;
+    try { await ack(); } catch { /* ignore */ }
+    try {
+      const userId: string | undefined = body?.user?.id;
+      const channelId: string | undefined = body?.channel?.id ?? body?.message?.channel ?? body?.channel_id;
+      const msg = (body?.message ?? {}) as { ts?: string; thread_ts?: string; text?: string };
+      if (!channelId || !userId || !msg?.ts) return;
+      const text = typeof msg.text === 'string' ? msg.text : '';
+      if (text.length === 0) return;
+      const chName = await getChannelName(client, channelId);
+      const permalink = await getPermalink(client, channelId, msg.ts as string);
+      const whoLabel = await getUserLabel(client, userId);
+      const fname = firstNameFrom(whoLabel);
+      const routeKind = ROUTE_KIND_CHANNEL_POSTS;
+      const resolved = options.resolveRoute ? await options.resolveRoute({ kind: routeKind, channelId, channelName: chName }) : undefined;
+      const activeSessions = resolved?.sessions ?? sessionManager;
+      const activeSystem = resolved?.systemPrompt ?? systemPrompt;
+      const when = fmtTs(msg.ts) || UNKNOWN_TIME;
+      const UNKNOWN = 'unknown';
+      const renderTemplate = (tpl: string): string => tpl
+        .replace(/{channel\.name}/g, (chName ?? UNKNOWN))
+        .replace(/{channel\.id}/g, channelId)
+        .replace(/{user\.id}/g, userId)
+        .replace(/{user\.label}/g, whoLabel)
+        .replace(/{ts}/g, when)
+        .replace(/{text}/g, text)
+        .replace(/{message\.url}/g, (permalink ?? ''));
+      const userPrompt = renderTemplate(resolved?.promptTemplates?.channelPost ?? DEFAULT_CHANNEL_POST_TEMPLATE);
+      // target thread if member, otherwise DM fallback
+      const member = await isBotMember(client, channelId);
+      let targetChannel = channelId;
+      let targetThreadTs: string | undefined = (msg.thread_ts ?? msg.ts) as string | undefined;
+      if (!member) {
+        const dm = await client.conversations.open({ users: userId });
+        const dmChannel = dm?.channel?.id as string | undefined;
+        if (!dmChannel) return;
+        targetChannel = dmChannel;
+        targetThreadTs = undefined;
+      }
+      const opener = pickOpener(fname, options.openerTone ?? 'random');
+      const initial = await client.chat.postMessage({ channel: targetChannel, thread_ts: targetThreadTs, text: opener });
+      const liveTs = String(initial.ts ?? targetThreadTs ?? msg.ts);
+      const history: ConversationMessage[] = [];
+      const runId = activeSessions.startRun({ source: 'slack', teamId: body?.team?.id, channelId: targetChannel, threadTsOrSessionId: liveTs }, activeSystem, userPrompt, history, { initialTitle: undefined });
+      runIdToSession.set(runId, activeSessions);
+      const cancelActions = { type: 'actions', elements: [
+        { type: 'button', text: { type: 'plain_text', text: 'Stop' }, action_id: 'stop_run', value: runId },
+        { type: 'button', text: { type: 'plain_text', text: 'Abort' }, style: 'danger', action_id: 'cancel_run', value: runId }
+      ] } as const;
+      try { await client.chat.update({ channel: targetChannel, ts: liveTs, text: opener, blocks: [ { type: 'section', text: { type: 'mrkdwn', text: opener } } ] }); } catch { /* ignore */ }
+      const render = (): { text: string; blocks: any[] } => {
+        const meta = activeSessions.getRun(runId);
+        if (meta && meta.status === 'stopping') return { text: STOPPING_TEXT, blocks: [ { type: 'section', text: { type: 'mrkdwn', text: STOPPING_TEXT } } ] } as any;
+        const now = Date.now();
+        const maybeTree = activeSessions.getOpTree(runId);
+        const snap = (() => {
+          try {
+            if (maybeTree && typeof maybeTree === 'object') {
+              const base = buildSnapshotFromOpTree(maybeTree as any, now);
+              try {
+                const logs = activeSessions.getLogs(runId);
+                const acc = activeSessions.getAccounting(runId);
+                const live = buildSnapshot(logs, acc, now);
+                base.totals = live.totals;
+                const byAgentTitle = new Map<string, string>();
+                live.lines.forEach((ln: any) => { if (ln.title) byAgentTitle.set(ln.agentId, ln.title); });
+                (base.lines as any[]).forEach((ln: any) => { const t = byAgentTitle.get(ln.agentId); if (t) ln.title = t; });
+                if ((Array.isArray(base.lines) ? base.lines.length : 0) <= 1 && Array.isArray(live.lines) && live.lines.length > 0) {
+                  const seen = new Set<string>((base.lines as any[]).map((l: any) => `${String(l.agentId)}|${String(l.callPath ?? '')}`));
+                  live.lines.forEach((l: any) => { const key = `${String(l.agentId)}|${String(l.callPath ?? '')}`; if (!seen.has(key)) (base.lines as any[]).push(l); });
+                }
+              } catch { /* ignore overlay issues */ }
+              return base;
+            }
+          } catch { /* ignore */ }
+          const logs = activeSessions.getLogs(runId);
+          const acc = activeSessions.getAccounting(runId);
+          return buildSnapshot(logs, acc, now);
+        })();
+        const text2 = formatSlackStatus(snap);
+        const blocks = buildStatusBlocks(snap, (maybeTree as any)?.agentId, (maybeTree as any)?.startedAt);
+        try {
+          for (let i = blocks.length - 1; i >= 0; i--) { const b = blocks[i]; if (b && b.type === 'actions') { blocks.splice(i, 1); } }
+          const m2 = activeSessions.getRun(runId);
+          if (m2 && m2.status === 'running') {
+            const footerIdx = (() => { for (let i = blocks.length - 1; i >= 0; i--) { if (blocks[i]?.type === 'context') return i; } return -1; })();
+            const insertIdx = footerIdx >= 0 ? footerIdx : blocks.length;
+            blocks.splice(insertIdx, 0, cancelActions);
+          }
+        } catch { /* ignore */ }
+        return { text: text2, blocks };
+      };
+      scheduleUpdate(client, targetChannel, liveTs, render);
+      let unsubscribe: (() => void) | undefined;
+      try { unsubscribe = activeSessions.onTreeUpdate((id: string) => { if (id === runId) scheduleUpdate(client, targetChannel, liveTs, render); }); } catch { /* ignore */ }
+      const poll = setInterval(async () => {
+        const meta = activeSessions.getRun(runId);
+        if (!meta || meta.status === 'running' || meta.status === 'stopping') { scheduleUpdate(client, targetChannel, liveTs, render); return; }
+        clearInterval(poll);
+        try { unsubscribe?.(); } catch { /* ignore */ }
+        await finalizeAndPost(activeSessions, client, targetChannel, liveTs, runId, { error: meta.error });
+      }, updateIntervalMs);
+    } catch (e) {
+      elog(`shortcut ask_neda failed: ${(e as Error).message}`);
+    }
+  });
+
   // Cancel button handler
   app.action('cancel_run', async (args: any) => {
     try {
@@ -736,7 +940,8 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
       const runId = body.actions?.[0]?.value as string | undefined;
       if (!channel || !ts || !runId) return;
       // Mark run as canceled (best-effort)
-      options.sessionManager.cancelRun?.(runId, 'Canceled by user');
+      const sm = runIdToSession.get(runId) ?? options.sessionManager;
+      sm.cancelRun?.(runId, 'Canceled by user');
       // Update message
       await args.client.chat.update({ channel, ts, text: '⛔ Aborting…' });
     } catch (e) {
@@ -753,7 +958,8 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
       const ts = body.message?.ts ?? body.container?.message_ts;
       const runId = body.actions?.[0]?.value as string | undefined;
       if (!channel || !ts || !runId) return;
-      options.sessionManager.stopRun?.(runId, 'Stopping by user');
+      const sm = runIdToSession.get(runId) ?? options.sessionManager;
+      sm.stopRun?.(runId, 'Stopping by user');
       await args.client.chat.update({ channel, ts, text: STOPPING_TEXT });
     } catch (e) {
       // eslint-disable-next-line no-console
