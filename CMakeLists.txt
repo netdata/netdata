@@ -197,6 +197,7 @@ cmake_dependent_option(ENABLE_PLUGIN_SLABINFO "Enable Linux kernel SLAB allocato
 cmake_dependent_option(ENABLE_PLUGIN_SYSTEMD_JOURNAL "Enable systemd journal log collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_SYSTEMD_UNITS "Enable systemd units information collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_XENSTAT "Enable Xen domain monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
+cmake_dependent_option(ENABLE_PLUGIN_DEV "Enable collection from /dev" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 
 # Metrics exporters
 option(ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE "Enable exporting to Prometheus via remote write API" ${DEFAULT_FEATURE_STATE})
@@ -1526,6 +1527,7 @@ set(INTERNAL_COLLECTORS_FILES
         src/collectors/common-contexts/mem-pgfaults.h
         src/collectors/common-contexts/mem-available.h
         src/collectors/common-contexts/power-supply.h
+        src/collectors/common-contexts/cpu-temperature.h
 )
 
 set(INTERCOMMUNICATION_COLLECTORS_FILES
@@ -1968,6 +1970,7 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/GetPowerSupply.c
         src/collectors/windows.plugin/GetServicesStatus.c
         src/collectors/windows.plugin/GetSensors.c
+        src/collectors/windows.plugin/GetHardwareInfo.c
         src/collectors/windows.plugin/perflib-adcs.c
         src/collectors/windows.plugin/perflib-adfs.c
         src/collectors/windows.plugin/perflib-rrd.c
@@ -1988,6 +1991,11 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/perflib-exchange.c
         src/collectors/windows.plugin/perflib-numa.c
         src/collectors/windows.plugin/perflib-asp.c
+)
+
+set(WINDOWS_PLUGIN_DRIVER
+        src/collectors/windows.plugin/netdata_win_driver.c
+        src/collectors/windows.plugin/netdata_win_driver.h
 )
 
 set(PROC_PLUGIN_FILES
@@ -2577,6 +2585,28 @@ if(ENABLE_PLUGIN_APPS)
     endif()
 endif()
 
+if(ENABLE_PLUGIN_DEV)
+    set(DEV_PLUGIN_FILES
+            src/collectors/dev.plugin/plugin_dev.c
+            src/collectors/dev.plugin/plugin_dev.h
+    )
+
+    add_executable(dev.plugin ${DEV_PLUGIN_FILES})
+
+    target_link_libraries(dev.plugin libnetdata)
+
+    install(TARGETS dev.plugin
+            COMPONENT plugin-apps
+            DESTINATION usr/libexec/netdata/plugins.d)
+
+    if(BUILD_FOR_PACKAGING)
+        install(FILES
+                ${PKG_FILES_PATH}/copyright
+                COMPONENT plugin-dev
+                DESTINATION usr/share/doc/netdata-plugin-dev)
+    endif()
+endif()
+
 if(CAP_FOUND)
     set(HAVE_CAPABILITY True)
 endif()
@@ -3039,6 +3069,35 @@ if(OS_WINDOWS)
         add_executable(NetdataClaim ${CLAIM_WINDOWS_FILES} ${NETDATA_CLAIM_RES_FILES})
         target_link_libraries(NetdataClaim shell32 gdi32 msftedit)
         target_compile_options(NetdataClaim PUBLIC -mwindows)
+
+        set(NETDATA_DRIVER_FILE "${CMAKE_BINARY_DIR}/netdata_driver.sys")
+
+        add_library(netdata_driver SHARED ${WINDOWS_PLUGIN_DRIVER})
+        set_target_properties(netdata_driver PROPERTIES LIBRARY_OUTPUT_NAME "netdata_driver")
+        set_target_properties(netdata_driver PROPERTIES PREFIX "")
+        set_target_properties(netdata_driver PROPERTIES SUFFIX ".sys")
+        target_include_directories(netdata_driver PRIVATE BEFORE "/mingw64/include/ddk" "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin")
+        target_compile_options(netdata_driver PRIVATE
+                -Wall
+                -Wextra
+                -Werror
+                -ffreestanding
+                -fno-exceptions
+                -fno-stack-protector
+                -fshort-wchar
+                -mno-red-zone
+        )
+        target_link_options(netdata_driver PRIVATE
+                -Wl,--entry,DriverEntry@8
+                -nostdlib
+                -Wl,--subsystem,native
+                -Wl,--image-base,0x10000
+        )
+        target_link_libraries(netdata_driver kernel32 ntoskrnl)
+
+        install(FILES "${NETDATA_DRIVER_FILE}"
+                COMPONENT netdata_win_driver
+                DESTINATION "${BINDIR}")
 endif()
 
 target_compile_options(netdata PRIVATE

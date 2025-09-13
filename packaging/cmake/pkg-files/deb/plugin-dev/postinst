@@ -1,0 +1,12 @@
+#!/bin/sh
+
+set -e
+
+case "$1" in
+  configure|reconfigure)
+    chown root:netdata /usr/libexec/netdata/plugins.d/dev.plugin
+    chmod 4750 /usr/libexec/netdata/plugins.d/dev.plugin
+    ;;
+esac
+
+exit 0

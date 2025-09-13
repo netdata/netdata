@@ -343,7 +343,8 @@ modules:
         description: ""
       default_behavior:
         auto_detection:
-          description: ""
+          description: |
+                If the metric is not available, you will need to load the appropriate kernel module on your FreeBSD system (use coretemp for Intel or amdtemp for AMD processors).
         limits:
           description: ""
         performance_impact:
