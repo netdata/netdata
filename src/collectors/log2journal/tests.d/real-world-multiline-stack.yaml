@@ -1,0 +1,11 @@
+pattern: |
+  (?x)
+  ^(?P<TIMESTAMP>\d{4}-\d{2}-\d{2} \s+ \d{2}:\d{2}:\d{2}) \s+
+  (?P<LOG_LEVEL>\w+) \s+
+  (?P<MESSAGE>.*)
+
+inject:
+  - key: SYSLOG_IDENTIFIER
+    value: java-app
+  - key: PRIORITY
+    value: 3
