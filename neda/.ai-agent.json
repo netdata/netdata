@@ -343,6 +343,15 @@
       ],
       "enabled": true
     },
+    "filesystem_cwd": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/opt/ai-agent/mcp/fs/fs-mcp-server.js",
+        "${MCP_ROOT}"
+      ],
+      "enabled": true
+    },
     "gsc1": {
       "type": "stdio",
       "command": "/opt/neda/mcp/mcp-gsc/.venv/bin/python",

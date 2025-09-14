@@ -145,8 +145,26 @@ function resolveMCPServer(id: string, layers: ConfigLayer[], _opts?: ResolverOpt
   const obj = srvs[id] as Record<string, unknown>;
   const env = found.env ?? {};
   const expanded = expandPlaceholders(obj, (name: string) => {
+    // Preserve existing precedence: layer env first, then process.env
     const envVal = Object.prototype.hasOwnProperty.call(env, name) ? env[name] : undefined;
     const v = envVal ?? process.env[name];
+    // Special-case MCP_ROOT: if empty or missing after expansion, default to current working directory
+    if (name === 'MCP_ROOT') {
+      const resolved = typeof v === 'string' ? v : '';
+      const trimmed = resolved.trim();
+      if (trimmed.length > 0) return trimmed;
+      // Verbose log for fallback behavior (mirrors other VRB config logs)
+      if (_opts?.verbose === true) {
+        try {
+          const msg = `[VRB] \u2192 [0.0] tool mcp:${id}: MCP_ROOT empty or blank; defaulting to current working directory: ${process.cwd()}\n`;
+          // Gray color in TTY to match VRB style used elsewhere
+          // eslint-disable-next-line no-constant-binary-expression
+          const out = process.stderr.isTTY ? `\x1b[90m${msg}\x1b[0m` : msg;
+          process.stderr.write(out);
+        } catch { /* ignore */ }
+      }
+      return process.cwd();
+    }
     if (v === undefined) throw buildMissingVarError('mcp', id, found.origin, name);
     return v;
   }) as MCPServerConfig;
