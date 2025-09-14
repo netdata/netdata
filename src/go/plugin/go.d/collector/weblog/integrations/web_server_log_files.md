@@ -157,26 +157,6 @@ No action required.
 
 ### Configuration
 
-#### File
-
-The configuration file name for this integration is `go.d/web_log.conf`.
-
-The file format is YAML. Generally, the structure is:
-
-```yaml
-update_every: 1
-autodetection_retry: 0
-jobs:
-  - name: some_name1
-  - name: some_name1
-```
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config go.d/web_log.conf
-```
 #### Options
 
 Weblog is aware of how to parse and interpret the following fields (**known fields**):
@@ -344,7 +324,41 @@ regexp_config:
 
 </details>
 
-#### Examples
+
+#### via UI
+
+The **web_log** collector can be configured directly through the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the web_log data-collection job to run** and click the :gear: (**Configure this node**). This node will be responsible for collecting metrics.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _web_log_ (or scroll the list) to locate the **web_log** collector.
+5. Click the **+** next to the **web_log** collector to add a new job.
+6. Fill in the job fields, then **Test** the configuration and **Submit**.
+
+
+#### via File
+
+The configuration file name for this integration is `go.d/web_log.conf`.
+
+The file format is YAML. Generally, the structure is:
+
+```yaml
+update_every: 1
+autodetection_retry: 0
+jobs:
+  - name: some_name1
+  - name: some_name1
+```
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config go.d/web_log.conf
+```
+
+##### Examples
 There are no configuration examples.
 
 

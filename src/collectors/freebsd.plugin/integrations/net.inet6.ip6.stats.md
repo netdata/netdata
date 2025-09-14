@@ -83,7 +83,24 @@ No action required.
 
 ### Configuration
 
-#### File
+#### Options
+
+
+
+<details open><summary>Config options</summary>
+
+| Name | Description | Default | Required |
+|:----|:-----------|:-------|:--------:|
+| ipv6 packets | Enable or disable ipv6 packet metric. | auto | no |
+| ipv6 fragments sent | Enable or disable ipv6 fragments sent metric. | auto | no |
+| ipv6 fragments assembly | Enable or disable ipv6 fragments assembly metric. | auto | no |
+| ipv6 errors | Enable or disable ipv6 errors metric. | auto | no |
+
+</details>
+
+
+
+#### via File
 
 The configuration file name for this integration is `netdata.conf`.
 Configuration for this specific integration is located in the `[plugin:freebsd:net.inet6.ip6.stats]` section within that file.
@@ -105,22 +122,8 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config netdata.conf
 ```
-#### Options
 
-
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| ipv6 packets | Enable or disable ipv6 packet metric. | auto | no |
-| ipv6 fragments sent | Enable or disable ipv6 fragments sent metric. | auto | no |
-| ipv6 fragments assembly | Enable or disable ipv6 fragments assembly metric. | auto | no |
-| ipv6 errors | Enable or disable ipv6 errors metric. | auto | no |
-
-</details>
-
-#### Examples
+##### Examples
 There are no configuration examples.
 
 

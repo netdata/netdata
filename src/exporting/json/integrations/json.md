@@ -31,18 +31,6 @@ further analysis, or correlation with data from other sources
 
 ### Configuration
 
-#### File
-
-The configuration file name for this integration is `exporting.conf`.
-
-
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config exporting.conf
-```
 #### Options
 
 The following options can be defined for this exporter.
@@ -120,9 +108,24 @@ different : disks with device-mapper, interrupts, QoS classes, statsd synthetic 
 
 </details>
 
-#### Examples
 
-##### Basic configuration
+
+#### via File
+
+The configuration file name for this integration is `exporting.conf`.
+
+
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config exporting.conf
+```
+
+##### Examples
+
+###### Basic configuration
 
 
 
@@ -132,7 +135,7 @@ different : disks with device-mapper, interrupts, QoS classes, statsd synthetic 
     destination = localhost:5448
 
 ```
-##### Configuration with HTTPS and HTTP authentication
+###### Configuration with HTTPS and HTTP authentication
 
 Add `:https` modifier to the connector type if you need to use the TLS/SSL protocol. For example: `json:https:my_json_instance`.
 

@@ -122,16 +122,19 @@ No action required.
 
 ### Configuration
 
-#### File
-
-There is no configuration file.
 #### Options
 
 
 
 There are no configuration options.
 
-#### Examples
+
+
+#### via File
+
+There is no configuration file.
+
+##### Examples
 There are no configuration examples.
 
 

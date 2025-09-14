@@ -100,7 +100,22 @@ The CUPS server must be installed and running. If you installed `netdata` using 
 
 ### Configuration
 
-#### File
+#### Options
+
+
+
+<details open><summary>Config options</summary>
+
+| Name | Description | Default | Required |
+|:----|:-----------|:-------|:--------:|
+| update every | Data collection frequency. | 1 | no |
+| command options | Additional parameters for the collector |  | no |
+
+</details>
+
+
+
+#### via File
 
 The configuration file name for this integration is `netdata.conf`.
 Configuration for this specific integration is located in the `[plugin:cups]` section within that file.
@@ -122,20 +137,8 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config netdata.conf
 ```
-#### Options
 
-
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update every | Data collection frequency. | 1 | no |
-| command options | Additional parameters for the collector |  | no |
-
-</details>
-
-#### Examples
+##### Examples
 There are no configuration examples.
 
 

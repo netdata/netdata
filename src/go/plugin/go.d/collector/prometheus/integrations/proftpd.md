@@ -89,26 +89,6 @@ Install [ProFTPD Exporter](https://github.com/transnano/proftpd_exporter) by fol
 
 ### Configuration
 
-#### File
-
-The configuration file name for this integration is `go.d/prometheus.conf`.
-
-The file format is YAML. Generally, the structure is:
-
-```yaml
-update_every: 1
-autodetection_retry: 0
-jobs:
-  - name: some_name1
-  - name: some_name1
-```
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config go.d/prometheus.conf
-```
 #### Options
 
 The following options can be defined globally: update_every, autodetection_retry.
@@ -180,9 +160,43 @@ fallback_type:
 
 </details>
 
-#### Examples
 
-##### Basic
+#### via UI
+
+The **prometheus** collector can be configured directly through the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the prometheus data-collection job to run** and click the :gear: (**Configure this node**). This node will be responsible for collecting metrics.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _prometheus_ (or scroll the list) to locate the **prometheus** collector.
+5. Click the **+** next to the **prometheus** collector to add a new job.
+6. Fill in the job fields, then **Test** the configuration and **Submit**.
+
+
+#### via File
+
+The configuration file name for this integration is `go.d/prometheus.conf`.
+
+The file format is YAML. Generally, the structure is:
+
+```yaml
+update_every: 1
+autodetection_retry: 0
+jobs:
+  - name: some_name1
+  - name: some_name1
+```
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config go.d/prometheus.conf
+```
+
+##### Examples
+
+###### Basic
 
 > **Note**: Change the port of the monitored application on which it provides metrics.
 
@@ -195,7 +209,7 @@ jobs:
     url: http://127.0.0.1:9090/metrics
 
 ```
-##### Read metrics from a file
+###### Read metrics from a file
 
 An example configuration to read metrics from a file.
 
@@ -210,7 +224,7 @@ jobs:
 ```
 </details>
 
-##### HTTP authentication
+###### HTTP authentication
 
 > **Note**: Change the port of the monitored application on which it provides metrics.
 
@@ -229,7 +243,7 @@ jobs:
 ```
 </details>
 
-##### HTTPS with self-signed certificate
+###### HTTPS with self-signed certificate
 
 > **Note**: Change the port of the monitored application on which it provides metrics.
 
@@ -247,7 +261,7 @@ jobs:
 ```
 </details>
 
-##### Multi-instance
+###### Multi-instance
 
 > **Note**: When you define multiple jobs, their names must be unique.
 > **Note**: Change the port of the monitored application on which it provides metrics.

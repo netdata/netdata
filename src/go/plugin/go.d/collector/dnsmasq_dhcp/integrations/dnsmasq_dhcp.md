@@ -113,7 +113,37 @@ No action required.
 
 ### Configuration
 
-#### File
+#### Options
+
+The following options can be defined globally: update_every, autodetection_retry.
+
+
+<details open><summary>Config options</summary>
+
+| Name | Description | Default | Required |
+|:----|:-----------|:-------|:--------:|
+| update_every | Data collection frequency. | 1 | no |
+| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
+| leases_path | Path to dnsmasq DHCP leases file. | /var/lib/misc/dnsmasq.leases | no |
+| conf_path | Path to dnsmasq configuration file. | /etc/dnsmasq.conf | no |
+| conf_dir | Path to dnsmasq configuration directory. | /etc/dnsmasq.d,.dpkg-dist,.dpkg-old,.dpkg-new | no |
+
+</details>
+
+
+#### via UI
+
+The **dnsmasq_dhcp** collector can be configured directly through the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the dnsmasq_dhcp data-collection job to run** and click the :gear: (**Configure this node**). This node will be responsible for collecting metrics.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _dnsmasq_dhcp_ (or scroll the list) to locate the **dnsmasq_dhcp** collector.
+5. Click the **+** next to the **dnsmasq_dhcp** collector to add a new job.
+6. Fill in the job fields, then **Test** the configuration and **Submit**.
+
+
+#### via File
 
 The configuration file name for this integration is `go.d/dnsmasq_dhcp.conf`.
 
@@ -133,26 +163,10 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config go.d/dnsmasq_dhcp.conf
 ```
-#### Options
 
-The following options can be defined globally: update_every, autodetection_retry.
+##### Examples
 
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update_every | Data collection frequency. | 1 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| leases_path | Path to dnsmasq DHCP leases file. | /var/lib/misc/dnsmasq.leases | no |
-| conf_path | Path to dnsmasq configuration file. | /etc/dnsmasq.conf | no |
-| conf_dir | Path to dnsmasq configuration directory. | /etc/dnsmasq.d,.dpkg-dist,.dpkg-old,.dpkg-new | no |
-
-</details>
-
-#### Examples
-
-##### Basic
+###### Basic
 
 An example configuration.
 
@@ -168,7 +182,7 @@ jobs:
 ```
 </details>
 
-##### Pi-hole
+###### Pi-hole
 
 Dnsmasq DHCP on Pi-hole.
 

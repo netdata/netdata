@@ -243,7 +243,37 @@ Create a read-only user for Netdata in the admin database.
 
 ### Configuration
 
-#### File
+#### Options
+
+The following options can be defined globally: update_every, autodetection_retry.
+
+
+<details open><summary>Config options</summary>
+
+| Name | Description | Default | Required |
+|:----|:-----------|:-------|:--------:|
+| update_every | Data collection frequency. | 5 | no |
+| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
+| uri | MongoDB connection string. See [URI syntax](https://www.mongodb.com/docs/manual/reference/connection-string/). | mongodb://localhost:27017 | yes |
+| timeout | Query timeout in seconds. | 1 | no |
+| databases | Databases selector. Determines which database metrics will be collected. |  | no |
+
+</details>
+
+
+#### via UI
+
+The **mongodb** collector can be configured directly through the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the mongodb data-collection job to run** and click the :gear: (**Configure this node**). This node will be responsible for collecting metrics.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _mongodb_ (or scroll the list) to locate the **mongodb** collector.
+5. Click the **+** next to the **mongodb** collector to add a new job.
+6. Fill in the job fields, then **Test** the configuration and **Submit**.
+
+
+#### via File
 
 The configuration file name for this integration is `go.d/mongodb.conf`.
 
@@ -263,26 +293,10 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config go.d/mongodb.conf
 ```
-#### Options
 
-The following options can be defined globally: update_every, autodetection_retry.
+##### Examples
 
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update_every | Data collection frequency. | 5 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| uri | MongoDB connection string. See [URI syntax](https://www.mongodb.com/docs/manual/reference/connection-string/). | mongodb://localhost:27017 | yes |
-| timeout | Query timeout in seconds. | 1 | no |
-| databases | Databases selector. Determines which database metrics will be collected. |  | no |
-
-</details>
-
-#### Examples
-
-##### TCP socket
+###### TCP socket
 
 An example configuration.
 
@@ -296,7 +310,7 @@ jobs:
 ```
 </details>
 
-##### With databases metrics
+###### With databases metrics
 
 An example configuration.
 
@@ -313,7 +327,7 @@ jobs:
 ```
 </details>
 
-##### Multi-instance
+###### Multi-instance
 
 > **Note**: When you define multiple jobs, their names must be unique.
 

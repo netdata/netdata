@@ -110,23 +110,6 @@ Make sure the path `/sbin/ipsec` matches your setup (execute `which ipsec` to fi
 
 ### Configuration
 
-#### File
-
-The configuration file name for this integration is `charts.d/libreswan.conf`.
-
-The file format is POSIX shell script. Generally, the structure is:
-
-```sh
-OPTION_1="some value"
-OPTION_2="some other value"
-```
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config charts.d/libreswan.conf
-```
 #### Options
 
 The config file is sourced by the charts.d plugin. It's a standard bash file.
@@ -145,9 +128,29 @@ The following collapsed table contains all the options that can be configured fo
 
 </details>
 
-#### Examples
 
-##### Run `ipsec` without sudo
+
+#### via File
+
+The configuration file name for this integration is `charts.d/libreswan.conf`.
+
+The file format is POSIX shell script. Generally, the structure is:
+
+```sh
+OPTION_1="some value"
+OPTION_2="some other value"
+```
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config charts.d/libreswan.conf
+```
+
+##### Examples
+
+###### Run `ipsec` without sudo
 
 Run the `ipsec` utility without sudo
 

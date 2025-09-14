@@ -33,18 +33,6 @@ Export metrics to Google Cloud Pub/Sub Service
 
 ### Configuration
 
-#### File
-
-The configuration file name for this integration is `exporting.conf`.
-
-
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config exporting.conf
-```
 #### Options
 
 The following options can be defined for this exporter.
@@ -122,9 +110,24 @@ different : disks with device-mapper, interrupts, QoS classes, statsd synthetic 
 
 </details>
 
-#### Examples
 
-##### Basic configuration
+
+#### via File
+
+The configuration file name for this integration is `exporting.conf`.
+
+
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config exporting.conf
+```
+
+##### Examples
+
+###### Basic configuration
 
 - Set the destination option to a Pub/Sub service endpoint. pubsub.googleapis.com is the default one.
 - Create the credentials JSON file by following Google Cloud's authentication guide.

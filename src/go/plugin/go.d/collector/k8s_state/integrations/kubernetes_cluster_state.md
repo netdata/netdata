@@ -220,7 +220,26 @@ No action required.
 
 ### Configuration
 
-#### File
+#### Options
+
+
+
+There are no configuration options.
+
+
+#### via UI
+
+The **k8s_state** collector can be configured directly through the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the k8s_state data-collection job to run** and click the :gear: (**Configure this node**). This node will be responsible for collecting metrics.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _k8s_state_ (or scroll the list) to locate the **k8s_state** collector.
+5. Click the **+** next to the **k8s_state** collector to add a new job.
+6. Fill in the job fields, then **Test** the configuration and **Submit**.
+
+
+#### via File
 
 The configuration file name for this integration is `go.d/k8s_state.conf`.
 
@@ -240,13 +259,8 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config go.d/k8s_state.conf
 ```
-#### Options
 
-
-
-There are no configuration options.
-
-#### Examples
+##### Examples
 There are no configuration examples.
 
 

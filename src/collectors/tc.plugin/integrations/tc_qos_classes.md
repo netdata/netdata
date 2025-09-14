@@ -101,7 +101,22 @@ tc_show="class"
 
 ### Configuration
 
-#### File
+#### Options
+
+
+
+<details open><summary>Config option</summary>
+
+| Name | Description | Default | Required |
+|:----|:-----------|:-------|:--------:|
+| script to run to get tc values | Path to script `tc-qos-helper.sh` | usr/libexec/netdata/plugins.d/tc-qos-helper.s | no |
+| enable show all classes and qdiscs for all interfaces | yes/no flag to control what data is presented. | yes | no |
+
+</details>
+
+
+
+#### via File
 
 The configuration file name for this integration is `netdata.conf`.
 Configuration for this specific integration is located in the `[plugin:tc]` section within that file.
@@ -123,22 +138,10 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config netdata.conf
 ```
-#### Options
 
+##### Examples
 
-
-<details open><summary>Config option</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| script to run to get tc values | Path to script `tc-qos-helper.sh` | usr/libexec/netdata/plugins.d/tc-qos-helper.s | no |
-| enable show all classes and qdiscs for all interfaces | yes/no flag to control what data is presented. | yes | no |
-
-</details>
-
-#### Examples
-
-##### Basic
+###### Basic
 
 A basic example configuration using classes defined in `/etc/iproute2/tc_cls`.
 

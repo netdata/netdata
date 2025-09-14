@@ -90,7 +90,38 @@ No action required.
 
 ### Configuration
 
-#### File
+#### Options
+
+The following options can be defined globally: update_every, autodetection_retry.
+
+
+<details open><summary>Config options</summary>
+
+| Name | Description | Default | Required |
+|:----|:-----------|:-------|:--------:|
+| update_every | Data collection frequency. | 60 | no |
+| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
+| source | Domain address. |  | yes |
+| days_until_expiration_warning | Number of days before the alarm status is warning. | 30 | no |
+| days_until_expiration_critical | Number of days before the alarm status is critical. | 15 | no |
+| timeout | The query timeout in seconds. | 5 | no |
+
+</details>
+
+
+#### via UI
+
+The **whoisquery** collector can be configured directly through the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the whoisquery data-collection job to run** and click the :gear: (**Configure this node**). This node will be responsible for collecting metrics.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _whoisquery_ (or scroll the list) to locate the **whoisquery** collector.
+5. Click the **+** next to the **whoisquery** collector to add a new job.
+6. Fill in the job fields, then **Test** the configuration and **Submit**.
+
+
+#### via File
 
 The configuration file name for this integration is `go.d/whoisquery.conf`.
 
@@ -110,27 +141,10 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config go.d/whoisquery.conf
 ```
-#### Options
 
-The following options can be defined globally: update_every, autodetection_retry.
+##### Examples
 
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update_every | Data collection frequency. | 60 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| source | Domain address. |  | yes |
-| days_until_expiration_warning | Number of days before the alarm status is warning. | 30 | no |
-| days_until_expiration_critical | Number of days before the alarm status is critical. | 15 | no |
-| timeout | The query timeout in seconds. | 5 | no |
-
-</details>
-
-#### Examples
-
-##### Basic
+###### Basic
 
 Basic configuration example
 
@@ -144,7 +158,7 @@ jobs:
 ```
 </details>
 
-##### Multi-instance
+###### Multi-instance
 
 > **Note**: When you define more than one job, their names must be unique.
 

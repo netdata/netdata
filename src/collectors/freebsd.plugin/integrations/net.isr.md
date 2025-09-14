@@ -99,7 +99,22 @@ No action required.
 
 ### Configuration
 
-#### File
+#### Options
+
+
+
+<details open><summary>Config options</summary>
+
+| Name | Description | Default | Required |
+|:----|:-----------|:-------|:--------:|
+| netisr | Enable or disable general vision about softnet stat metrics. | yes | no |
+| netisr per core | Enable or disable softnet stat metric per core. | yes | no |
+
+</details>
+
+
+
+#### via File
 
 The configuration file name for this integration is `netdata.conf`.
 Configuration for this specific integration is located in the `[plugin:freebsd:net.isr]` section within that file.
@@ -121,20 +136,8 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config netdata.conf
 ```
-#### Options
 
-
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| netisr | Enable or disable general vision about softnet stat metrics. | yes | no |
-| netisr per core | Enable or disable softnet stat metric per core. | yes | no |
-
-</details>
-
-#### Examples
+##### Examples
 There are no configuration examples.
 
 

@@ -116,7 +116,38 @@ No action required.
 
 ### Configuration
 
-#### File
+#### Options
+
+The following options can be defined globally: update_every, autodetection_retry.
+
+
+<details open><summary>Config options</summary>
+
+| Name | Description | Default | Required |
+|:----|:-----------|:-------|:--------:|
+| update_every | Data collection frequency. | 1 | no |
+| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
+| address | Docker daemon's listening address. When using a TCP socket, the format is: tcp://[ip]:[port] | unix:///var/run/docker.sock | yes |
+| timeout | Request timeout in seconds. | 2 | no |
+| container_selector | [Pattern](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme) to specify which containers to monitor. | * | no |
+| collect_container_size | Whether to collect container writable layer size. | no | no |
+
+</details>
+
+
+#### via UI
+
+The **docker** collector can be configured directly through the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the docker data-collection job to run** and click the :gear: (**Configure this node**). This node will be responsible for collecting metrics.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _docker_ (or scroll the list) to locate the **docker** collector.
+5. Click the **+** next to the **docker** collector to add a new job.
+6. Fill in the job fields, then **Test** the configuration and **Submit**.
+
+
+#### via File
 
 The configuration file name for this integration is `go.d/docker.conf`.
 
@@ -136,27 +167,10 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config go.d/docker.conf
 ```
-#### Options
 
-The following options can be defined globally: update_every, autodetection_retry.
+##### Examples
 
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update_every | Data collection frequency. | 1 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| address | Docker daemon's listening address. When using a TCP socket, the format is: tcp://[ip]:[port] | unix:///var/run/docker.sock | yes |
-| timeout | Request timeout in seconds. | 2 | no |
-| container_selector | [Pattern](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme) to specify which containers to monitor. | * | no |
-| collect_container_size | Whether to collect container writable layer size. | no | no |
-
-</details>
-
-#### Examples
-
-##### Basic
+###### Basic
 
 An example configuration.
 
@@ -166,7 +180,7 @@ jobs:
     address: 'unix:///var/run/docker.sock'
 
 ```
-##### Multi-instance
+###### Multi-instance
 
 > **Note**: When you define multiple jobs, their names must be unique.
 

@@ -97,7 +97,35 @@ Make sure the `iw` utility is installed.
 
 ### Configuration
 
-#### File
+#### Options
+
+The following options can be defined globally: update_every.
+
+
+<details open><summary>Config options</summary>
+
+| Name | Description | Default | Required |
+|:----|:-----------|:-------|:--------:|
+| update_every | Data collection frequency. | 10 | no |
+| binary_path | Path to the `iw` binary. If an absolute path is provided, the collector will use it directly; otherwise, it will search for the binary in directories specified in the PATH environment variable. | /usr/sbin/iw | yes |
+| timeout | Timeout for executing the binary, specified in seconds. | 2 | no |
+
+</details>
+
+
+#### via UI
+
+The **ap** collector can be configured directly through the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the ap data-collection job to run** and click the :gear: (**Configure this node**). This node will be responsible for collecting metrics.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _ap_ (or scroll the list) to locate the **ap** collector.
+5. Click the **+** next to the **ap** collector to add a new job.
+6. Fill in the job fields, then **Test** the configuration and **Submit**.
+
+
+#### via File
 
 The configuration file name for this integration is `go.d/ap.conf`.
 
@@ -117,24 +145,10 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config go.d/ap.conf
 ```
-#### Options
 
-The following options can be defined globally: update_every.
+##### Examples
 
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update_every | Data collection frequency. | 10 | no |
-| binary_path | Path to the `iw` binary. If an absolute path is provided, the collector will use it directly; otherwise, it will search for the binary in directories specified in the PATH environment variable. | /usr/sbin/iw | yes |
-| timeout | Timeout for executing the binary, specified in seconds. | 2 | no |
-
-</details>
-
-#### Examples
-
-##### Custom binary path
+###### Custom binary path
 
 The executable is not in the directories specified in the PATH environment variable.
 

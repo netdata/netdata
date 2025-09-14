@@ -135,7 +135,38 @@ No action required.
 
 ### Configuration
 
-#### File
+#### Options
+
+The following options can be defined globally: update_every, autodetection_retry.
+
+
+<details open><summary>Config options</summary>
+
+| Name | Description | Default | Required |
+|:----|:-----------|:-------|:--------:|
+| update_every | Data collection frequency. | 5 | no |
+| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
+| host | Remote host address in IPv4, IPv6 format, or DNS name. |  | yes |
+| ports | Target TCP ports. Must be specified in numeric format. |  | no |
+| udp_ports | Target UDP ports. Must be specified in numeric format. |  | no |
+| timeout | HTTP request timeout. | 2 | no |
+
+</details>
+
+
+#### via UI
+
+The **portcheck** collector can be configured directly through the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the portcheck data-collection job to run** and click the :gear: (**Configure this node**). This node will be responsible for collecting metrics.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _portcheck_ (or scroll the list) to locate the **portcheck** collector.
+5. Click the **+** next to the **portcheck** collector to add a new job.
+6. Fill in the job fields, then **Test** the configuration and **Submit**.
+
+
+#### via File
 
 The configuration file name for this integration is `go.d/portcheck.conf`.
 
@@ -155,27 +186,10 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config go.d/portcheck.conf
 ```
-#### Options
 
-The following options can be defined globally: update_every, autodetection_retry.
+##### Examples
 
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update_every | Data collection frequency. | 5 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| host | Remote host address in IPv4, IPv6 format, or DNS name. |  | yes |
-| ports | Target TCP ports. Must be specified in numeric format. |  | no |
-| udp_ports | Target UDP ports. Must be specified in numeric format. |  | no |
-| timeout | HTTP request timeout. | 2 | no |
-
-</details>
-
-#### Examples
-
-##### Check TCP ports (IPv4)
+###### Check TCP ports (IPv4)
 
 An example configuration.
 
@@ -192,7 +206,7 @@ jobs:
 ```
 </details>
 
-##### Check TCP ports (IPv6)
+###### Check TCP ports (IPv6)
 
 An example configuration.
 
@@ -209,7 +223,7 @@ jobs:
 ```
 </details>
 
-##### Check UDP ports (IPv4)
+###### Check UDP ports (IPv4)
 
 An example configuration.
 
@@ -226,7 +240,7 @@ jobs:
 ```
 </details>
 
-##### Check UDP ports (IPv6)
+###### Check UDP ports (IPv6)
 
 An example configuration.
 
@@ -243,7 +257,7 @@ jobs:
 ```
 </details>
 
-##### Multi-instance
+###### Multi-instance
 
 > **Note**: When you define multiple jobs, their names must be unique.
 

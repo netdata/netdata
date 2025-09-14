@@ -84,7 +84,23 @@ No action required.
 
 ### Configuration
 
-#### File
+#### Options
+
+
+
+<details open><summary>Config options</summary>
+
+| Name | Description | Default | Required |
+|:----|:-----------|:-------|:--------:|
+| counters for static rules | Enable or disable counters for static rules  metric. | yes | no |
+| number of dynamic rules | Enable or disable number of dynamic rules metric. | yes | no |
+| allocated memory | Enable or disable allocated memory metric. | yes | no |
+
+</details>
+
+
+
+#### via File
 
 The configuration file name for this integration is `netdata.conf`.
 Configuration for this specific integration is located in the `[plugin:freebsd:ipfw]` section within that file.
@@ -106,21 +122,8 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config netdata.conf
 ```
-#### Options
 
-
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| counters for static rules | Enable or disable counters for static rules  metric. | yes | no |
-| number of dynamic rules | Enable or disable number of dynamic rules metric. | yes | no |
-| allocated memory | Enable or disable allocated memory metric. | yes | no |
-
-</details>
-
-#### Examples
+##### Examples
 There are no configuration examples.
 
 

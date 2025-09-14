@@ -94,16 +94,19 @@ To have these charts you need to compile netdata with flag `NETDATA_DEV_MODE`.
 
 ### Configuration
 
-#### File
-
-There is no configuration file.
 #### Options
 
 
 
 There are no configuration options.
 
-#### Examples
+
+
+#### via File
+
+There is no configuration file.
+
+##### Examples
 There are no configuration examples.
 
 
