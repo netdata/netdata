@@ -83,90 +83,34 @@ modules:
             enabled: true
           list:
             - name: update_every
+              group: Base
               description: Data collection frequency.
               default_value: 10
               required: false
             - name: autodetection_retry
+              group: Base
               description: Recheck interval in seconds. Zero means no recheck will be scheduled.
               default_value: 0
               required: false
             - name: hostname
+              group: Base
               description: Target host (IP or DNS name, IPv4/IPv6).
               default_value: ""
               required: true
-            - name: enable_profiles
-              description: Enable collection of metrics using SNMP profiles.
-              default_value: "true"
-              required: false
-            - name: enable_profiles_table_metrics
-              description: Enable collection of SNMP table metrics from profiles. Enabling this may **increase collection time and memory usage** for devices with many network interfaces.
-              default_value: "true"
-              required: false
-            - name: disable_legacy_collection
-              description: Disable the legacy SNMP collection method, forcing the collector to use only SNMP profiles (YAML-based configuration). When enabled, the collector will ignore any non-profile based collection logic.
-              default_value: "false"
-              required: false
-            - name: create_vnode
-              description: If set, the collector will create a Netdata Virtual Node for this SNMP device, which will appear as a separate Node in Netdata.
-              default_value: "true"
-              required: false
-            - name: vnode_device_down_threshold
-              description: Number of consecutive failed data collections before marking the device as down.
-              default_value: 3
-              required: false
-            - name: vnode.guid
-              description: A unique identifier for the Virtual Node. If not set, a GUID will be automatically generated from the device's IP address.
-              default_value: ""
-              required: false
-            - name: vnode.hostname
-              description: The hostname that will be used for the Virtual Node. If not set, the device's hostname will be used.
-              default_value: ""
-              required: false
-            - name: vnode.labels
-              description: Additional key-value pairs to associate with the Virtual Node.
-              default_value: ""
-              required: false
+
             - name: community
+              group: SNMPv1/2
               description: SNMPv1/2 community string.
               default_value: public
               required: false
-            - name: options.version
-              description: "SNMP version. Available versions: 1, 2, 3."
-              default_value: 2
-              required: false
-            - name: options.port
-              description: Target port.
-              default_value: 161
-              required: false
-            - name: options.retries
-              description: Retries to attempt.
-              default_value: 1
-              required: false
-            - name: options.timeout
-              description: SNMP request/response timeout.
-              default_value: 5
-              required: false
-            - name: options.max_repetitions
-              description: Controls how many SNMP variables to retrieve in a single GETBULK request.
-              default_value: 25
-              required: false
-            - name: options.max_request_size
-              description: Maximum number of OIDs allowed in a single GET request.
-              default_value: 60
-              required: false
-            - name: network_interface_filter.by_name
-              description: "Filter interfaces by their names using [simple patterns](/src/libnetdata/simple_pattern/README.md#simple-patterns)."
-              default_value: ""
-              required: false
-            - name: network_interface_filter.by_type
-              description: "Filter interfaces by their types using [simple patterns](/src/libnetdata/simple_pattern/README.md#simple-patterns)."
-              default_value: ""
-              required: false
+
             - name: user.name
+              group: SNMPv3
               description: SNMPv3 user name.
               default_value: ""
               required: false
             - name: user.level
+              group: SNMPv3
               description: Security level of SNMPv3 messages.
               default_value: ""
               required: false
@@ -179,6 +123,7 @@ modules:
                 |  authNoPriv  |     2     | message authentication and no encryption |
                 |   authPriv   |     3     | message authentication and encryption    |
             - name: user.auth_proto
+              group: SNMPv3
               description: Authentication protocol for SNMPv3 messages.
               default_value: ""
               required: false
@@ -195,10 +140,12 @@ modules:
                 |    sha384    |     6     | SHA message authentication (HMAC-SHA-384) |
                 |    sha512    |     7     | SHA message authentication (HMAC-SHA-512) |
             - name: user.auth_key
+              group: SNMPv3
               description: Authentication protocol pass phrase for SNMPv3 messages.
               default_value: ""
               required: false
             - name: user.priv_proto
+              group: SNMPv3
               description: Privacy protocol for SNMPv3 messages.
               default_value: ""
               required: false
@@ -215,7 +162,92 @@ modules:
                 |   aes192c    |     6     | 192-bit AES encryption (CFB-AES-192) with "Reeder" key localization     |
                 |   aes256c    |     7     | 256-bit AES encryption (CFB-AES-256) with "Reeder" key localization     |
             - name: user.priv_key
+              group: SNMPv3
               description: Privacy protocol pass phrase for SNMPv3 messages.
+              default_value: ""
+              required: false
+
+            - name: options.version
+              group: SNMP transport
+              description: "SNMP version. Available versions: 1, 2, 3."
+              default_value: 2
+              required: false
+            - name: options.port
+              group: SNMP transport
+              description: Target port.
+              default_value: 161
+              required: false
+            - name: options.retries
+              group: SNMP transport
+              description: Retries to attempt.
+              default_value: 1
+              required: false
+            - name: options.timeout
+              group: SNMP transport
+              description: SNMP request/response timeout.
+              default_value: 5
+              required: false
+            - name: options.max_repetitions
+              group: SNMP transport
+              description: Controls how many SNMP variables to retrieve in a single GETBULK request.
+              default_value: 25
+              required: false
+            - name: options.max_request_size
+              group: SNMP transport
+              description: Maximum number of OIDs allowed in a single GET request.
+              default_value: 60
+              required: false
+
+            - name: enable_profiles
+              group: Profiles
+              description: Enable collection of metrics using SNMP profiles.
+              default_value: "true"
+              required: false
+            - name: enable_profiles_table_metrics
+              group: Profiles
+              description: Enable collection of SNMP table metrics from profiles. Enabling this may **increase collection time and memory usage** for devices with many network interfaces.
+              default_value: "true"
+              required: false
+            - name: disable_legacy_collection
+              group: Profiles
+              description: Disable the legacy SNMP collection method, forcing the collector to use only SNMP profiles (YAML-based configuration). When enabled, the collector will ignore any non-profile based collection logic.
+              default_value: "false"
+              required: false
+
+            - name: create_vnode
+              group: Virtual node
+              description: If set, the collector will create a Netdata Virtual Node for this SNMP device, which will appear as a separate Node in Netdata.
+              default_value: "true"
+              required: false
+            - name: vnode_device_down_threshold
+              group: Virtual node
+              description: Number of consecutive failed data collections before marking the device as down.
+              default_value: 3
+              required: false
+            - name: vnode.guid
+              group: Virtual node
+              description: A unique identifier for the Virtual Node. If not set, a GUID will be automatically generated from the device's IP address.
+              default_value: ""
+              required: false
+            - name: vnode.hostname
+              group: Virtual node
+              description: The hostname that will be used for the Virtual Node. If not set, the device's hostname will be used.
+              default_value: ""
+              required: false
+            - name: vnode.labels
+              group: Virtual node
+              description: Additional key-value pairs to associate with the Virtual Node.
+              default_value: ""
+              required: false
+
+            - name: network_interface_filter.by_name
+              group: Filters
+              description: "Filter interfaces by their names using [simple patterns](/src/libnetdata/simple_pattern/README.md#simple-patterns)."
+              default_value: ""
+              required: false
+            - name: network_interface_filter.by_type
+              group: Filters
+              description: "Filter interfaces by their types using [simple patterns](/src/libnetdata/simple_pattern/README.md#simple-patterns)."
               default_value: ""
               required: false
         examples:

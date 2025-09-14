@@ -158,13 +158,17 @@
                         "type": "string",
                         "description": "Option name."
                       },
+                      "group": {
+                        "type": "string",
+                        "description": "Optional group name. Used to organize related options together in documentation tables."
+                      },
                       "description": {
                         "type": "string",
                         "description": "Option description. Must be short. Use 'detailed_description' for a long description."
                       },
                       "detailed_description": {
                         "type": "string",
-                        "description": "Option detailed description. Use it to describe in details complex options."
+                        "description": "Option detailed description. Use it to describe in detail complex options."
                       },
                       "default_value": {
                         "type": [
