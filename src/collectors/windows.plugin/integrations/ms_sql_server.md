@@ -174,6 +174,7 @@ There are no alerts configured by default for this integration.
 
 ## Setup
 
+
 ### Prerequisites
 
 #### Configure SQL Server for Monitoring

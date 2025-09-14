@@ -22,6 +22,7 @@ You can send Netdata alerts to Alerta to see alerts coming from many Netdata hos
 
 ## Setup
 
+
 ### Prerequisites
 
 #### 

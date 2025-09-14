@@ -102,6 +102,21 @@ There are no alerts configured by default for this integration.
 
 ## Setup
 
+
+You can configure the **filecheck** collector in two ways:
+
+| Method                | Best for                                                                                 | How to                                                                                                                                 |
+|-----------------------|------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| [**UI**](#via-ui)     | Fast setup without editing files                                                         | Go to **Nodes → Configure this node → Collectors → Jobs**, search for **filecheck**, then click **+** to add a job. |
+| [**File**](#via-file) | If you prefer configuring via file, or need to automate deployments (e.g., with Ansible) | Edit `go.d/filecheck.conf` and add a job.                                                                        |
+
+:::important
+
+UI configuration requires paid Netdata Cloud plan. File-based configuration uses the same options and is useful if you prefer configuring via file or need to automate deployments.
+
+:::
+
+
 ### Prerequisites
 
 No action required.
@@ -166,14 +181,16 @@ dirs:
 
 #### via UI
 
-The **filecheck** collector can be configured directly through the Netdata web interface:
+Configure the **filecheck** collector from the Netdata web interface:
 
 1. Go to **Nodes**.
-2. Select the node **where you want the filecheck data-collection job to run** and click the :gear: (**Configure this node**). This node will be responsible for collecting metrics.
+2. Select the node **where you want the filecheck data-collection job to run** and click the :gear: (**Configure this node**). That node will run the data collection.
 3. The **Collectors → Jobs** view opens by default.
 4. In the Search box, type _filecheck_ (or scroll the list) to locate the **filecheck** collector.
 5. Click the **+** next to the **filecheck** collector to add a new job.
-6. Fill in the job fields, then **Test** the configuration and **Submit**.
+6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
+    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
 #### via File
@@ -187,7 +204,7 @@ update_every: 1
 autodetection_retry: 0
 jobs:
   - name: some_name1
-  - name: some_name1
+  - name: some_name2
 ```
 You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
 Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).

@@ -20,6 +20,7 @@ Integrate your organization's Authorization Servers with Netdata to better manag
 
 ## Setup
 
+
 ### Prerequisites
 - Authorization Server with OIDC protocol supported
 - A Netdata Cloud account
