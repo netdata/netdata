@@ -7,6 +7,8 @@ NEDA_HOME="${NEDA_HOME:-/opt/neda}"
 REPOS_DIR="$NEDA_HOME/netdata-repos"
 LOG_FILE="$NEDA_HOME/logs/repo-sync.log"
 GITHUB_APP_CONFIG="$NEDA_HOME/.github-app.json"
+TEMP_REPOS=""
+STOP_REQUESTED=0
 
 # Repositories to exclude from syncing
 EXCLUDED_REPOS=(
@@ -116,6 +118,7 @@ check_requirements() {
     command -v git >/dev/null 2>&1 || missing+=("git")
     command -v python3 >/dev/null 2>&1 || missing+=("python3")
     command -v jq >/dev/null 2>&1 || missing+=("jq")
+    command -v base64 >/dev/null 2>&1 || missing+=("base64")
     
     if [ ${#missing[@]} -gt 0 ]; then
         error "Missing required tools: ${missing[*]}"
@@ -133,6 +136,22 @@ check_requirements() {
         error '  }'
         exit 1
     fi
+}
+
+# Cleanup handler
+cleanup() {
+    if [ -n "$TEMP_REPOS" ] && [ -f "$TEMP_REPOS" ]; then
+        rm -f "$TEMP_REPOS" || true
+    fi
+}
+
+# Interrupt handler
+on_interrupt() {
+    STOP_REQUESTED=1
+    echo -e "${YELLOW}[INTERRUPT]${NC} Signal received. Stopping..." >&2
+    cleanup
+    # 130 is conventional exit code for SIGINT
+    exit 130
 }
 
 # Generate JWT token for GitHub App
@@ -245,36 +264,66 @@ sync_repo() {
     
     if [ -d "$repo_path" ]; then
         cd "$repo_path"
-        
         # Ensure remote URL does not persist credentials
         normalize_remote_url "$repo_name"
 
         # Fetch with depth=1 to get only latest, providing Authorization header
         local fetch_error
+        local rc_fetch=0
+        set +e
         fetch_error=$(timeout 30 git -c "http.https://github.com/.extraheader=$auth_header" fetch --depth=1 origin 2>&1)
-        if [ $? -ne 0 ]; then
+        rc_fetch=$?
+        set -e
+        if [ $rc_fetch -ne 0 ]; then
             warn "    Could not fetch $repo_name: ${fetch_error}"
             warn "    Trying to re-clone..."
             cd "$REPOS_DIR"
             rm -rf "$repo_path"
             local clone_error
+            local rc_clone=0
+            set +e
             clone_error=$(git -c "http.https://github.com/.extraheader=$auth_header" clone --depth=1 "$clone_url" "$repo_name" 2>&1)
-            if [ $? -ne 0 ]; then
+            rc_clone=$?
+            set -e
+            if [ $rc_clone -ne 0 ]; then
                 error "    Failed to clone $repo_name: ${clone_error}"
                 return 1
             fi
         else
             # Reset to latest
-            git reset --hard origin/HEAD 2>/dev/null || \
-            git reset --hard origin/main 2>/dev/null || \
-            git reset --hard origin/master 2>/dev/null || \
-            warn "    Could not reset $repo_name"
+            local head_ref
+            head_ref=$(git symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null || true)
+            local target="${head_ref:-origin/main}"
+            if ! git show-ref --verify --quiet "refs/remotes/${target}"; then
+                # Fallbacks if target doesn't exist
+                if git show-ref --verify --quiet refs/remotes/origin/main; then
+                    target="origin/main"
+                elif git show-ref --verify --quiet refs/remotes/origin/master; then
+                    target="origin/master"
+                else
+                    warn "    Could not determine default branch for $repo_name"
+                    return 1
+                fi
+            fi
+            local rc_reset=0
+            set +e
+            git reset --hard "$target" >/dev/null 2>&1
+            rc_reset=$?
+            set -e
+            if [ $rc_reset -ne 0 ]; then
+                warn "    Could not reset $repo_name to $target"
+                return 1
+            fi
         fi
     else
         cd "$REPOS_DIR"
         local clone_error
+        local rc_clone=0
+        set +e
         clone_error=$(git -c "http.https://github.com/.extraheader=$auth_header" clone --depth=1 "$clone_url" "$repo_name" 2>&1)
-        if [ $? -ne 0 ]; then
+        rc_clone=$?
+        set -e
+        if [ $rc_clone -ne 0 ]; then
             error "    Failed to clone $repo_name: ${clone_error}"
             return 1
         fi
@@ -353,9 +402,10 @@ main() {
     
     # Save repos to temp file to avoid subshell issues
     local temp_repos="/tmp/netdata-repos-$$.txt"
-    
-    # Ensure temp file is cleaned up on exit
-    trap "rm -f '$temp_repos'" EXIT INT TERM
+    TEMP_REPOS="$temp_repos"
+    # Setup traps
+    trap on_interrupt INT TERM
+    trap cleanup EXIT
     
     log "Writing repository list to $temp_repos..."
     get_all_repos "$ACCESS_TOKEN" > "$temp_repos"
@@ -392,8 +442,6 @@ main() {
             failed=$((failed + 1))
         fi
     done < "$temp_repos"
-    
-    rm -f "$temp_repos"
     
     log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     log "Repository sync completed!"
