@@ -30,7 +30,51 @@ No action required.
 [% endif %]
 ### Configuration
 
-#### File
+#### Options
+
+[[ entry.setup.configuration.options.description ]]
+
+[% if entry.setup.configuration.options.list %]
+[% if entry.setup.configuration.options.folding.enabled and not clean %]
+{% details open=true summary="[[ entry.setup.configuration.options.folding.title ]]" %}
+[% endif %]
+| Name | Description | Default | Required |
+|:----|:-----------|:-------|:--------:|
+[% for item in entry.setup.configuration.options.list %]
+| [[ strfy(item.name) ]] | [[ strfy(item.description) ]] | [[ strfy(item.default_value) ]] | [[ strfy(item.required) ]] |
+[% endfor %]
+
+[% for item in entry.setup.configuration.options.list %]
+[% if 'detailed_description' in item %]
+##### [[ item.name ]]
+
+[[ item.detailed_description ]]
+
+[% endif %]
+[% endfor %]
+[% if entry.setup.configuration.options.folding.enabled and not clean %]
+{% /details %}
+[% endif %]
+[% elif not entry.setup.configuration.options.description %]
+There are no configuration options.
+
+[% endif %]
+
+[% if entry.meta.plugin_name == 'go.d.plugin' %]
+#### via UI
+
+The **[[ entry.meta.module_name ]]** collector can be configured directly through the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the [[ entry.meta.module_name ]] data-collection job to run** and click the :gear: (**Configure this node**). This node will be responsible for collecting metrics.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _[[ entry.meta.module_name ]]_ (or scroll the list) to locate the **[[ entry.meta.module_name ]]** collector.
+5. Click the **+** next to the **[[ entry.meta.module_name ]]** collector to add a new job.
+6. Fill in the job fields, then **Test** the configuration and **Submit**.
+
+[% endif %]
+
+#### via File
 
 [% if entry.setup.configuration.file.name %]
 The configuration file name for this integration is `[[ entry.setup.configuration.file.name ]]`.
@@ -64,40 +108,12 @@ sudo ./edit-config [[ entry.setup.configuration.file.name ]]
 [% else %]
 There is no configuration file.
 [% endif %]
-#### Options
 
-[[ entry.setup.configuration.options.description ]]
-
-[% if entry.setup.configuration.options.list %]
-[% if entry.setup.configuration.options.folding.enabled and not clean %]
-{% details open=true summary="[[ entry.setup.configuration.options.folding.title ]]" %}
-[% endif %]
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-[% for item in entry.setup.configuration.options.list %]
-| [[ strfy(item.name) ]] | [[ strfy(item.description) ]] | [[ strfy(item.default_value) ]] | [[ strfy(item.required) ]] |
-[% endfor %]
-
-[% for item in entry.setup.configuration.options.list %]
-[% if 'detailed_description' in item %]
-##### [[ item.name ]]
-
-[[ item.detailed_description ]]
-
-[% endif %]
-[% endfor %]
-[% if entry.setup.configuration.options.folding.enabled and not clean %]
-{% /details %}
-[% endif %]
-[% elif not entry.setup.configuration.options.description %]
-There are no configuration options.
-
-[% endif %]
-#### Examples
+##### Examples
 [% if entry.setup.configuration.examples.list %]
 
 [% for example in entry.setup.configuration.examples.list %]
-##### [[ example.name ]]
+###### [[ example.name ]]
 
 [[ example.description ]]
 
