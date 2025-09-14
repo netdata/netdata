@@ -204,6 +204,31 @@ get_all_repos() {
     done
 }
 
+# Build an Authorization header for GitHub Basic auth with x-access-token
+create_auth_header() {
+    local _token="$1"
+    # Build base64 for "x-access-token:<token>" without newlines
+    local _basic
+    _basic=$(printf 'x-access-token:%s' "$_token" | base64 | tr -d '\n')
+    printf 'AUTHORIZATION: Basic %s' "$_basic"
+}
+
+# Ensure origin URL does not persist credentials
+normalize_remote_url() {
+    local _repo_name="$1"
+    local _clean_url="https://github.com/netdata/${_repo_name}.git"
+    if git remote >/dev/null 2>&1 | grep -q '^origin$'; then
+        # Read current URL (if any). If it contains an '@' userinfo or x-access-token, reset it.
+        local _url
+        _url=$(git remote get-url origin 2>/dev/null || echo "")
+        if [ -z "$_url" ] || echo "$_url" | grep -qE '://[^/]+@|x-access-token'; then
+            git remote set-url origin "$_clean_url" 2>/dev/null || true
+        fi
+    else
+        git remote add origin "$_clean_url" 2>/dev/null || true
+    fi
+}
+
 # Clone or update a repository
 sync_repo() {
     local repo_name="$1"
@@ -213,24 +238,27 @@ sync_repo() {
     
     local repo_path="$REPOS_DIR/$repo_name"
     
-    # For private repos, add token to URL
-    if [ "$is_private" = "true" ]; then
-        clone_url="https://x-access-token:${token}@github.com/netdata/${repo_name}.git"
-    fi
+    # Always use a clean URL; pass credentials via extraHeader per command
+    clone_url="https://github.com/netdata/${repo_name}.git"
+    local auth_header
+    auth_header=$(create_auth_header "$token")
     
     if [ -d "$repo_path" ]; then
         cd "$repo_path"
         
-        # Fetch with depth=1 to get only latest
+        # Ensure remote URL does not persist credentials
+        normalize_remote_url "$repo_name"
+
+        # Fetch with depth=1 to get only latest, providing Authorization header
         local fetch_error
-        fetch_error=$(timeout 30 git fetch --depth=1 origin 2>&1)
+        fetch_error=$(timeout 30 git -c "http.https://github.com/.extraheader=$auth_header" fetch --depth=1 origin 2>&1)
         if [ $? -ne 0 ]; then
             warn "    Could not fetch $repo_name: ${fetch_error}"
             warn "    Trying to re-clone..."
             cd "$REPOS_DIR"
             rm -rf "$repo_path"
             local clone_error
-            clone_error=$(git clone --depth=1 "$clone_url" "$repo_name" 2>&1)
+            clone_error=$(git -c "http.https://github.com/.extraheader=$auth_header" clone --depth=1 "$clone_url" "$repo_name" 2>&1)
             if [ $? -ne 0 ]; then
                 error "    Failed to clone $repo_name: ${clone_error}"
                 return 1
@@ -245,7 +273,7 @@ sync_repo() {
     else
         cd "$REPOS_DIR"
         local clone_error
-        clone_error=$(git clone --depth=1 "$clone_url" "$repo_name" 2>&1)
+        clone_error=$(git -c "http.https://github.com/.extraheader=$auth_header" clone --depth=1 "$clone_url" "$repo_name" 2>&1)
         if [ $? -ne 0 ]; then
             error "    Failed to clone $repo_name: ${clone_error}"
             return 1
