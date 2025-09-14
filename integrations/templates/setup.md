@@ -89,7 +89,7 @@ Configure the **[[ entry.meta.module_name ]]** collector from the Netdata web in
 5. Click the **+** next to the **[[ entry.meta.module_name ]]** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
     - **Test** runs the job with the provided settings and shows whether data can be collected.
-    - If it fails, an error panel appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
+    - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 [% endif %]
 
