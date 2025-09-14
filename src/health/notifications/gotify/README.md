@@ -22,6 +22,7 @@ You can send alerts to your Gotify instance using Netdata's Agent alert notifica
 
 ## Setup
 
+
 ### Prerequisites
 
 #### 

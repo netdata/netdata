@@ -22,6 +22,7 @@ The SMS Server Tools 3 is a SMS Gateway software which can send and receive shor
 
 ## Setup
 
+
 ### Prerequisites
 
 #### 

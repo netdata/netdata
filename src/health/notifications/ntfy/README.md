@@ -22,6 +22,7 @@ You can send alerts to an ntfy server using Netdata's Agent alert notification f
 
 ## Setup
 
+
 ### Prerequisites
 
 #### 

@@ -132,9 +132,31 @@ There are no alerts configured by default for this integration.
 
 ## Setup
 
+
+You can configure the **snmp** collector in two ways:
+
+| Method                | Best for                                                                                 | How to                                                                                                                                 |
+|-----------------------|------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| [**UI**](#via-ui)     | Fast setup without editing files                                                         | Go to **Nodes → Configure this node → Collectors → Jobs**, search for **snmp**, then click **+** to add a job. |
+| [**File**](#via-file) | If you prefer configuring via file, or need to automate deployments (e.g., with Ansible) | Edit `go.d/snmp.conf` and add a job.                                                                        |
+
+:::important
+
+UI configuration requires paid Netdata Cloud plan. File-based configuration uses the same options and is useful if you prefer configuring via file or need to automate deployments.
+
+:::
+
+
 ### Prerequisites
 
-No action required.
+#### Prepare the SNMP device
+
+Before configuring the collector:
+- Enable the SNMP service on the target device (through its management interface).
+- Make sure the device is reachable from the Netdata node on port 161/UDP.
+- Have ready the required connection details: IP address, SNMP version, and either a community string (v1/v2c) or user credentials (v3).
+
+
 
 ### Configuration
 
@@ -149,9 +171,9 @@ The following options can be defined globally: update_every, autodetection_retry
 |:----|:-----------|:-------|:--------:|
 | update_every | Data collection frequency. | 10 | no |
 | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| hostname | Target ipv4 address. |  | yes |
+| hostname | Target host (IP or DNS name, IPv4/IPv6). |  | yes |
 | enable_profiles | Enable collection of metrics using SNMP profiles. | true | no |
-| enable_profiles_table_metrics | Enable collection of SNMP table metrics from profiles. Enabling this may **increase collection time and memory usage** for devices with many network interfaces*. | true | no |
+| enable_profiles_table_metrics | Enable collection of SNMP table metrics from profiles. Enabling this may **increase collection time and memory usage** for devices with many network interfaces. | true | no |
 | disable_legacy_collection | Disable the legacy SNMP collection method, forcing the collector to use only SNMP profiles (YAML-based configuration). When enabled, the collector will ignore any non-profile based collection logic. | false | no |
 | create_vnode | If set, the collector will create a Netdata Virtual Node for this SNMP device, which will appear as a separate Node in Netdata. | true | no |
 | vnode_device_down_threshold | Number of consecutive failed data collections before marking the device as down. | 3 | no |
@@ -168,14 +190,13 @@ The following options can be defined globally: update_every, autodetection_retry
 | network_interface_filter.by_name | Filter interfaces by their names using [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md#simple-patterns). |  | no |
 | network_interface_filter.by_type | Filter interfaces by their types using [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md#simple-patterns). |  | no |
 | user.name | SNMPv3 user name. |  | no |
-| user.name | Security level of SNMPv3 messages. |  | no |
-| user.auth_proto | Security level of SNMPv3 messages. |  | no |
-| user.name | Authentication protocol for SNMPv3 messages. |  | no |
-| user.auth_key | Authentication protocol pass phrase. |  | no |
+| user.level | Security level of SNMPv3 messages. |  | no |
+| user.auth_proto | Authentication protocol for SNMPv3 messages. |  | no |
+| user.auth_key | Authentication protocol pass phrase for SNMPv3 messages. |  | no |
 | user.priv_proto | Privacy protocol for SNMPv3 messages. |  | no |
-| user.priv_key | Privacy protocol pass phrase. |  | no |
+| user.priv_key | Privacy protocol pass phrase for SNMPv3 messages. |  | no |
 
-##### user.auth_proto
+##### user.level
 
 The security of an SNMPv3 message as per RFC 3414 (`user.level`):
 
@@ -186,7 +207,7 @@ The security of an SNMPv3 message as per RFC 3414 (`user.level`):
 |   authPriv   |     3     | message authentication and encryption    |
 
 
-##### user.name
+##### user.auth_proto
 
 The digest algorithm for SNMPv3 messages that require authentication (`user.auth_proto`):
 
@@ -221,14 +242,16 @@ The encryption algorithm for SNMPv3 messages that require privacy (`user.priv_pr
 
 #### via UI
 
-The **snmp** collector can be configured directly through the Netdata web interface:
+Configure the **snmp** collector from the Netdata web interface:
 
 1. Go to **Nodes**.
-2. Select the node **where you want the snmp data-collection job to run** and click the :gear: (**Configure this node**). This node will be responsible for collecting metrics.
+2. Select the node **where you want the snmp data-collection job to run** and click the :gear: (**Configure this node**). That node will run the data collection.
 3. The **Collectors → Jobs** view opens by default.
 4. In the Search box, type _snmp_ (or scroll the list) to locate the **snmp** collector.
 5. Click the **+** next to the **snmp** collector to add a new job.
-6. Fill in the job fields, then **Test** the configuration and **Submit**.
+6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
+    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
 #### via File
@@ -242,7 +265,7 @@ update_every: 1
 autodetection_retry: 0
 jobs:
   - name: some_name1
-  - name: some_name1
+  - name: some_name2
 ```
 You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
 Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).

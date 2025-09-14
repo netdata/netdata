@@ -21,6 +21,7 @@ Send notifications to Syslog using Netdata's Agent alert notification feature, w
 
 ## Setup
 
+
 ### Prerequisites
 
 #### 

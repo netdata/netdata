@@ -108,6 +108,7 @@ The following alerts are available:
 
 ## Setup
 
+
 ### Prerequisites
 
 #### Install freeipmi.plugin

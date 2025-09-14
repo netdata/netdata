@@ -20,6 +20,7 @@ Integrate your organization's Okta account with Netdata to better manage your te
 
 ## Setup
 
+
 ### Prerequisites
 - An Okta account
 - A Netdata Cloud account
