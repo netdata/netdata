@@ -105,7 +105,7 @@ type (
 		perGroup   map[string]*vmetricsGroupBucket
 
 		// --- dimensions (composite) ---
-		dims vmetricsDimSpec
+		dimNames []string
 
 		// --- non-grouped accumulators (existing behavior) ---
 		perDim   map[string]int64 // composite total (dim -> sum)
@@ -128,12 +128,6 @@ type (
 		dimIdx int16
 	}
 
-	// precomputed dimension spec (avoids per-sample string lookups)
-	vmetricsDimSpec struct {
-		names []string
-		count int
-	}
-
 	// per-group accumulator (emitted as one table row)
 	vmetricsGroupBucket struct {
 		vals     []int64 // len == dims.count when composite
@@ -148,9 +142,9 @@ func (agg *vmetricsAggregator) accumulateTotal(sink vmetricsSink, v int64, mv ma
 
 	if sink.dimIdx >= 0 {
 		if agg.perDim == nil {
-			agg.perDim = make(map[string]int64, agg.dims.count)
+			agg.perDim = make(map[string]int64, len(agg.dimNames))
 		}
-		name := agg.dims.names[sink.dimIdx]
+		name := agg.dimNames[sink.dimIdx]
 		agg.perDim[name] += v
 		return
 	}
@@ -173,9 +167,9 @@ func (agg *vmetricsAggregator) accumulateGroupedWithKey(sink vmetricsSink, gkey 
 	b := agg.perGroup[gkey]
 	if b == nil {
 		b = &vmetricsGroupBucket{emitTags: vmBuildEmitTags(tags, agg)}
-		if agg.dims.count > 0 {
-			b.vals = make([]int64, agg.dims.count)
-			b.seen = make([]bool, agg.dims.count)
+		if len(agg.dimNames) > 0 {
+			b.vals = make([]int64, len(agg.dimNames))
+			b.seen = make([]bool, len(agg.dimNames))
 		}
 		agg.perGroup[gkey] = b
 	}
@@ -208,9 +202,9 @@ func (agg *vmetricsAggregator) emitGrouped(out *[]ddsnmp.Metric) {
 			Table:       agg.groupTable,
 			Tags:        b.emitTags,
 		}
-		if agg.dims.count > 0 {
-			mv := make(map[string]int64, agg.dims.count)
-			for i, dn := range agg.dims.names {
+		if len(agg.dimNames) > 0 {
+			mv := make(map[string]int64, len(agg.dimNames))
+			for i, dn := range agg.dimNames {
 				if b.seen[i] {
 					mv[dn] = b.vals[i]
 				}
@@ -292,15 +286,14 @@ func (p *vmetricsCollector) buildAggregators(profDef *ddprofiledefinition.Profil
 
 		if isComposite {
 			dimsIdxByName = make(map[string]int, len(cfg.Sources))
-			agg.dims.names = make([]string, 0, len(cfg.Sources))
+			agg.dimNames = make([]string, 0, len(cfg.Sources))
 			for _, s := range cfg.Sources {
 				name := ternary(s.As != "", s.As, s.Metric)
 				if _, dup := dimsIdxByName[name]; !dup {
-					dimsIdxByName[name] = len(agg.dims.names)
-					agg.dims.names = append(agg.dims.names, name)
+					dimsIdxByName[name] = len(agg.dimNames)
+					agg.dimNames = append(agg.dimNames, name)
 				}
 			}
-			agg.dims.count = len(agg.dims.names)
 		}
 
 		// register sinks

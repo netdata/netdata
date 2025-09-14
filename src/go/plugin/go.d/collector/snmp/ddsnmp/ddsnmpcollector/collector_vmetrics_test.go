@@ -1273,13 +1273,10 @@ func Benchmark_CollectorAccumulate_PerRowFallback(b *testing.B) {
 				groupBy:    nil,
 				groupTable: tableName,
 				perGroup:   make(map[string]*vmetricsGroupBucket, 64),
-				dims: vmetricsDimSpec{
-					names: make([]string, c.sinks),
-					count: c.sinks,
-				},
+				dimNames:   make([]string, c.sinks),
 			}
 			for i := 0; i < c.sinks; i++ {
-				agg.dims.names[i] = "d" + strconv.Itoa(i)
+				agg.dimNames[i] = "d" + strconv.Itoa(i)
 			}
 
 			// Build lookup with N sinks pointing to the SAME aggregator.
