@@ -98,7 +98,34 @@ There are no alerts configured by default for this integration.
 
 ### Configuration
 
-#### File
+#### Options
+
+The following options can be defined globally: update_every.
+
+
+<details open><summary>Config options</summary>
+
+| Name | Description | Default | Required |
+|:----|:-----------|:-------|:--------:|
+| update_every | Data collection frequency. | 10 | no |
+| timeout | fail2ban-client binary execution timeout. | 2 | no |
+
+</details>
+
+
+#### via UI
+
+The **fail2ban** collector can be configured directly through the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the fail2ban data-collection job to run** and click the :gear: (**Configure this node**). This node will be responsible for collecting metrics.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _fail2ban_ (or scroll the list) to locate the **fail2ban** collector.
+5. Click the **+** next to the **fail2ban** collector to add a new job.
+6. Fill in the job fields, then **Test** the configuration and **Submit**.
+
+
+#### via File
 
 The configuration file name for this integration is `go.d/fail2ban.conf`.
 
@@ -118,23 +145,10 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config go.d/fail2ban.conf
 ```
-#### Options
 
-The following options can be defined globally: update_every.
+##### Examples
 
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update_every | Data collection frequency. | 10 | no |
-| timeout | fail2ban-client binary execution timeout. | 2 | no |
-
-</details>
-
-#### Examples
-
-##### Custom update_every
+###### Custom update_every
 
 Allows you to override the default data collection interval.
 

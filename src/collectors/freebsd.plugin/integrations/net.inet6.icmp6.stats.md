@@ -86,7 +86,27 @@ No action required.
 
 ### Configuration
 
-#### File
+#### Options
+
+
+
+<details open><summary>Config options</summary>
+
+| Name | Description | Default | Required |
+|:----|:-----------|:-------|:--------:|
+| icmp | Enable or disable ICMP metric. | auto | no |
+| icmp redirects | Enable or disable ICMP redirects metric. | auto | no |
+| icmp errors | Enable or disable ICMP errors metric. | auto | no |
+| icmp echos | Enable or disable ICMP echos metric. | auto | no |
+| icmp router | Enable or disable ICMP router metric. | auto | no |
+| icmp neighbor | Enable or disable ICMP neighbor metric. | auto | no |
+| icmp types | Enable or disable ICMP types metric. | auto | no |
+
+</details>
+
+
+
+#### via File
 
 The configuration file name for this integration is `netdata.conf`.
 Configuration for this specific integration is located in the `[plugin:freebsd:net.inet6.icmp6.stats]` section within that file.
@@ -108,25 +128,8 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config netdata.conf
 ```
-#### Options
 
-
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| icmp | Enable or disable ICMP metric. | auto | no |
-| icmp redirects | Enable or disable ICMP redirects metric. | auto | no |
-| icmp errors | Enable or disable ICMP errors metric. | auto | no |
-| icmp echos | Enable or disable ICMP echos metric. | auto | no |
-| icmp router | Enable or disable ICMP router metric. | auto | no |
-| icmp neighbor | Enable or disable ICMP neighbor metric. | auto | no |
-| icmp types | Enable or disable ICMP types metric. | auto | no |
-
-</details>
-
-#### Examples
+##### Examples
 There are no configuration examples.
 
 

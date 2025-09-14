@@ -86,7 +86,25 @@ No action required.
 
 ### Configuration
 
-#### File
+#### Options
+
+The following options can be defined globally: update_every, autodetection_retry.
+
+
+
+#### via UI
+
+The **logind** collector can be configured directly through the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the logind data-collection job to run** and click the :gear: (**Configure this node**). This node will be responsible for collecting metrics.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _logind_ (or scroll the list) to locate the **logind** collector.
+5. Click the **+** next to the **logind** collector to add a new job.
+6. Fill in the job fields, then **Test** the configuration and **Submit**.
+
+
+#### via File
 
 The configuration file name for this integration is `go.d/logind.conf`.
 
@@ -106,12 +124,8 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config go.d/logind.conf
 ```
-#### Options
 
-The following options can be defined globally: update_every, autodetection_retry.
-
-
-#### Examples
+##### Examples
 There are no configuration examples.
 
 

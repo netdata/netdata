@@ -239,7 +239,37 @@ It will only be able to gather statistics without being able to alter or affect 
 
 ### Configuration
 
-#### File
+#### Options
+
+The following options can be defined globally: update_every, autodetection_retry.
+
+
+<details open><summary>Config options</summary>
+
+| Name | Description | Default | Required |
+|:----|:-----------|:-------|:--------:|
+| update_every | Data collection frequency. | 5 | no |
+| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
+| dsn | MySQL server DSN (Data Source Name). See [DSN syntax](https://github.com/go-sql-driver/mysql#dsn-data-source-name). | root@tcp(localhost:3306)/ | yes |
+| my.cnf | Specifies the my.cnf file to read the connection settings from the [client] section. |  | no |
+| timeout | Query timeout in seconds. | 1 | no |
+
+</details>
+
+
+#### via UI
+
+The **mysql** collector can be configured directly through the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the mysql data-collection job to run** and click the :gear: (**Configure this node**). This node will be responsible for collecting metrics.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _mysql_ (or scroll the list) to locate the **mysql** collector.
+5. Click the **+** next to the **mysql** collector to add a new job.
+6. Fill in the job fields, then **Test** the configuration and **Submit**.
+
+
+#### via File
 
 The configuration file name for this integration is `go.d/mysql.conf`.
 
@@ -259,26 +289,10 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config go.d/mysql.conf
 ```
-#### Options
 
-The following options can be defined globally: update_every, autodetection_retry.
+##### Examples
 
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update_every | Data collection frequency. | 5 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| dsn | MySQL server DSN (Data Source Name). See [DSN syntax](https://github.com/go-sql-driver/mysql#dsn-data-source-name). | root@tcp(localhost:3306)/ | yes |
-| my.cnf | Specifies the my.cnf file to read the connection settings from the [client] section. |  | no |
-| timeout | Query timeout in seconds. | 1 | no |
-
-</details>
-
-#### Examples
-
-##### TCP socket
+###### TCP socket
 
 An example configuration.
 
@@ -292,7 +306,7 @@ jobs:
 ```
 </details>
 
-##### Unix socket
+###### Unix socket
 
 An example configuration.
 
@@ -306,7 +320,7 @@ jobs:
 ```
 </details>
 
-##### Connection with password
+###### Connection with password
 
 An example configuration.
 
@@ -320,7 +334,7 @@ jobs:
 ```
 </details>
 
-##### my.cnf
+###### my.cnf
 
 An example configuration.
 
@@ -334,7 +348,7 @@ jobs:
 ```
 </details>
 
-##### Multi-instance
+###### Multi-instance
 
 > **Note**: When you define multiple jobs, their names must be unique.
 

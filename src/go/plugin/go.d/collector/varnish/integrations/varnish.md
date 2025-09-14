@@ -125,7 +125,36 @@ No action required.
 
 ### Configuration
 
-#### File
+#### Options
+
+The following options can be defined globally: update_every.
+
+
+<details open><summary>Config options</summary>
+
+| Name | Description | Default | Required |
+|:----|:-----------|:-------|:--------:|
+| update_every | Data collection frequency. | 10 | no |
+| timeout | Timeout for executing the binary, specified in seconds. | 2 | no |
+| instance_name | Specifies the name of the Varnish instance to collect metrics from. This corresponds to the `-n` argument used with the [varnishstat](https://varnish-cache.org/docs/trunk/reference/varnishstat.html) command. |  | no |
+| docker_container | Specifies the name of the Docker container where the Varnish instance is running. If set, the `varnishstat` command will be executed within this container. |  | no |
+
+</details>
+
+
+#### via UI
+
+The **varnish** collector can be configured directly through the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the varnish data-collection job to run** and click the :gear: (**Configure this node**). This node will be responsible for collecting metrics.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _varnish_ (or scroll the list) to locate the **varnish** collector.
+5. Click the **+** next to the **varnish** collector to add a new job.
+6. Fill in the job fields, then **Test** the configuration and **Submit**.
+
+
+#### via File
 
 The configuration file name for this integration is `go.d/varnish.conf`.
 
@@ -145,25 +174,10 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config go.d/varnish.conf
 ```
-#### Options
 
-The following options can be defined globally: update_every.
+##### Examples
 
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update_every | Data collection frequency. | 10 | no |
-| timeout | Timeout for executing the binary, specified in seconds. | 2 | no |
-| instance_name | Specifies the name of the Varnish instance to collect metrics from. This corresponds to the `-n` argument used with the [varnishstat](https://varnish-cache.org/docs/trunk/reference/varnishstat.html) command. |  | no |
-| docker_container | Specifies the name of the Docker container where the Varnish instance is running. If set, the `varnishstat` command will be executed within this container. |  | no |
-
-</details>
-
-#### Examples
-
-##### Custom update_every
+###### Custom update_every
 
 Allows you to override the default data collection interval.
 

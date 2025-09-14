@@ -82,7 +82,18 @@ No action required.
 
 ### Configuration
 
-#### File
+#### Options
+
+This integration only supports a single configuration option, and most users will not need to change it.
+
+
+| Name | Description | Default | Required |
+|:----|:-----------|:-------|:--------:|
+| loop time | Specifies the target time for the data collection thread to sleep, measured in miliseconds. | 20ms | no |
+
+
+
+#### via File
 
 The configuration file name for this integration is `netdata.conf`.
 
@@ -103,16 +114,8 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config netdata.conf
 ```
-#### Options
 
-This integration only supports a single configuration option, and most users will not need to change it.
-
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| loop time | Specifies the target time for the data collection thread to sleep, measured in miliseconds. | 20ms | no |
-
-#### Examples
+##### Examples
 There are no configuration examples.
 
 

@@ -90,26 +90,6 @@ Uncomment the `pm.status_path = /status` variable in the `php-fpm` config file.
 
 ### Configuration
 
-#### File
-
-The configuration file name for this integration is `go.d/phpfpm.conf`.
-
-The file format is YAML. Generally, the structure is:
-
-```yaml
-update_every: 1
-autodetection_retry: 0
-jobs:
-  - name: some_name1
-  - name: some_name1
-```
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config go.d/phpfpm.conf
-```
 #### Options
 
 The following options can be defined globally: update_every, autodetection_retry.
@@ -142,9 +122,43 @@ The following options can be defined globally: update_every, autodetection_retry
 
 </details>
 
-#### Examples
 
-##### HTTP
+#### via UI
+
+The **phpfpm** collector can be configured directly through the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the phpfpm data-collection job to run** and click the :gear: (**Configure this node**). This node will be responsible for collecting metrics.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _phpfpm_ (or scroll the list) to locate the **phpfpm** collector.
+5. Click the **+** next to the **phpfpm** collector to add a new job.
+6. Fill in the job fields, then **Test** the configuration and **Submit**.
+
+
+#### via File
+
+The configuration file name for this integration is `go.d/phpfpm.conf`.
+
+The file format is YAML. Generally, the structure is:
+
+```yaml
+update_every: 1
+autodetection_retry: 0
+jobs:
+  - name: some_name1
+  - name: some_name1
+```
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config go.d/phpfpm.conf
+```
+
+##### Examples
+
+###### HTTP
 
 Collecting data from a local instance over HTTP.
 
@@ -158,7 +172,7 @@ jobs:
 ```
 </details>
 
-##### Unix socket
+###### Unix socket
 
 Collecting data from a local instance over Unix socket.
 
@@ -172,7 +186,7 @@ jobs:
 ```
 </details>
 
-##### TCP socket
+###### TCP socket
 
 Collecting data from a local instance over TCP socket.
 
@@ -186,7 +200,7 @@ jobs:
 ```
 </details>
 
-##### Multi-instance
+###### Multi-instance
 
 > **Note**: When you define multiple jobs, their names must be unique.
 

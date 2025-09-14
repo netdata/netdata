@@ -117,7 +117,38 @@ No action required.
 
 ### Configuration
 
-#### File
+#### Options
+
+The following options can be defined globally: update_every.
+
+
+<details open><summary>Config options</summary>
+
+| Name | Description | Default | Required |
+|:----|:-----------|:-------|:--------:|
+| update_every | Data collection frequency. | 10 | no |
+| relabel | A list used to update existing sensor labels or add labels to sensors that don't have them. | [] | no |
+| relabel[].chip | [Pattern](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md#simple-patterns) to match the `chip_id` label value. |  | no |
+| relabel[].sensors | A list of sensors to be relabeled for the specified chip. | [] | no |
+| relabel[].sensors[].name | The exact sensor name (e.g., `'temp1'`, `'in1'`, `'voltage1'`). |  | no |
+| relabel[].sensors[].label | The new label value for the sensor. |  | no |
+
+</details>
+
+
+#### via UI
+
+The **sensors** collector can be configured directly through the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the sensors data-collection job to run** and click the :gear: (**Configure this node**). This node will be responsible for collecting metrics.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _sensors_ (or scroll the list) to locate the **sensors** collector.
+5. Click the **+** next to the **sensors** collector to add a new job.
+6. Fill in the job fields, then **Test** the configuration and **Submit**.
+
+
+#### via File
 
 The configuration file name for this integration is `go.d/sensors.conf`.
 
@@ -137,27 +168,10 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config go.d/sensors.conf
 ```
-#### Options
 
-The following options can be defined globally: update_every.
+##### Examples
 
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update_every | Data collection frequency. | 10 | no |
-| relabel | A list used to update existing sensor labels or add labels to sensors that don't have them. | [] | no |
-| relabel[].chip | [Pattern](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md#simple-patterns) to match the `chip_id` label value. |  | no |
-| relabel[].sensors | A list of sensors to be relabeled for the specified chip. | [] | no |
-| relabel[].sensors[].name | The exact sensor name (e.g., `'temp1'`, `'in1'`, `'voltage1'`). |  | no |
-| relabel[].sensors[].label | The new label value for the sensor. |  | no |
-
-</details>
-
-#### Examples
-
-##### Custom update_every
+###### Custom update_every
 
 Allows you to override the default data collection interval.
 
@@ -171,7 +185,7 @@ jobs:
 ```
 </details>
 
-##### Renaming labels
+###### Renaming labels
 
 Allows you to override/add labels.
 

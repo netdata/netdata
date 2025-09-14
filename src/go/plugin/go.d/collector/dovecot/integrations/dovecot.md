@@ -100,7 +100,36 @@ To enable `old_stats` plugin, see [Old Statistics](https://doc.dovecot.org/confi
 
 ### Configuration
 
-#### File
+#### Options
+
+The following options can be defined globally: update_every, autodetection_retry.
+
+
+<details open><summary>Config options</summary>
+
+| Name | Description | Default | Required |
+|:----|:-----------|:-------|:--------:|
+| update_every | Data collection frequency. | 1 | no |
+| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
+| address | The Unix or TCP socket address where the Dovecot [old_stats](https://doc.dovecot.org/configuration_manual/stats/old_statistics/#old-statistics) plugin listens for connections. | 127.0.0.1:24242 | yes |
+| timeout | Connection, read, and write timeout duration in seconds. The timeout includes name resolution. | 1 | no |
+
+</details>
+
+
+#### via UI
+
+The **dovecot** collector can be configured directly through the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the dovecot data-collection job to run** and click the :gear: (**Configure this node**). This node will be responsible for collecting metrics.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _dovecot_ (or scroll the list) to locate the **dovecot** collector.
+5. Click the **+** next to the **dovecot** collector to add a new job.
+6. Fill in the job fields, then **Test** the configuration and **Submit**.
+
+
+#### via File
 
 The configuration file name for this integration is `go.d/dovecot.conf`.
 
@@ -120,25 +149,10 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config go.d/dovecot.conf
 ```
-#### Options
 
-The following options can be defined globally: update_every, autodetection_retry.
+##### Examples
 
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update_every | Data collection frequency. | 1 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| address | The Unix or TCP socket address where the Dovecot [old_stats](https://doc.dovecot.org/configuration_manual/stats/old_statistics/#old-statistics) plugin listens for connections. | 127.0.0.1:24242 | yes |
-| timeout | Connection, read, and write timeout duration in seconds. The timeout includes name resolution. | 1 | no |
-
-</details>
-
-#### Examples
-
-##### Basic (TCP)
+###### Basic (TCP)
 
 A basic example configuration.
 
@@ -152,7 +166,7 @@ jobs:
 ```
 </details>
 
-##### Basic (UNIX)
+###### Basic (UNIX)
 
 A basic example configuration using a UNIX socket.
 
@@ -166,7 +180,7 @@ jobs:
 ```
 </details>
 
-##### Multi-instance
+###### Multi-instance
 
 > **Note**: When you define multiple jobs, their names must be unique.
 

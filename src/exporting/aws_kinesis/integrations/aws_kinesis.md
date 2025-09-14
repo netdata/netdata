@@ -44,18 +44,6 @@ Export metrics to AWS Kinesis Data Streams
 
 ### Configuration
 
-#### File
-
-The configuration file name for this integration is `exporting.conf`.
-
-
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config exporting.conf
-```
 #### Options
 
 Netdata automatically computes a partition key for every record with the purpose to distribute records across available shards evenly.
@@ -138,9 +126,24 @@ different : disks with device-mapper, interrupts, QoS classes, statsd synthetic 
 
 </details>
 
-#### Examples
 
-##### Example configuration
+
+#### via File
+
+The configuration file name for this integration is `exporting.conf`.
+
+
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config exporting.conf
+```
+
+##### Examples
+
+###### Example configuration
 
 Basic configuration
 
@@ -150,7 +153,7 @@ Basic configuration
     destination = us-east-1
 
 ```
-##### Configuration with AWS credentials
+###### Configuration with AWS credentials
 
 Add `:https` modifier to the connector type if you need to use the TLS/SSL protocol. For example: `remote_write:https:my_instance`.
 

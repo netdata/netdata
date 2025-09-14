@@ -110,7 +110,37 @@ It is disabled to not break other tools which use `Management Interface`.
 
 ### Configuration
 
-#### File
+#### Options
+
+The following options can be defined globally: update_every, autodetection_retry.
+
+
+<details open><summary>Config options</summary>
+
+| Name | Description | Default | Required |
+|:----|:-----------|:-------|:--------:|
+| update_every | Data collection frequency. | 1 | no |
+| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
+| address | Server address in IP:PORT format. | 127.0.0.1:7505 | yes |
+| timeout | Connection, read, and write timeout duration in seconds. The timeout includes name resolution. | 1 | no |
+| per_user_stats | User selector. Determines which user metrics will be collected. |  | no |
+
+</details>
+
+
+#### via UI
+
+The **openvpn** collector can be configured directly through the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the openvpn data-collection job to run** and click the :gear: (**Configure this node**). This node will be responsible for collecting metrics.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _openvpn_ (or scroll the list) to locate the **openvpn** collector.
+5. Click the **+** next to the **openvpn** collector to add a new job.
+6. Fill in the job fields, then **Test** the configuration and **Submit**.
+
+
+#### via File
 
 The configuration file name for this integration is `go.d/openvpn.conf`.
 
@@ -130,26 +160,10 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config go.d/openvpn.conf
 ```
-#### Options
 
-The following options can be defined globally: update_every, autodetection_retry.
+##### Examples
 
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update_every | Data collection frequency. | 1 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| address | Server address in IP:PORT format. | 127.0.0.1:7505 | yes |
-| timeout | Connection, read, and write timeout duration in seconds. The timeout includes name resolution. | 1 | no |
-| per_user_stats | User selector. Determines which user metrics will be collected. |  | no |
-
-</details>
-
-#### Examples
-
-##### Basic
+###### Basic
 
 A basic example configuration.
 
@@ -163,7 +177,7 @@ jobs:
 ```
 </details>
 
-##### With user metrics
+###### With user metrics
 
 Collect metrics of all users.
 
@@ -180,7 +194,7 @@ jobs:
 ```
 </details>
 
-##### Multi-instance
+###### Multi-instance
 
 > **Note**: When you define multiple jobs, their names must be unique.
 

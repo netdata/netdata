@@ -117,7 +117,27 @@ Change the value of the `perf` setting to `yes` in the `[plugins]` section. Save
 
 ### Configuration
 
-#### File
+#### Options
+
+You can get the available options running:
+
+```bash
+/usr/libexec/netdata/plugins.d/perf.plugin  --help
+````
+
+
+<details open><summary>Config options</summary>
+
+| Name | Description | Default | Required |
+|:----|:-----------|:-------|:--------:|
+| update every | Data collection frequency. | 1 | no |
+| command options | Command options that specify charts shown by the plugin. `cycles`, `instructions`, `branch`, `cache`, `bus`, `stalled`, `migrations`, `alignment`, `emulation`, `L1D`, `L1D-prefetch`, `L1I`, `LL`, `DTLB`, `ITLB`, `PBU`. | 1 | yes |
+
+</details>
+
+
+
+#### via File
 
 The configuration file name for this integration is `netdata.conf`.
 Configuration for this specific integration is located in the `[plugin:perf]` section within that file.
@@ -139,27 +159,10 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config netdata.conf
 ```
-#### Options
 
-You can get the available options running:
+##### Examples
 
-```bash
-/usr/libexec/netdata/plugins.d/perf.plugin  --help
-````
-
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update every | Data collection frequency. | 1 | no |
-| command options | Command options that specify charts shown by the plugin. `cycles`, `instructions`, `branch`, `cache`, `bus`, `stalled`, `migrations`, `alignment`, `emulation`, `L1D`, `L1D-prefetch`, `L1I`, `LL`, `DTLB`, `ITLB`, `PBU`. | 1 | yes |
-
-</details>
-
-#### Examples
-
-##### All metrics
+###### All metrics
 
 Monitor all metrics available.
 
@@ -168,7 +171,7 @@ Monitor all metrics available.
     command options = all
 
 ```
-##### CPU cycles
+###### CPU cycles
 
 Monitor CPU cycles.
 

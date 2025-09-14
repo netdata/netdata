@@ -149,26 +149,6 @@ No action required.
 
 ### Configuration
 
-#### File
-
-The configuration file name for this integration is `go.d/cockroachdb.conf`.
-
-The file format is YAML. Generally, the structure is:
-
-```yaml
-update_every: 1
-autodetection_retry: 0
-jobs:
-  - name: some_name1
-  - name: some_name1
-```
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config go.d/cockroachdb.conf
-```
 #### Options
 
 The following options can be defined globally: update_every, autodetection_retry.
@@ -198,9 +178,43 @@ The following options can be defined globally: update_every, autodetection_retry
 
 </details>
 
-#### Examples
 
-##### Basic
+#### via UI
+
+The **cockroachdb** collector can be configured directly through the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the cockroachdb data-collection job to run** and click the :gear: (**Configure this node**). This node will be responsible for collecting metrics.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _cockroachdb_ (or scroll the list) to locate the **cockroachdb** collector.
+5. Click the **+** next to the **cockroachdb** collector to add a new job.
+6. Fill in the job fields, then **Test** the configuration and **Submit**.
+
+
+#### via File
+
+The configuration file name for this integration is `go.d/cockroachdb.conf`.
+
+The file format is YAML. Generally, the structure is:
+
+```yaml
+update_every: 1
+autodetection_retry: 0
+jobs:
+  - name: some_name1
+  - name: some_name1
+```
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config go.d/cockroachdb.conf
+```
+
+##### Examples
+
+###### Basic
 
 An example configuration.
 
@@ -214,7 +228,7 @@ jobs:
 ```
 </details>
 
-##### HTTP authentication
+###### HTTP authentication
 
 Local server with basic HTTP authentication.
 
@@ -230,7 +244,7 @@ jobs:
 ```
 </details>
 
-##### HTTPS with self-signed certificate
+###### HTTPS with self-signed certificate
 
 CockroachDB with enabled HTTPS and self-signed certificate.
 
@@ -245,7 +259,7 @@ jobs:
 ```
 </details>
 
-##### Multi-instance
+###### Multi-instance
 
 > **Note**: When you define multiple jobs, their names must be unique.
 

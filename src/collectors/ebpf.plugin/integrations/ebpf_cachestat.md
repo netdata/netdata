@@ -140,27 +140,6 @@ Now follow steps:
 
 ### Configuration
 
-#### File
-
-The configuration file name for this integration is `ebpf.d/cachestat.conf`.
-
-The file format is a modified INI syntax. The general structure is:
-
-```ini
-[section1]
-    option1 = some value
-    option2 = some other value
-
-[section2]
-    option3 = some third value
-```
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config ebpf.d/cachestat.conf
-```
 #### Options
 
 All options are defined inside section `[global]`.
@@ -182,7 +161,31 @@ All options are defined inside section `[global]`.
 
 </details>
 
-#### Examples
+
+
+#### via File
+
+The configuration file name for this integration is `ebpf.d/cachestat.conf`.
+
+The file format is a modified INI syntax. The general structure is:
+
+```ini
+[section1]
+    option1 = some value
+    option2 = some other value
+
+[section2]
+    option3 = some third value
+```
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config ebpf.d/cachestat.conf
+```
+
+##### Examples
 There are no configuration examples.
 
 

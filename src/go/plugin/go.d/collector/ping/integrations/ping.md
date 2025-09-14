@@ -119,26 +119,6 @@ No action required.
 
 ### Configuration
 
-#### File
-
-The configuration file name for this integration is `go.d/ping.conf`.
-
-The file format is YAML. Generally, the structure is:
-
-```yaml
-update_every: 1
-autodetection_retry: 0
-jobs:
-  - name: some_name1
-  - name: some_name1
-```
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config go.d/ping.conf
-```
 #### Options
 
 The following options can be defined globally: update_every, autodetection_retry.
@@ -159,9 +139,43 @@ The following options can be defined globally: update_every, autodetection_retry
 
 </details>
 
-#### Examples
 
-##### IPv4 hosts
+#### via UI
+
+The **ping** collector can be configured directly through the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the ping data-collection job to run** and click the :gear: (**Configure this node**). This node will be responsible for collecting metrics.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _ping_ (or scroll the list) to locate the **ping** collector.
+5. Click the **+** next to the **ping** collector to add a new job.
+6. Fill in the job fields, then **Test** the configuration and **Submit**.
+
+
+#### via File
+
+The configuration file name for this integration is `go.d/ping.conf`.
+
+The file format is YAML. Generally, the structure is:
+
+```yaml
+update_every: 1
+autodetection_retry: 0
+jobs:
+  - name: some_name1
+  - name: some_name1
+```
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config go.d/ping.conf
+```
+
+##### Examples
+
+###### IPv4 hosts
 
 An example configuration.
 
@@ -177,7 +191,7 @@ jobs:
 ```
 </details>
 
-##### Unprivileged mode
+###### Unprivileged mode
 
 An example configuration.
 
@@ -194,7 +208,7 @@ jobs:
 ```
 </details>
 
-##### Multi-instance
+###### Multi-instance
 
 > **Note**: When you define multiple jobs, their names must be unique.
 
