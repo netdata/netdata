@@ -3,6 +3,7 @@
 package ddsnmpcollector
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -1182,6 +1183,142 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 
 			// Sort both slices for consistent comparison
 			assert.ElementsMatch(t, tc.expected, result)
+		})
+	}
+}
+
+var (
+	benchSinkString string
+	benchSinkBucket *vmetricsGroupBucket
+)
+
+func makeTags(n int) map[string]string {
+	t := make(map[string]string, n)
+	for i := 0; i < n; i++ {
+		t["label"+strconv.Itoa(i)] = "v" + strconv.Itoa(i)
+	}
+	return t
+}
+
+func makeAgg(perRow bool, groupBy []string) *vmetricsAggregator {
+	return &vmetricsAggregator{
+		perRow:  perRow,
+		groupBy: groupBy,
+		grouped: perRow || len(groupBy) > 0,
+	}
+}
+
+func Benchmark_vmBuildGroupKey(b *testing.B) {
+	type testCase struct {
+		name      string
+		perRow    bool
+		groupBy   []string
+		tagCount  int
+		expectKey bool
+	}
+
+	cases := []testCase{
+		{name: "PerRow_GroupBy2", perRow: true, groupBy: []string{"label0", "label1"}, tagCount: 10, expectKey: true},
+		{name: "PerRow_Fallback_AllTags10", perRow: true, groupBy: nil, tagCount: 10, expectKey: true},
+		{name: "PerRow_Fallback_AllTags30", perRow: true, groupBy: nil, tagCount: 30, expectKey: true},
+		{name: "GroupBy1", perRow: false, groupBy: []string{"label0"}, tagCount: 10, expectKey: true},
+		{name: "GroupBy2", perRow: false, groupBy: []string{"label0", "label1"}, tagCount: 10, expectKey: true},
+		{name: "GroupBy3", perRow: false, groupBy: []string{"label0", "label1", "label2"}, tagCount: 10, expectKey: true},
+		{name: "GroupBy2_MissingLabel", perRow: false, groupBy: []string{"label0", "missing"}, tagCount: 10, expectKey: false},
+	}
+
+	for _, tc := range cases {
+		b.Run(tc.name, func(b *testing.B) {
+			agg := makeAgg(tc.perRow, tc.groupBy)
+			tags := makeTags(tc.tagCount)
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				key, ok := vmBuildGroupKey(tags, agg)
+				if ok != tc.expectKey {
+					b.Fatalf("expected ok=%v, got %v", tc.expectKey, ok)
+				}
+				// prevent dead-code elimination
+				if ok {
+					benchSinkString = key
+				}
+			}
+		})
+	}
+}
+
+func Benchmark_CollectorAccumulate_PerRowFallback(b *testing.B) {
+	type tc struct {
+		name     string
+		sinks    int // number of sinks feeding the same aggregator (simulate composite dims)
+		tagCount int // number of tags to force the sort+join fallback
+	}
+	cases := []tc{
+		{name: "Sinks2_Tags10", sinks: 2, tagCount: 10},
+		{name: "Sinks4_Tags10", sinks: 4, tagCount: 10},
+		{name: "Sinks2_Tags30", sinks: 2, tagCount: 30},
+	}
+
+	for _, c := range cases {
+		b.Run(c.name, func(b *testing.B) {
+			// --- Arrange ---
+			const metricName = "raw_in"
+			const tableName = "ifTable"
+
+			// Aggregator configured as: grouped, PerRow=true, no groupBy (force fallback)
+			agg := &vmetricsAggregator{
+				config:     ddprofiledefinition.VirtualMetricConfig{Name: "vm_perrow"},
+				grouped:    true,
+				perRow:     true,
+				groupBy:    nil,
+				groupTable: tableName,
+				perGroup:   make(map[string]*vmetricsGroupBucket, 64),
+				dims: vmetricsDimSpec{
+					names: make([]string, c.sinks),
+					count: c.sinks,
+				},
+			}
+			for i := 0; i < c.sinks; i++ {
+				agg.dims.names[i] = "d" + strconv.Itoa(i)
+			}
+
+			// Build lookup with N sinks pointing to the SAME aggregator.
+			lookup := make(map[vmetricsSourceKey][]vmetricsSink, 1)
+			key := vmetricsSourceKey{metricName: metricName, tableName: tableName}
+			sinks := make([]vmetricsSink, c.sinks)
+			for i := 0; i < c.sinks; i++ {
+				sinks[i] = vmetricsSink{agg: agg, dimIdx: int16(i)}
+			}
+			lookup[key] = sinks
+
+			// One metric instance (like one SNMP sample)
+			tags := makeTags(c.tagCount)
+			m := ddsnmp.Metric{
+				Name:       metricName,
+				Table:      tableName,
+				Value:      1,
+				MetricType: ddprofiledefinition.ProfileMetricType("counter"),
+				Tags:       tags,
+			}
+			collected := []ddsnmp.Metric{m}
+
+			collector := &vmetricsCollector{log: nil} // log unused on accumulate
+
+			// Warm-up once so the bucket exists; we want to measure repeated key-building.
+			collector.accumulate(lookup, collected)
+
+			// --- Measure ---
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				collector.accumulate(lookup, collected)
+			}
+
+			// Prevent DCE: observe a bucket.
+			for _, v := range agg.perGroup {
+				benchSinkBucket = v
+				break
+			}
 		})
 	}
 }
