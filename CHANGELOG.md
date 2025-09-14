@@ -6,6 +6,13 @@
 
 **Merged pull requests:**
 
+- improve\(go.d/ddsnmp\): add per\_row mode for virtual metrics [\#20971](https://github.com/netdata/netdata/pull/20971) ([ilyam8](https://github.com/ilyam8))
+- improve\(go.d/ddsnmp\): add group\_by for virtual metrics [\#20970](https://github.com/netdata/netdata/pull/20970) ([ilyam8](https://github.com/ilyam8))
+- build\(deps\): bump k8s.io/client-go from 0.34.0 to 0.34.1 in /src/go [\#20968](https://github.com/netdata/netdata/pull/20968) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/redis/go-redis/v9 from 9.13.0 to 9.14.0 in /src/go [\#20966](https://github.com/netdata/netdata/pull/20966) ([dependabot[bot]](https://github.com/apps/dependabot))
+- improve\(go.d/ddsnmp\): add composite metrics for CPU & Load Average in std-ucd-mib [\#20964](https://github.com/netdata/netdata/pull/20964) ([ilyam8](https://github.com/ilyam8))
+- improve\(go.d/ddsnmp\): add composite virtual metrics [\#20962](https://github.com/netdata/netdata/pull/20962) ([ilyam8](https://github.com/ilyam8))
+- chore\(go.d/sd/snmp\): remove skipping servers in snmp discovery [\#20960](https://github.com/netdata/netdata/pull/20960) ([ilyam8](https://github.com/ilyam8))
 - improve\(go.d/snmp\): add net-snmp.yaml profile [\#20959](https://github.com/netdata/netdata/pull/20959) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d/snmp\): remove hrStorageTable from mikrotik-router.yaml [\#20958](https://github.com/netdata/netdata/pull/20958) ([ilyam8](https://github.com/ilyam8))
 - improve\(go.d/snmp\): add transform for Host-Resources-MIB storage metrics [\#20957](https://github.com/netdata/netdata/pull/20957) ([ilyam8](https://github.com/ilyam8))
@@ -442,14 +449,6 @@
 - Regenerate integrations docs [\#20430](https://github.com/netdata/netdata/pull/20430) ([netdatabot](https://github.com/netdatabot))
 - Update MSSQL Metadata [\#20429](https://github.com/netdata/netdata/pull/20429) ([thiagoftsm](https://github.com/thiagoftsm))
 - update ddsnmp mikrotik-router.yaml [\#20428](https://github.com/netdata/netdata/pull/20428) ([ilyam8](https://github.com/ilyam8))
-- chore\(go.d/ddsnmp\): lazy ddsnmp profile loading [\#20427](https://github.com/netdata/netdata/pull/20427) ([ilyam8](https://github.com/ilyam8))
-- feat\(go.d/snmp\): enable profile scalar metrics collection [\#20426](https://github.com/netdata/netdata/pull/20426) ([ilyam8](https://github.com/ilyam8))
-- ML: Add documentation for Netdata Insights [\#20425](https://github.com/netdata/netdata/pull/20425) ([kanelatechnical](https://github.com/kanelatechnical))
-- docs: remove sizing-netdata-parents.md [\#20421](https://github.com/netdata/netdata/pull/20421) ([ilyam8](https://github.com/ilyam8))
-- chore\(go.d/ddsnmp\): correctly handle all mapping types [\#20420](https://github.com/netdata/netdata/pull/20420) ([ilyam8](https://github.com/ilyam8))
-- SNMP: apc\_ups.yaml [\#20419](https://github.com/netdata/netdata/pull/20419) ([Ancairon](https://github.com/Ancairon))
-- update\_installer: Update remove instruction [\#20418](https://github.com/netdata/netdata/pull/20418) ([thiagoftsm](https://github.com/thiagoftsm))
-- Fix typo. [\#20417](https://github.com/netdata/netdata/pull/20417) ([de-authority](https://github.com/de-authority))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
