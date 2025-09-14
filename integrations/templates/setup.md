@@ -21,7 +21,7 @@ You can configure the **[[ entry.meta.module_name ]]** collector in two ways:
 
 :::important
 
-UI configuration requires paid Netdata Cloud plan. File-based configuration uses the same options and is useful if you prefer configuring via file or need to automate deployments.
+UI configuration requires paid Netdata Cloud plan.
 
 :::
 
