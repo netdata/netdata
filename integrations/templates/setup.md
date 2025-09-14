@@ -66,7 +66,7 @@ There are no configuration options.
 The **[[ entry.meta.module_name ]]** collector can be configured directly through the Netdata web interface:
 
 1. Go to **Nodes**.
-2. Select the node **where you want the [[ entry.meta.module_name ]] data-collection job to run** and click the :gear: (**Configure this node**). This node will be responsible for collecting metrics..
+2. Select the node **where you want the [[ entry.meta.module_name ]] data-collection job to run** and click the :gear: (**Configure this node**). This node will be responsible for collecting metrics.
 3. The **Collectors → Jobs** view opens by default.
 4. In the Search box, type [[ entry.meta.module_name ]] (or scroll the list) to locate the **[[ entry.meta.module_name ]]** collector.
 5. Click the **+** next to the **[[ entry.meta.module_name ]]** collector to add a new job.
