@@ -806,8 +806,10 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
     const { event, context } = args;
     const ct = event?.channel_type;
     if (ct !== 'channel' && ct !== 'group') return;
-    // Removed bot_id filter to allow responding to app messages (Freshdesk, HubSpot, etc.)
-    if (event?.subtype) return; // ignore message_changed, etc.
+    // Allow bot/app messages (Freshdesk, HubSpot) which arrive as subtype 'bot_message'.
+    // Still ignore edits and other non-new-message subtypes like 'message_changed', 'message_deleted', etc.
+    const subtype = typeof event?.subtype === 'string' ? event.subtype : undefined;
+    if (subtype && subtype !== 'bot_message' && subtype !== 'thread_broadcast') return;
     if (typeof event?.text !== 'string' || event.text.length === 0) return;
     // Only auto-engage on root messages, not thread replies
     if (event?.thread_ts) return;
