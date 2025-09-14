@@ -10,6 +10,23 @@
 There is no configuration needed for this integration.
 [% else %]
 
+[% if entry.meta.plugin_name == 'go.d.plugin' %]
+
+You can configure the **[[ entry.meta.module_name ]]** collector in two ways:
+
+| Method                | Best for                                                                                 | How to                                                                                                                                 |
+|-----------------------|------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| [**UI**](#via-ui)     | Fast setup without editing files                                                         | Go to **Nodes → Configure this node → Collectors → Jobs**, search for **[[ entry.meta.module_name ]]**, then click **+** to add a job. |
+| [**File**](#via-file) | If you prefer configuring via file, or need to automate deployments (e.g., with Ansible) | Edit `[[ entry.setup.configuration.file.name ]]` and add a job.                                                                        |
+
+:::important
+
+UI configuration requires paid Netdata Cloud plan. File-based configuration uses the same options and is useful if you prefer configuring via file or need to automate deployments.
+
+:::
+
+[% endif %]
+
 [% if entry.setup.description %]
 [[ entry.setup.description ]]
 [% else %]
@@ -63,14 +80,16 @@ There are no configuration options.
 [% if entry.meta.plugin_name == 'go.d.plugin' %]
 #### via UI
 
-The **[[ entry.meta.module_name ]]** collector can be configured directly through the Netdata web interface:
+Configure the **[[ entry.meta.module_name ]]** collector from the Netdata web interface:
 
 1. Go to **Nodes**.
-2. Select the node **where you want the [[ entry.meta.module_name ]] data-collection job to run** and click the :gear: (**Configure this node**). This node will be responsible for collecting metrics.
+2. Select the node **where you want the [[ entry.meta.module_name ]] data-collection job to run** and click the :gear: (**Configure this node**). That node will run the data collection.
 3. The **Collectors → Jobs** view opens by default.
 4. In the Search box, type _[[ entry.meta.module_name ]]_ (or scroll the list) to locate the **[[ entry.meta.module_name ]]** collector.
 5. Click the **+** next to the **[[ entry.meta.module_name ]]** collector to add a new job.
-6. Fill in the job fields, then **Test** the configuration and **Submit**.
+6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
+    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - If it fails, an error panel appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 [% endif %]
 
