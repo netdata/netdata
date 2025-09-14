@@ -40,6 +40,12 @@ func (p *vmetricsCollector) accumulate(lookup map[vmetricsSourceKey][]vmetricsSi
 
 		v, mv := vmCollapseMetricValue(m)
 
+		type gke struct {
+			key string
+			ok  bool
+		}
+		var gkCache map[*vmetricsAggregator]gke
+
 		for _, sink := range sinks {
 			agg := sink.agg
 			if agg == nil {
@@ -50,7 +56,24 @@ func (p *vmetricsCollector) accumulate(lookup map[vmetricsSourceKey][]vmetricsSi
 				agg.metricType = m.MetricType
 			}
 
-			agg.accumulate(sink, v, mv, m.Tags)
+			if !agg.grouped {
+				agg.accumulateTotal(sink, v, mv)
+				continue
+			}
+
+			if gkCache == nil {
+				gkCache = make(map[*vmetricsAggregator]gke, 2)
+			}
+			entry, found := gkCache[agg]
+			if !found {
+				k, ok := vmBuildGroupKey(m.Tags, agg)
+				entry = gke{key: k, ok: ok}
+				gkCache[agg] = entry
+			}
+			if !entry.ok {
+				continue
+			}
+			agg.accumulateGroupedWithKey(sink, entry.key, v, m.Tags)
 		}
 	}
 }
@@ -59,7 +82,7 @@ func (p *vmetricsCollector) emit(aggrs []*vmetricsAggregator) []ddsnmp.Metric {
 	// small pre-alloc: 1 total or ~groups count; start conservative
 	out := make([]ddsnmp.Metric, 0, len(aggrs))
 	for _, agg := range aggrs {
-		if agg.sourceCount == 0 {
+		if !agg.hadData {
 			p.log.Debugf("no source metrics found for virtual metric '%s'", agg.config.Name)
 			continue
 		}
@@ -82,15 +105,15 @@ type (
 		perGroup   map[string]*vmetricsGroupBucket
 
 		// --- dimensions (composite) ---
-		dims vmetricsDimSpec
+		dimNames []string
 
 		// --- non-grouped accumulators (existing behavior) ---
-		perDim      map[string]int64 // composite total (dim -> sum)
-		sum         int64            // single-source total
-		multiSum    map[string]int64 // merged base MultiValue
-		sourceCount int
+		perDim   map[string]int64 // composite total (dim -> sum)
+		sum      int64            // single-source total
+		multiSum map[string]int64 // merged base MultiValue
 
-		keyBuf strings.Builder
+		hadData bool
+		keyBuf  strings.Builder
 	}
 
 	// vmetricsSourceKey identifies a metric source
@@ -105,13 +128,6 @@ type (
 		dimIdx int16
 	}
 
-	// precomputed dimension spec (avoids per-sample string lookups)
-	vmetricsDimSpec struct {
-		names     []string
-		idxByName map[string]int // build-time only
-		count     int
-	}
-
 	// per-group accumulator (emitted as one table row)
 	vmetricsGroupBucket struct {
 		vals     []int64 // len == dims.count when composite
@@ -121,43 +137,14 @@ type (
 	}
 )
 
-func (agg *vmetricsAggregator) accumulate(sink vmetricsSink, v int64, mv map[string]int64, tags map[string]string) {
-	if agg.grouped {
-		agg.accumulateGrouped(sink, v, tags)
-	} else {
-		agg.accumulateTotal(sink, v, mv)
-	}
-	agg.sourceCount++
-}
-
-func (agg *vmetricsAggregator) accumulateGrouped(sink vmetricsSink, v int64, tags map[string]string) {
-	gkey, ok := vmBuildGroupKey(tags, agg)
-	if !ok {
-		return
-	}
-	b := agg.perGroup[gkey]
-	if b == nil {
-		b = &vmetricsGroupBucket{emitTags: vmBuildEmitTags(tags, agg)}
-		if agg.dims.count > 0 {
-			b.vals = make([]int64, agg.dims.count)
-			b.seen = make([]bool, agg.dims.count)
-		}
-		agg.perGroup[gkey] = b
-	}
-	if sink.dimIdx >= 0 {
-		b.vals[sink.dimIdx] += v
-		b.seen[sink.dimIdx] = true
-	} else {
-		b.sum += v
-	}
-}
-
 func (agg *vmetricsAggregator) accumulateTotal(sink vmetricsSink, v int64, mv map[string]int64) {
+	agg.hadData = true
+
 	if sink.dimIdx >= 0 {
 		if agg.perDim == nil {
-			agg.perDim = make(map[string]int64, agg.dims.count)
+			agg.perDim = make(map[string]int64, len(agg.dimNames))
 		}
-		name := agg.dims.names[sink.dimIdx]
+		name := agg.dimNames[sink.dimIdx]
 		agg.perDim[name] += v
 		return
 	}
@@ -172,6 +159,26 @@ func (agg *vmetricsAggregator) accumulateTotal(sink vmetricsSink, v int64, mv ma
 		return
 	}
 	agg.sum += v
+}
+
+func (agg *vmetricsAggregator) accumulateGroupedWithKey(sink vmetricsSink, gkey string, v int64, tags map[string]string) {
+	agg.hadData = true
+
+	b := agg.perGroup[gkey]
+	if b == nil {
+		b = &vmetricsGroupBucket{emitTags: vmBuildEmitTags(tags, agg)}
+		if len(agg.dimNames) > 0 {
+			b.vals = make([]int64, len(agg.dimNames))
+			b.seen = make([]bool, len(agg.dimNames))
+		}
+		agg.perGroup[gkey] = b
+	}
+	if sink.dimIdx >= 0 {
+		b.vals[sink.dimIdx] += v
+		b.seen[sink.dimIdx] = true
+	} else {
+		b.sum += v
+	}
 }
 
 func (agg *vmetricsAggregator) emitInto(out *[]ddsnmp.Metric) {
@@ -195,9 +202,9 @@ func (agg *vmetricsAggregator) emitGrouped(out *[]ddsnmp.Metric) {
 			Table:       agg.groupTable,
 			Tags:        b.emitTags,
 		}
-		if agg.dims.count > 0 {
-			mv := make(map[string]int64, agg.dims.count)
-			for i, dn := range agg.dims.names {
+		if len(agg.dimNames) > 0 {
+			mv := make(map[string]int64, len(agg.dimNames))
+			for i, dn := range agg.dimNames {
 				if b.seen[i] {
 					mv[dn] = b.vals[i]
 				}
@@ -275,17 +282,18 @@ func (p *vmetricsCollector) buildAggregators(profDef *ddprofiledefinition.Profil
 				return s.As != ""
 			})
 
+		var dimsIdxByName map[string]int
+
 		if isComposite {
-			agg.dims.idxByName = make(map[string]int, len(cfg.Sources))
-			agg.dims.names = make([]string, 0, len(cfg.Sources))
+			dimsIdxByName = make(map[string]int, len(cfg.Sources))
+			agg.dimNames = make([]string, 0, len(cfg.Sources))
 			for _, s := range cfg.Sources {
 				name := ternary(s.As != "", s.As, s.Metric)
-				if _, dup := agg.dims.idxByName[name]; !dup {
-					agg.dims.idxByName[name] = len(agg.dims.names)
-					agg.dims.names = append(agg.dims.names, name)
+				if _, dup := dimsIdxByName[name]; !dup {
+					dimsIdxByName[name] = len(agg.dimNames)
+					agg.dimNames = append(agg.dimNames, name)
 				}
 			}
-			agg.dims.count = len(agg.dims.names)
 		}
 
 		// register sinks
@@ -295,7 +303,7 @@ func (p *vmetricsCollector) buildAggregators(profDef *ddprofiledefinition.Profil
 			dimIdx := int16(-1)
 			if isComposite {
 				name := ternary(src.As != "", src.As, src.Metric)
-				if idx, ok := agg.dims.idxByName[name]; ok {
+				if idx, ok := dimsIdxByName[name]; ok {
 					dimIdx = int16(idx)
 				}
 			}
