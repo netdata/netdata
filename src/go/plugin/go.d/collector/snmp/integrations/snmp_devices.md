@@ -33,11 +33,6 @@ Additionally, it collects overall device uptime.
 
 It is compatible with all SNMP versions (v1, v2c, and v3) and uses the [gosnmp](https://github.com/gosnmp/gosnmp) package.
 
-**For advanced users**:
-
-- You can manually specify custom OIDs (Object Identifiers) to retrieve specific data points beyond the default metrics.
-- However, defining custom charts with dimensions for these OIDs requires manual configuration.
-
 
 
 
@@ -199,20 +194,6 @@ The following options can be defined globally: update_every, autodetection_retry
 | user.auth_key | Authentication protocol pass phrase. |  | no |
 | user.priv_proto | Privacy protocol for SNMPv3 messages. |  | no |
 | user.priv_key | Privacy protocol pass phrase. |  | no |
-| charts | List of charts. | [] | yes |
-| charts.id | Chart ID. Used to uniquely identify the chart. |  | yes |
-| charts.title | Chart title. | Untitled chart | no |
-| charts.units | Chart units. | num | no |
-| charts.family | Chart family. | charts.id | no |
-| charts.type | Chart type (line, area, stacked). | line | no |
-| charts.priority | Chart priority. | 70000 | no |
-| charts.multiply_range | Used when you need to define many charts using incremental OIDs. | [] | no |
-| charts.dimensions | List of chart dimensions. | [] | yes |
-| charts.dimensions.oid | Collected metric OID. |  | yes |
-| charts.dimensions.name | Dimension name. |  | yes |
-| charts.dimensions.algorithm | Dimension algorithm (absolute, incremental). | absolute | no |
-| charts.dimensions.multiplier | Collected value multiplier, applied to convert it properly to units. | 1 | no |
-| charts.dimensions.divisor | Collected value divisor, applied to convert it properly to units. | 1 | no |
 
 ##### user.auth_proto
 
@@ -307,155 +288,6 @@ jobs:
       auth_key: auth_protocol_passphrase
       priv_proto: aes256
       priv_key: priv_protocol_passphrase
-
-```
-</details>
-
-##### Custom OIDs
-
-In this example:
-
-- the SNMP device is `192.0.2.1`.
-- the SNMP version is `2`.
-- the SNMP community is `public`.
-- we will update the values every 10 seconds.
-
-
-<details open><summary>Config</summary>
-
-```yaml
-jobs:
-  - name: switch
-    update_every: 10
-    hostname: 192.0.2.1
-    community: public
-    options:
-      version: 2
-    charts:
-      - id: "bandwidth_port1"
-        title: "Switch Bandwidth for port 1"
-        units: "kilobits/s"
-        type: "area"
-        family: "ports"
-        dimensions:
-          - name: "in"
-            oid: "1.3.6.1.2.1.2.2.1.10.1"
-            algorithm: "incremental"
-            multiplier: 8
-            divisor: 1000
-          - name: "out"
-            oid: "1.3.6.1.2.1.2.2.1.16.1"
-            multiplier: -8
-            divisor: 1000
-      - id: "bandwidth_port2"
-        title: "Switch Bandwidth for port 2"
-        units: "kilobits/s"
-        type: "area"
-        family: "ports"
-        dimensions:
-          - name: "in"
-            oid: "1.3.6.1.2.1.2.2.1.10.2"
-            algorithm: "incremental"
-            multiplier: 8
-            divisor: 1000
-          - name: "out"
-            oid: "1.3.6.1.2.1.2.2.1.16.2"
-            multiplier: -8
-            divisor: 1000
-
-```
-</details>
-
-##### Custom OIDs with multiply range
-
-If you need to define many charts using incremental OIDs, you can use the `charts.multiply_range` option.
-
-This is like the SNMPv1/2 example, but the option will multiply the current chart from 1 to 24 inclusive, producing 24 charts in total for the 24 ports of the switch `192.0.2.1`.
-
-Each of the 24 new charts will have its id (1-24) appended at:
-
-- its chart unique `id`, i.e. `bandwidth_port_1` to `bandwidth_port_24`.
-- its title, i.e. `Switch Bandwidth for port 1` to `Switch Bandwidth for port 24`.
-- its `oid` (for all dimensions), i.e. dimension in will be `1.3.6.1.2.1.2.2.1.10.1` to `1.3.6.1.2.1.2.2.1.10.24`.
-- its `priority` will be incremented for each chart so that the charts will appear on the dashboard in this order.
-
-
-<details open><summary>Config</summary>
-
-```yaml
-jobs:
-  - name: switch
-    update_every: 10
-    hostname: "192.0.2.1"
-    community: public
-    options:
-      version: 2
-    charts:
-      - id: "bandwidth_port"
-        title: "Switch Bandwidth for port"
-        units: "kilobits/s"
-        type: "area"
-        family: "ports"
-        multiply_range: [1, 24]
-        dimensions:
-          - name: "in"
-            oid: "1.3.6.1.2.1.2.2.1.10"
-            algorithm: "incremental"
-            multiplier: 8
-            divisor: 1000
-          - name: "out"
-            oid: "1.3.6.1.2.1.2.2.1.16"
-            multiplier: -8
-            divisor: 1000
-
-```
-</details>
-
-##### Multiple devices with a common configuration
-
-YAML supports [anchors](https://yaml.org/spec/1.2.2/#3222-anchors-and-aliases). 
-The `&` defines and names an anchor, and the `*` uses it. `<<: *anchor` means, inject the anchor, then extend. We can use anchors to share the common configuration for multiple devices.
-
-The following example:
-
-- adds an `anchor` to the first job.
-- injects (copies) the first job configuration to the second and updates `name` and `hostname` parameters.
-- injects (copies) the first job configuration to the third and updates `name` and `hostname` parameters.
-
-
-<details open><summary>Config</summary>
-
-```yaml
-jobs:
-  - &anchor
-    name: switch
-    update_every: 10
-    hostname: "192.0.2.1"
-    community: public
-    options:
-      version: 2
-    charts:
-      - id: "bandwidth_port1"
-        title: "Switch Bandwidth for port 1"
-        units: "kilobits/s"
-        type: "area"
-        family: "ports"
-        dimensions:
-          - name: "in"
-            oid: "1.3.6.1.2.1.2.2.1.10.1"
-            algorithm: "incremental"
-            multiplier: 8
-            divisor: 1000
-          - name: "out"
-            oid: "1.3.6.1.2.1.2.2.1.16.1"
-            multiplier: -8
-            divisor: 1000
-  - <<: *anchor
-    name: switch2
-    hostname: "192.0.2.2"
-  - <<: *anchor
-    name: switch3
-    hostname: "192.0.2.3"
 
 ```
 </details>
