@@ -9,7 +9,7 @@ models:
 #  - anthropic/claude-3-5-haiku-20241022
   - anthropic/claude-sonnet-4-20250514
 tools:
-  - filesystem
+  - filesystem_repos
   - batch
 llmTimeout: 120000
 toolTimeout: 120000

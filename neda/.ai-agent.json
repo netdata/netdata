@@ -334,7 +334,7 @@
       ],
       "enabled": true
     },
-    "filesystem": {
+    "filesystem_repos": {
       "type": "stdio",
       "command": "node",
       "args": [
