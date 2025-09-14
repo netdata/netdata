@@ -806,7 +806,7 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
     const { event, context } = args;
     const ct = event?.channel_type;
     if (ct !== 'channel' && ct !== 'group') return;
-    if (event?.bot_id) return; // ignore bot messages
+    // Removed bot_id filter to allow responding to app messages (Freshdesk, HubSpot, etc.)
     if (event?.subtype) return; // ignore message_changed, etc.
     if (typeof event?.text !== 'string' || event.text.length === 0) return;
     // Only auto-engage on root messages, not thread replies
