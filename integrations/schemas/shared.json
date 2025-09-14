@@ -168,7 +168,7 @@
                       },
                       "detailed_description": {
                         "type": "string",
-                        "description": "Option detailed description. Use it to describe in detail complex options."
+                        "description": "Option detailed description. Use it to describe complex options in detail."
                       },
                       "default_value": {
                         "type": [
