@@ -69,8 +69,8 @@ modules:
           - title: "Prepare the SNMP device"
             description: |
               Before configuring the collector:
-              - Enable the SNMP service on the target device (through its management interface).  
-              - Make sure the device is reachable from the Netdata node on port 161/UDP.  
+              - Enable the SNMP service on the target device (through its management interface).
+              - Make sure the device is reachable from the Netdata node on port 161/UDP.
               - Have ready the required connection details: IP address, SNMP version, and either a community string (v1/v2c) or user credentials (v3).
       configuration:
         file:
