@@ -19,6 +19,7 @@ interface SlackHeadendOptions {
 }
 
 const stripBotMention = (text: string, botUserId: string): string => text.replace(new RegExp(`<@${botUserId}>`, 'g'), '').trim();
+const containsBotMention = (text: string, botUserId: string): boolean => new RegExp(`<@${botUserId}>`).test(text);
 const truncate = (s: string, max: number): string => (s.length <= max ? s : `${s.slice(0, max)}…`);
 const STOPPING_TEXT = '🛑 Stopping…';
 const fmtTs = (ts: unknown): string => {
@@ -802,12 +803,16 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
 
   // Channel/group posts (non-mentions). Requires message.channels/message.groups in manifest.
   app.event('message', async (args: any) => {
-    const { event } = args;
+    const { event, context } = args;
     const ct = event?.channel_type;
     if (ct !== 'channel' && ct !== 'group') return;
     if (event?.bot_id) return; // ignore bot messages
     if (event?.subtype) return; // ignore message_changed, etc.
     if (typeof event?.text !== 'string' || event.text.length === 0) return;
+    // Only auto-engage on root messages, not thread replies
+    if (event?.thread_ts) return;
+    // Don't auto-engage if the bot is mentioned (mentions are handled separately)
+    if (context?.botUserId && containsBotMention(event.text, String(context.botUserId))) return;
     await handleEvent(KIND_CHANNEL_POST, args);
   });
 
