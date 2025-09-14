@@ -23,7 +23,6 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 const fsp = fs.promises;
 
@@ -62,7 +61,18 @@ const ROOT = (() => {
     console.error(`Root path is not a directory: ${abs}`);
     process.exit(1);
   }
-  return abs;
+
+  // Canonicalize ROOT to handle symlinks and case normalization
+  let canonRoot;
+  try {
+    canonRoot = fs.realpathSync(abs);
+  } catch (e) {
+    console.error(`Cannot canonicalize root path: ${abs}: ${e.message}`);
+    process.exit(1);
+  }
+
+  // console.error(`MCP: Root directory: ${canonRoot}`);
+  return canonRoot;
 })();
 
 function assertNoDotDot(raw) {
@@ -81,6 +91,8 @@ function resolveRel(raw) {
 }
 
 // -------------------------- Binary-safe UTF-8 decode with hex escapes --------------------------
+// Note: Multi-byte UTF-8 characters split across chunk boundaries will be escaped as \u00XX bytes.
+// This is a known limitation - if precise multi-byte handling is needed, increase OVERLAP_SIZE.
 function decodeUtf8WithHexEscapes(buf) {
   const bytes = buf;
   let out = '';
@@ -134,8 +146,22 @@ async function validatePath(absPath, relPath = '', allowFollow = false) {
         // Resolve the target path
         const resolvedTarget = isAbsolute ? target : path.resolve(path.dirname(absPath), target);
 
-        // The ONLY reason to reject a symlink is if the resolved target is outside ROOT
-        if (!resolvedTarget.startsWith(ROOT)) {
+        // Canonicalize the target to handle symlinks and case normalization
+        let canonTarget;
+        try {
+          canonTarget = await fsp.realpath(resolvedTarget);
+        } catch (e) {
+          // If target doesn't exist, use the resolved path as-is
+          canonTarget = resolvedTarget;
+        }
+
+        // Safe containment check using canonical paths
+        const relToRoot = path.relative(ROOT, canonTarget);
+        const escapesRoot =
+          relToRoot === '' ? false :  // Exactly at ROOT is OK
+          relToRoot.startsWith('..' + path.sep) || relToRoot === '..' || path.isAbsolute(relToRoot);
+
+        if (escapesRoot) {
           let reason = 'symlink target is outside root directory';
           if (isAbsolute) {
             reason = 'symlink points to absolute path outside root directory';
@@ -164,7 +190,7 @@ async function validatePath(absPath, relPath = '', allowFollow = false) {
               size: targetStat.size || 0,
               isSymlink: true,
               target: resolvedRel,
-              resolvedPath: resolvedTarget
+              resolvedPath: canonTarget  // Use canonical path for consistency
             };
           }
 
@@ -235,7 +261,6 @@ async function validatePath(absPath, relPath = '', allowFollow = false) {
 
 // Format entry for compact output
 function formatEntry(relPath, validation) {
-  const name = path.basename(relPath);
 
   if (validation.type === 'dir') {
     return relPath ? relPath + '/' : './';
@@ -256,7 +281,14 @@ function formatEntry(relPath, validation) {
 
 async function listDirEntries(dirAbs, baseRel) {
   const entries = [];
-  const dirents = await fsp.readdir(dirAbs, { withFileTypes: true });
+  let dirents;
+  try {
+    dirents = await fsp.readdir(dirAbs, { withFileTypes: true });
+  } catch (e) {
+    // Return empty array if directory can't be read (permission denied, etc.)
+    console.error(`MCP: Cannot read directory ${dirAbs}: ${e.message}`);
+    return entries;
+  }
 
   for (const d of dirents) {
     const full = path.join(dirAbs, d.name);
@@ -278,7 +310,18 @@ async function listDirEntries(dirAbs, baseRel) {
 
 async function walkTree(dirAbs, baseRel, acc, indentStr = '', options = {}, stats = null) {
   if (stats) stats.dirsExamined++;
-  const dirents = await fsp.readdir(dirAbs, { withFileTypes: true });
+  let dirents;
+  try {
+    dirents = await fsp.readdir(dirAbs, { withFileTypes: true });
+  } catch (e) {
+    // Skip directories that can't be read and continue with siblings
+    acc.push({
+      display: indentStr + '[ERROR: Cannot read directory ' + (baseRel || '.') + ': ' + e.message + ']',
+      path: baseRel,
+      validation: { valid: false, type: 'error', reason: e.message }
+    });
+    return;
+  }
   const entries = [];
 
   // Collect and validate all entries
@@ -359,7 +402,14 @@ function globToRegex(pattern) {
 
 async function findMatches(baseAbs, baseRel, regex, acc, stats) {
   stats.dirsExamined++;
-  const dirents = await fsp.readdir(baseAbs, { withFileTypes: true });
+  let dirents;
+  try {
+    dirents = await fsp.readdir(baseAbs, { withFileTypes: true });
+  } catch (e) {
+    // Skip directories that can't be read and continue traversal
+    console.error(`MCP: Cannot read directory ${baseAbs}: ${e.message}`);
+    return;
+  }
   for (const d of dirents) {
     const rel = (baseRel ? baseRel + '/' : '') + d.name;
     const full = path.join(baseAbs, d.name);
@@ -388,7 +438,33 @@ async function findMatches(baseAbs, baseRel, regex, acc, stats) {
 }
 
 async function readFileDecoded(abs) { const buf = await fsp.readFile(abs); return decodeUtf8WithHexEscapes(buf); }
-function buildRegex(pattern, caseSensitive) { const flags = 'gs' + (caseSensitive ? '' : 'i'); return new RegExp(pattern, flags); }
+
+// Maximum allowed regex pattern length to prevent complex patterns
+const MAX_REGEX_LENGTH = 10000;
+
+function buildRegex(pattern, caseSensitive, global = false) {
+  // Guard against overly complex patterns
+  if (pattern.length > MAX_REGEX_LENGTH) {
+    throw new Error(`Regex pattern too long (${pattern.length} chars, max ${MAX_REGEX_LENGTH})`);
+  }
+
+  // Check for known problematic patterns (nested quantifiers)
+  const problematicPatterns = [
+    /(\.\*){2,}/,           // Multiple .*
+    /(\.\+){2,}/,           // Multiple .+
+    /\([^)]*[*+]{2,}/,      // Nested quantifiers
+    /\([^)]*\*\)[*+]/,      // Quantified groups
+  ];
+
+  for (const problematic of problematicPatterns) {
+    if (problematic.test(pattern)) {
+      throw new Error('Regex pattern contains potentially catastrophic backtracking constructs');
+    }
+  }
+
+  const flags = 's' + (global ? 'g' : '') + (caseSensitive ? '' : 'i');
+  return new RegExp(pattern, flags);
+}
 
 // -------------------------- Tool implementations --------------------------
 async function toolListDir(args) {
@@ -647,7 +723,7 @@ async function toolGrep(args) {
     idx += lines[i].length + 1;
   }
 
-  const re = buildRegex(regex, cs);
+  const re = buildRegex(regex, cs, true); // Need global flag for while() exec() loop
   const matchData = [];
   let m;
 
@@ -779,7 +855,14 @@ async function toolRGrep(args) {
   fileLoop: while (stack.length > 0) {
     const [curAbs, curRel] = stack.pop();
     dirsExamined++;  // Count each directory we examine
-    const dirents = await fsp.readdir(curAbs, { withFileTypes: true });
+    let dirents;
+    try {
+      dirents = await fsp.readdir(curAbs, { withFileTypes: true });
+    } catch (e) {
+      // Skip directories that can't be read and continue traversal
+      warnings.push(`WARNING: Cannot read directory ${curRel || '.'}: ${e.message}`);
+      continue;
+    }
     for (const d of dirents) {
       const rel = (curRel ? curRel + '/' : '') + d.name;
       const full = path.join(curAbs, d.name);
@@ -808,9 +891,6 @@ async function toolRGrep(args) {
       if (validation.valid && validation.type === 'file') {
         filesExamined++;  // Count each file we examine
         try {
-          // Reset regex lastIndex for each file (g flag maintains state across test() calls)
-          re.lastIndex = 0;
-
           // Check file in chunks to avoid loading entire file into memory
           const fd = await fsp.open(full, 'r');
           try {
@@ -851,7 +931,10 @@ async function toolRGrep(args) {
           } finally {
             await fd.close();
           }
-        } catch { }
+        } catch (e) {
+          // Log error but continue processing other files
+          warnings.push(`WARNING: failed to read ${rel}: ${e?.message ?? 'unknown error'}`);
+        }
       }
     }
   }
@@ -889,9 +972,9 @@ async function toolRGrep(args) {
 
 // -------------------------- MCP methods --------------------------
 const tools = [
-  { name: 'ListDir', description: 'List contents of a directory under ROOT. Returns entries with optional metadata. Symlinks to valid targets can be followed. All paths are relative to ROOT; ".." segments and absolute paths are forbidden.', inputSchema: { type: 'object', properties: { dir: { type: 'string', description: 'Directory path relative to ROOT (empty string for root, no leading slash)' }, showSize: { type: 'boolean', description: 'Include file sizes in bytes (files only, not directories)' }, showLastModified: { type: 'boolean', description: 'Include last modified timestamp' }, showCreated: { type: 'boolean', description: 'Include creation timestamp' } }, required: ['dir'] }, handler: toolListDir },
+  { name: 'ListDir', description: 'List contents of a directory under ROOT. Returns entries with optional metadata. Symlinks are shown but not followed. All paths are relative to ROOT; ".." segments and absolute paths are forbidden.', inputSchema: { type: 'object', properties: { dir: { type: 'string', description: 'Directory path relative to ROOT (empty string for root, no leading slash)' }, showSize: { type: 'boolean', description: 'Include file sizes in bytes (files only, not directories)' }, showLastModified: { type: 'boolean', description: 'Include last modified timestamp' }, showCreated: { type: 'boolean', description: 'Include creation timestamp' } }, required: ['dir'] }, handler: toolListDir },
   { name: 'Tree', description: 'Recursively list files and directories under a directory (symlinks are not traversed). All paths are relative to ROOT; ".." and absolute paths are forbidden.', inputSchema: { type: 'object', properties: { dir: { type: 'string', description: 'Directory path relative to ROOT (empty string for root, no leading slash)' }, showSize: { type: 'boolean', description: 'Include file sizes in bytes (files only, not directories)' } }, required: ['dir'] }, handler: toolTree },
-  { name: 'Find', description: 'Find entries by simple glob under a directory and its subdirectories. Supported glob: * and ? only (match across path separators). No character classes, braces, or **. Excludes symlinks and special files. Paths are relative to ROOT; ".." and absolute paths are forbidden.', inputSchema: { type: 'object', properties: { dir: { type: 'string', description: 'Directory path relative to ROOT (empty string for root, no leading slash)' }, glob: { type: 'string', description: 'Simple glob pattern (* and ? only, matches across path separators)' } }, required: ['dir', 'glob'] }, handler: toolFind },
+  { name: 'Find', description: 'Find entries by simple glob under a directory and its subdirectories. Supported glob: * and ? only (match across path separators). No character classes, braces, or **. Includes symlinks in results but never follows them. Paths are relative to ROOT; ".." and absolute paths are forbidden.', inputSchema: { type: 'object', properties: { dir: { type: 'string', description: 'Directory path relative to ROOT (empty string for root, no leading slash)' }, glob: { type: 'string', description: 'Simple glob pattern (* and ? only, matches across path separators)' } }, required: ['dir', 'glob'] }, handler: toolFind },
   { name: 'Read', description: "Read file by lines with numbering. Can follow symlinks to valid files. headOrTail='head' returns lines [start, start+lines); 'tail' treats start as offset from end (start=0 => last lines). Lines are multi-byte aware; invalid UTF-8 bytes are hex-escaped as \\u00NN (strict JSON). Each line is prefixed with a 4-char right-aligned line number and a space.", inputSchema: { type: 'object', properties: { file: { type: 'string', description: 'File path relative to ROOT' }, start: { type: 'integer', minimum: 0, description: 'Starting line (0-based for head, offset from end for tail)' }, lines: { type: 'integer', minimum: 0, description: 'Number of lines to read' }, headOrTail: { type: 'string', enum: ['head', 'tail'], description: "'head' reads from start, 'tail' reads from end" } }, required: ['file', 'start', 'lines', 'headOrTail'] }, handler: toolRead },
   { name: 'Grep', description: 'MULTI-LINE grep in a file. Can follow symlinks to valid files. The regex uses JavaScript syntax with dotAll (. matches newlines). Returns blocks per match with before/after context and line-numbered text. Control case sensitivity via caseSensitive flag. Paths are relative to ROOT; ".." and absolute paths are forbidden.', inputSchema: { type: 'object', properties: { file: { type: 'string', description: 'File path relative to ROOT' }, regex: { type: 'string', description: 'JavaScript regular expression pattern' }, before: { type: 'integer', minimum: 0, description: 'Lines of context before match' }, after: { type: 'integer', minimum: 0, description: 'Lines of context after match' }, caseSensitive: { type: 'boolean', description: 'true for case-sensitive matching' } }, required: ['file', 'regex', 'before', 'after', 'caseSensitive'] }, handler: toolGrep },
   { name: 'RGrep', description: 'MULTI-LINE grep across files under a directory. The regex uses JavaScript syntax with dotAll (. matches newlines). Returns paths of files that match. Cannot be used on root directory due to performance. Control case sensitivity via caseSensitive flag. Paths are relative to ROOT; ".." and absolute paths are forbidden.', inputSchema: { type: 'object', properties: { dir: { type: 'string', description: 'Directory path relative to ROOT (cannot be empty/root)' }, regex: { type: 'string', description: 'JavaScript regular expression pattern' }, caseSensitive: { type: 'boolean', description: 'true for case-sensitive matching' }, maxFiles: { type: 'integer', minimum: 1, description: 'Optional: Maximum number of matching files to return' } }, required: ['dir', 'regex', 'caseSensitive'] }, handler: toolRGrep },
@@ -918,35 +1001,51 @@ STDIN.on('end', () => {
   process.exit(0);
 });
 
-function processBuffer() {
-  // Check if buffer starts with JSON (no Content-Length header)
-  const bufStr = buffer.toString('utf8');
-  if (bufStr.startsWith('{')) {
-    // Try to parse as newline-delimited JSON
-    const lines = bufStr.split('\n');
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (line === '') continue;
-      
-      try {
-        const msg = JSON.parse(line);
-        // console.error('MCP: Parsed raw JSON message');
-        handleMessage(msg);
-        // Remove processed line from buffer
-        const lineEnd = bufStr.indexOf('\n', bufStr.indexOf(line)) + 1;
-        buffer = buffer.subarray(lineEnd > 0 ? lineEnd : line.length);
-      } catch (e) {
-        // Not a complete JSON line yet, wait for more data
-        if (i === lines.length - 1 && !line.endsWith('}')) {
-          // Last line is incomplete, keep it in buffer
-          return;
-        }
-        console.error('MCP: Failed to parse line as JSON:', e.message, 'Line:', line.substring(0, 100));
-      }
+function processNewlineJSON() {
+  // Process newline-delimited JSON directly on buffer to avoid string index desync
+  while (true) {
+    const nl = buffer.indexOf(0x0A); // '\n'
+    if (nl === -1) break; // No complete line available
+
+    // Extract line buffer and advance main buffer
+    const lineBuf = buffer.subarray(0, nl);
+    buffer = buffer.subarray(nl + 1);
+
+    // Convert to string and strip any trailing \r (for \r\n line endings)
+    let lineStr = lineBuf.toString('utf8');
+    if (lineStr.endsWith('\r')) {
+      lineStr = lineStr.slice(0, -1);
     }
+
+    // Skip empty lines
+    if (lineStr.length === 0) continue;
+
+    try {
+      const msg = JSON.parse(lineStr);
+      handleMessage(msg);
+    } catch (e) {
+      // For NDJSON, each line should be complete JSON
+      console.error('MCP: Failed to parse NDJSON line:', e.message, 'Line:', lineStr.slice(0, 200));
+    }
+  }
+}
+
+function processBuffer() {
+  // More robust detection: check for LSP headers first, then newline-JSON
+  const bufStr = buffer.toString('utf8');
+
+  // Check for LSP-style headers first (Content-Length: or header delimiter)
+  if (bufStr.match(/^Content-Length:/i) || bufStr.includes('\r\n\r\n') || bufStr.includes('\n\n')) {
+    // Process as LSP-framed messages (handled below)
+  } else if (buffer.indexOf(0x0A) !== -1) {
+    // Has newlines, process as NDJSON
+    processNewlineJSON();
+    return;
+  } else {
+    // Wait for more data
     return;
   }
-  
+
   // Parse headers (LSP-style framing)
   while (true) {
     const headerEnd = buffer.indexOf('\r\n\r\n');
