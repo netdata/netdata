@@ -13,11 +13,11 @@ tools:
   - batch
 llmTimeout: 120000
 toolTimeout: 120000
-toolResponseMaxBytes: 8192
+toolResponseMaxBytes: 16384
 maxConcurrentTools: 10
-temperature: 0.2
+temperature: 0.3
 topP: 1
-maxOutputTokens: 16384
+maxOutputTokens: 32768
 repeatPenalty: 1.1
 maxRetries: 5
 maxToolTurns: 50
