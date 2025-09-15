@@ -50,37 +50,52 @@ modules:
             enabled: true
           list:
             - name: update_every
-              description: Data collection frequency.
+              description: Data collection interval (seconds).
               default_value: 1
               required: false
+              group: Base
             - name: autodetection_retry
-              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              description: Autodetection retry interval (seconds). Set 0 to disable.
               default_value: 0
               required: false
+              group: Base
             - name: domains
-              description: Domain or subdomains to query. The collector will choose a random domain from the list on every iteration.
+              description: One or more domains/subdomains to query. A random domain from the list is selected on each iteration.
               default_value: ""
               required: true
+              group: Base
             - name: servers
-              description: Servers to query. If empty, the collector will automatically use DNS servers from `/etc/resolv.conf`.
+              description: DNS servers to query. If empty, servers from `/etc/resolv.conf` are used automatically.
               default_value: ""
               required: false
+              group: Base
+
             - name: port
               description: DNS server port.
               default_value: 53
               required: false
+              group: Advanced
             - name: network
-              description: "Network protocol name. Available options: udp, tcp, tcp-tls."
+              description: "Network protocol to use. Available options: udp, tcp, tcp-tls."
               default_value: udp
               required: false
+              group: Advanced
             - name: record_types
-              description: "Query record type. Available options: A, AAAA, CNAME, MX, NS, PTR, TXT, SOA, SPF, TXT, SRV."
+              description: "DNS record type to query. Available options: A, AAAA, CNAME, MX, NS, PTR, TXT, SOA, SPF, SRV."
               default_value: A
               required: false
+              group: Advanced
             - name: timeout
-              description: Query read timeout.
+              description: Query read timeout (seconds).
               default_value: 2
               required: false
+              group: Advanced
+
+            - name: vnode
+              description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+              default_value: ""
+              required: false
+              group: Virtual Node
         examples:
           folding:
             title: Config

@@ -74,93 +74,136 @@ modules:
             enabled: true
           list:
             - name: update_every
-              description: Data collection frequency.
+              description: Data collection interval (seconds).
               default_value: 5
               required: false
+              group: Base
             - name: autodetection_retry
-              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              description: Autodetection retry interval (seconds). Set 0 to disable.
               default_value: 0
               required: false
+              group: Base
             - name: url
-              description: Server URL.
+              description: Target endpoint URL.
               default_value: http://127.0.0.1:9200
               required: true
-            - name: cluster_mode
-              description: Controls whether to collect metrics for all nodes in the cluster or only for the local node.
-              default_value: "false"
-              required: false
-            - name: collect_node_stats
-              description: Controls whether to collect nodes metrics.
-              default_value: "true"
-              required: false
-            - name: collect_cluster_health
-              description: Controls whether to collect cluster health metrics.
-              default_value: "true"
-              required: false
-            - name: collect_cluster_stats
-              description: Controls whether to collect cluster stats metrics.
-              default_value: "true"
-              required: false
-            - name: collect_indices_stats
-              description: Controls whether to collect indices metrics.
-              default_value: "false"
-              required: false
+              group: Base
             - name: timeout
-              description: HTTP request timeout.
+              description: HTTP request timeout (seconds).
               default_value: 2
               required: false
+              group: Base
+
+            - name: cluster_mode
+              description: Collect metrics for all nodes in the cluster (yes) or only the local node (no).
+              default_value: no
+              required: false
+              group: Metrics Selection
+            - name: collect_node_stats
+              description: Collect node metrics.
+              default_value: yes
+              required: false
+              group: Metrics Selection
+            - name: collect_cluster_health
+              description: Collect cluster health metrics.
+              default_value: yes
+              required: false
+              group: Metrics Selection
+            - name: collect_cluster_stats
+              description: Collect cluster stats metrics.
+              default_value: yes
+              required: false
+              group: Metrics Selection
+            - name: collect_indices_stats
+              description: Collect index metrics.
+              default_value: no
+              required: false
+              group: Metrics Selection
+
             - name: username
-              description: Username for basic HTTP authentication.
+              description: Username for Basic HTTP authentication.
               default_value: ""
               required: false
+              group: HTTP Auth
             - name: password
-              description: Password for basic HTTP authentication.
+              description: Password for Basic HTTP authentication.
               default_value: ""
               required: false
+              group: HTTP Auth
+            - name: bearer_token_file
+              description: "Path to a file containing a bearer token (used for `Authorization: Bearer`)."
+              default_value: ""
+              required: false
+              group: HTTP Auth
+
+            - name: tls_skip_verify
+              description: Skip TLS certificate and hostname verification (insecure).
+              default_value: no
+              required: false
+              group: TLS
+            - name: tls_ca
+              description: Path to CA bundle used to validate the server certificate.
+              default_value: ""
+              required: false
+              group: TLS
+            - name: tls_cert
+              description: Path to client TLS certificate (for mTLS).
+              default_value: ""
+              required: false
+              group: TLS
+            - name: tls_key
+              description: Path to client TLS private key (for mTLS).
+              default_value: ""
+              required: false
+              group: TLS
+
             - name: proxy_url
-              description: Proxy URL.
+              description: HTTP proxy URL.
               default_value: ""
               required: false
+              group: Proxy
             - name: proxy_username
-              description: Username for proxy basic HTTP authentication.
+              description: Username for proxy Basic HTTP authentication.
               default_value: ""
               required: false
+              group: Proxy
             - name: proxy_password
-              description: Password for proxy basic HTTP authentication.
+              description: Password for proxy Basic HTTP authentication.
               default_value: ""
               required: false
+              group: Proxy
+
             - name: method
-              description: HTTP request method.
+              description: HTTP method to use.
               default_value: "GET"
               required: false
+              group: Request
             - name: body
-              description: HTTP request body.
+              description: Request body (e.g., for POST/PUT).
               default_value: ""
               required: false
+              group: Request
             - name: headers
-              description: HTTP request headers.
+              description: "Additional HTTP headers (one per line as key: value)."
               default_value: ""
               required: false
+              group: Request
             - name: not_follow_redirects
-              description: Redirect handling policy. Controls whether the client follows redirects.
+              description: Do not follow HTTP redirects.
               default_value: no
               required: false
-            - name: tls_skip_verify
-              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              group: Request
+            - name: force_http2
+              description: Force HTTP/2 (including h2c over TCP).
               default_value: no
               required: false
-            - name: tls_ca
-              description: Certification authority that the client uses when verifying the server's certificates.
+              group: Request
+
+            - name: vnode
+              description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
               default_value: ""
               required: false
-            - name: tls_cert
-              description: Client TLS certificate.
-              default_value: ""
-              required: false
-            - name: tls_key
-              description: Client TLS key.
-              default_value: ""
-              required: false
+              group: Virtual Node
         examples:
           folding:
             title: Config
