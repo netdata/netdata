@@ -117,8 +117,10 @@ No action required.
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | enable new interfaces detected at runtime | Enable or disable possibility to discover new interface after plugin starts. | auto | no |
 | total bandwidth for physical interfaces | Enable or disable total bandwidth for physical interfaces  metric. | auto | no |
 | total packets for physical interfaces | Enable or disable total packets for physical interfaces metric. | auto | no |
@@ -131,6 +133,7 @@ No action required.
 | collisions for all interface | Enable or disable collisions for all interface metric. | auto | no |
 | disable by default interfaces matching | Do not display data for intterfaces listed. | lo* | no |
 | set physical interfaces for system.net | Do not show network traffic for listed interfaces. | igb* ix* cxl* em* ixl* ixlv* bge* ixgbe* vtnet* vmx* re* igc* dwc* | no |
+
 
 </details>
 

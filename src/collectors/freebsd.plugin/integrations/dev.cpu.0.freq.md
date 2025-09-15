@@ -87,9 +87,12 @@ No action required.
 
 <details open><summary></summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | dev.cpu.0.freq | Enable or disable CPU Scaling frequency metric. | yes | no |
+
 
 </details>
 

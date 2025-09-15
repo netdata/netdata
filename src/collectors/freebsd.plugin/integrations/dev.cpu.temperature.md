@@ -87,9 +87,12 @@ No action required.
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | dev.cpu.temperature | Enable or disable CPU temperature metric. | yes | no |
+
 
 </details>
 

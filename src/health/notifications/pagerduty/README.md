@@ -42,8 +42,10 @@ The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | SEND_PD | Set `SEND_PD` to YES | YES | yes |
 | DEFAULT_RECIPIENT_PD | Set `DEFAULT_RECIPIENT_PD` to the PagerDuty service key you want the alert notifications to be sent to. You can define multiple service keys like this: `pd_service_key_1` `pd_service_key_2`. |  | yes |
 
@@ -60,6 +62,7 @@ role_recipients_pd[webmaster]="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxd"
 role_recipients_pd[proxyadmin]="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxe"
 role_recipients_pd[sitemgr]="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxf"
 ```
+
 
 
 </details>

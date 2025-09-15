@@ -107,10 +107,13 @@ The CUPS server must be installed and running. If you installed `netdata` using 
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | update every | Data collection frequency. | 1 | no |
 | command options | Additional parameters for the collector |  | no |
+
 
 </details>
 

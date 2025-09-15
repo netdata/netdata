@@ -95,7 +95,7 @@ You can configure the **litespeed** collector in two ways:
 
 :::important
 
-UI configuration requires paid Netdata Cloud plan. File-based configuration uses the same options and is useful if you prefer configuring via file or need to automate deployments.
+UI configuration requires paid Netdata Cloud plan.
 
 :::
 
@@ -113,11 +113,14 @@ The following options can be defined globally: update_every, autodetection_retry
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | update_every | Data collection frequency. | 10 | no |
 | autodetection_retry | Sets the job re-check interval in seconds. | 0 | no |
 | reports_dir | Directory containing Litespeed's real-time statistics files. | /tmp/lshttpd/ | no |
+
 
 </details>
 

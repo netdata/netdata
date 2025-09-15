@@ -92,9 +92,12 @@ No action required.
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | net.inet.tcp.states | Enable or disable TCP state metric. | yes | no |
+
 
 </details>
 

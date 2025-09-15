@@ -87,9 +87,12 @@ No action required.
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | vm.stats.vm.v_pgfaults | Enable or disable Memory page fault metric. | yes | no |
+
 
 </details>
 

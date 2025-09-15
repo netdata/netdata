@@ -107,9 +107,12 @@ The netdata main configuration file.
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | kern.cp_time | Enable or disable Total CPU usage. | yes | no |
+
 
 </details>
 

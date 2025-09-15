@@ -88,9 +88,12 @@ No action required.
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | vm.stats.sys.v_swtch | Enable or disable CPU context switch metric. | yes | no |
+
 
 </details>
 

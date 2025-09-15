@@ -40,8 +40,10 @@ The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | SEND_TELEGRAM | Set `SEND_TELEGRAM` to YES | YES | yes |
 | TELEGRAM_BOT_TOKEN | set `TELEGRAM_BOT_TOKEN` to your bot token. |  | yes |
 | DEFAULT_RECIPIENT_TELEGRAM | Set the `DEFAULT_RECIPIENT_TELEGRAM` variable in your config file to your Telegram chat ID (find it with @myidbot). Separate multiple chat IDs with spaces. To send alerts to a specific topic within a chat, use `chatID:topicID`. |  | yes |
@@ -60,6 +62,7 @@ role_recipients_telegram[webmaster]="-10099992222 -49999333389"
 role_recipients_telegram[proxyadmin]="-49999333344"
 role_recipients_telegram[sitemgr]="-49999333876"
 ```
+
 
 
 </details>

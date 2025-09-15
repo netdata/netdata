@@ -133,8 +133,10 @@ This configuration file have two different sections. The `[global]` overwrites d
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | update every | Data collection frequency. | 5 | no |
 | ebpf load mode | Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`). | entry | no |
 | lifetime | Set default lifetime for thread when enabled by cloud. | 300 | no |
@@ -143,6 +145,7 @@ This configuration file have two different sections. The `[global]` overwrites d
 | nfsdist | Enable or disable latency monitoring for functions associated with nfs filesystem. | yes | no |
 | xfsdist | Enable or disable latency monitoring for functions associated with xfs filesystem. | yes | no |
 | zfsdist | Enable or disable latency monitoring for functions associated with zfs filesystem. | yes | no |
+
 
 </details>
 

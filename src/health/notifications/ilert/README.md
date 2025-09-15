@@ -40,10 +40,13 @@ The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | SEND_ILERT | Set `SEND_ILERT` to YES | YES | yes |
 | ILERT_ALERT_SOURCE_URL | Set `ILERT_ALERT_SOURCE_URL` to your Netdata alert source url in ilert. |  | yes |
+
 
 </details>
 

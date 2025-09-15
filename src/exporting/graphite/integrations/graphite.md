@@ -35,8 +35,10 @@ The following options can be defined for this exporter.
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | enabled | Enables or disables an exporting connector instance (yes/no). | no | yes |
 | destination | Accepts a space separated list of hostnames, IPs (IPv4 and IPv6) and ports to connect to. Netdata will use the first available to send the metrics. | no | yes |
 | username | Username for HTTP authentication | my_username | no |
@@ -105,6 +107,7 @@ has a higher priority than the configuration option.
 Netdata supports names and IDs for charts and dimensions. Usually IDs are unique identifiers as read by the system and names
 are human friendly labels (also unique). Most charts and metrics have the same ID and name, but in several cases they are
 different : disks with device-mapper, interrupts, QoS classes, statsd synthetic charts, etc.
+
 
 
 </details>

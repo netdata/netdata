@@ -40,11 +40,14 @@ The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | SEND_SLACK | Set `SEND_SLACK` to YES | YES | yes |
 | SLACK_WEBHOOK_URL | set `SLACK_WEBHOOK_URL` to your Slack app's webhook URL. |  | yes |
 | DEFAULT_RECIPIENT_SLACK | Set `DEFAULT_RECIPIENT_SLACK` to the Slack channel your Slack app is set to send messages to. The syntax for channels is `#channel` or `channel`. |  | yes |
+
 
 </details>
 

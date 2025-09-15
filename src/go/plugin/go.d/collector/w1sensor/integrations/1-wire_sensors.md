@@ -87,7 +87,7 @@ You can configure the **w1sensor** collector in two ways:
 
 :::important
 
-UI configuration requires paid Netdata Cloud plan. File-based configuration uses the same options and is useful if you prefer configuring via file or need to automate deployments.
+UI configuration requires paid Netdata Cloud plan.
 
 :::
 
@@ -108,10 +108,13 @@ The following options can be defined globally: update_every.
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | update_every | Data collection frequency. | 1 | no |
 | sensors_path | Directory path containing sensor folders with w1_slave files. | /sys/bus/w1/devices | no |
+
 
 </details>
 

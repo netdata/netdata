@@ -134,9 +134,12 @@ No action required.
 
 
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | PerflibASP | An option to enable or disable the data collection. | yes | no |
+
 
 
 

@@ -183,8 +183,10 @@ Every configuration JOB starts with a `job_name` value which will appear in the 
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | update_every | Sets the default data collection frequency. | 5 | no |
 | priority | Controls the order of charts at the netdata dashboard. | 60000 | no |
 | autodetection_retry | Sets the job re-check interval in seconds. | 0 | no |
@@ -195,6 +197,7 @@ Every configuration JOB starts with a `job_name` value which will appear in the 
 | pass | If the URL is password protected, this is the password to use. |  | no |
 | collect_memstats | Enables charts for Go runtime's memory statistics. |  | no |
 | extra_charts | Defines extra data/charts to monitor, please see the example below. |  | no |
+
 
 </details>
 

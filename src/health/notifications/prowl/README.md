@@ -45,8 +45,10 @@ The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | SEND_PROWL | Set `SEND_PROWL` to YES | YES | yes |
 | DEFAULT_RECIPIENT_PROWL | Set `DEFAULT_RECIPIENT_PROWL` to  the Prowl API key you want the alert notifications to be sent to. You can define multiple API keys like this: `APIKEY1`, `APIKEY2`. |  | yes |
 
@@ -63,6 +65,7 @@ role_recipients_prowl[webmaster]="DDDDDDDDDD"
 role_recipients_prowl[proxyadmin]="EEEEEEEEEE"
 role_recipients_prowl[sitemgr]="FFFFFFFFFF"
 ```
+
 
 
 </details>

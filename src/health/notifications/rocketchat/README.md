@@ -40,8 +40,10 @@ The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | SEND_ROCKETCHAT | Set `SEND_ROCKETCHAT` to `YES` | YES | yes |
 | ROCKETCHAT_WEBHOOK_URL | set `ROCKETCHAT_WEBHOOK_URL` to your webhook URL. |  | yes |
 | DEFAULT_RECIPIENT_ROCKETCHAT | Set `DEFAULT_RECIPIENT_ROCKETCHAT` to the channel you want the alert notifications to be sent to. You can define multiple channels like this: `alerts` `systems`. |  | yes |
@@ -59,6 +61,7 @@ role_recipients_rocketchat[webmaster]="marketing development"
 role_recipients_rocketchat[proxyadmin]="proxy_admin"
 role_recipients_rocketchat[sitemgr]="sites"
 ```
+
 
 
 </details>

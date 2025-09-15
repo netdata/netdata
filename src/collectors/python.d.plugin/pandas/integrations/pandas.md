@@ -120,8 +120,10 @@ Every configuration JOB starts with a `job_name` value which will appear in the 
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | chart_configs | an array of chart configuration dictionaries | [] | yes |
 | chart_configs.name | name of the chart to be displayed in the dashboard. | None | yes |
 | chart_configs.title | title of the chart to be displayed in the dashboard. | None | yes |
@@ -135,6 +137,7 @@ Every configuration JOB starts with a `job_name` value which will appear in the 
 | autodetection_retry | Sets the job re-check interval in seconds. | 0 | no |
 | penalty | Indicates whether to apply penalty to update_every in case of failures. | yes | no |
 | name | Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works. |  | no |
+
 
 </details>
 

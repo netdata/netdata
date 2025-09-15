@@ -90,12 +90,15 @@ No action required.
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | ipv4 packets | Enable or disable IPv4 packets metric. | yes | no |
 | ipv4 fragments sent | Enable or disable IPv4 fragments sent metric. | yes | no |
 | ipv4 fragments assembly | Enable or disable IPv4 fragments assembly metric. | yes | no |
 | ipv4 errors | Enable or disable IPv4 errors metric. | yes | no |
+
 
 </details>
 

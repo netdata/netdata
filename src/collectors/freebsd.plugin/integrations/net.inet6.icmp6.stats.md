@@ -93,8 +93,10 @@ No action required.
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | icmp | Enable or disable ICMP metric. | auto | no |
 | icmp redirects | Enable or disable ICMP redirects metric. | auto | no |
 | icmp errors | Enable or disable ICMP errors metric. | auto | no |
@@ -102,6 +104,7 @@ No action required.
 | icmp router | Enable or disable ICMP router metric. | auto | no |
 | icmp neighbor | Enable or disable ICMP neighbor metric. | auto | no |
 | icmp types | Enable or disable ICMP types metric. | auto | no |
+
 
 </details>
 

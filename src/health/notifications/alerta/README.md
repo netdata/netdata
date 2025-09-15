@@ -41,8 +41,10 @@ The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | SEND_ALERTA | Set `SEND_ALERTA` to YES |  | yes |
 | ALERTA_WEBHOOK_URL | set `ALERTA_WEBHOOK_URL` to the API url you defined when you installed the Alerta server. |  | yes |
 | ALERTA_API_KEY | Set `ALERTA_API_KEY` to your API key. |  | yes |
@@ -70,6 +72,7 @@ role_recipients_alerta[sitemgr]="Sites"
 ```
 
 The values you provide should be defined as environments in `/etc/alertad.conf` with `ALLOWED_ENVIRONMENTS` option.
+
 
 
 </details>

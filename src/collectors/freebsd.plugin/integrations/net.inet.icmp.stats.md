@@ -89,11 +89,14 @@ No action required.
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | IPv4 ICMP packets | Enable or disable IPv4 ICMP packets metric. | yes | no |
 | IPv4 ICMP error | Enable or disable IPv4 ICMP error metric. | yes | no |
 | IPv4 ICMP messages | Enable or disable IPv4 ICMP messages metric. | yes | no |
+
 
 </details>
 

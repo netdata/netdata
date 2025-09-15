@@ -94,9 +94,12 @@ No action required.
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | kern.ipc.sem | Enable or disable semaphore metrics. | yes | no |
+
 
 </details>
 

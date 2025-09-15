@@ -111,8 +111,10 @@ No action required.
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | enable new disks detected at runtime | Enable or disable possibility to detect new disks. | auto | no |
 | performance metrics for pass devices | Enable or disable metrics for disks with type `PASS`. | auto | no |
 | total bandwidth for all disks | Enable or disable total bandwidth metric for all disks. | yes | no |
@@ -125,6 +127,7 @@ No action required.
 | average completed i/o bandwidth for all disks | Enable or disable average completed I/O bandwidth for all disks metric. | auto | no |
 | average service time for all disks | Enable or disable average service time for all disks metric. | auto | no |
 | disable by default disks matching | Do not create charts for disks listed. |  | no |
+
 
 </details>
 

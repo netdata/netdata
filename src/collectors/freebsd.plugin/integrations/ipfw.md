@@ -91,11 +91,14 @@ No action required.
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | counters for static rules | Enable or disable counters for static rules  metric. | yes | no |
 | number of dynamic rules | Enable or disable number of dynamic rules metric. | yes | no |
 | allocated memory | Enable or disable allocated memory metric. | yes | no |
+
 
 </details>
 

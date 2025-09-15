@@ -119,9 +119,12 @@ No action required.
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | show zero charts | Do not show charts with zero metrics. | no | no |
+
 
 </details>
 

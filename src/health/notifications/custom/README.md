@@ -38,8 +38,10 @@ The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | SEND_CUSTOM | Set `SEND_CUSTOM` to YES | YES | yes |
 | DEFAULT_RECIPIENT_CUSTOM | This value is dependent on how you handle the `${to}` variable inside the `custom_sender()` function. |  | yes |
 | custom_sender() | You can look at the other senders in `/usr/libexec/netdata/plugins.d/alarm-notify.sh` for examples of how to modify the function in this configuration file. |  | no |
@@ -127,6 +129,7 @@ The supported variables that you can use for the function's `msg` variable are:
 | `${calc_param_values}`      | The value of the variables in the evaluated expression                           |
 | `${total_warnings}`         | The total number of alarms in WARNING state on the host                          |
 | `${total_critical}`         | The total number of alarms in CRITICAL state on the host                         |
+
 
 
 </details>

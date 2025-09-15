@@ -186,8 +186,10 @@ There are three sections in the file which you can configure:
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | enable load average | Enable or disable monitoring of load average metrics (load1, load5, load15). | yes | no |
 | system swap | Enable or disable monitoring of system swap metrics (free, used). | yes | no |
 | bandwidth | Enable or disable monitoring of network bandwidth metrics (received, sent). | yes | no |
@@ -226,6 +228,7 @@ There are three sections in the file which you can configure:
 | swap i/o | Enable or disable monitoring of SWAP I/O metrics (I/O Swap). | yes | no |
 | memory page faults | Enable or disable monitoring of memory page faults metrics (memory, cow, I/O page, compress, decompress, zero fill, reactivate, purge). | yes | no |
 | disk i/o | Enable or disable monitoring of disk I/O metrics (In, Out). | yes | no |
+
 
 </details>
 

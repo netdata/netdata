@@ -39,8 +39,10 @@ The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | SYSLOG_FACILITY | Set `SYSLOG_FACILITY` to the facility used for logging, by default this value is set to `local6`. |  | yes |
 | DEFAULT_RECIPIENT_SYSLOG | Set `DEFAULT_RECIPIENT_SYSLOG` to the recipient you want the alert notifications to be sent to. |  | yes |
 | SEND_SYSLOG | Set SEND_SYSLOG to YES, make sure you have everything else configured before turning this on. |  | yes |
@@ -75,6 +77,7 @@ role_recipients_syslog[webmaster]="daemon.notice@loghost4:514/netdata"
 role_recipients_syslog[proxyadmin]="daemon.notice@loghost5:514/netdata"
 role_recipients_syslog[sitemgr]="daemon.notice@loghost6:514/netdata"
 ```
+
 
 
 </details>

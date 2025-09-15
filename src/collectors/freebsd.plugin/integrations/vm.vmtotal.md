@@ -94,11 +94,14 @@ No action required.
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | enable total processes | Number of active processes. | yes | no |
 | processes running | Show number of processes running or blocked. | yes | no |
 | real memory | Memeory used on host. | yes | no |
+
 
 </details>
 

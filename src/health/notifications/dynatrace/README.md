@@ -43,8 +43,10 @@ The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | SEND_DYNATRACE | Set `SEND_DYNATRACE` to YES | YES | yes |
 | DYNATRACE_SERVER | Set `DYNATRACE_SERVER` to the Dynatrace server with the protocol prefix, for example `https://monitor.example.com`. |  | yes |
 | DYNATRACE_TOKEN | Set `DYNATRACE_TOKEN` to your Dynatrace API authentication token |  | yes |
@@ -63,6 +65,7 @@ For example, the URL for a generated API token might look like: https://monitor.
 `AVAILABILITY_EVENT`, `CUSTOM_ALERT`, `CUSTOM_ANNOTATION`, `CUSTOM_CONFIGURATION`, `CUSTOM_DEPLOYMENT`, `CUSTOM_INFO`, `ERROR_EVENT`,
 `MARKED_FOR_TERMINATION`, `PERFORMANCE_EVENT`, `RESOURCE_CONTENTION_EVENT`.
 You can read more [here](https://www.dynatrace.com/support/help/dynatrace-api/environment-api/events-v2/post-event#request-body-objects).
+
 
 
 </details>

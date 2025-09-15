@@ -150,8 +150,10 @@ This configuration file have two different sections. The `[global]` overwrites a
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | update every | Data collection frequency. | 5 | no |
 | ebpf load mode | Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`). | entry | no |
 | apps | Enable or disable integration with apps.plugin | no | no |
@@ -165,6 +167,7 @@ This configuration file have two different sections. The `[global]` overwrites a
 | shmat | Enable or disable monitoring for syscall `shmat` | yes | no |
 | shmdt | Enable or disable monitoring for syscall `shmdt` | yes | no |
 | shmctl | Enable or disable monitoring for syscall `shmctl` | yes | no |
+
 
 </details>
 

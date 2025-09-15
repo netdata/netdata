@@ -40,8 +40,10 @@ The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | SEND_DISCORD | Set `SEND_DISCORD` to YES | YES | yes |
 | DISCORD_WEBHOOK_URL | set `DISCORD_WEBHOOK_URL` to your webhook URL. |  | yes |
 | DEFAULT_RECIPIENT_DISCORD | Set `DEFAULT_RECIPIENT_DISCORD` to the channel you want the alert notifications to be sent to. You can define multiple channels like this: `alerts` `systems`. |  | yes |
@@ -60,6 +62,7 @@ role_recipients_discord[sitemgr]="sites"
 ```
 
 The values you provide should already exist as Discord channels in your server.
+
 
 
 </details>

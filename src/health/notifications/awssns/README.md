@@ -58,8 +58,10 @@ The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | aws path | The full path of the aws command. If empty, the system `$PATH` will be searched for it. If not found, Amazon SNS notifications will be silently disabled. |  | yes |
 | SEND_AWSNS | Set `SEND_AWSNS` to YES | YES | yes |
 | AWSSNS_MESSAGE_FORMAT | Set `AWSSNS_MESSAGE_FORMAT` to to the string that you want the alert to be sent into. | ${status} on ${host} at ${date}: ${chart} ${value_string} | yes |
@@ -121,6 +123,7 @@ role_recipients_awssns[webmaster]="arn:aws:sns:us-east-2:123456789012:Developmen
 role_recipients_awssns[proxyadmin]="arn:aws:sns:us-east-2:123456789012:Proxy"
 role_recipients_awssns[sitemgr]="arn:aws:sns:us-east-2:123456789012:Sites"
 ```
+
 
 
 </details>

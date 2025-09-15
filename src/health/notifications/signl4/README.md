@@ -40,10 +40,13 @@ The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | SEND_SIGNL4 | Set `SEND_SIGNL4` to YES | YES | yes |
 | SIGNL4_WEBHOOK_URL | set `SIGNL4_WEBHOOK_URL` to your SIGNL4 webhook URL. |  | yes |
+
 
 </details>
 

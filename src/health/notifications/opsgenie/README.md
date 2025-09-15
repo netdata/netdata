@@ -40,11 +40,14 @@ The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | SEND_OPSGENIE | Set `SEND_OPSGENIE` to YES | YES | yes |
 | OPSGENIE_API_KEY | Set `OPSGENIE_API_KEY` to your API key. |  | yes |
 | OPSGENIE_API_URL | Set `OPSGENIE_API_URL` to the corresponding URL if required, for example there are region-specific API URLs such as `https://eu.api.opsgenie.com`. | https://api.opsgenie.com | no |
+
 
 </details>
 

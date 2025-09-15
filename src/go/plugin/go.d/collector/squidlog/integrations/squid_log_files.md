@@ -103,7 +103,7 @@ You can configure the **squidlog** collector in two ways:
 
 :::important
 
-UI configuration requires paid Netdata Cloud plan. File-based configuration uses the same options and is useful if you prefer configuring via file or need to automate deployments.
+UI configuration requires paid Netdata Cloud plan.
 
 :::
 
@@ -144,8 +144,10 @@ In addition, to make `Squid` [native log format](https://wiki.squid-cache.org/Fe
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | update_every | Data collection frequency. | 1 | no |
 | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
 | path | Path to the Squid access log file. | /var/log/squid/access.log | yes |
@@ -214,6 +216,7 @@ parser:
   regexp_config:
     pattern: PATTERN
 ```
+
 
 
 </details>

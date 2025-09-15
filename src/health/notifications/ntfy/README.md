@@ -41,8 +41,10 @@ The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | SEND_NTFY | Set `SEND_NTFY` to YES | YES | yes |
 | DEFAULT_RECIPIENT_NTFY | URL formed by the server-topic combination you want the alert notifications to be sent to. Unless hosting your own server, the server should always be set to https://ntfy.sh. |  | yes |
 | NTFY_USERNAME | The username for netdata to use to authenticate with an ntfy server. |  | no |
@@ -82,6 +84,7 @@ Ensure that your user has proper read/write access to the provided topic in `DEF
 
 This can be used in place of `NTFY_USERNAME` and `NTFY_PASSWORD` to authenticate with a self-hosted ntfy instance. See [access tokens](https://docs.ntfy.sh/config/?h=access+to#access-tokens) for details.
 Ensure that the token user has proper read/write access to the provided topic in `DEFAULT_RECIPIENT_NTFY`
+
 
 
 </details>

@@ -119,7 +119,7 @@ You can configure the **hfs** collector in two ways:
 
 :::important
 
-UI configuration requires paid Netdata Cloud plan. File-based configuration uses the same options and is useful if you prefer configuring via file or need to automate deployments.
+UI configuration requires paid Netdata Cloud plan.
 
 :::
 
@@ -137,8 +137,10 @@ The following options can be defined globally: update_every, autodetection_retry
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | update_every | Data collection frequency. | 1 | no |
 | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
 | url | Server URL. | http://127.0.0.1:9870/jmx | yes |
@@ -156,6 +158,7 @@ The following options can be defined globally: update_every, autodetection_retry
 | tls_ca | Certification authority that the client uses when verifying the server's certificates. |  | no |
 | tls_cert | Client TLS certificate. |  | no |
 | tls_key | Client TLS key. |  | no |
+
 
 </details>
 

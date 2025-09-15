@@ -39,8 +39,10 @@ The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | nc path | Set the path for nc, otherwise Netdata will search for it in your system $PATH |  | yes |
 | SEND_IRC | Set `SEND_IRC` YES. | YES | yes |
 | IRC_NETWORK | Set `IRC_NETWORK` to the IRC network which your preferred channels belong to. |  | yes |
@@ -73,6 +75,7 @@ role_recipients_irc[webmaster]="#marketing #development"
 role_recipients_irc[proxyadmin]="#proxy-admin"
 role_recipients_irc[sitemgr]="#sites"
 ```
+
 
 
 </details>

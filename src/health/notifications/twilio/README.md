@@ -39,8 +39,10 @@ The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | SEND_TWILIO | Set `SEND_TWILIO` to YES | YES | yes |
 | TWILIO_ACCOUNT_SID | set `TWILIO_ACCOUNT_SID`  to your account SID. |  | yes |
 | TWILIO_ACCOUNT_TOKEN | Set `TWILIO_ACCOUNT_TOKEN` to your account token. |  | yes |
@@ -59,6 +61,7 @@ role_recipients_twilio[webmaster]="+15555555558"
 role_recipients_twilio[proxyadmin]="+15555555559"
 role_recipients_twilio[sitemgr]="+15555555550"
 ```
+
 
 
 </details>

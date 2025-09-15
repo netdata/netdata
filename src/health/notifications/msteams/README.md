@@ -40,8 +40,10 @@ The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | SEND_MSTEAMS | Set `SEND_MSTEAMS` to YES | YES | yes |
 | MSTEAMS_WEBHOOK_URL | set `MSTEAMS_WEBHOOK_URL` to the incoming webhook URL as given by Microsoft Teams. |  | yes |
 | DEFAULT_RECIPIENT_MSTEAMS | Set `DEFAULT_RECIPIENT_MSTEAMS` to the encoded Microsoft Teams channel name you want the alert notifications to be sent to. |  | yes |
@@ -61,6 +63,7 @@ role_recipients_msteams[webmaster]="CHANNEL4"
 role_recipients_msteams[proxyadmin]="CHANNEL5"
 role_recipients_msteams[sitemgr]="CHANNEL6"
 ```
+
 
 
 </details>

@@ -142,7 +142,7 @@ You can configure the **snmp** collector in two ways:
 
 :::important
 
-UI configuration requires paid Netdata Cloud plan. File-based configuration uses the same options and is useful if you prefer configuring via file or need to automate deployments.
+UI configuration requires paid Netdata Cloud plan.
 
 :::
 
@@ -167,34 +167,36 @@ The following options can be defined globally: update_every, autodetection_retry
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update_every | Data collection frequency. | 10 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| hostname | Target host (IP or DNS name, IPv4/IPv6). |  | yes |
-| enable_profiles | Enable collection of metrics using SNMP profiles. | true | no |
-| enable_profiles_table_metrics | Enable collection of SNMP table metrics from profiles. Enabling this may **increase collection time and memory usage** for devices with many network interfaces. | true | no |
-| disable_legacy_collection | Disable the legacy SNMP collection method, forcing the collector to use only SNMP profiles (YAML-based configuration). When enabled, the collector will ignore any non-profile based collection logic. | false | no |
-| create_vnode | If set, the collector will create a Netdata Virtual Node for this SNMP device, which will appear as a separate Node in Netdata. | true | no |
-| vnode_device_down_threshold | Number of consecutive failed data collections before marking the device as down. | 3 | no |
-| vnode.guid | A unique identifier for the Virtual Node. If not set, a GUID will be automatically generated from the device's IP address. |  | no |
-| vnode.hostname | The hostname that will be used for the Virtual Node. If not set, the device's hostname will be used. |  | no |
-| vnode.labels | Additional key-value pairs to associate with the Virtual Node. |  | no |
-| community | SNMPv1/2 community string. | public | no |
-| options.version | SNMP version. Available versions: 1, 2, 3. | 2 | no |
-| options.port | Target port. | 161 | no |
-| options.retries | Retries to attempt. | 1 | no |
-| options.timeout | SNMP request/response timeout. | 5 | no |
-| options.max_repetitions | Controls how many SNMP variables to retrieve in a single GETBULK request. | 25 | no |
-| options.max_request_size | Maximum number of OIDs allowed in a single GET request. | 60 | no |
-| network_interface_filter.by_name | Filter interfaces by their names using [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md#simple-patterns). |  | no |
-| network_interface_filter.by_type | Filter interfaces by their types using [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md#simple-patterns). |  | no |
-| user.name | SNMPv3 user name. |  | no |
-| user.level | Security level of SNMPv3 messages. |  | no |
-| user.auth_proto | Authentication protocol for SNMPv3 messages. |  | no |
-| user.auth_key | Authentication protocol pass phrase for SNMPv3 messages. |  | no |
-| user.priv_proto | Privacy protocol for SNMPv3 messages. |  | no |
-| user.priv_key | Privacy protocol pass phrase for SNMPv3 messages. |  | no |
+
+
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Base** | update_every | Data collection frequency. | 10 | no |
+|  | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
+|  | hostname | Target host (IP or DNS name, IPv4/IPv6). |  | yes |
+| **SNMPv1/2** | community | SNMPv1/2 community string. | public | no |
+| **SNMPv3** | user.name | SNMPv3 user name. |  | no |
+|  | user.level | Security level of SNMPv3 messages. |  | no |
+|  | user.auth_proto | Authentication protocol for SNMPv3 messages. |  | no |
+|  | user.auth_key | Authentication protocol pass phrase for SNMPv3 messages. |  | no |
+|  | user.priv_proto | Privacy protocol for SNMPv3 messages. |  | no |
+|  | user.priv_key | Privacy protocol pass phrase for SNMPv3 messages. |  | no |
+| **SNMP transport** | options.version | SNMP version. Available versions: 1, 2, 3. | 2 | no |
+|  | options.port | Target port. | 161 | no |
+|  | options.retries | Retries to attempt. | 1 | no |
+|  | options.timeout | SNMP request/response timeout. | 5 | no |
+|  | options.max_repetitions | Controls how many SNMP variables to retrieve in a single GETBULK request. | 25 | no |
+|  | options.max_request_size | Maximum number of OIDs allowed in a single GET request. | 60 | no |
+| **Profiles** | enable_profiles | Enable collection of metrics using SNMP profiles. | true | no |
+|  | enable_profiles_table_metrics | Enable collection of SNMP table metrics from profiles. Enabling this may **increase collection time and memory usage** for devices with many network interfaces. | true | no |
+|  | disable_legacy_collection | Disable the legacy SNMP collection method, forcing the collector to use only SNMP profiles (YAML-based configuration). When enabled, the collector will ignore any non-profile based collection logic. | false | no |
+| **Virtual node** | create_vnode | If set, the collector will create a Netdata Virtual Node for this SNMP device, which will appear as a separate Node in Netdata. | true | no |
+|  | vnode_device_down_threshold | Number of consecutive failed data collections before marking the device as down. | 3 | no |
+|  | vnode.guid | A unique identifier for the Virtual Node. If not set, a GUID will be automatically generated from the device's IP address. |  | no |
+|  | vnode.hostname | The hostname that will be used for the Virtual Node. If not set, the device's hostname will be used. |  | no |
+|  | vnode.labels | Additional key-value pairs to associate with the Virtual Node. |  | no |
+| **Filters** | network_interface_filter.by_name | Filter interfaces by their names using [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md#simple-patterns). |  | no |
+|  | network_interface_filter.by_type | Filter interfaces by their types using [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md#simple-patterns). |  | no |
 
 ##### user.level
 
@@ -235,6 +237,7 @@ The encryption algorithm for SNMPv3 messages that require privacy (`user.priv_pr
 |    aes256    |     5     | 256-bit AES encryption (CFB-AES-256) with "Blumenthal" key localization |
 |   aes192c    |     6     | 192-bit AES encryption (CFB-AES-192) with "Reeder" key localization     |
 |   aes256c    |     7     | 256-bit AES encryption (CFB-AES-256) with "Reeder" key localization     |
+
 
 
 </details>

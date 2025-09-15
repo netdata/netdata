@@ -98,10 +98,13 @@ Install `libmnl-dev` and `libnetfilter-acct-dev` using the package manager of yo
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | update every | Data collection frequency. | 1 | no |
 | command options | Additinal parameters for collector |  | no |
+
 
 </details>
 

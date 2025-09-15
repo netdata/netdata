@@ -92,9 +92,12 @@ No action required.
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | vm.stats.vm.v_swappgs | Enable or disable infoormation about SWAP I/O metric. | yes | no |
+
 
 </details>
 

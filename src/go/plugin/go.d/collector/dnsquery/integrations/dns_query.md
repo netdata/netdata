@@ -97,7 +97,7 @@ You can configure the **dns_query** collector in two ways:
 
 :::important
 
-UI configuration requires paid Netdata Cloud plan. File-based configuration uses the same options and is useful if you prefer configuring via file or need to automate deployments.
+UI configuration requires paid Netdata Cloud plan.
 
 :::
 
@@ -115,8 +115,10 @@ The following options can be defined globally: update_every, autodetection_retry
 
 <details open><summary>All options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | update_every | Data collection frequency. | 1 | no |
 | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
 | domains | Domain or subdomains to query. The collector will choose a random domain from the list on every iteration. |  | yes |
@@ -125,6 +127,7 @@ The following options can be defined globally: update_every, autodetection_retry
 | network | Network protocol name. Available options: udp, tcp, tcp-tls. | udp | no |
 | record_types | Query record type. Available options: A, AAAA, CNAME, MX, NS, PTR, TXT, SOA, SPF, TXT, SRV. | A | no |
 | timeout | Query read timeout. | 2 | no |
+
 
 </details>
 

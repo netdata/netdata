@@ -44,8 +44,10 @@ The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | sendsms | Set the path for `sendsms`, otherwise Netdata will search for it in your system `$PATH:` | YES | yes |
 | SEND_SMS | Set `SEND_SMS` to `YES`. |  | yes |
 | DEFAULT_RECIPIENT_SMS | Set DEFAULT_RECIPIENT_SMS to the phone number you want the alert notifications to be sent to. You can define multiple phone numbers like this: PHONE1 PHONE2. |  | yes |
@@ -71,6 +73,7 @@ role_recipients_sms[webmaster]="PHONE4"
 role_recipients_sms[proxyadmin]="PHONE5"
 role_recipients_sms[sitemgr]="PHONE6"
 ```
+
 
 
 </details>
