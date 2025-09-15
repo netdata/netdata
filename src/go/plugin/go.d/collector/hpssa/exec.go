@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cmd"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 type ssacliBinary interface {
@@ -29,5 +29,5 @@ type ssacliExec struct {
 }
 
 func (e *ssacliExec) controllersInfo() ([]byte, error) {
-	return cmd.RunNDSudo(e.Logger, e.timeout, "ssacli-controllers-info")
+	return ndexec.RunNDSudo(e.Logger, e.timeout, "ssacli-controllers-info")
 }

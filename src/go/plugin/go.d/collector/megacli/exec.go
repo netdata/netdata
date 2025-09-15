@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cmd"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 type megaCli interface {
@@ -32,9 +32,9 @@ type megaCliExec struct {
 }
 
 func (e *megaCliExec) physDrivesInfo() ([]byte, error) {
-	return cmd.RunNDSudo(e.Logger, e.timeout, "megacli-disk-info")
+	return ndexec.RunNDSudo(e.Logger, e.timeout, "megacli-disk-info")
 }
 
 func (e *megaCliExec) bbuInfo() ([]byte, error) {
-	return cmd.RunNDSudo(e.Logger, e.timeout, "megacli-battery-info")
+	return ndexec.RunNDSudo(e.Logger, e.timeout, "megacli-battery-info")
 }

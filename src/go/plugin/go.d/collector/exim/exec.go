@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cmd"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 type eximBinary interface {
@@ -29,5 +29,5 @@ type eximExec struct {
 }
 
 func (e *eximExec) countMessagesInQueue() ([]byte, error) {
-	return cmd.RunNDSudo(e.Logger, e.timeout, "exim-bpc")
+	return ndexec.RunNDSudo(e.Logger, e.timeout, "exim-bpc")
 }

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cmd"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 type lvmCLI interface {
@@ -31,7 +31,7 @@ type lvmCLIExec struct {
 }
 
 func (e *lvmCLIExec) lvsReportJson() ([]byte, error) {
-	return cmd.RunNDSudo(
+	return ndexec.RunNDSudo(
 		e.Logger,
 		e.timeout,
 		"lvs-report-json",

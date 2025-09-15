@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cmd"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 type dmsetupCli interface {
@@ -31,5 +31,5 @@ type dmsetupExec struct {
 }
 
 func (e *dmsetupExec) cacheStatus() ([]byte, error) {
-	return cmd.RunNDSudo(e.Logger, e.timeout, "dmsetup-status-cache")
+	return ndexec.RunNDSudo(e.Logger, e.timeout, "dmsetup-status-cache")
 }

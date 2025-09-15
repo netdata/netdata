@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cmd"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 type storCli interface {
@@ -32,9 +32,9 @@ type storCliExec struct {
 }
 
 func (e *storCliExec) controllersInfo() ([]byte, error) {
-	return cmd.RunNDSudo(e.Logger, e.timeout, "storcli-controllers-info")
+	return ndexec.RunNDSudo(e.Logger, e.timeout, "storcli-controllers-info")
 }
 
 func (e *storCliExec) drivesInfo() ([]byte, error) {
-	return cmd.RunNDSudo(e.Logger, e.timeout, "storcli-drives-info")
+	return ndexec.RunNDSudo(e.Logger, e.timeout, "storcli-drives-info")
 }

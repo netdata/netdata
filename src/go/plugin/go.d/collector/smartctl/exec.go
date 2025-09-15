@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cmd"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 
 	"github.com/tidwall/gjson"
 )
@@ -58,7 +58,7 @@ func (e *ndsudoSmartctlCli) execute(args ...string) (*gjson.Result, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
 	defer cancel()
 
-	command := cmd.CommandNDSudo(ctx, e.Logger, args...)
+	command := ndexec.CommandNDSudo(ctx, e.Logger, args...)
 
 	bs, err := command.Output()
 	if err != nil {
@@ -109,7 +109,7 @@ func (e *directSmartctlCli) execute(args ...string) (*gjson.Result, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
 	defer cancel()
 
-	cmd := cmd.CommandUnprivileged(ctx, e.Logger, args...)
+	cmd := ndexec.CommandUnprivileged(ctx, e.Logger, args...)
 
 	bs, err := cmd.Output()
 	if err != nil {

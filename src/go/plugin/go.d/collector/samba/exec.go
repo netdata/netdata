@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cmd"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 type smbStatusBinary interface {
@@ -29,5 +29,5 @@ type smbStatusExec struct {
 }
 
 func (e *smbStatusExec) profile() ([]byte, error) {
-	return cmd.RunNDSudo(e.Logger, e.timeout, "smbstatus-profile")
+	return ndexec.RunNDSudo(e.Logger, e.timeout, "smbstatus-profile")
 }

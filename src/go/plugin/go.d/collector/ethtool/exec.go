@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cmd"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 type ethtoolCli interface {
@@ -29,5 +29,5 @@ type ethtoolCLIExec struct {
 }
 
 func (e *ethtoolCLIExec) moduleEeprom(iface string) ([]byte, error) {
-	return cmd.RunNDSudo(e.Logger, e.timeout, "ethtool-module-info", "--devname", iface)
+	return ndexec.RunNDSudo(e.Logger, e.timeout, "ethtool-module-info", "--devname", iface)
 }

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cmd"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 type arcconfCli interface {
@@ -32,9 +32,9 @@ type arcconfCliExec struct {
 }
 
 func (e *arcconfCliExec) logicalDevicesInfo() ([]byte, error) {
-	return cmd.RunNDSudo(e.Logger, e.timeout, "arcconf-ld-info")
+	return ndexec.RunNDSudo(e.Logger, e.timeout, "arcconf-ld-info")
 }
 
 func (e *arcconfCliExec) physicalDevicesInfo() ([]byte, error) {
-	return cmd.RunNDSudo(e.Logger, e.timeout, "arcconf-pd-info")
+	return ndexec.RunNDSudo(e.Logger, e.timeout, "arcconf-pd-info")
 }

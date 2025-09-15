@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cmd"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 type zpoolCli interface {
@@ -31,9 +31,9 @@ type zpoolCLIExec struct {
 }
 
 func (e *zpoolCLIExec) list() ([]byte, error) {
-	return cmd.RunUnprivileged(e.Logger, e.timeout, e.binPath, "list", "-p")
+	return ndexec.RunUnprivileged(e.Logger, e.timeout, e.binPath, "list", "-p")
 }
 
 func (e *zpoolCLIExec) listWithVdev(pool string) ([]byte, error) {
-	return cmd.RunUnprivileged(e.Logger, e.timeout, e.binPath, "list", "-p", "-v", "-L", pool)
+	return ndexec.RunUnprivileged(e.Logger, e.timeout, e.binPath, "list", "-p", "-v", "-L", pool)
 }

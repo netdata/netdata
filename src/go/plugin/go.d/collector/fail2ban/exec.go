@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cmd"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 var errJailNotExist = errors.New("jail not exist")
@@ -63,5 +63,5 @@ func (e *fail2banClientCliExec) jailStatus(jail string) ([]byte, error) {
 }
 
 func (e *fail2banClientCliExec) execute(args ...string) ([]byte, error) {
-	return cmd.RunNDSudo(e.Logger, e.timeout, args...)
+	return ndexec.RunNDSudo(e.Logger, e.timeout, args...)
 }

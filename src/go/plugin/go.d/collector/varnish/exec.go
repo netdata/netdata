@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cmd"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/dockerhost"
 )
 
@@ -34,7 +34,7 @@ type varnishstatExec struct {
 }
 
 func (e *varnishstatExec) statistics() ([]byte, error) {
-	return cmd.RunUnprivileged(e.Logger, e.timeout, "varnishstat-stats", "--instanceName", e.instanceName)
+	return ndexec.RunUnprivileged(e.Logger, e.timeout, "varnishstat-stats", "--instanceName", e.instanceName)
 }
 
 func newVarnishstatDockerExecBinary(cfg Config, log *logger.Logger) varnishstatBinary {

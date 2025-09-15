@@ -14,7 +14,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cmd"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 type nvidiaSmiBinary interface {
@@ -53,7 +53,7 @@ type nvidiaSmiExec struct {
 }
 
 func (e *nvidiaSmiExec) queryGPUInfo() ([]byte, error) {
-	return cmd.RunUnprivileged(e.Logger, e.timeout, e.binPath, "-q", "-x")
+	return ndexec.RunUnprivileged(e.Logger, e.timeout, e.binPath, "-q", "-x")
 }
 
 func (e *nvidiaSmiExec) stop() error { return nil }

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cmd"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 type localListeners interface {
@@ -48,5 +48,5 @@ func (e *localListenersExec) discover(ctx context.Context) ([]byte, error) {
 		"no-namespaces",
 	}
 
-	return cmd.RunUnprivileged(nil, e.timeout, args...)
+	return ndexec.RunUnprivileged(nil, e.timeout, args...)
 }
