@@ -51,45 +51,63 @@ modules:
             enabled: true
           list:
             - name: update_every
-              description: Data collection frequency.
+              description: Data collection interval (seconds).
               default_value: 1
               required: false
+              group: Base
             - name: autodetection_retry
-              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              description: Autodetection retry interval (seconds). Set 0 to disable.
               default_value: 0
               required: false
+              group: Base
             - name: source
               description: "Certificate source. Allowed schemes: https, tcp, tcp4, tcp6, udp, udp4, udp6, file, smtp."
               default_value: ""
               required: false
-            - name: check_full_chain
-              description: Monitor expiration time for all certificates in the SSL/TLS chain, including intermediate and root certificates.
-              default_value: false
-              required: false
-            - name: check_revocation_status
-              description: Whether to check the revocation status of the certificate.
-              default_value: false
-              required: false
+              group: Base
             - name: timeout
-              description: SSL connection timeout.
+              description: SSL connection timeout (seconds).
               default_value: 2
               required: false
+              group: Base
+
+            - name: check_full_chain
+              description: Monitor expiration time for all certificates in the chain (including intermediates and root).
+              default_value: no
+              required: false
+              group: Validation
+            - name: check_revocation_status
+              description: Check the revocation status of the certificate.
+              default_value: no
+              required: false
+              group: Validation
+
             - name: tls_skip_verify
-              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
-              default_value: false
+              description: Skip TLS certificate and hostname verification (insecure).
+              default_value: no
               required: false
+              group: TLS
             - name: tls_ca
-              description: Certification authority that the client uses when verifying the server's certificates.
+              description: Path to CA bundle used to validate the server certificate.
               default_value: ""
               required: false
+              group: TLS
             - name: tls_cert
-              description: Client TLS certificate.
+              description: Path to client TLS certificate (for mTLS).
               default_value: ""
               required: false
+              group: TLS
             - name: tls_key
-              description: Client TLS key.
+              description: Path to client TLS private key (for mTLS).
               default_value: ""
               required: false
+              group: TLS
+
+            - name: vnode
+              description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+              default_value: ""
+              required: false
+              group: Virtual Node
         examples:
           folding:
             title: Config

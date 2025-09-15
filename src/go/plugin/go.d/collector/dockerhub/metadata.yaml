@@ -60,7 +60,7 @@ modules:
               required: false
               group: Base
             - name: repositories
-              description: Space-separated list of Docker Hub repositories to monitor.
+              description: List of Docker Hub repositories to monitor.
               default_value: ""
               required: true
               group: Base
