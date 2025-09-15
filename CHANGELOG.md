@@ -6,6 +6,13 @@
 
 **Merged pull requests:**
 
+- perf\(go.d/ddsnmp\): cache group key per aggregator per metric [\#20979](https://github.com/netdata/netdata/pull/20979) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations docs [\#20978](https://github.com/netdata/netdata/pull/20978) ([netdatabot](https://github.com/netdatabot))
+- docs: restructure Setup, update SNMP prerequisites, and fix SNMP options [\#20977](https://github.com/netdata/netdata/pull/20977) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations docs [\#20976](https://github.com/netdata/netdata/pull/20976) ([netdatabot](https://github.com/netdatabot))
+- docs\(go.d\): add UI configuration instructions and restructure Configuration section [\#20975](https://github.com/netdata/netdata/pull/20975) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations docs [\#20973](https://github.com/netdata/netdata/pull/20973) ([netdatabot](https://github.com/netdatabot))
+- docs\(go.d/snmp\): remove legacy "custom oid" cfg examples [\#20972](https://github.com/netdata/netdata/pull/20972) ([ilyam8](https://github.com/ilyam8))
 - improve\(go.d/ddsnmp\): add per\_row mode for virtual metrics [\#20971](https://github.com/netdata/netdata/pull/20971) ([ilyam8](https://github.com/ilyam8))
 - improve\(go.d/ddsnmp\): add group\_by for virtual metrics [\#20970](https://github.com/netdata/netdata/pull/20970) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): bump k8s.io/client-go from 0.34.0 to 0.34.1 in /src/go [\#20968](https://github.com/netdata/netdata/pull/20968) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -442,13 +449,6 @@
 - improvement\(go.d/ddsnmp\): use dev type and vendor from meta for family [\#20439](https://github.com/netdata/netdata/pull/20439) ([ilyam8](https://github.com/ilyam8))
 - Fix registry save integer overflow and add failure backoff [\#20437](https://github.com/netdata/netdata/pull/20437) ([ktsaou](https://github.com/ktsaou))
 - Mcp3 [\#20435](https://github.com/netdata/netdata/pull/20435) ([ktsaou](https://github.com/ktsaou))
-- Adjust stream connector timeout during agent shutdown [\#20434](https://github.com/netdata/netdata/pull/20434) ([stelfrag](https://github.com/stelfrag))
-- Improve statement finalization and cleanup [\#20433](https://github.com/netdata/netdata/pull/20433) ([stelfrag](https://github.com/stelfrag))
-- SNMP: new version of families Cisco pass [\#20432](https://github.com/netdata/netdata/pull/20432) ([Ancairon](https://github.com/Ancairon))
-- Fix heap-use-after-free in query progress updates [\#20431](https://github.com/netdata/netdata/pull/20431) ([ktsaou](https://github.com/ktsaou))
-- Regenerate integrations docs [\#20430](https://github.com/netdata/netdata/pull/20430) ([netdatabot](https://github.com/netdatabot))
-- Update MSSQL Metadata [\#20429](https://github.com/netdata/netdata/pull/20429) ([thiagoftsm](https://github.com/thiagoftsm))
-- update ddsnmp mikrotik-router.yaml [\#20428](https://github.com/netdata/netdata/pull/20428) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
