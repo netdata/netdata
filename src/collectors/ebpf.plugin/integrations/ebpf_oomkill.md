@@ -94,6 +94,7 @@ There are no alerts configured by default for this integration.
 
 ## Setup
 
+
 ### Prerequisites
 
 #### Compile kernel
@@ -121,7 +122,14 @@ This thread needs to attach a tracepoint to monitor when a process schedule an e
 
 ### Configuration
 
-#### File
+#### Options
+
+Overwrite default configuration reducing number of I/O events
+
+
+
+
+#### via File
 
 The configuration file name for this integration is `ebpf.d/oomkill.conf`.
 
@@ -142,12 +150,8 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config ebpf.d/oomkill.conf
 ```
-#### Options
 
-Overwrite default configuration reducing number of I/O events
-
-
-#### Examples
+##### Examples
 There are no configuration examples.
 
 

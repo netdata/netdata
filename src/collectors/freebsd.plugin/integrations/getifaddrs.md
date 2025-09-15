@@ -104,13 +104,42 @@ The following alerts are available:
 
 ## Setup
 
+
 ### Prerequisites
 
 No action required.
 
 ### Configuration
 
-#### File
+#### Options
+
+
+
+<details open><summary>Config options</summary>
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| enable new interfaces detected at runtime | Enable or disable possibility to discover new interface after plugin starts. | auto | no |
+| total bandwidth for physical interfaces | Enable or disable total bandwidth for physical interfaces  metric. | auto | no |
+| total packets for physical interfaces | Enable or disable total packets for physical interfaces metric. | auto | no |
+| total bandwidth for ipv4 interface | Enable or disable total bandwidth for IPv4 interface metric. | auto | no |
+| total bandwidth for ipv6 interfaces | Enable or disable total bandwidth for ipv6 interfaces metric. | auto | no |
+| bandwidth for all interfaces | Enable or disable bandwidth for all interfaces metric. | auto | no |
+| packets for all interfaces | Enable or disable packets for all interfaces metric. | auto | no |
+| errors for all interfaces | Enable or disable errors for all interfaces metric. | auto | no |
+| drops for all interfaces | Enable or disable drops for all interfaces metric. | auto | no |
+| collisions for all interface | Enable or disable collisions for all interface metric. | auto | no |
+| disable by default interfaces matching | Do not display data for intterfaces listed. | lo* | no |
+| set physical interfaces for system.net | Do not show network traffic for listed interfaces. | igb* ix* cxl* em* ixl* ixlv* bge* ixgbe* vtnet* vmx* re* igc* dwc* | no |
+
+
+</details>
+
+
+
+#### via File
 
 The configuration file name for this integration is `netdata.conf`.
 Configuration for this specific integration is located in the `[plugin:freebsd:getifaddrs]` section within that file.
@@ -132,30 +161,8 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config netdata.conf
 ```
-#### Options
 
-
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| enable new interfaces detected at runtime | Enable or disable possibility to discover new interface after plugin starts. | auto | no |
-| total bandwidth for physical interfaces | Enable or disable total bandwidth for physical interfaces  metric. | auto | no |
-| total packets for physical interfaces | Enable or disable total packets for physical interfaces metric. | auto | no |
-| total bandwidth for ipv4 interface | Enable or disable total bandwidth for IPv4 interface metric. | auto | no |
-| total bandwidth for ipv6 interfaces | Enable or disable total bandwidth for ipv6 interfaces metric. | auto | no |
-| bandwidth for all interfaces | Enable or disable bandwidth for all interfaces metric. | auto | no |
-| packets for all interfaces | Enable or disable packets for all interfaces metric. | auto | no |
-| errors for all interfaces | Enable or disable errors for all interfaces metric. | auto | no |
-| drops for all interfaces | Enable or disable drops for all interfaces metric. | auto | no |
-| collisions for all interface | Enable or disable collisions for all interface metric. | auto | no |
-| disable by default interfaces matching | Do not display data for intterfaces listed. | lo* | no |
-| set physical interfaces for system.net | Do not show network traffic for listed interfaces. | igb* ix* cxl* em* ixl* ixlv* bge* ixgbe* vtnet* vmx* re* igc* dwc* | no |
-
-</details>
-
-#### Examples
+##### Examples
 There are no configuration examples.
 
 

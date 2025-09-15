@@ -22,6 +22,7 @@ for long-term storage, further analysis, or correlation with data from other sou
 
 ## Setup
 
+
 ### Prerequisites
 
 #### 
@@ -33,18 +34,6 @@ for long-term storage, further analysis, or correlation with data from other sou
 
 ### Configuration
 
-#### File
-
-The configuration file name for this integration is `exporting.conf`.
-
-
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config exporting.conf
-```
 #### Options
 
 The following options can be defined for this exporter.
@@ -52,8 +41,10 @@ The following options can be defined for this exporter.
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | enabled | Enables or disables an exporting connector instance (yes/no). | no | yes |
 | destination | Accepts a space separated list of hostnames, IPs (IPv4 and IPv6) and ports to connect to. Netdata will use the first available to send the metrics. | localhost | yes |
 | username | Username for HTTP authentication | my_username | no |
@@ -124,11 +115,27 @@ are human friendly labels (also unique). Most charts and metrics have the same I
 different : disks with device-mapper, interrupts, QoS classes, statsd synthetic charts, etc.
 
 
+
 </details>
 
-#### Examples
 
-##### Basic configuration
+
+#### via File
+
+The configuration file name for this integration is `exporting.conf`.
+
+
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config exporting.conf
+```
+
+##### Examples
+
+###### Basic configuration
 
 The default socket timeout depends on the exporting connector update interval.
 The timeout is 500 ms shorter than the interval (but not less than 1000 ms). You can alter the timeout using the sockettimeoutms MongoDB URI option.

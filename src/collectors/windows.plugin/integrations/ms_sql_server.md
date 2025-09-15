@@ -174,6 +174,7 @@ There are no alerts configured by default for this integration.
 
 ## Setup
 
+
 ### Prerequisites
 
 #### Configure SQL Server for Monitoring
@@ -243,7 +244,29 @@ For **each SQL Server** instance you want to monitor, complete the following ste
 
 ### Configuration
 
-#### File
+#### Options
+
+These options allow the collector to connect to your MSSQL instance and collect transaction data from it.
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| update every | Data collection frequency. | 10 | no |
+| driver | ODBC driver used to connect to the SQL Server. | SQL Server | no |
+| instance | Instance name | empty | yes |
+| server | Server address or instance name. | empty | yes |
+| address | Alternative to `server`; supports named pipes if the server supports them. | empty | yes |
+| uid | SQL Server user identifier. | empty | yes |
+| pwd | Password for the specified user. | empty | yes |
+| additional instances | Number of additional SQL Server instances to monitor. | 0 | no |
+| windows authentication | Set to yes to use Windows credentials instead of SQL Server authentication. | no | no |
+| express | Set to yes when running SQL Express version. | no | no |
+
+
+
+
+#### via File
 
 The configuration file name for this integration is `netdata.conf`.
 Configuration for this specific integration is located in the `[plugin:windows:PerflibMSSQL]` section within that file.
@@ -265,26 +288,10 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config netdata.conf
 ```
-#### Options
 
-These options allow the collector to connect to your MSSQL instance and collect transaction data from it.
+##### Examples
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update every | Data collection frequency. | 10 | no |
-| driver | ODBC driver used to connect to the SQL Server. | SQL Server | no |
-| instance | Instance name | empty | yes |
-| server | Server address or instance name. | empty | yes |
-| address | Alternative to `server`; supports named pipes if the server supports them. | empty | yes |
-| uid | SQL Server user identifier. | empty | yes |
-| pwd | Password for the specified user. | empty | yes |
-| additional instances | Number of additional SQL Server instances to monitor. | 0 | no |
-| windows authentication | Set to yes to use Windows credentials instead of SQL Server authentication. | no | no |
-| express | Set to yes when running SQL Express version. | no | no |
-
-#### Examples
-
-##### Single Instance
+###### Single Instance
 
 An example configuration with one instance.
 
@@ -298,7 +305,7 @@ An example configuration with one instance.
    express = no
 
 ```
-##### Multiple Instances
+###### Multiple Instances
 
 An example configuration with two instances.
 

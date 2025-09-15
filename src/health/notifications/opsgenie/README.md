@@ -22,6 +22,7 @@ You can send notifications to Opsgenie using Netdata's Agent alert notification 
 
 ## Setup
 
+
 ### Prerequisites
 
 #### 
@@ -33,7 +34,26 @@ You can send notifications to Opsgenie using Netdata's Agent alert notification 
 
 ### Configuration
 
-#### File
+#### Options
+
+The following options can be defined for this notification
+
+<details open><summary>Config Options</summary>
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| SEND_OPSGENIE | Set `SEND_OPSGENIE` to YES | YES | yes |
+| OPSGENIE_API_KEY | Set `OPSGENIE_API_KEY` to your API key. |  | yes |
+| OPSGENIE_API_URL | Set `OPSGENIE_API_URL` to the corresponding URL if required, for example there are region-specific API URLs such as `https://eu.api.opsgenie.com`. | https://api.opsgenie.com | no |
+
+
+</details>
+
+
+
+#### via File
 
 The configuration file name for this integration is `health_alarm_notify.conf`.
 
@@ -45,23 +65,10 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config health_alarm_notify.conf
 ```
-#### Options
 
-The following options can be defined for this notification
+##### Examples
 
-<details open><summary>Config Options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| SEND_OPSGENIE | Set `SEND_OPSGENIE` to YES | YES | yes |
-| OPSGENIE_API_KEY | Set `OPSGENIE_API_KEY` to your API key. |  | yes |
-| OPSGENIE_API_URL | Set `OPSGENIE_API_URL` to the corresponding URL if required, for example there are region-specific API URLs such as `https://eu.api.opsgenie.com`. | https://api.opsgenie.com | no |
-
-</details>
-
-#### Examples
-
-##### Basic Configuration
+###### Basic Configuration
 
 
 

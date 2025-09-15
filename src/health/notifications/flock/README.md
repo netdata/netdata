@@ -21,6 +21,7 @@ Send notifications to Flock using Netdata's Agent alert notification feature, wh
 
 ## Setup
 
+
 ### Prerequisites
 
 #### 
@@ -32,26 +33,16 @@ Send notifications to Flock using Netdata's Agent alert notification feature, wh
 
 ### Configuration
 
-#### File
-
-The configuration file name for this integration is `health_alarm_notify.conf`.
-
-
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config health_alarm_notify.conf
-```
 #### Options
 
 The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | SEND_FLOCK | Set `SEND_FLOCK` to YES | YES | yes |
 | FLOCK_WEBHOOK_URL | set `FLOCK_WEBHOOK_URL` to your webhook URL. |  | yes |
 | DEFAULT_RECIPIENT_FLOCK | Set `DEFAULT_RECIPIENT_FLOCK` to  the Flock channel you want the alert notifications to be sent to. All roles will default to this variable if left unconfigured. |  | yes |
@@ -69,11 +60,27 @@ role_recipients_flock[sitemgr]="sites"
 ```
 
 
+
 </details>
 
-#### Examples
 
-##### Basic Configuration
+
+#### via File
+
+The configuration file name for this integration is `health_alarm_notify.conf`.
+
+
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config health_alarm_notify.conf
+```
+
+##### Examples
+
+###### Basic Configuration
 
 
 

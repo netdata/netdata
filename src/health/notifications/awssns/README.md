@@ -37,6 +37,7 @@ You can send notifications through Amazon SNS using Netdata's Agent alert notifi
 
 ## Setup
 
+
 ### Prerequisites
 
 #### 
@@ -51,26 +52,16 @@ You can send notifications through Amazon SNS using Netdata's Agent alert notifi
 
 ### Configuration
 
-#### File
-
-The configuration file name for this integration is `health_alarm_notify.conf`.
-
-
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config health_alarm_notify.conf
-```
 #### Options
 
 The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | aws path | The full path of the aws command. If empty, the system `$PATH` will be searched for it. If not found, Amazon SNS notifications will be silently disabled. |  | yes |
 | SEND_AWSNS | Set `SEND_AWSNS` to YES | YES | yes |
 | AWSSNS_MESSAGE_FORMAT | Set `AWSSNS_MESSAGE_FORMAT` to to the string that you want the alert to be sent into. | ${status} on ${host} at ${date}: ${chart} ${value_string} | yes |
@@ -134,11 +125,27 @@ role_recipients_awssns[sitemgr]="arn:aws:sns:us-east-2:123456789012:Sites"
 ```
 
 
+
 </details>
 
-#### Examples
 
-##### Basic Configuration
+
+#### via File
+
+The configuration file name for this integration is `health_alarm_notify.conf`.
+
+
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config health_alarm_notify.conf
+```
+
+##### Examples
+
+###### Basic Configuration
 
 An example working configuration would be:
 

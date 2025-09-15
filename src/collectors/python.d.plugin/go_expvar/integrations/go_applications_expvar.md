@@ -80,6 +80,7 @@ There are no alerts configured by default for this integration.
 
 ## Setup
 
+
 ### Prerequisites
 
 #### Enable the go_expvar collector
@@ -166,7 +167,43 @@ number of currently running Goroutines and updates these stats every second.
 
 ### Configuration
 
-#### File
+#### Options
+
+There are 2 sections:
+
+* Global variables
+* One or more JOBS that can define multiple different instances to monitor.
+
+The following options can be defined globally: priority, penalty, autodetection_retry, update_every, but can also be defined per JOB to override the global values.
+
+Additionally, the following collapsed table contains all the options that can be configured inside a JOB definition.
+
+Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified. Each JOB can be used to monitor a different Go application.
+
+
+<details open><summary>Config options</summary>
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| update_every | Sets the default data collection frequency. | 5 | no |
+| priority | Controls the order of charts at the netdata dashboard. | 60000 | no |
+| autodetection_retry | Sets the job re-check interval in seconds. | 0 | no |
+| penalty | Indicates whether to apply penalty to update_every in case of failures. | yes | no |
+| name | Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works. |  | no |
+| url | the URL and port of the expvar endpoint. Please include the whole path of the endpoint, as the expvar handler can be installed in a non-standard location. |  | yes |
+| user | If the URL is password protected, this is the username to use. |  | no |
+| pass | If the URL is password protected, this is the password to use. |  | no |
+| collect_memstats | Enables charts for Go runtime's memory statistics. |  | no |
+| extra_charts | Defines extra data/charts to monitor, please see the example below. |  | no |
+
+
+</details>
+
+
+
+#### via File
 
 The configuration file name for this integration is `python.d/go_expvar.conf`.
 
@@ -187,40 +224,10 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config python.d/go_expvar.conf
 ```
-#### Options
 
-There are 2 sections:
+##### Examples
 
-* Global variables
-* One or more JOBS that can define multiple different instances to monitor.
-
-The following options can be defined globally: priority, penalty, autodetection_retry, update_every, but can also be defined per JOB to override the global values.
-
-Additionally, the following collapsed table contains all the options that can be configured inside a JOB definition.
-
-Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified. Each JOB can be used to monitor a different Go application.
-
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update_every | Sets the default data collection frequency. | 5 | no |
-| priority | Controls the order of charts at the netdata dashboard. | 60000 | no |
-| autodetection_retry | Sets the job re-check interval in seconds. | 0 | no |
-| penalty | Indicates whether to apply penalty to update_every in case of failures. | yes | no |
-| name | Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works. |  | no |
-| url | the URL and port of the expvar endpoint. Please include the whole path of the endpoint, as the expvar handler can be installed in a non-standard location. |  | yes |
-| user | If the URL is password protected, this is the username to use. |  | no |
-| pass | If the URL is password protected, this is the password to use. |  | no |
-| collect_memstats | Enables charts for Go runtime's memory statistics. |  | no |
-| extra_charts | Defines extra data/charts to monitor, please see the example below. |  | no |
-
-</details>
-
-#### Examples
-
-##### Monitor a Go app1 application
+###### Monitor a Go app1 application
 
 The example below sets a configuration for a Go application, called `app1`. Besides the `memstats`, the application also exposes two counters and the number of currently running Goroutines and updates these stats every second.
 

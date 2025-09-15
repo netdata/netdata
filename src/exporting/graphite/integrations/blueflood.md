@@ -21,32 +21,23 @@ Export your Netdata metrics to Blueflood DB using the Graphite protocol, allowin
 
 ## Setup
 
+
 ### Prerequisites
 
 No action required.
 
 ### Configuration
 
-#### File
-
-The configuration file name for this integration is `exporting.conf`.
-
-
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config exporting.conf
-```
 #### Options
 
 The following options can be defined for this exporter.
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | enabled | Enables or disables an exporting connector instance (yes/no). | no | yes |
 | destination | Accepts a space separated list of hostnames, IPs (IPv4 and IPv6) and ports to connect to. Netdata will use the first available to send the metrics. | no | yes |
 | username | Username for HTTP authentication | my_username | no |
@@ -117,11 +108,27 @@ are human friendly labels (also unique). Most charts and metrics have the same I
 different : disks with device-mapper, interrupts, QoS classes, statsd synthetic charts, etc.
 
 
+
 </details>
 
-#### Examples
 
-##### Example configuration
+
+#### via File
+
+The configuration file name for this integration is `exporting.conf`.
+
+
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config exporting.conf
+```
+
+##### Examples
+
+###### Example configuration
 
 Basic configuration
 
@@ -131,7 +138,7 @@ Basic configuration
     destination = localhost:2003
 
 ```
-##### Configuration with HTTPS and HTTP authentication
+###### Configuration with HTTPS and HTTP authentication
 
 Add `:https` modifier to the connector type if you need to use the TLS/SSL protocol. For example: `remote_write:https:my_instance`.
 
@@ -143,7 +150,7 @@ Add `:https` modifier to the connector type if you need to use the TLS/SSL proto
     password = my_password
 
 ```
-##### Detailed Configuration for a remote, secure host
+###### Detailed Configuration for a remote, secure host
 
 Add `:https` modifier to the connector type if you need to use the TLS/SSL protocol. For example: `remote_write:https:my_instance`.
 

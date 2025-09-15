@@ -98,13 +98,42 @@ The following alerts are available:
 
 ## Setup
 
+
 ### Prerequisites
 
 No action required.
 
 ### Configuration
 
-#### File
+#### Options
+
+
+
+<details open><summary>Config options</summary>
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| enable new disks detected at runtime | Enable or disable possibility to detect new disks. | auto | no |
+| performance metrics for pass devices | Enable or disable metrics for disks with type `PASS`. | auto | no |
+| total bandwidth for all disks | Enable or disable total bandwidth metric for all disks. | yes | no |
+| bandwidth for all disks | Enable or disable bandwidth for all disks metric. | auto | no |
+| operations for all disks | Enable or disable operations for all disks metric. | auto | no |
+| queued operations for all disks | Enable or disable queued operations for all disks  metric. | auto | no |
+| utilization percentage for all disks | Enable or disable utilization percentage for all disks metric. | auto | no |
+| i/o time for all disks | Enable or disable I/O time for all disks metric. | auto | no |
+| average completed i/o time for all disks | Enable or disable average completed I/O time for all disks metric. | auto | no |
+| average completed i/o bandwidth for all disks | Enable or disable average completed I/O bandwidth for all disks metric. | auto | no |
+| average service time for all disks | Enable or disable average service time for all disks metric. | auto | no |
+| disable by default disks matching | Do not create charts for disks listed. |  | no |
+
+
+</details>
+
+
+
+#### via File
 
 The configuration file name for this integration is `netdata.conf`.
 Configuration for this specific integration is located in the `[plugin:freebsd:kern.devstat]` section within that file.
@@ -126,30 +155,8 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config netdata.conf
 ```
-#### Options
 
-
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| enable new disks detected at runtime | Enable or disable possibility to detect new disks. | auto | no |
-| performance metrics for pass devices | Enable or disable metrics for disks with type `PASS`. | auto | no |
-| total bandwidth for all disks | Enable or disable total bandwidth metric for all disks. | yes | no |
-| bandwidth for all disks | Enable or disable bandwidth for all disks metric. | auto | no |
-| operations for all disks | Enable or disable operations for all disks metric. | auto | no |
-| queued operations for all disks | Enable or disable queued operations for all disks  metric. | auto | no |
-| utilization percentage for all disks | Enable or disable utilization percentage for all disks metric. | auto | no |
-| i/o time for all disks | Enable or disable I/O time for all disks metric. | auto | no |
-| average completed i/o time for all disks | Enable or disable average completed I/O time for all disks metric. | auto | no |
-| average completed i/o bandwidth for all disks | Enable or disable average completed I/O bandwidth for all disks metric. | auto | no |
-| average service time for all disks | Enable or disable average service time for all disks metric. | auto | no |
-| disable by default disks matching | Do not create charts for disks listed. |  | no |
-
-</details>
-
-#### Examples
+##### Examples
 There are no configuration examples.
 
 

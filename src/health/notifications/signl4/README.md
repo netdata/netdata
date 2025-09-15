@@ -22,6 +22,7 @@ You can send notifications to SIGNL4 using Netdata's Agent alert notification fe
 
 ## Setup
 
+
 ### Prerequisites
 
 #### 
@@ -33,7 +34,25 @@ You can send notifications to SIGNL4 using Netdata's Agent alert notification fe
 
 ### Configuration
 
-#### File
+#### Options
+
+The following options can be defined for this notification
+
+<details open><summary>Config Options</summary>
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| SEND_SIGNL4 | Set `SEND_SIGNL4` to YES | YES | yes |
+| SIGNL4_WEBHOOK_URL | set `SIGNL4_WEBHOOK_URL` to your SIGNL4 webhook URL. |  | yes |
+
+
+</details>
+
+
+
+#### via File
 
 The configuration file name for this integration is `health_alarm_notify.conf`.
 
@@ -45,22 +64,10 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config health_alarm_notify.conf
 ```
-#### Options
 
-The following options can be defined for this notification
+##### Examples
 
-<details open><summary>Config Options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| SEND_SIGNL4 | Set `SEND_SIGNL4` to YES | YES | yes |
-| SIGNL4_WEBHOOK_URL | set `SIGNL4_WEBHOOK_URL` to your SIGNL4 webhook URL. |  | yes |
-
-</details>
-
-#### Examples
-
-##### Basic Configuration
+###### Basic Configuration
 
 
 

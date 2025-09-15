@@ -82,6 +82,7 @@ There are no alerts configured by default for this integration.
 
 ## Setup
 
+
 ### Prerequisites
 
 #### Minimum setup
@@ -91,7 +92,24 @@ If you installed `netdata` using a package manager, it is also necessary to inst
 
 ### Configuration
 
-#### File
+#### Options
+
+
+
+<details open><summary>The main configuration file.</summary>
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| Enable plugin | As described above plugin is disabled by default, this option is used to enable plugin. | no | yes |
+
+
+</details>
+
+
+
+#### via File
 
 The configuration file name for this integration is `netdata.conf`.
 Configuration for this specific integration is located in the `[plugins]` section within that file.
@@ -113,19 +131,8 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config netdata.conf
 ```
-#### Options
 
-
-
-<details open><summary>The main configuration file.</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| Enable plugin | As described above plugin is disabled by default, this option is used to enable plugin. | no | yes |
-
-</details>
-
-#### Examples
+##### Examples
 There are no configuration examples.
 
 
