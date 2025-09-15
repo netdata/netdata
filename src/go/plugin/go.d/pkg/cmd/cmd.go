@@ -69,7 +69,7 @@ func RunUnprivileged(logger *logger.Logger, timeout time.Duration, arg ...string
 // This invokes the command and logs a debug message that the command
 // is being executed, and then returns the exec.Cmd object for the command.
 func CommandNDSudo(ctx context.Context, logger *logger.Logger, arg ...string) *exec.Cmd {
-	ndsudoPath := filepath.Join(buildinfo.NetdataBinDir, "ndsudo")
+	ndsudoPath := filepath.Join(buildinfo.PluginsDir, "ndsudo")
 
 	cmd := exec.CommandContext(ctx, ndsudoPath, arg...)
 	if logger != nil {

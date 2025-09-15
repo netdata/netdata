@@ -8,7 +8,8 @@ else()
 endif()
 
 set(GO_LDFLAGS "${GO_LDFLAGS} -X github.com/netdata/netdata/go/plugins/pkg/buildinfo.Version=${NETDATA_VERSION_STRING}")
-set(GO_LDFLAGS "${GO_LDFLAGS} -X github.com/netdata/netdata/go/plugins/pkg/buildinfo.RuntimePrefix=${NETDATA_RUNTIME_PREFIX}")
+set(GO_LDFLAGS "${GO_LDFLAGS} -X github.com/netdata/netdata/go/plugins/pkg/buildinfo.NetdataBinDir=${NETDATA_BIN_DIR}")
+set(GO_LDFLAGS "${GO_LDFLAGS} -X github.com/netdata/netdata/go/plugins/pkg/buildinfo.PluginsDir=${PLUGINS_DIR}")
 
 # add_go_target: Add a new target that needs to be built using the Go toolchain.
 #

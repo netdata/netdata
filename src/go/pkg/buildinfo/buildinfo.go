@@ -13,5 +13,8 @@ var UserConfigDir = ""
 // StockConfigDir stores the path to the stock (default) configuration directory.
 var StockConfigDir = ""
 
+// PluginsDir stores the directory where pulgins were installed at build time.
+var PluginsDir = "/usr/libexec/netdata/plugins.d"
+
 // NetdataBinDir stores the directory where executables were installed at build time.
 var NetdataBinDir = "/usr/sbin"
