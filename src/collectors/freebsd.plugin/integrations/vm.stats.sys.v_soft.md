@@ -87,9 +87,12 @@ No action required.
 
 <details open><summary>Config option</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | vm.stats.sys.v_soft | Enable or disable software inerrupts metric. | yes | no |
+
 
 </details>
 

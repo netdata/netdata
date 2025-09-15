@@ -139,8 +139,10 @@ All options are defined inside section `[global]`.
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | update every | Data collection frequency. | 5 | no |
 | ebpf load mode | Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`). | entry | no |
 | apps | Enable or disable integration with apps.plugin | no | no |
@@ -150,6 +152,7 @@ All options are defined inside section `[global]`.
 | ebpf co-re tracing | Select the attach method used by plugin when `co-re` is defined in previous option. Two options are available: `trampoline` (Option with lowest overhead), and `probe` (the same of legacy code). | trampoline | no |
 | maps per core | Define how plugin will load their hash maps. When enabled (`yes`) plugin will load one hash table per core, instead to have centralized information. | yes | no |
 | lifetime | Set default lifetime for thread when enabled by cloud. | 300 | no |
+
 
 </details>
 

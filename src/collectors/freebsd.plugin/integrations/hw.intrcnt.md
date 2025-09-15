@@ -88,9 +88,12 @@ No action required.
 
 <details open><summary>Config option</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | hw.intrcnt | Enable or disable Interrupts metric. | yes | no |
+
 
 </details>
 

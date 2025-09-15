@@ -102,10 +102,13 @@ The debugfs filesystem must be mounted on your host for plugin to collect data. 
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | update every | Data collection frequency. | 1 | no |
 | command options | Additinal parameters for collector |  | no |
+
 
 </details>
 

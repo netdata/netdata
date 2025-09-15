@@ -40,8 +40,10 @@ The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | SEND_KAVENEGAR | Set `SEND_KAVENEGAR` to YES | YES | yes |
 | KAVENEGAR_API_KEY | Set `KAVENEGAR_API_KEY` to your API key. |  | yes |
 | KAVENEGAR_SENDER | Set `KAVENEGAR_SENDER` to the value of your Sender. |  | yes |
@@ -62,6 +64,7 @@ role_recipients_kavenegar[sitemgr]="0955555555"
 ```
 
 The values you provide should be defined as environments in `/etc/alertad.conf` with `ALLOWED_ENVIRONMENTS` option.
+
 
 
 </details>

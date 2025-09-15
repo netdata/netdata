@@ -87,9 +87,12 @@ No action required.
 
 <details open><summary>Config option</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | vm.stats.sys.v_intr | Enable or disable device interrupts metric. | yes | no |
+
 
 </details>
 

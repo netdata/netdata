@@ -120,12 +120,15 @@ The following collapsed table contains all the options that can be configured fo
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | libreswan_update_every | The data collection frequency. If unset, will inherit the netdata update frequency. | 1 | no |
 | libreswan_priority | The charts priority on the dashboard | 90000 | no |
 | libreswan_retries | The number of retries to do in case of failure before disabling the collector. | 10 | no |
 | libreswan_sudo | Whether to run `ipsec` with `sudo` or not. | 1 | no |
+
 
 </details>
 

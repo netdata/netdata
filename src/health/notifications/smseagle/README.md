@@ -46,8 +46,10 @@ The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | DEFAULT_RECIPIENT_SMSEAGLE | If a role's recipients are not configured, a notification will be sent to this SMS recipient (empty = do not send a notification for unconfigured roles). Multiple recipients can be given like this: "PHONE1,PHONE2..." |  | yes |
 | SMSEAGLE_API_URL |  |  | yes |
 | SMSEAGLE_API_ACCESSTOKEN |  |  | yes |
@@ -93,6 +95,7 @@ Call duration, parameter required for Ring, TTS and TTS Advanced.
 ##### SMSEAGLE_VOICE_ID
 
 ID of the voice model, required for TTS Advanced.
+
 
 
 </details>

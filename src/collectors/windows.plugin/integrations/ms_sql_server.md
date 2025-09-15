@@ -248,8 +248,10 @@ For **each SQL Server** instance you want to monitor, complete the following ste
 
 These options allow the collector to connect to your MSSQL instance and collect transaction data from it.
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | update every | Data collection frequency. | 10 | no |
 | driver | ODBC driver used to connect to the SQL Server. | SQL Server | no |
 | instance | Instance name | empty | yes |
@@ -260,6 +262,7 @@ These options allow the collector to connect to your MSSQL instance and collect 
 | additional instances | Number of additional SQL Server instances to monitor. | 0 | no |
 | windows authentication | Set to yes to use Windows credentials instead of SQL Server authentication. | no | no |
 | express | Set to yes when running SQL Express version. | no | no |
+
 
 
 

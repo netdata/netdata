@@ -98,7 +98,7 @@ You can configure the **ap** collector in two ways:
 
 :::important
 
-UI configuration requires paid Netdata Cloud plan. File-based configuration uses the same options and is useful if you prefer configuring via file or need to automate deployments.
+UI configuration requires paid Netdata Cloud plan.
 
 :::
 
@@ -119,11 +119,14 @@ The following options can be defined globally: update_every.
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | update_every | Data collection frequency. | 10 | no |
 | binary_path | Path to the `iw` binary. If an absolute path is provided, the collector will use it directly; otherwise, it will search for the binary in directories specified in the PATH environment variable. | /usr/sbin/iw | yes |
 | timeout | Timeout for executing the binary, specified in seconds. | 2 | no |
+
 
 </details>
 

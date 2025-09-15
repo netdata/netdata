@@ -102,8 +102,10 @@ No action required.
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | ipv4 TCP packets | Enable or disable ipv4 TCP packets metric. | yes | no |
 | ipv4 TCP errors | Enable or disable pv4 TCP errors metric. | yes | no |
 | ipv4 TCP handshake issues | Enable or disable ipv4 TCP handshake issue metric. | yes | no |
@@ -112,6 +114,7 @@ No action required.
 | TCP SYN cookies | Enable or disable TCP SYN cookies metric. | auto | no |
 | TCP listen issues | Enable or disable TCP listen issues metric. | auto | no |
 | ECN packets | Enable or disable ECN packets metric. | auto | no |
+
 
 </details>
 

@@ -143,9 +143,12 @@ There are no alerts configured by default for this integration.
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | update every | Data collection frequency. | 1 | no |
+
 
 </details>
 

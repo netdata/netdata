@@ -96,12 +96,15 @@ You can install the command by passing the argument `install` to the plugin (`/u
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | update_every | Data collection frequency. | 1s | no |
 | destination | The directory/file/device to ioping. |  | yes |
 | request_size | The request size in bytes to ioping the destination (symbolic modifiers are supported) | 4k | no |
 | ioping_opts | Options passed to `ioping` commands. | -T 1000000 | no |
+
 
 </details>
 

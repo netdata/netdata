@@ -106,7 +106,7 @@ You can configure the **intelgpu** collector in two ways:
 
 :::important
 
-UI configuration requires paid Netdata Cloud plan. File-based configuration uses the same options and is useful if you prefer configuring via file or need to automate deployments.
+UI configuration requires paid Netdata Cloud plan.
 
 :::
 
@@ -127,10 +127,13 @@ The following options can be defined globally: update_every.
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | update_every | Data collection frequency. | 1 | no |
 | device | Select a specific GPU using [supported filter](https://manpages.debian.org/testing/intel-gpu-tools/intel_gpu_top.1.en.html#DESCRIPTION). |  | no |
+
 
 </details>
 

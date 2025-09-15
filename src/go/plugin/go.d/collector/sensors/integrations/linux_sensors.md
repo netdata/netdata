@@ -121,7 +121,7 @@ You can configure the **sensors** collector in two ways:
 
 :::important
 
-UI configuration requires paid Netdata Cloud plan. File-based configuration uses the same options and is useful if you prefer configuring via file or need to automate deployments.
+UI configuration requires paid Netdata Cloud plan.
 
 :::
 
@@ -139,14 +139,17 @@ The following options can be defined globally: update_every.
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | update_every | Data collection frequency. | 10 | no |
 | relabel | A list used to update existing sensor labels or add labels to sensors that don't have them. | [] | no |
 | relabel[].chip | [Pattern](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md#simple-patterns) to match the `chip_id` label value. |  | no |
 | relabel[].sensors | A list of sensors to be relabeled for the specified chip. | [] | no |
 | relabel[].sensors[].name | The exact sensor name (e.g., `'temp1'`, `'in1'`, `'voltage1'`). |  | no |
 | relabel[].sensors[].label | The new label value for the sensor. |  | no |
+
 
 </details>
 

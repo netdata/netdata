@@ -111,7 +111,7 @@ You can configure the **smartctl** collector in two ways:
 
 :::important
 
-UI configuration requires paid Netdata Cloud plan. File-based configuration uses the same options and is useful if you prefer configuring via file or need to automate deployments.
+UI configuration requires paid Netdata Cloud plan.
 
 :::
 
@@ -167,8 +167,10 @@ The following options can be defined globally: update_every.
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | update_every | interval for updating Netdata charts, measured in seconds. Collector might use cached data if less than **Devices poll interval**. | 10 | no |
 | timeout | smartctl binary execution timeout. | 5 | no |
 | scan_every | interval for discovering new devices using `smartctl --scan`, measured in seconds. Set to 0 to scan devices only once on startup. | 900 | no |
@@ -188,6 +190,7 @@ The valid arguments to this option are:
 | sleep   | Check the device unless it is in SLEEP mode.                                                                                                                                           |
 | standby | Check the device unless it is in SLEEP or STANDBY mode. In these modes most disks are not spinning, so if you want to prevent a disk from spinning up, this is probably what you want. |
 | idle    | Check the device unless it is in SLEEP, STANDBY or IDLE mode. In the IDLE state, most disks are still spinning, so this is probably not what you want.                                 |
+
 
 
 </details>

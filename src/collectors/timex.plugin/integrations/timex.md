@@ -94,11 +94,14 @@ At least one option ('clock synchronization state', 'time offset') needs to be e
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | update every | Data collection frequency. | 1 | no |
 | clock synchronization state | Make chart showing system clock synchronization state. | yes | yes |
 | time offset | Make chart showing computed time offset between local system and reference clock | yes | yes |
+
 
 </details>
 

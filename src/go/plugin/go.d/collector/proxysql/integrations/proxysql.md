@@ -169,7 +169,7 @@ You can configure the **proxysql** collector in two ways:
 
 :::important
 
-UI configuration requires paid Netdata Cloud plan. File-based configuration uses the same options and is useful if you prefer configuring via file or need to automate deployments.
+UI configuration requires paid Netdata Cloud plan.
 
 :::
 
@@ -187,12 +187,15 @@ The following options can be defined globally: update_every, autodetection_retry
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | update_every | Data collection frequency. | 1 | no |
 | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
 | dsn | Data Source Name. See [DSN syntax](https://github.com/go-sql-driver/mysql#dsn-data-source-name). | stats:stats@tcp(127.0.0.1:6032)/ | yes |
 | timeout | Query timeout in seconds. | 1 | no |
+
 
 </details>
 

@@ -41,8 +41,10 @@ The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | SEND_MATRIX | Set `SEND_MATRIX` to YES | YES | yes |
 | MATRIX_HOMESERVER | set `MATRIX_HOMESERVER` to the URL of the Matrix homeserver. |  | yes |
 | MATRIX_ACCESSTOKEN | Set `MATRIX_ACCESSTOKEN` to the access token from your Matrix account. |  | yes |
@@ -74,6 +76,7 @@ role_recipients_matrix[webmaster]="!roomid4:homeservername"
 role_recipients_matrix[proxyadmin]="!roomid5:homeservername"
 role_recipients_matrix[sitemgr]="!roomid6:homeservername"
 ```
+
 
 
 </details>

@@ -106,10 +106,13 @@ No action required.
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | netisr | Enable or disable general vision about softnet stat metrics. | yes | no |
 | netisr per core | Enable or disable softnet stat metric per core. | yes | no |
+
 
 </details>
 

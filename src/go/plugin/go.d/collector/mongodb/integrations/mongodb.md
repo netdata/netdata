@@ -222,7 +222,7 @@ You can configure the **mongodb** collector in two ways:
 
 :::important
 
-UI configuration requires paid Netdata Cloud plan. File-based configuration uses the same options and is useful if you prefer configuring via file or need to automate deployments.
+UI configuration requires paid Netdata Cloud plan.
 
 :::
 
@@ -265,13 +265,16 @@ The following options can be defined globally: update_every, autodetection_retry
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | update_every | Data collection frequency. | 5 | no |
 | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
 | uri | MongoDB connection string. See [URI syntax](https://www.mongodb.com/docs/manual/reference/connection-string/). | mongodb://localhost:27017 | yes |
 | timeout | Query timeout in seconds. | 1 | no |
 | databases | Databases selector. Determines which database metrics will be collected. |  | no |
+
 
 </details>
 

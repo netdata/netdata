@@ -39,8 +39,10 @@ The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | Send_PUSHBULLET | Set `Send_PUSHBULLET` to YES | YES | yes |
 | PUSHBULLET_ACCESS_TOKEN | set `PUSHBULLET_ACCESS_TOKEN` to the access token you generated. |  | yes |
 | DEFAULT_RECIPIENT_PUSHBULLET | Set `DEFAULT_RECIPIENT_PUSHBULLET` to the email (e.g. `example@domain.com`) or the channel tag (e.g. `#channel`) you want the alert notifications to be sent to. |  | yes |
@@ -60,6 +62,7 @@ role_recipients_pushbullet[webmaster]="#channel2"
 role_recipients_pushbullet[proxyadmin]="user3@mail.com"
 role_recipients_pushbullet[sitemgr]="user4@mail.com"
 ```
+
 
 
 </details>

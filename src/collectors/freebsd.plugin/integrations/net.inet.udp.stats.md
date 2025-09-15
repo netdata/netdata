@@ -94,10 +94,13 @@ No action required.
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | ipv4 UDP packets | Enable or disable ipv4 UDP packets metric. | yes | no |
 | ipv4 UDP errors | Enable or disable ipv4 UDP errors metric. | yes | no |
+
 
 </details>
 

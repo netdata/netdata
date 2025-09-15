@@ -87,9 +87,12 @@ No action required.
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | vm.loadavg | Enable or disable load average metric. | yes | no |
+
 
 </details>
 

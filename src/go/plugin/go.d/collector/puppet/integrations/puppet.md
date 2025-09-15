@@ -93,7 +93,7 @@ You can configure the **puppet** collector in two ways:
 
 :::important
 
-UI configuration requires paid Netdata Cloud plan. File-based configuration uses the same options and is useful if you prefer configuring via file or need to automate deployments.
+UI configuration requires paid Netdata Cloud plan.
 
 :::
 
@@ -111,8 +111,10 @@ The following options can be defined globally: update_every, autodetection_retry
 
 <details open><summary></summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | url | The base URL where the Puppet instance can be accessed. | https://127.0.0.1:8140 | yes |
 | timeout | HTTPS request timeout. | 1 | no |
 | username | Username for basic HTTPS authentication. |  | no |
@@ -128,6 +130,7 @@ The following options can be defined globally: update_every, autodetection_retry
 | tls_ca | Certification authority that the client uses when verifying the server's certificates. |  | no |
 | tls_cert | Client TLS certificate. |  | no |
 | tls_key | Client TLS key. |  | no |
+
 
 </details>
 

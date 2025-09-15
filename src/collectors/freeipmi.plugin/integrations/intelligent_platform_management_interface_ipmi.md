@@ -148,8 +148,10 @@ To display a help message listing the available command line options:
 
 <details open><summary>Command options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | SECONDS | Data collection frequency. |  | no |
 | debug | Enable verbose output. | disabled | no |
 | no-sel | Disable System Event Log (SEL) collection. | disabled | no |
@@ -174,6 +176,7 @@ To display a help message listing the available command line options:
 | ignore-status N1,N2,N3,... | Sensor IDs to ignore status (nominal/warning/critical). |  | no |
 | -v | Print version and exit. |  | no |
 | --help | Print usage message and exit. |  | no |
+
 
 </details>
 

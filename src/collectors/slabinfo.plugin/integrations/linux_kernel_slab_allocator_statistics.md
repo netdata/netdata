@@ -98,9 +98,12 @@ If you installed `netdata` using a package manager, it is also necessary to inst
 
 <details open><summary>The main configuration file.</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | Enable plugin | As described above plugin is disabled by default, this option is used to enable plugin. | no | yes |
+
 
 </details>
 

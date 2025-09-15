@@ -88,9 +88,12 @@ No action required.
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | kern.ipc.shm | Enable or disable shared memory metric. | yes | no |
+
 
 </details>
 

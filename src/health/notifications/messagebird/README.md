@@ -39,8 +39,10 @@ The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | SEND_MESSAGEBIRD | Set `SEND_MESSAGEBIRD` to YES | YES | yes |
 | MESSAGEBIRD_ACCESS_KEY | Set `MESSAGEBIRD_ACCESS_KEY` to your API key. |  | yes |
 | MESSAGEBIRD_NUMBER | Set `MESSAGEBIRD_NUMBER` to the MessageBird number you want to use for the alert. |  | yes |
@@ -59,6 +61,7 @@ role_recipients_messagebird[webmaster]="+15555555558"
 role_recipients_messagebird[proxyadmin]="+15555555559"
 role_recipients_messagebird[sitemgr]="+15555555550"
 ```
+
 
 
 </details>

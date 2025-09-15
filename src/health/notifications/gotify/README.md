@@ -40,11 +40,14 @@ The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | SEND_GOTIFY | Set `SEND_GOTIFY` to YES | YES | yes |
 | GOTIFY_APP_TOKEN | set `GOTIFY_APP_TOKEN` to the app token you generated. |  | yes |
 | GOTIFY_APP_URL | Set `GOTIFY_APP_URL` to point to your Gotify instance, for example `https://push.example.domain/` |  | yes |
+
 
 </details>
 

@@ -96,9 +96,12 @@ No action required.
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | system.ram | Enable or disable system RAM metric. | yes | no |
+
 
 </details>
 

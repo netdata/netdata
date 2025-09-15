@@ -39,8 +39,10 @@ The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | SEND_FLOCK | Set `SEND_FLOCK` to YES | YES | yes |
 | FLOCK_WEBHOOK_URL | set `FLOCK_WEBHOOK_URL` to your webhook URL. |  | yes |
 | DEFAULT_RECIPIENT_FLOCK | Set `DEFAULT_RECIPIENT_FLOCK` to  the Flock channel you want the alert notifications to be sent to. All roles will default to this variable if left unconfigured. |  | yes |
@@ -56,6 +58,7 @@ role_recipients_flock[webmaster]="marketing development"
 role_recipients_flock[proxyadmin]="proxy-admin"
 role_recipients_flock[sitemgr]="sites"
 ```
+
 
 
 </details>
