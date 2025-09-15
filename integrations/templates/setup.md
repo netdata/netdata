@@ -21,7 +21,7 @@ You can configure the **[[ entry.meta.module_name ]]** collector in two ways:
 
 :::important
 
-UI configuration requires paid Netdata Cloud plan. File-based configuration uses the same options and is useful if you prefer configuring via file or need to automate deployments.
+UI configuration requires paid Netdata Cloud plan.
 
 :::
 
@@ -55,11 +55,24 @@ No action required.
 [% if entry.setup.configuration.options.folding.enabled and not clean %]
 {% details open=true summary="[[ entry.setup.configuration.options.folding.title ]]" %}
 [% endif %]
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+[% set has_groups = entry.setup.configuration.options.list | selectattr("group","defined") | list | length > 0 %]
+
+[% if has_groups %]
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+[% set ns = namespace(last_group=None) %]
+[% for item in entry.setup.configuration.options.list %]
+| [[ ("**" ~ item.group ~ "**") if (item.group is defined and item.group != ns.last_group) else "" ]] | [[ strfy(item.name) ]] | [[ strfy(item.description) ]] | [[ strfy(item.default_value) ]] | [[ strfy(item.required) ]] |
+[% set ns.last_group = item.group if item.group is defined else ns.last_group %]
+[% endfor %]
+[% else %]
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 [% for item in entry.setup.configuration.options.list %]
 | [[ strfy(item.name) ]] | [[ strfy(item.description) ]] | [[ strfy(item.default_value) ]] | [[ strfy(item.required) ]] |
 [% endfor %]
+[% endif %]
 
 [% for item in entry.setup.configuration.options.list %]
 [% if 'detailed_description' in item %]
@@ -69,6 +82,7 @@ No action required.
 
 [% endif %]
 [% endfor %]
+
 [% if entry.setup.configuration.options.folding.enabled and not clean %]
 {% /details %}
 [% endif %]
