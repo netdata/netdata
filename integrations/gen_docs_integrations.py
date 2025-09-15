@@ -1,16 +1,26 @@
+import argparse
 import json
 import re
 import shutil
+import sys
 from pathlib import Path
 
 # Dictionary responsible for making the symbolic links at the end of the script's run.
 symlink_dict = {}
 
 
-def cleanup():
+def cleanup(only_base_paths=None):
     """
     clean directories that are either data collection or exporting integrations
+    If only_base_paths is provided (list of base dirs), clean ONLY those.
     """
+    if only_base_paths:
+        for base in only_base_paths:
+            p = Path(base) / "integrations"
+            if p.exists():
+                shutil.rmtree(p)
+        return
+
     for element in Path("src/go/plugin/go.d/collector").glob('**/*/'):
         if "integrations" in str(element):
             shutil.rmtree(element)
@@ -523,12 +533,52 @@ def make_symlinks(symlink_dict):
             f'{element}/{symlink_dict[element]}', f'{element}/README.md'))
 
 
-cleanup()
+parser = argparse.ArgumentParser(description="Generate integration docs from metadata.yaml files.")
+parser.add_argument("-c", "--collector",
+                    help="Only generate docs for this collector (plugin/module), e.g. 'go.d/snmp' or 'apps.plugin/groups'",
+                    default=None)
+args = parser.parse_args()
 
 categories, integrations = read_integrations_js('integrations/integrations.js')
 
+
+def _base_paths_for_collector(integrations, collector_key):
+    if not collector_key:
+        return []
+    paths = []
+    for integ in integrations:
+        if integ.get('integration_type') != 'collector':
+            continue
+        meta = integ.get('meta', {})
+        plugin = meta.get('plugin_name')
+        module = meta.get('module_name')
+        if not plugin or not module:
+            continue
+        key = plugin + "/" + module
+        if key == collector_key:
+            meta_yaml = integ.get('edit_link', '').replace("blob", "edit")
+            paths.append(build_path(meta_yaml))
+    return paths
+
+
+only_paths = _base_paths_for_collector(integrations, args.collector)
+
+if args.collector and not only_paths:
+    print("No matching collector found for:", args.collector)
+    sys.exit(1)
+
+cleanup(only_paths)
+
 # Iterate through every integration
 for integration in integrations:
+    if args.collector:
+        if integration.get('integration_type') != "collector":
+            continue
+        meta = integration.get('meta', {})
+        plugin = meta.get('plugin_name')
+        module = meta.get('module_name')
+        if not plugin or not module or (plugin + "/" + module) != args.collector:
+            continue
 
     if integration['integration_type'] == "collector":
 
