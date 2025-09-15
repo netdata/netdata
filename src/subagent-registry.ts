@@ -171,7 +171,8 @@ export class SubAgentRegistry {
       stopRef?: { stopping: boolean };
       // live updates: stream child opTree snapshots to parent orchestrator
       onChildOpTree?: (tree: SessionNode) => void;
-    }
+    },
+    opts?: { onChildOpTree?: (tree: SessionNode) => void; parentOpPath?: string }
   ): Promise<{ result: string; child: ChildInfo; accounting: readonly AccountingEntry[]; conversation: ConversationMessage[]; trace?: { originId?: string; parentId?: string; selfId?: string; callPath?: string }, opTree?: SessionNode }> {
     const name = exposedToolName.startsWith('agent__') ? exposedToolName.slice('agent__'.length) : exposedToolName;
     const info = this.children.get(name);
@@ -221,6 +222,17 @@ export class SubAgentRegistry {
           if (e.remoteIdentifier !== 'agent:title') {
             cloned.remoteIdentifier = `${childPrefix}:${e.remoteIdentifier}`;
           }
+          // Prefix opTree-provided path labels with parent op path so logs are hierarchically greppable
+          try {
+            const parentPath = (opts !== undefined && typeof opts.parentOpPath === 'string' && opts.parentOpPath.length > 0) ? opts.parentOpPath : undefined;
+            const existingPath = (cloned as { path?: string }).path;
+            if (typeof existingPath === 'string' && existingPath.length > 0) {
+              const prefix = typeof parentPath === 'string' && parentPath.length > 0 ? parentPath : undefined;
+              if (typeof prefix === 'string' && prefix.length > 0) (cloned as { path?: string }).path = `${prefix}.${existingPath}`;
+            } else if (typeof parentPath === 'string' && parentPath.length > 0) {
+              (cloned as { path?: string }).path = parentPath;
+            }
+          } catch { /* ignore */ }
           orig.onLog?.(cloned);
         },
         onOutput: (t) => { orig.onOutput?.(t); },

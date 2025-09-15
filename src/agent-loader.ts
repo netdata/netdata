@@ -150,7 +150,7 @@ export function loadAgent(aiPath: string, registry?: AgentRegistry, options?: Lo
   const selectedAgents = effAgents.map((rel) => path.resolve(path.dirname(aiPath), rel));
   const needProviders = Array.from(new Set(selectedTargets.map((t) => t.provider)));
 
-  const layers = discoverLayers({ configPath: options?.configPath });
+  const layers = discoverLayers({ configPath: options?.configPath, promptPath: aiPath });
   const config = buildUnifiedConfiguration({ providers: needProviders, mcpServers: selectedTools }, layers, { verbose: options?.verbose });
   const dfl = resolveDefaults(layers);
   validateNoPlaceholders(config);
@@ -429,7 +429,7 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
   const selectedAgents = effAgents2.map((rel) => path.resolve(options?.baseDir ?? process.cwd(), rel));
   const needProviders = Array.from(new Set(selectedTargets.map((t) => t.provider)));
 
-  const layers = discoverLayers({ configPath: options?.configPath });
+  const layers = discoverLayers({ configPath: options?.configPath, promptPath: id });
   const config = buildUnifiedConfiguration({ providers: needProviders, mcpServers: selectedTools }, layers, { verbose: options?.verbose });
   const dfl = resolveDefaults(layers);
   validateNoPlaceholders(config);
@@ -529,7 +529,7 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
       // Helper for expanding ${VAR} in strings
       const expandVars = (s: string): string => {
         // For loadAgentFromContent, we need to get env from layers
-        const layers = discoverLayers({ configPath: options?.configPath });
+        const layers = discoverLayers({ configPath: options?.configPath, promptPath: id });
         const mergedEnv: Record<string, string> = {};
         layers.forEach(l => { if (l.env !== undefined) Object.assign(mergedEnv, l.env); });
         return s.replace(/\$\{([^}]+)\}/g, (_m, name: string) => mergedEnv[name] ?? '');
@@ -548,7 +548,7 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
       const openapiSpecs = (dynamicConfig as unknown as { openapiSpecs?: Record<string, OpenAPISpecConfig> }).openapiSpecs;
       if (openapiSpecs !== undefined && selectedOpenAPIProviders.size > 0) {
         // For loadAgentFromContent, we need to find config from layers
-        const layers = discoverLayers({ configPath: options?.configPath });
+        const layers = discoverLayers({ configPath: options?.configPath, promptPath: id });
         const configLayer = layers.find(l => {
           const json = l.json;
           return json !== undefined && typeof json === 'object' && 'openapiSpecs' in json;

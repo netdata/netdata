@@ -15,7 +15,7 @@ const OUTPUT_FORMATS: Record<OutputFormatId, OutputFormat> = {
   ].join(' ') },
   tty: { id: 'tty', description: 'Fixed-width monospaced terminal, with ANSI colors, and ASCII-art for tables and diagrams. No markdown. ' +
      'When adding ANSI colors, emit literal \\x1b[...m codes (e.g., \\x1b[33m for yellow) instead of raw ESC characters. ' +
-     'IMPORTANT: Do not create unecessary boxes that wrap the content, let it breathe - on tables than need vertical alignment remember that the ANSI colors do not count in the width. Do not wrap long lines - let them wrap naturally depending on terminal size.' },
+     'IMPORTANT: Do not create unecessary boxes that wrap the content, let it breathe - on tables that need vertical alignment remember that the ANSI colors do not count in the width. Do not wrap long lines - let them wrap naturally depending on terminal size.' },
   pipe: { id: 'pipe', description: 'plain text' },
   
   json: { id: 'json', description: 'json' },

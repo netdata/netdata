@@ -153,20 +153,25 @@ The framework uses a **multi-level configuration system** with clear precedence 
    
    a. **`--config` specified file**: Explicitly provided via `--config /path/to/config.json`
       - When specified, becomes the highest priority config file
-   
+
    b. **Current working directory**: `.ai-agent.json` and `.ai-agent.env`
       - Where you run the command from
       - Ideal for project-specific settings
-   
-   c. **Binary directory**: `.ai-agent.json` and `.ai-agent.env`
+
+   c. **Prompt file directory**: `.ai-agent.json` and `.ai-agent.env`
+      - The directory containing your prompt file (`.ai` file)
+      - Perfect for prompt-specific configurations
+      - Automatically discovered when running prompts from subdirectories
+
+   d. **Binary directory**: `.ai-agent.json` and `.ai-agent.env`
       - Where the `ai-agent` executable is physically located
       - Perfect for portable installations
-   
-   d. **User home directory**: `~/.ai-agent/ai-agent.json` and `~/.ai-agent/ai-agent.env`
+
+   e. **User home directory**: `~/.ai-agent/ai-agent.json` and `~/.ai-agent/ai-agent.env`
       - Personal configuration for the current user
       - Shared across all your projects
-   
-   e. **System directory**: `/etc/ai-agent/ai-agent.json` and `/etc/ai-agent/ai-agent.env`
+
+   f. **System directory**: `/etc/ai-agent/ai-agent.json` and `/etc/ai-agent/ai-agent.env`
       - System-wide defaults for all users
       - Typically set by administrators
 

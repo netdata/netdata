@@ -5,7 +5,7 @@ import type { Configuration, MCPServerConfig, ProviderConfig, RestToolConfig, Op
 
 import { warn } from './utils.js';
 
-type LayerOrigin = '--config' | 'cwd' | 'binary' | 'home' | 'system';
+type LayerOrigin = '--config' | 'cwd' | 'prompt' | 'binary' | 'home' | 'system';
 
 interface ConfigLayer {
   origin: LayerOrigin;
@@ -61,7 +61,7 @@ function readEnvIfExists(p: string): Record<string, string> | undefined {
   return undefined;
 }
 
-export function discoverLayers(opts?: { configPath?: string }): ConfigLayer[] {
+export function discoverLayers(opts?: { configPath?: string; promptPath?: string }): ConfigLayer[] {
   const layers: ConfigLayer[] = [];
 
   const cwd = process.cwd();
@@ -78,6 +78,17 @@ export function discoverLayers(opts?: { configPath?: string }): ConfigLayer[] {
     list.push({ origin: '--config', json: opts.configPath, env: path.join(path.dirname(opts.configPath), HIDDEN_ENV) });
   }
   list.push({ origin: 'cwd', json: path.join(cwd, HIDDEN_JSON), env: path.join(cwd, HIDDEN_ENV) });
+
+  // Add prompt file directory as second priority (after cwd)
+  if (typeof opts?.promptPath === 'string' && opts.promptPath.length > 0) {
+    try {
+      const promptDir = path.dirname(opts.promptPath);
+      if (promptDir !== cwd) { // Only add if different from cwd
+        list.push({ origin: 'prompt', json: path.join(promptDir, HIDDEN_JSON), env: path.join(promptDir, HIDDEN_ENV) });
+      }
+    } catch { /* ignore errors */ }
+  }
+
   list.push({ origin: 'binary', json: path.join(binDir, HIDDEN_JSON), env: path.join(binDir, HIDDEN_ENV) });
   if (home.length > 0) {
     list.push({ origin: 'home', json: path.join(home, HOME_DIR, 'ai-agent.json'), env: path.join(home, HOME_DIR, 'ai-agent.env') });

@@ -113,6 +113,29 @@ export class AIAgentSession {
   private llmSyntheticFailures = 0;
   private centralSizeCapHits = 0;
   private currentLlmOpId?: string;
+  private systemTurnBegan = false;
+
+  // Per-turn buffer of tool failures to synthesize messages when provider omits tool_error
+  private pendingToolErrors: { id?: string; name: string; message: string; parameters?: Record<string, unknown> }[] = [];
+
+  // Find the last LLM op for a given turn to anchor agent-emitted logs (debug/FIN)
+  private getLastLlmOpIdForTurn(turnIndex: number): string | undefined {
+    try {
+      const s = this.opTree.getSession();
+      const turns = Array.isArray((s as { turns?: unknown }).turns) ? (s.turns as unknown as { index: number; ops?: unknown[] }[]) : [];
+      const t = turns.find((x) => x.index === turnIndex);
+      if (t === undefined) return undefined;
+      const ops = Array.isArray(t.ops) ? t.ops : [];
+      // eslint-disable-next-line functional/no-loop-statements
+      for (let i = ops.length - 1; i >= 0; i--) {
+        const o = ops[i] as { opId?: string; kind?: string } | undefined;
+        if (o !== undefined && o.kind === 'llm' && typeof o.opId === 'string' && o.opId.length > 0) return o.opId;
+      }
+    } catch (e) {
+      warn(`getLastLlmOpIdForTurn failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    return undefined;
+  }
   
   private persistSessionSnapshot(reason?: string): void {
     try {
@@ -182,6 +205,17 @@ export class AIAgentSession {
 
     // Hierarchical operation tree (Option C)
     this.opTree = new SessionTreeBuilder({ traceId: this.txnId, agentId: sessionConfig.agentId, callPath: this.callPath });
+    // Begin system preflight turn (turn 0) and log init
+    try {
+      if (!this.systemTurnBegan) {
+        this.opTree.beginTurn(0, { system: true, label: 'init' });
+        this.systemTurnBegan = true;
+      }
+      const sysInitOp = this.opTree.beginOp(0, 'system', { label: 'init' });
+      this.log({ timestamp: Date.now(), severity: 'VRB', turn: 0, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'agent:init', fatal: false, message: 'session initialization' }, { opId: sysInitOp });
+      this.opTree.endOp(sysInitOp, 'ok');
+      this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession());
+    } catch (e) { warn(`system init logging failed: ${e instanceof Error ? e.message : String(e)}`); }
 
     // Tools orchestrator (MCP + REST + Internal + Subagents)
     const orch = new ToolsOrchestrator({
@@ -190,8 +224,8 @@ export class AIAgentSession {
       maxConcurrentTools: sessionConfig.maxConcurrentTools,
       parallelToolCalls: sessionConfig.parallelToolCalls,
       traceTools: sessionConfig.traceMCP === true,
-    }, this.opTree, (tree: SessionNode) => { try { this.sessionConfig.callbacks?.onOpTree?.(tree); } catch (e) { warn(`onOpTree callback failed: ${e instanceof Error ? e.message : String(e)}`); } }, sessionConfig.callbacks?.onLog, sessionConfig.callbacks?.onAccounting);
-    orch.register(new MCPProvider('mcp', sessionConfig.config.mcpServers, { trace: sessionConfig.traceMCP, verbose: sessionConfig.verbose, requestTimeoutMs: sessionConfig.toolTimeout, onLog: (e) => { try { this.addLog(this.logs, e); } catch (err) { warn(`addLog failed: ${err instanceof Error ? err.message : String(err)}`); } } }));
+    }, this.opTree, (tree: SessionNode) => { try { this.sessionConfig.callbacks?.onOpTree?.(tree); } catch (e) { warn(`onOpTree callback failed: ${e instanceof Error ? e.message : String(e)}`); } }, (entry, opts) => { this.log(entry, opts); }, sessionConfig.callbacks?.onAccounting);
+    orch.register(new MCPProvider('mcp', sessionConfig.config.mcpServers, { trace: sessionConfig.traceMCP, verbose: sessionConfig.verbose, requestTimeoutMs: sessionConfig.toolTimeout, onLog: (e) => { this.log(e); } }));
     // Build selected REST tools by frontmatter selection
     if (this.sessionConfig.config.restTools !== undefined) {
       const selected: Record<string, RestToolConfig> = {};
@@ -230,7 +264,7 @@ export class AIAgentSession {
               bold: true,
               message: noteMsg,
             };
-            this.addLog(this.logs, entry);
+            this.log(entry);
           }
         },
         setTitle: (title: string, emoji?: string) => {
@@ -249,7 +283,7 @@ export class AIAgentSession {
             bold: true,
             message: (typeof emoji === 'string' && emoji.length > 0) ? `${emoji} ${clean}` : clean,
           };
-          this.addLog(this.logs, entry);
+          this.log(entry);
         },
         setFinalReport: (p) => { this.finalReport = { status: p.status, format: p.format as 'json'|'markdown'|'markdown+mermaid'|'slack-block-kit'|'tty'|'pipe'|'sub-agent'|'text', content: p.content, content_json: p.content_json, metadata: p.metadata, ts: Date.now() }; },
         orchestrator: orch,
@@ -259,7 +293,7 @@ export class AIAgentSession {
     }
     if (this.subAgents !== undefined) {
       const subAgents = this.subAgents;
-      const execFn = async (name: string, args: Record<string, unknown>, opts?: { onChildOpTree?: (tree: SessionNode) => void }) => {
+      const execFn = async (name: string, args: Record<string, unknown>, opts?: { onChildOpTree?: (tree: SessionNode) => void; parentOpPath?: string }) => {
         const exec = await subAgents.execute(name, args, {
           config: this.sessionConfig.config,
           callbacks: this.sessionConfig.callbacks,
@@ -281,7 +315,7 @@ export class AIAgentSession {
           stopRef: this.stopRef,
           trace: { originId: this.originTxnId, parentId: this.txnId, callPath: `${this.callPath ?? ''}->${name}` },
           onChildOpTree: opts?.onChildOpTree
-        });
+        }, opts);
         // Keep child conversation list (may be reported in results for compatibility)
         this.childConversations.push({ agentId: exec.child.toolName, toolName: exec.child.toolName, promptPath: exec.child.promptPath, conversation: exec.conversation, trace: exec.trace });
         try { this.persistSessionSnapshot('subagent_finish'); } catch (e) { warn(`persist subagent snapshot failed: ${e instanceof Error ? e.message : String(e)}`); }
@@ -293,6 +327,36 @@ export class AIAgentSession {
     // Populate mapping now (before warmup) so hasTool() sees all registered providers
     void orch.listTools();
     this.toolsOrchestrator = orch;
+    // Preflight: billing ledger writability check (if configured)
+    try {
+      const configuredLedger = this.sessionConfig.config.persistence?.billingFile
+        ?? ((): string | undefined => {
+          const home = process.env.HOME ?? process.env.USERPROFILE ?? '';
+          if (!home) return undefined;
+          const baseDir = path.join(home, '.ai-agent');
+          try { fs.mkdirSync(baseDir, { recursive: true }); } catch (e) { warn(`failed to create base dir '${baseDir}': ${e instanceof Error ? e.message : String(e)}`); }
+          return path.join(baseDir, 'accounting.jsonl');
+        })();
+      if (typeof configuredLedger === 'string' && configuredLedger.length > 0) {
+        const dir = path.dirname(configuredLedger);
+        let ok = false;
+        try {
+          fs.mkdirSync(dir, { recursive: true });
+          const tmp = path.join(dir, `.wcheck-${String(process.pid)}-${String(Date.now())}`);
+          fs.writeFileSync(tmp, 'x');
+          fs.unlinkSync(tmp);
+          ok = true;
+        } catch {
+          ok = false;
+        }
+        if (!ok) {
+          const op = this.opTree.beginOp(0, 'system', { label: 'preflight' });
+          this.log({ timestamp: Date.now(), severity: 'WRN', turn: 0, subturn: 0, direction: 'response', type: 'tool', remoteIdentifier: 'agent:billing', fatal: false, message: `billing ledger not writable: ${configuredLedger}` }, { opId: op });
+          this.opTree.endOp(op, 'ok');
+          this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession());
+        }
+      }
+    } catch (e) { warn(`preflight billing check failed: ${e instanceof Error ? e.message : String(e)}`); }
 
 
     // Apply an initial session title without consuming a tool turn (side-channel)
@@ -312,7 +376,7 @@ export class AIAgentSession {
           bold: true,
           message: t,
         };
-        this.addLog(this.logs, entry);
+        this.log(entry);
       }
     } catch (e) { warn(`initialTitle handling failed: ${e instanceof Error ? e.message : String(e)}`); }
   }
@@ -384,8 +448,7 @@ export class AIAgentSession {
   private logExit(
     exitCode: ExitCode,
     reason: string,
-    turn: number,
-    logs: LogEntry[]
+    turn: number
   ): void {
     const logEntry: LogEntry = {
       timestamp: Date.now(),
@@ -403,11 +466,16 @@ export class AIAgentSession {
       parentTxnId: this.parentTxnId,
       originTxnId: this.originTxnId
     };
-    this.addLog(logs, logEntry);
+    this.log(logEntry);
   }
 
   // Centralized helper to ensure all logs carry trace fields
-  private addLog(logs: LogEntry[], entry: LogEntry): void {
+  // Public unified logger used across the codebase
+  private log(entry: LogEntry, opts?: { opId?: string }): void {
+    this.addLog(this.logs, entry, opts);
+  }
+
+  private addLog(logs: LogEntry[], entry: LogEntry, opts?: { opId?: string }): void {
     const turnNum = typeof entry.turn === 'number' ? entry.turn : 0;
     const planned = this.plannedSubturns.get(turnNum);
     const enriched: LogEntry = {
@@ -421,18 +489,36 @@ export class AIAgentSession {
       ...entry,
     };
     logs.push(enriched);
+    // Anchor log to opTree when an opId is known, else best-effort for LLM logs
+    try {
+      const explicitOp = opts?.opId;
+      if (typeof explicitOp === 'string' && explicitOp.length > 0) {
+        this.opTree.appendLog(explicitOp, enriched);
+        this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession());
+      } else if (enriched.type === 'llm') {
+        const active = this.currentLlmOpId;
+        const targetOp = (typeof active === 'string' && active.length > 0)
+          ? active
+          : this.getLastLlmOpIdForTurn(typeof enriched.turn === 'number' ? enriched.turn : this.currentTurn);
+        if (typeof targetOp === 'string' && targetOp.length > 0) {
+          this.opTree.appendLog(targetOp, enriched);
+          this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession());
+        }
+      }
+    } catch (e) { warn(`addLog opTree anchor failed: ${e instanceof Error ? e.message : String(e)}`); }
+    // Single place try/catch for external sinks
     try { this.sessionConfig.callbacks?.onLog?.(enriched); } catch (e) { warn(`onLog callback failed: ${e instanceof Error ? e.message : String(e)}`); }
   }
 
   // Relay for logs originating outside AIAgentSession (LLM/MCP internals)
   recordExternalLog(entry: LogEntry): void {
-    try {
-      if (entry.type === 'llm' && typeof this.currentLlmOpId === 'string' && this.currentLlmOpId.length > 0) {
-        this.opTree.appendLog(this.currentLlmOpId, entry);
-        this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession());
-      }
-    } catch (e) { warn(`recordExternalLog opTree append failed: ${e instanceof Error ? e.message : String(e)}`); }
-    try { this.sessionConfig.callbacks?.onLog?.(entry); } catch (e) { warn(`onLog callback failed: ${e instanceof Error ? e.message : String(e)}`); }
+    // Delegate to unified logger with the active LLM opId when present
+    let opId: string | undefined;
+    if (entry.type === 'llm') {
+      const cid = this.currentLlmOpId;
+      if (typeof cid === 'string' && cid.length > 0) opId = cid;
+    }
+    this.log(entry, (typeof opId === 'string' && opId.length > 0) ? { opId } : undefined);
   }
 
   // Optional: expose a snapshot for progress UIs or web monitoring
@@ -481,7 +567,7 @@ export class AIAgentSession {
         fatal: false,
         message: `response exceeded max size: ${String(sizeBytes)} bytes > limit ${String(limitBytes)} bytes (truncated)`
       };
-      this.addLog(logs, warn);
+      this.log(warn);
     } catch { /* ignore logging errors */ }
     this.centralSizeCapHits += 1;
     return truncateUtf8WithNotice(result, limitBytes, sizeBytes);
@@ -554,7 +640,7 @@ export class AIAgentSession {
           fatal: false,
           message: JSON.stringify(settings),
         };
-        this.addLog(currentLogs, entry);
+        this.log(entry);
 
         // Emit a concise concurrency hint for quick visibility
         const cap = Math.max(1, this.sessionConfig.maxConcurrentTools ?? 1);
@@ -570,7 +656,7 @@ export class AIAgentSession {
           fatal: false,
           message: `tool concurrency: cap=${String(effectiveCap)} (parallelToolCalls=${String(this.sessionConfig.parallelToolCalls === true)}, maxConcurrentTools=${String(this.sessionConfig.maxConcurrentTools)})`,
         };
-        this.addLog(currentLogs, concEntry);
+        this.log(concEntry);
       }
       // MCP servers initialize lazily via provider; no explicit init here
 
@@ -592,7 +678,7 @@ export class AIAgentSession {
           fatal: false,
           message: `tools: mcp=${String(mcpToolNames.length)} [${mcpToolNames.join(', ')}]; rest=${String(restToolNames.length)} [${restToolNames.join(', ')}]; subagents=${String(subAgentTools.length)} [${subAgentTools.join(', ')}]`
         };
-        this.addLog(currentLogs, banner);
+        this.log(banner);
       } catch (e) { warn(`tools banner emit failed: ${e instanceof Error ? e.message : String(e)}`); }
 
       // One-time pricing coverage warning for master + loaded sub-agents
@@ -632,7 +718,7 @@ export class AIAgentSession {
             fatal: false,
             message: `Missing pricing entries for ${String(missing.length)} model(s): ${missing.join(', ')}`
           };
-          this.addLog(currentLogs, warn);
+          this.log(warn);
         }
       } catch (e) { warn(`pricing coverage check failed: ${e instanceof Error ? e.message : String(e)}`); }
 
@@ -646,6 +732,7 @@ export class AIAgentSession {
       // Apply ${FORMAT} replacement first, then expand variables
       // Safety: strip any shebang/frontmatter from system prompt to avoid leaking YAML to the LLM
       const sysBody = extractBodyWithoutFrontmatter(this.sessionConfig.systemPrompt);
+      // Inject plain format description only where ${FORMAT} or {{FORMAT}} exists; do not prepend extra text
       const withFormat = applyFormat(sysBody, fmtDesc);
       const vars = { ...buildPromptVars(), MAX_TURNS: String(this.sessionConfig.maxTurns ?? 10) };
       const systemExpanded = expandVars(withFormat, vars);
@@ -670,7 +757,7 @@ export class AIAgentSession {
             bold: true,
             message: `${ctx}: ${userExpanded}`,
           };
-          this.addLog(currentLogs, entry);
+          this.log(entry);
         }
           } catch (e) { warn(`startup verbose log failed: ${e instanceof Error ? e.message : String(e)}`); }
 
@@ -716,7 +803,16 @@ export class AIAgentSession {
         opTree: (() => { try { return this.opTree.getSession(); } catch { return undefined; } })(),
       } as AIAgentResult;
 
-      try { this.opTree.endSession(result.success, result.error); } catch (e) { warn(`endSession failed: ${e instanceof Error ? e.message : String(e)}`); }
+      try {
+        // System finalization log
+        if (!this.systemTurnBegan) { this.opTree.beginTurn(0, { system: true, label: 'init' }); this.systemTurnBegan = true; }
+        const finOp = this.opTree.beginOp(0, 'system', { label: 'fin' });
+        this.log({ timestamp: Date.now(), severity: 'VRB', turn: 0, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'agent:fin', fatal: false, message: 'session finalization' }, { opId: finOp });
+        this.opTree.endOp(finOp, 'ok');
+        // End system turn
+        this.opTree.endTurn(0);
+        this.opTree.endSession(result.success, result.error);
+      } catch (e) { warn(`endSession failed: ${e instanceof Error ? e.message : String(e)}`); }
       // Phase B/C: persist final session and accounting ledger
       try {
         this.persistSessionSnapshot('final');
@@ -748,15 +844,10 @@ export class AIAgentSession {
         fatal: true,
         message: `AI Agent failed: ${message}`
       };
-      this.addLog(currentLogs, logEntry);
+      this.log(logEntry);
       
       // Log exit for uncaught exception
-      this.logExit(
-        'EXIT-UNCAUGHT-EXCEPTION',
-        `Uncaught exception: ${message}`,
-        currentTurn,
-        currentLogs
-      );
+      this.logExit('EXIT-UNCAUGHT-EXCEPTION', `Uncaught exception: ${message}`, currentTurn);
 
       // Emit FIN summary even on failure
       this.emitFinalSummary(currentLogs, currentAccounting);
@@ -768,7 +859,14 @@ export class AIAgentSession {
         logs: flatFail.logs,
         accounting: flatFail.accounting
       } as AIAgentResult;
-      try { this.opTree.endSession(false, message); } catch (e) { warn(`endSession failed: ${e instanceof Error ? e.message : String(e)}`); }
+      try {
+        if (!this.systemTurnBegan) { this.opTree.beginTurn(0, { system: true, label: 'init' }); this.systemTurnBegan = true; }
+        const finOp = this.opTree.beginOp(0, 'system', { label: 'fin' });
+        this.log({ timestamp: Date.now(), severity: 'VRB', turn: 0, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'agent:fin', fatal: false, message: `session finalization (error)` }, { opId: finOp });
+        this.opTree.endOp(finOp, 'ok');
+        this.opTree.endTurn(0);
+        this.opTree.endSession(false, message);
+      } catch (e) { warn(`endSession failed: ${e instanceof Error ? e.message : String(e)}`); }
       return failShape;
     } finally {
       await this.toolsOrchestrator?.cleanup();
@@ -800,13 +898,27 @@ export class AIAgentSession {
       if (this.canceled) {
         const errMsg = 'canceled';
         this.emitFinalSummary(logs, accounting);
-      try { this.opTree.endSession(false, errMsg); } catch (e) { warn(`endSession failed: ${e instanceof Error ? e.message : String(e)}`); }
+      try {
+        if (!this.systemTurnBegan) { this.opTree.beginTurn(0, { system: true, label: 'init' }); this.systemTurnBegan = true; }
+        const finOp = this.opTree.beginOp(0, 'system', { label: 'fin' });
+        this.log({ timestamp: Date.now(), severity: 'VRB', turn: 0, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'agent:fin', fatal: false, message: `session finalization (uncaught)` }, { opId: finOp });
+        this.opTree.endOp(finOp, 'ok');
+        this.opTree.endTurn(0);
+        this.opTree.endSession(false, errMsg);
+      } catch (e) { warn(`endSession failed: ${e instanceof Error ? e.message : String(e)}`); }
         return { success: false, error: errMsg, conversation, logs, accounting };
       }
       if (this.stopRef?.stopping === true) {
         // Graceful stop: do not start further turns
         this.emitFinalSummary(logs, accounting);
-      try { this.opTree.endSession(true); } catch (e) { warn(`endSession failed: ${e instanceof Error ? e.message : String(e)}`); }
+      try {
+        if (!this.systemTurnBegan) { this.opTree.beginTurn(0, { system: true, label: 'init' }); this.systemTurnBegan = true; }
+        const finOp = this.opTree.beginOp(0, 'system', { label: 'fin' });
+        this.log({ timestamp: Date.now(), severity: 'VRB', turn: 0, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'agent:fin', fatal: false, message: 'session finalization' }, { opId: finOp });
+        this.opTree.endOp(finOp, 'ok');
+        this.opTree.endTurn(0);
+        this.opTree.endSession(true);
+      } catch (e) { warn(`endSession failed: ${e instanceof Error ? e.message : String(e)}`); }
         return { success: true, conversation, logs, accounting } as AIAgentResult;
       }
       try {
@@ -849,7 +961,7 @@ export class AIAgentSession {
               bold: true,
               message: `${ctx}: ${promptText}`,
             };
-            this.addLog(logs, entry);
+            this.log(entry);
           } catch (e) { warn(`verbose log failed: ${e instanceof Error ? e.message : String(e)}`); }
           this.masterLlmStartLogged = true;
         }
@@ -883,7 +995,7 @@ export class AIAgentSession {
                 fatal: false,
                 message: 'Final turn detected: restricting tools to `agent__final_report` and injecting finalization instruction.'
               };
-              this.addLog(logs, warn);
+              this.log(warn);
               finalTurnWarnLogged = true;
             }
 
@@ -939,7 +1051,7 @@ export class AIAgentSession {
                       fatal: false,
                       message: `Unknown tool requested (not executed): ${req}`
                     };
-                    this.addLog(logs, warn);
+                    this.log(warn);
                   }
                 });
               }
@@ -1032,7 +1144,7 @@ export class AIAgentSession {
               fatal: false,
               message: 'Synthetic retry: assistant returned content without tool calls and without final_report.'
             };
-            this.addLog(logs, warnEntry);
+            this.log(warnEntry);
             lastError = 'invalid_response: content_without_tools_or_final';
             // do not append these messages; try next provider/model in same turn
             continue;
@@ -1074,7 +1186,7 @@ export class AIAgentSession {
                     fatal: false,
                     message: `final_report JSON does not match schema: ${errs}`
                   };
-                  this.addLog(logs, warn);
+                  this.log(warn);
                 }
               } catch (e) {
                 const warn: LogEntry = {
@@ -1088,7 +1200,7 @@ export class AIAgentSession {
                   fatal: false,
                   message: `AJV validation failed: ${e instanceof Error ? e.message : String(e)}`
                 };
-                this.addLog(logs, warn);
+                this.log(warn);
               }
             }
           } else {
@@ -1096,12 +1208,7 @@ export class AIAgentSession {
           }
 
           // Log successful exit
-          this.logExit(
-            'EXIT-FINAL-ANSWER',
-            'Final report received (agent__final_report), session complete',
-            currentTurn,
-            logs
-          );
+        this.logExit('EXIT-FINAL-ANSWER', 'Final report received (agent__final_report), session complete', currentTurn);
 
           // Emit FIN summary log entry
           this.emitFinalSummary(logs, accounting);
@@ -1142,7 +1249,7 @@ export class AIAgentSession {
                   fatal: false,
                   message: `Turn result: hasToolCalls=${hasToolCallsStr}, hasToolResults=${hasToolResultsStr}, finalAnswer=${finalAnswerStr}, hasReasoning=${hasReasoningStr}, hasContent=${hasContentStr}, response length=${responseLenStr}, messages=${messagesLenStr}`
                 };
-                this.addLog(logs, debugEntry);
+                this.log(debugEntry);
                 
                 // Debug: show the actual messages content
                 if (process.env.DEBUG === 'true') {
@@ -1202,7 +1309,7 @@ export class AIAgentSession {
                   fatal: false,
                   message: 'Empty response without tools; retrying with next provider/model in this turn.'
                 };
-                this.addLog(logs, warnEntry);
+                this.log(warnEntry);
                 this.llmSyntheticFailures++;
                 lastError = 'invalid_response: empty_without_tools';
                 // do not mark turnSuccessful; continue retry loop
@@ -1233,7 +1340,7 @@ export class AIAgentSession {
                     fatal: false,
                     message: 'Final turn did not produce final_report; retrying with next provider/model in this turn.'
                   };
-                  this.addLog(logs, warnEntry);
+                  this.log(warnEntry);
                   // Continue attempts loop (do not mark successful)
                   continue;
                 }
@@ -1283,12 +1390,7 @@ export class AIAgentSession {
         
         const reason = `No LLM response after ${String(maxRetries)} retries across ${String(pairs.length)} provider/model pairs: ${lastError ?? 'All targets failed'}`;
         
-        this.logExit(
-          exitCode,
-          reason,
-          currentTurn,
-          logs
-        );
+        this.logExit(exitCode, reason, currentTurn);
         // Emit FIN summary even on failure
         this.emitFinalSummary(logs, accounting);
         return {
@@ -1320,8 +1422,7 @@ export class AIAgentSession {
     this.logExit(
       'EXIT-MAX-TURNS-NO-RESPONSE',
       `Max turns (${String(maxTurns)}) reached without final response`,
-      currentTurn,
-      logs
+      currentTurn
     );
     // Emit FIN summary even on failure
     this.emitFinalSummary(logs, accounting);
@@ -1387,7 +1488,7 @@ export class AIAgentSession {
         fatal: false,
         message: msg,
       };
-      this.addLog(logs, fin);
+      this.log(fin);
 
       // MCP summary single line
       const toolEntries = accounting.filter((e): e is ToolAccountingEntry => e.type === 'tool');
@@ -1419,7 +1520,7 @@ export class AIAgentSession {
         fatal: false,
         message: `requests=${String(mcpRequests)}, failed=${String(mcpFailures)}, capped=${String(sizeCaps)}, bytes in=${String(totalToolCharsIn)} out=${String(totalToolCharsOut)}, providers/tools: ${toolPairsStr.length > 0 ? toolPairsStr : 'none'}`,
       };
-      this.addLog(logs, finMcp);
+      this.log(finMcp);
     } catch { /* swallow summary errors */ }
   }
 
@@ -1477,7 +1578,7 @@ export class AIAgentSession {
       if (subturnCounter > maxToolCallsPerTurn) {
         const msg = `Tool calls per turn exceeded: limit=${String(maxToolCallsPerTurn)}. Switch strategy: avoid further tool calls this turn; either summarize progress or call agent__final_report to conclude.`;
         const warn: LogEntry = { timestamp: Date.now(), severity: 'WRN', turn: currentTurn, subturn: subturnCounter, direction: 'response', type: 'tool', remoteIdentifier: 'agent:limits', fatal: false, message: msg };
-        this.addLog(logs, warn);
+        this.log(warn);
         throw new Error('tool_calls_per_turn_limit_exceeded');
       }
       // Orchestrator receives ctx turn/subturn per call
@@ -1508,7 +1609,7 @@ export class AIAgentSession {
         {
           const req = formatToolRequestCompact(toolName, parameters);
           const warn: LogEntry = { timestamp: Date.now(), severity: 'WRN', turn: currentTurn, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'assistant:tool', fatal: false, message: `Unknown tool requested: ${req}` };
-          this.addLog(logs, warn);
+          this.log(warn);
           throw new Error(`No server found for tool: ${effectiveToolName}`);
         }
       } catch (error) {
@@ -1570,7 +1671,7 @@ export class AIAgentSession {
               fatal: false,
               message: ''  // Header only, no content
             };
-            this.addLog(logs, thinkingHeader);
+            this.log(thinkingHeader);
             shownThinking = true;
             // Update tracking to prevent duplicate headers
             lastShownThinkingHeaderTurn = currentTurn;
@@ -1641,7 +1742,7 @@ export class AIAgentSession {
       // Warn once for invalid batch input
       try {
         const warn: LogEntry = { timestamp: Date.now(), severity: 'WRN', turn: currentTurn, subturn: 0, direction: RESP_DIR, type: LLM_TYPE, remoteIdentifier: BATCH_REMOTE_ID, fatal: false, message: 'Invalid batch input: each call requires id, tool, args' };
-        this.addLog(logs, warn);
+        this.log(warn);
       } catch (e) { warn(`LLM error log failed: ${e instanceof Error ? e.message : String(e)}`); }
       const latency = Date.now() - startTime;
       const accountingEntry: AccountingEntry = {
@@ -1936,8 +2037,11 @@ export class AIAgentSession {
             },
           });
         } else {
+          const formatDesc = (typeof desc === 'string' && desc.length > 0) ? desc : id;
+          const prepend = 'Use this field for your final report. Do NOT output anything else. Insert your final report in this field, formatted as required.';
           tools.push({
             name: 'agent__final_report',
+            // Keep tool-level description as before (no prepend)
             description: ('Finalize the task with a ' + id + ' report.' + suffix).trim(),
             inputSchema: {
               type: 'object',
@@ -1945,8 +2049,10 @@ export class AIAgentSession {
               required: ['status', 'format', 'content'],
               properties: {
                 status: common.status,
-                format: { type: 'string', const: id, description: desc },
-                content: { type: 'string', minLength: 1, description: desc },
+                // Do NOT prepend for the format field; it already describes the format itself
+                format: { type: 'string', const: id, description: formatDesc },
+                // Prepend ONLY for content to emphasize what must be produced; do NOT add the format again here
+                content: { type: 'string', minLength: 1, description: prepend },
                 metadata: common.metadata,
               },
             },
@@ -1963,6 +2069,7 @@ export class AIAgentSession {
     const FINISH_ONLY = '- Finish ONLY by calling `agent__final_report` exactly once.';
     const ARGS = '- Arguments:';
     const STATUS_LINE = '  - `status`: one of `success`, `failure`, `partial`.';
+    // No extra context lines here; schema carries any prepended guidance when needed
     lines.push('- Use tool `agent__append_notes` sparingly for brief housekeeping notes; it is not graded and does not count as progress.');
     const rf2: OutputFormatId = this.sessionConfig.outputFormat;
     const rdesc = this.resolvedFormatDescription;

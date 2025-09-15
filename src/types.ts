@@ -412,7 +412,11 @@ export interface ToolAccountingEntry extends BaseAccountingEntry {
 }
 
 // Tool executor function type
-type ToolExecutor = (toolName: string, parameters: Record<string, unknown>) => Promise<string>;
+type ToolExecutor = (
+  toolName: string,
+  parameters: Record<string, unknown>,
+  options?: { toolCallId?: string }
+) => Promise<string>;
 
 // LLM interfaces
 export interface TurnRequest {

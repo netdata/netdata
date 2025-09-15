@@ -1,7 +1,7 @@
 import type { ConversationMessage, AIAgentResult } from '../types.js';
 import { warn } from '../utils.js';
 import { SessionManager } from './session-manager.js';
-import { buildSnapshot, buildSnapshotFromOpTree, formatSlackStatus, buildStatusBlocks } from './status-aggregator.js';
+import { buildSnapshotFromOpTree, formatSlackStatus, buildStatusBlocks } from './status-aggregator.js';
 
 type SlackClient = any;
 
@@ -525,13 +525,10 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
         }
         // Post tiny stats footer as a separate small message (context)
         try {
-          const logs = sm.getLogs(runId);
-          const acc = sm.getAccounting(runId);
-          const snap = buildSnapshot(logs, acc, Date.now());
-          // Prefer opTree-based counts when available
-          const result2 = sm.getResult(runId);
+          // Use only opTree for structure and totals
           const opTree = sm.getOpTree(runId) as any | undefined;
-          const startedAt = (opTree && typeof opTree.startedAt === 'number') ? opTree.startedAt : (snap.runStartedAt ?? Date.now());
+          const snap = opTree ? buildSnapshotFromOpTree(opTree as any, Date.now()) : { lines: [], totals: { tokensIn: 0, tokensOut: 0, tokensCacheRead: 0, tokensCacheWrite: 0, toolsRun: 0 } } as any;
+          const startedAt = (opTree && typeof opTree.startedAt === 'number') ? opTree.startedAt : Date.now();
           const elapsedSec = Math.max(0, Math.round((Date.now() - startedAt) / 1000));
           const mm = Math.floor(elapsedSec / 60);
           const ss = elapsedSec % 60;
@@ -554,12 +551,7 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
             }
             return { tools, sessions };
           };
-          const agCounts = (() => {
-            const ot = (result2 as { opTree?: unknown })?.opTree;
-            if (!ot) return { tools: snap.totals.toolsRun, sessions: new Set(snap.lines.map((l) => l.agentId)).size };
-            const c = countFromOpTree(ot);
-            return { tools: c.tools, sessions: c.sessions };
-          })();
+          const agCounts = countFromOpTree(opTree as any);
           const footer = `${elapsedClock} tokens →:${fmtK(snap.totals.tokensIn)} ←:${fmtK(snap.totals.tokensOut)} c→:${fmtK(snap.totals.tokensCacheRead)} c←:${fmtK(snap.totals.tokensCacheWrite)} | cost: $${(snap.totals.costUsd ?? 0).toFixed(2)} | tools ${agCounts.tools} | agents ${agCounts.sessions}`;
           await client.chat.postMessage({ channel, thread_ts: ts, text: footer, blocks: [ { type: 'context', elements: [ { type: 'mrkdwn', text: footer } ] } ] });
         } catch (e3) { elog(`stats footer post failed: ${(e3 as Error).message}`); }
@@ -570,12 +562,9 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
         await client.chat.update({ channel, ts, text: finalText, blocks: [] });
         // Post tiny stats footer as a separate small message (context)
         try {
-          const logs = sessionManager.getLogs(runId);
-          const acc = sessionManager.getAccounting(runId);
-          const snap = buildSnapshot(logs, acc, Date.now());
-          const result2 = sessionManager.getResult(runId);
           const opTree = sessionManager.getOpTree(runId) as any | undefined;
-          const startedAt = (opTree && typeof opTree.startedAt === 'number') ? opTree.startedAt : (snap.runStartedAt ?? Date.now());
+          const snap = opTree ? buildSnapshotFromOpTree(opTree as any, Date.now()) : { lines: [], totals: { tokensIn: 0, tokensOut: 0, tokensCacheRead: 0, tokensCacheWrite: 0, toolsRun: 0 } } as any;
+          const startedAt = (opTree && typeof opTree.startedAt === 'number') ? opTree.startedAt : Date.now();
           const elapsedSec = Math.max(0, Math.round((Date.now() - startedAt) / 1000));
           const mm = Math.floor(elapsedSec / 60);
           const ss = elapsedSec % 60;
@@ -598,12 +587,7 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
             }
             return { tools, sessions };
           };
-          const agCounts = (() => {
-            const ot = (result2 as { opTree?: unknown })?.opTree;
-            if (!ot) return { tools: snap.totals.toolsRun, sessions: new Set(snap.lines.map((l) => l.agentId)).size };
-            const c = countFromOpTree(ot);
-            return { tools: c.tools, sessions: c.sessions };
-          })();
+          const agCounts = countFromOpTree(opTree as any);
           const footer = `${elapsedClock} tokens →:${fmtK(snap.totals.tokensIn)} ←:${fmtK(snap.totals.tokensOut)} c→:${fmtK(snap.totals.tokensCacheRead)} c←:${fmtK(snap.totals.tokensCacheWrite)} | cost: $${(snap.totals.costUsd ?? 0).toFixed(2)} | tools ${agCounts.tools} | agents ${agCounts.sessions}`;
           await client.chat.postMessage({ channel, thread_ts: ts, text: footer, blocks: [ { type: 'context', elements: [ { type: 'mrkdwn', text: footer } ] } ] });
         } catch (e3) { elog(`stats footer post failed: ${(e3 as Error).message}`); }
@@ -722,37 +706,14 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
         return { text: STOPPING_TEXT, blocks: [ { type: 'section', text: { type: 'mrkdwn', text: STOPPING_TEXT } } ] } as any;
       }
       const now = Date.now();
-          const maybeTree = activeSessions.getOpTree(runId);
-          const snap = (() => {
-            try {
-              if (maybeTree && typeof maybeTree === 'object') {
-                // Prefer structural lines from opTree for hierarchy and elapsed, but overlay live totals from accounting
-                const base = buildSnapshotFromOpTree(maybeTree as any, now);
-                try {
-              const logs = activeSessions.getLogs(runId);
-              const acc = activeSessions.getAccounting(runId);
-                  const live = buildSnapshot(logs, acc, now);
-              // Overlay totals (tokens, cost, toolsRun) with live values for up-to-date progress
-              base.totals = live.totals;
-              // Overlay titles per agent from live logs
-              const byAgentTitle = new Map<string, string>();
-              live.lines.forEach((ln: any) => { if (ln.title) byAgentTitle.set(ln.agentId, ln.title); });
-              (base.lines as any[]).forEach((ln: any) => { const t = byAgentTitle.get(ln.agentId); if (t) ln.title = t; });
-              // Heuristic fallback: if opTree shows only the master agent, try to merge in lines inferred from logs
-              if ((Array.isArray(base.lines) ? base.lines.length : 0) <= 1 && Array.isArray(live.lines) && live.lines.length > 0) {
-                const seen = new Set<string>((base.lines as any[]).map((l: any) => `${String(l.agentId)}|${String(l.callPath ?? '')}`));
-                live.lines.forEach((l: any) => {
-                  const key = `${String(l.agentId)}|${String(l.callPath ?? '')}`;
-                  if (!seen.has(key)) (base.lines as any[]).push(l);
-                });
-              }
-            } catch (e) { warn(`slack overlay failed: ${e instanceof Error ? e.message : String(e)}`); }
-            return base;
+      const maybeTree = activeSessions.getOpTree(runId);
+      const snap = (() => {
+        try {
+          if (maybeTree && typeof maybeTree === 'object') {
+            return buildSnapshotFromOpTree(maybeTree as any, now);
           }
         } catch (e) { warn(`slack progress update failed: ${e instanceof Error ? e.message : String(e)}`); }
-        const logs = activeSessions.getLogs(runId);
-        const acc = activeSessions.getAccounting(runId);
-        return buildSnapshot(logs, acc, now);
+        return { lines: [], totals: { tokensIn: 0, tokensOut: 0, tokensCacheRead: 0, tokensCacheWrite: 0, toolsRun: 0 } } as any;
       })();
       const text = formatSlackStatus(snap);
       const blocks = buildStatusBlocks(snap, (maybeTree as any)?.agentId, (maybeTree as any)?.startedAt);
@@ -764,7 +725,7 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
           const b = blocks[i];
           if (b && b.type === 'actions') { blocks.splice(i, 1); }
         }
-        const m2 = sessionManager.getRun(runId);
+        const m2 = activeSessions.getRun(runId);
         if (m2 && m2.status === 'running') {
           const footerIdx = (() => {
             for (let i = blocks.length - 1; i >= 0; i--) { if (blocks[i]?.type === 'context') return i; }
@@ -890,26 +851,10 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
         const snap = (() => {
           try {
             if (maybeTree && typeof maybeTree === 'object') {
-              const base = buildSnapshotFromOpTree(maybeTree as any, now);
-              try {
-                const logs = activeSessions.getLogs(runId);
-                const acc = activeSessions.getAccounting(runId);
-                const live = buildSnapshot(logs, acc, now);
-                base.totals = live.totals;
-                const byAgentTitle = new Map<string, string>();
-                live.lines.forEach((ln: any) => { if (ln.title) byAgentTitle.set(ln.agentId, ln.title); });
-                (base.lines as any[]).forEach((ln: any) => { const t = byAgentTitle.get(ln.agentId); if (t) ln.title = t; });
-                if ((Array.isArray(base.lines) ? base.lines.length : 0) <= 1 && Array.isArray(live.lines) && live.lines.length > 0) {
-                  const seen = new Set<string>((base.lines as any[]).map((l: any) => `${String(l.agentId)}|${String(l.callPath ?? '')}`));
-                  live.lines.forEach((l: any) => { const key = `${String(l.agentId)}|${String(l.callPath ?? '')}`; if (!seen.has(key)) (base.lines as any[]).push(l); });
-                }
-              } catch (e) { warn(`slack overlay failed: ${e instanceof Error ? e.message : String(e)}`); }
-              return base;
+              return buildSnapshotFromOpTree(maybeTree as any, now);
             }
           } catch (e) { warn(`slack follow-up update failed: ${e instanceof Error ? e.message : String(e)}`); }
-          const logs = activeSessions.getLogs(runId);
-          const acc = activeSessions.getAccounting(runId);
-          return buildSnapshot(logs, acc, now);
+          return { lines: [], totals: { tokensIn: 0, tokensOut: 0, tokensCacheRead: 0, tokensCacheWrite: 0, toolsRun: 0 } } as any;
         })();
         const text2 = formatSlackStatus(snap);
         const blocks = buildStatusBlocks(snap, (maybeTree as any)?.agentId, (maybeTree as any)?.startedAt);

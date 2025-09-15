@@ -18,9 +18,10 @@ export class ToolsOrchestrator {
 
   constructor(
     private readonly opts: { toolTimeout?: number; toolResponseMaxBytes?: number; maxConcurrentTools?: number; parallelToolCalls?: boolean; traceTools?: boolean },
-    private readonly opTree?: SessionTreeBuilder,
-    private readonly onOpTreeSnapshot?: (tree: SessionNode) => void,
-    private readonly onLog?: (entry: LogEntry) => void,
+    private readonly opTree: SessionTreeBuilder,
+    private readonly onOpTreeSnapshot: (tree: SessionNode) => void,
+    // Unified logger: session-level log() (must never throw)
+    private readonly onLog: (entry: LogEntry, opts?: { opId?: string }) => void,
     private readonly onAccounting?: (entry: AccountingEntry) => void,
   ) {}
 
@@ -113,11 +114,11 @@ export class ToolsOrchestrator {
     // Internal agent-scoped tools (provider.id === 'agent') should remain regular 'tool' ops to avoid ghost sessions.
     const opKind = (kind === 'agent' && provider.id === 'subagent') ? 'session' : 'tool';
     const opId = (() => {
-      try { return this.opTree?.beginOp(ctx.turn, opKind, { name: effective, provider: provider.id, kind }); } catch { return undefined; }
+      try { return this.opTree.beginOp(ctx.turn, opKind, { name: effective, provider: provider.id, kind }); } catch { return undefined; }
     })();
     // For sub-agent session ops, attach a placeholder child session immediately so live views can show it
     try {
-      if (opKind === 'session' && this.opTree !== undefined && opId !== undefined) {
+      if (opKind === 'session' && opId !== undefined) {
         const parentSession = this.opTree.getSession();
         const childName = effective.startsWith('agent__') ? effective.slice('agent__'.length) : effective;
         const childCallPathBase = (typeof parentSession.callPath === 'string' && parentSession.callPath.length > 0)
@@ -132,7 +133,7 @@ export class ToolsOrchestrator {
           turns: [],
         };
         this.opTree.attachChildSession(opId, stub);
-        if (typeof this.onOpTreeSnapshot === 'function') this.onOpTreeSnapshot(this.opTree.getSession());
+        this.onOpTreeSnapshot(this.opTree.getSession());
       }
     } catch (e) { warn(`unknown tool '${name}' after refresh: ${e instanceof Error ? e.message : String(e)}`); }
     const requestMsg = formatToolRequestCompact(effective, args);
@@ -149,12 +150,12 @@ export class ToolsOrchestrator {
       fatal: false,
       message: requestMsg,
     };
-    // Attach to opTree logs and normalized request
-      try { if (opId !== undefined) this.opTree?.appendLog(opId, reqLog); } catch (e) { warn(`tools reqLog append failed: ${e instanceof Error ? e.message : String(e)}`); }
+    // Single emission point via session logger
+    this.onLog(reqLog, { opId });
     try {
       if (opId !== undefined) {
         const argSize = (() => { try { return JSON.stringify(args).length; } catch { return undefined; } })();
-        this.opTree?.setRequest(opId, { kind: 'tool', payload: args, size: argSize });
+        this.opTree.setRequest(opId, { kind: 'tool', payload: args, size: argSize });
       }
     } catch (e) { warn(`setRequest failed: ${e instanceof Error ? e.message : String(e)}`); }
     // Optional full request trace (args JSON)
@@ -172,7 +173,7 @@ export class ToolsOrchestrator {
         fatal: false,
         message: `REQUEST ${effective}\n${fullArgs}`,
       };
-      try { if (opId !== undefined) this.opTree?.appendLog(opId, traceReq); } catch (e) { warn(`trace req append failed: ${e instanceof Error ? e.message : String(e)}`); }
+      this.onLog(traceReq, { opId });
     }
 
     const start = Date.now();
@@ -246,17 +247,16 @@ export class ToolsOrchestrator {
       // Do not apply parent-level withTimeout to sub-agents; they manage their own timing
       const isSubAgent = (kind === 'agent' && provider.id === 'subagent');
       if (isSubAgent) {
+        const parentOpPath = (() => { try { return (opId !== undefined) ? this.opTree.getOpPath(opId) : undefined; } catch { return undefined; } })();
         const onChildOpTree = (tree: SessionNode) => {
           try {
             if (opId !== undefined) {
-              this.opTree?.attachChildSession(opId, tree);
-              if (typeof this.onOpTreeSnapshot === 'function' && this.opTree !== undefined) {
-                this.onOpTreeSnapshot(this.opTree.getSession());
-              }
+              this.opTree.attachChildSession(opId, tree);
+              this.onOpTreeSnapshot(this.opTree.getSession());
             }
           } catch (e) { warn(`onChildOpTree snapshot failed: ${e instanceof Error ? e.message : String(e)}`); }
         };
-        exec = await provider.execute(effective, preparedArgs, { ...opts, timeoutMs: undefined, trace: this.opts.traceTools, onChildOpTree });
+        exec = await provider.execute(effective, preparedArgs, { ...opts, timeoutMs: undefined, trace: this.opts.traceTools, onChildOpTree, parentOpPath });
       } else {
         exec = await withTimeout(
           provider.execute(effective, preparedArgs, { ...opts, timeoutMs: opts?.timeoutMs ?? this.opts.toolTimeout, trace: this.opts.traceTools }),
@@ -289,7 +289,7 @@ export class ToolsOrchestrator {
           fatal: false,
           message: `ERROR ${effective}\n${msg}`,
         };
-      try { if (opId !== undefined) this.opTree?.appendLog(opId, traceErr); } catch (e) { warn(`tools traceErr append failed: ${e instanceof Error ? e.message : String(e)}`); }
+      this.onLog(traceErr, { opId });
       }
       const errLog: LogEntry = {
         timestamp: Date.now(),
@@ -303,16 +303,16 @@ export class ToolsOrchestrator {
         fatal: false,
         message: `error ${name}: ${msg}`,
       };
-      try { if (opId !== undefined) this.opTree?.appendLog(opId, errLog); } catch (e) { warn(`tools errLog append failed: ${e instanceof Error ? e.message : String(e)}`); }
+      this.onLog(errLog, { opId });
       const acc: AccountingEntry = {
         type: 'tool', timestamp: start, status: 'failed', latency,
         mcpServer: provider.id, command: name, charactersIn, charactersOut: 0, error: msg,
       };
-      try { if (opId !== undefined) this.opTree?.appendAccounting(opId, acc); } catch (e) { warn(`tools accounting append failed: ${e instanceof Error ? e.message : String(e)}`); }
+      try { if (opId !== undefined) this.opTree.appendAccounting(opId, acc); } catch (e) { warn(`tools accounting append failed: ${e instanceof Error ? e.message : String(e)}`); }
       // Accounting is recorded in opTree op context only via attach; keep arrays via SessionManager callbacks
     try {
         if (opId !== undefined) {
-          this.opTree?.endOp(opId, 'failed', { latency, error: msg });
+          this.opTree.endOp(opId, 'failed', { latency, error: msg });
         }
       } catch (e) { warn(`tools endOp failed: ${e instanceof Error ? e.message : String(e)}`); }
       this.releaseSlot();
@@ -344,7 +344,7 @@ export class ToolsOrchestrator {
         fatal: false,
         message: `RESPONSE ${effective}\n${rawPayload}`,
       };
-      try { if (opId !== undefined) this.opTree?.appendLog(opId, traceRes); } catch (e) { warn(`tools traceRes append failed: ${e instanceof Error ? e.message : String(e)}`); }
+      this.onLog(traceRes, { opId });
     }
     const sizeBytes = Buffer.byteLength(raw, 'utf8');
     const limit = this.opts.toolResponseMaxBytes;
@@ -364,7 +364,7 @@ export class ToolsOrchestrator {
         fatal: false,
         message: `response exceeded max size: ${String(sizeBytes)} bytes > limit ${String(limit)} bytes (truncated)`
       };
-      try { if (opId !== undefined) this.opTree?.appendLog(opId, warnLog); } catch (e) { warn(`tools warn append failed: ${e instanceof Error ? e.message : String(e)}`); }
+      this.onLog(warnLog, { opId });
       result = truncateUtf8WithNotice(raw, limit, sizeBytes);
     }
 
@@ -383,10 +383,10 @@ export class ToolsOrchestrator {
       fatal: false,
       message: `ok ${effective}: ${String(result.length)} chars`,
     };
-    try { if (opId !== undefined) this.opTree?.appendLog(opId, resLog); } catch (e) { warn(`tools resLog append failed: ${e instanceof Error ? e.message : String(e)}`); }
+    this.onLog(resLog, { opId });
     try {
       if (opId !== undefined) {
-        this.opTree?.setResponse(opId, { payload: result.length > 0 ? result.slice(0, 4096) : '', size: Buffer.byteLength(result, 'utf8'), truncated: result.length > 4096 });
+        this.opTree.setResponse(opId, { payload: result.length > 0 ? result.slice(0, 4096) : '', size: Buffer.byteLength(result, 'utf8'), truncated: result.length > 4096 });
       }
     } catch (e) { warn(`tools setResponse failed: ${e instanceof Error ? e.message : String(e)}`); }
 
@@ -394,7 +394,7 @@ export class ToolsOrchestrator {
       type: 'tool', timestamp: start, status: 'ok', latency,
       mcpServer: providerLabel, command: name, charactersIn, charactersOut: result.length,
     };
-    try { if (opId !== undefined) this.opTree?.appendAccounting(opId, accOk); } catch (e) { warn(`tools accounting append failed: ${e instanceof Error ? e.message : String(e)}`); }
+    try { if (opId !== undefined) this.opTree.appendAccounting(opId, accOk); } catch (e) { warn(`tools accounting append failed: ${e instanceof Error ? e.message : String(e)}`); }
     // accounting will be attached under op
     // Optional: child accounting (from sub-agents)
     // Do NOT forward child accounting to the parent execution tree here.
@@ -409,15 +409,13 @@ export class ToolsOrchestrator {
           if (opKind === 'session') {
             const maybe = (safeExec.extras as { childOpTree?: SessionNode } | undefined)?.childOpTree;
             if (maybe !== undefined) {
-              this.opTree?.attachChildSession(opId, maybe);
+              this.opTree.attachChildSession(opId, maybe);
             }
           }
         } catch (e) { warn(`tools child attach failed: ${e instanceof Error ? e.message : String(e)}`); }
-        this.opTree?.endOp(opId, 'ok', { latency, size: result.length });
+        this.opTree.endOp(opId, 'ok', { latency, size: result.length });
         try {
-          if (typeof this.onOpTreeSnapshot === 'function' && this.opTree !== undefined) {
-            this.onOpTreeSnapshot(this.opTree.getSession());
-          }
+          this.onOpTreeSnapshot(this.opTree.getSession());
         } catch (e) { warn(`tools onOpTreeSnapshot failed: ${e instanceof Error ? e.message : String(e)}`); }
       }
     } catch (e) { warn(`tools finalize failed: ${e instanceof Error ? e.message : String(e)}`); }

@@ -123,7 +123,7 @@ function buildResolvedDefaultsHelp(): string {
     // Load configuration defaults (best effort) via layered resolver
     let configDefaults: NonNullable<Configuration['defaults']> = {};
     try {
-      const layers = discoverLayers({ configPath: undefined });
+      const layers = discoverLayers({ configPath: undefined, promptPath });
       configDefaults = resolveDefaults(layers);
     } catch {
       // ignore
@@ -223,7 +223,7 @@ function buildResolvedDefaultsHelp(): string {
     // Also show prompt/config locations for context
     if (promptPath !== undefined) lines.push('', `Prompt: ${promptPath}`);
     try {
-      const layers = discoverLayers({ configPath: undefined });
+      const layers = discoverLayers({ configPath: undefined, promptPath });
       lines.push('Config Files Resolution Order:');
       layers.forEach((ly, idx) => {
         const jExists = fs.existsSync(ly.jsonPath);
@@ -397,7 +397,11 @@ program
 
       // Probe layered config locations (verbose only)
       try {
-        const layers = discoverLayers({ configPath: cfgPath });
+        // Use system prompt path if it's a file, otherwise user prompt path
+        const promptPath = (systemPrompt !== '-' && fs.existsSync(systemPrompt) && fs.statSync(systemPrompt).isFile()) ? systemPrompt
+          : (userPrompt !== '-' && fs.existsSync(userPrompt) && fs.statSync(userPrompt).isFile()) ? userPrompt
+          : undefined;
+        const layers = discoverLayers({ configPath: cfgPath, promptPath });
         if (options.verbose === true) {
                     layers.forEach((ly) => {
             const jExists = fs.existsSync(ly.jsonPath);
@@ -696,7 +700,7 @@ function expandPrompt(str: string, vars: Record<string, string>): string {
 
 // Frontmatter helpers are imported from frontmatter.ts
 
-function createCallbacks(options: Record<string, unknown>, accountingFile?: string): AIAgentCallbacks {
+function createCallbacks(options: Record<string, unknown>, _accountingFile?: string): AIAgentCallbacks {
 
   // Helper for consistent coloring - MANDATORY in TTY according to DESIGN.md
   const colorize = (text: string, colorCode: string): string => {
@@ -747,14 +751,8 @@ function createCallbacks(options: Record<string, unknown>, accountingFile?: stri
       }
     },
     
-    onAccounting: (entry: AccountingEntry) => {
-      if (typeof accountingFile !== 'string' || accountingFile.length === 0) return;
-      try {
-        fs.appendFileSync(accountingFile, JSON.stringify(entry) + '\n', 'utf-8');
-      } catch (e) {
-        const message = colorize(`[warn] Failed to write accounting entry: ${e instanceof Error ? e.message : String(e)}`, '\x1b[33m');
-        process.stderr.write(`${message}\n`);
-      }
+    onAccounting: (_entry: AccountingEntry) => {
+      // No per-entry file writes from CLI; final ledger is written by ai-agent at session end.
     },
   };
 }

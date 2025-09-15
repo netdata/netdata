@@ -344,16 +344,16 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     };
   }
 
-  protected convertTools(tools: MCPTool[], toolExecutor: (toolName: string, parameters: Record<string, unknown>) => Promise<string>): ToolSet {
+  protected convertTools(tools: MCPTool[], toolExecutor: (toolName: string, parameters: Record<string, unknown>, options?: { toolCallId?: string }) => Promise<string>): ToolSet {
     return Object.fromEntries(
       tools.map(tool => [
         tool.name,
         {
           description: tool.description,
           inputSchema: jsonSchema(tool.inputSchema),
-          execute: async (args: unknown) => {
+          execute: async (args: unknown, opt?: { toolCallId?: string }) => {
             const parameters = args as Record<string, unknown>;
-            return await toolExecutor(tool.name, parameters);
+            return await toolExecutor(tool.name, parameters, { toolCallId: opt?.toolCallId });
           }
         }
       ])

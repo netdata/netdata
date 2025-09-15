@@ -13,6 +13,8 @@ export interface ToolExecuteOptions {
   trace?: boolean;
   // For sub-agents: stream live child opTree snapshots during execution
   onChildOpTree?: (tree: SessionNode) => void;
+  // Parent op path label (e.g., 1.2). Used to prefix child log entry.path for hierarchical greppability
+  parentOpPath?: string;
 }
 
 export interface ToolExecuteResult {

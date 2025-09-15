@@ -138,7 +138,7 @@ export async function startServer(agentPath: string, options?: { enableSlack?: b
     try { res.status(500).json({ error: 'internal_error', message }); } catch (e) { warn(`server JSON response failed: ${e instanceof Error ? e.message : String(e)}`); }
   };
   // Resolve slack/api with .ai-agent.env support (same paradigm as CLI)
-  const layers = discoverLayers({ configPath: undefined });
+  const layers = discoverLayers({ configPath: undefined, promptPath: agentPath });
   const mergeEnv = (a: Record<string, string> = {}, b: Record<string, string> = {}) => ({ ...b, ...a });
   const expandStrict = (obj: unknown, vars: Record<string, string>, section: string): unknown => {
     if (typeof obj === 'string') return obj.replace(/\$\{([^}]+)\}/g, (_m, n: string) => {

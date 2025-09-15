@@ -2,7 +2,7 @@ import type { AccountingEntry, LogEntry } from './types.js';
 
 import { warn } from './utils.js';
 
-type OperationKind = 'llm' | 'tool' | 'session';
+type OperationKind = 'llm' | 'tool' | 'session' | 'system';
 
 interface OperationNode {
   opId: string;
@@ -40,6 +40,8 @@ export interface SessionNode {
   success?: boolean;
   error?: string;
   attributes?: Record<string, unknown>;
+  // Aggregated totals recomputed after mutations
+  totals?: { tokensIn: number; tokensOut: number; tokensCacheRead: number; tokensCacheWrite: number; costUsd?: number; toolsRun: number };
   turns: TurnNode[];
 }
 
@@ -67,6 +69,23 @@ export class SessionTreeBuilder {
   getSession(): SessionNode { return this.session; }
 
   endSession(success: boolean, error?: string): void {
+    // Recompute totals and verify against current snapshot; log error if mismatch
+    const before = this.session.totals;
+    const recomputed = this.recomputeTotals();
+    const mismatch = (() => {
+      if (before === undefined) return false;
+      return before.tokensIn !== recomputed.tokensIn
+        || before.tokensOut !== recomputed.tokensOut
+        || before.tokensCacheRead !== recomputed.tokensCacheRead
+        || before.tokensCacheWrite !== recomputed.tokensCacheWrite
+        || (before.costUsd ?? 0) !== (recomputed.costUsd ?? 0)
+        || before.toolsRun !== recomputed.toolsRun;
+    })();
+    if (mismatch) {
+      try {
+        warn(`session-tree: accounting mismatch detected; snapshot=${JSON.stringify(before)} recomputed=${JSON.stringify(recomputed)}`);
+      } catch { /* ignore stringify errors */ }
+    }
     this.session.endedAt = Date.now();
     this.session.success = success;
     if (typeof error === 'string' && error.length > 0) this.session.error = error;
@@ -77,6 +96,7 @@ export class SessionTreeBuilder {
     const node: TurnNode = { id, index, startedAt: Date.now(), attributes, ops: [] };
     this.session.turns.push(node);
     this.turnIndex.set(index, node);
+    this.recomputeTotals();
     return id;
   }
 
@@ -86,6 +106,7 @@ export class SessionTreeBuilder {
       t.endedAt = Date.now();
       if (attributes !== undefined) t.attributes = { ...(t.attributes ?? {}), ...attributes };
     }
+    this.recomputeTotals();
   }
 
   beginOp(turnIndex: number, kind: OperationKind, attributes?: Record<string, unknown>): string {
@@ -94,12 +115,14 @@ export class SessionTreeBuilder {
     const node: OperationNode = { opId: id, kind, startedAt: Date.now(), attributes, logs: [], accounting: [] };
     if (t !== undefined) t.ops.push(node);
     this.opIndex.set(id, node);
+    this.recomputeTotals();
     return id;
   }
 
   attachChildSession(opId: string, child: SessionNode): void {
     const op = this.opIndex.get(opId);
     if (op !== undefined) op.childSession = child;
+    this.recomputeTotals();
   }
 
   appendLog(opId: string, log: LogEntry): void {
@@ -118,6 +141,7 @@ export class SessionTreeBuilder {
   appendAccounting(opId: string, acc: AccountingEntry): void {
     const op = this.opIndex.get(opId);
     if (op !== undefined) op.accounting.push(acc);
+    this.recomputeTotals();
   }
 
   // Compute a stable, bijective path label (e.g., 1.2 or 1.2.1.1) for a given opId
@@ -196,6 +220,7 @@ export class SessionTreeBuilder {
       op.status = status;
       if (attributes !== undefined) op.attributes = { ...(op.attributes ?? {}), ...attributes };
     }
+    this.recomputeTotals();
   }
 
   // Simple ASCII renderer
@@ -206,20 +231,65 @@ export class SessionTreeBuilder {
     const dur = (a?: number, b?: number): string => (typeof a === 'number' && typeof b === 'number') ? `${String(b - a)}ms` : '';
 
     lines.push(`SessionTree ${s.id}${(typeof s.traceId === 'string' && s.traceId.length > 0) ? ` trace=${s.traceId}` : ''}${(typeof s.agentId === 'string' && s.agentId.length > 0) ? ` agent=${s.agentId}` : ''}${(typeof s.callPath === 'string' && s.callPath.length > 0) ? ` callPath=${s.callPath}` : ''}`);
-    lines.push(`├─ started=${fmtTs(s.startedAt)}${(typeof s.endedAt === 'number') ? ` ended=${fmtTs(s.endedAt)} dur=${dur(s.startedAt, s.endedAt)}` : ''}${(typeof s.success === 'boolean') ? ` success=${String(s.success)}` : ''}${(typeof s.error === 'string' && s.error.length > 0) ? ` error=${s.error}` : ''}`);
+    const totals = s.totals;
+    const totalsStr = totals !== undefined
+      ? ` tokens in=${String(totals.tokensIn)} out=${String(totals.tokensOut)} cR=${String(totals.tokensCacheRead)} cW=${String(totals.tokensCacheWrite)} tools=${String(totals.toolsRun)} cost=$${(totals.costUsd ?? 0).toFixed(2)}`
+      : '';
+    lines.push(`├─ started=${fmtTs(s.startedAt)}${(typeof s.endedAt === 'number') ? ` ended=${fmtTs(s.endedAt)} dur=${dur(s.startedAt, s.endedAt)}` : ''}${(typeof s.success === 'boolean') ? ` success=${String(s.success)}` : ''}${(typeof s.error === 'string' && s.error.length > 0) ? ` error=${s.error}` : ''}${totalsStr ? ` | ${totalsStr}` : ''}`);
     lines.push(`├─ turns=${String(s.turns.length)}`);
     s.turns.forEach((t, ti) => {
       const tLast = ti === s.turns.length - 1;
       const tp = tLast ? '└─' : '├─';
       lines.push(`${tp} Turn#${String(t.index)} ${fmtTs(t.startedAt)}${(typeof t.endedAt === 'number') ? ` → ${fmtTs(t.endedAt)} (${dur(t.startedAt, t.endedAt)})` : ''}`);
+      // Show prompts summary when present
+      try {
+        const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
+        const attrsObj = isObj(t.attributes) ? t.attributes : undefined;
+        const hasPrompts = (v: Record<string, unknown>): v is Record<string, unknown> & { prompts?: unknown } => Object.prototype.hasOwnProperty.call(v, 'prompts');
+        const p0 = (attrsObj !== undefined && hasPrompts(attrsObj)) ? attrsObj.prompts : undefined;
+        const pr = (p0 !== undefined && p0 !== null && typeof p0 === 'object' && !Array.isArray(p0)) ? (p0 as { system?: string; user?: string }) : undefined;
+        const sys = pr?.system; const usr = pr?.user;
+        const trunc = (s?: string) => (typeof s === 'string' && s.length > 0) ? (s.length > 120 ? `${s.slice(0, 117)}...` : s) : undefined;
+        const sysLine = trunc(sys); const usrLine = trunc(usr);
+        const lpfx0 = tLast ? '   ' : '│  ';
+        if (sysLine !== undefined) lines.push(`${lpfx0}system: ${sysLine}`);
+        if (usrLine !== undefined) lines.push(`${lpfx0}user:   ${usrLine}`);
+      } catch { /* ignore */ }
       const ops = t.ops;
       ops.forEach((o, oi) => {
         const oLast = oi === ops.length - 1;
         const opfx = tLast ? (oLast ? '   └─' : '   ├─') : (oLast ? '│  └─' : '│  ├─');
         const adur = dur(o.startedAt, o.endedAt);
-        lines.push(`${opfx} ${o.kind.toUpperCase()} op=${o.opId} ${fmtTs(o.startedAt)}${(typeof o.endedAt === 'number') ? ` → ${fmtTs(o.endedAt)} (${adur})` : ''}${(typeof o.status === 'string') ? ` status=${o.status}` : ''}`);
+        const attrsRec = (() => {
+          const v = o.attributes as unknown;
+          return (v !== null && v !== undefined && typeof v === 'object' && !Array.isArray(v)) ? (v as Record<string, unknown>) : undefined;
+        })();
+        const prov = attrsRec?.provider;
+        const modelOrName = (attrsRec?.model ?? attrsRec?.name);
+        const meta = (() => {
+          const a: string[] = [];
+          if (typeof prov === 'string') a.push(prov);
+          if (typeof modelOrName === 'string') a.push(modelOrName);
+          return a.length > 0 ? ` [${a.join(':')}]` : '';
+        })();
+        lines.push(`${opfx} ${o.kind.toUpperCase()} op=${o.opId}${meta} ${fmtTs(o.startedAt)}${(typeof o.endedAt === 'number') ? ` → ${fmtTs(o.endedAt)} (${adur})` : ''}${(typeof o.status === 'string') ? ` status=${o.status}` : ''}`);
         const lpfx = tLast ? '      ' : '│     ';
         lines.push(`${lpfx}logs=${String(o.logs.length)} accounting=${String(o.accounting.length)}`);
+        // Show request/response previews when present
+        try {
+          if (o.request !== undefined) {
+            const rq = o.request.payload;
+            const txt = typeof rq === 'string' ? rq : JSON.stringify(rq);
+            const prev = txt.length > 200 ? `${txt.slice(0, 197)}...` : txt;
+            lines.push(`${lpfx}request: ${prev}`);
+          }
+          if (o.response !== undefined) {
+            const rp = o.response.payload;
+            const txt = typeof rp === 'string' ? rp : JSON.stringify(rp);
+            const prev = txt.length > 200 ? `${txt.slice(0, 197)}...` : txt;
+            lines.push(`${lpfx}response: ${prev}`);
+          }
+        } catch { /* ignore */ }
         if (o.childSession !== undefined) {
           lines.push(`${lpfx}child:`);
           // indent child tree
@@ -260,5 +330,41 @@ export class SessionTreeBuilder {
   // Helper to indent a multi-line ASCII block
   static indentAscii(block: string): string {
     return block.split('\n').map((l) => `   ${l}`).join('\n');
+  }
+
+  // Recompute and store aggregated totals on the session node
+  private recomputeTotals(): { tokensIn: number; tokensOut: number; tokensCacheRead: number; tokensCacheWrite: number; costUsd?: number; toolsRun: number } {
+    let tokensIn = 0; let tokensOut = 0; let tokensCacheRead = 0; let tokensCacheWrite = 0; let costUsd = 0; let toolsRun = 0;
+    const visit = (node: SessionNode): void => {
+      const turns = Array.isArray(node.turns) ? node.turns : [];
+      // eslint-disable-next-line functional/no-loop-statements
+      for (const t of turns) {
+        const ops = Array.isArray(t.ops) ? t.ops : [];
+        // eslint-disable-next-line functional/no-loop-statements
+        for (const o of ops) {
+          if (o.kind === 'tool') toolsRun += 1;
+          const acc = Array.isArray(o.accounting) ? o.accounting : [];
+          // eslint-disable-next-line functional/no-loop-statements
+          for (const a of acc) {
+            // Narrow via structural shape
+            const typ = (a as unknown as { type?: string }).type;
+            if (typ === 'llm') {
+              const tk = (a as unknown as { tokens?: { inputTokens?: number; outputTokens?: number; cacheReadInputTokens?: number; cacheWriteInputTokens?: number; cachedTokens?: number } }).tokens ?? {};
+              tokensIn += tk.inputTokens ?? 0;
+              tokensOut += tk.outputTokens ?? 0;
+              tokensCacheRead += tk.cacheReadInputTokens ?? tk.cachedTokens ?? 0;
+              tokensCacheWrite += tk.cacheWriteInputTokens ?? 0;
+              const c = (a as unknown as { costUsd?: number }).costUsd;
+              if (typeof c === 'number') costUsd += c;
+            }
+          }
+          if (o.kind === 'session' && o.childSession !== undefined) visit(o.childSession);
+        }
+      }
+    };
+    visit(this.session);
+    const totals = { tokensIn, tokensOut, tokensCacheRead, tokensCacheWrite, costUsd: costUsd > 0 ? Number(costUsd.toFixed(4)) : undefined, toolsRun };
+    this.session.totals = totals;
+    return totals;
   }
 }

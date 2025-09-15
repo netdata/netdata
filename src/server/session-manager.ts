@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 
-import type { AIAgentCallbacks, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry } from '../types.js';
+import type { AIAgentCallbacks, AIAgentResult, ConversationMessage, LogEntry } from '../types.js';
 import { warn } from '../utils.js';
 import type { RunKey, RunMeta } from './types.js';
 
@@ -10,8 +10,7 @@ export class SessionManager {
   private readonly runs = new Map<string, RunMeta>();
   private readonly results = new Map<string, AIAgentResult>();
   private readonly outputs = new Map<string, string>();
-  private readonly logs = new Map<string, LogEntry[]>();
-  private readonly accounting = new Map<string, AccountingEntry[]>();
+  // Deprecated: we no longer store flat logs/accounting; opTree is canonical
   private readonly opTrees = new Map<string, unknown>();
   private readonly ingress = new Map<string, Record<string, unknown>>();
   private readonly aborters = new Map<string, AbortController>();
@@ -37,13 +36,6 @@ export class SessionManager {
     return this.outputs.get(runId);
   }
 
-  public getLogs(runId: string): LogEntry[] {
-    return this.logs.get(runId) ?? [];
-  }
-
-  public getAccounting(runId: string): AccountingEntry[] {
-    return this.accounting.get(runId) ?? [];
-  }
   public getOpTree(runId: string): unknown | undefined {
     return this.opTrees.get(runId);
   }
@@ -126,9 +118,6 @@ export class SessionManager {
                 m.updatedAt = Date.now();
                 this.runs.set(runId, m);
               }
-              const arr = this.logs.get(runId) ?? [];
-              arr.push(entry);
-              this.logs.set(runId, arr);
               try { this.callbacks.onLog?.(entry); } catch (e) { warn(`callbacks.onLog failed: ${e instanceof Error ? e.message : String(e)}`); }
             this.callbacks.onTreeUpdate?.(runId);
           },
@@ -150,10 +139,8 @@ export class SessionManager {
             this.outputs.set(runId, outputBuf.join(''));
             try { this.callbacks.onTreeUpdate?.(runId); } catch (e) { warn(`callbacks.onTreeUpdate failed: ${e instanceof Error ? e.message : String(e)}`); }
           },
-            onAccounting: (a: AccountingEntry) => {
-              const arr = this.accounting.get(runId) ?? [];
-              arr.push(a);
-              this.accounting.set(runId, arr);
+            onAccounting: (_a) => {
+              // No flat accounting storage; rely on opTree updates
               this.callbacks.onTreeUpdate?.(runId);
               for (const fn of this.treeUpdateListeners) { try { fn(runId); } catch (e) { warn(`treeUpdate listener failed: ${e instanceof Error ? e.message : String(e)}`); } }
             }
