@@ -17,6 +17,7 @@ import { discoverLayers, resolveDefaults } from './config-resolver.js';
 import { describeFormat, resolveFormatIdForCli } from './formats.js';
 import { parseFrontmatter, stripFrontmatter, parseList, parsePairs, buildFrontmatterTemplate } from './frontmatter.js';
 import { resolveIncludes } from './include-resolver.js';
+import { formatLog } from './log-formatter.js';
 import { makeTTYLogCallbacks } from './log-sink-tty.js';
 import { getOptionsByGroup, formatCliNames, OPTIONS_REGISTRY } from './options-registry.js';
 import { formatAgentResultHumanReadable } from './utils.js';
@@ -702,8 +703,6 @@ function createCallbacks(options: Record<string, unknown>, accountingFile?: stri
     return process.stderr.isTTY ? `${colorCode}${text}\x1b[0m` : text;
   };
   
-  // Helper for direction symbols to save space
-  const dirSymbol = (direction: string): string => direction === 'request' ? '→' : '←';
 
   // Track thinking stream state to ensure proper newlines between logs
   let thinkingOpen = false;
@@ -721,18 +720,11 @@ function createCallbacks(options: Record<string, unknown>, accountingFile?: stri
       // Delegate all non-THK logs to the shared TTY sink
       ttyLog.onLog?.(entry);
       
-      // Show thinking header with light gray color
+      // Show thinking header, including txn and stable path via formatter; then stream text via onThinking
       if (entry.severity === 'THK') {
-        const agentPrefix = (() => {
-          const a = entry.agentId;
-          if (typeof a === 'string' && a.length > 0) {
-            try { return `${path.basename(a)} `; } catch { return `${a} `; }
-          }
-          return '';
-        })();
-        const rid = (() => { const v = entry.remoteIdentifier; return (typeof v === 'string' && v.length > 0) ? v : 'unknown'; })();
-        const formatted = colorize(`${agentPrefix}[THK] ${dirSymbol(entry.direction)} [${String(entry.turn)}.${String(entry.subturn)}] ${entry.type} ${rid}: `, '\x1b[2;37m');
-        process.stderr.write(formatted);
+        const header = formatLog(entry, { color: true, verbose: options.verbose === true, traceLlm: options.traceLlm === true, traceMcp: options.traceMcp === true });
+        // formatLog already applies dim color for THK; do not add newline so streamed text follows
+        try { process.stderr.write(`${header} `); } catch {}
         thinkingOpen = true;
         lastCharWasNewline = false;
         // The actual thinking text will follow via onThinking

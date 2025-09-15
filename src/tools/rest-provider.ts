@@ -3,6 +3,8 @@ import Ajv from 'ajv';
 import type { MCPTool, RestToolConfig } from '../types.js';
 import type { ToolExecuteOptions, ToolExecuteResult } from './types.js';
 
+import { warn } from '../utils.js';
+
 import { ToolProvider } from './types.js';
 
 export class RestProvider extends ToolProvider {
@@ -180,7 +182,7 @@ export class RestProvider extends ToolProvider {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeoutMs = opts?.timeoutMs;
     if (typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0) {
-      timer = setTimeout(() => { try { controller.abort(); } catch { /* ignore */ } }, Math.trunc(timeoutMs));
+      timer = setTimeout(() => { try { controller.abort(); } catch (e) { warn(`rest abort failed: ${e instanceof Error ? e.message : String(e)}`); } }, Math.trunc(timeoutMs));
     }
 
     const requestInit: RequestInit = { method, headers, signal: controller.signal };
@@ -209,7 +211,7 @@ export class RestProvider extends ToolProvider {
     } catch (e) {
       errorMsg = e instanceof Error ? e.message : String(e);
     } finally {
-      try { if (timer !== undefined) clearTimeout(timer); } catch { /* ignore */ }
+      try { if (timer !== undefined) clearTimeout(timer); } catch (e) { warn(`rest clearTimeout failed: ${e instanceof Error ? e.message : String(e)}`); }
     }
 
     const latency = Date.now() - start;

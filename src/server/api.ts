@@ -34,11 +34,15 @@ export function buildApiRouter(sessions: SessionManager, opts: { bearerKeys: str
   router.post('/ask', async (req: any, res: any, next: any) => {
     try {
       const auth = bearerAuth(req, opts.bearerKeys);
-      if (!auth.ok) return res.status(401).json({ error: auth.error });
+      if (!auth.ok) {
+        res.status(401).json({ error: auth.error });
+        return;
+      }
 
       const body: unknown = req.body;
       if (!body || typeof body !== 'object' || typeof (body as Record<string, unknown>).prompt !== 'string') {
-        return res.status(400).json({ error: 'invalid body: { prompt: string } required' });
+        res.status(400).json({ error: 'invalid body: { prompt: string } required' });
+        return;
       }
 
       const { prompt } = body as SimpleAskRequestBody;
@@ -58,14 +62,16 @@ export function buildApiRouter(sessions: SessionManager, opts: { bearerKeys: str
             text: meta.status === 'succeeded' ? out : undefined,
             error: meta.status === 'failed' ? meta.error ?? 'unknown error' : undefined
           };
-          return res.status(200).json(payload);
+          res.status(200).json(payload);
+          return;
         }
         // eslint-disable-next-line no-promise-executor-return
         await new Promise((r) => setTimeout(r, 250));
       }
 
       const payload: SimpleAskResponseBody = { runId, status: 'running' };
-      return res.status(202).json(payload);
+      res.status(202).json(payload);
+      return;
     } catch (err) {
       return next(err);
     }
@@ -73,20 +79,69 @@ export function buildApiRouter(sessions: SessionManager, opts: { bearerKeys: str
 
   router.get('/runs/:id', (req: any, res: any) => {
     const auth = bearerAuth(req, opts.bearerKeys);
-    if (!auth.ok) return res.status(401).json({ error: auth.error });
-    const runIdParam = req.params?.id;
+    if (!auth.ok) {
+      res.status(401).json({ error: auth.error });
+      return;
+    }
+    const runIdParam = req.params.id;
     if (typeof runIdParam !== 'string' || runIdParam.length === 0) {
-      return res.status(400).json({ error: 'invalid run id' });
+      res.status(400).json({ error: 'invalid run id' });
+      return;
     }
     const meta = sessions.getRun(runIdParam);
-    if (!meta) return res.status(404).json({ error: 'not found' });
-    return res.status(200).json({
+    if (!meta) {
+      res.status(404).json({ error: 'not found' });
+      return;
+    }
+    res.status(200).json({
       runId: meta.runId,
       status: meta.status,
       startedAt: meta.startedAt,
       updatedAt: meta.updatedAt,
       error: meta.error
     });
+  });
+
+  router.get('/runs/:id/tree', (req: any, res: any) => {
+    const auth = bearerAuth(req, opts.bearerKeys);
+    if (!auth.ok) {
+      res.status(401).json({ error: auth.error });
+      return;
+    }
+    const runIdParam = req.params.id;
+    if (typeof runIdParam !== 'string' || runIdParam.length === 0) {
+      res.status(400).json({ error: 'invalid run id' });
+      return;
+    }
+    const meta = sessions.getRun(runIdParam);
+    if (!meta) {
+      res.status(404).json({ error: 'not found' });
+      return;
+    }
+    const tree = sessions.getOpTree(runIdParam);
+    if (!tree) {
+      res.status(404).json({ error: 'tree not available' });
+      return;
+    }
+    // Basic redaction for secrets in request/response payloads
+    const redact = (obj: unknown): unknown => {
+      if (obj === null || obj === undefined) return obj;
+      if (Array.isArray(obj)) return (obj as unknown[]).map(redact);
+      if (typeof obj === 'object') {
+        const out: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+          const lower = k.toLowerCase();
+          if (lower === 'authorization' || lower === 'x-api-key' || lower === 'api-key' || lower === 'apikey' || lower === 'password' || lower === 'token' || lower === 'secret') {
+            out[k] = '[REDACTED]';
+          } else {
+            out[k] = redact(v as unknown);
+          }
+        }
+        return out;
+      }
+      return obj;
+    };
+    res.status(200).json(redact(tree));
   });
 
   return router;

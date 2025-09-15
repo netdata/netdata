@@ -2,10 +2,12 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 // import os from 'node:os';
 import path from 'node:path';
+import zlib from 'node:zlib';
 
 import Ajv from 'ajv';
 
 import type { OutputFormatId } from './formats.js';
+import type { SessionNode } from './session-tree.js';
 import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, MCPTool, LLMAccountingEntry, ToolAccountingEntry, RestToolConfig } from './types.js';
 
 // Exit codes according to DESIGN.md
@@ -41,7 +43,6 @@ type ExitCode =
 
 // empty line between import groups enforced by linter
 import { validateProviders, validateMCPServers, validatePrompts } from './config.js';
-import { ExecutionTree } from './execution-tree.js';
 import { parseFrontmatter, parsePairs, extractBodyWithoutFrontmatter } from './frontmatter.js';
 import { LLMClient } from './llm-client.js';
 import { buildPromptVars, applyFormat, expandVars } from './prompt-builder.js';
@@ -52,7 +53,7 @@ import { InternalToolProvider } from './tools/internal-provider.js';
 import { MCPProvider } from './tools/mcp-provider.js';
 import { RestProvider } from './tools/rest-provider.js';
 import { ToolsOrchestrator } from './tools/tools.js';
-import { formatToolRequestCompact, truncateUtf8WithNotice } from './utils.js';
+import { formatToolRequestCompact, truncateUtf8WithNotice, warn } from './utils.js';
 
 // Immutable session class according to DESIGN.md
 export class AIAgentSession {
@@ -81,7 +82,7 @@ export class AIAgentSession {
   private readonly originTxnId?: string;
   private readonly parentTxnId?: string;
   private readonly callPath?: string;
-  private readonly tree: ExecutionTree;
+  // opTree-only tracking (canonical)
   private readonly toolsOrchestrator?: ToolsOrchestrator;
   private readonly opTree: SessionTreeBuilder;
   // Per-turn planned subturns (tool call count) discovered when LLM yields toolCalls
@@ -89,6 +90,7 @@ export class AIAgentSession {
   private resolvedFormat?: OutputFormatId;
   private resolvedFormatDescription?: string;
   private resolvedUserPrompt?: string;
+  private resolvedSystemPrompt?: string;
   private masterLlmStartLogged = false;
   private sessionTitle?: { title: string; emoji?: string; ts: number };
   // Finalization state captured via agent__final_report
@@ -110,6 +112,28 @@ export class AIAgentSession {
   private llmAttempts = 0;
   private llmSyntheticFailures = 0;
   private centralSizeCapHits = 0;
+  private currentLlmOpId?: string;
+  
+  private persistSessionSnapshot(reason?: string): void {
+    try {
+      const sess = this.opTree.getSession();
+      const originId = this.originTxnId ?? this.txnId;
+      // Resolve sessions dir from config or fallback to ~/.ai-agent/sessions
+      const overrideDir = this.sessionConfig.config.persistence?.sessionsDir;
+      const home = process.env.HOME ?? process.env.USERPROFILE ?? '';
+      const defaultBase = home ? path.join(home, '.ai-agent') : process.cwd();
+      const sessDir = typeof overrideDir === 'string' && overrideDir.length > 0
+        ? overrideDir
+        : path.join(defaultBase, 'sessions');
+      try { fs.mkdirSync(sessDir, { recursive: true }); } catch (e) { warn(`failed to create sessions dir '${sessDir}': ${e instanceof Error ? e.message : String(e)}`); }
+      const json = JSON.stringify({ version: 1, reason, opTree: sess });
+      const gz = zlib.gzipSync(Buffer.from(json, 'utf8'));
+      const filePath = path.join(sessDir, `${originId}.json.gz`);
+      const tmp = `${filePath}.tmp-${String(process.pid)}-${String(Date.now())}`;
+      fs.writeFileSync(tmp, gz);
+      fs.renameSync(tmp, filePath);
+    } catch (e) { warn(`persistSessionSnapshot failed: ${e instanceof Error ? e.message : String(e)}`); }
+  }
 
   private constructor(
     config: Configuration,
@@ -137,15 +161,15 @@ export class AIAgentSession {
     if (this.abortSignal !== undefined) {
       if (this.abortSignal.aborted) {
         this.canceled = true;
-        try { this.toolsOrchestrator?.cancel(); } catch { /* ignore */ }
+        try { this.toolsOrchestrator?.cancel(); } catch (e) { warn(`toolsOrchestrator.cancel failed: ${e instanceof Error ? e.message : String(e)}`); }
       } else {
-        this.abortSignal.addEventListener('abort', () => { this.canceled = true; try { this.toolsOrchestrator?.cancel(); } catch { /* ignore */ } }, { once: true });
+        this.abortSignal.addEventListener('abort', () => { this.canceled = true; try { this.toolsOrchestrator?.cancel(); } catch (e) { warn(`toolsOrchestrator.cancel failed: ${e instanceof Error ? e.message : String(e)}`); } }, { once: true });
       }
     }
-    } catch { /* ignore */ }
+    } catch (e) { warn(`abortSignal wiring failed: ${e instanceof Error ? e.message : String(e)}`); }
     // Initialize sub-agents registry if provided
     if (Array.isArray(sessionConfig.subAgentPaths) && sessionConfig.subAgentPaths.length > 0) {
-      const reg = new SubAgentRegistry(undefined, [], { traceLLM: sessionConfig.traceLLM, traceMCP: sessionConfig.traceMCP, verbose: sessionConfig.verbose });
+      const reg = new SubAgentRegistry(undefined, Array.isArray(sessionConfig.ancestors) ? sessionConfig.ancestors : [], { traceLLM: sessionConfig.traceLLM, traceMCP: sessionConfig.traceMCP, verbose: sessionConfig.verbose });
       reg.load(sessionConfig.subAgentPaths);
       this.subAgents = reg;
     }
@@ -156,23 +180,18 @@ export class AIAgentSession {
     this.parentTxnId = sessionConfig.trace?.parentId;
     this.callPath = sessionConfig.trace?.callPath ?? sessionConfig.agentId;
 
-    // Central execution tree (source of truth for logs/accounting)
-    this.tree = new ExecutionTree(
-      { sessionId: this.txnId, agentId: sessionConfig.agentId, callPath: this.callPath, maxTurns: sessionConfig.maxTurns },
-      { onLog: sessionConfig.callbacks?.onLog, onAccounting: sessionConfig.callbacks?.onAccounting }
-    );
     // Hierarchical operation tree (Option C)
     this.opTree = new SessionTreeBuilder({ traceId: this.txnId, agentId: sessionConfig.agentId, callPath: this.callPath });
 
     // Tools orchestrator (MCP + REST + Internal + Subagents)
-    const orch = new ToolsOrchestrator(this.tree, {
+    const orch = new ToolsOrchestrator({
       toolTimeout: sessionConfig.toolTimeout,
       toolResponseMaxBytes: sessionConfig.toolResponseMaxBytes,
       maxConcurrentTools: sessionConfig.maxConcurrentTools,
       parallelToolCalls: sessionConfig.parallelToolCalls,
       traceTools: sessionConfig.traceMCP === true,
-    }, this.opTree, (tree) => { try { this.sessionConfig.callbacks?.onOpTree?.(tree); } catch { /* ignore */ } });
-    orch.register(new MCPProvider('mcp', sessionConfig.config.mcpServers, { trace: sessionConfig.traceMCP, verbose: sessionConfig.verbose, requestTimeoutMs: sessionConfig.toolTimeout, onLog: (e) => { try { this.addLog(this.logs, e); } catch { /* ignore */ } } }));
+    }, this.opTree, (tree: SessionNode) => { try { this.sessionConfig.callbacks?.onOpTree?.(tree); } catch (e) { warn(`onOpTree callback failed: ${e instanceof Error ? e.message : String(e)}`); } }, sessionConfig.callbacks?.onLog, sessionConfig.callbacks?.onAccounting);
+    orch.register(new MCPProvider('mcp', sessionConfig.config.mcpServers, { trace: sessionConfig.traceMCP, verbose: sessionConfig.verbose, requestTimeoutMs: sessionConfig.toolTimeout, onLog: (e) => { try { this.addLog(this.logs, e); } catch (err) { warn(`addLog failed: ${err instanceof Error ? err.message : String(err)}`); } } }));
     // Build selected REST tools by frontmatter selection
     if (this.sessionConfig.config.restTools !== undefined) {
       const selected: Record<string, RestToolConfig> = {};
@@ -240,7 +259,7 @@ export class AIAgentSession {
     }
     if (this.subAgents !== undefined) {
       const subAgents = this.subAgents;
-      const execFn = async (name: string, args: Record<string, unknown>) => {
+      const execFn = async (name: string, args: Record<string, unknown>, opts?: { onChildOpTree?: (tree: SessionNode) => void }) => {
         const exec = await subAgents.execute(name, args, {
           config: this.sessionConfig.config,
           callbacks: this.sessionConfig.callbacks,
@@ -260,10 +279,12 @@ export class AIAgentSession {
           // propagate control signals so children can stop/abort
           abortSignal: this.abortSignal,
           stopRef: this.stopRef,
-          trace: { originId: this.originTxnId, parentId: this.txnId, callPath: `${this.callPath ?? ''}->${name}` }
+          trace: { originId: this.originTxnId, parentId: this.txnId, callPath: `${this.callPath ?? ''}->${name}` },
+          onChildOpTree: opts?.onChildOpTree
         });
-        // Keep child conversation list for save-all
+        // Keep child conversation list (may be reported in results for compatibility)
         this.childConversations.push({ agentId: exec.child.toolName, toolName: exec.child.toolName, promptPath: exec.child.promptPath, conversation: exec.conversation, trace: exec.trace });
+        try { this.persistSessionSnapshot('subagent_finish'); } catch (e) { warn(`persist subagent snapshot failed: ${e instanceof Error ? e.message : String(e)}`); }
         return { result: exec.result, childAccounting: exec.accounting, childOpTree: exec.opTree };
       };
       // Register AgentProvider synchronously so sub-agent tools are known before first turn
@@ -293,7 +314,7 @@ export class AIAgentSession {
         };
         this.addLog(this.logs, entry);
       }
-    } catch { /* ignore initialTitle issues */ }
+    } catch (e) { warn(`initialTitle handling failed: ${e instanceof Error ? e.message : String(e)}`); }
   }
 
   // Static factory method for creating new sessions
@@ -332,7 +353,7 @@ export class AIAgentSession {
         parentTxnId: enrichedSessionConfig.trace?.parentId,
         originTxnId: enrichedSessionConfig.trace?.originId,
       };
-      try { externalLogRelay(enriched); } catch { /* ignore tree relay errors */ }
+      try { externalLogRelay(enriched); } catch (e) { warn(`external log relay failed: ${e instanceof Error ? e.message : String(e)}`); }
     };
 
     // Create session-owned MCP client
@@ -354,8 +375,8 @@ export class AIAgentSession {
       llmClient,
       enrichedSessionConfig
     );
-    // Bind external log relay to session's execution tree
-    externalLogRelay = (e: LogEntry) => { try { sess.recordExternalLog(e); } catch { /* noop */ } };
+    // Bind external log relay to append into opTree and relay to callbacks
+    externalLogRelay = (e: LogEntry) => { try { sess.recordExternalLog(e); } catch (err) { warn(`recordExternalLog failed: ${err instanceof Error ? err.message : String(err)}`); } };
     return sess;
   }
 
@@ -400,20 +421,22 @@ export class AIAgentSession {
       ...entry,
     };
     logs.push(enriched);
-    try { this.tree.recordLog(enriched); } catch { /* ignore tree errors */ }
-    // Do not call callbacks directly here; ExecutionTree handles fan-out.
+    try { this.sessionConfig.callbacks?.onLog?.(enriched); } catch (e) { warn(`onLog callback failed: ${e instanceof Error ? e.message : String(e)}`); }
   }
 
   // Relay for logs originating outside AIAgentSession (LLM/MCP internals)
   recordExternalLog(entry: LogEntry): void {
-    try { this.tree.recordLog(entry); } catch { /* ignore */ }
+    try {
+      if (entry.type === 'llm' && typeof this.currentLlmOpId === 'string' && this.currentLlmOpId.length > 0) {
+        this.opTree.appendLog(this.currentLlmOpId, entry);
+        this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession());
+      }
+    } catch (e) { warn(`recordExternalLog opTree append failed: ${e instanceof Error ? e.message : String(e)}`); }
+    try { this.sessionConfig.callbacks?.onLog?.(entry); } catch (e) { warn(`onLog callback failed: ${e instanceof Error ? e.message : String(e)}`); }
   }
 
   // Optional: expose a snapshot for progress UIs or web monitoring
-  getExecutionSnapshot(): { logs: number; accounting: number } {
-    const snap = this.tree.getSnapshot();
-    return { logs: snap.counters.logs, accounting: snap.counters.accounting };
-  }
+  getExecutionSnapshot(): { logs: number; accounting: number } { return { logs: this.logs.length, accounting: this.accounting.length }; }
 
   // Enforce a hard timeout around a promise (centralized tool timeout)
   private async withTimeout<T>(promise: Promise<T>, timeoutMs?: number): Promise<T> {
@@ -473,9 +496,9 @@ export class AIAgentSession {
 
     try {
       // Start execution session in the tree
-      try { this.tree.startSession(); } catch { /* ignore */ }
+      // opTree is canonical; no separate session
       // Warmup providers (ensures MCP tools/instructions are available) and refresh mapping
-      try { await this.toolsOrchestrator?.warmup(); } catch { /* ignore warmup errors */ }
+      try { await this.toolsOrchestrator?.warmup(); } catch (e) { warn(`tools warmup failed: ${e instanceof Error ? e.message : String(e)}`); }
 
       // Verbose: emit settings summary at start (without prompts)
       if (this.sessionConfig.verbose === true) {
@@ -497,7 +520,7 @@ export class AIAgentSession {
             envKeys: s.env !== undefined ? Object.keys(s.env) : [],
             enabled: s.enabled !== false,
           }));
-          return { providers: prov, mcpServers: srvs, accountingFile: this.config.accounting?.file };
+          return { providers: prov, mcpServers: srvs, billingFile: this.config.persistence?.billingFile ?? this.config.accounting?.file };
         };
         const summarizeSession = () => ({
           targets: this.sessionConfig.targets,
@@ -570,7 +593,7 @@ export class AIAgentSession {
           message: `tools: mcp=${String(mcpToolNames.length)} [${mcpToolNames.join(', ')}]; rest=${String(restToolNames.length)} [${restToolNames.join(', ')}]; subagents=${String(subAgentTools.length)} [${subAgentTools.join(', ')}]`
         };
         this.addLog(currentLogs, banner);
-      } catch { /* ignore banner errors */ }
+      } catch (e) { warn(`tools banner emit failed: ${e instanceof Error ? e.message : String(e)}`); }
 
       // One-time pricing coverage warning for master + loaded sub-agents
       try {
@@ -586,7 +609,7 @@ export class AIAgentSession {
             const fm = parseFrontmatter(raw, { baseDir: path.dirname(p) });
             const models = parsePairs((fm?.options as { models?: unknown } | undefined)?.models);
             if (models.length > 0) pairs.push(...models); else pairs.push(...this.sessionConfig.targets);
-          } catch { /* ignore per-child read/parse errors */ }
+          } catch (e) { warn(`sub-agent options parse failed: ${e instanceof Error ? e.message : String(e)}`); }
         });
         // Deduplicate and find missing pricing entries
         const uniq = new Set(pairs.map((x) => `${x.provider}/${x.model}`));
@@ -611,7 +634,7 @@ export class AIAgentSession {
           };
           this.addLog(currentLogs, warn);
         }
-      } catch { /* ignore pricing check errors */ }
+      } catch (e) { warn(`pricing coverage check failed: ${e instanceof Error ? e.message : String(e)}`); }
 
       // Resolve FORMAT centrally from configuration (with sane fallback)
       const { describeFormat } = await import('./formats.js');
@@ -649,11 +672,12 @@ export class AIAgentSession {
           };
           this.addLog(currentLogs, entry);
         }
-      } catch { /* ignore startup log errors */ }
+          } catch (e) { warn(`startup verbose log failed: ${e instanceof Error ? e.message : String(e)}`); }
 
       // Build enhanced system prompt with tool instructions
       const toolInstructions = this.toolsOrchestrator?.getMCPInstructions() ?? '';
       const enhancedSystemPrompt = this.enhanceSystemPrompt(systemExpanded, toolInstructions);
+      this.resolvedSystemPrompt = enhancedSystemPrompt;
 
       // Initialize conversation
       if (this.sessionConfig.conversationHistory !== undefined && this.sessionConfig.conversationHistory.length > 0) {
@@ -677,21 +701,38 @@ export class AIAgentSession {
         currentTurn
       );
 
+      // Derive arrays from opTree for canonical output
+      const flat = (() => { try { return this.opTree.flatten(); } catch { return { logs: this.logs, accounting: this.accounting }; } })();
       const resultShape = {
         success: result.success,
         error: result.error,
         conversation: result.conversation,
-        logs: result.logs,
-        accounting: result.accounting,
+        logs: flat.logs,
+        accounting: flat.accounting,
         finalReport: result.finalReport,
         // Provide ASCII tree for downstream consumers (CLI may choose to print)
-        treeAscii: (() => { try { return this.tree.renderAscii(); } catch { return undefined; } })(),
+        treeAscii: undefined,
         opTreeAscii: (() => { try { return this.opTree.renderAscii(); } catch { return undefined; } })(),
         opTree: (() => { try { return this.opTree.getSession(); } catch { return undefined; } })(),
       } as AIAgentResult;
 
-      try { this.tree.endSession(result.success, result.error); } catch { /* ignore */ }
-      try { this.opTree.endSession(result.success, result.error); } catch { /* ignore */ }
+      try { this.opTree.endSession(result.success, result.error); } catch (e) { warn(`endSession failed: ${e instanceof Error ? e.message : String(e)}`); }
+      // Phase B/C: persist final session and accounting ledger
+      try {
+        this.persistSessionSnapshot('final');
+        const configuredLedger = this.sessionConfig.config.persistence?.billingFile
+          ?? ((): string | undefined => {
+            const home = process.env.HOME ?? process.env.USERPROFILE ?? '';
+            if (!home) return undefined;
+            const baseDir = path.join(home, '.ai-agent');
+            try { fs.mkdirSync(baseDir, { recursive: true }); } catch (e) { warn(`failed to create base dir '${baseDir}': ${e instanceof Error ? e.message : String(e)}`); }
+            return path.join(baseDir, 'accounting.jsonl');
+          })();
+        if (typeof configuredLedger === 'string' && configuredLedger.length > 0) {
+          const lines = (resultShape.accounting).map((a) => JSON.stringify(a));
+          if (lines.length > 0) fs.appendFileSync(configuredLedger, lines.join('\n') + '\n');
+        }
+      } catch (e) { warn(`final persistence failed: ${e instanceof Error ? e.message : String(e)}`); }
       return resultShape;
 
     } catch (error) {
@@ -719,15 +760,15 @@ export class AIAgentSession {
 
       // Emit FIN summary even on failure
       this.emitFinalSummary(currentLogs, currentAccounting);
+      const flatFail = (() => { try { return this.opTree.flatten(); } catch { return { logs: this.logs, accounting: this.accounting }; } })();
       const failShape = {
         success: false,
         error: message,
         conversation: currentConversation,
-        logs: currentLogs,
-        accounting: currentAccounting
+        logs: flatFail.logs,
+        accounting: flatFail.accounting
       } as AIAgentResult;
-      try { this.tree.endSession(false, message); } catch { /* ignore */ }
-      try { this.opTree.endSession(false, message); } catch { /* ignore */ }
+      try { this.opTree.endSession(false, message); } catch (e) { warn(`endSession failed: ${e instanceof Error ? e.message : String(e)}`); }
       return failShape;
     } finally {
       await this.toolsOrchestrator?.cleanup();
@@ -759,18 +800,26 @@ export class AIAgentSession {
       if (this.canceled) {
         const errMsg = 'canceled';
         this.emitFinalSummary(logs, accounting);
-        try { this.tree.endSession(false, errMsg); } catch { /* ignore */ }
-        try { this.opTree.endSession(false, errMsg); } catch { /* ignore */ }
+      try { this.opTree.endSession(false, errMsg); } catch (e) { warn(`endSession failed: ${e instanceof Error ? e.message : String(e)}`); }
         return { success: false, error: errMsg, conversation, logs, accounting };
       }
       if (this.stopRef?.stopping === true) {
         // Graceful stop: do not start further turns
         this.emitFinalSummary(logs, accounting);
-        try { this.tree.endSession(true); } catch { /* ignore */ }
-        try { this.opTree.endSession(true); } catch { /* ignore */ }
+      try { this.opTree.endSession(true); } catch (e) { warn(`endSession failed: ${e instanceof Error ? e.message : String(e)}`); }
         return { success: true, conversation, logs, accounting } as AIAgentResult;
       }
-      try { this.opTree.beginTurn(currentTurn, {}); this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession()); } catch { /* ignore */ }
+      try {
+        // Capture effective prompts for this turn (post expansion/enhancement)
+        const turnAttrs = {
+          prompts: {
+            system: (() => { try { return this.resolvedSystemPrompt ?? ''; } catch { return ''; } })(),
+            user: (() => { try { return this.resolvedUserPrompt ?? ''; } catch { return ''; } })(),
+          }
+        } as Record<string, unknown>;
+        this.opTree.beginTurn(currentTurn, turnAttrs);
+        this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession());
+      } catch (e) { warn(`beginTurn/onOpTree failed: ${e instanceof Error ? e.message : String(e)}`); }
       // Orchestrator receives ctx turn/subturn per call; no MCP client turn management
       this.llmClient.setTurn(currentTurn, 0);
 
@@ -801,7 +850,7 @@ export class AIAgentSession {
               message: `${ctx}: ${promptText}`,
             };
             this.addLog(logs, entry);
-          } catch { /* ignore log errors */ }
+          } catch (e) { warn(`verbose log failed: ${e instanceof Error ? e.message : String(e)}`); }
           this.masterLlmStartLogged = true;
         }
         const pair = pairs[pairCursor % pairs.length];
@@ -842,6 +891,12 @@ export class AIAgentSession {
             attempts += 1;
             // Begin hierarchical LLM operation (Option C)
             const llmOpId = (() => { try { return this.opTree.beginOp(currentTurn, 'llm', { provider, model, isFinalTurn }); } catch { return undefined; } })();
+            this.currentLlmOpId = llmOpId;
+            try {
+              // Record LLM request summary
+              const msgBytes = (() => { try { return new TextEncoder().encode(JSON.stringify(attemptConversation)).length; } catch { return undefined; } })();
+              if (llmOpId !== undefined) this.opTree.setRequest(llmOpId, { kind: 'llm', payload: { messages: attemptConversation.length, bytes: msgBytes, isFinalTurn }, size: msgBytes });
+            } catch (e) { warn(`final turn warning log failed: ${e instanceof Error ? e.message : String(e)}`); }
             const turnResult = await this.executeSingleTurn(
               attemptConversation,
               provider,
@@ -888,7 +943,7 @@ export class AIAgentSession {
                   }
                 });
               }
-            } catch { /* ignore unknown-tool warning errors */ }
+            } catch (e) { warn(`unknown tool warning failed: ${e instanceof Error ? e.message : String(e)}`); }
 
             // Record accounting for every attempt (include failed attempts with zeroed tokens if absent)
             {
@@ -942,18 +997,21 @@ export class AIAgentSession {
                 originTxnId: this.originTxnId
               };
               accounting.push(accountingEntry);
-              try { this.tree.recordAccounting(accountingEntry); } catch { /* ignore */ }
-              try {
-                if (llmOpId !== undefined) this.opTree.appendAccounting(llmOpId, accountingEntry);
-              } catch { /* ignore */ }
+              try { if (llmOpId !== undefined) this.opTree.appendAccounting(llmOpId, accountingEntry); } catch (e) { warn(`appendAccounting failed: ${e instanceof Error ? e.message : String(e)}`); }
+              try { this.sessionConfig.callbacks?.onAccounting?.(accountingEntry); } catch (e) { warn(`onAccounting callback failed: ${e instanceof Error ? e.message : String(e)}`); }
             }
-            // Close hierarchical LLM op
+            // Close hierarchical LLM op and attach response summary
             try {
               if (llmOpId !== undefined) {
+                const lastAssistant = [...turnResult.messages].filter((m) => m.role === 'assistant').pop();
+                const respText = typeof lastAssistant?.content === 'string' ? lastAssistant.content : (turnResult.response ?? '');
+                const sz = respText.length > 0 ? Buffer.byteLength(respText, 'utf8') : 0;
+                this.opTree.setResponse(llmOpId, { payload: { textPreview: respText.slice(0, 4096) }, size: sz, truncated: respText.length > 4096 });
                 this.opTree.endOp(llmOpId, (turnResult.status.type === 'success') ? 'ok' : 'failed', { latency: turnResult.latencyMs });
                 this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession());
               }
-            } catch { /* ignore */ }
+            } catch (e) { warn(`finalize LLM op failed: ${e instanceof Error ? e.message : String(e)}`); }
+            this.currentLlmOpId = undefined;
 
       // Handle turn result based on status
       if (turnResult.status.type === 'success') {
@@ -1113,7 +1171,7 @@ export class AIAgentSession {
                   }, 0);
                   this.plannedSubturns.set(currentTurn, count);
                 }
-              } catch { /* ignore */ }
+              } catch (e) { warn(`LLM accounting callback failed: ${e instanceof Error ? e.message : String(e)}`); }
 
               // Output response text if we have any (even with tool calls)
               // Only in non-streaming mode (streaming already called onOutput per chunk)
@@ -1210,8 +1268,8 @@ export class AIAgentSession {
               agentId: this.sessionConfig.agentId, callPath: this.callPath, txnId: this.txnId, parentTxnId: this.parentTxnId, originTxnId: this.originTxnId
             };
             accounting.push(accountingEntry);
-            try { this.tree.recordAccounting(accountingEntry); } catch { /* ignore */ }
-            this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
+            try { if (typeof this.currentLlmOpId === 'string') this.opTree.appendAccounting(this.currentLlmOpId, accountingEntry); } catch (e) { warn(`appendAccounting failed: ${e instanceof Error ? e.message : String(e)}`); }
+            try { this.sessionConfig.callbacks?.onAccounting?.(accountingEntry); } catch (e) { warn(`onAccounting callback failed: ${e instanceof Error ? e.message : String(e)}`); }
             continue;
           }
       }
@@ -1245,7 +1303,16 @@ export class AIAgentSession {
       try {
         // no-op; placeholder to pair beginTurn with an endTurn finally
       } finally {
-        try { this.opTree.endTurn(currentTurn, {}); this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession()); } catch { /* ignore */ }
+        try {
+          // Optionally capture assistant content for the turn
+          const lastAssistant = (() => {
+            try { return [...conversation].filter((m) => m.role === 'assistant').pop(); } catch { return undefined; }
+          })();
+          const assistantText = typeof lastAssistant?.content === 'string' ? lastAssistant.content : undefined;
+          const attrs = (typeof assistantText === 'string' && assistantText.length > 0) ? { assistant: { content: assistantText } } : {};
+          this.opTree.endTurn(currentTurn, attrs);
+          this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession());
+        } catch (e) { warn(`endTurn/onOpTree failed: ${e instanceof Error ? e.message : String(e)}`); }
       }
     }
 
@@ -1388,7 +1455,7 @@ export class AIAgentSession {
     accounting: AccountingEntry[],
     lastShownThinkingHeaderTurn: number
   ) {
-    const turnSpanId = this.tree.startSpan('llm_turn', 'llm', { provider, model, turn: currentTurn });
+    // no spans; opTree is canonical
     // Expose provider tools plus session-specific internal tools (overrides schemas, same names)
     const availableTools = [
       ...(this.toolsOrchestrator?.listTools() ?? []),
@@ -1462,8 +1529,7 @@ export class AIAgentSession {
           agentId: this.sessionConfig.agentId, callPath: this.callPath, txnId: this.txnId, parentTxnId: this.parentTxnId, originTxnId: this.originTxnId
         };
         accounting.push(accountingEntry);
-        try { this.tree.recordAccounting(accountingEntry); } catch { /* ignore */ }
-        // accounting callback is invoked via execution tree
+        try { this.sessionConfig.callbacks?.onAccounting?.(accountingEntry); } catch (e) { warn(`tool accounting callback failed: ${e instanceof Error ? e.message : String(e)}`); }
         
         // Re-throw to let AI SDK create a tool-error part so the LLM sees structured failure
         this.releaseToolSlot();
@@ -1511,17 +1577,18 @@ export class AIAgentSession {
           }
           // Always stream the thinking text (including the first chunk)
           this.sessionConfig.callbacks?.onThinking?.(chunk);
+          try {
+            if (typeof this.currentLlmOpId === 'string') this.opTree.appendReasoningChunk(this.currentLlmOpId, chunk);
+          } catch (e) { warn(`appendReasoningChunk failed: ${e instanceof Error ? e.message : String(e)}`); }
         }
       }
     };
 
     try {
       const result = await this.llmClient.executeTurn(request);
-      this.tree.endSpan(turnSpanId, result.status.type === 'success' ? 'ok' : 'failed', { latency: result.latencyMs, status: result.status.type });
       return { ...result, shownThinking };
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      this.tree.endSpan(turnSpanId, 'failed', { error: msg });
+      // const msg = e instanceof Error ? e.message : String(e);
       throw e;
     }
   }
@@ -1575,7 +1642,7 @@ export class AIAgentSession {
       try {
         const warn: LogEntry = { timestamp: Date.now(), severity: 'WRN', turn: currentTurn, subturn: 0, direction: RESP_DIR, type: LLM_TYPE, remoteIdentifier: BATCH_REMOTE_ID, fatal: false, message: 'Invalid batch input: each call requires id, tool, args' };
         this.addLog(logs, warn);
-      } catch { /* ignore logging errors */ }
+      } catch (e) { warn(`LLM error log failed: ${e instanceof Error ? e.message : String(e)}`); }
       const latency = Date.now() - startTime;
       const accountingEntry: AccountingEntry = {
         type: 'tool', timestamp: startTime, status: 'failed', latency,
@@ -1590,7 +1657,7 @@ export class AIAgentSession {
     }
 
     // Batch execution: orchestrator-only inner calls; record a span for the batch
-    const batchSpan = this.tree.startSpan('agent_batch', 'tool', { count: bi.calls.length, turn: currentTurn });
+    // no spans
     const results = await Promise.all(bi.calls.map(async (c) => {
       const t0 = Date.now();
       if (c.tool === 'agent__append_notes' || c.tool === 'agent__final_report' || c.tool === 'agent__batch') {
@@ -1609,7 +1676,7 @@ export class AIAgentSession {
       }
     }));
     const payload = this.applyToolResponseCap(JSON.stringify({ results }), this.sessionConfig.toolResponseMaxBytes, logs, { server: 'agent', tool: toolName, turn: currentTurn, subturn: 0 });
-    this.tree.endSpan(batchSpan, 'ok', { results: results.length });
+    // end via opTree only
     return payload;
   }
 

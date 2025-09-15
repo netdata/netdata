@@ -1,10 +1,11 @@
+import type { SessionNode } from '../session-tree.js';
 import type { SubAgentRegistry } from '../subagent-registry.js';
 import type { MCPTool } from '../types.js';
 import type { ToolExecuteOptions, ToolExecuteResult } from './types.js';
 
 import { ToolProvider } from './types.js';
 
-type ExecFn = (name: string, args: Record<string, unknown>) => Promise<{
+type ExecFn = (name: string, args: Record<string, unknown>, opts?: { onChildOpTree?: (tree: SessionNode) => void }) => Promise<{
   result: string;
   // Optional extras for parent to inspect/record
   childAccounting?: readonly unknown[];
@@ -21,7 +22,7 @@ export class AgentProvider extends ToolProvider {
 
   async execute(name: string, args: Record<string, unknown>, _opts?: ToolExecuteOptions): Promise<ToolExecuteResult> {
     const start = Date.now();
-    const out = await this.execFn(name, args);
+    const out = await this.execFn(name, args, { onChildOpTree: _opts?.onChildOpTree });
     const latency = Date.now() - start;
     return { ok: true, result: out.result, latencyMs: latency, kind: this.kind, providerId: this.id, extras: { childAccounting: out.childAccounting, childConversation: out.childConversation, childOpTree: out.childOpTree } };
   }

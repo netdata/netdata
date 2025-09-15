@@ -1,5 +1,7 @@
 import type { AccountingEntry, LogEntry } from './types.js';
 
+import { warn } from './utils.js';
+
 type OperationKind = 'llm' | 'tool' | 'session';
 
 interface OperationNode {
@@ -13,6 +15,10 @@ interface OperationNode {
   accounting: AccountingEntry[];
   // For kind === 'session', we embed a full child session tree
   childSession?: SessionNode;
+  // Structured content
+  reasoning?: { chunks: { text: string; ts: number }[]; final?: string };
+  request?: { kind: 'llm'|'tool'; payload: unknown; size?: number };
+  response?: { payload: unknown; size?: number; truncated?: boolean };
 }
 
 interface TurnNode {
@@ -98,12 +104,89 @@ export class SessionTreeBuilder {
 
   appendLog(opId: string, log: LogEntry): void {
     const op = this.opIndex.get(opId);
-    if (op !== undefined) op.logs.push(log);
+    if (op !== undefined) {
+      // Attach stable path label if missing
+      try {
+        if ((log as { path?: string }).path === undefined) {
+          (log as { path?: string }).path = this.getOpPath(opId);
+        }
+      } catch (e) { warn(`session-tree: failed to compute path for op ${opId}: ${e instanceof Error ? e.message : String(e)}`); }
+      op.logs.push(log);
+    }
   }
 
   appendAccounting(opId: string, acc: AccountingEntry): void {
     const op = this.opIndex.get(opId);
     if (op !== undefined) op.accounting.push(acc);
+  }
+
+  // Compute a stable, bijective path label (e.g., 1.2 or 1.2.1.1) for a given opId
+  getOpPath(opId: string): string {
+    // const parts: string[] = [];
+    const walk = (node: SessionNode, prefix: string[]): string | undefined => {
+      // eslint-disable-next-line functional/no-loop-statements -- iterative traversal is clearer here
+      for (const t of node.turns) {
+        const base = [...prefix, String(t.index)];
+        // eslint-disable-next-line functional/no-loop-statements -- index needed for stable path labels
+        for (let i = 0; i < t.ops.length; i++) {
+          const o = t.ops[i];
+          const opIdx = String(i + 1);
+          const label = [...base, opIdx];
+          if (o.opId === opId) return label.join('.');
+          if (o.kind === 'session' && o.childSession !== undefined) {
+            const child = walk(o.childSession, label);
+            if (child !== undefined) return child;
+          }
+        }
+      }
+      return undefined;
+    };
+    return walk(this.session, []) ?? '';
+  }
+
+  appendReasoningChunk(opId: string, text: string): void {
+    const op = this.opIndex.get(opId);
+    if (op === undefined) return;
+    const r = op.reasoning ?? { chunks: [] as { text: string; ts: number }[] };
+    r.chunks.push({ text, ts: Date.now() });
+    op.reasoning = r;
+  }
+
+  setReasoningFinal(opId: string, text: string): void {
+    const op = this.opIndex.get(opId);
+    if (op === undefined) return;
+    const r = op.reasoning ?? { chunks: [] as { text: string; ts: number }[] };
+    r.final = text;
+    op.reasoning = r;
+  }
+
+  setRequest(opId: string, req: { kind: 'llm'|'tool'; payload: unknown; size?: number }): void {
+    const op = this.opIndex.get(opId);
+    if (op !== undefined) op.request = req;
+  }
+
+  setResponse(opId: string, res: { payload: unknown; size?: number; truncated?: boolean }): void {
+    const op = this.opIndex.get(opId);
+    if (op !== undefined) op.response = res;
+  }
+
+  // Flatten all logs and accounting from the tree in timestamp order for legacy consumers
+  flatten(): { logs: LogEntry[]; accounting: AccountingEntry[] } {
+    const logs: LogEntry[] = [];
+    const acc: AccountingEntry[] = [];
+    const visit = (node: SessionNode): void => {
+      node.turns.forEach((t) => {
+        t.ops.forEach((o) => {
+          logs.push(...o.logs);
+          acc.push(...o.accounting);
+          if (o.kind === 'session' && o.childSession !== undefined) visit(o.childSession);
+        });
+      });
+    };
+    visit(this.session);
+    logs.sort((a, b) => a.timestamp - b.timestamp);
+    acc.sort((a, b) => a.timestamp - b.timestamp);
+    return { logs, accounting: acc };
   }
 
   endOp(opId: string, status: 'ok' | 'failed', attributes?: Record<string, unknown>): void {
@@ -140,7 +223,7 @@ export class SessionTreeBuilder {
         if (o.childSession !== undefined) {
           lines.push(`${lpfx}child:`);
           // indent child tree
-          const childLines = new SessionTreeBuilder().indentAscii(this.renderChild(o.childSession)).split('\n');
+          const childLines = SessionTreeBuilder.indentAscii(this.renderChild(o.childSession)).split('\n');
           childLines.forEach((ln) => { if (ln.length > 0) lines.push(`${lpfx}${ln}`); });
         }
       });
@@ -175,7 +258,7 @@ export class SessionTreeBuilder {
   }
 
   // Helper to indent a multi-line ASCII block
-  private indentAscii(block: string): string {
+  static indentAscii(block: string): string {
     return block.split('\n').map((l) => `   ${l}`).join('\n');
   }
 }

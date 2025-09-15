@@ -1,4 +1,5 @@
 import type { ConversationMessage, AIAgentResult } from '../types.js';
+import { warn } from '../utils.js';
 import { SessionManager } from './session-manager.js';
 import { buildSnapshot, buildSnapshotFromOpTree, formatSlackStatus, buildStatusBlocks } from './status-aggregator.js';
 
@@ -354,8 +355,8 @@ async function fetchContext(client: SlackClient, event: any, limit: number, char
 
 export function initSlackHeadend(options: SlackHeadendOptions): void {
   const { sessionManager, app, historyLimit = 30, historyCharsCap = 8000, updateIntervalMs = 2000, enableMentions = true, enableDMs = true, systemPrompt, verbose = false } = options;
-  const vlog = (msg: string): void => { if (verbose) { try { process.stderr.write(`[SRV] ← [0.0] server slack: ${msg}\n`); } catch { /* ignore */ } } };
-  const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0] server slack: ${msg}\n`); } catch { /* ignore */ } };
+const vlog = (msg: string): void => { if (verbose) { try { process.stderr.write(`[SRV] ← [0.0] server slack: ${msg}\n`); } catch (e) { try { process.stderr.write(`[warn] failed to write vlog: ${e instanceof Error ? e.message : String(e)}\n`); } catch {} } } };
+const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0] server slack: ${msg}\n`); } catch (e) { try { process.stderr.write(`[warn] failed to write elog: ${e instanceof Error ? e.message : String(e)}\n`); } catch {} } };
 
   // Tracks any pending delayed update timeouts per message (channel:ts)
   const updating = new Map<string, NodeJS.Timeout>();
@@ -622,7 +623,7 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
         let maxMrkdwn = 0;
         slackMessages.forEach((m) => { const bl = Array.isArray(m.blocks) ? m.blocks : []; bl.forEach((b: any) => { const t = b?.text?.text; if (typeof t === 'string') maxMrkdwn = Math.max(maxMrkdwn, t.length); }); });
         diag = ` blocks=${String(blocksCount)} max_section_len=${String(maxMrkdwn)}`;
-      } catch { /* ignore */ }
+      } catch (e) { warn(`failed to update slack message: ${e instanceof Error ? e.message : String(e)}`); }
       const full = `Slack post failed: ${errMsg}${diag}\nDetails: ${dataStr}`;
       elog(`chat.update failed: ${errMsg} (size: ${String(chars)} chars, ${String(bytes)} bytes) details=${dataStr.substring(0, 400)}`);
       // Try to post a detailed fallback so users can report it
@@ -713,7 +714,7 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
           { type: 'section', text: { type: 'mrkdwn', text: openerText } }
         ]
       });
-    } catch { /* ignore update issues */ }
+    } catch (e) { warn(`update scheduling failed: ${e instanceof Error ? e.message : String(e)}`); }
     const render = (): { text: string; blocks: any[] } => {
       const meta = activeSessions.getRun(runId);
       if (meta && meta.status === 'stopping') {
@@ -745,10 +746,10 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
                   if (!seen.has(key)) (base.lines as any[]).push(l);
                 });
               }
-            } catch { /* ignore overlay issues */ }
+            } catch (e) { warn(`slack overlay failed: ${e instanceof Error ? e.message : String(e)}`); }
             return base;
           }
-        } catch { /* ignore */ }
+        } catch (e) { warn(`slack progress update failed: ${e instanceof Error ? e.message : String(e)}`); }
         const logs = activeSessions.getLogs(runId);
         const acc = activeSessions.getAccounting(runId);
         return buildSnapshot(logs, acc, now);
@@ -772,7 +773,7 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
           const insertIdx = footerIdx >= 0 ? footerIdx : blocks.length;
           blocks.splice(insertIdx, 0, cancelActions);
         }
-      } catch { /* ignore block surgery errors */ }
+      } catch (e) { warn(`slack block surgery failed: ${e instanceof Error ? e.message : String(e)}`); }
       return { text, blocks };
     };
     scheduleUpdate(client, channel, liveTs, render);
@@ -782,12 +783,12 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
       unsubscribe = sessionManager.onTreeUpdate((id: string) => {
         if (id === runId) scheduleUpdate(client, channel, liveTs, render);
       });
-    } catch { /* ignore */ }
+    } catch (e) { warn(`slack apply update failed: ${e instanceof Error ? e.message : String(e)}`); }
     const poll = setInterval(async () => {
       const meta = activeSessions.getRun(runId);
       if (!meta || meta.status === 'running' || meta.status === 'stopping') { scheduleUpdate(client, channel, liveTs, render); return; }
       clearInterval(poll);
-      try { unsubscribe?.(); } catch { /* ignore */ }
+      try { unsubscribe?.(); } catch (e) { warn(`slack unsubscribe failed: ${e instanceof Error ? e.message : String(e)}`); }
       await finalizeAndPost(activeSessions, client, channel, liveTs, runId, { error: meta.error });
     }, updateIntervalMs);
   };
@@ -832,7 +833,7 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
   // Message shortcut: Ask Neda — routes like channel-post with self-only context
   app.shortcut('ask_neda', async (args: any) => {
     const { ack, body, client } = args;
-    try { await ack(); } catch { /* ignore */ }
+    try { await ack(); } catch (e) { warn(`slack ack failed: ${e instanceof Error ? e.message : String(e)}`); }
     try {
       const userId: string | undefined = body?.user?.id;
       const channelId: string | undefined = body?.channel?.id ?? body?.message?.channel ?? body?.channel_id;
@@ -880,7 +881,7 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
         { type: 'button', text: { type: 'plain_text', text: 'Stop' }, action_id: 'stop_run', value: runId },
         { type: 'button', text: { type: 'plain_text', text: 'Abort' }, style: 'danger', action_id: 'cancel_run', value: runId }
       ] } as const;
-      try { await client.chat.update({ channel: targetChannel, ts: liveTs, text: opener, blocks: [ { type: 'section', text: { type: 'mrkdwn', text: opener } } ] }); } catch { /* ignore */ }
+      try { await client.chat.update({ channel: targetChannel, ts: liveTs, text: opener, blocks: [ { type: 'section', text: { type: 'mrkdwn', text: opener } } ] }); } catch (e) { warn(`initial slack update failed: ${e instanceof Error ? e.message : String(e)}`); }
       const render = (): { text: string; blocks: any[] } => {
         const meta = activeSessions.getRun(runId);
         if (meta && meta.status === 'stopping') return { text: STOPPING_TEXT, blocks: [ { type: 'section', text: { type: 'mrkdwn', text: STOPPING_TEXT } } ] } as any;
@@ -902,10 +903,10 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
                   const seen = new Set<string>((base.lines as any[]).map((l: any) => `${String(l.agentId)}|${String(l.callPath ?? '')}`));
                   live.lines.forEach((l: any) => { const key = `${String(l.agentId)}|${String(l.callPath ?? '')}`; if (!seen.has(key)) (base.lines as any[]).push(l); });
                 }
-              } catch { /* ignore overlay issues */ }
+              } catch (e) { warn(`slack overlay failed: ${e instanceof Error ? e.message : String(e)}`); }
               return base;
             }
-          } catch { /* ignore */ }
+          } catch (e) { warn(`slack follow-up update failed: ${e instanceof Error ? e.message : String(e)}`); }
           const logs = activeSessions.getLogs(runId);
           const acc = activeSessions.getAccounting(runId);
           return buildSnapshot(logs, acc, now);
@@ -920,17 +921,17 @@ export function initSlackHeadend(options: SlackHeadendOptions): void {
             const insertIdx = footerIdx >= 0 ? footerIdx : blocks.length;
             blocks.splice(insertIdx, 0, cancelActions);
           }
-        } catch { /* ignore */ }
+        } catch (e) { warn(`slack final update failed: ${e instanceof Error ? e.message : String(e)}`); }
         return { text: text2, blocks };
       };
       scheduleUpdate(client, targetChannel, liveTs, render);
       let unsubscribe: (() => void) | undefined;
-      try { unsubscribe = activeSessions.onTreeUpdate((id: string) => { if (id === runId) scheduleUpdate(client, targetChannel, liveTs, render); }); } catch { /* ignore */ }
+      try { unsubscribe = activeSessions.onTreeUpdate((id: string) => { if (id === runId) scheduleUpdate(client, targetChannel, liveTs, render); }); } catch (e) { warn(`slack onTreeUpdate subscribe failed: ${e instanceof Error ? e.message : String(e)}`); }
       const poll = setInterval(async () => {
         const meta = activeSessions.getRun(runId);
         if (!meta || meta.status === 'running' || meta.status === 'stopping') { scheduleUpdate(client, targetChannel, liveTs, render); return; }
         clearInterval(poll);
-        try { unsubscribe?.(); } catch { /* ignore */ }
+        try { unsubscribe?.(); } catch (e) { warn(`slack unsubscribe failed: ${e instanceof Error ? e.message : String(e)}`); }
         await finalizeAndPost(activeSessions, client, targetChannel, liveTs, runId, { error: meta.error });
       }, updateIntervalMs);
     } catch (e) {

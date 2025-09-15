@@ -5,6 +5,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 
 import { loadConfiguration } from '../config.js';
+import { warn } from '../utils.js';
 import { discoverLayers } from '../config-resolver.js';
 import { buildApiRouter } from './api.js';
 import { SessionManager } from './session-manager.js';
@@ -44,7 +45,7 @@ export async function startServer(agentPath: string, options?: { enableSlack?: b
 
   const logSink = (entry: any) => {
     const line = formatLog(entry, { color: true, verbose: options?.verbose === true, traceLlm: options?.traceLlm === true, traceMcp: options?.traceMcp === true });
-    if (line.length > 0) { try { process.stderr.write(`${line}\n`); } catch { /* ignore */ } }
+    if (line.length > 0) { try { process.stderr.write(`${line}\n`); } catch (e) { warn(`server write failed: ${e instanceof Error ? e.message : String(e)}`); } }
   };
 
   const sessions = new SessionManager(runner, { onLog: logSink });
@@ -133,8 +134,8 @@ export async function startServer(agentPath: string, options?: { enableSlack?: b
     const method = req?.method; const url = req?.originalUrl ?? req?.url; const ip = req?.ip;
     const bodyLen = (() => { try { return typeof req?.rawBody === 'string' ? Buffer.byteLength(req.rawBody, 'utf8') : JSON.stringify(req?.body ?? {}).length; } catch { return 0; } })();
     const line = `[SRV] ← [0.0] server api: ${method} ${url} from ${String(ip)} failed: ${message}${stack ? `\n${stack}` : ''} (bodySize=${String(bodyLen)} bytes)`;
-    try { process.stderr.write(`${line}\n`); } catch { /* ignore */ }
-    try { res.status(500).json({ error: 'internal_error', message }); } catch { /* ignore */ }
+    try { process.stderr.write(`${line}\n`); } catch (e) { warn(`server write failed: ${e instanceof Error ? e.message : String(e)}`); }
+    try { res.status(500).json({ error: 'internal_error', message }); } catch (e) { warn(`server JSON response failed: ${e instanceof Error ? e.message : String(e)}`); }
   };
   // Resolve slack/api with .ai-agent.env support (same paradigm as CLI)
   const layers = discoverLayers({ configPath: undefined });
@@ -243,8 +244,8 @@ export async function startServer(agentPath: string, options?: { enableSlack?: b
         });
       }
       lines.push('');
-      try { process.stderr.write(`${lines.join('\n')}\n`); } catch { /* ignore */ }
-    } catch { /* ignore */ }
+      try { process.stderr.write(`${lines.join('\n')}\n`); } catch (e) { warn(`server write failed: ${e instanceof Error ? e.message : String(e)}`); }
+    } catch (e) { warn(`server index catch failed: ${e instanceof Error ? e.message : String(e)}`); }
 
     // Resolver passed to headend
     const resolveRoute = async (args: { kind: 'mentions'|'channel-posts'|'dms'; channelId: string; channelName?: string }): Promise<{
@@ -266,7 +267,7 @@ export async function startServer(agentPath: string, options?: { enableSlack?: b
           const abs = resolveAgentPath(ru.agentPath);
           const rec = agentCache.get(abs);
           if (!rec) {
-            try { process.stderr.write(`[SRV] ← [0.0] server slack: ⚠️  routing warning: agent not preloaded/resolved: ${abs}\n`); } catch { /* ignore */ }
+            try { process.stderr.write(`[SRV] ← [0.0] server slack: ⚠️  routing warning: agent not preloaded/resolved: ${abs}\n`); } catch (e) { warn(`server write failed: ${e instanceof Error ? e.message : String(e)}`); }
             continue;
           }
           return { sessions: rec.sessions, systemPrompt: rec.loaded.systemTemplate, promptTemplates: ru.promptTemplates, contextPolicy: ru.contextPolicy };
@@ -301,23 +302,23 @@ export async function startServer(agentPath: string, options?: { enableSlack?: b
     const receiver = slackApp.receiver as any;
     if (receiver?.client?.on) {
       receiver.client.on('connected', () => {
-        try { process.stderr.write(`[SRV] ← [0.0] server slack: ✅ Socket Mode reconnected to Slack.\n`); } catch { /* ignore */ }
+        try { process.stderr.write(`[SRV] ← [0.0] server slack: ✅ Socket Mode reconnected to Slack.\n`); } catch (e) { warn(`server write failed: ${e instanceof Error ? e.message : String(e)}`); }
       });
       receiver.client.on('disconnected', () => {
-        try { process.stderr.write(`[SRV] ← [0.0] server slack: ⚠️  Socket Mode disconnected from Slack.\n`); } catch { /* ignore */ }
+        try { process.stderr.write(`[SRV] ← [0.0] server slack: ⚠️  Socket Mode disconnected from Slack.\n`); } catch (e) { warn(`server write failed: ${e instanceof Error ? e.message : String(e)}`); }
       });
       receiver.client.on('reconnecting', () => {
-        try { process.stderr.write(`[SRV] ← [0.0] server slack: 🔄 Socket Mode reconnecting to Slack...\n`); } catch { /* ignore */ }
+        try { process.stderr.write(`[SRV] ← [0.0] server slack: 🔄 Socket Mode reconnecting to Slack...\n`); } catch (e) { warn(`server write failed: ${e instanceof Error ? e.message : String(e)}`); }
       });
     }
     
     await slackApp.start();
-    try { process.stderr.write(`[SRV] ← [0.0] server slack: ⚡ Slack headend connected (Socket Mode).\n`); } catch { /* ignore */ }
+    try { process.stderr.write(`[SRV] ← [0.0] server slack: ⚡ Slack headend connected (Socket Mode).\n`); } catch (e) { warn(`server write failed: ${e instanceof Error ? e.message : String(e)}`); }
 
     // Optional: Slash commands public endpoint (requires external HTTPS in production)
     if (typeof slackSigningSecret === 'string' && slackSigningSecret.length > 0) {
       // Capture raw body for signature verification
-      const rawBodySaver = (req: any, _res: any, buf: Buffer): void => { try { req.rawBody = buf.toString('utf8'); } catch { /* ignore */ } };
+      const rawBodySaver = (req: any, _res: any, buf: Buffer): void => { try { req.rawBody = buf.toString('utf8'); } catch (e) { warn(`rawBodySaver failed: ${e instanceof Error ? e.message : String(e)}`); } };
       app.use('/slack/commands', express.urlencoded({ extended: false, verify: rawBodySaver }));
       const timingSafeEq = (a: Buffer, b: Buffer): boolean => { try { return crypto.timingSafeEqual(a, b); } catch { return false; } };
       const verifySlackSig = (req: any): boolean => {
@@ -336,12 +337,12 @@ export async function startServer(agentPath: string, options?: { enableSlack?: b
       };
       app.post('/slack/commands', async (req: any, res: any) => {
         try {
-          if (!verifySlackSig(req)) { try { res.status(401).send('invalid'); } catch { /* ignore */ } return; }
+          if (!verifySlackSig(req)) { try { res.status(401).send('invalid'); } catch (e) { warn(`server 401 response failed: ${e instanceof Error ? e.message : String(e)}`); } return; }
           const body = req.body as Record<string, string>;
           const command = body.command; const text = body.text; const userId = body.user_id; const channelId = body.channel_id; const teamId = body.team_id; const responseUrl = body.response_url;
-          if (!command || !userId || !channelId) { try { res.status(400).send('bad'); } catch { /* ignore */ } return; }
+          if (!command || !userId || !channelId) { try { res.status(400).send('bad'); } catch (e) { warn(`server 400 response failed: ${e instanceof Error ? e.message : String(e)}`); } return; }
           // Fast ack (ephemeral)
-          try { res.status(200).json({ response_type: 'ephemeral', text: 'Working…' }); } catch { /* ignore */ }
+          try { res.status(200).json({ response_type: 'ephemeral', text: 'Working…' }); } catch (e) { warn(`server 200 response failed: ${e instanceof Error ? e.message : String(e)}`); }
           // Resolve channel name and route
           const chInfo = await slackApp.client.conversations.info({ channel: channelId });
           const chName = chInfo?.channel?.name as string | undefined;
@@ -385,7 +386,7 @@ export async function startServer(agentPath: string, options?: { enableSlack?: b
           const isMember = await (async () => { try { const i = await slackApp.client.conversations.info({ channel: channelId }); return i?.channel?.is_member === true; } catch { return false; } })();
           let targetChannel = channelId; let threadTs: string | undefined = undefined;
           if (!isMember) {
-            try { await fetch(responseUrl, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ response_type: 'ephemeral', text: 'Not a channel member; continuing in DM…' }) }); } catch { /* ignore */ }
+            try { await fetch(responseUrl, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ response_type: 'ephemeral', text: 'Not a channel member; continuing in DM…' }) }); } catch (e) { warn(`slack ephemeral post failed: ${e instanceof Error ? e.message : String(e)}`); }
             const dm = await slackApp.client.conversations.open({ users: userId });
             const dmChannel = dm?.channel?.id as string | undefined; if (!dmChannel) return;
             targetChannel = dmChannel;
@@ -408,19 +409,19 @@ export async function startServer(agentPath: string, options?: { enableSlack?: b
           const outText = (() => { const r = activeSessions.getOutput(runId) ?? ''; if (r.length > 0) return r; const rr = activeSessions.getResult(runId); if (rr?.finalReport?.content) return rr.finalReport.content; return resMeta?.error ? `❌ ${resMeta.error}` : '✅ Done'; })();
           await slackApp.client.chat.postMessage({ channel: targetChannel, thread_ts: liveTs, text: outText.substring(0, 3500) });
         } catch (e) {
-          try { res.status(500).send('error'); } catch { /* ignore */ }
-          try { process.stderr.write(`[SRV] ← [0.0] server slack: slash command failed: ${(e as Error).message}\n`); } catch { /* ignore */ }
+          try { res.status(500).send('error'); } catch (e) { warn(`server 500 response failed: ${e instanceof Error ? e.message : String(e)}`); }
+          try { process.stderr.write(`[SRV] ← [0.0] server slack: slash command failed: ${(e as Error).message}\n`); } catch (ex) { warn(`server write failed: ${ex instanceof Error ? ex.message : String(ex)}`); }
         }
       });
-      try { process.stderr.write(`[SRV] ← [0.0] server api: 🛰️  Slash commands endpoint mounted at /slack/commands (needs public HTTPS).\n`); } catch { /* ignore */ }
+      try { process.stderr.write(`[SRV] ← [0.0] server api: 🛰️  Slash commands endpoint mounted at /slack/commands (needs public HTTPS).\n`); } catch (e) { warn(`server write failed: ${e instanceof Error ? e.message : String(e)}`); }
     }
   } else {
-    try { process.stderr.write(`[SRV] ← [0.0] server slack: Slack headend not started (missing SLACK_BOT_TOKEN or SLACK_APP_TOKEN).\n`); } catch { /* ignore */ }
+    try { process.stderr.write(`[SRV] ← [0.0] server slack: Slack headend not started (missing SLACK_BOT_TOKEN or SLACK_APP_TOKEN).\n`); } catch (e) { warn(`server write failed: ${e instanceof Error ? e.message : String(e)}`); }
   }
 
   const port = apiCfg.port ?? 8080;
   app.listen(port, () => {
-    try { process.stderr.write(`[SRV] ← [0.0] server api: Server listening on http://localhost:${String(port)}\n`); } catch { /* ignore */ }
+    try { process.stderr.write(`[SRV] ← [0.0] server api: Server listening on http://localhost:${String(port)}\n`); } catch (e) { warn(`server write failed: ${e instanceof Error ? e.message : String(e)}`); }
   });
   // Register error handler last
   // eslint-disable-next-line @typescript-eslint/no-misused-promises

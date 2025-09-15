@@ -213,3 +213,14 @@ export function truncateUtf8WithNotice(s: string, limitBytes: number, originalSi
   const truncated = dec.decode(contentSlice);
   return prefix + truncated;
 }
+
+// Consistent warning logger for stderr
+export function warn(message: string): void {
+  try {
+    const prefix = '[warn] ';
+    const out = process.stderr.isTTY ? `\x1b[33m${prefix}${message}\x1b[0m` : `${prefix}${message}`;
+    process.stderr.write(out + '\n');
+  } catch {
+    try { console.error(`[warn] ${message}`); } catch { /* noop */ }
+  }
+}

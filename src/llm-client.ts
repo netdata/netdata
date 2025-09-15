@@ -217,7 +217,7 @@ export class LLMClient {
                 const u = pr2.usage?.cost_details?.upstream_inference_cost;
                 reqCostUsd = typeof c === 'number' ? c : undefined;
                 reqUpstreamCostUsd = typeof u === 'number' ? u : undefined;
-              } catch { /* ignore */ }
+              } catch (e) { try { console.error(`[warn] openrouter extract usage cost failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
             } catch {
               // ignore parse errors
             }
@@ -250,7 +250,7 @@ export class LLMClient {
                 } catch { /* skip non-JSON lines */ }
                 return (reqActualProvider !== undefined && reqActualModel !== undefined && reqCostUsd !== undefined);
               });
-            } catch { /* ignore SSE parse errors */ }
+            } catch (e) { try { console.error(`[warn] openrouter SSE parse failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
           } else {
             // Clear for non-openrouter URLs
             if (!url.includes(LLMClient.OPENROUTER_HOST)) {
@@ -285,10 +285,10 @@ export class LLMClient {
                 }
                 const n = asNum(w);
                 if (typeof n === 'number') reqCacheWriteInputTokens = n;
-              } catch { /* ignore */ }
+              } catch (e) { try { console.error(`[warn] generic JSON usage parse failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
             }
           }
-        } catch { /* ignore */ }
+        } catch (e) { try { console.error(`[warn] traced fetch post-response processing failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
 
         // Commit per-request routing/cost to instance state for retrieval after this call
         this.lastActualProvider = reqActualProvider;

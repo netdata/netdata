@@ -11,6 +11,7 @@ import type { ToolExecuteOptions, ToolExecuteResult } from './types.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 
 import { createWebSocketTransport } from '../websocket-transport.js';
+import { warn } from '../utils.js';
 import { ToolProvider } from './types.js';
 
 export class MCPProvider extends ToolProvider {
@@ -192,10 +193,10 @@ export class MCPProvider extends ToolProvider {
           try {
             const s = chunk.toString('utf8');
             this.log('ERR', `stderr '${name}': ${s.trim()}`, `mcp:${name}`);
-          } catch { /* ignore */ }
+          } catch (e) { warn(`mcp stdio stderr relay failed: ${e instanceof Error ? e.message : String(e)}`); }
         });
       }
-    } catch { /* ignore */ }
+    } catch (e) { warn(`mcp stdio transport setup failed: ${e instanceof Error ? e.message : String(e)}`); }
     return transport;
   }
 
@@ -203,7 +204,7 @@ export class MCPProvider extends ToolProvider {
     const entry: LogEntry = {
       timestamp: Date.now(), severity, turn: 0, subturn: 0, direction: 'response', type: 'tool', toolKind: 'mcp', remoteIdentifier, fatal, message,
     };
-    try { this.onLog?.(entry); } catch { /* ignore */ }
+    try { this.onLog?.(entry); } catch (e) { warn(`mcp onLog failed: ${e instanceof Error ? e.message : String(e)}`); }
   }
 
   listTools(): MCPTool[] {
@@ -281,7 +282,7 @@ export class MCPProvider extends ToolProvider {
   }
 
   async cleanup(): Promise<void> {
-    await Promise.all(Array.from(this.clients.values()).map(async (c) => { try { await c.close(); } catch { /* ignore */ } }));
+    await Promise.all(Array.from(this.clients.values()).map(async (c) => { try { await c.close(); } catch (e) { warn(`mcp client close failed: ${e instanceof Error ? e.message : String(e)}`); } }));
     await Promise.all(Array.from(this.processes.values()).map((proc) => new Promise<void>((resolve) => {
       try {
         if (proc.killed || proc.exitCode !== null) { resolve(); return; }

@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 
 import type { AIAgentCallbacks, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry } from '../types.js';
+import { warn } from '../utils.js';
 import type { RunKey, RunMeta } from './types.js';
 
 interface Callbacks { onTreeUpdate?: (runId: string) => void; onLog?: (entry: LogEntry) => void; }
@@ -12,6 +13,7 @@ export class SessionManager {
   private readonly logs = new Map<string, LogEntry[]>();
   private readonly accounting = new Map<string, AccountingEntry[]>();
   private readonly opTrees = new Map<string, unknown>();
+  private readonly ingress = new Map<string, Record<string, unknown>>();
   private readonly aborters = new Map<string, AbortController>();
   private readonly stopRefs = new Map<string, { stopping: boolean }>();
   private readonly callbacks: Callbacks;
@@ -63,9 +65,9 @@ export class SessionManager {
       meta.error = reason ?? 'canceled';
       meta.updatedAt = Date.now();
       this.runs.set(runId, meta);
-      try { this.aborters.get(runId)?.abort(); } catch { /* ignore */ }
+      try { this.aborters.get(runId)?.abort(); } catch (e) { warn(`abort failed for run ${runId}: ${e instanceof Error ? e.message : String(e)}`); }
       this.callbacks.onTreeUpdate?.(runId);
-      for (const fn of this.treeUpdateListeners) { try { fn(runId); } catch { /* ignore */ } }
+      for (const fn of this.treeUpdateListeners) { try { fn(runId); } catch (e) { warn(`treeUpdate listener failed: ${e instanceof Error ? e.message : String(e)}`); } }
     }
   }
 
@@ -79,7 +81,7 @@ export class SessionManager {
       const ref = this.stopRefs.get(runId);
       if (ref) ref.stopping = true;
       this.callbacks.onTreeUpdate?.(runId);
-      for (const fn of this.treeUpdateListeners) { try { fn(runId); } catch { /* ignore */ } }
+      for (const fn of this.treeUpdateListeners) { try { fn(runId); } catch (e) { warn(`treeUpdate listener failed: ${e instanceof Error ? e.message : String(e)}`); } }
     }
   }
 
@@ -96,6 +98,16 @@ export class SessionManager {
       model: undefined
     };
     this.runs.set(runId, meta);
+    // Capture ingress metadata for later attachment to opTree
+    const ing: Record<string, unknown> = { source: key.source };
+    if (key.source === 'slack') {
+      if (key.teamId) ing.teamId = key.teamId;
+      if (key.channelId) ing.channelId = key.channelId;
+      if (key.threadTsOrSessionId) ing.threadTs = key.threadTsOrSessionId;
+    } else if (key.source === 'api') {
+      ing.requestId = key.threadTsOrSessionId;
+    }
+    this.ingress.set(runId, ing);
 
     const outputBuf: string[] = [];
 
@@ -117,24 +129,33 @@ export class SessionManager {
               const arr = this.logs.get(runId) ?? [];
               arr.push(entry);
               this.logs.set(runId, arr);
-              this.callbacks.onLog?.(entry);
+              try { this.callbacks.onLog?.(entry); } catch (e) { warn(`callbacks.onLog failed: ${e instanceof Error ? e.message : String(e)}`); }
             this.callbacks.onTreeUpdate?.(runId);
           },
           onOpTree: (tree) => {
+            try {
+              const ing = this.ingress.get(runId);
+              if (ing && tree && typeof tree === 'object') {
+                const root = tree as Record<string, unknown>;
+                const attrs = (root.attributes as Record<string, unknown>|undefined) ?? {};
+                attrs.ingress = { ...(attrs.ingress as Record<string, unknown> ?? {}), ...ing };
+                root.attributes = attrs;
+              }
+            } catch (e) { warn(`opTree ingress enrichment failed: ${e instanceof Error ? e.message : String(e)}`); }
             this.opTrees.set(runId, tree);
-            this.callbacks.onTreeUpdate?.(runId);
+            try { this.callbacks.onTreeUpdate?.(runId); } catch (e) { warn(`callbacks.onTreeUpdate failed: ${e instanceof Error ? e.message : String(e)}`); }
           },
           onOutput: (t: string) => {
             outputBuf.push(t);
             this.outputs.set(runId, outputBuf.join(''));
-            this.callbacks.onTreeUpdate?.(runId);
+            try { this.callbacks.onTreeUpdate?.(runId); } catch (e) { warn(`callbacks.onTreeUpdate failed: ${e instanceof Error ? e.message : String(e)}`); }
           },
             onAccounting: (a: AccountingEntry) => {
               const arr = this.accounting.get(runId) ?? [];
               arr.push(a);
               this.accounting.set(runId, arr);
               this.callbacks.onTreeUpdate?.(runId);
-              for (const fn of this.treeUpdateListeners) { try { fn(runId); } catch { /* ignore */ } }
+              for (const fn of this.treeUpdateListeners) { try { fn(runId); } catch (e) { warn(`treeUpdate listener failed: ${e instanceof Error ? e.message : String(e)}`); } }
             }
           }
         });
@@ -153,8 +174,8 @@ export class SessionManager {
           m.updatedAt = Date.now();
           this.runs.set(runId, m);
         }
-        this.callbacks.onTreeUpdate?.(runId);
-        for (const fn of this.treeUpdateListeners) { try { fn(runId); } catch { /* ignore */ } }
+        try { this.callbacks.onTreeUpdate?.(runId); } catch (e) { warn(`callbacks.onTreeUpdate failed: ${e instanceof Error ? e.message : String(e)}`); }
+        for (const fn of this.treeUpdateListeners) { try { fn(runId); } catch (e) { warn(`treeUpdate listener failed: ${e instanceof Error ? e.message : String(e)}`); } }
       } catch (err: unknown) {
         const m = this.runs.get(runId);
         if (m) {
@@ -163,8 +184,8 @@ export class SessionManager {
           m.updatedAt = Date.now();
           this.runs.set(runId, m);
         }
-        this.callbacks.onTreeUpdate?.(runId);
-        for (const fn of this.treeUpdateListeners) { try { fn(runId); } catch { /* ignore */ } }
+        try { this.callbacks.onTreeUpdate?.(runId); } catch (e) { warn(`callbacks.onTreeUpdate failed: ${e instanceof Error ? e.message : String(e)}`); }
+        for (const fn of this.treeUpdateListeners) { try { fn(runId); } catch (e) { warn(`treeUpdate listener failed: ${e instanceof Error ? e.message : String(e)}`); } }
       }
     })();
     this.aborters.set(runId, aborter);

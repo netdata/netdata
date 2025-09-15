@@ -140,8 +140,8 @@ function loadSchemaValue(v: unknown, schemaRef?: string, baseDir?: string): Reco
   try {
     if (v !== null && v !== undefined && typeof v === 'object') return v as Record<string, unknown>;
     if (typeof v === 'string') {
-      try { return JSON.parse(v) as Record<string, unknown>; } catch { /* ignore */ }
-      try { return yaml.load(v) as Record<string, unknown>; } catch { /* ignore */ }
+      try { return JSON.parse(v) as Record<string, unknown>; } catch (e) { try { process.stderr.write(`[warn] frontmatter JSON parse failed: ${e instanceof Error ? e.message : String(e)}\n`); } catch {} }
+      try { return yaml.load(v) as Record<string, unknown>; } catch (e) { try { process.stderr.write(`[warn] frontmatter YAML parse failed: ${e instanceof Error ? e.message : String(e)}\n`); } catch {} }
     }
     if (typeof schemaRef === 'string' && schemaRef.length > 0) {
       try {
@@ -149,7 +149,7 @@ function loadSchemaValue(v: unknown, schemaRef?: string, baseDir?: string): Reco
         const content = fs.readFileSync(resolvedPath, 'utf-8');
         if (/\.json$/i.test(resolvedPath)) return JSON.parse(content) as Record<string, unknown>;
         if (/\.(ya?ml)$/i.test(resolvedPath)) return yaml.load(content) as Record<string, unknown>;
-        try { return JSON.parse(content) as Record<string, unknown>; } catch { /* ignore */ }
+        try { return JSON.parse(content) as Record<string, unknown>; } catch (e) { try { process.stderr.write(`[warn] frontmatter JSON parse failed: ${e instanceof Error ? e.message : String(e)}\n`); } catch {} }
         return yaml.load(content) as Record<string, unknown>;
       } catch {
         return undefined;

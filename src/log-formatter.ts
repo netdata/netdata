@@ -45,7 +45,18 @@ export function formatLog(entry: LogEntry, opts: LogFormatOptions = {}): string 
     return `${entry.type} ${remote}: ${entry.message}`;
   })();
 
-  const raw = `${agentPrefix}[${entry.severity}] ${dir} [${turn}] ${base}`;
+  const txn = (() => {
+    const id = entry.originTxnId ?? entry.txnId;
+    return typeof id === 'string' && id.length > 0 ? id : '-';
+  })();
+  const call = (() => {
+    const cp = entry.callPath;
+    if (typeof cp === 'string' && cp.length > 0) return ` ${cp}`;
+    return '';
+  })();
+  // Include txn id and stable path label; prefer opTree-provided path when available
+  const pathLabel = (entry as { path?: string }).path ?? turn;
+  const raw = `[txn:${txn}] [path:${pathLabel}] ${agentPrefix}[${entry.severity}] ${dir} ${base}${call}`;
   // Color by severity (support bold hint on VRB)
   switch (entry.severity) {
     case 'ERR': return ansi(useColor, '\x1b[31m', raw); // red

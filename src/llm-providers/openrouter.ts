@@ -158,7 +158,7 @@ export class OpenRouterProvider extends BaseLLMProvider {
         const v = (raw as { provider?: unknown }).provider;
         if (this.isPlainObject(v)) return v;
       }
-    } catch { /* ignore */ }
+    } catch (e) { try { console.error(`[warn] openrouter provider cleanup failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
     return {};
   }
   

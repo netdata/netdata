@@ -3,6 +3,8 @@ import path from 'node:path';
 
 import type { Configuration, MCPServerConfig, ProviderConfig, RestToolConfig, OpenAPISpecConfig } from './types.js';
 
+import { warn } from './utils.js';
+
 type LayerOrigin = '--config' | 'cwd' | 'binary' | 'home' | 'system';
 
 interface ConfigLayer {
@@ -24,7 +26,7 @@ function readJSONIfExists(p: string): Record<string, unknown> | undefined {
       const raw = fs.readFileSync(p, 'utf-8');
       return JSON.parse(raw) as Record<string, unknown>;
     }
-  } catch { /* ignore */ }
+  } catch (e) { warn(`failed to read or parse JSON config: ${p}: ${e instanceof Error ? e.message : String(e)}`); }
   return undefined;
 }
 
@@ -55,7 +57,7 @@ function readEnvIfExists(p: string): Record<string, string> | undefined {
       const raw = fs.readFileSync(p, 'utf-8');
       return parseEnvFile(raw);
     }
-  } catch { /* ignore */ }
+  } catch (e) { warn(`failed to read env file: ${p}: ${e instanceof Error ? e.message : String(e)}`); }
   return undefined;
 }
 
@@ -161,7 +163,7 @@ function resolveMCPServer(id: string, layers: ConfigLayer[], _opts?: ResolverOpt
           // eslint-disable-next-line no-constant-binary-expression
           const out = process.stderr.isTTY ? `\x1b[90m${msg}\x1b[0m` : msg;
           process.stderr.write(out);
-        } catch { /* ignore */ }
+        } catch (e) { warn(`MCP_ROOT default warning write failed: ${e instanceof Error ? e.message : String(e)}`); }
       }
       return process.cwd();
     }

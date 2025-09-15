@@ -49,7 +49,7 @@ export interface LoadedAgent {
   run: (
     systemPrompt: string,
     userPrompt: string,
-    opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent'; outputFormat: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string }
+    opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent'; outputFormat: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string; ancestors?: string[] }
   ) => Promise<AIAgentResult>;
 }
 
@@ -86,6 +86,9 @@ interface LoadAgentOptions {
   mcpInitConcurrency?: number;
   traceLLM?: boolean;
   traceMCP?: boolean;
+  // Persistence overrides (CLI precedence)
+  sessionsDir?: string;
+  billingFile?: string;
   // Defaults applied only when frontmatter/config do not specify (for sub-agents)
   defaultsForUndefined?: {
     temperature?: number;
@@ -151,6 +154,13 @@ export function loadAgent(aiPath: string, registry?: AgentRegistry, options?: Lo
   const config = buildUnifiedConfiguration({ providers: needProviders, mcpServers: selectedTools }, layers, { verbose: options?.verbose });
   const dfl = resolveDefaults(layers);
   validateNoPlaceholders(config);
+  // Apply persistence overrides from CLI
+  if ((typeof options?.sessionsDir === 'string' && options.sessionsDir.length > 0) || (typeof options?.billingFile === 'string' && options.billingFile.length > 0)) {
+    const p = { ...(config.persistence ?? {}) } as { sessionsDir?: string; billingFile?: string };
+    if (typeof options.sessionsDir === 'string' && options.sessionsDir.length > 0) p.sessionsDir = options.sessionsDir;
+    if (typeof options.billingFile === 'string' && options.billingFile.length > 0) p.billingFile = options.billingFile;
+    (config as unknown as { persistence?: { sessionsDir?: string; billingFile?: string } }).persistence = p;
+  }
   
   // Validate that all requested MCP tools exist in configuration
   const missingTools: string[] = [];
@@ -211,7 +221,7 @@ export function loadAgent(aiPath: string, registry?: AgentRegistry, options?: Lo
     }
   }
 
-  const accountingFile: string | undefined = config.accounting?.file;
+  const accountingFile: string | undefined = config.persistence?.billingFile ?? config.accounting?.file;
 
   const agentName = path.basename(id).replace(/\.[^.]+$/, '');
   const loaded: LoadedAgent = {
@@ -245,8 +255,8 @@ export function loadAgent(aiPath: string, registry?: AgentRegistry, options?: Lo
       mcpInitConcurrency: eff.mcpInitConcurrency,
     },
     subTools: [],
-    run: async (systemPrompt: string, userPrompt: string, opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent'; outputFormat: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean } }): Promise<AIAgentResult> => {
-      const o = (opts ?? {}) as { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli'|'slack'|'api'|'web'|'sub-agent'; outputFormat?: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string };
+    run: async (systemPrompt: string, userPrompt: string, opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent'; outputFormat: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string; ancestors?: string[] }): Promise<AIAgentResult> => {
+      const o = (opts ?? {}) as { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli'|'slack'|'api'|'web'|'sub-agent'; outputFormat?: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string; ancestors?: string[] };
       if (o.outputFormat === undefined) throw new Error('outputFormat is required');
       // Support dynamic OpenAPI tool import from config.openapiSpecs
       // PR-002: Only load OpenAPI tools if agent explicitly selects the provider
@@ -474,7 +484,7 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
     }
   }
 
-  const accountingFile: string | undefined = config.accounting?.file;
+  const accountingFile: string | undefined = config.persistence?.billingFile ?? config.accounting?.file;
 
   const loaded: LoadedAgent = {
     id,
@@ -507,8 +517,8 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
       verbose: eff.verbose,
       mcpInitConcurrency: eff.mcpInitConcurrency,
     },
-    run: async (systemPrompt: string, userPrompt: string, opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent'; outputFormat: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string }): Promise<AIAgentResult> => {
-      const o = (opts ?? {}) as { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli'|'slack'|'api'|'web'|'sub-agent'; outputFormat?: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string };
+    run: async (systemPrompt: string, userPrompt: string, opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent'; outputFormat: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string; ancestors?: string[] }): Promise<AIAgentResult> => {
+      const o = (opts ?? {}) as { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli'|'slack'|'api'|'web'|'sub-agent'; outputFormat?: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string; ancestors?: string[] };
       if (o.outputFormat === undefined) throw new Error('outputFormat is required');
       
       // Support dynamic OpenAPI tool import from config.openapiSpecs
@@ -605,6 +615,7 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
         callbacks: o.callbacks,
         trace: o.trace,
         initialTitle: o.initialTitle,
+        ancestors: Array.isArray(o.ancestors) ? o.ancestors : undefined,
         // Propagate control signals to child sessions
         abortSignal: o.abortSignal,
         stopRef: o.stopRef,

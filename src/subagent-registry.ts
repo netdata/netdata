@@ -85,18 +85,16 @@ export class SubAgentRegistry {
       throw new Error(`Duplicate sub-agent tool name '${toolName}' from '${id}' conflicts with an existing sub-agent`);
     }
     // Max recursion = 0: sub-agents cannot declare further sub-agents
-    const childAgents: string[] = (() => {
-      const anyOpts = fm.options as Record<string, unknown> | undefined;
-      if (anyOpts !== undefined) {
-        const a = anyOpts.agents;
-        if (Array.isArray(a)) return (a as unknown[]).map((x) => String(x));
-        if (typeof a === 'string' && a.length > 0) return [a];
-      }
-      return [];
-    })();
-    if (childAgents.length > 0) {
-      throw new Error(`Sub-agent '${id}' declares its own agents; recursion is not allowed`);
-    }
+    // const childAgents: string[] = (() => {
+    //   const anyOpts = fm.options as Record<string, unknown> | undefined;
+    //   if (anyOpts !== undefined) {
+    //     const a = anyOpts.agents;
+    //     if (Array.isArray(a)) return (a as unknown[]).map((x) => String(x));
+    //     if (typeof a === 'string' && a.length > 0) return [a];
+    //   }
+    //   return [];
+    // })();
+    // Allow nested sub-agents; recursion cycles will be prevented by ancestors at load-time of child sessions.
     // Determine input format/schema
     const inputFmt = fm.inputSpec?.format ?? 'text';
     const inputSchema = fm.inputSpec?.schema;
@@ -171,6 +169,8 @@ export class SubAgentRegistry {
       // control signals to propagate
       abortSignal?: AbortSignal;
       stopRef?: { stopping: boolean };
+      // live updates: stream child opTree snapshots to parent orchestrator
+      onChildOpTree?: (tree: SessionNode) => void;
     }
   ): Promise<{ result: string; child: ChildInfo; accounting: readonly AccountingEntry[]; conversation: ConversationMessage[]; trace?: { originId?: string; parentId?: string; selfId?: string; callPath?: string }, opTree?: SessionNode }> {
     const name = exposedToolName.startsWith('agent__') ? exposedToolName.slice('agent__'.length) : exposedToolName;
@@ -225,7 +225,12 @@ export class SubAgentRegistry {
         },
         onOutput: (t) => { orig.onOutput?.(t); },
         onThinking: (t) => { orig.onThinking?.(t); },
-        onAccounting: (a) => { orig.onAccounting?.(a); }
+        onAccounting: (a) => { orig.onAccounting?.(a); },
+        onOpTree: (tree) => {
+          // Forward to parent session manager and to orchestrator live callback
+          try { orig.onOpTree?.(tree); } catch (e) { try { process.stderr.write(`[warn] child onOpTree callback failed: ${e instanceof Error ? e.message : String(e)}\n`); } catch {} }
+          try { parentSession.onChildOpTree?.(tree as SessionNode); } catch (e) { try { process.stderr.write(`[warn] parent onChildOpTree callback failed: ${e instanceof Error ? e.message : String(e)}\n`); } catch {} }
+        }
       };
 
       const history: ConversationMessage[] | undefined = undefined;
@@ -243,7 +248,9 @@ export class SubAgentRegistry {
         initialTitle: reason,
         // propagate control signals from parent session
         abortSignal: parentSession.abortSignal,
-        stopRef: parentSession.stopRef
+        stopRef: parentSession.stopRef,
+        // propagate ancestors to prevent recursion cycles in nested sessions
+        ancestors: [...this.ancestors, info.promptPath]
       });
     } finally {
       // no chdir in static mode

@@ -65,7 +65,7 @@ export class OllamaProvider extends BaseLLMProvider {
         if (Object.keys(dyn).length > 0) {
           providerOptions = { ...(providerOptions ?? {}), ...dyn };
         }
-      } catch { /* ignore */ }
+      } catch (e) { try { console.error(`[warn] ollama provider cleanup failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
 
       if (request.stream === true) {
         return await super.executeStreamingTurn(model, finalMessages, tools, request, startTime, providerOptions);

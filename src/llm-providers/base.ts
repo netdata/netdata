@@ -123,9 +123,9 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
             if (typeof innerStatus === 'string' && innerStatus.length > 0) {
               codeStr ??= innerStatus;
             }
-          } catch { /* ignore */ }
+          } catch (e) { try { console.error(`[warn] fetch body text read failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
         }
-      } catch { /* ignore */ }
+      } catch (e) { try { console.error(`[warn] provider traced fetch failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
     }
 
     const nameVal = (primary as { name?: unknown }).name;
@@ -414,11 +414,11 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         if (request.abortSignal.aborted) { controller.abort(); }
         else {
           // Tie external abort to our controller
-          const onAbort = () => { try { controller.abort(); } catch { /* ignore */ } };
+          const onAbort = () => { try { controller.abort(); } catch (e) { try { console.error(`[warn] controller.abort failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} } };
           request.abortSignal.addEventListener('abort', onAbort, { once: true });
         }
       }
-    } catch { /* ignore */ }
+    } catch (e) { try { console.error(`[warn] fetch finalization failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
     
     try {
       resetIdle();
@@ -494,7 +494,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
           });
           const dbgLabel = 'tool-parity(stream)';
           console.error(`[DEBUG] ${dbgLabel}:`, { toolCalls, callIds, toolResults, resIds });
-        } catch { /* ignore */ }
+        } catch (e) { try { console.error(`[warn] extract usage json failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
       }
       const tokens = this.extractTokenUsage(usage);
       // Try to enrich with provider metadata (e.g., Anthropic cache creation tokens)
@@ -586,7 +586,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
           const ids = tMsgs.map((m) => (m.toolCallId ?? '[none]'));
           // eslint-disable-next-line no-console
           console.error('[DEBUG] converted-tool-messages(stream):', { count: tMsgs.length, ids });
-        } catch { /* ignore */ }
+        } catch (e) { try { console.error(`[warn] extract usage json failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
       }
       
       // Find the LAST assistant message
@@ -657,11 +657,11 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         if (request.abortSignal !== undefined) {
           if (request.abortSignal.aborted) { controller.abort(); }
           else {
-            const onAbort = () => { try { controller.abort(); } catch { /* ignore */ } };
+            const onAbort = () => { try { controller.abort(); } catch (e) { try { console.error(`[warn] controller.abort failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} } };
             request.abortSignal.addEventListener('abort', onAbort, { once: true });
           }
         }
-      } catch { /* ignore */ }
+      } catch (e) { try { console.error(`[warn] streaming read failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
       const result = await generateText({
         model,
         messages,
@@ -713,7 +713,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         if (typeof w === 'number' && Number.isFinite(w)) {
           tokens.cacheWriteInputTokens = Math.trunc(w);
         }
-      } catch { /* ignore */ }
+      } catch (e) { try { console.error(`[warn] json parse failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
       if (process.env.DEBUG === 'true') {
         try {
           const msgs = Array.isArray(respObj.messages) ? respObj.messages : [];
@@ -742,7 +742,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
           });
           const dbgLabel = 'tool-parity(nonstream)';
           console.error(`[DEBUG] ${dbgLabel}:`, { toolCalls, callIds, toolResults, resIds });
-        } catch { /* ignore */ }
+        } catch (e) { try { console.error(`[warn] json parse failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
       }
 
       // Extract reasoning from AI SDK's normalized messages (for non-streaming mode)
@@ -787,7 +787,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
           const ids = tMsgs.map((m) => (m.toolCallId ?? '[none]'));
           // eslint-disable-next-line no-console
           console.error('[DEBUG] converted-tool-messages(nonstream):', { count: tMsgs.length, ids });
-        } catch { /* ignore */ }
+        } catch (e) { try { console.error(`[warn] json parse failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
       }
       
       // Find the LAST assistant message to determine if we need more tool calls

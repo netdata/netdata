@@ -62,6 +62,8 @@ export interface LogEntry {
   severity: 'VRB' | 'WRN' | 'ERR' | 'TRC' | 'THK' | 'FIN'; // FIN for end-of-run summary
   turn: number;                         // Sequential turn ID  
   subturn: number;                      // Sequential tool ID within turn
+  // Stable hierarchical path label tied to opTree node (e.g., 1.2 or 1.2.1.1)
+  path?: string;
   direction: 'request' | 'response';    // Request or response
   type: 'llm' | 'tool';                 // Operation type (llm = model-side, tool = any tool-side)
   // Optional precise tool kind for 'tool' logs.
@@ -150,6 +152,11 @@ export interface Configuration {
   // Optional OpenAPI specs to auto-generate REST tools
   openapiSpecs?: Record<string, OpenAPISpecConfig>;
   accounting?: { file: string };
+  // Persistence configuration
+  persistence?: {
+    sessionsDir?: string;
+    billingFile?: string;
+  };
   // Optional pricing table by provider/model. Prices are per "unit" tokens (1k or 1m).
   pricing?: Record<string, Record<string, {
     unit?: 'per_1k' | 'per_1m';
@@ -328,6 +335,8 @@ export interface AIAgentSessionConfig {
   abortSignal?: AbortSignal;
   // Graceful stop reference toggled by headend (no abort); agent should avoid starting new work
   stopRef?: { stopping: boolean };
+  // Ancestors chain of sub-agent prompt paths (for recursion prevention across nested sessions)
+  ancestors?: string[];
 }
 
 // Session result

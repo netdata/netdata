@@ -1,3 +1,4 @@
+import type { SessionNode } from '../session-tree.js';
 import type { MCPTool } from '../types.js';
 
 export type ToolKind = 'mcp' | 'rest' | 'agent';
@@ -10,6 +11,8 @@ export interface ToolExecuteOptions {
   bypassConcurrency?: boolean;
   // When true, provider should emit detailed trace logs
   trace?: boolean;
+  // For sub-agents: stream live child opTree snapshots during execution
+  onChildOpTree?: (tree: SessionNode) => void;
 }
 
 export interface ToolExecuteResult {
