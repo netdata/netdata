@@ -49,14 +49,10 @@ export function formatLog(entry: LogEntry, opts: LogFormatOptions = {}): string 
     const id = entry.originTxnId ?? entry.txnId;
     return typeof id === 'string' && id.length > 0 ? id : '-';
   })();
-  const call = (() => {
-    const cp = entry.callPath;
-    if (typeof cp === 'string' && cp.length > 0) return ` ${cp}`;
-    return '';
-  })();
+  // Don't append callPath - it's redundant
   // Include txn id and stable path label; prefer opTree-provided path when available
   const pathLabel = (entry as { path?: string }).path ?? turn;
-  const raw = `[txn:${txn}] [path:${pathLabel}] ${agentPrefix}[${entry.severity}] ${dir} ${base}${call}`;
+  const raw = `[txn:${txn}] [path:${pathLabel}] ${agentPrefix}[${entry.severity}] ${dir} ${base}`;
   // Color by severity (support bold hint on VRB)
   switch (entry.severity) {
     case 'ERR': return ansi(useColor, '\x1b[31m', raw); // red

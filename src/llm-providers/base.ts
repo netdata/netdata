@@ -321,7 +321,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         '\n',
         'You must call the tool `agent__final_report` with your report.\n',
         '\n',
-        'Review the collected data, check your instructions, and call the tool `agent__final_report` with your final report:\n',
+        'Review the collected data, check your instructions, and call the tool `agent__final_report` with your final report in the `report_content` field:\n',
         '\n',
         '- If the data is completely irrelevant or missing, set `status` to `failure` and describe the situation.\n',
         '- If the data is severealy incomplete, set `status` to `partial` and describe what you found.\n',
@@ -871,7 +871,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
                   } else if (p.output?.value !== undefined) {
                     errorMsg = p.output.value;
                   }
-                  messages.push(`Tool error: ${errorMsg}`);
+                  messages.push(`(tool failed: ${errorMsg})`);
                 } else if (p.type !== this.REASONING_TYPE && p.text !== undefined) {
                   messages.push(p.text);
                 }
@@ -943,24 +943,28 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
             if ((t === this.TOOL_RESULT_TYPE || t === this.TOOL_ERROR_TYPE) && typeof p.toolCallId === 'string') {
             let text = '';
             
-            // Handle tool errors
+            // Handle tool errors - ensure we always have valid output
             if (t === this.TOOL_ERROR_TYPE && p.error !== undefined) {
               if (typeof p.error === 'string') {
-                text = `Tool error: ${p.error}`;
+                text = `(tool failed: ${p.error})`;
               } else if (typeof p.error === 'object' && p.error !== null) {
                 const e = p.error as { message?: string; error?: string };
-                text = `Tool error: ${e.message ?? e.error ?? JSON.stringify(p.error)}`;
+                text = `(tool failed: ${e.message ?? e.error ?? JSON.stringify(p.error)})`;
               } else {
-                text = `Tool error: ${JSON.stringify(p.error)}`;
+                text = `(tool failed: ${JSON.stringify(p.error)})`;
               }
             } 
-            // Handle tool results
+            // Handle tool results - ensure we always have valid output
             else {
               const outObj = p.output as { type?: string; value?: unknown } | undefined;
               if (outObj !== undefined) {
                 if (outObj.type === 'text' && typeof outObj.value === 'string') text = outObj.value;
                 else if (outObj.type === 'json') text = JSON.stringify(outObj.value);
                 else if (typeof (outObj as unknown as string) === 'string') text = outObj as unknown as string;
+              }
+              // Ensure we always have valid output
+              if (!text || text.trim().length === 0) {
+                text = '(no output)';
               }
             }
             
@@ -995,24 +999,28 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
             if ((t === this.TOOL_RESULT_TYPE || t === this.TOOL_ERROR_TYPE) && typeof p.toolCallId === 'string') {
             let text = '';
             
-            // Handle tool errors
+            // Handle tool errors - ensure we always have valid output
             if (t === this.TOOL_ERROR_TYPE && p.error !== undefined) {
               if (typeof p.error === 'string') {
-                text = `Tool error: ${p.error}`;
+                text = `(tool failed: ${p.error})`;
               } else if (typeof p.error === 'object' && p.error !== null) {
                 const e = p.error as { message?: string; error?: string };
-                text = `Tool error: ${e.message ?? e.error ?? JSON.stringify(p.error)}`;
+                text = `(tool failed: ${e.message ?? e.error ?? JSON.stringify(p.error)})`;
               } else {
-                text = `Tool error: ${JSON.stringify(p.error)}`;
+                text = `(tool failed: ${JSON.stringify(p.error)})`;
               }
             } 
-            // Handle tool results
+            // Handle tool results - ensure we always have valid output
             else {
               const outObj = p.output as { type?: string; value?: unknown } | undefined;
               if (outObj !== undefined) {
                 if (outObj.type === 'text' && typeof outObj.value === 'string') text = outObj.value;
                 else if (outObj.type === 'json') text = JSON.stringify(outObj.value);
                 else if (typeof (outObj as unknown as string) === 'string') text = outObj as unknown as string;
+              }
+              // Ensure we always have valid output
+              if (!text || text.trim().length === 0) {
+                text = '(no output)';
               }
             }
             

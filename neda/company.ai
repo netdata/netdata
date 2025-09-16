@@ -82,7 +82,7 @@ Follow this exact loop until no new insights are found. Keep replies tool-only.
    - Stop when two consecutive batches fail the novelty test, then call `agent__final_report`.
 
 Finalization:
- - Conclude only by calling `agent__final_report` once, with `format: "markdown"`, embedding the narrative and inline links as specified below.
+ - Conclude only by calling `agent__final_report` once, embedding the narrative and inline links as specified below.
  - Do not output plain text responses; always use a tool (batch/append_notes/final_report).
 
 ## Your Report

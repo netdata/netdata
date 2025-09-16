@@ -100,8 +100,10 @@ export class InternalToolProvider extends ToolProvider {
     }
 if (name === 'agent__final_report') {
       const status = (typeof args.status === 'string' ? args.status : 'success') as 'success'|'failure'|'partial';
-      const format = (typeof args.format === 'string' ? args.format : 'markdown');
-      const content = typeof args.content === 'string' ? args.content : undefined;
+      // Support both old 'format' and new 'report_format' field names
+      const format = (typeof args.report_format === 'string' ? args.report_format : (typeof args.format === 'string' ? args.format : 'markdown'));
+      // Support both old 'content' and new 'report_content' field names
+      const content = typeof args.report_content === 'string' ? args.report_content : (typeof args.content === 'string' ? args.content : undefined);
       const content_json = (args.content_json !== null && typeof args.content_json === 'object' && !Array.isArray(args.content_json)) ? (args.content_json as Record<string, unknown>) : undefined;
       const metadata = (args.metadata !== null && typeof args.metadata === 'object' && !Array.isArray(args.metadata)) ? (args.metadata as Record<string, unknown>) : undefined;
       const messages = Array.isArray(args.messages) ? args.messages : undefined;
@@ -225,7 +227,7 @@ if (name === 'agent__final_report') {
           }
         }
       } else {
-        if (typeof content !== 'string' || content.trim().length === 0) throw new Error(`final_report(${format}) requires non-empty content.`);
+        if (typeof content !== 'string' || content.trim().length === 0) throw new Error(`agent__final_report requires non-empty report_content field.`);
       }
       this.opts.setFinalReport({ status, format, content, content_json, metadata, messages });
       return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, providerId: this.id };

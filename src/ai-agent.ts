@@ -1602,7 +1602,8 @@ export class AIAgentSession {
             { turn: currentTurn, subturn: subturnCounter },
             { timeoutMs: this.sessionConfig.toolTimeout, bypassConcurrency: effectiveToolName === 'agent__batch' }
           );
-          return managed.result;
+          // Ensure we always return a valid string
+          return managed.result || '(no output)';
         }
 
         // Unknown tool after all paths
@@ -1615,7 +1616,7 @@ export class AIAgentSession {
       } catch (error) {
         const latency = Date.now() - startTime;
         const errorMsg = error instanceof Error ? error.message : String(error);
-        
+
         // Add failed tool accounting
         const accountingEntry: AccountingEntry = {
           type: 'tool',
@@ -1631,10 +1632,10 @@ export class AIAgentSession {
         };
         accounting.push(accountingEntry);
         try { this.sessionConfig.callbacks?.onAccounting?.(accountingEntry); } catch (e) { warn(`tool accounting callback failed: ${e instanceof Error ? e.message : String(e)}`); }
-        
-        // Re-throw to let AI SDK create a tool-error part so the LLM sees structured failure
+
+        // Return error message instead of throwing - ensures LLM always gets valid tool output
         this.releaseToolSlot();
-        throw error;
+        return `(tool failed: ${errorMsg})`;
       }
     };
     
@@ -1831,10 +1832,10 @@ export class AIAgentSession {
           inputSchema: {
             type: 'object',
             additionalProperties: false,
-            required: ['status', 'format', 'content_json'],
+            required: ['status', 'report_format', 'content_json'],
             properties: {
               status: common.status,
-              format: { type: 'string', const: 'json', description: this.resolvedFormatDescription },
+              report_format: { type: 'string', const: 'json', description: this.resolvedFormatDescription },
               content_json: (exp?.schema ?? { type: 'object' }),
               metadata: common.metadata,
             },
@@ -1930,10 +1931,10 @@ export class AIAgentSession {
             inputSchema: {
               type: 'object',
               additionalProperties: false,
-              required: ['status', 'format', 'messages'],
+              required: ['status', 'report_format', 'messages'],
               properties: {
                 status: common.status,
-                format: { type: 'string', const: 'slack-block-kit', description: desc },
+                report_format: { type: 'string', const: 'slack-block-kit', description: desc },
                 // Block Kit messages for multi-message output
                 messages: {
                   type: 'array',
@@ -2046,13 +2047,13 @@ export class AIAgentSession {
             inputSchema: {
               type: 'object',
               additionalProperties: false,
-              required: ['status', 'format', 'content'],
+              required: ['status', 'report_format', 'report_content'],
               properties: {
                 status: common.status,
                 // Do NOT prepend for the format field; it already describes the format itself
-                format: { type: 'string', const: id, description: formatDesc },
+                report_format: { type: 'string', const: id, description: formatDesc },
                 // Prepend ONLY for content to emphasize what must be produced; do NOT add the format again here
-                content: { type: 'string', minLength: 1, description: prepend },
+                report_content: { type: 'string', minLength: 1, description: prepend },
                 metadata: common.metadata,
               },
             },
@@ -2077,7 +2078,7 @@ export class AIAgentSession {
       lines.push(FINISH_ONLY);
       lines.push(ARGS);
       lines.push(STATUS_LINE);
-      lines.push('  - `format`: "json".');
+      lines.push('  - `report_format`: "json".');
       lines.push('  - `content_json`: MUST match the required JSON Schema exactly.');
     } else {
       lines.push(FINISH_ONLY);
@@ -2085,12 +2086,12 @@ export class AIAgentSession {
       lines.push(STATUS_LINE);
       const id2 = this.sessionConfig.outputFormat as string;
       const descLine = (typeof rdesc === 'string' && rdesc.length > 0) ? ` ${rdesc}` : '';
-      lines.push('  - `format`: "' + id2 + '".' + descLine);
+      lines.push('  - `report_format`: "' + id2 + '".' + descLine);
       if (id2 === 'slack') {
-        lines.push('  - `messages`: array of Slack Block Kit messages (no plain `content`).');
+        lines.push('  - `messages`: array of Slack Block Kit messages (no plain `report_content`).');
         lines.push('    • Max 50 blocks per message; mrkdwn per section ≤ 2800 chars.');
       } else {
-        lines.push('  - `content`: complete deliverable.');
+        lines.push('  - `report_content`: complete deliverable.');
       }
     }
     lines.push('- Do NOT end with plain text. The session ends only after `agent__final_report`.');
