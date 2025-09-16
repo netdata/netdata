@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations docs [\#20982](https://github.com/netdata/netdata/pull/20982) ([netdatabot](https://github.com/netdatabot))
+- chore: add `-c` option to gen docs for a single collector [\#20981](https://github.com/netdata/netdata/pull/20981) ([ilyam8](https://github.com/ilyam8))
+- docs: improve config options table with grouped section headers [\#20980](https://github.com/netdata/netdata/pull/20980) ([ilyam8](https://github.com/ilyam8))
 - perf\(go.d/ddsnmp\): cache group key per aggregator per metric [\#20979](https://github.com/netdata/netdata/pull/20979) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#20978](https://github.com/netdata/netdata/pull/20978) ([netdatabot](https://github.com/netdatabot))
 - docs: restructure Setup, update SNMP prerequisites, and fix SNMP options [\#20977](https://github.com/netdata/netdata/pull/20977) ([ilyam8](https://github.com/ilyam8))
@@ -447,8 +450,6 @@
 - chore\(go.d/ddsnmp\): add basic SNMP table walking functionality [\#20441](https://github.com/netdata/netdata/pull/20441) ([ilyam8](https://github.com/ilyam8))
 - nd-mcp add claude cli cmd for adding netdata mcp [\#20440](https://github.com/netdata/netdata/pull/20440) ([andrewm4894](https://github.com/andrewm4894))
 - improvement\(go.d/ddsnmp\): use dev type and vendor from meta for family [\#20439](https://github.com/netdata/netdata/pull/20439) ([ilyam8](https://github.com/ilyam8))
-- Fix registry save integer overflow and add failure backoff [\#20437](https://github.com/netdata/netdata/pull/20437) ([ktsaou](https://github.com/ktsaou))
-- Mcp3 [\#20435](https://github.com/netdata/netdata/pull/20435) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
