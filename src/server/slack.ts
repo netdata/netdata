@@ -629,7 +629,8 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
     const text = (kind === 'mention' && context?.botUserId) ? stripBotMention(textRaw, String(context.botUserId)) : textRaw;
 
     if (!text) {
-      vlog(`[REJECT] empty text after processing (kind=${kind} channel=${channel})`);
+      const eventInfo = `user=${event.user ?? 'none'} channel=${channel} subtype=${event.subtype ?? 'none'} bot_id=${event.bot_id ?? 'none'}`;
+      vlog(`[REJECT] empty text after processing (kind=${kind} ${eventInfo} raw="${textRaw.substring(0, 50)}")`);
       return;
     }
 
@@ -771,7 +772,13 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
   if (enableDMs) app.event('message', async (args: any) => {
     const { event } = args;
     if (!event?.channel_type || event.channel_type !== 'im') return;
-    if (!event.text || !event.user || event.bot_id) return;
+    if (!event.text || !event.user || event.bot_id) {
+      if (verbose && (!event.text || !event.user)) {
+        const reason = !event.text ? 'no text' : (!event.user ? 'no user' : 'bot message');
+        vlog(`[REJECT] DM rejected: ${reason} (channel=${event?.channel ?? 'unknown'} user=${event?.user ?? 'none'} bot_id=${event?.bot_id ?? 'none'})`);
+      }
+      return;
+    }
     await handleEvent('dm', args);
   });
 
@@ -794,7 +801,8 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
       return;
     }
     if (typeof event?.text !== 'string' || event.text.length === 0) {
-      if (verbose) vlog(`[REJECT] empty text`);
+      const eventInfo = `channel=${event?.channel ?? 'unknown'} user=${event?.user ?? 'none'} bot_id=${event?.bot_id ?? 'none'} subtype="${subtype ?? 'none'}"`;
+      if (verbose) vlog(`[REJECT] empty text (${eventInfo})`);
       return;
     }
     // Only auto-engage on root messages, not thread replies
