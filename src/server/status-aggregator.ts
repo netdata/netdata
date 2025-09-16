@@ -1,4 +1,3 @@
-import type { AccountingEntry, LogEntry } from '../types.js';
 import type { SessionNode } from '../session-tree.js';
 
 interface AgentStatusLine {
@@ -29,122 +28,6 @@ interface SnapshotSummary {
   runElapsedSec?: number;
 }
 
-const arrowize = (s: string | undefined): string | undefined => s?.replace(/->/g, '→');
-
-export function buildSnapshot(logs: LogEntry[], accounting: AccountingEntry[], nowTs: number): SnapshotSummary {
-  interface TurnState { planned?: number; executed?: number; lastType?: 'llm'|'tool'; firstTs?: number; finished?: boolean }
-  const perAgentTurns = new Map<string, Map<number, TurnState>>();
-  const agentMeta = new Map<string, { callPath?: string; maxTurns?: number; origin?: string; firstSeenTs?: number; toolCount?: number }>();
-  const agentTitles = new Map<string, string>();
-
-  for (const le of logs) {
-    const agentId = le.agentId ?? 'agent';
-    const turn = typeof le.turn === 'number' ? le.turn : 0;
-    const turnMap = perAgentTurns.get(agentId) ?? new Map<number, TurnState>();
-    const st = turnMap.get(turn) ?? {};
-    st.firstTs = st.firstTs === undefined ? le.timestamp : Math.min(st.firstTs, le.timestamp);
-    if (le.severity === 'FIN') st.finished = true;
-    if (le.type === 'tool') st.lastType = 'tool';
-    else if (le.type === 'llm' && st.lastType !== 'tool') st.lastType = 'llm';
-    if (le.type === 'tool' && typeof le.subturn === 'number' && le.subturn > 0) {
-      st.executed = Math.max(st.executed ?? 0, le.subturn);
-    }
-    const maxSubsVal = (le as unknown as { max_subturns?: number }).max_subturns;
-    if (typeof maxSubsVal === 'number') st.planned = Math.max(st.planned ?? 0, maxSubsVal);
-    turnMap.set(turn, st);
-    perAgentTurns.set(agentId, turnMap);
-    // meta
-    const meta = agentMeta.get(agentId) ?? {};
-    if (typeof le.callPath === 'string' && le.callPath.length > 0) meta.callPath = arrowize(le.callPath);
-    const maxTurnsVal = (le as unknown as { max_turns?: number }).max_turns;
-    if (typeof maxTurnsVal === 'number') meta.maxTurns = maxTurnsVal;
-    if (typeof le.originTxnId === 'string') meta.origin = le.originTxnId;
-    // Track earliest timestamp per agent for stable elapsed time
-    meta.firstSeenTs = (typeof meta.firstSeenTs === 'number') ? Math.min(meta.firstSeenTs, le.timestamp) : le.timestamp;
-    // Count tool logs per agent
-    if (le.type === 'tool') meta.toolCount = (meta.toolCount ?? 0) + 1;
-    agentMeta.set(agentId, meta);
-    if (le.remoteIdentifier === 'agent:title' && typeof le.message === 'string' && le.message.length > 0) {
-      agentTitles.set(agentId, le.message);
-    }
-  }
-
-  const lines: AgentStatusLine[] = [];
-  for (const [agentId, tmap] of perAgentTurns.entries()) {
-    const latestTurn = Math.max(...Array.from(tmap.keys()));
-    const st = tmap.get(latestTurn) ?? {};
-    const meta = agentMeta.get(agentId) ?? {};
-    const l: AgentStatusLine = { agentId, callPath: meta.callPath, maxTurns: meta.maxTurns, turn: latestTurn, status: 'Thinking' };
-    const t = agentTitles.get(agentId);
-    if (typeof t === 'string' && t.length > 0) l.title = t;
-    const stableStart = typeof meta.firstSeenTs === 'number' ? meta.firstSeenTs : st.firstTs;
-    if (typeof stableStart === 'number') l.elapsedSec = Math.max(0, Math.round((nowTs - stableStart) / 1000));
-    const planned = st.planned ?? 0;
-    const executed = st.executed ?? 0;
-    if (planned > 0) {
-      l.maxSubturns = planned;
-      l.subturn = executed;
-      l.progressPct = Math.max(0, Math.min(100, Math.round((executed / planned) * 100)));
-      l.status = executed < planned ? 'Working' : (st.lastType === 'tool' ? 'Working' : 'Thinking');
-    } else {
-      // Without planned toolcalls, consider having emitted any tool logs as Working
-      const hasTools = (meta.toolCount ?? 0) > 0;
-      l.status = (st.lastType === 'tool' || hasTools) ? 'Working' : 'Thinking';
-    }
-    if (st.finished === true) l.status = 'Finished';
-    lines.push(l);
-  }
-
-  // Aggregate master status from children by origin
-  const byOrigin = new Map<string, AgentStatusLine[]>();
-  for (const [agentId, meta] of agentMeta.entries()) {
-    const origin = meta.origin ?? 'root';
-    const line = lines.find((x) => x.agentId === agentId);
-    if (!line) continue;
-    const arr = byOrigin.get(origin) ?? [];
-    arr.push(line);
-    byOrigin.set(origin, arr);
-  }
-  for (const arr of byOrigin.values()) {
-    const depth = (cp?: string) => (cp ? cp.split('→').length - 1 : 0);
-    const master = arr.slice().sort((a, b) => depth(a.callPath) - depth(b.callPath))[0];
-    if (!master) continue;
-    const anyWorkingChild = arr.some((l) => l !== master && l.status === 'Working');
-    if (anyWorkingChild) master.status = 'Working';
-  }
-
-  // Deduplicate per origin+agent: keep the shallowest callPath (master), drop duplicates
-  const deduped: AgentStatusLine[] = [];
-  const seen = new Set<string>();
-  const depthOf = (cp?: string) => (cp ? cp.split('→').length - 1 : 0);
-  for (const l of lines.sort((a, b) => depthOf(a.callPath) - depthOf(b.callPath))) {
-    const origin = (agentMeta.get(l.agentId ?? '')?.origin) ?? 'root';
-    const key = `${origin}::${l.agentId}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    deduped.push(l);
-  }
-
-  // Totals
-  let tokensIn = 0; let tokensOut = 0; let tokensCacheRead = 0; let tokensCacheWrite = 0; let toolsRun = 0; let costUsd = 0;
-  for (const a of accounting) {
-    if (a.type === 'llm') {
-      tokensIn += a.tokens.inputTokens;
-      tokensOut += a.tokens.outputTokens;
-      tokensCacheRead += a.tokens.cacheReadInputTokens ?? a.tokens.cachedTokens ?? 0;
-      tokensCacheWrite += a.tokens.cacheWriteInputTokens ?? 0;
-      if (typeof a.costUsd === 'number') costUsd += a.costUsd;
-    } else if (a.type === 'tool') {
-      toolsRun += 1;
-    }
-  }
-
-  return {
-    lines: deduped,
-    totals: { tokensIn, tokensOut, tokensCacheRead, tokensCacheWrite, toolsRun, costUsd: costUsd > 0 ? Number(costUsd.toFixed(4)) : undefined }
-  };
-}
-
 // Build SnapshotSummary from the hierarchical operation tree (Option C)
 export function buildSnapshotFromOpTree(root: SessionNode, nowTs: number): SnapshotSummary {
   const lines: AgentStatusLine[] = [];
@@ -159,7 +42,8 @@ export function buildSnapshotFromOpTree(root: SessionNode, nowTs: number): Snaps
     const ended = node.endedAt;
     const elapsedSec = Math.max(0, Math.round(((typeof ended === 'number' ? ended : nowTs) - started) / 1000));
     const status: AgentStatusLine['status'] = (typeof ended === 'number') ? 'Finished' : 'Working';
-    lines.push({ agentId, callPath, status, elapsedSec });
+    const title = node.sessionTitle && node.sessionTitle.trim().length > 0 ? node.sessionTitle : undefined;
+    lines.push({ agentId, callPath, status, elapsedSec, title });
 
     // Walk turns/ops, aggregate tools + tokens
     const turns = Array.isArray(node.turns) ? node.turns : [];
@@ -266,8 +150,8 @@ export function buildStatusBlocks(summary: SnapshotSummary, rootAgentId?: string
   // Oldest first ⇒ larger elapsedSec first
   const ordered = running.sort((a, b) => (b.elapsedSec ?? 0) - (a.elapsedSec ?? 0));
   const entries = ordered
-    .map((l) => {
-      if (typeof rootAgentId === 'string' && l.agentId === rootAgentId) return undefined; // drop master
+    .flatMap((l) => {
+      if (typeof rootAgentId === 'string' && l.agentId === rootAgentId) return []; // drop master
       const cpRaw = typeof l.callPath === 'string' && l.callPath.length > 0 ? l.callPath : l.agentId;
       const cpNorm = cpRaw.replace(/→/g, '->');
       const startsWithPrefix = typeof prefix === 'string' && (cpNorm.startsWith(prefix));
@@ -277,11 +161,19 @@ export function buildStatusBlocks(summary: SnapshotSummary, rootAgentId?: string
       const last = segments.length > 0 ? segments[segments.length - 1] : shownPath;
       const shownName = last.startsWith('agent__') ? last.slice('agent__'.length) : last;
       const secs = l.elapsedSec ?? 0;
-      const line1 = `*${shownName}* — ${asClock(secs)}`;
+      const agentLine = `${shownName} — ${asClock(secs)}`;
       const title = typeof l.title === 'string' && l.title.length > 0 ? l.title : undefined;
-      const text = title ? `${line1}
-${title}` : line1;
-      return { type: 'section', text: { type: 'mrkdwn', text } };
+
+      // If we have a title, show it as the main text and agent/duration as context
+      // If no title, just show agent/duration as main text
+      if (title) {
+        return [
+          { type: 'section', text: { type: 'mrkdwn', text: title } },
+          { type: 'context', elements: [{ type: 'mrkdwn', text: agentLine }] }
+        ];
+      } else {
+        return [{ type: 'section', text: { type: 'mrkdwn', text: agentLine } }];
+      }
     })
     .filter((v): v is any => v !== undefined);
 

@@ -204,7 +204,7 @@ export class AIAgentSession {
     this.callPath = sessionConfig.trace?.callPath ?? sessionConfig.agentId;
 
     // Hierarchical operation tree (Option C)
-    this.opTree = new SessionTreeBuilder({ traceId: this.txnId, agentId: sessionConfig.agentId, callPath: this.callPath });
+    this.opTree = new SessionTreeBuilder({ traceId: this.txnId, agentId: sessionConfig.agentId, callPath: this.callPath, sessionTitle: sessionConfig.initialTitle ?? '' });
     // Begin system preflight turn (turn 0) and log init
     try {
       if (!this.systemTurnBegan) {
@@ -271,6 +271,8 @@ export class AIAgentSession {
           const clean = title.trim();
           if (clean.length === 0) return;
           this.sessionTitle = { title: clean, emoji, ts: Date.now() };
+          // Update the opTree with the new title
+          this.opTree.setSessionTitle(clean);
           const entry: LogEntry = {
             timestamp: Date.now(),
             severity: 'VRB',
@@ -1942,8 +1944,8 @@ export class AIAgentSession {
             + '  }\n'
             + ']\n\n'
             + 'Split long output into multiple messages. You can post up to 20 messages, each message having up to 50 blocks, each block having up to 2000 characters in Slack mrkdwn (not GitHub markdown).\n\n'
-            + 'Slack mrkdwn format:\n'
-            + '- *bold* → bold\n'
+            + 'Slack mrkdwn (not GitHub markdown) format:\n'
+            + '- *bold* → bold (CRITICAL: single asterisk for bold)\n'
             + '- _italic_ → italic\n'
             + '- ~strikethrough~ → strikethrough\n'
             + '- `inline code`\n'
@@ -1957,13 +1959,14 @@ export class AIAgentSession {
             + '- No Horizontal rules (---)\n'
             + '- No Nested lists\n'
             + '- No Image embedding\n'
-            + '- No HTML tags'
+            + '- No HTML tags\n'
+            + 'CRITICAL: ALL STRINGS MUST BE IN SLACK MRKDWN FORMAT (not GitHub markdown)'
           );
           tools.push({
             name: 'agent__final_report',
             description: (
               'You MUST use agent__final_report to provide your final response to the user request. Use Slack mrkdwn (not GitHub markdown). ' + suffix
-              + '\nREQUIREMENT: Provide up to 20 `messages` with Block Kit + mrkdwn only. Do NOT provide plain `content`. Do NOT use GitHub markdown.\n\n'
+              + '\nREQUIREMENT: Provide up to 20 `messages` with Block Kit + mrkdwn only (not GitHub markdown). Do NOT provide plain `content`. Do NOT use GitHub markdown.\n\n'
               + slackInstructions
             ).trim(),
             inputSchema: {

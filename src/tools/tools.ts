@@ -129,6 +129,7 @@ export class ToolsOrchestrator {
           traceId: parentSession.traceId,
           agentId: childName,
           callPath: `${childCallPathBase}->${childName}`,
+          sessionTitle: '',
           startedAt: Date.now(),
           turns: [],
         };

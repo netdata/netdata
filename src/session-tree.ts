@@ -35,6 +35,7 @@ export interface SessionNode {
   traceId?: string;
   agentId?: string;
   callPath?: string;
+  sessionTitle: string;
   startedAt: number;
   endedAt?: number;
   success?: boolean;
@@ -54,12 +55,13 @@ export class SessionTreeBuilder {
   private readonly turnIndex = new Map<number, TurnNode>();
   private readonly opIndex = new Map<string, OperationNode>();
 
-  constructor(meta?: { traceId?: string; agentId?: string; callPath?: string; attributes?: Record<string, unknown> }) {
+  constructor(meta?: { traceId?: string; agentId?: string; callPath?: string; sessionTitle?: string; attributes?: Record<string, unknown> }) {
     this.session = {
       id: uid(),
       traceId: meta?.traceId,
       agentId: meta?.agentId,
       callPath: meta?.callPath,
+      sessionTitle: meta?.sessionTitle ?? '',
       startedAt: Date.now(),
       attributes: meta?.attributes,
       turns: [],
@@ -67,6 +69,10 @@ export class SessionTreeBuilder {
   }
 
   getSession(): SessionNode { return this.session; }
+
+  setSessionTitle(title: string): void {
+    this.session.sessionTitle = title;
+  }
 
   endSession(success: boolean, error?: string): void {
     // Recompute totals and verify against current snapshot; log error if mismatch
