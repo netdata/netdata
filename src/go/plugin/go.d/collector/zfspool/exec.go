@@ -5,12 +5,10 @@
 package zfspool
 
 import (
-	"context"
-	"fmt"
-	"os/exec"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 type zpoolCli interface {
@@ -33,31 +31,9 @@ type zpoolCLIExec struct {
 }
 
 func (e *zpoolCLIExec) list() ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, e.binPath, "list", "-p")
-	e.Debugf("executing '%s'", cmd)
-
-	bs, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("error on '%s': %v", cmd, err)
-	}
-
-	return bs, nil
+	return ndexec.RunUnprivileged(e.Logger, e.timeout, e.binPath, "list", "-p")
 }
 
 func (e *zpoolCLIExec) listWithVdev(pool string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, e.binPath, "list", "-p", "-v", "-L", pool)
-	e.Debugf("executing '%s'", cmd)
-
-	bs, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("error on '%s': %v", cmd, err)
-	}
-
-	return bs, nil
+	return ndexec.RunUnprivileged(e.Logger, e.timeout, e.binPath, "list", "-p", "-v", "-L", pool)
 }

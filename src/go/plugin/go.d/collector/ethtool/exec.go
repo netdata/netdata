@@ -3,12 +3,10 @@
 package ethtool
 
 import (
-	"context"
-	"fmt"
-	"os/exec"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 type ethtoolCli interface {
@@ -31,21 +29,5 @@ type ethtoolCLIExec struct {
 }
 
 func (e *ethtoolCLIExec) moduleEeprom(iface string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx,
-		e.ndsudoPath,
-		"ethtool-module-info",
-		"--devname",
-		iface,
-	)
-	e.Debugf("executing '%s'", cmd)
-
-	bs, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("error on '%s': %v", cmd, err)
-	}
-
-	return bs, nil
+	return ndexec.RunNDSudo(e.Logger, e.timeout, "ethtool-module-info", "--devname", iface)
 }

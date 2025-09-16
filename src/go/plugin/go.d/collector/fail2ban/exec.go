@@ -5,15 +5,12 @@
 package fail2ban
 
 import (
-	"context"
 	"errors"
-	"fmt"
 	"os"
-	"os/exec"
-	"strings"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 var errJailNotExist = errors.New("jail not exist")
@@ -66,19 +63,5 @@ func (e *fail2banClientCliExec) jailStatus(jail string) ([]byte, error) {
 }
 
 func (e *fail2banClientCliExec) execute(args ...string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, e.ndsudoPath, args...)
-	e.Debugf("executing '%s'", cmd)
-
-	bs, err := cmd.Output()
-	if err != nil {
-		if strings.HasPrefix(strings.TrimSpace(string(bs)), "Sorry but the jail") {
-			return nil, errJailNotExist
-		}
-		return nil, fmt.Errorf("error on '%s': %v", cmd, err)
-	}
-
-	return bs, nil
+	return ndexec.RunNDSudo(e.Logger, e.timeout, args...)
 }

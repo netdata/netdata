@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 
 	"github.com/tidwall/gjson"
 )
@@ -57,17 +58,16 @@ func (e *ndsudoSmartctlCli) execute(args ...string) (*gjson.Result, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, e.ndsudoPath, args...)
-	e.Debugf("executing '%s'", cmd)
+	command := ndexec.CommandNDSudo(ctx, e.Logger, args...)
 
-	bs, err := cmd.Output()
+	bs, err := command.Output()
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || isExecExitCode(err, 1) || len(bs) == 0 {
-			return nil, fmt.Errorf("'%s' execution failed: %v", cmd, err)
+			return nil, fmt.Errorf("'%s' execution failed: %v", command, err)
 		}
 	}
 
-	return parseOutput(cmd.String(), bs, args, e.Logger)
+	return parseOutput(command.String(), bs, args, e.Logger)
 }
 
 // directSmartctlCli executes smartctl directly (Windows, macOS, etc.)
@@ -109,8 +109,7 @@ func (e *directSmartctlCli) execute(args ...string) (*gjson.Result, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, e.smartctlPath, args...)
-	e.Debugf("executing '%s'", cmd)
+	cmd := ndexec.CommandUnprivileged(ctx, e.Logger, args...)
 
 	bs, err := cmd.Output()
 	if err != nil {

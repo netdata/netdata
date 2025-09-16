@@ -3,12 +3,10 @@
 package exim
 
 import (
-	"context"
-	"fmt"
-	"os/exec"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 type eximBinary interface {
@@ -31,17 +29,5 @@ type eximExec struct {
 }
 
 func (e *eximExec) countMessagesInQueue() ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, e.ndsudoPath, "exim-bpc")
-
-	e.Debugf("executing '%s'", cmd)
-
-	bs, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("error on '%s': %v", cmd, err)
-	}
-
-	return bs, nil
+	return ndexec.RunNDSudo(e.Logger, e.timeout, "exim-bpc")
 }
