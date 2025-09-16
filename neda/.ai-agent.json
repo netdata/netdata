@@ -432,7 +432,7 @@
           "agent": "neda.ai",
           "engage": ["channel-posts"],
           "promptTemplates": {
-            "channelPost": "Neda, analyze this support ticket. Follow this process: 1) understand what the customer is saying, 2) consult ask-netdata and source-code to understand how our software works, 3) prepare a response for the customer, 4) if we have bug in our code, provide workarounds, 5) provider instructions for our engineers to solve the bug/issue, 6) mention the relevant code owners (find them from github) so that they will be notified."
+            "channelPost": "Neda, analyze this support ticket:\n\nChannel: {channel.name}\nUser: {user.label}\nMessage: {text}\n\nFollow this process: 1) understand what the customer is saying, 2) consult ask-netdata and source-code to understand how our software works, 3) prepare a response for the customer, 4) if we have bug in our code, provide workarounds, 5) provider instructions for our engineers to solve the bug/issue, 6) mention the relevant code owners (find them from github) so that they will be notified."
           }
         },
         {
@@ -440,7 +440,7 @@
           "agent": "neda.ai",
           "engage": ["channel-posts"],
           "promptTemplates": {
-            "channelPost": "Neda, they have just posted this contact form. Research the company profile, their technology stack, and calculate IPC and estimate ARR. Check who is our contact (full profile). Give us a hint on how they found us (focus on pre and post form submission events on posthog). Check hubspot and fireflies for past engagements and encharge if they were in our mailing lists before this form submission (they may have been added now)."
+            "channelPost": "Neda, they have just posted this contact form:\n\nChannel: {channel.name}\nUser: {user.label}\nMessage: {text}\n\nResearch the company profile, their technology stack, and calculate IPC and estimate ARR. Check who is our contact (full profile). Give us a hint on how they found us (focus on pre and post form submission events on posthog). Check hubspot and fireflies for past engagements and encharge if they were in our mailing lists before this form submission (they may have been added now)."
           }
         }
       ]

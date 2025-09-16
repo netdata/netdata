@@ -90,6 +90,17 @@ export class SessionManager {
       model: undefined
     };
     this.runs.set(runId, meta);
+
+    // Log concurrent runs for debugging
+    const activeRuns = Array.from(this.runs.values()).filter(r => r.status === 'running');
+    if (activeRuns.length > 1) {
+      const channels = activeRuns.map(r => r.key.source === 'slack' ? r.key.channelId : 'non-slack').filter(Boolean);
+      if (key.source === 'slack') {
+        try {
+          process.stderr.write(`[CONCURRENT] Starting run ${runId} for channel ${key.channelId} with ${String(activeRuns.length - 1)} other active runs: ${channels.join(', ')}\n`);
+        } catch {}
+      }
+    }
     // Capture ingress metadata for later attachment to opTree
     const ing: Record<string, unknown> = { source: key.source };
     if (key.source === 'slack') {

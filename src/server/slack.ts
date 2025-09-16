@@ -84,7 +84,7 @@ function extractSlackMessages(result: AIAgentResult | undefined): { blocks?: unk
 
 // Removed workaround that split long mrkdwn into blocks; the model must output Block Kit
 
-async function fetchContext(client: SlackClient, event: any, limit: number, charsCap: number): Promise<ConversationMessage[]> {
+async function fetchContext(client: SlackClient, event: any, limit: number, charsCap: number, _verbose?: boolean): Promise<ConversationMessage[]> {
   const channel = event.channel;
   const threadTs = 'thread_ts' in event && event.thread_ts ? event.thread_ts : undefined;
   const isDM = event.channel_type === 'im';
@@ -440,11 +440,10 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
     return finalText;
   };
 
-  const finalizeAndPost = async (sm: SessionManager, client: any, channel: string, ts: string, runId: string, meta: { error?: string }): Promise<void> => {
+  const finalizeAndPost = async (sm: SessionManager, client: any, channel: string, ts: string, runId: string, meta: { error?: string; chName?: string; userName?: string }): Promise<void> => {
     const key = `${channel}:${ts}`;
     closed.add(key);
     const pending = updating.get(key); if (pending) { clearTimeout(pending); updating.delete(key); }
-    vlog('agent responded');
     const result = sm.getResult(runId);
     const slackMessages = extractSlackMessages(result);
     let finalText = extractFinalText(sm, runId);
@@ -459,6 +458,14 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
       elog('Warning: No content to post (both finalText and slackMessages are empty)');
       finalText = '⚠️ No response content was generated. Please check the logs for details.';
     }
+
+    // CONSOLIDATED POST-AGENT LOG
+    const responseType = hasSlackMessages ? `blocks(${String(slackMessages?.length ?? 0)})` : `text(${String(finalText.length)})`;
+    const responsePermalink = await getPermalink(client, channel, ts);
+    vlog(`[AGENT→SLACK] runId=${runId} channel="${meta.chName ?? 'unknown'}"/${channel} user="${meta.userName ?? 'unknown'}" ` +
+         `response=${responseType} error="${meta.error ?? 'none'}"` +
+         (responsePermalink ? ` url=${responsePermalink}` : ''));
+
     try {
       if (slackMessages && slackMessages.length > 0) {
         // Render first message via update, rest as thread replies
@@ -509,7 +516,6 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
         };
         const firstBlocks = repairBlocks(firstBlocksRaw.slice(0, MAX_BLOCKS));
         const fallback = 'Report posted as Block Kit messages.';
-        vlog('posting to slack (blocks, multi-message)');
         try {
           await client.chat.update({ channel, ts, text: fallback, blocks: firstBlocks });
         } catch (e1) {
@@ -557,7 +563,6 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
         } catch (e3) { elog(`stats footer post failed: ${(e3 as Error).message}`); }
       } else {
         // No splitting/truncation. Post as-is; if Slack rejects, error handler below will present a minimal fallback.
-        vlog('posting to slack (raw text, no splitting)');
         // Fix: Clear any existing blocks when posting plain text to ensure visibility
         await client.chat.update({ channel, ts, text: finalText, blocks: [] });
         // Post tiny stats footer as a separate small message (context)
@@ -596,26 +601,21 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
       const errMsg = (e as Error).message;
       const bytes = byteLength(finalText);
       const chars = finalText.length;
-      const data = ((e as unknown as { data?: unknown })?.data);
-      const dataStr = (() => { try { return data !== undefined ? JSON.stringify(data) : ''; } catch { return ''; } })();
-      // Collect diagnostics about slack messages if available
-      let diag = '';
+      elog(`[SLACK-ERROR] Failed to post response: ${errMsg} (${String(chars)} chars, ${String(bytes)} bytes)`);
+
+      // Try to post a simple error message back to Slack
+      const userErrorMsg = '❌ Failed to post response. The message might be too large or contain invalid formatting.';
       try {
-        const result2 = sessionManager.getResult(runId);
-        const slackMessages = extractSlackMessages(result2) ?? [];
-        const blocksCount = slackMessages.reduce((s, m) => s + ((Array.isArray(m.blocks) ? m.blocks.length : 0)), 0);
-        let maxMrkdwn = 0;
-        slackMessages.forEach((m) => { const bl = Array.isArray(m.blocks) ? m.blocks : []; bl.forEach((b: any) => { const t = b?.text?.text; if (typeof t === 'string') maxMrkdwn = Math.max(maxMrkdwn, t.length); }); });
-        diag = ` blocks=${String(blocksCount)} max_section_len=${String(maxMrkdwn)}`;
-      } catch (e) { warn(`failed to update slack message: ${e instanceof Error ? e.message : String(e)}`); }
-      const full = `Slack post failed: ${errMsg}${diag}\nDetails: ${dataStr}`;
-      elog(`chat.update failed: ${errMsg} (size: ${String(chars)} chars, ${String(bytes)} bytes) details=${dataStr.substring(0, 400)}`);
-      // Try to post a detailed fallback so users can report it
-      const fallback = full.substring(0, 2800);
-      try {
-        await client.chat.update({ channel, ts, text: fallback });
-      } catch (e2) {
-        elog(`fallback chat.update failed: ${(e2 as Error).message}`);
+        await client.chat.update({ channel, ts, text: userErrorMsg, blocks: [] });
+        vlog(`[SLACK-RECOVERY] Posted simple error message to user`);
+      } catch {
+        // If even the simple message fails, try one more time with minimal text
+        try {
+          await client.chat.update({ channel, ts, text: '❌ Response failed', blocks: [] });
+          vlog(`[SLACK-RECOVERY] Posted minimal error message`);
+        } catch (e3) {
+          elog(`[SLACK-FATAL] Cannot post any message to Slack: ${(e3 as Error).message}`);
+        }
       }
     }
   };
@@ -625,10 +625,14 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
   const handleEvent = async (kind: 'mention'|'dm'|typeof KIND_CHANNEL_POST, args: any): Promise<void> => {
     const { event, client, context } = args;
     const channel = event.channel;
-    vlog(`request received (${kind}) channel=${channel} ts=${event.ts}`);
     const textRaw = String(event.text ?? '');
     const text = (kind === 'mention' && context?.botUserId) ? stripBotMention(textRaw, String(context.botUserId)) : textRaw;
-    if (!text) return;
+
+    if (!text) {
+      vlog(`[REJECT] empty text after processing (kind=${kind} channel=${channel})`);
+      return;
+    }
+
     const threadTs = event.thread_ts ?? event.ts;
     // Personalized opener
     const who = typeof event.user === 'string' && event.user.length > 0 ? event.user : undefined;
@@ -638,18 +642,19 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
     const routeKind = kind === 'mention' ? 'mentions' : (kind === 'dm' ? 'dms' : ROUTE_KIND_CHANNEL_POSTS);
     const chName = await getChannelName(client, channel);
     const permalink = await getPermalink(client, channel, String(event.ts ?? ''));
+
     const resolved = options.resolveRoute ? await options.resolveRoute({ kind: routeKind, channelId: channel, channelName: chName }) : undefined;
-    const NO_ROUTE_MSG = 'no matching routing rule for channel-post; ignoring';
     if (routeKind === ROUTE_KIND_CHANNEL_POSTS && options.resolveRoute && !resolved) {
-      vlog(NO_ROUTE_MSG);
+      vlog(`[REJECT] no routing match (channel=${chName ?? channel} kind=${kind})`);
       return;
     }
+
     const initial = await client.chat.postMessage({ channel, thread_ts: threadTs, text: pickOpener(fname, options.openerTone ?? 'random') });
     const liveTs = String(initial.ts ?? threadTs);
     const activeSessions = resolved?.sessions ?? sessionManager;
     const activeSystem = resolved?.systemPrompt ?? systemPrompt;
     // Build history and user prompt per kind
-    const history = (kind === KIND_CHANNEL_POST) ? [] : await fetchContext(client, event, historyLimit, historyCharsCap);
+    const history = (kind === KIND_CHANNEL_POST) ? [] : await fetchContext(client, event, historyLimit, historyCharsCap, verbose);
     // Build the formal user request wrapper (mentions/dm default)
     const who2 = typeof event.user === 'string' && event.user.length > 0 ? event.user : undefined;
     const whoLabel = who2 ? await getUserLabel(client, who2) : 'unknown';
@@ -678,9 +683,16 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
         if (kind === 'dm' && resolved?.promptTemplates?.dm) return renderTemplate(resolved.promptTemplates.dm);
         return defaultUserPrompt;
       })();
-    vlog('calling agent');
+
+    // CONSOLIDATED PRE-AGENT LOG
+    const agentPath = resolved ? 'custom' : 'default';
     const initialTitle = undefined;
     const runId = activeSessions.startRun({ source: 'slack', teamId: context?.teamId, channelId: channel, threadTsOrSessionId: threadTs }, activeSystem, userPrompt, history, { initialTitle });
+
+    vlog(`[SLACK→AGENT] runId=${runId} kind=${kind} channel="${chName ?? 'unknown'}"/${channel} user="${whoLabel}"/${who ?? 'unknown'} ` +
+         `thread=${threadTs === event.ts ? 'root' : 'reply'} text="${text.substring(0, 50)}${text.length > 50 ? '...' : ''}" ` +
+         `context=${String(history.length)}msgs agent=${agentPath} ts=${event.ts}` +
+         (permalink ? ` url=${permalink}` : ''));
     runIdToSession.set(runId, activeSessions);
     // Update the opener message to include a Cancel button
     // Persist a cancel actions block for the life of this progress message
@@ -750,7 +762,7 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
       if (!meta || meta.status === 'running' || meta.status === 'stopping') { scheduleUpdate(client, channel, liveTs, render); return; }
       clearInterval(poll);
       try { unsubscribe?.(); } catch (e) { warn(`slack unsubscribe failed: ${e instanceof Error ? e.message : String(e)}`); }
-      await finalizeAndPost(activeSessions, client, channel, liveTs, runId, { error: meta.error });
+      await finalizeAndPost(activeSessions, client, channel, liveTs, runId, { error: meta.error, chName, userName: whoLabel });
     }, updateIntervalMs);
   };
 
@@ -767,16 +779,34 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
   app.event('message', async (args: any) => {
     const { event, context } = args;
     const ct = event?.channel_type;
-    if (ct !== 'channel' && ct !== 'group') return;
+    if (ct !== 'channel' && ct !== 'group') {
+      if (verbose) vlog(`[REJECT] channel_type="${ct ?? 'unknown'}" not channel/group`);
+      return;
+    }
     // Allow bot/app messages (Freshdesk, HubSpot) which arrive as subtype 'bot_message'.
     // Still ignore edits and other non-new-message subtypes like 'message_changed', 'message_deleted', etc.
     const subtype = typeof event?.subtype === 'string' ? event.subtype : undefined;
-    if (subtype && subtype !== 'bot_message' && subtype !== 'thread_broadcast') return;
-    if (typeof event?.text !== 'string' || event.text.length === 0) return;
+    if (subtype && subtype !== 'bot_message' && subtype !== 'thread_broadcast') {
+      // Don't log message_changed events - they're just our own progress updates
+      if (verbose && subtype !== 'message_changed' && subtype !== 'message_deleted') {
+        vlog(`[REJECT] subtype="${subtype}" not bot_message/thread_broadcast`);
+      }
+      return;
+    }
+    if (typeof event?.text !== 'string' || event.text.length === 0) {
+      if (verbose) vlog(`[REJECT] empty text`);
+      return;
+    }
     // Only auto-engage on root messages, not thread replies
-    if (event?.thread_ts) return;
+    if (event?.thread_ts) {
+      vlog(`[REJECT] thread reply (thread_ts="${event.thread_ts}") - auto-engage only on root messages`);
+      return;
+    }
     // Don't auto-engage if the bot is mentioned (mentions are handled separately)
-    if (context?.botUserId && containsBotMention(event.text, String(context.botUserId))) return;
+    if (context?.botUserId && containsBotMention(event.text, String(context.botUserId))) {
+      vlog(`[REJECT] bot mentioned - handled by mention event`);
+      return;
+    }
     await handleEvent(KIND_CHANNEL_POST, args);
   });
 
