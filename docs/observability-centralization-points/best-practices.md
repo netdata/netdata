@@ -42,6 +42,47 @@ flowchart TB
     class B1,C1,D1 complete
 ```
 
+## Critical Retention Configuration
+
+:::warning
+
+**Default retention settings will not work for production.** Netdata defaults to 1GB space limit per tier with combined time/space retention. You'll hit the 1GB limit within hours or days, causing data loss much sooner than your configured time limits.
+
+**You must configure retention properly before deployment.**
+
+:::
+
+### Choosing Your Retention Strategy
+
+Netdata supports three retention strategies:
+
+1. **Time-based retention** (recommended for predictable retention periods):
+   ```ini
+   [db]
+   dbengine tier 0 retention time = 30d
+   # Do NOT set retention size, or set to 0 to disable space limits
+   ```
+
+2. **Space-based retention** (recommended for predictable disk usage):
+   ```ini
+   [db]
+   dbengine tier 0 retention size = 500GB
+   # Do NOT set retention time, or set to 0 to disable time limits
+   ```
+
+3. **Combined retention** (use with caution):
+   ```ini
+   [db]
+   dbengine tier 0 retention time = 30d
+   dbengine tier 0 retention size = 500GB  # Must be large enough to hold 30 days of data!
+   ```
+
+:::tip
+
+For Parent nodes with millions of metrics, expect to allocate 100GB-1TB+ per tier. Setting `retention size = 0` means unlimited space (not zero space), which can work well with time-based retention if you have adequate disk space.
+
+:::
+
 ## Estimating Disk Retention by Metric Volume on Parent Nodes
 
 Parent nodes are the central long-term storage layer in a Netdata infrastructure. They receive all metrics streamed from children and store them according to tiered retention settings.
@@ -65,12 +106,26 @@ For **1,000,000 metrics streamed to the Parent**, this equals **≈ 3.7 TB**.
 
 Adding 5–15% overhead for replication buffers, indexes, and metadata, plan for **≈ 4 TB per million metrics** under this retention policy.
 
-### Key Parameters to Adjust
+### Configuration Example for Production Deployments
 
-* Total metrics streamed from all Children
-* Retention window per tier (`dbengine tier x retention time`)
-* Sampling interval per tier (`update every`)
-* Metadata & replication overhead (5–15 % recommended buffer)
+```ini
+[db]
+    mode = dbengine
+    update every = 1
+    storage tiers = 3
+
+    # Tier 0: per-second data for 30 days
+    dbengine tier 0 retention time = 30d
+    # No size limit - let time control retention
+
+    # Tier 1: per-minute data for 6 months  
+    dbengine tier 1 update every iterations = 60
+    dbengine tier 1 retention time = 6mo
+
+    # Tier 2: per-hour data for 5 years
+    dbengine tier 2 update every iterations = 60
+    dbengine tier 2 retention time = 5y
+```
 
 ## Cost Optimization Strategies
 
