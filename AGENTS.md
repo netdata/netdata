@@ -146,7 +146,7 @@ ai-agent MUST load all configuration at load-time.
 ai-agent MUST NOT depend on any file or external service for retreiving configuration at runtime.
 
 PR-002:
-There are no permanent tools available to all agents, except `append_note` and `final_report`.
+There are no permanent tools available to all agents, except `progress_report` and `final_report`.
 Per agent tools are subject to its configuration (frontmatter, command-line).
 
 

@@ -167,7 +167,7 @@ export function loadAgent(aiPath: string, registry?: AgentRegistry, options?: Lo
   selectedTools.forEach((toolName) => {
     // Skip special selectors like openapi:*, rest:*, agent:*
     if (toolName.includes(':')) return;
-    // Skip internal tools (batch, append_notes, final_report)
+    // Skip internal tools (batch, progress_report, final_report)
     if (isReservedAgentName(toolName)) return;
     // Check both MCP servers and REST tools
     const inMcpServers = Object.prototype.hasOwnProperty.call(config.mcpServers, toolName);
@@ -440,7 +440,7 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
   selectedTools.forEach((toolName) => {
     // Skip special selectors like openapi:*, rest:*, agent:*
     if (toolName.includes(':')) return;
-    // Skip internal tools (batch, append_notes, final_report)
+    // Skip internal tools (batch, progress_report, final_report)
     if (isReservedAgentName(toolName)) return;
     // Check both MCP servers and REST tools
     const inMcpServers = Object.prototype.hasOwnProperty.call(config.mcpServers, toolName);

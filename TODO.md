@@ -191,7 +191,7 @@ Appendix: What We Reviewed (no surprises)
 - `src/tools/tools.ts` — request/response/trace logging, size caps, accounting, spans, opTree append, child tree attach (at finish), concurrency.
 - `src/tools/mcp-provider.ts` — transports init, list tools, callTool, request/response normalization.
 - `src/tools/rest-provider.ts` — REST execution, optional streaming combine, return tokens string, TRC handled by orchestrator.
-- `src/tools/internal-provider.ts` — append_notes/title/final_report/batch; Slack Block Kit validation; final report saved to session.
+- `src/tools/internal-provider.ts` — progress_report/title/final_report/batch; Slack Block Kit validation; final report saved to session.
 - `src/tools/agent-provider.ts` — bridges orchestrator to SubAgentRegistry.
 - `src/subagent-registry.ts` — child runner execution, prefixed logs, returns conversation/accounting/opTree after completion (to be extended for live updates).
 - `src/execution-tree.ts` — current source of truth for arrays + spans; will be adapter once opTree becomes canonical.
@@ -387,7 +387,7 @@ Comprehensive Use‑Case Coverage (What opTree must capture)
 - Tool requests and responses (all kinds)
   - MCP tools: compact request line, optional TRC with full JSON args; response size, truncation notices, raw payload trace (when enabled), latency, errors
   - REST tools: same as MCP (providerId 'rest'); includes both manifest and OpenAPI‑generated endpoints
-  - Internal tools: `agent__append_notes`, `agent__final_report`, `agent__batch` (request args and results; batch orchestrates inner calls via orchestrator → inner ops appear in opTree)
+  - Internal tools: `agent__progress_report`, `agent__final_report`, `agent__batch` (request args and results; batch orchestrates inner calls via orchestrator → inner ops appear in opTree)
   - Sub‑agents (AgentProvider): treat as `kind:'session'` ops; attach child SessionNode and stream child updates live
 
 - Accounting
@@ -511,7 +511,7 @@ Console Logging Semantics (stdout/stderr behavior via opTree)
   - Numeric path labels (e.g., 1.1.2.3) are acceptable for compactness; exact format is a renderer detail, but it must be bijective with the opTree position.
 
 Final Verification Steps
-- Manual runs covering: (a) MCP tool; (b) REST tool; (c) Internal tools (append_notes/final_report/batch with inner calls); (d) Sub‑agent with long‑running child emitting live snapshots; (e) OpenAPI‑generated REST tool.
+- Manual runs covering: (a) MCP tool; (b) REST tool; (c) Internal tools (progress_report/final_report/batch with inner calls); (d) Sub‑agent with long‑running child emitting live snapshots; (e) OpenAPI‑generated REST tool.
 - Confirm live opTree updates in Slack and via `/api/runs/:id/tree` during in‑flight execution.
 - Confirm no references to `ExecutionTree` remain (static check) after Phase B.
 - Confirm secrets redaction on trace logs via the new tree API.

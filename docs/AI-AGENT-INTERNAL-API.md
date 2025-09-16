@@ -89,7 +89,7 @@ Type `tool` (MCP tool calls and internal tools):
 - `error?: string` – only when `status: 'failed'`
 
 Emission timing (tool): Immediately after each tool execution completes or fails:
-- Internal tools `agent_append_notes`, `agent_final_report`: `status: 'ok'`, `mcpServer: 'agent'`, fixed `charactersOut` (15 and 12 respectively), `charactersIn` reflects parameter size.
+- Internal tools `agent__progress_report`, `agent__final_report`: `status: 'ok'`, `mcpServer: 'agent'`, fixed `charactersOut` (15 and 12 respectively), `charactersIn` reflects parameter size.
 - External MCP tools: `status: 'ok'` with the resolved `mcpServer` on success; `status: 'failed'`, `mcpServer: 'unknown'`, and `charactersOut: 0` on error.
 - Truncation: If the tool response exceeds `toolResponseMaxBytes`, the library prefixes a truncation notice and trims the content to the limit; `charactersOut` reflects the returned (prefixed + truncated) content length.
 

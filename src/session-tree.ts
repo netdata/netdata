@@ -36,6 +36,7 @@ export interface SessionNode {
   agentId?: string;
   callPath?: string;
   sessionTitle: string;
+  latestStatus?: string;
   startedAt: number;
   endedAt?: number;
   success?: boolean;
@@ -72,6 +73,10 @@ export class SessionTreeBuilder {
 
   setSessionTitle(title: string): void {
     this.session.sessionTitle = title;
+  }
+
+  setLatestStatus(status: string): void {
+    this.session.latestStatus = status;
   }
 
   endSession(success: boolean, error?: string): void {

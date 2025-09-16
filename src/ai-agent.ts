@@ -75,7 +75,6 @@ export class AIAgentSession {
   private readonly stopRef?: { stopping: boolean };
   private ajv?: Ajv;
   // Internal housekeeping notes
-  private internalNotes: { text: string; tags?: string[]; ts: number }[] = [];
   private childConversations: { agentId?: string; toolName: string; promptPath: string; conversation: ConversationMessage[]; trace?: { originId?: string; parentId?: string; selfId?: string; callPath?: string } }[] = [];
   private readonly subAgents?: SubAgentRegistry;
   private readonly txnId: string;
@@ -242,16 +241,19 @@ export class AIAgentSession {
       const internalProvider = new InternalToolProvider('agent', {
         enableBatch,
         expectedJsonSchema,
-        appendNotes: (text: string, tags?: string[]) => {
+        updateStatus: (text: string) => {
           const t = text.trim();
           if (t.length > 0) {
+            // Update the latest status in the opTree
+            this.opTree.setLatestStatus(t);
+            // Trigger callback to notify listeners (like Slack progress updates)
+            try {
+              this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession());
+            } catch (e) {
+              warn(`onOpTree callback failed: ${e instanceof Error ? e.message : String(e)}`);
+            }
+            // Log progress update in VRB, bold, without truncation
             const ts = Date.now();
-            this.internalNotes.push({ text: t, tags, ts });
-            // Log note in VRB, bold, without truncation
-            const noteMsg = (() => {
-              const tagStr = Array.isArray(tags) && tags.length > 0 ? ` [${tags.join(', ')}]` : '';
-              return `${t}${tagStr}`;
-            })();
             const entry: LogEntry = {
               timestamp: ts,
               severity: 'VRB',
@@ -259,10 +261,10 @@ export class AIAgentSession {
               subturn: 0,
               direction: 'response',
               type: 'tool',
-              remoteIdentifier: 'agent:note',
+              remoteIdentifier: 'agent:progress',
               fatal: false,
               bold: true,
-              message: noteMsg,
+              message: `[PROGRESS UPDATE] ${t}`,
             };
             this.log(entry);
           }
@@ -974,11 +976,11 @@ export class AIAgentSession {
           try {
             // Build per-attempt conversation with optional guidance injection
             let attemptConversation = [...conversation];
-            // On the last allowed attempt within this turn, nudge the model to use tools (not append_notes)
+            // On the last allowed attempt within this turn, nudge the model to use tools (not progress_report)
             if ((attempts === maxRetries - 1) && currentTurn < (maxTurns - 1)) {
               attemptConversation.push({
                 role: 'user',
-                content: 'Reminder: do not end with plain text. Use an available tool (excluding `agent__append_notes`) to make progress. When ready to conclude, call the tool `agent__final_report` to provide the final answer.'
+                content: 'Reminder: do not end with plain text. Use an available tool (excluding `agent__progress_report`) to make progress. When ready to conclude, call the tool `agent__final_report` to provide the final answer.'
               });
             }
             // Do not inject final-turn user message here to avoid duplication.
@@ -1031,7 +1033,7 @@ export class AIAgentSession {
             try {
               // Consider only internal tool set as always known
               // Internal tools always available; include optional batch tool if enabled for this session
-              const internal = new Set<string>(['agent__append_notes', 'agent__final_report']);
+              const internal = new Set<string>(['agent__progress_report', 'agent__final_report']);
               if (this.sessionConfig.tools.includes('batch')) internal.add('agent__batch');
               const normalizeTool = (n: string) => n.replace(/^<\|[^|]+\|>/, '').trim();
               const lastAssistant = turnResult.messages.filter((m) => m.role === 'assistant');
@@ -1273,7 +1275,7 @@ export class AIAgentSession {
                   const count = toolCalls.reduce((acc, tc) => {
                     const name = (typeof tc.name === 'string' ? tc.name : '').trim();
                     if (name.length === 0) return acc;
-                    if (name === 'agent__append_notes' || name === 'agent__final_report' || name === 'agent__batch') return acc;
+                    if (name === 'agent__progress_report' || name === 'agent__final_report' || name === 'agent__batch') return acc;
                     // Count only known tools (non-internal) present in orchestrator
                     const isKnown = this.toolsOrchestrator?.hasTool(name) ?? false;
                     return isKnown ? acc + 1 : acc;
@@ -1591,10 +1593,9 @@ export class AIAgentSession {
     lastShownThinkingHeaderTurn: number
   ) {
     // no spans; opTree is canonical
-    // Expose provider tools plus session-specific internal tools (overrides schemas, same names)
+    // Expose provider tools (which includes internal tools from InternalToolProvider)
     const availableTools = [
-      ...(this.toolsOrchestrator?.listTools() ?? []),
-      ...this.getInternalTools()
+      ...(this.toolsOrchestrator?.listTools() ?? [])
     ];
 
     
@@ -1802,8 +1803,23 @@ export class AIAgentSession {
     // no spans
     const results = await Promise.all(bi.calls.map(async (c) => {
       const t0 = Date.now();
-      if (c.tool === 'agent__append_notes' || c.tool === 'agent__final_report' || c.tool === 'agent__batch') {
+      // Allow progress_report in batch, but not final_report or nested batch
+      if (c.tool === 'agent__final_report' || c.tool === 'agent__batch') {
         return { id: c.id, tool: c.tool, ok: false, elapsedMs: 0, error: { code: 'INTERNAL_NOT_ALLOWED', message: 'Internal tools are not allowed in batch' } };
+      }
+      // Handle progress_report directly in batch
+      if (c.tool === 'agent__progress_report') {
+        const progress = typeof (c.args.progress) === 'string' ? c.args.progress : '';
+        if (progress.trim().length > 0) {
+          this.opTree.setLatestStatus(progress);
+          // Trigger callback to notify listeners (like Slack progress updates)
+          try {
+            this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession());
+          } catch (e) {
+            warn(`onOpTree callback failed: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+        return { id: c.id, tool: c.tool, ok: true, elapsedMs: 0, output: JSON.stringify({ ok: true }) };
       }
       try {
         if (!(this.toolsOrchestrator?.hasTool(c.tool) ?? false)) {
@@ -1842,15 +1858,14 @@ export class AIAgentSession {
   private getInternalTools(): MCPTool[] {
     const tools: MCPTool[] = [
       {
-        name: 'agent__append_notes',
-        description: 'Side notes for operators. Use sparingly to record brief interim findings, assumptions, blockers, or caveats. Notes are appended to metadata and shown separately in the UI; they are NOT graded and should NOT be duplicated in final content.',
+        name: 'agent__progress_report',
+        description: 'Provide a brief text summary (up to 20 words) of your current status and next steps.',
         inputSchema: {
           type: 'object',
           additionalProperties: false,
-          required: ['text'],
+          required: ['progress'],
           properties: {
-            text: { type: 'string', minLength: 1 },
-            tags: { type: 'array', items: { type: 'string' } },
+            progress: { type: 'string', minLength: 1 }
           },
         },
       }
@@ -1945,7 +1960,7 @@ export class AIAgentSession {
             + ']\n\n'
             + 'Split long output into multiple messages. You can post up to 20 messages, each message having up to 50 blocks, each block having up to 2000 characters in Slack mrkdwn (not GitHub markdown).\n\n'
             + 'Slack mrkdwn (not GitHub markdown) format:\n'
-            + '- *bold* → bold (CRITICAL: single asterisk for bold)\n'
+            + '- *bold* → bold (**CRITICAL**: single asterisk * for bold, NOT double **)\n'
             + '- _italic_ → italic\n'
             + '- ~strikethrough~ → strikethrough\n'
             + '- `inline code`\n'
@@ -1960,13 +1975,13 @@ export class AIAgentSession {
             + '- No Nested lists\n'
             + '- No Image embedding\n'
             + '- No HTML tags\n'
-            + 'CRITICAL: ALL STRINGS MUST BE IN SLACK MRKDWN FORMAT (not GitHub markdown)'
+            + 'CRITICAL: ALL STRINGS MUST BE IN SLACK MRKDWN FORMAT (not GitHub markdown). CRITICAL: Use single asterisk * for bold, NOT double **.\n'
           );
           tools.push({
             name: 'agent__final_report',
             description: (
               'You MUST use agent__final_report to provide your final response to the user request. Use Slack mrkdwn (not GitHub markdown). ' + suffix
-              + '\nREQUIREMENT: Provide up to 20 `messages` with Block Kit + mrkdwn only (not GitHub markdown). Do NOT provide plain `content`. Do NOT use GitHub markdown.\n\n'
+              + '\nREQUIREMENT: Provide up to 20 `messages` with Block Kit + mrkdwn only (not GitHub markdown). Do NOT provide plain `content`. Do NOT use GitHub markdown. Single asterisks * MUST be used for bold text.\n\n'
               + slackInstructions
             ).trim(),
             inputSchema: {
@@ -2112,7 +2127,7 @@ export class AIAgentSession {
     const ARGS = '- Arguments:';
     const STATUS_LINE = '  - `status`: one of `success`, `failure`, `partial`.';
     // No extra context lines here; schema carries any prepended guidance when needed
-    lines.push('- Use tool `agent__append_notes` sparingly for brief housekeeping notes; it is not graded and does not count as progress.');
+    lines.push('- Use tool `agent__progress_report` to provide real-time progress updates (max 15 words) in parallel with your primary actions.');
     const rf2: OutputFormatId = this.sessionConfig.outputFormat;
     const rdesc = this.resolvedFormatDescription;
     if ((exp?.format === 'json') || rf2 === 'json') {
@@ -2137,6 +2152,26 @@ export class AIAgentSession {
     }
     lines.push('- Do NOT end with plain text. The session ends only after `agent__final_report`.');
 
+    // Add progress_report tool guidance
+    lines.push('');
+    lines.push('- Use tool `agent__progress_report` to provide real-time progress updates and next steps.');
+    lines.push('  - Real-time progress updates are crucial for user awareness. They help users understand what you are doing, the challenges you are facing and what you plan to do, especially during long tasks.');
+    lines.push('  - **CRITICAL**: You **MUST** call `agent__progress_report` on EVERY turn to ensure users know what you are doing.');
+    lines.push('  - **CRITICAL**: You **MUST** call `agent__progress_report` in PARALLEL with your other tools and actions.');
+    lines.push('  - Keep progress brief: max 20 words.');
+    lines.push('  - Examples of good parallel usage:');
+    lines.push('    When using batch:');
+    lines.push('    {');
+    lines.push('      "calls": [');
+    lines.push('        { "id": 1, "tool": "agent__progress_report", "args": { "progress": "Searching documentation for XYZ" } },');
+    lines.push('        { "id": 2, "tool": "jina__jina_search_web", "args": { "query": "..." } }');
+    lines.push('      ]');
+    lines.push('    }');
+    lines.push('    When calling multiple tools:');
+    lines.push('    - Call agent__progress_report with "Analyzing config files for ABC"');
+    lines.push('    - AND call your actual analysis tools in the same turn');
+    lines.push('  - BAD usage (wastes turns): Calling agent__progress_report alone');
+
     // If user enabled batch tool, add concise usage guidance with a compact example
     if (this.sessionConfig.tools.includes('batch')) {
       lines.push('');
@@ -2144,52 +2179,32 @@ export class AIAgentSession {
       lines.push('  - `calls[]`: items with `id`, `tool` (exposed name), `args`.');
       lines.push('  - Execution is always parallel.');
       lines.push('  - Keep `args` minimal; they are validated server-side against real schemas.');
-      lines.push('  - Examples (brave + jina + fetcher):');
-      lines.push('    1) Sequential batch (no deps): 2x Jina searches, 2x Brave searches, 2x Fetcher fetches');
+      lines.push('  - Examples (with progress_report + search tools):');
       lines.push('    {');
       lines.push('      "calls": [');
-      lines.push('        { "id": 1, "tool": "jina__jina_search_web",');
+      lines.push('        { "id": 1, "tool": "agent__progress_report",');
+      lines.push('          "args": { "progress": "Researching Netdata and eBPF" } },');
+      lines.push('');
+      lines.push('        { "id": 2, "tool": "jina__jina_search_web",');
       lines.push('          "args": { "query": "Netdata real-time monitoring features", "num": 10 } },');
       lines.push('');
-      lines.push('        { "id": 2, "tool": "jina__jina_search_arxiv",');
+      lines.push('        { "id": 3, "tool": "jina__jina_search_arxiv",');
       lines.push('          "args": { "query": "eBPF monitoring 2024", "num": 20 } },');
       lines.push('');
-      lines.push('        { "id": 3, "tool": "brave__brave_web_search",');
+      lines.push('        { "id": 4, "tool": "brave__brave_web_search",');
       lines.push('          "args": { "query": "Netdata Cloud pricing", "count": 8, "offset": 0 } },');
       lines.push('');
-      lines.push('        { "id": 4, "tool": "brave__brave_local_search",');
+      lines.push('        { "id": 5, "tool": "brave__brave_local_search",');
       lines.push('          "args": { "query": "coffee near Athens", "count": 5 } },');
       lines.push('');
-      lines.push('        { "id": 5, "tool": "fetcher__fetch_url",');
+      lines.push('        { "id": 6, "tool": "fetcher__fetch_url",');
       lines.push('          "args": { "url": "https://www.netdata.cloud" } },');
       lines.push('');
-      lines.push('        { "id": 6, "tool": "fetcher__fetch_url",');
+      lines.push('        { "id": 7, "tool": "fetcher__fetch_url",');
       lines.push('          "args": { "url": "https://learn.netdata.cloud/" } }');
       lines.push('      ]');
       lines.push('    }');
       lines.push('');
-      lines.push('    2) Parallel batch (same tools)');
-      lines.push('    {');
-      lines.push('      "calls": [');
-      lines.push('        { "id": 1, "tool": "jina__jina_search_web",');
-      lines.push('          "args": { "query": "Netdata vs Prometheus 2024", "num": 10 } },');
-      lines.push('');
-      lines.push('        { "id": 2, "tool": "jina__jina_search_arxiv",');
-      lines.push('          "args": { "query": "time-series anomaly detection streaming", "num": 15 } },');
-      lines.push('');
-      lines.push('        { "id": 3, "tool": "brave__brave_web_search",');
-      lines.push('          "args": { "query": "Netdata agent install Ubuntu", "count": 10 } },');
-      lines.push('');
-      lines.push('        { "id": 4, "tool": "brave__brave_local_search",');
-      lines.push('          "args": { "query": "devops meetups near Athens", "count": 5 } },');
-      lines.push('');
-      lines.push('        { "id": 5, "tool": "fetcher__fetch_url",');
-      lines.push('          "args": { "url": "https://github.com/netdata/netdata" } },');
-      lines.push('');
-      lines.push('        { "id": 6, "tool": "fetcher__fetch_url",');
-      lines.push('          "args": { "url": "https://community.netdata.cloud/" } }');
-      lines.push('      ]');
-      lines.push('    }');
     }
     return lines.join('\n');
   }

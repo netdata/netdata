@@ -11,6 +11,7 @@ interface AgentStatusLine {
   elapsedSec?: number;
   progressPct?: number;
   title?: string;
+  latestStatus?: string;
 }
 
 interface SnapshotSummary {
@@ -43,7 +44,8 @@ export function buildSnapshotFromOpTree(root: SessionNode, nowTs: number): Snaps
     const elapsedSec = Math.max(0, Math.round(((typeof ended === 'number' ? ended : nowTs) - started) / 1000));
     const status: AgentStatusLine['status'] = (typeof ended === 'number') ? 'Finished' : 'Working';
     const title = node.sessionTitle && node.sessionTitle.trim().length > 0 ? node.sessionTitle : undefined;
-    lines.push({ agentId, callPath, status, elapsedSec, title });
+    const latestStatus = node.latestStatus && node.latestStatus.trim().length > 0 ? node.latestStatus : undefined;
+    lines.push({ agentId, callPath, status, elapsedSec, title, latestStatus });
 
     // Walk turns/ops, aggregate tools + tokens
     const turns = Array.isArray(node.turns) ? node.turns : [];
@@ -129,12 +131,21 @@ export function buildStatusBlocks(summary: SnapshotSummary, rootAgentId?: string
     return arr.length > 0 ? Math.max(...arr) : 0;
   })();
 
-  // Title: prefer master agent session title if available; otherwise "Working..."
+  // Title: For master agent, prefer latestStatus over title (since title is just "Working...")
   const mm = Math.floor(elapsed / 60);
   const ss = elapsed % 60;
   const elapsedClock = `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
   const master = typeof rootAgentId === 'string' ? summary.lines.find((l) => l.agentId === rootAgentId) : undefined;
-  const headerTitle = (typeof master?.title === 'string' && master.title.trim().length > 0) ? master.title.trim() : 'Working...';
+  // For master agent: use latestStatus if available, otherwise title, otherwise "Working..."
+  const headerTitle = (() => {
+    if (master?.latestStatus && master.latestStatus.trim().length > 0) {
+      return master.latestStatus.trim();
+    }
+    if (master?.title && master.title.trim().length > 0) {
+      return master.title.trim();
+    }
+    return 'Working...';
+  })();
   blocks.push({ type: 'header', text: { type: 'plain_text', text: headerTitle } });
   blocks.push({ type: 'divider' });
 
@@ -163,16 +174,31 @@ export function buildStatusBlocks(summary: SnapshotSummary, rootAgentId?: string
       const secs = l.elapsedSec ?? 0;
       const agentLine = `${shownName} — ${asClock(secs)}`;
       const title = typeof l.title === 'string' && l.title.length > 0 ? l.title : undefined;
+      const latestStatus = typeof l.latestStatus === 'string' && l.latestStatus.length > 0 ? l.latestStatus : undefined;
 
-      // If we have a title, show it as the main text and agent/duration as context
+      // Build context elements: latestStatus on first line, agent/duration on second line
+      const contextElements: string[] = [];
+      if (latestStatus) contextElements.push(latestStatus);
+      contextElements.push(agentLine);
+      const contextText = contextElements.join('\n');
+
+      // If we have a title, show it as the main text with status and agent/duration as context
       // If no title, just show agent/duration as main text
       if (title) {
         return [
           { type: 'section', text: { type: 'mrkdwn', text: title } },
-          { type: 'context', elements: [{ type: 'mrkdwn', text: agentLine }] }
+          { type: 'context', elements: [{ type: 'mrkdwn', text: contextText }] }
         ];
       } else {
-        return [{ type: 'section', text: { type: 'mrkdwn', text: agentLine } }];
+        // No title, so if we have latestStatus show it with agent/duration as context
+        if (latestStatus) {
+          return [
+            { type: 'section', text: { type: 'mrkdwn', text: latestStatus } },
+            { type: 'context', elements: [{ type: 'mrkdwn', text: agentLine }] }
+          ];
+        } else {
+          return [{ type: 'section', text: { type: 'mrkdwn', text: agentLine } }];
+        }
       }
     })
     .filter((v): v is any => v !== undefined);

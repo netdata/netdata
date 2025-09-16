@@ -16,7 +16,7 @@ export class InternalToolProvider extends ToolProvider {
       enableBatch: boolean;
       expectedJsonSchema?: Record<string, unknown>;
       // Callbacks into session
-      appendNotes: (text: string, tags?: string[]) => void;
+      updateStatus: (text: string) => void;
       setTitle: (title: string, emoji?: string) => void;
       setFinalReport: (payload: { status: 'success'|'failure'|'partial'; format: string; content?: string; content_json?: Record<string, unknown>; metadata?: Record<string, unknown>; messages?: unknown[] }) => void;
       orchestrator: ToolsOrchestrator;
@@ -27,15 +27,14 @@ export class InternalToolProvider extends ToolProvider {
   listTools(): MCPTool[] {
     const tools: MCPTool[] = [
       {
-        name: 'agent__append_notes',
-        description: 'Side notes for operators. Use sparingly to record brief interim findings, assumptions, blockers, or caveats. Notes are appended to metadata and shown separately in the UI; they are NOT graded and should NOT be duplicated in final content.',
+        name: 'agent__progress_report',
+        description: 'Report current progress to user (max 15 words). MUST call in parallel with primary actions for real-time visibility.',
         inputSchema: {
           type: 'object',
           additionalProperties: false,
-          required: ['text'],
+          required: ['progress'],
           properties: {
-            text: { type: 'string', minLength: 1 },
-            tags: { type: 'array', items: { type: 'string' } },
+            progress: { type: 'string', description: 'Brief progress message (max 15 words)' }
           },
         },
       },
@@ -87,15 +86,14 @@ export class InternalToolProvider extends ToolProvider {
   }
 
   hasTool(name: string): boolean {
-    return name === 'agent__append_notes' || name === 'agent__final_report' || (this.opts.enableBatch && name === 'agent__batch');
+    return name === 'agent__progress_report' || name === 'agent__final_report' || (this.opts.enableBatch && name === 'agent__batch');
   }
 
   async execute(name: string, args: Record<string, unknown>, _opts?: ToolExecuteOptions): Promise<ToolExecuteResult> {
     const start = Date.now();
-    if (name === 'agent__append_notes') {
-      const text = typeof (args.text) === 'string' ? args.text : '';
-      const tags = Array.isArray(args.tags) ? (args.tags as unknown[]).filter((t): t is string => typeof t === 'string') : undefined;
-      if (text.trim().length > 0) this.opts.appendNotes(text, tags);
+    if (name === 'agent__progress_report') {
+      const progress = typeof (args.progress) === 'string' ? args.progress : '';
+      this.opts.updateStatus(progress);
       return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, providerId: this.id };
     }
 if (name === 'agent__final_report') {
@@ -242,7 +240,14 @@ if (name === 'agent__final_report') {
         const tool = typeof c.tool === 'string' ? c.tool : '';
         const a = (c.args !== null && typeof c.args === 'object') ? (c.args as Record<string, unknown>) : {};
         const t0 = Date.now();
-        if (tool === 'agent__append_notes' || tool === 'agent__final_report' || tool === 'agent__batch') return { id, tool, ok: false, elapsedMs: 0, error: { code: 'INTERNAL_NOT_ALLOWED', message: 'Internal tools are not allowed in batch' } };
+        // Allow progress_report in batch, but not final_report or nested batch
+        if (tool === 'agent__final_report' || tool === 'agent__batch') return { id, tool, ok: false, elapsedMs: 0, error: { code: 'INTERNAL_NOT_ALLOWED', message: 'Internal tools are not allowed in batch' } };
+        // Handle progress_report directly in batch
+        if (tool === 'agent__progress_report') {
+          const progress = typeof (a.progress) === 'string' ? a.progress : '';
+          this.opts.updateStatus(progress);
+          return { id, tool, ok: true, elapsedMs: 0, output: JSON.stringify({ ok: true }) };
+        }
         try {
           if (!(this.opts.orchestrator.hasTool(tool))) return { id, tool, ok: false, elapsedMs: 0, error: { code: 'UNKNOWN_TOOL', message: `Unknown tool: ${tool}` } };
           const managed = await this.opts.orchestrator.executeWithManagement(tool, a, { turn: 0, subturn: 0 }, { timeoutMs: this.opts.toolTimeoutMs });
