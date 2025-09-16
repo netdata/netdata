@@ -81,13 +81,33 @@ The following alerts are available:
 
 ## Setup
 
+
 ### Prerequisites
 
 No action required.
 
 ### Configuration
 
-#### File
+#### Options
+
+At least one option ('clock synchronization state', 'time offset') needs to be enabled for this collector to run.
+
+<details open><summary>Config options</summary>
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| update every | Data collection frequency. | 1 | no |
+| clock synchronization state | Make chart showing system clock synchronization state. | yes | yes |
+| time offset | Make chart showing computed time offset between local system and reference clock | yes | yes |
+
+
+</details>
+
+
+
+#### via File
 
 The configuration file name for this integration is `netdata.conf`.
 Configuration for this specific integration is located in the `[plugin:timex]` section within that file.
@@ -109,23 +129,10 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config netdata.conf
 ```
-#### Options
 
-At least one option ('clock synchronization state', 'time offset') needs to be enabled for this collector to run.
+##### Examples
 
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update every | Data collection frequency. | 1 | no |
-| clock synchronization state | Make chart showing system clock synchronization state. | yes | yes |
-| time offset | Make chart showing computed time offset between local system and reference clock | yes | yes |
-
-</details>
-
-#### Examples
-
-##### Basic
+###### Basic
 
 A basic configuration example.
 

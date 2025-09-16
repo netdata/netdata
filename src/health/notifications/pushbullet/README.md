@@ -21,6 +21,7 @@ Send notifications to Pushbullet using Netdata's Agent alert notification featur
 
 ## Setup
 
+
 ### Prerequisites
 
 #### 
@@ -32,26 +33,16 @@ Send notifications to Pushbullet using Netdata's Agent alert notification featur
 
 ### Configuration
 
-#### File
-
-The configuration file name for this integration is `health_alarm_notify.conf`.
-
-
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config health_alarm_notify.conf
-```
 #### Options
 
 The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | Send_PUSHBULLET | Set `Send_PUSHBULLET` to YES | YES | yes |
 | PUSHBULLET_ACCESS_TOKEN | set `PUSHBULLET_ACCESS_TOKEN` to the access token you generated. |  | yes |
 | DEFAULT_RECIPIENT_PUSHBULLET | Set `DEFAULT_RECIPIENT_PUSHBULLET` to the email (e.g. `example@domain.com`) or the channel tag (e.g. `#channel`) you want the alert notifications to be sent to. |  | yes |
@@ -73,11 +64,27 @@ role_recipients_pushbullet[sitemgr]="user4@mail.com"
 ```
 
 
+
 </details>
 
-#### Examples
 
-##### Basic Configuration
+
+#### via File
+
+The configuration file name for this integration is `health_alarm_notify.conf`.
+
+
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config health_alarm_notify.conf
+```
+
+##### Examples
+
+###### Basic Configuration
 
 
 

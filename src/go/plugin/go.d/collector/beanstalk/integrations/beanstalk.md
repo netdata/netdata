@@ -116,13 +116,63 @@ The following alerts are available:
 
 ## Setup
 
+
+You can configure the **beanstalk** collector in two ways:
+
+| Method                | Best for                                                                                 | How to                                                                                                                                 |
+|-----------------------|------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| [**UI**](#via-ui)     | Fast setup without editing files                                                         | Go to **Nodes → Configure this node → Collectors → Jobs**, search for **beanstalk**, then click **+** to add a job. |
+| [**File**](#via-file) | If you prefer configuring via file, or need to automate deployments (e.g., with Ansible) | Edit `go.d/beanstalk.conf` and add a job.                                                                        |
+
+:::important
+
+UI configuration requires paid Netdata Cloud plan.
+
+:::
+
+
 ### Prerequisites
 
 No action required.
 
 ### Configuration
 
-#### File
+#### Options
+
+The following options can be defined globally: update_every, autodetection_retry.
+
+
+<details open><summary>Config options</summary>
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| update_every | Data collection frequency. | 1 | no |
+| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
+| address | The IP address and port where the Beanstalk service listens for connections. | 127.0.0.1:11300 | yes |
+| timeout | Connection, read, and write timeout duration in seconds. The timeout includes name resolution. | 1 | no |
+| tube_selector | Specifies a [pattern](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme) for which Beanstalk tubes Netdata will collect statistics. | * | no |
+
+
+</details>
+
+
+#### via UI
+
+Configure the **beanstalk** collector from the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the beanstalk data-collection job to run** and click the :gear: (**Configure this node**). That node will run the data collection.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _beanstalk_ (or scroll the list) to locate the **beanstalk** collector.
+5. Click the **+** next to the **beanstalk** collector to add a new job.
+6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
+    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
+
+
+#### via File
 
 The configuration file name for this integration is `go.d/beanstalk.conf`.
 
@@ -133,7 +183,7 @@ update_every: 1
 autodetection_retry: 0
 jobs:
   - name: some_name1
-  - name: some_name1
+  - name: some_name2
 ```
 You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
 Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
@@ -142,26 +192,10 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config go.d/beanstalk.conf
 ```
-#### Options
 
-The following options can be defined globally: update_every, autodetection_retry.
+##### Examples
 
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update_every | Data collection frequency. | 1 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| address | The IP address and port where the Beanstalk service listens for connections. | 127.0.0.1:11300 | yes |
-| timeout | Connection, read, and write timeout duration in seconds. The timeout includes name resolution. | 1 | no |
-| tube_selector | Specifies a [pattern](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme) for which Beanstalk tubes Netdata will collect statistics. | * | no |
-
-</details>
-
-#### Examples
-
-##### Basic
+###### Basic
 
 A basic example configuration.
 
@@ -175,7 +209,7 @@ jobs:
 ```
 </details>
 
-##### Multi-instance
+###### Multi-instance
 
 > **Note**: When you define multiple jobs, their names must be unique.
 

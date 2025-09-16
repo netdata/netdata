@@ -109,32 +109,27 @@ The following alerts are available:
 
 ## Setup
 
+
+You can configure the **hfs** collector in two ways:
+
+| Method                | Best for                                                                                 | How to                                                                                                                                 |
+|-----------------------|------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| [**UI**](#via-ui)     | Fast setup without editing files                                                         | Go to **Nodes → Configure this node → Collectors → Jobs**, search for **hfs**, then click **+** to add a job. |
+| [**File**](#via-file) | If you prefer configuring via file, or need to automate deployments (e.g., with Ansible) | Edit `go.d/hdfs.conf` and add a job.                                                                        |
+
+:::important
+
+UI configuration requires paid Netdata Cloud plan.
+
+:::
+
+
 ### Prerequisites
 
 No action required.
 
 ### Configuration
 
-#### File
-
-The configuration file name for this integration is `go.d/hdfs.conf`.
-
-The file format is YAML. Generally, the structure is:
-
-```yaml
-update_every: 1
-autodetection_retry: 0
-jobs:
-  - name: some_name1
-  - name: some_name1
-```
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config go.d/hdfs.conf
-```
 #### Options
 
 The following options can be defined globally: update_every, autodetection_retry.
@@ -142,8 +137,10 @@ The following options can be defined globally: update_every, autodetection_retry
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | update_every | Data collection frequency. | 1 | no |
 | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
 | url | Server URL. | http://127.0.0.1:9870/jmx | yes |
@@ -162,11 +159,48 @@ The following options can be defined globally: update_every, autodetection_retry
 | tls_cert | Client TLS certificate. |  | no |
 | tls_key | Client TLS key. |  | no |
 
+
 </details>
 
-#### Examples
 
-##### Basic
+#### via UI
+
+Configure the **hfs** collector from the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the hfs data-collection job to run** and click the :gear: (**Configure this node**). That node will run the data collection.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _hfs_ (or scroll the list) to locate the **hfs** collector.
+5. Click the **+** next to the **hfs** collector to add a new job.
+6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
+    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
+
+
+#### via File
+
+The configuration file name for this integration is `go.d/hdfs.conf`.
+
+The file format is YAML. Generally, the structure is:
+
+```yaml
+update_every: 1
+autodetection_retry: 0
+jobs:
+  - name: some_name1
+  - name: some_name2
+```
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config go.d/hdfs.conf
+```
+
+##### Examples
+
+###### Basic
 
 A basic example configuration.
 
@@ -176,7 +210,7 @@ jobs:
     url: http://127.0.0.1:9870/jmx
 
 ```
-##### HTTP authentication
+###### HTTP authentication
 
 Basic HTTP authentication.
 
@@ -192,7 +226,7 @@ jobs:
 ```
 </details>
 
-##### HTTPS with self-signed certificate
+###### HTTPS with self-signed certificate
 
 Do not validate server certificate chain and hostname.
 
@@ -208,7 +242,7 @@ jobs:
 ```
 </details>
 
-##### Multi-instance
+###### Multi-instance
 
 > **Note**: When you define multiple jobs, their names must be unique.
 

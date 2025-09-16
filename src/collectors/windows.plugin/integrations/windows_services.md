@@ -83,13 +83,27 @@ There are no alerts configured by default for this integration.
 
 ## Setup
 
+
 ### Prerequisites
 
 No action required.
 
 ### Configuration
 
-#### File
+#### Options
+
+
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| update every | Data collection frequency. | 30 | no |
+
+
+
+
+#### via File
 
 The configuration file name for this integration is `netdata.conf`.
 Configuration for this specific integration is located in the `[plugin:windows:PerflibServices]` section within that file.
@@ -111,15 +125,8 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config netdata.conf
 ```
-#### Options
 
-
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update every | Data collection frequency. | 30 | no |
-
-#### Examples
+##### Examples
 There are no configuration examples.
 
 

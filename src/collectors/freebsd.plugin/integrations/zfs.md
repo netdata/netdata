@@ -106,13 +106,31 @@ The following alerts are available:
 
 ## Setup
 
+
 ### Prerequisites
 
 No action required.
 
 ### Configuration
 
-#### File
+#### Options
+
+
+
+<details open><summary>Config options</summary>
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| show zero charts | Do not show charts with zero metrics. | no | no |
+
+
+</details>
+
+
+
+#### via File
 
 The configuration file name for this integration is `netdata.conf`.
 Configuration for this specific integration is located in the `[plugin:freebsd:zfs_arcstats]` section within that file.
@@ -134,19 +152,8 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config netdata.conf
 ```
-#### Options
 
-
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| show zero charts | Do not show charts with zero metrics. | no | no |
-
-</details>
-
-#### Examples
+##### Examples
 There are no configuration examples.
 
 

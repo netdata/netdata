@@ -21,6 +21,7 @@ Send notifications to MessageBird using Netdata's Agent alert notification featu
 
 ## Setup
 
+
 ### Prerequisites
 
 #### 
@@ -32,26 +33,16 @@ Send notifications to MessageBird using Netdata's Agent alert notification featu
 
 ### Configuration
 
-#### File
-
-The configuration file name for this integration is `health_alarm_notify.conf`.
-
-
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config health_alarm_notify.conf
-```
 #### Options
 
 The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | SEND_MESSAGEBIRD | Set `SEND_MESSAGEBIRD` to YES | YES | yes |
 | MESSAGEBIRD_ACCESS_KEY | Set `MESSAGEBIRD_ACCESS_KEY` to your API key. |  | yes |
 | MESSAGEBIRD_NUMBER | Set `MESSAGEBIRD_NUMBER` to the MessageBird number you want to use for the alert. |  | yes |
@@ -72,11 +63,27 @@ role_recipients_messagebird[sitemgr]="+15555555550"
 ```
 
 
+
 </details>
 
-#### Examples
 
-##### Basic Configuration
+
+#### via File
+
+The configuration file name for this integration is `health_alarm_notify.conf`.
+
+
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config health_alarm_notify.conf
+```
+
+##### Examples
+
+###### Basic Configuration
 
 
 

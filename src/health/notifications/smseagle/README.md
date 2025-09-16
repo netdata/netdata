@@ -21,6 +21,7 @@ Forward notifications to SMSEagle device to send SMS, MMS, wake-up, or text-to-s
 
 ## Setup
 
+
 ### Prerequisites
 
 #### 
@@ -39,26 +40,16 @@ Optional: Enable the "Access to resources of all users" checkbox if you want thi
 
 ### Configuration
 
-#### File
-
-The configuration file name for this integration is `health_alarm_notify.conf`.
-
-
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config health_alarm_notify.conf
-```
 #### Options
 
 The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | DEFAULT_RECIPIENT_SMSEAGLE | If a role's recipients are not configured, a notification will be sent to this SMS recipient (empty = do not send a notification for unconfigured roles). Multiple recipients can be given like this: "PHONE1,PHONE2..." |  | yes |
 | SMSEAGLE_API_URL |  |  | yes |
 | SMSEAGLE_API_ACCESSTOKEN |  |  | yes |
@@ -106,11 +97,27 @@ Call duration, parameter required for Ring, TTS and TTS Advanced.
 ID of the voice model, required for TTS Advanced.
 
 
+
 </details>
 
-#### Examples
 
-##### Basic Configuration
+
+#### via File
+
+The configuration file name for this integration is `health_alarm_notify.conf`.
+
+
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config health_alarm_notify.conf
+```
+
+##### Examples
+
+###### Basic Configuration
 
 
 

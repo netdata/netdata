@@ -75,6 +75,7 @@ There are no alerts configured by default for this integration.
 
 ## Setup
 
+
 ### Prerequisites
 
 #### Install charts.d plugin
@@ -110,7 +111,30 @@ Make sure the path `/sbin/ipsec` matches your setup (execute `which ipsec` to fi
 
 ### Configuration
 
-#### File
+#### Options
+
+The config file is sourced by the charts.d plugin. It's a standard bash file.
+
+The following collapsed table contains all the options that can be configured for the libreswan collector.
+
+
+<details open><summary>Config options</summary>
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| libreswan_update_every | The data collection frequency. If unset, will inherit the netdata update frequency. | 1 | no |
+| libreswan_priority | The charts priority on the dashboard | 90000 | no |
+| libreswan_retries | The number of retries to do in case of failure before disabling the collector. | 10 | no |
+| libreswan_sudo | Whether to run `ipsec` with `sudo` or not. | 1 | no |
+
+
+</details>
+
+
+
+#### via File
 
 The configuration file name for this integration is `charts.d/libreswan.conf`.
 
@@ -127,27 +151,10 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config charts.d/libreswan.conf
 ```
-#### Options
 
-The config file is sourced by the charts.d plugin. It's a standard bash file.
+##### Examples
 
-The following collapsed table contains all the options that can be configured for the libreswan collector.
-
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| libreswan_update_every | The data collection frequency. If unset, will inherit the netdata update frequency. | 1 | no |
-| libreswan_priority | The charts priority on the dashboard | 90000 | no |
-| libreswan_retries | The number of retries to do in case of failure before disabling the collector. | 10 | no |
-| libreswan_sudo | Whether to run `ipsec` with `sudo` or not. | 1 | no |
-
-</details>
-
-#### Examples
-
-##### Run `ipsec` without sudo
+###### Run `ipsec` without sudo
 
 Run the `ipsec` utility without sudo
 

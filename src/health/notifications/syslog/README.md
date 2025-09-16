@@ -21,6 +21,7 @@ Send notifications to Syslog using Netdata's Agent alert notification feature, w
 
 ## Setup
 
+
 ### Prerequisites
 
 #### 
@@ -32,26 +33,16 @@ Send notifications to Syslog using Netdata's Agent alert notification feature, w
 
 ### Configuration
 
-#### File
-
-The configuration file name for this integration is `health_alarm_notify.conf`.
-
-
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config health_alarm_notify.conf
-```
 #### Options
 
 The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | SYSLOG_FACILITY | Set `SYSLOG_FACILITY` to the facility used for logging, by default this value is set to `local6`. |  | yes |
 | DEFAULT_RECIPIENT_SYSLOG | Set `DEFAULT_RECIPIENT_SYSLOG` to the recipient you want the alert notifications to be sent to. |  | yes |
 | SEND_SYSLOG | Set SEND_SYSLOG to YES, make sure you have everything else configured before turning this on. |  | yes |
@@ -88,11 +79,27 @@ role_recipients_syslog[sitemgr]="daemon.notice@loghost6:514/netdata"
 ```
 
 
+
 </details>
 
-#### Examples
 
-##### Basic Configuration
+
+#### via File
+
+The configuration file name for this integration is `health_alarm_notify.conf`.
+
+
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config health_alarm_notify.conf
+```
+
+##### Examples
+
+###### Basic Configuration
 
 
 

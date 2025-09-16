@@ -74,13 +74,31 @@ There are no alerts configured by default for this integration.
 
 ## Setup
 
+
 ### Prerequisites
 
 No action required.
 
 ### Configuration
 
-#### File
+#### Options
+
+
+
+<details open><summary></summary>
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| dev.cpu.0.freq | Enable or disable CPU Scaling frequency metric. | yes | no |
+
+
+</details>
+
+
+
+#### via File
 
 The configuration file name for this integration is `Config options`.
 Configuration for this specific integration is located in the `[plugin:freebsd]` section within that file.
@@ -93,19 +111,8 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config Config options
 ```
-#### Options
 
-
-
-<details open><summary></summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| dev.cpu.0.freq | Enable or disable CPU Scaling frequency metric. | yes | no |
-
-</details>
-
-#### Examples
+##### Examples
 There are no configuration examples.
 
 

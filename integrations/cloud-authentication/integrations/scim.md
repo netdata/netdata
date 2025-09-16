@@ -20,6 +20,7 @@ The System for Cross-domain Identity Management (SCIM) specification is designed
 
 ## Setup
 
+
 ### Prerequisites
 - A Netdata Cloud account
 - Admin access to the Space

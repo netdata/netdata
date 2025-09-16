@@ -94,13 +94,31 @@ The following alerts are available:
 
 ## Setup
 
+
 ### Prerequisites
 
 No action required.
 
 ### Configuration
 
-#### File
+#### Options
+
+The netdata main configuration file.
+
+<details open><summary>Config options</summary>
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| kern.cp_time | Enable or disable Total CPU usage. | yes | no |
+
+
+</details>
+
+
+
+#### via File
 
 The configuration file name for this integration is `netdata.conf`.
 
@@ -121,19 +139,8 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config netdata.conf
 ```
-#### Options
 
-The netdata main configuration file.
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| kern.cp_time | Enable or disable Total CPU usage. | yes | no |
-
-</details>
-
-#### Examples
+##### Examples
 There are no configuration examples.
 
 

@@ -83,6 +83,7 @@ There are no alerts configured by default for this integration.
 
 ## Setup
 
+
 ### Prerequisites
 
 #### Python Requirements
@@ -103,7 +104,46 @@ sudo pip install 'sqlalchemy<2.0' psycopg2-binary
 
 ### Configuration
 
-#### File
+#### Options
+
+There are 2 sections:
+
+* Global variables
+* One or more JOBS that can define multiple different instances to monitor.
+
+The following options can be defined globally: priority, penalty, autodetection_retry, update_every, but can also be defined per JOB to override the global values.
+
+Additionally, the following collapsed table contains all the options that can be configured inside a JOB definition.
+
+Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified.
+
+
+<details open><summary>Config options</summary>
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| chart_configs | an array of chart configuration dictionaries | [] | yes |
+| chart_configs.name | name of the chart to be displayed in the dashboard. | None | yes |
+| chart_configs.title | title of the chart to be displayed in the dashboard. | None | yes |
+| chart_configs.family | [family](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/netdata-charts.md#families) of the chart to be displayed in the dashboard. | None | yes |
+| chart_configs.context | [context](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/netdata-charts.md#contexts) of the chart to be displayed in the dashboard. | None | yes |
+| chart_configs.type | the type of the chart to be displayed in the dashboard. | None | yes |
+| chart_configs.units | the units of the chart to be displayed in the dashboard. | None | yes |
+| chart_configs.df_steps | a series of pandas operations (one per line) that each returns a dataframe. | None | yes |
+| update_every | Sets the default data collection frequency. | 5 | no |
+| priority | Controls the order of charts at the netdata dashboard. | 60000 | no |
+| autodetection_retry | Sets the job re-check interval in seconds. | 0 | no |
+| penalty | Indicates whether to apply penalty to update_every in case of failures. | yes | no |
+| name | Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works. |  | no |
+
+
+</details>
+
+
+
+#### via File
 
 The configuration file name for this integration is `python.d/pandas.conf`.
 
@@ -124,43 +164,10 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config python.d/pandas.conf
 ```
-#### Options
 
-There are 2 sections:
+##### Examples
 
-* Global variables
-* One or more JOBS that can define multiple different instances to monitor.
-
-The following options can be defined globally: priority, penalty, autodetection_retry, update_every, but can also be defined per JOB to override the global values.
-
-Additionally, the following collapsed table contains all the options that can be configured inside a JOB definition.
-
-Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified.
-
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| chart_configs | an array of chart configuration dictionaries | [] | yes |
-| chart_configs.name | name of the chart to be displayed in the dashboard. | None | yes |
-| chart_configs.title | title of the chart to be displayed in the dashboard. | None | yes |
-| chart_configs.family | [family](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/netdata-charts.md#families) of the chart to be displayed in the dashboard. | None | yes |
-| chart_configs.context | [context](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/netdata-charts.md#contexts) of the chart to be displayed in the dashboard. | None | yes |
-| chart_configs.type | the type of the chart to be displayed in the dashboard. | None | yes |
-| chart_configs.units | the units of the chart to be displayed in the dashboard. | None | yes |
-| chart_configs.df_steps | a series of pandas operations (one per line) that each returns a dataframe. | None | yes |
-| update_every | Sets the default data collection frequency. | 5 | no |
-| priority | Controls the order of charts at the netdata dashboard. | 60000 | no |
-| autodetection_retry | Sets the job re-check interval in seconds. | 0 | no |
-| penalty | Indicates whether to apply penalty to update_every in case of failures. | yes | no |
-| name | Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works. |  | no |
-
-</details>
-
-#### Examples
-
-##### Temperature API Example
+###### Temperature API Example
 
 example pulling some hourly temperature data, a chart for today forecast (mean,min,max) and another chart for current.
 
@@ -232,7 +239,7 @@ temperature:
 ```
 </details>
 
-##### API CSV Example
+###### API CSV Example
 
 example showing a read_csv from a url and some light pandas data wrangling.
 
@@ -260,7 +267,7 @@ example_csv:
 ```
 </details>
 
-##### API JSON Example
+###### API JSON Example
 
 example showing a read_json from a url and some light pandas data wrangling.
 
@@ -287,7 +294,7 @@ example_json:
 ```
 </details>
 
-##### XML Example
+###### XML Example
 
 example showing a read_xml from a url and some light pandas data wrangling.
 
@@ -313,7 +320,7 @@ example_xml:
 ```
 </details>
 
-##### SQL Example
+###### SQL Example
 
 example showing a read_sql from a postgres database using sqlalchemy.
 

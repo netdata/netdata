@@ -33,11 +33,6 @@ Additionally, it collects overall device uptime.
 
 It is compatible with all SNMP versions (v1, v2c, and v3) and uses the [gosnmp](https://github.com/gosnmp/gosnmp) package.
 
-**For advanced users**:
-
-- You can manually specify custom OIDs (Object Identifiers) to retrieve specific data points beyond the default metrics.
-- However, defining custom charts with dimensions for these OIDs requires manual configuration.
-
 
 
 
@@ -137,32 +132,34 @@ There are no alerts configured by default for this integration.
 
 ## Setup
 
+
+You can configure the **snmp** collector in two ways:
+
+| Method                | Best for                                                                                 | How to                                                                                                                                 |
+|-----------------------|------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| [**UI**](#via-ui)     | Fast setup without editing files                                                         | Go to **Nodes → Configure this node → Collectors → Jobs**, search for **snmp**, then click **+** to add a job. |
+| [**File**](#via-file) | If you prefer configuring via file, or need to automate deployments (e.g., with Ansible) | Edit `go.d/snmp.conf` and add a job.                                                                        |
+
+:::important
+
+UI configuration requires paid Netdata Cloud plan.
+
+:::
+
+
 ### Prerequisites
 
-No action required.
+#### Prepare the SNMP device
+
+Before configuring the collector:
+- Enable the SNMP service on the target device (through its management interface).
+- Make sure the device is reachable from the Netdata node on port 161/UDP.
+- Have ready the required connection details: IP address, SNMP version, and either a community string (v1/v2c) or user credentials (v3).
+
+
 
 ### Configuration
 
-#### File
-
-The configuration file name for this integration is `go.d/snmp.conf`.
-
-The file format is YAML. Generally, the structure is:
-
-```yaml
-update_every: 1
-autodetection_retry: 0
-jobs:
-  - name: some_name1
-  - name: some_name1
-```
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config go.d/snmp.conf
-```
 #### Options
 
 The following options can be defined globally: update_every, autodetection_retry.
@@ -170,51 +167,38 @@ The following options can be defined globally: update_every, autodetection_retry
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update_every | Data collection frequency. | 10 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| hostname | Target ipv4 address. |  | yes |
-| enable_profiles | Enable collection of metrics using SNMP profiles. | true | no |
-| enable_profiles_table_metrics | Enable collection of SNMP table metrics from profiles. Enabling this may **increase collection time and memory usage** for devices with many network interfaces*. | true | no |
-| disable_legacy_collection | Disable the legacy SNMP collection method, forcing the collector to use only SNMP profiles (YAML-based configuration). When enabled, the collector will ignore any non-profile based collection logic. | false | no |
-| create_vnode | If set, the collector will create a Netdata Virtual Node for this SNMP device, which will appear as a separate Node in Netdata. | true | no |
-| vnode_device_down_threshold | Number of consecutive failed data collections before marking the device as down. | 3 | no |
-| vnode.guid | A unique identifier for the Virtual Node. If not set, a GUID will be automatically generated from the device's IP address. |  | no |
-| vnode.hostname | The hostname that will be used for the Virtual Node. If not set, the device's hostname will be used. |  | no |
-| vnode.labels | Additional key-value pairs to associate with the Virtual Node. |  | no |
-| community | SNMPv1/2 community string. | public | no |
-| options.version | SNMP version. Available versions: 1, 2, 3. | 2 | no |
-| options.port | Target port. | 161 | no |
-| options.retries | Retries to attempt. | 1 | no |
-| options.timeout | SNMP request/response timeout. | 5 | no |
-| options.max_repetitions | Controls how many SNMP variables to retrieve in a single GETBULK request. | 25 | no |
-| options.max_request_size | Maximum number of OIDs allowed in a single GET request. | 60 | no |
-| network_interface_filter.by_name | Filter interfaces by their names using [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md#simple-patterns). |  | no |
-| network_interface_filter.by_type | Filter interfaces by their types using [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md#simple-patterns). |  | no |
-| user.name | SNMPv3 user name. |  | no |
-| user.name | Security level of SNMPv3 messages. |  | no |
-| user.auth_proto | Security level of SNMPv3 messages. |  | no |
-| user.name | Authentication protocol for SNMPv3 messages. |  | no |
-| user.auth_key | Authentication protocol pass phrase. |  | no |
-| user.priv_proto | Privacy protocol for SNMPv3 messages. |  | no |
-| user.priv_key | Privacy protocol pass phrase. |  | no |
-| charts | List of charts. | [] | yes |
-| charts.id | Chart ID. Used to uniquely identify the chart. |  | yes |
-| charts.title | Chart title. | Untitled chart | no |
-| charts.units | Chart units. | num | no |
-| charts.family | Chart family. | charts.id | no |
-| charts.type | Chart type (line, area, stacked). | line | no |
-| charts.priority | Chart priority. | 70000 | no |
-| charts.multiply_range | Used when you need to define many charts using incremental OIDs. | [] | no |
-| charts.dimensions | List of chart dimensions. | [] | yes |
-| charts.dimensions.oid | Collected metric OID. |  | yes |
-| charts.dimensions.name | Dimension name. |  | yes |
-| charts.dimensions.algorithm | Dimension algorithm (absolute, incremental). | absolute | no |
-| charts.dimensions.multiplier | Collected value multiplier, applied to convert it properly to units. | 1 | no |
-| charts.dimensions.divisor | Collected value divisor, applied to convert it properly to units. | 1 | no |
 
-##### user.auth_proto
+
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Base** | update_every | Data collection frequency. | 10 | no |
+|  | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
+|  | hostname | Target host (IP or DNS name, IPv4/IPv6). |  | yes |
+| **SNMPv1/2** | community | SNMPv1/2 community string. | public | no |
+| **SNMPv3** | user.name | SNMPv3 user name. |  | no |
+|  | user.level | Security level of SNMPv3 messages. |  | no |
+|  | user.auth_proto | Authentication protocol for SNMPv3 messages. |  | no |
+|  | user.auth_key | Authentication protocol pass phrase for SNMPv3 messages. |  | no |
+|  | user.priv_proto | Privacy protocol for SNMPv3 messages. |  | no |
+|  | user.priv_key | Privacy protocol pass phrase for SNMPv3 messages. |  | no |
+| **SNMP transport** | options.version | SNMP version. Available versions: 1, 2, 3. | 2 | no |
+|  | options.port | Target port. | 161 | no |
+|  | options.retries | Retries to attempt. | 1 | no |
+|  | options.timeout | SNMP request/response timeout. | 5 | no |
+|  | options.max_repetitions | Controls how many SNMP variables to retrieve in a single GETBULK request. | 25 | no |
+|  | options.max_request_size | Maximum number of OIDs allowed in a single GET request. | 60 | no |
+| **Profiles** | enable_profiles | Enable collection of metrics using SNMP profiles. | true | no |
+|  | enable_profiles_table_metrics | Enable collection of SNMP table metrics from profiles. Enabling this may **increase collection time and memory usage** for devices with many network interfaces. | true | no |
+|  | disable_legacy_collection | Disable the legacy SNMP collection method, forcing the collector to use only SNMP profiles (YAML-based configuration). When enabled, the collector will ignore any non-profile based collection logic. | false | no |
+| **Virtual node** | create_vnode | If set, the collector will create a Netdata Virtual Node for this SNMP device, which will appear as a separate Node in Netdata. | true | no |
+|  | vnode_device_down_threshold | Number of consecutive failed data collections before marking the device as down. | 3 | no |
+|  | vnode.guid | A unique identifier for the Virtual Node. If not set, a GUID will be automatically generated from the device's IP address. |  | no |
+|  | vnode.hostname | The hostname that will be used for the Virtual Node. If not set, the device's hostname will be used. |  | no |
+|  | vnode.labels | Additional key-value pairs to associate with the Virtual Node. |  | no |
+| **Filters** | network_interface_filter.by_name | Filter interfaces by their names using [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md#simple-patterns). |  | no |
+|  | network_interface_filter.by_type | Filter interfaces by their types using [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md#simple-patterns). |  | no |
+
+##### user.level
 
 The security of an SNMPv3 message as per RFC 3414 (`user.level`):
 
@@ -225,7 +209,7 @@ The security of an SNMPv3 message as per RFC 3414 (`user.level`):
 |   authPriv   |     3     | message authentication and encryption    |
 
 
-##### user.name
+##### user.auth_proto
 
 The digest algorithm for SNMPv3 messages that require authentication (`user.auth_proto`):
 
@@ -255,11 +239,48 @@ The encryption algorithm for SNMPv3 messages that require privacy (`user.priv_pr
 |   aes256c    |     7     | 256-bit AES encryption (CFB-AES-256) with "Reeder" key localization     |
 
 
+
 </details>
 
-#### Examples
 
-##### SNMPv1/2
+#### via UI
+
+Configure the **snmp** collector from the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the snmp data-collection job to run** and click the :gear: (**Configure this node**). That node will run the data collection.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _snmp_ (or scroll the list) to locate the **snmp** collector.
+5. Click the **+** next to the **snmp** collector to add a new job.
+6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
+    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
+
+
+#### via File
+
+The configuration file name for this integration is `go.d/snmp.conf`.
+
+The file format is YAML. Generally, the structure is:
+
+```yaml
+update_every: 1
+autodetection_retry: 0
+jobs:
+  - name: some_name1
+  - name: some_name2
+```
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config go.d/snmp.conf
+```
+
+##### Examples
+
+###### SNMPv1/2
 
 In this example:
 
@@ -283,7 +304,7 @@ jobs:
 ```
 </details>
 
-##### SNMPv3
+###### SNMPv3
 
 To use SNMPv3:
 
@@ -307,155 +328,6 @@ jobs:
       auth_key: auth_protocol_passphrase
       priv_proto: aes256
       priv_key: priv_protocol_passphrase
-
-```
-</details>
-
-##### Custom OIDs
-
-In this example:
-
-- the SNMP device is `192.0.2.1`.
-- the SNMP version is `2`.
-- the SNMP community is `public`.
-- we will update the values every 10 seconds.
-
-
-<details open><summary>Config</summary>
-
-```yaml
-jobs:
-  - name: switch
-    update_every: 10
-    hostname: 192.0.2.1
-    community: public
-    options:
-      version: 2
-    charts:
-      - id: "bandwidth_port1"
-        title: "Switch Bandwidth for port 1"
-        units: "kilobits/s"
-        type: "area"
-        family: "ports"
-        dimensions:
-          - name: "in"
-            oid: "1.3.6.1.2.1.2.2.1.10.1"
-            algorithm: "incremental"
-            multiplier: 8
-            divisor: 1000
-          - name: "out"
-            oid: "1.3.6.1.2.1.2.2.1.16.1"
-            multiplier: -8
-            divisor: 1000
-      - id: "bandwidth_port2"
-        title: "Switch Bandwidth for port 2"
-        units: "kilobits/s"
-        type: "area"
-        family: "ports"
-        dimensions:
-          - name: "in"
-            oid: "1.3.6.1.2.1.2.2.1.10.2"
-            algorithm: "incremental"
-            multiplier: 8
-            divisor: 1000
-          - name: "out"
-            oid: "1.3.6.1.2.1.2.2.1.16.2"
-            multiplier: -8
-            divisor: 1000
-
-```
-</details>
-
-##### Custom OIDs with multiply range
-
-If you need to define many charts using incremental OIDs, you can use the `charts.multiply_range` option.
-
-This is like the SNMPv1/2 example, but the option will multiply the current chart from 1 to 24 inclusive, producing 24 charts in total for the 24 ports of the switch `192.0.2.1`.
-
-Each of the 24 new charts will have its id (1-24) appended at:
-
-- its chart unique `id`, i.e. `bandwidth_port_1` to `bandwidth_port_24`.
-- its title, i.e. `Switch Bandwidth for port 1` to `Switch Bandwidth for port 24`.
-- its `oid` (for all dimensions), i.e. dimension in will be `1.3.6.1.2.1.2.2.1.10.1` to `1.3.6.1.2.1.2.2.1.10.24`.
-- its `priority` will be incremented for each chart so that the charts will appear on the dashboard in this order.
-
-
-<details open><summary>Config</summary>
-
-```yaml
-jobs:
-  - name: switch
-    update_every: 10
-    hostname: "192.0.2.1"
-    community: public
-    options:
-      version: 2
-    charts:
-      - id: "bandwidth_port"
-        title: "Switch Bandwidth for port"
-        units: "kilobits/s"
-        type: "area"
-        family: "ports"
-        multiply_range: [1, 24]
-        dimensions:
-          - name: "in"
-            oid: "1.3.6.1.2.1.2.2.1.10"
-            algorithm: "incremental"
-            multiplier: 8
-            divisor: 1000
-          - name: "out"
-            oid: "1.3.6.1.2.1.2.2.1.16"
-            multiplier: -8
-            divisor: 1000
-
-```
-</details>
-
-##### Multiple devices with a common configuration
-
-YAML supports [anchors](https://yaml.org/spec/1.2.2/#3222-anchors-and-aliases). 
-The `&` defines and names an anchor, and the `*` uses it. `<<: *anchor` means, inject the anchor, then extend. We can use anchors to share the common configuration for multiple devices.
-
-The following example:
-
-- adds an `anchor` to the first job.
-- injects (copies) the first job configuration to the second and updates `name` and `hostname` parameters.
-- injects (copies) the first job configuration to the third and updates `name` and `hostname` parameters.
-
-
-<details open><summary>Config</summary>
-
-```yaml
-jobs:
-  - &anchor
-    name: switch
-    update_every: 10
-    hostname: "192.0.2.1"
-    community: public
-    options:
-      version: 2
-    charts:
-      - id: "bandwidth_port1"
-        title: "Switch Bandwidth for port 1"
-        units: "kilobits/s"
-        type: "area"
-        family: "ports"
-        dimensions:
-          - name: "in"
-            oid: "1.3.6.1.2.1.2.2.1.10.1"
-            algorithm: "incremental"
-            multiplier: 8
-            divisor: 1000
-          - name: "out"
-            oid: "1.3.6.1.2.1.2.2.1.16.1"
-            multiplier: -8
-            divisor: 1000
-  - <<: *anchor
-    name: switch2
-    hostname: "192.0.2.2"
-  - <<: *anchor
-    name: switch3
-    hostname: "192.0.2.3"
 
 ```
 </details>

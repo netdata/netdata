@@ -21,6 +21,7 @@ Netdata Agent's alert notification feature allows you to send custom notificatio
 
 ## Setup
 
+
 ### Prerequisites
 
 #### 
@@ -31,26 +32,16 @@ Netdata Agent's alert notification feature allows you to send custom notificatio
 
 ### Configuration
 
-#### File
-
-The configuration file name for this integration is `health_alarm_notify.conf`.
-
-
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config health_alarm_notify.conf
-```
 #### Options
 
 The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | SEND_CUSTOM | Set `SEND_CUSTOM` to YES | YES | yes |
 | DEFAULT_RECIPIENT_CUSTOM | This value is dependent on how you handle the `${to}` variable inside the `custom_sender()` function. |  | yes |
 | custom_sender() | You can look at the other senders in `/usr/libexec/netdata/plugins.d/alarm-notify.sh` for examples of how to modify the function in this configuration file. |  | no |
@@ -140,11 +131,27 @@ The supported variables that you can use for the function's `msg` variable are:
 | `${total_critical}`         | The total number of alarms in CRITICAL state on the host                         |
 
 
+
 </details>
 
-#### Examples
 
-##### Basic Configuration
+
+#### via File
+
+The configuration file name for this integration is `health_alarm_notify.conf`.
+
+
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config health_alarm_notify.conf
+```
+
+##### Examples
+
+###### Basic Configuration
 
 
 

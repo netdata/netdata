@@ -22,6 +22,7 @@ Sending notification to ilert via Netdata's Agent alert notification feature inc
 
 ## Setup
 
+
 ### Prerequisites
 
 #### 
@@ -33,7 +34,25 @@ Sending notification to ilert via Netdata's Agent alert notification feature inc
 
 ### Configuration
 
-#### File
+#### Options
+
+The following options can be defined for this notification
+
+<details open><summary>Config Options</summary>
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| SEND_ILERT | Set `SEND_ILERT` to YES | YES | yes |
+| ILERT_ALERT_SOURCE_URL | Set `ILERT_ALERT_SOURCE_URL` to your Netdata alert source url in ilert. |  | yes |
+
+
+</details>
+
+
+
+#### via File
 
 The configuration file name for this integration is `health_alarm_notify.conf`.
 
@@ -45,22 +64,10 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config health_alarm_notify.conf
 ```
-#### Options
 
-The following options can be defined for this notification
+##### Examples
 
-<details open><summary>Config Options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| SEND_ILERT | Set `SEND_ILERT` to YES | YES | yes |
-| ILERT_ALERT_SOURCE_URL | Set `ILERT_ALERT_SOURCE_URL` to your Netdata alert source url in ilert. |  | yes |
-
-</details>
-
-#### Examples
-
-##### Basic Configuration
+###### Basic Configuration
 
 
 
