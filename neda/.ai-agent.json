@@ -432,7 +432,7 @@
           "agent": "neda.ai",
           "engage": ["channel-posts"],
           "promptTemplates": {
-            "channelPost": "Neda, analyze this support ticket, try to find the root cause, provide workaround if required/possible, an appropriate answer to the customer, instructions to solve the bug/issue in the codebase and mention the relevant code owners so that they will be notified"
+            "channelPost": "Neda, analyze this support ticket. Follow this process: 1) understand what the customer is saying, 2) consult ask-netdata and source-code to understand how our software works, 3) prepare a response for the customer, 4) if we have bug in our code, provide workarounds, 5) provider instructions for our engineers to solve the bug/issue, 6) mention the relevant code owners (find them from github) so that they will be notified."
           }
         },
         {
@@ -440,7 +440,7 @@
           "agent": "neda.ai",
           "engage": ["channel-posts"],
           "promptTemplates": {
-            "channelPost": "Neda, they have just posted this contact form. Please provide online intelligence about who they are (company, company-tech and person), find their exact path on posthog (focus on pre and post form submission events, check for learn and ask-netdata URLs on posthog), check hubspot and fireflies for past engagements and encharge if they were in our mailing lists before this form submission (they may have been added now). It is important to investigate how they found us (agent users, search terms, ai-assistants, etc)."
+            "channelPost": "Neda, they have just posted this contact form. Research the company profile, their technology stack, and calculate IPC and estimate ARR. Check who is our contact (full profile). Give us a hint on how they found us (focus on pre and post form submission events on posthog). Check hubspot and fireflies for past engagements and encharge if they were in our mailing lists before this form submission (they may have been added now)."
           }
         }
       ]

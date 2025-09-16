@@ -887,7 +887,7 @@ export class AIAgentSession {
     // Track the last turn where we showed thinking header
     let lastShownThinkingHeaderTurn = -1;
 
-    const maxTurns = this.sessionConfig.maxTurns ?? 10;
+    let maxTurns = this.sessionConfig.maxTurns ?? 10;
     const maxRetries = this.sessionConfig.maxRetries ?? 3; // GLOBAL attempts cap per turn
     const pairs = this.sessionConfig.targets;
 
@@ -1289,7 +1289,25 @@ export class AIAgentSession {
                   this.sessionConfig.callbacks?.onOutput?.('\n');
                 }
               }
-              
+
+              // Check if incomplete final_report was detected and adjust maxTurns
+              if ((turnResult as { incompleteFinalReportDetected?: boolean }).incompleteFinalReportDetected === true && currentTurn < maxTurns) {
+                const previousMaxTurns = maxTurns;
+                maxTurns = currentTurn + 1;
+                const adjustLog: LogEntry = {
+                  timestamp: Date.now(),
+                  severity: 'WRN',
+                  turn: currentTurn,
+                  subturn: 0,
+                  direction: 'response',
+                  type: 'llm',
+                  remoteIdentifier: 'agent:orchestrator',
+                  fatal: false,
+                  message: `Incomplete final_report detected at turn ${String(currentTurn)}, adjusting max_turns from ${String(previousMaxTurns)} to ${String(maxTurns)}`
+                };
+                this.log(adjustLog);
+              }
+
               // Check for reasoning-only responses (empty response but not final answer)
               if (!turnResult.status.finalAnswer && !turnResult.status.hasToolCalls &&
                   (turnResult.response === undefined || turnResult.response.trim().length === 0)) {
@@ -1317,10 +1335,24 @@ export class AIAgentSession {
               }
               
               if (turnResult.status.finalAnswer) {
-                // Treat as non-final unless a final_report was provided
-                // Continue to next turn to allow the model to call agent__final_report
-                turnSuccessful = true;
-                break;
+                // Check if final_report was actually successful by checking if finalReport was set
+                // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+                const finalReportSucceeded = this.finalReport !== undefined;
+
+                if (finalReportSucceeded) {
+                  // Final report succeeded, we're done
+                  turnSuccessful = true;
+                  break;
+                }
+
+                // Final report was called but failed
+                if (!isFinalTurn) {
+                  // On non-final turns, move to next turn to retry
+                  turnSuccessful = true;
+                  break;
+                }
+                // On final turn with failed final_report, continue retry loop
+                lastError = 'final_report_failed';
               } else {
                 // If this is the final turn and we still don't have a final answer,
                 // retry within this turn across provider/model pairs up to maxRetries.
@@ -1569,6 +1601,7 @@ export class AIAgentSession {
     
     // Create tool executor function that delegates to MCP client with accounting
     let subturnCounter = 0;
+    let incompleteFinalReportDetected = false;
     const maxToolCallsPerTurn = Math.max(1, this.sessionConfig.maxToolCallsPerTurn ?? 10);
     const toolExecutor = async (toolName: string, parameters: Record<string, unknown>): Promise<string> => {
       if (this.stopRef?.stopping === true) throw new Error('stop_requested');
@@ -1633,6 +1666,11 @@ export class AIAgentSession {
         accounting.push(accountingEntry);
         try { this.sessionConfig.callbacks?.onAccounting?.(accountingEntry); } catch (e) { warn(`tool accounting callback failed: ${e instanceof Error ? e.message : String(e)}`); }
 
+        // Check if this is an incomplete final_report error
+        if (toolName === 'agent__final_report' && errorMsg.includes('requires non-empty report_content')) {
+          incompleteFinalReportDetected = true;
+        }
+
         // Return error message instead of throwing - ensures LLM always gets valid tool output
         this.releaseToolSlot();
         return `(tool failed: ${errorMsg})`;
@@ -1688,7 +1726,7 @@ export class AIAgentSession {
 
     try {
       const result = await this.llmClient.executeTurn(request);
-      return { ...result, shownThinking };
+      return { ...result, shownThinking, incompleteFinalReportDetected };
     } catch (e) {
       // const msg = e instanceof Error ? e.message : String(e);
       throw e;

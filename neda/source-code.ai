@@ -13,7 +13,7 @@ tools:
   - batch
 llmTimeout: 120000
 toolTimeout: 120000
-toolResponseMaxBytes: 16384
+toolResponseMaxBytes: 8192
 maxConcurrentTools: 10
 temperature: 0.3
 topP: 1
