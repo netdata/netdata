@@ -13,8 +13,8 @@ struct cpu_data {
     collected_number cpu_temp;
 };
 
-struct cpu_data *cpus;
-size_t ncpus;
+struct cpu_data *cpus = NULL;
+size_t ncpus = 0 ;
 
 static void netdata_unload_driver()
 {
@@ -223,11 +223,14 @@ int do_GetHardwareInfo(int update_every, usec_t dt __maybe_unused)
 {
     static bool initialized = false;
     if (unlikely(!initialized)) {
+        initialized = true;
         if (initialize(update_every)) {
             return -1;
         }
+    }
 
-        initialized = true;
+    if (!ncpus) {
+        return -1;
     }
 
     netdata_collect_cpu_chart();
