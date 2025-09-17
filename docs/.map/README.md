@@ -46,7 +46,7 @@ Before merging, **always test the map file**.
 2. Prepare environment and dependencies (see [ingest instructions](https://github.com/netdata/learn#ingest-and-process-documentation-files)).
 3. Run the ingest command:
    ```bash
-   python3 ingest/ingest.py --repos OWNEROFREPO/netdata:YOURBRANC
+   python3 ingest/ingest.py --repos OWNEROFREPO/netdata:YOURBRANCH
    ```
 4. Inspect the ingested changes.
 5. (Optional, advanced) [Deploy Learn](https://github.com/netdata/learn#local-deploy-of-learn) locally to confirm it builds correctly.
