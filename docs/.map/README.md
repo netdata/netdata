@@ -35,7 +35,7 @@ The label that the doc will have on the sidebar.
 
 > [!Caution]
 >
-> If you flip something to unpublshed please refer to [this section](#unpublishing-files).
+> If you flip something to unpublished please refer to [this section](#unpublishing-files).
 
 #### learn_rel_path
 
