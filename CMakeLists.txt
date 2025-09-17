@@ -495,9 +495,6 @@ check_include_file("sys/socket.h" HAVE_SYS_SOCKET_H)
 check_include_file("sys/wait.h" HAVE_SYS_WAIT_H)
 check_include_file("sys/un.h" HAVE_SYS_UN_H)
 check_include_file("spawn.h" HAVE_SPAWN_H)
-if(OS_LINUX)
-    check_include_file("sys/capability.h" HAVE_SYS_CAPABILITY_H)
-endif()
 
 #
 # check symbols
@@ -511,19 +508,6 @@ check_symbol_exists(strerror_r "string.h" HAVE_STRERROR_R)
 check_symbol_exists(finite "math.h" HAVE_FINITE)
 check_symbol_exists(isfinite "math.h" HAVE_ISFINITE)
 check_symbol_exists(dlsym "dlfcn.h" HAVE_DLSYM)
-
-if(OS_LINUX AND HAVE_SYS_PRCTL_H)
-  check_symbol_exists(PR_CAP_AMBIENT "sys/prctl.h" HAVE_PR_CAP_AMBIENT)
-
-  if(NOT HAVE_PR_CAP_AMBIENT)
-    check_symbol_exists(PR_CAP_AMBIENT "linux/prctl.h" HAVE_PR_CAP_AMBIENT)
-    set(NEED_LINUX_PRCTL_H "${HAVE_PR_CAP_AMBIENT}")
-  else()
-    set(NEED_LINUX_PRCTL_H False)
-  endif()
-else()
-  set(HAVE_PR_CAP_AMBIENT False)
-endif()
 
 check_function_exists(setresuid HAVE_SETRESUID)
 check_function_exists(setresgid HAVE_SETRESGID)
@@ -2512,9 +2496,22 @@ list(APPEND ACLK_FILES ${ACLK_PROTO_BUILT_SRCS}
 # nd-run helper program
 #
 
+if(OS_LINUX)
+  pkg_check_modules(CAP IMPORTED_TARGET libcap)
+else()
+  set(CAP_FOUND False)
+endif()
+
+if(CAP_FOUND)
+  set(HAVE_CAPABILITY True)
+endif()
+
 set(NDRUN_FILES src/collectors/utils/nd-run.c)
 add_executable(nd-run ${NDRUN_FILES})
-target_include_directories(nd-run PUBLIC ${CONFIG_H_DIR})
+if(CAP_FOUND)
+  target_link_libraries(nd-run PRIVATE PkgConfig::CAP)
+endif()
+target_include_directories(nd-run PRIVATE ${CONFIG_H_DIR})
 install(TARGETS nd-run
         COMPONENT netdata
         DESTINATION "${BINDIR}")
@@ -2524,9 +2521,6 @@ install(TARGETS nd-run
 #
 
 if(ENABLE_PLUGIN_DEBUGFS)
-    # Check for libcap (optional)
-    pkg_check_modules(CAP QUIET libcap)
-
     # Define debugfs.plugin source files
     set(DEBUGFS_PLUGIN_FILES
             src/collectors/debugfs.plugin/debugfs_plugin.c
@@ -2581,8 +2575,6 @@ add_executable(spawn-tester src/libnetdata/spawn_server/spawn-tester.c)
 target_link_libraries(spawn-tester libnetdata)
 
 if(ENABLE_PLUGIN_APPS)
-    pkg_check_modules(CAP QUIET libcap)
-
     set(APPS_PLUGIN_FILES
             src/collectors/apps.plugin/apps_plugin.c
             src/collectors/apps.plugin/apps_plugin.h
@@ -2623,10 +2615,6 @@ if(ENABLE_PLUGIN_APPS)
                 COMPONENT plugin-apps
                 DESTINATION usr/share/doc/netdata-plugin-apps)
     endif()
-endif()
-
-if(CAP_FOUND)
-    set(HAVE_CAPABILITY True)
 endif()
 
 if(ENABLE_PLUGIN_FREEIPMI)

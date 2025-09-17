@@ -50,7 +50,7 @@ static struct debugfs_module {
     {.name = NULL, .enabled = CONFIG_BOOLEAN_NO, .func = NULL}
 };
 
-#ifdef HAVE_SYS_CAPABILITY_H
+#ifdef HAVE_CAPABILITY
 static int debugfs_check_capabilities()
 {
     cap_t caps = cap_get_proc();
@@ -204,7 +204,7 @@ int main(int argc, char **argv)
     // FIXME: remove debugfs_check_sys_permission() after https://github.com/netdata/netdata/issues/15048 is fixed
     if (!debugfs_check_capabilities() && !debugfs_am_i_running_as_root() && !debugfs_check_sys_permission()) {
         uid_t uid = getuid(), euid = geteuid();
-#ifdef HAVE_SYS_CAPABILITY_H
+#ifdef HAVE_CAPABILITY
         netdata_log_error(
             "debugfs.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities. "
             "Without these, debugfs.plugin cannot access /sys/kernel/debug. "

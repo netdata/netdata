@@ -1,4 +1,5 @@
 #include <unistd.h>
+#include <errno.h>
 #include <sys/types.h>
 #include <grp.h>
 #include <pwd.h>
@@ -7,11 +8,8 @@
 
 #include "config.h"
 
-#if defined(HAVE_PR_CAP_AMBIENT)
-#if defined(NEED_LINUX_PRCTL_H)
-#include <linux/prctl.h>
-#endif
-#include <sys/prctl.h>
+#ifdef HAVE_CAPABILITY
+#include <sys/capability.h>
 #endif
 
 #define FALLBACK_USER "nobody"
@@ -27,10 +25,75 @@ void show_help() {
     fprintf(stdout, "Defaults to running the command as '%s', but will fall back to '%s' if '%s' is not found on the system.\n", NETDATA_USER, FALLBACK_USER, NETDATA_USER);
     fprintf(stdout, "\n");
     fprintf(stdout, "If it's not possible to switch users, the command will run as the current user instead.\n");
-    #if defined(HAVE_PR_CAP_AMBIENT)
+    #ifdef HAVE_CAPABILITY
         fprintf(stdout, "\n");
         fprintf(stdout, "Regardless of whether it switched users, all capabilities will be dropped.\n");
     #endif
+}
+
+static void fatal(const char *msg) {
+    perror(msg);
+    exit(EXIT_FAILURE);
+}
+
+#ifdef HAVE_CAPABILITY
+static void clear_caps() {
+    // Clear out all capabilities
+    //
+    // This does not require any special privileges since it is reducing
+    // the process’s privileges.
+    cap_t caps = cap_init();
+
+    if (caps == NULL) fatal("cap_init");
+
+    if (cap_clear(caps) == -1) {
+        cap_free(caps);
+        fatal("cap_clear");
+    }
+
+    if (cap_set_proc(caps) == -1) {
+        cap_free(caps);
+        fatal("cap_set_proc");
+    }
+
+    cap_free(caps);
+}
+#endif
+
+static void set_env_var(const char *name, const char *value) {
+    // Set an environment variable if the specified value is not a NULL pointer.
+    char buf[64];
+
+    if (value == NULL) {
+        return;
+    }
+
+    if (setenv(name, value, 1) != 0) {
+        snprintf(buf, 64, "setenv %s", name);
+        perror(buf);
+    }
+}
+
+static void clean_environment(struct passwd *pw) {
+    // Explicitly scrub the environment, only passing on a few things
+    // we know are needed to make things work correctly.
+    const char * PATH = getenv("PATH");
+    const char * TZ = getenv("TZ");
+    const char * TZDIR = getenv("TZDIR");
+    const char * TMPDIR = getenv("TMPDIR");
+    const char * PWD = getenv("PWD");
+
+    clearenv();
+    set_env_var("USER", pw->pw_name);
+    set_env_var("LOGNAME", pw->pw_name);
+    set_env_var("HOME", pw->pw_dir);
+    set_env_var("SHELL", "/bin/sh"); // Ignore user default shell
+    set_env_var("LC_ALL", "C"); // Force C locale
+    set_env_var("PATH", PATH);
+    set_env_var("PWD", PWD);
+    set_env_var("TZ", TZ);
+    set_env_var("TZDIR", TZDIR);
+    set_env_var("TMPDIR", (TMPDIR == NULL) ? "/tmp" : TMPDIR); // Use a sane default for TMPDIR if it wasn’t set.
 }
 
 int main(int argc, char *argv[]) {
@@ -38,6 +101,8 @@ int main(int argc, char *argv[]) {
         show_help();
         return EXIT_FAILURE;
     }
+
+    uid_t euid = geteuid();
 
     struct passwd *pw = getpwnam(NETDATA_USER);
     if (!pw) {
@@ -50,53 +115,60 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    uid_t uid = pw->pw_uid;
-    gid_t gid = pw->pw_gid;
+    if (euid != pw->pw_uid) {
+        fprintf(stderr, "Attempting to run as user: %s (UID=%d, GID=%d)\n", pw->pw_name, (int)pw->pw_uid, (int)pw->pw_gid);
 
-    printf("Attempting to run as user: %s (UID=%d, GID=%d)\n", pw->pw_name, (int)uid, (int)gid);
+        // Set supplementary groups for this user (must be done before dropping privs)
+        if (initgroups(pw->pw_name, pw->pw_gid) != 0) {
+            if (euid == 0) {
+                perror("initgroups");
 
-    // Set supplementary groups for this user (must be done before dropping privs)
-    if (initgroups(pw->pw_name, gid) != 0) {
-        // Intentionally silently ignored
+                if (setgroups(0, NULL) != 0) {
+                    fatal("setgroups");
+                }
+            } else if (errno != EPERM) {
+                fatal("initgroups");
+            }
+        }
+
+        // Drop GID then UID. Prefer setres* when available to also drop saved IDs.
+        // Linux/BSD generally provide setresgid/setresuid; macOS does not.
+        #ifdef HAVE_SETRESGID
+            if (setresgid(pw->pw_gid, pw->pw_gid, pw->pw_gid) != 0) {
+                if (euid == 0 || errno != EPERM) {
+                    fatal("setresgid");
+                }
+            }
+        #else
+            if (setgid(pw->pw_gid) != 0) {
+                if (euid == 0 || errno != EPERM) {
+                    fatal("setgid");
+                }
+            }
+        #endif
+
+        #ifdef HAVE_SETRESUID
+            if (setresuid(pw->pw_uid, pw->pw_uid, pw->pw_uid) != 0) {
+                if (euid == 0 || errno != EPERM) {
+                    fatal("setresuid");
+                }
+            }
+        #else
+            if (setuid(pw->pw_uid) != 0) {
+                if (euid == 0 || errno != EPERM) {
+                    fatal("setuid");
+                }
+            }
+        #endif
     }
 
-    // Drop GID then UID. Prefer setres* when available to also drop saved IDs.
-    // Linux/BSD generally provide setresgid/setresuid; macOS does not.
-    #if defined(HAVE_SETRESGID)
-        if (setresgid(gid, gid, gid) != 0) {
-            // Intentionally silently ignored
-        }
-    #else
-        if (setgid(gid) != 0) {
-            // Intentionally silently ignored
-        }
+    #ifdef HAVE_CAPABILITY
+        clear_caps();
     #endif
 
-    #if defined(HAVE_SETRESUID)
-        if (setresuid(uid, uid, uid) != 0) {
-            // Intentionally silently ignored
-        }
-    #else
-        if (setuid(uid) != 0) {
-            // Intentionally silently ignored
-        }
-    #endif
-
-    #if defined(HAVE_PR_CAP_AMBIENT)
-        // Attempt to clear ambient capabilities (this isn’t done automatically on execve())
-        //
-        // Only needed on Linux, as other platforms do not have the concept
-        // of ambient capabilities (or even capabilities at all in many cases).
-        //
-        // Despite modifying capabilities, this is actually an unprivileged
-        // operation, so it’s preferable to have it here in case we would be
-        // able to switch UID due to capaibilities instead of being permitted
-        // to do so as a result of being root in the current user namespace.
-        prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_CLEAR_ALL);
-    #endif
+    clean_environment(pw);
 
     // Exec the requested command (replaces the current process on success)
     execvp(argv[1], &argv[1]);
-    perror("execvp");           // only reached on error
-    return EXIT_FAILURE;
+    fatal("execvp"); // Only reached on error
 }
