@@ -326,7 +326,7 @@ Modern infrastructure changes constantly. Netdata enables teams to:
 ## Frequently Asked Questions on Design Philosophy
 
 <details>
-<summary><strong>Doesn't edge architecture create a management nightmare?</strong></summary>
+<summary>Doesn't edge architecture create a management nightmare?</summary>
 
 **The opposite is true — edge architecture eliminates most management overhead.**
 
@@ -373,7 +373,7 @@ In practice, organizations using Netdata routinely achieve multi-million samples
 </details>
 
 <details>
-<summary><strong>Isn't collecting 'everything' fundamentally wasteful?</strong></summary>
+<summary>Isn't collecting 'everything' fundamentally wasteful?</summary>
 
 **The opposite is true — Netdata is the most energy-efficient monitoring solution available.**
 
@@ -398,7 +398,7 @@ Selective monitoring creates a paradox: you must predict what will break to know
 </details>
 
 <details>
-<summary><strong>Does complete coverage create analysis paralysis?</strong></summary>
+<summary>Does complete coverage create analysis paralysis?</summary>
 
 **Structure prevents paralysis — Netdata organizes data hierarchically, not as an unstructured pool.**
 
@@ -428,7 +428,7 @@ Organizations report that engineers who initially felt overwhelmed quickly adapt
 </details>
 
 <details>
-<summary><strong>Is per-second granularity actually useful or just marketing?</strong></summary>
+<summary>Is per-second granularity actually useful or just marketing?</summary>
 
 **Per-second is for engineers, not business metrics — it matches the speed at which systems actually operate.**
 
@@ -473,7 +473,7 @@ For business metrics, minute or hourly aggregations make sense. But for infrastr
 </details>
 
 <details>
-<summary><strong>What about the observer effect? How do you guarantee per-second collection isn't impacting application performance?</strong></summary>
+<summary>What about the observer effect? How do you guarantee per-second collection isn't impacting application performance?</summary>
 
 **Netdata's default collection frequencies are carefully configured to avoid impacting monitored applications.**
 
@@ -503,7 +503,7 @@ The University of Amsterdam study confirmed this approach works: despite compreh
 </details>
 
 <details>
-<summary><strong>Why systemd-journal instead of industry standards like Elasticsearch/Splunk?</strong></summary>
+<summary>Why systemd-journal instead of industry standards like Elasticsearch/Splunk?</summary>
 
 **systemd-journal IS the industry standard — it's already installed and running on every Linux system.**
 
