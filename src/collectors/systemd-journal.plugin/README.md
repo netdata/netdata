@@ -303,7 +303,7 @@ By contrast, evaluating only 5,000 entries (a small-sample approach typical of m
 CI95 ≈ 1.96 * sqrt(0.6 * 0.4 / 5_000) ≈ ±8.7 %
 ```
 
-The result is that even at extreme scale, mainly because Netdata samples 200x more data, it is able to provide significantly more accurate estimations on value distributions, at comparable performance.
+The result is that even at extreme scale, mainly because Netdata samples 200x more data, it can provide significantly more accurate estimations on value distributions, at comparable performance.
 
 ---
 
