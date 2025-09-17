@@ -13,7 +13,7 @@ Publishing documentation to [Learn](https://github.com/netdata/learn) involves a
 
 | Step  | Action                                                                                  | Output                                                         |
 |-------|-----------------------------------------------------------------------------------------|----------------------------------------------------------------|
-| **1** | Edit `map.csv` alongside your doc changes. Fill in all 5 columns correctly.             | Docs mapped with proper sidebar labels, paths, and edit links. |
+| **1** | Edit `map.csv` alongside your doc changes. Fill in all 4 columns (description can be left empty) correctly.             | Docs mapped with proper sidebar labels, paths, and edit links. |
 | **2** | Test locally with the `ingest.py` script. Optionally run a full local Learn deployment. | Confirms no broken links or build errors.                      |
 | **3** | Merge the Docs PR (requires approval).                                                  | Docs + `map.csv` merged into the repo.                         |
 | **4** | Inspect the automatic Learn ingest PR. Check files + deploy preview.                    | Verified preview of Learn with changes.                        |
