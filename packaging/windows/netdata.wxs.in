@@ -53,7 +53,7 @@
                 <ComponentRef Id="NetdataEtcPython" />
                 <ComponentRef Id="NetdataEtcStatsd" />
                 <ComponentGroupRef Id="WevtComponents" />
-                <ComponentGroupRef Id="NetdataDriver" />
+                <FeatureGroupRef Id="NetdataDriver" />
                 <ComponentRef Id="NetdataService" />
             </Feature>
 
@@ -185,10 +185,10 @@
             </ComponentGroup>
 
             <!-- Install netdata driver file -->
-            <ComponentGroup Id="NetdataDriver" Directory="System64Folder">
-                <File Id="NetdataDrv" Name="netdata_driver.sys" Source="C:\msys64\opt\netdata\usr\bin\netdata_driver.sys">
+            <FeatureGroup Id="NetdataDriver">
+                <File Id="NetdataDrv" Name="netdata_driver.sys" Directory="System64Folder" Source="C:\msys64\opt\netdata\usr\bin\netdata_driver.sys" Condition="NDDRVINST=1">
                 </File>
-            </ComponentGroup>
+            </FeatureGroup>
 
             <CustomAction Id="DllPermission" Directory="System64Folder" ExeCommand='[System64Folder]icacls.exe &quot;[System64Folder]wevt_netdata.dll&quot; /grant &quot;NT SERVICE\EventLog&quot;:R' Execute="deferred" Return="ignore" Impersonate="no"/>
             <InstallExecuteSequence>
