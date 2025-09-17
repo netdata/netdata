@@ -10,8 +10,8 @@ We have designed this platform for operations teams, sysadmins, DevOps engineers
 
 The system consists of three components:
 - [**Netdata Agent**](/docs/deployment-guides/standalone-deployment.md): Monitoring software installed on each system
-- [**Netdata Parents**](https://github.com/netdata/netdata/blob/master/docs/deployment-guides/deployment-with-centralization-points.md): Optional centralization points for aggregating data from multiple agents (Netdata Parents are the same software component as Netdata Agents, configured as Parents)
-- [**Netdata Cloud**](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/README.md): A smart control plane for unifying multiple independent Netdata Agents and Parents, providing horizontal scalability, role based access control, access from anywhere, centralized alerts notifications, team collaboration, AI insights and more.
+- [**Netdata Parents**](/docs/deployment-guides/deployment-with-centralization-points.md): Optional centralization points for aggregating data from multiple agents (Netdata Parents are the same software component as Netdata Agents, configured as Parents)
+- [**Netdata Cloud**](/docs/netdata-cloud/README.md): A smart control plane for unifying multiple independent Netdata Agents and Parents, providing horizontal scalability, role based access control, access from anywhere, centralized alerts notifications, team collaboration, AI insights and more.
 
 ## Performance at a Glance
 
@@ -168,7 +168,7 @@ Netdata democratizes ML and AI by making it automatic and universal (no configur
 
 Note: Netdata's ML focuses on detecting behavioral anomalies in metrics using their last 2 days of data. It is optimized for reliability rather than sensitivity and may miss slow (over days/weeks) infrastructure degradation or certain types of long-term anomalies (weekly, monthly, etc). However, it typically detects most types of abnormal behavior that break services.
 
-For more information see [Netdata's ML Accuracy, Reliability and Sensitivity](https://github.com/netdata/netdata/blob/master/docs/ml-ai/ml-anomaly-detection/ml-anomaly-detection.md).
+For more information see [Netdata's ML Accuracy, Reliability and Sensitivity](/docs/ml-ai/ml-anomaly-detection/ml-anomaly-detection.md).
 
 ### Troubleshooting
 
@@ -286,13 +286,13 @@ Based on extensive real-world deployments and independent academic validation, N
 
 The [University of Amsterdam study](https://twitter.com/IMalavolta/status/1734208439096676680) found Netdata to be the most energy-efficient monitoring solution, with the lowest CPU overhead, memory usage, and execution time impact among compared tools.
 
-For more information see [Netdata's impact on resources](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/sizing-netdata-agents/README.md).
+For more information see [Netdata's impact on resources](/docs/netdata-agent/sizing-netdata-agents/README.md).
 
 :::
 
 ## Practical Implications
 
-Please also see [Netdata Enterprise Evaluation Guide](https://github.com/netdata/netdata/blob/master/docs/netdata-enterprise-evaluation-corrected.md) and [Netdata's Security and Privacy Design](https://github.com/netdata/netdata/blob/master/docs/security-and-privacy-design/README.md).
+Please also see [Netdata Enterprise Evaluation Guide](/docs/netdata-enterprise-evaluation-corrected.md) and [Netdata's Security and Privacy Design](/docs/security-and-privacy-design/README.md).
 
 ### For Small Teams
 
@@ -324,7 +324,7 @@ Modern infrastructure changes constantly. Netdata enables teams to:
 ## Frequently Asked Questions on Design Philosophy
 
 <details>
-<summary><strong>Doesn't edge architecture create a management nightmare?</strong></summary><br/>
+<summary><strong>Doesn't edge architecture create a management nightmare?</strong></summary>
 
 **The opposite is true — edge architecture eliminates most management overhead.**
 
@@ -367,7 +367,7 @@ In practice, organizations using Netdata routinely achieve multi-million samples
 </details>
 
 <details>
-<summary><strong>Isn't collecting 'everything' fundamentally wasteful?</strong></summary><br/>
+<summary><strong>Isn't collecting 'everything' fundamentally wasteful?</strong></summary>
 
 **The opposite is true — Netdata is the most energy-efficient monitoring solution available.**
 
@@ -390,7 +390,7 @@ Selective monitoring creates a paradox: you must predict what will break to know
 </details>
 
 <details>
-<summary><strong>Does complete coverage create analysis paralysis?</strong></summary><br/>
+<summary><strong>Does complete coverage create analysis paralysis?</strong></summary>
 
 **Structure prevents paralysis — Netdata organizes data hierarchically, not as an unstructured pool.**
 
@@ -418,7 +418,7 @@ Organizations report that engineers who initially felt overwhelmed quickly adapt
 </details>
 
 <details>
-<summary><strong>Is per-second granularity actually useful or just marketing?</strong></summary><br/>
+<summary><strong>Is per-second granularity actually useful or just marketing?</strong></summary>
 
 **Per-second is for engineers, not business metrics — it matches the speed at which systems actually operate.**
 
@@ -459,7 +459,7 @@ For business metrics, minute or hourly aggregations make sense. But for infrastr
 </details>
 
 <details>
-<summary><strong>What about the observer effect? How do you guarantee per-second collection isn't impacting application performance?</strong></summary><br/>
+<summary><strong>What about the observer effect? How do you guarantee per-second collection isn't impacting application performance?</strong></summary>
 
 **Netdata's default collection frequencies are carefully configured to avoid impacting monitored applications.**
 
@@ -486,7 +486,7 @@ The University of Amsterdam study confirmed this approach works: despite compreh
 </details>
 
 <details>
-<summary><strong>Why systemd-journal instead of industry standards like Elasticsearch/Splunk?</strong></summary><br/>
+<summary><strong>Why systemd-journal instead of industry standards like Elasticsearch/Splunk?</strong></summary>
 
 **systemd-journal IS the industry standard — it's already installed and running on every Linux system.**
 
