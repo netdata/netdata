@@ -55,7 +55,7 @@ Before merging, **always test the map file**.
 
 - Submit your PR with the updated docs **and** `map.csv`.
 - Get at least one approval.
-- **Reviewers expect you to have tested already**. Don’t rely on them to test.
+- **Reviewers expect you to have tested already**. Don’t rely on them to test. Please also mention it if you have done testing, so it is clear.
 
 ### 4. Merge the Learn Ingest PR
 
