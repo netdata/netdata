@@ -282,6 +282,29 @@ The sampling algorithm is designed to be resilient to large datasets. Even if yo
 
 :::
 
+#### Accuracy implications
+Netdata’s sampling budget evaluates **up to 1,000,000 log entries** before it ever marks rows as `[unsampled]`. The proportion of the dataset we examine is:
+
+```
+evaluated_entries = min(total_entries, 1_000_000)
+evaluated_ratio   = evaluated_entries / total_entries
+```
+
+Because the sampling set is so large, percentage breakdowns stay tight even on massive datasets. For a 10 M–entry window where 60 % of logs share a value, the 95 % confidence interval around that percentage is:
+
+```
+standard_error ≈ sqrt(p * (1 - p) / evaluated_entries)
+CI95 ≈ 1.96 * standard_error = 1.96 * sqrt(0.6 * 0.4 / 1_000_000) ≈ ±0.9 %
+```
+
+By contrast, evaluating only 5,000 entries (a small-sample approach typical of many log explorers when speed is prioritized) would yield:
+
+```
+CI95 ≈ 1.96 * sqrt(0.6 * 0.4 / 5_000) ≈ ±8.7 %
+```
+
+The result is that even at extreme scale, mainly because Netdata samples 200x more data, it can provide significantly more accurate estimations on value distributions, at comparable performance.
+
 ---
 
 ## Best practices for better performance
