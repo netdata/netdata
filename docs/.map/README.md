@@ -1,108 +1,80 @@
 # How to Publish Docs on Learn
 
-Here is the forbidden knowledge of how one summons docs from this repo to the production Documentation site, Learn. This process involves code magic, you have been warned 😄
+Publishing documentation to [Learn](https://github.com/netdata/learn) involves a few key steps. Follow this guide carefully to avoid broken links or failed builds.
 
-## Prerequisites
+:warning: **Before You Begin**
 
-> [!CAUTION]
-> If you will **unpublish** a file that was on Learn, refer to [this section](#unpublishing-files) as it is a necessary step
+- If you plan to unpublish a file, see [Unpublishing Files](#unpublishing-files) first. It requires extra steps.
+- If you make large changes or move multiple docs, you must test with a local deployment of Learn.
 
-1. If the change is not obvious, and a lot of stuff is moved around, a local deployment of <https://github.com/netdata/learn> is needed. This is a must and a PR submitted for review should first be tested
+## Steps to Publish
 
-## Steps
+### Quick Checklist
 
-### 1. Edit the map.csv in the same PR as the docs you are editing
+| Step  | Action                                                                                  | Output                                                         |
+|-------|-----------------------------------------------------------------------------------------|----------------------------------------------------------------|
+| **1** | Edit `map.csv` alongside your doc changes. Fill in all 5 columns correctly.             | Docs mapped with proper sidebar labels, paths, and edit links. |
+| **2** | Test locally with the `ingest.py` script. Optionally run a full local Learn deployment. | Confirms no broken links or build errors.                      |
+| **3** | Merge the Docs PR (requires approval).                                                  | Docs + `map.csv` merged into the repo.                         |
+| **4** | Inspect the automatic Learn ingest PR. Check files + deploy preview.                    | Verified preview of Learn with changes.                        |
+| **5** | Merge the Learn ingest PR.                                                              | Docs officially live on Learn.                                 |
 
-The map file has five columns.
+### 1. Edit `map.csv`
 
-#### custom_edit_url
+All docs must be mapped in the [map.csv](https://github.com/netdata/netdata/blob/master/docs/.map/map.csv) file. Each row has five columns:
 
-This column has the link for the github file you want to use, due to having files from other repos apart from netdata/netdata, use full **EDIT** link here. This link will be used when someone presses the edit button on Learn.
+| Column                | Purpose                                                                       | Notes                                                                                                                                                    |
+|-----------------------|-------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **custom\_edit\_url** | Full GitHub **Edit** link for the file. Used for the "Edit this page" button. | Must use the full link (supports repos beyond `netdata/netdata`).                                                                                        |
+| **sidebar\_label**    | The label shown in the sidebar.                                               | To make a category: the **overview** page’s `sidebar_label` **must match** `learn_rel_path` (lowercase). <br>👉 Every folder must have an overview page. |
+| **learn\_status**     | `Published` or `Unpublished`.                                                 | If `Unpublished`, see [Unpublishing Files](#unpublishing-files).                                                                                         |
+| **learn\_rel\_path**  | The location path on Learn.                                                   | Use **uppercase letters** and **spaces**. Example: `Netdata Agent/Installation/Linux`. <br>👉 Every level requires an overview page.                     |
+| **description**       | Legacy metadata description.                                                  | Rarely used today.                                                                                                                                       |
 
-#### sidebar_Label
+Example row in `map.csv`:
 
-The label that the doc will have on the sidebar.
-
-> [!Important]
->
-> If you want to make a category, then the **overview** page has to have `sidebar_label` == `learn_rel_path`, otherwise it will not work and be lowercase. This is by design, as we autogenerate the sidebar and keep it dynamic.
->
-> **Folders must have an overview page**
-
-#### learn_status
-
-`Published` or `Unpublished`.
-
-> [!Caution]
->
-> If you flip something to unpublished please refer to [this section](#unpublishing-files).
-
-#### learn_rel_path
-
-This is the path that the file must go to, use uppercase letters, spaces and separate with slashes.
-
-Example: `Netdata Agent/Installation/Linux`
-
-> [!Note]
->
-> For every level you go, you need an overview page as well
-
-#### description
-
-This column is sort of legacy, it is meant to populate a `description` metadata field.
-
-### 2. Test the changes
-
-> [!Important]
->
-> If you don't want to do this process all over again because you made a wrong edit and somehow you merged it, you should **test** the map file.
-
-This is heavily documented in <https://github.com/netdata/learn#ingest-and-process-documentation-files>, but the gist is:
-
-On a local clone of Learn, **after following the ingest instructions detailed in the above link** (prep environment, pip dependencies) you run:
-
-```bash
-python3 ingest/ingest.py --repos OWNEROFREPO/netdata:YOURBRANCH
+```csv
+custom_edit_url,sidebar_label,learn_status,learn_rel_path,description
+https://github.com/netdata/netdata/edit/master/docs/installation/linux.md,Linux,Published,"Netdata Agent/Installation/Linux","How to install Netdata Agent on Linux"
 ```
 
-> you can override all the ingested repos, but most of the time you would be concerned about netdata/netdata.
+### 2. Test the Changes
 
-**You then inspect the changes.**
+Before merging, **always test the map file**.
 
->[!Important]
->
->If you are a real legend you can also do a [local deploy of Learn](https://github.com/netdata/learn#local-deploy-of-learn) to make sure the thing builds *(looking at you, that you did these HTML changes and have syntax errors)*.
+1. Clone [Learn](https://github.com/netdata/learn) locally.
+2. Prepare environment and dependencies (see [ingest instructions](https://github.com/netdata/learn#ingest-and-process-documentation-files)).
+3. Run the ingest command:
+   ```bash
+   python3 ingest/ingest.py --repos OWNEROFREPO/netdata:YOURBRANC
+   ```
+4. Inspect the ingested changes.
+5. (Optional, advanced) [Deploy Learn](https://github.com/netdata/learn#local-deploy-of-learn) locally to confirm it builds correctly.
 
-### 3. Merge the PR
+### 3. Merge the Docs PR
 
-After you make the edits in the CSV, you merge the Docs PR. You need an approval for this, so the map will be reviewed there.
+- Submit your PR with the updated docs **and** `map.csv`.
+- Get at least one approval.
+- **Reviewers expect you to have tested already**. Don’t rely on them to test.
 
->[!Note]
->
-> The review is done after you have tested your changes, it is weird to commit something untested, and don't expect the reviewer to test it for you
+### 4. Merge the Learn Ingest PR
 
-### 4. Merge the Learn ingest PR
+Once your docs PR is merged:
 
-When edits are made in `netdata/netdata` the ingest action is triggered at `netdata/learn`. Upon success it will make a PR like [this](https://github.com/netdata/learn/pull/2551).
+1. The ingest action triggers in [netdata/learn](https://github.com/netdata/learn).
+2. A PR is created automatically.
+3. Inspect the changes.
+4. Wait for the deploy preview.
+5. Check the deploy preview carefully.
+6. If everything looks good → merge.
 
-1. Inspect changes in files
-2. Wait for deploy preview
-3. Check the deploy preview
-
-If everything looks good, you merge.
-
-End of story, :beers:
+🍻 Done!
 
 ## Unpublishing Files
 
-If you:
+If you **delete**, **move**, or **unpublish** a file, redirects may break.
 
-1. **delete** a file from a repo
-2. move it (which 404s the old link)  
-3. unpublish it
-
-**you will break redirects to it.**
-
-The entries for it in the [redirects JSON](https://github.com/netdata/learn/blob/master/LegacyLearnCorrelateLinksWithGHURLs.json) will point to the 404.
-
-To fix, you just ctrl+f in that file for the old GitHub link, and either point it somewhere related. If no relevant spot can be found, then just remove the entries.
+1. Open [LegacyLearnCorrelateLinksWithGHURLs.json](https://github.com/netdata/learn/blob/master/LegacyLearnCorrelateLinksWithGHURLs.json).
+2. Search (`Ctrl+F`) for the old GitHub link.
+3. Update the entry to a relevant new location.
+4. If no suitable replacement exists → remove the entry.
