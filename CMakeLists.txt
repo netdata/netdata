@@ -508,6 +508,7 @@ check_symbol_exists(strerror_r "string.h" HAVE_STRERROR_R)
 check_symbol_exists(finite "math.h" HAVE_FINITE)
 check_symbol_exists(isfinite "math.h" HAVE_ISFINITE)
 check_symbol_exists(dlsym "dlfcn.h" HAVE_DLSYM)
+check_symbol_exists(clearenv "stdlib.h" HAVE_CLEARENV)
 
 check_function_exists(setresuid HAVE_SETRESUID)
 check_function_exists(setresgid HAVE_SETRESGID)

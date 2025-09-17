@@ -83,7 +83,12 @@ static void clean_environment(struct passwd *pw) {
     const char * TMPDIR = getenv("TMPDIR");
     const char * PWD = getenv("PWD");
 
+    #ifdef HAVE_CLEARENV
     clearenv();
+    #else
+    environ = NULL;
+    #endif
+
     set_env_var("USER", pw->pw_name);
     set_env_var("LOGNAME", pw->pw_name);
     set_env_var("HOME", pw->pw_dir);
