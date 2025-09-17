@@ -1077,12 +1077,12 @@ jobs:
       max-parallel: 8
       matrix:
         include:
-          - name: macos-13
-            runner: macos-13
           - name: macos-14-M1
             runner: macos-14
           - name: macos-15-M1
             runner: macos-15
+          - name: macos-26-M1
+            runner: macos-26
     steps:
       - name: Skip Check
         id: skip
