@@ -86,6 +86,7 @@ static void clean_environment(struct passwd *pw) {
     #ifdef HAVE_CLEARENV
     clearenv();
     #else
+    extern char **environ;
     environ = NULL;
     #endif
 
