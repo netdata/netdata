@@ -439,6 +439,7 @@ func (j *Job) processMetrics(metrics map[string]int64, startTime time.Time, sinc
 		}
 	}
 
+	bufLenBeforeHost := j.buf.Len()
 	j.api.HOST(j.vnode.GUID)
 
 	elapsed := int64(durationTo(time.Since(startTime), time.Millisecond))
@@ -467,6 +468,10 @@ func (j *Job) processMetrics(metrics map[string]int64, startTime time.Time, sinc
 		}
 	}
 	*j.charts = (*j.charts)[:i]
+
+	if updated == 0 && j.vnode.GUID != "" && bufLenBeforeHost > 0 {
+		j.buf.Truncate(bufLenBeforeHost)
+	}
 
 	j.api.HOST("")
 
