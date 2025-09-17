@@ -533,12 +533,16 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
                     rrddim_add(st, "SyncookiesRecv",   "received",  1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "SyncookiesSent",   "sent",     -1, 1, RRD_ALGORITHM_INCREMENTAL);
+#if __MAC_OS_X_VERSION_MAX_ALLOWED < 160000
                     rrddim_add(st, "SyncookiesFailed", "failed",   -1, 1, RRD_ALGORITHM_INCREMENTAL);
+#endif
                 }
 
                 rrddim_set(st, "SyncookiesRecv",   tcpstat.tcps_sc_recvcookie);
                 rrddim_set(st, "SyncookiesSent",   tcpstat.tcps_sc_sendcookie);
+#if __MAC_OS_X_VERSION_MAX_ALLOWED < 160000
                 rrddim_set(st, "SyncookiesFailed", tcpstat.tcps_sc_zonefail);
+#endif
                 rrdset_done(st);
             }
 
