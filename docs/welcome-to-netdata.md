@@ -117,7 +117,7 @@ Netdata dashboards are an algorithm, not a configuration. Each Netdata chart is 
 
 ### Efficient Storage
 
-Netdata, contrary to most observabillity solutions, is optimized for lightweight storage operations. Three storage tiers are updated in parallel (per-second, per-minute, per-hour). The high-resolution tier needs 0.6 bytes per sample on disk (Gorilla compression + ZSTD). The lower resolution tiers need 6-bytes and 18-bytes per sample respectively and maintain the ability to provide the same min, max, average and anomaly rate the high-resolution tier provides. Data are written in append-only files and are never reorganized on disk (Write Once Read Many - WORM). Writes are spread evenly over time. Netdata Agents write at 5 KiB/s, Netdata Parents aggregating 1M metrics/s write at 1MiB/s across all tiers.
+Netdata, contrary to most observability solutions, is optimized for lightweight storage operations. Three storage tiers are updated in parallel (per-second, per-minute, per-hour). The high-resolution tier needs 0.6 bytes per sample on disk (Gorilla compression + ZSTD). The lower resolution tiers need 6-bytes and 18-bytes per sample respectively and maintain the ability to provide the same min, max, average and anomaly rate the high-resolution tier provides. Data are written in append-only files and are never reorganized on disk (Write Once Read Many - WORM). Writes are spread evenly over time. Netdata Agents write at 5 KiB/s, Netdata Parents aggregating 1M metrics/s write at 1MiB/s across all tiers.
 
 Netdata implements a custom time-series database optimized for the specific patterns of system metrics:
 
