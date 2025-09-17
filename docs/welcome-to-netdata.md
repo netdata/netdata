@@ -9,31 +9,32 @@ Instead of centralizing the data, Netdata distributes the monitoring code to eac
 We have designed this platform for operations teams, sysadmins, DevOps engineers, and SREs who need comprehensive real-time, low-latency visibility into their infrastructure and applications. Netdata is opinionated — it collects everything, visualizes everything, runs machine learning anomaly detection on everything, with several innovations that make modern observability accessible to lean teams, without the need for specialized skills.
 
 The system consists of three components:
+
 - [**Netdata Agent**](/docs/deployment-guides/standalone-deployment.md): Monitoring software installed on each system
 - [**Netdata Parents**](/docs/deployment-guides/deployment-with-centralization-points.md): Optional centralization points for aggregating data from multiple agents (Netdata Parents are the same software component as Netdata Agents, configured as Parents)
 - [**Netdata Cloud**](/docs/netdata-cloud/README.md): A smart control plane for unifying multiple independent Netdata Agents and Parents, providing horizontal scalability, role based access control, access from anywhere, centralized alerts notifications, team collaboration, AI insights and more.
 
 ## Performance at a Glance
 
-| Aspect | Netdata | Industry Standard |
-|-------:|:-------:|:-----------------:|
-| **Real-Time Monitoring** | | |
-| Data granularity | 1 second | 10-60 seconds |
-| Collection to visualization | 1 second | 30+ seconds |
-| Time to first dashboard | 10 seconds | Hours to days |
-| **Automation** | | |
-| Configuration required | Minimal to none | Extensive |
-| ML anomaly detection | All metrics automatically | Selected metrics manually |
-| Pre-configured alerts | 400+ out of the box | Build from scratch |
-| **Efficiency** | | |
-| Storage per metric | 0.6 bytes/sample | 2-16 bytes/sample |
-| Agent CPU usage | 5% single core | 10-30% single core |
-| Scalability | Linear, unlimited | Exponential complexity |
-| **Coverage** | | |
-| Metrics collected | Everything available | Manually selected |
-| Built-in collectors | 800+ integrations | Basic system metrics |
-| Hardware monitoring | Comprehensive | Limited or none |
-| Live monitoring | processes, network connections, and more | Limited or none |
+|                      Aspect |                 Netdata                  |     Industry Standard     |
+|----------------------------:|:----------------------------------------:|:-------------------------:|
+|    **Real-Time Monitoring** |                                          |                           |
+|            Data granularity |                 1 second                 |       10-60 seconds       |
+| Collection to visualization |                 1 second                 |        30+ seconds        |
+|     Time to first dashboard |                10 seconds                |       Hours to days       |
+|              **Automation** |                                          |                           |
+|      Configuration required |             Minimal to none              |         Extensive         |
+|        ML anomaly detection |        All metrics automatically         | Selected metrics manually |
+|       Pre-configured alerts |           400+ out of the box            |    Build from scratch     |
+|              **Efficiency** |                                          |                           |
+|          Storage per metric |             0.6 bytes/sample             |     2-16 bytes/sample     |
+|             Agent CPU usage |              5% single core              |    10-30% single core     |
+|                 Scalability |            Linear, unlimited             |  Exponential complexity   |
+|                **Coverage** |                                          |                           |
+|           Metrics collected |           Everything available           |     Manually selected     |
+|         Built-in collectors |            800+ integrations             |   Basic system metrics    |
+|         Hardware monitoring |              Comprehensive               |      Limited or none      |
+|             Live monitoring | processes, network connections, and more |      Limited or none      |
 
 ## Design Philosophy and Implementation
 
@@ -66,6 +67,7 @@ Keeping data at the edge eliminates egress charges, ensures compliance by defaul
 Most observability solutions are usually selective to control cost, complexity and the time and skills required to set up. Organizations are frequently instructed to select only what is important for them, based on their understanding and needs.
 
 This creates two fundamental problems:
+
 - missing just one uncollected metric can obscure the root cause of an issue, leading to frustration and incomplete visibility during crisis
 - the observability quality organizations get reflects the skills and experience of their people.
 
@@ -145,7 +147,7 @@ Netdata takes a fundamentally different approach by leveraging the systemd journ
 - **Security built-in**: Write Once Read Many (WORM) and Forward Secure Sealing (FSS) ensures log integrity and tamper detection
 - **Logs transformation**: The platform includes `log2journal` for converting any text, JSON, or logfmt logs into structured journal entries
 
-Where traditional solutions sample 5,000 log entries to generate field statistics on their dashboards, Netdata starts sampling at 1 million entries, providing 200x more accurate insights into log patterns. 
+Where traditional solutions sample 5,000 log entries to generate field statistics on their dashboards, Netdata starts sampling at 1 million entries, providing 200x more accurate insights into log patterns.
 The result is enterprise-grade log management capabilities — field statistics, histogram breakdowns, full-text search, time-based filtering — all while keeping logs at the edge where they're generated, eliminating the massive costs of centralized log infrastructure.
 
 :::note
@@ -267,12 +269,12 @@ Based on extensive real-world deployments and independent academic validation, N
 
 | Resource               | Standalone 5k metrics/s | Child 5k metrics/s  | Parent 1M metrics/s |
 |------------------------|:-----------------------:|:-------------------:|:-------------------:|
-| **CPU**                | 5% of a single core     | 3% of a single core | ~10 cores total     |
-| **Memory**             | 200 MB                  | 150 MB              | ~40 GB              |
-| **Network**            | None                    | \<1 Mbps to Parent   | ~100 Mbps inbound   |
-| **Storage Capacity**   | 3 GiB (configurable)    | None                | as needed           |
-| **Storage Throughput** | 5 KiB/s write           | None                | 1 MiB/s write       |
-| **Retention**          | 1 year (configurable)   | None                | as needed           |
+| **CPU**                |   5% of a single core   | 3% of a single core |   ~10 cores total   |
+| **Memory**             |         200 MB          |       150 MB        |       ~40 GB        |
+| **Network**            |          None           | \<1 Mbps to Parent  |  ~100 Mbps inbound  |
+| **Storage Capacity**   |  3 GiB (configurable)   |        None         |      as needed      |
+| **Storage Throughput** |      5 KiB/s write      |        None         |    1 MiB/s write    |
+| **Retention**          |  1 year (configurable)  |        None         |      as needed      |
 
 :::note
 
@@ -329,6 +331,7 @@ Modern infrastructure changes constantly. Netdata enables teams to:
 **The opposite is true — edge architecture eliminates most management overhead.**
 
 Traditional centralized systems require:
+
 - Database administration (backups, compaction, tuning)
 - Capacity planning for central storage
 - Pipeline management and scaling
@@ -336,6 +339,7 @@ Traditional centralized systems require:
 - Downtime windows for maintenance
 
 Netdata's edge approach provides:
+
 - **Zero maintenance**: Agents and Parents run autonomously without administration
 - **Automatic updates**: Built-in update mechanisms or integration with provisioning tools
 - **Strong compatibility**: Backwards compatibility ensures upgrades don't break things
@@ -346,6 +350,7 @@ Netdata's edge approach provides:
 - **Built-in high availability**: Streaming and replication provide data redundancy without complex setup
 
 The architecture also delivers operational benefits:
+
 - **Minimal disk I/O**: Data commits only every 17 minutes per metric (spread over time), while real-time streaming maintains data safety
 - **No backup complexity**: Observability data is ephemeral (rotated) and write-once-read-many (WORM), eliminating traditional backup requirements via replication
 - **Isolated failures**: Issues affect only parts of the ecosystem (e.g., a single parent), not the entire monitoring foundation
@@ -353,6 +358,7 @@ The architecture also delivers operational benefits:
 **Why not use existing databases?**
 
 Existing time-series databases couldn't meet the requirements for edge deployment:
+
 - **Process independence**: No separate database processes to manage
 - **Write-once-read-many (WORM)**: Corruption-resistant with graceful degradation
 - **Zero maintenance**: No tuning, compaction, or optimization required
@@ -376,11 +382,13 @@ The University of Amsterdam study confirmed Netdata uses significantly fewer res
 The real question is: **What's the business impact when critical troubleshooting data isn't available during a crisis?**
 
 Consider:
+
 - **Crisis happens when things break unexpectedly** — if they were expected, you'd have mitigations in place
 - **The very fact systems are in crisis** means the failure mode wasn't predicted
 - **Engineers can't predict what data they'll need** for problems they didn't anticipate
 
 The business case for complete coverage:
+
 - **Reduced MTTD/MTTR**: All data is available immediately when investigating issues
 - **No blind spots**: The metric you didn't think to collect often holds the key
 - **ML/AI effectiveness**: Algorithms can find correlations in "insignificant" metrics that humans miss
@@ -395,11 +403,13 @@ Selective monitoring creates a paradox: you must predict what will break to know
 **Structure prevents paralysis — Netdata organizes data hierarchically, not as an unstructured pool.**
 
 Unlike monitoring solutions that present metrics as a flat list, Netdata uses intelligent hierarchical organization:
+
 - 50 disk metrics stay within the disk section
 - 100 container metrics remain in the container view
 - Database metrics don't interfere with network analysis
 
 This means:
+
 - **No performance impact**: Finding database issues isn't slower because you have more network metrics
 - **No confusion**: Each subsystem's metrics are logically grouped and accessible
 - **Negligible cost**: One more metric adds just 18KB memory and 0.6 bytes/sample on disk
@@ -423,6 +433,7 @@ Organizations report that engineers who initially felt overwhelmed quickly adapt
 **Per-second is for engineers, not business metrics — it matches the speed at which systems actually operate.**
 
 Consider the reality of modern systems:
+
 - CPUs execute **billions of instructions per second**
 - A single second contains enough time for entire cascading failures
 - In one minute, a system can process millions of requests, experience multiple garbage collections, or suffer intermittent network issues
@@ -430,6 +441,7 @@ Consider the reality of modern systems:
 **Per-second is the standard for engineering tools**
 
 When engineers debug with console tools, they never use 10-second or minute averages. Why? Because averaging hides critical details:
+
 - Stress spikes that trigger failures
 - Micro-bursts that overwhelm queues
 - Brief stalls that compound into user-facing latency
@@ -437,6 +449,7 @@ When engineers debug with console tools, they never use 10-second or minute aver
 **Netdata was designed as a unified console replacement**
 
 Think of Netdata as the evolution of `top`, `iostat`, `netstat`, and hundreds of other console tools — but with:
+
 - The same per-second granularity engineers expect
 - Complete coverage across all subsystems
 - Historical data to trace issues backward
@@ -448,6 +461,7 @@ This is true tools consolidation: instead of jumping between dozens of console c
 **Immediate feedback is crucial for effective operations**
 
 When engineers make infrastructure changes, they need to see the impact immediately:
+
 - **During crisis**: Every second counts — you can't wait for minute-averages to confirm if your fix is working
 - **Configuration changes**: See instantly whether that parameter helped or made things worse
 - **Scaling operations**: Watch resource utilization respond in real-time as you add capacity
@@ -466,16 +480,19 @@ For business metrics, minute or hourly aggregations make sense. But for infrastr
 The goal is simple: collect all metrics at the maximum possible frequency without affecting performance. This means:
 
 **Thoughtfully configured defaults:**
+
 - **Most metrics**: Collected per-second when source data updates frequently
-- **Slower metrics**: Collected every 5-10 seconds when source data changes less frequently  
+- **Slower metrics**: Collected every 5-10 seconds when source data changes less frequently
 - **Expensive metrics**: Disabled by default with optional configuration flags for specialized use cases
 
 **Performance-first defaults:**
+
 - Collection frequency is tuned based on the cost of data gathering
 - "Expensive" metrics (those affecting performance) have lower default frequencies
 - Some specialized metrics are completely disabled by default but can be enabled when their value justifies the overhead
 
 **User control:**
+
 - All frequencies are configurable — users can increase collection frequency if they need higher resolution for specific metrics
 - Can disable any collector that proves problematic in their specific environment
 - Can enable expensive collectors when their specialized value outweighs the performance cost
@@ -494,19 +511,21 @@ The question misframes the choice. systemd-journal isn't competing with Elastics
 
 **Understanding the trade-offs:**
 
-| Approach | Storage Footprint | Query Performance | Indexing Strategy |
-|----------|------------------|-------------------|-------------------|
-| **Loki** | 1/4 to 1/2 of original logs | Slow (brute force scan after metadata filtering) | Limited metadata indexing |
-| **Elasticsearch/Splunk** | 2-5x larger than original logs | Fast full-text search | Word-level reverse indexing |
-| **systemd-journal** | ~Equal to original logs | Fast field-value queries | Forward indexing of all field values |
+| Approach                 | Storage Footprint              | Query Performance                                | Indexing Strategy                    |
+|--------------------------|--------------------------------|--------------------------------------------------|--------------------------------------|
+| **Loki**                 | 1/4 to 1/2 of original logs    | Slow (brute force scan after metadata filtering) | Limited metadata indexing            |
+| **Elasticsearch/Splunk** | 2-5x larger than original logs | Fast full-text search                            | Word-level reverse indexing          |
+| **systemd-journal**      | ~Equal to original logs        | Fast field-value queries                         | Forward indexing of all field values |
 
 **systemd-journal provides a balanced approach:**
+
 - **Open schema**: Each log entry can have unique fields, all automatically indexed
 - **Storage efficient**: Roughly same size as original logs
 - **Query optimized**: Fast lookups for any field value as a whole
 - **Universal compatibility**: Already the source for all other log systems
 
 **But systemd-journal is actually superior in critical ways:**
+
 - **Security features**: Forward Secure Sealing (FSS) for tamper detection — not even available in most commercial solutions
 - **Native access control**: Uses filesystem permissions for isolation — no additional security layer to breach
 - **Extreme performance**: Outperforms everything else in single-node ingestion throughput while being lightweight
@@ -519,6 +538,7 @@ Furthermore, direct file access isn't a security risk — it's a security advant
 
 **What Netdata adds:**
 systemd-journal is powerful but lacks the visualization and analysis layer. Netdata provides:
+
 - Rich query interface and dashboards
 - Field statistics and histograms
 - Integration with metrics and anomaly detection
