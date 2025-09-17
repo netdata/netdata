@@ -469,7 +469,7 @@ func (j *Job) processMetrics(metrics map[string]int64, startTime time.Time, sinc
 	}
 	*j.charts = (*j.charts)[:i]
 
-	if updated == 0 && j.vnode.GUID != "" && bufLenBeforeHost > 0 {
+	if updated == 0 && j.vnode.GUID != "" {
 		j.buf.Truncate(bufLenBeforeHost)
 	}
 
