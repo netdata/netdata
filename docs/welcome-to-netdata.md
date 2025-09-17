@@ -9,7 +9,7 @@ Instead of centralizing the data, Netdata distributes the monitoring code to eac
 We have designed this platform for operations teams, sysadmins, DevOps engineers, and SREs who need comprehensive real-time, low-latency visibility into their infrastructure and applications. Netdata is opinionated — it collects everything, visualizes everything, runs machine learning anomaly detection on everything, with several innovations that make modern observability accessible to lean teams, without the need for specialized skills.
 
 The system consists of three components:
-- [**Netdata Agent**](https://github.com/netdata/netdata/blob/master/docs/deployment-guides/standalone-deployment.md): Monitoring software installed on each system
+- [**Netdata Agent**](/docs/deployment-guides/standalone-deployment.md): Monitoring software installed on each system
 - [**Netdata Parents**](https://github.com/netdata/netdata/blob/master/docs/deployment-guides/deployment-with-centralization-points.md): Optional centralization points for aggregating data from multiple agents (Netdata Parents are the same software component as Netdata Agents, configured as Parents)
 - [**Netdata Cloud**](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/README.md): A smart control plane for unifying multiple independent Netdata Agents and Parents, providing horizontal scalability, role based access control, access from anywhere, centralized alerts notifications, team collaboration, AI insights and more.
 
