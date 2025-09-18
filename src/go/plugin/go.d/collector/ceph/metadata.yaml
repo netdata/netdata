@@ -67,22 +67,23 @@ modules:
               description: Data collection interval (seconds).
               default_value: 1
               required: false
-              group: Base
+              group: Collection
             - name: autodetection_retry
               description: Autodetection retry interval (seconds). Set 0 to disable.
               default_value: 0
               required: false
-              group: Base
+              group: Collection
+
             - name: url
               description: The URL of the [Ceph Manager API](https://docs.ceph.com/en/reef/mgr/ceph_api/).
               default_value: https://127.0.0.1:8443
               required: true
-              group: Base
+              group: Target
             - name: timeout
               description: HTTP request timeout (seconds).
               default_value: 2
               required: false
-              group: Base
+              group: Target
 
             - name: username
               description: Username for Basic HTTP authentication.

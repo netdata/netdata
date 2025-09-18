@@ -82,34 +82,29 @@ modules:
               description: Data collection interval (seconds).
               default_value: 1
               required: false
-              group: Base
+              group: Collection
             - name: autodetection_retry
               description: Autodetection retry interval (seconds). Set 0 to disable.
               default_value: 0
               required: false
-              group: Base
+              group: Collection
+
             - name: url
               description: Consul HTTP API URL.
               default_value: http://localhost:8500
               required: true
-              group: Base
+              group: Target
             - name: timeout
               description: HTTP request timeout (seconds).
               default_value: 1
               required: false
-              group: Base
+              group: Target
 
-            - name: max_checks
-              description: Checks processing/charting limit.
+            - name: acl_token
+              description: Consul ACL token sent with every request (`X-Consul-Token` header).
               default_value: ""
               required: false
-              group: Consul
-            - name: max_filter
-              description: Checks processing/charting filter. Uses [simple patterns](/src/libnetdata/simple_pattern/README.md).
-              default_value: ""
-              required: false
-              group: Consul
-
+              group: HTTP Auth
             - name: username
               description: Username for Basic HTTP authentication.
               default_value: ""
@@ -122,11 +117,6 @@ modules:
               group: HTTP Auth
             - name: bearer_token_file
               description: "Path to a file containing a bearer token (used for `Authorization: Bearer`)."
-              default_value: ""
-              required: false
-              group: HTTP Auth
-            - name: acl_token
-              description: Consul ACL token sent with every request (`X-Consul-Token` header).
               default_value: ""
               required: false
               group: HTTP Auth
