@@ -98,13 +98,13 @@ Metrics:
 
 ### Per cpu core
 
-
+Collects per-core CPU metrics. Disabled by default, can be enabled in the [configuration options](#configuration).
 
 Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
-| cpu | TBD |
+| cpu | Identifier of the CPU core (e.g., core0, core1, core2). |
 
 Metrics:
 
@@ -147,6 +147,7 @@ No action required.
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
 | per cpu core utilization | Collects CPU usage metrics for each individual core, in addition to the system-wide averages. | no | no |
+| cpu idle states | Collects CPU idle state residency metrics for each individual core, showing how much time each core spends in different idle states (C-states). | no | no |
 
 
 </details>
