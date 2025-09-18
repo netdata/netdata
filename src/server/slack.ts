@@ -82,6 +82,68 @@ function extractSlackMessages(result: AIAgentResult | undefined): { blocks?: unk
   return arr.length > 0 ? arr : undefined;
 }
 
+const extractTextFromBlocks = (blocks: unknown): string => {
+  if (!Array.isArray(blocks)) return '';
+  const getText = (value: unknown): string => {
+    if (typeof value === 'string') return value;
+    if (value && typeof value === 'object') {
+      const entry = value as { text?: unknown };
+      const raw = entry.text;
+      if (typeof raw === 'string') return raw;
+      if (raw && typeof raw === 'object') {
+        const nested = raw as { text?: unknown };
+        if (typeof nested.text === 'string') return nested.text;
+      }
+    }
+    return '';
+  };
+
+  const parts: string[] = [];
+  for (const blk of blocks) {
+    if (!blk || typeof blk !== 'object') continue;
+    const b = blk as Record<string, unknown>;
+    const type = typeof b.type === 'string' ? b.type : '';
+    if (type === 'divider') {
+      parts.push('---');
+      continue;
+    }
+    if (type === 'header') {
+      const text = getText(b.text).trim();
+      if (text.length > 0) parts.push(text);
+      continue;
+    }
+    if (type === 'section') {
+      const sectionPieces: string[] = [];
+      const text = getText(b.text).trim();
+      if (text.length > 0) sectionPieces.push(text);
+      const fieldsRaw = Array.isArray(b.fields) ? b.fields : undefined;
+      if (fieldsRaw && fieldsRaw.length > 0) {
+        const fieldTexts = fieldsRaw
+          .map(getText)
+          .map((t) => t.trim())
+          .filter((t) => t.length > 0);
+        if (fieldTexts.length > 0) sectionPieces.push(fieldTexts.join(' | '));
+      }
+      if (sectionPieces.length > 0) parts.push(sectionPieces.join('\n'));
+      continue;
+    }
+    if (type === 'context') {
+      const elems = Array.isArray(b.elements) ? b.elements : undefined;
+      if (elems && elems.length > 0) {
+        const contextTexts = elems
+          .map(getText)
+          .map((t) => t.trim())
+          .filter((t) => t.length > 0);
+        if (contextTexts.length > 0) parts.push(contextTexts.join(' | '));
+      }
+      continue;
+    }
+    const fallback = getText(b.text).trim();
+    if (fallback.length > 0) parts.push(fallback);
+  }
+  return parts.join('\n').trim();
+};
+
 // Removed workaround that split long mrkdwn into blocks; the model must output Block Kit
 
 async function fetchContext(client: SlackClient, event: any, limit: number, charsCap: number, _verbose?: boolean): Promise<string> {
@@ -639,13 +701,21 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
   const handleEvent = async (kind: 'mention'|'dm'|typeof KIND_CHANNEL_POST, args: any): Promise<void> => {
     const { event, client, context } = args;
     const channel = event.channel;
-    const textRaw = String(event.text ?? '');
-    const text = (kind === 'mention' && context?.botUserId) ? stripBotMention(textRaw, String(context.botUserId)) : textRaw;
+    const originalText = typeof event.text === 'string' ? event.text : '';
+    const blocksText = extractTextFromBlocks(event.blocks);
+    const baseText = originalText.trim().length > 0 ? originalText : blocksText;
+    const text = (kind === 'mention' && context?.botUserId) ? stripBotMention(baseText, String(context.botUserId)) : baseText;
 
     if (!text) {
       const eventInfo = `user=${event.user ?? 'none'} channel=${channel} subtype=${event.subtype ?? 'none'} bot_id=${event.bot_id ?? 'none'}`;
-      vlog(`[IGNORED] empty text after processing (kind=${kind} ${eventInfo} raw="${textRaw.substring(0, 50)}")`);
+      const rawPreview = originalText.substring(0, 50);
+      const blockPreview = blocksText.substring(0, 50);
+      vlog(`[IGNORED] empty text after processing (kind=${kind} ${eventInfo} raw="${rawPreview}" blocks="${blockPreview}")`);
       return;
+    }
+
+    if (typeof event.text !== 'string' || event.text.length === 0) {
+      event.text = text;
     }
 
     const threadTs = event.thread_ts ?? event.ts;
@@ -793,12 +863,18 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
   if (enableDMs) app.event('message', async (args: any) => {
     const { event } = args;
     if (!event?.channel_type || event.channel_type !== 'im') return;
-    if (!event.text || !event.user || event.bot_id) {
-      if (verbose && (!event.text || !event.user)) {
-        const reason = !event.text ? 'no text' : (!event.user ? 'no user' : 'bot message');
+    const rawText = typeof event.text === 'string' ? event.text : '';
+    const blockText = extractTextFromBlocks(event.blocks);
+    const effectiveText = rawText.trim().length > 0 ? rawText : blockText;
+    if (!effectiveText || !event.user || event.bot_id) {
+      if (verbose && (!effectiveText || !event.user)) {
+        const reason = !effectiveText ? 'no text' : (!event.user ? 'no user' : 'bot message');
         vlog(`[IGNORED] DM: ${reason} (channel=${event?.channel ?? 'unknown'} user=${event?.user ?? 'none'} bot_id=${event?.bot_id ?? 'none'})`);
       }
       return;
+    }
+    if (typeof event.text !== 'string' || event.text.length === 0) {
+      event.text = effectiveText;
     }
     await handleEvent('dm', args);
   });
@@ -826,10 +902,16 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
       }
       return;
     }
-    if (typeof event?.text !== 'string' || event.text.length === 0) {
+    const rawText = typeof event?.text === 'string' ? event.text : '';
+    const blockText = extractTextFromBlocks(event?.blocks);
+    const effectiveText = rawText.length > 0 ? rawText : blockText;
+    if (effectiveText.length === 0) {
       const eventInfo = `channel=${channelDisplay} user=${event?.user ?? 'none'} bot_id=${event?.bot_id ?? 'none'} subtype="${subtype ?? 'none'}"`;
       if (verbose) vlog(`[IGNORED] empty text (${eventInfo})`);
       return;
+    }
+    if (typeof event.text !== 'string' || event.text.length === 0) {
+      event.text = effectiveText;
     }
     // Only auto-engage on root messages, not thread replies
     if (event?.thread_ts) {
