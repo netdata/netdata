@@ -416,8 +416,8 @@
     "mentions": true,
     "dms": true,
     "updateIntervalMs": 2000,
-    "historyLimit": 50,
-    "historyCharsCap": 25000,
+    "historyLimit": 100,
+    "historyCharsCap": 100000,
     "botToken": "${SLACK_BOT_TOKEN}",
     "appToken": "${SLACK_APP_TOKEN}",
     "routing": {
