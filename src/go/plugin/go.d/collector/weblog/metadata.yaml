@@ -91,22 +91,29 @@ modules:
               description: Data collection frequency.
               default_value: 1
               required: false
+              group: Collection
             - name: autodetection_retry
               description: Recheck interval in seconds. Zero means no recheck will be scheduled.
               default_value: 0
               required: false
+              group: Collection
+
             - name: path
               description: Path to the web server log file.
               default_value: ""
               required: true
+              group: Target
             - name: exclude_path
               description: Path to exclude.
               default_value: "*.gz"
               required: false
+              group: Target
+
             - name: url_patterns
               description: List of URL patterns.
               default_value: "[]"
               required: false
+              group: Customization
               detailed_description: |
                 "URL pattern" scope metrics will be collected for each URL pattern. 
 
@@ -123,14 +130,18 @@ modules:
               description: Used as a dimension name.
               default_value: ""
               required: true
+              group: Customization
             - name: url_patterns.pattern
               description: Used to match against full original request URI. Pattern syntax in [matcher](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#supported-format).
               default_value: ""
               required: true
+              group: Customization
+
             - name: log_type
               description: Log parser type.
               default_value: auto
               required: false
+              group: Parser
               detailed_description: |
                 Weblog supports 5 different log parsers:
 
@@ -141,7 +152,7 @@ modules:
                 | json        | [JSON](https://www.json.org/json-en.html) |
                 | ltsv        | [LTSV](http://ltsv.org/)                  |
                 | regexp      | Regular expression with named groups      |
-                
+
                 Syntax:
 
                 ```yaml
@@ -149,11 +160,11 @@ modules:
                 ```
 
                 If `log_type` parameter set to `auto` (which is default), weblog will try to auto-detect appropriate log parser and log format using the last line of the log file.
-                
+
                 - checks if format is `CSV` (using regexp).
                 - checks if format is `JSON` (using regexp).
                 - assumes format is `CSV` and tries to find appropriate `CSV` log format using predefined list of formats. It tries to parse the line using each of them in the following order (the first one matches is used later):
-                
+
                   ```sh
                   $host:$server_port $remote_addr - - [$time_local] "$request" $status $body_bytes_sent - - $request_length $request_time $upstream_response_time
                   $host:$server_port $remote_addr - - [$time_local] "$request" $status $body_bytes_sent - - $request_length $request_time
@@ -166,37 +177,43 @@ modules:
                   $remote_addr - - [$time_local] "$request" $status $body_bytes_sent     $request_length $request_time
                   $remote_addr - - [$time_local] "$request" $status $body_bytes_sent
                   ```
-                
+
                   If you're using the default Apache/NGINX log format, auto-detect will work for you. If it doesn't work you need to set the format manually.
             - name: csv_config
               description: CSV log parser config.
               default_value: ""
               required: false
+              group: Parser
             - name: csv_config.delimiter
               description: CSV field delimiter.
               default_value: ","
               required: false
+              group: Parser
             - name: csv_config.format
               description: CSV log format.
               default_value: ""
               required: false
-              detailed_description: ""
+              group: Parser
             - name: ltsv_config
               description: LTSV log parser config.
               default_value: ""
               required: false
+              group: Parser
             - name: ltsv_config.field_delimiter
               description: LTSV field delimiter.
               default_value: "\\t"
               required: false
+              group: Parser
             - name: ltsv_config.value_delimiter
               description: LTSV value delimiter.
               default_value: ":"
               required: false
+              group: Parser
             - name: ltsv_config.mapping
               description: LTSV fields mapping to **known fields**.
               default_value: ""
               required: true
+              group: Parser
               detailed_description: |
                 The mapping is a dictionary where the key is a field, as in logs, and the value is the corresponding **known field**.
 
@@ -213,10 +230,12 @@ modules:
               description: JSON log parser config.
               default_value: ""
               required: false
+              group: Parser
             - name: json_config.mapping
               description: JSON fields mapping to **known fields**.
               default_value: ""
               required: true
+              group: Parser
               detailed_description: |
                 The mapping is a dictionary where the key is a field, as in logs, and the value is the corresponding **known field**.
 
@@ -233,10 +252,12 @@ modules:
               description: RegExp log parser config.
               default_value: ""
               required: false
+              group: Parser
             - name: regexp_config.pattern
               description: RegExp pattern with named groups.
               default_value: ""
               required: true
+              group: Parser
               detailed_description: |
                 Use pattern with subexpressions names. These names should be **known fields**.
                 
