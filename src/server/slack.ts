@@ -630,7 +630,7 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
 
     if (!text) {
       const eventInfo = `user=${event.user ?? 'none'} channel=${channel} subtype=${event.subtype ?? 'none'} bot_id=${event.bot_id ?? 'none'}`;
-      vlog(`[REJECT] empty text after processing (kind=${kind} ${eventInfo} raw="${textRaw.substring(0, 50)}")`);
+      vlog(`[IGNORED] empty text after processing (kind=${kind} ${eventInfo} raw="${textRaw.substring(0, 50)}")`);
       return;
     }
 
@@ -646,7 +646,7 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
 
     const resolved = options.resolveRoute ? await options.resolveRoute({ kind: routeKind, channelId: channel, channelName: chName }) : undefined;
     if (routeKind === ROUTE_KIND_CHANNEL_POSTS && options.resolveRoute && !resolved) {
-      vlog(`[REJECT] no routing match (channel=${chName ?? channel} kind=${kind})`);
+      vlog(`[IGNORED] no routing match (channel=${chName ?? channel} kind=${kind})`);
       return;
     }
 
@@ -775,7 +775,7 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
     if (!event.text || !event.user || event.bot_id) {
       if (verbose && (!event.text || !event.user)) {
         const reason = !event.text ? 'no text' : (!event.user ? 'no user' : 'bot message');
-        vlog(`[REJECT] DM rejected: ${reason} (channel=${event?.channel ?? 'unknown'} user=${event?.user ?? 'none'} bot_id=${event?.bot_id ?? 'none'})`);
+        vlog(`[IGNORED] DM: ${reason} (channel=${event?.channel ?? 'unknown'} user=${event?.user ?? 'none'} bot_id=${event?.bot_id ?? 'none'})`);
       }
       return;
     }
@@ -787,7 +787,7 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
     const { event, context } = args;
     const ct = event?.channel_type;
     if (ct !== 'channel' && ct !== 'group') {
-      if (verbose) vlog(`[REJECT] channel_type="${ct ?? 'unknown'}" not channel/group`);
+      if (verbose) vlog(`[IGNORED] channel_type="${ct ?? 'unknown'}" not channel/group (channel=${event?.channel ?? 'unknown'})`);
       return;
     }
     // Allow bot/app messages (Freshdesk, HubSpot) which arrive as subtype 'bot_message'.
@@ -796,23 +796,23 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
     if (subtype && subtype !== 'bot_message' && subtype !== 'thread_broadcast') {
       // Don't log message_changed events - they're just our own progress updates
       if (verbose && subtype !== 'message_changed' && subtype !== 'message_deleted') {
-        vlog(`[REJECT] subtype="${subtype}" not bot_message/thread_broadcast`);
+        vlog(`[IGNORED] subtype="${subtype}" not bot_message/thread_broadcast (channel=${event?.channel ?? 'unknown'})`);
       }
       return;
     }
     if (typeof event?.text !== 'string' || event.text.length === 0) {
       const eventInfo = `channel=${event?.channel ?? 'unknown'} user=${event?.user ?? 'none'} bot_id=${event?.bot_id ?? 'none'} subtype="${subtype ?? 'none'}"`;
-      if (verbose) vlog(`[REJECT] empty text (${eventInfo})`);
+      if (verbose) vlog(`[IGNORED] empty text (${eventInfo})`);
       return;
     }
     // Only auto-engage on root messages, not thread replies
     if (event?.thread_ts) {
-      vlog(`[REJECT] thread reply (thread_ts="${event.thread_ts}") - auto-engage only on root messages`);
+      vlog(`[IGNORED] thread reply (channel=${event?.channel ?? 'unknown'} thread_ts="${event.thread_ts}") - auto-engage only on root messages`);
       return;
     }
     // Don't auto-engage if the bot is mentioned (mentions are handled separately)
     if (context?.botUserId && containsBotMention(event.text, String(context.botUserId))) {
-      vlog(`[REJECT] bot mentioned - handled by mention event`);
+      vlog(`[IGNORED] bot mentioned (channel=${event?.channel ?? 'unknown'}) - handled by mention event`);
       return;
     }
     await handleEvent(KIND_CHANNEL_POST, args);

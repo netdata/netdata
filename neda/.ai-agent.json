@@ -428,6 +428,7 @@
       },
       "rules": [
         {
+          "enabled": false,
           "channels": ["#support"],
           "agent": "neda.ai",
           "engage": ["channel-posts"],
@@ -436,11 +437,67 @@
           }
         },
         {
+          "enabled": true,
           "channels": ["#contact-us"],
           "agent": "neda.ai",
           "engage": ["channel-posts"],
           "promptTemplates": {
             "channelPost": "Neda, they have just posted this contact form:\n\nChannel: {channel.name} ({channel.id})\nUser: {user.label} ({user.id})\nTime: {ts}\nMessage: {text}\nURL: {message.url}\n\nResearch the company profile, their technology stack, and calculate IPC and estimate ARR. Check our contact (research its profile). Give us a hint on how they found us (focus on pre and post form submission events on posthog). Check hubspot and fireflies for past engagements and encharge to find if they were in our mailing lists before this form submission (they may have been added now)."
+          }
+        },
+        {
+          "enabled": false,
+          "channels": ["#engineering"],
+          "agent": "neda.ai",
+          "engage": ["mentions"],
+          "promptTemplates": {
+            "mention": "Neda, technical question from engineering:\n\nChannel: {channel.name} ({channel.id})\nUser: {user.label} ({user.id})\nTime: {ts}\nMessage: {text}\nURL: {message.url}\n\nProvide technical assistance. Focus on code analysis, debugging, and architectural guidance."
+          }
+        },
+        {
+          "enabled": false,
+          "channels": ["#sales"],
+          "agent": "neda.ai",
+          "engage": ["mentions", "channel-posts"],
+          "promptTemplates": {
+            "channelPost": "Neda, sales team update:\n\nChannel: {channel.name} ({channel.id})\nUser: {user.label} ({user.id})\nTime: {ts}\nMessage: {text}\nURL: {message.url}\n\nAnalyze this sales opportunity. Research the company, calculate ICP fit, check HubSpot for engagement history, and provide strategic recommendations.",
+            "mention": "Neda, sales question:\n\nChannel: {channel.name} ({channel.id})\nUser: {user.label} ({user.id})\nTime: {ts}\nMessage: {text}\nURL: {message.url}\n\nAssist with this sales query."
+          }
+        },
+        {
+          "enabled": false,
+          "channels": ["#general"],
+          "agent": "neda.ai",
+          "engage": ["mentions"],
+          "promptTemplates": {
+            "mention": "Neda, request from general channel:\n\nChannel: {channel.name} ({channel.id})\nUser: {user.label} ({user.id})\nTime: {ts}\nMessage: {text}\nURL: {message.url}\n\nRespond helpfully to this request."
+          }
+        },
+        {
+          "enabled": false,
+          "channels": ["#product"],
+          "agent": "neda.ai",
+          "engage": ["mentions"],
+          "promptTemplates": {
+            "mention": "Neda, product team query:\n\nChannel: {channel.name} ({channel.id})\nUser: {user.label} ({user.id})\nTime: {ts}\nMessage: {text}\nURL: {message.url}\n\nProvide product insights, user feedback analysis, or feature recommendations as requested."
+          }
+        },
+        {
+          "enabled": false,
+          "channels": ["#marketing"],
+          "agent": "neda.ai",
+          "engage": ["mentions"],
+          "promptTemplates": {
+            "mention": "Neda, marketing team request:\n\nChannel: {channel.name} ({channel.id})\nUser: {user.label} ({user.id})\nTime: {ts}\nMessage: {text}\nURL: {message.url}\n\nAssist with marketing analysis, content suggestions, or campaign insights."
+          }
+        },
+        {
+          "enabled": false,
+          "channels": ["#customer-success"],
+          "agent": "neda.ai",
+          "engage": ["channel-posts"],
+          "promptTemplates": {
+            "channelPost": "Neda, customer success update:\n\nChannel: {channel.name} ({channel.id})\nUser: {user.label} ({user.id})\nTime: {ts}\nMessage: {text}\nURL: {message.url}\n\nAnalyze this customer situation. Check their usage in PostHog, infrastructure in BigQuery, and provide recommendations for retention and expansion."
           }
         }
       ]

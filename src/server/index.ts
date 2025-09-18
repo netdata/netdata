@@ -102,6 +102,8 @@ export async function startServer(agentPath: string, options?: { enableSlack?: b
     // rules
     const rules = Array.isArray(r.rules) ? r.rules as Record<string, unknown>[] : [];
     rules.forEach((ru) => {
+      // Skip disabled rules (default to enabled if not specified)
+      if (ru.enabled === false) return;
       const { namePats, idPats } = parseChannels(ru.channels);
       const engage = toEngage(ru.engage);
       const ruAgent = (typeof ru.agent === 'string' && ru.agent.length > 0) ? ru.agent : agentPath;
@@ -237,11 +239,13 @@ export async function startServer(agentPath: string, options?: { enableSlack?: b
         });
       }
       if (compiled.rules.length > 0) {
-        lines.push('  rules:');
+        lines.push('  rules (enabled only):');
         compiled.rules.forEach((ru, i) => {
           const abs = resolveAgentPath(ru.agentPath);
           lines.push(`    [${String(i)}] agent=${abs} engage=[${fmtSet(ru.engage)}] namePats=${fmtRes(ru.channelNamePatterns)} idPats=${fmtRes(ru.channelIdPatterns)}`);
         });
+      } else {
+        lines.push('  rules: (none enabled)');
       }
       lines.push('');
       try { process.stderr.write(`${lines.join('\n')}\n`); } catch (e) { warn(`server write failed: ${e instanceof Error ? e.message : String(e)}`); }
