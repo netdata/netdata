@@ -173,7 +173,7 @@ modules:
               dimensions:
                 - name: a dimension per cpu core
         - name: cpu core
-          description: ""
+          description: Collects per-core CPU metrics. Disabled by default, can be enabled in the [configuration options](#configuration).
           labels:
             - name: cpu
               description: Identifier of the CPU core (e.g., core0, core1, core2).
