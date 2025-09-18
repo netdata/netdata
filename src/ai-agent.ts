@@ -1303,8 +1303,8 @@ export class AIAgentSession {
                 }
               }
 
-              // Check if incomplete final_report was detected and adjust maxTurns
-              if ((turnResult as { incompleteFinalReportDetected?: boolean }).incompleteFinalReportDetected === true && currentTurn < maxTurns) {
+              const retryFlags = turnResult as { incompleteFinalReportDetected?: boolean; finalReportAttempted?: boolean };
+              if ((retryFlags.incompleteFinalReportDetected === true || retryFlags.finalReportAttempted === true) && currentTurn < maxTurns) {
                 const previousMaxTurns = maxTurns;
                 maxTurns = currentTurn + 1;
                 const adjustLog: LogEntry = {
@@ -1316,7 +1316,7 @@ export class AIAgentSession {
                   type: 'llm',
                   remoteIdentifier: 'agent:orchestrator',
                   fatal: false,
-                  message: `Incomplete final_report detected at turn ${String(currentTurn)}, adjusting max_turns from ${String(previousMaxTurns)} to ${String(maxTurns)}`
+                  message: `Final report retry detected at turn ${String(currentTurn)}, adjusting max_turns from ${String(previousMaxTurns)} to ${String(maxTurns)}`
                 };
                 this.log(adjustLog);
               }
@@ -1679,7 +1679,7 @@ export class AIAgentSession {
         try { this.sessionConfig.callbacks?.onAccounting?.(accountingEntry); } catch (e) { warn(`tool accounting callback failed: ${e instanceof Error ? e.message : String(e)}`); }
 
         // Check if this is an incomplete final_report error
-        if (toolName === 'agent__final_report' && errorMsg.includes('requires non-empty report_content')) {
+        if (toolName === 'agent__final_report') {
           incompleteFinalReportDetected = true;
         }
 

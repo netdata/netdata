@@ -491,8 +491,33 @@ export class InternalToolProvider extends ToolProvider {
           let finalMsgs: Record<string, unknown>[] = repairedMessages;
           if (!ok) { ok = validate(normalizedMessages); finalMsgs = normalizedMessages; }
           if (!ok) {
-            const errs = (validate.errors ?? []).map((e) => `${e.instancePath} ${e.message ?? ''}`.trim()).join('; ');
-            throw new Error(`slack_invalid_blocks: ${errs}`);
+            const errsArr = validate.errors ?? [];
+            const errs = errsArr.map((e) => `${e.instancePath} ${e.message ?? ''}`.trim()).join('; ');
+            const samples = errsArr
+              .map((e) => {
+                const path = typeof e.instancePath === 'string' ? e.instancePath : '';
+                const match = /^\/(\d+)\/blocks\/(\d+)/.exec(path);
+                if (match === null) return undefined;
+                const msgIdx = Number.parseInt(match[1], 10);
+                const blockIdx = Number.parseInt(match[2], 10);
+                if (!Number.isFinite(msgIdx) || !Number.isFinite(blockIdx)) return undefined;
+                const msg = Array.isArray(finalMsgs) && msgIdx >= 0 && msgIdx < finalMsgs.length ? finalMsgs[msgIdx] : undefined;
+                if (msg === undefined) return undefined;
+                const msgRecord = msg;
+                const blocksValueUnknown = Object.prototype.hasOwnProperty.call(msgRecord, 'blocks') ? msgRecord.blocks : undefined;
+                if (!Array.isArray(blocksValueUnknown) || blockIdx < 0 || blockIdx >= blocksValueUnknown.length) return undefined;
+                const blocksValue = blocksValueUnknown as unknown[];
+                const block = blocksValue[blockIdx];
+                try {
+                  const json = JSON.stringify(block);
+                  return `${path}=${json.slice(0, 300)}`;
+                } catch {
+                  return `${path}=[unserializable block]`;
+                }
+              })
+              .filter((v): v is string => typeof v === 'string' && v.length > 0);
+            const sampleStr = samples.length > 0 ? ` samples: ${samples.join(' | ')}` : '';
+            throw new Error(`slack_invalid_blocks: ${errs}${sampleStr}`);
           }
           normalizedMessages.splice(0, normalizedMessages.length, ...finalMsgs);
         } catch (e) {
