@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- chore\(go.d\): skip HOST for vnodes during Cleanup with stale label [\#20996](https://github.com/netdata/netdata/pull/20996) ([ilyam8](https://github.com/ilyam8))
+- fix\(go.d\): skip writing HOST line for vnodes with no collected metrics [\#20995](https://github.com/netdata/netdata/pull/20995) ([ilyam8](https://github.com/ilyam8))
+- fix\(macos.plugin\): drop SyncookiesFailed metric on macOS 16+ [\#20994](https://github.com/netdata/netdata/pull/20994) ([ilyam8](https://github.com/ilyam8))
+- ci: rm macos 13, add macos 26 [\#20993](https://github.com/netdata/netdata/pull/20993) ([ilyam8](https://github.com/ilyam8))
+- Document accuracy implications of sampling algorithm [\#20991](https://github.com/netdata/netdata/pull/20991) ([ktsaou](https://github.com/ktsaou))
+- Update welcome-to-netdata.md [\#20986](https://github.com/netdata/netdata/pull/20986) ([kanelatechnical](https://github.com/kanelatechnical))
 - Regenerate integrations docs [\#20982](https://github.com/netdata/netdata/pull/20982) ([netdatabot](https://github.com/netdatabot))
 - chore: add `-c` option to gen docs for a single collector [\#20981](https://github.com/netdata/netdata/pull/20981) ([ilyam8](https://github.com/ilyam8))
 - docs: improve config options table with grouped section headers [\#20980](https://github.com/netdata/netdata/pull/20980) ([ilyam8](https://github.com/ilyam8))
@@ -29,6 +35,7 @@
 - Ensure memory ordering when updating partition list and the bitmap [\#20956](https://github.com/netdata/netdata/pull/20956) ([stelfrag](https://github.com/stelfrag))
 - Fix FreeBSD \(Part II\) [\#20955](https://github.com/netdata/netdata/pull/20955) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix\(health/rocketchat\): add missing "Content-Type: application/json" header [\#20954](https://github.com/netdata/netdata/pull/20954) ([ilyam8](https://github.com/ilyam8))
+- Enhance README with publishing instructions for docs [\#20952](https://github.com/netdata/netdata/pull/20952) ([Ancairon](https://github.com/Ancairon))
 - move whole category and fix leftovers [\#20951](https://github.com/netdata/netdata/pull/20951) ([Ancairon](https://github.com/Ancairon))
 - build\(deps\): bump github.com/jackc/pgx/v5 from 5.7.5 to 5.7.6 in /src/go [\#20950](https://github.com/netdata/netdata/pull/20950) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump golang.org/x/net from 0.43.0 to 0.44.0 in /src/go [\#20949](https://github.com/netdata/netdata/pull/20949) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -441,15 +448,6 @@
 - Regenerate integrations docs [\#20453](https://github.com/netdata/netdata/pull/20453) ([netdatabot](https://github.com/netdatabot))
 - MCP Part 4 [\#20452](https://github.com/netdata/netdata/pull/20452) ([ktsaou](https://github.com/ktsaou))
 - docs: improve SCIM documentation [\#20451](https://github.com/netdata/netdata/pull/20451) ([juacker](https://github.com/juacker))
-- build\(deps\): bump github.com/gosnmp/gosnmp from 1.40.0 to 1.41.0 in /src/go [\#20449](https://github.com/netdata/netdata/pull/20449) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump go.mongodb.org/mongo-driver from 1.17.3 to 1.17.4 in /src/go [\#20447](https://github.com/netdata/netdata/pull/20447) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/lmittmann/tint from 1.1.1 to 1.1.2 in /src/go [\#20446](https://github.com/netdata/netdata/pull/20446) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/redis/go-redis/v9 from 9.9.0 to 9.10.0 in /src/go [\#20445](https://github.com/netdata/netdata/pull/20445) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump golang.org/x/net from 0.40.0 to 0.41.0 in /src/go [\#20444](https://github.com/netdata/netdata/pull/20444) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Weblog collector: Exclude 429 from 4xx [\#20443](https://github.com/netdata/netdata/pull/20443) ([Slind14](https://github.com/Slind14))
-- chore\(go.d/ddsnmp\): add basic SNMP table walking functionality [\#20441](https://github.com/netdata/netdata/pull/20441) ([ilyam8](https://github.com/ilyam8))
-- nd-mcp add claude cli cmd for adding netdata mcp [\#20440](https://github.com/netdata/netdata/pull/20440) ([andrewm4894](https://github.com/andrewm4894))
-- improvement\(go.d/ddsnmp\): use dev type and vendor from meta for family [\#20439](https://github.com/netdata/netdata/pull/20439) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
