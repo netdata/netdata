@@ -100,7 +100,7 @@ modules:
               required: false
               group: Collection
             - name: timeout
-              description: `smartctl` binary execution timeout (seconds).
+              description: "`smartctl` binary execution timeout (seconds)."
               default_value: 5
               required: false
               group: Collection
