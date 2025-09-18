@@ -98,7 +98,7 @@ Metrics:
 
 ### Per cpu core
 
-Collects per-core CPU metrics. Disabled by default, can be enabled in the [configuration options](#configuration).
+Per-core CPU metrics. Disabled by default, can be enabled in the [configuration options](#configuration).
 
 Labels:
 

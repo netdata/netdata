@@ -115,13 +115,13 @@ The following options can be defined globally: update_every, autodetection_retry
 
 
 
-| Option | Description | Default | Required |
-|:-----|:------------|:--------|:---------:|
-| update_every | Data collection frequency. | 1 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| address | The IP address and port where the Tor's Control Port listens for connections. | 127.0.0.1:9051 | yes |
-| timeout | Connection, read, and write timeout duration in seconds. The timeout includes name resolution. | 1 | no |
-| password | Password for authentication. |  | no |
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Collection** | update_every | Data collection frequency. | 1 | no |
+|  | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
+| **Target** | address | The IP address and port where the Tor Control Port listens for connections. | 127.0.0.1:9051 | yes |
+|  | timeout | Connection, read, and write timeout duration in seconds. The timeout includes name resolution. | 1 | no |
+| **Auth** | password | Password for authentication. |  | no |
 
 
 </details>

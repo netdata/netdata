@@ -113,30 +113,33 @@ The following options can be defined globally: update_every, autodetection_retry
 
 
 
-| Option | Description | Default | Required |
-|:-----|:------------|:--------|:---------:|
-| update_every | Data collection frequency. | 10 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| url | Server URL. |  | yes |
-| selector | Time series selector (filter). |  | no |
-| fallback_type | Time series selector (filter). |  | no |
-| max_time_series | Global time series limit. If an endpoint returns number of time series > limit the data is not processed. | 2000 | no |
-| max_time_series_per_metric | Time series per metric (metric name) limit. Metrics with number of time series > limit are skipped. | 200 | no |
-| label_prefix | An optional prefix that will be added to all labels of all charts. If set, the label names will be automatically formatted as `prefix_name` (the prefix followed by an underscore and the original name). |  | no |
-| timeout | HTTP request timeout. | 10 | no |
-| username | Username for basic HTTP authentication. |  | no |
-| password | Password for basic HTTP authentication. |  | no |
-| proxy_url | Proxy URL. |  | no |
-| proxy_username | Username for proxy basic HTTP authentication. |  | no |
-| proxy_password | Password for proxy basic HTTP authentication. |  | no |
-| method | HTTP request method. | GET | no |
-| body | HTTP request body. |  | no |
-| headers | HTTP request headers. |  | no |
-| not_follow_redirects | Redirect handling policy. Controls whether the client follows redirects. | no | no |
-| tls_skip_verify | Server certificate chain and hostname validation policy. Controls whether the client performs this check. | no | no |
-| tls_ca | Certification authority that the client uses when verifying the server's certificates. |  | no |
-| tls_cert | Client TLS certificate. |  | no |
-| tls_key | Client TLS key. |  | no |
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Collection** | update_every | Data collection interval (seconds). | 10 | no |
+|  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
+| **Target** | url | Target endpoint URL. |  | yes |
+|  | timeout | HTTP request timeout (seconds). | 10 | no |
+| **Filters** | selector | Time series selector (filter). |  | no |
+| **Limits** | max_time_series | Global time series limit. If an endpoint returns more time series than this, the data is not processed. | 2000 | no |
+|  | max_time_series_per_metric | Per-metric time series limit. Metrics with more time series than this are skipped. | 200 | no |
+| **Customization** | fallback_type | Fallback type rules for untyped metrics. |  | no |
+|  | label_prefix | Optional prefix added to all labels of all charts. Labels will be formatted as `prefix_name`. |  | no |
+| **HTTP Auth** | username | Username for Basic HTTP authentication. |  | no |
+|  | password | Password for Basic HTTP authentication. |  | no |
+|  | bearer_token_file | Path to a file containing a bearer token (used for `Authorization: Bearer`). |  | no |
+| **TLS** | tls_skip_verify | Skip TLS certificate and hostname verification (insecure). | no | no |
+|  | tls_ca | Path to CA bundle used to validate the server certificate. |  | no |
+|  | tls_cert | Path to client TLS certificate (for mTLS). |  | no |
+|  | tls_key | Path to client TLS private key (for mTLS). |  | no |
+| **Proxy** | proxy_url | HTTP proxy URL. |  | no |
+|  | proxy_username | Username for proxy Basic HTTP authentication. |  | no |
+|  | proxy_password | Password for proxy Basic HTTP authentication. |  | no |
+| **Request** | method | HTTP method to use. | GET | no |
+|  | body | Request body (e.g., for POST/PUT). |  | no |
+|  | headers | Additional HTTP headers (one per line as key: value). |  | no |
+|  | not_follow_redirects | Do not follow HTTP redirects. | no | no |
+|  | force_http2 | Force HTTP/2 (including h2c over TCP). | no | no |
+| **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
 ##### selector
 

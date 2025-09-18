@@ -171,9 +171,9 @@ The following options can be defined globally: update_every, autodetection_retry
 
 | Group | Option | Description | Default | Required |
 |:------|:-----|:------------|:--------|:---------:|
-| **Base** | update_every | Data collection frequency. | 10 | no |
+| **Collection** | update_every | Data collection frequency. | 10 | no |
 |  | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-|  | hostname | Target host (IP or DNS name, IPv4/IPv6). |  | yes |
+| **Target** | hostname | Target host (IP or DNS name, IPv4/IPv6). |  | yes |
 | **SNMPv1/2** | community | SNMPv1/2 community string. | public | no |
 | **SNMPv3** | user.name | SNMPv3 user name. |  | no |
 |  | user.level | Security level of SNMPv3 messages. |  | no |
