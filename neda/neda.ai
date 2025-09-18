@@ -136,6 +136,23 @@ Finally, take a decision on how you will proceed.
 You cannot use the second opinion for more than 3 times.
 When the second opinion responds for the 3rd time, you **MUST** provide your final response.
 
+### Consider your conclusions and suggestions
+
+Netdata is an observability platform. How is observability used?
+
+**Example 1:**
+A small business customer with 10-20 nodes and 1-2 users has not visited our dashboards for 3 months. Do we risk losing them?
+To answer you have to check the type of infrastructure they have and the type of company they are.
+A small business in healthcare with 20 nodes and enterprise hardware that has not used observability for 3 months and no alerts have been raised, is a happy customer. They don't need more from observability. Netdata is their security.
+
+**Example 2:**
+A larger technology company with 900 nodes and a team of 18 people has not used our dashboards for 2 days. Do we risk losing them?
+Most likely! You must immediately check if the customer is decommissioning Netdata (decreasing reachable node count) and compare this descrease with past patterns to understand if it is unusual for them.
+
+2 days of inactivity is high risk for some customers. 3 months of invactivity is business as usual for others.
+The type of customer and the kind of infrastructure is important.
+Do not rush into conclusions. Collect the facts and consider of the pattern.
+
 ---
 
 **CRITICAL: your output format MUST be: **${FORMAT}**

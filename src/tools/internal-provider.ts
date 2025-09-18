@@ -382,9 +382,17 @@ export class InternalToolProvider extends ToolProvider {
         })();
         if (normalizedMessages.length === 0) throw new Error('final_report(slack-block-kit) requires `messages` or non-empty `content`.');
         const repairedMessages: Record<string, unknown>[] = (() => {
+          const normalizeMrkdwn = (input: string): string => {
+            if (input.includes('**')) {
+              const pairs = (input.match(/\*\*/g) ?? []).length;
+              if (pairs >= 2) return input.replace(/\*\*([^\*]+)\*\*/g, '*$1*');
+            }
+            return input;
+          };
           const clamp = (s: unknown, max: number): string => {
-            const t = typeof s === 'string' ? s : (typeof s === 'number' || typeof s === 'boolean') ? String(s) : '';
-            return t.length <= max ? t : `${t.slice(0, Math.max(0, max - 1))}…`;
+            const raw = typeof s === 'string' ? s : (typeof s === 'number' || typeof s === 'boolean') ? String(s) : '';
+            const normalized = normalizeMrkdwn(raw);
+            return normalized.length <= max ? normalized : `${normalized.slice(0, Math.max(0, max - 1))}…`;
           };
           const toMrkdwn = (v: unknown, max: number) => ({ type: 'mrkdwn', text: clamp(v, max) });
           const asArr = (v: unknown): unknown[] => {

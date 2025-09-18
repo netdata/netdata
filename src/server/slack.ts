@@ -144,6 +144,20 @@ const extractTextFromBlocks = (blocks: unknown): string => {
   return parts.join('\n').trim();
 };
 
+const extractTextFromAttachments = (attachments: unknown): string => {
+  if (!Array.isArray(attachments)) return '';
+  const pick = (value: unknown): string => (typeof value === 'string' ? value : '');
+  const parts: string[] = [];
+  for (const att of attachments) {
+    if (!att || typeof att !== 'object') continue;
+    const a = att as Record<string, unknown>;
+    const entries = [pick(a.text), pick(a.fallback), pick(a.pretext), pick(a.title)];
+    const chunk = entries.map((t) => t.trim()).filter((t) => t.length > 0).join(' • ');
+    if (chunk.length > 0) parts.push(chunk);
+  }
+  return parts.join('\n').trim();
+};
+
 // Removed workaround that split long mrkdwn into blocks; the model must output Block Kit
 
 async function fetchContext(client: SlackClient, event: any, limit: number, charsCap: number, _verbose?: boolean): Promise<string> {
@@ -703,7 +717,9 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
     const channel = event.channel;
     const originalText = typeof event.text === 'string' ? event.text : '';
     const blocksText = extractTextFromBlocks(event.blocks);
-    const baseText = originalText.trim().length > 0 ? originalText : blocksText;
+    const attachmentText = extractTextFromAttachments(event.attachments);
+    const baseTextCandidates = [originalText, blocksText, attachmentText].map((t) => (typeof t === 'string' ? t.trim() : '')).filter((t) => t.length > 0);
+    const baseText = baseTextCandidates.length > 0 ? baseTextCandidates[0] : '';
     const text = (kind === 'mention' && context?.botUserId) ? stripBotMention(baseText, String(context.botUserId)) : baseText;
 
     if (!text) {
@@ -865,7 +881,9 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
     if (!event?.channel_type || event.channel_type !== 'im') return;
     const rawText = typeof event.text === 'string' ? event.text : '';
     const blockText = extractTextFromBlocks(event.blocks);
-    const effectiveText = rawText.trim().length > 0 ? rawText : blockText;
+    const attachmentText = extractTextFromAttachments(event.attachments);
+    const effectiveTextCandidates = [rawText, blockText, attachmentText].map((t) => (typeof t === 'string' ? t.trim() : '')).filter((t) => t.length > 0);
+    const effectiveText = effectiveTextCandidates.length > 0 ? effectiveTextCandidates[0] : '';
     if (!effectiveText || !event.user || event.bot_id) {
       if (verbose && (!effectiveText || !event.user)) {
         const reason = !effectiveText ? 'no text' : (!event.user ? 'no user' : 'bot message');
@@ -904,7 +922,9 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
     }
     const rawText = typeof event?.text === 'string' ? event.text : '';
     const blockText = extractTextFromBlocks(event?.blocks);
-    const effectiveText = rawText.length > 0 ? rawText : blockText;
+    const attachmentText = extractTextFromAttachments(event?.attachments);
+    const effectiveTextCandidates = [rawText, blockText, attachmentText].map((t) => (typeof t === 'string' ? t.trim() : '')).filter((t) => t.length > 0);
+    const effectiveText = effectiveTextCandidates.length > 0 ? effectiveTextCandidates[0] : '';
     if (effectiveText.length === 0) {
       const eventInfo = `channel=${channelDisplay} user=${event?.user ?? 'none'} bot_id=${event?.bot_id ?? 'none'} subtype="${subtype ?? 'none'}"`;
       if (verbose) vlog(`[IGNORED] empty text (${eventInfo})`);
@@ -944,12 +964,54 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
     try {
       const userId: string | undefined = body?.user?.id;
       const channelId: string | undefined = body?.channel?.id ?? body?.message?.channel ?? body?.channel_id;
-      const msg = (body?.message ?? {}) as { ts?: string; thread_ts?: string; text?: string; blocks?: unknown };
-      if (!channelId || !userId || !msg?.ts) return;
+      const msg = (body?.message ?? {}) as { ts?: string; thread_ts?: string; text?: string; blocks?: unknown; attachments?: unknown };
+      const bodyBlocks = body?.message?.blocks ?? body?.message_blocks ?? body?.blocks ?? body?.item?.message?.blocks;
+      const bodyAttachments = body?.message?.attachments ?? body?.attachments ?? body?.item?.message?.attachments;
+      if (!channelId || !userId || !msg?.ts) {
+        if (options.verbose) {
+          const why = [
+            !channelId ? 'channelId' : undefined,
+            !userId ? 'userId' : undefined,
+            !msg?.ts ? 'ts' : undefined
+          ].filter(Boolean).join(', ');
+          vlog(`ask_neda shortcut ignored: missing ${why || 'unknown data'}`);
+        }
+        return;
+      }
       const originalText = typeof msg.text === 'string' ? msg.text : '';
-      const blocksText = extractTextFromBlocks(msg.blocks);
-      const text = originalText.trim().length > 0 ? originalText : blocksText;
-      if (text.length === 0) return;
+      const blocksText = (() => {
+        if (msg.blocks) return extractTextFromBlocks(msg.blocks);
+        if (bodyBlocks) return extractTextFromBlocks(bodyBlocks);
+        try {
+          const raw = JSON.stringify(body);
+          const parsed = JSON.parse(raw) as { message?: { blocks?: unknown } };
+          return extractTextFromBlocks(parsed?.message?.blocks);
+        } catch {
+          return '';
+        }
+      })();
+      const attachmentText = msg.attachments ? extractTextFromAttachments(msg.attachments) : extractTextFromAttachments(bodyAttachments);
+      const textCandidates = [originalText, blocksText, attachmentText]
+        .map((t) => (typeof t === 'string' ? t.trim() : ''))
+        .filter((t) => t.length > 0);
+      const text = textCandidates.length > 0 ? textCandidates[0] : '';
+      if (text.length === 0) {
+        if (options.verbose) {
+          const bodyPreview = (() => {
+            try {
+              const raw = JSON.stringify(body);
+              return raw.length > 2000 ? `${raw.slice(0, 2000)}…` : raw;
+            } catch {
+              return '[unserializable body]';
+            }
+          })();
+          vlog(`ask_neda shortcut ignored: empty text (channel=${channelId} user=${userId}) body=${bodyPreview}`);
+        }
+        return;
+      }
+      if (options.verbose) {
+        vlog(`ask_neda shortcut invoked channel=${channelId} user=${userId}`);
+      }
       const chName = await getChannelName(client, channelId);
       const permalink = await getPermalink(client, channelId, msg.ts as string);
       const whoLabel = await getUserLabel(client, userId);
