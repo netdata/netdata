@@ -137,13 +137,13 @@ The following options can be defined globally: update_every, autodetection_retry
 
 
 
-| Option | Description | Default | Required |
-|:-----|:------------|:--------|:---------:|
-| update_every | Data collection frequency. | 1 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| leases_path | Path to dnsmasq DHCP leases file. | /var/lib/misc/dnsmasq.leases | no |
-| conf_path | Path to dnsmasq configuration file. | /etc/dnsmasq.conf | no |
-| conf_dir | Path to dnsmasq configuration directory. | /etc/dnsmasq.d,.dpkg-dist,.dpkg-old,.dpkg-new | no |
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Collection** | update_every | Data collection interval (seconds). | 1 | no |
+|  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
+| **Target** | leases_path | Path to dnsmasq DHCP leases file. | /var/lib/misc/dnsmasq.leases | no |
+|  | conf_path | Path to dnsmasq configuration file (used to extract configured DHCP pools). | /etc/dnsmasq.conf | no |
+|  | conf_dir | Path to dnsmasq configuration directory (used to extract configured DHCP pools). | /etc/dnsmasq.d,.dpkg-dist,.dpkg-old,.dpkg-new | no |
 
 
 </details>

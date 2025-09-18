@@ -132,19 +132,19 @@ The following options can be defined globally: update_every, autodetection_retry
 
 
 
-| Option | Description | Default | Required |
-|:-----|:------------|:--------|:---------:|
-| update_every | Data collection frequency. | 10 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| files | List of files to monitor. |  | yes |
-| dirs | List of directories to monitor. |  | yes |
-| discovery_every | Files and directories discovery interval. | 60 | no |
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Collection** | update_every | Data collection interval (seconds). | 10 | no |
+|  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
+| **Target** | files | File selector. Defines which files to monitor. |  | yes |
+|  | dirs | Directory selector. Defines which directories to monitor. |  | yes |
+| **Discovery** | discovery_every | Files and directories discovery interval (seconds). | 60 | no |
 
 ##### files
 
 Files matching the selector will be monitored.
 
-- Logic: (pattern1 OR pattern2) AND !(pattern3 or pattern4)
+- Logic: (pattern1 OR pattern2) AND !(pattern3 OR pattern4)
 - Pattern syntax: [shell file name pattern](https://golang.org/pkg/path/filepath/#Match)
 - Syntax:
 
@@ -163,7 +163,7 @@ files:
 
 Directories matching the selector will be monitored.
 
-- Logic: (pattern1 OR pattern2) AND !(pattern3 or pattern4)
+- Logic: (pattern1 OR pattern2) AND !(pattern3 OR pattern4)
 - Pattern syntax: [shell file name pattern](https://golang.org/pkg/path/filepath/#Match)
 - Syntax:
 

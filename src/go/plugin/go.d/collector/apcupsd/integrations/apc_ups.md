@@ -134,12 +134,13 @@ The following options can be defined globally: update_every, autodetection_retry
 
 
 
-| Option | Description | Default | Required |
-|:-----|:------------|:--------|:---------:|
-| update_every | Data collection frequency. | 1 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| address | Apcupsd daemon address in IP:PORT format. | 127.0.0.1:3551 | yes |
-| timeout | Connection/read/write timeout in seconds. The timeout includes name resolution, if required. | 2 | no |
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Collection** | update_every | Data collection interval (seconds). | 1 | no |
+|  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
+| **Target** | address | apcupsd daemon address (`IP:PORT`). | 127.0.0.1:3551 | yes |
+|  | timeout | Connection, read, write, and name resolution timeout (seconds). | 2 | no |
+| **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
 
 </details>

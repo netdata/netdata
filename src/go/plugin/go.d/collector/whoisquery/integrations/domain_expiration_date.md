@@ -114,14 +114,15 @@ The following options can be defined globally: update_every, autodetection_retry
 
 
 
-| Option | Description | Default | Required |
-|:-----|:------------|:--------|:---------:|
-| update_every | Data collection frequency. | 60 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| source | Domain address. |  | yes |
-| days_until_expiration_warning | Number of days before the alarm status is warning. | 30 | no |
-| days_until_expiration_critical | Number of days before the alarm status is critical. | 15 | no |
-| timeout | The query timeout in seconds. | 5 | no |
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Collection** | update_every | Data collection frequency. | 60 | no |
+|  | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
+| **Target** | source | Domain address. |  | yes |
+|  | timeout | The query timeout in seconds. | 5 | no |
+| **Customization** | days_until_expiration_warning | Number of days before the alarm status is warning. | 30 | no |
+|  | days_until_expiration_critical | Number of days before the alarm status is critical. | 15 | no |
+| **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
 
 </details>
