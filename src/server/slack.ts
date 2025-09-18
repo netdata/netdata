@@ -784,10 +784,15 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
 
   // Channel/group posts (non-mentions). Requires message.channels/message.groups in manifest.
   app.event('message', async (args: any) => {
-    const { event, context } = args;
+    const { event, context, client } = args;
     const ct = event?.channel_type;
+    const channelId = event?.channel ?? 'unknown';
+    // Resolve channel name for better logging
+    const chName = channelId !== 'unknown' ? await getChannelName(client, channelId) : undefined;
+    const channelDisplay = chName ? `#${chName}` : channelId;
+
     if (ct !== 'channel' && ct !== 'group') {
-      if (verbose) vlog(`[IGNORED] channel_type="${ct ?? 'unknown'}" not channel/group (channel=${event?.channel ?? 'unknown'})`);
+      if (verbose) vlog(`[IGNORED] channel_type="${ct ?? 'unknown'}" not channel/group (channel=${channelDisplay})`);
       return;
     }
     // Allow bot/app messages (Freshdesk, HubSpot) which arrive as subtype 'bot_message'.
@@ -796,23 +801,23 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
     if (subtype && subtype !== 'bot_message' && subtype !== 'thread_broadcast') {
       // Don't log message_changed events - they're just our own progress updates
       if (verbose && subtype !== 'message_changed' && subtype !== 'message_deleted') {
-        vlog(`[IGNORED] subtype="${subtype}" not bot_message/thread_broadcast (channel=${event?.channel ?? 'unknown'})`);
+        vlog(`[IGNORED] subtype="${subtype}" not bot_message/thread_broadcast (channel=${channelDisplay})`);
       }
       return;
     }
     if (typeof event?.text !== 'string' || event.text.length === 0) {
-      const eventInfo = `channel=${event?.channel ?? 'unknown'} user=${event?.user ?? 'none'} bot_id=${event?.bot_id ?? 'none'} subtype="${subtype ?? 'none'}"`;
+      const eventInfo = `channel=${channelDisplay} user=${event?.user ?? 'none'} bot_id=${event?.bot_id ?? 'none'} subtype="${subtype ?? 'none'}"`;
       if (verbose) vlog(`[IGNORED] empty text (${eventInfo})`);
       return;
     }
     // Only auto-engage on root messages, not thread replies
     if (event?.thread_ts) {
-      vlog(`[IGNORED] thread reply (channel=${event?.channel ?? 'unknown'} thread_ts="${event.thread_ts}") - auto-engage only on root messages`);
+      vlog(`[IGNORED] thread reply (channel=${channelDisplay} thread_ts="${event.thread_ts}") - auto-engage only on root messages`);
       return;
     }
     // Don't auto-engage if the bot is mentioned (mentions are handled separately)
     if (context?.botUserId && containsBotMention(event.text, String(context.botUserId))) {
-      vlog(`[IGNORED] bot mentioned (channel=${event?.channel ?? 'unknown'}) - handled by mention event`);
+      vlog(`[IGNORED] bot mentioned (channel=${channelDisplay}) - handled by mention event`);
       return;
     }
     await handleEvent(KIND_CHANNEL_POST, args);
